@@ -1,14 +1,8 @@
-<<<<<<< HEAD
-.env
-__pycache__/
-*.pyc
-.venv/
-data/
-equity.csv
-trades.csv
-reports/
-*.log
-=======
+# User requested ignores
+uv.lock
+.python-version
+*.code-workspace
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -216,4 +210,8 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
->>>>>>> 7aaf7be11372d1235ab61cd1a400c95755c52b34
+daily_data/
+live_data/
+equity.csv
+trades.csv
+reports/
