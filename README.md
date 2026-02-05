@@ -1,3 +1,5 @@
+[Korean Version (한국어 가이드)](README_KR.md)
+
 # Quants Agent - Event-Driven Quantitative Trading System
 
 An advanced, event-driven quantitative trading pipeline designed for robust backtesting and live trading on Binance. Built with a modular architecture to ensure consistency between simulation and real-world execution.
@@ -10,11 +12,11 @@ An advanced, event-driven quantitative trading pipeline designed for robust back
   - Simulates fill latencies and commissions.
 - **Live Trading**:
   - Integration with **Binance** via `ccxt`.
-  - Threaded execution for non-blocking real-time data feeding (`LiveBinanceDataHandler`).
-  - Secure configuration management via `.env`.
-- **Strategy Ready**:
-  - Sample `MovingAverageCrossStrategy` included using **TA-Lib**.
-  - Easy-to-extend `Strategy` base class.
+  - **Robust State Management**: Syncs positions with exchange on startup.
+  - **Partial Fills**: Handles liquidity constraints by queuing remaining order quantities.
+- **Optimization**:
+  - Built-in parameter tuning using **Optuna** (Bayesian Optimization) or Grid Search.
+  - Walk-Forward Analysis (Train/Validation/Test split).
 
 ## Project Structure
 
@@ -23,15 +25,11 @@ quants-agent/
 ├── quants_agent/           # Core Package
 │   ├── backtest.py         # Backtesting Engine
 │   ├── live_trader.py      # Live Trading Engine
-│   ├── events.py           # Event Definitions
-│   ├── data.py             # Data Handlers (HistoricCSV, LiveBinance)
-│   ├── execution.py        # Execution Handlers (Simulated, Binance)
-│   ├── portfolio.py        # Portfolio & Risk Management
-│   ├── strategy.py         # Base Strategy Class
-│   ├── confg.py            # Configuration Manager
-│   └── utils/              # Performance Metrics
+│   ├── ...
 ├── generate_data.py        # Synthetic Data Generator
-├── sample_strategy.py      # Backtest Entry Point
+├── run_backtest.py         # Backtest Entry Point
+├── optimize.py             # Strategy Optimizer (Optuna)
+├── run_live.py             # Live Trading Entry Point
 └── README.md
 ```
 
@@ -58,39 +56,32 @@ quants-agent/
 
 ## Usage
 
-### 1. Backtesting
-Generate synthetic data and run a simulation:
+### 1. Data Generation
+Generate synthetic data for testing (defaults to 1000 days):
 ```bash
-# Generate dummy data for BTCUSDT
 uv run generate_data.py
+```
 
-# Run the backtest
-uv run sample_strategy.py
+### 2. Backtesting
+Run the standard backtest simulation:
+```bash
+uv run run_backtest.py
 ```
 Results (Sharpe Ratio, Max Drawdown) will be printed to the console, and an `equity.csv` curve will be saved.
 
-### 2. Live Trading
-To run the live trader (make sure `.env` is set!):
-```python
-from quants_agent.live_trader import LiveTrader
-from quants_agent.live_data import LiveBinanceDataHandler
-from quants_agent.binance_execution import BinanceExecutionHandler
-from quants_agent.portfolio import Portfolio
-from sample_strategy import MovingAverageCrossStrategy # Or your custom strategy
-
-# Define symbols
-symbol_list = ['BTC/USDT', 'ETH/USDT']
-
-trader = LiveTrader(
-    symbol_list=symbol_list,
-    data_handler_cls=LiveBinanceDataHandler,
-    execution_handler_cls=BinanceExecutionHandler,
-    portfolio_cls=Portfolio,
-    strategy_cls=MovingAverageCrossStrategy
-)
-
-trader.run()
+### 3. Optimization
+Find the best parameters for your strategy using Optuna:
+```bash
+uv run optimize.py
 ```
+This will run Training, Validation, and Test phases, saving the best parameters to `best_optimized_parameters/`.
+
+### 4. Live Trading
+To run the live trader (requires `.env` with API keys):
+```bash
+uv run run_live.py
+```
+*Note: Ensure you have sufficient USDT in your account (or Testnet account).*
 
 ## Data Analysis
 Performance metrics include:
