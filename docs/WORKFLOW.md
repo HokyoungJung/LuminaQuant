@@ -60,3 +60,23 @@ git add .
 git commit -m "chore: publish"
 git push origin main
 ```
+
+## 4. Authentication Setup (Multiple Accounts)
+
+If you use different GitHub accounts for public (`HokyoungJung`) and private (`hoky1227`) repos, use **Personal Access Tokens (PAT)** in the remote URL to avoid conflicts.
+
+1.  Generate a **Classic PAT** (checking `repo` scope) for each account on GitHub.
+2.  Run the following commands in your terminal (replace `<YOUR_TOKEN>`):
+
+**Public Repo (origin):**
+```powershell
+git remote set-url origin https://HokyoungJung:<YOUR_TOKEN>@github.com/HokyoungJung/LuminaQuant.git
+```
+
+**Private Repo (private):**
+```powershell
+git remote set-url private https://hoky1227:<YOUR_TOKEN>@github.com/hoky1227/Quants-agent.git
+```
+
+*Note: This saves your token in plain text in `.git/config`. Ensure your local machine is secure.*
+```

@@ -33,6 +33,17 @@ git merge main -m "sync: merge from main"
 
 Write-Host "Adding all files (including private ones)..." -ForegroundColor Cyan
 git add .
+# Force add private files ignored by .gitignore
+git add -f strategies/
+git add -f data/
+git add -f reports/
+git add -f equity.csv
+git add -f trades.csv
+git add -f live_equity.csv
+git add -f live_trades.csv
+git add -f best_optimized_parameters/
+git add -f .env
+
 git commit -m "sync: update private repository"
 
 Write-Host "Pushing to private repository..." -ForegroundColor Cyan
@@ -61,6 +72,17 @@ git merge main -m "sync: merge from main"
 
 Write-Host "Adding all files (including private ones)..." -ForegroundColor Cyan
 git add .
+# Force add private files ignored by .gitignore
+git add -f strategies/
+git add -f data/
+git add -f reports/
+git add -f equity.csv
+git add -f trades.csv
+git add -f live_equity.csv
+git add -f live_trades.csv
+git add -f best_optimized_parameters/
+git add -f .env
+
 git commit -m "sync: update private repository"
 
 Write-Host "Pushing to private repository..." -ForegroundColor Cyan

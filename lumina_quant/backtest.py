@@ -47,6 +47,7 @@ class Backtest(TradingEngine):
         strategy_cls,
         strategy_params=None,
         end_date=None,
+        data_dict=None,
     ):
         self.csv_dir = csv_dir
         self.symbol_list = symbol_list
@@ -54,6 +55,7 @@ class Backtest(TradingEngine):
         self.heartbeat = 0.0
         self.start_date = start_date
         self.end_date = end_date  # Override config if specific
+        self.data_dict = data_dict
 
         self.data_handler_cls = data_handler_cls
         self.execution_handler_cls = execution_handler_cls
@@ -81,7 +83,12 @@ class Backtest(TradingEngine):
         """
         print("Creating DataHandler, Strategy, Portfolio and ExecutionHandler")
         self.data_handler = self.data_handler_cls(
-            self.events, self.csv_dir, self.symbol_list, self.start_date, self.end_date
+            self.events,
+            self.csv_dir,
+            self.symbol_list,
+            self.start_date,
+            self.end_date,
+            self.data_dict,
         )
         self.strategy = self.strategy_cls(
             self.bars, self.events, **self.strategy_params

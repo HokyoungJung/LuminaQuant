@@ -23,8 +23,12 @@ def load_config(config_path="config.yaml"):
     if not path.exists():
         raise FileNotFoundError(f"Configuration file not found: {path.absolute()}")
 
-    with open(path, "r") as f:
-        return yaml.safe_load(f)
+    with open(path, "r", encoding="utf-8") as f:
+        try:
+            return yaml.safe_load(f) or {}
+        except yaml.YAMLError as e:
+            print(f"Error parsing config.yaml: {e}")
+            return {}
 
 
 # Load the config once
@@ -78,6 +82,10 @@ class LiveConfig(BaseConfig):
     BINANCE_API_KEY = os.getenv("BINANCE_API_KEY") or _l.get("api_key", "")
     BINANCE_SECRET_KEY = os.getenv("BINANCE_SECRET_KEY") or _l.get("secret_key", "")
 
+    # Telegram
+    TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+    TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+
     IS_TESTNET = _l.get("testnet", True)
     POLL_INTERVAL = int(_l.get("poll_interval", 2))
     ORDER_TIMEOUT = int(_l.get("order_timeout", 10))
@@ -99,6 +107,6 @@ class OptimizationConfig:
 
     METHOD = _o.get("method", "OPTUNA")
     STRATEGY_NAME = _o.get("strategy", "RsiStrategy")
-    
+
     OPTUNA_CONFIG = _o.get("optuna", {})
     GRID_CONFIG = _o.get("grid", {})

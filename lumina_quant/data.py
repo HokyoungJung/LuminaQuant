@@ -1,8 +1,7 @@
 import polars as pl
 import os
 from abc import ABC, abstractmethod
-from typing import List, Tuple, Optional, Any, Union, Dict
-from datetime import datetime
+from typing import List, Tuple, Any
 from lumina_quant.events import MarketEvent
 
 
@@ -44,13 +43,22 @@ class HistoricCSVDataHandler(DataHandler):
     Optimized to use Tuple iteration (named=False) instead of Dictionaries.
     """
 
-    def __init__(self, events, csv_dir, symbol_list, start_date=None, end_date=None):
+    def __init__(
+        self,
+        events,
+        csv_dir,
+        symbol_list,
+        start_date=None,
+        end_date=None,
+        data_dict=None,
+    ):
         self.events = events
         self.csv_dir = csv_dir
         self.symbol_list = symbol_list
         self.start_date = start_date
         self.end_date = end_date
         self.max_lookback = 5000  # Memory Cap (Safety)
+        self.data_dict = data_dict  # Pre-loaded data support
 
         self.symbol_data = {}
         self.latest_symbol_data = {s: [] for s in symbol_list}
@@ -76,11 +84,22 @@ class HistoricCSVDataHandler(DataHandler):
         Opens the CSV files using Polars and creates iterators.
         Filters by start_date and end_date if provided.
         """
+        combined_data = {}
+        if self.data_dict:
+            combined_data = self.data_dict
+
         for s in self.symbol_list:
-            # Load CSV with Polars
-            csv_path = os.path.join(self.csv_dir, f"{s}.csv")
             try:
-                df = pl.read_csv(csv_path, try_parse_dates=True)
+                # Load from Memory or Disk
+                if s in combined_data:
+                    df = combined_data[s]
+                else:
+                    # Load CSV with Polars
+                    csv_path = os.path.join(self.csv_dir, f"{s}.csv")
+                    if not os.path.exists(csv_path):
+                        print(f"Warning: Data file not found for {s} at {csv_path}")
+                        continue
+                    df = pl.read_csv(csv_path, try_parse_dates=True)
 
                 # Ensure correct column order for tuple unpacking
                 # datetime, open, high, low, close, volume
@@ -88,6 +107,11 @@ class HistoricCSVDataHandler(DataHandler):
                 required_cols = ["datetime", "open", "high", "low", "close", "volume"]
 
                 # Basic validation logic (omitted for speed, assumming standard format)
+                # Check if columns exist
+                if not all(col in df.columns for col in required_cols):
+                    print(f"Warning: Missing columns in {s}. Required: {required_cols}")
+                    continue
+
                 df = df.select(required_cols).sort("datetime")
 
                 # Date Filtering

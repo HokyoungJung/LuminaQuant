@@ -8,6 +8,12 @@ from lumina_quant.exchanges import get_exchange
 from lumina_quant.interfaces import ExchangeInterface
 
 
+from lumina_quant.utils.notification import NotificationManager
+
+
+from lumina_quant.risk_manager import RiskManager
+
+
 class LiveTrader(TradingEngine):
     """
     The LiveTrader engine.
@@ -26,6 +32,15 @@ class LiveTrader(TradingEngine):
         self.events = queue.Queue()
         self.config = LiveConfig
         self.state_manager = StateManager()
+        self.risk_manager = RiskManager(self.config)  # NEW
+
+        # Initialize Notification Manager
+        self.notifier = NotificationManager(
+            self.config.TELEGRAM_BOT_TOKEN, self.config.TELEGRAM_CHAT_ID
+        )
+        self.notifier.send_message(
+            f"🚀 **LuminaQuant Started**\nSymbols: {symbol_list}"
+        )
 
         # Initialize Exchange
         self.logger.info("Initializing Exchange...")
@@ -83,9 +98,9 @@ class LiveTrader(TradingEngine):
         """
         Hook from TradingEngine to save state on fill.
         """
-        self.logger.info(
-            f"Fill Event: {event.direction} {event.quantity} {event.symbol} @ {event.fill_cost}"
-        )
+        msg = f"✅ **FILL**: {event.direction} {event.quantity} {event.symbol} @ {event.fill_cost}"
+        self.logger.info(msg)
+        self.notifier.send_message(msg)
         self._save_state()
 
     def _sync_portfolio(self):
@@ -135,14 +150,14 @@ class LiveTrader(TradingEngine):
                         strategy_status = self.strategy.bought.get(s, "OUT")
 
                         if strategy_status != "OUT" and position_qty == 0:
-                            self.logger.warning(
-                                f"State Mismatch for {s}: Strategy={strategy_status}, Portfolio=0. Resetting Strategy to OUT."
-                            )
+                            msg = f"⚠️ **State Mismatch**: {s} Strategy={strategy_status}, Portfolio=0. Resetting Strategy to OUT."
+                            self.logger.warning(msg)
+                            self.notifier.send_message(msg)
                             self.strategy.bought[s] = "OUT"
                         elif strategy_status == "OUT" and position_qty != 0:
-                            self.logger.warning(
-                                f"State Mismatch for {s}: Strategy=OUT, Portfolio={position_qty}. Setting Strategy to matching Side."
-                            )
+                            msg = f"⚠️ **State Mismatch**: {s} Strategy=OUT, Portfolio={position_qty}. Syncing Strategy."
+                            self.logger.warning(msg)
+                            self.notifier.send_message(msg)
                             self.strategy.bought[s] = (
                                 "LONG" if position_qty > 0 else "SHORT"
                             )
@@ -199,8 +214,20 @@ class LiveTrader(TradingEngine):
                         self.logger.debug(f"Market Event: {event.symbol}")
                     elif event.type == "SIGNAL":
                         self.logger.info(f"Signal Event: {event.signal_type}")
-                    elif event.type == "ORDER":
+                    if event.type == "ORDER":
                         self.logger.info(f"Order Event: {event.direction}")
+                        # RISK CHECK
+                        current_price = self.data_handler.get_latest_bar_value(
+                            event.symbol, "close"
+                        )
+                        passed, reason = self.risk_manager.check_order(
+                            event, current_price
+                        )
+                        if not passed:
+                            msg = f"⛔ **Risk Reject**: {reason}"
+                            self.logger.warning(msg)
+                            self.notifier.send_message(msg)
+                            continue  # Skip processing this event
 
                     self.process_event(event)
 

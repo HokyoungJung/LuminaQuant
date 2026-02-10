@@ -11,11 +11,51 @@
 | Section | Description |
 | :--- | :--- |
 | **[Installation & Setup](#installation)** | Getting started with LuminaQuant. |
+| **[Deployment Guide](docs/DEPLOYMENT.md)** | **New**: Docker & VPS Setup for 24/7 Trading. |
 | **[Exchange Guide](docs/EXCHANGES.md)** | Detailed setup for **Binance** (CCXT) and **MetaTrader 5**. |
 | **[Trading Manual](docs/TRADING_MANUAL.md)** | **How-To**: Buy/Sell, Leverage, TP/SL, Trailing Stops. |
 | **[Performance Metrics](docs/METRICS.md)** | Explanation of Sharpe, Sortino, Alpha, Beta, etc. |
 | **[Developer API](docs/API.md)** | How to write Strategies and extend the system. |
 | **[Configuration](#configuration)** | Quick reference for `config.yaml`. |
+
+## 🏗 Architecture
+
+LuminaQuant follows a modular **Event-Driven Architecture**:
+
+```mermaid
+graph TD
+    Data[Data Handler] -->|MarketEvent| Engine[Trading Engine]
+    Engine -->|MarketEvent| Strategy[Strategy]
+    Strategy -->|SignalEvent| Portfolio[Portfolio]
+    Portfolio -->|OrderEvent| Execution[Execution Handler]
+    Execution -->|FillEvent| Portfolio
+```
+
+- **DataHandler**: Manages historical (CSV) or live (WebSocket) data feeds.
+- **Strategy**: Generates `SignalEvent` based on market data (e.g., RSI < 30).
+- **Portfolio**: Manages state, positions, and risk. Converts Signals to `OrderEvent`.
+- **ExecutionHandler**: Simulates fills (Backtest) or executes usage API (Live).
+
+---
+
+## ⚙️ Setup & Configuration
+
+### Prerequisites
+- Python 3.9+
+- [Polars](https://pola.rs/) (for high-performance data)
+- [Talib](https://github.com/TA-Lib/ta-lib-python) (for technical indicators)
+
+### Environment Variables
+For security, **never commit API keys**. Create a `.env` file in the root directory:
+
+```ini
+# .env file
+BINANCE_API_KEY=your_api_key
+BINANCE_SECRET_KEY=your_secret_key
+LOG_LEVEL=INFO
+```
+
+*See `.env.example` for a template.*
 
 ---
 

@@ -14,4 +14,6 @@ dependencies = [
     "ta-lib>=0.6.8",
     "PyYAML>=6.0",
     "MetaTrader5>=5.0.0",
+    "requests>=2.31.0",
+    "websockets>=12.0",
 ]

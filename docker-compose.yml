@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  lumina-quant:
+    build: .
+    container_name: lumina_quant
+    restart: always
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    # To run WebSocket Mode
+    command: python run_live_ws.py
+    # To run Dashboard
+    # command: streamlit run dashboard.py --server.port=8501 --server.address=0.0.0.0
+    ports:
+      - "8501:8501"

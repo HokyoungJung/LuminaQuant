@@ -16,6 +16,7 @@ strategy_name = st.sidebar.selectbox(
 )
 
 
+@st.cache_data
 def load_data():
     if not os.path.exists("equity.csv"):
         return None
@@ -37,6 +38,7 @@ df = load_data()
 params = load_params(strategy_name)
 
 
+@st.cache_data
 def load_trades():
     if not os.path.exists("trades.csv"):
         return None

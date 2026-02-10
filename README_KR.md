@@ -19,6 +19,47 @@
 
 ---
 
+## 🏗 아키텍처 (Architecture)
+
+LuminaQuant는 모듈식 **이벤트 기반 아키텍처(Event-Driven Architecture)**를 따릅니다:
+
+```mermaid
+graph TD
+    Data[Data Handler] -->|MarketEvent| Engine[Trading Engine]
+    Engine -->|MarketEvent| Strategy[Strategy]
+    Strategy -->|SignalEvent| Portfolio[Portfolio]
+    Portfolio -->|OrderEvent| Execution[Execution Handler]
+    Execution -->|FillEvent| Portfolio
+```
+
+- **DataHandler**: 과거(CSV) 또는 실시간(WebSocket) 데이터 피드를 관리합니다.
+- **Strategy**: 시장 데이터를 기반으로 `SignalEvent`를 생성합니다 (예: RSI < 30).
+- **Portfolio**: 상태, 포지션, 리스크를 관리하며, 신호를 `OrderEvent`로 변환합니다.
+- **ExecutionHandler**: 체결을 시뮬레이션(백테스트)하거나 API를 통해 실행(실거래)합니다.
+
+---
+
+## ⚙️ 설정 및 구성 (Setup & Configuration)
+
+### 필수 요구사항 (Prerequisites)
+- Python 3.9 이상
+- [Polars](https://pola.rs/) (고성능 데이터 처리를 위해 사용)
+- [Talib](https://github.com/TA-Lib/ta-lib-python) (기술적 지표 계산을 위해 사용)
+
+### 환경 변수 (Environment Variables)
+보안을 위해 **API 키를 절대 커밋하지 마세요**. 루트 디렉토리에 `.env` 파일을 생성하여 관리합니다:
+
+```ini
+# .env 파일 예시
+BINANCE_API_KEY=your_api_key
+BINANCE_SECRET_KEY=your_secret_key
+LOG_LEVEL=INFO
+```
+
+*템플릿은 `.env.example` 파일을 참고하세요.*
+
+---
+
 ## 🚀 빠른 시작 (Quick Start)
 
 ### 1. 설치 (Installation)

@@ -1,6 +1,8 @@
 import itertools
 import multiprocessing
 import sys
+import os
+import polars as pl
 from datetime import datetime
 
 # Engine Imports
@@ -47,41 +49,9 @@ GRID_PARAMS = OptimizationConfig.GRID_CONFIG.get("params", {})
 OPTUNA_CONFIG = OptimizationConfig.OPTUNA_CONFIG.get("params", {})
 OPTUNA_TRIALS = int(OptimizationConfig.OPTUNA_CONFIG.get("n_trials", 20))
 
+
 # 5. Data Splitting Settings (WFA)
-# Using strings from config and converting to datetime
 try:
-    TRAIN_START = datetime.strptime(BacktestConfig.START_DATE, "%Y-%m-%d")
-    # Define arbitrary split logic if not in config, or add WFA dates to config.
-    # For now, let's keep the split logic hardcoded relative to config START_DATE or similar?
-    # Actually, the previous code had hardcoded WFA dates.
-    # Let's define them relative to the config START_DATE for simplicity or just keep them fixed?
-    # The config has START_DATE. Let's assume the user wants to test from that start.
-
-    # Let's make it simple: Use config Start Date as Train Start.
-    # Then define 1 year train, 6 mo val, 6 mo test.
-
-    TRAIN_END = TRAIN_START.replace(year=TRAIN_START.year + 1)
-    VAL_START = TRAIN_END
-    VAL_END = (
-        VAL_START.replace(month=VAL_START.month + 6)
-        if VAL_START.month <= 6
-        else VAL_START.replace(year=VAL_START.year + 1, month=VAL_START.month - 6)
-    )
-    # Simple relative date math is tricky without explicit external lib like relativedelta,
-    # but let's just stick to the hardcoded ones if the user didn't put them in config,
-    # OR better: Add these dates to config?
-
-    # Re-reading config.yaml, I only put backtest start/end.
-    # I will stick to the hardcoded dates in the original file for now,
-    # BUT updated to use the start date as a base if possible.
-    # Actually, the original file had explicit dates. config.yaml has 2024-01-01.
-    # I'll update these to match the config's Start Date roughly.
-
-    # If the user put 2024-01-01 in config, we can't train in 2022.
-    # Let's derive dates from the config's start date?
-    # NO, simpler: Just use the dates from the code but update the years to be more current if needed,
-    # OR, just rely on the config start date as the beginning of training.
-
     TRAIN_START = datetime.strptime(BacktestConfig.START_DATE, "%Y-%m-%d")
     TRAIN_END = datetime(TRAIN_START.year + 1, 1, 1)
     VAL_START = TRAIN_END
@@ -98,16 +68,51 @@ except Exception as e:
     TEST_START = datetime(2024, 6, 1)
     TEST_END = datetime(2025, 1, 1)
 
+# Global Data Cache for Multiprocessing (Copy-on-Write)
+DATA_DICT = {}
+
+
+def load_all_data(csv_dir, symbol_list):
+    """
+    Loads all data into memory using Polars once.
+    """
+    print(f"Loading data for {len(symbol_list)} symbols from {csv_dir}...")
+    data = {}
+    for s in symbol_list:
+        csv_path = os.path.join(csv_dir, f"{s}.csv")
+        try:
+            if os.path.exists(csv_path):
+                df = pl.read_csv(csv_path, try_parse_dates=True)
+                # Optimization: select only needed columns and sort once
+                required_cols = ["datetime", "open", "high", "low", "close", "volume"]
+                if all(c in df.columns for c in required_cols):
+                    df = df.select(required_cols).sort("datetime")
+                    data[s] = df
+            else:
+                print(f"Warning: {csv_path} not found.")
+        except Exception as e:
+            print(f"Error loading {s}: {e}")
+    return data
+
+
 # ==========================================
 # IMPLEMENTATION
 # ==========================================
 
 
-def _execute_backtest(strategy_cls, params, csv_dir, symbol_list, start_date, end_date):
+def _execute_backtest(
+    strategy_cls, params, csv_dir, symbol_list, start_date, end_date, data_dict=None
+):
     """
     Core execution logic shared by Grid and Optuna.
+    Use provided data_dict if available, otherwise fallback (or use global DATA_DICT safely).
     """
     try:
+        # Use passed data_dict or fall back to global DATA_DICT
+        # In multiprocessing (fork), global might be accessible or passed explicitly.
+        # For simplicity, we prioritize passing it if possible, or assume it's available via COW.
+        current_data = data_dict if data_dict is not None else DATA_DICT
+
         backtest = Backtest(
             csv_dir=csv_dir,
             symbol_list=symbol_list,
@@ -118,6 +123,7 @@ def _execute_backtest(strategy_cls, params, csv_dir, symbol_list, start_date, en
             portfolio_cls=Portfolio,
             strategy_cls=strategy_cls,
             strategy_params=params,
+            data_dict=current_data,
         )
         backtest.simulate_trading()
 
@@ -136,14 +142,45 @@ def _execute_backtest(strategy_cls, params, csv_dir, symbol_list, start_date, en
             "mdd": stats_dict.get("Max Drawdown", "0.0%").strip("%"),
         }
     except Exception as e:
+        # print(f"Backtest Error: {e}")
         return {"params": params, "error": str(e), "sharpe": -999.0}
 
 
 def run_single_backtest_train(args):
+    # Unpack including data_dict if we decide to pass it explictly,
+    # OR rely on global DATA_DICT if using 'fork' start method (Linux/Mac).
+    # Windows uses 'spawn', so globals are NOT shared. We MUST pass data or reload.
+    # Passing Polars DF via pickling is fast.
     strategy_cls, params, csv_dir, symbol_list, start_date, end_date = args
+
+    # On Windows, DATA_DICT will be empty in the child process unless initialized.
+    # However, passing the entire dict in args can be heavy if huge.
+    # But for reasonable datasets (< few GB), it's faster than independent I/O.
+    # Wait, 'spawn' pickles the args.
+    # Let's try attempting to read global DATA_DICT. If empty, reload?
+    # No, that defeats the purpose.
+    # Best practice for Windows MP: Pass the data in args if it fits in memory.
+
+    # NOTE: To fix "Global variable not shared" on Windows, we need to handle it.
+    # But Pool.map pickles arguments.
+    # Let's modify GridOptimizer to include data_dict in args?
+    # Or just rely on 'csv_dir' loading if data_dict is empty?
+    # Actually, we can use 'initializer' in Pool to set the global variable in workers.
+
     return _execute_backtest(
-        strategy_cls, params, csv_dir, symbol_list, start_date, end_date
+        strategy_cls,
+        params,
+        csv_dir,
+        symbol_list,
+        start_date,
+        end_date,
+        data_dict=DATA_DICT,
     )
+
+
+def pool_initializer(shared_data):
+    global DATA_DICT
+    DATA_DICT = shared_data
 
 
 class GridSearchOptimizer:
@@ -181,7 +218,10 @@ class GridSearchOptimizer:
             for params in combinations
         ]
 
-        with multiprocessing.Pool(processes=max_workers) as pool:
+        # Use initializer to share data efficiently on Windows/Spawn
+        with multiprocessing.Pool(
+            processes=max_workers, initializer=pool_initializer, initargs=(DATA_DICT,)
+        ) as pool:
             results = pool.map(run_single_backtest_train, pool_args)
 
         valid_results = [r for r in results if "error" not in r]
@@ -215,6 +255,9 @@ class OptunaOptimizer:
                 params[key] = trial.suggest_categorical(key, conf["choices"])
 
         # Train on Train Set specific date range
+        # Here we are in the main process (usually), so DATA_DICT is available.
+        # Optuna usually runs sequentially or with its own parallel backend.
+        # If running simple sequential optuna:
         result = _execute_backtest(
             self.strategy_cls,
             params,
@@ -222,6 +265,7 @@ class OptunaOptimizer:
             self.symbol_list,
             self.start_date,
             self.end_date,
+            data_dict=DATA_DICT,
         )
         return result["sharpe"]
 
@@ -248,6 +292,9 @@ class OptunaOptimizer:
 
 
 if __name__ == "__main__":
+    # Load Data Once
+    DATA_DICT = load_all_data(CSV_DIR, SYMBOL_LIST)
+
     print(f"=== PHASE 1: TRAINING [{TRAIN_START.date()} ~ {TRAIN_END.date()}] ===")
     if OPTIMIZATION_METHOD == "GRID":
         optimizer = GridSearchOptimizer(
@@ -259,6 +306,9 @@ if __name__ == "__main__":
         optimizer = OptunaOptimizer(
             STRATEGY_CLASS, OPTUNA_CONFIG, CSV_DIR, SYMBOL_LIST, TRAIN_START, TRAIN_END
         )
+        # Optuna jobs=-1 can parallelize, but we need to handle data sharing if so.
+        # For now, keep it single threaded or handle via Optuna's mechanism.
+        # Simple run() above is single process.
         train_results = optimizer.run(n_trials=OPTUNA_TRIALS)
 
     else:
@@ -286,7 +336,13 @@ if __name__ == "__main__":
     limit = min(3, len(train_results))
     for cand in train_results[:limit]:
         res = _execute_backtest(
-            STRATEGY_CLASS, cand["params"], CSV_DIR, SYMBOL_LIST, VAL_START, VAL_END
+            STRATEGY_CLASS,
+            cand["params"],
+            CSV_DIR,
+            SYMBOL_LIST,
+            VAL_START,
+            VAL_END,
+            data_dict=DATA_DICT,
         )
         res["train_sharpe"] = cand["sharpe"]
         val_candidates.append(res)
@@ -295,10 +351,6 @@ if __name__ == "__main__":
         )
 
     # Robustness Check & Ranking
-    # We penalize candidates where Train and Validation performance diverge significantly (Overfitting).
-    # Score = Val_Sharpe - Penalty * abs(Train - Val)
-    # Penalty of 0.5 means if Train=2.0 and Val=1.0, Score = 1.0 - 0.5*1.0 = 0.5 (Heavy penalty)
-
     for c in val_candidates:
         train_s = float(c["train_sharpe"])
         val_s = float(c["sharpe"])
@@ -321,10 +373,16 @@ if __name__ == "__main__":
     print("Running Final Simulation on Unseen Test Data...")
 
     test_res = _execute_backtest(
-        STRATEGY_CLASS, final_best["params"], CSV_DIR, SYMBOL_LIST, TEST_START, TEST_END
+        STRATEGY_CLASS,
+        final_best["params"],
+        CSV_DIR,
+        SYMBOL_LIST,
+        TEST_START,
+        TEST_END,
+        data_dict=DATA_DICT,
     )
 
-    print(f"\n>>>> FINAL REPORT <<<<")
+    print("\n>>>> FINAL REPORT <<<<")
     print(f"Best Params: {final_best['params']}")
     print(f"Train Sharpe : {best_candidate['sharpe']:.4f}")
     print(f"Val Sharpe   : {final_best['sharpe']:.4f}")

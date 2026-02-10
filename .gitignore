@@ -217,15 +217,25 @@ trades.csv
 reports/
 test_output.txt
 
-# User Privacy Settings - UNCOMMENTED FOR PRIVATE REPO
-# strategies/*.py
-# !strategies/__init__.py
-# equity.csv
-# trades.csv
-# details.csv
-# reports/
-# best_optimized_parameters/
-# *.png
-# test_output.txt
-# data/
-# logs/
+# User Privacy Settings - STRICT MODE
+strategies/*
+!strategies/__init__.py
+!strategies/rsi_strategy.py
+equity.csv
+trades.csv
+live_equity.csv
+live_trades.csv
+details.csv
+reports/
+best_optimized_parameters/
+*.png
+test_output.txt
+data/
+logs/
+.env
+.DS_Store
+*.enc
+*.key
+*.pem
+secrets/
+credentials/
