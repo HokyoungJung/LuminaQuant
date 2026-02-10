@@ -1,4 +1,10 @@
 # User requested ignores
+logs/
+
+# Private Scripts
+*.ps1
+*.sh
+*.bat
 uv.lock
 .python-version
 *.code-workspace
