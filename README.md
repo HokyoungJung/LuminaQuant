@@ -12,6 +12,7 @@
 | :--- | :--- |
 | **[Installation & Setup](#installation)** | Getting started with LuminaQuant. |
 | **[Deployment Guide](docs/DEPLOYMENT.md)** | **New**: Docker & VPS Setup for 24/7 Trading. |
+| **[Validation Report](docs/VALIDATION_REPORT.md)** | Verification + optimization report for core workflows. |
 | **[Exchange Guide](docs/EXCHANGES.md)** | Detailed setup for **Binance** (CCXT) and **MetaTrader 5**. |
 | **[Trading Manual](docs/TRADING_MANUAL.md)** | **How-To**: Buy/Sell, Leverage, TP/SL, Trailing Stops. |
 | **[Performance Metrics](docs/METRICS.md)** | Explanation of Sharpe, Sortino, Alpha, Beta, etc. |
@@ -42,6 +43,7 @@ graph TD
 
 ### Prerequisites
 - Python 3.11 to 3.13
+- [uv](https://docs.astral.sh/uv/) for dependency/runtime management
 - [Polars](https://pola.rs/) (for high-performance data)
 - [Talib](https://github.com/TA-Lib/ta-lib-python) (for technical indicators)
 
@@ -68,14 +70,17 @@ LOG_LEVEL=INFO
 git clone https://github.com/HokyoungJung/LuminaQuant.git
 cd lumina-quant
 
+# Ensure compatible Python (project requires < 3.14)
+uv python pin 3.13
+
 # Install dependencies
-uv sync  # or pip install ".[live,optimize,dashboard]"
+uv sync --all-extras  # or pip install ".[live,optimize,dashboard]"
 
 # Verify install and tests
-python scripts/verify_install.py
+uv run python scripts/verify_install.py
 
 # (Optional) For MT5 Support
-pip install MetaTrader5
+uv sync --extra mt5
 ```
 
 ### 2. Configuration
@@ -99,43 +104,63 @@ trading:
 
 ### 3. Running the System
 
+**Sync Full Binance OHLCV into SQLite (and CSV mirror):**
+```bash
+uv run python scripts/sync_binance_ohlcv.py \
+  --symbols BTC/USDT ETH/USDT \
+  --timeframe 1m \
+  --db-path logs/lumina_quant.db \
+  --force-full
+```
+
 **Backtest a Strategy:**
 ```bash
-python run_backtest.py
+uv run python run_backtest.py
+
+# Force DB-only data source
+uv run python run_backtest.py --data-source db --market-db-path logs/lumina_quant.db
 ```
 
 **Walk-Forward Optimization (multi-fold):**
 ```bash
-python optimize.py
+uv run python optimize.py
+
+# Prefer DB data, fallback to CSV in auto mode
+uv run python optimize.py --data-source auto --market-db-path logs/lumina_quant.db
 ```
 
 **Architecture/Lint Gate:**
 ```bash
-python scripts/check_architecture.py
-ruff format . --check
-ruff check .
+uv run python scripts/check_architecture.py
+uv run ruff format . --check
+uv run ruff check .
 ```
 
 **Visualize Results:**
 ```bash
-streamlit run dashboard.py
+uv run streamlit run dashboard.py
 ```
 
 **Start Live Trading:**
 ```bash
-python run_live.py
+uv run python run_live.py
 # Real mode requires explicit safety flag:
-# LUMINA_ENABLE_LIVE_REAL=true python run_live.py --enable-live-real
+# LUMINA_ENABLE_LIVE_REAL=true uv run python run_live.py --enable-live-real
 ```
 
 **Generate 14-day Soak Report (Promotion Gate):**
 ```bash
-python scripts/generate_soak_report.py --db logs/lumina_quant.db --days 14
+uv run python scripts/generate_soak_report.py --db logs/lumina_quant.db --days 14
 ```
 
 **Backtest Benchmark Baseline/Regression:**
 ```bash
-python scripts/benchmark_backtest.py --output reports/benchmarks/baseline_snapshot.json
+uv run python scripts/benchmark_backtest.py --output reports/benchmarks/baseline_snapshot.json
+
+# Compare current run vs previous snapshot
+uv run python scripts/benchmark_backtest.py \
+  --output reports/benchmarks/current_snapshot.json \
+  --compare-to reports/benchmarks/baseline_snapshot.json
 ```
 
 ---

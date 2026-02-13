@@ -43,6 +43,7 @@ graph TD
 
 ### 필수 요구사항 (Prerequisites)
 - Python 3.11 이상 3.14 미만
+- [uv](https://docs.astral.sh/uv/) (의존성/실행 환경 관리)
 - [Polars](https://pola.rs/) (고성능 데이터 처리를 위해 사용)
 - [Talib](https://github.com/TA-Lib/ta-lib-python) (기술적 지표 계산을 위해 사용)
 
@@ -69,11 +70,14 @@ LOG_LEVEL=INFO
 git clone https://github.com/HokyoungJung/LuminaQuant.git
 cd lumina-quant
 
+# 프로젝트 Python 버전 고정 (< 3.14)
+uv python pin 3.13
+
 # 의존성 설치
-uv sync  # 또는 pip install ".[live,optimize,dashboard]"
+uv sync --all-extras  # 또는 pip install ".[live,optimize,dashboard]"
 
 # (선택 사항) MT5 지원을 위한 설치
-pip install MetaTrader5
+uv sync --extra mt5
 ```
 
 ### 2. 구성 (Configuration)
@@ -97,19 +101,55 @@ trading:
 
 ### 3. 시스템 실행 (Running the System)
 
+**바이낸스 OHLCV 전체 수집 + SQLite 업데이트 (+CSV 미러):**
+```bash
+uv run python scripts/sync_binance_ohlcv.py \
+  --symbols BTC/USDT ETH/USDT \
+  --timeframe 1m \
+  --db-path logs/lumina_quant.db \
+  --force-full
+```
+
 **전략 백테스트:**
 ```bash
-python run_backtest.py
+uv run python run_backtest.py
+
+# DB 데이터만 사용
+uv run python run_backtest.py --data-source db --market-db-path logs/lumina_quant.db
+```
+
+**워크포워드 최적화:**
+```bash
+uv run python optimize.py
+
+# DB 우선, 부족하면 CSV fallback
+uv run python optimize.py --data-source auto --market-db-path logs/lumina_quant.db
+```
+
+**아키텍처/린트 검증:**
+```bash
+uv run python scripts/check_architecture.py
+uv run ruff check .
+```
+
+**백테스트 성능 벤치마크/회귀 비교:**
+```bash
+uv run python scripts/benchmark_backtest.py --output reports/benchmarks/baseline_snapshot.json
+
+# 이전 스냅샷과 비교
+uv run python scripts/benchmark_backtest.py \
+  --output reports/benchmarks/current_snapshot.json \
+  --compare-to reports/benchmarks/baseline_snapshot.json
 ```
 
 **결과 시각화 (대시보드):**
 ```bash
-streamlit run dashboard.py
+uv run streamlit run dashboard.py
 ```
 
 **실거래 실행:**
 ```bash
-python run_live.py
+uv run python run_live.py
 ```
 
 ---
