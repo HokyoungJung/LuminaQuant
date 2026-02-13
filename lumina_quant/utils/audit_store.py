@@ -91,6 +91,18 @@ class AuditStore:
                     status TEXT,
                     details TEXT
                 );
+
+                CREATE TABLE IF NOT EXISTS order_state_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    run_id TEXT NOT NULL,
+                    event_time TEXT NOT NULL,
+                    symbol TEXT,
+                    client_order_id TEXT,
+                    exchange_order_id TEXT,
+                    state TEXT NOT NULL,
+                    message TEXT,
+                    details TEXT
+                );
                 """
             )
             self._conn.commit()
@@ -201,6 +213,47 @@ class AuditStore:
                     json.dumps(details or {}),
                 ),
             )
+            self._conn.commit()
+
+    def log_order_state(self, run_id, state_payload):
+        details = dict(state_payload.get("metadata") or {})
+        if "last_filled" in state_payload:
+            details["last_filled"] = state_payload["last_filled"]
+        if "created_at" in state_payload:
+            details["created_at"] = state_payload["created_at"]
+
+        symbol = state_payload.get("symbol")
+        client_order_id = state_payload.get("client_order_id")
+        exchange_order_id = state_payload.get("order_id")
+        state = str(state_payload.get("state", "UNKNOWN"))
+        message = state_payload.get("message")
+        with self._lock:
+            self._conn.execute(
+                """
+                INSERT INTO order_state_events(
+                    run_id, event_time, symbol, client_order_id, exchange_order_id, state, message, details
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    run_id,
+                    self._utcnow(),
+                    symbol,
+                    client_order_id,
+                    exchange_order_id,
+                    state,
+                    message,
+                    json.dumps(details),
+                ),
+            )
+            if client_order_id:
+                self._conn.execute(
+                    """
+                    UPDATE orders
+                    SET status = ?, exchange_order_id = COALESCE(?, exchange_order_id)
+                    WHERE run_id = ? AND client_order_id = ?
+                    """,
+                    (state, exchange_order_id, run_id, client_order_id),
+                )
             self._conn.commit()
 
     def close(self):

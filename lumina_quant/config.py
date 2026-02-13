@@ -102,6 +102,7 @@ class LiveConfig(BaseConfig):
     POLL_INTERVAL = int(_RUNTIME.live.poll_interval)
     ORDER_TIMEOUT = int(_RUNTIME.live.order_timeout)
     HEARTBEAT_INTERVAL_SEC = int(_RUNTIME.live.heartbeat_interval_sec)
+    RECONCILIATION_INTERVAL_SEC = int(_RUNTIME.live.reconciliation_interval_sec)
 
     EXCHANGE: ClassVar[dict[str, str | int]] = {
         "driver": str(_RUNTIME.live.exchange.driver).lower(),
@@ -168,6 +169,8 @@ class OptimizationConfig:
     GRID_CONFIG = dict(_RUNTIME.optimization.grid)
     WALK_FORWARD_FOLDS = int(_RUNTIME.optimization.walk_forward_folds)
     OVERFIT_PENALTY = float(_RUNTIME.optimization.overfit_penalty)
+    MAX_WORKERS = int(_RUNTIME.optimization.max_workers)
+    PERSIST_BEST_PARAMS = bool(_RUNTIME.optimization.persist_best_params)
 
 
 def export_runtime_dict() -> dict:

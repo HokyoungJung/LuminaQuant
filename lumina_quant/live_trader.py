@@ -45,7 +45,20 @@ class LiveTrader(TradingEngine):
         self.heartbeat_interval_sec = max(
             1, int(getattr(self.config, "HEARTBEAT_INTERVAL_SEC", 30))
         )
+        self.reconciliation_interval_sec = max(
+            5,
+            int(
+                getattr(
+                    self.config,
+                    "RECONCILIATION_INTERVAL_SEC",
+                    self.heartbeat_interval_sec,
+                )
+            ),
+        )
         self._last_heartbeat_monotonic = time.monotonic()
+        self._last_reconciliation_monotonic = 0.0
+        self._last_drift_signature = ()
+        self._reconciliation_drift_events = 0
         atexit.register(self._close_audit_store)
 
         # Initialize Notification Manager
@@ -65,6 +78,8 @@ class LiveTrader(TradingEngine):
         self.execution_handler = execution_handler_cls(
             self.events, self.data_handler, self.config, self.exchange
         )
+        if hasattr(self.execution_handler, "set_order_state_callback"):
+            self.execution_handler.set_order_state_callback(self._on_order_state)
 
         self.portfolio = portfolio_cls(self.data_handler, self.events, time.time(), self.config)
         self.strategy = strategy_cls(self.data_handler, self.events)
@@ -118,6 +133,32 @@ class LiveTrader(TradingEngine):
             pass
         self._audit_closed = True
 
+    def _on_order_state(self, state_payload):
+        try:
+            self.audit_store.log_order_state(self.run_id, state_payload)
+        except Exception as exc:
+            self.logger.error("Failed to persist order state event: %s", exc)
+            return
+
+        state = str(state_payload.get("state", "")).upper()
+        if state not in {"REJECTED", "TIMEOUT", "CANCELED"}:
+            return
+        details = {
+            "state": state,
+            "symbol": state_payload.get("symbol"),
+            "client_order_id": state_payload.get("client_order_id"),
+            "exchange_order_id": state_payload.get("order_id"),
+            "message": state_payload.get("message"),
+            "metadata": state_payload.get("metadata") or {},
+        }
+        self.audit_store.log_risk_event(
+            self.run_id,
+            reason=f"ORDER_{state}",
+            details=details,
+        )
+        msg = f"⚠️ **Order {state}** {details['symbol']} (client_id={details['client_order_id']})"
+        self.notifier.send_message(msg)
+
     def on_fill(self, event):
         """Hook from TradingEngine to save state on fill."""
         msg = f"✅ **FILL**: {event.direction} {event.quantity} {event.symbol} @ {event.fill_cost}"
@@ -132,7 +173,73 @@ class LiveTrader(TradingEngine):
             return
         self._last_heartbeat_monotonic = now_mono
         details = {"queue_size": self.events.qsize()}
+        if hasattr(self.execution_handler, "tracked_orders"):
+            details["tracked_orders"] = len(self.execution_handler.tracked_orders)
+        details["reconciliation_drift_events"] = self._reconciliation_drift_events
         self.audit_store.log_heartbeat(self.run_id, status="ALIVE", details=details)
+
+    def _reconcile_positions(self, force=False):
+        now_mono = time.monotonic()
+        if (
+            not force
+            and (now_mono - self._last_reconciliation_monotonic) < self.reconciliation_interval_sec
+        ):
+            return
+        self._last_reconciliation_monotonic = now_mono
+
+        try:
+            exchange_positions = self.exchange.get_all_positions()
+        except Exception as exc:
+            self.logger.error("Reconciliation failed to fetch exchange positions: %s", exc)
+            self.audit_store.log_risk_event(
+                self.run_id,
+                reason="RECONCILIATION_ERROR",
+                details={"error": str(exc)},
+            )
+            return
+
+        local = self.portfolio.current_positions
+        drift = []
+        for symbol in self.symbol_list:
+            local_qty = float(local.get(symbol, 0.0))
+            exchange_qty = float(exchange_positions.get(symbol, 0.0))
+            delta = exchange_qty - local_qty
+            if abs(delta) > 1e-9:
+                drift.append(
+                    {
+                        "symbol": symbol,
+                        "local_qty": local_qty,
+                        "exchange_qty": exchange_qty,
+                        "delta": delta,
+                    }
+                )
+
+        signature = tuple(
+            sorted(
+                (
+                    item["symbol"],
+                    round(item["local_qty"], 8),
+                    round(item["exchange_qty"], 8),
+                )
+                for item in drift
+            )
+        )
+        if drift and signature != self._last_drift_signature:
+            self._last_drift_signature = signature
+            self._reconciliation_drift_events += 1
+            self.audit_store.log_risk_event(
+                self.run_id,
+                reason="RECONCILIATION_DRIFT",
+                details={
+                    "drift_count": len(drift),
+                    "drift": drift,
+                },
+            )
+            self.notifier.send_message(
+                f"⚠️ **Reconciliation Drift** detected for {len(drift)} symbol(s)."
+            )
+        if not drift:
+            self._last_drift_signature = ()
 
     def _sync_portfolio(self):
         """Syncs the internal portfolio state with the exchange state."""
@@ -245,6 +352,7 @@ class LiveTrader(TradingEngine):
         while True:
             try:
                 self._emit_heartbeat(force=False)
+                self._reconcile_positions(force=False)
                 # In Live mode, data_handler is threaded and pushes events autonomously.
                 # We just blocking-wait for events.
                 event = self.events.get(True, timeout=10)  # Wait up to 10s
@@ -294,6 +402,7 @@ class LiveTrader(TradingEngine):
             except queue.Empty:
                 # Heartbeat
                 self._emit_heartbeat(force=True)
+                self._reconcile_positions(force=False)
                 if hasattr(self.execution_handler, "check_open_orders"):
                     self.execution_handler.check_open_orders(None)
             except KeyboardInterrupt:

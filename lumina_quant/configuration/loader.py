@@ -242,10 +242,16 @@ def build_runtime_config(data: dict[str, Any], env: Mapping[str, str]) -> Runtim
     runtime.execution.slippage_rate = _as_float(runtime.execution.slippage_rate, 0.0005)
     runtime.live.exchange.leverage = _as_int(runtime.live.exchange.leverage, 3)
     runtime.live.poll_interval = _as_int(runtime.live.poll_interval, 2)
+    runtime.live.reconciliation_interval_sec = _as_int(runtime.live.reconciliation_interval_sec, 30)
     runtime.backtest.random_seed = _as_int(runtime.backtest.random_seed, 42)
     runtime.backtest.leverage = _as_int(runtime.backtest.leverage, 3)
     runtime.optimization.walk_forward_folds = _as_int(runtime.optimization.walk_forward_folds, 3)
     runtime.optimization.overfit_penalty = _as_float(runtime.optimization.overfit_penalty, 0.5)
+    runtime.optimization.max_workers = _as_int(runtime.optimization.max_workers, 4)
+    runtime.optimization.persist_best_params = _as_bool(
+        runtime.optimization.persist_best_params,
+        False,
+    )
     return runtime
 
 

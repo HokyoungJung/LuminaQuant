@@ -1,6 +1,7 @@
 import logging
 import time
 import uuid
+from typing import Any
 
 from lumina_quant.events import FillEvent
 from lumina_quant.execution import ExecutionHandler
@@ -44,8 +45,14 @@ class LiveExecutionHandler(ExecutionHandler):
         self.config = config
         self.exchange = exchange
         self.logger = logging.getLogger("LiveExecutionHandler")
+        self.order_timeout_sec = max(1, int(getattr(config, "ORDER_TIMEOUT", 10)))
         self.tracked_orders = {}
         self.client_id_to_order = {}
+        self._state_callback = None
+
+    def set_order_state_callback(self, callback) -> None:
+        """Set a callback to receive order-state transition events."""
+        self._state_callback = callback
 
     def _call_with_retry(self, fn, *args, retries=3, delay=1.0, backoff=2.0, **kwargs):
         attempt = 0
@@ -90,6 +97,43 @@ class LiveExecutionHandler(ExecutionHandler):
 
     def _make_client_order_id(self):
         return f"LQ-{uuid.uuid4().hex[:24]}"
+
+    def _notify_state(
+        self,
+        *,
+        order_id: str | None,
+        entry: dict[str, Any] | None,
+        state: str,
+        message: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        callback = self._state_callback
+        if callback is None:
+            return
+        payload = {
+            "order_id": order_id,
+            "state": state,
+            "message": message,
+            "metadata": metadata or {},
+            "event_time": time.time(),
+        }
+        if entry:
+            event = entry.get("event")
+            payload["symbol"] = entry.get("symbol")
+            payload["client_order_id"] = getattr(event, "client_order_id", None)
+            payload["last_filled"] = float(entry.get("last_filled", 0.0))
+            payload["created_at"] = float(entry.get("created_at", 0.0))
+        try:
+            callback(payload)
+        except Exception as exc:  # pragma: no cover - defensive callback guard
+            self.logger.error("Order state callback failed: %s", exc)
+
+    def _forget_order(self, order_id: str, entry: dict[str, Any]) -> None:
+        self.tracked_orders.pop(order_id, None)
+        event = entry.get("event")
+        client_order_id = getattr(event, "client_order_id", None)
+        if client_order_id and self.client_id_to_order.get(client_order_id) == order_id:
+            self.client_id_to_order.pop(client_order_id, None)
 
     def _build_exchange_params(self, event):
         params = {}
@@ -208,8 +252,10 @@ class LiveExecutionHandler(ExecutionHandler):
                 "symbol": event.symbol,
                 "last_filled": filled_qty,
                 "state": state,
+                "created_at": time.time(),
                 "updated_at": time.time(),
             }
+            self._notify_state(order_id=order_id, entry=self.tracked_orders[order_id], state=state)
         else:
             self.logger.error(
                 "Exchange order id is missing for client_id=%s", event.client_order_id
@@ -220,12 +266,18 @@ class LiveExecutionHandler(ExecutionHandler):
             if filled_qty <= 0:
                 filled_qty = total_amount
             self._emit_fill_event(event, order, filled_qty, status="filled")
-            self.tracked_orders.pop(order_id, None)
+            self._notify_state(
+                order_id=order_id, entry=self.tracked_orders.get(order_id), state=state
+            )
+            self._forget_order(order_id, self.tracked_orders.get(order_id, {}))
         elif state in {STATE_OPEN, STATE_NEW, STATE_PARTIAL}:
             self.logger.info("Order tracked order_id=%s state=%s", order_id, state)
         elif state in {STATE_CANCELED, STATE_REJECTED}:
             self.logger.warning("Order terminal without fill id=%s state=%s", order_id, state)
-            self.tracked_orders.pop(order_id, None)
+            self._notify_state(
+                order_id=order_id, entry=self.tracked_orders.get(order_id), state=state
+            )
+            self._forget_order(order_id, self.tracked_orders.get(order_id, {}))
         else:
             self.logger.info("Order tracked id=%s state=%s", order_id, state)
 
@@ -234,13 +286,42 @@ class LiveExecutionHandler(ExecutionHandler):
         _ = event
         for order_id, entry in list(self.tracked_orders.items()):
             order_event = entry["event"]
-            latest = self._call_with_retry(
-                self.exchange.fetch_order,
-                order_id,
-                order_event.symbol,
-                retries=3,
-                delay=1,
-            )
+            previous_state = str(entry.get("state", STATE_OPEN))
+            now = time.time()
+
+            if (
+                previous_state in {STATE_NEW, STATE_OPEN, STATE_PARTIAL}
+                and now - float(entry.get("created_at", now)) >= self.order_timeout_sec
+            ):
+                canceled = False
+                try:
+                    canceled = bool(self.exchange.cancel_order(order_id, order_event.symbol))
+                except Exception as exc:
+                    self.logger.error("Failed to cancel timed-out order %s: %s", order_id, exc)
+                timeout_state = STATE_TIMEOUT if canceled else STATE_OPEN
+                if timeout_state == STATE_TIMEOUT:
+                    entry["state"] = STATE_TIMEOUT
+                    entry["updated_at"] = now
+                    self._notify_state(
+                        order_id=order_id,
+                        entry=entry,
+                        state=STATE_TIMEOUT,
+                        message="order_timeout",
+                    )
+                    self._forget_order(order_id, entry)
+                    continue
+
+            try:
+                latest = self._call_with_retry(
+                    self.exchange.fetch_order,
+                    order_id,
+                    order_event.symbol,
+                    retries=3,
+                    delay=1,
+                )
+            except Exception as exc:
+                self.logger.error("Failed to poll order %s: %s", order_id, exc)
+                continue
             if not latest:
                 continue
 
@@ -254,5 +335,7 @@ class LiveExecutionHandler(ExecutionHandler):
 
             entry["state"] = self._to_state(status, filled_now, total_amount)
             entry["updated_at"] = time.time()
+            if entry["state"] != previous_state:
+                self._notify_state(order_id=order_id, entry=entry, state=entry["state"])
             if entry["state"] in TERMINAL_STATES:
-                self.tracked_orders.pop(order_id, None)
+                self._forget_order(order_id, entry)

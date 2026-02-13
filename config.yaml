@@ -83,6 +83,7 @@ live:
   poll_interval: 2  # Seconds
   heartbeat_interval_sec: 30
   order_timeout: 10 # Seconds
+  reconciliation_interval_sec: 30
   # API Keys are best loaded from .env, but can be set here if needed (NOT RECOMMENDED for git)
   # api_key: "YOUR_KEY"
   # secret_key: "YOUR_SECRET"
@@ -99,6 +100,8 @@ optimization:
   strategy: "RsiStrategy" # Class name of the strategy to optimize
   walk_forward_folds: 3
   overfit_penalty: 0.5
+  max_workers: 4
+  persist_best_params: false
   
   # Optuna Settings
   optuna:

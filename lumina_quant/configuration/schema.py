@@ -96,6 +96,7 @@ class LiveRuntimeConfig:
     poll_interval: int = 2
     order_timeout: int = 10
     heartbeat_interval_sec: int = 30
+    reconciliation_interval_sec: int = 30
     exchange: LiveExchangeConfig = field(default_factory=LiveExchangeConfig)
     symbol_limits: dict[str, dict[str, float]] = field(default_factory=dict)
     api_key: str = ""
@@ -117,6 +118,8 @@ class OptimizationRuntimeConfig:
     grid: dict[str, Any] = field(default_factory=dict)
     walk_forward_folds: int = 3
     overfit_penalty: float = 0.5
+    max_workers: int = 4
+    persist_best_params: bool = False
 
 
 @dataclass(slots=True)

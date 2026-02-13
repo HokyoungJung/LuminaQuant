@@ -54,6 +54,7 @@ SYMBOL_LIST = BaseConfig.SYMBOLS
 GRID_PARAMS = OptimizationConfig.GRID_CONFIG.get("params", {})
 OPTUNA_CONFIG = OptimizationConfig.OPTUNA_CONFIG.get("params", {})
 OPTUNA_TRIALS = int(OptimizationConfig.OPTUNA_CONFIG.get("n_trials", 20))
+MAX_WORKERS = int(getattr(OptimizationConfig, "MAX_WORKERS", 4))
 
 
 # 5. Data Splitting Settings (WFA)
@@ -316,7 +317,7 @@ def run_walk_forward_fold(split):
         optimizer = GridSearchOptimizer(
             STRATEGY_CLASS, GRID_PARAMS, CSV_DIR, SYMBOL_LIST, train_start, train_end
         )
-        train_results = optimizer.run(max_workers=4)
+        train_results = optimizer.run(max_workers=MAX_WORKERS)
     elif OPTIMIZATION_METHOD == "OPTUNA":
         optimizer = OptunaOptimizer(
             STRATEGY_CLASS, OPTUNA_CONFIG, CSV_DIR, SYMBOL_LIST, train_start, train_end
@@ -400,11 +401,24 @@ if __name__ == "__main__":
         default=OPTUNA_TRIALS,
         help="Optuna trial count per fold when OPTUNA is selected.",
     )
+    parser.add_argument(
+        "--max-workers",
+        type=int,
+        default=MAX_WORKERS,
+        help="Worker process count for grid search.",
+    )
+    parser.add_argument(
+        "--save-best-params",
+        action="store_true",
+        help="Write winning params into best_optimized_parameters/<strategy>/best_params.json.",
+    )
     args = parser.parse_args()
 
     run_id = str(uuid.uuid4())
     db_path = getattr(BaseConfig, "STORAGE_SQLITE_PATH", "logs/lumina_quant.db")
     OPTUNA_TRIALS = args.n_trials
+    MAX_WORKERS = max(1, int(args.max_workers))
+    persist_best_params = bool(args.save_best_params or OptimizationConfig.PERSIST_BEST_PARAMS)
 
     # Load Data Once
     DATA_DICT = load_all_data(CSV_DIR, SYMBOL_LIST)
@@ -475,11 +489,14 @@ if __name__ == "__main__":
         f"Test Sharpe: {winner['test_result']['sharpe']:.4f}"
     )
 
-    # Save Best Parameters from winning fold.
-    strategy_name = STRATEGY_CLASS.__name__
-    save_dir = os.path.join("best_optimized_parameters", strategy_name)
-    os.makedirs(save_dir, exist_ok=True)
-    best_params_file = os.path.join(save_dir, "best_params.json")
-    with open(best_params_file, "w") as f:
-        json.dump(winner["selected"]["params"], f, indent=4)
-    print(f"[Artifact] Best Parameters saved to '{best_params_file}'")
+    if persist_best_params:
+        # Save best parameters from winning fold (opt-in artifact).
+        strategy_name = STRATEGY_CLASS.__name__
+        save_dir = os.path.join("best_optimized_parameters", strategy_name)
+        os.makedirs(save_dir, exist_ok=True)
+        best_params_file = os.path.join(save_dir, "best_params.json")
+        with open(best_params_file, "w") as f:
+            json.dump(winner["selected"]["params"], f, indent=4)
+        print(f"[Artifact] Best Parameters saved to '{best_params_file}'")
+    else:
+        print("[Artifact] best_params.json export skipped (pure-compute mode).")

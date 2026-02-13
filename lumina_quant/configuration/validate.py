@@ -44,6 +44,12 @@ def validate_runtime_config(runtime: RuntimeConfig, *, for_live: bool = False) -
         raise ValueError("risk.max_daily_loss_pct must be in (0, 1].")
     if runtime.backtest.leverage < 1 or runtime.backtest.leverage > 20:
         raise ValueError("backtest.leverage must be in range [1, 20].")
+    if runtime.live.order_timeout < 1:
+        raise ValueError("live.order_timeout must be >= 1.")
+    if runtime.live.reconciliation_interval_sec < 1:
+        raise ValueError("live.reconciliation_interval_sec must be >= 1.")
+    if runtime.optimization.max_workers < 1:
+        raise ValueError("optimization.max_workers must be >= 1.")
 
     if for_live and (not runtime.live.api_key or not runtime.live.secret_key):
         raise ValueError(
