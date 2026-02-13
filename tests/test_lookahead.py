@@ -1,7 +1,7 @@
-import unittest
+import os
 import queue
 import sys
-import os
+import unittest
 from datetime import datetime
 
 # Add Parent Dir to Path to import lumina_quant
@@ -88,9 +88,7 @@ class TestLookAheadBias(unittest.TestCase):
         self.bars.set_latest_bar(symbol, bar2)
 
         # Market Event T=2 triggers processing
-        mkt_event = MarketEvent(
-            bar2[0], symbol, bar2[1], bar2[2], bar2[3], bar2[4], bar2[5]
-        )
+        mkt_event = MarketEvent(bar2[0], symbol, bar2[1], bar2[2], bar2[3], bar2[4], bar2[5])
         self.handler.check_open_orders(mkt_event)
 
         # CHECK: Queue should have FillEvent now
@@ -120,9 +118,7 @@ class TestLookAheadBias(unittest.TestCase):
         # 110 is far away.
 
         self.assertTrue(diff_open < 1.0, "Fill Price is NOT close to Next Open!")
-        self.assertTrue(
-            diff_close > 1.0, "Fill Price IS close to previous Close! Look-Ahead Bias?"
-        )
+        self.assertTrue(diff_close > 1.0, "Fill Price IS close to previous Close! Look-Ahead Bias?")
 
         print("[Pass] Order filled at T=2 Open. No Look-Ahead confirmed.")
 

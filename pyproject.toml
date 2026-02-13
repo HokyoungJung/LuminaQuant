@@ -1,19 +1,118 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "lumina-quant"
 version = "0.1.0"
 description = "High-perf event-driven algo trading engine"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.11,<3.14"
 dependencies = [
-    "ccxt>=4.5.35",
-    "matplotlib>=3.10.8",
-    "numpy>=2.4.2",
-    "optuna>=4.7.0",
+    "numpy>=1.26.0,<3",
     "polars>=1.37.1",
+    "pandas>=2.2.0",
     "python-dotenv>=1.2.1",
-    "ta-lib>=0.6.8",
     "PyYAML>=6.0",
-    "MetaTrader5>=5.0.0",
+    "ta-lib>=0.6.8",
+]
+
+[project.optional-dependencies]
+optimize = [
+    "optuna>=4.7.0",
+]
+live = [
+    "ccxt>=4.5.35",
     "requests>=2.31.0",
     "websockets>=12.0",
 ]
+dashboard = [
+    "streamlit>=1.41.0",
+    "plotly>=5.24.0",
+    "matplotlib>=3.8.0",
+]
+mt5 = [
+    "MetaTrader5>=5.0.0; platform_system == 'Windows'",
+]
+dev = [
+    "pytest>=8.0.0",
+    "ruff>=0.15.1",
+]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["lumina_quant*", "strategies*"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["lumina_quant", "strategies", "scripts", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",
+    "F",
+    "W",
+    "I",
+    "UP",
+    "B",
+    "C4",
+    "SIM",
+    "PERF",
+    "RUF",
+    "D",
+    "ANN",
+]
+ignore = [
+    "E501",
+    "B007",
+    "B024",
+    "B027",
+    "B904",
+    "B905",
+    "C408",
+    "C416",
+    "D100",
+    "D101",
+    "D102",
+    "D103",
+    "D104",
+    "D105",
+    "D107",
+    "D200",
+    "D205",
+    "D212",
+    "D400",
+    "D401",
+    "D415",
+    "ANN001",
+    "ANN002",
+    "ANN003",
+    "ANN201",
+    "ANN202",
+    "ANN204",
+    "ANN206",
+    "ANN401",
+    "PERF401",
+    "RUF012",
+    "SIM105",
+    "SIM108",
+    "UP031",
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*.py" = ["D", "ANN", "B006", "E402", "F401", "RUF012"]
+"run_backtest.py" = ["D", "ANN"]
+"run_live.py" = ["D", "ANN"]
+"run_live_ws.py" = ["D", "ANN"]
+"optimize.py" = ["D", "ANN"]
+"scripts/benchmark_backtest.py" = ["E402"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

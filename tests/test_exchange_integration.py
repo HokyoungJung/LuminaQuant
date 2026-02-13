@@ -1,16 +1,16 @@
-import sys
 import os
+import sys
 import unittest
 from unittest.mock import MagicMock
 
 # Add Parent Dir to Path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from lumina_quant.live_trader import LiveTrader
+from lumina_quant.interfaces import ExchangeInterface
 from lumina_quant.live_data import LiveDataHandler
 from lumina_quant.live_execution import LiveExecutionHandler
+from lumina_quant.live_trader import LiveTrader
 from lumina_quant.portfolio import Portfolio
-from lumina_quant.interfaces import ExchangeInterface
 
 
 class MockConfig:

@@ -1,7 +1,7 @@
-import unittest
-from unittest.mock import MagicMock, patch
-import sys
 import os
+import sys
+import unittest
+from unittest.mock import MagicMock
 
 # Add Parent Dir to Path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -77,9 +77,7 @@ class TestMT5Exchange(unittest.TestCase):
         mock_mt5.order_send.return_value = mock_result
 
         # Execute Market Buy
-        self.exchange.execute_order(
-            symbol="EURUSD", type="market", side="buy", quantity=1.0
-        )
+        self.exchange.execute_order(symbol="EURUSD", type="market", side="buy", quantity=1.0)
 
         # Verify arguments
         args, _ = mock_mt5.order_send.call_args

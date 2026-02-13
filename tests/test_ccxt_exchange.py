@@ -1,7 +1,7 @@
-import unittest
-from unittest.mock import MagicMock, patch
-import sys
 import os
+import sys
+import unittest
+from unittest.mock import MagicMock
 
 # Add Parent Dir to Path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))

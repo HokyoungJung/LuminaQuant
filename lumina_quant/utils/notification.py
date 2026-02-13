@@ -1,11 +1,10 @@
-import requests
 import logging
+
+import requests
 
 
 class NotificationManager:
-    """
-    Sends notifications via Telegram.
-    """
+    """Sends notifications via Telegram."""
 
     def __init__(self, bot_token, chat_id):
         self.bot_token = bot_token
@@ -14,14 +13,10 @@ class NotificationManager:
         self.enabled = bool(bot_token and chat_id)
 
         if not self.enabled:
-            self.logger.warning(
-                "Telegram Bot Token or Chat ID missing. Notifications disabled."
-            )
+            self.logger.warning("Telegram Bot Token or Chat ID missing. Notifications disabled.")
 
     def send_message(self, message):
-        """
-        Sends a text message to the configured Telegram chat.
-        """
+        """Sends a text message to the configured Telegram chat."""
         if not self.enabled:
             return
 

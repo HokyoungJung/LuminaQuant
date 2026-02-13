@@ -32,7 +32,7 @@ COPY . .
 
 # Install Dependencies
 # We use . to install the current package and dependencies from pyproject.toml
-RUN pip install .
+RUN pip install ".[live,optimize,dashboard]"
 
 # Set Environment Variables
 ENV PYTHONUNBUFFERED=1

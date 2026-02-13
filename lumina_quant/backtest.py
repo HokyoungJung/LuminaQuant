@@ -1,13 +1,16 @@
-import queue
 import collections
+import logging
+import queue
 from pprint import pprint
+
 from lumina_quant.config import BacktestConfig
 from lumina_quant.engine import TradingEngine
 
+LOGGER = logging.getLogger(__name__)
+
 
 class FastQueue:
-    """
-    A lock-free wrapper around collections.deque for single-threaded backtests.
+    """A lock-free wrapper around collections.deque for single-threaded backtests.
     Speeds up event loops by avoiding thread locking overhead (~30% faster).
     """
 
@@ -31,8 +34,7 @@ class FastQueue:
 
 
 class Backtest(TradingEngine):
-    """
-    Encapsulates the settings and components for carrying out
+    """Encapsulates the settings and components for carrying out
     an event-driven backtest.
     """
 
@@ -48,6 +50,8 @@ class Backtest(TradingEngine):
         strategy_params=None,
         end_date=None,
         data_dict=None,
+        record_history=True,
+        track_metrics=True,
     ):
         self.csv_dir = csv_dir
         self.symbol_list = symbol_list
@@ -56,6 +60,8 @@ class Backtest(TradingEngine):
         self.start_date = start_date
         self.end_date = end_date  # Override config if specific
         self.data_dict = data_dict
+        self.record_history = bool(record_history)
+        self.track_metrics = bool(track_metrics)
 
         self.data_handler_cls = data_handler_cls
         self.execution_handler_cls = execution_handler_cls
@@ -77,11 +83,10 @@ class Backtest(TradingEngine):
         )
 
     def _generate_trading_instances(self):
-        """
-        Generates the trading instance objects from
+        """Generates the trading instance objects from
         their class types.
         """
-        print("Creating DataHandler, Strategy, Portfolio and ExecutionHandler")
+        LOGGER.debug("Creating DataHandler, Strategy, Portfolio and ExecutionHandler")
         self.data_handler = self.data_handler_cls(
             self.events,
             self.csv_dir,
@@ -90,25 +95,41 @@ class Backtest(TradingEngine):
             self.end_date,
             self.data_dict,
         )
-        self.strategy = self.strategy_cls(
-            self.bars, self.events, **self.strategy_params
-        )
-        self.portfolio = self.portfolio_cls(
-            self.bars, self.events, self.start_date, self.config
-        )
+        self.strategy = self.strategy_cls(self.bars, self.events, **self.strategy_params)
+        try:
+            self.portfolio = self.portfolio_cls(
+                self.bars,
+                self.events,
+                self.start_date,
+                self.config,
+                record_history=self.record_history,
+                track_metrics=self.track_metrics,
+            )
+        except TypeError:
+            try:
+                self.portfolio = self.portfolio_cls(
+                    self.bars,
+                    self.events,
+                    self.start_date,
+                    self.config,
+                    record_history=self.record_history,
+                )
+            except TypeError:
+                self.portfolio = self.portfolio_cls(
+                    self.bars,
+                    self.events,
+                    self.start_date,
+                    self.config,
+                )
         # Pass config to execution handler for slippage/commission
-        self.execution_handler = self.execution_handler_cls(
-            self.events, self.bars, self.config
-        )
+        self.execution_handler = self.execution_handler_cls(self.events, self.bars, self.config)
 
     @property
     def bars(self):
         return self.data_handler
 
     def _run_backtest(self):
-        """
-        Executes the backtest.
-        """
+        """Executes the backtest."""
         i = 0
         while True:
             i += 1
@@ -129,23 +150,33 @@ class Backtest(TradingEngine):
 
             # time.sleep(self.heartbeat)
 
-    def _output_performance(self):
-        """
-        Outputs the strategy performance from the backtest.
-        """
+    def _output_performance(self, persist_output=True, verbose=True):
+        """Outputs the strategy performance from the backtest."""
         self.portfolio.create_equity_curve_dataframe()
-        self.portfolio.output_trade_log()
+        if persist_output:
+            self.portfolio.output_trade_log()
 
-        print("Creating summary stats...")
         stats = self.portfolio.output_summary_stats()
 
-        print("Creating equity curve...")
-        print(self.portfolio.equity_curve.tail(10))
-        pprint(stats)
+        if persist_output:
+            self.portfolio.save_equity_curve("equity.csv")
 
-    def simulate_trading(self):
-        """
-        Simulates the backtest and outputs portfolio performance.
-        """
+        if verbose:
+            print("Creating summary stats...")
+            print("Creating equity curve...")
+            print(self.portfolio.equity_curve.tail(10).to_dict(as_series=False))
+            pprint(stats)
+        return stats
+
+    def simulate_trading(self, output=True, persist_output=None, verbose=True):
+        """Simulates the backtest and outputs portfolio performance."""
         self._run_backtest()
-        self._output_performance()
+        if not output:
+            return None
+
+        if persist_output is None:
+            persist_output = getattr(self.config, "PERSIST_OUTPUT", True)
+        return self._output_performance(
+            persist_output=persist_output,
+            verbose=verbose,
+        )

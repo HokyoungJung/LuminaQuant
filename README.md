@@ -41,7 +41,7 @@ graph TD
 ## ⚙️ Setup & Configuration
 
 ### Prerequisites
-- Python 3.9+
+- Python 3.11 to 3.13
 - [Polars](https://pola.rs/) (for high-performance data)
 - [Talib](https://github.com/TA-Lib/ta-lib-python) (for technical indicators)
 
@@ -69,7 +69,10 @@ git clone https://github.com/HokyoungJung/LuminaQuant.git
 cd lumina-quant
 
 # Install dependencies
-uv sync  # or pip install .
+uv sync  # or pip install ".[live,optimize,dashboard]"
+
+# Verify install and tests
+python scripts/verify_install.py
 
 # (Optional) For MT5 Support
 pip install MetaTrader5
@@ -101,6 +104,18 @@ trading:
 python run_backtest.py
 ```
 
+**Walk-Forward Optimization (multi-fold):**
+```bash
+python optimize.py
+```
+
+**Architecture/Lint Gate:**
+```bash
+python scripts/check_architecture.py
+ruff format . --check
+ruff check .
+```
+
 **Visualize Results:**
 ```bash
 streamlit run dashboard.py
@@ -109,6 +124,18 @@ streamlit run dashboard.py
 **Start Live Trading:**
 ```bash
 python run_live.py
+# Real mode requires explicit safety flag:
+# LUMINA_ENABLE_LIVE_REAL=true python run_live.py --enable-live-real
+```
+
+**Generate 14-day Soak Report (Promotion Gate):**
+```bash
+python scripts/generate_soak_report.py --db logs/lumina_quant.db --days 14
+```
+
+**Backtest Benchmark Baseline/Regression:**
+```bash
+python scripts/benchmark_backtest.py --output reports/benchmarks/baseline_snapshot.json
 ```
 
 ---

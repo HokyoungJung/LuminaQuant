@@ -50,7 +50,7 @@ If you prefer running directly on the OS.
 ### 1. Install Dependencies
 ```bash
 apt update && apt install python3-pip
-pip install .
+pip install ".[live,optimize,dashboard]"
 ```
 
 ### 2. Create Service File

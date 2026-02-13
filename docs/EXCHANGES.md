@@ -15,10 +15,14 @@ LuminaQuant relies on the `ccxt` library to connect to over 100+ crypto exchange
 
 ```yaml
 live:
+  mode: "paper"  # paper|real
   exchange:
     driver: "ccxt"
     name: "binance"
-  testnet: true  # Set to false for Mainnet
+    market_type: "future"   # spot|future
+    position_mode: "HEDGE"  # ONEWAY|HEDGE
+    margin_mode: "isolated" # isolated|cross
+    leverage: 3
 ```
 
 ### Environment Variables (`.env`)

@@ -44,6 +44,12 @@ class MyStrategy(Strategy):
                     # signal_type: "LONG", "SHORT", "EXIT"
                     signal = SignalEvent(1, s, event.time, "LONG", 1.0)
                     self.events.put(signal)
+
+    def get_state(self):
+        return {}
+
+    def set_state(self, state):
+        _ = state
 ```
 
 ## 2. Data Handler API
@@ -81,3 +87,9 @@ class ExchangeInterface(ABC):
 ```
 
 See `lumina_quant/exchanges/` for `CCXTExchange` and `MT5Exchange` implementations.
+
+## 4. Runtime Config Layer
+
+- New typed API: `lumina_quant.configuration.load_runtime_config`.
+- Env override prefix: `LQ_` (for nested keys: `LQ__LIVE__EXCHANGE__LEVERAGE=3`).
+- Backward compatibility: legacy keys still work through `lumina_quant.config`.

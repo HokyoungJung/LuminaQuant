@@ -1,11 +1,10 @@
 import json
-import os
 import logging
+import os
 
 
 class StateManager:
-    """
-    Manages the persistence of trading state (Positions, Strategy Logic) to a JSON file.
+    """Manages the persistence of trading state (Positions, Strategy Logic) to a JSON file.
     Ensures that if the bot crashes and restarts, it resumes with correct context.
     """
 
@@ -14,13 +13,12 @@ class StateManager:
         self.logger = logging.getLogger("lumina_quant.state_manager")
 
     def load_state(self):
-        """
-        Loads the state from the JSON file.
+        """Loads the state from the JSON file.
         Returns empty dict if file doesn't exist or error.
         """
         if os.path.exists(self.file_path):
             try:
-                with open(self.file_path, "r") as f:
+                with open(self.file_path) as f:
                     return json.load(f)
             except Exception as e:
                 self.logger.error(f"Failed to load state: {e}")
@@ -28,9 +26,7 @@ class StateManager:
         return {}
 
     def save_state(self, state_dict):
-        """
-        Saves the state dict to the JSON file.
-        """
+        """Saves the state dict to the JSON file."""
         try:
             # Atomic write (write to temp then rename) to prevent corruption
             temp_path = self.file_path + ".tmp"

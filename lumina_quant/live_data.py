@@ -1,13 +1,14 @@
-import time
 import threading
-from lumina_quant.events import MarketEvent
+import time
+from collections import deque
+
 from lumina_quant.data import DataHandler
+from lumina_quant.events import MarketEvent
 from lumina_quant.interfaces import ExchangeInterface
 
 
 class LiveDataHandler(DataHandler):
-    """
-    LiveDataHandler is designed to fetch live market data
+    """LiveDataHandler is designed to fetch live market data
     from an ExchangeInterface and push MarketEvents to the queue.
     It uses a separate thread to poll data so the main loop isn't blocked.
     """
@@ -30,7 +31,7 @@ class LiveDataHandler(DataHandler):
 
         self.continue_backtest = True  # Kept for compatibility, serves as "is_running"
 
-        self.latest_symbol_data = {s: [] for s in symbol_list}
+        self.latest_symbol_data = {s: deque(maxlen=100) for s in symbol_list}
         self.lock = threading.Lock()
 
         # Warmup Data
@@ -42,9 +43,7 @@ class LiveDataHandler(DataHandler):
         self.polling_thread.start()
 
     def _warmup_data(self):
-        """
-        Fetches historical data to warm up indicators.
-        """
+        """Fetches historical data to warm up indicators."""
         print("Warming up data buffers...")
         timeframe = getattr(self.config, "TIMEFRAME", "1m")
         for s in self.symbol_list:
@@ -63,9 +62,7 @@ class LiveDataHandler(DataHandler):
                 print(f"Warmup failed for {s}: {e}")
 
     def _poll_market_data(self):
-        """
-        Polls market data in a loop.
-        """
+        """Polls market data in a loop."""
         print("Starting Live Data Polling...")
         while self.continue_backtest:
             try:
@@ -83,17 +80,12 @@ class LiveDataHandler(DataHandler):
 
                         # Ensure we don't process the same timestamp multiple times
                         last_ts = (
-                            self.latest_symbol_data[s][-1][0]
-                            if self.latest_symbol_data[s]
-                            else 0
+                            self.latest_symbol_data[s][-1][0] if self.latest_symbol_data[s] else 0
                         )
 
                         if timestamp != last_ts:
                             with self.lock:
                                 self.latest_symbol_data[s].append(bar_tuple)
-                                # Keep list short
-                                if len(self.latest_symbol_data[s]) > 100:
-                                    self.latest_symbol_data[s].pop(0)
 
                             print(f"New Bar: {s} @ {timestamp}")
                             self.events.put(
@@ -115,9 +107,7 @@ class LiveDataHandler(DataHandler):
                 time.sleep(5)
 
     def update_bars(self):
-        """
-        In live mode, the thread handles updates.
-        """
+        """In live mode, the thread handles updates."""
         pass
 
     def get_latest_bar(self, symbol):
@@ -126,7 +116,7 @@ class LiveDataHandler(DataHandler):
 
     def get_latest_bars(self, symbol, N=1):
         with self.lock:
-            return self.latest_symbol_data[symbol][-N:]
+            return list(self.latest_symbol_data[symbol])[-N:]
 
     def get_latest_bar_datetime(self, symbol):
         with self.lock:
@@ -141,8 +131,13 @@ class LiveDataHandler(DataHandler):
 
     def get_latest_bars_values(self, symbol, val_type, N=1):
         with self.lock:
-            data = self.latest_symbol_data[symbol][-N:]
+            data = list(self.latest_symbol_data[symbol])[-N:]
             idx = self.col_idx.get(val_type)
             if idx is not None:
                 return [d[idx] for d in data]
             return []
+
+    def get_market_spec(self, symbol):
+        if self.exchange and hasattr(self.exchange, "get_market_spec"):
+            return self.exchange.get_market_spec(symbol)
+        return {}

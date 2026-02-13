@@ -1,5 +1,3 @@
-from typing import Dict, List, Optional
-
 try:
     import MetaTrader5 as mt5
 except ImportError:
@@ -9,8 +7,7 @@ from lumina_quant.interfaces import ExchangeInterface
 
 
 class MT5Exchange(ExchangeInterface):
-    """
-    Implementation of ExchangeInterface using MetaTrader5.
+    """Implementation of ExchangeInterface using MetaTrader5.
     Requires MetaTrader5 python package and a running MT5 terminal.
     """
 
@@ -41,11 +38,7 @@ class MT5Exchange(ExchangeInterface):
                 if authorized:
                     print(f"Connected to account #{login}")
                 else:
-                    print(
-                        "failed to connect at account #{}, error code: {}".format(
-                            login, mt5.last_error()
-                        )
-                    )
+                    print(f"failed to connect at account #{login}, error code: {mt5.last_error()}")
 
     def get_balance(self, currency: str = "USDT") -> float:
         if not self.connected:
@@ -57,7 +50,7 @@ class MT5Exchange(ExchangeInterface):
         # account_info.balance gives the account balance in deposit currency
         return account_info.balance
 
-    def get_all_positions(self) -> Dict[str, float]:
+    def get_all_positions(self) -> dict[str, float]:
         if not self.connected:
             return {}
         positions = mt5.positions_get()
@@ -69,7 +62,7 @@ class MT5Exchange(ExchangeInterface):
             result[pos.symbol] = pos.volume
         return result
 
-    def fetch_ohlcv(self, symbol: str, timeframe: str, limit: int = 100) -> List[tuple]:
+    def fetch_ohlcv(self, symbol: str, timeframe: str, limit: int = 100) -> list[tuple]:
         if not self.connected:
             return []
 
@@ -122,11 +115,12 @@ class MT5Exchange(ExchangeInterface):
         type: str,
         side: str,
         quantity: float,
-        price: Optional[float] = None,
-        params: Dict = {},
-    ) -> Dict:
+        price: float | None = None,
+        params: dict | None = None,
+    ) -> dict:
         if not self.connected:
             raise RuntimeError("Not connected to MT5")
+        params = params or {}
 
         # Prepare request
         action = mt5.TRADE_ACTION_DEAL
@@ -157,9 +151,7 @@ class MT5Exchange(ExchangeInterface):
         # Get defaults from config
         magic = params.get("magic", getattr(self.config, "MT5_MAGIC", 234000))
         deviation = params.get("deviation", getattr(self.config, "MT5_DEVIATION", 20))
-        comment = params.get(
-            "comment", getattr(self.config, "MT5_COMMENT", "LuminaQuant")
-        )
+        comment = params.get("comment", getattr(self.config, "MT5_COMMENT", "LuminaQuant"))
         filler_type = params.get("type_filling", mt5.ORDER_FILLING_IOC)
         sl = params.get("sl", 0.0)
         tp = params.get("tp", 0.0)
@@ -181,7 +173,7 @@ class MT5Exchange(ExchangeInterface):
 
         result = mt5.order_send(request)
         if result.retcode != mt5.TRADE_RETCODE_DONE:
-            print("Order send failed, retcode={}".format(result.retcode))
+            print(f"Order send failed, retcode={result.retcode}")
             raise RuntimeError(f"Order failed: {result.comment}")
 
         return {
@@ -193,7 +185,48 @@ class MT5Exchange(ExchangeInterface):
             "amount": result.volume,
         }
 
-    def fetch_open_orders(self, symbol: Optional[str] = None) -> List[Dict]:
+    def load_markets(self) -> dict:
+        return {}
+
+    def set_leverage(self, symbol: str, leverage: int) -> bool:
+        _ = (symbol, leverage)
+        return True
+
+    def set_margin_mode(self, symbol: str, margin_mode: str) -> bool:
+        _ = (symbol, margin_mode)
+        return True
+
+    def fetch_positions(self, symbol: str | None = None) -> list[dict]:
+        return [
+            {"symbol": sym, "contracts": qty}
+            for sym, qty in self.get_all_positions().items()
+            if symbol is None or sym == symbol
+        ]
+
+    def fetch_order(self, order_id: str, symbol: str | None = None) -> dict:
+        _ = symbol
+        if not self.connected:
+            return {}
+        try:
+            ticket = int(order_id)
+        except Exception:
+            return {}
+
+        orders = mt5.orders_get(ticket=ticket)
+        if not orders:
+            return {}
+        order = orders[0]
+        return {
+            "id": str(order.ticket),
+            "status": "open",
+            "filled": order.volume_initial - order.volume_current,
+            "average": order.price_open,
+            "price": order.price_open,
+            "amount": order.volume_initial,
+            "symbol": order.symbol,
+        }
+
+    def fetch_open_orders(self, symbol: str | None = None) -> list[dict]:
         if not self.connected:
             return []
 
@@ -213,9 +246,7 @@ class MT5Exchange(ExchangeInterface):
                 {
                     "id": str(order.ticket),
                     "symbol": order.symbol,
-                    "type": "buy"
-                    if order.type == mt5.ORDER_TYPE_BUY
-                    else "sell",  # Simplified
+                    "type": "buy" if order.type == mt5.ORDER_TYPE_BUY else "sell",  # Simplified
                     "side": "buy"
                     if order.type
                     in [
@@ -237,7 +268,7 @@ class MT5Exchange(ExchangeInterface):
             )
         return result
 
-    def cancel_order(self, order_id: str, symbol: Optional[str] = None) -> bool:
+    def cancel_order(self, order_id: str, symbol: str | None = None) -> bool:
         if not self.connected:
             return False
 

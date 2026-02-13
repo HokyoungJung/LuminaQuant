@@ -1,23 +1,20 @@
+import atexit
 import queue
 import time
+
 from lumina_quant.config import LiveConfig
-from lumina_quant.utils.logging_utils import setup_logging
-from lumina_quant.utils.persistence import StateManager
 from lumina_quant.engine import TradingEngine
 from lumina_quant.exchanges import get_exchange
 from lumina_quant.interfaces import ExchangeInterface
-
-
-from lumina_quant.utils.notification import NotificationManager
-
-
 from lumina_quant.risk_manager import RiskManager
+from lumina_quant.utils.audit_store import AuditStore
+from lumina_quant.utils.logging_utils import setup_logging
+from lumina_quant.utils.notification import NotificationManager
+from lumina_quant.utils.persistence import StateManager
 
 
 class LiveTrader(TradingEngine):
-    """
-    The LiveTrader engine.
-    """
+    """The LiveTrader engine."""
 
     def __init__(
         self,
@@ -33,14 +30,42 @@ class LiveTrader(TradingEngine):
         self.config = LiveConfig
         self.state_manager = StateManager()
         self.risk_manager = RiskManager(self.config)  # NEW
+        self.audit_store = AuditStore(
+            getattr(self.config, "STORAGE_SQLITE_PATH", "lumina_quant.db")
+        )
+        self.run_id = self.audit_store.start_run(
+            mode="live",
+            metadata={
+                "symbols": self.symbol_list,
+                "exchange": self.config.EXCHANGE,
+                "mode": self.config.MODE,
+            },
+        )
+        self._audit_closed = False
+        self.heartbeat_interval_sec = max(
+            1, int(getattr(self.config, "HEARTBEAT_INTERVAL_SEC", 30))
+        )
+        self.reconciliation_interval_sec = max(
+            5,
+            int(
+                getattr(
+                    self.config,
+                    "RECONCILIATION_INTERVAL_SEC",
+                    self.heartbeat_interval_sec,
+                )
+            ),
+        )
+        self._last_heartbeat_monotonic = time.monotonic()
+        self._last_reconciliation_monotonic = 0.0
+        self._last_drift_signature = ()
+        self._reconciliation_drift_events = 0
+        atexit.register(self._close_audit_store)
 
         # Initialize Notification Manager
         self.notifier = NotificationManager(
             self.config.TELEGRAM_BOT_TOKEN, self.config.TELEGRAM_CHAT_ID
         )
-        self.notifier.send_message(
-            f"🚀 **LuminaQuant Started**\nSymbols: {symbol_list}"
-        )
+        self.notifier.send_message(f"🚀 **LuminaQuant Started**\nSymbols: {symbol_list}")
 
         # Initialize Exchange
         self.logger.info("Initializing Exchange...")
@@ -53,10 +78,10 @@ class LiveTrader(TradingEngine):
         self.execution_handler = execution_handler_cls(
             self.events, self.data_handler, self.config, self.exchange
         )
+        if hasattr(self.execution_handler, "set_order_state_callback"):
+            self.execution_handler.set_order_state_callback(self._on_order_state)
 
-        self.portfolio = portfolio_cls(
-            self.data_handler, self.events, time.time(), self.config
-        )
+        self.portfolio = portfolio_cls(self.data_handler, self.events, time.time(), self.config)
         self.strategy = strategy_cls(self.data_handler, self.events)
 
         # Initialize Base Engine
@@ -94,19 +119,130 @@ class LiveTrader(TradingEngine):
         except Exception as e:
             self.logger.error(f"Failed to save state: {e}")
 
+    def _close_audit_store(self, status=None):
+        if self._audit_closed:
+            return
+        try:
+            if status:
+                self.audit_store.end_run(self.run_id, status=status)
+        except Exception:
+            pass
+        try:
+            self.audit_store.close()
+        except Exception:
+            pass
+        self._audit_closed = True
+
+    def _on_order_state(self, state_payload):
+        try:
+            self.audit_store.log_order_state(self.run_id, state_payload)
+        except Exception as exc:
+            self.logger.error("Failed to persist order state event: %s", exc)
+            return
+
+        state = str(state_payload.get("state", "")).upper()
+        if state not in {"REJECTED", "TIMEOUT", "CANCELED"}:
+            return
+        details = {
+            "state": state,
+            "symbol": state_payload.get("symbol"),
+            "client_order_id": state_payload.get("client_order_id"),
+            "exchange_order_id": state_payload.get("order_id"),
+            "message": state_payload.get("message"),
+            "metadata": state_payload.get("metadata") or {},
+        }
+        self.audit_store.log_risk_event(
+            self.run_id,
+            reason=f"ORDER_{state}",
+            details=details,
+        )
+        msg = f"⚠️ **Order {state}** {details['symbol']} (client_id={details['client_order_id']})"
+        self.notifier.send_message(msg)
+
     def on_fill(self, event):
-        """
-        Hook from TradingEngine to save state on fill.
-        """
+        """Hook from TradingEngine to save state on fill."""
         msg = f"✅ **FILL**: {event.direction} {event.quantity} {event.symbol} @ {event.fill_cost}"
         self.logger.info(msg)
         self.notifier.send_message(msg)
+        self.audit_store.log_fill(self.run_id, event)
         self._save_state()
 
+    def _emit_heartbeat(self, force=False):
+        now_mono = time.monotonic()
+        if not force and (now_mono - self._last_heartbeat_monotonic) < self.heartbeat_interval_sec:
+            return
+        self._last_heartbeat_monotonic = now_mono
+        details = {"queue_size": self.events.qsize()}
+        if hasattr(self.execution_handler, "tracked_orders"):
+            details["tracked_orders"] = len(self.execution_handler.tracked_orders)
+        details["reconciliation_drift_events"] = self._reconciliation_drift_events
+        self.audit_store.log_heartbeat(self.run_id, status="ALIVE", details=details)
+
+    def _reconcile_positions(self, force=False):
+        now_mono = time.monotonic()
+        if (
+            not force
+            and (now_mono - self._last_reconciliation_monotonic) < self.reconciliation_interval_sec
+        ):
+            return
+        self._last_reconciliation_monotonic = now_mono
+
+        try:
+            exchange_positions = self.exchange.get_all_positions()
+        except Exception as exc:
+            self.logger.error("Reconciliation failed to fetch exchange positions: %s", exc)
+            self.audit_store.log_risk_event(
+                self.run_id,
+                reason="RECONCILIATION_ERROR",
+                details={"error": str(exc)},
+            )
+            return
+
+        local = self.portfolio.current_positions
+        drift = []
+        for symbol in self.symbol_list:
+            local_qty = float(local.get(symbol, 0.0))
+            exchange_qty = float(exchange_positions.get(symbol, 0.0))
+            delta = exchange_qty - local_qty
+            if abs(delta) > 1e-9:
+                drift.append(
+                    {
+                        "symbol": symbol,
+                        "local_qty": local_qty,
+                        "exchange_qty": exchange_qty,
+                        "delta": delta,
+                    }
+                )
+
+        signature = tuple(
+            sorted(
+                (
+                    item["symbol"],
+                    round(item["local_qty"], 8),
+                    round(item["exchange_qty"], 8),
+                )
+                for item in drift
+            )
+        )
+        if drift and signature != self._last_drift_signature:
+            self._last_drift_signature = signature
+            self._reconciliation_drift_events += 1
+            self.audit_store.log_risk_event(
+                self.run_id,
+                reason="RECONCILIATION_DRIFT",
+                details={
+                    "drift_count": len(drift),
+                    "drift": drift,
+                },
+            )
+            self.notifier.send_message(
+                f"⚠️ **Reconciliation Drift** detected for {len(drift)} symbol(s)."
+            )
+        if not drift:
+            self._last_drift_signature = ()
+
     def _sync_portfolio(self):
-        """
-        Syncs the internal portfolio state with the exchange state.
-        """
+        """Syncs the internal portfolio state with the exchange state."""
         if isinstance(self.exchange, ExchangeInterface):
             self.logger.info("Syncing Portfolio with Exchange...")
 
@@ -117,10 +253,7 @@ class LiveTrader(TradingEngine):
                     self.logger.info(f"Exchange USDT Balance: {balance}")
                     self.portfolio.current_holdings["cash"] = balance
                     # If total is 0 (first run), init with balance.
-                    if (
-                        self.portfolio.current_holdings["total"]
-                        == self.portfolio.initial_capital
-                    ):
+                    if self.portfolio.current_holdings["total"] == self.portfolio.initial_capital:
                         self.portfolio.initial_capital = balance
 
                 # 2. Sync Positions
@@ -154,48 +287,72 @@ class LiveTrader(TradingEngine):
                             self.logger.warning(msg)
                             self.notifier.send_message(msg)
                             self.strategy.bought[s] = "OUT"
+                            self.audit_store.log_risk_event(
+                                self.run_id,
+                                reason="STATE_MISMATCH",
+                                details={
+                                    "symbol": s,
+                                    "strategy_status": strategy_status,
+                                    "position_qty": position_qty,
+                                },
+                            )
                         elif strategy_status == "OUT" and position_qty != 0:
                             msg = f"⚠️ **State Mismatch**: {s} Strategy=OUT, Portfolio={position_qty}. Syncing Strategy."
                             self.logger.warning(msg)
                             self.notifier.send_message(msg)
-                            self.strategy.bought[s] = (
-                                "LONG" if position_qty > 0 else "SHORT"
+                            self.strategy.bought[s] = "LONG" if position_qty > 0 else "SHORT"
+                            self.audit_store.log_risk_event(
+                                self.run_id,
+                                reason="STATE_MISMATCH",
+                                details={
+                                    "symbol": s,
+                                    "strategy_status": strategy_status,
+                                    "position_qty": position_qty,
+                                },
                             )
 
-                self.logger.info(
-                    f"Portfolio Sync Completed. Total Equity: {total_equity}"
-                )
+                self.logger.info(f"Portfolio Sync Completed. Total Equity: {total_equity}")
             except Exception as e:
                 self.logger.error(f"Portfolio Sync Failed: {e}")
+                self.audit_store.log_risk_event(
+                    self.run_id,
+                    reason="EXCHANGE_SYNC_ERROR",
+                    details={"error": str(e)},
+                )
 
     def handle_market_event(self, event):
-        """
-        Override to save equity curve on every bar.
-        """
+        """Override to save equity curve on every bar."""
         super().handle_market_event(event)
 
         # Save Live Equity
         self.portfolio.create_equity_curve_dataframe()
-        self.portfolio.save_equity_curve("live_equity.csv")
+        if getattr(self.config, "STORAGE_EXPORT_CSV", True):
+            self.portfolio.save_equity_curve("live_equity.csv")
+        self.audit_store.log_equity(
+            self.run_id,
+            timeindex=event.time,
+            total=self.portfolio.current_holdings.get("total", 0.0),
+            cash=self.portfolio.current_holdings.get("cash", 0.0),
+            metadata={"symbol": event.symbol},
+        )
 
     def handle_fill_event(self, event):
-        """
-        Override to save trades on every fill.
-        """
+        """Override to save trades on every fill."""
         super().handle_fill_event(event)  # This calls self.on_fill(event) too
 
         # Save Live Trades
-        self.portfolio.output_trade_log("live_trades.csv")
+        if getattr(self.config, "STORAGE_EXPORT_CSV", True):
+            self.portfolio.output_trade_log("live_trades.csv")
 
     def run(self):
-        """
-        Main Live Trading Loop.
-        """
+        """Main Live Trading Loop."""
         self.logger.info(f"Starting Live Trading on {self.symbol_list}...")
         self._sync_portfolio()
 
         while True:
             try:
+                self._emit_heartbeat(force=False)
+                self._reconcile_positions(force=False)
                 # In Live mode, data_handler is threaded and pushes events autonomously.
                 # We just blocking-wait for events.
                 event = self.events.get(True, timeout=10)  # Wait up to 10s
@@ -221,24 +378,47 @@ class LiveTrader(TradingEngine):
                             event.symbol, "close"
                         )
                         passed, reason = self.risk_manager.check_order(
-                            event, current_price
+                            event, current_price, portfolio=self.portfolio
                         )
                         if not passed:
                             msg = f"⛔ **Risk Reject**: {reason}"
                             self.logger.warning(msg)
                             self.notifier.send_message(msg)
+                            self.audit_store.log_risk_event(
+                                self.run_id,
+                                reason="ORDER_REJECTED",
+                                details={
+                                    "symbol": event.symbol,
+                                    "direction": event.direction,
+                                    "quantity": event.quantity,
+                                    "reason": reason,
+                                },
+                            )
                             continue  # Skip processing this event
+                        self.audit_store.log_order(self.run_id, event, status="NEW")
 
                     self.process_event(event)
 
             except queue.Empty:
                 # Heartbeat
-                pass
+                self._emit_heartbeat(force=True)
+                self._reconcile_positions(force=False)
+                if hasattr(self.execution_handler, "check_open_orders"):
+                    self.execution_handler.check_open_orders(None)
             except KeyboardInterrupt:
                 self.logger.info("Stopping Live Trader...")
                 self._save_state()  # Save on exit
                 self.data_handler.continue_backtest = False
+                if hasattr(self.data_handler, "ws_running"):
+                    self.data_handler.ws_running = False
+                self._close_audit_store(status="STOPPED")
                 break
             except Exception as e:
                 self.logger.error(f"Error in main loop: {e}")
                 self._save_state()  # Save on crash attempt
+                self.audit_store.log_risk_event(
+                    self.run_id, reason="MAIN_LOOP_ERROR", details={"error": str(e)}
+                )
+
+    def __del__(self):
+        self._close_audit_store(status="STOPPED")

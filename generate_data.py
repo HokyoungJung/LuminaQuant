@@ -1,7 +1,8 @@
-import polars as pl
-import numpy as np
 import os
 from datetime import datetime, timedelta
+
+import numpy as np
+import polars as pl
 
 
 def generate_random_data(symbol, days=100):

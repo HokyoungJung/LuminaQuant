@@ -1,14 +1,15 @@
+import asyncio
 import json
 import threading
-import asyncio
+from collections import deque
+
 import websockets
-from lumina_quant.events import MarketEvent
 from lumina_quant.data import DataHandler
+from lumina_quant.events import MarketEvent
 
 
 class BinanceWebSocketDataHandler(DataHandler):
-    """
-    Connects to Binance WebSocket for real-time trade/kline updates.
+    """Connects to Binance WebSocket for real-time trade/kline updates.
     significantly faster than polling.
     """
 
@@ -19,9 +20,10 @@ class BinanceWebSocketDataHandler(DataHandler):
         self.exchange = exchange  # still needed for warmup
 
         # Internal State
-        self.latest_symbol_data = {s: [] for s in symbol_list}
+        self.latest_symbol_data = {s: deque(maxlen=100) for s in symbol_list}
         self.lock = threading.Lock()
         self.ws_running = True
+        self.continue_backtest = True  # Compatibility with engine/live trader stop flow
 
         # Column Map
         self.col_idx = {
@@ -41,9 +43,7 @@ class BinanceWebSocketDataHandler(DataHandler):
         self.thread.start()
 
     def _warmup_data(self):
-        """
-        Fetch historical data via REST API before connecting WS.
-        """
+        """Fetch historical data via REST API before connecting WS."""
         print("Warming up data buffers via REST...")
         timeframe = getattr(self.config, "TIMEFRAME", "1m")
         if self.exchange:
@@ -64,8 +64,7 @@ class BinanceWebSocketDataHandler(DataHandler):
         loop.run_until_complete(self._listen_socket())
 
     async def _listen_socket(self):
-        """
-        Connects to Binance Stream.
+        """Connects to Binance Stream.
         URL format: wss://stream.binance.com:9443/stream?streams=<symbol>@kline_<interval>/...
         """
         base_url = "wss://stream.binance.com:9443/stream?streams="
@@ -93,8 +92,7 @@ class BinanceWebSocketDataHandler(DataHandler):
                 await asyncio.sleep(5)
 
     def _handle_message(self, data):
-        """
-        Parses WebSocket message and pushes MarketEvent.
+        """Parses WebSocket message and pushes MarketEvent.
         Data format:
         {
             "stream": "btcusdt@kline_1m",
@@ -153,8 +151,6 @@ class BinanceWebSocketDataHandler(DataHandler):
 
                 with self.lock:
                     self.latest_symbol_data[symbol].append(bar_tuple)
-                    if len(self.latest_symbol_data[symbol]) > 100:
-                        self.latest_symbol_data[symbol].pop(0)
 
                 # Push Event
                 print(f"⚡ WS Bar Closed: {symbol} @ {c}")
@@ -169,22 +165,16 @@ class BinanceWebSocketDataHandler(DataHandler):
     # GETTERS (Wrapped with Lock)
     def get_latest_bar(self, symbol):
         with self.lock:
-            return (
-                self.latest_symbol_data[symbol][-1]
-                if self.latest_symbol_data[symbol]
-                else None
-            )
+            return self.latest_symbol_data[symbol][-1] if self.latest_symbol_data[symbol] else None
 
     def get_latest_bars(self, symbol, N=1):
         with self.lock:
-            return self.latest_symbol_data[symbol][-N:]
+            return list(self.latest_symbol_data[symbol])[-N:]
 
     def get_latest_bar_datetime(self, symbol):
         with self.lock:
             return (
-                self.latest_symbol_data[symbol][-1][0]
-                if self.latest_symbol_data[symbol]
-                else None
+                self.latest_symbol_data[symbol][-1][0] if self.latest_symbol_data[symbol] else None
             )
 
     def get_latest_bar_value(self, symbol, val_type):
@@ -196,6 +186,11 @@ class BinanceWebSocketDataHandler(DataHandler):
 
     def get_latest_bars_values(self, symbol, val_type, N=1):
         with self.lock:
-            data = self.latest_symbol_data[symbol][-N:]
+            data = list(self.latest_symbol_data[symbol])[-N:]
             idx = self.col_idx.get(val_type)
             return [d[idx] for d in data] if idx is not None else []
+
+    def get_market_spec(self, symbol):
+        if self.exchange and hasattr(self.exchange, "get_market_spec"):
+            return self.exchange.get_market_spec(symbol)
+        return {}

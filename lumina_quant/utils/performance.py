@@ -2,8 +2,7 @@ import numpy as np
 
 
 def create_alpha_beta(strategy_returns, benchmark_returns, periods=252):
-    """
-    Calculates Alpha and Beta.
+    """Calculates Alpha and Beta.
     Beta = Cov(Ra, Rb) / Var(Rb)
     Alpha = R - Beta * Rb (Annualized)
     """
@@ -27,9 +26,7 @@ def create_alpha_beta(strategy_returns, benchmark_returns, periods=252):
 
 
 def create_information_ratio(strategy_returns, benchmark_returns):
-    """
-    Calculates Information Ratio (Active Return / Tracking Error).
-    """
+    """Calculates Information Ratio (Active Return / Tracking Error)."""
     min_len = min(len(strategy_returns), len(benchmark_returns))
     active_return = strategy_returns[:min_len] - benchmark_returns[:min_len]
     tracking_error = np.std(active_return)
@@ -40,9 +37,7 @@ def create_information_ratio(strategy_returns, benchmark_returns):
 
 
 def create_cagr(final_value, initial_value, periods, annual_periods=252):
-    """
-    Calculate Compound Annual Growth Rate.
-    """
+    """Calculate Compound Annual Growth Rate."""
     if initial_value == 0:
         return 0.0
     years = periods / annual_periods
@@ -52,25 +47,19 @@ def create_cagr(final_value, initial_value, periods, annual_periods=252):
 
 
 def create_annualized_volatility(returns, periods=252):
-    """
-    Calculate Annualized Volatility.
-    """
+    """Calculate Annualized Volatility."""
     return np.std(returns) * np.sqrt(periods)
 
 
 def create_sharpe_ratio(returns, periods=252, risk_free=0.0):
-    """
-    Create the Sharpe ratio for the strategy.
-    """
+    """Create the Sharpe ratio for the strategy."""
     if np.std(returns) == 0:
         return 0.0
     return np.sqrt(periods) * (np.mean(returns) - risk_free) / np.std(returns)
 
 
 def create_sortino_ratio(returns, periods=252, risk_free=0.0):
-    """
-    Create the Sortino ratio (Downside Risk only).
-    """
+    """Create the Sortino ratio (Downside Risk only)."""
     downside_returns = returns[returns < 0]
     downside_std = np.std(downside_returns)
     if downside_std == 0:
@@ -79,9 +68,7 @@ def create_sortino_ratio(returns, periods=252, risk_free=0.0):
 
 
 def create_calmar_ratio(cagr, max_drawdown):
-    """
-    Create the Calmar ratio (CAGR / MaxDD).
-    """
+    """Create the Calmar ratio (CAGR / MaxDD)."""
     if max_drawdown == 0:
         return 0.0
     # MaxDD is usually positive in stats, but if passed as negative, handle it.
@@ -89,8 +76,7 @@ def create_calmar_ratio(cagr, max_drawdown):
 
 
 def create_drawdowns(pnl):
-    """
-    Calculate the largest peak-to-trough drawdown of the PnL curve.
+    """Calculate the largest peak-to-trough drawdown of the PnL curve.
     pnl: list or numpy array of equity curve values
     """
     hwm = [0]

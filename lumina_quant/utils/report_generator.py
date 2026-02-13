@@ -1,21 +1,20 @@
-import pandas as pd
 import json
 import os
 from datetime import datetime
+
+import pandas as pd
 from lumina_quant.utils.performance import (
-    create_sharpe_ratio,
-    create_drawdowns,
-    create_cagr,
     create_annualized_volatility,
+    create_cagr,
     create_calmar_ratio,
+    create_drawdowns,
+    create_sharpe_ratio,
     create_sortino_ratio,
 )
 
 
 class ReportGenerator:
-    """
-    Generates markdown reports from trading data.
-    """
+    """Generates markdown reports from trading data."""
 
     def __init__(self, output_dir="reports"):
         self.output_dir = output_dir
@@ -23,9 +22,7 @@ class ReportGenerator:
             os.makedirs(self.output_dir)
 
     def generate_report(self, report_type="Backtest", strategy_name="Unknown"):
-        """
-        Main entry point to generate a report.
-        """
+        """Main entry point to generate a report."""
         date_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         filename = f"{self.output_dir}/{report_type}_Report_{date_str}.md"
 
@@ -98,11 +95,9 @@ class ReportGenerator:
         return None
 
     def _load_params(self, strategy_name):
-        path = os.path.join(
-            "best_optimized_parameters", strategy_name, "best_params.json"
-        )
+        path = os.path.join("best_optimized_parameters", strategy_name, "best_params.json")
         if os.path.exists(path):
-            with open(path, "r") as f:
+            with open(path) as f:
                 return json.load(f)
         return {}
 

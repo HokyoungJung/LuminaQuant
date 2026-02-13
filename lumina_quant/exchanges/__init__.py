@@ -3,9 +3,7 @@ from .mt5_exchange import MT5Exchange
 
 
 def get_exchange(config: object):
-    """
-    Factory function to get the appropriate exchange implementation.
-    """
+    """Factory function to get the appropriate exchange implementation."""
     # Parse config structure
     # Supports old style (exchange_id) for backward compat or new style (exchange.driver)
 

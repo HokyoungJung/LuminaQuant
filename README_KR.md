@@ -42,7 +42,7 @@ graph TD
 ## ⚙️ 설정 및 구성 (Setup & Configuration)
 
 ### 필수 요구사항 (Prerequisites)
-- Python 3.9 이상
+- Python 3.11 이상 3.14 미만
 - [Polars](https://pola.rs/) (고성능 데이터 처리를 위해 사용)
 - [Talib](https://github.com/TA-Lib/ta-lib-python) (기술적 지표 계산을 위해 사용)
 
@@ -70,7 +70,7 @@ git clone https://github.com/HokyoungJung/LuminaQuant.git
 cd lumina-quant
 
 # 의존성 설치
-uv sync  # 또는 pip install .
+uv sync  # 또는 pip install ".[live,optimize,dashboard]"
 
 # (선택 사항) MT5 지원을 위한 설치
 pip install MetaTrader5
