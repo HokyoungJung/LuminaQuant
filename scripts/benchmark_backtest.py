@@ -116,6 +116,55 @@ class BenchmarkSummary:
     mean_bars_per_sec: float
     median_peak_tracemalloc_mb: float
     max_peak_rss_mb: float | None
+    comparison: dict[str, Any] | None = None
+
+
+def _load_snapshot(path: str) -> dict[str, Any] | None:
+    """Load a previous benchmark snapshot for comparison."""
+    if not path:
+        return None
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path, encoding="utf-8") as file:
+            data = json.load(file)
+        if isinstance(data, dict):
+            return data
+    except (OSError, ValueError, TypeError):
+        return None
+    return None
+
+
+def _build_comparison(current: BenchmarkSummary, previous: dict[str, Any]) -> dict[str, Any]:
+    """Build comparison metrics between current and previous benchmark snapshots."""
+    prev_median_seconds = float(previous.get("median_seconds", 0.0) or 0.0)
+    prev_median_bps = float(previous.get("median_bars_per_sec", 0.0) or 0.0)
+
+    curr_median_seconds = float(current.median_seconds)
+    curr_median_bps = float(current.median_bars_per_sec)
+
+    sec_delta_pct = 0.0
+    bps_delta_pct = 0.0
+    speedup_factor = 0.0
+
+    if prev_median_seconds > 0.0:
+        sec_delta_pct = ((curr_median_seconds - prev_median_seconds) / prev_median_seconds) * 100.0
+        speedup_factor = (
+            prev_median_seconds / curr_median_seconds if curr_median_seconds > 0 else 0.0
+        )
+    if prev_median_bps > 0.0:
+        bps_delta_pct = ((curr_median_bps - prev_median_bps) / prev_median_bps) * 100.0
+
+    return {
+        "previous_snapshot": previous.get("generated_at_utc"),
+        "previous_median_seconds": prev_median_seconds,
+        "current_median_seconds": curr_median_seconds,
+        "median_seconds_delta_pct": sec_delta_pct,
+        "previous_median_bars_per_sec": prev_median_bps,
+        "current_median_bars_per_sec": curr_median_bps,
+        "median_bars_per_sec_delta_pct": bps_delta_pct,
+        "speedup_factor": speedup_factor,
+    }
 
 
 def _run_once(
@@ -143,6 +192,7 @@ def _run_once(
         strategy_params=params,
         record_history=record_history,
         track_metrics=record_history,
+        record_trades=record_history,
     )
     backtest.simulate_trading(output=False)
     ended = time.perf_counter()
@@ -223,7 +273,7 @@ def build_benchmark_summary(args: argparse.Namespace) -> BenchmarkSummary:
         warmup=args.warmup,
         seed=args.seed,
         generated_at_utc=datetime.now(UTC).isoformat(),
-        python=os.sys.version.split()[0],
+        python=sys.version.split()[0],
         samples=[asdict(sample) for sample in samples],
         median_seconds=statistics.median(seconds_list),
         mean_seconds=statistics.fmean(seconds_list),
@@ -262,6 +312,11 @@ def _parse_args() -> argparse.Namespace:
         default=os.path.join("reports", "benchmarks", "baseline_snapshot.json"),
         help="Output JSON path.",
     )
+    parser.add_argument(
+        "--compare-to",
+        default="",
+        help="Optional path to previous benchmark JSON snapshot for delta report.",
+    )
     return parser.parse_args()
 
 
@@ -269,6 +324,9 @@ def main() -> None:
     """Execute the benchmark and write a summary JSON artifact."""
     args = _parse_args()
     summary = build_benchmark_summary(args)
+    previous = _load_snapshot(args.compare_to)
+    if previous is not None:
+        summary.comparison = _build_comparison(summary, previous)
 
     output_dir = os.path.dirname(args.output)
     if output_dir:
