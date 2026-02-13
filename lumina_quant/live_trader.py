@@ -57,6 +57,17 @@ class LiveTrader(TradingEngine):
         )
         self._last_heartbeat_monotonic = time.monotonic()
         self._last_reconciliation_monotonic = 0.0
+        self._last_equity_snapshot_monotonic = 0.0
+        self._equity_snapshot_interval_sec = max(
+            1,
+            int(
+                getattr(
+                    self.config,
+                    "HEARTBEAT_INTERVAL_SEC",
+                    30,
+                )
+            ),
+        )
         self._last_drift_signature = ()
         self._reconciliation_drift_events = 0
         atexit.register(self._close_audit_store)
@@ -324,10 +335,16 @@ class LiveTrader(TradingEngine):
         """Override to save equity curve on every bar."""
         super().handle_market_event(event)
 
-        # Save Live Equity
-        self.portfolio.create_equity_curve_dataframe()
-        if getattr(self.config, "STORAGE_EXPORT_CSV", True):
-            self.portfolio.save_equity_curve("live_equity.csv")
+        # Save Live Equity snapshot periodically to reduce per-bar overhead.
+        now_mono = time.monotonic()
+        should_snapshot = (
+            now_mono - self._last_equity_snapshot_monotonic >= self._equity_snapshot_interval_sec
+        )
+        if should_snapshot:
+            self._last_equity_snapshot_monotonic = now_mono
+            self.portfolio.create_equity_curve_dataframe()
+            if getattr(self.config, "STORAGE_EXPORT_CSV", True):
+                self.portfolio.save_equity_curve("live_equity.csv")
         self.audit_store.log_equity(
             self.run_id,
             timeindex=event.time,

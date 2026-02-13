@@ -11,7 +11,16 @@ class Portfolio:
     Refactored to use Polars for equity curve storage.
     """
 
-    def __init__(self, bars, events, start_date, config, record_history=True, track_metrics=True):
+    def __init__(
+        self,
+        bars,
+        events,
+        start_date,
+        config,
+        record_history=True,
+        track_metrics=True,
+        record_trades=True,
+    ):
         self.bars = bars
         self.events = events
         self.config = config
@@ -19,6 +28,7 @@ class Portfolio:
         self._single_symbol = len(self.symbol_list) == 1
         self.record_history = bool(record_history)
         self.track_metrics = bool(track_metrics)
+        self.record_trades = bool(record_trades)
         self.start_date = start_date
         self.initial_capital = self.config.INITIAL_CAPITAL
 
@@ -30,6 +40,7 @@ class Portfolio:
 
         # Trade Log (for Visualization)
         self.trades = []
+        self.trade_count = 0
 
         # Circuit Breaker (Safety)
         self.circuit_breaker_tripped = False
@@ -88,6 +99,7 @@ class Portfolio:
             "total_funding_paid": self.total_funding_paid,
             "last_funding_ts": self._last_funding_ts,
             "pending_liquidation": list(self._pending_liquidation),
+            "trade_count": self.trade_count,
         }
 
     def set_state(self, state):
@@ -107,6 +119,8 @@ class Portfolio:
             self._last_funding_ts = state["last_funding_ts"]
         if "pending_liquidation" in state:
             self._pending_liquidation = set(state["pending_liquidation"])
+        if "trade_count" in state:
+            self.trade_count = int(state["trade_count"])
 
     def update_timeindex(self, event):
         """Updates the positions from the current locations to the
@@ -264,20 +278,22 @@ class Portfolio:
         if event.type == "FILL":
             self.update_positions_from_fill(event)
             self.update_holdings_from_fill(event)
+            self.trade_count += 1
 
             # Log Trade
             # FillEvent: timeindex, symbol, exchange, quantity, direction, fill_cost, commission
-            self.trades.append(
-                {
-                    "datetime": event.timeindex,
-                    "symbol": event.symbol,
-                    "direction": event.direction,
-                    "quantity": event.quantity,
-                    "fill_cost": event.fill_cost,
-                    "commission": event.commission,
-                    "price": event.fill_cost / event.quantity if event.quantity > 0 else 0.0,
-                }
-            )
+            if self.record_trades:
+                self.trades.append(
+                    {
+                        "datetime": event.timeindex,
+                        "symbol": event.symbol,
+                        "direction": event.direction,
+                        "quantity": event.quantity,
+                        "fill_cost": event.fill_cost,
+                        "commission": event.commission,
+                        "price": event.fill_cost / event.quantity if event.quantity > 0 else 0.0,
+                    }
+                )
 
             self._check_circuit_breaker()
 
@@ -574,7 +590,7 @@ class Portfolio:
             return 0.0
         return qty
 
-    def generate_order_from_signal(self, signal) -> OrderEvent:
+    def generate_order_from_signal(self, signal) -> OrderEvent | None:
         """Generates an OrderEvent from a SignalEvent.
         Uses risk-based sizing with exchange constraints.
         """
@@ -692,6 +708,16 @@ class Portfolio:
 
     def output_summary_stats(self):
         """Creates a list of summary statistics."""
+
+        def _safe_scalar(value, default=0.0):
+            try:
+                out = float(value)
+            except Exception:
+                return float(default)
+            if not np.isfinite(out):
+                return float(default)
+            return out
+
         # Convert to numpy for calc
         total_series = self.equity_curve["total"].to_numpy()
         returns = self.equity_curve["returns"].fill_null(0.0).to_numpy()
@@ -720,39 +746,44 @@ class Portfolio:
         # Benchmark Total Return (using last non-zero price vs first)
         # Note: Initial price might be 0 if recorded before first bar.
         # Check indices.
-        first_price = (
-            self.equity_curve["benchmark_price"][1] if len(self.equity_curve) > 1 else 1.0
-        )  # Index 1 is usually first bar
-        last_price = self.equity_curve["benchmark_price"][-1]
-
-        if first_price == 0:
-            first_price = 1.0  # Safety
+        benchmark_prices = self.equity_curve["benchmark_price"].fill_null(0.0).to_numpy()
+        first_price = 1.0
+        for price in benchmark_prices:
+            p = _safe_scalar(price, 0.0)
+            if p > 0:
+                first_price = p
+                break
+        last_price = _safe_scalar(benchmark_prices[-1], first_price)
         benchmark_unrealized = (last_price - first_price) / first_price
 
         # 2. CAGR
-        cagr = create_cagr(total_series[-1], total_series[0], len(total_series), periods)
+        cagr = _safe_scalar(
+            create_cagr(total_series[-1], total_series[0], len(total_series), periods)
+        )
 
         # 3. Volatility
-        volatility = create_annualized_volatility(returns, periods)
+        volatility = _safe_scalar(create_annualized_volatility(returns, periods))
 
         # 4. Sharpe
-        sharpe_ratio = create_sharpe_ratio(returns, periods=periods)
+        sharpe_ratio = _safe_scalar(create_sharpe_ratio(returns, periods=periods))
 
         # 5. Sortino
-        sortino_ratio = create_sortino_ratio(returns, periods=periods)
+        sortino_ratio = _safe_scalar(create_sortino_ratio(returns, periods=periods))
 
         # 6. Drawdowns
         drawdown, max_dd_duration = create_drawdowns(total_series)
-        max_dd = max(drawdown)
+        max_dd = _safe_scalar(max(drawdown), 0.0)
 
         # 7. Calmar
-        calmar_ratio = create_calmar_ratio(cagr, max_dd)
+        calmar_ratio = _safe_scalar(create_calmar_ratio(cagr, max_dd))
 
         # 8. Alpha / Beta
         alpha, beta = create_alpha_beta(returns, benchmark_returns, periods=periods)
+        alpha = _safe_scalar(alpha)
+        beta = _safe_scalar(beta)
 
         # 9. Information Ratio
-        info_ratio = create_information_ratio(returns, benchmark_returns)
+        info_ratio = _safe_scalar(create_information_ratio(returns, benchmark_returns))
 
         # 10. Daily Win Rate
         winning_days = len(returns[returns > 0])
@@ -834,7 +865,7 @@ class Portfolio:
 
     def output_trade_log(self, filename="trades.csv"):
         """Outputs the trade log to a CSV file."""
-        if not self.trades:
+        if not self.record_trades or not self.trades:
             # print("No trades generated.") # Optional: don't spam
             return
 

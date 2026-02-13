@@ -52,6 +52,7 @@ class Backtest(TradingEngine):
         data_dict=None,
         record_history=True,
         track_metrics=True,
+        record_trades=True,
     ):
         self.csv_dir = csv_dir
         self.symbol_list = symbol_list
@@ -62,6 +63,7 @@ class Backtest(TradingEngine):
         self.data_dict = data_dict
         self.record_history = bool(record_history)
         self.track_metrics = bool(track_metrics)
+        self.record_trades = bool(record_trades)
 
         self.data_handler_cls = data_handler_cls
         self.execution_handler_cls = execution_handler_cls
@@ -104,6 +106,7 @@ class Backtest(TradingEngine):
                 self.config,
                 record_history=self.record_history,
                 track_metrics=self.track_metrics,
+                record_trades=self.record_trades,
             )
         except TypeError:
             try:
@@ -113,6 +116,7 @@ class Backtest(TradingEngine):
                     self.start_date,
                     self.config,
                     record_history=self.record_history,
+                    record_trades=self.record_trades,
                 )
             except TypeError:
                 self.portfolio = self.portfolio_cls(

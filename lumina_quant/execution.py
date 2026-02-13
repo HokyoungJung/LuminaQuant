@@ -158,103 +158,106 @@ class SimulatedExecutionHandler(ExecutionHandler):
         """Check active orders against the new MarketEvent.
         Handles MKT (Next Open), STOP, TRAIL_STOP.
         """
-        if event.type == "MARKET":
-            bar_open = event.open
-            bar_high = event.high
-            bar_low = event.low
-            bar_volume = event.volume
+        if event.type != "MARKET" or not self.active_orders:
+            return
 
-            for order in self.active_orders[:]:
-                if order["symbol"] == event.symbol:
-                    triggered = False
-                    exec_price = None
+        bar_open = event.open
+        bar_high = event.high
+        bar_low = event.low
+        bar_volume = event.volume
 
-                    # MKT ORDER (Next Open)
-                    if order["type"] == "MKT" and order["status"] == "PENDING":
-                        # Execute at Open
+        next_active_orders: list[dict[str, Any]] = []
+        remainder_orders: list[dict[str, Any]] = []
+
+        for order in self.active_orders:
+            if order["symbol"] != event.symbol:
+                next_active_orders.append(order)
+                continue
+
+            triggered = False
+            exec_price = None
+
+            # MKT ORDER (Next Open)
+            if order["type"] == "MKT" and order["status"] == "PENDING":
+                exec_price = bar_open
+                triggered = True
+
+                # Liquidity Constraint (Partial Fill): cap at 10% of bar volume.
+                max_trade_vol = bar_volume * 0.1
+                original_qty = order["quantity"]
+
+                if original_qty > max_trade_vol:
+                    print(
+                        f"[Realism] Partial Fill: Req {original_qty} > Limit {max_trade_vol:.4f}. Filling {max_trade_vol} and keeping remainder."
+                    )
+                    order["quantity"] = max_trade_vol
+                    remainder = original_qty - max_trade_vol
+                    remainder_order = {
+                        "order_id": f"{order['order_id']}-R",
+                        "symbol": order["symbol"],
+                        "type": "MKT",
+                        "quantity": remainder,
+                        "direction": order["direction"],
+                        "status": "PENDING",
+                        "position_side": order.get("position_side"),
+                        "reduce_only": order.get("reduce_only", False),
+                        "client_order_id": order.get("client_order_id"),
+                    }
+                    remainder_orders.append(remainder_order)
+
+            # STOP ORDER
+            elif order["type"] == "STOP":
+                if order["direction"] == "SELL" and bar_low <= order["stop_price"]:
+                    exec_price = order["stop_price"]
+                    if exec_price > bar_open:
                         exec_price = bar_open
+                    triggered = True
+                elif order["direction"] == "BUY" and bar_high >= order["stop_price"]:
+                    exec_price = order["stop_price"]
+                    if exec_price < bar_open:
+                        exec_price = bar_open
+                    triggered = True
+
+            # TRAILING STOP
+            elif order["type"] == "TRAIL_STOP":
+                if order["direction"] == "SELL":
+                    if order["highest_price"] is None or bar_high > order["highest_price"]:
+                        order["highest_price"] = bar_high
+                        order["stop_price"] = order["highest_price"] * (
+                            1.0 - order["trailing_percent"]
+                        )
+
+                    if bar_low <= order["stop_price"]:
+                        exec_price = order["stop_price"]
                         triggered = True
 
-                        # 1. Liquidity Constraint (Partial Fill)
-                        # Cap at 10% of Bar Volume
-                        max_trade_vol = bar_volume * 0.1
-                        original_qty = order["quantity"]
+            if triggered and exec_price is not None:
+                fill_price, comm = self._apply_slippage_and_comm(
+                    exec_price,
+                    order["quantity"],
+                    order["direction"],
+                    order["symbol"],
+                )
 
-                        if original_qty > max_trade_vol:
-                            print(
-                                f"[Realism] Partial Fill: Req {original_qty} > Limit {max_trade_vol:.4f}. Filling {max_trade_vol} and keeping remainder."
-                            )
-                            # Update this order to execute only max_trade_vol
-                            order["quantity"] = max_trade_vol
+                fill_event = FillEvent(
+                    timeindex=event.time,
+                    symbol=order["symbol"],
+                    exchange="BINANCE_SIM",
+                    quantity=order["quantity"],
+                    direction=order["direction"],
+                    fill_cost=fill_price * order["quantity"],
+                    commission=comm,
+                    order_id=order.get("order_id"),
+                    client_order_id=order.get("client_order_id"),
+                    position_side=order.get("position_side"),
+                    status="FILLED",
+                    metadata={"reduce_only": order.get("reduce_only", False)},
+                )
+                self.events.put(fill_event)
+                continue
 
-                            # Create a NEW pending order for the remainder
-                            remainder = original_qty - max_trade_vol
-                            remainder_order = {
-                                "order_id": f"{order['order_id']}-R",
-                                "symbol": order["symbol"],
-                                "type": "MKT",
-                                "quantity": remainder,
-                                "direction": order["direction"],
-                                "status": "PENDING",  # Queue for NEXT bar
-                                "position_side": order.get("position_side"),
-                                "reduce_only": order.get("reduce_only", False),
-                                "client_order_id": order.get("client_order_id"),
-                            }
-                            # Append to active_orders to try again next bar
-                            # (We append to list, but we are iterating a slice, so it's safe)
-                            self.active_orders.append(remainder_order)
+            next_active_orders.append(order)
 
-                    # STOP ORDER
-                    elif order["type"] == "STOP":
-                        # Check High/Low for trigger
-                        if order["direction"] == "SELL" and bar_low <= order["stop_price"]:
-                            exec_price = order["stop_price"]  # Worst case or slip
-                            if exec_price > bar_open:
-                                exec_price = bar_open  # Gap protection
-                            triggered = True
-                        elif order["direction"] == "BUY" and bar_high >= order["stop_price"]:
-                            exec_price = order["stop_price"]
-                            if exec_price < bar_open:
-                                exec_price = bar_open
-                            triggered = True
-
-                    # TRAILING STOP
-                    elif order["type"] == "TRAIL_STOP":
-                        # Update extremums
-                        if order["direction"] == "SELL":
-                            if order["highest_price"] is None or bar_high > order["highest_price"]:
-                                order["highest_price"] = bar_high
-                                order["stop_price"] = order["highest_price"] * (
-                                    1.0 - order["trailing_percent"]
-                                )
-
-                            if bar_low <= order["stop_price"]:
-                                exec_price = order["stop_price"]
-                                triggered = True
-
-                    if triggered and exec_price is not None:
-                        # Apply Physics
-                        fill_price, comm = self._apply_slippage_and_comm(
-                            exec_price,
-                            order["quantity"],
-                            order["direction"],
-                            order["symbol"],
-                        )
-
-                        # Create Fill
-                        fill_event = FillEvent(
-                            timeindex=event.time,
-                            symbol=order["symbol"],
-                            exchange="BINANCE_SIM",
-                            quantity=order["quantity"],
-                            direction=order["direction"],
-                            fill_cost=fill_price * order["quantity"],
-                            commission=comm,
-                            order_id=order.get("order_id"),
-                            client_order_id=order.get("client_order_id"),
-                            position_side=order.get("position_side"),
-                            status="FILLED",
-                            metadata={"reduce_only": order.get("reduce_only", False)},
-                        )
-                        self.events.put(fill_event)
-                        self.active_orders.remove(order)
+        if remainder_orders:
+            next_active_orders.extend(remainder_orders)
+        self.active_orders = next_active_orders
