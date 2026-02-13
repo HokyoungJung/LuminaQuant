@@ -2,8 +2,11 @@ import itertools
 import multiprocessing
 import sys
 import os
+import json
+import uuid
+import sqlite3
 import polars as pl
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Engine Imports
 from lumina_quant.backtest import Backtest
@@ -52,24 +55,114 @@ OPTUNA_TRIALS = int(OptimizationConfig.OPTUNA_CONFIG.get("n_trials", 20))
 
 # 5. Data Splitting Settings (WFA)
 try:
-    TRAIN_START = datetime.strptime(BacktestConfig.START_DATE, "%Y-%m-%d")
-    TRAIN_END = datetime(TRAIN_START.year + 1, 1, 1)
-    VAL_START = TRAIN_END
-    VAL_END = datetime(VAL_START.year, 7, 1)
-    TEST_START = VAL_END
-    TEST_END = datetime(TEST_START.year + 1, 1, 1)
+    BASE_START = datetime.strptime(BacktestConfig.START_DATE, "%Y-%m-%d")
 
 except Exception as e:
     print(f"Error parsing dates from config: {e}. Using defaults.")
-    TRAIN_START = datetime(2023, 1, 1)
-    TRAIN_END = datetime(2024, 1, 1)
-    VAL_START = datetime(2024, 1, 1)
-    VAL_END = datetime(2024, 6, 1)
-    TEST_START = datetime(2024, 6, 1)
-    TEST_END = datetime(2025, 1, 1)
+    BASE_START = datetime(2023, 1, 1)
 
 # Global Data Cache for Multiprocessing (Copy-on-Write)
 DATA_DICT = {}
+
+
+def add_months(dt, months):
+    year = dt.year + (dt.month - 1 + months) // 12
+    month = (dt.month - 1 + months) % 12 + 1
+    day = min(
+        dt.day,
+        [31, 29 if year % 4 == 0 and (year % 100 != 0 or year % 400 == 0) else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1],
+    )
+    return datetime(year, month, day)
+
+
+def build_walk_forward_splits(
+    base_start,
+    folds,
+    train_months=12,
+    val_months=6,
+    test_months=6,
+    step_months=6,
+):
+    splits = []
+    cursor = base_start
+    for i in range(folds):
+        train_start = cursor
+        train_end = add_months(train_start, train_months)
+        val_start = train_end
+        val_end = add_months(val_start, val_months)
+        test_start = val_end
+        test_end = add_months(test_start, test_months)
+        splits.append(
+            {
+                "fold": i + 1,
+                "train_start": train_start,
+                "train_end": train_end,
+                "val_start": val_start,
+                "val_end": val_end,
+                "test_start": test_start,
+                "test_end": test_end,
+            }
+        )
+        cursor = add_months(cursor, step_months)
+    return splits
+
+
+def save_optimization_rows(db_path, run_id, stage, rows):
+    """
+    Persist optimization artifacts into SQLite.
+    """
+    if not rows:
+        return
+    db_dir = os.path.dirname(db_path)
+    if db_dir:
+        os.makedirs(db_dir, exist_ok=True)
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS optimization_results (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id TEXT NOT NULL,
+            stage TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            params_json TEXT NOT NULL,
+            sharpe REAL,
+            cagr TEXT,
+            mdd TEXT,
+            train_sharpe REAL,
+            robustness_score REAL,
+            extra_json TEXT
+        )
+        """
+    )
+
+    now = datetime.now(timezone.utc).isoformat()
+    for row in rows:
+        cur.execute(
+            """
+            INSERT INTO optimization_results(
+                run_id, stage, created_at, params_json, sharpe, cagr, mdd, train_sharpe, robustness_score, extra_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                run_id,
+                stage,
+                now,
+                json.dumps(row.get("params", {})),
+                float(row.get("sharpe", 0.0)) if row.get("sharpe") is not None else None,
+                str(row.get("cagr")) if row.get("cagr") is not None else None,
+                str(row.get("mdd")) if row.get("mdd") is not None else None,
+                float(row.get("train_sharpe", 0.0))
+                if row.get("train_sharpe") is not None
+                else None,
+                float(row.get("robustness_score", 0.0))
+                if row.get("robustness_score") is not None
+                else None,
+                json.dumps({k: v for k, v in row.items() if k not in {"params", "sharpe", "cagr", "mdd", "train_sharpe", "robustness_score"}}),
+            ),
+        )
+    conn.commit()
+    conn.close()
 
 
 def load_all_data(csv_dir, symbol_list):
@@ -79,7 +172,13 @@ def load_all_data(csv_dir, symbol_list):
     print(f"Loading data for {len(symbol_list)} symbols from {csv_dir}...")
     data = {}
     for s in symbol_list:
-        csv_path = os.path.join(csv_dir, f"{s}.csv")
+        candidates = [
+            os.path.join(csv_dir, f"{s}.csv"),
+            os.path.join(csv_dir, f"{s.replace('/', '')}.csv"),
+            os.path.join(csv_dir, f"{s.replace('/', '_')}.csv"),
+            os.path.join(csv_dir, f"{s.replace('/', '-')}.csv"),
+        ]
+        csv_path = next((p for p in candidates if os.path.exists(p)), candidates[0])
         try:
             if os.path.exists(csv_path):
                 df = pl.read_csv(csv_path, try_parse_dates=True)
@@ -125,21 +224,27 @@ def _execute_backtest(
             strategy_params=params,
             data_dict=current_data,
         )
-        backtest.simulate_trading()
+        backtest.simulate_trading(output=False)
+        backtest.portfolio.create_equity_curve_dataframe()
 
         stats = backtest.portfolio.output_summary_stats()
         stats_dict = {k: v for k, v in stats}
+        no_data = stats_dict.get("Status") == "Not enough data"
 
         # We prioritize Sharpe Ratio for optimization
         sharpe = float(stats_dict.get("Sharpe Ratio", 0.0))
         if sharpe != sharpe:
             sharpe = -999.0  # Handle NaN
+        if no_data:
+            sharpe = -999.0
 
         return {
             "params": params,
             "sharpe": sharpe,
             "cagr": stats_dict.get("CAGR", "0.0%").strip("%"),
             "mdd": stats_dict.get("Max Drawdown", "0.0%").strip("%"),
+            "num_trades": len(backtest.portfolio.trades),
+            "no_data": no_data,
         }
     except Exception as e:
         # print(f"Backtest Error: {e}")
@@ -291,48 +396,58 @@ class OptunaOptimizer:
         return params_list
 
 
-if __name__ == "__main__":
-    # Load Data Once
-    DATA_DICT = load_all_data(CSV_DIR, SYMBOL_LIST)
+def _apply_fold_metadata(rows, split):
+    out = []
+    for row in rows:
+        r = dict(row)
+        r["fold"] = split["fold"]
+        r["train_start"] = split["train_start"].date().isoformat()
+        r["train_end"] = split["train_end"].date().isoformat()
+        r["val_start"] = split["val_start"].date().isoformat()
+        r["val_end"] = split["val_end"].date().isoformat()
+        r["test_start"] = split["test_start"].date().isoformat()
+        r["test_end"] = split["test_end"].date().isoformat()
+        out.append(r)
+    return out
 
-    print(f"=== PHASE 1: TRAINING [{TRAIN_START.date()} ~ {TRAIN_END.date()}] ===")
+
+def run_walk_forward_fold(split):
+    fold = split["fold"]
+    train_start = split["train_start"]
+    train_end = split["train_end"]
+    val_start = split["val_start"]
+    val_end = split["val_end"]
+    test_start = split["test_start"]
+    test_end = split["test_end"]
+
+    print(
+        f"\n=== FOLD {fold} TRAIN [{train_start.date()} ~ {train_end.date()}] ==="
+    )
     if OPTIMIZATION_METHOD == "GRID":
         optimizer = GridSearchOptimizer(
-            STRATEGY_CLASS, GRID_PARAMS, CSV_DIR, SYMBOL_LIST, TRAIN_START, TRAIN_END
+            STRATEGY_CLASS, GRID_PARAMS, CSV_DIR, SYMBOL_LIST, train_start, train_end
         )
         train_results = optimizer.run(max_workers=4)
-
     elif OPTIMIZATION_METHOD == "OPTUNA":
         optimizer = OptunaOptimizer(
-            STRATEGY_CLASS, OPTUNA_CONFIG, CSV_DIR, SYMBOL_LIST, TRAIN_START, TRAIN_END
+            STRATEGY_CLASS, OPTUNA_CONFIG, CSV_DIR, SYMBOL_LIST, train_start, train_end
         )
-        # Optuna jobs=-1 can parallelize, but we need to handle data sharing if so.
-        # For now, keep it single threaded or handle via Optuna's mechanism.
-        # Simple run() above is single process.
         train_results = optimizer.run(n_trials=OPTUNA_TRIALS)
-
     else:
-        print(f"Unknown method: {OPTIMIZATION_METHOD}")
-        sys.exit(1)
+        raise ValueError(f"Unknown optimization method: {OPTIMIZATION_METHOD}")
 
     if not train_results:
-        print("No valid results found in optimization.")
-        sys.exit(0)
+        return None
 
-    print("\n[Train] Top Candidate:")
     best_candidate = train_results[0]
     print(
-        f"Params: {best_candidate['params']} | Sharpe: {best_candidate['sharpe']:.4f}"
+        f"[Fold {fold} Train] Top Candidate: Params={best_candidate['params']} | Sharpe={best_candidate['sharpe']:.4f}"
     )
 
-    # ==========================================
-    # VALIDATION PHASE
-    # ==========================================
-    print(f"\n=== PHASE 2: VALIDATION [{VAL_START.date()} ~ {VAL_END.date()}] ===")
-    print("Verifying Top 3 Candidates on Validation Set...")
-
+    print(
+        f"=== FOLD {fold} VALIDATION [{val_start.date()} ~ {val_end.date()}] ==="
+    )
     val_candidates = []
-    # Test top 3 or less
     limit = min(3, len(train_results))
     for cand in train_results[:limit]:
         res = _execute_backtest(
@@ -340,77 +455,128 @@ if __name__ == "__main__":
             cand["params"],
             CSV_DIR,
             SYMBOL_LIST,
-            VAL_START,
-            VAL_END,
+            val_start,
+            val_end,
             data_dict=DATA_DICT,
         )
         res["train_sharpe"] = cand["sharpe"]
+        divergence = abs(float(cand["sharpe"]) - float(res["sharpe"]))
+        penalty_factor = OptimizationConfig.OVERFIT_PENALTY
+        res["robustness_score"] = float(res["sharpe"]) - (divergence * penalty_factor)
+        if res.get("no_data"):
+            res["robustness_score"] = -999.0
         val_candidates.append(res)
         print(
-            f"Params: {cand['params']} -> Val Sharpe: {res['sharpe']:.4f} (Train: {cand['sharpe']:.4f})"
+            f"[Fold {fold} Val] Params={cand['params']} -> Val Sharpe={res['sharpe']:.4f} (Train={cand['sharpe']:.4f})"
         )
 
-    # Robustness Check & Ranking
-    for c in val_candidates:
-        train_s = float(c["train_sharpe"])
-        val_s = float(c["sharpe"])
-
-        # Robustness Score
-        divergence = abs(train_s - val_s)
-        penalty_factor = 0.5
-        c["robustness_score"] = val_s - (divergence * penalty_factor)
-
-    # Sort by Robustness Score instead of raw Sharpe
     val_candidates.sort(key=lambda x: x["robustness_score"], reverse=True)
     final_best = val_candidates[0]
+    print(f"[Fold {fold} Validation] Selected Params: {final_best['params']}")
 
-    print(f"\n[Validation] Selected Best Robust Params: {final_best['params']}")
-
-    # ==========================================
-    # TEST PHASE (FINAL)
-    # ==========================================
-    print(f"\n=== PHASE 3: FINAL TEST [{TEST_START.date()} ~ {TEST_END.date()}] ===")
-    print("Running Final Simulation on Unseen Test Data...")
-
+    print(f"=== FOLD {fold} TEST [{test_start.date()} ~ {test_end.date()}] ===")
     test_res = _execute_backtest(
         STRATEGY_CLASS,
         final_best["params"],
         CSV_DIR,
         SYMBOL_LIST,
-        TEST_START,
-        TEST_END,
+        test_start,
+        test_end,
         data_dict=DATA_DICT,
     )
+    print(
+        f"[Fold {fold} Test] Sharpe={test_res['sharpe']:.4f} | CAGR={test_res['cagr']} | MaxDD={test_res['mdd']}"
+    )
 
-    print("\n>>>> FINAL REPORT <<<<")
-    print(f"Best Params: {final_best['params']}")
-    print(f"Train Sharpe : {best_candidate['sharpe']:.4f}")
-    print(f"Val Sharpe   : {final_best['sharpe']:.4f}")
-    print(f"Test Sharpe  : {test_res['sharpe']:.4f}")
-    print(f"Test CAGR    : {test_res['cagr']}")
-    print(f"Test MaxDD   : {test_res['mdd']}")
+    return {
+        "fold": fold,
+        "split": split,
+        "train_results": _apply_fold_metadata(train_results, split),
+        "best_candidate": dict(best_candidate),
+        "val_candidates": _apply_fold_metadata(val_candidates, split),
+        "selected": dict(final_best),
+        "test_result": _apply_fold_metadata([test_res], split)[0],
+    }
 
-    # Overfitting Check
-    train_score = float(best_candidate["sharpe"])
-    test_score = float(test_res["sharpe"])
 
-    if test_score < train_score * 0.5:
-        print("\n[WARNING] Test performance dropped significantly (>50%) vs Train.")
-        print("This suggests OVERFITTING. Consider simpler logic or fewer parameters.")
-    else:
-        print("\n[SUCCESS] Strategy appears robust across datasets.")
+if __name__ == "__main__":
+    run_id = str(uuid.uuid4())
+    db_path = getattr(BaseConfig, "STORAGE_SQLITE_PATH", "logs/lumina_quant.db")
 
-    # Save Best Parameters
-    import json
-    import os
+    # Load Data Once
+    DATA_DICT = load_all_data(CSV_DIR, SYMBOL_LIST)
+    splits = build_walk_forward_splits(
+        BASE_START,
+        OptimizationConfig.WALK_FORWARD_FOLDS,
+    )
+    if not splits:
+        print("No walk-forward splits generated.")
+        sys.exit(1)
 
+    fold_reports = []
+    for split in splits:
+        try:
+            report = run_walk_forward_fold(split)
+            if report is None:
+                print(f"[Fold {split['fold']}] No valid optimization results.")
+                continue
+            fold_reports.append(report)
+            save_optimization_rows(
+                db_path,
+                run_id,
+                f"fold_{split['fold']}_train",
+                report["train_results"],
+            )
+            save_optimization_rows(
+                db_path,
+                run_id,
+                f"fold_{split['fold']}_validation",
+                report["val_candidates"],
+            )
+            save_optimization_rows(
+                db_path,
+                run_id,
+                f"fold_{split['fold']}_test",
+                [report["test_result"]],
+            )
+        except Exception as e:
+            print(f"[Fold {split['fold']}] Failed: {e}")
+
+    if not fold_reports:
+        print("No valid fold report generated.")
+        sys.exit(1)
+
+    # Select overall winner by test sharpe, then robustness score.
+    fold_reports.sort(
+        key=lambda r: (
+            0 if r["test_result"].get("no_data") else 1,
+            float(r["test_result"].get("sharpe", -999.0)),
+            float(r["selected"].get("robustness_score", -999.0)),
+            int(r["test_result"].get("num_trades", 0)),
+        ),
+        reverse=True,
+    )
+    winner = fold_reports[0]
+
+    print("\n>>>> FINAL WALK-FORWARD REPORT <<<<")
+    for report in fold_reports:
+        f = report["fold"]
+        print(
+            f"Fold {f}: Train={report['best_candidate']['sharpe']:.4f} | "
+            f"Val={report['selected']['sharpe']:.4f} | "
+            f"Test={report['test_result']['sharpe']:.4f}"
+        )
+
+    print(
+        f"\nSelected Fold: {winner['fold']} | Params: {winner['selected']['params']} | "
+        f"Test Sharpe: {winner['test_result']['sharpe']:.4f}"
+    )
+
+    # Save Best Parameters from winning fold.
     strategy_name = STRATEGY_CLASS.__name__
-    # Create directory: best_optimized_parameters/<StrategyName>
     save_dir = os.path.join("best_optimized_parameters", strategy_name)
     os.makedirs(save_dir, exist_ok=True)
-
     best_params_file = os.path.join(save_dir, "best_params.json")
-
     with open(best_params_file, "w") as f:
-        json.dump(final_best["params"], f, indent=4)
-    print(f"\n[Artifact] Best Parameters saved to '{best_params_file}'")
+        json.dump(winner["selected"]["params"], f, indent=4)
+    print(f"[Artifact] Best Parameters saved to '{best_params_file}'")

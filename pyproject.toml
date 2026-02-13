@@ -1,19 +1,45 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "lumina-quant"
 version = "0.1.0"
 description = "High-perf event-driven algo trading engine"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.11,<3.14"
 dependencies = [
-    "ccxt>=4.5.35",
-    "matplotlib>=3.10.8",
-    "numpy>=2.4.2",
-    "optuna>=4.7.0",
+    "numpy>=1.26.0,<3",
     "polars>=1.37.1",
+    "pandas>=2.2.0",
     "python-dotenv>=1.2.1",
-    "ta-lib>=0.6.8",
     "PyYAML>=6.0",
-    "MetaTrader5>=5.0.0",
+    "ta-lib>=0.6.8",
+]
+
+[project.optional-dependencies]
+optimize = [
+    "optuna>=4.7.0",
+]
+live = [
+    "ccxt>=4.5.35",
     "requests>=2.31.0",
     "websockets>=12.0",
 ]
+dashboard = [
+    "streamlit>=1.41.0",
+    "plotly>=5.24.0",
+    "matplotlib>=3.8.0",
+]
+mt5 = [
+    "MetaTrader5>=5.0.0; platform_system == 'Windows'",
+]
+dev = [
+    "pytest>=8.0.0",
+]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["lumina_quant*", "strategies*"]

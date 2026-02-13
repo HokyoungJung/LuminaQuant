@@ -146,3 +146,8 @@ class LiveDataHandler(DataHandler):
             if idx is not None:
                 return [d[idx] for d in data]
             return []
+
+    def get_market_spec(self, symbol):
+        if self.exchange and hasattr(self.exchange, "get_market_spec"):
+            return self.exchange.get_market_spec(symbol)
+        return {}

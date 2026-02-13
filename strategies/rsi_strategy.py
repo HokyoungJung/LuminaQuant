@@ -21,6 +21,13 @@ class RsiStrategy(Strategy):
         self.symbol_list = self.bars.symbol_list
         self.bought = {s: "OUT" for s in self.symbol_list}
 
+    def get_state(self):
+        return {"bought": dict(self.bought)}
+
+    def set_state(self, state):
+        if "bought" in state and isinstance(state["bought"], dict):
+            self.bought = state["bought"]
+
     def calculate_signals(self, event):
         if event.type == "MARKET":
             for s in self.symbol_list:

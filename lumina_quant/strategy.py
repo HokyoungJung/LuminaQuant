@@ -15,3 +15,15 @@ class Strategy(ABC):
         Provides the mechanisms to calculate the list of signals.
         """
         raise NotImplementedError
+
+    def get_state(self) -> dict:
+        """
+        Backward-compatible default state for strategies that are stateless.
+        """
+        return {}
+
+    def set_state(self, state: dict) -> None:
+        """
+        Backward-compatible default state loader.
+        """
+        _ = state

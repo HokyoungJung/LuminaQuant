@@ -34,6 +34,8 @@ class SimulatedExecutionHandler(ExecutionHandler):
         self.events = events
         self.bars = bars
         self.config = config
+        self.rng = random.Random(getattr(config, "RANDOM_SEED", 42))
+        self._order_seq = 0
 
         # Store conditional orders: { order_id: { 'symbol':..., 'type':..., 'trigger_price':..., 'parent_id':...} }
         # For simplicity, just list of order dicts
@@ -46,7 +48,8 @@ class SimulatedExecutionHandler(ExecutionHandler):
         Helper to apply physics (Slippage/Fees/Spread) to a raw price.
         """
         # 1. Variable Slippage Model
-        slippage_bps = random.uniform(0.0001, 0.0005)  # 1bps to 5bps
+        base_slippage = getattr(self.config, "SLIPPAGE_RATE", 0.0005)
+        slippage_bps = self.rng.uniform(base_slippage * 0.5, base_slippage * 1.5)
 
         # Volatility scale
         high = self.bars.get_latest_bar_value(symbol, "high")
@@ -73,7 +76,11 @@ class SimulatedExecutionHandler(ExecutionHandler):
             fill_price = price * (1 - total_penalty)
 
         # 3. Commission
-        commission_rate = getattr(self.config, "COMMISSION_RATE", 0.001)
+        commission_rate = getattr(
+            self.config,
+            "TAKER_FEE_RATE",
+            getattr(self.config, "COMMISSION_RATE", 0.001),
+        )
         fill_cost = fill_price * quantity
         commission = fill_cost * commission_rate
 
@@ -86,16 +93,23 @@ class SimulatedExecutionHandler(ExecutionHandler):
         - STOP/TRAIL: triggers active monitoring.
         """
         if event.type == "ORDER":
+            self._order_seq += 1
+            order_id = f"SIM-{self._order_seq}"
+
             if event.order_type == "MKT":
                 # LATENCY SIMULATION:
                 # Do NOT fill immediately. Queue for Next Open.
                 self.active_orders.append(
                     {
+                        "order_id": order_id,
                         "symbol": event.symbol,
                         "type": "MKT",
                         "quantity": event.quantity,
                         "direction": event.direction,
                         "status": "PENDING",
+                        "position_side": event.position_side,
+                        "reduce_only": event.reduce_only,
+                        "client_order_id": event.client_order_id,
                     }
                 )
 
@@ -106,11 +120,15 @@ class SimulatedExecutionHandler(ExecutionHandler):
                 # Add to active orders
                 self.active_orders.append(
                     {
+                        "order_id": order_id,
                         "symbol": event.symbol,
                         "type": "STOP",
                         "quantity": event.quantity,
                         "direction": event.direction,
                         "stop_price": event.stop_price,
+                        "position_side": event.position_side,
+                        "reduce_only": event.reduce_only,
+                        "client_order_id": event.client_order_id,
                     }
                 )
 
@@ -122,6 +140,7 @@ class SimulatedExecutionHandler(ExecutionHandler):
 
                 self.active_orders.append(
                     {
+                        "order_id": order_id,
                         "symbol": event.symbol,
                         "type": "TRAIL_STOP",
                         "quantity": event.quantity,
@@ -134,6 +153,9 @@ class SimulatedExecutionHandler(ExecutionHandler):
                         "lowest_price": curr_price
                         if event.direction == "BUY"
                         else None,  # For Short Exit Trailing Stop
+                        "position_side": event.position_side,
+                        "reduce_only": event.reduce_only,
+                        "client_order_id": event.client_order_id,
                     }
                 )
 
@@ -174,11 +196,15 @@ class SimulatedExecutionHandler(ExecutionHandler):
                             # Create a NEW pending order for the remainder
                             remainder = original_qty - max_trade_vol
                             remainder_order = {
+                                "order_id": f"{order['order_id']}-R",
                                 "symbol": order["symbol"],
                                 "type": "MKT",
                                 "quantity": remainder,
                                 "direction": order["direction"],
                                 "status": "PENDING",  # Queue for NEXT bar
+                                "position_side": order.get("position_side"),
+                                "reduce_only": order.get("reduce_only", False),
+                                "client_order_id": order.get("client_order_id"),
                             }
                             # Append to active_orders to try again next bar
                             # (We append to list, but we are iterating a slice, so it's safe)
@@ -239,6 +265,11 @@ class SimulatedExecutionHandler(ExecutionHandler):
                             direction=order["direction"],
                             fill_cost=fill_price * order["quantity"],
                             commission=comm,
+                            order_id=order.get("order_id"),
+                            client_order_id=order.get("client_order_id"),
+                            position_side=order.get("position_side"),
+                            status="FILLED",
+                            metadata={"reduce_only": order.get("reduce_only", False)},
                         )
                         self.events.put(fill_event)
                         self.active_orders.remove(order)

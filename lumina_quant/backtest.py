@@ -129,23 +129,37 @@ class Backtest(TradingEngine):
 
             # time.sleep(self.heartbeat)
 
-    def _output_performance(self):
+    def _output_performance(self, persist_output=True, verbose=True):
         """
         Outputs the strategy performance from the backtest.
         """
         self.portfolio.create_equity_curve_dataframe()
-        self.portfolio.output_trade_log()
+        if persist_output:
+            self.portfolio.output_trade_log()
 
-        print("Creating summary stats...")
         stats = self.portfolio.output_summary_stats()
 
-        print("Creating equity curve...")
-        print(self.portfolio.equity_curve.tail(10))
-        pprint(stats)
+        if persist_output:
+            self.portfolio.save_equity_curve("equity.csv")
 
-    def simulate_trading(self):
+        if verbose:
+            print("Creating summary stats...")
+            print("Creating equity curve...")
+            print(self.portfolio.equity_curve.tail(10).to_dict(as_series=False))
+            pprint(stats)
+        return stats
+
+    def simulate_trading(self, output=True, persist_output=None, verbose=True):
         """
         Simulates the backtest and outputs portfolio performance.
         """
         self._run_backtest()
-        self._output_performance()
+        if not output:
+            return None
+
+        if persist_output is None:
+            persist_output = getattr(self.config, "PERSIST_OUTPUT", True)
+        return self._output_performance(
+            persist_output=persist_output,
+            verbose=verbose,
+        )

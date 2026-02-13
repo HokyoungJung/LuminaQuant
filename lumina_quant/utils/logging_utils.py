@@ -1,7 +1,21 @@
 import logging
 import os
+import json
 from logging.handlers import RotatingFileHandler
 from lumina_quant.config import BaseConfig
+
+
+class JsonLogFormatter(logging.Formatter):
+    def format(self, record):
+        payload = {
+            "timestamp": self.formatTime(record, "%Y-%m-%dT%H:%M:%S"),
+            "logger": record.name,
+            "level": record.levelname,
+            "message": record.getMessage(),
+        }
+        if record.exc_info:
+            payload["exc_info"] = self.formatException(record.exc_info)
+        return json.dumps(payload, ensure_ascii=True)
 
 
 def setup_logging(name="lumina_quant"):
@@ -10,10 +24,18 @@ def setup_logging(name="lumina_quant"):
     """
     logger = logging.getLogger(name)
     logger.setLevel(BaseConfig.LOG_LEVEL)
+    logger.propagate = False
 
-    formatter = logging.Formatter(
+    # Prevent duplicate handlers when setup_logging is called multiple times.
+    if logger.handlers:
+        return logger
+
+    plain_formatter = logging.Formatter(
         "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
+    json_formatter = JsonLogFormatter()
+    use_json = os.getenv("LUMINA_JSON_LOG", "0").strip().lower() in {"1", "true", "yes"}
+    formatter = json_formatter if use_json else plain_formatter
 
     # Console Handler
     ch = logging.StreamHandler()

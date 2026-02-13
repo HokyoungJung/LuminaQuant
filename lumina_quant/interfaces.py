@@ -61,3 +61,23 @@ class ExchangeInterface(ABC):
     def cancel_order(self, order_id: str, symbol: Optional[str] = None) -> bool:
         """Cancels an order. Returns True if successful."""
         pass
+
+    # Optional extension points for futures/live robustness.
+    def load_markets(self) -> Dict:
+        return {}
+
+    def set_leverage(self, symbol: str, leverage: int) -> bool:
+        _ = (symbol, leverage)
+        return True
+
+    def set_margin_mode(self, symbol: str, margin_mode: str) -> bool:
+        _ = (symbol, margin_mode)
+        return True
+
+    def fetch_positions(self, symbol: Optional[str] = None) -> List[Dict]:
+        _ = symbol
+        return []
+
+    def fetch_order(self, order_id: str, symbol: Optional[str] = None) -> Dict:
+        _ = (order_id, symbol)
+        return {}

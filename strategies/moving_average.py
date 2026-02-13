@@ -19,7 +19,7 @@ class MovingAverageCrossStrategy(Strategy):
         self.bought = {s: "OUT" for s in self.symbol_list}
 
     def get_state(self):
-        return {"bought": self.bought}
+        return {"bought": dict(self.bought)}
 
     def set_state(self, state):
         if "bought" in state:

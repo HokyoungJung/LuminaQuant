@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Dict, Any
 
 
 class Event:
@@ -39,6 +39,12 @@ class SignalEvent(Event):
     signal_type: str  # 'LONG', 'SHORT', 'EXIT'
     strength: float = 1.0  # For potential position sizing
     price: Optional[float] = None  # Price at which signal was generated (optional)
+    stop_loss: Optional[float] = None
+    take_profit: Optional[float] = None
+    position_side: Optional[str] = None  # LONG|SHORT for futures hedge mode
+    client_order_id: Optional[str] = None
+    time_in_force: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
     type: str = "SIGNAL"
 
 
@@ -56,6 +62,13 @@ class OrderEvent(Event):
     price: Optional[float] = None
     stop_price: Optional[float] = None
     trailing_percent: Optional[float] = None
+    position_side: Optional[str] = None  # LONG|SHORT for futures hedge mode
+    reduce_only: bool = False
+    client_order_id: Optional[str] = None
+    stop_loss: Optional[float] = None
+    take_profit: Optional[float] = None
+    time_in_force: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
     type: str = "ORDER"
 
 
@@ -75,4 +88,9 @@ class FillEvent(Event):
     direction: str
     fill_cost: Optional[float] = None
     commission: Optional[float] = None
+    order_id: Optional[str] = None
+    client_order_id: Optional[str] = None
+    position_side: Optional[str] = None
+    status: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
     type: str = "FILL"

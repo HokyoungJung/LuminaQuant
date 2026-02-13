@@ -76,6 +76,8 @@ class HistoricCSVDataHandler(DataHandler):
 
         # Generators for iterating over data
         self.data_generators = {}
+        self.next_bar = {}
+        self.finished_symbols = set()
 
         self._open_convert_csv_files()
 
@@ -95,7 +97,7 @@ class HistoricCSVDataHandler(DataHandler):
                     df = combined_data[s]
                 else:
                     # Load CSV with Polars
-                    csv_path = os.path.join(self.csv_dir, f"{s}.csv")
+                    csv_path = self._resolve_symbol_csv_path(s)
                     if not os.path.exists(csv_path):
                         print(f"Warning: Data file not found for {s} at {csv_path}")
                         continue
@@ -121,10 +123,33 @@ class HistoricCSVDataHandler(DataHandler):
                     df = df.filter(pl.col("datetime") <= self.end_date)
 
                 # Convert to iterator of Tuples (much faster than Dicts)
-                self.data_generators[s] = df.iter_rows(named=False)
+                generator = df.iter_rows(named=False)
+                self.data_generators[s] = generator
+
+                # Prime first bar to support global timestamp-ordered merge
+                first_bar = next(generator, None)
+                if first_bar is None:
+                    self.finished_symbols.add(s)
+                    continue
+                self.next_bar[s] = first_bar
             except Exception as e:
                 print(f"Dataset Load Error for {s}: {e}")
-                self.continue_backtest = False
+                self.finished_symbols.add(s)
+
+        if not self.next_bar:
+            self.continue_backtest = False
+
+    def _resolve_symbol_csv_path(self, symbol):
+        candidates = [
+            os.path.join(self.csv_dir, f"{symbol}.csv"),
+            os.path.join(self.csv_dir, f"{symbol.replace('/', '')}.csv"),
+            os.path.join(self.csv_dir, f"{symbol.replace('/', '_')}.csv"),
+            os.path.join(self.csv_dir, f"{symbol.replace('/', '-')}.csv"),
+        ]
+        for path in candidates:
+            if os.path.exists(path):
+                return path
+        return candidates[0]
 
     def _get_new_bar(self, symbol):
         """
@@ -133,55 +158,72 @@ class HistoricCSVDataHandler(DataHandler):
         try:
             return next(self.data_generators[symbol])
         except StopIteration:
-            self.continue_backtest = False
+            self.finished_symbols.add(symbol)
             return None
 
     def update_bars(self):
         """
-        Pushes the latest bar to the latest_symbol_data structure.
+        Pushes bars in global timestamp order across symbols.
+        If one symbol ends earlier, others continue until all data is exhausted.
         """
-        for s in self.symbol_list:
-            bar = self._get_new_bar(s)
+        if not self.next_bar:
+            self.continue_backtest = False
+            return
 
-            if bar is not None:
-                # bar is a Tuple: (datetime, open, high, low, close, volume)
-                self.latest_symbol_data[s].append(bar)
+        # Find earliest timestamp among currently available bars
+        min_time = min(bar[0] for bar in self.next_bar.values())
+        emit_symbols = [s for s, bar in self.next_bar.items() if bar[0] == min_time]
 
-                # Publish MarketEvent
-                self.events.put(
-                    MarketEvent(
-                        bar[0],  # datetime
-                        s,
-                        bar[1],  # open
-                        bar[2],  # high
-                        bar[3],  # low
-                        bar[4],  # close
-                        bar[5],  # volume
-                    )
+        for s in emit_symbols:
+            bar = self.next_bar[s]
+            # bar is a Tuple: (datetime, open, high, low, close, volume)
+            self.latest_symbol_data[s].append(bar)
+
+            # Publish MarketEvent
+            self.events.put(
+                MarketEvent(
+                    bar[0],  # datetime
+                    s,
+                    bar[1],  # open
+                    bar[2],  # high
+                    bar[3],  # low
+                    bar[4],  # close
+                    bar[5],  # volume
                 )
+            )
 
-                # MEMORY OPTIMIZATION: Rolling Window
-                # Prevent unbounded growth. Strategy needs usually < 1000 bars.
-                if len(self.latest_symbol_data[s]) > self.max_lookback:
-                    self.latest_symbol_data[s].pop(0)
+            # MEMORY OPTIMIZATION: Rolling Window
+            if len(self.latest_symbol_data[s]) > self.max_lookback:
+                self.latest_symbol_data[s].pop(0)
 
+            # Advance only symbol that was emitted
+            nxt = self._get_new_bar(s)
+            if nxt is None:
+                self.next_bar.pop(s, None)
             else:
-                self.continue_backtest = False
+                self.next_bar[s] = nxt
+
+        if not self.next_bar:
+            self.continue_backtest = False
 
     def get_latest_bar(self, symbol):
         # Returns Tuple
+        if not self.latest_symbol_data.get(symbol):
+            return None
         return self.latest_symbol_data[symbol][-1]
 
     def get_latest_bars(self, symbol, N=1):
         # Returns List of Tuples
-        return self.latest_symbol_data[symbol][-N:]
+        return self.latest_symbol_data.get(symbol, [])[-N:]
 
     def get_latest_bar_datetime(self, symbol):
+        if not self.latest_symbol_data.get(symbol):
+            return None
         return self.latest_symbol_data[symbol][-1][0]
 
     def get_latest_bar_value(self, symbol, val_type):
         idx = self.col_idx.get(val_type)
-        if idx is not None:
+        if idx is not None and self.latest_symbol_data.get(symbol):
             return self.latest_symbol_data[symbol][-1][idx]
         return 0.0
 
@@ -194,3 +236,7 @@ class HistoricCSVDataHandler(DataHandler):
         if idx is not None:
             return [b[idx] for b in bars]
         return []
+
+    def get_market_spec(self, symbol):
+        _ = symbol
+        return {}

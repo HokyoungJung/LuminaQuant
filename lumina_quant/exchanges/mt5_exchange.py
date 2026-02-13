@@ -123,10 +123,11 @@ class MT5Exchange(ExchangeInterface):
         side: str,
         quantity: float,
         price: Optional[float] = None,
-        params: Dict = {},
+        params: Optional[Dict] = None,
     ) -> Dict:
         if not self.connected:
             raise RuntimeError("Not connected to MT5")
+        params = params or {}
 
         # Prepare request
         action = mt5.TRADE_ACTION_DEAL
@@ -191,6 +192,47 @@ class MT5Exchange(ExchangeInterface):
             "average": result.price,
             "price": result.price,
             "amount": result.volume,
+        }
+
+    def load_markets(self) -> Dict:
+        return {}
+
+    def set_leverage(self, symbol: str, leverage: int) -> bool:
+        _ = (symbol, leverage)
+        return True
+
+    def set_margin_mode(self, symbol: str, margin_mode: str) -> bool:
+        _ = (symbol, margin_mode)
+        return True
+
+    def fetch_positions(self, symbol: Optional[str] = None) -> List[Dict]:
+        return [
+            {"symbol": sym, "contracts": qty}
+            for sym, qty in self.get_all_positions().items()
+            if symbol is None or sym == symbol
+        ]
+
+    def fetch_order(self, order_id: str, symbol: Optional[str] = None) -> Dict:
+        _ = symbol
+        if not self.connected:
+            return {}
+        try:
+            ticket = int(order_id)
+        except Exception:
+            return {}
+
+        orders = mt5.orders_get(ticket=ticket)
+        if not orders:
+            return {}
+        order = orders[0]
+        return {
+            "id": str(order.ticket),
+            "status": "open",
+            "filled": order.volume_initial - order.volume_current,
+            "average": order.price_open,
+            "price": order.price_open,
+            "amount": order.volume_initial,
+            "symbol": order.symbol,
         }
 
     def fetch_open_orders(self, symbol: Optional[str] = None) -> List[Dict]:

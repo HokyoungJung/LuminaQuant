@@ -21,6 +21,38 @@ trading:
   min_trade_qty: 0.001
 
 # ------------------------------------------
+# Risk Settings (Shared)
+# ------------------------------------------
+risk:
+  risk_per_trade: 0.005          # 0.5%
+  max_daily_loss_pct: 0.03       # 3%
+  max_total_margin_pct: 0.50     # 50%
+  max_symbol_exposure_pct: 0.25  # 25%
+  max_order_value: 5000.0
+  default_stop_loss_pct: 0.01
+
+# ------------------------------------------
+# Execution Model (Shared)
+# ------------------------------------------
+execution:
+  maker_fee_rate: 0.0002
+  taker_fee_rate: 0.0004
+  spread_rate: 0.0002
+  slippage_rate: 0.0005
+  funding_rate_per_8h: 0.0
+  funding_interval_hours: 8
+  maintenance_margin_rate: 0.005
+  liquidation_buffer_rate: 0.0005
+
+# ------------------------------------------
+# Storage / Audit
+# ------------------------------------------
+storage:
+  backend: "sqlite"
+  sqlite_path: "logs/lumina_quant.db"
+  export_csv: true
+
+# ------------------------------------------
 # Backtest Specific Settings
 # ------------------------------------------
 backtest:
@@ -29,16 +61,26 @@ backtest:
   commission_rate: 0.001  # 0.1%
   slippage_rate: 0.0005   # 0.05%
   annual_periods: 252     # Daily: 252, 1h: 252*24, 1m: 252*24*60
+  random_seed: 42
+  persist_output: true
+  leverage: 3
 
 # ------------------------------------------
 # Live Trading Specific Settings
 # ------------------------------------------
 live:
+  mode: "paper" # paper|real
   exchange:
     driver: "ccxt" # Options: "ccxt", "mt5"
     name: "binance" # Specific exchange name for driver (e.g. "binance" for ccxt)
+    market_type: "future" # spot|future
+    position_mode: "HEDGE" # ONEWAY|HEDGE
+    margin_mode: "isolated" # isolated|cross
+    leverage: 3
   testnet: true
+  require_real_enable_flag: true
   poll_interval: 2  # Seconds
+  heartbeat_interval_sec: 30
   order_timeout: 10 # Seconds
   # API Keys are best loaded from .env, but can be set here if needed (NOT RECOMMENDED for git)
   # api_key: "YOUR_KEY"
@@ -54,6 +96,8 @@ live:
 optimization:
   method: "OPTUNA" # Options: "GRID", "OPTUNA"
   strategy: "RsiStrategy" # Class name of the strategy to optimize
+  walk_forward_folds: 3
+  overfit_penalty: 0.5
   
   # Optuna Settings
   optuna:

@@ -1,8 +1,10 @@
 import queue
 import time
+import atexit
 from lumina_quant.config import LiveConfig
 from lumina_quant.utils.logging_utils import setup_logging
 from lumina_quant.utils.persistence import StateManager
+from lumina_quant.utils.audit_store import AuditStore
 from lumina_quant.engine import TradingEngine
 from lumina_quant.exchanges import get_exchange
 from lumina_quant.interfaces import ExchangeInterface
@@ -33,6 +35,21 @@ class LiveTrader(TradingEngine):
         self.config = LiveConfig
         self.state_manager = StateManager()
         self.risk_manager = RiskManager(self.config)  # NEW
+        self.audit_store = AuditStore(getattr(self.config, "STORAGE_SQLITE_PATH", "lumina_quant.db"))
+        self.run_id = self.audit_store.start_run(
+            mode="live",
+            metadata={
+                "symbols": self.symbol_list,
+                "exchange": self.config.EXCHANGE,
+                "mode": self.config.MODE,
+            },
+        )
+        self._audit_closed = False
+        self.heartbeat_interval_sec = max(
+            1, int(getattr(self.config, "HEARTBEAT_INTERVAL_SEC", 30))
+        )
+        self._last_heartbeat_monotonic = time.monotonic()
+        atexit.register(self._close_audit_store)
 
         # Initialize Notification Manager
         self.notifier = NotificationManager(
@@ -94,6 +111,20 @@ class LiveTrader(TradingEngine):
         except Exception as e:
             self.logger.error(f"Failed to save state: {e}")
 
+    def _close_audit_store(self, status=None):
+        if self._audit_closed:
+            return
+        try:
+            if status:
+                self.audit_store.end_run(self.run_id, status=status)
+        except Exception:
+            pass
+        try:
+            self.audit_store.close()
+        except Exception:
+            pass
+        self._audit_closed = True
+
     def on_fill(self, event):
         """
         Hook from TradingEngine to save state on fill.
@@ -101,7 +132,16 @@ class LiveTrader(TradingEngine):
         msg = f"✅ **FILL**: {event.direction} {event.quantity} {event.symbol} @ {event.fill_cost}"
         self.logger.info(msg)
         self.notifier.send_message(msg)
+        self.audit_store.log_fill(self.run_id, event)
         self._save_state()
+
+    def _emit_heartbeat(self, force=False):
+        now_mono = time.monotonic()
+        if not force and (now_mono - self._last_heartbeat_monotonic) < self.heartbeat_interval_sec:
+            return
+        self._last_heartbeat_monotonic = now_mono
+        details = {"queue_size": self.events.qsize()}
+        self.audit_store.log_heartbeat(self.run_id, status="ALIVE", details=details)
 
     def _sync_portfolio(self):
         """
@@ -154,6 +194,15 @@ class LiveTrader(TradingEngine):
                             self.logger.warning(msg)
                             self.notifier.send_message(msg)
                             self.strategy.bought[s] = "OUT"
+                            self.audit_store.log_risk_event(
+                                self.run_id,
+                                reason="STATE_MISMATCH",
+                                details={
+                                    "symbol": s,
+                                    "strategy_status": strategy_status,
+                                    "position_qty": position_qty,
+                                },
+                            )
                         elif strategy_status == "OUT" and position_qty != 0:
                             msg = f"⚠️ **State Mismatch**: {s} Strategy=OUT, Portfolio={position_qty}. Syncing Strategy."
                             self.logger.warning(msg)
@@ -161,12 +210,26 @@ class LiveTrader(TradingEngine):
                             self.strategy.bought[s] = (
                                 "LONG" if position_qty > 0 else "SHORT"
                             )
+                            self.audit_store.log_risk_event(
+                                self.run_id,
+                                reason="STATE_MISMATCH",
+                                details={
+                                    "symbol": s,
+                                    "strategy_status": strategy_status,
+                                    "position_qty": position_qty,
+                                },
+                            )
 
                 self.logger.info(
                     f"Portfolio Sync Completed. Total Equity: {total_equity}"
                 )
             except Exception as e:
                 self.logger.error(f"Portfolio Sync Failed: {e}")
+                self.audit_store.log_risk_event(
+                    self.run_id,
+                    reason="EXCHANGE_SYNC_ERROR",
+                    details={"error": str(e)},
+                )
 
     def handle_market_event(self, event):
         """
@@ -176,7 +239,15 @@ class LiveTrader(TradingEngine):
 
         # Save Live Equity
         self.portfolio.create_equity_curve_dataframe()
-        self.portfolio.save_equity_curve("live_equity.csv")
+        if getattr(self.config, "STORAGE_EXPORT_CSV", True):
+            self.portfolio.save_equity_curve("live_equity.csv")
+        self.audit_store.log_equity(
+            self.run_id,
+            timeindex=event.time,
+            total=self.portfolio.current_holdings.get("total", 0.0),
+            cash=self.portfolio.current_holdings.get("cash", 0.0),
+            metadata={"symbol": event.symbol},
+        )
 
     def handle_fill_event(self, event):
         """
@@ -185,7 +256,8 @@ class LiveTrader(TradingEngine):
         super().handle_fill_event(event)  # This calls self.on_fill(event) too
 
         # Save Live Trades
-        self.portfolio.output_trade_log("live_trades.csv")
+        if getattr(self.config, "STORAGE_EXPORT_CSV", True):
+            self.portfolio.output_trade_log("live_trades.csv")
 
     def run(self):
         """
@@ -196,6 +268,7 @@ class LiveTrader(TradingEngine):
 
         while True:
             try:
+                self._emit_heartbeat(force=False)
                 # In Live mode, data_handler is threaded and pushes events autonomously.
                 # We just blocking-wait for events.
                 event = self.events.get(True, timeout=10)  # Wait up to 10s
@@ -221,24 +294,46 @@ class LiveTrader(TradingEngine):
                             event.symbol, "close"
                         )
                         passed, reason = self.risk_manager.check_order(
-                            event, current_price
+                            event, current_price, portfolio=self.portfolio
                         )
                         if not passed:
                             msg = f"⛔ **Risk Reject**: {reason}"
                             self.logger.warning(msg)
                             self.notifier.send_message(msg)
+                            self.audit_store.log_risk_event(
+                                self.run_id,
+                                reason="ORDER_REJECTED",
+                                details={
+                                    "symbol": event.symbol,
+                                    "direction": event.direction,
+                                    "quantity": event.quantity,
+                                    "reason": reason,
+                                },
+                            )
                             continue  # Skip processing this event
+                        self.audit_store.log_order(self.run_id, event, status="NEW")
 
                     self.process_event(event)
 
             except queue.Empty:
                 # Heartbeat
-                pass
+                self._emit_heartbeat(force=True)
+                if hasattr(self.execution_handler, "check_open_orders"):
+                    self.execution_handler.check_open_orders(None)
             except KeyboardInterrupt:
                 self.logger.info("Stopping Live Trader...")
                 self._save_state()  # Save on exit
                 self.data_handler.continue_backtest = False
+                if hasattr(self.data_handler, "ws_running"):
+                    self.data_handler.ws_running = False
+                self._close_audit_store(status="STOPPED")
                 break
             except Exception as e:
                 self.logger.error(f"Error in main loop: {e}")
                 self._save_state()  # Save on crash attempt
+                self.audit_store.log_risk_event(
+                    self.run_id, reason="MAIN_LOOP_ERROR", details={"error": str(e)}
+                )
+
+    def __del__(self):
+        self._close_audit_store(status="STOPPED")

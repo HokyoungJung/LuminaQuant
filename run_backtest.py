@@ -43,12 +43,12 @@ if os.path.exists(param_path):
     try:
         with open(param_path, "r") as f:
             loaded_params = json.load(f)
-        print(f"✅ Loaded Optimized Params from {param_path}")
+        print(f"[OK] Loaded Optimized Params from {param_path}")
         STRATEGY_PARAMS = loaded_params
     except Exception as e:
-        print(f"⚠️ Failed to load optimized params: {e}")
+        print(f"[WARN] Failed to load optimized params: {e}")
 else:
-    print(f"ℹ️ Optimized params not found at {param_path}. Using Defaults.")
+    print(f"[INFO] Optimized params not found at {param_path}. Using Defaults.")
 
 
 # 3. Data Settings

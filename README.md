@@ -69,7 +69,10 @@ git clone https://github.com/HokyoungJung/LuminaQuant.git
 cd lumina-quant
 
 # Install dependencies
-uv sync  # or pip install .
+uv sync  # or pip install ".[live,optimize,dashboard]"
+
+# Verify install and tests
+python scripts/verify_install.py
 
 # (Optional) For MT5 Support
 pip install MetaTrader5
@@ -101,6 +104,11 @@ trading:
 python run_backtest.py
 ```
 
+**Walk-Forward Optimization (multi-fold):**
+```bash
+python optimize.py
+```
+
 **Visualize Results:**
 ```bash
 streamlit run dashboard.py
@@ -109,6 +117,13 @@ streamlit run dashboard.py
 **Start Live Trading:**
 ```bash
 python run_live.py
+# Real mode requires explicit safety flag:
+# LUMINA_ENABLE_LIVE_REAL=true python run_live.py --enable-live-real
+```
+
+**Generate 14-day Soak Report (Promotion Gate):**
+```bash
+python scripts/generate_soak_report.py --db logs/lumina_quant.db --days 14
 ```
 
 ---

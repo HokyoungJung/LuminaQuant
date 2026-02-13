@@ -22,6 +22,7 @@ class BinanceWebSocketDataHandler(DataHandler):
         self.latest_symbol_data = {s: [] for s in symbol_list}
         self.lock = threading.Lock()
         self.ws_running = True
+        self.continue_backtest = True  # Compatibility with engine/live trader stop flow
 
         # Column Map
         self.col_idx = {
@@ -199,3 +200,8 @@ class BinanceWebSocketDataHandler(DataHandler):
             data = self.latest_symbol_data[symbol][-N:]
             idx = self.col_idx.get(val_type)
             return [d[idx] for d in data] if idx is not None else []
+
+    def get_market_spec(self, symbol):
+        if self.exchange and hasattr(self.exchange, "get_market_spec"):
+            return self.exchange.get_market_spec(symbol)
+        return {}
