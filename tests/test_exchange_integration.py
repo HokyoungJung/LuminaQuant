@@ -1,11 +1,13 @@
 import os
 import sys
+import tempfile
 import unittest
 from unittest.mock import MagicMock
 
 # Add Parent Dir to Path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+from lumina_quant.config import LiveConfig
 from lumina_quant.interfaces import ExchangeInterface
 from lumina_quant.live_data import LiveDataHandler
 from lumina_quant.live_execution import LiveExecutionHandler
@@ -76,32 +78,48 @@ class TestExchangeIntegration(unittest.TestCase):
         # We need to mock strategy to avoid complex logic
         mock_strategy_cls = MagicMock()
 
-        trader = LiveTrader(
-            symbol_list=["BTC/USDT"],
-            data_handler_cls=LiveDataHandler,
-            execution_handler_cls=LiveExecutionHandler,
-            portfolio_cls=Portfolio,
-            strategy_cls=mock_strategy_cls,
-        )
+        original_api_key = LiveConfig.BINANCE_API_KEY
+        original_secret_key = LiveConfig.BINANCE_SECRET_KEY
+        original_storage_path = LiveConfig.STORAGE_SQLITE_PATH
+        LiveConfig.BINANCE_API_KEY = "test_key"
+        LiveConfig.BINANCE_SECRET_KEY = "test_secret"
 
-        self.assertIsInstance(trader.exchange, MockExchange)
-        self.assertIsInstance(trader.data_handler, LiveDataHandler)
-        self.assertIsInstance(trader.execution_handler, LiveExecutionHandler)
+        with tempfile.TemporaryDirectory() as tmp:
+            LiveConfig.STORAGE_SQLITE_PATH = os.path.join(tmp, "test_lumina_quant.db")
+            trader = None
+            try:
+                trader = LiveTrader(
+                    symbol_list=["BTC/USDT"],
+                    data_handler_cls=LiveDataHandler,
+                    execution_handler_cls=LiveExecutionHandler,
+                    portfolio_cls=Portfolio,
+                    strategy_cls=mock_strategy_cls,
+                )
 
-        print("LiveTrader instantiated successfully with Exchange.")
+                self.assertIsInstance(trader.exchange, MockExchange)
+                self.assertIsInstance(trader.data_handler, LiveDataHandler)
+                self.assertIsInstance(trader.execution_handler, LiveExecutionHandler)
 
-        # Test basic method delegation
-        balance = trader.execution_handler.get_balance()
-        self.assertEqual(balance, 10000.0)
-        print("get_balance delegated correctly.")
+                print("LiveTrader instantiated successfully with Exchange.")
 
-        # Test new interface methods existence
-        try:
-            trader.exchange.fetch_open_orders()
-            trader.exchange.cancel_order("123")
-            print("New interface methods called successfully.")
-        except AttributeError:
-            self.fail("ExchangeInterface missing new methods!")
+                # Test basic method delegation
+                balance = trader.execution_handler.get_balance()
+                self.assertEqual(balance, 10000.0)
+                print("get_balance delegated correctly.")
+
+                # Test new interface methods existence
+                try:
+                    trader.exchange.fetch_open_orders()
+                    trader.exchange.cancel_order("123")
+                    print("New interface methods called successfully.")
+                except AttributeError:
+                    self.fail("ExchangeInterface missing new methods!")
+            finally:
+                if trader is not None:
+                    trader._close_audit_store(status="STOPPED")
+                LiveConfig.BINANCE_API_KEY = original_api_key
+                LiveConfig.BINANCE_SECRET_KEY = original_secret_key
+                LiveConfig.STORAGE_SQLITE_PATH = original_storage_path
 
 
 if __name__ == "__main__":

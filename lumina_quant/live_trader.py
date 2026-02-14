@@ -1,4 +1,5 @@
 import atexit
+import os
 import queue
 import time
 
@@ -23,11 +24,22 @@ class LiveTrader(TradingEngine):
         execution_handler_cls,
         portfolio_cls,
         strategy_cls,
+        strategy_name=None,
+        stop_file="",
+        external_run_id="",
     ):
         self.logger = setup_logging("LiveTrader")
+        self._audit_closed = True
+        self.audit_store = None
+        self.run_id = None
         self.symbol_list = symbol_list
         self.events = queue.Queue()
         self.config = LiveConfig
+        self.config.validate()
+        default_strategy_name = getattr(strategy_cls, "__name__", strategy_cls.__class__.__name__)
+        self.strategy_name = str(strategy_name or default_strategy_name)
+        self.stop_file = str(stop_file or "")
+        self.external_run_id = str(external_run_id or "")
         self.state_manager = StateManager()
         self.risk_manager = RiskManager(self.config)  # NEW
         self.audit_store = AuditStore(
@@ -39,7 +51,10 @@ class LiveTrader(TradingEngine):
                 "symbols": self.symbol_list,
                 "exchange": self.config.EXCHANGE,
                 "mode": self.config.MODE,
+                "strategy": self.strategy_name,
+                "stop_file": self.stop_file,
             },
+            run_id=self.external_run_id or None,
         )
         self._audit_closed = False
         self.heartbeat_interval_sec = max(
@@ -76,7 +91,9 @@ class LiveTrader(TradingEngine):
         self.notifier = NotificationManager(
             self.config.TELEGRAM_BOT_TOKEN, self.config.TELEGRAM_CHAT_ID
         )
-        self.notifier.send_message(f"🚀 **LuminaQuant Started**\nSymbols: {symbol_list}")
+        self.notifier.send_message(
+            f"🚀 **LuminaQuant Started**\nSymbols: {symbol_list}\nStrategy: {self.strategy_name}"
+        )
 
         # Initialize Exchange
         self.logger.info("Initializing Exchange...")
@@ -130,11 +147,19 @@ class LiveTrader(TradingEngine):
         except Exception as e:
             self.logger.error(f"Failed to save state: {e}")
 
+    def _is_stop_requested(self):
+        if not self.stop_file:
+            return False
+        return os.path.exists(self.stop_file)
+
     def _close_audit_store(self, status=None):
-        if self._audit_closed:
+        if getattr(self, "_audit_closed", True):
+            return
+        if self.audit_store is None:
+            self._audit_closed = True
             return
         try:
-            if status:
+            if status and self.run_id:
                 self.audit_store.end_run(self.run_id, status=status)
         except Exception:
             pass
@@ -368,6 +393,18 @@ class LiveTrader(TradingEngine):
 
         while True:
             try:
+                if self._is_stop_requested():
+                    self.logger.warning("Stop file detected. Shutting down live trader gracefully.")
+                    self.notifier.send_message(
+                        "⏹️ **Stop Requested** via control file. Stopping trader."
+                    )
+                    self._save_state()
+                    self.data_handler.continue_backtest = False
+                    if hasattr(self.data_handler, "ws_running"):
+                        self.data_handler.ws_running = False
+                    self._close_audit_store(status="STOPPED")
+                    break
+
                 self._emit_heartbeat(force=False)
                 self._reconcile_positions(force=False)
                 # In Live mode, data_handler is threaded and pushes events autonomously.

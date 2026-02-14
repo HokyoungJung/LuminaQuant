@@ -13,6 +13,7 @@
 | **[Installation & Setup](#installation)** | Getting started with LuminaQuant. |
 | **[Deployment Guide](docs/DEPLOYMENT.md)** | **New**: Docker & VPS Setup for 24/7 Trading. |
 | **[Validation Report](docs/VALIDATION_REPORT.md)** | Verification + optimization report for core workflows. |
+| **[Dashboard Realtime Report](docs/DASHBOARD_REALTIME_ANALYSIS_REPORT.md)** | Analysis + implementation report for live-refresh dashboard behavior. |
 | **[Exchange Guide](docs/EXCHANGES.md)** | Detailed setup for **Binance** (CCXT) and **MetaTrader 5**. |
 | **[Trading Manual](docs/TRADING_MANUAL.md)** | **How-To**: Buy/Sell, Leverage, TP/SL, Trailing Stops. |
 | **[Performance Metrics](docs/METRICS.md)** | Explanation of Sharpe, Sortino, Alpha, Beta, etc. |
@@ -139,6 +140,32 @@ uv run ruff check .
 **Visualize Results:**
 ```bash
 uv run streamlit run dashboard.py
+```
+
+Dashboard now includes no-code workflow controls for backtest, optimization, and live launch/stop with:
+- asynchronous managed jobs and log tail viewer
+- explicit real-mode arming phrase (`ENABLE REAL`)
+- graceful stop via control-file signal and emergency force-kill fallback
+- optimization results panel from SQLite (`optimization_results`)
+- ghost cleanup controls (dry-run/apply) for stale `RUNNING` rows
+
+**Ghost Cleanup CLI (stale RUNNING rows):**
+```bash
+# Dry-run (recommended first)
+uv run python scripts/cleanup_ghost_runs.py --db logs/lumina_quant.db --stale-sec 300 --startup-grace-sec 90
+
+# Apply cleanup
+uv run python scripts/cleanup_ghost_runs.py --db logs/lumina_quant.db --stale-sec 300 --startup-grace-sec 90 --apply
+```
+
+**Realtime Dashboard Smoke Check (equity row growth):**
+```bash
+# Run while live trader is writing to logs/lumina_quant.db
+uv run python scripts/smoke_dashboard_realtime.py \
+  --db-path logs/lumina_quant.db \
+  --require-running \
+  --timeout-sec 90 \
+  --poll-sec 3
 ```
 
 **Start Live Trading:**

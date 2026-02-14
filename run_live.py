@@ -7,6 +7,12 @@ from lumina_quant.live.data_poll import LiveDataHandler
 from lumina_quant.live.execution_live import LiveExecutionHandler
 from lumina_quant.live.trader import LiveTrader
 from strategies.moving_average import MovingAverageCrossStrategy
+from strategies.rsi_strategy import RsiStrategy
+
+STRATEGY_MAP = {
+    "MovingAverageCrossStrategy": MovingAverageCrossStrategy,
+    "RsiStrategy": RsiStrategy,
+}
 
 
 def main():
@@ -15,6 +21,22 @@ def main():
         "--enable-live-real",
         action="store_true",
         help="Explicitly allow real trading mode.",
+    )
+    parser.add_argument(
+        "--strategy",
+        choices=sorted(STRATEGY_MAP.keys()),
+        default="MovingAverageCrossStrategy",
+        help="Strategy class to run in live mode.",
+    )
+    parser.add_argument(
+        "--run-id",
+        default="",
+        help="Optional external run_id for audit trail correlation.",
+    )
+    parser.add_argument(
+        "--stop-file",
+        default="",
+        help="Optional stop-file path for graceful shutdown signal.",
     )
     args = parser.parse_args()
     if args.enable_live_real:
@@ -34,13 +56,17 @@ def main():
     print(f"Trading Symbols: {symbol_list}")
 
     # 3. Initialize Trader
+    strategy_cls = STRATEGY_MAP.get(args.strategy, MovingAverageCrossStrategy)
     try:
         trader = LiveTrader(
             symbol_list=symbol_list,
             data_handler_cls=LiveDataHandler,
             execution_handler_cls=LiveExecutionHandler,
             portfolio_cls=Portfolio,
-            strategy_cls=MovingAverageCrossStrategy,
+            strategy_cls=strategy_cls,
+            strategy_name=args.strategy,
+            stop_file=args.stop_file,
+            external_run_id=args.run_id,
         )
 
         # 4. Run

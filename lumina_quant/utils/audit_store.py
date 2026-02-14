@@ -107,8 +107,8 @@ class AuditStore:
             )
             self._conn.commit()
 
-    def start_run(self, mode, metadata=None):
-        run_id = str(uuid.uuid4())
+    def start_run(self, mode, metadata=None, run_id=None):
+        run_id = str(run_id) if run_id else str(uuid.uuid4())
         now = self._utcnow()
         with self._lock:
             self._conn.execute(

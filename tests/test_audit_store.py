@@ -8,6 +8,30 @@ from lumina_quant.utils.audit_store import AuditStore
 
 
 class TestAuditStore(unittest.TestCase):
+    def test_start_run_with_external_run_id(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = os.path.join(tmp, "audit.db")
+            store = AuditStore(db_path)
+            expected_run_id = "external-run-123"
+            run_id = store.start_run("backtest", {"source": "dashboard"}, run_id=expected_run_id)
+            self.assertEqual(run_id, expected_run_id)
+            store.end_run(run_id, status="COMPLETED")
+            store.close()
+
+            conn = sqlite3.connect(db_path)
+            try:
+                cur = conn.cursor()
+                cur.execute(
+                    "SELECT run_id, mode, status FROM runs WHERE run_id=?", (expected_run_id,)
+                )
+                row = cur.fetchone()
+                self.assertIsNotNone(row)
+                self.assertEqual(row[0], expected_run_id)
+                self.assertEqual(row[1], "backtest")
+                self.assertEqual(row[2], "COMPLETED")
+            finally:
+                conn.close()
+
     def test_insert_order_fill(self):
         with tempfile.TemporaryDirectory() as tmp:
             db_path = os.path.join(tmp, "audit.db")

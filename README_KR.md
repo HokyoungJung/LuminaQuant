@@ -11,6 +11,7 @@
 | 섹션 | 설명 |
 | :--- | :--- |
 | **[설치 및 설정](#설치-installation)** | LuminaQuant 시작하기. |
+| **[대시보드 실시간 분석 리포트](docs/DASHBOARD_REALTIME_ANALYSIS_REPORT.md)** | 실시간 갱신 동작 개선 분석 및 구현 결과. |
 | **[거래소 가이드](docs/kr/EXCHANGES.md)** | **바이낸스(Binance)** (CCXT) 및 **MetaTrader 5 (MT5)** 상세 설정법. |
 | **[거래 매뉴얼](docs/kr/TRADING_MANUAL.md)** | **실전 운용법**: 매수/매도, 레버리지, TP/SL, 트레일링 스탑. |
 | **[성과 지표](docs/kr/METRICS.md)** | Sharpe, Sortino, Alpha, Beta 등 지표에 대한 설명. |
@@ -145,6 +146,16 @@ uv run python scripts/benchmark_backtest.py \
 **결과 시각화 (대시보드):**
 ```bash
 uv run streamlit run dashboard.py
+```
+
+**대시보드 실시간 스모크 체크 (equity row 증가 확인):**
+```bash
+# live trader가 logs/lumina_quant.db를 쓰는 동안 실행
+uv run python scripts/smoke_dashboard_realtime.py \
+  --db-path logs/lumina_quant.db \
+  --require-running \
+  --timeout-sec 90 \
+  --poll-sec 3
 ```
 
 **실거래 실행:**

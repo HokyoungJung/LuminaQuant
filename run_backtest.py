@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import uuid
 from datetime import datetime
 
 from lumina_quant.backtesting.backtest import Backtest
@@ -9,6 +10,7 @@ from lumina_quant.backtesting.execution_sim import SimulatedExecutionHandler
 from lumina_quant.backtesting.portfolio_backtest import Portfolio
 from lumina_quant.config import BacktestConfig, BaseConfig, OptimizationConfig
 from lumina_quant.market_data import load_data_dict_from_db
+from lumina_quant.utils.audit_store import AuditStore
 
 # ==========================================
 # CONFIGURATION FROM YAML
@@ -102,30 +104,67 @@ def _load_data_dict(data_source, market_db_path, market_exchange):
     return None
 
 
-def run(data_source="auto", market_db_path=MARKET_DB_PATH, market_exchange=MARKET_DB_EXCHANGE):
+def run(
+    data_source="auto",
+    market_db_path=MARKET_DB_PATH,
+    market_exchange=MARKET_DB_EXCHANGE,
+    run_id="",
+):
     print("------------------------------------------------")
     print(f"Running Backtest for {SYMBOL_LIST}")
     print(f"Strategy: {STRATEGY_CLASS.__name__}")
     print(f"Params: {STRATEGY_PARAMS}")
     print("------------------------------------------------")
 
-    data_dict = _load_data_dict(data_source, market_db_path, market_exchange)
-
-    # Initialize Backtest
-    backtest = Backtest(
-        csv_dir=CSV_DIR,
-        symbol_list=SYMBOL_LIST,
-        start_date=START_DATE,
-        end_date=END_DATE,
-        data_handler_cls=HistoricCSVDataHandler,
-        execution_handler_cls=SimulatedExecutionHandler,
-        portfolio_cls=Portfolio,
-        strategy_cls=STRATEGY_CLASS,
-        strategy_params=STRATEGY_PARAMS,
-        data_dict=data_dict,
+    backtest_run_id = str(run_id or "").strip() or str(uuid.uuid4())
+    audit_store = AuditStore(getattr(BaseConfig, "STORAGE_SQLITE_PATH", "logs/lumina_quant.db"))
+    audit_store.start_run(
+        mode="backtest",
+        metadata={
+            "symbols": list(SYMBOL_LIST),
+            "strategy": STRATEGY_CLASS.__name__,
+            "params": STRATEGY_PARAMS,
+            "data_source": str(data_source),
+            "market_db_path": str(market_db_path),
+            "market_exchange": str(market_exchange),
+        },
+        run_id=backtest_run_id,
     )
 
-    backtest.simulate_trading()
+    try:
+        data_dict = _load_data_dict(data_source, market_db_path, market_exchange)
+
+        # Initialize Backtest
+        backtest = Backtest(
+            csv_dir=CSV_DIR,
+            symbol_list=SYMBOL_LIST,
+            start_date=START_DATE,
+            end_date=END_DATE,
+            data_handler_cls=HistoricCSVDataHandler,
+            execution_handler_cls=SimulatedExecutionHandler,
+            portfolio_cls=Portfolio,
+            strategy_cls=STRATEGY_CLASS,
+            strategy_params=STRATEGY_PARAMS,
+            data_dict=data_dict,
+        )
+
+        backtest.simulate_trading()
+        audit_store.end_run(
+            backtest_run_id,
+            status="COMPLETED",
+            metadata={
+                "final_equity": float(backtest.portfolio.current_holdings.get("total", 0.0)),
+            },
+        )
+    except Exception as exc:
+        audit_store.end_run(
+            backtest_run_id,
+            status="FAILED",
+            metadata={"error": str(exc)},
+        )
+        raise
+    finally:
+        audit_store.close()
 
 
 if __name__ == "__main__":
@@ -146,9 +185,15 @@ if __name__ == "__main__":
         default=MARKET_DB_EXCHANGE,
         help="Exchange key used in OHLCV DB rows.",
     )
+    parser.add_argument(
+        "--run-id",
+        default="",
+        help="Optional external run_id for audit trail correlation.",
+    )
     args = parser.parse_args()
     run(
         data_source=args.data_source,
         market_db_path=args.market_db_path,
         market_exchange=args.market_exchange,
+        run_id=args.run_id,
     )

@@ -78,7 +78,7 @@ class Portfolio:
 
         # Initial holdings - Store as Tuple: (datetime, cash, commission, total, s1, s2, ..., benchmark_price)
         h_row = (
-            [self.start_date, self.initial_capital, 0.0, self.initial_capital]
+            [self.start_date, self.initial_capital, 0.0, 0.0, self.initial_capital]
             + [0.0 for _ in self.symbol_list]
             + [0.0]
         )  # Benchmark Price Placeholder
@@ -157,6 +157,7 @@ class Portfolio:
                         latest_datetime,
                         cash,
                         commission,
+                        current_holdings.get("funding", 0.0),
                         total,
                         market_value,
                         close_price,
@@ -197,6 +198,7 @@ class Portfolio:
                 latest_datetime,
                 cash,
                 commission,
+                current_holdings.get("funding", 0.0),
                 total,
                 *market_vals,
                 bench_price,
@@ -674,7 +676,15 @@ class Portfolio:
         """Creates a Polars DataFrame from the all_holdings list (list of Tuples)."""
         # Define Schema matches Tuple order
         # (datetime, cash, commission, total, s1, s2, ..., benchmark_price)
-        cols = ["datetime", "cash", "commission", "total", *self.symbol_list, "benchmark_price"]
+        cols = [
+            "datetime",
+            "cash",
+            "commission",
+            "funding",
+            "total",
+            *self.symbol_list,
+            "benchmark_price",
+        ]
 
         # Polars handles list of tuples with 'schema' or 'columns' arg
         # Note: If list is empty, this might crash, but typically not in backtest.

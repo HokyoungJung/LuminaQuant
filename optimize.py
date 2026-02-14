@@ -19,6 +19,7 @@ from lumina_quant.config import BacktestConfig, BaseConfig, OptimizationConfig
 from lumina_quant.market_data import load_data_dict_from_db, resolve_symbol_csv_path
 from lumina_quant.optimization.storage import save_optimization_rows
 from lumina_quant.optimization.walkers import build_walk_forward_splits
+from lumina_quant.utils.audit_store import AuditStore
 
 # Strategy Imports
 from strategies.moving_average import MovingAverageCrossStrategy
@@ -522,118 +523,162 @@ if __name__ == "__main__":
         default=MARKET_DB_EXCHANGE,
         help="Exchange key used in OHLCV DB rows.",
     )
+    parser.add_argument(
+        "--run-id",
+        default="",
+        help="Optional external run_id for audit trail correlation.",
+    )
     args = parser.parse_args()
 
-    run_id = str(uuid.uuid4())
+    run_id = str(args.run_id or "").strip() or str(uuid.uuid4())
     db_path = getattr(BaseConfig, "STORAGE_SQLITE_PATH", "logs/lumina_quant.db")
+    audit_store = AuditStore(db_path)
+    audit_store.start_run(
+        mode="optimize",
+        metadata={
+            "strategy": STRATEGY_CLASS.__name__,
+            "method": str(OPTIMIZATION_METHOD),
+            "folds": int(args.folds),
+            "n_trials": int(args.n_trials),
+            "max_workers": int(args.max_workers),
+            "data_source": str(args.data_source),
+            "market_db_path": str(args.market_db_path),
+            "market_exchange": str(args.market_exchange),
+        },
+        run_id=run_id,
+    )
+
+    final_status = "FAILED"
+    final_metadata = {}
+
     OPTUNA_TRIALS = args.n_trials
     MAX_WORKERS = max(1, int(args.max_workers))
     persist_best_params = bool(args.save_best_params or OptimizationConfig.PERSIST_BEST_PARAMS)
 
-    # Load Data Once
-    DATA_DICT = load_all_data(
-        CSV_DIR,
-        SYMBOL_LIST,
-        data_source=args.data_source,
-        market_db_path=args.market_db_path,
-        market_exchange=args.market_exchange,
-        timeframe=BaseConfig.TIMEFRAME,
-    )
-    splits = build_walk_forward_splits(
-        BASE_START,
-        args.folds,
-    )
-    data_start, data_end = _data_datetime_range(DATA_DICT)
-    if data_start is None or data_end is None:
-        print("No usable datetime range found in loaded data.")
-        sys.exit(1)
-
-    valid_splits = _filter_valid_splits(splits, data_start, data_end)
-    if not valid_splits:
-        fallback_split = _build_data_aware_split(data_start, data_end)
-        if fallback_split is None:
-            print(
-                "Could not build a valid walk-forward split from current data range. "
-                "Check your dataset coverage and config dates."
-            )
+    try:
+        # Load Data Once
+        DATA_DICT = load_all_data(
+            CSV_DIR,
+            SYMBOL_LIST,
+            data_source=args.data_source,
+            market_db_path=args.market_db_path,
+            market_exchange=args.market_exchange,
+            timeframe=BaseConfig.TIMEFRAME,
+        )
+        splits = build_walk_forward_splits(
+            BASE_START,
+            args.folds,
+        )
+        data_start, data_end = _data_datetime_range(DATA_DICT)
+        if data_start is None or data_end is None:
+            print("No usable datetime range found in loaded data.")
             sys.exit(1)
-        valid_splits = [fallback_split]
+
+        valid_splits = _filter_valid_splits(splits, data_start, data_end)
+        if not valid_splits:
+            fallback_split = _build_data_aware_split(data_start, data_end)
+            if fallback_split is None:
+                print(
+                    "Could not build a valid walk-forward split from current data range. "
+                    "Check your dataset coverage and config dates."
+                )
+                sys.exit(1)
+            valid_splits = [fallback_split]
+            print(
+                "[INFO] Default walk-forward windows were outside available data range. "
+                "Using one data-aware fallback split."
+            )
+
+        if not valid_splits:
+            print("No walk-forward splits generated.")
+            sys.exit(1)
+
+        fold_reports = []
+        for split in valid_splits:
+            try:
+                report = run_walk_forward_fold(split)
+                if report is None:
+                    print(f"[Fold {split['fold']}] No valid optimization results.")
+                    continue
+                fold_reports.append(report)
+                save_optimization_rows(
+                    db_path,
+                    run_id,
+                    f"fold_{split['fold']}_train",
+                    report["train_results"],
+                )
+                save_optimization_rows(
+                    db_path,
+                    run_id,
+                    f"fold_{split['fold']}_validation",
+                    report["val_candidates"],
+                )
+                save_optimization_rows(
+                    db_path,
+                    run_id,
+                    f"fold_{split['fold']}_test",
+                    [report["test_result"]],
+                )
+            except Exception as e:
+                print(f"[Fold {split['fold']}] Failed: {e}")
+
+        if not fold_reports:
+            print("No valid fold report generated.")
+            sys.exit(1)
+
+        # Select overall winner by test sharpe, then robustness score.
+        fold_reports.sort(
+            key=lambda r: (
+                0 if r["test_result"].get("no_data") else 1,
+                float(r["test_result"].get("sharpe", -999.0)),
+                float(r["selected"].get("robustness_score", -999.0)),
+                int(r["test_result"].get("num_trades", 0)),
+            ),
+            reverse=True,
+        )
+        winner = fold_reports[0]
+
+        print("\n>>>> FINAL WALK-FORWARD REPORT <<<<")
+        for report in fold_reports:
+            f = report["fold"]
+            print(
+                f"Fold {f}: Train={report['best_candidate']['sharpe']:.4f} | "
+                f"Val={report['selected']['sharpe']:.4f} | "
+                f"Test={report['test_result']['sharpe']:.4f}"
+            )
+
         print(
-            "[INFO] Default walk-forward windows were outside available data range. "
-            "Using one data-aware fallback split."
+            f"\nSelected Fold: {winner['fold']} | Params: {winner['selected']['params']} | "
+            f"Test Sharpe: {winner['test_result']['sharpe']:.4f}"
         )
 
-    if not valid_splits:
-        print("No walk-forward splits generated.")
-        sys.exit(1)
+        if persist_best_params:
+            # Save best parameters from winning fold (opt-in artifact).
+            strategy_name = STRATEGY_CLASS.__name__
+            save_dir = os.path.join("best_optimized_parameters", strategy_name)
+            os.makedirs(save_dir, exist_ok=True)
+            best_params_file = os.path.join(save_dir, "best_params.json")
+            with open(best_params_file, "w") as f:
+                json.dump(winner["selected"]["params"], f, indent=4)
+            print(f"[Artifact] Best Parameters saved to '{best_params_file}'")
+        else:
+            print("[Artifact] best_params.json export skipped (pure-compute mode).")
 
-    fold_reports = []
-    for split in valid_splits:
-        try:
-            report = run_walk_forward_fold(split)
-            if report is None:
-                print(f"[Fold {split['fold']}] No valid optimization results.")
-                continue
-            fold_reports.append(report)
-            save_optimization_rows(
-                db_path,
-                run_id,
-                f"fold_{split['fold']}_train",
-                report["train_results"],
-            )
-            save_optimization_rows(
-                db_path,
-                run_id,
-                f"fold_{split['fold']}_validation",
-                report["val_candidates"],
-            )
-            save_optimization_rows(
-                db_path,
-                run_id,
-                f"fold_{split['fold']}_test",
-                [report["test_result"]],
-            )
-        except Exception as e:
-            print(f"[Fold {split['fold']}] Failed: {e}")
-
-    if not fold_reports:
-        print("No valid fold report generated.")
-        sys.exit(1)
-
-    # Select overall winner by test sharpe, then robustness score.
-    fold_reports.sort(
-        key=lambda r: (
-            0 if r["test_result"].get("no_data") else 1,
-            float(r["test_result"].get("sharpe", -999.0)),
-            float(r["selected"].get("robustness_score", -999.0)),
-            int(r["test_result"].get("num_trades", 0)),
-        ),
-        reverse=True,
-    )
-    winner = fold_reports[0]
-
-    print("\n>>>> FINAL WALK-FORWARD REPORT <<<<")
-    for report in fold_reports:
-        f = report["fold"]
-        print(
-            f"Fold {f}: Train={report['best_candidate']['sharpe']:.4f} | "
-            f"Val={report['selected']['sharpe']:.4f} | "
-            f"Test={report['test_result']['sharpe']:.4f}"
-        )
-
-    print(
-        f"\nSelected Fold: {winner['fold']} | Params: {winner['selected']['params']} | "
-        f"Test Sharpe: {winner['test_result']['sharpe']:.4f}"
-    )
-
-    if persist_best_params:
-        # Save best parameters from winning fold (opt-in artifact).
-        strategy_name = STRATEGY_CLASS.__name__
-        save_dir = os.path.join("best_optimized_parameters", strategy_name)
-        os.makedirs(save_dir, exist_ok=True)
-        best_params_file = os.path.join(save_dir, "best_params.json")
-        with open(best_params_file, "w") as f:
-            json.dump(winner["selected"]["params"], f, indent=4)
-        print(f"[Artifact] Best Parameters saved to '{best_params_file}'")
-    else:
-        print("[Artifact] best_params.json export skipped (pure-compute mode).")
+        final_status = "COMPLETED"
+        final_metadata = {
+            "selected_fold": int(winner["fold"]),
+            "selected_params": winner["selected"].get("params", {}),
+            "selected_test_sharpe": float(winner["test_result"].get("sharpe", -999.0)),
+        }
+    except SystemExit as exc:
+        code = int(exc.code or 0)
+        final_status = "COMPLETED" if code == 0 else "FAILED"
+        final_metadata = {"exit_code": code}
+        raise
+    except Exception as exc:
+        final_status = "FAILED"
+        final_metadata = {"error": str(exc)}
+        raise
+    finally:
+        audit_store.end_run(run_id, status=final_status, metadata=final_metadata)
+        audit_store.close()
