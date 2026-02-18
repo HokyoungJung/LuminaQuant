@@ -1,7 +1,9 @@
 import json
 import math
 import os
+from collections.abc import Sequence
 from datetime import datetime
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -58,8 +60,8 @@ class ReportGenerator:
             "report_type": report_type,
             "strategy": strategy_name,
             "strategy_params": params,
-            "equity_rows": int(len(equity_df)),
-            "trade_rows": int(len(trades_df)),
+            "equity_rows": len(equity_df),
+            "trade_rows": len(trades_df),
             "performance": performance,
             "trade_analysis": trade_stats,
             "mt5_summary": mt5_rows,
@@ -103,7 +105,7 @@ class ReportGenerator:
         return {}
 
     @staticmethod
-    def _safe_float(value, default=0.0):
+    def _safe_float(value: Any, default: float = 0.0) -> float:
         try:
             out = float(value)
         except Exception:
@@ -113,26 +115,26 @@ class ReportGenerator:
         return out
 
     @staticmethod
-    def _safe_div(numerator, denominator, default=0.0):
+    def _safe_div(numerator: Any, denominator: Any, default: float = 0.0) -> float:
         den = ReportGenerator._safe_float(denominator, 0.0)
         if abs(den) <= 1e-12:
             return float(default)
         return float(ReportGenerator._safe_float(numerator, 0.0) / den)
 
     @staticmethod
-    def _format_pct(value):
+    def _format_pct(value: Any) -> str:
         return f"{ReportGenerator._safe_float(value):.2%}"
 
     @staticmethod
-    def _format_num(value, digits=4):
+    def _format_num(value: Any, digits: int = 4) -> str:
         parsed = ReportGenerator._safe_float(value, 0.0)
         if math.isinf(parsed):
             return "inf"
         return f"{parsed:.{digits}f}"
 
     @staticmethod
-    def _format_duration(seconds):
-        sec = int(round(max(0.0, ReportGenerator._safe_float(seconds, 0.0))))
+    def _format_duration(seconds: Any) -> str:
+        sec = round(max(0.0, ReportGenerator._safe_float(seconds, 0.0)))
         hours = sec // 3600
         minutes = (sec % 3600) // 60
         remain = sec % 60
@@ -199,7 +201,7 @@ class ReportGenerator:
         return {
             "start_equity": float(total_series[0]),
             "end_equity": float(total_series[-1]),
-            "bars": int(len(equity_df)),
+            "bars": len(equity_df),
             "total_return": float(total_ret),
             "cagr": float(cagr),
             "sharpe_ratio": float(sharpe),
@@ -211,7 +213,7 @@ class ReportGenerator:
         }
 
     @staticmethod
-    def _drawdown_stats(values, initial_value):
+    def _drawdown_stats(values: Any, initial_value: Any) -> dict[str, float]:
         arr = np.asarray(values, dtype=np.float64)
         arr = arr[np.isfinite(arr)]
         if arr.size == 0:
@@ -231,7 +233,7 @@ class ReportGenerator:
         return {"absolute": absolute, "maximal": maximal, "relative_pct": relative}
 
     @staticmethod
-    def _streak_groups(sequence):
+    def _streak_groups(sequence: Sequence[bool]) -> list[tuple[bool, int]]:
         if not sequence:
             return []
         groups = []
@@ -248,7 +250,7 @@ class ReportGenerator:
         return groups
 
     @staticmethod
-    def _runs_test_zscore(binary_outcomes):
+    def _runs_test_zscore(binary_outcomes: Sequence[bool]) -> float:
         if not binary_outcomes:
             return 0.0
         outcomes = [bool(value) for value in binary_outcomes]
@@ -525,7 +527,7 @@ class ReportGenerator:
         if trades_df.empty:
             return out
 
-        out["total_transactions"] = int(len(trades_df))
+        out["total_transactions"] = len(trades_df)
         out["buy_orders"] = int((trades_df["direction"].astype(str).str.upper() == "BUY").sum())
         out["sell_orders"] = int((trades_df["direction"].astype(str).str.upper() == "SELL").sum())
 
@@ -538,7 +540,7 @@ class ReportGenerator:
             return out
 
         pnl = pd.to_numeric(closed.get("realized_pnl"), errors="coerce").fillna(0.0)
-        out["closed_trades"] = int(len(closed))
+        out["closed_trades"] = len(closed)
         out["wins"] = int((pnl > 0.0).sum())
         out["losses"] = int((pnl < 0.0).sum())
         out["profit_trades_count"] = int((pnl > 0.0).sum())
@@ -588,8 +590,8 @@ class ReportGenerator:
         if "close_side" in closed.columns:
             long_closed = closed[closed["close_side"] == "LONG"]
             short_closed = closed[closed["close_side"] == "SHORT"]
-            out["long_trades"] = int(len(long_closed))
-            out["short_trades"] = int(len(short_closed))
+            out["long_trades"] = len(long_closed)
+            out["short_trades"] = len(short_closed)
             if len(long_closed) > 0:
                 out["long_win_rate"] = float((long_closed["realized_pnl"] > 0.0).mean())
             if len(short_closed) > 0:

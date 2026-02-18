@@ -256,6 +256,7 @@ tests/test_indicators*.py
 strategies/
 tests/test_strategy*.py
 tests/test_*strategy*.py
+tests/test_moving_average_incremental.py
 tests/test_pair_trading_zscore.py
 tests/test_topcap_tsmom_strategy.py
 

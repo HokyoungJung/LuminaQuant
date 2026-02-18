@@ -1,7 +1,7 @@
 import unittest
 from datetime import datetime
 
-from optimize import build_walk_forward_splits
+from lumina_quant.optimization.walkers import build_walk_forward_splits
 
 
 class TestWalkForwardSplits(unittest.TestCase):

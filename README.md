@@ -103,6 +103,15 @@ trading:
 
 *👉 See [Exchange Guide](docs/EXCHANGES.md) for detailed credentials setup.*
 
+### Public vs Private Repository Scope
+
+- This public repository intentionally excludes proprietary research IP:
+  - `lumina_quant/indicators/`
+  - `strategies/`
+  - private strategy/indicator test files
+- Full strategy/indicator implementation and AGENTS guidance are maintained in the private repository.
+- Database/runtime artifacts are never published (`*.db`, `*.sqlite*`, `data/`, `logs/`, `.omx/`, `.sisyphus/`).
+
 ### 3. Running the System
 
 **Sync Full Binance OHLCV into SQLite (and CSV mirror):**

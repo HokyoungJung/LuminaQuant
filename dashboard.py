@@ -1,5 +1,5 @@
-import importlib
 import html
+import importlib
 import json
 import math
 import os
@@ -15,7 +15,6 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
-from plotly.subplots import make_subplots
 from lumina_quant.config import BacktestConfig, BaseConfig, OptimizationConfig
 from lumina_quant.utils.performance import (
     create_alpha_beta,
@@ -27,6 +26,7 @@ from lumina_quant.utils.performance import (
     create_sharpe_ratio,
     create_sortino_ratio,
 )
+from plotly.subplots import make_subplots
 from strategies import (
     get_default_grid_config,
     get_default_optuna_config,
@@ -1303,7 +1303,7 @@ def _format_duration_seconds(value):
     sec = _safe_float(value, 0.0)
     if sec <= 0.0:
         return "0s"
-    total = int(round(sec))
+    total = round(sec)
     hours = total // 3600
     minutes = (total % 3600) // 60
     seconds = total % 60
@@ -1803,7 +1803,7 @@ def compute_trade_analytics(df_trades):
         commission = float(row["commission"])
         direction = str(row["direction"]).upper()
         signed = qty if direction == "BUY" else -qty
-        event_time = row["datetime"] if "datetime" in row else pd.NaT
+        event_time = row.get("datetime", pd.NaT)
         event_time = event_time if pd.notna(event_time) else pd.NaT
 
         pos = float(positions.get(symbol, 0.0))
@@ -2005,7 +2005,7 @@ def build_summary(df_equity, df_trades):
         )
         if not closed.empty:
             pnl_series = pd.to_numeric(closed.get("realized_pnl"), errors="coerce").fillna(0.0)
-            out["closed_trades"] = int(len(closed))
+            out["closed_trades"] = len(closed)
             out["wins"] = int((pnl_series > 0.0).sum())
             out["losses"] = int((pnl_series < 0.0).sum())
             out["profit_trades_count"] = int((pnl_series > 0.0).sum())
@@ -2111,8 +2111,8 @@ def build_summary(df_equity, df_trades):
             if "close_side" in closed.columns:
                 long_closed = closed[closed["close_side"] == "LONG"]
                 short_closed = closed[closed["close_side"] == "SHORT"]
-                out["long_trades"] = int(len(long_closed))
-                out["short_trades"] = int(len(short_closed))
+                out["long_trades"] = len(long_closed)
+                out["short_trades"] = len(short_closed)
                 if len(long_closed) > 0:
                     long_wins = int((long_closed["realized_pnl"] > 0.0).sum())
                     out["long_win_rate"] = float(long_wins / float(len(long_closed)))
