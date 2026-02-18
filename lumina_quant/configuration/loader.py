@@ -1,12 +1,11 @@
-"""Configuration loader with env overrides and legacy mapping."""
+"""Configuration loader with env overrides and typed coercion."""
 
 import json
 import os
-import warnings
 from collections.abc import Mapping
 from dataclasses import fields
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any
 
 import yaml
 from dotenv import load_dotenv
@@ -23,7 +22,7 @@ from lumina_quant.configuration.schema import (
     TradingConfig,
 )
 
-T = TypeVar("T")
+DEFAULT_STORAGE_DB_PATH = "data/lumina_quant.db"
 
 
 def _as_bool(value: Any, default: bool = False) -> bool:
@@ -125,48 +124,21 @@ def apply_env_overrides(data: dict[str, Any], env: Mapping[str, str]) -> dict[st
     return merged
 
 
-def apply_legacy_mapping(data: dict[str, Any]) -> dict[str, Any]:
-    """Map legacy keys into the current schema while preserving compatibility."""
-    mapped = dict(data)
-    live = mapped.get("live", {})
-    if not isinstance(live, dict):
-        live = {}
-        mapped["live"] = live
-
-    exchange = live.get("exchange", {})
-    if isinstance(exchange, str):
-        exchange = {"name": exchange}
-    if not isinstance(exchange, dict):
-        exchange = {}
-
-    # Legacy flat exchange id mapping.
-    if "exchange_id" in live and "name" not in exchange:
-        exchange["name"] = str(live.get("exchange_id", "binance")).lower()
-    if "exchange_driver" in live and "driver" not in exchange:
-        exchange["driver"] = str(live.get("exchange_driver", "ccxt")).lower()
-    live["exchange"] = exchange
-
-    # Legacy testnet boolean -> mode string.
-    if "mode" not in live and "testnet" in live:
-        live["mode"] = "paper" if _as_bool(live.get("testnet"), True) else "real"
-        warnings.warn(
-            "live.testnet is deprecated; use live.mode: paper|real.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-    mapped["live"] = live
-    return mapped
-
-
-def _coerce_dataclass_kwargs(raw: dict[str, Any], model_cls: type[T]) -> dict[str, Any]:
+def _coerce_dataclass_kwargs(raw: dict[str, Any], model_cls: type[Any]) -> dict[str, Any]:
     allowed = {item.name for item in fields(model_cls)}
     return {key: value for key, value in raw.items() if key in allowed}
 
 
+def _resolve_storage_path(path_value: str) -> str:
+    normalized = str(path_value or "").strip().replace("\\", "/")
+    if not normalized:
+        return DEFAULT_STORAGE_DB_PATH
+    return normalized
+
+
 def build_runtime_config(data: dict[str, Any], env: Mapping[str, str]) -> RuntimeConfig:
     """Build a strongly typed runtime config from raw dict + environment."""
-    mapped = apply_legacy_mapping(apply_env_overrides(data, env))
+    mapped = apply_env_overrides(data, env)
 
     system_raw = mapped.get("system", {}) if isinstance(mapped.get("system", {}), dict) else {}
     trading_raw = mapped.get("trading", {}) if isinstance(mapped.get("trading", {}), dict) else {}
@@ -214,9 +186,8 @@ def build_runtime_config(data: dict[str, Any], env: Mapping[str, str]) -> Runtim
         telegram_bot_token=env.get("TELEGRAM_BOT_TOKEN") or live_raw.get("telegram_bot_token"),
         telegram_chat_id=env.get("TELEGRAM_CHAT_ID") or live_raw.get("telegram_chat_id"),
     )
-    # Normalize mode from legacy testnet when mode is still empty.
     if not live.mode:
-        live.mode = "paper" if _as_bool(live.testnet, True) else "real"
+        live.mode = "paper"
 
     runtime = RuntimeConfig(
         system=SystemConfig(**_coerce_dataclass_kwargs(system_raw, SystemConfig)),
@@ -233,6 +204,11 @@ def build_runtime_config(data: dict[str, Any], env: Mapping[str, str]) -> Runtim
         ),
     )
 
+    runtime.storage.sqlite_path = _resolve_storage_path(runtime.storage.sqlite_path)
+    runtime.storage.market_data_sqlite_path = _resolve_storage_path(
+        runtime.storage.market_data_sqlite_path
+    )
+
     # Safe type coercion for critical numeric fields.
     runtime.trading.initial_capital = _as_float(runtime.trading.initial_capital, 10000.0)
     runtime.trading.target_allocation = _as_float(runtime.trading.target_allocation, 0.1)
@@ -244,12 +220,10 @@ def build_runtime_config(data: dict[str, Any], env: Mapping[str, str]) -> Runtim
         str(runtime.execution.compute_backend).strip().lower() or "cpu"
     )
     if runtime.execution.compute_backend != "cpu":
-        warnings.warn(
-            "execution.compute_backend only supports 'cpu'. Falling back to 'cpu'.",
-            DeprecationWarning,
-            stacklevel=2,
+        raise ValueError(
+            "execution.compute_backend must be 'cpu' in this runtime. "
+            f"Received: {runtime.execution.compute_backend!r}"
         )
-        runtime.execution.compute_backend = "cpu"
     runtime.live.exchange.leverage = _as_int(runtime.live.exchange.leverage, 3)
     runtime.live.poll_interval = _as_int(runtime.live.poll_interval, 2)
     runtime.live.reconciliation_interval_sec = _as_int(runtime.live.reconciliation_interval_sec, 30)

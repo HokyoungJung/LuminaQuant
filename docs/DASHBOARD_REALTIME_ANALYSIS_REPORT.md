@@ -103,7 +103,7 @@
 - `uv run ruff check .` passed.
 - `uv run pytest -q` passed.
 - `uv run python -m streamlit run dashboard.py --server.headless true` startup confirmed.
-- `uv run python scripts/smoke_dashboard_realtime.py --db-path logs/lumina_quant.db --dry-run` passed.
+- `uv run python scripts/smoke_dashboard_realtime.py --db-path data/lumina_quant.db --dry-run` passed.
 
 ## Completed Follow-ups
 

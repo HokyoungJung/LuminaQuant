@@ -6,24 +6,25 @@ import multiprocessing
 import os
 import sys
 import uuid
-from datetime import datetime
-
-import polars as pl
+from datetime import datetime, timedelta
 
 # Engine Imports
 from lumina_quant.backtesting.backtest import Backtest
 from lumina_quant.backtesting.data import HistoricCSVDataHandler
 from lumina_quant.backtesting.execution_sim import SimulatedExecutionHandler
 from lumina_quant.backtesting.portfolio_backtest import Portfolio
-from lumina_quant.config import BacktestConfig, BaseConfig, OptimizationConfig
-from lumina_quant.market_data import load_data_dict_from_db, resolve_symbol_csv_path
+from lumina_quant.compute.ohlcv_loader import OHLCVFrameLoader
+from lumina_quant.config import BacktestConfig, BaseConfig, LiveConfig, OptimizationConfig
+from lumina_quant.data_collector import auto_collect_market_data
+from lumina_quant.market_data import (
+    load_data_dict_from_db,
+    resolve_symbol_csv_path,
+    timeframe_to_milliseconds,
+)
 from lumina_quant.optimization.storage import save_optimization_rows
 from lumina_quant.optimization.walkers import build_walk_forward_splits
 from lumina_quant.utils.audit_store import AuditStore
-
-# Strategy Imports
-from strategies.moving_average import MovingAverageCrossStrategy
-from strategies.rsi_strategy import RsiStrategy
+from strategies import DEFAULT_STRATEGY_NAME, get_strategy_map, resolve_strategy_class
 
 # Optuna Import
 try:
@@ -45,24 +46,23 @@ except ImportError:
 OPTIMIZATION_METHOD = OptimizationConfig.METHOD
 
 # 2. Select Strategy
-STRATEGY_MAP = {
-    "RsiStrategy": RsiStrategy,
-    "MovingAverageCrossStrategy": MovingAverageCrossStrategy,
-}
-strategy_name = OptimizationConfig.STRATEGY_NAME
-STRATEGY_CLASS = STRATEGY_MAP.get(strategy_name, RsiStrategy)
+STRATEGY_MAP = get_strategy_map()
+requested_strategy_name = str(OptimizationConfig.STRATEGY_NAME or "").strip()
+STRATEGY_CLASS = resolve_strategy_class(requested_strategy_name, default_name=DEFAULT_STRATEGY_NAME)
 
 # 3. Data Settings
 CSV_DIR = "data"
 SYMBOL_LIST = BaseConfig.SYMBOLS
-MARKET_DB_PATH = getattr(BaseConfig, "MARKET_DATA_SQLITE_PATH", BaseConfig.STORAGE_SQLITE_PATH)
-MARKET_DB_EXCHANGE = getattr(BaseConfig, "MARKET_DATA_EXCHANGE", "binance")
+MARKET_DB_PATH = BaseConfig.MARKET_DATA_SQLITE_PATH
+MARKET_DB_EXCHANGE = BaseConfig.MARKET_DATA_EXCHANGE
+BASE_TIMEFRAME = str(os.getenv("LQ_BASE_TIMEFRAME", "1s") or "1s").strip().lower()
+STRATEGY_TIMEFRAME = str(BaseConfig.TIMEFRAME)
 
 # 4. Optimization Settings
 GRID_PARAMS = OptimizationConfig.GRID_CONFIG.get("params", {})
 OPTUNA_CONFIG = OptimizationConfig.OPTUNA_CONFIG.get("params", {})
 OPTUNA_TRIALS = int(OptimizationConfig.OPTUNA_CONFIG.get("n_trials", 20))
-MAX_WORKERS = int(getattr(OptimizationConfig, "MAX_WORKERS", 4))
+MAX_WORKERS = int(OptimizationConfig.MAX_WORKERS)
 
 
 # 5. Data Splitting Settings (WFA)
@@ -72,6 +72,13 @@ try:
 except Exception as e:
     print(f"Error parsing dates from config: {e}. Using defaults.")
     BASE_START = datetime(2023, 1, 1)
+
+AUTO_COLLECT_DB = str(os.getenv("LQ_AUTO_COLLECT_DB", "1")).strip().lower() not in {
+    "0",
+    "false",
+    "no",
+    "off",
+}
 
 # Global Data Cache for Multiprocessing (Copy-on-Write)
 DATA_DICT = {}
@@ -92,6 +99,7 @@ def load_all_data(
     """
     source = str(data_source).strip().lower()
     data = {}
+    csv_loader = OHLCVFrameLoader()
 
     if source in {"db", "auto"} and market_db_path:
         db_data = load_data_dict_from_db(
@@ -101,9 +109,12 @@ def load_all_data(
             timeframe=timeframe,
         )
         if db_data:
-            data.update(db_data)
+            for symbol, frame in db_data.items():
+                normalized = csv_loader.normalize(frame)
+                if normalized is not None and normalized.height > 0:
+                    data[symbol] = normalized
             print(
-                f"Loaded {len(db_data)}/{len(symbol_list)} symbols from DB "
+                f"Loaded {len(data)}/{len(symbol_list)} symbols from DB "
                 f"{market_db_path} (exchange={market_exchange}, timeframe={timeframe})."
             )
         elif source == "db":
@@ -122,12 +133,14 @@ def load_all_data(
         csv_path = resolve_symbol_csv_path(csv_dir, s)
         try:
             if os.path.exists(csv_path):
-                df = pl.read_csv(csv_path, try_parse_dates=True)
-                # Optimization: select only needed columns and sort once
-                required_cols = ["datetime", "open", "high", "low", "close", "volume"]
-                if all(c in df.columns for c in required_cols):
-                    df = df.select(required_cols).sort("datetime")
+                df = csv_loader.load_csv(csv_path)
+                if df is not None:
                     data[s] = df
+                else:
+                    print(
+                        "Warning: Missing or invalid OHLCV columns in "
+                        f"{csv_path}. Expected {csv_loader.columns}."
+                    )
             else:
                 print(f"Warning: {csv_path} not found.")
         except Exception as e:
@@ -171,6 +184,21 @@ def _build_data_aware_split(data_start, data_end):
     }
 
 
+def _resolve_in_sample_and_oos_window(data_start, data_end, oos_days, timeframe):
+    """Split loaded data range into in-sample and final OOS holdout windows."""
+    requested_days = max(0, int(oos_days))
+    if requested_days <= 0:
+        return None, None, None
+
+    oos_start = data_end - timedelta(days=requested_days)
+    tf_ms = max(1, int(timeframe_to_milliseconds(str(timeframe))))
+    in_sample_end = oos_start - timedelta(milliseconds=tf_ms)
+    min_train_span = timedelta(days=7)
+    if in_sample_end <= data_start + min_train_span:
+        return None, None, None
+    return in_sample_end, oos_start, data_end
+
+
 def _filter_valid_splits(splits, data_start, data_end):
     valid = []
     for split in splits:
@@ -180,6 +208,52 @@ def _filter_valid_splits(splits, data_start, data_end):
             continue
         valid.append(split)
     return valid
+
+
+def _auto_collect_db_if_enabled(
+    data_source,
+    market_db_path,
+    market_exchange,
+    *,
+    base_timeframe,
+    auto_collect_db,
+):
+    source = str(data_source).strip().lower()
+    if source not in {"auto", "db"}:
+        return []
+    if not bool(auto_collect_db):
+        return []
+
+    sync_rows = auto_collect_market_data(
+        symbol_list=list(SYMBOL_LIST),
+        timeframe=str(base_timeframe),
+        db_path=str(market_db_path),
+        exchange_id=str(market_exchange),
+        market_type=str(LiveConfig.MARKET_TYPE),
+        since_dt=BASE_START,
+        until_dt=None,
+        api_key=str(LiveConfig.BINANCE_API_KEY or ""),
+        secret_key=str(LiveConfig.BINANCE_SECRET_KEY or ""),
+        testnet=bool(LiveConfig.IS_TESTNET),
+        limit=1000,
+        max_batches=100000,
+        retries=3,
+        base_wait_sec=0.5,
+    )
+
+    def _safe_int(value):
+        try:
+            return int(value)
+        except Exception:
+            return 0
+
+    fetched = sum(_safe_int(item.get("fetched_rows", 0)) for item in sync_rows)
+    upserted = sum(_safe_int(item.get("upserted_rows", 0)) for item in sync_rows)
+    print(
+        f"[INFO] Auto collector checked DB coverage for {len(sync_rows)} symbols "
+        f"(fetched={fetched}, upserted={upserted})."
+    )
+    return sync_rows
 
 
 # ==========================================
@@ -214,6 +288,7 @@ def _execute_backtest(
             record_history=False,
             track_metrics=True,
             record_trades=False,
+            strategy_timeframe=str(STRATEGY_TIMEFRAME),
         )
         backtest.simulate_trading(output=False)
         stats = backtest.portfolio.output_summary_stats_fast()
@@ -457,18 +532,21 @@ def run_walk_forward_fold(split):
     final_best = val_candidates[0]
     print(f"[Fold {fold} Validation] Selected Params: {final_best['params']}")
 
-    print(f"=== FOLD {fold} TEST [{test_start.date()} ~ {test_end.date()}] ===")
-    test_res = _execute_backtest(
-        STRATEGY_CLASS,
-        final_best["params"],
-        CSV_DIR,
-        SYMBOL_LIST,
-        test_start,
-        test_end,
-        data_dict=DATA_DICT,
-    )
+    # NOTE: Fold-test window is intentionally not evaluated for model selection.
+    # We keep this range metadata for audit only and reserve true performance check
+    # for the final OOS holdout after parameter selection is frozen.
+    test_res = {
+        "params": dict(final_best["params"]),
+        "sharpe": -999.0,
+        "cagr": "N/A",
+        "mdd": "N/A",
+        "num_trades": 0,
+        "no_data": True,
+        "status": "skipped_in_optimization",
+    }
     print(
-        f"[Fold {fold} Test] Sharpe={test_res['sharpe']:.4f} | CAGR={test_res['cagr']} | MaxDD={test_res['mdd']}"
+        f"[Fold {fold}] Test window reserved for holdout policy "
+        f"[{test_start.date()} ~ {test_end.date()}]"
     )
 
     return {
@@ -524,14 +602,30 @@ if __name__ == "__main__":
         help="Exchange key used in OHLCV DB rows.",
     )
     parser.add_argument(
+        "--base-timeframe",
+        default=BASE_TIMEFRAME,
+        help="Collection/load source timeframe. Use minimum resolution (recommended: 1s).",
+    )
+    parser.add_argument(
         "--run-id",
         default="",
         help="Optional external run_id for audit trail correlation.",
     )
+    parser.add_argument(
+        "--oos-days",
+        type=int,
+        default=30,
+        help="Final holdout window length in days excluded from optimization and used only for final evaluation.",
+    )
+    parser.add_argument(
+        "--no-auto-collect-db",
+        action="store_true",
+        help="Disable automatic DB market-data collection before optimization load.",
+    )
     args = parser.parse_args()
 
     run_id = str(args.run_id or "").strip() or str(uuid.uuid4())
-    db_path = getattr(BaseConfig, "STORAGE_SQLITE_PATH", "logs/lumina_quant.db")
+    db_path = BaseConfig.STORAGE_SQLITE_PATH
     audit_store = AuditStore(db_path)
     audit_store.start_run(
         mode="optimize",
@@ -544,6 +638,10 @@ if __name__ == "__main__":
             "data_source": str(args.data_source),
             "market_db_path": str(args.market_db_path),
             "market_exchange": str(args.market_exchange),
+            "base_timeframe": str(args.base_timeframe),
+            "strategy_timeframe": str(STRATEGY_TIMEFRAME),
+            "auto_collect_db": bool(not bool(args.no_auto_collect_db) and bool(AUTO_COLLECT_DB)),
+            "oos_days": int(max(0, int(args.oos_days))),
         },
         run_id=run_id,
     )
@@ -556,6 +654,17 @@ if __name__ == "__main__":
     persist_best_params = bool(args.save_best_params or OptimizationConfig.PERSIST_BEST_PARAMS)
 
     try:
+        if int(args.oos_days) <= 0:
+            raise ValueError("--oos-days must be > 0 for strict OOS exclusion.")
+
+        _auto_collect_db_if_enabled(
+            data_source=args.data_source,
+            market_db_path=args.market_db_path,
+            market_exchange=args.market_exchange,
+            base_timeframe=args.base_timeframe,
+            auto_collect_db=(not bool(args.no_auto_collect_db) and bool(AUTO_COLLECT_DB)),
+        )
+
         # Load Data Once
         DATA_DICT = load_all_data(
             CSV_DIR,
@@ -563,7 +672,7 @@ if __name__ == "__main__":
             data_source=args.data_source,
             market_db_path=args.market_db_path,
             market_exchange=args.market_exchange,
-            timeframe=BaseConfig.TIMEFRAME,
+            timeframe=str(args.base_timeframe),
         )
         splits = build_walk_forward_splits(
             BASE_START,
@@ -574,9 +683,28 @@ if __name__ == "__main__":
             print("No usable datetime range found in loaded data.")
             sys.exit(1)
 
+        in_sample_end, final_oos_start, final_oos_end = _resolve_in_sample_and_oos_window(
+            data_start,
+            data_end,
+            args.oos_days,
+            BaseConfig.TIMEFRAME,
+        )
+        if in_sample_end is None or final_oos_start is None or final_oos_end is None:
+            raise ValueError(
+                "Insufficient data range to reserve strict OOS holdout. "
+                "Expand data history or reduce --oos-days."
+            )
+        print(
+            f"[INFO] OOS holdout excluded from optimization: "
+            f"[{final_oos_start.date()} ~ {final_oos_end.date()}]"
+        )
+
         valid_splits = _filter_valid_splits(splits, data_start, data_end)
+        if in_sample_end < data_end:
+            valid_splits = _filter_valid_splits(valid_splits, data_start, in_sample_end)
+
         if not valid_splits:
-            fallback_split = _build_data_aware_split(data_start, data_end)
+            fallback_split = _build_data_aware_split(data_start, in_sample_end)
             if fallback_split is None:
                 print(
                     "Could not build a valid walk-forward split from current data range. "
@@ -626,13 +754,12 @@ if __name__ == "__main__":
             print("No valid fold report generated.")
             sys.exit(1)
 
-        # Select overall winner by test sharpe, then robustness score.
+        # Select overall winner by validation robustness inside in-sample only.
         fold_reports.sort(
             key=lambda r: (
-                0 if r["test_result"].get("no_data") else 1,
-                float(r["test_result"].get("sharpe", -999.0)),
                 float(r["selected"].get("robustness_score", -999.0)),
-                int(r["test_result"].get("num_trades", 0)),
+                float(r["selected"].get("sharpe", -999.0)),
+                int(r["selected"].get("num_trades", 0)),
             ),
             reverse=True,
         )
@@ -649,8 +776,36 @@ if __name__ == "__main__":
 
         print(
             f"\nSelected Fold: {winner['fold']} | Params: {winner['selected']['params']} | "
-            f"Test Sharpe: {winner['test_result']['sharpe']:.4f}"
+            f"In-sample Val Sharpe: {winner['selected']['sharpe']:.4f}"
         )
+
+        final_oos_result = None
+        if final_oos_start is not None and final_oos_end is not None:
+            final_oos_result = _execute_backtest(
+                STRATEGY_CLASS,
+                winner["selected"]["params"],
+                CSV_DIR,
+                SYMBOL_LIST,
+                final_oos_start,
+                final_oos_end,
+                data_dict=DATA_DICT,
+            )
+            save_optimization_rows(
+                db_path,
+                run_id,
+                "final_oos",
+                [
+                    {
+                        **final_oos_result,
+                        "oos_start": final_oos_start.date().isoformat(),
+                        "oos_end": final_oos_end.date().isoformat(),
+                    }
+                ],
+            )
+            print(
+                f"[FINAL OOS] Sharpe={final_oos_result['sharpe']:.4f} | "
+                f"CAGR={final_oos_result['cagr']} | MaxDD={final_oos_result['mdd']}"
+            )
 
         if persist_best_params:
             # Save best parameters from winning fold (opt-in artifact).
@@ -660,6 +815,22 @@ if __name__ == "__main__":
             best_params_file = os.path.join(save_dir, "best_params.json")
             with open(best_params_file, "w") as f:
                 json.dump(winner["selected"]["params"], f, indent=4)
+            best_meta_file = os.path.join(save_dir, "best_params.meta.json")
+            meta_payload = {
+                "selection_basis": "validation_only",
+                "run_id": run_id,
+                "oos_days": int(args.oos_days),
+                "in_sample_end": in_sample_end.date().isoformat(),
+                "oos_start": final_oos_start.date().isoformat(),
+                "oos_end": final_oos_end.date().isoformat(),
+                "selected_fold": int(winner["fold"]),
+                "selected_val_sharpe": float(winner["selected"].get("sharpe", -999.0)),
+                "final_oos_sharpe": float(final_oos_result.get("sharpe", -999.0))
+                if isinstance(final_oos_result, dict)
+                else -999.0,
+            }
+            with open(best_meta_file, "w") as f:
+                json.dump(meta_payload, f, indent=2)
             print(f"[Artifact] Best Parameters saved to '{best_params_file}'")
         else:
             print("[Artifact] best_params.json export skipped (pure-compute mode).")
@@ -668,7 +839,10 @@ if __name__ == "__main__":
         final_metadata = {
             "selected_fold": int(winner["fold"]),
             "selected_params": winner["selected"].get("params", {}),
-            "selected_test_sharpe": float(winner["test_result"].get("sharpe", -999.0)),
+            "selected_val_sharpe": float(winner["selected"].get("sharpe", -999.0)),
+            "final_oos_sharpe": float(final_oos_result.get("sharpe", -999.0))
+            if isinstance(final_oos_result, dict)
+            else -999.0,
         }
     except SystemExit as exc:
         code = int(exc.code or 0)

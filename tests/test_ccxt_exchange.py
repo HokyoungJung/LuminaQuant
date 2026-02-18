@@ -17,7 +17,11 @@ mock_ccxt.binance.return_value = mock_exchange_inst
 
 
 class MockConfig:
-    EXCHANGE_ID = "binance"
+    EXCHANGE = {
+        "driver": "ccxt",
+        "name": "binance",
+        "market_type": "spot",
+    }
     BINANCE_API_KEY = "test_key"
     BINANCE_SECRET_KEY = "test_secret"
     IS_TESTNET = True

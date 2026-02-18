@@ -9,7 +9,7 @@ from lumina_quant.configuration.loader import load_runtime_config
 
 
 class TestRuntimeConfigLoader(unittest.TestCase):
-    """Runtime config loader coverage for env overrides and legacy mapping."""
+    """Runtime config loader coverage for env overrides and strict settings."""
 
     def test_env_nested_override(self):
         yaml_text = textwrap.dedent(
@@ -38,13 +38,13 @@ class TestRuntimeConfigLoader(unittest.TestCase):
         finally:
             os.remove(path)
 
-    def test_legacy_testnet_mapping(self):
+    def test_live_mode_is_explicit(self):
         yaml_text = textwrap.dedent(
             """
             trading:
               symbols: ["BTC/USDT"]
             live:
-              testnet: true
+              mode: "real"
               exchange:
                 driver: "ccxt"
                 name: "binance"
@@ -59,11 +59,11 @@ class TestRuntimeConfigLoader(unittest.TestCase):
             path = fp.name
         try:
             runtime = load_runtime_config(config_path=path, env=os.environ)
-            self.assertEqual(runtime.live.mode, "paper")
+            self.assertEqual(runtime.live.mode, "real")
         finally:
             os.remove(path)
 
-    def test_legacy_compute_backend_falls_back_to_cpu(self):
+    def test_invalid_compute_backend_raises(self):
         yaml_text = textwrap.dedent(
             """
             trading:
@@ -85,8 +85,8 @@ class TestRuntimeConfigLoader(unittest.TestCase):
             fp.write(yaml_text)
             path = fp.name
         try:
-            runtime = load_runtime_config(config_path=path, env=os.environ)
-            self.assertEqual(runtime.execution.compute_backend, "cpu")
+            with self.assertRaises(ValueError):
+                load_runtime_config(config_path=path, env=os.environ)
         finally:
             os.remove(path)
 

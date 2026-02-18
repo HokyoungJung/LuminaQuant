@@ -56,8 +56,8 @@ class StorageConfig:
     """Storage settings for audit and exports."""
 
     backend: str = "sqlite"
-    sqlite_path: str = "logs/lumina_quant.db"
-    market_data_sqlite_path: str = "logs/lumina_quant.db"
+    sqlite_path: str = "data/lumina_quant.db"
+    market_data_sqlite_path: str = "data/lumina_quant.db"
     market_data_exchange: str = "binance"
     export_csv: bool = True
 

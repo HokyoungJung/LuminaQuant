@@ -2,9 +2,10 @@ import heapq
 import os
 from abc import ABC, abstractmethod
 from collections import deque
+from itertools import islice
 from typing import Any
 
-import polars as pl
+from lumina_quant.compute.ohlcv_loader import OHLCVFrameLoader
 from lumina_quant.events import MarketEvent
 from lumina_quant.market_data import resolve_symbol_csv_path
 
@@ -59,6 +60,7 @@ class HistoricCSVDataHandler(DataHandler):
         self.max_lookback = 5000  # Memory Cap (Safety)
         self.data_dict = data_dict  # Pre-loaded data support
         self._single_symbol = len(symbol_list) == 1
+        self._frame_loader = OHLCVFrameLoader(start_date=self.start_date, end_date=self.end_date)
 
         self.symbol_data = {}
         self.latest_symbol_data = {s: deque(maxlen=self.max_lookback) for s in symbol_list}
@@ -95,33 +97,21 @@ class HistoricCSVDataHandler(DataHandler):
             try:
                 # Load from Memory or Disk
                 if s in combined_data:
-                    df = combined_data[s]
+                    df = self._frame_loader.normalize(combined_data[s])
                 else:
                     # Load CSV with Polars
                     csv_path = self._resolve_symbol_csv_path(s)
                     if not os.path.exists(csv_path):
                         print(f"Warning: Data file not found for {s} at {csv_path}")
                         continue
-                    df = pl.read_csv(csv_path, try_parse_dates=True)
+                    df = self._frame_loader.load_csv(csv_path)
 
-                # Ensure correct column order for tuple unpacking
-                # datetime, open, high, low, close, volume
-                # Add missing cols if needed or reorder
-                required_cols = ["datetime", "open", "high", "low", "close", "volume"]
-
-                # Basic validation logic (omitted for speed, assumming standard format)
-                # Check if columns exist
-                if not all(col in df.columns for col in required_cols):
-                    print(f"Warning: Missing columns in {s}. Required: {required_cols}")
+                if df is None:
+                    print(
+                        "Warning: Missing or invalid OHLCV columns in "
+                        f"{s}. Required: {self._frame_loader.columns}"
+                    )
                     continue
-
-                df = df.select(required_cols).sort("datetime")
-
-                # Date Filtering
-                if self.start_date:
-                    df = df.filter(pl.col("datetime") >= self.start_date)
-                if self.end_date:
-                    df = df.filter(pl.col("datetime") <= self.end_date)
 
                 # Convert to iterator of Tuples (much faster than Dicts)
                 generator = df.iter_rows(named=False)
@@ -265,7 +255,10 @@ class HistoricCSVDataHandler(DataHandler):
             return []
         if N <= 0:
             return []
-        return list(history)[-N:]
+        size = len(history)
+        if size <= N:
+            return list(history)
+        return list(islice(history, size - N, None))
 
     def get_latest_bar_datetime(self, symbol):
         if not self.latest_symbol_data.get(symbol):
@@ -280,11 +273,14 @@ class HistoricCSVDataHandler(DataHandler):
 
     def get_latest_bars_values(self, symbol, val_type, N=1):
         """Returns last N values for a specific column."""
-        bars = self.get_latest_bars(symbol, N)
+        history = self.latest_symbol_data.get(symbol)
         idx = self.col_idx.get(val_type)
-        if idx is not None:
-            return [b[idx] for b in bars]
-        return []
+        if idx is None or not history or N <= 0:
+            return []
+        size = len(history)
+        if size <= N:
+            return [bar[idx] for bar in history]
+        return [bar[idx] for bar in islice(history, size - N, None)]
 
     def get_market_spec(self, symbol):
         _ = symbol

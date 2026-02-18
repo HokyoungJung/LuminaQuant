@@ -131,20 +131,66 @@ def create_drawdowns(pnl):
     """Calculate the largest peak-to-trough drawdown of the PnL curve.
     pnl: list or numpy array of equity curve values
     """
-    hwm = [0]
-    drawdown = [0.0] * len(pnl)
-    duration = [0] * len(pnl)
+    values = np.asarray(pnl, dtype=np.float64)
+    count = int(values.size)
+    if count == 0:
+        return [], 0
 
-    for t in range(1, len(pnl)):
-        cur_val = pnl[t]
-        hwm.append(max(hwm[t - 1], cur_val))
+    drawdown = np.zeros(count, dtype=np.float64)
+    if count == 1:
+        return drawdown.tolist(), 0
 
-        div = hwm[t]
-        if div == 0:
-            div = 1  # avoid div by zero
+    # Preserve legacy behavior exactly:
+    # hwm[0] = 0 and for t>=1 hwm[t] = max(hwm[t-1], pnl[t]).
+    hwm_tail = np.maximum.accumulate(values[1:])
+    hwm_tail = np.maximum(hwm_tail, 0.0)
+    denominator = np.where(hwm_tail == 0.0, 1.0, hwm_tail)
+    drawdown[1:] = (hwm_tail - values[1:]) / denominator
 
-        dd = (hwm[t] - cur_val) / div
-        drawdown[t] = dd
-        duration[t] = 0 if dd == 0 else duration[t - 1] + 1
+    active = drawdown > 0.0
+    idx = np.arange(count, dtype=np.int64)
+    last_reset = np.maximum.accumulate(np.where(active, -1, idx))
+    duration = np.where(active, idx - last_reset, 0)
 
-    return drawdown, max(duration)
+    return drawdown.tolist(), int(duration.max())
+
+
+class PerformanceMetrics:
+    """OOP facade for performance metric calculations."""
+
+    @staticmethod
+    def alpha_beta(strategy_returns, benchmark_returns, periods=252) -> tuple[float, float]:
+        return create_alpha_beta(strategy_returns, benchmark_returns, periods=periods)
+
+    @staticmethod
+    def information_ratio(strategy_returns, benchmark_returns) -> float:
+        return create_information_ratio(strategy_returns, benchmark_returns)
+
+    @staticmethod
+    def cagr(final_value, initial_value, periods, annual_periods=252) -> float:
+        return create_cagr(
+            final_value,
+            initial_value,
+            periods,
+            annual_periods=annual_periods,
+        )
+
+    @staticmethod
+    def annualized_volatility(returns, periods=252) -> float:
+        return create_annualized_volatility(returns, periods=periods)
+
+    @staticmethod
+    def sharpe_ratio(returns, periods=252, risk_free=0.0) -> float:
+        return create_sharpe_ratio(returns, periods=periods, risk_free=risk_free)
+
+    @staticmethod
+    def sortino_ratio(returns, periods=252, risk_free=0.0) -> float:
+        return create_sortino_ratio(returns, periods=periods, risk_free=risk_free)
+
+    @staticmethod
+    def calmar_ratio(cagr, max_drawdown) -> float:
+        return create_calmar_ratio(cagr, max_drawdown)
+
+    @staticmethod
+    def drawdowns(pnl) -> tuple[list[float], int]:
+        return create_drawdowns(pnl)

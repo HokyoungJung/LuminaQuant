@@ -24,13 +24,13 @@ class LiveTrader(TradingEngine):
         execution_handler_cls,
         portfolio_cls,
         strategy_cls,
+        strategy_params=None,
         strategy_name=None,
         stop_file="",
         external_run_id="",
     ):
         self.logger = setup_logging("LiveTrader")
         self._audit_closed = True
-        self.audit_store = None
         self.run_id = None
         self.symbol_list = symbol_list
         self.events = queue.Queue()
@@ -38,13 +38,12 @@ class LiveTrader(TradingEngine):
         self.config.validate()
         default_strategy_name = getattr(strategy_cls, "__name__", strategy_cls.__class__.__name__)
         self.strategy_name = str(strategy_name or default_strategy_name)
+        self.strategy_params = dict(strategy_params or {})
         self.stop_file = str(stop_file or "")
         self.external_run_id = str(external_run_id or "")
         self.state_manager = StateManager()
         self.risk_manager = RiskManager(self.config)  # NEW
-        self.audit_store = AuditStore(
-            getattr(self.config, "STORAGE_SQLITE_PATH", "lumina_quant.db")
-        )
+        self.audit_store: AuditStore = AuditStore(self.config.STORAGE_SQLITE_PATH)
         self.run_id = self.audit_store.start_run(
             mode="live",
             metadata={
@@ -52,36 +51,23 @@ class LiveTrader(TradingEngine):
                 "exchange": self.config.EXCHANGE,
                 "mode": self.config.MODE,
                 "strategy": self.strategy_name,
+                "strategy_params": self.strategy_params,
                 "stop_file": self.stop_file,
             },
             run_id=self.external_run_id or None,
         )
         self._audit_closed = False
-        self.heartbeat_interval_sec = max(
-            1, int(getattr(self.config, "HEARTBEAT_INTERVAL_SEC", 30))
-        )
+        self.heartbeat_interval_sec = max(1, int(self.config.HEARTBEAT_INTERVAL_SEC))
         self.reconciliation_interval_sec = max(
             5,
-            int(
-                getattr(
-                    self.config,
-                    "RECONCILIATION_INTERVAL_SEC",
-                    self.heartbeat_interval_sec,
-                )
-            ),
+            int(self.config.RECONCILIATION_INTERVAL_SEC),
         )
         self._last_heartbeat_monotonic = time.monotonic()
         self._last_reconciliation_monotonic = 0.0
         self._last_equity_snapshot_monotonic = 0.0
         self._equity_snapshot_interval_sec = max(
             1,
-            int(
-                getattr(
-                    self.config,
-                    "HEARTBEAT_INTERVAL_SEC",
-                    30,
-                )
-            ),
+            int(self.config.HEARTBEAT_INTERVAL_SEC),
         )
         self._last_drift_signature = ()
         self._reconciliation_drift_events = 0
@@ -110,7 +96,7 @@ class LiveTrader(TradingEngine):
             self.execution_handler.set_order_state_callback(self._on_order_state)
 
         self.portfolio = portfolio_cls(self.data_handler, self.events, time.time(), self.config)
-        self.strategy = strategy_cls(self.data_handler, self.events)
+        self.strategy = strategy_cls(self.data_handler, self.events, **self.strategy_params)
 
         # Initialize Base Engine
         super().__init__(
@@ -153,10 +139,7 @@ class LiveTrader(TradingEngine):
         return os.path.exists(self.stop_file)
 
     def _close_audit_store(self, status=None):
-        if getattr(self, "_audit_closed", True):
-            return
-        if self.audit_store is None:
-            self._audit_closed = True
+        if self._audit_closed:
             return
         try:
             if status and self.run_id:
@@ -368,7 +351,7 @@ class LiveTrader(TradingEngine):
         if should_snapshot:
             self._last_equity_snapshot_monotonic = now_mono
             self.portfolio.create_equity_curve_dataframe()
-            if getattr(self.config, "STORAGE_EXPORT_CSV", True):
+            if self.config.STORAGE_EXPORT_CSV:
                 self.portfolio.save_equity_curve("live_equity.csv")
         self.audit_store.log_equity(
             self.run_id,
@@ -383,7 +366,7 @@ class LiveTrader(TradingEngine):
         super().handle_fill_event(event)  # This calls self.on_fill(event) too
 
         # Save Live Trades
-        if getattr(self.config, "STORAGE_EXPORT_CSV", True):
+        if self.config.STORAGE_EXPORT_CSV:
             self.portfolio.output_trade_log("live_trades.csv")
 
     def run(self):

@@ -5,8 +5,76 @@ from pprint import pprint
 
 from lumina_quant.config import BacktestConfig
 from lumina_quant.engine import TradingEngine
+from lumina_quant.market_data import timeframe_to_milliseconds
 
 LOGGER = logging.getLogger(__name__)
+
+
+def _event_time_to_ms(value):
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        numeric = int(value)
+        if abs(numeric) < 100_000_000_000:
+            return numeric * 1000
+        return numeric
+    ts_fn = getattr(value, "timestamp", None)
+    if callable(ts_fn):
+        try:
+            return int(ts_fn() * 1000)
+        except Exception:
+            return None
+    return None
+
+
+class TimeframeGatedStrategy:
+    """Gate strategy signal evaluations to aligned timeframe boundaries."""
+
+    def __init__(self, strategy, timeframe):
+        self._strategy = strategy
+        self._timeframe = str(timeframe).strip().lower()
+        self._timeframe_ms = max(1, int(timeframe_to_milliseconds(self._timeframe)))
+        self._last_bucket_per_symbol = {}
+
+    def __getattr__(self, name):
+        return getattr(self._strategy, name)
+
+    def should_process_market_event(self, event):
+        if getattr(event, "type", None) != "MARKET":
+            return True
+        event_ms = _event_time_to_ms(getattr(event, "time", None))
+        if event_ms is None:
+            return True
+        if event_ms % self._timeframe_ms != 0:
+            return False
+
+        symbol = getattr(event, "symbol", None)
+        bucket = event_ms // self._timeframe_ms
+        previous = self._last_bucket_per_symbol.get(symbol)
+        if previous == bucket:
+            return False
+        self._last_bucket_per_symbol[symbol] = bucket
+        return True
+
+    def calculate_signals(self, event):
+        self._strategy.calculate_signals(event)
+
+    def get_state(self):
+        state = {}
+        get_state_fn = getattr(self._strategy, "get_state", None)
+        if callable(get_state_fn):
+            state = dict(get_state_fn() or {})
+        state["_tf_gate_last_bucket"] = dict(self._last_bucket_per_symbol)
+        return state
+
+    def set_state(self, state):
+        if isinstance(state, dict):
+            raw = state.get("_tf_gate_last_bucket")
+            if isinstance(raw, dict):
+                self._last_bucket_per_symbol = {k: int(v) for k, v in raw.items() if v is not None}
+        set_state_fn = getattr(self._strategy, "set_state", None)
+        if callable(set_state_fn):
+            set_state_fn(state)
 
 
 class FastQueue:
@@ -53,6 +121,7 @@ class Backtest(TradingEngine):
         record_history=True,
         track_metrics=True,
         record_trades=True,
+        strategy_timeframe=None,
     ):
         self.csv_dir = csv_dir
         self.symbol_list = symbol_list
@@ -64,6 +133,9 @@ class Backtest(TradingEngine):
         self.record_history = bool(record_history)
         self.track_metrics = bool(track_metrics)
         self.record_trades = bool(record_trades)
+        self.strategy_timeframe = (
+            str(strategy_timeframe or getattr(self.config, "TIMEFRAME", "1m")).strip().lower()
+        )
 
         self.data_handler_cls = data_handler_cls
         self.execution_handler_cls = execution_handler_cls
@@ -98,6 +170,8 @@ class Backtest(TradingEngine):
             self.data_dict,
         )
         self.strategy = self.strategy_cls(self.bars, self.events, **self.strategy_params)
+        if self.strategy_timeframe != "1s":
+            self.strategy = TimeframeGatedStrategy(self.strategy, self.strategy_timeframe)
         try:
             self.portfolio = self.portfolio_cls(
                 self.bars,
@@ -107,6 +181,7 @@ class Backtest(TradingEngine):
                 record_history=self.record_history,
                 track_metrics=self.track_metrics,
                 record_trades=self.record_trades,
+                sampling_timeframe=self.strategy_timeframe,
             )
         except TypeError:
             try:

@@ -72,9 +72,9 @@ uv run python run_backtest.py
 uv run python optimize.py --folds 1 --n-trials 3 --max-workers 2
 uv run python scripts/check_architecture.py
 uv run python scripts/benchmark_backtest.py --output reports/benchmarks/post_ulw_rsi.json --compare-to reports/benchmarks/post_continue.json
-uv run python scripts/sync_binance_ohlcv.py --symbols BTC/USDT --timeframe 1m --db-path logs/lumina_quant.db --since 2025-01-01T00:00:00+00:00 --max-batches 2 --limit 1000
-uv run python run_backtest.py --data-source db --market-db-path logs/lumina_quant.db --market-exchange binance
-uv run python optimize.py --folds 1 --n-trials 2 --max-workers 1 --data-source db --market-db-path logs/lumina_quant.db --market-exchange binance
+uv run python scripts/sync_binance_ohlcv.py --symbols BTC/USDT --timeframe 1m --db-path data/lumina_quant.db --since 2025-01-01T00:00:00+00:00 --max-batches 2 --limit 1000
+uv run python run_backtest.py --data-source db --market-db-path data/lumina_quant.db --market-exchange binance
+uv run python optimize.py --folds 1 --n-trials 2 --max-workers 1 --data-source db --market-db-path data/lumina_quant.db --market-exchange binance
 ```
 
 Observed outcomes:

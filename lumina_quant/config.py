@@ -1,10 +1,9 @@
-"""Backward-compatible config shim backed by typed runtime configuration."""
+"""Typed runtime config access for backtest/live modules."""
 
 from __future__ import annotations
 
 import os
 import re
-import warnings
 from dataclasses import asdict
 from typing import ClassVar
 
@@ -13,7 +12,7 @@ from lumina_quant.configuration.validate import validate_runtime_config
 
 
 def load_config(config_path: str = "config.yaml") -> dict:
-    """Load raw YAML config for backward compatibility."""
+    """Load raw YAML config."""
     return load_yaml_config(config_path=config_path)
 
 
@@ -31,7 +30,6 @@ def _as_bool(value, default: bool = False) -> bool:
 
 _CONFIG_PATH = os.getenv("LQ_CONFIG_PATH", "config.yaml")
 _RUNTIME = load_runtime_config(config_path=_CONFIG_PATH)
-_CONFIG_DATA = load_config(_CONFIG_PATH)
 
 
 class BaseConfig:
@@ -69,7 +67,7 @@ class BaseConfig:
 
 
 class BacktestConfig(BaseConfig):
-    """Backtest configuration shim."""
+    """Backtest configuration access."""
 
     START_DATE = _RUNTIME.backtest.start_date
     END_DATE = _RUNTIME.backtest.end_date
@@ -83,7 +81,7 @@ class BacktestConfig(BaseConfig):
 
 
 class LiveConfig(BaseConfig):
-    """Live configuration shim with runtime validation helpers."""
+    """Live configuration access with runtime validation helpers."""
 
     BINANCE_API_KEY = _RUNTIME.live.api_key
     BINANCE_SECRET_KEY = _RUNTIME.live.secret_key
@@ -91,13 +89,6 @@ class LiveConfig(BaseConfig):
     TELEGRAM_CHAT_ID = _RUNTIME.live.telegram_chat_id
 
     MODE = str(_RUNTIME.live.mode).strip().lower()
-    if _RUNTIME.live.testnet is not None and "mode" not in (_CONFIG_DATA.get("live") or {}):
-        warnings.warn(
-            "live.testnet is deprecated; use live.mode: paper|real. "
-            "Automatically mapped for backward compatibility.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
 
     IS_TESTNET = MODE != "real"
     REQUIRE_REAL_ENABLE_FLAG = bool(_RUNTIME.live.require_real_enable_flag)
@@ -163,7 +154,7 @@ class LiveConfig(BaseConfig):
 
 
 class OptimizationConfig:
-    """Optimization configuration shim."""
+    """Optimization configuration access."""
 
     METHOD = _RUNTIME.optimization.method
     STRATEGY_NAME = _RUNTIME.optimization.strategy

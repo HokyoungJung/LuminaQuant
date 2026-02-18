@@ -39,6 +39,10 @@ class SimulatedExecutionHandler(ExecutionHandler):
         # For simplicity, just list of order dicts
         self.active_orders: list[dict[str, Any]] = []
 
+    def _next_order_id(self) -> str:
+        self._order_seq += 1
+        return f"SIM-{self._order_seq}"
+
     def _apply_slippage_and_comm(
         self, price: float, quantity: float, direction: str, symbol: str
     ) -> tuple[float, float]:
@@ -82,16 +86,104 @@ class SimulatedExecutionHandler(ExecutionHandler):
 
         return fill_price, commission
 
+    def _cancel_protective_orders(self, symbol: str, position_side: str | None = None) -> None:
+        protected_types = {"STOP", "TAKE_PROFIT"}
+        target_side = str(position_side).upper() if position_side else None
+        kept: list[dict[str, Any]] = []
+        for order in self.active_orders:
+            if order.get("symbol") != symbol:
+                kept.append(order)
+                continue
+            if str(order.get("type")) not in protected_types:
+                kept.append(order)
+                continue
+            if not bool(order.get("is_protective", False)):
+                kept.append(order)
+                continue
+            if target_side and str(order.get("position_side") or "").upper() not in {
+                target_side,
+                "",
+            }:
+                kept.append(order)
+                continue
+        self.active_orders = kept
+
+    def _build_protective_orders(self, order: dict[str, Any]) -> list[dict[str, Any]]:
+        if bool(order.get("reduce_only", False)):
+            return []
+
+        stop_loss = order.get("stop_loss")
+        take_profit = order.get("take_profit")
+        if stop_loss is None and take_profit is None:
+            return []
+
+        position_side = order.get("position_side")
+        if not position_side:
+            position_side = "LONG" if order.get("direction") == "BUY" else "SHORT"
+
+        exit_direction = "SELL" if order.get("direction") == "BUY" else "BUY"
+        oco_group = f"{order.get('order_id')}-BRACKET"
+        quantity = float(order.get("quantity") or 0.0)
+        if quantity <= 0.0:
+            return []
+
+        out: list[dict[str, Any]] = []
+        if stop_loss is not None:
+            out.append(
+                {
+                    "order_id": self._next_order_id(),
+                    "symbol": order.get("symbol"),
+                    "type": "STOP",
+                    "quantity": quantity,
+                    "direction": exit_direction,
+                    "stop_price": float(stop_loss),
+                    "position_side": position_side,
+                    "reduce_only": True,
+                    "client_order_id": f"{order.get('client_order_id')}-SL"
+                    if order.get("client_order_id")
+                    else None,
+                    "is_protective": True,
+                    "oco_group": oco_group,
+                    "parent_order_id": order.get("order_id"),
+                }
+            )
+
+        if take_profit is not None:
+            out.append(
+                {
+                    "order_id": self._next_order_id(),
+                    "symbol": order.get("symbol"),
+                    "type": "TAKE_PROFIT",
+                    "quantity": quantity,
+                    "direction": exit_direction,
+                    "stop_price": float(take_profit),
+                    "position_side": position_side,
+                    "reduce_only": True,
+                    "client_order_id": f"{order.get('client_order_id')}-TP"
+                    if order.get("client_order_id")
+                    else None,
+                    "is_protective": True,
+                    "oco_group": oco_group,
+                    "parent_order_id": order.get("order_id"),
+                }
+            )
+
+        return out
+
     def execute_order(self, event: Any) -> None:
         """Receives OrderEvent.
         - MKT: Queues for Next Open execution (realism).
         - STOP/TRAIL: triggers active monitoring.
         """
         if event.type == "ORDER":
-            self._order_seq += 1
-            order_id = f"SIM-{self._order_seq}"
+            order_id = self._next_order_id()
 
             if event.order_type == "MKT":
+                if bool(getattr(event, "reduce_only", False)):
+                    self._cancel_protective_orders(
+                        event.symbol,
+                        getattr(event, "position_side", None),
+                    )
                 # LATENCY SIMULATION:
                 # Do NOT fill immediately. Queue for Next Open.
                 self.active_orders.append(
@@ -105,6 +197,8 @@ class SimulatedExecutionHandler(ExecutionHandler):
                         "position_side": event.position_side,
                         "reduce_only": event.reduce_only,
                         "client_order_id": event.client_order_id,
+                        "stop_loss": event.stop_loss,
+                        "take_profit": event.take_profit,
                     }
                 )
 
@@ -156,7 +250,7 @@ class SimulatedExecutionHandler(ExecutionHandler):
 
     def check_open_orders(self, event: Any) -> None:
         """Check active orders against the new MarketEvent.
-        Handles MKT (Next Open), STOP, TRAIL_STOP.
+        Handles MKT (Next Open), STOP/TP, TRAIL_STOP.
         """
         if event.type != "MARKET" or not self.active_orders:
             return
@@ -168,8 +262,14 @@ class SimulatedExecutionHandler(ExecutionHandler):
 
         next_active_orders: list[dict[str, Any]] = []
         remainder_orders: list[dict[str, Any]] = []
+        closed_oco_groups: set[str] = set()
+        closed_positions: set[tuple[str, str | None]] = set()
 
         for order in self.active_orders:
+            oco_group = order.get("oco_group")
+            if oco_group and str(oco_group) in closed_oco_groups:
+                continue
+
             if order["symbol"] != event.symbol:
                 next_active_orders.append(order)
                 continue
@@ -202,6 +302,8 @@ class SimulatedExecutionHandler(ExecutionHandler):
                         "position_side": order.get("position_side"),
                         "reduce_only": order.get("reduce_only", False),
                         "client_order_id": order.get("client_order_id"),
+                        "stop_loss": order.get("stop_loss"),
+                        "take_profit": order.get("take_profit"),
                     }
                     remainder_orders.append(remainder_order)
 
@@ -215,6 +317,20 @@ class SimulatedExecutionHandler(ExecutionHandler):
                 elif order["direction"] == "BUY" and bar_high >= order["stop_price"]:
                     exec_price = order["stop_price"]
                     if exec_price < bar_open:
+                        exec_price = bar_open
+                    triggered = True
+
+            # TAKE PROFIT ORDER
+            elif order["type"] == "TAKE_PROFIT":
+                target = float(order["stop_price"])
+                if order["direction"] == "SELL" and bar_high >= target:
+                    exec_price = target
+                    if bar_open > exec_price:
+                        exec_price = bar_open
+                    triggered = True
+                elif order["direction"] == "BUY" and bar_low <= target:
+                    exec_price = target
+                    if bar_open < exec_price:
                         exec_price = bar_open
                     triggered = True
 
@@ -254,9 +370,51 @@ class SimulatedExecutionHandler(ExecutionHandler):
                     metadata={"reduce_only": order.get("reduce_only", False)},
                 )
                 self.events.put(fill_event)
+
+                if order.get("type") == "MKT":
+                    remainder_orders.extend(self._build_protective_orders(order))
+
+                if bool(order.get("reduce_only", False)):
+                    closed_positions.add(
+                        (
+                            str(order.get("symbol")),
+                            str(order.get("position_side")).upper()
+                            if order.get("position_side")
+                            else None,
+                        )
+                    )
+
+                if oco_group:
+                    closed_oco_groups.add(str(oco_group))
                 continue
 
+            if oco_group and str(oco_group) in closed_oco_groups:
+                continue
             next_active_orders.append(order)
+
+        if closed_positions:
+            filtered: list[dict[str, Any]] = []
+            for order in next_active_orders:
+                if str(order.get("type")) not in {"STOP", "TAKE_PROFIT"}:
+                    filtered.append(order)
+                    continue
+                if not bool(order.get("is_protective", False)):
+                    filtered.append(order)
+                    continue
+                symbol = str(order.get("symbol"))
+                side = (
+                    str(order.get("position_side")).upper() if order.get("position_side") else None
+                )
+                matched = False
+                for c_symbol, c_side in closed_positions:
+                    if symbol != c_symbol:
+                        continue
+                    if c_side is None or side is None or side == c_side:
+                        matched = True
+                        break
+                if not matched:
+                    filtered.append(order)
+            next_active_orders = filtered
 
         if remainder_orders:
             next_active_orders.extend(remainder_orders)

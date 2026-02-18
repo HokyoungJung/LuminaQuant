@@ -13,18 +13,14 @@ class CCXTExchange(ExchangeInterface):
         self.connect()
 
     def connect(self):
-        # Determine exchange ID from config or default to binance
-        exchange_id = "binance"
         exchange_config = getattr(self.config, "EXCHANGE", None)
-        if exchange_config and isinstance(exchange_config, dict):
-            exchange_id = exchange_config.get("name", "binance")
-            self.market_type = exchange_config.get("market_type", "spot")
-        else:
-            exchange_id = getattr(self.config, "EXCHANGE_ID", "binance")
-            self.market_type = getattr(self.config, "MARKET_TYPE", "spot")
+        if not isinstance(exchange_config, dict):
+            raise ValueError("EXCHANGE config must be a dictionary with name/market_type fields.")
 
+        exchange_id = str(exchange_config.get("name", "")).strip().lower()
+        self.market_type = str(exchange_config.get("market_type", "spot")).strip().lower()
         if not exchange_id:
-            exchange_id = "binance"
+            raise ValueError("EXCHANGE.name must be configured.")
 
         exchange_class = getattr(ccxt, exchange_id)
 

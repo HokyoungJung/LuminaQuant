@@ -28,23 +28,14 @@ from lumina_quant.backtest import Backtest
 from lumina_quant.data import HistoricCSVDataHandler
 from lumina_quant.execution import SimulatedExecutionHandler
 from lumina_quant.portfolio import Portfolio
-from strategies.moving_average import MovingAverageCrossStrategy
-from strategies.rsi_strategy import RsiStrategy
+from strategies import get_default_strategy_params, get_strategy_map
 
 try:
     import psutil
 except ImportError:
     psutil = None
 
-STRATEGY_MAP = {
-    "RsiStrategy": RsiStrategy,
-    "MovingAverageCrossStrategy": MovingAverageCrossStrategy,
-}
-
-DEFAULT_PARAMS = {
-    "RsiStrategy": {"rsi_period": 14, "oversold": 30, "overbought": 70},
-    "MovingAverageCrossStrategy": {"short_window": 10, "long_window": 30},
-}
+STRATEGY_MAP = get_strategy_map()
 
 
 def _read_yaml(path: str) -> dict[str, Any]:
@@ -58,11 +49,16 @@ def _read_yaml(path: str) -> dict[str, Any]:
 
 def _load_best_params(strategy_name: str) -> dict[str, Any]:
     """Load optimized params if present, otherwise return defaults."""
-    params = dict(DEFAULT_PARAMS.get(strategy_name, {}))
+    params = get_default_strategy_params(strategy_name)
     param_path = os.path.join(
         "best_optimized_parameters",
         strategy_name,
         "best_params.json",
+    )
+    meta_path = os.path.join(
+        "best_optimized_parameters",
+        strategy_name,
+        "best_params.meta.json",
     )
     if not os.path.exists(param_path):
         return params
@@ -71,6 +67,20 @@ def _load_best_params(strategy_name: str) -> dict[str, Any]:
             loaded = json.load(file)
         if isinstance(loaded, dict):
             params.update(loaded)
+        if os.path.exists(meta_path):
+            try:
+                with open(meta_path, encoding="utf-8") as meta_file:
+                    meta = json.load(meta_file)
+                basis = str(meta.get("selection_basis", "")).strip().lower()
+                if basis != "validation_only":
+                    print(
+                        "[WARN] best_params metadata indicates non validation-only selection basis "
+                        f"for {strategy_name}."
+                    )
+            except (OSError, ValueError, TypeError):
+                print(f"[WARN] Failed to parse best_params metadata for {strategy_name}.")
+        else:
+            print(f"[WARN] best_params metadata missing for {strategy_name}.")
     except (OSError, ValueError, TypeError):
         pass
     return params

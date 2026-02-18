@@ -1,9 +1,9 @@
-import math
 from datetime import date, datetime
 
-import numpy as np
 import polars as pl
 from lumina_quant.events import FillEvent, OrderEvent
+from lumina_quant.market_data import timeframe_to_milliseconds
+from lumina_quant.services.portfolio import PortfolioPerformanceService, PortfolioSizingService
 
 
 class Portfolio:
@@ -20,6 +20,7 @@ class Portfolio:
         record_history=True,
         track_metrics=True,
         record_trades=True,
+        sampling_timeframe=None,
     ):
         self.bars = bars
         self.events = events
@@ -29,6 +30,16 @@ class Portfolio:
         self.record_history = bool(record_history)
         self.track_metrics = bool(track_metrics)
         self.record_trades = bool(record_trades)
+        self.sampling_timeframe = (
+            str(sampling_timeframe).strip().lower() if sampling_timeframe else None
+        )
+        self._sampling_interval_ms = None
+        if self.sampling_timeframe:
+            try:
+                self._sampling_interval_ms = int(timeframe_to_milliseconds(self.sampling_timeframe))
+            except Exception:
+                self._sampling_interval_ms = None
+        self._last_sample_timestamp_ms = None
         self.start_date = start_date
         self.initial_capital = self.config.INITIAL_CAPITAL
 
@@ -83,6 +94,7 @@ class Portfolio:
             + [0.0]
         )  # Benchmark Price Placeholder
         self.all_holdings.append(tuple(h_row))
+        self._last_sample_timestamp_ms = self._to_timestamp_ms(self.start_date)
         self.save_portfolio_state()
 
     def save_portfolio_state(self):
@@ -129,6 +141,7 @@ class Portfolio:
         _ = event
         primary_symbol = self.symbol_list[0]
         latest_datetime = self.bars.get_latest_bar_datetime(primary_symbol)
+        should_sample = self._should_sample(latest_datetime)
         self._update_day_boundary(latest_datetime)
         self._apply_funding(latest_datetime)
         self._check_liquidations(latest_datetime)
@@ -137,6 +150,7 @@ class Portfolio:
         current_holdings = self.current_holdings
         cash = current_holdings["cash"]
         commission = current_holdings["commission"]
+        collect_history = self.record_history and should_sample
 
         if self._single_symbol:
             symbol = primary_symbol
@@ -146,11 +160,11 @@ class Portfolio:
             current_holdings[symbol] = market_value
             total = cash + market_value
             current_holdings["total"] = total
-            if self.track_metrics:
+            if self.track_metrics and should_sample:
                 self._metric_totals.append(float(total))
                 self._metric_benchmarks.append(float(close_price))
 
-            if self.record_history:
+            if collect_history:
                 self.all_positions.append((latest_datetime, qty))
                 self.all_holdings.append(
                     (
@@ -166,33 +180,35 @@ class Portfolio:
             return
 
         total = cash
-        market_vals = []
+        market_vals = [] if collect_history else None
         for symbol in self.symbol_list:
             qty = current_positions[symbol]
             market_value = (
                 qty * self.bars.get_latest_bar_value(symbol, "close") if qty != 0 else 0.0
             )
-            market_vals.append(market_value)
+            if market_vals is not None:
+                market_vals.append(market_value)
             total += market_value
             current_holdings[symbol] = market_value
 
         current_holdings["total"] = total
         bench_price = self.bars.get_latest_bar_value(primary_symbol, "close")
-        if self.track_metrics:
+        if self.track_metrics and should_sample:
             self._metric_totals.append(float(total))
             self._metric_benchmarks.append(float(bench_price))
-        if not self.record_history:
+        if not collect_history:
             return
 
         # Update positions
         # Tuple: (datetime, s1, s2...)
         self.all_positions.append(
-            (latest_datetime, *[current_positions[s] for s in self.symbol_list])
+            (latest_datetime, *(current_positions[s] for s in self.symbol_list))
         )
 
         # Store Tuple
         # Schema: (datetime, cash, commission, total, s1_val, s2_val, ..., benchmark_price)
         # Benchmark: Close price of first symbol (Primary Asset)
+        history_market_vals = market_vals if market_vals is not None else []
         self.all_holdings.append(
             (
                 latest_datetime,
@@ -200,10 +216,39 @@ class Portfolio:
                 commission,
                 current_holdings.get("funding", 0.0),
                 total,
-                *market_vals,
+                *history_market_vals,
                 bench_price,
             )
         )
+
+    def _to_timestamp_ms(self, value):
+        if value is None:
+            return None
+        if isinstance(value, (int, float)):
+            ts = int(value)
+            if abs(ts) < 100_000_000_000:
+                ts *= 1000
+            return ts
+        if isinstance(value, datetime):
+            return int(value.timestamp() * 1000)
+        if isinstance(value, date):
+            return int(datetime(value.year, value.month, value.day).timestamp() * 1000)
+        try:
+            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except Exception:
+            return None
+        return int(parsed.timestamp() * 1000)
+
+    def _should_sample(self, latest_datetime):
+        ts_ms = self._to_timestamp_ms(latest_datetime)
+        if ts_ms is None:
+            return True
+        if self._last_sample_timestamp_ms is not None and ts_ms == self._last_sample_timestamp_ms:
+            return False
+        if self._sampling_interval_ms and ts_ms % self._sampling_interval_ms != 0:
+            return False
+        self._last_sample_timestamp_ms = ts_ms
+        return True
 
     def update_positions_from_fill(self, fill):
         fill_dir = 0
@@ -537,60 +582,34 @@ class Portfolio:
         }
 
     def _round_quantity(self, quantity, step):
-        if step <= 0:
-            return quantity
-        return math.floor(quantity / step) * step
+        return PortfolioSizingService.round_quantity(quantity, step)
 
     def _risk_based_quantity(self, signal, current_price):
         """Futures-oriented position sizing:
         risk_amount = equity * risk_per_trade
         qty = risk_amount / stop_distance
         """
-        direction = signal.signal_type
-        equity = self.current_holdings["total"]
-        risk_amount = max(equity * self.risk_per_trade, 0.0)
-        if risk_amount <= 0:
-            return 0.0
-
-        if signal.stop_loss is not None:
-            stop_price = float(signal.stop_loss)
-        else:
-            if direction == "LONG":
-                stop_price = current_price * (1.0 - self.default_stop_loss_pct)
-            else:
-                stop_price = current_price * (1.0 + self.default_stop_loss_pct)
-
-        stop_distance = abs(current_price - stop_price)
-        if stop_distance <= 0:
-            stop_distance = current_price * self.default_stop_loss_pct
-        if stop_distance <= 0:
-            return 0.0
-
-        quantity = risk_amount / stop_distance
-
-        # Exposure cap (legacy target_allocation honored as upper bound if configured)
-        exposure_cap_pct = self.max_symbol_exposure_pct
-        target_alloc = getattr(self.config, "TARGET_ALLOCATION", exposure_cap_pct)
-        if target_alloc > 0:
-            exposure_cap_pct = min(exposure_cap_pct, target_alloc)
-        notional_cap = equity * exposure_cap_pct
-        if notional_cap > 0:
-            quantity = min(quantity, notional_cap / current_price)
-
-        # Absolute per-order notional cap
-        if self.max_order_value > 0:
-            quantity = min(quantity, self.max_order_value / current_price)
-
-        return max(quantity, 0.0)
+        target_alloc = getattr(self.config, "TARGET_ALLOCATION", self.max_symbol_exposure_pct)
+        return PortfolioSizingService.risk_based_quantity(
+            signal=signal,
+            current_price=float(current_price),
+            equity=float(self.current_holdings["total"]),
+            risk_per_trade=float(self.risk_per_trade),
+            default_stop_loss_pct=float(self.default_stop_loss_pct),
+            max_symbol_exposure_pct=float(self.max_symbol_exposure_pct),
+            target_allocation=float(target_alloc),
+            max_order_value=float(self.max_order_value),
+        )
 
     def _validate_and_round_quantity(self, symbol, quantity, price):
         limits = self._get_symbol_limits(symbol)
-        qty = self._round_quantity(quantity, limits["qty_step"])
-        if qty < limits["min_qty"]:
-            return 0.0
-        if qty * price < limits["min_notional"]:
-            return 0.0
-        return qty
+        return PortfolioSizingService.validate_and_round_quantity(
+            quantity=float(quantity),
+            price=float(price),
+            min_qty=float(limits["min_qty"]),
+            qty_step=float(limits["qty_step"]),
+            min_notional=float(limits["min_notional"]),
+        )
 
     def generate_order_from_signal(self, signal) -> OrderEvent | None:
         """Generates an OrderEvent from a SignalEvent.
@@ -718,107 +737,12 @@ class Portfolio:
 
     def output_summary_stats(self):
         """Creates a list of summary statistics."""
-
-        def _safe_scalar(value, default=0.0):
-            try:
-                out = float(value)
-            except Exception:
-                return float(default)
-            if not np.isfinite(out):
-                return float(default)
-            return out
-
-        # Convert to numpy for calc
-        total_series = self.equity_curve["total"].to_numpy()
-        returns = self.equity_curve["returns"].fill_null(0.0).to_numpy()
-        benchmark_returns = self.equity_curve["benchmark_returns"].fill_null(0.0).to_numpy()
-
-        if len(total_series) < 2:
-            return [("Status", "Not enough data")]
-
-        from lumina_quant.utils.performance import (
-            create_alpha_beta,
-            create_annualized_volatility,
-            create_cagr,
-            create_calmar_ratio,
-            create_drawdowns,
-            create_information_ratio,
-            create_sharpe_ratio,
-            create_sortino_ratio,
+        return PortfolioPerformanceService.build_summary_stats(
+            equity_curve=self.equity_curve,
+            config=self.config,
+            total_funding_paid=self.total_funding_paid,
+            liquidation_count=len(self.liquidation_events),
         )
-
-        # Use period from config if available (check BacktestConfig)
-        periods = getattr(self.config, "ANNUAL_PERIODS", 252)  # Crypto often 365
-
-        # 1. Total Return
-        total_return = (total_series[-1] - total_series[0]) / total_series[0]
-
-        # Benchmark Total Return (using last non-zero price vs first)
-        # Note: Initial price might be 0 if recorded before first bar.
-        # Check indices.
-        benchmark_prices = self.equity_curve["benchmark_price"].fill_null(0.0).to_numpy()
-        first_price = 1.0
-        for price in benchmark_prices:
-            p = _safe_scalar(price, 0.0)
-            if p > 0:
-                first_price = p
-                break
-        last_price = _safe_scalar(benchmark_prices[-1], first_price)
-        benchmark_unrealized = (last_price - first_price) / first_price
-
-        # 2. CAGR
-        cagr = _safe_scalar(
-            create_cagr(total_series[-1], total_series[0], len(total_series), periods)
-        )
-
-        # 3. Volatility
-        volatility = _safe_scalar(create_annualized_volatility(returns, periods))
-
-        # 4. Sharpe
-        sharpe_ratio = _safe_scalar(create_sharpe_ratio(returns, periods=periods))
-
-        # 5. Sortino
-        sortino_ratio = _safe_scalar(create_sortino_ratio(returns, periods=periods))
-
-        # 6. Drawdowns
-        drawdown, max_dd_duration = create_drawdowns(total_series)
-        max_dd = _safe_scalar(max(drawdown), 0.0)
-
-        # 7. Calmar
-        calmar_ratio = _safe_scalar(create_calmar_ratio(cagr, max_dd))
-
-        # 8. Alpha / Beta
-        alpha, beta = create_alpha_beta(returns, benchmark_returns, periods=periods)
-        alpha = _safe_scalar(alpha)
-        beta = _safe_scalar(beta)
-
-        # 9. Information Ratio
-        info_ratio = _safe_scalar(create_information_ratio(returns, benchmark_returns))
-
-        # 10. Daily Win Rate
-        winning_days = len(returns[returns > 0])
-        total_days = len(returns) - 1  # exclude first 0 return
-        win_rate = winning_days / total_days if total_days > 0 else 0.0
-
-        stats = [
-            ("Total Return", "%0.2f%%" % (total_return * 100.0)),
-            ("Benchmark Return", "%0.2f%%" % (benchmark_unrealized * 100.0)),
-            ("CAGR", "%0.2f%%" % (cagr * 100.0)),
-            ("Ann. Volatility", "%0.2f%%" % (volatility * 100.0)),
-            ("Sharpe Ratio", "%0.4f" % sharpe_ratio),
-            ("Sortino Ratio", "%0.4f" % sortino_ratio),
-            ("Calmar Ratio", "%0.4f" % calmar_ratio),
-            ("Max Drawdown", "%0.2f%%" % (max_dd * 100.0)),
-            ("DD Duration", "%d bars" % max_dd_duration),
-            ("Alpha", "%0.4f" % alpha),
-            ("Beta", "%0.4f" % beta),
-            ("Information Ratio", "%0.4f" % info_ratio),
-            ("Daily Win Rate", "%0.2f%%" % (win_rate * 100.0)),
-            ("Funding (Net)", "%0.4f" % self.total_funding_paid),
-            ("Liquidations", "%d" % len(self.liquidation_events)),
-        ]
-
-        return stats
 
     def output_summary_stats_fast(self):
         """Return lightweight stats without constructing a DataFrame.
@@ -826,52 +750,10 @@ class Portfolio:
         This is intended for optimization loops where only core objective
         metrics are needed.
         """
-        total_series = np.asarray(self._metric_totals, dtype=np.float64)
-        if total_series.size < 2:
-            return {
-                "status": "not_enough_data",
-                "sharpe": -999.0,
-                "cagr": 0.0,
-                "max_drawdown": 0.0,
-            }
-
-        prev_total = total_series[:-1]
-        next_total = total_series[1:]
-        returns = np.divide(
-            next_total - prev_total,
-            np.where(prev_total == 0.0, 1.0, prev_total),
-            dtype=np.float64,
+        return PortfolioPerformanceService.build_fast_stats(
+            metric_totals=self._metric_totals,
+            config=self.config,
         )
-        if returns.size > 0 and not np.isfinite(returns[0]):
-            returns[0] = 0.0
-
-        from lumina_quant.utils.performance import (
-            create_cagr,
-            create_drawdowns,
-            create_sharpe_ratio,
-        )
-
-        periods = int(getattr(self.config, "ANNUAL_PERIODS", 252))
-        cagr = float(
-            create_cagr(total_series[-1], total_series[0], int(total_series.size), periods)
-        )
-        sharpe_ratio = float(create_sharpe_ratio(returns, periods=periods))
-        drawdown, _ = create_drawdowns(total_series)
-        max_dd = float(max(drawdown)) if drawdown else 0.0
-
-        if not np.isfinite(sharpe_ratio):
-            sharpe_ratio = -999.0
-        if not np.isfinite(cagr):
-            cagr = 0.0
-        if not np.isfinite(max_dd):
-            max_dd = 0.0
-
-        return {
-            "status": "ok",
-            "sharpe": sharpe_ratio,
-            "cagr": cagr,
-            "max_drawdown": max_dd,
-        }
 
     def output_trade_log(self, filename="trades.csv"):
         """Outputs the trade log to a CSV file."""

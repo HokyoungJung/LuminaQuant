@@ -224,9 +224,7 @@ reports/
 test_output.txt
 
 # User Privacy Settings - STRICT MODE
-strategies/*
-!strategies/__init__.py
-!strategies/rsi_strategy.py
+# Keep proprietary research code private by default.
 equity.csv
 trades.csv
 live_equity.csv
@@ -245,3 +243,33 @@ logs/
 *.pem
 secrets/
 credentials/
+
+# Proprietary factor/indicator IP (do not publish)
+lumina_quant/indicators/
+tests/test_accelerated_indicators.py
+tests/test_formulaic_alpha_subset.py
+tests/test_formulaic_operators.py
+tests/test_indicator*.py
+tests/test_indicators*.py
+
+# Proprietary strategy IP (do not publish)
+strategies/
+tests/test_strategy*.py
+tests/test_*strategy*.py
+tests/test_pair_trading_zscore.py
+tests/test_topcap_tsmom_strategy.py
+
+# DB artifacts (never publish)
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.db-wal
+*.db-shm
+
+# Agent/runtime local files (never publish)
+AGENTS.md
+.omx/
+.sisyphus/

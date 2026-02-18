@@ -107,7 +107,7 @@ trading:
 uv run python scripts/sync_binance_ohlcv.py \
   --symbols BTC/USDT ETH/USDT \
   --timeframe 1m \
-  --db-path logs/lumina_quant.db \
+  --db-path data/lumina_quant.db \
   --force-full
 ```
 
@@ -116,7 +116,7 @@ uv run python scripts/sync_binance_ohlcv.py \
 uv run python run_backtest.py
 
 # DB 데이터만 사용
-uv run python run_backtest.py --data-source db --market-db-path logs/lumina_quant.db
+uv run python run_backtest.py --data-source db --market-db-path data/lumina_quant.db
 ```
 
 **워크포워드 최적화:**
@@ -124,7 +124,7 @@ uv run python run_backtest.py --data-source db --market-db-path logs/lumina_quan
 uv run python optimize.py
 
 # DB 우선, 부족하면 CSV fallback
-uv run python optimize.py --data-source auto --market-db-path logs/lumina_quant.db
+uv run python optimize.py --data-source auto --market-db-path data/lumina_quant.db
 ```
 
 **아키텍처/린트 검증:**
@@ -150,9 +150,9 @@ uv run streamlit run dashboard.py
 
 **대시보드 실시간 스모크 체크 (equity row 증가 확인):**
 ```bash
-# live trader가 logs/lumina_quant.db를 쓰는 동안 실행
+# live trader가 data/lumina_quant.db를 쓰는 동안 실행
 uv run python scripts/smoke_dashboard_realtime.py \
-  --db-path logs/lumina_quant.db \
+  --db-path data/lumina_quant.db \
   --require-running \
   --timeout-sec 90 \
   --poll-sec 3

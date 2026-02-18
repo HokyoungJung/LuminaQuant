@@ -50,8 +50,8 @@ execution:
 # ------------------------------------------
 storage:
   backend: "sqlite"
-  sqlite_path: "logs/lumina_quant.db"
-  market_data_sqlite_path: "logs/lumina_quant.db"
+  sqlite_path: "data/lumina_quant.db"
+  market_data_sqlite_path: "data/lumina_quant.db"
   market_data_exchange: "binance"
   export_csv: true
 

@@ -14,7 +14,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Validate realtime equity row growth for a dashboard-monitored run.",
     )
-    parser.add_argument("--db-path", default="logs/lumina_quant.db", help="SQLite DB path.")
+    parser.add_argument("--db-path", default="data/lumina_quant.db", help="SQLite DB path.")
     parser.add_argument("--run-id", default="", help="Specific run_id to monitor.")
     parser.add_argument(
         "--require-running",

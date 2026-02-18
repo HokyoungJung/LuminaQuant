@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 class AuditStore:
     """Lightweight SQLite audit store for runs, orders, fills and risk events."""
 
-    def __init__(self, db_path="lumina_quant.db"):
+    def __init__(self, db_path="data/lumina_quant.db"):
         self.db_path = db_path
         self._lock = threading.Lock()
         db_dir = os.path.dirname(self.db_path)

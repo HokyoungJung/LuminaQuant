@@ -110,7 +110,7 @@ trading:
 uv run python scripts/sync_binance_ohlcv.py \
   --symbols BTC/USDT ETH/USDT \
   --timeframe 1m \
-  --db-path logs/lumina_quant.db \
+  --db-path data/lumina_quant.db \
   --force-full
 ```
 
@@ -119,7 +119,7 @@ uv run python scripts/sync_binance_ohlcv.py \
 uv run python run_backtest.py
 
 # Force DB-only data source
-uv run python run_backtest.py --data-source db --market-db-path logs/lumina_quant.db
+uv run python run_backtest.py --data-source db --market-db-path data/lumina_quant.db
 ```
 
 **Walk-Forward Optimization (multi-fold):**
@@ -127,7 +127,7 @@ uv run python run_backtest.py --data-source db --market-db-path logs/lumina_quan
 uv run python optimize.py
 
 # Prefer DB data, fallback to CSV in auto mode
-uv run python optimize.py --data-source auto --market-db-path logs/lumina_quant.db
+uv run python optimize.py --data-source auto --market-db-path data/lumina_quant.db
 ```
 
 **Architecture/Lint Gate:**
@@ -152,17 +152,17 @@ Dashboard now includes no-code workflow controls for backtest, optimization, and
 **Ghost Cleanup CLI (stale RUNNING rows):**
 ```bash
 # Dry-run (recommended first)
-uv run python scripts/cleanup_ghost_runs.py --db logs/lumina_quant.db --stale-sec 300 --startup-grace-sec 90
+uv run python scripts/cleanup_ghost_runs.py --db data/lumina_quant.db --stale-sec 300 --startup-grace-sec 90
 
 # Apply cleanup
-uv run python scripts/cleanup_ghost_runs.py --db logs/lumina_quant.db --stale-sec 300 --startup-grace-sec 90 --apply
+uv run python scripts/cleanup_ghost_runs.py --db data/lumina_quant.db --stale-sec 300 --startup-grace-sec 90 --apply
 ```
 
 **Realtime Dashboard Smoke Check (equity row growth):**
 ```bash
-# Run while live trader is writing to logs/lumina_quant.db
+# Run while live trader is writing to data/lumina_quant.db
 uv run python scripts/smoke_dashboard_realtime.py \
-  --db-path logs/lumina_quant.db \
+  --db-path data/lumina_quant.db \
   --require-running \
   --timeout-sec 90 \
   --poll-sec 3
@@ -177,7 +177,7 @@ uv run python run_live.py
 
 **Generate 14-day Soak Report (Promotion Gate):**
 ```bash
-uv run python scripts/generate_soak_report.py --db logs/lumina_quant.db --days 14
+uv run python scripts/generate_soak_report.py --db data/lumina_quant.db --days 14
 ```
 
 **Backtest Benchmark Baseline/Regression:**

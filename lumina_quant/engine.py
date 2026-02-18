@@ -33,7 +33,15 @@ class TradingEngine(ABC):
 
     def handle_market_event(self, event):
         self.market_events += 1
-        self.strategy.calculate_signals(event)
+        should_process = True
+        strategy_guard = getattr(self.strategy, "should_process_market_event", None)
+        if callable(strategy_guard):
+            try:
+                should_process = bool(strategy_guard(event))
+            except Exception:
+                should_process = True
+        if should_process:
+            self.strategy.calculate_signals(event)
         self.portfolio.update_timeindex(event)
         # Optional: Simulated execution handler might need to check open orders
         if hasattr(self.execution_handler, "check_open_orders"):

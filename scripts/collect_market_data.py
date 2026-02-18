@@ -1,4 +1,4 @@
-"""Synchronize Binance OHLCV data into SQLite and optional CSV mirrors."""
+"""Ensure local DB market-data coverage for requested symbols/time windows."""
 
 from __future__ import annotations
 
@@ -7,17 +7,28 @@ import os
 from datetime import UTC, datetime
 
 from lumina_quant.config import BaseConfig, LiveConfig
-from lumina_quant.data_sync import (
-    create_binance_exchange,
-    parse_timestamp_input,
-    sync_market_data,
-)
+from lumina_quant.data_collector import auto_collect_market_data
+
+
+def _parse_datetime_input(value: str) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    if text.isdigit():
+        numeric = int(text)
+        if abs(numeric) < 100_000_000_000:
+            numeric *= 1000
+        return datetime.fromtimestamp(numeric / 1000.0, tz=UTC)
+    dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt
 
 
 def _build_parser() -> argparse.ArgumentParser:
     default_base_tf = str(os.getenv("LQ_BASE_TIMEFRAME", "1s") or "1s").strip().lower()
     parser = argparse.ArgumentParser(
-        description="Sync Binance OHLCV data into market-data SQLite storage."
+        description="Collect and fill missing OHLCV coverage into SQLite market-data DB."
     )
     parser.add_argument(
         "--symbols",
@@ -48,18 +59,13 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--since",
-        default="2017-01-01T00:00:00+00:00",
-        help="Backfill start (ISO8601 or unix seconds/ms).",
+        default="",
+        help="Coverage start (ISO8601 or unix seconds/ms). Optional.",
     )
     parser.add_argument(
         "--until",
         default="",
-        help="Optional end time (ISO8601 or unix seconds/ms). Default is now UTC.",
-    )
-    parser.add_argument(
-        "--force-full",
-        action="store_true",
-        help="Ignore existing DB tail and always fetch from --since.",
+        help="Coverage end (ISO8601 or unix seconds/ms). Optional; default now UTC.",
     )
     parser.add_argument(
         "--limit",
@@ -80,16 +86,6 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Retry count for transient exchange API errors.",
     )
     parser.add_argument(
-        "--export-csv-dir",
-        default="data",
-        help="If set, export synchronized DB bars to symbol CSV files under this dir.",
-    )
-    parser.add_argument(
-        "--no-export-csv",
-        action="store_true",
-        help="Disable CSV export mirrors after DB sync.",
-    )
-    parser.add_argument(
         "--testnet",
         action="store_true",
         help="Use Binance sandbox mode for CCXT client.",
@@ -101,42 +97,35 @@ def main() -> None:
     parser = _build_parser()
     args = parser.parse_args()
 
-    since_ms = parse_timestamp_input(args.since)
-    until_ms = parse_timestamp_input(args.until) if args.until else None
-    export_csv_dir = None if args.no_export_csv else args.export_csv_dir
+    since_dt = _parse_datetime_input(args.since)
+    until_dt = _parse_datetime_input(args.until)
 
-    exchange = create_binance_exchange(
-        api_key=LiveConfig.BINANCE_API_KEY,
-        secret_key=LiveConfig.BINANCE_SECRET_KEY,
-        market_type=args.market_type,
+    stats = auto_collect_market_data(
+        symbol_list=list(args.symbols),
+        timeframe=str(args.timeframe),
+        db_path=str(args.db_path),
+        exchange_id=str(args.exchange_id),
+        market_type=str(args.market_type),
+        since_dt=since_dt,
+        until_dt=until_dt,
+        api_key=str(LiveConfig.BINANCE_API_KEY or ""),
+        secret_key=str(LiveConfig.BINANCE_SECRET_KEY or ""),
         testnet=bool(args.testnet),
-    )
-
-    stats = sync_market_data(
-        exchange=exchange,
-        db_path=args.db_path,
-        exchange_id=args.exchange_id,
-        symbol_list=args.symbols,
-        timeframe=args.timeframe,
-        since_ms=since_ms,
-        until_ms=until_ms,
-        force_full=bool(args.force_full),
         limit=max(1, int(args.limit)),
         max_batches=max(1, int(args.max_batches)),
         retries=max(0, int(args.retries)),
-        export_csv_dir=export_csv_dir,
     )
 
-    print("\n=== Market Data Sync Summary ===")
+    print("\n=== Market Data Collector Summary ===")
     print(f"DB Path: {args.db_path}")
     print(f"Exchange: {args.exchange_id}")
+    print(f"Market Type: {args.market_type}")
     print(f"Timeframe: {args.timeframe}")
     print(f"Symbols: {', '.join(args.symbols)}")
-    print(f"Completed at: {datetime.now(UTC).isoformat()}")
     for item in stats:
         print(
-            f"- {item.symbol}: fetched={item.fetched_rows} upserted={item.upserted_rows} "
-            f"first_ts={item.first_timestamp_ms} last_ts={item.last_timestamp_ms}"
+            f"- {item['symbol']}: fetched={item['fetched_rows']} upserted={item['upserted_rows']} "
+            f"first_ts={item['first_timestamp_ms']} last_ts={item['last_timestamp_ms']}"
         )
 
 

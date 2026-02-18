@@ -7,6 +7,7 @@ import unittest
 from pathlib import Path
 
 from lumina_quant.market_data import (
+    MarketDataRepository,
     connect_market_data_db,
     ensure_market_ohlcv_schema,
     get_last_ohlcv_timestamp_ms,
@@ -89,6 +90,31 @@ class TestMarketDataStore(unittest.TestCase):
             )
             self.assertIn("BTC/USDT", data_dict)
             self.assertNotIn("ETH/USDT", data_dict)
+
+    def test_repository_facade_roundtrip(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = str(Path(tmp_dir) / "market_data.db")
+            repo = MarketDataRepository(db_path)
+
+            conn = connect_market_data_db(db_path)
+            try:
+                ensure_market_ohlcv_schema(conn)
+                upsert_ohlcv_rows(
+                    conn,
+                    exchange="binance",
+                    symbol="BTC/USDT",
+                    timeframe="1m",
+                    rows=[(1704067200000, 100.0, 101.0, 99.0, 100.5, 10.0)],
+                    source="test",
+                )
+            finally:
+                conn.close()
+
+            self.assertTrue(
+                repo.market_data_exists(exchange="binance", symbol="BTCUSDT", timeframe="1m")
+            )
+            frame = repo.load_ohlcv(exchange="binance", symbol="BTC/USDT", timeframe="1m")
+            self.assertEqual(frame.height, 1)
 
 
 if __name__ == "__main__":

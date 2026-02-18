@@ -194,7 +194,7 @@ def build_report(
 
 def main():
     parser = argparse.ArgumentParser(description="Generate LuminaQuant soak report.")
-    parser.add_argument("--db", default="logs/lumina_quant.db", help="SQLite DB path")
+    parser.add_argument("--db", default="data/lumina_quant.db", help="SQLite DB path")
     parser.add_argument("--days", type=int, default=14, help="Soak window in days")
     parser.add_argument(
         "--min-uptime-hours",
