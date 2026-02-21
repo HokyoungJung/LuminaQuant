@@ -15,6 +15,7 @@ from lumina_quant.configuration.schema import (
     LiveExchangeConfig,
     LiveRuntimeConfig,
     OptimizationRuntimeConfig,
+    PromotionGateConfig,
     RiskConfig,
     RuntimeConfig,
     StorageConfig,
@@ -22,7 +23,7 @@ from lumina_quant.configuration.schema import (
     TradingConfig,
 )
 
-DEFAULT_STORAGE_DB_PATH = "data/lumina_quant.db"
+DEFAULT_STORAGE_DB_PATH = "data/lq_audit.sqlite3"
 
 
 def _as_bool(value: Any, default: bool = False) -> bool:
@@ -152,9 +153,16 @@ def build_runtime_config(data: dict[str, Any], env: Mapping[str, str]) -> Runtim
     optimization_raw = (
         mapped.get("optimization", {}) if isinstance(mapped.get("optimization", {}), dict) else {}
     )
+    promotion_raw = (
+        mapped.get("promotion_gate", {})
+        if isinstance(mapped.get("promotion_gate", {}), dict)
+        else {}
+    )
     exchange_raw = (
         live_raw.get("exchange", {}) if isinstance(live_raw.get("exchange", {}), dict) else {}
     )
+    promotion_kwargs = _coerce_dataclass_kwargs(promotion_raw, PromotionGateConfig)
+    strategy_profiles = promotion_kwargs.pop("strategy_profiles", {})
 
     live_kwargs = _coerce_dataclass_kwargs(live_raw, LiveRuntimeConfig)
     for reserved_key in (
@@ -202,6 +210,12 @@ def build_runtime_config(data: dict[str, Any], env: Mapping[str, str]) -> Runtim
         optimization=OptimizationRuntimeConfig(
             **_coerce_dataclass_kwargs(optimization_raw, OptimizationRuntimeConfig)
         ),
+        promotion_gate=PromotionGateConfig(
+            **promotion_kwargs,
+            strategy_profiles=(
+                dict(strategy_profiles) if isinstance(strategy_profiles, dict) else {}
+            ),
+        ),
     )
 
     runtime.storage.sqlite_path = _resolve_storage_path(runtime.storage.sqlite_path)
@@ -236,6 +250,32 @@ def build_runtime_config(data: dict[str, Any], env: Mapping[str, str]) -> Runtim
         runtime.optimization.persist_best_params,
         False,
     )
+    runtime.promotion_gate.days = _as_int(runtime.promotion_gate.days, 14)
+    runtime.promotion_gate.max_order_rejects = _as_int(runtime.promotion_gate.max_order_rejects, 0)
+    runtime.promotion_gate.max_order_timeouts = _as_int(
+        runtime.promotion_gate.max_order_timeouts, 0
+    )
+    runtime.promotion_gate.max_reconciliation_alerts = _as_int(
+        runtime.promotion_gate.max_reconciliation_alerts,
+        0,
+    )
+    runtime.promotion_gate.max_critical_errors = _as_int(
+        runtime.promotion_gate.max_critical_errors, 0
+    )
+    runtime.promotion_gate.require_alpha_card = _as_bool(
+        runtime.promotion_gate.require_alpha_card,
+        False,
+    )
+
+    normalized_profiles: dict[str, dict[str, Any]] = {}
+    for name, profile in dict(runtime.promotion_gate.strategy_profiles or {}).items():
+        if not isinstance(profile, dict):
+            continue
+        key = str(name).strip()
+        if not key:
+            continue
+        normalized_profiles[key] = dict(profile)
+    runtime.promotion_gate.strategy_profiles = normalized_profiles
     return runtime
 
 

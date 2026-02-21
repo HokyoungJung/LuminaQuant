@@ -88,6 +88,11 @@ except Exception:
 
 MARKET_DB_PATH = BaseConfig.MARKET_DATA_SQLITE_PATH
 MARKET_DB_EXCHANGE = BaseConfig.MARKET_DATA_EXCHANGE
+MARKET_DB_BACKEND = BaseConfig.STORAGE_BACKEND
+MARKET_INFLUX_URL = BaseConfig.INFLUX_URL
+MARKET_INFLUX_ORG = BaseConfig.INFLUX_ORG
+MARKET_INFLUX_BUCKET = BaseConfig.INFLUX_BUCKET
+MARKET_INFLUX_TOKEN_ENV = BaseConfig.INFLUX_TOKEN_ENV
 
 
 def _normalize_timeframe_or_default(value, default):
@@ -101,12 +106,22 @@ def _normalize_timeframe_or_default(value, default):
 
 
 BASE_TIMEFRAME = _normalize_timeframe_or_default(os.getenv("LQ_BASE_TIMEFRAME", "1s"), "1s")
-AUTO_COLLECT_DB = str(os.getenv("LQ_AUTO_COLLECT_DB", "1")).strip().lower() not in {
+AUTO_COLLECT_DB = str(os.getenv("LQ_AUTO_COLLECT_DB", "0")).strip().lower() not in {
     "0",
     "false",
     "no",
     "off",
 }
+
+
+def _enforce_1s_base_timeframe(value: str) -> str:
+    token = _normalize_timeframe_or_default(value, "1s")
+    if token != "1s":
+        print(
+            f"[WARN] base_timeframe '{token}' overridden to '1s' for intrabar backtest execution."
+        )
+    return "1s"
+
 
 # ==========================================
 # EXECUTION (Do not modify generally)
@@ -168,6 +183,11 @@ def _load_data_dict(
         timeframe=str(base_timeframe),
         start_date=START_DATE,
         end_date=END_DATE,
+        backend=str(MARKET_DB_BACKEND),
+        influx_url=str(MARKET_INFLUX_URL),
+        influx_org=str(MARKET_INFLUX_ORG),
+        influx_bucket=str(MARKET_INFLUX_BUCKET),
+        influx_token_env=str(MARKET_INFLUX_TOKEN_ENV),
     )
     if data_dict:
         missing = [symbol for symbol in SYMBOL_LIST if symbol not in data_dict]
@@ -271,7 +291,7 @@ def run(
     print("------------------------------------------------")
 
     backtest_run_id = str(run_id or "").strip() or str(uuid.uuid4())
-    timeframe_token = _normalize_timeframe_or_default(base_timeframe, "1s")
+    timeframe_token = _enforce_1s_base_timeframe(str(base_timeframe))
     audit_store = AuditStore(BaseConfig.STORAGE_SQLITE_PATH)
     audit_store.start_run(
         mode="backtest",

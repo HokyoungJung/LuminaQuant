@@ -1,5 +1,6 @@
 import collections
 import logging
+import os
 import queue
 from pprint import pprint
 from typing import Any
@@ -52,7 +53,9 @@ class TimeframeGatedStrategy:
         if event_ms % self._timeframe_ms != 0:
             return False
 
-        symbol = getattr(event, "symbol", None)
+        symbol = str(getattr(event, "symbol", "") or "")
+        if not symbol:
+            return True
         bucket = event_ms // self._timeframe_ms
         previous = self._last_bucket_per_symbol.get(symbol)
         if previous == bucket:
@@ -241,12 +244,12 @@ class Backtest(TradingEngine):
         """Outputs the strategy performance from the backtest."""
         self.portfolio.create_equity_curve_dataframe()
         if persist_output:
-            self.portfolio.output_trade_log()
+            self.portfolio.output_trade_log(os.path.join("data", "trades.csv"))
 
         stats = self.portfolio.output_summary_stats()
 
         if persist_output:
-            self.portfolio.save_equity_curve("equity.csv")
+            self.portfolio.save_equity_curve(os.path.join("data", "equity.csv"))
 
         if verbose:
             print("Creating summary stats...")

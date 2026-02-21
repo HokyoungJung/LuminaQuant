@@ -154,7 +154,8 @@ def main() -> None:
                 retries=max(0, int(args.retries)),
             )
             elapsed = time.time() - t0
-            entry = rows[0] if rows else {"symbol": symbol}
+            entry_raw = rows[0] if rows else {"symbol": symbol}
+            entry: dict[str, object] = dict(entry_raw)
             entry["elapsed_sec"] = round(float(elapsed), 3)
             entry["status"] = "ok"
             report["results"].append(entry)
@@ -177,7 +178,7 @@ def main() -> None:
     out_path = (
         Path(args.out)
         if str(args.out).strip()
-        else Path("reports")
+        else Path("logs")
         / ("collect_universe_1s_" + datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ") + ".json")
     )
     out_path.parent.mkdir(parents=True, exist_ok=True)

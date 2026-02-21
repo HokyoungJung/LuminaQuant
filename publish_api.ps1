@@ -1,121 +1,93 @@
-# Self-preserving logic: Copy to temp and run from there if running from repo
+$ErrorActionPreference = "Stop"
+
+$protectedPaths = @(
+    "AGENTS.md",
+    ".env",
+    ".omx",
+    ".sisyphus",
+    "data",
+    "logs",
+    "reports",
+    "best_optimized_parameters",
+    "equity.csv",
+    "trades.csv",
+    "live_equity.csv",
+    "live_trades.csv",
+    "strategies",
+    "lumina_quant/indicators",
+    "lumina_quant/data_sync.py",
+    "lumina_quant/data_collector.py",
+    "scripts/sync_binance_ohlcv.py",
+    "scripts/collect_market_data.py",
+    "scripts/collect_universe_1s.py",
+    "tests/test_data_sync.py"
+)
+
 $scriptPath = $MyInvocation.MyCommand.Path
 if ($scriptPath -like "*\Quants-agent\LuminaQuant\*") {
     $tempPath = Join-Path $env:TEMP "publish_api.ps1"
     Write-Host "Copying script to temp: $tempPath" -ForegroundColor DarkGray
     Copy-Item $scriptPath $tempPath -Force
-    
-    # Run the temp copy and exit
     & $tempPath
     exit
 }
 
-$currentBranch = git branch --show-current
-
+$currentBranch = (git branch --show-current).Trim()
 if ($currentBranch -ne "private-main") {
     Write-Host "Please run this script from the 'private-main' branch." -ForegroundColor Red
-    exit
+    exit 1
 }
 
-# Check for uncommitted changes
 $status = git status --porcelain
 if ($status) {
     Write-Host "You have uncommitted changes. Please commit or stash them first." -ForegroundColor Red
-    exit
+    exit 1
 }
 
 Write-Host "Switching to main..." -ForegroundColor Cyan
 git checkout main
 
 Write-Host "Merging changes from private-main (without committing)..." -ForegroundColor Cyan
-# --no-commit: stop before committing to allow us to filter files
-# --no-ff: always create a merge commit (easier to see history)
 git merge private-main --no-commit --no-ff
 
 Write-Host "Enforcing public .gitignore..." -ForegroundColor Cyan
-# Restore .gitignore from main (HEAD) to ensure we don't accidentally unwanted rules
 git checkout HEAD -- .gitignore
 
-Write-Host "Filtering private files..." -ForegroundColor Cyan
-# Unstage EVERYTHING (mixed reset). This keeps the file changes in your folder
-# but clears the "ready to be committed" list.
+Write-Host "Preparing staged public set..." -ForegroundColor Cyan
 git reset
-
-# Now add files again. Since we restored the public .gitignore,
-# 'git add .' will IGNORING the private files (strategies, data, etc.)
 git add .
 
-$staged = git diff --name-only --cached
-if (-not $staged) {
+Write-Host "Removing protected/sensitive paths from staging..." -ForegroundColor Cyan
+foreach ($p in $protectedPaths) {
+    git rm -r --cached --ignore-unmatch -- $p *> $null
+}
+
+Write-Host "Validating sensitive paths are absent from staged tree..." -ForegroundColor Cyan
+$sensitiveRegex = '^strategies/|^lumina_quant/indicators/|^data/|^logs/|^reports/|^best_optimized_parameters/|^\.omx/|^\.sisyphus/|^AGENTS\.md$|^\.env$|^lumina_quant/data_sync\.py$|^lumina_quant/data_collector\.py$|^scripts/sync_binance_ohlcv\.py$|^scripts/collect_market_data\.py$|^scripts/collect_universe_1s\.py$|^tests/test_data_sync\.py$|(^|/)live_?equity\.csv$|(^|/)live_?trades\.csv$|(^|/)equity\.csv$|(^|/)trades\.csv$'
+$staged = git diff --cached --name-only
+$hasSensitive = $false
+if ($staged) {
+    foreach ($line in ($staged -split "`n")) {
+        $trimmed = $line.Trim()
+        if ($trimmed -and ($trimmed -match $sensitiveRegex)) {
+            $hasSensitive = $true
+            break
+        }
+    }
+}
+if ($hasSensitive) {
+    Write-Host "Sensitive files are still staged. Aborting publish." -ForegroundColor Red
+    git merge --abort
+    git checkout private-main
+    exit 1
+}
+
+$stagedNames = git diff --name-only --cached
+if (-not $stagedNames) {
     Write-Host "No public changes to publish." -ForegroundColor Yellow
     git merge --abort
     git checkout private-main
-    exit
-}
-
-Write-Host "Committing public changes..." -ForegroundColor Cyan
-git commit -m "chore: publish updates from private repository"
-
-Write-Host "Pushing to origin main..." -ForegroundColor Cyan
-git push origin main
-
-Write-Host "Switching back to private-main..." -ForegroundColor Cyan
-git checkout private-main
-
-Write-Host "Done! Public API published to 'main'." -ForegroundColor Green
-# Self-preserving logic: Copy to temp and run from there if running from repo
-$scriptPath = $MyInvocation.MyCommand.Path
-if ($scriptPath -like "*\Quants-agent\LuminaQuant\*") {
-    $tempPath = Join-Path $env:TEMP "publish_api.ps1"
-    Write-Host "Copying script to temp: $tempPath" -ForegroundColor DarkGray
-    Copy-Item $scriptPath $tempPath -Force
-    
-    # Run the temp copy and exit
-    & $tempPath
-    exit
-}
-
-$currentBranch = git branch --show-current
-
-if ($currentBranch -ne "private-main") {
-    Write-Host "Please run this script from the 'private-main' branch." -ForegroundColor Red
-    exit
-}
-
-# Check for uncommitted changes
-$status = git status --porcelain
-if ($status) {
-    Write-Host "You have uncommitted changes. Please commit or stash them first." -ForegroundColor Red
-    exit
-}
-
-Write-Host "Switching to main..." -ForegroundColor Cyan
-git checkout main
-
-Write-Host "Merging changes from private-main (without committing)..." -ForegroundColor Cyan
-# --no-commit: stop before committing to allow us to filter files
-# --no-ff: always create a merge commit (easier to see history)
-git merge private-main --no-commit --no-ff
-
-Write-Host "Enforcing public .gitignore..." -ForegroundColor Cyan
-# Restore .gitignore from main (HEAD) to ensure we don't accidentally unwanted rules
-git checkout HEAD -- .gitignore
-
-Write-Host "Filtering private files..." -ForegroundColor Cyan
-# Unstage EVERYTHING (mixed reset). This keeps the file changes in your folder
-# but clears the "ready to be committed" list.
-git reset
-
-# Now add files again. Since we restored the public .gitignore,
-# 'git add .' will IGNORING the private files (strategies, data, etc.)
-git add .
-
-$staged = git diff --name-only --cached
-if (-not $staged) {
-    Write-Host "No public changes to publish." -ForegroundColor Yellow
-    git merge --abort
-    git checkout private-main
-    exit
+    exit 0
 }
 
 Write-Host "Committing public changes..." -ForegroundColor Cyan

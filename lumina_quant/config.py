@@ -30,6 +30,14 @@ def _as_bool(value, default: bool = False) -> bool:
 
 _CONFIG_PATH = os.getenv("LQ_CONFIG_PATH", "config.yaml")
 _RUNTIME = load_runtime_config(config_path=_CONFIG_PATH)
+os.environ.setdefault("LQ__STORAGE__BACKEND", str(_RUNTIME.storage.backend))
+os.environ.setdefault("LQ__STORAGE__INFLUX_URL", str(_RUNTIME.storage.influx_url or ""))
+os.environ.setdefault("LQ__STORAGE__INFLUX_ORG", str(_RUNTIME.storage.influx_org or ""))
+os.environ.setdefault("LQ__STORAGE__INFLUX_BUCKET", str(_RUNTIME.storage.influx_bucket or ""))
+os.environ.setdefault(
+    "LQ__STORAGE__INFLUX_TOKEN_ENV",
+    str(_RUNTIME.storage.influx_token_env or "INFLUXDB_TOKEN"),
+)
 
 
 class BaseConfig:
@@ -48,6 +56,10 @@ class BaseConfig:
     MAX_SYMBOL_EXPOSURE_PCT = float(_RUNTIME.risk.max_symbol_exposure_pct)
     MAX_ORDER_VALUE = float(_RUNTIME.risk.max_order_value)
     DEFAULT_STOP_LOSS_PCT = float(_RUNTIME.risk.default_stop_loss_pct)
+    MAX_INTRADAY_DRAWDOWN_PCT = float(_RUNTIME.risk.max_intraday_drawdown_pct)
+    MAX_ROLLING_LOSS_PCT_1H = float(_RUNTIME.risk.max_rolling_loss_pct_1h)
+    FREEZE_NEW_ENTRIES_ON_BREACH = bool(_RUNTIME.risk.freeze_new_entries_on_breach)
+    AUTO_FLATTEN_ON_BREACH = bool(_RUNTIME.risk.auto_flatten_on_breach)
 
     MAKER_FEE_RATE = float(_RUNTIME.execution.maker_fee_rate)
     TAKER_FEE_RATE = float(_RUNTIME.execution.taker_fee_rate)
@@ -64,6 +76,12 @@ class BaseConfig:
     MARKET_DATA_SQLITE_PATH = _RUNTIME.storage.market_data_sqlite_path
     MARKET_DATA_EXCHANGE = _RUNTIME.storage.market_data_exchange
     STORAGE_EXPORT_CSV = bool(_RUNTIME.storage.export_csv)
+    INFLUX_URL = str(getattr(_RUNTIME.storage, "influx_url", "") or "")
+    INFLUX_ORG = str(getattr(_RUNTIME.storage, "influx_org", "") or "")
+    INFLUX_BUCKET = str(getattr(_RUNTIME.storage, "influx_bucket", "") or "")
+    INFLUX_TOKEN_ENV = str(
+        getattr(_RUNTIME.storage, "influx_token_env", "INFLUXDB_TOKEN") or "INFLUXDB_TOKEN"
+    )
 
 
 class BacktestConfig(BaseConfig):
@@ -113,6 +131,12 @@ class LiveConfig(BaseConfig):
     SYMBOL_LIMITS = dict(_RUNTIME.live.symbol_limits)
     MT5_MAGIC = int(_RUNTIME.live.mt5_magic)
     MT5_DEVIATION = int(_RUNTIME.live.mt5_deviation)
+    MT5_BRIDGE_PYTHON = str(getattr(_RUNTIME.live, "mt5_bridge_python", "") or "")
+    MT5_BRIDGE_SCRIPT = str(
+        getattr(_RUNTIME.live, "mt5_bridge_script", "scripts/mt5_bridge_worker.py")
+        or "scripts/mt5_bridge_worker.py"
+    )
+    MT5_BRIDGE_USE_WSLPATH = bool(getattr(_RUNTIME.live, "mt5_bridge_use_wslpath", True))
 
     @classmethod
     def _as_runtime(cls):
@@ -127,6 +151,9 @@ class LiveConfig(BaseConfig):
         runtime.live.exchange.position_mode = str(cls.EXCHANGE["position_mode"])
         runtime.live.exchange.margin_mode = str(cls.EXCHANGE["margin_mode"])
         runtime.live.exchange.leverage = int(cls.EXCHANGE["leverage"])
+        runtime.live.mt5_bridge_python = str(cls.MT5_BRIDGE_PYTHON)
+        runtime.live.mt5_bridge_script = str(cls.MT5_BRIDGE_SCRIPT)
+        runtime.live.mt5_bridge_use_wslpath = bool(cls.MT5_BRIDGE_USE_WSLPATH)
         runtime.trading.symbols = list(cls.SYMBOLS)
         runtime.risk.max_daily_loss_pct = cls.MAX_DAILY_LOSS_PCT
         return runtime

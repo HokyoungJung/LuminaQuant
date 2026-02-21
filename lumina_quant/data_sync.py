@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import zipfile
 from collections.abc import Sequence
@@ -19,6 +21,7 @@ from lumina_quant.market_data import (
     MARKET_OHLCV_TABLE,
     connect_market_data_1s_db,
     connect_market_data_db,
+    ensure_futures_feature_points_schema,
     ensure_market_ohlcv_1s_schema,
     ensure_market_ohlcv_schema,
     export_ohlcv_to_csv,
@@ -28,6 +31,7 @@ from lumina_quant.market_data import (
     normalize_timeframe_token,
     symbol_csv_filename,
     timeframe_to_milliseconds,
+    upsert_futures_feature_points,
     upsert_ohlcv_rows,
     upsert_ohlcv_rows_1s,
 )
@@ -412,6 +416,361 @@ class SyncRequest:
     max_batches: int = 100_000
     retries: int = 3
     base_wait_sec: float = 0.5
+
+
+@dataclass(slots=True)
+class FuturesFeatureSyncStats:
+    """Synchronization summary for futures feature points."""
+
+    symbol: str
+    upserted_rows: int
+    first_timestamp_ms: int | None
+    last_timestamp_ms: int | None
+
+
+def _compact_symbol(symbol: str) -> str:
+    return normalize_symbol(symbol).replace("/", "")
+
+
+def _http_get_json(
+    url: str,
+    *,
+    params: dict[str, Any],
+    retries: int,
+    base_wait_sec: float,
+) -> Any:
+    query = urllib.parse.urlencode(params)
+    target = f"{url}?{query}" if query else url
+    wait = max(0.1, float(base_wait_sec))
+    attempt = 0
+    while True:
+        try:
+            with urllib.request.urlopen(target, timeout=30) as resp:
+                payload = resp.read().decode("utf-8")
+            return json.loads(payload)
+        except urllib.error.HTTPError as exc:
+            attempt += 1
+            if attempt > max(0, int(retries)):
+                raise RuntimeError(f"HTTP {getattr(exc, 'code', '')} for {target}") from exc
+            time.sleep(wait)
+            wait = min(wait * 2.0, 10.0)
+        except Exception:
+            attempt += 1
+            if attempt > max(0, int(retries)):
+                raise
+            time.sleep(wait)
+            wait = min(wait * 2.0, 10.0)
+
+
+def _merge_feature_point(
+    store: dict[int, dict[str, Any]],
+    timestamp_ms: int,
+    fields: dict[str, Any],
+) -> None:
+    row = store.get(int(timestamp_ms))
+    if row is None:
+        row = {"timestamp_ms": int(timestamp_ms)}
+        store[int(timestamp_ms)] = row
+    row.update(fields)
+
+
+def _fetch_funding_history(
+    *,
+    symbol: str,
+    since_ms: int,
+    until_ms: int,
+    retries: int,
+    base_wait_sec: float,
+) -> list[dict[str, Any]]:
+    url = "https://fapi.binance.com/fapi/v1/fundingRate"
+    out: list[dict[str, Any]] = []
+    cursor = max(0, int(since_ms))
+    end_ms = int(until_ms)
+    while cursor <= end_ms:
+        data = _http_get_json(
+            url,
+            params={
+                "symbol": _compact_symbol(symbol),
+                "startTime": cursor,
+                "endTime": end_ms,
+                "limit": 1000,
+            },
+            retries=retries,
+            base_wait_sec=base_wait_sec,
+        )
+        rows = list(data) if isinstance(data, list) else []
+        if not rows:
+            break
+        out.extend(rows)
+        last = int(rows[-1].get("fundingTime", cursor))
+        if last < cursor:
+            break
+        cursor = last + 1
+        if len(rows) < 1000:
+            break
+    return out
+
+
+def _fetch_price_klines(
+    *,
+    symbol: str,
+    price_type: str,
+    interval: str,
+    since_ms: int,
+    until_ms: int,
+    retries: int,
+    base_wait_sec: float,
+) -> list[list[Any]]:
+    endpoint = "markPriceKlines" if price_type == "mark" else "indexPriceKlines"
+    url = f"https://fapi.binance.com/fapi/v1/{endpoint}"
+    out: list[list[Any]] = []
+    cursor = max(0, int(since_ms))
+    end_ms = int(until_ms)
+    while cursor <= end_ms:
+        data = _http_get_json(
+            url,
+            params={
+                "symbol": _compact_symbol(symbol),
+                "interval": str(interval),
+                "startTime": cursor,
+                "endTime": end_ms,
+                "limit": 1500,
+            },
+            retries=retries,
+            base_wait_sec=base_wait_sec,
+        )
+        rows = list(data) if isinstance(data, list) else []
+        if not rows:
+            break
+        out.extend(rows)
+        last_open_ms = int(rows[-1][0])
+        if last_open_ms < cursor:
+            break
+        cursor = last_open_ms + 1
+        if len(rows) < 1500:
+            break
+    return out
+
+
+def _fetch_open_interest_history(
+    *,
+    symbol: str,
+    period: str,
+    since_ms: int,
+    until_ms: int,
+    retries: int,
+    base_wait_sec: float,
+) -> list[dict[str, Any]]:
+    url = "https://fapi.binance.com/futures/data/openInterestHist"
+    out: list[dict[str, Any]] = []
+    cursor = max(0, int(since_ms))
+    end_ms = int(until_ms)
+    while cursor <= end_ms:
+        data = _http_get_json(
+            url,
+            params={
+                "symbol": _compact_symbol(symbol),
+                "period": str(period),
+                "startTime": cursor,
+                "endTime": end_ms,
+                "limit": 500,
+            },
+            retries=retries,
+            base_wait_sec=base_wait_sec,
+        )
+        rows = list(data) if isinstance(data, list) else []
+        if not rows:
+            break
+        out.extend(rows)
+        last_ts = int(rows[-1].get("timestamp", cursor))
+        if last_ts < cursor:
+            break
+        cursor = last_ts + 1
+        if len(rows) < 500:
+            break
+    return out
+
+
+def _fetch_liquidation_orders(
+    *,
+    symbol: str,
+    since_ms: int,
+    until_ms: int,
+    retries: int,
+    base_wait_sec: float,
+) -> list[dict[str, Any]]:
+    url = "https://fapi.binance.com/fapi/v1/allForceOrders"
+    out: list[dict[str, Any]] = []
+    cursor = max(0, int(since_ms))
+    end_ms = int(until_ms)
+    while cursor <= end_ms:
+        data = _http_get_json(
+            url,
+            params={
+                "symbol": _compact_symbol(symbol),
+                "startTime": cursor,
+                "endTime": end_ms,
+                "limit": 1000,
+            },
+            retries=retries,
+            base_wait_sec=base_wait_sec,
+        )
+        rows = list(data) if isinstance(data, list) else []
+        if not rows:
+            break
+        out.extend(rows)
+        last_ts = int(rows[-1].get("time", cursor))
+        if last_ts < cursor:
+            break
+        cursor = last_ts + 1
+        if len(rows) < 1000:
+            break
+    return out
+
+
+def sync_futures_feature_points(
+    *,
+    db_path: str,
+    exchange_id: str,
+    symbol_list: Sequence[str],
+    since_ms: int,
+    until_ms: int,
+    mark_index_interval: str = "1m",
+    open_interest_period: str = "5m",
+    retries: int = 3,
+    base_wait_sec: float = 0.5,
+) -> list[FuturesFeatureSyncStats]:
+    """Collect and store futures feature data points for strategy research."""
+    conn = connect_market_data_db(db_path)
+    try:
+        ensure_futures_feature_points_schema(conn)
+        summaries: list[FuturesFeatureSyncStats] = []
+        stream_exchange = str(exchange_id).strip().lower()
+
+        for symbol in symbol_list:
+            stream_symbol = normalize_symbol(symbol)
+            points: dict[int, dict[str, Any]] = {}
+
+            funding_rows = _fetch_funding_history(
+                symbol=stream_symbol,
+                since_ms=since_ms,
+                until_ms=until_ms,
+                retries=retries,
+                base_wait_sec=base_wait_sec,
+            )
+            for row in funding_rows:
+                ts = int(row.get("fundingTime", 0) or 0)
+                if ts <= 0:
+                    continue
+                _merge_feature_point(
+                    points,
+                    ts,
+                    {
+                        "funding_rate": float(row.get("fundingRate"))
+                        if row.get("fundingRate") is not None
+                        else None,
+                        "funding_mark_price": float(row.get("markPrice"))
+                        if row.get("markPrice") is not None
+                        else None,
+                    },
+                )
+
+            mark_rows = _fetch_price_klines(
+                symbol=stream_symbol,
+                price_type="mark",
+                interval=mark_index_interval,
+                since_ms=since_ms,
+                until_ms=until_ms,
+                retries=retries,
+                base_wait_sec=base_wait_sec,
+            )
+            for row in mark_rows:
+                ts = int(row[0])
+                _merge_feature_point(points, ts, {"mark_price": float(row[4])})
+
+            index_rows = _fetch_price_klines(
+                symbol=stream_symbol,
+                price_type="index",
+                interval=mark_index_interval,
+                since_ms=since_ms,
+                until_ms=until_ms,
+                retries=retries,
+                base_wait_sec=base_wait_sec,
+            )
+            for row in index_rows:
+                ts = int(row[0])
+                _merge_feature_point(points, ts, {"index_price": float(row[4])})
+
+            oi_rows = _fetch_open_interest_history(
+                symbol=stream_symbol,
+                period=open_interest_period,
+                since_ms=since_ms,
+                until_ms=until_ms,
+                retries=retries,
+                base_wait_sec=base_wait_sec,
+            )
+            for row in oi_rows:
+                ts = int(row.get("timestamp", 0) or 0)
+                if ts <= 0:
+                    continue
+                oi_val = row.get("sumOpenInterestValue")
+                if oi_val is None:
+                    oi_val = row.get("sumOpenInterest")
+                _merge_feature_point(
+                    points,
+                    ts,
+                    {"open_interest": float(oi_val) if oi_val is not None else None},
+                )
+
+            liq_rows = _fetch_liquidation_orders(
+                symbol=stream_symbol,
+                since_ms=since_ms,
+                until_ms=until_ms,
+                retries=retries,
+                base_wait_sec=base_wait_sec,
+            )
+            for row in liq_rows:
+                ts = int(row.get("time", 0) or 0)
+                if ts <= 0:
+                    continue
+                side = str(row.get("side", "")).upper()
+                qty = float(row.get("origQty", 0.0) or 0.0)
+                price = float(row.get("price", 0.0) or 0.0)
+                notional = qty * price
+                fields: dict[str, Any]
+                if side == "SELL":
+                    fields = {
+                        "liquidation_long_qty": qty,
+                        "liquidation_long_notional": notional,
+                    }
+                else:
+                    fields = {
+                        "liquidation_short_qty": qty,
+                        "liquidation_short_notional": notional,
+                    }
+                _merge_feature_point(points, ts, fields)
+
+            sorted_rows = [points[key] for key in sorted(points.keys())]
+            upserted = upsert_futures_feature_points(
+                conn,
+                exchange=stream_exchange,
+                symbol=stream_symbol,
+                rows=sorted_rows,
+            )
+            first_ts = int(sorted_rows[0]["timestamp_ms"]) if sorted_rows else None
+            last_ts = int(sorted_rows[-1]["timestamp_ms"]) if sorted_rows else None
+            summaries.append(
+                FuturesFeatureSyncStats(
+                    symbol=stream_symbol,
+                    upserted_rows=int(upserted),
+                    first_timestamp_ms=first_ts,
+                    last_timestamp_ms=last_ts,
+                )
+            )
+
+        return summaries
+    finally:
+        conn.close()
 
 
 class MarketDataSyncService:

@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 class AuditStore:
     """Lightweight SQLite audit store for runs, orders, fills and risk events."""
 
-    def __init__(self, db_path="data/lumina_quant.db"):
+    def __init__(self, db_path="data/lq_audit.sqlite3"):
         self.db_path = db_path
         self._lock = threading.Lock()
         db_dir = os.path.dirname(self.db_path)
@@ -101,6 +101,21 @@ class AuditStore:
                     exchange_order_id TEXT,
                     state TEXT NOT NULL,
                     message TEXT,
+                    details TEXT
+                );
+
+                CREATE TABLE IF NOT EXISTS order_reconciliation_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    run_id TEXT NOT NULL,
+                    event_time TEXT NOT NULL,
+                    symbol TEXT,
+                    client_order_id TEXT,
+                    exchange_order_id TEXT,
+                    local_state TEXT,
+                    exchange_state TEXT,
+                    local_filled REAL,
+                    exchange_filled REAL,
+                    reason TEXT NOT NULL,
                     details TEXT
                 );
                 """
@@ -270,6 +285,37 @@ class AuditStore:
                     """,
                     (state, exchange_order_id, run_id, client_order_id),
                 )
+            self._conn.commit()
+
+    def log_order_reconciliation(self, run_id, payload):
+        details = dict(payload.get("metadata") or {})
+        local_state = str(payload.get("local_state") or "")
+        exchange_state = str(payload.get("exchange_state") or "")
+        local_filled = float(payload.get("local_filled") or 0.0)
+        exchange_filled = float(payload.get("exchange_filled") or 0.0)
+        reason = str(payload.get("reason") or "RECONCILIATION")
+        with self._lock:
+            self._conn.execute(
+                """
+                INSERT INTO order_reconciliation_events(
+                    run_id, event_time, symbol, client_order_id, exchange_order_id,
+                    local_state, exchange_state, local_filled, exchange_filled, reason, details
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    run_id,
+                    self._utcnow(),
+                    payload.get("symbol"),
+                    payload.get("client_order_id"),
+                    payload.get("order_id"),
+                    local_state,
+                    exchange_state,
+                    local_filled,
+                    exchange_filled,
+                    reason,
+                    json.dumps(details),
+                ),
+            )
             self._conn.commit()
 
     def close(self):

@@ -19,6 +19,10 @@ class ExchangeInterface(ABC):
         """Returns a dictionary of open positions {symbol: quantity}."""
         pass
 
+    def get_all_position_legs(self) -> dict[str, dict[str, float]]:
+        """Optional side-aware positions {symbol: {LONG: qty, SHORT: qty}}."""
+        return {}
+
     @abstractmethod
     def fetch_ohlcv(self, symbol: str, timeframe: str, limit: int = 100) -> list[tuple]:
         """Fetches OHLCV data.

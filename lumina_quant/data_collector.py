@@ -4,7 +4,12 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from lumina_quant.data_sync import create_binance_exchange, ensure_market_data_coverage
+from lumina_quant.data_sync import (
+    create_binance_exchange,
+    ensure_market_data_coverage,
+    parse_timestamp_input,
+    sync_futures_feature_points,
+)
 
 
 def _datetime_to_ms(value: datetime | None) -> int | None:
@@ -68,3 +73,79 @@ def auto_collect_market_data(
         }
         for item in stats
     ]
+
+
+def collect_strategy_support_data(
+    *,
+    db_path: str,
+    exchange_id: str,
+    symbol_list: list[str],
+    since: str | int | float,
+    until: str | int | float | None = None,
+    mark_index_interval: str = "1m",
+    open_interest_period: str = "5m",
+    retries: int = 3,
+    execute: bool = False,
+) -> dict[str, object]:
+    """Prepare or execute strategy-support data collection.
+
+    Defaults to plan-only mode so no network data is fetched unless execute=True.
+    """
+    since_ms = parse_timestamp_input(since)
+    until_ms = parse_timestamp_input(until)
+    if since_ms is None:
+        raise ValueError("since must resolve to a valid timestamp")
+    effective_until = (
+        int(until_ms) if until_ms is not None else int(datetime.now(UTC).timestamp() * 1000)
+    )
+
+    plan: dict[str, object] = {
+        "db_path": str(db_path),
+        "exchange_id": str(exchange_id),
+        "symbol_list": list(symbol_list),
+        "since_ms": int(since_ms),
+        "until_ms": int(effective_until),
+        "mark_index_interval": str(mark_index_interval),
+        "open_interest_period": str(open_interest_period),
+        "execute": bool(execute),
+        "features": [
+            "funding_rate",
+            "funding_mark_price",
+            "mark_price",
+            "index_price",
+            "open_interest",
+            "liquidation_long_qty",
+            "liquidation_short_qty",
+            "liquidation_long_notional",
+            "liquidation_short_notional",
+        ],
+    }
+
+    if not execute:
+        plan["status"] = "planned_only"
+        plan["upserted_rows"] = 0
+        return plan
+
+    stats = sync_futures_feature_points(
+        db_path=str(db_path),
+        exchange_id=str(exchange_id),
+        symbol_list=list(symbol_list),
+        since_ms=int(since_ms),
+        until_ms=int(effective_until),
+        mark_index_interval=str(mark_index_interval),
+        open_interest_period=str(open_interest_period),
+        retries=max(0, int(retries)),
+    )
+    upserted_rows = sum(int(item.upserted_rows) for item in stats)
+    plan["status"] = "executed"
+    plan["upserted_rows"] = int(upserted_rows)
+    plan["per_symbol"] = [
+        {
+            "symbol": row.symbol,
+            "upserted_rows": int(row.upserted_rows),
+            "first_timestamp_ms": row.first_timestamp_ms,
+            "last_timestamp_ms": row.last_timestamp_ms,
+        }
+        for row in stats
+    ]
+    return plan

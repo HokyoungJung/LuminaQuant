@@ -63,6 +63,11 @@ CSV_DIR = "data"
 SYMBOL_LIST = BaseConfig.SYMBOLS
 MARKET_DB_PATH = BaseConfig.MARKET_DATA_SQLITE_PATH
 MARKET_DB_EXCHANGE = BaseConfig.MARKET_DATA_EXCHANGE
+MARKET_DB_BACKEND = BaseConfig.STORAGE_BACKEND
+MARKET_INFLUX_URL = BaseConfig.INFLUX_URL
+MARKET_INFLUX_ORG = BaseConfig.INFLUX_ORG
+MARKET_INFLUX_BUCKET = BaseConfig.INFLUX_BUCKET
+MARKET_INFLUX_TOKEN_ENV = BaseConfig.INFLUX_TOKEN_ENV
 BASE_TIMEFRAME = str(os.getenv("LQ_BASE_TIMEFRAME", "1s") or "1s").strip().lower()
 STRATEGY_TIMEFRAME = str(BaseConfig.TIMEFRAME)
 
@@ -81,12 +86,27 @@ except Exception as e:
     print(f"Error parsing dates from config: {e}. Using defaults.")
     BASE_START = datetime(2023, 1, 1)
 
-AUTO_COLLECT_DB = str(os.getenv("LQ_AUTO_COLLECT_DB", "1")).strip().lower() not in {
+AUTO_COLLECT_DB = str(os.getenv("LQ_AUTO_COLLECT_DB", "0")).strip().lower() not in {
     "0",
     "false",
     "no",
     "off",
 }
+
+try:
+    BASE_END = (
+        datetime.strptime(BacktestConfig.END_DATE, "%Y-%m-%d") if BacktestConfig.END_DATE else None
+    )
+except Exception:
+    BASE_END = None
+
+
+def _enforce_1s_base_timeframe(value: str) -> str:
+    token = str(value or "").strip().lower() or "1s"
+    if token != "1s":
+        print(f"[WARN] base_timeframe '{token}' overridden to '1s' for intrabar optimization feed.")
+    return "1s"
+
 
 # Global Data Cache for Multiprocessing (Copy-on-Write)
 DATA_DICT = {}
@@ -257,6 +277,8 @@ def load_all_data(
     market_db_path=None,
     market_exchange="binance",
     timeframe="1m",
+    start_date=None,
+    end_date=None,
 ):
     """
     Load all data into memory once.
@@ -272,6 +294,13 @@ def load_all_data(
             exchange=market_exchange,
             symbol_list=symbol_list,
             timeframe=timeframe,
+            start_date=start_date,
+            end_date=end_date,
+            backend=str(MARKET_DB_BACKEND),
+            influx_url=str(MARKET_INFLUX_URL),
+            influx_org=str(MARKET_INFLUX_ORG),
+            influx_bucket=str(MARKET_INFLUX_BUCKET),
+            influx_token_env=str(MARKET_INFLUX_TOKEN_ENV),
         )
         if db_data:
             for symbol, frame in db_data.items():
@@ -932,6 +961,7 @@ if __name__ == "__main__":
         help="Disable automatic DB market-data collection before optimization load.",
     )
     args = parser.parse_args()
+    args.base_timeframe = _enforce_1s_base_timeframe(str(args.base_timeframe))
 
     run_id = str(args.run_id or "").strip() or str(uuid.uuid4())
     db_path = BaseConfig.STORAGE_SQLITE_PATH
@@ -974,7 +1004,7 @@ if __name__ == "__main__":
             data_source=args.data_source,
             market_db_path=args.market_db_path,
             market_exchange=args.market_exchange,
-            base_timeframe=args.base_timeframe,
+            base_timeframe=str(args.base_timeframe),
             auto_collect_db=(not bool(args.no_auto_collect_db) and bool(AUTO_COLLECT_DB)),
         )
 
@@ -987,6 +1017,8 @@ if __name__ == "__main__":
             market_db_path=args.market_db_path,
             market_exchange=args.market_exchange,
             timeframe=str(args.base_timeframe),
+            start_date=BASE_START,
+            end_date=BASE_END,
         )
         _profile_add("feature_seconds", time.perf_counter() - feature_start)
         FROZEN_DATASET = build_frozen_dataset(RAW_DATA_DICT)

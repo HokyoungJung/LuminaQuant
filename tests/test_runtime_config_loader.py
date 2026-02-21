@@ -90,6 +90,43 @@ class TestRuntimeConfigLoader(unittest.TestCase):
         finally:
             os.remove(path)
 
+    def test_promotion_gate_strategy_profile_loaded(self):
+        yaml_text = textwrap.dedent(
+            """
+            trading:
+              symbols: ["BTC/USDT"]
+            promotion_gate:
+              days: 14
+              max_order_rejects: 0
+              strategy_profiles:
+                RsiStrategy:
+                  days: 21
+                  max_order_rejects: 2
+                  require_alpha_card: true
+            live:
+              mode: "paper"
+              exchange:
+                driver: "ccxt"
+                name: "binance"
+                market_type: "future"
+                position_mode: "HEDGE"
+                margin_mode: "isolated"
+                leverage: 2
+            """
+        ).strip()
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False, encoding="utf-8") as fp:
+            fp.write(yaml_text)
+            path = fp.name
+        try:
+            runtime = load_runtime_config(config_path=path, env=os.environ)
+            self.assertEqual(runtime.promotion_gate.days, 14)
+            profile = runtime.promotion_gate.strategy_profiles["RsiStrategy"]
+            self.assertEqual(int(profile["days"]), 21)
+            self.assertEqual(int(profile["max_order_rejects"]), 2)
+            self.assertTrue(bool(profile["require_alpha_card"]))
+        finally:
+            os.remove(path)
+
 
 if __name__ == "__main__":
     unittest.main()

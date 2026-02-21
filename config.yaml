@@ -26,10 +26,14 @@ trading:
 risk:
   risk_per_trade: 0.005          # 0.5%
   max_daily_loss_pct: 0.03       # 3%
+  max_intraday_drawdown_pct: 0.03
+  max_rolling_loss_pct_1h: 0.05
   max_total_margin_pct: 0.50     # 50%
   max_symbol_exposure_pct: 0.25  # 25%
   max_order_value: 5000.0
   default_stop_loss_pct: 0.01
+  freeze_new_entries_on_breach: true
+  auto_flatten_on_breach: false
 
 # ------------------------------------------
 # Execution Model (Shared)
@@ -49,11 +53,15 @@ execution:
 # Storage / Audit
 # ------------------------------------------
 storage:
-  backend: "sqlite"
-  sqlite_path: "data/lumina_quant.db"
-  market_data_sqlite_path: "data/lumina_quant.db"
+  backend: "influxdb"
+  sqlite_path: "data/lq_audit.sqlite3"
+  market_data_sqlite_path: "data/lq_market.sqlite3"
   market_data_exchange: "binance"
   export_csv: true
+  influx_url: ""
+  influx_org: ""
+  influx_bucket: ""
+  influx_token_env: "INFLUXDB_TOKEN"
 
 # ------------------------------------------
 # Backtest Specific Settings
@@ -93,6 +101,9 @@ live:
   # MT5 Specific Settings
   mt5_magic: 234000
   mt5_deviation: 20
+  mt5_bridge_python: ""  # WSL: set to Windows python.exe path for bridge mode
+  mt5_bridge_script: "scripts/mt5_bridge_worker.py"
+  mt5_bridge_use_wslpath: true
 
 # ------------------------------------------
 # Optimization (Hyperparameter Tuning)
@@ -128,3 +139,22 @@ optimization:
       rsi_period: [10, 14, 20]
       oversold: [20, 25, 30]
       overbought: [70, 75, 80]
+
+# ------------------------------------------
+# Promotion Gate (Soak -> Promote)
+# ------------------------------------------
+promotion_gate:
+  days: 14
+  max_order_rejects: 0
+  max_order_timeouts: 0
+  max_reconciliation_alerts: 0
+  max_critical_errors: 0
+  require_alpha_card: false
+  strategy_profiles:
+    RsiStrategy:
+      max_order_rejects: 1
+      max_order_timeouts: 1
+      max_reconciliation_alerts: 0
+      max_critical_errors: 0
+      require_alpha_card: true
+      alpha_card_path: "reports/alpha_card_rsi_strategy.md"

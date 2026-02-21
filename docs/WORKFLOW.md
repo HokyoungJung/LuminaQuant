@@ -98,3 +98,47 @@ git remote set-url private https://hoky1227:<YOUR_TOKEN>@github.com/hoky1227/Qua
 
 *Note: This saves your token in plain text in `.git/config`. Ensure your local machine is secure.*
 ```
+
+## 6. Live Promotion Gate Workflow
+
+Recommended flow before enabling real mode:
+
+1. Produce an Alpha Card (strategy assumptions, market, risk limits, and deployment parameters).
+
+```bash
+uv run python scripts/generate_alpha_card_template.py \
+  --config config.yaml \
+  --strategy RsiStrategy \
+  --output reports/alpha_card_rsi_strategy.md
+```
+
+2. Run testnet/paper for 14 days and generate soak report:
+
+```bash
+uv run python scripts/generate_soak_report.py --db data/lumina_quant.db --days 14
+```
+
+3. Run promotion gate report (soak + runtime reliability checks):
+
+```bash
+# uses promotion_gate defaults from config.yaml
+uv run python scripts/generate_promotion_gate_report.py \
+  --db data/lumina_quant.db \
+  --config config.yaml
+
+# strategy-specific profile from promotion_gate.strategy_profiles
+uv run python scripts/generate_promotion_gate_report.py \
+  --db data/lumina_quant.db \
+  --config config.yaml \
+  --strategy RsiStrategy
+```
+
+4. If your process requires Alpha Card presence:
+
+```bash
+uv run python scripts/generate_promotion_gate_report.py \
+  --db data/lumina_quant.db \
+  --strategy RsiStrategy \
+  --alpha-card reports/alpha_card_rsi_strategy.md \
+  --require-alpha-card
+```

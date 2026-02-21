@@ -202,6 +202,39 @@ uv run python run_live.py
 uv run python scripts/generate_soak_report.py --db data/lumina_quant.db --days 14
 ```
 
+**Generate Promotion Gate Report (Soak + Runtime Reliability):**
+```bash
+# Uses defaults from promotion_gate in config.yaml
+uv run python scripts/generate_promotion_gate_report.py \
+  --db data/lumina_quant.db \
+  --config config.yaml
+
+# Strategy-specific profile from promotion_gate.strategy_profiles
+uv run python scripts/generate_promotion_gate_report.py \
+  --db data/lumina_quant.db \
+  --config config.yaml \
+  --strategy RsiStrategy
+
+# Override specific threshold from CLI
+uv run python scripts/generate_promotion_gate_report.py \
+  --db data/lumina_quant.db \
+  --strategy RsiStrategy \
+  --max-order-rejects 0
+
+# Generate Alpha Card scaffold from runtime config
+uv run python scripts/generate_alpha_card_template.py \
+  --config config.yaml \
+  --strategy RsiStrategy \
+  --output reports/alpha_card_rsi_strategy.md
+
+# Optional Alpha Card requirement
+uv run python scripts/generate_promotion_gate_report.py \
+  --db data/lumina_quant.db \
+  --strategy RsiStrategy \
+  --alpha-card reports/alpha_card_rsi_strategy.md \
+  --require-alpha-card
+```
+
 **Backtest Benchmark Baseline/Regression:**
 ```bash
 uv run python scripts/benchmark_backtest.py --output reports/benchmarks/baseline_snapshot.json
@@ -210,6 +243,89 @@ uv run python scripts/benchmark_backtest.py --output reports/benchmarks/baseline
 uv run python scripts/benchmark_backtest.py \
   --output reports/benchmarks/current_snapshot.json \
   --compare-to reports/benchmarks/baseline_snapshot.json
+```
+
+**Phase-1 Binance USDT-M Research Starter (sync + OOS sweep):**
+```bash
+# Dry run to inspect the generated sweep command
+uv run python scripts/run_phase1_research.py --skip-sync --dry-run
+
+# Full phase-1 kickoff with default liquid USDT universe
+uv run python scripts/run_phase1_research.py
+
+# Faster iteration profile
+uv run python scripts/run_phase1_research.py \
+  --topcap-iters 120 \
+  --pair-iters 90 \
+  --ensemble-iters 1200 \
+  --timeframes 15m 1h
+```
+
+**Two-Book Research Starter (market-neutral alpha + trend overlay):**
+```bash
+# Print command only (no sweep run)
+uv run python scripts/run_two_book_research.py --dry-run
+
+# Run sweep and emit two-book selection artifact
+uv run python scripts/run_two_book_research.py \
+  --timeframes 15m 1h 4h \
+  --alpha-risk-budget 0.8 \
+  --trend-risk-budget 0.2
+
+# Rebuild two-book selection from an existing sweep report
+uv run python scripts/run_two_book_research.py \
+  --dry-run \
+  --sweep-report reports/timeframe_sweep_oos_YYYYMMDDTHHMMSSZ.json
+```
+
+**Strategy-Team Research Factory (many sleeves, many seeds/timeframes):**
+```bash
+# Preview run matrix only
+uv run python scripts/run_strategy_team_research.py --dry-run
+
+# Build a broad candidate pool and select a diversified strategy team
+uv run python scripts/run_strategy_team_research.py \
+  --timeframes 1s 1m 5m 15m 30m 1h 4h 1d \
+  --seeds 20260220 20260221 20260222 \
+  --search-engine random \
+  --max-selected 32
+```
+
+**Unified Futures Data Bundle (1s OHLCV + derivatives feature points):**
+```bash
+# Canonical 1s base stream + required futures features
+uv run python scripts/collect_futures_bundle.py \
+  --symbols BTC/USDT ETH/USDT SOL/USDT XAU/USDT XAG/USDT \
+  --db-path data/lumina_quant.db \
+  --since 2024-01-01T00:00:00+00:00
+
+# Feature-only refresh (skip OHLCV)
+uv run python scripts/collect_futures_bundle.py \
+  --skip-ohlcv \
+  --mark-index-interval 1m \
+  --open-interest-period 5m
+```
+
+Collected feature points are stored in SQLite table `futures_feature_points` with:
+- `funding_rate`, `funding_mark_price`
+- `mark_price`, `index_price`
+- `open_interest`
+- `liquidation_long_qty`, `liquidation_short_qty`
+- `liquidation_long_notional`, `liquidation_short_notional`
+
+**Fast Local Scan Profiles (avoid full 20min+ runs while iterating):**
+```bash
+# Very fast smoke scan (default)
+uv run python scripts/quick_scan.py --profile quick
+
+# Broader targeted scan
+uv run python scripts/quick_scan.py --profile standard
+
+# Full suite + build when needed
+uv run python scripts/quick_scan.py --profile full --with-build
+
+# Preview commands only
+uv run python scripts/quick_scan.py --profile quick --dry-run
 ```
 
 ---
