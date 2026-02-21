@@ -57,7 +57,7 @@ strategy_registry = importlib.import_module("strategies.registry")
 st.set_page_config(layout="wide", page_title="LuminaQuant Dashboard")
 st.title("LuminaQuant: Full Trading Intelligence")
 
-DEFAULT_DB_PATH = "data/lumina_quant.db"
+DEFAULT_DB_PATH = "data/lq_audit.sqlite3"
 
 
 def _count_market_rows(db_path):
@@ -79,7 +79,7 @@ def _resolve_default_market_db_path():
     configured = str(getattr(BaseConfig, "MARKET_DATA_SQLITE_PATH", DEFAULT_DB_PATH))
     candidate_list = []
     seen = set()
-    for raw in [configured, "data/market_recent.db", DEFAULT_DB_PATH]:
+    for raw in [configured, "data/lq_market.sqlite3", DEFAULT_DB_PATH]:
         token = os.path.normpath(str(raw))
         if token in seen:
             continue

@@ -1,3 +1,5 @@
+import os
+from collections import deque
 from datetime import date, datetime
 
 import polars as pl
@@ -72,6 +74,8 @@ class Portfolio:
         self._pending_liquidation = set()
         self._metric_totals = [float(self.initial_capital)] if self.track_metrics else []
         self._metric_benchmarks = [0.0] if self.track_metrics else []
+        self._equity_points = deque(maxlen=20_000)
+        self.trading_frozen = False
 
         # Initialize first record
         self.update_initial_record()
@@ -115,6 +119,8 @@ class Portfolio:
             "last_funding_ts": self._last_funding_ts,
             "pending_liquidation": list(self._pending_liquidation),
             "trade_count": self.trade_count,
+            "trading_frozen": bool(self.trading_frozen),
+            "equity_points": list(self._equity_points),
         }
 
     def set_state(self, state):
@@ -136,6 +142,10 @@ class Portfolio:
             self._pending_liquidation = set(state["pending_liquidation"])
         if "trade_count" in state:
             self.trade_count = int(state["trade_count"])
+        if "trading_frozen" in state:
+            self.trading_frozen = bool(state["trading_frozen"])
+        if "equity_points" in state and isinstance(state["equity_points"], list):
+            self._equity_points = deque(state["equity_points"], maxlen=20_000)
 
     def update_timeindex(self, event):
         """Updates the positions from the current locations to the
@@ -163,6 +173,7 @@ class Portfolio:
             current_holdings[symbol] = market_value
             total = cash + market_value
             current_holdings["total"] = total
+            self._record_equity_point(latest_datetime, total)
             if self.track_metrics and should_sample:
                 self._metric_totals.append(float(total))
                 self._metric_benchmarks.append(float(close_price))
@@ -195,6 +206,7 @@ class Portfolio:
             current_holdings[symbol] = market_value
 
         current_holdings["total"] = total
+        self._record_equity_point(latest_datetime, total)
         bench_price = self.bars.get_latest_bar_value(primary_symbol, "close")
         if self.track_metrics and should_sample:
             self._metric_totals.append(float(total))
@@ -557,6 +569,26 @@ class Portfolio:
         except Exception:
             return None
 
+    def _record_equity_point(self, latest_datetime, total):
+        ts = self._to_unix_seconds(latest_datetime)
+        if ts is None:
+            return
+        self._equity_points.append((float(ts), float(total)))
+
+    def get_rolling_loss_pct(self, window_seconds=3600):
+        if window_seconds <= 0 or len(self._equity_points) < 2:
+            return 0.0
+        now_ts = self._equity_points[-1][0]
+        cutoff = float(now_ts) - float(window_seconds)
+        window = [point for point in self._equity_points if point[0] >= cutoff]
+        if len(window) < 2:
+            return 0.0
+        start_equity = float(window[0][1])
+        end_equity = float(window[-1][1])
+        if start_equity <= 0:
+            return 0.0
+        return max(0.0, (start_equity - end_equity) / start_equity)
+
     def _get_symbol_limits(self, symbol):
         """Returns fallback limits from config for symbols that don't have exchange metadata."""
         if hasattr(self.bars, "get_market_spec"):
@@ -734,9 +766,12 @@ class Portfolio:
                 [(pl.col("total") / start_val).alias("equity_curve_norm")]
             )
 
-    def save_equity_curve(self, filename="equity.csv"):
+    def save_equity_curve(self, filename="data/equity.csv"):
         if hasattr(self, "equity_curve") and not self.equity_curve.is_empty():
-            self.equity_curve.write_csv(filename)
+            parent = os.path.dirname(str(filename))
+            if parent:
+                os.makedirs(parent, exist_ok=True)
+            self.equity_curve.write_csv(str(filename))
 
     def output_summary_stats(self):
         """Creates a list of summary statistics."""
@@ -758,12 +793,15 @@ class Portfolio:
             config=self.config,
         )
 
-    def output_trade_log(self, filename="trades.csv"):
+    def output_trade_log(self, filename="data/trades.csv"):
         """Outputs the trade log to a CSV file."""
         if not self.record_trades or not self.trades:
             # print("No trades generated.") # Optional: don't spam
             return
 
         df = pl.DataFrame(self.trades)
-        df.write_csv(filename)
+        parent = os.path.dirname(str(filename))
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        df.write_csv(str(filename))
         # print(f"Trade log saved to '{filename}'")

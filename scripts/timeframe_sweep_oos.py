@@ -90,7 +90,7 @@ def _score_from_report(report: dict, mode: str) -> tuple[float, dict]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run timeframe sweep for OOS/live search.")
-    parser.add_argument("--db-path", default="data/lumina_quant.db")
+    parser.add_argument("--db-path", default="data/lq_market.sqlite3")
     parser.add_argument("--exchange", default="binance")
     parser.add_argument("--base-timeframe", default="1s")
     parser.add_argument("--market-type", choices=["spot", "future"], default="future")

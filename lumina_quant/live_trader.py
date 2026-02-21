@@ -5,6 +5,7 @@ import time
 
 from lumina_quant.config import LiveConfig
 from lumina_quant.engine import TradingEngine
+from lumina_quant.events import OrderEvent
 from lumina_quant.exchanges import get_exchange
 from lumina_quant.interfaces import ExchangeInterface
 from lumina_quant.risk_manager import RiskManager
@@ -71,7 +72,14 @@ class LiveTrader(TradingEngine):
             int(self.config.HEARTBEAT_INTERVAL_SEC),
         )
         self._last_drift_signature = ()
+        self._last_dual_leg_signature = ()
         self._reconciliation_drift_events = 0
+        self._flatten_inflight = False
+        self._last_order_reconciliation_monotonic = 0.0
+        self._order_reconciliation_interval_sec = max(
+            5,
+            int(self.config.RECONCILIATION_INTERVAL_SEC),
+        )
         self.runtime_cache = RuntimeCache()
         self.outbox_events: list[dict] = []
         atexit.register(self._close_audit_store)
@@ -124,6 +132,8 @@ class LiveTrader(TradingEngine):
                     self.strategy.set_state(state["strategy"])
                 if isinstance(state.get("runtime_cache"), dict):
                     self.runtime_cache.restore(state["runtime_cache"])
+                    if hasattr(self.execution_handler, "rehydrate_orders"):
+                        self.execution_handler.rehydrate_orders(self.runtime_cache.open_orders)
                 if isinstance(state.get("outbox_events"), list):
                     self.outbox_events = list(state["outbox_events"])
                 self.logger.info("State restored.")
@@ -169,6 +179,7 @@ class LiveTrader(TradingEngine):
         except Exception as exc:
             self.logger.error("Failed to persist order state event: %s", exc)
             return
+        self._save_state()
 
         state = str(state_payload.get("state", "")).upper()
         if state not in {"REJECTED", "TIMEOUT", "CANCELED"}:
@@ -251,8 +262,47 @@ class LiveTrader(TradingEngine):
             )
             return
 
+        exchange_position_legs = {}
+        if hasattr(self.exchange, "get_all_position_legs"):
+            try:
+                exchange_position_legs = self.exchange.get_all_position_legs() or {}
+            except Exception as exc:
+                self.logger.error("Failed to fetch position legs for reconciliation: %s", exc)
+                self.audit_store.log_risk_event(
+                    self.run_id,
+                    reason="POSITION_LEG_RECONCILIATION_ERROR",
+                    details={"error": str(exc)},
+                )
+
         local = self.portfolio.current_positions
         self.runtime_cache.update_positions(exchange_positions)
+        if exchange_position_legs:
+            self.runtime_cache.update_position_legs(exchange_position_legs)
+        else:
+            self.runtime_cache.update_position_legs({})
+
+        if str(getattr(self.config, "POSITION_MODE", "")).upper() == "HEDGE":
+            dual_leg_signature = tuple(
+                sorted(
+                    (
+                        symbol,
+                        round(float(legs.get("LONG", 0.0)), 8),
+                        round(float(legs.get("SHORT", 0.0)), 8),
+                    )
+                    for symbol, legs in exchange_position_legs.items()
+                    if float(legs.get("LONG", 0.0)) > 0.0 and float(legs.get("SHORT", 0.0)) > 0.0
+                )
+            )
+            if dual_leg_signature and dual_leg_signature != self._last_dual_leg_signature:
+                self._last_dual_leg_signature = dual_leg_signature
+                self.audit_store.log_risk_event(
+                    self.run_id,
+                    reason="HEDGE_DUAL_LEG_DETECTED",
+                    details={"legs": exchange_position_legs},
+                )
+            if not dual_leg_signature:
+                self._last_dual_leg_signature = ()
+
         drift = []
         for symbol in self.symbol_list:
             local_qty = float(local.get(symbol, 0.0))
@@ -294,6 +344,135 @@ class LiveTrader(TradingEngine):
             )
         if not drift:
             self._last_drift_signature = ()
+
+    def _reconcile_orders(self, force=False):
+        now_mono = time.monotonic()
+        if (
+            not force
+            and (now_mono - self._last_order_reconciliation_monotonic)
+            < self._order_reconciliation_interval_sec
+        ):
+            return
+        self._last_order_reconciliation_monotonic = now_mono
+
+        if hasattr(self.execution_handler, "reconcile_open_orders"):
+            records = self.execution_handler.reconcile_open_orders() or []
+            for item in records:
+                try:
+                    self.audit_store.log_order_reconciliation(self.run_id, item)
+                except Exception as exc:
+                    self.logger.error("Failed to persist order reconciliation event: %s", exc)
+
+    def _set_trade_freeze(self, *, enabled, reason, details=None):
+        self.portfolio.trading_frozen = bool(enabled)
+        event_reason = "TRADE_FREEZE_ON" if enabled else "TRADE_FREEZE_OFF"
+        self.audit_store.log_risk_event(
+            self.run_id,
+            reason=event_reason,
+            details={"reason": reason, **dict(details or {})},
+        )
+        status = "ON" if enabled else "OFF"
+        self.notifier.send_message(f"⚠️ **Trade Freeze {status}**: {reason}")
+
+    def _queue_reduce_only_order(self, *, symbol, quantity, direction, position_side):
+        if float(quantity) <= 1e-12:
+            return False
+        event = OrderEvent(
+            symbol=symbol,
+            order_type="MKT",
+            quantity=abs(float(quantity)),
+            direction=direction,
+            position_side=position_side,
+            reduce_only=True,
+        )
+        self.events.put(event)
+        return True
+
+    def _flatten_all_positions(self, *, reason, details=None):
+        orders_sent = 0
+        legs = {}
+        if hasattr(self.exchange, "get_all_position_legs"):
+            try:
+                legs = self.exchange.get_all_position_legs() or {}
+            except Exception as exc:
+                self.logger.error("Flatten could not fetch position legs: %s", exc)
+
+        for symbol in self.symbol_list:
+            payload = legs.get(symbol) if isinstance(legs, dict) else None
+            if not isinstance(payload, dict):
+                continue
+            long_qty = float(payload.get("LONG", 0.0) or 0.0)
+            short_qty = float(payload.get("SHORT", 0.0) or 0.0)
+            if self._queue_reduce_only_order(
+                symbol=symbol,
+                quantity=long_qty,
+                direction="SELL",
+                position_side="LONG",
+            ):
+                orders_sent += 1
+            if self._queue_reduce_only_order(
+                symbol=symbol,
+                quantity=short_qty,
+                direction="BUY",
+                position_side="SHORT",
+            ):
+                orders_sent += 1
+
+        if orders_sent > 0:
+            self.audit_store.log_risk_event(
+                self.run_id,
+                reason="FLATTEN_ALL_TRIGGERED",
+                details={"reason": reason, "orders_sent": orders_sent, **dict(details or {})},
+            )
+            self.notifier.send_message(
+                f"🛑 **Flatten All Triggered**: {reason} (orders={orders_sent})"
+            )
+            return orders_sent
+
+        for symbol in self.symbol_list:
+            qty = float(self.portfolio.current_positions.get(symbol, 0.0))
+            if self._queue_reduce_only_order(
+                symbol=symbol,
+                quantity=abs(qty),
+                direction="SELL" if qty > 0 else "BUY",
+                position_side="LONG" if qty > 0 else "SHORT",
+            ):
+                orders_sent += 1
+
+        self.audit_store.log_risk_event(
+            self.run_id,
+            reason="FLATTEN_ALL_TRIGGERED",
+            details={"reason": reason, "orders_sent": orders_sent, **dict(details or {})},
+        )
+        self.notifier.send_message(f"🛑 **Flatten All Triggered**: {reason} (orders={orders_sent})")
+        return orders_sent
+
+    def _evaluate_risk_guards(self):
+        passed, reason, action, details = self.risk_manager.evaluate_portfolio_risk(self.portfolio)
+        if passed:
+            self._flatten_inflight = False
+            if getattr(self.portfolio, "trading_frozen", False):
+                self._set_trade_freeze(enabled=False, reason="risk_recovered", details=details)
+            return
+
+        if action == "FREEZE":
+            if not getattr(self.portfolio, "trading_frozen", False):
+                self._set_trade_freeze(enabled=True, reason=reason, details=details)
+            return
+
+        if action == "FLATTEN":
+            if not getattr(self.portfolio, "trading_frozen", False):
+                self._set_trade_freeze(enabled=True, reason=reason, details=details)
+            if not self._flatten_inflight:
+                orders_sent = self._flatten_all_positions(reason=reason, details=details)
+                self._flatten_inflight = orders_sent > 0
+            return
+
+        self.audit_store.log_risk_event(
+            self.run_id,
+            reason="RISK_POLICY_BREACH",
+            details={"reason": reason, **dict(details or {})},
+        )
 
     def _sync_portfolio(self):
         """Syncs the internal portfolio state with the exchange state."""
@@ -398,7 +577,7 @@ class LiveTrader(TradingEngine):
             self._last_equity_snapshot_monotonic = now_mono
             self.portfolio.create_equity_curve_dataframe()
             if self.config.STORAGE_EXPORT_CSV:
-                self.portfolio.save_equity_curve("live_equity.csv")
+                self.portfolio.save_equity_curve(os.path.join("data", "live_equity.csv"))
         self.audit_store.log_equity(
             self.run_id,
             timeindex=event.time,
@@ -413,7 +592,7 @@ class LiveTrader(TradingEngine):
 
         # Save Live Trades
         if self.config.STORAGE_EXPORT_CSV:
-            self.portfolio.output_trade_log("live_trades.csv")
+            self.portfolio.output_trade_log(os.path.join("data", "live_trades.csv"))
 
     def run(self):
         """Main Live Trading Loop."""
@@ -436,6 +615,8 @@ class LiveTrader(TradingEngine):
 
                 self._emit_heartbeat(force=False)
                 self._reconcile_positions(force=False)
+                self._reconcile_orders(force=False)
+                self._evaluate_risk_guards()
                 # In Live mode, data_handler is threaded and pushes events autonomously.
                 # We just blocking-wait for events.
                 event = self.events.get(True, timeout=10)  # Wait up to 10s
@@ -486,6 +667,8 @@ class LiveTrader(TradingEngine):
                 # Heartbeat
                 self._emit_heartbeat(force=True)
                 self._reconcile_positions(force=False)
+                self._reconcile_orders(force=False)
+                self._evaluate_risk_guards()
                 if hasattr(self.execution_handler, "check_open_orders"):
                     self.execution_handler.check_open_orders(None)
             except KeyboardInterrupt:

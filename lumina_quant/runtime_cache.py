@@ -11,6 +11,7 @@ class RuntimeCache:
     latest_market: dict[str, dict[str, Any]] = field(default_factory=dict)
     open_orders: dict[str, dict[str, Any]] = field(default_factory=dict)
     positions: dict[str, float] = field(default_factory=dict)
+    position_legs: dict[str, dict[str, float]] = field(default_factory=dict)
     account: dict[str, Any] = field(default_factory=dict)
 
     def update_market(self, symbol: str, payload: dict[str, Any]) -> None:
@@ -28,6 +29,18 @@ class RuntimeCache:
     def update_positions(self, positions: dict[str, Any]) -> None:
         self.positions = {str(symbol): float(qty) for symbol, qty in positions.items()}
 
+    def update_position_legs(self, legs: dict[str, dict[str, Any]]) -> None:
+        normalized: dict[str, dict[str, float]] = {}
+        for symbol, payload in dict(legs or {}).items():
+            if not isinstance(payload, dict):
+                continue
+            long_qty = max(0.0, float(payload.get("LONG", 0.0) or 0.0))
+            short_qty = max(0.0, float(payload.get("SHORT", 0.0) or 0.0))
+            if long_qty <= 0.0 and short_qty <= 0.0:
+                continue
+            normalized[str(symbol)] = {"LONG": long_qty, "SHORT": short_qty}
+        self.position_legs = normalized
+
     def update_account(self, account: dict[str, Any]) -> None:
         self.account = dict(account)
 
@@ -36,6 +49,7 @@ class RuntimeCache:
             "latest_market": dict(self.latest_market),
             "open_orders": dict(self.open_orders),
             "positions": dict(self.positions),
+            "position_legs": dict(self.position_legs),
             "account": dict(self.account),
         }
 
@@ -47,4 +61,5 @@ class RuntimeCache:
         self.positions = {
             str(symbol): float(qty) for symbol, qty in dict(payload.get("positions") or {}).items()
         }
+        self.update_position_legs(dict(payload.get("position_legs") or {}))
         self.account = dict(payload.get("account") or {})

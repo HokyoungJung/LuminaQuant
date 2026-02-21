@@ -34,6 +34,10 @@ class RiskConfig:
     max_symbol_exposure_pct: float = 0.25
     max_order_value: float = 5000.0
     default_stop_loss_pct: float = 0.01
+    max_intraday_drawdown_pct: float = 0.03
+    max_rolling_loss_pct_1h: float = 0.05
+    freeze_new_entries_on_breach: bool = True
+    auto_flatten_on_breach: bool = False
 
 
 @dataclass(slots=True)
@@ -55,11 +59,15 @@ class ExecutionConfig:
 class StorageConfig:
     """Storage settings for audit and exports."""
 
-    backend: str = "sqlite"
-    sqlite_path: str = "data/lumina_quant.db"
-    market_data_sqlite_path: str = "data/lumina_quant.db"
+    backend: str = "influxdb"
+    sqlite_path: str = "data/lq_audit.sqlite3"
+    market_data_sqlite_path: str = "data/lq_market.sqlite3"
     market_data_exchange: str = "binance"
     export_csv: bool = True
+    influx_url: str = ""
+    influx_org: str = ""
+    influx_bucket: str = ""
+    influx_token_env: str = "INFLUXDB_TOKEN"
 
 
 @dataclass(slots=True)
@@ -108,6 +116,9 @@ class LiveRuntimeConfig:
     testnet: bool | None = None
     mt5_magic: int = 234000
     mt5_deviation: int = 20
+    mt5_bridge_python: str = ""
+    mt5_bridge_script: str = "scripts/mt5_bridge_worker.py"
+    mt5_bridge_use_wslpath: bool = True
 
 
 @dataclass(slots=True)
@@ -125,6 +136,19 @@ class OptimizationRuntimeConfig:
 
 
 @dataclass(slots=True)
+class PromotionGateConfig:
+    """Promotion gate defaults and strategy-specific override profiles."""
+
+    days: int = 14
+    max_order_rejects: int = 0
+    max_order_timeouts: int = 0
+    max_reconciliation_alerts: int = 0
+    max_critical_errors: int = 0
+    require_alpha_card: bool = False
+    strategy_profiles: dict[str, dict[str, Any]] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
 class RuntimeConfig:
     """Full runtime configuration bundle."""
 
@@ -136,3 +160,4 @@ class RuntimeConfig:
     backtest: BacktestRuntimeConfig = field(default_factory=BacktestRuntimeConfig)
     live: LiveRuntimeConfig = field(default_factory=LiveRuntimeConfig)
     optimization: OptimizationRuntimeConfig = field(default_factory=OptimizationRuntimeConfig)
+    promotion_gate: PromotionGateConfig = field(default_factory=PromotionGateConfig)

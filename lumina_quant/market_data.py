@@ -10,9 +10,12 @@ from datetime import UTC, datetime
 from typing import Any
 
 import polars as pl
+from lumina_quant.influx_market_data import InfluxMarketDataRepository
 
 MARKET_OHLCV_TABLE = "market_ohlcv"
 MARKET_OHLCV_1S_TABLE = "market_ohlcv_1s"
+FUTURES_FEATURE_POINTS_TABLE = "futures_feature_points"
+DEFAULT_MARKET_DATA_DB_PATH = "data/lq_market.sqlite3"
 KNOWN_QUOTES = ("USDT", "USDC", "BUSD", "USD", "BTC", "ETH")
 TIMEFRAME_UNIT_MS = {
     "s": 1_000,
@@ -30,6 +33,59 @@ EMPTY_OHLCV_SCHEMA = {
     "close": pl.Float64,
     "volume": pl.Float64,
 }
+
+
+def normalize_storage_backend(value: str | None) -> str:
+    token = str(value or "").strip().lower()
+    if token in {"influx", "influxdb"}:
+        return "influxdb"
+    return "sqlite"
+
+
+def _resolve_storage_backend(backend: str | None = None) -> str:
+    explicit = str(backend or "").strip()
+    if explicit:
+        return normalize_storage_backend(explicit)
+    env_backend = os.getenv("LQ__STORAGE__BACKEND") or os.getenv("LQ_STORAGE_BACKEND") or "sqlite"
+    return normalize_storage_backend(env_backend)
+
+
+def _build_market_data_repository(
+    db_path: str,
+    *,
+    backend: str | None = None,
+    influx_url: str | None = None,
+    influx_org: str | None = None,
+    influx_bucket: str | None = None,
+    influx_token: str | None = None,
+    influx_token_env: str = "INFLUXDB_TOKEN",
+) -> Any:
+    storage_backend = _resolve_storage_backend(backend)
+    if storage_backend != "influxdb":
+        return MarketDataRepository(db_path)
+
+    token_env_name = str(
+        influx_token_env
+        or os.getenv("LQ__STORAGE__INFLUX_TOKEN_ENV")
+        or os.getenv("INFLUX_TOKEN_ENV")
+        or "INFLUXDB_TOKEN"
+    ).strip()
+    token_value = str(influx_token or os.getenv(token_env_name, "") or "").strip()
+    return InfluxMarketDataRepository(
+        url=str(
+            influx_url or os.getenv("LQ__STORAGE__INFLUX_URL") or os.getenv("INFLUX_URL") or ""
+        ).strip(),
+        org=str(
+            influx_org or os.getenv("LQ__STORAGE__INFLUX_ORG") or os.getenv("INFLUX_ORG") or ""
+        ).strip(),
+        bucket=str(
+            influx_bucket
+            or os.getenv("LQ__STORAGE__INFLUX_BUCKET")
+            or os.getenv("INFLUX_BUCKET")
+            or ""
+        ).strip(),
+        token=token_value,
+    )
 
 
 def _empty_ohlcv_frame() -> pl.DataFrame:
@@ -191,6 +247,36 @@ def ensure_market_ohlcv_schema(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def ensure_futures_feature_points_schema(conn: sqlite3.Connection) -> None:
+    """Ensure futures feature-points table and indexes are present."""
+    conn.executescript(
+        f"""
+        CREATE TABLE IF NOT EXISTS {FUTURES_FEATURE_POINTS_TABLE} (
+            exchange TEXT NOT NULL,
+            symbol TEXT NOT NULL,
+            timestamp_ms INTEGER NOT NULL,
+            datetime TEXT NOT NULL,
+            funding_rate REAL,
+            funding_mark_price REAL,
+            mark_price REAL,
+            index_price REAL,
+            open_interest REAL,
+            liquidation_long_qty REAL,
+            liquidation_short_qty REAL,
+            liquidation_long_notional REAL,
+            liquidation_short_notional REAL,
+            source TEXT,
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY (exchange, symbol, timestamp_ms)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_futures_feature_points_symbol_time
+        ON {FUTURES_FEATURE_POINTS_TABLE}(symbol, timestamp_ms);
+        """
+    )
+    conn.commit()
+
+
 def ensure_market_ohlcv_1s_schema(conn: sqlite3.Connection) -> None:
     """Ensure compact 1-second OHLCV table and indexes are present."""
     conn.executescript(
@@ -278,9 +364,25 @@ def get_last_ohlcv_1s_timestamp_ms(
     *,
     exchange: str,
     symbol: str,
+    backend: str | None = None,
+    influx_url: str | None = None,
+    influx_org: str | None = None,
+    influx_bucket: str | None = None,
+    influx_token: str | None = None,
+    influx_token_env: str = "INFLUXDB_TOKEN",
 ) -> int | None:
     """Return latest stored compact 1-second bar timestamp for key."""
-    repo = MarketDataRepository(db_path)
+    repo = _build_market_data_repository(
+        db_path,
+        backend=backend,
+        influx_url=influx_url,
+        influx_org=influx_org,
+        influx_bucket=influx_bucket,
+        influx_token=influx_token,
+        influx_token_env=influx_token_env,
+    )
+    if isinstance(repo, InfluxMarketDataRepository):
+        return repo.get_last_timestamp_ms(exchange=exchange, symbol=symbol)
     return repo.get_last_ohlcv_1s_timestamp_ms(exchange=exchange, symbol=symbol)
 
 
@@ -289,6 +391,103 @@ class MarketDataRepository:
 
     def __init__(self, db_path: str):
         self.db_path = str(db_path)
+        self._prefer_1s_derived = str(
+            os.getenv("LQ_PREFER_1S_DERIVED", "1")
+        ).strip().lower() not in {
+            "0",
+            "false",
+            "no",
+            "off",
+        }
+
+    @staticmethod
+    def _rows_to_ohlcv_frame(rows: Sequence[sqlite3.Row]) -> pl.DataFrame:
+        if not rows:
+            return _empty_ohlcv_frame()
+        frame = pl.DataFrame(
+            rows,
+            schema=["timestamp_ms", "open", "high", "low", "close", "volume"],
+            orient="row",
+        )
+        return frame.with_columns(
+            pl.from_epoch("timestamp_ms", time_unit="ms").alias("datetime")
+        ).select(["datetime", "open", "high", "low", "close", "volume"])
+
+    def _load_derived_ohlcv_from_1s(
+        self,
+        *,
+        exchange: str,
+        symbol: str,
+        timeframe: str,
+        start_date: Any = None,
+        end_date: Any = None,
+    ) -> pl.DataFrame:
+        timeframe_token = normalize_timeframe_token(timeframe)
+        if timeframe_token == "1s":
+            return self.load_ohlcv_1s(
+                exchange=exchange,
+                symbol=symbol,
+                start_date=start_date,
+                end_date=end_date,
+            )
+
+        tf_ms = int(timeframe_to_milliseconds(timeframe_token))
+        if tf_ms <= 1000:
+            return _empty_ohlcv_frame()
+
+        conn = connect_market_data_1s_db(self.db_path)
+        try:
+            ensure_market_ohlcv_1s_schema(conn)
+            start_ms = _coerce_timestamp_ms(start_date)
+            end_ms = _coerce_timestamp_ms(end_date)
+
+            query = f"""
+                WITH filtered AS (
+                    SELECT timestamp_ms, open, high, low, close, volume
+                    FROM {MARKET_OHLCV_1S_TABLE}
+                    WHERE exchange = ? AND symbol = ?
+            """
+            params: list[Any] = [
+                str(exchange).strip().lower(),
+                normalize_symbol(symbol),
+            ]
+            if start_ms is not None:
+                query += " AND timestamp_ms >= ?"
+                params.append(start_ms)
+            if end_ms is not None:
+                query += " AND timestamp_ms <= ?"
+                params.append(end_ms)
+
+            query += """
+                ), bucketed AS (
+                    SELECT
+                        ((timestamp_ms / ?) * ?) AS bucket_ms,
+                        MIN(timestamp_ms) AS first_ts,
+                        MAX(timestamp_ms) AS last_ts,
+                        MAX(high) AS high,
+                        MIN(low) AS low,
+                        SUM(volume) AS volume
+                    FROM filtered
+                    GROUP BY bucket_ms
+                )
+                SELECT
+                    b.bucket_ms AS timestamp_ms,
+                    o.open AS open,
+                    b.high AS high,
+                    b.low AS low,
+                    c.close AS close,
+                    b.volume AS volume
+                FROM bucketed b
+                JOIN filtered o ON o.timestamp_ms = b.first_ts
+                JOIN filtered c ON c.timestamp_ms = b.last_ts
+                ORDER BY b.bucket_ms
+            """
+            params.extend([tf_ms, tf_ms])
+            rows = conn.execute(query, params).fetchall()
+        finally:
+            conn.close()
+
+        return self._rows_to_ohlcv_frame(rows)
 
     def get_last_ohlcv_1s_timestamp_ms(self, *, exchange: str, symbol: str) -> int | None:
         conn = connect_market_data_1s_db(self.db_path)
@@ -362,13 +561,25 @@ class MarketDataRepository:
         start_date: Any = None,
         end_date: Any = None,
     ) -> pl.DataFrame:
-        if normalize_timeframe_token(timeframe) == "1s":
+        timeframe_token = normalize_timeframe_token(timeframe)
+        if timeframe_token == "1s":
             return self.load_ohlcv_1s(
                 exchange=exchange,
                 symbol=symbol,
                 start_date=start_date,
                 end_date=end_date,
             )
+
+        if self._prefer_1s_derived:
+            derived = self._load_derived_ohlcv_from_1s(
+                exchange=exchange,
+                symbol=symbol,
+                timeframe=timeframe_token,
+                start_date=start_date,
+                end_date=end_date,
+            )
+            if not derived.is_empty():
+                return derived
 
         conn = connect_market_data_db(self.db_path)
         try:
@@ -384,7 +595,7 @@ class MarketDataRepository:
             params: list[Any] = [
                 str(exchange).strip().lower(),
                 normalize_symbol(symbol),
-                normalize_timeframe_token(timeframe),
+                timeframe_token,
             ]
             if start_ms is not None:
                 query += " AND timestamp_ms >= ?"
@@ -398,17 +609,7 @@ class MarketDataRepository:
         finally:
             conn.close()
 
-        if not rows:
-            return _empty_ohlcv_frame()
-
-        frame = pl.DataFrame(
-            rows,
-            schema=["timestamp_ms", "open", "high", "low", "close", "volume"],
-            orient="row",
-        )
-        return frame.with_columns(
-            pl.from_epoch("timestamp_ms", time_unit="ms").alias("datetime")
-        ).select(["datetime", "open", "high", "low", "close", "volume"])
+        return self._rows_to_ohlcv_frame(rows)
 
     def load_ohlcv_1s(
         self,
@@ -443,17 +644,7 @@ class MarketDataRepository:
         finally:
             conn.close()
 
-        if not rows:
-            return _empty_ohlcv_frame()
-
-        frame = pl.DataFrame(
-            rows,
-            schema=["timestamp_ms", "open", "high", "low", "close", "volume"],
-            orient="row",
-        )
-        return frame.with_columns(
-            pl.from_epoch("timestamp_ms", time_unit="ms").alias("datetime")
-        ).select(["datetime", "open", "high", "low", "close", "volume"])
+        return self._rows_to_ohlcv_frame(rows)
 
     def load_data_dict(
         self,
@@ -569,10 +760,29 @@ def upsert_ohlcv_rows_1s(
     exchange: str,
     symbol: str,
     rows: Sequence[Sequence[float]],
+    backend: str | None = None,
+    influx_url: str | None = None,
+    influx_org: str | None = None,
+    influx_bucket: str | None = None,
+    influx_token: str | None = None,
+    influx_token_env: str = "INFLUXDB_TOKEN",
 ) -> int:
     """Insert/update compact 1-second OHLCV rows idempotently."""
     if not rows:
         return 0
+
+    if _resolve_storage_backend(backend) == "influxdb":
+        repo = _build_market_data_repository(
+            db_path,
+            backend="influxdb",
+            influx_url=influx_url,
+            influx_org=influx_org,
+            influx_bucket=influx_bucket,
+            influx_token=influx_token,
+            influx_token_env=influx_token_env,
+        )
+        payload = [tuple(row) for row in rows]
+        return int(repo.write_ohlcv_1s(exchange=exchange, symbol=symbol, rows=payload))
 
     conn = connect_market_data_1s_db(db_path)
     try:
@@ -618,15 +828,105 @@ def upsert_ohlcv_rows_1s(
         conn.close()
 
 
+def upsert_futures_feature_points(
+    conn: sqlite3.Connection,
+    *,
+    exchange: str,
+    symbol: str,
+    rows: Sequence[dict[str, Any]],
+    source: str = "binance_futures_api",
+) -> int:
+    """Insert or update futures feature rows idempotently."""
+    if not rows:
+        return 0
+
+    ensure_futures_feature_points_schema(conn)
+    now = datetime.now(UTC).isoformat()
+    stream_exchange = str(exchange).strip().lower()
+    stream_symbol = normalize_symbol(symbol)
+    stream_source = str(source).strip().lower()
+    payload: list[tuple[Any, ...]] = []
+
+    for row in rows:
+        ts_raw = row.get("timestamp_ms")
+        if ts_raw is None:
+            continue
+        ts = int(ts_raw)
+        payload.append(
+            (
+                stream_exchange,
+                stream_symbol,
+                ts,
+                _utc_iso_from_ms(ts),
+                row.get("funding_rate"),
+                row.get("funding_mark_price"),
+                row.get("mark_price"),
+                row.get("index_price"),
+                row.get("open_interest"),
+                row.get("liquidation_long_qty"),
+                row.get("liquidation_short_qty"),
+                row.get("liquidation_long_notional"),
+                row.get("liquidation_short_notional"),
+                stream_source,
+                now,
+            )
+        )
+
+    if not payload:
+        return 0
+
+    conn.executemany(
+        f"""
+        INSERT INTO {FUTURES_FEATURE_POINTS_TABLE}(
+            exchange, symbol, timestamp_ms, datetime,
+            funding_rate, funding_mark_price, mark_price, index_price, open_interest,
+            liquidation_long_qty, liquidation_short_qty,
+            liquidation_long_notional, liquidation_short_notional,
+            source, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(exchange, symbol, timestamp_ms)
+        DO UPDATE SET
+            funding_rate = COALESCE(excluded.funding_rate, funding_rate),
+            funding_mark_price = COALESCE(excluded.funding_mark_price, funding_mark_price),
+            mark_price = COALESCE(excluded.mark_price, mark_price),
+            index_price = COALESCE(excluded.index_price, index_price),
+            open_interest = COALESCE(excluded.open_interest, open_interest),
+            liquidation_long_qty = COALESCE(excluded.liquidation_long_qty, liquidation_long_qty),
+            liquidation_short_qty = COALESCE(excluded.liquidation_short_qty, liquidation_short_qty),
+            liquidation_long_notional = COALESCE(excluded.liquidation_long_notional, liquidation_long_notional),
+            liquidation_short_notional = COALESCE(excluded.liquidation_short_notional, liquidation_short_notional),
+            source = excluded.source,
+            updated_at = excluded.updated_at
+        """,
+        payload,
+    )
+    conn.commit()
+    return len(payload)
+
+
 def market_data_exists(
     db_path: str,
     *,
     exchange: str,
     symbol: str,
     timeframe: str,
+    backend: str | None = None,
+    influx_url: str | None = None,
+    influx_org: str | None = None,
+    influx_bucket: str | None = None,
+    influx_token: str | None = None,
+    influx_token_env: str = "INFLUXDB_TOKEN",
 ) -> bool:
     """Return True if at least one OHLCV row exists for key."""
-    repo = MarketDataRepository(db_path)
+    repo = _build_market_data_repository(
+        db_path,
+        backend=backend,
+        influx_url=influx_url,
+        influx_org=influx_org,
+        influx_bucket=influx_bucket,
+        influx_token=influx_token,
+        influx_token_env=influx_token_env,
+    )
     return repo.market_data_exists(exchange=exchange, symbol=symbol, timeframe=timeframe)
 
 
@@ -638,9 +938,23 @@ def load_ohlcv_from_db(
     timeframe: str,
     start_date: Any = None,
     end_date: Any = None,
+    backend: str | None = None,
+    influx_url: str | None = None,
+    influx_org: str | None = None,
+    influx_bucket: str | None = None,
+    influx_token: str | None = None,
+    influx_token_env: str = "INFLUXDB_TOKEN",
 ) -> pl.DataFrame:
-    """Load OHLCV data from SQLite into canonical DataFrame format."""
-    repo = MarketDataRepository(db_path)
+    """Load OHLCV data into canonical DataFrame format from configured backend."""
+    repo = _build_market_data_repository(
+        db_path,
+        backend=backend,
+        influx_url=influx_url,
+        influx_org=influx_org,
+        influx_bucket=influx_bucket,
+        influx_token=influx_token,
+        influx_token_env=influx_token_env,
+    )
     return repo.load_ohlcv(
         exchange=exchange,
         symbol=symbol,
@@ -657,9 +971,23 @@ def load_ohlcv_1s_from_db(
     symbol: str,
     start_date: Any = None,
     end_date: Any = None,
+    backend: str | None = None,
+    influx_url: str | None = None,
+    influx_org: str | None = None,
+    influx_bucket: str | None = None,
+    influx_token: str | None = None,
+    influx_token_env: str = "INFLUXDB_TOKEN",
 ) -> pl.DataFrame:
     """Load compact 1-second OHLCV rows into canonical DataFrame format."""
-    repo = MarketDataRepository(db_path)
+    repo = _build_market_data_repository(
+        db_path,
+        backend=backend,
+        influx_url=influx_url,
+        influx_org=influx_org,
+        influx_bucket=influx_bucket,
+        influx_token=influx_token,
+        influx_token_env=influx_token_env,
+    )
     return repo.load_ohlcv_1s(
         exchange=exchange,
         symbol=symbol,
@@ -676,9 +1004,23 @@ def load_data_dict_from_db(
     timeframe: str,
     start_date: Any = None,
     end_date: Any = None,
+    backend: str | None = None,
+    influx_url: str | None = None,
+    influx_org: str | None = None,
+    influx_bucket: str | None = None,
+    influx_token: str | None = None,
+    influx_token_env: str = "INFLUXDB_TOKEN",
 ) -> dict[str, pl.DataFrame]:
-    """Load a symbol->DataFrame dictionary from SQLite market data."""
-    repo = MarketDataRepository(db_path)
+    """Load symbol->DataFrame dictionary from configured market-data backend."""
+    repo = _build_market_data_repository(
+        db_path,
+        backend=backend,
+        influx_url=influx_url,
+        influx_org=influx_org,
+        influx_bucket=influx_bucket,
+        influx_token=influx_token,
+        influx_token_env=influx_token_env,
+    )
     return repo.load_data_dict(
         exchange=exchange,
         symbol_list=symbol_list,
@@ -697,9 +1039,23 @@ def export_ohlcv_to_csv(
     csv_path: str,
     start_date: Any = None,
     end_date: Any = None,
+    backend: str | None = None,
+    influx_url: str | None = None,
+    influx_org: str | None = None,
+    influx_bucket: str | None = None,
+    influx_token: str | None = None,
+    influx_token_env: str = "INFLUXDB_TOKEN",
 ) -> int:
-    """Export OHLCV from SQLite into a CSV file. Returns exported row count."""
-    repo = MarketDataRepository(db_path)
+    """Export OHLCV from configured backend into CSV. Returns exported row count."""
+    repo = _build_market_data_repository(
+        db_path,
+        backend=backend,
+        influx_url=influx_url,
+        influx_org=influx_org,
+        influx_bucket=influx_bucket,
+        influx_token=influx_token,
+        influx_token_env=influx_token_env,
+    )
     return repo.export_ohlcv_to_csv(
         exchange=exchange,
         symbol=symbol,

@@ -15,7 +15,7 @@ import subprocess
 from datetime import UTC, datetime
 from typing import Any
 
-DEFAULT_DB_PATH = "data/lumina_quant.db"
+DEFAULT_DB_PATH = "data/lq_audit.sqlite3"
 DEFAULT_STALE_SEC = 300
 DEFAULT_STARTUP_GRACE_SEC = 90
 RUN_ID_PATTERN = re.compile(r"--run-id(?:=|\s+)([A-Za-z0-9_-]+)")

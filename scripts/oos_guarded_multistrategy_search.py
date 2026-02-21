@@ -45,8 +45,10 @@ from lumina_quant.utils.performance import (
 )
 from strategies.lag_convergence import LagConvergenceStrategy
 from strategies.mean_reversion_std import MeanReversionStdStrategy
+from strategies.moving_average import MovingAverageCrossStrategy
 from strategies.pair_trading_zscore import PairTradingZScoreStrategy
 from strategies.rolling_breakout import RollingBreakoutStrategy
+from strategies.rsi_strategy import RsiStrategy
 from strategies.topcap_tsmom import TopCapTimeSeriesMomentumStrategy
 from strategies.vwap_reversion import VwapReversionStrategy
 
@@ -925,6 +927,46 @@ def _sample_lag_convergence_params(rng: random.Random) -> dict:
     }
 
 
+def _sample_rsi_params(rng: random.Random) -> dict:
+    return {
+        "rsi_period": rng.choice([5, 7, 10, 14, 21, 28]),
+        "oversold": rng.choice([15, 20, 25, 30, 35]),
+        "overbought": rng.choice([65, 70, 75, 80, 85]),
+        "allow_short": rng.choice([True, False]),
+    }
+
+
+def _suggest_rsi_params_optuna(trial) -> dict:
+    return {
+        "rsi_period": trial.suggest_categorical("rsi_period", [5, 7, 10, 14, 21, 28]),
+        "oversold": trial.suggest_categorical("oversold", [15, 20, 25, 30, 35]),
+        "overbought": trial.suggest_categorical("overbought", [65, 70, 75, 80, 85]),
+        "allow_short": trial.suggest_categorical("allow_short", [True, False]),
+    }
+
+
+def _sample_moving_average_params(rng: random.Random) -> dict:
+    short_window = int(rng.choice([5, 8, 10, 14, 21, 30, 40]))
+    long_window = int(rng.choice([30, 50, 80, 120, 160, 200]))
+    if long_window <= short_window:
+        long_window = short_window + 5
+    return {
+        "short_window": short_window,
+        "long_window": long_window,
+        "allow_short": rng.choice([True, False]),
+    }
+
+
+def _suggest_moving_average_params_optuna(trial) -> dict:
+    short_window = trial.suggest_categorical("short_window", [5, 8, 10, 14, 21, 30, 40])
+    long_window_raw = trial.suggest_categorical("long_window_raw", [30, 50, 80, 120, 160, 200])
+    return {
+        "short_window": int(short_window),
+        "long_window": max(int(short_window) + 5, int(long_window_raw)),
+        "allow_short": trial.suggest_categorical("allow_short", [True, False]),
+    }
+
+
 def _suggest_lag_convergence_params_optuna(trial) -> dict:
     return {
         "lag_bars": trial.suggest_categorical("lag_bars", [1, 2, 3, 4, 6, 8]),
@@ -1289,7 +1331,7 @@ def _evaluate_ensemble_eligibility(
 
 def main():
     parser = argparse.ArgumentParser(description="Leakage-safe multi-strategy OOS search")
-    parser.add_argument("--db-path", default="data/lumina_quant.db")
+    parser.add_argument("--db-path", default="data/lq_market.sqlite3")
     parser.add_argument("--exchange", default="binance")
     parser.add_argument("--timeframe", default="1h")
     parser.add_argument("--base-timeframe", default="1s")
@@ -1625,6 +1667,24 @@ def main():
                     "iterations": int(args.pair_iters),
                     "min_trades": 2,
                 },
+                {
+                    "name": "rsi_topcap",
+                    "strategy_cls": RsiStrategy,
+                    "symbols": topcap_symbols,
+                    "sampler": _sample_rsi_params,
+                    "suggestor": _suggest_rsi_params_optuna,
+                    "iterations": int(args.topcap_iters),
+                    "min_trades": 6,
+                },
+                {
+                    "name": "moving_average_topcap",
+                    "strategy_cls": MovingAverageCrossStrategy,
+                    "symbols": topcap_symbols,
+                    "sampler": _sample_moving_average_params,
+                    "suggestor": _suggest_moving_average_params_optuna,
+                    "iterations": int(args.topcap_iters),
+                    "min_trades": 6,
+                },
             ]
         )
 
@@ -1655,6 +1715,24 @@ def main():
                     "symbols": ["XAU/USDT", "XAG/USDT"],
                     "sampler": _sample_lag_convergence_params,
                     "suggestor": _suggest_lag_convergence_params_optuna,
+                    "iterations": int(args.pair_iters),
+                    "min_trades": 2,
+                },
+                {
+                    "name": "rsi_xau_xag",
+                    "strategy_cls": RsiStrategy,
+                    "symbols": ["XAU/USDT", "XAG/USDT"],
+                    "sampler": _sample_rsi_params,
+                    "suggestor": _suggest_rsi_params_optuna,
+                    "iterations": int(args.pair_iters),
+                    "min_trades": 2,
+                },
+                {
+                    "name": "moving_average_xau_xag",
+                    "strategy_cls": MovingAverageCrossStrategy,
+                    "symbols": ["XAU/USDT", "XAG/USDT"],
+                    "sampler": _sample_moving_average_params,
+                    "suggestor": _suggest_moving_average_params_optuna,
                     "iterations": int(args.pair_iters),
                     "min_trades": 2,
                 },

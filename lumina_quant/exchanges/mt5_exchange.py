@@ -1,3 +1,11 @@
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+from pathlib import Path
+from typing import Any
+
 try:
     import MetaTrader5 as mt5
 except ImportError:
@@ -6,67 +14,230 @@ except ImportError:
 from lumina_quant.interfaces import ExchangeInterface
 
 
+def _as_bool(value: Any, default: bool = False) -> bool:
+    if value is None:
+        return bool(default)
+    token = str(value).strip().lower()
+    if not token:
+        return bool(default)
+    return token not in {"0", "false", "no", "off"}
+
+
+def _is_wsl() -> bool:
+    if os.name != "posix":
+        return False
+    try:
+        with open("/proc/sys/kernel/osrelease", encoding="utf-8") as f:
+            text = f.read().lower()
+    except Exception:
+        return False
+    return "microsoft" in text or "wsl" in text
+
+
 class MT5Exchange(ExchangeInterface):
     """Implementation of ExchangeInterface using MetaTrader5.
-    Requires MetaTrader5 python package and a running MT5 terminal.
+
+    On Windows, this uses in-process MetaTrader5 Python package.
+    On WSL/Linux, set `LQ_MT5_BRIDGE_PYTHON` to a Windows Python executable path
+    to use bridge mode through `scripts/mt5_bridge_worker.py`.
     """
 
     def __init__(self, config):
         self.config = config
         self.connected = False
+        root = Path(__file__).resolve().parents[2]
+        default_bridge_script = str(root / "scripts" / "mt5_bridge_worker.py")
+        self._bridge_python = str(
+            getattr(config, "MT5_BRIDGE_PYTHON", "") or os.getenv("LQ_MT5_BRIDGE_PYTHON", "")
+        ).strip()
+        self._bridge_script = str(
+            getattr(config, "MT5_BRIDGE_SCRIPT", "")
+            or os.getenv("LQ_MT5_BRIDGE_SCRIPT", "")
+            or default_bridge_script
+        ).strip()
+        self._bridge_use_wslpath = _as_bool(
+            getattr(config, "MT5_BRIDGE_USE_WSLPATH", None)
+            if hasattr(config, "MT5_BRIDGE_USE_WSLPATH")
+            else os.getenv("LQ_MT5_BRIDGE_USE_WSLPATH", "1"),
+            True,
+        )
         self.connect()
+
+    def _bridge_enabled(self) -> bool:
+        return bool(self._bridge_python)
+
+    def _bridge_mode(self) -> bool:
+        return mt5 is None and self._bridge_enabled()
+
+    def _bridge_auth_payload(self) -> dict[str, Any]:
+        return {
+            "login": getattr(self.config, "MT5_LOGIN", None),
+            "password": getattr(self.config, "MT5_PASSWORD", None),
+            "server": getattr(self.config, "MT5_SERVER", None),
+            "mt5_magic": getattr(self.config, "MT5_MAGIC", 234000),
+            "mt5_deviation": getattr(self.config, "MT5_DEVIATION", 20),
+            "mt5_comment": getattr(self.config, "MT5_COMMENT", "LuminaQuant"),
+        }
+
+    def _bridge_script_for_target(self) -> str:
+        script_path = Path(self._bridge_script)
+        if not script_path.is_absolute():
+            script_path = Path.cwd() / script_path
+        script_local = str(script_path)
+
+        python_token = self._bridge_python.lower()
+        if (
+            self._bridge_use_wslpath
+            and _is_wsl()
+            and (python_token.endswith(".exe") or "\\\\" in python_token)
+        ):
+            proc = subprocess.run(
+                ["wslpath", "-w", script_local],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            converted = (proc.stdout or "").strip()
+            if proc.returncode == 0 and converted:
+                return converted
+        return script_local
+
+    def _bridge_call(self, action: str, payload: dict[str, Any] | None = None) -> Any:
+        if not self._bridge_enabled():
+            raise RuntimeError("MT5 bridge is not configured.")
+        merged_payload = dict(payload or {})
+        merged_payload.update(self._bridge_auth_payload())
+
+        cmd = [
+            self._bridge_python,
+            self._bridge_script_for_target(),
+            "--action",
+            str(action),
+            "--payload",
+            json.dumps(merged_payload, ensure_ascii=True),
+        ]
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if proc.returncode != 0:
+            detail = (proc.stderr or proc.stdout or "").strip()
+            raise RuntimeError(f"MT5 bridge command failed ({action}): {detail}")
+
+        stdout_text = (proc.stdout or "").strip()
+        if not stdout_text:
+            raise RuntimeError(f"MT5 bridge command returned empty response ({action}).")
+        response_line = stdout_text.splitlines()[-1]
+        try:
+            response = json.loads(response_line)
+        except Exception as exc:
+            raise RuntimeError(f"Invalid MT5 bridge response ({action}): {stdout_text}") from exc
+        if not isinstance(response, dict):
+            raise RuntimeError(f"Unexpected MT5 bridge payload type ({action}).")
+        if not bool(response.get("ok", False)):
+            error_text = str(response.get("error") or f"MT5 bridge call failed: {action}")
+            raise RuntimeError(error_text)
+        return response.get("result")
 
     def connect(self):
         if mt5 is None:
-            print("MetaTrader5 package not installed. Cannot connect.")
+            if not self._bridge_enabled():
+                print(
+                    "MetaTrader5 package not installed. Set LQ_MT5_BRIDGE_PYTHON for WSL/Linux bridge mode."
+                )
+                return
+            try:
+                self._bridge_call("connect")
+                self.connected = True
+                print("Connected to MT5 via bridge worker.")
+            except Exception as exc:
+                print(f"MT5 bridge connection failed: {exc}")
+                self.connected = False
             return
 
         if not mt5.initialize():
             print("initialize() failed, error code =", mt5.last_error())
             self.connected = False
-        else:
-            print("MetaTrader5 package version:", mt5.__version__)
-            self.connected = True
+            return
 
-            # Optional: Login if credentials provided in config
-            login = getattr(self.config, "MT5_LOGIN", None)
-            password = getattr(self.config, "MT5_PASSWORD", None)
-            server = getattr(self.config, "MT5_SERVER", None)
+        print("MetaTrader5 package version:", mt5.__version__)
+        self.connected = True
 
-            if login and password and server:
-                authorized = mt5.login(login, password=password, server=server)
-                if authorized:
-                    print(f"Connected to account #{login}")
-                else:
-                    print(f"failed to connect at account #{login}, error code: {mt5.last_error()}")
+        login = getattr(self.config, "MT5_LOGIN", None)
+        password = getattr(self.config, "MT5_PASSWORD", None)
+        server = getattr(self.config, "MT5_SERVER", None)
+
+        if login and password and server:
+            authorized = mt5.login(login, password=password, server=server)
+            if authorized:
+                print(f"Connected to account #{login}")
+            else:
+                print(f"failed to connect at account #{login}, error code: {mt5.last_error()}")
 
     def get_balance(self, currency: str = "USDT") -> float:
         if not self.connected:
             return 0.0
+        if self._bridge_mode():
+            try:
+                result = self._bridge_call("get_balance", {"currency": currency})
+                return float(result or 0.0)
+            except Exception:
+                return 0.0
         account_info = mt5.account_info()
         if account_info is None:
             return 0.0
-        # MT5 usually has one balance for the account. Currency check might be needed.
-        # account_info.balance gives the account balance in deposit currency
-        return account_info.balance
+        return float(account_info.balance)
 
     def get_all_positions(self) -> dict[str, float]:
         if not self.connected:
             return {}
+        if self._bridge_mode():
+            try:
+                result = self._bridge_call("get_all_positions")
+            except Exception:
+                return {}
+            if not isinstance(result, dict):
+                return {}
+            out: dict[str, float] = {}
+            for key, value in result.items():
+                try:
+                    out[str(key)] = float(value)
+                except Exception:
+                    continue
+            return out
+
         positions = mt5.positions_get()
         if positions is None:
             return {}
-
-        result = {}
+        result: dict[str, float] = {}
         for pos in positions:
-            result[pos.symbol] = pos.volume
+            result[str(pos.symbol)] = float(pos.volume)
         return result
 
     def fetch_ohlcv(self, symbol: str, timeframe: str, limit: int = 100) -> list[tuple]:
         if not self.connected:
             return []
 
-        # Map timeframe string to MT5 constant
+        if self._bridge_mode():
+            try:
+                payload = {
+                    "symbol": str(symbol),
+                    "timeframe": str(timeframe),
+                    "limit": int(limit),
+                }
+                result = self._bridge_call("fetch_ohlcv", payload)
+            except Exception:
+                return []
+            if not isinstance(result, list):
+                return []
+            out: list[tuple] = []
+            for row in result:
+                if isinstance(row, (list, tuple)) and len(row) >= 6:
+                    out.append(tuple(row[:6]))
+            return out
+
         tf_map = {
             "1m": mt5.TIMEFRAME_M1,
             "5m": mt5.TIMEFRAME_M5,
@@ -77,9 +248,6 @@ class MT5Exchange(ExchangeInterface):
         }
 
         mt5_tf = tf_map.get(timeframe, mt5.TIMEFRAME_M1)
-
-        # Get rates
-        # from pos 0 to limit
         rates = mt5.copy_rates_from_pos(symbol, mt5_tf, 0, limit)
 
         if rates is None:
@@ -88,25 +256,17 @@ class MT5Exchange(ExchangeInterface):
 
         data = []
         for rate in rates:
-            # rate is a numpy void object or similar struct
-            # format: (time, open, high, low, close, tick_volume, spread, real_volume)
-            # We need (timestamp_ms, open, high, low, close, volume)
-            # MT5 time is seconds, CCXT usually uses ms. Let's stick to seconds for now or convert to ms?
-            # Existing system uses unix timestamp (float or int).
-            # CCXT returns ms usually. Strategy might expect seconds.
-            # Let's check live_data.py usage. It uses timestamp directly.
-            timestamp = rate["time"] * 1000  # Convert to ms to match CCXT
+            timestamp = int(rate["time"]) * 1000
             data.append(
                 (
                     timestamp,
-                    rate["open"],
-                    rate["high"],
-                    rate["low"],
-                    rate["close"],
+                    float(rate["open"]),
+                    float(rate["high"]),
+                    float(rate["low"]),
+                    float(rate["close"]),
                     float(rate["tick_volume"]),
                 )
             )
-
         return data
 
     def execute_order(
@@ -122,14 +282,23 @@ class MT5Exchange(ExchangeInterface):
             raise RuntimeError("Not connected to MT5")
         params = params or {}
 
-        # Prepare request
-        action = mt5.TRADE_ACTION_DEAL
+        if self._bridge_mode():
+            payload = {
+                "symbol": str(symbol),
+                "type": str(type),
+                "side": str(side),
+                "quantity": float(quantity),
+                "price": None if price is None else float(price),
+                "params": dict(params),
+            }
+            result = self._bridge_call("execute_order", payload)
+            if isinstance(result, dict):
+                return result
+            raise RuntimeError("MT5 bridge execute_order returned invalid payload")
 
-        # side: buy or sell
+        action = mt5.TRADE_ACTION_DEAL
         mt5_type = mt5.ORDER_TYPE_BUY if side == "buy" else mt5.ORDER_TYPE_SELL
 
-        # type: market or limit.
-        # If limit, we need TRADE_ACTION_PENDING and proper ORDER_TYPE
         if type == "limit":
             action = mt5.TRADE_ACTION_PENDING
             if side == "buy":
@@ -137,18 +306,15 @@ class MT5Exchange(ExchangeInterface):
             else:
                 mt5_type = mt5.ORDER_TYPE_SELL_LIMIT
 
-        # For Market Buy, price should be Ask. For Market Sell, price should be Bid.
         if type == "market":
             symbol_info = mt5.symbol_info_tick(symbol)
             if symbol_info is None:
                 raise RuntimeError(f"Symbol {symbol} not found")
-
             if side == "buy":
                 price = symbol_info.ask
             else:
                 price = symbol_info.bid
 
-        # Get defaults from config
         magic = params.get("magic", getattr(self.config, "MT5_MAGIC", 234000))
         deviation = params.get("deviation", getattr(self.config, "MT5_DEVIATION", 20))
         comment = params.get("comment", getattr(self.config, "MT5_COMMENT", "LuminaQuant"))
@@ -178,7 +344,7 @@ class MT5Exchange(ExchangeInterface):
 
         return {
             "id": str(result.order),
-            "status": "closed" if type == "market" else "open",  # Simplified
+            "status": "closed" if type == "market" else "open",
             "filled": result.volume,
             "average": result.price,
             "price": result.price,
@@ -207,6 +373,15 @@ class MT5Exchange(ExchangeInterface):
         _ = symbol
         if not self.connected:
             return {}
+        if self._bridge_mode():
+            try:
+                result = self._bridge_call(
+                    "fetch_order", {"order_id": str(order_id), "symbol": symbol}
+                )
+            except Exception:
+                return {}
+            return result if isinstance(result, dict) else {}
+
         try:
             ticket = int(order_id)
         except Exception:
@@ -229,8 +404,15 @@ class MT5Exchange(ExchangeInterface):
     def fetch_open_orders(self, symbol: str | None = None) -> list[dict]:
         if not self.connected:
             return []
+        if self._bridge_mode():
+            try:
+                result = self._bridge_call("fetch_open_orders", {"symbol": symbol})
+            except Exception:
+                return []
+            if isinstance(result, list):
+                return [item for item in result if isinstance(item, dict)]
+            return []
 
-        # mt5.orders_get(symbol=...) or group=...
         if symbol:
             orders = mt5.orders_get(symbol=symbol)
         else:
@@ -241,12 +423,11 @@ class MT5Exchange(ExchangeInterface):
 
         result = []
         for order in orders:
-            # order is a named tuple
             result.append(
                 {
                     "id": str(order.ticket),
                     "symbol": order.symbol,
-                    "type": "buy" if order.type == mt5.ORDER_TYPE_BUY else "sell",  # Simplified
+                    "type": "buy" if order.type == mt5.ORDER_TYPE_BUY else "sell",
                     "side": "buy"
                     if order.type
                     in [
@@ -257,10 +438,7 @@ class MT5Exchange(ExchangeInterface):
                     else "sell",
                     "price": order.price_open,
                     "amount": order.volume_initial,
-                    "filled": order.volume_current,  # In MT5 volume_current is remaining volume? Check docs.
-                    # volume_current: VOLUME_CURRENT: Volume current
-                    # volume_initial: VOLUME_INITIAL: Volume initial
-                    # So filled = initial - current
+                    "filled": order.volume_current,
                     "filled_qty": order.volume_initial - order.volume_current,
                     "status": "open",
                     "info": order._asdict(),
@@ -269,10 +447,18 @@ class MT5Exchange(ExchangeInterface):
         return result
 
     def cancel_order(self, order_id: str, symbol: str | None = None) -> bool:
+        _ = symbol
         if not self.connected:
             return False
+        if self._bridge_mode():
+            try:
+                result = self._bridge_call(
+                    "cancel_order", {"order_id": str(order_id), "symbol": symbol}
+                )
+                return bool(result)
+            except Exception:
+                return False
 
-        # To cancel, we send a TRADE_ACTION_REMOVE
         request = {
             "action": mt5.TRADE_ACTION_REMOVE,
             "order": int(order_id),

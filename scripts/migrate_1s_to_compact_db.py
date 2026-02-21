@@ -14,7 +14,7 @@ from lumina_quant.market_data import (
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Migrate timeframe=1s rows to compact DB.")
-    parser.add_argument("--db-path", default="data/lumina_quant.db")
+    parser.add_argument("--db-path", default="data/lq_market.sqlite3")
     parser.add_argument("--batch-size", type=int, default=50000)
     parser.add_argument(
         "--delete-legacy",

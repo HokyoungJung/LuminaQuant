@@ -1,3 +1,5 @@
+from typing import Any, cast
+
 import ccxt
 from lumina_quant.interfaces import ExchangeInterface
 
@@ -7,10 +9,15 @@ class CCXTExchange(ExchangeInterface):
 
     def __init__(self, config):
         self.config = config
-        self.exchange = None
+        self.exchange: Any = None
         self.market_type = "spot"
         self._markets = {}
         self.connect()
+
+    def _client(self) -> Any:
+        if self.exchange is None:
+            raise RuntimeError("Exchange client is not initialized")
+        return cast(Any, self.exchange)
 
     def connect(self):
         exchange_config = getattr(self.config, "EXCHANGE", None)
@@ -33,9 +40,10 @@ class CCXTExchange(ExchangeInterface):
             exchange_kwargs["options"] = {"defaultType": "future"}
 
         self.exchange = exchange_class(exchange_kwargs)
+        ex = self._client()
 
         if getattr(self.config, "IS_TESTNET", False):
-            self.exchange.set_sandbox_mode(True)
+            ex.set_sandbox_mode(True)
             print(f"CCXTExchange ({exchange_id}): Running in Sandbox/Testnet Mode")
 
         # Futures setup (best-effort; some exchanges don't expose all endpoints)
@@ -47,8 +55,8 @@ class CCXTExchange(ExchangeInterface):
 
             position_mode = getattr(self.config, "POSITION_MODE", "HEDGE").upper()
             try:
-                if hasattr(self.exchange, "set_position_mode"):
-                    self.exchange.set_position_mode(position_mode == "HEDGE")
+                if hasattr(ex, "set_position_mode"):
+                    ex.set_position_mode(position_mode == "HEDGE")
             except Exception as e:
                 print(f"Warning: failed to set position mode: {e}")
 
@@ -60,10 +68,11 @@ class CCXTExchange(ExchangeInterface):
 
     def get_balance(self, currency: str = "USDT") -> float:
         try:
+            ex = self._client()
             params = {}
             if str(self.market_type).lower() == "future":
                 params = {"type": "future"}
-            balance = self.exchange.fetch_balance(params)
+            balance = ex.fetch_balance(params)
             entry = balance.get(currency, {})
             if isinstance(entry, dict):
                 return float(entry.get("free", 0.0))
@@ -74,18 +83,57 @@ class CCXTExchange(ExchangeInterface):
             print(f"Error fetching balance: {e}")
             return 0.0
 
+    @staticmethod
+    def _as_float(value, default=0.0) -> float:
+        try:
+            if value is None:
+                return float(default)
+            return float(value)
+        except Exception:
+            return float(default)
+
+    def _extract_signed_position_qty(self, position: dict) -> float:
+        info = position.get("info") if isinstance(position, dict) else {}
+        if not isinstance(info, dict):
+            info = {}
+
+        candidates = [
+            position.get("contracts"),
+            position.get("positionAmt"),
+            position.get("size"),
+            position.get("amount"),
+            info.get("positionAmt"),
+            info.get("contracts"),
+            info.get("size"),
+        ]
+        qty = 0.0
+        for item in candidates:
+            qty = self._as_float(item, 0.0)
+            if abs(qty) > 0.0:
+                break
+
+        side_token = str(
+            position.get("side") or position.get("positionSide") or info.get("positionSide") or ""
+        ).upper()
+        if side_token == "SHORT" and qty > 0.0:
+            return -qty
+        if side_token == "LONG" and qty < 0.0:
+            return abs(qty)
+        return qty
+
     def get_all_positions(self) -> dict[str, float]:
         positions = {}
         try:
             if str(self.market_type).lower() == "future":
                 for p in self.fetch_positions():
                     symbol = p.get("symbol")
-                    qty = float(p.get("contracts") or p.get("positionAmt") or p.get("size") or 0.0)
-                    if symbol and qty != 0:
+                    qty = self._extract_signed_position_qty(p)
+                    if symbol and abs(qty) > 0.0:
                         positions[symbol] = positions.get(symbol, 0.0) + qty
                 return positions
 
-            bal = self.exchange.fetch_balance()
+            ex = self._client()
+            bal = ex.fetch_balance()
             total = bal.get("total", {})
             for coin, qty in total.items():
                 if qty > 0:
@@ -96,9 +144,43 @@ class CCXTExchange(ExchangeInterface):
             print(f"Error fetching positions: {e}")
             return {}
 
+    def get_all_position_legs(self) -> dict[str, dict[str, float]]:
+        legs: dict[str, dict[str, float]] = {}
+        try:
+            if str(self.market_type).lower() != "future":
+                for symbol, qty in self.get_all_positions().items():
+                    if qty > 0:
+                        legs[str(symbol)] = {"LONG": float(qty), "SHORT": 0.0}
+                    elif qty < 0:
+                        legs[str(symbol)] = {"LONG": 0.0, "SHORT": abs(float(qty))}
+                return legs
+
+            for position in self.fetch_positions():
+                symbol = position.get("symbol")
+                if not symbol:
+                    continue
+                signed_qty = self._extract_signed_position_qty(position)
+                if abs(signed_qty) <= 0.0:
+                    continue
+                bucket = legs.setdefault(str(symbol), {"LONG": 0.0, "SHORT": 0.0})
+                if signed_qty > 0:
+                    bucket["LONG"] += abs(float(signed_qty))
+                else:
+                    bucket["SHORT"] += abs(float(signed_qty))
+
+            return {
+                symbol: payload
+                for symbol, payload in legs.items()
+                if payload.get("LONG", 0.0) > 0.0 or payload.get("SHORT", 0.0) > 0.0
+            }
+        except Exception as e:
+            print(f"Error fetching position legs: {e}")
+            return {}
+
     def fetch_ohlcv(self, symbol: str, timeframe: str, limit: int = 100) -> list[tuple]:
         try:
-            ohlcv = self.exchange.fetch_ohlcv(symbol, timeframe, limit=limit)
+            ex = self._client()
+            ohlcv = ex.fetch_ohlcv(symbol, timeframe, limit=limit)
             # ccxt returns [timestamp, open, high, low, close, volume]
             # convert to list of tuples
             return [tuple(candle[:6]) for candle in ohlcv]
@@ -116,10 +198,11 @@ class CCXTExchange(ExchangeInterface):
         params: dict | None = None,
     ) -> dict:
         try:
+            ex = self._client()
             order_params = dict(params or {})
             # Type: market or limit
             # Side: buy or sell
-            order = self.exchange.create_order(
+            order = ex.create_order(
                 symbol=symbol,
                 type=type,
                 side=side,
@@ -147,7 +230,8 @@ class CCXTExchange(ExchangeInterface):
 
     def fetch_open_orders(self, symbol: str | None = None) -> list[dict]:
         try:
-            orders = self.exchange.fetch_open_orders(symbol)
+            ex = self._client()
+            orders = ex.fetch_open_orders(symbol)
             result = []
             for order in orders:
                 result.append(
@@ -170,20 +254,23 @@ class CCXTExchange(ExchangeInterface):
 
     def cancel_order(self, order_id: str, symbol: str | None = None) -> bool:
         try:
-            self.exchange.cancel_order(order_id, symbol)
+            ex = self._client()
+            ex.cancel_order(order_id, symbol)
             return True
         except Exception as e:
             print(f"Error canceling order {order_id}: {e}")
             return False
 
     def load_markets(self) -> dict:
-        self._markets = self.exchange.load_markets()
+        ex = self._client()
+        self._markets = ex.load_markets()
         return self._markets
 
     def set_leverage(self, symbol: str, leverage: int) -> bool:
         try:
-            if hasattr(self.exchange, "set_leverage"):
-                self.exchange.set_leverage(int(leverage), symbol)
+            ex = self._client()
+            if hasattr(ex, "set_leverage"):
+                ex.set_leverage(int(leverage), symbol)
             return True
         except Exception as e:
             print(f"Warning: failed to set leverage for {symbol}: {e}")
@@ -191,8 +278,9 @@ class CCXTExchange(ExchangeInterface):
 
     def set_margin_mode(self, symbol: str, margin_mode: str) -> bool:
         try:
-            if hasattr(self.exchange, "set_margin_mode"):
-                self.exchange.set_margin_mode(margin_mode, symbol)
+            ex = self._client()
+            if hasattr(ex, "set_margin_mode"):
+                ex.set_margin_mode(margin_mode, symbol)
             return True
         except Exception as e:
             print(f"Warning: failed to set margin mode for {symbol}: {e}")
@@ -200,8 +288,9 @@ class CCXTExchange(ExchangeInterface):
 
     def fetch_positions(self, symbol: str | None = None) -> list[dict]:
         try:
-            if hasattr(self.exchange, "fetch_positions"):
-                return self.exchange.fetch_positions([symbol] if symbol else None)
+            ex = self._client()
+            if hasattr(ex, "fetch_positions"):
+                return ex.fetch_positions([symbol] if symbol else None)
             return []
         except Exception as e:
             print(f"Error fetching positions: {e}")
@@ -209,7 +298,8 @@ class CCXTExchange(ExchangeInterface):
 
     def fetch_order(self, order_id: str, symbol: str | None = None) -> dict:
         try:
-            order = self.exchange.fetch_order(order_id, symbol)
+            ex = self._client()
+            order = ex.fetch_order(order_id, symbol)
             return {
                 "id": order.get("id"),
                 "status": order.get("status"),

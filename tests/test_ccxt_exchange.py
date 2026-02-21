@@ -27,6 +27,15 @@ class MockConfig:
     IS_TESTNET = True
 
 
+class FutureConfig(MockConfig):
+    EXCHANGE = {
+        "driver": "ccxt",
+        "name": "binance",
+        "market_type": "future",
+    }
+    IS_TESTNET = False
+
+
 class TestCCXTExchange(unittest.TestCase):
     def setUp(self):
         # Manually patch ccxt in the module
@@ -112,6 +121,24 @@ class TestCCXTExchange(unittest.TestCase):
     def test_cancel_order(self):
         self.exchange.cancel_order("111", "BTC/USDT")
         mock_exchange_inst.cancel_order.assert_called_with("111", "BTC/USDT")
+
+    def test_get_all_position_legs_future_mode(self):
+        mock_exchange_inst.reset_mock()
+        exchange = CCXTExchange(FutureConfig())
+        mock_exchange_inst.fetch_positions.return_value = [
+            {"symbol": "BTC/USDT", "contracts": 0.4, "side": "long"},
+            {"symbol": "BTC/USDT", "contracts": 0.1, "side": "short"},
+            {"symbol": "ETH/USDT", "positionAmt": "-0.2", "info": {"positionSide": "SHORT"}},
+        ]
+
+        legs = exchange.get_all_position_legs()
+        net = exchange.get_all_positions()
+
+        self.assertEqual(legs["BTC/USDT"]["LONG"], 0.4)
+        self.assertEqual(legs["BTC/USDT"]["SHORT"], 0.1)
+        self.assertEqual(legs["ETH/USDT"]["SHORT"], 0.2)
+        self.assertAlmostEqual(net["BTC/USDT"], 0.3)
+        self.assertAlmostEqual(net["ETH/USDT"], -0.2)
 
 
 if __name__ == "__main__":
