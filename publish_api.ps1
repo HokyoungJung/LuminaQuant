@@ -54,7 +54,21 @@ Write-Host "Switching to main..." -ForegroundColor Cyan
 git checkout main
 
 Write-Host "Merging changes from private-main (without committing)..." -ForegroundColor Cyan
-git merge private-main --no-commit --no-ff
+$mergeFailed = $false
+try {
+    git merge private-main --no-commit --no-ff
+}
+catch {
+    $mergeFailed = $true
+}
+if ($LASTEXITCODE -ne 0) {
+    $mergeFailed = $true
+}
+if ($mergeFailed) {
+    Write-Host "Merge had conflicts. Preferring private-main content before filtering..." -ForegroundColor Yellow
+    git checkout --theirs -- . *> $null
+    git add -A *> $null
+}
 
 Write-Host "Enforcing public .gitignore..." -ForegroundColor Cyan
 git checkout HEAD -- .gitignore

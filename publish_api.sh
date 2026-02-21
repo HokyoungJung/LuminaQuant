@@ -55,7 +55,11 @@ echo -e "\033[0;36mSwitching to main...\033[0m"
 git checkout main
 
 echo -e "\033[0;36mMerging changes from private-main (without committing)...\033[0m"
-git merge private-main --no-commit --no-ff
+if ! git merge private-main --no-commit --no-ff; then
+  echo -e "\033[0;33mMerge had conflicts. Preferring private-main content before filtering...\033[0m"
+  git checkout --theirs -- . >/dev/null 2>&1 || true
+  git add -A >/dev/null 2>&1 || true
+fi
 
 echo -e "\033[0;36mEnforcing public .gitignore...\033[0m"
 git checkout HEAD -- .gitignore
