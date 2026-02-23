@@ -28,7 +28,18 @@ from lumina_quant.backtest import Backtest
 from lumina_quant.data import HistoricCSVDataHandler
 from lumina_quant.execution import SimulatedExecutionHandler
 from lumina_quant.portfolio import Portfolio
-from strategies import get_default_strategy_params, get_strategy_map
+
+STRATEGY_IMPORT_ERROR: Exception | None = None
+try:
+    from strategies import get_default_strategy_params, get_strategy_map
+except Exception as exc:
+    STRATEGY_IMPORT_ERROR = exc
+
+    def get_default_strategy_params(_strategy_name: str) -> dict[str, Any]:
+        return {}
+
+    def get_strategy_map() -> dict[str, type]:
+        return {}
 
 try:
     import psutil
@@ -333,6 +344,23 @@ def _parse_args() -> argparse.Namespace:
 def main() -> None:
     """Execute the benchmark and write a summary JSON artifact."""
     args = _parse_args()
+    if not STRATEGY_MAP:
+        output_dir = os.path.dirname(args.output)
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
+        payload = {
+            "skipped": True,
+            "reason": "strategies package unavailable in this distribution",
+            "error": str(STRATEGY_IMPORT_ERROR) if STRATEGY_IMPORT_ERROR is not None else None,
+            "generated_at_utc": datetime.now(UTC).isoformat(),
+            "python": sys.version.split()[0],
+        }
+        with open(args.output, "w", encoding="utf-8") as file:
+            json.dump(payload, file, indent=2)
+        print(json.dumps(payload, indent=2))
+        print(f"Saved benchmark snapshot: {args.output}")
+        return
+
     summary = build_benchmark_summary(args)
     previous = _load_snapshot(args.compare_to)
     if previous is not None:
