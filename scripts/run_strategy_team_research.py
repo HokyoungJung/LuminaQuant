@@ -25,8 +25,8 @@ DEFAULT_TOP10_PLUS_METALS: tuple[str, ...] = (
     "TRX/USDT",
     "AVAX/USDT",
     "LINK/USDT",
-    "XAU/USDT",
-    "XAG/USDT",
+    "XAU/USDT:USDT",
+    "XAG/USDT:USDT",
 )
 
 _TF_SECONDS: dict[str, int] = {
@@ -58,6 +58,25 @@ def _extract_saved_report_path(output: str) -> Path | None:
     return None
 
 
+def _read_log_tail(path: Path, *, max_bytes: int = 65536) -> str:
+    if not path.exists():
+        return ""
+    data = b""
+    with path.open("rb") as file:
+        file.seek(0, 2)
+        size = file.tell()
+        if size <= 0:
+            return ""
+        file.seek(max(0, size - int(max_bytes)))
+        data = file.read()
+    return data.decode("utf-8", errors="ignore")
+
+
+def _extract_saved_report_path_from_log(path: Path) -> Path | None:
+    tail = _read_log_tail(path, max_bytes=131072)
+    return _extract_saved_report_path(tail)
+
+
 def _normalize_timeframe(value: str) -> str:
     return str(value).strip().lower()
 
@@ -65,6 +84,13 @@ def _normalize_timeframe(value: str) -> str:
 def _timeframe_seconds(value: str) -> int:
     token = _normalize_timeframe(value)
     return int(_TF_SECONDS.get(token, 0))
+
+
+def _enforce_1s_base_timeframe(value: str) -> str:
+    token = _normalize_timeframe(value)
+    if token != "1s":
+        print(f"[WARN] base-timeframe '{token}' overridden to '1s' for all backtests.")
+    return "1s"
 
 
 def _eligible_base_timeframes(strategy_timeframe: str, base_candidates: list[str]) -> list[str]:
@@ -154,12 +180,18 @@ def _select_diversified_team(
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Build a large strategy-team research report.")
     parser.add_argument("--db-path", default="data/lq_market.sqlite3")
+    parser.add_argument("--backend", default="influxdb", help="Storage backend override (sqlite|influxdb).")
+    parser.add_argument("--influx-url", default="")
+    parser.add_argument("--influx-org", default="")
+    parser.add_argument("--influx-bucket", default="")
+    parser.add_argument("--influx-token", default="")
+    parser.add_argument("--influx-token-env", default="INFLUXDB_TOKEN")
     parser.add_argument("--exchange", default="binance")
     parser.add_argument("--base-timeframe", default="1s")
     parser.add_argument(
         "--base-timeframes",
         nargs="+",
-        default=["1s", "1m", "5m", "15m", "1h"],
+        default=["1s"],
         help="Fallback base timeframe candidates; must be <= strategy timeframe.",
     )
     parser.add_argument("--market-type", choices=["spot", "future"], default="future")
@@ -205,12 +237,54 @@ def _build_parser() -> argparse.ArgumentParser:
         default=0,
         help="Optional cap for timeframe x seed runs (0 means all).",
     )
+    parser.add_argument(
+        "--candidate-manifest",
+        default="",
+        help="Optional path to candidate manifest JSON (forwarded to OOS search).",
+    )
+    parser.add_argument("--data-cache-max-entries", type=int, default=3)
+    parser.add_argument("--data-cache-max-rows", type=int, default=0)
+    parser.add_argument(
+        "--data-cache-scope",
+        choices=["global", "strategy"],
+        default="strategy",
+    )
+    parser.add_argument("--ensemble-mode", choices=["auto", "off"], default="auto")
+    parser.add_argument("--ensemble-max-candidates", type=int, default=4)
+    parser.add_argument(
+        "--prefetch-strategy-data",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Forward prefetch behavior to oos_guarded_multistrategy_search.py",
+    )
+    parser.add_argument("--influx-1s-query-chunk-days", type=int, default=0)
+    parser.add_argument("--influx-1s-agg-chunk-days", type=int, default=0)
+    parser.add_argument("--child-log-dir", default="logs/team_research")
     parser.add_argument("--dry-run", action="store_true")
     return parser
 
 
 def main() -> None:
     args = _build_parser().parse_args()
+    args.base_timeframe = _enforce_1s_base_timeframe(args.base_timeframe)
+    args.base_timeframes = ["1s"]
+    candidate_manifest_arg = str(args.candidate_manifest or "").strip()
+    backend_arg = str(args.backend or "").strip()
+    influx_url_arg = str(args.influx_url or "").strip()
+    influx_org_arg = str(args.influx_org or "").strip()
+    influx_bucket_arg = str(args.influx_bucket or "").strip()
+    influx_token_arg = str(args.influx_token or "").strip()
+    influx_token_env_arg = str(args.influx_token_env or "INFLUXDB_TOKEN").strip() or "INFLUXDB_TOKEN"
+    use_influx_options = bool(
+        backend_arg
+        or influx_url_arg
+        or influx_org_arg
+        or influx_bucket_arg
+        or influx_token_arg
+        or influx_token_env_arg != "INFLUXDB_TOKEN"
+    )
+    child_log_dir = Path(str(args.child_log_dir or "logs/team_research"))
+    child_log_dir.mkdir(parents=True, exist_ok=True)
 
     run_plan: list[tuple[str, int]] = []
     for timeframe in list(args.timeframes):
@@ -311,10 +385,42 @@ def main() -> None:
                 str(float(args.xau_xag_ensemble_min_overlap_days)),
                 "--xau-xag-ensemble-min-oos-trades",
                 str(int(args.xau_xag_ensemble_min_oos_trades)),
+                "--data-cache-max-entries",
+                str(int(args.data_cache_max_entries)),
+                "--data-cache-max-rows",
+                str(int(args.data_cache_max_rows)),
+                "--data-cache-scope",
+                str(args.data_cache_scope),
+                "--ensemble-mode",
+                str(args.ensemble_mode),
+                "--ensemble-max-candidates",
+                str(int(args.ensemble_max_candidates)),
+                "--prefetch-strategy-data"
+                if bool(args.prefetch_strategy_data)
+                else "--no-prefetch-strategy-data",
+                "--influx-1s-query-chunk-days",
+                str(int(args.influx_1s_query_chunk_days)),
+                "--influx-1s-agg-chunk-days",
+                str(int(args.influx_1s_agg_chunk_days)),
                 "--topcap-symbols",
                 *[str(token) for token in args.topcap_symbols],
             ]
-            print(" ".join(cmd))
+            if candidate_manifest_arg:
+                cmd.extend(["--candidate-manifest", candidate_manifest_arg])
+            if backend_arg:
+                cmd.extend(["--backend", backend_arg])
+            if influx_url_arg:
+                cmd.extend(["--influx-url", influx_url_arg])
+            if influx_org_arg:
+                cmd.extend(["--influx-org", influx_org_arg])
+            if influx_bucket_arg:
+                cmd.extend(["--influx-bucket", influx_bucket_arg])
+            if influx_token_arg:
+                cmd.extend(["--influx-token", influx_token_arg])
+            if use_influx_options and influx_token_env_arg:
+                cmd.extend(["--influx-token-env", influx_token_env_arg])
+            command_text = " ".join(cmd)
+            print(f"[TEAM-RUN-CMD] {command_text}")
             run_rows.append(
                 {
                     "timeframe": timeframe,
@@ -387,23 +493,70 @@ def main() -> None:
                 str(float(args.xau_xag_ensemble_min_overlap_days)),
                 "--xau-xag-ensemble-min-oos-trades",
                 str(int(args.xau_xag_ensemble_min_oos_trades)),
+                "--data-cache-max-entries",
+                str(int(args.data_cache_max_entries)),
+                "--data-cache-max-rows",
+                str(int(args.data_cache_max_rows)),
+                "--data-cache-scope",
+                str(args.data_cache_scope),
+                "--ensemble-mode",
+                str(args.ensemble_mode),
+                "--ensemble-max-candidates",
+                str(int(args.ensemble_max_candidates)),
+                "--prefetch-strategy-data"
+                if bool(args.prefetch_strategy_data)
+                else "--no-prefetch-strategy-data",
+                "--influx-1s-query-chunk-days",
+                str(int(args.influx_1s_query_chunk_days)),
+                "--influx-1s-agg-chunk-days",
+                str(int(args.influx_1s_agg_chunk_days)),
                 "--topcap-symbols",
                 *[str(token) for token in args.topcap_symbols],
             ]
-            print(" ".join(cmd))
-            proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
-            stdout = proc.stdout or ""
-            stderr = proc.stderr or ""
+            if candidate_manifest_arg:
+                cmd.extend(["--candidate-manifest", candidate_manifest_arg])
+            if backend_arg:
+                cmd.extend(["--backend", backend_arg])
+            if influx_url_arg:
+                cmd.extend(["--influx-url", influx_url_arg])
+            if influx_org_arg:
+                cmd.extend(["--influx-org", influx_org_arg])
+            if influx_bucket_arg:
+                cmd.extend(["--influx-bucket", influx_bucket_arg])
+            if influx_token_arg:
+                cmd.extend(["--influx-token", influx_token_arg])
+            if use_influx_options and influx_token_env_arg:
+                cmd.extend(["--influx-token-env", influx_token_env_arg])
+            command_text = " ".join(cmd)
+            stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+            run_log = child_log_dir / (
+                f"team_run_{str(timeframe).lower()}_seed{int(seed)}_base{str(base_timeframe).lower()}_{stamp}.log"
+            )
+            print(f"[TEAM-RUN-CMD] {command_text}")
+            print(f"[TEAM-RUN-LOG] {run_log}")
+            with run_log.open("w", encoding="utf-8") as log_fd:
+                log_fd.write(f"$ {command_text}\n")
+                log_fd.flush()
+                proc = subprocess.run(
+                    cmd,
+                    stdout=log_fd,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    check=False,
+                )
+            log_tail = _read_log_tail(run_log, max_bytes=8192)
             attempts.append(
                 {
                     "base_timeframe": str(base_timeframe),
                     "return_code": int(proc.returncode),
-                    "stderr": stderr[-1200:],
+                    "log_path": str(run_log),
+                    "command": cmd,
+                    "log_tail": log_tail[-1200:],
                 }
             )
             if int(proc.returncode) != 0:
                 continue
-            report_path = _extract_saved_report_path(stdout)
+            report_path = _extract_saved_report_path_from_log(run_log)
             if report_path is not None and report_path.exists():
                 break
 
@@ -460,6 +613,21 @@ def main() -> None:
         "seeds": list(args.seeds),
         "strategy_set": str(args.strategy_set),
         "topcap_symbols": list(args.topcap_symbols),
+        "backend": backend_arg,
+        "influx_url": influx_url_arg,
+        "influx_org": influx_org_arg,
+        "influx_bucket": influx_bucket_arg,
+        "influx_token_env": influx_token_env_arg,
+        "candidate_manifest": candidate_manifest_arg,
+        "data_cache_max_entries": int(args.data_cache_max_entries),
+        "data_cache_max_rows": int(args.data_cache_max_rows),
+        "data_cache_scope": str(args.data_cache_scope),
+        "ensemble_mode": str(args.ensemble_mode),
+        "ensemble_max_candidates": int(args.ensemble_max_candidates),
+        "prefetch_strategy_data": bool(args.prefetch_strategy_data),
+        "influx_1s_query_chunk_days": int(args.influx_1s_query_chunk_days),
+        "influx_1s_agg_chunk_days": int(args.influx_1s_agg_chunk_days),
+        "child_log_dir": str(child_log_dir),
         "run_rows": run_rows,
         "all_candidates_count": len(all_candidates),
         "selected_team_count": len(selected),
@@ -476,6 +644,18 @@ def main() -> None:
     print("\n=== Strategy Team Research Done ===")
     print(f"all_candidates={len(all_candidates)} selected_team={len(selected)}")
     print(f"Saved: {out_path}")
+    if (not bool(args.dry_run)) and len(all_candidates) <= 0:
+        failed_runs = sum(1 for row in run_rows if str(row.get("status")) != "ok")
+        total_runs = len(run_rows)
+        print(
+            (
+                "[ERROR] No valid candidates were produced. "
+                f"failed_runs={failed_runs}/{total_runs}. "
+                "Inspect per-run logs under child_log_dir."
+            ),
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
 
 
 if __name__ == "__main__":

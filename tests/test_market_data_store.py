@@ -5,9 +5,12 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+from lumina_quant.influx_market_data import InfluxMarketDataRepository
 from lumina_quant.market_data import (
     MarketDataRepository,
+    _build_market_data_repository,
     connect_market_data_1s_db,
     connect_market_data_db,
     ensure_market_ohlcv_schema,
@@ -27,6 +30,58 @@ class TestMarketDataStore(unittest.TestCase):
         self.assertEqual(normalize_symbol("btcusdt"), "BTC/USDT")
         self.assertEqual(normalize_symbol("BTC-USDT"), "BTC/USDT")
         self.assertEqual(normalize_symbol("eth_usdt"), "ETH/USDT")
+
+    def test_builder_inferred_influx_missing_credentials_falls_back_to_sqlite(self):
+        with patch.dict(
+            "os.environ",
+            {
+                "LQ__STORAGE__BACKEND": "influxdb",
+            },
+            clear=True,
+        ):
+            repo = _build_market_data_repository("data/lq_market.sqlite3")
+        self.assertIsInstance(repo, MarketDataRepository)
+
+    def test_builder_explicit_influx_missing_credentials_is_strict(self):
+        with patch.dict("os.environ", {}, clear=True):
+            for backend in ("influxdb", "influx"):
+                with self.subTest(backend=backend), self.assertRaises(ValueError):
+                    _build_market_data_repository("data/lq_market.sqlite3", backend=backend)
+
+    def test_builder_inferred_influx_with_credentials_uses_influx_repo(self):
+        with patch.dict(
+            "os.environ",
+            {
+                "LQ__STORAGE__BACKEND": "influxdb",
+                "LQ__STORAGE__INFLUX_URL": "http://localhost:8086",
+                "LQ__STORAGE__INFLUX_ORG": "test-org",
+                "LQ__STORAGE__INFLUX_BUCKET": "test-bucket",
+                "INFLUXDB_TOKEN": "test-token",
+            },
+            clear=True,
+        ):
+            repo = _build_market_data_repository("data/lq_market.sqlite3")
+        self.assertIsInstance(repo, InfluxMarketDataRepository)
+
+    def test_upsert_1s_empty_rows_explicit_influx_missing_credentials_is_strict(self):
+        with patch.dict("os.environ", {}, clear=True), self.assertRaises(ValueError):
+            upsert_ohlcv_rows_1s(
+                "data/lq_market.sqlite3",
+                exchange="binance",
+                symbol="BTC/USDT",
+                rows=[],
+                backend="influxdb",
+            )
+
+    def test_upsert_1s_empty_rows_inferred_influx_missing_credentials_returns_zero(self):
+        with patch.dict("os.environ", {"LQ__STORAGE__BACKEND": "influxdb"}, clear=True):
+            inserted = upsert_ohlcv_rows_1s(
+                "data/lq_market.sqlite3",
+                exchange="binance",
+                symbol="BTC/USDT",
+                rows=[],
+            )
+        self.assertEqual(inserted, 0)
 
     def test_upsert_and_load_roundtrip(self):
         with tempfile.TemporaryDirectory() as tmp_dir:

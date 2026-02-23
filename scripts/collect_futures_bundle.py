@@ -11,6 +11,7 @@ with derivatives-related feature points needed for research:
 from __future__ import annotations
 
 import argparse
+import os
 from datetime import UTC, datetime
 
 from lumina_quant.config import BaseConfig, LiveConfig
@@ -24,7 +25,7 @@ from lumina_quant.data_sync import (
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Collect 1s OHLCV and futures feature points into SQLite."
+        description="Collect 1s OHLCV and futures feature points into configured storage backend."
     )
     parser.add_argument("--symbols", nargs="+", default=list(BaseConfig.SYMBOLS))
     parser.add_argument("--db-path", default=BaseConfig.MARKET_DATA_SQLITE_PATH)
@@ -35,8 +36,19 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--ohlcv-limit", type=int, default=1000)
     parser.add_argument("--ohlcv-max-batches", type=int, default=100000)
     parser.add_argument("--retries", type=int, default=3)
+    parser.add_argument(
+        "--force-full",
+        action="store_true",
+        help="Ignore existing coverage and resync from --since.",
+    )
     parser.add_argument("--mark-index-interval", default="1m")
     parser.add_argument("--open-interest-period", default="5m")
+    parser.add_argument("--backend", default="influxdb", help="Storage backend override (sqlite|influxdb).")
+    parser.add_argument("--influx-url", default="")
+    parser.add_argument("--influx-org", default="")
+    parser.add_argument("--influx-bucket", default="")
+    parser.add_argument("--influx-token", default="")
+    parser.add_argument("--influx-token-env", default="INFLUXDB_TOKEN")
     parser.add_argument("--skip-ohlcv", action="store_true")
     parser.add_argument("--skip-features", action="store_true")
     return parser
@@ -44,6 +56,29 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = _build_parser().parse_args()
+    backend_arg = str(args.backend or "").strip()
+    influx_url_arg = str(args.influx_url or "").strip()
+    influx_org_arg = str(args.influx_org or "").strip()
+    influx_bucket_arg = str(args.influx_bucket or "").strip()
+    influx_token_arg = str(args.influx_token or "").strip()
+    influx_token_env_arg = str(args.influx_token_env or "INFLUXDB_TOKEN").strip() or "INFLUXDB_TOKEN"
+
+    if backend_arg:
+        os.environ["LQ__STORAGE__BACKEND"] = "influxdb" if backend_arg.lower() in {
+            "influx",
+            "influxdb",
+        } else "sqlite"
+    if influx_url_arg:
+        os.environ["LQ__STORAGE__INFLUX_URL"] = influx_url_arg
+    if influx_org_arg:
+        os.environ["LQ__STORAGE__INFLUX_ORG"] = influx_org_arg
+    if influx_bucket_arg:
+        os.environ["LQ__STORAGE__INFLUX_BUCKET"] = influx_bucket_arg
+    if influx_token_env_arg:
+        os.environ["LQ__STORAGE__INFLUX_TOKEN_ENV"] = influx_token_env_arg
+    if influx_token_arg:
+        os.environ[influx_token_env_arg] = influx_token_arg
+
     since_ms = parse_timestamp_input(args.since)
     until_ms = parse_timestamp_input(args.until) if args.until else None
     if since_ms is None:
@@ -68,10 +103,11 @@ def main() -> None:
                 timeframe="1s",
                 since_ms=int(since_ms),
                 until_ms=effective_until,
-                force_full=False,
+                force_full=bool(args.force_full),
                 limit=max(1, int(args.ohlcv_limit)),
                 max_batches=max(1, int(args.ohlcv_max_batches)),
                 retries=max(0, int(args.retries)),
+                backend=backend_arg,
                 export_csv_dir="data",
             )
             print("\n=== 1s OHLCV Sync ===")
@@ -90,6 +126,12 @@ def main() -> None:
                 mark_index_interval=str(args.mark_index_interval),
                 open_interest_period=str(args.open_interest_period),
                 retries=max(0, int(args.retries)),
+                backend=backend_arg,
+                influx_url=influx_url_arg,
+                influx_org=influx_org_arg,
+                influx_bucket=influx_bucket_arg,
+                influx_token=influx_token_arg,
+                influx_token_env=influx_token_env_arg,
             )
             print("\n=== Futures Feature Points Sync ===")
             for row in feature_stats:

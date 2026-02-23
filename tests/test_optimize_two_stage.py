@@ -4,35 +4,6 @@ import importlib.util
 import sys
 from datetime import datetime
 from pathlib import Path
-from types import ModuleType, SimpleNamespace
-
-
-def _install_strategy_stub() -> None:
-    if "strategies" in sys.modules:
-        return
-
-    class _DummyStrategy:
-        __name__ = "DummyStrategy"
-
-    def _get_strategy_map():
-        return {"DummyStrategy": _DummyStrategy}
-
-    def _resolve_strategy_class(requested_name, default_name=None):
-        _ = requested_name
-        _ = default_name
-        return _DummyStrategy
-
-    registry = SimpleNamespace(
-        DEFAULT_STRATEGY_NAME="DummyStrategy",
-        get_strategy_map=_get_strategy_map,
-        resolve_strategy_class=_resolve_strategy_class,
-    )
-    strategies_mod = ModuleType("strategies")
-    strategies_mod.registry = registry
-    sys.modules["strategies"] = strategies_mod
-
-
-_install_strategy_stub()
 
 _OPTIMIZE_PATH = Path(__file__).resolve().parents[1] / "optimize.py"
 sys.path.insert(0, str(_OPTIMIZE_PATH.parent))

@@ -24,6 +24,12 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--mark-index-interval", default="1m")
     parser.add_argument("--open-interest-period", default="5m")
     parser.add_argument("--retries", type=int, default=3)
+    parser.add_argument("--backend", default="influxdb", help="Storage backend override (sqlite|influxdb).")
+    parser.add_argument("--influx-url", default="")
+    parser.add_argument("--influx-org", default="")
+    parser.add_argument("--influx-bucket", default="")
+    parser.add_argument("--influx-token", default="")
+    parser.add_argument("--influx-token-env", default="INFLUXDB_TOKEN")
     parser.add_argument(
         "--execute",
         action="store_true",
@@ -44,6 +50,12 @@ def main() -> None:
         open_interest_period=str(args.open_interest_period),
         retries=max(0, int(args.retries)),
         execute=bool(args.execute),
+        backend=str(args.backend),
+        influx_url=str(args.influx_url),
+        influx_org=str(args.influx_org),
+        influx_bucket=str(args.influx_bucket),
+        influx_token=str(args.influx_token),
+        influx_token_env=str(args.influx_token_env),
     )
     print(json.dumps(result, ensure_ascii=True, indent=2))
 

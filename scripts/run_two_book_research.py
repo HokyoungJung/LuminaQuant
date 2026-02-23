@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from datetime import UTC, datetime
@@ -30,6 +31,8 @@ def _build_sweep_command(args: argparse.Namespace) -> list[str]:
         "scripts/timeframe_sweep_oos.py",
         "--db-path",
         str(args.db_path),
+        "--backend",
+        str(args.backend),
         "--exchange",
         str(args.exchange),
         "--base-timeframe",
@@ -89,9 +92,26 @@ def _build_sweep_command(args: argparse.Namespace) -> list[str]:
         "--timeframes",
         *[str(token) for token in args.timeframes],
     ]
+    if str(args.influx_url).strip():
+        cmd.extend(["--influx-url", str(args.influx_url).strip()])
+    if str(args.influx_org).strip():
+        cmd.extend(["--influx-org", str(args.influx_org).strip()])
+    if str(args.influx_bucket).strip():
+        cmd.extend(["--influx-bucket", str(args.influx_bucket).strip()])
+    if str(args.influx_token).strip():
+        cmd.extend(["--influx-token", str(args.influx_token).strip()])
+    if str(args.influx_token_env).strip():
+        cmd.extend(["--influx-token-env", str(args.influx_token_env).strip()])
     if args.topcap_symbols:
         cmd.extend(["--topcap-symbols", *[str(symbol) for symbol in args.topcap_symbols]])
     return cmd
+
+
+def _enforce_1s_base_timeframe(value: str) -> str:
+    token = str(value or "").strip().lower() or "1s"
+    if token != "1s":
+        print(f"[WARN] base-timeframe '{token}' overridden to '1s' for all backtests.")
+    return "1s"
 
 
 def _latest_sweep_report(mode: str) -> Path:
@@ -137,9 +157,15 @@ def _prefixed(candidates: list[dict], prefixes: list[str]) -> list[dict]:
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run two-book quant research workflow.")
     parser.add_argument("--db-path", default="data/lq_market.sqlite3")
+    parser.add_argument("--backend", default="influxdb", help="Storage backend override (sqlite|influxdb).")
+    parser.add_argument("--influx-url", default="")
+    parser.add_argument("--influx-org", default="")
+    parser.add_argument("--influx-bucket", default="")
+    parser.add_argument("--influx-token", default="")
+    parser.add_argument("--influx-token-env", default="INFLUXDB_TOKEN")
     parser.add_argument("--exchange", default="binance")
     parser.add_argument("--market-type", choices=["spot", "future"], default="future")
-    parser.add_argument("--base-timeframe", default="1m")
+    parser.add_argument("--base-timeframe", default="1s")
     parser.add_argument("--mode", choices=["oos", "live"], default="oos")
     parser.add_argument(
         "--strategy-set", choices=["all", "crypto-only", "xau-xag-only"], default="crypto-only"
@@ -217,6 +243,26 @@ def _select_two_book_candidates(
 def main() -> None:
     parser = _build_parser()
     args = parser.parse_args()
+    args.base_timeframe = _enforce_1s_base_timeframe(args.base_timeframe)
+
+    backend_arg = str(args.backend or "").strip()
+    influx_url_arg = str(args.influx_url or "").strip()
+    influx_org_arg = str(args.influx_org or "").strip()
+    influx_bucket_arg = str(args.influx_bucket or "").strip()
+    influx_token_arg = str(args.influx_token or "").strip()
+    influx_token_env_arg = str(args.influx_token_env or "INFLUXDB_TOKEN").strip() or "INFLUXDB_TOKEN"
+    if backend_arg:
+        os.environ["LQ__STORAGE__BACKEND"] = "influxdb" if backend_arg.lower() in {"influx", "influxdb"} else "sqlite"
+    if influx_url_arg:
+        os.environ["LQ__STORAGE__INFLUX_URL"] = influx_url_arg
+    if influx_org_arg:
+        os.environ["LQ__STORAGE__INFLUX_ORG"] = influx_org_arg
+    if influx_bucket_arg:
+        os.environ["LQ__STORAGE__INFLUX_BUCKET"] = influx_bucket_arg
+    if influx_token_env_arg:
+        os.environ["LQ__STORAGE__INFLUX_TOKEN_ENV"] = influx_token_env_arg
+    if influx_token_arg:
+        os.environ[influx_token_env_arg] = influx_token_arg
 
     sweep_cmd = _build_sweep_command(args)
     print("=== Two-Book Sweep Command ===")

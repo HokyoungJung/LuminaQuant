@@ -8,6 +8,7 @@ This wrapper does two things with stable defaults:
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 from collections.abc import Sequence
@@ -51,6 +52,8 @@ def _build_sweep_command(args: argparse.Namespace, symbols: Sequence[str]) -> li
         "scripts/timeframe_sweep_oos.py",
         "--db-path",
         str(args.db_path),
+        "--backend",
+        str(args.backend),
         "--exchange",
         str(args.exchange),
         "--base-timeframe",
@@ -110,17 +113,40 @@ def _build_sweep_command(args: argparse.Namespace, symbols: Sequence[str]) -> li
         "--timeframes",
         *[str(token) for token in args.timeframes],
     ]
+    if str(args.influx_url).strip():
+        cmd.extend(["--influx-url", str(args.influx_url).strip()])
+    if str(args.influx_org).strip():
+        cmd.extend(["--influx-org", str(args.influx_org).strip()])
+    if str(args.influx_bucket).strip():
+        cmd.extend(["--influx-bucket", str(args.influx_bucket).strip()])
+    if str(args.influx_token).strip():
+        cmd.extend(["--influx-token", str(args.influx_token).strip()])
+    if str(args.influx_token_env).strip():
+        cmd.extend(["--influx-token-env", str(args.influx_token_env).strip()])
     if symbols:
         cmd.extend(["--topcap-symbols", *symbols])
     return cmd
 
 
+def _enforce_1s_base_timeframe(value: str) -> str:
+    token = str(value or "").strip().lower() or "1s"
+    if token != "1s":
+        print(f"[WARN] base-timeframe '{token}' overridden to '1s' for all backtests.")
+    return "1s"
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run phase-1 Binance USDT-M research workflow.")
     parser.add_argument("--db-path", default="data/lq_market.sqlite3")
+    parser.add_argument("--backend", default="influxdb", help="Storage backend override (sqlite|influxdb).")
+    parser.add_argument("--influx-url", default="")
+    parser.add_argument("--influx-org", default="")
+    parser.add_argument("--influx-bucket", default="")
+    parser.add_argument("--influx-token", default="")
+    parser.add_argument("--influx-token-env", default="INFLUXDB_TOKEN")
     parser.add_argument("--exchange", default="binance")
     parser.add_argument("--market-type", choices=["spot", "future"], default="future")
-    parser.add_argument("--base-timeframe", default="1m")
+    parser.add_argument("--base-timeframe", default="1s")
     parser.add_argument("--mode", choices=["oos", "live"], default="oos")
     parser.add_argument(
         "--strategy-set",
@@ -168,6 +194,26 @@ def _build_parser() -> argparse.ArgumentParser:
 def main() -> None:
     parser = _build_parser()
     args = parser.parse_args()
+    args.base_timeframe = _enforce_1s_base_timeframe(args.base_timeframe)
+
+    backend_arg = str(args.backend or "").strip()
+    influx_url_arg = str(args.influx_url or "").strip()
+    influx_org_arg = str(args.influx_org or "").strip()
+    influx_bucket_arg = str(args.influx_bucket or "").strip()
+    influx_token_arg = str(args.influx_token or "").strip()
+    influx_token_env_arg = str(args.influx_token_env or "INFLUXDB_TOKEN").strip() or "INFLUXDB_TOKEN"
+    if backend_arg:
+        os.environ["LQ__STORAGE__BACKEND"] = "influxdb" if backend_arg.lower() in {"influx", "influxdb"} else "sqlite"
+    if influx_url_arg:
+        os.environ["LQ__STORAGE__INFLUX_URL"] = influx_url_arg
+    if influx_org_arg:
+        os.environ["LQ__STORAGE__INFLUX_ORG"] = influx_org_arg
+    if influx_bucket_arg:
+        os.environ["LQ__STORAGE__INFLUX_BUCKET"] = influx_bucket_arg
+    if influx_token_env_arg:
+        os.environ["LQ__STORAGE__INFLUX_TOKEN_ENV"] = influx_token_env_arg
+    if influx_token_arg:
+        os.environ[influx_token_env_arg] = influx_token_arg
 
     symbols = _normalize_symbols(args.symbols)
     if not symbols:
@@ -190,6 +236,7 @@ def main() -> None:
                 max_batches=max(1, int(args.sync_max_batches)),
                 retries=max(0, int(args.sync_retries)),
                 export_csv_dir="data",
+                backend=str(args.backend),
             )
         finally:
             close_fn = getattr(exchange, "close", None)

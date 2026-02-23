@@ -10,10 +10,13 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import gc
 import io
 import json
+import os
 import random
 import sqlite3
+from collections import OrderedDict
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -37,12 +40,18 @@ from lumina_quant.backtesting.backtest import Backtest
 from lumina_quant.backtesting.data import HistoricCSVDataHandler
 from lumina_quant.backtesting.execution_sim import SimulatedExecutionHandler
 from lumina_quant.backtesting.portfolio_backtest import Portfolio
-from lumina_quant.market_data import load_data_dict_from_db
+from lumina_quant.market_data import (
+    load_data_dict_from_db,
+    load_ohlcv_coverage_from_db,
+    normalize_timeframe_token,
+)
 from lumina_quant.utils.performance import (
     create_drawdowns,
     create_sharpe_ratio,
     create_sortino_ratio,
 )
+from strategies.candidate_regime_breakout import RegimeBreakoutCandidateStrategy
+from strategies.candidate_vol_compression_reversion import VolatilityCompressionReversionStrategy
 from strategies.lag_convergence import LagConvergenceStrategy
 from strategies.mean_reversion_std import MeanReversionStdStrategy
 from strategies.moving_average import MovingAverageCrossStrategy
@@ -59,11 +68,206 @@ class RunResult:
     curve: dict
 
 
+class BoundedDataCache:
+    """Approximate LRU cache for loaded market windows used in repeated backtests."""
+
+    def __init__(self, *, max_entries: int = 3, max_rows: int = 0) -> None:
+        self.max_entries = max(1, int(max_entries))
+        self.max_rows = max(0, int(max_rows))
+        self._store: OrderedDict[tuple, tuple[dict[str, pl.DataFrame], int]] = OrderedDict()
+        self._rows = 0
+
+    @staticmethod
+    def _estimate_rows(payload: dict[str, pl.DataFrame]) -> int:
+        total = 0
+        if not isinstance(payload, dict):
+            return 0
+        for frame in payload.values():
+            if isinstance(frame, pl.DataFrame):
+                total += int(frame.height)
+        return int(total)
+
+    def _evict_if_needed(self) -> None:
+        evicted = 0
+        while self._store and (
+            len(self._store) > self.max_entries
+            or (self.max_rows > 0 and self._rows > self.max_rows)
+        ):
+            _, (_, rows) = self._store.popitem(last=False)
+            self._rows = max(0, self._rows - int(rows))
+            evicted += 1
+        if evicted > 0:
+            gc.collect()
+
+    def get(self, key: tuple) -> dict[str, pl.DataFrame] | None:
+        row = self._store.get(key)
+        if row is None:
+            return None
+        self._store.move_to_end(key, last=True)
+        return row[0]
+
+    def put(self, key: tuple, payload: dict[str, pl.DataFrame]) -> bool:
+        rows = self._estimate_rows(payload)
+        if key in self._store:
+            _, previous_rows = self._store.pop(key)
+            self._rows = max(0, self._rows - int(previous_rows))
+
+        if self.max_rows > 0 and rows > self.max_rows:
+            return False
+
+        self._store[key] = (payload, rows)
+        self._store.move_to_end(key, last=True)
+        self._rows += rows
+        self._evict_if_needed()
+        return True
+
+    def stats(self) -> dict[str, int]:
+        return {
+            "entries": len(self._store),
+            "rows": int(self._rows),
+            "max_entries": int(self.max_entries),
+            "max_rows": int(self.max_rows),
+        }
+
+
 def _safe_float(value, default=0.0):
     try:
         return float(value)
     except Exception:
         return float(default)
+
+
+def _compact_ohlcv_frame(frame: pl.DataFrame | None) -> pl.DataFrame:
+    if not isinstance(frame, pl.DataFrame) or frame.height <= 0:
+        return pl.DataFrame(
+            {
+                "datetime": [],
+                "open": [],
+                "high": [],
+                "low": [],
+                "close": [],
+                "volume": [],
+            },
+            schema={
+                "datetime": pl.Datetime(time_unit="ms"),
+                "open": pl.Float32,
+                "high": pl.Float32,
+                "low": pl.Float32,
+                "close": pl.Float32,
+                "volume": pl.Float32,
+            },
+        )
+
+    out = frame.select(
+        [
+            pl.col("datetime").cast(pl.Datetime(time_unit="ms"), strict=False).alias("datetime"),
+            pl.col("open").cast(pl.Float32, strict=False).alias("open"),
+            pl.col("high").cast(pl.Float32, strict=False).alias("high"),
+            pl.col("low").cast(pl.Float32, strict=False).alias("low"),
+            pl.col("close").cast(pl.Float32, strict=False).alias("close"),
+            pl.col("volume").cast(pl.Float32, strict=False).alias("volume"),
+        ]
+    )
+    datetime_dtype = out.schema.get("datetime")
+    if getattr(datetime_dtype, "time_zone", None) is not None:
+        out = out.with_columns(
+            pl.col("datetime").dt.convert_time_zone("UTC").dt.replace_time_zone(None)
+        )
+    return out.sort("datetime").rechunk()
+
+
+def _compact_ohlcv_payload(payload: dict[str, pl.DataFrame] | None) -> dict[str, pl.DataFrame]:
+    if not isinstance(payload, dict):
+        return {}
+    out: dict[str, pl.DataFrame] = {}
+    for symbol, frame in payload.items():
+        compact = _compact_ohlcv_frame(frame)
+        if compact.height > 0:
+            out[str(symbol)] = compact
+    return out
+
+
+def _slice_frame_window(frame: pl.DataFrame, start_date: datetime, end_date: datetime) -> pl.DataFrame:
+    if not isinstance(frame, pl.DataFrame) or frame.height <= 0:
+        return frame
+    if end_date <= start_date:
+        return frame.slice(0, 0)
+
+    start_idx = int(
+        frame.select(pl.col("datetime").search_sorted(start_date, side="left")).item()
+    )
+    end_idx = int(frame.select(pl.col("datetime").search_sorted(end_date, side="right")).item())
+    if end_idx <= start_idx:
+        return frame.slice(0, 0)
+    return frame.slice(start_idx, end_idx - start_idx)
+
+
+def _resolved_storage_backend() -> str:
+    token = str(
+        os.getenv("LQ__STORAGE__BACKEND") or os.getenv("LQ_STORAGE_BACKEND") or "influxdb"
+    ).strip().lower()
+    if token in {"sqlite", "sqlite3"}:
+        return "sqlite"
+    if token in {"influx", "influxdb"}:
+        return "influxdb"
+    return "influxdb"
+
+
+def _normalize_timeframe_or_default(value: str, default: str) -> str:
+    token = str(value or "").strip()
+    if not token:
+        return str(default)
+    try:
+        return normalize_timeframe_token(token)
+    except Exception:
+        return str(default)
+
+
+def _enforce_1s_base_timeframe(value: str) -> str:
+    token = _normalize_timeframe_or_default(value, "1s")
+    if token != "1s":
+        print(f"[WARN] base-timeframe '{token}' overridden to '1s' for all backtests.")
+    return "1s"
+
+
+def _coerce_datetime(value) -> datetime | None:
+    if isinstance(value, datetime):
+        return value
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except Exception:
+        return None
+
+
+def _coverage_from_frame(frame: pl.DataFrame | None) -> tuple[datetime | None, datetime | None, int]:
+    if not isinstance(frame, pl.DataFrame) or frame.height <= 0:
+        return None, None, 0
+    first = _coerce_datetime(frame["datetime"].min())
+    last = _coerce_datetime(frame["datetime"].max())
+    return first, last, int(frame.height)
+
+
+def _load_symbol_coverage(
+    *,
+    db_path: str,
+    exchange: str,
+    symbol: str,
+    timeframe: str,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+) -> tuple[datetime | None, datetime | None, int]:
+    return load_ohlcv_coverage_from_db(
+        db_path,
+        exchange=exchange,
+        symbol=symbol,
+        timeframe=timeframe,
+        start_date=start_date,
+        end_date=end_date,
+        backend=_resolved_storage_backend(),
+    )
 
 
 def _annual_periods_for_timeframe(timeframe: str) -> int:
@@ -92,6 +296,43 @@ def _bars_per_day_for_timeframe(timeframe: str) -> float:
         "1d": 1.0,
     }
     return float(mapping.get(str(timeframe).strip().lower(), 1.0))
+
+
+def _load_manifest_strategy_classes(manifest_path: str) -> set[str]:
+    path_text = str(manifest_path or "").strip()
+    if not path_text:
+        return set()
+    path = Path(path_text)
+    if not path.exists():
+        return set()
+    try:
+        with path.open(encoding="utf-8") as file:
+            payload = json.load(file)
+    except Exception:
+        return set()
+    candidates = payload.get("candidates") if isinstance(payload, dict) else []
+    if not isinstance(candidates, list):
+        return set()
+    out: set[str] = set()
+    for row in candidates:
+        if not isinstance(row, dict):
+            continue
+        class_name = str(row.get("strategy") or row.get("strategy_class") or "").strip()
+        if class_name:
+            out.add(class_name)
+    return out
+
+
+def _filter_specs_by_manifest(specs: list[dict], allowed_strategy_classes: set[str]) -> list[dict]:
+    if not allowed_strategy_classes:
+        return specs
+    out: list[dict] = []
+    for spec in specs:
+        cls = spec.get("strategy_cls")
+        class_name = str(getattr(cls, "__name__", "")).strip()
+        if class_name in allowed_strategy_classes:
+            out.append(spec)
+    return out
 
 
 def _coverage_days_from_bounds(
@@ -279,21 +520,89 @@ def _benchmark_period_return(
     if key in cache:
         return _safe_float(cache[key], 0.0)
 
-    frame = load_data_dict_from_db(
-        db_path,
-        exchange=exchange,
-        symbol_list=[symbol],
-        timeframe=timeframe,
-        start_date=start_date,
-        end_date=end_date,
-    ).get(symbol)
-
     out = 0.0
-    if isinstance(frame, pl.DataFrame) and frame.height >= 2:
-        first = _safe_float(frame["close"][0], 0.0)
-        last = _safe_float(frame["close"][-1], 0.0)
-        if first > 0.0:
-            out = float((last / first) - 1.0)
+    resolved = False
+    backend = _resolved_storage_backend()
+
+    # Fast path for large Influx 1s windows:
+    # fetch coverage first/last timestamps, then query only tiny edge windows.
+    with contextlib.suppress(Exception):
+        cov_first, cov_last, cov_count = load_ohlcv_coverage_from_db(
+            db_path,
+            exchange=exchange,
+            symbol=symbol,
+            timeframe=timeframe,
+            start_date=start_date,
+            end_date=end_date,
+            backend=backend,
+        )
+        if int(cov_count or 0) >= 2 and isinstance(cov_first, datetime) and isinstance(cov_last, datetime):
+            token = normalize_timeframe_token(timeframe)
+            unit_seconds = {
+                "s": 1,
+                "m": 60,
+                "h": 3600,
+                "d": 86400,
+                "w": 604800,
+                "M": 2592000,
+            }
+            window_seconds = max(
+                1,
+                int(token[:-1]) * int(unit_seconds.get(token[-1], 1)) * 2,
+            )
+            window = timedelta(seconds=window_seconds)
+
+            first_frame = load_data_dict_from_db(
+                db_path,
+                exchange=exchange,
+                symbol_list=[symbol],
+                timeframe=timeframe,
+                start_date=cov_first,
+                end_date=cov_first + window,
+                backend=backend,
+            ).get(symbol)
+            last_start = cov_last - window
+            if last_start < cov_first:
+                last_start = cov_first
+            last_frame = load_data_dict_from_db(
+                db_path,
+                exchange=exchange,
+                symbol_list=[symbol],
+                timeframe=timeframe,
+                start_date=last_start,
+                end_date=cov_last,
+                backend=backend,
+            ).get(symbol)
+
+            if (
+                isinstance(first_frame, pl.DataFrame)
+                and first_frame.height > 0
+                and isinstance(last_frame, pl.DataFrame)
+                and last_frame.height > 0
+            ):
+                first = _safe_float(first_frame["close"][0], 0.0)
+                last = _safe_float(last_frame["close"][-1], 0.0)
+                if first > 0.0:
+                    out = float((last / first) - 1.0)
+                    resolved = True
+
+    if not resolved:
+        frame = load_data_dict_from_db(
+            db_path,
+            exchange=exchange,
+            symbol_list=[symbol],
+            timeframe=timeframe,
+            start_date=start_date,
+            end_date=end_date,
+            backend=backend,
+        ).get(symbol)
+
+        if isinstance(frame, pl.DataFrame) and frame.height >= 2:
+            first = _safe_float(frame["close"][0], 0.0)
+            last = _safe_float(frame["close"][-1], 0.0)
+            if first > 0.0:
+                out = float((last / first) - 1.0)
+                resolved = True
 
     cache[key] = out
     return out
@@ -424,22 +733,38 @@ def _read_symbol_coverage(
     symbol: str,
     timeframe: str,
 ) -> tuple[datetime | None, datetime | None, int]:
-    conn = sqlite3.connect(db_path)
+    if _resolved_storage_backend() == "influxdb":
+        return _load_symbol_coverage(
+            db_path=db_path,
+            exchange=exchange,
+            symbol=symbol,
+            timeframe=timeframe,
+        )
+
     try:
-        row = conn.execute(
-            """
-            SELECT MIN(datetime), MAX(datetime), COUNT(*)
-            FROM market_ohlcv
-            WHERE exchange = ? AND symbol = ? AND timeframe = ?
-            """,
-            (
-                str(exchange).strip().lower(),
-                str(symbol).strip().upper(),
-                str(timeframe).strip().lower(),
-            ),
-        ).fetchone()
-    finally:
-        conn.close()
+        conn = sqlite3.connect(db_path)
+        try:
+            row = conn.execute(
+                """
+                SELECT MIN(datetime), MAX(datetime), COUNT(*)
+                FROM market_ohlcv
+                WHERE exchange = ? AND symbol = ? AND timeframe = ?
+                """,
+                (
+                    str(exchange).strip().lower(),
+                    str(symbol).strip().upper(),
+                    str(timeframe).strip().lower(),
+                ),
+            ).fetchone()
+        finally:
+            conn.close()
+    except sqlite3.Error:
+        return _load_symbol_coverage(
+            db_path=db_path,
+            exchange=exchange,
+            symbol=symbol,
+            timeframe=timeframe,
+        )
 
     if row is None:
         return None, None, 0
@@ -458,28 +783,48 @@ def _read_symbol_window_coverage(
     start_date: datetime,
     end_date: datetime,
 ) -> tuple[datetime | None, datetime | None, int]:
-    conn = sqlite3.connect(db_path)
+    if _resolved_storage_backend() == "influxdb":
+        return _load_symbol_coverage(
+            db_path=db_path,
+            exchange=exchange,
+            symbol=symbol,
+            timeframe=timeframe,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
     try:
-        row = conn.execute(
-            """
-            SELECT MIN(datetime), MAX(datetime), COUNT(*)
-            FROM market_ohlcv
-            WHERE exchange = ?
-              AND symbol = ?
-              AND timeframe = ?
-              AND datetime >= ?
-              AND datetime <= ?
-            """,
-            (
-                str(exchange).strip().lower(),
-                str(symbol).strip().upper(),
-                str(timeframe).strip().lower(),
-                start_date.isoformat(),
-                end_date.isoformat(),
-            ),
-        ).fetchone()
-    finally:
-        conn.close()
+        conn = sqlite3.connect(db_path)
+        try:
+            row = conn.execute(
+                """
+                SELECT MIN(datetime), MAX(datetime), COUNT(*)
+                FROM market_ohlcv
+                WHERE exchange = ?
+                  AND symbol = ?
+                  AND timeframe = ?
+                  AND datetime >= ?
+                  AND datetime <= ?
+                """,
+                (
+                    str(exchange).strip().lower(),
+                    str(symbol).strip().upper(),
+                    str(timeframe).strip().lower(),
+                    start_date.isoformat(),
+                    end_date.isoformat(),
+                ),
+            ).fetchone()
+        finally:
+            conn.close()
+    except sqlite3.Error:
+        return _load_symbol_coverage(
+            db_path=db_path,
+            exchange=exchange,
+            symbol=symbol,
+            timeframe=timeframe,
+            start_date=start_date,
+            end_date=end_date,
+        )
 
     if row is None:
         return None, None, 0
@@ -560,7 +905,10 @@ def _run_backtest(
     base_timeframe: str,
     db_path: str,
     exchange: str,
-    data_cache: dict,
+    data_cache: BoundedDataCache | dict,
+    prefetched_full_data: dict[str, pl.DataFrame] | None = None,
+    *,
+    keep_curve: bool = False,
 ) -> RunResult | None:
     key = (
         tuple(symbols),
@@ -569,18 +917,38 @@ def _run_backtest(
         start_date.isoformat() if isinstance(start_date, datetime) else str(start_date),
         end_date.isoformat() if isinstance(end_date, datetime) else str(end_date),
     )
-    if key not in data_cache:
-        loaded = load_data_dict_from_db(
-            db_path,
-            exchange=exchange,
-            symbol_list=symbols,
-            timeframe=str(base_timeframe).strip().lower(),
-            start_date=start_date,
-            end_date=end_date,
-        )
-        data_cache[key] = loaded
+    loaded: dict[str, pl.DataFrame] | None = None
+    if isinstance(prefetched_full_data, dict) and prefetched_full_data:
+        sliced: dict[str, pl.DataFrame] = {}
+        for symbol in symbols:
+            full_frame = prefetched_full_data.get(symbol)
+            if not isinstance(full_frame, pl.DataFrame) or full_frame.height <= 0:
+                continue
+            window = _slice_frame_window(full_frame, start_date, end_date)
+            if isinstance(window, pl.DataFrame) and window.height > 0:
+                sliced[symbol] = window
+        loaded = sliced
     else:
-        loaded = data_cache[key]
+        if isinstance(data_cache, BoundedDataCache):
+            loaded = data_cache.get(key)
+        else:
+            loaded = data_cache.get(key)
+
+        if loaded is None:
+            loaded = _compact_ohlcv_payload(
+                load_data_dict_from_db(
+                    db_path,
+                    exchange=exchange,
+                    symbol_list=symbols,
+                    timeframe=str(base_timeframe).strip().lower(),
+                    start_date=start_date,
+                    end_date=end_date,
+                )
+            )
+            if isinstance(data_cache, BoundedDataCache):
+                data_cache.put(key, loaded)
+            else:
+                data_cache[key] = loaded
 
     present_symbols = [symbol for symbol in symbols if symbol in loaded]
     required_symbols = _required_symbol_count(strategy_cls)
@@ -599,7 +967,7 @@ def _run_backtest(
             strategy_cls=strategy_cls,
             strategy_params=params,
             data_dict=loaded,
-            record_history=True,
+            record_history=bool(keep_curve),
             track_metrics=True,
             record_trades=True,
             strategy_timeframe=str(timeframe).strip().lower(),
@@ -610,21 +978,52 @@ def _run_backtest(
         return None
 
     portfolio = backtest.portfolio
-    portfolio.create_equity_curve_dataframe()
-    stats = dict(portfolio.output_summary_stats())
-    curve = portfolio.equity_curve.to_dict(as_series=False)
+    if bool(keep_curve):
+        portfolio.create_equity_curve_dataframe()
+        stats = dict(portfolio.output_summary_stats())
+        curve = portfolio.equity_curve.to_dict(as_series=False)
+        totals = curve.get("total", [])
+        metrics = {
+            "return": 0.0,
+            "sharpe": _safe_float(stats.get("Sharpe Ratio"), 0.0),
+            "sortino": _safe_float(stats.get("Sortino Ratio"), 0.0),
+            "mdd": _safe_float(str(stats.get("Max Drawdown", "0")).replace("%", ""), 0.0) / 100.0,
+            "trades": int(getattr(portfolio, "trade_count", 0)),
+            "bars": max(0, len(totals) - 1),
+        }
+        if len(totals) >= 2 and _safe_float(totals[0], 0.0) > 0.0:
+            metrics["return"] = (_safe_float(totals[-1], 0.0) / _safe_float(totals[0], 1.0)) - 1.0
+        return RunResult(metrics=metrics, curve=curve)
+
+    fast_stats = dict(portfolio.output_summary_stats_fast())
+    totals = np.asarray(list(getattr(portfolio, "_metric_totals", []) or []), dtype=np.float64)
+    bars = max(0, int(totals.size) - 1)
+    ret_value = 0.0
+    if totals.size >= 2 and float(totals[0]) > 0.0:
+        ret_value = float(totals[-1] / totals[0] - 1.0)
+
+    sortino = 0.0
+    if totals.size >= 3:
+        with np.errstate(divide="ignore", invalid="ignore"):
+            returns = np.diff(totals) / totals[:-1]
+        returns = returns[np.isfinite(returns)]
+        downside = returns[returns < 0.0]
+        if downside.size > 0:
+            downside_std = float(np.std(downside))
+            if downside_std > 0.0:
+                mean_return = float(np.mean(returns)) if returns.size > 0 else 0.0
+                annual_periods = float(_annual_periods_for_timeframe(str(timeframe).strip().lower()))
+                sortino = float((mean_return / downside_std) * np.sqrt(max(1.0, annual_periods)))
 
     metrics = {
-        "return": 0.0,
-        "sharpe": _safe_float(stats.get("Sharpe Ratio"), 0.0),
-        "sortino": _safe_float(stats.get("Sortino Ratio"), 0.0),
-        "mdd": _safe_float(str(stats.get("Max Drawdown", "0")).replace("%", ""), 0.0) / 100.0,
+        "return": float(ret_value),
+        "sharpe": _safe_float(fast_stats.get("sharpe"), 0.0),
+        "sortino": float(sortino),
+        "mdd": _safe_float(fast_stats.get("max_drawdown"), 0.0),
         "trades": int(getattr(portfolio, "trade_count", 0)),
+        "bars": int(bars),
     }
-    totals = curve.get("total", [])
-    if len(totals) >= 2 and _safe_float(totals[0], 0.0) > 0.0:
-        metrics["return"] = (_safe_float(totals[-1], 0.0) / _safe_float(totals[0], 1.0)) - 1.0
-    return RunResult(metrics=metrics, curve=curve)
+    return RunResult(metrics=metrics, curve={})
 
 
 def _min_overlap_days(
@@ -636,30 +1035,29 @@ def _min_overlap_days(
     start_date: datetime,
     end_date: datetime,
 ) -> float:
-    data = load_data_dict_from_db(
-        db_path,
-        exchange=exchange,
-        symbol_list=symbols,
-        timeframe=timeframe,
+    starts: list[datetime] = []
+    ends: list[datetime] = []
+    for symbol in symbols:
+        first, last, count = _read_symbol_window_coverage(
+            db_path=db_path,
+            exchange=exchange,
+            symbol=symbol,
+            timeframe=timeframe,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        if count <= 0 or not isinstance(first, datetime) or not isinstance(last, datetime):
+            return 0.0
+        starts.append(first)
+        ends.append(last)
+    if not starts or not ends:
+        return 0.0
+    return _coverage_days_from_bounds(
+        max(starts),
+        min(ends),
         start_date=start_date,
         end_date=end_date,
     )
-    starts = []
-    ends = []
-    for symbol in symbols:
-        frame = data.get(symbol)
-        if not isinstance(frame, pl.DataFrame) or frame.height == 0:
-            return 0.0
-        starts.append(frame["datetime"].min())
-        ends.append(frame["datetime"].max())
-    if not starts or not ends:
-        return 0.0
-    overlap_start = max(starts)
-    overlap_end = min(ends)
-    delta = overlap_end - overlap_start
-    if not hasattr(delta, "total_seconds"):
-        return 0.0
-    return max(0.0, float(delta.total_seconds()) / 86400.0)
 
 
 def _resolve_strategy_windows(
@@ -916,6 +1314,74 @@ def _suggest_vwap_reversion_params_optuna(trial) -> dict:
     }
 
 
+def _sample_regime_breakout_params(rng: random.Random) -> dict:
+    return {
+        "lookback_window": rng.choice([24, 32, 48, 64, 96]),
+        "slope_window": rng.choice([8, 13, 21, 34]),
+        "volatility_fast_window": rng.choice([8, 12, 20, 30]),
+        "volatility_slow_window": rng.choice([48, 72, 96, 144]),
+        "range_entry_threshold": rng.choice([0.60, 0.66, 0.72, 0.80]),
+        "slope_entry_threshold": rng.choice([0.0, 0.0005, 0.001, 0.002]),
+        "momentum_floor": rng.choice([0.0, 0.005, 0.01, 0.02]),
+        "max_volatility_ratio": rng.choice([1.2, 1.6, 1.8, 2.2]),
+        "stop_loss_pct": rng.choice([0.01, 0.02, 0.03, 0.05]),
+        "allow_short": rng.choice([True, False]),
+    }
+
+
+def _suggest_regime_breakout_params_optuna(trial) -> dict:
+    return {
+        "lookback_window": trial.suggest_categorical("lookback_window", [24, 32, 48, 64, 96]),
+        "slope_window": trial.suggest_categorical("slope_window", [8, 13, 21, 34]),
+        "volatility_fast_window": trial.suggest_categorical(
+            "volatility_fast_window", [8, 12, 20, 30]
+        ),
+        "volatility_slow_window": trial.suggest_categorical(
+            "volatility_slow_window", [48, 72, 96, 144]
+        ),
+        "range_entry_threshold": trial.suggest_categorical(
+            "range_entry_threshold", [0.60, 0.66, 0.72, 0.80]
+        ),
+        "slope_entry_threshold": trial.suggest_categorical(
+            "slope_entry_threshold", [0.0, 0.0005, 0.001, 0.002]
+        ),
+        "momentum_floor": trial.suggest_categorical("momentum_floor", [0.0, 0.005, 0.01, 0.02]),
+        "max_volatility_ratio": trial.suggest_categorical(
+            "max_volatility_ratio", [1.2, 1.6, 1.8, 2.2]
+        ),
+        "stop_loss_pct": trial.suggest_categorical("stop_loss_pct", [0.01, 0.02, 0.03, 0.05]),
+        "allow_short": trial.suggest_categorical("allow_short", [True, False]),
+    }
+
+
+def _sample_vol_compression_params(rng: random.Random) -> dict:
+    return {
+        "z_window": rng.choice([16, 24, 36, 48, 64, 96]),
+        "fast_vol_window": rng.choice([8, 12, 20, 30]),
+        "slow_vol_window": rng.choice([48, 72, 96, 144]),
+        "compression_threshold": rng.choice([0.55, 0.70, 0.85, 1.0]),
+        "entry_z": rng.choice([1.0, 1.4, 1.8, 2.2]),
+        "exit_z": rng.choice([0.2, 0.35, 0.5, 0.7]),
+        "stop_loss_pct": rng.choice([0.01, 0.02, 0.03, 0.05]),
+        "allow_short": rng.choice([True, False]),
+    }
+
+
+def _suggest_vol_compression_params_optuna(trial) -> dict:
+    return {
+        "z_window": trial.suggest_categorical("z_window", [16, 24, 36, 48, 64, 96]),
+        "fast_vol_window": trial.suggest_categorical("fast_vol_window", [8, 12, 20, 30]),
+        "slow_vol_window": trial.suggest_categorical("slow_vol_window", [48, 72, 96, 144]),
+        "compression_threshold": trial.suggest_categorical(
+            "compression_threshold", [0.55, 0.70, 0.85, 1.0]
+        ),
+        "entry_z": trial.suggest_categorical("entry_z", [1.0, 1.4, 1.8, 2.2]),
+        "exit_z": trial.suggest_categorical("exit_z", [0.2, 0.35, 0.5, 0.7]),
+        "stop_loss_pct": trial.suggest_categorical("stop_loss_pct", [0.01, 0.02, 0.03, 0.05]),
+        "allow_short": trial.suggest_categorical("allow_short", [True, False]),
+    }
+
+
 def _sample_lag_convergence_params(rng: random.Random) -> dict:
     return {
         "lag_bars": rng.choice([1, 2, 3, 4, 6, 8]),
@@ -1001,6 +1467,7 @@ def _search_strategy(
     db_path: str,
     exchange: str,
     data_cache: dict,
+    prefetched_full_data: dict[str, pl.DataFrame] | None,
     rng: random.Random,
     selection_mode: str,
     train_hurdle_return: float,
@@ -1020,6 +1487,7 @@ def _search_strategy(
             db_path,
             exchange,
             data_cache,
+            prefetched_full_data,
         )
         if train is None:
             continue
@@ -1039,6 +1507,7 @@ def _search_strategy(
             db_path,
             exchange,
             data_cache,
+            prefetched_full_data,
         )
         if val is None:
             continue
@@ -1099,6 +1568,7 @@ def _search_strategy_optuna(
     db_path: str,
     exchange: str,
     data_cache: dict,
+    prefetched_full_data: dict[str, pl.DataFrame] | None,
     selection_mode: str,
     seed: int,
     n_jobs: int,
@@ -1128,6 +1598,7 @@ def _search_strategy_optuna(
                 db_path,
                 exchange,
                 data_cache,
+                prefetched_full_data,
             )
         return trial_cache.get(key)
 
@@ -1186,6 +1657,7 @@ def _search_strategy_optuna(
             db_path,
             exchange,
             data_cache,
+            prefetched_full_data,
         )
         if val is None:
             continue
@@ -1332,6 +1804,12 @@ def _evaluate_ensemble_eligibility(
 def main():
     parser = argparse.ArgumentParser(description="Leakage-safe multi-strategy OOS search")
     parser.add_argument("--db-path", default="data/lq_market.sqlite3")
+    parser.add_argument("--backend", default="influxdb", help="Storage backend override (sqlite|influxdb).")
+    parser.add_argument("--influx-url", default="")
+    parser.add_argument("--influx-org", default="")
+    parser.add_argument("--influx-bucket", default="")
+    parser.add_argument("--influx-token", default="")
+    parser.add_argument("--influx-token-env", default="INFLUXDB_TOKEN")
     parser.add_argument("--exchange", default="binance")
     parser.add_argument("--timeframe", default="1h")
     parser.add_argument("--base-timeframe", default="1s")
@@ -1437,7 +1915,99 @@ def main():
         default=2,
         help="Minimum XAU/XAG OOS trades required for ensemble inclusion.",
     )
+    parser.add_argument(
+        "--candidate-manifest",
+        default="",
+        help="Optional candidate manifest JSON path to constrain strategy classes.",
+    )
+    parser.add_argument(
+        "--data-cache-max-entries",
+        type=int,
+        default=3,
+        help="LRU cap for cached (symbols,time-window) datasets.",
+    )
+    parser.add_argument(
+        "--data-cache-max-rows",
+        type=int,
+        default=0,
+        help="Approximate max cached rows across windows (0 disables row cap).",
+    )
+    parser.add_argument(
+        "--data-cache-scope",
+        choices=["global", "strategy"],
+        default="strategy",
+        help="Cache scope: global shares one cache across all sleeves; strategy resets per sleeve.",
+    )
+    parser.add_argument(
+        "--ensemble-mode",
+        choices=["auto", "off"],
+        default="auto",
+        help="Use 'off' to skip ensemble optimization and keep memory bounded.",
+    )
+    parser.add_argument(
+        "--ensemble-max-candidates",
+        type=int,
+        default=4,
+        help="Max eligible sleeves to re-run with curves for ensemble optimization.",
+    )
+    parser.add_argument(
+        "--prefetch-strategy-data",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=(
+            "Prefetch each sleeve's full train+val+oos 1s window once and slice in-memory. "
+            "Disable with --no-prefetch-strategy-data when debugging."
+        ),
+    )
+    parser.add_argument(
+        "--influx-1s-query-chunk-days",
+        type=int,
+        default=0,
+        help="Influx 1s raw query chunk size in days (0 keeps env/default).",
+    )
+    parser.add_argument(
+        "--influx-1s-agg-chunk-days",
+        type=int,
+        default=0,
+        help="Influx 1s aggregate query chunk size in days (0 keeps env/default).",
+    )
     args = parser.parse_args()
+    args.timeframe = _normalize_timeframe_or_default(args.timeframe, "1h")
+    args.base_timeframe = _enforce_1s_base_timeframe(args.base_timeframe)
+
+    backend_arg = str(args.backend or "").strip().lower()
+    if backend_arg:
+        os.environ["LQ__STORAGE__BACKEND"] = "influxdb" if backend_arg in {
+            "influx",
+            "influxdb",
+        } else "sqlite"
+    influx_url_arg = str(args.influx_url or "").strip()
+    influx_org_arg = str(args.influx_org or "").strip()
+    influx_bucket_arg = str(args.influx_bucket or "").strip()
+    influx_token_arg = str(args.influx_token or "").strip()
+    influx_token_env_arg = str(args.influx_token_env or "INFLUXDB_TOKEN").strip() or "INFLUXDB_TOKEN"
+    if influx_url_arg:
+        os.environ["LQ__STORAGE__INFLUX_URL"] = influx_url_arg
+    if influx_org_arg:
+        os.environ["LQ__STORAGE__INFLUX_ORG"] = influx_org_arg
+    if influx_bucket_arg:
+        os.environ["LQ__STORAGE__INFLUX_BUCKET"] = influx_bucket_arg
+    if influx_token_env_arg:
+        os.environ["LQ__STORAGE__INFLUX_TOKEN_ENV"] = influx_token_env_arg
+    if influx_token_arg:
+        os.environ[influx_token_env_arg] = influx_token_arg
+
+    query_chunk_days = int(args.influx_1s_query_chunk_days)
+    agg_chunk_days = int(args.influx_1s_agg_chunk_days)
+    if _resolved_storage_backend() == "influxdb":
+        if query_chunk_days <= 0:
+            query_chunk_days = int(os.getenv("LQ__STORAGE__INFLUX_1S_QUERY_CHUNK_DAYS", "2") or 2)
+        if agg_chunk_days <= 0:
+            agg_chunk_days = int(os.getenv("LQ__STORAGE__INFLUX_1S_AGG_CHUNK_DAYS", "5") or 5)
+    if query_chunk_days > 0:
+        os.environ["LQ__STORAGE__INFLUX_1S_QUERY_CHUNK_DAYS"] = str(query_chunk_days)
+    if agg_chunk_days > 0:
+        os.environ["LQ__STORAGE__INFLUX_1S_AGG_CHUNK_DAYS"] = str(agg_chunk_days)
 
     rng = random.Random(int(args.seed))
     annual_periods = _annual_periods_for_timeframe(args.timeframe)
@@ -1447,36 +2017,38 @@ def main():
         explicit_start = datetime.strptime(str(args.start), "%Y-%m-%d")
 
     strategy_set = str(args.strategy_set).strip().lower()
+    allowed_strategy_classes = _load_manifest_strategy_classes(str(args.candidate_manifest))
     probe_symbols = []
     if strategy_set != "xau-xag-only":
         probe_symbols.extend(["BTC/USDT", "ETH/USDT", "BNB/USDT"])
     if strategy_set != "crypto-only":
-        probe_symbols.extend(["XAU/USDT", "XAG/USDT"])
+        probe_symbols.extend(["XAU/USDT:USDT", "XAG/USDT:USDT"])
     if not probe_symbols:
         raise RuntimeError("No probe symbols resolved for split construction.")
 
     probe_start = explicit_start or datetime(2020, 1, 1)
-    probe_data = load_data_dict_from_db(
-        args.db_path,
-        exchange=args.exchange,
-        symbol_list=probe_symbols,
-        timeframe=args.base_timeframe,
-        start_date=probe_start,
-        end_date=None,
-    )
-    if not probe_data:
-        raise RuntimeError("No probe data found to build split windows.")
-
     full_end = None
-    for frame in probe_data.values():
-        raw_end = frame["datetime"].max()
-        cur_end = (
-            raw_end
-            if isinstance(raw_end, datetime)
-            else datetime.fromisoformat(str(raw_end).replace("Z", "+00:00"))
+    probe_found = False
+    for probe_symbol in probe_symbols:
+        _first, last, count = load_ohlcv_coverage_from_db(
+            args.db_path,
+            exchange=args.exchange,
+            symbol=probe_symbol,
+            timeframe=args.base_timeframe,
+            start_date=probe_start,
+            end_date=None,
+            backend=_resolved_storage_backend(),
         )
+        if int(count or 0) <= 0 or not isinstance(last, datetime):
+            continue
+        probe_found = True
+        cur_end = last
+        if isinstance(cur_end, datetime) and cur_end.tzinfo is not None:
+            cur_end = cur_end.astimezone(UTC).replace(tzinfo=None)
         if full_end is None or cur_end > full_end:
             full_end = cur_end
+    if not probe_found:
+        raise RuntimeError("No probe data found to build split windows.")
     if full_end is None:
         raise RuntimeError("Failed to determine latest timestamp from probe data.")
     if isinstance(full_end, datetime) and full_end.tzinfo is not None:
@@ -1596,10 +2168,11 @@ def main():
             min_row_ratio=float(args.topcap_min_row_ratio),
         )
         dropped_topcap = [symbol for symbol in raw_topcap_symbols if symbol not in topcap_symbols]
-        if len(topcap_symbols) < int(max(2, int(args.topcap_min_symbols))):
+        required_topcap_symbols = max(1, int(args.topcap_min_symbols))
+        if len(topcap_symbols) < required_topcap_symbols:
             raise RuntimeError(
                 "Topcap coverage gate removed too many symbols: "
-                f"kept={len(topcap_symbols)} required={int(args.topcap_min_symbols)}"
+                f"kept={len(topcap_symbols)} required={required_topcap_symbols}"
             )
 
         print(
@@ -1612,136 +2185,207 @@ def main():
         print(f"Topcap symbols: {topcap_symbols}")
 
         strategies.extend(
-            [
-                {
-                    "name": "topcap_tsmom",
-                    "strategy_cls": TopCapTimeSeriesMomentumStrategy,
-                    "symbols": topcap_symbols,
-                    "sampler": _sample_topcap_params,
-                    "suggestor": _suggest_topcap_params_optuna,
-                    "iterations": int(args.topcap_iters),
-                    "min_trades": 6,
-                },
-                {
-                    "name": "pair_btc_bnb",
-                    "strategy_cls": PairTradingZScoreStrategy,
-                    "symbols": ["BTC/USDT", "BNB/USDT"],
-                    "sampler": _sample_pair_params,
-                    "suggestor": _suggest_pair_params_optuna,
-                    "iterations": int(args.pair_iters),
-                    "min_trades": 2,
-                },
-                {
-                    "name": "rolling_breakout_topcap",
-                    "strategy_cls": RollingBreakoutStrategy,
-                    "symbols": topcap_symbols,
-                    "sampler": _sample_breakout_params,
-                    "suggestor": _suggest_breakout_params_optuna,
-                    "iterations": int(args.topcap_iters),
-                    "min_trades": 6,
-                },
-                {
-                    "name": "mean_reversion_std_topcap",
-                    "strategy_cls": MeanReversionStdStrategy,
-                    "symbols": topcap_symbols,
-                    "sampler": _sample_mean_reversion_params,
-                    "suggestor": _suggest_mean_reversion_params_optuna,
-                    "iterations": int(args.topcap_iters),
-                    "min_trades": 6,
-                },
-                {
-                    "name": "vwap_reversion_topcap",
-                    "strategy_cls": VwapReversionStrategy,
-                    "symbols": topcap_symbols,
-                    "sampler": _sample_vwap_reversion_params,
-                    "suggestor": _suggest_vwap_reversion_params_optuna,
-                    "iterations": int(args.topcap_iters),
-                    "min_trades": 6,
-                },
-                {
-                    "name": "lag_convergence_btc_eth",
-                    "strategy_cls": LagConvergenceStrategy,
-                    "symbols": ["BTC/USDT", "ETH/USDT"],
-                    "sampler": _sample_lag_convergence_params,
-                    "suggestor": _suggest_lag_convergence_params_optuna,
-                    "iterations": int(args.pair_iters),
-                    "min_trades": 2,
-                },
-                {
-                    "name": "rsi_topcap",
-                    "strategy_cls": RsiStrategy,
-                    "symbols": topcap_symbols,
-                    "sampler": _sample_rsi_params,
-                    "suggestor": _suggest_rsi_params_optuna,
-                    "iterations": int(args.topcap_iters),
-                    "min_trades": 6,
-                },
-                {
-                    "name": "moving_average_topcap",
-                    "strategy_cls": MovingAverageCrossStrategy,
-                    "symbols": topcap_symbols,
-                    "sampler": _sample_moving_average_params,
-                    "suggestor": _suggest_moving_average_params_optuna,
-                    "iterations": int(args.topcap_iters),
-                    "min_trades": 6,
-                },
-            ]
+            _filter_specs_by_manifest(
+                [
+                    {
+                        "name": "topcap_tsmom",
+                        "strategy_cls": TopCapTimeSeriesMomentumStrategy,
+                        "symbols": topcap_symbols,
+                        "sampler": _sample_topcap_params,
+                        "suggestor": _suggest_topcap_params_optuna,
+                        "iterations": int(args.topcap_iters),
+                        "min_trades": 6,
+                    },
+                    {
+                        "name": "pair_btc_bnb",
+                        "strategy_cls": PairTradingZScoreStrategy,
+                        "symbols": ["BTC/USDT", "BNB/USDT"],
+                        "sampler": _sample_pair_params,
+                        "suggestor": _suggest_pair_params_optuna,
+                        "iterations": int(args.pair_iters),
+                        "min_trades": 2,
+                    },
+                    {
+                        "name": "rolling_breakout_topcap",
+                        "strategy_cls": RollingBreakoutStrategy,
+                        "symbols": topcap_symbols,
+                        "sampler": _sample_breakout_params,
+                        "suggestor": _suggest_breakout_params_optuna,
+                        "iterations": int(args.topcap_iters),
+                        "min_trades": 6,
+                    },
+                    {
+                        "name": "candidate_regime_breakout_topcap",
+                        "strategy_cls": RegimeBreakoutCandidateStrategy,
+                        "symbols": topcap_symbols,
+                        "sampler": _sample_regime_breakout_params,
+                        "suggestor": _suggest_regime_breakout_params_optuna,
+                        "iterations": int(args.topcap_iters),
+                        "min_trades": 6,
+                    },
+                    {
+                        "name": "candidate_vol_compression_topcap",
+                        "strategy_cls": VolatilityCompressionReversionStrategy,
+                        "symbols": topcap_symbols,
+                        "sampler": _sample_vol_compression_params,
+                        "suggestor": _suggest_vol_compression_params_optuna,
+                        "iterations": int(args.topcap_iters),
+                        "min_trades": 6,
+                    },
+                    {
+                        "name": "mean_reversion_std_topcap",
+                        "strategy_cls": MeanReversionStdStrategy,
+                        "symbols": topcap_symbols,
+                        "sampler": _sample_mean_reversion_params,
+                        "suggestor": _suggest_mean_reversion_params_optuna,
+                        "iterations": int(args.topcap_iters),
+                        "min_trades": 6,
+                    },
+                    {
+                        "name": "vwap_reversion_topcap",
+                        "strategy_cls": VwapReversionStrategy,
+                        "symbols": topcap_symbols,
+                        "sampler": _sample_vwap_reversion_params,
+                        "suggestor": _suggest_vwap_reversion_params_optuna,
+                        "iterations": int(args.topcap_iters),
+                        "min_trades": 6,
+                    },
+                    {
+                        "name": "lag_convergence_btc_eth",
+                        "strategy_cls": LagConvergenceStrategy,
+                        "symbols": ["BTC/USDT", "ETH/USDT"],
+                        "sampler": _sample_lag_convergence_params,
+                        "suggestor": _suggest_lag_convergence_params_optuna,
+                        "iterations": int(args.pair_iters),
+                        "min_trades": 2,
+                    },
+                    {
+                        "name": "rsi_topcap",
+                        "strategy_cls": RsiStrategy,
+                        "symbols": topcap_symbols,
+                        "sampler": _sample_rsi_params,
+                        "suggestor": _suggest_rsi_params_optuna,
+                        "iterations": int(args.topcap_iters),
+                        "min_trades": 6,
+                    },
+                    {
+                        "name": "moving_average_topcap",
+                        "strategy_cls": MovingAverageCrossStrategy,
+                        "symbols": topcap_symbols,
+                        "sampler": _sample_moving_average_params,
+                        "suggestor": _suggest_moving_average_params_optuna,
+                        "iterations": int(args.topcap_iters),
+                        "min_trades": 6,
+                    },
+                ],
+                allowed_strategy_classes,
+            )
         )
 
     if strategy_set != "crypto-only":
         strategies.extend(
-            [
-                {
-                    "name": "pair_xau_xag",
-                    "strategy_cls": PairTradingZScoreStrategy,
-                    "symbols": ["XAU/USDT", "XAG/USDT"],
-                    "sampler": _sample_pair_params,
-                    "suggestor": _suggest_pair_params_optuna,
-                    "iterations": int(args.pair_iters),
-                    "min_trades": 2,
-                },
-                {
-                    "name": "pair_xau_xag_lag",
-                    "strategy_cls": PairTradingZScoreStrategy,
-                    "symbols": ["XAU/USDT", "XAG/USDT"],
-                    "sampler": _sample_pair_xau_lag_params,
-                    "suggestor": _suggest_pair_xau_lag_params_optuna,
-                    "iterations": int(args.pair_iters),
-                    "min_trades": 2,
-                },
-                {
-                    "name": "lag_convergence_xau_xag",
-                    "strategy_cls": LagConvergenceStrategy,
-                    "symbols": ["XAU/USDT", "XAG/USDT"],
-                    "sampler": _sample_lag_convergence_params,
-                    "suggestor": _suggest_lag_convergence_params_optuna,
-                    "iterations": int(args.pair_iters),
-                    "min_trades": 2,
-                },
-                {
-                    "name": "rsi_xau_xag",
-                    "strategy_cls": RsiStrategy,
-                    "symbols": ["XAU/USDT", "XAG/USDT"],
-                    "sampler": _sample_rsi_params,
-                    "suggestor": _suggest_rsi_params_optuna,
-                    "iterations": int(args.pair_iters),
-                    "min_trades": 2,
-                },
-                {
-                    "name": "moving_average_xau_xag",
-                    "strategy_cls": MovingAverageCrossStrategy,
-                    "symbols": ["XAU/USDT", "XAG/USDT"],
-                    "sampler": _sample_moving_average_params,
-                    "suggestor": _suggest_moving_average_params_optuna,
-                    "iterations": int(args.pair_iters),
-                    "min_trades": 2,
-                },
-            ]
+            _filter_specs_by_manifest(
+                [
+                    {
+                        "name": "pair_xau_xag",
+                        "strategy_cls": PairTradingZScoreStrategy,
+                        "symbols": ["XAU/USDT:USDT", "XAG/USDT:USDT"],
+                        "sampler": _sample_pair_params,
+                        "suggestor": _suggest_pair_params_optuna,
+                        "iterations": int(args.pair_iters),
+                        "min_trades": 2,
+                    },
+                    {
+                        "name": "pair_xau_xag_lag",
+                        "strategy_cls": PairTradingZScoreStrategy,
+                        "symbols": ["XAU/USDT:USDT", "XAG/USDT:USDT"],
+                        "sampler": _sample_pair_xau_lag_params,
+                        "suggestor": _suggest_pair_xau_lag_params_optuna,
+                        "iterations": int(args.pair_iters),
+                        "min_trades": 2,
+                    },
+                    {
+                        "name": "lag_convergence_xau_xag",
+                        "strategy_cls": LagConvergenceStrategy,
+                        "symbols": ["XAU/USDT:USDT", "XAG/USDT:USDT"],
+                        "sampler": _sample_lag_convergence_params,
+                        "suggestor": _suggest_lag_convergence_params_optuna,
+                        "iterations": int(args.pair_iters),
+                        "min_trades": 2,
+                    },
+                    {
+                        "name": "candidate_regime_breakout_xau_xag",
+                        "strategy_cls": RegimeBreakoutCandidateStrategy,
+                        "symbols": ["XAU/USDT:USDT", "XAG/USDT:USDT"],
+                        "sampler": _sample_regime_breakout_params,
+                        "suggestor": _suggest_regime_breakout_params_optuna,
+                        "iterations": int(args.pair_iters),
+                        "min_trades": 2,
+                    },
+                    {
+                        "name": "candidate_vol_compression_xau_xag",
+                        "strategy_cls": VolatilityCompressionReversionStrategy,
+                        "symbols": ["XAU/USDT:USDT", "XAG/USDT:USDT"],
+                        "sampler": _sample_vol_compression_params,
+                        "suggestor": _suggest_vol_compression_params_optuna,
+                        "iterations": int(args.pair_iters),
+                        "min_trades": 2,
+                    },
+                    {
+                        "name": "rsi_xau_xag",
+                        "strategy_cls": RsiStrategy,
+                        "symbols": ["XAU/USDT:USDT", "XAG/USDT:USDT"],
+                        "sampler": _sample_rsi_params,
+                        "suggestor": _suggest_rsi_params_optuna,
+                        "iterations": int(args.pair_iters),
+                        "min_trades": 2,
+                    },
+                    {
+                        "name": "moving_average_xau_xag",
+                        "strategy_cls": MovingAverageCrossStrategy,
+                        "symbols": ["XAU/USDT:USDT", "XAG/USDT:USDT"],
+                        "sampler": _sample_moving_average_params,
+                        "suggestor": _suggest_moving_average_params_optuna,
+                        "iterations": int(args.pair_iters),
+                        "min_trades": 2,
+                    },
+                ],
+                allowed_strategy_classes,
+            )
         )
 
-    data_cache = {}
+    cache_scope = str(args.data_cache_scope).strip().lower()
+    global_data_cache = BoundedDataCache(
+        max_entries=int(args.data_cache_max_entries),
+        max_rows=int(args.data_cache_max_rows),
+    )
+    ensemble_mode = str(args.ensemble_mode).strip().lower()
+    print(
+        f"[CACHE] entries<={int(args.data_cache_max_entries)} "
+        f"rows<={int(args.data_cache_max_rows)} "
+        f"scope={cache_scope}"
+    )
+    print(
+        f"[ENSEMBLE] mode={ensemble_mode} "
+        f"max_candidates={max(0, int(args.ensemble_max_candidates))}"
+    )
+    if _resolved_storage_backend() == "influxdb":
+        print(
+            "[INFLUX_CHUNKS] "
+            f"raw_1s_days={os.getenv('LQ__STORAGE__INFLUX_1S_QUERY_CHUNK_DAYS', '')} "
+            f"agg_1s_days={os.getenv('LQ__STORAGE__INFLUX_1S_AGG_CHUNK_DAYS', '')}"
+        )
     winners = []
     for spec in strategies:
+        data_cache = (
+            global_data_cache
+            if cache_scope == "global"
+            else BoundedDataCache(
+                max_entries=int(args.data_cache_max_entries),
+                max_rows=int(args.data_cache_max_rows),
+            )
+        )
+        prefetched_full_data: dict[str, pl.DataFrame] | None = None
         print(f"\n[SEARCH] {spec['name']} iterations={spec['iterations']}")
         coverage_days = _min_overlap_days(
             spec["symbols"],
@@ -1801,6 +2445,29 @@ def main():
             benchmark_symbol=benchmark_symbol,
             benchmark_cache=benchmark_cache,
         )
+        if bool(args.prefetch_strategy_data):
+            try:
+                prefetched_full_data = _compact_ohlcv_payload(
+                    load_data_dict_from_db(
+                        args.db_path,
+                        exchange=args.exchange,
+                        symbol_list=list(spec["symbols"]),
+                        timeframe=str(args.base_timeframe).strip().lower(),
+                        start_date=start_date,
+                        end_date=full_end,
+                    )
+                )
+                prefetched_rows = int(
+                    sum(
+                        int(frame.height)
+                        for frame in (prefetched_full_data or {}).values()
+                        if isinstance(frame, pl.DataFrame)
+                    )
+                )
+                print(f"  prefetch_rows={prefetched_rows}")
+            except Exception as exc:
+                print(f"  [WARN] prefetch failed, fallback to per-window loading: {exc}")
+                prefetched_full_data = None
 
         winner = None
         if str(args.search_engine).strip().lower() == "optuna" and OPTUNA_AVAILABLE:
@@ -1820,6 +2487,7 @@ def main():
                 db_path=args.db_path,
                 exchange=args.exchange,
                 data_cache=data_cache,
+                prefetched_full_data=prefetched_full_data,
                 selection_mode=str(args.selection_mode),
                 seed=int(args.seed),
                 n_jobs=int(args.optuna_jobs),
@@ -1845,6 +2513,7 @@ def main():
                 db_path=args.db_path,
                 exchange=args.exchange,
                 data_cache=data_cache,
+                prefetched_full_data=prefetched_full_data,
                 rng=rng,
                 selection_mode=str(args.selection_mode),
                 train_hurdle_return=float(train_hurdle["hurdle_return"]),
@@ -1879,6 +2548,8 @@ def main():
             args.db_path,
             args.exchange,
             data_cache,
+            prefetched_full_data,
+            keep_curve=False,
         )
         if oos is None:
             print("  -> final evaluation failed")
@@ -1897,8 +2568,14 @@ def main():
         winner["train_hurdle_fields"] = _hurdle_fields(winner["train"].metrics, train_hurdle)
         winner["val_hurdle_fields"] = _hurdle_fields(winner["val"].metrics, val_hurdle)
         winner["oos_hurdle_fields"] = _hurdle_fields(winner["oos"].metrics, eval_hurdle)
-        oos_bars = len(_returns_from_curve(oos.curve))
+        oos_bars = int(oos.metrics.get("bars") or 0)
         winner["oos_bars"] = int(oos_bars)
+        winner["_strategy_cls"] = spec["strategy_cls"]
+        winner["_symbols"] = list(spec["symbols"])
+        winner["_val_start_dt"] = spec_val_start
+        winner["_val_end_dt"] = spec_val_end
+        winner["_eval_start_dt"] = eval_start
+        winner["_eval_end_dt"] = eval_end
         ensemble_eligible, ensemble_reasons = _evaluate_ensemble_eligibility(
             strategy_name=str(spec["name"]),
             coverage_days=float(coverage_days),
@@ -1925,6 +2602,8 @@ def main():
         )
         if not bool(ensemble_eligible):
             print(f"  ensemble_eligible=False reason={winner['ensemble_skip_reason']}")
+        if cache_scope == "strategy":
+            gc.collect()
 
     if not winners:
         raise RuntimeError("No strategy produced a valid candidate.")
@@ -1941,22 +2620,80 @@ def main():
         for winner in winners
         if not bool(winner.get("ensemble_eligible", True))
     ]
-    val_curves = {winner["name"]: winner["val"].curve for winner in ensemble_pool}
-    oos_curves = {winner["name"]: winner["oos"].curve for winner in ensemble_pool}
-    names = [winner["name"] for winner in ensemble_pool]
+    val_curves: dict[str, dict] = {}
+    oos_curves: dict[str, dict] = {}
+    names: list[str] = []
 
     ensemble_best = None
-    if len(names) >= 2:
-        ensemble_best = _optimize_ensemble_weights(
-            names,
-            val_curves,
-            annual_periods=annual_periods,
-            rng=np.random.default_rng(int(args.seed)),
-            iterations=int(args.ensemble_iters),
-            val_hurdle_return=float(global_val_hurdle["hurdle_return"]),
-        )
+    if ensemble_mode == "off":
+        print("\n[ENSEMBLE] disabled: --ensemble-mode=off")
     else:
-        print("\n[ENSEMBLE] skipped: fewer than 2 eligible sleeves")
+        shortlist = sorted(
+            ensemble_pool,
+            key=lambda row: _safe_float(row.get("selection_score"), -1_000_000.0),
+            reverse=True,
+        )
+        max_ensemble_candidates = max(0, int(args.ensemble_max_candidates))
+        if max_ensemble_candidates > 0:
+            shortlist = shortlist[:max_ensemble_candidates]
+
+        for winner in shortlist:
+            curve_cache = BoundedDataCache(
+                max_entries=max(1, min(2, int(args.data_cache_max_entries))),
+                max_rows=max(0, int(args.data_cache_max_rows)),
+            )
+            val_curve_run = _run_backtest(
+                winner.get("_strategy_cls"),
+                winner["params"],
+                list(winner.get("_symbols") or winner.get("symbols") or []),
+                winner.get("_val_start_dt"),
+                winner.get("_val_end_dt"),
+                args.timeframe,
+                args.base_timeframe,
+                args.db_path,
+                args.exchange,
+                curve_cache,
+                keep_curve=True,
+            )
+            oos_curve_run = _run_backtest(
+                winner.get("_strategy_cls"),
+                winner["params"],
+                list(winner.get("_symbols") or winner.get("symbols") or []),
+                winner.get("_eval_start_dt"),
+                winner.get("_eval_end_dt"),
+                args.timeframe,
+                args.base_timeframe,
+                args.db_path,
+                args.exchange,
+                curve_cache,
+                keep_curve=True,
+            )
+            if (
+                val_curve_run is None
+                or oos_curve_run is None
+                or not bool(val_curve_run.curve)
+                or not bool(oos_curve_run.curve)
+            ):
+                continue
+            name = str(winner.get("name") or "")
+            if not name:
+                continue
+            val_curves[name] = val_curve_run.curve
+            oos_curves[name] = oos_curve_run.curve
+            names.append(name)
+            gc.collect()
+
+        if len(names) >= 2:
+            ensemble_best = _optimize_ensemble_weights(
+                names,
+                val_curves,
+                annual_periods=annual_periods,
+                rng=np.random.default_rng(int(args.seed)),
+                iterations=int(args.ensemble_iters),
+                val_hurdle_return=float(global_val_hurdle["hurdle_return"]),
+            )
+        else:
+            print("\n[ENSEMBLE] skipped: fewer than 2 eligible sleeves with curve data")
 
     ensemble_oos_metrics = None
     ensemble_val_hurdle_fields = None
@@ -2021,6 +2758,8 @@ def main():
             for winner in winners
         ],
         "ensemble": {
+            "mode": ensemble_mode,
+            "max_candidates": int(args.ensemble_max_candidates),
             "best_val": ensemble_best,
             "oos_metrics": ensemble_oos_metrics,
             "hurdle_fields": {
@@ -2054,6 +2793,19 @@ def main():
             "min_coverage_days": float(args.topcap_min_coverage_days),
             "min_row_ratio": float(args.topcap_min_row_ratio),
             "details": topcap_coverage,
+        },
+        "runtime": {
+            "storage_backend": _resolved_storage_backend(),
+            "prefetch_strategy_data": bool(args.prefetch_strategy_data),
+            "data_cache": data_cache.stats(),
+            "influx_chunks": {
+                "raw_1s_query_days": _safe_float(
+                    os.getenv("LQ__STORAGE__INFLUX_1S_QUERY_CHUNK_DAYS"), 0.0
+                ),
+                "agg_1s_query_days": _safe_float(
+                    os.getenv("LQ__STORAGE__INFLUX_1S_AGG_CHUNK_DAYS"), 0.0
+                ),
+            },
         },
     }
 

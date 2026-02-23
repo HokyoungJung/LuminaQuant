@@ -17,7 +17,8 @@ from lumina_quant.backtesting.data import HistoricCSVDataHandler
 from lumina_quant.backtesting.execution_sim import SimulatedExecutionHandler
 from lumina_quant.backtesting.portfolio_backtest import Portfolio
 from lumina_quant.compute.ohlcv_loader import OHLCVFrameLoader
-from lumina_quant.config import BacktestConfig, BaseConfig, OptimizationConfig
+from lumina_quant.config import BacktestConfig, BaseConfig, LiveConfig, OptimizationConfig
+from lumina_quant.data_collector import auto_collect_market_data
 from lumina_quant.market_data import (
     load_data_dict_from_db,
     resolve_symbol_csv_path,
@@ -412,8 +413,42 @@ def _auto_collect_db_if_enabled(
     base_timeframe,
     auto_collect_db,
 ):
-    _ = (data_source, market_db_path, market_exchange, base_timeframe, auto_collect_db)
-    return []
+    source = str(data_source).strip().lower()
+    if source not in {"auto", "db"}:
+        return []
+    if not bool(auto_collect_db):
+        return []
+
+    sync_rows = auto_collect_market_data(
+        symbol_list=list(SYMBOL_LIST),
+        timeframe=str(base_timeframe),
+        db_path=str(market_db_path),
+        exchange_id=str(market_exchange),
+        market_type=str(LiveConfig.MARKET_TYPE),
+        since_dt=BASE_START,
+        until_dt=None,
+        api_key=str(LiveConfig.BINANCE_API_KEY or ""),
+        secret_key=str(LiveConfig.BINANCE_SECRET_KEY or ""),
+        testnet=bool(LiveConfig.IS_TESTNET),
+        limit=1000,
+        max_batches=100000,
+        retries=3,
+        base_wait_sec=0.5,
+    )
+
+    def _safe_int(value):
+        try:
+            return int(value)
+        except Exception:
+            return 0
+
+    fetched = sum(_safe_int(item.get("fetched_rows", 0)) for item in sync_rows)
+    upserted = sum(_safe_int(item.get("upserted_rows", 0)) for item in sync_rows)
+    print(
+        f"[INFO] Auto collector checked DB coverage for {len(sync_rows)} symbols "
+        f"(fetched={fetched}, upserted={upserted})."
+    )
+    return sync_rows
 
 
 # ==========================================

@@ -58,9 +58,9 @@ storage:
   market_data_sqlite_path: "data/lq_market.sqlite3"
   market_data_exchange: "binance"
   export_csv: true
-  influx_url: ""
-  influx_org: ""
-  influx_bucket: ""
+  influx_url: "http://127.0.0.1:8086"
+  influx_org: "lumina-org"
+  influx_bucket: "lumina-market"
   influx_token_env: "INFLUXDB_TOKEN"
 
 # ------------------------------------------

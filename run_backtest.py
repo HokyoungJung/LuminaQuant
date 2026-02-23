@@ -9,7 +9,8 @@ from lumina_quant.backtesting.backtest import Backtest
 from lumina_quant.backtesting.data import HistoricCSVDataHandler
 from lumina_quant.backtesting.execution_sim import SimulatedExecutionHandler
 from lumina_quant.backtesting.portfolio_backtest import Portfolio
-from lumina_quant.config import BacktestConfig, BaseConfig, OptimizationConfig
+from lumina_quant.config import BacktestConfig, BaseConfig, LiveConfig, OptimizationConfig
+from lumina_quant.data_collector import auto_collect_market_data
 from lumina_quant.market_data import load_data_dict_from_db, normalize_timeframe_token
 from lumina_quant.utils.audit_store import AuditStore
 from strategies import registry as strategy_registry
@@ -136,9 +137,44 @@ def _load_data_dict(
     auto_collect_db=True,
 ):
     source = str(data_source).strip().lower()
-    _ = auto_collect_db
     if source == "csv":
         return None
+
+    if source in {"auto", "db"} and auto_collect_db:
+        try:
+            sync_rows = auto_collect_market_data(
+                symbol_list=list(SYMBOL_LIST),
+                timeframe=str(base_timeframe),
+                db_path=str(market_db_path),
+                exchange_id=str(market_exchange),
+                market_type=str(LiveConfig.MARKET_TYPE),
+                since_dt=START_DATE,
+                until_dt=END_DATE,
+                api_key=str(LiveConfig.BINANCE_API_KEY or ""),
+                secret_key=str(LiveConfig.BINANCE_SECRET_KEY or ""),
+                testnet=bool(LiveConfig.IS_TESTNET),
+                limit=1000,
+                max_batches=100000,
+                retries=3,
+                base_wait_sec=0.5,
+            )
+
+            def _safe_int(value):
+                try:
+                    return int(value)
+                except Exception:
+                    return 0
+
+            upserted = sum(_safe_int(item.get("upserted_rows", 0)) for item in sync_rows)
+            fetched = sum(_safe_int(item.get("fetched_rows", 0)) for item in sync_rows)
+            print(
+                f"[INFO] Auto collector checked DB coverage for {len(sync_rows)} symbols "
+                f"(fetched={fetched}, upserted={upserted})."
+            )
+        except Exception as exc:
+            if source == "db":
+                raise RuntimeError(f"DB auto-collect failed: {exc}") from exc
+            print(f"[WARN] DB auto-collect failed; continuing with fallback behavior: {exc}")
 
     data_dict = load_data_dict_from_db(
         market_db_path,
@@ -165,7 +201,7 @@ def _load_data_dict(
     if source == "db":
         raise RuntimeError(
             "No market data found in DB for requested symbols/timeframe. "
-            "Provide a prebuilt DB dataset or switch to --data-source csv."
+            "Run scripts/sync_binance_ohlcv.py first or switch to --data-source csv."
         )
     return None
 

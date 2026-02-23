@@ -88,9 +88,22 @@ def _score_from_report(report: dict, mode: str) -> tuple[float, dict]:
     return ret, {"source": "candidate_oos_fallback", "name": best.get("name"), "value": ret}
 
 
+def _enforce_1s_base_timeframe(value: str) -> str:
+    token = str(value or "").strip().lower() or "1s"
+    if token != "1s":
+        print(f"[WARN] base-timeframe '{token}' overridden to '1s' for all backtests.")
+    return "1s"
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run timeframe sweep for OOS/live search.")
     parser.add_argument("--db-path", default="data/lq_market.sqlite3")
+    parser.add_argument("--backend", default="influxdb", help="Storage backend override (sqlite|influxdb).")
+    parser.add_argument("--influx-url", default="")
+    parser.add_argument("--influx-org", default="")
+    parser.add_argument("--influx-bucket", default="")
+    parser.add_argument("--influx-token", default="")
+    parser.add_argument("--influx-token-env", default="INFLUXDB_TOKEN")
     parser.add_argument("--exchange", default="binance")
     parser.add_argument("--base-timeframe", default="1s")
     parser.add_argument("--market-type", choices=["spot", "future"], default="future")
@@ -130,6 +143,7 @@ def main() -> None:
     parser.add_argument("--xau-xag-ensemble-min-overlap-days", type=float, default=120.0)
     parser.add_argument("--xau-xag-ensemble-min-oos-trades", type=int, default=2)
     args = parser.parse_args()
+    args.base_timeframe = _enforce_1s_base_timeframe(args.base_timeframe)
 
     reports: list[dict] = []
     for timeframe in list(args.timeframes):
@@ -138,6 +152,8 @@ def main() -> None:
             "scripts/oos_guarded_multistrategy_search.py",
             "--db-path",
             str(args.db_path),
+            "--backend",
+            str(args.backend),
             "--exchange",
             str(args.exchange),
             "--base-timeframe",
@@ -197,6 +213,16 @@ def main() -> None:
             "--xau-xag-ensemble-min-oos-trades",
             str(int(args.xau_xag_ensemble_min_oos_trades)),
         ]
+        if str(args.influx_url).strip():
+            cmd.extend(["--influx-url", str(args.influx_url).strip()])
+        if str(args.influx_org).strip():
+            cmd.extend(["--influx-org", str(args.influx_org).strip()])
+        if str(args.influx_bucket).strip():
+            cmd.extend(["--influx-bucket", str(args.influx_bucket).strip()])
+        if str(args.influx_token).strip():
+            cmd.extend(["--influx-token", str(args.influx_token).strip()])
+        if str(args.influx_token_env).strip():
+            cmd.extend(["--influx-token-env", str(args.influx_token_env).strip()])
         if args.topcap_symbols:
             cmd.append("--topcap-symbols")
             cmd.extend([str(symbol) for symbol in args.topcap_symbols])
