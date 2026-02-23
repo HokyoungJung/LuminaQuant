@@ -245,21 +245,8 @@ logs/
 secrets/
 credentials/
 
-# Proprietary factor/indicator IP (do not publish)
-lumina_quant/indicators/
-tests/test_accelerated_indicators.py
-tests/test_formulaic_alpha_subset.py
-tests/test_formulaic_operators.py
-tests/test_indicator*.py
-tests/test_indicators*.py
-
-# Proprietary strategy IP (do not publish)
-strategies/
-tests/test_strategy*.py
-tests/test_*strategy*.py
-tests/test_moving_average_incremental.py
-tests/test_pair_trading_zscore.py
-tests/test_topcap_tsmom_strategy.py
+# NOTE(private-main): keep private strategy/indicator source + tests tracked.
+# Public redaction is enforced during publish via publish_api.sh filtering.
 
 # DB artifacts (never publish)
 *.db
