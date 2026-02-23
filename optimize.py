@@ -18,7 +18,6 @@ from lumina_quant.backtesting.execution_sim import SimulatedExecutionHandler
 from lumina_quant.backtesting.portfolio_backtest import Portfolio
 from lumina_quant.compute.ohlcv_loader import OHLCVFrameLoader
 from lumina_quant.config import BacktestConfig, BaseConfig, LiveConfig, OptimizationConfig
-from lumina_quant.data_collector import auto_collect_market_data
 from lumina_quant.market_data import (
     load_data_dict_from_db,
     resolve_symbol_csv_path,
@@ -30,6 +29,14 @@ from lumina_quant.optimization.threading_control import configure_numba_threads
 from lumina_quant.optimization.walkers import build_walk_forward_splits
 from lumina_quant.utils.audit_store import AuditStore
 from strategies import registry as strategy_registry
+
+try:
+    from lumina_quant.data_collector import auto_collect_market_data
+except Exception:
+    def auto_collect_market_data(*args, **kwargs):
+        raise RuntimeError(
+            "auto_collect_market_data is unavailable in this distribution."
+        )
 
 # Optuna Import
 try:
