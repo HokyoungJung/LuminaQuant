@@ -246,6 +246,10 @@ credentials/
 # NOTE(private-main): keep private strategy/indicator source + tests tracked.
 # Public redaction is enforced during publish via publish_api.sh filtering.
 
+# NOTE(public-main): never track proprietary strategy/indicator directories.
+strategies/
+lumina_quant/indicators/
+
 # DB artifacts (never publish)
 *.db
 *.db-*
