@@ -169,12 +169,13 @@ uv run python scripts/run_strategy_factory_pipeline.py \
   --seeds 20260221 \
   --single-min-score 0.0 \
   --single-min-return 0.0 \
-  --single-min-sharpe 0.0 \
+  --single-min-sharpe 0.7 \
+  --single-min-trades 20 \
   --drop-single-without-metrics
 ```
 
 포트폴리오 숏리스트 기본 정책:
-- **단일 전략**은 score/return/sharpe 기준을 통과하지 못하면 제외
+- **단일 전략**은 score/return/sharpe/trades 기준을 통과하지 못하면 제외
 - `--allow-multi-asset`을 명시하지 않으면 **직접 multi-asset 전략은 포트폴리오 숏리스트에서 제외**
 - 최종 포트폴리오 후보는 성과가 검증된 단일 전략을 자산별로 묶은 **`portfolio_sets`**(가중치 `portfolio_weight`)로 생성
 
@@ -212,12 +213,13 @@ uv run python scripts/run_strategy_factory_pipeline.py \
   --seeds 20260221 \
   --single-min-score 0.0 \
   --single-min-return 0.0 \
-  --single-min-sharpe 0.0 \
+  --single-min-sharpe 0.7 \
+  --single-min-trades 20 \
   --drop-single-without-metrics
 ```
 
 기본 shortlist 정책:
-- 단일 전략은 score/return/sharpe 기준을 통과해야 포함
+- 단일 전략은 score/return/sharpe/trades 기준을 통과해야 포함
 - direct multi-asset 행은 기본 제외 (`--allow-multi-asset`으로 허용)
 - 성공한 단일-자산 전략 조합으로 `portfolio_sets`가 생성되고 각 멤버에 `portfolio_weight`가 부여됨
 

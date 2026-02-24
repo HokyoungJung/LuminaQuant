@@ -5,7 +5,7 @@
 
 ## 핵심 정책
 
-1. 단일 전략이 OOS 성과 기준(score/return/sharpe)을 통과해야 포트폴리오 후보에 포함
+1. 단일 전략이 OOS 성과 기준(score/return/sharpe/trades)을 통과해야 포트폴리오 후보에 포함
 2. 기본적으로 direct multi-asset 전략 행은 제외 (`--allow-multi-asset` 지정 시만 포함)
 3. 최종 포트폴리오는 **성공한 단일-자산 전략 조합(`portfolio_sets`)**으로 생성
 4. 각 멤버 전략에 정규화 가중치(`portfolio_weight`)를 부여
@@ -18,7 +18,8 @@ uv run python scripts/select_strategy_factory_shortlist.py \
   --mode oos \
   --single-min-score 0.0 \
   --single-min-return 0.0 \
-  --single-min-sharpe 0.0 \
+  --single-min-sharpe 0.7 \
+  --single-min-trades 20 \
   --drop-single-without-metrics \
   --min-trades 5 \
   --max-selected 32
