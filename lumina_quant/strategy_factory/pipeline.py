@@ -35,12 +35,7 @@ def extract_saved_report_path(output: str) -> Path | None:
 def build_research_command(
     *,
     db_path: str,
-    backend: str = "influxdb",
-    influx_url: str = "",
-    influx_org: str = "",
-    influx_bucket: str = "",
-    influx_token: str = "",
-    influx_token_env: str = "INFLUXDB_TOKEN",
+    backend: str = "parquet-postgres",
     exchange: str,
     market_type: str,
     mode: str,
@@ -82,26 +77,6 @@ def build_research_command(
     ]
     if str(backend).strip():
         cmd.extend(["--backend", str(backend).strip()])
-    if str(influx_url).strip():
-        cmd.extend(["--influx-url", str(influx_url).strip()])
-    if str(influx_org).strip():
-        cmd.extend(["--influx-org", str(influx_org).strip()])
-    if str(influx_bucket).strip():
-        cmd.extend(["--influx-bucket", str(influx_bucket).strip()])
-    if str(influx_token).strip():
-        cmd.extend(["--influx-token", str(influx_token).strip()])
-    if (
-        str(influx_token_env).strip()
-        and (
-            str(backend).strip()
-            or str(influx_url).strip()
-            or str(influx_org).strip()
-            or str(influx_bucket).strip()
-            or str(influx_token).strip()
-            or str(influx_token_env).strip() != "INFLUXDB_TOKEN"
-        )
-    ):
-        cmd.extend(["--influx-token-env", str(influx_token_env).strip()])
 
     if base_timeframes:
         cmd.append("--base-timeframes")
@@ -230,7 +205,7 @@ def render_shortlist_markdown(shortlist_payload: dict[str, Any]) -> str:
     lines.append("")
     lines.append("```bash")
     lines.append(
-        "python scripts/run_strategy_factory_pipeline.py --backend influxdb"
+        "python scripts/run_strategy_factory_pipeline.py --backend parquet-postgres"
     )
     lines.append("```")
     lines.append("")

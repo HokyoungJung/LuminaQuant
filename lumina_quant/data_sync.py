@@ -16,18 +16,12 @@ from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 import ccxt
-from lumina_quant.influx_market_data import InfluxMarketDataRepository
 from lumina_quant.market_data import (
-    MARKET_OHLCV_1S_TABLE,
-    MARKET_OHLCV_TABLE,
-    _build_market_data_repository,
-    connect_market_data_1s_db,
     connect_market_data_db,
-    ensure_market_ohlcv_1s_schema,
-    ensure_market_ohlcv_schema,
     export_ohlcv_to_csv,
     get_last_ohlcv_1s_timestamp_ms,
     get_last_ohlcv_timestamp_ms,
+    load_ohlcv_coverage_from_db,
     normalize_symbol,
     normalize_timeframe_token,
     symbol_csv_filename,
@@ -42,9 +36,9 @@ def _now_ms() -> int:
     return int(datetime.now(UTC).timestamp() * 1000)
 
 
-def _is_influx_backend(db_path: str, *, backend: str | None = None) -> bool:
-    repo = _build_market_data_repository(str(db_path), backend=backend)
-    return isinstance(repo, InfluxMarketDataRepository)
+def _is_local_storage(db_path: str, *, backend: str | None = None) -> bool:
+    _ = (db_path, backend)
+    return True
 
 
 def parse_timestamp_input(value: str | int | float | None) -> int | None:
@@ -688,13 +682,10 @@ def sync_futures_feature_points(
     retries: int = 3,
     base_wait_sec: float = 0.5,
     backend: str | None = None,
-    influx_url: str | None = None,
-    influx_org: str | None = None,
-    influx_bucket: str | None = None,
-    influx_token: str | None = None,
-    influx_token_env: str = "INFLUXDB_TOKEN",
+    **legacy: Any,
 ) -> list[FuturesFeatureSyncStats]:
     """Collect and store futures feature data points for strategy research."""
+    _ = legacy
     summaries: list[FuturesFeatureSyncStats] = []
     stream_exchange = str(exchange_id).strip().lower()
 
@@ -809,11 +800,6 @@ def sync_futures_feature_points(
             rows=sorted_rows,
             source="binance_futures_api",
             backend=backend,
-            influx_url=influx_url,
-            influx_org=influx_org,
-            influx_bucket=influx_bucket,
-            influx_token=influx_token,
-            influx_token_env=influx_token_env,
         )
         first_ts = int(sorted_rows[0]["timestamp_ms"]) if sorted_rows else None
         last_ts = int(sorted_rows[-1]["timestamp_ms"]) if sorted_rows else None
@@ -939,70 +925,15 @@ def get_symbol_ohlcv_coverage(
     backend: str | None = None,
 ) -> tuple[int | None, int | None, int]:
     """Return (first_ts, last_ts, row_count) for one OHLCV stream key."""
-    timeframe_token = normalize_timeframe_token(timeframe)
-    if _is_influx_backend(db_path, backend=backend):
-        repo = _build_market_data_repository(str(db_path), backend=backend)
-        if isinstance(repo, InfluxMarketDataRepository):
-            return repo.get_ohlcv_coverage(
-                exchange=str(exchange_id).strip().lower(),
-                symbol=normalize_symbol(symbol),
-                timeframe=timeframe_token,
-            )
-        return None, None, 0
-
-    if timeframe_token == "1s":
-        conn = connect_market_data_1s_db(db_path)
-        try:
-            ensure_market_ohlcv_1s_schema(conn)
-            row = conn.execute(
-                f"""
-                SELECT
-                    MIN(timestamp_ms) AS min_ts,
-                    MAX(timestamp_ms) AS max_ts,
-                    COUNT(*) AS row_count
-                FROM {MARKET_OHLCV_1S_TABLE}
-                WHERE exchange = ? AND symbol = ?
-                """,
-                (
-                    str(exchange_id).strip().lower(),
-                    normalize_symbol(symbol),
-                ),
-            ).fetchone()
-            if row is None:
-                return None, None, 0
-            first_ts = int(row["min_ts"]) if row["min_ts"] is not None else None
-            last_ts = int(row["max_ts"]) if row["max_ts"] is not None else None
-            row_count = int(row["row_count"] or 0)
-            return first_ts, last_ts, row_count
-        finally:
-            conn.close()
-
-    conn = connect_market_data_db(db_path)
-    try:
-        ensure_market_ohlcv_schema(conn)
-        row = conn.execute(
-            f"""
-            SELECT
-                MIN(timestamp_ms) AS min_ts,
-                MAX(timestamp_ms) AS max_ts,
-                COUNT(*) AS row_count
-            FROM {MARKET_OHLCV_TABLE}
-            WHERE exchange = ? AND symbol = ? AND timeframe = ?
-            """,
-            (
-                str(exchange_id).strip().lower(),
-                normalize_symbol(symbol),
-                timeframe_token,
-            ),
-        ).fetchone()
-        if row is None:
-            return None, None, 0
-        first_ts = int(row["min_ts"]) if row["min_ts"] is not None else None
-        last_ts = int(row["max_ts"]) if row["max_ts"] is not None else None
-        row_count = int(row["row_count"] or 0)
-        return first_ts, last_ts, row_count
-    finally:
-        conn.close()
+    _ = _is_local_storage(db_path, backend=backend)
+    first_ts, last_ts, row_count = load_ohlcv_coverage_from_db(
+        db_path,
+        exchange=str(exchange_id).strip().lower(),
+        symbol=normalize_symbol(symbol),
+        timeframe=normalize_timeframe_token(timeframe),
+        backend=backend,
+    )
+    return first_ts, last_ts, int(row_count)
 
 
 def ensure_market_data_coverage(
@@ -1129,11 +1060,9 @@ def sync_symbol_ohlcv(
     backend: str | None = None,
 ) -> SyncStats:
     """Synchronize one symbol OHLCV range into configured storage backend."""
-    use_influx_backend = _is_influx_backend(db_path, backend=backend)
-    conn = None if use_influx_backend else connect_market_data_db(db_path)
+    _ = _is_local_storage(db_path, backend=backend)
+    conn = connect_market_data_db(db_path)
     try:
-        if conn is not None:
-            ensure_market_ohlcv_schema(conn)
         timeframe_token = normalize_timeframe_token(timeframe)
         tf_ms = timeframe_to_milliseconds(timeframe_token)
         stream_symbol = normalize_symbol(symbol)
@@ -1313,8 +1242,7 @@ def sync_symbol_ohlcv(
             last_timestamp_ms=last_ts,
         )
     finally:
-        if conn is not None:
-            conn.close()
+        conn.close()
 
 
 def sync_market_data(
@@ -1342,11 +1270,9 @@ def sync_market_data(
         else int(datetime(2017, 1, 1, tzinfo=UTC).timestamp() * 1000)
     )
 
-    use_influx_backend = _is_influx_backend(db_path, backend=backend)
-    conn = None if use_influx_backend else connect_market_data_db(db_path)
+    _ = _is_local_storage(db_path, backend=backend)
+    conn = connect_market_data_db(db_path)
     try:
-        if conn is not None:
-            ensure_market_ohlcv_schema(conn)
         stats: list[SyncStats] = []
 
         for symbol in symbol_list:
@@ -1360,15 +1286,12 @@ def sync_market_data(
                     backend=backend,
                 )
             else:
-                if conn is not None:
-                    last_ts = get_last_ohlcv_timestamp_ms(
-                        conn,
-                        exchange=str(exchange_id).lower(),
-                        symbol=stream_symbol,
-                        timeframe=timeframe_token,
-                    )
-                else:
-                    last_ts = None
+                last_ts = get_last_ohlcv_timestamp_ms(
+                    conn,
+                    exchange=str(exchange_id).lower(),
+                    symbol=stream_symbol,
+                    timeframe=timeframe_token,
+                )
             start_ms = default_since
             if last_ts is not None and not force_full:
                 start_ms = last_ts + timeframe_to_milliseconds(timeframe)
@@ -1400,5 +1323,4 @@ def sync_market_data(
                 )
         return stats
     finally:
-        if conn is not None:
-            conn.close()
+        conn.close()

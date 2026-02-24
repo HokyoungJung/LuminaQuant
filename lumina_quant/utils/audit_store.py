@@ -1,323 +1,159 @@
-import json
+"""Runtime audit store backed by local PostgreSQL state tables."""
+
+from __future__ import annotations
+
 import os
-import sqlite3
 import threading
 import uuid
 from datetime import UTC, datetime
+from typing import Any
+
+from lumina_quant.postgres_state import PostgresStateRepository, payload_fingerprint
+
+
+def _utc_iso() -> str:
+    return datetime.now(UTC).isoformat()
 
 
 class AuditStore:
-    """Lightweight SQLite audit store for runs, orders, fills and risk events."""
+    """Compatibility audit API implemented on top of PostgresStateRepository."""
 
-    def __init__(self, db_path="data/lq_audit.sqlite3"):
-        self.db_path = db_path
+    def __init__(self, db_path: str = ""):
+        resolved_dsn = (
+            str(db_path or "").strip()
+            or str(os.getenv("LQ_POSTGRES_DSN", "")).strip()
+            or str(os.getenv("LQ__STORAGE__POSTGRES_DSN", "")).strip()
+        )
+        if not resolved_dsn:
+            raise ValueError(
+                "Postgres DSN is required. Set LQ_POSTGRES_DSN (or storage.postgres_dsn)."
+            )
+        self.db_path = resolved_dsn
+        self._repo = PostgresStateRepository(dsn=resolved_dsn)
         self._lock = threading.Lock()
-        db_dir = os.path.dirname(self.db_path)
-        if db_dir:
-            os.makedirs(db_dir, exist_ok=True)
-        self._conn = sqlite3.connect(self.db_path, check_same_thread=False)
-        self._conn.row_factory = sqlite3.Row
-        self._ensure_schema()
+        self._repo.initialize_schema()
 
-    def _utcnow(self):
-        return datetime.now(UTC).isoformat()
-
-    def _ensure_schema(self):
+    def start_run(self, mode: str, metadata: dict[str, Any] | None = None, run_id: str | None = None) -> str:
+        resolved_run_id = str(run_id or uuid.uuid4())
         with self._lock:
-            cur = self._conn.cursor()
-            cur.executescript(
-                """
-                CREATE TABLE IF NOT EXISTS runs (
-                    run_id TEXT PRIMARY KEY,
-                    mode TEXT NOT NULL,
-                    started_at TEXT NOT NULL,
-                    ended_at TEXT,
-                    status TEXT,
-                    metadata TEXT
-                );
+            return self._repo.start_run(mode=mode, metadata=metadata or {}, run_id=resolved_run_id)
 
-                CREATE TABLE IF NOT EXISTS orders (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    run_id TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    symbol TEXT NOT NULL,
-                    side TEXT NOT NULL,
-                    order_type TEXT NOT NULL,
-                    quantity REAL NOT NULL,
-                    price REAL,
-                    status TEXT,
-                    client_order_id TEXT,
-                    exchange_order_id TEXT,
-                    metadata TEXT
-                );
-
-                CREATE TABLE IF NOT EXISTS fills (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    run_id TEXT NOT NULL,
-                    fill_time TEXT NOT NULL,
-                    symbol TEXT NOT NULL,
-                    side TEXT NOT NULL,
-                    quantity REAL NOT NULL,
-                    fill_price REAL,
-                    fill_cost REAL,
-                    commission REAL,
-                    client_order_id TEXT,
-                    exchange_order_id TEXT,
-                    status TEXT,
-                    metadata TEXT
-                );
-
-                CREATE TABLE IF NOT EXISTS equity (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    run_id TEXT NOT NULL,
-                    timeindex TEXT NOT NULL,
-                    total REAL NOT NULL,
-                    cash REAL,
-                    metadata TEXT
-                );
-
-                CREATE TABLE IF NOT EXISTS risk_events (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    run_id TEXT NOT NULL,
-                    event_time TEXT NOT NULL,
-                    reason TEXT NOT NULL,
-                    details TEXT
-                );
-
-                CREATE TABLE IF NOT EXISTS heartbeats (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    run_id TEXT NOT NULL,
-                    heartbeat_time TEXT NOT NULL,
-                    status TEXT,
-                    details TEXT
-                );
-
-                CREATE TABLE IF NOT EXISTS order_state_events (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    run_id TEXT NOT NULL,
-                    event_time TEXT NOT NULL,
-                    symbol TEXT,
-                    client_order_id TEXT,
-                    exchange_order_id TEXT,
-                    state TEXT NOT NULL,
-                    message TEXT,
-                    details TEXT
-                );
-
-                CREATE TABLE IF NOT EXISTS order_reconciliation_events (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    run_id TEXT NOT NULL,
-                    event_time TEXT NOT NULL,
-                    symbol TEXT,
-                    client_order_id TEXT,
-                    exchange_order_id TEXT,
-                    local_state TEXT,
-                    exchange_state TEXT,
-                    local_filled REAL,
-                    exchange_filled REAL,
-                    reason TEXT NOT NULL,
-                    details TEXT
-                );
-                """
-            )
-            self._conn.commit()
-
-    def start_run(self, mode, metadata=None, run_id=None):
-        run_id = str(run_id) if run_id else str(uuid.uuid4())
-        now = self._utcnow()
+    def end_run(self, run_id: str, status: str = "COMPLETED", metadata: dict[str, Any] | None = None) -> None:
         with self._lock:
-            self._conn.execute(
-                "INSERT INTO runs(run_id, mode, started_at, status, metadata) VALUES (?, ?, ?, ?, ?)",
-                (run_id, mode, now, "RUNNING", json.dumps(metadata or {})),
-            )
-            self._conn.commit()
-        return run_id
+            self._repo.end_run(run_id=run_id, status=status, metadata=metadata or {})
 
-    def end_run(self, run_id, status="COMPLETED", metadata=None):
-        now = self._utcnow()
-        incoming = dict(metadata or {})
+    def log_order(self, run_id: str, order_event: Any, status: str = "NEW", exchange_order_id: str | None = None) -> None:
+        payload = dict(getattr(order_event, "metadata", {}) or {})
+        created_at = str(getattr(order_event, "created_at", "") or _utc_iso())
         with self._lock:
-            row = self._conn.execute(
-                "SELECT metadata FROM runs WHERE run_id=?",
-                (run_id,),
-            ).fetchone()
-            merged_metadata = {}
-            if row is not None:
-                raw_existing = row["metadata"]
-                if raw_existing:
-                    try:
-                        parsed_existing = json.loads(raw_existing)
-                        if isinstance(parsed_existing, dict):
-                            merged_metadata.update(parsed_existing)
-                    except Exception:
-                        pass
-            merged_metadata.update(incoming)
-            self._conn.execute(
-                "UPDATE runs SET ended_at=?, status=?, metadata=? WHERE run_id=?",
-                (now, status, json.dumps(merged_metadata), run_id),
+            price_value = getattr(order_event, "price", None)
+            self._repo.upsert_order(
+                run_id=run_id,
+                created_at=created_at,
+                symbol=str(getattr(order_event, "symbol", "")),
+                side=str(getattr(order_event, "direction", "")),
+                order_type=str(getattr(order_event, "order_type", "")),
+                quantity=float(getattr(order_event, "quantity", 0.0) or 0.0),
+                price=(float(price_value) if price_value is not None else None),
+                status=str(status),
+                client_order_id=str(getattr(order_event, "client_order_id", "") or ""),
+                exchange_order_id=exchange_order_id,
+                metadata=payload,
             )
-            self._conn.commit()
 
-    def log_order(self, run_id, order_event, status="NEW", exchange_order_id=None):
-        payload = order_event.metadata if hasattr(order_event, "metadata") else {}
-        with self._lock:
-            self._conn.execute(
-                """
-                INSERT INTO orders(run_id, created_at, symbol, side, order_type, quantity, price, status,
-                                   client_order_id, exchange_order_id, metadata)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    run_id,
-                    self._utcnow(),
-                    order_event.symbol,
-                    order_event.direction,
-                    order_event.order_type,
-                    float(order_event.quantity),
-                    float(order_event.price) if order_event.price is not None else None,
-                    status,
-                    order_event.client_order_id,
-                    exchange_order_id,
-                    json.dumps(payload or {}),
-                ),
-            )
-            self._conn.commit()
-
-    def log_fill(self, run_id, fill_event):
+    def log_fill(self, run_id: str, fill_event: Any) -> None:
+        fill_cost = getattr(fill_event, "fill_cost", None)
+        qty = float(getattr(fill_event, "quantity", 0.0) or 0.0)
         fill_price = None
-        if fill_event.fill_cost is not None and fill_event.quantity:
-            fill_price = float(fill_event.fill_cost) / float(fill_event.quantity)
+        if fill_cost is not None and qty:
+            fill_price = float(fill_cost) / qty
         with self._lock:
-            self._conn.execute(
-                """
-                INSERT INTO fills(run_id, fill_time, symbol, side, quantity, fill_price, fill_cost, commission,
-                                  client_order_id, exchange_order_id, status, metadata)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    run_id,
-                    str(fill_event.timeindex),
-                    fill_event.symbol,
-                    fill_event.direction,
-                    float(fill_event.quantity),
-                    fill_price,
-                    float(fill_event.fill_cost) if fill_event.fill_cost is not None else None,
-                    float(fill_event.commission) if fill_event.commission is not None else 0.0,
-                    fill_event.client_order_id,
-                    fill_event.order_id,
-                    fill_event.status,
-                    json.dumps(fill_event.metadata or {}),
-                ),
+            self._repo.upsert_fill(
+                run_id=run_id,
+                fill_time=str(getattr(fill_event, "timeindex", "") or _utc_iso()),
+                symbol=str(getattr(fill_event, "symbol", "")),
+                side=str(getattr(fill_event, "direction", "")),
+                quantity=qty,
+                fill_price=fill_price,
+                fill_cost=float(fill_cost) if fill_cost is not None else None,
+                commission=float(getattr(fill_event, "commission", 0.0) or 0.0),
+                client_order_id=str(getattr(fill_event, "client_order_id", "") or ""),
+                exchange_order_id=str(getattr(fill_event, "order_id", "") or ""),
+                status=str(getattr(fill_event, "status", "") or ""),
+                metadata=dict(getattr(fill_event, "metadata", {}) or {}),
             )
-            self._conn.commit()
 
-    def log_equity(self, run_id, timeindex, total, cash=None, metadata=None):
+    def log_equity(
+        self,
+        run_id: str,
+        timeindex: str | datetime,
+        total: float,
+        cash: float | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
         with self._lock:
-            self._conn.execute(
-                "INSERT INTO equity(run_id, timeindex, total, cash, metadata) VALUES (?, ?, ?, ?, ?)",
-                (
-                    run_id,
-                    str(timeindex),
-                    float(total),
-                    float(cash) if cash is not None else None,
-                    json.dumps(metadata or {}),
-                ),
+            self._repo.upsert_equity(
+                run_id=run_id,
+                timeindex=timeindex,
+                total=float(total),
+                cash=float(cash) if cash is not None else None,
+                metadata=metadata or {},
             )
-            self._conn.commit()
 
-    def log_risk_event(self, run_id, reason, details=None):
+    def log_risk_event(self, run_id: str, reason: str, details: dict[str, Any] | None = None) -> None:
         with self._lock:
-            self._conn.execute(
-                "INSERT INTO risk_events(run_id, event_time, reason, details) VALUES (?, ?, ?, ?)",
-                (run_id, self._utcnow(), reason, json.dumps(details or {})),
-            )
-            self._conn.commit()
+            self._repo.upsert_risk_event(run_id=run_id, reason=reason, details=details or {})
 
-    def log_heartbeat(self, run_id, status="ALIVE", details=None):
+    def log_heartbeat(self, run_id: str, status: str = "ALIVE", details: dict[str, Any] | None = None) -> None:
         with self._lock:
-            self._conn.execute(
-                "INSERT INTO heartbeats(run_id, heartbeat_time, status, details) VALUES (?, ?, ?, ?)",
-                (
-                    run_id,
-                    self._utcnow(),
-                    status,
-                    json.dumps(details or {}),
-                ),
+            self._repo.upsert_heartbeat(
+                run_id=run_id,
+                status=status,
+                details=details or {},
+                worker_id=str((details or {}).get("worker_id", "") or ""),
             )
-            self._conn.commit()
 
-    def log_order_state(self, run_id, state_payload):
+    def log_order_state(self, run_id: str, state_payload: dict[str, Any]) -> None:
         details = dict(state_payload.get("metadata") or {})
         if "last_filled" in state_payload:
-            details["last_filled"] = state_payload["last_filled"]
+            details["last_filled"] = state_payload.get("last_filled")
         if "created_at" in state_payload:
-            details["created_at"] = state_payload["created_at"]
-
-        symbol = state_payload.get("symbol")
-        client_order_id = state_payload.get("client_order_id")
-        exchange_order_id = state_payload.get("order_id")
-        state = str(state_payload.get("state", "UNKNOWN"))
-        message = state_payload.get("message")
+            details["created_at"] = state_payload.get("created_at")
         with self._lock:
-            self._conn.execute(
-                """
-                INSERT INTO order_state_events(
-                    run_id, event_time, symbol, client_order_id, exchange_order_id, state, message, details
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    run_id,
-                    self._utcnow(),
-                    symbol,
-                    client_order_id,
-                    exchange_order_id,
-                    state,
-                    message,
-                    json.dumps(details),
-                ),
+            self._repo.upsert_order_state_event(
+                run_id=run_id,
+                event_time=str(state_payload.get("event_time") or _utc_iso()),
+                state=str(state_payload.get("state", "UNKNOWN")),
+                symbol=state_payload.get("symbol"),
+                client_order_id=state_payload.get("client_order_id"),
+                exchange_order_id=state_payload.get("order_id"),
+                message=state_payload.get("message"),
+                details=details,
             )
-            if client_order_id:
-                self._conn.execute(
-                    """
-                    UPDATE orders
-                    SET status = ?, exchange_order_id = COALESCE(?, exchange_order_id)
-                    WHERE run_id = ? AND client_order_id = ?
-                    """,
-                    (state, exchange_order_id, run_id, client_order_id),
-                )
-            self._conn.commit()
 
-    def log_order_reconciliation(self, run_id, payload):
+    def log_order_reconciliation(self, run_id: str, payload: dict[str, Any]) -> None:
+        """Persist reconciliation as a risk event for compatibility."""
+        reason = str(payload.get("reason") or "ORDER_RECONCILIATION")
         details = dict(payload.get("metadata") or {})
-        local_state = str(payload.get("local_state") or "")
-        exchange_state = str(payload.get("exchange_state") or "")
-        local_filled = float(payload.get("local_filled") or 0.0)
-        exchange_filled = float(payload.get("exchange_filled") or 0.0)
-        reason = str(payload.get("reason") or "RECONCILIATION")
+        details.update(
+            {
+                "symbol": payload.get("symbol"),
+                "client_order_id": payload.get("client_order_id"),
+                "order_id": payload.get("order_id"),
+                "local_state": payload.get("local_state"),
+                "exchange_state": payload.get("exchange_state"),
+                "local_filled": payload.get("local_filled"),
+                "exchange_filled": payload.get("exchange_filled"),
+            }
+        )
+        dedupe_key = payload_fingerprint(run_id, reason, details)
         with self._lock:
-            self._conn.execute(
-                """
-                INSERT INTO order_reconciliation_events(
-                    run_id, event_time, symbol, client_order_id, exchange_order_id,
-                    local_state, exchange_state, local_filled, exchange_filled, reason, details
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    run_id,
-                    self._utcnow(),
-                    payload.get("symbol"),
-                    payload.get("client_order_id"),
-                    payload.get("order_id"),
-                    local_state,
-                    exchange_state,
-                    local_filled,
-                    exchange_filled,
-                    reason,
-                    json.dumps(details),
-                ),
+            self._repo.upsert_risk_event(
+                run_id=run_id,
+                reason=reason,
+                details=details,
+                dedupe_key=dedupe_key,
             )
-            self._conn.commit()
 
-    def close(self):
-        with self._lock:
-            self._conn.close()
+    def close(self) -> None:
+        return

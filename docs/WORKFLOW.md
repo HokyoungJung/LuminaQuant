@@ -15,12 +15,11 @@ When publishing to `main`, remove (or keep removed) DB construction/sync code:
 - `lumina_quant/data_collector.py`
 - `scripts/sync_binance_ohlcv.py`
 - `scripts/collect_market_data.py`
-- `scripts/collect_universe_1s.py`
 - `tests/test_data_sync.py`
 
 Public branch policy:
 
-- Keep DB **read-only** workflows (consume existing SQLite/CSV).
+- Keep DB **read-only** workflows (consume existing Postgres/Parquet/CSV artifacts).
 - Do not include exchange OHLCV bootstrap/sync pipelines.
 - Keep runtime DB/data artifacts out of git.
 
@@ -72,7 +71,7 @@ git push private private-main:main
 git checkout main
 git merge private-main --no-commit --no-ff
 git checkout HEAD -- .gitignore
-git rm -f lumina_quant/data_sync.py lumina_quant/data_collector.py scripts/sync_binance_ohlcv.py scripts/collect_market_data.py scripts/collect_universe_1s.py tests/test_data_sync.py
+git rm -f lumina_quant/data_sync.py lumina_quant/data_collector.py scripts/sync_binance_ohlcv.py scripts/collect_market_data.py tests/test_data_sync.py
 git reset
 git add .
 git commit -m "chore: publish"
@@ -112,33 +111,24 @@ uv run python scripts/generate_alpha_card_template.py \
   --output reports/alpha_card_rsi_strategy.md
 ```
 
-2. Run testnet/paper for 14 days and generate soak report:
-
-```bash
-uv run python scripts/generate_soak_report.py --db data/lumina_quant.db --days 14
-```
-
-3. Run promotion gate report (soak + runtime reliability checks):
+2. Run promotion gate report (soak + runtime reliability checks):
 
 ```bash
 # uses promotion_gate defaults from config.yaml
 uv run python scripts/generate_promotion_gate_report.py \
-  --db data/lumina_quant.db \
   --config config.yaml
 
 # strategy-specific profile from promotion_gate.strategy_profiles
 uv run python scripts/generate_promotion_gate_report.py \
-  --db data/lumina_quant.db \
   --config config.yaml \
   --strategy RsiStrategy
 ```
 
-4. If your process requires Alpha Card presence:
+3. Persist the resolved promotion gate profile for review:
 
 ```bash
 uv run python scripts/generate_promotion_gate_report.py \
-  --db data/lumina_quant.db \
+  --config config.yaml \
   --strategy RsiStrategy \
-  --alpha-card reports/alpha_card_rsi_strategy.md \
-  --require-alpha-card
+  > reports/promotion_gate_rsi_strategy.json
 ```

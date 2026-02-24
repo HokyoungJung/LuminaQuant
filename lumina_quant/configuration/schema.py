@@ -52,22 +52,19 @@ class ExecutionConfig:
     funding_interval_hours: int = 8
     maintenance_margin_rate: float = 0.005
     liquidation_buffer_rate: float = 0.0005
-    compute_backend: str = "cpu"
+    compute_backend: str = "auto"
 
 
 @dataclass(slots=True)
 class StorageConfig:
     """Storage settings for audit and exports."""
 
-    backend: str = "influxdb"
-    sqlite_path: str = "data/lq_audit.sqlite3"
-    market_data_sqlite_path: str = "data/lq_market.sqlite3"
+    backend: str = "parquet-postgres"
+    postgres_dsn: str = ""
+    postgres_dsn_env: str = "LQ_POSTGRES_DSN"
+    market_data_parquet_path: str = "data/market_parquet"
     market_data_exchange: str = "binance"
     export_csv: bool = True
-    influx_url: str = ""
-    influx_org: str = ""
-    influx_bucket: str = ""
-    influx_token_env: str = "INFLUXDB_TOKEN"
 
 
 @dataclass(slots=True)

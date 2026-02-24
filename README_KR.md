@@ -12,6 +12,8 @@
 | :--- | :--- |
 | **[설치 및 설정](#설치-installation)** | LuminaQuant 시작하기. |
 | **[운영 워크플로우](docs/kr/WORKFLOW.md)** | Private/Public 브랜치 운영 및 공개 배포 체크리스트. |
+| **[마이그레이션 가이드](docs/MIGRATION_GUIDE_POSTGRES_PARQUET.md)** | 레거시 저장소 제거 후 Parquet + PostgreSQL 전환 가이드. |
+| **[GPU 자동 실행 설계](docs/DESIGN_NOTES_GPU_AUTO.md)** | Polars GPU/CPU 자동 선택 및 fallback 전략 설명. |
 | **[대시보드 실시간 분석 리포트](docs/DASHBOARD_REALTIME_ANALYSIS_REPORT.md)** | 실시간 갱신 동작 개선 분석 및 구현 결과. |
 | **[거래소 가이드](docs/kr/EXCHANGES.md)** | **바이낸스(Binance)** (CCXT) 및 **MetaTrader 5 (MT5)** 상세 설정법. |
 | **[거래 매뉴얼](docs/kr/TRADING_MANUAL.md)** | **실전 운용법**: 매수/매도, 레버리지, TP/SL, 트레일링 스탑. |
@@ -39,6 +41,11 @@ graph TD
 - **Portfolio**: 상태, 포지션, 리스크를 관리하며, 신호를 `OrderEvent`로 변환합니다.
 - **ExecutionHandler**: 체결을 시뮬레이션(백테스트)하거나 API를 통해 실행(실거래)합니다.
 
+현재 기본 로컬 스택:
+- **1초 캔들 저장소**: Parquet(ZSTD, exchange/symbol/date 파티션)
+- **상태/감사/잡 관리**: PostgreSQL(local)
+- **백테스트/최적화 계산**: Polars Lazy + GPU 자동(`LQ_GPU_MODE=auto`)
+
 ---
 
 ## ⚙️ 설정 및 구성 (Setup & Configuration)
@@ -56,6 +63,9 @@ graph TD
 # .env 파일 예시
 BINANCE_API_KEY=your_api_key
 BINANCE_SECRET_KEY=your_secret_key
+LQ_POSTGRES_DSN=postgresql://localhost:5432/luminaquant
+LQ_GPU_MODE=auto
+LQ_GPU_DEVICE=0
 LOG_LEVEL=INFO
 ```
 
@@ -112,19 +122,18 @@ trading:
   - `lumina_quant/data_collector.py`
   - `scripts/sync_binance_ohlcv.py`
   - `scripts/collect_market_data.py`
-  - `scripts/collect_universe_1s.py`
   - `tests/test_data_sync.py`
 - 전략/지표 전체 구현 및 AGENTS 가이드는 Private 저장소에서 관리합니다.
-- DB/런타임 산출물은 게시하지 않습니다 (`*.db`, `*.sqlite*`, `data/`, `logs/`, `.omx/`, `.sisyphus/`).
+- DB/런타임 산출물은 게시하지 않습니다 (`data/`, `logs/`, `.omx/`, `.sisyphus/`).
 
 ### 3. 시스템 실행 (Running the System)
 
-**(Private 저장소 전용) 바이낸스 OHLCV 전체 수집 + SQLite 업데이트 (+CSV 미러):**
+**(Private 저장소 전용) 바이낸스 OHLCV 전체 수집 + Parquet 업데이트 (+CSV 미러):**
 ```bash
 uv run python scripts/sync_binance_ohlcv.py \
   --symbols BTC/USDT ETH/USDT \
   --timeframe 1m \
-  --db-path data/lumina_quant.db \
+  --db-path data/market_parquet \
   --force-full
 ```
 
@@ -135,7 +144,7 @@ Public 저장소에는 DB 동기화/구축 헬퍼를 의도적으로 포함하�
 uv run python run_backtest.py
 
 # DB 데이터만 사용
-uv run python run_backtest.py --data-source db --market-db-path data/lumina_quant.db
+uv run python run_backtest.py --data-source db --market-db-path data/market_parquet
 ```
 
 **워크포워드 최적화:**
@@ -143,13 +152,18 @@ uv run python run_backtest.py --data-source db --market-db-path data/lumina_quan
 uv run python optimize.py
 
 # DB 우선, 부족하면 CSV fallback
-uv run python optimize.py --data-source auto --market-db-path data/lumina_quant.db
+uv run python optimize.py --data-source auto --market-db-path data/market_parquet
 ```
 
 **아키텍처/린트 검증:**
 ```bash
 uv run python scripts/check_architecture.py
 uv run ruff check .
+```
+
+**PostgreSQL 스키마 초기화:**
+```bash
+uv run python scripts/init_postgres_schema.py --dsn "$LQ_POSTGRES_DSN"
 ```
 
 **백테스트 성능 벤치마크/회귀 비교:**
@@ -169,17 +183,28 @@ uv run streamlit run dashboard.py
 
 대시보드 개선 사항:
 - 전략별 Run 필터(`Filter Run IDs By Strategy`) 및 전략 변경 시 Run 자동 재선택
-- 감사 DB와 별도로 시장 OHLCV 소스를 지정하는 `Market Data SQLite Path`
-- SQLite run 데이터가 없을 때 CSV fallback 상태를 명시적으로 경고
+- 감사 상태(PostgreSQL)와 시장 OHLCV(Parquet) 소스를 분리하여 표시
+- 런타임 데이터가 없을 때 CSV fallback 상태를 명시적으로 경고
 
 **대시보드 실시간 스모크 체크 (equity row 증가 확인):**
 ```bash
-# live trader가 data/lumina_quant.db를 쓰는 동안 실행
-uv run python scripts/smoke_dashboard_realtime.py \
-  --db-path data/lumina_quant.db \
-  --require-running \
-  --timeout-sec 90 \
-  --poll-sec 3
+uv run python -m streamlit run dashboard.py --server.headless true
+```
+
+**Ghost RUNNING 정리 (PostgreSQL):**
+```bash
+# dry-run
+uv run python scripts/cleanup_ghost_runs.py \
+  --dsn "$LQ_POSTGRES_DSN" \
+  --stale-sec 300 \
+  --startup-grace-sec 90
+
+# apply
+uv run python scripts/cleanup_ghost_runs.py \
+  --dsn "$LQ_POSTGRES_DSN" \
+  --stale-sec 300 \
+  --startup-grace-sec 90 \
+  --apply
 ```
 
 **실거래 실행:**

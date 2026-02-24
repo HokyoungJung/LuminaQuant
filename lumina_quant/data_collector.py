@@ -38,8 +38,10 @@ def auto_collect_market_data(
     base_wait_sec: float = 0.5,
     force_full: bool = False,
     backend: str | None = None,
+    **legacy: object,
 ) -> list[dict[str, int | str | None]]:
-    """Ensure requested OHLCV coverage exists in SQLite and return sync summary."""
+    """Ensure requested OHLCV coverage exists in parquet storage and return summary."""
+    _ = legacy
     exchange = create_binance_exchange(
         api_key=api_key,
         secret_key=secret_key,
@@ -91,16 +93,13 @@ def collect_strategy_support_data(
     retries: int = 3,
     execute: bool = False,
     backend: str | None = None,
-    influx_url: str | None = None,
-    influx_org: str | None = None,
-    influx_bucket: str | None = None,
-    influx_token: str | None = None,
-    influx_token_env: str = "INFLUXDB_TOKEN",
+    **legacy: object,
 ) -> dict[str, object]:
     """Prepare or execute strategy-support data collection.
 
     Defaults to plan-only mode so no network data is fetched unless execute=True.
     """
+    _ = legacy
     since_ms = parse_timestamp_input(since)
     until_ms = parse_timestamp_input(until)
     if since_ms is None:
@@ -147,11 +146,6 @@ def collect_strategy_support_data(
         open_interest_period=str(open_interest_period),
         retries=max(0, int(retries)),
         backend=backend,
-        influx_url=influx_url,
-        influx_org=influx_org,
-        influx_bucket=influx_bucket,
-        influx_token=influx_token,
-        influx_token_env=influx_token_env,
     )
     upserted_rows = sum(int(item.upserted_rows) for item in stats)
     plan["status"] = "executed"

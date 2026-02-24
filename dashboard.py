@@ -4,19 +4,22 @@ import json
 import math
 import os
 import signal
-import sqlite3
 import subprocess
 import sys
 import time
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 from lumina_quant.config import BacktestConfig, BaseConfig, OptimizationConfig
-from lumina_quant.market_data import normalize_symbol, normalize_timeframe_token
+from lumina_quant.market_data import (
+    normalize_symbol,
+    normalize_timeframe_token,
+    timeframe_to_milliseconds,
+)
 from lumina_quant.utils.performance import (
     create_alpha_beta,
     create_annualized_volatility,
@@ -57,43 +60,136 @@ strategy_registry = importlib.import_module("strategies.registry")
 st.set_page_config(layout="wide", page_title="LuminaQuant Dashboard")
 st.title("LuminaQuant: Full Trading Intelligence")
 
-DEFAULT_DB_PATH = "data/lq_audit.sqlite3"
+DEFAULT_DB_PATH = str(
+    os.getenv("LQ_POSTGRES_DSN")
+    or getattr(BaseConfig, "POSTGRES_DSN", "")
+    or "postgresql://localhost:5432/luminaquant"
+)
 
 
-def _count_market_rows(db_path):
-    if not os.path.exists(db_path):
-        return 0
-    conn = sqlite3.connect(db_path)
+def _resolve_postgres_dsn(dsn: str | None = None) -> str:
+    token = str(
+        dsn
+        or os.getenv("LQ_POSTGRES_DSN")
+        or getattr(BaseConfig, "POSTGRES_DSN", "")
+        or ""
+    ).strip()
+    return token
+
+
+class _StateCursor:
+    def __init__(self, cursor):
+        self._cursor = cursor
+
+    def execute(self, query, params=None):
+        self._cursor.execute(str(query), tuple(params or ()))
+        return self
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.close()
+        return False
+
+    def fetchone(self):
+        return self._cursor.fetchone()
+
+    def fetchall(self):
+        return self._cursor.fetchall()
+
+    def close(self):
+        self._cursor.close()
+
+    @property
+    def description(self):
+        return self._cursor.description
+
+
+class _StateConnection:
+    def __init__(self, connection):
+        self._conn = connection
+
+    def cursor(self):
+        return _StateCursor(self._conn.cursor())
+
+    def execute(self, query, params=None):
+        cursor = self.cursor()
+        cursor.execute(query, params)
+        return cursor
+
+    def executescript(self, script):
+        with self._conn.cursor() as cursor:
+            for statement in str(script).split(";"):
+                payload = statement.strip()
+                if not payload:
+                    continue
+                cursor.execute(payload)
+
+    def commit(self):
+        self._conn.commit()
+
+    def rollback(self):
+        self._conn.rollback()
+
+    def close(self):
+        self._conn.close()
+
+    def __getattr__(self, name):
+        return getattr(self._conn, name)
+
+
+def _connect_state_store(dsn: str):
+    resolved = _resolve_postgres_dsn(dsn)
+    if not resolved:
+        raise RuntimeError("Postgres DSN is required.")
+    from lumina_quant.postgres_state import _connect_postgres
+
+    return _StateConnection(_connect_postgres(resolved))
+
+
+def _execute_query(dsn: str, query: str, params=None):
+    conn = _connect_state_store(dsn)
     try:
-        row = conn.execute("SELECT COUNT(*) FROM market_ohlcv").fetchone()
-        if row is None or row[0] is None:
-            return 0
-        return int(row[0])
-    except Exception:
-        return 0
+        with conn.cursor() as cursor:
+            cursor.execute(query, tuple(params or ()))
+            try:
+                rows = cursor.fetchall()
+            except Exception:
+                rows = []
+        conn.commit()
+        return rows
     finally:
         conn.close()
 
 
-def _resolve_default_market_db_path():
-    configured = str(getattr(BaseConfig, "MARKET_DATA_SQLITE_PATH", DEFAULT_DB_PATH))
-    candidate_list = []
-    seen = set()
-    for raw in [configured, "data/lq_market.sqlite3", DEFAULT_DB_PATH]:
-        token = os.path.normpath(str(raw))
-        if token in seen:
-            continue
-        seen.add(token)
-        candidate_list.append(token)
+def _read_sql_query(dsn: str, query: str, params=None):
+    conn = _connect_state_store(dsn)
+    try:
+        return pd.read_sql_query(query, conn, params=params)
+    finally:
+        conn.close()
 
-    best_path = configured
-    best_rows = -1
-    for candidate in candidate_list:
-        rows = _count_market_rows(candidate)
-        if rows > best_rows:
-            best_rows = rows
-            best_path = candidate
-    return best_path
+
+def _count_market_rows(db_path):
+    try:
+        rows = _execute_query(db_path, "SELECT COUNT(*) FROM market_ohlcv_1m")
+        row = rows[0] if rows else None
+        if row is None:
+            return 0
+        return int(row[0])
+    except Exception:
+        return 0
+
+
+def _resolve_default_market_db_path():
+    configured = str(
+        getattr(BaseConfig, "MARKET_DATA_PARQUET_PATH", "")
+        or os.getenv("LQ__STORAGE__MARKET_DATA_PARQUET_PATH")
+        or os.getenv("LQ_MARKET_PARQUET_PATH")
+        or "data/market_parquet"
+    ).strip()
+    return configured
 
 
 DEFAULT_MARKET_DB_PATH = _resolve_default_market_db_path()
@@ -233,10 +329,7 @@ def _utc_now_iso():
 def _ensure_workflow_jobs_schema(db_path):
     if not db_path:
         return
-    parent = os.path.dirname(db_path)
-    if parent:
-        os.makedirs(parent, exist_ok=True)
-    conn = sqlite3.connect(db_path)
+    conn = _connect_state_store(db_path)
     try:
         conn.executescript(
             """
@@ -271,15 +364,31 @@ def _ensure_workflow_jobs_schema(db_path):
 
 def _insert_workflow_job_row(db_path, row):
     _ensure_workflow_jobs_schema(db_path)
-    conn = sqlite3.connect(db_path)
+    conn = _connect_state_store(db_path)
     try:
         conn.execute(
             """
-            INSERT OR REPLACE INTO workflow_jobs(
+            INSERT INTO workflow_jobs(
                 job_id, workflow, status, requested_mode, strategy, command_json,
                 env_json, pid, run_id, started_at, ended_at, exit_code,
                 log_path, stop_file, metadata_json, last_updated
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (job_id) DO UPDATE SET
+                workflow = EXCLUDED.workflow,
+                status = EXCLUDED.status,
+                requested_mode = EXCLUDED.requested_mode,
+                strategy = EXCLUDED.strategy,
+                command_json = EXCLUDED.command_json,
+                env_json = EXCLUDED.env_json,
+                pid = EXCLUDED.pid,
+                run_id = EXCLUDED.run_id,
+                started_at = EXCLUDED.started_at,
+                ended_at = EXCLUDED.ended_at,
+                exit_code = EXCLUDED.exit_code,
+                log_path = EXCLUDED.log_path,
+                stop_file = EXCLUDED.stop_file,
+                metadata_json = EXCLUDED.metadata_json,
+                last_updated = EXCLUDED.last_updated
             """,
             (
                 row.get("job_id"),
@@ -311,12 +420,12 @@ def _update_workflow_job_row(db_path, job_id, **updates):
     _ensure_workflow_jobs_schema(db_path)
     fields = dict(updates)
     fields["last_updated"] = _utc_now_iso()
-    assignments = ", ".join(f"{key} = ?" for key in fields)
+    assignments = ", ".join(f"{key} = %s" for key in fields)
     values = [*list(fields.values()), job_id]
-    conn = sqlite3.connect(db_path)
+    conn = _connect_state_store(db_path)
     try:
         conn.execute(
-            f"UPDATE workflow_jobs SET {assignments} WHERE job_id = ?",
+            f"UPDATE workflow_jobs SET {assignments} WHERE job_id = %s",
             values,
         )
         conn.commit()
@@ -392,10 +501,10 @@ def _tail_text_file(path, max_chars=20000):
 @st.cache_data
 def load_workflow_jobs(db_path, refresh_counter=0, limit=200):
     _ = refresh_counter
-    if not os.path.exists(db_path):
+    if not _resolve_postgres_dsn(db_path):
         return pd.DataFrame()
     _ensure_workflow_jobs_schema(db_path)
-    conn = sqlite3.connect(db_path)
+    conn = _connect_state_store(db_path)
     try:
         df = pd.read_sql_query(
             """
@@ -404,7 +513,7 @@ def load_workflow_jobs(db_path, refresh_counter=0, limit=200):
                    log_path, stop_file, metadata_json, last_updated
             FROM workflow_jobs
             ORDER BY COALESCE(started_at, last_updated) DESC
-            LIMIT ?
+            LIMIT %s
             """,
             conn,
             params=[int(max(1, limit))],
@@ -422,7 +531,7 @@ def _refresh_workflow_jobs(db_path):
         st.session_state["workflow_processes"] = {}
     managed = st.session_state["workflow_processes"]
 
-    conn = sqlite3.connect(db_path)
+    conn = _connect_state_store(db_path)
     try:
         rows = conn.execute(
             """
@@ -586,9 +695,9 @@ def _request_job_stop(db_path, stop_file):
 @st.cache_data
 def load_runs(db_path, refresh_counter=0):
     _ = refresh_counter
-    if not os.path.exists(db_path):
+    if not _resolve_postgres_dsn(db_path):
         return pd.DataFrame()
-    conn = sqlite3.connect(db_path)
+    conn = _connect_state_store(db_path)
     try:
         df = pd.read_sql_query(
             """
@@ -598,9 +707,9 @@ def load_runs(db_path, refresh_counter=0):
                 r.started_at,
                 r.ended_at,
                 r.status,
-                r.metadata,
+                r.metadata_json AS metadata,
                 COALESCE(
-                    json_extract(r.metadata, '$.strategy'),
+                    (r.metadata_json ->> 'strategy'),
                     (
                         SELECT w.strategy
                         FROM workflow_jobs w
@@ -645,19 +754,19 @@ def load_runs(db_path, refresh_counter=0):
 
 
 @st.cache_data
-def load_equity_sqlite(db_path, run_id, refresh_counter=0, max_points=DEFAULT_WINDOW_POINTS):
+def load_equity_state(db_path, run_id, refresh_counter=0, max_points=DEFAULT_WINDOW_POINTS):
     _ = refresh_counter
-    conn = sqlite3.connect(db_path)
+    conn = _connect_state_store(db_path)
     try:
         df = pd.read_sql_query(
             """
-            SELECT timeindex AS datetime, total, cash, metadata
+            SELECT timeindex AS datetime, total, cash, metadata_json AS metadata
             FROM (
-                SELECT id, timeindex, total, cash, metadata
+                SELECT id, timeindex, total, cash, metadata_json
                 FROM equity
-                WHERE run_id = ?
+                WHERE run_id = %s
                 ORDER BY id DESC
-                LIMIT ?
+                LIMIT %s
             ) recent
             ORDER BY id ASC
             """,
@@ -670,9 +779,9 @@ def load_equity_sqlite(db_path, run_id, refresh_counter=0, max_points=DEFAULT_WI
 
 
 @st.cache_data
-def load_metrics_sqlite(db_path, run_id, refresh_counter=0):
+def load_metrics_state(db_path, run_id, refresh_counter=0):
     _ = refresh_counter
-    conn = sqlite3.connect(db_path)
+    conn = _connect_state_store(db_path)
     try:
         df = pd.read_sql_query(
             """
@@ -680,9 +789,9 @@ def load_metrics_sqlite(db_path, run_id, refresh_counter=0):
                 timeindex AS datetime,
                 total,
                 cash,
-                metadata
+                metadata_json AS metadata
             FROM equity
-            WHERE run_id = ?
+            WHERE run_id = %s
             ORDER BY id ASC
             """,
             conn,
@@ -713,9 +822,9 @@ def load_metrics_sqlite(db_path, run_id, refresh_counter=0):
 
 
 @st.cache_data
-def load_fills_sqlite(db_path, run_id, refresh_counter=0, max_points=DEFAULT_WINDOW_POINTS):
+def load_fills_state(db_path, run_id, refresh_counter=0, max_points=DEFAULT_WINDOW_POINTS):
     _ = refresh_counter
-    conn = sqlite3.connect(db_path)
+    conn = _connect_state_store(db_path)
     try:
         df = pd.read_sql_query(
             """
@@ -728,16 +837,16 @@ def load_fills_sqlite(db_path, run_id, refresh_counter=0, max_points=DEFAULT_WIN
                 commission,
                 fill_price AS price,
                 status,
-                metadata,
+                metadata_json AS metadata,
                 exchange_order_id,
                 client_order_id
             FROM (
                 SELECT id, fill_time, symbol, side, quantity, fill_cost, commission,
-                       fill_price, status, metadata, exchange_order_id, client_order_id
+                       fill_price, status, metadata_json, exchange_order_id, client_order_id
                 FROM fills
-                WHERE run_id = ?
+                WHERE run_id = %s
                 ORDER BY id DESC
-                LIMIT ?
+                LIMIT %s
             ) recent
             ORDER BY id ASC
             """,
@@ -759,21 +868,21 @@ def load_fills_sqlite(db_path, run_id, refresh_counter=0, max_points=DEFAULT_WIN
 
 
 @st.cache_data
-def load_orders_sqlite(db_path, run_id, refresh_counter=0, max_points=DEFAULT_WINDOW_POINTS):
+def load_orders_state(db_path, run_id, refresh_counter=0, max_points=DEFAULT_WINDOW_POINTS):
     _ = refresh_counter
-    conn = sqlite3.connect(db_path)
+    conn = _connect_state_store(db_path)
     try:
         df = pd.read_sql_query(
             """
             SELECT created_at, symbol, side, order_type, quantity, price, status,
-                   client_order_id, exchange_order_id, metadata
+                   client_order_id, exchange_order_id, metadata_json AS metadata
             FROM (
                 SELECT id, created_at, symbol, side, order_type, quantity, price, status,
-                       client_order_id, exchange_order_id, metadata
+                       client_order_id, exchange_order_id, metadata_json
                 FROM orders
-                WHERE run_id = ?
+                WHERE run_id = %s
                 ORDER BY id DESC
-                LIMIT ?
+                LIMIT %s
             ) recent
             ORDER BY id ASC
             """,
@@ -786,19 +895,19 @@ def load_orders_sqlite(db_path, run_id, refresh_counter=0, max_points=DEFAULT_WI
 
 
 @st.cache_data
-def load_risk_events_sqlite(db_path, run_id, refresh_counter=0, max_points=5000):
+def load_risk_events_state(db_path, run_id, refresh_counter=0, max_points=5000):
     _ = refresh_counter
-    conn = sqlite3.connect(db_path)
+    conn = _connect_state_store(db_path)
     try:
         df = pd.read_sql_query(
             """
-            SELECT event_time, reason, details
+            SELECT event_time, reason, details_json AS details
             FROM (
-                SELECT id, event_time, reason, details
+                SELECT id, event_time, reason, details_json
                 FROM risk_events
-                WHERE run_id = ?
+                WHERE run_id = %s
                 ORDER BY id DESC
-                LIMIT ?
+                LIMIT %s
             ) recent
             ORDER BY id ASC
             """,
@@ -811,19 +920,19 @@ def load_risk_events_sqlite(db_path, run_id, refresh_counter=0, max_points=5000)
 
 
 @st.cache_data
-def load_heartbeats_sqlite(db_path, run_id, refresh_counter=0, max_points=5000):
+def load_heartbeats_state(db_path, run_id, refresh_counter=0, max_points=5000):
     _ = refresh_counter
-    conn = sqlite3.connect(db_path)
+    conn = _connect_state_store(db_path)
     try:
         df = pd.read_sql_query(
             """
-            SELECT heartbeat_time, status, details
+            SELECT heartbeat_time, status, details_json AS details
             FROM (
-                SELECT id, heartbeat_time, status, details
+                SELECT id, heartbeat_time, status, details_json
                 FROM heartbeats
-                WHERE run_id = ?
+                WHERE run_id = %s
                 ORDER BY id DESC
-                LIMIT ?
+                LIMIT %s
             ) recent
             ORDER BY id ASC
             """,
@@ -836,19 +945,19 @@ def load_heartbeats_sqlite(db_path, run_id, refresh_counter=0, max_points=5000):
 
 
 @st.cache_data
-def load_order_states_sqlite(db_path, run_id, refresh_counter=0, max_points=10000):
+def load_order_states_state(db_path, run_id, refresh_counter=0, max_points=10000):
     _ = refresh_counter
-    conn = sqlite3.connect(db_path)
+    conn = _connect_state_store(db_path)
     try:
         df = pd.read_sql_query(
             """
-            SELECT event_time, symbol, client_order_id, exchange_order_id, state, message, details
+            SELECT event_time, symbol, client_order_id, exchange_order_id, state, message, details_json AS details
             FROM (
-                SELECT id, event_time, symbol, client_order_id, exchange_order_id, state, message, details
+                SELECT id, event_time, symbol, client_order_id, exchange_order_id, state, message, details_json
                 FROM order_state_events
-                WHERE run_id = ?
+                WHERE run_id = %s
                 ORDER BY id DESC
-                LIMIT ?
+                LIMIT %s
             ) recent
             ORDER BY id ASC
             """,
@@ -861,11 +970,11 @@ def load_order_states_sqlite(db_path, run_id, refresh_counter=0, max_points=1000
 
 
 @st.cache_data
-def load_optimization_results_sqlite(db_path, refresh_counter=0, max_points=10000):
+def load_optimization_results_state(db_path, refresh_counter=0, max_points=10000):
     _ = refresh_counter
-    if not os.path.exists(db_path):
+    if not _resolve_postgres_dsn(db_path):
         return pd.DataFrame()
-    conn = sqlite3.connect(db_path)
+    conn = _connect_state_store(db_path)
     try:
         df = pd.read_sql_query(
             """
@@ -876,7 +985,7 @@ def load_optimization_results_sqlite(db_path, refresh_counter=0, max_points=1000
                        train_sharpe, robustness_score, extra_json
                 FROM optimization_results
                 ORDER BY id DESC
-                LIMIT ?
+                LIMIT %s
             ) recent
             ORDER BY id ASC
             """,
@@ -889,14 +998,14 @@ def load_optimization_results_sqlite(db_path, refresh_counter=0, max_points=1000
         df["params"] = df["params_json"].apply(_parse_json_dict)
         df["extra"] = df["extra_json"].apply(_parse_json_dict)
         return df
-    except sqlite3.OperationalError:
+    except Exception:
         return pd.DataFrame()
     finally:
         conn.close()
 
 
 @st.cache_data
-def load_market_ohlcv_sqlite(
+def load_market_ohlcv_state(
     db_path,
     symbol,
     timeframe,
@@ -905,31 +1014,32 @@ def load_market_ohlcv_sqlite(
     max_points=DEFAULT_WINDOW_POINTS,
 ):
     _ = refresh_counter
-    if not os.path.exists(db_path):
+    root_path = str(db_path or "").strip()
+    if not root_path:
         return pd.DataFrame()
     symbol_token = normalize_symbol(symbol)
     timeframe_token = normalize_timeframe_token(timeframe)
-    exchange_token = str(exchange_id).strip().lower()
-    conn = sqlite3.connect(db_path)
     try:
-        df = pd.read_sql_query(
-            """
-            SELECT datetime, open, high, low, close, volume
-            FROM (
-                SELECT timestamp_ms, datetime, open, high, low, close, volume
-                FROM market_ohlcv
-                WHERE exchange = ? AND symbol = ? AND timeframe = ?
-                ORDER BY timestamp_ms DESC
-                LIMIT ?
-            ) recent
-            ORDER BY datetime ASC
-            """,
-            conn,
-            params=[exchange_token, symbol_token, timeframe_token, int(max(1, max_points))],
+        from lumina_quant.parquet_market_data import ParquetMarketDataRepository
+
+        repo = ParquetMarketDataRepository(root_path)
+        interval_ms = max(1, int(timeframe_to_milliseconds(timeframe_token)))
+        end_dt = datetime.now(UTC).replace(tzinfo=None)
+        start_dt = end_dt - timedelta(milliseconds=interval_ms * int(max(2, max_points) * 2))
+        frame = repo.load_ohlcv(
+            exchange=str(exchange_id).strip().lower(),
+            symbol=symbol_token,
+            timeframe=timeframe_token,
+            start_date=start_dt,
+            end_date=end_dt,
         )
-        return _coerce_datetime(df, "datetime")
-    finally:
-        conn.close()
+        if frame.is_empty():
+            return pd.DataFrame()
+        if frame.height > max_points:
+            frame = frame.tail(int(max_points))
+        return _coerce_datetime(frame.to_pandas(), "datetime")
+    except Exception:
+        return pd.DataFrame()
 
 
 @st.cache_data
@@ -2758,9 +2868,9 @@ def save_report_snapshot(payload):
 
 
 st.sidebar.header("Configuration")
-data_source = st.sidebar.selectbox("Data Source", ["Auto", "SQLite", "CSV"])
-db_path = st.sidebar.text_input("SQLite Path", value=DEFAULT_DB_PATH)
-market_db_path = st.sidebar.text_input("Market Data SQLite Path", value=DEFAULT_MARKET_DB_PATH)
+data_source = st.sidebar.selectbox("Data Source", ["Auto", "Postgres", "CSV"])
+db_path = st.sidebar.text_input("Postgres DSN", value=DEFAULT_DB_PATH)
+market_db_path = st.sidebar.text_input("Market Data Parquet Path", value=DEFAULT_MARKET_DB_PATH)
 market_exchange = st.sidebar.text_input(
     "Market Exchange", value=getattr(BaseConfig, "MARKET_DATA_EXCHANGE", "binance")
 )
@@ -3138,11 +3248,11 @@ runs_df = pd.DataFrame()
 _ensure_workflow_jobs_schema(db_path)
 _refresh_workflow_jobs(db_path)
 
-use_sqlite = data_source == "SQLite" or (data_source == "Auto" and os.path.exists(db_path))
-if use_sqlite and os.path.exists(db_path):
+use_state = data_source == "Postgres" or (data_source == "Auto" and bool(_resolve_postgres_dsn(db_path)))
+if use_state and _resolve_postgres_dsn(db_path):
     runs_df = load_runs(db_path, refresh_counter=refresh_counter)
     runs_df = _annotate_run_health(runs_df, stale_after_sec=run_stale_sec)
-    df_optimize = load_optimization_results_sqlite(db_path, refresh_counter=refresh_counter)
+    df_optimize = load_optimization_results_state(db_path, refresh_counter=refresh_counter)
     if not runs_df.empty:
         run_options = runs_df["run_id"].astype(str).tolist()
         strategy_run_options = _runs_for_strategy(runs_df, strategy_name)
@@ -3150,7 +3260,7 @@ if use_sqlite and os.path.exists(db_path):
             run_options = strategy_run_options
         elif filter_runs_by_strategy and not strategy_run_options:
             st.sidebar.info(
-                "No SQLite runs tagged with selected strategy yet. Showing all runs instead."
+                "No Postgres runs tagged with selected strategy yet. Showing all runs instead."
             )
 
         default_run = _latest_running_run_id(runs_df) if pin_to_running else None
@@ -3183,21 +3293,21 @@ if use_sqlite and os.path.exists(db_path):
         active_run_id = st.sidebar.selectbox("Run ID", run_options, index=selected_idx)
         st.session_state["dashboard_run_id"] = active_run_id
 
-        df_equity = load_equity_sqlite(
+        df_equity = load_equity_state(
             db_path, active_run_id, refresh_counter=refresh_counter, max_points=max_points
         )
-        df_trades = load_fills_sqlite(
+        df_trades = load_fills_state(
             db_path, active_run_id, refresh_counter=refresh_counter, max_points=max_points
         )
-        df_orders = load_orders_sqlite(
+        df_orders = load_orders_state(
             db_path, active_run_id, refresh_counter=refresh_counter, max_points=max_points
         )
-        df_risk = load_risk_events_sqlite(db_path, active_run_id, refresh_counter=refresh_counter)
-        df_hb = load_heartbeats_sqlite(db_path, active_run_id, refresh_counter=refresh_counter)
-        df_order_states = load_order_states_sqlite(
+        df_risk = load_risk_events_state(db_path, active_run_id, refresh_counter=refresh_counter)
+        df_hb = load_heartbeats_state(db_path, active_run_id, refresh_counter=refresh_counter)
+        df_order_states = load_order_states_state(
             db_path, active_run_id, refresh_counter=refresh_counter
         )
-        resolved_source = "SQLite"
+        resolved_source = "Postgres"
 
 if resolved_source is None or (df_equity.empty and data_source == "Auto"):
     fallback_equity = load_equity_csv(refresh_counter=refresh_counter, max_points=max_points)
@@ -3212,7 +3322,7 @@ if resolved_source == "CSV" and data_source in {"Auto", "CSV"}:
     st.warning(
         "Dashboard is currently rendering CSV fallback data. In this mode, changing strategy updates "
         "strategy indicators/config controls, but core PnL/equity history remains the same CSV sample until "
-        "a SQLite run with equity rows is available."
+        "a Postgres run with equity rows is available."
     )
 
 if resolved_source is None:
@@ -3251,8 +3361,8 @@ market_symbol = st.sidebar.selectbox(
     "Market Symbol", symbols if symbols else list(BaseConfig.SYMBOLS)
 )
 
-if os.path.exists(market_db_path):
-    df_market = load_market_ohlcv_sqlite(
+if str(market_db_path).strip():
+    df_market = load_market_ohlcv_state(
         market_db_path,
         market_symbol,
         market_timeframe,
@@ -3851,8 +3961,8 @@ with tab_market:
             else:
                 pair_x_df = pd.DataFrame()
                 pair_y_df = pd.DataFrame()
-                if os.path.exists(db_path):
-                    pair_x_df = load_market_ohlcv_sqlite(
+                if _resolve_postgres_dsn(db_path):
+                    pair_x_df = load_market_ohlcv_state(
                         db_path,
                         pair_symbol_x,
                         market_timeframe,
@@ -3860,7 +3970,7 @@ with tab_market:
                         refresh_counter=refresh_counter,
                         max_points=max_points,
                     )
-                    pair_y_df = load_market_ohlcv_sqlite(
+                    pair_y_df = load_market_ohlcv_state(
                         db_path,
                         pair_symbol_y,
                         market_timeframe,
@@ -4176,7 +4286,7 @@ with tab_market:
 with tab_opt:
     st.subheader("Optimization Results")
     if df_optimize.empty:
-        st.info("No optimization_results rows found in SQLite yet.")
+        st.info("No optimization_results rows found in Postgres yet.")
     else:
         opt_run_ids = sorted(df_optimize["run_id"].dropna().astype(str).unique().tolist())
         opt_stages = sorted(df_optimize["stage"].dropna().astype(str).unique().tolist())

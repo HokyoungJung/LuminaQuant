@@ -45,7 +45,7 @@ class LiveTrader(TradingEngine):
         self.external_run_id = str(external_run_id or "")
         self.state_manager = StateManager()
         self.risk_manager = RiskManager(self.config)  # NEW
-        self.audit_store: AuditStore = AuditStore(self.config.STORAGE_SQLITE_PATH)
+        self.audit_store: AuditStore = AuditStore(self.config.POSTGRES_DSN)
         self.run_id = self.audit_store.start_run(
             mode="live",
             metadata={

@@ -47,21 +47,18 @@ execution:
   funding_interval_hours: 8
   maintenance_margin_rate: 0.005
   liquidation_buffer_rate: 0.0005
-  compute_backend: "cpu" # cpu only
+  compute_backend: "auto" # auto|cpu|gpu|forced-gpu
 
 # ------------------------------------------
 # Storage / Audit
 # ------------------------------------------
 storage:
-  backend: "influxdb"
-  sqlite_path: "data/lq_audit.sqlite3"
-  market_data_sqlite_path: "data/lq_market.sqlite3"
+  backend: "parquet-postgres"
+  postgres_dsn: ""
+  postgres_dsn_env: "LQ_POSTGRES_DSN"
+  market_data_parquet_path: "data/market_parquet"
   market_data_exchange: "binance"
   export_csv: true
-  influx_url: "http://127.0.0.1:8086"
-  influx_org: "lumina-org"
-  influx_bucket: "lumina-market"
-  influx_token_env: "INFLUXDB_TOKEN"
 
 # ------------------------------------------
 # Backtest Specific Settings

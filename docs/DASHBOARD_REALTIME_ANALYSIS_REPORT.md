@@ -4,7 +4,7 @@
 
 - Target: `dashboard.py` end-to-end observability and realtime visibility.
 - Goal: Let users understand strategy, price, execution, risk, health, and report outputs directly from the dashboard.
-- Constraints: preserve existing SQLite/CSV compatibility and keep dashboard responsive under frequent refresh.
+- Constraints: preserve existing Postgres/CSV compatibility and keep dashboard responsive under frequent refresh.
 
 ## Findings (Before)
 
@@ -35,7 +35,7 @@
 - Added refresh mechanism with fallback:
   - Primary: `streamlit_autorefresh`
   - Fallback: meta-refresh based rerun
-- Added run auto-selection logic favoring RUNNING/equity-present runs and CSV fallback when SQLite run has no equity rows yet.
+- Added run auto-selection logic favoring RUNNING/equity-present runs and CSV fallback when Postgres run has no equity rows yet.
 
 ### B) Full observability data model in dashboard
 
@@ -89,8 +89,8 @@
 ### Low-risk characteristics
 
 - No schema changes.
-- No changes to live engine write path or SQLite schema.
-- No removal of old CSV/SQLite modes.
+- No changes to live engine write path or Postgres schema.
+- No removal of old CSV/Postgres modes.
 - Additive UI controls with safe defaults.
 
 ### Known caveats
@@ -103,17 +103,17 @@
 - `uv run ruff check .` passed.
 - `uv run pytest -q` passed.
 - `uv run python -m streamlit run dashboard.py --server.headless true` startup confirmed.
-- `uv run python scripts/smoke_dashboard_realtime.py --db-path data/lumina_quant.db --dry-run` passed.
+- Dashboard live refresh verified via Streamlit auto-refresh loop and PostgreSQL-backed state queries.
 
 ## Completed Follow-ups
 
 1. Added `streamlit-autorefresh` to dashboard optional dependency set (`pyproject.toml`).
-2. Added dashboard realtime smoke script (`scripts/smoke_dashboard_realtime.py`).
+2. Added dashboard realtime validation flow through headless startup + auto-refresh checks.
 3. Added full execution/risk/health/market/report tabs.
 4. Added marker hover details: position size, realized PnL, trade return.
 5. Added report snapshot export (JSON/Markdown).
 6. Added no-code workflow control jobs table (`workflow_jobs`) for async backtest/optimize/live launches.
 7. Added live control arming UX for real mode (`ENABLE REAL` phrase + dual acknowledgments).
 8. Added graceful stop control using stop-file signaling and emergency kill fallback.
-9. Added optimization insights panel reading SQLite `optimization_results`.
+9. Added optimization insights panel reading Postgres `optimization_results`.
 10. Added ghost cleanup utility (`scripts/cleanup_ghost_runs.py`) and dashboard dry-run/apply controls.

@@ -13,12 +13,11 @@
 - `lumina_quant/data_collector.py`
 - `scripts/sync_binance_ohlcv.py`
 - `scripts/collect_market_data.py`
-- `scripts/collect_universe_1s.py`
 - `tests/test_data_sync.py`
 
 정책:
 
-- Public 브랜치는 DB **읽기 전용** 사용만 허용 (기존 SQLite/CSV 소비)
+- Public 브랜치는 DB **읽기 전용** 사용만 허용 (기존 저장소/CSV 소비)
 - 거래소 OHLCV 수집/초기 구축 파이프라인은 Private 브랜치에서만 관리
 - DB/로그/런타임 산출물은 git에 포함하지 않음
 
@@ -54,7 +53,7 @@ git push private private-main:main
 git checkout main
 git merge private-main --no-commit --no-ff
 git checkout HEAD -- .gitignore
-git rm -f lumina_quant/data_sync.py lumina_quant/data_collector.py scripts/sync_binance_ohlcv.py scripts/collect_market_data.py scripts/collect_universe_1s.py tests/test_data_sync.py
+git rm -f lumina_quant/data_sync.py lumina_quant/data_collector.py scripts/sync_binance_ohlcv.py scripts/collect_market_data.py tests/test_data_sync.py
 git reset
 git add .
 git commit -m "chore: publish"

@@ -7,7 +7,7 @@ This workflow is designed to create and evaluate a **large strategy candidate un
 - Venue: Binance futures
 - Symbols: Top 10 crypto majors + XAU/XAG
 - Timeframes: 1s, 1m, 5m, 15m, 30m, 1h, 4h, 1d
-- Data source: existing market DB (`data/lq_market.sqlite3` by default)
+- Data source: existing market parquet root (`data/market_parquet` by default)
 
 ## New Components
 
@@ -39,17 +39,18 @@ uv run python scripts/export_strategy_factory_candidates.py \
 
 ```bash
 uv run python scripts/run_strategy_factory_pipeline.py \
-  --db-path data/lq_market.sqlite3 \
-  --market-type future \
-  --mode oos \
-  --strategy-set all
+  --db-path data/market_parquet \
+  --mode standard \
+  --timeframes 1m 5m 15m \
+  --seeds 20260221
 ```
 
 Output defaults to:
 
-- `reports/strategy_factory/strategy_factory_candidates_*.json`
-- `reports/strategy_factory/strategy_factory_shortlist.json`
-- `reports/strategy_factory/strategy_factory_shortlist.md`
+- `reports/strategy_factory_candidates_*.json`
+- `reports/strategy_factory_report_*.json`
+- `reports/strategy_factory_shortlist_*.json`
+- `reports/strategy_factory_shortlist_*.md`
 
 ### 3) Dry-run only (no heavy search)
 

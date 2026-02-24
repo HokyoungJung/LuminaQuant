@@ -36,16 +36,13 @@ LQ__LIVE__MT5_BRIDGE_USE_WSLPATH=true
 EOF
 ```
 
-If you use InfluxDB backend:
+If you use the local Postgres + Parquet stack:
 
 ```bash
 cat >> .env <<'EOF'
-LQ__STORAGE__BACKEND=influxdb
-LQ__STORAGE__INFLUX_URL=http://127.0.0.1:8086
-LQ__STORAGE__INFLUX_ORG=<ORG>
-LQ__STORAGE__INFLUX_BUCKET=<BUCKET>
-LQ__STORAGE__INFLUX_TOKEN_ENV=INFLUXDB_TOKEN
-INFLUXDB_TOKEN=<TOKEN>
+LQ__STORAGE__BACKEND=parquet-postgres
+LQ__STORAGE__MARKET_DATA_PARQUET_PATH=data/market_parquet
+LQ_POSTGRES_DSN=postgresql://<USER>:<PASS>@127.0.0.1:5432/<DB>
 EOF
 ```
 

@@ -12,6 +12,10 @@ from lumina_quant.backtesting.portfolio_backtest import Portfolio
 from lumina_quant.config import BacktestConfig, BaseConfig, LiveConfig, OptimizationConfig
 from lumina_quant.data_collector import auto_collect_market_data
 from lumina_quant.market_data import load_data_dict_from_db, normalize_timeframe_token
+from lumina_quant.parquet_market_data import (
+    is_parquet_market_data_store,
+    load_data_dict_from_parquet,
+)
 from lumina_quant.utils.audit_store import AuditStore
 from strategies import registry as strategy_registry
 
@@ -86,13 +90,9 @@ try:
 except Exception:
     END_DATE = None
 
-MARKET_DB_PATH = BaseConfig.MARKET_DATA_SQLITE_PATH
+MARKET_DB_PATH = BaseConfig.MARKET_DATA_PARQUET_PATH
 MARKET_DB_EXCHANGE = BaseConfig.MARKET_DATA_EXCHANGE
 MARKET_DB_BACKEND = BaseConfig.STORAGE_BACKEND
-MARKET_INFLUX_URL = BaseConfig.INFLUX_URL
-MARKET_INFLUX_ORG = BaseConfig.INFLUX_ORG
-MARKET_INFLUX_BUCKET = BaseConfig.INFLUX_BUCKET
-MARKET_INFLUX_TOKEN_ENV = BaseConfig.INFLUX_TOKEN_ENV
 
 
 def _normalize_timeframe_or_default(value, default):
@@ -112,6 +112,18 @@ AUTO_COLLECT_DB = str(os.getenv("LQ_AUTO_COLLECT_DB", "0")).strip().lower() not 
     "no",
     "off",
 }
+
+
+def _env_int(name, default):
+    raw = str(os.getenv(name, str(default))).strip()
+    try:
+        return int(raw)
+    except Exception:
+        return int(default)
+
+
+BT_CHUNK_DAYS = max(1, _env_int("LQ_BT_CHUNK_DAYS", 7))
+BT_CHUNK_WARMUP_BARS = max(0, _env_int("LQ_BT_CHUNK_WARMUP_BARS", 0))
 
 
 def _enforce_1s_base_timeframe(value: str) -> str:
@@ -140,7 +152,12 @@ def _load_data_dict(
     if source == "csv":
         return None
 
-    if source in {"auto", "db"} and auto_collect_db:
+    use_parquet = is_parquet_market_data_store(
+        str(market_db_path),
+        backend=str(MARKET_DB_BACKEND),
+    )
+
+    if source in {"auto", "db"} and auto_collect_db and not use_parquet:
         try:
             sync_rows = auto_collect_market_data(
                 symbol_list=list(SYMBOL_LIST),
@@ -175,20 +192,30 @@ def _load_data_dict(
             if source == "db":
                 raise RuntimeError(f"DB auto-collect failed: {exc}") from exc
             print(f"[WARN] DB auto-collect failed; continuing with fallback behavior: {exc}")
+    elif source in {"auto", "db"} and auto_collect_db and use_parquet:
+        print("[INFO] Auto collector skipped for parquet market-data backend.")
 
-    data_dict = load_data_dict_from_db(
-        market_db_path,
-        exchange=market_exchange,
-        symbol_list=SYMBOL_LIST,
-        timeframe=str(base_timeframe),
-        start_date=START_DATE,
-        end_date=END_DATE,
-        backend=str(MARKET_DB_BACKEND),
-        influx_url=str(MARKET_INFLUX_URL),
-        influx_org=str(MARKET_INFLUX_ORG),
-        influx_bucket=str(MARKET_INFLUX_BUCKET),
-        influx_token_env=str(MARKET_INFLUX_TOKEN_ENV),
-    )
+    if use_parquet:
+        data_dict = load_data_dict_from_parquet(
+            str(market_db_path),
+            exchange=str(market_exchange),
+            symbol_list=list(SYMBOL_LIST),
+            timeframe=str(base_timeframe),
+            start_date=START_DATE,
+            end_date=END_DATE,
+            chunk_days=BT_CHUNK_DAYS,
+            warmup_bars=BT_CHUNK_WARMUP_BARS,
+        )
+    else:
+        data_dict = load_data_dict_from_db(
+            market_db_path,
+            exchange=market_exchange,
+            symbol_list=SYMBOL_LIST,
+            timeframe=str(base_timeframe),
+            start_date=START_DATE,
+            end_date=END_DATE,
+            backend=str(MARKET_DB_BACKEND),
+        )
     if data_dict:
         missing = [symbol for symbol in SYMBOL_LIST if symbol not in data_dict]
         print(
@@ -292,7 +319,7 @@ def run(
 
     backtest_run_id = str(run_id or "").strip() or str(uuid.uuid4())
     timeframe_token = _enforce_1s_base_timeframe(str(base_timeframe))
-    audit_store = AuditStore(BaseConfig.STORAGE_SQLITE_PATH)
+    audit_store = AuditStore(BaseConfig.POSTGRES_DSN)
     audit_store.start_run(
         mode="backtest",
         metadata={
@@ -364,7 +391,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--market-db-path",
         default=MARKET_DB_PATH,
-        help="SQLite path for market OHLCV data.",
+        help="Market data parquet root path.",
     )
     parser.add_argument(
         "--market-exchange",

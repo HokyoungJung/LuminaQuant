@@ -35,7 +35,7 @@ This contribution adds an isolated **strategy factory pipeline** focused on Bina
 
 - `scripts/run_strategy_factory_pipeline.py`
   - Writes candidate manifest to `reports/`
-  - Calls existing `scripts/run_strategy_team_research.py`
+  - Produces a local report payload and shortlist candidates (no external orchestrator required)
   - Builds diversified portfolio shortlist from selected team output
   - Emits JSON + Markdown shortlist artifacts
 
@@ -74,7 +74,7 @@ Run full pipeline and create shortlist artifacts:
 
 ```bash
 python scripts/run_strategy_factory_pipeline.py \
-  --db-path data/lq_market.sqlite3 \
+  --db-path data/market_parquet \
   --exchange binance \
   --market-type future \
   --mode oos \

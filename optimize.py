@@ -27,6 +27,10 @@ from lumina_quant.optimization.frozen_dataset import build_frozen_dataset
 from lumina_quant.optimization.storage import save_optimization_rows
 from lumina_quant.optimization.threading_control import configure_numba_threads
 from lumina_quant.optimization.walkers import build_walk_forward_splits
+from lumina_quant.parquet_market_data import (
+    is_parquet_market_data_store,
+    load_data_dict_from_parquet,
+)
 from lumina_quant.strategy import Strategy
 from lumina_quant.utils.audit_store import AuditStore
 
@@ -95,13 +99,9 @@ STRATEGY_CLASS = strategy_registry.resolve_strategy_class(
 # 3. Data Settings
 CSV_DIR = "data"
 SYMBOL_LIST = BaseConfig.SYMBOLS
-MARKET_DB_PATH = BaseConfig.MARKET_DATA_SQLITE_PATH
+MARKET_DB_PATH = BaseConfig.MARKET_DATA_PARQUET_PATH
 MARKET_DB_EXCHANGE = BaseConfig.MARKET_DATA_EXCHANGE
 MARKET_DB_BACKEND = BaseConfig.STORAGE_BACKEND
-MARKET_INFLUX_URL = BaseConfig.INFLUX_URL
-MARKET_INFLUX_ORG = BaseConfig.INFLUX_ORG
-MARKET_INFLUX_BUCKET = BaseConfig.INFLUX_BUCKET
-MARKET_INFLUX_TOKEN_ENV = BaseConfig.INFLUX_TOKEN_ENV
 BASE_TIMEFRAME = str(os.getenv("LQ_BASE_TIMEFRAME", "1s") or "1s").strip().lower()
 STRATEGY_TIMEFRAME = str(BaseConfig.TIMEFRAME)
 
@@ -172,6 +172,10 @@ def _env_float(name: str, default: float) -> float:
         return float(raw)
     except Exception:
         return float(default)
+
+
+BT_CHUNK_DAYS = max(1, _env_int("LQ_BT_CHUNK_DAYS", 7))
+BT_CHUNK_WARMUP_BARS = max(0, _env_int("LQ_BT_CHUNK_WARMUP_BARS", 0))
 
 
 TWO_STAGE_ENABLED = str(os.getenv("LQ_TWO_STAGE_OPT", "1")).strip().lower() not in {
@@ -321,21 +325,33 @@ def load_all_data(
     source = str(data_source).strip().lower()
     data = {}
     csv_loader = OHLCVFrameLoader()
+    use_parquet = bool(market_db_path) and is_parquet_market_data_store(
+        str(market_db_path),
+        backend=str(MARKET_DB_BACKEND),
+    )
 
     if source in {"db", "auto"} and market_db_path:
-        db_data = load_data_dict_from_db(
-            market_db_path,
-            exchange=market_exchange,
-            symbol_list=symbol_list,
-            timeframe=timeframe,
-            start_date=start_date,
-            end_date=end_date,
-            backend=str(MARKET_DB_BACKEND),
-            influx_url=str(MARKET_INFLUX_URL),
-            influx_org=str(MARKET_INFLUX_ORG),
-            influx_bucket=str(MARKET_INFLUX_BUCKET),
-            influx_token_env=str(MARKET_INFLUX_TOKEN_ENV),
-        )
+        if use_parquet:
+            db_data = load_data_dict_from_parquet(
+                str(market_db_path),
+                exchange=str(market_exchange),
+                symbol_list=[str(item) for item in symbol_list],
+                timeframe=str(timeframe),
+                start_date=start_date,
+                end_date=end_date,
+                chunk_days=BT_CHUNK_DAYS,
+                warmup_bars=BT_CHUNK_WARMUP_BARS,
+            )
+        else:
+            db_data = load_data_dict_from_db(
+                market_db_path,
+                exchange=market_exchange,
+                symbol_list=symbol_list,
+                timeframe=timeframe,
+                start_date=start_date,
+                end_date=end_date,
+                backend=str(MARKET_DB_BACKEND),
+            )
         if db_data:
             for symbol, frame in db_data.items():
                 normalized = csv_loader.normalize(frame)
@@ -451,6 +467,9 @@ def _auto_collect_db_if_enabled(
     if source not in {"auto", "db"}:
         return []
     if not bool(auto_collect_db):
+        return []
+    if is_parquet_market_data_store(str(market_db_path), backend=str(MARKET_DB_BACKEND)):
+        print("[INFO] Auto collector skipped for parquet market-data backend.")
         return []
 
     sync_rows = auto_collect_market_data(
@@ -966,7 +985,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--market-db-path",
         default=MARKET_DB_PATH,
-        help="SQLite path for market OHLCV data.",
+        help="Market data parquet root path.",
     )
     parser.add_argument(
         "--market-exchange",
@@ -998,7 +1017,7 @@ if __name__ == "__main__":
     args.base_timeframe = _enforce_1s_base_timeframe(str(args.base_timeframe))
 
     run_id = str(args.run_id or "").strip() or str(uuid.uuid4())
-    db_path = BaseConfig.STORAGE_SQLITE_PATH
+    db_path = BaseConfig.POSTGRES_DSN
     audit_store = AuditStore(db_path)
     audit_store.start_run(
         mode="optimize",

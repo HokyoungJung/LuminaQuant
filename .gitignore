@@ -72,8 +72,6 @@ cover/
 # Django stuff:
 *.log
 local_settings.py
-db.sqlite3
-db.sqlite3-journal
 
 # Flask stuff:
 instance/
@@ -251,10 +249,6 @@ credentials/
 # DB artifacts (never publish)
 *.db
 *.db-*
-*.sqlite
-*.sqlite3
-*.sqlite-wal
-*.sqlite-shm
 *.db-wal
 *.db-shm
 

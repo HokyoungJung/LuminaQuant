@@ -51,7 +51,7 @@ This report summarizes the recent verification and hardening work across backtes
 ### 4) Data ingestion and storage unification
 
 - **Unified market-data storage helpers** (`lumina_quant/market_data.py`)
-  - Added canonical symbol normalization, timeframe conversion, SQLite OHLCV schema creation, idempotent upsert, DB load/export helpers.
+  - Added canonical symbol normalization, timeframe conversion, parquet OHLCV schema conventions, idempotent upsert, DB load/export helpers.
   - Enabled DB-backed data loading for backtest/optimization while preserving CSV compatibility.
 - **Binance OHLCV sync pipeline** (`lumina_quant/data_sync.py`, `scripts/sync_binance_ohlcv.py`)
   - Added paginated Binance OHLCV sync with retry/backoff and incremental update behavior.
@@ -72,9 +72,9 @@ uv run python run_backtest.py
 uv run python optimize.py --folds 1 --n-trials 3 --max-workers 2
 uv run python scripts/check_architecture.py
 uv run python scripts/benchmark_backtest.py --output reports/benchmarks/post_ulw_rsi.json --compare-to reports/benchmarks/post_continue.json
-uv run python scripts/sync_binance_ohlcv.py --symbols BTC/USDT --timeframe 1m --db-path data/lumina_quant.db --since 2025-01-01T00:00:00+00:00 --max-batches 2 --limit 1000
-uv run python run_backtest.py --data-source db --market-db-path data/lumina_quant.db --market-exchange binance
-uv run python optimize.py --folds 1 --n-trials 2 --max-workers 1 --data-source db --market-db-path data/lumina_quant.db --market-exchange binance
+uv run python scripts/sync_binance_ohlcv.py --symbols BTC/USDT --timeframe 1m --db-path data/market_parquet --since 2025-01-01T00:00:00+00:00 --max-batches 2 --limit 1000
+uv run python run_backtest.py --data-source db --market-db-path data/market_parquet --market-exchange binance
+uv run python optimize.py --folds 1 --n-trials 2 --max-workers 1 --data-source db --market-db-path data/market_parquet --market-exchange binance
 ```
 
 Observed outcomes:
@@ -85,16 +85,16 @@ Observed outcomes:
 - Optimization executed successfully with data-aware fallback split and produced non-degenerate train/val/test results.
 - Architecture check passed.
 - Benchmark snapshot and delta report generated successfully (`reports/benchmarks/post_ulw_rsi.json`, `reports/benchmarks/post_ulw_ma.json`).
-- Binance OHLCV sync updated SQLite storage and DB-backed backtest/optimization runs completed successfully.
+- Binance OHLCV sync updated parquet storage and DB-backed backtest/optimization runs completed successfully.
 
 ## Operational Notes
 
 - Live trading still requires valid exchange credentials and safety flags (`LUMINA_ENABLE_LIVE_REAL`) for real mode.
 - Existing slippage/fee/partial-fill realism remains intact and was not removed.
-- Existing outputs (`equity.csv`, `trades.csv`, live audit DB) remain supported.
+- Existing outputs (`equity.csv`, `trades.csv`, live audit Postgres tables) remain supported.
 
 ## Recommended Next Steps
 
 1. Add optional config knobs for live equity snapshot interval and optimization split policy.
 2. Add a focused benchmark script comparing before/after runtime for backtest and optimization loops.
-3. Extend dashboard with direct soak-report and optimization-run summaries from SQLite.
+3. Extend dashboard with direct soak-report and optimization-run summaries from Postgres.

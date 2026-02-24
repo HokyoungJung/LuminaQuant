@@ -23,7 +23,7 @@ from lumina_quant.configuration.schema import (
     TradingConfig,
 )
 
-DEFAULT_STORAGE_DB_PATH = "data/lq_audit.sqlite3"
+DEFAULT_MARKET_DATA_PARQUET_PATH = "data/market_parquet"
 
 
 def _as_bool(value: Any, default: bool = False) -> bool:
@@ -133,7 +133,7 @@ def _coerce_dataclass_kwargs(raw: dict[str, Any], model_cls: type[Any]) -> dict[
 def _resolve_storage_path(path_value: str) -> str:
     normalized = str(path_value or "").strip().replace("\\", "/")
     if not normalized:
-        return DEFAULT_STORAGE_DB_PATH
+        return DEFAULT_MARKET_DATA_PARQUET_PATH
     return normalized
 
 
@@ -218,9 +218,8 @@ def build_runtime_config(data: dict[str, Any], env: Mapping[str, str]) -> Runtim
         ),
     )
 
-    runtime.storage.sqlite_path = _resolve_storage_path(runtime.storage.sqlite_path)
-    runtime.storage.market_data_sqlite_path = _resolve_storage_path(
-        runtime.storage.market_data_sqlite_path
+    runtime.storage.market_data_parquet_path = _resolve_storage_path(
+        runtime.storage.market_data_parquet_path
     )
 
     # Safe type coercion for critical numeric fields.
@@ -231,11 +230,11 @@ def build_runtime_config(data: dict[str, Any], env: Mapping[str, str]) -> Runtim
     runtime.risk.max_daily_loss_pct = _as_float(runtime.risk.max_daily_loss_pct, 0.03)
     runtime.execution.slippage_rate = _as_float(runtime.execution.slippage_rate, 0.0005)
     runtime.execution.compute_backend = (
-        str(runtime.execution.compute_backend).strip().lower() or "cpu"
+        str(runtime.execution.compute_backend).strip().lower() or "auto"
     )
-    if runtime.execution.compute_backend != "cpu":
+    if runtime.execution.compute_backend not in {"auto", "cpu", "gpu", "forced-gpu"}:
         raise ValueError(
-            "execution.compute_backend must be 'cpu' in this runtime. "
+            "execution.compute_backend must be one of: auto, cpu, gpu, forced-gpu. "
             f"Received: {runtime.execution.compute_backend!r}"
         )
     runtime.live.exchange.leverage = _as_int(runtime.live.exchange.leverage, 3)

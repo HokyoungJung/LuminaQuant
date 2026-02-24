@@ -20,8 +20,8 @@ def _validate_symbols(symbols: Iterable[str]) -> None:
 def validate_runtime_config(runtime: RuntimeConfig, *, for_live: bool = False) -> None:
     """Validate runtime configuration invariants."""
     storage_backend = str(runtime.storage.backend or "").strip().lower()
-    if storage_backend not in {"sqlite", "influxdb"}:
-        raise ValueError("storage.backend must be one of: sqlite, influxdb.")
+    if storage_backend not in {"parquet-postgres", "parquet", "local"}:
+        raise ValueError("storage.backend must be one of: parquet-postgres, parquet, local.")
 
     if not runtime.trading.symbols:
         raise ValueError("No symbols configured in trading.symbols.")
@@ -59,8 +59,8 @@ def validate_runtime_config(runtime: RuntimeConfig, *, for_live: bool = False) -
         raise ValueError("risk.max_intraday_drawdown_pct must be in (0, 1].")
     if runtime.risk.max_rolling_loss_pct_1h <= 0 or runtime.risk.max_rolling_loss_pct_1h > 1:
         raise ValueError("risk.max_rolling_loss_pct_1h must be in (0, 1].")
-    if runtime.execution.compute_backend != "cpu":
-        raise ValueError("execution.compute_backend must be 'cpu'.")
+    if runtime.execution.compute_backend not in {"auto", "cpu", "gpu", "forced-gpu"}:
+        raise ValueError("execution.compute_backend must be one of: auto, cpu, gpu, forced-gpu.")
     if runtime.backtest.leverage < 1 or runtime.backtest.leverage > 20:
         raise ValueError("backtest.leverage must be in range [1, 20].")
     if runtime.live.order_timeout < 1:

@@ -31,13 +31,15 @@ def _as_bool(value, default: bool = False) -> bool:
 _CONFIG_PATH = os.getenv("LQ_CONFIG_PATH", "config.yaml")
 _RUNTIME = load_runtime_config(config_path=_CONFIG_PATH)
 os.environ.setdefault("LQ__STORAGE__BACKEND", str(_RUNTIME.storage.backend))
-os.environ.setdefault("LQ__STORAGE__INFLUX_URL", str(_RUNTIME.storage.influx_url or ""))
-os.environ.setdefault("LQ__STORAGE__INFLUX_ORG", str(_RUNTIME.storage.influx_org or ""))
-os.environ.setdefault("LQ__STORAGE__INFLUX_BUCKET", str(_RUNTIME.storage.influx_bucket or ""))
 os.environ.setdefault(
-    "LQ__STORAGE__INFLUX_TOKEN_ENV",
-    str(_RUNTIME.storage.influx_token_env or "INFLUXDB_TOKEN"),
+    "LQ__STORAGE__MARKET_DATA_PARQUET_PATH",
+    str(_RUNTIME.storage.market_data_parquet_path or "data/market_parquet"),
 )
+if str(_RUNTIME.storage.postgres_dsn or "").strip():
+    os.environ.setdefault(
+        str(_RUNTIME.storage.postgres_dsn_env or "LQ_POSTGRES_DSN"),
+        str(_RUNTIME.storage.postgres_dsn),
+    )
 
 
 class BaseConfig:
@@ -72,16 +74,12 @@ class BaseConfig:
     COMPUTE_BACKEND = str(_RUNTIME.execution.compute_backend).lower()
 
     STORAGE_BACKEND = _RUNTIME.storage.backend
-    STORAGE_SQLITE_PATH = _RUNTIME.storage.sqlite_path
-    MARKET_DATA_SQLITE_PATH = _RUNTIME.storage.market_data_sqlite_path
+    STORAGE_MARKET_DATA_PARQUET_PATH = _RUNTIME.storage.market_data_parquet_path
+    MARKET_DATA_PARQUET_PATH = _RUNTIME.storage.market_data_parquet_path
     MARKET_DATA_EXCHANGE = _RUNTIME.storage.market_data_exchange
+    POSTGRES_DSN_ENV = str(getattr(_RUNTIME.storage, "postgres_dsn_env", "LQ_POSTGRES_DSN"))
+    POSTGRES_DSN = str(getattr(_RUNTIME.storage, "postgres_dsn", "") or "")
     STORAGE_EXPORT_CSV = bool(_RUNTIME.storage.export_csv)
-    INFLUX_URL = str(getattr(_RUNTIME.storage, "influx_url", "") or "")
-    INFLUX_ORG = str(getattr(_RUNTIME.storage, "influx_org", "") or "")
-    INFLUX_BUCKET = str(getattr(_RUNTIME.storage, "influx_bucket", "") or "")
-    INFLUX_TOKEN_ENV = str(
-        getattr(_RUNTIME.storage, "influx_token_env", "INFLUXDB_TOKEN") or "INFLUXDB_TOKEN"
-    )
 
 
 class BacktestConfig(BaseConfig):

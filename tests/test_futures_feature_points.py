@@ -15,7 +15,7 @@ from lumina_quant.market_data import (
 class TestFuturesFeaturePoints(unittest.TestCase):
     def test_upsert_and_merge_preserves_existing_non_null_values(self):
         with tempfile.TemporaryDirectory() as tmp:
-            db_path = os.path.join(tmp, "test.db")
+            db_path = os.path.join(tmp, "feature_store")
             conn = connect_market_data_db(db_path)
             try:
                 ensure_futures_feature_points_schema(conn)

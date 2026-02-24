@@ -58,4 +58,4 @@ python scripts/futures_strategy_factory.py \
 
 - Defaults target the mission scope: **timeframes `1s~1d`**, **top10 + XAU/XAG**.
 - If no report exists, the script still emits a factory-seeded shortlist.
-- Use `scripts/run_strategy_team_research.py` first for richer shortlist scoring.
+- Use `scripts/run_strategy_factory_pipeline.py` or `scripts/run_mass_strategy_research.py` first for richer shortlist scoring.

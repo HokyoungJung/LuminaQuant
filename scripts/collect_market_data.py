@@ -28,7 +28,7 @@ def _parse_datetime_input(value: str) -> datetime | None:
 def _build_parser() -> argparse.ArgumentParser:
     default_base_tf = str(os.getenv("LQ_BASE_TIMEFRAME", "1s") or "1s").strip().lower()
     parser = argparse.ArgumentParser(
-        description="Collect and fill missing OHLCV coverage into SQLite market-data DB."
+        description="Collect and fill missing OHLCV coverage into parquet market-data storage."
     )
     parser.add_argument(
         "--symbols",
@@ -43,8 +43,8 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--db-path",
-        default=BaseConfig.MARKET_DATA_SQLITE_PATH,
-        help="SQLite DB path for market OHLCV storage.",
+        default=BaseConfig.MARKET_DATA_PARQUET_PATH,
+        help="Parquet root path for market OHLCV storage.",
     )
     parser.add_argument(
         "--exchange-id",

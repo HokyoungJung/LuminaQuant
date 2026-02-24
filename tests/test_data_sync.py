@@ -86,7 +86,7 @@ class TestDataSync(unittest.TestCase):
     def test_sync_symbol_ohlcv_dedupes_overlapping_batches(self):
         fake = _FakeExchange()
         with tempfile.TemporaryDirectory() as tmp_dir:
-            db_path = str(Path(tmp_dir) / "market_data.db")
+            db_path = str(Path(tmp_dir) / "market_data_store")
             conn = connect_market_data_db(db_path)
             try:
                 ensure_market_ohlcv_schema(conn)
@@ -113,7 +113,7 @@ class TestDataSync(unittest.TestCase):
     def test_ensure_market_data_coverage_fills_head_and_tail_gaps(self):
         fake = _FakeExchange()
         with tempfile.TemporaryDirectory() as tmp_dir:
-            db_path = str(Path(tmp_dir) / "market_data.db")
+            db_path = str(Path(tmp_dir) / "market_data_store")
             conn = connect_market_data_db(db_path)
             try:
                 ensure_market_ohlcv_schema(conn)
@@ -155,7 +155,7 @@ class TestDataSync(unittest.TestCase):
     def test_sync_symbol_1s_falls_back_to_trades_when_ohlcv_unsupported(self):
         fake = _FakeTradeFallbackExchange()
         with tempfile.TemporaryDirectory() as tmp_dir:
-            db_path = str(Path(tmp_dir) / "market_data.db")
+            db_path = str(Path(tmp_dir) / "market_data_store")
             conn = connect_market_data_db(db_path)
             try:
                 ensure_market_ohlcv_schema(conn)
@@ -182,7 +182,7 @@ class TestDataSync(unittest.TestCase):
     def test_sync_service_facade(self):
         fake = _FakeExchange()
         with tempfile.TemporaryDirectory() as tmp_dir:
-            db_path = str(Path(tmp_dir) / "market_data.db")
+            db_path = str(Path(tmp_dir) / "market_data_store")
             conn = connect_market_data_db(db_path)
             try:
                 ensure_market_ohlcv_schema(conn)

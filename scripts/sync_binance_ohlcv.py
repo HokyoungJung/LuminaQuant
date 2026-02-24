@@ -1,4 +1,4 @@
-"""Synchronize Binance OHLCV data into SQLite and optional CSV mirrors."""
+"""Synchronize Binance OHLCV data into parquet and optional CSV mirrors."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from lumina_quant.data_sync import (
 def _build_parser() -> argparse.ArgumentParser:
     default_base_tf = str(os.getenv("LQ_BASE_TIMEFRAME", "1s") or "1s").strip().lower()
     parser = argparse.ArgumentParser(
-        description="Sync Binance OHLCV data into market-data SQLite storage."
+        description="Sync Binance OHLCV data into market-data parquet storage."
     )
     parser.add_argument(
         "--symbols",
@@ -32,8 +32,8 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--db-path",
-        default=BaseConfig.MARKET_DATA_SQLITE_PATH,
-        help="SQLite DB path for market OHLCV storage.",
+        default=BaseConfig.MARKET_DATA_PARQUET_PATH,
+        help="Parquet root path for market OHLCV storage.",
     )
     parser.add_argument(
         "--exchange-id",
