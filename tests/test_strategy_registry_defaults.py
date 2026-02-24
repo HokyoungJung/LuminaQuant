@@ -12,3 +12,4 @@ def test_registry_includes_rsi_and_moving_average_strategies():
     mapping = strategy_registry.get_strategy_map()
     assert "RsiStrategy" in mapping
     assert "MovingAverageCrossStrategy" in mapping
+    assert "RareEventScoreStrategy" in mapping
