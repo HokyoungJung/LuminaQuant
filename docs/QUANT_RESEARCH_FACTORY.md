@@ -55,11 +55,14 @@ uv run python scripts/run_strategy_factory_pipeline.py \
   --seeds 20260221 \
   --single-min-score 0.0 \
   --single-min-return 0.0 \
-  --single-min-sharpe 0.0 \
+  --single-min-sharpe 0.7 \
+  --single-min-trades 20 \
   --drop-single-without-metrics \
   --set-max-per-asset 2 \
   --set-max-sets 16
 ```
+
+Default single-strategy floor policy: `score >= 0`, `return >= 0`, `sharpe >= 0.7`, `trades >= 20`.
 
 Output defaults to:
 

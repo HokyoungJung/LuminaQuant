@@ -254,6 +254,7 @@ def select_diversified_shortlist(
     drop_single_without_metrics: bool = False,
     single_min_return: float | None = None,
     single_min_sharpe: float | None = None,
+    single_min_trades: int | None = None,
     allow_multi_asset: bool = True,
     include_weights: bool = False,
     weight_temperature: float = 0.35,
@@ -293,6 +294,10 @@ def select_diversified_shortlist(
             if single_min_sharpe is not None:
                 metric_sharpe = safe_float(metrics.get("sharpe"), float("-inf"))
                 if metric_sharpe < float(single_min_sharpe):
+                    continue
+            if single_min_trades is not None:
+                metric_trades = safe_float(metrics.get("trades"), float("-inf"))
+                if metric_trades < float(single_min_trades):
                     continue
         if family_count.get(family, 0) >= int(max_per_family):
             continue

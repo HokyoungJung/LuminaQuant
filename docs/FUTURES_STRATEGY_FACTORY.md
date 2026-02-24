@@ -15,7 +15,7 @@ produces a diversified shortlist from existing research reports.
    - `PairTradingZScoreStrategy`
    - `LagConvergenceStrategy`
 2. **Shortlist JSON + CSV** with family/timeframe/symbol diversification.
-   - weak single-strategy rows can be filtered by score/return/sharpe floors
+   - weak single-strategy rows can be filtered by score/return/sharpe/trades floors
    - direct multi-asset rows can be excluded (default in pipeline mode)
 3. **Markdown report** with summary mix + reusable commands.
 4. **Portfolio sets**: combinations of successful single-asset strategies with normalized `portfolio_weight`.
@@ -56,6 +56,9 @@ uv run python scripts/select_strategy_factory_shortlist.py \
   --report-glob "reports/oos_guarded_multistrategy_oos_*.json" \
   --mode oos \
   --single-min-score 0.0 \
+  --single-min-return 0.0 \
+  --single-min-sharpe 0.7 \
+  --single-min-trades 20 \
   --min-trades 5 \
   --max-selected 32
 ```

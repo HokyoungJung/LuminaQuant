@@ -13,7 +13,7 @@ def test_build_shortlist_payload_applies_filters_weights_and_sets():
                 "strategy_timeframe": "1m",
                 "symbols": ["BTC/USDT"],
                 "hurdle_fields": {"oos": {"pass": True, "score": 1.0}},
-                "oos": {"return": -0.02, "sharpe": -0.1, "mdd": 0.06, "trades": 20},
+                "oos": {"return": 0.01, "sharpe": 1.0, "mdd": 0.06, "trades": 19},
                 "params": {"rsi_period": 14},
             },
             {
@@ -61,6 +61,7 @@ def test_build_shortlist_payload_applies_filters_weights_and_sets():
         drop_single_without_metrics=True,
         single_min_return=0.0,
         single_min_sharpe=0.0,
+        single_min_trades=20,
         allow_multi_asset=False,
         include_weights=True,
         weight_temperature=0.35,

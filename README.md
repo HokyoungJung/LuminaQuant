@@ -244,12 +244,13 @@ uv run python scripts/run_strategy_factory_pipeline.py \
   --seeds 20260221 \
   --single-min-score 0.0 \
   --single-min-return 0.0 \
-  --single-min-sharpe 0.0 \
+  --single-min-sharpe 0.7 \
+  --single-min-trades 20 \
   --drop-single-without-metrics
 ```
 
 Portfolio shortlist policy (default):
-- **single strategy** must pass score/return/sharpe floors to stay in shortlist
+- **single strategy** must pass score/return/sharpe/trades floors to stay in shortlist
 - **direct multi-asset strategy rows are excluded** from portfolio shortlist unless `--allow-multi-asset` is set
 - portfolio-level candidates are emitted as **`portfolio_sets`** by combining successful single-asset strategies, each with normalized weights (`portfolio_weight`)
 

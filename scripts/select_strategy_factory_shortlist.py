@@ -83,6 +83,7 @@ def _select_diversified(
     single_min_score: float | None = 0.0,
     single_min_return: float | None = None,
     single_min_sharpe: float | None = None,
+    single_min_trades: int | None = 20,
     drop_single_without_metrics: bool = False,
     allow_multi_asset: bool = False,
 ) -> list[dict]:
@@ -133,6 +134,8 @@ def _select_diversified(
                 metric_sharpe = _safe_float(metrics.get("sharpe"), float("-inf"))
                 if metric_sharpe < float(single_min_sharpe):
                     continue
+            if single_min_trades is not None and trades < int(single_min_trades):
+                continue
 
         if strategy_counts.get(strategy_name, 0) >= int(max_per_strategy):
             continue
@@ -293,7 +296,8 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--require-pass", action="store_true")
     parser.add_argument("--single-min-score", type=float, default=0.0)
     parser.add_argument("--single-min-return", type=float, default=0.0)
-    parser.add_argument("--single-min-sharpe", type=float, default=0.0)
+    parser.add_argument("--single-min-sharpe", type=float, default=0.7)
+    parser.add_argument("--single-min-trades", type=int, default=20)
     parser.add_argument("--drop-single-without-metrics", action="store_true")
     parser.add_argument("--allow-multi-asset", action="store_true")
     parser.add_argument("--disable-weights", action="store_true")
@@ -325,6 +329,7 @@ def main() -> None:
         single_min_score=float(args.single_min_score),
         single_min_return=float(args.single_min_return),
         single_min_sharpe=float(args.single_min_sharpe),
+        single_min_trades=int(args.single_min_trades),
         drop_single_without_metrics=bool(args.drop_single_without_metrics),
         allow_multi_asset=bool(args.allow_multi_asset),
     )
@@ -357,6 +362,7 @@ def main() -> None:
         "single_min_score": float(args.single_min_score),
         "single_min_return": float(args.single_min_return),
         "single_min_sharpe": float(args.single_min_sharpe),
+        "single_min_trades": int(args.single_min_trades),
         "drop_single_without_metrics": bool(args.drop_single_without_metrics),
         "allow_multi_asset": bool(args.allow_multi_asset),
         "weights_enabled": not bool(args.disable_weights),
