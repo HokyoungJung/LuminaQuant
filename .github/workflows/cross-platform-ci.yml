@@ -37,4 +37,4 @@ jobs:
         run: uv run python scripts/check_architecture.py
 
       - name: Unit tests
-        run: uv run pytest tests/test_native_backend.py tests/test_message_bus.py tests/test_runtime_cache.py tests/test_ohlcv_loader.py tests/test_execution_protective_orders.py tests/test_live_execution_state_machine.py tests/test_lookahead.py tests/test_strategy_factory_library.py tests/test_strategy_factory_pipeline.py tests/test_rare_event_indicator.py tests/test_rare_event_strategy.py
+        run: uv run pytest tests/test_native_backend.py tests/test_optimize_two_stage.py tests/test_message_bus.py tests/test_runtime_cache.py tests/test_system_assembly.py tests/test_ohlcv_loader.py tests/test_execution_protective_orders.py tests/test_live_execution_state_machine.py tests/test_lookahead.py
