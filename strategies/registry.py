@@ -29,6 +29,7 @@ MovingAverageCrossStrategy = _optional_strategy_class(
     "moving_average", "MovingAverageCrossStrategy"
 )
 RollingBreakoutStrategy = _optional_strategy_class("rolling_breakout", "RollingBreakoutStrategy")
+RareEventScoreStrategy = _optional_strategy_class("rare_event_score", "RareEventScoreStrategy")
 RsiStrategy = _optional_strategy_class("rsi_strategy", "RsiStrategy")
 RegimeBreakoutCandidateStrategy = _optional_strategy_class(
     "candidate_regime_breakout", "RegimeBreakoutCandidateStrategy"
@@ -48,6 +49,7 @@ _RAW_STRATEGY_MAP: dict[str, StrategyClass | None] = {
     "RsiStrategy": RsiStrategy,
     "MovingAverageCrossStrategy": MovingAverageCrossStrategy,
     "PairTradingZScoreStrategy": PairTradingZScoreStrategy,
+    "RareEventScoreStrategy": RareEventScoreStrategy,
     "RegimeBreakoutCandidateStrategy": RegimeBreakoutCandidateStrategy,
     "RollingBreakoutStrategy": RollingBreakoutStrategy,
     "TopCapTimeSeriesMomentumStrategy": TopCapTimeSeriesMomentumStrategy,
@@ -110,6 +112,19 @@ _DEFAULT_STRATEGY_PARAMS: dict[str, dict[str, Any]] = {
         "symbol_x": "",
         "symbol_y": "",
         "use_log_price": True,
+    },
+    "RareEventScoreStrategy": {
+        "history_bars": 512,
+        "lookbacks": [1, 2, 3, 4, 5],
+        "return_factor": 1.0,
+        "trend_rolling_window": 20,
+        "local_extremum_window": 200,
+        "entry_score": 0.18,
+        "exit_score": 0.55,
+        "entry_streak": 3,
+        "stop_loss_pct": 0.03,
+        "allow_short": True,
+        "diff": False,
     },
     "RollingBreakoutStrategy": {
         "lookback_bars": 48,
@@ -240,6 +255,21 @@ _DEFAULT_OPTUNA_CONFIG: dict[str, dict[str, Any]] = {
             },
         },
     },
+    "RareEventScoreStrategy": {
+        "n_trials": 28,
+        "params": {
+            "history_bars": {"type": "int", "low": 256, "high": 2048, "step": 64},
+            "return_factor": {"type": "float", "low": 0.2, "high": 2.0, "step": 0.1},
+            "trend_rolling_window": {"type": "int", "low": 8, "high": 64},
+            "local_extremum_window": {"type": "int", "low": 48, "high": 400},
+            "entry_score": {"type": "float", "low": 0.03, "high": 0.40, "step": 0.01},
+            "exit_score": {"type": "float", "low": 0.35, "high": 0.90, "step": 0.01},
+            "entry_streak": {"type": "int", "low": 2, "high": 8},
+            "stop_loss_pct": {"type": "float", "low": 0.005, "high": 0.10, "step": 0.005},
+            "allow_short": {"type": "categorical", "choices": [True, False]},
+            "diff": {"type": "categorical", "choices": [False, True]},
+        },
+    },
     "RollingBreakoutStrategy": {
         "n_trials": 24,
         "params": {
@@ -343,6 +373,20 @@ _DEFAULT_GRID_CONFIG: dict[str, dict[str, Any]] = {
             "max_abs_beta": [3.0, 6.0, 9.0],
             "min_volume_window": [12, 24, 48],
             "min_volume_ratio": [0.0, 0.2, 0.5],
+        }
+    },
+    "RareEventScoreStrategy": {
+        "params": {
+            "history_bars": [256, 512, 1024],
+            "return_factor": [0.6, 1.0, 1.4],
+            "trend_rolling_window": [12, 20, 32],
+            "local_extremum_window": [96, 160, 240],
+            "entry_score": [0.08, 0.12, 0.18, 0.24],
+            "exit_score": [0.45, 0.55, 0.65, 0.75],
+            "entry_streak": [2, 3, 4, 5],
+            "stop_loss_pct": [0.01, 0.02, 0.03, 0.05],
+            "allow_short": [True, False],
+            "diff": [False, True],
         }
     },
     "RollingBreakoutStrategy": {

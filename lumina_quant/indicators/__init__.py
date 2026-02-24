@@ -100,6 +100,14 @@ from .oscillators import true_strength_index as true_strength_index
 from .oscillators import ultimate_oscillator as ultimate_oscillator
 from .oscillators import williams_r as williams_r
 from .oscillators import zscore as zscore
+from .rare_event import RareEventScore as RareEventScore
+from .rare_event import load_close_tail_from_lazy as load_close_tail_from_lazy
+from .rare_event import local_extremum_score_latest as local_extremum_score_latest
+from .rare_event import rare_event_scores_from_frame as rare_event_scores_from_frame
+from .rare_event import rare_event_scores_latest as rare_event_scores_latest
+from .rare_event import rare_return_score_latest as rare_return_score_latest
+from .rare_event import rare_streak_score_latest as rare_streak_score_latest
+from .rare_event import trend_break_score_latest as trend_break_score_latest
 from .rolling_stats import RollingZScoreWindow as RollingZScoreWindow
 from .rolling_stats import rolling_beta as rolling_beta
 from .rolling_stats import rolling_corr as rolling_corr
@@ -151,6 +159,7 @@ __all__ = [
     "POLARS_AVAILABLE",
     "TALIB_AVAILABLE",
     "IncrementalRsi",
+    "RareEventScore",
     "RollingMeanWindow",
     "RollingZScoreWindow",
     "accumulation_distribution_line",
@@ -217,6 +226,8 @@ __all__ = [
     "kaufman_efficiency_ratio",
     "keltner_channel",
     "linear_regression_slope",
+    "load_close_tail_from_lazy",
+    "local_extremum_score_latest",
     "log_returns",
     "max_drawdown",
     "momentum_return",
@@ -232,6 +243,10 @@ __all__ = [
     "positive_volume_index",
     "price_volume_correlation",
     "rank_pct",
+    "rare_event_scores_from_frame",
+    "rare_event_scores_latest",
+    "rare_return_score_latest",
+    "rare_streak_score_latest",
     "rate_of_change",
     "relative_strength_index",
     "returns_from_close",
@@ -256,6 +271,7 @@ __all__ = [
     "supertrend",
     "talib_feature_pack",
     "time_key",
+    "trend_break_score_latest",
     "trend_efficiency_latest",
     "triple_exponential_average_rate_of_change",
     "triple_exponential_moving_average",
