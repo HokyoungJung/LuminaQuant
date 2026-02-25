@@ -7,7 +7,7 @@ LuminaQuant supports multiple exchanges through a unified interface. Currently s
 LuminaQuant relies on the `ccxt` library to connect to over 100+ crypto exchanges, with first-class support for Binance.
 
 ### Prerequisites
-- Python `ccxt` package (installed via `uv sync` or `pip install ccxt`).
+- Python `ccxt` package (installed via `uv sync`).
 - A Binance Account (Real or Testnet).
 - API Key and Secret Key.
 

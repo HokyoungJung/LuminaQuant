@@ -65,7 +65,7 @@ Expected output:
 
 ```bash
 # Configuration and core tests
-python -m pytest tests/test_runtime_config_loader.py tests/test_mt5_exchange.py tests/test_data_sync.py
+uv run python -m pytest tests/test_runtime_config_loader.py tests/test_mt5_exchange.py tests/test_data_sync.py
 
 # Start live runner in paper mode first
 uv run python run_live.py

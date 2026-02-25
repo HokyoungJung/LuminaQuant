@@ -7,7 +7,7 @@ LuminaQuant는 통합 인터페이스를 통해 여러 거래소를 지원합니
 LuminaQuant는 `ccxt` 라이브러리를 사용하여 바이낸스를 포함한 100개 이상의 암호화폐 거래소에 연결합니다.
 
 ### 필수 조건 (Prerequisites)
-- Python `ccxt` 패키지 (`uv sync` 또는 `pip install ccxt`로 설치).
+- Python `ccxt` 패키지 (`uv sync`로 설치).
 - 바이낸스 계정 (실계좌 또는 테스트넷).
 - API Key 및 Secret Key.
 

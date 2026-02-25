@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Production Startup Script for macOS/Linux
-# Handles virtual environment activation and auto-restart on crash.
+# Uses uv-only runtime and auto-restarts on crash.
 
 echo "---------------------------------------------------"
 echo "[PRODUCTION] Starting Quants Agent in Resilient Mode"
@@ -11,18 +11,13 @@ echo "---------------------------------------------------"
 mkdir -p logs
 
 while true; do
-    echo "[INFO] Activating Virtual Environment..."
-    # Check for venv in standard locations
-    if [ -d ".venv" ]; then
-        source .venv/bin/activate
-    elif [ -d "venv" ]; then
-        source venv/bin/activate
-    else
-        echo "[WARNING] Virtual environment not found! Attempting to run with system python..."
+    if ! command -v uv >/dev/null 2>&1; then
+        echo "[ERROR] uv is required but not found in PATH."
+        exit 1
     fi
 
     echo "[INFO] Launching Live Trader at $(date)..."
-    python3 run_live.py >> logs/crash.log 2>&1
+    uv run python run_live.py >> logs/crash.log 2>&1
     EXIT_CODE=$?
 
     echo "[WARNING] Bot crashed or stopped! Exit Code: $EXIT_CODE"

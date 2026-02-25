@@ -8,6 +8,7 @@ import sys
 import time
 import uuid
 from datetime import datetime, timedelta
+from typing import Any
 
 import polars as pl
 
@@ -60,6 +61,42 @@ except Exception:
             _ = name, default_name
             return _PublicStubStrategy
 
+        @staticmethod
+        def get_default_strategy_params(strategy_name: str):
+            _ = strategy_name
+            return {}
+
+        @staticmethod
+        def resolve_strategy_params(strategy_name: str, overrides: dict[str, Any] | None = None):
+            _ = strategy_name
+            return dict(overrides or {})
+
+        @staticmethod
+        def get_default_optuna_config(strategy_name: str):
+            _ = strategy_name
+            return {"n_trials": 20, "params": {}}
+
+        @staticmethod
+        def get_default_grid_config(strategy_name: str):
+            _ = strategy_name
+            return {"params": {}}
+
+        @staticmethod
+        def resolve_optuna_config(strategy_name: str, override: dict[str, Any] | None = None):
+            _ = strategy_name
+            cfg = {"n_trials": 20, "params": {}}
+            if isinstance(override, dict):
+                cfg.update(override)
+            return cfg
+
+        @staticmethod
+        def resolve_grid_config(strategy_name: str, override: dict[str, Any] | None = None):
+            _ = strategy_name
+            cfg = {"params": {}}
+            if isinstance(override, dict):
+                cfg.update(override)
+            return cfg
+
     strategy_registry = _PublicStrategyRegistry()
 
 try:
@@ -80,7 +117,7 @@ except ImportError:
     optuna = None
     TrialState = None
     OPTUNA_AVAILABLE = False
-    print("Warning: Optuna not found. Run 'pip install optuna'.")
+    print("Warning: Optuna not found. Run 'uv sync --extra optimize'.")
 
 # ==========================================
 # CONFIGURATION FROM YAML
@@ -96,6 +133,7 @@ STRATEGY_CLASS = strategy_registry.resolve_strategy_class(
     requested_strategy_name,
     default_name=strategy_registry.DEFAULT_STRATEGY_NAME,
 )
+ACTIVE_STRATEGY_NAME = STRATEGY_CLASS.__name__
 
 # 3. Data Settings
 CSV_DIR = "data"
@@ -107,9 +145,17 @@ BASE_TIMEFRAME = str(os.getenv("LQ_BASE_TIMEFRAME", "1s") or "1s").strip().lower
 STRATEGY_TIMEFRAME = str(BaseConfig.TIMEFRAME)
 
 # 4. Optimization Settings
-GRID_PARAMS = OptimizationConfig.GRID_CONFIG.get("params", {})
-OPTUNA_CONFIG = OptimizationConfig.OPTUNA_CONFIG.get("params", {})
-OPTUNA_TRIALS = int(OptimizationConfig.OPTUNA_CONFIG.get("n_trials", 20))
+_RESOLVED_OPTUNA_CONFIG = strategy_registry.resolve_optuna_config(
+    ACTIVE_STRATEGY_NAME,
+    OptimizationConfig.OPTUNA_CONFIG,
+)
+_RESOLVED_GRID_CONFIG = strategy_registry.resolve_grid_config(
+    ACTIVE_STRATEGY_NAME,
+    OptimizationConfig.GRID_CONFIG,
+)
+GRID_PARAMS = dict(_RESOLVED_GRID_CONFIG.get("params", {}))
+OPTUNA_CONFIG = dict(_RESOLVED_OPTUNA_CONFIG.get("params", {}))
+OPTUNA_TRIALS = int(_RESOLVED_OPTUNA_CONFIG.get("n_trials", 20))
 MAX_WORKERS = min(2, max(1, int(OptimizationConfig.MAX_WORKERS)))
 
 
@@ -475,6 +521,11 @@ def _execute_backtest(
     Use provided data_dict if available, otherwise fallback (or use global DATA_DICT safely).
     """
     orchestration_start = time.perf_counter()
+    strategy_name = getattr(strategy_cls, "__name__", "")
+    resolved_params = strategy_registry.resolve_strategy_params(
+        strategy_name,
+        params if isinstance(params, dict) else {},
+    )
     try:
         sim_start = time.perf_counter()
         if PARQUET_MODE:
@@ -499,7 +550,7 @@ def _execute_backtest(
                 start_date=start_date,
                 end_date=end_date,
                 strategy_cls=strategy_cls,
-                strategy_params=params,
+                strategy_params=resolved_params,
                 data_loader=_chunk_loader,
                 chunk_days=max(1, int(BT_CHUNK_DAYS)),
                 strategy_timeframe=str(STRATEGY_TIMEFRAME),
@@ -521,7 +572,7 @@ def _execute_backtest(
                 execution_handler_cls=SimulatedExecutionHandler,
                 portfolio_cls=Portfolio,
                 strategy_cls=strategy_cls,
-                strategy_params=params,
+                strategy_params=resolved_params,
                 data_dict=current_data,
                 record_history=False,
                 track_metrics=True,
@@ -544,7 +595,7 @@ def _execute_backtest(
         mdd_pct = float(stats.get("max_drawdown", 0.0)) * 100.0
 
         return {
-            "params": params,
+            "params": resolved_params,
             "sharpe": sharpe,
             "cagr": f"{cagr_pct:.4f}",
             "mdd": f"{mdd_pct:.4f}",
@@ -553,7 +604,7 @@ def _execute_backtest(
         }
     except Exception as e:
         # print(f"Backtest Error: {e}")
-        return {"params": params, "error": str(e), "sharpe": -999.0}
+        return {"params": resolved_params, "error": str(e), "sharpe": -999.0}
     finally:
         _profile_add("orchestration_seconds", time.perf_counter() - orchestration_start)
         PROFILE_TOTALS["calls"] = int(PROFILE_TOTALS.get("calls", 0)) + 1

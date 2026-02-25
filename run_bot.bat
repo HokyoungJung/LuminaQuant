@@ -5,11 +5,14 @@ echo [PRODUCTION] Starting Quants Agent in Resilient Mode
 echo ---------------------------------------------------
 
 :start
-echo [INFO] Activating Virtual Environment...
-call .venv\Scripts\activate.bat
+where uv >nul 2>nul
+if %ERRORLEVEL% NEQ 0 (
+  echo [ERROR] uv is required but was not found in PATH.
+  exit /b 1
+)
 
 echo [INFO] Launching Live Trader at %TIME%...
-python run_live.py >> logs\crash.log 2>&1
+uv run python run_live.py >> logs\crash.log 2>&1
 
 echo [WARNING] Bot crashed or stopped! Exit Code: %ERRORLEVEL%
 echo [INFO] Restarting in 5 seconds...

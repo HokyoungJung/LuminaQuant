@@ -60,7 +60,7 @@ existing behavior while reducing runtime and temporary allocations.
 
 All tests pass after refactor:
 
-- `51 passed` via `python -m pytest`
+- `51 passed` via `uv run python -m pytest`
 
 Benchmarks (median of 2 measured iterations, 1 warmup):
 

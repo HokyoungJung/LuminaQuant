@@ -80,3 +80,29 @@ def test_run_backtest_loader_uses_parquet_when_detected(tmp_path: Path, monkeypa
     assert data_dict is not None
     assert "BTC/USDT" in data_dict
     assert data_dict["BTC/USDT"].height >= 2
+
+
+def test_resolve_execution_profile_low_memory_defaults(monkeypatch):
+    monkeypatch.delenv("LQ_BACKTEST_LOW_MEMORY", raising=False)
+    monkeypatch.delenv("LQ_BACKTEST_PERSIST_OUTPUT", raising=False)
+
+    profile = run_backtest._resolve_execution_profile(low_memory=True, persist_output=None)
+
+    assert profile["low_memory"] is True
+    assert profile["record_history"] is False
+    assert profile["record_trades"] is False
+    assert profile["track_metrics"] is True
+    assert profile["persist_output"] is False
+
+
+def test_resolve_execution_profile_respects_env_and_override(monkeypatch):
+    monkeypatch.setenv("LQ_BACKTEST_LOW_MEMORY", "1")
+    monkeypatch.setenv("LQ_BACKTEST_PERSIST_OUTPUT", "1")
+
+    profile_env = run_backtest._resolve_execution_profile(low_memory=None, persist_output=None)
+    assert profile_env["low_memory"] is True
+    assert profile_env["persist_output"] is True
+
+    profile_override = run_backtest._resolve_execution_profile(low_memory=None, persist_output=False)
+    assert profile_override["low_memory"] is True
+    assert profile_override["persist_output"] is False
