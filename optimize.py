@@ -7,12 +7,13 @@ import os
 import sys
 import time
 import uuid
-from bisect import bisect_left, bisect_right
-from collections import OrderedDict
 from datetime import datetime, timedelta
+
+import polars as pl
 
 # Engine Imports
 from lumina_quant.backtesting.backtest import Backtest
+from lumina_quant.backtesting.chunked_runner import run_backtest_chunked
 from lumina_quant.backtesting.data import HistoricCSVDataHandler
 from lumina_quant.backtesting.execution_sim import SimulatedExecutionHandler
 from lumina_quant.backtesting.portfolio_backtest import Portfolio
@@ -23,11 +24,11 @@ from lumina_quant.market_data import (
     resolve_symbol_csv_path,
     timeframe_to_milliseconds,
 )
-from lumina_quant.optimization.frozen_dataset import build_frozen_dataset
 from lumina_quant.optimization.storage import save_optimization_rows
 from lumina_quant.optimization.threading_control import configure_numba_threads
 from lumina_quant.optimization.walkers import build_walk_forward_splits
 from lumina_quant.parquet_market_data import (
+    ParquetMarketDataRepository,
     is_parquet_market_data_store,
     load_data_dict_from_parquet,
 )
@@ -109,7 +110,7 @@ STRATEGY_TIMEFRAME = str(BaseConfig.TIMEFRAME)
 GRID_PARAMS = OptimizationConfig.GRID_CONFIG.get("params", {})
 OPTUNA_CONFIG = OptimizationConfig.OPTUNA_CONFIG.get("params", {})
 OPTUNA_TRIALS = int(OptimizationConfig.OPTUNA_CONFIG.get("n_trials", 20))
-MAX_WORKERS = int(OptimizationConfig.MAX_WORKERS)
+MAX_WORKERS = min(2, max(1, int(OptimizationConfig.MAX_WORKERS)))
 
 
 # 5. Data Splitting Settings (WFA)
@@ -142,13 +143,14 @@ def _enforce_1s_base_timeframe(value: str) -> str:
     return "1s"
 
 
-# Global Data Cache for Multiprocessing (Copy-on-Write)
+# Runtime data context (configured in __main__)
 DATA_DICT = {}
-DATA_TIMESTAMPS = {}
-WINDOW_DATA_CACHE: OrderedDict[tuple[int, int], dict[str, tuple[tuple, ...]]] = OrderedDict()
-WINDOW_CACHE_MAX_SIZE = 256
-FROZEN_DATASET = None
-DATASET_BUILD_READY = False
+PARQUET_MODE = False
+ACTIVE_DATA_SOURCE = "auto"
+ACTIVE_MARKET_DB_PATH = str(MARKET_DB_PATH)
+ACTIVE_MARKET_EXCHANGE = str(MARKET_DB_EXCHANGE)
+ACTIVE_BASE_TIMEFRAME = str(BASE_TIMEFRAME)
+PARQUET_REPO: ParquetMarketDataRepository | None = None
 PROFILE_ENABLED = str(os.getenv("LQ_OPT_PROFILE", "0")).strip().lower() in {"1", "true", "yes"}
 PROFILE_TOTALS = {
     "feature_seconds": 0.0,
@@ -191,7 +193,6 @@ TWO_STAGE_PREFILTER_FRACTION = min(
     0.9,
     max(0.1, _env_float("LQ_TWO_STAGE_PREFILTER_FRACTION", 0.4)),
 )
-WINDOW_CACHE_MAX_SIZE = max(16, _env_int("LQ_WINDOW_CACHE_SIZE", WINDOW_CACHE_MAX_SIZE))
 
 
 def _profile_add(key: str, elapsed: float) -> None:
@@ -233,78 +234,21 @@ def _params_signature(params: dict) -> tuple:
     return tuple(items)
 
 
-def _to_epoch_ms(value) -> int:
-    if value is None:
-        return 0
-    if isinstance(value, (int, float)):
-        raw = int(value)
-        if abs(raw) < 100_000_000_000:
-            return raw
-        if abs(raw) < 100_000_000_000_000:
-            return raw // 1000
-        return raw // 1_000_000
-    ts_fn = getattr(value, "timestamp", None)
-    if callable(ts_fn):
-        try:
-            ts_raw = ts_fn()
-            if isinstance(ts_raw, (int, float)):
-                return int(float(ts_raw) * 1000.0)
-            return 0
-        except Exception:
-            return 0
-    return 0
-
-
-def _freeze_rows_dict(data_dict: dict) -> dict[str, tuple[tuple, ...]]:
-    out: dict[str, tuple[tuple, ...]] = {}
+def _slice_data_dict_frames(data_dict: dict, start_date, end_date) -> dict:
+    out = {}
+    if not data_dict:
+        return out
     for symbol, frame in data_dict.items():
-        if frame is None:
+        if frame is None or "datetime" not in frame.columns or frame.height == 0:
             continue
-        rows = tuple(frame.iter_rows(named=False))
-        if rows:
-            out[str(symbol)] = rows
+        sliced = frame
+        if start_date is not None:
+            sliced = sliced.filter(pl.col("datetime") >= start_date)
+        if end_date is not None:
+            sliced = sliced.filter(pl.col("datetime") <= end_date)
+        if sliced.height > 0:
+            out[str(symbol)] = sliced
     return out
-
-
-def _ensure_timestamp_index() -> None:
-    global DATA_TIMESTAMPS
-    if DATA_TIMESTAMPS:
-        return
-    ts_index: dict[str, list[int]] = {}
-    for symbol, rows in DATA_DICT.items():
-        ts_index[str(symbol)] = [_to_epoch_ms(row[0]) for row in rows]
-    DATA_TIMESTAMPS = ts_index
-
-
-def _get_window_data_dict(start_date, end_date, data_dict: dict | None = None) -> dict:
-    global WINDOW_DATA_CACHE
-    current_data = data_dict if data_dict is not None else DATA_DICT
-    if not current_data:
-        return {}
-
-    start_ms = _to_epoch_ms(start_date)
-    end_ms = _to_epoch_ms(end_date)
-    cache_key = (int(start_ms), int(end_ms))
-    cached = WINDOW_DATA_CACHE.get(cache_key)
-    if cached is not None:
-        WINDOW_DATA_CACHE.move_to_end(cache_key)
-        return cached
-
-    _ensure_timestamp_index()
-    sliced: dict[str, tuple[tuple, ...]] = {}
-    for symbol, rows in current_data.items():
-        timestamps = DATA_TIMESTAMPS.get(str(symbol), [])
-        if not timestamps or not rows:
-            continue
-        lo = bisect_left(timestamps, start_ms)
-        hi = bisect_right(timestamps, end_ms)
-        if hi > lo:
-            sliced[str(symbol)] = rows[lo:hi]
-    WINDOW_DATA_CACHE[cache_key] = sliced
-    WINDOW_DATA_CACHE.move_to_end(cache_key)
-    while len(WINDOW_DATA_CACHE) > WINDOW_CACHE_MAX_SIZE:
-        WINDOW_DATA_CACHE.popitem(last=False)
-    return sliced
 
 
 def load_all_data(
@@ -403,6 +347,20 @@ def _data_datetime_range(data_dict):
     if not starts or not ends:
         return None, None
     # Use intersection across symbols for robust multi-asset walk-forward windows.
+    return max(starts), min(ends)
+
+
+def _data_datetime_range_from_repo(repo: ParquetMarketDataRepository, exchange: str, symbol_list):
+    starts = []
+    ends = []
+    for symbol in symbol_list:
+        start_dt, end_dt = repo.get_symbol_time_range(exchange=exchange, symbol=symbol)
+        if start_dt is None or end_dt is None:
+            continue
+        starts.append(start_dt)
+        ends.append(end_dt)
+    if not starts or not ends:
+        return None, None
     return max(starts), min(ends)
 
 
@@ -518,36 +476,60 @@ def _execute_backtest(
     """
     orchestration_start = time.perf_counter()
     try:
-        if not DATASET_BUILD_READY:
-            raise RuntimeError(
-                "Frozen dataset was not built before optimization trials. "
-                "Run dataset build stage first."
-            )
-        # Slice once per date window and reuse via cache.
-        current_data = _get_window_data_dict(start_date, end_date, data_dict=data_dict)
-        if any(hasattr(frame, "select") for frame in current_data.values()):
-            raise RuntimeError(
-                "Polars frame detected inside trial loop. Use pre-frozen tuple rows only."
-            )
-
         sim_start = time.perf_counter()
-        backtest = Backtest(
-            csv_dir=csv_dir,
-            symbol_list=symbol_list,
-            start_date=start_date,  # Specific Start
-            end_date=end_date,  # Specific End
-            data_handler_cls=HistoricCSVDataHandler,
-            execution_handler_cls=SimulatedExecutionHandler,
-            portfolio_cls=Portfolio,
-            strategy_cls=strategy_cls,
-            strategy_params=params,
-            data_dict=current_data,
-            record_history=False,
-            track_metrics=True,
-            record_trades=False,
-            strategy_timeframe=str(STRATEGY_TIMEFRAME),
-        )
-        backtest.simulate_trading(output=False)
+        if PARQUET_MODE:
+            if end_date is None:
+                raise RuntimeError("Chunked optimization requires explicit end_date.")
+
+            def _chunk_loader(chunk_start, chunk_end):
+                return load_data_dict_from_parquet(
+                    str(ACTIVE_MARKET_DB_PATH),
+                    exchange=str(ACTIVE_MARKET_EXCHANGE),
+                    symbol_list=list(symbol_list),
+                    timeframe=str(ACTIVE_BASE_TIMEFRAME),
+                    start_date=chunk_start,
+                    end_date=chunk_end,
+                    chunk_days=max(1, int(BT_CHUNK_DAYS)),
+                    warmup_bars=0,
+                )
+
+            backtest = run_backtest_chunked(
+                csv_dir=csv_dir,
+                symbol_list=list(symbol_list),
+                start_date=start_date,
+                end_date=end_date,
+                strategy_cls=strategy_cls,
+                strategy_params=params,
+                data_loader=_chunk_loader,
+                chunk_days=max(1, int(BT_CHUNK_DAYS)),
+                strategy_timeframe=str(STRATEGY_TIMEFRAME),
+                data_handler_cls=HistoricCSVDataHandler,
+                execution_handler_cls=SimulatedExecutionHandler,
+                portfolio_cls=Portfolio,
+                record_history=False,
+                track_metrics=True,
+                record_trades=False,
+            )
+        else:
+            current_data = _slice_data_dict_frames(data_dict if data_dict is not None else DATA_DICT, start_date, end_date)
+            backtest = Backtest(
+                csv_dir=csv_dir,
+                symbol_list=symbol_list,
+                start_date=start_date,  # Specific Start
+                end_date=end_date,  # Specific End
+                data_handler_cls=HistoricCSVDataHandler,
+                execution_handler_cls=SimulatedExecutionHandler,
+                portfolio_cls=Portfolio,
+                strategy_cls=strategy_cls,
+                strategy_params=params,
+                data_dict=current_data,
+                record_history=False,
+                track_metrics=True,
+                record_trades=False,
+                strategy_timeframe=str(STRATEGY_TIMEFRAME),
+            )
+            backtest.simulate_trading(output=False)
+
         _profile_add("simulation_seconds", time.perf_counter() - sim_start)
         stats = backtest.portfolio.output_summary_stats_fast()
         no_data = stats.get("status") != "ok"
@@ -578,25 +560,7 @@ def _execute_backtest(
 
 
 def run_single_backtest_train(args):
-    # Unpack including data_dict if we decide to pass it explictly,
-    # OR rely on global DATA_DICT if using 'fork' start method (Linux/Mac).
-    # Windows uses 'spawn', so globals are NOT shared. We MUST pass data or reload.
-    # Passing Polars DF via pickling is fast.
     strategy_cls, params, csv_dir, symbol_list, start_date, end_date = args
-
-    # On Windows, DATA_DICT will be empty in the child process unless initialized.
-    # However, passing the entire dict in args can be heavy if huge.
-    # But for reasonable datasets (< few GB), it's faster than independent I/O.
-    # Wait, 'spawn' pickles the args.
-    # Let's try attempting to read global DATA_DICT. If empty, reload?
-    # No, that defeats the purpose.
-    # Best practice for Windows MP: Pass the data in args if it fits in memory.
-
-    # NOTE: To fix "Global variable not shared" on Windows, we need to handle it.
-    # But Pool.map pickles arguments.
-    # Let's modify GridOptimizer to include data_dict in args?
-    # Or just rely on 'csv_dir' loading if data_dict is empty?
-    # Actually, we can use 'initializer' in Pool to set the global variable in workers.
 
     return _execute_backtest(
         strategy_cls,
@@ -610,16 +574,24 @@ def run_single_backtest_train(args):
 
 
 def _run_backtests_parallel(pool_args, worker_count):
-    workers = max(1, int(worker_count))
+    workers = min(2, max(1, int(worker_count)))
     if workers == 1 or len(pool_args) <= 1:
         return [run_single_backtest_train(args) for args in pool_args]
 
     ctx = multiprocessing.get_context("spawn")
     chunksize = max(1, len(pool_args) // max(1, workers * 4))
+    context = {
+        "data_dict": DATA_DICT,
+        "parquet_mode": bool(PARQUET_MODE),
+        "data_source": str(ACTIVE_DATA_SOURCE),
+        "market_db_path": str(ACTIVE_MARKET_DB_PATH),
+        "market_exchange": str(ACTIVE_MARKET_EXCHANGE),
+        "base_timeframe": str(ACTIVE_BASE_TIMEFRAME),
+    }
     with ctx.Pool(
         processes=workers,
         initializer=pool_initializer,
-        initargs=(DATA_DICT,),
+        initargs=(context,),
     ) as pool:
         return pool.map(run_single_backtest_train, pool_args, chunksize)
 
@@ -638,11 +610,18 @@ def _build_pool_args(strategy_cls, params_list, csv_dir, symbol_list, start_date
     ]
 
 
-def pool_initializer(shared_data):
-    global DATA_DICT, DATA_TIMESTAMPS, WINDOW_DATA_CACHE
-    DATA_DICT = shared_data
-    DATA_TIMESTAMPS = {}
-    WINDOW_DATA_CACHE = OrderedDict()
+def pool_initializer(context):
+    global DATA_DICT, PARQUET_MODE, ACTIVE_DATA_SOURCE, ACTIVE_MARKET_DB_PATH
+    global ACTIVE_MARKET_EXCHANGE, ACTIVE_BASE_TIMEFRAME, PARQUET_REPO
+    DATA_DICT = dict(context.get("data_dict", {}))
+    PARQUET_MODE = bool(context.get("parquet_mode", False))
+    ACTIVE_DATA_SOURCE = str(context.get("data_source", ACTIVE_DATA_SOURCE))
+    ACTIVE_MARKET_DB_PATH = str(context.get("market_db_path", ACTIVE_MARKET_DB_PATH))
+    ACTIVE_MARKET_EXCHANGE = str(context.get("market_exchange", ACTIVE_MARKET_EXCHANGE))
+    ACTIVE_BASE_TIMEFRAME = str(context.get("base_timeframe", ACTIVE_BASE_TIMEFRAME))
+    PARQUET_REPO = (
+        ParquetMarketDataRepository(ACTIVE_MARKET_DB_PATH) if PARQUET_MODE else None
+    )
 
 
 class GridSearchOptimizer:
@@ -1045,7 +1024,7 @@ if __name__ == "__main__":
     final_metadata = {}
 
     OPTUNA_TRIALS = args.n_trials
-    MAX_WORKERS = max(1, int(args.max_workers))
+    MAX_WORKERS = min(2, max(1, int(args.max_workers)))
     configured_numba_threads = configure_numba_threads(MAX_WORKERS)
     persist_best_params = bool(args.save_best_params or OptimizationConfig.PERSIST_BEST_PARAMS)
 
@@ -1061,26 +1040,43 @@ if __name__ == "__main__":
             auto_collect_db=(not bool(args.no_auto_collect_db) and bool(AUTO_COLLECT_DB)),
         )
 
-        # Load Data Once
-        feature_start = time.perf_counter()
-        RAW_DATA_DICT = load_all_data(
-            CSV_DIR,
-            SYMBOL_LIST,
-            data_source=args.data_source,
-            market_db_path=args.market_db_path,
-            market_exchange=args.market_exchange,
-            timeframe=str(args.base_timeframe),
-            start_date=BASE_START,
-            end_date=BASE_END,
+        ACTIVE_DATA_SOURCE = str(args.data_source)
+        ACTIVE_MARKET_DB_PATH = str(args.market_db_path)
+        ACTIVE_MARKET_EXCHANGE = str(args.market_exchange)
+        ACTIVE_BASE_TIMEFRAME = str(args.base_timeframe)
+        PARQUET_MODE = is_parquet_market_data_store(
+            str(args.market_db_path),
+            backend=str(MARKET_DB_BACKEND),
         )
+
+        feature_start = time.perf_counter()
+        if PARQUET_MODE:
+            DATA_DICT = {}
+            PARQUET_REPO = ParquetMarketDataRepository(str(args.market_db_path))
+            data_start, data_end = _data_datetime_range_from_repo(
+                PARQUET_REPO,
+                str(args.market_exchange),
+                SYMBOL_LIST,
+            )
+        else:
+            PARQUET_REPO = None
+            DATA_DICT = load_all_data(
+                CSV_DIR,
+                SYMBOL_LIST,
+                data_source=args.data_source,
+                market_db_path=args.market_db_path,
+                market_exchange=args.market_exchange,
+                timeframe=str(args.base_timeframe),
+                start_date=BASE_START,
+                end_date=BASE_END,
+            )
+            data_start, data_end = _data_datetime_range(DATA_DICT)
         _profile_add("feature_seconds", time.perf_counter() - feature_start)
-        FROZEN_DATASET = build_frozen_dataset(RAW_DATA_DICT)
-        DATA_DICT = _freeze_rows_dict(RAW_DATA_DICT)
-        DATA_TIMESTAMPS = {}
-        WINDOW_DATA_CACHE = OrderedDict()
-        DATASET_BUILD_READY = True
-        if FROZEN_DATASET.close.size == 0:
-            raise RuntimeError("Frozen dataset build produced empty arrays")
+
+        if data_start is None or data_end is None:
+            print("No usable datetime range found in loaded data.")
+            sys.exit(1)
+
         if configured_numba_threads is not None:
             print(f"[INFO] Numba threads configured: {configured_numba_threads}")
         if TWO_STAGE_ENABLED:
@@ -1095,11 +1091,6 @@ if __name__ == "__main__":
             BASE_START,
             args.folds,
         )
-        data_start, data_end = _data_datetime_range(RAW_DATA_DICT)
-        RAW_DATA_DICT.clear()
-        if data_start is None or data_end is None:
-            print("No usable datetime range found in loaded data.")
-            sys.exit(1)
 
         in_sample_end, final_oos_start, final_oos_end = _resolve_in_sample_and_oos_window(
             data_start,

@@ -25,6 +25,17 @@ class MarketEvent(Event):
 
 
 @dataclass(slots=True)
+class MarketBatchEvent(Event):
+    """Aggregated market events for one timestamp across multiple symbols."""
+
+    time: Any
+    bars: tuple[MarketEvent, ...]
+    timestamp_ns: int | None = None
+    sequence: int | None = None
+    type: str = "MARKET_BATCH"
+
+
+@dataclass(slots=True)
 class SignalEvent(Event):
     """Handles the event of sending a Signal from a Strategy object.
     This is received by a Portfolio object and acted upon.

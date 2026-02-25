@@ -664,6 +664,7 @@ class MarketDataRepository:
         self.db_path = str(db_path)
         self.root_path = _resolve_market_root_path(self.db_path)
         self.root_path.mkdir(parents=True, exist_ok=True)
+        self._parquet_repo = _parquet_repo(self.root_path)
         self._prefer_1s_derived = str(
             os.getenv("LQ_PREFER_1S_DERIVED", "1")
         ).strip().lower() not in {
@@ -674,10 +675,9 @@ class MarketDataRepository:
         }
 
     def get_last_ohlcv_1s_timestamp_ms(self, *, exchange: str, symbol: str) -> int | None:
-        frame = _load_direct_ohlcv(
-            self.root_path,
-            exchange=exchange,
-            symbol=symbol,
+        frame = self._parquet_repo.load_ohlcv(
+            exchange=_normalize_exchange(exchange),
+            symbol=normalize_symbol(symbol),
             timeframe="1s",
         )
         if frame.is_empty():
@@ -710,10 +710,26 @@ class MarketDataRepository:
         end_date: Any = None,
     ) -> pl.DataFrame:
         timeframe_token = normalize_timeframe_token(timeframe)
+        normalized_exchange = _normalize_exchange(exchange)
+        normalized_symbol = normalize_symbol(symbol)
+        try:
+            merged = self._parquet_repo.load_ohlcv(
+                exchange=normalized_exchange,
+                symbol=normalized_symbol,
+                timeframe=timeframe_token,
+                start_date=start_date,
+                end_date=end_date,
+            )
+        except Exception:
+            merged = _empty_ohlcv_frame()
+
+        if not merged.is_empty():
+            return merged
+
         direct = _load_direct_ohlcv(
             self.root_path,
-            exchange=exchange,
-            symbol=symbol,
+            exchange=normalized_exchange,
+            symbol=normalized_symbol,
             timeframe=timeframe_token,
             start_date=start_date,
             end_date=end_date,
@@ -721,26 +737,7 @@ class MarketDataRepository:
         if not direct.is_empty() or timeframe_token == "1s" or not self._prefer_1s_derived:
             return direct
 
-        repo = _parquet_repo(self.root_path)
-        try:
-            derived = repo.load_ohlcv(
-                exchange=_normalize_exchange(exchange),
-                symbol=normalize_symbol(symbol),
-                timeframe=timeframe_token,
-                start_date=start_date,
-                end_date=end_date,
-            )
-        except Exception:
-            return direct
-
-        if derived.is_empty():
-            return direct
-        return (
-            derived.select(["datetime", "open", "high", "low", "close", "volume"])
-            .sort("datetime")
-            .unique(subset=["datetime"], keep="last")
-            .sort("datetime")
-        )
+        return direct
 
     def load_ohlcv_1s(
         self,
@@ -812,11 +809,18 @@ class MarketDataRepository:
         rows: Any,
     ) -> int:
         frame = _ensure_ohlcv_frame(rows)
+        timeframe_token = normalize_timeframe_token(timeframe)
+        if timeframe_token == "1s":
+            return self._parquet_repo.upsert_1s(
+                exchange=_normalize_exchange(exchange),
+                symbol=normalize_symbol(symbol),
+                rows=frame,
+            )
         return _upsert_ohlcv_frame(
             self.root_path,
             exchange=exchange,
             symbol=symbol,
-            timeframe=normalize_timeframe_token(timeframe),
+            timeframe=timeframe_token,
             frame=frame,
         )
 

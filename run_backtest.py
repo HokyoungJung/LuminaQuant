@@ -6,6 +6,7 @@ from datetime import datetime
 from types import SimpleNamespace
 
 from lumina_quant.backtesting.backtest import Backtest
+from lumina_quant.backtesting.chunked_runner import run_backtest_chunked
 from lumina_quant.backtesting.data import HistoricCSVDataHandler
 from lumina_quant.backtesting.execution_sim import SimulatedExecutionHandler
 from lumina_quant.backtesting.portfolio_backtest import Portfolio
@@ -337,29 +338,76 @@ def run(
     )
 
     try:
-        data_dict = _load_data_dict(
-            data_source,
-            market_db_path,
-            market_exchange,
-            base_timeframe=str(timeframe_token),
-            auto_collect_db=bool(auto_collect_db),
+        use_parquet = is_parquet_market_data_store(
+            str(market_db_path),
+            backend=str(MARKET_DB_BACKEND),
         )
+        source_token = str(data_source).strip().lower()
+        use_chunked_runner = bool(use_parquet and source_token in {"auto", "db"})
+        data_dict = None
 
-        backtest = Backtest(
-            csv_dir=CSV_DIR,
-            symbol_list=SYMBOL_LIST,
-            start_date=START_DATE,
-            end_date=END_DATE,
-            data_handler_cls=HistoricCSVDataHandler,
-            execution_handler_cls=SimulatedExecutionHandler,
-            portfolio_cls=Portfolio,
-            strategy_cls=STRATEGY_CLASS,
-            strategy_params=STRATEGY_PARAMS,
-            data_dict=data_dict,
-            strategy_timeframe=str(BaseConfig.TIMEFRAME),
-        )
+        if not use_chunked_runner:
+            data_dict = _load_data_dict(
+                data_source,
+                market_db_path,
+                market_exchange,
+                base_timeframe=str(timeframe_token),
+                auto_collect_db=bool(auto_collect_db),
+            )
 
-        backtest.simulate_trading()
+        if use_chunked_runner:
+            if END_DATE is None:
+                raise RuntimeError(
+                    "Chunked backtest requires an explicit END_DATE when using parquet backend."
+                )
+
+            def _chunk_loader(chunk_start, chunk_end):
+                return load_data_dict_from_parquet(
+                    str(market_db_path),
+                    exchange=str(market_exchange),
+                    symbol_list=list(SYMBOL_LIST),
+                    timeframe=str(timeframe_token),
+                    start_date=chunk_start,
+                    end_date=chunk_end,
+                    chunk_days=max(1, int(BT_CHUNK_DAYS)),
+                    warmup_bars=0,
+                )
+
+            backtest = run_backtest_chunked(
+                csv_dir=CSV_DIR,
+                symbol_list=list(SYMBOL_LIST),
+                start_date=START_DATE,
+                end_date=END_DATE,
+                strategy_cls=STRATEGY_CLASS,
+                strategy_params=STRATEGY_PARAMS,
+                data_loader=_chunk_loader,
+                chunk_days=max(1, int(BT_CHUNK_DAYS)),
+                strategy_timeframe=str(BaseConfig.TIMEFRAME),
+                data_handler_cls=HistoricCSVDataHandler,
+                execution_handler_cls=SimulatedExecutionHandler,
+                portfolio_cls=Portfolio,
+                record_history=True,
+                track_metrics=True,
+                record_trades=True,
+            )
+            persist_output = bool(getattr(backtest.config, "PERSIST_OUTPUT", True))
+            backtest._output_performance(persist_output=persist_output, verbose=True)
+        else:
+            backtest = Backtest(
+                csv_dir=CSV_DIR,
+                symbol_list=SYMBOL_LIST,
+                start_date=START_DATE,
+                end_date=END_DATE,
+                data_handler_cls=HistoricCSVDataHandler,
+                execution_handler_cls=SimulatedExecutionHandler,
+                portfolio_cls=Portfolio,
+                strategy_cls=STRATEGY_CLASS,
+                strategy_params=STRATEGY_PARAMS,
+                data_dict=data_dict,
+                strategy_timeframe=str(BaseConfig.TIMEFRAME),
+            )
+            backtest.simulate_trading()
+
         persisted_counts = _persist_backtest_audit_rows(audit_store, backtest_run_id, backtest)
         audit_store.end_run(
             backtest_run_id,

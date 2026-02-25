@@ -322,6 +322,20 @@ def _coerce_datetime(df, column):
     return df
 
 
+def _resolve_dashboard_market_timeframe(value):
+    """Clamp dashboard market chart queries to >=1m to avoid heavy 1s scans."""
+    try:
+        token = normalize_timeframe_token(value)
+    except Exception:
+        return "1m", True
+    try:
+        if int(timeframe_to_milliseconds(token)) < 60_000:
+            return "1m", True
+    except Exception:
+        return "1m", True
+    return token, False
+
+
 def _utc_now_iso():
     return datetime.now(UTC).isoformat()
 
@@ -1018,7 +1032,7 @@ def load_market_ohlcv_state(
     if not root_path:
         return pd.DataFrame()
     symbol_token = normalize_symbol(symbol)
-    timeframe_token = normalize_timeframe_token(timeframe)
+    timeframe_token, _ = _resolve_dashboard_market_timeframe(timeframe)
     try:
         from lumina_quant.parquet_market_data import ParquetMarketDataRepository
 
@@ -2874,9 +2888,16 @@ market_db_path = st.sidebar.text_input("Market Data Parquet Path", value=DEFAULT
 market_exchange = st.sidebar.text_input(
     "Market Exchange", value=getattr(BaseConfig, "MARKET_DATA_EXCHANGE", "binance")
 )
-market_timeframe = st.sidebar.text_input(
+market_timeframe_requested = st.sidebar.text_input(
     "Market Timeframe", value=getattr(BaseConfig, "TIMEFRAME", "1m")
 )
+market_timeframe, market_timeframe_clamped = _resolve_dashboard_market_timeframe(
+    market_timeframe_requested
+)
+if market_timeframe_clamped:
+    st.sidebar.caption(
+        "Market chart timeframe clamped to 1m minimum for dashboard performance."
+    )
 strategy_options = strategy_registry.get_strategy_names()
 default_strategy_name = "RsiStrategy"
 default_strategy_index = (

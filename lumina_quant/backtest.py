@@ -147,6 +147,18 @@ class Backtest(TradingEngine):
             self.strategy_timeframe = normalize_timeframe_token(raw_strategy_timeframe)
         except Exception:
             self.strategy_timeframe = "1m"
+        try:
+            self._strategy_timeframe_ms = int(timeframe_to_milliseconds(self.strategy_timeframe))
+        except Exception:
+            self._strategy_timeframe_ms = 60_000
+        self._skip_ahead_enabled = str(os.getenv("LQ_SKIP_AHEAD", "1")).strip().lower() not in {
+            "0",
+            "false",
+            "no",
+            "off",
+        }
+        self.skip_ahead_jumps = 0
+        self.skip_ahead_rows_skipped = 0
 
         self.data_handler_cls = data_handler_cls
         self.execution_handler_cls = execution_handler_cls
@@ -218,6 +230,40 @@ class Backtest(TradingEngine):
     def bars(self):
         return self.data_handler
 
+    def _supports_skip_ahead(self) -> bool:
+        if not bool(self._skip_ahead_enabled):
+            return False
+        if int(self._strategy_timeframe_ms) <= 1_000:
+            return False
+        return callable(getattr(self.data_handler, "skip_to_timestamp_ms", None))
+
+    def _can_skip_ahead_now(self) -> bool:
+        if not self._supports_skip_ahead():
+            return False
+        if bool(getattr(self.strategy, "requires_intrabar_checks", False)):
+            return False
+        active_orders = getattr(self.execution_handler, "active_orders", None)
+        if active_orders:
+            return False
+        try:
+            positions = getattr(self.portfolio, "current_positions", {}) or {}
+            return all(abs(float(qty)) < 1e-12 for qty in positions.values())
+        except Exception:
+            return False
+
+    def _apply_skip_ahead(self) -> None:
+        if not self._can_skip_ahead_now():
+            return
+        current_ms = getattr(self.data_handler, "last_emitted_timestamp_ms", None)
+        if current_ms is None:
+            return
+        step = max(1_000, int(self._strategy_timeframe_ms))
+        target_ms = ((int(current_ms) // step) + 1) * step
+        skipped = int(self.data_handler.skip_to_timestamp_ms(target_ms))
+        if skipped > 0:
+            self.skip_ahead_jumps += 1
+            self.skip_ahead_rows_skipped += skipped
+
     def _run_backtest(self):
         """Executes the backtest."""
         i = 0
@@ -237,6 +283,8 @@ class Backtest(TradingEngine):
                     break
                 else:
                     self.process_event(event)
+
+            self._apply_skip_ahead()
 
             # time.sleep(self.heartbeat)
 

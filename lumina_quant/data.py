@@ -1,12 +1,14 @@
 import heapq
 import os
 from abc import ABC, abstractmethod
+from bisect import bisect_left
 from collections import deque
+from datetime import UTC, datetime
 from itertools import islice
 from typing import Any
 
 from lumina_quant.compute.ohlcv_loader import OHLCVFrameLoader
-from lumina_quant.events import MarketEvent
+from lumina_quant.events import MarketBatchEvent, MarketEvent
 from lumina_quant.market_data import resolve_symbol_csv_path
 
 
@@ -39,9 +41,7 @@ class DataHandler(ABC):
 
 
 class HistoricCSVDataHandler(DataHandler):
-    """HistoricCSVDataHandler using Polars for high performance.
-    Optimized to use Tuple iteration (named=False) instead of Dictionaries.
-    """
+    """Historic data handler with timestamp-ordered merge and skip-ahead support."""
 
     def __init__(
         self,
@@ -59,10 +59,19 @@ class HistoricCSVDataHandler(DataHandler):
         self.end_date = end_date
         self.max_lookback = 5000  # Memory Cap (Safety)
         self.data_dict = data_dict  # Pre-loaded data support
+        self._strict_data_dict = data_dict is not None
         self._single_symbol = len(symbol_list) == 1
         self._frame_loader = OHLCVFrameLoader(start_date=self.start_date, end_date=self.end_date)
 
-        self.symbol_data = {}
+        self.symbol_rows: dict[str, tuple[tuple[Any, ...], ...]] = {}
+        self.symbol_timestamps_ms: dict[str, list[int]] = {}
+        self.symbol_index: dict[str, int] = {}
+        self.next_bar: dict[str, tuple[Any, ...]] = {}
+        self.finished_symbols = set()
+        self._bar_heap: list[tuple[Any, int, str]] = []
+        self._heap_seq = 0
+        self.last_emitted_timestamp_ms: int | None = None
+
         self.latest_symbol_data = {s: deque(maxlen=self.max_lookback) for s in symbol_list}
         self.continue_backtest = True
 
@@ -76,22 +85,31 @@ class HistoricCSVDataHandler(DataHandler):
             "volume": 5,
         }
 
-        # Generators for iterating over data
-        self.data_generators = {}
-        self.next_bar = {}
-        self._bar_heap = []
-        self._heap_seq = 0
-        self.finished_symbols = set()
-
         self._open_convert_csv_files()
 
+    @staticmethod
+    def _bar_time_ms(bar_time: Any) -> int | None:
+        if bar_time is None:
+            return None
+        if isinstance(bar_time, (int, float)):
+            numeric = int(bar_time)
+            if abs(numeric) < 100_000_000_000:
+                return numeric * 1000
+            return numeric
+        if isinstance(bar_time, datetime):
+            dt = bar_time if bar_time.tzinfo is not None else bar_time.replace(tzinfo=UTC)
+            return int(dt.astimezone(UTC).timestamp() * 1000)
+        try:
+            dt = datetime.fromisoformat(str(bar_time).replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=UTC)
+            return int(dt.astimezone(UTC).timestamp() * 1000)
+        except Exception:
+            return None
+
     def _open_convert_csv_files(self):
-        """Opens the CSV files using Polars and creates iterators.
-        Filters by start_date and end_date if provided.
-        """
-        combined_data = {}
-        if self.data_dict:
-            combined_data = self.data_dict
+        """Opens the CSV files using Polars and materializes tuple rows per symbol."""
+        combined_data = self.data_dict if self.data_dict else {}
 
         for s in self.symbol_list:
             try:
@@ -99,42 +117,49 @@ class HistoricCSVDataHandler(DataHandler):
                 if s in combined_data:
                     preloaded = combined_data[s]
                     if self._is_prefrozen_rows(preloaded):
-                        generator = iter(preloaded)
-                        self.data_generators[s] = generator
-                        first_bar = next(generator, None)
-                        if first_bar is None:
+                        rows = tuple(preloaded)
+                    else:
+                        df = self._frame_loader.normalize(preloaded)
+                        if df is None:
+                            print(
+                                "Warning: Missing or invalid OHLCV columns in "
+                                f"{s}. Required: {self._frame_loader.columns}"
+                            )
                             self.finished_symbols.add(s)
                             continue
-                        self.next_bar[s] = first_bar
-                        self._push_heap(s, first_bar)
-                        continue
-                    df = self._frame_loader.normalize(preloaded)
+                        rows = tuple(df.iter_rows(named=False))
                 else:
-                    # Load CSV with Polars
+                    if self._strict_data_dict:
+                        # When explicit in-memory data_dict is supplied (chunked DB mode),
+                        # never fallback to CSV to avoid hidden full-history loads.
+                        self.finished_symbols.add(s)
+                        continue
                     csv_path = self._resolve_symbol_csv_path(s)
                     if not os.path.exists(csv_path):
                         print(f"Warning: Data file not found for {s} at {csv_path}")
+                        self.finished_symbols.add(s)
                         continue
                     df = self._frame_loader.load_csv(csv_path)
+                    if df is None:
+                        print(
+                            "Warning: Missing or invalid OHLCV columns in "
+                            f"{s}. Required: {self._frame_loader.columns}"
+                        )
+                        self.finished_symbols.add(s)
+                        continue
+                    rows = tuple(df.iter_rows(named=False))
 
-                if df is None:
-                    print(
-                        "Warning: Missing or invalid OHLCV columns in "
-                        f"{s}. Required: {self._frame_loader.columns}"
-                    )
-                    continue
-
-                # Convert to iterator of Tuples (much faster than Dicts)
-                generator = df.iter_rows(named=False)
-                self.data_generators[s] = generator
-
-                # Prime first bar to support global timestamp-ordered merge
-                first_bar = next(generator, None)
-                if first_bar is None:
+                if not rows:
                     self.finished_symbols.add(s)
                     continue
-                self.next_bar[s] = first_bar
-                self._push_heap(s, first_bar)
+
+                self.symbol_rows[s] = rows
+                self.symbol_index[s] = 0
+                self.next_bar[s] = rows[0]
+
+                timestamps_ms = [self._bar_time_ms(row[0]) or 0 for row in rows]
+                self.symbol_timestamps_ms[s] = timestamps_ms
+                self._push_heap(s, rows[0])
             except Exception as e:
                 print(f"Dataset Load Error for {s}: {e}")
                 self.finished_symbols.add(s)
@@ -163,17 +188,71 @@ class HistoricCSVDataHandler(DataHandler):
         for symbol, bar in self.next_bar.items():
             self._push_heap(symbol, bar)
 
-    def _get_new_bar(self, symbol):
-        """Returns the latest bar from the data feed."""
-        try:
-            return next(self.data_generators[symbol])
-        except StopIteration:
+    def _advance_symbol(self, symbol: str) -> None:
+        rows = self.symbol_rows.get(symbol)
+        if not rows:
+            self.next_bar.pop(symbol, None)
             self.finished_symbols.add(symbol)
+            return
+
+        idx = int(self.symbol_index.get(symbol, 0)) + 1
+        if idx >= len(rows):
+            self.symbol_index[symbol] = len(rows)
+            self.next_bar.pop(symbol, None)
+            self.finished_symbols.add(symbol)
+            return
+
+        self.symbol_index[symbol] = idx
+        nxt = rows[idx]
+        self.next_bar[symbol] = nxt
+        self._push_heap(symbol, nxt)
+
+    def skip_to_timestamp_ms(self, target_ts_ms: int | None) -> int:
+        """Skip internal cursors to the first row >= target timestamp (binary search)."""
+        if target_ts_ms is None:
+            return 0
+        target = int(target_ts_ms)
+
+        moved = 0
+        for symbol, rows in self.symbol_rows.items():
+            if symbol in self.finished_symbols:
+                continue
+            ts_list = self.symbol_timestamps_ms.get(symbol)
+            if not ts_list:
+                continue
+            idx = int(self.symbol_index.get(symbol, 0))
+            next_idx = bisect_left(ts_list, target, lo=idx)
+            if next_idx <= idx:
+                continue
+
+            moved += next_idx - idx
+            if next_idx >= len(rows):
+                self.symbol_index[symbol] = len(rows)
+                self.next_bar.pop(symbol, None)
+                self.finished_symbols.add(symbol)
+            else:
+                self.symbol_index[symbol] = next_idx
+                self.next_bar[symbol] = rows[next_idx]
+
+        if moved > 0:
+            self._rebuild_heap()
+            if not self.next_bar:
+                self.continue_backtest = False
+        return moved
+
+    def get_next_timestamp_ms(self) -> int | None:
+        if not self.next_bar:
             return None
+        candidate = min((self._bar_time_ms(bar[0]) for bar in self.next_bar.values()), default=None)
+        if candidate is None:
+            return None
+        return int(candidate)
 
     def update_bars(self):
-        """Pushes bars in global timestamp order across symbols.
-        If one symbol ends earlier, others continue until all data is exhausted.
+        """Push bars in global timestamp order across symbols.
+
+        Multi-symbol mode emits one `MarketBatchEvent` per timestamp to reduce
+        event fan-out and allow `portfolio.update_timeindex` to run once.
         """
         if not self.next_bar:
             self.continue_backtest = False
@@ -187,6 +266,7 @@ class HistoricCSVDataHandler(DataHandler):
                 return
 
             self.latest_symbol_data[symbol].append(bar)
+            self.last_emitted_timestamp_ms = self._bar_time_ms(bar[0])
             self.events.put(
                 MarketEvent(
                     bar[0],
@@ -198,13 +278,9 @@ class HistoricCSVDataHandler(DataHandler):
                     bar[5],
                 )
             )
-
-            nxt = self._get_new_bar(symbol)
-            if nxt is None:
-                self.next_bar.pop(symbol, None)
+            self._advance_symbol(symbol)
+            if not self.next_bar:
                 self.continue_backtest = False
-            else:
-                self.next_bar[symbol] = nxt
             return
 
         selected_time = None
@@ -233,31 +309,29 @@ class HistoricCSVDataHandler(DataHandler):
                 continue
             emit_symbols.append(symbol)
 
+        batch_events: list[MarketEvent] = []
         for s in emit_symbols:
             bar = self.next_bar[s]
-            # bar is a Tuple: (datetime, open, high, low, close, volume)
             self.latest_symbol_data[s].append(bar)
-
-            # Publish MarketEvent
-            self.events.put(
+            batch_events.append(
                 MarketEvent(
-                    bar[0],  # datetime
+                    bar[0],
                     s,
-                    bar[1],  # open
-                    bar[2],  # high
-                    bar[3],  # low
-                    bar[4],  # close
-                    bar[5],  # volume
+                    bar[1],
+                    bar[2],
+                    bar[3],
+                    bar[4],
+                    bar[5],
                 )
             )
+            self._advance_symbol(s)
 
-            # Advance only symbol that was emitted
-            nxt = self._get_new_bar(s)
-            if nxt is None:
-                self.next_bar.pop(s, None)
-            else:
-                self.next_bar[s] = nxt
-                self._push_heap(s, nxt)
+        self.last_emitted_timestamp_ms = self._bar_time_ms(selected_time)
+
+        if len(batch_events) == 1:
+            self.events.put(batch_events[0])
+        else:
+            self.events.put(MarketBatchEvent(time=selected_time, bars=tuple(batch_events)))
 
         if not self.next_bar:
             self.continue_backtest = False

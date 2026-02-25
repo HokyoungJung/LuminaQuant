@@ -28,21 +28,15 @@ def _sample_1s_frame() -> pl.DataFrame:
     )
 
 
-def test_upsert_1s_writes_partitioned_parquet(tmp_path: Path):
+def test_upsert_1s_writes_wal(tmp_path: Path):
     repo = ParquetMarketDataRepository(tmp_path)
     written = repo.upsert_1s(exchange="binance", symbol="BTC/USDT", rows=_sample_1s_frame())
 
     assert written == 4
 
-    partition = (
-        tmp_path
-        / "exchange=binance"
-        / "symbol=BTCUSDT"
-        / "timeframe=1s"
-        / "date=2026-01-01"
-    )
-    files = list(partition.glob("*.parquet"))
-    assert files
+    symbol_root = tmp_path / "market_ohlcv_1s" / "binance" / "BTCUSDT"
+    assert (symbol_root / "wal.bin").exists()
+    assert not list(symbol_root.glob("*.parquet"))
 
 
 def test_load_ohlcv_resamples_with_bucket_groupby(tmp_path: Path):
@@ -73,8 +67,8 @@ def test_compact_partition_merges_files(tmp_path: Path):
         remove_sources=True,
     )
 
-    assert result.files_before >= 2
     assert result.files_after == 1
+    assert result.rows_before >= 2
     assert result.rows_after == 2
 
 
@@ -100,6 +94,7 @@ def test_load_data_dict_from_parquet_reads_symbols(tmp_path: Path):
 def test_is_parquet_market_data_store_detects_existing_partition_layout(tmp_path: Path):
     repo = ParquetMarketDataRepository(tmp_path)
     repo.upsert_1s(exchange="binance", symbol="BTC/USDT", rows=_sample_1s_frame())
+    repo.compact_all(exchange="binance", symbol="BTC/USDT", timeframe="1s", remove_sources=True)
 
     assert is_parquet_market_data_store(str(tmp_path))
     assert is_parquet_market_data_store("anything", backend="parquet")

@@ -1,4 +1,5 @@
 import random
+from copy import deepcopy
 from abc import ABC, abstractmethod
 from typing import Any
 
@@ -41,6 +42,31 @@ class SimulatedExecutionHandler(ExecutionHandler):
         # Store conditional orders: { order_id: { 'symbol':..., 'type':..., 'trigger_price':..., 'parent_id':...} }
         # For simplicity, just list of order dicts
         self.active_orders: list[dict[str, Any]] = []
+
+    def get_state(self) -> dict[str, Any]:
+        return {
+            "active_orders": deepcopy(self.active_orders),
+            "order_seq": int(self._order_seq),
+            "rng_state": self.rng.getstate(),
+        }
+
+    def set_state(self, state: dict[str, Any] | None) -> None:
+        if not isinstance(state, dict):
+            return
+        active_orders = state.get("active_orders")
+        if isinstance(active_orders, list):
+            self.active_orders = deepcopy(active_orders)
+        if "order_seq" in state:
+            try:
+                self._order_seq = int(state.get("order_seq", 0))
+            except Exception:
+                pass
+        rng_state = state.get("rng_state")
+        if rng_state is not None:
+            try:
+                self.rng.setstate(rng_state)
+            except Exception:
+                pass
 
     def _next_order_id(self) -> str:
         self._order_seq += 1

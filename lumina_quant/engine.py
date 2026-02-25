@@ -32,6 +32,8 @@ class TradingEngine(ABC):
             self.message_bus.publish(f"event.{event_type}", event)
             if event.type == "MARKET":
                 self.handle_market_event(event)
+            elif event.type == "MARKET_BATCH":
+                self.handle_market_batch_event(event)
             elif event.type == "SIGNAL":
                 self.handle_signal_event(event)
             elif event.type == "ORDER":
@@ -54,6 +56,30 @@ class TradingEngine(ABC):
         # Optional: Simulated execution handler might need to check open orders
         if hasattr(self.execution_handler, "check_open_orders"):
             self.execution_handler.check_open_orders(event)
+
+    def handle_market_batch_event(self, event):
+        batch_events = tuple(getattr(event, "bars", ()) or ())
+        if not batch_events:
+            return
+
+        strategy_guard = getattr(self.strategy, "should_process_market_event", None)
+        for market_event in batch_events:
+            self.market_events += 1
+            should_process = True
+            if callable(strategy_guard):
+                try:
+                    should_process = bool(strategy_guard(market_event))
+                except Exception:
+                    should_process = True
+            if should_process:
+                self.strategy.calculate_signals(market_event)
+
+        # Timestamp-level accounting update (once per second).
+        self.portfolio.update_timeindex(event)
+
+        if hasattr(self.execution_handler, "check_open_orders"):
+            for market_event in batch_events:
+                self.execution_handler.check_open_orders(market_event)
 
     def handle_signal_event(self, event):
         self.signals += 1

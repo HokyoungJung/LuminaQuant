@@ -2,9 +2,11 @@ import threading
 import time
 from collections import deque
 
+from lumina_quant.config import BaseConfig
 from lumina_quant.data import DataHandler
 from lumina_quant.events import MarketEvent
 from lumina_quant.interfaces import ExchangeInterface
+from lumina_quant.market_data import MarketDataRepository
 
 
 class LiveDataHandler(DataHandler):
@@ -33,6 +35,14 @@ class LiveDataHandler(DataHandler):
 
         self.latest_symbol_data = {s: deque(maxlen=100) for s in symbol_list}
         self.lock = threading.Lock()
+        self._last_persisted_1s_ts = {s: 0 for s in symbol_list}
+        self._market_repo = MarketDataRepository(str(BaseConfig.MARKET_DATA_PARQUET_PATH))
+        self._market_exchange = str(getattr(BaseConfig, "MARKET_DATA_EXCHANGE", "binance"))
+        self._persist_interval_sec = max(
+            10,
+            int(float(getattr(self.config, "LIVE_INGEST_INTERVAL_SEC", 60) or 60)),
+        )
+        self._last_persist_monotonic = 0.0
 
         # Warmup Data
         self._warmup_data()
@@ -66,7 +76,15 @@ class LiveDataHandler(DataHandler):
         print("Starting Live Data Polling...")
         while self.continue_backtest:
             try:
+                now_mono = time.monotonic()
+                should_persist_1s = (
+                    now_mono - self._last_persist_monotonic >= self._persist_interval_sec
+                )
+
                 for s in self.symbol_list:
+                    if should_persist_1s:
+                        self._persist_last_minute_1s(s)
+
                     timeframe = getattr(self.config, "TIMEFRAME", "1m")
                     ohlcv = self.exchange.fetch_ohlcv(s, timeframe, limit=2)
 
@@ -100,11 +118,54 @@ class LiveDataHandler(DataHandler):
                                 )
                             )
 
+                if should_persist_1s:
+                    self._last_persist_monotonic = now_mono
                 time.sleep(getattr(self.config, "POLL_INTERVAL", 2))
 
             except Exception as e:
                 print(f"Error polling data: {e}")
                 time.sleep(5)
+
+    def _persist_last_minute_1s(self, symbol):
+        try:
+            rows_1s = self.exchange.fetch_ohlcv(symbol, "1s", limit=60) or []
+        except Exception:
+            return
+
+        if not rows_1s:
+            return
+
+        last_seen = int(self._last_persisted_1s_ts.get(symbol, 0) or 0)
+        new_rows = []
+        newest = last_seen
+        for row in rows_1s:
+            if not row or len(row) < 6:
+                continue
+            ts = int(row[0])
+            if ts <= last_seen:
+                continue
+            newest = max(newest, ts)
+            new_rows.append(
+                {
+                    "datetime": ts,
+                    "open": float(row[1]),
+                    "high": float(row[2]),
+                    "low": float(row[3]),
+                    "close": float(row[4]),
+                    "volume": float(row[5]),
+                }
+            )
+
+        if not new_rows:
+            return
+
+        self._market_repo.upsert_ohlcv(
+            exchange=self._market_exchange,
+            symbol=symbol,
+            timeframe="1s",
+            rows=new_rows,
+        )
+        self._last_persisted_1s_ts[symbol] = newest
 
     def update_bars(self):
         """In live mode, the thread handles updates."""
