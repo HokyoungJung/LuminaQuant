@@ -128,7 +128,7 @@ class OptimizationRuntimeConfig:
     grid: dict[str, Any] = field(default_factory=dict)
     walk_forward_folds: int = 3
     overfit_penalty: float = 0.5
-    max_workers: int = 4
+    max_workers: int = 1
     persist_best_params: bool = False
 
 
