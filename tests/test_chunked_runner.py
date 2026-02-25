@@ -3,7 +3,6 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 
 import polars as pl
-
 from lumina_quant.backtesting.chunked_runner import iter_chunk_windows, run_backtest_chunked
 from lumina_quant.strategy import Strategy
 

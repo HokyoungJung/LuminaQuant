@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Any
 
 import polars as pl
-
 from lumina_quant.storage.wal_binary import BinaryWAL, WALRecord
 
 _DEFAULT_SCHEMA: dict[str, pl.DataType] = {
@@ -670,7 +669,7 @@ class ParquetMarketDataRepository:
             payload={
                 "wal_offset": int(next_offset),
                 "updated_at": datetime.now(tz=UTC).isoformat(),
-                "compacted_rows": int(len(records)),
+                "compacted_rows": len(records),
                 "remove_sources": bool(remove_sources),
             },
         )

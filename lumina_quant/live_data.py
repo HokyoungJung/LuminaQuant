@@ -35,7 +35,7 @@ class LiveDataHandler(DataHandler):
 
         self.latest_symbol_data = {s: deque(maxlen=100) for s in symbol_list}
         self.lock = threading.Lock()
-        self._last_persisted_1s_ts = {s: 0 for s in symbol_list}
+        self._last_persisted_1s_ts = dict.fromkeys(symbol_list, 0)
         self._market_repo = MarketDataRepository(str(BaseConfig.MARKET_DATA_PARQUET_PATH))
         self._market_exchange = str(getattr(BaseConfig, "MARKET_DATA_EXCHANGE", "binance"))
         self._persist_interval_sec = max(

@@ -8,7 +8,6 @@ from datetime import datetime, timedelta
 from time import perf_counter
 
 import polars as pl
-
 from lumina_quant.backtesting.backtest import Backtest
 from lumina_quant.backtesting.data import HistoricCSVDataHandler
 from lumina_quant.backtesting.execution_sim import SimulatedExecutionHandler

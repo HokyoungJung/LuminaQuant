@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from lumina_quant.storage.wal_binary import BinaryWAL, RECORD_LEN
+from lumina_quant.storage.wal_binary import RECORD_LEN, BinaryWAL
 
 
 def _rows(count: int):

@@ -20,10 +20,11 @@ from __future__ import annotations
 import os
 import struct
 import zlib
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterable, Iterator, Mapping
+from typing import Any
 
 MAGIC = b"LQWB"
 VERSION = 1

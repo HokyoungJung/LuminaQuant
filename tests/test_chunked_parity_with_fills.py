@@ -1,8 +1,8 @@
 from __future__ import annotations
+
 from datetime import datetime, timedelta
 
 import polars as pl
-
 from lumina_quant.backtesting.backtest import Backtest
 from lumina_quant.backtesting.chunked_runner import run_backtest_chunked
 from lumina_quant.backtesting.data import HistoricCSVDataHandler

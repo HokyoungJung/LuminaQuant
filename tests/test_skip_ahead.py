@@ -4,7 +4,6 @@ from datetime import datetime, timedelta
 from time import perf_counter
 
 import polars as pl
-
 from lumina_quant.backtesting.backtest import Backtest
 from lumina_quant.backtesting.data import HistoricCSVDataHandler
 from lumina_quant.backtesting.execution_sim import SimulatedExecutionHandler
@@ -79,7 +78,7 @@ def test_skip_ahead_matches_baseline_and_reduces_work(monkeypatch):
     assert all(
         abs(float(optimized.portfolio.current_positions[s]))
         == abs(float(baseline.portfolio.current_positions[s]))
-        for s in data_dict.keys()
+        for s in data_dict
     )
 
     assert optimized.skip_ahead_jumps > 0

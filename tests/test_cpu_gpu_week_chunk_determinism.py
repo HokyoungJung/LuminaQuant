@@ -4,7 +4,6 @@ from datetime import datetime, timedelta
 
 import polars as pl
 import pytest
-
 from lumina_quant.compute_engine import GPUNotAvailableError, select_engine
 
 

@@ -1,6 +1,6 @@
 import random
-from copy import deepcopy
 from abc import ABC, abstractmethod
+from copy import deepcopy
 from typing import Any
 
 from lumina_quant.events import FillEvent
