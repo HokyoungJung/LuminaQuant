@@ -1,56 +1,15 @@
-# 🚀 Deployment Guide
+# 🚀 Deployment Guide (Local / UV-Only)
 
-This guide explains how to deploy **LuminaQuant** to a remote server (AWS, GCP, VPS) for 24/7 trading.
+This guide explains how to run **LuminaQuant** in the current local-first stack.
+Docker deployment is intentionally out of scope for this runtime profile.
 
-## 📦 Option 1: Docker (Recommended)
-
-Docker ensures the environment is exactly the same as development.
-
-### 1. Prerequisites
-- Docker & Docker Compose installed on the server.
-- `.env` file with API keys.
-
-### 2. Setup
-Copy the project to your server:
-```bash
-git clone https://github.com/HokyoungJung/LuminaQuant.git
-cd lumina-quant
-```
-
-Create/Edit `.env`:
-```bash
-nano .env
-# Paste your keys
-TELEGRAM_BOT_TOKEN=...
-TELEGRAM_CHAT_ID=...
-```
-
-### 3. Run
-Start in detached mode (background):
-```bash
-docker-compose up -d
-```
-
-View logs:
-```bash
-docker-compose logs -f
-```
-
-Stop:
-```bash
-docker-compose down
-```
-
----
-
-## ☁️ Option 2: Linux Service (Systemd)
-
-If you prefer running directly on the OS.
+## ☁️ Linux Service (Systemd, uv-only)
 
 ### 1. Install Dependencies
 ```bash
-apt update && apt install python3-pip
-pip install ".[live,optimize,dashboard]"
+apt update && apt install -y curl
+curl -LsSf https://astral.sh/uv/install.sh | sh
+uv sync --all-extras
 ```
 
 ### 2. Create Service File
@@ -64,7 +23,7 @@ After=network.target
 [Service]
 User=ubuntu
 WorkingDirectory=/home/ubuntu/lumina-quant
-ExecStart=/usr/bin/python3 run_live_ws.py
+ExecStart=/home/ubuntu/.local/bin/uv run python run_live_ws.py
 Restart=always
 EnvironmentFile=/home/ubuntu/lumina-quant/.env
 

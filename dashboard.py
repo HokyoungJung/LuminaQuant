@@ -1102,18 +1102,18 @@ def _strategy_default_grid(strategy_name):
 
 
 def _merged_strategy_params(strategy_name, loaded_params):
-    params = _strategy_default_params(strategy_name)
     if isinstance(loaded_params, dict):
-        params.update(loaded_params)
-    return params
+        return strategy_registry.resolve_strategy_params(strategy_name, loaded_params)
+    return _strategy_default_params(strategy_name)
 
 
 def _save_strategy_params(strategy_name, params):
+    resolved = strategy_registry.resolve_strategy_params(strategy_name, params)
     out_dir = os.path.join("best_optimized_parameters", strategy_name)
     os.makedirs(out_dir, exist_ok=True)
     out_path = os.path.join(out_dir, "best_params.json")
     with open(out_path, "w", encoding="utf-8") as f:
-        json.dump(params, f, indent=2, ensure_ascii=False)
+        json.dump(resolved, f, indent=2, ensure_ascii=False)
     return out_path
 
 
@@ -1189,7 +1189,7 @@ def _run_python_script(script_name, script_args, env_overrides, timeout_sec):
 
 def _run_ghost_cleanup_script(
     *,
-    db_path,
+    dsn,
     stale_sec,
     startup_grace_sec,
     close_status,
@@ -1199,8 +1199,8 @@ def _run_ghost_cleanup_script(
     cmd = [
         sys.executable,
         "scripts/cleanup_ghost_runs.py",
-        "--db",
-        str(db_path),
+        "--dsn",
+        str(dsn),
         "--stale-sec",
         str(int(stale_sec)),
         "--startup-grace-sec",
@@ -3188,10 +3188,14 @@ with st.sidebar.expander("Optimization Search Space", expanded=False):
     default_optuna_cfg = _strategy_default_optuna(strategy_name)
     default_grid_cfg = _strategy_default_grid(strategy_name)
     if strategy_name == str(OptimizationConfig.STRATEGY_NAME):
-        if isinstance(OptimizationConfig.OPTUNA_CONFIG, dict) and OptimizationConfig.OPTUNA_CONFIG:
-            default_optuna_cfg = dict(OptimizationConfig.OPTUNA_CONFIG)
-        if isinstance(OptimizationConfig.GRID_CONFIG, dict) and OptimizationConfig.GRID_CONFIG:
-            default_grid_cfg = dict(OptimizationConfig.GRID_CONFIG)
+        default_optuna_cfg = strategy_registry.resolve_optuna_config(
+            strategy_name,
+            OptimizationConfig.OPTUNA_CONFIG if isinstance(OptimizationConfig.OPTUNA_CONFIG, dict) else {},
+        )
+        default_grid_cfg = strategy_registry.resolve_grid_config(
+            strategy_name,
+            OptimizationConfig.GRID_CONFIG if isinstance(OptimizationConfig.GRID_CONFIG, dict) else {},
+        )
 
     default_optuna_json = json.dumps(default_optuna_cfg, indent=2, ensure_ascii=False)
     default_grid_json = json.dumps(default_grid_cfg, indent=2, ensure_ascii=False)
@@ -3224,18 +3228,24 @@ with st.sidebar.expander("Optimization Search Space", expanded=False):
         "Persist best params after optimize", value=bool(OptimizationConfig.PERSIST_BEST_PARAMS)
     )
 
-optuna_config_for_runner = dict(OptimizationConfig.OPTUNA_CONFIG)
-grid_config_for_runner = dict(OptimizationConfig.GRID_CONFIG)
+optuna_config_for_runner = strategy_registry.resolve_optuna_config(strategy_name, default_optuna_cfg)
+grid_config_for_runner = strategy_registry.resolve_grid_config(strategy_name, default_grid_cfg)
 opt_space_error = None
 try:
     parsed_optuna = json.loads(optuna_json_raw)
     parsed_grid = json.loads(grid_json_raw)
     if isinstance(parsed_optuna, dict):
-        optuna_config_for_runner = parsed_optuna
+        optuna_config_for_runner = strategy_registry.resolve_optuna_config(
+            strategy_name,
+            parsed_optuna,
+        )
     else:
         opt_space_error = "OPTUNA config JSON must be an object."
     if isinstance(parsed_grid, dict):
-        grid_config_for_runner = parsed_grid
+        grid_config_for_runner = strategy_registry.resolve_grid_config(
+            strategy_name,
+            parsed_grid,
+        )
     else:
         opt_space_error = "GRID config JSON must be an object."
 except Exception as exc:
@@ -4708,7 +4718,7 @@ with tab_report:
     cleanup_btn_col_1, cleanup_btn_col_2 = st.columns(2)
     if cleanup_btn_col_1.button("Ghost Cleanup Dry-Run", use_container_width=True):
         cleanup_result = _run_ghost_cleanup_script(
-            db_path=db_path,
+            dsn=db_path,
             stale_sec=cleanup_stale_sec,
             startup_grace_sec=cleanup_startup_grace_sec,
             close_status=cleanup_close_status,
@@ -4720,7 +4730,7 @@ with tab_report:
 
     if cleanup_btn_col_2.button("Ghost Cleanup Apply", use_container_width=True):
         cleanup_result = _run_ghost_cleanup_script(
-            db_path=db_path,
+            dsn=db_path,
             stale_sec=cleanup_stale_sec,
             startup_grace_sec=cleanup_startup_grace_sec,
             close_status=cleanup_close_status,

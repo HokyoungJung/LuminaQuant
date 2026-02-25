@@ -9,10 +9,24 @@ from __future__ import annotations
 
 from lumina_quant.events import SignalEvent
 from lumina_quant.strategy import Strategy
+from lumina_quant.tuning import HyperParam, resolve_params_from_schema
 
 
 class BitcoinBuyHoldStrategy(Strategy):
     """One-shot long entry baseline strategy for BTC buy-and-hold."""
+
+    @classmethod
+    def get_param_schema(cls) -> dict[str, HyperParam]:
+        return {
+            "symbol": HyperParam.string("symbol", default="BTC/USDT", tunable=False),
+            "strength": HyperParam.floating(
+                "strength",
+                default=1.0,
+                low=0.0,
+                high=5.0,
+                tunable=False,
+            ),
+        }
 
     def __init__(self, bars, events, symbol: str = "BTC/USDT", strength: float = 1.0):
         self.bars = bars
@@ -20,6 +34,17 @@ class BitcoinBuyHoldStrategy(Strategy):
         self.symbol_list = list(getattr(self.bars, "symbol_list", []))
         if not self.symbol_list:
             raise ValueError("BitcoinBuyHoldStrategy requires at least one symbol.")
+
+        resolved = resolve_params_from_schema(
+            self.get_param_schema(),
+            {
+                "symbol": symbol,
+                "strength": strength,
+            },
+            keep_unknown=False,
+        )
+        symbol = str(resolved["symbol"])
+        strength = float(resolved["strength"])
 
         requested = str(symbol).strip()
         if requested in self.symbol_list:

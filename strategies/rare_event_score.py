@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from lumina_quant.events import SignalEvent
 from lumina_quant.indicators import rare_event_scores_latest, safe_float, time_key
 from lumina_quant.strategy import Strategy
+from lumina_quant.tuning import HyperParam, resolve_params_from_schema
 
 
 @dataclass(slots=True)
@@ -25,6 +26,109 @@ class _SymbolState:
 class RareEventScoreStrategy(Strategy):
     """Trade on rare directional events using a 0~1 composite rarity score."""
 
+    @classmethod
+    def get_param_schema(cls) -> dict[str, HyperParam]:
+        return {
+            "history_bars": HyperParam.integer(
+                "history_bars",
+                default=512,
+                low=64,
+                high=20000,
+                optuna={"type": "int", "low": 256, "high": 2048, "step": 64},
+                grid=[256, 512, 1024],
+            ),
+            "lookbacks": HyperParam.int_tuple(
+                "lookbacks",
+                default=(1, 2, 3, 4, 5),
+                min_value=1,
+                max_value=1024,
+                tunable=False,
+            ),
+            "return_factor": HyperParam.floating(
+                "return_factor",
+                default=1.0,
+                low=0.0,
+                high=20.0,
+                optuna={"type": "float", "low": 0.2, "high": 2.0, "step": 0.1},
+                grid=[0.6, 1.0, 1.4],
+            ),
+            "trend_rolling_window": HyperParam.integer(
+                "trend_rolling_window",
+                default=20,
+                low=5,
+                high=4096,
+                optuna={"type": "int", "low": 8, "high": 64},
+                grid=[12, 20, 32],
+            ),
+            "local_extremum_window": HyperParam.integer(
+                "local_extremum_window",
+                default=200,
+                low=10,
+                high=20000,
+                optuna={"type": "int", "low": 48, "high": 400},
+                grid=[96, 160, 240],
+            ),
+            "entry_score": HyperParam.floating(
+                "entry_score",
+                default=0.18,
+                low=0.01,
+                high=0.95,
+                optuna={"type": "float", "low": 0.03, "high": 0.40, "step": 0.01},
+                grid=[0.08, 0.12, 0.18, 0.24],
+            ),
+            "exit_score": HyperParam.floating(
+                "exit_score",
+                default=0.55,
+                low=0.03,
+                high=0.99,
+                optuna={"type": "float", "low": 0.35, "high": 0.90, "step": 0.01},
+                grid=[0.45, 0.55, 0.65, 0.75],
+            ),
+            "exit_score_min_gap": HyperParam.floating(
+                "exit_score_min_gap",
+                default=0.02,
+                low=0.0,
+                high=0.5,
+                optuna={"type": "float", "low": 0.0, "high": 0.2, "step": 0.01},
+                grid=[0.0, 0.02, 0.04, 0.08],
+            ),
+            "entry_streak": HyperParam.integer(
+                "entry_streak",
+                default=3,
+                low=2,
+                high=100,
+                optuna={"type": "int", "low": 2, "high": 8},
+                grid=[2, 3, 4, 5],
+            ),
+            "stop_loss_pct": HyperParam.floating(
+                "stop_loss_pct",
+                default=0.03,
+                low=0.002,
+                high=0.4,
+                optuna={"type": "float", "low": 0.005, "high": 0.10, "step": 0.005},
+                grid=[0.01, 0.02, 0.03, 0.05],
+            ),
+            "allow_short": HyperParam.boolean(
+                "allow_short",
+                default=True,
+                optuna={"type": "categorical", "choices": [True, False]},
+                grid=[True, False],
+            ),
+            "diff": HyperParam.boolean(
+                "diff",
+                default=False,
+                optuna={"type": "categorical", "choices": [False, True]},
+                grid=[False, True],
+            ),
+            "history_padding_bars": HyperParam.integer(
+                "history_padding_bars",
+                default=12,
+                low=0,
+                high=20000,
+                tunable=False,
+            ),
+        }
+
     def __init__(
         self,
         bars,
@@ -36,30 +140,56 @@ class RareEventScoreStrategy(Strategy):
         local_extremum_window: int = 200,
         entry_score: float = 0.18,
         exit_score: float = 0.55,
+        exit_score_min_gap: float = 0.02,
         entry_streak: int = 3,
         stop_loss_pct: float = 0.03,
         allow_short: bool = True,
         diff: bool = False,
+        history_padding_bars: int = 12,
     ):
         self.bars = bars
         self.events = events
         self.symbol_list = list(self.bars.symbol_list)
+        resolved = resolve_params_from_schema(
+            self.get_param_schema(),
+            {
+                "history_bars": history_bars,
+                "lookbacks": lookbacks,
+                "return_factor": return_factor,
+                "trend_rolling_window": trend_rolling_window,
+                "local_extremum_window": local_extremum_window,
+                "entry_score": entry_score,
+                "exit_score": exit_score,
+                "exit_score_min_gap": exit_score_min_gap,
+                "entry_streak": entry_streak,
+                "stop_loss_pct": stop_loss_pct,
+                "allow_short": allow_short,
+                "diff": diff,
+                "history_padding_bars": history_padding_bars,
+            },
+            keep_unknown=False,
+        )
 
-        self.lookbacks = tuple(max(1, int(x)) for x in lookbacks if int(x) > 0) or (1, 2, 3, 4, 5)
-        self.return_factor = float(return_factor)
-        self.trend_rolling_window = max(5, int(trend_rolling_window))
-        self.local_extremum_window = max(10, int(local_extremum_window))
-        self.entry_score = min(0.95, max(0.01, float(entry_score)))
-        self.exit_score = min(0.99, max(self.entry_score + 0.02, float(exit_score)))
-        self.entry_streak = max(2, int(entry_streak))
-        self.stop_loss_pct = min(0.40, max(0.002, float(stop_loss_pct)))
-        self.allow_short = bool(allow_short)
-        self.diff = bool(diff)
+        self.lookbacks = tuple(int(x) for x in resolved["lookbacks"])
+        self.return_factor = float(resolved["return_factor"])
+        self.trend_rolling_window = int(resolved["trend_rolling_window"])
+        self.local_extremum_window = int(resolved["local_extremum_window"])
+        self.entry_score = float(resolved["entry_score"])
+        self.exit_score_min_gap = float(resolved["exit_score_min_gap"])
+        self.exit_score = max(
+            self.entry_score + self.exit_score_min_gap,
+            float(resolved["exit_score"]),
+        )
+        self.entry_streak = int(resolved["entry_streak"])
+        self.stop_loss_pct = float(resolved["stop_loss_pct"])
+        self.allow_short = bool(resolved["allow_short"])
+        self.diff = bool(resolved["diff"])
+        self.history_padding_bars = int(resolved["history_padding_bars"])
 
-        base_history = max(64, int(history_bars))
+        base_history = int(resolved["history_bars"])
         min_required = max(
             max(self.lookbacks) + 4,
-            self.trend_rolling_window + 12,
+            self.trend_rolling_window + self.history_padding_bars,
             self.local_extremum_window + 2,
         )
         self._history_bars = max(base_history, min_required)
@@ -215,4 +345,3 @@ class RareEventScoreStrategy(Strategy):
             self._emit(symbol, event_time, "SHORT", stop_loss=stop_loss, metadata=metadata)
             item.mode = "SHORT"
             item.entry_price = close
-

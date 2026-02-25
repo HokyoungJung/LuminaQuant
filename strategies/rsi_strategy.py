@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from lumina_quant.events import SignalEvent
 from lumina_quant.indicators import IncrementalRsi, safe_float
 from lumina_quant.strategy import Strategy
+from lumina_quant.tuning import HyperParam, resolve_params_from_schema
 
 
 @dataclass(slots=True)
@@ -15,6 +16,41 @@ class _SymbolState:
 
 
 class RsiStrategy(Strategy):
+    @classmethod
+    def get_param_schema(cls) -> dict[str, HyperParam]:
+        return {
+            "rsi_period": HyperParam.integer(
+                "rsi_period",
+                default=14,
+                low=2,
+                high=512,
+                optuna={"type": "int", "low": 5, "high": 30},
+                grid=[10, 14, 20],
+            ),
+            "oversold": HyperParam.floating(
+                "oversold",
+                default=30.0,
+                low=1.0,
+                high=50.0,
+                optuna={"type": "int", "low": 20, "high": 40},
+                grid=[20, 25, 30],
+            ),
+            "overbought": HyperParam.floating(
+                "overbought",
+                default=70.0,
+                low=2.0,
+                high=99.0,
+                optuna={"type": "int", "low": 60, "high": 90},
+                grid=[70, 75, 80],
+            ),
+            "allow_short": HyperParam.boolean(
+                "allow_short",
+                default=True,
+                optuna={"type": "categorical", "choices": [True, False]},
+                grid=[True, False],
+            ),
+        }
+
     def __init__(
         self,
         bars,
@@ -27,10 +63,20 @@ class RsiStrategy(Strategy):
         self.bars = bars
         self.events = events
         self.symbol_list = list(self.bars.symbol_list)
-        self.rsi_period = max(2, int(rsi_period))
-        self.oversold = min(50.0, max(1.0, float(oversold)))
-        self.overbought = max(self.oversold + 1.0, min(99.0, float(overbought)))
-        self.allow_short = bool(allow_short)
+        resolved = resolve_params_from_schema(
+            self.get_param_schema(),
+            {
+                "rsi_period": rsi_period,
+                "oversold": oversold,
+                "overbought": overbought,
+                "allow_short": allow_short,
+            },
+            keep_unknown=False,
+        )
+        self.rsi_period = int(resolved["rsi_period"])
+        self.oversold = float(resolved["oversold"])
+        self.overbought = max(self.oversold + 1.0, float(resolved["overbought"]))
+        self.allow_short = bool(resolved["allow_short"])
         self._state = {
             symbol: _SymbolState(rsi=IncrementalRsi(self.rsi_period)) for symbol in self.symbol_list
         }

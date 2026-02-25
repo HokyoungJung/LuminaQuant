@@ -34,8 +34,11 @@ jobs:
       - name: Architecture check
         run: uv run python scripts/check_architecture.py
 
+      - name: Hardcoded parameter audit
+        run: uv run python scripts/audit_hardcoded_params.py
+
       - name: Run pytest suite
-        run: uv run pytest tests/test_native_backend.py tests/test_optimize_two_stage.py tests/test_message_bus.py tests/test_runtime_cache.py tests/test_system_assembly.py tests/test_ohlcv_loader.py tests/test_execution_protective_orders.py tests/test_live_execution_state_machine.py tests/test_lookahead.py
+        run: uv run pytest tests/test_audit_hardcoded_params.py tests/test_native_backend.py tests/test_optimize_two_stage.py tests/test_message_bus.py tests/test_runtime_cache.py tests/test_system_assembly.py tests/test_ohlcv_loader.py tests/test_execution_protective_orders.py tests/test_live_execution_state_machine.py tests/test_lookahead.py
 
       - name: Benchmark smoke
         run: uv run python scripts/benchmark_backtest.py --iters 1 --warmup 0 --output reports/benchmarks/ci_smoke.json

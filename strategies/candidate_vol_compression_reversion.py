@@ -10,6 +10,7 @@ from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.indicators.factory_fast import volatility_ratio_latest
 from lumina_quant.indicators.oscillators import zscore
 from lumina_quant.strategy import Strategy
+from lumina_quant.tuning import HyperParam, resolve_params_from_schema
 
 
 @dataclass(slots=True)
@@ -23,6 +24,81 @@ class _SymbolState:
 class VolatilityCompressionReversionStrategy(Strategy):
     """Fade short-term extremes only during volatility compression phases."""
 
+    @classmethod
+    def get_param_schema(cls) -> dict[str, HyperParam]:
+        return {
+            "z_window": HyperParam.integer(
+                "z_window",
+                default=48,
+                low=6,
+                high=4096,
+                optuna={"type": "int", "low": 12, "high": 192},
+                grid=[24, 36, 48, 64, 96],
+            ),
+            "fast_vol_window": HyperParam.integer(
+                "fast_vol_window",
+                default=12,
+                low=5,
+                high=4096,
+                optuna={"type": "int", "low": 6, "high": 48},
+                grid=[8, 12, 20],
+            ),
+            "slow_vol_window": HyperParam.integer(
+                "slow_vol_window",
+                default=72,
+                low=6,
+                high=8192,
+                optuna={"type": "int", "low": 24, "high": 320},
+                grid=[48, 72, 120],
+            ),
+            "compression_threshold": HyperParam.floating(
+                "compression_threshold",
+                default=0.75,
+                low=0.1,
+                high=10.0,
+                optuna={"type": "float", "low": 0.20, "high": 1.20, "step": 0.02},
+                grid=[0.55, 0.7, 0.85],
+            ),
+            "entry_z": HyperParam.floating(
+                "entry_z",
+                default=1.6,
+                low=0.2,
+                high=20.0,
+                optuna={"type": "float", "low": 0.6, "high": 3.0, "step": 0.05},
+                grid=[1.2, 1.6, 2.0, 2.4],
+            ),
+            "exit_z": HyperParam.floating(
+                "exit_z",
+                default=0.35,
+                low=0.05,
+                high=20.0,
+                optuna={"type": "float", "low": 0.05, "high": 1.2, "step": 0.05},
+                grid=[0.2, 0.35, 0.5, 0.75],
+            ),
+            "stop_loss_pct": HyperParam.floating(
+                "stop_loss_pct",
+                default=0.025,
+                low=0.002,
+                high=0.5,
+                optuna={"type": "float", "low": 0.005, "high": 0.12, "step": 0.005},
+                grid=[0.01, 0.02, 0.03, 0.05],
+            ),
+            "exit_compression_multiplier": HyperParam.floating(
+                "exit_compression_multiplier",
+                default=1.20,
+                low=1.0,
+                high=10.0,
+                optuna={"type": "float", "low": 1.0, "high": 2.0, "step": 0.05},
+                grid=[1.0, 1.2, 1.4, 1.8],
+            ),
+            "allow_short": HyperParam.boolean(
+                "allow_short",
+                default=True,
+                optuna={"type": "categorical", "choices": [True, False]},
+                grid=[True, False],
+            ),
+        }
+
     def __init__(
         self,
         bars,
@@ -34,20 +110,37 @@ class VolatilityCompressionReversionStrategy(Strategy):
         entry_z: float = 1.6,
         exit_z: float = 0.35,
         stop_loss_pct: float = 0.025,
+        exit_compression_multiplier: float = 1.20,
         allow_short: bool = True,
     ):
         self.bars = bars
         self.events = events
         self.symbol_list = list(self.bars.symbol_list)
+        resolved = resolve_params_from_schema(
+            self.get_param_schema(),
+            {
+                "z_window": z_window,
+                "fast_vol_window": fast_vol_window,
+                "slow_vol_window": slow_vol_window,
+                "compression_threshold": compression_threshold,
+                "entry_z": entry_z,
+                "exit_z": exit_z,
+                "stop_loss_pct": stop_loss_pct,
+                "exit_compression_multiplier": exit_compression_multiplier,
+                "allow_short": allow_short,
+            },
+            keep_unknown=False,
+        )
 
-        self.z_window = max(6, int(z_window))
-        self.fast_vol_window = max(5, int(fast_vol_window))
-        self.slow_vol_window = max(self.fast_vol_window + 1, int(slow_vol_window))
-        self.compression_threshold = max(0.1, float(compression_threshold))
-        self.entry_z = max(0.2, float(entry_z))
-        self.exit_z = min(self.entry_z - 0.05, max(0.05, float(exit_z)))
-        self.stop_loss_pct = min(0.50, max(0.002, float(stop_loss_pct)))
-        self.allow_short = bool(allow_short)
+        self.z_window = int(resolved["z_window"])
+        self.fast_vol_window = int(resolved["fast_vol_window"])
+        self.slow_vol_window = max(self.fast_vol_window + 1, int(resolved["slow_vol_window"]))
+        self.compression_threshold = float(resolved["compression_threshold"])
+        self.entry_z = float(resolved["entry_z"])
+        self.exit_z = float(resolved["exit_z"])
+        self.stop_loss_pct = float(resolved["stop_loss_pct"])
+        self.exit_compression_multiplier = float(resolved["exit_compression_multiplier"])
+        self.allow_short = bool(resolved["allow_short"])
 
         maxlen = max(self.z_window, self.slow_vol_window) + 4
         self._state = {
@@ -157,7 +250,7 @@ class VolatilityCompressionReversionStrategy(Strategy):
             if (
                 close <= (item.entry_price or close) * (1.0 - self.stop_loss_pct)
                 or z_value >= -self.exit_z
-                or vol_ratio > self.compression_threshold * 1.20
+                or vol_ratio > self.compression_threshold * self.exit_compression_multiplier
             ):
                 self._emit(symbol, event_time, "EXIT", metadata={**metadata, "reason": "long_exit"})
                 item.mode = "OUT"
@@ -168,7 +261,7 @@ class VolatilityCompressionReversionStrategy(Strategy):
             if (
                 close >= (item.entry_price or close) * (1.0 + self.stop_loss_pct)
                 or z_value <= self.exit_z
-                or vol_ratio > self.compression_threshold * 1.20
+                or vol_ratio > self.compression_threshold * self.exit_compression_multiplier
             ):
                 self._emit(symbol, event_time, "EXIT", metadata={**metadata, "reason": "short_exit"})
                 item.mode = "OUT"

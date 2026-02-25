@@ -73,6 +73,8 @@ if os.path.exists(param_path):
 else:
     print(f"[INFO] Optimized params not found at {param_path}. Using Defaults.")
 
+STRATEGY_PARAMS = strategy_registry.resolve_strategy_params(strategy_name, STRATEGY_PARAMS)
+
 
 # 3. Data Settings
 CSV_DIR = "data"
@@ -113,6 +115,23 @@ AUTO_COLLECT_DB = str(os.getenv("LQ_AUTO_COLLECT_DB", "0")).strip().lower() not 
     "no",
     "off",
 }
+
+
+def _env_bool(name, default=False):
+    raw = os.getenv(name)
+    if raw is None:
+        return bool(default)
+    return str(raw).strip().lower() not in {"0", "false", "no", "off"}
+
+
+def _env_optional_bool(name):
+    raw = os.getenv(name)
+    if raw is None:
+        return None
+    token = str(raw).strip()
+    if not token:
+        return None
+    return token.lower() not in {"0", "false", "no", "off"}
 
 
 def _env_int(name, default):
@@ -243,6 +262,13 @@ def _safe_float(value):
         return None
 
 
+def _safe_float_or(value, default):
+    parsed = _safe_float(value)
+    if parsed is None:
+        return float(default)
+    return float(parsed)
+
+
 def _persist_backtest_audit_rows(audit_store, run_id, backtest):
     equity_rows = 0
     fill_rows = 0
@@ -304,6 +330,57 @@ def _persist_backtest_audit_rows(audit_store, run_id, backtest):
     return {"equity_rows": equity_rows, "fill_rows": fill_rows}
 
 
+def _resolve_execution_profile(*, low_memory=None, persist_output=None):
+    resolved_low_memory = (
+        _env_bool("LQ_BACKTEST_LOW_MEMORY", False) if low_memory is None else bool(low_memory)
+    )
+    resolved_persist_output = persist_output
+    if resolved_persist_output is None:
+        resolved_persist_output = _env_optional_bool("LQ_BACKTEST_PERSIST_OUTPUT")
+    if resolved_persist_output is None:
+        resolved_persist_output = (
+            False
+            if resolved_low_memory
+            else bool(getattr(BacktestConfig, "PERSIST_OUTPUT", True))
+        )
+    return {
+        "low_memory": bool(resolved_low_memory),
+        "record_history": not bool(resolved_low_memory),
+        "track_metrics": True,
+        "record_trades": not bool(resolved_low_memory),
+        "persist_output": bool(resolved_persist_output),
+    }
+
+
+def _print_low_memory_stats(backtest):
+    fast_stats = {}
+    try:
+        fast_stats = dict(backtest.portfolio.output_summary_stats_fast() or {})
+    except Exception as exc:
+        fast_stats = {"status": f"error: {exc}"}
+
+    final_equity = _safe_float(getattr(backtest.portfolio, "current_holdings", {}).get("total"))
+    trade_count = int(getattr(backtest.portfolio, "trade_count", 0))
+    print("[INFO] Low-memory mode enabled (history/trade logs disabled).")
+    print(
+        "[INFO] Backtest summary: "
+        f"final_equity={final_equity if final_equity is not None else 0.0:.4f}, "
+        f"trade_count={trade_count}, "
+        f"sharpe={_safe_float_or(fast_stats.get('sharpe'), 0.0):.4f}, "
+        f"cagr={_safe_float_or(fast_stats.get('cagr'), 0.0):.6f}, "
+        f"max_drawdown={_safe_float_or(fast_stats.get('max_drawdown'), 0.0):.6f}"
+    )
+    return fast_stats
+
+
+def _persist_low_memory_outputs(backtest, persist_output):
+    if not bool(persist_output):
+        return
+    backtest.portfolio.create_equity_curve_dataframe()
+    backtest.portfolio.output_trade_log(os.path.join("data", "trades.csv"))
+    backtest.portfolio.save_equity_curve(os.path.join("data", "equity.csv"))
+
+
 def run(
     data_source="auto",
     market_db_path=MARKET_DB_PATH,
@@ -311,6 +388,8 @@ def run(
     base_timeframe=BASE_TIMEFRAME,
     auto_collect_db=AUTO_COLLECT_DB,
     run_id="",
+    low_memory=None,
+    persist_output=None,
 ):
     print("------------------------------------------------")
     print(f"Running Backtest for {SYMBOL_LIST}")
@@ -321,6 +400,10 @@ def run(
     backtest_run_id = str(run_id or "").strip() or str(uuid.uuid4())
     timeframe_token = _enforce_1s_base_timeframe(str(base_timeframe))
     audit_store = AuditStore(BaseConfig.POSTGRES_DSN)
+    execution_profile = _resolve_execution_profile(
+        low_memory=low_memory,
+        persist_output=persist_output,
+    )
     audit_store.start_run(
         mode="backtest",
         metadata={
@@ -333,6 +416,7 @@ def run(
             "base_timeframe": str(timeframe_token),
             "strategy_timeframe": str(BaseConfig.TIMEFRAME),
             "auto_collect_db": bool(auto_collect_db),
+            **execution_profile,
         },
         run_id=backtest_run_id,
     )
@@ -386,12 +470,18 @@ def run(
                 data_handler_cls=HistoricCSVDataHandler,
                 execution_handler_cls=SimulatedExecutionHandler,
                 portfolio_cls=Portfolio,
-                record_history=True,
-                track_metrics=True,
-                record_trades=True,
+                record_history=bool(execution_profile["record_history"]),
+                track_metrics=bool(execution_profile["track_metrics"]),
+                record_trades=bool(execution_profile["record_trades"]),
             )
-            persist_output = bool(getattr(backtest.config, "PERSIST_OUTPUT", True))
-            backtest._output_performance(persist_output=persist_output, verbose=True)
+            if bool(execution_profile["low_memory"]):
+                _persist_low_memory_outputs(backtest, execution_profile["persist_output"])
+                _print_low_memory_stats(backtest)
+            else:
+                backtest._output_performance(
+                    persist_output=bool(execution_profile["persist_output"]),
+                    verbose=True,
+                )
         else:
             backtest = Backtest(
                 csv_dir=CSV_DIR,
@@ -404,9 +494,19 @@ def run(
                 strategy_cls=STRATEGY_CLASS,
                 strategy_params=STRATEGY_PARAMS,
                 data_dict=data_dict,
+                record_history=bool(execution_profile["record_history"]),
+                track_metrics=bool(execution_profile["track_metrics"]),
+                record_trades=bool(execution_profile["record_trades"]),
                 strategy_timeframe=str(BaseConfig.TIMEFRAME),
             )
-            backtest.simulate_trading()
+            if bool(execution_profile["low_memory"]):
+                backtest.simulate_trading(output=False)
+                _persist_low_memory_outputs(backtest, execution_profile["persist_output"])
+                _print_low_memory_stats(backtest)
+            else:
+                backtest.simulate_trading(
+                    persist_output=bool(execution_profile["persist_output"]),
+                )
 
         persisted_counts = _persist_backtest_audit_rows(audit_store, backtest_run_id, backtest)
         audit_store.end_run(
@@ -461,6 +561,37 @@ if __name__ == "__main__":
         action="store_true",
         help="Disable automatic DB market-data collection before loading.",
     )
+    low_memory_group = parser.add_mutually_exclusive_group()
+    low_memory_group.add_argument(
+        "--low-memory",
+        dest="low_memory",
+        action="store_true",
+        help=(
+            "Use low-memory execution profile (record_history=False, record_trades=False, "
+            "track_metrics=True)."
+        ),
+    )
+    low_memory_group.add_argument(
+        "--no-low-memory",
+        dest="low_memory",
+        action="store_false",
+        help="Explicitly disable low-memory profile even if LQ_BACKTEST_LOW_MEMORY is set.",
+    )
+    parser.set_defaults(low_memory=None)
+    persist_group = parser.add_mutually_exclusive_group()
+    persist_group.add_argument(
+        "--persist-output",
+        dest="persist_output",
+        action="store_true",
+        help="Force writing CSV outputs (equity/trades).",
+    )
+    persist_group.add_argument(
+        "--no-persist-output",
+        dest="persist_output",
+        action="store_false",
+        help="Force disabling CSV outputs (equity/trades).",
+    )
+    parser.set_defaults(persist_output=None)
     args = parser.parse_args()
     run(
         data_source=args.data_source,
@@ -469,4 +600,6 @@ if __name__ == "__main__":
         base_timeframe=_normalize_timeframe_or_default(args.base_timeframe, "1s"),
         auto_collect_db=(not bool(args.no_auto_collect_db) and bool(AUTO_COLLECT_DB)),
         run_id=args.run_id,
+        low_memory=args.low_memory,
+        persist_output=args.persist_output,
     )

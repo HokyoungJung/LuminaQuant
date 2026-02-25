@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from lumina_quant.events import SignalEvent
 from lumina_quant.indicators import safe_float, vwap_deviation, vwap_from_sums
 from lumina_quant.strategy import Strategy
+from lumina_quant.tuning import HyperParam, resolve_params_from_schema
 
 
 @dataclass(slots=True)
@@ -26,6 +27,49 @@ class _SymbolState:
 class VwapReversionStrategy(Strategy):
     """Revert-to-VWAP strategy using rolling deviation thresholds."""
 
+    @classmethod
+    def get_param_schema(cls) -> dict[str, HyperParam]:
+        return {
+            "window": HyperParam.integer(
+                "window",
+                default=64,
+                low=8,
+                high=8192,
+                optuna={"type": "int", "low": 16, "high": 256},
+                grid=[24, 48, 64, 96, 128],
+            ),
+            "entry_dev": HyperParam.floating(
+                "entry_dev",
+                default=0.02,
+                low=0.001,
+                high=2.0,
+                optuna={"type": "float", "low": 0.002, "high": 0.08, "step": 0.001},
+                grid=[0.006, 0.01, 0.015, 0.02, 0.03],
+            ),
+            "exit_dev": HyperParam.floating(
+                "exit_dev",
+                default=0.005,
+                low=0.0,
+                high=2.0,
+                optuna={"type": "float", "low": 0.0, "high": 0.03, "step": 0.001},
+                grid=[0.0, 0.002, 0.004, 0.006],
+            ),
+            "stop_loss_pct": HyperParam.floating(
+                "stop_loss_pct",
+                default=0.03,
+                low=0.001,
+                high=0.5,
+                optuna={"type": "float", "low": 0.005, "high": 0.12, "step": 0.005},
+                grid=[0.01, 0.02, 0.03, 0.05],
+            ),
+            "allow_short": HyperParam.boolean(
+                "allow_short",
+                default=True,
+                optuna={"type": "categorical", "choices": [True, False]},
+                grid=[True, False],
+            ),
+        }
+
     def __init__(
         self,
         bars,
@@ -39,11 +83,22 @@ class VwapReversionStrategy(Strategy):
         self.bars = bars
         self.events = events
         self.symbol_list = list(self.bars.symbol_list)
-        self.window = max(8, int(window))
-        self.entry_dev = max(0.001, float(entry_dev))
-        self.exit_dev = max(0.0, float(exit_dev))
-        self.stop_loss_pct = min(0.5, max(0.001, float(stop_loss_pct)))
-        self.allow_short = bool(allow_short)
+        resolved = resolve_params_from_schema(
+            self.get_param_schema(),
+            {
+                "window": window,
+                "entry_dev": entry_dev,
+                "exit_dev": exit_dev,
+                "stop_loss_pct": stop_loss_pct,
+                "allow_short": allow_short,
+            },
+            keep_unknown=False,
+        )
+        self.window = int(resolved["window"])
+        self.entry_dev = float(resolved["entry_dev"])
+        self.exit_dev = float(resolved["exit_dev"])
+        self.stop_loss_pct = float(resolved["stop_loss_pct"])
+        self.allow_short = bool(resolved["allow_short"])
 
         self._state = {
             symbol: _SymbolState(

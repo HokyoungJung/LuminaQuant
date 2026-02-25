@@ -10,6 +10,7 @@ from statistics import mean
 from lumina_quant.events import SignalEvent
 from lumina_quant.indicators import momentum_return, safe_float, safe_int, time_key
 from lumina_quant.strategy import Strategy
+from lumina_quant.tuning import HyperParam, resolve_params_from_schema
 
 LOGGER = logging.getLogger(__name__)
 
@@ -28,6 +29,68 @@ class TopCapTimeSeriesMomentumStrategy(Strategy):
     - Uses only bars available at signal timestamp.
     - Orders are still executed by the engine on next bar open.
     """
+
+    @classmethod
+    def get_param_schema(cls) -> dict[str, HyperParam]:
+        return {
+            "lookback_bars": HyperParam.integer(
+                "lookback_bars",
+                default=16,
+                low=3,
+                high=8192,
+                tunable=False,
+            ),
+            "rebalance_bars": HyperParam.integer(
+                "rebalance_bars",
+                default=16,
+                low=1,
+                high=8192,
+                tunable=False,
+            ),
+            "signal_threshold": HyperParam.floating(
+                "signal_threshold",
+                default=0.04,
+                low=0.0,
+                high=1.0,
+                tunable=False,
+            ),
+            "stop_loss_pct": HyperParam.floating(
+                "stop_loss_pct",
+                default=0.08,
+                low=0.01,
+                high=0.5,
+                tunable=False,
+            ),
+            "max_longs": HyperParam.integer(
+                "max_longs",
+                default=6,
+                low=1,
+                high=256,
+                tunable=False,
+            ),
+            "max_shorts": HyperParam.integer(
+                "max_shorts",
+                default=5,
+                low=1,
+                high=256,
+                tunable=False,
+            ),
+            "min_price": HyperParam.floating(
+                "min_price",
+                default=0.10,
+                low=0.0,
+                high=1000000.0,
+                tunable=False,
+            ),
+            "btc_regime_ma": HyperParam.integer(
+                "btc_regime_ma",
+                default=48,
+                low=0,
+                high=8192,
+                tunable=False,
+            ),
+            "btc_symbol": HyperParam.string("btc_symbol", default="BTC/USDT", tunable=False),
+        }
 
     def __init__(
         self,
@@ -49,16 +112,33 @@ class TopCapTimeSeriesMomentumStrategy(Strategy):
         if not self.symbol_list:
             raise ValueError("TopCapTimeSeriesMomentumStrategy requires at least one symbol.")
 
-        self.lookback_bars = max(3, int(lookback_bars))
-        self.rebalance_bars = max(1, int(rebalance_bars))
-        self.signal_threshold = max(0.0, float(signal_threshold))
-        self.stop_loss_pct = min(0.50, max(0.01, float(stop_loss_pct)))
-        self.max_longs = max(1, int(max_longs))
-        self.max_shorts = max(1, int(max_shorts))
-        self.min_price = max(0.0, float(min_price))
-        self.btc_regime_ma = max(0, int(btc_regime_ma))
+        resolved = resolve_params_from_schema(
+            self.get_param_schema(),
+            {
+                "lookback_bars": lookback_bars,
+                "rebalance_bars": rebalance_bars,
+                "signal_threshold": signal_threshold,
+                "stop_loss_pct": stop_loss_pct,
+                "max_longs": max_longs,
+                "max_shorts": max_shorts,
+                "min_price": min_price,
+                "btc_regime_ma": btc_regime_ma,
+                "btc_symbol": btc_symbol,
+            },
+            keep_unknown=False,
+        )
+
+        self.lookback_bars = int(resolved["lookback_bars"])
+        self.rebalance_bars = int(resolved["rebalance_bars"])
+        self.signal_threshold = float(resolved["signal_threshold"])
+        self.stop_loss_pct = float(resolved["stop_loss_pct"])
+        self.max_longs = int(resolved["max_longs"])
+        self.max_shorts = int(resolved["max_shorts"])
+        self.min_price = float(resolved["min_price"])
+        self.btc_regime_ma = int(resolved["btc_regime_ma"])
 
         default_btc = "BTC/USDT" if "BTC/USDT" in self.symbol_list else self.symbol_list[0]
+        btc_symbol = resolved["btc_symbol"]
         self.btc_symbol = str(btc_symbol) if btc_symbol else default_btc
         if self.btc_symbol not in self.symbol_list:
             self.btc_symbol = default_btc

@@ -32,7 +32,13 @@ def iter_chunk_windows(
     return windows
 
 
-def _capture_backtest_state(backtest: Backtest) -> dict[str, Any]:
+def _capture_backtest_state(
+    backtest: Backtest,
+    *,
+    record_history: bool,
+    track_metrics: bool,
+    record_trades: bool,
+) -> dict[str, Any]:
     strategy_state: dict[str, Any] = {}
     get_strategy_state = getattr(backtest.strategy, "get_state", None)
     if callable(get_strategy_state):
@@ -54,19 +60,23 @@ def _capture_backtest_state(backtest: Backtest) -> dict[str, Any]:
         if isinstance(raw, dict):
             execution_state = raw
 
-    return {
+    carry: dict[str, Any] = {
         "strategy_state": strategy_state,
         "portfolio_state": portfolio_state,
         "execution_state": execution_state,
-        "all_positions": getattr(backtest.portfolio, "all_positions", []),
-        "all_holdings": getattr(backtest.portfolio, "all_holdings", []),
-        "trades": getattr(backtest.portfolio, "trades", []),
         "trade_count": int(getattr(backtest.portfolio, "trade_count", 0)),
-        "metric_totals": getattr(backtest.portfolio, "_metric_totals", []),
-        "metric_benchmarks": getattr(backtest.portfolio, "_metric_benchmarks", []),
         "active_orders": deepcopy(getattr(backtest.execution_handler, "active_orders", [])),
         "order_seq": int(getattr(backtest.execution_handler, "_order_seq", 0)),
     }
+    if bool(record_history):
+        carry["all_positions"] = getattr(backtest.portfolio, "all_positions", [])
+        carry["all_holdings"] = getattr(backtest.portfolio, "all_holdings", [])
+    if bool(record_trades):
+        carry["trades"] = getattr(backtest.portfolio, "trades", [])
+    if bool(track_metrics):
+        carry["metric_totals"] = getattr(backtest.portfolio, "_metric_totals", [])
+        carry["metric_benchmarks"] = getattr(backtest.portfolio, "_metric_benchmarks", [])
+    return carry
 
 
 def _restore_backtest_state(backtest: Backtest, carry: dict[str, Any]) -> None:
@@ -158,7 +168,12 @@ def run_backtest_chunked(
             _restore_backtest_state(backtest, carry)
 
         backtest.simulate_trading(output=False)
-        carry = _capture_backtest_state(backtest)
+        carry = _capture_backtest_state(
+            backtest,
+            record_history=bool(record_history),
+            track_metrics=bool(track_metrics),
+            record_trades=bool(record_trades),
+        )
         final_backtest = backtest
 
     if final_backtest is not None:

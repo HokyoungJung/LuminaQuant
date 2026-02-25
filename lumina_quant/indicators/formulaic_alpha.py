@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import ast
 import math
 import re
+from collections.abc import Mapping
+from dataclasses import dataclass
+from functools import lru_cache
 from itertools import pairwise
 
 import numpy as np
@@ -11,16 +15,41 @@ import pandas as pd
 
 from .formulaic_definitions import ALPHA_FORMULAS
 from .formulaic_operators import (
+    as_window,
+    decay_linear_series,
+    delay_series,
     delta,
+    delta_series,
+    indneutralize_series,
     rank_pct,
+    rank_series,
     returns_from_close,
+    scale_series,
     signed_power,
+    signed_power_series,
+    to_series,
     ts_argmax,
+    ts_argmax_series,
+    ts_argmin_series,
+    ts_corr_series,
     ts_correlation,
+    ts_cov_series,
     ts_covariance,
+    ts_max_series,
+    ts_min_series,
+    ts_product_series,
     ts_rank,
+    ts_rank_series,
     ts_stddev,
+    ts_stddev_series,
+    ts_sum_series,
+    where_series,
 )
+
+try:  # Optional vectorized backend.
+    import polars as pl
+except Exception:  # pragma: no cover - optional dependency behavior
+    pl = None
 
 
 def alpha_001(closes, *, std_window: int = 20, argmax_window: int = 5) -> float | None:
@@ -565,32 +594,11 @@ def _last_finite_value(series: pd.Series) -> float | None:
 
 
 def _to_series(value, index: pd.Index) -> pd.Series:
-    if isinstance(value, pd.Series):
-        return value.astype(float)
-    if np.isscalar(value):
-        try:
-            scalar_arr = np.asarray(value, dtype=float)
-            scalar = float(scalar_arr.reshape(-1)[0]) if scalar_arr.size > 0 else float("nan")
-        except (TypeError, ValueError):
-            scalar = float("nan")
-        return pd.Series(scalar, index=index, dtype=float)
-    arr = np.asarray(list(value), dtype=float)
-    n = min(len(index), arr.size)
-    out = np.full(len(index), np.nan, dtype=float)
-    if n > 0:
-        out[-n:] = arr[-n:]
-    return pd.Series(out, index=index, dtype=float)
+    return to_series(value, index)
 
 
 def _as_window(value) -> int:
-    if isinstance(value, pd.Series):
-        value = _last_finite_value(value.dropna())
-    if value is None:
-        return 1
-    try:
-        return max(1, int(float(value)))
-    except (TypeError, ValueError):
-        return 1
+    return as_window(value)
 
 
 def _make_context(
@@ -717,7 +725,112 @@ def _convert_ternary(expr: str) -> str:
     return text.strip()
 
 
-def _compile_formula(expr: str) -> str:
+@dataclass(frozen=True, slots=True)
+class _ConstantSlot:
+    key: str
+    default: float
+
+
+@dataclass(frozen=True, slots=True)
+class _CompiledFormula:
+    alpha_id: int
+    source: str
+    normalized: str
+    tree: ast.Expression
+    constant_slots: dict[int, _ConstantSlot]
+    polars_capable: bool
+
+
+class ParamRegistry:
+    """Key/value store for runtime-tunable formula constants."""
+
+    def __init__(self, initial: Mapping[str, float] | None = None):
+        self._values: dict[str, float] = {}
+        if initial:
+            self.update(initial)
+
+    def update(self, mapping: Mapping[str, float]) -> None:
+        for key, value in mapping.items():
+            self._values[str(key)] = float(value)
+
+    def set(self, key: str, value: float) -> None:
+        self._values[str(key)] = float(value)
+
+    def get(self, key: str, default: float) -> float:
+        return float(self._values.get(str(key), default))
+
+    def clear_prefix(self, prefix: str = "alpha101.") -> None:
+        prefix_s = str(prefix)
+        keys = [key for key in self._values if key.startswith(prefix_s)]
+        for key in keys:
+            self._values.pop(key, None)
+
+    def snapshot(self, prefix: str = "") -> dict[str, float]:
+        prefix_s = str(prefix)
+        if not prefix_s:
+            return dict(self._values)
+        return {key: value for key, value in self._values.items() if key.startswith(prefix_s)}
+
+
+ALPHA101_PARAM_REGISTRY = ParamRegistry()
+_EXEMPT_CONSTANTS = frozenset({-1.0, 0.0, 1.0})
+_ADV_NAME_RE = re.compile(r"^adv\d+$")
+_ROOT_NAMES = frozenset(
+    {
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "vwap",
+        "returns",
+        "cap",
+        "sector",
+        "industry",
+        "subindustry",
+    }
+)
+_CALL_NAMES = frozenset(
+    {
+        "abs",
+        "log",
+        "sign",
+        "rank",
+        "ts_rank",
+        "ts_sum",
+        "ts_stddev",
+        "ts_corr",
+        "ts_cov",
+        "ts_min",
+        "ts_max",
+        "ts_product",
+        "delay",
+        "delta",
+        "ts_argmax",
+        "ts_argmin",
+        "decay_linear",
+        "scale",
+        "signed_power",
+        "where",
+        "indneutralize",
+        "max",
+        "min",
+    }
+)
+_POLARS_CALLS = frozenset({"abs", "log", "sign", "where", "max", "min"})
+
+
+def set_alpha101_param_overrides(overrides: Mapping[str, float]) -> None:
+    """Update global registry for Alpha101 tunable constants."""
+    ALPHA101_PARAM_REGISTRY.update(overrides)
+
+
+def clear_alpha101_param_overrides(prefix: str = "alpha101.") -> None:
+    """Clear global Alpha101 overrides by prefix."""
+    ALPHA101_PARAM_REGISTRY.clear_prefix(prefix=prefix)
+
+
+def _normalize_formula(expr: str) -> str:
     code = _convert_ternary(expr)
     replacements = {
         "Ts_ArgMax": "ts_argmax",
@@ -736,143 +849,445 @@ def _compile_formula(expr: str) -> str:
         code = code.replace(source, target)
 
     code = re.sub(r"\bsum\(", "ts_sum(", code)
-    code = re.sub(r"\bstddev\(", "ts_stddev_s(", code)
-    code = re.sub(r"\bcorrelation\(", "ts_corr_s(", code)
-    code = re.sub(r"\bcovariance\(", "ts_cov_s(", code)
-    code = re.sub(r"\bproduct\(", "ts_product_s(", code)
+    code = re.sub(r"\bstddev\(", "ts_stddev(", code)
+    code = re.sub(r"\bcorrelation\(", "ts_corr(", code)
+    code = re.sub(r"\bcovariance\(", "ts_cov(", code)
+    code = re.sub(r"\bproduct\(", "ts_product(", code)
     code = code.replace("^", "**")
     code = code.replace("||", "|")
     code = code.replace("&&", "&")
     return code
 
 
+def _is_exempt_constant(value: float) -> bool:
+    return any(abs(float(value) - float(exempt)) <= 1e-12 for exempt in _EXEMPT_CONSTANTS)
+
+
+class _FormulaValidator(ast.NodeVisitor):
+    def __init__(self, alpha_id: int, constant_slots: dict[int, _ConstantSlot]):
+        self.alpha_id = int(alpha_id)
+        self.constant_slots = constant_slots
+        self.constant_index = 0
+
+    def generic_visit(self, node):  # type: ignore[override]
+        raise ValueError(f"Unsupported formula node: {type(node).__name__}")
+
+    def visit_BinOp(self, node: ast.BinOp) -> None:
+        if not isinstance(
+            node.op, ast.Add | ast.Sub | ast.Mult | ast.Div | ast.Pow | ast.BitAnd | ast.BitOr
+        ):
+            raise ValueError(f"Unsupported binary operator: {type(node.op).__name__}")
+        self.visit(node.left)
+        self.visit(node.right)
+
+    def visit_UnaryOp(self, node: ast.UnaryOp) -> None:
+        if not isinstance(node.op, ast.UAdd | ast.USub | ast.Not | ast.Invert):
+            raise ValueError(f"Unsupported unary operator: {type(node.op).__name__}")
+        self.visit(node.operand)
+
+    def visit_BoolOp(self, node: ast.BoolOp) -> None:
+        if not isinstance(node.op, ast.And | ast.Or):
+            raise ValueError(f"Unsupported boolean operator: {type(node.op).__name__}")
+        for value in node.values:
+            self.visit(value)
+
+    def visit_Compare(self, node: ast.Compare) -> None:
+        for op in node.ops:
+            if not isinstance(op, ast.Lt | ast.LtE | ast.Gt | ast.GtE | ast.Eq | ast.NotEq):
+                raise ValueError(f"Unsupported compare operator: {type(op).__name__}")
+        self.visit(node.left)
+        for comparator in node.comparators:
+            self.visit(comparator)
+
+    def visit_Call(self, node: ast.Call) -> None:
+        if not isinstance(node.func, ast.Name):
+            raise ValueError("Only direct function calls are allowed.")
+        func_name = node.func.id
+        if func_name not in _CALL_NAMES:
+            raise ValueError(f"Unsupported formula function: {func_name}")
+        for arg in node.args:
+            self.visit(arg)
+        for keyword in node.keywords:
+            self.visit(keyword.value)
+
+    def visit_Name(self, node: ast.Name) -> None:
+        name = node.id
+        if name in _CALL_NAMES or name in _ROOT_NAMES or _ADV_NAME_RE.match(name):
+            return
+        raise ValueError(f"Unsupported formula symbol: {name}")
+
+    def visit_Constant(self, node: ast.Constant) -> None:
+        if not isinstance(node.value, int | float) or isinstance(node.value, bool):
+            raise ValueError(f"Unsupported constant type: {type(node.value).__name__}")
+        value = float(node.value)
+        if _is_exempt_constant(value):
+            return
+        self.constant_index += 1
+        key = f"alpha101.{self.alpha_id}.const.{self.constant_index:03d}"
+        self.constant_slots[id(node)] = _ConstantSlot(key=key, default=value)
+
+
+def _polars_supported(node: ast.AST) -> bool:
+    if isinstance(node, ast.Constant):
+        return isinstance(node.value, int | float) and not isinstance(node.value, bool)
+    if isinstance(node, ast.Name):
+        return node.id in _ROOT_NAMES or bool(_ADV_NAME_RE.match(node.id))
+    if isinstance(node, ast.UnaryOp):
+        if not isinstance(node.op, ast.UAdd | ast.USub):
+            return False
+        return _polars_supported(node.operand)
+    if isinstance(node, ast.BinOp):
+        if not isinstance(node.op, ast.Add | ast.Sub | ast.Mult | ast.Div | ast.Pow):
+            return False
+        return _polars_supported(node.left) and _polars_supported(node.right)
+    if isinstance(node, ast.Compare):
+        if len(node.ops) != 1 or len(node.comparators) != 1:
+            return False
+        if not isinstance(node.ops[0], ast.Lt | ast.LtE | ast.Gt | ast.GtE | ast.Eq | ast.NotEq):
+            return False
+        return _polars_supported(node.left) and _polars_supported(node.comparators[0])
+    if isinstance(node, ast.Call):
+        if not isinstance(node.func, ast.Name):
+            return False
+        name = node.func.id
+        if name not in _POLARS_CALLS:
+            return False
+        if name in {"max", "min"} and len(node.args) != 2:
+            return False
+        if name == "where" and len(node.args) != 3:
+            return False
+        if name in {"abs", "log", "sign"} and len(node.args) != 1:
+            return False
+        return all(_polars_supported(arg) for arg in node.args)
+    return False
+
+
+@lru_cache(maxsize=256)
+def _compile_formula(alpha_id: int, expr: str) -> _CompiledFormula:
+    normalized = _normalize_formula(expr)
+    parsed = ast.parse(normalized, mode="eval")
+    if not isinstance(parsed, ast.Expression):
+        raise ValueError("Formula parser expected expression tree.")
+    slots: dict[int, _ConstantSlot] = {}
+    _FormulaValidator(alpha_id, slots).visit(parsed.body)
+    return _CompiledFormula(
+        alpha_id=int(alpha_id),
+        source=expr,
+        normalized=normalized,
+        tree=parsed,
+        constant_slots=slots,
+        polars_capable=_polars_supported(parsed.body),
+    )
+
+
+def list_alpha101_tunable_params(alpha_id: int | None = None) -> dict[str, float]:
+    """Return discovered tunable constant keys with defaults."""
+    out: dict[str, float] = {}
+    if alpha_id is None:
+        formula_ids = sorted(ALPHA_FORMULAS)
+    else:
+        formula_ids = [int(alpha_id)]
+    for alpha_key in formula_ids:
+        formula = ALPHA_FORMULAS.get(alpha_key)
+        if formula is None:
+            continue
+        compiled = _compile_formula(alpha_key, formula)
+        for slot in compiled.constant_slots.values():
+            out[slot.key] = float(slot.default)
+    return out
+
+
+def _resolve_constant(
+    node: ast.Constant,
+    *,
+    compiled: _CompiledFormula,
+    param_overrides: Mapping[str, float] | None,
+) -> float:
+    base = float(node.value)
+    slot = compiled.constant_slots.get(id(node))
+    if slot is None:
+        return base
+    if param_overrides is not None and slot.key in param_overrides:
+        try:
+            return float(param_overrides[slot.key])
+        except (TypeError, ValueError):
+            return slot.default
+    return ALPHA101_PARAM_REGISTRY.get(slot.key, slot.default)
+
+
+def _bool_series(value, index: pd.Index) -> pd.Series:
+    return _to_series(value, index).fillna(0.0).astype(bool)
+
+
+def _apply_compare(op: ast.cmpop, left, right, *, index: pd.Index):
+    if isinstance(op, ast.Lt):
+        return left < right
+    if isinstance(op, ast.LtE):
+        return left <= right
+    if isinstance(op, ast.Gt):
+        return left > right
+    if isinstance(op, ast.GtE):
+        return left >= right
+    if isinstance(op, ast.Eq):
+        return left == right
+    if isinstance(op, ast.NotEq):
+        return left != right
+    raise ValueError(f"Unsupported comparison operator: {type(op).__name__}")
+
+
+def _eval_ast_node(
+    node: ast.AST,
+    *,
+    env: dict[str, object],
+    compiled: _CompiledFormula,
+    index: pd.Index,
+    param_overrides: Mapping[str, float] | None,
+):
+    if isinstance(node, ast.Constant):
+        return _resolve_constant(node, compiled=compiled, param_overrides=param_overrides)
+    if isinstance(node, ast.Name):
+        return env[node.id]
+    if isinstance(node, ast.UnaryOp):
+        operand = _eval_ast_node(
+            node.operand,
+            env=env,
+            compiled=compiled,
+            index=index,
+            param_overrides=param_overrides,
+        )
+        if isinstance(node.op, ast.USub):
+            return -operand
+        if isinstance(node.op, ast.UAdd):
+            return +operand
+        if isinstance(node.op, ast.Not | ast.Invert):
+            return ~_bool_series(operand, index)
+        raise ValueError(f"Unsupported unary operator: {type(node.op).__name__}")
+    if isinstance(node, ast.BinOp):
+        left = _eval_ast_node(
+            node.left, env=env, compiled=compiled, index=index, param_overrides=param_overrides
+        )
+        right = _eval_ast_node(
+            node.right, env=env, compiled=compiled, index=index, param_overrides=param_overrides
+        )
+        if isinstance(node.op, ast.Add):
+            return left + right
+        if isinstance(node.op, ast.Sub):
+            return left - right
+        if isinstance(node.op, ast.Mult):
+            return left * right
+        if isinstance(node.op, ast.Div):
+            return left / right
+        if isinstance(node.op, ast.Pow):
+            return left**right
+        if isinstance(node.op, ast.BitAnd):
+            return _bool_series(left, index) & _bool_series(right, index)
+        if isinstance(node.op, ast.BitOr):
+            return _bool_series(left, index) | _bool_series(right, index)
+        raise ValueError(f"Unsupported binary operator: {type(node.op).__name__}")
+    if isinstance(node, ast.BoolOp):
+        values = [
+            _eval_ast_node(v, env=env, compiled=compiled, index=index, param_overrides=param_overrides)
+            for v in node.values
+        ]
+        if not values:
+            return False
+        result = _bool_series(values[0], index)
+        for value in values[1:]:
+            if isinstance(node.op, ast.And):
+                result = result & _bool_series(value, index)
+            elif isinstance(node.op, ast.Or):
+                result = result | _bool_series(value, index)
+            else:
+                raise ValueError(f"Unsupported boolean op: {type(node.op).__name__}")
+        return result
+    if isinstance(node, ast.Compare):
+        left = _eval_ast_node(
+            node.left, env=env, compiled=compiled, index=index, param_overrides=param_overrides
+        )
+        result = None
+        for op, comparator in zip(node.ops, node.comparators, strict=False):
+            right = _eval_ast_node(
+                comparator, env=env, compiled=compiled, index=index, param_overrides=param_overrides
+            )
+            current = _apply_compare(op, left, right, index=index)
+            result = current if result is None else (_bool_series(result, index) & _bool_series(current, index))
+            left = right
+        return result
+    if isinstance(node, ast.Call):
+        if not isinstance(node.func, ast.Name):
+            raise ValueError("Unsupported callable node.")
+        fn_name = node.func.id
+        fn = env[fn_name]
+        args = [
+            _eval_ast_node(arg, env=env, compiled=compiled, index=index, param_overrides=param_overrides)
+            for arg in node.args
+        ]
+        kwargs = {
+            kw.arg: _eval_ast_node(
+                kw.value,
+                env=env,
+                compiled=compiled,
+                index=index,
+                param_overrides=param_overrides,
+            )
+            for kw in node.keywords
+            if kw.arg is not None
+        }
+        return fn(*args, **kwargs)
+    raise ValueError(f"Unsupported AST node: {type(node).__name__}")
+
+
+def _build_polars_expr(
+    node: ast.AST,
+    *,
+    compiled: _CompiledFormula,
+    param_overrides: Mapping[str, float] | None,
+):
+    if pl is None:
+        raise RuntimeError("Polars backend unavailable.")
+    if isinstance(node, ast.Constant):
+        return pl.lit(_resolve_constant(node, compiled=compiled, param_overrides=param_overrides))
+    if isinstance(node, ast.Name):
+        return pl.col(node.id)
+    if isinstance(node, ast.UnaryOp):
+        operand = _build_polars_expr(node.operand, compiled=compiled, param_overrides=param_overrides)
+        if isinstance(node.op, ast.USub):
+            return -operand
+        if isinstance(node.op, ast.UAdd):
+            return operand
+        raise NotImplementedError
+    if isinstance(node, ast.BinOp):
+        left = _build_polars_expr(node.left, compiled=compiled, param_overrides=param_overrides)
+        right = _build_polars_expr(node.right, compiled=compiled, param_overrides=param_overrides)
+        if isinstance(node.op, ast.Add):
+            return left + right
+        if isinstance(node.op, ast.Sub):
+            return left - right
+        if isinstance(node.op, ast.Mult):
+            return left * right
+        if isinstance(node.op, ast.Div):
+            return left / right
+        if isinstance(node.op, ast.Pow):
+            return left.pow(right)
+        raise NotImplementedError
+    if isinstance(node, ast.Compare):
+        if len(node.ops) != 1 or len(node.comparators) != 1:
+            raise NotImplementedError
+        left = _build_polars_expr(node.left, compiled=compiled, param_overrides=param_overrides)
+        right = _build_polars_expr(
+            node.comparators[0], compiled=compiled, param_overrides=param_overrides
+        )
+        op = node.ops[0]
+        if isinstance(op, ast.Lt):
+            return left < right
+        if isinstance(op, ast.LtE):
+            return left <= right
+        if isinstance(op, ast.Gt):
+            return left > right
+        if isinstance(op, ast.GtE):
+            return left >= right
+        if isinstance(op, ast.Eq):
+            return left == right
+        if isinstance(op, ast.NotEq):
+            return left != right
+        raise NotImplementedError
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+        name = node.func.id
+        args = [
+            _build_polars_expr(arg, compiled=compiled, param_overrides=param_overrides)
+            for arg in node.args
+        ]
+        if name == "abs":
+            return args[0].abs()
+        if name == "log":
+            return args[0].log()
+        if name == "sign":
+            return args[0].sign()
+        if name == "where":
+            return pl.when(args[0]).then(args[1]).otherwise(args[2])
+        if name == "max":
+            return pl.max_horizontal(args[0], args[1])
+        if name == "min":
+            return pl.min_horizontal(args[0], args[1])
+    raise NotImplementedError
+
+
 def _eval_formula(
-    expr: str, context: dict[str, pd.Series], *, rank_window: int = 20
+    alpha_id: int,
+    expr: str,
+    context: dict[str, pd.Series],
+    *,
+    rank_window: int = 20,
+    param_overrides: Mapping[str, float] | None = None,
+    vector_backend: str = "auto",
 ) -> float | None:
+    compiled = _compile_formula(alpha_id, expr)
     index = next(iter(context.values())).index
 
-    def rank(series):
-        s = _to_series(series, index)
-        w = max(2, int(rank_window))
-        return s.rolling(w).apply(lambda a: (pd.Series(a).rank(pct=True).iloc[-1]), raw=False)
+    backend = str(vector_backend).strip().lower()
+    if backend not in {"auto", "numpy", "polars"}:
+        raise ValueError("vector_backend must be one of: auto, numpy, polars")
 
-    def ts_rank_s(series, window):
-        s = _to_series(series, index)
-        w = _as_window(window)
-        return s.rolling(w).apply(lambda a: (pd.Series(a).rank(pct=True).iloc[-1]), raw=False)
-
-    def ts_sum_s(series, window):
-        s = _to_series(series, index)
-        return s.rolling(_as_window(window)).sum()
-
-    def ts_stddev_s(series, window):
-        s = _to_series(series, index)
-        return s.rolling(max(2, _as_window(window))).std()
-
-    def ts_corr_s(left, right, window):
-        left_series = _to_series(left, index)
-        right_series = _to_series(right, index)
-        return left_series.rolling(max(2, _as_window(window))).corr(right_series)
-
-    def ts_cov_s(left, right, window):
-        left_series = _to_series(left, index)
-        right_series = _to_series(right, index)
-        return left_series.rolling(max(2, _as_window(window))).cov(right_series)
-
-    def ts_min_s(series, window):
-        s = _to_series(series, index)
-        return s.rolling(_as_window(window)).min()
-
-    def ts_max_s(series, window):
-        s = _to_series(series, index)
-        return s.rolling(_as_window(window)).max()
-
-    def ts_product_s(series, window):
-        s = _to_series(series, index)
-        return s.rolling(_as_window(window)).apply(np.prod, raw=True)
-
-    def delay_s(series, period=1):
-        s = _to_series(series, index)
-        return s.shift(_as_window(period))
-
-    def delta_s(series, period=1):
-        s = _to_series(series, index)
-        return s - s.shift(_as_window(period))
-
-    def ts_argmax_s(series, window):
-        s = _to_series(series, index)
-        return s.rolling(_as_window(window)).apply(lambda a: float(np.argmax(a) + 1), raw=True)
-
-    def ts_argmin_s(series, window):
-        s = _to_series(series, index)
-        return s.rolling(_as_window(window)).apply(lambda a: float(np.argmin(a) + 1), raw=True)
-
-    def decay_linear_s(series, period=10):
-        s = _to_series(series, index)
-        p = _as_window(period)
-        weights = np.arange(1, p + 1, dtype=float)
-        denom = float(weights.sum())
-        return s.rolling(p).apply(lambda a: float(np.dot(a, weights) / denom), raw=True)
-
-    def scale_s(series, a=1.0):
-        s = _to_series(series, index)
-        denom = s.abs().rolling(max(2, int(rank_window))).sum()
-        denom_arr = np.asarray(denom, dtype=float)
-        denom_arr = np.where(denom_arr == 0.0, np.nan, denom_arr)
-        return (float(a) * s).divide(pd.Series(denom_arr, index=index, dtype=float))
-
-    def signed_power_s(series, power):
-        s = _to_series(series, index)
-        p = _to_series(power, index)
-        return np.sign(s) * np.power(np.abs(s), p)
-
-    def where(cond, left, right):
-        cond_series = _to_series(cond, index)
-        cond_clean = cond_series.where(cond_series.notna(), 0.0)
-        c = cond_clean.astype(bool)
-        left_series = _to_series(left, index)
-        right_series = _to_series(right, index)
-        return pd.Series(np.where(c, left_series, right_series), index=index, dtype=float)
-
-    def indneutralize(series, group):
-        s = _to_series(series, index)
-        g = _to_series(group, index)
-        frame = pd.DataFrame({"s": s, "g": g})
-        centered = frame["s"] - frame.groupby("g")["s"].transform("mean")
-        return centered.fillna(s)
+    if pl is not None and backend in {"auto", "polars"} and compiled.polars_capable:
+        try:
+            frame = pl.DataFrame(
+                {name: np.asarray(series, dtype=float) for name, series in context.items()}
+            )
+            expr_pl = _build_polars_expr(
+                compiled.tree.body,
+                compiled=compiled,
+                param_overrides=param_overrides,
+            )
+            out = frame.lazy().select(expr_pl.alias("__alpha__")).collect()
+            values = out["__alpha__"].to_numpy()
+            result_series = pd.Series(values, index=index, dtype=float)
+            result_series = result_series.replace([np.inf, -np.inf], np.nan)
+            latest = _last_finite_value(result_series.dropna())
+            if latest is not None:
+                return latest
+        except Exception:
+            # Fallback to numpy/pandas evaluator.
+            pass
 
     env: dict[str, object] = {
         **context,
         "abs": np.abs,
         "log": np.log,
         "sign": np.sign,
-        "rank": rank,
-        "ts_rank": ts_rank_s,
-        "ts_sum": ts_sum_s,
-        "ts_stddev_s": ts_stddev_s,
-        "ts_corr_s": ts_corr_s,
-        "ts_cov_s": ts_cov_s,
-        "ts_min": ts_min_s,
-        "ts_max": ts_max_s,
-        "ts_product_s": ts_product_s,
-        "delay": delay_s,
-        "delta": delta_s,
-        "ts_argmax": ts_argmax_s,
-        "ts_argmin": ts_argmin_s,
-        "decay_linear": decay_linear_s,
-        "scale": scale_s,
-        "signed_power": signed_power_s,
-        "where": where,
-        "indneutralize": indneutralize,
+        "rank": lambda s: rank_series(s, index=index, window=max(2, int(rank_window))),
+        "ts_rank": lambda s, w: ts_rank_series(s, w, index=index),
+        "ts_sum": lambda s, w: ts_sum_series(s, w, index=index),
+        "ts_stddev": lambda s, w: ts_stddev_series(s, w, index=index),
+        "ts_corr": lambda left, right, window: ts_corr_series(left, right, window, index=index),
+        "ts_cov": lambda left, right, window: ts_cov_series(left, right, window, index=index),
+        "ts_min": lambda s, w: ts_min_series(s, w, index=index),
+        "ts_max": lambda s, w: ts_max_series(s, w, index=index),
+        "ts_product": lambda s, w: ts_product_series(s, w, index=index),
+        "delay": lambda s, p=1: delay_series(s, p, index=index),
+        "delta": lambda s, p=1: delta_series(s, p, index=index),
+        "ts_argmax": lambda s, w: ts_argmax_series(s, w, index=index),
+        "ts_argmin": lambda s, w: ts_argmin_series(s, w, index=index),
+        "decay_linear": lambda s, p=10: decay_linear_series(s, p, index=index),
+        "scale": lambda s, a=1.0: scale_series(s, rank_window=int(rank_window), index=index, a=a),
+        "signed_power": lambda s, p: signed_power_series(s, p, index=index),
+        "where": lambda cond, left, right: where_series(cond, left, right, index=index),
+        "indneutralize": lambda s, g: indneutralize_series(s, g, index=index),
         "max": np.maximum,
         "min": np.minimum,
     }
-    code = _compile_formula(expr)
-    result = eval(code, {"__builtins__": {}}, env)
+    result = _eval_ast_node(
+        compiled.tree.body,
+        env=env,
+        compiled=compiled,
+        index=index,
+        param_overrides=param_overrides,
+    )
     result_series = _to_series(result, index).replace([np.inf, -np.inf], np.nan)
     if result_series.empty:
         return None
-    latest = result_series.iloc[-1]
+    latest = _last_finite_value(result_series.dropna())
+    if latest is None:
+        return None
     latest_float = float(latest)
     return latest_float if math.isfinite(latest_float) else None
 
@@ -892,6 +1307,8 @@ def compute_alpha101(
     industry=None,
     subindustry=None,
     rank_window: int = 20,
+    param_overrides: Mapping[str, float] | None = None,
+    vector_backend: str = "auto",
 ) -> float | None:
     """Evaluate Alpha101 formula by ID with tunable rank window and optional neutralizers."""
     alpha_int = int(alpha_id)
@@ -911,7 +1328,14 @@ def compute_alpha101(
         industry=industry,
         subindustry=subindustry,
     )
-    return _eval_formula(formula, context, rank_window=rank_window)
+    return _eval_formula(
+        alpha_int,
+        formula,
+        context,
+        rank_window=rank_window,
+        param_overrides=param_overrides,
+        vector_backend=vector_backend,
+    )
 
 
 def _make_formula_alpha(alpha_id: int):
@@ -929,6 +1353,8 @@ def _make_formula_alpha(alpha_id: int):
         industry=None,
         subindustry=None,
         rank_window: int = 20,
+        param_overrides: Mapping[str, float] | None = None,
+        vector_backend: str = "auto",
     ) -> float | None:
         return compute_alpha101(
             alpha_id,
@@ -944,6 +1370,8 @@ def _make_formula_alpha(alpha_id: int):
             industry=industry,
             subindustry=subindustry,
             rank_window=rank_window,
+            param_overrides=param_overrides,
+            vector_backend=vector_backend,
         )
 
     _alpha.__name__ = f"alpha_{alpha_id:03d}"

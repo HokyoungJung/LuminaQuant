@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from lumina_quant.events import SignalEvent
 from lumina_quant.indicators import RollingMeanWindow, safe_float
 from lumina_quant.strategy import Strategy
+from lumina_quant.tuning import HyperParam, resolve_params_from_schema
 
 
 @dataclass(slots=True)
@@ -16,13 +17,49 @@ class _SymbolState:
 
 
 class MovingAverageCrossStrategy(Strategy):
+    @classmethod
+    def get_param_schema(cls) -> dict[str, HyperParam]:
+        return {
+            "short_window": HyperParam.integer(
+                "short_window",
+                default=10,
+                low=2,
+                high=4096,
+                optuna={"type": "int", "low": 5, "high": 80},
+                grid=[10, 20, 30],
+            ),
+            "long_window": HyperParam.integer(
+                "long_window",
+                default=30,
+                low=3,
+                high=8192,
+                optuna={"type": "int", "low": 20, "high": 250},
+                grid=[40, 80, 120],
+            ),
+            "allow_short": HyperParam.boolean(
+                "allow_short",
+                default=True,
+                optuna={"type": "categorical", "choices": [True, False]},
+                grid=[True, False],
+            ),
+        }
+
     def __init__(self, bars, events, short_window=10, long_window=30, allow_short=True):
         self.bars = bars
         self.events = events
         self.symbol_list = list(self.bars.symbol_list)
-        self.short_window = max(2, int(short_window))
-        self.long_window = max(self.short_window + 1, int(long_window))
-        self.allow_short = bool(allow_short)
+        resolved = resolve_params_from_schema(
+            self.get_param_schema(),
+            {
+                "short_window": short_window,
+                "long_window": long_window,
+                "allow_short": allow_short,
+            },
+            keep_unknown=False,
+        )
+        self.short_window = int(resolved["short_window"])
+        self.long_window = max(self.short_window + 1, int(resolved["long_window"]))
+        self.allow_short = bool(resolved["allow_short"])
         self._state = {
             symbol: _SymbolState(
                 short_window=RollingMeanWindow(self.short_window),

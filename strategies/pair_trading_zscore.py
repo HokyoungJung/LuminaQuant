@@ -11,6 +11,7 @@ from statistics import mean
 from lumina_quant.events import SignalEvent
 from lumina_quant.indicators import rolling_beta, rolling_corr, rolling_vwap, safe_float, sample_std
 from lumina_quant.strategy import Strategy
+from lumina_quant.tuning import HyperParam, resolve_params_from_schema
 
 LOGGER = logging.getLogger(__name__)
 
@@ -28,6 +29,188 @@ class PairTradingZScoreStrategy(Strategy):
     - Fill timing remains controlled by execution handler (next bar open).
     """
 
+    @classmethod
+    def get_param_schema(cls) -> dict[str, HyperParam]:
+        return {
+            "lookback_window": HyperParam.integer(
+                "lookback_window",
+                default=96,
+                low=10,
+                high=20000,
+                optuna={"type": "int", "low": 48, "high": 240},
+                grid=[72, 96, 144],
+            ),
+            "hedge_window": HyperParam.integer(
+                "hedge_window",
+                default=192,
+                low=10,
+                high=40000,
+                optuna={"type": "int", "low": 96, "high": 480},
+                grid=[144, 192, 288],
+            ),
+            "entry_z": HyperParam.floating(
+                "entry_z",
+                default=2.0,
+                low=0.5,
+                high=20.0,
+                optuna={"type": "float", "low": 1.2, "high": 3.0, "step": 0.1},
+                grid=[1.6, 2.0, 2.4],
+            ),
+            "exit_z": HyperParam.floating(
+                "exit_z",
+                default=0.35,
+                low=0.0,
+                high=20.0,
+                optuna={"type": "float", "low": 0.1, "high": 1.0, "step": 0.05},
+                grid=[0.25, 0.35, 0.5],
+            ),
+            "stop_z": HyperParam.floating(
+                "stop_z",
+                default=3.5,
+                low=0.6,
+                high=50.0,
+                optuna={"type": "float", "low": 2.5, "high": 5.0, "step": 0.1},
+                grid=[3.0, 3.5, 4.0],
+            ),
+            "stop_z_min_gap": HyperParam.floating(
+                "stop_z_min_gap",
+                default=0.1,
+                low=0.0,
+                high=5.0,
+                optuna={"type": "float", "low": 0.0, "high": 1.0, "step": 0.05},
+                grid=[0.0, 0.1, 0.2, 0.4],
+            ),
+            "min_correlation": HyperParam.floating(
+                "min_correlation",
+                default=0.15,
+                low=-1.0,
+                high=1.0,
+                optuna={"type": "float", "low": -0.2, "high": 0.8, "step": 0.05},
+                grid=[0.0, 0.15, 0.3],
+            ),
+            "max_hold_bars": HyperParam.integer(
+                "max_hold_bars",
+                default=240,
+                low=1,
+                high=100000,
+                optuna={"type": "int", "low": 24, "high": 480},
+                grid=[96, 240, 384],
+            ),
+            "cooldown_bars": HyperParam.integer(
+                "cooldown_bars",
+                default=6,
+                low=0,
+                high=100000,
+                optuna={"type": "int", "low": 0, "high": 48},
+                grid=[0, 6, 12],
+            ),
+            "reentry_z_buffer": HyperParam.floating(
+                "reentry_z_buffer",
+                default=0.2,
+                low=0.0,
+                high=20.0,
+                optuna={"type": "float", "low": 0.0, "high": 0.8, "step": 0.05},
+                grid=[0.0, 0.2, 0.35],
+            ),
+            "min_z_turn": HyperParam.floating(
+                "min_z_turn",
+                default=0.0,
+                low=0.0,
+                high=20.0,
+                optuna={"type": "float", "low": 0.0, "high": 0.8, "step": 0.05},
+                grid=[0.0, 0.05, 0.15],
+            ),
+            "stop_loss_pct": HyperParam.floating(
+                "stop_loss_pct",
+                default=0.04,
+                low=0.001,
+                high=0.5,
+                optuna={"type": "float", "low": 0.005, "high": 0.12, "step": 0.005},
+                grid=[0.02, 0.04, 0.08],
+            ),
+            "min_abs_beta": HyperParam.floating(
+                "min_abs_beta",
+                default=0.02,
+                low=0.0,
+                high=100.0,
+                optuna={"type": "float", "low": 0.0, "high": 0.5, "step": 0.01},
+                grid=[0.0, 0.02, 0.1],
+            ),
+            "max_abs_beta": HyperParam.floating(
+                "max_abs_beta",
+                default=6.0,
+                low=0.0,
+                high=100.0,
+                optuna={"type": "float", "low": 1.0, "high": 10.0, "step": 0.1},
+                grid=[3.0, 6.0, 9.0],
+            ),
+            "min_volume_window": HyperParam.integer(
+                "min_volume_window",
+                default=24,
+                low=1,
+                high=100000,
+                optuna={"type": "int", "low": 4, "high": 128},
+                grid=[12, 24, 48],
+            ),
+            "min_volume_ratio": HyperParam.floating(
+                "min_volume_ratio",
+                default=0.0,
+                low=0.0,
+                high=10.0,
+                optuna={"type": "float", "low": 0.0, "high": 1.2, "step": 0.05},
+                grid=[0.0, 0.2, 0.5],
+            ),
+            "symbol_x": HyperParam.string("symbol_x", default="", tunable=False),
+            "symbol_y": HyperParam.string("symbol_y", default="", tunable=False),
+            "use_log_price": HyperParam.boolean("use_log_price", default=True, tunable=False),
+            "vol_lag_bars": HyperParam.integer("vol_lag_bars", default=0, low=0, tunable=False),
+            "min_vol_convergence": HyperParam.floating(
+                "min_vol_convergence",
+                default=0.0,
+                low=0.0,
+                tunable=False,
+            ),
+            "vwap_window": HyperParam.integer("vwap_window", default=0, low=0, tunable=False),
+            "atr_window": HyperParam.integer("atr_window", default=0, low=0, tunable=False),
+            "atr_max_pct": HyperParam.floating(
+                "atr_max_pct",
+                default=1.0,
+                low=0.001,
+                tunable=False,
+            ),
+            "atr_disable_threshold": HyperParam.floating(
+                "atr_disable_threshold",
+                default=0.999,
+                low=0.0,
+                high=1.0,
+                tunable=False,
+            ),
+            "beta_stop_scale_min": HyperParam.floating(
+                "beta_stop_scale_min",
+                default=0.75,
+                low=0.0,
+                high=10.0,
+            ),
+            "beta_stop_scale_max": HyperParam.floating(
+                "beta_stop_scale_max",
+                default=2.5,
+                low=0.0,
+                high=20.0,
+            ),
+            "vol_divergence_floor": HyperParam.floating(
+                "vol_divergence_floor",
+                default=3.0,
+                low=0.0,
+                high=20.0,
+            ),
+            "vol_divergence_multiplier": HyperParam.floating(
+                "vol_divergence_multiplier",
+                default=3.0,
+                low=0.0,
+                high=20.0,
+            ),
+        }
+
     def __init__(
         self,
         bars,
@@ -37,6 +220,7 @@ class PairTradingZScoreStrategy(Strategy):
         entry_z=2.0,
         exit_z=0.35,
         stop_z=3.5,
+        stop_z_min_gap=0.1,
         min_correlation=0.15,
         max_hold_bars=240,
         cooldown_bars=6,
@@ -55,6 +239,11 @@ class PairTradingZScoreStrategy(Strategy):
         vwap_window=0,
         atr_window=0,
         atr_max_pct=1.0,
+        atr_disable_threshold=0.999,
+        beta_stop_scale_min=0.75,
+        beta_stop_scale_max=2.5,
+        vol_divergence_floor=3.0,
+        vol_divergence_multiplier=3.0,
     ):
         self.bars = bars
         self.events = events
@@ -62,32 +251,79 @@ class PairTradingZScoreStrategy(Strategy):
         if len(self.symbol_list) < 2:
             raise ValueError("PairTradingZScoreStrategy requires at least two symbols.")
 
+        resolved = resolve_params_from_schema(
+            self.get_param_schema(),
+            {
+                "lookback_window": lookback_window,
+                "hedge_window": hedge_window,
+                "entry_z": entry_z,
+                "exit_z": exit_z,
+                "stop_z": stop_z,
+                "stop_z_min_gap": stop_z_min_gap,
+                "min_correlation": min_correlation,
+                "max_hold_bars": max_hold_bars,
+                "cooldown_bars": cooldown_bars,
+                "reentry_z_buffer": reentry_z_buffer,
+                "min_z_turn": min_z_turn,
+                "stop_loss_pct": stop_loss_pct,
+                "min_abs_beta": min_abs_beta,
+                "max_abs_beta": max_abs_beta,
+                "min_volume_window": min_volume_window,
+                "min_volume_ratio": min_volume_ratio,
+                "symbol_x": symbol_x,
+                "symbol_y": symbol_y,
+                "use_log_price": use_log_price,
+                "vol_lag_bars": vol_lag_bars,
+                "min_vol_convergence": min_vol_convergence,
+                "vwap_window": vwap_window,
+                "atr_window": atr_window,
+                "atr_max_pct": atr_max_pct,
+                "atr_disable_threshold": atr_disable_threshold,
+                "beta_stop_scale_min": beta_stop_scale_min,
+                "beta_stop_scale_max": beta_stop_scale_max,
+                "vol_divergence_floor": vol_divergence_floor,
+                "vol_divergence_multiplier": vol_divergence_multiplier,
+            },
+            keep_unknown=False,
+        )
+
+        symbol_x = resolved["symbol_x"]
+        symbol_y = resolved["symbol_y"]
         self.symbol_x = str(symbol_x) if symbol_x else str(self.symbol_list[0])
         self.symbol_y = str(symbol_y) if symbol_y else str(self.symbol_list[1])
         if self.symbol_x == self.symbol_y:
             raise ValueError("symbol_x and symbol_y must be different.")
 
-        self.lookback_window = max(10, int(lookback_window))
-        self.hedge_window = max(self.lookback_window, int(hedge_window))
-        self.entry_z = max(0.5, float(entry_z))
-        self.exit_z = max(0.0, float(exit_z))
-        self.stop_z = max(self.entry_z + 0.1, float(stop_z))
-        self.min_correlation = max(-1.0, min(1.0, float(min_correlation)))
-        self.max_hold_bars = max(1, int(max_hold_bars))
-        self.cooldown_bars = max(0, int(cooldown_bars))
-        self.reentry_z_buffer = max(0.0, float(reentry_z_buffer))
-        self.min_z_turn = max(0.0, float(min_z_turn))
-        self.stop_loss_pct = min(0.50, max(0.001, float(stop_loss_pct)))
-        self.min_abs_beta = max(0.0, float(min_abs_beta))
-        self.max_abs_beta = max(self.min_abs_beta + 1e-9, float(max_abs_beta))
-        self.min_volume_window = max(1, int(min_volume_window))
-        self.min_volume_ratio = max(0.0, float(min_volume_ratio))
-        self.use_log_price = bool(use_log_price)
-        self.vol_lag_bars = max(0, int(vol_lag_bars))
-        self.min_vol_convergence = max(0.0, float(min_vol_convergence))
-        self.vwap_window = max(0, int(vwap_window))
-        self.atr_window = max(0, int(atr_window))
-        self.atr_max_pct = max(0.001, float(atr_max_pct))
+        self.lookback_window = int(resolved["lookback_window"])
+        self.hedge_window = max(self.lookback_window, int(resolved["hedge_window"]))
+        self.entry_z = float(resolved["entry_z"])
+        self.exit_z = float(resolved["exit_z"])
+        self.stop_z_min_gap = float(resolved["stop_z_min_gap"])
+        self.stop_z = max(self.entry_z + self.stop_z_min_gap, float(resolved["stop_z"]))
+        self.min_correlation = max(-1.0, min(1.0, float(resolved["min_correlation"])))
+        self.max_hold_bars = int(resolved["max_hold_bars"])
+        self.cooldown_bars = int(resolved["cooldown_bars"])
+        self.reentry_z_buffer = float(resolved["reentry_z_buffer"])
+        self.min_z_turn = float(resolved["min_z_turn"])
+        self.stop_loss_pct = float(resolved["stop_loss_pct"])
+        self.min_abs_beta = float(resolved["min_abs_beta"])
+        self.max_abs_beta = max(self.min_abs_beta + 1e-9, float(resolved["max_abs_beta"]))
+        self.min_volume_window = int(resolved["min_volume_window"])
+        self.min_volume_ratio = float(resolved["min_volume_ratio"])
+        self.use_log_price = bool(resolved["use_log_price"])
+        self.vol_lag_bars = int(resolved["vol_lag_bars"])
+        self.min_vol_convergence = float(resolved["min_vol_convergence"])
+        self.vwap_window = int(resolved["vwap_window"])
+        self.atr_window = int(resolved["atr_window"])
+        self.atr_max_pct = float(resolved["atr_max_pct"])
+        self.atr_disable_threshold = float(resolved["atr_disable_threshold"])
+        self.beta_stop_scale_min = float(resolved["beta_stop_scale_min"])
+        self.beta_stop_scale_max = max(
+            self.beta_stop_scale_min + 1e-9,
+            float(resolved["beta_stop_scale_max"]),
+        )
+        self.vol_divergence_floor = float(resolved["vol_divergence_floor"])
+        self.vol_divergence_multiplier = float(resolved["vol_divergence_multiplier"])
 
         self._x_history = deque(maxlen=self.hedge_window)
         self._y_history = deque(maxlen=self.hedge_window)
@@ -316,7 +552,7 @@ class PairTradingZScoreStrategy(Strategy):
     def _atr_filter_passed(self, close_x, close_y):
         if self.atr_window <= 1:
             return True
-        if self.atr_max_pct >= 0.999:
+        if self.atr_max_pct >= self.atr_disable_threshold:
             return True
         if len(self._x_tr_history) < self.atr_window or len(self._y_tr_history) < self.atr_window:
             return True
@@ -368,7 +604,10 @@ class PairTradingZScoreStrategy(Strategy):
         return (vol_spread - spread_mean) / spread_std
 
     def _entry_stop_price(self, direction, price, beta):
-        beta_scale = max(0.75, min(2.5, abs(float(beta))))
+        beta_scale = max(
+            self.beta_stop_scale_min,
+            min(self.beta_stop_scale_max, abs(float(beta))),
+        )
         stop_pct = min(0.50, self.stop_loss_pct * beta_scale)
         if direction == "LONG":
             return price * (1.0 - stop_pct)
@@ -626,7 +865,11 @@ class PairTradingZScoreStrategy(Strategy):
         elif (
             self.min_vol_convergence > 0.0
             and vol_zscore is not None
-            and abs(vol_zscore) >= max(3.0, self.min_vol_convergence * 3.0)
+            and abs(vol_zscore)
+            >= max(
+                self.vol_divergence_floor,
+                self.min_vol_convergence * self.vol_divergence_multiplier,
+            )
         ):
             exit_reason = "vol_divergence"
         elif self._bars_in_position >= self.max_hold_bars:

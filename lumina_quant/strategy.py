@@ -19,3 +19,8 @@ class Strategy(ABC):
     def set_state(self, state: dict) -> None:
         """Backward-compatible default state loader."""
         _ = state
+
+    @classmethod
+    def get_param_schema(cls) -> dict:
+        """Optional hyper-parameter schema for registry-driven tuning."""
+        return {}

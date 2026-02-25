@@ -86,8 +86,8 @@ cd lumina-quant
 # 프로젝트 Python 버전 고정 (< 3.14)
 uv python pin 3.13
 
-# 의존성 설치
-uv sync --all-extras  # 또는 pip install ".[live,optimize,dashboard]"
+# 의존성 설치 (uv 전용 런타임)
+uv sync --all-extras
 
 # (선택 사항) MT5 지원을 위한 설치
 uv sync --extra mt5

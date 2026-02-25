@@ -86,8 +86,8 @@ cd lumina-quant
 # Ensure compatible Python (project requires < 3.14)
 uv python pin 3.13
 
-# Install dependencies
-uv sync --all-extras  # or pip install ".[live,optimize,dashboard]"
+# Install dependencies (uv-only runtime)
+uv sync --all-extras
 
 # Verify install and tests
 uv run python scripts/verify_install.py

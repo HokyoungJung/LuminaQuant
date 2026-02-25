@@ -248,7 +248,7 @@ def render_shortlist_markdown(shortlist_payload: dict[str, Any]) -> str:
     lines.append("")
     lines.append("```bash")
     lines.append(
-        "python scripts/run_strategy_factory_pipeline.py --backend parquet-postgres"
+        "uv run python scripts/run_strategy_factory_pipeline.py --backend parquet-postgres"
     )
     lines.append("```")
     lines.append("")

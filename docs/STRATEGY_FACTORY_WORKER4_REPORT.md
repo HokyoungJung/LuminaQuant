@@ -67,13 +67,13 @@ This contribution adds an isolated **strategy factory pipeline** focused on Bina
 Generate candidate universe only:
 
 ```bash
-python scripts/run_strategy_factory_pipeline.py --dry-run
+uv run python scripts/run_strategy_factory_pipeline.py --dry-run
 ```
 
 Run full pipeline and create shortlist artifacts:
 
 ```bash
-python scripts/run_strategy_factory_pipeline.py \
+uv run python scripts/run_strategy_factory_pipeline.py \
   --db-path data/market_parquet \
   --exchange binance \
   --market-type future \
@@ -84,7 +84,7 @@ python scripts/run_strategy_factory_pipeline.py \
 Control shortlist size/diversification:
 
 ```bash
-python scripts/run_strategy_factory_pipeline.py \
+uv run python scripts/run_strategy_factory_pipeline.py \
   --shortlist-max-total 24 \
   --shortlist-max-per-family 8 \
   --shortlist-max-per-timeframe 6

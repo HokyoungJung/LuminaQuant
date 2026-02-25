@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from lumina_quant.events import SignalEvent
 from lumina_quant.indicators import RollingZScoreWindow, safe_float
 from lumina_quant.strategy import Strategy
+from lumina_quant.tuning import HyperParam, resolve_params_from_schema
 
 
 @dataclass(slots=True)
@@ -19,6 +20,49 @@ class _SymbolState:
 
 class MeanReversionStdStrategy(Strategy):
     """Single-asset z-score mean reversion with optional shorts."""
+
+    @classmethod
+    def get_param_schema(cls) -> dict[str, HyperParam]:
+        return {
+            "window": HyperParam.integer(
+                "window",
+                default=64,
+                low=8,
+                high=8192,
+                optuna={"type": "int", "low": 16, "high": 256},
+                grid=[24, 48, 64, 96, 128],
+            ),
+            "entry_z": HyperParam.floating(
+                "entry_z",
+                default=2.0,
+                low=0.2,
+                high=20.0,
+                optuna={"type": "float", "low": 0.8, "high": 3.5, "step": 0.1},
+                grid=[1.2, 1.6, 2.0, 2.4, 2.8],
+            ),
+            "exit_z": HyperParam.floating(
+                "exit_z",
+                default=0.5,
+                low=0.0,
+                high=10.0,
+                optuna={"type": "float", "low": 0.1, "high": 1.5, "step": 0.05},
+                grid=[0.2, 0.4, 0.6, 0.8],
+            ),
+            "stop_loss_pct": HyperParam.floating(
+                "stop_loss_pct",
+                default=0.03,
+                low=0.001,
+                high=0.5,
+                optuna={"type": "float", "low": 0.005, "high": 0.12, "step": 0.005},
+                grid=[0.01, 0.02, 0.03, 0.04],
+            ),
+            "allow_short": HyperParam.boolean(
+                "allow_short",
+                default=True,
+                optuna={"type": "categorical", "choices": [True, False]},
+                grid=[True, False],
+            ),
+        }
 
     def __init__(
         self,
@@ -33,11 +77,22 @@ class MeanReversionStdStrategy(Strategy):
         self.bars = bars
         self.events = events
         self.symbol_list = list(self.bars.symbol_list)
-        self.window = max(8, int(window))
-        self.entry_z = max(0.2, float(entry_z))
-        self.exit_z = max(0.0, float(exit_z))
-        self.stop_loss_pct = min(0.5, max(0.001, float(stop_loss_pct)))
-        self.allow_short = bool(allow_short)
+        resolved = resolve_params_from_schema(
+            self.get_param_schema(),
+            {
+                "window": window,
+                "entry_z": entry_z,
+                "exit_z": exit_z,
+                "stop_loss_pct": stop_loss_pct,
+                "allow_short": allow_short,
+            },
+            keep_unknown=False,
+        )
+        self.window = int(resolved["window"])
+        self.entry_z = float(resolved["entry_z"])
+        self.exit_z = float(resolved["exit_z"])
+        self.stop_loss_pct = float(resolved["stop_loss_pct"])
+        self.allow_short = bool(resolved["allow_short"])
 
         self._state = {
             symbol: _SymbolState(zscore_window=RollingZScoreWindow(self.window))

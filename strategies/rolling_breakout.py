@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from lumina_quant.events import SignalEvent
 from lumina_quant.indicators import average_true_range, safe_float, true_range
 from lumina_quant.strategy import Strategy
+from lumina_quant.tuning import HyperParam, resolve_params_from_schema
 
 
 @dataclass(slots=True)
@@ -24,6 +25,57 @@ class _SymbolState:
 class RollingBreakoutStrategy(Strategy):
     """Channel breakout strategy with simple ATR-aware protective stops."""
 
+    @classmethod
+    def get_param_schema(cls) -> dict[str, HyperParam]:
+        return {
+            "lookback_bars": HyperParam.integer(
+                "lookback_bars",
+                default=48,
+                low=5,
+                high=8192,
+                optuna={"type": "int", "low": 10, "high": 240},
+                grid=[16, 32, 48, 64, 96],
+            ),
+            "breakout_buffer": HyperParam.floating(
+                "breakout_buffer",
+                default=0.0,
+                low=0.0,
+                high=1.0,
+                optuna={"type": "float", "low": 0.0, "high": 0.02, "step": 0.001},
+                grid=[0.0, 0.001, 0.002, 0.005],
+            ),
+            "atr_window": HyperParam.integer(
+                "atr_window",
+                default=14,
+                low=1,
+                high=1024,
+                optuna={"type": "int", "low": 5, "high": 48},
+                grid=[8, 14, 21, 34],
+            ),
+            "atr_stop_multiplier": HyperParam.floating(
+                "atr_stop_multiplier",
+                default=2.5,
+                low=0.1,
+                high=20.0,
+                optuna={"type": "float", "low": 0.8, "high": 6.0, "step": 0.1},
+                grid=[1.2, 1.8, 2.5, 3.5],
+            ),
+            "stop_loss_pct": HyperParam.floating(
+                "stop_loss_pct",
+                default=0.03,
+                low=0.001,
+                high=0.5,
+                optuna={"type": "float", "low": 0.005, "high": 0.12, "step": 0.005},
+                grid=[0.01, 0.02, 0.03, 0.05],
+            ),
+            "allow_short": HyperParam.boolean(
+                "allow_short",
+                default=False,
+                optuna={"type": "categorical", "choices": [True, False]},
+                grid=[True, False],
+            ),
+        }
+
     def __init__(
         self,
         bars,
@@ -38,12 +90,24 @@ class RollingBreakoutStrategy(Strategy):
         self.bars = bars
         self.events = events
         self.symbol_list = list(self.bars.symbol_list)
-        self.lookback_bars = max(5, int(lookback_bars))
-        self.breakout_buffer = max(0.0, float(breakout_buffer))
-        self.atr_window = max(1, int(atr_window))
-        self.atr_stop_multiplier = max(0.1, float(atr_stop_multiplier))
-        self.stop_loss_pct = min(0.5, max(0.001, float(stop_loss_pct)))
-        self.allow_short = bool(allow_short)
+        resolved = resolve_params_from_schema(
+            self.get_param_schema(),
+            {
+                "lookback_bars": lookback_bars,
+                "breakout_buffer": breakout_buffer,
+                "atr_window": atr_window,
+                "atr_stop_multiplier": atr_stop_multiplier,
+                "stop_loss_pct": stop_loss_pct,
+                "allow_short": allow_short,
+            },
+            keep_unknown=False,
+        )
+        self.lookback_bars = int(resolved["lookback_bars"])
+        self.breakout_buffer = float(resolved["breakout_buffer"])
+        self.atr_window = int(resolved["atr_window"])
+        self.atr_stop_multiplier = float(resolved["atr_stop_multiplier"])
+        self.stop_loss_pct = float(resolved["stop_loss_pct"])
+        self.allow_short = bool(resolved["allow_short"])
 
         self._state = {
             symbol: _SymbolState(

@@ -14,6 +14,7 @@ from lumina_quant.indicators.factory_fast import (
     volatility_ratio_latest,
 )
 from lumina_quant.strategy import Strategy
+from lumina_quant.tuning import HyperParam, resolve_params_from_schema
 
 
 @dataclass(slots=True)
@@ -28,6 +29,89 @@ class _SymbolState:
 
 class RegimeBreakoutCandidateStrategy(Strategy):
     """Trade breakouts only when trend and volatility regime align."""
+
+    @classmethod
+    def get_param_schema(cls) -> dict[str, HyperParam]:
+        return {
+            "lookback_window": HyperParam.integer(
+                "lookback_window",
+                default=48,
+                low=10,
+                high=4096,
+                optuna={"type": "int", "low": 16, "high": 128},
+                grid=[24, 48, 72, 96],
+            ),
+            "slope_window": HyperParam.integer(
+                "slope_window",
+                default=21,
+                low=5,
+                high=4096,
+                optuna={"type": "int", "low": 8, "high": 64},
+                grid=[13, 21, 34],
+            ),
+            "volatility_fast_window": HyperParam.integer(
+                "volatility_fast_window",
+                default=20,
+                low=5,
+                high=4096,
+                optuna={"type": "int", "low": 6, "high": 48},
+                grid=[12, 20, 30],
+            ),
+            "volatility_slow_window": HyperParam.integer(
+                "volatility_slow_window",
+                default=96,
+                low=6,
+                high=8192,
+                optuna={"type": "int", "low": 24, "high": 240},
+                grid=[48, 96, 144],
+            ),
+            "range_entry_threshold": HyperParam.floating(
+                "range_entry_threshold",
+                default=0.70,
+                low=0.51,
+                high=0.99,
+                optuna={"type": "float", "low": 0.55, "high": 0.90, "step": 0.01},
+                grid=[0.6, 0.7, 0.8],
+            ),
+            "slope_entry_threshold": HyperParam.floating(
+                "slope_entry_threshold",
+                default=0.0,
+                low=-1.0,
+                high=1.0,
+                optuna={"type": "float", "low": -0.001, "high": 0.003, "step": 0.0005},
+                grid=[0.0, 0.001, 0.002],
+            ),
+            "momentum_floor": HyperParam.floating(
+                "momentum_floor",
+                default=0.0,
+                low=-1.0,
+                high=1.0,
+                optuna={"type": "float", "low": -0.02, "high": 0.05, "step": 0.002},
+                grid=[0.0, 0.01, 0.02],
+            ),
+            "max_volatility_ratio": HyperParam.floating(
+                "max_volatility_ratio",
+                default=1.80,
+                low=0.2,
+                high=20.0,
+                optuna={"type": "float", "low": 0.5, "high": 3.0, "step": 0.05},
+                grid=[1.2, 1.8, 2.4],
+            ),
+            "stop_loss_pct": HyperParam.floating(
+                "stop_loss_pct",
+                default=0.03,
+                low=0.002,
+                high=0.5,
+                optuna={"type": "float", "low": 0.005, "high": 0.10, "step": 0.005},
+                grid=[0.01, 0.02, 0.03, 0.05],
+            ),
+            "allow_short": HyperParam.boolean(
+                "allow_short",
+                default=True,
+                optuna={"type": "categorical", "choices": [True, False]},
+                grid=[True, False],
+            ),
+        }
 
     def __init__(
         self,
@@ -47,24 +131,45 @@ class RegimeBreakoutCandidateStrategy(Strategy):
         self.bars = bars
         self.events = events
         self.symbol_list = list(self.bars.symbol_list)
+        resolved = resolve_params_from_schema(
+            self.get_param_schema(),
+            {
+                "lookback_window": lookback_window,
+                "slope_window": slope_window,
+                "volatility_fast_window": volatility_fast_window,
+                "volatility_slow_window": volatility_slow_window,
+                "range_entry_threshold": range_entry_threshold,
+                "slope_entry_threshold": slope_entry_threshold,
+                "momentum_floor": momentum_floor,
+                "max_volatility_ratio": max_volatility_ratio,
+                "stop_loss_pct": stop_loss_pct,
+                "allow_short": allow_short,
+            },
+            keep_unknown=False,
+        )
 
-        self.lookback_window = max(10, int(lookback_window))
-        self.slope_window = max(5, int(slope_window))
-        self.volatility_fast_window = max(5, int(volatility_fast_window))
-        self.volatility_slow_window = max(self.volatility_fast_window + 1, int(volatility_slow_window))
-        self.range_entry_threshold = min(0.99, max(0.51, float(range_entry_threshold)))
-        self.slope_entry_threshold = float(slope_entry_threshold)
-        self.momentum_floor = float(momentum_floor)
-        self.max_volatility_ratio = max(0.2, float(max_volatility_ratio))
-        self.stop_loss_pct = min(0.50, max(0.002, float(stop_loss_pct)))
-        self.allow_short = bool(allow_short)
+        self.lookback_window = int(resolved["lookback_window"])
+        self.slope_window = int(resolved["slope_window"])
+        self.volatility_fast_window = int(resolved["volatility_fast_window"])
+        self.volatility_slow_window = max(
+            self.volatility_fast_window + 1,
+            int(resolved["volatility_slow_window"]),
+        )
+        self.range_entry_threshold = float(resolved["range_entry_threshold"])
+        self.slope_entry_threshold = float(resolved["slope_entry_threshold"])
+        self.momentum_floor = float(resolved["momentum_floor"])
+        self.max_volatility_ratio = float(resolved["max_volatility_ratio"])
+        self.stop_loss_pct = float(resolved["stop_loss_pct"])
+        self.allow_short = bool(resolved["allow_short"])
 
-        maxlen = max(
-            self.lookback_window,
-            self.slope_window,
-            self.volatility_fast_window,
-            self.volatility_slow_window,
-            55,
+        maxlen = (
+            max(
+                self.lookback_window,
+                self.slope_window,
+                self.volatility_fast_window,
+                self.volatility_slow_window,
+            )
+            + 2
         )
         self._state = {
             symbol: _SymbolState(

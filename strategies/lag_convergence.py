@@ -7,10 +7,66 @@ from collections import deque
 from lumina_quant.events import SignalEvent
 from lumina_quant.indicators import momentum_return, momentum_spread, safe_float
 from lumina_quant.strategy import Strategy
+from lumina_quant.tuning import HyperParam, resolve_params_from_schema
 
 
 class LagConvergenceStrategy(Strategy):
     """Pair strategy that trades convergence of lagged momentum spread."""
+
+    @classmethod
+    def get_param_schema(cls) -> dict[str, HyperParam]:
+        return {
+            "symbol_x": HyperParam.string("symbol_x", default="", tunable=False),
+            "symbol_y": HyperParam.string("symbol_y", default="", tunable=False),
+            "lag_bars": HyperParam.integer(
+                "lag_bars",
+                default=3,
+                low=1,
+                high=2048,
+                optuna={"type": "int", "low": 1, "high": 12},
+                grid=[1, 2, 3, 5, 8],
+            ),
+            "entry_threshold": HyperParam.floating(
+                "entry_threshold",
+                default=0.015,
+                low=0.001,
+                high=1.0,
+                optuna={"type": "float", "low": 0.004, "high": 0.05, "step": 0.001},
+                grid=[0.008, 0.012, 0.015, 0.02, 0.03],
+            ),
+            "exit_threshold": HyperParam.floating(
+                "exit_threshold",
+                default=0.004,
+                low=0.0,
+                high=1.0,
+                optuna={"type": "float", "low": 0.001, "high": 0.02, "step": 0.001},
+                grid=[0.002, 0.004, 0.006, 0.01],
+            ),
+            "stop_threshold": HyperParam.floating(
+                "stop_threshold",
+                default=0.05,
+                low=0.001,
+                high=2.0,
+                optuna={"type": "float", "low": 0.01, "high": 0.12, "step": 0.002},
+                grid=[0.03, 0.05, 0.08],
+            ),
+            "max_hold_bars": HyperParam.integer(
+                "max_hold_bars",
+                default=96,
+                low=1,
+                high=10000,
+                optuna={"type": "int", "low": 12, "high": 240},
+                grid=[24, 48, 96, 160],
+            ),
+            "stop_loss_pct": HyperParam.floating(
+                "stop_loss_pct",
+                default=0.03,
+                low=0.001,
+                high=0.5,
+                optuna={"type": "float", "low": 0.005, "high": 0.08, "step": 0.005},
+                grid=[0.01, 0.02, 0.03, 0.04],
+            ),
+        }
 
     def __init__(
         self,
@@ -31,17 +87,40 @@ class LagConvergenceStrategy(Strategy):
         if len(self.symbol_list) < 2:
             raise ValueError("LagConvergenceStrategy requires at least two symbols.")
 
+        resolved = resolve_params_from_schema(
+            self.get_param_schema(),
+            {
+                "symbol_x": symbol_x,
+                "symbol_y": symbol_y,
+                "lag_bars": lag_bars,
+                "entry_threshold": entry_threshold,
+                "exit_threshold": exit_threshold,
+                "stop_threshold": stop_threshold,
+                "max_hold_bars": max_hold_bars,
+                "stop_loss_pct": stop_loss_pct,
+            },
+            keep_unknown=False,
+        )
+        symbol_x = resolved["symbol_x"]
+        symbol_y = resolved["symbol_y"]
+        lag_bars = resolved["lag_bars"]
+        entry_threshold = resolved["entry_threshold"]
+        exit_threshold = resolved["exit_threshold"]
+        stop_threshold = resolved["stop_threshold"]
+        max_hold_bars = resolved["max_hold_bars"]
+        stop_loss_pct = resolved["stop_loss_pct"]
+
         self.symbol_x = str(symbol_x) if symbol_x else str(self.symbol_list[0])
         self.symbol_y = str(symbol_y) if symbol_y else str(self.symbol_list[1])
         if self.symbol_x == self.symbol_y:
             raise ValueError("symbol_x and symbol_y must be different.")
 
         self.lag_bars = max(1, int(lag_bars))
-        self.entry_threshold = max(0.001, float(entry_threshold))
+        self.entry_threshold = float(entry_threshold)
         self.exit_threshold = max(0.0, float(exit_threshold))
         self.stop_threshold = max(self.entry_threshold + 1e-9, float(stop_threshold))
         self.max_hold_bars = max(1, int(max_hold_bars))
-        self.stop_loss_pct = min(0.5, max(0.001, float(stop_loss_pct)))
+        self.stop_loss_pct = float(stop_loss_pct)
 
         history_len = max(16, self.lag_bars + 8)
         self._x_history = deque(maxlen=history_len)

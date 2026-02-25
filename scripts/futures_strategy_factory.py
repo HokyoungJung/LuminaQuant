@@ -702,14 +702,14 @@ def _write_markdown_report(
     lines.append("")
     lines.append(
         "```bash\n"
-        "python scripts/futures_strategy_factory.py "
+        "uv run python scripts/futures_strategy_factory.py "
         "--max-shortlist 64 --max-report-files 20\n"
         "```"
     )
     lines.append("")
     lines.append(
         "```bash\n"
-        "python scripts/run_strategy_team_research.py "
+        "uv run python scripts/run_strategy_team_research.py "
         "--market-type future --mode oos --strategy-set all "
         f"--topcap-symbols {' '.join([_normalize_symbol(symbol) for symbol in symbols])}\n"
         "```"
