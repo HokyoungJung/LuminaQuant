@@ -35,6 +35,25 @@
 - Windows: `./publish_api.ps1`
 - Mac/Linux: `./publish_api.sh`
 
+기본 동작:
+- `origin/main` 기준 신규 브랜치 생성 (`public-sync-YYYYMMDD-HHMMSS`)
+- `private/main` 변경을 staged merge
+- 보호 경로 제거 + 민감 경로 검사
+- 브랜치 push 후 `main` 대상 PR 자동 생성
+
+옵션 예시:
+
+```bash
+# PR 생성 없이 브랜치만 push
+./publish_api.sh --no-pr
+
+# 소스 ref를 로컬 private-main으로 지정
+./publish_api.sh --source-ref private-main
+
+# CI 통과 시 자동 머지 예약
+./publish_api.sh --auto-merge
+```
+
 ## 3. 수동 배포 절차
 
 ### Private 반영
@@ -50,12 +69,6 @@ git push private private-main:main
 ### Public 반영
 
 ```bash
-git checkout main
-git merge private-main --no-commit --no-ff
-git checkout HEAD -- .gitignore
-git rm -f lumina_quant/data_sync.py lumina_quant/data_collector.py scripts/sync_binance_ohlcv.py scripts/collect_market_data.py tests/test_data_sync.py
-git reset
-git add .
-git commit -m "chore: publish"
-git push origin main
+git checkout private-main
+uv run python scripts/publish_public_pr.py --source-ref private/main
 ```

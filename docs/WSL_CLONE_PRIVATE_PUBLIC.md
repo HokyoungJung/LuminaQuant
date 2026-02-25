@@ -50,11 +50,19 @@ git push private private-main:main
 
 ## 5) Public publish (sensitive paths removed)
 
-The publish script enforces filtering for strategies/indicators/data/logs/secrets and DB build/sync helpers.
+The publish script is PR-first and enforces filtering for strategies/indicators/data/logs/secrets and DB build/sync helpers.
 
 ```bash
 git checkout private-main
 ./publish_api.sh
+```
+
+This creates a sanitized `public-sync-*` branch from `origin/main`, pushes it, then opens a PR.
+
+Optional:
+
+```bash
+./publish_api.sh --auto-merge
 ```
 
 ## 6) Verify public branch does not contain sensitive files

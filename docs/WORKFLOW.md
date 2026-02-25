@@ -41,7 +41,7 @@ We provide automation scripts for both Windows (PowerShell) and Mac/Linux (Bash)
     ```
 
 ### B. Publishing to Public API
-**Goal**: Update the public `main` branch with core engine changes, but *exclude* your private strategies and data.
+**Goal**: Create a conflict-free public sync PR from private source while excluding private strategies/data.
 
 *   **Windows**:
     ```powershell
@@ -52,6 +52,25 @@ We provide automation scripts for both Windows (PowerShell) and Mac/Linux (Bash)
     chmod +x publish_api.sh  # Run once
     ./publish_api.sh
     ```
+
+Default behavior:
+- Builds a fresh branch from `origin/main` (ex: `public-sync-YYYYMMDD-HHMMSS`)
+- Merges from `private/main` in staging mode
+- Removes protected paths from the staged set
+- Validates no sensitive paths remain
+- Pushes the branch and opens a PR to `main`
+
+Useful options:
+```bash
+# only push sanitized branch (skip PR creation)
+./publish_api.sh --no-pr
+
+# use local private-main instead of private/main
+./publish_api.sh --source-ref private-main
+
+# create PR and enable auto-merge after CI is green
+./publish_api.sh --auto-merge
+```
 
 ## 4. Manual Process (If scripts fail)
 
@@ -66,16 +85,10 @@ git commit -m "sync"
 git push private private-main:main
 ```
 
-**Publish Public:**
+**Publish Public (PR-based):**
 ```bash
-git checkout main
-git merge private-main --no-commit --no-ff
-git checkout HEAD -- .gitignore
-git rm -f lumina_quant/data_sync.py lumina_quant/data_collector.py scripts/sync_binance_ohlcv.py scripts/collect_market_data.py tests/test_data_sync.py
-git reset
-git add .
-git commit -m "chore: publish"
-git push origin main
+git checkout private-main
+uv run python scripts/publish_public_pr.py --source-ref private/main
 ```
 
 ## 5. Authentication Setup (Multiple Accounts)

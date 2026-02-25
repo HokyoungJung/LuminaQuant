@@ -36,7 +36,7 @@ All are implemented in `lumina_quant/indicators/futures_fast.py` with optional N
 ### Build shortlist from latest team research reports
 
 ```bash
-python scripts/futures_strategy_factory.py \
+uv run python scripts/futures_strategy_factory.py \
   --mode oos \
   --report-glob "reports/strategy_team_research_oos_*.json" \
   --max-report-files 20 \
@@ -46,7 +46,7 @@ python scripts/futures_strategy_factory.py \
 ### Dry-run (no files written)
 
 ```bash
-python scripts/futures_strategy_factory.py --dry-run
+uv run python scripts/futures_strategy_factory.py --dry-run
 ```
 
 ### Build weighted shortlist from research reports
@@ -69,7 +69,7 @@ Use `--allow-multi-asset` only if you explicitly want direct multi-asset rows in
 ### Custom symbol/timeframe set
 
 ```bash
-python scripts/futures_strategy_factory.py \
+uv run python scripts/futures_strategy_factory.py \
   --symbols BTC/USDT ETH/USDT BNB/USDT XAU/USDT XAG/USDT \
   --timeframes 1s 1m 5m 15m 1h 4h 1d
 ```
