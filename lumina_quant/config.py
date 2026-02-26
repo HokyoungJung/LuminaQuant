@@ -40,6 +40,51 @@ if str(_RUNTIME.storage.postgres_dsn or "").strip():
         str(_RUNTIME.storage.postgres_dsn_env or "LQ_POSTGRES_DSN"),
         str(_RUNTIME.storage.postgres_dsn),
     )
+os.environ.setdefault(
+    "LQ_GPU_MODE",
+    str(getattr(_RUNTIME.execution, "gpu_mode", _RUNTIME.execution.compute_backend) or "auto"),
+)
+os.environ.setdefault(
+    "LQ_GPU_VRAM_GB",
+    str(float(getattr(_RUNTIME.execution, "gpu_vram_gb", 0.0))),
+)
+os.environ.setdefault(
+    "LQ__EXECUTION__GPU_MODE",
+    str(getattr(_RUNTIME.execution, "gpu_mode", _RUNTIME.execution.compute_backend) or "auto"),
+)
+os.environ.setdefault(
+    "LQ__EXECUTION__GPU_VRAM_GB",
+    str(float(getattr(_RUNTIME.execution, "gpu_vram_gb", 0.0))),
+)
+os.environ.setdefault("LQ__BACKTEST__CHUNK_DAYS", str(int(getattr(_RUNTIME.backtest, "chunk_days", 2))))
+os.environ.setdefault(
+    "LQ__BACKTEST__CHUNK_WARMUP_BARS",
+    str(int(getattr(_RUNTIME.backtest, "chunk_warmup_bars", 0))),
+)
+os.environ.setdefault(
+    "LQ__BACKTEST__SKIP_AHEAD_ENABLED",
+    "1" if bool(getattr(_RUNTIME.backtest, "skip_ahead_enabled", True)) else "0",
+)
+os.environ.setdefault(
+    "LQ__LIVE__POLL_SECONDS",
+    str(int(getattr(_RUNTIME.live, "poll_seconds", getattr(_RUNTIME.live, "poll_interval", 20)))),
+)
+os.environ.setdefault(
+    "LQ__LIVE__WINDOW_SECONDS",
+    str(int(getattr(_RUNTIME.live, "window_seconds", 20))),
+)
+os.environ.setdefault(
+    "LQ__BACKTEST__POLL_SECONDS",
+    str(int(getattr(_RUNTIME.backtest, "poll_seconds", 20))),
+)
+os.environ.setdefault(
+    "LQ__BACKTEST__WINDOW_SECONDS",
+    str(int(getattr(_RUNTIME.backtest, "window_seconds", 20))),
+)
+os.environ.setdefault(
+    "LQ__BACKTEST__DECISION_CADENCE_SECONDS",
+    str(int(getattr(_RUNTIME.backtest, "decision_cadence_seconds", 20))),
+)
 
 
 class BaseConfig:
@@ -71,7 +116,11 @@ class BaseConfig:
     FUNDING_INTERVAL_HOURS = int(_RUNTIME.execution.funding_interval_hours)
     MAINTENANCE_MARGIN_RATE = float(_RUNTIME.execution.maintenance_margin_rate)
     LIQUIDATION_BUFFER_RATE = float(_RUNTIME.execution.liquidation_buffer_rate)
-    COMPUTE_BACKEND = str(_RUNTIME.execution.compute_backend).lower()
+    GPU_MODE = str(
+        getattr(_RUNTIME.execution, "gpu_mode", _RUNTIME.execution.compute_backend) or "auto"
+    ).lower()
+    GPU_VRAM_GB = float(getattr(_RUNTIME.execution, "gpu_vram_gb", 0.0))
+    COMPUTE_BACKEND = GPU_MODE
 
     STORAGE_BACKEND = _RUNTIME.storage.backend
     STORAGE_MARKET_DATA_PARQUET_PATH = _RUNTIME.storage.market_data_parquet_path
@@ -94,6 +143,15 @@ class BacktestConfig(BaseConfig):
     RANDOM_SEED = int(_RUNTIME.backtest.random_seed)
     PERSIST_OUTPUT = bool(_RUNTIME.backtest.persist_output)
     LEVERAGE = int(_RUNTIME.backtest.leverage)
+    POLL_SECONDS = int(getattr(_RUNTIME.backtest, "poll_seconds", 20))
+    WINDOW_SECONDS = int(getattr(_RUNTIME.backtest, "window_seconds", 20))
+    DECISION_CADENCE_SECONDS = int(getattr(_RUNTIME.backtest, "decision_cadence_seconds", 20))
+    BACKTEST_POLL_SECONDS = POLL_SECONDS
+    BACKTEST_WINDOW_SECONDS = WINDOW_SECONDS
+    BACKTEST_DECISION_SECONDS = DECISION_CADENCE_SECONDS
+    CHUNK_DAYS = int(getattr(_RUNTIME.backtest, "chunk_days", 2))
+    CHUNK_WARMUP_BARS = int(getattr(_RUNTIME.backtest, "chunk_warmup_bars", 0))
+    SKIP_AHEAD_ENABLED = bool(getattr(_RUNTIME.backtest, "skip_ahead_enabled", True))
 
 
 class LiveConfig(BaseConfig):
@@ -108,7 +166,12 @@ class LiveConfig(BaseConfig):
 
     IS_TESTNET = MODE != "real"
     REQUIRE_REAL_ENABLE_FLAG = bool(_RUNTIME.live.require_real_enable_flag)
-    POLL_INTERVAL = int(_RUNTIME.live.poll_interval)
+    POLL_SECONDS = int(getattr(_RUNTIME.live, "poll_seconds", _RUNTIME.live.poll_interval))
+    POLL_INTERVAL = POLL_SECONDS
+    LIVE_POLL_SECONDS = POLL_SECONDS
+    WINDOW_SECONDS = int(getattr(_RUNTIME.live, "window_seconds", 20))
+    INGEST_WINDOW_SECONDS = WINDOW_SECONDS
+    DECISION_CADENCE_SECONDS = int(getattr(_RUNTIME.live, "decision_cadence_seconds", 20))
     ORDER_TIMEOUT = int(_RUNTIME.live.order_timeout)
     HEARTBEAT_INTERVAL_SEC = int(_RUNTIME.live.heartbeat_interval_sec)
     RECONCILIATION_INTERVAL_SEC = int(_RUNTIME.live.reconciliation_interval_sec)

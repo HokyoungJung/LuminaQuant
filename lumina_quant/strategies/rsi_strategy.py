@@ -2,39 +2,47 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from lumina_quant.events import SignalEvent
-from lumina_quant.indicators import RollingMeanWindow, safe_float
+from lumina_quant.core.events import SignalEvent
+from lumina_quant.indicators.common import safe_float
+from lumina_quant.indicators.rsi import IncrementalRsi
 from lumina_quant.strategy import Strategy
 from lumina_quant.tuning import HyperParam, resolve_params_from_schema
 
 
 @dataclass(slots=True)
 class _SymbolState:
-    short_window: RollingMeanWindow
-    long_window: RollingMeanWindow
+    rsi: IncrementalRsi
     position: str = "OUT"
     last_time_key: str = ""
 
 
-class MovingAverageCrossStrategy(Strategy):
+class RsiStrategy(Strategy):
     @classmethod
     def get_param_schema(cls) -> dict[str, HyperParam]:
         return {
-            "short_window": HyperParam.integer(
-                "short_window",
-                default=10,
+            "rsi_period": HyperParam.integer(
+                "rsi_period",
+                default=14,
                 low=2,
-                high=4096,
-                optuna={"type": "int", "low": 5, "high": 80},
-                grid=[10, 20, 30],
+                high=512,
+                optuna={"type": "int", "low": 5, "high": 30},
+                grid=[10, 14, 20],
             ),
-            "long_window": HyperParam.integer(
-                "long_window",
-                default=30,
-                low=3,
-                high=8192,
-                optuna={"type": "int", "low": 20, "high": 250},
-                grid=[40, 80, 120],
+            "oversold": HyperParam.floating(
+                "oversold",
+                default=30.0,
+                low=1.0,
+                high=50.0,
+                optuna={"type": "int", "low": 20, "high": 40},
+                grid=[20, 25, 30],
+            ),
+            "overbought": HyperParam.floating(
+                "overbought",
+                default=70.0,
+                low=2.0,
+                high=99.0,
+                optuna={"type": "int", "low": 60, "high": 90},
+                grid=[70, 75, 80],
             ),
             "allow_short": HyperParam.boolean(
                 "allow_short",
@@ -44,28 +52,34 @@ class MovingAverageCrossStrategy(Strategy):
             ),
         }
 
-    def __init__(self, bars, events, short_window=10, long_window=30, allow_short=True):
+    def __init__(
+        self,
+        bars,
+        events,
+        rsi_period=14,
+        oversold=30,
+        overbought=70,
+        allow_short=True,
+    ):
         self.bars = bars
         self.events = events
         self.symbol_list = list(self.bars.symbol_list)
         resolved = resolve_params_from_schema(
             self.get_param_schema(),
             {
-                "short_window": short_window,
-                "long_window": long_window,
+                "rsi_period": rsi_period,
+                "oversold": oversold,
+                "overbought": overbought,
                 "allow_short": allow_short,
             },
             keep_unknown=False,
         )
-        self.short_window = int(resolved["short_window"])
-        self.long_window = max(self.short_window + 1, int(resolved["long_window"]))
+        self.rsi_period = int(resolved["rsi_period"])
+        self.oversold = float(resolved["oversold"])
+        self.overbought = max(self.oversold + 1.0, float(resolved["overbought"]))
         self.allow_short = bool(resolved["allow_short"])
         self._state = {
-            symbol: _SymbolState(
-                short_window=RollingMeanWindow(self.short_window),
-                long_window=RollingMeanWindow(self.long_window),
-            )
-            for symbol in self.symbol_list
+            symbol: _SymbolState(rsi=IncrementalRsi(self.rsi_period)) for symbol in self.symbol_list
         }
 
     def get_state(self):
@@ -74,8 +88,7 @@ class MovingAverageCrossStrategy(Strategy):
                 symbol: {
                     "position": item.position,
                     "last_time_key": item.last_time_key,
-                    "short_state": item.short_window.to_state(),
-                    "long_state": item.long_window.to_state(),
+                    "rsi_state": item.rsi.to_state(),
                 }
                 for symbol, item in self._state.items()
             }
@@ -94,8 +107,7 @@ class MovingAverageCrossStrategy(Strategy):
             position = str(raw.get("position", "OUT")).upper()
             item.position = position if position in {"OUT", "LONG", "SHORT"} else "OUT"
             item.last_time_key = str(raw.get("last_time_key", ""))
-            item.short_window.load_state(list((raw.get("short_state") or {}).get("values") or []))
-            item.long_window.load_state(list((raw.get("long_state") or {}).get("values") or []))
+            item.rsi.load_state(dict(raw.get("rsi_state") or {}))
 
     def calculate_signals(self, event):
         if getattr(event, "type", None) != "MARKET":
@@ -119,81 +131,78 @@ class MovingAverageCrossStrategy(Strategy):
         if close_price is None:
             return
 
-        item.short_window.append(close_price)
-        item.long_window.append(close_price)
-        short_ma = item.short_window.mean()
-        long_ma = item.long_window.mean()
-        if short_ma is None or long_ma is None:
+        rsi_value = item.rsi.update(close_price)
+        if rsi_value is None:
             return
 
-        if item.position == "OUT" and short_ma > long_ma:
+        if item.position == "OUT" and rsi_value <= self.oversold:
             self.events.put(
                 SignalEvent(
-                    strategy_id="moving_average_cross",
+                    strategy_id="rsi",
                     symbol=symbol,
                     datetime=event_time,
                     signal_type="LONG",
                     strength=1.0,
-                    metadata={"strategy": "MovingAverageCrossStrategy"},
+                    metadata={"strategy": "RsiStrategy", "rsi": float(rsi_value)},
                 )
             )
             item.position = "LONG"
-        elif item.position == "OUT" and self.allow_short and short_ma < long_ma:
+        elif item.position == "OUT" and self.allow_short and rsi_value >= self.overbought:
             self.events.put(
                 SignalEvent(
-                    strategy_id="moving_average_cross",
+                    strategy_id="rsi",
                     symbol=symbol,
                     datetime=event_time,
                     signal_type="SHORT",
                     strength=1.0,
-                    metadata={"strategy": "MovingAverageCrossStrategy"},
+                    metadata={"strategy": "RsiStrategy", "rsi": float(rsi_value)},
                 )
             )
             item.position = "SHORT"
-        elif item.position == "LONG" and short_ma < long_ma:
+        elif item.position == "LONG" and rsi_value >= self.overbought:
             self.events.put(
                 SignalEvent(
-                    strategy_id="moving_average_cross",
+                    strategy_id="rsi",
                     symbol=symbol,
                     datetime=event_time,
                     signal_type="EXIT",
                     strength=1.0,
-                    metadata={"strategy": "MovingAverageCrossStrategy"},
+                    metadata={"strategy": "RsiStrategy", "rsi": float(rsi_value)},
                 )
             )
             if self.allow_short:
                 self.events.put(
                     SignalEvent(
-                        strategy_id="moving_average_cross",
+                        strategy_id="rsi",
                         symbol=symbol,
                         datetime=event_time,
                         signal_type="SHORT",
                         strength=1.0,
-                        metadata={"strategy": "MovingAverageCrossStrategy"},
+                        metadata={"strategy": "RsiStrategy", "rsi": float(rsi_value)},
                     )
                 )
                 item.position = "SHORT"
             else:
                 item.position = "OUT"
-        elif item.position == "SHORT" and short_ma > long_ma:
+        elif item.position == "SHORT" and rsi_value <= self.oversold:
             self.events.put(
                 SignalEvent(
-                    strategy_id="moving_average_cross",
+                    strategy_id="rsi",
                     symbol=symbol,
                     datetime=event_time,
                     signal_type="EXIT",
                     strength=1.0,
-                    metadata={"strategy": "MovingAverageCrossStrategy"},
+                    metadata={"strategy": "RsiStrategy", "rsi": float(rsi_value)},
                 )
             )
             self.events.put(
                 SignalEvent(
-                    strategy_id="moving_average_cross",
+                    strategy_id="rsi",
                     symbol=symbol,
                     datetime=event_time,
                     signal_type="LONG",
                     strength=1.0,
-                    metadata={"strategy": "MovingAverageCrossStrategy"},
+                    metadata={"strategy": "RsiStrategy", "rsi": float(rsi_value)},
                 )
             )
             item.position = "LONG"

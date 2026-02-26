@@ -1,6 +1,9 @@
 import unittest
 
-from strategies.factory_candidate_set import build_candidate_set, summarize_candidate_set
+from lumina_quant.strategies.factory_candidate_set import (
+    build_candidate_set,
+    summarize_candidate_set,
+)
 
 
 class TestFactoryCandidateSet(unittest.TestCase):

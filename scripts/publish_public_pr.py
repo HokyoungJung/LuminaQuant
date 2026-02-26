@@ -33,6 +33,7 @@ PROTECTED_PATHS: tuple[str, ...] = (
     "trades.csv",
     "live_equity.csv",
     "live_trades.csv",
+    "lumina_quant/strategies",
     "strategies",
     "lumina_quant/indicators",
     "lumina_quant/data_sync.py",
@@ -44,7 +45,8 @@ PROTECTED_PATHS: tuple[str, ...] = (
 )
 
 SENSITIVE_PATH_RE = re.compile(
-    r"^strategies/"
+    r"^lumina_quant/strategies/"
+    r"|^strategies/"
     r"|^lumina_quant/indicators/"
     r"|^data/"
     r"|^logs/"

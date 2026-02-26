@@ -15,10 +15,10 @@ This workflow is designed to create and evaluate a **large strategy candidate un
   - `lumina_quant/indicators/factory_fast.py`
   - `lumina_quant/indicators/futures_fast.py`
 - New strategy candidates:
-  - `strategies/candidate_regime_breakout.py`
-  - `strategies/candidate_vol_compression_reversion.py`
+  - `lumina_quant/strategies/candidate_regime_breakout.py`
+  - `lumina_quant/strategies/candidate_vol_compression_reversion.py`
 - Strategy-candidate universe builders:
-  - `strategies/factory_candidate_set.py`
+  - `lumina_quant/strategies/factory_candidate_set.py`
   - `lumina_quant/strategy_factory/*`
 - Candidate export and pipeline scripts:
   - `scripts/export_strategy_factory_candidates.py`

@@ -41,7 +41,7 @@ def build_symbol_frame(start: datetime, seconds: int, offset: float) -> pl.DataF
 
 
 def run_once(skip_ahead: bool, data_dict: dict[str, pl.DataFrame], start: datetime, end: datetime):
-    os.environ["LQ_SKIP_AHEAD"] = "1" if skip_ahead else "0"
+    os.environ["LQ__BACKTEST__SKIP_AHEAD_ENABLED"] = "1" if skip_ahead else "0"
     bt = Backtest(
         csv_dir="data",
         symbol_list=list(data_dict.keys()),

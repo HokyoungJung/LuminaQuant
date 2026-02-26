@@ -6,8 +6,8 @@ import queue
 import unittest
 from datetime import datetime
 
-from lumina_quant.events import FillEvent
-from lumina_quant.portfolio import Portfolio
+from lumina_quant.backtesting.portfolio_backtest import Portfolio
+from lumina_quant.core.events import FillEvent
 
 
 class MockBars:

@@ -37,7 +37,7 @@ def _frame(start: datetime, seconds: int, offset: float) -> pl.DataFrame:
 
 
 def _run(skip_enabled: bool, data_dict: dict[str, pl.DataFrame], monkeypatch):
-    monkeypatch.setenv("LQ_SKIP_AHEAD", "1" if skip_enabled else "0")
+    monkeypatch.setenv("LQ__BACKTEST__SKIP_AHEAD_ENABLED", "1" if skip_enabled else "0")
     backtest = Backtest(
         csv_dir="data",
         symbol_list=list(data_dict.keys()),

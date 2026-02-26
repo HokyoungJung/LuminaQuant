@@ -8,8 +8,10 @@ from collections import deque
 from itertools import islice
 from statistics import mean
 
-from lumina_quant.events import SignalEvent
-from lumina_quant.indicators import rolling_beta, rolling_corr, rolling_vwap, safe_float, sample_std
+from lumina_quant.core.events import SignalEvent
+from lumina_quant.indicators.common import safe_float
+from lumina_quant.indicators.rolling_stats import rolling_beta, rolling_corr, sample_std
+from lumina_quant.indicators.vwap import rolling_vwap
 from lumina_quant.strategy import Strategy
 from lumina_quant.tuning import HyperParam, resolve_params_from_schema
 

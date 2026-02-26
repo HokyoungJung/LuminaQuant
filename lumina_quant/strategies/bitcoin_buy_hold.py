@@ -7,7 +7,7 @@ for comparison and later customization.
 
 from __future__ import annotations
 
-from lumina_quant.events import SignalEvent
+from lumina_quant.core.events import SignalEvent
 from lumina_quant.strategy import Strategy
 from lumina_quant.tuning import HyperParam, resolve_params_from_schema
 

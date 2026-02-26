@@ -9,6 +9,7 @@ from typing import Any
 
 from lumina_quant.backtesting.backtest import Backtest
 from lumina_quant.backtesting.data import HistoricCSVDataHandler
+from lumina_quant.backtesting.data_windowed_parquet import HistoricParquetWindowedDataHandler
 from lumina_quant.backtesting.execution_sim import SimulatedExecutionHandler
 from lumina_quant.backtesting.portfolio_backtest import Portfolio
 
@@ -64,6 +65,11 @@ def _capture_backtest_state(
         "strategy_state": strategy_state,
         "portfolio_state": portfolio_state,
         "execution_state": execution_state,
+        "engine_state": (
+            backtest.get_engine_state()
+            if callable(getattr(backtest, "get_engine_state", None))
+            else {}
+        ),
         "trade_count": int(getattr(backtest.portfolio, "trade_count", 0)),
         "active_orders": deepcopy(getattr(backtest.execution_handler, "active_orders", [])),
         "order_seq": int(getattr(backtest.execution_handler, "_order_seq", 0)),
@@ -95,6 +101,10 @@ def _restore_backtest_state(backtest: Backtest, carry: dict[str, Any]) -> None:
     if callable(set_execution_state):
         set_execution_state(dict(carry.get("execution_state", {})))
 
+    set_engine_state = getattr(backtest, "set_engine_state", None)
+    if callable(set_engine_state):
+        set_engine_state(dict(carry.get("engine_state", {})))
+
     if "all_positions" in carry:
         backtest.portfolio.all_positions = carry["all_positions"]
     if "all_holdings" in carry:
@@ -125,14 +135,30 @@ def run_backtest_chunked(
     data_loader: Callable[[datetime, datetime], dict[str, Any]],
     chunk_days: int,
     strategy_timeframe: str,
-    data_handler_cls=HistoricCSVDataHandler,
+    data_handler_cls=None,
     execution_handler_cls=SimulatedExecutionHandler,
     portfolio_cls=Portfolio,
+    backtest_mode: str = "windowed",
+    data_handler_kwargs: dict[str, Any] | None = None,
     record_history: bool = True,
     track_metrics: bool = True,
     record_trades: bool = True,
 ) -> Backtest:
     """Execute one logical backtest by loading bounded chunks sequentially."""
+    mode_token = str(backtest_mode or "windowed").strip().lower()
+    if mode_token not in {"windowed", "legacy_batch", "legacy_1s"}:
+        mode_token = "windowed"
+
+    selected_data_handler_cls = data_handler_cls
+    if selected_data_handler_cls is None:
+        selected_data_handler_cls = (
+            HistoricParquetWindowedDataHandler
+            if mode_token == "windowed"
+            else HistoricCSVDataHandler
+        )
+
+    handler_kwargs = dict(data_handler_kwargs or {})
+
     windows = iter_chunk_windows(
         start_date=start_date,
         end_date=end_date,
@@ -152,12 +178,13 @@ def run_backtest_chunked(
             symbol_list=symbol_list,
             start_date=chunk_start,
             end_date=chunk_end,
-            data_handler_cls=data_handler_cls,
+            data_handler_cls=selected_data_handler_cls,
             execution_handler_cls=execution_handler_cls,
             portfolio_cls=portfolio_cls,
             strategy_cls=strategy_cls,
             strategy_params=strategy_params or {},
             data_dict=chunk_data,
+            data_handler_kwargs=handler_kwargs,
             record_history=record_history,
             track_metrics=track_metrics,
             record_trades=record_trades,
@@ -184,12 +211,13 @@ def run_backtest_chunked(
         symbol_list=symbol_list,
         start_date=start_date,
         end_date=end_date,
-        data_handler_cls=data_handler_cls,
+        data_handler_cls=selected_data_handler_cls,
         execution_handler_cls=execution_handler_cls,
         portfolio_cls=portfolio_cls,
         strategy_cls=strategy_cls,
         strategy_params=strategy_params or {},
         data_dict={},
+        data_handler_kwargs=handler_kwargs,
         record_history=record_history,
         track_metrics=track_metrics,
         record_trades=record_trades,

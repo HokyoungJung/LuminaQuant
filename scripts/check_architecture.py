@@ -16,9 +16,16 @@ LAYER_RULES = {
             "lumina_quant.live",
             "lumina_quant.optimization",
             "lumina_quant.infra",
+            "lumina_quant.strategies",
         )
     },
     "lumina_quant.backtesting": {"deny_prefixes": ("lumina_quant.live",)},
+    "lumina_quant.strategies": {
+        "deny_prefixes": (
+            "lumina_quant.live",
+            "lumina_quant.backtesting",
+        )
+    },
 }
 
 

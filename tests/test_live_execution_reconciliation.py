@@ -6,8 +6,8 @@ import queue
 from datetime import datetime
 from typing import cast
 
-from lumina_quant.interfaces import ExchangeInterface
-from lumina_quant.live_execution import LiveExecutionHandler
+from lumina_quant.core.protocols import ExchangeInterface
+from lumina_quant.live.execution_live import LiveExecutionHandler
 
 
 class _Bars:

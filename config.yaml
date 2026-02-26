@@ -48,6 +48,8 @@ execution:
   maintenance_margin_rate: 0.005
   liquidation_buffer_rate: 0.0005
   compute_backend: "auto" # auto|cpu|gpu|forced-gpu
+  gpu_mode: "auto" # auto|cpu|gpu|forced-gpu
+  gpu_vram_gb: 8.0
 
 # ------------------------------------------
 # Storage / Audit
@@ -72,6 +74,15 @@ backtest:
   random_seed: 42
   persist_output: true
   leverage: 3
+  poll_seconds: 20
+  backtest_poll_seconds: 20
+  window_seconds: 20
+  backtest_window_seconds: 20
+  decision_cadence_seconds: 20
+  backtest_decision_seconds: 20
+  chunk_days: 2
+  chunk_warmup_bars: 0
+  skip_ahead_enabled: true
 
 # ------------------------------------------
 # Live Trading Specific Settings
@@ -87,7 +98,12 @@ live:
     leverage: 3
   testnet: true
   require_real_enable_flag: true
-  poll_interval: 2  # Seconds
+  poll_interval: 20  # Seconds
+  poll_seconds: 20
+  live_poll_seconds: 20
+  window_seconds: 20
+  ingest_window_seconds: 20
+  decision_cadence_seconds: 20
   heartbeat_interval_sec: 30
   order_timeout: 10 # Seconds
   reconciliation_interval_sec: 30

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
-from lumina_quant.data import HistoricCSVDataHandler
+from lumina_quant.backtesting.data import HistoricCSVDataHandler
 
 
 class _Queue:

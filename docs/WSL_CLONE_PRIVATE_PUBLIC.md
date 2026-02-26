@@ -50,7 +50,7 @@ git push private private-main:main
 
 ## 5) Public publish (sensitive paths removed)
 
-The publish script is PR-first and enforces filtering for strategies/indicators/data/logs/secrets and DB build/sync helpers.
+The publish script is PR-first and enforces filtering for lumina_quant/strategies/indicators/data/logs/secrets and DB build/sync helpers.
 
 ```bash
 git checkout private-main
@@ -69,7 +69,7 @@ Optional:
 
 ```bash
 git fetch origin
-git ls-tree -r --name-only origin/main | rg "^strategies/|^lumina_quant/indicators/|^data/|^logs/|^reports/|^best_optimized_parameters/|^\.omx/|^\.sisyphus/|^AGENTS\.md$|^\.env$|^lumina_quant/data_sync\.py$|^lumina_quant/data_collector\.py$|^scripts/sync_binance_ohlcv\.py$|^scripts/collect_market_data\.py$|^scripts/collect_universe_1s\.py$|^tests/test_data_sync\.py$"
+git ls-tree -r --name-only origin/main | rg "^lumina_quant/strategies/|^lumina_quant/indicators/|^data/|^logs/|^reports/|^best_optimized_parameters/|^\.omx/|^\.sisyphus/|^AGENTS\.md$|^\.env$|^lumina_quant/data_sync\.py$|^lumina_quant/data_collector\.py$|^scripts/sync_binance_ohlcv\.py$|^scripts/collect_market_data\.py$|^scripts/collect_universe_1s\.py$|^tests/test_data_sync\.py$"
 ```
 
 No output from the command above means filtering worked as intended.

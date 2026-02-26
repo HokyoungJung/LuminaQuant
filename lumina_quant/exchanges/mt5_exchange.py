@@ -11,7 +11,7 @@ try:
 except ImportError:
     mt5 = None
 
-from lumina_quant.interfaces import ExchangeInterface
+from lumina_quant.core.protocols import ExchangeInterface
 
 
 def _as_bool(value: Any, default: bool = False) -> bool:

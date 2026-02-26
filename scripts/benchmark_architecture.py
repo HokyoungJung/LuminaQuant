@@ -6,7 +6,7 @@ import argparse
 import time
 
 import numpy as np
-from lumina_quant.events import MarketEvent
+from lumina_quant.core.events import MarketEvent
 from lumina_quant.message_bus import MessageBus
 from lumina_quant.optimization.fast_eval import evaluate_metrics_numba
 from lumina_quant.replay import assert_monotonic_event_order, stable_event_sort

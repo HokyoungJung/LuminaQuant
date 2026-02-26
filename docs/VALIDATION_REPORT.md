@@ -33,7 +33,7 @@ This report summarizes the recent verification and hardening work across backtes
 - **Lookback memory optimization** (`lumina_quant/data.py`)
   - Replaced list front-trimming with `deque(maxlen=lookback)` for rolling bar history.
   - Removes repeated O(n) left-side deletions.
-- **Strategy computation reduction** (`strategies/moving_average.py`)
+- **Strategy computation reduction** (`lumina_quant/strategies/moving_average.py`)
   - Replaced per-event TA-Lib full-window recalculation with incremental rolling SMA state.
   - Computes in O(1) per bar update and preserves signal semantics/state recovery.
 - **Live loop overhead reduction** (`lumina_quant/live_trader.py`)

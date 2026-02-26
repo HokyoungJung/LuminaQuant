@@ -4,7 +4,7 @@ import queue
 from types import SimpleNamespace
 from typing import Any, cast
 
-from lumina_quant.live_trader import LiveTrader
+from lumina_quant.live.trader import LiveTrader
 
 
 class _Audit:

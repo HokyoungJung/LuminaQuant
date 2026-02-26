@@ -10,7 +10,7 @@
 
 ```python
 from lumina_quant.strategy import Strategy
-from lumina_quant.events import SignalEvent
+from lumina_quant.core.events import SignalEvent
 
 class MyStrategy(Strategy):
     def __init__(self, bars, events, my_param=10):

@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+from lumina_quant.strategies.factory_candidate_set import (
+    build_candidate_set,
+    summarize_candidate_set,
+)
+from lumina_quant.strategies.registry import get_strategy_names
 from lumina_quant.strategy_factory import (
     build_binance_futures_candidates,
     build_single_asset_portfolio_sets,
     candidate_identity,
     select_diversified_shortlist,
 )
-from strategies.factory_candidate_set import build_candidate_set, summarize_candidate_set
-from strategies.registry import get_strategy_names
 
 
 def test_factory_candidate_set_is_large_and_diverse():

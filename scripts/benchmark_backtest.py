@@ -24,14 +24,14 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from lumina_quant.backtest import Backtest
-from lumina_quant.data import HistoricCSVDataHandler
-from lumina_quant.execution import SimulatedExecutionHandler
-from lumina_quant.portfolio import Portfolio
+from lumina_quant.backtesting.backtest import Backtest
+from lumina_quant.backtesting.data import HistoricCSVDataHandler
+from lumina_quant.backtesting.execution_sim import SimulatedExecutionHandler
+from lumina_quant.backtesting.portfolio_backtest import Portfolio
 
 STRATEGY_IMPORT_ERROR: Exception | None = None
 try:
-    from strategies import get_default_strategy_params, get_strategy_map
+    from lumina_quant.strategies import get_default_strategy_params, get_strategy_map
 except Exception as exc:
     STRATEGY_IMPORT_ERROR = exc
 

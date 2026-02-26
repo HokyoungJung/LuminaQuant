@@ -8,13 +8,13 @@ This contribution adds a worker-3 strategy-factory bundle focused on Binance fut
 
 ### 1) Strategy candidate set (multiple files)
 
-- `strategies/candidate_regime_breakout.py`
+- `lumina_quant/strategies/candidate_regime_breakout.py`
   - `RegimeBreakoutCandidateStrategy`
   - Regime-aware breakout logic using trend slope, range position, volatility gating.
-- `strategies/candidate_vol_compression_reversion.py`
+- `lumina_quant/strategies/candidate_vol_compression_reversion.py`
   - `VolatilityCompressionReversionStrategy`
   - Volatility-compression mean-reversion logic using z-score + volatility ratio.
-- `strategies/factory_candidate_set.py`
+- `lumina_quant/strategies/factory_candidate_set.py`
   - Deterministic candidate-universe builder for top-cap symbols/timeframes.
   - Includes both new candidate strategies and existing families (`RollingBreakoutStrategy`, `TopCapTimeSeriesMomentumStrategy`).
 
@@ -70,9 +70,9 @@ uv run python scripts/select_strategy_factory_shortlist.py \
 ```bash
 uv run ruff check \
   lumina_quant/indicators/factory_fast.py \
-  strategies/candidate_regime_breakout.py \
-  strategies/candidate_vol_compression_reversion.py \
-  strategies/factory_candidate_set.py \
+  lumina_quant/strategies/candidate_regime_breakout.py \
+  lumina_quant/strategies/candidate_vol_compression_reversion.py \
+  lumina_quant/strategies/factory_candidate_set.py \
   scripts/export_strategy_factory_candidates.py \
   scripts/select_strategy_factory_shortlist.py \
   tests/test_factory_fast_indicators.py \

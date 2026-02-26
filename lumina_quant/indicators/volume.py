@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from lumina_quant.compute import ops as compute_ops
+
 from .moving_average import exponential_moving_average, simple_moving_average
-from .rolling_stats import rolling_corr
 
 
 def on_balance_volume(closes, volumes) -> float | None:
@@ -259,10 +260,4 @@ def volume_oscillator(volumes, *, short_period: int = 14, long_period: int = 28)
 
 def price_volume_correlation(closes, volumes, *, window: int = 20) -> float | None:
     """Return rolling correlation between close and volume."""
-    window_i = max(2, int(window))
-    closes_f = [float(value) for value in closes]
-    volumes_f = [max(0.0, float(value)) for value in volumes]
-    n = min(len(closes_f), len(volumes_f))
-    if n < window_i:
-        return None
-    return rolling_corr(closes_f[-window_i:], volumes_f[-window_i:])
+    return compute_ops.ts_corr(closes, volumes, window=max(2, int(window)))

@@ -125,5 +125,5 @@ uv run pytest tests/test_message_bus.py tests/test_runtime_cache.py tests/test_r
 uv run pytest tests/test_parity_fast_eval.py tests/test_fast_eval.py tests/test_frozen_dataset.py tests/test_event_clock.py tests/test_system_assembly.py tests/test_portfolio_fast_stats.py
 uv run pytest tests/test_execution_protective_orders.py tests/test_live_execution_state_machine.py tests/test_lookahead.py
 uv run pytest tests/test_optimize_two_stage.py tests/test_native_backend.py tests/test_strategy_registry_defaults.py
-uv run ruff check lumina_quant optimize.py strategies/registry.py strategies/rsi_strategy.py strategies/moving_average.py scripts/benchmark_architecture.py scripts/benchmark_dataset_build.py scripts/benchmark_native_compare.py tests/test_message_bus.py tests/test_runtime_cache.py tests/test_replay.py tests/test_optimize_two_stage.py
+uv run ruff check lumina_quant optimize.py lumina_quant/strategies/registry.py lumina_quant/strategies/rsi_strategy.py lumina_quant/strategies/moving_average.py scripts/benchmark_architecture.py scripts/benchmark_dataset_build.py scripts/benchmark_native_compare.py tests/test_message_bus.py tests/test_runtime_cache.py tests/test_replay.py tests/test_optimize_two_stage.py
 ```

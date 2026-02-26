@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from lumina_quant.events import MarketEvent
+from lumina_quant.core.events import MarketEvent
 from lumina_quant.replay import assert_monotonic_event_order, stable_event_sort
 
 

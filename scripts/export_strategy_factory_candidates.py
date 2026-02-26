@@ -7,7 +7,7 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
-from strategies.factory_candidate_set import (
+from lumina_quant.strategies.factory_candidate_set import (
     DEFAULT_TIMEFRAMES,
     DEFAULT_TOP10_PLUS_METALS,
     build_candidate_set,

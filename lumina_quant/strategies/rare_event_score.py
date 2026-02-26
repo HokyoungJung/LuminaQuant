@@ -9,8 +9,9 @@ from __future__ import annotations
 from collections import deque
 from dataclasses import dataclass
 
-from lumina_quant.events import SignalEvent
-from lumina_quant.indicators import rare_event_scores_latest, safe_float, time_key
+from lumina_quant.core.events import SignalEvent
+from lumina_quant.indicators.common import safe_float, time_key
+from lumina_quant.indicators.rare_event import rare_event_scores_latest
 from lumina_quant.strategy import Strategy
 from lumina_quant.tuning import HyperParam, resolve_params_from_schema
 

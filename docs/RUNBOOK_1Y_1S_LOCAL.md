@@ -57,9 +57,9 @@ export LQ_GPU_MODE=auto
 export LQ_GPU_DEVICE=0
 export LQ_GPU_VERBOSE=0
 
-export LQ_SKIP_AHEAD=1
-export LQ_BT_CHUNK_DAYS=7            # tune 1..60
-export LQ_BT_CHUNK_WARMUP_BARS=0
+export LQ__BACKTEST__SKIP_AHEAD_ENABLED=1
+export LQ__BACKTEST__CHUNK_DAYS=7            # tune 1..60
+export LQ__BACKTEST__CHUNK_WARMUP_BARS=0
 
 export LQ_BACKTEST_LOW_MEMORY=1
 export LQ_BACKTEST_PERSIST_OUTPUT=0
@@ -127,7 +127,7 @@ uv run python optimize.py \
 
 1. Lower chunk size:
    ```bash
-   export LQ_BT_CHUNK_DAYS=3
+   export LQ__BACKTEST__CHUNK_DAYS=3
    ```
 2. Keep optimization worker at 1:
    ```bash
@@ -148,4 +148,3 @@ uv run python -m streamlit run dashboard.py
 ```
 
 Live real mode remains gated by dashboard arming phrase: **ENABLE REAL**.
-

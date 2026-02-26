@@ -3,7 +3,7 @@ from __future__ import annotations
 import queue
 from datetime import datetime, timedelta
 
-from strategies.rare_event_score import RareEventScoreStrategy
+from lumina_quant.strategies.rare_event_score import RareEventScoreStrategy
 
 
 class _BarsMock:
