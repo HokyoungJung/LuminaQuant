@@ -2,9 +2,9 @@ import queue
 import unittest
 from dataclasses import dataclass
 
-from lumina_quant.events import MarketEvent
-from strategies.moving_average import MovingAverageCrossStrategy
-from strategies.rsi_strategy import RsiStrategy
+from lumina_quant.core.events import MarketEvent
+from lumina_quant.strategies.moving_average import MovingAverageCrossStrategy
+from lumina_quant.strategies.rsi_strategy import RsiStrategy
 
 
 @dataclass

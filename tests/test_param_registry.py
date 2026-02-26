@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from strategies import registry as strategy_registry
+from lumina_quant.strategies import registry as strategy_registry
 
 
 def test_strategy_param_schema_and_defaults_exist_for_rsi():
@@ -65,3 +65,13 @@ def test_resolve_optuna_grid_configs_filter_unknown_params():
     assert grid["params"]["rsi_period"] == [8, 10, 12]
     assert "unknown" not in grid["params"]
 
+
+def test_resolve_strategy_params_does_not_use_canonical_alias_keys():
+    resolved = strategy_registry.resolve_strategy_params(
+        "RsiStrategy",
+        {
+            "rsi.rsi_period": 9,
+        },
+    )
+    assert resolved["rsi_period"] == 14
+    assert resolved["rsi.rsi_period"] == 9

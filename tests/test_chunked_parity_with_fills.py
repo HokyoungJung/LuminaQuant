@@ -8,7 +8,7 @@ from lumina_quant.backtesting.chunked_runner import run_backtest_chunked
 from lumina_quant.backtesting.data import HistoricCSVDataHandler
 from lumina_quant.backtesting.execution_sim import SimulatedExecutionHandler
 from lumina_quant.backtesting.portfolio_backtest import Portfolio
-from lumina_quant.events import SignalEvent
+from lumina_quant.core.events import SignalEvent
 from lumina_quant.strategy import Strategy
 
 
@@ -84,7 +84,7 @@ def _build_frame(start: datetime, days: int) -> pl.DataFrame:
 
 
 def test_chunked_runner_matches_full_run_with_fills(monkeypatch):
-    monkeypatch.setenv("LQ_SKIP_AHEAD", "0")
+    monkeypatch.setenv("LQ__BACKTEST__SKIP_AHEAD_ENABLED", "0")
 
     symbol = "BTC/USDT"
     start = datetime(2026, 1, 1, 0, 0, 0)

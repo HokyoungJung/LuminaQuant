@@ -37,7 +37,7 @@ from lumina_quant.strategy import Strategy
 from lumina_quant.utils.audit_store import AuditStore
 
 try:
-    from strategies import registry as strategy_registry
+    from lumina_quant.strategies import registry as strategy_registry
 except Exception:
     class _PublicStubStrategy(Strategy):
         def __init__(self, *args, **kwargs):
@@ -222,8 +222,17 @@ def _env_float(name: str, default: float) -> float:
         return float(default)
 
 
-BT_CHUNK_DAYS = max(1, _env_int("LQ_BT_CHUNK_DAYS", 7))
-BT_CHUNK_WARMUP_BARS = max(0, _env_int("LQ_BT_CHUNK_WARMUP_BARS", 0))
+BT_CHUNK_DAYS = max(
+    1,
+    _env_int("LQ__BACKTEST__CHUNK_DAYS", int(getattr(BacktestConfig, "CHUNK_DAYS", 2))),
+)
+BT_CHUNK_WARMUP_BARS = max(
+    0,
+    _env_int(
+        "LQ__BACKTEST__CHUNK_WARMUP_BARS",
+        int(getattr(BacktestConfig, "CHUNK_WARMUP_BARS", 0)),
+    ),
+)
 
 
 TWO_STAGE_ENABLED = str(os.getenv("LQ_TWO_STAGE_OPT", "1")).strip().lower() not in {
@@ -541,7 +550,7 @@ def _execute_backtest(
                     start_date=chunk_start,
                     end_date=chunk_end,
                     chunk_days=max(1, int(BT_CHUNK_DAYS)),
-                    warmup_bars=0,
+                    warmup_bars=max(0, int(BT_CHUNK_WARMUP_BARS)),
                 )
 
             backtest = run_backtest_chunked(

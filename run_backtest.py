@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from lumina_quant.backtesting.backtest import Backtest
 from lumina_quant.backtesting.chunked_runner import run_backtest_chunked
 from lumina_quant.backtesting.data import HistoricCSVDataHandler
+from lumina_quant.backtesting.data_windowed_parquet import HistoricParquetWindowedDataHandler
 from lumina_quant.backtesting.execution_sim import SimulatedExecutionHandler
 from lumina_quant.backtesting.portfolio_backtest import Portfolio
 from lumina_quant.config import BacktestConfig, BaseConfig, LiveConfig, OptimizationConfig
@@ -17,8 +18,8 @@ from lumina_quant.parquet_market_data import (
     is_parquet_market_data_store,
     load_data_dict_from_parquet,
 )
+from lumina_quant.strategies import registry as strategy_registry
 from lumina_quant.utils.audit_store import AuditStore
-from strategies import registry as strategy_registry
 
 # ==========================================
 # CONFIGURATION FROM YAML
@@ -142,8 +143,55 @@ def _env_int(name, default):
         return int(default)
 
 
-BT_CHUNK_DAYS = max(1, _env_int("LQ_BT_CHUNK_DAYS", 7))
-BT_CHUNK_WARMUP_BARS = max(0, _env_int("LQ_BT_CHUNK_WARMUP_BARS", 0))
+BT_CHUNK_DAYS = max(
+    1,
+    _env_int("LQ__BACKTEST__CHUNK_DAYS", int(getattr(BacktestConfig, "CHUNK_DAYS", 2))),
+)
+BT_CHUNK_WARMUP_BARS = max(
+    0,
+    _env_int(
+        "LQ__BACKTEST__CHUNK_WARMUP_BARS",
+        int(getattr(BacktestConfig, "CHUNK_WARMUP_BARS", 0)),
+    ),
+)
+BACKTEST_POLL_SECONDS = max(
+    1,
+    _env_int(
+        "LQ__BACKTEST__POLL_SECONDS",
+        int(getattr(BacktestConfig, "POLL_SECONDS", 20)),
+    ),
+)
+BACKTEST_WINDOW_SECONDS = max(
+    1,
+    _env_int(
+        "LQ__BACKTEST__WINDOW_SECONDS",
+        int(getattr(BacktestConfig, "WINDOW_SECONDS", 20)),
+    ),
+)
+BACKTEST_DECISION_CADENCE_SECONDS = max(
+    1,
+    _env_int(
+        "LQ__BACKTEST__DECISION_CADENCE_SECONDS",
+        int(getattr(BacktestConfig, "DECISION_CADENCE_SECONDS", 20)),
+    ),
+)
+
+
+def _normalize_backtest_mode(value: str | None, default: str = "windowed") -> str:
+    token = str(value or default).strip().lower()
+    if token in {"windowed", "legacy_batch", "legacy_1s"}:
+        return token
+    return str(default)
+
+
+BACKTEST_MODE = _normalize_backtest_mode(
+    os.getenv("LQ_BACKTEST_MODE", str(getattr(BacktestConfig, "MODE", "windowed"))),
+    default="windowed",
+)
+os.environ.setdefault(
+    "LQ__BACKTEST__DECISION_CADENCE_SECONDS",
+    str(int(BACKTEST_DECISION_CADENCE_SECONDS)),
+)
 
 
 def _enforce_1s_base_timeframe(value: str) -> str:
@@ -390,6 +438,7 @@ def run(
     run_id="",
     low_memory=None,
     persist_output=None,
+    backtest_mode=BACKTEST_MODE,
 ):
     print("------------------------------------------------")
     print(f"Running Backtest for {SYMBOL_LIST}")
@@ -404,6 +453,20 @@ def run(
         low_memory=low_memory,
         persist_output=persist_output,
     )
+    resolved_backtest_mode = _normalize_backtest_mode(str(backtest_mode), "windowed")
+    selected_data_handler_cls = (
+        HistoricParquetWindowedDataHandler
+        if resolved_backtest_mode == "windowed"
+        else HistoricCSVDataHandler
+    )
+    selected_data_handler_kwargs = (
+        {
+            "backtest_poll_seconds": int(BACKTEST_POLL_SECONDS),
+            "backtest_window_seconds": int(BACKTEST_WINDOW_SECONDS),
+        }
+        if resolved_backtest_mode == "windowed"
+        else {}
+    )
     audit_store.start_run(
         mode="backtest",
         metadata={
@@ -416,6 +479,12 @@ def run(
             "base_timeframe": str(timeframe_token),
             "strategy_timeframe": str(BaseConfig.TIMEFRAME),
             "auto_collect_db": bool(auto_collect_db),
+            "backtest_poll_seconds": int(BACKTEST_POLL_SECONDS),
+            "backtest_window_seconds": int(BACKTEST_WINDOW_SECONDS),
+            "backtest_decision_cadence_seconds": int(BACKTEST_DECISION_CADENCE_SECONDS),
+            "backtest_mode": str(resolved_backtest_mode),
+            "chunk_days": int(BT_CHUNK_DAYS),
+            "chunk_warmup_bars": int(BT_CHUNK_WARMUP_BARS),
             **execution_profile,
         },
         run_id=backtest_run_id,
@@ -454,7 +523,7 @@ def run(
                     start_date=chunk_start,
                     end_date=chunk_end,
                     chunk_days=max(1, int(BT_CHUNK_DAYS)),
-                    warmup_bars=0,
+                    warmup_bars=max(0, int(BT_CHUNK_WARMUP_BARS)),
                 )
 
             backtest = run_backtest_chunked(
@@ -467,9 +536,11 @@ def run(
                 data_loader=_chunk_loader,
                 chunk_days=max(1, int(BT_CHUNK_DAYS)),
                 strategy_timeframe=str(BaseConfig.TIMEFRAME),
-                data_handler_cls=HistoricCSVDataHandler,
+                data_handler_cls=selected_data_handler_cls,
                 execution_handler_cls=SimulatedExecutionHandler,
                 portfolio_cls=Portfolio,
+                backtest_mode=str(resolved_backtest_mode),
+                data_handler_kwargs=selected_data_handler_kwargs,
                 record_history=bool(execution_profile["record_history"]),
                 track_metrics=bool(execution_profile["track_metrics"]),
                 record_trades=bool(execution_profile["record_trades"]),
@@ -488,12 +559,13 @@ def run(
                 symbol_list=SYMBOL_LIST,
                 start_date=START_DATE,
                 end_date=END_DATE,
-                data_handler_cls=HistoricCSVDataHandler,
+                data_handler_cls=selected_data_handler_cls,
                 execution_handler_cls=SimulatedExecutionHandler,
                 portfolio_cls=Portfolio,
                 strategy_cls=STRATEGY_CLASS,
                 strategy_params=STRATEGY_PARAMS,
                 data_dict=data_dict,
+                data_handler_kwargs=selected_data_handler_kwargs,
                 record_history=bool(execution_profile["record_history"]),
                 track_metrics=bool(execution_profile["track_metrics"]),
                 record_trades=bool(execution_profile["record_trades"]),
@@ -552,6 +624,12 @@ if __name__ == "__main__":
         help="Collection/backtest source timeframe. Use the minimum resolution (recommended: 1s).",
     )
     parser.add_argument(
+        "--backtest-mode",
+        choices=["windowed", "legacy_batch", "legacy_1s"],
+        default=BACKTEST_MODE,
+        help="Backtest event model: windowed (default) or legacy modes.",
+    )
+    parser.add_argument(
         "--run-id",
         default="",
         help="Optional external run_id for audit trail correlation.",
@@ -602,4 +680,5 @@ if __name__ == "__main__":
         run_id=args.run_id,
         low_memory=args.low_memory,
         persist_output=args.persist_output,
+        backtest_mode=args.backtest_mode,
     )

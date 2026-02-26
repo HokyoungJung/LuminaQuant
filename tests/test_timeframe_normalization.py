@@ -1,6 +1,6 @@
 import unittest
 
-from lumina_quant.backtest import TimeframeGatedStrategy
+from lumina_quant.backtesting.backtest import TimeframeGatedStrategy
 from lumina_quant.market_data import normalize_timeframe_token, timeframe_to_milliseconds
 
 

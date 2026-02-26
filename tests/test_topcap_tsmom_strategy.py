@@ -2,8 +2,8 @@ import queue
 import unittest
 from dataclasses import dataclass
 
-from lumina_quant.events import MarketEvent
-from strategies.topcap_tsmom import TopCapTimeSeriesMomentumStrategy
+from lumina_quant.core.events import MarketEvent
+from lumina_quant.strategies.topcap_tsmom import TopCapTimeSeriesMomentumStrategy
 
 
 @dataclass

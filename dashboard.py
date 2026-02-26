@@ -38,9 +38,9 @@ if PROJECT_ROOT not in sys.path:
 
 
 def _ensure_project_strategies_module(project_root):
-    strategies_dir = os.path.join(project_root, "strategies")
+    strategies_dir = os.path.join(project_root, "lumina_quant", "strategies")
     expected_init = os.path.abspath(os.path.join(strategies_dir, "__init__.py"))
-    loaded = sys.modules.get("strategies")
+    loaded = sys.modules.get("lumina_quant.strategies")
     if loaded is None:
         return
 
@@ -49,13 +49,13 @@ def _ensure_project_strategies_module(project_root):
     if loaded_file == expected_init:
         return
 
-    sys.modules.pop("strategies", None)
-    sys.modules.pop("strategies.registry", None)
+    sys.modules.pop("lumina_quant.strategies", None)
+    sys.modules.pop("lumina_quant.strategies.registry", None)
 
 
 _ensure_project_strategies_module(PROJECT_ROOT)
 
-strategy_registry = importlib.import_module("strategies.registry")
+strategy_registry = importlib.import_module("lumina_quant.strategies.registry")
 
 st.set_page_config(layout="wide", page_title="LuminaQuant Dashboard")
 st.title("LuminaQuant: Full Trading Intelligence")

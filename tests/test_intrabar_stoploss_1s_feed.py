@@ -7,7 +7,7 @@ from lumina_quant.backtesting.backtest import Backtest
 from lumina_quant.backtesting.data import HistoricCSVDataHandler
 from lumina_quant.backtesting.execution_sim import SimulatedExecutionHandler
 from lumina_quant.backtesting.portfolio_backtest import Portfolio
-from lumina_quant.events import SignalEvent
+from lumina_quant.core.events import SignalEvent
 from lumina_quant.strategy import Strategy
 
 

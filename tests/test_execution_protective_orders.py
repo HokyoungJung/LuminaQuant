@@ -2,8 +2,8 @@ import queue
 import unittest
 from datetime import datetime, timedelta
 
-from lumina_quant.events import MarketEvent, OrderEvent
-from lumina_quant.execution import SimulatedExecutionHandler
+from lumina_quant.backtesting.execution_sim import SimulatedExecutionHandler
+from lumina_quant.core.events import MarketEvent, OrderEvent
 
 
 class _MockBars:

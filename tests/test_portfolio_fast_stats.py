@@ -5,7 +5,7 @@ from __future__ import annotations
 import unittest
 from datetime import datetime, timedelta
 
-from lumina_quant.portfolio import Portfolio
+from lumina_quant.backtesting.portfolio_backtest import Portfolio
 
 
 class MockBars:

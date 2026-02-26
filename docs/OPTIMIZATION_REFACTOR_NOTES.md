@@ -38,13 +38,13 @@ existing behavior while reducing runtime and temporary allocations.
 
 ### Pair strategy
 
-- `strategies/pair_trading_zscore.py` now keeps incremental return histories.
+- `lumina_quant/strategies/pair_trading_zscore.py` now keeps incremental return histories.
 - Removes repeated full-history return reconstruction in `_vol_spread_zscore()`.
 - Uses iterator-based tail aggregation in ATR filter.
 
 ### Top-cap momentum strategy
 
-- `strategies/topcap_tsmom.py` now computes BTC regime MA from iterator slices
+- `lumina_quant/strategies/topcap_tsmom.py` now computes BTC regime MA from iterator slices
   instead of materializing a full list each call.
 
 ### Portfolio and performance stats

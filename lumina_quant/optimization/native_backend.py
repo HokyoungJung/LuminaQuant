@@ -11,11 +11,35 @@ from pathlib import Path
 from typing import Any, cast
 
 import numpy as np
+from lumina_quant.optimization.constants import (
+    DEFAULT_ANNUAL_PERIODS,
+    METRIC_FALLBACK_SHARPE,
+    METRIC_FALLBACK_TRIPLE,
+    NATIVE_AUTO_SELECT_ENV,
+    NATIVE_BACKEND_DLL_ENV,
+    NATIVE_BACKEND_ENV,
+    NATIVE_BENCH_DEFAULT_LOOPS,
+    NATIVE_BENCH_DEFAULT_TOL,
+    NATIVE_BENCH_LOOPS_ENV,
+    NATIVE_BENCH_MIN_ELAPSED_SECONDS,
+    NATIVE_BENCH_MIN_LOOPS,
+    NATIVE_BENCH_MIN_TOL,
+    NATIVE_BENCH_RANDOM_SEED,
+    NATIVE_BENCH_RETURNS_STD,
+    NATIVE_BENCH_SAMPLE_SIZE,
+    NATIVE_BENCH_STARTING_CAPITAL,
+    NATIVE_MIN_SPEEDUP_ENV,
+    NATIVE_MODE_AUTO,
+    NATIVE_MODE_NATIVE,
+    NATIVE_MODE_NUMBA,
+    NATIVE_MODE_PYTHON,
+    NATIVE_SELECTION_TOL_ENV,
+)
 from lumina_quant.optimization.fast_eval import NUMBA_AVAILABLE, evaluate_metrics_numba
 
 _NATIVE_FN: Any = None
 _NATIVE_DLL: str = ""
-_BACKEND_MODE = "numba" if NUMBA_AVAILABLE else "python"
+_BACKEND_MODE = NATIVE_MODE_NUMBA if NUMBA_AVAILABLE else NATIVE_MODE_PYTHON
 NATIVE_BACKEND_NAME = _BACKEND_MODE
 
 
@@ -97,7 +121,7 @@ def _evaluate_native_fn(
 
 def _evaluate_python(total_series: np.ndarray, annual_periods: int) -> tuple[float, float, float]:
     if total_series.size < 2:
-        return -999.0, 0.0, 0.0
+        return METRIC_FALLBACK_TRIPLE
 
     prev_total = total_series[:-1]
     next_total = total_series[1:]
@@ -114,7 +138,7 @@ def _evaluate_python(total_series: np.ndarray, annual_periods: int) -> tuple[flo
     if std_r > 0.0:
         sharpe = mean_r / std_r * np.sqrt(float(max(1, annual_periods)))
     else:
-        sharpe = -999.0
+        sharpe = METRIC_FALLBACK_SHARPE
 
     initial = float(total_series[0])
     final = float(total_series[-1])
@@ -151,7 +175,7 @@ def _bench(
     start = time.perf_counter()
     for _ in range(loops_i):
         out = fn(arr, annual_periods)
-    elapsed = max(1e-9, time.perf_counter() - start)
+    elapsed = max(NATIVE_BENCH_MIN_ELAPSED_SECONDS, time.perf_counter() - start)
     out_tuple = cast(tuple[float, float, float], out)
     return float(loops_i) / elapsed, (
         float(out_tuple[0]),
@@ -162,7 +186,7 @@ def _bench(
 
 def _discover_dll_candidates() -> list[tuple[str, str]]:
     out: list[tuple[str, str]] = []
-    explicit = str(os.getenv("LQ_NATIVE_METRICS_DLL", "")).strip()
+    explicit = str(os.getenv(NATIVE_BACKEND_DLL_ENV, "")).strip()
     if explicit:
         return [("explicit", explicit)]
 
@@ -205,47 +229,47 @@ def _outputs_close(
 def _select_fastest_backend() -> None:
     global _NATIVE_FN, _NATIVE_DLL, _BACKEND_MODE, NATIVE_BACKEND_NAME
 
-    fallback_name = "numba" if NUMBA_AVAILABLE else "python"
+    fallback_name = NATIVE_MODE_NUMBA if NUMBA_AVAILABLE else NATIVE_MODE_PYTHON
     fallback_fn = _evaluate_numba_or_python
     _BACKEND_MODE = fallback_name
     NATIVE_BACKEND_NAME = fallback_name
 
-    mode_override = str(os.getenv("LQ_NATIVE_BACKEND", "auto")).strip().lower()
-    if mode_override == "python":
-        _BACKEND_MODE = "python"
-        NATIVE_BACKEND_NAME = "python"
+    mode_override = str(os.getenv(NATIVE_BACKEND_ENV, NATIVE_MODE_AUTO)).strip().lower()
+    if mode_override == NATIVE_MODE_PYTHON:
+        _BACKEND_MODE = NATIVE_MODE_PYTHON
+        NATIVE_BACKEND_NAME = NATIVE_MODE_PYTHON
         return
-    if mode_override == "numba" and NUMBA_AVAILABLE:
-        _BACKEND_MODE = "numba"
-        NATIVE_BACKEND_NAME = "numba"
+    if mode_override == NATIVE_MODE_NUMBA and NUMBA_AVAILABLE:
+        _BACKEND_MODE = NATIVE_MODE_NUMBA
+        NATIVE_BACKEND_NAME = NATIVE_MODE_NUMBA
         return
 
     candidates = _discover_dll_candidates()
     if not candidates:
         return
 
-    if mode_override == "native":
+    if mode_override == NATIVE_MODE_NATIVE:
         for candidate_name, dll_path in candidates:
             fn = _load_native_function(dll_path)
             if fn is None:
                 continue
             _NATIVE_FN = fn
             _NATIVE_DLL = dll_path
-            _BACKEND_MODE = "native"
-            NATIVE_BACKEND_NAME = f"native:{candidate_name}"
+            _BACKEND_MODE = NATIVE_MODE_NATIVE
+            NATIVE_BACKEND_NAME = f"{NATIVE_MODE_NATIVE}:{candidate_name}"
             return
         return
 
-    auto_select = _env_bool("LQ_NATIVE_AUTO_SELECT", True)
-    min_gain = max(0.0, _env_float("LQ_NATIVE_MIN_SPEEDUP", 0.0))
-    loops = max(32, _env_int("LQ_NATIVE_BENCH_LOOPS", 256))
-    tol = max(1e-12, _env_float("LQ_NATIVE_SELECTION_TOL", 1e-9))
+    auto_select = _env_bool(NATIVE_AUTO_SELECT_ENV, True)
+    min_gain = max(0.0, _env_float(NATIVE_MIN_SPEEDUP_ENV, 0.0))
+    loops = max(NATIVE_BENCH_MIN_LOOPS, _env_int(NATIVE_BENCH_LOOPS_ENV, NATIVE_BENCH_DEFAULT_LOOPS))
+    tol = max(NATIVE_BENCH_MIN_TOL, _env_float(NATIVE_SELECTION_TOL_ENV, NATIVE_BENCH_DEFAULT_TOL))
 
-    rng = np.random.default_rng(7)
-    returns = rng.normal(0.0, 0.001, size=4096).astype(np.float64)
-    series = (1.0 + returns).cumprod() * 10_000.0
+    rng = np.random.default_rng(NATIVE_BENCH_RANDOM_SEED)
+    returns = rng.normal(0.0, NATIVE_BENCH_RETURNS_STD, size=NATIVE_BENCH_SAMPLE_SIZE).astype(np.float64)
+    series = (1.0 + returns).cumprod() * NATIVE_BENCH_STARTING_CAPITAL
 
-    fallback_speed, fallback_out = _bench(fallback_fn, series, 252, loops)
+    fallback_speed, fallback_out = _bench(fallback_fn, series, DEFAULT_ANNUAL_PERIODS, loops)
     best_speed = fallback_speed
     best_name = fallback_name
     best_fn = None
@@ -263,18 +287,18 @@ def _select_fastest_backend() -> None:
         ) -> tuple[float, float, float]:
             out = _evaluate_native_fn(_fn, arr, periods)
             if out is None:
-                return -999.0, 0.0, 0.0
+                return METRIC_FALLBACK_TRIPLE
             return out
 
-        native_speed, native_out = _bench(_call_native, series, 252, loops)
+        native_speed, native_out = _bench(_call_native, series, DEFAULT_ANNUAL_PERIODS, loops)
         if not _outputs_close(native_out, fallback_out, tol):
             continue
 
         if not auto_select:
             _NATIVE_FN = fn
             _NATIVE_DLL = dll_path
-            _BACKEND_MODE = "native"
-            NATIVE_BACKEND_NAME = f"native:{candidate_name}"
+            _BACKEND_MODE = NATIVE_MODE_NATIVE
+            NATIVE_BACKEND_NAME = f"{NATIVE_MODE_NATIVE}:{candidate_name}"
             return
 
         threshold = best_speed * (1.0 + min_gain)
@@ -288,8 +312,8 @@ def _select_fastest_backend() -> None:
         return
     _NATIVE_FN = best_fn
     _NATIVE_DLL = best_dll
-    _BACKEND_MODE = "native"
-    NATIVE_BACKEND_NAME = f"native:{best_name}"
+    _BACKEND_MODE = NATIVE_MODE_NATIVE
+    NATIVE_BACKEND_NAME = f"{NATIVE_MODE_NATIVE}:{best_name}"
 
 
 _select_fastest_backend()
@@ -300,7 +324,7 @@ def evaluate_metrics_backend(
     annual_periods: int,
 ) -> tuple[float, float, float]:
     """Evaluate metrics via selected fastest backend with safe fallback."""
-    if _BACKEND_MODE == "native" and _NATIVE_FN is not None:
+    if _BACKEND_MODE == NATIVE_MODE_NATIVE and _NATIVE_FN is not None:
         native_out = _evaluate_native_fn(_NATIVE_FN, total_series, annual_periods)
         if native_out is not None:
             return native_out

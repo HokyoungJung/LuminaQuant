@@ -53,6 +53,8 @@ class ExecutionConfig:
     maintenance_margin_rate: float = 0.005
     liquidation_buffer_rate: float = 0.0005
     compute_backend: str = "auto"
+    gpu_mode: str = "auto"
+    gpu_vram_gb: float = 8.0
 
 
 @dataclass(slots=True)
@@ -80,6 +82,15 @@ class BacktestRuntimeConfig:
     random_seed: int = 42
     persist_output: bool = True
     leverage: int = 3
+    poll_seconds: int = 20
+    window_seconds: int = 20
+    decision_cadence_seconds: int = 20
+    chunk_days: int = 2
+    chunk_warmup_bars: int = 0
+    skip_ahead_enabled: bool = True
+    backtest_poll_seconds: int | None = None
+    backtest_window_seconds: int | None = None
+    backtest_decision_seconds: int | None = None
 
 
 @dataclass(slots=True)
@@ -100,7 +111,12 @@ class LiveRuntimeConfig:
 
     mode: str = "paper"
     require_real_enable_flag: bool = True
-    poll_interval: int = 2
+    poll_interval: int = 20
+    poll_seconds: int = 20
+    window_seconds: int = 20
+    decision_cadence_seconds: int = 20
+    live_poll_seconds: int | None = None
+    ingest_window_seconds: int | None = None
     order_timeout: int = 10
     heartbeat_interval_sec: int = 30
     reconciliation_interval_sec: int = 30

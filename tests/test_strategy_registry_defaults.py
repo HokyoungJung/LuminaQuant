@@ -5,7 +5,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from strategies import registry as strategy_registry
+from lumina_quant.strategies import registry as strategy_registry
 
 
 def test_registry_includes_rsi_and_moving_average_strategies():

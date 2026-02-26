@@ -46,7 +46,7 @@ dev = [
 include-package-data = true
 
 [tool.setuptools.packages.find]
-include = ["lumina_quant*", "strategies*"]
+include = ["lumina_quant*"]
 
 [tool.ruff]
 target-version = "py311"

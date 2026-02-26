@@ -112,13 +112,10 @@ def apply_env_overrides(data: dict[str, Any], env: Mapping[str, str]) -> dict[st
     """Apply `LQ_` env overrides onto the config dictionary."""
     merged = dict(data)
     for key, raw_value in env.items():
-        if not key.startswith("LQ_"):
+        if not key.startswith("LQ__"):
             continue
         value = _parse_env_scalar(raw_value)
-        if key.startswith("LQ__"):
-            tokens = [token for token in key[4:].split("__") if token]
-        else:
-            tokens = [token for token in key[3:].split("__") if token]
+        tokens = [token for token in key[4:].split("__") if token]
         if not tokens:
             continue
         _set_nested_value(merged, tokens, value)
@@ -229,19 +226,125 @@ def build_runtime_config(data: dict[str, Any], env: Mapping[str, str]) -> Runtim
     runtime.risk.risk_per_trade = _as_float(runtime.risk.risk_per_trade, 0.005)
     runtime.risk.max_daily_loss_pct = _as_float(runtime.risk.max_daily_loss_pct, 0.03)
     runtime.execution.slippage_rate = _as_float(runtime.execution.slippage_rate, 0.0005)
-    runtime.execution.compute_backend = (
-        str(runtime.execution.compute_backend).strip().lower() or "auto"
-    )
-    if runtime.execution.compute_backend not in {"auto", "cpu", "gpu", "forced-gpu"}:
+    def _normalize_backend_token(value: Any, *, field_name: str) -> str:
+        token = str(value or "").strip().lower().replace("_", "-")
+        if token in {"", "auto"}:
+            return "auto"
+        if token in {"cpu", "gpu"}:
+            return token
+        if token in {"force-gpu", "forcegpu", "forcedgpu", "forced-gpu"}:
+            return "forced-gpu"
         raise ValueError(
-            "execution.compute_backend must be one of: auto, cpu, gpu, forced-gpu. "
-            f"Received: {runtime.execution.compute_backend!r}"
+            f"{field_name} must be one of: auto, cpu, gpu, forced-gpu. Received: {value!r}"
         )
+
+    raw_gpu_mode = exec_raw.get("gpu_mode") if isinstance(exec_raw, dict) else None
+    raw_compute_backend = exec_raw.get("compute_backend") if isinstance(exec_raw, dict) else None
+    normalized_gpu_mode = _normalize_backend_token(
+        raw_gpu_mode if str(raw_gpu_mode or "").strip() else runtime.execution.gpu_mode,
+        field_name="execution.gpu_mode",
+    )
+    normalized_compute_backend = _normalize_backend_token(
+        raw_compute_backend if str(raw_compute_backend or "").strip() else runtime.execution.compute_backend,
+        field_name="execution.compute_backend",
+    )
+    requested_gpu_mode = (
+        normalized_gpu_mode
+        if str(raw_gpu_mode or "").strip()
+        else (
+            normalized_compute_backend
+            if str(raw_compute_backend or "").strip()
+            else normalized_gpu_mode
+        )
+    )
+    runtime.execution.gpu_mode = requested_gpu_mode
+    runtime.execution.compute_backend = requested_gpu_mode
+    runtime.execution.gpu_vram_gb = max(0.0, _as_float(runtime.execution.gpu_vram_gb, 0.0))
     runtime.live.exchange.leverage = _as_int(runtime.live.exchange.leverage, 3)
-    runtime.live.poll_interval = _as_int(runtime.live.poll_interval, 2)
+    runtime.live.poll_interval = max(1, _as_int(runtime.live.poll_interval, 20))
+    live_poll_raw = (
+        live_raw.get("live_poll_seconds")
+        if isinstance(live_raw, dict) and "live_poll_seconds" in live_raw
+        else (
+            live_raw.get("poll_seconds")
+            if isinstance(live_raw, dict) and "poll_seconds" in live_raw
+            else (
+                live_raw.get("poll_interval")
+                if isinstance(live_raw, dict) and "poll_interval" in live_raw
+                else runtime.live.poll_interval
+            )
+        )
+    )
+    runtime.live.poll_seconds = max(1, _as_int(live_poll_raw, runtime.live.poll_interval))
+    runtime.live.live_poll_seconds = int(runtime.live.poll_seconds)
+    runtime.live.poll_interval = int(runtime.live.poll_seconds)
+    ingest_window_raw = (
+        live_raw.get("ingest_window_seconds")
+        if isinstance(live_raw, dict) and "ingest_window_seconds" in live_raw
+        else (
+            live_raw.get("window_seconds")
+            if isinstance(live_raw, dict) and "window_seconds" in live_raw
+            else runtime.live.poll_seconds
+        )
+    )
+    runtime.live.window_seconds = max(1, _as_int(ingest_window_raw, runtime.live.poll_seconds))
+    runtime.live.ingest_window_seconds = int(runtime.live.window_seconds)
+    runtime.live.decision_cadence_seconds = max(
+        1,
+        _as_int(
+            runtime.live.decision_cadence_seconds,
+            runtime.live.poll_seconds,
+        ),
+    )
     runtime.live.reconciliation_interval_sec = _as_int(runtime.live.reconciliation_interval_sec, 30)
     runtime.backtest.random_seed = _as_int(runtime.backtest.random_seed, 42)
     runtime.backtest.leverage = _as_int(runtime.backtest.leverage, 3)
+    backtest_poll_raw = (
+        backtest_raw.get("backtest_poll_seconds")
+        if isinstance(backtest_raw, dict) and "backtest_poll_seconds" in backtest_raw
+        else (
+            backtest_raw.get("poll_seconds")
+            if isinstance(backtest_raw, dict) and "poll_seconds" in backtest_raw
+            else runtime.live.poll_seconds
+        )
+    )
+    runtime.backtest.poll_seconds = max(1, _as_int(backtest_poll_raw, runtime.live.poll_seconds))
+    runtime.backtest.backtest_poll_seconds = int(runtime.backtest.poll_seconds)
+    backtest_window_raw = (
+        backtest_raw.get("backtest_window_seconds")
+        if isinstance(backtest_raw, dict) and "backtest_window_seconds" in backtest_raw
+        else (
+            backtest_raw.get("window_seconds")
+            if isinstance(backtest_raw, dict) and "window_seconds" in backtest_raw
+            else runtime.live.window_seconds
+        )
+    )
+    runtime.backtest.window_seconds = max(1, _as_int(backtest_window_raw, runtime.live.window_seconds))
+    runtime.backtest.backtest_window_seconds = int(runtime.backtest.window_seconds)
+    backtest_decision_raw = (
+        backtest_raw.get("decision_cadence_seconds")
+        if isinstance(backtest_raw, dict) and "decision_cadence_seconds" in backtest_raw
+        else (
+            backtest_raw.get("backtest_decision_seconds")
+            if isinstance(backtest_raw, dict) and "backtest_decision_seconds" in backtest_raw
+            else (
+                backtest_raw.get("decision_seconds")
+                if isinstance(backtest_raw, dict) and "decision_seconds" in backtest_raw
+                else runtime.live.decision_cadence_seconds
+            )
+        )
+    )
+    runtime.backtest.decision_cadence_seconds = max(
+        1,
+        _as_int(backtest_decision_raw, runtime.live.decision_cadence_seconds),
+    )
+    runtime.backtest.backtest_decision_seconds = int(runtime.backtest.decision_cadence_seconds)
+    runtime.backtest.chunk_days = max(1, _as_int(runtime.backtest.chunk_days, 2))
+    runtime.backtest.chunk_warmup_bars = max(
+        0,
+        _as_int(runtime.backtest.chunk_warmup_bars, 0),
+    )
+    runtime.backtest.skip_ahead_enabled = _as_bool(runtime.backtest.skip_ahead_enabled, True)
     runtime.optimization.walk_forward_folds = _as_int(runtime.optimization.walk_forward_folds, 3)
     runtime.optimization.overfit_penalty = _as_float(runtime.optimization.overfit_penalty, 0.5)
     runtime.optimization.max_workers = _as_int(runtime.optimization.max_workers, 4)

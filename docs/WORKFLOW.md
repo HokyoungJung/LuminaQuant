@@ -41,7 +41,7 @@ We provide automation scripts for both Windows (PowerShell) and Mac/Linux (Bash)
     ```
 
 ### B. Publishing to Public API
-**Goal**: Create a conflict-free public sync PR from private source while excluding private strategies/data.
+**Goal**: Create a conflict-free public sync PR from private source while excluding private lumina_quant/strategies/data.
 
 *   **Windows**:
     ```powershell

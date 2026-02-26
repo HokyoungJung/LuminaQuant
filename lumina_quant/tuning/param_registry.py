@@ -123,7 +123,6 @@ class HyperParam:
     tunable: bool = True
     optuna: Mapping[str, Any] | None = None
     grid: Sequence[Any] | None = None
-    aliases: tuple[str, ...] = ()
     description: str = ""
     parser: Callable[[Any, Any], Any] | None = None
 
@@ -139,7 +138,6 @@ class HyperParam:
         tunable: bool = True,
         optuna: Mapping[str, Any] | None = None,
         grid: Sequence[Any] | None = None,
-        aliases: Sequence[str] | None = None,
         description: str = "",
     ) -> HyperParam:
         return cls(
@@ -152,7 +150,6 @@ class HyperParam:
             tunable=tunable,
             optuna=optuna,
             grid=grid,
-            aliases=tuple(aliases or ()),
             description=description,
         )
 
@@ -168,7 +165,6 @@ class HyperParam:
         tunable: bool = True,
         optuna: Mapping[str, Any] | None = None,
         grid: Sequence[Any] | None = None,
-        aliases: Sequence[str] | None = None,
         description: str = "",
     ) -> HyperParam:
         return cls(
@@ -181,7 +177,6 @@ class HyperParam:
             tunable=tunable,
             optuna=optuna,
             grid=grid,
-            aliases=tuple(aliases or ()),
             description=description,
         )
 
@@ -194,7 +189,6 @@ class HyperParam:
         tunable: bool = True,
         optuna: Mapping[str, Any] | None = None,
         grid: Sequence[Any] | None = None,
-        aliases: Sequence[str] | None = None,
         description: str = "",
     ) -> HyperParam:
         return cls(
@@ -204,7 +198,6 @@ class HyperParam:
             tunable=tunable,
             optuna=optuna,
             grid=grid,
-            aliases=tuple(aliases or ()),
             description=description,
         )
 
@@ -218,7 +211,6 @@ class HyperParam:
         tunable: bool = True,
         optuna: Mapping[str, Any] | None = None,
         grid: Sequence[Any] | None = None,
-        aliases: Sequence[str] | None = None,
         description: str = "",
     ) -> HyperParam:
         choice_tuple = tuple(choices)
@@ -230,7 +222,6 @@ class HyperParam:
             tunable=tunable,
             optuna=optuna,
             grid=grid,
-            aliases=tuple(aliases or ()),
             description=description,
         )
 
@@ -241,7 +232,6 @@ class HyperParam:
         default: str = "",
         *,
         tunable: bool = False,
-        aliases: Sequence[str] | None = None,
         description: str = "",
     ) -> HyperParam:
         return cls(
@@ -249,7 +239,6 @@ class HyperParam:
             kind="str",
             default=str(default),
             tunable=tunable,
-            aliases=tuple(aliases or ()),
             description=description,
         )
 
@@ -262,7 +251,6 @@ class HyperParam:
         min_value: int = 1,
         max_value: int | None = None,
         tunable: bool = False,
-        aliases: Sequence[str] | None = None,
         description: str = "",
     ) -> HyperParam:
         default_tuple = tuple(int(item) for item in default)
@@ -280,7 +268,6 @@ class HyperParam:
             kind="int_tuple",
             default=default_tuple,
             tunable=tunable,
-            aliases=tuple(aliases or ()),
             description=description,
             parser=_parser,
         )
@@ -402,16 +389,11 @@ def resolve_params_from_schema(
     resolved: dict[str, Any] = {}
     used_keys: set[str] = set()
     for key, param in schema.items():
-        aliases = [key, *tuple(param.aliases or ())]
-        raw = None
-        found = False
-        for alias in aliases:
-            if alias in source:
-                raw = source[alias]
-                used_keys.add(alias)
-                found = True
-                break
-        resolved[key] = param.resolve(raw if found else None)
+        has_value = key in source
+        raw = source.get(key)
+        if has_value:
+            used_keys.add(key)
+        resolved[key] = param.resolve(raw if has_value else None)
 
     if keep_unknown:
         for key, value in source.items():
@@ -434,6 +416,43 @@ class ParamRegistry:
 
     def __init__(self):
         self._bundles: dict[str, _StrategySchemaBundle] = {}
+        self._runtime_values: dict[str, float] = {}
+
+    # Runtime override key-value registry helpers (used by Alpha101 constants).
+    def update(self, mapping: Mapping[str, Any]) -> None:
+        for key, value in mapping.items():
+            try:
+                self._runtime_values[str(key)] = float(value)
+            except Exception:
+                continue
+
+    def set(self, key: str, value: Any) -> None:
+        try:
+            self._runtime_values[str(key)] = float(value)
+        except Exception:
+            return
+
+    def get(self, key: str, default: Any = 0.0) -> float:
+        try:
+            fallback = float(default)
+        except Exception:
+            fallback = 0.0
+        return float(self._runtime_values.get(str(key), fallback))
+
+    def clear_prefix(self, prefix: str = "") -> None:
+        prefix_s = str(prefix)
+        if not prefix_s:
+            self._runtime_values.clear()
+            return
+        keys = [key for key in self._runtime_values if key.startswith(prefix_s)]
+        for key in keys:
+            self._runtime_values.pop(key, None)
+
+    def snapshot(self, prefix: str = "") -> dict[str, float]:
+        prefix_s = str(prefix)
+        if not prefix_s:
+            return dict(self._runtime_values)
+        return {key: value for key, value in self._runtime_values.items() if key.startswith(prefix_s)}
 
     def register(
         self,
@@ -491,12 +510,7 @@ class ParamRegistry:
             return dict(overrides or {})
 
         source = dict(overrides or {})
-        alias_source = dict(source)
-        canonical_map = self.get_canonical_names(name)
-        for key, canonical in canonical_map.items():
-            if canonical in source and key not in alias_source:
-                alias_source[key] = source[canonical]
-        return resolve_params_from_schema(bundle.schema, alias_source, keep_unknown=keep_unknown)
+        return resolve_params_from_schema(bundle.schema, source, keep_unknown=keep_unknown)
 
     def default_params(self, strategy_name: str) -> dict[str, Any]:
         return self.resolve_params(strategy_name, {}, keep_unknown=False)

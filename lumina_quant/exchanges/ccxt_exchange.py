@@ -1,7 +1,7 @@
 from typing import Any, cast
 
 import ccxt
-from lumina_quant.interfaces import ExchangeInterface
+from lumina_quant.core.protocols import ExchangeInterface
 
 
 class CCXTExchange(ExchangeInterface):

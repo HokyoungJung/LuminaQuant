@@ -7,6 +7,14 @@ from datetime import datetime
 
 import numpy as np
 import polars as pl
+from lumina_quant.optimization.constants import (
+    FROZEN_DEFAULT_ROLLING_WINDOW,
+    FROZEN_DEFAULT_SPLIT_KEY,
+    TIMESTAMP_MEDIUM_SCALE_TO_NS,
+    TIMESTAMP_MEDIUM_THRESHOLD,
+    TIMESTAMP_SMALL_SCALE_TO_NS,
+    TIMESTAMP_SMALL_THRESHOLD,
+)
 
 
 @dataclass(slots=True)
@@ -25,10 +33,10 @@ def _as_ns_epoch(value) -> int:
         return int(value.timestamp() * 1_000_000_000)
     if isinstance(value, (int, float)):
         raw = int(value)
-        if abs(raw) < 100_000_000_000:
-            return raw * 1_000_000
-        if abs(raw) < 100_000_000_000_000:
-            return raw * 1_000
+        if abs(raw) < TIMESTAMP_SMALL_THRESHOLD:
+            return raw * TIMESTAMP_SMALL_SCALE_TO_NS
+        if abs(raw) < TIMESTAMP_MEDIUM_THRESHOLD:
+            return raw * TIMESTAMP_MEDIUM_SCALE_TO_NS
         return raw
     try:
         parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
@@ -39,7 +47,7 @@ def _as_ns_epoch(value) -> int:
 
 def _build_split_ranges(timestamp_ns: np.ndarray, split: dict | None) -> dict[str, tuple[int, int]]:
     if not split:
-        return {"all": (0, int(timestamp_ns.shape[0]))}
+        return {FROZEN_DEFAULT_SPLIT_KEY: (0, int(timestamp_ns.shape[0]))}
 
     out: dict[str, tuple[int, int]] = {}
     boundaries = {
@@ -59,14 +67,18 @@ def _build_split_ranges(timestamp_ns: np.ndarray, split: dict | None) -> dict[st
             hi = lo
         out[key] = (lo, hi)
     if not out:
-        out["all"] = (0, int(timestamp_ns.shape[0]))
+        out[FROZEN_DEFAULT_SPLIT_KEY] = (0, int(timestamp_ns.shape[0]))
     return out
 
 
 def build_frozen_dataset(
-    data_dict: dict[str, pl.DataFrame], split: dict | None = None
+    data_dict: dict[str, pl.DataFrame],
+    split: dict | None = None,
+    *,
+    rolling_window: int = FROZEN_DEFAULT_ROLLING_WINDOW,
 ) -> FrozenDataset:
     """Run one-time ETL and produce contiguous arrays reused in all trials."""
+    rolling_window_i = max(1, int(rolling_window))
     if not data_dict:
         empty = np.asarray([], dtype=np.float64)
         return FrozenDataset(
@@ -76,7 +88,7 @@ def build_frozen_dataset(
             returns=empty,
             roll_mean_32=empty,
             roll_std_32=empty,
-            split_ranges={"all": (0, 0)},
+            split_ranges={FROZEN_DEFAULT_SPLIT_KEY: (0, 0)},
         )
 
     frames: list[pl.DataFrame] = []
@@ -108,12 +120,12 @@ def build_frozen_dataset(
             .fill_null(0.0)
             .alias("returns"),
             pl.col("close")
-            .rolling_mean(window_size=32)
+            .rolling_mean(window_size=rolling_window_i)
             .over("symbol")
             .fill_null(0.0)
             .alias("roll_mean_32"),
             pl.col("close")
-            .rolling_std(window_size=32)
+            .rolling_std(window_size=rolling_window_i)
             .over("symbol")
             .fill_null(0.0)
             .alias("roll_std_32"),

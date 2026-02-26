@@ -9,12 +9,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from strategies.factory_candidate_set import (
+from lumina_quant.strategies.factory_candidate_set import (
     DEFAULT_TIMEFRAMES,
     build_candidate_set,
     summarize_candidate_set,
 )
-from strategies.factory_candidate_set import (
+from lumina_quant.strategies.factory_candidate_set import (
     DEFAULT_TOP10_PLUS_METALS as DEFAULT_BINANCE_TOP10_PLUS_METALS,
 )
 

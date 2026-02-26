@@ -1,4 +1,5 @@
 import lumina_quant.compute_engine as compute_engine
+import polars as pl
 import pytest
 
 
@@ -132,6 +133,19 @@ def test_parse_gpu_device_rejects_invalid_values():
         compute_engine._parse_gpu_device("cuda:x")
 
 
+def test_parse_gpu_vram_accepts_numeric_values():
+    assert compute_engine._parse_gpu_vram_gb(None) == 0.0
+    assert compute_engine._parse_gpu_vram_gb("0") == 0.0
+    assert compute_engine._parse_gpu_vram_gb("6.5") == 6.5
+
+
+def test_parse_gpu_vram_rejects_invalid_values():
+    with pytest.raises(ValueError):
+        compute_engine._parse_gpu_vram_gb("abc")
+    with pytest.raises(ValueError):
+        compute_engine._parse_gpu_vram_gb("-1")
+
+
 def test_collect_uses_provided_engine_without_reselecting(monkeypatch):
     class _FakeLazyFrame:
         def __init__(self):
@@ -169,3 +183,81 @@ def test_resolve_compute_engine_aliases_select_engine(monkeypatch):
     resolved = compute_engine.resolve_compute_engine(mode="auto")
 
     assert resolved is sentinel
+
+
+def test_gpu_collect_falls_back_to_cpu_on_oom_when_not_forced(monkeypatch):
+    class _FakeLazyFrame:
+        def __init__(self):
+            self.engines = []
+
+        def collect(self, *, engine):
+            self.engines.append(engine)
+            if engine != "streaming":
+                raise RuntimeError("CUDA out of memory")
+            return {"engine": engine}
+
+    monkeypatch.setattr(compute_engine, "_build_gpu_engine", lambda *, device: f"gpu:{device}")
+
+    lazy = _FakeLazyFrame()
+    engine = compute_engine.ComputeEngine(
+        requested_mode="auto",
+        resolved_engine="gpu",
+        device=0,
+        verbose=False,
+        reason="test",
+    )
+
+    out = engine.collect(lazy)
+
+    assert out == {"engine": "streaming"}
+    assert lazy.engines == ["gpu:0", "streaming"]
+
+
+def test_gpu_collect_keeps_oom_when_forced(monkeypatch):
+    class _FakeLazyFrame:
+        def collect(self, *, engine):
+            raise RuntimeError("CUDA out of memory")
+
+    monkeypatch.setattr(compute_engine, "_build_gpu_engine", lambda *, device: f"gpu:{device}")
+
+    lazy = _FakeLazyFrame()
+    engine = compute_engine.ComputeEngine(
+        requested_mode="forced-gpu",
+        resolved_engine="gpu",
+        device=0,
+        verbose=False,
+        reason="test",
+    )
+
+    with pytest.raises(RuntimeError, match="out of memory"):
+        engine.collect(lazy)
+
+
+def test_compare_cpu_gpu_determinism_report(monkeypatch):
+    class _FakeEngine:
+        def __init__(self, frame: pl.DataFrame):
+            self._frame = frame
+
+        def collect(self, lazy_frame):
+            _ = lazy_frame
+            return self._frame
+
+    cpu_frame = pl.DataFrame({"x": [1.0, 2.0], "y": [3.0, 4.0]})
+    gpu_frame = pl.DataFrame({"x": [1.0, 2.0], "y": [3.0, 4.0]})
+
+    def _fake_select_engine(*, mode, **kwargs):
+        _ = kwargs
+        if mode == "cpu":
+            return _FakeEngine(cpu_frame)
+        if mode == "gpu":
+            return _FakeEngine(gpu_frame)
+        raise AssertionError(f"unexpected mode={mode}")
+
+    monkeypatch.setattr(compute_engine, "select_engine", _fake_select_engine)
+
+    report = compute_engine.compare_cpu_gpu_determinism(None, tolerance=1e-12)
+
+    assert report["within_tolerance"] is True
+    assert report["cpu_rows"] == 2
+    assert report["gpu_rows"] == 2
+    assert report["max_abs_diff"]["x"] == 0.0

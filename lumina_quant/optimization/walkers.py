@@ -4,26 +4,20 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from lumina_quant.optimization.constants import MONTH_MAX_DAYS_COMMON_YEAR
+
 
 def add_months(dt: datetime, months: int) -> datetime:
     """Add months to a datetime while preserving a valid day."""
     year = dt.year + (dt.month - 1 + months) // 12
     month = (dt.month - 1 + months) % 12 + 1
-    max_days = [
-        31,
-        29 if year % 4 == 0 and (year % 100 != 0 or year % 400 == 0) else 28,
-        31,
-        30,
-        31,
-        30,
-        31,
-        31,
-        30,
-        31,
-        30,
-        31,
-    ]
-    day = min(dt.day, max_days[month - 1])
+    is_leap_year = year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
+    max_day = (
+        29
+        if month == 2 and is_leap_year
+        else MONTH_MAX_DAYS_COMMON_YEAR[month - 1]
+    )
+    day = min(dt.day, max_day)
     return datetime(year, month, day)
 
 

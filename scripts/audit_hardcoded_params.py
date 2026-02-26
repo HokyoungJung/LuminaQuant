@@ -17,11 +17,12 @@ import re
 from collections.abc import Iterable, Sequence
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
+from functools import lru_cache
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
-DEFAULT_LITERAL_PATHS: tuple[str, ...] = ("strategies",)
+DEFAULT_LITERAL_PATHS: tuple[str, ...] = ("lumina_quant/strategies",)
 DEFAULT_FORMULA_PATHS: tuple[str, ...] = ("lumina_quant/indicators/formulaic_definitions.py",)
 DEFAULT_BASELINE = ".github/hardcoded_params_baseline.json"
 DEFAULT_JSON_REPORT = "reports/quality/hardcoded_params_report.json"
@@ -45,6 +46,11 @@ class Violation:
     context: str
 
     def signature(self) -> str:
+        if self.kind == "formula_string":
+            return f"{self.kind}:{self.path}:{self.suggestion}"
+        return f"{self.kind}:{self.path}:{self.line}:{self.col}:{self.literal}"
+
+    def legacy_signature(self) -> str:
         return f"{self.kind}:{self.path}:{self.line}:{self.col}:{self.literal}"
 
 
@@ -100,6 +106,32 @@ def _looks_like_formula_string(text: str) -> bool:
         "vwap",
     )
     return any(token in lower for token in formula_tokens)
+
+
+def _module_declares_formula_specs(tree: ast.AST) -> bool:
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id in {"ALPHA_FUNCTION_SPECS", "ALPHA_SPECS"}:
+                    return True
+        if (
+            isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id in {"ALPHA_FUNCTION_SPECS", "ALPHA_SPECS"}
+        ):
+            return True
+    return False
+
+
+@lru_cache(maxsize=512)
+def _formula_is_tunable_via_ir(alpha_id: int, formula: str) -> bool:
+    try:
+        from lumina_quant.strategies.alpha101.formula_ir import parse_formula_to_ir
+
+        _ = parse_formula_to_ir(int(alpha_id), str(formula))
+        return True
+    except Exception:
+        return False
 
 
 def _iter_python_files(paths: Sequence[str]) -> list[Path]:
@@ -359,6 +391,7 @@ def _scan_formula_string_violations(
     tree: ast.AST,
     parent_map: dict[ast.AST, ast.AST],
     rel_path: Path,
+    skip_tunable_alpha_formula_strings: bool = False,
 ) -> list[Violation]:
     violations: list[Violation] = []
     for node in ast.walk(tree):
@@ -375,10 +408,20 @@ def _scan_formula_string_violations(
                 idx = parent.values.index(node)
             except ValueError:
                 idx = -1
-            if idx >= 0 and idx < len(parent.keys):
-                key_node = parent.keys[idx]
-                if isinstance(key_node, ast.Constant) and isinstance(key_node.value, int):
-                    alpha_id = int(key_node.value)
+            if (
+                idx >= 0
+                and idx < len(parent.keys)
+                and isinstance(parent.keys[idx], ast.Constant)
+                and isinstance(parent.keys[idx].value, int)
+            ):
+                alpha_id = int(parent.keys[idx].value)
+
+        if (
+            skip_tunable_alpha_formula_strings
+            and alpha_id is not None
+            and _formula_is_tunable_via_ir(alpha_id, text)
+        ):
+            continue
 
         for constant_index, match in enumerate(_NUMBER_PATTERN.finditer(text)):
             token = match.group(0)
@@ -428,6 +471,9 @@ def collect_violations(plan: Sequence[FileScanConfig]) -> list[Violation]:
         tree = ast.parse(source, filename=entry.path.as_posix())
         parent_map = _build_parent_map(tree)
         rel_path = entry.path.relative_to(PROJECT_ROOT)
+        skip_tunable_formula_strings = bool(
+            entry.scan_formula_strings and _module_declares_formula_specs(tree)
+        )
 
         if entry.scan_literals:
             violations.extend(
@@ -445,6 +491,7 @@ def collect_violations(plan: Sequence[FileScanConfig]) -> list[Violation]:
                     tree=tree,
                     parent_map=parent_map,
                     rel_path=rel_path,
+                    skip_tunable_alpha_formula_strings=skip_tunable_formula_strings,
                 )
             )
     violations.sort(key=lambda item: (item.path, item.line, item.col, item.kind, item.literal))
@@ -459,6 +506,29 @@ def _load_baseline_signatures(path: Path) -> set[str]:
     return {str(item) for item in raw}
 
 
+def _path_aliases(path: str) -> set[str]:
+    aliases = {path}
+
+    if path.startswith("lumina_quant/strategies/"):
+        aliases.add(path.removeprefix("lumina_quant/"))
+    elif path.startswith("strategies/"):
+        aliases.add(f"lumina_quant/{path}")
+
+    return aliases
+
+
+def _signature_aliases(signature: str) -> set[str]:
+    parts = signature.split(":", 2)
+    if len(parts) < 3:
+        return {signature}
+
+    kind, path, remainder = parts
+    variants: set[str] = {signature}
+    for alias in _path_aliases(path):
+        variants.add(f"{kind}:{alias}:{remainder}")
+    return variants
+
+
 def _write_baseline(path: Path, signatures: Iterable[str], *, literal_paths: Sequence[str], formula_paths: Sequence[str]) -> None:
     payload = {
         "generated_at_utc": datetime.now(UTC).isoformat(),
@@ -468,6 +538,16 @@ def _write_baseline(path: Path, signatures: Iterable[str], *, literal_paths: Seq
     }
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+def _is_baselined(violation: Violation, baseline_signatures: set[str]) -> bool:
+    for signature in _signature_aliases(violation.signature()):
+        if signature in baseline_signatures:
+            return True
+    for legacy_signature in _signature_aliases(violation.legacy_signature()):
+        if legacy_signature in baseline_signatures:
+            return True
+    return False
 
 
 def _write_json_report(
@@ -482,7 +562,7 @@ def _write_json_report(
     new_count = 0
     for violation in violations:
         signature = violation.signature()
-        status = "baselined" if signature in baselined else "new"
+        status = "baselined" if _is_baselined(violation, baselined) else "new"
         if status == "new":
             new_count += 1
         row = asdict(violation)
@@ -509,7 +589,7 @@ def _write_markdown_report(path: Path, *, violations: Sequence[Violation], basel
     lines: list[str] = []
     now = datetime.now(UTC).isoformat()
     total = len(violations)
-    new_total = sum(1 for violation in violations if violation.signature() not in baselined)
+    new_total = sum(1 for violation in violations if not _is_baselined(violation, baselined))
     baselined_total = total - new_total
 
     lines.append("# Hardcoded Parameter Audit Report")
@@ -527,7 +607,7 @@ def _write_markdown_report(path: Path, *, violations: Sequence[Violation], basel
         lines.append("| status | kind | file | line | literal | suggested_param_key | context |")
         lines.append("|---|---|---|---:|---|---|---|")
         for violation in violations:
-            status = "baselined" if violation.signature() in baselined else "new"
+            status = "baselined" if _is_baselined(violation, baselined) else "new"
             lines.append(
                 "| {status} | {kind} | `{path}` | {line} | `{literal}` | `{suggestion}` | {context} |".format(
                     status=status,
@@ -621,7 +701,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     _write_markdown_report(md_out, violations=violations, baselined=baseline_signatures)
 
-    new_violations = [violation for violation in violations if violation.signature() not in baseline_signatures]
+    new_violations = [
+        violation for violation in violations if not _is_baselined(violation, baseline_signatures)
+    ]
 
     print(
         "Hardcoded parameter audit: "

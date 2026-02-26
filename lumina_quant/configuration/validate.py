@@ -61,8 +61,54 @@ def validate_runtime_config(runtime: RuntimeConfig, *, for_live: bool = False) -
         raise ValueError("risk.max_rolling_loss_pct_1h must be in (0, 1].")
     if runtime.execution.compute_backend not in {"auto", "cpu", "gpu", "forced-gpu"}:
         raise ValueError("execution.compute_backend must be one of: auto, cpu, gpu, forced-gpu.")
+    gpu_mode = str(getattr(runtime.execution, "gpu_mode", runtime.execution.compute_backend)).strip()
+    if gpu_mode not in {"auto", "cpu", "gpu", "forced-gpu"}:
+        raise ValueError("execution.gpu_mode must be one of: auto, cpu, gpu, forced-gpu.")
+    if float(getattr(runtime.execution, "gpu_vram_gb", 0.0)) < 0.0:
+        raise ValueError("execution.gpu_vram_gb must be >= 0.")
     if runtime.backtest.leverage < 1 or runtime.backtest.leverage > 20:
         raise ValueError("backtest.leverage must be in range [1, 20].")
+    if int(getattr(runtime.backtest, "poll_seconds", 1)) < 1:
+        raise ValueError("backtest.poll_seconds must be >= 1.")
+    if int(getattr(runtime.backtest, "window_seconds", 20)) < 1:
+        raise ValueError("backtest.window_seconds must be >= 1.")
+    if int(getattr(runtime.backtest, "decision_cadence_seconds", 20)) < 1:
+        raise ValueError("backtest.decision_cadence_seconds must be >= 1.")
+    if (
+        getattr(runtime.backtest, "backtest_poll_seconds", None) is not None
+        and int(getattr(runtime.backtest, "backtest_poll_seconds", 1)) < 1
+    ):
+        raise ValueError("backtest.backtest_poll_seconds must be >= 1.")
+    if (
+        getattr(runtime.backtest, "backtest_window_seconds", None) is not None
+        and int(getattr(runtime.backtest, "backtest_window_seconds", 1)) < 1
+    ):
+        raise ValueError("backtest.backtest_window_seconds must be >= 1.")
+    if (
+        getattr(runtime.backtest, "backtest_decision_seconds", None) is not None
+        and int(getattr(runtime.backtest, "backtest_decision_seconds", 1)) < 1
+    ):
+        raise ValueError("backtest.backtest_decision_seconds must be >= 1.")
+    if int(getattr(runtime.backtest, "chunk_days", 7)) < 1:
+        raise ValueError("backtest.chunk_days must be >= 1.")
+    if int(getattr(runtime.backtest, "chunk_warmup_bars", 0)) < 0:
+        raise ValueError("backtest.chunk_warmup_bars must be >= 0.")
+    if int(getattr(runtime.live, "poll_seconds", runtime.live.poll_interval)) < 1:
+        raise ValueError("live.poll_seconds must be >= 1.")
+    if int(getattr(runtime.live, "window_seconds", 20)) < 1:
+        raise ValueError("live.window_seconds must be >= 1.")
+    if (
+        getattr(runtime.live, "live_poll_seconds", None) is not None
+        and int(getattr(runtime.live, "live_poll_seconds", 1)) < 1
+    ):
+        raise ValueError("live.live_poll_seconds must be >= 1.")
+    if (
+        getattr(runtime.live, "ingest_window_seconds", None) is not None
+        and int(getattr(runtime.live, "ingest_window_seconds", 1)) < 1
+    ):
+        raise ValueError("live.ingest_window_seconds must be >= 1.")
+    if int(getattr(runtime.live, "decision_cadence_seconds", 20)) < 1:
+        raise ValueError("live.decision_cadence_seconds must be >= 1.")
     if runtime.live.order_timeout < 1:
         raise ValueError("live.order_timeout must be >= 1.")
     if runtime.live.reconciliation_interval_sec < 1:

@@ -7,8 +7,8 @@ from datetime import datetime
 # Add Parent Dir to Path to import lumina_quant
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from lumina_quant.events import MarketEvent, OrderEvent
-from lumina_quant.execution import SimulatedExecutionHandler
+from lumina_quant.backtesting.execution_sim import SimulatedExecutionHandler
+from lumina_quant.core.events import MarketEvent, OrderEvent
 
 
 # Mock classes

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from lumina_quant.core.events import MarketEvent
 from lumina_quant.event_clock import EventSequencer, assign_event_identity
-from lumina_quant.events import MarketEvent
 
 
 def test_assign_event_identity_sets_monotonic_sequence():

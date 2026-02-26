@@ -126,7 +126,7 @@ def _normalize_param_values(value: Any) -> tuple[object, ...]:
 
 
 def _default_grid_for_strategy(name: str) -> dict[str, Sequence[object]]:
-    from strategies import registry as strategy_registry
+    from lumina_quant.strategies import registry as strategy_registry
 
     grid = strategy_registry.get_default_grid_config(name)
     params = grid.get("params") if isinstance(grid, dict) else None
@@ -167,7 +167,7 @@ def _limit_grid_rows(
 
 
 def _strategy_templates() -> list[StrategyTemplate]:
-    from strategies import registry as strategy_registry
+    from lumina_quant.strategies import registry as strategy_registry
 
     templates: list[StrategyTemplate] = []
     for name in strategy_registry.get_strategy_names():

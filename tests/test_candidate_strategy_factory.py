@@ -3,8 +3,10 @@ from __future__ import annotations
 import queue
 from datetime import datetime, timedelta
 
-from strategies.candidate_regime_breakout import RegimeBreakoutCandidateStrategy
-from strategies.candidate_vol_compression_reversion import VolatilityCompressionReversionStrategy
+from lumina_quant.strategies.candidate_regime_breakout import RegimeBreakoutCandidateStrategy
+from lumina_quant.strategies.candidate_vol_compression_reversion import (
+    VolatilityCompressionReversionStrategy,
+)
 
 
 class _BarsMock:

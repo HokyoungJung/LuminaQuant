@@ -7,8 +7,9 @@ from collections import deque
 from itertools import islice
 from statistics import mean
 
-from lumina_quant.events import SignalEvent
-from lumina_quant.indicators import momentum_return, safe_float, safe_int, time_key
+from lumina_quant.core.events import SignalEvent
+from lumina_quant.indicators.common import safe_float, safe_int, time_key
+from lumina_quant.indicators.momentum import momentum_return
 from lumina_quant.strategy import Strategy
 from lumina_quant.tuning import HyperParam, resolve_params_from_schema
 

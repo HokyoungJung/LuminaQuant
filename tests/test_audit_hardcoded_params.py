@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -38,7 +39,7 @@ def test_exemption_values_match_expected_contract():
 def test_detects_non_exempt_numeric_literals(tmp_path, monkeypatch):
     monkeypatch.setattr(MODULE, "PROJECT_ROOT", tmp_path)
 
-    sample = tmp_path / "strategies" / "sample.py"
+    sample = tmp_path / "lumina_quant" / "strategies" / "sample.py"
     sample.parent.mkdir(parents=True, exist_ok=True)
     sample.write_text(
         """
@@ -52,7 +53,7 @@ def f(threshold=3, decay=0.5):
         encoding="utf-8",
     )
 
-    plan = MODULE._build_scan_plan(["strategies"], [])
+    plan = MODULE._build_scan_plan(["lumina_quant/strategies"], [])
     violations = MODULE.collect_violations(plan)
 
     values = sorted({float(item.value) for item in violations})
@@ -90,18 +91,39 @@ ALPHA_FORMULAS = {
     assert any("alpha_1" in item.suggestion for item in violations)
 
 
+def test_skips_formula_string_literals_when_tunable_specs_exist(tmp_path, monkeypatch):
+    monkeypatch.setattr(MODULE, "PROJECT_ROOT", tmp_path)
+
+    formula_file = tmp_path / "lumina_quant" / "indicators" / "formulaic_definitions.py"
+    formula_file.parent.mkdir(parents=True, exist_ok=True)
+    formula_file.write_text(
+        """
+ALPHA_FORMULAS = {
+    1: "rank(delta(close, 7) + 0.03 - 1e-9 + 0.5)",
+}
+ALPHA_FUNCTION_SPECS = {}
+""",
+        encoding="utf-8",
+    )
+
+    plan = MODULE._build_scan_plan([], ["lumina_quant/indicators/formulaic_definitions.py"])
+    violations = MODULE.collect_violations(plan)
+
+    assert violations == []
+
+
 def test_baseline_mode_filters_existing_violations(tmp_path, monkeypatch):
     monkeypatch.setattr(MODULE, "PROJECT_ROOT", tmp_path)
 
-    sample = tmp_path / "strategies" / "sample.py"
+    sample = tmp_path / "lumina_quant" / "strategies" / "sample.py"
     sample.parent.mkdir(parents=True, exist_ok=True)
     sample.write_text("x = 3\n", encoding="utf-8")
 
     args = [
         "--literal-paths",
-        "strategies",
+        "lumina_quant/strategies",
         "--formula-paths",
-        "strategies",
+        "lumina_quant/strategies",
         "--baseline",
         "reports/quality/baseline.json",
         "--json-out",
@@ -119,3 +141,96 @@ def test_baseline_mode_filters_existing_violations(tmp_path, monkeypatch):
 
     # If configured, baselined entries can be forced to fail.
     assert MODULE.main([*args, "--fail-on-baselined"]) == 1
+
+
+def test_formula_signature_is_stable_across_line_shifts(tmp_path, monkeypatch):
+    monkeypatch.setattr(MODULE, "PROJECT_ROOT", tmp_path)
+
+    formula_path = tmp_path / "lumina_quant" / "indicators" / "formulaic_definitions.py"
+    formula_path.parent.mkdir(parents=True, exist_ok=True)
+
+    base_formula = """
+ALPHA_FORMULAS = {
+    1: "rank(delta(close, 7) + 0.03)",
+}
+"""
+    shifted_formula = """
+# header shift
+ALPHA_FORMULAS = {
+    1: "rank(delta(close, 7) + 0.03)",
+}
+"""
+
+    formula_path.write_text(base_formula, encoding="utf-8")
+    base_violations = MODULE.collect_violations(
+        MODULE._build_scan_plan([], ["lumina_quant/indicators/formulaic_definitions.py"])
+    )
+    base_signatures = {item.signature() for item in base_violations}
+
+    formula_path.write_text(shifted_formula, encoding="utf-8")
+    shifted_violations = MODULE.collect_violations(
+        MODULE._build_scan_plan([], ["lumina_quant/indicators/formulaic_definitions.py"])
+    )
+    shifted_signatures = {item.signature() for item in shifted_violations}
+
+    assert base_signatures
+    assert base_signatures == shifted_signatures
+
+
+def test_formula_signature_accepts_legacy_baseline_signatures(tmp_path, monkeypatch):
+    monkeypatch.setattr(MODULE, "PROJECT_ROOT", tmp_path)
+
+    formula_path = tmp_path / "lumina_quant" / "indicators" / "formulaic_definitions.py"
+    formula_path.parent.mkdir(parents=True, exist_ok=True)
+    formula_path.write_text(
+        """
+ALPHA_FORMULAS = {
+    1: "rank(delta(close, 7) + 0.03)",
+}
+""",
+        encoding="utf-8",
+    )
+
+    plan = MODULE._build_scan_plan([], ["lumina_quant/indicators/formulaic_definitions.py"])
+    violations = MODULE.collect_violations(plan)
+    assert violations
+
+    legacy_signatures = sorted(item.legacy_signature() for item in violations)
+    baseline_path = tmp_path / "reports" / "quality" / "baseline.json"
+    baseline_path.parent.mkdir(parents=True, exist_ok=True)
+    baseline_path.write_text(
+        json.dumps({"signatures": legacy_signatures}, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    rc = MODULE.main(
+        [
+            "--literal-paths",
+            "lumina_quant/strategies",
+            "--formula-paths",
+            "lumina_quant/indicators/formulaic_definitions.py",
+            "--baseline",
+            "reports/quality/baseline.json",
+            "--json-out",
+            "reports/quality/report.json",
+            "--md-out",
+            "reports/quality/report.md",
+        ]
+    )
+    assert rc == 0
+
+
+def test_strategy_path_move_signatures_map_to_legacy_baseline():
+    violation = MODULE.Violation(
+        kind="literal",
+        path="lumina_quant/strategies/sample.py",
+        line=10,
+        col=4,
+        value=3.0,
+        literal="3",
+        suggestion="sample_param_3",
+        context="module",
+    )
+
+    baseline = {"literal:strategies/sample.py:10:4:3"}
+    assert MODULE._is_baselined(violation, baseline)

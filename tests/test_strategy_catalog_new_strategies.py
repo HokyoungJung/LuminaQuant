@@ -1,10 +1,10 @@
 import queue
 from datetime import datetime, timedelta
 
-from strategies.lag_convergence import LagConvergenceStrategy
-from strategies.mean_reversion_std import MeanReversionStdStrategy
-from strategies.rolling_breakout import RollingBreakoutStrategy
-from strategies.vwap_reversion import VwapReversionStrategy
+from lumina_quant.strategies.lag_convergence import LagConvergenceStrategy
+from lumina_quant.strategies.mean_reversion_std import MeanReversionStdStrategy
+from lumina_quant.strategies.rolling_breakout import RollingBreakoutStrategy
+from lumina_quant.strategies.vwap_reversion import VwapReversionStrategy
 
 
 class _BarsMock:
