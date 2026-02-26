@@ -126,7 +126,7 @@ def _module_declares_formula_specs(tree: ast.AST) -> bool:
 @lru_cache(maxsize=512)
 def _formula_is_tunable_via_ir(alpha_id: int, formula: str) -> bool:
     try:
-        from lumina_quant.strategies.alpha101.formula_ir import parse_formula_to_ir
+        from lumina_quant.indicators.alpha101.formula_ir import parse_formula_to_ir
 
         _ = parse_formula_to_ir(int(alpha_id), str(formula))
         return True

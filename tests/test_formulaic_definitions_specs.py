@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+from lumina_quant.indicators.alpha101.compiler import build_context
+from lumina_quant.indicators.alpha101.registry import (
+    ALPHA_FUNCTION_SPECS as REGISTRY_ALPHA_FUNCTION_SPECS,
+)
 from lumina_quant.indicators.formulaic_definitions import (
     ALPHA_FUNCTION_SPECS,
     get_alpha_function_spec,
     list_alpha_tunable_constants,
-)
-from lumina_quant.strategies.alpha101.compiler import build_context
-from lumina_quant.strategies.alpha101.registry import (
-    ALPHA_FUNCTION_SPECS as REGISTRY_ALPHA_FUNCTION_SPECS,
 )
 
 

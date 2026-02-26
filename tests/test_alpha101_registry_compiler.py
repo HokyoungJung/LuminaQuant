@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import lumina_quant.strategies.alpha101.registry as alpha101_registry_module
-from lumina_quant.strategies.alpha101.compiler import build_context
-from lumina_quant.strategies.alpha101.formula_ir import is_exempt_constant, parse_formula_to_ir
-from lumina_quant.strategies.alpha101.registry import (
+import lumina_quant.indicators.alpha101.registry as alpha101_registry_module
+from lumina_quant.indicators.alpha101.compiler import build_context
+from lumina_quant.indicators.alpha101.formula_ir import is_exempt_constant, parse_formula_to_ir
+from lumina_quant.indicators.alpha101.registry import (
     build_optuna_search_space,
     get_all_alpha_callables,
     list_alpha_ids,

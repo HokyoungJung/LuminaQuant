@@ -10,7 +10,7 @@ from functools import lru_cache
 import numpy as np
 import pandas as pd
 from lumina_quant.indicators import formulaic_operators as ops
-from lumina_quant.strategies.alpha101.formula_sources import ALPHA_PROGRAM_DEFINITIONS
+from lumina_quant.indicators.alpha101.formula_sources import ALPHA_PROGRAM_DEFINITIONS
 
 
 def _last_finite_value(series: pd.Series) -> float | None:

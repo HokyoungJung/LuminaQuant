@@ -6,8 +6,8 @@ import math
 from collections.abc import Mapping
 from itertools import pairwise
 
-from lumina_quant.strategies.alpha101 import compiler as alpha101_compiler
-from lumina_quant.strategies.alpha101 import registry as alpha101_registry
+from lumina_quant.indicators.alpha101 import compiler as alpha101_compiler
+from lumina_quant.indicators.alpha101 import registry as alpha101_registry
 
 from .formulaic_operators import (
     delta,
