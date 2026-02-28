@@ -264,7 +264,18 @@ uv run python scripts/cleanup_ghost_runs.py \
 
 **실거래 실행:**
 ```bash
+# 기본 엔트리포인트 (폴링 기반 시장데이터 핸들러)
 uv run python run_live.py
+
+# WebSocket 엔트리포인트 (더 낮은 지연)
+uv run python run_live_ws.py
+
+# real 모드는 명시적 안전 플래그가 필요
+# LUMINA_ENABLE_LIVE_REAL=true uv run python run_live.py --enable-live-real
+
+# 운영 권장: stop-file 기반 정상 종료
+touch /tmp/lq.stop
+uv run python run_live.py --stop-file /tmp/lq.stop
 ```
 
 ---

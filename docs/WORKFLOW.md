@@ -2,6 +2,12 @@
 
 This repository uses a dual-branch strategy to maintain a **private codebase** (full research + operations) and a **public API** (core engine only).
 
+## Repository Identity (Source of Truth)
+
+- Public repo: `https://github.com/HokyoungJung/LuminaQuant.git` (typical folder: `LuminaQuant`)
+- Private repo: `https://github.com/hoky1227/Quants-agent.git` (typical folder: `Quants-agent`)
+- Package/import namespace: `lumina_quant`
+
 ## 1. Branch Structure
 
 - **`private-main`**: The primary development branch. Contains ALL files including sensitive strategies, data, and logs.

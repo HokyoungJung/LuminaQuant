@@ -224,9 +224,18 @@ uv run python -m streamlit run dashboard.py --server.headless true
 
 **Start Live Trading:**
 ```bash
+# Default entrypoint (polling market-data handler)
 uv run python run_live.py
+
+# WebSocket market-data entrypoint (lower latency)
+uv run python run_live_ws.py
+
 # Real mode requires explicit safety flag:
 # LUMINA_ENABLE_LIVE_REAL=true uv run python run_live.py --enable-live-real
+
+# Graceful stop (recommended in ops): touch a stop file and pass it to runner
+touch /tmp/lq.stop
+uv run python run_live.py --stop-file /tmp/lq.stop
 ```
 
 **Generate Promotion Gate Report (Soak + Runtime Reliability):**

@@ -2,6 +2,12 @@
 
 이 저장소는 **이중 브랜치 전략**을 사용합니다.
 
+## 저장소 정체성 (Source of Truth)
+
+- Public 저장소: `https://github.com/HokyoungJung/LuminaQuant.git` (권장 폴더명: `LuminaQuant`)
+- Private 저장소: `https://github.com/hoky1227/Quants-agent.git` (권장 폴더명: `Quants-agent`)
+- 패키지/임포트 네임스페이스: `lumina_quant`
+
 - `private-main`: 연구/운영 전체 코드(전략, 내부 도구, 민감 워크플로우 포함)
 - `main`: 공개 배포용 브랜치(핵심 엔진 중심)
 

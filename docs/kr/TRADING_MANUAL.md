@@ -2,6 +2,18 @@
 
 이 가이드는 LuminaQuant에서 수행하는 공통적인 거래 운용에 대한 구체적인 지침과 코드 예시를 제공합니다.
 
+## 0. 실거래 안전 체크리스트 (Ops)
+
+`live.mode=real` 실행 전:
+
+1. `config.yaml`에서 `live.require_real_enable_flag: true` 유지
+2. 명시적 arming 후 실행:
+   - `LUMINA_ENABLE_LIVE_REAL=true uv run python run_live.py --enable-live-real`
+3. stop-file 기반 정상 종료 권장:
+   - 실행 시 `--stop-file /tmp/lq.stop`
+   - 종료 시 `touch /tmp/lq.stop`
+4. 비상 시 systemd stop / 프로세스 kill 절차를 운영 문서에 사전 정의
+
 ## 1. 매수 및 매도 (Buying and Selling)
 
 LuminaQuant에서는 반복문 안에서 직접 "주문을 넣는" 방식이 아닙니다. 대신 **전략(Strategy)**이 **시그널(Signal)**을 생성하면, 시스템이 이를 주문으로 변환합니다.

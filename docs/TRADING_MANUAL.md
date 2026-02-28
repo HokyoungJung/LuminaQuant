@@ -2,6 +2,18 @@
 
 This guide provides concrete instructions and code snippets for common trading operations in LuminaQuant.
 
+## 0. Live Safety Quick Checklist (Ops)
+
+Before running in `live.mode=real`:
+
+1. Keep `live.require_real_enable_flag: true` in `config.yaml`.
+2. Start with explicit arming:
+   - `LUMINA_ENABLE_LIVE_REAL=true uv run python run_live.py --enable-live-real`
+3. Prefer graceful shutdown with stop-file:
+   - launch with `--stop-file /tmp/lq.stop`
+   - stop by `touch /tmp/lq.stop`
+4. Keep emergency fallback documented for your host (systemd stop / process kill).
+
 ## 1. Buying and Selling
 
 In LuminaQuant, you do not "place orders" directly in a loop. Instead, your **Strategy** generates **Signals**, which the system converts into Orders.

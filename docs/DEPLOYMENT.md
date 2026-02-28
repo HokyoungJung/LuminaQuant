@@ -35,6 +35,15 @@ WantedBy=multi-user.target
 - `LuminaQuant` (public repo)
 - `Quants-agent` (private repo)
 
+Entrypoint choice:
+- `run_live.py`: polling-based live runner (default/simple ops)
+- `run_live_ws.py`: WebSocket-based live runner (lower latency path)
+
+Real mode safety:
+- keep `live.require_real_enable_flag: true` in `config.yaml`
+- arm real mode explicitly with `LUMINA_ENABLE_LIVE_REAL=true` and `--enable-live-real`
+- for controlled shutdown, pass `--stop-file /tmp/lq.stop`
+
 ### 3. Enable & Start
 ```bash
 sudo systemctl enable lumina
