@@ -25,6 +25,14 @@ trading:
     - "AVAX/USDT"
     - "XAU/USDT"
     - "XAG/USDT"
+  timeframes:
+    - "1m"
+    - "5m"
+    - "15m"
+    - "30m"
+    - "1h"
+    - "4h"
+    - "1d"
   timeframe: "1m"
   initial_capital: 10000.0
   target_allocation: 0.1  # 10% of capital per trade
@@ -73,20 +81,20 @@ storage:
   wal_max_bytes: 268435456
   wal_compact_on_threshold: true
   wal_compaction_interval_seconds: 3600
-  export_csv: true
+  export_csv: false
 
 # ------------------------------------------
 # Backtest Specific Settings
 # ------------------------------------------
 backtest:
-  start_date: "2024-01-01"
+  start_date: "2025-01-01"
   end_date: null  # null means "up to now" or end of data
   mode: "windowed"
   commission_rate: 0.001  # 0.1%
   slippage_rate: 0.0005   # 0.05%
   annual_periods: 252     # Daily: 252, 1h: 252*24, 1m: 252*24*60
   random_seed: 42
-  persist_output: true
+  persist_output: false
   leverage: 3
   poll_seconds: 20
   backtest_poll_seconds: 20
@@ -94,7 +102,7 @@ backtest:
   backtest_window_seconds: 20
   decision_cadence_seconds: 20
   backtest_decision_seconds: 20
-  chunk_days: 2
+  chunk_days: 1
   chunk_warmup_bars: 0
   skip_ahead_enabled: true
 
@@ -138,6 +146,8 @@ live:
 optimization:
   method: "OPTUNA" # Options: "GRID", "OPTUNA"
   strategy: "RsiStrategy" # Class name of the strategy to optimize
+  validation_days: 30
+  oos_days: 30
   walk_forward_folds: 3
   overfit_penalty: 0.5
   max_workers: 1
