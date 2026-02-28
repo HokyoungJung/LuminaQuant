@@ -101,6 +101,9 @@ uv python pin 3.13
 # 의존성 설치 (uv 전용 런타임)
 uv sync --all-extras
 
+# 설치/테스트 기본 검증
+uv run python scripts/verify_install.py
+
 # (선택 사항) MT5 지원을 위한 설치
 uv sync --extra mt5
 ```

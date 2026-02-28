@@ -22,18 +22,24 @@ After=network.target
 
 [Service]
 User=ubuntu
-WorkingDirectory=/home/ubuntu/<REPO_DIR>
-ExecStart=/home/ubuntu/.local/bin/uv run python run_live_ws.py
+WorkingDirectory=/opt/{REPO_DIR}
+ExecStart=/home/ubuntu/.local/bin/uv run python run_live.py
 Restart=always
-EnvironmentFile=/home/ubuntu/<REPO_DIR>/.env
+EnvironmentFile=/opt/{REPO_DIR}/.env
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-`<REPO_DIR>` should match your actual clone folder name:
+`{REPO_DIR}` should match your actual clone folder name:
 - `LuminaQuant` (public repo)
 - `Quants-agent` (private repo)
+
+If you prefer WebSocket feed in production, replace `ExecStart` with:
+
+```ini
+ExecStart=/home/ubuntu/.local/bin/uv run python run_live_ws.py
+```
 
 Entrypoint choice:
 - `run_live.py`: polling-based live runner (default/simple ops)
