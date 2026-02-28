@@ -9,7 +9,7 @@ from lumina_quant.strategies.plugin_interface import StrategyPlugin, register_pl
 @register_plugin("trend_momentum")
 class TrendMomentumPlugin(StrategyPlugin):
     def compute_features(self, data: pl.DataFrame, params: dict) -> pl.DataFrame:
-        lookback = max(1, int(params.get("lookback_bars", 12)))
+        lookback = max(1, int(params.get("lookback_bars", 16)))
         by_keys = ["asset"]
         if "timeframe" in data.columns:
             by_keys.append("timeframe")

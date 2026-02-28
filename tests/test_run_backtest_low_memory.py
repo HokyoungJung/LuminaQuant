@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import importlib.util
+from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
-from datetime import datetime
 
 _RUN_BACKTEST_PATH = Path(__file__).resolve().parents[1] / "run_backtest.py"
 _RUN_BACKTEST_SPEC = importlib.util.spec_from_file_location("run_backtest_module", _RUN_BACKTEST_PATH)

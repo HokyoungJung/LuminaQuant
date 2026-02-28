@@ -27,7 +27,7 @@ def _symbol_aliases(symbol: str) -> set[str]:
 
     aliases = {base}
     aliases.add(base.split(":", 1)[0])
-    for token in list(aliases):
+    for token in tuple(aliases):
         for suffix in ("/PERP", "_PERP", "-PERP"):
             if token.endswith(suffix):
                 aliases.add(token[: -len(suffix)])
