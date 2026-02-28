@@ -1,0 +1,26 @@
+experiment_id: cost_aware_timeframe_sweep
+universe:
+  assets: ["BTC/USDT", "ETH/USDT", "SOL/USDT", "XRP/USDT"]
+  filters:
+    min_adv: 1000
+    max_spread_bps: 20
+timeframes: ["5m", "1h", "1d"]
+cost_global:
+  fees_bps: 1.0
+  tax_bps: 0.0
+run_controls:
+  start_date: "2025-01-01T00:00:00Z"
+  end_date: "2025-01-02T00:00:00Z"
+  seed: 42
+  parallelism: 1
+  ranking_objective: composite
+  ranking_weights:
+    sharpe: 1.0
+    total_return: 0.25
+    drawdown: 0.5
+    stability: 0.25
+  exchange: "binance"
+  market_data_root: "data/market_parquet"
+  use_synthetic_data: true
+  synthetic_bars: 3600
+  initial_capital: 100000
