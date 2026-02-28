@@ -126,3 +126,38 @@ def test_main_passes_when_missing_rss_source_is_allowed(tmp_path, monkeypatch):
         ]
     )
     assert rc == 0
+
+
+def test_main_accepts_skipped_benchmark_payload(tmp_path, monkeypatch):
+    monkeypatch.setattr(verify_8gb_baseline, "PROJECT_ROOT", tmp_path)
+
+    benchmark = tmp_path / "bench.json"
+    benchmark.write_text(
+        json.dumps(
+            {
+                "skipped": True,
+                "reason": "strategies package unavailable in this distribution",
+            }
+        ),
+        encoding="utf-8",
+    )
+    time_log = tmp_path / "time.log"
+    time_log.write_text("Maximum resident set size (kbytes): 102400\n", encoding="utf-8")
+
+    rc = verify_8gb_baseline.main(
+        [
+            "--benchmark",
+            str(benchmark),
+            "--time-log",
+            str(time_log),
+            "--skip-dmesg",
+            "--allow-missing-oom-sources",
+            "--disk-path",
+            str(tmp_path),
+            "--disk-budget-gib",
+            "1.0",
+            "--output",
+            str(tmp_path / "gate.json"),
+        ]
+    )
+    assert rc == 0

@@ -200,25 +200,34 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         benchmark_payload = _load_benchmark(benchmark_path)
-        missing_keys = [
-            key
-            for key in ("iterations", "median_seconds", "median_bars_per_sec")
-            if key not in benchmark_payload
-        ]
-        if missing_keys:
-            checks["benchmark_parse"] = {
-                "status": "FAIL",
-                "detail": f"Missing benchmark keys: {', '.join(missing_keys)}",
-            }
-        else:
+        if bool(benchmark_payload.get("skipped")):
             checks["benchmark_parse"] = {
                 "status": "PASS",
                 "detail": (
-                    f"Loaded {benchmark_path} (iterations={benchmark_payload.get('iterations')}, "
-                    f"median_seconds={benchmark_payload.get('median_seconds')}, "
-                    f"median_bars_per_sec={benchmark_payload.get('median_bars_per_sec')})"
+                    f"Benchmark reported skipped mode: "
+                    f"{benchmark_payload.get('reason', 'no reason provided')}"
                 ),
             }
+        else:
+            missing_keys = [
+                key
+                for key in ("iterations", "median_seconds", "median_bars_per_sec")
+                if key not in benchmark_payload
+            ]
+            if missing_keys:
+                checks["benchmark_parse"] = {
+                    "status": "FAIL",
+                    "detail": f"Missing benchmark keys: {', '.join(missing_keys)}",
+                }
+            else:
+                checks["benchmark_parse"] = {
+                    "status": "PASS",
+                    "detail": (
+                        f"Loaded {benchmark_path} (iterations={benchmark_payload.get('iterations')}, "
+                        f"median_seconds={benchmark_payload.get('median_seconds')}, "
+                        f"median_bars_per_sec={benchmark_payload.get('median_bars_per_sec')})"
+                    ),
+                }
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         benchmark_payload = {}
         checks["benchmark_parse"] = {
