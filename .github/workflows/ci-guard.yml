@@ -1,0 +1,90 @@
+name: ci-guard
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+      - cross-platform-ci
+    types:
+      - completed
+
+permissions:
+  actions: write
+  contents: read
+  issues: write
+
+concurrency:
+  group: ci-guard-${{ github.event.workflow_run.id }}
+  cancel-in-progress: false
+
+jobs:
+  auto-rerun:
+    if: ${{ github.event.workflow_run.conclusion == 'failure' && github.event.workflow_run.run_attempt == 1 }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Auto-rerun failed jobs once
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: gh api --method POST "repos/${{ github.repository }}/actions/runs/${RUN_ID}/rerun-failed-jobs"
+
+      - name: Summarize auto-rerun
+        run: |
+          {
+            echo "Triggered automatic failed-job rerun (attempt 1 -> 2)."
+            echo ""
+            echo "- Workflow: ${{ github.event.workflow_run.name }}"
+            echo "- Branch: ${{ github.event.workflow_run.head_branch }}"
+            echo "- Commit: ${{ github.event.workflow_run.head_sha }}"
+            echo "- Run URL: ${{ github.event.workflow_run.html_url }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  notify-final-failure:
+    if: ${{ github.event.workflow_run.conclusion == 'failure' && github.event.workflow_run.run_attempt > 1 }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create CI alert issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const run = context.payload.workflow_run;
+            const shortSha = run.head_sha.slice(0, 7);
+            const title = `[CI Alert] ${run.name} failed after auto-rerun (${run.head_branch} @ ${shortSha})`;
+            const body = [
+              "Automated CI guard detected a final failure after one automatic recheck.",
+              "",
+              `- Workflow: **${run.name}**`,
+              `- Branch: \`${run.head_branch}\``,
+              `- Commit: \`${run.head_sha}\``,
+              `- Run attempt: **${run.run_attempt}**`,
+              `- Run URL: ${run.html_url}`,
+              "",
+              "Please investigate and fix before merging or releasing."
+            ].join("\\n");
+
+            const existing = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              per_page: 100
+            });
+
+            if (!existing.some((issue) => issue.title === title)) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body
+              });
+            }
+
+      - name: Summarize notification
+        run: |
+          {
+            echo "Final CI failure notification processed."
+            echo ""
+            echo "- Workflow: ${{ github.event.workflow_run.name }}"
+            echo "- Branch: ${{ github.event.workflow_run.head_branch }}"
+            echo "- Commit: ${{ github.event.workflow_run.head_sha }}"
+            echo "- Run URL: ${{ github.event.workflow_run.html_url }}"
+          } >> "$GITHUB_STEP_SUMMARY"
