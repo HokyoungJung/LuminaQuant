@@ -59,7 +59,7 @@ def main():
         os.environ["LUMINA_ENABLE_LIVE_REAL"] = "true"
 
     # 1. Check Configuration
-    print("=== Quants Agent Live Trader ===")
+    print("=== LuminaQuant Live Trader ===")
 
     # Note: Exchange-specific keys might need check based on config.EXCHANGE_ID
     # For now, we assume binance-like environment vars if usage is binance.

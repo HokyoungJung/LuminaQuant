@@ -1,7 +1,7 @@
 @echo off
 setlocal
 echo ---------------------------------------------------
-echo [PRODUCTION] Starting Quants Agent in Resilient Mode
+echo [PRODUCTION] Starting LuminaQuant in Resilient Mode
 echo ---------------------------------------------------
 
 :start

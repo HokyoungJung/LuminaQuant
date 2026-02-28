@@ -210,6 +210,20 @@ def _enforce_1s_base_timeframe(value: str) -> str:
     return "1s"
 
 
+def _create_audit_store():
+    try:
+        return AuditStore(BaseConfig.POSTGRES_DSN), True
+    except Exception as exc:
+        message = str(exc).strip()
+        if not message:
+            message = exc.__class__.__name__
+        print(
+            "[WARN] PostgreSQL audit store unavailable "
+            f"({message}). Backtest will run without PostgreSQL audit persistence."
+        )
+        return None, False
+
+
 # ==========================================
 # EXECUTION (Do not modify generally)
 # ==========================================
@@ -498,7 +512,7 @@ def run(
 
     backtest_run_id = str(run_id or "").strip() or str(uuid.uuid4())
     timeframe_token = _enforce_1s_base_timeframe(str(base_timeframe))
-    audit_store = AuditStore(BaseConfig.POSTGRES_DSN)
+    audit_store, audit_enabled = _create_audit_store()
     execution_profile = _resolve_execution_profile(
         low_memory=low_memory,
         persist_output=persist_output,
@@ -519,28 +533,31 @@ def run(
         if resolved_backtest_mode == "windowed"
         else {}
     )
-    audit_store.start_run(
-        mode="backtest",
-        metadata={
-            "symbols": list(SYMBOL_LIST),
-            "strategy": STRATEGY_CLASS.__name__,
-            "params": STRATEGY_PARAMS,
-            "data_source": str(data_source),
-            "market_db_path": str(market_db_path),
-            "market_exchange": str(market_exchange),
-            "base_timeframe": str(timeframe_token),
-            "strategy_timeframe": str(BaseConfig.TIMEFRAME),
-            "auto_collect_db": bool(auto_collect_db),
-            "backtest_poll_seconds": int(BACKTEST_POLL_SECONDS),
-            "backtest_window_seconds": int(BACKTEST_WINDOW_SECONDS),
-            "backtest_decision_cadence_seconds": int(BACKTEST_DECISION_CADENCE_SECONDS),
-            "backtest_mode": str(resolved_backtest_mode),
-            "chunk_days": int(BT_CHUNK_DAYS),
-            "chunk_warmup_bars": int(BT_CHUNK_WARMUP_BARS),
-            **execution_profile,
-        },
-        run_id=backtest_run_id,
-    )
+    if audit_store is not None:
+        audit_store.start_run(
+            mode="backtest",
+            metadata={
+                "symbols": list(SYMBOL_LIST),
+                "strategy": STRATEGY_CLASS.__name__,
+                "params": STRATEGY_PARAMS,
+                "data_source": str(data_source),
+                "market_db_path": str(market_db_path),
+                "market_exchange": str(market_exchange),
+                "base_timeframe": str(timeframe_token),
+                "strategy_timeframe": str(BaseConfig.TIMEFRAME),
+                "auto_collect_db": bool(auto_collect_db),
+                "backtest_poll_seconds": int(BACKTEST_POLL_SECONDS),
+                "backtest_window_seconds": int(BACKTEST_WINDOW_SECONDS),
+                "backtest_decision_cadence_seconds": int(BACKTEST_DECISION_CADENCE_SECONDS),
+                "backtest_mode": str(resolved_backtest_mode),
+                "chunk_days": int(BT_CHUNK_DAYS),
+                "chunk_warmup_bars": int(BT_CHUNK_WARMUP_BARS),
+                **execution_profile,
+            },
+            run_id=backtest_run_id,
+        )
+    elif not bool(audit_enabled):
+        print("[INFO] Audit persistence is disabled for this backtest run.")
 
     try:
         use_parquet = is_parquet_market_data_store(
@@ -632,12 +649,14 @@ def run(
                     persist_output=bool(execution_profile["persist_output"]),
                 )
 
-        persisted_counts = _persist_backtest_audit_rows(
-            audit_store,
-            backtest_run_id,
-            backtest,
-            low_memory=bool(execution_profile["low_memory"]),
-        )
+        persisted_counts = {"equity_rows": 0, "fill_rows": 0}
+        if audit_store is not None:
+            persisted_counts = _persist_backtest_audit_rows(
+                audit_store,
+                backtest_run_id,
+                backtest,
+                low_memory=bool(execution_profile["low_memory"]),
+            )
         summary_metadata = {}
         if bool(execution_profile["low_memory"]):
             try:
@@ -646,24 +665,27 @@ def run(
                 )
             except Exception:
                 summary_metadata["summary_stats_fast"] = {}
-        audit_store.end_run(
-            backtest_run_id,
-            status="COMPLETED",
-            metadata={
-                "final_equity": float(backtest.portfolio.current_holdings.get("total", 0.0)),
-                **persisted_counts,
-                **summary_metadata,
-            },
-        )
+        if audit_store is not None:
+            audit_store.end_run(
+                backtest_run_id,
+                status="COMPLETED",
+                metadata={
+                    "final_equity": float(backtest.portfolio.current_holdings.get("total", 0.0)),
+                    **persisted_counts,
+                    **summary_metadata,
+                },
+            )
     except Exception as exc:
-        audit_store.end_run(
-            backtest_run_id,
-            status="FAILED",
-            metadata={"error": str(exc)},
-        )
+        if audit_store is not None:
+            audit_store.end_run(
+                backtest_run_id,
+                status="FAILED",
+                metadata={"error": str(exc)},
+            )
         raise
     finally:
-        audit_store.close()
+        if audit_store is not None:
+            audit_store.close()
 
 
 if __name__ == "__main__":

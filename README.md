@@ -79,9 +79,15 @@ LOG_LEVEL=INFO
 ### 1. Installation
 
 ```bash
-# Clone the repository
+# Clone one repository (choose ONE)
+
+# Public repository (open)
 git clone https://github.com/HokyoungJung/LuminaQuant.git
-cd lumina-quant
+cd LuminaQuant
+
+# Private repository (full internal workflow; access required)
+# git clone https://github.com/hoky1227/Quants-agent.git
+# cd Quants-agent
 
 # Ensure compatible Python (project requires < 3.14)
 uv python pin 3.13
@@ -150,6 +156,8 @@ uv run python run_backtest.py
 # Force DB-only data source
 uv run python run_backtest.py --data-source db --market-db-path data/market_parquet
 ```
+
+If `LQ_POSTGRES_DSN` is unset, backtest still runs but skips PostgreSQL audit persistence.
 
 **Walk-Forward Optimization (multi-fold):**
 ```bash

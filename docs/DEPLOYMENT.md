@@ -22,14 +22,18 @@ After=network.target
 
 [Service]
 User=ubuntu
-WorkingDirectory=/home/ubuntu/lumina-quant
+WorkingDirectory=/home/ubuntu/<REPO_DIR>
 ExecStart=/home/ubuntu/.local/bin/uv run python run_live_ws.py
 Restart=always
-EnvironmentFile=/home/ubuntu/lumina-quant/.env
+EnvironmentFile=/home/ubuntu/<REPO_DIR>/.env
 
 [Install]
 WantedBy=multi-user.target
 ```
+
+`<REPO_DIR>` should match your actual clone folder name:
+- `LuminaQuant` (public repo)
+- `Quants-agent` (private repo)
 
 ### 3. Enable & Start
 ```bash

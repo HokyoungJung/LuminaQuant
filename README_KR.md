@@ -79,9 +79,15 @@ LOG_LEVEL=INFO
 ### 1. 설치 (Installation)
 
 ```bash
-# 저장소 복제
+# 저장소 1개 선택해서 복제
+
+# 공개 저장소 (누구나 접근 가능)
 git clone https://github.com/HokyoungJung/LuminaQuant.git
-cd lumina-quant
+cd LuminaQuant
+
+# 비공개 저장소 (전체 내부 워크플로우, 권한 필요)
+# git clone https://github.com/hoky1227/Quants-agent.git
+# cd Quants-agent
 
 # 프로젝트 Python 버전 고정 (< 3.14)
 uv python pin 3.13
@@ -147,6 +153,8 @@ uv run python run_backtest.py
 # DB 데이터만 사용
 uv run python run_backtest.py --data-source db --market-db-path data/market_parquet
 ```
+
+`LQ_POSTGRES_DSN`이 없으면 백테스트는 계속 실행되지만 PostgreSQL 감사(audit) 저장은 건너뜁니다.
 
 **워크포워드 최적화:**
 ```bash

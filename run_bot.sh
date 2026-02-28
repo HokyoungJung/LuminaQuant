@@ -4,7 +4,7 @@
 # Uses uv-only runtime and auto-restarts on crash.
 
 echo "---------------------------------------------------"
-echo "[PRODUCTION] Starting Quants Agent in Resilient Mode"
+echo "[PRODUCTION] Starting LuminaQuant in Resilient Mode"
 echo "---------------------------------------------------"
 
 # Ensure log directory exists
