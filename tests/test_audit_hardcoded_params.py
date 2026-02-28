@@ -93,6 +93,7 @@ ALPHA_FORMULAS = {
 
 def test_skips_formula_string_literals_when_tunable_specs_exist(tmp_path, monkeypatch):
     monkeypatch.setattr(MODULE, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(MODULE, "_formula_is_tunable_via_ir", lambda *_args, **_kwargs: True)
 
     formula_file = tmp_path / "lumina_quant" / "indicators" / "formulaic_definitions.py"
     formula_file.parent.mkdir(parents=True, exist_ok=True)
