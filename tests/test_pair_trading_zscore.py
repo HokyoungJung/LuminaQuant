@@ -4,6 +4,7 @@ import unittest
 from dataclasses import dataclass
 
 from lumina_quant.core.events import MarketEvent
+from lumina_quant.symbols import canonical_symbol
 from lumina_quant.strategies.pair_trading_zscore import PairTradingZScoreStrategy
 
 
@@ -12,20 +13,23 @@ class _PairBarStore:
     symbol_list: list[str]
 
     def __post_init__(self):
-        self._latest_close = dict.fromkeys(self.symbol_list)
-        self._latest_time = dict.fromkeys(self.symbol_list)
+        canonical = [canonical_symbol(symbol) for symbol in self.symbol_list]
+        self._latest_close = dict.fromkeys(canonical)
+        self._latest_time = dict.fromkeys(canonical)
+        self.symbol_list = canonical
 
     def set_bar(self, symbol, time_index, close_price):
-        self._latest_time[symbol] = time_index
-        self._latest_close[symbol] = float(close_price)
+        token = canonical_symbol(symbol)
+        self._latest_time[token] = time_index
+        self._latest_close[token] = float(close_price)
 
     def get_latest_bar_value(self, symbol, val_type):
         _ = val_type
-        value = self._latest_close.get(symbol)
+        value = self._latest_close.get(canonical_symbol(symbol))
         return float(value) if value is not None else 0.0
 
     def get_latest_bar_datetime(self, symbol):
-        return self._latest_time.get(symbol)
+        return self._latest_time.get(canonical_symbol(symbol))
 
 
 def _build_pair_prices(length=320):
@@ -43,8 +47,8 @@ def _build_pair_prices(length=320):
 
 
 def _run_strategy(prices, split=None):
-    symbol_x = "XAU/USDT:USDT"
-    symbol_y = "XAG/USDT:USDT"
+    symbol_x = "XAU/USDT"
+    symbol_y = "XAG/USDT"
     params = {
         "lookback_window": 30,
         "hedge_window": 60,
@@ -105,7 +109,7 @@ class TestPairTradingZScore(unittest.TestCase):
         self.assertIn("EXIT", signal_types)
 
         exit_symbols = {symbol for _, symbol, signal_type in signals if signal_type == "EXIT"}
-        self.assertEqual(exit_symbols, {"XAU/USDT:USDT", "XAG/USDT:USDT"})
+        self.assertEqual(exit_symbols, {"XAU/USDT", "XAG/USDT"})
 
     def test_state_roundtrip_preserves_signal_sequence(self):
         prices = _build_pair_prices()

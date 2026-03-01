@@ -12,6 +12,7 @@ from typing import Any
 
 import polars as pl
 from lumina_quant.storage.wal_binary import BinaryWAL, WALRecord
+from lumina_quant.symbols import canonical_symbol
 
 _DEFAULT_SCHEMA: dict[str, pl.DataType] = {
     "datetime": pl.Datetime(time_unit="ms"),
@@ -35,15 +36,7 @@ _TIMEFRAME_PATTERN = re.compile(r"^([1-9][0-9]*)([smhdwM])$")
 
 def normalize_symbol(symbol: str) -> str:
     """Normalize symbol format into BASE/QUOTE uppercase."""
-    raw = str(symbol).strip().upper().replace("_", "/").replace("-", "/")
-    if "/" in raw:
-        base, quote = raw.split("/", 1)
-        return f"{base}/{quote}"
-    for quote in _KNOWN_QUOTES:
-        if raw.endswith(quote) and len(raw) > len(quote):
-            base = raw[: -len(quote)]
-            return f"{base}/{quote}"
-    return raw
+    return canonical_symbol(symbol)
 
 
 def normalize_timeframe_token(timeframe: str) -> str:

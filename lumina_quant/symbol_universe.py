@@ -1,37 +1,98 @@
-"""Helpers for validating requested symbols against exchange market metadata."""
+"""Helpers for symbol canonicalization and exchange availability matching."""
 
 from __future__ import annotations
 
 from collections.abc import Iterable
 from typing import Any
 
-_KNOWN_QUOTES = ("USDT", "USDC", "BUSD", "USD", "BTC", "ETH")
+from lumina_quant.symbols import canonical_symbol
+
+RESEARCH_CANONICAL_QUOTE = "USDT"
+REQUIRED_RESEARCH_TIMEFRAMES: tuple[str, ...] = (
+    "1s",
+    "1m",
+    "5m",
+    "15m",
+    "30m",
+    "1h",
+    "4h",
+    "1d",
+)
 
 
-def _normalize_symbol(symbol: str) -> str:
-    token = str(symbol or "").strip().upper().replace("_", "/").replace("-", "/")
-    while "//" in token:
-        token = token.replace("//", "/")
-    if "/" not in token:
-        for quote in _KNOWN_QUOTES:
-            if token.endswith(quote) and len(token) > len(quote):
-                token = f"{token[: -len(quote)]}/{quote}"
-                break
-    return token
+def canonicalize_research_symbol(symbol: str) -> str:
+    """Canonicalize symbols to BASE/USDT while accepting legacy aliases.
+
+    Examples:
+      BTCUSDT -> BTC/USDT
+      BTC-USDT -> BTC/USDT
+      XAU/USDT:USDT -> XAU/USDT
+    """
+
+    canonical = canonical_symbol(symbol)
+    if not canonical:
+        return ""
+    base, _, _quote = canonical.partition("/")
+    if not base:
+        return ""
+    return f"{base}/{RESEARCH_CANONICAL_QUOTE}"
+
+
+def canonicalize_research_symbols(symbols: Iterable[str]) -> tuple[str, ...]:
+    """Canonicalize and de-duplicate research symbols preserving order."""
+    out: list[str] = []
+    for raw in symbols:
+        symbol = canonicalize_research_symbol(str(raw))
+        if symbol and symbol not in out:
+            out.append(symbol)
+    return tuple(out)
+
+
+def normalize_research_timeframes(
+    timeframes: Iterable[str],
+    *,
+    strict_required_set: bool = False,
+) -> tuple[str, ...]:
+    """Normalize timeframe tokens and optionally enforce canonical required set."""
+    out: list[str] = []
+    for raw in timeframes:
+        token = str(raw or "").strip().lower()
+        if token and token not in out:
+            out.append(token)
+
+    if strict_required_set:
+        out_set = set(out)
+        required_set = set(REQUIRED_RESEARCH_TIMEFRAMES)
+        if out_set != required_set:
+            required = ", ".join(REQUIRED_RESEARCH_TIMEFRAMES)
+            raise ValueError(
+                "Strategy timeframes must match canonical set exactly: "
+                f"{required}."
+            )
+        return tuple(token for token in REQUIRED_RESEARCH_TIMEFRAMES if token in out_set)
+
+    if not out:
+        return REQUIRED_RESEARCH_TIMEFRAMES
+    return tuple(out)
 
 
 def _symbol_aliases(symbol: str) -> set[str]:
-    base = _normalize_symbol(symbol)
-    if not base:
+    canonical = canonical_symbol(symbol)
+    if not canonical:
         return set()
 
-    aliases = {base}
-    aliases.add(base.split(":", 1)[0])
-    for token in tuple(aliases):
-        for suffix in ("/PERP", "_PERP", "-PERP"):
-            if token.endswith(suffix):
-                aliases.add(token[: -len(suffix)])
-        aliases.add(token.replace("/", ""))
+    aliases = {
+        canonical,
+        canonicalize_research_symbol(canonical),
+        canonical.replace("/", ""),
+        canonical.replace("/", "-"),
+        canonical.replace("/", "_"),
+    }
+
+    base, _, quote = canonical.partition("/")
+    if base and quote:
+        aliases.add(f"{base}/{quote}:{quote}")
+        aliases.add(f"{base}/{RESEARCH_CANONICAL_QUOTE}:{RESEARCH_CANONICAL_QUOTE}")
     return {item for item in aliases if item}
 
 
@@ -60,7 +121,7 @@ def resolve_available_symbols(
     """Return (kept, dropped) symbols after exchange-market availability matching."""
     requested: list[str] = []
     for raw in symbols:
-        symbol = _normalize_symbol(str(raw))
+        symbol = canonicalize_research_symbol(str(raw))
         if symbol and symbol not in requested:
             requested.append(symbol)
 
@@ -79,4 +140,11 @@ def resolve_available_symbols(
     return kept, dropped
 
 
-__all__ = ["resolve_available_symbols"]
+__all__ = [
+    "RESEARCH_CANONICAL_QUOTE",
+    "REQUIRED_RESEARCH_TIMEFRAMES",
+    "canonicalize_research_symbol",
+    "canonicalize_research_symbols",
+    "normalize_research_timeframes",
+    "resolve_available_symbols",
+]

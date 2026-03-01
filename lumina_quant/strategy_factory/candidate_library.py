@@ -1,4 +1,4 @@
-"""Candidate-library builder for Binance futures strategy research."""
+"""Candidate-library builder for advanced multi-sleeve quant research."""
 
 from __future__ import annotations
 
@@ -8,24 +8,50 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from itertools import product
+from pathlib import Path
 from typing import Any
 
-DEFAULT_BINANCE_TOP10_PLUS_METALS: tuple[str, ...] = (
+from lumina_quant.symbols import (
+    CANONICAL_STRATEGY_TIMEFRAMES,
+    canonicalize_symbol_list,
+    normalize_strategy_timeframes,
+)
+
+_DEFAULT_SYMBOL_FALLBACK: tuple[str, ...] = (
     "BTC/USDT",
     "ETH/USDT",
+    "XRP/USDT",
     "BNB/USDT",
     "SOL/USDT",
-    "XRP/USDT",
-    "ADA/USDT",
-    "DOGE/USDT",
     "TRX/USDT",
+    "DOGE/USDT",
+    "ADA/USDT",
+    "TON/USDT",
     "AVAX/USDT",
-    "LINK/USDT",
     "XAU/USDT",
     "XAG/USDT",
 )
 
-DEFAULT_TIMEFRAMES: tuple[str, ...] = ("1s", "1m", "5m", "15m", "30m", "1h", "4h", "1d")
+_PAIR_ANCHORS: tuple[tuple[str, str], ...] = (
+    ("BTC/USDT", "ETH/USDT"),
+    ("ETH/USDT", "SOL/USDT"),
+    ("XAU/USDT", "XAG/USDT"),
+)
+
+_CRYPTO_LEADERS = {"BTC/USDT", "ETH/USDT", "BNB/USDT", "SOL/USDT"}
+_METALS = {"XAU/USDT", "XAG/USDT"}
+
+
+try:  # pragma: no cover - guarded import for bootstrap contexts
+    from lumina_quant.config import BaseConfig
+
+    DEFAULT_BINANCE_TOP10_PLUS_METALS: tuple[str, ...] = tuple(
+        canonicalize_symbol_list(list(getattr(BaseConfig, "SYMBOLS", _DEFAULT_SYMBOL_FALLBACK)))
+    )
+except Exception:  # pragma: no cover - safe fallback during partial imports
+    DEFAULT_BINANCE_TOP10_PLUS_METALS = _DEFAULT_SYMBOL_FALLBACK
+
+DEFAULT_TIMEFRAMES: tuple[str, ...] = CANONICAL_STRATEGY_TIMEFRAMES
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,12 +68,16 @@ class StrategyCandidate:
     notes: str
 
     def to_dict(self) -> dict[str, Any]:
+        timeframe = str(self.timeframe)
         return {
             "candidate_id": self.candidate_id,
             "name": self.name,
             "family": self.family,
             "strategy_class": self.strategy_class,
-            "timeframe": self.timeframe,
+            "strategy": self.strategy_class,
+            "strategy_timeframe": timeframe,
+            # Legacy alias retained for compatibility.
+            "timeframe": timeframe,
             "symbols": list(self.symbols),
             "params": dict(self.params),
             "notes": self.notes,
@@ -55,14 +85,7 @@ class StrategyCandidate:
 
 
 def _normalize_unique(values: Iterable[str]) -> tuple[str, ...]:
-    out: list[str] = []
-    for raw in values:
-        token = str(raw).strip().upper()
-        if not token:
-            continue
-        if token not in out:
-            out.append(token)
-    return tuple(out)
+    return tuple(canonicalize_symbol_list(values))
 
 
 def _candidate_id(*, name: str, timeframe: str, params: dict[str, Any], symbols: tuple[str, ...]) -> str:
@@ -76,32 +99,51 @@ def _candidate_id(*, name: str, timeframe: str, params: dict[str, Any], symbols:
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()[:16]
 
 
-def _build_symbol_pairs(symbols: Sequence[str]) -> list[tuple[str, str]]:
-    topcap = [symbol for symbol in symbols if symbol not in {"XAU/USDT", "XAG/USDT"}]
-    pairs: list[tuple[str, str]] = []
+def _has_perp_support_data() -> bool:
+    path = Path("data") / "market_parquet" / "feature_points"
+    return path.exists()
 
-    anchor_pairs = [
-        ("BTC/USDT", "ETH/USDT"),
-        ("ETH/USDT", "SOL/USDT"),
-        ("BNB/USDT", "SOL/USDT"),
-        ("ADA/USDT", "XRP/USDT"),
-        ("DOGE/USDT", "TRX/USDT"),
-        ("AVAX/USDT", "LINK/USDT"),
-        ("XAU/USDT", "XAG/USDT"),
-    ]
-    for left, right in anchor_pairs:
-        if left in symbols and right in symbols:
-            pairs.append((left, right))
 
-    if len(pairs) < 6:
-        for idx in range(max(0, len(topcap) - 1)):
-            pair = (topcap[idx], topcap[idx + 1])
-            if pair not in pairs:
-                pairs.append(pair)
-            if len(pairs) >= 6:
-                break
+def _add_candidate(
+    out: list[StrategyCandidate],
+    *,
+    name: str,
+    family: str,
+    strategy_class: str,
+    timeframe: str,
+    symbols: Sequence[str],
+    params: dict[str, Any],
+    notes: str,
+) -> None:
+    symbol_tuple = tuple(canonicalize_symbol_list(symbols))
+    if not symbol_tuple:
+        return
+    out.append(
+        StrategyCandidate(
+            candidate_id=_candidate_id(
+                name=name,
+                timeframe=timeframe,
+                params=params,
+                symbols=symbol_tuple,
+            ),
+            name=name,
+            family=family,
+            strategy_class=strategy_class,
+            timeframe=str(timeframe),
+            symbols=symbol_tuple,
+            params=dict(params),
+            notes=notes,
+        )
+    )
 
-    return pairs
+
+def _pairs_in_universe(symbols: Sequence[str]) -> list[tuple[str, str]]:
+    universe = set(symbols)
+    out: list[tuple[str, str]] = []
+    for left, right in _PAIR_ANCHORS:
+        if left in universe and right in universe:
+            out.append((left, right))
+    return out
 
 
 def build_binance_futures_candidates(
@@ -109,245 +151,182 @@ def build_binance_futures_candidates(
     timeframes: Sequence[str] = DEFAULT_TIMEFRAMES,
     symbols: Sequence[str] = DEFAULT_BINANCE_TOP10_PLUS_METALS,
 ) -> list[StrategyCandidate]:
-    """Build a diversified candidate universe for Binance futures research."""
-    normalized_timeframes = tuple(str(token).strip().lower() for token in timeframes if str(token).strip())
+    """Build candidate universe for RG_PVTM and diversifier sleeves."""
+    normalized_timeframes = tuple(
+        normalize_strategy_timeframes(
+            list(timeframes),
+            required=CANONICAL_STRATEGY_TIMEFRAMES,
+            strict_subset=True,
+        )
+    )
     normalized_symbols = _normalize_unique(symbols)
     if not normalized_timeframes:
         raise ValueError("timeframes must not be empty")
     if len(normalized_symbols) < 2:
         raise ValueError("symbols must include at least two instruments")
 
-    pair_symbols = _build_symbol_pairs(normalized_symbols)
-    topcap_symbols = tuple(symbol for symbol in normalized_symbols if symbol not in {"XAU/USDT", "XAG/USDT"})
-    if not topcap_symbols:
-        topcap_symbols = normalized_symbols
-
     candidates: list[StrategyCandidate] = []
+    pairs = _pairs_in_universe(normalized_symbols)
 
-    for timeframe in normalized_timeframes:
-        timeframe_slug = timeframe.replace("/", "-")
+    trend_tfs = [tf for tf in ("30m", "1h", "4h", "1d") if tf in normalized_timeframes]
+    mean_rev_tfs = [tf for tf in ("1m", "5m", "15m") if tf in normalized_timeframes]
+    pair_tfs = [tf for tf in ("5m", "15m", "1h") if tf in normalized_timeframes]
+    carry_tfs = [tf for tf in ("30m", "1h", "4h") if tf in normalized_timeframes]
+    micro_tfs = [tf for tf in ("1s",) if tf in normalized_timeframes]
 
-        for rsi_period, oversold, overbought in product((7, 14, 21), (22, 28, 34), (66, 72, 78)):
-            name = f"rsi_reversion_{timeframe_slug}_{rsi_period}_{oversold}_{overbought}"
+    crypto_symbols = [symbol for symbol in normalized_symbols if symbol not in _METALS]
+    laggard_symbols = [symbol for symbol in crypto_symbols if symbol not in _CRYPTO_LEADERS]
+
+    # Primary trend sleeve (RG_PVTM).
+    for timeframe in trend_tfs:
+        tf_tag = timeframe.replace("/", "-")
+        for long_th, short_th, te_min, vr_min in product((0.45, 0.60, 0.75), (0.45, 0.60, 0.75), (0.20, 0.25), (0.80, 0.95)):
             params = {
-                "rsi_period": int(rsi_period),
-                "oversold": int(oversold),
-                "overbought": int(overbought),
+                "long_threshold": float(long_th),
+                "short_threshold": float(short_th),
+                "te_min": float(te_min),
+                "vr_min": float(vr_min),
+                "chop_max": 62.0,
+                "risk_target_vol": 0.004,
+                "atr_stop_mult": 2.0,
+                "trail_atr_mult": 2.8,
                 "allow_short": True,
             }
-            candidates.append(
-                StrategyCandidate(
-                    candidate_id=_candidate_id(
-                        name=name,
-                        timeframe=timeframe,
-                        params=params,
-                        symbols=normalized_symbols,
-                    ),
-                    name=name,
-                    family="mean_reversion",
-                    strategy_class="RsiStrategy",
-                    timeframe=timeframe,
-                    symbols=normalized_symbols,
-                    params=params,
-                    notes="Single-symbol RSI mean reversion sweep over the full futures universe.",
-                )
+            _add_candidate(
+                candidates,
+                name=f"composite_trend_{tf_tag}_{long_th:.2f}_{short_th:.2f}_{te_min:.2f}_{vr_min:.2f}",
+                family="trend",
+                strategy_class="CompositeTrendStrategy",
+                timeframe=timeframe,
+                symbols=normalized_symbols,
+                params=params,
+                notes="Primary RG_PVTM trend sleeve across full universe.",
             )
 
-        for short_window, long_window in (
-            (8, 34),
-            (12, 48),
-            (21, 64),
-            (34, 96),
-            (55, 144),
-        ):
-            name = f"ma_cross_{timeframe_slug}_{short_window}_{long_window}"
+    # Vol-compression VWAP reversion sleeve.
+    for timeframe in mean_rev_tfs:
+        tf_tag = timeframe.replace("/", "-")
+        for entry_z, exit_z, comp_pct in product((1.2, 1.5, 1.9), (0.25, 0.35, 0.50), (0.20, 0.30, 0.40)):
             params = {
-                "short_window": int(short_window),
-                "long_window": int(long_window),
-                "allow_short": True,
-            }
-            candidates.append(
-                StrategyCandidate(
-                    candidate_id=_candidate_id(
-                        name=name,
-                        timeframe=timeframe,
-                        params=params,
-                        symbols=normalized_symbols,
-                    ),
-                    name=name,
-                    family="trend",
-                    strategy_class="MovingAverageCrossStrategy",
-                    timeframe=timeframe,
-                    symbols=normalized_symbols,
-                    params=params,
-                    notes="Classic momentum crossover with long/short enabled for futures.",
-                )
-            )
-
-        for lookback, entry_z, exit_z in product((32, 64, 96, 128), (1.4, 1.8, 2.2), (0.35, 0.55)):
-            name = f"mean_rev_std_{timeframe_slug}_{lookback}_{entry_z:.2f}_{exit_z:.2f}"
-            params = {
-                "window": int(lookback),
                 "entry_z": float(entry_z),
                 "exit_z": float(exit_z),
-                "stop_loss_pct": 0.03,
+                "compression_percentile": float(comp_pct),
+                "compression_vol_ratio": 0.85,
+                "atr_stop_pct": 0.02,
+                "max_hold_bars": 64,
                 "allow_short": True,
             }
-            candidates.append(
-                StrategyCandidate(
-                    candidate_id=_candidate_id(
-                        name=name,
-                        timeframe=timeframe,
-                        params=params,
-                        symbols=normalized_symbols,
-                    ),
-                    name=name,
-                    family="mean_reversion",
-                    strategy_class="MeanReversionStdStrategy",
-                    timeframe=timeframe,
-                    symbols=normalized_symbols,
-                    params=params,
-                    notes="Z-score reversal with symmetric long/short entries.",
-                )
+            _add_candidate(
+                candidates,
+                name=f"volcomp_vwap_rev_{tf_tag}_{entry_z:.2f}_{exit_z:.2f}_{comp_pct:.2f}",
+                family="mean_reversion",
+                strategy_class="VolCompressionVWAPReversionStrategy",
+                timeframe=timeframe,
+                symbols=normalized_symbols,
+                params=params,
+                notes="Compression-gated VWAP mean reversion diversifier.",
             )
 
-        for lookback_bars, atr_stop_multiplier in product((20, 48, 96), (1.5, 2.2, 3.0)):
-            name = f"breakout_{timeframe_slug}_{lookback_bars}_{atr_stop_multiplier:.1f}"
-            params = {
-                "lookback_bars": int(lookback_bars),
-                "breakout_buffer": 0.001,
-                "atr_window": 14,
-                "atr_stop_multiplier": float(atr_stop_multiplier),
-                "stop_loss_pct": 0.03,
-                "allow_short": True,
-            }
-            candidates.append(
-                StrategyCandidate(
-                    candidate_id=_candidate_id(
-                        name=name,
-                        timeframe=timeframe,
-                        params=params,
-                        symbols=normalized_symbols,
-                    ),
-                    name=name,
-                    family="breakout",
-                    strategy_class="RollingBreakoutStrategy",
+    # Lead/lag spillover sleeve (metals excluded).
+    if laggard_symbols:
+        for timeframe in mean_rev_tfs:
+            tf_tag = timeframe.replace("/", "-")
+            for entry_score, max_lag in product((0.25, 0.35, 0.50), (2, 3, 4)):
+                params = {
+                    "entry_score": float(entry_score),
+                    "exit_score": 0.08,
+                    "max_lag": int(max_lag),
+                    "ridge_alpha": 1.0,
+                    "max_hold_bars": 24,
+                    "stop_loss_pct": 0.02,
+                    "allow_short": True,
+                }
+                _add_candidate(
+                    candidates,
+                    name=f"leadlag_spillover_{tf_tag}_{entry_score:.2f}_lag{max_lag}",
+                    family="intraday_alpha",
+                    strategy_class="LeadLagSpilloverStrategy",
                     timeframe=timeframe,
-                    symbols=normalized_symbols,
+                    symbols=tuple(sorted(set(_CRYPTO_LEADERS).intersection(normalized_symbols)) + laggard_symbols),
                     params=params,
-                    notes="Donchian breakout with ATR trailing stop.",
+                    notes="Cross-asset lead-lag predictor (crypto only, metals excluded).",
                 )
-            )
 
-        for window, entry_dev, exit_dev in product((32, 64, 96), (0.010, 0.018, 0.026), (0.002, 0.005)):
-            name = f"vwap_rev_{timeframe_slug}_{window}_{entry_dev:.3f}_{exit_dev:.3f}"
-            params = {
-                "window": int(window),
-                "entry_dev": float(entry_dev),
-                "exit_dev": float(exit_dev),
-                "stop_loss_pct": 0.025,
-                "allow_short": True,
-            }
-            candidates.append(
-                StrategyCandidate(
-                    candidate_id=_candidate_id(
-                        name=name,
-                        timeframe=timeframe,
-                        params=params,
-                        symbols=normalized_symbols,
-                    ),
-                    name=name,
-                    family="mean_reversion",
-                    strategy_class="VwapReversionStrategy",
-                    timeframe=timeframe,
-                    symbols=normalized_symbols,
-                    params=params,
-                    notes="VWAP distance reversion with volatility-scaled exits.",
-                )
-            )
-
-        for lookback_bars, rebalance_bars, signal_threshold in product(
-            (8, 16, 24),
-            (8, 16),
-            (0.02, 0.04, 0.06),
-        ):
-            name = (
-                f"topcap_tsmom_{timeframe_slug}_{lookback_bars}_{rebalance_bars}_"
-                f"{signal_threshold:.2f}"
-            )
-            params = {
-                "lookback_bars": int(lookback_bars),
-                "rebalance_bars": int(rebalance_bars),
-                "signal_threshold": float(signal_threshold),
-                "stop_loss_pct": 0.07,
-                "max_longs": min(6, len(topcap_symbols)),
-                "max_shorts": min(5, len(topcap_symbols)),
-                "min_price": 0.10,
-                "btc_regime_ma": 48,
-                "btc_symbol": "BTC/USDT" if "BTC/USDT" in topcap_symbols else topcap_symbols[0],
-            }
-            candidates.append(
-                StrategyCandidate(
-                    candidate_id=_candidate_id(
-                        name=name,
-                        timeframe=timeframe,
-                        params=params,
-                        symbols=topcap_symbols,
-                    ),
-                    name=name,
-                    family="trend",
-                    strategy_class="TopCapTimeSeriesMomentumStrategy",
-                    timeframe=timeframe,
-                    symbols=topcap_symbols,
-                    params=params,
-                    notes="Cross-sectional top-cap momentum rotation with BTC regime filter.",
-                )
-            )
-
-        for symbol_x, symbol_y in pair_symbols:
-            for entry_z, exit_z, stop_z in ((1.8, 0.45, 3.4), (2.2, 0.55, 3.9), (2.6, 0.7, 4.2)):
-                pair_token = (
-                    f"{symbol_x.replace('/', '').lower()}_{symbol_y.replace('/', '').lower()}"
-                )
-                name = f"pair_z_{timeframe_slug}_{pair_token}_{entry_z:.1f}_{exit_z:.2f}"
+    # Pair spread sleeve.
+    for timeframe in pair_tfs:
+        tf_tag = timeframe.replace("/", "-")
+        for symbol_x, symbol_y in pairs:
+            pair_token = f"{symbol_x.replace('/', '').lower()}_{symbol_y.replace('/', '').lower()}"
+            for entry_z, exit_z, stop_z in ((1.8, 0.45, 3.4), (2.2, 0.55, 3.9), (2.6, 0.70, 4.2)):
                 params = {
                     "lookback_window": 96,
                     "hedge_window": 192,
                     "entry_z": float(entry_z),
                     "exit_z": float(exit_z),
                     "stop_z": float(stop_z),
-                    "min_correlation": 0.1,
                     "max_hold_bars": 240,
-                    "cooldown_bars": 4,
-                    "reentry_z_buffer": 0.2,
-                    "min_z_turn": 0.05,
+                    "min_correlation": 0.1,
                     "stop_loss_pct": 0.03,
-                    "min_abs_beta": 0.02,
-                    "max_abs_beta": 5.0,
-                    "min_volume_window": 24,
-                    "min_volume_ratio": 0.0,
                     "symbol_x": symbol_x,
                     "symbol_y": symbol_y,
-                    "use_log_price": True,
                 }
-                pair_universe = tuple(sorted({symbol_x, symbol_y}))
-                candidates.append(
-                    StrategyCandidate(
-                        candidate_id=_candidate_id(
-                            name=name,
-                            timeframe=timeframe,
-                            params=params,
-                            symbols=pair_universe,
-                        ),
-                        name=name,
-                        family="market_neutral",
-                        strategy_class="PairTradingZScoreStrategy",
-                        timeframe=timeframe,
-                        symbols=pair_universe,
-                        params=params,
-                        notes="Pair mean-reversion with beta + spread z-score gating.",
-                    )
+                _add_candidate(
+                    candidates,
+                    name=f"pair_spread_{tf_tag}_{pair_token}_{entry_z:.1f}_{exit_z:.2f}",
+                    family="market_neutral",
+                    strategy_class="PairSpreadZScoreStrategy",
+                    timeframe=timeframe,
+                    symbols=(symbol_x, symbol_y),
+                    params=params,
+                    notes="Rolling-beta spread z-score with correlation stability filters.",
                 )
+
+    # Optional carry/crowding sleeve.
+    if _has_perp_support_data() and carry_tfs:
+        for timeframe in carry_tfs:
+            tf_tag = timeframe.replace("/", "-")
+            for entry, exit_th in ((0.25, 0.08), (0.35, 0.10), (0.45, 0.15)):
+                params = {
+                    "entry_threshold": float(entry),
+                    "exit_threshold": float(exit_th),
+                    "mild_funding": 0.0002,
+                    "extreme_funding": 0.0012,
+                    "stop_loss_pct": 0.02,
+                    "max_hold_bars": 72,
+                    "allow_short": True,
+                }
+                _add_candidate(
+                    candidates,
+                    name=f"perp_crowding_carry_{tf_tag}_{entry:.2f}_{exit_th:.2f}",
+                    family="carry",
+                    strategy_class="PerpCrowdingCarryStrategy",
+                    timeframe=timeframe,
+                    symbols=crypto_symbols,
+                    params=params,
+                    notes="Funding/OI crowding-aware carry sleeve.",
+                )
+
+    # Research-only micro sleeve.
+    for timeframe in micro_tfs:
+        tf_tag = timeframe.replace("/", "-")
+        for lookback, range_z, vol_z in ((20, 1.2, 0.8), (30, 1.5, 1.0), (45, 2.0, 1.2)):
+            params = {
+                "lookback": int(lookback),
+                "range_z_threshold": float(range_z),
+                "volume_z_threshold": float(vol_z),
+                "max_hold_bars": 20,
+                "allow_short": True,
+            }
+            _add_candidate(
+                candidates,
+                name=f"micro_range_expansion_{tf_tag}_{lookback}_{range_z:.1f}_{vol_z:.1f}",
+                family="micro",
+                strategy_class="MicroRangeExpansion1sStrategy",
+                timeframe=timeframe,
+                symbols=crypto_symbols,
+                params=params,
+                notes="Research-only micro breakout sleeve with strict turnover controls.",
+            )
 
     return candidates
 
@@ -358,7 +337,18 @@ def build_candidate_manifest(
     symbols: Sequence[str] = DEFAULT_BINANCE_TOP10_PLUS_METALS,
 ) -> dict[str, Any]:
     """Build a JSON-ready manifest with aggregate metadata."""
-    candidates = build_binance_futures_candidates(timeframes=timeframes, symbols=symbols)
+    normalized_symbols = tuple(canonicalize_symbol_list(symbols))
+    normalized_timeframes = tuple(
+        normalize_strategy_timeframes(
+            list(timeframes),
+            required=CANONICAL_STRATEGY_TIMEFRAMES,
+            strict_subset=True,
+        )
+    )
+    candidates = build_binance_futures_candidates(
+        timeframes=normalized_timeframes,
+        symbols=normalized_symbols,
+    )
 
     family_counts: dict[str, int] = {}
     strategy_counts: dict[str, int] = {}
@@ -371,8 +361,8 @@ def build_candidate_manifest(
 
     return {
         "generated_at": datetime.now(UTC).isoformat(),
-        "symbol_universe": list(_normalize_unique(symbols)),
-        "timeframes": [str(token).strip().lower() for token in timeframes if str(token).strip()],
+        "symbol_universe": list(normalized_symbols),
+        "timeframes": list(normalized_timeframes),
         "candidate_count": len(candidates),
         "family_counts": family_counts,
         "strategy_counts": strategy_counts,

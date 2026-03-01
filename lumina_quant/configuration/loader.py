@@ -52,6 +52,13 @@ def _as_int(value: Any, default: int) -> int:
         return int(default)
 
 
+def _normalize_timeframe_token(value: Any, default: str) -> str:
+    token = str(value or "").strip().lower()
+    if not token:
+        return str(default)
+    return token
+
+
 def load_yaml_config(config_path: str = "config.yaml") -> dict[str, Any]:
     """Load YAML config from project root or an absolute path."""
     project_root = Path(__file__).resolve().parents[2]
@@ -229,6 +236,20 @@ def build_runtime_config(data: dict[str, Any], env: Mapping[str, str]) -> Runtim
     )
 
     # Safe type coercion for critical numeric fields.
+    runtime.trading.timeframe = _normalize_timeframe_token(runtime.trading.timeframe, "1m")
+    normalized_timeframes: list[str] = []
+    raw_timeframes = getattr(runtime.trading, "timeframes", None)
+    if isinstance(raw_timeframes, (list, tuple, set)):
+        for item in raw_timeframes:
+            token = _normalize_timeframe_token(item, "")
+            if token:
+                normalized_timeframes.append(token)
+    if not normalized_timeframes:
+        normalized_timeframes = [str(runtime.trading.timeframe)]
+    if str(runtime.trading.timeframe) not in normalized_timeframes:
+        normalized_timeframes.insert(0, str(runtime.trading.timeframe))
+    runtime.trading.timeframes = list(dict.fromkeys(normalized_timeframes))
+
     runtime.trading.initial_capital = _as_float(runtime.trading.initial_capital, 10000.0)
     runtime.trading.target_allocation = _as_float(runtime.trading.target_allocation, 0.1)
     runtime.trading.min_trade_qty = _as_float(runtime.trading.min_trade_qty, 0.001)
@@ -364,6 +385,14 @@ def build_runtime_config(data: dict[str, Any], env: Mapping[str, str]) -> Runtim
     runtime.optimization.persist_best_params = _as_bool(
         runtime.optimization.persist_best_params,
         False,
+    )
+    runtime.optimization.validation_days = max(
+        0,
+        _as_int(getattr(runtime.optimization, "validation_days", 30), 30),
+    )
+    runtime.optimization.oos_days = max(
+        1,
+        _as_int(getattr(runtime.optimization, "oos_days", 30), 30),
     )
     runtime.promotion_gate.days = _as_int(runtime.promotion_gate.days, 14)
     runtime.promotion_gate.max_order_rejects = _as_int(runtime.promotion_gate.max_order_rejects, 0)

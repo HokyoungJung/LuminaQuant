@@ -13,6 +13,7 @@ from lumina_quant.strategy_factory.pipeline import (
     render_shortlist_markdown,
     write_candidate_manifest,
 )
+from lumina_quant.strategy_factory.research_runner import run_candidate_research
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -21,7 +22,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--backend", default="parquet-postgres")
     parser.add_argument("--db-path", default=str(BaseConfig.MARKET_DATA_PARQUET_PATH))
     parser.add_argument("--mode", default="standard")
-    parser.add_argument("--timeframes", nargs="+", default=["1m", "5m", "15m"])
+    parser.add_argument("--timeframes", nargs="+", default=list(BaseConfig.TIMEFRAMES))
     parser.add_argument("--seeds", nargs="+", default=["20260221"])
     parser.add_argument("--single-min-score", type=float, default=0.0)
     parser.add_argument("--single-min-return", type=float, default=0.0)
@@ -60,6 +61,21 @@ def main() -> int:
         "dry_run": bool(args.dry_run),
         "seeds": [str(item) for item in list(args.seeds)],
     }
+    research_report = run_candidate_research(
+        candidates=selected_team,
+        base_timeframe="1s",
+        strategy_timeframes=[str(item) for item in list(args.timeframes)],
+        symbol_universe=list(BaseConfig.SYMBOLS),
+        stage1_keep_ratio=0.5,
+        max_candidates=max(1, len(selected_team)),
+    )
+    report["selected_team"] = list(research_report.get("candidates") or [])
+    report["split"] = research_report.get("split")
+    report["base_timeframe"] = research_report.get("base_timeframe")
+    report["strategy_timeframes"] = research_report.get("strategy_timeframes")
+    report["stage1"] = research_report.get("stage1")
+    report["data_sources"] = research_report.get("data_sources")
+
     report_path = output_dir / f"strategy_factory_report_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}.json"
     report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
 

@@ -19,6 +19,12 @@ from lumina_quant.indicators import (
     trend_efficiency_latest,
     volume_shock_zscore_latest,
 )
+from lumina_quant.symbols import (
+    CANONICAL_STRATEGY_TIMEFRAMES,
+    canonical_symbol,
+    canonicalize_symbol_list,
+    normalize_strategy_timeframes,
+)
 
 DEFAULT_TOP10_PLUS_METALS: tuple[str, ...] = (
     "BTC/USDT",
@@ -30,18 +36,18 @@ DEFAULT_TOP10_PLUS_METALS: tuple[str, ...] = (
     "DOGE/USDT",
     "TRX/USDT",
     "AVAX/USDT",
-    "LINK/USDT",
-    "XAU/USDT:USDT",
-    "XAG/USDT:USDT",
+    "TON/USDT",
+    "XAU/USDT",
+    "XAG/USDT",
 )
 
-DEFAULT_TIMEFRAMES: tuple[str, ...] = ("1s", "1m", "5m", "15m", "30m", "1h", "4h", "1d")
+DEFAULT_TIMEFRAMES: tuple[str, ...] = CANONICAL_STRATEGY_TIMEFRAMES
 
 DEFAULT_PAIR_SET: tuple[tuple[str, str], ...] = (
     ("BTC/USDT", "ETH/USDT"),
     ("BTC/USDT", "BNB/USDT"),
     ("ETH/USDT", "SOL/USDT"),
-    ("XAU/USDT:USDT", "XAG/USDT:USDT"),
+    ("XAU/USDT", "XAG/USDT"),
 )
 
 TIMEFRAME_SECONDS: dict[str, int] = {
@@ -74,10 +80,7 @@ def _parse_float(value) -> float | None:
 
 
 def _normalize_symbol(value: str) -> str:
-    token = str(value).strip().upper().replace("-", "/").replace("_", "/")
-    if "/" not in token and token.endswith("USDT") and len(token) > 4:
-        token = f"{token[:-4]}/USDT"
-    return token
+    return canonical_symbol(str(value))
 
 
 def _normalize_timeframe(value: str) -> str:
@@ -133,12 +136,12 @@ def _append_candidate(
 
 
 def _build_candidate_universe(symbols: list[str], timeframes: list[str]) -> list[dict]:
-    normalized_symbols = [_normalize_symbol(symbol) for symbol in symbols if str(symbol).strip()]
-    normalized_timeframes = [
-        _normalize_timeframe(token)
-        for token in timeframes
-        if _normalize_timeframe(token) in TIMEFRAME_SECONDS
-    ]
+    normalized_symbols = canonicalize_symbol_list(symbols)
+    normalized_timeframes = normalize_strategy_timeframes(
+        timeframes,
+        required=CANONICAL_STRATEGY_TIMEFRAMES,
+        strict_subset=True,
+    )
     if not normalized_timeframes:
         normalized_timeframes = list(DEFAULT_TIMEFRAMES)
 
@@ -381,6 +384,28 @@ def _load_candidates_from_team_report(path: Path, *, mode: str) -> list[dict]:
 
     rows: list[dict] = []
     seen: set[str] = set()
+
+    # Candidate report v2 direct path.
+    if isinstance(doc.get("candidates"), list):
+        default_tf = str(((doc.get("split") or {}) if isinstance(doc.get("split"), dict) else {}).get("strategy_timeframe") or "")
+        for raw in list(doc.get("candidates") or []):
+            if not isinstance(raw, dict):
+                continue
+            timeframe = str(raw.get("strategy_timeframe") or raw.get("timeframe") or default_tf)
+            normalized = _normalize_strategy_row(
+                raw,
+                timeframe=timeframe,
+                source_report=path,
+                mode=mode,
+                source="candidate_report",
+            )
+            if normalized is None:
+                continue
+            ident = str(normalized.get("identity", ""))
+            if ident in seen:
+                continue
+            seen.add(ident)
+            rows.append(normalized)
 
     for raw in list(doc.get("selected_team") or []):
         if not isinstance(raw, dict):
@@ -709,9 +734,9 @@ def _write_markdown_report(
     lines.append("")
     lines.append(
         "```bash\n"
-        "uv run python scripts/run_strategy_team_research.py "
-        "--market-type future --mode oos --strategy-set all "
-        f"--topcap-symbols {' '.join([_normalize_symbol(symbol) for symbol in symbols])}\n"
+        "uv run python scripts/run_candidate_research.py "
+        "--output-dir reports "
+        f"--symbols {' '.join([_normalize_symbol(symbol) for symbol in symbols])}\n"
         "```"
     )
     lines.append("")
@@ -725,7 +750,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--symbols", nargs="+", default=list(DEFAULT_TOP10_PLUS_METALS))
     parser.add_argument("--timeframes", nargs="+", default=list(DEFAULT_TIMEFRAMES))
     parser.add_argument("--mode", choices=["oos", "live"], default="oos")
-    parser.add_argument("--report-glob", default="reports/strategy_team_research_oos_*.json")
+    parser.add_argument("--report-glob", default="reports/candidate_research_*.json")
     parser.add_argument("--max-report-files", type=int, default=20)
     parser.add_argument("--data-dir", default="data")
     parser.add_argument("--regime-window", type=int, default=128)

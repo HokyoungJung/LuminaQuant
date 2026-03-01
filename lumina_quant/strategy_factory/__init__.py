@@ -15,17 +15,22 @@ from .pipeline import (
     write_candidate_manifest,
 )
 from .selection import (
+    DEFAULT_ROBUST_SCORE_PARAMS,
+    DEFAULT_ROBUST_SCORE_WEIGHTS,
     allocate_portfolio_weights,
     build_single_asset_portfolio_sets,
     candidate_identity,
     candidate_mix_type,
     hurdle_score,
+    robust_score_from_metrics,
     select_diversified_shortlist,
     strategy_family,
     summarize_shortlist,
 )
 
 __all__ = [
+    "DEFAULT_ROBUST_SCORE_PARAMS",
+    "DEFAULT_ROBUST_SCORE_WEIGHTS",
     "DEFAULT_BINANCE_TOP10_PLUS_METALS",
     "DEFAULT_TIMEFRAMES",
     "StrategyCandidate",
@@ -39,6 +44,7 @@ __all__ = [
     "candidate_mix_type",
     "extract_saved_report_path",
     "hurdle_score",
+    "robust_score_from_metrics",
     "render_shortlist_markdown",
     "select_diversified_shortlist",
     "strategy_family",

@@ -9,12 +9,22 @@ from collections.abc import Iterable
 from lumina_quant.configuration.schema import RuntimeConfig
 
 SYMBOL_RE = re.compile(r"^[A-Z0-9]+/[A-Z0-9]+$")
+TIMEFRAME_RE = re.compile(r"^[1-9][0-9]*[smhdwM]$")
 
 
 def _validate_symbols(symbols: Iterable[str]) -> None:
     for symbol in symbols:
         if not SYMBOL_RE.match(symbol):
             raise ValueError(f"Invalid symbol format '{symbol}'. Expected format like BTC/USDT.")
+
+
+def _validate_timeframes(timeframes: Iterable[str]) -> None:
+    for timeframe in timeframes:
+        token = str(timeframe or "").strip()
+        if not token or TIMEFRAME_RE.match(token) is None:
+            raise ValueError(
+                f"Invalid timeframe token '{timeframe}'. Expected format like 1m, 5m, 1h, 1d."
+            )
 
 
 def validate_runtime_config(runtime: RuntimeConfig, *, for_live: bool = False) -> None:
@@ -32,6 +42,12 @@ def validate_runtime_config(runtime: RuntimeConfig, *, for_live: bool = False) -
     if not runtime.trading.symbols:
         raise ValueError("No symbols configured in trading.symbols.")
     _validate_symbols(runtime.trading.symbols)
+    if TIMEFRAME_RE.match(str(runtime.trading.timeframe or "").strip()) is None:
+        raise ValueError("trading.timeframe must be a valid token like 1m, 5m, 1h, 1d.")
+    _validate_timeframes(getattr(runtime.trading, "timeframes", []))
+    configured_timeframes = {str(token).strip() for token in runtime.trading.timeframes}
+    if str(runtime.trading.timeframe).strip() not in configured_timeframes:
+        raise ValueError("trading.timeframe must be included in trading.timeframes.")
 
     mode = runtime.live.mode.strip().lower()
     if mode not in {"paper", "real"}:
@@ -127,6 +143,10 @@ def validate_runtime_config(runtime: RuntimeConfig, *, for_live: bool = False) -
         raise ValueError("live.reconciliation_interval_sec must be >= 1.")
     if runtime.optimization.max_workers < 1:
         raise ValueError("optimization.max_workers must be >= 1.")
+    if int(getattr(runtime.optimization, "validation_days", 0)) < 0:
+        raise ValueError("optimization.validation_days must be >= 0.")
+    if int(getattr(runtime.optimization, "oos_days", 0)) < 1:
+        raise ValueError("optimization.oos_days must be >= 1.")
 
     if runtime.promotion_gate.days < 1:
         raise ValueError("promotion_gate.days must be >= 1.")

@@ -30,6 +30,40 @@ def test_resolve_prefilter_window_bounds():
     assert start < fast_end <= end
 
 
+def test_recent_validation_split_anchors_before_oos():
+    data_start = datetime(2025, 1, 1)
+    oos_start = datetime(2026, 2, 1)
+    oos_end = datetime(2026, 3, 1)
+    in_sample_end = datetime(2026, 1, 31, 23, 59)
+
+    split = optimize._build_recent_validation_split(
+        data_start,
+        in_sample_end=in_sample_end,
+        oos_start=oos_start,
+        oos_end=oos_end,
+        validation_days=30,
+        timeframe="1m",
+    )
+
+    assert split is not None
+    assert split["val_end"] == in_sample_end
+    assert split["test_start"] == oos_start
+    assert split["test_end"] == oos_end
+    assert (oos_start - split["val_start"]).days == 30
+
+
+def test_recent_validation_split_can_be_disabled():
+    split = optimize._build_recent_validation_split(
+        datetime(2025, 1, 1),
+        in_sample_end=datetime(2026, 1, 31),
+        oos_start=datetime(2026, 2, 1),
+        oos_end=datetime(2026, 3, 1),
+        validation_days=0,
+        timeframe="1m",
+    )
+    assert split is None
+
+
 def test_optimize_uses_windowed_handler_in_parquet_mode(monkeypatch):
     captured: dict[str, object] = {}
 

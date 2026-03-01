@@ -8,6 +8,21 @@ import math
 from collections.abc import Iterable
 from typing import Any
 
+DEFAULT_ROBUST_SCORE_WEIGHTS: dict[str, float] = {
+    "sharpe_weight": 2.8,
+    "deflated_sharpe_weight": 1.5,
+    "pbo_penalty": 2.0,
+    "return_weight": 35.0,
+    "drawdown_penalty": 3.0,
+    "turnover_penalty": 2.5,
+    "cross_corr_penalty": 0.8,
+}
+DEFAULT_ROBUST_SCORE_PARAMS: dict[str, float] = {
+    "turnover_threshold": 2.5,
+    "failed_candidate_scale": 0.1,
+    **DEFAULT_ROBUST_SCORE_WEIGHTS,
+}
+
 
 def safe_float(value: Any, default: float = 0.0) -> float:
     try:
@@ -22,6 +37,16 @@ def strategy_family(name: str, fallback: str = "other") -> str:
         return "market_neutral"
     if token.startswith(("topcap_", "ma_cross", "breakout_", "rolling_breakout", "rsi_")):
         return "trend"
+    if "composite_trend" in token:
+        return "trend"
+    if "volcomp" in token:
+        return "mean_reversion"
+    if "leadlag" in token:
+        return "intraday_alpha"
+    if "perp_crowding" in token or "carry" in token:
+        return "carry"
+    if "micro_range" in token:
+        return "micro"
     if token.startswith(("carry_", "funding_")):
         return "carry"
     if token:
@@ -40,7 +65,43 @@ def candidate_identity(candidate: dict[str, Any]) -> str:
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()[:20]
 
 
-def hurdle_score(candidate: dict[str, Any], *, mode: str = "oos") -> float:
+def _resolve_robust_score_params(overrides: dict[str, Any] | None = None) -> dict[str, float]:
+    merged = dict(DEFAULT_ROBUST_SCORE_PARAMS)
+    if not isinstance(overrides, dict):
+        return merged
+    for key, value in overrides.items():
+        if key in merged:
+            merged[key] = safe_float(value, merged[key])
+    return merged
+
+
+def robust_score_from_metrics(
+    metrics: dict[str, Any],
+    *,
+    params: dict[str, Any] | None = None,
+) -> float:
+    cfg = _resolve_robust_score_params(params)
+    turnover_threshold = float(cfg["turnover_threshold"])
+    return float(
+        (float(cfg["sharpe_weight"]) * safe_float(metrics.get("sharpe"), 0.0))
+        + (float(cfg["deflated_sharpe_weight"]) * safe_float(metrics.get("deflated_sharpe"), 0.0))
+        - (float(cfg["pbo_penalty"]) * safe_float(metrics.get("pbo"), 1.0))
+        + (float(cfg["return_weight"]) * safe_float(metrics.get("return"), 0.0))
+        - (float(cfg["drawdown_penalty"]) * safe_float(metrics.get("mdd"), 0.0))
+        - (
+            float(cfg["turnover_penalty"])
+            * max(0.0, safe_float(metrics.get("turnover"), 0.0) - turnover_threshold)
+        )
+        - (float(cfg["cross_corr_penalty"]) * safe_float(metrics.get("cross_candidate_corr"), 0.0))
+    )
+
+
+def hurdle_score(
+    candidate: dict[str, Any],
+    *,
+    mode: str = "oos",
+    robust_score_params: dict[str, Any] | None = None,
+) -> float:
     mode_token = str(mode).strip().lower()
     hurdle_key = "val" if mode_token == "live" else "oos"
     hurdle = ((candidate.get("hurdle_fields") or {}).get(hurdle_key)) or {}
@@ -48,14 +109,17 @@ def hurdle_score(candidate: dict[str, Any], *, mode: str = "oos") -> float:
     score = safe_float(hurdle.get("score"), -1_000_000.0)
     excess_return = safe_float(hurdle.get("excess_return"), -1_000_000.0)
     passed = bool(hurdle.get("pass", False))
-    if passed:
-        return score
 
     metric_key = "val" if mode_token == "live" else "oos"
     metrics = candidate.get(metric_key)
     if isinstance(metrics, dict):
+        robust_score = robust_score_from_metrics(metrics, params=robust_score_params)
+        cfg = _resolve_robust_score_params(robust_score_params)
+        failed_scale = float(cfg["failed_candidate_scale"])
+        if passed:
+            return max(score, robust_score)
         metric_return = safe_float(metrics.get("return"), -1_000_000.0)
-        return -500_000.0 + metric_return
+        return -500_000.0 + metric_return + (failed_scale * robust_score)
 
     return -1_000_000.0 + excess_return
 
@@ -167,6 +231,7 @@ def build_single_asset_portfolio_sets(
     mode: str = "oos",
     max_per_asset: int = 2,
     max_sets: int = 16,
+    robust_score_params: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Build portfolio-set candidates from successful single-asset strategies."""
     rows = [dict(row) for row in shortlist]
@@ -188,7 +253,15 @@ def build_single_asset_portfolio_sets(
 
     max_per_asset_i = max(1, int(max_per_asset))
     for symbol, symbol_rows in by_symbol.items():
-        symbol_rows.sort(key=lambda row: float(row.get("shortlist_score", hurdle_score(row, mode=mode))), reverse=True)
+        symbol_rows.sort(
+            key=lambda row: float(
+                row.get(
+                    "shortlist_score",
+                    hurdle_score(row, mode=mode, robust_score_params=robust_score_params),
+                )
+            ),
+            reverse=True,
+        )
         by_symbol[symbol] = symbol_rows[:max_per_asset_i]
 
     symbols_sorted = sorted(by_symbol.keys())
@@ -200,7 +273,15 @@ def build_single_asset_portfolio_sets(
     max_sets_i = max(1, int(max_sets))
 
     def _normalize_set_weights(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        scores = [float(item.get("shortlist_score", hurdle_score(item, mode=mode))) for item in items]
+        scores = [
+            float(
+                item.get(
+                    "shortlist_score",
+                    hurdle_score(item, mode=mode, robust_score_params=robust_score_params),
+                )
+            )
+            for item in items
+        ]
         max_score = max(scores)
         raw = [math.exp(max(-60.0, min(0.0, score - max_score))) for score in scores]
         total = float(sum(raw))
@@ -259,8 +340,13 @@ def select_diversified_shortlist(
     include_weights: bool = False,
     weight_temperature: float = 0.35,
     max_weight: float = 0.35,
+    robust_score_params: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
-    ranked = sorted(candidates, key=lambda row: hurdle_score(row, mode=mode), reverse=True)
+    ranked = sorted(
+        candidates,
+        key=lambda row: hurdle_score(row, mode=mode, robust_score_params=robust_score_params),
+        reverse=True,
+    )
 
     selected: list[dict[str, Any]] = []
     family_count: dict[str, int] = {}
@@ -275,7 +361,7 @@ def select_diversified_shortlist(
         family = strategy_family(str(row.get("name", "")), fallback=str(row.get("family", "other")))
         mix_type = candidate_mix_type(row)
         identity = str(row.get("identity") or candidate_identity(row))
-        score = float(hurdle_score(row, mode=mode))
+        score = float(hurdle_score(row, mode=mode, robust_score_params=robust_score_params))
 
         if identity in seen_identities:
             continue

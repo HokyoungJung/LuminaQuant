@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import polars as pl
+from lumina_quant.symbols import canonical_symbol
 
 MARKET_OHLCV_TABLE = "market_ohlcv"
 MARKET_OHLCV_1S_TABLE = "market_ohlcv_1s"
@@ -164,16 +165,7 @@ def _build_market_data_repository(
 
 def normalize_symbol(symbol: str) -> str:
     """Normalize symbol format into BASE/QUOTE uppercase."""
-    raw = str(symbol).strip().upper().replace("_", "/").replace("-", "/")
-    if "/" in raw:
-        base, quote = raw.split("/", 1)
-        return f"{base}/{quote}"
-
-    for quote in KNOWN_QUOTES:
-        if raw.endswith(quote) and len(raw) > len(quote):
-            base = raw[: -len(quote)]
-            return f"{base}/{quote}"
-    return raw
+    return canonical_symbol(symbol)
 
 
 def symbol_csv_filename(symbol: str) -> str:

@@ -105,6 +105,7 @@ class BaseConfig:
     LOG_LEVEL = _RUNTIME.system.log_level
     SYMBOLS = list(_RUNTIME.trading.symbols)
     TIMEFRAME = _RUNTIME.trading.timeframe
+    TIMEFRAMES = list(getattr(_RUNTIME.trading, "timeframes", [])) or [str(TIMEFRAME)]
     INITIAL_CAPITAL = float(_RUNTIME.trading.initial_capital)
     TARGET_ALLOCATION = float(_RUNTIME.trading.target_allocation)
     MIN_TRADE_QTY = float(_RUNTIME.trading.min_trade_qty)
@@ -234,6 +235,8 @@ class LiveConfig(BaseConfig):
         runtime.live.mt5_bridge_script = str(cls.MT5_BRIDGE_SCRIPT)
         runtime.live.mt5_bridge_use_wslpath = bool(cls.MT5_BRIDGE_USE_WSLPATH)
         runtime.trading.symbols = list(cls.SYMBOLS)
+        runtime.trading.timeframe = str(cls.TIMEFRAME)
+        runtime.trading.timeframes = list(getattr(cls, "TIMEFRAMES", [cls.TIMEFRAME]))
         runtime.risk.max_daily_loss_pct = cls.MAX_DAILY_LOSS_PCT
         return runtime
 
@@ -270,6 +273,8 @@ class OptimizationConfig:
     OVERFIT_PENALTY = float(_RUNTIME.optimization.overfit_penalty)
     MAX_WORKERS = int(_RUNTIME.optimization.max_workers)
     PERSIST_BEST_PARAMS = bool(_RUNTIME.optimization.persist_best_params)
+    VALIDATION_DAYS = int(getattr(_RUNTIME.optimization, "validation_days", 30))
+    OOS_DAYS = int(getattr(_RUNTIME.optimization, "oos_days", 30))
 
 
 def export_runtime_dict() -> dict:

@@ -496,6 +496,42 @@ def _resolve_in_sample_and_oos_window(data_start, data_end, oos_days, timeframe)
     return in_sample_end, oos_start, data_end
 
 
+def _build_recent_validation_split(
+    data_start,
+    *,
+    in_sample_end,
+    oos_start,
+    oos_end,
+    validation_days,
+    timeframe,
+):
+    """Build one strict split anchored to the month before OOS holdout."""
+    requested_days = max(0, int(validation_days))
+    if requested_days <= 0:
+        return None
+
+    tf_ms = max(1, int(timeframe_to_milliseconds(str(timeframe))))
+    val_start = oos_start - timedelta(days=requested_days)
+    val_end = in_sample_end
+    train_end = val_start - timedelta(milliseconds=tf_ms)
+
+    min_train_days = max(1, _env_int("LQ_MIN_TRAIN_DAYS", 7))
+    if train_end <= data_start + timedelta(days=min_train_days):
+        return None
+    if val_start <= data_start or val_end <= val_start:
+        return None
+
+    return {
+        "fold": 1,
+        "train_start": data_start,
+        "train_end": train_end,
+        "val_start": val_start,
+        "val_end": val_end,
+        "test_start": oos_start,
+        "test_end": oos_end,
+    }
+
+
 def _filter_valid_splits(splits, data_start, data_end):
     valid = []
     for split in splits:
@@ -1091,8 +1127,17 @@ if __name__ == "__main__":
     parser.add_argument(
         "--oos-days",
         type=int,
-        default=30,
+        default=OptimizationConfig.OOS_DAYS,
         help="Final holdout window length in days excluded from optimization and used only for final evaluation.",
+    )
+    parser.add_argument(
+        "--validation-days",
+        type=int,
+        default=OptimizationConfig.VALIDATION_DAYS,
+        help=(
+            "If > 0, enforce a strict recent validation window immediately before OOS "
+            "(e.g. 30 = previous month). Set 0 to keep legacy walk-forward windows."
+        ),
     )
     parser.add_argument(
         "--no-auto-collect-db",
@@ -1119,6 +1164,7 @@ if __name__ == "__main__":
             "base_timeframe": str(args.base_timeframe),
             "strategy_timeframe": str(STRATEGY_TIMEFRAME),
             "auto_collect_db": bool(not bool(args.no_auto_collect_db) and bool(AUTO_COLLECT_DB)),
+            "validation_days": int(max(0, int(args.validation_days))),
             "oos_days": int(max(0, int(args.oos_days))),
             "two_stage_enabled": bool(TWO_STAGE_ENABLED),
             "two_stage_topk_ratio": float(TWO_STAGE_TOPK_RATIO),
@@ -1138,6 +1184,8 @@ if __name__ == "__main__":
     try:
         if int(args.oos_days) <= 0:
             raise ValueError("--oos-days must be > 0 for strict OOS exclusion.")
+        if int(args.validation_days) < 0:
+            raise ValueError("--validation-days must be >= 0.")
 
         _auto_collect_db_if_enabled(
             data_source=args.data_source,
@@ -1222,8 +1270,28 @@ if __name__ == "__main__":
         if in_sample_end < data_end:
             valid_splits = _filter_valid_splits(valid_splits, data_start, in_sample_end)
 
+        strict_recent_split = _build_recent_validation_split(
+            data_start,
+            in_sample_end=in_sample_end,
+            oos_start=final_oos_start,
+            oos_end=final_oos_end,
+            validation_days=int(args.validation_days),
+            timeframe=BaseConfig.TIMEFRAME,
+        )
+        if int(args.validation_days) > 0:
+            if strict_recent_split is None:
+                raise ValueError(
+                    "Could not reserve strict validation window before OOS. "
+                    "Expand data history or reduce --validation-days / --oos-days."
+                )
+            valid_splits = [strict_recent_split]
+            print(
+                "[INFO] Validation window anchored before OOS: "
+                f"[{strict_recent_split['val_start'].date()} ~ {strict_recent_split['val_end'].date()}]"
+            )
+
         if not valid_splits:
-            fallback_split = _build_data_aware_split(data_start, in_sample_end)
+            fallback_split = strict_recent_split or _build_data_aware_split(data_start, in_sample_end)
             if fallback_split is None:
                 print(
                     "Could not build a valid walk-forward split from current data range. "
@@ -1233,7 +1301,7 @@ if __name__ == "__main__":
             valid_splits = [fallback_split]
             print(
                 "[INFO] Default walk-forward windows were outside available data range. "
-                "Using one data-aware fallback split."
+                "Using one fallback split."
             )
 
         if not valid_splits:
@@ -1338,6 +1406,7 @@ if __name__ == "__main__":
             meta_payload = {
                 "selection_basis": "validation_only",
                 "run_id": run_id,
+                "validation_days": int(args.validation_days),
                 "oos_days": int(args.oos_days),
                 "in_sample_end": in_sample_end.date().isoformat(),
                 "oos_start": final_oos_start.date().isoformat(),
@@ -1357,6 +1426,8 @@ if __name__ == "__main__":
         final_status = "COMPLETED"
         final_metadata = {
             "selected_fold": int(winner["fold"]),
+            "validation_days": int(args.validation_days),
+            "oos_days": int(args.oos_days),
             "selected_params": winner["selected"].get("params", {}),
             "selected_val_sharpe": float(winner["selected"].get("sharpe", -999.0)),
             "final_oos_sharpe": float(final_oos_result.get("sharpe", -999.0))

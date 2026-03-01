@@ -33,6 +33,9 @@ class TradingConfig:
             "XAG/USDT",
         ]
     )
+    timeframes: list[str] = field(
+        default_factory=lambda: ["1m", "5m", "15m", "1h", "4h", "1d"]
+    )
     timeframe: str = "1m"
     initial_capital: float = 10000.0
     target_allocation: float = 0.1
@@ -165,6 +168,8 @@ class OptimizationRuntimeConfig:
     overfit_penalty: float = 0.5
     max_workers: int = 1
     persist_best_params: bool = False
+    validation_days: int = 30
+    oos_days: int = 30
 
 
 @dataclass(slots=True)

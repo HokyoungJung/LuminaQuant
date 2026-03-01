@@ -11,9 +11,13 @@ from lumina_quant.live_selection import (
     load_selection_payload,
     resolve_selection_file,
 )
-from lumina_quant.strategies import DEFAULT_STRATEGY_NAME, get_strategy_map, resolve_strategy_class
+from lumina_quant.strategies import (
+    DEFAULT_STRATEGY_NAME,
+    get_live_strategy_map,
+    resolve_strategy_class,
+)
 
-STRATEGY_MAP = get_strategy_map()
+STRATEGY_MAP = get_live_strategy_map(include_opt_in=True)
 DEFAULT_WS_STRATEGY_NAME = "RsiStrategy"
 
 if __name__ == "__main__":

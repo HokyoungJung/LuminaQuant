@@ -9,13 +9,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from lumina_quant.strategies.factory_candidate_set import (
+from .candidate_library import (
+    DEFAULT_BINANCE_TOP10_PLUS_METALS,
     DEFAULT_TIMEFRAMES,
-    build_candidate_set,
-    summarize_candidate_set,
-)
-from lumina_quant.strategies.factory_candidate_set import (
-    DEFAULT_TOP10_PLUS_METALS as DEFAULT_BINANCE_TOP10_PLUS_METALS,
+    build_candidate_manifest,
 )
 
 from .selection import (
@@ -57,45 +54,36 @@ def build_research_command(
 ) -> list[str]:
     cmd = [
         sys.executable,
-        "scripts/run_strategy_team_research.py",
-        "--db-path",
-        str(db_path),
-        "--exchange",
-        str(exchange),
-        "--market-type",
-        str(market_type),
-        "--mode",
-        str(mode),
-        "--strategy-set",
-        str(strategy_set),
-        "--base-timeframe",
-        str(base_timeframe),
-        "--max-selected",
-        str(int(max_selected)),
-        "--max-per-family",
-        str(int(max_per_family)),
-        "--max-per-timeframe",
-        str(int(max_per_timeframe)),
-        "--max-runs",
+        "scripts/run_candidate_research.py",
+        "--output-dir",
+        "reports",
+        "--max-candidates",
         str(int(max_runs)),
     ]
-    if str(backend).strip():
-        cmd.extend(["--backend", str(backend).strip()])
-
-    if base_timeframes:
-        cmd.append("--base-timeframes")
-        cmd.extend(str(token) for token in base_timeframes)
     if timeframes:
         cmd.append("--timeframes")
         cmd.extend(str(token) for token in timeframes)
-    if seeds:
-        cmd.append("--seeds")
-        cmd.extend(str(int(seed)) for seed in seeds)
     if topcap_symbols:
-        cmd.append("--topcap-symbols")
+        cmd.append("--symbols")
         cmd.extend(str(symbol) for symbol in topcap_symbols)
-    if candidate_manifest:
-        cmd.extend(["--candidate-manifest", str(candidate_manifest)])
+    if int(max_selected) <= 0:
+        cmd.append("--dry-run")
+
+    # Keep legacy args for traceability in command rendering output.
+    _ = (
+        db_path,
+        backend,
+        exchange,
+        market_type,
+        mode,
+        strategy_set,
+        base_timeframe,
+        base_timeframes,
+        seeds,
+        candidate_manifest,
+        max_per_family,
+        max_per_timeframe,
+    )
 
     return cmd
 
@@ -107,16 +95,7 @@ def write_candidate_manifest(
     symbols: Sequence[str] = DEFAULT_BINANCE_TOP10_PLUS_METALS,
 ) -> tuple[Path, dict[str, Any]]:
     output_dir.mkdir(parents=True, exist_ok=True)
-    candidates = build_candidate_set(timeframes=timeframes, symbols=symbols)
-    summary = summarize_candidate_set(candidates)
-    manifest = {
-        "generated_at": datetime.now(UTC).isoformat(),
-        "candidate_count": len(candidates),
-        "summary": summary,
-        "timeframes": list(timeframes),
-        "symbol_universe": list(symbols),
-        "candidates": candidates,
-    }
+    manifest = build_candidate_manifest(timeframes=timeframes, symbols=symbols)
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     path = output_dir / f"strategy_factory_candidates_{stamp}.json"
     with path.open("w", encoding="utf-8") as fp:

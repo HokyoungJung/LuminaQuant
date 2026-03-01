@@ -214,6 +214,39 @@ class TestRuntimeConfigLoader(unittest.TestCase):
         finally:
             os.remove(path)
 
+    def test_trading_timeframes_and_recent_split_days(self):
+        yaml_text = textwrap.dedent(
+            """
+            trading:
+              symbols: ["BTC/USDT"]
+              timeframe: "1D"
+              timeframes: ["1m", "4H", "1D"]
+            optimization:
+              validation_days: 30
+              oos_days: 30
+            live:
+              mode: "paper"
+              exchange:
+                driver: "ccxt"
+                name: "binance"
+                market_type: "future"
+                position_mode: "HEDGE"
+                margin_mode: "isolated"
+                leverage: 2
+            """
+        ).strip()
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False, encoding="utf-8") as fp:
+            fp.write(yaml_text)
+            path = fp.name
+        try:
+            runtime = load_runtime_config(config_path=path, env=os.environ)
+            self.assertEqual(runtime.trading.timeframe, "1d")
+            self.assertEqual(runtime.trading.timeframes, ["1m", "4h", "1d"])
+            self.assertEqual(runtime.optimization.validation_days, 30)
+            self.assertEqual(runtime.optimization.oos_days, 30)
+        finally:
+            os.remove(path)
+
 
 if __name__ == "__main__":
     unittest.main()
