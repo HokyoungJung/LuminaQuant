@@ -17,6 +17,158 @@ from lumina_quant.strategy_factory.research_runner import (
 from lumina_quant.strategy_factory.selection import select_diversified_shortlist
 from lumina_quant.symbols import CANONICAL_STRATEGY_TIMEFRAMES, canonicalize_symbol_list
 
+DEFAULT_SHORTLIST_SELECTION_CONFIG: dict[str, Any] = {
+    "drop_single_without_metrics": False,
+    "single_min_score": 0.0,
+    "single_min_return": 0.0,
+    "single_min_sharpe": 0.0,
+    "single_min_trades": 5,
+    "allow_multi_asset": True,
+    "include_weights": True,
+    "weight_temperature": 0.35,
+    "max_weight": 0.35,
+}
+
+ROBUST_SCORE_PARAM_KEYS: tuple[str, ...] = (
+    "sharpe_weight",
+    "deflated_sharpe_weight",
+    "pbo_penalty",
+    "return_weight",
+    "drawdown_penalty",
+    "turnover_penalty",
+    "turnover_threshold",
+    "cross_corr_penalty",
+    "failed_candidate_scale",
+    "sentinel_floor_score",
+    "failed_candidate_base_penalty",
+    "shortlist_missing_score_fallback",
+    "weight_exp_clamp_floor",
+    "pair_multi_mix_bonus",
+    "mdd_risk_penalty_coeff",
+)
+
+
+def _score_config_scope(score_config: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(score_config, dict):
+        return {}
+    nested = score_config.get("candidate_research")
+    if isinstance(nested, dict):
+        return nested
+    return score_config
+
+
+def _safe_int(value: Any, default: int, *, minimum: int = 0) -> int:
+    try:
+        parsed = int(value)
+    except Exception:
+        parsed = int(default)
+    return max(minimum, parsed)
+
+
+def _safe_float(value: Any, default: float) -> float:
+    try:
+        return float(value)
+    except Exception:
+        return float(default)
+
+
+def _safe_bool(value: Any, default: bool) -> bool:
+    if value is None:
+        return bool(default)
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+    return bool(default)
+
+
+def _optional_float(value: Any, default: float | None) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, str) and not value.strip():
+        return default
+    return _safe_float(value, 0.0)
+
+
+def _resolve_shortlist_selection_config(
+    score_config: dict[str, Any] | None,
+    *,
+    top_k: int,
+) -> dict[str, Any]:
+    scope = _score_config_scope(score_config)
+    raw = scope.get("shortlist_selection")
+    shortlist_cfg = raw if isinstance(raw, dict) else {}
+
+    resolved: dict[str, Any] = {
+        "max_total": max(1, int(top_k)),
+        "max_per_family": max(2, int(top_k // 2)),
+        "max_per_timeframe": max(2, int(top_k // 2)),
+        **DEFAULT_SHORTLIST_SELECTION_CONFIG,
+    }
+
+    if "max_per_family" in shortlist_cfg:
+        resolved["max_per_family"] = _safe_int(
+            shortlist_cfg.get("max_per_family"),
+            resolved["max_per_family"],
+            minimum=1,
+        )
+    if "max_per_timeframe" in shortlist_cfg:
+        resolved["max_per_timeframe"] = _safe_int(
+            shortlist_cfg.get("max_per_timeframe"),
+            resolved["max_per_timeframe"],
+            minimum=1,
+        )
+    if "drop_single_without_metrics" in shortlist_cfg:
+        resolved["drop_single_without_metrics"] = _safe_bool(
+            shortlist_cfg.get("drop_single_without_metrics"),
+            bool(resolved["drop_single_without_metrics"]),
+        )
+    if "single_min_score" in shortlist_cfg:
+        resolved["single_min_score"] = _optional_float(
+            shortlist_cfg.get("single_min_score"),
+            resolved.get("single_min_score"),
+        )
+    if "single_min_return" in shortlist_cfg:
+        resolved["single_min_return"] = _optional_float(
+            shortlist_cfg.get("single_min_return"),
+            resolved.get("single_min_return"),
+        )
+    if "single_min_sharpe" in shortlist_cfg:
+        resolved["single_min_sharpe"] = _optional_float(
+            shortlist_cfg.get("single_min_sharpe"),
+            resolved.get("single_min_sharpe"),
+        )
+    if "single_min_trades" in shortlist_cfg:
+        resolved["single_min_trades"] = _safe_int(
+            shortlist_cfg.get("single_min_trades"),
+            int(resolved["single_min_trades"]),
+            minimum=0,
+        )
+    if "allow_multi_asset" in shortlist_cfg:
+        resolved["allow_multi_asset"] = _safe_bool(
+            shortlist_cfg.get("allow_multi_asset"),
+            bool(resolved["allow_multi_asset"]),
+        )
+    if "include_weights" in shortlist_cfg:
+        resolved["include_weights"] = _safe_bool(
+            shortlist_cfg.get("include_weights"),
+            bool(resolved["include_weights"]),
+        )
+    if "weight_temperature" in shortlist_cfg:
+        resolved["weight_temperature"] = max(
+            0.0,
+            _safe_float(shortlist_cfg.get("weight_temperature"), float(resolved["weight_temperature"])),
+        )
+    if "max_weight" in shortlist_cfg:
+        resolved["max_weight"] = max(
+            0.0,
+            _safe_float(shortlist_cfg.get("max_weight"), float(resolved["max_weight"])),
+        )
+
+    return resolved
+
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run advanced candidate research pipeline.")
@@ -52,28 +204,26 @@ def _load_score_config(path: Path) -> dict[str, Any]:
 
 
 def _shortlist_robust_score_params(score_config: dict[str, Any] | None) -> dict[str, Any] | None:
-    if not isinstance(score_config, dict):
-        return None
-    rank_weights = score_config.get("candidate_rank_score_weights")
+    scope = _score_config_scope(score_config)
+    rank_weights = scope.get("candidate_rank_score_weights")
     if not isinstance(rank_weights, dict):
-        return None
-    reject = score_config.get("reject_thresholds")
+        rank_weights = {}
+    reject = scope.get("reject_thresholds")
     reject_thresholds = reject if isinstance(reject, dict) else {}
+    shortlist_selection = scope.get("shortlist_selection")
+    shortlist_cfg = shortlist_selection if isinstance(shortlist_selection, dict) else {}
+    robust_overrides_raw = shortlist_cfg.get("robust_score_params")
+    robust_overrides = robust_overrides_raw if isinstance(robust_overrides_raw, dict) else {}
+
     params: dict[str, Any] = {}
-    mapping = {
-        "sharpe_weight": "sharpe_weight",
-        "deflated_sharpe_weight": "deflated_sharpe_weight",
-        "pbo_penalty": "pbo_penalty",
-        "return_weight": "return_weight",
-        "drawdown_penalty": "drawdown_penalty",
-        "turnover_penalty": "turnover_penalty",
-        "turnover_threshold": "turnover_threshold",
-    }
-    for src, dst in mapping.items():
-        if src in rank_weights:
-            params[dst] = rank_weights[src]
+    for key in ROBUST_SCORE_PARAM_KEYS:
+        if key in rank_weights:
+            params[key] = rank_weights[key]
     if "turnover_threshold" not in params and "max_turnover" in reject_thresholds:
         params["turnover_threshold"] = reject_thresholds["max_turnover"]
+    for key in ROBUST_SCORE_PARAM_KEYS:
+        if key in robust_overrides:
+            params[key] = robust_overrides[key]
     return params or None
 
 
@@ -169,6 +319,7 @@ def main() -> int:
             score_config = _load_score_config(Path(str(args.score_config)).resolve())
         except ValueError as exc:
             raise SystemExit(f"[RESEARCH] {exc}")
+    score_config_scope = _score_config_scope(score_config)
 
     symbols = canonicalize_symbol_list(list(args.symbols))
     timeframes = [str(token).strip().lower() for token in list(args.timeframes) if str(token).strip()]
@@ -190,22 +341,29 @@ def main() -> int:
         symbol_universe=symbols,
         stage1_keep_ratio=float(args.stage1_keep_ratio),
         max_candidates=max(1, int(args.max_candidates)),
-        score_config=score_config,
+        score_config=score_config_scope or None,
     )
 
-    shortlist_score_params = _shortlist_robust_score_params(score_config)
+    shortlist_config = _resolve_shortlist_selection_config(
+        score_config_scope or None,
+        top_k=max(1, int(args.top_k)),
+    )
+    shortlist_score_params = _shortlist_robust_score_params(score_config_scope or None)
     shortlisted = select_diversified_shortlist(
         report.get("candidates") or [],
         mode="oos",
-        max_total=max(1, int(args.top_k)),
-        max_per_family=max(2, int(args.top_k // 2)),
-        max_per_timeframe=max(2, int(args.top_k // 2)),
-        single_min_score=0.0,
-        single_min_return=0.0,
-        single_min_sharpe=0.0,
-        single_min_trades=5,
-        allow_multi_asset=True,
-        include_weights=True,
+        max_total=int(shortlist_config["max_total"]),
+        max_per_family=int(shortlist_config["max_per_family"]),
+        max_per_timeframe=int(shortlist_config["max_per_timeframe"]),
+        single_min_score=shortlist_config.get("single_min_score"),
+        drop_single_without_metrics=bool(shortlist_config["drop_single_without_metrics"]),
+        single_min_return=shortlist_config.get("single_min_return"),
+        single_min_sharpe=shortlist_config.get("single_min_sharpe"),
+        single_min_trades=int(shortlist_config["single_min_trades"]),
+        allow_multi_asset=bool(shortlist_config["allow_multi_asset"]),
+        include_weights=bool(shortlist_config["include_weights"]),
+        weight_temperature=float(shortlist_config["weight_temperature"]),
+        max_weight=float(shortlist_config["max_weight"]),
         robust_score_params=shortlist_score_params,
     )
 
@@ -233,6 +391,10 @@ def main() -> int:
         "candidates": report.get("candidates") or [],
         "stage1": report.get("stage1") or {},
         "scoring_config": report.get("scoring_config") or {},
+        "shortlist_config": {
+            **shortlist_config,
+            "robust_score_params": shortlist_score_params or {},
+        },
         "data_sources": report.get("data_sources") or {},
     }
     team_report_path = output_dir / f"strategy_factory_report_{stamp}.json"

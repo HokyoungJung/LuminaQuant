@@ -66,6 +66,7 @@ DEFAULT_RESEARCH_SCORING_CONFIG: dict[str, Any] = {
         "spa_pvalue_penalty": 1.0,
     },
     "reject_thresholds": {
+        "in_sample_sharpe_min": -0.1,
         "oos_sharpe_min": 0.35,
         "max_pbo": 0.45,
         "max_turnover": 2.5,
@@ -79,6 +80,11 @@ DEFAULT_RESEARCH_SCORING_CONFIG: dict[str, Any] = {
     "keep_ratio_bounds": {
         "min": 0.05,
         "max": 1.0,
+    },
+    "score_fallbacks": {
+        "stage1_error_score": -1_000_000.0,
+        "failed_candidate_selection_score": -1_000_000.0,
+        "sort_missing_selection_score": -1_000_000.0,
     },
 }
 
@@ -444,42 +450,44 @@ def _hurdle_fields(
     oos: dict[str, float],
     *,
     scoring_config: Mapping[str, Any] | None = None,
-    oos_sharpe_min: float = 0.35,
-    max_pbo: float = 0.45,
-    max_turnover: float = 2.5,
-    max_drawdown: float = 0.45,
+    oos_sharpe_min: float | None = None,
+    max_pbo: float | None = None,
+    max_turnover: float | None = None,
+    max_drawdown: float | None = None,
 ) -> tuple[dict[str, Any], bool, dict[str, Any]]:
     cfg = _resolve_score_config(scoring_config)
-    thresholds = dict(cfg.get("reject_thresholds") or {})
-    weights = dict(cfg.get("hurdle_score_weights") or {})
-    oos_sharpe_min = float(thresholds.get("oos_sharpe_min", oos_sharpe_min))
-    max_pbo = float(thresholds.get("max_pbo", max_pbo))
-    max_turnover = float(thresholds.get("max_turnover", max_turnover))
-    max_drawdown = float(thresholds.get("max_drawdown", max_drawdown))
-    min_trade_count = float(thresholds.get("min_trade_count", 5.0))
+    thresholds = dict(cfg["reject_thresholds"])
+    weights = dict(cfg["hurdle_score_weights"])
+    resolved_oos_sharpe_min = float(thresholds["oos_sharpe_min"] if oos_sharpe_min is None else oos_sharpe_min)
+    in_sample_sharpe_min = float(thresholds["in_sample_sharpe_min"])
+    resolved_max_pbo = float(thresholds["max_pbo"] if max_pbo is None else max_pbo)
+    resolved_max_turnover = float(thresholds["max_turnover"] if max_turnover is None else max_turnover)
+    resolved_max_drawdown = float(thresholds["max_drawdown"] if max_drawdown is None else max_drawdown)
+    min_trade_count = float(thresholds["min_trade_count"])
 
     def _pack(metrics: dict[str, float], *, stage: str) -> dict[str, Any]:
         score = (
-            (float(weights.get("sharpe_weight", 2.4)) * float(metrics.get("sharpe", 0.0)))
-            + (float(weights.get("return_weight", 35.0)) * float(metrics.get("return", 0.0)))
-            + (float(weights.get("deflated_sharpe_weight", 1.2)) * float(metrics.get("deflated_sharpe", 0.0)))
-            - (float(weights.get("pbo_penalty", 2.0)) * float(metrics.get("pbo", 1.0)))
+            (float(weights["sharpe_weight"]) * float(metrics.get("sharpe", 0.0)))
+            + (float(weights["return_weight"]) * float(metrics.get("return", 0.0)))
+            + (float(weights["deflated_sharpe_weight"]) * float(metrics.get("deflated_sharpe", 0.0)))
+            - (float(weights["pbo_penalty"]) * float(metrics.get("pbo", 1.0)))
             - (
-                float(weights.get("turnover_penalty", 4.0))
-                * max(0.0, float(metrics.get("turnover", 0.0)) - max_turnover)
+                float(weights["turnover_penalty"])
+                * max(0.0, float(metrics.get("turnover", 0.0)) - resolved_max_turnover)
             )
             - (
-                float(weights.get("drawdown_penalty", 5.0))
-                * max(0.0, float(metrics.get("mdd", 0.0)) - max_drawdown)
+                float(weights["drawdown_penalty"])
+                * max(0.0, float(metrics.get("mdd", 0.0)) - resolved_max_drawdown)
             )
-            - (float(weights.get("spa_pvalue_penalty", 1.0)) * float(metrics.get("spa_pvalue", 1.0)))
+            - (float(weights["spa_pvalue_penalty"]) * float(metrics.get("spa_pvalue", 1.0)))
         )
 
         passed = bool(
-            float(metrics.get("sharpe", 0.0)) >= (-0.1 if stage != "oos" else oos_sharpe_min)
-            and float(metrics.get("pbo", 1.0)) <= max_pbo
-            and float(metrics.get("turnover", 0.0)) <= max_turnover
-            and float(metrics.get("mdd", 0.0)) <= max_drawdown
+            float(metrics.get("sharpe", 0.0))
+            >= (in_sample_sharpe_min if stage != "oos" else resolved_oos_sharpe_min)
+            and float(metrics.get("pbo", 1.0)) <= resolved_max_pbo
+            and float(metrics.get("turnover", 0.0)) <= resolved_max_turnover
+            and float(metrics.get("mdd", 0.0)) <= resolved_max_drawdown
             and float(metrics.get("trade_count", 0.0)) >= min_trade_count
         )
 
@@ -496,18 +504,18 @@ def _hurdle_fields(
     }
 
     cost_ok = bool(
-        float(oos.get("sharpe", 0.0)) >= oos_sharpe_min
-        and float(oos.get("pbo", 1.0)) <= max_pbo
+        float(oos.get("sharpe", 0.0)) >= resolved_oos_sharpe_min
+        and float(oos.get("pbo", 1.0)) <= resolved_max_pbo
     )
 
     hard_reject_reasons: dict[str, Any] = {}
-    if float(oos.get("sharpe", 0.0)) < oos_sharpe_min:
+    if float(oos.get("sharpe", 0.0)) < resolved_oos_sharpe_min:
         hard_reject_reasons["oos_sharpe"] = float(oos.get("sharpe", 0.0))
-    if float(oos.get("pbo", 1.0)) > max_pbo:
+    if float(oos.get("pbo", 1.0)) > resolved_max_pbo:
         hard_reject_reasons["pbo"] = float(oos.get("pbo", 1.0))
-    if float(oos.get("turnover", 0.0)) > max_turnover:
+    if float(oos.get("turnover", 0.0)) > resolved_max_turnover:
         hard_reject_reasons["turnover"] = float(oos.get("turnover", 0.0))
-    if float(oos.get("mdd", 0.0)) > max_drawdown:
+    if float(oos.get("mdd", 0.0)) > resolved_max_drawdown:
         hard_reject_reasons["max_drawdown"] = float(oos.get("mdd", 0.0))
     if float(oos.get("trade_count", 0.0)) < min_trade_count:
         hard_reject_reasons["trade_count"] = float(oos.get("trade_count", 0.0))
@@ -1000,18 +1008,18 @@ def _evaluate_candidate(
 
 def _candidate_rank_score(row: dict[str, Any], *, scoring_config: Mapping[str, Any] | None = None) -> float:
     cfg = _resolve_score_config(scoring_config)
-    weights = dict(cfg.get("candidate_rank_score_weights") or {})
+    weights = dict(cfg["candidate_rank_score_weights"])
     oos = dict(row.get("oos") or {})
     return float(
-        (float(weights.get("sharpe_weight", 2.8)) * float(oos.get("sharpe", 0.0)))
-        + (float(weights.get("deflated_sharpe_weight", 1.4)) * float(oos.get("deflated_sharpe", 0.0)))
-        - (float(weights.get("pbo_penalty", 2.0)) * float(oos.get("pbo", 1.0)))
-        + (float(weights.get("return_weight", 35.0)) * float(oos.get("return", 0.0)))
+        (float(weights["sharpe_weight"]) * float(oos.get("sharpe", 0.0)))
+        + (float(weights["deflated_sharpe_weight"]) * float(oos.get("deflated_sharpe", 0.0)))
+        - (float(weights["pbo_penalty"]) * float(oos.get("pbo", 1.0)))
+        + (float(weights["return_weight"]) * float(oos.get("return", 0.0)))
         - (
-            float(weights.get("turnover_penalty", 2.5))
-            * max(0.0, float(oos.get("turnover", 0.0)) - float(weights.get("turnover_threshold", 2.5)))
+            float(weights["turnover_penalty"])
+            * max(0.0, float(oos.get("turnover", 0.0)) - float(weights["turnover_threshold"]))
         )
-        - (float(weights.get("drawdown_penalty", 3.0)) * float(oos.get("mdd", 0.0)))
+        - (float(weights["drawdown_penalty"]) * float(oos.get("mdd", 0.0)))
     )
 
 
@@ -1238,9 +1246,14 @@ def run_candidate_research(
         base_tf = "1s"
 
     resolved_scoring_config = _resolve_score_config(score_config)
-    keep_ratio_cfg = dict(resolved_scoring_config.get("keep_ratio_bounds") or {})
-    keep_ratio_min = float(keep_ratio_cfg.get("min", 0.05))
-    keep_ratio_max = float(keep_ratio_cfg.get("max", 1.0))
+    keep_ratio_cfg = dict(resolved_scoring_config["keep_ratio_bounds"])
+    score_fallbacks = dict(resolved_scoring_config["score_fallbacks"])
+    stage1_weights = dict(resolved_scoring_config["stage1_prefilter_weights"])
+    keep_ratio_min = float(keep_ratio_cfg["min"])
+    keep_ratio_max = float(keep_ratio_cfg["max"])
+    stage1_error_score = float(score_fallbacks["stage1_error_score"])
+    failed_candidate_selection_score = float(score_fallbacks["failed_candidate_selection_score"])
+    sort_missing_selection_score = float(score_fallbacks["sort_missing_selection_score"])
     keep_ratio_applied = max(keep_ratio_min, min(keep_ratio_max, float(stage1_keep_ratio)))
 
     adapted = [adapt_legacy_candidate(item) for item in candidates]
@@ -1306,14 +1319,13 @@ def run_candidate_research(
             scoring_config=resolved_scoring_config,
         )
         if result.get("error"):
-            score = float("-inf")
+            score = stage1_error_score
         else:
             train = dict(result.get("train") or {})
-            stage1_weights = dict(resolved_scoring_config.get("stage1_prefilter_weights") or {})
             score = (
-                (float(stage1_weights.get("sharpe_weight", 2.0)) * float(train.get("sharpe", 0.0)))
-                + (float(stage1_weights.get("return_weight", 20.0)) * float(train.get("return", 0.0)))
-                - (float(stage1_weights.get("pbo_penalty", 2.0)) * float(train.get("pbo", 1.0)))
+                (float(stage1_weights["sharpe_weight"]) * float(train.get("sharpe", 0.0)))
+                + (float(stage1_weights["return_weight"]) * float(train.get("return", 0.0)))
+                - (float(stage1_weights["pbo_penalty"]) * float(train.get("pbo", 1.0)))
             )
         scored_stage1.append((float(score), result))
 
@@ -1362,7 +1374,7 @@ def run_candidate_research(
                     "oos_cost_stress": {"x2": {"sharpe": 0.0, "return": 0.0}, "x3": {"sharpe": 0.0, "return": 0.0}},
                     "hard_reject": True,
                     "hard_reject_reasons": {"insufficient_data": True},
-                    "selection_score": -1_000_000.0,
+                    "selection_score": failed_candidate_selection_score,
                     "pass": bool(passed),
                     "metadata": dict(result.get("metadata") or {}),
                 }
@@ -1436,7 +1448,10 @@ def run_candidate_research(
         row.setdefault("oos", {})["cross_candidate_corr"] = float(np.mean(corr_values)) if corr_values else 0.0
 
     # Stable sort by robust score.
-    report_candidates.sort(key=lambda item: float(item.get("selection_score", -1e9)), reverse=True)
+    report_candidates.sort(
+        key=lambda item: float(item.get("selection_score", sort_missing_selection_score)),
+        reverse=True,
+    )
 
     split_timeframe = normalized_timeframes[0] if normalized_timeframes else "1m"
     split = _build_default_split(split_timeframe)

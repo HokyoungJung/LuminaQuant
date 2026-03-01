@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import itertools
 import json
+import os
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from typing import Any
@@ -37,6 +38,18 @@ DEFAULT_TOP10_PLUS_METALS: tuple[str, ...] = (
 )
 
 DEFAULT_TIMEFRAMES: tuple[str, ...] = CANONICAL_STRATEGY_TIMEFRAMES
+
+
+def _default_max_param_rows_per_strategy() -> int:
+    fallback = max(1, len(DEFAULT_TOP10_PLUS_METALS) * 2)
+    raw = str(os.getenv("LQ_MAX_PARAM_ROWS_PER_STRATEGY", "")).strip()
+    if not raw:
+        return fallback
+    try:
+        parsed = int(raw)
+    except Exception:
+        return fallback
+    return max(1, parsed)
 
 
 @dataclass(frozen=True, slots=True)
@@ -194,9 +207,12 @@ def build_candidate_set(
     symbols: Iterable[str] | None = None,
     timeframes: Iterable[str] | None = None,
     max_candidates: int = 0,
-    max_param_rows_per_strategy: int = 24,
+    max_param_rows_per_strategy: int | None = None,
 ) -> list[dict[str, object]]:
     """Build a deterministic strategy candidate set."""
+    if max_param_rows_per_strategy is None:
+        max_param_rows_per_strategy = _default_max_param_rows_per_strategy()
+
     symbol_list = canonicalize_symbol_list(symbols or DEFAULT_TOP10_PLUS_METALS)
     timeframe_list = normalize_strategy_timeframes(
         timeframes or DEFAULT_TIMEFRAMES,

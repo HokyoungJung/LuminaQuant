@@ -1,31 +1,10 @@
 {
-  "generated_at_utc": "2026-03-01T06:48:06.959107+00:00",
+  "generated_at_utc": "2026-03-01T07:13:26.233084+00:00",
   "literal_paths": [
     "lumina_quant/strategies"
   ],
   "formula_paths": [
     "lumina_quant/indicators/formulaic_definitions.py"
   ],
-  "signatures": [
-    "literal:lumina_quant/strategies/candidate_vol_compression_reversion.py:248:12:24",
-    "literal:lumina_quant/strategies/candidate_vol_compression_reversion.py:290:28:0.001",
-    "literal:lumina_quant/strategies/candidate_vol_compression_reversion.py:328:57:0.9",
-    "literal:lumina_quant/strategies/candidate_vol_compression_reversion.py:329:32:0.4",
-    "literal:lumina_quant/strategies/candidate_vol_compression_reversion.py:346:57:0.9",
-    "literal:lumina_quant/strategies/candidate_vol_compression_reversion.py:347:32:0.4",
-    "literal:lumina_quant/strategies/composite_trend.py:275:29:3",
-    "literal:lumina_quant/strategies/composite_trend.py:297:53:0.10",
-    "literal:lumina_quant/strategies/composite_trend.py:300:25:0.05",
-    "literal:lumina_quant/strategies/composite_trend.py:349:30:96",
-    "literal:lumina_quant/strategies/composite_trend.py:367:22:1e-8",
-    "literal:lumina_quant/strategies/composite_trend.py:436:66:1.8",
-    "literal:lumina_quant/strategies/composite_trend.py:454:66:1.8",
-    "literal:lumina_quant/strategies/factory_candidate_set.py:197:39:24",
-    "literal:lumina_quant/strategies/leadlag_spillover.py:201:58:48",
-    "literal:lumina_quant/strategies/leadlag_spillover.py:257:82:3",
-    "literal:lumina_quant/strategies/leadlag_spillover.py:261:28:3",
-    "literal:lumina_quant/strategies/leadlag_spillover.py:326:32:0.2",
-    "literal:lumina_quant/strategies/micro_range_expansion_1s.py:189:25:5",
-    "literal:lumina_quant/strategies/perp_crowding_carry.py:285:32:0.2"
-  ]
+  "signatures": []
 }

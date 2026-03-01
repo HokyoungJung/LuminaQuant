@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 from collections import deque
 from dataclasses import dataclass
 
@@ -38,12 +37,19 @@ class LeadLagSpilloverStrategy(Strategy):
             "window": HyperParam.integer("window", default=180, low=32, high=4096),
             "max_lag": HyperParam.integer("max_lag", default=3, low=1, high=8),
             "ridge_alpha": HyperParam.floating("ridge_alpha", default=1.0, low=1e-6, high=100.0),
+            "realized_vol_window": HyperParam.integer("realized_vol_window", default=48, low=8, high=4096),
+            "min_cross_symbols": HyperParam.integer("min_cross_symbols", default=3, low=2, high=64),
+            "min_price_history": HyperParam.integer("min_price_history", default=32, low=8, high=8192),
+            "cross_window_divisor": HyperParam.integer("cross_window_divisor", default=3, low=1, high=64),
+            "entry_strength_floor": HyperParam.floating("entry_strength_floor", default=0.2, low=0.0, high=5.0),
             "entry_score": HyperParam.floating("entry_score", default=0.35, low=0.01, high=5.0),
             "exit_score": HyperParam.floating("exit_score", default=0.08, low=0.0, high=2.0),
             "max_hold_bars": HyperParam.integer("max_hold_bars", default=32, low=1, high=100_000),
+            "min_history_floor": HyperParam.integer("min_history_floor", default=64, low=8, high=8192),
             "stop_loss_pct": HyperParam.floating("stop_loss_pct", default=0.02, low=0.001, high=0.5),
             "max_realized_vol": HyperParam.floating("max_realized_vol", default=0.08, low=0.001, high=2.0),
             "min_range_pct": HyperParam.floating("min_range_pct", default=0.0001, low=0.0, high=1.0),
+            "max_signal_strength": HyperParam.floating("max_signal_strength", default=2.0, low=0.1, high=10.0),
             "allow_short": HyperParam.boolean("allow_short", default=True),
             # Backwards-compatible aliases.
             "entry_spillover": HyperParam.floating(
@@ -76,12 +82,19 @@ class LeadLagSpilloverStrategy(Strategy):
         window: int = 180,
         max_lag: int = 3,
         ridge_alpha: float = 1.0,
+        realized_vol_window: int = 48,
+        min_cross_symbols: int = 3,
+        min_price_history: int = 32,
+        cross_window_divisor: int = 3,
+        entry_strength_floor: float = 0.2,
         entry_score: float = 0.35,
         exit_score: float = 0.08,
         max_hold_bars: int = 32,
+        min_history_floor: int = 64,
         stop_loss_pct: float = 0.02,
         max_realized_vol: float = 0.08,
         min_range_pct: float = 0.0001,
+        max_signal_strength: float = 2.0,
         allow_short: bool = True,
         **legacy: object,
     ):
@@ -101,12 +114,19 @@ class LeadLagSpilloverStrategy(Strategy):
                 "window": window,
                 "max_lag": max_lag,
                 "ridge_alpha": ridge_alpha,
+                "realized_vol_window": realized_vol_window,
+                "min_cross_symbols": min_cross_symbols,
+                "min_price_history": min_price_history,
+                "cross_window_divisor": cross_window_divisor,
+                "entry_strength_floor": entry_strength_floor,
                 "entry_score": entry_score,
                 "exit_score": exit_score,
                 "max_hold_bars": max_hold_bars,
+                "min_history_floor": min_history_floor,
                 "stop_loss_pct": stop_loss_pct,
                 "max_realized_vol": max_realized_vol,
                 "min_range_pct": min_range_pct,
+                "max_signal_strength": max_signal_strength,
                 "allow_short": allow_short,
             },
             keep_unknown=True,
@@ -115,12 +135,19 @@ class LeadLagSpilloverStrategy(Strategy):
         self.window = int(resolved["window"])
         self.max_lag = int(resolved["max_lag"])
         self.ridge_alpha = float(resolved["ridge_alpha"])
+        self.realized_vol_window = int(resolved["realized_vol_window"])
+        self.min_cross_symbols = int(resolved["min_cross_symbols"])
+        self.min_price_history = int(resolved["min_price_history"])
+        self.cross_window_divisor = int(resolved["cross_window_divisor"])
+        self.entry_strength_floor = float(resolved["entry_strength_floor"])
         self.entry_score = float(resolved["entry_score"])
         self.exit_score = float(resolved["exit_score"])
         self.max_hold_bars = int(resolved["max_hold_bars"])
+        self.min_history_floor = int(resolved["min_history_floor"])
         self.stop_loss_pct = float(resolved["stop_loss_pct"])
         self.max_realized_vol = float(resolved["max_realized_vol"])
         self.min_range_pct = float(resolved["min_range_pct"])
+        self.max_signal_strength = float(resolved["max_signal_strength"])
         self.allow_short = bool(resolved["allow_short"])
 
         size = max(256, self.window + 32)
@@ -197,8 +224,8 @@ class LeadLagSpilloverStrategy(Strategy):
             return None, None, None, None
         return event_time, high, low, close
 
-    @staticmethod
-    def _realized_vol(closes: deque[float], window: int = 48) -> float:
+    def _realized_vol(self, closes: deque[float]) -> float:
+        window = int(self.realized_vol_window)
         arr = np.asarray(list(closes), dtype=float)
         if arr.size < max(8, int(window)):
             return 0.0
@@ -248,17 +275,18 @@ class LeadLagSpilloverStrategy(Strategy):
         item.lows.append(float(low))
         item.closes.append(float(close))
 
-        if len(item.closes) < max(64, self.window // 2):
+        if len(item.closes) < max(self.min_history_floor, self.window // 2):
             return
 
         price_map = {
             sym: list(state.closes)
             for sym, state in self._state.items()
-            if sym not in _METALS and len(state.closes) >= max(32, self.window // 3)
+            if sym not in _METALS
+            and len(state.closes) >= max(self.min_price_history, self.window // max(1, self.cross_window_divisor))
         }
         if symbol in _METALS:
             return
-        if len(price_map) < 3:
+        if len(price_map) < self.min_cross_symbols:
             return
 
         spill = cross_leadlag_spillover(
@@ -323,7 +351,7 @@ class LeadLagSpilloverStrategy(Strategy):
         if not liquidity_ok or not vol_ok:
             return
 
-        strength = min(2.0, max(0.2, abs(score)))
+        strength = min(self.max_signal_strength, max(self.entry_strength_floor, abs(score)))
         if score >= self.entry_score:
             self._emit(
                 symbol,
@@ -351,5 +379,3 @@ class LeadLagSpilloverStrategy(Strategy):
             item.entry_price = float(close)
             item.bars_held = 0
             return
-
-        _ = math.copysign(1.0, predicted_return) if predicted_return != 0.0 else 0.0

@@ -47,7 +47,12 @@ class VolatilityCompressionReversionStrategy(Strategy):
                 high=3.0,
             ),
             "atr_stop_pct": HyperParam.floating("atr_stop_pct", default=0.02, low=0.001, high=0.5),
+            "min_stop_loss_pct": HyperParam.floating("min_stop_loss_pct", default=0.001, low=0.00001, high=0.2),
             "max_hold_bars": HyperParam.integer("max_hold_bars", default=64, low=1, high=200_000),
+            "min_history_floor": HyperParam.integer("min_history_floor", default=24, low=8, high=8192),
+            "take_profit_scale": HyperParam.floating("take_profit_scale", default=0.9, low=0.1, high=10.0),
+            "entry_strength_bias": HyperParam.floating("entry_strength_bias", default=0.4, low=0.0, high=5.0),
+            "max_signal_strength": HyperParam.floating("max_signal_strength", default=2.0, low=0.1, high=10.0),
             "allow_short": HyperParam.boolean("allow_short", default=True),
             # Backwards-compatible aliases.
             "compression_threshold": HyperParam.floating(
@@ -82,7 +87,12 @@ class VolatilityCompressionReversionStrategy(Strategy):
         fast_vol_window: int = 12,
         slow_vol_window: int = 60,
         atr_stop_pct: float = 0.02,
+        min_stop_loss_pct: float = 0.001,
         max_hold_bars: int = 64,
+        min_history_floor: int = 24,
+        take_profit_scale: float = 0.9,
+        entry_strength_bias: float = 0.4,
+        max_signal_strength: float = 2.0,
         allow_short: bool = True,
         **legacy: object,
     ):
@@ -99,6 +109,8 @@ class VolatilityCompressionReversionStrategy(Strategy):
             fast_vol_window = int(legacy.get("fast_vol_window") or fast_vol_window)
         if "slow_vol_window" in legacy:
             slow_vol_window = int(legacy.get("slow_vol_window") or slow_vol_window)
+        if "exit_compression_multiplier" in legacy and "take_profit_scale" not in legacy:
+            take_profit_scale = float(legacy.get("exit_compression_multiplier") or take_profit_scale)
 
         resolved = resolve_params_from_schema(
             self.get_param_schema(),
@@ -112,7 +124,12 @@ class VolatilityCompressionReversionStrategy(Strategy):
                 "fast_vol_window": fast_vol_window,
                 "slow_vol_window": slow_vol_window,
                 "atr_stop_pct": atr_stop_pct,
+                "min_stop_loss_pct": min_stop_loss_pct,
                 "max_hold_bars": max_hold_bars,
+                "min_history_floor": min_history_floor,
+                "take_profit_scale": take_profit_scale,
+                "entry_strength_bias": entry_strength_bias,
+                "max_signal_strength": max_signal_strength,
                 "allow_short": allow_short,
             },
             keep_unknown=True,
@@ -127,7 +144,12 @@ class VolatilityCompressionReversionStrategy(Strategy):
         self.fast_vol_window = int(resolved["fast_vol_window"])
         self.slow_vol_window = int(resolved["slow_vol_window"])
         self.atr_stop_pct = float(resolved["atr_stop_pct"])
+        self.min_stop_loss_pct = float(resolved["min_stop_loss_pct"])
         self.max_hold_bars = int(resolved["max_hold_bars"])
+        self.min_history_floor = int(resolved["min_history_floor"])
+        self.take_profit_scale = float(resolved["take_profit_scale"])
+        self.entry_strength_bias = float(resolved["entry_strength_bias"])
+        self.max_signal_strength = float(resolved["max_signal_strength"])
         self.allow_short = bool(resolved["allow_short"])
 
         size = max(256, self.z_window + 64)
@@ -245,7 +267,7 @@ class VolatilityCompressionReversionStrategy(Strategy):
         item.volumes.append(float(volume if volume is not None else 0.0))
 
         min_history = max(
-            24,
+            self.min_history_floor,
             int(self.fast_vol_window) + 4,
             int(self.slow_vol_window) + 4,
             max(8, int(self.z_window)),
@@ -287,7 +309,7 @@ class VolatilityCompressionReversionStrategy(Strategy):
             "rare_event_score": factor.get("rare_event_score"),
         }
 
-        stop_loss_pct = max(0.001, float(self.atr_stop_pct))
+        stop_loss_pct = max(float(self.min_stop_loss_pct), float(self.atr_stop_pct))
 
         if item.mode == "LONG":
             item.bars_held += 1
@@ -325,8 +347,8 @@ class VolatilityCompressionReversionStrategy(Strategy):
         # Reversion direction: positive z => price above VWAP => short.
         if dev_z <= -self.entry_z:
             stop = float(close) * (1.0 - stop_loss_pct)
-            take = float(close) * (1.0 + stop_loss_pct * 0.9)
-            strength = min(2.0, 0.4 + abs(score))
+            take = float(close) * (1.0 + stop_loss_pct * float(self.take_profit_scale))
+            strength = min(self.max_signal_strength, float(self.entry_strength_bias) + abs(score))
             self._emit(
                 symbol,
                 event_time,
@@ -343,8 +365,8 @@ class VolatilityCompressionReversionStrategy(Strategy):
 
         if self.allow_short and dev_z >= self.entry_z:
             stop = float(close) * (1.0 + stop_loss_pct)
-            take = float(close) * (1.0 - stop_loss_pct * 0.9)
-            strength = min(2.0, 0.4 + abs(score))
+            take = float(close) * (1.0 - stop_loss_pct * float(self.take_profit_scale))
+            strength = min(self.max_signal_strength, float(self.entry_strength_bias) + abs(score))
             self._emit(
                 symbol,
                 event_time,

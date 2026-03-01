@@ -20,6 +20,12 @@ DEFAULT_ROBUST_SCORE_WEIGHTS: dict[str, float] = {
 DEFAULT_ROBUST_SCORE_PARAMS: dict[str, float] = {
     "turnover_threshold": 2.5,
     "failed_candidate_scale": 0.1,
+    "sentinel_floor_score": -1_000_000.0,
+    "failed_candidate_base_penalty": -500_000.0,
+    "shortlist_missing_score_fallback": -1_000_000.0,
+    "weight_exp_clamp_floor": -60.0,
+    "pair_multi_mix_bonus": 1.05,
+    "mdd_risk_penalty_coeff": 2.5,
     **DEFAULT_ROBUST_SCORE_WEIGHTS,
 }
 
@@ -102,26 +108,29 @@ def hurdle_score(
     mode: str = "oos",
     robust_score_params: dict[str, Any] | None = None,
 ) -> float:
+    cfg = _resolve_robust_score_params(robust_score_params)
+    sentinel_floor_score = float(cfg["sentinel_floor_score"])
+    failed_candidate_base_penalty = float(cfg["failed_candidate_base_penalty"])
+    failed_scale = float(cfg["failed_candidate_scale"])
+
     mode_token = str(mode).strip().lower()
     hurdle_key = "val" if mode_token == "live" else "oos"
     hurdle = ((candidate.get("hurdle_fields") or {}).get(hurdle_key)) or {}
 
-    score = safe_float(hurdle.get("score"), -1_000_000.0)
-    excess_return = safe_float(hurdle.get("excess_return"), -1_000_000.0)
+    score = safe_float(hurdle.get("score"), sentinel_floor_score)
+    excess_return = safe_float(hurdle.get("excess_return"), sentinel_floor_score)
     passed = bool(hurdle.get("pass", False))
 
     metric_key = "val" if mode_token == "live" else "oos"
     metrics = candidate.get(metric_key)
     if isinstance(metrics, dict):
         robust_score = robust_score_from_metrics(metrics, params=robust_score_params)
-        cfg = _resolve_robust_score_params(robust_score_params)
-        failed_scale = float(cfg["failed_candidate_scale"])
         if passed:
             return max(score, robust_score)
-        metric_return = safe_float(metrics.get("return"), -1_000_000.0)
-        return -500_000.0 + metric_return + (failed_scale * robust_score)
+        metric_return = safe_float(metrics.get("return"), sentinel_floor_score)
+        return failed_candidate_base_penalty + metric_return + (failed_scale * robust_score)
 
-    return -1_000_000.0 + excess_return
+    return sentinel_floor_score + excess_return
 
 
 def candidate_mix_type(candidate: dict[str, Any]) -> str:
@@ -164,10 +173,17 @@ def allocate_portfolio_weights(
     score_key: str = "shortlist_score",
     temperature: float = 0.35,
     max_weight: float = 0.35,
+    robust_score_params: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     rows = [dict(row) for row in shortlist]
     if not rows:
         return rows
+
+    cfg = _resolve_robust_score_params(robust_score_params)
+    shortlist_missing_score_fallback = float(cfg["shortlist_missing_score_fallback"])
+    weight_exp_clamp_floor = float(cfg["weight_exp_clamp_floor"])
+    pair_multi_mix_bonus = float(cfg["pair_multi_mix_bonus"])
+    mdd_risk_penalty_coeff = float(cfg["mdd_risk_penalty_coeff"])
 
     capped_max = min(1.0, max(0.05, float(max_weight)))
     temp = max(0.05, float(temperature))
@@ -180,7 +196,13 @@ def allocate_portfolio_weights(
         family_counts[family] = family_counts.get(family, 0) + 1
         timeframe_counts[timeframe] = timeframe_counts.get(timeframe, 0) + 1
 
-    scores = [safe_float(row.get(score_key), safe_float(row.get("selection_score"), -1_000_000.0)) for row in rows]
+    scores = [
+        safe_float(
+            row.get(score_key),
+            safe_float(row.get("selection_score"), shortlist_missing_score_fallback),
+        )
+        for row in rows
+    ]
     max_score = max(scores)
 
     raw_weights: list[float] = []
@@ -190,13 +212,13 @@ def allocate_portfolio_weights(
         mix_type = candidate_mix_type(row)
 
         scaled = (score - max_score) / temp
-        base = math.exp(max(-60.0, min(0.0, scaled)))
+        base = math.exp(max(weight_exp_clamp_floor, min(0.0, scaled)))
         diversity_penalty = 1.0 / math.sqrt(max(1, family_counts.get(family, 1)))
         timeframe_penalty = 1.0 / math.sqrt(max(1, timeframe_counts.get(timeframe, 1)))
-        mix_bonus = 1.05 if mix_type in {"pair", "multi"} else 1.0
+        mix_bonus = pair_multi_mix_bonus if mix_type in {"pair", "multi"} else 1.0
 
         mdd = abs(safe_float((row.get("oos") or {}).get("mdd"), 0.0))
-        risk_penalty = 1.0 / (1.0 + (2.5 * max(0.0, mdd)))
+        risk_penalty = 1.0 / (1.0 + (mdd_risk_penalty_coeff * max(0.0, mdd)))
         raw_weights.append(base * diversity_penalty * timeframe_penalty * mix_bonus * risk_penalty)
 
     weight_sum = float(sum(raw_weights))
@@ -234,6 +256,10 @@ def build_single_asset_portfolio_sets(
     robust_score_params: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Build portfolio-set candidates from successful single-asset strategies."""
+    cfg = _resolve_robust_score_params(robust_score_params)
+    shortlist_missing_score_fallback = float(cfg["shortlist_missing_score_fallback"])
+    weight_exp_clamp_floor = float(cfg["weight_exp_clamp_floor"])
+
     rows = [dict(row) for row in shortlist]
     if not rows:
         return []
@@ -277,13 +303,16 @@ def build_single_asset_portfolio_sets(
             float(
                 item.get(
                     "shortlist_score",
-                    hurdle_score(item, mode=mode, robust_score_params=robust_score_params),
+                    safe_float(
+                        hurdle_score(item, mode=mode, robust_score_params=robust_score_params),
+                        shortlist_missing_score_fallback,
+                    ),
                 )
             )
             for item in items
         ]
         max_score = max(scores)
-        raw = [math.exp(max(-60.0, min(0.0, score - max_score))) for score in scores]
+        raw = [math.exp(max(weight_exp_clamp_floor, min(0.0, score - max_score))) for score in scores]
         total = float(sum(raw))
         if total <= 0.0:
             equal = 1.0 / float(len(items))
@@ -407,6 +436,7 @@ def select_diversified_shortlist(
             score_key="shortlist_score",
             temperature=weight_temperature,
             max_weight=max_weight,
+            robust_score_params=robust_score_params,
         )
     return selected
 

@@ -38,6 +38,8 @@ class MicroRangeExpansion1sStrategy(Strategy):
             "volume_z_threshold": HyperParam.floating(
                 "volume_z_threshold", default=1.0, low=0.0, high=6.0, grid=[0.8, 1.0, 1.5]
             ),
+            "signal_strength": HyperParam.floating("signal_strength", default=1.0, low=0.0, high=10.0),
+            "min_range_samples": HyperParam.integer("min_range_samples", default=5, low=3, high=256),
             "max_hold_bars": HyperParam.integer("max_hold_bars", default=20, low=1, high=2000, grid=[10, 20, 30]),
             "allow_short": HyperParam.boolean("allow_short", default=True, grid=[True, False]),
         }
@@ -49,6 +51,8 @@ class MicroRangeExpansion1sStrategy(Strategy):
         lookback: int = 30,
         range_z_threshold: float = 1.5,
         volume_z_threshold: float = 1.0,
+        signal_strength: float = 1.0,
+        min_range_samples: int = 5,
         max_hold_bars: int = 20,
         allow_short: bool = True,
     ):
@@ -62,6 +66,8 @@ class MicroRangeExpansion1sStrategy(Strategy):
                 "lookback": lookback,
                 "range_z_threshold": range_z_threshold,
                 "volume_z_threshold": volume_z_threshold,
+                "signal_strength": signal_strength,
+                "min_range_samples": min_range_samples,
                 "max_hold_bars": max_hold_bars,
                 "allow_short": allow_short,
             },
@@ -71,6 +77,8 @@ class MicroRangeExpansion1sStrategy(Strategy):
         self.lookback = int(resolved["lookback"])
         self.range_z_threshold = float(resolved["range_z_threshold"])
         self.volume_z_threshold = float(resolved["volume_z_threshold"])
+        self.signal_strength = float(resolved["signal_strength"])
+        self.min_range_samples = int(resolved["min_range_samples"])
         self.max_hold_bars = int(resolved["max_hold_bars"])
         self.allow_short = bool(resolved["allow_short"])
 
@@ -134,7 +142,7 @@ class MicroRangeExpansion1sStrategy(Strategy):
                 symbol=symbol,
                 datetime=event_time,
                 signal_type=signal_type,
-                strength=1.0,
+                strength=float(self.signal_strength),
                 metadata={
                     "strategy": "MicroRangeExpansion1sStrategy",
                     "range_z": float(range_z),
@@ -186,7 +194,7 @@ class MicroRangeExpansion1sStrategy(Strategy):
             for high_px, low_px, close_px in zip(item.highs, item.lows, item.closes, strict=True)
             if close_px > 0.0
         ]
-        if len(ranges) < 5:
+        if len(ranges) < self.min_range_samples:
             return
 
         latest_range = ranges[-1]

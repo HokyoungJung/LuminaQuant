@@ -6,6 +6,7 @@ import argparse
 import json
 import math
 from collections import defaultdict
+from copy import deepcopy
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -13,6 +14,36 @@ from typing import Any
 import numpy as np
 
 _METALS = {"XAU/USDT", "XAG/USDT"}
+
+DEFAULT_PORTFOLIO_SCORING_CONFIG: dict[str, Any] = {
+    "candidate_rank_score_weights": {
+        "sharpe_weight": 2.8,
+        "deflated_sharpe_weight": 1.5,
+        "pbo_penalty": 2.0,
+        "return_weight": 25.0,
+    },
+    "allocation_quality_params": {
+        "deflated_sharpe_floor": 0.01,
+        "deflated_sharpe_offset": 0.5,
+    },
+    "vol_targeting": {
+        "target_vol_floor": 0.01,
+        "vol_scale_cap": 2.0,
+        "vol_scale_epsilon": 1e-12,
+    },
+    "sensitivity": {
+        "cost_stress_x2_multiplier": 2.0,
+        "cost_stress_x3_multiplier": 3.0,
+        "signal_drift_down_multiplier": 0.9,
+        "signal_drift_up_multiplier": 1.1,
+    },
+    "constraints": {
+        "max_strategy": 0.15,
+        "max_family": 0.40,
+        "max_asset": 0.20,
+        "max_metals": 0.15,
+    },
+}
 
 
 def _safe_float(value: Any, default: float = 0.0) -> float:
@@ -27,6 +58,41 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
 
 def _stream_to_array(stream: list[dict[str, Any]]) -> np.ndarray:
     return np.asarray([_safe_float(item.get("v"), 0.0) for item in stream], dtype=float)
+
+
+def _load_score_config(path: Path) -> dict[str, Any]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise ValueError(f"score config file not found: {path}") from exc
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"invalid score config JSON ({path}): {exc}") from exc
+    if not isinstance(payload, dict):
+        raise ValueError(f"score config must be a JSON object: {path}")
+    return dict(payload)
+
+
+def _resolve_portfolio_score_config(overrides: dict[str, Any] | None) -> dict[str, Any]:
+    resolved = deepcopy(DEFAULT_PORTFOLIO_SCORING_CONFIG)
+    if not isinstance(overrides, dict):
+        return resolved
+    source = overrides
+    nested = source.get("portfolio_optimization")
+    if isinstance(nested, dict):
+        source = nested
+    for key, default_value in resolved.items():
+        override_value = source.get(key)
+        if isinstance(default_value, dict) and isinstance(override_value, dict):
+            for sub_key in default_value:
+                if sub_key in override_value:
+                    default_value[sub_key] = override_value[sub_key]
+    return resolved
+
+
+def _resolved_cli_or_config_float(cli_value: float | None, config_value: Any, *, default: float) -> float:
+    if cli_value is not None:
+        return max(0.0, _safe_float(cli_value, default))
+    return max(0.0, _safe_float(config_value, default))
 
 
 def _corr(x: np.ndarray, y: np.ndarray) -> float:
@@ -419,11 +485,16 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Optimize shortlisted strategy portfolio.")
     parser.add_argument("--research-report", default="reports/candidate_research_latest.json")
     parser.add_argument("--team-report", default="reports/strategy_factory_report_latest.json")
+    parser.add_argument("--score-config", default="", help="Optional scoring config JSON path.")
     parser.add_argument("--output-dir", default="reports")
     parser.add_argument("--max-strategies", type=int, default=24)
     parser.add_argument("--target-vol", type=float, default=0.12)
     parser.add_argument("--correlation-threshold", type=float, default=0.60)
     parser.add_argument("--cost-penalty", type=float, default=0.35)
+    parser.add_argument("--max-strategy-cap", type=float, default=None)
+    parser.add_argument("--max-family-cap", type=float, default=None)
+    parser.add_argument("--max-asset-cap", type=float, default=None)
+    parser.add_argument("--max-metals-cap", type=float, default=None)
     return parser
 
 
@@ -431,6 +502,21 @@ def main() -> int:
     args = _build_parser().parse_args()
     output_dir = Path(args.output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    score_config_payload: dict[str, Any] | None = None
+    score_config_path = None
+    if str(args.score_config).strip():
+        score_config_path = Path(str(args.score_config)).resolve()
+        try:
+            score_config_payload = _load_score_config(score_config_path)
+        except ValueError as exc:
+            raise SystemExit(f"[PORTFOLIO] {exc}")
+    optimization_config = _resolve_portfolio_score_config(score_config_payload)
+    rank_weights = dict(optimization_config.get("candidate_rank_score_weights") or {})
+    allocation_quality_params = dict(optimization_config.get("allocation_quality_params") or {})
+    vol_targeting_params = dict(optimization_config.get("vol_targeting") or {})
+    sensitivity_params = dict(optimization_config.get("sensitivity") or {})
+    constraint_defaults = dict(optimization_config.get("constraints") or {})
 
     rows_raw, source_path = _load_rows(args)
     if not rows_raw:
@@ -450,10 +536,13 @@ def main() -> int:
     def _score(row: dict[str, Any]) -> float:
         oos = dict(row.get("oos") or {})
         return float(
-            (2.8 * _safe_float(oos.get("sharpe"), 0.0))
-            + (1.5 * _safe_float(oos.get("deflated_sharpe"), 0.0))
-            - (2.0 * _safe_float(oos.get("pbo"), 1.0))
-            + (25.0 * _safe_float(oos.get("return"), 0.0))
+            (_safe_float(rank_weights.get("sharpe_weight"), 2.8) * _safe_float(oos.get("sharpe"), 0.0))
+            + (
+                _safe_float(rank_weights.get("deflated_sharpe_weight"), 1.5)
+                * _safe_float(oos.get("deflated_sharpe"), 0.0)
+            )
+            - (_safe_float(rank_weights.get("pbo_penalty"), 2.0) * _safe_float(oos.get("pbo"), 1.0))
+            + (_safe_float(rank_weights.get("return_weight"), 25.0) * _safe_float(oos.get("return"), 0.0))
         )
 
     filtered.sort(key=_score, reverse=True)
@@ -494,7 +583,11 @@ def main() -> int:
         for cid in cluster:
             row = rows[cid]
             oos = dict(row.get("oos") or {})
-            quality = max(0.01, _safe_float(oos.get("deflated_sharpe"), 0.0) + 0.5)
+            quality = max(
+                _safe_float(allocation_quality_params.get("deflated_sharpe_floor"), 0.01),
+                _safe_float(oos.get("deflated_sharpe"), 0.0)
+                + _safe_float(allocation_quality_params.get("deflated_sharpe_offset"), 0.5),
+            )
             inv_vol = _inverse_vol_weight(oos_map[cid])
             turnover = _safe_float(oos.get("turnover"), 0.0)
             penalty = 1.0 + (float(args.cost_penalty) * turnover)
@@ -519,10 +612,26 @@ def main() -> int:
 
     # 3) Apply constraints and caps.
     configured_caps = {
-        "max_strategy": 0.15,
-        "max_family": 0.40,
-        "max_asset": 0.20,
-        "max_metals": 0.15,
+        "max_strategy": _resolved_cli_or_config_float(
+            args.max_strategy_cap,
+            constraint_defaults.get("max_strategy"),
+            default=0.15,
+        ),
+        "max_family": _resolved_cli_or_config_float(
+            args.max_family_cap,
+            constraint_defaults.get("max_family"),
+            default=0.40,
+        ),
+        "max_asset": _resolved_cli_or_config_float(
+            args.max_asset_cap,
+            constraint_defaults.get("max_asset"),
+            default=0.20,
+        ),
+        "max_metals": _resolved_cli_or_config_float(
+            args.max_metals_cap,
+            constraint_defaults.get("max_metals"),
+            default=0.15,
+        ),
     }
     weights, effective_caps = _apply_caps(
         weights,
@@ -534,10 +643,13 @@ def main() -> int:
     )
 
     # 4) Vol targeting.
+    target_vol_floor = max(0.0, _safe_float(vol_targeting_params.get("target_vol_floor"), 0.01))
+    vol_scale_cap = max(0.0, _safe_float(vol_targeting_params.get("vol_scale_cap"), 2.0))
+    vol_scale_epsilon = max(0.0, _safe_float(vol_targeting_params.get("vol_scale_epsilon"), 1e-12))
     portfolio_oos = _build_portfolio_returns(weights, rows, split="oos")
     oos_vol = _safe_float(np.std(portfolio_oos, ddof=1), 0.0)
-    target_vol = max(0.01, float(args.target_vol))
-    vol_scale = 1.0 if oos_vol <= 1e-12 else min(2.0, target_vol / max(1e-12, oos_vol))
+    target_vol = max(target_vol_floor, float(args.target_vol))
+    vol_scale = 1.0 if oos_vol <= vol_scale_epsilon else min(vol_scale_cap, target_vol / max(vol_scale_epsilon, oos_vol))
     for key in weights:
         weights[key] *= vol_scale
 
@@ -566,8 +678,13 @@ def main() -> int:
         weighted_turnover += weight * _safe_float(oos.get("turnover"), 0.0)
         weighted_cost += weight * cost
 
-    oos_x2 = portfolio_oos - (weighted_turnover * weighted_cost)
-    oos_x3 = portfolio_oos - (2.0 * weighted_turnover * weighted_cost)
+    cost_stress_x2_multiplier = _safe_float(sensitivity_params.get("cost_stress_x2_multiplier"), 2.0)
+    cost_stress_x3_multiplier = _safe_float(sensitivity_params.get("cost_stress_x3_multiplier"), 3.0)
+    signal_drift_down_multiplier = _safe_float(sensitivity_params.get("signal_drift_down_multiplier"), 0.9)
+    signal_drift_up_multiplier = _safe_float(sensitivity_params.get("signal_drift_up_multiplier"), 1.1)
+
+    oos_x2 = portfolio_oos - (max(0.0, cost_stress_x2_multiplier - 1.0) * weighted_turnover * weighted_cost)
+    oos_x3 = portfolio_oos - (max(0.0, cost_stress_x3_multiplier - 1.0) * weighted_turnover * weighted_cost)
 
     sensitivity = {
         "cost_stress": {
@@ -575,8 +692,8 @@ def main() -> int:
             "x3": _metrics(oos_x3),
         },
         "param_drift": {
-            "minus_10pct_signal": _metrics(portfolio_oos * 0.9),
-            "plus_10pct_signal": _metrics(portfolio_oos * 1.1),
+            "minus_10pct_signal": _metrics(portfolio_oos * signal_drift_down_multiplier),
+            "plus_10pct_signal": _metrics(portfolio_oos * signal_drift_up_multiplier),
         },
     }
 
@@ -617,6 +734,26 @@ def main() -> int:
             "max_metals": float(effective_caps.get("max_metals", configured_caps["max_metals"])),
             "family_caps": dict(effective_caps.get("family_caps") or {}),
             "configured": configured_caps,
+        },
+        "scoring": {
+            "candidate_rank_score_weights": {
+                "sharpe_weight": _safe_float(rank_weights.get("sharpe_weight"), 2.8),
+                "deflated_sharpe_weight": _safe_float(rank_weights.get("deflated_sharpe_weight"), 1.5),
+                "pbo_penalty": _safe_float(rank_weights.get("pbo_penalty"), 2.0),
+                "return_weight": _safe_float(rank_weights.get("return_weight"), 25.0),
+            },
+            "vol_targeting": {
+                "target_vol_floor": float(target_vol_floor),
+                "vol_scale_cap": float(vol_scale_cap),
+                "vol_scale_epsilon": float(vol_scale_epsilon),
+            },
+            "sensitivity": {
+                "cost_stress_x2_multiplier": float(cost_stress_x2_multiplier),
+                "cost_stress_x3_multiplier": float(cost_stress_x3_multiplier),
+                "signal_drift_down_multiplier": float(signal_drift_down_multiplier),
+                "signal_drift_up_multiplier": float(signal_drift_up_multiplier),
+            },
+            "source": str(score_config_path) if score_config_path is not None else "",
         },
         "weights": allocation_rows,
         "sleeve_budget": dict(sorted(sleeve_budget.items())),

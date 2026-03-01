@@ -42,6 +42,8 @@ class PerpCrowdingCarryStrategy(Strategy):
                 high=0.99,
                 grid=[0.2, 0.3, 0.4],
             ),
+            "entry_strength_floor": HyperParam.floating("entry_strength_floor", default=0.2, low=0.0, high=5.0),
+            "max_signal_strength": HyperParam.floating("max_signal_strength", default=2.0, low=0.1, high=10.0),
             "exit_threshold": HyperParam.floating(
                 "exit_threshold",
                 default=0.10,
@@ -62,6 +64,8 @@ class PerpCrowdingCarryStrategy(Strategy):
         mild_funding: float = 0.0002,
         extreme_funding: float = 0.0012,
         entry_threshold: float = 0.30,
+        entry_strength_floor: float = 0.2,
+        max_signal_strength: float = 2.0,
         exit_threshold: float = 0.10,
         stop_loss_pct: float = 0.02,
         max_hold_bars: int = 72,
@@ -78,6 +82,8 @@ class PerpCrowdingCarryStrategy(Strategy):
                 "mild_funding": mild_funding,
                 "extreme_funding": extreme_funding,
                 "entry_threshold": entry_threshold,
+                "entry_strength_floor": entry_strength_floor,
+                "max_signal_strength": max_signal_strength,
                 "exit_threshold": exit_threshold,
                 "stop_loss_pct": stop_loss_pct,
                 "max_hold_bars": max_hold_bars,
@@ -90,6 +96,8 @@ class PerpCrowdingCarryStrategy(Strategy):
         self.mild_funding = float(resolved["mild_funding"])
         self.extreme_funding = float(resolved["extreme_funding"])
         self.entry_threshold = float(resolved["entry_threshold"])
+        self.entry_strength_floor = float(resolved["entry_strength_floor"])
+        self.max_signal_strength = float(resolved["max_signal_strength"])
         self.exit_threshold = float(resolved["exit_threshold"])
         self.stop_loss_pct = float(resolved["stop_loss_pct"])
         self.max_hold_bars = int(resolved["max_hold_bars"])
@@ -282,7 +290,7 @@ class PerpCrowdingCarryStrategy(Strategy):
         # 1) Carry-aligned: mildly positive funding + low crowding => LONG
         # 2) Extreme positive funding + rising OI crowding => SHORT fade
         oi_delta_z = float(comps.get("oi_delta_z", 0.0))
-        strength = min(2.0, max(0.2, abs(score)))
+        strength = min(self.max_signal_strength, max(self.entry_strength_floor, abs(score)))
 
         carry_long = funding > 0.0 and funding <= self.mild_funding and score >= self.entry_threshold
         crowded_long = funding >= self.extreme_funding and oi_delta_z > 0.0 and score >= self.entry_threshold
