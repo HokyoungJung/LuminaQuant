@@ -14,7 +14,6 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 import numpy as np
-
 from lumina_quant.indicators.factory_fast import (
     rolling_range_position_latest,
     volatility_ratio_latest,
@@ -125,7 +124,6 @@ def pv_trend_score(
 
     Returns a dict containing `score` and `gate`, plus diagnostics.
     """
-
     closes = _to_array(close)
     volumes = _to_array(volume)
     n = min(closes.size, volumes.size)
@@ -247,7 +245,6 @@ def volcomp_vwap_pressure(
     rare_extreme_weight: float = 0.50,
 ) -> dict[str, Any]:
     """Compute volatility-compression VWAP mean-reversion pressure."""
-
     highs = _to_array(high)
     lows = _to_array(low)
     closes = _to_array(close)
@@ -357,7 +354,6 @@ def cross_leadlag_spillover(
 
     Metals are excluded by design.
     """
-
     clean_prices: dict[str, np.ndarray] = {}
     excluded: list[str] = []
     for raw_symbol, values in dict(price_by_symbol or {}).items():

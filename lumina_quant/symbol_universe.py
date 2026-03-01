@@ -28,7 +28,6 @@ def canonicalize_research_symbol(symbol: str) -> str:
       BTC-USDT -> BTC/USDT
       XAU/USDT:USDT -> XAU/USDT
     """
-
     canonical = canonical_symbol(symbol)
     if not canonical:
         return ""
@@ -141,8 +140,8 @@ def resolve_available_symbols(
 
 
 __all__ = [
-    "RESEARCH_CANONICAL_QUOTE",
     "REQUIRED_RESEARCH_TIMEFRAMES",
+    "RESEARCH_CANONICAL_QUOTE",
     "canonicalize_research_symbol",
     "canonicalize_research_symbols",
     "normalize_research_timeframes",

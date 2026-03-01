@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import numpy as np
-
 from lumina_quant.indicators.advanced_alpha import (
     cross_leadlag_spillover,
     perp_crowding_score,

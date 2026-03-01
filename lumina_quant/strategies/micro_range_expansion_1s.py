@@ -182,9 +182,9 @@ class MicroRangeExpansion1sStrategy(Strategy):
             return
 
         ranges = [
-            (h - l) / max(c, 1e-12)
-            for h, l, c in zip(item.highs, item.lows, item.closes, strict=True)
-            if c > 0.0
+            (high_px - low_px) / max(close_px, 1e-12)
+            for high_px, low_px, close_px in zip(item.highs, item.lows, item.closes, strict=True)
+            if close_px > 0.0
         ]
         if len(ranges) < 5:
             return

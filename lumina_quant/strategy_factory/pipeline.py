@@ -14,7 +14,6 @@ from .candidate_library import (
     DEFAULT_TIMEFRAMES,
     build_candidate_manifest,
 )
-
 from .selection import (
     build_single_asset_portfolio_sets,
     select_diversified_shortlist,

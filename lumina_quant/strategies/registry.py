@@ -182,7 +182,6 @@ for _strategy_name, _strategy_cls in _STRATEGY_MAP.items():
 
 def get_strategy_metadata(strategy_name: str) -> dict[str, Any]:
     """Return strategy metadata (tier and name)."""
-
     token = str(strategy_name)
     return dict(_STRATEGY_METADATA.get(token, {"name": token, "tier": "live_default"}))
 

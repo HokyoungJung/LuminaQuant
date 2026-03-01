@@ -32,7 +32,6 @@ def canonical_symbol(symbol: str) -> str:
     - ``XAU/USDT:USDT`` -> ``XAU/USDT``
     - ``eth-usdt`` -> ``ETH/USDT``
     """
-
     token = _normalize_raw_symbol(symbol)
     if not token:
         return ""
@@ -63,13 +62,11 @@ def canonical_symbol(symbol: str) -> str:
 
 def normalize_symbol(symbol: str) -> str:
     """Backwards-compatible alias for canonical symbol normalization."""
-
     return canonical_symbol(symbol)
 
 
 def symbol_aliases(symbol: str) -> set[str]:
     """Return canonical + compatibility aliases for market lookup."""
-
     canonical = canonical_symbol(symbol)
     if not canonical:
         return set()
@@ -88,7 +85,6 @@ def symbol_aliases(symbol: str) -> set[str]:
 
 def canonicalize_symbol_list(symbols: Iterable[str]) -> list[str]:
     """Normalize, de-duplicate and preserve order for symbol lists."""
-
     out: list[str] = []
     for raw in symbols:
         symbol = canonical_symbol(raw)
@@ -104,7 +100,6 @@ def normalize_strategy_timeframes(
     strict_subset: bool = True,
 ) -> list[str]:
     """Normalize timeframe tokens and optionally enforce canonical subset."""
-
     allowed = {str(item).strip().lower() for item in required if str(item).strip()}
     out: list[str] = []
     for raw in list(timeframes or []):

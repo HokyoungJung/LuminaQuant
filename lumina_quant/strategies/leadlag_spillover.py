@@ -7,7 +7,6 @@ from collections import deque
 from dataclasses import dataclass
 
 import numpy as np
-
 from lumina_quant.core.events import SignalEvent
 from lumina_quant.indicators.advanced_alpha import cross_leadlag_spillover
 from lumina_quant.indicators.common import safe_float, time_key

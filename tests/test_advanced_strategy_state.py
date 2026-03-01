@@ -4,10 +4,10 @@ import queue
 from dataclasses import dataclass
 
 from lumina_quant.core.events import MarketEvent
-from lumina_quant.strategies.composite_trend import CompositeTrendStrategy
 from lumina_quant.strategies.candidate_vol_compression_reversion import (
     VolatilityCompressionReversionStrategy,
 )
+from lumina_quant.strategies.composite_trend import CompositeTrendStrategy
 from lumina_quant.strategies.leadlag_spillover import LeadLagSpilloverStrategy
 from lumina_quant.strategies.perp_crowding_carry import PerpCrowdingCarryStrategy
 

@@ -29,7 +29,6 @@ def leadlag_spillover(
 
     Legacy callers expect `{leader, laggers, spillover_score, excluded_symbols}`.
     """
-
     _ = metals_exclusion
     result = cross_leadlag_spillover(
         price_by_symbol,
@@ -54,11 +53,11 @@ def leadlag_spillover(
     spill = float((preds.get(best_symbol) or {}).get("score", 0.0))
     laggers = sorted(preds.keys())
     return {
-        "leader": list(result.get("leaders") or [None])[0] if result.get("leaders") else None,
+        "leader": next(iter(result.get("leaders") or [None])),
         "laggers": laggers,
         "spillover_score": float(spill),
         "excluded_symbols": list(result.get("excluded_symbols") or []),
-        "sample_size": int(len(laggers)),
+        "sample_size": len(laggers),
         "predictions": preds,
     }
 

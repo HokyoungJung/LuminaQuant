@@ -13,7 +13,6 @@ from collections import deque
 from dataclasses import dataclass
 
 import numpy as np
-
 from lumina_quant.core.events import SignalEvent
 from lumina_quant.indicators.advanced_alpha import pv_trend_score
 from lumina_quant.indicators.common import safe_float, time_key
@@ -276,14 +275,14 @@ class CompositeTrendStrategy(Strategy):
         if len(closes) < max(3, int(window)):
             return 0.0
         h = np.asarray(list(highs)[-int(window) :], dtype=float)
-        l = np.asarray(list(lows)[-int(window) :], dtype=float)
+        low_arr = np.asarray(list(lows)[-int(window) :], dtype=float)
         c = np.asarray(list(closes)[-int(window) :], dtype=float)
         prev_close = np.r_[c[0], c[:-1]]
         tr = np.maximum.reduce(
             [
-                h - l,
+                h - low_arr,
                 np.abs(h - prev_close),
-                np.abs(l - prev_close),
+                np.abs(low_arr - prev_close),
             ]
         )
         tr = np.asarray(tr, dtype=float)

@@ -14,6 +14,7 @@ from .accelerated import rolling_mean_latest_numpy as rolling_mean_latest_numpy
 from .accelerated import rolling_std_latest_numpy as rolling_std_latest_numpy
 from .accelerated import talib_feature_pack as talib_feature_pack
 from .accelerated import yang_zhang_volatility as yang_zhang_volatility
+from .advanced_alpha import cross_leadlag_spillover as cross_leadlag_spillover
 from .atr import average_true_range as average_true_range
 from .atr import true_range as true_range
 from .bands import bollinger_bands as bollinger_bands
@@ -108,7 +109,6 @@ from .rare_event import rare_event_scores_latest as rare_event_scores_latest
 from .rare_event import rare_return_score_latest as rare_return_score_latest
 from .rare_event import rare_streak_score_latest as rare_streak_score_latest
 from .rare_event import trend_break_score_latest as trend_break_score_latest
-from .advanced_alpha import cross_leadlag_spillover as cross_leadlag_spillover
 from .research_factors import leadlag_spillover as leadlag_spillover
 from .research_factors import perp_crowding_score as perp_crowding_score
 from .research_factors import pv_trend_score as pv_trend_score
@@ -210,8 +210,8 @@ __all__ = [
     "close_to_close_volatility",
     "commodity_channel_index",
     "compute_fast_alpha_bundle",
-    "cross_leadlag_spillover",
     "conditional_value_at_risk",
+    "cross_leadlag_spillover",
     "cumulative_return",
     "decay_linear",
     "delay",
@@ -231,6 +231,7 @@ __all__ = [
     "ichimoku_cloud",
     "kaufman_efficiency_ratio",
     "keltner_channel",
+    "leadlag_spillover",
     "linear_regression_slope",
     "load_close_tail_from_lazy",
     "local_extremum_score_latest",
@@ -310,5 +311,4 @@ __all__ = [
     "williams_r",
     "yang_zhang_volatility",
     "zscore",
-    "leadlag_spillover",
 ]

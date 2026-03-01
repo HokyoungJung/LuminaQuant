@@ -80,7 +80,7 @@ def main() -> int:
         by_timeframe[timeframe]["avg_return_sum"] += _safe_float(oos.get("return"), 0.0)
 
         cid = str(row.get("candidate_id") or row.get("name") or "")
-        stream = list(((row.get("return_streams") or {}).get("oos") or []))
+        stream = list((row.get("return_streams") or {}).get("oos") or [])
         if cid and stream:
             oos_streams[cid] = _stream_to_array(stream)
             labels[cid] = str(row.get("name") or cid)

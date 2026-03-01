@@ -7,8 +7,8 @@ import itertools
 import json
 import math
 import random
-from copy import deepcopy
 from collections.abc import Iterable, Mapping, Sequence
+from copy import deepcopy
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -16,7 +16,6 @@ from typing import Any
 
 import numpy as np
 import polars as pl
-
 from lumina_quant.config import BaseConfig
 from lumina_quant.parquet_market_data import load_data_dict_from_parquet
 from lumina_quant.symbols import (
@@ -135,7 +134,6 @@ def _candidate_identity(candidate: dict[str, Any]) -> str:
 
 def adapt_legacy_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
     """Adapt legacy candidate fields to v2 contract without data loss."""
-
     row = dict(candidate)
 
     if not row.get("strategy_timeframe") and row.get("timeframe"):
@@ -1094,11 +1092,11 @@ def _synthetic_bundle(symbol: str, timeframe: str, *, bars: int = 2400) -> Serie
         c = max(0.1, o * (1.0 + step))
         wiggle = abs(rng.gauss(0.0, 0.0018)) + 0.0003
         h = max(o, c) * (1.0 + wiggle)
-        l = min(o, c) * (1.0 - wiggle)
+        low_price = min(o, c) * (1.0 - wiggle)
 
         open_[idx] = o
         high[idx] = h
-        low[idx] = l
+        low[idx] = low_price
         close[idx] = c
         volume[idx] = max(1.0, 1200.0 * (1.0 + abs(regime)) + rng.uniform(-200.0, 200.0))
 
@@ -1235,7 +1233,6 @@ def run_candidate_research(
     score_config: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Evaluate candidate manifest into train/val/OOS report contract (v2)."""
-
     base_tf = str(base_timeframe).strip().lower() or "1s"
     if base_tf != "1s":
         base_tf = "1s"
@@ -1322,7 +1319,7 @@ def run_candidate_research(
 
     ranked = sorted(scored_stage1, key=lambda item: item[0], reverse=True)
     keep_ratio = keep_ratio_applied
-    keep_count = max(1, int(round(len(ranked) * keep_ratio)))
+    keep_count = max(1, round(len(ranked) * keep_ratio))
     stage2 = [item[1] for item in ranked[:keep_count]]
 
     report_candidates: list[dict[str, Any]] = []
@@ -1470,7 +1467,6 @@ def build_default_candidate_rows(
     max_candidates: int = 512,
 ) -> list[dict[str, Any]]:
     """Build candidate rows from strategy-factory candidate library."""
-
     from lumina_quant.strategy_factory.candidate_library import build_binance_futures_candidates
 
     rows = build_binance_futures_candidates(

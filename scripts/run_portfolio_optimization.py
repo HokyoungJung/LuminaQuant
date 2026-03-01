@@ -136,19 +136,19 @@ def _project_simplex_with_upper_bounds(
     clipped_upper = {key: max(0.0, float(upper.get(key, target))) for key in keys}
     capacity = sum(clipped_upper.values())
     if capacity <= 0.0:
-        return {key: 0.0 for key in keys}
+        return dict.fromkeys(keys, 0.0)
     if capacity < target:
         target = capacity
 
     pref = {key: max(0.0, float(weights.get(key, 0.0))) for key in keys}
     pref_sum = sum(pref.values())
     if pref_sum <= 0.0:
-        pref = {key: 1.0 for key in keys}
+        pref = dict.fromkeys(keys, 1.0)
         pref_sum = float(len(keys))
     for key in keys:
         pref[key] /= pref_sum
 
-    out = {key: 0.0 for key in keys}
+    out = dict.fromkeys(keys, 0.0)
     active = set(keys)
     remaining = target
 
@@ -278,7 +278,7 @@ def _apply_caps(
         family_counts[fam] += 1
 
     family_caps: dict[str, float] = {}
-    for fam, count in family_counts.items():
+    for fam in family_counts:
         other_capacity = 0.0
         for other_fam, other_count in family_counts.items():
             if other_fam == fam:
@@ -322,7 +322,7 @@ def _apply_caps(
         metal_ratios[key] = float(metals_count) / float(len(symbols))
     metals_cap = max(float(max_metals), _min_required_exposure(metal_ratios, strategy_cap=strategy_cap))
 
-    upper = {key: strategy_cap for key in out}
+    upper = dict.fromkeys(out, strategy_cap)
     out = _project_simplex_with_upper_bounds(out, upper=upper, target_sum=1.0)
 
     for _ in range(24):
@@ -385,7 +385,7 @@ def _build_portfolio_returns(
     arrays: list[tuple[float, np.ndarray]] = []
     min_len = None
     for cid, weight in weights.items():
-        stream = list((((rows.get(cid) or {}).get("return_streams") or {}).get(split) or []))
+        stream = list(((rows.get(cid) or {}).get("return_streams") or {}).get(split) or [])
         arr = _stream_to_array(stream)
         if arr.size == 0 or weight <= 0.0:
             continue
@@ -441,7 +441,7 @@ def main() -> int:
         row
         for row in rows_raw
         if bool(row.get("pass", True))
-        and list((((row.get("return_streams") or {}).get("oos")) or []))
+        and list(((row.get("return_streams") or {}).get("oos")) or [])
     ]
     if not filtered:
         filtered = rows_raw
@@ -462,7 +462,7 @@ def main() -> int:
     rows = {str(row.get("candidate_id") or row.get("name")): row for row in selected}
     ids = list(rows.keys())
     oos_map = {
-        cid: _stream_to_array(list(((rows[cid].get("return_streams") or {}).get("oos") or [])))
+        cid: _stream_to_array(list((rows[cid].get("return_streams") or {}).get("oos") or []))
         for cid in ids
     }
 
@@ -583,7 +583,7 @@ def main() -> int:
     # Sleeve budgets.
     sleeve_budget: dict[str, float] = defaultdict(float)
     for cid, weight in weights.items():
-        sleeve = str((rows[cid].get("family") or "other"))
+        sleeve = str(rows[cid].get("family") or "other")
         sleeve_budget[sleeve] += float(weight)
 
     ranked_weights = sorted(weights.items(), key=lambda item: item[1], reverse=True)

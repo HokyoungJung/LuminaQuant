@@ -4,8 +4,8 @@ import unittest
 from dataclasses import dataclass
 
 from lumina_quant.core.events import MarketEvent
-from lumina_quant.symbols import canonical_symbol
 from lumina_quant.strategies.pair_trading_zscore import PairTradingZScoreStrategy
+from lumina_quant.symbols import canonical_symbol
 
 
 @dataclass
