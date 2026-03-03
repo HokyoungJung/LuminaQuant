@@ -14,7 +14,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from scripts.benchmark_formulaic_pipeline import _synthetic_ohlcv  # noqa: E402
+from scripts.benchmark_pipeline_k import _synthetic_ohlcv  # noqa: E402
 
 
 def _load_compute_alpha101():

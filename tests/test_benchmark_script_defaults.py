@@ -26,7 +26,7 @@ def test_benchmark_indicators_parser_defaults():
 
 
 def test_benchmark_formulaic_alpha_parser_defaults():
-    module = _load_module("benchmark_formulaic_alpha_script", "scripts/benchmark_formulaic_alpha.py")
+    module = _load_module("benchmark_kernel_a_script", "scripts/benchmark_kernel_a.py")
     args = module._build_parser().parse_args([])
     assert args.alpha_start == 1
     assert args.alpha_end == 101

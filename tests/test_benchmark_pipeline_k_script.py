@@ -7,10 +7,10 @@ from pathlib import Path
 
 def _load_module():
     root = Path(__file__).resolve().parent.parent
-    module_path = root / "scripts" / "benchmark_formulaic_pipeline.py"
-    spec = importlib.util.spec_from_file_location("benchmark_formulaic_pipeline_script", module_path)
+    module_path = root / "scripts" / "benchmark_pipeline_k.py"
+    spec = importlib.util.spec_from_file_location("benchmark_pipeline_k_script", module_path)
     if spec is None or spec.loader is None:
-        raise RuntimeError("Failed to load benchmark_formulaic_pipeline module")
+        raise RuntimeError("Failed to load benchmark_pipeline_k module")
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)

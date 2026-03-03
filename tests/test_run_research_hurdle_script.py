@@ -7,10 +7,10 @@ from pathlib import Path
 
 def _load_module():
     root = Path(__file__).resolve().parents[1]
-    module_path = root / "scripts" / "futures_strategy_factory.py"
-    spec = importlib.util.spec_from_file_location("futures_strategy_factory_script", module_path)
+    module_path = root / "scripts" / "run_research_hurdle.py"
+    spec = importlib.util.spec_from_file_location("run_research_hurdle_script", module_path)
     if spec is None or spec.loader is None:
-        raise RuntimeError("Failed to load futures_strategy_factory module")
+        raise RuntimeError("Failed to load run_research_hurdle module")
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)

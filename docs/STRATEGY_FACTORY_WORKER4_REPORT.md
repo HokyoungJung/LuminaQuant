@@ -33,7 +33,7 @@ This contribution adds an isolated **strategy factory pipeline** focused on Bina
 
 ### 3) Tuning/selection pipeline for multi-timeframe and multi-symbol evaluation
 
-- `scripts/run_strategy_factory_pipeline.py`
+- `scripts/run_research_pipeline.py`
   - Writes candidate manifest to `reports/`
   - Produces a local report payload and shortlist candidates (no external orchestrator required)
   - Builds diversified portfolio shortlist from selected team output
@@ -60,20 +60,20 @@ This contribution adds an isolated **strategy factory pipeline** focused on Bina
 - `tests/test_strategy_factory_candidate_library.py`
 - `tests/test_strategy_factory_selection.py`
 - `tests/test_fast_ops.py`
-- `tests/test_strategy_factory_pipeline.py`
+- `tests/test_research_pipeline.py`
 
 ## Usage
 
 Generate candidate universe only:
 
 ```bash
-uv run python scripts/run_strategy_factory_pipeline.py --dry-run
+uv run python scripts/run_research_pipeline.py --dry-run
 ```
 
 Run full pipeline and create shortlist artifacts:
 
 ```bash
-uv run python scripts/run_strategy_factory_pipeline.py \
+uv run python scripts/run_research_pipeline.py \
   --db-path data/market_parquet \
   --exchange binance \
   --market-type future \
@@ -84,7 +84,7 @@ uv run python scripts/run_strategy_factory_pipeline.py \
 Control shortlist size/diversification:
 
 ```bash
-uv run python scripts/run_strategy_factory_pipeline.py \
+uv run python scripts/run_research_pipeline.py \
   --shortlist-max-total 24 \
   --shortlist-max-per-family 8 \
   --shortlist-max-per-timeframe 6

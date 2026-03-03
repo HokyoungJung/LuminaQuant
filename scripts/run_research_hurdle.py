@@ -858,14 +858,14 @@ def _write_markdown_report(
     lines.append("")
     lines.append(
         "```bash\n"
-        "uv run python scripts/futures_strategy_factory.py "
+        "uv run python scripts/run_research_hurdle.py "
         "--max-shortlist 64 --max-report-files 20\n"
         "```"
     )
     lines.append("")
     lines.append(
         "```bash\n"
-        "uv run python scripts/run_candidate_research.py "
+        "uv run python scripts/run_research_candidates.py "
         "--output-dir reports "
         f"--symbols {' '.join([_normalize_symbol(symbol) for symbol in symbols])}\n"
         "```"

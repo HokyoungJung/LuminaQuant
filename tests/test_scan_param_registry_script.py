@@ -8,8 +8,8 @@ from pathlib import Path
 
 def _load_module():
     root = Path(__file__).resolve().parent.parent
-    module_path = root / "scripts" / "scan_alpha101_params.py"
-    spec = importlib.util.spec_from_file_location("scan_alpha101_params_script", module_path)
+    module_path = root / "scripts" / "scan_param_registry.py"
+    spec = importlib.util.spec_from_file_location("scan_param_registry_script", module_path)
     if spec is None or spec.loader is None:
         raise RuntimeError("Failed to load scan_alpha101_params module")
     module = importlib.util.module_from_spec(spec)
@@ -32,7 +32,7 @@ def test_table_output_renders_headers_and_values():
 
 
 def test_main_json_output_contains_param_namespace(monkeypatch, capsys):
-    monkeypatch.setattr("sys.argv", ["scan_alpha101_params.py", "--alpha", "101"])
+    monkeypatch.setattr("sys.argv", ["scan_param_registry.py", "--alpha", "101"])
     MODULE.main()
     output = capsys.readouterr().out
     payload = json.loads(output)

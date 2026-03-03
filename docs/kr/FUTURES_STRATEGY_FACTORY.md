@@ -1,6 +1,6 @@
 # 선물 전략 팩토리 (Binance USDT-M + XAU/XAG)
 
-`scripts/futures_strategy_factory.py`와 `scripts/select_strategy_factory_shortlist.py`는
+`scripts/run_research_hurdle.py`와 `scripts/select_research_shortlist.py`는
 대규모 전략 후보를 만들고, 백테스트 결과 기반으로 실전 포트폴리오 후보를 추립니다.
 
 ## 핵심 정책
@@ -13,7 +13,7 @@
 ## 실행 예시
 
 ```bash
-uv run python scripts/select_strategy_factory_shortlist.py \
+uv run python scripts/select_research_shortlist.py \
   --report-glob "reports/oos_guarded_multistrategy_oos_*.json" \
   --mode oos \
   --score-config configs/score_config.example.json \
@@ -33,7 +33,7 @@ uv run python scripts/select_strategy_factory_shortlist.py \
 팩토리 랭킹 단계도 동일 템플릿을 사용할 수 있습니다:
 
 ```bash
-uv run python scripts/futures_strategy_factory.py \
+uv run python scripts/run_research_hurdle.py \
   --mode oos \
   --report-glob "reports/strategy_team_research_oos_*.json" \
   --score-config configs/score_config.example.json
@@ -43,8 +43,8 @@ uv run python scripts/futures_strategy_factory.py \
 
 `configs/score_config.example.json`을 템플릿으로 사용하세요.
 
-- `strategy_shortlist` 섹션 → `scripts/select_strategy_factory_shortlist.py`
-- `futures_strategy_factory` 섹션 → `scripts/futures_strategy_factory.py`
+- `strategy_shortlist` 섹션 → `scripts/select_research_shortlist.py`
+- `research_hurdle` 섹션 → `scripts/run_research_hurdle.py`
 - 같은 파일을 아래 스크립트에도 재사용할 수 있습니다.
-  - `candidate_research` (`scripts/run_candidate_research.py`)
+  - `candidate_research` (`scripts/run_research_candidates.py`)
   - `portfolio_optimization` (`scripts/run_portfolio_optimization.py`)

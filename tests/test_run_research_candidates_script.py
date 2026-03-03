@@ -9,10 +9,10 @@ from pathlib import Path
 
 def _load_module():
     root = Path(__file__).resolve().parents[1]
-    module_path = root / "scripts" / "run_candidate_research.py"
-    spec = importlib.util.spec_from_file_location("run_candidate_research_script", module_path)
+    module_path = root / "scripts" / "run_research_candidates.py"
+    spec = importlib.util.spec_from_file_location("run_research_candidates_script", module_path)
     if spec is None or spec.loader is None:
-        raise RuntimeError("Failed to load run_candidate_research module")
+        raise RuntimeError("Failed to load run_research_candidates module")
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
@@ -22,9 +22,9 @@ def _load_module():
 MODULE = _load_module()
 
 
-def test_run_candidate_research_script_smoke(tmp_path: Path):
+def test_run_research_candidates_script_smoke(tmp_path: Path):
     root = Path(__file__).resolve().parents[1]
-    script = root / "scripts" / "run_candidate_research.py"
+    script = root / "scripts" / "run_research_candidates.py"
     cmd = [
         sys.executable,
         str(script),
@@ -51,9 +51,9 @@ def test_run_candidate_research_script_smoke(tmp_path: Path):
     assert (tmp_path / "strategy_factory_report_latest.json").exists()
 
 
-def test_run_candidate_research_script_smoke_with_score_config(tmp_path: Path):
+def test_run_research_candidates_script_smoke_with_score_config(tmp_path: Path):
     root = Path(__file__).resolve().parents[1]
-    script = root / "scripts" / "run_candidate_research.py"
+    script = root / "scripts" / "run_research_candidates.py"
     score_cfg_path = tmp_path / "score_config.json"
     score_cfg_path.write_text(
         json.dumps(

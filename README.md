@@ -374,10 +374,10 @@ uv run python scripts/benchmark_backtest.py \
 **Strategy Factory Pipeline (manifest + shortlist):**
 ```bash
 # Dry run
-uv run python scripts/run_strategy_factory_pipeline.py --dry-run
+uv run python scripts/run_research_pipeline.py --dry-run
 
 # Generate report + shortlist artifacts
-uv run python scripts/run_strategy_factory_pipeline.py \
+uv run python scripts/run_research_pipeline.py \
   --db-path data/market_parquet \
   --mode standard \
   --timeframes 1m 5m 15m \
@@ -397,10 +397,10 @@ Portfolio shortlist policy (default):
 Score config template:
 - Use `configs/score_config.example.json`
 - Shared sections:
-  - `candidate_research` → `scripts/run_candidate_research.py --score-config ...`
+  - `candidate_research` → `scripts/run_research_candidates.py --score-config ...`
   - `portfolio_optimization` → `scripts/run_portfolio_optimization.py --score-config ...`
-  - `strategy_shortlist` → `scripts/select_strategy_factory_shortlist.py --score-config ...`
-  - `futures_strategy_factory` → `scripts/futures_strategy_factory.py --score-config ...`
+  - `strategy_shortlist` → `scripts/select_research_shortlist.py --score-config ...`
+  - `research_hurdle` → `scripts/run_research_hurdle.py --score-config ...`
 
 **Futures Support Feature Collection (funding / mark/index / OI):**
 ```bash

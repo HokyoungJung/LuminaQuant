@@ -1,6 +1,6 @@
 # Futures Strategy Factory (Binance USDT-M + XAU/XAG)
 
-`scripts/futures_strategy_factory.py` builds a large strategy-candidate universe and
+`scripts/run_research_hurdle.py` builds a large strategy-candidate universe and
 produces a diversified shortlist from existing research reports.
 
 ## What it produces
@@ -36,7 +36,7 @@ All are implemented in `lumina_quant/indicators/futures_fast.py` with optional N
 ### Build shortlist from latest team research reports
 
 ```bash
-uv run python scripts/futures_strategy_factory.py \
+uv run python scripts/run_research_hurdle.py \
   --mode oos \
   --report-glob "reports/strategy_team_research_oos_*.json" \
   --score-config configs/score_config.example.json \
@@ -47,13 +47,13 @@ uv run python scripts/futures_strategy_factory.py \
 ### Dry-run (no files written)
 
 ```bash
-uv run python scripts/futures_strategy_factory.py --dry-run
+uv run python scripts/run_research_hurdle.py --dry-run
 ```
 
 ### Build weighted shortlist from research reports
 
 ```bash
-uv run python scripts/select_strategy_factory_shortlist.py \
+uv run python scripts/select_research_shortlist.py \
   --report-glob "reports/oos_guarded_multistrategy_oos_*.json" \
   --mode oos \
   --score-config configs/score_config.example.json \
@@ -72,16 +72,16 @@ Use `--allow-multi-asset` only if you explicitly want direct multi-asset rows in
 
 Use `configs/score_config.example.json` as a base template.
 
-- `strategy_shortlist` section → `scripts/select_strategy_factory_shortlist.py`
-- `futures_strategy_factory` section → `scripts/futures_strategy_factory.py`
+- `strategy_shortlist` section → `scripts/select_research_shortlist.py`
+- `research_hurdle` section → `scripts/run_research_hurdle.py`
 - The same file can also be reused for:
-  - `candidate_research` (`scripts/run_candidate_research.py`)
+  - `candidate_research` (`scripts/run_research_candidates.py`)
   - `portfolio_optimization` (`scripts/run_portfolio_optimization.py`)
 
 ### Custom symbol/timeframe set
 
 ```bash
-uv run python scripts/futures_strategy_factory.py \
+uv run python scripts/run_research_hurdle.py \
   --symbols BTC/USDT ETH/USDT BNB/USDT XAU/USDT XAG/USDT \
   --timeframes 1s 1m 5m 15m 1h 4h 1d
 ```
@@ -90,4 +90,4 @@ uv run python scripts/futures_strategy_factory.py \
 
 - Defaults target the mission scope: **timeframes `1s~1d`**, **top10 + XAU/XAG**.
 - If no report exists, the script still emits a factory-seeded shortlist.
-- Use `scripts/run_strategy_factory_pipeline.py` or `scripts/run_mass_strategy_research.py` first for richer shortlist scoring.
+- Use `scripts/run_research_pipeline.py` or `scripts/run_bulk_research.py` first for richer shortlist scoring.

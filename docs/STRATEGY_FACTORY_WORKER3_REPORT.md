@@ -30,9 +30,9 @@ This contribution adds a worker-3 strategy-factory bundle focused on Binance fut
 
 ### 3) Tuning/selection pipeline scripts
 
-- `scripts/export_strategy_factory_candidates.py`
+- `scripts/export_research_candidates.py`
   - Generates strategy candidate universe JSON.
-- `scripts/select_strategy_factory_shortlist.py`
+- `scripts/select_research_shortlist.py`
   - Aggregates multi-report candidates and outputs a diversified shortlist.
   - Supports caps by strategy/timeframe/symbol and pass/trade filters.
 
@@ -48,13 +48,13 @@ This contribution adds a worker-3 strategy-factory bundle focused on Binance fut
 ### Export candidate universe
 
 ```bash
-uv run python scripts/export_strategy_factory_candidates.py --pretty
+uv run python scripts/export_research_candidates.py --pretty
 ```
 
 ### Build a shortlisted portfolio candidate file from prior OOS reports
 
 ```bash
-uv run python scripts/select_strategy_factory_shortlist.py \
+uv run python scripts/select_research_shortlist.py \
   --report-glob "reports/oos_guarded_multistrategy_oos_*.json" \
   --mode oos \
   --max-selected 32 \
@@ -73,8 +73,8 @@ uv run ruff check \
   lumina_quant/strategies/candidate_regime_breakout.py \
   lumina_quant/strategies/candidate_vol_compression_reversion.py \
   lumina_quant/strategies/factory_candidate_set.py \
-  scripts/export_strategy_factory_candidates.py \
-  scripts/select_strategy_factory_shortlist.py \
+  scripts/export_research_candidates.py \
+  scripts/select_research_shortlist.py \
   tests/test_factory_fast_indicators.py \
   tests/test_factory_candidate_set.py \
   tests/test_candidate_strategies_worker3.py \

@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 def main() -> None:
-    target = Path(__file__).resolve().parent / "run_strategy_factory_pipeline.py"
+    target = Path(__file__).resolve().parent / "run_research_pipeline.py"
     runpy.run_path(str(target), run_name="__main__")
 
 

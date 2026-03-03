@@ -21,16 +21,16 @@ This workflow is designed to create and evaluate a **large strategy candidate un
   - `lumina_quant/strategies/factory_candidate_set.py`
   - `lumina_quant/strategy_factory/*`
 - Candidate export and pipeline scripts:
-  - `scripts/export_strategy_factory_candidates.py`
-  - `scripts/run_strategy_factory_pipeline.py`
-  - `scripts/run_mass_strategy_research.py` (alias)
+  - `scripts/export_research_candidates.py`
+  - `scripts/run_research_pipeline.py`
+  - `scripts/run_bulk_research.py` (alias)
 
 ## Typical Workflow
 
 ### 1) Export large candidate universe
 
 ```bash
-uv run python scripts/export_strategy_factory_candidates.py \
+uv run python scripts/export_research_candidates.py \
   --output reports/strategy_factory_candidates.json \
   --pretty
 ```
@@ -38,7 +38,7 @@ uv run python scripts/export_strategy_factory_candidates.py \
 ### 2) Run full pipeline (manifest -> research -> shortlist)
 
 ```bash
-uv run python scripts/run_strategy_factory_pipeline.py \
+uv run python scripts/run_research_pipeline.py \
   --db-path data/market_parquet \
   --mode standard \
   --timeframes 1m 5m 15m \
@@ -48,7 +48,7 @@ uv run python scripts/run_strategy_factory_pipeline.py \
 ### 2-1) Apply shortlist weighting + single-strategy performance filters
 
 ```bash
-uv run python scripts/run_strategy_factory_pipeline.py \
+uv run python scripts/run_research_pipeline.py \
   --db-path data/market_parquet \
   --mode standard \
   --timeframes 1m 5m 15m \
@@ -79,13 +79,13 @@ Shortlist JSON now includes:
 ### 3) Dry-run only (no heavy search)
 
 ```bash
-uv run python scripts/run_strategy_factory_pipeline.py --dry-run
+uv run python scripts/run_research_pipeline.py --dry-run
 ```
 
 ### 4) Alias command
 
 ```bash
-uv run python scripts/run_mass_strategy_research.py --dry-run
+uv run python scripts/run_bulk_research.py --dry-run
 ```
 
 ## Notes

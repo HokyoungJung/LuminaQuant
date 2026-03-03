@@ -5,27 +5,27 @@
 ## 섹션 매핑
 
 - `candidate_research`
-  - 스크립트: `scripts/run_candidate_research.py --score-config ...`
+  - 스크립트: `scripts/run_research_candidates.py --score-config ...`
 - `portfolio_optimization`
   - 스크립트: `scripts/run_portfolio_optimization.py --score-config ...`
 - `strategy_shortlist`
-  - 스크립트: `scripts/select_strategy_factory_shortlist.py --score-config ...`
-- `futures_strategy_factory`
-  - 스크립트: `scripts/futures_strategy_factory.py --score-config ...`
+  - 스크립트: `scripts/select_research_shortlist.py --score-config ...`
+- `research_hurdle`
+  - 스크립트: `scripts/run_research_hurdle.py --score-config ...`
 
 ## 빠른 실행 예시
 
 ```bash
-uv run python scripts/run_candidate_research.py \
+uv run python scripts/run_research_candidates.py \
   --score-config configs/score_config.example.json
 
 uv run python scripts/run_portfolio_optimization.py \
   --score-config configs/score_config.example.json
 
-uv run python scripts/select_strategy_factory_shortlist.py \
+uv run python scripts/select_research_shortlist.py \
   --score-config configs/score_config.example.json
 
-uv run python scripts/futures_strategy_factory.py \
+uv run python scripts/run_research_hurdle.py \
   --score-config configs/score_config.example.json
 ```
 

@@ -5,27 +5,27 @@
 ## Section mapping
 
 - `candidate_research`
-  - script: `scripts/run_candidate_research.py --score-config ...`
+  - script: `scripts/run_research_candidates.py --score-config ...`
 - `portfolio_optimization`
   - script: `scripts/run_portfolio_optimization.py --score-config ...`
 - `strategy_shortlist`
-  - script: `scripts/select_strategy_factory_shortlist.py --score-config ...`
-- `futures_strategy_factory`
-  - script: `scripts/futures_strategy_factory.py --score-config ...`
+  - script: `scripts/select_research_shortlist.py --score-config ...`
+- `research_hurdle`
+  - script: `scripts/run_research_hurdle.py --score-config ...`
 
 ## Quick examples
 
 ```bash
-uv run python scripts/run_candidate_research.py \
+uv run python scripts/run_research_candidates.py \
   --score-config configs/score_config.example.json
 
 uv run python scripts/run_portfolio_optimization.py \
   --score-config configs/score_config.example.json
 
-uv run python scripts/select_strategy_factory_shortlist.py \
+uv run python scripts/select_research_shortlist.py \
   --score-config configs/score_config.example.json
 
-uv run python scripts/futures_strategy_factory.py \
+uv run python scripts/run_research_hurdle.py \
   --score-config configs/score_config.example.json
 ```
 

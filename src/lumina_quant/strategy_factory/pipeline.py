@@ -53,7 +53,7 @@ def build_research_command(
 ) -> list[str]:
     cmd = [
         sys.executable,
-        "scripts/run_candidate_research.py",
+        "scripts/run_research_candidates.py",
         "--output-dir",
         "reports",
         "--max-candidates",
@@ -226,7 +226,7 @@ def render_shortlist_markdown(shortlist_payload: dict[str, Any]) -> str:
     lines.append("")
     lines.append("```bash")
     lines.append(
-        "uv run python scripts/run_strategy_factory_pipeline.py --backend parquet-postgres"
+        "uv run python scripts/run_research_pipeline.py --backend parquet-postgres"
     )
     lines.append("```")
     lines.append("")
