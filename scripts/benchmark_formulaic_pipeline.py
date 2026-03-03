@@ -20,16 +20,37 @@ for candidate in (PROJECT_ROOT, SCRIPT_DIR):
     if str(candidate) not in sys.path:
         sys.path.insert(0, str(candidate))
 
-from lumina_quant.indicators import (  # noqa: E402
-    alpha_001,
-    alpha_005,
-    alpha_011,
-    alpha_025,
-    alpha_101,
-)
-from lumina_quant.indicators.formulaic_alpha import compute_alpha101  # noqa: E402
-
 import benchmark_backtest as backtest_benchmark  # noqa: E402
+
+
+def _load_indicator_primitives():
+    try:
+        from lumina_quant.indicators import (
+            alpha_001,
+            alpha_005,
+            alpha_011,
+            alpha_025,
+            alpha_101,
+        )
+
+        return alpha_001, alpha_005, alpha_011, alpha_025, alpha_101, False
+    except Exception:
+        def _noop(*_args, **_kwargs):
+            return 0.0
+
+        return _noop, _noop, _noop, _noop, _noop, True
+
+
+def _load_formulaic_compute():
+    try:
+        from lumina_quant.indicators.formulaic_alpha import compute_alpha101
+
+        return compute_alpha101, False
+    except Exception:
+        def _compute_alpha101(*_args, **_kwargs):
+            return 0.0
+
+        return _compute_alpha101, True
 
 
 @dataclass(slots=True)
@@ -39,7 +60,7 @@ class SectionSummary:
     median_seconds: float
     mean_seconds: float
     throughput: float
-    extra: dict[str, float | int | None]
+    extra: dict[str, float | int | str | None]
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -100,7 +121,7 @@ def _summarize(
     iterations: int,
     samples: list[float],
     units_per_iter: float,
-    extra: dict[str, float | int | None] | None = None,
+    extra: dict[str, float | int | str | None] | None = None,
 ) -> SectionSummary:
     median_seconds = statistics.median(samples)
     mean_seconds = statistics.fmean(samples)
@@ -129,6 +150,21 @@ def main() -> None:
     alpha_end = min(101, int(args.alpha_end))
     alpha_ids = list(range(alpha_start, alpha_end + 1))
 
+    alpha_001, alpha_005, alpha_011, alpha_025, alpha_101, indicators_stub = (
+        _load_indicator_primitives()
+    )
+    compute_alpha101, formulaic_stub = _load_formulaic_compute()
+    if indicators_stub:
+        print(
+            "[WARN] Optional indicator primitive modules unavailable; using placeholders.",
+            file=sys.stderr,
+        )
+    if formulaic_stub:
+        print(
+            "[WARN] Optional formulaic alpha module unavailable; using placeholder evaluator.",
+            file=sys.stderr,
+        )
+
     indicator_samples = _run_timed(
         args.indicator_iters,
         lambda: (
@@ -144,7 +180,7 @@ def main() -> None:
         iterations=args.indicator_iters,
         samples=indicator_samples,
         units_per_iter=5.0,
-        extra={"rows": len(closes)},
+        extra={"rows": len(closes), "used_placeholders": int(indicators_stub)},
     )
 
     def formulaic_workload() -> None:
@@ -166,7 +202,12 @@ def main() -> None:
         iterations=args.formula_iters,
         samples=formulaic_samples,
         units_per_iter=float(len(alpha_ids)),
-        extra={"alpha_start": alpha_start, "alpha_end": alpha_end, "backend": args.backend},
+        extra={
+            "alpha_start": alpha_start,
+            "alpha_end": alpha_end,
+            "backend": args.backend,
+            "used_placeholders": int(formulaic_stub),
+        },
     )
 
     backtest_section: SectionSummary

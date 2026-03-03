@@ -143,12 +143,12 @@ trading:
 ### Public / Private 저장소 범위
 
 - Public 저장소에서는 아래 연구 IP를 의도적으로 제외합니다.
-  - `lumina_quant/indicators/`
+  - `src/lumina_quant/indicators/`
   - `strategies/`
   - 전략/지표 전용 테스트 파일
 - Public 저장소에서는 DB 구축/동기화 코드도 제외합니다.
-  - `lumina_quant/data_sync.py`
-  - `lumina_quant/data_collector.py`
+  - `src/lumina_quant/data_sync.py`
+  - `src/lumina_quant/data_collector.py`
   - `scripts/sync_binance_ohlcv.py`
   - `scripts/collect_market_data.py`
   - `tests/test_data_sync.py`

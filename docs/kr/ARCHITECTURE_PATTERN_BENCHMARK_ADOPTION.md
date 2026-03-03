@@ -17,15 +17,15 @@
    - 검증: `tests/test_runtime_cache.py`, 재시작 상태 스냅샷/복원 경로.
 
 4. 최적화용 1회성 데이터셋 빌드 + frozen 배열
-   - 파일: `lumina_quant/optimization/frozen_dataset.py`, `optimize.py`, `lumina_quant/data.py`
-   - 검증: trial 루프에서 Polars 프레임 금지(`optimize.py` 하드 가드), pre-frozen tuple row 사용.
+   - 파일: `lumina_quant/optimization/frozen_dataset.py`, `src/lumina_quant/cli/optimize.py`, `lumina_quant/data.py`
+   - 검증: trial 루프에서 Polars 프레임 금지(`src/lumina_quant/cli/optimize.py` 하드 가드), pre-frozen tuple row 사용.
 
 5. 컴파일된 평가 커널 경로 (Numba/native)
    - 파일: `lumina_quant/optimization/fast_eval.py`, `lumina_quant/optimization/native_backend.py`, `lumina_quant/services/portfolio.py`
    - 검증: `tests/test_fast_eval.py`, `tests/test_parity_fast_eval.py`, 커널 처리량 벤치마크.
 
 6. Polars/Numba 동시 과구독(oversubscription) 제어
-   - 파일: `lumina_quant/optimization/threading_control.py`, `optimize.py`
+   - 파일: `lumina_quant/optimization/threading_control.py`, `src/lumina_quant/cli/optimize.py`
    - 검증: 시작 로그의 Numba thread 설정 값.
 
 7. 실행 시뮬레이션 모델 모듈화
@@ -33,7 +33,7 @@
    - 검증: 보호 주문/상태머신 회귀 테스트.
 
 8. 2단계 최적화기 (빠른 prefilter -> 전체 이벤트 리플레이)
-   - 파일: `optimize.py`
+   - 파일: `src/lumina_quant/cli/optimize.py`
    - 검증: 학습 단계 로그의 `[Two-Stage]` prefilter/replay 메시지.
 
 ## 런타임 활성화
@@ -105,7 +105,7 @@ uv run python scripts/benchmark_native_compare.py --bars 50000 --evals 5000
 
 ```bash
 LQ_OPT_PROFILE=1 LQ_TWO_STAGE_OPT=1 LQ_TWO_STAGE_TOPK_RATIO=0.5 LQ_TWO_STAGE_PREFILTER_FRACTION=0.4 LQ_MIN_TRAIN_DAYS=1 \
-uv run python optimize.py --folds 1 --n-trials 6 --max-workers 2 --oos-days 1 --data-source csv --no-auto-collect-db
+uv run lq optimize --folds 1 --n-trials 6 --max-workers 2 --oos-days 1 --data-source csv --no-auto-collect-db
 ```
 
 결과 요약:
@@ -125,5 +125,5 @@ uv run pytest tests/test_message_bus.py tests/test_runtime_cache.py tests/test_r
 uv run pytest tests/test_parity_fast_eval.py tests/test_fast_eval.py tests/test_frozen_dataset.py tests/test_event_clock.py tests/test_system_assembly.py tests/test_portfolio_fast_stats.py
 uv run pytest tests/test_execution_protective_orders.py tests/test_live_execution_state_machine.py tests/test_lookahead.py
 uv run pytest tests/test_optimize_two_stage.py tests/test_native_backend.py tests/test_strategy_registry_defaults.py
-uv run ruff check lumina_quant optimize.py lumina_quant/strategies/registry.py lumina_quant/strategies/rsi_strategy.py lumina_quant/strategies/moving_average.py scripts/benchmark_architecture.py scripts/benchmark_dataset_build.py scripts/benchmark_native_compare.py tests/test_message_bus.py tests/test_runtime_cache.py tests/test_replay.py tests/test_optimize_two_stage.py
+uv run ruff check src/lumina_quant src/lumina_quant/cli/optimize.py lumina_quant/strategies/registry.py lumina_quant/strategies/rsi_strategy.py lumina_quant/strategies/moving_average.py scripts/benchmark_architecture.py scripts/benchmark_dataset_build.py scripts/benchmark_native_compare.py tests/test_message_bus.py tests/test_runtime_cache.py tests/test_replay.py tests/test_optimize_two_stage.py
 ```

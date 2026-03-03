@@ -143,12 +143,12 @@ trading:
 ### Public vs Private Repository Scope
 
 - This public repository intentionally excludes proprietary research IP:
-  - `lumina_quant/indicators/`
+  - `src/lumina_quant/indicators/`
   - `strategies/`
   - private strategy/indicator test files
 - This public repository also excludes DB construction/sync code:
-  - `lumina_quant/data_sync.py`
-  - `lumina_quant/data_collector.py`
+  - `src/lumina_quant/data_sync.py`
+  - `src/lumina_quant/data_collector.py`
   - `scripts/sync_binance_ohlcv.py`
   - `scripts/collect_market_data.py`
   - `tests/test_data_sync.py`

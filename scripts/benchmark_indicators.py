@@ -14,13 +14,6 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from lumina_quant.indicators import (  # noqa: E402
-    alpha_001,
-    alpha_005,
-    alpha_011,
-    alpha_025,
-    alpha_101,
-)
 from scripts.benchmark_formulaic_pipeline import _synthetic_ohlcv  # noqa: E402
 
 
@@ -36,6 +29,24 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _load_alpha_functions():
+    try:
+        from lumina_quant.indicators import (
+            alpha_001,
+            alpha_005,
+            alpha_011,
+            alpha_025,
+            alpha_101,
+        )
+
+        return alpha_001, alpha_005, alpha_011, alpha_025, alpha_101, False
+    except Exception:
+        def _noop(*_args, **_kwargs):
+            return 0.0
+
+        return _noop, _noop, _noop, _noop, _noop, True
+
+
 def main() -> None:
     args = _build_parser().parse_args()
     payload = _synthetic_ohlcv(args.rows)
@@ -45,6 +56,13 @@ def main() -> None:
     closes = payload["closes"]
     volumes = payload["volumes"]
     vwaps = payload["vwaps"]
+
+    alpha_001, alpha_005, alpha_011, alpha_025, alpha_101, using_stub = _load_alpha_functions()
+    if using_stub:
+        print(
+            "[WARN] Optional indicator alpha modules are unavailable; using placeholder functions.",
+            file=sys.stderr,
+        )
 
     samples: list[float] = []
     for _ in range(max(1, int(args.iters))):
@@ -66,6 +84,7 @@ def main() -> None:
         "median_seconds": float(median_seconds),
         "mean_seconds": float(mean_seconds),
         "calls_per_second": float(throughput),
+        "used_placeholder_functions": bool(using_stub),
     }
 
     output = Path(args.output)

@@ -14,8 +14,19 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from lumina_quant.indicators.formulaic_alpha import compute_alpha101  # noqa: E402
 from scripts.benchmark_formulaic_pipeline import _synthetic_ohlcv  # noqa: E402
+
+
+def _load_compute_alpha101():
+    try:
+        from lumina_quant.indicators.formulaic_alpha import compute_alpha101
+
+        return compute_alpha101, False
+    except Exception:
+        def _compute_alpha101(*_args, **_kwargs):
+            return 0.0
+
+        return _compute_alpha101, True
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -40,6 +51,13 @@ def main() -> None:
     alpha_end = min(101, int(args.alpha_end))
     alpha_ids = list(range(alpha_start, alpha_end + 1))
     samples: list[float] = []
+
+    compute_alpha101, using_stub = _load_compute_alpha101()
+    if using_stub:
+        print(
+            "[WARN] Optional formulaic alpha module unavailable; using placeholder evaluator.",
+            file=sys.stderr,
+        )
 
     for _ in range(max(1, int(args.iters))):
         started = perf_counter()
@@ -69,6 +87,7 @@ def main() -> None:
         "median_seconds": float(median_seconds),
         "mean_seconds": float(mean_seconds),
         "alphas_per_second": float(throughput),
+        "used_placeholder_functions": bool(using_stub),
     }
 
     output = Path(args.output)

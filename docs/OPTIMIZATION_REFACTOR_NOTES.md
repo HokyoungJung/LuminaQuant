@@ -24,7 +24,7 @@ existing behavior while reducing runtime and temporary allocations.
 ### Updated usage sites
 
 - `lumina_quant/data.py` now uses `OHLCVFrameLoader` for preloaded and CSV data.
-- `optimize.py` now uses the same loader for CSV fallback and DB frame
+- `src/lumina_quant/cli/optimize.py` now uses the same loader for CSV fallback and DB frame
   normalization.
 
 ## Performance Changes

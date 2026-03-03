@@ -2,7 +2,7 @@
 
 ## Scope
 
-- Target: `dashboard.py` end-to-end observability and realtime visibility.
+- Target: `apps/dashboard/app.py` end-to-end observability and realtime visibility.
 - Goal: Let users understand strategy, price, execution, risk, health, and report outputs directly from the dashboard.
 - Constraints: preserve existing Postgres/CSV compatibility and keep dashboard responsive under frequent refresh.
 
@@ -102,7 +102,7 @@
 
 - `uv run ruff check .` passed.
 - `uv run pytest -q` passed.
-- `uv run python -m streamlit run dashboard.py --server.headless true` startup confirmed.
+- `uv run python -m streamlit run apps/dashboard/app.py --server.headless true` startup confirmed.
 - Dashboard live refresh verified via Streamlit auto-refresh loop and PostgreSQL-backed state queries.
 
 ## Completed Follow-ups

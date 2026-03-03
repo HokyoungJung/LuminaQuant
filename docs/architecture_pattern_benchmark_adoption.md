@@ -17,15 +17,15 @@ This document tracks high-performance engine patterns adopted in LuminaQuant, wi
    - Check: `tests/test_runtime_cache.py` and restart-safe state snapshot path.
 
 4. One-time dataset build and frozen arrays for optimization
-   - Files: `lumina_quant/optimization/frozen_dataset.py`, `optimize.py`, `lumina_quant/data.py`
-   - Check: no Polars frame allowed in trial loop (`optimize.py` hard guard), pre-frozen tuple rows.
+   - Files: `lumina_quant/optimization/frozen_dataset.py`, `src/lumina_quant/cli/optimize.py`, `lumina_quant/data.py`
+   - Check: no Polars frame allowed in trial loop (`src/lumina_quant/cli/optimize.py` hard guard), pre-frozen tuple rows.
 
 5. Compiled evaluation kernel path (Numba/native)
    - Files: `lumina_quant/optimization/fast_eval.py`, `lumina_quant/optimization/native_backend.py`, `lumina_quant/services/portfolio.py`
    - Check: `tests/test_fast_eval.py`, `tests/test_parity_fast_eval.py`, kernel throughput benchmark.
 
 6. Oversubscription control for Polars/Numba phases
-   - Files: `lumina_quant/optimization/threading_control.py`, `optimize.py`
+   - Files: `lumina_quant/optimization/threading_control.py`, `src/lumina_quant/cli/optimize.py`
    - Check: startup log line for configured Numba threads.
 
 7. Modular execution simulation models
@@ -33,7 +33,7 @@ This document tracks high-performance engine patterns adopted in LuminaQuant, wi
    - Check: protective order and execution state-machine regression tests.
 
 8. Two-stage optimizer (fast prefilter -> full event-driven replay)
-   - Files: `optimize.py`
+   - Files: `src/lumina_quant/cli/optimize.py`
    - Check: train-phase logs include `[Two-Stage]` prefilter/replay messages.
 
 ## Runtime activation
@@ -105,7 +105,7 @@ Command:
 
 ```bash
 LQ_OPT_PROFILE=1 LQ_TWO_STAGE_OPT=1 LQ_TWO_STAGE_TOPK_RATIO=0.5 LQ_TWO_STAGE_PREFILTER_FRACTION=0.4 LQ_MIN_TRAIN_DAYS=1 \
-uv run python optimize.py --folds 1 --n-trials 6 --max-workers 2 --oos-days 1 --data-source csv --no-auto-collect-db
+uv run lq optimize --folds 1 --n-trials 6 --max-workers 2 --oos-days 1 --data-source csv --no-auto-collect-db
 ```
 
 Result highlights:
@@ -125,5 +125,5 @@ uv run pytest tests/test_message_bus.py tests/test_runtime_cache.py tests/test_r
 uv run pytest tests/test_parity_fast_eval.py tests/test_fast_eval.py tests/test_frozen_dataset.py tests/test_event_clock.py tests/test_system_assembly.py tests/test_portfolio_fast_stats.py
 uv run pytest tests/test_execution_protective_orders.py tests/test_live_execution_state_machine.py tests/test_lookahead.py
 uv run pytest tests/test_optimize_two_stage.py tests/test_native_backend.py tests/test_strategy_registry_defaults.py
-uv run ruff check lumina_quant optimize.py lumina_quant/strategies/registry.py lumina_quant/strategies/rsi_strategy.py lumina_quant/strategies/moving_average.py scripts/benchmark_architecture.py scripts/benchmark_dataset_build.py scripts/benchmark_native_compare.py tests/test_message_bus.py tests/test_runtime_cache.py tests/test_replay.py tests/test_optimize_two_stage.py
+uv run ruff check src/lumina_quant src/lumina_quant/cli/optimize.py lumina_quant/strategies/registry.py lumina_quant/strategies/rsi_strategy.py lumina_quant/strategies/moving_average.py scripts/benchmark_architecture.py scripts/benchmark_dataset_build.py scripts/benchmark_native_compare.py tests/test_message_bus.py tests/test_runtime_cache.py tests/test_replay.py tests/test_optimize_two_stage.py
 ```
