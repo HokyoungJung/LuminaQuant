@@ -1,7 +1,4 @@
-"""Backward-compatible parquet market-data API.
-
-Primary implementation now lives under ``lumina_quant.storage.parquet``.
-"""
+"""Parquet-backed market-data repositories and compaction helpers."""
 
 from lumina_quant.storage.parquet.compaction import CompactionResult
 from lumina_quant.storage.parquet.ohlcv_repo import (
