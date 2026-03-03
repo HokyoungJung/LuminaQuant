@@ -12,5 +12,7 @@ runtime:
 symbols:
   - BTC/USDT
   - ETH/USDT
+  - XPT/USDT
+  - XPD/USDT
 
 timeframe: 1m
