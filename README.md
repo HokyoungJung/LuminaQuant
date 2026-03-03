@@ -254,6 +254,18 @@ uv run lq dashboard --run
 
 Root compatibility shims were removed. Use `uv run lq ...` as the single supported entrypoint.
 
+### Optional private extension package
+
+Public/main and private/main can share the same repository layout.
+Proprietary strategy/indicator implementations can be distributed separately as an extension package:
+
+- package/module: `lumina_quant_private`
+- optional strategy registry module: `lumina_quant_private.strategy_registry`
+- optional indicator module: `lumina_quant_private.indicators`
+
+When installed, `lumina_quant.strategies.registry` and `lumina_quant.indicators` auto-merge private exports at runtime.
+
+
 ### Windowed model parity + memory safety defaults
 
 - `lq optimize` in parquet mode uses the same **windowed MarketWindow model** as live:

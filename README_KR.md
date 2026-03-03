@@ -254,6 +254,18 @@ uv run lq dashboard --run
 
 루트 호환 shim은 제거되었습니다. `uv run lq ...`를 단일 공식 엔트리포인트로 사용하세요.
 
+### 선택적 private 확장 패키지
+
+public/main과 private/main은 동일한 저장소 레이아웃을 유지할 수 있습니다.
+비공개 전략/지표 구현은 별도 확장 패키지로 배포하면 됩니다.
+
+- 패키지/모듈: `lumina_quant_private`
+- 선택적 전략 레지스트리: `lumina_quant_private.strategy_registry`
+- 선택적 지표 모듈: `lumina_quant_private.indicators`
+
+해당 패키지가 설치되면 `lumina_quant.strategies.registry`와 `lumina_quant.indicators`가 런타임에 자동으로 private export를 병합합니다.
+
+
 **전략 팩토리 파이프라인 (후보 + 숏리스트):**
 ```bash
 # dry-run
