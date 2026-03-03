@@ -243,6 +243,18 @@ uv run python optimize.py \
   --market-db-path data/market_parquet
 ```
 
+**Preferred unified CLI (`lq`):**
+```bash
+uv run lq backtest --data-mode raw-first
+uv run lq optimize --data-mode raw-first
+uv run lq live --transport poll
+uv run lq live --transport ws
+uv run lq dashboard --run
+```
+
+Backwards compatibility is preserved: existing root entrypoints (`run_backtest.py`, `optimize.py`,
+`run_live.py`, `run_live_ws.py`, and `dashboard.py`) continue to work as shims.
+
 ### Windowed model parity + memory safety defaults
 
 - `optimize.py` in parquet mode uses the same **windowed MarketWindow model** as live:

@@ -109,6 +109,7 @@ ignore = [
     "ANN204",
     "ANN206",
     "ANN401",
+    "I001",
     "PERF401",
     "RUF012",
     "SIM105",
@@ -121,10 +122,10 @@ convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*.py" = ["D", "ANN", "B006", "E402", "F401", "RUF012"]
-"run_backtest.py" = ["D", "ANN"]
-"run_live.py" = ["D", "ANN"]
-"run_live_ws.py" = ["D", "ANN"]
-"optimize.py" = ["D", "ANN"]
+"run_backtest.py" = ["D", "ANN", "E402"]
+"run_live.py" = ["D", "ANN", "E402"]
+"run_live_ws.py" = ["D", "ANN", "E402"]
+"optimize.py" = ["D", "ANN", "E402"]
 "scripts/benchmark_backtest.py" = ["E402"]
 
 [tool.ruff.format]

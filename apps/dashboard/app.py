@@ -15,6 +15,8 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
+from plotly.subplots import make_subplots
+
 from lumina_quant.config import BacktestConfig, BaseConfig, OptimizationConfig
 from lumina_quant.market_data import (
     normalize_symbol,
@@ -31,7 +33,6 @@ from lumina_quant.utils.performance import (
     create_sharpe_ratio,
     create_sortino_ratio,
 )
-from plotly.subplots import make_subplots
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SRC_ROOT = PROJECT_ROOT / "src"

@@ -256,3 +256,13 @@ credentials/
 AGENTS.md
 .omx/
 .sisyphus/
+
+# Keep canonical runtime layout directories (contents remain ignored).
+!var/
+var/*
+!var/**/
+!var/**/.gitkeep
+
+# Keep source package namespace even with root-level data/ ignores.
+!src/lumina_quant/data/
+!src/lumina_quant/data/**

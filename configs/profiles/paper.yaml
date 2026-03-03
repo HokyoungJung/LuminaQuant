@@ -1,0 +1,4 @@
+profile: paper
+live:
+  is_testnet: true
+  enable_live_real: false

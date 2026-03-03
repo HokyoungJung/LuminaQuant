@@ -1,0 +1,16 @@
+# LuminaQuant example config profile.
+# Copy to config.yaml and adjust values for your environment.
+
+storage:
+  backend: parquet
+  market_data_parquet_path: data/market_parquet
+  postgres_dsn_env: LQ_POSTGRES_DSN
+
+runtime:
+  mode: paper
+
+symbols:
+  - BTC/USDT
+  - ETH/USDT
+
+timeframe: 1m

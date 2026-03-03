@@ -243,6 +243,18 @@ uv run python optimize.py \
   --market-db-path data/market_parquet
 ```
 
+**권장 통합 CLI (`lq`):**
+```bash
+uv run lq backtest --data-mode raw-first
+uv run lq optimize --data-mode raw-first
+uv run lq live --transport poll
+uv run lq live --transport ws
+uv run lq dashboard --run
+```
+
+하위 호환은 유지됩니다. 기존 루트 엔트리포인트(`run_backtest.py`, `optimize.py`,
+`run_live.py`, `run_live_ws.py`, `dashboard.py`)는 shim으로 계속 동작합니다.
+
 **전략 팩토리 파이프라인 (후보 + 숏리스트):**
 ```bash
 # dry-run
