@@ -16,7 +16,7 @@ def _extract_function_block(source: str, func_name: str) -> str:
 
 
 def test_dashboard_ghost_cleanup_uses_dsn_flag():
-    dashboard_path = Path(__file__).resolve().parents[1] / "dashboard.py"
+    dashboard_path = Path(__file__).resolve().parents[1] / "apps" / "dashboard" / "app.py"
     source = dashboard_path.read_text(encoding="utf-8")
     block = _extract_function_block(source, "_run_ghost_cleanup_script")
 

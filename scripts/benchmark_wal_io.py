@@ -6,7 +6,7 @@ import argparse
 from pathlib import Path
 from time import perf_counter
 
-from lumina_quant.storage.wal_binary import BinaryWAL
+from lumina_quant.storage.wal.binary import BinaryWAL
 
 
 def main() -> None:

@@ -6,7 +6,7 @@ import polars as pl
 import pytest
 from lumina_quant.backtesting.cli_contract import RawFirstDataMissingError
 from lumina_quant.market_data import load_data_dict_from_parquet
-from lumina_quant.parquet_market_data import ParquetMarketDataRepository
+from lumina_quant.storage.parquet import ParquetMarketDataRepository
 
 
 def _seed_legacy_and_manifest(root) -> None:

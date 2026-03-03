@@ -11,7 +11,7 @@ from pathlib import Path
 from lumina_quant.config import BaseConfig, LiveConfig
 from lumina_quant.data_collector import collect_binance_aggtrades_raw
 from lumina_quant.data_sync import parse_timestamp_input
-from lumina_quant.parquet_market_data import ParquetMarketDataRepository
+from lumina_quant.storage.parquet import ParquetMarketDataRepository
 
 
 def _parse_symbols(value: str) -> list[str]:

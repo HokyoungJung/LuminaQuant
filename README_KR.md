@@ -184,13 +184,13 @@ uv run python scripts/materialize_market_windows.py \
   --periodic --poll-seconds 5 --cycles 2
 
 # 3) Live는 커밋된 윈도우만 읽음 (커밋 누락 시 fail-fast, 종료코드 2)
-uv run python run_live.py
+uv run lq live
 ```
 
 라이브 시작 전 커밋 데이터 확인:
 ```bash
 uv run python - <<'PY'
-from lumina_quant.parquet_market_data import ParquetMarketDataRepository
+from lumina_quant.storage.parquet import ParquetMarketDataRepository
 repo = ParquetMarketDataRepository("data/market_parquet")
 for symbol in ("BTC/USDT", "ETH/USDT"):
     frame = repo.load_committed_ohlcv_chunked(exchange="binance", symbol=symbol, timeframe="1s")
@@ -220,10 +220,10 @@ uv run python scripts/ci/check_market_window_rollout_gates.py \
 
 **전략 백테스트:**
 ```bash
-uv run python run_backtest.py --data-mode raw-first
+uv run lq backtest --data-mode raw-first
 
 # DB 데이터만 사용
-uv run python run_backtest.py \
+uv run lq backtest \
   --data-mode raw-first \
   --data-source db \
   --backtest-mode windowed \
@@ -234,10 +234,10 @@ uv run python run_backtest.py \
 
 **워크포워드 최적화:**
 ```bash
-uv run python optimize.py --data-mode raw-first
+uv run lq optimize --data-mode raw-first
 
 # DB 우선, 부족하면 CSV fallback
-uv run python optimize.py \
+uv run lq optimize \
   --data-mode raw-first \
   --data-source auto \
   --market-db-path data/market_parquet
@@ -252,8 +252,7 @@ uv run lq live --transport ws
 uv run lq dashboard --run
 ```
 
-하위 호환은 유지됩니다. 기존 루트 엔트리포인트(`run_backtest.py`, `optimize.py`,
-`run_live.py`, `run_live_ws.py`, `dashboard.py`)는 shim으로 계속 동작합니다.
+루트 호환 shim은 제거되었습니다. `uv run lq ...`를 단일 공식 엔트리포인트로 사용하세요.
 
 **전략 팩토리 파이프라인 (후보 + 숏리스트):**
 ```bash
@@ -350,7 +349,7 @@ uv run python scripts/run_strategy_factory_pipeline.py \
 
 **결과 시각화 (대시보드):**
 ```bash
-uv run streamlit run dashboard.py
+uv run streamlit run apps/dashboard/app.py
 ```
 
 대시보드 개선 사항:
@@ -360,7 +359,7 @@ uv run streamlit run dashboard.py
 
 **대시보드 실시간 스모크 체크 (equity row 증가 확인):**
 ```bash
-uv run python -m streamlit run dashboard.py --server.headless true
+uv run python -m streamlit run apps/dashboard/app.py --server.headless true
 ```
 
 **Ghost RUNNING 정리 (PostgreSQL):**
@@ -382,17 +381,17 @@ uv run python scripts/cleanup_ghost_runs.py \
 **실거래 실행:**
 ```bash
 # 기본 엔트리포인트 (폴링 기반 시장데이터 핸들러)
-uv run python run_live.py
+uv run lq live
 
 # WebSocket 엔트리포인트 (더 낮은 지연)
-uv run python run_live_ws.py
+uv run lq live --transport ws
 
 # real 모드는 명시적 안전 플래그가 필요
-# LUMINA_ENABLE_LIVE_REAL=true uv run python run_live.py --enable-live-real
+# LUMINA_ENABLE_LIVE_REAL=true uv run lq live --enable-live-real
 
 # 운영 권장: stop-file 기반 정상 종료
 touch /tmp/lq.stop
-uv run python run_live.py --stop-file /tmp/lq.stop
+uv run lq live --stop-file /tmp/lq.stop
 ```
 
 ---

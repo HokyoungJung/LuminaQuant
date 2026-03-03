@@ -1,18 +1,9 @@
 from __future__ import annotations
 
-import importlib.util
-import sys
 from datetime import datetime
-from pathlib import Path
 from types import SimpleNamespace
 
-_OPTIMIZE_PATH = Path(__file__).resolve().parents[1] / "optimize.py"
-sys.path.insert(0, str(_OPTIMIZE_PATH.parent))
-_SPEC = importlib.util.spec_from_file_location("optimize_windowed_module", _OPTIMIZE_PATH)
-if _SPEC is None or _SPEC.loader is None:
-    raise RuntimeError(f"Failed to load optimize module from {_OPTIMIZE_PATH}")
-optimize = importlib.util.module_from_spec(_SPEC)
-_SPEC.loader.exec_module(optimize)
+from lumina_quant.cli import optimize
 
 
 def test_optimize_uses_windowed_handler_in_parquet_mode(monkeypatch):
@@ -63,4 +54,3 @@ def test_optimize_uses_windowed_handler_in_parquet_mode(monkeypatch):
         "backtest_poll_seconds": int(optimize.BacktestConfig.POLL_SECONDS),
         "backtest_window_seconds": int(optimize.BacktestConfig.WINDOW_SECONDS),
     }
-

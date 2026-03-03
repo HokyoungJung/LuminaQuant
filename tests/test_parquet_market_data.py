@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import polars as pl
-from lumina_quant.parquet_market_data import (
+from lumina_quant.storage.parquet import (
     ParquetMarketDataRepository,
     is_parquet_market_data_store,
     load_data_dict_from_parquet,

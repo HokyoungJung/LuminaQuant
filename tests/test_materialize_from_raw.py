@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from lumina_quant.parquet_market_data import ParquetMarketDataRepository
+from lumina_quant.storage.parquet import ParquetMarketDataRepository
 from lumina_quant.services.materialize_from_raw import materialize_raw_aggtrades
 
 

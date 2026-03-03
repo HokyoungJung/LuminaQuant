@@ -1,10 +1,15 @@
 {
-  "generated_at_utc": "2026-03-01T07:13:26.233084+00:00",
+  "generated_at_utc": "2026-03-03T10:45:31.575901+00:00",
   "literal_paths": [
-    "src/lumina_quant/strategies"
+    "src/lumina_quant/strategies",
+    "lumina_quant/strategies"
   ],
   "formula_paths": [
-    "src/lumina_quant/indicators/formulaic_definitions.py"
+    "src/lumina_quant/indicators/formulaic_definitions.py",
+    "lumina_quant/indicators/formulaic_definitions.py"
   ],
-  "signatures": []
+  "signatures": [
+    "literal:src/lumina_quant/strategies/registry.py:85:24:20",
+    "literal:src/lumina_quant/strategies/sample_public_strategy.py:11:31:20"
+  ]
 }

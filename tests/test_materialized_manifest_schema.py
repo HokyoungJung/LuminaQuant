@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 import polars as pl
 import pytest
 from lumina_quant.backtesting.cli_contract import RawFirstManifestInvalidError
-from lumina_quant.parquet_market_data import ParquetMarketDataRepository
+from lumina_quant.storage.parquet import ParquetMarketDataRepository
 
 
 def _write_committed_partition(root, *, exchange="binance", symbol="BTC/USDT", timeframe="1s"):

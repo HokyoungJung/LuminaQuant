@@ -10,7 +10,7 @@ from typing import Any
 import polars as pl
 from lumina_quant.backtesting.cli_contract import RawFirstDataMissingError
 from lumina_quant.market_data import normalize_timeframe_token
-from lumina_quant.parquet_market_data import ParquetMarketDataRepository
+from lumina_quant.storage.parquet import ParquetMarketDataRepository
 from lumina_quant.timeframe_aggregator import aggregate_1s_frame_to_timeframe
 
 _OHLCV_COLUMNS = ["datetime", "open", "high", "low", "close", "volume"]

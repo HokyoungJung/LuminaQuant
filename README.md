@@ -184,13 +184,13 @@ uv run python scripts/materialize_market_windows.py \
   --periodic --poll-seconds 5 --cycles 2
 
 # 3) Live trader reads committed windows only (fail-fast: exit code 2 on missing committed data)
-uv run python run_live.py
+uv run lq live
 ```
 
 Pre-live committed data check:
 ```bash
 uv run python - <<'PY'
-from lumina_quant.parquet_market_data import ParquetMarketDataRepository
+from lumina_quant.storage.parquet import ParquetMarketDataRepository
 repo = ParquetMarketDataRepository("data/market_parquet")
 for symbol in ("BTC/USDT", "ETH/USDT"):
     frame = repo.load_committed_ohlcv_chunked(exchange="binance", symbol=symbol, timeframe="1s")
@@ -220,10 +220,10 @@ uv run python scripts/ci/check_market_window_rollout_gates.py \
 
 **Backtest a Strategy:**
 ```bash
-uv run python run_backtest.py --data-mode raw-first
+uv run lq backtest --data-mode raw-first
 
 # Force DB-only data source
-uv run python run_backtest.py \
+uv run lq backtest \
   --data-mode raw-first \
   --data-source db \
   --backtest-mode windowed \
@@ -234,10 +234,10 @@ If `LQ_POSTGRES_DSN` is unset, backtest still runs but skips PostgreSQL audit pe
 
 **Walk-Forward Optimization (multi-fold):**
 ```bash
-uv run python optimize.py --data-mode raw-first
+uv run lq optimize --data-mode raw-first
 
 # Prefer DB data, fallback to CSV in auto mode
-uv run python optimize.py \
+uv run lq optimize \
   --data-mode raw-first \
   --data-source auto \
   --market-db-path data/market_parquet
@@ -252,17 +252,16 @@ uv run lq live --transport ws
 uv run lq dashboard --run
 ```
 
-Backwards compatibility is preserved: existing root entrypoints (`run_backtest.py`, `optimize.py`,
-`run_live.py`, `run_live_ws.py`, and `dashboard.py`) continue to work as shims.
+Root compatibility shims were removed. Use `uv run lq ...` as the single supported entrypoint.
 
 ### Windowed model parity + memory safety defaults
 
-- `optimize.py` in parquet mode uses the same **windowed MarketWindow model** as live:
+- `lq optimize` in parquet mode uses the same **windowed MarketWindow model** as live:
   - `HistoricParquetWindowedDataHandler`
   - `backtest_mode=windowed`
   - `backtest_poll_seconds` / `backtest_window_seconds` from config/env
 - Parquet optimization enforces `MAX_WORKERS=1` for RAM safety.
-- `run_backtest.py` auto-enables low-memory profile for ranges **>= 30 days** (or `LQ_BACKTEST_LOW_MEMORY=1`):
+- `lq backtest` auto-enables low-memory profile for ranges **>= 30 days** (or `LQ_BACKTEST_LOW_MEMORY=1`):
   - `record_history=False`
   - `record_trades=False`
   - `persist_output=False`
@@ -300,7 +299,7 @@ Full 8GB workflow: [docs/QUICKSTART_8GB_BASELINE.md](docs/QUICKSTART_8GB_BASELIN
 
 **Visualize Results:**
 ```bash
-uv run streamlit run dashboard.py
+uv run streamlit run apps/dashboard/app.py
 ```
 
 Dashboard now includes no-code workflow controls for backtest, optimization, and live launch/stop with:
@@ -325,23 +324,23 @@ uv run python scripts/cleanup_ghost_runs.py --dsn \"$LQ_POSTGRES_DSN\" --stale-s
 **Realtime Dashboard Smoke Check (equity row growth):**
 ```bash
 # Headless startup check
-uv run python -m streamlit run dashboard.py --server.headless true
+uv run python -m streamlit run apps/dashboard/app.py --server.headless true
 ```
 
 **Start Live Trading:**
 ```bash
 # Default entrypoint (polling market-data handler)
-uv run python run_live.py
+uv run lq live
 
 # WebSocket market-data entrypoint (lower latency)
-uv run python run_live_ws.py
+uv run lq live --transport ws
 
 # Real mode requires explicit safety flag:
-# LUMINA_ENABLE_LIVE_REAL=true uv run python run_live.py --enable-live-real
+# LUMINA_ENABLE_LIVE_REAL=true uv run lq live --enable-live-real
 
 # Graceful stop (recommended in ops): touch a stop file and pass it to runner
 touch /tmp/lq.stop
-uv run python run_live.py --stop-file /tmp/lq.stop
+uv run lq live --stop-file /tmp/lq.stop
 ```
 
 **Generate Promotion Gate Report (Soak + Runtime Reliability):**

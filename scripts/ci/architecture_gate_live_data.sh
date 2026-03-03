@@ -4,8 +4,7 @@ set -euo pipefail
 PACKAGE_ROOT="src/lumina_quant"
 
 targets=(
-  "run_live.py"
-  "run_live_ws.py"
+  "${PACKAGE_ROOT}/cli/live.py"
   "${PACKAGE_ROOT}/system_assembly.py"
   "${PACKAGE_ROOT}/live/data_materialized.py"
   "${PACKAGE_ROOT}/live/data_poll.py"

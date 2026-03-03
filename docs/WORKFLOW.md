@@ -159,7 +159,7 @@ For live/backtest contract alignment, run market data in this order:
 ```bash
 uv run python scripts/collect_binance_aggtrades_raw.py --symbols BTC/USDT,ETH/USDT --periodic --poll-seconds 2
 uv run python scripts/materialize_market_windows.py --symbols BTC/USDT,ETH/USDT --timeframes 1s,1m,5m,15m,30m,1h,4h,1d --periodic --poll-seconds 5
-uv run python run_backtest.py --data-mode raw-first --data-source db --backtest-mode windowed
+uv run lq backtest --data-mode raw-first --data-source db --backtest-mode windowed
 ```
 
 Before merging changes that touch live data files, run:

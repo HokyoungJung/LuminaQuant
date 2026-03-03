@@ -8,7 +8,7 @@
 
 1. `config.yaml`에서 `live.require_real_enable_flag: true` 유지
 2. 명시적 arming 후 실행:
-   - `LUMINA_ENABLE_LIVE_REAL=true uv run python run_live.py --enable-live-real`
+   - `LUMINA_ENABLE_LIVE_REAL=true uv run lq live --enable-live-real`
 3. stop-file 기반 정상 종료 권장:
    - 실행 시 `--stop-file /tmp/lq.stop`
    - 종료 시 `touch /tmp/lq.stop`

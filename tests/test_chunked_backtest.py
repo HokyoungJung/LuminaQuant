@@ -1,18 +1,11 @@
 from __future__ import annotations
 
-import importlib.util
 from datetime import datetime, timedelta
 from pathlib import Path
 
 import polars as pl
-from lumina_quant.parquet_market_data import ParquetMarketDataRepository
-
-_RUN_BACKTEST_PATH = Path(__file__).resolve().parents[1] / "run_backtest.py"
-_RUN_BACKTEST_SPEC = importlib.util.spec_from_file_location("run_backtest_module", _RUN_BACKTEST_PATH)
-if _RUN_BACKTEST_SPEC is None or _RUN_BACKTEST_SPEC.loader is None:
-    raise RuntimeError(f"Failed to load run_backtest module from {_RUN_BACKTEST_PATH}")
-run_backtest = importlib.util.module_from_spec(_RUN_BACKTEST_SPEC)
-_RUN_BACKTEST_SPEC.loader.exec_module(run_backtest)
+from lumina_quant.cli import backtest as run_backtest
+from lumina_quant.storage.parquet import ParquetMarketDataRepository
 
 
 def _cross_day_1s_frame() -> pl.DataFrame:

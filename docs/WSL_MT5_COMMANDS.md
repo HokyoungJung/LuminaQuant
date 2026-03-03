@@ -68,7 +68,7 @@ Expected output:
 uv run python -m pytest tests/test_runtime_config_loader.py tests/test_mt5_exchange.py tests/test_data_sync.py
 
 # Start live runner in paper mode first
-uv run python run_live.py
+uv run lq live
 ```
 
 ## 6) Common troubleshooting

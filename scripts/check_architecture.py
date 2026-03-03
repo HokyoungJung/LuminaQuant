@@ -7,7 +7,8 @@ import pathlib
 from collections import defaultdict
 
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[1]
-PKG_ROOT = PROJECT_ROOT / "lumina_quant"
+SRC_ROOT = PROJECT_ROOT / "src"
+PKG_ROOT = SRC_ROOT / "lumina_quant"
 
 LAYER_RULES = {
     "lumina_quant.core": {
@@ -30,7 +31,7 @@ LAYER_RULES = {
 
 
 def _module_name(path: pathlib.Path) -> str:
-    rel = path.relative_to(PROJECT_ROOT).with_suffix("")
+    rel = path.relative_to(SRC_ROOT).with_suffix("")
     return ".".join(rel.parts)
 
 

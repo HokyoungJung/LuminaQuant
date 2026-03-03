@@ -14,7 +14,7 @@ from lumina_quant.core.market_window_contract import (
     MarketWindowContractError,
     build_market_window_event,
 )
-from lumina_quant.parquet_market_data import ParquetMarketDataRepository
+from lumina_quant.storage.parquet import ParquetMarketDataRepository
 
 
 @dataclass(slots=True)

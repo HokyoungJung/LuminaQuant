@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from lumina_quant.parquet_market_data import ParquetMarketDataRepository
+from lumina_quant.storage.parquet import ParquetMarketDataRepository
 
 
 def test_wal_size_guard_warns_and_marks_required_when_auto_compact_disabled(tmp_path: Path):

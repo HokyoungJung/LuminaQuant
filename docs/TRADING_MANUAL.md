@@ -8,7 +8,7 @@ Before running in `live.mode=real`:
 
 1. Keep `live.require_real_enable_flag: true` in `config.yaml`.
 2. Start with explicit arming:
-   - `LUMINA_ENABLE_LIVE_REAL=true uv run python run_live.py --enable-live-real`
+   - `LUMINA_ENABLE_LIVE_REAL=true uv run lq live --enable-live-real`
 3. Prefer graceful shutdown with stop-file:
    - launch with `--stop-file /tmp/lq.stop`
    - stop by `touch /tmp/lq.stop`

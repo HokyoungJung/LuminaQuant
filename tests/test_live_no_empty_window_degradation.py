@@ -39,7 +39,7 @@ def test_live_reader_no_empty_window_degradation_on_missing_committed_data():
     assert "Committed 1s data missing for binance:BTC/USDT." in str(exc.value)
 
 
-def test_run_live_ws_fail_fast_exit_contract_present():
-    source = Path("run_live_ws.py").read_text(encoding="utf-8")
+def test_live_cli_fail_fast_exit_contract_present():
+    source = Path("src/lumina_quant/cli/live.py").read_text(encoding="utf-8")
     assert "LiveDataFatalError" in source
     assert "SystemExit(2)" in source

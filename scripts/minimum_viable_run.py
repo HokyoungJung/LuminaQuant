@@ -74,7 +74,9 @@ def run_minimum_viable_backtest(*, days: int) -> int:
     env = build_demo_env()
     cmd = [
         sys.executable,
-        "run_backtest.py",
+        "-m",
+        "lumina_quant.cli.main",
+        "backtest",
         "--data-source",
         "csv",
         "--no-auto-collect-db",

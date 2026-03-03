@@ -119,7 +119,7 @@ def _resolve_market_root_path(db_path: str | os.PathLike[str] | None = None) -> 
 
 
 def _parquet_repo(root_path: Path):
-    from lumina_quant.parquet_market_data import ParquetMarketDataRepository
+    from lumina_quant.storage.parquet import ParquetMarketDataRepository
 
     return ParquetMarketDataRepository(root_path)
 
@@ -182,7 +182,7 @@ def load_data_dict_from_parquet(
     staleness_threshold_seconds: int | None = None,
 ) -> dict[str, pl.DataFrame]:
     """Owner entrypoint for parquet data loading contract."""
-    from lumina_quant.parquet_market_data import ParquetMarketDataRepository
+    from lumina_quant.storage.parquet import ParquetMarketDataRepository
 
     repo = ParquetMarketDataRepository(root_path)
     resolved_mode = _normalize_data_mode(data_mode, default="legacy")

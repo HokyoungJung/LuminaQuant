@@ -17,7 +17,7 @@ from typing import Any
 import numpy as np
 import polars as pl
 from lumina_quant.config import BaseConfig
-from lumina_quant.parquet_market_data import load_data_dict_from_parquet
+from lumina_quant.storage.parquet import load_data_dict_from_parquet
 from lumina_quant.symbols import (
     CANONICAL_STRATEGY_TIMEFRAMES,
     canonical_symbol,

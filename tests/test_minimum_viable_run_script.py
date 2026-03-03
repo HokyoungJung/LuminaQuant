@@ -41,6 +41,13 @@ def test_run_minimum_viable_backtest_invokes_csv_backtest(monkeypatch):
     rc = mvr.run_minimum_viable_backtest(days=45)
     assert rc == 0
     assert captured["days"] == 45
-    assert captured["cmd"][:4] == [mvr.sys.executable, "run_backtest.py", "--data-source", "csv"]
+    assert captured["cmd"][:6] == [
+        mvr.sys.executable,
+        "-m",
+        "lumina_quant.cli.main",
+        "backtest",
+        "--data-source",
+        "csv",
+    ]
     assert "--no-auto-collect-db" in captured["cmd"]
     assert captured["env"]["LQ__TRADING__SYMBOLS"] == '["BTC/USDT","ETH/USDT"]'

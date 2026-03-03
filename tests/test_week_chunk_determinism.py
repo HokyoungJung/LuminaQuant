@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import polars as pl
-from lumina_quant.parquet_market_data import ParquetMarketDataRepository
+from lumina_quant.storage.parquet import ParquetMarketDataRepository
 
 
 def _build_rows(order: str = "base") -> pl.DataFrame:

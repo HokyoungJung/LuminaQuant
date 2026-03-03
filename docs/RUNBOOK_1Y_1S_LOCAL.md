@@ -68,7 +68,7 @@ uv run python scripts/materialize_market_windows.py \
   --db-path data/market_parquet \
   --periodic --poll-seconds 5 --cycles 2
 
-uv run python run_live.py
+uv run lq live
 ```
 
 Live fail-fast contract:
@@ -80,7 +80,7 @@ Pre-live committed-data verification (copy/paste):
 
 ```bash
 uv run python - <<'PY'
-from lumina_quant.parquet_market_data import ParquetMarketDataRepository
+from lumina_quant.storage.parquet import ParquetMarketDataRepository
 
 repo = ParquetMarketDataRepository("data/market_parquet")
 for symbol in ("BTC/USDT", "ETH/USDT"):
@@ -143,7 +143,7 @@ export LQ_AUTO_COLLECT_DB=0
 
 ```bash
 /usr/bin/time -v \
-uv run python run_backtest.py \
+uv run lq backtest \
   --data-source db \
   --market-db-path data/market_parquet \
   --market-exchange binance \
@@ -166,7 +166,7 @@ grep "Maximum resident set size" logs/backtest_1y_1s.log
 
 ```bash
 /usr/bin/time -v \
-uv run python optimize.py \
+uv run lq optimize \
   --data-source db \
   --market-db-path data/market_parquet \
   --market-exchange binance \
@@ -216,7 +216,7 @@ uv run python optimize.py \
 ## 7) Streamlit GUI (monitor + launcher)
 
 ```bash
-uv run python -m streamlit run dashboard.py
+uv run python -m streamlit run apps/dashboard/app.py
 ```
 
 Live real mode remains gated by dashboard arming phrase: **ENABLE REAL**.

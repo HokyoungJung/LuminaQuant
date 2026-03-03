@@ -7,7 +7,7 @@ from datetime import datetime
 
 import polars as pl
 from lumina_quant.market_data import normalize_timeframe_token, timeframe_to_milliseconds
-from lumina_quant.parquet_market_data import ParquetMarketDataRepository
+from lumina_quant.storage.parquet import ParquetMarketDataRepository
 
 
 def _clean_ohlcv(frame: pl.DataFrame) -> pl.DataFrame:

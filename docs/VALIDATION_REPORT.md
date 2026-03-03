@@ -22,7 +22,7 @@ This report summarizes the recent verification and hardening work across backtes
 
 ### 2) Optimization realism and data-range safety
 
-- **Data-aware walk-forward split handling** (`optimize.py`)
+- **Data-aware walk-forward split handling** (`lq optimize`)
   - Added dataset datetime-range detection from loaded symbol data.
   - Added split validation against available data range.
   - Added one fallback data-aware split when configured folds are fully out of range.
@@ -39,7 +39,7 @@ This report summarizes the recent verification and hardening work across backtes
 - **Live loop overhead reduction** (`lumina_quant/live_trader.py`)
   - Switched per-bar equity DataFrame regeneration to periodic snapshots.
   - Keeps audit logging per event but reduces heavy CSV/DataFrame overhead in hot path.
-- **Optimization memory reduction on trial loops** (`lumina_quant/portfolio.py`, `lumina_quant/backtest.py`, `optimize.py`)
+- **Optimization memory reduction on trial loops** (`lumina_quant/portfolio.py`, `lumina_quant/backtest.py`, `lq optimize`)
   - Added `record_trades` mode so optimization runs keep `trade_count` without storing full per-trade dict logs.
   - Reduced per-trial allocations while preserving ranking tie-breaks that depend on trade count.
 - **Execution-loop list handling optimization** (`lumina_quant/execution.py`)
@@ -56,7 +56,7 @@ This report summarizes the recent verification and hardening work across backtes
 - **Binance OHLCV sync pipeline** (`lumina_quant/data_sync.py`, `scripts/sync_binance_ohlcv.py`)
   - Added paginated Binance OHLCV sync with retry/backoff and incremental update behavior.
   - Added optional CSV mirror export after DB sync for compatibility with existing tooling.
-- **Backtest/optimization data-source controls** (`run_backtest.py`, `optimize.py`)
+- **Backtest/optimization data-source controls** (`lq backtest`, `lq optimize`)
   - Added `--data-source auto|csv|db`, market DB path, and exchange selector flags.
   - `auto` mode now prefers DB and falls back to CSV for missing symbols.
 
@@ -68,13 +68,13 @@ Executed from project root:
 uv sync --extra optimize --extra dev --extra live
 uv run ruff check .
 uv run pytest -q
-uv run python run_backtest.py
-uv run python optimize.py --folds 1 --n-trials 3 --max-workers 2
+uv run lq backtest
+uv run lq optimize --folds 1 --n-trials 3 --max-workers 2
 uv run python scripts/check_architecture.py
 uv run python scripts/benchmark_backtest.py --output reports/benchmarks/post_ulw_rsi.json --compare-to reports/benchmarks/post_continue.json
 uv run python scripts/sync_binance_ohlcv.py --symbols BTC/USDT --timeframe 1m --db-path data/market_parquet --since 2025-01-01T00:00:00+00:00 --max-batches 2 --limit 1000
-uv run python run_backtest.py --data-source db --market-db-path data/market_parquet --market-exchange binance
-uv run python optimize.py --folds 1 --n-trials 2 --max-workers 1 --data-source db --market-db-path data/market_parquet --market-exchange binance
+uv run lq backtest --data-source db --market-db-path data/market_parquet --market-exchange binance
+uv run lq optimize --folds 1 --n-trials 2 --max-workers 1 --data-source db --market-db-path data/market_parquet --market-exchange binance
 ```
 
 Observed outcomes:

@@ -1,17 +1,9 @@
 from __future__ import annotations
 
-import importlib.util
-import sys
 from datetime import datetime
-from pathlib import Path
 from types import SimpleNamespace
 
-_OPTIMIZE_PATH = Path(__file__).resolve().parents[1] / "optimize.py"
-sys.path.insert(0, str(_OPTIMIZE_PATH.parent))
-_SPEC = importlib.util.spec_from_file_location("optimize_module", _OPTIMIZE_PATH)
-assert _SPEC is not None and _SPEC.loader is not None
-optimize = importlib.util.module_from_spec(_SPEC)
-_SPEC.loader.exec_module(optimize)
+from lumina_quant.cli import optimize
 
 
 def test_resolve_topk_bounds():

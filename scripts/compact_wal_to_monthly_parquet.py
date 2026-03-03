@@ -6,7 +6,7 @@ import argparse
 from pathlib import Path
 
 from lumina_quant.config import BaseConfig
-from lumina_quant.parquet_market_data import ParquetMarketDataRepository, normalize_symbol
+from lumina_quant.storage.parquet import ParquetMarketDataRepository, normalize_symbol
 
 
 def _discover_symbols(root: Path, exchange: str) -> list[str]:

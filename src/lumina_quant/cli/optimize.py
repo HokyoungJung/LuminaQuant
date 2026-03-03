@@ -37,7 +37,7 @@ from lumina_quant.market_data import (
 from lumina_quant.optimization.storage import save_optimization_rows
 from lumina_quant.optimization.threading_control import configure_numba_threads
 from lumina_quant.optimization.walkers import build_walk_forward_splits
-from lumina_quant.parquet_market_data import (
+from lumina_quant.storage.parquet import (
     ParquetMarketDataRepository,
     is_parquet_market_data_store,
 )

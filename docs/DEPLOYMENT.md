@@ -25,7 +25,7 @@ After=network.target
 [Service]
 User=ubuntu
 WorkingDirectory=/opt/{REPO_DIR}
-ExecStart=/home/ubuntu/.local/bin/uv run python run_live.py
+ExecStart=/home/ubuntu/.local/bin/uv run lq live
 Restart=always
 EnvironmentFile=/opt/{REPO_DIR}/.env
 
@@ -40,23 +40,23 @@ WantedBy=multi-user.target
 If you prefer WebSocket feed in production, replace `ExecStart` with:
 
 ```ini
-ExecStart=/home/ubuntu/.local/bin/uv run python run_live_ws.py
+ExecStart=/home/ubuntu/.local/bin/uv run lq live --transport ws
 ```
 
 Entrypoint choice:
-- `run_live.py`: polling-based live runner (default/simple ops)
-- `run_live_ws.py`: WebSocket-based live runner (lower latency path)
+- `lq live --transport poll`: polling-based live runner (default/simple ops)
+- `lq live --transport ws`: WebSocket-based live runner (lower latency path)
 
 Raw-first live data lifecycle (recommended):
 1. `scripts/collect_binance_aggtrades_raw.py` (raw collector, checkpoint resume, periodic loop)
 2. `scripts/materialize_market_windows.py` (raw -> committed 1s+timeframe bundle, periodic loop)
-3. `run_live.py` / `run_live_ws.py` (committed-window reader only, fail-fast on missing committed data)
+3. `lq live --transport poll|ws` (committed-window reader only, fail-fast on missing committed data)
 
 Example periodic startup:
 ```bash
 uv run python scripts/collect_binance_aggtrades_raw.py --symbols BTC/USDT,ETH/USDT --periodic --poll-seconds 2
 uv run python scripts/materialize_market_windows.py --symbols BTC/USDT,ETH/USDT --timeframes 1s,1m,5m,15m,30m,1h,4h,1d --periodic --poll-seconds 5
-uv run python run_live.py
+uv run lq live
 ```
 
 Fail-fast contract:
@@ -67,7 +67,7 @@ Fail-fast contract:
 Verify committed data before live start:
 ```bash
 uv run python - <<'PY'
-from lumina_quant.parquet_market_data import ParquetMarketDataRepository
+from lumina_quant.storage.parquet import ParquetMarketDataRepository
 
 repo = ParquetMarketDataRepository("data/market_parquet")
 for symbol in ("BTC/USDT", "ETH/USDT"):

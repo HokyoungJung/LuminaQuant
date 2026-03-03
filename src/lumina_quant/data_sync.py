@@ -499,7 +499,7 @@ def sync_symbol_aggtrades_raw(
     resume_from_checkpoint: bool = True,
 ) -> RawAggTradesSyncStats:
     """Collect Binance aggTrades into raw parquet partitions with checkpoint resume."""
-    from lumina_quant.parquet_market_data import ParquetMarketDataRepository
+    from lumina_quant.storage.parquet import ParquetMarketDataRepository
 
     repo = ParquetMarketDataRepository(str(db_path))
     stream_exchange = str(exchange_id).strip().lower() or "binance"

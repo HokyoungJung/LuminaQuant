@@ -12,7 +12,7 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 echo [INFO] Launching Live Trader at %TIME%...
-uv run python run_live.py >> logs\crash.log 2>&1
+uv run lq live >> logs\crash.log 2>&1
 
 echo [WARNING] Bot crashed or stopped! Exit Code: %ERRORLEVEL%
 echo [INFO] Restarting in 5 seconds...

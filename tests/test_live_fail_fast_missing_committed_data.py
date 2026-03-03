@@ -1,28 +1,12 @@
 from __future__ import annotations
 
-import importlib.util
 import queue
-import sys
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from lumina_quant.backtesting.cli_contract import RawFirstDataMissingError
+from lumina_quant.cli import live as live_cli
 from lumina_quant.live.data_poll import LiveDataHandler
-
-_RUN_LIVE_PATH = Path(__file__).resolve().parents[1] / "run_live.py"
-_RUN_LIVE_SPEC = importlib.util.spec_from_file_location("run_live_module", _RUN_LIVE_PATH)
-if _RUN_LIVE_SPEC is None or _RUN_LIVE_SPEC.loader is None:
-    raise RuntimeError(f"Failed to load module from {_RUN_LIVE_PATH}")
-run_live = importlib.util.module_from_spec(_RUN_LIVE_SPEC)
-_RUN_LIVE_SPEC.loader.exec_module(run_live)
-
-_RUN_LIVE_WS_PATH = Path(__file__).resolve().parents[1] / "run_live_ws.py"
-_RUN_LIVE_WS_SPEC = importlib.util.spec_from_file_location("run_live_ws_module", _RUN_LIVE_WS_PATH)
-if _RUN_LIVE_WS_SPEC is None or _RUN_LIVE_WS_SPEC.loader is None:
-    raise RuntimeError(f"Failed to load module from {_RUN_LIVE_WS_PATH}")
-run_live_ws = importlib.util.module_from_spec(_RUN_LIVE_WS_SPEC)
-_RUN_LIVE_WS_SPEC.loader.exec_module(run_live_ws)
 
 
 class _Config:
@@ -112,16 +96,14 @@ def _patch_entrypoint_env(monkeypatch, module, *, strategy_name: str):
 
 
 def test_run_live_exits_with_code_2_on_fail_fast(monkeypatch):
-    _patch_entrypoint_env(monkeypatch, run_live, strategy_name="MovingAverageCrossStrategy")
-    monkeypatch.setattr(sys, "argv", ["run_live.py", "--no-selection"])
+    _patch_entrypoint_env(monkeypatch, live_cli, strategy_name="MovingAverageCrossStrategy")
     with pytest.raises(SystemExit) as exc:
-        run_live.main()
+        live_cli.main(["--no-selection"])
     assert int(exc.value.code) == 2
 
 
 def test_run_live_ws_exits_with_code_2_on_fail_fast(monkeypatch):
-    _patch_entrypoint_env(monkeypatch, run_live_ws, strategy_name="RsiStrategy")
-    monkeypatch.setattr(sys, "argv", ["run_live_ws.py", "--no-selection"])
+    _patch_entrypoint_env(monkeypatch, live_cli, strategy_name="RsiStrategy")
     with pytest.raises(SystemExit) as exc:
-        run_live_ws.main()
+        live_cli.main(["--transport", "ws", "--no-selection"])
     assert int(exc.value.code) == 2

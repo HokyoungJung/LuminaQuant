@@ -12,7 +12,7 @@ from lumina_quant.data_sync import (
     parse_timestamp_input,
     sync_futures_feature_points,
 )
-from lumina_quant.parquet_market_data import ParquetMarketDataRepository, normalize_symbol
+from lumina_quant.storage.parquet import ParquetMarketDataRepository, normalize_symbol
 
 
 def _datetime_to_ms(value: datetime | None) -> int | None:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from lumina_quant.data_collector import collect_binance_aggtrades_raw
-from lumina_quant.parquet_market_data import ParquetMarketDataRepository
+from lumina_quant.storage.parquet import ParquetMarketDataRepository
 
 
 class _ExchangeStub:

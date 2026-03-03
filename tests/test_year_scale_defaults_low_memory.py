@@ -1,15 +1,8 @@
 from __future__ import annotations
 
-import importlib.util
 from datetime import datetime
-from pathlib import Path
 
-_RUN_BACKTEST_PATH = Path(__file__).resolve().parents[1] / "run_backtest.py"
-_SPEC = importlib.util.spec_from_file_location("run_backtest_year_scale_module", _RUN_BACKTEST_PATH)
-if _SPEC is None or _SPEC.loader is None:
-    raise RuntimeError(f"Failed to load run_backtest module from {_RUN_BACKTEST_PATH}")
-run_backtest = importlib.util.module_from_spec(_SPEC)
-_SPEC.loader.exec_module(run_backtest)
+from lumina_quant.cli import backtest as run_backtest
 
 
 def test_year_scale_low_memory_profile_default(monkeypatch):
@@ -28,4 +21,3 @@ def test_year_scale_low_memory_profile_default(monkeypatch):
     assert profile["record_trades"] is False
     assert profile["persist_output"] is False
     assert profile["track_metrics"] is True
-

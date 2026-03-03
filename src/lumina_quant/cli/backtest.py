@@ -26,7 +26,7 @@ from lumina_quant.market_data import (
     load_data_dict_from_parquet,
     normalize_timeframe_token,
 )
-from lumina_quant.parquet_market_data import is_parquet_market_data_store
+from lumina_quant.storage.parquet import is_parquet_market_data_store
 from lumina_quant.strategies import registry as strategy_registry
 from lumina_quant.utils.audit_store import AuditStore
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from datetime import date
 
-from lumina_quant.parquet_market_data import ParquetMarketDataRepository
+from lumina_quant.storage.parquet import ParquetMarketDataRepository
 
 
 def parse_args() -> argparse.Namespace:

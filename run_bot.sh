@@ -17,7 +17,7 @@ while true; do
     fi
 
     echo "[INFO] Launching Live Trader at $(date)..."
-    uv run python run_live.py >> logs/crash.log 2>&1
+    uv run lq live >> logs/crash.log 2>&1
     EXIT_CODE=$?
 
     echo "[WARNING] Bot crashed or stopped! Exit Code: $EXIT_CODE"

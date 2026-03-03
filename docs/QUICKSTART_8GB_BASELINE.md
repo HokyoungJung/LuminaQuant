@@ -20,7 +20,7 @@ uv sync --extra gpu
 ```bash
 mkdir -p logs reports/benchmarks
 /usr/bin/time -v \
-  uv run python run_backtest.py --data-source csv --no-persist-output --no-auto-collect-db \
+  uv run lq backtest --data-source csv --no-persist-output --no-auto-collect-db \
   2>&1 | tee logs/8gb_smoke_backtest.log
 ```
 
@@ -63,13 +63,13 @@ Shadow-live dry run (paper mode by default):
 ```bash
 STOP_FILE=/tmp/lq.shadow.stop
 rm -f "$STOP_FILE"
-uv run python run_live.py --no-selection --run-id shadow-$(date +%Y%m%d-%H%M%S) --stop-file "$STOP_FILE"
+uv run lq live --no-selection --run-id shadow-$(date +%Y%m%d-%H%M%S) --stop-file "$STOP_FILE"
 ```
 
 ## 5) Dashboard smoke
 
 ```bash
-uv run python -m streamlit run dashboard.py --server.headless true
+uv run python -m streamlit run apps/dashboard/app.py --server.headless true
 ```
 
 ## 6) Safe stop

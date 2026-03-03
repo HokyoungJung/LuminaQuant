@@ -50,5 +50,5 @@ LuminaQuant/
 
 Notes:
 - Use `uv run lq ...` as the primary CLI.
-- Root entrypoints are compatibility shims (`run_backtest.py`, `optimize.py`, `run_live.py`, `run_live_ws.py`, `dashboard.py`).
+- Root compatibility shims were removed; use `uv run lq ...` entrypoints only.
 - Runtime artifacts should prefer `var/`.
