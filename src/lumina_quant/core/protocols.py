@@ -75,5 +75,14 @@ class ExchangeInterface(ABC):
         _ = (order_id, symbol)
         return {}
 
+    def fetch_trades(
+        self,
+        symbol: str,
+        since: int | None = None,
+        limit: int | None = None,
+    ) -> list[dict]:
+        _ = (symbol, since, limit)
+        return []
+
 
 __all__ = ["ExchangeInterface"]

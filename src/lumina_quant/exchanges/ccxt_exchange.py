@@ -319,6 +319,20 @@ class CCXTExchange(ExchangeInterface):
             print(f"Error fetching order {order_id}: {e}")
             return {}
 
+    def fetch_trades(
+        self,
+        symbol: str,
+        since: int | None = None,
+        limit: int | None = None,
+    ) -> list[dict]:
+        try:
+            ex = self._client()
+            rows = ex.fetch_trades(symbol, since=since, limit=limit)
+            return [dict(item or {}) for item in list(rows or [])]
+        except Exception as e:
+            print(f"Error fetching trades for {symbol}: {e}")
+            return []
+
     def get_market_spec(self, symbol: str) -> dict:
         if not self._markets:
             self.load_markets()
