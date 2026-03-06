@@ -38,7 +38,9 @@ def test_collect_binance_aggtrades_raw_checkpoint_resume(tmp_path, monkeypatch):
         ],
     }
 
-    monkeypatch.setattr("lumina_quant.data_collector.create_binance_exchange", lambda **_: _ExchangeStub())
+    monkeypatch.setattr(
+        "lumina_quant.data_collector.create_binance_exchange", lambda **_: _ExchangeStub()
+    )
 
     def _fetch(*, exchange, symbol, since_ms, limit, retries, base_wait_sec):
         _ = exchange, symbol, limit, retries, base_wait_sec
@@ -76,3 +78,36 @@ def test_collect_binance_aggtrades_raw_checkpoint_resume(tmp_path, monkeypatch):
     checkpoint = repo.read_raw_checkpoint(exchange="binance", symbol="BTC/USDT")
     last_id = checkpoint.get("last_trade_id", checkpoint.get("last_agg_trade_id"))
     assert int(last_id) == 3
+
+
+def test_collect_binance_aggtrades_raw_bootstrap_lookback_used_without_checkpoint(
+    tmp_path, monkeypatch
+):
+    observed_since: list[int] = []
+
+    monkeypatch.setattr(
+        "lumina_quant.data_collector.create_binance_exchange", lambda **_: _ExchangeStub()
+    )
+
+    def _fetch(*, exchange, symbol, since_ms, limit, retries, base_wait_sec):
+        _ = exchange, symbol, limit, retries, base_wait_sec
+        observed_since.append(int(since_ms))
+        return []
+
+    monkeypatch.setattr("lumina_quant.data_collector.fetch_aggtrades_batch", _fetch)
+
+    until_ms = 1_700_000_010_000
+    result = collect_binance_aggtrades_raw(
+        db_path=str(tmp_path),
+        exchange_id="binance",
+        symbol="BTC/USDT",
+        since_ms=None,
+        until_ms=until_ms,
+        bootstrap_lookback_hours=2,
+        limit=1000,
+        max_batches=10,
+    )
+
+    expected_since = until_ms - (2 * 60 * 60 * 1000)
+    assert observed_since == [expected_since]
+    assert int(result["start_cursor_ms"]) == expected_since

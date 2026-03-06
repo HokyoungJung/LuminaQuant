@@ -51,7 +51,9 @@ def _write_cycle_checkpoint_snapshot(
     }
     output_path = Path(db_path) / "raw_collector_cycle_checkpoint.json"
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps(checkpoint_payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    output_path.write_text(
+        json.dumps(checkpoint_payload, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     return str(output_path)
 
 
@@ -69,6 +71,7 @@ def run_collector_periodic_loop(
     periodic_enabled: bool,
     poll_seconds: int,
     max_cycles: int,
+    bootstrap_lookback_hours: int = 24,
     sleep_fn=time.sleep,
 ) -> list[dict[str, object]]:
     cycles: list[dict[str, object]] = []
@@ -88,6 +91,7 @@ def run_collector_periodic_loop(
                 testnet=bool(LiveConfig.IS_TESTNET),
                 since_ms=cycle_since_ms,
                 until_ms=until_ms,
+                bootstrap_lookback_hours=max(1, int(bootstrap_lookback_hours)),
                 limit=max(1, int(limit)),
                 max_batches=max(1, int(max_batches)),
                 retries=max(0, int(retries)),
@@ -111,6 +115,7 @@ def run_collector_periodic_loop(
             "db_path": str(db_path),
             "exchange_id": str(exchange_id),
             "symbols": symbols,
+            "bootstrap_lookback_hours": max(1, int(bootstrap_lookback_hours)),
             "results": results,
             "checkpoint_snapshot": checkpoint_snapshot_path,
         }
@@ -143,7 +148,10 @@ def main() -> None:
     parser.add_argument(
         "--since",
         default="",
-        help="Optional start timestamp (ms/sec/ISO8601). Empty = checkpoint resume.",
+        help=(
+            "Optional start timestamp (ms/sec/ISO8601). "
+            "Empty = checkpoint resume, or bootstrap recent lookback window on first run."
+        ),
     )
     parser.add_argument(
         "--until",
@@ -163,6 +171,15 @@ def main() -> None:
         type=float,
         default=0.5,
         help="Initial retry backoff seconds.",
+    )
+    parser.add_argument(
+        "--bootstrap-lookback-hours",
+        type=int,
+        default=int(getattr(BaseConfig, "COLLECTOR_BOOTSTRAP_LOOKBACK_HOURS", 24)),
+        help=(
+            "Used only when --since is empty and no checkpoint exists. "
+            "Collector starts from now - lookback_hours."
+        ),
     )
     parser.add_argument(
         "--periodic",
@@ -218,6 +235,7 @@ def main() -> None:
         periodic_enabled=periodic,
         poll_seconds=poll_seconds,
         max_cycles=max_cycles,
+        bootstrap_lookback_hours=max(1, int(args.bootstrap_lookback_hours)),
     )
 
 

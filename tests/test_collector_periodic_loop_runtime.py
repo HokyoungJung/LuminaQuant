@@ -38,6 +38,7 @@ def test_collector_periodic_loop_uses_configured_poll_interval(monkeypatch, tmp_
         symbols=["BTC/USDT"],
         since_ms=None,
         until_ms=None,
+        bootstrap_lookback_hours=12,
         limit=1000,
         max_batches=10,
         retries=0,
@@ -51,4 +52,6 @@ def test_collector_periodic_loop_uses_configured_poll_interval(monkeypatch, tmp_
     assert len(calls) == 2
     assert len(cycles) == 2
     assert all(call["symbol"] == "BTC/USDT" for call in calls)
+    assert all(int(call["bootstrap_lookback_hours"]) == 12 for call in calls)
+    assert all(int(cycle["bootstrap_lookback_hours"]) == 12 for cycle in cycles)
     assert sleeps == [3.0]

@@ -57,6 +57,10 @@ os.environ.setdefault(
     str(int(getattr(_RUNTIME.storage, "collector_poll_seconds", 2))),
 )
 os.environ.setdefault(
+    "LQ__STORAGE__COLLECTOR_BOOTSTRAP_LOOKBACK_HOURS",
+    str(int(getattr(_RUNTIME.storage, "collector_bootstrap_lookback_hours", 24))),
+)
+os.environ.setdefault(
     "LQ__STORAGE__MATERIALIZER_PERIODIC_ENABLED",
     "1" if bool(getattr(_RUNTIME.storage, "materializer_periodic_enabled", True)) else "0",
 )
@@ -221,6 +225,9 @@ class BaseConfig:
     )
     COLLECTOR_PERIODIC_ENABLED = bool(getattr(_RUNTIME.storage, "collector_periodic_enabled", True))
     COLLECTOR_POLL_SECONDS = int(getattr(_RUNTIME.storage, "collector_poll_seconds", 2))
+    COLLECTOR_BOOTSTRAP_LOOKBACK_HOURS = int(
+        getattr(_RUNTIME.storage, "collector_bootstrap_lookback_hours", 24)
+    )
     MATERIALIZER_PERIODIC_ENABLED = bool(
         getattr(_RUNTIME.storage, "materializer_periodic_enabled", True)
     )
@@ -364,6 +371,9 @@ class LiveConfig(BaseConfig):
         runtime.live.mt5_bridge_use_wslpath = bool(cls.MT5_BRIDGE_USE_WSLPATH)
         runtime.storage.collector_periodic_enabled = bool(cls.COLLECTOR_PERIODIC_ENABLED)
         runtime.storage.collector_poll_seconds = int(cls.COLLECTOR_POLL_SECONDS)
+        runtime.storage.collector_bootstrap_lookback_hours = int(
+            cls.COLLECTOR_BOOTSTRAP_LOOKBACK_HOURS
+        )
         runtime.storage.materializer_periodic_enabled = bool(cls.MATERIALIZER_PERIODIC_ENABLED)
         runtime.storage.materializer_poll_seconds = int(cls.MATERIALIZER_POLL_SECONDS)
         runtime.storage.materializer_base_timeframe = str(cls.MATERIALIZER_BASE_TIMEFRAME)

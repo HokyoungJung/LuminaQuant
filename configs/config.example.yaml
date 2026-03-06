@@ -5,6 +5,7 @@ storage:
   backend: parquet
   market_data_parquet_path: data/market_parquet
   postgres_dsn_env: LQ_POSTGRES_DSN
+  collector_bootstrap_lookback_hours: 24
 
 runtime:
   mode: paper

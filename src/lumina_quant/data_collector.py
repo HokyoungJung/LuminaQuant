@@ -176,6 +176,7 @@ def collect_binance_aggtrades_raw(
     testnet: bool = False,
     since_ms: int | None = None,
     until_ms: int | None = None,
+    bootstrap_lookback_hours: int = 24,
     limit: int = 1000,
     max_batches: int = 100_000,
     retries: int = 3,
@@ -193,10 +194,16 @@ def collect_binance_aggtrades_raw(
         except Exception:
             checkpoint_cursor = None
 
+    end_cursor = (
+        int(until_ms) if until_ms is not None else int(datetime.now(UTC).timestamp() * 1000)
+    )
     start_cursor = int(since_ms) if since_ms is not None else None
     if start_cursor is None:
-        start_cursor = int(checkpoint_cursor + 1) if checkpoint_cursor is not None else 0
-    end_cursor = int(until_ms) if until_ms is not None else int(datetime.now(UTC).timestamp() * 1000)
+        if checkpoint_cursor is not None:
+            start_cursor = int(checkpoint_cursor + 1)
+        else:
+            lookback_ms = max(1, int(bootstrap_lookback_hours)) * 60 * 60 * 1000
+            start_cursor = max(0, int(end_cursor) - int(lookback_ms))
 
     exchange = create_binance_exchange(
         api_key=api_key,

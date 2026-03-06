@@ -80,6 +80,8 @@ def validate_runtime_config(runtime: RuntimeConfig, *, for_live: bool = False) -
         raise ValueError("storage.wal_compaction_interval_seconds must be >= 0.")
     if int(getattr(runtime.storage, "collector_poll_seconds", 0)) < 1:
         raise ValueError("storage.collector_poll_seconds must be >= 1.")
+    if int(getattr(runtime.storage, "collector_bootstrap_lookback_hours", 0)) < 1:
+        raise ValueError("storage.collector_bootstrap_lookback_hours must be >= 1.")
     if int(getattr(runtime.storage, "materializer_poll_seconds", 0)) < 1:
         raise ValueError("storage.materializer_poll_seconds must be >= 1.")
     if str(getattr(runtime.storage, "materializer_base_timeframe", "")).strip().lower() != "1s":

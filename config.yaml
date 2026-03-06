@@ -86,6 +86,7 @@ storage:
   wal_compaction_interval_seconds: 3600
   collector_periodic_enabled: true
   collector_poll_seconds: 2
+  collector_bootstrap_lookback_hours: 24 # used when first run has no checkpoint and no --since
   materializer_periodic_enabled: true
   materializer_poll_seconds: 5
   materializer_base_timeframe: "1s"

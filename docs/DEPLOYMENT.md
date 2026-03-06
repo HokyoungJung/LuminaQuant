@@ -55,6 +55,16 @@ Raw-first live data lifecycle (recommended for committed mode):
 2. `scripts/materialize_market_windows.py` (raw -> committed 1s+timeframe bundle, periodic loop)
 3. `lq live --transport poll|ws` (committed reader by default, optional `binance_live` source)
 
+First bootstrap recommendation:
+```bash
+uv run python scripts/collect_binance_aggtrades_raw.py \
+  --symbols BTC/USDT,ETH/USDT \
+  --since 2026-03-01T00:00:00Z \
+  --no-periodic
+```
+- If `--since` is omitted and checkpoint is missing, collector starts from
+  `now - storage.collector_bootstrap_lookback_hours` (default 24h).
+
 Example periodic startup:
 ```bash
 uv run python scripts/collect_binance_aggtrades_raw.py --symbols BTC/USDT,ETH/USDT --periodic --poll-seconds 2
