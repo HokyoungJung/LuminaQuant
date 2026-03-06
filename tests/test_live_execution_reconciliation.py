@@ -67,6 +67,13 @@ class _Exchange:
         return {}
 
 
+class _FailOpenOrdersExchange(_Exchange):
+    @staticmethod
+    def fetch_open_orders(symbol=None):
+        _ = symbol
+        raise RuntimeError("network-down")
+
+
 def test_rehydrate_and_reconcile_terminal_order_emits_fill():
     events = queue.Queue()
     exchange = _Exchange()
@@ -102,3 +109,39 @@ def test_rehydrate_and_reconcile_terminal_order_emits_fill():
     assert fill.symbol == "BTC/USDT"
     assert fill.direction == "BUY"
     assert float(fill.quantity) == 1.0
+
+
+def test_reconcile_open_orders_rehydrates_unknown_exchange_open_order():
+    events = queue.Queue()
+    exchange = _Exchange()
+    exchange._open_orders = [
+        {
+            "id": "ext-1",
+            "symbol": "BTC/USDT",
+            "status": "open",
+            "filled": 0.2,
+            "amount": 1.0,
+            "price": 100.0,
+            "side": "buy",
+            "type": "limit",
+            "clientOrderId": "LQ-ext-1",
+        }
+    ]
+    handler = LiveExecutionHandler(events, _Bars(), _Config, cast(ExchangeInterface, exchange))
+
+    assert "ext-1" not in handler.tracked_orders
+    records = handler.reconcile_open_orders()
+
+    assert "ext-1" in handler.tracked_orders
+    assert handler.exchange_open_order_count() == 1
+    assert handler.exchange_open_snapshot_ready() is True
+    assert any(item["reason"] == "UNTRACKED_OPEN_ORDER_REHYDRATED" for item in records)
+
+
+def test_reconcile_open_orders_marks_snapshot_unready_on_fetch_failure():
+    events = queue.Queue()
+    exchange = _FailOpenOrdersExchange()
+    handler = LiveExecutionHandler(events, _Bars(), _Config, cast(ExchangeInterface, exchange))
+
+    _ = handler.reconcile_open_orders()
+    assert handler.exchange_open_snapshot_ready() is False

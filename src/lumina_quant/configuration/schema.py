@@ -142,6 +142,12 @@ class LiveRuntimeConfig:
 
     mode: str = "paper"
     require_real_enable_flag: bool = True
+    market_data_source: str = "committed"
+    order_state_source: str = "polling"
+    shadow_live_enabled: bool = False
+    reconciliation_poll_fallback_enabled: bool = True
+    book_ticker_enabled: bool = False
+    startup_reconciliation_hard_fail: bool = False
     poll_interval: int = 20
     poll_seconds: int = 20
     window_seconds: int = 20

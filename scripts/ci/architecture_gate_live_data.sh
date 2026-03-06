@@ -3,7 +3,7 @@ set -euo pipefail
 
 PACKAGE_ROOT="src/lumina_quant"
 
-targets=(
+legacy_targets=(
   "${PACKAGE_ROOT}/cli/live.py"
   "${PACKAGE_ROOT}/system_assembly.py"
   "${PACKAGE_ROOT}/live/data_materialized.py"
@@ -12,25 +12,33 @@ targets=(
   "${PACKAGE_ROOT}/live/trader.py"
 )
 
-banned_patterns=(
+stream_targets=(
+  "${PACKAGE_ROOT}/live/data_binance_live.py"
+  "${PACKAGE_ROOT}/live/binance_market_stream.py"
+  "${PACKAGE_ROOT}/live/binance_user_stream.py"
+  "${PACKAGE_ROOT}/live/order_gateway.py"
+  "${PACKAGE_ROOT}/live/order_state_machine.py"
+  "${PACKAGE_ROOT}/live/order_state_projector.py"
+  "${PACKAGE_ROOT}/live/recovery_reconciliation.py"
+  "${PACKAGE_ROOT}/live/shadow_live_runner.py"
+)
+
+banned_common_patterns=(
   "fetch_ohlcv\\("
-  "fetch_trades\\("
   "auto_collect_market_data\\("
   "from lumina_quant\\.data_sync import"
   "import lumina_quant\\.data_sync"
 )
+banned_legacy_extra_patterns=("fetch_trades\\(")
 
 allow_tag="# architecture-gate: allow-live-data"
 hits=0
 
-for target in "${targets[@]}"; do
-  if [[ ! -f "${target}" ]]; then
-    echo "missing-target:${target}"
-    hits=$((hits + 1))
-    continue
-  fi
-
-  for pattern in "${banned_patterns[@]}"; do
+check_patterns() {
+  local target="$1"
+  shift
+  local patterns=("$@")
+  for pattern in "${patterns[@]}"; do
     while IFS=: read -r line_no line_text; do
       [[ -z "${line_no}" ]] && continue
       if [[ "${line_text}" == *"${allow_tag}"* ]]; then
@@ -40,6 +48,20 @@ for target in "${targets[@]}"; do
       hits=$((hits + 1))
     done < <(grep -nE "${pattern}" "${target}" || true)
   done
+}
+
+for target in "${legacy_targets[@]}"; do
+  if [[ ! -f "${target}" ]]; then
+    echo "missing-target:${target}"
+    hits=$((hits + 1))
+    continue
+  fi
+  check_patterns "${target}" "${banned_common_patterns[@]}" "${banned_legacy_extra_patterns[@]}"
+done
+
+for target in "${stream_targets[@]}"; do
+  [[ -f "${target}" ]] || continue
+  check_patterns "${target}" "${banned_common_patterns[@]}"
 done
 
 # Critical fail-fast invariant: no synthetic empty DataFrame fallback in committed reader.

@@ -7,6 +7,10 @@ from typing import Any
 from lumina_quant.backtesting.execution_sim import ExecutionHandler
 from lumina_quant.core.events import FillEvent
 from lumina_quant.core.protocols import ExchangeInterface
+from lumina_quant.live.binance_market_stream import normalize_stream_symbol
+from lumina_quant.live.order_gateway import OrderGateway
+from lumina_quant.live.order_state_machine import OrderStateMachine
+from lumina_quant.live.order_state_projector import OrderStateProjector
 
 STATE_NEW = "NEW"
 STATE_SUBMITTED = "SUBMITTED"
@@ -52,6 +56,18 @@ class LiveExecutionHandler(ExecutionHandler):
         self.tracked_orders = {}
         self.client_id_to_order = {}
         self._state_callback = None
+        self.order_gateway = OrderGateway(exchange)
+        self.order_state_source = (
+            str(getattr(config, "ORDER_STATE_SOURCE", "polling") or "polling").strip().lower()
+        )
+        self.poll_fallback_enabled = bool(
+            getattr(config, "RECONCILIATION_POLL_FALLBACK_ENABLED", True)
+        )
+        self.state_machine = OrderStateMachine()
+        self.state_projector = OrderStateProjector(state_machine=self.state_machine)
+        self._last_exchange_open_ids: set[str] = set()
+        self._last_exchange_open_snapshot_ok = False
+        self._last_exchange_open_snapshot_ts = 0.0
 
     def set_order_state_callback(self, callback) -> None:
         """Set a callback to receive order-state transition events."""
@@ -216,6 +232,99 @@ class LiveExecutionHandler(ExecutionHandler):
             if event.client_order_id:
                 self.client_id_to_order[event.client_order_id] = oid
 
+    def ingest_user_stream_event(self, payload: dict[str, Any]) -> None:
+        """Apply one normalized user-stream event to tracked order state."""
+        if not isinstance(payload, dict):
+            return
+        event_type = str(payload.get("event_type") or "").strip()
+        if event_type != "executionReport":
+            # Account/balance events are owned by trader/runtime cache projection.
+            return
+
+        raw_order_id = payload.get("order_id")
+        if raw_order_id in {None, ""}:
+            return
+        order_id = str(raw_order_id)
+        entry = self.tracked_orders.get(order_id)
+
+        if entry is None:
+            symbol = normalize_stream_symbol(str(payload.get("symbol") or ""))
+            synthetic = SimpleNamespace(
+                symbol=symbol,
+                direction=str(payload.get("side") or "BUY"),
+                order_type="MKT",
+                quantity=float(payload.get("cum_fill_qty") or payload.get("last_fill_qty") or 0.0),
+                price=float(payload.get("last_fill_price") or 0.0),
+                position_side=payload.get("position_side"),
+                reduce_only=bool(payload.get("reduce_only", False)),
+                client_order_id=str(payload.get("client_order_id") or ""),
+                time_in_force=None,
+                stop_loss=None,
+                take_profit=None,
+                metadata={},
+                type="ORDER",
+            )
+            entry = {
+                "event": synthetic,
+                "symbol": symbol,
+                "last_filled": 0.0,
+                "state": STATE_SUBMITTED,
+                "created_at": time.time(),
+                "updated_at": time.time(),
+            }
+            self.tracked_orders[order_id] = entry
+            if synthetic.client_order_id:
+                self.client_id_to_order[synthetic.client_order_id] = order_id
+
+        previous_state = str(entry.get("state") or STATE_SUBMITTED).upper()
+        previous_filled = float(entry.get("last_filled") or 0.0)
+        projection = self.state_projector.project_execution_report(
+            payload,
+            previous_state=previous_state,
+            previous_filled=previous_filled,
+        )
+        if not projection.accepted:
+            if projection.reason == "ORDER_INVALID_TRANSITION":
+                self._notify_state(
+                    order_id=order_id,
+                    entry=entry,
+                    state=previous_state,
+                    message="invalid_transition",
+                    metadata={"reason": projection.reason, "event_key": projection.event_key},
+                )
+            return
+
+        if projection.fill_delta > 0:
+            order_payload = {
+                "id": order_id,
+                "status": payload.get("order_status"),
+                "filled": projection.cumulative_filled,
+                "amount": max(
+                    float(getattr(entry.get("event"), "quantity", 0.0) or 0.0),
+                    projection.cumulative_filled,
+                ),
+                "average": float(payload.get("last_fill_price") or 0.0),
+                "price": float(payload.get("last_fill_price") or 0.0),
+            }
+            self._emit_fill_event(
+                entry.get("event"),
+                order_payload,
+                float(projection.fill_delta),
+                status=str(payload.get("order_status") or "").lower(),
+            )
+
+        entry["last_filled"] = float(projection.cumulative_filled)
+        entry["state"] = str(projection.next_state).upper()
+        entry["updated_at"] = time.time()
+        self._notify_state(
+            order_id=order_id,
+            entry=entry,
+            state=entry["state"],
+            metadata={"event_key": projection.event_key},
+        )
+        if str(entry["state"]).upper() in TERMINAL_STATES:
+            self._forget_order(order_id, entry)
+
     def _build_reconciliation_payload(
         self,
         *,
@@ -244,12 +353,84 @@ class LiveExecutionHandler(ExecutionHandler):
     def reconcile_open_orders(self) -> list[dict[str, Any]]:
         records: list[dict[str, Any]] = []
         try:
-            exchange_open = list(self.exchange.fetch_open_orders(None) or [])
+            exchange_open = list(self.order_gateway.query_open_orders(None) or [])
         except Exception as exc:
+            self._last_exchange_open_snapshot_ok = False
             self.logger.error("Failed to fetch open orders for reconciliation: %s", exc)
             return records
+        self._last_exchange_open_snapshot_ok = True
+        self._last_exchange_open_snapshot_ts = time.time()
 
         open_ids = {str(item.get("id")) for item in exchange_open if item.get("id")}
+        self._last_exchange_open_ids = set(open_ids)
+
+        tracked_ids = set(self.tracked_orders.keys())
+        for row in exchange_open:
+            if not isinstance(row, dict):
+                continue
+            order_id = str(row.get("id") or "")
+            if not order_id or order_id in tracked_ids:
+                continue
+
+            symbol = normalize_stream_symbol(str(row.get("symbol") or ""))
+            if not symbol:
+                continue
+            side = str(row.get("side") or "buy").upper()
+            direction = "BUY" if side == "BUY" else "SELL"
+            client_order_id = str(row.get("clientOrderId") or row.get("client_order_id") or "")
+            status = self._normalize_status(row.get("status"))
+            filled_qty = float(row.get("filled") or 0.0)
+            amount = float(row.get("amount") or row.get("remaining") or filled_qty or 0.0)
+            state = self._to_state(status, filled_qty, max(amount, filled_qty))
+            if state in TERMINAL_STATES:
+                continue
+
+            synthetic = SimpleNamespace(
+                symbol=symbol,
+                direction=direction,
+                order_type=str(row.get("type") or "MKT").upper(),
+                quantity=max(float(amount), float(filled_qty)),
+                price=row.get("price"),
+                position_side=row.get("positionSide"),
+                reduce_only=bool(row.get("reduceOnly", False)),
+                client_order_id=client_order_id,
+                time_in_force=row.get("timeInForce"),
+                stop_loss=None,
+                take_profit=None,
+                metadata={},
+                type="ORDER",
+            )
+            entry = {
+                "event": synthetic,
+                "symbol": symbol,
+                "last_filled": filled_qty,
+                "state": state,
+                "created_at": time.time(),
+                "updated_at": time.time(),
+            }
+            self.tracked_orders[order_id] = entry
+            if client_order_id:
+                self.client_id_to_order[client_order_id] = order_id
+
+            self._notify_state(
+                order_id=order_id,
+                entry=entry,
+                state=str(state),
+                message="rehydrated_exchange_open_order",
+            )
+            records.append(
+                self._build_reconciliation_payload(
+                    order_id=order_id,
+                    entry=entry,
+                    local_state=STATE_SUBMITTED,
+                    exchange_state=str(state),
+                    local_filled=0.0,
+                    exchange_filled=filled_qty,
+                    reason="UNTRACKED_OPEN_ORDER_REHYDRATED",
+                    metadata={"status": status},
+                )
+            )
+
         for order_id, entry in list(self.tracked_orders.items()):
             if order_id in open_ids:
                 continue
@@ -261,7 +442,7 @@ class LiveExecutionHandler(ExecutionHandler):
             local_filled = float(entry.get("last_filled") or 0.0)
             try:
                 latest = self._call_with_retry(
-                    self.exchange.fetch_order,
+                    self.order_gateway.query_order,
                     order_id,
                     symbol,
                     retries=2,
@@ -344,6 +525,14 @@ class LiveExecutionHandler(ExecutionHandler):
                 )
                 self._forget_order(order_id, entry)
         return records
+
+    def exchange_open_order_count(self) -> int:
+        """Most recent exchange open-order count observed during reconciliation."""
+        return len(self._last_exchange_open_ids)
+
+    def exchange_open_snapshot_ready(self) -> bool:
+        """Whether exchange open-order snapshot has been fetched successfully at least once."""
+        return bool(self._last_exchange_open_snapshot_ok)
 
     def _build_exchange_params(self, event):
         params = {}
@@ -452,7 +641,7 @@ class LiveExecutionHandler(ExecutionHandler):
         )
 
         order = self._call_with_retry(
-            self.exchange.execute_order,
+            self.order_gateway.submit,
             symbol=event.symbol,
             type=order_type,
             side=side,
@@ -504,7 +693,10 @@ class LiveExecutionHandler(ExecutionHandler):
 
     def check_open_orders(self, event=None):
         """Poll tracked exchange orders and emit delta fills for partial/full executions."""
-        _ = event
+        if self.order_state_source == "user_stream":
+            force_poll = bool(event is None)
+            if not self.poll_fallback_enabled or not force_poll:
+                return
         for order_id, entry in list(self.tracked_orders.items()):
             order_event = entry["event"]
             previous_state = str(entry.get("state", STATE_OPEN))
@@ -517,7 +709,7 @@ class LiveExecutionHandler(ExecutionHandler):
             ):
                 canceled = False
                 try:
-                    canceled = bool(self.exchange.cancel_order(order_id, order_event.symbol))
+                    canceled = bool(self.order_gateway.cancel(order_id, order_event.symbol))
                 except Exception as exc:
                     self.logger.error("Failed to cancel timed-out order %s: %s", order_id, exc)
                 timeout_state = STATE_TIMEOUT if canceled else STATE_OPEN
@@ -525,7 +717,7 @@ class LiveExecutionHandler(ExecutionHandler):
                     timeout_message = "order_timeout"
                     try:
                         latest_after_cancel = self._call_with_retry(
-                            self.exchange.fetch_order,
+                            self.order_gateway.query_order,
                             order_id,
                             order_event.symbol,
                             retries=2,
@@ -578,7 +770,7 @@ class LiveExecutionHandler(ExecutionHandler):
 
             try:
                 latest = self._call_with_retry(
-                    self.exchange.fetch_order,
+                    self.order_gateway.query_order,
                     order_id,
                     order_event.symbol,
                     retries=3,

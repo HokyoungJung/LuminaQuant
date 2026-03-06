@@ -135,6 +135,12 @@ backtest:
 # ------------------------------------------
 live:
   mode: "paper" # paper|real
+  market_data_source: "committed" # committed|binance_live
+  order_state_source: "polling" # polling|user_stream
+  shadow_live_enabled: false
+  reconciliation_poll_fallback_enabled: true
+  book_ticker_enabled: false
+  startup_reconciliation_hard_fail: false
   exchange:
     driver: "ccxt" # Options: "ccxt", "mt5"
     name: "binance" # Specific exchange name for driver (e.g. "binance" for ccxt)

@@ -13,6 +13,7 @@ class RuntimeCache:
     positions: dict[str, float] = field(default_factory=dict)
     position_legs: dict[str, dict[str, float]] = field(default_factory=dict)
     account: dict[str, Any] = field(default_factory=dict)
+    stream_state: dict[str, Any] = field(default_factory=dict)
 
     def update_market(self, symbol: str, payload: dict[str, Any]) -> None:
         self.latest_market[str(symbol)] = dict(payload)
@@ -44,6 +45,9 @@ class RuntimeCache:
     def update_account(self, account: dict[str, Any]) -> None:
         self.account = dict(account)
 
+    def update_stream_state(self, payload: dict[str, Any]) -> None:
+        self.stream_state = dict(payload or {})
+
     def snapshot(self) -> dict[str, Any]:
         return {
             "latest_market": dict(self.latest_market),
@@ -51,6 +55,7 @@ class RuntimeCache:
             "positions": dict(self.positions),
             "position_legs": dict(self.position_legs),
             "account": dict(self.account),
+            "stream_state": dict(self.stream_state),
         }
 
     def restore(self, payload: dict[str, Any]) -> None:
@@ -63,3 +68,4 @@ class RuntimeCache:
         }
         self.update_position_legs(dict(payload.get("position_legs") or {}))
         self.account = dict(payload.get("account") or {})
+        self.stream_state = dict(payload.get("stream_state") or {})

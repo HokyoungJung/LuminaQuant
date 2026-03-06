@@ -93,7 +93,9 @@ os.environ.setdefault(
     "LQ__EXECUTION__GPU_VRAM_GB",
     str(float(getattr(_RUNTIME.execution, "gpu_vram_gb", 0.0))),
 )
-os.environ.setdefault("LQ__BACKTEST__CHUNK_DAYS", str(int(getattr(_RUNTIME.backtest, "chunk_days", 2))))
+os.environ.setdefault(
+    "LQ__BACKTEST__CHUNK_DAYS", str(int(getattr(_RUNTIME.backtest, "chunk_days", 2)))
+)
 os.environ.setdefault(
     "LQ__BACKTEST__CHUNK_WARMUP_BARS",
     str(int(getattr(_RUNTIME.backtest, "chunk_warmup_bars", 0))),
@@ -109,6 +111,30 @@ os.environ.setdefault(
 os.environ.setdefault(
     "LQ__LIVE__WINDOW_SECONDS",
     str(int(getattr(_RUNTIME.live, "window_seconds", 20))),
+)
+os.environ.setdefault(
+    "LQ__LIVE__MARKET_DATA_SOURCE",
+    str(getattr(_RUNTIME.live, "market_data_source", "committed")),
+)
+os.environ.setdefault(
+    "LQ__LIVE__ORDER_STATE_SOURCE",
+    str(getattr(_RUNTIME.live, "order_state_source", "polling")),
+)
+os.environ.setdefault(
+    "LQ__LIVE__SHADOW_LIVE_ENABLED",
+    "1" if bool(getattr(_RUNTIME.live, "shadow_live_enabled", False)) else "0",
+)
+os.environ.setdefault(
+    "LQ__LIVE__RECONCILIATION_POLL_FALLBACK_ENABLED",
+    "1" if bool(getattr(_RUNTIME.live, "reconciliation_poll_fallback_enabled", True)) else "0",
+)
+os.environ.setdefault(
+    "LQ__LIVE__BOOK_TICKER_ENABLED",
+    "1" if bool(getattr(_RUNTIME.live, "book_ticker_enabled", False)) else "0",
+)
+os.environ.setdefault(
+    "LQ__LIVE__STARTUP_RECONCILIATION_HARD_FAIL",
+    "1" if bool(getattr(_RUNTIME.live, "startup_reconciliation_hard_fail", False)) else "0",
 )
 os.environ.setdefault(
     "LQ__LIVE__MATERIALIZED_STALENESS_THRESHOLD_SECONDS",
@@ -137,7 +163,9 @@ os.environ.setdefault(
 os.environ.setdefault(
     "LQ__MARKET_WINDOW__METRICS_LOG_PATH",
     str(
-        getattr(_RUNTIME.market_window, "metrics_log_path", "logs/live/market_window_metrics.ndjson")
+        getattr(
+            _RUNTIME.market_window, "metrics_log_path", "logs/live/market_window_metrics.ndjson"
+        )
         or "logs/live/market_window_metrics.ndjson"
     ),
 )
@@ -204,9 +232,13 @@ class BaseConfig:
         getattr(_RUNTIME.storage, "materializer_required_timeframes", ["1s"])
     ) or ["1s"]
 
-    MARKET_WINDOW_PARITY_V2_ENABLED = bool(getattr(_RUNTIME.market_window, "parity_v2_enabled", False))
+    MARKET_WINDOW_PARITY_V2_ENABLED = bool(
+        getattr(_RUNTIME.market_window, "parity_v2_enabled", False)
+    )
     MARKET_WINDOW_METRICS_LOG_PATH = str(
-        getattr(_RUNTIME.market_window, "metrics_log_path", "logs/live/market_window_metrics.ndjson")
+        getattr(
+            _RUNTIME.market_window, "metrics_log_path", "logs/live/market_window_metrics.ndjson"
+        )
         or "logs/live/market_window_metrics.ndjson"
     )
 
@@ -244,6 +276,20 @@ class LiveConfig(BaseConfig):
     TELEGRAM_CHAT_ID = _RUNTIME.live.telegram_chat_id
 
     MODE = str(_RUNTIME.live.mode).strip().lower()
+    MARKET_DATA_SOURCE = (
+        str(getattr(_RUNTIME.live, "market_data_source", "committed")).strip().lower()
+    )
+    ORDER_STATE_SOURCE = (
+        str(getattr(_RUNTIME.live, "order_state_source", "polling")).strip().lower()
+    )
+    SHADOW_LIVE_ENABLED = bool(getattr(_RUNTIME.live, "shadow_live_enabled", False))
+    RECONCILIATION_POLL_FALLBACK_ENABLED = bool(
+        getattr(_RUNTIME.live, "reconciliation_poll_fallback_enabled", True)
+    )
+    BOOK_TICKER_ENABLED = bool(getattr(_RUNTIME.live, "book_ticker_enabled", False))
+    STARTUP_RECONCILIATION_HARD_FAIL = bool(
+        getattr(_RUNTIME.live, "startup_reconciliation_hard_fail", False)
+    )
 
     IS_TESTNET = MODE != "real"
     REQUIRE_REAL_ENABLE_FLAG = bool(_RUNTIME.live.require_real_enable_flag)
@@ -290,6 +336,14 @@ class LiveConfig(BaseConfig):
     def _as_runtime(cls):
         runtime = load_runtime_config(config_path=os.getenv("LQ_CONFIG_PATH", "config.yaml"))
         runtime.live.mode = cls.MODE
+        runtime.live.market_data_source = str(cls.MARKET_DATA_SOURCE)
+        runtime.live.order_state_source = str(cls.ORDER_STATE_SOURCE)
+        runtime.live.shadow_live_enabled = bool(cls.SHADOW_LIVE_ENABLED)
+        runtime.live.reconciliation_poll_fallback_enabled = bool(
+            cls.RECONCILIATION_POLL_FALLBACK_ENABLED
+        )
+        runtime.live.book_ticker_enabled = bool(cls.BOOK_TICKER_ENABLED)
+        runtime.live.startup_reconciliation_hard_fail = bool(cls.STARTUP_RECONCILIATION_HARD_FAIL)
         runtime.live.require_real_enable_flag = cls.REQUIRE_REAL_ENABLE_FLAG
         runtime.live.materialized_staleness_threshold_seconds = int(
             cls.MATERIALIZED_STALENESS_THRESHOLD_SECONDS
@@ -313,7 +367,9 @@ class LiveConfig(BaseConfig):
         runtime.storage.materializer_periodic_enabled = bool(cls.MATERIALIZER_PERIODIC_ENABLED)
         runtime.storage.materializer_poll_seconds = int(cls.MATERIALIZER_POLL_SECONDS)
         runtime.storage.materializer_base_timeframe = str(cls.MATERIALIZER_BASE_TIMEFRAME)
-        runtime.storage.materializer_required_timeframes = list(cls.MATERIALIZER_REQUIRED_TIMEFRAMES)
+        runtime.storage.materializer_required_timeframes = list(
+            cls.MATERIALIZER_REQUIRED_TIMEFRAMES
+        )
         runtime.market_window.parity_v2_enabled = bool(cls.MARKET_WINDOW_PARITY_V2_ENABLED)
         runtime.market_window.metrics_log_path = str(cls.MARKET_WINDOW_METRICS_LOG_PATH)
         runtime.trading.symbols = list(cls.SYMBOLS)

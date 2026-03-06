@@ -5,6 +5,7 @@ This package intentionally avoids eager imports so optional dependencies
 """
 
 __all__ = [
+    "BinanceLiveDataHandler",
     "BinanceWebSocketDataHandler",
     "LiveDataHandler",
     "LiveExecutionHandler",

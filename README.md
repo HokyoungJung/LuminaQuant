@@ -183,7 +183,7 @@ uv run python scripts/materialize_market_windows.py \
   --db-path data/market_parquet \
   --periodic --poll-seconds 5 --cycles 2
 
-# 3) Live trader reads committed windows only (fail-fast: exit code 2 on missing committed data)
+# 3) Live trader (default = committed source; optional Binance live source via config flags)
 uv run lq live
 ```
 
@@ -250,6 +250,16 @@ uv run lq optimize --data-mode raw-first
 uv run lq live --transport poll
 uv run lq live --transport ws
 uv run lq dashboard --run
+```
+
+Live migration flags (non-HFT incremental rollout):
+```yaml
+live:
+  market_data_source: committed      # committed | binance_live
+  order_state_source: polling        # polling | user_stream
+  shadow_live_enabled: false
+  reconciliation_poll_fallback_enabled: true
+  book_ticker_enabled: false
 ```
 
 Root compatibility shims were removed. Use `uv run lq ...` as the single supported entrypoint.
@@ -345,6 +355,11 @@ uv run python -m streamlit run apps/dashboard/app.py --server.headless true
 uv run lq live
 
 # WebSocket market-data entrypoint (lower latency)
+uv run lq live --transport ws
+
+# Enable real Binance live stream source (config-driven)
+# set in config.yaml: live.market_data_source: binance_live
+# optional: live.order_state_source: user_stream
 uv run lq live --transport ws
 
 # Real mode requires explicit safety flag:

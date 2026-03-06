@@ -469,11 +469,19 @@ class LatencyModel:
     """Simple latency model releasing queued orders on next check cycle."""
 
     def __init__(self, config: Any):
-        _ = config
+        seed = int(getattr(config, "RANDOM_SEED", 42))
+        self.rng = random.Random(seed + 701)
+        self.min_bars = max(1, int(getattr(config, "SIM_LATENCY_MIN_BARS", 1)))
+        self.max_bars = max(self.min_bars, int(getattr(config, "SIM_LATENCY_MAX_BARS", 1)))
 
     def should_release(self, order: dict[str, Any]) -> bool:
-        _ = order
-        return True
+        target = order.get("_latency_target_bars")
+        if target is None:
+            target = int(self.rng.randint(int(self.min_bars), int(self.max_bars)))
+            order["_latency_target_bars"] = int(target)
+        waited = int(order.get("_latency_waited_bars", 0)) + 1
+        order["_latency_waited_bars"] = int(waited)
+        return int(waited) >= int(target)
 
 
 class LiquidityModel:
@@ -486,4 +494,11 @@ class LiquidityModel:
         max_ratio = float(getattr(self.config, "SIM_MAX_BAR_VOLUME_RATIO", 0.1))
         return max(0.0, bar_volume * max_ratio)
 
-__all__ = ["ExecutionHandler", "FillModel", "LatencyModel", "LiquidityModel", "SimulatedExecutionHandler"]
+
+__all__ = [
+    "ExecutionHandler",
+    "FillModel",
+    "LatencyModel",
+    "LiquidityModel",
+    "SimulatedExecutionHandler",
+]

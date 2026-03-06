@@ -10,6 +10,9 @@ from lumina_quant.core.events import OrderEvent
 from lumina_quant.core.market_window_contract import MarketWindowContractError
 from lumina_quant.core.protocols import ExchangeInterface
 from lumina_quant.exchanges import get_exchange
+from lumina_quant.live.binance_market_stream import normalize_stream_symbol
+from lumina_quant.live.binance_user_stream import BinanceUserStreamClient
+from lumina_quant.live.recovery_reconciliation import RecoveryReconciliationService
 from lumina_quant.risk_manager import RiskManager
 from lumina_quant.runtime_cache import RuntimeCache
 from lumina_quant.symbol_universe import resolve_available_symbols
@@ -88,6 +91,37 @@ class LiveTrader(TradingEngine):
             int(self.config.RECONCILIATION_INTERVAL_SEC),
         )
         self.runtime_cache = RuntimeCache()
+        self.order_state_source = (
+            str(getattr(self.config, "ORDER_STATE_SOURCE", "polling") or "polling").strip().lower()
+        )
+        self.market_data_source = (
+            str(getattr(self.config, "MARKET_DATA_SOURCE", "committed") or "committed")
+            .strip()
+            .lower()
+        )
+        self.reconciliation_poll_fallback_enabled = bool(
+            getattr(self.config, "RECONCILIATION_POLL_FALLBACK_ENABLED", True)
+        )
+        self.startup_reconciliation_hard_fail = bool(
+            getattr(self.config, "STARTUP_RECONCILIATION_HARD_FAIL", False)
+        )
+        self.startup_reconciliation_timeout_seconds = max(
+            10.0,
+            float(getattr(self.config, "STARTUP_RECONCILIATION_TIMEOUT_SECONDS", 90.0) or 90.0),
+        )
+        self.user_stream_stale_timeout_seconds = max(
+            10.0,
+            float(getattr(self.config, "USER_STREAM_STALE_TIMEOUT_SECONDS", 45.0) or 45.0),
+        )
+        self.reconciliation_fallback_window_seconds = max(
+            10.0,
+            float(getattr(self.config, "RECONCILIATION_FALLBACK_WINDOW_SECONDS", 120.0) or 120.0),
+        )
+        self._startup_reconciliation_complete = False
+        self._user_stream_client: BinanceUserStreamClient | None = None
+        self._user_stream_last_event_monotonic = time.monotonic()
+        self._fallback_poll_until_monotonic = 0.0
+        self._last_fallback_reason = ""
         self.outbox_events: list[dict] = []
         atexit.register(self._close_audit_store)
 
@@ -116,6 +150,22 @@ class LiveTrader(TradingEngine):
         )
         if hasattr(self.execution_handler, "set_order_state_callback"):
             self.execution_handler.set_order_state_callback(self._on_order_state)
+        if self.order_state_source == "user_stream":
+            self._start_user_stream()
+        self._recovery_service = RecoveryReconciliationService(
+            reconcile_positions=lambda: self._reconcile_positions(force=True),
+            reconcile_orders=lambda: self._reconcile_orders(force=True),
+            tracked_orders_count=lambda: len(
+                getattr(self.execution_handler, "tracked_orders", {}) or {}
+            ),
+            cache_open_orders_count=lambda: len(self.runtime_cache.open_orders or {}),
+            exchange_open_orders_count=lambda: int(
+                getattr(self.execution_handler, "exchange_open_order_count", lambda: 0)()
+            ),
+            exchange_snapshot_ready=lambda: bool(
+                getattr(self.execution_handler, "exchange_open_snapshot_ready", lambda: False)()
+            ),
+        )
 
         self.portfolio = portfolio_cls(self.data_handler, self.events, time.time(), self.config)
         self.strategy = strategy_cls(self.data_handler, self.events, **self.strategy_params)
@@ -181,7 +231,9 @@ class LiveTrader(TradingEngine):
         try:
             markets = load_markets() or {}
         except Exception as exc:
-            self.logger.warning("Failed to load exchange markets for symbol availability check: %s", exc)
+            self.logger.warning(
+                "Failed to load exchange markets for symbol availability check: %s", exc
+            )
             return requested
 
         available = set(markets.keys()) if isinstance(markets, dict) else set()
@@ -190,9 +242,8 @@ class LiveTrader(TradingEngine):
 
         resolved, dropped = resolve_available_symbols(requested, dict(markets))
         if dropped:
-            warning = (
-                "Dropping unavailable symbols after exchange market sync: "
-                + ", ".join(sorted(dropped))
+            warning = "Dropping unavailable symbols after exchange market sync: " + ", ".join(
+                sorted(dropped)
             )
             self.logger.warning(warning)
             self.notifier.send_message(f"⚠️ {warning}")
@@ -247,6 +298,156 @@ class LiveTrader(TradingEngine):
         except Exception:
             pass
         self._audit_closed = True
+
+    def _start_user_stream(self) -> None:
+        if self.order_state_source != "user_stream":
+            return
+        try:
+            self._user_stream_client = BinanceUserStreamClient(
+                exchange=self.exchange,
+                market_type=str(getattr(self.config, "MARKET_TYPE", "future")),
+            )
+            self._user_stream_client.start(
+                on_event=self._on_user_stream_event,
+                on_error=self._on_user_stream_error,
+            )
+        except Exception as exc:
+            self.logger.error("Failed to start user stream client: %s", exc)
+            self.audit_store.log_risk_event(
+                self.run_id,
+                reason="USER_STREAM_START_ERROR",
+                details={"error": str(exc)},
+            )
+            self._activate_fallback_polling("user_stream_start_error")
+            if self.startup_reconciliation_hard_fail:
+                raise
+
+    def _on_user_stream_error(self, exc: Exception) -> None:
+        self.logger.error("User stream error: %s", exc)
+        self.audit_store.log_risk_event(
+            self.run_id,
+            reason="USER_STREAM_ERROR",
+            details={"error": str(exc)},
+        )
+        self._activate_fallback_polling("user_stream_error")
+
+    def _activate_fallback_polling(self, reason: str) -> None:
+        if not self.reconciliation_poll_fallback_enabled:
+            return
+        now = time.monotonic()
+        new_until = now + float(self.reconciliation_fallback_window_seconds)
+        extended = new_until > float(self._fallback_poll_until_monotonic)
+        self._fallback_poll_until_monotonic = max(
+            float(self._fallback_poll_until_monotonic),
+            float(new_until),
+        )
+        if extended and str(reason) != str(self._last_fallback_reason):
+            self._last_fallback_reason = str(reason)
+            self.audit_store.log_risk_event(
+                self.run_id,
+                reason="POLL_FALLBACK_ACTIVATED",
+                details={
+                    "trigger": str(reason),
+                    "fallback_window_seconds": float(self.reconciliation_fallback_window_seconds),
+                },
+            )
+
+    def _is_fallback_polling_required(self) -> bool:
+        if self.order_state_source != "user_stream":
+            return True
+        if not self.reconciliation_poll_fallback_enabled:
+            return False
+        now = time.monotonic()
+        stale = (now - float(self._user_stream_last_event_monotonic)) > float(
+            self.user_stream_stale_timeout_seconds
+        )
+        if stale:
+            self._activate_fallback_polling("user_stream_stale")
+        return now <= float(self._fallback_poll_until_monotonic)
+
+    def _on_user_stream_event(self, payload: dict) -> None:
+        if not isinstance(payload, dict):
+            return
+        self._user_stream_last_event_monotonic = time.monotonic()
+        event_type = str(payload.get("event_type") or "").strip()
+        self.runtime_cache.update_stream_state(
+            {
+                "last_event_type": event_type,
+                "exchange_ts_ms": payload.get("exchange_ts_ms"),
+                "received_at_ms": int(time.time() * 1000),
+            }
+        )
+        self._append_outbox("user_stream", payload)
+        if event_type == "executionReport" and hasattr(
+            self.execution_handler, "ingest_user_stream_event"
+        ):
+            self.execution_handler.ingest_user_stream_event(payload)
+            return
+
+        if event_type == "outboundAccountPosition":
+            balances = list(payload.get("balances") or [])
+            account_snapshot = {"balances": balances}
+            self.runtime_cache.update_account(account_snapshot)
+            return
+
+        if event_type == "accountUpdate":
+            self._apply_account_update(payload)
+            return
+
+        if event_type == "balanceUpdate":
+            account_snapshot = dict(self.runtime_cache.account or {})
+            updates = list(account_snapshot.get("balance_updates") or [])
+            updates.append(
+                {
+                    "asset": payload.get("asset"),
+                    "delta": payload.get("balance_delta"),
+                    "clear_time_ms": payload.get("clear_time_ms"),
+                    "exchange_ts_ms": payload.get("exchange_ts_ms"),
+                }
+            )
+            if len(updates) > 200:
+                updates = updates[-200:]
+            account_snapshot["balance_updates"] = updates
+            self.runtime_cache.update_account(account_snapshot)
+
+    def _apply_account_update(self, payload: dict) -> None:
+        balances = [dict(item or {}) for item in list(payload.get("balances") or [])]
+        positions = [dict(item or {}) for item in list(payload.get("positions") or [])]
+
+        account_snapshot = dict(self.runtime_cache.account or {})
+        account_snapshot["balances"] = balances
+        account_snapshot["reason"] = payload.get("reason")
+        account_snapshot["exchange_ts_ms"] = payload.get("exchange_ts_ms")
+        self.runtime_cache.update_account(account_snapshot)
+
+        net_positions: dict[str, float] = {}
+        legs: dict[str, dict[str, float]] = {}
+        for item in positions:
+            symbol = normalize_stream_symbol(str(item.get("symbol") or item.get("s") or ""))
+            if not symbol:
+                continue
+            qty = float(item.get("position_amount") or item.get("pa") or 0.0)
+            side = str(item.get("position_side") or item.get("ps") or "").upper()
+
+            net_positions[symbol] = float(net_positions.get(symbol, 0.0)) + float(qty)
+            current = legs.setdefault(symbol, {"LONG": 0.0, "SHORT": 0.0})
+            if side == "LONG":
+                current["LONG"] += abs(float(qty))
+            elif side == "SHORT":
+                current["SHORT"] += abs(float(qty))
+            elif qty > 0:
+                current["LONG"] += abs(float(qty))
+            elif qty < 0:
+                current["SHORT"] += abs(float(qty))
+
+        if net_positions:
+            self.runtime_cache.update_positions(net_positions)
+            self.runtime_cache.update_position_legs(legs)
+            portfolio = getattr(self, "portfolio", None)
+            if portfolio is not None:
+                for symbol, qty in net_positions.items():
+                    if symbol in portfolio.current_positions:
+                        portfolio.current_positions[symbol] = float(qty)
 
     def _on_order_state(self, state_payload):
         self.runtime_cache.update_order_state(state_payload.get("order_id"), state_payload)
@@ -719,7 +920,9 @@ class LiveTrader(TradingEngine):
         self._materialized_stale_block_active = False
         self._materialized_fresh_streak = 0
         self.logger.info("LIVE_DATA_RECOVERED %s", details)
-        self.notifier.send_message("✅ **Live data recovered**. Trading resumed after two fresh windows.")
+        self.notifier.send_message(
+            "✅ **Live data recovered**. Trading resumed after two fresh windows."
+        )
         return False
 
     def _consume_data_fatal(self):
@@ -754,14 +957,70 @@ class LiveTrader(TradingEngine):
         self.data_handler.continue_backtest = False
         if hasattr(self.data_handler, "ws_running"):
             self.data_handler.ws_running = False
+        if self._user_stream_client is not None:
+            try:
+                self._user_stream_client.stop(join_timeout=5.0)
+            except Exception:
+                pass
         shutdown = getattr(self.data_handler, "shutdown", None)
         if callable(shutdown):
             shutdown(join_timeout=5.0)
+
+    def _run_startup_reconciliation_gate(self) -> None:
+        if self.order_state_source != "user_stream":
+            self._startup_reconciliation_complete = True
+            return
+
+        self.portfolio.trading_frozen = True
+        outcome = self._recovery_service.startup_converge(
+            timeout_seconds=float(self.startup_reconciliation_timeout_seconds)
+        )
+        if outcome.converged:
+            self._startup_reconciliation_complete = True
+            self.portfolio.trading_frozen = False
+            self.audit_store.log_risk_event(
+                self.run_id,
+                reason="STARTUP_RECONCILIATION_COMPLETE",
+                details={
+                    "tracked_orders": outcome.tracked_orders,
+                    "cache_open_orders": outcome.cache_open_orders,
+                    "exchange_open_orders": outcome.exchange_open_orders,
+                    "exchange_snapshot_ready": outcome.exchange_snapshot_ready,
+                    "elapsed_seconds": round(float(outcome.elapsed_seconds), 3),
+                },
+            )
+            return
+
+        self.audit_store.log_risk_event(
+            self.run_id,
+            reason="STARTUP_RECONCILIATION_TIMEOUT",
+            details={
+                "timeout_seconds": float(self.startup_reconciliation_timeout_seconds),
+                "tracked_orders": outcome.tracked_orders,
+                "cache_open_orders": outcome.cache_open_orders,
+                "exchange_open_orders": outcome.exchange_open_orders,
+                "exchange_snapshot_ready": outcome.exchange_snapshot_ready,
+            },
+        )
+        self._activate_fallback_polling("startup_reconciliation_timeout")
+        if self.startup_reconciliation_hard_fail:
+            raise LiveDataFatalError("startup_reconciliation_timeout")
+        self._startup_reconciliation_complete = True
+        self.portfolio.trading_frozen = False
+        self.audit_store.log_risk_event(
+            self.run_id,
+            reason="STARTUP_RECONCILIATION_DEGRADED",
+            details={
+                "mode": "fallback_polling",
+                "fallback_window_seconds": float(self.reconciliation_fallback_window_seconds),
+            },
+        )
 
     def run(self):
         """Main Live Trading Loop."""
         self.logger.info(f"Starting Live Trading on {self.symbol_list}...")
         self._sync_portfolio()
+        self._run_startup_reconciliation_gate()
 
         while True:
             try:
@@ -789,8 +1048,9 @@ class LiveTrader(TradingEngine):
                     break
 
                 self._emit_heartbeat(force=False)
-                self._reconcile_positions(force=False)
-                self._reconcile_orders(force=False)
+                if self._is_fallback_polling_required():
+                    self._reconcile_positions(force=False)
+                    self._reconcile_orders(force=False)
                 self._evaluate_risk_guards()
                 # In Live mode, data_handler is threaded and pushes events autonomously.
                 # We just blocking-wait for events.
@@ -806,7 +1066,9 @@ class LiveTrader(TradingEngine):
                 # simpler: just log here then call process.
 
                 if event is not None:
-                    if event.type == "MARKET_WINDOW" and self._handle_market_window_staleness(event):
+                    if event.type == "MARKET_WINDOW" and self._handle_market_window_staleness(
+                        event
+                    ):
                         continue
                     if self._hard_halt_active and event.type in {"SIGNAL", "ORDER"}:
                         self.logger.error(
@@ -820,6 +1082,12 @@ class LiveTrader(TradingEngine):
                     elif event.type == "SIGNAL":
                         self.logger.info(f"Signal Event: {event.signal_type}")
                     if event.type == "ORDER":
+                        if (
+                            self.order_state_source == "user_stream"
+                            and not self._startup_reconciliation_complete
+                        ):
+                            self.logger.error("ORDER_BLOCKED_STARTUP_RECONCILIATION_PENDING")
+                            continue
                         if self._materialized_stale_block_active:
                             self.logger.error(
                                 "ORDER_BLOCKED_STALE_FEED symbol=%s direction=%s",
@@ -866,10 +1134,12 @@ class LiveTrader(TradingEngine):
             except queue.Empty:
                 # Heartbeat
                 self._emit_heartbeat(force=True)
-                self._reconcile_positions(force=False)
-                self._reconcile_orders(force=False)
+                should_poll_fallback = self._is_fallback_polling_required()
+                if should_poll_fallback:
+                    self._reconcile_positions(force=False)
+                    self._reconcile_orders(force=False)
                 self._evaluate_risk_guards()
-                if hasattr(self.execution_handler, "check_open_orders"):
+                if hasattr(self.execution_handler, "check_open_orders") and should_poll_fallback:
                     self.execution_handler.check_open_orders(None)
             except KeyboardInterrupt:
                 self.logger.info("Stopping Live Trader...")
@@ -888,5 +1158,6 @@ class LiveTrader(TradingEngine):
 
     def __del__(self):
         self._close_audit_store(status="STOPPED")
+
 
 __all__ = ["LiveDataFatalError", "LiveTrader"]

@@ -3,6 +3,7 @@ set -euo pipefail
 
 targets=(
   "src/lumina_quant/live/data_materialized.py"
+  "src/lumina_quant/live/market_window_rolling.py"
   "src/lumina_quant/backtesting/data_windowed_parquet.py"
 )
 
