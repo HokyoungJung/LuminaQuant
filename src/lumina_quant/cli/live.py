@@ -148,7 +148,16 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"Mode: {'TESTNET/PAPER' if LiveConfig.IS_TESTNET else 'REAL TRADING'}")
     print(f"Exchange: {LiveConfig.EXCHANGE}")
+    market_data_source = str(getattr(LiveConfig, "MARKET_DATA_SOURCE", "committed"))
+    order_state_source = str(getattr(LiveConfig, "ORDER_STATE_SOURCE", "polling"))
+    print(f"Market Data Source: {market_data_source}")
+    print(f"Order State Source: {order_state_source}")
     print(f"Transport: {transport}")
+    if market_data_source == "committed" and transport == "ws":
+        print(
+            "[WARN] --transport=ws is ignored when live.market_data_source=committed "
+            "(committed reader path remains active)."
+        )
 
     if selection_path is not None:
         print(f"Selection File: {selection_path}")

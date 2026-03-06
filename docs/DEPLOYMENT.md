@@ -46,11 +46,14 @@ ExecStart=/home/ubuntu/.local/bin/uv run lq live --transport ws
 Entrypoint choice:
 - `lq live --transport poll`: polling-based live runner (default/simple ops)
 - `lq live --transport ws`: WebSocket-based live runner (lower latency path)
+- Effective source is controlled by `config.yaml`:
+  - `live.market_data_source: committed` (default)
+  - `live.market_data_source: binance_live` (real Binance stream)
 
-Raw-first live data lifecycle (recommended):
+Raw-first live data lifecycle (recommended for committed mode):
 1. `scripts/collect_binance_aggtrades_raw.py` (raw collector, checkpoint resume, periodic loop)
 2. `scripts/materialize_market_windows.py` (raw -> committed 1s+timeframe bundle, periodic loop)
-3. `lq live --transport poll|ws` (committed-window reader only, fail-fast on missing committed data)
+3. `lq live --transport poll|ws` (committed reader by default, optional `binance_live` source)
 
 Example periodic startup:
 ```bash
@@ -63,6 +66,11 @@ Fail-fast contract:
 - background reader fatal (missing committed/parity decode error) is propagated to main
 - live entrypoints exit with code `2`
 - recovery requires restoring committed data then restarting collector -> materializer -> live
+
+Binance live mode (non-HFT incremental rollout):
+- set `live.market_data_source: binance_live`
+- optional stream authority: `live.order_state_source: user_stream`
+- keep `live.reconciliation_poll_fallback_enabled: true` for safety recovery
 
 Verify committed data before live start:
 ```bash

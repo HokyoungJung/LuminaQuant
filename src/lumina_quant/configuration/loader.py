@@ -77,6 +77,24 @@ def _as_bool_or_none(value: Any) -> bool | None:
     return None
 
 
+def _normalize_live_source(value: Any) -> str:
+    token = str(value or "").strip().lower().replace("-", "_")
+    if token in {"", "committed"}:
+        return "committed"
+    if token in {"binance_live", "binance", "live"}:
+        return "binance_live"
+    return token
+
+
+def _normalize_order_state_source(value: Any) -> str:
+    token = str(value or "").strip().lower().replace("-", "_")
+    if token in {"", "polling", "poll"}:
+        return "polling"
+    if token in {"user_stream", "userstream", "stream"}:
+        return "user_stream"
+    return token
+
+
 def _normalize_timeframe_list(value: Any) -> list[str]:
     items: list[Any]
     if isinstance(value, str):
@@ -212,18 +230,24 @@ def build_runtime_config(data: dict[str, Any], env: Mapping[str, str]) -> Runtim
     risk_raw = mapped.get("risk", {}) if isinstance(mapped.get("risk", {}), dict) else {}
     exec_raw = mapped.get("execution", {}) if isinstance(mapped.get("execution", {}), dict) else {}
     storage_raw = mapped.get("storage", {}) if isinstance(mapped.get("storage", {}), dict) else {}
-    backtest_raw = mapped.get("backtest", {}) if isinstance(mapped.get("backtest", {}), dict) else {}
+    backtest_raw = (
+        mapped.get("backtest", {}) if isinstance(mapped.get("backtest", {}), dict) else {}
+    )
     live_raw = mapped.get("live", {}) if isinstance(mapped.get("live", {}), dict) else {}
     optimization_raw = (
         mapped.get("optimization", {}) if isinstance(mapped.get("optimization", {}), dict) else {}
     )
     promotion_raw = (
-        mapped.get("promotion_gate", {}) if isinstance(mapped.get("promotion_gate", {}), dict) else {}
+        mapped.get("promotion_gate", {})
+        if isinstance(mapped.get("promotion_gate", {}), dict)
+        else {}
     )
     market_window_raw = (
         mapped.get("market_window", {}) if isinstance(mapped.get("market_window", {}), dict) else {}
     )
-    exchange_raw = live_raw.get("exchange", {}) if isinstance(live_raw.get("exchange", {}), dict) else {}
+    exchange_raw = (
+        live_raw.get("exchange", {}) if isinstance(live_raw.get("exchange", {}), dict) else {}
+    )
 
     promotion_kwargs = _coerce_dataclass_kwargs(promotion_raw, PromotionGateConfig)
     strategy_profiles = promotion_kwargs.pop("strategy_profiles", {})
@@ -265,7 +289,9 @@ def build_runtime_config(data: dict[str, Any], env: Mapping[str, str]) -> Runtim
         risk=RiskConfig(**_coerce_dataclass_kwargs(risk_raw, RiskConfig)),
         execution=ExecutionConfig(**_coerce_dataclass_kwargs(exec_raw, ExecutionConfig)),
         storage=StorageConfig(**_coerce_dataclass_kwargs(storage_raw, StorageConfig)),
-        backtest=BacktestRuntimeConfig(**_coerce_dataclass_kwargs(backtest_raw, BacktestRuntimeConfig)),
+        backtest=BacktestRuntimeConfig(
+            **_coerce_dataclass_kwargs(backtest_raw, BacktestRuntimeConfig)
+        ),
         live=live,
         optimization=OptimizationRuntimeConfig(
             **_coerce_dataclass_kwargs(optimization_raw, OptimizationRuntimeConfig)
@@ -275,13 +301,19 @@ def build_runtime_config(data: dict[str, Any], env: Mapping[str, str]) -> Runtim
         ),
         promotion_gate=PromotionGateConfig(
             **promotion_kwargs,
-            strategy_profiles=(dict(strategy_profiles) if isinstance(strategy_profiles, dict) else {}),
+            strategy_profiles=(
+                dict(strategy_profiles) if isinstance(strategy_profiles, dict) else {}
+            ),
         ),
     )
 
-    runtime.storage.market_data_parquet_path = _resolve_storage_path(runtime.storage.market_data_parquet_path)
+    runtime.storage.market_data_parquet_path = _resolve_storage_path(
+        runtime.storage.market_data_parquet_path
+    )
     runtime.storage.wal_max_bytes = max(0, _as_int(runtime.storage.wal_max_bytes, 268435456))
-    runtime.storage.wal_compact_on_threshold = _as_bool(runtime.storage.wal_compact_on_threshold, True)
+    runtime.storage.wal_compact_on_threshold = _as_bool(
+        runtime.storage.wal_compact_on_threshold, True
+    )
     runtime.storage.wal_compaction_interval_seconds = max(
         0,
         _as_int(runtime.storage.wal_compaction_interval_seconds, 3600),
@@ -306,7 +338,9 @@ def build_runtime_config(data: dict[str, Any], env: Mapping[str, str]) -> Runtim
         getattr(runtime.storage, "materializer_base_timeframe", "1s"),
         "1s",
     )
-    explicit_required = isinstance(storage_raw, dict) and "materializer_required_timeframes" in storage_raw
+    explicit_required = (
+        isinstance(storage_raw, dict) and "materializer_required_timeframes" in storage_raw
+    )
     raw_required = (
         storage_raw.get("materializer_required_timeframes")
         if explicit_required
@@ -315,9 +349,11 @@ def build_runtime_config(data: dict[str, Any], env: Mapping[str, str]) -> Runtim
     if explicit_required:
         runtime.storage.materializer_required_timeframes = _normalize_timeframe_list(raw_required)
     else:
-        runtime.storage.materializer_required_timeframes = _resolve_materializer_required_timeframes(
-            raw_required,
-            list(StorageConfig().materializer_required_timeframes),
+        runtime.storage.materializer_required_timeframes = (
+            _resolve_materializer_required_timeframes(
+                raw_required,
+                list(StorageConfig().materializer_required_timeframes),
+            )
         )
 
     # Safe type coercion for critical numeric fields.
@@ -382,6 +418,28 @@ def build_runtime_config(data: dict[str, Any], env: Mapping[str, str]) -> Runtim
     runtime.execution.gpu_vram_gb = max(0.0, _as_float(runtime.execution.gpu_vram_gb, 0.0))
 
     runtime.live.exchange.leverage = _as_int(runtime.live.exchange.leverage, 3)
+    runtime.live.market_data_source = _normalize_live_source(
+        getattr(runtime.live, "market_data_source", "committed")
+    )
+    runtime.live.order_state_source = _normalize_order_state_source(
+        getattr(runtime.live, "order_state_source", "polling")
+    )
+    runtime.live.shadow_live_enabled = _as_bool(
+        getattr(runtime.live, "shadow_live_enabled", False),
+        False,
+    )
+    runtime.live.reconciliation_poll_fallback_enabled = _as_bool(
+        getattr(runtime.live, "reconciliation_poll_fallback_enabled", True),
+        True,
+    )
+    runtime.live.book_ticker_enabled = _as_bool(
+        getattr(runtime.live, "book_ticker_enabled", False),
+        False,
+    )
+    runtime.live.startup_reconciliation_hard_fail = _as_bool(
+        getattr(runtime.live, "startup_reconciliation_hard_fail", False),
+        False,
+    )
     runtime.live.poll_interval = max(1, _as_int(runtime.live.poll_interval, 20))
     live_poll_raw = (
         live_raw.get("live_poll_seconds")
@@ -446,7 +504,9 @@ def build_runtime_config(data: dict[str, Any], env: Mapping[str, str]) -> Runtim
             else runtime.live.window_seconds
         )
     )
-    runtime.backtest.window_seconds = max(1, _as_int(backtest_window_raw, runtime.live.window_seconds))
+    runtime.backtest.window_seconds = max(
+        1, _as_int(backtest_window_raw, runtime.live.window_seconds)
+    )
     runtime.backtest.backtest_window_seconds = int(runtime.backtest.window_seconds)
     backtest_decision_raw = (
         backtest_raw.get("decision_cadence_seconds")
@@ -477,7 +537,9 @@ def build_runtime_config(data: dict[str, Any], env: Mapping[str, str]) -> Runtim
     runtime.optimization.walk_forward_folds = _as_int(runtime.optimization.walk_forward_folds, 3)
     runtime.optimization.overfit_penalty = _as_float(runtime.optimization.overfit_penalty, 0.5)
     runtime.optimization.max_workers = _as_int(runtime.optimization.max_workers, 4)
-    runtime.optimization.persist_best_params = _as_bool(runtime.optimization.persist_best_params, False)
+    runtime.optimization.persist_best_params = _as_bool(
+        runtime.optimization.persist_best_params, False
+    )
     runtime.optimization.validation_days = max(
         0,
         _as_int(getattr(runtime.optimization, "validation_days", 30), 30),
@@ -500,9 +562,13 @@ def build_runtime_config(data: dict[str, Any], env: Mapping[str, str]) -> Runtim
     runtime.live.market_window_parity_v2_enabled = _as_bool_or_none(deprecated_live_parity)
     runtime.backtest.market_window_parity_v2_enabled = _as_bool_or_none(deprecated_backtest_parity)
 
-    parity_flag_explicit = isinstance(market_window_raw, dict) and "parity_v2_enabled" in market_window_raw
+    parity_flag_explicit = (
+        isinstance(market_window_raw, dict) and "parity_v2_enabled" in market_window_raw
+    )
     if parity_flag_explicit:
-        runtime.market_window.parity_v2_enabled = _as_bool(runtime.market_window.parity_v2_enabled, False)
+        runtime.market_window.parity_v2_enabled = _as_bool(
+            runtime.market_window.parity_v2_enabled, False
+        )
     else:
         for candidate in (
             runtime.live.market_window_parity_v2_enabled,
@@ -523,13 +589,19 @@ def build_runtime_config(data: dict[str, Any], env: Mapping[str, str]) -> Runtim
 
     runtime.promotion_gate.days = _as_int(runtime.promotion_gate.days, 14)
     runtime.promotion_gate.max_order_rejects = _as_int(runtime.promotion_gate.max_order_rejects, 0)
-    runtime.promotion_gate.max_order_timeouts = _as_int(runtime.promotion_gate.max_order_timeouts, 0)
+    runtime.promotion_gate.max_order_timeouts = _as_int(
+        runtime.promotion_gate.max_order_timeouts, 0
+    )
     runtime.promotion_gate.max_reconciliation_alerts = _as_int(
         runtime.promotion_gate.max_reconciliation_alerts,
         0,
     )
-    runtime.promotion_gate.max_critical_errors = _as_int(runtime.promotion_gate.max_critical_errors, 0)
-    runtime.promotion_gate.require_alpha_card = _as_bool(runtime.promotion_gate.require_alpha_card, False)
+    runtime.promotion_gate.max_critical_errors = _as_int(
+        runtime.promotion_gate.max_critical_errors, 0
+    )
+    runtime.promotion_gate.require_alpha_card = _as_bool(
+        runtime.promotion_gate.require_alpha_card, False
+    )
 
     normalized_profiles: dict[str, dict[str, Any]] = {}
     for name, profile in dict(runtime.promotion_gate.strategy_profiles or {}).items():

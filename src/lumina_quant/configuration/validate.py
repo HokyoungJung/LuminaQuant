@@ -100,6 +100,16 @@ def validate_runtime_config(runtime: RuntimeConfig, *, for_live: bool = False) -
     if mode not in {"paper", "real"}:
         raise ValueError("live.mode must be one of: paper, real.")
 
+    market_data_source = (
+        str(getattr(runtime.live, "market_data_source", "committed")).strip().lower()
+    )
+    if market_data_source not in {"committed", "binance_live"}:
+        raise ValueError("live.market_data_source must be one of: committed, binance_live.")
+
+    order_state_source = str(getattr(runtime.live, "order_state_source", "polling")).strip().lower()
+    if order_state_source not in {"polling", "user_stream"}:
+        raise ValueError("live.order_state_source must be one of: polling, user_stream.")
+
     exchange = runtime.live.exchange
     if exchange.driver not in {"ccxt", "mt5"}:
         raise ValueError("live.exchange.driver must be 'ccxt' or 'mt5'.")
@@ -113,6 +123,19 @@ def validate_runtime_config(runtime: RuntimeConfig, *, for_live: bool = False) -
             )
     if exchange.market_type not in {"spot", "future"}:
         raise ValueError("live.exchange.market_type must be 'spot' or 'future'.")
+    if market_data_source == "binance_live":
+        if str(exchange.driver).lower() != "ccxt":
+            raise ValueError(
+                "live.market_data_source=binance_live requires live.exchange.driver='ccxt'."
+            )
+        if str(exchange.name).lower() != "binance":
+            raise ValueError(
+                "live.market_data_source=binance_live requires live.exchange.name='binance'."
+            )
+    if order_state_source == "user_stream" and market_data_source != "binance_live":
+        raise ValueError(
+            "live.order_state_source=user_stream requires live.market_data_source=binance_live."
+        )
     if exchange.position_mode.upper() not in {"ONEWAY", "HEDGE"}:
         raise ValueError("live.exchange.position_mode must be ONEWAY or HEDGE.")
     if exchange.margin_mode not in {"isolated", "cross"}:
@@ -130,7 +153,9 @@ def validate_runtime_config(runtime: RuntimeConfig, *, for_live: bool = False) -
         raise ValueError("risk.max_rolling_loss_pct_1h must be in (0, 1].")
     if runtime.execution.compute_backend not in {"auto", "cpu", "gpu", "forced-gpu"}:
         raise ValueError("execution.compute_backend must be one of: auto, cpu, gpu, forced-gpu.")
-    gpu_mode = str(getattr(runtime.execution, "gpu_mode", runtime.execution.compute_backend)).strip()
+    gpu_mode = str(
+        getattr(runtime.execution, "gpu_mode", runtime.execution.compute_backend)
+    ).strip()
     if gpu_mode not in {"auto", "cpu", "gpu", "forced-gpu"}:
         raise ValueError("execution.gpu_mode must be one of: auto, cpu, gpu, forced-gpu.")
     if float(getattr(runtime.execution, "gpu_vram_gb", 0.0)) < 0.0:
