@@ -326,6 +326,10 @@ def build_runtime_config(data: dict[str, Any], env: Mapping[str, str]) -> Runtim
         getattr(runtime.storage, "collector_poll_seconds", 2),
         2,
     )
+    runtime.storage.collector_bootstrap_lookback_hours = max(
+        1,
+        _as_int(getattr(runtime.storage, "collector_bootstrap_lookback_hours", 24), 24),
+    )
     runtime.storage.materializer_periodic_enabled = _as_bool(
         getattr(runtime.storage, "materializer_periodic_enabled", True),
         True,

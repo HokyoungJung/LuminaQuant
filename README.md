@@ -170,6 +170,13 @@ In the public repository, sync/build helpers are intentionally removed. Use preb
 
 **Raw aggTrades → committed materialized pipeline (private repo):**
 ```bash
+# 0) First bootstrap run (recommended): set explicit --since once.
+uv run python scripts/collect_binance_aggtrades_raw.py \
+  --symbols BTC/USDT,ETH/USDT \
+  --db-path data/market_parquet \
+  --since 2026-03-01T00:00:00Z \
+  --no-periodic
+
 # 1) Raw collector (checkpoint-resumable periodic loop)
 uv run python scripts/collect_binance_aggtrades_raw.py \
   --symbols BTC/USDT,ETH/USDT \
@@ -186,6 +193,11 @@ uv run python scripts/materialize_market_windows.py \
 # 3) Live trader (default = committed source; optional Binance live source via config flags)
 uv run lq live
 ```
+
+Collector bootstrap behavior:
+- If `--since` is empty and no raw checkpoint exists yet, collector starts from
+  `now - storage.collector_bootstrap_lookback_hours` (default: 24h).
+- For deterministic initial coverage, prefer explicit `--since` on first run.
 
 Pre-live committed data check:
 ```bash

@@ -89,6 +89,7 @@ class StorageConfig:
     wal_compaction_interval_seconds: int = 3600
     collector_periodic_enabled: bool = True
     collector_poll_seconds: int = 2
+    collector_bootstrap_lookback_hours: int = 24
     materializer_periodic_enabled: bool = True
     materializer_poll_seconds: int = 5
     materializer_base_timeframe: str = "1s"

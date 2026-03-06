@@ -161,6 +161,7 @@ class TestRuntimeConfigLoader(unittest.TestCase):
             env["LQ__BACKTEST__WINDOW_SECONDS"] = "22"
             env["LQ__EXECUTION__GPU_MODE"] = "gpu"
             env["LQ__EXECUTION__GPU_VRAM_GB"] = "6.5"
+            env["LQ__STORAGE__COLLECTOR_BOOTSTRAP_LOOKBACK_HOURS"] = "36"
             env["LQ__LIVE__POLL_SECONDS"] = "4"
             env["LQ__LIVE__WINDOW_SECONDS"] = "5"
             runtime = load_runtime_config(config_path=path, env=env)
@@ -176,6 +177,7 @@ class TestRuntimeConfigLoader(unittest.TestCase):
             self.assertEqual(runtime.execution.gpu_mode, "gpu")
             self.assertEqual(runtime.execution.compute_backend, "gpu")
             self.assertAlmostEqual(runtime.execution.gpu_vram_gb, 6.5)
+            self.assertEqual(runtime.storage.collector_bootstrap_lookback_hours, 36)
             self.assertEqual(runtime.live.poll_seconds, 4)
             self.assertEqual(runtime.live.poll_interval, 4)
             self.assertEqual(runtime.live.live_poll_seconds, 4)
