@@ -1013,6 +1013,51 @@ class ParquetMarketDataRepository:
         self._fsync_dir(manifest_path.parent)
         return manifest_path
 
+    def read_latest_materialized_manifest(
+        self,
+        *,
+        exchange: str,
+        symbol: str,
+        timeframe: str,
+    ) -> dict[str, Any] | None:
+        token = normalize_timeframe_token(timeframe)
+        manifests = self._iter_materialized_manifest_paths(
+            exchange=exchange,
+            symbol=symbol,
+            timeframe=token,
+        )
+        latest_payload: dict[str, Any] | None = None
+        latest_key: tuple[int, int, str, str] | None = None
+
+        for manifest_path in manifests:
+            try:
+                payload = self._read_json_file(manifest_path)
+            except Exception:
+                continue
+            if not isinstance(payload, dict):
+                continue
+
+            try:
+                checkpoint_end = int(payload.get("source_checkpoint_end", 0) or 0)
+            except Exception:
+                checkpoint_end = 0
+            try:
+                watermark_ms = int(payload.get("event_time_watermark_ms", 0) or 0)
+            except Exception:
+                watermark_ms = 0
+            commit_id = str(payload.get("commit_id", "") or "")
+            key = (
+                int(checkpoint_end),
+                int(watermark_ms),
+                commit_id,
+                str(manifest_path),
+            )
+            if latest_key is None or key > latest_key:
+                latest_key = key
+                latest_payload = dict(payload)
+
+        return latest_payload
+
     @staticmethod
     def _env_int(*, names: list[str], default: int) -> int:
         for name in names:

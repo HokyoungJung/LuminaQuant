@@ -10,7 +10,9 @@ from datetime import UTC, datetime
 
 from lumina_quant.backtesting.cli_contract import RawFirstDataMissingError
 from lumina_quant.config import BaseConfig
+from lumina_quant.market_data import normalize_timeframe_token, timeframe_to_milliseconds
 from lumina_quant.services.materialize_from_raw import materialize_raw_aggtrades_bundle
+from lumina_quant.storage.parquet import ParquetMarketDataRepository
 
 
 def _parse_symbols(value: str) -> list[str]:
@@ -40,6 +42,64 @@ def _parse_timeframes(value: str) -> list[str]:
     return deduped or list(BaseConfig.MATERIALIZER_REQUIRED_TIMEFRAMES)
 
 
+def _normalize_timeframes(values: list[str]) -> list[str]:
+    normalized = [normalize_timeframe_token(str(value)) for value in list(values or []) if str(value).strip()]
+    deduped = list(dict.fromkeys(normalized))
+    if "1s" in deduped and deduped[0] != "1s":
+        deduped = ["1s", *[token for token in deduped if token != "1s"]]
+    return deduped or list(BaseConfig.MATERIALIZER_REQUIRED_TIMEFRAMES)
+
+
+def _coerce_positive_int(value: object) -> int | None:
+    try:
+        parsed = int(value or 0)
+    except Exception:
+        return None
+    return parsed if parsed > 0 else None
+
+
+def _isoformat_utc_from_ms(timestamp_ms: int) -> str:
+    return datetime.fromtimestamp(int(timestamp_ms) / 1000.0, tz=UTC).isoformat().replace("+00:00", "Z")
+
+
+def _resolve_symbol_materialization_window(
+    *,
+    db_path: str,
+    exchange: str,
+    symbol: str,
+    required_timeframes: list[str],
+    start_date: str | None,
+    end_date: str | None,
+    incremental_window: bool,
+) -> tuple[str | None, str | None]:
+    if not incremental_window or start_date is not None or end_date is not None:
+        return start_date, end_date
+
+    repo = ParquetMarketDataRepository(str(db_path))
+    latest_manifest = repo.read_latest_materialized_manifest(
+        exchange=str(exchange),
+        symbol=str(symbol),
+        timeframe="1s",
+    )
+    if not latest_manifest:
+        return None, None
+
+    anchor_ms = _coerce_positive_int(latest_manifest.get("source_checkpoint_end"))
+    if anchor_ms is None:
+        anchor_ms = _coerce_positive_int(latest_manifest.get("event_time_watermark_ms"))
+    if anchor_ms is None:
+        return None, None
+
+    earliest_bucket_ms = int(anchor_ms)
+    for timeframe in _normalize_timeframes(required_timeframes):
+        tf_ms = max(1, int(timeframe_to_milliseconds(timeframe)))
+        earliest_bucket_ms = min(earliest_bucket_ms, (int(anchor_ms) // tf_ms) * tf_ms)
+
+    day_ms = 24 * 60 * 60 * 1000
+    earliest_partition_start_ms = (int(earliest_bucket_ms) // day_ms) * day_ms
+    return _isoformat_utc_from_ms(earliest_partition_start_ms), None
+
+
 def run_materializer_cycle(
     *,
     db_path: str,
@@ -50,6 +110,7 @@ def run_materializer_cycle(
     start_date: str | None,
     end_date: str | None,
     producer: str,
+    incremental_window: bool = True,
 ) -> dict[str, object]:
     if str(base_timeframe or "").strip().lower() != "1s":
         raise ValueError("storage.materializer_base_timeframe must be '1s'.")
@@ -59,14 +120,23 @@ def run_materializer_cycle(
 
     for symbol in symbols:
         try:
+            resolved_start_date, resolved_end_date = _resolve_symbol_materialization_window(
+                db_path=str(db_path),
+                exchange=str(exchange),
+                symbol=str(symbol),
+                required_timeframes=list(required_timeframes),
+                start_date=start_date,
+                end_date=end_date,
+                incremental_window=bool(incremental_window),
+            )
             bundle_id = f"bundle-{datetime.now(tz=UTC).strftime('%Y%m%dT%H%M%SZ')}-{symbol.replace('/', '-')}"
             result = materialize_raw_aggtrades_bundle(
                 root_path=str(db_path),
                 exchange=str(exchange),
                 symbol=str(symbol),
                 timeframes=list(required_timeframes),
-                start_date=start_date,
-                end_date=end_date,
+                start_date=resolved_start_date,
+                end_date=resolved_end_date,
                 producer=str(producer),
                 require_complete=True,
             )
@@ -128,6 +198,7 @@ def run_materializer_periodic_loop(
     periodic_enabled: bool,
     poll_seconds: int,
     max_cycles: int | None = None,
+    incremental_window: bool = True,
     sleep_fn=time.sleep,
 ) -> list[dict[str, object]]:
     cycles: list[dict[str, object]] = []
@@ -144,6 +215,7 @@ def run_materializer_periodic_loop(
             start_date=start_date,
             end_date=end_date,
             producer=producer,
+            incremental_window=incremental_window,
         )
         payload["cycle"] = int(cycle)
         cycles.append(payload)
@@ -240,6 +312,16 @@ def _parse_args() -> argparse.Namespace:
         default="",
         help="Override periodic mode (true/false). Empty = config default.",
     )
+    parser.add_argument(
+        "--full-rebuild",
+        action="store_true",
+        help=(
+            "Disable incremental partition-safe windowing when --start-date/--end-date are empty. "
+            "Default behavior re-reads only the UTC date partitions that can still change based "
+            "on the latest committed 1s manifest. Use this for historical backfills or raw "
+            "repairs older than the latest committed anchor."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -278,6 +360,7 @@ def main() -> int:
         periodic_enabled=periodic_enabled,
         poll_seconds=max(1, int(args.poll_seconds)),
         max_cycles=max_cycles,
+        incremental_window=not bool(args.full_rebuild),
     )
     return 0
 

@@ -199,6 +199,16 @@ Collector bootstrap behavior:
   `now - storage.collector_bootstrap_lookback_hours` (default: 24h).
 - For deterministic initial coverage, prefer explicit `--since` on first run.
 
+Materializer window behavior:
+- If `--start-date/--end-date` are omitted, periodic materializer runs reuse the
+  latest committed `1s` manifest and re-read only the UTC date partitions that can
+  still change (for the default timeframe set, this is typically "current UTC day
+  so far"; the replay span depends on the largest required timeframe plus any
+  day-boundary gap since the last committed anchor).
+- Use `--full-rebuild` to force the previous full-history scan behavior when you
+  intentionally want a historical rebuild, or when raw backfills/repairs land
+  earlier than the latest committed materializer anchor.
+
 Pre-live committed data check:
 ```bash
 uv run python - <<'PY'
