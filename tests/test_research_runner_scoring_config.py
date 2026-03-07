@@ -39,8 +39,16 @@ def test_run_candidate_research_scoring_config_defaults_and_override(monkeypatch
         _ = cache, timeframes
         return {"1m": np.zeros(24, dtype=float)}
 
-    def _mock_evaluate_candidate(candidate, *, cache, benchmark_cache, candidate_count, scoring_config=None):
-        _ = cache, benchmark_cache, candidate_count, scoring_config
+    def _mock_evaluate_candidate(
+        candidate,
+        *,
+        cache,
+        feature_cache,
+        benchmark_cache,
+        candidate_count,
+        scoring_config=None,
+    ):
+        _ = cache, feature_cache, benchmark_cache, candidate_count, scoring_config
         cid = str(candidate.get("candidate_id"))
         base = metric_by_id[cid]
         metrics = {

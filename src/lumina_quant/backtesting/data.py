@@ -9,6 +9,7 @@ from typing import Any
 
 from lumina_quant.compute.ohlcv_loader import OHLCVFrameLoader
 from lumina_quant.core.events import MarketBatchEvent, MarketEvent
+from lumina_quant.data.feature_points import FeaturePointLookup
 from lumina_quant.market_data import resolve_symbol_csv_path
 
 
@@ -51,6 +52,8 @@ class HistoricCSVDataHandler(DataHandler):
         start_date=None,
         end_date=None,
         data_dict=None,
+        feature_db_path: str | None = None,
+        feature_exchange: str | None = None,
     ):
         self.events = events
         self.csv_dir = csv_dir
@@ -62,6 +65,10 @@ class HistoricCSVDataHandler(DataHandler):
         self._strict_data_dict = data_dict is not None
         self._single_symbol = len(symbol_list) == 1
         self._frame_loader = OHLCVFrameLoader(start_date=self.start_date, end_date=self.end_date)
+        self._feature_lookup = self._build_feature_lookup(
+            db_path=feature_db_path,
+            exchange=feature_exchange,
+        )
 
         self.symbol_rows: dict[str, tuple[tuple[Any, ...], ...]] = {}
         self.symbol_timestamps_ms: dict[str, list[int]] = {}
@@ -86,6 +93,30 @@ class HistoricCSVDataHandler(DataHandler):
         }
 
         self._open_convert_csv_files()
+
+    @staticmethod
+    def _build_feature_lookup(
+        *,
+        db_path: str | None,
+        exchange: str | None,
+    ) -> FeaturePointLookup:
+        resolved_db_path = db_path
+        resolved_exchange = exchange
+        if resolved_db_path is None or resolved_exchange is None:
+            try:
+                from lumina_quant.config import BaseConfig
+            except Exception:
+                BaseConfig = None
+            if resolved_db_path is None:
+                resolved_db_path = str(
+                    getattr(BaseConfig, "MARKET_DATA_PARQUET_PATH", "data/market_parquet")
+                )
+            if resolved_exchange is None:
+                resolved_exchange = str(getattr(BaseConfig, "MARKET_DATA_EXCHANGE", "binance"))
+        return FeaturePointLookup(
+            db_path=resolved_db_path,
+            exchange=str(resolved_exchange or "binance"),
+        )
 
     @staticmethod
     def _bar_time_ms(bar_time: Any) -> int | None:
@@ -363,7 +394,19 @@ class HistoricCSVDataHandler(DataHandler):
         idx = self.col_idx.get(val_type)
         if idx is not None and self.latest_symbol_data.get(symbol):
             return self.latest_symbol_data[symbol][-1][idx]
+        feature_value = self.get_latest_feature_value(symbol, val_type)
+        if feature_value is not None:
+            return float(feature_value)
         return 0.0
+
+    def get_latest_feature_value(self, symbol, field):
+        bar_time = self.get_latest_bar_datetime(symbol)
+        timestamp_ms = self._bar_time_ms(bar_time)
+        return self._feature_lookup.get_latest(
+            str(symbol),
+            str(field),
+            timestamp_ms=timestamp_ms,
+        )
 
     def get_latest_bars_values(self, symbol, val_type, N=1):
         """Returns last N values for a specific column."""

@@ -37,6 +37,8 @@ EMPTY_OHLCV_SCHEMA = {
 _FEATURE_COLUMNS = (
     "funding_rate",
     "funding_mark_price",
+    "funding_fee_rate",
+    "funding_fee_quote_per_unit",
     "mark_price",
     "index_price",
     "open_interest",
@@ -642,7 +644,18 @@ def _upsert_feature_points(
     if not incoming_records:
         return 0
 
-    incoming = pl.DataFrame(incoming_records)
+    incoming = pl.DataFrame(
+        incoming_records,
+        schema={
+            "exchange": pl.Utf8,
+            "symbol": pl.Utf8,
+            "timestamp_ms": pl.Int64,
+            "datetime": pl.Utf8,
+            "source": pl.Utf8,
+            **dict.fromkeys(_FEATURE_COLUMNS, pl.Float64),
+        },
+        strict=False,
+    )
     canonical_columns = ["exchange", "symbol", "timestamp_ms", "datetime", "source", *_FEATURE_COLUMNS]
 
     def _align_columns(frame: pl.DataFrame) -> pl.DataFrame:

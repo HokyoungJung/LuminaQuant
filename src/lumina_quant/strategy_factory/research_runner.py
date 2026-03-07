@@ -17,6 +17,7 @@ from typing import Any
 import numpy as np
 import polars as pl
 from lumina_quant.config import BaseConfig
+from lumina_quant.market_data import load_futures_feature_points_from_db
 from lumina_quant.storage.parquet import load_data_dict_from_parquet
 from lumina_quant.symbols import (
     CANONICAL_STRATEGY_TIMEFRAMES,
@@ -40,6 +41,19 @@ _MIN_BARS = 360
 _CROWDING_SUPPORT_PATH = Path("data") / "market_parquet" / "feature_points"
 _METALS = {"XAU/USDT", "XAG/USDT"}
 _LEADERS = ("BTC/USDT", "ETH/USDT", "BNB/USDT", "SOL/USDT")
+_FEATURE_POINT_COLUMNS: tuple[str, ...] = (
+    "funding_rate",
+    "funding_mark_price",
+    "funding_fee_rate",
+    "funding_fee_quote_per_unit",
+    "mark_price",
+    "index_price",
+    "open_interest",
+    "liquidation_long_qty",
+    "liquidation_short_qty",
+    "liquidation_long_notional",
+    "liquidation_short_notional",
+)
 
 DEFAULT_RESEARCH_SCORING_CONFIG: dict[str, Any] = {
     "stage1_prefilter_weights": {
@@ -114,6 +128,132 @@ class SeriesBundle:
     low: np.ndarray
     close: np.ndarray
     volume: np.ndarray
+
+
+def _load_feature_cache(*, symbols: Sequence[str]) -> dict[str, pl.DataFrame]:
+    db_path = str(getattr(BaseConfig, "MARKET_DATA_PARQUET_PATH", "data/market_parquet"))
+    exchange = str(getattr(BaseConfig, "MARKET_DATA_EXCHANGE", "binance") or "binance")
+    cache: dict[str, pl.DataFrame] = {}
+
+    for symbol in canonicalize_symbol_list(symbols):
+        try:
+            frame = load_futures_feature_points_from_db(
+                db_path,
+                exchange=exchange,
+                symbol=symbol,
+            )
+        except Exception:
+            frame = pl.DataFrame()
+
+        if frame.is_empty() or "timestamp_ms" not in frame.columns:
+            cache[symbol] = pl.DataFrame()
+            continue
+
+        cleaned = frame.filter(pl.col("timestamp_ms").is_not_null()).with_columns(
+            pl.col("timestamp_ms").cast(pl.Int64)
+        )
+        if cleaned.is_empty():
+            cache[symbol] = pl.DataFrame()
+            continue
+
+        for field in _FEATURE_POINT_COLUMNS:
+            if field not in cleaned.columns:
+                cleaned = cleaned.with_columns(pl.lit(None, dtype=pl.Float64).alias(field))
+
+        cleaned = cleaned.select(["timestamp_ms", *_FEATURE_POINT_COLUMNS]).sort("timestamp_ms").unique(
+            subset=["timestamp_ms"],
+            keep="last",
+        )
+        cleaned = cleaned.with_columns(
+            [
+                pl.col("timestamp_ms").cast(pl.Int64),
+                pl.from_epoch("timestamp_ms", time_unit="ms").alias("datetime"),
+                *[
+                    pl.col(field).cast(pl.Float64).fill_null(strategy="forward").alias(field)
+                    for field in _FEATURE_POINT_COLUMNS
+                ],
+            ]
+        )
+        cache[symbol] = cleaned
+
+    return cache
+
+
+def _crowding_support_series(
+    *,
+    funding_rate: np.ndarray,
+    open_interest: np.ndarray,
+    mark_price: np.ndarray | None = None,
+    index_price: np.ndarray | None = None,
+    liquidation_long_notional: np.ndarray | None = None,
+    liquidation_short_notional: np.ndarray | None = None,
+    window: int = 96,
+) -> dict[str, np.ndarray]:
+    n = int(funding_rate.size)
+    empty = np.full(n, np.nan, dtype=float)
+    if n <= 0:
+        return {
+            "crowding_score": empty,
+            "funding_z": empty,
+            "oi_delta_z": empty,
+            "basis_z": empty,
+            "liquidation_imbalance_z": empty,
+        }
+
+    funding = np.asarray(funding_rate, dtype=float)
+    oi = np.asarray(open_interest, dtype=float)
+    mark = None if mark_price is None else np.asarray(mark_price, dtype=float)
+    index = None if index_price is None else np.asarray(index_price, dtype=float)
+    long_liq = (
+        np.zeros(n, dtype=float)
+        if liquidation_long_notional is None
+        else np.nan_to_num(np.asarray(liquidation_long_notional, dtype=float), nan=0.0)
+    )
+    short_liq = (
+        np.zeros(n, dtype=float)
+        if liquidation_short_notional is None
+        else np.nan_to_num(np.asarray(liquidation_short_notional, dtype=float), nan=0.0)
+    )
+
+    oi_prev = np.roll(oi, 1)
+    oi_prev[0] = np.nan
+    oi_delta = np.full(n, np.nan, dtype=float)
+    oi_mask = (
+        np.isfinite(oi)
+        & np.isfinite(oi_prev)
+        & (oi > 0.0)
+        & (oi_prev > 0.0)
+    )
+    oi_delta[oi_mask] = np.log(oi[oi_mask] / oi_prev[oi_mask])
+
+    basis = np.full(n, np.nan, dtype=float)
+    if mark is not None and index is not None:
+        basis_mask = np.isfinite(mark) & np.isfinite(index) & (np.abs(index) > 1e-12)
+        basis[basis_mask] = (mark[basis_mask] - index[basis_mask]) / index[basis_mask]
+
+    liq_den = np.abs(long_liq) + np.abs(short_liq) + 1e-12
+    liq_imbalance = (long_liq - short_liq) / liq_den
+
+    funding_z = _rolling_z(np.nan_to_num(funding, nan=0.0), max(16, int(window)))
+    oi_delta_z = _rolling_z(np.nan_to_num(oi_delta, nan=0.0), max(16, int(window // 2)))
+    basis_z = _rolling_z(np.nan_to_num(basis, nan=0.0), max(12, int(window // 2)))
+    liq_z = _rolling_z(np.nan_to_num(liq_imbalance, nan=0.0), max(12, int(window // 2)))
+
+    valid = np.isfinite(funding) & np.isfinite(oi)
+    score = np.tanh(
+        (0.45 * np.nan_to_num(funding_z, nan=0.0))
+        + (0.35 * np.nan_to_num(oi_delta_z, nan=0.0))
+        + (0.15 * np.nan_to_num(basis_z, nan=0.0))
+        + (0.05 * np.nan_to_num(liq_z, nan=0.0))
+    )
+    score = np.where(valid, score, np.nan)
+    return {
+        "crowding_score": score.astype(float, copy=False),
+        "funding_z": np.where(valid, funding_z, np.nan),
+        "oi_delta_z": np.where(valid, oi_delta_z, np.nan),
+        "basis_z": np.where(valid, basis_z, np.nan),
+        "liquidation_imbalance_z": np.where(valid, liq_z, np.nan),
+    }
 
 
 def _hash_unit_interval(*parts: str) -> float:
@@ -623,7 +763,11 @@ def _pair_spread_z(px: np.ndarray, py: np.ndarray, window: int = 96) -> np.ndarr
     return out
 
 
-def _align_bundles(bundles: Sequence[SeriesBundle]) -> dict[str, np.ndarray] | None:
+def _align_bundles(
+    bundles: Sequence[SeriesBundle],
+    *,
+    feature_cache: Mapping[str, pl.DataFrame] | None = None,
+) -> dict[str, np.ndarray] | None:
     if not bundles:
         return None
     min_len = min(bundle.close.size for bundle in bundles)
@@ -640,7 +784,165 @@ def _align_bundles(bundles: Sequence[SeriesBundle]) -> dict[str, np.ndarray] | N
         aligned[f"{prefix}:low"] = bundle.low[-min_len:]
         aligned[f"{prefix}:close"] = bundle.close[-min_len:]
         aligned[f"{prefix}:volume"] = bundle.volume[-min_len:]
+        feature_frame = None if feature_cache is None else feature_cache.get(prefix)
+        if feature_frame is None or feature_frame.is_empty():
+            continue
+
+        target = pl.DataFrame(
+            {"datetime": pl.Series("datetime", bundle.datetime[-min_len:])}
+        )
+        joined = target.join_asof(
+            feature_frame.select(["datetime", *_FEATURE_POINT_COLUMNS]).sort("datetime"),
+            on="datetime",
+            strategy="backward",
+        )
+        for field in _FEATURE_POINT_COLUMNS:
+            aligned[f"{prefix}:{field}"] = joined.get_column(field).to_numpy()
+
+        support = _crowding_support_series(
+            funding_rate=np.asarray(joined.get_column("funding_rate").to_numpy(), dtype=float),
+            open_interest=np.asarray(joined.get_column("open_interest").to_numpy(), dtype=float),
+            mark_price=np.asarray(joined.get_column("mark_price").to_numpy(), dtype=float),
+            index_price=np.asarray(joined.get_column("index_price").to_numpy(), dtype=float),
+            liquidation_long_notional=np.asarray(
+                joined.get_column("liquidation_long_notional").to_numpy(),
+                dtype=float,
+            ),
+            liquidation_short_notional=np.asarray(
+                joined.get_column("liquidation_short_notional").to_numpy(),
+                dtype=float,
+            ),
+        )
+        for key, values in support.items():
+            aligned[f"{prefix}:{key}"] = values
     return aligned
+
+
+def _perp_carry_position_series(
+    *,
+    close: np.ndarray,
+    funding_rate: np.ndarray,
+    open_interest: np.ndarray,
+    liquidation_long_notional: np.ndarray,
+    liquidation_short_notional: np.ndarray,
+    mark_price: np.ndarray | None = None,
+    index_price: np.ndarray | None = None,
+    window: int,
+    mild_funding: float,
+    extreme_funding: float,
+    entry_threshold: float,
+    exit_threshold: float,
+    stop_loss_pct: float,
+    max_hold_bars: int,
+    allow_short: bool,
+) -> tuple[np.ndarray, dict[str, np.ndarray]]:
+    support = _crowding_support_series(
+        funding_rate=funding_rate,
+        open_interest=open_interest,
+        mark_price=mark_price,
+        index_price=index_price,
+        liquidation_long_notional=liquidation_long_notional,
+        liquidation_short_notional=liquidation_short_notional,
+        window=window,
+    )
+    score = np.asarray(support["crowding_score"], dtype=float)
+    oi_delta_z = np.asarray(support["oi_delta_z"], dtype=float)
+    funding = np.asarray(funding_rate, dtype=float)
+    close_arr = np.asarray(close, dtype=float)
+
+    position = np.zeros(close_arr.shape, dtype=float)
+    mode = 0
+    entry_price: float | None = None
+    bars_held = 0
+
+    for idx in range(close_arr.size):
+        funding_i = funding[idx]
+        score_i = score[idx]
+        oi_delta_z_i = oi_delta_z[idx]
+        close_i = close_arr[idx]
+        if not np.isfinite(close_i):
+            position[idx] = float(mode)
+            continue
+
+        if mode == 1:
+            bars_held += 1
+            should_exit = (
+                (np.isfinite(score_i) and float(score_i) <= float(exit_threshold))
+                or (np.isfinite(funding_i) and float(funding_i) >= float(extreme_funding))
+                or (bars_held >= int(max_hold_bars))
+                or (
+                    entry_price is not None
+                    and close_i <= float(entry_price) * (1.0 - float(stop_loss_pct))
+                )
+            )
+            if should_exit:
+                mode = 0
+                entry_price = None
+                bars_held = 0
+            position[idx] = float(mode)
+            continue
+
+        if mode == -1:
+            bars_held += 1
+            should_exit = (
+                (np.isfinite(score_i) and float(score_i) >= -float(exit_threshold))
+                or (np.isfinite(funding_i) and float(funding_i) <= -float(extreme_funding))
+                or (bars_held >= int(max_hold_bars))
+                or (
+                    entry_price is not None
+                    and close_i >= float(entry_price) * (1.0 + float(stop_loss_pct))
+                )
+            )
+            if should_exit:
+                mode = 0
+                entry_price = None
+                bars_held = 0
+            position[idx] = float(mode)
+            continue
+
+        if not (np.isfinite(funding_i) and np.isfinite(score_i) and np.isfinite(oi_delta_z_i)):
+            position[idx] = 0.0
+            continue
+
+        carry_long = (
+            (funding_i > 0.0)
+            and (funding_i <= float(mild_funding))
+            and (score_i >= float(entry_threshold))
+        )
+        crowded_long = (
+            (funding_i >= float(extreme_funding))
+            and (oi_delta_z_i > 0.0)
+            and (score_i >= float(entry_threshold))
+        )
+        carry_short = (
+            (funding_i < 0.0)
+            and (abs(funding_i) <= float(mild_funding))
+            and (score_i <= -float(entry_threshold))
+        )
+        crowded_short = (
+            (funding_i <= -float(extreme_funding))
+            and (oi_delta_z_i < 0.0)
+            and (score_i <= -float(entry_threshold))
+        )
+
+        if carry_long and not crowded_long:
+            mode = 1
+            entry_price = float(close_i)
+            bars_held = 0
+        elif bool(allow_short) and (
+            crowded_long or (carry_short and not crowded_short)
+        ):
+            mode = -1
+            entry_price = float(close_i)
+            bars_held = 0
+        elif crowded_short:
+            mode = 1
+            entry_price = float(close_i)
+            bars_held = 0
+
+        position[idx] = float(mode)
+
+    return position, support
 
 
 def _returns_from_close(closes: np.ndarray) -> np.ndarray:
@@ -699,6 +1001,17 @@ def _strategy_signal(
 
             position = np.where(score >= long_th, 1.0, np.where(score <= -short_th, -1.0, 0.0))
             position = np.where(gate, position, 0.0)
+            crowding = aligned.get(f"{symbol}:crowding_score")
+            if crowding is not None:
+                reduce_th = float(params.get("crowding_reduce_threshold", 0.55))
+                block_th = float(params.get("crowding_block_threshold", 0.85))
+                crowd = np.nan_to_num(np.asarray(crowding, dtype=float), nan=0.0)
+                position = np.where(np.abs(crowd) >= block_th, 0.0, position)
+                position = np.where(
+                    (np.abs(crowd) >= reduce_th) & (position != 0.0),
+                    0.5 * np.sign(position),
+                    position,
+                )
             exposures[s_idx] = position
 
             _ = high, low  # kept for symmetry with requested factor inputs.
@@ -801,14 +1114,43 @@ def _strategy_signal(
             meta["missing_support_data"] = True
             exposures[:] = 0.0
         else:
-            # Placeholder support-data proxy from price/volume dynamics.
-            entry = float(params.get("entry_threshold", 0.30))
+            missing_symbols: list[str] = []
             for s_idx, symbol in enumerate(symbols):
                 close = aligned[f"{symbol}:close"]
-                ret = _returns_from_close(close)
-                vol = np.nan_to_num(_rolling_z(np.abs(ret), 96), nan=0.0)
-                crowd = np.tanh(_rolling_z(ret, 64) + 0.5 * vol)
-                exposures[s_idx] = np.where(crowd >= entry, 1.0, np.where(crowd <= -entry, -1.0, 0.0))
+                funding = aligned.get(f"{symbol}:funding_rate")
+                oi = aligned.get(f"{symbol}:open_interest")
+                liq_long = aligned.get(f"{symbol}:liquidation_long_notional")
+                liq_short = aligned.get(f"{symbol}:liquidation_short_notional")
+                if funding is None or oi is None or liq_long is None or liq_short is None:
+                    missing_symbols.append(symbol)
+                    continue
+                position, support = _perp_carry_position_series(
+                    close=np.asarray(close, dtype=float),
+                    funding_rate=np.asarray(funding, dtype=float),
+                    open_interest=np.asarray(oi, dtype=float),
+                    liquidation_long_notional=np.asarray(liq_long, dtype=float),
+                    liquidation_short_notional=np.asarray(liq_short, dtype=float),
+                    mark_price=None
+                    if aligned.get(f"{symbol}:mark_price") is None
+                    else np.asarray(aligned[f"{symbol}:mark_price"], dtype=float),
+                    index_price=None
+                    if aligned.get(f"{symbol}:index_price") is None
+                    else np.asarray(aligned[f"{symbol}:index_price"], dtype=float),
+                    window=int(params.get("window", 96)),
+                    mild_funding=float(params.get("mild_funding", 0.0002)),
+                    extreme_funding=float(params.get("extreme_funding", 0.0012)),
+                    entry_threshold=float(params.get("entry_threshold", 0.30)),
+                    exit_threshold=float(params.get("exit_threshold", 0.10)),
+                    stop_loss_pct=float(params.get("stop_loss_pct", 0.02)),
+                    max_hold_bars=int(params.get("max_hold_bars", 72)),
+                    allow_short=bool(params.get("allow_short", True)),
+                )
+                exposures[s_idx] = position
+                if np.any(np.isfinite(support["crowding_score"])):
+                    meta.setdefault("support_data_symbols", []).append(symbol)
+            if missing_symbols:
+                meta["missing_support_data"] = True
+                meta["missing_support_symbols"] = missing_symbols
 
     elif strategy_class == "MicroRangeExpansion1sStrategy":
         lookback = max(8, int(params.get("lookback", 30)))
@@ -857,6 +1199,7 @@ def _evaluate_candidate(
     candidate: dict[str, Any],
     *,
     cache: Mapping[tuple[str, str], SeriesBundle],
+    feature_cache: Mapping[str, pl.DataFrame] | None,
     benchmark_cache: Mapping[str, np.ndarray],
     candidate_count: int,
     scoring_config: Mapping[str, Any] | None = None,
@@ -870,7 +1213,7 @@ def _evaluate_candidate(
             continue
         bundles.append(bundle)
 
-    aligned = _align_bundles(bundles)
+    aligned = _align_bundles(bundles, feature_cache=feature_cache)
     if aligned is None:
         return {
             "error": "insufficient_data",
@@ -1306,6 +1649,15 @@ def run_candidate_research(
         symbols=universe,
         timeframes=normalized_timeframes,
     )
+    support_feature_symbols = canonicalize_symbol_list(
+        itertools.chain.from_iterable(
+            list(row.get("symbols") or [])
+            for row in adapted
+            if str(row.get("strategy_class") or row.get("strategy") or "")
+            in {"PerpCrowdingCarryStrategy", "CompositeTrendStrategy"}
+        )
+    )
+    feature_cache = _load_feature_cache(symbols=support_feature_symbols)
     benchmark = _benchmark_cache(cache, normalized_timeframes)
 
     # Stage-1 fast prefilter: evaluate on early train region approximation.
@@ -1314,6 +1666,7 @@ def run_candidate_research(
         result = _evaluate_candidate(
             row,
             cache=cache,
+            feature_cache=feature_cache,
             benchmark_cache=benchmark,
             candidate_count=max(1, len(adapted)),
             scoring_config=resolved_scoring_config,

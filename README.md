@@ -462,14 +462,29 @@ uv run python scripts/collect_strategy_support_data.py \
 uv run python scripts/collect_strategy_support_data.py \
   --db-path data/market_parquet \
   --execute
+
+# Unified collector aligned to current OHLCV coverage + canonical inventory refresh
+uv run python scripts/collect_all_strategy_support_data.py \
+  --db-path data/market_parquet \
+  --symbols BTC/USDT ETH/USDT XAU/USDT XAG/USDT \
+  --force-full
+
+# Rebuild the canonical inventory only
+uv run python scripts/build_strategy_support_inventory.py \
+  --db-path data/market_parquet
 ```
 
 Collected feature points are stored in parquet-backed `futures_feature_points` datasets with:
 - `funding_rate`, `funding_mark_price`
+- `funding_fee_rate`, `funding_fee_quote_per_unit`
 - `mark_price`, `index_price`
 - `open_interest`
 - `liquidation_long_qty`, `liquidation_short_qty`
 - `liquidation_long_notional`, `liquidation_short_notional`
+
+Canonical inventory outputs:
+- `var/reports/strategy_support_inventory_latest.json`
+- `var/reports/strategy_support_inventory_latest.csv`
 
 **Fast Local Scan Profiles (avoid full 20min+ runs while iterating):**
 ```bash

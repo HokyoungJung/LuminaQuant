@@ -408,15 +408,12 @@ class Portfolio:
     def _apply_funding(self, latest_datetime):
         interval_hours = max(1, int(getattr(self.config, "FUNDING_INTERVAL_HOURS", 8)))
         interval_seconds = interval_hours * 3600
-        rate_per_8h = float(getattr(self.config, "FUNDING_RATE_PER_8H", 0.0))
-        if rate_per_8h == 0.0:
-            return
+        default_rate_per_8h = float(getattr(self.config, "FUNDING_RATE_PER_8H", 0.0))
 
         now_ts = self._to_unix_seconds(latest_datetime)
         if now_ts is None:
             return
 
-        interval_rate = rate_per_8h * (interval_hours / 8.0)
         for symbol in self.symbol_list:
             qty = float(self.current_positions.get(symbol, 0.0))
             if abs(qty) < 1e-12:
@@ -433,10 +430,20 @@ class Portfolio:
             if periods <= 0:
                 continue
 
+            rate_per_8h = self._resolve_funding_rate(symbol, default=default_rate_per_8h)
+            if rate_per_8h is None:
+                self._last_funding_ts[symbol] = now_ts
+                continue
+
             price = self.bars.get_latest_bar_value(symbol, "close")
             notional = abs(qty * price)
             if notional <= 0:
                 self._last_funding_ts[symbol] = now_ts
+                continue
+
+            interval_rate = float(rate_per_8h) * (interval_hours / 8.0)
+            if abs(interval_rate) <= 1e-12:
+                self._last_funding_ts[symbol] = last_ts + periods * interval_seconds
                 continue
 
             # Positive funding rate: longs pay, shorts receive.
@@ -447,6 +454,33 @@ class Portfolio:
             self.current_holdings["funding"] += funding_payment
             self.total_funding_paid += funding_payment
             self._last_funding_ts[symbol] = last_ts + periods * interval_seconds
+
+    def _resolve_funding_rate(self, symbol, *, default: float) -> float | None:
+        getter = getattr(self.bars, "get_latest_feature_value", None)
+        if callable(getter):
+            try:
+                dynamic = getter(symbol, "funding_rate")
+            except Exception:
+                dynamic = None
+            if dynamic is not None:
+                try:
+                    return float(dynamic)
+                except Exception:
+                    pass
+
+        try:
+            fallback = self.bars.get_latest_bar_value(symbol, "funding_rate")
+        except Exception:
+            fallback = None
+        if fallback not in (None, 0.0):
+            try:
+                return float(fallback)
+            except Exception:
+                pass
+
+        if abs(float(default)) <= 1e-12:
+            return None
+        return float(default)
 
     def _check_liquidations(self, latest_datetime):
         leverage = max(1, int(getattr(self.config, "LEVERAGE", 1)))

@@ -9,12 +9,13 @@ from lumina_quant.core.events import FillEvent
 class MockBars:
     symbol_list = ["BTC/USDT"]
 
-    def __init__(self, start_dt, price):
+    def __init__(self, start_dt, price, *, funding_rate=None):
         self.current_dt = start_dt
         self.open = price
         self.high = price
         self.low = price
         self.close = price
+        self.funding_rate = funding_rate
 
     def get_latest_bar_datetime(self, symbol):
         _ = symbol
@@ -33,6 +34,12 @@ class MockBars:
     def get_market_spec(self, symbol):
         _ = symbol
         return {"min_qty": 0.001, "qty_step": 0.001, "min_notional": 5.0}
+
+    def get_latest_feature_value(self, symbol, field):
+        _ = symbol
+        if field == "funding_rate":
+            return self.funding_rate
+        return None
 
 
 class FundingConfig:
@@ -56,6 +63,10 @@ class LiquidationConfig(FundingConfig):
     FUNDING_RATE_PER_8H = 0.0
 
 
+class DynamicFundingConfig(FundingConfig):
+    FUNDING_RATE_PER_8H = 0.0
+
+
 class TestFundingAndLiquidation(unittest.TestCase):
     def test_funding_is_applied_on_interval(self):
         events = queue.Queue()
@@ -72,6 +83,21 @@ class TestFundingAndLiquidation(unittest.TestCase):
         bars.current_dt += timedelta(hours=8)
         p.update_timeindex(None)
         self.assertNotEqual(p.current_holdings["cash"], cash_before)
+        self.assertGreater(p.total_funding_paid, 0.0)
+
+    def test_dynamic_funding_feature_rate_is_used_when_config_default_is_zero(self):
+        events = queue.Queue()
+        bars = MockBars(datetime(2026, 1, 1, 0, 0), 100.0, funding_rate=0.001)
+        p = Portfolio(bars, events, bars.current_dt, DynamicFundingConfig)
+        p.current_positions["BTC/USDT"] = 1.0
+        p.entry_prices["BTC/USDT"] = 100.0
+
+        p.update_timeindex(None)
+        cash_before = p.current_holdings["cash"]
+
+        bars.current_dt += timedelta(hours=8)
+        p.update_timeindex(None)
+        self.assertLess(p.current_holdings["cash"], cash_before)
         self.assertGreater(p.total_funding_paid, 0.0)
 
     def test_liquidation_event_emitted(self):
