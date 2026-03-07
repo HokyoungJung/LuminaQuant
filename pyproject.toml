@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.11,<3.14"
 dependencies = [
     "numpy>=1.26.0,<3",
-    "polars>=1.35.2,<1.36",
+    "polars>=1.35.2,<1.39",
     "pandas>=2.2.0",
     "psycopg[binary]>=3.2.0",
     "python-dotenv>=1.2.1",
