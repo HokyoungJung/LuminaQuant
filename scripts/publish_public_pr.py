@@ -4,7 +4,7 @@ Workflow:
 1) start from local/private source ref (default: private/main)
 2) build a fresh branch from origin/main
 3) merge source ref (auto-resolve conflicts by preferring source content)
-4) remove protected/sensitive paths from stage
+4) restore protected/sensitive paths to the public-base version
 5) commit + push branch
 6) open PR to origin/main (optional)
 """
@@ -33,6 +33,7 @@ PROTECTED_PATHS: tuple[str, ...] = (
     "trades.csv",
     "live_equity.csv",
     "live_trades.csv",
+    ".github/hardcoded_params_baseline.json",
     "src/lumina_quant/strategies",
     "lumina_quant/strategies",
     "strategies",
@@ -62,6 +63,7 @@ SENSITIVE_PATH_RE = re.compile(
     r"|^\.sisyphus/"
     r"|^AGENTS\.md$"
     r"|^\.env$"
+    r"|^\.github/hardcoded_params_baseline\.json$"
     r"|^src/lumina_quant/data_sync\.py$"
     r"|^src/lumina_quant/data_collector\.py$"
     r"|^lumina_quant/data_sync\.py$"
@@ -78,11 +80,11 @@ SENSITIVE_PATH_RE = re.compile(
 
 DEFAULT_PR_BODY = """## Summary
 - conflict-free sanitized sync branch from private source
-- protected paths remain excluded from public main
+- protected paths are restored from the current public base
 - preserves safe runtime/docs improvements only
 
 ## Safety gates
-- protected path unstage/removal
+- protected path restore-from-base
 - sensitive-path regex validation before commit
 - PR-based publish (no direct push to public main)
 """
@@ -138,9 +140,17 @@ def _find_sensitive_paths(paths: list[str]) -> list[str]:
     return [path for path in paths if is_sensitive_path(path)]
 
 
-def _remove_protected_paths_from_stage() -> None:
+def _restore_protected_paths_from_base() -> None:
     for protected_path in PROTECTED_PATHS:
-        _git("rm", "-r", "--cached", "--ignore-unmatch", "--", protected_path, check=False)
+        _git(
+            "restore",
+            "--source=HEAD",
+            "--staged",
+            "--worktree",
+            "--",
+            protected_path,
+            check=False,
+        )
 
 
 def _default_branch_name(prefix: str) -> str:
@@ -237,7 +247,7 @@ def main() -> int:
         _git("checkout", args.base_ref, "--", ".gitignore")
         _git("reset")
         _git("add", ".")
-        _remove_protected_paths_from_stage()
+        _restore_protected_paths_from_base()
 
         staged = _staged_names()
         sensitive = _find_sensitive_paths(staged)
