@@ -31,6 +31,8 @@ class TradingConfig:
             "AVAX/USDT",
             "XAU/USDT",
             "XAG/USDT",
+            "XPT/USDT",
+            "XPD/USDT",
         ]
     )
     timeframes: list[str] = field(

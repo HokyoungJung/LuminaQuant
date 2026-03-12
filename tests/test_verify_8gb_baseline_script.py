@@ -5,6 +5,9 @@ import json
 import sys
 from pathlib import Path
 
+from lumina_quant.core.memory_budget import DEFAULT_EXECUTION_MEMORY_POLICY
+
+_POLICY = DEFAULT_EXECUTION_MEMORY_POLICY
 _SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "verify_8gb_baseline.py"
 _SPEC = importlib.util.spec_from_file_location("verify_8gb_baseline_script", _SCRIPT_PATH)
 if _SPEC is None or _SPEC.loader is None:
@@ -20,6 +23,13 @@ def test_parser_accepts_benchmark_aliases():
     args_b = parser.parse_args(["--benchmark-json", "reports/benchmarks/b.json"])
     assert args_a.benchmark_json == "reports/benchmarks/a.json"
     assert args_b.benchmark_json == "reports/benchmarks/b.json"
+
+
+def test_parser_defaults_preserve_8gb_rss_gate():
+    args = verify_8gb_baseline._build_parser().parse_args([])
+    assert args.rss_limit_gib == _POLICY.rss_limit_gib
+    assert args.disk_budget_gib == _POLICY.disk_budget_gib
+    assert args.output == "reports/benchmarks/8gb_baseline_gate.json"
 
 
 def test_main_passes_with_time_log_alias(tmp_path, monkeypatch):

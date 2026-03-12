@@ -22,6 +22,8 @@ from datetime import UTC, datetime
 
 PROTECTED_PATHS: tuple[str, ...] = (
     "AGENTS.md",
+    ".agents",
+    ".codex",
     ".env",
     ".omx",
     ".sisyphus",
@@ -44,14 +46,55 @@ PROTECTED_PATHS: tuple[str, ...] = (
     "src/lumina_quant/data_collector.py",
     "lumina_quant/data_sync.py",
     "lumina_quant/data_collector.py",
+    "src/lumina_quant/strategy_factory/candidate_library.py",
+    "src/lumina_quant/strategy_factory/research_runner.py",
+    "src/lumina_quant/workflows/alpha_research_pipeline.py",
+    "apps/dashboard/app.py",
+    "apps/dashboard/exact_window_suite.py",
+    "apps/dashboard/services/exact_window.py",
+    "src/lumina_quant/cli/exact_window.py",
+    "src/lumina_quant/eval/exact_window_decision.py",
+    "src/lumina_quant/eval/exact_window_log_archive.py",
+    "src/lumina_quant/eval/exact_window_reporting.py",
+    "src/lumina_quant/eval/exact_window_runtime.py",
+    "src/lumina_quant/eval/exact_window_suite.py",
     "scripts/sync_binance_ohlcv.py",
+    "scripts/research/rebuild_exact_window_registry_from_logs.py",
+    "scripts/research/refresh_exact_window_bundle.py",
+    "scripts/research/run_llm_alpha_pipeline.py",
+    "scripts/research/write_exact_window_deployment_combo.py",
     "scripts/collect_strategy_support_data.py",
     "scripts/collect_all_strategy_support_data.py",
     "scripts/backfill_funding_fee_features.py",
     "scripts/collect_market_data.py",
     "scripts/collect_universe_1s.py",
+    "scripts/run_exact_window_suite.py",
+    "scripts/run_portfolio_optimization.py",
+    "scripts/run_research_candidates.py",
+    "tests/test_advanced_alpha_indicators.py",
+    "tests/test_alpha_research_pipeline.py",
+    "tests/test_alpha101_formula_strategy.py",
     "tests/test_data_sync.py",
+    "tests/test_exact_window_cli.py",
+    "tests/test_exact_window_dashboard_loader.py",
+    "tests/test_exact_window_decision.py",
+    "tests/test_exact_window_deployment_combo.py",
+    "tests/test_exact_window_log_archive.py",
+    "tests/test_exact_window_pair_focus_profiles.py",
+    "tests/test_exact_window_reporting.py",
+    "tests/test_exact_window_runtime.py",
+    "tests/test_exact_window_suite.py",
+    "tests/test_research_runner_feature_support.py",
+    "tests/test_research_runner_exact_split.py",
+    "tests/test_research_runner_scoring_config.py",
+    "tests/test_run_exact_window_suite_script.py",
+    "tests/test_run_llm_alpha_pipeline_script.py",
+    "tests/test_run_portfolio_optimization_script.py",
+    "tests/test_run_research_candidates_script.py",
+    "tests/test_strategy_alias_compat.py",
+    "tests/test_strategy_factory_library.py",
     "tests/test_strategy_support_collection_profiles.py",
+    "tests/test_topcap_tsmom_strategy.py",
 )
 
 SENSITIVE_PATH_RE = re.compile(
@@ -67,6 +110,8 @@ SENSITIVE_PATH_RE = re.compile(
     r"|^best_optimized_parameters/"
     r"|^\.omx/"
     r"|^\.sisyphus/"
+    r"|^\.agents/"
+    r"|^\.codex/"
     r"|^AGENTS\.md$"
     r"|^\.env$"
     r"|^\.github/hardcoded_params_baseline\.json$"
@@ -74,14 +119,55 @@ SENSITIVE_PATH_RE = re.compile(
     r"|^src/lumina_quant/data_collector\.py$"
     r"|^lumina_quant/data_sync\.py$"
     r"|^lumina_quant/data_collector\.py$"
+    r"|^src/lumina_quant/strategy_factory/candidate_library\.py$"
+    r"|^src/lumina_quant/strategy_factory/research_runner\.py$"
+    r"|^src/lumina_quant/workflows/alpha_research_pipeline\.py$"
+    r"|^apps/dashboard/app\.py$"
+    r"|^apps/dashboard/exact_window_suite\.py$"
+    r"|^apps/dashboard/services/exact_window\.py$"
+    r"|^src/lumina_quant/cli/exact_window\.py$"
+    r"|^src/lumina_quant/eval/exact_window_decision\.py$"
+    r"|^src/lumina_quant/eval/exact_window_log_archive\.py$"
+    r"|^src/lumina_quant/eval/exact_window_reporting\.py$"
+    r"|^src/lumina_quant/eval/exact_window_runtime\.py$"
+    r"|^src/lumina_quant/eval/exact_window_suite\.py$"
     r"|^scripts/sync_binance_ohlcv\.py$"
+    r"|^scripts/research/rebuild_exact_window_registry_from_logs\.py$"
+    r"|^scripts/research/refresh_exact_window_bundle\.py$"
+    r"|^scripts/research/run_llm_alpha_pipeline\.py$"
+    r"|^scripts/research/write_exact_window_deployment_combo\.py$"
     r"|^scripts/collect_strategy_support_data\.py$"
     r"|^scripts/collect_all_strategy_support_data\.py$"
     r"|^scripts/backfill_funding_fee_features\.py$"
     r"|^scripts/collect_market_data\.py$"
     r"|^scripts/collect_universe_1s\.py$"
+    r"|^scripts/run_exact_window_suite\.py$"
+    r"|^scripts/run_portfolio_optimization\.py$"
+    r"|^scripts/run_research_candidates\.py$"
+    r"|^tests/test_advanced_alpha_indicators\.py$"
+    r"|^tests/test_alpha_research_pipeline\.py$"
+    r"|^tests/test_alpha101_formula_strategy\.py$"
     r"|^tests/test_data_sync\.py$"
+    r"|^tests/test_exact_window_cli\.py$"
+    r"|^tests/test_exact_window_dashboard_loader\.py$"
+    r"|^tests/test_exact_window_decision\.py$"
+    r"|^tests/test_exact_window_deployment_combo\.py$"
+    r"|^tests/test_exact_window_log_archive\.py$"
+    r"|^tests/test_exact_window_pair_focus_profiles\.py$"
+    r"|^tests/test_exact_window_reporting\.py$"
+    r"|^tests/test_exact_window_runtime\.py$"
+    r"|^tests/test_exact_window_suite\.py$"
+    r"|^tests/test_research_runner_feature_support\.py$"
+    r"|^tests/test_research_runner_exact_split\.py$"
+    r"|^tests/test_research_runner_scoring_config\.py$"
+    r"|^tests/test_run_exact_window_suite_script\.py$"
+    r"|^tests/test_run_llm_alpha_pipeline_script\.py$"
+    r"|^tests/test_run_portfolio_optimization_script\.py$"
+    r"|^tests/test_run_research_candidates_script\.py$"
+    r"|^tests/test_strategy_alias_compat\.py$"
+    r"|^tests/test_strategy_factory_library\.py$"
     r"|^tests/test_strategy_support_collection_profiles\.py$"
+    r"|^tests/test_topcap_tsmom_strategy\.py$"
     r"|(^|/)live_?equity\.csv$"
     r"|(^|/)live_?trades\.csv$"
     r"|(^|/)equity\.csv$"
