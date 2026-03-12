@@ -272,3 +272,183 @@ def test_run_portfolio_optimization_enforces_strategy_cap_when_feasible(tmp_path
     max_strategy = float(constraints.get("max_strategy", 0.15))
     assert max_strategy <= 0.150001
     assert all(float(row.get("weight", 0.0)) <= max_strategy + 1e-6 for row in weights)
+
+
+def test_run_portfolio_optimization_fits_on_validation_and_reports_oos(tmp_path: Path):
+    root = Path(__file__).resolve().parents[1]
+
+    candidates = [
+        {
+            "candidate_id": "fit_winner",
+            "name": "fit_winner",
+            "strategy_class": "CompositeTrendStrategy",
+            "family": "trend",
+            "strategy_timeframe": "1h",
+            "symbols": ["BTC/USDT"],
+            "train": {"sharpe": 0.5, "return": 0.03, "deflated_sharpe": 0.2, "pbo": 0.2, "turnover": 0.2},
+            "val": {"sharpe": 3.0, "return": 0.12, "deflated_sharpe": 1.0, "pbo": 0.1, "turnover": 0.1},
+            "oos": {"sharpe": -0.2, "return": -0.03, "deflated_sharpe": 0.0, "pbo": 0.4, "turnover": 0.2},
+            "pass": True,
+            "return_streams": {
+                "train": [
+                    {"t": "2025-12-30T00:00:00Z", "v": 0.001},
+                    {"t": "2025-12-31T00:00:00Z", "v": 0.001},
+                ],
+                "val": [
+                    {"t": "2026-01-01T00:00:00Z", "v": 0.01},
+                    {"t": "2026-01-02T00:00:00Z", "v": 0.01},
+                ],
+                "oos": [
+                    {"t": "2026-02-01T00:00:00Z", "v": -0.01},
+                    {"t": "2026-02-02T00:00:00Z", "v": -0.01},
+                ],
+            },
+            "metadata": {"cost_rate": 0.0005},
+        },
+        {
+            "candidate_id": "oos_winner",
+            "name": "oos_winner",
+            "strategy_class": "PairSpreadZScoreStrategy",
+            "family": "market_neutral",
+            "strategy_timeframe": "1h",
+            "symbols": ["ETH/USDT", "SOL/USDT"],
+            "train": {"sharpe": 0.5, "return": 0.03, "deflated_sharpe": 0.2, "pbo": 0.2, "turnover": 0.2},
+            "val": {"sharpe": 0.1, "return": 0.01, "deflated_sharpe": 0.05, "pbo": 0.2, "turnover": 0.2},
+            "oos": {"sharpe": 4.0, "return": 0.20, "deflated_sharpe": 1.2, "pbo": 0.05, "turnover": 0.1},
+            "pass": True,
+            "return_streams": {
+                "train": [
+                    {"t": "2025-12-30T00:00:00Z", "v": 0.001},
+                    {"t": "2025-12-31T00:00:00Z", "v": 0.001},
+                ],
+                "val": [
+                    {"t": "2026-01-01T00:00:00Z", "v": 0.001},
+                    {"t": "2026-01-02T00:00:00Z", "v": 0.001},
+                ],
+                "oos": [
+                    {"t": "2026-02-01T00:00:00Z", "v": 0.03},
+                    {"t": "2026-02-02T00:00:00Z", "v": 0.03},
+                ],
+            },
+            "metadata": {"cost_rate": 0.0005},
+        },
+    ]
+
+    research_path = tmp_path / "candidate_research.json"
+    team_path = tmp_path / "team_report.json"
+    out_dir = tmp_path / "reports"
+    research_path.write_text(json.dumps({"schema_version": "v2", "candidates": candidates}), encoding="utf-8")
+    team_path.write_text(json.dumps({"selected_team": candidates}), encoding="utf-8")
+
+    script = root / "scripts" / "run_portfolio_optimization.py"
+    cmd = [
+        sys.executable,
+        str(script),
+        "--research-report",
+        str(research_path),
+        "--team-report",
+        str(team_path),
+        "--output-dir",
+        str(out_dir),
+        "--max-strategies",
+        "1",
+        "--fit-split",
+        "val",
+        "--report-split",
+        "oos",
+    ]
+
+    result = subprocess.run(cmd, cwd=str(root), check=False, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+
+    payload = json.loads((out_dir / "portfolio_optimization_latest.json").read_text(encoding="utf-8"))
+    selection = dict(payload.get("selection") or {})
+    assert selection.get("fit_split") == "val"
+    assert selection.get("report_split") == "oos"
+
+    weights = list(payload.get("weights") or [])
+    assert [row.get("candidate_id") for row in weights] == ["fit_winner"]
+    assert float(weights[0].get("fit_return", 0.0)) == 0.12
+    assert float(weights[0].get("report_return", 0.0)) == -0.03
+
+    oos_stream = list((payload.get("portfolio_return_streams") or {}).get("oos") or [])
+    assert [point.get("t") for point in oos_stream] == [
+        "2026-02-01T00:00:00Z",
+        "2026-02-02T00:00:00Z",
+    ]
+
+
+def test_run_portfolio_optimization_prefers_research_candidates_over_team_shortlist(tmp_path: Path):
+    root = Path(__file__).resolve().parents[1]
+
+    fit_winner = {
+        "candidate_id": "fit_winner",
+        "name": "fit_winner",
+        "strategy_class": "CompositeTrendStrategy",
+        "family": "trend",
+        "strategy_timeframe": "1h",
+        "symbols": ["BTC/USDT"],
+        "train": {"sharpe": 0.4, "return": 0.02, "deflated_sharpe": 0.1, "pbo": 0.2, "turnover": 0.2},
+        "val": {"sharpe": 2.5, "return": 0.10, "deflated_sharpe": 0.9, "pbo": 0.1, "turnover": 0.1},
+        "oos": {"sharpe": -0.1, "return": -0.01, "deflated_sharpe": 0.0, "pbo": 0.4, "turnover": 0.2},
+        "pass": True,
+        "return_streams": {
+            "train": [{"t": "2025-12-31T00:00:00Z", "v": 0.001}],
+            "val": [{"t": "2026-01-01T00:00:00Z", "v": 0.02}],
+            "oos": [{"t": "2026-02-01T00:00:00Z", "v": -0.01}],
+        },
+        "metadata": {"cost_rate": 0.0005},
+    }
+    oos_winner = {
+        "candidate_id": "oos_winner",
+        "name": "oos_winner",
+        "strategy_class": "PairSpreadZScoreStrategy",
+        "family": "market_neutral",
+        "strategy_timeframe": "1h",
+        "symbols": ["ETH/USDT", "SOL/USDT"],
+        "train": {"sharpe": 0.4, "return": 0.02, "deflated_sharpe": 0.1, "pbo": 0.2, "turnover": 0.2},
+        "val": {"sharpe": 0.1, "return": 0.01, "deflated_sharpe": 0.05, "pbo": 0.2, "turnover": 0.2},
+        "oos": {"sharpe": 3.0, "return": 0.18, "deflated_sharpe": 1.1, "pbo": 0.05, "turnover": 0.1},
+        "pass": True,
+        "return_streams": {
+            "train": [{"t": "2025-12-31T00:00:00Z", "v": 0.001}],
+            "val": [{"t": "2026-01-01T00:00:00Z", "v": 0.001}],
+            "oos": [{"t": "2026-02-01T00:00:00Z", "v": 0.03}],
+        },
+        "metadata": {"cost_rate": 0.0005},
+    }
+
+    research_path = tmp_path / "candidate_research.json"
+    team_path = tmp_path / "team_report.json"
+    out_dir = tmp_path / "reports"
+    research_path.write_text(
+        json.dumps({"schema_version": "v2", "candidates": [fit_winner, oos_winner]}),
+        encoding="utf-8",
+    )
+    team_path.write_text(json.dumps({"selected_team": [oos_winner]}), encoding="utf-8")
+
+    script = root / "scripts" / "run_portfolio_optimization.py"
+    cmd = [
+        sys.executable,
+        str(script),
+        "--research-report",
+        str(research_path),
+        "--team-report",
+        str(team_path),
+        "--output-dir",
+        str(out_dir),
+        "--max-strategies",
+        "1",
+        "--fit-split",
+        "val",
+        "--report-split",
+        "oos",
+    ]
+
+    result = subprocess.run(cmd, cwd=str(root), check=False, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+
+    payload = json.loads((out_dir / "portfolio_optimization_latest.json").read_text(encoding="utf-8"))
+    assert payload.get("source_report") == str(research_path.resolve())
+    weights = list(payload.get("weights") or [])
+    assert [row.get("candidate_id") for row in weights] == ["fit_winner"]

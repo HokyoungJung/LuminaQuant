@@ -13,7 +13,7 @@ from typing import Any
 
 import numpy as np
 
-_METALS = {"XAU/USDT", "XAG/USDT"}
+_METALS = {"XAU/USDT", "XAG/USDT", "XPT/USDT", "XPD/USDT"}
 
 DEFAULT_PORTFOLIO_SCORING_CONFIG: dict[str, Any] = {
     "candidate_rank_score_weights": {
@@ -58,6 +58,166 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
 
 def _stream_to_array(stream: list[dict[str, Any]]) -> np.ndarray:
     return np.asarray([_safe_float(item.get("v"), 0.0) for item in stream], dtype=float)
+
+
+def _canonical_split(value: Any, *, default: str) -> str:
+    token = str(value or "").strip().lower()
+    if not token:
+        return default
+    alias_map = {
+        "train": "train",
+        "validation": "val",
+        "val": "val",
+        "oos": "oos",
+        "test": "oos",
+        "test_oos": "oos",
+    }
+    return alias_map.get(token, default)
+
+
+def _coerce_stream_datetime(value: Any) -> datetime | None:
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
+
+    numeric_value: float | None = None
+    if isinstance(value, (int, float)):
+        numeric_value = float(value)
+    elif isinstance(value, str) and value.strip():
+        token = value.strip()
+        try:
+            numeric_value = float(token)
+        except Exception:
+            normalized = token.replace("Z", "+00:00") if token.endswith("Z") else token
+            try:
+                parsed = datetime.fromisoformat(normalized)
+            except ValueError:
+                return None
+            if parsed.tzinfo is None:
+                return parsed.replace(tzinfo=UTC)
+            return parsed.astimezone(UTC)
+
+    if numeric_value is None or not math.isfinite(numeric_value):
+        return None
+
+    magnitude = abs(numeric_value)
+    if magnitude >= 1e15:
+        return datetime.fromtimestamp(numeric_value / 1_000_000.0, tz=UTC)
+    if magnitude >= 1e12:
+        return datetime.fromtimestamp(numeric_value / 1_000.0, tz=UTC)
+    if magnitude >= 1e9:
+        return datetime.fromtimestamp(numeric_value, tz=UTC)
+    return None
+
+
+def _isoformat_utc(value: datetime) -> str:
+    return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
+
+
+def _stream_point_timestamp(raw_point: dict[str, Any]) -> Any:
+    return raw_point.get("t", raw_point.get("timestamp", raw_point.get("datetime")))
+
+
+def _normalize_stream(stream: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    normalized: list[dict[str, Any]] = []
+    for idx, raw_point in enumerate(stream):
+        value = _safe_float(raw_point.get("v"), 0.0)
+        raw_timestamp = _stream_point_timestamp(raw_point)
+        dt = _coerce_stream_datetime(raw_timestamp)
+        if dt is not None:
+            timestamp = _isoformat_utc(dt)
+            normalized.append(
+                {
+                    "token": f"dt:{timestamp}",
+                    "sort_key": (0, float(dt.timestamp()), float(idx)),
+                    "t": timestamp,
+                    "datetime": timestamp,
+                    "v": float(value),
+                }
+            )
+            continue
+
+        numeric_timestamp = None
+        if isinstance(raw_timestamp, (int, float)):
+            numeric_timestamp = float(raw_timestamp)
+        elif isinstance(raw_timestamp, str) and raw_timestamp.strip():
+            try:
+                numeric_timestamp = float(raw_timestamp.strip())
+            except Exception:
+                numeric_timestamp = None
+
+        if numeric_timestamp is not None and math.isfinite(numeric_timestamp):
+            normalized.append(
+                {
+                    "token": f"num:{numeric_timestamp:.12g}",
+                    "sort_key": (1, float(numeric_timestamp), float(idx)),
+                    "t": float(numeric_timestamp),
+                    "datetime": None,
+                    "v": float(value),
+                }
+            )
+            continue
+
+        seq = float(idx)
+        normalized.append(
+            {
+                "token": f"seq:{seq:.12g}",
+                "sort_key": (2, float(seq), float(idx)),
+                "t": float(seq),
+                "datetime": None,
+                "v": float(value),
+            }
+        )
+    normalized.sort(key=lambda item: item["sort_key"])
+    return normalized
+
+
+def _aggregate_stream(stream: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    aggregated: dict[str, dict[str, Any]] = {}
+    for point in _normalize_stream(stream):
+        token = str(point["token"])
+        if token not in aggregated:
+            aggregated[token] = {
+                "token": token,
+                "sort_key": point["sort_key"],
+                "t": point["t"],
+                "datetime": point.get("datetime"),
+                "v": 0.0,
+            }
+        aggregated[token]["v"] += float(point["v"])
+    return aggregated
+
+
+def _aligned_stream_arrays(lhs_stream: list[dict[str, Any]], rhs_stream: list[dict[str, Any]]) -> tuple[np.ndarray, np.ndarray]:
+    lhs = _aggregate_stream(lhs_stream)
+    rhs = _aggregate_stream(rhs_stream)
+    if not lhs and not rhs:
+        return np.asarray([], dtype=float), np.asarray([], dtype=float)
+
+    merged = dict(lhs)
+    for token, point in rhs.items():
+        if token not in merged:
+            merged[token] = point
+
+    ordered_tokens = [token for token, _ in sorted(merged.items(), key=lambda item: item[1]["sort_key"])]
+    lhs_values = np.asarray([_safe_float((lhs.get(token) or {}).get("v"), 0.0) for token in ordered_tokens], dtype=float)
+    rhs_values = np.asarray([_safe_float((rhs.get(token) or {}).get("v"), 0.0) for token in ordered_tokens], dtype=float)
+    return lhs_values, rhs_values
+
+
+def _split_metrics(row: dict[str, Any], split: str) -> dict[str, Any]:
+    token = _canonical_split(split, default="oos")
+    if token == "val":
+        return dict(row.get("val") or {})
+    if token == "train":
+        return dict(row.get("train") or {})
+    return dict(row.get("oos") or {})
+
+
+def _split_stream(row: dict[str, Any], split: str) -> list[dict[str, Any]]:
+    token = _canonical_split(split, default="oos")
+    return list(((row.get("return_streams") or {}).get(token)) or [])
 
 
 def _load_score_config(path: Path) -> dict[str, Any]:
@@ -111,6 +271,11 @@ def _corr(x: np.ndarray, y: np.ndarray) -> float:
     return value
 
 
+def _corr_streams(lhs_stream: list[dict[str, Any]], rhs_stream: list[dict[str, Any]]) -> float:
+    lhs, rhs = _aligned_stream_arrays(lhs_stream, rhs_stream)
+    return _corr(lhs, rhs)
+
+
 def _max_drawdown(returns: np.ndarray) -> float:
     if returns.size == 0:
         return 0.0
@@ -157,12 +322,16 @@ def _metrics(returns: np.ndarray, periods_per_year: int = 365) -> dict[str, floa
     }
 
 
-def _cluster_by_correlation(ids: list[str], oos_map: dict[str, np.ndarray], threshold: float = 0.60) -> list[list[str]]:
+def _cluster_by_correlation(
+    ids: list[str],
+    stream_map: dict[str, list[dict[str, Any]]],
+    threshold: float = 0.60,
+) -> list[list[str]]:
     clusters: list[list[str]] = []
     for cid in ids:
         added = False
         for cluster in clusters:
-            if any(abs(_corr(oos_map[cid], oos_map[member])) >= threshold for member in cluster):
+            if any(abs(_corr_streams(stream_map[cid], stream_map[member])) >= threshold for member in cluster):
                 cluster.append(cid)
                 added = True
                 break
@@ -442,32 +611,54 @@ def _apply_caps(
     }
 
 
+def _build_portfolio_stream(
+    weights: dict[str, float],
+    rows: dict[str, dict[str, Any]],
+    *,
+    split: str,
+) -> list[dict[str, Any]]:
+    aggregated: dict[str, dict[str, Any]] = {}
+    for cid, weight in weights.items():
+        stream = _split_stream(rows.get(cid) or {}, split)
+        if not stream or weight <= 0.0:
+            continue
+        for token, point in _aggregate_stream(stream).items():
+            if token not in aggregated:
+                aggregated[token] = {
+                    "token": token,
+                    "sort_key": point["sort_key"],
+                    "t": point["t"],
+                    "datetime": point.get("datetime"),
+                    "v": 0.0,
+                }
+            aggregated[token]["v"] += float(weight) * _safe_float(point.get("v"), 0.0)
+
+    out: list[dict[str, Any]] = []
+    for point in sorted(aggregated.values(), key=lambda item: item["sort_key"]):
+        row = {"t": point["t"], "v": float(point["v"])}
+        if point.get("datetime"):
+            row["datetime"] = point["datetime"]
+        out.append(row)
+    return out
+
+
 def _build_portfolio_returns(
     weights: dict[str, float],
     rows: dict[str, dict[str, Any]],
     *,
     split: str,
 ) -> np.ndarray:
-    arrays: list[tuple[float, np.ndarray]] = []
-    min_len = None
-    for cid, weight in weights.items():
-        stream = list(((rows.get(cid) or {}).get("return_streams") or {}).get(split) or [])
-        arr = _stream_to_array(stream)
-        if arr.size == 0 or weight <= 0.0:
-            continue
-        arrays.append((float(weight), arr))
-        min_len = arr.size if min_len is None else min(min_len, arr.size)
-
-    if not arrays or min_len is None or min_len <= 0:
-        return np.asarray([], dtype=float)
-
-    out = np.zeros(min_len, dtype=float)
-    for weight, arr in arrays:
-        out += weight * arr[-min_len:]
-    return out
+    return _stream_to_array(_build_portfolio_stream(weights, rows, split=split))
 
 
 def _load_rows(args) -> tuple[list[dict[str, Any]], str]:
+    research_path = Path(args.research_report)
+    if research_path.exists():
+        payload = json.loads(research_path.read_text(encoding="utf-8"))
+        rows = [dict(row) for row in list(payload.get("candidates") or []) if isinstance(row, dict)]
+        if rows:
+            return rows, str(research_path.resolve())
+
     if args.team_report and Path(args.team_report).exists():
         payload = json.loads(Path(args.team_report).read_text(encoding="utf-8"))
         rows = list(payload.get("selected_team") or [])
@@ -475,10 +666,7 @@ def _load_rows(args) -> tuple[list[dict[str, Any]], str]:
         if rows:
             return [dict(row) for row in rows if isinstance(row, dict)], source
 
-    payload = json.loads(Path(args.research_report).read_text(encoding="utf-8"))
-    rows = list(payload.get("candidates") or [])
-    source = str(Path(args.research_report).resolve())
-    return [dict(row) for row in rows if isinstance(row, dict)], source
+    raise RuntimeError("No candidate rows available in research report or team report.")
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -488,6 +676,8 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--score-config", default="", help="Optional scoring config JSON path.")
     parser.add_argument("--output-dir", default="reports")
     parser.add_argument("--max-strategies", type=int, default=24)
+    parser.add_argument("--fit-split", default="val")
+    parser.add_argument("--report-split", default="oos")
     parser.add_argument("--target-vol", type=float, default=0.12)
     parser.add_argument("--correlation-threshold", type=float, default=0.60)
     parser.add_argument("--cost-penalty", type=float, default=0.35)
@@ -517,32 +707,39 @@ def main() -> int:
     vol_targeting_params = dict(optimization_config.get("vol_targeting") or {})
     sensitivity_params = dict(optimization_config.get("sensitivity") or {})
     constraint_defaults = dict(optimization_config.get("constraints") or {})
+    fit_split = _canonical_split(args.fit_split, default="val")
+    report_split = _canonical_split(args.report_split, default="oos")
 
     rows_raw, source_path = _load_rows(args)
     if not rows_raw:
         raise RuntimeError("No candidate rows available for optimization.")
 
-    # Filter by pass + non-empty OOS stream.
+    # Filter by pass + non-empty fit/report streams.
     filtered = [
         row
         for row in rows_raw
         if bool(row.get("pass", True))
-        and list(((row.get("return_streams") or {}).get("oos")) or [])
+        and _split_stream(row, fit_split)
+        and _split_stream(row, report_split)
     ]
     if not filtered:
-        filtered = rows_raw
+        filtered = [
+            row
+            for row in rows_raw
+            if _split_stream(row, fit_split) or _split_stream(row, report_split)
+        ] or rows_raw
 
-    # Rank by robust OOS quality.
+    # Rank by robust fit-split quality.
     def _score(row: dict[str, Any]) -> float:
-        oos = dict(row.get("oos") or {})
+        fit_metrics = _split_metrics(row, fit_split)
         return float(
-            (_safe_float(rank_weights.get("sharpe_weight"), 2.8) * _safe_float(oos.get("sharpe"), 0.0))
+            (_safe_float(rank_weights.get("sharpe_weight"), 2.8) * _safe_float(fit_metrics.get("sharpe"), 0.0))
             + (
                 _safe_float(rank_weights.get("deflated_sharpe_weight"), 1.5)
-                * _safe_float(oos.get("deflated_sharpe"), 0.0)
+                * _safe_float(fit_metrics.get("deflated_sharpe"), 0.0)
             )
-            - (_safe_float(rank_weights.get("pbo_penalty"), 2.0) * _safe_float(oos.get("pbo"), 1.0))
-            + (_safe_float(rank_weights.get("return_weight"), 25.0) * _safe_float(oos.get("return"), 0.0))
+            - (_safe_float(rank_weights.get("pbo_penalty"), 2.0) * _safe_float(fit_metrics.get("pbo"), 1.0))
+            + (_safe_float(rank_weights.get("return_weight"), 25.0) * _safe_float(fit_metrics.get("return"), 0.0))
         )
 
     filtered.sort(key=_score, reverse=True)
@@ -550,19 +747,17 @@ def main() -> int:
 
     rows = {str(row.get("candidate_id") or row.get("name")): row for row in selected}
     ids = list(rows.keys())
-    oos_map = {
-        cid: _stream_to_array(list((rows[cid].get("return_streams") or {}).get("oos") or []))
-        for cid in ids
-    }
+    fit_streams = {cid: _split_stream(rows[cid], fit_split) for cid in ids}
+    fit_map = {cid: _stream_to_array(fit_streams[cid]) for cid in ids}
 
     # 1) Correlation clustering.
-    clusters = _cluster_by_correlation(ids, oos_map, threshold=float(args.correlation_threshold))
+    clusters = _cluster_by_correlation(ids, fit_streams, threshold=float(args.correlation_threshold))
 
     # 2) HRP-like allocation (inverse-vol cluster + member weights with turnover penalty).
     cluster_weight_raw: dict[int, float] = {}
     member_weight_raw: dict[str, float] = {}
     for c_idx, cluster in enumerate(clusters):
-        cluster_rets = [oos_map[cid] for cid in cluster if oos_map[cid].size > 0]
+        cluster_rets = [fit_map[cid] for cid in cluster if fit_map[cid].size > 0]
         min_len = min((arr.size for arr in cluster_rets), default=0)
         if min_len <= 0:
             cluster_weight_raw[c_idx] = 1.0
@@ -582,14 +777,14 @@ def main() -> int:
 
         for cid in cluster:
             row = rows[cid]
-            oos = dict(row.get("oos") or {})
+            fit_metrics = _split_metrics(row, fit_split)
             quality = max(
                 _safe_float(allocation_quality_params.get("deflated_sharpe_floor"), 0.01),
-                _safe_float(oos.get("deflated_sharpe"), 0.0)
+                _safe_float(fit_metrics.get("deflated_sharpe"), 0.0)
                 + _safe_float(allocation_quality_params.get("deflated_sharpe_offset"), 0.5),
             )
-            inv_vol = _inverse_vol_weight(oos_map[cid])
-            turnover = _safe_float(oos.get("turnover"), 0.0)
+            inv_vol = _inverse_vol_weight(fit_map[cid])
+            turnover = _safe_float(fit_metrics.get("turnover"), 0.0)
             penalty = 1.0 + (float(args.cost_penalty) * turnover)
             member_weight_raw[cid] = (quality * inv_vol) / max(1e-9, penalty)
 
@@ -646,10 +841,10 @@ def main() -> int:
     target_vol_floor = max(0.0, _safe_float(vol_targeting_params.get("target_vol_floor"), 0.01))
     vol_scale_cap = max(0.0, _safe_float(vol_targeting_params.get("vol_scale_cap"), 2.0))
     vol_scale_epsilon = max(0.0, _safe_float(vol_targeting_params.get("vol_scale_epsilon"), 1e-12))
-    portfolio_oos = _build_portfolio_returns(weights, rows, split="oos")
-    oos_vol = _safe_float(np.std(portfolio_oos, ddof=1), 0.0)
+    portfolio_fit = _build_portfolio_returns(weights, rows, split=fit_split)
+    fit_vol = _safe_float(np.std(portfolio_fit, ddof=1), 0.0)
     target_vol = max(target_vol_floor, float(args.target_vol))
-    vol_scale = 1.0 if oos_vol <= vol_scale_epsilon else min(vol_scale_cap, target_vol / max(vol_scale_epsilon, oos_vol))
+    vol_scale = 1.0 if fit_vol <= vol_scale_epsilon else min(vol_scale_cap, target_vol / max(vol_scale_epsilon, fit_vol))
     for key in weights:
         weights[key] *= vol_scale
 
@@ -660,22 +855,32 @@ def main() -> int:
             weights[key] /= total
 
     # Portfolio metrics across splits.
-    portfolio_train = _build_portfolio_returns(weights, rows, split="train")
-    portfolio_val = _build_portfolio_returns(weights, rows, split="val")
-    portfolio_oos = _build_portfolio_returns(weights, rows, split="oos")
+    portfolio_train_stream = _build_portfolio_stream(weights, rows, split="train")
+    portfolio_val_stream = _build_portfolio_stream(weights, rows, split="val")
+    portfolio_oos_stream = _build_portfolio_stream(weights, rows, split="oos")
+    portfolio_fit_stream = _build_portfolio_stream(weights, rows, split=fit_split)
+    portfolio_report_stream = _build_portfolio_stream(weights, rows, split=report_split)
+
+    portfolio_train = _stream_to_array(portfolio_train_stream)
+    portfolio_val = _stream_to_array(portfolio_val_stream)
+    portfolio_oos = _stream_to_array(portfolio_oos_stream)
+    portfolio_fit = _stream_to_array(portfolio_fit_stream)
+    portfolio_report = _stream_to_array(portfolio_report_stream)
 
     train_metrics = _metrics(portfolio_train)
     val_metrics = _metrics(portfolio_val)
     oos_metrics = _metrics(portfolio_oos)
+    fit_metrics = _metrics(portfolio_fit)
+    report_metrics = _metrics(portfolio_report)
 
     # Cost sensitivity (x2/x3).
     weighted_turnover = 0.0
     weighted_cost = 0.0
     for cid, weight in weights.items():
         row = rows[cid]
-        oos = dict(row.get("oos") or {})
+        report_row_metrics = _split_metrics(row, report_split)
         cost = _safe_float(((row.get("metadata") or {}).get("cost_rate")), 0.0005)
-        weighted_turnover += weight * _safe_float(oos.get("turnover"), 0.0)
+        weighted_turnover += weight * _safe_float(report_row_metrics.get("turnover"), 0.0)
         weighted_cost += weight * cost
 
     cost_stress_x2_multiplier = _safe_float(sensitivity_params.get("cost_stress_x2_multiplier"), 2.0)
@@ -683,17 +888,17 @@ def main() -> int:
     signal_drift_down_multiplier = _safe_float(sensitivity_params.get("signal_drift_down_multiplier"), 0.9)
     signal_drift_up_multiplier = _safe_float(sensitivity_params.get("signal_drift_up_multiplier"), 1.1)
 
-    oos_x2 = portfolio_oos - (max(0.0, cost_stress_x2_multiplier - 1.0) * weighted_turnover * weighted_cost)
-    oos_x3 = portfolio_oos - (max(0.0, cost_stress_x3_multiplier - 1.0) * weighted_turnover * weighted_cost)
+    report_x2 = portfolio_report - (max(0.0, cost_stress_x2_multiplier - 1.0) * weighted_turnover * weighted_cost)
+    report_x3 = portfolio_report - (max(0.0, cost_stress_x3_multiplier - 1.0) * weighted_turnover * weighted_cost)
 
     sensitivity = {
         "cost_stress": {
-            "x2": _metrics(oos_x2),
-            "x3": _metrics(oos_x3),
+            "x2": _metrics(report_x2),
+            "x3": _metrics(report_x3),
         },
         "param_drift": {
-            "minus_10pct_signal": _metrics(portfolio_oos * signal_drift_down_multiplier),
-            "plus_10pct_signal": _metrics(portfolio_oos * signal_drift_up_multiplier),
+            "minus_10pct_signal": _metrics(portfolio_report * signal_drift_down_multiplier),
+            "plus_10pct_signal": _metrics(portfolio_report * signal_drift_up_multiplier),
         },
     }
 
@@ -707,6 +912,8 @@ def main() -> int:
     allocation_rows = []
     for cid, weight in ranked_weights:
         row = rows[cid]
+        fit_row_metrics = _split_metrics(row, fit_split)
+        report_row_metrics = _split_metrics(row, report_split)
         allocation_rows.append(
             {
                 "candidate_id": cid,
@@ -716,6 +923,12 @@ def main() -> int:
                 "symbols": list(row.get("symbols") or []),
                 "timeframe": row.get("strategy_timeframe") or row.get("timeframe"),
                 "weight": float(weight),
+                "fit_split": fit_split,
+                "fit_sharpe": _safe_float(fit_row_metrics.get("sharpe"), 0.0),
+                "fit_return": _safe_float(fit_row_metrics.get("return"), 0.0),
+                "report_split": report_split,
+                "report_sharpe": _safe_float(report_row_metrics.get("sharpe"), 0.0),
+                "report_return": _safe_float(report_row_metrics.get("return"), 0.0),
                 "oos_sharpe": _safe_float((row.get("oos") or {}).get("sharpe"), 0.0),
                 "oos_return": _safe_float((row.get("oos") or {}).get("return"), 0.0),
             }
@@ -725,6 +938,11 @@ def main() -> int:
     report = {
         "generated_at": datetime.now(UTC).isoformat(),
         "source_report": source_path,
+        "selection": {
+            "fit_split": fit_split,
+            "report_split": report_split,
+            "selection_basis": "validation_only" if fit_split == "val" and report_split == "oos" else f"{fit_split}_fit",
+        },
         "cluster_count": len(clusters),
         "clusters": clusters,
         "constraints": {
@@ -757,11 +975,22 @@ def main() -> int:
         },
         "weights": allocation_rows,
         "sleeve_budget": dict(sorted(sleeve_budget.items())),
+        "portfolio_return_streams": {
+            "train": portfolio_train_stream,
+            "val": portfolio_val_stream,
+            "oos": portfolio_oos_stream,
+            fit_split: portfolio_fit_stream,
+            report_split: portfolio_report_stream,
+        },
         "portfolio_metrics": {
             "train": train_metrics,
             "val": val_metrics,
             "oos": oos_metrics,
+            fit_split: fit_metrics,
+            report_split: report_metrics,
         },
+        "fit_metrics": fit_metrics,
+        "report_metrics": report_metrics,
         "sensitivity": sensitivity,
     }
 
@@ -775,6 +1004,8 @@ def main() -> int:
         "# Portfolio Optimization Report",
         "",
         f"- Source report: `{source_path}`",
+        f"- Fit split: `{fit_split}`",
+        f"- Report split: `{report_split}`",
         f"- Clusters: {len(clusters)}",
         "",
         "## Sleeve budgets",
@@ -788,8 +1019,8 @@ def main() -> int:
             "",
             "## Top strategy weights",
             "",
-            "| # | Name | Strategy | Family | TF | Weight | OOS Sharpe | OOS Return |",
-            "|---:|---|---|---|---|---:|---:|---:|",
+            "| # | Name | Strategy | Family | TF | Weight | Fit Sharpe | Fit Return | Report Sharpe | Report Return |",
+            "|---:|---|---|---|---|---:|---:|---:|---:|---:|",
         ]
     )
     for idx, row in enumerate(allocation_rows[:20], start=1):
@@ -797,7 +1028,8 @@ def main() -> int:
             "| "
             f"{idx} | {row.get('name', '')} | {row.get('strategy_class', '')} | {row.get('family', '')} | "
             f"{row.get('timeframe', '')} | {float(row.get('weight', 0.0)):.2%} | "
-            f"{float(row.get('oos_sharpe', 0.0)):.3f} | {float(row.get('oos_return', 0.0)):.2%} |"
+            f"{float(row.get('fit_sharpe', 0.0)):.3f} | {float(row.get('fit_return', 0.0)):.2%} | "
+            f"{float(row.get('report_sharpe', 0.0)):.3f} | {float(row.get('report_return', 0.0)):.2%} |"
         )
 
     lines.extend(
@@ -805,6 +1037,8 @@ def main() -> int:
             "",
             "## Portfolio metrics",
             "",
+            f"- Fit ({fit_split}): " + json.dumps(fit_metrics, sort_keys=True),
+            f"- Report ({report_split}): " + json.dumps(report_metrics, sort_keys=True),
             "- Train: " + json.dumps(train_metrics, sort_keys=True),
             "- Val: " + json.dumps(val_metrics, sort_keys=True),
             "- OOS: " + json.dumps(oos_metrics, sort_keys=True),

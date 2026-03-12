@@ -9,7 +9,10 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from lumina_quant.core.memory_budget import DEFAULT_EXECUTION_MEMORY_POLICY
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+_DEFAULT_POLICY = DEFAULT_EXECUTION_MEMORY_POLICY
 TIME_RSS_PATTERN = re.compile(
     r"Maximum resident set size \(kbytes\):\s*(\d+)",
     flags=re.IGNORECASE,
@@ -142,8 +145,8 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--rss-limit-gib",
         type=float,
-        default=7.2,
-        help="RSS limit in GiB (default: 7.2).",
+        default=_DEFAULT_POLICY.rss_limit_gib,
+        help=f"RSS limit in GiB (default: {_DEFAULT_POLICY.rss_limit_gib:.1f}).",
     )
     parser.add_argument(
         "--allow-missing-rss-source",
@@ -176,8 +179,8 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--disk-budget-gib",
         type=float,
-        default=30.0,
-        help="Combined disk budget for tracked paths in GiB (default: 30).",
+        default=_DEFAULT_POLICY.disk_budget_gib,
+        help=f"Combined disk budget for tracked paths in GiB (default: {_DEFAULT_POLICY.disk_budget_gib:.1f}).",
     )
     parser.add_argument(
         "--output",

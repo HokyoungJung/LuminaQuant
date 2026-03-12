@@ -60,9 +60,22 @@ def _ensure_project_strategies_module(project_root: Path) -> None:
 _ensure_project_strategies_module(PROJECT_ROOT)
 
 strategy_registry = importlib.import_module("lumina_quant.strategies.registry")
+render_exact_window_dashboard = importlib.import_module(
+    "apps.dashboard.exact_window_suite"
+).render_exact_window_dashboard
 
 st.set_page_config(layout="wide", page_title="LuminaQuant Dashboard")
 st.title("LuminaQuant: Full Trading Intelligence")
+
+dashboard_view = st.sidebar.radio(
+    "Dashboard View",
+    ["Main Dashboard", "Exact-Window Suite"],
+    index=0,
+)
+if dashboard_view == "Exact-Window Suite":
+    st.caption("Switched from the main dashboard menu into the exact-window research view.")
+    render_exact_window_dashboard(standalone=False)
+    st.stop()
 
 DEFAULT_DB_PATH = str(
     os.getenv("LQ_POSTGRES_DSN")

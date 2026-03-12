@@ -152,8 +152,13 @@ trading:
   - `scripts/sync_binance_ohlcv.py`
   - `scripts/collect_market_data.py`
   - `tests/test_data_sync.py`
+- Public 저장소에서는 아래 연구/배포 메타데이터 surface도 제외합니다.
+  - 튜닝된 candidate library / research runner / article-pipeline workflow
+  - deployment scenario 생성기와 follow-up watchlist 로직
+  - 튜닝 상수, family ID, shortlist 메타데이터를 드러내는 전략 전용 테스트
 - 전략/지표 전체 구현 및 AGENTS 가이드는 Private 저장소에서 관리합니다.
 - DB/런타임 산출물은 게시하지 않습니다 (`data/`, `logs/`, `.omx/`, `.sisyphus/`).
+- 정상적인 운영/검토용 report 산출물은 Private 저장소에 둘 수 있지만, Public 저장소에는 push 하지 않습니다.
 
 ### 3. 시스템 실행 (Running the System)
 

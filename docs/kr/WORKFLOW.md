@@ -25,6 +25,7 @@
 
 - Public 브랜치는 DB **읽기 전용** 사용만 허용 (기존 저장소/CSV 소비)
 - 거래소 OHLCV 수집/초기 구축 파이프라인은 Private 브랜치에서만 관리
+- 튜닝된 strategy-factory 연구 메타데이터(candidate library, research runner, article-pipeline/deployment 생성기, 전략 메타데이터 테스트)는 Public 브랜치에 포함하지 않음
 - DB/로그/런타임 산출물은 git에 포함하지 않음
 
 ## 2. 자동화 스크립트
@@ -56,6 +57,9 @@
 # 소스 ref를 로컬 private-main으로 지정
 ./publish_api.sh --source-ref private-main
 
+# 현재 체크아웃된 feature 브랜치를 그대로 공개용으로 sanitize
+./publish_api.sh --source-ref HEAD
+
 # CI 통과 시 자동 머지 예약
 ./publish_api.sh --auto-merge
 ```
@@ -77,4 +81,7 @@ git push private private-main:main
 ```bash
 git checkout private-main
 uv run python scripts/publish_public_pr.py --source-ref private/main
+
+# 아직 private-main에 merge되지 않은 feature 브랜치에서 공개 PR 생성
+uv run python scripts/publish_public_pr.py --source-ref HEAD
 ```

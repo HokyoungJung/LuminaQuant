@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import argparse
 import csv
+import inspect
 import json
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from lumina_quant.config import BaseConfig
+from lumina_quant.storage.parquet import load_data_dict_from_parquet
 from lumina_quant.strategy_factory.research_runner import (
     build_default_candidate_rows,
     run_candidate_research,
@@ -46,6 +48,7 @@ ROBUST_SCORE_PARAM_KEYS: tuple[str, ...] = (
     "pair_multi_mix_bonus",
     "mdd_risk_penalty_coeff",
 )
+_MIN_COVERAGE_BARS = 360
 
 
 def _score_config_scope(score_config: dict[str, Any] | None) -> dict[str, Any]:
@@ -181,6 +184,12 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-candidates", type=int, default=512)
     parser.add_argument("--top-k", type=int, default=40)
     parser.add_argument("--score-config", default="", help="Optional scoring config JSON path.")
+    parser.add_argument("--train-start", default="", help="Exact split train window start (ISO/date).")
+    parser.add_argument("--train-end", default="", help="Exact split train window end (ISO/date).")
+    parser.add_argument("--validation-start", default="", help="Exact split validation window start (ISO/date).")
+    parser.add_argument("--validation-end", default="", help="Exact split validation window end (ISO/date).")
+    parser.add_argument("--oos-start", default="", help="Exact split OOS/test window start (ISO/date).")
+    parser.add_argument("--oos-end", default="", help="Exact split OOS/test window end (ISO/date).")
     parser.add_argument("--dry-run", action="store_true")
     return parser
 
@@ -201,6 +210,259 @@ def _load_score_config(path: Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError(f"score config must be a JSON object: {path}")
     return dict(payload)
+
+
+def _validate_split_token(value: Any, *, field: str) -> str:
+    token = str(value or "").strip()
+    if not token:
+        raise ValueError(f"missing exact split field: {field}")
+
+    normalized = token.replace("Z", "+00:00") if token.endswith("Z") else token
+    try:
+        datetime.fromisoformat(normalized)
+    except ValueError:
+        try:
+            datetime.fromisoformat(f"{normalized}T00:00:00+00:00")
+        except ValueError as exc:
+            raise ValueError(f"invalid ISO/date token for {field}: {token}") from exc
+    return token
+
+
+def _build_exact_split(args: argparse.Namespace) -> dict[str, str] | None:
+    raw = {
+        "train_start": getattr(args, "train_start", ""),
+        "train_end": getattr(args, "train_end", ""),
+        "val_start": getattr(args, "validation_start", ""),
+        "val_end": getattr(args, "validation_end", ""),
+        "oos_start": getattr(args, "oos_start", ""),
+        "oos_end": getattr(args, "oos_end", ""),
+    }
+    if not any(str(value or "").strip() for value in raw.values()):
+        return None
+
+    missing = [field for field, value in raw.items() if not str(value or "").strip()]
+    if missing:
+        missing_text = ", ".join(sorted(missing))
+        raise ValueError(
+            "exact split requires all window boundaries; missing: "
+            f"{missing_text}"
+        )
+
+    resolved = {
+        field: _validate_split_token(value, field=field)
+        for field, value in raw.items()
+    }
+    resolved["mode"] = "exact_dates"
+    return resolved
+
+
+def _coerce_utc_datetime(value: Any, *, end_of_day: bool = False) -> datetime | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        dt = value
+    else:
+        text = str(value).strip()
+        if not text:
+            return None
+        normalized = text.replace("Z", "+00:00") if text.endswith("Z") else text
+        try:
+            dt = datetime.fromisoformat(normalized)
+        except ValueError:
+            dt = datetime.fromisoformat(f"{normalized}T00:00:00+00:00")
+            if end_of_day:
+                dt = dt.replace(hour=23, minute=59, second=59, microsecond=999000)
+        else:
+            if end_of_day and len(text) == 10 and text[4] == "-" and text[7] == "-":
+                dt = dt.replace(hour=23, minute=59, second=59, microsecond=999000)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC)
+
+
+def _isoformat_z(value: datetime | None) -> str | None:
+    if value is None:
+        return None
+    return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
+
+
+def _split_bounds(split: dict[str, Any] | None) -> tuple[datetime | None, datetime | None]:
+    if not isinstance(split, dict):
+        return None, None
+    starts = [
+        _coerce_utc_datetime(split.get("train_start")),
+        _coerce_utc_datetime(split.get("val_start")),
+        _coerce_utc_datetime(split.get("oos_start")),
+    ]
+    ends = [
+        _coerce_utc_datetime(split.get("train_end"), end_of_day=True),
+        _coerce_utc_datetime(split.get("val_end"), end_of_day=True),
+        _coerce_utc_datetime(split.get("oos_end"), end_of_day=True),
+    ]
+    valid_starts = [item for item in starts if item is not None]
+    valid_ends = [item for item in ends if item is not None]
+    return (
+        min(valid_starts) if valid_starts else None,
+        max(valid_ends) if valid_ends else None,
+    )
+
+
+def _rebuild_candidates_after_coverage(
+    *,
+    candidates: list[dict[str, Any]],
+    symbols: list[str],
+    timeframes: list[str],
+    split: dict[str, Any] | None,
+) -> tuple[list[dict[str, Any]], dict[str, Any] | None, dict[str, Any]]:
+    if split is None:
+        return candidates, split, {"enabled": False, "used_candidate_count": len(candidates)}
+
+    start_bound, requested_end = _split_bounds(split)
+    if start_bound is None or requested_end is None:
+        return candidates, split, {"enabled": False, "used_candidate_count": len(candidates)}
+
+    db_path = str(getattr(BaseConfig, "MARKET_DATA_PARQUET_PATH", "data/market_parquet"))
+    exchange = str(getattr(BaseConfig, "MARKET_DATA_EXCHANGE", "binance") or "binance")
+    coverage: dict[tuple[str, str], dict[str, Any]] = {}
+    last_values: list[datetime] = []
+
+    for timeframe in timeframes:
+        loaded = load_data_dict_from_parquet(
+            db_path,
+            exchange=exchange,
+            symbol_list=list(symbols),
+            timeframe=timeframe,
+            start_date=_isoformat_z(start_bound),
+            end_date=_isoformat_z(requested_end),
+        )
+        for symbol in symbols:
+            frame = loaded.get(symbol)
+            if frame is None or frame.is_empty():
+                coverage[(symbol, timeframe)] = {"rows": 0, "first": None, "last": None}
+                continue
+            first = _coerce_utc_datetime(frame["datetime"].min())
+            last = _coerce_utc_datetime(frame["datetime"].max())
+            rows = int(frame.height)
+            coverage[(symbol, timeframe)] = {"rows": rows, "first": first, "last": last}
+            if rows >= _MIN_COVERAGE_BARS and first is not None and last is not None:
+                last_values.append(last)
+
+    actual_max = min(last_values) if last_values else requested_end
+    resolved_split = dict(split)
+    resolved_split["requested_oos_end"] = split.get("oos_end")
+    resolved_split["actual_max_timestamp"] = _isoformat_z(actual_max)
+    if actual_max is not None:
+        resolved_split["oos_end"] = _isoformat_z(min(requested_end, actual_max))
+    effective_oos_end = _coerce_utc_datetime(resolved_split.get("oos_end"), end_of_day=True)
+
+    available_pairs = {
+        pair
+        for pair, item in coverage.items()
+        if int(item.get("rows", 0)) >= _MIN_COVERAGE_BARS
+        and item.get("first") is not None
+        and item.get("last") is not None
+        and item["first"] <= start_bound
+        and (effective_oos_end is None or item["last"] >= effective_oos_end)
+    }
+    filtered = [
+        row
+        for row in candidates
+        if all(
+            (
+                symbol,
+                str(row.get("strategy_timeframe") or row.get("timeframe") or "1m"),
+            )
+            in available_pairs
+            for symbol in canonicalize_symbol_list(list(row.get("symbols") or []))
+        )
+    ]
+    used = filtered or candidates
+    return used, resolved_split, {
+        "enabled": True,
+        "requested_candidate_count": len(candidates),
+        "filtered_candidate_count": len(filtered),
+        "used_candidate_count": len(used),
+        "fallback_to_precoverage": bool(not filtered and candidates),
+        "actual_max_timestamp": resolved_split.get("actual_max_timestamp"),
+        "available_pairs": sorted(f"{symbol}@{timeframe}" for symbol, timeframe in available_pairs),
+    }
+
+
+def _run_candidate_research_with_optional_split(
+    *,
+    candidates: list[dict[str, Any]],
+    base_timeframe: str,
+    strategy_timeframes: list[str],
+    symbol_universe: list[str],
+    stage1_keep_ratio: float,
+    max_candidates: int,
+    score_config: dict[str, Any] | None,
+    exact_split: dict[str, str] | None,
+) -> dict[str, Any]:
+    kwargs: dict[str, Any] = {
+        "candidates": candidates,
+        "base_timeframe": base_timeframe,
+        "strategy_timeframes": strategy_timeframes,
+        "symbol_universe": symbol_universe,
+        "stage1_keep_ratio": float(stage1_keep_ratio),
+        "max_candidates": int(max_candidates),
+        "score_config": score_config,
+    }
+    if not exact_split:
+        return run_candidate_research(**kwargs)
+
+    signature = inspect.signature(run_candidate_research)
+    param_names = set(signature.parameters)
+
+    split_param_candidates = ("split", "requested_split", "exact_split", "split_windows")
+    for param_name in split_param_candidates:
+        if param_name in param_names:
+            kwargs[param_name] = dict(exact_split)
+            return run_candidate_research(**kwargs)
+
+    family_mappings = (
+        {
+            "train_start": "train_start",
+            "train_end": "train_end",
+            "val_start": "val_start",
+            "val_end": "val_end",
+            "oos_start": "oos_start",
+            "oos_end": "oos_end",
+        },
+        {
+            "train_start": "train_start",
+            "train_end": "train_end",
+            "validation_start": "val_start",
+            "validation_end": "val_end",
+            "oos_start": "oos_start",
+            "oos_end": "oos_end",
+        },
+        {
+            "train_start": "train_start",
+            "train_end": "train_end",
+            "val_start": "val_start",
+            "val_end": "val_end",
+            "test_start": "oos_start",
+            "test_end": "oos_end",
+        },
+        {
+            "train_start": "train_start",
+            "train_end": "train_end",
+            "validation_start": "val_start",
+            "validation_end": "val_end",
+            "test_start": "oos_start",
+            "test_end": "oos_end",
+        },
+    )
+    for mapping in family_mappings:
+        if set(mapping).issubset(param_names):
+            kwargs.update({param_name: exact_split[split_key] for param_name, split_key in mapping.items()})
+            return run_candidate_research(**kwargs)
+
+    raise ValueError(
+        "exact split requested, but run_candidate_research does not expose a supported "
+        "exact-window interface yet"
+    )
 
 
 def _shortlist_robust_score_params(score_config: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -334,15 +596,39 @@ def main() -> int:
             max_candidates=max(1, int(args.max_candidates)),
         )
 
-    report = run_candidate_research(
-        candidates=candidates,
-        base_timeframe=str(args.base_timeframe),
-        strategy_timeframes=timeframes,
-        symbol_universe=symbols,
-        stage1_keep_ratio=float(args.stage1_keep_ratio),
-        max_candidates=max(1, int(args.max_candidates)),
-        score_config=score_config_scope or None,
-    )
+    coverage_summary: dict[str, Any] | None = None
+    try:
+        exact_split = _build_exact_split(args)
+        if exact_split is not None:
+            exact_split["strategy_timeframe"] = timeframes[0] if timeframes else str(args.base_timeframe)
+            candidates, exact_split, coverage_summary = _rebuild_candidates_after_coverage(
+                candidates=list(candidates),
+                symbols=symbols,
+                timeframes=timeframes,
+                split=exact_split,
+            )
+        report = _run_candidate_research_with_optional_split(
+            candidates=candidates,
+            base_timeframe=str(args.base_timeframe),
+            strategy_timeframes=timeframes,
+            symbol_universe=symbols,
+            stage1_keep_ratio=float(args.stage1_keep_ratio),
+            max_candidates=max(1, int(args.max_candidates)),
+            score_config=score_config_scope or None,
+            exact_split=exact_split,
+        )
+    except ValueError as exc:
+        raise SystemExit(f"[RESEARCH] {exc}")
+
+    if exact_split is not None:
+        report["requested_split"] = dict(exact_split)
+        report["effective_split"] = dict(report.get("split") or exact_split)
+        report["split_mode"] = "exact"
+    else:
+        report["effective_split"] = dict(report.get("split") or {})
+        report["split_mode"] = "default"
+    if coverage_summary is not None:
+        report["coverage_rebuild"] = coverage_summary
 
     shortlist_config = _resolve_shortlist_selection_config(
         score_config_scope or None,
@@ -386,6 +672,9 @@ def main() -> int:
         "base_timeframe": report.get("base_timeframe"),
         "strategy_timeframes": report.get("strategy_timeframes"),
         "split": report.get("split"),
+        "requested_split": report.get("requested_split") or {},
+        "effective_split": report.get("effective_split") or {},
+        "split_mode": report.get("split_mode") or ("exact" if exact_split is not None else "default"),
         "source_report": str(output_path),
         "selected_team": shortlisted,
         "candidates": report.get("candidates") or [],
@@ -397,6 +686,8 @@ def main() -> int:
         },
         "data_sources": report.get("data_sources") or {},
     }
+    if coverage_summary is not None:
+        team_report["coverage_rebuild"] = coverage_summary
     team_report_path = output_dir / f"strategy_factory_report_{stamp}.json"
     team_report_latest = output_dir / "strategy_factory_report_latest.json"
     team_report_path.write_text(json.dumps(team_report, indent=2), encoding="utf-8")
@@ -412,6 +703,8 @@ def main() -> int:
     print(f"[RESEARCH] candidates_in={len(candidates)}")
     print(f"[RESEARCH] candidates_stage2={len(list(report.get('candidates') or []))}")
     print(f"[RESEARCH] shortlisted={len(shortlisted)}")
+    if coverage_summary and coverage_summary.get("actual_max_timestamp"):
+        print(f"[RESEARCH] actual_max_timestamp={coverage_summary['actual_max_timestamp']}")
     print(f"Saved: {output_path}")
     print(f"Saved latest: {latest_path}")
     print(f"Saved CSV: {csv_path}")

@@ -50,11 +50,14 @@ git push private private-main:main
 
 ## 5) Public publish (sensitive paths removed)
 
-The publish script is PR-first and enforces filtering for lumina_quant/strategies/indicators/data/logs/secrets and DB build/sync helpers.
+The publish script is PR-first and enforces filtering for lumina_quant/strategies/indicators/data/logs/secrets, tuned strategy-factory research metadata, deployment generators, and DB build/sync helpers.
 
 ```bash
 git checkout private-main
 ./publish_api.sh
+
+# or publish the currently checked-out feature branch safely
+./publish_api.sh --source-ref HEAD
 ```
 
 This creates a sanitized `public-sync-*` branch from `origin/main`, pushes it, then opens a PR.
@@ -69,7 +72,7 @@ Optional:
 
 ```bash
 git fetch origin
-git ls-tree -r --name-only origin/main | rg "^lumina_quant/strategies/|^lumina_quant/indicators/|^data/|^logs/|^reports/|^best_optimized_parameters/|^\.omx/|^\.sisyphus/|^AGENTS\.md$|^\.env$|^lumina_quant/data_sync\.py$|^lumina_quant/data_collector\.py$|^scripts/sync_binance_ohlcv\.py$|^scripts/collect_market_data\.py$|^scripts/collect_universe_1s\.py$|^tests/test_data_sync\.py$"
+git ls-tree -r --name-only origin/main | rg "^src/lumina_quant/strategies/|^src/lumina_quant/indicators/|^src/lumina_quant/strategy_factory/candidate_library\\.py$|^src/lumina_quant/strategy_factory/research_runner\\.py$|^src/lumina_quant/workflows/alpha_research_pipeline\\.py$|^data/|^var/|^logs/|^reports/|^best_optimized_parameters/|^\\.omx/|^\\.sisyphus/|^AGENTS\\.md$|^\\.env$|^src/lumina_quant/data_sync\\.py$|^src/lumina_quant/data_collector\\.py$|^scripts/sync_binance_ohlcv\\.py$|^scripts/research/run_llm_alpha_pipeline\\.py$|^scripts/research/write_exact_window_deployment_combo\\.py$|^scripts/collect_strategy_support_data\\.py$|^scripts/collect_all_strategy_support_data\\.py$|^scripts/backfill_funding_fee_features\\.py$|^scripts/collect_market_data\\.py$|^scripts/collect_universe_1s\\.py$|^tests/test_alpha_research_pipeline\\.py$|^tests/test_alpha101_formula_strategy\\.py$|^tests/test_data_sync\\.py$|^tests/test_exact_window_deployment_combo\\.py$|^tests/test_research_runner_feature_support\\.py$|^tests/test_run_llm_alpha_pipeline_script\\.py$|^tests/test_strategy_alias_compat\\.py$|^tests/test_strategy_factory_library\\.py$|^tests/test_strategy_support_collection_profiles\\.py$|^tests/test_topcap_tsmom_strategy\\.py$"
 ```
 
 No output from the command above means filtering worked as intended.

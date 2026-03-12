@@ -4,7 +4,10 @@ import importlib.util
 import json
 import subprocess
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
+
+import polars as pl
 
 
 def _load_module():
@@ -160,3 +163,161 @@ def test_shortlist_robust_score_params_cross_corr_penalty_and_override_precedenc
     assert float(params.get("turnover_penalty", 0.0)) == 2.2
     assert float(params.get("turnover_threshold", 0.0)) == 1.7
     assert float(params.get("cross_corr_penalty", 0.0)) == 0.4
+
+
+def test_exact_split_builder_and_passthrough_support():
+    args = MODULE._build_parser().parse_args(
+        [
+            "--train-start",
+            "2025-01-01",
+            "--train-end",
+            "2025-12-31",
+            "--validation-start",
+            "2026-01-01",
+            "--validation-end",
+            "2026-01-31",
+            "--oos-start",
+            "2026-02-01",
+            "--oos-end",
+            "2026-03-07T23:59:59Z",
+        ]
+    )
+    exact_split = MODULE._build_exact_split(args)
+
+    captured: dict[str, object] = {}
+
+    def _stub_run_candidate_research(
+        *,
+        candidates,
+        base_timeframe,
+        strategy_timeframes,
+        symbol_universe,
+        stage1_keep_ratio,
+        max_candidates,
+        score_config,
+        split,
+    ):
+        captured.update(
+            {
+                "candidates": candidates,
+                "base_timeframe": base_timeframe,
+                "strategy_timeframes": strategy_timeframes,
+                "symbol_universe": symbol_universe,
+                "stage1_keep_ratio": stage1_keep_ratio,
+                "max_candidates": max_candidates,
+                "score_config": score_config,
+                "split": split,
+            }
+        )
+        return {"schema_version": "v2", "split": split, "candidates": []}
+
+    original = MODULE.run_candidate_research
+    try:
+        MODULE.run_candidate_research = _stub_run_candidate_research
+        payload = MODULE._run_candidate_research_with_optional_split(
+            candidates=[{"candidate_id": "demo"}],
+            base_timeframe="1s",
+            strategy_timeframes=["1m"],
+            symbol_universe=["BTC/USDT"],
+            stage1_keep_ratio=0.35,
+            max_candidates=16,
+            score_config={"candidate_rank_score_weights": {"return_weight": 25.0}},
+            exact_split=exact_split,
+        )
+    finally:
+        MODULE.run_candidate_research = original
+
+    assert payload["split"] == exact_split
+    assert captured["split"] == exact_split
+    assert captured["base_timeframe"] == "1s"
+    assert captured["strategy_timeframes"] == ["1m"]
+
+
+def test_exact_split_coverage_rebuild_clamps_oos_end_and_filters_candidates(monkeypatch):
+    start = datetime(2025, 1, 1, tzinfo=UTC)
+    oos_cap = datetime(2026, 3, 7, tzinfo=UTC)
+    frame = pl.DataFrame(
+        {
+            "datetime": pl.datetime_range(
+                start.replace(tzinfo=None),
+                oos_cap.replace(tzinfo=None),
+                interval="1d",
+                eager=True,
+            ),
+            "open": pl.Series([1.0] * 431, dtype=pl.Float64),
+            "high": pl.Series([1.0] * 431, dtype=pl.Float64),
+            "low": pl.Series([1.0] * 431, dtype=pl.Float64),
+            "close": pl.Series([1.0] * 431, dtype=pl.Float64),
+            "volume": pl.Series([1.0] * 431, dtype=pl.Float64),
+        }
+    )
+
+    def _mock_load_data_dict_from_parquet(
+        root_path,
+        *,
+        exchange,
+        symbol_list,
+        timeframe,
+        start_date=None,
+        end_date=None,
+        chunk_days=7,
+        warmup_bars=0,
+        data_mode="legacy",
+        staleness_threshold_seconds=None,
+    ):
+        _ = (
+            root_path,
+            exchange,
+            timeframe,
+            start_date,
+            end_date,
+            chunk_days,
+            warmup_bars,
+            data_mode,
+            staleness_threshold_seconds,
+        )
+        return {symbol: frame for symbol in symbol_list if symbol == "BTC/USDT"}
+
+    monkeypatch.setattr(MODULE, "load_data_dict_from_parquet", _mock_load_data_dict_from_parquet)
+
+    candidates = [
+        {
+            "candidate_id": "keep",
+            "name": "keep",
+            "strategy_class": "CompositeTrendStrategy",
+            "strategy_timeframe": "1d",
+            "symbols": ["BTC/USDT"],
+            "params": {},
+        },
+        {
+            "candidate_id": "drop",
+            "name": "drop",
+            "strategy_class": "CompositeTrendStrategy",
+            "strategy_timeframe": "1d",
+            "symbols": ["ETH/USDT"],
+            "params": {},
+        },
+    ]
+
+    rebuilt, split, summary = MODULE._rebuild_candidates_after_coverage(
+        candidates=candidates,
+        symbols=["BTC/USDT", "ETH/USDT"],
+        timeframes=["1d"],
+        split={
+            "train_start": "2025-01-01T00:00:00Z",
+            "train_end": "2025-12-31T23:59:59.999000Z",
+            "val_start": "2026-01-01T00:00:00Z",
+            "val_end": "2026-01-31T23:59:59.999000Z",
+            "oos_start": "2026-02-01T00:00:00Z",
+            "oos_end": "2026-03-08T23:59:59.999000Z",
+            "strategy_timeframe": "1d",
+            "mode": "exact_dates",
+        },
+    )
+
+    assert [row["candidate_id"] for row in rebuilt] == ["keep"]
+    assert split is not None
+    assert split["requested_oos_end"] == "2026-03-08T23:59:59.999000Z"
+    assert split["oos_end"] == "2026-03-07T00:00:00Z"
+    assert split["actual_max_timestamp"] == "2026-03-07T00:00:00Z"
+    assert summary["used_candidate_count"] == 1

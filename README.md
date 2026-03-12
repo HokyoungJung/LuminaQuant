@@ -152,8 +152,13 @@ trading:
   - `scripts/sync_binance_ohlcv.py`
   - `scripts/collect_market_data.py`
   - `tests/test_data_sync.py`
+- This public repository also excludes private research/deployment metadata surfaces:
+  - tuned candidate libraries / research runners / article-pipeline workflows
+  - deployment scenario generators and follow-up watchlist logic
+  - strategy-specific test fixtures that reveal tuned constants, family IDs, or shortlist metadata
 - Full strategy/indicator implementation and AGENTS guidance are maintained in the private repository.
 - Database/runtime artifacts are never published (`data/`, `logs/`, `.omx/`, `.sisyphus/`).
+- Valid report artifacts may exist in the private repo for operations/review, but are never pushed to the public repo.
 
 ### 3. Running the System
 

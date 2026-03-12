@@ -71,6 +71,8 @@ def test_cross_leadlag_spillover_excludes_metals_and_predicts_lagger():
             "ADA/USDT": lagger,
             "XAU/USDT": np.linspace(1900, 1910, n),
             "XAG/USDT": np.linspace(23, 24, n),
+            "XPT/USDT": np.linspace(950, 960, n),
+            "XPD/USDT": np.linspace(980, 995, n),
         },
         max_lag=3,
         ridge_alpha=1.0,
@@ -80,6 +82,8 @@ def test_cross_leadlag_spillover_excludes_metals_and_predicts_lagger():
     assert result["available"] is True
     assert "XAU/USDT" in set(result["excluded_symbols"])
     assert "XAG/USDT" in set(result["excluded_symbols"])
+    assert "XPT/USDT" in set(result["excluded_symbols"])
+    assert "XPD/USDT" in set(result["excluded_symbols"])
     assert "ADA/USDT" in set(result["predictions"])
     ada = result["predictions"]["ADA/USDT"]
     assert np.isfinite(float(ada["score"]))

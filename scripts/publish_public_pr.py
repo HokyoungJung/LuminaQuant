@@ -44,14 +44,27 @@ PROTECTED_PATHS: tuple[str, ...] = (
     "src/lumina_quant/data_collector.py",
     "lumina_quant/data_sync.py",
     "lumina_quant/data_collector.py",
+    "src/lumina_quant/strategy_factory/candidate_library.py",
+    "src/lumina_quant/strategy_factory/research_runner.py",
+    "src/lumina_quant/workflows/alpha_research_pipeline.py",
     "scripts/sync_binance_ohlcv.py",
+    "scripts/research/run_llm_alpha_pipeline.py",
+    "scripts/research/write_exact_window_deployment_combo.py",
     "scripts/collect_strategy_support_data.py",
     "scripts/collect_all_strategy_support_data.py",
     "scripts/backfill_funding_fee_features.py",
     "scripts/collect_market_data.py",
     "scripts/collect_universe_1s.py",
+    "tests/test_alpha_research_pipeline.py",
+    "tests/test_alpha101_formula_strategy.py",
     "tests/test_data_sync.py",
+    "tests/test_exact_window_deployment_combo.py",
+    "tests/test_research_runner_feature_support.py",
+    "tests/test_run_llm_alpha_pipeline_script.py",
+    "tests/test_strategy_alias_compat.py",
+    "tests/test_strategy_factory_library.py",
     "tests/test_strategy_support_collection_profiles.py",
+    "tests/test_topcap_tsmom_strategy.py",
 )
 
 SENSITIVE_PATH_RE = re.compile(
@@ -74,14 +87,27 @@ SENSITIVE_PATH_RE = re.compile(
     r"|^src/lumina_quant/data_collector\.py$"
     r"|^lumina_quant/data_sync\.py$"
     r"|^lumina_quant/data_collector\.py$"
+    r"|^src/lumina_quant/strategy_factory/candidate_library\.py$"
+    r"|^src/lumina_quant/strategy_factory/research_runner\.py$"
+    r"|^src/lumina_quant/workflows/alpha_research_pipeline\.py$"
     r"|^scripts/sync_binance_ohlcv\.py$"
+    r"|^scripts/research/run_llm_alpha_pipeline\.py$"
+    r"|^scripts/research/write_exact_window_deployment_combo\.py$"
     r"|^scripts/collect_strategy_support_data\.py$"
     r"|^scripts/collect_all_strategy_support_data\.py$"
     r"|^scripts/backfill_funding_fee_features\.py$"
     r"|^scripts/collect_market_data\.py$"
     r"|^scripts/collect_universe_1s\.py$"
+    r"|^tests/test_alpha_research_pipeline\.py$"
+    r"|^tests/test_alpha101_formula_strategy\.py$"
     r"|^tests/test_data_sync\.py$"
+    r"|^tests/test_exact_window_deployment_combo\.py$"
+    r"|^tests/test_research_runner_feature_support\.py$"
+    r"|^tests/test_run_llm_alpha_pipeline_script\.py$"
+    r"|^tests/test_strategy_alias_compat\.py$"
+    r"|^tests/test_strategy_factory_library\.py$"
     r"|^tests/test_strategy_support_collection_profiles\.py$"
+    r"|^tests/test_topcap_tsmom_strategy\.py$"
     r"|(^|/)live_?equity\.csv$"
     r"|(^|/)live_?trades\.csv$"
     r"|(^|/)equity\.csv$"

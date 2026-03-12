@@ -27,6 +27,7 @@ Public branch policy:
 
 - Keep DB **read-only** workflows (consume existing Postgres/Parquet/CSV artifacts).
 - Do not include exchange OHLCV bootstrap/sync pipelines.
+- Do not include tuned strategy-factory research metadata (candidate libraries, research runners, article-pipeline/deployment generators, or strategy-specific metadata tests).
 - Keep runtime DB/data artifacts out of git.
 
 ## 3. Automation Scripts
@@ -74,6 +75,9 @@ Useful options:
 # use local private-main instead of private/main
 ./publish_api.sh --source-ref private-main
 
+# publish the currently checked-out feature branch instead of private/main
+./publish_api.sh --source-ref HEAD
+
 # create PR and enable auto-merge after CI is green
 ./publish_api.sh --auto-merge
 ```
@@ -95,6 +99,9 @@ git push private private-main:main
 ```bash
 git checkout private-main
 uv run python scripts/publish_public_pr.py --source-ref private/main
+
+# or from a feature branch that is not merged to private/main yet
+uv run python scripts/publish_public_pr.py --source-ref HEAD
 ```
 
 ## 5. Authentication Setup (Multiple Accounts)

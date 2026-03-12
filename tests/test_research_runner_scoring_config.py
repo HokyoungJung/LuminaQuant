@@ -124,3 +124,26 @@ def test_run_candidate_research_scoring_config_defaults_and_override(monkeypatch
     rows_override = list(report_override.get("candidates") or [])
     assert rows_override
     assert rows_override[0]["candidate_id"] == "cand-b"
+
+
+def test_candidate_rank_score_penalizes_validation_to_oos_instability():
+    stable = {
+        "val": {"sharpe": 1.1, "return": 0.021, "turnover": 1.0},
+        "oos": {
+            "sharpe": 1.0,
+            "return": 0.02,
+            "turnover": 1.0,
+            "deflated_sharpe": 0.4,
+            "pbo": 0.1,
+            "mdd": 0.08,
+        },
+    }
+    unstable = {
+        "val": {"sharpe": 4.0, "return": 0.09, "turnover": 0.4},
+        "oos": dict(stable["oos"]),
+    }
+
+    stable_score = research_runner._candidate_rank_score(stable)
+    unstable_score = research_runner._candidate_rank_score(unstable)
+
+    assert stable_score > unstable_score
