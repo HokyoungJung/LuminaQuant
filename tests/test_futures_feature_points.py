@@ -27,6 +27,8 @@ class TestFuturesFeaturePoints(unittest.TestCase):
                         {
                             "timestamp_ms": 1_700_000_000_000,
                             "funding_rate": 0.0001,
+                            "funding_fee_rate": 0.0001,
+                            "funding_fee_quote_per_unit": 5.0,
                             "mark_price": 50000.0,
                         }
                     ],
@@ -47,12 +49,15 @@ class TestFuturesFeaturePoints(unittest.TestCase):
                 self.assertEqual(upserted_again, 1)
 
                 row = conn.execute(
-                    f"SELECT funding_rate, mark_price, index_price FROM {FUTURES_FEATURE_POINTS_TABLE}"
+                    "SELECT funding_rate, funding_fee_rate, funding_fee_quote_per_unit, "
+                    f"mark_price, index_price FROM {FUTURES_FEATURE_POINTS_TABLE}"
                 ).fetchone()
                 self.assertIsNotNone(row)
                 self.assertAlmostEqual(float(row[0]), 0.0001)
-                self.assertAlmostEqual(float(row[1]), 50000.0)
-                self.assertAlmostEqual(float(row[2]), 49990.0)
+                self.assertAlmostEqual(float(row[1]), 0.0001)
+                self.assertAlmostEqual(float(row[2]), 5.0)
+                self.assertAlmostEqual(float(row[3]), 50000.0)
+                self.assertAlmostEqual(float(row[4]), 49990.0)
             finally:
                 conn.close()
 

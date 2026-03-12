@@ -25,6 +25,7 @@ PROTECTED_PATHS: tuple[str, ...] = (
     ".env",
     ".omx",
     ".sisyphus",
+    "var",
     "data",
     "logs",
     "reports",
@@ -44,9 +45,13 @@ PROTECTED_PATHS: tuple[str, ...] = (
     "lumina_quant/data_sync.py",
     "lumina_quant/data_collector.py",
     "scripts/sync_binance_ohlcv.py",
+    "scripts/collect_strategy_support_data.py",
+    "scripts/collect_all_strategy_support_data.py",
+    "scripts/backfill_funding_fee_features.py",
     "scripts/collect_market_data.py",
     "scripts/collect_universe_1s.py",
     "tests/test_data_sync.py",
+    "tests/test_strategy_support_collection_profiles.py",
 )
 
 SENSITIVE_PATH_RE = re.compile(
@@ -56,6 +61,7 @@ SENSITIVE_PATH_RE = re.compile(
     r"|^src/lumina_quant/indicators/"
     r"|^lumina_quant/indicators/"
     r"|^data/"
+    r"|^var/"
     r"|^logs/"
     r"|^reports/"
     r"|^best_optimized_parameters/"
@@ -69,9 +75,13 @@ SENSITIVE_PATH_RE = re.compile(
     r"|^lumina_quant/data_sync\.py$"
     r"|^lumina_quant/data_collector\.py$"
     r"|^scripts/sync_binance_ohlcv\.py$"
+    r"|^scripts/collect_strategy_support_data\.py$"
+    r"|^scripts/collect_all_strategy_support_data\.py$"
+    r"|^scripts/backfill_funding_fee_features\.py$"
     r"|^scripts/collect_market_data\.py$"
     r"|^scripts/collect_universe_1s\.py$"
     r"|^tests/test_data_sync\.py$"
+    r"|^tests/test_strategy_support_collection_profiles\.py$"
     r"|(^|/)live_?equity\.csv$"
     r"|(^|/)live_?trades\.csv$"
     r"|(^|/)equity\.csv$"
@@ -158,7 +168,19 @@ def _default_branch_name(prefix: str) -> str:
     return f"{prefix}-{stamp}"
 
 
-def _detect_repo() -> str | None:
+def _detect_repo(remote: str) -> str | None:
+    remote_name = str(remote or "").strip()
+    if remote_name:
+        result = _git("remote", "get-url", remote_name, check=False)
+        if result.returncode == 0 and result.stdout:
+            url = result.stdout.strip()
+            if url.endswith(".git"):
+                url = url[:-4]
+            if url.startswith("git@github.com:"):
+                return url.removeprefix("git@github.com:")
+            marker = "github.com/"
+            if marker in url:
+                return url.split(marker, 1)[1].strip("/") or None
     if shutil.which("gh") is None:
         return None
     result = _gh("repo", "view", "--json", "nameWithOwner", check=False)
@@ -224,7 +246,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     original_branch = _current_branch()
-    repo = str(args.repo).strip() or _detect_repo()
+    repo = str(args.repo).strip() or _detect_repo(str(args.remote))
     head_branch = str(args.head_branch).strip() or _default_branch_name(str(args.head_prefix))
 
     try:

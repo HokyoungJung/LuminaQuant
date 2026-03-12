@@ -9,6 +9,7 @@ from collections import deque
 from typing import Any
 
 from lumina_quant.core.events import MarketWindowEvent
+from lumina_quant.data.feature_points import FeaturePointLookup
 from lumina_quant.live.binance_market_stream import (
     BinanceMarketStreamClient,
     BinanceMarketStreamConfig,
@@ -37,6 +38,10 @@ class BinanceLiveDataHandler:
         self.transport = str(transport or "ws").strip().lower()
         if self.transport not in {"ws", "poll"}:
             self.transport = "ws"
+        self._feature_lookup = FeaturePointLookup(
+            db_path=str(getattr(self.config, "MARKET_DATA_PARQUET_PATH", "data/market_parquet")),
+            exchange=str(getattr(self.config, "MARKET_DATA_EXCHANGE", "binance")),
+        )
 
         self.continue_backtest = True
         self._shutdown = threading.Event()
@@ -300,12 +305,21 @@ class BinanceLiveDataHandler:
     def get_latest_bar_value(self, symbol, val_type):
         with self.lock:
             data = self.latest_symbol_data.get(symbol) or deque()
-            if not data:
-                return 0.0
-            idx = self.col_idx.get(val_type)
-            if idx is None:
-                return 0.0
-            return float(data[-1][idx])
+            if data:
+                idx = self.col_idx.get(val_type)
+                if idx is not None:
+                    return float(data[-1][idx])
+                timestamp_ms = int(data[-1][0])
+            else:
+                timestamp_ms = None
+        feature_value = self._feature_lookup.get_latest(
+            str(symbol),
+            str(val_type),
+            timestamp_ms=timestamp_ms,
+        )
+        if feature_value is not None:
+            return float(feature_value)
+        return 0.0
 
     def get_latest_bars_values(self, symbol, val_type, N=1):
         with self.lock:
@@ -314,6 +328,16 @@ class BinanceLiveDataHandler:
             if idx is None:
                 return []
             return [float(row[idx]) for row in data]
+
+    def get_latest_feature_value(self, symbol, field):
+        with self.lock:
+            data = self.latest_symbol_data.get(symbol) or deque()
+            timestamp_ms = int(data[-1][0]) if data else None
+        return self._feature_lookup.get_latest(
+            str(symbol),
+            str(field),
+            timestamp_ms=timestamp_ms,
+        )
 
     def get_market_spec(self, symbol):
         if self.exchange and hasattr(self.exchange, "get_market_spec"):
