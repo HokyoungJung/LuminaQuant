@@ -4,7 +4,7 @@ import argparse
 import sys
 from collections.abc import Callable
 
-from lumina_quant.cli import backtest, dashboard, data, live, optimize
+from lumina_quant.cli import backtest, dashboard, data, exact_window, live, optimize
 
 Handler = Callable[[list[str] | None], int]
 
@@ -27,6 +27,7 @@ def main(argv: list[str] | None = None) -> int:
         "live": live.main,
         "dashboard": dashboard.main,
         "data": data.main,
+        "exact-window": exact_window.main,
     }
 
     parser = argparse.ArgumentParser(
