@@ -83,7 +83,7 @@ if str(_RUNTIME.storage.postgres_dsn or "").strip():
     )
 os.environ.setdefault(
     "LQ_GPU_MODE",
-    str(getattr(_RUNTIME.execution, "gpu_mode", _RUNTIME.execution.compute_backend) or "auto"),
+    str(getattr(_RUNTIME.execution, "gpu_mode", _RUNTIME.execution.compute_backend) or "gpu"),
 )
 os.environ.setdefault(
     "LQ_GPU_VRAM_GB",
@@ -91,7 +91,7 @@ os.environ.setdefault(
 )
 os.environ.setdefault(
     "LQ__EXECUTION__GPU_MODE",
-    str(getattr(_RUNTIME.execution, "gpu_mode", _RUNTIME.execution.compute_backend) or "auto"),
+    str(getattr(_RUNTIME.execution, "gpu_mode", _RUNTIME.execution.compute_backend) or "gpu"),
 )
 os.environ.setdefault(
     "LQ__EXECUTION__GPU_VRAM_GB",
@@ -206,7 +206,7 @@ class BaseConfig:
     MAINTENANCE_MARGIN_RATE = float(_RUNTIME.execution.maintenance_margin_rate)
     LIQUIDATION_BUFFER_RATE = float(_RUNTIME.execution.liquidation_buffer_rate)
     GPU_MODE = str(
-        getattr(_RUNTIME.execution, "gpu_mode", _RUNTIME.execution.compute_backend) or "auto"
+        getattr(_RUNTIME.execution, "gpu_mode", _RUNTIME.execution.compute_backend) or "gpu"
     ).lower()
     GPU_VRAM_GB = float(getattr(_RUNTIME.execution, "gpu_vram_gb", 0.0))
     COMPUTE_BACKEND = GPU_MODE

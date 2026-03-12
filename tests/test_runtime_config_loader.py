@@ -186,6 +186,32 @@ class TestRuntimeConfigLoader(unittest.TestCase):
         finally:
             os.remove(path)
 
+    def test_execution_defaults_are_gpu_first(self):
+        yaml_text = textwrap.dedent(
+            """
+            trading:
+              symbols: ["BTC/USDT"]
+            live:
+              mode: "paper"
+              exchange:
+                driver: "ccxt"
+                name: "binance"
+                market_type: "future"
+                position_mode: "HEDGE"
+                margin_mode: "isolated"
+                leverage: 2
+            """
+        ).strip()
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False, encoding="utf-8") as fp:
+            fp.write(yaml_text)
+            path = fp.name
+        try:
+            runtime = load_runtime_config(config_path=path, env=os.environ)
+            self.assertEqual(runtime.execution.gpu_mode, "gpu")
+            self.assertEqual(runtime.execution.compute_backend, "gpu")
+        finally:
+            os.remove(path)
+
     def test_env_backtest_decision_cadence_seconds(self):
         yaml_text = textwrap.dedent(
             """

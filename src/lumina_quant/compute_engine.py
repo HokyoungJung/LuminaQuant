@@ -1,7 +1,7 @@
 """Compute-engine selection with deterministic GPU auto/CPU fallback semantics.
 
 Environment controls:
-- LQ_GPU_MODE: auto|cpu|gpu|forced-gpu
+- LQ_GPU_MODE: gpu|auto|cpu|forced-gpu
 - LQ_GPU_DEVICE: integer id or cuda:<id>/gpu:<id>
 - LQ_GPU_VRAM_GB: required minimum VRAM in GB for GPU eligibility
 - LQ_GPU_VERBOSE: truthy values enable selection/fallback logging
@@ -296,7 +296,7 @@ def select_engine(
     verbose: str | bool | None = None,
 ) -> ComputeEngine:
     """Resolve CPU/GPU mode from args/environment with deterministic fallback."""
-    requested_mode = _normalize_gpu_mode(mode or os.getenv("LQ_GPU_MODE", "auto"))
+    requested_mode = _normalize_gpu_mode(mode or os.getenv("LQ_GPU_MODE", "gpu"))
     resolved_device = _parse_gpu_device(device if device is not None else os.getenv("LQ_GPU_DEVICE"))
     resolved_vram_gb = _parse_gpu_vram_gb(
         vram_gb if vram_gb is not None else os.getenv("LQ_GPU_VRAM_GB", "0")

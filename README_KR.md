@@ -55,7 +55,7 @@ graph TD
 현재 기본 로컬 스택:
 - **1초 캔들 저장소**: Parquet(ZSTD, exchange/symbol/date 파티션)
 - **상태/감사/잡 관리**: PostgreSQL(local)
-- **백테스트/최적화 계산**: Polars Lazy + GPU 자동(`LQ_GPU_MODE=auto`)
+- **백테스트/최적화 계산**: Polars Lazy + GPU 우선 실행(`gpu` 기본, CI/비GPU 환경은 `cpu` 또는 `auto` override 가능)
 
 ---
 
@@ -75,7 +75,7 @@ graph TD
 BINANCE_API_KEY=your_api_key
 BINANCE_SECRET_KEY=your_secret_key
 LQ_POSTGRES_DSN=postgresql://localhost:5432/luminaquant
-LQ_GPU_MODE=auto
+LQ_GPU_MODE=gpu
 LQ_GPU_DEVICE=0
 LOG_LEVEL=INFO
 ```

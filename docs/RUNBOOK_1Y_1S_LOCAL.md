@@ -127,7 +127,7 @@ uv run python scripts/ci/check_market_window_rollout_gates.py \
 ## 2) Runtime knobs for 8GB-safe runs
 
 ```bash
-export LQ_GPU_MODE=auto
+export LQ_GPU_MODE=gpu
 export LQ_GPU_DEVICE=0
 export LQ_GPU_VERBOSE=0
 

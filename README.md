@@ -55,7 +55,7 @@ graph TD
 Current local-first stack defaults:
 - **1s market store**: Parquet (ZSTD, exchange/symbol/date partitioning)
 - **State/audit/job control**: PostgreSQL (local)
-- **Backtest/optimization compute**: Polars Lazy with automatic GPU/CPU execution mode
+- **Backtest/optimization compute**: Polars Lazy with GPU-first execution (`gpu` by default; CI/non-GPU environments can override to `cpu` or `auto`)
 
 ---
 
@@ -75,7 +75,7 @@ For security, **never commit API keys**. Create a `.env` file in the root direct
 BINANCE_API_KEY=your_api_key
 BINANCE_SECRET_KEY=your_secret_key
 LQ_POSTGRES_DSN=postgresql://localhost:5432/luminaquant
-LQ_GPU_MODE=auto
+LQ_GPU_MODE=gpu
 LQ_GPU_DEVICE=0
 LOG_LEVEL=INFO
 ```

@@ -1,4 +1,5 @@
 import platform
+import shutil
 import subprocess
 
 
@@ -7,12 +8,27 @@ def run(cmd):
     subprocess.check_call(cmd)
 
 
+def run_optional(cmd):
+    print(f"$ {' '.join(cmd)}")
+    return subprocess.run(cmd, check=False)
+
+
 def main():
     print(f"Platform: {platform.platform()}")
-    run(["uv", "sync", "--extra", "optimize", "--extra", "dev", "--extra", "live"])
+    run(["uv", "sync", "--extra", "optimize", "--extra", "dev", "--extra", "live", "--extra", "gpu"])
     run(["uv", "run", "ruff", "check", "."])
     run(["uv", "run", "python", "scripts/check_architecture.py"])
     run(["uv", "run", "python", "scripts/verify_docs.py"])
+    run(
+        [
+            "uv",
+            "run",
+            "python",
+            "scripts/ci/verify_polars_gpu_runtime.py",
+            "--output-json",
+            "reports/benchmarks/verify_install_gpu_contract.json",
+        ]
+    )
     run(
         [
             "uv",
@@ -46,6 +62,22 @@ def main():
         "[verify_install] 8GB gate ran in fallback mode "
         "(RSS/OOM strict checks require --time-log and explicit OOM logs)."
     )
+    if shutil.which("nvidia-smi"):
+        result = run_optional(
+            [
+                "uv",
+                "run",
+                "python",
+                "scripts/ci/verify_polars_gpu_runtime.py",
+                "--require-gpu",
+                "--mode",
+                "forced-gpu",
+                "--output-json",
+                "reports/benchmarks/verify_install_gpu_runtime.json",
+            ]
+        )
+        if result.returncode != 0:
+            raise SystemExit(result.returncode)
     run(
         [
             "uv",

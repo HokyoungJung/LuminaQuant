@@ -21,6 +21,11 @@ Resolution policy:
    - Runs the same probe.
    - Uses GPU on success, otherwise logs reason and falls back to CPU.
 
+Current project default is **GPU-first**:
+- runtime config defaults to `execution.gpu_mode=gpu`
+- `select_engine()` defaults to `LQ_GPU_MODE=gpu` when no explicit mode/env override is provided
+- generic non-GPU CI lanes explicitly override `LQ_GPU_MODE=cpu`
+
 ## Safety Invariants
 
 - **No silent downgrade in forced mode**.
@@ -43,8 +48,32 @@ and `ON CONFLICT DO UPDATE` to prevent duplicate semantic rows during retries/re
 
 ## Operational Guidance
 
-- default to `LQ_GPU_MODE=auto` for production-like local runs
+- default to `LQ_GPU_MODE=gpu` for GPU-first local runs
+- use `LQ_GPU_MODE=auto` when you want opportunistic fallback semantics on shared/mixed hardware
 - use `LQ_GPU_MODE=forced-gpu` only when GPU availability is guaranteed
 - install GPU runtime extras before enabling GPU mode:
   - `uv sync --extra gpu` (includes `cudf-polars-cu12` and `nvidia-nvjitlink-cu12`)
 - run determinism tests after any pipeline/grouping change
+
+## CI Design
+
+The CI workflow uses a two-layer GPU strategy:
+
+1. **GPU contract job (always runs on standard Ubuntu runners)**
+   - installs the GPU extras
+   - runs `tests/test_compute_engine.py`
+   - runs `tests/test_verify_polars_gpu_runtime_script.py`
+   - executes `scripts/ci/verify_polars_gpu_runtime.py` in skip-safe mode
+   - validates that the codebase, dependency graph, and skip semantics stay healthy even when no GPU hardware is attached
+
+2. **Strict GPU runtime smoke (runs only when a GPU runner is configured)**
+   - enabled by repository variable `LQ_GPU_CI_RUNS_ON_JSON`
+   - expects a JSON string or JSON label array for `runs-on`
+   - example for a self-hosted runner:
+     - `["self-hosted", "linux", "x64", "gpu"]`
+   - optional guard:
+     - `LQ_GPU_CI_REQUIRED=true`
+   - executes `scripts/ci/verify_polars_gpu_runtime.py --require-gpu --mode forced-gpu`
+   - uses a strict `polars.GPUEngine` query path and fails if the runtime cannot execute on GPU
+
+This split keeps the default CI green on ordinary hosted runners while still supporting true Polars GPU validation on dedicated NVIDIA-backed runners.

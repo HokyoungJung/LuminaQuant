@@ -117,6 +117,20 @@ def test_select_engine_verbose_fallback_logs_reason(monkeypatch, capsys):
     assert "auto fallback to CPU" in captured.out
 
 
+def test_select_engine_defaults_to_gpu_mode_from_environment_fallback(monkeypatch):
+    monkeypatch.delenv("LQ_GPU_MODE", raising=False)
+    monkeypatch.setattr(
+        compute_engine,
+        "polars_gpu_available",
+        lambda *, device, smoke_test: (True, "gpu smoke test passed"),
+    )
+
+    selection = compute_engine.select_engine()
+
+    assert selection.requested_mode == "gpu"
+    assert selection.resolved_engine == "gpu"
+
+
 def test_parse_gpu_device_accepts_prefix_and_numeric_tokens():
     assert compute_engine._parse_gpu_device(None) is None
     assert compute_engine._parse_gpu_device(2) == 2

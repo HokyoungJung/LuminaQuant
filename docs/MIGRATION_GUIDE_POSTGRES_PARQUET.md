@@ -12,7 +12,7 @@ This guide covers the local-only storage migration for LuminaQuant runtime workf
 ## New Environment Variables
 
 - `LQ_POSTGRES_DSN` (required): PostgreSQL DSN for runtime state
-- `LQ_GPU_MODE` (`auto|cpu|gpu|forced-gpu`)
+- `LQ_GPU_MODE` (`gpu|auto|cpu|forced-gpu`, project default: `gpu`)
 - `LQ_GPU_DEVICE` (optional device index, e.g. `0`, `cuda:0`)
 - `LQ_GPU_VERBOSE` (`0|1`, optional)
 
