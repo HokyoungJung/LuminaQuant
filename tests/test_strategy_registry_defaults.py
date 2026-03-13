@@ -8,8 +8,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from lumina_quant.strategies import registry as strategy_registry
 
 
-def test_registry_includes_rsi_and_moving_average_strategies():
+def test_registry_exposes_only_public_sample_strategy_by_default():
     mapping = strategy_registry.get_strategy_map()
-    assert "RsiStrategy" in mapping
-    assert "MovingAverageCrossStrategy" in mapping
-    assert "RareEventScoreStrategy" in mapping
+    assert mapping == {
+        "PublicSampleStrategy": strategy_registry.resolve_strategy_class("PublicSampleStrategy")
+    }

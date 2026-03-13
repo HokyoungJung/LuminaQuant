@@ -16,10 +16,6 @@ DEFAULT_STRATEGY_NAME = "PublicSampleStrategy"
 
 _STRATEGY_MAP: dict[str, StrategyClass] = {
     "PublicSampleStrategy": PublicSampleStrategy,
-    # Public build exposes sample strategy as aliases for private families.
-    "RsiStrategy": PublicSampleStrategy,
-    "MovingAverageCrossStrategy": PublicSampleStrategy,
-    "RareEventScoreStrategy": PublicSampleStrategy,
 }
 
 _STRATEGY_TIER: dict[str, str] = dict.fromkeys(_STRATEGY_MAP, "live_default")
@@ -28,65 +24,17 @@ _PARAM_SCHEMAS: dict[str, dict[str, dict[str, Any]]] = {
     "PublicSampleStrategy": {
         "decision_cadence_seconds": {"type": "int", "min": 1, "max": 3600},
     },
-    "RsiStrategy": {
-        "rsi_period": {"type": "int", "min": 2, "max": 500},
-        "oversold": {"type": "float", "min": 1.0, "max": 99.0},
-        "overbought": {"type": "float", "min": 1.0, "max": 99.0},
-        "allow_short": {"type": "bool"},
-    },
-    "MovingAverageCrossStrategy": {
-        "short_window": {"type": "int", "min": 2, "max": 500},
-        "long_window": {"type": "int", "min": 3, "max": 1000},
-        "allow_short": {"type": "bool"},
-    },
-    "RareEventScoreStrategy": {
-        "zscore_threshold": {"type": "float", "min": 0.1, "max": 20.0},
-        "hold_bars": {"type": "int", "min": 1, "max": 10000},
-        "allow_short": {"type": "bool"},
-    },
 }
 
 _DEFAULT_PARAMS: dict[str, dict[str, Any]] = {
     "PublicSampleStrategy": {
         "decision_cadence_seconds": 20,
     },
-    "RsiStrategy": {
-        "rsi_period": 14,
-        "oversold": 30.0,
-        "overbought": 70.0,
-        "allow_short": True,
-    },
-    "MovingAverageCrossStrategy": {
-        "short_window": 20,
-        "long_window": 50,
-        "allow_short": True,
-    },
-    "RareEventScoreStrategy": {
-        "zscore_threshold": 2.0,
-        "hold_bars": 20,
-        "allow_short": False,
-    },
 }
 
 _CANONICAL_PARAM_NAMES: dict[str, dict[str, str]] = {
     "PublicSampleStrategy": {
         "decision_cadence_seconds": "public_sample.decision_cadence_seconds",
-    },
-    "RsiStrategy": {
-        "rsi_period": "rsi.rsi_period",
-        "oversold": "rsi.oversold",
-        "overbought": "rsi.overbought",
-        "allow_short": "rsi.allow_short",
-    },
-    "MovingAverageCrossStrategy": {
-        "short_window": "moving_average_cross.short_window",
-        "long_window": "moving_average_cross.long_window",
-        "allow_short": "moving_average_cross.allow_short",
-    },
-    "RareEventScoreStrategy": {
-        "zscore_threshold": "rare_event_score.zscore_threshold",
-        "hold_bars": "rare_event_score.hold_bars",
-        "allow_short": "rare_event_score.allow_short",
     },
 }
 
@@ -97,53 +45,12 @@ _DEFAULT_OPTUNA: dict[str, dict[str, Any]] = {
             "decision_cadence_seconds": {"type": "int", "low": 5, "high": 120},
         },
     },
-    "RsiStrategy": {
-        "n_trials": 20,
-        "params": {
-            "rsi_period": {"type": "int", "low": 6, "high": 30},
-            "oversold": {"type": "float", "low": 10.0, "high": 40.0},
-            "overbought": {"type": "float", "low": 60.0, "high": 90.0},
-        },
-    },
-    "MovingAverageCrossStrategy": {
-        "n_trials": 20,
-        "params": {
-            "short_window": {"type": "int", "low": 5, "high": 60},
-            "long_window": {"type": "int", "low": 20, "high": 200},
-        },
-    },
-    "RareEventScoreStrategy": {
-        "n_trials": 20,
-        "params": {
-            "zscore_threshold": {"type": "float", "low": 1.0, "high": 5.0},
-            "hold_bars": {"type": "int", "low": 5, "high": 100},
-        },
-    },
 }
 
 _DEFAULT_GRID: dict[str, dict[str, Any]] = {
     "PublicSampleStrategy": {
         "params": {
             "decision_cadence_seconds": [10, 20, 30],
-        },
-    },
-    "RsiStrategy": {
-        "params": {
-            "rsi_period": [8, 14, 21],
-            "oversold": [20.0, 30.0, 40.0],
-            "overbought": [60.0, 70.0, 80.0],
-        },
-    },
-    "MovingAverageCrossStrategy": {
-        "params": {
-            "short_window": [10, 20, 30],
-            "long_window": [40, 60, 100],
-        },
-    },
-    "RareEventScoreStrategy": {
-        "params": {
-            "zscore_threshold": [1.5, 2.0, 2.5],
-            "hold_bars": [10, 20, 30],
         },
     },
 }
