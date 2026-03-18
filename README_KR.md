@@ -17,7 +17,6 @@
 | 섹션 | 설명 |
 | :--- | :--- |
 | **[설치 및 설정](#설치-installation)** | LuminaQuant 시작하기. |
-| **[운영 워크플로우](docs/kr/WORKFLOW.md)** | Private/Public 브랜치 운영 및 공개 배포 체크리스트. |
 | **[8GB 기준 Quickstart](docs/kr/QUICKSTART_8GB_BASELINE.md)** | 설치/스모크/섀도우라이브/대시보드/안전종료/정리 최소 절차. |
 | **[마이그레이션 가이드](docs/kr/MIGRATION_GUIDE_POSTGRES_PARQUET.md)** | 레거시 저장소 제거 후 Parquet + PostgreSQL 전환 가이드. |
 | **[GPU 자동 실행 설계](docs/kr/DESIGN_NOTES_GPU_AUTO.md)** | Polars GPU/CPU 선택, GPU-first 기본값, CI 검증 전략 설명. |

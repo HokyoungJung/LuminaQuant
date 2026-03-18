@@ -141,7 +141,6 @@ jobs:
             tests/test_execution_protective_orders.py \
             tests/test_live_execution_state_machine.py \
             tests/test_lookahead.py \
-            tests/test_publish_public_pr.py \
             tests/test_readme_quickstart_paths.py \
             tests/test_verify_8gb_baseline_script.py
 
