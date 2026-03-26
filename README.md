@@ -23,7 +23,6 @@
 | **[Validation Report](docs/VALIDATION_REPORT.md)** | Verification + optimization report for core workflows. |
 | **[Scoring Config Guide](docs/SCORING_CONFIG_GUIDE.md)** | Shared score-config template usage across research/shortlist/optimization scripts. |
 | **[8GB Baseline Quickstart](docs/QUICKSTART_8GB_BASELINE.md)** | Minimal install/smoke/replay/shadow-live/dashboard/safe-stop/cleanup flow. |
-| **[Dashboard Realtime Report](docs/DASHBOARD_REALTIME_ANALYSIS_REPORT.md)** | Analysis + implementation report for live-refresh dashboard behavior. |
 | **[Exchange Guide](docs/EXCHANGES.md)** | Detailed setup for **Binance** (CCXT) and **MetaTrader 5**. |
 | **[Trading Manual](docs/TRADING_MANUAL.md)** | **How-To**: Buy/Sell, Leverage, TP/SL, Trailing Stops. |
 | **[Performance Metrics](docs/METRICS.md)** | Explanation of Sharpe, Sortino, Alpha, Beta, etc. |
@@ -525,7 +524,7 @@ uv run python scripts/quick_scan.py --profile quick --dry-run
 
 ## 📊 Dashboard Preview
 
-The included Streamlit dashboard provides professional-grade analytics:
+The included dashboard surfaces provide professional-grade analytics:
 
 - **Equity Curve & Drawdowns**: Visualize your portfolio growth and risk.
 - **Trade Analysis**: See exactly where buys and sells occurred on the chart.

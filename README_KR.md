@@ -22,7 +22,6 @@
 | **[GPU 자동 실행 설계](docs/kr/DESIGN_NOTES_GPU_AUTO.md)** | Polars GPU/CPU 선택, GPU-first 기본값, CI 검증 전략 설명. |
 | **[1년+ 1초 로컬 런북](docs/kr/RUNBOOK_1Y_1S_LOCAL.md)** | 8GB RAM / 8GB VRAM 기준 장기 로컬 실행/튜닝 절차. |
 | **[스코어 설정 가이드](docs/kr/SCORING_CONFIG_GUIDE.md)** | 리서치/숏리스트/최적화 스크립트 공용 score-config 템플릿 사용법. |
-| **[대시보드 실시간 분석 리포트](docs/DASHBOARD_REALTIME_ANALYSIS_REPORT.md)** | 실시간 갱신 동작 개선 분석 및 구현 결과. |
 | **[거래소 가이드](docs/kr/EXCHANGES.md)** | **바이낸스(Binance)** (CCXT) 및 **MetaTrader 5 (MT5)** 상세 설정법. |
 | **[거래 매뉴얼](docs/kr/TRADING_MANUAL.md)** | **실전 운용법**: 매수/매도, 레버리지, TP/SL, 트레일링 스탑. |
 | **[성과 지표](docs/kr/METRICS.md)** | Sharpe, Sortino, Alpha, Beta 등 지표에 대한 설명. |
@@ -451,7 +450,7 @@ uv run lq live --stop-file /tmp/lq.stop
 
 ## 📊 대시보드 미리보기
 
-내장된 Streamlit 대시보드는 전문가 수준의 분석을 제공합니다:
+내장된 대시보드 화면은 전문가 수준의 분석을 제공합니다:
 
 - **자산 곡선 & 낙폭**: 포트폴리오 성장과 리스크 시각화.
 - **매매 분석**: 차트상에서 매수/매도 타점 확인.
