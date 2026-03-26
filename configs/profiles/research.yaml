@@ -1,4 +1,0 @@
-profile: research
-optimization:
-  method: OPTUNA
-  walk_forward_folds: 3

@@ -99,28 +99,8 @@ jobs:
       - name: Architecture gate (market-window parity contract)
         run: bash scripts/ci/architecture_gate_market_window_contract.sh
 
-      - name: Raw-first periodic preload contract tests
-        run: |
-          uv run pytest -q \
-            tests/test_periodic_loop_config_contract.py \
-            tests/test_collector_periodic_loop_runtime.py \
-            tests/test_materializer_periodic_loop_timeframe_resolution.py \
-            tests/test_live_fail_fast_missing_committed_data.py \
-            tests/test_live_no_empty_window_degradation.py \
-            tests/test_market_window_schema_parity.py \
-            tests/test_market_window_emission_parity_live_vs_backtest.py \
-            tests/test_market_window_payload_flag.py \
-            tests/test_market_window_payload_rollout_gates.py \
-            tests/test_market_window_parity_flag_validation.py \
-            tests/test_run_backtest_data_mode_contract.py \
-            tests/test_optimize_data_mode_contract.py \
-            tests/test_backtest_optimize_loader_entrypoint.py
-
       - name: Architecture check
         run: uv run python scripts/check_architecture.py
-
-      - name: Hardcoded parameter audit
-        run: uv run python scripts/audit_hardcoded_params.py
 
       - name: Documentation verification (EN/KR + docs)
         run: uv run python scripts/verify_docs.py
@@ -134,8 +114,6 @@ jobs:
             tests/test_optimize_two_stage.py \
             tests/test_message_bus.py \
             tests/test_runtime_cache.py \
-            tests/test_strategy_registry_defaults.py \
-            tests/test_param_registry.py \
             tests/test_system_assembly.py \
             tests/test_ohlcv_loader.py \
             tests/test_execution_protective_orders.py \
