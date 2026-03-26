@@ -116,40 +116,5 @@
       "missing_selection_score": -1000000000.0,
       "weight_exp_clamp_floor": -60.0
     }
-  },
-  "futures_strategy_factory": {
-    "hurdle": {
-      "missing_score_fallback": -1000000.0,
-      "missing_excess_fallback": -1000000.0,
-      "failed_candidate_base_penalty": -1000000.0
-    },
-    "selection": {
-      "missing_adjusted_score_fallback": -1000000.0
-    },
-    "regime_bias": {
-      "trend_overlay": {
-        "eff_min": 0.33,
-        "eff_bonus": 0.3,
-        "ntr_min": 0.01,
-        "ntr_bonus": 0.2,
-        "vshock_min": 1.0,
-        "vshock_bonus": 0.1
-      },
-      "alpha_market_neutral": {
-        "eff_max": 0.25,
-        "eff_bonus": 0.25,
-        "ntr_max": 0.009,
-        "ntr_bonus": 0.15,
-        "vshock_abs_min": 1.5,
-        "vshock_bonus": 0.05
-      },
-      "momentum_mean_reversion": {
-        "eff_min": 0.2,
-        "eff_max": 0.55,
-        "eff_bonus": 0.2,
-        "vshock_min": 0.5,
-        "vshock_bonus": 0.05
-      }
-    }
   }
 }

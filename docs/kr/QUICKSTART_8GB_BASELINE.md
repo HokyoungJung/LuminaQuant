@@ -66,11 +66,10 @@ rm -f "$STOP_FILE"
 uv run lq live --no-selection --run-id shadow-$(date +%Y%m%d-%H%M%S) --stop-file "$STOP_FILE"
 ```
 
-## 5) 대시보드 스모크
+## 5) 대시보드 상태
 
-```bash
-uv run python -m streamlit run apps/dashboard/app.py --server.headless true
-```
+인터랙티브 대시보드 런타임은 `public/main`에 포함되지 않습니다.
+이 퀵스타트의 CLI 흐름을 사용하세요.
 
 ## 6) 안전 종료
 

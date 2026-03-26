@@ -221,10 +221,7 @@ uv run lq optimize \
 
 ---
 
-## 7) Streamlit GUI (monitor + launcher)
+## 7) Dashboard status
 
-```bash
-uv run python -m streamlit run apps/dashboard/app.py
-```
-
-Live real mode remains gated by dashboard arming phrase: **ENABLE REAL**.
+The interactive dashboard runtime is maintained only on `private/main`.
+Public/main uses the CLI workflows in this runbook.
