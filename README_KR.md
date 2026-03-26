@@ -273,7 +273,6 @@ uv run lq backtest --data-mode raw-first
 uv run lq optimize --data-mode raw-first
 uv run lq live --transport poll
 uv run lq live --transport ws
-uv run lq dashboard --run
 ```
 
 루트 호환 shim은 제거되었습니다. `uv run lq ...`를 단일 공식 엔트리포인트로 사용하세요.
@@ -291,29 +290,6 @@ public/main과 private/main은 동일한 저장소 레이아웃을 유지할 수
 
 private 확장 패키지가 없으면 public 레지스트리는 **`PublicSampleStrategy`만** 노출합니다.
 
-
-**전략 팩토리 파이프라인 (후보 + 숏리스트):**
-```bash
-# dry-run
-uv run python scripts/run_research_pipeline.py --dry-run
-
-# 후보/숏리스트 생성
-uv run python scripts/run_research_pipeline.py \
-  --db-path data/market_parquet \
-  --mode standard \
-  --timeframes 1m 5m 15m \
-  --seeds 20260221 \
-  --single-min-score 0.0 \
-  --single-min-return 0.0 \
-  --single-min-sharpe 0.7 \
-  --single-min-trades 20 \
-  --drop-single-without-metrics
-```
-
-포트폴리오 숏리스트 기본 정책:
-- **단일 전략**은 score/return/sharpe/trades 기준을 통과하지 못하면 제외
-- `--allow-multi-asset`을 명시하지 않으면 **직접 multi-asset 전략은 포트폴리오 숏리스트에서 제외**
-- 최종 포트폴리오 후보는 성과가 검증된 단일 전략을 자산별로 묶은 **`portfolio_sets`**(가중치 `portfolio_weight`)로 생성
 
 **아키텍처/린트 검증:**
 ```bash
@@ -354,51 +330,10 @@ uv run python scripts/benchmark_backtest.py \
   --compare-to reports/benchmarks/baseline_snapshot.json
 ```
 
-**전략 팩토리 파이프라인 (manifest + shortlist):**
-```bash
-# Dry run
-uv run python scripts/run_research_pipeline.py --dry-run
+**대시보드 상태:**
 
-# 단일 전략 성과 필터 + 가중치 + portfolio_sets 생성
-uv run python scripts/run_research_pipeline.py \
-  --db-path data/market_parquet \
-  --mode standard \
-  --timeframes 1m 5m 15m \
-  --seeds 20260221 \
-  --single-min-score 0.0 \
-  --single-min-return 0.0 \
-  --single-min-sharpe 0.7 \
-  --single-min-trades 20 \
-  --drop-single-without-metrics
-```
-
-기본 shortlist 정책:
-- 단일 전략은 score/return/sharpe/trades 기준을 통과해야 포함
-- direct multi-asset 행은 기본 제외 (`--allow-multi-asset`으로 허용)
-- 성공한 단일-자산 전략 조합으로 `portfolio_sets`가 생성되고 각 멤버에 `portfolio_weight`가 부여됨
-
-스코어 설정 템플릿:
-- `configs/score_config.example.json` 사용
-- 공용 섹션:
-  - `candidate_research` → `scripts/run_research_candidates.py --score-config ...`
-  - `portfolio_optimization` → `scripts/run_portfolio_optimization.py --score-config ...`
-  - `strategy_shortlist` → `scripts/select_research_shortlist.py --score-config ...`
-  - `research_hurdle` → `scripts/run_research_hurdle.py --score-config ...`
-
-**결과 시각화 (대시보드):**
-```bash
-uv run streamlit run apps/dashboard/app.py
-```
-
-대시보드 개선 사항:
-- 전략별 Run 필터(`Filter Run IDs By Strategy`) 및 전략 변경 시 Run 자동 재선택
-- 감사 상태(PostgreSQL)와 시장 OHLCV(Parquet) 소스를 분리하여 표시
-- 런타임 데이터가 없을 때 CSV fallback 상태를 명시적으로 경고
-
-**대시보드 실시간 스모크 체크 (equity row 증가 확인):**
-```bash
-uv run python -m streamlit run apps/dashboard/app.py --server.headless true
-```
+인터랙티브 대시보드 런타임은 `private/main`에서만 유지됩니다.
+`public/main`은 CLI 워크플로와 샘플 공개 전략 표면만 제공합니다.
 
 **Ghost RUNNING 정리 (PostgreSQL):**
 ```bash

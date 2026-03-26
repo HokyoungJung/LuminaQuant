@@ -2,9 +2,15 @@ from __future__ import annotations
 
 import argparse
 import subprocess
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+DASHBOARD_RETIRED_STUB_PATH = REPO_ROOT / "src" / "lumina_quant" / "dashboard" / "retired_stub.py"
 
 
-DASHBOARD_APP_PATH = "apps/dashboard/app.py"
+def build_dashboard_command() -> list[str]:
+    return [sys.executable, str(DASHBOARD_RETIRED_STUB_PATH)]
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -12,18 +18,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--run",
         action="store_true",
-        help="Launch streamlit dashboard instead of printing the command.",
-    )
-    parser.add_argument(
-        "--path",
-        default=DASHBOARD_APP_PATH,
-        help="Dashboard app path (default: apps/dashboard/app.py).",
+        help="Run the retired dashboard stub for guidance.",
     )
     args = parser.parse_args(argv)
 
-    command = ["streamlit", "run", args.path]
+    command = build_dashboard_command()
     if args.run:
-        return int(subprocess.call(command))
+        return int(subprocess.call(command, cwd=str(REPO_ROOT)))
     print(" ".join(command))
     return 0
 

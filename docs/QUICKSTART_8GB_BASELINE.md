@@ -66,11 +66,10 @@ rm -f "$STOP_FILE"
 uv run lq live --no-selection --run-id shadow-$(date +%Y%m%d-%H%M%S) --stop-file "$STOP_FILE"
 ```
 
-## 5) Dashboard smoke
+## 5) Dashboard status
 
-```bash
-uv run python -m streamlit run apps/dashboard/app.py --server.headless true
-```
+The interactive dashboard runtime is not shipped on `public/main`.
+Use the CLI flow in this quickstart instead.
 
 ## 6) Safe stop
 

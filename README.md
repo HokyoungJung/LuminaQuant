@@ -274,7 +274,6 @@ uv run lq backtest --data-mode raw-first
 uv run lq optimize --data-mode raw-first
 uv run lq live --transport poll
 uv run lq live --transport ws
-uv run lq dashboard --run
 ```
 
 Live migration flags (non-HFT incremental rollout):
@@ -346,20 +345,10 @@ uv run python scripts/verify_8gb_baseline.py \
 
 Full 8GB workflow: [docs/QUICKSTART_8GB_BASELINE.md](docs/QUICKSTART_8GB_BASELINE.md)
 
-**Visualize Results:**
-```bash
-uv run streamlit run apps/dashboard/app.py
-```
+**Dashboard status:**
 
-Dashboard now includes no-code workflow controls for backtest, optimization, and live launch/stop with:
-- asynchronous managed jobs and log tail viewer
-- explicit real-mode arming phrase (`ENABLE REAL`)
-- graceful stop via control-file signal and emergency force-kill fallback
-- optimization results panel from Postgres (`optimization_results`)
-- ghost cleanup controls (dry-run/apply) for stale `RUNNING` rows
-- strategy-scoped run filtering (`Filter Run IDs By Strategy`) and automatic run reselection on strategy change
-- separate `Market Data DSN` so market OHLCV source can differ from runtime state DSN
-- explicit CSV fallback warning when equity is rendered from CSV samples instead of Postgres run rows
+The interactive dashboard runtime is maintained only on `private/main`.
+Public/main intentionally exposes the CLI workflows and sample strategy surface only.
 
 **Ghost Cleanup CLI (stale RUNNING rows):**
 ```bash
@@ -368,12 +357,6 @@ uv run python scripts/cleanup_ghost_runs.py --dsn \"$LQ_POSTGRES_DSN\" --stale-s
 
 # Apply cleanup
 uv run python scripts/cleanup_ghost_runs.py --dsn \"$LQ_POSTGRES_DSN\" --stale-sec 300 --startup-grace-sec 90 --apply
-```
-
-**Realtime Dashboard Smoke Check (equity row growth):**
-```bash
-# Headless startup check
-uv run python -m streamlit run apps/dashboard/app.py --server.headless true
 ```
 
 **Start Live Trading:**
@@ -424,37 +407,6 @@ uv run python scripts/benchmark_backtest.py \
   --output reports/benchmarks/current_snapshot.json \
   --compare-to reports/benchmarks/baseline_snapshot.json
 ```
-
-**Strategy Factory Pipeline (manifest + shortlist):**
-```bash
-# Dry run
-uv run python scripts/run_research_pipeline.py --dry-run
-
-# Generate report + shortlist artifacts
-uv run python scripts/run_research_pipeline.py \
-  --db-path data/market_parquet \
-  --mode standard \
-  --timeframes 1m 5m 15m \
-  --seeds 20260221 \
-  --single-min-score 0.0 \
-  --single-min-return 0.0 \
-  --single-min-sharpe 0.7 \
-  --single-min-trades 20 \
-  --drop-single-without-metrics
-```
-
-Portfolio shortlist policy (default):
-- **single strategy** must pass score/return/sharpe/trades floors to stay in shortlist
-- **direct multi-asset strategy rows are excluded** from portfolio shortlist unless `--allow-multi-asset` is set
-- portfolio-level candidates are emitted as **`portfolio_sets`** by combining successful single-asset strategies, each with normalized weights (`portfolio_weight`)
-
-Score config template:
-- Use `configs/score_config.example.json`
-- Shared sections:
-  - `candidate_research` → `scripts/run_research_candidates.py --score-config ...`
-  - `portfolio_optimization` → `scripts/run_portfolio_optimization.py --score-config ...`
-  - `strategy_shortlist` → `scripts/select_research_shortlist.py --score-config ...`
-  - `research_hurdle` → `scripts/run_research_hurdle.py --score-config ...`
 
 **Futures Support Feature Collection (funding / mark/index / OI):**
 ```bash
