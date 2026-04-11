@@ -27,7 +27,7 @@ optimize = [
     "optuna>=4.7.0",
 ]
 live = [
-    "ccxt>=4.5.35",
+    "ccxt>=4.5.48",
     "requests>=2.31.0",
     "websockets>=12.0",
 ]
