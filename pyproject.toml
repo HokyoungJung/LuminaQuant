@@ -23,7 +23,7 @@ lq = "lumina_quant.cli.main:main"
 
 [project.optional-dependencies]
 optimize = [
-    "numba>=0.64.0",
+    "numba>=0.65.0",
     "optuna>=4.7.0",
 ]
 live = [
