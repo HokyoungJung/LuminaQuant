@@ -13,7 +13,7 @@ dependencies = [
     "polars>=1.35.2,<1.36",
     "pandas>=2.2.0",
     "psycopg[binary]>=3.2.0",
-    "python-dotenv>=1.2.1",
+    "python-dotenv>=1.2.2",
     "PyYAML>=6.0",
     "ta-lib>=0.6.8",
 ]
