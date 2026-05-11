@@ -481,6 +481,122 @@ def test_state_proxy_signals_do_not_depend_on_calendar_month() -> None:
     )
 
 
+def test_state_distilled_leadership_unwind_is_dynamic_and_calendar_free() -> None:
+    arrays = {
+        "datetime": [
+            datetime(2026, 1, 15, tzinfo=UTC),
+            datetime(2026, 6, 15, tzinfo=UTC),
+            datetime(2026, 6, 16, tzinfo=UTC),
+        ],
+        "symbols": ("BTC/USDT", "SOL/USDT", "TRX/USDT", "ETH/USDT"),
+        "symbol_prefixes": ("btcusdt", "solusdt", "trxusdt", "ethusdt"),
+        "btcusdt_close": np.array([100.0, 100.0, 100.0]),
+        "solusdt_close": np.array([40.0, 40.0, 40.0]),
+        "trxusdt_close": np.array([20.0, 20.0, 20.0]),
+        "ethusdt_close": np.array([50.0, 50.0, 50.0]),
+        "btcusdt_ret_72h": np.array([0.006, 0.008, 0.032]),
+        "solusdt_ret_72h": np.array([0.006, 0.008, 0.035]),
+        "trxusdt_ret_72h": np.array([0.030, 0.030, 0.010]),
+        "ethusdt_ret_72h": np.array([-0.018, -0.018, -0.012]),
+        "btcusdt_ret_168h": np.array([0.006, 0.008, 0.034]),
+        "solusdt_ret_168h": np.array([0.006, 0.008, 0.038]),
+        "trxusdt_ret_168h": np.array([0.033, 0.033, 0.012]),
+        "ethusdt_ret_168h": np.array([-0.020, -0.020, -0.015]),
+        "btcusdt_resid_z_168h": np.array([0.20, 0.30, 1.60]),
+        "solusdt_resid_z_168h": np.array([0.20, 0.30, 1.80]),
+        "trxusdt_resid_z_168h": np.array([1.45, 1.45, 0.35]),
+        "ethusdt_resid_z_168h": np.array([-1.25, -1.25, -0.80]),
+        "btcusdt_flow_imbalance_6h": np.array([0.01, 0.01, 0.05]),
+        "solusdt_flow_imbalance_6h": np.array([0.01, 0.01, 0.06]),
+        "trxusdt_flow_imbalance_6h": np.array([0.06, 0.06, 0.00]),
+        "ethusdt_flow_imbalance_6h": np.array([-0.04, -0.04, -0.02]),
+        "btcusdt_funding_ffill": np.array([0.0000, 0.0000, 0.0000]),
+        "solusdt_funding_ffill": np.array([0.0001, 0.0001, 0.0001]),
+        "trxusdt_funding_ffill": np.array([0.0001, 0.0001, 0.0001]),
+        "ethusdt_funding_ffill": np.array([0.0004, 0.0004, 0.0004]),
+        "btcusdt_oi_delta_6h": np.array([0.00, 0.00, 0.01]),
+        "solusdt_oi_delta_6h": np.array([0.00, 0.00, 0.01]),
+        "trxusdt_oi_delta_6h": np.array([0.01, 0.01, 0.00]),
+        "ethusdt_oi_delta_6h": np.array([0.03, 0.03, 0.03]),
+        "market_ret_72h": np.array([0.010, 0.010, 0.012]),
+        "market_ret_168h": np.array([0.006, 0.006, 0.008]),
+    }
+    spec = FreshSpec(
+        name="state_distilled_dynamic",
+        family="state_distilled_leadership_unwind",
+        lookback_bars=168,
+        adaptive_lookback_bars=72,
+        threshold=1.0,
+        hold_bars=120,
+        cooldown_bars=0,
+        stop_loss_pct=0.006,
+        take_profit_pct=0.060,
+        min_abs_return=0.012,
+        flow_lookback_bars=6,
+        flow_threshold=0.03,
+        sharpe_rank_min=1.0,
+        oi_rank_min=0.02,
+    )
+
+    assert MODULE._candidate_signal(spec, arrays, 0) == ("TRX/USDT", "LONG", "")
+    assert MODULE._candidate_signal(spec, arrays, 1) == ("TRX/USDT", "LONG", "")
+    assert MODULE._candidate_signal(spec, arrays, 2) == ("SOL/USDT", "LONG", "")
+
+    assert spec.calendar_long_months == ()
+    assert spec.calendar_short_months == ()
+    assert not spec.primary_symbol
+    assert not spec.secondary_symbol
+
+
+def test_state_distilled_leadership_unwind_can_short_crowded_laggard() -> None:
+    arrays = {
+        "datetime": [datetime(2026, 2, 15, tzinfo=UTC)],
+        "symbols": ("BTC/USDT", "TRX/USDT", "ETH/USDT"),
+        "symbol_prefixes": ("btcusdt", "trxusdt", "ethusdt"),
+        "btcusdt_close": np.array([100.0]),
+        "trxusdt_close": np.array([20.0]),
+        "ethusdt_close": np.array([50.0]),
+        "btcusdt_ret_72h": np.array([-0.008]),
+        "trxusdt_ret_72h": np.array([-0.004]),
+        "ethusdt_ret_72h": np.array([-0.035]),
+        "btcusdt_ret_168h": np.array([-0.010]),
+        "trxusdt_ret_168h": np.array([-0.006]),
+        "ethusdt_ret_168h": np.array([-0.040]),
+        "btcusdt_resid_z_168h": np.array([-0.20]),
+        "trxusdt_resid_z_168h": np.array([0.10]),
+        "ethusdt_resid_z_168h": np.array([-1.60]),
+        "btcusdt_flow_imbalance_6h": np.array([-0.01]),
+        "trxusdt_flow_imbalance_6h": np.array([0.01]),
+        "ethusdt_flow_imbalance_6h": np.array([-0.07]),
+        "btcusdt_funding_ffill": np.array([0.0000]),
+        "trxusdt_funding_ffill": np.array([0.0001]),
+        "ethusdt_funding_ffill": np.array([0.0005]),
+        "btcusdt_oi_delta_6h": np.array([0.00]),
+        "trxusdt_oi_delta_6h": np.array([0.00]),
+        "ethusdt_oi_delta_6h": np.array([0.04]),
+        "market_ret_72h": np.array([-0.020]),
+        "market_ret_168h": np.array([-0.025]),
+    }
+    spec = FreshSpec(
+        name="state_distilled_unwind",
+        family="state_distilled_leadership_unwind",
+        lookback_bars=168,
+        adaptive_lookback_bars=72,
+        threshold=1.0,
+        hold_bars=120,
+        cooldown_bars=0,
+        stop_loss_pct=0.006,
+        take_profit_pct=0.060,
+        min_abs_return=0.012,
+        flow_lookback_bars=6,
+        flow_threshold=0.03,
+        sharpe_rank_min=1.0,
+        oi_rank_min=0.02,
+    )
+
+    assert MODULE._candidate_signal(spec, arrays, 0) == ("ETH/USDT", "SHORT", "")
+
+
 def test_calendar_veto_and_day_window_do_not_promote_blocked_entries() -> None:
     arrays = {
         "datetime": [
@@ -828,6 +944,7 @@ def test_candidate_specs_include_external_inspired_families() -> None:
     assert "flow_imbalance_persistence" in families
     assert "flow_imbalance_exhaustion" in families
     assert "funding_oi_carry_fade" in families
+    assert "state_distilled_leadership_unwind" in families
     assert "state_momentum_proxy" in families
     assert "state_relative_strength_spread" in families
     assert "calendar_rotation" in families
@@ -844,6 +961,8 @@ def test_candidate_specs_include_external_inspired_families() -> None:
     assert any(name.startswith("fresh_calendar_trx_veto_") for name in names)
     assert any(name.startswith("fresh_calendar_trx_daywin_") for name in names)
     assert any(name.startswith("fresh_state_trx_mom_") for name in names)
+    assert any(name.startswith("fresh_state_distilled_both_") for name in names)
+    assert any(name.startswith("fresh_state_distilled_longonly_") for name in names)
     assert any(name.startswith("fresh_state_trx_longonly_") for name in names)
     assert any(name.startswith("fresh_state_trx_dual_mom_") for name in names)
     assert any(name.startswith("fresh_state_trx_eth_spread_") for name in names)

@@ -884,6 +884,151 @@ def _calendar_veto_reason(
     return ""
 
 
+def _state_distilled_leadership_unwind_signal(
+    spec: FreshSpec, arrays: dict[str, Any], idx: int
+) -> tuple[str, str, str]:
+    """Select the current leader or crowded laggard without calendar inputs.
+
+    This family is a causal state proxy for the rejected calendar tuple.  The
+    old calendar sleeve is treated as a teacher only at the design level: live
+    selection uses cross-sectional return/residual rank, flow confirmation,
+    market regime, and optional OI/funding crowding.  No month, day, or fixed
+    symbol target is consulted.
+    """
+    blocked = _entry_window_block_reason(spec, arrays, idx)
+    if blocked:
+        return "", "", blocked
+
+    symbols = tuple(arrays["symbols"])
+    prefixes = tuple(arrays.get("symbol_prefixes") or tuple(_symbol_prefix(symbol) for symbol in symbols))
+    lookback = max(1, int(spec.lookback_bars))
+    fast_lookback = max(1, int(spec.adaptive_lookback_bars or spec.lookback_bars))
+    flow_lookback = max(1, int(spec.flow_lookback_bars or 6))
+    oi_lookback = max(1, int(spec.sharpe_lookback_bars or spec.flow_lookback_bars or 6))
+    min_abs_return = max(0.0, float(spec.min_abs_return))
+    resid_threshold = max(0.0, float(spec.threshold))
+    min_rank_gap = max(0.0, float(spec.sharpe_rank_min))
+    market_ret = _array_value(arrays, f"market_ret_{lookback}h", idx)
+    fast_market_ret = _array_value(arrays, f"market_ret_{fast_lookback}h", idx)
+
+    states: list[dict[str, float | str]] = []
+    for symbol, prefix in zip(symbols, prefixes, strict=True):
+        # Treat BTC as the broad market/risk-regime anchor for this family,
+        # not as the alt leadership/unwind target.  That keeps the teacher
+        # distillation focused on the calendar tuple's alt/major behavior
+        # without pinning to a fixed month or a fixed TRX/ETH target.
+        if _compact(symbol) == "BTCUSDT":
+            continue
+        close = _array_value(arrays, f"{prefix}_close", idx)
+        if not math.isfinite(close) or close <= 0.0:
+            continue
+        if spec.max_rv > 0.0:
+            rv = _array_value(arrays, f"{prefix}_rv_{spec.rv_lookback_bars}h", idx)
+            if not math.isfinite(rv) or rv > float(spec.max_rv):
+                continue
+        funding = _array_value(arrays, f"{prefix}_funding_ffill", idx)
+        if spec.funding_abs_cap > 0.0 and (
+            not math.isfinite(funding) or abs(funding) > float(spec.funding_abs_cap)
+        ):
+            continue
+        ret = _array_value(arrays, f"{prefix}_ret_{lookback}h", idx)
+        fast_ret = _array_value(arrays, f"{prefix}_ret_{fast_lookback}h", idx)
+        resid_z = _array_value(arrays, f"{prefix}_resid_z_{lookback}h", idx)
+        flow = _array_value(arrays, f"{prefix}_flow_imbalance_{flow_lookback}h", idx)
+        oi_delta = _array_value(arrays, f"{prefix}_oi_delta_{oi_lookback}h", idx)
+        if not math.isfinite(ret) or not math.isfinite(resid_z):
+            continue
+        flow_score = 0.0 if not math.isfinite(flow) else float(flow)
+        funding_score = 0.0 if not math.isfinite(funding) else float(funding)
+        oi_score = 0.0 if not math.isfinite(oi_delta) else float(oi_delta)
+        fast_score = float(fast_ret) if math.isfinite(fast_ret) else float(ret)
+        states.append(
+            {
+                "symbol": symbol,
+                "ret": float(ret),
+                "fast_ret": fast_score,
+                "resid_z": float(resid_z),
+                "flow": flow_score,
+                "funding": funding_score,
+                "oi_delta": oi_score,
+                "leadership_score": float(ret) + 0.01 * float(resid_z) + 0.05 * max(0.0, flow_score),
+                "unwind_score": abs(float(ret))
+                + 0.01 * abs(float(resid_z))
+                + 0.05 * max(0.0, -flow_score)
+                + max(0.0, funding_score)
+                + 0.10 * max(0.0, oi_score),
+            }
+        )
+
+    if len(states) < 2:
+        return "", "", "state_distilled_universe_too_small"
+
+    leader = max(states, key=lambda row: float(row["leadership_score"]))
+    laggard = max(states, key=lambda row: float(row["unwind_score"]))
+    strongest_resid = max(float(row["resid_z"]) for row in states)
+    weakest_resid = min(float(row["resid_z"]) for row in states)
+    rank_gap = strongest_resid - weakest_resid
+    if rank_gap < min_rank_gap:
+        return "", "", "state_distilled_rank_gap_too_small"
+
+    market_is_bad = (
+        math.isfinite(market_ret)
+        and market_ret <= -float(spec.broad_min_abs)
+        if spec.broad_min_abs > 0.0
+        else math.isfinite(market_ret) and market_ret < 0.0
+    )
+    market_is_good_enough = (
+        not math.isfinite(market_ret)
+        or spec.broad_min_abs <= 0.0
+        or market_ret >= -float(spec.broad_min_abs)
+    )
+    fast_market_is_good_enough = not math.isfinite(fast_market_ret) or fast_market_ret >= -float(spec.broad_min_abs)
+
+    long_ok = (
+        spec.allow_long
+        and market_is_good_enough
+        and fast_market_is_good_enough
+        and float(leader["ret"]) >= min_abs_return
+        and float(leader["fast_ret"]) >= 0.0
+        and float(leader["resid_z"]) >= resid_threshold
+        and (spec.flow_threshold <= 0.0 or float(leader["flow"]) >= float(spec.flow_threshold))
+    )
+    short_crowding_ok = (
+        spec.oi_rank_min <= 0.0
+        or float(laggard["oi_delta"]) >= float(spec.oi_rank_min)
+        or (
+            spec.funding_rank_min > 0.0
+            and float(laggard["funding"]) >= float(spec.funding_rank_min)
+        )
+    )
+    short_ok = (
+        spec.allow_short
+        and (
+            market_is_bad
+            or float(laggard["ret"]) <= -min_abs_return * 1.5
+            or float(laggard["flow"]) <= -float(spec.flow_threshold)
+        )
+        and float(laggard["ret"]) <= -min_abs_return
+        and float(laggard["fast_ret"]) <= 0.0
+        and float(laggard["resid_z"]) <= -resid_threshold
+        and (spec.flow_threshold <= 0.0 or float(laggard["flow"]) <= -float(spec.flow_threshold))
+        and short_crowding_ok
+    )
+
+    if long_ok and short_ok:
+        market_score = float(market_ret) if math.isfinite(market_ret) else 0.0
+        long_score = float(leader["leadership_score"]) + max(0.0, 0.5 * market_score)
+        short_score = float(laggard["unwind_score"]) + max(0.0, -0.5 * market_score)
+        if long_score >= short_score:
+            return str(leader["symbol"]), "LONG", ""
+        return str(laggard["symbol"]), "SHORT", ""
+    if long_ok:
+        return str(leader["symbol"]), "LONG", ""
+    if short_ok:
+        return str(laggard["symbol"]), "SHORT", ""
+    return "", "", "signal_missing"
+
+
 def _candidate_signal(spec: FreshSpec, arrays: dict[str, Any], idx: int) -> tuple[str, str, str]:
     blocked = _entry_window_block_reason(spec, arrays, idx)
     if blocked:
@@ -892,6 +1037,8 @@ def _candidate_signal(spec: FreshSpec, arrays: dict[str, Any], idx: int) -> tupl
     prefixes = tuple(arrays.get("symbol_prefixes") or tuple(_symbol_prefix(symbol) for symbol in symbols))
     lookback = int(spec.lookback_bars)
     market_ret = _array_value(arrays, f"market_ret_{lookback}h", idx)
+    if spec.family == "state_distilled_leadership_unwind":
+        return _state_distilled_leadership_unwind_signal(spec, arrays, idx)
     if spec.family != "calendar_rotation" and spec.broad_min_abs > 0.0 and (
         not math.isfinite(market_ret) or abs(market_ret) < spec.broad_min_abs
     ):
@@ -2201,6 +2348,47 @@ def _candidate_specs(arrays: dict[str, Any], symbols: list[str]) -> list[FreshSp
                     trailing_stop_floor_pct=0.005,
                     trailing_stop_cap_pct=0.014,
                 )
+    for lookback, fast_lookback in ((72, 24), (168, 72), (336, 168)):
+        for resid_z in (0.50, 0.75, 1.0):
+            for min_return in (0.006, 0.012, 0.018):
+                for hold in (120, 168):
+                    for flow_threshold in (0.0, 0.03):
+                        for mode_label, allow_long, allow_short, long_scale, short_scale in (
+                            ("both", True, True, 5.9, 10.0),
+                            ("longonly", True, False, 6.2, 0.0),
+                        ):
+                            for take in (0.024, 0.045, 0.060):
+                                flow_label = f"_fl{int(flow_threshold * 100)}" if flow_threshold else ""
+                                name = (
+                                    f"fresh_state_distilled_{mode_label}_lb{lookback}_fast{fast_lookback}_"
+                                    f"z{int(resid_z * 100):03d}_ret{int(min_return * 10000)}_"
+                                    f"h{hold}_ls{int(long_scale * 100)}_ss{int(short_scale * 10)}_"
+                                    f"tp{int(take * 10000)}{flow_label}"
+                                )
+                                specs[name] = FreshSpec(
+                                    name=name,
+                                    family="state_distilled_leadership_unwind",
+                                    lookback_bars=lookback,
+                                    threshold=resid_z,
+                                    hold_bars=hold,
+                                    cooldown_bars=max(0, hold // 4),
+                                    stop_loss_pct=0.0,
+                                    take_profit_pct=take,
+                                    min_abs_return=min_return,
+                                    allow_long=allow_long,
+                                    allow_short=allow_short,
+                                    adaptive_lookback_bars=fast_lookback,
+                                    flow_lookback_bars=6,
+                                    flow_threshold=flow_threshold,
+                                    sharpe_lookback_bars=6,
+                                    sharpe_rank_min=max(1.0, resid_z * 1.5),
+                                    oi_rank_min=0.02 if flow_threshold > 0.0 else 0.0,
+                                    long_allocation_scale=long_scale,
+                                    short_allocation_scale=short_scale,
+                                    trailing_stop_rv_multiple=0.0,
+                                    trailing_stop_floor_pct=0.0,
+                                    trailing_stop_cap_pct=0.0,
+                                )
     for lookback in (72, 168, 336):
         for resid_z in (0.75, 1.0, 1.25):
             for min_return in (0.012, 0.015, 0.018):
@@ -2765,7 +2953,7 @@ def _markdown(payload: dict[str, Any], rows: list[dict[str, Any]]) -> str:
         "",
         "- 기존 ETH shock-reversion incumbent/leadlag/context-wrapper를 쓰지 않고 raw-first data에서 새로 출발했다.",
         "- 신규 후보군: cross-sectional residual reversal, cross-sectional momentum, adaptive trend, cross-sectional Sharpe/rank selector, "
-        "funding-carry fade, funding+OI carry fade, taker-flow persistence/exhaustion, non-calendar TRX state-momentum proxy, "
+        "funding-carry fade, funding+OI carry fade, taker-flow persistence/exhaustion, non-calendar state-distilled leadership/unwind, non-calendar TRX state-momentum proxy, "
         "non-calendar TRX/ETH state-relative-strength spread, calendar rotation, calendar-conditioned veto/day-window sleeves, "
         "TRX/ETH calendar spread, compression breakout.",
         "- Replay는 one-position, fee/slippage, 10% bar-volume fill cap, cooldown, stop/take/max-hold, 0.8% target allocation, $175 max order를 강제한다.",
