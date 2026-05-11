@@ -544,6 +544,10 @@ def _liquidation_margin_evidence(
                 "selected_by_train_validation_retune",
                 "best_deployable_train_validation_retune",
                 "current_base_reference_result",
+                "train",
+                "validation",
+                "val",
+                "oos",
             ):
                 if key in value:
                     visit(value.get(key))
@@ -714,13 +718,12 @@ def _candidate_return_quality_check(
         else raw_val_monthly >= MIN_RAW_VAL_MONTHLY_RETURN
     )
     integer_leverage_check = no_improvement_base_retained or abs(leverage - round(leverage)) <= 1e-9
-    if liquidation_count is None:
-        liquidation_check = True
-    elif allowed_total_liquidations is not None:
-        liquidation_check = int(liquidation_count) <= int(allowed_total_liquidations)
+    if no_improvement_base_retained:
+        liquidation_check = True if liquidation_count is None else int(liquidation_count) == 0
+        margin_buffer_check = True if minimum_margin_buffer is None else float(minimum_margin_buffer) > 0.0
     else:
-        liquidation_check = int(liquidation_count) == 0
-    margin_buffer_check = True if minimum_margin_buffer is None else float(minimum_margin_buffer) > 0.0
+        liquidation_check = liquidation_count is not None and int(liquidation_count) == 0
+        margin_buffer_check = minimum_margin_buffer is not None and float(minimum_margin_buffer) > 0.0
     if liquidation_count is None or int(liquidation_count) == 0:
         liquidation_event_drawdown_check = True
         liquidation_loss_fraction_check = True

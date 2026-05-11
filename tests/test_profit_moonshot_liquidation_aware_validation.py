@@ -144,7 +144,42 @@ def test_liquidation_gates_accept_validation_split_name() -> None:
     assert MODULE._liquidation_safe_for_promotion(gates) is True
 
 
-def test_tiny_liquidation_tolerance_allows_small_event_with_positive_buffers() -> None:
+def test_cli_defaults_to_strict_zero_liquidation_promotion() -> None:
+    args = MODULE.build_parser().parse_args([])
+
+    assert args.allowed_total_liquidations == 0
+    assert args.allowed_split_liquidations == 0
+    assert args.retune_audit_limit == 0
+    assert args.retune_csv_limit == 0
+
+
+def test_empty_retune_selection_stays_empty() -> None:
+    selected = MODULE._select_train_validation_candidate(
+        [],
+        tolerance=MODULE.LiquidationTolerance(),
+    )
+
+    assert selected == {}
+
+
+def test_retune_seed_defaults_keep_replay_current_base_only(tmp_path: Path) -> None:
+    audit = {
+        "selected_by_train_val_stability": {"name": "audit-selected", "sleeves": ["sleeve-a"]},
+        "diagnostic_best_oos": {"name": "audit-oos", "sleeves": ["sleeve-b"]},
+        "diagnostic_quarantine": [{"name": "quarantine", "sleeves": ["sleeve-c"]}],
+    }
+
+    seeds = MODULE._build_candidate_seeds(
+        integer_audit=audit,
+        candidate_csv=tmp_path / "missing.csv",
+        audit_limit=0,
+        csv_limit=0,
+    )
+
+    assert [seed["source"] for seed in seeds] == ["current_base_tuple"]
+    assert [seed["sleeves"] for seed in seeds] == [list(MODULE.CURRENT_BASE_SLEEVES)]
+
+def test_tiny_liquidation_tolerance_is_diagnostic_not_promotional() -> None:
     tolerance = MODULE.LiquidationTolerance(
         allowed_total_liquidations=1,
         allowed_split_liquidations=1,
@@ -180,7 +215,7 @@ def test_tiny_liquidation_tolerance_allows_small_event_with_positive_buffers() -
     assert gates["liquidation_within_tolerance"] is True
     assert gates["split_liquidations_within_tolerance"] is True
     assert gates["liquidation_event_drawdown_within_tolerance"] is True
-    assert MODULE._liquidation_safe_for_promotion(gates) is True
+    assert MODULE._liquidation_safe_for_promotion(gates) is False
 
 
 def test_tiny_liquidation_tolerance_still_blocks_excess_or_buffer_failure() -> None:

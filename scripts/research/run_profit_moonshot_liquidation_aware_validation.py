@@ -41,7 +41,7 @@ FRESH_PATH = REPO_ROOT / "scripts/research/replay_profit_moonshot_fresh_start.py
 DEFAULT_OUTPUT_DIR = (
     REPO_ROOT
     / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/"
-    "liquidation_tolerant_retune_20260510"
+    "liquidation_aware_strict_20260511"
 )
 DEFAULT_MARKET_ROOT = REPO_ROOT / "data/market_parquet"
 DEFAULT_CURRENT_BASE_ARTIFACT = (
@@ -106,10 +106,10 @@ class MarginModel:
 
 @dataclass(frozen=True, slots=True)
 class LiquidationTolerance:
-    """Explicit tiny-liquidation allowance for promotion and re-selection gates."""
+    """Explicit diagnostic allowance; deployment promotion remains strict-zero."""
 
-    allowed_total_liquidations: int = 1
-    allowed_split_liquidations: int = 1
+    allowed_total_liquidations: int = 0
+    allowed_split_liquidations: int = 0
     max_liquidation_event_drawdown: float = 0.005
     max_liquidation_equity_loss_fraction: float = 0.005
 
@@ -377,8 +377,6 @@ def _liquidation_promotion_gates(
 
 
 def _liquidation_safe_for_promotion(gates: Mapping[str, Any]) -> bool:
-    if "liquidation_within_tolerance" in gates:
-        return bool(gates.get("liquidation_within_tolerance")) and bool(gates.get("margin_buffer_positive"))
     return bool(gates.get("liquidation_free")) and bool(gates.get("margin_buffer_positive")) and bool(
         gates.get("all_splits_liquidation_safe")
     )
@@ -1195,6 +1193,9 @@ def _candidate_seed(
 
 
 def _audit_candidate_seeds(integer_audit: Mapping[str, Any], *, limit: int) -> list[dict[str, Any]]:
+    if limit <= 0:
+        return []
+
     seeds: list[dict[str, Any]] = []
 
     def add(source: str, item: Any) -> None:
@@ -1338,6 +1339,8 @@ def _select_train_validation_candidate(
     ]
     selection_pool = train_val_safe or [dict(item) for item in results]
     selected = max(selection_pool, key=_selection_rank, default={})
+    if not selected:
+        return {}
     selected.setdefault("selection_policy", {})
     selected["selection_policy"] = {
         **dict(selected.get("selection_policy") or {}),
@@ -1358,6 +1361,7 @@ def _markdown(payload: Mapping[str, Any]) -> str:
     promoted = dict(payload.get("promoted_candidate") or {})
     current = dict(payload.get("current_base_reference_result") or {})
     decision = dict(payload.get("decision") or {})
+    retune_summary = dict(payload.get("retune_candidate_summary") or {})
 
     def _split_line(item: Mapping[str, Any], split: str) -> str:
         split_payload = _split_payload(dict(item.get("splits") or {}), split)
@@ -1408,36 +1412,56 @@ def _markdown(payload: Mapping[str, Any]) -> str:
         _split_line(selected, "train") if selected else "",
         _split_line(selected, VALIDATION_SPLIT) if selected else "",
         _split_line(selected, "oos") if selected else "",
-        "",
-        "## Re-selected by train/validation retune",
-        "",
-        f"- candidate: `{retuned.get('candidate_name')}`",
-        f"- source: `{retuned.get('candidate_source')}`",
-        f"- leverage: `{_safe_float(retuned.get('leverage')):.6f}x`",
-        f"- deployable_success: `{bool(retuned.get('deployable_success'))}`",
-        f"- locked-OOS used for selection: `{bool((retuned.get('selection_policy') or {}).get('uses_locked_oos_for_selection'))}`",
-        _split_line(retuned, "train") if retuned else "",
-        _split_line(retuned, VALIDATION_SPLIT) if retuned else "",
-        _split_line(retuned, "oos") if retuned else "",
-        "",
-        "## Best deployable retune candidate",
-        "",
-        f"- candidate: `{best_deployable.get('candidate_name')}`",
-        f"- leverage: `{_safe_float(best_deployable.get('leverage')):.6f}x`",
-        "",
-        "## Promoted candidate",
-        "",
-        f"- candidate: `{promoted.get('candidate_name')}`",
-        f"- source: `{promoted.get('candidate_source')}`",
-        f"- leverage: `{_safe_float(promoted.get('leverage')):.6f}x`",
-        _split_line(promoted, "train") if promoted else "",
-        _split_line(promoted, VALIDATION_SPLIT) if promoted else "",
-        _split_line(promoted, "oos") if promoted else "",
-        "",
-        "## Decision",
-        "",
-        f"- `{decision.get('summary')}`",
     ]
+
+    if int(retune_summary.get("evaluated_result_count") or 0) > 0 or retuned or best_deployable:
+        lines.extend(
+            [
+                "",
+                "## Re-selected by train/validation retune",
+                "",
+                f"- candidate: `{retuned.get('candidate_name')}`",
+                f"- source: `{retuned.get('candidate_source')}`",
+                f"- leverage: `{_safe_float(retuned.get('leverage')):.6f}x`",
+                f"- deployable_success: `{bool(retuned.get('deployable_success'))}`",
+                f"- locked-OOS used for selection: `{bool((retuned.get('selection_policy') or {}).get('uses_locked_oos_for_selection'))}`",
+                _split_line(retuned, "train") if retuned else "",
+                _split_line(retuned, VALIDATION_SPLIT) if retuned else "",
+                _split_line(retuned, "oos") if retuned else "",
+                "",
+                "## Best deployable retune candidate",
+                "",
+                f"- candidate: `{best_deployable.get('candidate_name')}`",
+                f"- leverage: `{_safe_float(best_deployable.get('leverage')):.6f}x`",
+            ]
+        )
+    else:
+        lines.extend(
+            [
+                "",
+                "## Retune candidates",
+                "",
+                "- disabled for strict current-base-only replay (`retune_audit_limit=0`, `retune_csv_limit=0`).",
+            ]
+        )
+
+    lines.extend(
+        [
+            "",
+            "## Promoted candidate",
+            "",
+            f"- candidate: `{promoted.get('candidate_name')}`",
+            f"- source: `{promoted.get('candidate_source')}`",
+            f"- leverage: `{_safe_float(promoted.get('leverage')):.6f}x`",
+            _split_line(promoted, "train") if promoted else "",
+            _split_line(promoted, VALIDATION_SPLIT) if promoted else "",
+            _split_line(promoted, "oos") if promoted else "",
+            "",
+            "## Decision",
+            "",
+            f"- `{decision.get('summary')}`",
+        ]
+    )
     return "\n".join(lines).strip() + "\n"
 
 
@@ -1550,7 +1574,10 @@ def run_validation(args: argparse.Namespace) -> dict[str, Any]:
     ]
     highest_zero_liq = max(zero_liq, key=lambda item: float(item.get("leverage") or 0.0), default={})
     retune_integer_results = [
-        item for item in all_results if abs(float(item["leverage"]) - round(float(item["leverage"]))) <= 1e-9
+        item
+        for item in all_results
+        if abs(float(item["leverage"]) - round(float(item["leverage"]))) <= 1e-9
+        and str(item.get("candidate_source")) != "current_base_tuple"
     ]
     selected_retuned = _select_train_validation_candidate(retune_integer_results, tolerance=tolerance)
     deployable_candidates = [item for item in retune_integer_results if bool(item.get("deployable_success"))]
@@ -1559,7 +1586,7 @@ def run_validation(args: argparse.Namespace) -> dict[str, Any]:
     selected_success = bool(selected.get("deployable_success"))
     retuned_success = bool(best_deployable)
     outcome = (
-        "liquidation_tolerant_reselected_deployable"
+        "strict_reselected_deployable"
         if retuned_success
         else "current_base_5x_deployable_improvement"
         if forced_5x_success
@@ -1568,11 +1595,22 @@ def run_validation(args: argparse.Namespace) -> dict[str, Any]:
         else "current_base_retained_liquidation_or_performance_gate_failed"
     )
     summary = (
-        "A train/validation-ranked liquidation-tolerant re-selection passed all report-only OOS gates."
+        "A train/validation-ranked strict zero-liquidation re-selection passed all report-only OOS gates."
         if retuned_success
         else "Forced current-base 5x passes liquidation and performance gates."
         if forced_5x_success
-        else "No re-tuned train/validation-selected integer candidate passed liquidation-tolerant performance gates; retain current base."
+        else "Forced current-base 5x is unsafe or underqualified; an alternate current-base integer leverage passes strict gates."
+        if selected_success
+        else "No current-base integer candidate passed strict liquidation/performance gates; retain current base."
+    )
+    promoted_candidate = (
+        best_deployable
+        if retuned_success
+        else forced_5x
+        if forced_5x_success
+        else selected
+        if selected_success
+        else {}
     )
     payload = {
         "artifact_kind": "profit_moonshot_liquidation_aware_validation",
@@ -1584,7 +1622,7 @@ def run_validation(args: argparse.Namespace) -> dict[str, Any]:
             "uses_locked_oos_for_selection": False,
             "forced_candidate": "current_base_integer_5x",
             "integer_grid": [int(item) for item in range(1, int(args.max_leverage) + 1)],
-            "promotion_requires_liquidation_count_zero": False,
+            "promotion_requires_liquidation_count_zero": True,
             "liquidation_tolerance": asdict(tolerance),
             "promotion_requires_positive_margin_buffer": True,
             "promotion_requires_positive_train_validation_return": True,
@@ -1611,7 +1649,7 @@ def run_validation(args: argparse.Namespace) -> dict[str, Any]:
         "selected_by_train_validation": selected,
         "selected_by_train_validation_retune": selected_retuned,
         "best_deployable_train_validation_retune": best_deployable,
-        "promoted_candidate": (best_deployable or forced_5x) if (retuned_success or forced_5x_success) else {},
+        "promoted_candidate": promoted_candidate,
         "retune_results": sorted(retune_integer_results, key=_selection_rank, reverse=True)[: int(args.retune_report_limit)],
         "retune_candidate_summary": {
             "candidate_seed_count": len(candidate_seeds),
@@ -1628,11 +1666,11 @@ def run_validation(args: argparse.Namespace) -> dict[str, Any]:
         },
         "decision": {
             "outcome": outcome,
-            "deployable_improvement": bool(forced_5x_success or retuned_success),
+            "deployable_improvement": bool(forced_5x_success or selected_success or retuned_success),
             "selected_integer_deployable": selected_success,
             "reselected_deployable": retuned_success,
             "forced_5x_deployable": forced_5x_success,
-            "current_base_retained": not (forced_5x_success or retuned_success),
+            "current_base_retained": not (forced_5x_success or selected_success or retuned_success),
             "summary": summary,
         },
     }
@@ -1666,11 +1704,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--candidate-csv", default=str(DEFAULT_CANDIDATE_CSV))
     parser.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_DIR))
     parser.add_argument("--max-leverage", type=int, default=6)
-    parser.add_argument("--retune-audit-limit", type=int, default=18)
-    parser.add_argument("--retune-csv-limit", type=int, default=24)
+    parser.add_argument("--retune-audit-limit", type=int, default=0)
+    parser.add_argument("--retune-csv-limit", type=int, default=0)
     parser.add_argument("--retune-report-limit", type=int, default=40)
-    parser.add_argument("--allowed-total-liquidations", type=int, default=1)
-    parser.add_argument("--allowed-split-liquidations", type=int, default=1)
+    parser.add_argument("--allowed-total-liquidations", type=int, default=0)
+    parser.add_argument("--allowed-split-liquidations", type=int, default=0)
     parser.add_argument("--max-liquidation-event-drawdown", type=float, default=0.005)
     parser.add_argument("--max-liquidation-equity-loss-fraction", type=float, default=0.005)
     parser.add_argument("--margin-mode", default="cross")

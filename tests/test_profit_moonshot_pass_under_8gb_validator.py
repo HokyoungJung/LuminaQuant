@@ -47,6 +47,25 @@ def _passing_candidate_payload() -> dict:
             "locked_oos_smart_sortino": 3.2,
             "locked_oos_calmar": 10.0,
         },
+        "liquidation_aware_validation": {
+            "splits": {
+                "train": {
+                    "liquidation_count": 0,
+                    "minimum_margin_buffer": 1000.0,
+                    "minimum_margin_ratio": 3.0,
+                },
+                "validation": {
+                    "liquidation_count": 0,
+                    "minimum_margin_buffer": 1000.0,
+                    "minimum_margin_ratio": 3.0,
+                },
+                "oos": {
+                    "liquidation_count": 0,
+                    "minimum_margin_buffer": 1000.0,
+                    "minimum_margin_ratio": 3.0,
+                },
+            }
+        },
     }
 
 
@@ -254,6 +273,83 @@ def test_validator_rejects_fractional_leverage_candidate(tmp_path: Path) -> None
     details = json.loads(quality_check["detail"])
     assert quality_check["passed"] is False
     assert details["leverage"] == pytest.approx(2.5)
+
+
+def test_validator_rejects_positive_liquidation_even_when_tolerance_metadata_allows_it(
+    tmp_path: Path,
+) -> None:
+    candidate_path = tmp_path / "candidate.json"
+    rss_summary = tmp_path / "rss_summary.json"
+    result_path = tmp_path / "result.json"
+    candidate = _passing_candidate_payload()
+    candidate["liquidation_aware_validation"] = {
+        "liquidation_tolerance": {"allowed_total_liquidations": 1},
+        "splits": {
+            "train": {"liquidation_count": 0, "minimum_margin_buffer": 1000.0},
+            "validation": {"liquidation_count": 1, "minimum_margin_buffer": 1000.0},
+            "oos": {"liquidation_count": 0, "minimum_margin_buffer": 1000.0},
+        },
+    }
+    _write_json(candidate_path, candidate)
+    _write_json(rss_summary, {"peak_rss_bytes": 512 * 1024 * 1024})
+    _write_json(
+        result_path,
+        {
+            "status": "passed",
+            "passed": True,
+            "source_changed": False,
+            "passing_candidate_artifact": "candidate.json",
+            "rss_under_8gb_logs": ["rss_summary.json"],
+            "tests_passed": True,
+            "ci_passed": True,
+        },
+    )
+
+    payload = validator.validate(result_path, repo_root=tmp_path)
+
+    assert payload["passed"] is False
+    quality_check = next(
+        check for check in payload["checks"] if check["name"] == "candidate_return_quality_contract"
+    )
+    details = json.loads(quality_check["detail"])
+    assert quality_check["passed"] is False
+    assert details["liquidation_count"] == 1
+    assert details["allowed_total_liquidations"] == 1
+
+
+def test_validator_rejects_promoted_candidate_with_missing_liquidation_margin_evidence(
+    tmp_path: Path,
+) -> None:
+    candidate_path = tmp_path / "candidate.json"
+    rss_summary = tmp_path / "rss_summary.json"
+    result_path = tmp_path / "result.json"
+    candidate = _passing_candidate_payload()
+    candidate.pop("liquidation_aware_validation")
+    _write_json(candidate_path, candidate)
+    _write_json(rss_summary, {"peak_rss_bytes": 512 * 1024 * 1024})
+    _write_json(
+        result_path,
+        {
+            "status": "passed",
+            "passed": True,
+            "source_changed": False,
+            "passing_candidate_artifact": "candidate.json",
+            "rss_under_8gb_logs": ["rss_summary.json"],
+            "tests_passed": True,
+            "ci_passed": True,
+        },
+    )
+
+    payload = validator.validate(result_path, repo_root=tmp_path)
+
+    assert payload["passed"] is False
+    quality_check = next(
+        check for check in payload["checks"] if check["name"] == "candidate_return_quality_contract"
+    )
+    details = json.loads(quality_check["detail"])
+    assert quality_check["passed"] is False
+    assert details["liquidation_count"] is None
+    assert details["minimum_margin_buffer"] is None
 
 
 def test_validator_accepts_no_improvement_current_base_retention(tmp_path: Path) -> None:
