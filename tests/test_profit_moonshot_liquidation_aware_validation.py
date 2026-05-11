@@ -153,6 +153,77 @@ def test_cli_defaults_to_strict_zero_liquidation_promotion() -> None:
     assert args.retune_csv_limit == 0
 
 
+def test_calendar_current_base_sleeves_are_strategy_invalid() -> None:
+    validity = MODULE._strategy_validity_for_sleeves(MODULE.CURRENT_BASE_SLEEVES)
+
+    assert validity["pass"] is False
+    assert validity["primary_signal_type"] == "calendar_primary"
+    assert "calendar_primary_alpha_unsupported" in validity["rejection_reasons"]
+
+
+def test_strategy_invalid_rows_cannot_be_deployable_even_when_metrics_pass() -> None:
+    class FakeTuner:
+        MAX_ACCEPTABLE_OOS_MDD = 0.25
+        SUCCESS_SHARPE = 1.0
+        SUCCESS_SORTINO = 1.0
+        SUCCESS_SMART_SORTINO = 1.0
+        SUCCESS_CALMAR = 1.0
+
+        @staticmethod
+        def _return_risk_score(total_return: float, max_drawdown: float) -> float:
+            return total_return / max(max_drawdown, 1e-9)
+
+        @staticmethod
+        def _smart_sortino(metrics: dict) -> float:
+            return float(metrics.get("sortino") or 0.0)
+
+    current_base = {
+        "leverage": 1.0,
+        "splits": {
+            "oos": {
+                "metrics": {
+                    "total_return": 0.01,
+                    "max_drawdown": 0.01,
+                    "sharpe": 1.0,
+                    "sortino": 1.0,
+                    "calmar": 1.0,
+                }
+            }
+        },
+    }
+    invalid = {
+        "leverage": 5.0,
+        "strategy_validity": MODULE._strategy_validity_for_sleeves(
+            ["fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600"]
+        ),
+        "liquidation_gates": {
+            "liquidation_free": True,
+            "margin_buffer_positive": True,
+            "all_splits_liquidation_safe": True,
+        },
+        "train_val_score": 5.0,
+        "splits": {
+            "train": {"metrics": {"total_return": 0.2}},
+            "validation": {"metrics": {"total_return": 0.1}},
+            "oos": {
+                "metrics": {
+                    "total_return": 0.2,
+                    "max_drawdown": 0.02,
+                    "sharpe": 5.0,
+                    "sortino": 5.0,
+                    "calmar": 5.0,
+                }
+            },
+        },
+    }
+
+    MODULE._apply_reference_gates(FakeTuner(), [invalid], current_base)
+
+    assert invalid["strategy_validity"]["pass"] is False
+    assert invalid["strategy_validity_gate"] is False
+    assert invalid["deployable_success"] is False
+
+
 def test_empty_retune_selection_stays_empty() -> None:
     selected = MODULE._select_train_validation_candidate(
         [],

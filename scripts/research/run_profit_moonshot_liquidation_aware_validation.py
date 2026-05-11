@@ -77,6 +77,14 @@ BINANCE_SOURCE_REFS = {
         "Get-Funding-Rate-History"
     ),
 }
+CALENDAR_PRIMARY_FAMILIES = {"calendar_rotation", "calendar_spread"}
+CALENDAR_PRIMARY_NAME_TOKENS = (
+    "fresh_calendar_",
+    "calendar_rotation",
+    "calendar_spread",
+    "calendar_rot_",
+    "optuna_calendar_",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,6 +120,84 @@ class LiquidationTolerance:
     allowed_split_liquidations: int = 0
     max_liquidation_event_drawdown: float = 0.005
     max_liquidation_equity_loss_fraction: float = 0.005
+
+
+def _calendar_primary_family(name: str, family: str = "") -> bool:
+    normalized_family = str(family or "").strip().lower()
+    if normalized_family in CALENDAR_PRIMARY_FAMILIES:
+        return True
+    token = str(name or "").strip().lower()
+    return any(marker in token for marker in CALENDAR_PRIMARY_NAME_TOKENS)
+
+
+def _strategy_validity_for_sleeves(
+    sleeves: list[str] | tuple[str, ...],
+    *,
+    specs: list[Any] | None = None,
+) -> dict[str, Any]:
+    """Fail closed on calendar-primary sleeves before liquidation promotion.
+
+    Liquidation replay can still report historical calendar/current-base rows,
+    but they are research-only: fixed month/asset calendar alpha is not a valid
+    deployable signal regardless of leverage, MDD, or non-wipeout liquidation
+    behavior.
+    """
+    family_by_name = {str(getattr(spec, "name", "")): str(getattr(spec, "family", "")) for spec in specs or []}
+    audited: list[dict[str, Any]] = []
+    rejection_reasons: list[str] = []
+    for sleeve in [str(item) for item in sleeves if str(item)]:
+        family = family_by_name.get(sleeve, "")
+        is_calendar = _calendar_primary_family(sleeve, family)
+        reasons = (
+            [
+                "calendar_primary_alpha_unsupported",
+                "calendar_fixed_month_alpha",
+                "fixed_asset_calendar_target",
+            ]
+            if is_calendar
+            else []
+        )
+        rejection_reasons.extend(reasons)
+        audited.append(
+            {
+                "sleeve": sleeve,
+                "family": family or ("calendar_rotation" if is_calendar else "unknown_non_calendar"),
+                "pass": not is_calendar,
+                "primary_signal_type": "calendar_primary" if is_calendar else "state_signal",
+                "primary_signal_evidence": (
+                    "fixed_month_asset_calendar_rule"
+                    if is_calendar
+                    else "non_calendar_state_or_cross_sectional_signal"
+                ),
+                "rejection_reasons": reasons,
+            }
+        )
+    if not audited:
+        return {
+            "pass": False,
+            "primary_signal_type": "missing",
+            "primary_signal_evidence": "no active sleeves",
+            "audited_sleeves": [],
+            "rejection_reasons": ["strategy_source_row_missing_sleeves"],
+        }
+    unique_reasons = sorted(set(rejection_reasons))
+    passed = not unique_reasons and all(bool(item.get("pass")) for item in audited)
+    return {
+        "pass": bool(passed),
+        "primary_signal_type": "state_signal" if passed else "calendar_primary",
+        "primary_signal_evidence": (
+            "all_active_sleeves_non_calendar"
+            if passed
+            else "calendar-primary sleeve present in active tuple"
+        ),
+        "audited_sleeves": audited,
+        "rejection_reasons": unique_reasons,
+    }
+
+
+def _strategy_validity_passes(item: Mapping[str, Any]) -> bool:
+    validity = item.get("strategy_validity")
+    return isinstance(validity, Mapping) and bool(validity.get("pass"))
 
 
 @dataclass(slots=True)
@@ -1062,6 +1148,7 @@ def _build_leverage_result(
         "mode": "train_val_monthly_return_budget",
         "sleeves": sleeve_names,
         "leverage": float(leverage),
+        "strategy_validity": _strategy_validity_for_sleeves(sleeve_names, specs=specs),
         "splits": split_payloads,
         "return_quality": {
             "train_monthlyized_return": _monthlyized_return(tuner, train),
@@ -1157,8 +1244,10 @@ def _apply_reference_gates(tuner: Any, results: list[dict[str, Any]], current_ba
             result=result,
             current_base_result=current_base_result,
         )
+        result["strategy_validity_gate"] = _strategy_validity_passes(result)
         result["deployable_success"] = bool(
-            _liquidation_safe_for_promotion(dict(result.get("liquidation_gates") or {}))
+            _strategy_validity_passes(result)
+            and _liquidation_safe_for_promotion(dict(result.get("liquidation_gates") or {}))
             and all(bool(item) for item in dict(result.get("train_validation_performance_gates") or {}).values())
             and all(bool(item) for item in dict(result.get("performance_gates") or {}).values())
         )
@@ -1204,6 +1293,8 @@ def _audit_candidate_seeds(integer_audit: Mapping[str, Any], *, limit: int) -> l
         sleeves = [str(value) for value in list(item.get("sleeves") or []) if str(value)]
         if not sleeves:
             return
+        if not bool(_strategy_validity_for_sleeves(sleeves).get("pass")):
+            return
         seeds.append(
             _candidate_seed(
                 name=str(item.get("name") or source),
@@ -1233,6 +1324,8 @@ def _candidate_csv_seeds(path: Path, *, limit: int) -> list[dict[str, Any]]:
         for row in reader:
             name = str(row.get("name") or "").strip()
             if not name:
+                continue
+            if _calendar_primary_family(name, str(row.get("family") or "")):
                 continue
             train = _safe_float(row.get("train_total_return"))
             val = _safe_float(row.get("val_total_return"))
@@ -1393,11 +1486,14 @@ def _markdown(payload: Mapping[str, Any]) -> str:
         "## Current base reference replay",
         "",
         f"- leverage: `{_safe_float(current.get('leverage')):.6f}x`",
+        f"- strategy_validity: `{bool((current.get('strategy_validity') or {}).get('pass'))}`",
+        f"- strategy rejection reasons: `{', '.join((current.get('strategy_validity') or {}).get('rejection_reasons') or [])}`",
         _split_line(current, "oos") if current else "- missing current base replay",
         "",
         "## Forced 5x replay",
         "",
         f"- deployable_success: `{bool(forced.get('deployable_success'))}`",
+        f"- strategy_validity: `{bool((forced.get('strategy_validity') or {}).get('pass'))}`",
         f"- train/validation score: `{_safe_float(forced.get('train_val_score')):.6f}`",
         f"- OOS return delta vs current-base replay: `{_safe_float((forced.get('comparison_to_current_base') or {}).get('oos_return_delta')):+.4%}`",
         f"- OOS return/MDD delta vs current-base replay: `{_safe_float((forced.get('comparison_to_current_base') or {}).get('oos_return_risk_delta')):+.6f}`",
@@ -1570,7 +1666,8 @@ def run_validation(args: argparse.Namespace) -> dict[str, Any]:
     zero_liq = [
         item
         for item in integer_grid
-        if _liquidation_safe_for_promotion(dict(item.get("liquidation_gates") or {}))
+        if _strategy_validity_passes(item)
+        and _liquidation_safe_for_promotion(dict(item.get("liquidation_gates") or {}))
     ]
     highest_zero_liq = max(zero_liq, key=lambda item: float(item.get("leverage") or 0.0), default={})
     retune_integer_results = [
@@ -1585,6 +1682,7 @@ def run_validation(args: argparse.Namespace) -> dict[str, Any]:
     forced_5x_success = bool(forced_5x.get("deployable_success"))
     selected_success = bool(selected.get("deployable_success"))
     retuned_success = bool(best_deployable)
+    current_base_strategy_valid = _strategy_validity_passes(current_base_result)
     outcome = (
         "strict_reselected_deployable"
         if retuned_success
@@ -1592,6 +1690,8 @@ def run_validation(args: argparse.Namespace) -> dict[str, Any]:
         if forced_5x_success
         else "alternate_integer_leverage_deployable"
         if selected_success
+        else "no_live_promotion_strategy_validity_failed"
+        if not current_base_strategy_valid
         else "current_base_retained_liquidation_or_performance_gate_failed"
     )
     summary = (
@@ -1601,6 +1701,8 @@ def run_validation(args: argparse.Namespace) -> dict[str, Any]:
         if forced_5x_success
         else "Forced current-base 5x is unsafe or underqualified; an alternate current-base integer leverage passes strict gates."
         if selected_success
+        else "Calendar-primary current-base tuple is rejected by strategy-validity gates; no live promotion."
+        if not current_base_strategy_valid
         else "No current-base integer candidate passed strict liquidation/performance gates; retain current base."
     )
     promoted_candidate = (
@@ -1626,6 +1728,8 @@ def run_validation(args: argparse.Namespace) -> dict[str, Any]:
             "liquidation_tolerance": asdict(tolerance),
             "promotion_requires_positive_margin_buffer": True,
             "promotion_requires_positive_train_validation_return": True,
+            "promotion_requires_strategy_validity": True,
+            "calendar_primary_alpha_rejected": True,
             "maximum_oos_mdd": tuner.MAX_ACCEPTABLE_OOS_MDD,
             "memory_budget_bytes": PORTFOLIO_FOLLOWUP_EXPLICIT_BUDGET_BYTES,
         },
@@ -1670,6 +1774,7 @@ def run_validation(args: argparse.Namespace) -> dict[str, Any]:
             "selected_integer_deployable": selected_success,
             "reselected_deployable": retuned_success,
             "forced_5x_deployable": forced_5x_success,
+            "current_base_strategy_valid": current_base_strategy_valid,
             "current_base_retained": not (forced_5x_success or selected_success or retuned_success),
             "summary": summary,
         },
