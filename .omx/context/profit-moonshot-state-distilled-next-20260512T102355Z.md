@@ -1,0 +1,28 @@
+# Context Snapshot — profit moonshot state-distilled next
+
+- Created UTC: 2026-05-12T10:23:55.331149Z
+- Task: Continue `$ralplan $team $ralph` from the 2026-05-11 state-distilled profit-moonshot handoff in `/home/hoky/Quants-agent/LuminaQuant`.
+- Desired outcome: Improve valid non-calendar state-distilled strategy families, select candidates using train/validation only, evaluate locked-OOS only after freeze as report/gate, persist reports/handoff, verify, Lore commit, push `private/main`, and confirm GitHub Actions `ci`/`private-ci` green.
+- Known evidence:
+  - Current green head: `private/main 7e451311757a1ce0e43bebaec0a24b3746dbcb65`.
+  - Code/performance baseline to preserve: `02f4520cf906f48089b8852c2651a0f1e4bd0c1c`.
+  - Prior valid family `state_distilled_leadership_unwind` was strategy-valid but not deployable: best strict 4x OOS +2.4722%, return/MDD 0.9761 vs current-base reference OOS +6.4281%, return/MDD 6.9169.
+  - Prior replay: 648 specs, survivor 0, success 0, peak RSS ~254 MiB.
+  - Invalid current-base/calendar tuple may be used only as hypothesis generator, never selection target.
+- Constraints:
+  - No month/day/hour calendar entry rule in valid families.
+  - Locked-OOS cannot affect selection/hyperparameter choice.
+  - Strict deploy lane must have zero train/validation/OOS liquidations and all min margin buffers > 0.
+  - Diagnostic nonfatal liquidation lane must remain separate from live promotion and report count/event drawdown/equity loss/recovery.
+  - Memory < 8 GiB.
+  - Required validation: targeted tests, focused pytest, full pytest, ruff, compileall, git diff --check, push, GitHub Actions green.
+- Unknowns/open questions:
+  - Whether narrow new market-state families can beat current-base OOS return and return/MDD without hidden calendar leakage.
+  - Whether strict zero-liquidation highest leverage remains 4x or improves after exposure scaling.
+- Likely touchpoints:
+  - `scripts/research/replay_profit_moonshot_fresh_start.py`
+  - `scripts/research/run_profit_moonshot_liquidation_aware_validation.py`
+  - `tests/test_profit_moonshot_fresh_start_replay.py`
+  - `tests/test_profit_moonshot_liquidation_aware_validation.py`
+  - `tests/test_profit_moonshot_live_final_selection.py`
+  - `.omx/plans/*`, `.omx/notepad.md`, `docs/session_handoff_*state_distilled*_20260511.md`, `var/reports/.../alpha_v2/state_distilled_*`, `var/reports/.../alpha_v2/liquidation_aware_state_distilled_*`

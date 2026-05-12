@@ -636,3 +636,17 @@ User corrected scope: do not only compare HYBRID. Need full universe: all saved 
 - Liquidation-aware selected non-calendar row at 4x: train +32.9431%, validation +11.6925%, OOS +2.4722%, OOS MDD 2.5328%, zero liquidations, min buffers positive; strategy-valid but not deployable vs current-base OOS return/risk.
 - 5x/6x diagnostics have no account wipeout and positive OOS (+3.0887%/+3.7036%) but train liquidations 2/4, so strict promotion remains blocked. Calendar-primary current-base remains invalid.
 - Full verification: targeted profit-moonshot suite 54 passed; full pytest 1264 passed in 264.61s / wall 4:01.78, max RSS 2782136 KiB; ruff check ., compileall scripts/tests/src, and git diff --check passed.
+
+## 2026-05-11 — State-distilled next plan handoff
+- Wrote next plan: `.omx/plans/profit_moonshot_state_distilled_next_plan_20260511.md`.
+- Wrote next session prompt: `docs/next_session_prompt_profit_moonshot_state_distilled_next_20260511.md`.
+- Core next objective: improve valid non-calendar state-distilled strategies without using invalid calendar tuple as a selection target; keep locked-OOS gate/report-only.
+- Added dedicated research note: `docs/research_note_profit_moonshot_state_distilled_20260511.md` and embedded the core research-result summary directly into the next-session prompt.
+
+## 2026-05-12 — Profit moonshot state-distilled market-state next pass
+- Team/Ralph pass completed for valid non-calendar state-distilled mechanisms. Added/strengthened crowded leadership unwind v2, funding/OI exhaustion reversal, beta residual reversion, dispersion compression breakout/unwind, and vol/regime/margin-scaled momentum. Calendar month/day/hour entry fields are guarded for valid non-calendar families.
+- Added liquidation validation provenance: current-base/calendar tuple is `hypothesis_reference_only`; locked-OOS is gate/report-only; OOS-discovered diagnostic seeds cannot be selection targets; strict deploy and diagnostic nonfatal lanes are separate.
+- New market-state replay: 184 specs, 0 train/validation-positive candidates, 0 survivors, 0 success, peak RSS 257.844 MiB.
+- Train/validation-only portfolio diagnostic on prior leadership-unwind top18: 56,203 portfolio specs, 0 success; selected train/validation candidate OOS +4.6759%/MDD 6.9705%; diagnostic-best-OOS +8.2808% is report-only and not selectable.
+- Final liquidation-aware validation: 62 seeds / 366 integer results / 0 deployable. Train/validation-selected retune at 2x has zero liquidations and positive train/validation returns but OOS +2.1440%/MDD 5.0839% fails baseline economics. Highest strict zero-liquidation selection-target leverage remains 4x prior state-distilled row with OOS +2.4722%/MDD 2.5328%, below current-base reference +6.4281% and return/MDD 6.9169. Diagnostic 5x/6x portfolio has 10/17 total liquidations, no wipeout, OOS +5.0099%/+5.8698%, non-promotional. Memory under 8 GiB.
+- Artifacts: docs/session_handoff_20260511_profit_moonshot_state_distilled_market_state_next.md; var/reports/.../state_distilled_market_state_next_20260512/; var/reports/.../liquidation_aware_state_distilled_market_state_next_20260512/.

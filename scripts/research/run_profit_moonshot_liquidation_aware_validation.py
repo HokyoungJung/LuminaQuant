@@ -39,8 +39,7 @@ from lumina_quant.portfolio_split_contract import (  # noqa: E402
 TUNER_PATH = REPO_ROOT / "scripts/research/tune_profit_moonshot_fresh_portfolio.py"
 FRESH_PATH = REPO_ROOT / "scripts/research/replay_profit_moonshot_fresh_start.py"
 DEFAULT_OUTPUT_DIR = (
-    REPO_ROOT
-    / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/"
+    REPO_ROOT / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/"
     "liquidation_aware_strict_20260511"
 )
 DEFAULT_MARKET_ROOT = REPO_ROOT / "data/market_parquet"
@@ -49,8 +48,7 @@ DEFAULT_CURRENT_BASE_ARTIFACT = (
     / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/passing_candidate_latest.json"
 )
 DEFAULT_INTEGER_AUDIT_ARTIFACT = (
-    REPO_ROOT
-    / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/"
+    REPO_ROOT / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/"
     "integer_leverage_alpha_v2_top40_20260509/fresh_portfolio_tuning_latest.json"
 )
 DEFAULT_CANDIDATE_CSV = (
@@ -85,6 +83,12 @@ CALENDAR_PRIMARY_NAME_TOKENS = (
     "calendar_rot_",
     "optuna_calendar_",
 )
+CALENDAR_ENTRY_RULE_REASON_BY_FIELD = {
+    "calendar_long_months": "calendar_month_entry_rule",
+    "calendar_short_months": "calendar_month_entry_rule",
+    "entry_days_of_month": "calendar_day_entry_rule",
+    "entry_hours": "calendar_hour_entry_rule",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -130,6 +134,29 @@ def _calendar_primary_family(name: str, family: str = "") -> bool:
     return any(marker in token for marker in CALENDAR_PRIMARY_NAME_TOKENS)
 
 
+def _spec_has_non_empty_rule(spec: Any, field: str) -> bool:
+    value = getattr(spec, field, ())
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    try:
+        return any(True for _ in value)
+    except TypeError:
+        return bool(value)
+
+
+def _calendar_entry_rule_reasons(spec: Any | None) -> list[str]:
+    if spec is None:
+        return []
+    reasons = [
+        reason
+        for field, reason in CALENDAR_ENTRY_RULE_REASON_BY_FIELD.items()
+        if _spec_has_non_empty_rule(spec, field)
+    ]
+    return sorted(set(reasons))
+
+
 def _strategy_validity_for_sleeves(
     sleeves: list[str] | tuple[str, ...],
     *,
@@ -142,31 +169,45 @@ def _strategy_validity_for_sleeves(
     deployable signal regardless of leverage, MDD, or non-wipeout liquidation
     behavior.
     """
-    family_by_name = {str(getattr(spec, "name", "")): str(getattr(spec, "family", "")) for spec in specs or []}
+    spec_by_name = {str(getattr(spec, "name", "")): spec for spec in specs or []}
     audited: list[dict[str, Any]] = []
     rejection_reasons: list[str] = []
     for sleeve in [str(item) for item in sleeves if str(item)]:
-        family = family_by_name.get(sleeve, "")
+        spec = spec_by_name.get(sleeve)
+        family = str(getattr(spec, "family", "")) if spec is not None else ""
         is_calendar = _calendar_primary_family(sleeve, family)
-        reasons = (
-            [
-                "calendar_primary_alpha_unsupported",
-                "calendar_fixed_month_alpha",
-                "fixed_asset_calendar_target",
-            ]
-            if is_calendar
-            else []
-        )
+        timing_reasons = _calendar_entry_rule_reasons(spec)
+        reasons = []
+        if is_calendar:
+            reasons.extend(
+                [
+                    "calendar_primary_alpha_unsupported",
+                    "calendar_fixed_month_alpha",
+                    "fixed_asset_calendar_target",
+                ]
+            )
+        if timing_reasons:
+            reasons.extend(["calendar_entry_rule_unsupported", *timing_reasons])
         rejection_reasons.extend(reasons)
+        passed = not reasons
         audited.append(
             {
                 "sleeve": sleeve,
-                "family": family or ("calendar_rotation" if is_calendar else "unknown_non_calendar"),
-                "pass": not is_calendar,
-                "primary_signal_type": "calendar_primary" if is_calendar else "state_signal",
+                "family": family
+                or ("calendar_rotation" if is_calendar else "unknown_non_calendar"),
+                "pass": passed,
+                "primary_signal_type": (
+                    "calendar_primary"
+                    if is_calendar
+                    else "calendar_timed_state_signal"
+                    if timing_reasons
+                    else "state_signal"
+                ),
                 "primary_signal_evidence": (
                     "fixed_month_asset_calendar_rule"
                     if is_calendar
+                    else "calendar_month_day_hour_entry_rule"
+                    if timing_reasons
                     else "non_calendar_state_or_cross_sectional_signal"
                 ),
                 "rejection_reasons": reasons,
@@ -198,6 +239,40 @@ def _strategy_validity_for_sleeves(
 def _strategy_validity_passes(item: Mapping[str, Any]) -> bool:
     validity = item.get("strategy_validity")
     return isinstance(validity, Mapping) and bool(validity.get("pass"))
+
+
+def _is_current_base_tuple(item: Mapping[str, Any]) -> bool:
+    return str(item.get("candidate_source") or "") == "current_base_tuple"
+
+
+def _is_locked_oos_diagnostic_seed(item: Mapping[str, Any]) -> bool:
+    source = str(item.get("candidate_source") or "")
+    return source == "integer_audit_diagnostic_best_oos" or source.startswith(
+        "integer_audit_diagnostic_quarantine_"
+    )
+
+
+def _reference_only_selection_policy(item: Mapping[str, Any]) -> dict[str, Any]:
+    if _is_current_base_tuple(item):
+        return {
+            "selection_target": False,
+            "selection_role": "hypothesis_reference_only",
+            "selection_exclusion_reason": "invalid_current_base_calendar_tuple_reference_only",
+        }
+    if _is_locked_oos_diagnostic_seed(item):
+        return {
+            "selection_target": False,
+            "selection_role": "diagnostic_locked_oos_report_only",
+            "selection_exclusion_reason": "diagnostic_seed_uses_locked_oos_for_discovery",
+        }
+    return {"selection_target": True}
+
+
+def _selection_target_allowed(item: Mapping[str, Any]) -> bool:
+    policy = dict(item.get("selection_policy") or {})
+    if "selection_target" in policy:
+        return bool(policy.get("selection_target"))
+    return not (_is_current_base_tuple(item) or _is_locked_oos_diagnostic_seed(item))
 
 
 @dataclass(slots=True)
@@ -282,7 +357,9 @@ def _liquidation_adverse_fraction(*, leverage: float, model: MarginModel) -> flo
     return max(0.0, (1.0 / lev) - float(model.liquidation_reserve_rate))
 
 
-def _liquidation_price(entry_price: float, side: str, *, leverage: float, model: MarginModel) -> float:
+def _liquidation_price(
+    entry_price: float, side: str, *, leverage: float, model: MarginModel
+) -> float:
     entry = max(1e-12, float(entry_price))
     adverse_fraction = _liquidation_adverse_fraction(leverage=leverage, model=model)
     if str(side).upper() == "LONG":
@@ -339,7 +416,11 @@ def _split_margin_summary(
     snapshots: list[Mapping[str, Any]],
     liquidation_events: list[Mapping[str, Any]],
 ) -> dict[str, Any]:
-    split_snapshots = [dict(item) for item in snapshots if str(item.get("split")) in {"", split_name} or "split" not in item]
+    split_snapshots = [
+        dict(item)
+        for item in snapshots
+        if str(item.get("split")) in {"", split_name} or "split" not in item
+    ]
     if not split_snapshots:
         split_snapshots = [dict(item) for item in snapshots]
     buffers = [_safe_float(item.get("margin_buffer"), STARTING_EQUITY) for item in split_snapshots]
@@ -358,6 +439,11 @@ def _split_margin_summary(
         for event in liquidation_events
         if str(event.get("split")) == split_name
     ]
+    recovery_bars = [
+        _safe_float(event.get("recovery_bars"), 0.0)
+        for event in liquidation_events
+        if str(event.get("split")) == split_name
+    ]
     return {
         "liquidation_count": int(count),
         "minimum_margin_buffer": float(minimum_buffer),
@@ -365,13 +451,16 @@ def _split_margin_summary(
         "margin_buffer_positive": bool(minimum_buffer > 0.0),
         "maximum_liquidation_event_drawdown": float(max(event_drawdowns, default=0.0)),
         "maximum_liquidation_equity_loss_fraction": float(max(event_loss_fractions, default=0.0)),
+        "maximum_liquidation_recovery_bars": float(max(recovery_bars, default=0.0)),
+        "liquidation_recovery_observed": bool(recovery_bars),
     }
 
 
 def _split_is_liquidation_safe(split_payload: Mapping[str, Any]) -> bool:
-    return int(split_payload.get("liquidation_count") or 0) == 0 and _safe_float(
-        split_payload.get("minimum_margin_buffer"), 0.0
-    ) > 0.0
+    return (
+        int(split_payload.get("liquidation_count") or 0) == 0
+        and _safe_float(split_payload.get("minimum_margin_buffer"), 0.0) > 0.0
+    )
 
 
 def _split_within_liquidation_tolerance(
@@ -380,7 +469,8 @@ def _split_within_liquidation_tolerance(
     tolerance: LiquidationTolerance,
 ) -> bool:
     return (
-        int(split_payload.get("liquidation_count") or 0) <= int(tolerance.allowed_split_liquidations)
+        int(split_payload.get("liquidation_count") or 0)
+        <= int(tolerance.allowed_split_liquidations)
         and _safe_float(split_payload.get("minimum_margin_buffer"), 0.0) > 0.0
         and _safe_float(split_payload.get("maximum_liquidation_event_drawdown"), 0.0)
         <= float(tolerance.max_liquidation_event_drawdown)
@@ -390,7 +480,127 @@ def _split_within_liquidation_tolerance(
 
 
 def _liquidation_count_for_split(split_payload: Mapping[str, Any]) -> int:
-    return int(split_payload.get("liquidation_count") or split_payload.get("liquidation_event_count_total") or 0)
+    return int(
+        split_payload.get("liquidation_count")
+        or split_payload.get("liquidation_event_count_total")
+        or 0
+    )
+
+
+def _strict_deploy_lane(candidate: Mapping[str, Any]) -> dict[str, Any]:
+    splits = dict(candidate.get("splits") or {})
+    split_status: dict[str, dict[str, Any]] = {}
+    total_liquidations = 0
+    buffers: list[float] = []
+    for split_name in ("train", VALIDATION_SPLIT, "oos"):
+        split_payload = _split_payload(splits, split_name)
+        count = _liquidation_count_for_split(split_payload)
+        buffer_value = _safe_float(split_payload.get("minimum_margin_buffer"), 0.0)
+        total_liquidations += int(count)
+        buffers.append(float(buffer_value))
+        split_status[split_name] = {
+            "liquidation_count": int(count),
+            "minimum_margin_buffer": float(buffer_value),
+            "liquidation_free": int(count) == 0,
+            "margin_buffer_positive": float(buffer_value) > 0.0,
+            "strict_safe": int(count) == 0 and float(buffer_value) > 0.0,
+        }
+    promotion_allowed = all(bool(item["strict_safe"]) for item in split_status.values())
+    return {
+        "lane": "strict_deploy",
+        "promotion_allowed": bool(promotion_allowed),
+        "promotion_eligible": bool(promotion_allowed),
+        "requires": {
+            "liquidation_count_per_split": 0,
+            "minimum_margin_buffer": ">0 for train, validation, and locked_oos",
+        },
+        "selection_inputs": ["train", VALIDATION_SPLIT],
+        "locked_oos": "gate_only_report_only",
+        "split_status": split_status,
+        "total_liquidation_count": int(total_liquidations),
+        "minimum_margin_buffer": float(min(buffers)) if buffers else 0.0,
+    }
+
+
+def _diagnostic_nonfatal_lane(
+    candidate: Mapping[str, Any],
+    *,
+    tolerance: LiquidationTolerance,
+) -> dict[str, Any]:
+    splits = dict(candidate.get("splits") or {})
+    split_status: dict[str, dict[str, Any]] = {}
+    total_liquidations = 0
+    max_event_drawdown = 0.0
+    max_loss_fraction = 0.0
+    wipeout_count = 0
+    for split_name in ("train", VALIDATION_SPLIT, "oos"):
+        split_payload = _split_payload(splits, split_name)
+        events = [dict(item) for item in list(split_payload.get("liquidation_events") or [])]
+        count = max(_liquidation_count_for_split(split_payload), len(events))
+        total_liquidations += int(count)
+        split_drawdown = max(
+            [_safe_float(event.get("event_drawdown"), 0.0) for event in events]
+            + [_safe_float(split_payload.get("maximum_liquidation_event_drawdown"), 0.0)]
+        )
+        split_loss = max(
+            [_safe_float(event.get("equity_loss_fraction"), 0.0) for event in events]
+            + [_safe_float(split_payload.get("maximum_liquidation_equity_loss_fraction"), 0.0)]
+        )
+        max_event_drawdown = max(max_event_drawdown, split_drawdown)
+        max_loss_fraction = max(max_loss_fraction, split_loss)
+        split_wipeouts = sum(1 for event in events if bool(event.get("account_wipeout")))
+        wipeout_count += split_wipeouts
+        final_equity = _safe_float(split_payload.get("final_equity"), 0.0)
+        pre_equities = [_safe_float(event.get("pre_liquidation_equity"), 0.0) for event in events]
+        post_equities = [_safe_float(event.get("post_liquidation_equity"), 0.0) for event in events]
+        recovery_from_event_low = (
+            max(0.0, final_equity - min(post_equities))
+            if post_equities and final_equity > 0.0
+            else 0.0
+        )
+        recovered_to_pre = bool(not pre_equities or final_equity >= max(pre_equities))
+        split_status[split_name] = {
+            "liquidation_count": int(count),
+            "minimum_margin_buffer": _safe_float(split_payload.get("minimum_margin_buffer"), 0.0),
+            "maximum_event_drawdown": float(split_drawdown),
+            "maximum_liquidation_event_drawdown": float(split_drawdown),
+            "maximum_equity_loss_fraction": float(split_loss),
+            "maximum_liquidation_equity_loss_fraction": float(split_loss),
+            "maximum_liquidation_recovery_bars": _safe_float(
+                split_payload.get("maximum_liquidation_recovery_bars"), 0.0
+            ),
+            "liquidation_recovery_observed": bool(
+                split_payload.get("liquidation_recovery_observed")
+            ),
+            "account_wipeout_count": int(split_wipeouts),
+            "final_equity": float(final_equity),
+            "recovery_from_event_low": float(recovery_from_event_low),
+            "recovered_to_pre_liquidation_equity": recovered_to_pre,
+        }
+    within_nonfatal_tolerance = (
+        total_liquidations <= int(tolerance.allowed_total_liquidations)
+        and all(
+            int(item["liquidation_count"]) <= int(tolerance.allowed_split_liquidations)
+            for item in split_status.values()
+        )
+        and max_event_drawdown <= float(tolerance.max_liquidation_event_drawdown)
+        and max_loss_fraction <= float(tolerance.max_liquidation_equity_loss_fraction)
+        and wipeout_count == 0
+    )
+    return {
+        "lane": "diagnostic_nonfatal",
+        "diagnostic_only": True,
+        "promotion_allowed": False,
+        "promotion_eligible": False,
+        "separate_from_strict_deploy": True,
+        "live_promotion_lane": "strict_deploy_lane_only",
+        "within_nonfatal_tolerance": bool(within_nonfatal_tolerance),
+        "total_liquidation_count": int(total_liquidations),
+        "maximum_event_drawdown": float(max_event_drawdown),
+        "maximum_equity_loss_fraction": float(max_loss_fraction),
+        "account_wipeout_count": int(wipeout_count),
+        "split_status": split_status,
+    }
 
 
 def _liquidation_promotion_gates(
@@ -405,13 +615,19 @@ def _liquidation_promotion_gates(
     gates = {
         "train_validation_liquidation_safe": bool(train and val),
         "all_splits_liquidation_safe": bool(train and val and oos),
-        "liquidation_free": all(int(dict(payload).get("liquidation_count") or 0) == 0 for payload in splits.values()),
+        "liquidation_free": all(
+            int(dict(payload).get("liquidation_count") or 0) == 0 for payload in splits.values()
+        ),
         "margin_buffer_positive": all(
-            _safe_float(dict(payload).get("minimum_margin_buffer"), 0.0) > 0.0 for payload in splits.values()
+            _safe_float(dict(payload).get("minimum_margin_buffer"), 0.0) > 0.0
+            for payload in splits.values()
         ),
     }
     if tolerance is not None:
-        split_counts = {name: _liquidation_count_for_split(dict(payload or {})) for name, payload in splits.items()}
+        split_counts = {
+            name: _liquidation_count_for_split(dict(payload or {}))
+            for name, payload in splits.items()
+        }
         total_liquidations = sum(split_counts.values())
         train_tolerant = _split_within_liquidation_tolerance(
             _split_payload(splits, "train"),
@@ -425,24 +641,42 @@ def _liquidation_promotion_gates(
             _split_payload(splits, "oos"),
             tolerance=tolerance,
         )
-        max_event_drawdown = max(
-            _safe_float(dict(payload or {}).get("maximum_liquidation_event_drawdown"), 0.0)
-            for payload in splits.values()
-        ) if splits else 0.0
-        max_loss_fraction = max(
-            _safe_float(dict(payload or {}).get("maximum_liquidation_equity_loss_fraction"), 0.0)
-            for payload in splits.values()
-        ) if splits else 0.0
+        max_event_drawdown = (
+            max(
+                _safe_float(dict(payload or {}).get("maximum_liquidation_event_drawdown"), 0.0)
+                for payload in splits.values()
+            )
+            if splits
+            else 0.0
+        )
+        max_loss_fraction = (
+            max(
+                _safe_float(
+                    dict(payload or {}).get("maximum_liquidation_equity_loss_fraction"), 0.0
+                )
+                for payload in splits.values()
+            )
+            if splits
+            else 0.0
+        )
         split_liquidations_within = all(
             count <= int(tolerance.allowed_split_liquidations) for count in split_counts.values()
         )
         total_within = total_liquidations <= int(tolerance.allowed_total_liquidations)
-        event_drawdown_within = max_event_drawdown <= float(tolerance.max_liquidation_event_drawdown)
-        loss_fraction_within = max_loss_fraction <= float(tolerance.max_liquidation_equity_loss_fraction)
+        event_drawdown_within = max_event_drawdown <= float(
+            tolerance.max_liquidation_event_drawdown
+        )
+        loss_fraction_within = max_loss_fraction <= float(
+            tolerance.max_liquidation_equity_loss_fraction
+        )
         gates.update(
             {
-                "train_validation_liquidation_within_tolerance": bool(train_tolerant and val_tolerant),
-                "all_splits_liquidation_within_tolerance": bool(train_tolerant and val_tolerant and oos_tolerant),
+                "train_validation_liquidation_within_tolerance": bool(
+                    train_tolerant and val_tolerant
+                ),
+                "all_splits_liquidation_within_tolerance": bool(
+                    train_tolerant and val_tolerant and oos_tolerant
+                ),
                 "split_liquidations_within_tolerance": bool(split_liquidations_within),
                 "total_liquidations_within_tolerance": bool(total_within),
                 "liquidation_event_drawdown_within_tolerance": bool(event_drawdown_within),
@@ -463,8 +697,10 @@ def _liquidation_promotion_gates(
 
 
 def _liquidation_safe_for_promotion(gates: Mapping[str, Any]) -> bool:
-    return bool(gates.get("liquidation_free")) and bool(gates.get("margin_buffer_positive")) and bool(
-        gates.get("all_splits_liquidation_safe")
+    return (
+        bool(gates.get("liquidation_free"))
+        and bool(gates.get("margin_buffer_positive"))
+        and bool(gates.get("all_splits_liquidation_safe"))
     )
 
 
@@ -476,9 +712,9 @@ def _select_train_validation_leverage(
     def train_val_ok(item: Mapping[str, Any]) -> bool:
         splits = dict(item.get("splits") or {})
         if tolerance is None:
-            return _split_is_liquidation_safe(_split_payload(splits, "train")) and _split_is_liquidation_safe(
-                _split_payload(splits, VALIDATION_SPLIT)
-            )
+            return _split_is_liquidation_safe(
+                _split_payload(splits, "train")
+            ) and _split_is_liquidation_safe(_split_payload(splits, VALIDATION_SPLIT))
         return _split_within_liquidation_tolerance(
             _split_payload(splits, "train"),
             tolerance=tolerance,
@@ -487,12 +723,11 @@ def _select_train_validation_leverage(
             tolerance=tolerance,
         )
 
-    train_val_safe = [
-        dict(item)
-        for item in grid
-        if train_val_ok(item)
-    ]
-    selection_pool = train_val_safe or [dict(item) for item in grid]
+    eligible = [dict(item) for item in grid if _selection_target_allowed(item)]
+    if not eligible:
+        return {}
+    train_val_safe = [dict(item) for item in eligible if train_val_ok(item)]
+    selection_pool = train_val_safe or eligible
     selected = max(
         selection_pool,
         key=lambda item: (
@@ -506,6 +741,7 @@ def _select_train_validation_leverage(
         "selection_inputs": ["train", "validation"],
         "locked_oos": "report_only_gate_only",
         "uses_locked_oos_for_selection": False,
+        "selection_target": True,
     }
     return selected
 
@@ -540,11 +776,15 @@ def _leg_unrealized_pnl(arrays: Mapping[str, Any], leg: OpenLeg, idx: int, fresh
     return float(leg.qty) * (float(leg.entry_price) - close)
 
 
-def _state_unrealized_pnl(arrays: Mapping[str, Any], state: SleeveState, idx: int, fresh: Any) -> float:
+def _state_unrealized_pnl(
+    arrays: Mapping[str, Any], state: SleeveState, idx: int, fresh: Any
+) -> float:
     return sum(_leg_unrealized_pnl(arrays, leg, idx, fresh) for leg in state.legs)
 
 
-def _portfolio_equity(cash: float, states: list[SleeveState], arrays: Mapping[str, Any], idx: int, fresh: Any) -> float:
+def _portfolio_equity(
+    cash: float, states: list[SleeveState], arrays: Mapping[str, Any], idx: int, fresh: Any
+) -> float:
     return float(cash) + sum(_state_unrealized_pnl(arrays, state, idx, fresh) for state in states)
 
 
@@ -552,7 +792,9 @@ def _open_legs(states: list[SleeveState]) -> list[OpenLeg]:
     return [leg for state in states for leg in state.legs]
 
 
-def _portfolio_notional(states: list[SleeveState], arrays: Mapping[str, Any], idx: int, fresh: Any) -> float:
+def _portfolio_notional(
+    states: list[SleeveState], arrays: Mapping[str, Any], idx: int, fresh: Any
+) -> float:
     total = 0.0
     for leg in _open_legs(states):
         prefix = _symbol_prefix(fresh, leg.symbol)
@@ -610,7 +852,9 @@ def _apply_funding_cost(
     for leg in _open_legs(states):
         prefix = _symbol_prefix(fresh, leg.symbol)
         close = _array_value(arrays, f"{prefix}_close", idx, leg.entry_price)
-        funding = abs(_array_value(arrays, f"{prefix}_funding_ffill", idx, model.funding_rate_per_8h))
+        funding = abs(
+            _array_value(arrays, f"{prefix}_funding_ffill", idx, model.funding_rate_per_8h)
+        )
         funding = max(float(model.funding_rate_per_8h), funding)
         hourly_cost += abs(float(leg.qty) * close) * funding / 8.0
     return float(cash) - float(hourly_cost)
@@ -627,13 +871,17 @@ def _realize_leg(
     model: MarginModel,
     liquidation: bool = False,
 ) -> float:
-    fill, fee_rate = fresh._fill_price(float(fill_price), str(action), high_low_vol=float(high_low_vol))
+    fill, fee_rate = fresh._fill_price(
+        float(fill_price), str(action), high_low_vol=float(high_low_vol)
+    )
     effective_fee_rate = max(float(fee_rate), float(model.taker_fee_rate))
     if liquidation:
         effective_fee_rate += float(model.liquidation_fee_rate)
     qty = float(leg.qty)
-    pnl = qty * (float(fill) - float(leg.entry_price)) if leg.side == "LONG" else qty * (
-        float(leg.entry_price) - float(fill)
+    pnl = (
+        qty * (float(fill) - float(leg.entry_price))
+        if leg.side == "LONG"
+        else qty * (float(leg.entry_price) - float(fill))
     )
     return float(cash) + pnl - abs(qty * float(fill)) * effective_fee_rate
 
@@ -654,7 +902,9 @@ def _close_state_at_idx(
     override = dict(override_prices or {})
     for leg in list(state.legs):
         prefix = _symbol_prefix(fresh, leg.symbol)
-        close = override.get(leg.symbol, _array_value(arrays, f"{prefix}_close", idx, leg.entry_price))
+        close = override.get(
+            leg.symbol, _array_value(arrays, f"{prefix}_close", idx, leg.entry_price)
+        )
         high = _array_value(arrays, f"{prefix}_high", idx, close)
         low = _array_value(arrays, f"{prefix}_low", idx, close)
         open_ = _array_value(arrays, f"{prefix}_open", idx, close)
@@ -703,7 +953,9 @@ def _plan_order(
     open_ = _array_value(arrays, f"{prefix}_open", idx, close)
     volume = max(0.0, _array_value(arrays, f"{prefix}_volume", idx, 0.0))
     high_low_vol = max(0.0, (high - low) / open_) if open_ > 0.0 else 0.0
-    base_notional = min(fresh.TARGET_ALLOCATION * float(scale) * float(equity), fresh.MAX_ORDER_VALUE * float(scale))
+    base_notional = min(
+        fresh.TARGET_ALLOCATION * float(scale) * float(equity), fresh.MAX_ORDER_VALUE * float(scale)
+    )
     notional = base_notional * max(0.0, float(leverage))
     raw_qty = math.floor((notional / close) / 0.001) * 0.001
     order_qty = min(raw_qty, volume * 0.10)
@@ -731,7 +983,9 @@ def _is_spread_state(state: SleeveState) -> bool:
     return str(state.spec.family) in SPREAD_FAMILIES
 
 
-def _spread_signal_for_state(fresh: Any, state: SleeveState, arrays: Mapping[str, Any], idx: int) -> tuple[str, str, str, str]:
+def _spread_signal_for_state(
+    fresh: Any, state: SleeveState, arrays: Mapping[str, Any], idx: int
+) -> tuple[str, str, str, str]:
     family = str(state.spec.family)
     if family == "calendar_spread":
         return fresh._calendar_spread_signal(state.spec, arrays, idx)
@@ -742,7 +996,9 @@ def _spread_signal_for_state(fresh: Any, state: SleeveState, arrays: Mapping[str
     return "", "", "", "unsupported_spread_family"
 
 
-def _single_leg_signal_for_state(fresh: Any, state: SleeveState, arrays: Mapping[str, Any], idx: int) -> tuple[str, str, str]:
+def _single_leg_signal_for_state(
+    fresh: Any, state: SleeveState, arrays: Mapping[str, Any], idx: int
+) -> tuple[str, str, str]:
     return fresh._candidate_signal(state.spec, arrays, idx)
 
 
@@ -780,7 +1036,11 @@ def _run_liquidation_split(
     split_name = _display_split_name(split.name)
     timestamps = arrays["timestamp"]
     start_ts = int(datetime.combine(split.start, datetime.min.time(), tzinfo=UTC).timestamp())
-    end_ts = int(datetime.combine(split.end, datetime.min.time(), tzinfo=UTC).timestamp()) + 24 * 60 * 60 - 1
+    end_ts = (
+        int(datetime.combine(split.end, datetime.min.time(), tzinfo=UTC).timestamp())
+        + 24 * 60 * 60
+        - 1
+    )
     indices = np.flatnonzero((timestamps >= start_ts) & (timestamps <= end_ts))
     if indices.size == 0:
         return {
@@ -798,7 +1058,9 @@ def _run_liquidation_split(
 
     for raw_idx in indices:
         idx = int(raw_idx)
-        cash = _apply_funding_cost(cash=cash, states=states, arrays=arrays, idx=idx, model=model, fresh=fresh)
+        cash = _apply_funding_cost(
+            cash=cash, states=states, arrays=arrays, idx=idx, model=model, fresh=fresh
+        )
 
         for state in states:
             if not state.legs:
@@ -821,7 +1083,9 @@ def _run_liquidation_split(
                 )
                 if event is not None:
                     state_events.append(event)
-                    override_prices[leg.symbol] = _safe_float(event.get("liquidation_price"), leg.entry_price)
+                    override_prices[leg.symbol] = _safe_float(
+                        event.get("liquidation_price"), leg.entry_price
+                    )
             if state_events:
                 pre_equity = _portfolio_equity(cash, states, arrays, idx, fresh)
                 running_peak = max([STARTING_EQUITY, *equity_history, pre_equity])
@@ -899,9 +1163,13 @@ def _run_liquidation_split(
                     spread_return = _state_unrealized_pnl(arrays, state, idx, fresh) / max(
                         1e-9, float(state.gross_entry_notional)
                     )
-                    if float(state.spec.stop_loss_pct) > 0.0 and spread_return <= -float(state.spec.stop_loss_pct):
+                    if float(state.spec.stop_loss_pct) > 0.0 and spread_return <= -float(
+                        state.spec.stop_loss_pct
+                    ):
                         exit_reason = "stop"
-                    elif float(state.spec.take_profit_pct) > 0.0 and spread_return >= float(state.spec.take_profit_pct):
+                    elif float(state.spec.take_profit_pct) > 0.0 and spread_return >= float(
+                        state.spec.take_profit_pct
+                    ):
                         exit_reason = "take_profit"
                     elif state.bars_held >= int(state.spec.hold_bars):
                         exit_reason = "max_hold"
@@ -914,10 +1182,19 @@ def _run_liquidation_split(
                     open_ = _array_value(arrays, f"{prefix}_open", idx, close)
                     side = str(leg.side).upper()
                     if side == "LONG":
-                        state.best_price = max(float(state.best_price or leg.entry_price), high if math.isfinite(high) else close)
+                        state.best_price = max(
+                            float(state.best_price or leg.entry_price),
+                            high if math.isfinite(high) else close,
+                        )
                         stop_pct = float(state.position_stop_loss_pct)
-                        base_stop = float(leg.entry_price) * (1.0 - stop_pct) if stop_pct > 0.0 else -math.inf
-                        trail_stop = state.best_price * (1.0 - stop_pct) if stop_pct > 0.0 else -math.inf
+                        base_stop = (
+                            float(leg.entry_price) * (1.0 - stop_pct)
+                            if stop_pct > 0.0
+                            else -math.inf
+                        )
+                        trail_stop = (
+                            state.best_price * (1.0 - stop_pct) if stop_pct > 0.0 else -math.inf
+                        )
                         stop = max(base_stop, trail_stop)
                         take = (
                             float(leg.entry_price) * (1.0 + float(state.position_take_profit_pct))
@@ -933,10 +1210,19 @@ def _run_liquidation_split(
                         elif state.bars_held >= int(state.spec.hold_bars):
                             exit_reason = "max_hold"
                     elif side == "SHORT":
-                        state.best_price = min(float(state.best_price or leg.entry_price), low if math.isfinite(low) else close)
+                        state.best_price = min(
+                            float(state.best_price or leg.entry_price),
+                            low if math.isfinite(low) else close,
+                        )
                         stop_pct = float(state.position_stop_loss_pct)
-                        base_stop = float(leg.entry_price) * (1.0 + stop_pct) if stop_pct > 0.0 else math.inf
-                        trail_stop = state.best_price * (1.0 + stop_pct) if stop_pct > 0.0 else math.inf
+                        base_stop = (
+                            float(leg.entry_price) * (1.0 + stop_pct)
+                            if stop_pct > 0.0
+                            else math.inf
+                        )
+                        trail_stop = (
+                            state.best_price * (1.0 + stop_pct) if stop_pct > 0.0 else math.inf
+                        )
                         stop = min(base_stop, trail_stop)
                         take = (
                             float(leg.entry_price) * (1.0 - float(state.position_take_profit_pct))
@@ -969,19 +1255,29 @@ def _run_liquidation_split(
                 state.cooldown -= 1
                 continue
             if _is_spread_state(state):
-                long_symbol, short_symbol, direction, _reason = _spread_signal_for_state(fresh, state, arrays, idx)
+                long_symbol, short_symbol, direction, _reason = _spread_signal_for_state(
+                    fresh, state, arrays, idx
+                )
                 if not long_symbol or not short_symbol or not direction:
                     continue
                 hedge = max(0.0, float(state.spec.spread_hedge_ratio))
                 if direction == "LONG_SPREAD":
                     plans = (
                         (long_symbol, "BUY", max(0.0, float(state.spec.long_allocation_scale))),
-                        (short_symbol, "SELL", max(0.0, float(state.spec.short_allocation_scale)) * hedge),
+                        (
+                            short_symbol,
+                            "SELL",
+                            max(0.0, float(state.spec.short_allocation_scale)) * hedge,
+                        ),
                     )
                 else:
                     plans = (
                         (long_symbol, "SELL", max(0.0, float(state.spec.long_allocation_scale))),
-                        (short_symbol, "BUY", max(0.0, float(state.spec.short_allocation_scale)) * hedge),
+                        (
+                            short_symbol,
+                            "BUY",
+                            max(0.0, float(state.spec.short_allocation_scale)) * hedge,
+                        ),
                     )
                 expected_orders = 2
             else:
@@ -1013,7 +1309,9 @@ def _run_liquidation_split(
             ]
             if len(orders) != expected_orders:
                 continue
-            state.gross_entry_notional = sum(abs(float(order["qty"]) * float(order["fill"])) for order in orders)
+            state.gross_entry_notional = sum(
+                abs(float(order["qty"]) * float(order["fill"])) for order in orders
+            )
             for order in orders:
                 cash -= abs(float(order["qty"]) * float(order["fill"])) * float(order["fee_rate"])
                 state.legs.append(
@@ -1030,7 +1328,9 @@ def _run_liquidation_split(
             if not _is_spread_state(state) and state.legs:
                 leg = state.legs[0]
                 prefix = _symbol_prefix(fresh, leg.symbol)
-                state.position_stop_loss_pct = float(fresh._entry_stop_pct(state.spec, arrays, prefix, idx))
+                state.position_stop_loss_pct = float(
+                    fresh._entry_stop_pct(state.spec, arrays, prefix, idx)
+                )
                 state.position_take_profit_pct = float(state.spec.take_profit_pct)
                 state.best_price = float(leg.entry_price)
             state.bars_held = 0
@@ -1062,7 +1362,9 @@ def _run_liquidation_split(
         if equity_history:
             equity_history[-1] = float(cash)
 
-    metrics = fresh._metrics_from_equity_totals(equity_history, periods=int(fresh.HOURLY_PERIODS_PER_YEAR))
+    metrics = fresh._metrics_from_equity_totals(
+        equity_history, periods=int(fresh.HOURLY_PERIODS_PER_YEAR)
+    )
     summary = _split_margin_summary(
         split_name=split_name,
         snapshots=margin_snapshots,
@@ -1167,6 +1469,7 @@ def _build_leverage_result(
             "selection_inputs": ["train", "validation"],
             "locked_oos": "report_only_gate_only",
             "uses_locked_oos_for_selection": False,
+            **_reference_only_selection_policy({"candidate_source": str(candidate_source)}),
         },
     }
     result["train_val_score"] = _train_val_score(tuner, result)
@@ -1181,7 +1484,9 @@ def _performance_gates_against_current_base(
     current_base_result: Mapping[str, Any],
 ) -> dict[str, bool]:
     oos = dict(_split_payload(dict(result.get("splits") or {}), "oos").get("metrics") or {})
-    base_oos = dict(_split_payload(dict(current_base_result.get("splits") or {}), "oos").get("metrics") or {})
+    base_oos = dict(
+        _split_payload(dict(current_base_result.get("splits") or {}), "oos").get("metrics") or {}
+    )
     oos_return = _safe_float(oos.get("total_return"))
     oos_mdd = _safe_float(oos.get("max_drawdown"), 1.0)
     base_return = _safe_float(base_oos.get("total_return"))
@@ -1211,9 +1516,13 @@ def _train_validation_performance_gates(result: Mapping[str, Any]) -> dict[str, 
     }
 
 
-def _comparison_to_current_base(tuner: Any, result: Mapping[str, Any], current_base_result: Mapping[str, Any]) -> dict[str, Any]:
+def _comparison_to_current_base(
+    tuner: Any, result: Mapping[str, Any], current_base_result: Mapping[str, Any]
+) -> dict[str, Any]:
     oos = dict(_split_payload(dict(result.get("splits") or {}), "oos").get("metrics") or {})
-    base_oos = dict(_split_payload(dict(current_base_result.get("splits") or {}), "oos").get("metrics") or {})
+    base_oos = dict(
+        _split_payload(dict(current_base_result.get("splits") or {}), "oos").get("metrics") or {}
+    )
     oos_return = _safe_float(oos.get("total_return"))
     oos_mdd = _safe_float(oos.get("max_drawdown"), 1.0)
     base_return = _safe_float(base_oos.get("total_return"))
@@ -1235,9 +1544,23 @@ def _comparison_to_current_base(tuner: Any, result: Mapping[str, Any], current_b
     }
 
 
-def _apply_reference_gates(tuner: Any, results: list[dict[str, Any]], current_base_result: Mapping[str, Any]) -> None:
+def _apply_reference_gates(
+    tuner: Any,
+    results: list[dict[str, Any]],
+    current_base_result: Mapping[str, Any],
+    *,
+    tolerance: LiquidationTolerance | None = None,
+) -> None:
+    diagnostic_tolerance = tolerance or LiquidationTolerance()
     for result in results:
-        result["comparison_to_current_base"] = _comparison_to_current_base(tuner, result, current_base_result)
+        result.setdefault("selection_policy", {})
+        result["selection_policy"] = {
+            **dict(result.get("selection_policy") or {}),
+            **_reference_only_selection_policy(result),
+        }
+        result["comparison_to_current_base"] = _comparison_to_current_base(
+            tuner, result, current_base_result
+        )
         result["train_validation_performance_gates"] = _train_validation_performance_gates(result)
         result["performance_gates"] = _performance_gates_against_current_base(
             tuner=tuner,
@@ -1245,10 +1568,19 @@ def _apply_reference_gates(tuner: Any, results: list[dict[str, Any]], current_ba
             current_base_result=current_base_result,
         )
         result["strategy_validity_gate"] = _strategy_validity_passes(result)
+        result["strict_deploy_lane"] = _strict_deploy_lane(result)
+        result["diagnostic_nonfatal_lane"] = _diagnostic_nonfatal_lane(
+            result,
+            tolerance=diagnostic_tolerance,
+        )
         result["deployable_success"] = bool(
-            _strategy_validity_passes(result)
-            and _liquidation_safe_for_promotion(dict(result.get("liquidation_gates") or {}))
-            and all(bool(item) for item in dict(result.get("train_validation_performance_gates") or {}).values())
+            _selection_target_allowed(result)
+            and _strategy_validity_passes(result)
+            and bool(dict(result.get("strict_deploy_lane") or {}).get("promotion_allowed"))
+            and all(
+                bool(item)
+                for item in dict(result.get("train_validation_performance_gates") or {}).values()
+            )
             and all(bool(item) for item in dict(result.get("performance_gates") or {}).values())
         )
 
@@ -1308,9 +1640,14 @@ def _audit_candidate_seeds(integer_audit: Mapping[str, Any], *, limit: int) -> l
             )
         )
 
-    add("integer_audit_selected_by_train_val_stability", integer_audit.get("selected_by_train_val_stability"))
+    add(
+        "integer_audit_selected_by_train_val_stability",
+        integer_audit.get("selected_by_train_val_stability"),
+    )
     add("integer_audit_diagnostic_best_oos", integer_audit.get("diagnostic_best_oos"))
-    for idx, item in enumerate(list(integer_audit.get("diagnostic_quarantine") or [])[: max(0, int(limit))]):
+    for idx, item in enumerate(
+        list(integer_audit.get("diagnostic_quarantine") or [])[: max(0, int(limit))]
+    ):
         add(f"integer_audit_diagnostic_quarantine_{idx:02d}", item)
     return seeds
 
@@ -1397,7 +1734,9 @@ def _train_val_positive(item: Mapping[str, Any]) -> bool:
     splits = dict(item.get("splits") or {})
     train = dict(_split_payload(splits, "train").get("metrics") or {})
     val = dict(_split_payload(splits, VALIDATION_SPLIT).get("metrics") or {})
-    return _safe_float(train.get("total_return")) > 0.0 and _safe_float(val.get("total_return")) > 0.0
+    return (
+        _safe_float(train.get("total_return")) > 0.0 and _safe_float(val.get("total_return")) > 0.0
+    )
 
 
 def _selection_rank(item: Mapping[str, Any]) -> tuple[float, float, float, float]:
@@ -1417,9 +1756,12 @@ def _select_train_validation_candidate(
     *,
     tolerance: LiquidationTolerance,
 ) -> dict[str, Any]:
+    eligible = [dict(item) for item in results if _selection_target_allowed(item)]
+    if not eligible:
+        return {}
     train_val_safe = [
         dict(item)
-        for item in results
+        for item in eligible
         if _train_val_positive(item)
         and _split_within_liquidation_tolerance(
             _split_payload(dict(item.get("splits") or {}), "train"),
@@ -1430,7 +1772,7 @@ def _select_train_validation_candidate(
             tolerance=tolerance,
         )
     ]
-    selection_pool = train_val_safe or [dict(item) for item in results]
+    selection_pool = train_val_safe or eligible
     selected = max(selection_pool, key=_selection_rank, default={})
     if not selected:
         return {}
@@ -1440,10 +1782,165 @@ def _select_train_validation_candidate(
         "selection_inputs": ["train", "validation"],
         "locked_oos": "report_only_gate_only",
         "uses_locked_oos_for_selection": False,
+        "selection_target": True,
         "train_validation_positive_filter": bool(train_val_safe),
         "liquidation_tolerance": asdict(tolerance),
     }
     return selected
+
+
+def _split_liquidation_diagnostics(split_payload: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "liquidation_count": _liquidation_count_for_split(split_payload),
+        "minimum_margin_buffer": _safe_float(split_payload.get("minimum_margin_buffer"), 0.0),
+        "maximum_liquidation_event_drawdown": _safe_float(
+            split_payload.get("maximum_liquidation_event_drawdown"), 0.0
+        ),
+        "maximum_liquidation_equity_loss_fraction": _safe_float(
+            split_payload.get("maximum_liquidation_equity_loss_fraction"), 0.0
+        ),
+        "maximum_liquidation_recovery_bars": _safe_float(
+            split_payload.get("maximum_liquidation_recovery_bars"), 0.0
+        ),
+        "liquidation_recovery_observed": bool(split_payload.get("liquidation_recovery_observed")),
+    }
+
+
+def _diagnostic_nonfatal_item(
+    item: Mapping[str, Any],
+    *,
+    tolerance: LiquidationTolerance,
+) -> dict[str, Any]:
+    lane = _diagnostic_nonfatal_lane(item, tolerance=tolerance)
+    splits = dict(item.get("splits") or {})
+    split_diagnostics = {
+        split_name: {
+            **_split_liquidation_diagnostics(_split_payload(splits, split_name)),
+            **dict(dict(lane.get("split_status") or {}).get(split_name) or {}),
+        }
+        for split_name in ("train", VALIDATION_SPLIT, "oos")
+    }
+    return {
+        **lane,
+        "candidate_name": item.get("candidate_name"),
+        "candidate_source": item.get("candidate_source"),
+        "leverage": _safe_float(item.get("leverage")),
+        "split_diagnostics": split_diagnostics,
+    }
+
+
+def _split_metric_summary(split_payload: Mapping[str, Any]) -> dict[str, float]:
+    metrics = dict(split_payload.get("metrics") or {})
+    return {
+        "total_return": _safe_float(metrics.get("total_return")),
+        "max_drawdown": _safe_float(metrics.get("max_drawdown")),
+        "sharpe": _safe_float(metrics.get("sharpe")),
+        "sortino": _safe_float(metrics.get("sortino")),
+        "calmar": _safe_float(metrics.get("calmar")),
+    }
+
+
+def _diagnostic_high_leverage_item(
+    item: Mapping[str, Any],
+    *,
+    tolerance: LiquidationTolerance,
+) -> dict[str, Any]:
+    diagnostic = _diagnostic_nonfatal_item(item, tolerance=tolerance)
+    splits = dict(item.get("splits") or {})
+    diagnostic["split_metrics"] = {
+        split_name: _split_metric_summary(_split_payload(splits, split_name))
+        for split_name in ("train", VALIDATION_SPLIT, "oos")
+    }
+    diagnostic["selection_target"] = _selection_target_allowed(item)
+    return diagnostic
+
+
+def _strict_deploy_lane_payload(
+    *,
+    promoted_candidate: Mapping[str, Any],
+    highest_zero_liquidation_integer: Mapping[str, Any],
+    deployable_candidate_count: int,
+) -> dict[str, Any]:
+    return {
+        "lane": "strict_deploy",
+        "promotion_eligible": bool(promoted_candidate),
+        "promoted_candidate_name": promoted_candidate.get("candidate_name"),
+        "promoted_candidate_source": promoted_candidate.get("candidate_source"),
+        "promoted_leverage": _safe_float(promoted_candidate.get("leverage")),
+        "highest_zero_liquidation_integer": {
+            "candidate_name": highest_zero_liquidation_integer.get("candidate_name"),
+            "candidate_source": highest_zero_liquidation_integer.get("candidate_source"),
+            "leverage": _safe_float(highest_zero_liquidation_integer.get("leverage")),
+            "liquidation_gates": dict(
+                highest_zero_liquidation_integer.get("liquidation_gates") or {}
+            ),
+        }
+        if highest_zero_liquidation_integer
+        else {},
+        "deployable_candidate_count": int(deployable_candidate_count),
+        "promotion_rule": (
+            "train/validation/OOS liquidation_count must be zero, every split minimum "
+            "margin buffer must be positive, strategy-validity and train/validation "
+            "performance gates must pass, then locked-OOS is gate/report-only."
+        ),
+        "requires_liquidation_count_zero": True,
+        "requires_positive_min_margin_buffer": True,
+        "locked_oos_role": "gate_only_report_only_after_train_validation_freeze",
+    }
+
+
+def _diagnostic_nonfatal_lane_payload(
+    *,
+    results: list[Mapping[str, Any]],
+    tolerance: LiquidationTolerance,
+    report_limit: int,
+) -> dict[str, Any]:
+    diagnostic_items = [
+        _diagnostic_nonfatal_item(item, tolerance=tolerance)
+        for item in results
+        if any(
+            _liquidation_count_for_split(_split_payload(dict(item.get("splits") or {}), split)) > 0
+            for split in ("train", VALIDATION_SPLIT, "oos")
+        )
+    ]
+    diagnostic_items.sort(
+        key=lambda item: (
+            -_safe_float(item.get("leverage")),
+            str(item.get("candidate_name") or ""),
+        )
+    )
+    high_leverage_items = [
+        _diagnostic_high_leverage_item(item, tolerance=tolerance)
+        for item in results
+        if _selection_target_allowed(item)
+        and round(_safe_float(item.get("leverage"))) in {5, 6}
+        and abs(_safe_float(item.get("leverage")) - round(_safe_float(item.get("leverage"))))
+        <= 1e-9
+    ]
+    high_leverage_items.sort(
+        key=lambda item: (
+            -_safe_float(item.get("leverage")),
+            -_safe_float(item.get("total_liquidation_count")),
+            str(item.get("candidate_name") or ""),
+        )
+    )
+    return {
+        "lane": "diagnostic_nonfatal",
+        "diagnostic_only": True,
+        "promotion_eligible": False,
+        "live_promotion_distinct_from_strict_lane": True,
+        "liquidation_tolerance": asdict(tolerance),
+        "reported_fields": [
+            "liquidation_count",
+            "maximum_liquidation_event_drawdown",
+            "maximum_liquidation_equity_loss_fraction",
+            "maximum_liquidation_recovery_bars",
+            "minimum_margin_buffer",
+        ],
+        "candidate_count": len(diagnostic_items),
+        "results": diagnostic_items[: max(0, int(report_limit))],
+        "high_leverage_5x_6x_report": high_leverage_items[: max(0, int(report_limit))],
+    }
 
 
 def _markdown(payload: Mapping[str, Any]) -> str:
@@ -1455,6 +1952,8 @@ def _markdown(payload: Mapping[str, Any]) -> str:
     current = dict(payload.get("current_base_reference_result") or {})
     decision = dict(payload.get("decision") or {})
     retune_summary = dict(payload.get("retune_candidate_summary") or {})
+    strict_lane = dict(payload.get("strict_deploy_lane") or {})
+    diagnostic_lane = dict(payload.get("diagnostic_nonfatal_lane") or {})
 
     def _split_line(item: Mapping[str, Any], split: str) -> str:
         split_payload = _split_payload(dict(item.get("splits") or {}), split)
@@ -1508,6 +2007,13 @@ def _markdown(payload: Mapping[str, Any]) -> str:
         _split_line(selected, "train") if selected else "",
         _split_line(selected, VALIDATION_SPLIT) if selected else "",
         _split_line(selected, "oos") if selected else "",
+        "",
+        "## Promotion lanes",
+        "",
+        f"- strict lane promotion eligible: `{bool(strict_lane.get('promotion_eligible'))}`",
+        f"- strict lane rule: `{strict_lane.get('promotion_rule')}`",
+        f"- diagnostic nonfatal lane promotion eligible: `{bool(diagnostic_lane.get('promotion_eligible'))}`",
+        f"- diagnostic nonfatal candidates reported: `{int(diagnostic_lane.get('candidate_count') or 0)}`",
     ]
 
     if int(retune_summary.get("evaluated_result_count") or 0) > 0 or retuned or best_deployable:
@@ -1600,7 +2106,10 @@ def run_validation(args: argparse.Namespace) -> dict[str, Any]:
         raise RuntimeError(f"missing current-base sleeve specs: {missing}")
     specs = [specs_by_name[name] for name in CURRENT_BASE_SLEEVES]
 
-    leverage_values = [float(tuner.CURRENT_BASE_LEVERAGE), *[float(item) for item in range(1, int(args.max_leverage) + 1)]]
+    leverage_values = [
+        float(tuner.CURRENT_BASE_LEVERAGE),
+        *[float(item) for item in range(1, int(args.max_leverage) + 1)],
+    ]
     current_results = [
         _build_leverage_result(
             leverage=leverage,
@@ -1658,26 +2167,38 @@ def run_validation(args: argparse.Namespace) -> dict[str, Any]:
 
     by_leverage = {round(float(item["leverage"]), 9): item for item in current_results}
     current_base_result = dict(by_leverage.get(round(float(tuner.CURRENT_BASE_LEVERAGE), 9)) or {})
-    _apply_reference_gates(tuner, all_results, current_base_result)
+    _apply_reference_gates(tuner, all_results, current_base_result, tolerance=tolerance)
     current_base_result = dict(by_leverage.get(round(float(tuner.CURRENT_BASE_LEVERAGE), 9)) or {})
-    integer_grid = [item for item in current_results if abs(float(item["leverage"]) - round(float(item["leverage"]))) <= 1e-9]
+    integer_grid = [
+        item
+        for item in current_results
+        if abs(float(item["leverage"]) - round(float(item["leverage"]))) <= 1e-9
+    ]
     selected = _select_train_validation_leverage(integer_grid, tolerance=tolerance)
     forced_5x = dict(by_leverage.get(5.0) or {})
     zero_liq = [
         item
-        for item in integer_grid
-        if _strategy_validity_passes(item)
+        for item in all_results
+        if _selection_target_allowed(item)
+        and _strategy_validity_passes(item)
+        and abs(float(item["leverage"]) - round(float(item["leverage"]))) <= 1e-9
         and _liquidation_safe_for_promotion(dict(item.get("liquidation_gates") or {}))
     ]
-    highest_zero_liq = max(zero_liq, key=lambda item: float(item.get("leverage") or 0.0), default={})
+    highest_zero_liq = max(
+        zero_liq, key=lambda item: float(item.get("leverage") or 0.0), default={}
+    )
     retune_integer_results = [
         item
         for item in all_results
         if abs(float(item["leverage"]) - round(float(item["leverage"]))) <= 1e-9
         and str(item.get("candidate_source")) != "current_base_tuple"
     ]
-    selected_retuned = _select_train_validation_candidate(retune_integer_results, tolerance=tolerance)
-    deployable_candidates = [item for item in retune_integer_results if bool(item.get("deployable_success"))]
+    selected_retuned = _select_train_validation_candidate(
+        retune_integer_results, tolerance=tolerance
+    )
+    deployable_candidates = [
+        item for item in retune_integer_results if bool(item.get("deployable_success"))
+    ]
     best_deployable = max(deployable_candidates, key=_selection_rank, default={})
     forced_5x_success = bool(forced_5x.get("deployable_success"))
     selected_success = bool(selected.get("deployable_success"))
@@ -1714,6 +2235,29 @@ def run_validation(args: argparse.Namespace) -> dict[str, Any]:
         if selected_success
         else {}
     )
+    selection_provenance = {
+        "selection_inputs": ["train", "validation"],
+        "uses_locked_oos_for_selection": False,
+        "locked_oos_role": "gate_only_report_only_after_train_validation_freeze",
+        "candidate_freeze_before_locked_oos_gate": True,
+        "nested_or_equivalent_selection": "train_validation_rank_then_locked_oos_gate",
+        "ranking_function": (
+            "_selection_rank(train_val_score, train_total_return, validation_total_return, "
+            "leverage)"
+        ),
+        "selection_excludes_current_base_calendar_tuple": True,
+        "current_base_calendar_tuple_role": "hypothesis_reference_only",
+    }
+    strict_deploy_lane = _strict_deploy_lane_payload(
+        promoted_candidate=promoted_candidate,
+        highest_zero_liquidation_integer=highest_zero_liq,
+        deployable_candidate_count=len(deployable_candidates),
+    )
+    diagnostic_nonfatal_lane = _diagnostic_nonfatal_lane_payload(
+        results=all_results,
+        tolerance=tolerance,
+        report_limit=int(args.retune_report_limit),
+    )
     payload = {
         "artifact_kind": "profit_moonshot_liquidation_aware_validation",
         "generated_at_utc": _utc_now_iso(),
@@ -1730,31 +2274,46 @@ def run_validation(args: argparse.Namespace) -> dict[str, Any]:
             "promotion_requires_positive_train_validation_return": True,
             "promotion_requires_strategy_validity": True,
             "calendar_primary_alpha_rejected": True,
+            "invalid_current_base_calendar_tuple_role": "hypothesis_reference_only",
+            "current_base_is_selection_target": False,
+            "strict_deploy_lane": "zero_liquidation_positive_margin_buffer_promotional",
+            "diagnostic_nonfatal_lane": "separate_report_only_non_promotional",
             "maximum_oos_mdd": tuner.MAX_ACCEPTABLE_OOS_MDD,
             "memory_budget_bytes": PORTFOLIO_FOLLOWUP_EXPLICIT_BUDGET_BYTES,
         },
         "source_references": dict(BINANCE_SOURCE_REFS),
-        "margin_model": {**asdict(model), "liquidation_reserve_rate": model.liquidation_reserve_rate},
+        "margin_model": {
+            **asdict(model),
+            "liquidation_reserve_rate": model.liquidation_reserve_rate,
+        },
         "current_base_artifact": str(Path(args.current_base_artifact)),
         "integer_audit_artifact": str(Path(args.integer_audit_artifact)),
         "current_base_source_metrics": dict(current_base.get("metrics") or {}),
         "baseline_preservation": {
-            "pushed_green_handoff_head": "77f10d54174628c24f1a6bbba34a74505a2a40b5",
+            "pushed_green_handoff_head": "7e451311757a1ce0e43bebaec0a24b3746dbcb65",
             "performance_baseline_commit": "02f4520cf906f48089b8852c2651a0f1e4bd0c1c",
             "comparison_baseline": "liquidation_aware_current_base_replay",
             "baseline_preserved": True,
         },
         "integer_audit_forced_current_base_row": dict(
-            ((integer_audit.get("runs") or {}).get("alpha_v2_top40") or {}).get("forced_current_base_integer_row") or {}
+            ((integer_audit.get("runs") or {}).get("alpha_v2_top40") or {}).get(
+                "forced_current_base_integer_row"
+            )
+            or {}
         ),
         "current_base_reference_result": current_base_result,
         "forced_5x": forced_5x,
         "integer_grid_results": integer_grid,
         "selected_by_train_validation": selected,
         "selected_by_train_validation_retune": selected_retuned,
+        "selection_provenance": selection_provenance,
         "best_deployable_train_validation_retune": best_deployable,
         "promoted_candidate": promoted_candidate,
-        "retune_results": sorted(retune_integer_results, key=_selection_rank, reverse=True)[: int(args.retune_report_limit)],
+        "strict_deploy_lane": strict_deploy_lane,
+        "diagnostic_nonfatal_lane": diagnostic_nonfatal_lane,
+        "retune_results": sorted(retune_integer_results, key=_selection_rank, reverse=True)[
+            : int(args.retune_report_limit)
+        ],
         "retune_candidate_summary": {
             "candidate_seed_count": len(candidate_seeds),
             "evaluated_result_count": len(retune_integer_results),
@@ -1763,14 +2322,18 @@ def run_validation(args: argparse.Namespace) -> dict[str, Any]:
         },
         "highest_zero_liquidation_integer": highest_zero_liq,
         "data_metadata": data_metadata,
-        "memory_policy": memory_policy_payload(budget_bytes=PORTFOLIO_FOLLOWUP_EXPLICIT_BUDGET_BYTES),
+        "memory_policy": memory_policy_payload(
+            budget_bytes=PORTFOLIO_FOLLOWUP_EXPLICIT_BUDGET_BYTES
+        ),
         "memory_summary": {
             "peak_rss_mib": _rss_mib(),
             "under_8gib": _rss_mib() * 1024.0 * 1024.0 < PORTFOLIO_FOLLOWUP_EXPLICIT_BUDGET_BYTES,
         },
         "decision": {
             "outcome": outcome,
-            "deployable_improvement": bool(forced_5x_success or selected_success or retuned_success),
+            "deployable_improvement": bool(
+                forced_5x_success or selected_success or retuned_success
+            ),
             "selected_integer_deployable": selected_success,
             "reselected_deployable": retuned_success,
             "forced_5x_deployable": forced_5x_success,
@@ -1789,13 +2352,21 @@ def write_outputs(payload: Mapping[str, Any], output_dir: Path) -> dict[str, Pat
     md_path = output_dir / f"liquidation_aware_current_base_{timestamp}.md"
     latest_json = output_dir / "liquidation_aware_current_base_latest.json"
     latest_md = output_dir / "liquidation_aware_current_base_latest.md"
-    text = json.dumps(_json_safe(payload), ensure_ascii=False, indent=2, sort_keys=True, default=str) + "\n"
+    text = (
+        json.dumps(_json_safe(payload), ensure_ascii=False, indent=2, sort_keys=True, default=str)
+        + "\n"
+    )
     json_path.write_text(text, encoding="utf-8")
     latest_json.write_text(text, encoding="utf-8")
     markdown = _markdown(payload)
     md_path.write_text(markdown, encoding="utf-8")
     latest_md.write_text(markdown, encoding="utf-8")
-    return {"json": latest_json, "markdown": latest_md, "timestamped_json": json_path, "timestamped_markdown": md_path}
+    return {
+        "json": latest_json,
+        "markdown": latest_md,
+        "timestamped_json": json_path,
+        "timestamped_markdown": md_path,
+    }
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1868,7 +2439,9 @@ def main(argv: list[str] | None = None) -> int:
         paths = write_outputs(payload, output_dir)
     except Exception as exc:
         if not finalized:
-            memory_guard.finalize(status="failed", error=str(exc), context={"script": Path(__file__).name})
+            memory_guard.finalize(
+                status="failed", error=str(exc), context={"script": Path(__file__).name}
+            )
         raise
     finally:
         memory_guard.release()

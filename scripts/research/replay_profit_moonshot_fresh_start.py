@@ -54,8 +54,7 @@ from scripts.research.replay_eth_shock_filters import (  # noqa: E402
 )
 
 DEFAULT_OUTPUT_DIR = (
-    REPO_ROOT
-    / "var/reports/profit_moonshot_20260501/current_tail_20260507/fresh_overhaul"
+    REPO_ROOT / "var/reports/profit_moonshot_20260501/current_tail_20260507/fresh_overhaul"
 )
 DEFAULT_SYMBOLS = ("BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "TRX/USDT")
 CURRENT_CHAMPION_OOS_RETURN = 0.012181
@@ -77,6 +76,22 @@ FEATURE_VALUE_COLUMNS = (
     "taker_sell_quote_volume",
     "liquidation_long_notional",
     "liquidation_short_notional",
+)
+NON_CALENDAR_SPEC_FAMILIES = frozenset(
+    {
+        "beta_residual_reversion",
+        "dispersion_compression_breakout_unwind",
+        "funding_oi_exhaustion_reversal",
+        "state_distilled_leadership_unwind",
+        "state_distilled_crowded_unwind_v2",
+        "vol_regime_margin_scaled_momentum",
+    }
+)
+NON_CALENDAR_FIELD_NAMES = (
+    "entry_hours",
+    "entry_days_of_month",
+    "calendar_long_months",
+    "calendar_short_months",
 )
 
 
@@ -337,7 +352,9 @@ def _load_symbol_hourly(
                 end=window_end,
             )
             frames.append(monthly_frame)
-            missing_days = _incomplete_hourly_days(monthly_frame, start=window_start, end=window_end)
+            missing_days = _incomplete_hourly_days(
+                monthly_frame, start=window_start, end=window_end
+            )
             if missing_days:
                 frames.extend(
                     _load_daily_materialized_hourly(
@@ -399,12 +416,16 @@ def _load_feature_hourly(
         if column not in aligned.columns:
             dtype = pl.Int64 if column == "timestamp_ms" else pl.Float64
             aligned = aligned.with_columns(pl.lit(None, dtype=dtype).alias(column))
-    aligned = aligned.select(["timestamp_ms", *FEATURE_VALUE_COLUMNS]).filter(pl.col("timestamp_ms").is_not_null())
+    aligned = aligned.select(["timestamp_ms", *FEATURE_VALUE_COLUMNS]).filter(
+        pl.col("timestamp_ms").is_not_null()
+    )
     metadata = {
         "symbol": symbol,
         "rows": int(aligned.height),
         "funding_rows": int(aligned.select(pl.col("funding_rate").is_not_null().sum()).item()),
-        "open_interest_rows": int(aligned.select(pl.col("open_interest").is_not_null().sum()).item()),
+        "open_interest_rows": int(
+            aligned.select(pl.col("open_interest").is_not_null().sum()).item()
+        ),
         "taker_flow_rows": int(
             aligned.select(
                 (
@@ -415,9 +436,13 @@ def _load_feature_hourly(
         ),
     }
     if aligned.is_empty():
-        return pl.DataFrame({"datetime": []}, schema={"datetime": pl.Datetime(time_unit="ms")}), metadata
+        return pl.DataFrame(
+            {"datetime": []}, schema={"datetime": pl.Datetime(time_unit="ms")}
+        ), metadata
     hourly = (
-        aligned.with_columns(pl.from_epoch(pl.col("timestamp_ms"), time_unit="ms").alias("datetime"))
+        aligned.with_columns(
+            pl.from_epoch(pl.col("timestamp_ms"), time_unit="ms").alias("datetime")
+        )
         .sort("datetime")
         .group_by_dynamic("datetime", every="1h", period="1h", closed="left", label="left")
         .agg(
@@ -428,8 +453,12 @@ def _load_feature_hourly(
                 pl.col("taker_sell_base_volume").sum().alias(f"{compact}_taker_sell_base_volume"),
                 pl.col("taker_buy_quote_volume").sum().alias(f"{compact}_taker_buy_quote_volume"),
                 pl.col("taker_sell_quote_volume").sum().alias(f"{compact}_taker_sell_quote_volume"),
-                pl.col("liquidation_long_notional").sum().alias(f"{compact}_liquidation_long_notional"),
-                pl.col("liquidation_short_notional").sum().alias(f"{compact}_liquidation_short_notional"),
+                pl.col("liquidation_long_notional")
+                .sum()
+                .alias(f"{compact}_liquidation_long_notional"),
+                pl.col("liquidation_short_notional")
+                .sum()
+                .alias(f"{compact}_liquidation_short_notional"),
             ]
         )
         .sort("datetime")
@@ -593,13 +622,20 @@ def _joined_panel(
             }
             return panel, data_metadata
 
-    panels = [_load_symbol_hourly(market_root=market_root, exchange=exchange, symbol=s, start=start, end=end) for s in symbols]
+    panels = [
+        _load_symbol_hourly(
+            market_root=market_root, exchange=exchange, symbol=s, start=start, end=end
+        )
+        for s in symbols
+    ]
     panel = panels[0]
     for frame in panels[1:]:
         panel = panel.join(frame, on="datetime", how="inner")
     feature_meta: list[dict[str, Any]] = []
     for symbol in symbols:
-        features, meta = _load_feature_hourly(market_root=market_root, exchange=exchange, symbol=symbol, start=start, end=end)
+        features, meta = _load_feature_hourly(
+            market_root=market_root, exchange=exchange, symbol=symbol, start=start, end=end
+        )
         feature_meta.append(meta)
         if not features.is_empty():
             panel = panel.join(features, on="datetime", how="left")
@@ -672,11 +708,23 @@ def _resolve_calendar_symbol(symbols: tuple[str, ...], target: str) -> str:
     return ""
 
 
+def _non_calendar_spec_calendar_fields(spec: FreshSpec) -> list[str]:
+    """Return calendar entry fields that would make a state-distilled spec invalid."""
+    if spec.family not in NON_CALENDAR_SPEC_FAMILIES:
+        return []
+    violations: list[str] = []
+    for field_name in NON_CALENDAR_FIELD_NAMES:
+        if tuple(getattr(spec, field_name, ()) or ()):
+            violations.append(field_name)
+    return violations
+
 
 def _to_float_array(panel: pl.DataFrame, column: str) -> np.ndarray:
     if column not in panel.columns:
         return np.full(panel.height, np.nan, dtype=float)
-    return np.asarray([float(v) if v is not None else np.nan for v in panel[column].to_list()], dtype=float)
+    return np.asarray(
+        [float(v) if v is not None else np.nan for v in panel[column].to_list()], dtype=float
+    )
 
 
 def _pct_change(values: np.ndarray, lookback: int) -> np.ndarray:
@@ -735,7 +783,9 @@ def _build_arrays(panel: pl.DataFrame, symbols: list[str]) -> dict[str, Any]:
     datetimes = panel["datetime"].to_list()
     arrays: dict[str, Any] = {
         "datetime": datetimes,
-        "timestamp": np.asarray([int(dt.replace(tzinfo=UTC).timestamp()) for dt in datetimes], dtype=np.int64),
+        "timestamp": np.asarray(
+            [int(dt.replace(tzinfo=UTC).timestamp()) for dt in datetimes], dtype=np.int64
+        ),
         "symbols": tuple(symbols),
         "symbol_prefixes": tuple(_symbol_prefix(symbol) for symbol in symbols),
     }
@@ -798,7 +848,9 @@ def _build_arrays(panel: pl.DataFrame, symbols: list[str]) -> dict[str, Any]:
             prefix = _compact(symbol).lower()
             residual = arrays[f"{prefix}_ret_{lookback}h"] - market_ret
             arrays[f"{prefix}_resid_{lookback}h"] = residual
-            arrays[f"{prefix}_resid_z_{lookback}h"] = _rolling_zscore(residual, max(24, lookback * 4))
+            arrays[f"{prefix}_resid_z_{lookback}h"] = _rolling_zscore(
+                residual, max(24, lookback * 4)
+            )
     return arrays
 
 
@@ -833,6 +885,38 @@ def _entry_stop_pct(spec: FreshSpec, arrays: dict[str, Any], prefix: str, idx: i
     if spec.trailing_stop_cap_pct > 0.0:
         stop_pct = min(stop_pct, float(spec.trailing_stop_cap_pct))
     return max(0.0, float(stop_pct))
+
+
+def _state_exposure_scale(
+    spec: FreshSpec, arrays: dict[str, Any], symbol: str, side: str, idx: int
+) -> float:
+    """Scale signal exposure for explicit vol/regime/margin-buffer research specs."""
+    if spec.family != "vol_regime_margin_scaled_momentum":
+        return 1.0
+    prefix = _symbol_prefix(symbol)
+    scale = 1.0
+    if spec.max_rv > 0.0:
+        rv = _array_value(arrays, f"{prefix}_rv_{spec.rv_lookback_bars}h", idx)
+        if not math.isfinite(rv) or rv <= 0.0:
+            return 0.0
+        scale *= min(1.0, max(0.25, float(spec.max_rv) / rv))
+    market_lookback = max(1, int(spec.adaptive_lookback_bars or spec.lookback_bars))
+    market_ret = _array_value(arrays, f"market_ret_{market_lookback}h", idx)
+    if spec.broad_min_abs > 0.0 and math.isfinite(market_ret):
+        adverse = -market_ret if side == "LONG" else market_ret
+        if adverse > 0.0:
+            scale *= max(0.30, 1.0 - min(0.70, adverse / float(spec.broad_min_abs)))
+    if spec.funding_abs_cap > 0.0:
+        funding = _array_value(arrays, f"{prefix}_funding_ffill", idx)
+        if not math.isfinite(funding):
+            return 0.0
+        funding_load = abs(funding) / float(spec.funding_abs_cap)
+        if funding_load > 1.0:
+            scale *= max(0.25, 1.0 / funding_load)
+    notional_scale = _side_allocation_scale(spec, side)
+    if spec.sharpe_rank_min > 0.0 and notional_scale > spec.sharpe_rank_min:
+        scale *= max(0.25, float(spec.sharpe_rank_min) / notional_scale)
+    return max(0.0, min(1.0, scale))
 
 
 def _entry_window_block_reason(spec: FreshSpec, arrays: dict[str, Any], idx: int) -> str:
@@ -870,7 +954,9 @@ def _calendar_veto_reason(
     if spec.calendar_veto_market_ret_abs > 0.0:
         market_lookback = max(1, int(spec.adaptive_lookback_bars or spec.lookback_bars))
         market_ret = _array_value(arrays, f"market_ret_{market_lookback}h", idx)
-        if math.isfinite(market_ret) and abs(market_ret) >= float(spec.calendar_veto_market_ret_abs):
+        if math.isfinite(market_ret) and abs(market_ret) >= float(
+            spec.calendar_veto_market_ret_abs
+        ):
             return "calendar_market_extreme_veto"
     if spec.calendar_veto_flow_abs > 0.0:
         flow_lookback = max(1, int(spec.flow_lookback_bars or 6))
@@ -900,7 +986,9 @@ def _state_distilled_leadership_unwind_signal(
         return "", "", blocked
 
     symbols = tuple(arrays["symbols"])
-    prefixes = tuple(arrays.get("symbol_prefixes") or tuple(_symbol_prefix(symbol) for symbol in symbols))
+    prefixes = tuple(
+        arrays.get("symbol_prefixes") or tuple(_symbol_prefix(symbol) for symbol in symbols)
+    )
     lookback = max(1, int(spec.lookback_bars))
     fast_lookback = max(1, int(spec.adaptive_lookback_bars or spec.lookback_bars))
     flow_lookback = max(1, int(spec.flow_lookback_bars or 6))
@@ -951,7 +1039,9 @@ def _state_distilled_leadership_unwind_signal(
                 "flow": flow_score,
                 "funding": funding_score,
                 "oi_delta": oi_score,
-                "leadership_score": float(ret) + 0.01 * float(resid_z) + 0.05 * max(0.0, flow_score),
+                "leadership_score": float(ret)
+                + 0.01 * float(resid_z)
+                + 0.05 * max(0.0, flow_score),
                 "unwind_score": abs(float(ret))
                 + 0.01 * abs(float(resid_z))
                 + 0.05 * max(0.0, -flow_score)
@@ -972,8 +1062,7 @@ def _state_distilled_leadership_unwind_signal(
         return "", "", "state_distilled_rank_gap_too_small"
 
     market_is_bad = (
-        math.isfinite(market_ret)
-        and market_ret <= -float(spec.broad_min_abs)
+        math.isfinite(market_ret) and market_ret <= -float(spec.broad_min_abs)
         if spec.broad_min_abs > 0.0
         else math.isfinite(market_ret) and market_ret < 0.0
     )
@@ -982,7 +1071,9 @@ def _state_distilled_leadership_unwind_signal(
         or spec.broad_min_abs <= 0.0
         or market_ret >= -float(spec.broad_min_abs)
     )
-    fast_market_is_good_enough = not math.isfinite(fast_market_ret) or fast_market_ret >= -float(spec.broad_min_abs)
+    fast_market_is_good_enough = not math.isfinite(fast_market_ret) or fast_market_ret >= -float(
+        spec.broad_min_abs
+    )
 
     long_ok = (
         spec.allow_long
@@ -1029,18 +1120,153 @@ def _state_distilled_leadership_unwind_signal(
     return "", "", "signal_missing"
 
 
+def _residual_dispersion(
+    arrays: dict[str, Any], symbols: tuple[str, ...], lookback: int, idx: int
+) -> float:
+    values: list[float] = []
+    for symbol in symbols:
+        prefix = _symbol_prefix(symbol)
+        resid_z = _array_value(arrays, f"{prefix}_resid_z_{lookback}h", idx)
+        if math.isfinite(resid_z):
+            values.append(float(resid_z))
+    if len(values) < 2:
+        return np.nan
+    return max(values) - min(values)
+
+
+def _state_distilled_crowded_unwind_v2_signal(
+    spec: FreshSpec, arrays: dict[str, Any], idx: int
+) -> tuple[str, str, str]:
+    """Short a crowded non-BTC leader when observable state starts unwinding.
+
+    This is the second non-calendar state-distilled pass.  It keeps the old
+    calendar tuple as a design teacher only, then trades a current market-state
+    mechanism: high residual/return leadership plus funding/OI crowding, with
+    either fast-momentum weakening, taker-flow reversal, or residual-rank-gap
+    compression.  Month/day/hour entry fields are explicitly rejected.
+    """
+    if _non_calendar_spec_calendar_fields(spec):
+        return "", "", "non_calendar_calendar_field_block"
+
+    symbols = tuple(arrays["symbols"])
+    prefixes = tuple(
+        arrays.get("symbol_prefixes") or tuple(_symbol_prefix(symbol) for symbol in symbols)
+    )
+    lookback = max(1, int(spec.lookback_bars))
+    fast_lookback = max(1, int(spec.adaptive_lookback_bars or 24))
+    flow_lookback = max(1, int(spec.flow_lookback_bars or 6))
+    oi_lookback = max(1, int(spec.sharpe_lookback_bars or spec.flow_lookback_bars or 12))
+    resid_threshold = max(0.0, float(spec.threshold))
+    min_abs_return = max(0.0, float(spec.min_abs_return))
+    funding_min = max(0.0, float(spec.funding_rank_min))
+    oi_min = max(0.0, float(spec.oi_rank_min))
+    flow_reversal_min = max(0.0, float(spec.flow_threshold))
+    compression_gap_max = max(0.0, float(spec.sharpe_rank_min))
+    fast_market_ret = _array_value(arrays, f"market_ret_{fast_lookback}h", idx)
+    broad_ok = (
+        spec.broad_min_abs <= 0.0
+        or not math.isfinite(fast_market_ret)
+        or fast_market_ret <= float(spec.broad_min_abs)
+    )
+
+    states: list[dict[str, float | str]] = []
+    for symbol, prefix in zip(symbols, prefixes, strict=True):
+        if _compact(symbol) == "BTCUSDT":
+            continue
+        close = _array_value(arrays, f"{prefix}_close", idx)
+        if not math.isfinite(close) or close <= 0.0:
+            continue
+        if spec.max_rv > 0.0:
+            rv = _array_value(arrays, f"{prefix}_rv_{spec.rv_lookback_bars}h", idx)
+            if not math.isfinite(rv) or rv > float(spec.max_rv):
+                continue
+        ret = _array_value(arrays, f"{prefix}_ret_{lookback}h", idx)
+        fast_ret = _array_value(arrays, f"{prefix}_ret_{fast_lookback}h", idx)
+        resid_z = _array_value(arrays, f"{prefix}_resid_z_{lookback}h", idx)
+        funding = _array_value(arrays, f"{prefix}_funding_ffill", idx)
+        oi_delta = _array_value(arrays, f"{prefix}_oi_delta_{oi_lookback}h", idx)
+        flow = _array_value(arrays, f"{prefix}_flow_imbalance_{flow_lookback}h", idx)
+        if not math.isfinite(ret) or not math.isfinite(resid_z):
+            continue
+        states.append(
+            {
+                "symbol": symbol,
+                "ret": float(ret),
+                "fast_ret": float(fast_ret) if math.isfinite(fast_ret) else float(ret),
+                "resid_z": float(resid_z),
+                "funding": float(funding) if math.isfinite(funding) else 0.0,
+                "oi_delta": float(oi_delta) if math.isfinite(oi_delta) else 0.0,
+                "flow": float(flow) if math.isfinite(flow) else 0.0,
+            }
+        )
+
+    if len(states) < 2:
+        return "", "", "state_crowded_universe_too_small"
+
+    states.sort(key=lambda row: float(row["resid_z"]), reverse=True)
+    top_resid = float(states[0]["resid_z"])
+    second_resid = float(states[1]["resid_z"])
+    leadership_gap = top_resid - second_resid
+    candidates: list[tuple[float, str, str]] = []
+    for row in states:
+        ret = float(row["ret"])
+        fast_ret = float(row["fast_ret"])
+        resid_z = float(row["resid_z"])
+        funding = float(row["funding"])
+        oi_delta = float(row["oi_delta"])
+        flow = float(row["flow"])
+        overheated = ret >= min_abs_return and resid_z >= resid_threshold
+        crowding_checks = []
+        if funding_min > 0.0:
+            crowding_checks.append(funding >= funding_min)
+        if oi_min > 0.0:
+            crowding_checks.append(oi_delta >= oi_min)
+        crowded = any(crowding_checks) if crowding_checks else True
+        fast_weakening = fast_ret <= max(0.0, ret * 0.50)
+        flow_reversal = flow_reversal_min > 0.0 and flow <= -flow_reversal_min
+        gap_compression = compression_gap_max > 0.0 and leadership_gap <= compression_gap_max
+        if (
+            spec.allow_short
+            and broad_ok
+            and overheated
+            and crowded
+            and (fast_weakening or flow_reversal or gap_compression)
+        ):
+            score = (
+                resid_z
+                + abs(ret) * 10.0
+                + max(0.0, funding) * 1_000.0
+                + max(0.0, oi_delta)
+                + max(0.0, -flow)
+                + (0.25 if gap_compression else 0.0)
+            )
+            candidates.append((score, str(row["symbol"]), "SHORT"))
+
+    if not candidates:
+        return "", "", "signal_missing"
+    candidates.sort(reverse=True, key=lambda item: item[0])
+    _, symbol, side = candidates[0]
+    return symbol, side, ""
+
+
 def _candidate_signal(spec: FreshSpec, arrays: dict[str, Any], idx: int) -> tuple[str, str, str]:
     blocked = _entry_window_block_reason(spec, arrays, idx)
     if blocked:
         return "", "", blocked
     symbols = tuple(arrays["symbols"])
-    prefixes = tuple(arrays.get("symbol_prefixes") or tuple(_symbol_prefix(symbol) for symbol in symbols))
+    prefixes = tuple(
+        arrays.get("symbol_prefixes") or tuple(_symbol_prefix(symbol) for symbol in symbols)
+    )
     lookback = int(spec.lookback_bars)
     market_ret = _array_value(arrays, f"market_ret_{lookback}h", idx)
     if spec.family == "state_distilled_leadership_unwind":
         return _state_distilled_leadership_unwind_signal(spec, arrays, idx)
-    if spec.family != "calendar_rotation" and spec.broad_min_abs > 0.0 and (
-        not math.isfinite(market_ret) or abs(market_ret) < spec.broad_min_abs
+    if spec.family == "state_distilled_crowded_unwind_v2":
+        return _state_distilled_crowded_unwind_v2_signal(spec, arrays, idx)
+    if (
+        spec.family != "calendar_rotation"
+        and spec.broad_min_abs > 0.0
+        and (not math.isfinite(market_ret) or abs(market_ret) < spec.broad_min_abs)
     ):
         return "", "", "broad_move_missing"
     signal_month = int(arrays["datetime"][idx].replace(tzinfo=UTC).month)
@@ -1090,19 +1316,41 @@ def _candidate_signal(spec: FreshSpec, arrays: dict[str, Any], idx: int) -> tupl
             continue
 
         funding = _array_value(arrays, f"{prefix}_funding_ffill", idx)
-        if spec.funding_abs_cap > 0.0 and (not math.isfinite(funding) or abs(funding) > spec.funding_abs_cap):
+        if spec.funding_abs_cap > 0.0 and (
+            not math.isfinite(funding) or abs(funding) > spec.funding_abs_cap
+        ):
             continue
         if spec.family == "residual_reversion":
             resid_z = _array_value(arrays, f"{prefix}_resid_z_{lookback}h", idx)
-            if spec.allow_long and math.isfinite(resid_z) and resid_z <= -spec.threshold and ret <= -spec.min_abs_return:
+            if (
+                spec.allow_long
+                and math.isfinite(resid_z)
+                and resid_z <= -spec.threshold
+                and ret <= -spec.min_abs_return
+            ):
                 candidates.append((abs(resid_z), symbol, "LONG"))
-            if spec.allow_short and math.isfinite(resid_z) and resid_z >= spec.threshold and ret >= spec.min_abs_return:
+            if (
+                spec.allow_short
+                and math.isfinite(resid_z)
+                and resid_z >= spec.threshold
+                and ret >= spec.min_abs_return
+            ):
                 candidates.append((abs(resid_z), symbol, "SHORT"))
         elif spec.family == "residual_momentum":
             resid_z = _array_value(arrays, f"{prefix}_resid_z_{lookback}h", idx)
-            if spec.allow_long and math.isfinite(resid_z) and resid_z >= spec.threshold and ret >= spec.min_abs_return:
+            if (
+                spec.allow_long
+                and math.isfinite(resid_z)
+                and resid_z >= spec.threshold
+                and ret >= spec.min_abs_return
+            ):
                 candidates.append((abs(resid_z) + abs(ret), symbol, "LONG"))
-            if spec.allow_short and math.isfinite(resid_z) and resid_z <= -spec.threshold and ret <= -spec.min_abs_return:
+            if (
+                spec.allow_short
+                and math.isfinite(resid_z)
+                and resid_z <= -spec.threshold
+                and ret <= -spec.min_abs_return
+            ):
                 candidates.append((abs(resid_z) + abs(ret), symbol, "SHORT"))
         elif spec.family == "state_momentum_proxy":
             primary_symbol = spec.primary_symbol or "TRXUSDT"
@@ -1132,7 +1380,10 @@ def _candidate_signal(spec: FreshSpec, arrays: dict[str, Any], idx: int) -> tupl
                         regime_ret >= spec.min_abs_return
                         and (
                             spec.sharpe_rank_min <= 0.0
-                            or (math.isfinite(regime_resid_z) and regime_resid_z >= spec.sharpe_rank_min)
+                            or (
+                                math.isfinite(regime_resid_z)
+                                and regime_resid_z >= spec.sharpe_rank_min
+                            )
                         )
                     )
                 )
@@ -1150,13 +1401,18 @@ def _candidate_signal(spec: FreshSpec, arrays: dict[str, Any], idx: int) -> tupl
                         regime_ret <= -spec.min_abs_return
                         and (
                             spec.sharpe_rank_min <= 0.0
-                            or (math.isfinite(regime_resid_z) and regime_resid_z <= -spec.sharpe_rank_min)
+                            or (
+                                math.isfinite(regime_resid_z)
+                                and regime_resid_z <= -spec.sharpe_rank_min
+                            )
                         )
                     )
                 )
                 and (spec.flow_threshold <= 0.0 or flow_score <= -spec.flow_threshold)
             ):
-                candidates.append((abs(resid_z) + abs(ret) + max(0.0, -flow_score), symbol, "SHORT"))
+                candidates.append(
+                    (abs(resid_z) + abs(ret) + max(0.0, -flow_score), symbol, "SHORT")
+                )
         elif spec.family == "cross_momentum":
             if not math.isfinite(ret) or abs(ret) < spec.min_abs_return:
                 continue
@@ -1209,26 +1465,111 @@ def _candidate_signal(spec: FreshSpec, arrays: dict[str, Any], idx: int) -> tupl
             if not math.isfinite(funding):
                 continue
             resid_z = _array_value(arrays, f"{prefix}_resid_z_{lookback}h", idx)
-            if spec.allow_short and funding >= spec.funding_rank_min and resid_z >= spec.threshold and ret >= spec.min_abs_return:
+            if (
+                spec.allow_short
+                and funding >= spec.funding_rank_min
+                and resid_z >= spec.threshold
+                and ret >= spec.min_abs_return
+            ):
                 candidates.append((abs(funding) + abs(resid_z) / 100.0, symbol, "SHORT"))
-            if spec.allow_long and funding <= -spec.funding_rank_min and resid_z <= -spec.threshold and ret <= -spec.min_abs_return:
+            if (
+                spec.allow_long
+                and funding <= -spec.funding_rank_min
+                and resid_z <= -spec.threshold
+                and ret <= -spec.min_abs_return
+            ):
                 candidates.append((abs(funding) + abs(resid_z) / 100.0, symbol, "LONG"))
         elif spec.family == "funding_carry_momentum":
             if not math.isfinite(funding):
                 continue
             resid_z = _array_value(arrays, f"{prefix}_resid_z_{lookback}h", idx)
-            if spec.allow_long and funding >= spec.funding_rank_min and resid_z >= spec.threshold and ret >= spec.min_abs_return:
+            if (
+                spec.allow_long
+                and funding >= spec.funding_rank_min
+                and resid_z >= spec.threshold
+                and ret >= spec.min_abs_return
+            ):
                 candidates.append((abs(funding) + abs(resid_z) / 100.0 + abs(ret), symbol, "LONG"))
-            if spec.allow_short and funding <= -spec.funding_rank_min and resid_z <= -spec.threshold and ret <= -spec.min_abs_return:
+            if (
+                spec.allow_short
+                and funding <= -spec.funding_rank_min
+                and resid_z <= -spec.threshold
+                and ret <= -spec.min_abs_return
+            ):
                 candidates.append((abs(funding) + abs(resid_z) / 100.0 + abs(ret), symbol, "SHORT"))
         elif spec.family == "funding_oi_carry_fade":
-            oi = _array_value(arrays, f"{prefix}_oi_delta_{max(int(spec.sharpe_lookback_bars),1)}h", idx)
+            oi = _array_value(
+                arrays, f"{prefix}_oi_delta_{max(int(spec.sharpe_lookback_bars), 1)}h", idx
+            )
             if not math.isfinite(funding) or not math.isfinite(oi):
                 continue
-            if spec.allow_short and funding >= spec.funding_rank_min and oi >= spec.oi_rank_min and ret >= spec.min_abs_return:
+            if (
+                spec.allow_short
+                and funding >= spec.funding_rank_min
+                and oi >= spec.oi_rank_min
+                and ret >= spec.min_abs_return
+            ):
                 candidates.append((abs(funding) + abs(oi), symbol, "SHORT"))
-            if spec.allow_long and funding <= -spec.funding_rank_min and oi <= -spec.oi_rank_min and ret <= -spec.min_abs_return:
+            if (
+                spec.allow_long
+                and funding <= -spec.funding_rank_min
+                and oi <= -spec.oi_rank_min
+                and ret <= -spec.min_abs_return
+            ):
                 candidates.append((abs(funding) + abs(oi), symbol, "LONG"))
+        elif spec.family == "funding_oi_exhaustion_reversal":
+            oi = _array_value(
+                arrays, f"{prefix}_oi_delta_{max(int(spec.sharpe_lookback_bars), 1)}h", idx
+            )
+            flow = _array_value(arrays, f"{prefix}_flow_imbalance_{spec.flow_lookback_bars}h", idx)
+            fast_ret = _array_value(
+                arrays, f"{prefix}_ret_{max(int(spec.adaptive_lookback_bars), 1)}h", idx
+            )
+            resid_z = _array_value(arrays, f"{prefix}_resid_z_{lookback}h", idx)
+            if not all(math.isfinite(value) for value in (funding, oi, fast_ret, resid_z, flow)):
+                continue
+            long_crowd = funding >= spec.funding_rank_min and oi >= spec.oi_rank_min
+            short_crowd = funding <= -spec.funding_rank_min and oi <= -spec.oi_rank_min
+            long_exhausted = (
+                ret >= spec.min_abs_return
+                and resid_z >= spec.threshold
+                and (fast_ret <= 0.0 or flow <= -spec.flow_threshold)
+            )
+            short_exhausted = (
+                ret <= -spec.min_abs_return
+                and resid_z <= -spec.threshold
+                and (fast_ret >= 0.0 or flow >= spec.flow_threshold)
+            )
+            if spec.allow_short and long_crowd and long_exhausted:
+                candidates.append(
+                    (abs(funding) * 1_000.0 + abs(oi) + abs(resid_z), symbol, "SHORT")
+                )
+            if spec.allow_long and short_crowd and short_exhausted:
+                candidates.append((abs(funding) * 1_000.0 + abs(oi) + abs(resid_z), symbol, "LONG"))
+        elif spec.family == "beta_residual_reversion":
+            fast_ret = _array_value(
+                arrays, f"{prefix}_ret_{max(int(spec.adaptive_lookback_bars), 1)}h", idx
+            )
+            flow = _array_value(arrays, f"{prefix}_flow_imbalance_{spec.flow_lookback_bars}h", idx)
+            beta = float(spec.spread_hedge_ratio or 1.0)
+            beta_residual = ret - beta * market_ret
+            if not math.isfinite(beta_residual) or not math.isfinite(fast_ret):
+                continue
+            flow_score = 0.0 if not math.isfinite(flow) else float(flow)
+            if (
+                spec.allow_long
+                and beta_residual <= -spec.threshold
+                and fast_ret >= -spec.min_abs_return
+                and (spec.flow_threshold <= 0.0 or flow_score >= spec.flow_threshold)
+            ):
+                candidates.append((abs(beta_residual) + max(0.0, flow_score), symbol, "LONG"))
+            if (
+                spec.allow_short
+                and beta_residual >= spec.threshold
+                and fast_ret <= spec.min_abs_return
+                and (spec.flow_threshold <= 0.0 or flow_score <= -spec.flow_threshold)
+            ):
+                candidates.append((abs(beta_residual) + max(0.0, -flow_score), symbol, "SHORT"))
         elif spec.family == "flow_momentum":
             flow = _array_value(arrays, f"{prefix}_flow_imbalance_{spec.flow_lookback_bars}h", idx)
             if not math.isfinite(ret) or not math.isfinite(flow) or abs(ret) < spec.min_abs_return:
@@ -1268,9 +1609,17 @@ def _candidate_signal(spec: FreshSpec, arrays: dict[str, Any], idx: int) -> tupl
             flow = _array_value(arrays, f"{prefix}_flow_imbalance_{spec.flow_lookback_bars}h", idx)
             if not math.isfinite(flow) or not math.isfinite(ret) or abs(ret) < spec.min_abs_return:
                 continue
-            if spec.allow_long and flow <= -spec.flow_persistence_threshold and ret <= -spec.min_abs_return:
+            if (
+                spec.allow_long
+                and flow <= -spec.flow_persistence_threshold
+                and ret <= -spec.min_abs_return
+            ):
                 candidates.append((abs(flow) + abs(ret), symbol, "LONG"))
-            if spec.allow_short and flow >= spec.flow_persistence_threshold and ret >= spec.min_abs_return:
+            if (
+                spec.allow_short
+                and flow >= spec.flow_persistence_threshold
+                and ret >= spec.min_abs_return
+            ):
                 candidates.append((abs(flow) + abs(ret), symbol, "SHORT"))
         elif spec.family == "residual_reversion_flow_confirmed":
             resid_z = _array_value(arrays, f"{prefix}_resid_z_{lookback}h", idx)
@@ -1350,6 +1699,39 @@ def _candidate_signal(spec: FreshSpec, arrays: dict[str, Any], idx: int) -> tupl
                 continue
             if spec.allow_short and ret <= -spec.threshold:
                 candidates.append((abs(ret), symbol, "SHORT"))
+        elif spec.family == "dispersion_compression_breakout_unwind":
+            dispersion = _residual_dispersion(arrays, symbols, lookback, idx)
+            flow = _array_value(arrays, f"{prefix}_flow_imbalance_{spec.flow_lookback_bars}h", idx)
+            resid_z = _array_value(arrays, f"{prefix}_resid_z_{lookback}h", idx)
+            if (
+                not math.isfinite(dispersion)
+                or dispersion > spec.compression_quantile
+                or not math.isfinite(flow)
+                or not math.isfinite(resid_z)
+            ):
+                continue
+            market_up = market_ret >= spec.broad_min_abs
+            market_down = market_ret <= -spec.broad_min_abs
+            continuation_long = (
+                ret >= spec.threshold and resid_z > 0.0 and flow >= spec.flow_threshold
+            )
+            continuation_short = (
+                ret <= -spec.threshold and resid_z < 0.0 and flow <= -spec.flow_threshold
+            )
+            unwind_short = ret >= spec.threshold and resid_z > 0.0 and flow <= -spec.flow_threshold
+            unwind_long = ret <= -spec.threshold and resid_z < 0.0 and flow >= spec.flow_threshold
+            if spec.allow_long and ((market_up and continuation_long) or unwind_long):
+                candidates.append((abs(ret) + abs(resid_z) / 10.0 + abs(flow), symbol, "LONG"))
+            if spec.allow_short and ((market_down and continuation_short) or unwind_short):
+                candidates.append((abs(ret) + abs(resid_z) / 10.0 + abs(flow), symbol, "SHORT"))
+        elif spec.family == "vol_regime_margin_scaled_momentum":
+            resid_z = _array_value(arrays, f"{prefix}_resid_z_{lookback}h", idx)
+            if not math.isfinite(resid_z) or not math.isfinite(ret):
+                continue
+            if spec.allow_long and ret >= spec.min_abs_return and resid_z >= spec.threshold:
+                candidates.append((abs(ret) + abs(resid_z), symbol, "LONG"))
+            if spec.allow_short and ret <= -spec.min_abs_return and resid_z <= -spec.threshold:
+                candidates.append((abs(ret) + abs(resid_z), symbol, "SHORT"))
     if not candidates:
         return "", "", veto_reason or "signal_missing"
     candidates.sort(reverse=True, key=lambda item: item[0])
@@ -1427,7 +1809,9 @@ def _residual_pair_spread_signal(
     lookback = int(spec.lookback_bars)
     threshold = max(0.0, float(spec.threshold))
     symbols = tuple(arrays["symbols"])
-    prefixes = tuple(arrays.get("symbol_prefixes") or tuple(_symbol_prefix(symbol) for symbol in symbols))
+    prefixes = tuple(
+        arrays.get("symbol_prefixes") or tuple(_symbol_prefix(symbol) for symbol in symbols)
+    )
     long_leg: tuple[float, str] | None = None
     short_leg: tuple[float, str] | None = None
 
@@ -1481,7 +1865,9 @@ def _residual_pair_momentum_spread_signal(
     lookback = int(spec.lookback_bars)
     threshold = max(0.0, float(spec.threshold))
     symbols = tuple(arrays["symbols"])
-    prefixes = tuple(arrays.get("symbol_prefixes") or tuple(_symbol_prefix(symbol) for symbol in symbols))
+    prefixes = tuple(
+        arrays.get("symbol_prefixes") or tuple(_symbol_prefix(symbol) for symbol in symbols)
+    )
     long_leg: tuple[float, str] | None = None
     short_leg: tuple[float, str] | None = None
 
@@ -1624,10 +2010,23 @@ def _run_calendar_spread_split(
 ) -> dict[str, Any]:
     timestamps = arrays["timestamp"]
     start_ts = int(datetime.combine(split.start, datetime.min.time(), tzinfo=UTC).timestamp())
-    end_ts = int(datetime.combine(split.end + timedelta(days=1), datetime.min.time(), tzinfo=UTC).timestamp()) - 1
+    end_ts = (
+        int(
+            datetime.combine(
+                split.end + timedelta(days=1), datetime.min.time(), tzinfo=UTC
+            ).timestamp()
+        )
+        - 1
+    )
     indices = np.flatnonzero((timestamps >= start_ts) & (timestamps <= end_ts))
     if indices.size == 0:
-        return {"metrics": {}, "round_trips": 0, "fills": 0, "reject_counts": {"split_empty": 1}, "liquidations": 0}
+        return {
+            "metrics": {},
+            "round_trips": 0,
+            "fills": 0,
+            "reject_counts": {"split_empty": 1},
+            "liquidations": 0,
+        }
 
     cash = 10_000.0
     legs: list[dict[str, Any]] = []
@@ -1743,12 +2142,20 @@ def _run_calendar_spread_split(
                     if direction == "LONG_SPREAD":
                         leg_plans = (
                             (long_symbol, "BUY", max(0.0, float(spec.long_allocation_scale))),
-                            (short_symbol, "SELL", max(0.0, float(spec.short_allocation_scale)) * hedge),
+                            (
+                                short_symbol,
+                                "SELL",
+                                max(0.0, float(spec.short_allocation_scale)) * hedge,
+                            ),
                         )
                     else:
                         leg_plans = (
                             (long_symbol, "SELL", max(0.0, float(spec.long_allocation_scale))),
-                            (short_symbol, "BUY", max(0.0, float(spec.short_allocation_scale)) * hedge),
+                            (
+                                short_symbol,
+                                "BUY",
+                                max(0.0, float(spec.short_allocation_scale)) * hedge,
+                            ),
                         )
                     orders = [
                         order
@@ -1758,7 +2165,9 @@ def _run_calendar_spread_split(
                     if len(orders) != 2:
                         record_reject("fill_or_min_notional")
                     else:
-                        gross_entry_notional = sum(abs(float(order["qty"]) * float(order["fill"])) for order in orders)
+                        gross_entry_notional = sum(
+                            abs(float(order["qty"]) * float(order["fill"])) for order in orders
+                        )
                         for order in orders:
                             qty = float(order["qty"])
                             fill = float(order["fill"])
@@ -1791,7 +2200,9 @@ def _run_calendar_spread_split(
         "round_trips": int(round_trips),
         "fills": int(fills),
         "final_equity": float(equity_history[-1]) if equity_history else 10_000.0,
-        "reject_counts": dict(sorted(reject_counts.items(), key=lambda item: (-item[1], item[0]))[:8]),
+        "reject_counts": dict(
+            sorted(reject_counts.items(), key=lambda item: (-item[1], item[0]))[:8]
+        ),
         "liquidations": 0,
     }
     if include_equity:
@@ -1803,7 +2214,9 @@ def _run_split(
     *, spec: FreshSpec, arrays: dict[str, Any], split: SplitWindow, include_equity: bool = False
 ) -> dict[str, Any]:
     if spec.family == "calendar_spread":
-        return _run_calendar_spread_split(spec=spec, arrays=arrays, split=split, include_equity=include_equity)
+        return _run_calendar_spread_split(
+            spec=spec, arrays=arrays, split=split, include_equity=include_equity
+        )
     if spec.family == "residual_pair_reversion_spread":
         return _run_calendar_spread_split(
             spec=spec,
@@ -1830,10 +2243,23 @@ def _run_split(
         )
     timestamps = arrays["timestamp"]
     start_ts = int(datetime.combine(split.start, datetime.min.time(), tzinfo=UTC).timestamp())
-    end_ts = int(datetime.combine(split.end + timedelta(days=1), datetime.min.time(), tzinfo=UTC).timestamp()) - 1
+    end_ts = (
+        int(
+            datetime.combine(
+                split.end + timedelta(days=1), datetime.min.time(), tzinfo=UTC
+            ).timestamp()
+        )
+        - 1
+    )
     indices = np.flatnonzero((timestamps >= start_ts) & (timestamps <= end_ts))
     if indices.size == 0:
-        return {"metrics": {}, "round_trips": 0, "fills": 0, "reject_counts": {"split_empty": 1}, "liquidations": 0}
+        return {
+            "metrics": {},
+            "round_trips": 0,
+            "fills": 0,
+            "reject_counts": {"split_empty": 1},
+            "liquidations": 0,
+        }
 
     cash = 10_000.0
     qty = 0.0
@@ -1950,7 +2376,9 @@ def _run_split(
                     open_ = float(arrays[f"{prefix}_open"][idx])
                     volume = max(0.0, float(arrays[f"{prefix}_volume"][idx]))
                     high_low_vol = max(0.0, (high - low) / open_) if open_ > 0.0 else 0.0
-                    allocation_scale = _side_allocation_scale(spec, side)
+                    allocation_scale = _side_allocation_scale(spec, side) * _state_exposure_scale(
+                        spec, arrays, symbol, side, int(idx)
+                    )
                     notional = min(
                         TARGET_ALLOCATION * allocation_scale * mark_equity_at(int(idx)),
                         MAX_ORDER_VALUE * allocation_scale,
@@ -2006,7 +2434,9 @@ def _run_split(
         "round_trips": int(round_trips),
         "fills": int(fills),
         "final_equity": float(equity_history[-1]) if equity_history else 10_000.0,
-        "reject_counts": dict(sorted(reject_counts.items(), key=lambda item: (-item[1], item[0]))[:8]),
+        "reject_counts": dict(
+            sorted(reject_counts.items(), key=lambda item: (-item[1], item[0]))[:8]
+        ),
         "liquidations": 0,
     }
     if include_equity:
@@ -2069,7 +2499,7 @@ def _candidate_specs(arrays: dict[str, Any], symbols: list[str]) -> list[FreshSp
     for cap in rv_caps:
         for lookback in (12, 24, 48):
             for threshold in (1.25, 1.5, 1.75):
-                name = f"fresh_resid_rev_rvcap{int(cap*1e6)}_lb{lookback}_z{str(threshold).replace('.', '')}"
+                name = f"fresh_resid_rev_rvcap{int(cap * 1e6)}_lb{lookback}_z{str(threshold).replace('.', '')}"
                 specs[name] = FreshSpec(
                     name=name,
                     family="residual_reversion",
@@ -2111,7 +2541,7 @@ def _candidate_specs(arrays: dict[str, Any], symbols: list[str]) -> list[FreshSp
     for lookback in (12, 24, 48, 72):
         for threshold in (1.0, 1.25, 1.5):
             for funding_min in (0.00005, 0.00010, 0.00015):
-                name = f"fresh_funding_fade_lb{lookback}_z{str(threshold).replace('.', '')}_f{int(funding_min*1e6)}ppm"
+                name = f"fresh_funding_fade_lb{lookback}_z{str(threshold).replace('.', '')}_f{int(funding_min * 1e6)}ppm"
                 specs[name] = FreshSpec(
                     name=name,
                     family="funding_carry_fade",
@@ -2127,7 +2557,7 @@ def _candidate_specs(arrays: dict[str, Any], symbols: list[str]) -> list[FreshSp
                 )
                 name = (
                     f"fresh_funding_mom_lb{lookback}_z{str(threshold).replace('.', '')}_"
-                    f"f{int(funding_min*1e6)}ppm"
+                    f"f{int(funding_min * 1e6)}ppm"
                 )
                 specs[name] = FreshSpec(
                     name=name,
@@ -2149,7 +2579,7 @@ def _candidate_specs(arrays: dict[str, Any], symbols: list[str]) -> list[FreshSp
     for lookback in (6, 12, 24, 48):
         for threshold in (1.25, 1.5, 1.75):
             for funding_min in (0.00005, 0.00010):
-                name = f"fresh_funding_oi_fade_lb{lookback}_z{str(threshold).replace('.', '')}_f{int(funding_min*1e6)}_oi{int((funding_min*10)*100)}"
+                name = f"fresh_funding_oi_fade_lb{lookback}_z{str(threshold).replace('.', '')}_f{int(funding_min * 1e6)}_oi{int((funding_min * 10) * 100)}"
                 specs[name] = FreshSpec(
                     name=name,
                     family="funding_oi_carry_fade",
@@ -2165,6 +2595,135 @@ def _candidate_specs(arrays: dict[str, Any], symbols: list[str]) -> list[FreshSp
                     min_abs_return=0.003 if lookback >= 24 else 0.002,
                     allow_short=True,
                 )
+    for lookback, fast_lookback, oi_lookback in ((72, 24, 12), (168, 72, 24)):
+        for resid_z in (0.75, 1.00):
+            for funding_min in (0.00008, 0.00012):
+                for oi_min in (0.012, 0.020):
+                    for flow_threshold in (0.03, 0.06):
+                        name = (
+                            f"fresh_funding_oi_exhaustion_rev_lb{lookback}_fast{fast_lookback}_"
+                            f"z{int(resid_z * 100):03d}_f{int(funding_min * 1e6)}_"
+                            f"oi{int(oi_min * 1000)}_fl{int(flow_threshold * 100)}"
+                        )
+                        specs[name] = FreshSpec(
+                            name=name,
+                            family="funding_oi_exhaustion_reversal",
+                            lookback_bars=lookback,
+                            threshold=resid_z,
+                            hold_bars=96,
+                            cooldown_bars=24,
+                            stop_loss_pct=0.010,
+                            take_profit_pct=0.035,
+                            min_abs_return=0.010,
+                            allow_long=True,
+                            allow_short=True,
+                            adaptive_lookback_bars=fast_lookback,
+                            flow_lookback_bars=6,
+                            flow_threshold=flow_threshold,
+                            funding_rank_min=funding_min,
+                            oi_rank_min=oi_min,
+                            sharpe_lookback_bars=oi_lookback,
+                            long_allocation_scale=2.5,
+                            short_allocation_scale=2.5,
+                            trailing_stop_rv_multiple=1.0,
+                            trailing_stop_floor_pct=0.005,
+                            trailing_stop_cap_pct=0.014,
+                        )
+    for lookback, fast_lookback in ((72, 24), (168, 72)):
+        for beta in (0.80, 1.00, 1.20):
+            for threshold in (0.010, 0.016):
+                for flow_threshold in (0.00, 0.03):
+                    name = (
+                        f"fresh_beta_resid_reversion_lb{lookback}_fast{fast_lookback}_"
+                        f"b{int(beta * 100)}_thr{int(threshold * 10000)}_"
+                        f"fl{int(flow_threshold * 100)}"
+                    )
+                    specs[name] = FreshSpec(
+                        name=name,
+                        family="beta_residual_reversion",
+                        lookback_bars=lookback,
+                        threshold=threshold,
+                        hold_bars=96,
+                        cooldown_bars=24,
+                        stop_loss_pct=0.010,
+                        take_profit_pct=0.032,
+                        min_abs_return=0.003,
+                        allow_long=True,
+                        allow_short=True,
+                        adaptive_lookback_bars=fast_lookback,
+                        flow_lookback_bars=6,
+                        flow_threshold=flow_threshold,
+                        spread_hedge_ratio=beta,
+                        long_allocation_scale=2.0,
+                        short_allocation_scale=2.0,
+                        trailing_stop_rv_multiple=1.0,
+                        trailing_stop_floor_pct=0.005,
+                        trailing_stop_cap_pct=0.014,
+                    )
+    for lookback in (24, 72):
+        for threshold in (0.006, 0.012):
+            for compression in (0.75, 1.10):
+                for flow_threshold in (0.03, 0.06):
+                    name = (
+                        f"fresh_dispersion_compression_state_lb{lookback}_"
+                        f"thr{int(threshold * 10000)}_comp{int(compression * 100)}_"
+                        f"fl{int(flow_threshold * 100)}"
+                    )
+                    specs[name] = FreshSpec(
+                        name=name,
+                        family="dispersion_compression_breakout_unwind",
+                        lookback_bars=lookback,
+                        threshold=threshold,
+                        hold_bars=72,
+                        cooldown_bars=18,
+                        stop_loss_pct=0.010,
+                        take_profit_pct=0.030,
+                        min_abs_return=threshold,
+                        allow_long=True,
+                        allow_short=True,
+                        broad_min_abs=0.002,
+                        flow_lookback_bars=6,
+                        flow_threshold=flow_threshold,
+                        compression_quantile=compression,
+                        long_allocation_scale=2.0,
+                        short_allocation_scale=2.0,
+                        trailing_stop_rv_multiple=1.0,
+                        trailing_stop_floor_pct=0.005,
+                        trailing_stop_cap_pct=0.014,
+                    )
+    for lookback, fast_lookback in ((24, 12), (72, 24)):
+        for resid_z in (0.75, 1.00):
+            for min_return in (0.006, 0.012):
+                for max_rv in (0.018, 0.030):
+                    name = (
+                        f"fresh_vol_regime_margin_scaled_lb{lookback}_fast{fast_lookback}_"
+                        f"z{int(resid_z * 100):03d}_ret{int(min_return * 10000)}_"
+                        f"rv{int(max_rv * 10000)}"
+                    )
+                    specs[name] = FreshSpec(
+                        name=name,
+                        family="vol_regime_margin_scaled_momentum",
+                        lookback_bars=lookback,
+                        threshold=resid_z,
+                        hold_bars=72,
+                        cooldown_bars=18,
+                        stop_loss_pct=0.010,
+                        take_profit_pct=0.035,
+                        min_abs_return=min_return,
+                        allow_long=True,
+                        allow_short=True,
+                        adaptive_lookback_bars=fast_lookback,
+                        rv_lookback_bars=24,
+                        max_rv=max_rv,
+                        broad_min_abs=0.012,
+                        funding_abs_cap=0.00020,
+                        sharpe_rank_min=3.0,
+                        long_allocation_scale=5.0,
+                        short_allocation_scale=5.0,
+                        trailing_stop_rv_multiple=1.1,
+                        trailing_stop_floor_pct=0.005,
+                        trailing_stop_cap_pct=0.014,
+                    )
     for flow_lookback in (3, 6, 12, 24):
         for price_lookback in (3, 6, 12, 24):
             for flow_threshold in (0.03, 0.06, 0.10, 0.15):
@@ -2263,7 +2822,7 @@ def _candidate_specs(arrays: dict[str, Any], symbols: list[str]) -> list[FreshSp
                     )
     for lookback in (12, 24, 48):
         for threshold in (0.0010, 0.0015, 0.0020):
-            name = f"fresh_adaptive_trend_lb{lookback}_thr{int(threshold*10000)}"
+            name = f"fresh_adaptive_trend_lb{lookback}_thr{int(threshold * 10000)}"
             specs[name] = FreshSpec(
                 name=name,
                 family="adaptive_trend",
@@ -2285,7 +2844,7 @@ def _candidate_specs(arrays: dict[str, Any], symbols: list[str]) -> list[FreshSp
             for hold in (6, 12, 24, 48):
                 for scale in (0.5, 1.0, 2.0):
                     name = (
-                        f"fresh_adaptive_trend_fade_lb{lookback}_thr{int(threshold*10000)}_"
+                        f"fresh_adaptive_trend_fade_lb{lookback}_thr{int(threshold * 10000)}_"
                         f"h{hold}_sc{str(scale).replace('.', '')}"
                     )
                     specs[name] = FreshSpec(
@@ -2308,7 +2867,7 @@ def _candidate_specs(arrays: dict[str, Any], symbols: list[str]) -> list[FreshSp
                     )
     for lookback in (12, 24, 48):
         for rank_min in (0.05, 0.08, 0.12):
-            name = f"fresh_cross_sharpe_rank_lb{lookback}_r{int(rank_min*100)}"
+            name = f"fresh_cross_sharpe_rank_lb{lookback}_r{int(rank_min * 100)}"
             specs[name] = FreshSpec(
                 name=name,
                 family="cross_sectional_sharpe_rank",
@@ -2328,7 +2887,7 @@ def _candidate_specs(arrays: dict[str, Any], symbols: list[str]) -> list[FreshSp
     for lookback in (12, 24, 48, 72):
         for rank_min in (0.03, 0.05, 0.08, 0.12):
             for hold in (12, 24, 48):
-                name = f"fresh_cross_sharpe_reversal_lb{lookback}_r{int(rank_min*100)}_h{hold}"
+                name = f"fresh_cross_sharpe_reversal_lb{lookback}_r{int(rank_min * 100)}_h{hold}"
                 specs[name] = FreshSpec(
                     name=name,
                     family="cross_sectional_sharpe_reversal",
@@ -2358,7 +2917,9 @@ def _candidate_specs(arrays: dict[str, Any], symbols: list[str]) -> list[FreshSp
                             ("longonly", True, False, 6.2, 0.0),
                         ):
                             for take in (0.024, 0.045, 0.060):
-                                flow_label = f"_fl{int(flow_threshold * 100)}" if flow_threshold else ""
+                                flow_label = (
+                                    f"_fl{int(flow_threshold * 100)}" if flow_threshold else ""
+                                )
                                 name = (
                                     f"fresh_state_distilled_{mode_label}_lb{lookback}_fast{fast_lookback}_"
                                     f"z{int(resid_z * 100):03d}_ret{int(min_return * 10000)}_"
@@ -2389,6 +2950,45 @@ def _candidate_specs(arrays: dict[str, Any], symbols: list[str]) -> list[FreshSp
                                     trailing_stop_floor_pct=0.0,
                                     trailing_stop_cap_pct=0.0,
                                 )
+    for lookback, fast_lookback in ((72, 24), (168, 24), (168, 72)):
+        for resid_z in (1.50, 1.75):
+            for min_return in (0.012, 0.020):
+                for hold in (72, 96):
+                    for crowd_label, funding_min, oi_min in (
+                        ("fund", 0.00010, 0.0),
+                        ("oi", 0.0, 0.020),
+                    ):
+                        for gap_max in (0.20, 0.40):
+                            name = (
+                                f"fresh_state_crowded_unwind_v2_lb{lookback}_fast{fast_lookback}_"
+                                f"z{int(resid_z * 100):03d}_ret{int(min_return * 10000)}_"
+                                f"h{hold}_{crowd_label}_gap{int(gap_max * 100)}"
+                            )
+                            specs[name] = FreshSpec(
+                                name=name,
+                                family="state_distilled_crowded_unwind_v2",
+                                lookback_bars=lookback,
+                                threshold=resid_z,
+                                hold_bars=hold,
+                                cooldown_bars=max(1, hold // 4),
+                                stop_loss_pct=0.006,
+                                take_profit_pct=0.040,
+                                min_abs_return=min_return,
+                                allow_long=False,
+                                allow_short=True,
+                                adaptive_lookback_bars=fast_lookback,
+                                flow_lookback_bars=6,
+                                flow_threshold=0.04,
+                                funding_rank_min=funding_min,
+                                oi_rank_min=oi_min,
+                                sharpe_lookback_bars=12,
+                                sharpe_rank_min=gap_max,
+                                broad_min_abs=0.010,
+                                short_allocation_scale=3.0,
+                                trailing_stop_rv_multiple=1.1,
+                                trailing_stop_floor_pct=0.005,
+                                trailing_stop_cap_pct=0.014,
+                            )
     for lookback in (72, 168, 336):
         for resid_z in (0.75, 1.0, 1.25):
             for min_return in (0.012, 0.015, 0.018):
@@ -2397,7 +2997,9 @@ def _candidate_specs(arrays: dict[str, Any], symbols: list[str]) -> list[FreshSp
                         for short_scale in (6.0, 10.0):
                             for take in (0.018, 0.024, 0.045):
                                 for flow_threshold in (0.0, 0.03):
-                                    flow_label = f"_fl{int(flow_threshold * 100)}" if flow_threshold else ""
+                                    flow_label = (
+                                        f"_fl{int(flow_threshold * 100)}" if flow_threshold else ""
+                                    )
                                     name = (
                                         f"fresh_state_trx_mom_lb{lookback}_"
                                         f"z{int(resid_z * 100):03d}_ret{int(min_return * 10000)}_"
@@ -2459,7 +3061,11 @@ def _candidate_specs(arrays: dict[str, Any], symbols: list[str]) -> list[FreshSp
                             for short_scale in (6.0, 10.0):
                                 for take in (0.024, 0.045):
                                     for flow_threshold in (0.0, 0.03):
-                                        flow_label = f"_fl{int(flow_threshold * 100)}" if flow_threshold else ""
+                                        flow_label = (
+                                            f"_fl{int(flow_threshold * 100)}"
+                                            if flow_threshold
+                                            else ""
+                                        )
                                         name = (
                                             f"fresh_state_trx_dual_mom_fast{fast_lookback}_reg{regime_lookback}_"
                                             f"z{int(resid_z * 100):03d}_rz{int(regime_resid_z * 100):03d}_"
@@ -2496,7 +3102,9 @@ def _candidate_specs(arrays: dict[str, Any], symbols: list[str]) -> list[FreshSp
                         for scale in (2.0, 3.0, 4.0):
                             for take in (0.018, 0.024, 0.060):
                                 for flow_threshold in (0.0, 0.03):
-                                    flow_label = f"_fl{int(flow_threshold * 100)}" if flow_threshold else ""
+                                    flow_label = (
+                                        f"_fl{int(flow_threshold * 100)}" if flow_threshold else ""
+                                    )
                                     name = (
                                         f"fresh_state_trx_eth_spread_lb{lookback}_"
                                         f"thr{int(threshold * 10000)}_zg{int(resid_gap * 100):03d}_"
@@ -2542,8 +3150,8 @@ def _candidate_specs(arrays: dict[str, Any], symbols: list[str]) -> list[FreshSp
                         for stop in (0.0, 0.006):
                             name = (
                                 f"fresh_calendar_rot_l{long_label}_s{short_label}_lb{lookback}_"
-                                f"thr{int(threshold*10000)}_h{hold}_sc{str(scale).replace('.', '')}_"
-                                f"st{int(stop*10000)}"
+                                f"thr{int(threshold * 10000)}_h{hold}_sc{str(scale).replace('.', '')}_"
+                                f"st{int(stop * 10000)}"
                             )
                             specs[name] = FreshSpec(
                                 name=name,
@@ -2572,9 +3180,9 @@ def _candidate_specs(arrays: dict[str, Any], symbols: list[str]) -> list[FreshSp
                     for short_scale in (8.0, 10.0, 12.0):
                         for take in (0.018, 0.024, 0.045, 0.060):
                             name = (
-                                f"fresh_calendar_trx_takeprofit_s{short_label}_thr{int(threshold*10000)}_"
-                                f"h{hold}_ls{int(long_scale*100)}_ss{int(short_scale*10)}_"
-                                f"tp{int(take*10000)}"
+                                f"fresh_calendar_trx_takeprofit_s{short_label}_thr{int(threshold * 10000)}_"
+                                f"h{hold}_ls{int(long_scale * 100)}_ss{int(short_scale * 10)}_"
+                                f"tp{int(take * 10000)}"
                             )
                             specs[name] = FreshSpec(
                                 name=name,
@@ -2609,7 +3217,7 @@ def _candidate_specs(arrays: dict[str, Any], symbols: list[str]) -> list[FreshSp
                 for veto_label, veto_kwargs in veto_sets:
                     name = (
                         f"fresh_calendar_trx_veto_{veto_label}_s{short_label}_"
-                        f"thr{int(threshold*10000)}_h{hold}"
+                        f"thr{int(threshold * 10000)}_h{hold}"
                     )
                     specs[name] = FreshSpec(
                         name=name,
@@ -2675,8 +3283,8 @@ def _candidate_specs(arrays: dict[str, Any], symbols: list[str]) -> list[FreshSp
             for hedge in (0.5, 1.0):
                 for take in (0.024, 0.060):
                     name = (
-                        f"fresh_calendar_spread_trx_eth_hr{int(hedge*100)}_"
-                        f"thr{int(threshold*10000)}_h{hold}_tp{int(take*10000)}"
+                        f"fresh_calendar_spread_trx_eth_hr{int(hedge * 100)}_"
+                        f"thr{int(threshold * 10000)}_h{hold}_tp{int(take * 10000)}"
                     )
                     specs[name] = FreshSpec(
                         name=name,
@@ -2712,9 +3320,9 @@ def _candidate_specs(arrays: dict[str, Any], symbols: list[str]) -> list[FreshSp
                             for session_label, hours in pair_sessions.items():
                                 name = (
                                     f"fresh_pair_resid_revert_spread_lb{lookback}_"
-                                    f"z{int(threshold*100):03d}_h{hold}_"
+                                    f"z{int(threshold * 100):03d}_h{hold}_"
                                     f"sc{str(scale).replace('.', '')}_"
-                                    f"st{int(stop*10000)}_tp{int(take*10000)}_{session_label}"
+                                    f"st{int(stop * 10000)}_tp{int(take * 10000)}_{session_label}"
                                 )
                                 specs[name] = FreshSpec(
                                     name=name,
@@ -2745,8 +3353,8 @@ def _candidate_specs(arrays: dict[str, Any], symbols: list[str]) -> list[FreshSp
                         for session_label, hours in momentum_sessions.items():
                             name = (
                                 f"fresh_pair_resid_mom_spread_lb{lookback}_"
-                                f"z{int(threshold*100):03d}_h{hold}_"
-                                f"sc{str(scale).replace('.', '')}_st{int(stop*10000)}_{session_label}"
+                                f"z{int(threshold * 100):03d}_h{hold}_"
+                                f"sc{str(scale).replace('.', '')}_st{int(stop * 10000)}_{session_label}"
                             )
                             specs[name] = FreshSpec(
                                 name=name,
@@ -2768,7 +3376,7 @@ def _candidate_specs(arrays: dict[str, Any], symbols: list[str]) -> list[FreshSp
     for lookback in (6, 12, 24):
         for threshold in (0.006, 0.010, 0.014):
             for comp in (0.55, 0.70, 0.85):
-                name = f"fresh_compression_breakout_lb{lookback}_thr{int(threshold*10000)}_c{int(comp*100)}"
+                name = f"fresh_compression_breakout_lb{lookback}_thr{int(threshold * 10000)}_c{int(comp * 100)}"
                 specs[name] = FreshSpec(
                     name=name,
                     family="compression_breakout",
@@ -2788,8 +3396,8 @@ def _candidate_specs(arrays: dict[str, Any], symbols: list[str]) -> list[FreshSp
             for comp in (0.55, 0.70, 0.85):
                 for hold in (12, 24, 48):
                     name = (
-                        f"fresh_compression_fade_lb{lookback}_thr{int(threshold*10000)}_"
-                        f"c{int(comp*100)}_h{hold}"
+                        f"fresh_compression_fade_lb{lookback}_thr{int(threshold * 10000)}_"
+                        f"c{int(comp * 100)}_h{hold}"
                     )
                     specs[name] = FreshSpec(
                         name=name,
@@ -2817,8 +3425,8 @@ def _candidate_specs(arrays: dict[str, Any], symbols: list[str]) -> list[FreshSp
                             for take in (0.012, 0.025):
                                 name = (
                                     f"fresh_compression_downside_short_lb{lookback}_"
-                                    f"thr{int(threshold*10000)}_c{int(comp*100)}_h{hold}_"
-                                    f"sc{str(scale).replace('.', '')}_st{int(stop*10000)}_tp{int(take*10000)}"
+                                    f"thr{int(threshold * 10000)}_c{int(comp * 100)}_h{hold}_"
+                                    f"sc{str(scale).replace('.', '')}_st{int(stop * 10000)}_tp{int(take * 10000)}"
                                 )
                                 specs[name] = FreshSpec(
                                     name=name,
@@ -2843,20 +3451,29 @@ def _candidate_specs(arrays: dict[str, Any], symbols: list[str]) -> list[FreshSp
     return list(specs.values())
 
 
-def _evaluate_specs(*, specs: list[FreshSpec], arrays: dict[str, Any], splits: list[SplitWindow]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+def _evaluate_specs(
+    *, specs: list[FreshSpec], arrays: dict[str, Any], splits: list[SplitWindow]
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     rows: list[dict[str, Any]] = []
     results: list[dict[str, Any]] = []
     for spec in specs:
-        split_results = {split.name: _run_split(spec=spec, arrays=arrays, split=split) for split in splits}
-        metrics = {name: dict(result.get("metrics") or {}) for name, result in split_results.items()}
+        split_results = {
+            split.name: _run_split(spec=spec, arrays=arrays, split=split) for split in splits
+        }
+        metrics = {
+            name: dict(result.get("metrics") or {}) for name, result in split_results.items()
+        }
         train = metrics.get("train", {})
         val = metrics.get("val", {})
         oos = metrics.get("oos", {})
         gates = {
-            "not_incumbent_or_context_wrapper": not spec.name.startswith("profit_moonshot_hourly_shock"),
+            "not_incumbent_or_context_wrapper": not spec.name.startswith(
+                "profit_moonshot_hourly_shock"
+            ),
             "train_positive": _safe_float(train.get("total_return"), 0.0) > 0.0,
             "val_positive": _safe_float(val.get("total_return"), 0.0) > 0.0,
-            "oos_return_beats_incumbent": _safe_float(oos.get("total_return"), 0.0) > BASELINE_OOS_RETURN,
+            "oos_return_beats_incumbent": _safe_float(oos.get("total_return"), 0.0)
+            > BASELINE_OOS_RETURN,
             "oos_mdd_beats_shadow": _safe_float(oos.get("max_drawdown"), 1.0) < SHADOW_OOS_MDD,
             "oos_sharpe_gt_1": _safe_float(oos.get("sharpe"), 0.0) > SUCCESS_SHARPE,
             "oos_trades_not_starved": int(split_results["oos"].get("round_trips") or 0) >= 5,
@@ -2885,7 +3502,9 @@ def _evaluate_specs(*, specs: list[FreshSpec], arrays: dict[str, Any], splits: l
             "success_candidate": success,
             "failed_gates": ",".join(failed),
             "filters": json.dumps(spec.payload(), sort_keys=True),
-            "reject_top": json.dumps(split_results["oos"].get("reject_counts") or {}, sort_keys=True),
+            "reject_top": json.dumps(
+                split_results["oos"].get("reject_counts") or {}, sort_keys=True
+            ),
         }
         for split_name, result in split_results.items():
             split_metrics = dict(result.get("metrics") or {})
@@ -2934,7 +3553,9 @@ def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         path.write_text("", encoding="utf-8")
         return
     with path.open("w", encoding="utf-8", newline="") as fp:
-        writer = csv.DictWriter(fp, fieldnames=sorted({key for row in rows for key in row}), lineterminator="\n")
+        writer = csv.DictWriter(
+            fp, fieldnames=sorted({key for row in rows for key in row}), lineterminator="\n"
+        )
         writer.writeheader()
         writer.writerows(rows)
 
@@ -2953,7 +3574,8 @@ def _markdown(payload: dict[str, Any], rows: list[dict[str, Any]]) -> str:
         "",
         "- 기존 ETH shock-reversion incumbent/leadlag/context-wrapper를 쓰지 않고 raw-first data에서 새로 출발했다.",
         "- 신규 후보군: cross-sectional residual reversal, cross-sectional momentum, adaptive trend, cross-sectional Sharpe/rank selector, "
-        "funding-carry fade, funding+OI carry fade, taker-flow persistence/exhaustion, non-calendar state-distilled leadership/unwind, non-calendar TRX state-momentum proxy, "
+        "funding-carry fade, funding+OI carry fade, taker-flow persistence/exhaustion, non-calendar state-distilled leadership/unwind, "
+        "non-calendar crowded-leadership unwind v2, non-calendar TRX state-momentum proxy, "
         "non-calendar TRX/ETH state-relative-strength spread, calendar rotation, calendar-conditioned veto/day-window sleeves, "
         "TRX/ETH calendar spread, compression breakout.",
         "- Replay는 one-position, fee/slippage, 10% bar-volume fill cap, cooldown, stop/take/max-hold, 0.8% target allocation, $175 max order를 강제한다.",
@@ -2989,11 +3611,17 @@ def _markdown(payload: dict[str, Any], rows: list[dict[str, Any]]) -> str:
         ]
     )
     if success:
-        lines.append("- At least one fresh-start replay candidate earned a one-at-a-time full live-equivalent backtest slot.")
+        lines.append(
+            "- At least one fresh-start replay candidate earned a one-at-a-time full live-equivalent backtest slot."
+        )
     elif survivors:
-        lines.append("- Replay survivors exist, but none is a final success until live-equivalent raw-first backtest proves Sharpe > 1.0 and all gates.")
+        lines.append(
+            "- Replay survivors exist, but none is a final success until live-equivalent raw-first backtest proves Sharpe > 1.0 and all gates."
+        )
     else:
-        lines.append("- No fresh-start candidate earned a full live-equivalent slot; do not promote or backtest a random vector-only shape.")
+        lines.append(
+            "- No fresh-start candidate earned a full live-equivalent slot; do not promote or backtest a random vector-only shape."
+        )
     lines.extend(
         [
             "- Blocked/failed families remain recorded in CSV/JSON with failed gates and top reject reasons.",
@@ -3005,20 +3633,26 @@ def _markdown(payload: dict[str, Any], rows: list[dict[str, Any]]) -> str:
 
 def _split_arg_tokens(raw: Any) -> tuple[str, ...]:
     return tuple(
-        token.strip()
-        for token in str(raw or "").replace(";", ",").split(",")
-        if token.strip()
+        token.strip() for token in str(raw or "").replace(";", ",").split(",") if token.strip()
     )
 
 
-def _filter_specs(specs: list[FreshSpec], args: argparse.Namespace) -> tuple[list[FreshSpec], dict[str, Any]]:
+def _filter_specs(
+    specs: list[FreshSpec], args: argparse.Namespace
+) -> tuple[list[FreshSpec], dict[str, Any]]:
     families = set(_split_arg_tokens(getattr(args, "spec_family", "")))
     name_tokens = _split_arg_tokens(getattr(args, "spec_name_contains", ""))
     max_specs = max(0, int(getattr(args, "max_specs", 0) or 0))
+    rejected_non_calendar_specs = {
+        spec.name: violations
+        for spec in specs
+        if (violations := _non_calendar_spec_calendar_fields(spec))
+    }
     filtered = [
         spec
         for spec in specs
-        if (not families or spec.family in families)
+        if spec.name not in rejected_non_calendar_specs
+        and (not families or spec.family in families)
         and (not name_tokens or any(token in spec.name for token in name_tokens))
     ]
     if max_specs > 0:
@@ -3029,11 +3663,17 @@ def _filter_specs(specs: list[FreshSpec], args: argparse.Namespace) -> tuple[lis
         "max_specs": max_specs,
         "unfiltered_spec_count": len(specs),
         "filtered_spec_count": len(filtered),
+        "rejected_non_calendar_spec_count": len(rejected_non_calendar_specs),
+        "rejected_non_calendar_specs": rejected_non_calendar_specs,
     }
 
 
 def build_payload(args: argparse.Namespace) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    oos_end = datetime.fromisoformat(str(args.oos_end_date)).date() if str(args.oos_end_date or "").strip() else date(2026, 5, 6)
+    oos_end = (
+        datetime.fromisoformat(str(args.oos_end_date)).date()
+        if str(args.oos_end_date or "").strip()
+        else date(2026, 5, 6)
+    )
     splits = _split_windows(oos_end=oos_end)
     start = min(split.start for split in splits)
     end = max(split.end for split in splits)
@@ -3089,9 +3729,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_DIR))
     parser.add_argument("--panel-cache-dir", default=str(DEFAULT_PANEL_CACHE_DIR))
     parser.add_argument("--refresh-panel-cache", action="store_true")
-    parser.add_argument("--spec-family", default="", help="Comma-separated candidate family allowlist.")
-    parser.add_argument("--spec-name-contains", default="", help="Comma-separated substrings; keep matching spec names.")
-    parser.add_argument("--max-specs", type=int, default=0, help="Optional cap after spec filters; 0 means no cap.")
+    parser.add_argument(
+        "--spec-family", default="", help="Comma-separated candidate family allowlist."
+    )
+    parser.add_argument(
+        "--spec-name-contains",
+        default="",
+        help="Comma-separated substrings; keep matching spec names.",
+    )
+    parser.add_argument(
+        "--max-specs", type=int, default=0, help="Optional cap after spec filters; 0 means no cap."
+    )
     return parser.parse_args(argv)
 
 
@@ -3170,7 +3818,9 @@ def main(argv: list[str] | None = None) -> int:
         md_path.write_text(_markdown(payload, rows) + "\n", encoding="utf-8")
     except Exception as exc:
         if not finalized:
-            memory_guard.finalize(status="failed", error=str(exc), context={"script": Path(__file__).name})
+            memory_guard.finalize(
+                status="failed", error=str(exc), context={"script": Path(__file__).name}
+            )
         raise
     finally:
         memory_guard.release()

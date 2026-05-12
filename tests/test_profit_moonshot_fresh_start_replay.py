@@ -75,9 +75,10 @@ def test_fresh_start_hourly_loader_matches_raw_first_1s_aggregation_when_data_ex
     )
 
     assert loaded.height == aggregated.height
-    assert loaded.select("datetime", "btcusdt_close").to_dicts() == aggregated.select(
-        "datetime", "btcusdt_close"
-    ).to_dicts()
+    assert (
+        loaded.select("datetime", "btcusdt_close").to_dicts()
+        == aggregated.select("datetime", "btcusdt_close").to_dicts()
+    )
 
 
 def test_candidate_signal_adaptive_trend_and_persistence_rules() -> None:
@@ -597,6 +598,117 @@ def test_state_distilled_leadership_unwind_can_short_crowded_laggard() -> None:
     assert MODULE._candidate_signal(spec, arrays, 0) == ("ETH/USDT", "SHORT", "")
 
 
+def test_state_distilled_crowded_unwind_v2_shorts_weakening_leader_without_calendar() -> None:
+    arrays = {
+        "datetime": [
+            datetime(2026, 1, 15, tzinfo=UTC),
+            datetime(2026, 6, 15, tzinfo=UTC),
+            datetime(2026, 6, 16, tzinfo=UTC),
+        ],
+        "symbols": ("BTC/USDT", "SOL/USDT", "TRX/USDT", "ETH/USDT"),
+        "symbol_prefixes": ("btcusdt", "solusdt", "trxusdt", "ethusdt"),
+        "btcusdt_close": np.array([100.0, 100.0, 100.0]),
+        "solusdt_close": np.array([40.0, 40.0, 40.0]),
+        "trxusdt_close": np.array([20.0, 20.0, 20.0]),
+        "ethusdt_close": np.array([50.0, 50.0, 50.0]),
+        "btcusdt_ret_24h": np.array([0.004, 0.004, 0.003]),
+        "solusdt_ret_24h": np.array([0.002, 0.002, 0.026]),
+        "trxusdt_ret_24h": np.array([0.004, 0.004, 0.010]),
+        "ethusdt_ret_24h": np.array([-0.001, -0.001, 0.005]),
+        "btcusdt_ret_168h": np.array([0.006, 0.006, 0.004]),
+        "solusdt_ret_168h": np.array([0.060, 0.060, 0.070]),
+        "trxusdt_ret_168h": np.array([0.022, 0.022, 0.052]),
+        "ethusdt_ret_168h": np.array([0.006, 0.006, 0.040]),
+        "btcusdt_resid_z_168h": np.array([0.10, 0.10, 0.05]),
+        "solusdt_resid_z_168h": np.array([2.20, 2.20, 2.05]),
+        "trxusdt_resid_z_168h": np.array([0.60, 0.60, 1.90]),
+        "ethusdt_resid_z_168h": np.array([-0.20, -0.20, 1.75]),
+        "btcusdt_flow_imbalance_6h": np.array([0.00, 0.00, 0.00]),
+        "solusdt_flow_imbalance_6h": np.array([-0.07, -0.07, 0.04]),
+        "trxusdt_flow_imbalance_6h": np.array([0.01, 0.01, 0.02]),
+        "ethusdt_flow_imbalance_6h": np.array([0.00, 0.00, 0.01]),
+        "btcusdt_funding_ffill": np.array([0.0, 0.0, 0.0]),
+        "solusdt_funding_ffill": np.array([0.00016, 0.00016, 0.00015]),
+        "trxusdt_funding_ffill": np.array([0.00002, 0.00002, 0.00010]),
+        "ethusdt_funding_ffill": np.array([0.0, 0.0, 0.00009]),
+        "btcusdt_oi_delta_12h": np.array([0.00, 0.00, 0.00]),
+        "solusdt_oi_delta_12h": np.array([0.040, 0.040, 0.030]),
+        "trxusdt_oi_delta_12h": np.array([0.010, 0.010, 0.025]),
+        "ethusdt_oi_delta_12h": np.array([0.000, 0.000, 0.020]),
+        "market_ret_24h": np.array([0.001, 0.001, 0.000]),
+        "market_ret_168h": np.array([0.010, 0.010, 0.008]),
+    }
+    spec = FreshSpec(
+        name="state_crowded_unwind_v2",
+        family="state_distilled_crowded_unwind_v2",
+        lookback_bars=168,
+        adaptive_lookback_bars=24,
+        threshold=1.75,
+        hold_bars=96,
+        cooldown_bars=0,
+        stop_loss_pct=0.006,
+        take_profit_pct=0.040,
+        min_abs_return=0.020,
+        allow_long=False,
+        allow_short=True,
+        flow_lookback_bars=6,
+        flow_threshold=0.04,
+        funding_rank_min=0.00010,
+        oi_rank_min=0.020,
+        sharpe_lookback_bars=12,
+        sharpe_rank_min=0.20,
+    )
+
+    assert MODULE._candidate_signal(spec, arrays, 0) == ("SOL/USDT", "SHORT", "")
+    assert MODULE._candidate_signal(spec, arrays, 1) == ("SOL/USDT", "SHORT", "")
+    assert MODULE._candidate_signal(spec, arrays, 2) == ("SOL/USDT", "SHORT", "")
+    assert spec.entry_hours == ()
+    assert spec.entry_days_of_month == ()
+    assert spec.calendar_long_months == ()
+    assert spec.calendar_short_months == ()
+
+
+def test_state_distilled_non_calendar_families_reject_calendar_entry_fields() -> None:
+    args = MODULE.parse_args(["--spec-family", "state_distilled_crowded_unwind_v2"])
+    invalid = FreshSpec(
+        name="invalid_calendar_state_unwind",
+        family="state_distilled_crowded_unwind_v2",
+        lookback_bars=168,
+        threshold=1.75,
+        hold_bars=96,
+        cooldown_bars=0,
+        stop_loss_pct=0.006,
+        take_profit_pct=0.040,
+        entry_hours=(2, 10),
+        entry_days_of_month=(15,),
+        calendar_long_months=(3, 4, 5),
+        calendar_short_months=(1, 2),
+    )
+    valid = FreshSpec(
+        name="valid_state_unwind",
+        family="state_distilled_crowded_unwind_v2",
+        lookback_bars=168,
+        threshold=1.75,
+        hold_bars=96,
+        cooldown_bars=0,
+        stop_loss_pct=0.006,
+        take_profit_pct=0.040,
+    )
+
+    filtered, metadata = MODULE._filter_specs([invalid, valid], args)
+
+    assert [spec.name for spec in filtered] == ["valid_state_unwind"]
+    assert metadata["rejected_non_calendar_spec_count"] == 1
+    assert metadata["rejected_non_calendar_specs"] == {
+        "invalid_calendar_state_unwind": [
+            "entry_hours",
+            "entry_days_of_month",
+            "calendar_long_months",
+            "calendar_short_months",
+        ]
+    }
+
+
 def test_calendar_veto_and_day_window_do_not_promote_blocked_entries() -> None:
     arrays = {
         "datetime": [
@@ -715,7 +827,9 @@ def test_calendar_spread_split_runs_two_legs_and_reports_equity() -> None:
     result = MODULE._run_split(
         spec=spec,
         arrays=arrays,
-        split=MODULE.SplitWindow(name="train", start=date(2026, 3, 1), end=date(2026, 3, 1), role="train"),
+        split=MODULE.SplitWindow(
+            name="train", start=date(2026, 3, 1), end=date(2026, 3, 1), role="train"
+        ),
         include_equity=True,
     )
 
@@ -838,7 +952,9 @@ def test_residual_pair_reversion_spread_split_runs_two_legs_and_reports_equity()
     result = MODULE._run_split(
         spec=spec,
         arrays=arrays,
-        split=MODULE.SplitWindow(name="train", start=date(2026, 5, 1), end=date(2026, 5, 1), role="train"),
+        split=MODULE.SplitWindow(
+            name="train", start=date(2026, 5, 1), end=date(2026, 5, 1), role="train"
+        ),
         include_equity=True,
     )
 
@@ -945,6 +1061,7 @@ def test_candidate_specs_include_external_inspired_families() -> None:
     assert "flow_imbalance_exhaustion" in families
     assert "funding_oi_carry_fade" in families
     assert "state_distilled_leadership_unwind" in families
+    assert "state_distilled_crowded_unwind_v2" in families
     assert "state_momentum_proxy" in families
     assert "state_relative_strength_spread" in families
     assert "calendar_rotation" in families
@@ -953,6 +1070,10 @@ def test_candidate_specs_include_external_inspired_families() -> None:
     assert "cross_sectional_sharpe_reversal" in families
     assert "compression_breakout_fade" in families
     assert "funding_carry_momentum" in families
+    assert "funding_oi_exhaustion_reversal" in families
+    assert "beta_residual_reversion" in families
+    assert "dispersion_compression_breakout_unwind" in families
+    assert "vol_regime_margin_scaled_momentum" in families
     assert "calendar_spread" in families
     assert "residual_pair_reversion_spread" in families
     assert "residual_pair_momentum_spread" in families
@@ -963,12 +1084,121 @@ def test_candidate_specs_include_external_inspired_families() -> None:
     assert any(name.startswith("fresh_state_trx_mom_") for name in names)
     assert any(name.startswith("fresh_state_distilled_both_") for name in names)
     assert any(name.startswith("fresh_state_distilled_longonly_") for name in names)
+    assert any(name.startswith("fresh_state_crowded_unwind_v2_") for name in names)
     assert any(name.startswith("fresh_state_trx_longonly_") for name in names)
     assert any(name.startswith("fresh_state_trx_dual_mom_") for name in names)
     assert any(name.startswith("fresh_state_trx_eth_spread_") for name in names)
     assert any(name.startswith("fresh_pair_resid_revert_spread_") for name in names)
     assert any(name.startswith("fresh_pair_resid_mom_spread_") for name in names)
     assert any(name.startswith("fresh_compression_downside_short_") for name in names)
+    assert any(name.startswith("fresh_funding_oi_exhaustion_rev_") for name in names)
+    assert any(name.startswith("fresh_beta_resid_reversion_") for name in names)
+    assert any(name.startswith("fresh_dispersion_compression_state_") for name in names)
+    assert any(name.startswith("fresh_vol_regime_margin_scaled_") for name in names)
+    for spec in specs:
+        if spec.family in MODULE.NON_CALENDAR_SPEC_FAMILIES:
+            assert spec.entry_hours == ()
+            assert spec.entry_days_of_month == ()
+            assert spec.calendar_long_months == ()
+            assert spec.calendar_short_months == ()
+
+
+def test_integrated_market_state_specs_have_clean_non_calendar_variants() -> None:
+    arrays = {
+        "btcusdt_rv_24h": np.linspace(0.002, 0.003, 6),
+        "btcusdt_ret_6h": np.zeros(6),
+        "btcusdt_ret_12h": np.zeros(6),
+        "btcusdt_ret_24h": np.zeros(6),
+        "btcusdt_ret_48h": np.zeros(6),
+        "btcusdt_ret_72h": np.zeros(6),
+    }
+    specs = MODULE._candidate_specs(arrays=arrays, symbols=["BTC/USDT"])
+    lane_predicates = {
+        "crowded_leadership_unwind_v2": lambda spec: (
+            spec.family == "state_distilled_crowded_unwind_v2"
+        ),
+        "funding_oi_exhaustion_reversal": lambda spec: (
+            spec.family == "funding_oi_exhaustion_reversal"
+        ),
+        "beta_residual_reversion": lambda spec: spec.family == "beta_residual_reversion",
+        "dispersion_compression_state": lambda spec: (
+            spec.family == "dispersion_compression_breakout_unwind"
+        ),
+        "vol_regime_margin_scaled_momentum": lambda spec: (
+            spec.family == "vol_regime_margin_scaled_momentum"
+        ),
+    }
+
+    for lane, predicate in lane_predicates.items():
+        exposed = [spec for spec in specs if predicate(spec)]
+        clean = [
+            spec
+            for spec in exposed
+            if not (
+                spec.calendar_long_months
+                or spec.calendar_short_months
+                or spec.entry_days_of_month
+                or spec.entry_hours
+            )
+        ]
+        assert exposed, lane
+        assert clean, lane
+
+
+def test_regime_exposure_scales_single_leg_replay_when_not_volume_capped() -> None:
+    datetimes = [datetime(2026, 5, 1, hour, tzinfo=UTC) for hour in range(8)]
+    timestamps = np.array([int(item.timestamp()) for item in datetimes])
+    close = np.linspace(100.0, 108.0, len(datetimes))
+    arrays = {
+        "datetime": datetimes,
+        "timestamp": timestamps,
+        "symbols": ("BTC/USDT",),
+        "symbol_prefixes": ("btcusdt",),
+        "btcusdt_open": close,
+        "btcusdt_high": close * 1.02,
+        "btcusdt_low": close * 0.99,
+        "btcusdt_close": close,
+        "btcusdt_volume": np.full(len(datetimes), 100_000.0),
+        "btcusdt_ret_6h": np.full(len(datetimes), 0.03),
+        "btcusdt_resid_z_6h": np.full(len(datetimes), 2.0),
+        "btcusdt_funding_ffill": np.zeros(len(datetimes)),
+        "market_ret_6h": np.full(len(datetimes), 0.02),
+    }
+
+    def run_scaled(scale: float) -> dict[str, object]:
+        spec = FreshSpec(
+            name=f"scaled_residual_momentum_{scale}",
+            family="residual_momentum",
+            lookback_bars=6,
+            threshold=1.0,
+            hold_bars=3,
+            cooldown_bars=0,
+            stop_loss_pct=0.0,
+            take_profit_pct=0.0,
+            min_abs_return=0.01,
+            allow_long=True,
+            allow_short=False,
+            long_allocation_scale=scale,
+            short_allocation_scale=scale,
+        )
+        return MODULE._run_split(
+            spec=spec,
+            arrays=arrays,
+            split=MODULE.SplitWindow(
+                name="train",
+                start=date(2026, 5, 1),
+                end=date(2026, 5, 1),
+                role="train",
+            ),
+            include_equity=True,
+        )
+
+    low = run_scaled(0.5)
+    high = run_scaled(2.0)
+
+    assert low["fills"] == high["fills"]
+    assert high["final_equity"] > low["final_equity"]
+    assert high["metrics"]["total_return"] > low["metrics"]["total_return"]
 
 
 def test_joined_panel_reuses_cache_without_reloading_sources(
@@ -1097,10 +1327,17 @@ def test_fresh_replay_main_wraps_execution_with_memory_guard(
 
     assert MODULE.main(["--output-dir", str(tmp_path / "external_overhaul")]) == 0
 
-    payload = json.loads((tmp_path / "external_overhaul" / "fresh_start_overhaul_replay_latest.json").read_text(encoding="utf-8"))
+    payload = json.loads(
+        (tmp_path / "external_overhaul" / "fresh_start_overhaul_replay_latest.json").read_text(
+            encoding="utf-8"
+        )
+    )
     assert captured["run_name"] == MODULE.RUN_NAME
     assert captured["budget_bytes"] == MODULE.PORTFOLIO_FOLLOWUP_EXPLICIT_BUDGET_BYTES
-    assert payload["memory_policy"]["explicit_budget_bytes"] == MODULE.PORTFOLIO_FOLLOWUP_EXPLICIT_BUDGET_BYTES
+    assert (
+        payload["memory_policy"]["explicit_budget_bytes"]
+        == MODULE.PORTFOLIO_FOLLOWUP_EXPLICIT_BUDGET_BYTES
+    )
     assert payload["rss_log_path"].endswith("fresh_replay_rss_latest.jsonl")
     assert payload["memory_summary_path"].endswith("fresh_replay_memory_latest.json")
     assert payload["memory_summary"]["status"] == "completed"

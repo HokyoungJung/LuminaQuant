@@ -40,7 +40,22 @@ A legitimate non-calendar strategy now exists and reproduces part of the calenda
 
 - strict 4x has zero liquidations and positive train/validation/OOS, but OOS return/risk does not beat the current-base replay;
 - 5x/6x are non-wipeout diagnostics but have train liquidation events, so they remain blocked under strict promotion;
-- current-base calendar tuple remains invalid regardless of its performance.
+- current-base calendar tuple remains invalid regardless of its performance and is hypothesis-reference-only, not a candidate selection target.
+
+## Locked-OOS selection firewall audit
+Worker-3 inspected the relevant scripts/tests without editing them. The audited contract is:
+
+- Candidate freeze is train/validation-only: `train_val_stability_score_from_components` uses train and validation components only, and the final selection payload records `selection_inputs=["train", "validation"]` with `uses_locked_oos_for_selection=false`.
+- Locked-OOS opens only after that freeze as a report/gate surface: OOS metrics can veto live promotion through deployability gates, but they cannot rank, tune, or replace the train/validation-selected candidate.
+- Current-base/calendar evidence can be used only as a rejected hypothesis/reference baseline after valid non-calendar candidates are frozen; it must not be resurrected as a live sleeve or optimizer target.
+- Existing regression coverage already exercises OOS-poison and report-only behavior in `tests/test_profit_moonshot_live_final_selection.py`, `tests/test_profit_moonshot_liquidation_aware_validation.py`, and `tests/test_profit_moonshot_fresh_portfolio_tuning.py`.
+
+## Worker-3 reconciliation evidence
+This reconciliation updated only the docs/report handoff text above. Scripts and tests were inspected, not edited. Post-reconciliation regression evidence was rerun as a guardrail, not as new research performance evidence. The 67-test pytest count below is Worker-3 Task-9 verification evidence, not an additional 2026-05-11 replay/validation result:
+
+- `git diff --check` passed.
+- `uv run --extra dev ruff check` on the inspected locked-OOS scripts/src/tests paths passed.
+- `uv run --extra dev pytest -q` on the six inspected locked-OOS suites passed: 67 tests.
 
 ## Verification completed so far
 - Targeted tests: `uv run --extra dev pytest -q tests/test_profit_moonshot_fresh_start_replay.py tests/test_profit_moonshot_liquidation_aware_validation.py` → 34 passed.
