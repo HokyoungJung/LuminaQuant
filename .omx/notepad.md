@@ -635,7 +635,7 @@ User corrected scope: do not only compare HYBRID. Need full universe: all saved 
 - Best state-distilled raw row `fresh_state_distilled_both_lb168_fast72_z075_ret180_h168_ls590_ss100_tp600`: train +8.0437%, validation +2.9051%, OOS +0.7380%, OOS MDD 0.6042%, Sharpe 1.7795.
 - Liquidation-aware selected non-calendar row at 4x: train +32.9431%, validation +11.6925%, OOS +2.4722%, OOS MDD 2.5328%, zero liquidations, min buffers positive; strategy-valid but not deployable vs current-base OOS return/risk.
 - 5x/6x diagnostics have no account wipeout and positive OOS (+3.0887%/+3.7036%) but train liquidations 2/4, so strict promotion remains blocked. Calendar-primary current-base remains invalid.
-- Full verification: targeted profit-moonshot suite 54 passed; full pytest 1264 passed in 264.61s / wall 4:01.78, max RSS 2782136 KiB; ruff check ., compileall scripts/tests/src, and git diff --check passed.
+- Full verification: targeted profit-moonshot suite 54 passed; full pytest 1264 passed in 264.61s / wall 4:01.78, max RSS 2782136 KiB; hardcoded parameter audit new=0, ruff check ., compileall scripts/tests/src, and git diff --check passed.
 
 ## 2026-05-11 — State-distilled next plan handoff
 - Wrote next plan: `.omx/plans/profit_moonshot_state_distilled_next_plan_20260511.md`.
@@ -650,3 +650,10 @@ User corrected scope: do not only compare HYBRID. Need full universe: all saved 
 - Train/validation-only portfolio diagnostic on prior leadership-unwind top18: 56,203 portfolio specs, 0 success; selected train/validation candidate OOS +4.6759%/MDD 6.9705%; diagnostic-best-OOS +8.2808% is report-only and not selectable.
 - Final liquidation-aware validation: 62 seeds / 366 integer results / 0 deployable. Train/validation-selected retune at 2x has zero liquidations and positive train/validation returns but OOS +2.1440%/MDD 5.0839% fails baseline economics. Highest strict zero-liquidation selection-target leverage remains 4x prior state-distilled row with OOS +2.4722%/MDD 2.5328%, below current-base reference +6.4281% and return/MDD 6.9169. Diagnostic 5x/6x portfolio has 10/17 total liquidations, no wipeout, OOS +5.0099%/+5.8698%, non-promotional. Memory under 8 GiB.
 - Artifacts: docs/session_handoff_20260511_profit_moonshot_state_distilled_market_state_next.md; var/reports/.../state_distilled_market_state_next_20260512/; var/reports/.../liquidation_aware_state_distilled_market_state_next_20260512/.
+
+## 2026-05-12 — Crypto/FX Alpha Zoo state foundation
+- Implemented `CryptoFxAlphaZooStateStrategy` research scaffold: Alpha191-style factor operators/specs, train/validation-only screen, factor cards, triple-barrier outcome labels, candidate ledger, edge calibration, and crypto strategy with FX USD/JPY regime filter + calibrated-edge gate.
+- Added 63 bounded crypto/FX factors; no calendar/month/day/hour fields are allowed for valid candidate specs. Locked-OOS remains report-only/gate-only and `uses_locked_oos_for_selection=false` is persisted in screen/cards/strategy/report artifacts.
+- Registered `crypto_fx_alpha_zoo_state` as live opt-in; no live promotion was made. Smoke report is infrastructure-only: 720 synthetic rows, 21 smoke signals, 2 calibration buckets, decision `research_scaffold_only_no_live_promotion`.
+- Artifacts: `.omx/plans/profit_moonshot_crypto_fx_alpha_zoo_state_plan_20260512.md`, `docs/session_handoff_20260512_crypto_fx_alpha_zoo_state.md`, `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_state_20260512/`.
+- Verification: smoke screen/replay/calibration passed; targeted pytest 14 passed; focused pytest 20 passed; full pytest 1289 passed in 288.64s; hardcoded parameter audit new=0, ruff check ., compileall scripts/tests/src, and git diff --check passed.

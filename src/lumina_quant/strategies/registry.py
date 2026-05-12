@@ -14,6 +14,7 @@ from .adaptive_regime_momentum import AdaptiveRegimeMomentumStrategy
 from .alpha101_formula import Alpha101FormulaStrategy
 from .bitcoin_buy_hold import BitcoinBuyHoldStrategy
 from .compression_breakout_continuation import CompressionBreakoutContinuationStrategy
+from .crypto_fx_alpha_zoo_state import CryptoFxAlphaZooStateStrategy
 from .lag_convergence import LagConvergenceStrategy
 from .mean_reversion_std import MeanReversionStdStrategy
 from .pair_trading_zscore import PairTradingZScoreStrategy
@@ -106,6 +107,7 @@ _RAW_STRATEGY_MAP: dict[str, StrategyClass | None] = {
     "Alpha101FormulaStrategy": Alpha101FormulaStrategy,
     "BitcoinBuyHoldStrategy": BitcoinBuyHoldStrategy,
     "CompressionBreakoutContinuationStrategy": CompressionBreakoutContinuationStrategy,
+    "CryptoFxAlphaZooStateStrategy": CryptoFxAlphaZooStateStrategy,
     "LagConvergenceStrategy": LagConvergenceStrategy,
     "MeanReversionStdStrategy": MeanReversionStdStrategy,
     "PanicReboundMeanReversionStrategy": PanicReboundMeanReversionStrategy,
@@ -153,6 +155,7 @@ _STRATEGY_TIER_HINTS: dict[str, str] = {
     "Alpha101FormulaStrategy": "research_only",
     "BitcoinBuyHoldStrategy": "live_default",
     "CompressionBreakoutContinuationStrategy": "live_opt_in",
+    "CryptoFxAlphaZooStateStrategy": "live_opt_in",
     "LagConvergenceStrategy": "live_default",
     "MeanReversionStdStrategy": "live_default",
     "PanicReboundMeanReversionStrategy": "live_opt_in",
@@ -198,6 +201,7 @@ _OPTUNA_TRIAL_OVERRIDES: dict[str, str] = {
     "Alpha101FormulaStrategy": "24",
     "LagConvergenceStrategy": "24",
     "CompressionBreakoutContinuationStrategy": "20",
+    "CryptoFxAlphaZooStateStrategy": "16",
     "MeanReversionStdStrategy": "24",
     "PanicReboundMeanReversionStrategy": "20",
     "ProfitMoonshotBreakoutStrategy": "20",
