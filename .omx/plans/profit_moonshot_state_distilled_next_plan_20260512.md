@@ -104,3 +104,13 @@ Use Ralph as the persistent single-owner loop after team execution to integrate 
 - Liquidation-aware validation: `62` candidate seeds, `366` integer results, `0` deployable candidates. Train/validation-selected candidate at `2x` is strict-liquidation safe but fails OOS economic gates. Highest strict zero-liquidation selection target remains the prior `fresh_state_distilled_both_lb168_fast72_z075_ret180_h168_ls590_ss100_tp600` at `4x`; locked-OOS report `+2.4722%` / MDD `2.5328%` / return-MDD `0.9761` does not beat the reference `+6.4281%` / `6.9169`.
 - Diagnostic high-leverage lane is non-promotional: train/validation-selected portfolio at `5x` has `10` total liquidations, at `6x` has `17`; no wipeout, but strict promotion blocked.
 - Result: strategy-validity/provenance improved, but strict deployable improvement remains `false`. Next pass should diagnose activation/threshold coverage before any broader grid expansion.
+
+## Execution result — 2026-05-12 KST external-risk teacher pass
+
+- Added lagged external market-state ingestion from FRED via `scripts/research/fetch_profit_moonshot_external_state.py` and joined it into replay/liquidation via `--external-state-csv`.
+- Added non-calendar families: `calendar_teacher_state_similarity`, `calendar_teacher_state_fade`, and `state_distilled_external_risk_filter`.
+- Teacher similarity/fade were not useful: similarity `972` specs and fade `324` specs both produced `0` survivors and no train/validation-positive improvement.
+- External-risk filtered state-distilled replay: `1,728` specs, `565` train/validation-positive, `0` replay survivors under the legacy shadow-MDD gate, peak RSS `280.348 MiB`.
+- Best train/validation-positive OOS diagnostic row after freeze (report-only, not selector): `fresh_state_distilled_ext_both_lb336_fast168_z050_ret180_h120_tp750_fl0_xr200`, vector train `+3.2248%`, validation `+1.8146%`, locked-OOS `+1.4128%`, OOS MDD `0.5320%`, Sharpe `3.6699`.
+- Liquidation-aware train/validation-selected strict row: `fresh_state_distilled_ext_both_lb168_fast72_z075_ret180_h168_tp600_fl0_xr125` at `4x`, train `+30.9030%`, validation `+12.4704%`, locked-OOS `+2.4852%`, MDD `2.5328%`, Sharpe `1.5096`, liquidation `0`, min margin buffers positive, strategy-validity pass.
+- Decision: no live promotion. The new valid external-risk line still does not beat invalid current-base/calendar reference OOS `+6.4281%` and return/MDD `6.9169`; 5x/6x remains diagnostic-only because train/validation liquidations appear.

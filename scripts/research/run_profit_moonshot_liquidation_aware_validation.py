@@ -2099,6 +2099,9 @@ def run_validation(args: argparse.Namespace) -> dict[str, Any]:
         start=start,
         end=end,
     )
+    panel, external_state_metadata = fresh._join_external_state(
+        panel, str(getattr(args, "external_state_csv", "") or "")
+    )
     arrays = fresh._build_arrays(panel, symbols)
     specs_by_name = {spec.name: spec for spec in fresh._candidate_specs(arrays, symbols)}
     missing = [name for name in CURRENT_BASE_SLEEVES if name not in specs_by_name]
@@ -2322,6 +2325,7 @@ def run_validation(args: argparse.Namespace) -> dict[str, Any]:
         },
         "highest_zero_liquidation_integer": highest_zero_liq,
         "data_metadata": data_metadata,
+        "external_state_metadata": external_state_metadata,
         "memory_policy": memory_policy_payload(
             budget_bytes=PORTFOLIO_FOLLOWUP_EXPLICIT_BUDGET_BYTES
         ),
@@ -2378,6 +2382,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--current-base-artifact", default=str(DEFAULT_CURRENT_BASE_ARTIFACT))
     parser.add_argument("--integer-audit-artifact", default=str(DEFAULT_INTEGER_AUDIT_ARTIFACT))
     parser.add_argument("--candidate-csv", default=str(DEFAULT_CANDIDATE_CSV))
+    parser.add_argument(
+        "--external-state-csv",
+        default="",
+        help="Optional lagged daily external market-state CSV with external_* columns.",
+    )
     parser.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_DIR))
     parser.add_argument("--max-leverage", type=int, default=6)
     parser.add_argument("--retune-audit-limit", type=int, default=0)
@@ -2409,6 +2418,7 @@ def main(argv: list[str] | None = None) -> int:
             "current_base_artifact": str(args.current_base_artifact),
             "integer_audit_artifact": str(args.integer_audit_artifact),
             "candidate_csv": str(args.candidate_csv),
+            "external_state_csv": str(args.external_state_csv),
             "max_leverage": int(args.max_leverage),
             "allowed_total_liquidations": int(args.allowed_total_liquidations),
             "selection": "train_validation_only",

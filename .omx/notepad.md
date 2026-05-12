@@ -657,3 +657,19 @@ User corrected scope: do not only compare HYBRID. Need full universe: all saved 
 - Registered `crypto_fx_alpha_zoo_state` as live opt-in; no live promotion was made. Smoke report is infrastructure-only: 720 synthetic rows, 21 smoke signals, 2 calibration buckets, decision `research_scaffold_only_no_live_promotion`.
 - Artifacts: `.omx/plans/profit_moonshot_crypto_fx_alpha_zoo_state_plan_20260512.md`, `docs/session_handoff_20260512_crypto_fx_alpha_zoo_state.md`, `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_state_20260512/`.
 - Verification: smoke screen/replay/calibration passed; targeted pytest 14 passed; focused pytest 20 passed; full pytest 1289 passed in 288.64s; hardcoded parameter audit new=0, ruff check ., compileall scripts/tests/src, and git diff --check passed.
+
+## 2026-05-12 — state-distilled external-risk teacher pass
+
+- Answered calendar-teacher question: the old calendar/current-base tuple still has strong locked-OOS reference performance (+6.4281% return, return/MDD 6.9169, Sharpe 5.2024), but it remains `hypothesis_reference_only` because calendar-primary/fixed month entry is invalid for live promotion. The valid teacher-distilled line is `state_distilled_leadership_unwind`; its strict 4x candidate remains zero-liquidation but only OOS +2.4722%, below current-base reference economics.
+- Added external FRED lagged state fetch: `scripts/research/fetch_profit_moonshot_external_state.py`; outputs `external_market_state_lagged.csv/json` from DTWEXBGS, VIXCLS, DGS2, DGS10, DCOILWTICO with one-observation lag.
+- Added non-calendar families in `scripts/research/replay_profit_moonshot_fresh_start.py`:
+  - `calendar_teacher_state_similarity` (teacher-like state classifier; no calendar fields)
+  - `calendar_teacher_state_fade` (diagnostic contrarian fade; no promotion)
+  - `state_distilled_external_risk_filter` (existing state-distilled leadership/unwind gated by lagged external risk-off score)
+- Replay artifacts:
+  - `.../calendar_teacher_state_similarity_20260512/`: 972 specs, 0 survivor; all train/val negative.
+  - `.../calendar_teacher_state_fade_20260512/`: 324 specs, 0 survivor; all train/val negative.
+  - `.../state_distilled_external_risk_filter_20260512/`: 1728 specs, 565 train/val-positive, 0 replay survivor due legacy shadow-MDD gate, peak RSS 280.348 MiB.
+- Best train/val-positive OOS diagnostic row (OOS-ranked after freeze, report-only): `fresh_state_distilled_ext_both_lb336_fast168_z050_ret180_h120_tp750_fl0_xr200`, vector train +3.2248%, val +1.8146%, OOS +1.4128%, OOS MDD 0.5320%, Sharpe 3.6699, 0 replay liquidations; not used for selection.
+- Liquidation-aware train/validation-selected strict row: `fresh_state_distilled_ext_both_lb168_fast72_z075_ret180_h168_tp600_fl0_xr125` at 4x, train +30.9030% / MDD 10.2437% / Sharpe 1.8484; validation +12.4704% / MDD 2.5167% / Sharpe 5.7588; OOS +2.4852% / MDD 2.5328% / Sharpe 1.5096; liquidation count 0 and min margin buffers positive, strategy_validity pass, but deployable_success false because it still does not beat current-base reference OOS +6.4281% / return-MDD 6.9169.
+- Diagnostic 5x/6x high leverage stayed non-promotional: OOS can reach ~3.7% in some 6x diagnostic rows, but train/validation liquidations occur, so strict lane blocks promotion.

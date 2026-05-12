@@ -80,8 +80,11 @@ FEATURE_VALUE_COLUMNS = (
 NON_CALENDAR_SPEC_FAMILIES = frozenset(
     {
         "beta_residual_reversion",
+        "calendar_teacher_state_fade",
+        "calendar_teacher_state_similarity",
         "dispersion_compression_breakout_unwind",
         "funding_oi_exhaustion_reversal",
+        "state_distilled_external_risk_filter",
         "state_distilled_leadership_unwind",
         "state_distilled_crowded_unwind_v2",
         "vol_regime_margin_scaled_momentum",
@@ -141,6 +144,7 @@ class FreshSpec:
     calendar_veto_market_ret_abs: float = 0.0
     calendar_veto_flow_abs: float = 0.0
     spread_hedge_ratio: float = 1.0
+    external_risk_max: float = 0.0
 
     def payload(self) -> dict[str, Any]:
         return {
@@ -188,6 +192,7 @@ class FreshSpec:
             "calendar_veto_market_ret_abs": self.calendar_veto_market_ret_abs,
             "calendar_veto_flow_abs": self.calendar_veto_flow_abs,
             "spread_hedge_ratio": self.spread_hedge_ratio,
+            "external_risk_max": self.external_risk_max,
             "target_allocation": TARGET_ALLOCATION,
             "max_order_value": MAX_ORDER_VALUE,
         }
@@ -789,6 +794,9 @@ def _build_arrays(panel: pl.DataFrame, symbols: list[str]) -> dict[str, Any]:
         "symbols": tuple(symbols),
         "symbol_prefixes": tuple(_symbol_prefix(symbol) for symbol in symbols),
     }
+    for column in panel.columns:
+        if column.startswith("external_"):
+            arrays[column] = _to_float_array(panel, column)
     close_stack: list[np.ndarray] = []
     for symbol in symbols:
         prefix = _compact(symbol).lower()
@@ -852,6 +860,66 @@ def _build_arrays(panel: pl.DataFrame, symbols: list[str]) -> dict[str, Any]:
                 residual, max(24, lookback * 4)
             )
     return arrays
+
+
+def _join_external_state(panel: pl.DataFrame, external_state_csv: str | Path) -> tuple[pl.DataFrame, dict[str, Any]]:
+    """Join lagged daily external market-state features to the hourly crypto panel.
+
+    The external CSV is expected to be pre-lagged by the fetch script so the
+    feature available for a UTC date only uses information from prior dates.
+    This function keeps the join fail-closed: malformed or empty files do not
+    create synthetic signal and are reported in metadata instead.
+    """
+    path = Path(external_state_csv)
+    metadata: dict[str, Any] = {
+        "path": str(path),
+        "enabled": bool(str(external_state_csv).strip()),
+        "joined": False,
+        "feature_columns": [],
+        "rows": 0,
+    }
+    if not str(external_state_csv).strip():
+        return panel, metadata
+    if not path.exists():
+        metadata["error"] = "external_state_csv_missing"
+        return panel, metadata
+    try:
+        external = pl.read_csv(path, try_parse_dates=True)
+    except Exception as exc:  # pragma: no cover - defensive metadata path
+        metadata["error"] = f"external_state_csv_read_failed:{exc}"
+        return panel, metadata
+    date_column = "effective_date" if "effective_date" in external.columns else "date"
+    if date_column not in external.columns:
+        metadata["error"] = "external_state_csv_missing_date_column"
+        return panel, metadata
+    feature_columns = [column for column in external.columns if column.startswith("external_")]
+    if not feature_columns:
+        metadata["error"] = "external_state_csv_missing_external_columns"
+        return panel, metadata
+    external = (
+        external.select([pl.col(date_column).cast(pl.Date).alias("external_join_date"), *feature_columns])
+        .unique(subset=["external_join_date"], keep="last")
+        .sort("external_join_date")
+    )
+    joined = (
+        panel.with_columns(pl.col("datetime").dt.date().alias("external_join_date"))
+        .join(external, on="external_join_date", how="left")
+        .drop("external_join_date")
+    )
+    metadata.update(
+        {
+            "joined": True,
+            "feature_columns": feature_columns,
+            "rows": int(external.height),
+            "first_effective_date": (
+                external["external_join_date"][0].isoformat() if external.height else None
+            ),
+            "last_effective_date": (
+                external["external_join_date"][-1].isoformat() if external.height else None
+            ),
+        }
+    )
+    return joined, metadata
 
 
 def _hour_utc(dt: datetime) -> int:
@@ -1249,6 +1317,224 @@ def _state_distilled_crowded_unwind_v2_signal(
     return symbol, side, ""
 
 
+def _external_risk_score(arrays: dict[str, Any], idx: int) -> float:
+    """Return lagged external risk-off score when an external panel is joined."""
+    for key in (
+        "external_risk_off_score_lag1",
+        "external_risk_off_score",
+        "external_vix_z_lag1",
+        "external_vix_z",
+    ):
+        value = _array_value(arrays, key, idx)
+        if math.isfinite(value):
+            return float(value)
+    return 0.0
+
+
+def _calendar_teacher_state_similarity_signal(
+    spec: FreshSpec, arrays: dict[str, Any], idx: int
+) -> tuple[str, str, str]:
+    """Trade market states that resemble the rejected calendar teacher without dates.
+
+    The invalid calendar tuple is used only as a research teacher: it suggested
+    that outsized returns came from a mix of alt leadership, major-coin laggard
+    unwind, and risk-regime timing.  This live-valid proxy consumes only
+    observable state at the bar: cross-sectional residual rank, slow/fast
+    returns, taker flow, funding/OI crowding, broad-market return, realized vol,
+    and optional lagged external risk state.  It never reads month/day/hour
+    entry fields or fixed calendar target symbols.
+    """
+    if _non_calendar_spec_calendar_fields(spec):
+        return "", "", "non_calendar_calendar_field_block"
+
+    symbols = tuple(arrays["symbols"])
+    prefixes = tuple(
+        arrays.get("symbol_prefixes") or tuple(_symbol_prefix(symbol) for symbol in symbols)
+    )
+    lookback = max(1, int(spec.lookback_bars))
+    fast_lookback = max(1, int(spec.adaptive_lookback_bars or 24))
+    flow_lookback = max(1, int(spec.flow_lookback_bars or 6))
+    oi_lookback = max(1, int(spec.sharpe_lookback_bars or spec.flow_lookback_bars or 12))
+    min_abs_return = max(0.0, float(spec.min_abs_return))
+    resid_threshold = max(0.0, float(spec.threshold))
+    min_rank_gap = max(0.0, float(spec.sharpe_rank_min))
+    flow_threshold = max(0.0, float(spec.flow_threshold))
+    market_ret = _array_value(arrays, f"market_ret_{lookback}h", idx)
+    fast_market_ret = _array_value(arrays, f"market_ret_{fast_lookback}h", idx)
+    external_risk = _external_risk_score(arrays, idx)
+
+    states: list[dict[str, float | str]] = []
+    for symbol, prefix in zip(symbols, prefixes, strict=True):
+        if _compact(symbol) == "BTCUSDT":
+            continue
+        close = _array_value(arrays, f"{prefix}_close", idx)
+        if not math.isfinite(close) or close <= 0.0:
+            continue
+        if spec.max_rv > 0.0:
+            rv = _array_value(arrays, f"{prefix}_rv_{spec.rv_lookback_bars}h", idx)
+            if not math.isfinite(rv) or rv > float(spec.max_rv):
+                continue
+        ret = _array_value(arrays, f"{prefix}_ret_{lookback}h", idx)
+        fast_ret = _array_value(arrays, f"{prefix}_ret_{fast_lookback}h", idx)
+        resid_z = _array_value(arrays, f"{prefix}_resid_z_{lookback}h", idx)
+        flow = _array_value(arrays, f"{prefix}_flow_imbalance_{flow_lookback}h", idx)
+        funding = _array_value(arrays, f"{prefix}_funding_ffill", idx)
+        oi_delta = _array_value(arrays, f"{prefix}_oi_delta_{oi_lookback}h", idx)
+        if not math.isfinite(ret) or not math.isfinite(resid_z):
+            continue
+        flow_score = float(flow) if math.isfinite(flow) else 0.0
+        fast_score = float(fast_ret) if math.isfinite(fast_ret) else float(ret)
+        funding_score = float(funding) if math.isfinite(funding) else 0.0
+        oi_score = float(oi_delta) if math.isfinite(oi_delta) else 0.0
+        normalized_ret = float(ret) / max(min_abs_return, 0.001)
+        normalized_fast = fast_score / max(min_abs_return, 0.001)
+        states.append(
+            {
+                "symbol": symbol,
+                "ret": float(ret),
+                "fast_ret": fast_score,
+                "resid_z": float(resid_z),
+                "flow": flow_score,
+                "funding": funding_score,
+                "oi_delta": oi_score,
+                "long_score": (
+                    float(resid_z)
+                    + 0.25 * normalized_ret
+                    + 0.20 * max(0.0, normalized_fast)
+                    + 0.70 * max(0.0, flow_score)
+                    - 0.20 * max(0.0, external_risk)
+                    - 500.0 * max(0.0, funding_score)
+                ),
+                "short_score": (
+                    -float(resid_z)
+                    - 0.25 * normalized_ret
+                    + 0.20 * max(0.0, -normalized_fast)
+                    + 0.70 * max(0.0, -flow_score)
+                    + 0.20 * max(0.0, external_risk)
+                    + 0.10 * max(0.0, oi_score)
+                    + 500.0 * max(0.0, funding_score)
+                ),
+                "crowded_unwind_score": (
+                    float(resid_z)
+                    + 0.25 * max(0.0, normalized_ret)
+                    + 0.20 * max(0.0, external_risk)
+                    + 0.70 * max(0.0, -flow_score)
+                    + 0.10 * max(0.0, oi_score)
+                    + 500.0 * max(0.0, funding_score)
+                ),
+            }
+        )
+
+    if len(states) < 2:
+        return "", "", "teacher_state_universe_too_small"
+
+    strongest_resid = max(float(row["resid_z"]) for row in states)
+    weakest_resid = min(float(row["resid_z"]) for row in states)
+    rank_gap = strongest_resid - weakest_resid
+    if rank_gap < min_rank_gap:
+        return "", "", "teacher_state_rank_gap_too_small"
+
+    broad_ok_for_longs = (
+        not math.isfinite(market_ret)
+        or spec.broad_min_abs <= 0.0
+        or market_ret >= -float(spec.broad_min_abs)
+    ) and (not math.isfinite(fast_market_ret) or fast_market_ret >= -float(spec.broad_min_abs))
+    if spec.external_risk_max > 0.0 and external_risk > float(spec.external_risk_max):
+        broad_ok_for_longs = False
+    broad_supports_shorts = (
+        math.isfinite(market_ret) and market_ret <= -float(spec.broad_min_abs)
+        if spec.broad_min_abs > 0.0
+        else math.isfinite(market_ret) and market_ret < 0.0
+    ) or external_risk > 0.0
+
+    long_candidates: list[tuple[float, str, str]] = []
+    short_candidates: list[tuple[float, str, str]] = []
+    for row in states:
+        ret = float(row["ret"])
+        fast_ret = float(row["fast_ret"])
+        resid_z = float(row["resid_z"])
+        flow = float(row["flow"])
+        funding = float(row["funding"])
+        oi_delta = float(row["oi_delta"])
+        if (
+            spec.allow_long
+            and broad_ok_for_longs
+            and ret >= min_abs_return
+            and fast_ret >= -0.25 * min_abs_return
+            and resid_z >= resid_threshold
+            and (flow_threshold <= 0.0 or flow >= -0.5 * flow_threshold)
+            and (
+                spec.funding_abs_cap <= 0.0
+                or not math.isfinite(funding)
+                or funding <= spec.funding_abs_cap
+            )
+        ):
+            long_candidates.append((float(row["long_score"]), str(row["symbol"]), "LONG"))
+
+        laggard_break = (
+            ret <= -min_abs_return
+            and fast_ret <= 0.25 * min_abs_return
+            and resid_z <= -resid_threshold
+        )
+        crowded_break = (
+            ret >= min_abs_return
+            and resid_z >= resid_threshold
+            and (
+                fast_ret <= max(0.0, ret * 0.35)
+                or flow <= -flow_threshold
+                or (spec.funding_rank_min > 0.0 and funding >= spec.funding_rank_min)
+                or (spec.oi_rank_min > 0.0 and oi_delta >= spec.oi_rank_min)
+            )
+        )
+        if (
+            spec.allow_short
+            and (broad_supports_shorts or laggard_break or crowded_break)
+            and (laggard_break or crowded_break)
+            and (flow_threshold <= 0.0 or flow <= flow_threshold)
+        ):
+            score_key = "crowded_unwind_score" if crowded_break else "short_score"
+            short_candidates.append((float(row[score_key]), str(row["symbol"]), "SHORT"))
+
+    candidates = long_candidates + short_candidates
+    if not candidates:
+        return "", "", "signal_missing"
+    candidates.sort(reverse=True, key=lambda item: item[0])
+    _, symbol, side = candidates[0]
+    return symbol, side, ""
+
+
+def _calendar_teacher_state_fade_signal(
+    spec: FreshSpec, arrays: dict[str, Any], idx: int
+) -> tuple[str, str, str]:
+    """Fade teacher-like crowded states when train/validation prove the teacher sign decays."""
+    symbol, side, reason = _calendar_teacher_state_similarity_signal(spec, arrays, idx)
+    if reason:
+        return "", "", reason
+    if side == "LONG" and spec.allow_short:
+        return symbol, "SHORT", ""
+    if side == "SHORT" and spec.allow_long:
+        return symbol, "LONG", ""
+    return "", "", "teacher_fade_side_blocked"
+
+
+def _state_distilled_external_risk_filter_signal(
+    spec: FreshSpec, arrays: dict[str, Any], idx: int
+) -> tuple[str, str, str]:
+    """Apply lagged external risk-state gating to state-distilled leadership/unwind."""
+    symbol, side, reason = _state_distilled_leadership_unwind_signal(spec, arrays, idx)
+    if reason:
+        return "", "", reason
+    risk_max = float(spec.external_risk_max)
+    if risk_max <= 0.0:
+        return symbol, side, ""
+    external_risk = _external_risk_score(arrays, idx)
+    if side == "LONG" and external_risk > risk_max:
+        return "", "", "external_risk_long_block"
+    if side == "SHORT" and external_risk < -risk_max:
+        return "", "", "external_risk_short_block"
+    return symbol, side, ""
+
+
 def _candidate_signal(spec: FreshSpec, arrays: dict[str, Any], idx: int) -> tuple[str, str, str]:
     blocked = _entry_window_block_reason(spec, arrays, idx)
     if blocked:
@@ -1263,6 +1549,12 @@ def _candidate_signal(spec: FreshSpec, arrays: dict[str, Any], idx: int) -> tupl
         return _state_distilled_leadership_unwind_signal(spec, arrays, idx)
     if spec.family == "state_distilled_crowded_unwind_v2":
         return _state_distilled_crowded_unwind_v2_signal(spec, arrays, idx)
+    if spec.family == "state_distilled_external_risk_filter":
+        return _state_distilled_external_risk_filter_signal(spec, arrays, idx)
+    if spec.family == "calendar_teacher_state_similarity":
+        return _calendar_teacher_state_similarity_signal(spec, arrays, idx)
+    if spec.family == "calendar_teacher_state_fade":
+        return _calendar_teacher_state_fade_signal(spec, arrays, idx)
     if (
         spec.family != "calendar_rotation"
         and spec.broad_min_abs > 0.0
@@ -2950,6 +3242,142 @@ def _candidate_specs(arrays: dict[str, Any], symbols: list[str]) -> list[FreshSp
                                     trailing_stop_floor_pct=0.0,
                                     trailing_stop_cap_pct=0.0,
                                 )
+    for lookback, fast_lookback, oi_lookback in ((72, 24, 12), (168, 72, 24), (336, 72, 24)):
+        for resid_z in (0.35, 0.50, 0.75):
+            for min_return in (0.003, 0.006, 0.009):
+                for hold in (72, 120, 168):
+                    for flow_threshold in (0.0, 0.02):
+                        for mode_label, allow_long, allow_short, long_scale, short_scale in (
+                            ("both", True, True, 5.9, 8.0),
+                            ("longonly", True, False, 6.2, 0.0),
+                            ("shortonly", False, True, 0.0, 6.0),
+                        ):
+                            for external_risk_max in (0.0, 1.25):
+                                risk_label = (
+                                    f"_xr{int(external_risk_max * 100)}"
+                                    if external_risk_max
+                                    else ""
+                                )
+                                name = (
+                                    f"fresh_calendar_teacher_state_{mode_label}_lb{lookback}_"
+                                    f"fast{fast_lookback}_z{int(resid_z * 100):03d}_"
+                                    f"ret{int(min_return * 10000)}_h{hold}_"
+                                    f"fl{int(flow_threshold * 100)}{risk_label}"
+                                )
+                                specs[name] = FreshSpec(
+                                    name=name,
+                                    family="calendar_teacher_state_similarity",
+                                    lookback_bars=lookback,
+                                    threshold=resid_z,
+                                    hold_bars=hold,
+                                    cooldown_bars=max(1, hold // 4),
+                                    stop_loss_pct=0.004,
+                                    take_profit_pct=0.045,
+                                    min_abs_return=min_return,
+                                    allow_long=allow_long,
+                                    allow_short=allow_short,
+                                    adaptive_lookback_bars=fast_lookback,
+                                    flow_lookback_bars=6,
+                                    flow_threshold=flow_threshold,
+                                    sharpe_lookback_bars=oi_lookback,
+                                    sharpe_rank_min=max(0.50, resid_z),
+                                    funding_rank_min=0.00010,
+                                    funding_abs_cap=0.00025,
+                                    oi_rank_min=0.012,
+                                    broad_min_abs=0.006,
+                                    long_allocation_scale=long_scale,
+                                    short_allocation_scale=short_scale,
+                                    trailing_stop_rv_multiple=0.8,
+                                    trailing_stop_floor_pct=0.004,
+                                    trailing_stop_cap_pct=0.012,
+                                    external_risk_max=external_risk_max,
+                                )
+    for lookback, fast_lookback in ((168, 72), (336, 168)):
+        for resid_z in (0.50, 0.75):
+            for min_return in (0.006, 0.012, 0.018):
+                for hold in (120, 168):
+                    for flow_threshold in (0.0, 0.03):
+                        for mode_label, allow_long, allow_short, long_scale, short_scale in (
+                            ("both", True, True, 5.9, 10.0),
+                            ("longonly", True, False, 6.2, 0.0),
+                        ):
+                            for take in (0.045, 0.060, 0.075):
+                                for external_risk_max in (0.50, 1.00, 1.25, 1.50, 1.75, 2.00):
+                                    name = (
+                                        f"fresh_state_distilled_ext_{mode_label}_lb{lookback}_"
+                                        f"fast{fast_lookback}_z{int(resid_z * 100):03d}_"
+                                        f"ret{int(min_return * 10000)}_h{hold}_"
+                                        f"tp{int(take * 10000)}_fl{int(flow_threshold * 100)}_"
+                                        f"xr{int(external_risk_max * 100)}"
+                                    )
+                                    specs[name] = FreshSpec(
+                                        name=name,
+                                        family="state_distilled_external_risk_filter",
+                                        lookback_bars=lookback,
+                                        threshold=resid_z,
+                                        hold_bars=hold,
+                                        cooldown_bars=max(0, hold // 4),
+                                        stop_loss_pct=0.0,
+                                        take_profit_pct=take,
+                                        min_abs_return=min_return,
+                                        allow_long=allow_long,
+                                        allow_short=allow_short,
+                                        adaptive_lookback_bars=fast_lookback,
+                                        flow_lookback_bars=6,
+                                        flow_threshold=flow_threshold,
+                                        sharpe_lookback_bars=6,
+                                        sharpe_rank_min=max(1.0, resid_z * 1.5),
+                                        oi_rank_min=0.02 if flow_threshold > 0.0 else 0.0,
+                                        long_allocation_scale=long_scale,
+                                        short_allocation_scale=short_scale,
+                                        trailing_stop_rv_multiple=0.0,
+                                        trailing_stop_floor_pct=0.0,
+                                        trailing_stop_cap_pct=0.0,
+                                        external_risk_max=external_risk_max,
+                                    )
+    for lookback, fast_lookback, oi_lookback in ((72, 24, 12), (168, 72, 24), (336, 72, 24)):
+        for resid_z in (0.35, 0.50, 0.75):
+            for min_return in (0.003, 0.006, 0.009):
+                for hold in (72, 120, 168):
+                    for flow_threshold in (0.0, 0.02):
+                        for external_risk_max in (0.0, 1.25):
+                            risk_label = (
+                                f"_xr{int(external_risk_max * 100)}" if external_risk_max else ""
+                            )
+                            name = (
+                                f"fresh_calendar_teacher_fade_both_lb{lookback}_"
+                                f"fast{fast_lookback}_z{int(resid_z * 100):03d}_"
+                                f"ret{int(min_return * 10000)}_h{hold}_"
+                                f"fl{int(flow_threshold * 100)}{risk_label}"
+                            )
+                            specs[name] = FreshSpec(
+                                name=name,
+                                family="calendar_teacher_state_fade",
+                                lookback_bars=lookback,
+                                threshold=resid_z,
+                                hold_bars=hold,
+                                cooldown_bars=max(1, hold // 4),
+                                stop_loss_pct=0.004,
+                                take_profit_pct=0.045,
+                                min_abs_return=min_return,
+                                allow_long=True,
+                                allow_short=True,
+                                adaptive_lookback_bars=fast_lookback,
+                                flow_lookback_bars=6,
+                                flow_threshold=flow_threshold,
+                                sharpe_lookback_bars=oi_lookback,
+                                sharpe_rank_min=max(0.50, resid_z),
+                                funding_rank_min=0.00010,
+                                funding_abs_cap=0.00025,
+                                oi_rank_min=0.012,
+                                broad_min_abs=0.006,
+                                long_allocation_scale=6.0,
+                                short_allocation_scale=8.0,
+                                trailing_stop_rv_multiple=0.8,
+                                trailing_stop_floor_pct=0.004,
+                                trailing_stop_cap_pct=0.012,
+                                external_risk_max=external_risk_max,
+                            )
     for lookback, fast_lookback in ((72, 24), (168, 24), (168, 72)):
         for resid_z in (1.50, 1.75):
             for min_return in (0.012, 0.020):
@@ -3688,6 +4116,9 @@ def build_payload(args: argparse.Namespace) -> tuple[dict[str, Any], list[dict[s
         cache_dir=cache_dir,
         refresh_cache=bool(args.refresh_panel_cache),
     )
+    panel, external_state_metadata = _join_external_state(
+        panel, str(getattr(args, "external_state_csv", "") or "")
+    )
     arrays = _build_arrays(panel, symbols)
     unfiltered_specs = _candidate_specs(arrays, symbols)
     specs, spec_filter = _filter_specs(unfiltered_specs, args)
@@ -3701,6 +4132,7 @@ def build_payload(args: argparse.Namespace) -> tuple[dict[str, Any], list[dict[s
         "oos_end_date": oos_end.isoformat(),
         "split_windows": [split.as_payload() for split in splits],
         "data_metadata": data_metadata,
+        "external_state_metadata": external_state_metadata,
         "spec_filter": spec_filter,
         "gate_policy": {
             "baseline_oos_return": BASELINE_OOS_RETURN,
@@ -3729,6 +4161,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_DIR))
     parser.add_argument("--panel-cache-dir", default=str(DEFAULT_PANEL_CACHE_DIR))
     parser.add_argument("--refresh-panel-cache", action="store_true")
+    parser.add_argument(
+        "--external-state-csv",
+        default="",
+        help="Optional lagged daily external market-state CSV with external_* columns.",
+    )
     parser.add_argument(
         "--spec-family", default="", help="Comma-separated candidate family allowlist."
     )
@@ -3762,6 +4199,7 @@ def main(argv: list[str] | None = None) -> int:
             "spec_family": str(args.spec_family),
             "spec_name_contains": str(args.spec_name_contains),
             "max_specs": int(args.max_specs),
+            "external_state_csv": str(args.external_state_csv),
         },
         budget_bytes=PORTFOLIO_FOLLOWUP_EXPLICIT_BUDGET_BYTES,
     )
@@ -3777,6 +4215,7 @@ def main(argv: list[str] | None = None) -> int:
                 "spec_family": str(args.spec_family),
                 "spec_name_contains": str(args.spec_name_contains),
                 "max_specs": int(args.max_specs),
+                "external_state_csv": str(args.external_state_csv),
             },
         )
         payload, rows = build_payload(args)

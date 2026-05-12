@@ -156,6 +156,7 @@ def test_cli_defaults_to_strict_zero_liquidation_promotion() -> None:
     assert args.allowed_split_liquidations == 0
     assert args.retune_audit_limit == 0
     assert args.retune_csv_limit == 0
+    assert args.external_state_csv == ""
 
 
 def test_calendar_current_base_sleeves_are_strategy_invalid() -> None:

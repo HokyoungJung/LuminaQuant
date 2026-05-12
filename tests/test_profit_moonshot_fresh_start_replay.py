@@ -548,6 +548,30 @@ def test_state_distilled_leadership_unwind_is_dynamic_and_calendar_free() -> Non
     assert not spec.primary_symbol
     assert not spec.secondary_symbol
 
+    arrays["external_risk_off_score_lag1"] = np.array([2.0, 2.0, -0.2])
+    ext_gated = FreshSpec(
+        name="state_distilled_external_risk_filter",
+        family="state_distilled_external_risk_filter",
+        lookback_bars=168,
+        adaptive_lookback_bars=72,
+        threshold=1.0,
+        hold_bars=120,
+        cooldown_bars=0,
+        stop_loss_pct=0.006,
+        take_profit_pct=0.060,
+        min_abs_return=0.012,
+        flow_lookback_bars=6,
+        flow_threshold=0.03,
+        sharpe_rank_min=1.0,
+        oi_rank_min=0.02,
+        external_risk_max=1.25,
+    )
+    assert MODULE._candidate_signal(ext_gated, arrays, 0) == (
+        "",
+        "",
+        "external_risk_long_block",
+    )
+    assert MODULE._candidate_signal(ext_gated, arrays, 2) == ("SOL/USDT", "LONG", "")
 
 def test_state_distilled_leadership_unwind_can_short_crowded_laggard() -> None:
     arrays = {
@@ -668,11 +692,107 @@ def test_state_distilled_crowded_unwind_v2_shorts_weakening_leader_without_calen
     assert spec.calendar_short_months == ()
 
 
+def test_calendar_teacher_state_similarity_is_state_based_and_calendar_free() -> None:
+    arrays = {
+        "datetime": [
+            datetime(2026, 1, 15, tzinfo=UTC),
+            datetime(2026, 6, 15, tzinfo=UTC),
+            datetime(2026, 6, 16, tzinfo=UTC),
+        ],
+        "symbols": ("BTC/USDT", "SOL/USDT", "TRX/USDT", "ETH/USDT"),
+        "symbol_prefixes": ("btcusdt", "solusdt", "trxusdt", "ethusdt"),
+        "btcusdt_close": np.array([100.0, 100.0, 100.0]),
+        "solusdt_close": np.array([40.0, 40.0, 40.0]),
+        "trxusdt_close": np.array([20.0, 20.0, 20.0]),
+        "ethusdt_close": np.array([50.0, 50.0, 50.0]),
+        "btcusdt_ret_24h": np.array([0.002, 0.002, -0.010]),
+        "solusdt_ret_24h": np.array([0.010, 0.010, -0.006]),
+        "trxusdt_ret_24h": np.array([0.018, 0.018, -0.008]),
+        "ethusdt_ret_24h": np.array([-0.006, -0.006, -0.020]),
+        "btcusdt_ret_168h": np.array([0.006, 0.006, -0.020]),
+        "solusdt_ret_168h": np.array([0.018, 0.018, 0.008]),
+        "trxusdt_ret_168h": np.array([0.032, 0.032, -0.010]),
+        "ethusdt_ret_168h": np.array([-0.018, -0.018, -0.035]),
+        "btcusdt_resid_z_168h": np.array([0.10, 0.10, -0.20]),
+        "solusdt_resid_z_168h": np.array([0.70, 0.70, 0.50]),
+        "trxusdt_resid_z_168h": np.array([1.20, 1.20, -0.30]),
+        "ethusdt_resid_z_168h": np.array([-1.00, -1.00, -1.40]),
+        "btcusdt_flow_imbalance_6h": np.array([0.00, 0.00, -0.02]),
+        "solusdt_flow_imbalance_6h": np.array([0.02, 0.02, 0.00]),
+        "trxusdt_flow_imbalance_6h": np.array([0.05, 0.05, -0.02]),
+        "ethusdt_flow_imbalance_6h": np.array([-0.02, -0.02, -0.05]),
+        "btcusdt_funding_ffill": np.array([0.0, 0.0, 0.0]),
+        "solusdt_funding_ffill": np.array([0.00002, 0.00002, 0.00001]),
+        "trxusdt_funding_ffill": np.array([0.00002, 0.00002, 0.00001]),
+        "ethusdt_funding_ffill": np.array([0.00001, 0.00001, 0.00012]),
+        "btcusdt_oi_delta_12h": np.array([0.00, 0.00, 0.00]),
+        "solusdt_oi_delta_12h": np.array([0.01, 0.01, 0.01]),
+        "trxusdt_oi_delta_12h": np.array([0.02, 0.02, 0.01]),
+        "ethusdt_oi_delta_12h": np.array([0.01, 0.01, 0.04]),
+        "market_ret_24h": np.array([0.004, 0.004, -0.015]),
+        "market_ret_168h": np.array([0.006, 0.006, -0.020]),
+        "external_risk_off_score_lag1": np.array([-0.5, -0.5, 1.4]),
+    }
+    spec = FreshSpec(
+        name="calendar_teacher_state_similarity",
+        family="calendar_teacher_state_similarity",
+        lookback_bars=168,
+        adaptive_lookback_bars=24,
+        threshold=0.50,
+        hold_bars=120,
+        cooldown_bars=0,
+        stop_loss_pct=0.006,
+        take_profit_pct=0.045,
+        min_abs_return=0.006,
+        flow_lookback_bars=6,
+        flow_threshold=0.02,
+        sharpe_lookback_bars=12,
+        sharpe_rank_min=0.50,
+        funding_rank_min=0.00010,
+        oi_rank_min=0.012,
+        broad_min_abs=0.006,
+        external_risk_max=1.25,
+    )
+
+    assert MODULE._candidate_signal(spec, arrays, 0) == ("TRX/USDT", "LONG", "")
+    assert MODULE._candidate_signal(spec, arrays, 1) == ("TRX/USDT", "LONG", "")
+    assert MODULE._candidate_signal(spec, arrays, 2) == ("ETH/USDT", "SHORT", "")
+    assert spec.entry_hours == ()
+    assert spec.entry_days_of_month == ()
+    assert spec.calendar_long_months == ()
+    assert spec.calendar_short_months == ()
+    assert not spec.primary_symbol
+    assert not spec.secondary_symbol
+
+    fade = FreshSpec(
+        name="calendar_teacher_state_fade",
+        family="calendar_teacher_state_fade",
+        lookback_bars=168,
+        adaptive_lookback_bars=24,
+        threshold=0.50,
+        hold_bars=120,
+        cooldown_bars=0,
+        stop_loss_pct=0.006,
+        take_profit_pct=0.045,
+        min_abs_return=0.006,
+        flow_lookback_bars=6,
+        flow_threshold=0.02,
+        sharpe_lookback_bars=12,
+        sharpe_rank_min=0.50,
+        funding_rank_min=0.00010,
+        oi_rank_min=0.012,
+        broad_min_abs=0.006,
+        external_risk_max=1.25,
+    )
+    assert MODULE._candidate_signal(fade, arrays, 0) == ("TRX/USDT", "SHORT", "")
+    assert MODULE._candidate_signal(fade, arrays, 2) == ("ETH/USDT", "LONG", "")
+
+
 def test_state_distilled_non_calendar_families_reject_calendar_entry_fields() -> None:
-    args = MODULE.parse_args(["--spec-family", "state_distilled_crowded_unwind_v2"])
+    args = MODULE.parse_args(["--spec-family", "calendar_teacher_state_similarity"])
     invalid = FreshSpec(
         name="invalid_calendar_state_unwind",
-        family="state_distilled_crowded_unwind_v2",
+        family="calendar_teacher_state_similarity",
         lookback_bars=168,
         threshold=1.75,
         hold_bars=96,
@@ -686,7 +806,7 @@ def test_state_distilled_non_calendar_families_reject_calendar_entry_fields() ->
     )
     valid = FreshSpec(
         name="valid_state_unwind",
-        family="state_distilled_crowded_unwind_v2",
+        family="calendar_teacher_state_similarity",
         lookback_bars=168,
         threshold=1.75,
         hold_bars=96,
@@ -1044,6 +1164,45 @@ def test_spec_filters_are_train_validation_universe_controls() -> None:
     assert metadata["spec_family"] == ["calendar_spread"]
 
 
+def test_external_state_panel_is_lagged_and_joined_to_hourly_panel(tmp_path: Path) -> None:
+    module_path = ROOT / "scripts" / "research" / "fetch_profit_moonshot_external_state.py"
+    spec = importlib.util.spec_from_file_location("fetch_profit_moonshot_external_state", module_path)
+    assert spec is not None and spec.loader is not None
+    external_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(external_module)
+
+    dates = pl.date_range(date(2025, 1, 1), date(2025, 4, 30), "1d", eager=True)
+    frames = [
+        pl.DataFrame({"date": dates, "usd_broad": np.linspace(100.0, 112.0, len(dates))}),
+        pl.DataFrame({"date": dates, "vix": np.linspace(12.0, 24.0, len(dates))}),
+        pl.DataFrame({"date": dates, "ust2y": np.linspace(4.0, 3.8, len(dates))}),
+        pl.DataFrame({"date": dates, "ust10y": np.linspace(4.5, 4.2, len(dates))}),
+        pl.DataFrame({"date": dates, "wti": np.linspace(80.0, 70.0, len(dates))}),
+    ]
+    external = external_module._build_external_state_panel(frames)
+
+    assert "external_risk_off_score_lag1" in external.columns
+    assert external["external_risk_off_score_lag1"][0] is None
+    assert external["external_risk_off_score_lag1"][80] == external["external_risk_off_score"][79]
+
+    csv_path = tmp_path / "external.csv"
+    external.write_csv(csv_path)
+    hourly = pl.DataFrame(
+        {
+            "datetime": [
+                datetime(2025, 3, 25, 0, tzinfo=UTC),
+                datetime(2025, 3, 25, 1, tzinfo=UTC),
+            ],
+            "btcusdt_close": [100.0, 101.0],
+        }
+    )
+    joined, metadata = MODULE._join_external_state(hourly, csv_path)
+
+    assert metadata["joined"] is True
+    assert "external_risk_off_score_lag1" in joined.columns
+    assert joined["external_risk_off_score_lag1"][0] == joined["external_risk_off_score_lag1"][1]
+
+
 def test_candidate_specs_include_external_inspired_families() -> None:
     arrays = {
         "btcusdt_rv_24h": np.linspace(0.002, 0.003, 6),
@@ -1062,6 +1221,9 @@ def test_candidate_specs_include_external_inspired_families() -> None:
     assert "funding_oi_carry_fade" in families
     assert "state_distilled_leadership_unwind" in families
     assert "state_distilled_crowded_unwind_v2" in families
+    assert "state_distilled_external_risk_filter" in families
+    assert "calendar_teacher_state_similarity" in families
+    assert "calendar_teacher_state_fade" in families
     assert "state_momentum_proxy" in families
     assert "state_relative_strength_spread" in families
     assert "calendar_rotation" in families
@@ -1085,6 +1247,9 @@ def test_candidate_specs_include_external_inspired_families() -> None:
     assert any(name.startswith("fresh_state_distilled_both_") for name in names)
     assert any(name.startswith("fresh_state_distilled_longonly_") for name in names)
     assert any(name.startswith("fresh_state_crowded_unwind_v2_") for name in names)
+    assert any(name.startswith("fresh_state_distilled_ext_") for name in names)
+    assert any(name.startswith("fresh_calendar_teacher_state_") for name in names)
+    assert any(name.startswith("fresh_calendar_teacher_fade_") for name in names)
     assert any(name.startswith("fresh_state_trx_longonly_") for name in names)
     assert any(name.startswith("fresh_state_trx_dual_mom_") for name in names)
     assert any(name.startswith("fresh_state_trx_eth_spread_") for name in names)
@@ -1127,6 +1292,13 @@ def test_integrated_market_state_specs_have_clean_non_calendar_variants() -> Non
         "vol_regime_margin_scaled_momentum": lambda spec: (
             spec.family == "vol_regime_margin_scaled_momentum"
         ),
+        "state_distilled_external_risk_filter": lambda spec: (
+            spec.family == "state_distilled_external_risk_filter"
+        ),
+        "calendar_teacher_state_similarity": lambda spec: (
+            spec.family == "calendar_teacher_state_similarity"
+        ),
+        "calendar_teacher_state_fade": lambda spec: spec.family == "calendar_teacher_state_fade",
     }
 
     for lane, predicate in lane_predicates.items():
