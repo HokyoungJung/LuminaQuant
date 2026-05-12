@@ -682,3 +682,10 @@ User corrected scope: do not only compare HYBRID. Need full universe: all saved 
 - Saved next plan: `.omx/plans/profit_moonshot_alpha_zoo_real_data_next_plan_20260512.md`.
 - Saved copy-paste prompt: `docs/next_session_prompt_profit_moonshot_alpha_zoo_real_data_20260512.md`.
 - Next session should wire Alpha Zoo to real current-tail data, build candidate outcome ledger, calibrate train/validation-only edges, replay calibrated strategy plus state-distilled seeds, then run strict zero-liquidation integer grid and separate diagnostic 5x/6x lane.
+
+
+## 2026-05-12 — Research-note update requirement added
+
+- Added current research note: `docs/research_note_profit_moonshot_alpha_zoo_real_data_20260512.md`.
+- Updated next-session prompt and plan to require research-note updates before final handoff.
+- Future sessions must update `.omx/notepad.md`, active `.omx/plans/*`, `docs/research_note_*`, and `docs/session_handoff_*`; if global research inventory/source ledger changes, update/regenerate `docs/profit_moonshot_research_history_20260510.md` and matching `var/reports/.../research_history/` artifacts or state why not required.

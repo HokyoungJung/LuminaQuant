@@ -117,6 +117,7 @@ Then write/update:
 
 - `.omx/notepad.md`
 - `.omx/plans/profit_moonshot_alpha_zoo_real_data_next_plan_20260512.md` or successor
+- `docs/research_note_profit_moonshot_alpha_zoo_real_data_20260512.md` or successor
 - `docs/session_handoff_*alpha_zoo*_20260512.md` or successor
 - `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_*` or successor
 
@@ -126,3 +127,8 @@ Stop only when one of these is true:
 
 1. A valid strict deployable candidate beats the invalid calendar reference on OOS return and return/MDD with zero liquidations and positive min buffers; or
 2. Real-data Alpha Zoo path is exhausted with reproducible artifacts showing why no live promotion is allowed, plus the next best research seed is documented.
+
+
+## Research-note update requirement
+
+Every future session must update the active research notes before final handoff. At minimum, update `.omx/notepad.md`, the active `.omx/plans/*` file, and `docs/research_note_profit_moonshot_alpha_zoo_real_data_20260512.md` or its successor. If the session changes the global source inventory or research chronology, regenerate/update `docs/profit_moonshot_research_history_20260510.md` plus the matching `var/reports/profit_moonshot_20260501/research_history/` artifacts, or explicitly state why regeneration was not required.

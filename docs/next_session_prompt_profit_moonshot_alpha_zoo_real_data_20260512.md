@@ -15,6 +15,8 @@ $ralplan $team $ralph 이어서 진행해. 작업 디렉터리는 /home/hoky/Qua
 - .omx/plans/profit_moonshot_alpha_zoo_real_data_next_plan_20260512.md
 - docs/session_handoff_20260512_crypto_fx_alpha_zoo_state.md
 - docs/session_handoff_20260512_state_distilled_external_risk_filter.md
+- docs/research_note_profit_moonshot_alpha_zoo_real_data_20260512.md
+- docs/research_note_profit_moonshot_state_distilled_20260511.md
 - .omx/plans/profit_moonshot_crypto_fx_alpha_zoo_state_plan_20260512.md
 - var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_state_20260512/crypto_fx_alpha_zoo_state_v0_summary_latest.json
 - var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/liquidation_aware_state_distilled_external_risk_filter_20260512/liquidation_aware_current_base_latest.json
@@ -48,7 +50,7 @@ Crypto/FX Alpha Zoo scaffold를 synthetic smoke가 아니라 real current-tail c
 5. `CryptoFxAlphaZooStateStrategy` calibrated replay를 state_distilled_external_risk_filter/residual-pair seeds와 좁고 해석 가능한 grid로 비교해.
 6. 후보 freeze 후 locked-OOS를 report/gate-only로 열어.
 7. integer leverage 1x..6x strict zero-liquidation lane과 diagnostic nonfatal 5x/6x lane을 둘 다 보고해.
-8. 결과/handoff를 `.omx/notepad.md`, `.omx/plans/...`, `docs/session_handoff_*alpha_zoo*`, `var/reports/.../alpha_v2/crypto_fx_alpha_zoo_*`에 저장해.
+8. 결과/handoff를 `.omx/notepad.md`, `.omx/plans/...`, `docs/research_note_*alpha_zoo*`, `docs/session_handoff_*alpha_zoo*`, `var/reports/.../alpha_v2/crypto_fx_alpha_zoo_*`에 저장해. 연구노트는 반드시 업데이트하고, global research inventory/source ledger가 바뀌면 `docs/profit_moonshot_research_history_20260510.md` 및 `var/reports/.../research_history/` 갱신 여부도 명시해.
 
 검증은 targeted tests, focused pytest, full pytest, ruff, compileall, git diff --check를 모두 돌려. 통과하면 Lore commit으로 private/main에 push하고 GitHub Actions ci/private-ci green까지 확인해.
 ```
