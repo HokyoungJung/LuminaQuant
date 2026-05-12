@@ -673,3 +673,12 @@ User corrected scope: do not only compare HYBRID. Need full universe: all saved 
 - Best train/val-positive OOS diagnostic row (OOS-ranked after freeze, report-only): `fresh_state_distilled_ext_both_lb336_fast168_z050_ret180_h120_tp750_fl0_xr200`, vector train +3.2248%, val +1.8146%, OOS +1.4128%, OOS MDD 0.5320%, Sharpe 3.6699, 0 replay liquidations; not used for selection.
 - Liquidation-aware train/validation-selected strict row: `fresh_state_distilled_ext_both_lb168_fast72_z075_ret180_h168_tp600_fl0_xr125` at 4x, train +30.9030% / MDD 10.2437% / Sharpe 1.8484; validation +12.4704% / MDD 2.5167% / Sharpe 5.7588; OOS +2.4852% / MDD 2.5328% / Sharpe 1.5096; liquidation count 0 and min margin buffers positive, strategy_validity pass, but deployable_success false because it still does not beat current-base reference OOS +6.4281% / return-MDD 6.9169.
 - Diagnostic 5x/6x high leverage stayed non-promotional: OOS can reach ~3.7% in some 6x diagnostic rows, but train/validation liquidations occur, so strict lane blocks promotion.
+
+## 2026-05-12 — Next-session TODO: use Alpha Zoo real-data calibration
+
+- Next primary path is `CryptoFxAlphaZooStateStrategy` + real-data triple-barrier outcome calibration, not another hand-tuned/calendar-proxy strategy.
+- Calendar/current-base tuple remains `hypothesis_reference_only`: strong locked-OOS reference (+6.4281%, return/MDD 6.9169) but invalid for live promotion due calendar-primary behavior.
+- Best valid strict seed remains state-distilled external-risk 4x (`fresh_state_distilled_ext_both_lb168_fast72_z075_ret180_h168_tp600_fl0_xr125`): train +30.9030%, validation +12.4704%, OOS +2.4852%, 0 liquidations, positive buffers, not deployable vs invalid current-base reference.
+- Saved next plan: `.omx/plans/profit_moonshot_alpha_zoo_real_data_next_plan_20260512.md`.
+- Saved copy-paste prompt: `docs/next_session_prompt_profit_moonshot_alpha_zoo_real_data_20260512.md`.
+- Next session should wire Alpha Zoo to real current-tail data, build candidate outcome ledger, calibrate train/validation-only edges, replay calibrated strategy plus state-distilled seeds, then run strict zero-liquidation integer grid and separate diagnostic 5x/6x lane.
