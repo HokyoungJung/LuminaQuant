@@ -128,3 +128,11 @@ Do not repeat the earlier loop of finding a good-looking single rule and then di
 - Peak RSS `512.711` MiB (<8 GiB).
 - Artifacts: `/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_real_data_20260513/crypto_fx_alpha_zoo_real_data_summary_latest.json`, `/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_real_data_20260513/crypto_fx_alpha_zoo_state_replay_latest.json`, `/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_real_data_20260513/edge_calibration_latest.json`, `/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_real_data_20260513/candidate_outcome_ledger_latest.jsonl`.
 - Research history/source ledger not regenerated: No new external source class or global chronology/source-ledger change; reused existing current-tail cache and 20260512 lagged FRED external-state artifact, added only session-scoped Alpha Zoo artifacts.
+
+---
+
+## 2026-05-13 KST — Related state-distilled regime-boost overlay note
+
+A separate research-only `StateDistilledRegimeBoostPortfolio` overlay was tested on the existing state-distilled seeds. This did not change the `CryptoFxAlphaZooStateStrategy` promotion policy or Alpha Zoo factor cards. The overlay reused real current-tail crypto data and lagged FRED external-risk state, kept calendar/current-base as hypothesis reference only, and kept locked-OOS gate/report-only after freeze.
+
+Result: strict zero-liquidation/margin gates passed, but validation and locked-OOS return/risk-quality metrics failed, so no new deployable promotion came from the regime-boost overlay. Artifacts live under `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/state_distilled_regime_boost_20260513/`.

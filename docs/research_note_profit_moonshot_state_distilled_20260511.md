@@ -78,3 +78,60 @@ Use the invalid calendar tuple only as a hypothesis generator, not as a selectio
 5. Volatility/regime/margin-buffer exposure scaler.
 
 Selection must remain train/validation-only. Locked-OOS is gate/report-only after candidate freeze.
+
+---
+
+## 2026-05-13 KST — StateDistilledRegimeBoostPortfolio overlay pass
+
+Implemented a research-only `StateDistilledRegimeBoostPortfolio` overlay on top of the two existing non-calendar state-distilled seeds:
+
+- Core A: `fresh_state_distilled_ext_both_lb168_fast72_z075_ret180_h168_tp600_fl0_xr125` external-risk state-distilled seed.
+- Core B: `fresh_state_distilled_both_lb168_fast72_z075_ret180_h168_ls590_ss100_tp600` pure leadership/unwind seed.
+- Booster C: conditional high-leverage sleeve derived from Core B, tunable up to 25x but capped by long-term asset volatility and stress/volatility gates.
+- Overlay D: neutral-high-dispersion pair overlay fit/frozen from train/validation lagged features only.
+
+The run used real current-tail crypto panel data plus the existing lagged FRED external-risk state. Calendar/month/day/hour fields were not used. The invalid calendar/current-base tuple remains `hypothesis_reference_only` and was not used as a selection or promotion target.
+
+### Selection provenance
+
+- Selection inputs: train + validation only.
+- `uses_locked_oos_for_selection=false`.
+- `locked_oos_metrics_visible_during_selection=false`.
+- Grid: configured/evaluated/product `64 / 64 / 5832`; hard cap remains `256`.
+- Freeze artifact was written before locked-OOS gate and hashed via sidecar manifest.
+- Freeze hash: `68db1c473bf43778ccdaba7c2e78ab4a754f71dde2557643fa4267b73d8b3535`.
+
+Selected overlay parameters were conservative: core A/B weights `0.10/0.10`, base leverage `1.0`, rebalance stride `24h`, booster allocation `0.10`, neutral pair overlay `0.10`, max effective leverage `4.5x` after volatility targeting.
+
+### Strict lane result
+
+| Split | Return | MDD | Sharpe | Sortino | Calmar | Liq | Min buffer |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| train | +3.4706% | 3.7181% | 3.4408 | 4.3918 | 0.9334 | 0 | 9837.0960 |
+| validation | -1.7179% | 1.7999% | -20.0965 | -10.6949 | -0.9544 | 0 | 9783.9340 |
+| locked-OOS | -0.3208% | 0.6141% | -7.9524 | -4.6065 | -0.5224 | 0 | 9936.6557 |
+
+Decision: `deployable_success=false`. Liquidation and margin gates passed, but validation/OOS return and locked-OOS risk-quality metrics failed. Return/MDD remains diagnostic-only; it was not used as a hard gate.
+
+### Diagnostic high-leverage lane
+
+The 5x/6x/10x/15x/25x diagnostic caps all resolved to max effective leverage `4.5x` because the long-term volatility target downshifted exposure. Diagnostic OOS stayed `-0.3208%` return, `0.6141%` MDD, zero liquidation, and positive min buffer. The lane is diagnostic-only and cannot promote live success.
+
+### Artifacts
+
+- Runner: `scripts/research/run_state_distilled_regime_boost_portfolio.py`
+- Tests: `tests/test_profit_moonshot_regime_boost_portfolio.py`
+- Assertion guide: `docs/state_distilled_regime_boost_artifact_assertions.md`
+- Report dir: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/state_distilled_regime_boost_20260513/`
+- Summary: `state_distilled_regime_boost_summary_latest.json`
+- Report: `state_distilled_regime_boost_report_latest.md`
+- Frozen config: `frozen_config.json` + `frozen_config.sha256.json`
+- Locked-OOS gate: `locked_oos_gate.json`
+- Selection ledger: `selection_ledger.jsonl`
+- Peak RSS: `307077120` bytes (`292.85 MiB`), under 8 GiB.
+
+Global research inventory/source ledger was not updated because no new external source family was introduced; this run reused the existing current-tail crypto panel and lagged FRED external-state source.
+
+### Verification evidence
+
+Post-implementation checks passed on 2026-05-13 KST: artifact assertion, focused regime-boost tests (`7 passed`), Alpha Zoo/triple-barrier/edge/state tests (`20 passed`), moonshot validation tests (`74 passed`), full pytest (`1304 passed`), `ruff check .`, `compileall`, `git diff --check`, and `git diff --cached --check`.

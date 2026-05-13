@@ -1,0 +1,243 @@
+{
+  "artifact_kind": "state_distilled_regime_boost_frozen_config",
+  "candidate_freeze_before_locked_oos_gate": true,
+  "frozen_at": "2026-05-13T14:04:49Z",
+  "git_state": {
+    "commit": "cbb84070d941719ee36a5c759ce37c3c31fa338b",
+    "dirty_files": [
+      ".omx/notepad.md",
+      "docs/research_note_profit_moonshot_alpha_zoo_real_data_20260512.md",
+      "docs/research_note_profit_moonshot_state_distilled_20260511.md",
+      "docs/session_handoff_20260513_state_distilled_regime_boost.md",
+      "docs/state_distilled_regime_boost_artifact_assertions.md",
+      "scripts/research/run_state_distilled_regime_boost_portfolio.py",
+      "tests/test_profit_moonshot_regime_boost_portfolio.py",
+      "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/state_distilled_regime_boost_20260513/"
+    ],
+    "dirty_tree": true
+  },
+  "grid_metadata": {
+    "configured_grid_limit": 64,
+    "evaluated_count": 64,
+    "hard_grid_cap": 256,
+    "product_space_size": 5832,
+    "search_space_hash": "9f47d2319f22ff9a94f111b3c99ad4d11a9ca96ee0bdfa1e0e1c49aed8731eb2",
+    "selection_score_fields": [
+      "train.total_return",
+      "validation.total_return",
+      "train.sharpe",
+      "validation.sharpe",
+      "train.max_drawdown",
+      "validation.max_drawdown",
+      "train.liquidation_count",
+      "validation.liquidation_count"
+    ],
+    "skipped_pruned_count": 5768
+  },
+  "input_artifact_manifest": [
+    {
+      "bytes": 2070869,
+      "exists": true,
+      "path": "var/cache/profit_moonshot_fresh_start/joined_panel_de62df511cec53df6ad39521.parquet",
+      "sha256": "dc6a6357d770c851fb45e20f3d8fac4fb8e6576719177d6177fed0aabafeed8d"
+    },
+    {
+      "bytes": 123030,
+      "exists": true,
+      "path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/external_market_state_20260512/external_market_state_lagged.csv",
+      "sha256": "23144361b99b83f21d2fdc078fc7b80255f6fc1113a173605694a71f0ebd66e0"
+    },
+    {
+      "bytes": 2746347,
+      "exists": true,
+      "path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/liquidation_aware_state_distilled_external_risk_filter_20260512/liquidation_aware_current_base_latest.json",
+      "sha256": "19782a559e3bd0555ad9237cccd7470c45134f3a2c33ead81ebe180ca6bf7432"
+    },
+    {
+      "bytes": 1544058,
+      "exists": true,
+      "path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/liquidation_aware_state_distilled_20260511/liquidation_aware_current_base_latest.json",
+      "sha256": "e2c165bf5ea54b3ed2c77def71137209033bf64b2eb1e4ab9d6885ee3dfb7784"
+    }
+  ],
+  "locked_oos_metrics_visible_during_selection": false,
+  "pair_fit": {
+    "as_of_policy": "train_validation_lagged_features_only_frozen_before_locked_oos",
+    "eligible_symbols": [
+      "ETHUSDT",
+      "SOLUSDT",
+      "BNBUSDT",
+      "TRXUSDT"
+    ],
+    "fit_row_count": 9415,
+    "fit_splits": [
+      "train",
+      "validation"
+    ],
+    "hedge_ratios": {
+      "BNBUSDT|ETHUSDT": 0.7529169673649947,
+      "BNBUSDT|SOLUSDT": 0.630225249585062,
+      "BNBUSDT|TRXUSDT": 1.3216044994357885,
+      "ETHUSDT|BNBUSDT": 1.3281677042021365,
+      "ETHUSDT|SOLUSDT": 0.8370448228716103,
+      "ETHUSDT|TRXUSDT": 1.755312413878845,
+      "SOLUSDT|BNBUSDT": 1.586734267880248,
+      "SOLUSDT|ETHUSDT": 1.1946791529865115,
+      "SOLUSDT|TRXUSDT": 2.0970351478394873,
+      "TRXUSDT|BNBUSDT": 0.7566560195784094,
+      "TRXUSDT|ETHUSDT": 0.5696991555994442,
+      "TRXUSDT|SOLUSDT": 0.4768637287888427
+    },
+    "uses_locked_oos_for_pair_fit": false
+  },
+  "run_id": "state_distilled_regime_boost_20260513",
+  "selected_candidate_ids": {
+    "booster_seed": "fresh_state_distilled_both_lb168_fast72_z075_ret180_h168_ls590_ss100_tp600",
+    "core_a": "fresh_state_distilled_ext_both_lb168_fast72_z075_ret180_h168_tp600_fl0_xr125",
+    "core_b": "fresh_state_distilled_both_lb168_fast72_z075_ret180_h168_ls590_ss100_tp600",
+    "neutral_pair_overlay": "train_validation_frozen_pair_fit"
+  },
+  "selected_config": {
+    "booster": {
+      "allocation_weight": 0.1,
+      "allowed_regimes": [
+        "bull",
+        "bear",
+        "neutral_high_dispersion"
+      ],
+      "enabled": true,
+      "max_leverage": 5.0,
+      "max_vol_ratio": 0.85,
+      "min_confidence": 0.8,
+      "min_margin_safety_score": 0.6
+    },
+    "core_a_weight": 0.1,
+    "core_b_weight": 0.1,
+    "external_risk_downshift": 0.5,
+    "external_risk_short_boost": 1.15,
+    "leverage": {
+      "base_leverage": 1.0,
+      "high_confidence_threshold": 0.8,
+      "high_vol_leverage": 2.0,
+      "high_vol_ratio_threshold": 1.5,
+      "long_term_vol_floor": 0.02,
+      "low_vol_ratio_threshold": 0.85,
+      "max_effective_leverage": 25.0,
+      "medium_confidence_leverage": 4.5,
+      "medium_confidence_threshold": 0.65,
+      "medium_vol_leverage": 3.0,
+      "medium_vol_ratio_threshold": 1.25,
+      "min_effective_leverage": 1.0,
+      "stress_leverage": 1.0,
+      "target_annual_volatility": 2.0
+    },
+    "long_entry_threshold": 0.75,
+    "margin": {
+      "liquidation_fee_rate": 0.005,
+      "maintenance_margin_rate": 0.01,
+      "taker_fee_rate": 0.0004
+    },
+    "neutral_pair": {
+      "allocation_weight": 0.1,
+      "enabled": true,
+      "fit_splits": [
+        "train",
+        "validation"
+      ],
+      "hedge_ratio_ceiling": 2.5,
+      "hedge_ratio_floor": 0.25,
+      "max_pair_leverage": 4.0,
+      "min_rank_gap": 0.35
+    },
+    "rebalance_stride_hours": 24,
+    "regime": {
+      "breadth_weight": 0.2,
+      "btc_drawdown_stress_threshold": -0.12,
+      "btc_trend_weight": 0.35,
+      "curve_risk_weight": 0.2,
+      "dispersion_threshold": 0.75,
+      "eth_trend_weight": 0.25,
+      "oil_risk_weight": 0.2,
+      "risk_bear_threshold": 1.0,
+      "risk_stress_threshold": 1.5,
+      "trend_bear_threshold": -0.75,
+      "trend_bull_threshold": 0.75,
+      "usd_risk_weight": 0.25,
+      "vix_risk_weight": 0.35,
+      "vol_penalty_weight": 0.2,
+      "vol_ratio_stress_threshold": 1.75
+    },
+    "selection": {
+      "drawdown_penalty": 0.35,
+      "grid_limit": 64,
+      "hard_grid_cap": 256,
+      "liquidation_penalty": 100.0,
+      "min_validation_return": -1.0,
+      "sharpe_weight": 0.08,
+      "strict_oos_mdd_max": 0.25,
+      "train_return_weight": 0.35,
+      "validation_return_weight": 0.65
+    },
+    "short_entry_threshold": -0.75,
+    "side_bias": {
+      "bear_long_multiplier": 0.45,
+      "bear_short_multiplier": 1.15,
+      "bull_long_multiplier": 1.1,
+      "bull_short_multiplier": 0.6,
+      "neutral_high_long_multiplier": 1.0,
+      "neutral_high_short_multiplier": 1.0,
+      "neutral_low_long_multiplier": 0.5,
+      "neutral_low_short_multiplier": 0.5,
+      "stress_long_multiplier": 0.0,
+      "stress_short_multiplier": 0.0
+    },
+    "signal_fast_weight": 0.35,
+    "signal_residual_weight": 0.65
+  },
+  "selection_ledger_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/state_distilled_regime_boost_20260513/selection_ledger.jsonl",
+  "selection_ledger_sha256": "1abe17fc824c7df2b2b883431fb1c81ec4f50cd54cb13302d79931d3fd6f24f3",
+  "selection_metrics_train_validation_only": {
+    "train": {
+      "calmar": 0.9334338988153325,
+      "liquidation_count": 0,
+      "margin_buffer_positive": true,
+      "max_drawdown": 0.03718072673153172,
+      "minimum_margin_buffer": 9837.095988291017,
+      "regime_counts": {
+        "bear": 29,
+        "bull": 53,
+        "neutral_high_dispersion": 33,
+        "neutral_low_dispersion": 159,
+        "stress": 21
+      },
+      "return_mdd": 0.9334338988153325,
+      "sharpe": 3.4407558966415985,
+      "smart_sortino": 4.228495035272903,
+      "sortino": 4.39178478523648,
+      "total_return": 0.03470575071380111,
+      "trade_count": 371
+    },
+    "validation": {
+      "calmar": -0.954442336726476,
+      "liquidation_count": 0,
+      "margin_buffer_positive": true,
+      "max_drawdown": 0.017999228397883926,
+      "minimum_margin_buffer": 9783.933983071172,
+      "regime_counts": {
+        "bear": 12,
+        "bull": 8,
+        "neutral_high_dispersion": 6,
+        "neutral_low_dispersion": 62,
+        "stress": 10
+      },
+      "return_mdd": -0.954442336726476,
+      "sharpe": -20.09651056998609,
+      "smart_sortino": -10.502381005019124,
+      "sortino": -10.694880603693095,
+      "total_return": -0.01717922561134988,
+      "trade_count": 56
+    }
+  },
+  "selection_score": -1.350792842060402,
+  "uses_locked_oos_for_selection": false
+}
