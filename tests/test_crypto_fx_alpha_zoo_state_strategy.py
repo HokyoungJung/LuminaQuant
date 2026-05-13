@@ -18,6 +18,7 @@ assert _REPLAY_SPEC.loader is not None
 sys.modules[_REPLAY_SPEC.name] = _REPLAY_MODULE
 _REPLAY_SPEC.loader.exec_module(_REPLAY_MODULE)
 _GridSpec = _REPLAY_MODULE._GridSpec
+_liquidation_lanes = _REPLAY_MODULE._liquidation_lanes
 replay_frame = _REPLAY_MODULE.replay_frame
 
 
@@ -176,3 +177,28 @@ def test_replay_grid_hides_locked_oos_until_after_train_validation_selection() -
         assert row["locked_oos_metrics_visible_during_selection"] is False
         assert row["uses_locked_oos_for_selection"] is False
     assert payload["selection_provenance"]["candidate_freeze_before_locked_oos_gate"] is True
+
+
+def test_revised_promotion_gate_treats_return_mdd_as_diagnostic_only() -> None:
+    data = pd.DataFrame(columns=["timestamp", "symbol", "open", "high", "low", "close", "volume", "split"])
+    trades = [
+        {
+            "symbol": "BTC/USDT",
+            "side": "LONG",
+            "entry_time": pd.Timestamp("2026-01-01T00:00:00Z"),
+            "exit_time": pd.Timestamp("2026-01-01T01:00:00Z"),
+            "entry_price": 100.0,
+            "entry_split": "locked_oos",
+            "gross_return": gross_return,
+        }
+        for gross_return in (0.20, -0.05, 0.02)
+    ]
+
+    lanes = _liquidation_lanes(data, trades, allocation_fraction=1.0, max_leverage=1)
+    promoted = lanes["strict_zero_liquidation_lane"]["promoted_candidate"]
+
+    assert promoted["deployable_success"] is True
+    assert promoted["performance_gates"]["oos_return_beats_current_base"] is True
+    assert "oos_return_risk_beats_current_base" not in promoted["performance_gates"]
+    assert promoted["performance_diagnostics"]["return_mdd_hurdle_required"] is False
+    assert promoted["performance_diagnostics"]["oos_return_mdd_beats_current_base"] is False

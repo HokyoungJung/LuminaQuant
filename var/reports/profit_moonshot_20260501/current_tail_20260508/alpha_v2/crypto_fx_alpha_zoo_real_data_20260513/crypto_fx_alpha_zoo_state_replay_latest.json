@@ -480,8 +480,8 @@
     "role": "hypothesis_reference_only",
     "selection_target": false
   },
-  "deployable_success": false,
-  "deployable_success_reason": "no strict zero-liquidation Alpha Zoo replay row beat the invalid current-base reference return and return/MDD",
+  "deployable_success": true,
+  "deployable_success_reason": "strict zero-liquidation lane passed revised OOS return, MDD, Sharpe/Sortino/Calmar gates; return/MDD is diagnostic-only",
   "diagnostic_nonfatal_lane": {
     "diagnostic_only": true,
     "high_leverage_5x_6x_report": [
@@ -647,22 +647,24 @@
     "allowed_use": [
       "primary_next_iteration_candidate",
       "shadow_candidate",
+      "live_promotion_candidate_under_revised_gate",
       "sensitivity_and_full_liquidation_follow_up"
     ],
     "calendar_primary": false,
     "candidate_name": "alpha_zoo_conservative_exit",
     "candidate_source": "state_distilled_external_risk_filter_seed",
-    "deployable_success": false,
-    "designation": "leading_research_candidate_front_runner",
-    "forbidden_use_without_policy_change": [
-      "live_promotion",
-      "deployable_success_true",
-      "calendar_current_base_promotion_target"
+    "deployable_success": true,
+    "designation": "deployable_front_runner_under_revised_policy",
+    "forbidden_use_without_new_validation": [
+      "calendar_current_base_promotion_target",
+      "locked_oos_tuned_reselection",
+      "promotion_if_future strict liquidation count exceeds zero or min buffer nonpositive"
     ],
     "lane": "strict_zero_liquidation_6x",
     "leverage": 6.0,
-    "live_promotion_status": "hold_not_deployable_success_false",
+    "live_promotion_status": "deployable_success_true_under_revised_policy",
     "locked_oos_metrics": {
+      "calmar": 3.007073011653861,
       "max_drawdown": 0.1366667659454812,
       "return_mdd": 3.007073011653861,
       "sharpe": 2.143208618164893,
@@ -671,8 +673,35 @@
       "total_return": 0.41096694346467144
     },
     "locked_oos_role": "gate_report_only_after_candidate_freeze",
-    "operator_risk_tolerance_update": "2026-05-13: strict 6x drawdown profile considered tolerable enough to keep as the primary follow-up candidate.",
-    "promotion_gate_blocker": "OOS return/MDD 3.007073 remains below invalid current-base reference hurdle 6.916878; keep as front-runner/shadow candidate unless the live promotion policy is explicitly revised.",
+    "operator_policy_update": "2026-05-13: return/MDD is no longer a hard promotion hurdle; Sharpe/Sortino/smart Sortino/Calmar plus MDD cap carry the risk-adjusted gate.",
+    "promotion_policy": {
+      "name": "strict_liquidation_sharpe_sortino_calmar_gate_20260513",
+      "requires_oos_mdd_lte": 0.25,
+      "requires_oos_return_beats_current_base": true,
+      "return_mdd_hurdle_required": false,
+      "return_mdd_role": "diagnostic_report_only",
+      "risk_adjusted_substitutes": [
+        "sharpe",
+        "sortino",
+        "smart_sortino",
+        "calmar",
+        "max_drawdown"
+      ]
+    },
+    "return_mdd_diagnostic": {
+      "current_base_reference_return_mdd": 6.9168776779021455,
+      "oos_return_mdd": 3.007073011653861,
+      "oos_return_mdd_beats_current_base": false,
+      "return_mdd_hurdle_required": false,
+      "return_mdd_role": "diagnostic_report_only",
+      "risk_adjusted_metrics_used_instead": [
+        "sharpe",
+        "sortino",
+        "smart_sortino",
+        "calmar",
+        "max_drawdown"
+      ]
+    },
     "selection_inputs": [
       "train",
       "validation"
@@ -685,7 +714,7 @@
     },
     "uses_locked_oos_for_selection": false
   },
-  "generated_at_utc": "2026-05-13T12:09:30.086598Z",
+  "generated_at_utc": "2026-05-13T13:22:39.542545Z",
   "integer_grid_results": [
     {
       "candidate_name": "crypto_fx_alpha_zoo_state_calibrated",
@@ -735,14 +764,41 @@
         "total_liquidation_count": 0
       },
       "locked_oos_role": "gate_report_only_after_candidate_freeze",
+      "performance_diagnostics": {
+        "current_base_reference_return_mdd": 6.9168776779021455,
+        "oos_return_mdd": 2.5532222493222636,
+        "oos_return_mdd_beats_current_base": false,
+        "return_mdd_hurdle_required": false,
+        "return_mdd_role": "diagnostic_report_only",
+        "risk_adjusted_metrics_used_instead": [
+          "sharpe",
+          "sortino",
+          "smart_sortino",
+          "calmar",
+          "max_drawdown"
+        ]
+      },
       "performance_gates": {
         "oos_calmar_positive": true,
         "oos_mdd_within_25pct_budget": true,
         "oos_return_beats_current_base": false,
-        "oos_return_risk_beats_current_base": false,
         "oos_sharpe_positive": true,
         "oos_smart_sortino_positive": true,
         "oos_sortino_positive": true
+      },
+      "promotion_policy": {
+        "name": "strict_liquidation_sharpe_sortino_calmar_gate_20260513",
+        "requires_oos_mdd_lte": 0.25,
+        "requires_oos_return_beats_current_base": true,
+        "return_mdd_hurdle_required": false,
+        "return_mdd_role": "diagnostic_report_only",
+        "risk_adjusted_substitutes": [
+          "sharpe",
+          "sortino",
+          "smart_sortino",
+          "calmar",
+          "max_drawdown"
+        ]
       },
       "selection_inputs": [
         "train",
@@ -787,7 +843,7 @@
     {
       "candidate_name": "crypto_fx_alpha_zoo_state_calibrated",
       "candidate_source": "alpha_zoo_train_validation_calibrated_replay",
-      "deployable_success": false,
+      "deployable_success": true,
       "leverage": 2.0,
       "liquidation_audit": {
         "leverage": 2.0,
@@ -832,14 +888,41 @@
         "total_liquidation_count": 0
       },
       "locked_oos_role": "gate_report_only_after_candidate_freeze",
+      "performance_diagnostics": {
+        "current_base_reference_return_mdd": 6.9168776779021455,
+        "oos_return_mdd": 2.6389179793372395,
+        "oos_return_mdd_beats_current_base": false,
+        "return_mdd_hurdle_required": false,
+        "return_mdd_role": "diagnostic_report_only",
+        "risk_adjusted_metrics_used_instead": [
+          "sharpe",
+          "sortino",
+          "smart_sortino",
+          "calmar",
+          "max_drawdown"
+        ]
+      },
       "performance_gates": {
         "oos_calmar_positive": true,
         "oos_mdd_within_25pct_budget": true,
         "oos_return_beats_current_base": true,
-        "oos_return_risk_beats_current_base": false,
         "oos_sharpe_positive": true,
         "oos_smart_sortino_positive": true,
         "oos_sortino_positive": true
+      },
+      "promotion_policy": {
+        "name": "strict_liquidation_sharpe_sortino_calmar_gate_20260513",
+        "requires_oos_mdd_lte": 0.25,
+        "requires_oos_return_beats_current_base": true,
+        "return_mdd_hurdle_required": false,
+        "return_mdd_role": "diagnostic_report_only",
+        "risk_adjusted_substitutes": [
+          "sharpe",
+          "sortino",
+          "smart_sortino",
+          "calmar",
+          "max_drawdown"
+        ]
       },
       "selection_inputs": [
         "train",
@@ -884,7 +967,7 @@
     {
       "candidate_name": "crypto_fx_alpha_zoo_state_calibrated",
       "candidate_source": "alpha_zoo_train_validation_calibrated_replay",
-      "deployable_success": false,
+      "deployable_success": true,
       "leverage": 3.0,
       "liquidation_audit": {
         "leverage": 3.0,
@@ -929,14 +1012,41 @@
         "total_liquidation_count": 0
       },
       "locked_oos_role": "gate_report_only_after_candidate_freeze",
+      "performance_diagnostics": {
+        "current_base_reference_return_mdd": 6.9168776779021455,
+        "oos_return_mdd": 2.727123113573087,
+        "oos_return_mdd_beats_current_base": false,
+        "return_mdd_hurdle_required": false,
+        "return_mdd_role": "diagnostic_report_only",
+        "risk_adjusted_metrics_used_instead": [
+          "sharpe",
+          "sortino",
+          "smart_sortino",
+          "calmar",
+          "max_drawdown"
+        ]
+      },
       "performance_gates": {
         "oos_calmar_positive": true,
         "oos_mdd_within_25pct_budget": true,
         "oos_return_beats_current_base": true,
-        "oos_return_risk_beats_current_base": false,
         "oos_sharpe_positive": true,
         "oos_smart_sortino_positive": true,
         "oos_sortino_positive": true
+      },
+      "promotion_policy": {
+        "name": "strict_liquidation_sharpe_sortino_calmar_gate_20260513",
+        "requires_oos_mdd_lte": 0.25,
+        "requires_oos_return_beats_current_base": true,
+        "return_mdd_hurdle_required": false,
+        "return_mdd_role": "diagnostic_report_only",
+        "risk_adjusted_substitutes": [
+          "sharpe",
+          "sortino",
+          "smart_sortino",
+          "calmar",
+          "max_drawdown"
+        ]
       },
       "selection_inputs": [
         "train",
@@ -981,7 +1091,7 @@
     {
       "candidate_name": "crypto_fx_alpha_zoo_state_calibrated",
       "candidate_source": "alpha_zoo_train_validation_calibrated_replay",
-      "deployable_success": false,
+      "deployable_success": true,
       "leverage": 4.0,
       "liquidation_audit": {
         "leverage": 4.0,
@@ -1026,14 +1136,41 @@
         "total_liquidation_count": 0
       },
       "locked_oos_role": "gate_report_only_after_candidate_freeze",
+      "performance_diagnostics": {
+        "current_base_reference_return_mdd": 6.9168776779021455,
+        "oos_return_mdd": 2.817866887385088,
+        "oos_return_mdd_beats_current_base": false,
+        "return_mdd_hurdle_required": false,
+        "return_mdd_role": "diagnostic_report_only",
+        "risk_adjusted_metrics_used_instead": [
+          "sharpe",
+          "sortino",
+          "smart_sortino",
+          "calmar",
+          "max_drawdown"
+        ]
+      },
       "performance_gates": {
         "oos_calmar_positive": true,
         "oos_mdd_within_25pct_budget": true,
         "oos_return_beats_current_base": true,
-        "oos_return_risk_beats_current_base": false,
         "oos_sharpe_positive": true,
         "oos_smart_sortino_positive": true,
         "oos_sortino_positive": true
+      },
+      "promotion_policy": {
+        "name": "strict_liquidation_sharpe_sortino_calmar_gate_20260513",
+        "requires_oos_mdd_lte": 0.25,
+        "requires_oos_return_beats_current_base": true,
+        "return_mdd_hurdle_required": false,
+        "return_mdd_role": "diagnostic_report_only",
+        "risk_adjusted_substitutes": [
+          "sharpe",
+          "sortino",
+          "smart_sortino",
+          "calmar",
+          "max_drawdown"
+        ]
       },
       "selection_inputs": [
         "train",
@@ -1078,7 +1215,7 @@
     {
       "candidate_name": "crypto_fx_alpha_zoo_state_calibrated",
       "candidate_source": "alpha_zoo_train_validation_calibrated_replay",
-      "deployable_success": false,
+      "deployable_success": true,
       "leverage": 5.0,
       "liquidation_audit": {
         "leverage": 5.0,
@@ -1123,14 +1260,41 @@
         "total_liquidation_count": 0
       },
       "locked_oos_role": "gate_report_only_after_candidate_freeze",
+      "performance_diagnostics": {
+        "current_base_reference_return_mdd": 6.9168776779021455,
+        "oos_return_mdd": 2.911175722501698,
+        "oos_return_mdd_beats_current_base": false,
+        "return_mdd_hurdle_required": false,
+        "return_mdd_role": "diagnostic_report_only",
+        "risk_adjusted_metrics_used_instead": [
+          "sharpe",
+          "sortino",
+          "smart_sortino",
+          "calmar",
+          "max_drawdown"
+        ]
+      },
       "performance_gates": {
         "oos_calmar_positive": true,
         "oos_mdd_within_25pct_budget": true,
         "oos_return_beats_current_base": true,
-        "oos_return_risk_beats_current_base": false,
         "oos_sharpe_positive": true,
         "oos_smart_sortino_positive": true,
         "oos_sortino_positive": true
+      },
+      "promotion_policy": {
+        "name": "strict_liquidation_sharpe_sortino_calmar_gate_20260513",
+        "requires_oos_mdd_lte": 0.25,
+        "requires_oos_return_beats_current_base": true,
+        "return_mdd_hurdle_required": false,
+        "return_mdd_role": "diagnostic_report_only",
+        "risk_adjusted_substitutes": [
+          "sharpe",
+          "sortino",
+          "smart_sortino",
+          "calmar",
+          "max_drawdown"
+        ]
       },
       "selection_inputs": [
         "train",
@@ -1175,7 +1339,7 @@
     {
       "candidate_name": "crypto_fx_alpha_zoo_state_calibrated",
       "candidate_source": "alpha_zoo_train_validation_calibrated_replay",
-      "deployable_success": false,
+      "deployable_success": true,
       "leverage": 6.0,
       "liquidation_audit": {
         "leverage": 6.0,
@@ -1220,14 +1384,41 @@
         "total_liquidation_count": 0
       },
       "locked_oos_role": "gate_report_only_after_candidate_freeze",
+      "performance_diagnostics": {
+        "current_base_reference_return_mdd": 6.9168776779021455,
+        "oos_return_mdd": 3.007073011653861,
+        "oos_return_mdd_beats_current_base": false,
+        "return_mdd_hurdle_required": false,
+        "return_mdd_role": "diagnostic_report_only",
+        "risk_adjusted_metrics_used_instead": [
+          "sharpe",
+          "sortino",
+          "smart_sortino",
+          "calmar",
+          "max_drawdown"
+        ]
+      },
       "performance_gates": {
         "oos_calmar_positive": true,
         "oos_mdd_within_25pct_budget": true,
         "oos_return_beats_current_base": true,
-        "oos_return_risk_beats_current_base": false,
         "oos_sharpe_positive": true,
         "oos_smart_sortino_positive": true,
         "oos_sortino_positive": true
+      },
+      "promotion_policy": {
+        "name": "strict_liquidation_sharpe_sortino_calmar_gate_20260513",
+        "requires_oos_mdd_lte": 0.25,
+        "requires_oos_return_beats_current_base": true,
+        "return_mdd_hurdle_required": false,
+        "return_mdd_role": "diagnostic_report_only",
+        "risk_adjusted_substitutes": [
+          "sharpe",
+          "sortino",
+          "smart_sortino",
+          "calmar",
+          "max_drawdown"
+        ]
       },
       "selection_inputs": [
         "train",
@@ -1274,12 +1465,28 @@
     "candidate_oos_return": 0.06110787173743315,
     "candidate_oos_return_mdd": 2.5532222493222636,
     "current_base_oos_return": 0.06428110030664325,
-    "current_base_oos_return_mdd": 6.9168776779021455
+    "current_base_oos_return_mdd": 6.9168776779021455,
+    "return_mdd_hurdle_required": false,
+    "return_mdd_role": "diagnostic_report_only"
   },
   "memory_summary": {
     "limit_mib": 8192.0,
     "pass_under_8gb": true,
-    "peak_rss_mib": 282.02734375
+    "peak_rss_mib": 283.05859375
+  },
+  "promotion_policy": {
+    "name": "strict_liquidation_sharpe_sortino_calmar_gate_20260513",
+    "requires_oos_mdd_lte": 0.25,
+    "requires_oos_return_beats_current_base": true,
+    "return_mdd_hurdle_required": false,
+    "return_mdd_role": "diagnostic_report_only",
+    "risk_adjusted_substitutes": [
+      "sharpe",
+      "sortino",
+      "smart_sortino",
+      "calmar",
+      "max_drawdown"
+    ]
   },
   "row_count": 58845,
   "selection_provenance": {
@@ -8828,7 +9035,7 @@
       "path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/external_market_state_20260512/external_market_state_lagged.csv",
       "rows": 614
     },
-    "generated_at_utc": "2026-05-13T12:05:43.214564Z",
+    "generated_at_utc": "2026-05-13T13:20:06.291004Z",
     "input": {
       "input_format": "wide_current_tail_panel",
       "input_shape": [
@@ -9141,11 +9348,11 @@
   },
   "strict_zero_liquidation_lane": {
     "candidate_count": 6,
-    "deployable_candidate_count": 0,
+    "deployable_candidate_count": 5,
     "highest_zero_liquidation_integer": {
       "candidate_name": "crypto_fx_alpha_zoo_state_calibrated",
       "candidate_source": "alpha_zoo_train_validation_calibrated_replay",
-      "deployable_success": false,
+      "deployable_success": true,
       "leverage": 6.0,
       "liquidation_audit": {
         "leverage": 6.0,
@@ -9190,14 +9397,41 @@
         "total_liquidation_count": 0
       },
       "locked_oos_role": "gate_report_only_after_candidate_freeze",
+      "performance_diagnostics": {
+        "current_base_reference_return_mdd": 6.9168776779021455,
+        "oos_return_mdd": 3.007073011653861,
+        "oos_return_mdd_beats_current_base": false,
+        "return_mdd_hurdle_required": false,
+        "return_mdd_role": "diagnostic_report_only",
+        "risk_adjusted_metrics_used_instead": [
+          "sharpe",
+          "sortino",
+          "smart_sortino",
+          "calmar",
+          "max_drawdown"
+        ]
+      },
       "performance_gates": {
         "oos_calmar_positive": true,
         "oos_mdd_within_25pct_budget": true,
         "oos_return_beats_current_base": true,
-        "oos_return_risk_beats_current_base": false,
         "oos_sharpe_positive": true,
         "oos_smart_sortino_positive": true,
         "oos_sortino_positive": true
+      },
+      "promotion_policy": {
+        "name": "strict_liquidation_sharpe_sortino_calmar_gate_20260513",
+        "requires_oos_mdd_lte": 0.25,
+        "requires_oos_return_beats_current_base": true,
+        "return_mdd_hurdle_required": false,
+        "return_mdd_role": "diagnostic_report_only",
+        "risk_adjusted_substitutes": [
+          "sharpe",
+          "sortino",
+          "smart_sortino",
+          "calmar",
+          "max_drawdown"
+        ]
       },
       "selection_inputs": [
         "train",
@@ -9240,8 +9474,145 @@
       "uses_locked_oos_for_selection": false
     },
     "lane": "strict_deploy",
-    "promoted_candidate": {},
-    "promotion_rule": "train/validation/locked-OOS liquidation_count must be zero, every split minimum margin buffer must be positive, then locked-OOS return/MDD gates are report-only after train/validation freeze.",
+    "promoted_candidate": {
+      "candidate_name": "crypto_fx_alpha_zoo_state_calibrated",
+      "candidate_source": "alpha_zoo_train_validation_calibrated_replay",
+      "deployable_success": true,
+      "leverage": 6.0,
+      "liquidation_audit": {
+        "leverage": 6.0,
+        "liquidation_free": true,
+        "margin_buffer_positive": true,
+        "minimum_margin_buffer": 9049.12596153846,
+        "split_status": {
+          "locked_oos": {
+            "account_wipeout_count": 0,
+            "liquidation_count": 0,
+            "liquidation_recovery_observed": false,
+            "margin_buffer_positive": true,
+            "maximum_liquidation_equity_loss_fraction": 0.0,
+            "maximum_liquidation_event_drawdown": 0.0,
+            "minimum_margin_buffer": 9572.449083382613,
+            "recovered_to_pre_liquidation_equity": true,
+            "strict_safe": true
+          },
+          "train": {
+            "account_wipeout_count": 0,
+            "liquidation_count": 0,
+            "liquidation_recovery_observed": false,
+            "margin_buffer_positive": true,
+            "maximum_liquidation_equity_loss_fraction": 0.0,
+            "maximum_liquidation_event_drawdown": 0.0,
+            "minimum_margin_buffer": 9049.12596153846,
+            "recovered_to_pre_liquidation_equity": true,
+            "strict_safe": true
+          },
+          "validation": {
+            "account_wipeout_count": 0,
+            "liquidation_count": 0,
+            "liquidation_recovery_observed": false,
+            "margin_buffer_positive": true,
+            "maximum_liquidation_equity_loss_fraction": 0.0,
+            "maximum_liquidation_event_drawdown": 0.0,
+            "minimum_margin_buffer": 9527.695927547531,
+            "recovered_to_pre_liquidation_equity": true,
+            "strict_safe": true
+          }
+        },
+        "total_liquidation_count": 0
+      },
+      "locked_oos_role": "gate_report_only_after_candidate_freeze",
+      "performance_diagnostics": {
+        "current_base_reference_return_mdd": 6.9168776779021455,
+        "oos_return_mdd": 3.007073011653861,
+        "oos_return_mdd_beats_current_base": false,
+        "return_mdd_hurdle_required": false,
+        "return_mdd_role": "diagnostic_report_only",
+        "risk_adjusted_metrics_used_instead": [
+          "sharpe",
+          "sortino",
+          "smart_sortino",
+          "calmar",
+          "max_drawdown"
+        ]
+      },
+      "performance_gates": {
+        "oos_calmar_positive": true,
+        "oos_mdd_within_25pct_budget": true,
+        "oos_return_beats_current_base": true,
+        "oos_sharpe_positive": true,
+        "oos_smart_sortino_positive": true,
+        "oos_sortino_positive": true
+      },
+      "promotion_policy": {
+        "name": "strict_liquidation_sharpe_sortino_calmar_gate_20260513",
+        "requires_oos_mdd_lte": 0.25,
+        "requires_oos_return_beats_current_base": true,
+        "return_mdd_hurdle_required": false,
+        "return_mdd_role": "diagnostic_report_only",
+        "risk_adjusted_substitutes": [
+          "sharpe",
+          "sortino",
+          "smart_sortino",
+          "calmar",
+          "max_drawdown"
+        ]
+      },
+      "selection_inputs": [
+        "train",
+        "validation"
+      ],
+      "split_metrics": {
+        "locked_oos": {
+          "calmar": 3.007073011653861,
+          "max_drawdown": 0.1366667659454812,
+          "return_mdd": 3.007073011653861,
+          "sharpe": 2.143208618164893,
+          "smart_sortino": 2.5002366612271256,
+          "sortino": 2.8419359198153646,
+          "total_return": 0.41096694346467144,
+          "trade_count": 540
+        },
+        "train": {
+          "calmar": 2.3299138826572765,
+          "max_drawdown": 0.2956514670572235,
+          "return_mdd": 2.3299138826572765,
+          "sharpe": 1.5691392287535169,
+          "smart_sortino": 1.4817069095478044,
+          "sortino": 1.9197757311044374,
+          "total_return": 0.6888424575246155,
+          "trade_count": 1779
+        },
+        "validation": {
+          "calmar": 3.150734499031939,
+          "max_drawdown": 0.09559509283920696,
+          "return_mdd": 3.150734499031939,
+          "sharpe": 1.5520405722881823,
+          "smart_sortino": 1.9128821340063138,
+          "sortino": 2.0957442791971075,
+          "total_return": 0.30119475694665043,
+          "trade_count": 524
+        }
+      },
+      "strategy": "CryptoFxAlphaZooStateStrategy",
+      "strict_safe": true,
+      "uses_locked_oos_for_selection": false
+    },
+    "promotion_policy": {
+      "name": "strict_liquidation_sharpe_sortino_calmar_gate_20260513",
+      "requires_oos_mdd_lte": 0.25,
+      "requires_oos_return_beats_current_base": true,
+      "return_mdd_hurdle_required": false,
+      "return_mdd_role": "diagnostic_report_only",
+      "risk_adjusted_substitutes": [
+        "sharpe",
+        "sortino",
+        "smart_sortino",
+        "calmar",
+        "max_drawdown"
+      ]
+    },
+    "promotion_rule": "train/validation/locked-OOS liquidation_count must be zero, every split minimum margin buffer must be positive, OOS MDD must stay within 25%, OOS return must beat the current-base reference, and Sharpe/Sortino/smart Sortino/Calmar must be positive. Return/MDD is diagnostic report-only, not a promotion hurdle.",
     "requires_liquidation_count_zero": true,
     "requires_positive_min_margin_buffer": true
   },

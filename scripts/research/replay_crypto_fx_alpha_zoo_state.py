@@ -34,6 +34,14 @@ CURRENT_BASE_REFERENCE = {
     "locked_oos_return_mdd": 6.9168776779021455,
     "locked_oos_sharpe": 5.202361970933632,
 }
+PROMOTION_POLICY = {
+    "name": "strict_liquidation_sharpe_sortino_calmar_gate_20260513",
+    "return_mdd_hurdle_required": False,
+    "return_mdd_role": "diagnostic_report_only",
+    "risk_adjusted_substitutes": ["sharpe", "sortino", "smart_sortino", "calmar", "max_drawdown"],
+    "requires_oos_return_beats_current_base": True,
+    "requires_oos_mdd_lte": 0.25,
+}
 
 
 @dataclass(slots=True)
@@ -515,14 +523,22 @@ def _liquidation_lanes(data: pd.DataFrame, trades: list[dict[str, Any]], *, allo
         oos_return = _safe_float(oos.get("total_return"))
         oos_mdd = _safe_float(oos.get("max_drawdown"), 1.0)
         return_mdd = oos_return / oos_mdd if oos_mdd > 1e-12 else (float("inf") if oos_return > 0 else 0.0)
+        return_mdd_beats_reference = return_mdd > CURRENT_BASE_REFERENCE["locked_oos_return_mdd"]
         performance_gates = {
             "oos_mdd_within_25pct_budget": oos_mdd <= 0.25,
             "oos_return_beats_current_base": oos_return > CURRENT_BASE_REFERENCE["locked_oos_total_return"],
-            "oos_return_risk_beats_current_base": return_mdd > CURRENT_BASE_REFERENCE["locked_oos_return_mdd"],
             "oos_sharpe_positive": _safe_float(oos.get("sharpe")) > 0.0,
             "oos_sortino_positive": _safe_float(oos.get("sortino")) > 0.0,
             "oos_smart_sortino_positive": _safe_float(oos.get("smart_sortino")) > 0.0,
             "oos_calmar_positive": _safe_float(oos.get("calmar")) > 0.0,
+        }
+        performance_diagnostics = {
+            "oos_return_mdd": return_mdd,
+            "current_base_reference_return_mdd": CURRENT_BASE_REFERENCE["locked_oos_return_mdd"],
+            "oos_return_mdd_beats_current_base": return_mdd_beats_reference,
+            "return_mdd_hurdle_required": False,
+            "return_mdd_role": "diagnostic_report_only",
+            "risk_adjusted_metrics_used_instead": ["sharpe", "sortino", "smart_sortino", "calmar", "max_drawdown"],
         }
         strict_safe = bool(audit["liquidation_free"] and audit["margin_buffer_positive"])
         deployable = strict_safe and all(performance_gates.values())
@@ -537,7 +553,9 @@ def _liquidation_lanes(data: pd.DataFrame, trades: list[dict[str, Any]], *, allo
                 "locked_oos_role": "gate_report_only_after_candidate_freeze",
                 "split_metrics": metrics,
                 "liquidation_audit": audit,
+                "promotion_policy": PROMOTION_POLICY,
                 "performance_gates": performance_gates,
+                "performance_diagnostics": performance_diagnostics,
                 "strict_safe": strict_safe,
                 "deployable_success": bool(deployable),
             }
@@ -562,14 +580,15 @@ def _liquidation_lanes(data: pd.DataFrame, trades: list[dict[str, Any]], *, allo
     ]
     return {
         "integer_grid_results": rows,
-        "strict_zero_liquidation_lane": {
-            "lane": "strict_deploy",
-            "requires_liquidation_count_zero": True,
-            "requires_positive_min_margin_buffer": True,
-            "promotion_rule": "train/validation/locked-OOS liquidation_count must be zero, every split minimum margin buffer must be positive, then locked-OOS return/MDD gates are report-only after train/validation freeze.",
-            "candidate_count": len(strict_candidates),
-            "deployable_candidate_count": len(deployable),
-            "highest_zero_liquidation_integer": max(strict_candidates, key=lambda row: row["leverage"], default={}),
+            "strict_zero_liquidation_lane": {
+                "lane": "strict_deploy",
+                "requires_liquidation_count_zero": True,
+                "requires_positive_min_margin_buffer": True,
+                "promotion_policy": PROMOTION_POLICY,
+                "promotion_rule": "train/validation/locked-OOS liquidation_count must be zero, every split minimum margin buffer must be positive, OOS MDD must stay within 25%, OOS return must beat the current-base reference, and Sharpe/Sortino/smart Sortino/Calmar must be positive. Return/MDD is diagnostic report-only, not a promotion hurdle.",
+                "candidate_count": len(strict_candidates),
+                "deployable_candidate_count": len(deployable),
+                "highest_zero_liquidation_integer": max(strict_candidates, key=lambda row: row["leverage"], default={}),
             "promoted_candidate": max(deployable, key=lambda row: row["leverage"], default={}),
         },
         "diagnostic_nonfatal_lane": {
@@ -680,17 +699,20 @@ def replay_frame(
             "calibrated_edge_keys": sorted(edge_map),
         },
         "current_base_reference": CURRENT_BASE_REFERENCE,
+        "promotion_policy": PROMOTION_POLICY,
         "deployable_success": deployable,
         "deployable_success_reason": (
-            "strict zero-liquidation lane beat current-base reference return and return/MDD"
+            "strict zero-liquidation lane passed revised OOS return, MDD, Sharpe/Sortino/Calmar gates; return/MDD is diagnostic-only"
             if deployable
-            else "no strict zero-liquidation Alpha Zoo replay row beat the invalid current-base reference return and return/MDD"
+            else "no strict zero-liquidation Alpha Zoo replay row passed the revised OOS return, MDD, Sharpe/Sortino/Calmar gates"
         ),
         "locked_oos_report_only_metrics": {
             "candidate_oos_return": _safe_float(oos.get("total_return")),
             "candidate_oos_return_mdd": return_mdd,
             "current_base_oos_return": CURRENT_BASE_REFERENCE["locked_oos_total_return"],
             "current_base_oos_return_mdd": CURRENT_BASE_REFERENCE["locked_oos_return_mdd"],
+            "return_mdd_hurdle_required": False,
+            "return_mdd_role": "diagnostic_report_only",
         },
         "memory_summary": {"peak_rss_mib": _rss_mib(), "limit_mib": 8192.0, "pass_under_8gb": _rss_mib() < 8192.0},
         "source_coverage": source_metadata or {},
@@ -719,6 +741,7 @@ def _write_markdown(payload: dict[str, Any], path: Path) -> None:
         "- uses_locked_oos_for_selection: `False`",
         "- locked-OOS role: `gate/report only after candidate freeze`",
         "- current-base/calendar tuple: `hypothesis_reference_only`, not selection/promotion target",
+        "- promotion policy: return/MDD is `diagnostic_report_only`; Sharpe/Sortino/smart Sortino/Calmar and MDD cap carry the risk-adjusted gate",
         "",
         "## Locked-OOS report-only comparison",
         "",

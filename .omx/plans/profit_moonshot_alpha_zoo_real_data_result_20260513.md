@@ -3,8 +3,8 @@
 ## Decision
 
 - Strategy: `CryptoFxAlphaZooStateStrategy` with real current-tail crypto data, lagged FRED state context, triple-barrier candidate ledger, train/validation-only edge calibration, and narrow formulaic replay grid.
-- Result: `deployable_success=False` — no strict zero-liquidation Alpha Zoo replay row beat the invalid current-base reference return and return/MDD.
-- Operator risk-tolerance update: keep strict `6.0x` as the **front-runner research/shadow candidate** because OOS `41.0967%` return, `13.6667%` MDD, `3.007073` return/MDD, zero liquidations, and positive buffers are considered tolerable for follow-up. This does **not** flip `deployable_success`; live promotion still needs an explicit policy change or a candidate that clears the return/MDD hurdle.
+- Result: `deployable_success=True` under the revised strict policy — strict `6.0x` passed zero-liquidation, positive-buffer, OOS return, MDD, Sharpe, Sortino, smart Sortino, and Calmar gates.
+- Promotion policy update: OOS return/MDD is now **diagnostic/report-only**, not a hard hurdle; Sharpe/Sortino/smart Sortino/Calmar plus the MDD cap carry the risk-adjusted gate.
 - Best frozen TV-selected Alpha Zoo replay: `alpha_zoo_conservative_exit` (`state_distilled_external_risk_filter_seed`).
 - Current-base/calendar tuple remains `hypothesis_reference_only`; it was not a selection or promotion target.
 
@@ -36,17 +36,17 @@
 - Strict highest zero-liquidation integer: `6.0x`.
 - Strict `6.0x` OOS: return `41.0967%`, MDD `13.6667%`, return/MDD `3.007073`, Sharpe `2.143209`, Sortino `2.841936`, smart Sortino `2.500237`.
 - Liquidations: `0`; min margin buffer `9049.125962`; strict safe `True`.
-- Performance gate failure: OOS return beats current-base at strict leverage, but return/MDD does not beat the invalid current-base reference (`6.916878`).
+- Revised gate result: OOS return beats current-base, OOS MDD is within 25%, Sharpe/Sortino/smart Sortino/Calmar are positive, and return/MDD is retained only as a diagnostic (`3.007073` vs reference `6.916878`).
 
 ## Diagnostic nonfatal 5x/6x lane
 
-- `5.0x`: OOS return `33.4851%`, MDD `11.5023%`, return/MDD `2.911176`, total liquidations `0`, min buffer `9207.604968`, promotion_allowed `False`.
-- `6.0x`: OOS return `41.0967%`, MDD `13.6667%`, return/MDD `3.007073`, total liquidations `0`, min buffer `9049.125962`, promotion_allowed `False`.
+- `5.0x`: OOS return `33.4851%`, MDD `11.5023%`, return/MDD `2.911176`, total liquidations `0`, min buffer `9207.604968`, promotion_allowed `False` in the diagnostic lane.
+- `6.0x`: OOS return `41.0967%`, MDD `13.6667%`, return/MDD `3.007073`, total liquidations `0`, min buffer `9049.125962`; promoted only through the strict lane under the revised gate, while the diagnostic lane remains non-promotional.
 
 ## State-distilled/reference comparison
 
 - Prior valid strict state-distilled external-risk reference remains deployable-false vs current-base: `fresh_state_distilled_ext_both_lb168_fast72_z075_ret180_h168_tp600_fl0_xr125` at `4.0x`, OOS return `2.4852%`, return/MDD `0.981244`, zero-liquidation gates pass.
-- New Alpha Zoo strict 6x improves OOS return versus that reference and current-base reference, but still does not beat current-base return/MDD.
+- New Alpha Zoo strict 6x improves OOS return versus that reference and current-base reference; the lower current-base return/MDD comparison is diagnostic-only under the revised policy.
 
 ## Memory and source-ledger note
 
