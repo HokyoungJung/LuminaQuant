@@ -1,7 +1,16 @@
 from __future__ import annotations
 
+import importlib.util
+from pathlib import Path
+
 from lumina_quant.research.candidate_outcome_ledger import CandidateOutcomeLedger, CandidateOutcomeRecord
 from lumina_quant.research.edge_calibration import calibrate_edge_buckets
+
+_CALIBRATION_SPEC = importlib.util.spec_from_file_location("calibrate_crypto_fx_edges", Path("scripts/research/calibrate_crypto_fx_edges.py"))
+_CALIBRATION_MODULE = importlib.util.module_from_spec(_CALIBRATION_SPEC)
+assert _CALIBRATION_SPEC.loader is not None
+_CALIBRATION_SPEC.loader.exec_module(_CALIBRATION_MODULE)
+build_calibration_payload = _CALIBRATION_MODULE.build_calibration_payload
 
 
 def test_calibration_allows_positive_bucket_after_shrinkage() -> None:
@@ -56,3 +65,28 @@ def test_outcome_ledger_roundtrip_and_summary(tmp_path) -> None:
     assert summary["train_validation_record_count"] == 1
     assert summary["locked_oos_record_count"] == 1
     assert summary["uses_locked_oos_for_selection"] is False
+
+def test_calibration_payload_physically_excludes_locked_oos_records() -> None:
+    records = [
+        {"candidate_id": "alpha", "split": "train", "side": "LONG", "symbol": "ETH/USDT", "net_pnl_bps": 20.0}
+        for _ in range(20)
+    ] + [
+        {"candidate_id": "alpha", "split": "validation", "side": "LONG", "symbol": "ETH/USDT", "net_pnl_bps": 18.0}
+        for _ in range(20)
+    ] + [
+        {"candidate_id": "alpha", "split": "locked_oos", "side": "LONG", "symbol": "ETH/USDT", "net_pnl_bps": -9999.0}
+        for _ in range(10)
+    ]
+    payload = build_calibration_payload(
+        records,
+        ledger_summary={"record_count": len(records)},
+        bucket_fields=("candidate_id", "side", "symbol"),
+        parent_fields=("candidate_id", "side"),
+        min_bucket_n=10,
+    )
+    assert payload["input_locked_oos_record_count"] == 10
+    assert payload["calibration_record_count"] == 40
+    assert payload["locked_oos_calibration_record_count"] == 0
+    calibration = payload["calibrations"]["alpha|LONG|ETH/USDT"]
+    assert calibration["mean_edge_bps"] > 0.0
+    assert payload["uses_locked_oos_for_calibration"] is False

@@ -1,11 +1,24 @@
 from __future__ import annotations
 
 import queue
+import importlib.util
+import sys
 from dataclasses import dataclass
+from pathlib import Path
+
+import pandas as pd
 
 from lumina_quant.core.events import MarketBatchEvent, MarketEvent
 from lumina_quant.strategies.crypto_fx_alpha_zoo_state import CryptoFxAlphaZooStateStrategy
 from lumina_quant.strategies.registry import get_strategy_map, get_strategy_tier
+
+_REPLAY_SPEC = importlib.util.spec_from_file_location("replay_crypto_fx_alpha_zoo_state", Path("scripts/research/replay_crypto_fx_alpha_zoo_state.py"))
+_REPLAY_MODULE = importlib.util.module_from_spec(_REPLAY_SPEC)
+assert _REPLAY_SPEC.loader is not None
+sys.modules[_REPLAY_SPEC.name] = _REPLAY_MODULE
+_REPLAY_SPEC.loader.exec_module(_REPLAY_MODULE)
+_GridSpec = _REPLAY_MODULE._GridSpec
+replay_frame = _REPLAY_MODULE.replay_frame
 
 
 @dataclass(slots=True)
@@ -124,3 +137,42 @@ def test_strategy_state_roundtrip_preserves_signal_sequence() -> None:
         split_b.calculate_signals(_batch(ts))
     split_signals = [(item.datetime, item.symbol, item.signal_type) for item in list(events_split.queue)]
     assert split_signals == full_signals
+
+
+def test_replay_grid_hides_locked_oos_until_after_train_validation_selection() -> None:
+    rows = []
+    for ts in range(60):
+        timestamp = pd.Timestamp("2026-01-01") + pd.Timedelta(hours=ts)
+        split = "train" if ts < 30 else "validation" if ts < 45 else "locked_oos"
+        for symbol, drift in (("BTC/USDT", 0.001), ("ETH/USDT", 0.004), ("SOL/USDT", -0.002)):
+            close = 100.0 * (1.0 + drift * ts)
+            rows.append(
+                {
+                    "timestamp": timestamp,
+                    "symbol": symbol,
+                    "open": close * 0.999,
+                    "high": close * 1.002,
+                    "low": close * 0.998,
+                    "close": close,
+                    "volume": 1000.0 + ts,
+                    "split": split,
+                }
+            )
+    payload = replay_frame(
+        pd.DataFrame(rows),
+        require_calibrated_edge=True,
+        calibrated_edges={"default:LONG": 5.0, "default:SHORT": 5.0},
+        strategy_params={"fast_lookback_bars": 2, "slow_lookback_bars": 8, "history_window": 16, "entry_threshold": 0.15},
+        grid_specs=[
+            _GridSpec("low_threshold", "unit", {"entry_threshold": 0.15}),
+            _GridSpec("higher_threshold", "unit", {"entry_threshold": 0.30}),
+        ],
+    )
+    grid = payload["candidate_selection_grid"]
+    assert grid["uses_locked_oos_for_selection"] is False
+    assert grid["locked_oos_calibration_record_count"] == 0
+    for row in grid["rows"]:
+        assert set(row["selection_metrics"]) == {"train", "validation"}
+        assert row["locked_oos_metrics_visible_during_selection"] is False
+        assert row["uses_locked_oos_for_selection"] is False
+    assert payload["selection_provenance"]["candidate_freeze_before_locked_oos_gate"] is True

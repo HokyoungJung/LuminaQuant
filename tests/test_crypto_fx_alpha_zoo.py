@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import math
+import importlib.util
+from pathlib import Path
 
 import pandas as pd
 
@@ -15,6 +17,13 @@ from lumina_quant.alpha_zoo.crypto_fx_factors import (
 )
 from lumina_quant.alpha_zoo.factor_card import build_factor_card
 from lumina_quant.alpha_zoo.operators import delta, ts_rank
+from lumina_quant.research.crypto_fx_alpha_zoo_real_data import normalize_real_data_frame
+
+_SCREEN_SPEC = importlib.util.spec_from_file_location("run_crypto_fx_alpha_zoo_screen", Path("scripts/research/run_crypto_fx_alpha_zoo_screen.py"))
+_SCREEN_MODULE = importlib.util.module_from_spec(_SCREEN_SPEC)
+assert _SCREEN_SPEC.loader is not None
+_SCREEN_SPEC.loader.exec_module(_SCREEN_MODULE)
+build_screen_payload = _SCREEN_MODULE.build_screen_payload
 
 
 def _sample_panel(periods: int = 36) -> pd.DataFrame:
@@ -116,3 +125,63 @@ def test_valid_factor_card_records_gate_only_oos_provenance() -> None:
     assert card.strategy_validity["pass"] is True
     assert card.selection_provenance["selected_using_splits"] == ("train", "validation")
     assert card.selection_provenance["locked_oos_role"] == "gate_report_only"
+
+def _wide_current_tail_panel(periods: int = 80) -> pd.DataFrame:
+    rows = []
+    for t in range(periods):
+        ts = pd.Timestamp("2025-01-01") + pd.Timedelta(hours=t)
+        row = {"datetime": ts}
+        for prefix, drift in (("btcusdt", 0.001), ("ethusdt", 0.003), ("solusdt", -0.002)):
+            close = 100.0 * (1.0 + drift * t)
+            row[f"{prefix}_open"] = close * 0.999
+            row[f"{prefix}_high"] = close * 1.003
+            row[f"{prefix}_low"] = close * 0.997
+            row[f"{prefix}_close"] = close
+            row[f"{prefix}_volume"] = 1000.0 + t
+            row[f"{prefix}_funding_rate"] = 0.0001
+            row[f"{prefix}_open_interest"] = 1_000_000.0 + t
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def test_real_current_tail_wide_adapter_reports_observed_and_imputed_coverage() -> None:
+    bundle = normalize_real_data_frame(
+        _wide_current_tail_panel(),
+        source_path="unit-wide.parquet",
+        strict_real_data=True,
+    )
+    assert {"BTC/USDT", "ETH/USDT", "SOL/USDT"}.issubset(set(bundle.frame["symbol"]))
+    coverage = bundle.metadata["input"]["symbol_coverage"]["BTC/USDT"]
+    assert coverage["required_ohlcv_observed"] is True
+    assert "funding_rate" in coverage["observed_fields"]
+    assert "vwap" in coverage["imputed_fields"]
+    assert bundle.metadata["strategy_validity"]["pass"] is True
+
+
+def test_real_current_tail_adapter_fails_closed_when_required_ohlcv_missing() -> None:
+    bad = _wide_current_tail_panel().drop(columns=["ethusdt_volume"])
+    try:
+        normalize_real_data_frame(bad, source_path="bad-wide.parquet", strict_real_data=True)
+    except ValueError as exc:
+        assert "required_real_ohlcv_coverage_missing" in str(exc)
+    else:  # pragma: no cover - assertion clarity
+        raise AssertionError("missing required real OHLCV coverage should fail closed")
+
+
+def test_screen_payload_writes_real_candidate_outcome_ledger(tmp_path) -> None:
+    bundle = normalize_real_data_frame(_wide_current_tail_panel(), source_path="unit-wide.parquet")
+    ledger_path = tmp_path / "ledger.jsonl"
+    payload = build_screen_payload(
+        bundle.frame,
+        top_n=3,
+        source_ref="unit-wide",
+        source_coverage=bundle.metadata,
+        ledger_output=ledger_path,
+        max_ledger_records_per_factor_side_split=5,
+    )
+    assert payload["artifact_kind"] == "crypto_fx_alpha_zoo_real_data_screen_bundle"
+    assert payload["source_coverage"]["strategy_validity"]["pass"] is True
+    assert payload["candidate_outcome_ledger"]["record_count"] > 0
+    assert payload["candidate_outcome_ledger"]["train_validation_record_count"] > 0
+    assert ledger_path.exists()
+    assert payload["uses_locked_oos_for_selection"] is False
