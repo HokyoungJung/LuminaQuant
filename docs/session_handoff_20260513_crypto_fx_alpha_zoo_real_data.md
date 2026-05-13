@@ -4,6 +4,7 @@
 
 - Strategy: `CryptoFxAlphaZooStateStrategy` with real current-tail crypto data, lagged FRED state context, triple-barrier candidate ledger, train/validation-only edge calibration, and narrow formulaic replay grid.
 - Result: `deployable_success=False` — no strict zero-liquidation Alpha Zoo replay row beat the invalid current-base reference return and return/MDD.
+- Operator risk-tolerance update: keep strict `6.0x` as the **front-runner research/shadow candidate** because OOS `41.0967%` return, `13.6667%` MDD, `3.007073` return/MDD, zero liquidations, and positive buffers are considered tolerable for follow-up. This does **not** flip `deployable_success`; live promotion still needs an explicit policy change or a candidate that clears the return/MDD hurdle.
 - Best frozen TV-selected Alpha Zoo replay: `alpha_zoo_conservative_exit` (`state_distilled_external_risk_filter_seed`).
 - Current-base/calendar tuple remains `hypothesis_reference_only`; it was not a selection or promotion target.
 
@@ -62,4 +63,4 @@
 
 ## Next handoff
 
-Continue from the summary JSON/MD above. Do not promote until a train/validation-frozen, non-calendar candidate beats the invalid current-base reference on locked-OOS return and return/MDD while strict liquidation count is zero and min buffers are positive.
+Continue from the summary JSON/MD above with strict `6.0x` Alpha Zoo as the primary front-runner/shadow candidate. Do not mark `deployable_success=true` or promote live until either the live promotion policy is explicitly revised for this risk tolerance, or a train/validation-frozen non-calendar candidate beats the invalid current-base reference on locked-OOS return and return/MDD while strict liquidation count is zero and min buffers are positive.

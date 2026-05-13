@@ -562,6 +562,48 @@
     },
     "uses_locked_oos_for_selection": false
   },
+  "front_runner_candidate": {
+    "allowed_use": [
+      "primary_next_iteration_candidate",
+      "shadow_candidate",
+      "sensitivity_and_full_liquidation_follow_up"
+    ],
+    "calendar_primary": false,
+    "candidate_name": "alpha_zoo_conservative_exit",
+    "candidate_source": "state_distilled_external_risk_filter_seed",
+    "deployable_success": false,
+    "designation": "leading_research_candidate_front_runner",
+    "forbidden_use_without_policy_change": [
+      "live_promotion",
+      "deployable_success_true",
+      "calendar_current_base_promotion_target"
+    ],
+    "lane": "strict_zero_liquidation_6x",
+    "leverage": 6.0,
+    "live_promotion_status": "hold_not_deployable_success_false",
+    "locked_oos_metrics": {
+      "max_drawdown": 0.1366667659454812,
+      "return_mdd": 3.007073011653861,
+      "sharpe": 2.143208618164893,
+      "smart_sortino": 2.5002366612271256,
+      "sortino": 2.8419359198153646,
+      "total_return": 0.41096694346467144
+    },
+    "locked_oos_role": "gate_report_only_after_candidate_freeze",
+    "operator_risk_tolerance_update": "2026-05-13: strict 6x drawdown profile considered tolerable enough to keep as the primary follow-up candidate.",
+    "promotion_gate_blocker": "OOS return/MDD 3.007073 remains below invalid current-base reference hurdle 6.916878; keep as front-runner/shadow candidate unless the live promotion policy is explicitly revised.",
+    "selection_inputs": [
+      "train",
+      "validation"
+    ],
+    "strategy": "CryptoFxAlphaZooStateStrategy",
+    "strict_safety": {
+      "liquidation_count": 0,
+      "minimum_margin_buffer": 9049.12596153846,
+      "strict_safe": true
+    },
+    "uses_locked_oos_for_selection": false
+  },
   "generated_at_utc": "2026-05-13T12:11:59.852372Z",
   "memory_summary": {
     "limit_mib": 8192.0,
