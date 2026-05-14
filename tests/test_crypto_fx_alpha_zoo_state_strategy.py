@@ -19,7 +19,9 @@ assert _REPLAY_SPEC.loader is not None
 sys.modules[_REPLAY_SPEC.name] = _REPLAY_MODULE
 _REPLAY_SPEC.loader.exec_module(_REPLAY_MODULE)
 _GridSpec = _REPLAY_MODULE._GridSpec
+_build_trades = _REPLAY_MODULE._build_trades
 _liquidation_lanes = _REPLAY_MODULE._liquidation_lanes
+_paper_forward_diagnostics = _REPLAY_MODULE._paper_forward_diagnostics
 replay_frame = _REPLAY_MODULE.replay_frame
 
 _SUMMARY_SPEC = importlib.util.spec_from_file_location(
@@ -101,6 +103,8 @@ def test_strategy_requires_calibrated_edge_for_entries() -> None:
     assert first_entry.symbol.endswith("USDT")
     assert first_entry.metadata["uses_locked_oos_for_selection"] is False
     assert first_entry.metadata["calibrated_lower_bound_edge_bps"] == 5.0
+    assert first_entry.metadata["dominant_factor_family"]
+    assert first_entry.metadata["factor_family_scores"]
 
 
 def test_strategy_state_roundtrip_preserves_signal_sequence() -> None:
@@ -215,6 +219,116 @@ def test_return_mdd_reference_hurdle_is_diagnostic_not_promotion_gate() -> None:
     assert promoted["performance_diagnostics"]["return_mdd_hurdle_required"] is False
     assert promoted["performance_diagnostics"]["return_mdd_role"] == "diagnostic_report_only"
     assert promoted["deployable_success"] is True
+
+
+def test_replay_preserves_exit_reason_from_strategy_metadata() -> None:
+    data = pd.DataFrame(
+        [
+            {
+                "timestamp": pd.Timestamp("2026-01-01T00:00:00Z"),
+                "symbol": "BTC/USDT",
+                "open": 100.0,
+                "high": 101.0,
+                "low": 99.0,
+                "close": 100.0,
+                "volume": 1.0,
+                "split": "locked_oos",
+            },
+            {
+                "timestamp": pd.Timestamp("2026-01-01T01:00:00Z"),
+                "symbol": "BTC/USDT",
+                "open": 105.0,
+                "high": 106.0,
+                "low": 104.0,
+                "close": 105.0,
+                "volume": 1.0,
+                "split": "locked_oos",
+            },
+        ]
+    )
+    signals = [
+        {
+            "datetime": pd.Timestamp("2026-01-01T00:00:00Z").isoformat(),
+            "symbol": "BTC/USDT",
+            "signal_type": "LONG",
+            "price": 100.0,
+            "metadata": {"fx_risk_state": "risk_on", "dominant_factor_family": "crypto_residual_momentum"},
+        },
+        {
+            "datetime": pd.Timestamp("2026-01-01T01:00:00Z").isoformat(),
+            "symbol": "BTC/USDT",
+            "signal_type": "EXIT",
+            "price": 105.0,
+            "metadata": {"exit_reason_detail": "take_profit"},
+        },
+    ]
+
+    trades = _build_trades(data, signals)
+
+    assert trades[0]["exit_reason"] == "take_profit"
+    assert trades[0]["exit_metadata"]["exit_reason_detail"] == "take_profit"
+
+
+def test_paper_forward_diagnostics_report_breakdowns_and_cost_sensitivity() -> None:
+    trades = [
+        {
+            "symbol": "BTC/USDT",
+            "side": "LONG",
+            "entry_time": pd.Timestamp("2026-01-01T00:00:00Z"),
+            "exit_time": pd.Timestamp("2026-01-01T12:00:00Z"),
+            "entry_split": "train",
+            "gross_return": 0.03,
+            "exit_reason": "take_profit",
+            "entry_metadata": {
+                "fx_risk_state": "risk_on",
+                "dominant_factor_family": "crypto_residual_momentum",
+                "factor_family_scores": {"crypto_residual_momentum": 1.2},
+            },
+        },
+        {
+            "symbol": "ETH/USDT",
+            "side": "SHORT",
+            "entry_time": pd.Timestamp("2026-01-02T00:00:00Z"),
+            "exit_time": pd.Timestamp("2026-01-02T06:00:00Z"),
+            "entry_split": "validation",
+            "gross_return": -0.01,
+            "exit_reason": "stop_loss",
+            "entry_metadata": {
+                "fx_risk_state": "risk_off",
+                "dominant_factor_family": "breakout_failure",
+                "factor_family_scores": {"breakout_failure": -1.0},
+            },
+        },
+        {
+            "symbol": "SOL/USDT",
+            "side": "SHORT",
+            "entry_time": pd.Timestamp("2026-01-03T00:00:00Z"),
+            "exit_time": pd.Timestamp("2026-01-04T00:00:00Z"),
+            "entry_split": "locked_oos",
+            "gross_return": 0.04,
+            "exit_reason": "time_exit",
+            "entry_metadata": {
+                "fx_risk_state": "risk_off",
+                "dominant_factor_family": "trend_efficiency",
+                "factor_family_scores": {"trend_efficiency": -0.8},
+            },
+        },
+    ]
+
+    diagnostics = _paper_forward_diagnostics(trades, leverage=6.0, allocation_fraction=0.10, candidate_name="unit")
+    breakdowns = diagnostics["breakdowns"]
+
+    assert diagnostics["promotion_allowed"] is False
+    assert "risk_off" in breakdowns["by_regime"]["groups"]
+    assert "SOL/USDT" in breakdowns["by_symbol"]["groups"]
+    assert "SHORT" in breakdowns["by_side"]["groups"]
+    assert "trend_efficiency" in breakdowns["by_factor_family"]["groups"]
+    assert "time_exit" in breakdowns["by_exit_reason"]["groups"]
+
+    slippage_rows = diagnostics["slippage_sensitivity"]["rows"]
+    funding_rows = diagnostics["funding_cost_sensitivity"]["rows"]
+    assert slippage_rows[-1]["locked_oos"]["total_return"] < slippage_rows[0]["locked_oos"]["total_return"]
+    assert funding_rows[-1]["locked_oos"]["total_return"] < funding_rows[0]["locked_oos"]["total_return"]
 
 
 def test_real_data_summary_fails_closed_when_return_mdd_is_a_strict_gate(tmp_path: Path) -> None:

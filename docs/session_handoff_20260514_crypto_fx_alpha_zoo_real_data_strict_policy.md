@@ -84,3 +84,23 @@ Treat this as the current Alpha Zoo live-promotion candidate, subject to any nor
 Do not repeat the earlier loop of finding a good-looking single rule and then discovering it is calendar-primary or OOS-selected. The next path must be evidence-first:
 
 `real factors → train/validation labels → calibrated edge → stateful replay → locked-OOS gate/report → strict liquidation validation`.
+
+## Addendum — Paper-forward diagnostics (2026-05-14)
+
+Additional non-promotional diagnostics were added to the replay and summary artifacts for the same train/validation-selected `alpha_zoo_conservative_exit` strict 6x candidate. These diagnostics are not live-promotion gates and do not use locked-OOS for selection/calibration.
+
+Locked-OOS 6x breakdown:
+
+- Regime: `neutral` `+41.0967%` (`540` trades).
+- Symbol: SOL/USDT `+19.2672%`, BNB/USDT `+10.3167%`, TRX/USDT `+4.9566%`, ETH/USDT `+1.4843%`, BTC/USDT `+0.6807%`.
+- Side: SHORT `+26.3040%`, LONG `+11.7120%`.
+- Factor family: crypto residual momentum `+30.1822%`, crypto residual reversal `+8.4241%`, volume/vwap pressure `-0.0370%`.
+- Exit reason: score_exit `+41.0936%`, take_profit `+16.1976%`, end_of_sample `-0.0788%`, stop_loss `-13.8700%`.
+- Round-trip slippage 0/2.5/5/10/20 bps: `+41.0967%`, `+30.1241%`, `+20.0034%`, `+2.0585%`, `-26.1930%`.
+- Conservative funding drag 0/1/2/5/10 bps/day: `+41.0967%`, `+40.4210%`, `+39.7486%`, `+37.7505%`, `+34.4835%`.
+
+Updated artifact fields:
+
+- `paper_forward_diagnostics` in `crypto_fx_alpha_zoo_state_replay_latest.json`.
+- `paper_forward_diagnostics` in `crypto_fx_alpha_zoo_real_data_summary_latest.json`.
+- Markdown summaries include the same non-promotional breakdowns.

@@ -156,3 +156,19 @@ Real current-tail run under `crypto_fx_alpha_zoo_real_data_20260514`:
 - Artifacts: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_real_data_20260514/`.
 
 Research history/source ledger was not regenerated because no new global source family was introduced; this pass reused the current-tail crypto cache and 20260512 lagged FRED external-state source.
+
+## 2026-05-14 KST — Paper-forward diagnostics added
+
+Added non-promotional diagnostics requested for the current leading `CryptoFxAlphaZooStateStrategy` / `alpha_zoo_conservative_exit` / strict 6x candidate. The strategy/replay now records dominant factor-family metadata and exit-reason metadata, and the real-data replay summary includes locked-OOS PnL breakdowns plus cost sensitivity.
+
+Locked-OOS diagnostic breakdown at 6x, 10% allocation:
+
+- Regime: `neutral` `+41.0967%` across `540` trades. Direct FX OHLCV trading remains blocked; lagged FRED state remains context only.
+- Symbol: SOL/USDT `+19.2672%` (`126`), BNB/USDT `+10.3167%` (`128`), TRX/USDT `+4.9566%` (`139`), ETH/USDT `+1.4843%` (`132`), BTC/USDT `+0.6807%` (`15`).
+- Side: SHORT `+26.3040%` (`259`), LONG `+11.7120%` (`281`).
+- Dominant factor family: crypto residual momentum `+30.1822%` (`184`), crypto residual reversal `+8.4241%` (`237`), volume/vwap pressure `-0.0370%` (`119`).
+- Exit reason: score_exit `+41.0936%` (`526`), take_profit `+16.1976%` (`4`), end_of_sample `-0.0788%` (`2`), stop_loss `-13.8700%` (`8`).
+- Slippage sensitivity, round-trip 0/2.5/5/10/20 bps: `+41.0967%`, `+30.1241%`, `+20.0034%`, `+2.0585%`, `-26.1930%`.
+- Conservative funding drag sensitivity, 0/1/2/5/10 bps per day: `+41.0967%`, `+40.4210%`, `+39.7486%`, `+37.7505%`, `+34.4835%`.
+
+Promotion policy unchanged: these diagnostics are `diagnostic_only`, `promotion_allowed=false`; the strict lane remains zero-liquidation + positive buffer + OOS return, MDD cap, and positive risk-metric policy with return/MDD report-only. Research history/source ledger was not regenerated because no new global source family was introduced.

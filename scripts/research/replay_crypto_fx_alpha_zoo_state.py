@@ -48,6 +48,7 @@ PROMOTION_POLICY = {
     "requires_oos_return_mdd_beats_current_base": False,
     "requires_oos_mdd_lte": 0.25,
 }
+SPLITS = ("train", "validation", "locked_oos")
 
 
 @dataclass(slots=True)
@@ -191,7 +192,15 @@ def _build_trades(data: pd.DataFrame, signals: list[dict[str, Any]]) -> list[dic
             }
         elif side == "EXIT" and symbol in positions:
             trade = positions.pop(symbol)
-            trade.update({"exit_time": ts, "exit_price": price, "exit_reason": "strategy_exit"})
+            metadata = dict(signal.get("metadata") or {})
+            trade.update(
+                {
+                    "exit_time": ts,
+                    "exit_price": price,
+                    "exit_reason": str(metadata.get("exit_reason_detail") or "strategy_exit"),
+                    "exit_metadata": metadata,
+                }
+            )
             trades.append(trade)
     if positions:
         for symbol, trade in list(positions.items()):
@@ -409,31 +418,213 @@ def _max_drawdown(returns: list[float]) -> float:
     return max_dd
 
 
+def _holding_days(trade: dict[str, Any]) -> float:
+    try:
+        entry = pd.Timestamp(trade["entry_time"])
+        exit_ = pd.Timestamp(trade["exit_time"])
+    except Exception:
+        return 0.0
+    seconds = max(0.0, float((exit_ - entry).total_seconds()))
+    return seconds / 86_400.0
+
+
+def _portfolio_trade_return(
+    trade: dict[str, Any],
+    *,
+    leverage: float,
+    allocation_fraction: float,
+    round_trip_slippage_bps: float = 0.0,
+    funding_bps_per_day: float = 0.0,
+) -> float:
+    slippage_drag = max(0.0, float(round_trip_slippage_bps)) / 10_000.0
+    funding_drag = max(0.0, float(funding_bps_per_day)) / 10_000.0 * _holding_days(trade)
+    gross = _safe_float(trade.get("gross_return"))
+    return float(allocation_fraction) * float(leverage) * (gross - slippage_drag - funding_drag)
+
+
+def _metrics_from_returns(returns: list[float]) -> dict[str, Any]:
+    clean = [float(item) for item in returns if math.isfinite(float(item))]
+    total = math.prod([1.0 + item for item in clean]) - 1.0 if clean else 0.0
+    mdd = _max_drawdown(clean)
+    mean = sum(clean) / len(clean) if clean else 0.0
+    variance = sum((item - mean) ** 2 for item in clean) / (len(clean) - 1) if len(clean) > 1 else 0.0
+    sigma = math.sqrt(variance)
+    downside = [item for item in clean if item < 0.0]
+    down_sigma = math.sqrt(sum(item * item for item in downside) / len(downside)) if downside else 0.0
+    sharpe = (mean / sigma * math.sqrt(len(clean))) if sigma > 1e-12 else 0.0
+    sortino = (mean / down_sigma * math.sqrt(len(clean))) if down_sigma > 1e-12 else 0.0
+    return {
+        "total_return": float(total),
+        "max_drawdown": float(mdd),
+        "return_mdd": float(total / mdd) if mdd > 1e-12 else (float("inf") if total > 0 else 0.0),
+        "sharpe": float(sharpe),
+        "sortino": float(sortino),
+        "smart_sortino": float(sortino / (1.0 + mdd)),
+        "calmar": float(total / mdd) if mdd > 1e-12 else (float("inf") if total > 0 else 0.0),
+        "trade_count": len(clean),
+    }
+
+
 def _split_metrics(trades: list[dict[str, Any]], *, leverage: float = 1.0, allocation_fraction: float = 0.10) -> dict[str, dict[str, Any]]:
     out: dict[str, dict[str, Any]] = {}
-    for split in ("train", "validation", "locked_oos"):
+    for split in SPLITS:
         split_trades = [trade for trade in trades if str(trade.get("entry_split")) == split]
-        returns = [allocation_fraction * leverage * _safe_float(trade.get("gross_return")) for trade in split_trades]
-        total = math.prod([1.0 + item for item in returns]) - 1.0 if returns else 0.0
-        mdd = _max_drawdown(returns)
-        mean = sum(returns) / len(returns) if returns else 0.0
-        variance = sum((item - mean) ** 2 for item in returns) / (len(returns) - 1) if len(returns) > 1 else 0.0
-        sigma = math.sqrt(variance)
-        downside = [item for item in returns if item < 0.0]
-        down_sigma = math.sqrt(sum(item * item for item in downside) / len(downside)) if downside else 0.0
-        sharpe = (mean / sigma * math.sqrt(len(returns))) if sigma > 1e-12 else 0.0
-        sortino = (mean / down_sigma * math.sqrt(len(returns))) if down_sigma > 1e-12 else 0.0
-        out[split] = {
-            "total_return": float(total),
-            "max_drawdown": float(mdd),
-            "return_mdd": float(total / mdd) if mdd > 1e-12 else (float("inf") if total > 0 else 0.0),
-            "sharpe": float(sharpe),
-            "sortino": float(sortino),
-            "smart_sortino": float(sortino / (1.0 + mdd)),
-            "calmar": float(total / mdd) if mdd > 1e-12 else (float("inf") if total > 0 else 0.0),
-            "trade_count": len(split_trades),
-        }
+        returns = [_portfolio_trade_return(trade, leverage=leverage, allocation_fraction=allocation_fraction) for trade in split_trades]
+        out[split] = _metrics_from_returns(returns)
     return out
+
+
+def _entry_metadata(trade: dict[str, Any]) -> dict[str, Any]:
+    return dict(trade.get("entry_metadata") or {})
+
+
+def _factor_family_key(trade: dict[str, Any]) -> str:
+    metadata = _entry_metadata(trade)
+    dominant = str(metadata.get("dominant_factor_family") or "").strip()
+    if dominant:
+        return dominant
+    scores = dict(metadata.get("factor_family_scores") or {})
+    if scores:
+        return max(scores, key=lambda key: abs(_safe_float(scores[key])))
+    return "alpha_zoo_composite_score"
+
+
+def _grouped_breakdown(
+    trades: list[dict[str, Any]],
+    key_name: str,
+    key_fn: Any,
+    *,
+    leverage: float,
+    allocation_fraction: float,
+) -> dict[str, Any]:
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for trade in trades:
+        grouped.setdefault(str(key_fn(trade) or "unknown"), []).append(trade)
+    rows: dict[str, Any] = {}
+    for key in sorted(grouped):
+        group_trades = grouped[key]
+        split_metrics: dict[str, Any] = {}
+        for split in SPLITS:
+            split_trades = [trade for trade in group_trades if str(trade.get("entry_split")) == split]
+            split_returns = [
+                _portfolio_trade_return(trade, leverage=leverage, allocation_fraction=allocation_fraction) for trade in split_trades
+            ]
+            split_metrics[split] = _metrics_from_returns(split_returns)
+        all_returns = [_portfolio_trade_return(trade, leverage=leverage, allocation_fraction=allocation_fraction) for trade in group_trades]
+        split_metrics["all"] = _metrics_from_returns(all_returns)
+        rows[key] = split_metrics
+    return {
+        "key": key_name,
+        "diagnostic_only": True,
+        "promotion_allowed": False,
+        "groups": rows,
+    }
+
+
+def _adjusted_split_metrics(
+    trades: list[dict[str, Any]],
+    *,
+    leverage: float,
+    allocation_fraction: float,
+    round_trip_slippage_bps: float = 0.0,
+    funding_bps_per_day: float = 0.0,
+) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for split in SPLITS:
+        split_trades = [trade for trade in trades if str(trade.get("entry_split")) == split]
+        returns = [
+            _portfolio_trade_return(
+                trade,
+                leverage=leverage,
+                allocation_fraction=allocation_fraction,
+                round_trip_slippage_bps=round_trip_slippage_bps,
+                funding_bps_per_day=funding_bps_per_day,
+            )
+            for trade in split_trades
+        ]
+        out[split] = _metrics_from_returns(returns)
+    return out
+
+
+def _scenario_rows(
+    trades: list[dict[str, Any]],
+    *,
+    leverage: float,
+    allocation_fraction: float,
+    scenario_name: str,
+    values: tuple[float, ...],
+    value_field: str,
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for value in values:
+        kwargs = {"round_trip_slippage_bps": value} if value_field == "round_trip_slippage_bps" else {"funding_bps_per_day": value}
+        metrics = _adjusted_split_metrics(trades, leverage=leverage, allocation_fraction=allocation_fraction, **kwargs)
+        rows.append(
+            {
+                "scenario": f"{scenario_name}_{value:g}",
+                value_field: float(value),
+                "split_metrics": metrics,
+                "locked_oos": metrics["locked_oos"],
+            }
+        )
+    return rows
+
+
+def _paper_forward_diagnostics(
+    trades: list[dict[str, Any]],
+    *,
+    leverage: float,
+    allocation_fraction: float,
+    candidate_name: str,
+) -> dict[str, Any]:
+    return {
+        "diagnostic_only": True,
+        "promotion_allowed": False,
+        "live_promotion_lane": "strict_zero_liquidation_lane",
+        "candidate_name": candidate_name,
+        "leverage": float(leverage),
+        "allocation_fraction": float(allocation_fraction),
+        "trade_return_model": (
+            "allocation_fraction * leverage * "
+            "(gross_return - round_trip_slippage_bps/10000 - funding_bps_per_day/10000*holding_days)"
+        ),
+        "breakdowns": {
+            "by_regime": _grouped_breakdown(
+                trades,
+                "entry_metadata.fx_risk_state",
+                lambda trade: _entry_metadata(trade).get("fx_risk_state") or "unknown",
+                leverage=leverage,
+                allocation_fraction=allocation_fraction,
+            ),
+            "by_symbol": _grouped_breakdown(trades, "symbol", lambda trade: trade.get("symbol") or "unknown", leverage=leverage, allocation_fraction=allocation_fraction),
+            "by_side": _grouped_breakdown(trades, "side", lambda trade: trade.get("side") or "unknown", leverage=leverage, allocation_fraction=allocation_fraction),
+            "by_factor_family": _grouped_breakdown(trades, "entry_metadata.dominant_factor_family", _factor_family_key, leverage=leverage, allocation_fraction=allocation_fraction),
+            "by_exit_reason": _grouped_breakdown(trades, "exit_reason", lambda trade: trade.get("exit_reason") or "unknown", leverage=leverage, allocation_fraction=allocation_fraction),
+        },
+        "slippage_sensitivity": {
+            "round_trip_bps_grid": [0.0, 2.5, 5.0, 10.0, 20.0],
+            "rows": _scenario_rows(
+                trades,
+                leverage=leverage,
+                allocation_fraction=allocation_fraction,
+                scenario_name="round_trip_slippage_bps",
+                values=(0.0, 2.5, 5.0, 10.0, 20.0),
+                value_field="round_trip_slippage_bps",
+            ),
+        },
+        "funding_cost_sensitivity": {
+            "funding_bps_per_day_grid": [0.0, 1.0, 2.0, 5.0, 10.0],
+            "conservative_drag_model": "funding is treated as a same-direction cost drag for both longs and shorts",
+            "rows": _scenario_rows(
+                trades,
+                leverage=leverage,
+                allocation_fraction=allocation_fraction,
+                scenario_name="funding_bps_per_day",
+                values=(0.0, 1.0, 2.0, 5.0, 10.0),
+                value_field="funding_bps_per_day",
+            ),
+        },
+    }
 
 
 def _symbol_frames(data: pd.DataFrame) -> dict[str, pd.DataFrame]:
@@ -656,9 +847,18 @@ def replay_frame(
     trades = selected_trades
     unlevered_metrics = _split_metrics(trades, leverage=1.0, allocation_fraction=allocation_fraction)
     lanes = _liquidation_lanes(data, trades, allocation_fraction=allocation_fraction, max_leverage=max_leverage)
+    strict_lane = dict(lanes["strict_zero_liquidation_lane"])
+    promoted_candidate = dict(strict_lane.get("promoted_candidate") or {})
+    diagnostic_leverage = _safe_float(promoted_candidate.get("leverage"), float(max_leverage)) if promoted_candidate else float(max_leverage)
+    paper_forward_diagnostics = _paper_forward_diagnostics(
+        trades,
+        leverage=diagnostic_leverage,
+        allocation_fraction=allocation_fraction,
+        candidate_name=str((selected or {}).get("candidate_name") or "unknown"),
+    )
     oos = unlevered_metrics["locked_oos"]
     return_mdd = _safe_float(oos.get("return_mdd"))
-    deployable = bool(lanes["strict_zero_liquidation_lane"].get("promoted_candidate"))
+    deployable = bool(promoted_candidate)
     return {
         "artifact_kind": "crypto_fx_alpha_zoo_state_real_data_replay",
         "generated_at_utc": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
@@ -688,6 +888,7 @@ def replay_frame(
             "selected_candidate_params": (selected or {}).get("params", {}),
             "rows": sorted(grid_rows, key=lambda row: float(row["selection_score"]), reverse=True),
         },
+        "paper_forward_diagnostics": paper_forward_diagnostics,
         **lanes,
         "strategy_validity": CryptoFxAlphaZooStateStrategy.strategy_validity,
         "selection_provenance": {
@@ -731,6 +932,7 @@ def _write_markdown(payload: dict[str, Any], path: Path) -> None:
     strict = dict(payload.get("strict_zero_liquidation_lane") or {})
     diag = dict(payload.get("diagnostic_nonfatal_lane") or {})
     oos = dict(payload.get("locked_oos_report_only_metrics") or {})
+    paper = dict(payload.get("paper_forward_diagnostics") or {})
     lines = [
         "# Crypto/FX Alpha Zoo state real-data replay",
         "",
@@ -769,6 +971,41 @@ def _write_markdown(payload: dict[str, Any], path: Path) -> None:
             f"- `{item.get('leverage')}x`: total_liquidations `{item.get('total_liquidation_count')}`, "
             f"min_margin_buffer `{_safe_float(item.get('minimum_margin_buffer')):.4f}`, promotion_allowed `False`"
         )
+    lines.extend(
+        [
+            "",
+            "## Paper-forward diagnostics",
+            "",
+            f"- diagnostic_only: `{paper.get('diagnostic_only')}`; promotion_allowed: `{paper.get('promotion_allowed')}`",
+            f"- diagnostic leverage/allocation: `{paper.get('leverage')}x` / `{_safe_float(paper.get('allocation_fraction')):.2%}`",
+        ]
+    )
+    breakdowns = dict(paper.get("breakdowns") or {})
+    for label, key in (
+        ("regime", "by_regime"),
+        ("symbol", "by_symbol"),
+        ("side", "by_side"),
+        ("factor family", "by_factor_family"),
+        ("exit reason", "by_exit_reason"),
+    ):
+        groups = dict(dict(breakdowns.get(key) or {}).get("groups") or {})
+        locked_rows = []
+        for group_name, metrics_by_split in groups.items():
+            locked = dict(dict(metrics_by_split).get("locked_oos") or {})
+            locked_rows.append((group_name, _safe_float(locked.get("total_return")), int(locked.get("trade_count") or 0)))
+        locked_rows.sort(key=lambda item: item[1], reverse=True)
+        preview = ", ".join(f"{name}: {_safe_float(ret):.2%} ({count})" for name, ret, count in locked_rows[:5]) or "none"
+        lines.append(f"- locked-OOS by {label}: {preview}")
+    for sensitivity_key, value_field in (
+        ("slippage_sensitivity", "round_trip_slippage_bps"),
+        ("funding_cost_sensitivity", "funding_bps_per_day"),
+    ):
+        rows = list(dict(paper.get(sensitivity_key) or {}).get("rows") or [])
+        preview = ", ".join(
+            f"{_safe_float(row.get(value_field)):g}bps: {_safe_float(dict(row.get('locked_oos') or {}).get('total_return')):.2%}"
+            for row in rows
+        )
+        lines.append(f"- locked-OOS {sensitivity_key}: {preview}")
     lines.extend(
         [
             "",

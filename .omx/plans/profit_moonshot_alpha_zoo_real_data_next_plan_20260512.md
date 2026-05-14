@@ -125,7 +125,7 @@ Then write/update:
 
 Stop only when one of these is true:
 
-1. A valid strict deployable candidate beats the invalid calendar reference on OOS return and return/MDD with zero liquidations and positive min buffers; or
+1. A valid strict deployable candidate beats the invalid calendar reference on OOS return with zero liquidations, positive min buffers, OOS MDD <=25%, and positive Sharpe/Sortino/smart Sortino/Calmar; return/MDD remains diagnostic/report-only; or
 2. Real-data Alpha Zoo path is exhausted with reproducible artifacts showing why no live promotion is allowed, plus the next best research seed is documented.
 
 
@@ -159,3 +159,12 @@ Every future session must update the active research notes before final handoff.
 - Decision: `deployable_success=true`; return/MDD `3.007073` is reported versus current-base `6.916878` but is not a gate.
 - Diagnostic 5x/6x lane remains non-promotional and separate.
 - Peak RSS `626.7266 MiB`; source ledger not regenerated because no new global source family was introduced.
+
+## 2026-05-14 — Paper-forward diagnostics follow-up
+
+- Added non-promotional paper-forward diagnostics to the Alpha Zoo replay/summary artifacts for the current train/validation-selected `alpha_zoo_conservative_exit` strict 6x candidate.
+- New diagnostics report locked-OOS PnL by regime, symbol, side, dominant factor family, and exit reason, plus round-trip slippage and conservative funding-cost sensitivity.
+- Locked-OOS diagnostic highlights at 6x/10% allocation: regime `neutral` +41.0967% (540 trades); symbols SOL +19.2672%, BNB +10.3167%, TRX +4.9566%, ETH +1.4843%, BTC +0.6807%; side SHORT +26.3040%, LONG +11.7120%; factor families residual momentum +30.1822%, residual reversal +8.4241%, volume/vwap pressure -0.0370%; exit reasons score_exit +41.0936%, take_profit +16.1976%, stop_loss -13.8700%.
+- Slippage sensitivity: 0/2.5/5/10/20 bps round-trip -> locked-OOS +41.0967%/+30.1241%/+20.0034%/+2.0585%/-26.1930%.
+- Funding drag sensitivity: 0/1/2/5/10 bps per day -> locked-OOS +41.0967%/+40.4210%/+39.7486%/+37.7505%/+34.4835%.
+- These diagnostics do not change the promotion gate; strict live promotion remains only through the strict zero-liquidation lane, with return/MDD diagnostic-only.

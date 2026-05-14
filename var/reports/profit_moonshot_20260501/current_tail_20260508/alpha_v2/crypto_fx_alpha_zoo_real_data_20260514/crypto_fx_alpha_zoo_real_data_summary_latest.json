@@ -622,7 +622,7 @@
     },
     "uses_locked_oos_for_selection": false
   },
-  "generated_at_utc": "2026-05-14T13:31:28.475582Z",
+  "generated_at_utc": "2026-05-14T13:52:09.308206Z",
   "memory_summary": {
     "limit_mib": 8192.0,
     "pass_under_8gb": true,
@@ -631,8 +631,1167 @@
     "stage_rss_kb": {
       "edge_calibration_time.log": 584564,
       "real_screen_time.log": 641768,
-      "replay_time.log": 288772
+      "replay_time.log": 304264
     }
+  },
+  "paper_forward_diagnostics": {
+    "allocation_fraction": 0.1,
+    "breakdowns": {
+      "by_exit_reason": {
+        "diagnostic_only": true,
+        "groups": {
+          "end_of_sample": {
+            "all": {
+              "calmar": -1.0,
+              "max_drawdown": 0.0007879611890488913,
+              "return_mdd": -1.0,
+              "sharpe": -1.0,
+              "smart_sortino": -0.7065500471712559,
+              "sortino": -0.7071067811865476,
+              "total_return": -0.0007879611890488913,
+              "trade_count": 2
+            },
+            "locked_oos": {
+              "calmar": -1.0,
+              "max_drawdown": 0.0007879611890488913,
+              "return_mdd": -1.0,
+              "sharpe": -1.0,
+              "smart_sortino": -0.7065500471712559,
+              "sortino": -0.7071067811865476,
+              "total_return": -0.0007879611890488913,
+              "trade_count": 2
+            },
+            "train": {
+              "calmar": 0.0,
+              "max_drawdown": 0.0,
+              "return_mdd": 0.0,
+              "sharpe": 0.0,
+              "smart_sortino": 0.0,
+              "sortino": 0.0,
+              "total_return": 0.0,
+              "trade_count": 0
+            },
+            "validation": {
+              "calmar": 0.0,
+              "max_drawdown": 0.0,
+              "return_mdd": 0.0,
+              "sharpe": 0.0,
+              "smart_sortino": 0.0,
+              "sortino": 0.0,
+              "total_return": 0.0,
+              "trade_count": 0
+            }
+          },
+          "score_exit": {
+            "all": {
+              "calmar": 14.609258358175195,
+              "max_drawdown": 0.21811263209538334,
+              "return_mdd": 14.609258358175195,
+              "sharpe": 4.31586613174996,
+              "smart_sortino": 4.668325337850843,
+              "sortino": 5.686546064767059,
+              "total_return": 3.18646379346307,
+              "trade_count": 2740
+            },
+            "locked_oos": {
+              "calmar": 6.053531931017552,
+              "max_drawdown": 0.06788365189304531,
+              "return_mdd": 6.053531931017552,
+              "sharpe": 2.552706493113973,
+              "smart_sortino": 3.2334897228667794,
+              "sortino": 3.452990813613607,
+              "total_return": 0.4109358543286299,
+              "trade_count": 526
+            },
+            "train": {
+              "calmar": 6.1183199404907125,
+              "max_drawdown": 0.21811263209538334,
+              "return_mdd": 6.1183199404907125,
+              "sharpe": 3.1454538954969116,
+              "smart_sortino": 3.3533097538365357,
+              "sortino": 4.084708970476944,
+              "total_return": 1.3344828662220984,
+              "trade_count": 1706
+            },
+            "validation": {
+              "calmar": 3.0339575141102006,
+              "max_drawdown": 0.08932597211072517,
+              "return_mdd": 3.0339575141102006,
+              "sharpe": 1.7397280189959052,
+              "smart_sortino": 2.1789395478454536,
+              "sortino": 2.3735754411272527,
+              "total_return": 0.2710112042905328,
+              "trade_count": 508
+            }
+          },
+          "stop_loss": {
+            "all": {
+              "calmar": -1.0,
+              "max_drawdown": 0.7704370355754295,
+              "return_mdd": -1.0,
+              "sharpe": -22.91590651153306,
+              "smart_sortino": -4.49830729235496,
+              "sortino": -7.963969827784253,
+              "total_return": -0.7704370355754295,
+              "trade_count": 72
+            },
+            "locked_oos": {
+              "calmar": -1.0,
+              "max_drawdown": 0.1386997251252372,
+              "return_mdd": -1.0,
+              "sharpe": -13.107178435882997,
+              "smart_sortino": -2.4348012020683982,
+              "sortino": -2.7725074595298818,
+              "total_return": -0.1386997251252372,
+              "trade_count": 8
+            },
+            "train": {
+              "calmar": -1.0,
+              "max_drawdown": 0.6772202129103004,
+              "return_mdd": -1.0,
+              "sharpe": -18.25189382453439,
+              "smart_sortino": -4.069556082299439,
+              "sortino": -6.825541718804673,
+              "total_return": -0.6772202129103004,
+              "trade_count": 54
+            },
+            "validation": {
+              "calmar": -1.0,
+              "max_drawdown": 0.17426459217074075,
+              "return_mdd": -1.0,
+              "sharpe": -15.586331480424162,
+              "smart_sortino": -2.6444464994839643,
+              "sortino": -3.1052798902338807,
+              "total_return": -0.17426459217074075,
+              "trade_count": 10
+            }
+          },
+          "take_profit": {
+            "all": {
+              "calmar": Infinity,
+              "max_drawdown": 0.0,
+              "return_mdd": Infinity,
+              "sharpe": 27.485618219530796,
+              "smart_sortino": 0.0,
+              "sortino": 0.0,
+              "total_return": 2.228802349490424,
+              "trade_count": 29
+            },
+            "locked_oos": {
+              "calmar": Infinity,
+              "max_drawdown": 0.0,
+              "return_mdd": Infinity,
+              "sharpe": 61.01619499076375,
+              "smart_sortino": 0.0,
+              "sortino": 0.0,
+              "total_return": 0.16197644833076352,
+              "trade_count": 4
+            },
+            "train": {
+              "calmar": Infinity,
+              "max_drawdown": 0.0,
+              "return_mdd": Infinity,
+              "sharpe": 20.508650554877992,
+              "smart_sortino": 0.0,
+              "sortino": 0.0,
+              "total_return": 1.2412593637620328,
+              "trade_count": 19
+            },
+            "validation": {
+              "calmar": Infinity,
+              "max_drawdown": 0.0,
+              "return_mdd": Infinity,
+              "sharpe": 36.58067349458938,
+              "smart_sortino": 0.0,
+              "sortino": 0.0,
+              "total_return": 0.23980110181523817,
+              "trade_count": 6
+            }
+          }
+        },
+        "key": "exit_reason",
+        "promotion_allowed": false
+      },
+      "by_factor_family": {
+        "diagnostic_only": true,
+        "groups": {
+          "crypto_residual_momentum": {
+            "all": {
+              "calmar": 4.510089095291015,
+              "max_drawdown": 0.15842734929123561,
+              "return_mdd": 4.510089095291015,
+              "sharpe": 2.141329844479664,
+              "smart_sortino": 2.428215177750705,
+              "sortino": 2.812910871870496,
+              "total_return": 0.7145214604342625,
+              "trade_count": 938
+            },
+            "locked_oos": {
+              "calmar": 5.457330915000724,
+              "max_drawdown": 0.05530579241338764,
+              "return_mdd": 5.457330915000724,
+              "sharpe": 2.447793262319466,
+              "smart_sortino": 3.5240678792095843,
+              "sortino": 3.718969245787837,
+              "total_return": 0.30182201071619286,
+              "trade_count": 184
+            },
+            "train": {
+              "calmar": 1.5772404977933778,
+              "max_drawdown": 0.15842734929123561,
+              "return_mdd": 1.5772404977933778,
+              "sharpe": 1.1205825984762807,
+              "smart_sortino": 1.235019785704417,
+              "sortino": 1.4306806966757974,
+              "total_return": 0.2498780312601938,
+              "trade_count": 582
+            },
+            "validation": {
+              "calmar": 0.5337698339528854,
+              "max_drawdown": 0.10063561855683915,
+              "return_mdd": 0.5337698339528854,
+              "sharpe": 0.5452911857766128,
+              "smart_sortino": 0.6498649964094475,
+              "sortino": 0.7152645623015503,
+              "total_return": 0.05371625740682995,
+              "trade_count": 172
+            }
+          },
+          "crypto_residual_reversal": {
+            "all": {
+              "calmar": -0.07612839852608129,
+              "max_drawdown": 0.3515542085361628,
+              "return_mdd": -0.07612839852608129,
+              "sharpe": 0.03544033111082127,
+              "smart_sortino": 0.03036882514607628,
+              "sortino": 0.041045113434478246,
+              "total_return": -0.026763258890962094,
+              "trade_count": 1284
+            },
+            "locked_oos": {
+              "calmar": 1.8933191784903316,
+              "max_drawdown": 0.04449396566987429,
+              "return_mdd": 1.8933191784903316,
+              "sharpe": 0.9079415281176221,
+              "smart_sortino": 1.0333641224204089,
+              "sortino": 1.0793425902078624,
+              "total_return": 0.0842412785298634,
+              "trade_count": 237
+            },
+            "train": {
+              "calmar": -0.434724565210967,
+              "max_drawdown": 0.3515542085361628,
+              "return_mdd": -0.434724565210967,
+              "sharpe": -0.5999739199995615,
+              "smart_sortino": -0.4956148429579042,
+              "sortino": -0.6698503268127448,
+              "total_return": -0.152829250453969,
+              "trade_count": 820
+            },
+            "validation": {
+              "calmar": 0.671840741808175,
+              "max_drawdown": 0.08863762303703969,
+              "return_mdd": 0.671840741808175,
+              "sharpe": 0.5967476230532694,
+              "smart_sortino": 0.77656229752162,
+              "sortino": 0.8453949337141188,
+              "total_return": 0.05955036641331812,
+              "trade_count": 227
+            }
+          },
+          "volume_vwap_pressure": {
+            "all": {
+              "calmar": 9.218366080831384,
+              "max_drawdown": 0.0930941616829564,
+              "return_mdd": 9.218366080831384,
+              "sharpe": 2.6911176783272808,
+              "smart_sortino": 3.244691333901143,
+              "sortino": 3.5467531535506236,
+              "total_return": 0.8581760623815979,
+              "trade_count": 621
+            },
+            "locked_oos": {
+              "calmar": -0.004459301448581013,
+              "max_drawdown": 0.08296737225730479,
+              "return_mdd": -0.004459301448581013,
+              "sharpe": 0.036349589303164204,
+              "smart_sortino": 0.04233087659066631,
+              "sortino": 0.04584295818674215,
+              "total_return": -0.0003699765232919594,
+              "trade_count": 119
+            },
+            "train": {
+              "calmar": 6.390978388149547,
+              "max_drawdown": 0.0930941616829564,
+              "return_mdd": 6.390978388149547,
+              "sharpe": 2.398019132822189,
+              "smart_sortino": 2.9084987891091,
+              "sortino": 3.1792630456371054,
+              "total_return": 0.5949627753786739,
+              "trade_count": 377
+            },
+            "validation": {
+              "calmar": 3.571682071162264,
+              "max_drawdown": 0.046325245375621715,
+              "return_mdd": 3.571682071162264,
+              "sharpe": 1.590005945396035,
+              "smart_sortino": 1.9789636658528458,
+              "sortino": 2.070639643262919,
+              "total_return": 0.16545904835030067,
+              "trade_count": 125
+            }
+          }
+        },
+        "key": "entry_metadata.dominant_factor_family",
+        "promotion_allowed": false
+      },
+      "by_regime": {
+        "diagnostic_only": true,
+        "groups": {
+          "neutral": {
+            "all": {
+              "calmar": 7.105048903228588,
+              "max_drawdown": 0.2956514670572235,
+              "return_mdd": 7.105048903228588,
+              "sharpe": 2.7280740497242157,
+              "smart_sortino": 2.640153022116918,
+              "sortino": 3.4207181363613466,
+              "total_return": 2.100618131752849,
+              "trade_count": 2843
+            },
+            "locked_oos": {
+              "calmar": 3.007073011653861,
+              "max_drawdown": 0.1366667659454812,
+              "return_mdd": 3.007073011653861,
+              "sharpe": 2.143208618164893,
+              "smart_sortino": 2.5002366612271256,
+              "sortino": 2.8419359198153646,
+              "total_return": 0.41096694346467144,
+              "trade_count": 540
+            },
+            "train": {
+              "calmar": 2.3299138826572765,
+              "max_drawdown": 0.2956514670572235,
+              "return_mdd": 2.3299138826572765,
+              "sharpe": 1.5691392287535169,
+              "smart_sortino": 1.4817069095478044,
+              "sortino": 1.9197757311044374,
+              "total_return": 0.6888424575246155,
+              "trade_count": 1779
+            },
+            "validation": {
+              "calmar": 3.150734499031939,
+              "max_drawdown": 0.09559509283920696,
+              "return_mdd": 3.150734499031939,
+              "sharpe": 1.5520405722881823,
+              "smart_sortino": 1.9128821340063138,
+              "sortino": 2.0957442791971075,
+              "total_return": 0.30119475694665043,
+              "trade_count": 524
+            }
+          }
+        },
+        "key": "entry_metadata.fx_risk_state",
+        "promotion_allowed": false
+      },
+      "by_side": {
+        "diagnostic_only": true,
+        "groups": {
+          "LONG": {
+            "all": {
+              "calmar": 7.379853937581853,
+              "max_drawdown": 0.1680953926634228,
+              "return_mdd": 7.379853937581853,
+              "sharpe": 2.8148673462245895,
+              "smart_sortino": 3.0896405799845867,
+              "sortino": 3.608994926465941,
+              "total_return": 1.2405194454365285,
+              "trade_count": 1405
+            },
+            "locked_oos": {
+              "calmar": 0.9332431323430501,
+              "max_drawdown": 0.12549764704355437,
+              "return_mdd": 0.9332431323430501,
+              "sharpe": 1.0059913714832829,
+              "smart_sortino": 1.020603397642644,
+              "sortino": 1.1486867226114532,
+              "total_return": 0.1171198172286092,
+              "trade_count": 281
+            },
+            "train": {
+              "calmar": 7.134478559999557,
+              "max_drawdown": 0.12117780445250065,
+              "return_mdd": 7.134478559999557,
+              "sharpe": 2.613862941717097,
+              "smart_sortino": 3.088350380315366,
+              "sortino": 3.4625898987820274,
+              "total_return": 0.8645404478141847,
+              "trade_count": 877
+            },
+            "validation": {
+              "calmar": 0.7164981706155211,
+              "max_drawdown": 0.10560429459215251,
+              "return_mdd": 0.7164981706155211,
+              "sharpe": 0.6480931846630605,
+              "smart_sortino": 0.7448861826246299,
+              "sortino": 0.8235493624921453,
+              "total_return": 0.07566528388441984,
+              "trade_count": 247
+            }
+          },
+          "SHORT": {
+            "all": {
+              "calmar": 0.9779227820021761,
+              "max_drawdown": 0.39255001937441886,
+              "return_mdd": 0.9779227820021761,
+              "sharpe": 1.1347350842913413,
+              "smart_sortino": 1.0077174188645803,
+              "sortino": 1.4032969111638107,
+              "total_return": 0.3838836070216398,
+              "trade_count": 1438
+            },
+            "locked_oos": {
+              "calmar": 5.008419729605855,
+              "max_drawdown": 0.05251954730298646,
+              "return_mdd": 5.008419729605855,
+              "sharpe": 2.012530229539206,
+              "smart_sortino": 3.021059535514721,
+              "sortino": 3.179724214695325,
+              "total_return": 0.26303993690224536,
+              "trade_count": 259
+            },
+            "train": {
+              "calmar": -0.24004904454852277,
+              "max_drawdown": 0.39255001937441886,
+              "return_mdd": -0.24004904454852277,
+              "sharpe": -0.20576049759430307,
+              "smart_sortino": -0.17212570976684857,
+              "sortino": -0.23969366047066057,
+              "total_return": -0.09423125708833335,
+              "trade_count": 902
+            },
+            "validation": {
+              "calmar": 2.591844848647545,
+              "max_drawdown": 0.08089415676084705,
+              "return_mdd": 2.591844848647545,
+              "sharpe": 1.5255327330124095,
+              "smart_sortino": 2.033470622470682,
+              "sortino": 2.1979665137734026,
+              "total_return": 0.20966510348628842,
+              "trade_count": 277
+            }
+          }
+        },
+        "key": "side",
+        "promotion_allowed": false
+      },
+      "by_symbol": {
+        "diagnostic_only": true,
+        "groups": {
+          "BNB/USDT": {
+            "all": {
+              "calmar": 3.418444427853624,
+              "max_drawdown": 0.11548359642682364,
+              "return_mdd": 3.418444427853624,
+              "sharpe": 1.9323233630998513,
+              "smart_sortino": 2.216264372272512,
+              "sortino": 2.472206552615179,
+              "total_return": 0.394774256713772,
+              "trade_count": 655
+            },
+            "locked_oos": {
+              "calmar": 2.064247496601515,
+              "max_drawdown": 0.04997786765061358,
+              "return_mdd": 2.064247496601515,
+              "sharpe": 1.4481228435887827,
+              "smart_sortino": 1.815133547721754,
+              "sortino": 1.9058500519379804,
+              "total_return": 0.10316668818326091,
+              "trade_count": 128
+            },
+            "train": {
+              "calmar": 1.261466929742323,
+              "max_drawdown": 0.11548359642682364,
+              "return_mdd": 1.261466929742323,
+              "sharpe": 0.9920018254661028,
+              "smart_sortino": 1.099938466981658,
+              "sortino": 1.226963316996907,
+              "total_return": 0.14567873782014673,
+              "trade_count": 408
+            },
+            "validation": {
+              "calmar": 2.4949253007906598,
+              "max_drawdown": 0.04151231041424394,
+              "return_mdd": 2.4949253007906598,
+              "sharpe": 1.3181379405297922,
+              "smart_sortino": 1.814628913746449,
+              "sortino": 1.8899583525005539,
+              "total_return": 0.10357011354677281,
+              "trade_count": 119
+            }
+          },
+          "BTC/USDT": {
+            "all": {
+              "calmar": 2.562659681381506,
+              "max_drawdown": 0.028646900347856958,
+              "return_mdd": 2.562659681381506,
+              "sharpe": 1.1570919819143557,
+              "smart_sortino": 1.792785848107198,
+              "sortino": 1.8441436056429732,
+              "total_return": 0.07341225651800687,
+              "trade_count": 86
+            },
+            "locked_oos": {
+              "calmar": 0.6928937201701633,
+              "max_drawdown": 0.009823559139790605,
+              "return_mdd": 0.6928937201701633,
+              "sharpe": 0.6687059324607483,
+              "smart_sortino": 0.8099863533463418,
+              "sortino": 0.817943302190863,
+              "total_return": 0.006806682437681122,
+              "trade_count": 15
+            },
+            "train": {
+              "calmar": 3.388049558688796,
+              "max_drawdown": 0.025136171469305447,
+              "return_mdd": 3.388049558688796,
+              "sharpe": 1.4240057044850356,
+              "smart_sortino": 2.634072595738856,
+              "sortino": 2.7002830961679467,
+              "total_return": 0.08516259465370624,
+              "trade_count": 56
+            },
+            "validation": {
+              "calmar": -0.6114323321130491,
+              "max_drawdown": 0.028646900347856885,
+              "return_mdd": -0.6114323321130491,
+              "sharpe": -0.8950565206434,
+              "smart_sortino": -0.7913328081299384,
+              "sortino": -0.8140020402264265,
+              "total_return": -0.017515641087500256,
+              "trade_count": 15
+            }
+          },
+          "ETH/USDT": {
+            "all": {
+              "calmar": 3.5597998182424466,
+              "max_drawdown": 0.14129794779138852,
+              "return_mdd": 3.5597998182424466,
+              "sharpe": 1.6650369575607495,
+              "smart_sortino": 1.8762868424493249,
+              "sortino": 2.1414023227553987,
+              "total_return": 0.5029924088658155,
+              "trade_count": 707
+            },
+            "locked_oos": {
+              "calmar": 0.17818259344890638,
+              "max_drawdown": 0.08329969855453886,
+              "return_mdd": 0.17818259344890638,
+              "sharpe": 0.19372976981381249,
+              "smart_sortino": 0.2430245174242025,
+              "sortino": 0.26326838646700085,
+              "total_return": 0.014842556321959854,
+              "trade_count": 132
+            },
+            "train": {
+              "calmar": 2.015203579275331,
+              "max_drawdown": 0.14129794779138852,
+              "return_mdd": 2.015203579275331,
+              "sharpe": 1.2426187790319925,
+              "smart_sortino": 1.3585185319204287,
+              "sortino": 1.550474412517355,
+              "total_return": 0.284744130133465,
+              "trade_count": 445
+            },
+            "validation": {
+              "calmar": 4.165815017094204,
+              "max_drawdown": 0.03667153656423259,
+              "return_mdd": 4.165815017094204,
+              "sharpe": 1.39473796698979,
+              "smart_sortino": 1.8954517149315968,
+              "sortino": 1.9649608418014481,
+              "total_return": 0.1527668377191993,
+              "trade_count": 130
+            }
+          },
+          "SOL/USDT": {
+            "all": {
+              "calmar": -0.20880978485608498,
+              "max_drawdown": 0.3032677534797282,
+              "return_mdd": -0.20880978485608498,
+              "sharpe": -0.10187222727061539,
+              "smart_sortino": -0.09394285825191342,
+              "sortino": -0.12243269782943575,
+              "total_return": -0.06332527435789026,
+              "trade_count": 713
+            },
+            "locked_oos": {
+              "calmar": 5.119297681052962,
+              "max_drawdown": 0.037636404164526745,
+              "return_mdd": 5.119297681052962,
+              "sharpe": 1.7599144339608497,
+              "smart_sortino": 2.3146544681585803,
+              "sortino": 2.4017697392234245,
+              "total_return": 0.1926719565626338,
+              "trade_count": 126
+            },
+            "train": {
+              "calmar": -0.7366386967116897,
+              "max_drawdown": 0.3032677534797282,
+              "return_mdd": -0.7366386967116897,
+              "sharpe": -0.9964743642937622,
+              "smart_sortino": -0.881102296239908,
+              "sortino": -1.1483122102064147,
+              "total_return": -0.22339876267798897,
+              "trade_count": 469
+            },
+            "validation": {
+              "calmar": 0.07766244081699568,
+              "max_drawdown": 0.1451929100564649,
+              "return_mdd": 0.07766244081699568,
+              "sharpe": 0.15486856792266068,
+              "smart_sortino": 0.18358914948943694,
+              "sortino": 0.21024499235859964,
+              "total_return": 0.011276035784307581,
+              "trade_count": 118
+            }
+          },
+          "TRX/USDT": {
+            "all": {
+              "calmar": 4.086499496653218,
+              "max_drawdown": 0.11527377219008697,
+              "return_mdd": 4.086499496653218,
+              "sharpe": 2.693959519148692,
+              "smart_sortino": 3.3940363420870336,
+              "sortino": 3.78527971418965,
+              "total_return": 0.4710662120321081,
+              "trade_count": 682
+            },
+            "locked_oos": {
+              "calmar": 2.030546080736899,
+              "max_drawdown": 0.024410394843931215,
+              "return_mdd": 2.030546080736899,
+              "sharpe": 1.1639450887854494,
+              "smart_sortino": 1.3069663917254692,
+              "sortino": 1.3388699573952358,
+              "total_return": 0.049566431579584735,
+              "trade_count": 139
+            },
+            "train": {
+              "calmar": 4.182299990348107,
+              "max_drawdown": 0.0864350219222937,
+              "return_mdd": 4.182299990348107,
+              "sharpe": 2.3873659595230476,
+              "smart_sortino": 3.207639009416606,
+              "sortino": 3.484891357514335,
+              "total_return": 0.3614971913513474,
+              "trade_count": 401
+            },
+            "validation": {
+              "calmar": 0.6394845846837389,
+              "max_drawdown": 0.046053753403975474,
+              "return_mdd": 0.6394845846837389,
+              "sharpe": 0.6388378712571846,
+              "smart_sortino": 0.7857405648873516,
+              "sortino": 0.8219268671021741,
+              "total_return": 0.029450665368668583,
+              "trade_count": 142
+            }
+          }
+        },
+        "key": "symbol",
+        "promotion_allowed": false
+      }
+    },
+    "candidate_name": "alpha_zoo_conservative_exit",
+    "diagnostic_only": true,
+    "funding_cost_sensitivity": {
+      "conservative_drag_model": "funding is treated as a same-direction cost drag for both longs and shorts",
+      "funding_bps_per_day_grid": [
+        0.0,
+        1.0,
+        2.0,
+        5.0,
+        10.0
+      ],
+      "rows": [
+        {
+          "funding_bps_per_day": 0.0,
+          "locked_oos": {
+            "calmar": 3.007073011653861,
+            "max_drawdown": 0.1366667659454812,
+            "return_mdd": 3.007073011653861,
+            "sharpe": 2.143208618164893,
+            "smart_sortino": 2.5002366612271256,
+            "sortino": 2.8419359198153646,
+            "total_return": 0.41096694346467144,
+            "trade_count": 540
+          },
+          "scenario": "funding_bps_per_day_0",
+          "split_metrics": {
+            "locked_oos": {
+              "calmar": 3.007073011653861,
+              "max_drawdown": 0.1366667659454812,
+              "return_mdd": 3.007073011653861,
+              "sharpe": 2.143208618164893,
+              "smart_sortino": 2.5002366612271256,
+              "sortino": 2.8419359198153646,
+              "total_return": 0.41096694346467144,
+              "trade_count": 540
+            },
+            "train": {
+              "calmar": 2.3299138826572765,
+              "max_drawdown": 0.2956514670572235,
+              "return_mdd": 2.3299138826572765,
+              "sharpe": 1.5691392287535169,
+              "smart_sortino": 1.4817069095478044,
+              "sortino": 1.9197757311044374,
+              "total_return": 0.6888424575246155,
+              "trade_count": 1779
+            },
+            "validation": {
+              "calmar": 3.150734499031939,
+              "max_drawdown": 0.09559509283920696,
+              "return_mdd": 3.150734499031939,
+              "sharpe": 1.5520405722881823,
+              "smart_sortino": 1.9128821340063138,
+              "sortino": 2.0957442791971075,
+              "total_return": 0.30119475694665043,
+              "trade_count": 524
+            }
+          }
+        },
+        {
+          "funding_bps_per_day": 1.0,
+          "locked_oos": {
+            "calmar": 2.951422294084082,
+            "max_drawdown": 0.1369544206667571,
+            "return_mdd": 2.951422294084082,
+            "sharpe": 2.1149641666383254,
+            "smart_sortino": 2.4679390535091246,
+            "sortino": 2.8059342168233314,
+            "total_return": 0.4042103304292366,
+            "trade_count": 540
+          },
+          "scenario": "funding_bps_per_day_1",
+          "split_metrics": {
+            "locked_oos": {
+              "calmar": 2.951422294084082,
+              "max_drawdown": 0.1369544206667571,
+              "return_mdd": 2.951422294084082,
+              "sharpe": 2.1149641666383254,
+              "smart_sortino": 2.4679390535091246,
+              "sortino": 2.8059342168233314,
+              "total_return": 0.4042103304292366,
+              "trade_count": 540
+            },
+            "train": {
+              "calmar": 2.2105552032742466,
+              "max_drawdown": 0.29983500451953593,
+              "return_mdd": 2.2105552032742466,
+              "sharpe": 1.528508665769484,
+              "smart_sortino": 1.437408560305128,
+              "sortino": 1.8683939624806358,
+              "total_return": 0.6628018293644173,
+              "trade_count": 1779
+            },
+            "validation": {
+              "calmar": 3.072717116614119,
+              "max_drawdown": 0.09604760708317776,
+              "return_mdd": 3.072717116614119,
+              "sharpe": 1.5264344040298379,
+              "smart_sortino": 1.8816074828044638,
+              "sortino": 2.062331378997634,
+              "total_return": 0.2951271262943078,
+              "trade_count": 524
+            }
+          }
+        },
+        {
+          "funding_bps_per_day": 2.0,
+          "locked_oos": {
+            "calmar": 2.896241922117663,
+            "max_drawdown": 0.13724198315281397,
+            "return_mdd": 2.896241922117663,
+            "sharpe": 2.0867040952807403,
+            "smart_sortino": 2.4312984434788807,
+            "sortino": 2.764974663498272,
+            "total_return": 0.3974859850817458,
+            "trade_count": 540
+          },
+          "scenario": "funding_bps_per_day_2",
+          "split_metrics": {
+            "locked_oos": {
+              "calmar": 2.896241922117663,
+              "max_drawdown": 0.13724198315281397,
+              "return_mdd": 2.896241922117663,
+              "sharpe": 2.0867040952807403,
+              "smart_sortino": 2.4312984434788807,
+              "sortino": 2.764974663498272,
+              "total_return": 0.3974859850817458,
+              "trade_count": 540
+            },
+            "train": {
+              "calmar": 2.095972083480072,
+              "max_drawdown": 0.3039937442485003,
+              "return_mdd": 2.095972083480072,
+              "sharpe": 1.4878550979417031,
+              "smart_sortino": 1.393468464996492,
+              "sortino": 1.8170741611629857,
+              "total_return": 0.6371624014974373,
+              "trade_count": 1779
+            },
+            "validation": {
+              "calmar": 2.995730713692664,
+              "max_drawdown": 0.09649990012134446,
+              "return_mdd": 2.995730713692664,
+              "sharpe": 1.5008135116709749,
+              "smart_sortino": 1.8471340240465695,
+              "sortino": 2.0253822728778004,
+              "total_return": 0.28908771466178607,
+              "trade_count": 524
+            }
+          }
+        },
+        {
+          "funding_bps_per_day": 5.0,
+          "locked_oos": {
+            "calmar": 2.7334812954107717,
+            "max_drawdown": 0.1381041174840611,
+            "return_mdd": 2.7334812954107717,
+            "sharpe": 2.0018305902840505,
+            "smart_sortino": 2.325991467534232,
+            "sortino": 2.6472204664335033,
+            "total_return": 0.37750502196189273,
+            "trade_count": 540
+          },
+          "scenario": "funding_bps_per_day_5",
+          "split_metrics": {
+            "locked_oos": {
+              "calmar": 2.7334812954107717,
+              "max_drawdown": 0.1381041174840611,
+              "return_mdd": 2.7334812954107717,
+              "sharpe": 2.0018305902840505,
+              "smart_sortino": 2.325991467534232,
+              "sortino": 2.6472204664335033,
+              "total_return": 0.37750502196189273,
+              "trade_count": 540
+            },
+            "train": {
+              "calmar": 1.7785322996848287,
+              "max_drawdown": 0.3163226395815275,
+              "return_mdd": 1.7785322996848287,
+              "sharpe": 1.3657566262673881,
+              "smart_sortino": 1.265717057212452,
+              "sortino": 1.666092017713258,
+              "total_return": 0.5625900316173094,
+              "trade_count": 1779
+            },
+            "validation": {
+              "calmar": 2.7707958987434096,
+              "max_drawdown": 0.09785545305695835,
+              "return_mdd": 2.7707958987434096,
+              "sharpe": 1.4238627061582867,
+              "smart_sortino": 1.7472073575064413,
+              "sortino": 1.9181811250596852,
+              "total_return": 0.27113748799989845,
+              "trade_count": 524
+            }
+          }
+        },
+        {
+          "funding_bps_per_day": 10.0,
+          "locked_oos": {
+            "calmar": 2.47123857195535,
+            "max_drawdown": 0.13953916598478136,
+            "return_mdd": 2.47123857195535,
+            "sharpe": 1.86006637149736,
+            "smart_sortino": 2.156345725399098,
+            "sortino": 2.4572404094961366,
+            "total_return": 0.3448345692800716,
+            "trade_count": 540
+          },
+          "scenario": "funding_bps_per_day_10",
+          "split_metrics": {
+            "locked_oos": {
+              "calmar": 2.47123857195535,
+              "max_drawdown": 0.13953916598478136,
+              "return_mdd": 2.47123857195535,
+              "sharpe": 1.86006637149736,
+              "smart_sortino": 2.156345725399098,
+              "sortino": 2.4572404094961366,
+              "total_return": 0.3448345692800716,
+              "trade_count": 540
+            },
+            "train": {
+              "calmar": 1.325160684828571,
+              "max_drawdown": 0.3363883655629362,
+              "return_mdd": 1.325160684828571,
+              "sharpe": 1.1618015310264287,
+              "smart_sortino": 1.059090910920035,
+              "sortino": 1.415356771426987,
+              "total_return": 0.44576863687774426,
+              "trade_count": 1779
+            },
+            "validation": {
+              "calmar": 2.396714806902315,
+              "max_drawdown": 0.10087671890642279,
+              "return_mdd": 2.396714806902315,
+              "sharpe": 1.2953189143165074,
+              "smart_sortino": 1.5813622713342361,
+              "sortino": 1.740884908668842,
+              "total_return": 0.24177272587474619,
+              "trade_count": 524
+            }
+          }
+        }
+      ]
+    },
+    "leverage": 6.0,
+    "live_promotion_lane": "strict_zero_liquidation_lane",
+    "promotion_allowed": false,
+    "slippage_sensitivity": {
+      "round_trip_bps_grid": [
+        0.0,
+        2.5,
+        5.0,
+        10.0,
+        20.0
+      ],
+      "rows": [
+        {
+          "locked_oos": {
+            "calmar": 3.007073011653861,
+            "max_drawdown": 0.1366667659454812,
+            "return_mdd": 3.007073011653861,
+            "sharpe": 2.143208618164893,
+            "smart_sortino": 2.5002366612271256,
+            "sortino": 2.8419359198153646,
+            "total_return": 0.41096694346467144,
+            "trade_count": 540
+          },
+          "round_trip_slippage_bps": 0.0,
+          "scenario": "round_trip_slippage_bps_0",
+          "split_metrics": {
+            "locked_oos": {
+              "calmar": 3.007073011653861,
+              "max_drawdown": 0.1366667659454812,
+              "return_mdd": 3.007073011653861,
+              "sharpe": 2.143208618164893,
+              "smart_sortino": 2.5002366612271256,
+              "sortino": 2.8419359198153646,
+              "total_return": 0.41096694346467144,
+              "trade_count": 540
+            },
+            "train": {
+              "calmar": 2.3299138826572765,
+              "max_drawdown": 0.2956514670572235,
+              "return_mdd": 2.3299138826572765,
+              "sharpe": 1.5691392287535169,
+              "smart_sortino": 1.4817069095478044,
+              "sortino": 1.9197757311044374,
+              "total_return": 0.6888424575246155,
+              "trade_count": 1779
+            },
+            "validation": {
+              "calmar": 3.150734499031939,
+              "max_drawdown": 0.09559509283920696,
+              "return_mdd": 3.150734499031939,
+              "sharpe": 1.5520405722881823,
+              "smart_sortino": 1.9128821340063138,
+              "sortino": 2.0957442791971075,
+              "total_return": 0.30119475694665043,
+              "trade_count": 524
+            }
+          }
+        },
+        {
+          "locked_oos": {
+            "calmar": 2.125578707731948,
+            "max_drawdown": 0.1417220696939152,
+            "return_mdd": 2.125578707731948,
+            "sharpe": 1.658592417696884,
+            "smart_sortino": 1.9273043815958164,
+            "sortino": 2.200445947485727,
+            "total_return": 0.30124141375708935,
+            "trade_count": 540
+          },
+          "round_trip_slippage_bps": 2.5,
+          "scenario": "round_trip_slippage_bps_2.5",
+          "split_metrics": {
+            "locked_oos": {
+              "calmar": 2.125578707731948,
+              "max_drawdown": 0.1417220696939152,
+              "return_mdd": 2.125578707731948,
+              "sharpe": 1.658592417696884,
+              "smart_sortino": 1.9273043815958164,
+              "sortino": 2.200445947485727,
+              "total_return": 0.30124141375708935,
+              "trade_count": 540
+            },
+            "train": {
+              "calmar": 0.7996691813421896,
+              "max_drawdown": 0.3668481681901513,
+              "return_mdd": 0.7996691813421896,
+              "sharpe": 0.8661141782650736,
+              "smart_sortino": 0.7740742246634026,
+              "sortino": 1.0580419360243833,
+              "total_return": 0.29335717433350017,
+              "trade_count": 1779
+            },
+            "validation": {
+              "calmar": 1.7909693330736705,
+              "max_drawdown": 0.1132763545905136,
+              "return_mdd": 1.7909693330736705,
+              "sharpe": 1.115422217194343,
+              "smart_sortino": 1.3537845231173882,
+              "sortino": 1.5071362987971828,
+              "total_return": 0.20287447723398877,
+              "trade_count": 524
+            }
+          }
+        },
+        {
+          "locked_oos": {
+            "calmar": 1.3631091084166411,
+            "max_drawdown": 0.14674852653086398,
+            "return_mdd": 1.3631091084166411,
+            "sharpe": 1.1739762172288755,
+            "smart_sortino": 1.3578362942202766,
+            "sortino": 1.5570967696672309,
+            "total_return": 0.2000342531609418,
+            "trade_count": 540
+          },
+          "round_trip_slippage_bps": 5.0,
+          "scenario": "round_trip_slippage_bps_5",
+          "split_metrics": {
+            "locked_oos": {
+              "calmar": 1.3631091084166411,
+              "max_drawdown": 0.14674852653086398,
+              "return_mdd": 1.3631091084166411,
+              "sharpe": 1.1739762172288755,
+              "smart_sortino": 1.3578362942202766,
+              "sortino": 1.5570967696672309,
+              "total_return": 0.2000342531609418,
+              "trade_count": 540
+            },
+            "train": {
+              "calmar": -0.021526325870625473,
+              "max_drawdown": 0.44386778952434885,
+              "return_mdd": -0.021526325870625473,
+              "sharpe": 0.1630891277766304,
+              "smart_sortino": 0.13745371211360768,
+              "sortino": 0.19846498747139094,
+              "total_return": -0.009554842680775333,
+              "trade_count": 1779
+            },
+            "validation": {
+              "calmar": 0.7902339510177577,
+              "max_drawdown": 0.14169262984996664,
+              "return_mdd": 0.7902339510177577,
+              "sharpe": 0.6788038621005035,
+              "smart_sortino": 0.8007495864751039,
+              "sortino": 0.9142099012340346,
+              "total_return": 0.11197032671643581,
+              "trade_count": 524
+            }
+          }
+        },
+        {
+          "locked_oos": {
+            "calmar": 0.12992612672749626,
+            "max_drawdown": 0.15843926609448278,
+            "return_mdd": 0.12992612672749626,
+            "sharpe": 0.20474381629285787,
+            "smart_sortino": 0.23019308902131377,
+            "sortino": 0.2666647131058727,
+            "total_return": 0.02058540016520327,
+            "trade_count": 540
+          },
+          "round_trip_slippage_bps": 10.0,
+          "scenario": "round_trip_slippage_bps_10",
+          "split_metrics": {
+            "locked_oos": {
+              "calmar": 0.12992612672749626,
+              "max_drawdown": 0.15843926609448278,
+              "return_mdd": 0.12992612672749626,
+              "sharpe": 0.20474381629285787,
+              "smart_sortino": 0.23019308902131377,
+              "sortino": 0.2666647131058727,
+              "total_return": 0.02058540016520327,
+              "trade_count": 540
+            },
+            "train": {
+              "calmar": -0.7153183059443654,
+              "max_drawdown": 0.586078481618197,
+              "return_mdd": -0.7153183059443654,
+              "sharpe": -1.2429609732002556,
+              "smart_sortino": -0.9475488730789611,
+              "sortino": -1.5028868778721123,
+              "total_return": -0.41923266662157455,
+              "trade_count": 1779
+            },
+            "validation": {
+              "calmar": -0.24489395202835523,
+              "max_drawdown": 0.20327658266896645,
+              "return_mdd": -0.24489395202835523,
+              "sharpe": -0.19443284808717504,
+              "smart_sortino": -0.2152807723672409,
+              "sortino": -0.2590423120883893,
+              "total_return": -0.049781205684621854,
+              "trade_count": 524
+            }
+          }
+        },
+        {
+          "locked_oos": {
+            "calmar": -0.7246153969912067,
+            "max_drawdown": 0.361474794426292,
+            "return_mdd": -0.7246153969912067,
+            "sharpe": -1.7337209855791769,
+            "smart_sortino": -1.6301312919340498,
+            "sortino": -2.219382665573776,
+            "total_return": -0.2619302016655224,
+            "trade_count": 540
+          },
+          "round_trip_slippage_bps": 20.0,
+          "scenario": "round_trip_slippage_bps_20",
+          "split_metrics": {
+            "locked_oos": {
+              "calmar": -0.7246153969912067,
+              "max_drawdown": 0.361474794426292,
+              "return_mdd": -0.7246153969912067,
+              "sharpe": -1.7337209855791769,
+              "smart_sortino": -1.6301312919340498,
+              "sortino": -2.219382665573776,
+              "total_return": -0.2619302016655224,
+              "trade_count": 540
+            },
+            "train": {
+              "calmar": -0.9841944058595945,
+              "max_drawdown": 0.8132650144216033,
+              "return_mdd": -0.9841944058595945,
+              "sharpe": -4.0550611751540275,
+              "smart_sortino": -2.649196920810024,
+              "sortino": -4.803696092818256,
+              "total_return": -0.8004108776750644,
+              "trade_count": 1779
+            },
+            "validation": {
+              "calmar": -0.8803024493715143,
+              "max_drawdown": 0.3478555386832617,
+              "return_mdd": -0.8803024493715143,
+              "sharpe": -1.9409062684625322,
+              "smart_sortino": -1.8683459119861414,
+              "sortino": -2.5182603856467503,
+              "total_return": -0.3062180827303228,
+              "trade_count": 524
+            }
+          }
+        }
+      ]
+    },
+    "trade_return_model": "allocation_fraction * leverage * (gross_return - round_trip_slippage_bps/10000 - funding_bps_per_day/10000*holding_days)"
   },
   "promotion_policy": {
     "name": "strict_liquidation_risk_metric_gate_20260514_return_mdd_diagnostic",
@@ -1130,6 +2289,1165 @@
       "oos_return_mdd_beats_current_base": false,
       "return_mdd_hurdle_required": false,
       "return_mdd_role": "diagnostic_report_only"
+    },
+    "paper_forward_diagnostics": {
+      "allocation_fraction": 0.1,
+      "breakdowns": {
+        "by_exit_reason": {
+          "diagnostic_only": true,
+          "groups": {
+            "end_of_sample": {
+              "all": {
+                "calmar": -1.0,
+                "max_drawdown": 0.0007879611890488913,
+                "return_mdd": -1.0,
+                "sharpe": -1.0,
+                "smart_sortino": -0.7065500471712559,
+                "sortino": -0.7071067811865476,
+                "total_return": -0.0007879611890488913,
+                "trade_count": 2
+              },
+              "locked_oos": {
+                "calmar": -1.0,
+                "max_drawdown": 0.0007879611890488913,
+                "return_mdd": -1.0,
+                "sharpe": -1.0,
+                "smart_sortino": -0.7065500471712559,
+                "sortino": -0.7071067811865476,
+                "total_return": -0.0007879611890488913,
+                "trade_count": 2
+              },
+              "train": {
+                "calmar": 0.0,
+                "max_drawdown": 0.0,
+                "return_mdd": 0.0,
+                "sharpe": 0.0,
+                "smart_sortino": 0.0,
+                "sortino": 0.0,
+                "total_return": 0.0,
+                "trade_count": 0
+              },
+              "validation": {
+                "calmar": 0.0,
+                "max_drawdown": 0.0,
+                "return_mdd": 0.0,
+                "sharpe": 0.0,
+                "smart_sortino": 0.0,
+                "sortino": 0.0,
+                "total_return": 0.0,
+                "trade_count": 0
+              }
+            },
+            "score_exit": {
+              "all": {
+                "calmar": 14.609258358175195,
+                "max_drawdown": 0.21811263209538334,
+                "return_mdd": 14.609258358175195,
+                "sharpe": 4.31586613174996,
+                "smart_sortino": 4.668325337850843,
+                "sortino": 5.686546064767059,
+                "total_return": 3.18646379346307,
+                "trade_count": 2740
+              },
+              "locked_oos": {
+                "calmar": 6.053531931017552,
+                "max_drawdown": 0.06788365189304531,
+                "return_mdd": 6.053531931017552,
+                "sharpe": 2.552706493113973,
+                "smart_sortino": 3.2334897228667794,
+                "sortino": 3.452990813613607,
+                "total_return": 0.4109358543286299,
+                "trade_count": 526
+              },
+              "train": {
+                "calmar": 6.1183199404907125,
+                "max_drawdown": 0.21811263209538334,
+                "return_mdd": 6.1183199404907125,
+                "sharpe": 3.1454538954969116,
+                "smart_sortino": 3.3533097538365357,
+                "sortino": 4.084708970476944,
+                "total_return": 1.3344828662220984,
+                "trade_count": 1706
+              },
+              "validation": {
+                "calmar": 3.0339575141102006,
+                "max_drawdown": 0.08932597211072517,
+                "return_mdd": 3.0339575141102006,
+                "sharpe": 1.7397280189959052,
+                "smart_sortino": 2.1789395478454536,
+                "sortino": 2.3735754411272527,
+                "total_return": 0.2710112042905328,
+                "trade_count": 508
+              }
+            },
+            "stop_loss": {
+              "all": {
+                "calmar": -1.0,
+                "max_drawdown": 0.7704370355754295,
+                "return_mdd": -1.0,
+                "sharpe": -22.91590651153306,
+                "smart_sortino": -4.49830729235496,
+                "sortino": -7.963969827784253,
+                "total_return": -0.7704370355754295,
+                "trade_count": 72
+              },
+              "locked_oos": {
+                "calmar": -1.0,
+                "max_drawdown": 0.1386997251252372,
+                "return_mdd": -1.0,
+                "sharpe": -13.107178435882997,
+                "smart_sortino": -2.4348012020683982,
+                "sortino": -2.7725074595298818,
+                "total_return": -0.1386997251252372,
+                "trade_count": 8
+              },
+              "train": {
+                "calmar": -1.0,
+                "max_drawdown": 0.6772202129103004,
+                "return_mdd": -1.0,
+                "sharpe": -18.25189382453439,
+                "smart_sortino": -4.069556082299439,
+                "sortino": -6.825541718804673,
+                "total_return": -0.6772202129103004,
+                "trade_count": 54
+              },
+              "validation": {
+                "calmar": -1.0,
+                "max_drawdown": 0.17426459217074075,
+                "return_mdd": -1.0,
+                "sharpe": -15.586331480424162,
+                "smart_sortino": -2.6444464994839643,
+                "sortino": -3.1052798902338807,
+                "total_return": -0.17426459217074075,
+                "trade_count": 10
+              }
+            },
+            "take_profit": {
+              "all": {
+                "calmar": Infinity,
+                "max_drawdown": 0.0,
+                "return_mdd": Infinity,
+                "sharpe": 27.485618219530796,
+                "smart_sortino": 0.0,
+                "sortino": 0.0,
+                "total_return": 2.228802349490424,
+                "trade_count": 29
+              },
+              "locked_oos": {
+                "calmar": Infinity,
+                "max_drawdown": 0.0,
+                "return_mdd": Infinity,
+                "sharpe": 61.01619499076375,
+                "smart_sortino": 0.0,
+                "sortino": 0.0,
+                "total_return": 0.16197644833076352,
+                "trade_count": 4
+              },
+              "train": {
+                "calmar": Infinity,
+                "max_drawdown": 0.0,
+                "return_mdd": Infinity,
+                "sharpe": 20.508650554877992,
+                "smart_sortino": 0.0,
+                "sortino": 0.0,
+                "total_return": 1.2412593637620328,
+                "trade_count": 19
+              },
+              "validation": {
+                "calmar": Infinity,
+                "max_drawdown": 0.0,
+                "return_mdd": Infinity,
+                "sharpe": 36.58067349458938,
+                "smart_sortino": 0.0,
+                "sortino": 0.0,
+                "total_return": 0.23980110181523817,
+                "trade_count": 6
+              }
+            }
+          },
+          "key": "exit_reason",
+          "promotion_allowed": false
+        },
+        "by_factor_family": {
+          "diagnostic_only": true,
+          "groups": {
+            "crypto_residual_momentum": {
+              "all": {
+                "calmar": 4.510089095291015,
+                "max_drawdown": 0.15842734929123561,
+                "return_mdd": 4.510089095291015,
+                "sharpe": 2.141329844479664,
+                "smart_sortino": 2.428215177750705,
+                "sortino": 2.812910871870496,
+                "total_return": 0.7145214604342625,
+                "trade_count": 938
+              },
+              "locked_oos": {
+                "calmar": 5.457330915000724,
+                "max_drawdown": 0.05530579241338764,
+                "return_mdd": 5.457330915000724,
+                "sharpe": 2.447793262319466,
+                "smart_sortino": 3.5240678792095843,
+                "sortino": 3.718969245787837,
+                "total_return": 0.30182201071619286,
+                "trade_count": 184
+              },
+              "train": {
+                "calmar": 1.5772404977933778,
+                "max_drawdown": 0.15842734929123561,
+                "return_mdd": 1.5772404977933778,
+                "sharpe": 1.1205825984762807,
+                "smart_sortino": 1.235019785704417,
+                "sortino": 1.4306806966757974,
+                "total_return": 0.2498780312601938,
+                "trade_count": 582
+              },
+              "validation": {
+                "calmar": 0.5337698339528854,
+                "max_drawdown": 0.10063561855683915,
+                "return_mdd": 0.5337698339528854,
+                "sharpe": 0.5452911857766128,
+                "smart_sortino": 0.6498649964094475,
+                "sortino": 0.7152645623015503,
+                "total_return": 0.05371625740682995,
+                "trade_count": 172
+              }
+            },
+            "crypto_residual_reversal": {
+              "all": {
+                "calmar": -0.07612839852608129,
+                "max_drawdown": 0.3515542085361628,
+                "return_mdd": -0.07612839852608129,
+                "sharpe": 0.03544033111082127,
+                "smart_sortino": 0.03036882514607628,
+                "sortino": 0.041045113434478246,
+                "total_return": -0.026763258890962094,
+                "trade_count": 1284
+              },
+              "locked_oos": {
+                "calmar": 1.8933191784903316,
+                "max_drawdown": 0.04449396566987429,
+                "return_mdd": 1.8933191784903316,
+                "sharpe": 0.9079415281176221,
+                "smart_sortino": 1.0333641224204089,
+                "sortino": 1.0793425902078624,
+                "total_return": 0.0842412785298634,
+                "trade_count": 237
+              },
+              "train": {
+                "calmar": -0.434724565210967,
+                "max_drawdown": 0.3515542085361628,
+                "return_mdd": -0.434724565210967,
+                "sharpe": -0.5999739199995615,
+                "smart_sortino": -0.4956148429579042,
+                "sortino": -0.6698503268127448,
+                "total_return": -0.152829250453969,
+                "trade_count": 820
+              },
+              "validation": {
+                "calmar": 0.671840741808175,
+                "max_drawdown": 0.08863762303703969,
+                "return_mdd": 0.671840741808175,
+                "sharpe": 0.5967476230532694,
+                "smart_sortino": 0.77656229752162,
+                "sortino": 0.8453949337141188,
+                "total_return": 0.05955036641331812,
+                "trade_count": 227
+              }
+            },
+            "volume_vwap_pressure": {
+              "all": {
+                "calmar": 9.218366080831384,
+                "max_drawdown": 0.0930941616829564,
+                "return_mdd": 9.218366080831384,
+                "sharpe": 2.6911176783272808,
+                "smart_sortino": 3.244691333901143,
+                "sortino": 3.5467531535506236,
+                "total_return": 0.8581760623815979,
+                "trade_count": 621
+              },
+              "locked_oos": {
+                "calmar": -0.004459301448581013,
+                "max_drawdown": 0.08296737225730479,
+                "return_mdd": -0.004459301448581013,
+                "sharpe": 0.036349589303164204,
+                "smart_sortino": 0.04233087659066631,
+                "sortino": 0.04584295818674215,
+                "total_return": -0.0003699765232919594,
+                "trade_count": 119
+              },
+              "train": {
+                "calmar": 6.390978388149547,
+                "max_drawdown": 0.0930941616829564,
+                "return_mdd": 6.390978388149547,
+                "sharpe": 2.398019132822189,
+                "smart_sortino": 2.9084987891091,
+                "sortino": 3.1792630456371054,
+                "total_return": 0.5949627753786739,
+                "trade_count": 377
+              },
+              "validation": {
+                "calmar": 3.571682071162264,
+                "max_drawdown": 0.046325245375621715,
+                "return_mdd": 3.571682071162264,
+                "sharpe": 1.590005945396035,
+                "smart_sortino": 1.9789636658528458,
+                "sortino": 2.070639643262919,
+                "total_return": 0.16545904835030067,
+                "trade_count": 125
+              }
+            }
+          },
+          "key": "entry_metadata.dominant_factor_family",
+          "promotion_allowed": false
+        },
+        "by_regime": {
+          "diagnostic_only": true,
+          "groups": {
+            "neutral": {
+              "all": {
+                "calmar": 7.105048903228588,
+                "max_drawdown": 0.2956514670572235,
+                "return_mdd": 7.105048903228588,
+                "sharpe": 2.7280740497242157,
+                "smart_sortino": 2.640153022116918,
+                "sortino": 3.4207181363613466,
+                "total_return": 2.100618131752849,
+                "trade_count": 2843
+              },
+              "locked_oos": {
+                "calmar": 3.007073011653861,
+                "max_drawdown": 0.1366667659454812,
+                "return_mdd": 3.007073011653861,
+                "sharpe": 2.143208618164893,
+                "smart_sortino": 2.5002366612271256,
+                "sortino": 2.8419359198153646,
+                "total_return": 0.41096694346467144,
+                "trade_count": 540
+              },
+              "train": {
+                "calmar": 2.3299138826572765,
+                "max_drawdown": 0.2956514670572235,
+                "return_mdd": 2.3299138826572765,
+                "sharpe": 1.5691392287535169,
+                "smart_sortino": 1.4817069095478044,
+                "sortino": 1.9197757311044374,
+                "total_return": 0.6888424575246155,
+                "trade_count": 1779
+              },
+              "validation": {
+                "calmar": 3.150734499031939,
+                "max_drawdown": 0.09559509283920696,
+                "return_mdd": 3.150734499031939,
+                "sharpe": 1.5520405722881823,
+                "smart_sortino": 1.9128821340063138,
+                "sortino": 2.0957442791971075,
+                "total_return": 0.30119475694665043,
+                "trade_count": 524
+              }
+            }
+          },
+          "key": "entry_metadata.fx_risk_state",
+          "promotion_allowed": false
+        },
+        "by_side": {
+          "diagnostic_only": true,
+          "groups": {
+            "LONG": {
+              "all": {
+                "calmar": 7.379853937581853,
+                "max_drawdown": 0.1680953926634228,
+                "return_mdd": 7.379853937581853,
+                "sharpe": 2.8148673462245895,
+                "smart_sortino": 3.0896405799845867,
+                "sortino": 3.608994926465941,
+                "total_return": 1.2405194454365285,
+                "trade_count": 1405
+              },
+              "locked_oos": {
+                "calmar": 0.9332431323430501,
+                "max_drawdown": 0.12549764704355437,
+                "return_mdd": 0.9332431323430501,
+                "sharpe": 1.0059913714832829,
+                "smart_sortino": 1.020603397642644,
+                "sortino": 1.1486867226114532,
+                "total_return": 0.1171198172286092,
+                "trade_count": 281
+              },
+              "train": {
+                "calmar": 7.134478559999557,
+                "max_drawdown": 0.12117780445250065,
+                "return_mdd": 7.134478559999557,
+                "sharpe": 2.613862941717097,
+                "smart_sortino": 3.088350380315366,
+                "sortino": 3.4625898987820274,
+                "total_return": 0.8645404478141847,
+                "trade_count": 877
+              },
+              "validation": {
+                "calmar": 0.7164981706155211,
+                "max_drawdown": 0.10560429459215251,
+                "return_mdd": 0.7164981706155211,
+                "sharpe": 0.6480931846630605,
+                "smart_sortino": 0.7448861826246299,
+                "sortino": 0.8235493624921453,
+                "total_return": 0.07566528388441984,
+                "trade_count": 247
+              }
+            },
+            "SHORT": {
+              "all": {
+                "calmar": 0.9779227820021761,
+                "max_drawdown": 0.39255001937441886,
+                "return_mdd": 0.9779227820021761,
+                "sharpe": 1.1347350842913413,
+                "smart_sortino": 1.0077174188645803,
+                "sortino": 1.4032969111638107,
+                "total_return": 0.3838836070216398,
+                "trade_count": 1438
+              },
+              "locked_oos": {
+                "calmar": 5.008419729605855,
+                "max_drawdown": 0.05251954730298646,
+                "return_mdd": 5.008419729605855,
+                "sharpe": 2.012530229539206,
+                "smart_sortino": 3.021059535514721,
+                "sortino": 3.179724214695325,
+                "total_return": 0.26303993690224536,
+                "trade_count": 259
+              },
+              "train": {
+                "calmar": -0.24004904454852277,
+                "max_drawdown": 0.39255001937441886,
+                "return_mdd": -0.24004904454852277,
+                "sharpe": -0.20576049759430307,
+                "smart_sortino": -0.17212570976684857,
+                "sortino": -0.23969366047066057,
+                "total_return": -0.09423125708833335,
+                "trade_count": 902
+              },
+              "validation": {
+                "calmar": 2.591844848647545,
+                "max_drawdown": 0.08089415676084705,
+                "return_mdd": 2.591844848647545,
+                "sharpe": 1.5255327330124095,
+                "smart_sortino": 2.033470622470682,
+                "sortino": 2.1979665137734026,
+                "total_return": 0.20966510348628842,
+                "trade_count": 277
+              }
+            }
+          },
+          "key": "side",
+          "promotion_allowed": false
+        },
+        "by_symbol": {
+          "diagnostic_only": true,
+          "groups": {
+            "BNB/USDT": {
+              "all": {
+                "calmar": 3.418444427853624,
+                "max_drawdown": 0.11548359642682364,
+                "return_mdd": 3.418444427853624,
+                "sharpe": 1.9323233630998513,
+                "smart_sortino": 2.216264372272512,
+                "sortino": 2.472206552615179,
+                "total_return": 0.394774256713772,
+                "trade_count": 655
+              },
+              "locked_oos": {
+                "calmar": 2.064247496601515,
+                "max_drawdown": 0.04997786765061358,
+                "return_mdd": 2.064247496601515,
+                "sharpe": 1.4481228435887827,
+                "smart_sortino": 1.815133547721754,
+                "sortino": 1.9058500519379804,
+                "total_return": 0.10316668818326091,
+                "trade_count": 128
+              },
+              "train": {
+                "calmar": 1.261466929742323,
+                "max_drawdown": 0.11548359642682364,
+                "return_mdd": 1.261466929742323,
+                "sharpe": 0.9920018254661028,
+                "smart_sortino": 1.099938466981658,
+                "sortino": 1.226963316996907,
+                "total_return": 0.14567873782014673,
+                "trade_count": 408
+              },
+              "validation": {
+                "calmar": 2.4949253007906598,
+                "max_drawdown": 0.04151231041424394,
+                "return_mdd": 2.4949253007906598,
+                "sharpe": 1.3181379405297922,
+                "smart_sortino": 1.814628913746449,
+                "sortino": 1.8899583525005539,
+                "total_return": 0.10357011354677281,
+                "trade_count": 119
+              }
+            },
+            "BTC/USDT": {
+              "all": {
+                "calmar": 2.562659681381506,
+                "max_drawdown": 0.028646900347856958,
+                "return_mdd": 2.562659681381506,
+                "sharpe": 1.1570919819143557,
+                "smart_sortino": 1.792785848107198,
+                "sortino": 1.8441436056429732,
+                "total_return": 0.07341225651800687,
+                "trade_count": 86
+              },
+              "locked_oos": {
+                "calmar": 0.6928937201701633,
+                "max_drawdown": 0.009823559139790605,
+                "return_mdd": 0.6928937201701633,
+                "sharpe": 0.6687059324607483,
+                "smart_sortino": 0.8099863533463418,
+                "sortino": 0.817943302190863,
+                "total_return": 0.006806682437681122,
+                "trade_count": 15
+              },
+              "train": {
+                "calmar": 3.388049558688796,
+                "max_drawdown": 0.025136171469305447,
+                "return_mdd": 3.388049558688796,
+                "sharpe": 1.4240057044850356,
+                "smart_sortino": 2.634072595738856,
+                "sortino": 2.7002830961679467,
+                "total_return": 0.08516259465370624,
+                "trade_count": 56
+              },
+              "validation": {
+                "calmar": -0.6114323321130491,
+                "max_drawdown": 0.028646900347856885,
+                "return_mdd": -0.6114323321130491,
+                "sharpe": -0.8950565206434,
+                "smart_sortino": -0.7913328081299384,
+                "sortino": -0.8140020402264265,
+                "total_return": -0.017515641087500256,
+                "trade_count": 15
+              }
+            },
+            "ETH/USDT": {
+              "all": {
+                "calmar": 3.5597998182424466,
+                "max_drawdown": 0.14129794779138852,
+                "return_mdd": 3.5597998182424466,
+                "sharpe": 1.6650369575607495,
+                "smart_sortino": 1.8762868424493249,
+                "sortino": 2.1414023227553987,
+                "total_return": 0.5029924088658155,
+                "trade_count": 707
+              },
+              "locked_oos": {
+                "calmar": 0.17818259344890638,
+                "max_drawdown": 0.08329969855453886,
+                "return_mdd": 0.17818259344890638,
+                "sharpe": 0.19372976981381249,
+                "smart_sortino": 0.2430245174242025,
+                "sortino": 0.26326838646700085,
+                "total_return": 0.014842556321959854,
+                "trade_count": 132
+              },
+              "train": {
+                "calmar": 2.015203579275331,
+                "max_drawdown": 0.14129794779138852,
+                "return_mdd": 2.015203579275331,
+                "sharpe": 1.2426187790319925,
+                "smart_sortino": 1.3585185319204287,
+                "sortino": 1.550474412517355,
+                "total_return": 0.284744130133465,
+                "trade_count": 445
+              },
+              "validation": {
+                "calmar": 4.165815017094204,
+                "max_drawdown": 0.03667153656423259,
+                "return_mdd": 4.165815017094204,
+                "sharpe": 1.39473796698979,
+                "smart_sortino": 1.8954517149315968,
+                "sortino": 1.9649608418014481,
+                "total_return": 0.1527668377191993,
+                "trade_count": 130
+              }
+            },
+            "SOL/USDT": {
+              "all": {
+                "calmar": -0.20880978485608498,
+                "max_drawdown": 0.3032677534797282,
+                "return_mdd": -0.20880978485608498,
+                "sharpe": -0.10187222727061539,
+                "smart_sortino": -0.09394285825191342,
+                "sortino": -0.12243269782943575,
+                "total_return": -0.06332527435789026,
+                "trade_count": 713
+              },
+              "locked_oos": {
+                "calmar": 5.119297681052962,
+                "max_drawdown": 0.037636404164526745,
+                "return_mdd": 5.119297681052962,
+                "sharpe": 1.7599144339608497,
+                "smart_sortino": 2.3146544681585803,
+                "sortino": 2.4017697392234245,
+                "total_return": 0.1926719565626338,
+                "trade_count": 126
+              },
+              "train": {
+                "calmar": -0.7366386967116897,
+                "max_drawdown": 0.3032677534797282,
+                "return_mdd": -0.7366386967116897,
+                "sharpe": -0.9964743642937622,
+                "smart_sortino": -0.881102296239908,
+                "sortino": -1.1483122102064147,
+                "total_return": -0.22339876267798897,
+                "trade_count": 469
+              },
+              "validation": {
+                "calmar": 0.07766244081699568,
+                "max_drawdown": 0.1451929100564649,
+                "return_mdd": 0.07766244081699568,
+                "sharpe": 0.15486856792266068,
+                "smart_sortino": 0.18358914948943694,
+                "sortino": 0.21024499235859964,
+                "total_return": 0.011276035784307581,
+                "trade_count": 118
+              }
+            },
+            "TRX/USDT": {
+              "all": {
+                "calmar": 4.086499496653218,
+                "max_drawdown": 0.11527377219008697,
+                "return_mdd": 4.086499496653218,
+                "sharpe": 2.693959519148692,
+                "smart_sortino": 3.3940363420870336,
+                "sortino": 3.78527971418965,
+                "total_return": 0.4710662120321081,
+                "trade_count": 682
+              },
+              "locked_oos": {
+                "calmar": 2.030546080736899,
+                "max_drawdown": 0.024410394843931215,
+                "return_mdd": 2.030546080736899,
+                "sharpe": 1.1639450887854494,
+                "smart_sortino": 1.3069663917254692,
+                "sortino": 1.3388699573952358,
+                "total_return": 0.049566431579584735,
+                "trade_count": 139
+              },
+              "train": {
+                "calmar": 4.182299990348107,
+                "max_drawdown": 0.0864350219222937,
+                "return_mdd": 4.182299990348107,
+                "sharpe": 2.3873659595230476,
+                "smart_sortino": 3.207639009416606,
+                "sortino": 3.484891357514335,
+                "total_return": 0.3614971913513474,
+                "trade_count": 401
+              },
+              "validation": {
+                "calmar": 0.6394845846837389,
+                "max_drawdown": 0.046053753403975474,
+                "return_mdd": 0.6394845846837389,
+                "sharpe": 0.6388378712571846,
+                "smart_sortino": 0.7857405648873516,
+                "sortino": 0.8219268671021741,
+                "total_return": 0.029450665368668583,
+                "trade_count": 142
+              }
+            }
+          },
+          "key": "symbol",
+          "promotion_allowed": false
+        }
+      },
+      "candidate_name": "alpha_zoo_conservative_exit",
+      "diagnostic_only": true,
+      "funding_cost_sensitivity": {
+        "conservative_drag_model": "funding is treated as a same-direction cost drag for both longs and shorts",
+        "funding_bps_per_day_grid": [
+          0.0,
+          1.0,
+          2.0,
+          5.0,
+          10.0
+        ],
+        "rows": [
+          {
+            "funding_bps_per_day": 0.0,
+            "locked_oos": {
+              "calmar": 3.007073011653861,
+              "max_drawdown": 0.1366667659454812,
+              "return_mdd": 3.007073011653861,
+              "sharpe": 2.143208618164893,
+              "smart_sortino": 2.5002366612271256,
+              "sortino": 2.8419359198153646,
+              "total_return": 0.41096694346467144,
+              "trade_count": 540
+            },
+            "scenario": "funding_bps_per_day_0",
+            "split_metrics": {
+              "locked_oos": {
+                "calmar": 3.007073011653861,
+                "max_drawdown": 0.1366667659454812,
+                "return_mdd": 3.007073011653861,
+                "sharpe": 2.143208618164893,
+                "smart_sortino": 2.5002366612271256,
+                "sortino": 2.8419359198153646,
+                "total_return": 0.41096694346467144,
+                "trade_count": 540
+              },
+              "train": {
+                "calmar": 2.3299138826572765,
+                "max_drawdown": 0.2956514670572235,
+                "return_mdd": 2.3299138826572765,
+                "sharpe": 1.5691392287535169,
+                "smart_sortino": 1.4817069095478044,
+                "sortino": 1.9197757311044374,
+                "total_return": 0.6888424575246155,
+                "trade_count": 1779
+              },
+              "validation": {
+                "calmar": 3.150734499031939,
+                "max_drawdown": 0.09559509283920696,
+                "return_mdd": 3.150734499031939,
+                "sharpe": 1.5520405722881823,
+                "smart_sortino": 1.9128821340063138,
+                "sortino": 2.0957442791971075,
+                "total_return": 0.30119475694665043,
+                "trade_count": 524
+              }
+            }
+          },
+          {
+            "funding_bps_per_day": 1.0,
+            "locked_oos": {
+              "calmar": 2.951422294084082,
+              "max_drawdown": 0.1369544206667571,
+              "return_mdd": 2.951422294084082,
+              "sharpe": 2.1149641666383254,
+              "smart_sortino": 2.4679390535091246,
+              "sortino": 2.8059342168233314,
+              "total_return": 0.4042103304292366,
+              "trade_count": 540
+            },
+            "scenario": "funding_bps_per_day_1",
+            "split_metrics": {
+              "locked_oos": {
+                "calmar": 2.951422294084082,
+                "max_drawdown": 0.1369544206667571,
+                "return_mdd": 2.951422294084082,
+                "sharpe": 2.1149641666383254,
+                "smart_sortino": 2.4679390535091246,
+                "sortino": 2.8059342168233314,
+                "total_return": 0.4042103304292366,
+                "trade_count": 540
+              },
+              "train": {
+                "calmar": 2.2105552032742466,
+                "max_drawdown": 0.29983500451953593,
+                "return_mdd": 2.2105552032742466,
+                "sharpe": 1.528508665769484,
+                "smart_sortino": 1.437408560305128,
+                "sortino": 1.8683939624806358,
+                "total_return": 0.6628018293644173,
+                "trade_count": 1779
+              },
+              "validation": {
+                "calmar": 3.072717116614119,
+                "max_drawdown": 0.09604760708317776,
+                "return_mdd": 3.072717116614119,
+                "sharpe": 1.5264344040298379,
+                "smart_sortino": 1.8816074828044638,
+                "sortino": 2.062331378997634,
+                "total_return": 0.2951271262943078,
+                "trade_count": 524
+              }
+            }
+          },
+          {
+            "funding_bps_per_day": 2.0,
+            "locked_oos": {
+              "calmar": 2.896241922117663,
+              "max_drawdown": 0.13724198315281397,
+              "return_mdd": 2.896241922117663,
+              "sharpe": 2.0867040952807403,
+              "smart_sortino": 2.4312984434788807,
+              "sortino": 2.764974663498272,
+              "total_return": 0.3974859850817458,
+              "trade_count": 540
+            },
+            "scenario": "funding_bps_per_day_2",
+            "split_metrics": {
+              "locked_oos": {
+                "calmar": 2.896241922117663,
+                "max_drawdown": 0.13724198315281397,
+                "return_mdd": 2.896241922117663,
+                "sharpe": 2.0867040952807403,
+                "smart_sortino": 2.4312984434788807,
+                "sortino": 2.764974663498272,
+                "total_return": 0.3974859850817458,
+                "trade_count": 540
+              },
+              "train": {
+                "calmar": 2.095972083480072,
+                "max_drawdown": 0.3039937442485003,
+                "return_mdd": 2.095972083480072,
+                "sharpe": 1.4878550979417031,
+                "smart_sortino": 1.393468464996492,
+                "sortino": 1.8170741611629857,
+                "total_return": 0.6371624014974373,
+                "trade_count": 1779
+              },
+              "validation": {
+                "calmar": 2.995730713692664,
+                "max_drawdown": 0.09649990012134446,
+                "return_mdd": 2.995730713692664,
+                "sharpe": 1.5008135116709749,
+                "smart_sortino": 1.8471340240465695,
+                "sortino": 2.0253822728778004,
+                "total_return": 0.28908771466178607,
+                "trade_count": 524
+              }
+            }
+          },
+          {
+            "funding_bps_per_day": 5.0,
+            "locked_oos": {
+              "calmar": 2.7334812954107717,
+              "max_drawdown": 0.1381041174840611,
+              "return_mdd": 2.7334812954107717,
+              "sharpe": 2.0018305902840505,
+              "smart_sortino": 2.325991467534232,
+              "sortino": 2.6472204664335033,
+              "total_return": 0.37750502196189273,
+              "trade_count": 540
+            },
+            "scenario": "funding_bps_per_day_5",
+            "split_metrics": {
+              "locked_oos": {
+                "calmar": 2.7334812954107717,
+                "max_drawdown": 0.1381041174840611,
+                "return_mdd": 2.7334812954107717,
+                "sharpe": 2.0018305902840505,
+                "smart_sortino": 2.325991467534232,
+                "sortino": 2.6472204664335033,
+                "total_return": 0.37750502196189273,
+                "trade_count": 540
+              },
+              "train": {
+                "calmar": 1.7785322996848287,
+                "max_drawdown": 0.3163226395815275,
+                "return_mdd": 1.7785322996848287,
+                "sharpe": 1.3657566262673881,
+                "smart_sortino": 1.265717057212452,
+                "sortino": 1.666092017713258,
+                "total_return": 0.5625900316173094,
+                "trade_count": 1779
+              },
+              "validation": {
+                "calmar": 2.7707958987434096,
+                "max_drawdown": 0.09785545305695835,
+                "return_mdd": 2.7707958987434096,
+                "sharpe": 1.4238627061582867,
+                "smart_sortino": 1.7472073575064413,
+                "sortino": 1.9181811250596852,
+                "total_return": 0.27113748799989845,
+                "trade_count": 524
+              }
+            }
+          },
+          {
+            "funding_bps_per_day": 10.0,
+            "locked_oos": {
+              "calmar": 2.47123857195535,
+              "max_drawdown": 0.13953916598478136,
+              "return_mdd": 2.47123857195535,
+              "sharpe": 1.86006637149736,
+              "smart_sortino": 2.156345725399098,
+              "sortino": 2.4572404094961366,
+              "total_return": 0.3448345692800716,
+              "trade_count": 540
+            },
+            "scenario": "funding_bps_per_day_10",
+            "split_metrics": {
+              "locked_oos": {
+                "calmar": 2.47123857195535,
+                "max_drawdown": 0.13953916598478136,
+                "return_mdd": 2.47123857195535,
+                "sharpe": 1.86006637149736,
+                "smart_sortino": 2.156345725399098,
+                "sortino": 2.4572404094961366,
+                "total_return": 0.3448345692800716,
+                "trade_count": 540
+              },
+              "train": {
+                "calmar": 1.325160684828571,
+                "max_drawdown": 0.3363883655629362,
+                "return_mdd": 1.325160684828571,
+                "sharpe": 1.1618015310264287,
+                "smart_sortino": 1.059090910920035,
+                "sortino": 1.415356771426987,
+                "total_return": 0.44576863687774426,
+                "trade_count": 1779
+              },
+              "validation": {
+                "calmar": 2.396714806902315,
+                "max_drawdown": 0.10087671890642279,
+                "return_mdd": 2.396714806902315,
+                "sharpe": 1.2953189143165074,
+                "smart_sortino": 1.5813622713342361,
+                "sortino": 1.740884908668842,
+                "total_return": 0.24177272587474619,
+                "trade_count": 524
+              }
+            }
+          }
+        ]
+      },
+      "leverage": 6.0,
+      "live_promotion_lane": "strict_zero_liquidation_lane",
+      "promotion_allowed": false,
+      "slippage_sensitivity": {
+        "round_trip_bps_grid": [
+          0.0,
+          2.5,
+          5.0,
+          10.0,
+          20.0
+        ],
+        "rows": [
+          {
+            "locked_oos": {
+              "calmar": 3.007073011653861,
+              "max_drawdown": 0.1366667659454812,
+              "return_mdd": 3.007073011653861,
+              "sharpe": 2.143208618164893,
+              "smart_sortino": 2.5002366612271256,
+              "sortino": 2.8419359198153646,
+              "total_return": 0.41096694346467144,
+              "trade_count": 540
+            },
+            "round_trip_slippage_bps": 0.0,
+            "scenario": "round_trip_slippage_bps_0",
+            "split_metrics": {
+              "locked_oos": {
+                "calmar": 3.007073011653861,
+                "max_drawdown": 0.1366667659454812,
+                "return_mdd": 3.007073011653861,
+                "sharpe": 2.143208618164893,
+                "smart_sortino": 2.5002366612271256,
+                "sortino": 2.8419359198153646,
+                "total_return": 0.41096694346467144,
+                "trade_count": 540
+              },
+              "train": {
+                "calmar": 2.3299138826572765,
+                "max_drawdown": 0.2956514670572235,
+                "return_mdd": 2.3299138826572765,
+                "sharpe": 1.5691392287535169,
+                "smart_sortino": 1.4817069095478044,
+                "sortino": 1.9197757311044374,
+                "total_return": 0.6888424575246155,
+                "trade_count": 1779
+              },
+              "validation": {
+                "calmar": 3.150734499031939,
+                "max_drawdown": 0.09559509283920696,
+                "return_mdd": 3.150734499031939,
+                "sharpe": 1.5520405722881823,
+                "smart_sortino": 1.9128821340063138,
+                "sortino": 2.0957442791971075,
+                "total_return": 0.30119475694665043,
+                "trade_count": 524
+              }
+            }
+          },
+          {
+            "locked_oos": {
+              "calmar": 2.125578707731948,
+              "max_drawdown": 0.1417220696939152,
+              "return_mdd": 2.125578707731948,
+              "sharpe": 1.658592417696884,
+              "smart_sortino": 1.9273043815958164,
+              "sortino": 2.200445947485727,
+              "total_return": 0.30124141375708935,
+              "trade_count": 540
+            },
+            "round_trip_slippage_bps": 2.5,
+            "scenario": "round_trip_slippage_bps_2.5",
+            "split_metrics": {
+              "locked_oos": {
+                "calmar": 2.125578707731948,
+                "max_drawdown": 0.1417220696939152,
+                "return_mdd": 2.125578707731948,
+                "sharpe": 1.658592417696884,
+                "smart_sortino": 1.9273043815958164,
+                "sortino": 2.200445947485727,
+                "total_return": 0.30124141375708935,
+                "trade_count": 540
+              },
+              "train": {
+                "calmar": 0.7996691813421896,
+                "max_drawdown": 0.3668481681901513,
+                "return_mdd": 0.7996691813421896,
+                "sharpe": 0.8661141782650736,
+                "smart_sortino": 0.7740742246634026,
+                "sortino": 1.0580419360243833,
+                "total_return": 0.29335717433350017,
+                "trade_count": 1779
+              },
+              "validation": {
+                "calmar": 1.7909693330736705,
+                "max_drawdown": 0.1132763545905136,
+                "return_mdd": 1.7909693330736705,
+                "sharpe": 1.115422217194343,
+                "smart_sortino": 1.3537845231173882,
+                "sortino": 1.5071362987971828,
+                "total_return": 0.20287447723398877,
+                "trade_count": 524
+              }
+            }
+          },
+          {
+            "locked_oos": {
+              "calmar": 1.3631091084166411,
+              "max_drawdown": 0.14674852653086398,
+              "return_mdd": 1.3631091084166411,
+              "sharpe": 1.1739762172288755,
+              "smart_sortino": 1.3578362942202766,
+              "sortino": 1.5570967696672309,
+              "total_return": 0.2000342531609418,
+              "trade_count": 540
+            },
+            "round_trip_slippage_bps": 5.0,
+            "scenario": "round_trip_slippage_bps_5",
+            "split_metrics": {
+              "locked_oos": {
+                "calmar": 1.3631091084166411,
+                "max_drawdown": 0.14674852653086398,
+                "return_mdd": 1.3631091084166411,
+                "sharpe": 1.1739762172288755,
+                "smart_sortino": 1.3578362942202766,
+                "sortino": 1.5570967696672309,
+                "total_return": 0.2000342531609418,
+                "trade_count": 540
+              },
+              "train": {
+                "calmar": -0.021526325870625473,
+                "max_drawdown": 0.44386778952434885,
+                "return_mdd": -0.021526325870625473,
+                "sharpe": 0.1630891277766304,
+                "smart_sortino": 0.13745371211360768,
+                "sortino": 0.19846498747139094,
+                "total_return": -0.009554842680775333,
+                "trade_count": 1779
+              },
+              "validation": {
+                "calmar": 0.7902339510177577,
+                "max_drawdown": 0.14169262984996664,
+                "return_mdd": 0.7902339510177577,
+                "sharpe": 0.6788038621005035,
+                "smart_sortino": 0.8007495864751039,
+                "sortino": 0.9142099012340346,
+                "total_return": 0.11197032671643581,
+                "trade_count": 524
+              }
+            }
+          },
+          {
+            "locked_oos": {
+              "calmar": 0.12992612672749626,
+              "max_drawdown": 0.15843926609448278,
+              "return_mdd": 0.12992612672749626,
+              "sharpe": 0.20474381629285787,
+              "smart_sortino": 0.23019308902131377,
+              "sortino": 0.2666647131058727,
+              "total_return": 0.02058540016520327,
+              "trade_count": 540
+            },
+            "round_trip_slippage_bps": 10.0,
+            "scenario": "round_trip_slippage_bps_10",
+            "split_metrics": {
+              "locked_oos": {
+                "calmar": 0.12992612672749626,
+                "max_drawdown": 0.15843926609448278,
+                "return_mdd": 0.12992612672749626,
+                "sharpe": 0.20474381629285787,
+                "smart_sortino": 0.23019308902131377,
+                "sortino": 0.2666647131058727,
+                "total_return": 0.02058540016520327,
+                "trade_count": 540
+              },
+              "train": {
+                "calmar": -0.7153183059443654,
+                "max_drawdown": 0.586078481618197,
+                "return_mdd": -0.7153183059443654,
+                "sharpe": -1.2429609732002556,
+                "smart_sortino": -0.9475488730789611,
+                "sortino": -1.5028868778721123,
+                "total_return": -0.41923266662157455,
+                "trade_count": 1779
+              },
+              "validation": {
+                "calmar": -0.24489395202835523,
+                "max_drawdown": 0.20327658266896645,
+                "return_mdd": -0.24489395202835523,
+                "sharpe": -0.19443284808717504,
+                "smart_sortino": -0.2152807723672409,
+                "sortino": -0.2590423120883893,
+                "total_return": -0.049781205684621854,
+                "trade_count": 524
+              }
+            }
+          },
+          {
+            "locked_oos": {
+              "calmar": -0.7246153969912067,
+              "max_drawdown": 0.361474794426292,
+              "return_mdd": -0.7246153969912067,
+              "sharpe": -1.7337209855791769,
+              "smart_sortino": -1.6301312919340498,
+              "sortino": -2.219382665573776,
+              "total_return": -0.2619302016655224,
+              "trade_count": 540
+            },
+            "round_trip_slippage_bps": 20.0,
+            "scenario": "round_trip_slippage_bps_20",
+            "split_metrics": {
+              "locked_oos": {
+                "calmar": -0.7246153969912067,
+                "max_drawdown": 0.361474794426292,
+                "return_mdd": -0.7246153969912067,
+                "sharpe": -1.7337209855791769,
+                "smart_sortino": -1.6301312919340498,
+                "sortino": -2.219382665573776,
+                "total_return": -0.2619302016655224,
+                "trade_count": 540
+              },
+              "train": {
+                "calmar": -0.9841944058595945,
+                "max_drawdown": 0.8132650144216033,
+                "return_mdd": -0.9841944058595945,
+                "sharpe": -4.0550611751540275,
+                "smart_sortino": -2.649196920810024,
+                "sortino": -4.803696092818256,
+                "total_return": -0.8004108776750644,
+                "trade_count": 1779
+              },
+              "validation": {
+                "calmar": -0.8803024493715143,
+                "max_drawdown": 0.3478555386832617,
+                "return_mdd": -0.8803024493715143,
+                "sharpe": -1.9409062684625322,
+                "smart_sortino": -1.8683459119861414,
+                "sortino": -2.5182603856467503,
+                "total_return": -0.3062180827303228,
+                "trade_count": 524
+              }
+            }
+          }
+        ]
+      },
+      "trade_return_model": "allocation_fraction * leverage * (gross_return - round_trip_slippage_bps/10000 - funding_bps_per_day/10000*holding_days)"
     },
     "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_real_data_20260514/crypto_fx_alpha_zoo_state_replay_latest.json",
     "row_count": 58845,

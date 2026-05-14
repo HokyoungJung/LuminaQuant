@@ -31,6 +31,18 @@
 - `5.0x`: OOS return `33.4851%`, return/MDD `2.911176`, total liquidations `0`, min buffer `9207.604968`, promotion_allowed `False`
 - `6.0x`: OOS return `41.0967%`, return/MDD `3.007073`, total liquidations `0`, min buffer `9049.125962`, promotion_allowed `False`
 
+## Paper-forward diagnostics (non-promotional)
+
+- Candidate/leverage: `alpha_zoo_conservative_exit` / `6.0x`
+- Trade-return cost model: `allocation_fraction * leverage * (gross_return - round_trip_slippage_bps/10000 - funding_bps_per_day/10000*holding_days)`
+- locked-OOS by regime: neutral: 41.0967% (540)
+- locked-OOS by symbol: SOL/USDT: 19.2672% (126), BNB/USDT: 10.3167% (128), TRX/USDT: 4.9566% (139), ETH/USDT: 1.4843% (132), BTC/USDT: 0.6807% (15)
+- locked-OOS by side: SHORT: 26.3040% (259), LONG: 11.7120% (281)
+- locked-OOS by factor family: crypto_residual_momentum: 30.1822% (184), crypto_residual_reversal: 8.4241% (237), volume_vwap_pressure: -0.0370% (119)
+- locked-OOS by exit reason: score_exit: 41.0936% (526), take_profit: 16.1976% (4), end_of_sample: -0.0788% (2), stop_loss: -13.8700% (8)
+- locked-OOS slippage_sensitivity: 0bps: 41.0967%, 2.5bps: 30.1241%, 5bps: 20.0034%, 10bps: 2.0585%, 20bps: -26.1930%
+- locked-OOS funding_cost_sensitivity: 0bps: 41.0967%, 1bps: 40.4210%, 2bps: 39.7486%, 5bps: 37.7505%, 10bps: 34.4835%
+
 ## Memory
 
 - peak_rss_mib: `626.726562`

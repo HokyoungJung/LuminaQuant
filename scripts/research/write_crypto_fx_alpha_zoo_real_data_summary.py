@@ -195,12 +195,14 @@ def build_summary_payload(
             "selection_provenance": replay.get("selection_provenance"),
             "calibration_provenance": replay.get("calibration_provenance"),
             "locked_oos_report_only_metrics": replay.get("locked_oos_report_only_metrics"),
+            "paper_forward_diagnostics": replay.get("paper_forward_diagnostics"),
             "deployable_success": replay.get("deployable_success"),
             "deployable_success_reason": replay.get("deployable_success_reason"),
         },
         "promotion_policy": replay_policy,
         "strict_zero_liquidation_lane": strict_lane,
         "diagnostic_nonfatal_5x_6x_lane": diagnostic_lane.get("high_leverage_5x_6x_report", []),
+        "paper_forward_diagnostics": replay.get("paper_forward_diagnostics"),
         "front_runner_candidate": {
             "designation": "strict_candidate_after_train_validation_freeze",
             "live_promotion_status": "deployable_success_true" if deployable_success else "no_live_promotion_strict_gate_failed",
@@ -264,6 +266,7 @@ def write_summary_markdown(payload: dict[str, Any], path: str | Path) -> None:
     edge = _as_dict(payload.get("edge_calibration"))
     ledger = _as_dict(payload.get("candidate_outcome_ledger"))
     memory = _as_dict(payload.get("memory_summary"))
+    paper = _as_dict(payload.get("paper_forward_diagnostics"))
     lines = [
         "# Crypto/FX Alpha Zoo real-data return/MDD-diagnostic policy summary — 2026-05-14",
         "",
@@ -304,6 +307,41 @@ def write_summary_markdown(payload: dict[str, Any], path: str | Path) -> None:
             f"return/MDD `{_fmt_num(row_oos.get('return_mdd'))}`, total liquidations `{row.get('total_liquidation_count')}`, "
             f"min buffer `{_fmt_num(row.get('minimum_margin_buffer'))}`, promotion_allowed `False`"
         )
+    lines.extend(
+        [
+            "",
+            "## Paper-forward diagnostics (non-promotional)",
+            "",
+            f"- Candidate/leverage: `{paper.get('candidate_name')}` / `{paper.get('leverage')}x`",
+            f"- Trade-return cost model: `{paper.get('trade_return_model')}`",
+        ]
+    )
+    breakdowns = _as_dict(paper.get("breakdowns"))
+    for label, key in (
+        ("regime", "by_regime"),
+        ("symbol", "by_symbol"),
+        ("side", "by_side"),
+        ("factor family", "by_factor_family"),
+        ("exit reason", "by_exit_reason"),
+    ):
+        groups = _as_dict(_as_dict(breakdowns.get(key)).get("groups"))
+        locked_rows = []
+        for group_name, metrics_by_split in groups.items():
+            locked = _as_dict(_as_dict(metrics_by_split).get("locked_oos"))
+            locked_rows.append((group_name, _safe_float(locked.get("total_return")), int(locked.get("trade_count") or 0)))
+        locked_rows.sort(key=lambda item: item[1], reverse=True)
+        preview = ", ".join(f"{name}: {_fmt_pct(ret)} ({count})" for name, ret, count in locked_rows[:5]) or "none"
+        lines.append(f"- locked-OOS by {label}: {preview}")
+    for sensitivity_key, value_field in (
+        ("slippage_sensitivity", "round_trip_slippage_bps"),
+        ("funding_cost_sensitivity", "funding_bps_per_day"),
+    ):
+        rows = list(_as_dict(paper.get(sensitivity_key)).get("rows") or [])
+        preview = ", ".join(
+            f"{_safe_float(row.get(value_field)):g}bps: {_fmt_pct(_as_dict(row.get('locked_oos')).get('total_return'))}"
+            for row in rows
+        )
+        lines.append(f"- locked-OOS {sensitivity_key}: {preview}")
     lines.extend(
         [
             "",

@@ -213,6 +213,7 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
             )
             for symbol in self.symbol_list
         }
+        self._last_score_components: dict[str, dict[str, float]] = {}
 
     def get_state(self) -> dict[str, Any]:
         return {
@@ -342,6 +343,7 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
         return edge is not None and edge > self.min_calibrated_edge_bps, edge
 
     def _score_symbol(self, symbol: str) -> float | None:
+        self._last_score_components.pop(symbol, None)
         item = self._state[symbol]
         btc_symbol = next((candidate for candidate in self.crypto_symbols if normalize_symbol(candidate) == "BTC"), None)
         if btc_symbol is None or len(item.closes) <= self.slow_lookback_bars:
@@ -369,13 +371,15 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
         elif item.lows[-1] < prior_low and item.closes[-1] > prior_low:
             breakout_failure = 1.0
         trend_eff = _trend_efficiency(item.closes, self.fast_lookback_bars)
-        return (
-            self.residual_momentum_weight * residual_mom
-            + self.residual_reversal_weight * residual_reversal
-            + self.vwap_pressure_weight * vwap_pressure
-            + self.breakout_failure_weight * breakout_failure
-            + self.trend_efficiency_weight * trend_eff * (1.0 if residual_fast >= 0.0 else -1.0)
-        )
+        components = {
+            "crypto_residual_momentum": self.residual_momentum_weight * residual_mom,
+            "crypto_residual_reversal": self.residual_reversal_weight * residual_reversal,
+            "volume_vwap_pressure": self.vwap_pressure_weight * vwap_pressure,
+            "breakout_failure": self.breakout_failure_weight * breakout_failure,
+            "trend_efficiency": self.trend_efficiency_weight * trend_eff * (1.0 if residual_fast >= 0.0 else -1.0),
+        }
+        self._last_score_components[symbol] = {key: float(value) for key, value in components.items()}
+        return sum(components.values())
 
     def _adjust_for_fx(self, score: float, risk_state: str) -> float:
         if risk_state == "risk_off":
@@ -384,7 +388,17 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
             return score * (self.risk_on_long_multiplier if score > 0.0 else self.risk_on_short_multiplier)
         return score
 
-    def _emit(self, symbol: str, event_time: Any, signal_type: str, *, score: float, edge_bps: float | None, risk_state: str) -> None:
+    def _emit(
+        self,
+        symbol: str,
+        event_time: Any,
+        signal_type: str,
+        *,
+        score: float,
+        edge_bps: float | None,
+        risk_state: str,
+        exit_reason: str | None = None,
+    ) -> None:
         close = float(self._state[symbol].closes[-1])
         side = "LONG" if signal_type == "LONG" else "SHORT" if signal_type == "SHORT" else None
         stop = None
@@ -395,6 +409,24 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
         elif signal_type == "SHORT":
             stop = close * (1.0 + self.stop_loss_pct)
             take = close * (1.0 - self.take_profit_pct)
+        components = {key: float(value) for key, value in self._last_score_components.get(symbol, {}).items()}
+        dominant = (
+            max(components, key=lambda key: abs(components[key]))
+            if any(abs(value) > 1e-12 for value in components.values())
+            else "alpha_zoo_composite_score"
+        )
+        metadata = {
+            "strategy": self.__class__.__name__,
+            "factor_score": float(score),
+            "factor_family_scores": components,
+            "dominant_factor_family": dominant,
+            "fx_risk_state": risk_state,
+            "calibrated_lower_bound_edge_bps": edge_bps,
+            "calendar_primary": False,
+            "uses_locked_oos_for_selection": False,
+        }
+        if exit_reason:
+            metadata["exit_reason_detail"] = exit_reason
         self.events.put(
             SignalEvent(
                 strategy_id=self.strategy_id,
@@ -406,14 +438,7 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
                 stop_loss=stop,
                 take_profit=take,
                 position_side=side,
-                metadata={
-                    "strategy": self.__class__.__name__,
-                    "factor_score": float(score),
-                    "fx_risk_state": risk_state,
-                    "calibrated_lower_bound_edge_bps": edge_bps,
-                    "calendar_primary": False,
-                    "uses_locked_oos_for_selection": False,
-                },
+                metadata=metadata,
             )
         )
 
@@ -433,7 +458,26 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
                 take_hit = close >= item.entry_price * (1.0 + self.take_profit_pct)
                 stale = item.bars_held >= self.max_hold_bars
                 if stop_hit or take_hit or stale or score <= self.exit_threshold or risk_state == "risk_off":
-                    self._emit(symbol, event_time, "EXIT", score=score, edge_bps=self._calibrated_edge_bps(symbol, "LONG"), risk_state=risk_state)
+                    exit_reason = (
+                        "stop_loss"
+                        if stop_hit
+                        else "take_profit"
+                        if take_hit
+                        else "time_exit"
+                        if stale
+                        else "regime_flip_exit"
+                        if risk_state == "risk_off"
+                        else "score_exit"
+                    )
+                    self._emit(
+                        symbol,
+                        event_time,
+                        "EXIT",
+                        score=score,
+                        edge_bps=self._calibrated_edge_bps(symbol, "LONG"),
+                        risk_state=risk_state,
+                        exit_reason=exit_reason,
+                    )
                     item.mode = "OUT"
                     item.entry_price = 0.0
                     item.bars_held = 0
@@ -443,7 +487,26 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
                 take_hit = close <= item.entry_price * (1.0 - self.take_profit_pct)
                 stale = item.bars_held >= self.max_hold_bars
                 if stop_hit or take_hit or stale or score >= -self.exit_threshold or risk_state == "risk_on":
-                    self._emit(symbol, event_time, "EXIT", score=score, edge_bps=self._calibrated_edge_bps(symbol, "SHORT"), risk_state=risk_state)
+                    exit_reason = (
+                        "stop_loss"
+                        if stop_hit
+                        else "take_profit"
+                        if take_hit
+                        else "time_exit"
+                        if stale
+                        else "regime_flip_exit"
+                        if risk_state == "risk_on"
+                        else "score_exit"
+                    )
+                    self._emit(
+                        symbol,
+                        event_time,
+                        "EXIT",
+                        score=score,
+                        edge_bps=self._calibrated_edge_bps(symbol, "SHORT"),
+                        risk_state=risk_state,
+                        exit_reason=exit_reason,
+                    )
                     item.mode = "OUT"
                     item.entry_price = 0.0
                     item.bars_held = 0
