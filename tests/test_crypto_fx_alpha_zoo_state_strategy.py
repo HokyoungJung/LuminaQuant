@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import queue
 import importlib.util
+import json
+import queue
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,6 +21,15 @@ _REPLAY_SPEC.loader.exec_module(_REPLAY_MODULE)
 _GridSpec = _REPLAY_MODULE._GridSpec
 _liquidation_lanes = _REPLAY_MODULE._liquidation_lanes
 replay_frame = _REPLAY_MODULE.replay_frame
+
+_SUMMARY_SPEC = importlib.util.spec_from_file_location(
+    "write_crypto_fx_alpha_zoo_real_data_summary", Path("scripts/research/write_crypto_fx_alpha_zoo_real_data_summary.py")
+)
+_SUMMARY_MODULE = importlib.util.module_from_spec(_SUMMARY_SPEC)
+assert _SUMMARY_SPEC.loader is not None
+sys.modules[_SUMMARY_SPEC.name] = _SUMMARY_MODULE
+_SUMMARY_SPEC.loader.exec_module(_SUMMARY_MODULE)
+build_summary_payload = _SUMMARY_MODULE.build_summary_payload
 
 
 @dataclass(slots=True)
@@ -179,7 +189,7 @@ def test_replay_grid_hides_locked_oos_until_after_train_validation_selection() -
     assert payload["selection_provenance"]["candidate_freeze_before_locked_oos_gate"] is True
 
 
-def test_revised_promotion_gate_treats_return_mdd_as_diagnostic_only() -> None:
+def test_strict_promotion_gate_blocks_when_return_mdd_reference_hurdle_fails() -> None:
     data = pd.DataFrame(columns=["timestamp", "symbol", "open", "high", "low", "close", "volume", "split"])
     trades = [
         {
@@ -195,10 +205,72 @@ def test_revised_promotion_gate_treats_return_mdd_as_diagnostic_only() -> None:
     ]
 
     lanes = _liquidation_lanes(data, trades, allocation_fraction=1.0, max_leverage=1)
-    promoted = lanes["strict_zero_liquidation_lane"]["promoted_candidate"]
+    strict_lane = lanes["strict_zero_liquidation_lane"]
+    highest = strict_lane["highest_zero_liquidation_integer"]
 
-    assert promoted["deployable_success"] is True
-    assert promoted["performance_gates"]["oos_return_beats_current_base"] is True
-    assert "oos_return_risk_beats_current_base" not in promoted["performance_gates"]
-    assert promoted["performance_diagnostics"]["return_mdd_hurdle_required"] is False
-    assert promoted["performance_diagnostics"]["oos_return_mdd_beats_current_base"] is False
+    assert strict_lane["promoted_candidate"] == {}
+    assert highest["strict_safe"] is True
+    assert highest["performance_gates"]["oos_return_beats_current_base"] is True
+    assert highest["performance_gates"]["oos_return_mdd_beats_current_base"] is False
+    assert highest["performance_diagnostics"]["return_mdd_hurdle_required"] is True
+    assert highest["performance_diagnostics"]["return_mdd_role"] == "strict_promotion_gate"
+    assert highest["deployable_success"] is False
+
+
+def test_real_data_summary_fails_closed_without_strict_return_mdd_gate(tmp_path: Path) -> None:
+    screen_path = tmp_path / "screen.json"
+    calibration_path = tmp_path / "calibration.json"
+    replay_path = tmp_path / "replay.json"
+    screen_path.write_text(
+        json.dumps(
+            {
+                "factor_count": 1,
+                "row_count": 1,
+                "calendar_primary": False,
+                "uses_locked_oos_for_selection": False,
+                "screen": {"selected_factors": []},
+                "source_coverage": {"input": {"symbols": ["BTC/USDT"]}},
+                "candidate_outcome_ledger": {"record_count": 1, "train_validation_record_count": 1, "locked_oos_record_count": 0},
+            }
+        ),
+        encoding="utf-8",
+    )
+    calibration_path.write_text(
+        json.dumps(
+            {
+                "calibration_policy": "physical_train_validation_record_filter_before_bucket_estimation",
+                "input_record_count": 1,
+                "calibration_record_count": 1,
+                "locked_oos_calibration_record_count": 0,
+                "calibrated_edges_for_strategy": {"default:LONG": 1.0},
+            }
+        ),
+        encoding="utf-8",
+    )
+    replay_path.write_text(
+        json.dumps(
+            {
+                "promotion_policy": {"return_mdd_hurdle_required": False, "return_mdd_role": "diagnostic"},
+                "integer_grid_results": [
+                    {
+                        "performance_gates": {"oos_return_beats_current_base": True},
+                        "performance_diagnostics": {"return_mdd_hurdle_required": False},
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    try:
+        build_summary_payload(
+            screen_path=screen_path,
+            calibration_path=calibration_path,
+            replay_path=replay_path,
+            output_json_path=tmp_path / "summary.json",
+            output_md_path=tmp_path / "summary.md",
+        )
+    except ValueError as exc:
+        assert "return/MDD" in str(exc)
+    else:
+        raise AssertionError("summary writer must fail closed without the strict return/MDD gate")

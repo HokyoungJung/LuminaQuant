@@ -1,10 +1,16 @@
 # Crypto/FX Alpha Zoo real-data result — 2026-05-13
 
+> Superseded on 2026-05-14 by the strict return/MDD gate restoration in
+> `docs/session_handoff_20260514_crypto_fx_alpha_zoo_real_data_strict_policy.md`.
+> The 2026-05-13 metrics remain historical, but the deployable-success claim is
+> no longer current because OOS return/MDD must beat the invalid current-base
+> reference before any live promotion.
+
 ## Decision
 
 - Strategy: `CryptoFxAlphaZooStateStrategy` with real current-tail crypto data, lagged FRED state context, triple-barrier candidate ledger, train/validation-only edge calibration, and narrow formulaic replay grid.
-- Result: `deployable_success=True` under the revised strict policy — strict `6.0x` passed zero-liquidation, positive-buffer, OOS return, MDD, Sharpe, Sortino, smart Sortino, and Calmar gates.
-- Promotion policy update: OOS return/MDD is now **diagnostic/report-only**, not a hard hurdle; Sharpe/Sortino/smart Sortino/Calmar plus the MDD cap carry the risk-adjusted gate.
+- Result superseded: under the restored 2026-05-14 strict policy this same strict `6.0x` row is `deployable_success=False` because OOS return/MDD `3.007073` does not beat the current-base reference `6.916878`.
+- Promotion policy correction: OOS return and OOS return/MDD are both hard deployability gates for this Alpha Zoo lane.
 - Best frozen TV-selected Alpha Zoo replay: `alpha_zoo_conservative_exit` (`state_distilled_external_risk_filter_seed`).
 - Current-base/calendar tuple remains `hypothesis_reference_only`; it was not a selection or promotion target.
 
@@ -36,17 +42,17 @@
 - Strict highest zero-liquidation integer: `6.0x`.
 - Strict `6.0x` OOS: return `41.0967%`, MDD `13.6667%`, return/MDD `3.007073`, Sharpe `2.143209`, Sortino `2.841936`, smart Sortino `2.500237`.
 - Liquidations: `0`; min margin buffer `9049.125962`; strict safe `True`.
-- Revised gate result: OOS return beats current-base, OOS MDD is within 25%, Sharpe/Sortino/smart Sortino/Calmar are positive, and return/MDD is retained only as a diagnostic (`3.007073` vs reference `6.916878`).
+- Restored strict gate result: OOS return beats current-base, OOS MDD is within 25%, Sharpe/Sortino/smart Sortino/Calmar are positive, but return/MDD fails the hard reference hurdle (`3.007073` vs reference `6.916878`).
 
 ## Diagnostic nonfatal 5x/6x lane
 
 - `5.0x`: OOS return `33.4851%`, MDD `11.5023%`, return/MDD `2.911176`, total liquidations `0`, min buffer `9207.604968`, promotion_allowed `False` in the diagnostic lane.
-- `6.0x`: OOS return `41.0967%`, MDD `13.6667%`, return/MDD `3.007073`, total liquidations `0`, min buffer `9049.125962`; promoted only through the strict lane under the revised gate, while the diagnostic lane remains non-promotional.
+- `6.0x`: OOS return `41.0967%`, MDD `13.6667%`, return/MDD `3.007073`, total liquidations `0`, min buffer `9049.125962`; not promoted under the restored strict return/MDD gate, and the diagnostic lane remains non-promotional.
 
 ## State-distilled/reference comparison
 
 - Prior valid strict state-distilled external-risk reference remains deployable-false vs current-base: `fresh_state_distilled_ext_both_lb168_fast72_z075_ret180_h168_tp600_fl0_xr125` at `4.0x`, OOS return `2.4852%`, return/MDD `0.981244`, zero-liquidation gates pass.
-- New Alpha Zoo strict 6x improves OOS return versus that reference and current-base reference; the lower current-base return/MDD comparison is diagnostic-only under the revised policy.
+- New Alpha Zoo strict 6x improves OOS return versus that reference and current-base reference, but the lower current-base return/MDD comparison is a hard promotion failure under the restored 2026-05-14 policy.
 
 ## Memory and source-ledger note
 
@@ -63,4 +69,4 @@
 
 ## Next handoff
 
-Continue from the summary JSON/MD above with strict `6.0x` Alpha Zoo as the primary deployable front-runner under the revised policy. Do not use return/MDD as a hard promotion hurdle; keep it diagnostic/report-only. Preserve the non-calendar, train/validation-frozen, locked-OOS gate/report-only, strict zero-liquidation, positive-buffer, OOS MDD <=25%, and positive Sharpe/Sortino/smart Sortino/Calmar requirements.
+Continue from the 2026-05-14 strict-policy successor artifacts, not this superseded deployability note. Treat the strict `6.0x` Alpha Zoo row as a non-promotional research seed until a train/validation-selected candidate also beats the current-base OOS return/MDD reference. Preserve the non-calendar, train/validation-frozen, locked-OOS gate/report-only, strict zero-liquidation, positive-buffer, OOS MDD <=25%, positive Sharpe/Sortino/smart Sortino/Calmar, and hard OOS return/MDD requirements.

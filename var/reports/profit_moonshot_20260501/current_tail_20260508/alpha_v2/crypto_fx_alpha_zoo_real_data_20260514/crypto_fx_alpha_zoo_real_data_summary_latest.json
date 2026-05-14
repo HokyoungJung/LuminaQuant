@@ -1,0 +1,1309 @@
+{
+  "artifact_kind": "crypto_fx_alpha_zoo_real_data_20260514_summary",
+  "artifacts": {
+    "calibration": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_real_data_20260514/edge_calibration_latest.json",
+    "ledger": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_real_data_20260514/candidate_outcome_ledger_latest.jsonl",
+    "replay": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_real_data_20260514/crypto_fx_alpha_zoo_state_replay_latest.json",
+    "screen": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_real_data_20260514/crypto_fx_alpha_zoo_screen_latest.json",
+    "summary": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_real_data_20260514/crypto_fx_alpha_zoo_real_data_summary_latest.json",
+    "summary_md": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_real_data_20260514/crypto_fx_alpha_zoo_real_data_summary_latest.md"
+  },
+  "baseline_preservation": {
+    "actual_synced_head_note": "private/main was reset before work; see git history for exact current head",
+    "baseline_preserved": true,
+    "private_main_green_head_user_stated": "4afa544226f635a851783b56b714db27a82e2a1b"
+  },
+  "candidate_outcome_ledger": {
+    "artifact_kind": "candidate_outcome_ledger_summary",
+    "calendar_primary": false,
+    "enabled": true,
+    "locked_oos_record_count": 21948,
+    "locked_oos_role": "gate_report_only",
+    "mean_net_pnl_bps": 0.5678890566256154,
+    "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_real_data_20260514/candidate_outcome_ledger_latest.jsonl",
+    "record_count": 67259,
+    "split_counts": {
+      "locked_oos": 21948,
+      "train": 22906,
+      "validation": 22405
+    },
+    "strategy": "CryptoFxAlphaZooStateStrategy",
+    "train_validation_record_count": 45311,
+    "uses_locked_oos_for_selection": false
+  },
+  "current_base_calendar_teacher": {
+    "calendar_primary_invalid": true,
+    "hypothesis_reference_only": true,
+    "locked_oos_return_mdd": 6.9168776779021455,
+    "locked_oos_sharpe": 5.202361970933632,
+    "locked_oos_total_return": 0.06428110030664325,
+    "promotion_target": false,
+    "role": "hypothesis_reference_only",
+    "selection_target": false
+  },
+  "deployable_success": false,
+  "deployable_success_reason": "no strict zero-liquidation Alpha Zoo replay row passed all hard gates including OOS return/MDD versus the current-base reference",
+  "diagnostic_nonfatal_5x_6x_lane": [
+    {
+      "candidate_name": "crypto_fx_alpha_zoo_state_calibrated",
+      "diagnostic_only": true,
+      "leverage": 5.0,
+      "minimum_margin_buffer": 9207.604967948717,
+      "promotion_allowed": false,
+      "promotion_eligible": false,
+      "separate_from_strict_deploy": true,
+      "split_diagnostics": {
+        "locked_oos": {
+          "account_wipeout_count": 0,
+          "liquidation_count": 0,
+          "liquidation_recovery_observed": false,
+          "margin_buffer_positive": true,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": 9643.707569485512,
+          "recovered_to_pre_liquidation_equity": true,
+          "strict_safe": true
+        },
+        "train": {
+          "account_wipeout_count": 0,
+          "liquidation_count": 0,
+          "liquidation_recovery_observed": false,
+          "margin_buffer_positive": true,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": 9207.604967948717,
+          "recovered_to_pre_liquidation_equity": true,
+          "strict_safe": true
+        },
+        "validation": {
+          "account_wipeout_count": 0,
+          "liquidation_count": 0,
+          "liquidation_recovery_observed": false,
+          "margin_buffer_positive": true,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": 9606.413272956277,
+          "recovered_to_pre_liquidation_equity": true,
+          "strict_safe": true
+        }
+      },
+      "split_metrics": {
+        "locked_oos": {
+          "calmar": 2.911175722501698,
+          "max_drawdown": 0.11502276281125212,
+          "return_mdd": 2.911175722501698,
+          "sharpe": 2.143208618164893,
+          "smart_sortino": 2.548769419424345,
+          "sortino": 2.841935919815364,
+          "total_return": 0.33485147463118836,
+          "trade_count": 540
+        },
+        "train": {
+          "calmar": 2.2378686261466956,
+          "max_drawdown": 0.2515618400304033,
+          "return_mdd": 2.2378686261466956,
+          "sharpe": 1.5691392287535169,
+          "smart_sortino": 1.5339040147291496,
+          "sortino": 1.9197757311044374,
+          "total_return": 0.5629623493397735,
+          "trade_count": 1779
+        },
+        "validation": {
+          "calmar": 3.0919876887422877,
+          "max_drawdown": 0.0802410212647008,
+          "return_mdd": 3.0919876887422877,
+          "sharpe": 1.5520405722881823,
+          "smart_sortino": 1.940071000769345,
+          "sortino": 2.0957442791971075,
+          "total_return": 0.24810424988256297,
+          "trade_count": 524
+        }
+      },
+      "total_liquidation_count": 0
+    },
+    {
+      "candidate_name": "crypto_fx_alpha_zoo_state_calibrated",
+      "diagnostic_only": true,
+      "leverage": 6.0,
+      "minimum_margin_buffer": 9049.12596153846,
+      "promotion_allowed": false,
+      "promotion_eligible": false,
+      "separate_from_strict_deploy": true,
+      "split_diagnostics": {
+        "locked_oos": {
+          "account_wipeout_count": 0,
+          "liquidation_count": 0,
+          "liquidation_recovery_observed": false,
+          "margin_buffer_positive": true,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": 9572.449083382613,
+          "recovered_to_pre_liquidation_equity": true,
+          "strict_safe": true
+        },
+        "train": {
+          "account_wipeout_count": 0,
+          "liquidation_count": 0,
+          "liquidation_recovery_observed": false,
+          "margin_buffer_positive": true,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": 9049.12596153846,
+          "recovered_to_pre_liquidation_equity": true,
+          "strict_safe": true
+        },
+        "validation": {
+          "account_wipeout_count": 0,
+          "liquidation_count": 0,
+          "liquidation_recovery_observed": false,
+          "margin_buffer_positive": true,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": 9527.695927547531,
+          "recovered_to_pre_liquidation_equity": true,
+          "strict_safe": true
+        }
+      },
+      "split_metrics": {
+        "locked_oos": {
+          "calmar": 3.007073011653861,
+          "max_drawdown": 0.1366667659454812,
+          "return_mdd": 3.007073011653861,
+          "sharpe": 2.143208618164893,
+          "smart_sortino": 2.5002366612271256,
+          "sortino": 2.8419359198153646,
+          "total_return": 0.41096694346467144,
+          "trade_count": 540
+        },
+        "train": {
+          "calmar": 2.3299138826572765,
+          "max_drawdown": 0.2956514670572235,
+          "return_mdd": 2.3299138826572765,
+          "sharpe": 1.5691392287535169,
+          "smart_sortino": 1.4817069095478044,
+          "sortino": 1.9197757311044374,
+          "total_return": 0.6888424575246155,
+          "trade_count": 1779
+        },
+        "validation": {
+          "calmar": 3.150734499031939,
+          "max_drawdown": 0.09559509283920696,
+          "return_mdd": 3.150734499031939,
+          "sharpe": 1.5520405722881823,
+          "smart_sortino": 1.9128821340063138,
+          "sortino": 2.0957442791971075,
+          "total_return": 0.30119475694665043,
+          "trade_count": 524
+        }
+      },
+      "total_liquidation_count": 0
+    }
+  ],
+  "edge_calibration": {
+    "calibrated_edge_count": 12,
+    "calibration_policy": "physical_train_validation_record_filter_before_bucket_estimation",
+    "calibration_record_count": 45311,
+    "excluded_locked_oos_record_count": 21948,
+    "input_locked_oos_record_count": 21948,
+    "input_record_count": 67259,
+    "locked_oos_calibration_record_count": 0,
+    "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_real_data_20260514/edge_calibration_latest.json",
+    "uses_locked_oos_for_calibration": false
+  },
+  "factor_screen": {
+    "calendar_primary": false,
+    "direct_fx_ohlcv_symbols": [],
+    "direct_fx_trading_status": "blocked_no_reliable_fx_ohlcv_in_current_tail_cache; FRED lagged state used as regime context only",
+    "external_state_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/external_market_state_20260512/external_market_state_lagged.csv",
+    "factor_count": 63,
+    "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_real_data_20260514/crypto_fx_alpha_zoo_screen_latest.json",
+    "row_count": 58845,
+    "selected_factor_count": 20,
+    "source_coverage": {
+      "artifact_kind": "crypto_fx_alpha_zoo_real_data_source_coverage",
+      "external_state": {
+        "coverage_ratio_by_feature": {
+          "external_curve_z": 0.7145042059648229,
+          "external_curve_z_lag1": 0.7145042059648229,
+          "external_risk_off_score": 0.7145042059648229,
+          "external_risk_off_score_lag1": 0.7145042059648229,
+          "external_usd_ret_z": 0.7145042059648229,
+          "external_usd_ret_z_lag1": 0.7145042059648229,
+          "external_vix_z": 0.7145042059648229,
+          "external_vix_z_lag1": 0.7145042059648229,
+          "external_wti_ret_z": 0.7145042059648229,
+          "external_wti_ret_z_lag1": 0.7145042059648229
+        },
+        "enabled": true,
+        "feature_columns": [
+          "external_usd_ret_z",
+          "external_vix_z",
+          "external_curve_z",
+          "external_wti_ret_z",
+          "external_risk_off_score",
+          "external_usd_ret_z_lag1",
+          "external_vix_z_lag1",
+          "external_curve_z_lag1",
+          "external_wti_ret_z_lag1",
+          "external_risk_off_score_lag1"
+        ],
+        "joined": true,
+        "path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/external_market_state_20260512/external_market_state_lagged.csv",
+        "rows": 614
+      },
+      "generated_at_utc": "2026-05-14T12:58:53.156781Z",
+      "input": {
+        "input_format": "wide_current_tail_panel",
+        "input_shape": [
+          11769,
+          66
+        ],
+        "symbol_coverage": {
+          "BNB/USDT": {
+            "coverage_ratio_by_field": {
+              "close": 1.0,
+              "funding_rate": 0.12498937887671,
+              "high": 1.0,
+              "liquidation_long_notional": 1.0,
+              "liquidation_short_notional": 1.0,
+              "low": 1.0,
+              "open": 1.0,
+              "open_interest": 0.12312006117767015,
+              "taker_buy_base_volume": 1.0,
+              "taker_buy_quote_volume": 1.0,
+              "taker_sell_base_volume": 1.0,
+              "taker_sell_quote_volume": 1.0,
+              "volume": 1.0
+            },
+            "imputed_fields": [
+              "vwap"
+            ],
+            "observed_fields": [
+              "close",
+              "funding_rate",
+              "high",
+              "liquidation_long_notional",
+              "liquidation_short_notional",
+              "low",
+              "open",
+              "open_interest",
+              "taker_buy_base_volume",
+              "taker_buy_quote_volume",
+              "taker_sell_base_volume",
+              "taker_sell_quote_volume",
+              "volume"
+            ],
+            "required_ohlcv_observed": true,
+            "rows": 11769,
+            "source_columns": {
+              "close": "bnbusdt_close",
+              "funding_rate": "bnbusdt_funding_rate",
+              "high": "bnbusdt_high",
+              "liquidation_long_notional": "bnbusdt_liquidation_long_notional",
+              "liquidation_short_notional": "bnbusdt_liquidation_short_notional",
+              "low": "bnbusdt_low",
+              "open": "bnbusdt_open",
+              "open_interest": "bnbusdt_open_interest",
+              "taker_buy_base_volume": "bnbusdt_taker_buy_base_volume",
+              "taker_buy_quote_volume": "bnbusdt_taker_buy_quote_volume",
+              "taker_sell_base_volume": "bnbusdt_taker_sell_base_volume",
+              "taker_sell_quote_volume": "bnbusdt_taker_sell_quote_volume",
+              "volume": "bnbusdt_volume"
+            },
+            "source_prefix": "bnbusdt"
+          },
+          "BTC/USDT": {
+            "coverage_ratio_by_field": {
+              "close": 1.0,
+              "funding_rate": 0.12490440989039,
+              "high": 1.0,
+              "liquidation_long_notional": 0.9990653411504801,
+              "liquidation_short_notional": 0.9990653411504801,
+              "low": 1.0,
+              "open": 1.0,
+              "open_interest": 0.12108080550599032,
+              "taker_buy_base_volume": 0.9990653411504801,
+              "taker_buy_quote_volume": 0.9990653411504801,
+              "taker_sell_base_volume": 0.9990653411504801,
+              "taker_sell_quote_volume": 0.9990653411504801,
+              "volume": 1.0
+            },
+            "imputed_fields": [
+              "vwap"
+            ],
+            "observed_fields": [
+              "close",
+              "funding_rate",
+              "high",
+              "liquidation_long_notional",
+              "liquidation_short_notional",
+              "low",
+              "open",
+              "open_interest",
+              "taker_buy_base_volume",
+              "taker_buy_quote_volume",
+              "taker_sell_base_volume",
+              "taker_sell_quote_volume",
+              "volume"
+            ],
+            "required_ohlcv_observed": true,
+            "rows": 11769,
+            "source_columns": {
+              "close": "btcusdt_close",
+              "funding_rate": "btcusdt_funding_rate",
+              "high": "btcusdt_high",
+              "liquidation_long_notional": "btcusdt_liquidation_long_notional",
+              "liquidation_short_notional": "btcusdt_liquidation_short_notional",
+              "low": "btcusdt_low",
+              "open": "btcusdt_open",
+              "open_interest": "btcusdt_open_interest",
+              "taker_buy_base_volume": "btcusdt_taker_buy_base_volume",
+              "taker_buy_quote_volume": "btcusdt_taker_buy_quote_volume",
+              "taker_sell_base_volume": "btcusdt_taker_sell_base_volume",
+              "taker_sell_quote_volume": "btcusdt_taker_sell_quote_volume",
+              "volume": "btcusdt_volume"
+            },
+            "source_prefix": "btcusdt"
+          },
+          "ETH/USDT": {
+            "coverage_ratio_by_field": {
+              "close": 1.0,
+              "funding_rate": 0.12498937887671,
+              "high": 1.0,
+              "liquidation_long_notional": 1.0,
+              "liquidation_short_notional": 1.0,
+              "low": 1.0,
+              "open": 1.0,
+              "open_interest": 0.12312006117767015,
+              "taker_buy_base_volume": 1.0,
+              "taker_buy_quote_volume": 1.0,
+              "taker_sell_base_volume": 1.0,
+              "taker_sell_quote_volume": 1.0,
+              "volume": 1.0
+            },
+            "imputed_fields": [
+              "vwap"
+            ],
+            "observed_fields": [
+              "close",
+              "funding_rate",
+              "high",
+              "liquidation_long_notional",
+              "liquidation_short_notional",
+              "low",
+              "open",
+              "open_interest",
+              "taker_buy_base_volume",
+              "taker_buy_quote_volume",
+              "taker_sell_base_volume",
+              "taker_sell_quote_volume",
+              "volume"
+            ],
+            "required_ohlcv_observed": true,
+            "rows": 11769,
+            "source_columns": {
+              "close": "ethusdt_close",
+              "funding_rate": "ethusdt_funding_rate",
+              "high": "ethusdt_high",
+              "liquidation_long_notional": "ethusdt_liquidation_long_notional",
+              "liquidation_short_notional": "ethusdt_liquidation_short_notional",
+              "low": "ethusdt_low",
+              "open": "ethusdt_open",
+              "open_interest": "ethusdt_open_interest",
+              "taker_buy_base_volume": "ethusdt_taker_buy_base_volume",
+              "taker_buy_quote_volume": "ethusdt_taker_buy_quote_volume",
+              "taker_sell_base_volume": "ethusdt_taker_sell_base_volume",
+              "taker_sell_quote_volume": "ethusdt_taker_sell_quote_volume",
+              "volume": "ethusdt_volume"
+            },
+            "source_prefix": "ethusdt"
+          },
+          "SOL/USDT": {
+            "coverage_ratio_by_field": {
+              "close": 1.0,
+              "funding_rate": 0.12498937887671,
+              "high": 1.0,
+              "liquidation_long_notional": 1.0,
+              "liquidation_short_notional": 1.0,
+              "low": 1.0,
+              "open": 1.0,
+              "open_interest": 0.12312006117767015,
+              "taker_buy_base_volume": 1.0,
+              "taker_buy_quote_volume": 1.0,
+              "taker_sell_base_volume": 1.0,
+              "taker_sell_quote_volume": 1.0,
+              "volume": 1.0
+            },
+            "imputed_fields": [
+              "vwap"
+            ],
+            "observed_fields": [
+              "close",
+              "funding_rate",
+              "high",
+              "liquidation_long_notional",
+              "liquidation_short_notional",
+              "low",
+              "open",
+              "open_interest",
+              "taker_buy_base_volume",
+              "taker_buy_quote_volume",
+              "taker_sell_base_volume",
+              "taker_sell_quote_volume",
+              "volume"
+            ],
+            "required_ohlcv_observed": true,
+            "rows": 11769,
+            "source_columns": {
+              "close": "solusdt_close",
+              "funding_rate": "solusdt_funding_rate",
+              "high": "solusdt_high",
+              "liquidation_long_notional": "solusdt_liquidation_long_notional",
+              "liquidation_short_notional": "solusdt_liquidation_short_notional",
+              "low": "solusdt_low",
+              "open": "solusdt_open",
+              "open_interest": "solusdt_open_interest",
+              "taker_buy_base_volume": "solusdt_taker_buy_base_volume",
+              "taker_buy_quote_volume": "solusdt_taker_buy_quote_volume",
+              "taker_sell_base_volume": "solusdt_taker_sell_base_volume",
+              "taker_sell_quote_volume": "solusdt_taker_sell_quote_volume",
+              "volume": "solusdt_volume"
+            },
+            "source_prefix": "solusdt"
+          },
+          "TRX/USDT": {
+            "coverage_ratio_by_field": {
+              "close": 1.0,
+              "funding_rate": 0.12498937887671,
+              "high": 1.0,
+              "liquidation_long_notional": 1.0,
+              "liquidation_short_notional": 1.0,
+              "low": 1.0,
+              "open": 1.0,
+              "open_interest": 0.12312006117767015,
+              "taker_buy_base_volume": 1.0,
+              "taker_buy_quote_volume": 1.0,
+              "taker_sell_base_volume": 1.0,
+              "taker_sell_quote_volume": 1.0,
+              "volume": 1.0
+            },
+            "imputed_fields": [
+              "vwap"
+            ],
+            "observed_fields": [
+              "close",
+              "funding_rate",
+              "high",
+              "liquidation_long_notional",
+              "liquidation_short_notional",
+              "low",
+              "open",
+              "open_interest",
+              "taker_buy_base_volume",
+              "taker_buy_quote_volume",
+              "taker_sell_base_volume",
+              "taker_sell_quote_volume",
+              "volume"
+            ],
+            "required_ohlcv_observed": true,
+            "rows": 11769,
+            "source_columns": {
+              "close": "trxusdt_close",
+              "funding_rate": "trxusdt_funding_rate",
+              "high": "trxusdt_high",
+              "liquidation_long_notional": "trxusdt_liquidation_long_notional",
+              "liquidation_short_notional": "trxusdt_liquidation_short_notional",
+              "low": "trxusdt_low",
+              "open": "trxusdt_open",
+              "open_interest": "trxusdt_open_interest",
+              "taker_buy_base_volume": "trxusdt_taker_buy_base_volume",
+              "taker_buy_quote_volume": "trxusdt_taker_buy_quote_volume",
+              "taker_sell_base_volume": "trxusdt_taker_sell_base_volume",
+              "taker_sell_quote_volume": "trxusdt_taker_sell_quote_volume",
+              "volume": "trxusdt_volume"
+            },
+            "source_prefix": "trxusdt"
+          }
+        },
+        "symbols": [
+          "BNB/USDT",
+          "BTC/USDT",
+          "ETH/USDT",
+          "SOL/USDT",
+          "TRX/USDT"
+        ],
+        "time_column": "datetime"
+      },
+      "row_count": 58845,
+      "source_path": "/home/hoky/Quants-agent/LuminaQuant/var/cache/profit_moonshot_fresh_start/joined_panel_de62df511cec53df6ad39521.parquet",
+      "split_counts_pre_factor": {},
+      "strategy_validity": {
+        "calendar_primary": false,
+        "locked_oos_role": "gate_report_only",
+        "pass": true,
+        "rejection_reasons": [],
+        "uses_locked_oos_for_selection": false
+      },
+      "strict_real_data": true,
+      "timestamp_max": "2026-05-06 23:00:00",
+      "timestamp_min": "2025-01-01 00:00:00"
+    },
+    "source_path": "/home/hoky/Quants-agent/LuminaQuant/var/cache/profit_moonshot_fresh_start/joined_panel_de62df511cec53df6ad39521.parquet",
+    "source_symbols": [
+      "BNB/USDT",
+      "BTC/USDT",
+      "ETH/USDT",
+      "SOL/USDT",
+      "TRX/USDT"
+    ],
+    "strategy_validity": {
+      "calendar_primary": false,
+      "locked_oos_role": "gate_report_only",
+      "pass": true,
+      "primary_signal_type": "formulaic_state_factor",
+      "rejection_reasons": [],
+      "uses_locked_oos_for_selection": false
+    },
+    "uses_locked_oos_for_selection": false
+  },
+  "front_runner_candidate": {
+    "allowed_use": [
+      "hypothesis_reference",
+      "next_train_validation_research_seed"
+    ],
+    "candidate_name": "crypto_fx_alpha_zoo_state_calibrated",
+    "candidate_source": "alpha_zoo_train_validation_calibrated_replay",
+    "deployable_success": false,
+    "designation": "strict_candidate_after_train_validation_freeze",
+    "forbidden_use_without_new_validation": [
+      "calendar_current_base_promotion_target",
+      "locked_oos_tuned_reselection",
+      "live_promotion_when_return_mdd_gate_fails",
+      "promotion_if_strict_liquidation_count_exceeds_zero_or_min_buffer_nonpositive"
+    ],
+    "leverage": 6.0,
+    "live_promotion_status": "no_live_promotion_return_mdd_gate_failed",
+    "locked_oos_metrics": {
+      "calmar": 3.007073011653861,
+      "max_drawdown": 0.1366667659454812,
+      "return_mdd": 3.007073011653861,
+      "sharpe": 2.143208618164893,
+      "smart_sortino": 2.5002366612271256,
+      "sortino": 2.8419359198153646,
+      "total_return": 0.41096694346467144,
+      "trade_count": 540
+    },
+    "locked_oos_role": "gate_report_only_after_candidate_freeze",
+    "performance_diagnostics": {
+      "current_base_reference_return_mdd": 6.9168776779021455,
+      "oos_return_mdd": 3.007073011653861,
+      "oos_return_mdd_beats_current_base": false,
+      "return_mdd_hurdle_required": true,
+      "return_mdd_role": "strict_promotion_gate"
+    },
+    "performance_gates": {
+      "oos_calmar_positive": true,
+      "oos_mdd_within_25pct_budget": true,
+      "oos_return_beats_current_base": true,
+      "oos_return_mdd_beats_current_base": false,
+      "oos_sharpe_positive": true,
+      "oos_smart_sortino_positive": true,
+      "oos_sortino_positive": true
+    },
+    "selection_inputs": [
+      "train",
+      "validation"
+    ],
+    "strategy": "CryptoFxAlphaZooStateStrategy",
+    "strict_rejection_reasons": [
+      "oos_return_mdd_beats_current_base"
+    ],
+    "strict_safety": {
+      "liquidation_count": 0,
+      "minimum_margin_buffer": 9049.12596153846,
+      "strict_safe": true
+    },
+    "uses_locked_oos_for_selection": false
+  },
+  "generated_at_utc": "2026-05-14T13:05:07.187676Z",
+  "memory_summary": {
+    "limit_mib": 8192.0,
+    "pass_under_8gb": true,
+    "peak_rss_kb": 641768,
+    "peak_rss_mib": 626.7265625,
+    "stage_rss_kb": {
+      "edge_calibration_time.log": 584564,
+      "real_screen_time.log": 641768,
+      "replay_time.log": 287620
+    }
+  },
+  "promotion_policy": {
+    "name": "strict_liquidation_return_mdd_gate_20260514",
+    "requires_oos_mdd_lte": 0.25,
+    "requires_oos_return_beats_current_base": true,
+    "requires_oos_return_mdd_beats_current_base": true,
+    "return_mdd_hurdle_required": true,
+    "return_mdd_role": "strict_promotion_gate",
+    "risk_adjusted_metric_thresholds": {
+      "calmar": ">0.0",
+      "sharpe": ">0.0",
+      "smart_sortino": ">0.0",
+      "sortino": ">0.0"
+    }
+  },
+  "replay": {
+    "calibration_provenance": {
+      "calibrated_edge_count": 12,
+      "calibrated_edge_keys": [
+        "BNB/USDT:LONG",
+        "BNB/USDT:SHORT",
+        "BTC/USDT:LONG",
+        "BTC/USDT:SHORT",
+        "ETH/USDT:LONG",
+        "ETH/USDT:SHORT",
+        "SOL/USDT:LONG",
+        "SOL/USDT:SHORT",
+        "TRX/USDT:LONG",
+        "TRX/USDT:SHORT",
+        "default:LONG",
+        "default:SHORT"
+      ],
+      "require_calibrated_edge": true
+    },
+    "candidate_selection_grid": {
+      "candidate_count": 9,
+      "grid_profile": "narrow_train_validation_formulaic",
+      "locked_oos_calibration_record_count": 0,
+      "rows": [
+        {
+          "candidate_name": "alpha_zoo_conservative_exit",
+          "candidate_source": "state_distilled_external_risk_filter_seed",
+          "locked_oos_metrics_visible_during_selection": false,
+          "params": {
+            "entry_threshold": 0.95,
+            "exit_threshold": 0.3,
+            "max_hold_bars": 48,
+            "risk_off_long_multiplier": 0.1,
+            "risk_off_short_multiplier": 1.2,
+            "risk_on_long_multiplier": 1.15,
+            "risk_on_short_multiplier": 0.35,
+            "stop_loss_pct": 0.025,
+            "take_profit_pct": 0.055
+          },
+          "selection_inputs": [
+            "train",
+            "validation"
+          ],
+          "selection_metrics": {
+            "train": {
+              "calmar": 1.872137247579542,
+              "max_drawdown": 0.054565949295329756,
+              "return_mdd": 1.872137247579542,
+              "sharpe": 1.569139228753517,
+              "smart_sortino": 1.8204416066982332,
+              "sortino": 1.9197757311044374,
+              "total_return": 0.1021549461253235,
+              "trade_count": 1779
+            },
+            "validation": {
+              "calmar": 2.8567848602544266,
+              "max_drawdown": 0.016520512582379406,
+              "return_mdd": 2.8567848602544266,
+              "sharpe": 1.5520405722881823,
+              "smart_sortino": 2.0616841994393766,
+              "sortino": 2.0957442791971075,
+              "total_return": 0.04719555022898425,
+              "trade_count": 524
+            }
+          },
+          "selection_score": 4.251848140195694,
+          "signal_count": 5684,
+          "strategy": "CryptoFxAlphaZooStateStrategy",
+          "trade_count": 2843,
+          "uses_locked_oos_for_selection": false
+        },
+        {
+          "candidate_name": "alpha_zoo_long_risk_on",
+          "candidate_source": "state_distilled_external_risk_filter_seed",
+          "locked_oos_metrics_visible_during_selection": false,
+          "params": {
+            "allow_shorts": false,
+            "entry_threshold": 0.85,
+            "exit_threshold": 0.25,
+            "max_hold_bars": 72,
+            "max_longs": 2,
+            "max_shorts": 0,
+            "risk_off_long_multiplier": 0.05,
+            "risk_on_long_multiplier": 1.2,
+            "stop_loss_pct": 0.025,
+            "take_profit_pct": 0.06
+          },
+          "selection_inputs": [
+            "train",
+            "validation"
+          ],
+          "selection_metrics": {
+            "train": {
+              "calmar": 2.902230410301506,
+              "max_drawdown": 0.0322176857513878,
+              "return_mdd": 2.902230410301506,
+              "sharpe": 1.844228698713276,
+              "smart_sortino": 2.2928368984131318,
+              "sortino": 2.366706797085393,
+              "total_return": 0.09350314733721521,
+              "trade_count": 1120
+            },
+            "validation": {
+              "calmar": 0.6932222477441567,
+              "max_drawdown": 0.020924666035683416,
+              "return_mdd": 0.6932222477441567,
+              "sharpe": 0.624363624338715,
+              "smart_sortino": 0.7438947486923083,
+              "sortino": 0.7594604978743935,
+              "total_return": 0.014505444022552272,
+              "trade_count": 324
+            }
+          },
+          "selection_score": 1.7680971655885651,
+          "signal_count": 3575,
+          "strategy": "CryptoFxAlphaZooStateStrategy",
+          "trade_count": 1788,
+          "uses_locked_oos_for_selection": false
+        },
+        {
+          "candidate_name": "alpha_zoo_default",
+          "candidate_source": "crypto_fx_alpha_zoo_formulaic_default",
+          "locked_oos_metrics_visible_during_selection": false,
+          "params": {},
+          "selection_inputs": [
+            "train",
+            "validation"
+          ],
+          "selection_metrics": {
+            "train": {
+              "calmar": 1.8074739306001253,
+              "max_drawdown": 0.07819886545226261,
+              "return_mdd": 1.8074739306001253,
+              "sharpe": 1.8130322535246668,
+              "smart_sortino": 2.0985680622954095,
+              "sortino": 2.2626737038412634,
+              "total_return": 0.14134241070747144,
+              "trade_count": 2540
+            },
+            "validation": {
+              "calmar": 0.6922506259244334,
+              "max_drawdown": 0.03943333190751251,
+              "return_mdd": 0.6922506259244334,
+              "sharpe": 0.7623955722587352,
+              "smart_sortino": 0.9832653928622307,
+              "sortino": 1.0220388234521376,
+              "total_return": 0.02729774869526147,
+              "trade_count": 778
+            }
+          },
+          "selection_score": 1.5941832242023373,
+          "signal_count": 8253,
+          "strategy": "CryptoFxAlphaZooStateStrategy",
+          "trade_count": 4128,
+          "uses_locked_oos_for_selection": false
+        },
+        {
+          "candidate_name": "alpha_zoo_quality_single_pair",
+          "candidate_source": "residual_pair_seed",
+          "locked_oos_metrics_visible_during_selection": false,
+          "params": {
+            "breakout_failure_weight": 0.1,
+            "entry_threshold": 1.1,
+            "exit_threshold": 0.35,
+            "max_hold_bars": 36,
+            "max_longs": 1,
+            "max_shorts": 1,
+            "residual_momentum_weight": 0.45,
+            "residual_reversal_weight": 0.2,
+            "stop_loss_pct": 0.02,
+            "take_profit_pct": 0.05,
+            "trend_efficiency_weight": 0.15,
+            "vwap_pressure_weight": 0.1
+          },
+          "selection_inputs": [
+            "train",
+            "validation"
+          ],
+          "selection_metrics": {
+            "train": {
+              "calmar": 2.462450122385777,
+              "max_drawdown": 0.05159541890659888,
+              "return_mdd": 2.462450122385777,
+              "sharpe": 2.1039467437605244,
+              "smart_sortino": 2.4620058008111934,
+              "sortino": 2.5890340214545233,
+              "total_return": 0.12705114560109987,
+              "trade_count": 1167
+            },
+            "validation": {
+              "calmar": 0.5302872532521844,
+              "max_drawdown": 0.020765860656185298,
+              "return_mdd": 0.5302872532521844,
+              "sharpe": 0.4492984181569765,
+              "smart_sortino": 0.554143236270698,
+              "sortino": 0.5656504974986628,
+              "total_return": 0.011011871208786106,
+              "trade_count": 359
+            }
+          },
+          "selection_score": 1.4022661330599404,
+          "signal_count": 3771,
+          "strategy": "CryptoFxAlphaZooStateStrategy",
+          "trade_count": 1886,
+          "uses_locked_oos_for_selection": false
+        },
+        {
+          "candidate_name": "alpha_zoo_fast_residual",
+          "candidate_source": "residual_pair_seed",
+          "locked_oos_metrics_visible_during_selection": false,
+          "params": {
+            "entry_threshold": 0.9,
+            "exit_threshold": 0.25,
+            "fast_lookback_bars": 2,
+            "history_window": 72,
+            "max_hold_bars": 36,
+            "max_longs": 1,
+            "max_shorts": 1,
+            "slow_lookback_bars": 18,
+            "stop_loss_pct": 0.025,
+            "take_profit_pct": 0.05
+          },
+          "selection_inputs": [
+            "train",
+            "validation"
+          ],
+          "selection_metrics": {
+            "train": {
+              "calmar": 0.07857309801177771,
+              "max_drawdown": 0.06831591781024454,
+              "return_mdd": 0.07857309801177771,
+              "sharpe": 0.1200641889595477,
+              "smart_sortino": 0.1303153494500875,
+              "sortino": 0.13921796215253296,
+              "total_return": 0.005367793305868895,
+              "trade_count": 2517
+            },
+            "validation": {
+              "calmar": 0.3202026386252396,
+              "max_drawdown": 0.033397271487131584,
+              "return_mdd": 0.3202026386252396,
+              "sharpe": 0.3777558048045867,
+              "smart_sortino": 0.44850014732364923,
+              "sortino": 0.46347882850583566,
+              "total_return": 0.010693894453063013,
+              "trade_count": 826
+            }
+          },
+          "selection_score": 0.5517568483867746,
+          "signal_count": 8340,
+          "strategy": "CryptoFxAlphaZooStateStrategy",
+          "trade_count": 4171,
+          "uses_locked_oos_for_selection": false
+        },
+        {
+          "candidate_name": "alpha_zoo_high_confidence_single_pair",
+          "candidate_source": "state_distilled_external_risk_filter_seed",
+          "locked_oos_metrics_visible_during_selection": false,
+          "params": {
+            "entry_threshold": 1.35,
+            "exit_threshold": 0.45,
+            "max_hold_bars": 24,
+            "max_longs": 1,
+            "max_shorts": 1,
+            "risk_off_long_multiplier": 0.05,
+            "risk_off_short_multiplier": 1.25,
+            "risk_on_long_multiplier": 1.15,
+            "risk_on_short_multiplier": 0.25,
+            "stop_loss_pct": 0.015,
+            "take_profit_pct": 0.035
+          },
+          "selection_inputs": [
+            "train",
+            "validation"
+          ],
+          "selection_metrics": {
+            "train": {
+              "calmar": 0.7250649519137161,
+              "max_drawdown": 0.03600707806913122,
+              "return_mdd": 0.7250649519137161,
+              "sharpe": 0.6529614072383716,
+              "smart_sortino": 0.7177954545462099,
+              "sortino": 0.7436411715157228,
+              "total_return": 0.02610747032874805,
+              "trade_count": 684
+            },
+            "validation": {
+              "calmar": 0.09194629570646885,
+              "max_drawdown": 0.016539210997570518,
+              "return_mdd": 0.09194629570646885,
+              "sharpe": 0.08853513478769515,
+              "smart_sortino": 0.10449482444004128,
+              "sortino": 0.10622308638960923,
+              "total_return": 0.0015207191851343005,
+              "trade_count": 186
+            }
+          },
+          "selection_score": 0.32223038308439916,
+          "signal_count": 2125,
+          "strategy": "CryptoFxAlphaZooStateStrategy",
+          "trade_count": 1063,
+          "uses_locked_oos_for_selection": false
+        },
+        {
+          "candidate_name": "alpha_zoo_short_risk_off",
+          "candidate_source": "state_distilled_external_risk_filter_seed",
+          "locked_oos_metrics_visible_during_selection": false,
+          "params": {
+            "entry_threshold": 1.05,
+            "exit_threshold": 0.35,
+            "max_hold_bars": 36,
+            "max_longs": 0,
+            "max_shorts": 2,
+            "risk_off_short_multiplier": 1.3,
+            "risk_on_short_multiplier": 0.25,
+            "stop_loss_pct": 0.02,
+            "take_profit_pct": 0.05
+          },
+          "selection_inputs": [
+            "train",
+            "validation"
+          ],
+          "selection_metrics": {
+            "train": {
+              "calmar": -0.33746159218465066,
+              "max_drawdown": 0.08105114518491013,
+              "return_mdd": -0.33746159218465066,
+              "sharpe": -0.6494956414445578,
+              "smart_sortino": -0.6688416085320135,
+              "sortino": -0.7230519868508505,
+              "total_return": -0.027351648502489057,
+              "trade_count": 762
+            },
+            "validation": {
+              "calmar": 2.657919029332337,
+              "max_drawdown": 0.01134094162645371,
+              "return_mdd": 2.657919029332337,
+              "sharpe": 1.544897489093353,
+              "smart_sortino": 2.1309728547760534,
+              "sortino": 2.1551400935296257,
+              "total_return": 0.03014330455949854,
+              "trade_count": 229
+            }
+          },
+          "selection_score": -6.765923615491615,
+          "signal_count": 2404,
+          "strategy": "CryptoFxAlphaZooStateStrategy",
+          "trade_count": 1203,
+          "uses_locked_oos_for_selection": false
+        },
+        {
+          "candidate_name": "alpha_zoo_high_confidence_long_only",
+          "candidate_source": "state_distilled_external_risk_filter_seed",
+          "locked_oos_metrics_visible_during_selection": false,
+          "params": {
+            "allow_shorts": false,
+            "entry_threshold": 1.25,
+            "exit_threshold": 0.4,
+            "max_hold_bars": 24,
+            "max_longs": 1,
+            "max_shorts": 0,
+            "risk_off_long_multiplier": 0.05,
+            "risk_on_long_multiplier": 1.2,
+            "stop_loss_pct": 0.018,
+            "take_profit_pct": 0.04
+          },
+          "selection_inputs": [
+            "train",
+            "validation"
+          ],
+          "selection_metrics": {
+            "train": {
+              "calmar": 1.302257544128171,
+              "max_drawdown": 0.032797332124180914,
+              "return_mdd": 1.302257544128171,
+              "sharpe": 1.4261907617506582,
+              "smart_sortino": 1.6895246164082869,
+              "sortino": 1.744936516384609,
+              "total_return": 0.04271057318599181,
+              "trade_count": 403
+            },
+            "validation": {
+              "calmar": -0.21036648360988464,
+              "max_drawdown": 0.015641210646762056,
+              "return_mdd": -0.21036648360988464,
+              "sharpe": -0.2261828871751552,
+              "smart_sortino": -0.2385466561346074,
+              "sortino": -0.2422778146322895,
+              "total_return": -0.003290386483160823,
+              "trade_count": 116
+            }
+          },
+          "selection_score": -20.035533541478472,
+          "signal_count": 1298,
+          "strategy": "CryptoFxAlphaZooStateStrategy",
+          "trade_count": 649,
+          "uses_locked_oos_for_selection": false
+        },
+        {
+          "candidate_name": "alpha_zoo_slow_residual_pair",
+          "candidate_source": "residual_pair_seed",
+          "locked_oos_metrics_visible_during_selection": false,
+          "params": {
+            "breakout_failure_weight": 0.1,
+            "entry_threshold": 1.0,
+            "exit_threshold": 0.3,
+            "fast_lookback_bars": 6,
+            "history_window": 144,
+            "max_hold_bars": 48,
+            "max_longs": 1,
+            "max_shorts": 1,
+            "residual_momentum_weight": 0.4,
+            "residual_reversal_weight": 0.25,
+            "slow_lookback_bars": 48,
+            "stop_loss_pct": 0.02,
+            "take_profit_pct": 0.06,
+            "trend_efficiency_weight": 0.15,
+            "vwap_pressure_weight": 0.1
+          },
+          "selection_inputs": [
+            "train",
+            "validation"
+          ],
+          "selection_metrics": {
+            "train": {
+              "calmar": 1.051698624130992,
+              "max_drawdown": 0.0653396358968145,
+              "return_mdd": 1.051698624130992,
+              "sharpe": 1.1417982754013778,
+              "smart_sortino": 1.3276088043387704,
+              "sortino": 1.414354280227671,
+              "total_return": 0.0687176051738998,
+              "trade_count": 1161
+            },
+            "validation": {
+              "calmar": -0.18626581383543034,
+              "max_drawdown": 0.03600280566500681,
+              "return_mdd": -0.18626581383543034,
+              "sharpe": -0.24490704628511384,
+              "smart_sortino": -0.26995527347491094,
+              "sortino": -0.27967442072407195,
+              "total_return": -0.006706091897551336,
+              "trade_count": 388
+            }
+          },
+          "selection_score": -20.122470702666977,
+          "signal_count": 3879,
+          "strategy": "CryptoFxAlphaZooStateStrategy",
+          "trade_count": 1940,
+          "uses_locked_oos_for_selection": false
+        }
+      ],
+      "selected_candidate_name": "alpha_zoo_conservative_exit",
+      "selected_candidate_params": {
+        "entry_threshold": 0.95,
+        "exit_threshold": 0.3,
+        "max_hold_bars": 48,
+        "risk_off_long_multiplier": 0.1,
+        "risk_off_short_multiplier": 1.2,
+        "risk_on_long_multiplier": 1.15,
+        "risk_on_short_multiplier": 0.35,
+        "stop_loss_pct": 0.025,
+        "take_profit_pct": 0.055
+      },
+      "selected_candidate_source": "state_distilled_external_risk_filter_seed",
+      "selection_inputs": [
+        "train",
+        "validation"
+      ],
+      "selection_policy": "rank by train/validation-only score; locked-OOS hidden until candidate freeze",
+      "uses_locked_oos_for_selection": false
+    },
+    "deployable_success": false,
+    "deployable_success_reason": "no strict zero-liquidation Alpha Zoo replay row passed all hard gates including OOS return/MDD versus the current-base reference",
+    "locked_oos_report_only_metrics": {
+      "candidate_oos_return": 0.06110787173743315,
+      "candidate_oos_return_mdd": 2.5532222493222636,
+      "current_base_oos_return": 0.06428110030664325,
+      "current_base_oos_return_mdd": 6.9168776779021455,
+      "oos_return_mdd_beats_current_base": false,
+      "return_mdd_hurdle_required": true,
+      "return_mdd_role": "strict_promotion_gate"
+    },
+    "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_real_data_20260514/crypto_fx_alpha_zoo_state_replay_latest.json",
+    "row_count": 58845,
+    "selection_provenance": {
+      "candidate_freeze_before_locked_oos_gate": true,
+      "current_base_calendar_tuple_role": "hypothesis_reference_only",
+      "locked_oos_role": "gate_report_only_after_candidate_freeze",
+      "selection_excludes_current_base_calendar_tuple": true,
+      "selection_inputs": [
+        "train",
+        "validation"
+      ],
+      "uses_locked_oos_for_selection": false
+    },
+    "signal_count": 5684,
+    "trade_count": 2843
+  },
+  "research_history_update": {
+    "global_inventory_changed": false,
+    "reason": "No new external source class or global chronology/source-ledger change; reused existing current-tail cache and 20260512 lagged FRED external-state artifact, added only session-scoped Alpha Zoo strict-policy artifacts.",
+    "research_history_regenerated": false
+  },
+  "state_distilled_external_risk_reference": {
+    "candidate_name": "fresh_state_distilled_ext_both_lb168_fast72_z075_ret180_h168_tp600_fl0_xr125",
+    "deployable_success": false,
+    "role": "valid_strict_reference_not_promotion_target",
+    "source_artifact": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/liquidation_aware_state_distilled_external_risk_filter_20260512/liquidation_aware_current_base_latest.json"
+  },
+  "strategy": "CryptoFxAlphaZooStateStrategy",
+  "strict_rejection_reasons": [
+    "oos_return_mdd_beats_current_base"
+  ],
+  "strict_zero_liquidation_lane": {
+    "candidate_count": 6,
+    "deployable_candidate_count": 0,
+    "highest_zero_liquidation_integer": {
+      "candidate_name": "crypto_fx_alpha_zoo_state_calibrated",
+      "candidate_source": "alpha_zoo_train_validation_calibrated_replay",
+      "deployable_success": false,
+      "leverage": 6.0,
+      "liquidation_audit": {
+        "leverage": 6.0,
+        "liquidation_free": true,
+        "margin_buffer_positive": true,
+        "minimum_margin_buffer": 9049.12596153846,
+        "split_status": {
+          "locked_oos": {
+            "account_wipeout_count": 0,
+            "liquidation_count": 0,
+            "liquidation_recovery_observed": false,
+            "margin_buffer_positive": true,
+            "maximum_liquidation_equity_loss_fraction": 0.0,
+            "maximum_liquidation_event_drawdown": 0.0,
+            "minimum_margin_buffer": 9572.449083382613,
+            "recovered_to_pre_liquidation_equity": true,
+            "strict_safe": true
+          },
+          "train": {
+            "account_wipeout_count": 0,
+            "liquidation_count": 0,
+            "liquidation_recovery_observed": false,
+            "margin_buffer_positive": true,
+            "maximum_liquidation_equity_loss_fraction": 0.0,
+            "maximum_liquidation_event_drawdown": 0.0,
+            "minimum_margin_buffer": 9049.12596153846,
+            "recovered_to_pre_liquidation_equity": true,
+            "strict_safe": true
+          },
+          "validation": {
+            "account_wipeout_count": 0,
+            "liquidation_count": 0,
+            "liquidation_recovery_observed": false,
+            "margin_buffer_positive": true,
+            "maximum_liquidation_equity_loss_fraction": 0.0,
+            "maximum_liquidation_event_drawdown": 0.0,
+            "minimum_margin_buffer": 9527.695927547531,
+            "recovered_to_pre_liquidation_equity": true,
+            "strict_safe": true
+          }
+        },
+        "total_liquidation_count": 0
+      },
+      "locked_oos_role": "gate_report_only_after_candidate_freeze",
+      "performance_diagnostics": {
+        "current_base_reference_return_mdd": 6.9168776779021455,
+        "oos_return_mdd": 3.007073011653861,
+        "oos_return_mdd_beats_current_base": false,
+        "return_mdd_hurdle_required": true,
+        "return_mdd_role": "strict_promotion_gate"
+      },
+      "performance_gates": {
+        "oos_calmar_positive": true,
+        "oos_mdd_within_25pct_budget": true,
+        "oos_return_beats_current_base": true,
+        "oos_return_mdd_beats_current_base": false,
+        "oos_sharpe_positive": true,
+        "oos_smart_sortino_positive": true,
+        "oos_sortino_positive": true
+      },
+      "promotion_policy": {
+        "name": "strict_liquidation_return_mdd_gate_20260514",
+        "requires_oos_mdd_lte": 0.25,
+        "requires_oos_return_beats_current_base": true,
+        "requires_oos_return_mdd_beats_current_base": true,
+        "return_mdd_hurdle_required": true,
+        "return_mdd_role": "strict_promotion_gate",
+        "risk_adjusted_metric_thresholds": {
+          "calmar": ">0.0",
+          "sharpe": ">0.0",
+          "smart_sortino": ">0.0",
+          "sortino": ">0.0"
+        }
+      },
+      "selection_inputs": [
+        "train",
+        "validation"
+      ],
+      "split_metrics": {
+        "locked_oos": {
+          "calmar": 3.007073011653861,
+          "max_drawdown": 0.1366667659454812,
+          "return_mdd": 3.007073011653861,
+          "sharpe": 2.143208618164893,
+          "smart_sortino": 2.5002366612271256,
+          "sortino": 2.8419359198153646,
+          "total_return": 0.41096694346467144,
+          "trade_count": 540
+        },
+        "train": {
+          "calmar": 2.3299138826572765,
+          "max_drawdown": 0.2956514670572235,
+          "return_mdd": 2.3299138826572765,
+          "sharpe": 1.5691392287535169,
+          "smart_sortino": 1.4817069095478044,
+          "sortino": 1.9197757311044374,
+          "total_return": 0.6888424575246155,
+          "trade_count": 1779
+        },
+        "validation": {
+          "calmar": 3.150734499031939,
+          "max_drawdown": 0.09559509283920696,
+          "return_mdd": 3.150734499031939,
+          "sharpe": 1.5520405722881823,
+          "smart_sortino": 1.9128821340063138,
+          "sortino": 2.0957442791971075,
+          "total_return": 0.30119475694665043,
+          "trade_count": 524
+        }
+      },
+      "strategy": "CryptoFxAlphaZooStateStrategy",
+      "strict_safe": true,
+      "uses_locked_oos_for_selection": false
+    },
+    "lane": "strict_deploy",
+    "promoted_candidate": {},
+    "promotion_policy": {
+      "name": "strict_liquidation_return_mdd_gate_20260514",
+      "requires_oos_mdd_lte": 0.25,
+      "requires_oos_return_beats_current_base": true,
+      "requires_oos_return_mdd_beats_current_base": true,
+      "return_mdd_hurdle_required": true,
+      "return_mdd_role": "strict_promotion_gate",
+      "risk_adjusted_metric_thresholds": {
+        "calmar": ">0.0",
+        "sharpe": ">0.0",
+        "smart_sortino": ">0.0",
+        "sortino": ">0.0"
+      }
+    },
+    "promotion_rule": "train/validation/locked-OOS liquidation_count must be zero, every split minimum margin buffer must be positive, OOS MDD must stay within 25%, OOS return and return/MDD must beat the current-base reference, and Sharpe/Sortino/smart Sortino/Calmar must be positive.",
+    "requires_liquidation_count_zero": true,
+    "requires_positive_min_margin_buffer": true
+  }
+}

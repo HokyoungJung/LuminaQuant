@@ -24,7 +24,7 @@ from lumina_quant.strategies.crypto_fx_alpha_zoo_state import CryptoFxAlphaZooSt
 
 DEFAULT_OUTPUT = (
     "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/"
-    "crypto_fx_alpha_zoo_real_data_20260513/crypto_fx_alpha_zoo_state_replay_latest.json"
+    "crypto_fx_alpha_zoo_real_data_20260514/crypto_fx_alpha_zoo_state_replay_latest.json"
 )
 CURRENT_BASE_REFERENCE = {
     "role": "hypothesis_reference_only",
@@ -35,11 +35,17 @@ CURRENT_BASE_REFERENCE = {
     "locked_oos_sharpe": 5.202361970933632,
 }
 PROMOTION_POLICY = {
-    "name": "strict_liquidation_sharpe_sortino_calmar_gate_20260513",
-    "return_mdd_hurdle_required": False,
-    "return_mdd_role": "diagnostic_report_only",
-    "risk_adjusted_substitutes": ["sharpe", "sortino", "smart_sortino", "calmar", "max_drawdown"],
+    "name": "strict_liquidation_return_mdd_gate_20260514",
+    "return_mdd_hurdle_required": True,
+    "return_mdd_role": "strict_promotion_gate",
+    "risk_adjusted_metric_thresholds": {
+        "sharpe": ">0.0",
+        "sortino": ">0.0",
+        "smart_sortino": ">0.0",
+        "calmar": ">0.0",
+    },
     "requires_oos_return_beats_current_base": True,
+    "requires_oos_return_mdd_beats_current_base": True,
     "requires_oos_mdd_lte": 0.25,
 }
 
@@ -527,6 +533,7 @@ def _liquidation_lanes(data: pd.DataFrame, trades: list[dict[str, Any]], *, allo
         performance_gates = {
             "oos_mdd_within_25pct_budget": oos_mdd <= 0.25,
             "oos_return_beats_current_base": oos_return > CURRENT_BASE_REFERENCE["locked_oos_total_return"],
+            "oos_return_mdd_beats_current_base": return_mdd_beats_reference,
             "oos_sharpe_positive": _safe_float(oos.get("sharpe")) > 0.0,
             "oos_sortino_positive": _safe_float(oos.get("sortino")) > 0.0,
             "oos_smart_sortino_positive": _safe_float(oos.get("smart_sortino")) > 0.0,
@@ -536,9 +543,8 @@ def _liquidation_lanes(data: pd.DataFrame, trades: list[dict[str, Any]], *, allo
             "oos_return_mdd": return_mdd,
             "current_base_reference_return_mdd": CURRENT_BASE_REFERENCE["locked_oos_return_mdd"],
             "oos_return_mdd_beats_current_base": return_mdd_beats_reference,
-            "return_mdd_hurdle_required": False,
-            "return_mdd_role": "diagnostic_report_only",
-            "risk_adjusted_metrics_used_instead": ["sharpe", "sortino", "smart_sortino", "calmar", "max_drawdown"],
+            "return_mdd_hurdle_required": True,
+            "return_mdd_role": "strict_promotion_gate",
         }
         strict_safe = bool(audit["liquidation_free"] and audit["margin_buffer_positive"])
         deployable = strict_safe and all(performance_gates.values())
@@ -585,7 +591,7 @@ def _liquidation_lanes(data: pd.DataFrame, trades: list[dict[str, Any]], *, allo
                 "requires_liquidation_count_zero": True,
                 "requires_positive_min_margin_buffer": True,
                 "promotion_policy": PROMOTION_POLICY,
-                "promotion_rule": "train/validation/locked-OOS liquidation_count must be zero, every split minimum margin buffer must be positive, OOS MDD must stay within 25%, OOS return must beat the current-base reference, and Sharpe/Sortino/smart Sortino/Calmar must be positive. Return/MDD is diagnostic report-only, not a promotion hurdle.",
+                "promotion_rule": "train/validation/locked-OOS liquidation_count must be zero, every split minimum margin buffer must be positive, OOS MDD must stay within 25%, OOS return and return/MDD must beat the current-base reference, and Sharpe/Sortino/smart Sortino/Calmar must be positive.",
                 "candidate_count": len(strict_candidates),
                 "deployable_candidate_count": len(deployable),
                 "highest_zero_liquidation_integer": max(strict_candidates, key=lambda row: row["leverage"], default={}),
@@ -702,17 +708,18 @@ def replay_frame(
         "promotion_policy": PROMOTION_POLICY,
         "deployable_success": deployable,
         "deployable_success_reason": (
-            "strict zero-liquidation lane passed revised OOS return, MDD, Sharpe/Sortino/Calmar gates; return/MDD is diagnostic-only"
+            "strict zero-liquidation lane passed OOS return and return/MDD reference gates plus MDD and Sharpe/Sortino/Calmar gates"
             if deployable
-            else "no strict zero-liquidation Alpha Zoo replay row passed the revised OOS return, MDD, Sharpe/Sortino/Calmar gates"
+            else "no strict zero-liquidation Alpha Zoo replay row passed all hard gates including OOS return/MDD versus the current-base reference"
         ),
         "locked_oos_report_only_metrics": {
             "candidate_oos_return": _safe_float(oos.get("total_return")),
             "candidate_oos_return_mdd": return_mdd,
             "current_base_oos_return": CURRENT_BASE_REFERENCE["locked_oos_total_return"],
             "current_base_oos_return_mdd": CURRENT_BASE_REFERENCE["locked_oos_return_mdd"],
-            "return_mdd_hurdle_required": False,
-            "return_mdd_role": "diagnostic_report_only",
+            "oos_return_mdd_beats_current_base": return_mdd > CURRENT_BASE_REFERENCE["locked_oos_return_mdd"],
+            "return_mdd_hurdle_required": True,
+            "return_mdd_role": "strict_promotion_gate",
         },
         "memory_summary": {"peak_rss_mib": _rss_mib(), "limit_mib": 8192.0, "pass_under_8gb": _rss_mib() < 8192.0},
         "source_coverage": source_metadata or {},
@@ -741,7 +748,7 @@ def _write_markdown(payload: dict[str, Any], path: Path) -> None:
         "- uses_locked_oos_for_selection: `False`",
         "- locked-OOS role: `gate/report only after candidate freeze`",
         "- current-base/calendar tuple: `hypothesis_reference_only`, not selection/promotion target",
-        "- promotion policy: return/MDD is `diagnostic_report_only`; Sharpe/Sortino/smart Sortino/Calmar and MDD cap carry the risk-adjusted gate",
+        "- promotion policy: OOS return and return/MDD must both beat the current-base reference; Sharpe/Sortino/smart Sortino/Calmar must be positive",
         "",
         "## Locked-OOS report-only comparison",
         "",

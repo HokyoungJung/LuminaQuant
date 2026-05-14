@@ -5,7 +5,7 @@
 - Add/extend tests when adapter/reporting behavior changes, especially source coverage, calendar guard, locked-OOS exclusion, and calibration bucket blocking.
 - Include an artifact-level calibration test proving locked-OOS ledger rows are excluded from bucket estimation, with `locked_oos_calibration_record_count=0` in the output.
 - Include an adapter/reporting test proving real current-tail input reports observed/imputed coverage and fails closed on missing required OHLCV coverage instead of silently treating defaults as real data.
-- Include a return/MDD diagnostic-only promotion gate regression proving Sharpe/Sortino/smart Sortino/Calmar plus MDD cap can promote a strict zero-liquidation candidate even when return/MDD does not beat the invalid reference.
+- Include a strict return/MDD promotion gate regression proving no Alpha Zoo candidate can promote when OOS return/MDD does not beat the invalid current-base reference, even if OOS return, MDD, Sharpe, Sortino, smart Sortino, Calmar, and liquidation/buffer gates pass.
 
 ## Focused integration tests
 - `uv run --extra dev pytest tests/test_profit_moonshot_fresh_start_replay.py tests/test_profit_moonshot_liquidation_aware_validation.py tests/test_profit_moonshot_live_final_selection.py tests/test_profit_moonshot_pass_under_8gb_validator.py -q`

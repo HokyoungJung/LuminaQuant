@@ -26,7 +26,7 @@ Promote the Alpha Zoo path from synthetic smoke to real current-tail research by
 - Candidate ledger and calibration artifacts record train/validation-only provenance and locked-OOS exclusion.
 - Edge calibration must physically filter records to `split in {"train", "validation"}` before estimating buckets and must report `locked_oos_calibration_record_count=0`.
 - Strict validation reports all leverages 1x..6x, zero-liquidation strict lane, and diagnostic 5x/6x lane.
-- Any promoted success has zero liquidations across train/validation/OOS, positive min buffers, OOS MDD <= 25%, OOS return above the invalid current-base reference, and positive Sharpe/Sortino/smart Sortino/Calmar. Return/MDD is diagnostic/report-only, not a hard promotion hurdle.
+- Any promoted success has zero liquidations across train/validation/OOS, positive min buffers, OOS MDD <= 25%, OOS return above the invalid current-base reference, OOS return/MDD above the invalid current-base reference, and positive Sharpe/Sortino/smart Sortino/Calmar.
 - If no deployable candidate exists, artifacts explicitly set live promotion/deployable success false and explain the gate that failed.
 - Peak RSS is reported and < 8 GiB.
 - Required tests/lint/compile/diff checks pass.

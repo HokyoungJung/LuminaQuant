@@ -34,7 +34,7 @@ from lumina_quant.research.crypto_fx_alpha_zoo_real_data import (
 
 DEFAULT_OUTPUT_DIR = (
     "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/"
-    "crypto_fx_alpha_zoo_real_data_20260513"
+    "crypto_fx_alpha_zoo_real_data_20260514"
 )
 
 
