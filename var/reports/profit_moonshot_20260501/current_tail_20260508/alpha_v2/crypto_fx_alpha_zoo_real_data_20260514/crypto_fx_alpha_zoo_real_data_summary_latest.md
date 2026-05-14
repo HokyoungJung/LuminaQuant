@@ -1,9 +1,9 @@
-# Crypto/FX Alpha Zoo real-data strict-policy summary — 2026-05-14
+# Crypto/FX Alpha Zoo real-data return/MDD-diagnostic policy summary — 2026-05-14
 
 - Strategy: `CryptoFxAlphaZooStateStrategy`
-- Deployable success: `False`
-- Reason: no strict zero-liquidation Alpha Zoo replay row passed all hard gates including OOS return/MDD versus the current-base reference
-- Strict rejection reasons: `oos_return_mdd_beats_current_base`
+- Deployable success: `True`
+- Reason: strict zero-liquidation lane passed OOS return, MDD, Sharpe/Sortino/smart Sortino/Calmar gates; return/MDD is diagnostic-only
+- Strict rejection reasons: ``
 
 ## Selection and calibration provenance
 
@@ -17,9 +17,9 @@
 ## Strict zero-liquidation lane
 
 - Candidate count: `6`
-- Deployable candidate count: `0`
+- Deployable candidate count: `5`
 - Highest zero-liquidation integer: `6.0`
-- Selected strict candidate live status: `no_live_promotion_return_mdd_gate_failed`
+- Selected strict candidate live status: `deployable_success_true`
 - OOS return: `41.0967%` vs current-base `6.4281%`
 - OOS return/MDD: `3.007073` vs current-base `6.916878`
 - OOS MDD: `13.6667%`
@@ -48,4 +48,4 @@
 ## Research history/source ledger
 
 - regenerated: `False`
-- reason: No new external source class or global chronology/source-ledger change; reused existing current-tail cache and 20260512 lagged FRED external-state artifact, added only session-scoped Alpha Zoo strict-policy artifacts.
+- reason: No new external source class or global chronology/source-ledger change; reused existing current-tail cache and 20260512 lagged FRED external-state artifact, added only session-scoped Alpha Zoo return/MDD-diagnostic artifacts.

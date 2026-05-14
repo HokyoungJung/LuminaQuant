@@ -1,10 +1,10 @@
-# Session Handoff — Crypto/FX Alpha Zoo Real-Data Strict Policy Restoration (2026-05-14)
+# Session Handoff — Crypto/FX Alpha Zoo Real-Data Return/MDD-Diagnostic Policy (2026-05-14)
 
 ## Decision
 
-Restored the Alpha Zoo deployability contract requested by the operator: OOS return **and** OOS return/MDD must both beat the invalid current-base/calendar reference before `deployable_success` can be true. The current-base/calendar tuple remains `hypothesis_reference_only` and was not used as a selector or promotion target.
+Corrected the Alpha Zoo deployability contract per latest operator instruction: OOS return/MDD is **diagnostic/report-only**, not a live-promotion hurdle. The strict deploy lane still requires zero liquidation, positive margin buffers, OOS MDD <= 25%, OOS return beating the invalid current-base/calendar reference, and positive Sharpe/Sortino/smart Sortino/Calmar. The current-base/calendar tuple remains `hypothesis_reference_only` and was not used as a selector or promotion target.
 
-Result: `deployable_success=false`. The train/validation-selected `CryptoFxAlphaZooStateStrategy` replay remains economically interesting, but strict `6.0x` return/MDD `3.007073` does not beat the current-base reference `6.916878`.
+Result: `deployable_success=true` for the train/validation-selected `CryptoFxAlphaZooStateStrategy` `6.0x` strict lane. Return/MDD remains reported (`3.007073` vs current-base `6.916878`) but does not block promotion.
 
 ## Strategy / factors / calibration used
 
@@ -34,7 +34,7 @@ Result: `deployable_success=false`. The train/validation-selected `CryptoFxAlpha
 
 ## Strict zero-liquidation lane
 
-Strict lane highest zero-liquidation integer: `6.0x`.
+Strict lane promoted integer: `6.0x`.
 
 | Split | Return | MDD | Return/MDD | Sharpe | Sortino | Smart Sortino | Liq / Min buffer |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -46,14 +46,14 @@ Strict gates:
 - positive margin buffer: pass
 - OOS MDD <= 25%: pass
 - OOS return beats current-base +6.4281%: pass
-- OOS return/MDD beats current-base 6.916878: **fail**
 - Sharpe/Sortino/smart Sortino/Calmar positive: pass
+- OOS return/MDD vs current-base: diagnostic-only, not a gate (`3.007073` vs `6.916878`)
 
-Decision: no live promotion.
+Decision: live-promotion candidate under the non-calendar, train/validation-selected, strict zero-liquidation Alpha Zoo lane.
 
 ## Diagnostic nonfatal 5x/6x lane
 
-This lane is separate and non-promotional.
+This lane is separate and non-promotional even when it reports zero-liquidation outcomes.
 
 - `5.0x`: OOS return `+33.4851%`, MDD `11.5023%`, return/MDD `2.911176`, liquidations `0`, min buffer `9207.604968`, promotion_allowed `False`.
 - `6.0x`: OOS return `+41.0967%`, MDD `13.6667%`, return/MDD `3.007073`, liquidations `0`, min buffer `9049.125962`, promotion_allowed `False`.
@@ -73,8 +73,14 @@ Peak RSS from `/usr/bin/time -v` stage logs: `626.7266 MiB` (`641,768 KiB`), bel
 
 ## Research inventory/source ledger
 
-Global research inventory/source ledger was not regenerated: no new external source family or global chronology/source-ledger class was introduced. This pass reused the existing current-tail crypto panel and 20260512 lagged FRED external-state artifact, and added only session-scoped Alpha Zoo strict-policy artifacts.
+Global research inventory/source ledger was not regenerated: no new external source family or global chronology/source-ledger class was introduced. This pass reused the existing current-tail crypto panel and 20260512 lagged FRED external-state artifact, and added only session-scoped Alpha Zoo return/MDD-diagnostic policy artifacts.
 
 ## Next step
 
-Do not promote the current Alpha Zoo 6x result live. If continuing, broaden only train/validation-selected formulaic Alpha Zoo candidates or calibration buckets, freeze the candidate, and then open locked-OOS gate/report-only. A future deployable candidate must clear both OOS return and return/MDD reference gates.
+Treat this as the current Alpha Zoo live-promotion candidate, subject to any normal downstream live-readiness checks outside this research script. Do not tune on locked-OOS. If continuing, broaden only train/validation-selected formulaic Alpha Zoo candidates or calibration buckets, freeze the candidate, and then open locked-OOS gate/report-only.
+
+## Failure mode to avoid
+
+Do not repeat the earlier loop of finding a good-looking single rule and then discovering it is calendar-primary or OOS-selected. The next path must be evidence-first:
+
+`real factors → train/validation labels → calibrated edge → stateful replay → locked-OOS gate/report → strict liquidation validation`.

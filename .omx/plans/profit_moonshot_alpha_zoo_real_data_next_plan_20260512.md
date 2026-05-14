@@ -44,7 +44,7 @@ Use these existing components:
    - train/validation/OOS liquidation count `0`
    - every split min margin buffer `> 0`
    - OOS MDD `<= 25%`
-   - OOS return and return/MDD beat baseline reference
+   - OOS return beats baseline reference; return/MDD is diagnostic/report-only
 6. Diagnostic nonfatal 5x/6x lane must remain separate and non-promotional.
 7. Memory must stay below 8 GiB.
 
@@ -141,21 +141,21 @@ Every future session must update the active research notes before final handoff.
 - Edge calibration physically filtered to train/validation: input `45160`, calibration `30494`, locked-OOS calibration `0`, excluded locked-OOS `14666`.
 - Replay grid selected `alpha_zoo_conservative_exit` from `9` formulaic candidates using train/validation metrics only; locked-OOS remained hidden until candidate freeze.
 - Strict zero-liquidation lane highest safe integer: `6.0x`, liquidation count `0`, min buffer `9049.125962`, OOS return `41.0967%`, OOS MDD `13.6667%`, return/MDD `3.007073`, Sharpe `2.143209`.
-- Deployable success remains `false`: OOS return beats the invalid current-base reference at strict 6x, but return/MDD `3.007073` is below current-base reference `6.916878`.
+- Deployable success is `true` under the latest operator correction: OOS return beats the invalid current-base reference at strict 6x, while return/MDD `3.007073` vs `6.916878` is diagnostic-only.
 - Diagnostic 5x/6x lane is non-promotional and separate: 5x/6x both zero liquidation in this approximate replay, promotion_allowed=false.
 - Peak RSS `512.711` MiB (<8 GiB).
 - Artifacts: `/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_real_data_20260513/crypto_fx_alpha_zoo_real_data_summary_latest.json`, `/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_real_data_20260513/crypto_fx_alpha_zoo_state_replay_latest.json`, `/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_real_data_20260513/edge_calibration_latest.json`, `/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_real_data_20260513/candidate_outcome_ledger_latest.jsonl`.
 - Research history/source ledger not regenerated: No new external source class or global chronology/source-ledger change; reused existing current-tail cache and 20260512 lagged FRED external-state artifact, added only session-scoped Alpha Zoo artifacts.
 
-## 2026-05-14 — Strict policy restoration result
+## 2026-05-14 — Return/MDD-diagnostic policy result
 
-- Restored hard Alpha Zoo promotion gate: OOS return and OOS return/MDD must both beat the invalid current-base/calendar reference.
+- Applied latest operator correction: OOS return/MDD is diagnostic-only; OOS return remains the current-base reference gate.
 - Regenerated real-data artifacts under `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_real_data_20260514/` using `--strict-real-data` and explicit output paths.
 - Screen rows `58,845`; factor count `63`; selected cards `20`.
 - Candidate ledger `67,259` rows; train+validation `45,311`; locked-OOS `21,948`.
 - Edge calibration records `45,311`; locked-OOS calibration `0`; calibrated edge keys `12`.
 - Replay selected `alpha_zoo_conservative_exit` from `9` formulaic train/validation candidates.
 - Strict 6x lane: OOS return `41.0967%`, MDD `13.6667%`, return/MDD `3.007073`, Sharpe `2.143209`, Sortino `2.841936`, smart Sortino `2.500237`, liquidation `0`, min buffer `9049.125962`.
-- Decision: `deployable_success=false`; return/MDD `3.007073` fails current-base reference `6.916878` despite OOS return beating reference.
+- Decision: `deployable_success=true`; return/MDD `3.007073` is reported versus current-base `6.916878` but is not a gate.
 - Diagnostic 5x/6x lane remains non-promotional and separate.
 - Peak RSS `626.7266 MiB`; source ledger not regenerated because no new global source family was introduced.

@@ -189,7 +189,7 @@ def test_replay_grid_hides_locked_oos_until_after_train_validation_selection() -
     assert payload["selection_provenance"]["candidate_freeze_before_locked_oos_gate"] is True
 
 
-def test_strict_promotion_gate_blocks_when_return_mdd_reference_hurdle_fails() -> None:
+def test_return_mdd_reference_hurdle_is_diagnostic_not_promotion_gate() -> None:
     data = pd.DataFrame(columns=["timestamp", "symbol", "open", "high", "low", "close", "volume", "split"])
     trades = [
         {
@@ -206,18 +206,18 @@ def test_strict_promotion_gate_blocks_when_return_mdd_reference_hurdle_fails() -
 
     lanes = _liquidation_lanes(data, trades, allocation_fraction=1.0, max_leverage=1)
     strict_lane = lanes["strict_zero_liquidation_lane"]
-    highest = strict_lane["highest_zero_liquidation_integer"]
+    promoted = strict_lane["promoted_candidate"]
 
-    assert strict_lane["promoted_candidate"] == {}
-    assert highest["strict_safe"] is True
-    assert highest["performance_gates"]["oos_return_beats_current_base"] is True
-    assert highest["performance_gates"]["oos_return_mdd_beats_current_base"] is False
-    assert highest["performance_diagnostics"]["return_mdd_hurdle_required"] is True
-    assert highest["performance_diagnostics"]["return_mdd_role"] == "strict_promotion_gate"
-    assert highest["deployable_success"] is False
+    assert promoted["strict_safe"] is True
+    assert promoted["performance_gates"]["oos_return_beats_current_base"] is True
+    assert "oos_return_mdd_beats_current_base" not in promoted["performance_gates"]
+    assert promoted["performance_diagnostics"]["oos_return_mdd_beats_current_base"] is False
+    assert promoted["performance_diagnostics"]["return_mdd_hurdle_required"] is False
+    assert promoted["performance_diagnostics"]["return_mdd_role"] == "diagnostic_report_only"
+    assert promoted["deployable_success"] is True
 
 
-def test_real_data_summary_fails_closed_without_strict_return_mdd_gate(tmp_path: Path) -> None:
+def test_real_data_summary_fails_closed_when_return_mdd_is_a_strict_gate(tmp_path: Path) -> None:
     screen_path = tmp_path / "screen.json"
     calibration_path = tmp_path / "calibration.json"
     replay_path = tmp_path / "replay.json"
@@ -250,11 +250,17 @@ def test_real_data_summary_fails_closed_without_strict_return_mdd_gate(tmp_path:
     replay_path.write_text(
         json.dumps(
             {
-                "promotion_policy": {"return_mdd_hurdle_required": False, "return_mdd_role": "diagnostic"},
+                "promotion_policy": {"return_mdd_hurdle_required": True, "return_mdd_role": "strict_promotion_gate"},
                 "integer_grid_results": [
                     {
-                        "performance_gates": {"oos_return_beats_current_base": True},
-                        "performance_diagnostics": {"return_mdd_hurdle_required": False},
+                        "performance_gates": {
+                            "oos_return_beats_current_base": True,
+                            "oos_return_mdd_beats_current_base": False,
+                        },
+                        "performance_diagnostics": {
+                            "oos_return_mdd_beats_current_base": False,
+                            "return_mdd_hurdle_required": True,
+                        },
                     }
                 ],
             }
@@ -273,4 +279,4 @@ def test_real_data_summary_fails_closed_without_strict_return_mdd_gate(tmp_path:
     except ValueError as exc:
         assert "return/MDD" in str(exc)
     else:
-        raise AssertionError("summary writer must fail closed without the strict return/MDD gate")
+        raise AssertionError("summary writer must fail closed if return/MDD is a strict promotion gate")

@@ -1,10 +1,10 @@
 # Crypto/FX Alpha Zoo real-data result — 2026-05-13
 
-> Superseded on 2026-05-14 by the strict return/MDD gate restoration in
+> Superseded on 2026-05-14 by the return/MDD-diagnostic policy in
 > `docs/session_handoff_20260514_crypto_fx_alpha_zoo_real_data_strict_policy.md`.
-> The 2026-05-13 metrics remain historical, but the deployable-success claim is
-> no longer current because OOS return/MDD must beat the invalid current-base
-> reference before any live promotion.
+> The 2026-05-13 metrics remain historical; the current Alpha Zoo successor keeps
+> return/MDD diagnostic-only and records the strict 6x row as deployable under
+> the latest operator correction.
 
 ## Decision
 
@@ -69,4 +69,4 @@
 
 ## Next handoff
 
-Continue from the 2026-05-14 strict-policy successor artifacts, not this superseded deployability note. Treat the strict `6.0x` Alpha Zoo row as a non-promotional research seed until a train/validation-selected candidate also beats the current-base OOS return/MDD reference. Preserve the non-calendar, train/validation-frozen, locked-OOS gate/report-only, strict zero-liquidation, positive-buffer, OOS MDD <=25%, positive Sharpe/Sortino/smart Sortino/Calmar, and hard OOS return/MDD requirements.
+Continue from the 2026-05-14 return/MDD-diagnostic successor artifacts, not this superseded deployability note. Treat the strict `6.0x` Alpha Zoo row as the current deployable real-data Alpha Zoo candidate under the latest operator correction. Preserve the non-calendar, train/validation-frozen, locked-OOS gate/report-only, strict zero-liquidation, positive-buffer, OOS MDD <=25%, positive Sharpe/Sortino/smart Sortino/Calmar, and OOS-return gate requirements; keep return/MDD diagnostic-only.

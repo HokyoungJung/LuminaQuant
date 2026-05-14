@@ -1,11 +1,11 @@
 # Crypto/FX Alpha Zoo state real-data replay
 
-Generated: `2026-05-14T13:05:00.064720Z`
+Generated: `2026-05-14T13:31:06.571357Z`
 Rows: `58845`
 Signals: `5684`
 Trades: `2843`
-Deployable success: `False`
-Reason: no strict zero-liquidation Alpha Zoo replay row passed all hard gates including OOS return/MDD versus the current-base reference
+Deployable success: `True`
+Reason: strict zero-liquidation lane passed OOS return, MDD, Sharpe/Sortino/smart Sortino/Calmar gates; return/MDD is diagnostic-only
 
 ## Provenance
 
@@ -13,7 +13,7 @@ Reason: no strict zero-liquidation Alpha Zoo replay row passed all hard gates in
 - uses_locked_oos_for_selection: `False`
 - locked-OOS role: `gate/report only after candidate freeze`
 - current-base/calendar tuple: `hypothesis_reference_only`, not selection/promotion target
-- promotion policy: OOS return and return/MDD must both beat the current-base reference; Sharpe/Sortino/smart Sortino/Calmar must be positive
+- promotion policy: OOS return must beat the current-base reference; Sharpe/Sortino/smart Sortino/Calmar must be positive; return/MDD is diagnostic report-only
 
 ## Locked-OOS report-only comparison
 
@@ -25,7 +25,7 @@ Reason: no strict zero-liquidation Alpha Zoo replay row passed all hard gates in
 ## Strict zero-liquidation lane
 
 - strict candidate count: `6`
-- deployable candidate count: `0`
+- deployable candidate count: `5`
 
 ## Diagnostic nonfatal 5x/6x lane
 
@@ -34,4 +34,4 @@ Reason: no strict zero-liquidation Alpha Zoo replay row passed all hard gates in
 
 ## Memory
 
-- peak_rss_mib: `280.879`
+- peak_rss_mib: `282.004`

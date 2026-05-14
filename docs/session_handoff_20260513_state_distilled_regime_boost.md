@@ -56,4 +56,4 @@ No global research inventory/source ledger update was required. The run reused t
 
 ## Next work
 
-Do not promote this overlay as live. If continuing, either improve the train/validation overlay economics without touching locked-OOS, or use the Alpha Zoo strict 6x result only as a non-promotional research seed unless a train/validation-selected successor also clears the restored hard OOS return/MDD gate.
+Do not promote this overlay as live. If continuing, either improve the train/validation overlay economics without touching locked-OOS, or use the Alpha Zoo strict 6x result from the 2026-05-14 return/MDD-diagnostic policy as the current deployable Alpha Zoo reference; return/MDD remains diagnostic-only there.

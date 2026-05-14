@@ -2,9 +2,9 @@
 """Write aggregate Crypto/FX Alpha Zoo real-data summary artifacts.
 
 The summary is deliberately derived from the screen/calibration/replay JSON
-artifacts.  It fails closed when the replay artifact does not expose the strict
-return/MDD gate, so a hand-written summary cannot accidentally preserve a stale
-promotion claim.
+artifacts.  It fails closed when the replay artifact does not expose the current
+operator policy: return/MDD is diagnostic-only and must not be a strict
+promotion gate.
 """
 
 from __future__ import annotations
@@ -68,22 +68,24 @@ def _memory_summary(output_dir: Path, replay: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _require_strict_return_mdd_gate(replay: dict[str, Any]) -> None:
+def _require_return_mdd_diagnostic_policy(replay: dict[str, Any]) -> None:
     policy = _as_dict(replay.get("promotion_policy"))
-    if policy.get("return_mdd_hurdle_required") is not True:
-        raise ValueError("replay promotion policy must require return/MDD as a hard hurdle")
-    if policy.get("return_mdd_role") != "strict_promotion_gate":
-        raise ValueError("replay promotion policy must mark return/MDD as strict_promotion_gate")
+    if policy.get("return_mdd_hurdle_required") is not False:
+        raise ValueError("replay promotion policy must keep return/MDD diagnostic-only")
+    if policy.get("return_mdd_role") != "diagnostic_report_only":
+        raise ValueError("replay promotion policy must mark return/MDD as diagnostic_report_only")
     rows = list(replay.get("integer_grid_results") or [])
     if not rows:
         raise ValueError("replay artifact must include integer_grid_results")
     for row in rows:
         gates = _as_dict(row.get("performance_gates"))
-        if "oos_return_mdd_beats_current_base" not in gates:
-            raise ValueError("strict performance_gates missing oos_return_mdd_beats_current_base")
+        if "oos_return_mdd_beats_current_base" in gates:
+            raise ValueError("return/MDD must not appear in strict performance_gates")
         diagnostics = _as_dict(row.get("performance_diagnostics"))
-        if diagnostics.get("return_mdd_hurdle_required") is not True:
-            raise ValueError("row diagnostics must mark return/MDD hurdle as required")
+        if "oos_return_mdd_beats_current_base" not in diagnostics:
+            raise ValueError("row diagnostics must report oos_return_mdd_beats_current_base")
+        if diagnostics.get("return_mdd_hurdle_required") is not False:
+            raise ValueError("row diagnostics must mark return/MDD hurdle as diagnostic-only")
 
 
 def _failed_gate_reasons(candidate: dict[str, Any]) -> list[str]:
@@ -110,7 +112,7 @@ def build_summary_payload(
     screen = _load_json(screen_path)
     calibration = _load_json(calibration_path)
     replay = _load_json(replay_path)
-    _require_strict_return_mdd_gate(replay)
+    _require_return_mdd_diagnostic_policy(replay)
 
     output_dir = Path(output_json_path).expanduser().resolve().parent
     strict_lane = _as_dict(replay.get("strict_zero_liquidation_lane"))
@@ -201,7 +203,7 @@ def build_summary_payload(
         "diagnostic_nonfatal_5x_6x_lane": diagnostic_lane.get("high_leverage_5x_6x_report", []),
         "front_runner_candidate": {
             "designation": "strict_candidate_after_train_validation_freeze",
-            "live_promotion_status": "deployable_success_true" if deployable_success else "no_live_promotion_return_mdd_gate_failed",
+            "live_promotion_status": "deployable_success_true" if deployable_success else "no_live_promotion_strict_gate_failed",
             "candidate_name": front_runner.get("candidate_name"),
             "candidate_source": front_runner.get("candidate_source"),
             "strategy": front_runner.get("strategy"),
@@ -223,7 +225,7 @@ def build_summary_payload(
             "forbidden_use_without_new_validation": [
                 "calendar_current_base_promotion_target",
                 "locked_oos_tuned_reselection",
-                "live_promotion_when_return_mdd_gate_fails",
+                "treating_return_mdd_as_hard_gate_without_operator_instruction",
                 "promotion_if_strict_liquidation_count_exceeds_zero_or_min_buffer_nonpositive",
             ],
         },
@@ -239,7 +241,7 @@ def build_summary_payload(
             "research_history_regenerated": False,
             "reason": (
                 "No new external source class or global chronology/source-ledger change; reused existing current-tail cache "
-                "and 20260512 lagged FRED external-state artifact, added only session-scoped Alpha Zoo strict-policy artifacts."
+                "and 20260512 lagged FRED external-state artifact, added only session-scoped Alpha Zoo return/MDD-diagnostic artifacts."
             ),
         },
     }
@@ -263,7 +265,7 @@ def write_summary_markdown(payload: dict[str, Any], path: str | Path) -> None:
     ledger = _as_dict(payload.get("candidate_outcome_ledger"))
     memory = _as_dict(payload.get("memory_summary"))
     lines = [
-        "# Crypto/FX Alpha Zoo real-data strict-policy summary — 2026-05-14",
+        "# Crypto/FX Alpha Zoo real-data return/MDD-diagnostic policy summary — 2026-05-14",
         "",
         f"- Strategy: `{payload.get('strategy')}`",
         f"- Deployable success: `{payload.get('deployable_success')}`",

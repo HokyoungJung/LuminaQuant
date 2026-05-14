@@ -122,9 +122,9 @@ Do not repeat the earlier loop of finding a good-looking single rule and then di
 - Edge calibration physically filtered to train/validation: input `45160`, calibration `30494`, locked-OOS calibration `0`, excluded locked-OOS `14666`.
 - Replay grid selected `alpha_zoo_conservative_exit` from `9` formulaic candidates using train/validation metrics only; locked-OOS remained hidden until candidate freeze.
 - Strict zero-liquidation lane highest safe integer: `6.0x`, liquidation count `0`, min buffer `9049.125962`, OOS return `41.0967%`, OOS MDD `13.6667%`, return/MDD `3.007073`, Sharpe `2.143209`.
-- 2026-05-14 correction: return/MDD is restored as a hard Alpha Zoo promotion hurdle per operator instruction; OOS return and OOS return/MDD must both beat the invalid current-base reference.
-- Deployable success is now `false` under the restored strict policy: strict 6x has OOS return `41.0967%`, MDD `13.6667%`, Sharpe `2.143209`, Sortino `2.841936`, smart Sortino `2.500237`, Calmar/return-MDD `3.007073`, zero liquidations, and positive buffers, but return/MDD `3.007073` is below the current-base reference `6.916878`.
-- Diagnostic 5x/6x lane remains non-promotional and separate: 5x/6x both zero liquidation in this approximate replay, but neither lane can promote while the hard return/MDD gate fails.
+- 2026-05-14 latest correction: return/MDD is diagnostic/report-only per operator clarification; OOS return must beat the invalid current-base reference, but OOS return/MDD does not block promotion.
+- Deployable success is now `true` under the corrected policy: strict 6x has OOS return `41.0967%`, MDD `13.6667%`, Sharpe `2.143209`, Sortino `2.841936`, smart Sortino `2.500237`, Calmar/return-MDD `3.007073`, zero liquidations, and positive buffers.
+- Diagnostic 5x/6x lane remains non-promotional and separate: 5x/6x both zero liquidation in this approximate replay, but that lane is report-only.
 - Peak RSS `512.711` MiB (<8 GiB).
 - Artifacts: `/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_real_data_20260513/crypto_fx_alpha_zoo_real_data_summary_latest.json`, `/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_real_data_20260513/crypto_fx_alpha_zoo_state_replay_latest.json`, `/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_real_data_20260513/edge_calibration_latest.json`, `/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_real_data_20260513/candidate_outcome_ledger_latest.jsonl`.
 - Research history/source ledger not regenerated: No new external source class or global chronology/source-ledger change; reused existing current-tail cache and 20260512 lagged FRED external-state artifact, added only session-scoped Alpha Zoo artifacts.
@@ -139,9 +139,9 @@ Result: strict zero-liquidation/margin gates passed, but validation and locked-O
 
 ---
 
-## 2026-05-14 KST — Strict return/MDD gate restoration
+## 2026-05-14 KST — Return/MDD diagnostic-only policy correction
 
-Restored the operator-requested Alpha Zoo deployability policy: OOS return and OOS return/MDD must both beat the invalid current-base/calendar reference before live promotion. The current-base/calendar tuple remains `hypothesis_reference_only`, not a selection or promotion target.
+Applied the latest operator clarification: OOS return/MDD is diagnostic/report-only, not a strict promotion hurdle. The current-base/calendar tuple remains `hypothesis_reference_only`, not a selection or promotion target; the strict deploy lane still requires zero liquidation, positive buffers, OOS MDD <=25%, OOS return beating the current-base reference, and positive risk metrics.
 
 Real current-tail run under `crypto_fx_alpha_zoo_real_data_20260514`:
 
@@ -149,9 +149,9 @@ Real current-tail run under `crypto_fx_alpha_zoo_real_data_20260514`:
 - Candidate outcome ledger: `67,259` rows; train+validation `45,311`; locked-OOS `21,948`.
 - Edge calibration: train/validation-only physical filter; locked-OOS calibration records `0`; calibrated edge keys `12`.
 - Replay selected `alpha_zoo_conservative_exit` from `9` formulaic candidates using train/validation metrics only.
-- Strict zero-liquidation lane highest safe integer: `6.0x`, liquidation count `0`, min buffer `9049.125962`, OOS return `41.0967%`, OOS MDD `13.6667%`, return/MDD `3.007073`, Sharpe `2.143209`, Sortino `2.841936`, smart Sortino `2.500237`.
-- Deployable success: `false` because return/MDD `3.007073` does not beat current-base reference `6.916878`; rejection reason `oos_return_mdd_beats_current_base`.
-- Diagnostic 5x/6x lane is separate and non-promotional; 5x/6x both zero liquidation but cannot promote while the hard return/MDD gate fails.
+- Strict zero-liquidation lane promoted integer: `6.0x`, liquidation count `0`, min buffer `9049.125962`, OOS return `41.0967%`, OOS MDD `13.6667%`, return/MDD `3.007073`, Sharpe `2.143209`, Sortino `2.841936`, smart Sortino `2.500237`.
+- Deployable success: `true`; return/MDD `3.007073` vs current-base `6.916878` is reported as diagnostic-only and does not block promotion.
+- Diagnostic 5x/6x lane is separate and non-promotional; 5x/6x both zero liquidation but `promotion_allowed=false` in that diagnostic lane.
 - Peak RSS `626.7266 MiB` (<8 GiB).
 - Artifacts: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_real_data_20260514/`.
 
