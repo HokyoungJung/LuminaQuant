@@ -1,5 +1,8 @@
 {
   "alpha_zoo_strict_6x_live_promotable": true,
+  "calendar_current_base_rows_quarantined_not_ranked": true,
+  "core_candidate_count_after_calendar_exclusion": 10,
+  "core_candidate_universe_excludes_calendar_current_base": true,
   "has_candidate_strategy_source": true,
   "has_diagnostic_lane": true,
   "has_memory_peak": true,
@@ -9,6 +12,9 @@
   "has_three_split_metrics": true,
   "has_three_split_periods": true,
   "hybrid_optuna_live_guarded_invalid": true,
+  "local_calendar_quarantine_verification_log_present": true,
   "local_required_verification_passed": true,
-  "local_verification_log_present": true
+  "local_required_verification_passed_after_calendar_quarantine_correction": true,
+  "local_verification_log_present": true,
+  "quarantine_candidate_count": 5
 }

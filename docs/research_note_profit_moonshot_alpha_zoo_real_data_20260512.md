@@ -175,7 +175,7 @@ Promotion policy unchanged: these diagnostics are `diagnostic_only`, `promotion_
 
 ## 2026-05-16 KST — Hybrid v3.5/v3.6 and Optuna comparison against Alpha Zoo strict 6x
 
-Completed a repo-wide inventory and policy audit for hybrid v3.5/v3.6, hybrid Optuna, tuning/optimization, calendar Optuna, candidate-hybrid, and fresh-portfolio optimization artifacts against the preserved private/main baseline `1c6816fced44d277f6c7112934c9dded65ba710f`.
+Completed a repo-wide inventory and policy audit for hybrid v3.5/v3.6, hybrid Optuna, tuning/optimization, candidate-hybrid, calendar Optuna, and fresh-portfolio optimization artifacts against the preserved private/main baseline `1c6816fced44d277f6c7112934c9dded65ba710f`. Correction on 2026-05-17 KST: the **core comparison universe excludes every calendar/current-base-derived row before ranking**; those rows are retained only in a quarantine/reference ledger.
 
 Decision: **only** `CryptoFxAlphaZooStateStrategy / alpha_zoo_conservative_exit / strict 6x` remains live-promotion possible. Alpha Zoo selection is train/validation-only, locked-OOS is gate/report-only after candidate freeze, and strict 6x passes zero-liquidation, positive margin buffer, OOS MDD <=25%, OOS return above the invalid current-base reference, positive Sharpe/Sortino/smart Sortino/Calmar, and memory <8 GiB.
 
@@ -190,16 +190,18 @@ Hybrid/Optuna conclusions:
 - Hybrid v3.5/v3.6 clean rows use train/validation selection with locked-OOS report-only evidence, but locked-OOS returns are far below Alpha Zoo strict 6x and below the invalid current-base reference; strict liquidation/margin replay is not available for live promotion.
 - Hybrid Optuna `live_guarded` and `train_aware_guarded` are live-promotion invalid because those objective profiles consume OOS metrics; good-looking OOS values remain diagnostic/reference only.
 - Hybrid/tuning `locked_train_val` policy shape is valid (`oos_is_objective_input=false`) but locked-OOS performance is weak and lacks strict zero-liquidation replay.
-- Calendar Optuna and calendar/current-base-dependent fresh/candidate-hybrid rows remain diagnostic/reference only; calendar month/day/hour rules are invalid, and calendar Optuna best-trial/top-trial ordering uses locked-OOS after the train/validation objective.
-- Candidate-hybrid had strong OOS metrics but is not strict-promotable due validation liquidation count `1` plus calendar/current-base-source dependency.
+- Calendar Optuna and calendar/current-base-dependent fresh/candidate-hybrid rows are **not part of the core hybrid comparison**. They were moved to a quarantine/reference ledger because calendar month/day/hour rules and current-base tuple dependencies are invalid before any ranking.
+- Candidate-hybrid had strong OOS metrics but is excluded from the core runner-up set due validation liquidation count `1` plus calendar/current-base-source dependency; it is quarantine/reference only.
 
 Strict integer recheck 1x..6x was rerun in the comparison directory. Highest strict integer remains `6.0x`: OOS return `41.0967%`, MDD `13.6667%`, return/MDD diagnostic `3.007073`, Sharpe `2.143209`, Sortino `2.841936`, smart Sortino `2.500237`, liquidation `0`, min buffer `9049.125962`. The separate diagnostic 5x/6x lane is preserved with `promotion_allowed=false`.
 
 Artifacts:
 
 - Full JSON report: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/hybrid_optuna_alpha_zoo_comparison_20260514/hybrid_optuna_alpha_zoo_comparison_latest.json`
+- Corrected non-calendar JSON snapshot: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/hybrid_optuna_alpha_zoo_comparison_20260514/hybrid_optuna_alpha_zoo_comparison_20260517T000000Z_calendar_quarantine_corrected.json`
 - Full Markdown report: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/hybrid_optuna_alpha_zoo_comparison_20260514/hybrid_optuna_alpha_zoo_comparison_latest.md`
-- Split performance CSV: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/hybrid_optuna_alpha_zoo_comparison_20260514/candidate_split_performance_latest.csv`
+- Core split performance CSV: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/hybrid_optuna_alpha_zoo_comparison_20260514/candidate_split_performance_latest.csv`
+- Calendar/current-base quarantine CSV: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/hybrid_optuna_alpha_zoo_comparison_20260514/excluded_calendar_current_base_quarantine_latest.csv`
 - Inventory JSON: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/hybrid_optuna_alpha_zoo_comparison_20260514/hybrid_optuna_alpha_zoo_inventory_latest.json`
 - Prompt checklist audit: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/hybrid_optuna_alpha_zoo_comparison_20260514/prompt_checklist_audit_latest.json`
 - Strict integer recheck: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/hybrid_optuna_alpha_zoo_comparison_20260514/alpha_zoo_strict_integer_recheck_latest.json`

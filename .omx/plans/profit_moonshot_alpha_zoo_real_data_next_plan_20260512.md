@@ -171,15 +171,15 @@ Every future session must update the active research notes before final handoff.
 
 ## 2026-05-16 KST — Hybrid/Optuna comparison execution result
 
-Status: artifact generation, documentation update, and local verification completed; commit/push/CI pending in this Ralph pass.
+Status: initial artifact generation and verification completed; 2026-05-17 correction applied because calendar/current-base rows must be excluded from the hybrid core universe, not merely marked invalid.
 
 - Baseline preserved: `private/main` `1c6816fced44d277f6c7112934c9dded65ba710f`.
 - Comparison artifact directory: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/hybrid_optuna_alpha_zoo_comparison_20260514/`.
-- Candidate rows inventoried: `15`.
+- Core candidate rows after calendar/current-base exclusion: `10`; quarantined scanned rows: `5`.
 - Live promotion possible: `crypto_fx_alpha_zoo_state_calibrated`.
-- OOS-objective/ranking/selection invalid rows: `5`.
-- Calendar/current-base invalid rows: `5`.
-- Clean hybrid-policy rows without live promotion: `5`; rejected for weak OOS economics and/or missing strict zero-liquidation margin replay.
+- Core OOS-objective/ranking/selection invalid rows: `3` (plus quarantined calendar Optuna rows with OOS post-study ordering).
+- Calendar/current-base rows: `5`, excluded from core comparison and stored only in quarantine/reference ledger.
+- Non-calendar runner-up rows without live promotion: `9`; rejected for weak OOS economics, OOS-objective contamination, legacy policy ambiguity, and/or missing strict zero-liquidation margin replay.
 - Strict 1x..6x recheck confirms Alpha Zoo strict `6.0x` as highest zero-liquidation deployable integer; diagnostic 5x/6x remains non-promotional.
 - Max observed peak RSS: `1239.703125 MiB` (<8 GiB).
 - Research history/source ledger: not regenerated; no new source family/global chronology change.
