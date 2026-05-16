@@ -1,8 +1,11 @@
 {
   "alpha_zoo_strict_6x_live_promotable": true,
   "calendar_current_base_rows_quarantined_not_ranked": true,
-  "core_candidate_count_after_calendar_exclusion": 10,
+  "core_candidate_count_after_calendar_and_nested_exclusion": 1,
+  "core_candidate_count_after_calendar_exclusion": 1,
+  "core_candidate_count_after_calendar_exclusion_before_nested_quarantine": 10,
   "core_candidate_universe_excludes_calendar_current_base": true,
+  "core_candidate_universe_excludes_nested_hybrid_same_family": true,
   "has_candidate_strategy_source": true,
   "has_diagnostic_lane": true,
   "has_memory_peak": true,
@@ -12,9 +15,12 @@
   "has_three_split_metrics": true,
   "has_three_split_periods": true,
   "hybrid_optuna_live_guarded_invalid": true,
-  "local_calendar_quarantine_verification_log_present": true,
+  "local_nested_hybrid_quarantine_verification_log_present": true,
   "local_required_verification_passed": true,
-  "local_required_verification_passed_after_calendar_quarantine_correction": true,
+  "local_required_verification_passed_after_nested_hybrid_quarantine_correction": true,
   "local_verification_log_present": true,
-  "quarantine_candidate_count": 5
+  "nested_hybrid_same_family_quarantine_candidate_count": 9,
+  "nested_hybrid_same_family_rows_quarantined_not_ranked": true,
+  "quarantine_candidate_count": 5,
+  "strict_core_candidate_count": 1
 }

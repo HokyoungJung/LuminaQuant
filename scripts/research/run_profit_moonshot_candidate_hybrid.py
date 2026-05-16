@@ -54,6 +54,15 @@ STARTING_EQUITY = 10_000.0
 LIVE_LEVERAGE_INTEGER_TOLERANCE = 1e-9
 _SOURCE_LEDGER_REF_FIELDS = ("source_ledger_refs", "source_search_ledger_refs", "source_ledger_ref")
 _RESEARCH_HISTORY_REF_FIELDS = ("research_history_refs", "research_history_ref", "source_history_refs")
+_NESTED_HYBRID_SOURCE_TOKENS = (
+    "hybrid",
+    "portfolio",
+    "allocator",
+    "governor",
+    "leverage_sweep",
+    "static_blend",
+    "meta_portfolio",
+)
 
 
 def _load_module(path: Path, name: str) -> Any:
@@ -153,6 +162,37 @@ def _calendar_primary_source_invalid(row: Mapping[str, Any]) -> bool:
     return "calendar" in primary_signal or "seasonality" in primary_signal
 
 
+def _nested_hybrid_source_invalid(row: Mapping[str, Any]) -> bool:
+    """Reject hybrid/meta/portfolio sources as sleeves of a new hybrid.
+
+    Candidate-hybrid construction must be a first-order blend of atomic,
+    traceable strategy rows. Feeding an already-hybrid, allocator, portfolio,
+    leverage-sweep, or same-family blend back into another hybrid double-counts
+    prior selection and hides the true strategy provenance.
+    """
+    validity = row.get("strategy_validity")
+    if isinstance(validity, Mapping):
+        primary_signal = str(validity.get("primary_signal_type") or "").lower()
+        if any(token in primary_signal for token in _NESTED_HYBRID_SOURCE_TOKENS):
+            return True
+
+    text_fields = (
+        row.get("name"),
+        row.get("mode"),
+        row.get("family"),
+        row.get("strategy_name"),
+        row.get("candidate_family"),
+        row.get("candidate_source"),
+    )
+    tokens = [str(value or "").lower() for value in text_fields]
+    tokens.extend(str(sleeve or "").lower() for sleeve in list(row.get("sleeves") or []))
+    return any(
+        marker in token
+        for token in tokens
+        for marker in _NESTED_HYBRID_SOURCE_TOKENS
+    )
+
+
 def _split_like_sources(row: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     sources: list[Mapping[str, Any]] = [row]
     splits = row.get("splits")
@@ -200,6 +240,9 @@ def _source_candidate_rejection_reasons(row: Mapping[str, Any]) -> list[str]:
         reasons.append("strategy_validity_rejected")
     elif _calendar_primary_source_invalid(row):
         reasons.append("calendar_primary_source_invalid")
+
+    if _nested_hybrid_source_invalid(row):
+        reasons.append("nested_hybrid_or_same_family_source_invalid")
 
     if not _source_metadata_present(row):
         reasons.append("research_history_source_metadata_missing")

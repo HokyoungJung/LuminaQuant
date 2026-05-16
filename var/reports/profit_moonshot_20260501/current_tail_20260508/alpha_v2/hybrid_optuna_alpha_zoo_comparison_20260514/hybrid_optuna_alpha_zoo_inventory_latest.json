@@ -20,12 +20,18 @@
   },
   "candidate_universe_correction": {
     "calendar_current_base_candidates_quarantined": 5,
-    "core_candidates_after_calendar_exclusion": 10,
-    "quarantine_is_not_a_hybrid_comparison_lane": true
+    "core_candidates_after_calendar_and_nested_hybrid_exclusion": 1,
+    "nested_hybrid_same_family_candidates_quarantined": 9,
+    "quarantine_is_not_a_hybrid_comparison_lane": true,
+    "strict_hybrid_composition_rule": "A live-promotable hybrid must be a first-order blend of atomic, traceable, non-calendar, non-current-base, non-hybrid source strategies. Prior hybrid/portfolio/allocator/leverage-sweep/static-blend/meta outputs and same-family parameter-clone portfolios are excluded from strict core."
   },
   "excluded_calendar_current_base_quarantine_paths": {
     "csv": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/hybrid_optuna_alpha_zoo_comparison_20260514/excluded_calendar_current_base_quarantine_latest.csv",
     "json_key": "excluded_calendar_current_base_quarantine in hybrid_optuna_alpha_zoo_comparison_latest.json"
+  },
+  "excluded_nested_hybrid_same_family_quarantine_paths": {
+    "csv": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/hybrid_optuna_alpha_zoo_comparison_20260514/excluded_nested_hybrid_same_family_quarantine_latest.csv",
+    "json_key": "excluded_nested_hybrid_same_family_quarantine in hybrid_optuna_alpha_zoo_comparison_latest.json"
   },
   "requested_keyword_scan_summary": {
     "hybrid_v35_v36_scripts": [
