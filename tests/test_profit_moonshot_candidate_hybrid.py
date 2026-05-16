@@ -92,7 +92,7 @@ def test_candidate_hybrid_live_source_gate_discards_untraceable_or_invalid_rows(
     assert reasons["liquidation_unsafe"] == ["liquidation_source_unsafe"]
 
 
-def test_candidate_hybrid_rejects_nested_hybrid_or_same_family_sources() -> None:
+def test_candidate_hybrid_rejects_nested_hybrid_sources_only() -> None:
     rows = [
         {
             "name": "atomic_state_signal",
@@ -100,6 +100,27 @@ def test_candidate_hybrid_rejects_nested_hybrid_or_same_family_sources() -> None
             "strategy_validity": {"pass": True, "primary_signal_type": "state_signal"},
             "research_history_refs": ["strategy_chronology:atomic_state_signal"],
             "source_search_ledger_refs": ["local_artifact:atomic_state_signal"],
+            "splits": {
+                "train": {"liquidation_count": 0, "minimum_margin_buffer": 1.0},
+                "validation": {"liquidation_count": 0, "minimum_margin_buffer": 1.0},
+                "oos": {"liquidation_count": 0, "minimum_margin_buffer": 1.0},
+            },
+        },
+        {
+            "name": "portfolio_allocator_static_blend_plain",
+            "leverage": 3.0,
+            "strategy_validity": {"pass": True, "primary_signal_type": "state_signal"},
+            "research_history_refs": [
+                "strategy_chronology:portfolio_allocator_static_blend_plain"
+            ],
+            "source_search_ledger_refs": [
+                "local_artifact:portfolio_allocator_static_blend_plain"
+            ],
+            "sleeves": [
+                "prior_portfolio_governor",
+                "allocator_leverage_sweep",
+                "meta_portfolio_static_blend",
+            ],
             "splits": {
                 "train": {"liquidation_count": 0, "minimum_margin_buffer": 1.0},
                 "validation": {"liquidation_count": 0, "minimum_margin_buffer": 1.0},
@@ -123,6 +144,9 @@ def test_candidate_hybrid_rejects_nested_hybrid_or_same_family_sources() -> None
 
     accepted, discarded = MODULE._partition_live_source_candidate_rows(rows)
 
-    assert [row["name"] for row in accepted] == ["atomic_state_signal"]
+    assert [row["name"] for row in accepted] == [
+        "atomic_state_signal",
+        "portfolio_allocator_static_blend_plain",
+    ]
     assert [row["name"] for row in discarded] == ["nested_hybrid_online_allocator"]
     assert discarded[0]["reasons"] == ["nested_hybrid_or_same_family_source_invalid"]

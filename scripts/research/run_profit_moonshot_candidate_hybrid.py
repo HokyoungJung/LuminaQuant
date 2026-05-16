@@ -56,12 +56,6 @@ _SOURCE_LEDGER_REF_FIELDS = ("source_ledger_refs", "source_search_ledger_refs", 
 _RESEARCH_HISTORY_REF_FIELDS = ("research_history_refs", "research_history_ref", "source_history_refs")
 _NESTED_HYBRID_SOURCE_TOKENS = (
     "hybrid",
-    "portfolio",
-    "allocator",
-    "governor",
-    "leverage_sweep",
-    "static_blend",
-    "meta_portfolio",
 )
 
 
@@ -163,12 +157,14 @@ def _calendar_primary_source_invalid(row: Mapping[str, Any]) -> bool:
 
 
 def _nested_hybrid_source_invalid(row: Mapping[str, Any]) -> bool:
-    """Reject hybrid/meta/portfolio sources as sleeves of a new hybrid.
+    """Reject already-hybrid sources as sleeves of a new hybrid.
 
     Candidate-hybrid construction must be a first-order blend of atomic,
-    traceable strategy rows. Feeding an already-hybrid, allocator, portfolio,
-    leverage-sweep, or same-family blend back into another hybrid double-counts
-    prior selection and hides the true strategy provenance.
+    traceable strategy rows. Feeding an already-hybrid source back into another
+    hybrid double-counts prior selection and hides the true strategy provenance.
+    Generic portfolio/allocator/meta/static-blend/leverage-sweep names are not
+    invalid by themselves; they are rejected here only when their own provenance
+    explicitly identifies them as hybrid.
     """
     validity = row.get("strategy_validity")
     if isinstance(validity, Mapping):

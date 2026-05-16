@@ -20,10 +20,11 @@
   },
   "candidate_universe_correction": {
     "calendar_current_base_candidates_quarantined": 5,
-    "core_candidates_after_calendar_and_nested_hybrid_exclusion": 1,
-    "nested_hybrid_same_family_candidates_quarantined": 9,
+    "core_candidates_after_calendar_and_nested_hybrid_exclusion": 2,
+    "nested_hybrid_same_family_candidates_quarantined": 8,
+    "portfolio_allocator_meta_static_blend_not_auto_excluded": true,
     "quarantine_is_not_a_hybrid_comparison_lane": true,
-    "strict_hybrid_composition_rule": "A live-promotable hybrid must be a first-order blend of atomic, traceable, non-calendar, non-current-base, non-hybrid source strategies. Prior hybrid/portfolio/allocator/leverage-sweep/static-blend/meta outputs and same-family parameter-clone portfolios are excluded from strict core."
+    "strict_hybrid_composition_rule": "Exclude literal hybrid/hybrid-online/hybrid-tuning sources from nested-hybrid strict quarantine. Portfolio/allocator/meta/static_blend/leverage_sweep labels are not invalid by themselves."
   },
   "excluded_calendar_current_base_quarantine_paths": {
     "csv": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/hybrid_optuna_alpha_zoo_comparison_20260514/excluded_calendar_current_base_quarantine_latest.csv",
