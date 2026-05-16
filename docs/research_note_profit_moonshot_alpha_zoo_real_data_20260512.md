@@ -172,3 +172,36 @@ Locked-OOS diagnostic breakdown at 6x, 10% allocation:
 - Conservative funding drag sensitivity, 0/1/2/5/10 bps per day: `+41.0967%`, `+40.4210%`, `+39.7486%`, `+37.7505%`, `+34.4835%`.
 
 Promotion policy unchanged: these diagnostics are `diagnostic_only`, `promotion_allowed=false`; the strict lane remains zero-liquidation + positive buffer + OOS return, MDD cap, and positive risk-metric policy with return/MDD report-only. Research history/source ledger was not regenerated because no new global source family was introduced.
+
+## 2026-05-16 KST — Hybrid v3.5/v3.6 and Optuna comparison against Alpha Zoo strict 6x
+
+Completed a repo-wide inventory and policy audit for hybrid v3.5/v3.6, hybrid Optuna, tuning/optimization, calendar Optuna, candidate-hybrid, and fresh-portfolio optimization artifacts against the preserved private/main baseline `1c6816fced44d277f6c7112934c9dded65ba710f`.
+
+Decision: **only** `CryptoFxAlphaZooStateStrategy / alpha_zoo_conservative_exit / strict 6x` remains live-promotion possible. Alpha Zoo selection is train/validation-only, locked-OOS is gate/report-only after candidate freeze, and strict 6x passes zero-liquidation, positive margin buffer, OOS MDD <=25%, OOS return above the invalid current-base reference, positive Sharpe/Sortino/smart Sortino/Calmar, and memory <8 GiB.
+
+Alpha Zoo strict 6x split evidence:
+
+- train: 2025-01-01T00:00:00 → 2025-10-19T13:00:00, return 68.8842%, MDD 29.5651%, Sharpe 1.569139, Sortino 1.919776, smart Sortino 1.481707, Calmar 2.329914, trades 1779, liq 0, min buffer 9049.125962
+- validation: 2025-10-22T05:00:00 → 2026-01-28T06:00:00, return 30.1195%, MDD 9.5595%, Sharpe 1.552041, Sortino 2.095744, smart Sortino 1.912882, Calmar 3.150734, trades 524, liq 0, min buffer 9527.695928
+- locked_oos: 2026-01-28T07:00:00 → 2026-05-06T23:00:00, return 41.0967%, MDD 13.6667%, Sharpe 2.143209, Sortino 2.841936, smart Sortino 2.500237, Calmar 3.007073, trades 540, liq 0, min buffer 9572.449083
+
+Hybrid/Optuna conclusions:
+
+- Hybrid v3.5/v3.6 clean rows use train/validation selection with locked-OOS report-only evidence, but locked-OOS returns are far below Alpha Zoo strict 6x and below the invalid current-base reference; strict liquidation/margin replay is not available for live promotion.
+- Hybrid Optuna `live_guarded` and `train_aware_guarded` are live-promotion invalid because those objective profiles consume OOS metrics; good-looking OOS values remain diagnostic/reference only.
+- Hybrid/tuning `locked_train_val` policy shape is valid (`oos_is_objective_input=false`) but locked-OOS performance is weak and lacks strict zero-liquidation replay.
+- Calendar Optuna and calendar/current-base-dependent fresh/candidate-hybrid rows remain diagnostic/reference only; calendar month/day/hour rules are invalid, and calendar Optuna best-trial/top-trial ordering uses locked-OOS after the train/validation objective.
+- Candidate-hybrid had strong OOS metrics but is not strict-promotable due validation liquidation count `1` plus calendar/current-base-source dependency.
+
+Strict integer recheck 1x..6x was rerun in the comparison directory. Highest strict integer remains `6.0x`: OOS return `41.0967%`, MDD `13.6667%`, return/MDD diagnostic `3.007073`, Sharpe `2.143209`, Sortino `2.841936`, smart Sortino `2.500237`, liquidation `0`, min buffer `9049.125962`. The separate diagnostic 5x/6x lane is preserved with `promotion_allowed=false`.
+
+Artifacts:
+
+- Full JSON report: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/hybrid_optuna_alpha_zoo_comparison_20260514/hybrid_optuna_alpha_zoo_comparison_latest.json`
+- Full Markdown report: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/hybrid_optuna_alpha_zoo_comparison_20260514/hybrid_optuna_alpha_zoo_comparison_latest.md`
+- Split performance CSV: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/hybrid_optuna_alpha_zoo_comparison_20260514/candidate_split_performance_latest.csv`
+- Inventory JSON: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/hybrid_optuna_alpha_zoo_comparison_20260514/hybrid_optuna_alpha_zoo_inventory_latest.json`
+- Prompt checklist audit: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/hybrid_optuna_alpha_zoo_comparison_20260514/prompt_checklist_audit_latest.json`
+- Strict integer recheck: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/hybrid_optuna_alpha_zoo_comparison_20260514/alpha_zoo_strict_integer_recheck_latest.json`
+
+Memory peak across inspected/replayed comparison artifacts: `1239.703125 MiB`, below 8 GiB. Research history/source ledger was **not regenerated** because this session did not add a new global data source family or chronology ledger; it reused existing repo-local artifacts and added a session-scoped comparison report.

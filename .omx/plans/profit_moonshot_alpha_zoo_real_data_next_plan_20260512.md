@@ -168,3 +168,18 @@ Every future session must update the active research notes before final handoff.
 - Slippage sensitivity: 0/2.5/5/10/20 bps round-trip -> locked-OOS +41.0967%/+30.1241%/+20.0034%/+2.0585%/-26.1930%.
 - Funding drag sensitivity: 0/1/2/5/10 bps per day -> locked-OOS +41.0967%/+40.4210%/+39.7486%/+37.7505%/+34.4835%.
 - These diagnostics do not change the promotion gate; strict live promotion remains only through the strict zero-liquidation lane, with return/MDD diagnostic-only.
+
+## 2026-05-16 KST — Hybrid/Optuna comparison execution result
+
+Status: artifact generation, documentation update, and local verification completed; commit/push/CI pending in this Ralph pass.
+
+- Baseline preserved: `private/main` `1c6816fced44d277f6c7112934c9dded65ba710f`.
+- Comparison artifact directory: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/hybrid_optuna_alpha_zoo_comparison_20260514/`.
+- Candidate rows inventoried: `15`.
+- Live promotion possible: `crypto_fx_alpha_zoo_state_calibrated`.
+- OOS-objective/ranking/selection invalid rows: `5`.
+- Calendar/current-base invalid rows: `5`.
+- Clean hybrid-policy rows without live promotion: `5`; rejected for weak OOS economics and/or missing strict zero-liquidation margin replay.
+- Strict 1x..6x recheck confirms Alpha Zoo strict `6.0x` as highest zero-liquidation deployable integer; diagnostic 5x/6x remains non-promotional.
+- Max observed peak RSS: `1239.703125 MiB` (<8 GiB).
+- Research history/source ledger: not regenerated; no new source family/global chronology change.

@@ -1,0 +1,1848 @@
+{
+  "artifact_inventory": {
+    "artifacts_read": {
+      "alpha_ledger": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_real_data_20260514/candidate_outcome_ledger_latest.jsonl",
+      "alpha_recheck": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/hybrid_optuna_alpha_zoo_comparison_20260514/alpha_zoo_strict_integer_recheck_latest.json",
+      "alpha_replay": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_real_data_20260514/crypto_fx_alpha_zoo_state_replay_latest.json",
+      "alpha_summary": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_real_data_20260514/crypto_fx_alpha_zoo_real_data_summary_latest.json",
+      "calendar_optuna_all_family": "var/reports/profit_moonshot_20260501/current_tail_20260508/all_family_expansion/calendar_optuna_latest.json",
+      "calendar_optuna_continuation": "var/reports/profit_moonshot_20260501/current_tail_20260508/continuation/calendar_optuna_latest.json",
+      "candidate_hybrid": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_hybrid/candidate_hybrid_latest.json",
+      "continued_fresh_tuning": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/continued_optimization_20260509/fresh_portfolio_tuning_latest.json",
+      "full_universe_selection": "var/reports/exact_window_backtests/followup_status/portfolio_incumbent_autoresearch_grouped/full_universe_selection_20260426/full_universe_selection_latest.json",
+      "hybrid_final_selection": "var/reports/exact_window_backtests/followup_status/portfolio_incumbent_autoresearch_grouped/hybrid_final_selection_20260426/hybrid_final_selection_latest.json",
+      "hybrid_optuna_live_guarded": "var/reports/exact_window_backtests/followup_status/portfolio_incumbent_autoresearch_grouped/portfolio_hybrid_online_optuna_current/hybrid_online_optuna_latest.json",
+      "hybrid_optuna_train_aware": "var/reports/exact_window_backtests/followup_status/portfolio_incumbent_autoresearch_grouped/portfolio_hybrid_online_optuna_current/train_aware_guarded/hybrid_online_optuna_latest.json",
+      "legacy_hybrid_tuning": "var/reports/exact_window_backtests/followup_status/portfolio_incumbent_autoresearch_grouped/portfolio_hybrid_online_tuning_current/hybrid_online_tuning_latest.json",
+      "live_hybrid_final": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/hybrid_final/hybrid_online_portfolio_latest.json",
+      "live_hybrid_tuning": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/hybrid_tuning/hybrid_online_tuning_latest.json",
+      "portfolio_target_budget": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/portfolio_target_budget_v1/fresh_portfolio_tuning_latest.json",
+      "state_distilled_tuning": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/state_distilled_market_state_next_20260512/portfolio_tuning_leadership_unwind_top18/fresh_portfolio_tuning_latest.json"
+    },
+    "requested_keyword_scan_summary": {
+      "hybrid_v35_v36_scripts": [
+        "scripts/research/build_full_universe_selection.py",
+        "scripts/research/run_hybrid_online_portfolio.py"
+      ],
+      "optuna_tuning_scripts": [
+        "scripts/research/optuna_tune_hybrid_online_portfolio.py",
+        "scripts/research/tune_hybrid_online_portfolio.py",
+        "scripts/research/optuna_tune_profit_moonshot_calendar.py",
+        "scripts/research/tune_profit_moonshot_fresh_portfolio.py",
+        "scripts/research/run_profit_moonshot_candidate_hybrid.py"
+      ],
+      "policy_modules": [
+        "src/lumina_quant/portfolio/hybrid_objective.py",
+        "src/lumina_quant/portfolio/optimizer_core.py",
+        "src/lumina_quant/tuning/param_registry.py",
+        "src/lumina_quant/optimization/"
+      ],
+      "tests": [
+        "tests/test_crypto_fx_alpha_zoo.py",
+        "tests/test_crypto_fx_alpha_zoo_state_strategy.py",
+        "tests/test_profit_moonshot_fresh_start_replay.py",
+        "tests/test_profit_moonshot_liquidation_aware_validation.py",
+        "tests/test_profit_moonshot_live_final_selection.py",
+        "tests/test_profit_moonshot_pass_under_8gb_validator.py"
+      ]
+    }
+  },
+  "artifact_kind": "hybrid_optuna_alpha_zoo_comparison_20260514",
+  "baseline_preservation": {
+    "comparison_artifact_directory": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/hybrid_optuna_alpha_zoo_comparison_20260514",
+    "private_main_green_head_preserved_as_parent": "1c6816fced44d277f6c7112934c9dded65ba710f",
+    "working_branch": "private-main"
+  },
+  "candidates": [
+    {
+      "artifact_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/hybrid_optuna_alpha_zoo_comparison_20260514/alpha_zoo_strict_integer_recheck_latest.json",
+      "baseline_artifact_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_real_data_20260514/crypto_fx_alpha_zoo_state_replay_latest.json",
+      "calendar_rule_violation": false,
+      "candidate_family": "alpha_zoo_strict_formulaic_state_factor",
+      "candidate_name": "crypto_fx_alpha_zoo_state_calibrated",
+      "candidate_source": "alpha_zoo_train_validation_calibrated_replay",
+      "candidate_variant": "alpha_zoo_conservative_exit",
+      "current_base_reference_dependency": false,
+      "deployable_success": true,
+      "has_strict_liquidation_replay": true,
+      "lane": "strict_deploy",
+      "leverage": 6.0,
+      "live_promotion_possible": true,
+      "locked_oos_selection_violation": false,
+      "locked_oos_used_for_objective": false,
+      "memory_peak_rss_mib": 626.7265625,
+      "memory_under_8gib": true,
+      "minimum_margin_buffer": 9049.12596153846,
+      "rejection_reasons": [],
+      "requires_strict_liquidation_replay": true,
+      "selection_provenance": {
+        "candidate_freeze_before_locked_oos_gate": true,
+        "current_base_calendar_tuple_role": "hypothesis_reference_only",
+        "locked_oos_calibration_record_count": 0,
+        "locked_oos_role": "gate_report_only_after_candidate_freeze",
+        "selected_grid_candidate": "alpha_zoo_conservative_exit",
+        "selected_grid_source": "state_distilled_external_risk_filter_seed",
+        "selection_excludes_current_base_calendar_tuple": true,
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "uses_locked_oos_for_selection": false
+      },
+      "split_performance": {
+        "locked_oos": {
+          "calmar": 3.007073011653861,
+          "liquidation_count": 0,
+          "mdd": 0.1366667659454812,
+          "minimum_margin_buffer": 9572.449083382613,
+          "return_mdd_diagnostic": 3.007073011653861,
+          "sharpe": 2.143208618164893,
+          "smart_sortino": 2.5002366612271256,
+          "sortino": 2.8419359198153646,
+          "total_return": 0.41096694346467144,
+          "trade_count": 540
+        },
+        "train": {
+          "calmar": 2.3299138826572765,
+          "liquidation_count": 0,
+          "mdd": 0.2956514670572235,
+          "minimum_margin_buffer": 9049.12596153846,
+          "return_mdd_diagnostic": 2.3299138826572765,
+          "sharpe": 1.5691392287535169,
+          "smart_sortino": 1.4817069095478044,
+          "sortino": 1.9197757311044374,
+          "total_return": 0.6888424575246155,
+          "trade_count": 1779
+        },
+        "validation": {
+          "calmar": 3.150734499031939,
+          "liquidation_count": 0,
+          "mdd": 0.09559509283920696,
+          "minimum_margin_buffer": 9527.695927547531,
+          "return_mdd_diagnostic": 3.150734499031939,
+          "sharpe": 1.5520405722881823,
+          "smart_sortino": 1.9128821340063138,
+          "sortino": 2.0957442791971075,
+          "total_return": 0.30119475694665043,
+          "trade_count": 524
+        }
+      },
+      "split_periods": {
+        "locked_oos": {
+          "end_timestamp": "2026-05-06T23:00:00",
+          "entry_time_max": "2026-05-06T22:00:00",
+          "entry_time_min": "2026-01-28T07:00:00",
+          "exit_time_max": "2026-05-06T23:00:00",
+          "exit_time_min": "2026-01-28T21:00:00",
+          "period_source": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_real_data_20260514/candidate_outcome_ledger_latest.jsonl",
+          "period_status": "exact_from_source_artifact",
+          "record_count": 21948,
+          "start_timestamp": "2026-01-28T07:00:00"
+        },
+        "train": {
+          "end_timestamp": "2025-10-19T13:00:00",
+          "entry_time_max": "2025-10-19T02:00:00",
+          "entry_time_min": "2025-01-01T00:00:00",
+          "exit_time_max": "2025-10-19T13:00:00",
+          "exit_time_min": "2025-01-01T19:00:00",
+          "period_source": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_real_data_20260514/candidate_outcome_ledger_latest.jsonl",
+          "period_status": "exact_from_source_artifact",
+          "record_count": 22906,
+          "start_timestamp": "2025-01-01T00:00:00"
+        },
+        "validation": {
+          "end_timestamp": "2026-01-28T06:00:00",
+          "entry_time_max": "2026-01-27T12:00:00",
+          "entry_time_min": "2025-10-22T05:00:00",
+          "exit_time_max": "2026-01-28T06:00:00",
+          "exit_time_min": "2025-10-22T11:00:00",
+          "period_source": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/crypto_fx_alpha_zoo_real_data_20260514/candidate_outcome_ledger_latest.jsonl",
+          "period_status": "exact_from_source_artifact",
+          "record_count": 22405,
+          "start_timestamp": "2025-10-22T05:00:00"
+        }
+      },
+      "strategy_name": "CryptoFxAlphaZooStateStrategy",
+      "total_liquidation_count": 0
+    },
+    {
+      "artifact_path": "var/reports/exact_window_backtests/followup_status/portfolio_incumbent_autoresearch_grouped/full_universe_selection_20260426/full_universe_selection_latest.json",
+      "calendar_rule_violation": false,
+      "candidate_family": "true_hybrid_v35_train_learned_high_vol_clean",
+      "candidate_name": "full_universe_v35_train_learned_high_vol_hybrid",
+      "candidate_source": "full_universe_selection_generated_hybrid_candidates",
+      "current_base_reference_dependency": false,
+      "deployable_success": false,
+      "has_strict_liquidation_replay": false,
+      "lane": "candidate_comparison_not_strict_deploy",
+      "leverage": null,
+      "live_promotion_possible": false,
+      "locked_oos_selection_violation": false,
+      "locked_oos_used_for_objective": false,
+      "memory_peak_rss_mib": null,
+      "memory_under_8gib": null,
+      "minimum_margin_buffer": null,
+      "rejection_reasons": [
+        "inferior_locked_oos_return_vs_alpha_zoo_strict_6x",
+        "locked_oos_return_not_above_invalid_current_base_reference",
+        "no_strict_zero_liquidation_margin_replay_for_live_promotion"
+      ],
+      "requires_strict_liquidation_replay": true,
+      "selection_provenance": {
+        "diagnostic_oos_used": false,
+        "final_selection_eligible": true,
+        "oos_scored": false,
+        "primary_source_path": "var/reports/exact_window_backtests/followup_status/portfolio_incumbent_autoresearch_grouped/full_universe_selection_20260426/generated_full_universe_hybrid_experiments",
+        "selection_metric": "val_scaled_score + 0.18 * train_scaled_score",
+        "selection_score": 73.76581644885513
+      },
+      "split_performance": {
+        "locked_oos": {
+          "calmar": 4.424896345022248,
+          "liquidation_count": null,
+          "mdd": 0.007089919920678089,
+          "minimum_margin_buffer": null,
+          "return_mdd_diagnostic": 4.424896345022248,
+          "sharpe": 1.0071688948090627,
+          "smart_sortino": null,
+          "sortino": 1.045660664763523,
+          "total_return": 0.0037306810855510797,
+          "trade_count": 0
+        },
+        "train": {
+          "calmar": 1.1353307842726204,
+          "liquidation_count": null,
+          "mdd": 0.14768706210036664,
+          "minimum_margin_buffer": null,
+          "return_mdd_diagnostic": 1.1353307842726204,
+          "sharpe": 1.0887743266408951,
+          "smart_sortino": null,
+          "sortino": 1.8574885454408334,
+          "total_return": 0.16767366804132844,
+          "trade_count": 0
+        },
+        "validation": {
+          "calmar": 42.75416280550446,
+          "liquidation_count": null,
+          "mdd": 0.0367673852858571,
+          "minimum_margin_buffer": null,
+          "return_mdd_diagnostic": 42.75416280550446,
+          "sharpe": 3.6331255459665623,
+          "smart_sortino": null,
+          "sortino": 7.132147942244293,
+          "total_return": 0.16497511128782305,
+          "trade_count": 0
+        }
+      },
+      "split_periods": {
+        "locked_oos": {
+          "caveat": "inferred from continuous stream_day_count; source artifact does not persist daily timestamps",
+          "end_timestamp": "2026-04-13T23:59:59",
+          "period_source": "scripts/research/build_full_universe_selection.py constants + stream_day_count",
+          "period_status": "reconstructed_from_persisted_metrics_or_split_config",
+          "start_timestamp": "2026-03-01T00:00:00"
+        },
+        "train": {
+          "caveat": "inferred from continuous stream_day_count; source artifact does not persist daily timestamps",
+          "end_timestamp": "2025-12-31T23:59:59",
+          "period_source": "scripts/research/build_full_universe_selection.py constants + stream_day_count",
+          "period_status": "reconstructed_from_persisted_metrics_or_split_config",
+          "start_timestamp": "2025-01-01T00:00:00"
+        },
+        "validation": {
+          "caveat": "inferred from continuous stream_day_count; source artifact does not persist daily timestamps",
+          "end_timestamp": "2026-02-28T23:59:59",
+          "period_source": "scripts/research/build_full_universe_selection.py constants + stream_day_count",
+          "period_status": "reconstructed_from_persisted_metrics_or_split_config",
+          "start_timestamp": "2026-01-01T00:00:00"
+        }
+      },
+      "strategy_name": "hybrid_online_portfolio_governor",
+      "total_liquidation_count": null
+    },
+    {
+      "artifact_path": "var/reports/exact_window_backtests/followup_status/portfolio_incumbent_autoresearch_grouped/full_universe_selection_20260426/full_universe_selection_latest.json",
+      "calendar_rule_violation": false,
+      "candidate_family": "true_hybrid_v36_rolling_dynamic_clean",
+      "candidate_name": "full_universe_v36_rolling_dynamic_high_vol_hybrid",
+      "candidate_source": "full_universe_selection_generated_hybrid_candidates",
+      "current_base_reference_dependency": false,
+      "deployable_success": false,
+      "has_strict_liquidation_replay": false,
+      "lane": "candidate_comparison_not_strict_deploy",
+      "leverage": null,
+      "live_promotion_possible": false,
+      "locked_oos_selection_violation": false,
+      "locked_oos_used_for_objective": false,
+      "memory_peak_rss_mib": null,
+      "memory_under_8gib": null,
+      "minimum_margin_buffer": null,
+      "rejection_reasons": [
+        "inferior_locked_oos_return_vs_alpha_zoo_strict_6x",
+        "locked_oos_return_not_above_invalid_current_base_reference",
+        "no_strict_zero_liquidation_margin_replay_for_live_promotion"
+      ],
+      "requires_strict_liquidation_replay": true,
+      "selection_provenance": {
+        "diagnostic_oos_used": false,
+        "final_selection_eligible": true,
+        "oos_scored": false,
+        "primary_source_path": "var/reports/exact_window_backtests/followup_status/portfolio_incumbent_autoresearch_grouped/full_universe_selection_20260426/generated_full_universe_hybrid_experiments",
+        "selection_metric": "val_scaled_score + 0.18 * train_scaled_score",
+        "selection_score": 70.43260499478892
+      },
+      "split_performance": {
+        "locked_oos": {
+          "calmar": 3.765693024614334,
+          "liquidation_count": null,
+          "mdd": 0.007125679960727993,
+          "minimum_margin_buffer": null,
+          "return_mdd_diagnostic": 3.765693024614334,
+          "sharpe": 0.8909711636394764,
+          "smart_sortino": null,
+          "sortino": 0.9023137937398158,
+          "total_return": 0.003197140656533426,
+          "trade_count": 0
+        },
+        "train": {
+          "calmar": 0.561704729354076,
+          "liquidation_count": null,
+          "mdd": 0.16943179670766884,
+          "minimum_margin_buffer": null,
+          "return_mdd_diagnostic": 0.561704729354076,
+          "sharpe": 0.6520964124331091,
+          "smart_sortino": null,
+          "sortino": 1.032088561275107,
+          "total_return": 0.09517064151365595,
+          "trade_count": 0
+        },
+        "validation": {
+          "calmar": 40.22232539473065,
+          "liquidation_count": null,
+          "mdd": 0.03895009861238308,
+          "minimum_margin_buffer": null,
+          "return_mdd_diagnostic": 40.22232539473065,
+          "sharpe": 3.5835708704486575,
+          "smart_sortino": null,
+          "sortino": 6.678936299518725,
+          "total_return": 0.1645870751093248,
+          "trade_count": 0
+        }
+      },
+      "split_periods": {
+        "locked_oos": {
+          "caveat": "inferred from continuous stream_day_count; source artifact does not persist daily timestamps",
+          "end_timestamp": "2026-04-13T23:59:59",
+          "period_source": "scripts/research/build_full_universe_selection.py constants + stream_day_count",
+          "period_status": "reconstructed_from_persisted_metrics_or_split_config",
+          "start_timestamp": "2026-03-01T00:00:00"
+        },
+        "train": {
+          "caveat": "inferred from continuous stream_day_count; source artifact does not persist daily timestamps",
+          "end_timestamp": "2025-12-31T23:59:59",
+          "period_source": "scripts/research/build_full_universe_selection.py constants + stream_day_count",
+          "period_status": "reconstructed_from_persisted_metrics_or_split_config",
+          "start_timestamp": "2025-01-01T00:00:00"
+        },
+        "validation": {
+          "caveat": "inferred from continuous stream_day_count; source artifact does not persist daily timestamps",
+          "end_timestamp": "2026-02-28T23:59:59",
+          "period_source": "scripts/research/build_full_universe_selection.py constants + stream_day_count",
+          "period_status": "reconstructed_from_persisted_metrics_or_split_config",
+          "start_timestamp": "2026-01-01T00:00:00"
+        }
+      },
+      "strategy_name": "hybrid_online_portfolio_governor",
+      "total_liquidation_count": null
+    },
+    {
+      "artifact_path": "var/reports/exact_window_backtests/followup_status/portfolio_incumbent_autoresearch_grouped/hybrid_final_selection_20260426/hybrid_final_selection_latest.json",
+      "calendar_rule_violation": false,
+      "candidate_family": "true_hybrid_v35_train_learned_high_vol",
+      "candidate_name": "final_scaled_v35_train_high_vol",
+      "candidate_source": "hybrid_final_selection_ranked_spec_highvol_true_hybrid",
+      "current_base_reference_dependency": false,
+      "deployable_success": false,
+      "has_strict_liquidation_replay": false,
+      "lane": "legacy_metric_only_reference",
+      "leverage": null,
+      "live_promotion_possible": false,
+      "locked_oos_selection_violation": false,
+      "locked_oos_used_for_objective": false,
+      "memory_peak_rss_mib": null,
+      "memory_under_8gib": null,
+      "minimum_margin_buffer": null,
+      "rejection_reasons": [
+        "inferior_locked_oos_return_vs_alpha_zoo_strict_6x",
+        "locked_oos_return_not_above_invalid_current_base_reference",
+        "metric_only_row_no_trade_timestamp_or_strict_liquidation_replay",
+        "no_strict_zero_liquidation_margin_replay_for_live_promotion"
+      ],
+      "requires_strict_liquidation_replay": true,
+      "selection_provenance": {
+        "diagnostic_oos_used": false,
+        "eligible_for_final_clean_selection": true,
+        "selection_policy": {
+          "cash_scored": false,
+          "excluded_from_primary": [
+            "static blends are challengers, not true HYBRID",
+            "metric-only/no-HV runs are challengers because latest spec requested high-vol boost",
+            "diagnostic runs using OOS guard",
+            "train/val MDD > 25%"
+          ],
+          "oos_scored": false,
+          "primary_universe": "spec-compliant v3.5/v3.6-style true HYBRID online-governor variants; metric-only/no-HV HYBRID is reported as challenger",
+          "scaled_score_formula": "100*(0.30*tanh(return/0.18)+0.30*tanh(sharpe/4)+0.15*tanh(sortino/12)+0.15*tanh(calmar/80)+0.10*(1-min(max(MDD,0),0.25)/0.25))",
+          "selection_metric": "val_scaled_score + 0.18 * train_scaled_score; OOS report-only"
+        },
+        "selection_score": 90.38463593195023,
+        "source_paths": null
+      },
+      "split_performance": {
+        "locked_oos": {
+          "calmar": 0.5164629865378633,
+          "liquidation_count": null,
+          "mdd": 0.016216175566440838,
+          "minimum_margin_buffer": null,
+          "return_mdd_diagnostic": 0.5164629865378633,
+          "sharpe": 0.16691722897632852,
+          "smart_sortino": null,
+          "sortino": 0.14140725003310065,
+          "total_return": 0.001166019252146766,
+          "trade_count": 0
+        },
+        "train": {
+          "calmar": 4.5634297602418314,
+          "liquidation_count": null,
+          "mdd": 0.08687966784304968,
+          "minimum_margin_buffer": null,
+          "return_mdd_diagnostic": 4.5634297602418314,
+          "sharpe": 1.587552969171389,
+          "smart_sortino": null,
+          "sortino": 2.3877861371850093,
+          "total_return": 0.39646926179489816,
+          "trade_count": 0
+        },
+        "validation": {
+          "calmar": 89.79201388937066,
+          "liquidation_count": null,
+          "mdd": 0.03392801917107979,
+          "minimum_margin_buffer": null,
+          "return_mdd_diagnostic": 89.79201388937066,
+          "sharpe": 3.9139021047970375,
+          "smart_sortino": null,
+          "sortino": 11.699613065807355,
+          "total_return": 0.2535165199736167,
+          "trade_count": 0
+        }
+      },
+      "split_periods": {
+        "locked_oos": {
+          "caveat": "source artifact did not persist explicit OOS end; end inferred from OOS total_return/CAGR annualization and should be treated as report-period reconstruction",
+          "end_timestamp": "2026-04-20T23:59:59",
+          "period_source": "scripts/research/build_full_universe_selection.py constants; metric-only row does not persist OOS end timestamp; inferred_end_from_oos_total_return_cagr_annualization",
+          "period_status": "reconstructed_from_persisted_metrics_or_split_config",
+          "start_timestamp": "2026-03-01T00:00:00"
+        },
+        "train": {
+          "caveat": "source artifact does not persist OOS end timestamp",
+          "end_timestamp": "2025-12-31T23:59:59",
+          "period_source": "scripts/research/build_full_universe_selection.py constants; metric-only row does not persist OOS end timestamp",
+          "period_status": "reconstructed_from_persisted_metrics_or_split_config",
+          "start_timestamp": "2025-01-01T00:00:00"
+        },
+        "validation": {
+          "caveat": "source artifact does not persist OOS end timestamp",
+          "end_timestamp": "2026-02-28T23:59:59",
+          "period_source": "scripts/research/build_full_universe_selection.py constants; metric-only row does not persist OOS end timestamp",
+          "period_status": "reconstructed_from_persisted_metrics_or_split_config",
+          "start_timestamp": "2026-01-01T00:00:00"
+        }
+      },
+      "strategy_name": "hybrid_v35_v36_final_selection_metric_only",
+      "total_liquidation_count": null
+    },
+    {
+      "artifact_path": "var/reports/exact_window_backtests/followup_status/portfolio_incumbent_autoresearch_grouped/hybrid_final_selection_20260426/hybrid_final_selection_latest.json",
+      "calendar_rule_violation": false,
+      "candidate_family": "true_hybrid_v36_rolling_dynamic",
+      "candidate_name": "final_scaled_v36_dynamic_high_vol",
+      "candidate_source": "hybrid_final_selection_ranked_spec_highvol_true_hybrid",
+      "current_base_reference_dependency": false,
+      "deployable_success": false,
+      "has_strict_liquidation_replay": false,
+      "lane": "legacy_metric_only_reference",
+      "leverage": null,
+      "live_promotion_possible": false,
+      "locked_oos_selection_violation": false,
+      "locked_oos_used_for_objective": false,
+      "memory_peak_rss_mib": null,
+      "memory_under_8gib": null,
+      "minimum_margin_buffer": null,
+      "rejection_reasons": [
+        "inferior_locked_oos_return_vs_alpha_zoo_strict_6x",
+        "locked_oos_return_not_above_invalid_current_base_reference",
+        "metric_only_row_no_trade_timestamp_or_strict_liquidation_replay",
+        "no_strict_zero_liquidation_margin_replay_for_live_promotion"
+      ],
+      "requires_strict_liquidation_replay": true,
+      "selection_provenance": {
+        "diagnostic_oos_used": false,
+        "eligible_for_final_clean_selection": true,
+        "selection_policy": {
+          "cash_scored": false,
+          "excluded_from_primary": [
+            "static blends are challengers, not true HYBRID",
+            "metric-only/no-HV runs are challengers because latest spec requested high-vol boost",
+            "diagnostic runs using OOS guard",
+            "train/val MDD > 25%"
+          ],
+          "oos_scored": false,
+          "primary_universe": "spec-compliant v3.5/v3.6-style true HYBRID online-governor variants; metric-only/no-HV HYBRID is reported as challenger",
+          "scaled_score_formula": "100*(0.30*tanh(return/0.18)+0.30*tanh(sharpe/4)+0.15*tanh(sortino/12)+0.15*tanh(calmar/80)+0.10*(1-min(max(MDD,0),0.25)/0.25))",
+          "selection_metric": "val_scaled_score + 0.18 * train_scaled_score; OOS report-only"
+        },
+        "selection_score": 88.50255900787933,
+        "source_paths": null
+      },
+      "split_performance": {
+        "locked_oos": {
+          "calmar": -0.589948432428728,
+          "liquidation_count": null,
+          "mdd": 0.015187574732288267,
+          "minimum_margin_buffer": null,
+          "return_mdd_diagnostic": -0.589948432428728,
+          "sharpe": -0.1530192606232223,
+          "smart_sortino": null,
+          "sortino": -0.10845774682752173,
+          "total_return": -0.0012567811516623895,
+          "trade_count": 0
+        },
+        "train": {
+          "calmar": 2.0525360772068066,
+          "liquidation_count": null,
+          "mdd": 0.12122123221096737,
+          "minimum_margin_buffer": null,
+          "return_mdd_diagnostic": 2.0525360772068066,
+          "sharpe": 1.0646186655712602,
+          "smart_sortino": null,
+          "sortino": 1.6707426235188656,
+          "total_return": 0.24881095243647433,
+          "trade_count": 0
+        },
+        "validation": {
+          "calmar": 88.162285682999,
+          "liquidation_count": null,
+          "mdd": 0.03373878949747777,
+          "minimum_margin_buffer": null,
+          "return_mdd_diagnostic": 88.162285682999,
+          "sharpe": 3.8536403636069383,
+          "smart_sortino": null,
+          "sortino": 12.034966890880495,
+          "total_return": 0.24988519627364747,
+          "trade_count": 0
+        }
+      },
+      "split_periods": {
+        "locked_oos": {
+          "caveat": "source artifact did not persist explicit OOS end; end inferred from OOS total_return/CAGR annualization and should be treated as report-period reconstruction",
+          "end_timestamp": "2026-04-20T23:59:59",
+          "period_source": "scripts/research/build_full_universe_selection.py constants; metric-only row does not persist OOS end timestamp; inferred_end_from_oos_total_return_cagr_annualization",
+          "period_status": "reconstructed_from_persisted_metrics_or_split_config",
+          "start_timestamp": "2026-03-01T00:00:00"
+        },
+        "train": {
+          "caveat": "source artifact does not persist OOS end timestamp",
+          "end_timestamp": "2025-12-31T23:59:59",
+          "period_source": "scripts/research/build_full_universe_selection.py constants; metric-only row does not persist OOS end timestamp",
+          "period_status": "reconstructed_from_persisted_metrics_or_split_config",
+          "start_timestamp": "2025-01-01T00:00:00"
+        },
+        "validation": {
+          "caveat": "source artifact does not persist OOS end timestamp",
+          "end_timestamp": "2026-02-28T23:59:59",
+          "period_source": "scripts/research/build_full_universe_selection.py constants; metric-only row does not persist OOS end timestamp",
+          "period_status": "reconstructed_from_persisted_metrics_or_split_config",
+          "start_timestamp": "2026-01-01T00:00:00"
+        }
+      },
+      "strategy_name": "hybrid_v35_v36_final_selection_metric_only",
+      "total_liquidation_count": null
+    },
+    {
+      "artifact_path": "var/reports/exact_window_backtests/followup_status/portfolio_incumbent_autoresearch_grouped/portfolio_hybrid_online_optuna_current/hybrid_online_optuna_latest.json",
+      "calendar_rule_violation": false,
+      "candidate_family": "hybrid_optuna_diagnostic_oos_objective",
+      "candidate_name": "hybrid_online_optuna_best_trial_9_live_guarded",
+      "candidate_source": "optuna_live_guarded",
+      "current_base_reference_dependency": false,
+      "deployable_success": false,
+      "has_strict_liquidation_replay": false,
+      "lane": "diagnostic_reference_only",
+      "leverage": null,
+      "live_promotion_possible": false,
+      "locked_oos_selection_violation": true,
+      "locked_oos_used_for_objective": true,
+      "memory_peak_rss_mib": null,
+      "memory_under_8gib": null,
+      "minimum_margin_buffer": null,
+      "rejection_reasons": [
+        "hybrid_optuna_objective_profile_uses_oos_metrics",
+        "inferior_locked_oos_return_vs_alpha_zoo_strict_6x",
+        "locked_oos_return_not_above_invalid_current_base_reference",
+        "locked_oos_used_for_objective_ranking_pruning_selection_or_tie_break",
+        "no_strict_zero_liquidation_margin_replay_for_live_promotion"
+      ],
+      "requires_strict_liquidation_replay": true,
+      "selection_provenance": {
+        "objective": 75.14682553320803,
+        "objective_policy": null,
+        "objective_profile": "live_guarded",
+        "oos_objective_code_evidence": "src/lumina_quant/portfolio/hybrid_objective.py profiles live_guarded/train_aware_guarded consume ref_oos/hist_oos",
+        "trial_number": 9
+      },
+      "split_performance": {
+        "locked_oos": {
+          "calmar": 29.63435495370123,
+          "liquidation_count": null,
+          "mdd": 0.0025728409137670827,
+          "minimum_margin_buffer": null,
+          "return_mdd_diagnostic": 29.63435495370123,
+          "sharpe": 3.2370328163019604,
+          "smart_sortino": null,
+          "sortino": 2.5982611292819637,
+          "total_return": 0.006867970374799581,
+          "trade_count": 0
+        },
+        "train": {
+          "calmar": 1.6084035565802084,
+          "liquidation_count": null,
+          "mdd": 0.04244850127610034,
+          "minimum_margin_buffer": null,
+          "return_mdd_diagnostic": 1.6084035565802084,
+          "sharpe": 0.8752874270443606,
+          "smart_sortino": null,
+          "sortino": 1.4564135494543393,
+          "total_return": 0.0682743204239793,
+          "trade_count": 0
+        },
+        "validation": {
+          "calmar": 37.53549853974935,
+          "liquidation_count": null,
+          "mdd": 0.012776358123159581,
+          "minimum_margin_buffer": null,
+          "return_mdd_diagnostic": 37.53549853974935,
+          "sharpe": 3.285676857909495,
+          "smart_sortino": null,
+          "sortino": 8.148959733254436,
+          "total_return": 0.06537184135232543,
+          "trade_count": 0
+        }
+      },
+      "split_periods": {
+        "locked_oos": {
+          "caveat": "source artifact did not persist explicit OOS end; end inferred from OOS total_return/CAGR annualization and should be treated as report-period reconstruction",
+          "end_timestamp": "2026-04-03T23:59:59",
+          "period_source": "artifact split_windows; legacy artifact stored oos_end_inclusive=latest; inferred_end_from_oos_total_return_cagr_annualization",
+          "period_status": "reconstructed_from_persisted_metrics_or_split_config",
+          "start_timestamp": "2026-03-01T00:00:00"
+        },
+        "train": {
+          "end_timestamp": "2025-12-31T23:59:59",
+          "period_source": "artifact split_windows; legacy artifact stored oos_end_inclusive=latest",
+          "period_status": "exact_from_source_artifact",
+          "start_timestamp": "2025-01-01T00:00:00"
+        },
+        "validation": {
+          "end_timestamp": "2026-02-28T23:59:59",
+          "period_source": "artifact split_windows; legacy artifact stored oos_end_inclusive=latest",
+          "period_status": "exact_from_source_artifact",
+          "start_timestamp": "2026-01-01T00:00:00"
+        }
+      },
+      "strategy_name": "hybrid_online_portfolio_optuna",
+      "total_liquidation_count": null
+    },
+    {
+      "artifact_path": "var/reports/exact_window_backtests/followup_status/portfolio_incumbent_autoresearch_grouped/portfolio_hybrid_online_optuna_current/train_aware_guarded/hybrid_online_optuna_latest.json",
+      "calendar_rule_violation": false,
+      "candidate_family": "hybrid_optuna_diagnostic_oos_objective",
+      "candidate_name": "hybrid_online_optuna_best_trial_9_train_aware_guarded",
+      "candidate_source": "optuna_train_aware_guarded",
+      "current_base_reference_dependency": false,
+      "deployable_success": false,
+      "has_strict_liquidation_replay": false,
+      "lane": "diagnostic_reference_only",
+      "leverage": null,
+      "live_promotion_possible": false,
+      "locked_oos_selection_violation": true,
+      "locked_oos_used_for_objective": true,
+      "memory_peak_rss_mib": null,
+      "memory_under_8gib": null,
+      "minimum_margin_buffer": null,
+      "rejection_reasons": [
+        "hybrid_optuna_objective_profile_uses_oos_metrics",
+        "inferior_locked_oos_return_vs_alpha_zoo_strict_6x",
+        "locked_oos_return_not_above_invalid_current_base_reference",
+        "locked_oos_used_for_objective_ranking_pruning_selection_or_tie_break",
+        "no_strict_zero_liquidation_margin_replay_for_live_promotion"
+      ],
+      "requires_strict_liquidation_replay": true,
+      "selection_provenance": {
+        "objective": 90.39921449421108,
+        "objective_policy": null,
+        "objective_profile": "train_aware_guarded",
+        "oos_objective_code_evidence": "src/lumina_quant/portfolio/hybrid_objective.py profiles live_guarded/train_aware_guarded consume ref_oos/hist_oos",
+        "trial_number": 9
+      },
+      "split_performance": {
+        "locked_oos": {
+          "calmar": 29.63435495370123,
+          "liquidation_count": null,
+          "mdd": 0.0025728409137670827,
+          "minimum_margin_buffer": null,
+          "return_mdd_diagnostic": 29.63435495370123,
+          "sharpe": 3.2370328163019604,
+          "smart_sortino": null,
+          "sortino": 2.5982611292819637,
+          "total_return": 0.006867970374799581,
+          "trade_count": 0
+        },
+        "train": {
+          "calmar": 1.6084035565802084,
+          "liquidation_count": null,
+          "mdd": 0.04244850127610034,
+          "minimum_margin_buffer": null,
+          "return_mdd_diagnostic": 1.6084035565802084,
+          "sharpe": 0.8752874270443606,
+          "smart_sortino": null,
+          "sortino": 1.4564135494543393,
+          "total_return": 0.0682743204239793,
+          "trade_count": 0
+        },
+        "validation": {
+          "calmar": 37.53549853974935,
+          "liquidation_count": null,
+          "mdd": 0.012776358123159581,
+          "minimum_margin_buffer": null,
+          "return_mdd_diagnostic": 37.53549853974935,
+          "sharpe": 3.285676857909495,
+          "smart_sortino": null,
+          "sortino": 8.148959733254436,
+          "total_return": 0.06537184135232543,
+          "trade_count": 0
+        }
+      },
+      "split_periods": {
+        "locked_oos": {
+          "caveat": "source artifact did not persist explicit OOS end; end inferred from OOS total_return/CAGR annualization and should be treated as report-period reconstruction",
+          "end_timestamp": "2026-04-03T23:59:59",
+          "period_source": "artifact split_windows; legacy artifact stored oos_end_inclusive=latest; inferred_end_from_oos_total_return_cagr_annualization",
+          "period_status": "reconstructed_from_persisted_metrics_or_split_config",
+          "start_timestamp": "2026-03-01T00:00:00"
+        },
+        "train": {
+          "end_timestamp": "2025-12-31T23:59:59",
+          "period_source": "artifact split_windows; legacy artifact stored oos_end_inclusive=latest",
+          "period_status": "exact_from_source_artifact",
+          "start_timestamp": "2025-01-01T00:00:00"
+        },
+        "validation": {
+          "end_timestamp": "2026-02-28T23:59:59",
+          "period_source": "artifact split_windows; legacy artifact stored oos_end_inclusive=latest",
+          "period_status": "exact_from_source_artifact",
+          "start_timestamp": "2026-01-01T00:00:00"
+        }
+      },
+      "strategy_name": "hybrid_online_portfolio_optuna",
+      "total_liquidation_count": null
+    },
+    {
+      "artifact_path": "var/reports/exact_window_backtests/followup_status/portfolio_incumbent_autoresearch_grouped/portfolio_hybrid_online_tuning_current/hybrid_online_tuning_latest.json",
+      "calendar_rule_violation": false,
+      "candidate_family": "hybrid_tuning_grid",
+      "candidate_name": "hybrid_tuning_long_memory_legacy_no_policy",
+      "candidate_source": "legacy_hybrid_online_tuning_no_explicit_objective_policy",
+      "current_base_reference_dependency": false,
+      "deployable_success": false,
+      "has_strict_liquidation_replay": false,
+      "lane": "candidate_comparison_not_strict_deploy",
+      "leverage": null,
+      "live_promotion_possible": false,
+      "locked_oos_selection_violation": true,
+      "locked_oos_used_for_objective": false,
+      "memory_peak_rss_mib": null,
+      "memory_under_8gib": null,
+      "minimum_margin_buffer": null,
+      "rejection_reasons": [
+        "inferior_locked_oos_return_vs_alpha_zoo_strict_6x",
+        "legacy_artifact_lacks_explicit_no_oos_policy",
+        "locked_oos_return_not_above_invalid_current_base_reference",
+        "locked_oos_used_for_objective_ranking_pruning_selection_or_tie_break",
+        "no_strict_zero_liquidation_margin_replay_for_live_promotion"
+      ],
+      "requires_strict_liquidation_replay": true,
+      "selection_provenance": {
+        "objective": 68.79577381127194,
+        "objective_policy": null,
+        "objective_profile": null,
+        "provenance_confidence": "low_legacy_no_explicit_policy"
+      },
+      "split_performance": {
+        "locked_oos": {
+          "calmar": 248.40739228876896,
+          "liquidation_count": null,
+          "mdd": 4.54157386553522e-06,
+          "minimum_margin_buffer": null,
+          "return_mdd_diagnostic": 248.40739228876896,
+          "sharpe": 3.125323091918733,
+          "smart_sortino": null,
+          "sortino": 59.73228712659324,
+          "total_return": 0.00010503520699645108,
+          "trade_count": 0
+        },
+        "train": {
+          "calmar": 1.5528485158501732,
+          "liquidation_count": null,
+          "mdd": 0.04644104441653396,
+          "minimum_margin_buffer": null,
+          "return_mdd_diagnostic": 1.5528485158501732,
+          "sharpe": 0.9375085487697316,
+          "smart_sortino": null,
+          "sortino": 1.5480182021552553,
+          "total_return": 0.07211590689674674,
+          "trade_count": 0
+        },
+        "validation": {
+          "calmar": 30.26374318474027,
+          "liquidation_count": null,
+          "mdd": 0.010043287023272174,
+          "minimum_margin_buffer": null,
+          "return_mdd_diagnostic": 30.26374318474027,
+          "sharpe": 3.073616150430555,
+          "smart_sortino": null,
+          "sortino": 11.011706033847304,
+          "total_return": 0.043833146142575385,
+          "trade_count": 0
+        }
+      },
+      "split_periods": {
+        "locked_oos": {
+          "caveat": "source artifact did not persist explicit OOS end; end inferred from OOS total_return/CAGR annualization and should be treated as report-period reconstruction",
+          "end_timestamp": "2026-04-03T23:59:59",
+          "period_source": "artifact split_windows; inferred_end_from_oos_total_return_cagr_annualization",
+          "period_status": "reconstructed_from_persisted_metrics_or_split_config",
+          "start_timestamp": "2026-03-01T00:00:00"
+        },
+        "train": {
+          "end_timestamp": "2025-12-31T23:59:59",
+          "period_source": "artifact split_windows",
+          "period_status": "exact_from_source_artifact",
+          "start_timestamp": "2025-01-01T00:00:00"
+        },
+        "validation": {
+          "end_timestamp": "2026-02-28T23:59:59",
+          "period_source": "artifact split_windows",
+          "period_status": "exact_from_source_artifact",
+          "start_timestamp": "2026-01-01T00:00:00"
+        }
+      },
+      "strategy_name": "hybrid_online_portfolio_tuning",
+      "total_liquidation_count": null
+    },
+    {
+      "artifact_path": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/hybrid_tuning/hybrid_online_tuning_latest.json",
+      "calendar_rule_violation": false,
+      "candidate_family": "hybrid_tuning_grid",
+      "candidate_name": "hybrid_tuning_baseline_locked_train_val",
+      "candidate_source": "live_final_hybrid_tuning_locked_train_val",
+      "current_base_reference_dependency": false,
+      "deployable_success": false,
+      "has_strict_liquidation_replay": false,
+      "lane": "candidate_comparison_not_strict_deploy",
+      "leverage": null,
+      "live_promotion_possible": false,
+      "locked_oos_selection_violation": false,
+      "locked_oos_used_for_objective": false,
+      "memory_peak_rss_mib": null,
+      "memory_under_8gib": null,
+      "minimum_margin_buffer": null,
+      "rejection_reasons": [
+        "inferior_locked_oos_return_vs_alpha_zoo_strict_6x",
+        "locked_oos_return_not_above_invalid_current_base_reference",
+        "no_strict_zero_liquidation_margin_replay_for_live_promotion"
+      ],
+      "requires_strict_liquidation_replay": true,
+      "selection_provenance": {
+        "objective": 65.68096814777863,
+        "objective_policy": {
+          "locked_oos_label": "locked_oos_report_only",
+          "objective_policy": "train_val_only_locked_oos_report",
+          "objective_profile": "locked_train_val",
+          "oos_is_objective_input": false,
+          "selection_label": "train_val_validation_only"
+        },
+        "objective_profile": "locked_train_val",
+        "provenance_confidence": "high_locked_train_val"
+      },
+      "split_performance": {
+        "locked_oos": {
+          "calmar": 3.575246760792684,
+          "liquidation_count": null,
+          "mdd": 0.004896704890141268,
+          "minimum_margin_buffer": null,
+          "return_mdd_diagnostic": 3.575246760792684,
+          "sharpe": 0.7763172405928882,
+          "smart_sortino": null,
+          "sortino": 0.8998624362864446,
+          "total_return": 0.001617979335523323,
+          "trade_count": 0
+        },
+        "train": {
+          "calmar": 1.394125428183764,
+          "liquidation_count": null,
+          "mdd": 0.049953690173354715,
+          "minimum_margin_buffer": null,
+          "return_mdd_diagnostic": 1.394125428183764,
+          "sharpe": 0.8957917111788695,
+          "smart_sortino": null,
+          "sortino": 1.5082663105733576,
+          "total_return": 0.06964170970228722,
+          "trade_count": 0
+        },
+        "validation": {
+          "calmar": 38.66709022525689,
+          "liquidation_count": null,
+          "mdd": 0.012715598209944057,
+          "minimum_margin_buffer": null,
+          "return_mdd_diagnostic": 38.66709022525689,
+          "sharpe": 3.305313347521935,
+          "smart_sortino": null,
+          "sortino": 8.940229070146314,
+          "total_return": 0.06677633838335151,
+          "trade_count": 0
+        }
+      },
+      "split_periods": {
+        "locked_oos": {
+          "end_timestamp": "2026-05-09T23:59:59",
+          "period_source": "artifact split_windows",
+          "period_status": "exact_from_source_artifact",
+          "start_timestamp": "2026-03-01T00:00:00"
+        },
+        "train": {
+          "end_timestamp": "2025-12-31T23:59:59",
+          "period_source": "artifact split_windows",
+          "period_status": "exact_from_source_artifact",
+          "start_timestamp": "2025-01-01T00:00:00"
+        },
+        "validation": {
+          "end_timestamp": "2026-02-28T23:59:59",
+          "period_source": "artifact split_windows",
+          "period_status": "exact_from_source_artifact",
+          "start_timestamp": "2026-01-01T00:00:00"
+        }
+      },
+      "strategy_name": "hybrid_online_portfolio_tuning",
+      "total_liquidation_count": null
+    },
+    {
+      "artifact_path": "var/reports/profit_moonshot_20260501/live_final_selection_20260510/candidate_hybrid/candidate_hybrid_latest.json",
+      "calendar_rule_violation": true,
+      "candidate_family": "candidate_hybrid_dynamic_weight",
+      "candidate_name": "candidate_hybrid_online_rank_01_candidate_hybrid_input_01_fresh_portfolio_train_val_monthly_",
+      "candidate_source": "candidate_hybrid_train_validation_selected",
+      "current_base_reference_dependency": true,
+      "deployable_success": false,
+      "has_strict_liquidation_replay": true,
+      "lane": "candidate_comparison_not_strict_deploy",
+      "leverage": 1.0,
+      "live_promotion_possible": false,
+      "locked_oos_selection_violation": false,
+      "locked_oos_used_for_objective": false,
+      "memory_peak_rss_mib": 322.4375,
+      "memory_under_8gib": true,
+      "minimum_margin_buffer": 9174.874641446591,
+      "rejection_reasons": [
+        "calendar_month_day_hour_or_calendar_primary_rule_invalid",
+        "current_base_calendar_tuple_dependency_hypothesis_reference_only",
+        "inferior_locked_oos_return_vs_alpha_zoo_strict_6x",
+        "strict_lane_liquidation_count_gt_zero"
+      ],
+      "requires_strict_liquidation_replay": true,
+      "selection_provenance": {
+        "locked_oos_policy": {
+          "oos_is_gate_only": true,
+          "oos_is_report_only": true,
+          "uses_locked_oos_for_selection": false
+        },
+        "selection_basis": "candidate_derived_online_hybrid_train_validation_only",
+        "selection_policy": {
+          "locked_oos": "report_only_gate_only",
+          "selection_inputs": [
+            "train",
+            "validation"
+          ],
+          "tuning_objective": "frozen_weighted_train_validation_score_v1",
+          "uses_locked_oos_for_selection": false
+        },
+        "sleeve_sample": [
+          "candidate_hybrid_input_01_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+          "candidate_hybrid_input_03_current_base_tuple_liquidation_aware_5x",
+          "candidate_hybrid_input_07_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+          "candidate_hybrid_input_08_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+          "candidate_hybrid_input_09_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+          "candidate_hybrid_input_10_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+          "candidate_hybrid_input_11_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se",
+          "candidate_hybrid_input_17_fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_se"
+        ]
+      },
+      "split_performance": {
+        "locked_oos": {
+          "calmar": 115.1662122299702,
+          "liquidation_count": 0,
+          "mdd": 0.009362192564588145,
+          "minimum_margin_buffer": 9834.08967127332,
+          "return_mdd_diagnostic": 15.349926709015831,
+          "sharpe": 6.422833331778017,
+          "smart_sortino": 16.03773445932763,
+          "sortino": 16.661694426001848,
+          "total_return": 0.143708969702121,
+          "trade_count": 288
+        },
+        "train": {
+          "calmar": 3.2330736554820803,
+          "liquidation_count": 0,
+          "mdd": 0.1001181576347775,
+          "minimum_margin_buffer": 9174.874641446591,
+          "return_mdd_diagnostic": 3.2330736554820803,
+          "sharpe": 1.1763454312527821,
+          "smart_sortino": 0.6470807449868617,
+          "sortino": 1.0793181061420647,
+          "total_return": 0.3236893778844012,
+          "trade_count": 767
+        },
+        "validation": {
+          "calmar": 174.2765090441274,
+          "liquidation_count": 1,
+          "mdd": 0.019996439142215938,
+          "minimum_margin_buffer": 9764.479684233294,
+          "return_mdd_diagnostic": 13.72922386938922,
+          "sharpe": 5.2142728735843695,
+          "smart_sortino": 13.083834871119011,
+          "sortino": 14.221339467880039,
+          "total_return": 0.27453558957409996,
+          "trade_count": 128
+        }
+      },
+      "split_periods": {
+        "locked_oos": {
+          "end_timestamp": "2026-05-09T23:59:59",
+          "period_source": "artifact split_windows",
+          "period_status": "exact_from_source_artifact",
+          "start_timestamp": "2026-03-01T00:00:00"
+        },
+        "train": {
+          "end_timestamp": "2025-12-31T23:59:59",
+          "period_source": "artifact split_windows",
+          "period_status": "exact_from_source_artifact",
+          "start_timestamp": "2025-01-01T00:00:00"
+        },
+        "validation": {
+          "end_timestamp": "2026-02-28T23:59:59",
+          "period_source": "artifact split_windows",
+          "period_status": "exact_from_source_artifact",
+          "start_timestamp": "2026-01-01T00:00:00"
+        }
+      },
+      "strategy_name": "profit_moonshot_candidate_hybrid",
+      "total_liquidation_count": 1
+    },
+    {
+      "artifact_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/continuation/calendar_optuna_latest.json",
+      "calendar_rule_violation": true,
+      "candidate_family": "calendar_optuna_reference_invalid",
+      "candidate_name": "optuna_calendar_trx_sethusdt_t0_thr150_h120_ls620_ss100_tp180",
+      "candidate_source": "calendar_optuna_continuation",
+      "current_base_reference_dependency": false,
+      "deployable_success": false,
+      "has_strict_liquidation_replay": false,
+      "lane": "diagnostic_reference_only",
+      "leverage": null,
+      "live_promotion_possible": false,
+      "locked_oos_selection_violation": true,
+      "locked_oos_used_for_objective": false,
+      "memory_peak_rss_mib": 243.5859375,
+      "memory_under_8gib": true,
+      "minimum_margin_buffer": null,
+      "rejection_reasons": [
+        "calendar_month_day_hour_or_calendar_primary_rule_invalid",
+        "calendar_optuna_best_trial_sorted_with_locked_oos_after_objective",
+        "inferior_locked_oos_return_vs_alpha_zoo_strict_6x",
+        "locked_oos_return_not_above_invalid_current_base_reference",
+        "locked_oos_used_for_objective_ranking_pruning_selection_or_tie_break",
+        "no_strict_zero_liquidation_margin_replay_for_live_promotion"
+      ],
+      "requires_strict_liquidation_replay": true,
+      "selection_provenance": {
+        "evidence": "scripts/research/optuna_tune_profit_moonshot_calendar.py objective() runs train/val only, then trials.sort includes oos success/return before objective",
+        "objective_inputs": [
+          "train",
+          "validation"
+        ],
+        "objective_policy": "train_val_only_locked_oos_report",
+        "post_study_ranking_uses_locked_oos": true
+      },
+      "split_performance": {
+        "locked_oos": {
+          "calmar": 37.01156944153708,
+          "liquidation_count": 0,
+          "mdd": 0.001531997749754712,
+          "minimum_margin_buffer": null,
+          "return_mdd_diagnostic": 37.01156944153708,
+          "sharpe": 7.949855447013018,
+          "smart_sortino": null,
+          "sortino": 8.133893979846018,
+          "total_return": 0.010073529587425911,
+          "trade_count": 15
+        },
+        "train": {
+          "calmar": 2.3105858667212846,
+          "liquidation_count": 0,
+          "mdd": 0.009763907407173093,
+          "minimum_margin_buffer": null,
+          "return_mdd_diagnostic": 2.3105858667212846,
+          "sharpe": 1.2968327340236367,
+          "smart_sortino": null,
+          "sortino": 0.7017451991288494,
+          "total_return": 0.022557742245568058,
+          "trade_count": 42
+        },
+        "validation": {
+          "calmar": 3.4459384422834125,
+          "liquidation_count": 0,
+          "mdd": 0.01247840772575019,
+          "minimum_margin_buffer": null,
+          "return_mdd_diagnostic": 3.4459384422834125,
+          "sharpe": 1.398135269164284,
+          "smart_sortino": null,
+          "sortino": 1.1437377113933471,
+          "total_return": 0.006823738716461136,
+          "trade_count": 19
+        }
+      },
+      "split_periods": {
+        "locked_oos": {
+          "end_timestamp": "2026-05-08T23:59:59",
+          "period_source": "fresh _split_windows / artifact data_metadata",
+          "period_status": "exact_from_source_artifact",
+          "start_timestamp": "2026-03-01T00:00:00"
+        },
+        "train": {
+          "end_timestamp": "2025-12-31T23:59:59",
+          "period_source": "fresh _split_windows / artifact data_metadata",
+          "period_status": "exact_from_source_artifact",
+          "start_timestamp": "2025-01-01T00:00:00"
+        },
+        "validation": {
+          "end_timestamp": "2026-02-28T23:59:59",
+          "period_source": "fresh _split_windows / artifact data_metadata",
+          "period_status": "exact_from_source_artifact",
+          "start_timestamp": "2026-01-01T00:00:00"
+        }
+      },
+      "strategy_name": "profit_moonshot_calendar_optuna",
+      "total_liquidation_count": 0
+    },
+    {
+      "artifact_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/all_family_expansion/calendar_optuna_latest.json",
+      "calendar_rule_violation": true,
+      "candidate_family": "calendar_optuna_reference_invalid",
+      "candidate_name": "optuna_calendar_trx_sethusdt_t47_thr150_h168_ls590_ss100_tp180",
+      "candidate_source": "calendar_optuna_all_family_expansion",
+      "current_base_reference_dependency": false,
+      "deployable_success": false,
+      "has_strict_liquidation_replay": false,
+      "lane": "diagnostic_reference_only",
+      "leverage": null,
+      "live_promotion_possible": false,
+      "locked_oos_selection_violation": true,
+      "locked_oos_used_for_objective": false,
+      "memory_peak_rss_mib": 242.7578125,
+      "memory_under_8gib": true,
+      "minimum_margin_buffer": null,
+      "rejection_reasons": [
+        "calendar_month_day_hour_or_calendar_primary_rule_invalid",
+        "calendar_optuna_best_trial_sorted_with_locked_oos_after_objective",
+        "inferior_locked_oos_return_vs_alpha_zoo_strict_6x",
+        "locked_oos_return_not_above_invalid_current_base_reference",
+        "locked_oos_used_for_objective_ranking_pruning_selection_or_tie_break",
+        "no_strict_zero_liquidation_margin_replay_for_live_promotion"
+      ],
+      "requires_strict_liquidation_replay": true,
+      "selection_provenance": {
+        "evidence": "scripts/research/optuna_tune_profit_moonshot_calendar.py objective() runs train/val only, then trials.sort includes oos success/return before objective",
+        "objective_inputs": [
+          "train",
+          "validation"
+        ],
+        "objective_policy": "train_val_only_locked_oos_report",
+        "post_study_ranking_uses_locked_oos": true
+      },
+      "split_performance": {
+        "locked_oos": {
+          "calmar": 70.6507661149127,
+          "liquidation_count": 0,
+          "mdd": 0.0008039594493393958,
+          "minimum_margin_buffer": null,
+          "return_mdd_diagnostic": 70.6507661149127,
+          "sharpe": 9.140601095309947,
+          "smart_sortino": null,
+          "sortino": 9.001472046845954,
+          "total_return": 0.010090676414809208,
+          "trade_count": 14
+        },
+        "train": {
+          "calmar": 1.6889478500030806,
+          "liquidation_count": 0,
+          "mdd": 0.01593487013555036,
+          "minimum_margin_buffer": null,
+          "return_mdd_diagnostic": 1.6889478500030806,
+          "sharpe": 1.2554248224519482,
+          "smart_sortino": null,
+          "sortino": 0.6522968095088872,
+          "total_return": 0.02691005140476177,
+          "trade_count": 33
+        },
+        "validation": {
+          "calmar": 1.3483571029822696,
+          "liquidation_count": 0,
+          "mdd": 0.010831463652095802,
+          "minimum_margin_buffer": null,
+          "return_mdd_diagnostic": 1.3483571029822696,
+          "sharpe": 0.4326520200493,
+          "smart_sortino": null,
+          "sortino": 0.38159222533406106,
+          "total_return": 0.002344773175171788,
+          "trade_count": 13
+        }
+      },
+      "split_periods": {
+        "locked_oos": {
+          "end_timestamp": "2026-05-08T23:59:59",
+          "period_source": "fresh _split_windows / artifact data_metadata",
+          "period_status": "exact_from_source_artifact",
+          "start_timestamp": "2026-03-01T00:00:00"
+        },
+        "train": {
+          "end_timestamp": "2025-12-31T23:59:59",
+          "period_source": "fresh _split_windows / artifact data_metadata",
+          "period_status": "exact_from_source_artifact",
+          "start_timestamp": "2025-01-01T00:00:00"
+        },
+        "validation": {
+          "end_timestamp": "2026-02-28T23:59:59",
+          "period_source": "fresh _split_windows / artifact data_metadata",
+          "period_status": "exact_from_source_artifact",
+          "start_timestamp": "2026-01-01T00:00:00"
+        }
+      },
+      "strategy_name": "profit_moonshot_calendar_optuna",
+      "total_liquidation_count": 0
+    },
+    {
+      "artifact_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/continued_optimization_20260509/fresh_portfolio_tuning_latest.json",
+      "calendar_rule_violation": true,
+      "candidate_family": "fresh_portfolio_tuning",
+      "candidate_name": "fresh_portfolio_train_val_monthly_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sweakest_thr120_h120_ls620_ss120_tp450__fresh_calendar_rot_lstrongest_sethusdt_lb336_thr50_h120_sc80_st0__fresh_calendar_rot_lstrongest_sethusdt_lb336_thr100_h120_sc80_st0",
+      "candidate_source": "continued_optimization_20260509",
+      "current_base_reference_dependency": false,
+      "deployable_success": false,
+      "has_strict_liquidation_replay": false,
+      "lane": "diagnostic_reference_only",
+      "leverage": 1.9742117405176016,
+      "live_promotion_possible": false,
+      "locked_oos_selection_violation": false,
+      "locked_oos_used_for_objective": false,
+      "memory_peak_rss_mib": 1239.703125,
+      "memory_under_8gib": true,
+      "minimum_margin_buffer": null,
+      "rejection_reasons": [
+        "calendar_month_day_hour_or_calendar_primary_rule_invalid",
+        "inferior_locked_oos_return_vs_alpha_zoo_strict_6x",
+        "no_strict_zero_liquidation_margin_replay_for_live_promotion",
+        "oos_return_risk_beats_current_base",
+        "oos_return_risk_beats_current_champion",
+        "train_sortino_high"
+      ],
+      "requires_strict_liquidation_replay": true,
+      "selection_provenance": {
+        "diagnostic_best_oos_is_not_selection_authority": true,
+        "failed_gates": [
+          "train_sortino_high",
+          "oos_return_risk_beats_current_champion",
+          "oos_return_risk_beats_current_base"
+        ],
+        "locked_oos_policy": {
+          "locked_oos_label": "locked_oos_report_only",
+          "oos_is_gate_only": true,
+          "oos_is_report_only": true,
+          "selection_basis": "train_val_only",
+          "uses_locked_oos_for_selection": false
+        },
+        "selection_basis": "train_val_stability / selected_by_validation",
+        "uses_locked_oos_for_selection": false
+      },
+      "split_performance": {
+        "locked_oos": {
+          "calmar": 25.253236871697386,
+          "liquidation_count": null,
+          "mdd": 0.02115083702298733,
+          "minimum_margin_buffer": null,
+          "return_mdd_diagnostic": 25.253236871697386,
+          "sharpe": 4.008757641155439,
+          "smart_sortino": 5.122451716919118,
+          "sortino": 5.5958820760835115,
+          "total_return": 0.08088014816229583,
+          "trade_count": 38
+        },
+        "train": {
+          "calmar": 3.735298248055958,
+          "liquidation_count": null,
+          "mdd": 0.071812684489693,
+          "minimum_margin_buffer": null,
+          "return_mdd_diagnostic": 3.735298248055958,
+          "sharpe": 1.691892977610358,
+          "smart_sortino": null,
+          "sortino": 1.437849941922603,
+          "total_return": 0.26820739157769236,
+          "trade_count": 91
+        },
+        "validation": {
+          "calmar": 58.266009226709,
+          "liquidation_count": null,
+          "mdd": 0.03993242699798326,
+          "minimum_margin_buffer": null,
+          "return_mdd_diagnostic": 58.266009226709,
+          "sharpe": 4.802735358961827,
+          "smart_sortino": null,
+          "sortino": 5.927001380831728,
+          "total_return": 0.21428537054041974,
+          "trade_count": 37
+        }
+      },
+      "split_periods": {
+        "locked_oos": {
+          "end_timestamp": "2026-05-06T23:59:59",
+          "period_source": "fresh _split_windows / artifact panel_cache",
+          "period_status": "exact_from_source_artifact",
+          "start_timestamp": "2026-03-01T00:00:00"
+        },
+        "train": {
+          "end_timestamp": "2025-12-31T23:59:59",
+          "period_source": "fresh _split_windows / artifact panel_cache",
+          "period_status": "exact_from_source_artifact",
+          "start_timestamp": "2025-01-01T00:00:00"
+        },
+        "validation": {
+          "end_timestamp": "2026-02-28T23:59:59",
+          "period_source": "fresh _split_windows / artifact panel_cache",
+          "period_status": "exact_from_source_artifact",
+          "start_timestamp": "2026-01-01T00:00:00"
+        }
+      },
+      "strategy_name": "profit_moonshot_fresh_portfolio_tuning",
+      "total_liquidation_count": null
+    },
+    {
+      "artifact_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/state_distilled_market_state_next_20260512/portfolio_tuning_leadership_unwind_top18/fresh_portfolio_tuning_latest.json",
+      "calendar_rule_violation": false,
+      "candidate_family": "fresh_portfolio_tuning",
+      "candidate_name": "fresh_portfolio_train_val_monthly_return_budget_fresh_state_distilled_both_lb168_fast72_z075_ret180_h168_ls590_ss100_tp600__fresh_state_distilled_both_lb168_fast72_z075_ret60_h168_ls590_ss100_tp600__fresh_state_distilled_both_lb168_fast72_z100_ret60_h168_ls590_ss100_tp450__fresh_state_distilled_both_lb168_fast72_z050_ret120_h120_ls590_ss100_tp240",
+      "candidate_source": "state_distilled_market_state_next_tuning",
+      "current_base_reference_dependency": false,
+      "deployable_success": false,
+      "has_strict_liquidation_replay": false,
+      "lane": "diagnostic_reference_only",
+      "leverage": 3.0,
+      "live_promotion_possible": false,
+      "locked_oos_selection_violation": false,
+      "locked_oos_used_for_objective": false,
+      "memory_peak_rss_mib": 954.421875,
+      "memory_under_8gib": true,
+      "minimum_margin_buffer": null,
+      "rejection_reasons": [
+        "inferior_locked_oos_return_vs_alpha_zoo_strict_6x",
+        "locked_oos_return_not_above_invalid_current_base_reference",
+        "no_strict_zero_liquidation_margin_replay_for_live_promotion",
+        "oos_return_risk_beats_current_champion",
+        "oos_sharpe_high",
+        "oos_smart_sortino_high",
+        "oos_sortino_high"
+      ],
+      "requires_strict_liquidation_replay": true,
+      "selection_provenance": {
+        "diagnostic_best_oos_is_not_selection_authority": true,
+        "failed_gates": [
+          "oos_return_risk_beats_current_champion",
+          "oos_sharpe_high",
+          "oos_sortino_high",
+          "oos_smart_sortino_high"
+        ],
+        "locked_oos_policy": {
+          "locked_oos_label": "locked_oos_report_only",
+          "oos_is_gate_only": true,
+          "oos_is_report_only": true,
+          "selection_basis": "train_val_only",
+          "uses_locked_oos_for_selection": false
+        },
+        "selection_basis": "train_val_stability / selected_by_validation",
+        "uses_locked_oos_for_selection": false
+      },
+      "split_performance": {
+        "locked_oos": {
+          "calmar": 4.1015611911678675,
+          "liquidation_count": null,
+          "mdd": 0.06970462797171063,
+          "minimum_margin_buffer": null,
+          "return_mdd_diagnostic": 4.1015611911678675,
+          "sharpe": 1.2567859618876303,
+          "smart_sortino": 1.1919800512657106,
+          "sortino": 1.6528156516944346,
+          "total_return": 0.04675887569428028,
+          "trade_count": 40
+        },
+        "train": {
+          "calmar": 3.611439635335049,
+          "liquidation_count": null,
+          "mdd": 0.17753155899326947,
+          "minimum_margin_buffer": null,
+          "return_mdd_diagnostic": 3.611439635335049,
+          "sharpe": 1.8546118113715448,
+          "smart_sortino": null,
+          "sortino": 2.0167287167639727,
+          "total_return": 0.641051701600289,
+          "trade_count": 255
+        },
+        "validation": {
+          "calmar": 61.85916841372469,
+          "liquidation_count": null,
+          "mdd": 0.05371855661250009,
+          "minimum_margin_buffer": null,
+          "return_mdd_diagnostic": 61.85916841372469,
+          "sharpe": 6.499974419683825,
+          "smart_sortino": null,
+          "sortino": 9.165445391452254,
+          "total_return": 0.2667705151932951,
+          "trade_count": 55
+        }
+      },
+      "split_periods": {
+        "locked_oos": {
+          "end_timestamp": "2026-05-06T23:59:59",
+          "period_source": "fresh _split_windows / artifact panel_cache",
+          "period_status": "exact_from_source_artifact",
+          "start_timestamp": "2026-03-01T00:00:00"
+        },
+        "train": {
+          "end_timestamp": "2025-12-31T23:59:59",
+          "period_source": "fresh _split_windows / artifact panel_cache",
+          "period_status": "exact_from_source_artifact",
+          "start_timestamp": "2025-01-01T00:00:00"
+        },
+        "validation": {
+          "end_timestamp": "2026-02-28T23:59:59",
+          "period_source": "fresh _split_windows / artifact panel_cache",
+          "period_status": "exact_from_source_artifact",
+          "start_timestamp": "2026-01-01T00:00:00"
+        }
+      },
+      "strategy_name": "profit_moonshot_fresh_portfolio_tuning",
+      "total_liquidation_count": null
+    },
+    {
+      "artifact_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/portfolio_target_budget_v1/fresh_portfolio_tuning_latest.json",
+      "calendar_rule_violation": true,
+      "candidate_family": "fresh_portfolio_tuning",
+      "candidate_name": "fresh_portfolio_train_val_target_return_budget_fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr120_h120_ls620_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls590_ss120_tp600__fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls560_ss120_tp600",
+      "candidate_source": "portfolio_target_budget_v1_best_success_calendar",
+      "current_base_reference_dependency": false,
+      "deployable_success": false,
+      "has_strict_liquidation_replay": false,
+      "lane": "diagnostic_reference_only",
+      "leverage": 0.3518254541668833,
+      "live_promotion_possible": false,
+      "locked_oos_selection_violation": false,
+      "locked_oos_used_for_objective": false,
+      "memory_peak_rss_mib": 746.1875,
+      "memory_under_8gib": true,
+      "minimum_margin_buffer": null,
+      "rejection_reasons": [
+        "calendar_month_day_hour_or_calendar_primary_rule_invalid",
+        "inferior_locked_oos_return_vs_alpha_zoo_strict_6x",
+        "locked_oos_return_not_above_invalid_current_base_reference",
+        "no_strict_zero_liquidation_margin_replay_for_live_promotion"
+      ],
+      "requires_strict_liquidation_replay": true,
+      "selection_provenance": {
+        "diagnostic_best_oos_is_not_selection_authority": true,
+        "failed_gates": [],
+        "locked_oos_policy": {
+          "locked_oos_label": "locked_oos_report_only",
+          "oos_is_gate_only": true,
+          "oos_is_report_only": true,
+          "selection_basis": "train_val_only",
+          "uses_locked_oos_for_selection": false
+        },
+        "selection_basis": "train_val_stability / selected_by_validation",
+        "uses_locked_oos_for_selection": false
+      },
+      "split_performance": {
+        "locked_oos": {
+          "calmar": 42.825182534712944,
+          "liquidation_count": null,
+          "mdd": 0.001774102912063881,
+          "minimum_margin_buffer": null,
+          "return_mdd_diagnostic": 42.825182534712944,
+          "sharpe": 5.477385370503527,
+          "smart_sortino": null,
+          "sortino": 6.776899962963284,
+          "total_return": 0.013397126166723838,
+          "trade_count": 27
+        },
+        "train": {
+          "calmar": 3.7487337411344965,
+          "liquidation_count": null,
+          "mdd": 0.014678498456059027,
+          "minimum_margin_buffer": null,
+          "return_mdd_diagnostic": 3.7487337411344965,
+          "sharpe": 1.7535434500907068,
+          "smart_sortino": null,
+          "sortino": 1.3329742428759985,
+          "total_return": 0.055019331232847524,
+          "trade_count": 80
+        },
+        "validation": {
+          "calmar": 21.166547780708072,
+          "liquidation_count": null,
+          "mdd": 0.012983881543176116,
+          "minimum_margin_buffer": null,
+          "return_mdd_diagnostic": 21.166547780708072,
+          "sharpe": 3.9766999321443337,
+          "smart_sortino": null,
+          "sortino": 4.452539191369094,
+          "total_return": 0.040000000000000036,
+          "trade_count": 39
+        }
+      },
+      "split_periods": {
+        "locked_oos": {
+          "end_timestamp": "2026-05-06T23:59:59",
+          "period_source": "fresh _split_windows / artifact panel_cache",
+          "period_status": "exact_from_source_artifact",
+          "start_timestamp": "2026-03-01T00:00:00"
+        },
+        "train": {
+          "end_timestamp": "2025-12-31T23:59:59",
+          "period_source": "fresh _split_windows / artifact panel_cache",
+          "period_status": "exact_from_source_artifact",
+          "start_timestamp": "2025-01-01T00:00:00"
+        },
+        "validation": {
+          "end_timestamp": "2026-02-28T23:59:59",
+          "period_source": "fresh _split_windows / artifact panel_cache",
+          "period_status": "exact_from_source_artifact",
+          "start_timestamp": "2026-01-01T00:00:00"
+        }
+      },
+      "strategy_name": "profit_moonshot_fresh_portfolio_tuning",
+      "total_liquidation_count": null
+    }
+  ],
+  "current_base_reference": {
+    "locked_oos_return_mdd": 6.9168776779021455,
+    "locked_oos_sharpe": 5.202361970933632,
+    "locked_oos_total_return": 0.06428110030664325,
+    "promotion_target": false,
+    "role": "hypothesis_reference_only",
+    "selection_target": false
+  },
+  "diagnostic_nonfatal_5x_6x_lane": [
+    {
+      "diagnostic_only": true,
+      "leverage": 5.0,
+      "locked_oos_calmar": 2.911175722501698,
+      "locked_oos_mdd": 0.11502276281125212,
+      "locked_oos_return_mdd_diagnostic": 2.911175722501698,
+      "locked_oos_sharpe": 2.143208618164893,
+      "locked_oos_smart_sortino": 2.548769419424345,
+      "locked_oos_sortino": 2.841935919815364,
+      "locked_oos_total_return": 0.33485147463118836,
+      "minimum_margin_buffer": 9207.604967948717,
+      "promotion_allowed": false,
+      "total_liquidation_count": 0
+    },
+    {
+      "diagnostic_only": true,
+      "leverage": 6.0,
+      "locked_oos_calmar": 3.007073011653861,
+      "locked_oos_mdd": 0.1366667659454812,
+      "locked_oos_return_mdd_diagnostic": 3.007073011653861,
+      "locked_oos_sharpe": 2.143208618164893,
+      "locked_oos_smart_sortino": 2.5002366612271256,
+      "locked_oos_sortino": 2.8419359198153646,
+      "locked_oos_total_return": 0.41096694346467144,
+      "minimum_margin_buffer": 9049.12596153846,
+      "promotion_allowed": false,
+      "total_liquidation_count": 0
+    }
+  ],
+  "generated_at_utc": "2026-05-16T13:28:36.200925Z",
+  "headline_decision": {
+    "best_live_promotion_candidate": "CryptoFxAlphaZooStateStrategy / alpha_zoo_conservative_exit / strict 6x",
+    "best_live_promotion_status": "deployable_success_true",
+    "hybrid_optuna_live_promotion_possible": false,
+    "hybrid_v35_v36_live_promotion_possible": false,
+    "reason": "Alpha Zoo strict 6x is the only candidate with train/validation-only selection, locked-OOS gate/report-only, strict zero-liquidation replay, OOS return above current-base reference, OOS MDD <=25%, positive risk metrics, and memory below 8 GiB."
+  },
+  "local_verification": {
+    "commands": [
+      "uv run --extra dev pytest tests/test_crypto_fx_alpha_zoo.py tests/test_triple_barrier_labeler.py tests/test_edge_calibration.py tests/test_crypto_fx_alpha_zoo_state_strategy.py -q",
+      "uv run --extra dev pytest tests/test_profit_moonshot_fresh_start_replay.py tests/test_profit_moonshot_liquidation_aware_validation.py tests/test_profit_moonshot_live_final_selection.py tests/test_profit_moonshot_pass_under_8gb_validator.py -q",
+      "uv run --extra dev pytest -q",
+      "uv run --extra dev ruff check .",
+      "uv run --extra dev python -m compileall -q src scripts tests",
+      "git diff --check",
+      "git diff --cached --check"
+    ],
+    "log_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/hybrid_optuna_alpha_zoo_comparison_20260514/local_verification_20260516T134741Z.log",
+    "results_summary": [
+      "23 passed in 2.14s",
+      "74 passed in 0.97s",
+      "1307 passed in 431.06s (0:07:11)",
+      "ruff passed",
+      "compileall passed",
+      "diff checks passed"
+    ],
+    "status": "passed"
+  },
+  "memory_summary": {
+    "alpha_zoo_recheck_peak_rss_mib": 291.73828125,
+    "alpha_zoo_summary_peak_rss_mib": 626.7265625,
+    "pass_under_8gib": true,
+    "peak_rss_mib_max_observed": 1239.703125
+  },
+  "policy_contract": {
+    "calendar_month_day_hour_entry_rule_allowed": false,
+    "current_base_calendar_tuple_role": "hypothesis_reference_only",
+    "locked_oos_allowed_use": "gate_report_only_after_candidate_freeze",
+    "locked_oos_for_objective_ranking_pruning_selection_or_tie_break_invalidates_live_promotion": true,
+    "memory_limit_mib": 8192.0,
+    "oos_mdd_limit": 0.25,
+    "oos_return_must_exceed_current_base_reference_return": 0.06428110030664325,
+    "return_mdd_role": "diagnostic_report_only_not_hard_promotion_gate",
+    "strict_deploy_lane_separate_from_diagnostic_5x_6x": true,
+    "strict_promotion_requires_zero_liquidations_and_positive_margin_buffer": true
+  },
+  "prompt_checklist_audit": {
+    "alpha_zoo_strict_6x_live_promotable": true,
+    "has_candidate_strategy_source": true,
+    "has_diagnostic_lane": true,
+    "has_memory_peak": true,
+    "has_selection_provenance": true,
+    "has_split_period_status_and_caveats": true,
+    "has_strict_lane": true,
+    "has_three_split_metrics": true,
+    "has_three_split_periods": true,
+    "hybrid_optuna_live_guarded_invalid": true,
+    "local_required_verification_passed": true,
+    "local_verification_log_present": true
+  },
+  "research_history_update": {
+    "docs_profit_moonshot_research_history_20260510_regenerated": false,
+    "reason": "No new external data source family or global source ledger changed; this comparison reuses existing repo-local artifacts and adds a session-scoped comparison report.",
+    "var_reports_research_history_regenerated": false
+  },
+  "split_period_reconstruction_summary": {
+    "exact_split_period_count": 30,
+    "note": "Some legacy non-promotable hybrid/Optuna artifacts did not persist raw day-level timestamps. Their period end timestamps were reconstructed from persisted split config plus total_return/CAGR annualization identity; all such rows are explicitly caveated and are not live-promotion candidates.",
+    "reconstructed_periods": [
+      {
+        "candidate_name": "full_universe_v35_train_learned_high_vol_hybrid",
+        "caveat": "inferred from continuous stream_day_count; source artifact does not persist daily timestamps",
+        "split": "locked_oos"
+      },
+      {
+        "candidate_name": "full_universe_v35_train_learned_high_vol_hybrid",
+        "caveat": "inferred from continuous stream_day_count; source artifact does not persist daily timestamps",
+        "split": "train"
+      },
+      {
+        "candidate_name": "full_universe_v35_train_learned_high_vol_hybrid",
+        "caveat": "inferred from continuous stream_day_count; source artifact does not persist daily timestamps",
+        "split": "validation"
+      },
+      {
+        "candidate_name": "full_universe_v36_rolling_dynamic_high_vol_hybrid",
+        "caveat": "inferred from continuous stream_day_count; source artifact does not persist daily timestamps",
+        "split": "locked_oos"
+      },
+      {
+        "candidate_name": "full_universe_v36_rolling_dynamic_high_vol_hybrid",
+        "caveat": "inferred from continuous stream_day_count; source artifact does not persist daily timestamps",
+        "split": "train"
+      },
+      {
+        "candidate_name": "full_universe_v36_rolling_dynamic_high_vol_hybrid",
+        "caveat": "inferred from continuous stream_day_count; source artifact does not persist daily timestamps",
+        "split": "validation"
+      },
+      {
+        "candidate_name": "final_scaled_v35_train_high_vol",
+        "caveat": "source artifact did not persist explicit OOS end; end inferred from OOS total_return/CAGR annualization and should be treated as report-period reconstruction",
+        "split": "locked_oos"
+      },
+      {
+        "candidate_name": "final_scaled_v35_train_high_vol",
+        "caveat": "source artifact does not persist OOS end timestamp",
+        "split": "train"
+      },
+      {
+        "candidate_name": "final_scaled_v35_train_high_vol",
+        "caveat": "source artifact does not persist OOS end timestamp",
+        "split": "validation"
+      },
+      {
+        "candidate_name": "final_scaled_v36_dynamic_high_vol",
+        "caveat": "source artifact did not persist explicit OOS end; end inferred from OOS total_return/CAGR annualization and should be treated as report-period reconstruction",
+        "split": "locked_oos"
+      },
+      {
+        "candidate_name": "final_scaled_v36_dynamic_high_vol",
+        "caveat": "source artifact does not persist OOS end timestamp",
+        "split": "train"
+      },
+      {
+        "candidate_name": "final_scaled_v36_dynamic_high_vol",
+        "caveat": "source artifact does not persist OOS end timestamp",
+        "split": "validation"
+      },
+      {
+        "candidate_name": "hybrid_online_optuna_best_trial_9_live_guarded",
+        "caveat": "source artifact did not persist explicit OOS end; end inferred from OOS total_return/CAGR annualization and should be treated as report-period reconstruction",
+        "split": "locked_oos"
+      },
+      {
+        "candidate_name": "hybrid_online_optuna_best_trial_9_train_aware_guarded",
+        "caveat": "source artifact did not persist explicit OOS end; end inferred from OOS total_return/CAGR annualization and should be treated as report-period reconstruction",
+        "split": "locked_oos"
+      },
+      {
+        "candidate_name": "hybrid_tuning_long_memory_legacy_no_policy",
+        "caveat": "source artifact did not persist explicit OOS end; end inferred from OOS total_return/CAGR annualization and should be treated as report-period reconstruction",
+        "split": "locked_oos"
+      }
+    ],
+    "reconstructed_split_period_count": 15
+  },
+  "strict_zero_liquidation_integer_lane_1x_to_6x": [
+    {
+      "deployable_success": false,
+      "leverage": 1.0,
+      "locked_oos_calmar": 2.5532222493222636,
+      "locked_oos_mdd": 0.02393362808649104,
+      "locked_oos_return_mdd_diagnostic": 2.5532222493222636,
+      "locked_oos_sharpe": 2.143208618164893,
+      "locked_oos_smart_sortino": 2.77550794491077,
+      "locked_oos_sortino": 2.841935919815365,
+      "locked_oos_total_return": 0.06110787173743315,
+      "minimum_margin_buffer": 9841.520993589744,
+      "promotion_allowed": false,
+      "rejection_reasons": [
+        "oos_return_not_above_invalid_current_base_reference"
+      ],
+      "strict_safe": true,
+      "total_liquidation_count": 0
+    },
+    {
+      "deployable_success": true,
+      "leverage": 2.0,
+      "locked_oos_calmar": 2.6389179793372395,
+      "locked_oos_mdd": 0.04739607498482658,
+      "locked_oos_return_mdd_diagnostic": 2.6389179793372395,
+      "locked_oos_sharpe": 2.143208618164893,
+      "locked_oos_smart_sortino": 2.71333451374308,
+      "locked_oos_sortino": 2.841935919815365,
+      "locked_oos_total_return": 0.12507435442747483,
+      "minimum_margin_buffer": 9683.041987179486,
+      "promotion_allowed": true,
+      "rejection_reasons": [],
+      "strict_safe": true,
+      "total_liquidation_count": 0
+    },
+    {
+      "deployable_success": true,
+      "leverage": 3.0,
+      "locked_oos_calmar": 2.727123113573087,
+      "locked_oos_mdd": 0.07039399895101447,
+      "locked_oos_return_mdd_diagnostic": 2.727123113573087,
+      "locked_oos_sharpe": 2.143208618164893,
+      "locked_oos_smart_sortino": 2.65503723171137,
+      "locked_oos_sortino": 2.8419359198153646,
+      "locked_oos_total_return": 0.19197310159615122,
+      "minimum_margin_buffer": 9524.562980769231,
+      "promotion_allowed": true,
+      "rejection_reasons": [],
+      "strict_safe": true,
+      "total_liquidation_count": 0
+    },
+    {
+      "deployable_success": true,
+      "leverage": 4.0,
+      "locked_oos_calmar": 2.817866887385088,
+      "locked_oos_mdd": 0.09293402891632523,
+      "locked_oos_return_mdd_diagnostic": 2.817866887385088,
+      "locked_oos_sharpe": 2.143208618164893,
+      "locked_oos_smart_sortino": 2.600281302095813,
+      "locked_oos_sortino": 2.841935919815365,
+      "locked_oos_total_return": 0.26187572279460114,
+      "minimum_margin_buffer": 9366.083974358975,
+      "promotion_allowed": true,
+      "rejection_reasons": [],
+      "strict_safe": true,
+      "total_liquidation_count": 0
+    },
+    {
+      "deployable_success": true,
+      "leverage": 5.0,
+      "locked_oos_calmar": 2.911175722501698,
+      "locked_oos_mdd": 0.11502276281125212,
+      "locked_oos_return_mdd_diagnostic": 2.911175722501698,
+      "locked_oos_sharpe": 2.143208618164893,
+      "locked_oos_smart_sortino": 2.548769419424345,
+      "locked_oos_sortino": 2.841935919815364,
+      "locked_oos_total_return": 0.33485147463118836,
+      "minimum_margin_buffer": 9207.604967948717,
+      "promotion_allowed": true,
+      "rejection_reasons": [],
+      "strict_safe": true,
+      "total_liquidation_count": 0
+    },
+    {
+      "deployable_success": true,
+      "leverage": 6.0,
+      "locked_oos_calmar": 3.007073011653861,
+      "locked_oos_mdd": 0.1366667659454812,
+      "locked_oos_return_mdd_diagnostic": 3.007073011653861,
+      "locked_oos_sharpe": 2.143208618164893,
+      "locked_oos_smart_sortino": 2.5002366612271256,
+      "locked_oos_sortino": 2.8419359198153646,
+      "locked_oos_total_return": 0.41096694346467144,
+      "minimum_margin_buffer": 9049.12596153846,
+      "promotion_allowed": true,
+      "rejection_reasons": [],
+      "strict_safe": true,
+      "total_liquidation_count": 0
+    }
+  ]
+}
