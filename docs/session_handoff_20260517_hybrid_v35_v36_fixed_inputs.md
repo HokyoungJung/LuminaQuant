@@ -96,4 +96,4 @@ git diff --cached --check
 # passed
 ```
 
-Commit/push/CI confirmation remains pending and must be completed before final closeout.
+Commit/push/CI confirmation was completed in the final closeout path; use the final assistant report for the authoritative pushed head and GitHub Actions run URLs.
