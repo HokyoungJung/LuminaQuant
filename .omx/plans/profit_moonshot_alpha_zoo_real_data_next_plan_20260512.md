@@ -183,3 +183,12 @@ Status: initial artifact generation and verification completed; 2026-05-17 corre
 - Strict 1x..6x recheck confirms Alpha Zoo strict `6.0x` as highest zero-liquidation deployable integer; diagnostic 5x/6x remains non-promotional.
 - Max observed peak RSS: `1239.703125 MiB` (<8 GiB).
 - Research history/source ledger: not regenerated; no new source family/global chronology change.
+
+
+## 2026-05-17 KST — Fixed-input hybrid v3.5/v3.6 method adaptation result
+
+- External method concept verified from `/home/hoky/DeepLearning/ensemble_strategies`: v3.6 = v3.5 core plus online dynamic default-candidate refresh; v3.5 Optuna knobs/weight-ratio/high-vol boost/max-weight remain learned/frozen before locked-OOS.
+- Implemented fixed-input experiment for `A0 + P0 + E0 + S1 + S2 + S3 + S4` in `scripts/research/run_profit_moonshot_hybrid_v35_v36_fixed_inputs.py`.
+- Generated report artifacts under `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/hybrid_v35_v36_fixed_inputs_20260517/`.
+- Result: v3.5 locked-OOS +8.5233% / MDD 1.7654%; v3.6 locked-OOS +7.7916% / MDD 1.7491%; both train/validation-only and locked-OOS report-only, but both live-promotion false because mixed hybrid margin replay is not available. Alpha Zoo strict 6x remains live-promotion anchor (+41.0967% OOS, zero liquidations, positive buffers).
+- Research history/source ledger not regenerated because no new global source family was introduced.
