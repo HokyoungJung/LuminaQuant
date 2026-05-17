@@ -474,6 +474,22 @@ def _split_metrics(trades: list[dict[str, Any]], *, leverage: float = 1.0, alloc
     return out
 
 
+def _trade_split_periods(trades: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    out: dict[str, dict[str, Any]] = {}
+    for split in SPLITS:
+        stamps = sorted(
+            pd.Timestamp(trade["entry_time"])
+            for trade in trades
+            if str(trade.get("entry_split")) == split and trade.get("entry_time") is not None
+        )
+        out[split] = {
+            "start_timestamp": stamps[0].isoformat() if stamps else None,
+            "end_timestamp": stamps[-1].isoformat() if stamps else None,
+            "trade_count": len(stamps),
+        }
+    return out
+
+
 def _entry_metadata(trade: dict[str, Any]) -> dict[str, Any]:
     return dict(trade.get("entry_metadata") or {})
 
@@ -876,6 +892,7 @@ def replay_frame(
         ],
         "split_counts": dict(Counter(str(item) for item in data["split"])),
         "unlevered_split_metrics": unlevered_metrics,
+        "trade_split_periods": _trade_split_periods(trades),
         "candidate_selection_grid": {
             "grid_profile": "narrow_train_validation_formulaic",
             "selection_policy": "rank by train/validation-only score; locked-OOS hidden until candidate freeze",

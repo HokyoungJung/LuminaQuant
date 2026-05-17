@@ -281,3 +281,42 @@ Artifacts:
 - Peak RSS: `353.754 MiB` (<8 GiB)
 
 Research history/source ledger was not regenerated: this run reused existing repo-local market/research artifacts and added a session-scoped method-adaptation report; it did not introduce a new global data-source family or chronology ledger.
+
+## 2026-05-17 KST — Common-split Alpha Zoo vs fixed-input hybrid v3.5/v3.6 fair comparison
+
+Re-ran the Alpha Zoo best and fixed-input hybrid v3.5/v3.6 candidates on one explicit common split from baseline `private/main@80a557c133930f51748ec20c4e582aa0d6f678de`. The prior Alpha Zoo split is now **historical only** in this comparison; it is not used for common-split selection, promotion, or tie-breaks.
+
+Common split authority:
+
+- train: `2025-01-01T00:00:00Z` ~ `2025-12-31T23:00:00Z` (`8760` hourly timestamps, `43800` rows)
+- validation: `2026-01-01T00:00:00Z` ~ `2026-02-28T23:00:00Z` (`1416` hourly timestamps, `7080` rows)
+- locked-OOS: `2026-03-01T00:00:00Z` ~ `2026-05-06T23:00:00Z` (`1593` hourly timestamps, `7965` rows)
+
+Alpha Zoo result on common split:
+
+- Historical old split strict 6x is preserved only as reference: old split periods were train `2025-01-01T00:00:00Z`~`2025-10-22T04:00:00Z`, validation `2025-10-22T05:00:00Z`~`2026-01-28T06:00:00Z`, locked-OOS `2026-01-28T07:00:00Z`~`2026-05-06T23:00:00Z`; old locked-OOS return was `+41.0967%`, but it is not comparable for new selection.
+- Common-split carry-forward of the old selected `alpha_zoo_conservative_exit` and common-split reselected grid both select/retain `alpha_zoo_conservative_exit` and produce the same strict 6x replay: train `+114.4617%` / MDD `29.5651%`; validation `+19.9681%` / MDD `13.6667%`; locked-OOS `+20.5127%` / MDD `6.7884%`; locked-OOS Sharpe `1.772136`, Sortino `2.578776`, smart Sortino `2.414847`, Calmar `3.021741`, trades `365`, liquidation `0`, min margin buffer `9643.447509`; `deployable_success=true` under the strict lane.
+- Strict integer leverage 1x..6x on the common split keeps `6x` as the highest deployable integer: OOS return `+20.5127%`, MDD `6.7884%`, liquidation `0`, min buffer `9049.125962`. Return/MDD remains diagnostic/report-only.
+- Diagnostic nonfatal 5x/6x lane remains separate from live promotion: 5x and 6x both have `promotion_allowed=false` even though their diagnostic replay has zero liquidations.
+
+Fixed-input hybrid v3.5/v3.6 common-split Optuna result:
+
+- Input universe remains exactly `A0 + P0 + E0 + S1 + S2 + S3 + S4`; no literal hybrid/hybrid-online/hybrid-tuning output is used as an input.
+- v3.5 uses fixed default + rolling weights/high-vol boost + Optuna; v3.6 is v3.5 core plus online dynamic default-candidate refresh only. No other knob is OOS-adaptive.
+- Optuna ran with `n_trials=80`, `seed=42`, and train+validation objective/selection only. Audit found no locked-OOS use for objective, pruning, selection, or tie-break (`violation=false`; calibration locked-OOS records `0`).
+- v3.5 common-split locked-OOS: return `+8.5233%`, MDD `1.7654%`, Sharpe `5.259028`, Sortino `7.316663`, smart Sortino `7.189734`, Calmar `32.173151`; `deployable_success=false` because dedicated integrated margin replay is missing.
+- v3.6 common-split locked-OOS: return `+7.7916%`, MDD `1.7491%`, Sharpe `4.859674`, Sortino `5.991026`, smart Sortino `5.888040`, Calmar `29.199963`; `deployable_success=false` for the same margin-replay reason.
+
+Decision: on the fair common split, Alpha Zoo strict 6x remains the only live-promotion-capable lane. Hybrid v3.5/v3.6 are useful diagnostics and beat the invalid current-base OOS return reference, but they are not live-promotable until an integrated strict liquidation/margin replay supplies liquidation count and minimum margin buffer. Peak RSS was `769.1015625 MiB` (<8 GiB). Research history/source ledger was not regenerated because this session added a session-scoped comparison artifact only and did not introduce a new global source family or chronology ledger.
+
+Artifacts:
+
+- Runner: `scripts/research/run_common_split_alpha_zoo_hybrid_v35_v36.py`
+- Regression tests: `tests/test_common_split_alpha_zoo_hybrid_v35_v36.py`
+- Main JSON: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/common_split_alpha_zoo_hybrid_v35_v36_20260517/common_split_alpha_zoo_hybrid_v35_v36_latest.json`
+- Main Markdown: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/common_split_alpha_zoo_hybrid_v35_v36_20260517/common_split_alpha_zoo_hybrid_v35_v36_latest.md`
+- Alpha stage artifacts: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/common_split_alpha_zoo_hybrid_v35_v36_20260517/alpha_zoo_common_split/`
+- Hybrid stage artifacts: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/common_split_alpha_zoo_hybrid_v35_v36_20260517/hybrid_v35_v36_common_split/`
+
+Verification for the common-split run passed on 2026-05-17 UTC: targeted Alpha Zoo suite `23 passed`, moonshot validation suite `74 passed`, full pytest `1319 passed`, ruff/compileall/diff checks passed. Log: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/common_split_alpha_zoo_hybrid_v35_v36_20260517/local_verification_common_split_20260517T054257Z.log`.
+Post-deslop verification re-ran the full required command set and passed again: targeted Alpha Zoo suite `23 passed`, moonshot validation suite `74 passed`, full pytest `1319 passed`, ruff/compileall/diff checks passed. Log: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/common_split_alpha_zoo_hybrid_v35_v36_20260517/local_verification_common_split_post_deslop_20260517T054855Z.log`.

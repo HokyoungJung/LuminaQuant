@@ -192,3 +192,13 @@ Status: initial artifact generation and verification completed; 2026-05-17 corre
 - Generated report artifacts under `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/hybrid_v35_v36_fixed_inputs_20260517/`.
 - Result: v3.5 locked-OOS +8.5233% / MDD 1.7654%; v3.6 locked-OOS +7.7916% / MDD 1.7491%; both train/validation-only and locked-OOS report-only, but both live-promotion false because mixed hybrid margin replay is not available. Alpha Zoo strict 6x remains live-promotion anchor (+41.0967% OOS, zero liquidations, positive buffers).
 - Research history/source ledger not regenerated because no new global source family was introduced.
+
+## 2026-05-17 — Common-split comparison closeout
+
+- Implemented additive common-split runner `scripts/research/run_common_split_alpha_zoo_hybrid_v35_v36.py` and regression tests `tests/test_common_split_alpha_zoo_hybrid_v35_v36.py`.
+- Common split is now the comparison authority: train `2025-01-01T00:00:00Z`~`2025-12-31T23:00:00Z`, validation `2026-01-01T00:00:00Z`~`2026-02-28T23:00:00Z`, locked-OOS `2026-03-01T00:00:00Z`~`2026-05-06T23:00:00Z`.
+- Old Alpha Zoo split is historical-only. Common-split carry-forward and reselected Alpha Zoo both land on `alpha_zoo_conservative_exit` strict 6x, OOS `+20.5127%`, MDD `6.7884%`, Sharpe `1.772136`, Sortino `2.578776`, smart Sortino `2.414847`, Calmar `3.021741`, liquidation `0`, positive buffers, deployable success true.
+- Fixed-input hybrid v3.5/v3.6 Optuna used train+validation only and did not use locked-OOS for objective/pruning/selection. v3.5 OOS `+8.5233%`, v3.6 OOS `+7.7916%`; both remain non-promotable because integrated margin replay is missing.
+- Strict integer 1x..6x common-split recheck keeps 6x as highest strict deployable; diagnostic 5x/6x remains separate/non-promotional.
+- Main artifacts live under `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/common_split_alpha_zoo_hybrid_v35_v36_20260517/`.
+- Research history/source ledger not regenerated: no new global source family or chronology ledger change.

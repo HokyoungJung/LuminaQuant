@@ -30,6 +30,7 @@ from collections.abc import Iterable, Mapping
 from typing import Any
 
 import numpy as np
+import pandas as pd
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
@@ -660,7 +661,9 @@ def _build_alpha_stream(
         external_state_csv=external_state_csv,
         strict_real_data=True,
     )
-    data = alpha._ensure_replay_frame(bundle.frame)
+    data = alpha._ensure_replay_frame(
+        _apply_common_split_contract(bundle.frame, _common_split_contract_from_payload(alpha_replay_payload))
+    )
     edges = alpha._load_calibrated_edges(calibration_path)
     grid = dict(alpha_replay_payload.get("candidate_selection_grid") or {})
     params = dict(grid.get("selected_candidate_params") or {})
@@ -712,6 +715,50 @@ def _period_payload(timestamps: np.ndarray, mask: np.ndarray) -> dict[str, Any]:
         "end_timestamp": _timestamp_for_idx(timestamps, int(idx[-1])),
         "record_count": int(idx.size),
     }
+
+
+def _parse_utc_timestamp(value: Any) -> pd.Timestamp:
+    parsed = pd.Timestamp(datetime.fromisoformat(str(value).replace("Z", "+00:00")))
+    if parsed.tzinfo is None:
+        return parsed.tz_localize(UTC)
+    return parsed.tz_convert(UTC)
+
+
+def _common_split_contract_from_payload(payload: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+    manifest = dict(payload.get("common_split_manifest") or {})
+    contract = dict(manifest.get("split_contract") or payload.get("common_split_contract") or {})
+    return {str(key): dict(value) for key, value in contract.items() if isinstance(value, Mapping)}
+
+
+def _apply_common_split_contract(frame: Any, contract: Mapping[str, Mapping[str, Any]]) -> Any:
+    """Apply a replay payload's explicit split contract to the Alpha stream.
+
+    The fixed-input hybrid runner reconstructs A0 from the Alpha replay source
+    path. Historical Alpha replay artifacts did not carry split labels in that
+    source file, so this helper is intentionally no-op unless a common-split
+    replay payload provides a manifest. When present, it prevents the Alpha
+    stream from falling back to the older fractional split assignment.
+    """
+    if not contract:
+        return frame
+    required = {"train", "validation", "locked_oos"}
+    if not required.issubset(set(contract)):
+        return frame
+    out = frame.copy()
+    ts = pd.to_datetime(out["timestamp"], errors="coerce", utc=True)
+    overall_start = min(_parse_utc_timestamp(contract[name]["start"]) for name in required)
+    overall_end = max(_parse_utc_timestamp(contract[name]["end"]) for name in required)
+    keep = ts.ge(overall_start) & ts.le(overall_end)
+    out = out.loc[keep].copy()
+    ts = ts.loc[keep]
+    labels = pd.Series("outside_common_split", index=out.index, dtype="object")
+    for name in ("train", "validation", "locked_oos"):
+        start = _parse_utc_timestamp(contract[name]["start"])
+        end = _parse_utc_timestamp(contract[name]["end"])
+        labels.loc[ts.ge(start) & ts.le(end)] = name
+    out["timestamp"] = ts.dt.tz_convert(UTC).dt.tz_localize(None)
+    out["split"] = labels.to_numpy(dtype=object)
+    return out[out["split"].isin(("train", "validation", "locked_oos"))].copy()
 
 
 def _public_result(result: Mapping[str, Any], candidate_labels: list[str]) -> dict[str, Any]:
