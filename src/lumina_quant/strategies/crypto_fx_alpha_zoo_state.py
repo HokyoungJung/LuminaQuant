@@ -29,6 +29,11 @@ WINDOW_TUPLE_HIGH_IDX = 2
 WINDOW_TUPLE_LOW_IDX = 2 + 1
 WINDOW_TUPLE_CLOSE_IDX = 4
 WINDOW_TUPLE_VOLUME_IDX = 4 + 1
+AGG_WINDOW_OPEN_IDX = 0
+AGG_WINDOW_HIGH_IDX = AGG_WINDOW_OPEN_IDX + 1
+AGG_WINDOW_LOW_IDX = AGG_WINDOW_HIGH_IDX + 1
+AGG_WINDOW_CLOSE_IDX = AGG_WINDOW_LOW_IDX + 1
+AGG_WINDOW_VOLUME_IDX = AGG_WINDOW_CLOSE_IDX + 1
 
 
 @dataclass(slots=True)
@@ -582,11 +587,11 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
         if not parsed_rows:
             return None
         return (
-            parsed_rows[0][0],
-            max(row[1] for row in parsed_rows),
-            min(row[2] for row in parsed_rows),
-            parsed_rows[-1][3],
-            sum(row[4] for row in parsed_rows),
+            parsed_rows[0][AGG_WINDOW_OPEN_IDX],
+            max(row[AGG_WINDOW_HIGH_IDX] for row in parsed_rows),
+            min(row[AGG_WINDOW_LOW_IDX] for row in parsed_rows),
+            parsed_rows[-1][AGG_WINDOW_CLOSE_IDX],
+            sum(row[AGG_WINDOW_VOLUME_IDX] for row in parsed_rows),
         )
 
     def calculate_signals_window(self, event: Any, aggregator: Any) -> None:
