@@ -400,3 +400,19 @@ Latest-data March-validation verification passed on 2026-05-17 UTC: live/source 
 Live-readiness preflight for the isolated `7x` decision artifact also passed for paper/testnet mode with a supplied paper Postgres DSN placeholder and freshness threshold override: `recommended_action=paper_run_allowed`, `ready_for_paper=true`, `ready_for_real=false`. Artifact: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/validation_to_20260331_latest_data_20260517/live_readiness_preflight_7x_latest.json`.
 
 Post-staging CSV LF/runner-lineterminator verification re-ran clean: full pytest `1329 passed in 55.01s`, required Alpha Zoo suite `24 passed`, moonshot suite `74 passed`, live/source targeted suite `27 passed`, ruff/compileall/diff checks passed.
+
+## 2026-05-17 KST — Live notional/risk alignment plan for Alpha Zoo 7x lane
+
+After reviewing the latest `alpha_zoo_fast_residual` 7x isolated live decision, the key remaining live-readiness issue is not the signal hypothesis but the sizing contract. The no-cost research replay models account return as `allocation_fraction * leverage * gross_return`, so the current winner `allocation_fraction=0.15`, `leverage=7` represents approximately `105%` notional exposure with about `15%` isolated margin. The live runtime currently treats `target_allocation` as a notional cap, so the same `0.15` can size closer to `15%` notional exposure. That mismatch must be fixed before expecting live/paper results to match replay performance.
+
+Static `max_order_value=5000.0` is also identified as a legacy fixed-dollar guardrail, not a strategy-derived cap. For this futures lane it must be replaced/subordinated by an equity-scaled and leverage-aware cap, with any absolute dollar cap treated only as an explicit emergency ceiling. Otherwise a $10,000 account targeting the replay-intended `0.15 * 7 = 1.05` notional/equity can be silently truncated.
+
+Planning artifacts created for the next implementation session:
+
+- PRD: `.omx/plans/prd-live-alpha-zoo-notional-risk-alignment-20260517.md`
+- Test spec: `.omx/plans/test-spec-live-alpha-zoo-notional-risk-alignment-20260517.md`
+- Handoff: `docs/session_handoff_20260517_live_notional_risk_alignment.md`
+
+Next-session acceptance target: add an explicit sizing mode such as `isolated_margin_fraction` vs `notional_fraction`, preserve backward compatibility, retune leverage/allocation using train+validation only, include liquidation losses in equity/MDD for any isolated high-performance lane, keep strict zero-liquidation lane separate, add no-cost and cost-stressed reports, prove paper-equivalent live sizing parity, and avoid real-money execution until a separate credentialed real preflight is green and explicitly authorized.
+
+Research history/source ledger was not regenerated for this planning-only update because it introduces no new data-source family or new market-data chronology artifact. The next implementation session must revisit the global research history/source ledger if it refreshes data beyond the current tail or adds new source families.
