@@ -320,3 +320,30 @@ Artifacts:
 
 Verification for the common-split run passed on 2026-05-17 UTC: targeted Alpha Zoo suite `23 passed`, moonshot validation suite `74 passed`, full pytest `1319 passed`, ruff/compileall/diff checks passed. Log: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/common_split_alpha_zoo_hybrid_v35_v36_20260517/local_verification_common_split_20260517T054257Z.log`.
 Post-deslop verification re-ran the full required command set and passed again: targeted Alpha Zoo suite `23 passed`, moonshot validation suite `74 passed`, full pytest `1319 passed`, ruff/compileall/diff checks passed. Log: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/common_split_alpha_zoo_hybrid_v35_v36_20260517/local_verification_common_split_post_deslop_20260517T054855Z.log`.
+
+## 2026-05-17 KST — Integrated margin replay addendum for fixed-input hybrid v3.5/v3.6
+
+Supersedes the earlier same-day note that marked fixed-input hybrid v3.5/v3.6 non-promotable solely because liquidation count/minimum margin buffer were `not_replayed`. Added a mixed-allocator integrated margin replay for the frozen A0+P0+E0+S1+S2+S3+S4 hybrid return streams. The replay uses post-freeze v3.5/v3.6 allocator weights, maps each fixed stream to its source gross-notional fraction, and evaluates one cross-margin account path. It is not used by Optuna objective, pruning, selection, or tie-break; locked-OOS remains gate/report-only after candidate freeze.
+
+Updated common-split hybrid live-gate result:
+
+| Candidate | Split | Return | MDD | Sharpe | Sortino | Smart Sortino | Calmar | Active hours | Liquidations | Min margin buffer | Deployable success |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| hybrid_v3_5_optuna | train | +47.7257% | 11.0421% | 2.705685 | 2.932093 | 2.640523 | 4.322148 | 7514 | 0 | 9932.438663 | true |
+| hybrid_v3_5_optuna | validation | +13.3102% | 2.2622% | 5.390597 | 7.610005 | 7.441656 | 51.558258 | 1302 | 0 | 14594.054033 | true |
+| hybrid_v3_5_optuna | locked-OOS | +8.5233% | 1.7654% | 5.259028 | 7.316663 | 7.189734 | 32.173151 | 1467 | 0 | 16587.499982 | true |
+| hybrid_v3_6_optuna | train | +49.5204% | 7.6947% | 2.897597 | 2.999204 | 2.784914 | 6.435678 | 7514 | 0 | 9847.514685 | true |
+| hybrid_v3_6_optuna | validation | +12.4946% | 1.5354% | 7.002337 | 8.680826 | 8.549560 | 69.800312 | 1302 | 0 | 14690.924128 | true |
+| hybrid_v3_6_optuna | locked-OOS | +7.7916% | 1.7491% | 4.859674 | 5.991026 | 5.888040 | 29.199963 | 1467 | 0 | 16664.270300 | true |
+
+Decision update: fixed-input hybrid v3.5/v3.6 are now live-promotion-capable under the integrated margin gate, but they do **not** beat the common-split Alpha Zoo strict 6x lane on locked-OOS return (`+20.5127%` for Alpha Zoo vs `+8.5233%` v3.5 and `+7.7916%` v3.6). Alpha Zoo strict 6x remains the common-split performance leader; hybrid v3.5/v3.6 become lower-return, lower-MDD deployable alternatives rather than blocked diagnostics. Research history/source ledger still not regenerated: this addendum adds a local validation/replay artifact and no new global source family.
+
+Updated artifacts:
+
+- Runner update: `scripts/research/run_profit_moonshot_hybrid_v35_v36_fixed_inputs.py`
+- Common report JSON: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/common_split_alpha_zoo_hybrid_v35_v36_20260517/common_split_alpha_zoo_hybrid_v35_v36_latest.json`
+- Common report Markdown: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/common_split_alpha_zoo_hybrid_v35_v36_20260517/common_split_alpha_zoo_hybrid_v35_v36_latest.md`
+- Hybrid stage JSON: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/common_split_alpha_zoo_hybrid_v35_v36_20260517/hybrid_v35_v36_common_split/hybrid_v35_v36_fixed_inputs_common_split_latest.json`
+- Hybrid stage Markdown: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/common_split_alpha_zoo_hybrid_v35_v36_20260517/hybrid_v35_v36_common_split/hybrid_v35_v36_fixed_inputs_common_split_latest.md`
+
+Integrated margin addendum verification passed on 2026-05-17 UTC: targeted Alpha Zoo suite `23 passed`, moonshot validation suite `74 passed`, full pytest `1321 passed`, ruff/compileall/diff checks passed. Log: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/common_split_alpha_zoo_hybrid_v35_v36_20260517/local_verification_integrated_margin_20260517T071937Z.log`.

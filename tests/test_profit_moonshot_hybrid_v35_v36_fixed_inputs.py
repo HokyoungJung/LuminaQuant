@@ -72,3 +72,79 @@ def test_v36_only_refreshes_default_candidate_from_v35_core_params() -> None:
         assert row["adaptive_weight_ratio"] == learned.default_weight_ratio
         assert row["adaptive_high_vol_boost"] == learned.high_vol_weight_boost
         assert row["adaptive_max_single_weight"] == params.max_single_weight
+
+
+def test_integrated_margin_replay_flags_account_liquidation_pressure() -> None:
+    timestamps = np.array([1, 2, 3], dtype=np.int64)
+    split_masks = {
+        "train": np.array([True, False, False]),
+        "validation": np.array([False, True, False]),
+        "locked_oos": np.array([False, False, True]),
+    }
+    candidate_returns = np.array([[0.01], [0.01], [-1.10]], dtype=float)
+    allocations = [
+        {"index": 0, "exposure": 1.0, "weights": [1.0]},
+        {"index": 1, "exposure": 1.0, "weights": [1.0]},
+        {"index": 2, "exposure": 1.0, "weights": [1.0]},
+    ]
+
+    replay = MODULE._integrated_margin_replay(
+        timestamps=timestamps,
+        split_masks=split_masks,
+        candidate_returns=candidate_returns,
+        portfolio_returns=candidate_returns[:, 0],
+        allocations=allocations,
+        streams=[{"label": "A0", "leverage": 6.0, "allocation_fraction": 0.10}],
+    )
+
+    locked = replay["split_status"]["locked_oos"]
+    assert replay["uses_locked_oos_for_selection"] is False
+    assert locked["liquidation_count"] == 1
+    assert replay["component_threshold_breach_counts_diagnostic"]["A0"] == 1
+    assert locked["minimum_margin_buffer"] <= 0.0
+
+
+def test_live_policy_can_promote_after_safe_integrated_margin_replay() -> None:
+    returns = np.full((6, 1), 0.02, dtype=float)
+    split_masks = {
+        "train": np.array([True, True, False, False, False, False]),
+        "validation": np.array([False, False, True, True, False, False]),
+        "locked_oos": np.array([False, False, False, False, True, True]),
+    }
+    result = {
+        "version": "v3_5",
+        "params": MODULE.HybridParams(mape_window=2, bias_window=2, short_vol_window=2).__dict__,
+        "learned_params": MODULE.LearnedParams(
+            high_vol_threshold=99.0,
+            default_idx=0,
+            high_vol_best_idx=0,
+            default_weight_ratio=1.0,
+            high_vol_weight_boost=0.0,
+            cv_score=0.0,
+        ).__dict__,
+        "splits": {
+            "train": {"total_return": 0.10, "max_drawdown": 0.01, "sharpe": 1.0, "sortino": 1.0, "smart_sortino": 1.0, "calmar": 1.0},
+            "validation": {"total_return": 0.10, "max_drawdown": 0.01, "sharpe": 1.0, "sortino": 1.0, "smart_sortino": 1.0, "calmar": 1.0},
+            "locked_oos": {"total_return": 0.10, "max_drawdown": 0.01, "sharpe": 1.0, "sortino": 1.0, "smart_sortino": 1.0, "calmar": 1.0},
+        },
+        "train_val_score": 1.0,
+        "train_val_gate": True,
+        "allocations": [],
+        "final_weights": [1.0],
+        "portfolio_returns": returns[:, 0],
+    }
+
+    annotated = MODULE._annotate_live_policy(
+        result,
+        labels=["A0"],
+        returns=returns,
+        split_masks=split_masks,
+        timestamps=np.arange(6, dtype=np.int64),
+        streams=[{"label": "A0", "leverage": 6.0, "allocation_fraction": 0.10}],
+    )
+
+    assert annotated["margin_replay_available"] is True
+    assert annotated["deployable_success"] is True
+    assert annotated["rejection_reasons"] == []
+    assert annotated["splits"]["locked_oos"]["liquidation_count"] == 0
+    assert annotated["splits"]["locked_oos"]["minimum_margin_buffer"] > 0.0

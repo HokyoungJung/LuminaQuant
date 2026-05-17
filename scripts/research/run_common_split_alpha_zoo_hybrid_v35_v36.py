@@ -487,6 +487,13 @@ def _hybrid_rows(
     ]
 
 
+def _hybrid_live_promotion_possible(hybrid_payload: Mapping[str, Any]) -> bool:
+    return any(
+        bool(dict(hybrid_payload.get(key) or {}).get("deployable_success"))
+        for key in ("hybrid_v3_5_optuna", "hybrid_v3_6_optuna")
+    )
+
+
 def _alpha_strict_integer_table(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
     rows = list(payload.get("integer_grid_results") or [])
     if not rows:
@@ -604,7 +611,7 @@ def _markdown_report(payload: Mapping[str, Any]) -> str:
             f"- locked-OOS contamination violation: `{audit.get('violation')}`",
             f"- violation reasons: `{', '.join(audit.get('violation_reasons') or []) or 'none'}`",
             "- Hybrid input universe: `A0 + P0 + E0 + S1 + S2 + S3 + S4`.",
-            "- Hybrid live promotion possible: `False` unless a dedicated integrated margin replay is added.",
+            f"- Hybrid live promotion possible: `{payload.get('hybrid_live_promotion_possible')}`.",
             "",
             "## Strict zero-liquidation integer leverage lane",
             "",
@@ -889,7 +896,7 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
         "strict_zero_liquidation_integer_leverage": strict_rows,
         "diagnostic_nonfatal_5x_6x_lane": _alpha_diagnostic_5x_6x(reselected_payload),
         "best_common_split_candidate": dict(promoted).get("candidate_name") or selected_name,
-        "hybrid_live_promotion_possible": False,
+        "hybrid_live_promotion_possible": _hybrid_live_promotion_possible(hybrid_payload),
         "hybrid_live_promotion_rejection_reasons": sorted(
             set(
                 list(dict(hybrid_payload.get("hybrid_v3_5_optuna") or {}).get("rejection_reasons") or [])
@@ -1054,7 +1061,7 @@ def build_payload_from_stage_artifacts(args: argparse.Namespace) -> dict[str, An
         "strict_zero_liquidation_integer_leverage": strict_rows,
         "diagnostic_nonfatal_5x_6x_lane": _alpha_diagnostic_5x_6x(reselected_payload),
         "best_common_split_candidate": dict(promoted).get("candidate_name") or selected_name,
-        "hybrid_live_promotion_possible": False,
+        "hybrid_live_promotion_possible": _hybrid_live_promotion_possible(hybrid_payload),
         "hybrid_live_promotion_rejection_reasons": sorted(
             set(
                 list(dict(hybrid_payload.get("hybrid_v3_5_optuna") or {}).get("rejection_reasons") or [])

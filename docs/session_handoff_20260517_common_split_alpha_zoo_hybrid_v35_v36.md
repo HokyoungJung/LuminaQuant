@@ -130,3 +130,51 @@ Commands/results:
 - `uv run --extra dev python -m compileall -q src scripts tests` → passed
 - `git diff --check` → passed
 - `git diff --cached --check` → passed
+
+## Addendum — 2026-05-17 KST integrated margin replay for mixed fixed-input hybrids
+
+Follow-up question: the fixed-input hybrid rows were blocked only because the mixed A0/P0/E0/S1/S2/S3/S4 allocator lacked liquidation-count/min-buffer evidence. This is now patched.
+
+Implementation delta:
+
+- `scripts/research/run_profit_moonshot_hybrid_v35_v36_fixed_inputs.py`
+  - Adds `mixed_allocator_integrated_margin_replay` using frozen post-selection allocator weights and fixed stream gross-notional fractions.
+  - Attaches split-level `liquidation_count`, `minimum_margin_buffer`, `margin_replay_available`, and active-hour evidence to `hybrid_v3_5_optuna` and `hybrid_v3_6_optuna`.
+  - Keeps margin replay out of Optuna objective/pruning/selection; locked-OOS remains post-freeze gate/report-only.
+- `scripts/research/run_common_split_alpha_zoo_hybrid_v35_v36.py`
+  - Propagates hybrid live-promotion status from stage artifacts instead of hardcoding `False`.
+- `tests/test_profit_moonshot_hybrid_v35_v36_fixed_inputs.py`
+  - Adds regression coverage for account-level liquidation pressure and safe live-policy promotion after integrated margin replay.
+
+Updated hybrid common-split status:
+
+| candidate | split | return | MDD | Sharpe | Sortino | smart Sortino | Calmar | active hours | liq | min buffer | deployable |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| v3.5 | train | +47.7257% | 11.0421% | 2.705685 | 2.932093 | 2.640523 | 4.322148 | 7514 | 0 | 9932.438663 | true |
+| v3.5 | validation | +13.3102% | 2.2622% | 5.390597 | 7.610005 | 7.441656 | 51.558258 | 1302 | 0 | 14594.054033 | true |
+| v3.5 | locked-OOS | +8.5233% | 1.7654% | 5.259028 | 7.316663 | 7.189734 | 32.173151 | 1467 | 0 | 16587.499982 | true |
+| v3.6 | train | +49.5204% | 7.6947% | 2.897597 | 2.999204 | 2.784914 | 6.435678 | 7514 | 0 | 9847.514685 | true |
+| v3.6 | validation | +12.4946% | 1.5354% | 7.002337 | 8.680826 | 8.549560 | 69.800312 | 1302 | 0 | 14690.924128 | true |
+| v3.6 | locked-OOS | +7.7916% | 1.7491% | 4.859674 | 5.991026 | 5.888040 | 29.199963 | 1467 | 0 | 16664.270300 | true |
+
+Decision update:
+
+- Hybrid v3.5/v3.6 are now live-promotion-capable under strict integrated margin evidence (`total_liquidation_count=0`, minimum margin buffer positive, no rejection reasons).
+- They are still lower-return than Alpha Zoo strict 6x on the same locked-OOS (`+20.5127%` Alpha Zoo vs `+8.5233%` v3.5 / `+7.7916%` v3.6). Alpha Zoo remains the common-split performance leader.
+- Locked-OOS contamination audit remains clean (`violation=false`); margin replay is post-freeze gate/report-only.
+- Peak RSS in the top-level report remains `769.1015625 MiB` (<8 GiB).
+- Research history/source ledger not regenerated; no new global source family or chronology/source-ledger change.
+
+Updated report artifacts:
+
+- `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/common_split_alpha_zoo_hybrid_v35_v36_20260517/common_split_alpha_zoo_hybrid_v35_v36_latest.json`
+- `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/common_split_alpha_zoo_hybrid_v35_v36_20260517/common_split_alpha_zoo_hybrid_v35_v36_latest.md`
+- `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/common_split_alpha_zoo_hybrid_v35_v36_20260517/hybrid_v35_v36_common_split/hybrid_v35_v36_fixed_inputs_common_split_latest.json`
+- `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/common_split_alpha_zoo_hybrid_v35_v36_20260517/hybrid_v35_v36_common_split/hybrid_v35_v36_fixed_inputs_common_split_latest.md`
+
+Verification after integrated margin addendum passed on 2026-05-17 UTC. Log: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/common_split_alpha_zoo_hybrid_v35_v36_20260517/local_verification_integrated_margin_20260517T071937Z.log`.
+
+- Alpha Zoo targeted suite: `23 passed`
+- Moonshot validation suite: `74 passed`
+- Full pytest: `1321 passed`
+- `ruff check .`, `compileall`, `git diff --check`, and `git diff --cached --check`: passed

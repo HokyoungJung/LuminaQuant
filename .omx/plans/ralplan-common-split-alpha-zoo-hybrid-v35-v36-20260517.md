@@ -54,3 +54,9 @@ Run the exact user-required commands:
 - `git diff --check`
 - `git diff --cached --check`
 Then run final artifact audit, Lore commit, push to `private/main`, and verify GitHub Actions `ci/private-ci` green. If `gh` auth/workflow visibility is blocked after push, record exact blocker and do not claim green.
+
+## 2026-05-17 KST addendum — mixed allocator integrated margin replay
+
+Follow-up resolved the prior hybrid live-promotion blocker. `run_profit_moonshot_hybrid_v35_v36_fixed_inputs.py` now performs post-freeze account-level integrated margin replay for the mixed A0+P0+E0+S1+S2+S3+S4 allocator and emits split liquidation count/minimum margin buffer. `run_common_split_alpha_zoo_hybrid_v35_v36.py` now propagates hybrid deployability instead of hardcoding the missing-replay blocker.
+
+Updated decision: hybrid v3.5/v3.6 are live-promotion-capable under strict integrated margin evidence, but Alpha Zoo strict 6x remains the common-split performance leader. Research history/source ledger remains unchanged because no new global source family or chronology/source-ledger input was added.
