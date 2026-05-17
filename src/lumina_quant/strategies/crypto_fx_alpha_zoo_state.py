@@ -150,6 +150,9 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
             "risk_on_long_multiplier": HyperParam.floating("risk_on_long_multiplier", default=1.10, low=0.0, high=2.0, tunable=False),
             "risk_on_short_multiplier": HyperParam.floating("risk_on_short_multiplier", default=0.50, low=0.0, high=2.0, tunable=False),
             "min_signal_strength": HyperParam.floating("min_signal_strength", default=0.10, low=0.0, high=1.0, tunable=False),
+            "decision_cadence_seconds": HyperParam.integer(
+                "decision_cadence_seconds", default=cls.decision_cadence_seconds, low=1, high=86400, tunable=False
+            ),
         }
 
     def __init__(
@@ -194,6 +197,7 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
         self.risk_on_long_multiplier = float(resolved["risk_on_long_multiplier"])
         self.risk_on_short_multiplier = float(resolved["risk_on_short_multiplier"])
         self.min_signal_strength = float(resolved["min_signal_strength"])
+        self.decision_cadence_seconds = max(1, int(resolved["decision_cadence_seconds"]))
         self.calibrated_edges = {str(key): float(value) for key, value in dict(calibrated_edges or {}).items()}
 
         requested_crypto = {normalize_symbol(item) for item in (crypto_symbols or CRYPTO_DEFAULTS)}
@@ -544,6 +548,47 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
         if self._append_bar(event_time, symbol, open_f, high_f, low_f, close_f, volume_f):
             self._evaluate(event_time)
 
+    @staticmethod
+    def _aggregate_window_rows(rows: Any) -> tuple[float, float, float, float, float] | None:
+        parsed_rows: list[tuple[float, float, float, float, float]] = []
+        for row in list(rows or ()):
+            if isinstance(row, Mapping):
+                close_f = safe_float(row.get("close"))
+                if close_f is None or close_f <= 0.0:
+                    continue
+                open_f = safe_float(row.get("open")) or close_f
+                high_f = safe_float(row.get("high")) or close_f
+                low_f = safe_float(row.get("low")) or close_f
+                volume_f = safe_float(row.get("volume")) or 0.0
+            elif isinstance(row, (tuple, list)) and len(row) >= WINDOW_TUPLE_MIN_FIELDS:
+                close_f = safe_float(row[WINDOW_TUPLE_CLOSE_IDX])
+                if close_f is None or close_f <= 0.0:
+                    continue
+                open_f = safe_float(row[WINDOW_TUPLE_OPEN_IDX]) or close_f
+                high_f = safe_float(row[WINDOW_TUPLE_HIGH_IDX]) or close_f
+                low_f = safe_float(row[WINDOW_TUPLE_LOW_IDX]) or close_f
+                volume_f = safe_float(row[WINDOW_TUPLE_VOLUME_IDX]) or 0.0
+            else:
+                continue
+            parsed_rows.append(
+                (
+                    max(0.0, float(open_f)),
+                    max(float(close_f), float(high_f)),
+                    min(float(close_f), float(low_f)),
+                    float(close_f),
+                    max(0.0, float(volume_f)),
+                )
+            )
+        if not parsed_rows:
+            return None
+        return (
+            parsed_rows[0][0],
+            max(row[1] for row in parsed_rows),
+            min(row[2] for row in parsed_rows),
+            parsed_rows[-1][3],
+            sum(row[4] for row in parsed_rows),
+        )
+
     def calculate_signals_window(self, event: Any, aggregator: Any) -> None:
         _ = aggregator
         if not isinstance(event, MarketWindowEvent) and getattr(event, "type", None) != "MARKET_WINDOW":
@@ -553,25 +598,9 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
         for symbol, rows in dict(getattr(event, "bars_1s", {}) or {}).items():
             if symbol not in self._state or not rows:
                 continue
-            row = rows[-1]
-            if isinstance(row, Mapping):
-                self._append_bar(
-                    event_time,
-                    symbol,
-                    row.get("open"),
-                    row.get("high"),
-                    row.get("low"),
-                    row.get("close"),
-                    row.get("volume"),
-                )
-            elif isinstance(row, (tuple, list)) and len(row) >= WINDOW_TUPLE_MIN_FIELDS:
-                self._append_bar(
-                    event_time,
-                    symbol,
-                    row[WINDOW_TUPLE_OPEN_IDX],
-                    row[WINDOW_TUPLE_HIGH_IDX],
-                    row[WINDOW_TUPLE_LOW_IDX],
-                    row[WINDOW_TUPLE_CLOSE_IDX],
-                    row[WINDOW_TUPLE_VOLUME_IDX],
-                )
+            aggregated = self._aggregate_window_rows(rows)
+            if aggregated is None:
+                continue
+            open_f, high_f, low_f, close_f, volume_f = aggregated
+            self._append_bar(event_time, symbol, open_f, high_f, low_f, close_f, volume_f)
         self._evaluate(event_time)

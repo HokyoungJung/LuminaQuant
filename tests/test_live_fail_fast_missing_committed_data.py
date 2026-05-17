@@ -463,6 +463,215 @@ def test_live_cli_uses_decision_strategy_target_without_falling_back_to_stale_se
     assert observed["kwargs"]["strategy_name"] == "RsiStrategy"
 
 
+def test_live_cli_fails_closed_when_decision_strategy_is_not_registered(monkeypatch, capsys):
+    class _LiveConfig:
+        SYMBOLS = ["BTC/USDT"]
+        IS_TESTNET = True
+        EXCHANGE = {"driver": "binance_futures", "name": "binance", "market_type": "future"}
+        TIMEFRAME = "1m"
+        MARKET_DATA_SOURCE = "committed"
+        ORDER_STATE_SOURCE = "polling"
+        MATERIALIZED_STALENESS_THRESHOLD_SECONDS = 45
+        MATERIALIZED_STALENESS_ALERT_COOLDOWN_SECONDS = 60
+
+        @classmethod
+        def validate(cls):
+            raise AssertionError("validate should not run for unsupported decision strategy")
+
+    class _Moving:
+        __name__ = "MovingAverageCrossStrategy"
+
+    monkeypatch.setattr(live_cli, "LiveConfig", _LiveConfig)
+    monkeypatch.setattr(
+        live_cli,
+        "_strategy_helpers",
+        lambda: (
+            "MovingAverageCrossStrategy",
+            lambda include_opt_in=True: {"MovingAverageCrossStrategy": _Moving},
+            lambda name, **_kwargs: {"MovingAverageCrossStrategy": _Moving}[name],
+        ),
+    )
+    monkeypatch.setattr(live_cli, "resolve_live_decision_file", lambda _path="": "decision.json")
+    monkeypatch.setattr(live_cli, "load_live_decision_payload", lambda _path: {"decision": "selected_live_mode"})
+    monkeypatch.setattr(
+        live_cli,
+        "extract_live_decision_config",
+        lambda _payload: {
+            "decision": "selected_live_mode",
+            "reference": "GhostStrategy",
+            "target_kind": "strategy_class",
+            "strategy_name": "GhostStrategy",
+        },
+    )
+    monkeypatch.setattr(
+        live_cli,
+        "resolve_selection_file",
+        lambda _path="": (_ for _ in ()).throw(AssertionError("stale selection should not be consulted")),
+    )
+    monkeypatch.setattr(
+        live_cli,
+        "build_live_runtime_contract",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("runtime should not build")),
+    )
+
+    assert live_cli.main([]) == 1
+    captured = capsys.readouterr().out
+    assert "unsupported strategy class" in captured
+    assert "GhostStrategy" in captured
+
+
+def test_live_cli_applies_alpha_zoo_decision_params_and_6x_runtime_overrides(monkeypatch):
+    observed: dict[str, object] = {}
+    validate_snapshot: dict[str, object] = {}
+
+    class _LiveConfig:
+        SYMBOLS = ["BTC/USDT"]
+        IS_TESTNET = True
+        EXCHANGE = {
+            "driver": "binance_futures",
+            "name": "binance",
+            "market_type": "future",
+            "position_mode": "HEDGE",
+            "margin_mode": "isolated",
+            "leverage": 3,
+        }
+        EXCHANGE_ID = "paper"
+        MARKET_TYPE = "spot"
+        POSITION_MODE = "ONEWAY"
+        MARGIN_MODE = "cross"
+        LEVERAGE = 3
+        TARGET_ALLOCATION = 0.05
+        TIMEFRAME = "1m"
+        WINDOW_SECONDS = 20
+        INGEST_WINDOW_SECONDS = 20
+        DECISION_CADENCE_SECONDS = 20
+        MARKET_DATA_SOURCE = "committed"
+        ORDER_STATE_SOURCE = "polling"
+        MATERIALIZED_STALENESS_THRESHOLD_SECONDS = 45
+        MATERIALIZED_STALENESS_ALERT_COOLDOWN_SECONDS = 60
+
+        @classmethod
+        def validate(cls):
+            validate_snapshot["symbols"] = list(cls.SYMBOLS)
+            validate_snapshot["timeframe"] = str(cls.TIMEFRAME)
+            validate_snapshot["exchange"] = dict(cls.EXCHANGE)
+            validate_snapshot["exchange_id"] = str(cls.EXCHANGE_ID)
+            validate_snapshot["market_type"] = str(cls.MARKET_TYPE)
+            validate_snapshot["position_mode"] = str(cls.POSITION_MODE)
+            validate_snapshot["margin_mode"] = str(cls.MARGIN_MODE)
+            validate_snapshot["leverage"] = int(cls.LEVERAGE)
+            validate_snapshot["target_allocation"] = float(cls.TARGET_ALLOCATION)
+            validate_snapshot["window_seconds"] = int(cls.WINDOW_SECONDS)
+            validate_snapshot["ingest_window_seconds"] = int(cls.INGEST_WINDOW_SECONDS)
+            validate_snapshot["decision_cadence_seconds"] = int(cls.DECISION_CADENCE_SECONDS)
+            return None
+
+    class _Fallback:
+        __name__ = "MovingAverageCrossStrategy"
+
+    class _AlphaZoo:
+        __name__ = "CryptoFxAlphaZooStateStrategy"
+
+    class _Trader:
+        def __init__(self, *args, **kwargs):
+            _ = args
+            observed["kwargs"] = kwargs
+            self.data_handler = SimpleNamespace(consume_fatal_error=lambda: None)
+
+        @staticmethod
+        def run():
+            return None
+
+    monkeypatch.setattr(live_cli, "LiveConfig", _LiveConfig)
+    monkeypatch.setattr(
+        live_cli,
+        "_strategy_helpers",
+        lambda: (
+            "MovingAverageCrossStrategy",
+            lambda include_opt_in=True: {
+                "MovingAverageCrossStrategy": _Fallback,
+                "CryptoFxAlphaZooStateStrategy": _AlphaZoo,
+            },
+            lambda name, **_kwargs: {
+                "MovingAverageCrossStrategy": _Fallback,
+                "CryptoFxAlphaZooStateStrategy": _AlphaZoo,
+            }[name],
+        ),
+    )
+    monkeypatch.setattr(live_cli, "resolve_live_decision_file", lambda _path="": "decision.json")
+    monkeypatch.setattr(
+        live_cli,
+        "load_live_decision_payload",
+        lambda _path: {
+            "decision": "selected_live_mode",
+            "selected_mode": "crypto_fx_alpha_zoo_state_calibrated",
+            "strategy_name": "CryptoFxAlphaZooStateStrategy",
+            "symbols": ["BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "TRX/USDT"],
+            "strategy_timeframe": "1h",
+            "strategy_params": {
+                "entry_threshold": 0.95,
+                "calibrated_edges": {"default:LONG": 5.0, "default:SHORT": 5.0},
+                "decision_cadence_seconds": 3600,
+            },
+            "exchange": {
+                "driver": "binance_futures",
+                "name": "binance",
+                "market_type": "future",
+                "position_mode": "HEDGE",
+                "margin_mode": "isolated",
+                "leverage": 6,
+            },
+            "target_allocation": 0.10,
+            "window_seconds": 3600,
+            "ingest_window_seconds": 3600,
+            "decision_cadence_seconds": 3600,
+        },
+    )
+    monkeypatch.setattr(
+        live_cli,
+        "resolve_selection_file",
+        lambda _path="": (_ for _ in ()).throw(AssertionError("stale selection should not be consulted")),
+    )
+    monkeypatch.setattr(
+        live_cli,
+        "build_live_runtime_contract",
+        lambda **_kwargs: SimpleNamespace(
+            engine_cls=_Trader,
+            data_handler_cls=object,
+            execution_handler_cls=object,
+            portfolio_cls=object,
+            fatal_error_cls=RuntimeError,
+            transport="poll",
+        ),
+    )
+
+    assert live_cli.main([]) == 0
+    assert observed["kwargs"]["strategy_name"] == "CryptoFxAlphaZooStateStrategy"
+    assert observed["kwargs"]["symbol_list"] == [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+    ]
+    assert observed["kwargs"]["strategy_params"]["entry_threshold"] == 0.95
+    assert observed["kwargs"]["strategy_params"]["calibrated_edges"] == {
+        "default:LONG": 5.0,
+        "default:SHORT": 5.0,
+    }
+    assert validate_snapshot["timeframe"] == "1h"
+    assert validate_snapshot["exchange"]["leverage"] == 6
+    assert validate_snapshot["exchange_id"] == "binance"
+    assert validate_snapshot["market_type"] == "future"
+    assert validate_snapshot["position_mode"] == "HEDGE"
+    assert validate_snapshot["margin_mode"] == "isolated"
+    assert validate_snapshot["leverage"] == 6
+    assert validate_snapshot["target_allocation"] == 0.10
+    assert validate_snapshot["window_seconds"] == 3600
+    assert validate_snapshot["ingest_window_seconds"] == 3600
+    assert validate_snapshot["decision_cadence_seconds"] == 3600
+
+
 def test_strategy_helper_resolver_accepts_default_name_keyword():
     _, _, resolver = live_cli._strategy_helpers()
 

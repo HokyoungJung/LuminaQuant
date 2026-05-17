@@ -194,8 +194,8 @@ def _validate_live_exchange_runtime_invariants(runtime: RuntimeConfig, market_da
         raise ValueError("live.exchange.position_mode must be ONEWAY or HEDGE.")
     if exchange.margin_mode not in {"isolated", "cross"}:
         raise ValueError("live.exchange.margin_mode must be isolated or cross.")
-    if exchange.leverage < 1 or exchange.leverage > 3:
-        raise ValueError("live.exchange.leverage must be in range [1, 3].")
+    if exchange.leverage < 1 or exchange.leverage > 6:
+        raise ValueError("live.exchange.leverage must be in range [1, 6].")
 
 
 def _validate_risk_and_execution_runtime_invariants(runtime: RuntimeConfig) -> None:

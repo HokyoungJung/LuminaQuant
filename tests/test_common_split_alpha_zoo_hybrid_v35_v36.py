@@ -1,16 +1,25 @@
 from __future__ import annotations
 
 import importlib.util
-from pathlib import Path
+import json
 import sys
+from pathlib import Path
 
 import pandas as pd
+import pytest
+
+from lumina_quant.live_selection import extract_live_decision_config
 
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNNER_PATH = ROOT / "scripts" / "research" / "run_common_split_alpha_zoo_hybrid_v35_v36.py"
 HYBRID_PATH = ROOT / "scripts" / "research" / "run_profit_moonshot_hybrid_v35_v36_fixed_inputs.py"
 CALIBRATOR_PATH = ROOT / "scripts" / "research" / "calibrate_crypto_fx_edges.py"
+REPORT_DIR = (
+    ROOT
+    / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/"
+    "common_split_alpha_zoo_hybrid_v35_v36_20260517"
+)
 
 
 def _load(path: Path, name: str):
@@ -240,3 +249,30 @@ def test_hybrid_rows_use_split_periods_as_effective_active_window() -> None:
 
     assert locked["active_start_timestamp"] == "2026-03-01T00:00:00Z"
     assert locked["active_end_timestamp"] == "2026-05-06T23:00:00Z"
+
+
+def test_live_alpha_zoo_strict_6x_decision_artifact_maps_to_live_runtime() -> None:
+    path = REPORT_DIR / "live_alpha_zoo_strict_6x_decision_latest.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+
+    config = extract_live_decision_config(payload)
+    locked_oos = payload["replay_evidence"]["split_metrics"]["locked_oos"]
+
+    assert config["target_kind"] == "strategy_class"
+    assert config["strategy_name"] == "CryptoFxAlphaZooStateStrategy"
+    assert config["symbols"] == ["BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "TRX/USDT"]
+    assert config["strategy_timeframe"] == "1h"
+    assert config["leverage"] == 6
+    assert config["exchange"]["leverage"] == 6
+    assert config["target_allocation"] == pytest.approx(0.10)
+    assert config["window_seconds"] == 3600
+    assert config["ingest_window_seconds"] == 3600
+    assert config["decision_cadence_seconds"] == 3600
+    assert config["strategy_params"]["calibrated_edges"]["default:LONG"] > 0.0
+    assert config["strategy_params"]["calibrated_edges"]["default:SHORT"] > 0.0
+    assert config["strategy_params"]["decision_cadence_seconds"] == 3600
+    assert payload["live_equivalent_contract"]["live_cli_params_supported"] is True
+    assert payload["live_equivalent_contract"]["market_window_hourly_parity_test"] == "required_and_covered"
+    assert locked_oos["total_return"] == pytest.approx(0.20512682089993306)
+    assert locked_oos["liquidation_count"] == 0
+    assert locked_oos["minimum_margin_buffer"] > 0.0

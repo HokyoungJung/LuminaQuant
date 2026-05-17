@@ -175,10 +175,102 @@ def load_live_decision_payload(path: Path) -> dict:
     return payload
 
 
+def _normalize_symbol_list(value: Any) -> list[str]:
+    if not isinstance(value, list | tuple):
+        return []
+    return [str(item).strip().upper() for item in value if str(item).strip()]
+
+
+def _as_mapping(value: Any) -> dict[str, Any]:
+    return dict(value) if isinstance(value, dict) else {}
+
+
+def _optional_int(value: Any) -> int | None:
+    if value in (None, ""):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _optional_float(value: Any) -> float | None:
+    if value in (None, ""):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _decision_strategy_params(payload: dict) -> dict[str, Any]:
+    params = _as_mapping(payload.get("strategy_params"))
+    if not params:
+        params = _as_mapping(payload.get("params"))
+    return params
+
+
+def _decision_runtime_overrides(payload: dict) -> dict[str, Any]:
+    overrides: dict[str, Any] = {}
+    symbols = _normalize_symbol_list(
+        payload.get("symbols")
+        or payload.get("trading_symbols")
+        or payload.get("selected_symbols")
+    )
+    if symbols:
+        overrides["symbols"] = symbols
+
+    params = _decision_strategy_params(payload)
+    if params:
+        overrides["strategy_params"] = params
+
+    strategy_timeframe = str(
+        payload.get("strategy_timeframe")
+        or payload.get("timeframe")
+        or ""
+    ).strip()
+    if strategy_timeframe:
+        overrides["strategy_timeframe"] = strategy_timeframe
+
+    exchange = _as_mapping(payload.get("exchange"))
+    live_exchange = _as_mapping(payload.get("live_exchange"))
+    exchange_override = {**exchange, **live_exchange}
+    leverage = _optional_int(
+        payload.get("leverage")
+        or payload.get("live_leverage")
+        or exchange_override.get("leverage")
+    )
+    if leverage is not None:
+        exchange_override["leverage"] = int(leverage)
+        overrides["leverage"] = int(leverage)
+    if exchange_override:
+        overrides["exchange"] = exchange_override
+
+    target_allocation = _optional_float(payload.get("target_allocation"))
+    if target_allocation is not None:
+        overrides["target_allocation"] = float(target_allocation)
+
+    for source_key, target_key in (
+        ("window_seconds", "window_seconds"),
+        ("ingest_window_seconds", "ingest_window_seconds"),
+        ("decision_cadence_seconds", "decision_cadence_seconds"),
+    ):
+        numeric = _optional_int(payload.get(source_key))
+        if numeric is not None:
+            overrides[target_key] = int(numeric)
+    return overrides
+
+
 def infer_strategy_class_name(candidate_name: str) -> str | None:
     token = str(candidate_name or "").strip().lower()
     if not token:
         return None
+    if (
+        token.startswith("crypto_fx_alpha_zoo")
+        or token.startswith("alpha_zoo")
+        or token.startswith("profit_moonshot_alpha_zoo")
+    ):
+        return "CryptoFxAlphaZooStateStrategy"
     if token.startswith("bitcoin_buy_hold"):
         return "BitcoinBuyHoldStrategy"
     if token.startswith("lag_convergence"):
@@ -259,13 +351,20 @@ def extract_live_decision_config(payload: dict) -> dict:
         or payload.get("candidate_key")
         or ""
     ).strip()
-    strategy_name = infer_strategy_class_name(reference)
+    explicit_strategy_name = str(
+        payload.get("strategy_name")
+        or payload.get("strategy_class")
+        or ""
+    ).strip()
+    strategy_name = explicit_strategy_name or infer_strategy_class_name(reference)
+    overrides = _decision_runtime_overrides(payload)
     if decision == "keep_incumbent":
         return {
             "decision": decision,
             "reference": reference,
             "target_kind": "incumbent_fallback",
             "strategy_name": strategy_name,
+            **overrides,
         }
     if strategy_name:
         return {
@@ -273,6 +372,7 @@ def extract_live_decision_config(payload: dict) -> dict:
             "reference": reference,
             "target_kind": "strategy_class",
             "strategy_name": strategy_name,
+            **overrides,
         }
     if reference:
         return {
@@ -280,12 +380,14 @@ def extract_live_decision_config(payload: dict) -> dict:
             "reference": reference,
             "target_kind": "portfolio_mode",
             "strategy_name": None,
+            **overrides,
         }
     return {
         "decision": decision,
         "reference": reference,
         "target_kind": "unknown",
         "strategy_name": None,
+        **overrides,
     }
 
 

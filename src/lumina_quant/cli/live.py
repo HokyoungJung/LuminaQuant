@@ -179,9 +179,23 @@ def main(argv: list[str] | None = None) -> int:
             target_kind = str(decision_cfg.get("target_kind") or "")
             if target_kind == "strategy_class":
                 inferred_name = str(decision_cfg.get("strategy_name") or "").strip()
-                if inferred_name and inferred_name in strategy_map:
-                    strategy_cls = strategy_map[inferred_name]
-                    strategy_name = inferred_name
+                if not inferred_name or inferred_name not in strategy_map:
+                    raise ValueError(
+                        "Live decision points to unsupported strategy class "
+                        f"'{inferred_name or 'unknown'}'. Pass an explicit --strategy override "
+                        "or register the strategy for live execution."
+                    )
+                strategy_cls = strategy_map[inferred_name]
+                strategy_name = inferred_name
+                decision_symbols = list(decision_cfg.get("symbols") or [])
+                if decision_symbols:
+                    symbol_list = [str(item) for item in decision_symbols]
+                decision_timeframe = decision_cfg.get("strategy_timeframe")
+                if decision_timeframe:
+                    resolved_timeframe = str(decision_timeframe)
+                decision_params = decision_cfg.get("strategy_params")
+                if isinstance(decision_params, dict):
+                    strategy_params = dict(decision_params)
             elif target_kind == "portfolio_mode":
                 reference = str(decision_cfg.get("reference") or "").strip() or "unknown_portfolio_mode"
                 if not supports_live_portfolio_mode(reference):
@@ -194,6 +208,40 @@ def main(argv: list[str] | None = None) -> int:
                 strategy_name = f"ArtifactPortfolioModeStrategy[{reference}]"
                 strategy_params = {"portfolio_mode": reference}
                 symbol_list = list(mode_definition.symbols)
+
+            exchange_override = decision_cfg.get("exchange")
+            if isinstance(exchange_override, dict) and exchange_override:
+                live_exchange = dict(getattr(LiveConfig, "EXCHANGE", {}) or {})
+                live_exchange.update(exchange_override)
+                LiveConfig.EXCHANGE = live_exchange
+                if "name" in live_exchange:
+                    LiveConfig.EXCHANGE_ID = str(live_exchange["name"])
+                if "market_type" in live_exchange:
+                    LiveConfig.MARKET_TYPE = str(live_exchange["market_type"])
+                if "position_mode" in live_exchange:
+                    LiveConfig.POSITION_MODE = str(live_exchange["position_mode"])
+                if "margin_mode" in live_exchange:
+                    LiveConfig.MARGIN_MODE = str(live_exchange["margin_mode"])
+                if "leverage" in exchange_override:
+                    LiveConfig.LEVERAGE = int(exchange_override["leverage"])
+            elif decision_cfg.get("leverage") is not None:
+                leverage = int(decision_cfg["leverage"])
+                live_exchange = dict(getattr(LiveConfig, "EXCHANGE", {}) or {})
+                live_exchange["leverage"] = leverage
+                LiveConfig.EXCHANGE = live_exchange
+                LiveConfig.LEVERAGE = leverage
+
+            if decision_cfg.get("target_allocation") is not None:
+                LiveConfig.TARGET_ALLOCATION = float(decision_cfg["target_allocation"])
+            if decision_cfg.get("window_seconds") is not None:
+                window_seconds = int(decision_cfg["window_seconds"])
+                LiveConfig.WINDOW_SECONDS = window_seconds
+                if decision_cfg.get("ingest_window_seconds") is None:
+                    LiveConfig.INGEST_WINDOW_SECONDS = window_seconds
+            if decision_cfg.get("ingest_window_seconds") is not None:
+                LiveConfig.INGEST_WINDOW_SECONDS = int(decision_cfg["ingest_window_seconds"])
+            if decision_cfg.get("decision_cadence_seconds") is not None:
+                LiveConfig.DECISION_CADENCE_SECONDS = int(decision_cfg["decision_cadence_seconds"])
 
         if not bool(args.no_selection) and (
             decision_cfg is None or str(decision_cfg.get("target_kind") or "") == "incumbent_fallback"

@@ -10,6 +10,7 @@ from pathlib import Path
 import pandas as pd
 
 from lumina_quant.core.events import MarketBatchEvent, MarketEvent
+from lumina_quant.core.market_window_contract import build_market_window_event
 from lumina_quant.strategies.crypto_fx_alpha_zoo_state import CryptoFxAlphaZooStateStrategy
 from lumina_quant.strategies.registry import get_strategy_map, get_strategy_tier
 
@@ -59,6 +60,32 @@ def _batch(ts: int, eth_mult: float = 1.0, sol_mult: float = 1.0) -> MarketBatch
     ):
         bars.append(MarketEvent(ts, symbol, close * 0.999, close * 1.002, close * 0.998, close, volume))
     return MarketBatchEvent(time=ts, bars=tuple(bars))
+
+
+def _window_from_batch(batch: MarketBatchEvent):
+    bars_1s = {
+        bar.symbol: (
+            (
+                int(batch.time),
+                float(bar.open),
+                float(bar.high),
+                float(bar.low),
+                float(bar.close),
+                float(bar.volume),
+            ),
+        )
+        for bar in batch.bars
+    }
+    return build_market_window_event(
+        time=batch.time,
+        window_seconds=3600,
+        bars_1s=bars_1s,
+        event_time_watermark_ms=int(batch.time),
+        commit_id=None,
+        lag_ms=0,
+        is_stale=False,
+        emit_metrics=False,
+    )
 
 
 def _run_strategy(*, require_edge: bool = True, calibrated_edges: dict[str, float] | None = None):
@@ -152,6 +179,44 @@ def test_strategy_state_roundtrip_preserves_signal_sequence() -> None:
         split_b.calculate_signals(_batch(ts))
     split_signals = [(item.datetime, item.symbol, item.signal_type) for item in list(events_split.queue)]
     assert split_signals == full_signals
+
+
+def test_market_window_live_path_matches_batch_path_for_hourly_alpha_zoo_decisions() -> None:
+    symbols = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "EURUSD", "GBPUSD", "AUDUSD", "USDJPY"]
+    params = {
+        "fast_lookback_bars": 2,
+        "slow_lookback_bars": 8,
+        "history_window": 16,
+        "entry_threshold": 0.15,
+        "exit_threshold": 0.02,
+        "use_fx_filter": False,
+        "calibrated_edges": {"default:LONG": 5.0, "default:SHORT": 5.0},
+        "max_longs": 1,
+        "max_shorts": 1,
+        "decision_cadence_seconds": 3600,
+    }
+    batch_events: queue.Queue = queue.Queue()
+    window_events: queue.Queue = queue.Queue()
+    batch_strategy = CryptoFxAlphaZooStateStrategy(_Bars(symbols), batch_events, **params)
+    window_strategy = CryptoFxAlphaZooStateStrategy(_Bars(symbols), window_events, **params)
+
+    for ts in range(30):
+        batch = _batch(ts)
+        batch_strategy.calculate_signals(MarketBatchEvent(time=int(batch.time) * 1000, bars=batch.bars))
+        window_strategy.calculate_signals_window(_window_from_batch(batch), None)
+
+    batch_signals = [
+        (item.datetime, item.symbol, item.signal_type, round(float(item.price), 8))
+        for item in list(batch_events.queue)
+    ]
+    window_signals = [
+        (item.datetime, item.symbol, item.signal_type, round(float(item.price), 8))
+        for item in list(window_events.queue)
+    ]
+
+    assert batch_strategy.decision_cadence_seconds == 3600
+    assert window_strategy.decision_cadence_seconds == 3600
+    assert window_signals == batch_signals
 
 
 def test_replay_grid_hides_locked_oos_until_after_train_validation_selection() -> None:

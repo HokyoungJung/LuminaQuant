@@ -178,3 +178,70 @@ Verification after integrated margin addendum passed on 2026-05-17 UTC. Log: `va
 - Moonshot validation suite: `74 passed`
 - Full pytest: `1321 passed`
 - `ruff check .`, `compileall`, `git diff --check`, and `git diff --cached --check`: passed
+
+## Addendum — 2026-05-17 KST Alpha Zoo strict 6x live wiring and live-equivalent tests
+
+Follow-up objective: make the common-split #1 strategy (`CryptoFxAlphaZooStateStrategy` / `alpha_zoo_conservative_exit` / strict `6x`) runnable through the live decision path while preserving the replay contract as closely as possible.
+
+Implementation delta:
+
+- `src/lumina_quant/live_selection.py`
+  - Maps `crypto_fx_alpha_zoo*`, `alpha_zoo*`, and `profit_moonshot_alpha_zoo*` live references to `CryptoFxAlphaZooStateStrategy`.
+  - Preserves live-decision runtime overrides: `symbols`, `strategy_timeframe`, `strategy_params`/`calibrated_edges`, `leverage`, exchange overrides, `target_allocation`, `window_seconds`, `ingest_window_seconds`, and `decision_cadence_seconds`.
+- `src/lumina_quant/cli/live.py`
+  - Applies strategy-class decision overrides before `LiveConfig.validate()` and before `LiveTrader` construction.
+  - Keeps stale live-selection artifacts out of the path when a strategy-class decision is present.
+- `src/lumina_quant/configuration/validate.py`
+  - Raises the live exchange leverage cap from `3x` to `6x`, matching the strict zero-liquidation integer grid cap used by the common-split Alpha Zoo winner.
+- `src/lumina_quant/strategies/crypto_fx_alpha_zoo_state.py`
+  - Accepts `decision_cadence_seconds` as a non-tunable runtime parameter.
+  - Aggregates MARKET_WINDOW rows into OHLCV before state update so a `3600s` live window can match the hourly replay contract instead of consuming only the final 1s row.
+- New decision artifact:
+  - `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/common_split_alpha_zoo_hybrid_v35_v36_20260517/live_alpha_zoo_strict_6x_decision_latest.json`
+  - `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/common_split_alpha_zoo_hybrid_v35_v36_20260517/live_alpha_zoo_strict_6x_decision_latest.md`
+
+Live decision contract:
+
+- `decision=selected_live_mode`, `target_kind=strategy_class`, `strategy_name=CryptoFxAlphaZooStateStrategy`.
+- Symbols: `BTC/USDT`, `ETH/USDT`, `SOL/USDT`, `BNB/USDT`, `TRX/USDT`.
+- Runtime: `strategy_timeframe=1h`, `window_seconds=3600`, `ingest_window_seconds=3600`, `decision_cadence_seconds=3600`, isolated `6x`, `target_allocation=0.10`.
+- Strategy params include the common-split reselected `alpha_zoo_conservative_exit` params plus train+validation calibrated edges; locked-OOS remains gate/report-only.
+
+Verification added:
+
+- Live selection inference and decision override preservation for Alpha Zoo.
+- Live CLI propagation of Alpha Zoo decision params, calibrated edges, symbols, 1h/3600s window/cadence, target allocation, and 6x leverage into `LiveConfig`/`LiveTrader`.
+- Runtime validation accepts live `6x` and rejects `>6x`.
+- `CryptoFxAlphaZooStateStrategy` MARKET_WINDOW path matches MARKET_BATCH path for hourly Alpha Zoo decisions.
+- Decision artifact maps to the live runtime and retains the strict 6x locked-OOS replay evidence (`+20.512682%`, MDD `6.788365%`, liquidation `0`, min buffer positive).
+
+Preflight evidence:
+
+- With the new decision artifact and a non-stale-refresh test horizon, `scripts/ops/live_readiness_preflight.py` reports `paper_run_allowed`; `decision_runtime_compatible=true` and `decision_allows_live_start=true`.
+
+Operator command for paper/live review:
+
+```bash
+uv run lq live --transport poll --decision-file var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/common_split_alpha_zoo_hybrid_v35_v36_20260517/live_alpha_zoo_strict_6x_decision_latest.json
+```
+
+Caveat: this wiring preserves the replay contract through committed `MARKET_WINDOW` 3600s OHLCV aggregation. Real-mode execution still requires normal live preflight, credentials, `LUMINA_ENABLE_LIVE_REAL`, fresh committed data, and operator review; live fills/slippage/funding can differ from replay.
+
+### Final live-wiring verification — 2026-05-17T09:10Z
+
+Additional live-applicability hardening after the first wiring pass:
+
+- Live decision exchange overrides now also synchronize derived live config fields used by the exchange/trader bootstrap: `EXCHANGE_ID`, `MARKET_TYPE`, `POSITION_MODE`, and `MARGIN_MODE`, not only `EXCHANGE`/`LEVERAGE`; unknown strategy-class decisions fail closed instead of falling back to a default strategy.
+- The Alpha Zoo strict 6x decision artifact remains the live-equivalent entry point and still targets isolated Binance futures `6x`, `1h` strategy cadence, `3600s` committed MARKET_WINDOW ingestion, five-symbol crypto universe, and train+validation calibrated edges.
+- Preflight with the decision artifact returned `paper_run_allowed`, `decision_runtime_compatible=true`, `decision_allows_live_start=true`, `ready_for_paper=true`, `ready_for_real=false` (real mode remains credentials/operator-gated).
+
+Fresh local verification passed after the live hardening:
+
+- `uv run --extra dev pytest tests/test_live_selection_infer.py tests/test_live_fail_fast_missing_committed_data.py tests/test_live_config_source_validation.py tests/test_crypto_fx_alpha_zoo_state_strategy.py tests/test_common_split_alpha_zoo_hybrid_v35_v36.py -q` → `46 passed`.
+- `uv run --extra dev pytest tests/test_live_readiness_ops_scripts.py tests/test_live_binance_market_window_aggregation.py tests/test_market_window_emission_parity_live_vs_backtest.py tests/test_live_trader_config_snapshot.py -q` → `11 passed`.
+- `uv run --extra dev pytest tests/test_crypto_fx_alpha_zoo.py tests/test_triple_barrier_labeler.py tests/test_edge_calibration.py tests/test_crypto_fx_alpha_zoo_state_strategy.py -q` → `24 passed`.
+- `uv run --extra dev pytest tests/test_profit_moonshot_fresh_start_replay.py tests/test_profit_moonshot_liquidation_aware_validation.py tests/test_profit_moonshot_live_final_selection.py tests/test_profit_moonshot_pass_under_8gb_validator.py -q` → `74 passed`.
+- `uv run --extra dev pytest -q` → `1328 passed in 288.32s`.
+- `uv run --extra dev ruff check .`, `uv run --extra dev python -m compileall -q src scripts tests`, `git diff --check`, and `git diff --cached --check` passed.
+
+Live-equivalent caveat remains: this validates artifact-to-live runtime wiring and strategy input parity for committed 3600s MARKET_WINDOW bars. It does not assert identical real exchange fills, fees, slippage, funding, or latency.

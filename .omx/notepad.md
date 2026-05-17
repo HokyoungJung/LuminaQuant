@@ -747,3 +747,12 @@ Implemented research-only regime-boost overlay with tunable regime/side-bias/dyn
 
 [2026-05-17T16:18:22+09:00] Integrated margin replay follow-up completed for common-split fixed-input hybrid v3.5/v3.6. Added mixed allocator account-level margin replay in `scripts/research/run_profit_moonshot_hybrid_v35_v36_fixed_inputs.py` and propagated hybrid promotion status in `scripts/research/run_common_split_alpha_zoo_hybrid_v35_v36.py`. Updated artifacts under `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/common_split_alpha_zoo_hybrid_v35_v36_20260517/`: v3.5/v3.6 now have split liquidation_count=0 and positive min buffers; locked-OOS min buffers v3.5 16587.499982, v3.6 16664.270300; both deployable_success=true with no rejection reasons. Alpha Zoo strict 6x remains common-split return leader (OOS +20.5127% vs v3.5 +8.5233% / v3.6 +7.7916%). Locked-OOS still post-freeze gate/report-only; research history/source ledger not regenerated.
 [2026-05-17T16:24:00+09:00] Integrated margin addendum verification passed: Alpha Zoo targeted suite 23 passed; moonshot validation suite 74 passed; full pytest 1321 passed; ruff/compileall/diff checks passed. Log `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/common_split_alpha_zoo_hybrid_v35_v36_20260517/local_verification_integrated_margin_20260517T071937Z.log`.
+
+## 2026-05-17 Alpha Zoo strict 6x live wiring
+
+- Added live decision/runtime support for common-split #1 `CryptoFxAlphaZooStateStrategy` / `alpha_zoo_conservative_exit` / strict `6x`.
+- Decision artifact: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/common_split_alpha_zoo_hybrid_v35_v36_20260517/live_alpha_zoo_strict_6x_decision_latest.json`.
+- Live path now carries symbols, 1h/3600s window/cadence, calibrated edges, selected params, target allocation 0.10, isolated 6x.
+- Tests cover Alpha Zoo live inference, CLI decision-param propagation, 6x validation, and MARKET_WINDOW-vs-MARKET_BATCH parity.
+
+[2026-05-17T18:09:52+09:00] Alpha Zoo strict 6x live wiring final hardening: decision exchange overrides now sync derived LiveConfig exchange fields as well as leverage, and unknown strategy-class live decisions fail closed. Preflight on `live_alpha_zoo_strict_6x_decision_latest.json` returned `paper_run_allowed`/`ready_for_paper=true`; fresh verification passed with targeted live/common-split 46, live-readiness/parity 11, required Alpha Zoo 24, moonshot 74, full pytest 1328, ruff/compileall/diff checks.

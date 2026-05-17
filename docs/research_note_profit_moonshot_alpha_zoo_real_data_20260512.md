@@ -347,3 +347,18 @@ Updated artifacts:
 - Hybrid stage Markdown: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/common_split_alpha_zoo_hybrid_v35_v36_20260517/hybrid_v35_v36_common_split/hybrid_v35_v36_fixed_inputs_common_split_latest.md`
 
 Integrated margin addendum verification passed on 2026-05-17 UTC: targeted Alpha Zoo suite `23 passed`, moonshot validation suite `74 passed`, full pytest `1321 passed`, ruff/compileall/diff checks passed. Log: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/common_split_alpha_zoo_hybrid_v35_v36_20260517/local_verification_integrated_margin_20260517T071937Z.log`.
+
+## 2026-05-17 Addendum — strict 6x Alpha Zoo live wiring check
+
+The common-split #1 (`CryptoFxAlphaZooStateStrategy` / `alpha_zoo_conservative_exit` / strict `6x`) is now explicitly represented as a live decision artifact rather than only as a replay result. The live decision path maps Alpha Zoo references to `CryptoFxAlphaZooStateStrategy`, passes train+validation calibrated edges and selected conservative-exit params to `LiveTrader`, and applies 3600s MARKET_WINDOW/cadence plus isolated `6x` and `target_allocation=0.10` overrides.
+
+Live-equivalent tests were added for selection inference, decision override propagation, live CLI parameter injection, runtime leverage validation (`6x` allowed, `>6x` rejected), and MARKET_WINDOW-vs-MARKET_BATCH strategy parity for hourly Alpha Zoo decisions. The strict 6x replay evidence remains: locked-OOS return `+20.512682%`, MDD `6.788365%`, liquidation `0`, and positive min margin buffer. Real live fills/slippage/funding remain execution-environment risks and are not asserted identical to replay.
+
+Artifacts:
+
+- `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/common_split_alpha_zoo_hybrid_v35_v36_20260517/live_alpha_zoo_strict_6x_decision_latest.json`
+- `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/common_split_alpha_zoo_hybrid_v35_v36_20260517/live_alpha_zoo_strict_6x_decision_latest.md`
+
+## 2026-05-17 Addendum — strict 6x live-wiring final verification
+
+Final hardening synced live decision exchange overrides into both `LiveConfig.EXCHANGE` and derived fields (`EXCHANGE_ID`, `MARKET_TYPE`, `POSITION_MODE`, `MARGIN_MODE`, `LEVERAGE`) before validation/trader construction and made unknown strategy-class live decisions fail closed. The decision artifact preflight reports `paper_run_allowed` and `ready_for_paper=true` while keeping real execution operator/credential gated. Fresh verification passed: targeted live/common-split suite `46 passed`, live-readiness/parity suite `11 passed`, required Alpha Zoo suite `24 passed`, required moonshot validation suite `74 passed`, full pytest `1328 passed`, ruff/compileall/diff checks passed.

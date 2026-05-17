@@ -1,0 +1,244 @@
+{
+  "artifact_kind": "common_split_alpha_zoo_strict_6x_live_decision",
+  "candidate_key": "crypto_fx_alpha_zoo_state_calibrated",
+  "candidate_mode": "crypto_fx_alpha_zoo_state_calibrated",
+  "common_split_contract": {
+    "locked_oos": {
+      "end": "2026-05-06T23:00:00Z",
+      "role": "gate_report_only_after_candidate_freeze",
+      "start": "2026-03-01T00:00:00Z"
+    },
+    "train": {
+      "end": "2025-12-31T23:00:00Z",
+      "role": "objective_calibration_selection",
+      "start": "2025-01-01T00:00:00Z"
+    },
+    "validation": {
+      "end": "2026-02-28T23:00:00Z",
+      "role": "objective_selection",
+      "start": "2026-01-01T00:00:00Z"
+    }
+  },
+  "common_split_periods": {
+    "locked_oos": {
+      "end_timestamp": "2026-05-06T23:00:00Z",
+      "row_count": 7965,
+      "start_timestamp": "2026-03-01T00:00:00Z",
+      "unique_timestamp_count": 1593
+    },
+    "train": {
+      "end_timestamp": "2025-12-31T23:00:00Z",
+      "row_count": 43800,
+      "start_timestamp": "2025-01-01T00:00:00Z",
+      "unique_timestamp_count": 8760
+    },
+    "validation": {
+      "end_timestamp": "2026-02-28T23:00:00Z",
+      "row_count": 7080,
+      "start_timestamp": "2026-01-01T00:00:00Z",
+      "unique_timestamp_count": 1416
+    }
+  },
+  "decision": "selected_live_mode",
+  "decision_cadence_seconds": 3600,
+  "exchange": {
+    "driver": "binance_futures",
+    "leverage": 6,
+    "margin_mode": "isolated",
+    "market_type": "future",
+    "name": "binance",
+    "position_mode": "HEDGE"
+  },
+  "generated_at_utc": "2026-05-17T08:54:16.003901Z",
+  "ingest_window_seconds": 3600,
+  "leverage": 6,
+  "live_equivalent_contract": {
+    "live_cli_params_supported": true,
+    "market_data_contract": "committed MARKET_WINDOW with 3600s ingest/window and 3600s decision cadence",
+    "market_window_hourly_parity_test": "required_and_covered",
+    "operator_command": "uv run lq live --transport poll --decision-file /home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/common_split_alpha_zoo_hybrid_v35_v36_20260517/live_alpha_zoo_strict_6x_decision_latest.json",
+    "real_mode_note": "real execution still requires normal live preflight, credentials, LUMINA_ENABLE_LIVE_REAL, and operator review; artifact does not bypass risk controls.",
+    "replay_contract": "same CryptoFxAlphaZooStateStrategy conservative-exit params and calibrated edges; strict 6x isolated margin replay evidence"
+  },
+  "locked_oos_contamination_audit": {
+    "checks": {
+      "calibration_locked_oos_record_count": 0,
+      "calibration_uses_locked_oos": false,
+      "carry_forward_uses_locked_oos_for_selection": false,
+      "hybrid_uses_locked_oos_for_objective": false,
+      "hybrid_uses_locked_oos_for_pruning": false,
+      "hybrid_uses_locked_oos_for_selection": false,
+      "reselected_uses_locked_oos_for_selection": false,
+      "screen_uses_locked_oos_for_selection": false
+    },
+    "live_promotion_invalid_if_violation": true,
+    "locked_oos_role": "gate_report_only_after_candidate_freeze",
+    "violation": false,
+    "violation_reasons": []
+  },
+  "memory_summary": {
+    "limit_mib": 8192.0,
+    "pass_under_8gb": true,
+    "peak_rss_mib": 769.1015625
+  },
+  "replay_evidence": {
+    "alpha_replay_artifact": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/common_split_alpha_zoo_hybrid_v35_v36_20260517/alpha_zoo_common_split/crypto_fx_alpha_zoo_state_replay_reselected_common_split_latest.json",
+    "candidate_source": "alpha_zoo_train_validation_calibrated_replay",
+    "deployable_success": true,
+    "edge_calibration_artifact": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/common_split_alpha_zoo_hybrid_v35_v36_20260517/alpha_zoo_common_split/edge_calibration_common_split_latest.json",
+    "leverage": 6,
+    "liquidation_audit": {
+      "leverage": 6.0,
+      "liquidation_free": true,
+      "margin_buffer_positive": true,
+      "minimum_margin_buffer": 9049.12596153846,
+      "split_status": {
+        "locked_oos": {
+          "account_wipeout_count": 0,
+          "liquidation_count": 0,
+          "liquidation_recovery_observed": false,
+          "margin_buffer_positive": true,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": 9643.447509477995,
+          "recovered_to_pre_liquidation_equity": true,
+          "strict_safe": true
+        },
+        "train": {
+          "account_wipeout_count": 0,
+          "liquidation_count": 0,
+          "liquidation_recovery_observed": false,
+          "margin_buffer_positive": true,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": 9049.12596153846,
+          "recovered_to_pre_liquidation_equity": true,
+          "strict_safe": true
+        },
+        "validation": {
+          "account_wipeout_count": 0,
+          "liquidation_count": 0,
+          "liquidation_recovery_observed": false,
+          "margin_buffer_positive": true,
+          "maximum_liquidation_equity_loss_fraction": 0.0,
+          "maximum_liquidation_event_drawdown": 0.0,
+          "minimum_margin_buffer": 9572.449083382613,
+          "recovered_to_pre_liquidation_equity": true,
+          "strict_safe": true
+        }
+      },
+      "total_liquidation_count": 0
+    },
+    "performance_diagnostics": {
+      "current_base_reference_return_mdd": 6.9168776779021455,
+      "oos_return_mdd": 3.0217410993610976,
+      "oos_return_mdd_beats_current_base": false,
+      "return_mdd_hurdle_required": false,
+      "return_mdd_role": "diagnostic_report_only"
+    },
+    "performance_gates": {
+      "oos_calmar_positive": true,
+      "oos_mdd_within_25pct_budget": true,
+      "oos_return_beats_current_base": true,
+      "oos_sharpe_positive": true,
+      "oos_smart_sortino_positive": true,
+      "oos_sortino_positive": true
+    },
+    "source_artifact": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/common_split_alpha_zoo_hybrid_v35_v36_20260517/common_split_alpha_zoo_hybrid_v35_v36_latest.json",
+    "split_metrics": {
+      "locked_oos": {
+        "calmar": 3.0217410993610976,
+        "liquidation_count": 0,
+        "max_drawdown": 0.06788365189304407,
+        "minimum_margin_buffer": 9643.447509477995,
+        "return_mdd": 3.0217410993610976,
+        "sharpe": 1.7721356269487436,
+        "smart_sortino": 2.414847017475308,
+        "sortino": 2.5787756517845573,
+        "total_return": 0.20512682089993306,
+        "trade_count": 365
+      },
+      "train": {
+        "calmar": 3.8715076089655285,
+        "max_drawdown": 0.2956514670572235,
+        "return_mdd": 3.8715076089655285,
+        "sharpe": 2.0620104981013645,
+        "smart_sortino": 1.9807066344556197,
+        "sortino": 2.5663054567423993,
+        "total_return": 1.144616904313862,
+        "trade_count": 2143
+      },
+      "validation": {
+        "calmar": 1.4610799252638929,
+        "max_drawdown": 0.13666676594548058,
+        "return_mdd": 1.4610799252638929,
+        "sharpe": 1.251760533634051,
+        "smart_sortino": 1.3697072113796884,
+        "sortino": 1.556900666251153,
+        "total_return": 0.1996810681736807,
+        "trade_count": 335
+      }
+    },
+    "strict_safe": true
+  },
+  "review_status": "candidate_ready_for_paper_live_equivalent_review",
+  "selected_mode": "crypto_fx_alpha_zoo_state_calibrated",
+  "selection_basis": "common_split_train_validation_reselected_alpha_zoo_conservative_exit_locked_oos_gate_report_only",
+  "selection_provenance": {
+    "candidate_freeze_before_locked_oos_gate": true,
+    "current_base_calendar_tuple_role": "hypothesis_reference_only",
+    "locked_oos_role": "gate_report_only_after_candidate_freeze",
+    "selection_excludes_current_base_calendar_tuple": true,
+    "selection_inputs": [
+      "train",
+      "validation"
+    ],
+    "uses_locked_oos_for_selection": false
+  },
+  "strategy_name": "CryptoFxAlphaZooStateStrategy",
+  "strategy_params": {
+    "calibrated_edges": {
+      "BNB/USDT:LONG": 107.06453536222826,
+      "BNB/USDT:SHORT": 269.9308188080215,
+      "BTC/USDT:LONG": 187.88479675191778,
+      "BTC/USDT:SHORT": 134.69167638091676,
+      "ETH/USDT:LONG": 207.2646437841462,
+      "ETH/USDT:SHORT": 378.1307643910648,
+      "SOL/USDT:LONG": 421.69381445726697,
+      "SOL/USDT:SHORT": 200.24307817641397,
+      "TRX/USDT:LONG": 176.8720293533195,
+      "TRX/USDT:SHORT": 187.3178789381597,
+      "default:LONG": 421.69381445726697,
+      "default:SHORT": 378.1307643910648
+    },
+    "crypto_symbols": [
+      "BTC/USDT",
+      "ETH/USDT",
+      "SOL/USDT",
+      "BNB/USDT",
+      "TRX/USDT"
+    ],
+    "decision_cadence_seconds": 3600,
+    "entry_threshold": 0.95,
+    "exit_threshold": 0.3,
+    "max_hold_bars": 48,
+    "require_calibrated_edge": true,
+    "risk_off_long_multiplier": 0.1,
+    "risk_off_short_multiplier": 1.2,
+    "risk_on_long_multiplier": 1.15,
+    "risk_on_short_multiplier": 0.35,
+    "stop_loss_pct": 0.025,
+    "take_profit_pct": 0.055
+  },
+  "strategy_timeframe": "1h",
+  "symbols": [
+    "BTC/USDT",
+    "ETH/USDT",
+    "SOL/USDT",
+    "BNB/USDT",
+    "TRX/USDT"
+  ],
+  "target_allocation": 0.1,
+  "target_kind": "strategy_class",
+  "window_seconds": 3600
+}
