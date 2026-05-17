@@ -362,3 +362,41 @@ Artifacts:
 ## 2026-05-17 Addendum — strict 6x live-wiring final verification
 
 Final hardening synced live decision exchange overrides into both `LiveConfig.EXCHANGE` and derived fields (`EXCHANGE_ID`, `MARKET_TYPE`, `POSITION_MODE`, `MARGIN_MODE`, `LEVERAGE`) before validation/trader construction and made unknown strategy-class live decisions fail closed. The decision artifact preflight reports `paper_run_allowed` and `ready_for_paper=true` while keeping real execution operator/credential gated. Fresh verification passed: targeted live/common-split suite `46 passed`, live-readiness/parity suite `11 passed`, required Alpha Zoo suite `24 passed`, required moonshot validation suite `74 passed`, full pytest `1328 passed`, ruff/compileall/diff checks passed.
+
+## 2026-05-17 KST — Latest-data validation-to-March high-leverage Alpha Zoo replay
+
+Refreshed the five-symbol raw-first Binance Futures data tail to cutoff `2026-05-17T10:59:59Z`, compacted the OHLCV WAL to monthly parquet, and rebuilt the joined hourly current-tail panel `var/cache/profit_moonshot_fresh_start/joined_panel_76f825ffea81c04f2fe41fbf.parquet` with actual max timestamp `2026-05-17T10:00:00Z`.
+
+Updated split authority:
+
+- train: `2025-01-01T00:00:00Z` ~ `2025-12-31T23:00:00Z` (`8760` hourly timestamps, `43800` rows)
+- validation: `2026-01-01T00:00:00Z` ~ `2026-03-31T23:00:00Z` (`2156` hourly timestamps, `10780` rows)
+- locked-OOS: `2026-04-01T00:00:00Z` ~ `2026-05-17T10:00:00Z` (`1115` hourly timestamps, `5575` rows)
+
+High-leverage tuning used only train+validation for candidate ranking. Locked-OOS was applied after candidate freeze as gate/report-only. The high-leverage lane assumes isolated per-position margin; if a path breaches liquidation threshold, the trade loss is capped to the configured isolated allocation fraction, and account-wipeout count must remain zero.
+
+Result:
+
+- Top train/validation score was `alpha_zoo_conservative_exit`/carry-forward at `9x` with `12.5%` allocation, but it failed locked-OOS gate (`-0.6029%` OOS return, non-positive Calmar).
+- First pre-frozen candidate to pass locked-OOS gate: `CryptoFxAlphaZooStateStrategy` / `alpha_zoo_fast_residual` / isolated `7x` / `15%` allocation.
+- Promoted high-leverage candidate metrics: train `+1.4941%` / MDD `59.9354%`; validation `+44.9483%` / MDD `13.7796%`; locked-OOS `+30.5357%` / MDD `11.3027%`; locked-OOS Sharpe `1.815354`, Sortino `2.318591`, smart Sortino `2.083139`, Calmar `2.701628`, trades `391`, liquidation count `0`, account-wipeout count `0`, `live_promotion_possible=true`.
+- Strict zero-liquidation integer lane at `10%` allocation for the same `alpha_zoo_fast_residual` params still promotes `6x`: locked-OOS `+16.7783%`, MDD `6.5951%`, liquidation `0`, min buffer `9150.924760`, positive Sharpe/Sortino/smart Sortino/Calmar.
+- Runtime leverage validation cap was raised from `6x` to `20x` so the isolated `7x` decision artifact can pass live configuration validation; real execution remains operator/credential gated.
+- Peak RSS: data refresh `4467.1172 MiB`, replay `736.1953 MiB`, both under 8 GiB.
+
+Artifacts:
+
+- Runner: `scripts/research/run_alpha_zoo_validation_march_high_leverage.py`
+- Main JSON: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/validation_to_20260331_latest_data_20260517/alpha_zoo_validation_march_high_leverage_latest.json`
+- Main Markdown: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/validation_to_20260331_latest_data_20260517/alpha_zoo_validation_march_high_leverage_latest.md`
+- Candidate CSV: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/validation_to_20260331_latest_data_20260517/alpha_zoo_validation_march_high_leverage_candidates_latest.csv`
+- Live decision artifact: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/validation_to_20260331_latest_data_20260517/live_alpha_zoo_fast_residual_7x_isolated_decision_latest.json`
+- Data refresh report: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/validation_to_20260331_latest_data_20260517/data_refresh_latest.json`
+
+Research history/source ledger not regenerated: this is a same-source tail refresh and session-scoped Alpha Zoo replay, not a new global source family or chronology ledger change.
+
+Latest-data March-validation verification passed on 2026-05-17 UTC: live/source validation suite `27 passed`, required Alpha Zoo suite `24 passed`, required moonshot validation suite `74 passed`, full pytest `1329 passed`, ruff/compileall/diff checks passed. Log: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/validation_to_20260331_latest_data_20260517/local_verification_validation_march_high_leverage_20260517T120700Z.log`.
+
+Live-readiness preflight for the isolated `7x` decision artifact also passed for paper/testnet mode with a supplied paper Postgres DSN placeholder and freshness threshold override: `recommended_action=paper_run_allowed`, `ready_for_paper=true`, `ready_for_real=false`. Artifact: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/validation_to_20260331_latest_data_20260517/live_readiness_preflight_7x_latest.json`.
+
+Post-staging CSV LF/runner-lineterminator verification re-ran clean: full pytest `1329 passed in 55.01s`, required Alpha Zoo suite `24 passed`, moonshot suite `74 passed`, live/source targeted suite `27 passed`, ruff/compileall/diff checks passed.

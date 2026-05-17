@@ -123,3 +123,42 @@ def test_extract_live_decision_config_preserves_alpha_zoo_runtime_overrides() ->
     assert config["window_seconds"] == 3600
     assert config["ingest_window_seconds"] == 3600
     assert config["decision_cadence_seconds"] == 3600
+
+
+def test_extract_live_decision_config_preserves_alpha_zoo_7x_isolated_overrides() -> None:
+    payload = {
+        "decision": "selected_live_mode",
+        "selected_mode": "alpha_zoo_fast_residual",
+        "strategy_name": "CryptoFxAlphaZooStateStrategy",
+        "symbols": ["btc/usdt", "eth/usdt", "sol/usdt"],
+        "strategy_timeframe": "1h",
+        "strategy_params": {
+            "entry_threshold": 0.9,
+            "exit_threshold": 0.25,
+            "fast_lookback_bars": 2,
+            "slow_lookback_bars": 18,
+            "history_window": 72,
+        },
+        "exchange": {
+            "driver": "binance_futures",
+            "name": "binance",
+            "market_type": "future",
+            "position_mode": "HEDGE",
+            "margin_mode": "isolated",
+            "leverage": 7,
+        },
+        "target_allocation": 0.15,
+        "window_seconds": 3600,
+        "ingest_window_seconds": 3600,
+        "decision_cadence_seconds": 3600,
+    }
+
+    config = extract_live_decision_config(payload)
+
+    assert config["target_kind"] == "strategy_class"
+    assert config["strategy_name"] == "CryptoFxAlphaZooStateStrategy"
+    assert config["symbols"] == ["BTC/USDT", "ETH/USDT", "SOL/USDT"]
+    assert config["exchange"]["margin_mode"] == "isolated"
+    assert config["leverage"] == 7
+    assert config["exchange"]["leverage"] == 7
+    assert config["target_allocation"] == 0.15

@@ -1,0 +1,33 @@
+2026-05-17T12:07:00Z local verification for latest-data March-validation high-leverage Alpha Zoo replay
+
+Commands and results:
+- uv run --extra dev pytest tests/test_live_config_source_validation.py tests/test_live_selection_infer.py tests/test_crypto_fx_alpha_zoo_state_strategy.py -q
+  27 passed in 0.31s
+- uv run --extra dev pytest tests/test_crypto_fx_alpha_zoo.py tests/test_triple_barrier_labeler.py tests/test_edge_calibration.py tests/test_crypto_fx_alpha_zoo_state_strategy.py -q
+  24 passed in 1.31s
+- uv run --extra dev pytest tests/test_profit_moonshot_fresh_start_replay.py tests/test_profit_moonshot_liquidation_aware_validation.py tests/test_profit_moonshot_live_final_selection.py tests/test_profit_moonshot_pass_under_8gb_validator.py -q
+  74 passed in 0.69s
+- uv run --extra dev pytest -q
+  1329 passed in 80.27s (0:01:20)
+- uv run --extra dev ruff check .
+  All checks passed!
+- uv run --extra dev python -m compileall -q src scripts tests
+  passed with no output
+- git diff --check
+  passed with no output
+- git diff --cached --check
+  passed with no output
+- LQ_POSTGRES_DSN=postgres://paper:paper@localhost:5432/lumina uv run --extra dev python scripts/ops/live_readiness_preflight.py --refresh-json var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/validation_to_20260331_latest_data_20260517/data_refresh_latest.json --decision-json var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/validation_to_20260331_latest_data_20260517/live_alpha_zoo_fast_residual_7x_isolated_decision_latest.json --stale-minutes 1000000
+  recommended_action=paper_run_allowed; ready_for_paper=true; ready_for_real=false
+
+Post-staging CSV LF/runner-lineterminator verification:
+- uv run --extra dev ruff check . && uv run --extra dev python -m compileall -q src scripts tests && uv run --extra dev pytest -q
+  ruff passed; compileall passed; full pytest 1329 passed in 55.01s
+- uv run --extra dev pytest tests/test_crypto_fx_alpha_zoo.py tests/test_triple_barrier_labeler.py tests/test_edge_calibration.py tests/test_crypto_fx_alpha_zoo_state_strategy.py -q
+  24 passed in 0.94s
+- uv run --extra dev pytest tests/test_profit_moonshot_fresh_start_replay.py tests/test_profit_moonshot_liquidation_aware_validation.py tests/test_profit_moonshot_live_final_selection.py tests/test_profit_moonshot_pass_under_8gb_validator.py -q
+  74 passed in 0.49s
+- uv run --extra dev pytest tests/test_live_config_source_validation.py tests/test_live_selection_infer.py tests/test_crypto_fx_alpha_zoo_state_strategy.py -q
+  27 passed in 0.21s
+- git diff --check && git diff --cached --check
+  passed with no output

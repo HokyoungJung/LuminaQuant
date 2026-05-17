@@ -10,6 +10,7 @@ from lumina_quant.configuration.schema import RuntimeConfig
 
 SYMBOL_RE = re.compile(r"^[A-Z0-9]+/[A-Z0-9]+$")
 TIMEFRAME_RE = re.compile(r"^[1-9][0-9]*[smhdwM]$")
+MAX_LIVE_EXCHANGE_LEVERAGE = 20
 
 
 def _validate_symbols(symbols: Iterable[str]) -> None:
@@ -194,8 +195,10 @@ def _validate_live_exchange_runtime_invariants(runtime: RuntimeConfig, market_da
         raise ValueError("live.exchange.position_mode must be ONEWAY or HEDGE.")
     if exchange.margin_mode not in {"isolated", "cross"}:
         raise ValueError("live.exchange.margin_mode must be isolated or cross.")
-    if exchange.leverage < 1 or exchange.leverage > 6:
-        raise ValueError("live.exchange.leverage must be in range [1, 6].")
+    if exchange.leverage < 1 or exchange.leverage > MAX_LIVE_EXCHANGE_LEVERAGE:
+        raise ValueError(
+            f"live.exchange.leverage must be in range [1, {MAX_LIVE_EXCHANGE_LEVERAGE}]."
+        )
 
 
 def _validate_risk_and_execution_runtime_invariants(runtime: RuntimeConfig) -> None:

@@ -72,18 +72,18 @@ def test_validate_accepts_binance_futures_with_user_stream_on_binance_futures():
     validate_runtime_config(runtime)
 
 
-def test_validate_accepts_research_promoted_6x_live_leverage():
+def test_validate_accepts_research_promoted_7x_live_leverage():
     raw = _base_raw()
-    raw["live"]["exchange"]["leverage"] = 6
+    raw["live"]["exchange"]["leverage"] = 7
     runtime = build_runtime_config(raw, env={})
     validate_runtime_config(runtime)
 
 
 def test_validate_rejects_live_leverage_above_research_promoted_cap():
     raw = _base_raw()
-    raw["live"]["exchange"]["leverage"] = 7
+    raw["live"]["exchange"]["leverage"] = 21
     runtime = build_runtime_config(raw, env={})
-    with pytest.raises(ValueError, match=r"\[1, 6\]"):
+    with pytest.raises(ValueError, match=r"\[1, 20\]"):
         validate_runtime_config(runtime)
 
 
