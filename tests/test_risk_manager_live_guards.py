@@ -14,6 +14,8 @@ class _Config:
     MAX_TOTAL_MARGIN_PCT = 0.5
     FREEZE_NEW_ENTRIES_ON_BREACH = True
     AUTO_FLATTEN_ON_BREACH = False
+    TARGET_ALLOCATION_MODE = "legacy_notional_cap"
+    LEVERAGE = 1
 
 
 def _portfolio(*, equity: float, day_start: float, rolling_loss: float, frozen: bool = False):
@@ -118,3 +120,88 @@ def test_risk_manager_allows_side_aware_reduce_of_short_leg_within_cap():
 
     assert passed is True
     assert reason == "Passed"
+
+
+def test_risk_manager_allows_equity_scaled_isolated_lane_without_fixed_cap():
+    class _IsolatedConfig(_Config):
+        MAX_ORDER_VALUE = 0.0
+        MAX_ORDER_NOTIONAL_PCT = 1.10
+        MAX_SYMBOL_EXPOSURE_PCT = 1.10
+        MAX_TOTAL_NOTIONAL_PCT = 1.20
+
+    manager = RiskManager(_IsolatedConfig)
+    portfolio = _portfolio(equity=10000.0, day_start=10000.0, rolling_loss=0.0)
+    portfolio.current_holdings["BTC/USDT"] = 0.0
+    portfolio.current_positions = {"BTC/USDT": 0.0}
+    order = SimpleNamespace(
+        symbol="BTC/USDT",
+        quantity=105.0,
+        direction="BUY",
+        reduce_only=False,
+    )
+
+    passed, reason = manager.check_order(order, current_price=100.0, portfolio=portfolio)
+
+    assert passed is True
+    assert reason == "Passed"
+
+
+def test_risk_manager_explicit_absolute_emergency_cap_still_blocks():
+    class _EmergencyCapConfig(_Config):
+        MAX_ORDER_VALUE = 5000.0
+        MAX_ORDER_NOTIONAL_PCT = 1.10
+        MAX_SYMBOL_EXPOSURE_PCT = 1.10
+        MAX_TOTAL_NOTIONAL_PCT = 1.20
+
+    manager = RiskManager(_EmergencyCapConfig)
+    portfolio = _portfolio(equity=10000.0, day_start=10000.0, rolling_loss=0.0)
+    portfolio.current_holdings["BTC/USDT"] = 0.0
+    portfolio.current_positions = {"BTC/USDT": 0.0}
+    order = SimpleNamespace(
+        symbol="BTC/USDT",
+        quantity=105.0,
+        direction="BUY",
+        reduce_only=False,
+    )
+
+    passed, reason = manager.check_order(order, current_price=100.0, portfolio=portfolio)
+
+    assert passed is False
+    assert "exceeds limit" in reason
+
+
+def test_evaluate_portfolio_risk_uses_isolated_margin_not_notional_for_margin_utilization():
+    class _IsolatedConfig(_Config):
+        TARGET_ALLOCATION_MODE = "isolated_margin_fraction"
+        LEVERAGE = 7
+        MAX_TOTAL_MARGIN_PCT = 0.20
+
+    manager = RiskManager(_IsolatedConfig)
+    portfolio = _portfolio(equity=10000.0, day_start=10000.0, rolling_loss=0.0)
+    portfolio.current_holdings["BTC/USDT"] = 10500.0
+
+    passed, reason, action, details = manager.evaluate_portfolio_risk(portfolio)
+
+    assert passed is True
+    assert reason == "Passed"
+    assert action == "NONE"
+    assert details["margin_utilization"] == 0.15
+    assert details["target_allocation_mode"] == "isolated_margin_fraction"
+
+
+def test_evaluate_portfolio_risk_blocks_isolated_margin_when_margin_cap_breached():
+    class _IsolatedConfig(_Config):
+        TARGET_ALLOCATION_MODE = "isolated_margin_fraction"
+        LEVERAGE = 7
+        MAX_TOTAL_MARGIN_PCT = 0.10
+
+    manager = RiskManager(_IsolatedConfig)
+    portfolio = _portfolio(equity=10000.0, day_start=10000.0, rolling_loss=0.0)
+    portfolio.current_holdings["BTC/USDT"] = 10500.0
+
+    passed, reason, action, details = manager.evaluate_portfolio_risk(portfolio)
+
+    assert passed is False
+    assert reason == "Margin utilization breach"
+    assert action == "FREEZE"
+    assert details["margin_utilization"] == 0.15

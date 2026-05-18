@@ -147,7 +147,14 @@ def test_extract_live_decision_config_preserves_alpha_zoo_7x_isolated_overrides(
             "margin_mode": "isolated",
             "leverage": 7,
         },
+        "sizing_mode": "isolated_margin_fraction",
         "target_allocation": 0.15,
+        "risk_caps": {
+            "max_order_value": 0.0,
+            "max_order_notional_pct": 1.10,
+            "max_symbol_exposure_pct": 1.10,
+            "max_total_notional_pct": 1.20,
+        },
         "window_seconds": 3600,
         "ingest_window_seconds": 3600,
         "decision_cadence_seconds": 3600,
@@ -162,3 +169,8 @@ def test_extract_live_decision_config_preserves_alpha_zoo_7x_isolated_overrides(
     assert config["leverage"] == 7
     assert config["exchange"]["leverage"] == 7
     assert config["target_allocation"] == 0.15
+    assert config["target_allocation_mode"] == "isolated_margin_fraction"
+    assert config["max_order_value"] == 0.0
+    assert config["max_order_notional_pct"] == 1.10
+    assert config["max_symbol_exposure_pct"] == 1.10
+    assert config["max_total_notional_pct"] == 1.20

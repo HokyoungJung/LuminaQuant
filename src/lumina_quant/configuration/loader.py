@@ -396,9 +396,21 @@ def _normalize_trading_and_risk_runtime_section(runtime: RuntimeConfig) -> None:
 
     runtime.trading.initial_capital = _as_float(runtime.trading.initial_capital, 10000.0)
     runtime.trading.target_allocation = _as_float(runtime.trading.target_allocation, 0.1)
+    runtime.trading.target_allocation_mode = str(
+        getattr(runtime.trading, "target_allocation_mode", "legacy_notional_cap")
+        or "legacy_notional_cap"
+    ).strip().lower()
     runtime.trading.min_trade_qty = _as_float(runtime.trading.min_trade_qty, 0.001)
     runtime.risk.risk_per_trade = _as_float(runtime.risk.risk_per_trade, 0.005)
     runtime.risk.max_daily_loss_pct = _as_float(runtime.risk.max_daily_loss_pct, 0.03)
+    runtime.risk.max_order_notional_pct = _as_float(
+        getattr(runtime.risk, "max_order_notional_pct", 0.0),
+        0.0,
+    )
+    runtime.risk.max_total_notional_pct = _as_float(
+        getattr(runtime.risk, "max_total_notional_pct", 0.0),
+        0.0,
+    )
 
 
 def _normalize_execution_runtime_section(runtime: RuntimeConfig, exec_raw: dict[str, Any]) -> None:

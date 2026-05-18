@@ -41,6 +41,7 @@ class TradingConfig:
     timeframe: str = "1m"
     initial_capital: float = 10000.0
     target_allocation: float = 0.1
+    target_allocation_mode: str = "legacy_notional_cap"
     min_trade_qty: float = 0.001
 
 
@@ -53,6 +54,8 @@ class RiskConfig:
     max_total_margin_pct: float = 0.50
     max_symbol_exposure_pct: float = 0.25
     max_order_value: float = 5000.0
+    max_order_notional_pct: float = 0.0
+    max_total_notional_pct: float = 0.0
     default_stop_loss_pct: float = 0.01
     max_intraday_drawdown_pct: float = 0.03
     max_rolling_loss_pct_1h: float = 0.05

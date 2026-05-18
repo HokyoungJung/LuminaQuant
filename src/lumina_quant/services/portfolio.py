@@ -16,6 +16,37 @@ from lumina_quant.utils.risk_free import (
 class PortfolioSizingService:
     """Stateless sizing/validation helpers for Portfolio."""
 
+    LEGACY_NOTIONAL_CAP_MODES = frozenset({"", "legacy_notional_cap", "notional_cap"})
+    NOTIONAL_FRACTION_MODES = frozenset({"notional_fraction", "notional_target_fraction"})
+    ISOLATED_MARGIN_FRACTION_MODES = frozenset(
+        {"isolated_margin_fraction", "margin_fraction", "isolated_margin"}
+    )
+
+    @staticmethod
+    def normalize_target_allocation_mode(mode: str | None) -> str:
+        token = str(mode or "legacy_notional_cap").strip().lower()
+        if token in PortfolioSizingService.LEGACY_NOTIONAL_CAP_MODES:
+            return "legacy_notional_cap"
+        if token in PortfolioSizingService.NOTIONAL_FRACTION_MODES:
+            return "notional_fraction"
+        if token in PortfolioSizingService.ISOLATED_MARGIN_FRACTION_MODES:
+            return "isolated_margin_fraction"
+        raise ValueError(f"Unsupported target allocation mode: {mode}")
+
+    @staticmethod
+    def target_notional_fraction(
+        *,
+        target_allocation: float,
+        leverage: float,
+        target_allocation_mode: str | None,
+    ) -> float:
+        """Return intended notional/equity for an explicit sizing contract."""
+        allocation = max(0.0, float(target_allocation))
+        mode = PortfolioSizingService.normalize_target_allocation_mode(target_allocation_mode)
+        if mode == "isolated_margin_fraction":
+            return allocation * max(float(leverage), 0.0)
+        return allocation
+
     @staticmethod
     def round_quantity(quantity: float, step: float) -> float:
         if step <= 0:
@@ -33,6 +64,9 @@ class PortfolioSizingService:
         max_symbol_exposure_pct: float,
         target_allocation: float,
         max_order_value: float,
+        target_allocation_mode: str = "legacy_notional_cap",
+        leverage: float = 1.0,
+        max_order_notional_pct: float = 0.0,
     ) -> float:
         metadata = dict(getattr(signal, "metadata", None) or {})
         override_target_allocation = metadata.get("target_allocation")
@@ -43,9 +77,24 @@ class PortfolioSizingService:
         if override_target_allocation is not None:
             target_allocation = max(0.0, float(override_target_allocation))
 
+        override_target_mode = metadata.get("target_allocation_mode", metadata.get("sizing_mode"))
+        if override_target_mode is not None:
+            target_allocation_mode = str(override_target_mode)
+        target_allocation_mode = PortfolioSizingService.normalize_target_allocation_mode(
+            target_allocation_mode
+        )
+
+        override_leverage = metadata.get("leverage")
+        if override_leverage is not None:
+            leverage = max(0.0, float(override_leverage))
+
         override_max_symbol_exposure = metadata.get("max_symbol_exposure_pct")
         if override_max_symbol_exposure is not None:
             max_symbol_exposure_pct = max(0.0, float(override_max_symbol_exposure))
+
+        override_max_order_notional_pct = metadata.get("max_order_notional_pct")
+        if override_max_order_notional_pct is not None:
+            max_order_notional_pct = max(0.0, float(override_max_order_notional_pct))
 
         override_max_order_value = metadata.get("max_order_value")
         if override_max_order_value is None and metadata.get("max_order_value_scale") is not None:
@@ -53,32 +102,48 @@ class PortfolioSizingService:
         if override_max_order_value is not None:
             max_order_value = max(0.0, float(override_max_order_value))
 
-        risk_amount = max(float(equity) * float(risk_per_trade), 0.0)
-        if risk_amount <= 0:
+        if float(current_price) <= 0 or float(equity) <= 0:
             return 0.0
 
-        if signal.stop_loss is not None:
-            stop_price = float(signal.stop_loss)
-        else:
-            if signal.signal_type == "LONG":
-                stop_price = float(current_price) * (1.0 - float(default_stop_loss_pct))
+        target_notional_fraction = PortfolioSizingService.target_notional_fraction(
+            target_allocation=float(target_allocation),
+            leverage=float(leverage),
+            target_allocation_mode=target_allocation_mode,
+        )
+
+        if target_allocation_mode == "legacy_notional_cap":
+            risk_amount = max(float(equity) * float(risk_per_trade), 0.0)
+            if risk_amount <= 0:
+                return 0.0
+
+            if signal.stop_loss is not None:
+                stop_price = float(signal.stop_loss)
             else:
-                stop_price = float(current_price) * (1.0 + float(default_stop_loss_pct))
+                if signal.signal_type == "LONG":
+                    stop_price = float(current_price) * (1.0 - float(default_stop_loss_pct))
+                else:
+                    stop_price = float(current_price) * (1.0 + float(default_stop_loss_pct))
 
-        stop_distance = abs(float(current_price) - stop_price)
-        if stop_distance <= 0:
-            stop_distance = float(current_price) * float(default_stop_loss_pct)
-        if stop_distance <= 0:
-            return 0.0
+            stop_distance = abs(float(current_price) - stop_price)
+            if stop_distance <= 0:
+                stop_distance = float(current_price) * float(default_stop_loss_pct)
+            if stop_distance <= 0:
+                return 0.0
 
-        quantity = risk_amount / stop_distance
+            quantity = risk_amount / stop_distance
+        else:
+            quantity = (float(equity) * float(target_notional_fraction)) / float(current_price)
 
         exposure_cap_pct = float(max_symbol_exposure_pct)
-        if float(target_allocation) > 0:
-            exposure_cap_pct = min(exposure_cap_pct, float(target_allocation))
+        if target_allocation_mode == "legacy_notional_cap" and float(target_notional_fraction) > 0:
+            exposure_cap_pct = min(exposure_cap_pct, float(target_notional_fraction))
         notional_cap = float(equity) * exposure_cap_pct
         if notional_cap > 0:
             quantity = min(quantity, notional_cap / float(current_price))
+
+        max_order_notional_cap = float(equity) * float(max_order_notional_pct)
+        if max_order_notional_cap > 0:
+            quantity = min(quantity, max_order_notional_cap / float(current_price))
 
         if float(max_order_value) > 0:
             quantity = min(quantity, float(max_order_value) / float(current_price))

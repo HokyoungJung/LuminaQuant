@@ -416,3 +416,36 @@ Planning artifacts created for the next implementation session:
 Next-session acceptance target: add an explicit sizing mode such as `isolated_margin_fraction` vs `notional_fraction`, preserve backward compatibility, retune leverage/allocation using train+validation only, include liquidation losses in equity/MDD for any isolated high-performance lane, keep strict zero-liquidation lane separate, add no-cost and cost-stressed reports, prove paper-equivalent live sizing parity, and avoid real-money execution until a separate credentialed real preflight is green and explicitly authorized.
 
 Research history/source ledger was not regenerated for this planning-only update because it introduces no new data-source family or new market-data chronology artifact. The next implementation session must revisit the global research history/source ledger if it refreshes data beyond the current tail or adds new source families.
+
+## 2026-05-18 KST — Live/replay notional-risk aligned Alpha Zoo 7x contract
+
+Implemented the live sizing contract required for the latest high-leverage winner. Existing strategies keep backward-compatible `legacy_notional_cap` behavior by default, while the promoted Alpha Zoo lane now opts into explicit `isolated_margin_fraction`: `target_allocation=0.15` means `15%` isolated margin/equity and, with `leverage=7`, `105%` notional/equity. The legacy fixed-dollar `max_order_value` cap is disabled for this lane (`0.0`) and replaced by equity-scaled notional caps: per-order `110%`, symbol `110%`, total notional `220%`; any positive `max_order_value` remains an explicit emergency ceiling.
+
+Latest-data train+validation retune kept `CryptoFxAlphaZooStateStrategy / alpha_zoo_fast_residual / isolated 7x / allocation 0.15`. The raw grid also found a notional-equivalent `6x/0.175` row with the same train+validation score; a documented incumbent tie-breaker selected the requested `7x/0.15` contract without using locked-OOS for scoring. Locked-OOS remains freeze-after-selection gate/report-only. No real-money execution was attempted.
+
+Selected high-performance lane:
+
+- Sizing mode: `isolated_margin_fraction`.
+- Exposure: notional/equity `105.00%`; isolated margin/equity `15.00%`.
+- Train: `+1.4941%` return / `59.9354%` MDD.
+- Validation: `+44.9483%` return / `13.7796%` MDD.
+- Locked-OOS no-cost: `+30.5357%` return / liquidation-inclusive MDD `11.3027%`; Sharpe `1.815354`, Sortino `2.318591`, smart Sortino `2.083139`, Calmar `2.701628`, trades `391`, locked-OOS liquidation `0`, total account wipeout `0`.
+- Paper-equivalent parity fixture: equity `$10,000`, price `$100`, `target_allocation=0.15`, `leverage=7` -> replay expected notional `$10,500`, live quantity `105.0`, live notional `$10,500`, absolute diff `0.0`, risk check `Passed`.
+- Preflight: `recommended_action=paper_run_allowed`, `ready_for_paper=true`, `ready_for_real=false`.
+
+Cost-stressed locked-OOS diagnostics are separate from the no-cost headline. Round-trip slippage/fee: `1bps` `+25.2882%` / MDD `11.9349%`; `3bps` `+15.4160%` / MDD `13.1860%`; `5bps` `+6.3199%` / MDD `15.4731%`; `10bps` `-13.4130%` / MDD `24.2149%`; `20bps` `-42.5899%` / MDD `44.8361%`. Funding drag: `1bps/day` `+29.9911%`; `2bps/day` `+29.4486%`; `5bps/day` `+27.8349%`; `10bps/day` `+25.1897%`; `20bps/day` `+20.0619%`.
+
+Strict zero-liquidation lane is kept separate: same calibrated Alpha Zoo parameters at strict `6x` / `10%` allocation show locked-OOS `+16.7783%` return, MDD `6.5951%`, Sharpe `1.815354`, Sortino `2.318591`, smart Sortino `2.175137`, Calmar `2.544032`, liquidation `0`, account wipeout `0`, minimum margin buffer `9150.924760`.
+
+Artifacts:
+
+- Main aligned JSON: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/live_notional_risk_aligned_alpha_zoo_20260518/live_notional_risk_aligned_alpha_zoo_latest.json`
+- Main aligned Markdown: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/live_notional_risk_aligned_alpha_zoo_20260518/live_notional_risk_aligned_alpha_zoo_latest.md`
+- Live decision artifact: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/live_notional_risk_aligned_alpha_zoo_20260518/live_alpha_zoo_notional_risk_aligned_decision_latest.json`
+- Preflight artifact: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/live_notional_risk_aligned_alpha_zoo_20260518/live_readiness_preflight_notional_risk_aligned_latest.json`
+- Candidate CSV: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/live_notional_risk_aligned_alpha_zoo_20260518/alpha_zoo_validation_march_high_leverage_candidates_latest.csv`
+- Verification log: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/live_notional_risk_aligned_alpha_zoo_20260518/local_verification_live_notional_risk_alignment_20260518T113100Z.log`
+
+Fresh local verification passed on 2026-05-18 UTC: required live/Alpha Zoo suite `32 passed`, required moonshot validation suite `74 passed`, full pytest `1340 passed`, ruff, compileall, `git diff --check`, and `git diff --cached --check` all passed.
+
+Research history/source ledger not regenerated: this session used the already-refreshed 2026-05-17 current-tail data and added a live-sizing contract/validation artifact bundle, not a new market-data source family or global chronology refresh.

@@ -203,3 +203,7 @@ If pushing implementation, confirm GitHub Actions `ci` and `private-ci` green.
 - `critic` or `code-reviewer`: review live real-money safety boundaries before any real-mode handoff.
 
 Recommended next-session mode: `$ralplan $team $ralph` if coordinating code/replay/docs lanes; otherwise `$ralph` with this PRD and test spec if one owner is doing the implementation.
+
+## 2026-05-18 Implementation status
+
+Completed in follow-up artifact bundle `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/live_notional_risk_aligned_alpha_zoo_20260518/`. The promoted live decision uses `target_allocation_mode=isolated_margin_fraction`, `target_allocation=0.15`, `leverage=7`, notional/equity `1.05`, isolated margin/equity `0.15`, `max_order_value=0.0`, and equity-scaled notional caps. Backward-compatible default sizing remains `legacy_notional_cap` for existing strategies. No real-money execution was attempted; preflight reports `ready_for_paper=true`, `ready_for_real=false`.

@@ -233,6 +233,17 @@ def main(argv: list[str] | None = None) -> int:
 
             if decision_cfg.get("target_allocation") is not None:
                 LiveConfig.TARGET_ALLOCATION = float(decision_cfg["target_allocation"])
+            if decision_cfg.get("target_allocation_mode") is not None:
+                LiveConfig.TARGET_ALLOCATION_MODE = str(decision_cfg["target_allocation_mode"])
+            for cfg_key, attr_name in (
+                ("max_order_value", "MAX_ORDER_VALUE"),
+                ("max_order_notional_pct", "MAX_ORDER_NOTIONAL_PCT"),
+                ("max_symbol_exposure_pct", "MAX_SYMBOL_EXPOSURE_PCT"),
+                ("max_total_margin_pct", "MAX_TOTAL_MARGIN_PCT"),
+                ("max_total_notional_pct", "MAX_TOTAL_NOTIONAL_PCT"),
+            ):
+                if decision_cfg.get(cfg_key) is not None:
+                    setattr(LiveConfig, attr_name, float(decision_cfg[cfg_key]))
             if decision_cfg.get("window_seconds") is not None:
                 window_seconds = int(decision_cfg["window_seconds"])
                 LiveConfig.WINDOW_SECONDS = window_seconds

@@ -541,6 +541,12 @@ def test_live_cli_applies_alpha_zoo_decision_params_and_6x_runtime_overrides(mon
         MARGIN_MODE = "cross"
         LEVERAGE = 3
         TARGET_ALLOCATION = 0.05
+        TARGET_ALLOCATION_MODE = "legacy_notional_cap"
+        MAX_ORDER_VALUE = 5000.0
+        MAX_ORDER_NOTIONAL_PCT = 0.0
+        MAX_SYMBOL_EXPOSURE_PCT = 0.25
+        MAX_TOTAL_MARGIN_PCT = 0.5
+        MAX_TOTAL_NOTIONAL_PCT = 0.0
         TIMEFRAME = "1m"
         WINDOW_SECONDS = 20
         INGEST_WINDOW_SECONDS = 20
@@ -561,6 +567,11 @@ def test_live_cli_applies_alpha_zoo_decision_params_and_6x_runtime_overrides(mon
             validate_snapshot["margin_mode"] = str(cls.MARGIN_MODE)
             validate_snapshot["leverage"] = int(cls.LEVERAGE)
             validate_snapshot["target_allocation"] = float(cls.TARGET_ALLOCATION)
+            validate_snapshot["target_allocation_mode"] = str(cls.TARGET_ALLOCATION_MODE)
+            validate_snapshot["max_order_value"] = float(cls.MAX_ORDER_VALUE)
+            validate_snapshot["max_order_notional_pct"] = float(cls.MAX_ORDER_NOTIONAL_PCT)
+            validate_snapshot["max_symbol_exposure_pct"] = float(cls.MAX_SYMBOL_EXPOSURE_PCT)
+            validate_snapshot["max_total_notional_pct"] = float(cls.MAX_TOTAL_NOTIONAL_PCT)
             validate_snapshot["window_seconds"] = int(cls.WINDOW_SECONDS)
             validate_snapshot["ingest_window_seconds"] = int(cls.INGEST_WINDOW_SECONDS)
             validate_snapshot["decision_cadence_seconds"] = int(cls.DECISION_CADENCE_SECONDS)
@@ -621,7 +632,14 @@ def test_live_cli_applies_alpha_zoo_decision_params_and_6x_runtime_overrides(mon
                 "margin_mode": "isolated",
                 "leverage": 6,
             },
+            "sizing_mode": "isolated_margin_fraction",
             "target_allocation": 0.10,
+            "risk_caps": {
+                "max_order_value": 0.0,
+                "max_order_notional_pct": 0.75,
+                "max_symbol_exposure_pct": 0.75,
+                "max_total_notional_pct": 1.5,
+            },
             "window_seconds": 3600,
             "ingest_window_seconds": 3600,
             "decision_cadence_seconds": 3600,
@@ -667,6 +685,11 @@ def test_live_cli_applies_alpha_zoo_decision_params_and_6x_runtime_overrides(mon
     assert validate_snapshot["margin_mode"] == "isolated"
     assert validate_snapshot["leverage"] == 6
     assert validate_snapshot["target_allocation"] == 0.10
+    assert validate_snapshot["target_allocation_mode"] == "isolated_margin_fraction"
+    assert validate_snapshot["max_order_value"] == 0.0
+    assert validate_snapshot["max_order_notional_pct"] == 0.75
+    assert validate_snapshot["max_symbol_exposure_pct"] == 0.75
+    assert validate_snapshot["max_total_notional_pct"] == 1.5
     assert validate_snapshot["window_seconds"] == 3600
     assert validate_snapshot["ingest_window_seconds"] == 3600
     assert validate_snapshot["decision_cadence_seconds"] == 3600

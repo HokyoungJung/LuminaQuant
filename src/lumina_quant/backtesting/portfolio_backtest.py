@@ -65,6 +65,13 @@ class Portfolio:
         self.risk_per_trade = getattr(config, "RISK_PER_TRADE", 0.005)
         self.max_symbol_exposure_pct = getattr(config, "MAX_SYMBOL_EXPOSURE_PCT", 0.25)
         self.max_order_value = getattr(config, "MAX_ORDER_VALUE", 5000.0)
+        self.max_order_notional_pct = getattr(config, "MAX_ORDER_NOTIONAL_PCT", 0.0)
+        self.target_allocation_mode = getattr(
+            config,
+            "TARGET_ALLOCATION_MODE",
+            "legacy_notional_cap",
+        )
+        self.leverage = getattr(config, "LEVERAGE", 1.0)
         self.default_stop_loss_pct = getattr(config, "DEFAULT_STOP_LOSS_PCT", 0.01)
         self._current_day = None
         self._last_funding_ts = dict.fromkeys(self.symbol_list)
@@ -738,6 +745,9 @@ class Portfolio:
             max_symbol_exposure_pct=float(self.max_symbol_exposure_pct),
             target_allocation=float(target_alloc),
             max_order_value=float(self.max_order_value),
+            target_allocation_mode=str(self.target_allocation_mode),
+            leverage=float(self.leverage),
+            max_order_notional_pct=float(self.max_order_notional_pct),
         )
 
     def _validate_and_round_quantity(self, symbol, quantity, price):

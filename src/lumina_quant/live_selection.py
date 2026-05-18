@@ -250,6 +250,33 @@ def _decision_runtime_overrides(payload: dict) -> dict[str, Any]:
     if target_allocation is not None:
         overrides["target_allocation"] = float(target_allocation)
 
+    sizing_mode = str(
+        payload.get("target_allocation_mode")
+        or payload.get("sizing_mode")
+        or _as_mapping(payload.get("live_equivalent_contract")).get("target_allocation_mode")
+        or _as_mapping(payload.get("live_equivalent_contract")).get("sizing_mode")
+        or ""
+    ).strip()
+    if sizing_mode:
+        overrides["target_allocation_mode"] = sizing_mode
+
+    risk_caps = {
+        **_as_mapping(payload.get("risk_caps")),
+        **_as_mapping(payload.get("live_risk_caps")),
+    }
+    for key in (
+        "max_order_value",
+        "max_order_notional_pct",
+        "max_symbol_exposure_pct",
+        "max_total_margin_pct",
+        "max_total_notional_pct",
+    ):
+        numeric = _optional_float(payload.get(key))
+        if numeric is None:
+            numeric = _optional_float(risk_caps.get(key))
+        if numeric is not None:
+            overrides[key] = float(numeric)
+
     for source_key, target_key in (
         ("window_seconds", "window_seconds"),
         ("ingest_window_seconds", "ingest_window_seconds"),

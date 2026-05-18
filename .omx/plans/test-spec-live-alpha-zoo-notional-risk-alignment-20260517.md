@@ -102,3 +102,7 @@ git diff --cached --check
 - Paper-equivalent live sizing parity evidence.
 - Preflight status (`ready_for_paper`, `ready_for_real`).
 - CI/private-CI links if pushed.
+
+## 2026-05-18 Verification status
+
+Implemented tests cover live/replay paper-equivalent sizing parity, explicit `isolated_margin_fraction`, explicit `notional_fraction`, legacy default behavior, live decision/CLI propagation, disabled fixed-dollar cap, equity-scaled notional caps, isolated margin utilization, exact slippage/funding grids, and incumbent 7x/0.15 train+validation tie-breaker. Fresh verification passed: required live/Alpha Zoo suite `32 passed`, required moonshot suite `74 passed`, full pytest `1340 passed`, ruff, compileall, `git diff --check`, and `git diff --cached --check`.

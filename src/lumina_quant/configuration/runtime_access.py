@@ -394,12 +394,18 @@ def _base_config_values(runtime) -> dict[str, object]:
         "TIMEFRAMES": timeframes,
         "INITIAL_CAPITAL": float(trading.initial_capital),
         "TARGET_ALLOCATION": float(trading.target_allocation),
+        "TARGET_ALLOCATION_MODE": str(
+            getattr(trading, "target_allocation_mode", "legacy_notional_cap")
+            or "legacy_notional_cap"
+        ),
         "MIN_TRADE_QTY": float(trading.min_trade_qty),
         "RISK_PER_TRADE": float(risk.risk_per_trade),
         "MAX_DAILY_LOSS_PCT": float(risk.max_daily_loss_pct),
         "MAX_TOTAL_MARGIN_PCT": float(risk.max_total_margin_pct),
         "MAX_SYMBOL_EXPOSURE_PCT": float(risk.max_symbol_exposure_pct),
         "MAX_ORDER_VALUE": float(risk.max_order_value),
+        "MAX_ORDER_NOTIONAL_PCT": float(getattr(risk, "max_order_notional_pct", 0.0)),
+        "MAX_TOTAL_NOTIONAL_PCT": float(getattr(risk, "max_total_notional_pct", 0.0)),
         "DEFAULT_STOP_LOSS_PCT": float(risk.default_stop_loss_pct),
         "MAX_INTRADAY_DRAWDOWN_PCT": float(risk.max_intraday_drawdown_pct),
         "MAX_ROLLING_LOSS_PCT_1H": float(risk.max_rolling_loss_pct_1h),
@@ -757,7 +763,22 @@ class LiveConfig(BaseConfig):
         runtime.trading.symbols = list(cls.SYMBOLS)
         runtime.trading.timeframe = str(cls.TIMEFRAME)
         runtime.trading.timeframes = list(getattr(cls, "TIMEFRAMES", [cls.TIMEFRAME]))
+        runtime.trading.target_allocation = float(cls.TARGET_ALLOCATION)
+        runtime.trading.target_allocation_mode = str(
+            getattr(cls, "TARGET_ALLOCATION_MODE", "legacy_notional_cap")
+            or "legacy_notional_cap"
+        )
         runtime.risk.max_daily_loss_pct = cls.MAX_DAILY_LOSS_PCT
+        runtime.risk.risk_per_trade = float(cls.RISK_PER_TRADE)
+        runtime.risk.max_total_margin_pct = float(cls.MAX_TOTAL_MARGIN_PCT)
+        runtime.risk.max_symbol_exposure_pct = float(cls.MAX_SYMBOL_EXPOSURE_PCT)
+        runtime.risk.max_order_value = float(cls.MAX_ORDER_VALUE)
+        runtime.risk.max_order_notional_pct = float(
+            getattr(cls, "MAX_ORDER_NOTIONAL_PCT", 0.0)
+        )
+        runtime.risk.max_total_notional_pct = float(
+            getattr(cls, "MAX_TOTAL_NOTIONAL_PCT", 0.0)
+        )
         return runtime
 
     @classmethod

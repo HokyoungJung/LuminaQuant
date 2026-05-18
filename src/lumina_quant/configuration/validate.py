@@ -202,6 +202,19 @@ def _validate_live_exchange_runtime_invariants(runtime: RuntimeConfig, market_da
 
 
 def _validate_risk_and_execution_runtime_invariants(runtime: RuntimeConfig) -> None:
+    if runtime.trading.target_allocation_mode not in {
+        "legacy_notional_cap",
+        "notional_cap",
+        "notional_fraction",
+        "notional_target_fraction",
+        "isolated_margin_fraction",
+        "margin_fraction",
+        "isolated_margin",
+    }:
+        raise ValueError(
+            "trading.target_allocation_mode must be one of: legacy_notional_cap, "
+            "notional_fraction, isolated_margin_fraction."
+        )
     if runtime.risk.risk_per_trade <= 0 or runtime.risk.risk_per_trade > 0.05:
         raise ValueError("risk.risk_per_trade must be in (0, 0.05].")
     if runtime.risk.max_daily_loss_pct <= 0 or runtime.risk.max_daily_loss_pct > 1:
@@ -210,6 +223,10 @@ def _validate_risk_and_execution_runtime_invariants(runtime: RuntimeConfig) -> N
         raise ValueError("risk.max_intraday_drawdown_pct must be in (0, 1].")
     if runtime.risk.max_rolling_loss_pct_1h <= 0 or runtime.risk.max_rolling_loss_pct_1h > 1:
         raise ValueError("risk.max_rolling_loss_pct_1h must be in (0, 1].")
+    if runtime.risk.max_order_notional_pct < 0:
+        raise ValueError("risk.max_order_notional_pct must be >= 0.")
+    if runtime.risk.max_total_notional_pct < 0:
+        raise ValueError("risk.max_total_notional_pct must be >= 0.")
     if runtime.execution.compute_backend not in {"auto", "cpu", "gpu", "forced-gpu"}:
         raise ValueError("execution.compute_backend must be one of: auto, cpu, gpu, forced-gpu.")
     gpu_mode = str(

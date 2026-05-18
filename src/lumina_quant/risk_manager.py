@@ -1,9 +1,13 @@
+from lumina_quant.services.portfolio import PortfolioSizingService
+
+
 class RiskManager:
     """Enforces risk limits before orders are sent to the exchange."""
 
     def __init__(self, config):
         self.config = config
         self.max_order_value = getattr(config, "MAX_ORDER_VALUE", 5000.0)
+        self.max_order_notional_pct = getattr(config, "MAX_ORDER_NOTIONAL_PCT", 0.0)
         self.max_daily_loss = getattr(config, "MAX_DAILY_LOSS_PCT", 0.05)
         self.max_intraday_drawdown_pct = getattr(
             config,
@@ -13,6 +17,16 @@ class RiskManager:
         self.max_rolling_loss_pct_1h = getattr(config, "MAX_ROLLING_LOSS_PCT_1H", 0.05)
         self.max_symbol_exposure_pct = getattr(config, "MAX_SYMBOL_EXPOSURE_PCT", 0.25)
         self.max_total_margin_pct = getattr(config, "MAX_TOTAL_MARGIN_PCT", 0.5)
+        max_total_notional_pct = getattr(config, "MAX_TOTAL_NOTIONAL_PCT", 0.0)
+        self.max_total_notional_pct = (
+            float(max_total_notional_pct)
+            if float(max_total_notional_pct) > 0.0
+            else self.max_total_margin_pct
+        )
+        self.target_allocation_mode = PortfolioSizingService.normalize_target_allocation_mode(
+            getattr(config, "TARGET_ALLOCATION_MODE", "legacy_notional_cap")
+        )
+        self.leverage = max(1.0, float(getattr(config, "LEVERAGE", 1.0) or 1.0))
         self.freeze_new_entries_on_breach = bool(
             getattr(config, "FREEZE_NEW_ENTRIES_ON_BREACH", True)
         )
@@ -66,7 +80,7 @@ class RiskManager:
 
         # 1. Check Notional Value (absolute per-order cap)
         notional_value = order_event.quantity * current_price
-        if notional_value > self.max_order_value:
+        if float(self.max_order_value) > 0.0 and notional_value > self.max_order_value:
             return (
                 False,
                 f"Order Value ${notional_value:.2f} exceeds limit ${self.max_order_value}",
@@ -86,6 +100,13 @@ class RiskManager:
             total_equity = float(portfolio.current_holdings.get("total", 0.0))
             if total_equity <= 0:
                 return False, "Non-positive equity."
+
+            order_notional_cap = total_equity * float(self.max_order_notional_pct)
+            if order_notional_cap > 0 and notional_value > order_notional_cap:
+                return (
+                    False,
+                    f"Order Value ${notional_value:.2f} exceeds equity-scaled cap ${order_notional_cap:.2f}",
+                )
 
             if getattr(portfolio, "circuit_breaker_tripped", False):
                 return False, "Circuit breaker already tripped."
@@ -124,7 +145,7 @@ class RiskManager:
                 sym_mv = float(portfolio.current_holdings.get(sym, 0.0))
                 current_total_notional += abs(sym_mv)
             projected_total_notional = current_total_notional + notional_value
-            total_cap = total_equity * self.max_total_margin_pct
+            total_cap = total_equity * self.max_total_notional_pct
             if total_cap > 0 and projected_total_notional > total_cap:
                 return (
                     False,
@@ -151,7 +172,10 @@ class RiskManager:
         total_notional = 0.0
         for sym in portfolio.symbol_list:
             total_notional += abs(float(portfolio.current_holdings.get(sym, 0.0)))
-        margin_utilization = total_notional / equity if equity > 0 else 0.0
+        if self.target_allocation_mode == "isolated_margin_fraction":
+            margin_utilization = total_notional / (equity * self.leverage) if equity > 0 else 0.0
+        else:
+            margin_utilization = total_notional / equity if equity > 0 else 0.0
 
         if intraday_loss_pct >= float(self.max_intraday_drawdown_pct):
             action = "FLATTEN" if self.auto_flatten_on_breach else "FREEZE"
@@ -186,6 +210,8 @@ class RiskManager:
                 {
                     "margin_utilization": margin_utilization,
                     "threshold": float(self.max_total_margin_pct),
+                    "target_allocation_mode": self.target_allocation_mode,
+                    "leverage": self.leverage,
                 },
             )
 
@@ -197,6 +223,8 @@ class RiskManager:
                 "intraday_loss_pct": intraday_loss_pct,
                 "rolling_loss_pct_1h": rolling_loss_pct_1h,
                 "margin_utilization": margin_utilization,
+                "target_allocation_mode": self.target_allocation_mode,
+                "leverage": self.leverage,
             },
         )
 
