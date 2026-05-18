@@ -449,3 +449,15 @@ Artifacts:
 Fresh local verification passed on 2026-05-18 UTC: required live/Alpha Zoo suite `32 passed`, required moonshot validation suite `74 passed`, full pytest `1340 passed`, ruff, compileall, `git diff --check`, and `git diff --cached --check` all passed.
 
 Research history/source ledger not regenerated: this session used the already-refreshed 2026-05-17 current-tail data and added a live-sizing contract/validation artifact bundle, not a new market-data source family or global chronology refresh.
+
+## 2026-05-18 KST — Plan for Alpha Zoo top-seed hybrid v3.5/v3.6 cost validation
+
+Prepared a next-session plan to test whether the current Alpha Zoo leaderboard can be improved by building Hybrid v3.5/v3.6 portfolios from the top individual candidate streams rather than from the prior fixed-input `A0 + P0 + E0 + S1 + S2 + S3 + S4` universe. The plan is saved at `.omx/plans/plan-alpha-zoo-hybrid-v35-v36-cost-validation-20260518.md`.
+
+Current seed-selection snapshot is based on `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/live_notional_risk_aligned_alpha_zoo_20260518/`: leverage grid `1x..20x`, allocation grid `0.03,0.05,0.075,0.10,0.125,0.15,0.175,0.20`, `1600` rows, `113` live-promotion rows, and `50` rows passing the train-dominant/val-good/OOS-good filter. The next session must recompute the buckets from the latest CSV before running.
+
+Planned seed universe uses top-3 bucket union from live OOS return/Sharpe/Sortino/smart Sortino/Calmar, full compound, and filtered balanced/validation-return/OOS-return/OOS-Calmar lists. The current deduped snapshot has `18` rows spanning `fast_residual`, `quality_single_pair`, `high_confidence_single_pair`, and `high_confidence_long_only` configurations. Known duplicates such as `fast_residual 7x/0.15` and `6x/0.175` are intentional because they have the same notional/equity (`105%`) but different isolated margin semantics.
+
+The required cost validation is explicitly round-trip slippage/fee `5bps = 0.05%` and `10bps = 0.10%`. For every individual seed plus `hybrid_v3_5_seed_union` and `hybrid_v3_6_seed_union`, the next run must report train/validation/locked-OOS total return, MDD, Sharpe, Sortino, smart Sortino, Calmar, trade/event count, liquidation count, account-wipeout count, and minimum margin buffer. Locked-OOS remains gate/report-only and must not enter objective, pruning, parameter fitting, or seed/hybrid selection.
+
+Recommended output directory for the next run: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_top_seed_hybrid_cost_validation_20260518/`. Real-money execution remains prohibited. Research history/source ledger does not need regeneration for this planning-only update because it introduces no new data source family or market-data chronology; the execution session must revisit that decision if it refreshes data or changes source lineage.
