@@ -461,3 +461,34 @@ Planned seed universe uses top-3 bucket union from live OOS return/Sharpe/Sortin
 The required cost validation is explicitly round-trip slippage/fee `5bps = 0.05%` and `10bps = 0.10%`. For every individual seed plus `hybrid_v3_5_seed_union` and `hybrid_v3_6_seed_union`, the next run must report train/validation/locked-OOS total return, MDD, Sharpe, Sortino, smart Sortino, Calmar, trade/event count, liquidation count, account-wipeout count, and minimum margin buffer. Locked-OOS remains gate/report-only and must not enter objective, pruning, parameter fitting, or seed/hybrid selection.
 
 Recommended output directory for the next run: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_top_seed_hybrid_cost_validation_20260518/`. Real-money execution remains prohibited. Research history/source ledger does not need regeneration for this planning-only update because it introduces no new data source family or market-data chronology; the execution session must revisit that decision if it refreshes data or changes source lineage.
+
+## 2026-05-19 KST — Alpha Zoo top-seed Hybrid v3.5/v3.6 cost validation
+
+Recomputed the current Alpha Zoo top-bucket plus filtered top-3 seed-union from the latest live-notional/risk-aligned candidate CSV, then generated a separate research-only Hybrid v3.5/v3.6 cost-validation bundle. The deduped seed universe now has `16` rows across `fast_residual`, `quality_single_pair`, `high_confidence_single_pair`, and `high_confidence_long_only`. The bundle reports every individual seed, `hybrid_v3_5_seed_union`, `hybrid_v3_6_seed_union`, `reference_fast_residual_7x_0p15`, and `reference_strict_zero_fast_residual_6x_0p10` at round-trip slippage/fee `5bps` and `10bps` over `train`, `validation`, and `locked_oos` splits: `(16 + 2 + 2) * 2 * 3 = 120` metric rows.
+
+Locked-OOS remains a gate/report split after model freeze for the hybrid objective/pruning/parameter-fitting path: the artifact audit records `uses_locked_oos_for_objective=false`, `uses_locked_oos_for_pruning=false`, `uses_locked_oos_for_parameter_fitting=false`, and `uses_locked_oos_for_selection=false`. Because the requested seed basket is assembled from current leaderboard buckets, the artifact also labels the seed basket as a post-hoc research basket rather than a deployable live-selection rule. No real-money execution was attempted.
+
+Key cost outcomes:
+
+- `hybrid_v3_5_seed_union`, `5bps`: train `+49.19%` / MDD `30.09%`; validation `+21.16%` / MDD `12.33%`; locked-OOS `+3.29%` / MDD `15.39%`; liquidation `0`; account wipeout `0`; locked-OOS gate `true`.
+- `hybrid_v3_6_seed_union`, `5bps`: train `-7.98%`; validation `+8.21%`; locked-OOS `-2.90%`; liquidation `0`; account wipeout `0`; locked-OOS gate `false`.
+- `hybrid_v3_5_seed_union`, `10bps`: train `+47.75%`; validation `+18.91%`; locked-OOS `-2.82%`; liquidation `0`; account wipeout `0`; locked-OOS gate `false`.
+- `hybrid_v3_6_seed_union`, `10bps`: train `-9.07%`; validation `-7.11%`; locked-OOS `-6.22%`; liquidation `0`; account wipeout `0`; locked-OOS gate `false`.
+- References: `fast_residual 7x/0.15` locked-OOS is `+7.63%` at `5bps` and `-12.44%` at `10bps`; strict zero `fast_residual 6x/0.10` locked-OOS is `+4.59%` at `5bps` and `-7.05%` at `10bps`.
+- Best locked-OOS individual seed in the bundle is `alpha_zoo_high_confidence_single_pair 7x/0.2`: `+11.03%` / MDD `14.02%` at `5bps`, and `+3.02%` / MDD `16.87%` at `10bps`. Isolated liquidation losses are included in equity/MDD; the bundle's max split liquidation count is `9` on one high-leverage seed train split, and all account-wipeout counts are `0`.
+
+Artifacts:
+
+- Runner: `scripts/research/run_alpha_zoo_top_seed_hybrid_v35_v36_cost_validation.py`
+- Main JSON: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_top_seed_hybrid_cost_validation_20260518/alpha_zoo_top_seed_hybrid_cost_validation_latest.json`
+- Main Markdown/full metric table: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_top_seed_hybrid_cost_validation_20260518/alpha_zoo_top_seed_hybrid_cost_validation_latest.md`
+- Seed selection CSV/JSON: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_top_seed_hybrid_cost_validation_20260518/seed_selection_latest.csv`, `seed_selection_latest.json`
+- Model metrics CSV: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_top_seed_hybrid_cost_validation_20260518/model_cost_metrics_latest.csv`
+- Hybrid weights CSV: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_top_seed_hybrid_cost_validation_20260518/hybrid_weights_latest.csv`
+- Generation log: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_top_seed_hybrid_cost_validation_20260518/local_verification_alpha_zoo_top_seed_hybrid_cost_validation_20260519T093343Z.log`
+- Final verification log: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_top_seed_hybrid_cost_validation_20260518/local_verification_alpha_zoo_top_seed_hybrid_cost_validation_final_20260519T100131Z.log`
+- Post-deslop verification log: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_top_seed_hybrid_cost_validation_20260518/local_verification_alpha_zoo_top_seed_hybrid_cost_validation_post_deslop_20260519T100507Z.log`
+
+Fresh local verification passed on 2026-05-19 UTC: artifact assertion passed (`seed_count=16`, `metric_rows=120`, max liquidation count `9`, account wipeout max `0`); new Alpha Zoo top-seed tests `5 passed`; hybrid/common split tests `14 passed`; live/liquidation/state tests `46 passed`; full pytest `1345 passed`; ruff, compileall, and `git diff --check` all passed. Post-deslop verification re-ran after narrowing broad exception handling in the new runner: artifact assertion passed; new tests `5 passed`; full pytest `1345 passed`; ruff, compileall, and `git diff --check` passed.
+
+Research history/source ledger not regenerated: this session reused the already-refreshed 2026-05-17 current-tail data and the 2026-05-18 live-notional/risk-aligned Alpha Zoo artifact family; it added a same-lineage research-only cost-validation bundle, not a new market-data source family or global chronology refresh.
