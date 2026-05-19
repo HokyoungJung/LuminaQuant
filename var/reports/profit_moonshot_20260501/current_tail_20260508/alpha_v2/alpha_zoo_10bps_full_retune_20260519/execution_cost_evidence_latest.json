@@ -1,76 +1,16 @@
 {
-  "artifact_kind": "alpha_zoo_10bps_full_retune_execution_cost_evidence",
-  "contract_guards": {
-    "execution_cost_evidence_role": "diagnostic_only",
-    "locked_oos_cost_selection_allowed": false,
-    "real_money_execution_attempted": false
-  },
-  "depth_snapshot_schema": {
-    "diagnostic_only": true,
-    "not_backtest_input": true,
-    "notional_usdt_levels": [
-      10000,
-      50000,
-      100000
-    ],
-    "observed_at_utc": "2026-05-19T10:47:00Z",
-    "required_fields_per_symbol": [
-      "spread_bps_approx",
-      "one_way_depth_slippage_bps_by_notional_approx",
-      "book_source_url_or_endpoint",
-      "observed_at_utc"
-    ],
-    "source": "leader-gathered Binance USD-M public order-book snapshot",
-    "symbols": [
-      "BTCUSDT",
-      "ETHUSDT",
-      "SOLUSDT"
-    ],
-    "usage_rule": "Use only as execution-cost context; never as train/validation/locked-OOS optimization input."
-  },
+  "collected_at_utc": "2026-05-19T11:07:40.908135Z",
   "diagnostic_only": true,
-  "generated_at_utc": "2026-05-19T11:08:21.118797Z",
-  "leader_snapshot_summary": {
-    "BTCUSDT": {
-      "depth_slippage_bps_note": "~0.007bps for 10k USDT notional",
-      "spread_bps_approx": 0.013
-    },
-    "ETHUSDT": {
-      "depth_slippage_bps_note": "~0.024bps for 10k USDT notional",
-      "spread_bps_approx": 0.047
-    },
-    "SOLUSDT": {
-      "depth_slippage_bps_note": "~0.59bps to ~1.03bps across sampled notionals",
-      "spread_bps_approx": 1.185
-    }
-  },
-  "promotion_cost_model": {
-    "cost_model": "round_trip_all_in",
-    "note": "Lower-cost rows are diagnostics only; promotion/live-readiness uses 10bps all-in round-trip cost.",
-    "promotion_primary": true,
-    "round_trip_cost_bps": 10.0,
-    "sensitivity_rows_allowed": [
-      5.0,
-      15.0,
-      20.0
-    ]
-  },
-  "schema_version": "1.0",
-  "sources": [
-    {
-      "label": "Binance USD\u24c8-M Futures fee page",
-      "url": "https://www.binance.com/en/fee/futureFee",
-      "use": "Official fee surface reference; account-specific VIP/tier rates must be resolved at execution time, not hardcoded from stale memory."
-    },
-    {
-      "label": "Binance Academy: bid-ask spread and slippage explained",
-      "url": "https://www.binance.com/en/academy/articles/bid-ask-spread-and-slippage-explained",
-      "use": "Public explanation that spread/slippage are real trading costs beyond visible fees and that large orders can walk the book."
-    },
-    {
-      "label": "Binance Academy glossary: slippage",
-      "url": "https://www.binance.com/en/academy/glossary/slippage",
-      "use": "Public mitigation guidance: limit orders, order splitting, liquid pairs, and order-book depth checks."
-    }
+  "may_reduce_promotion_cost": false,
+  "primary_round_trip_cost_bps": 10.0,
+  "promotion_baseline_locked": true,
+  "snapshot_status": "not_required_for_local_gate_tests",
+  "source_note": "Execution-cost context is diagnostic only; promotion remains locked to 10bps all-in round-trip slippage/fee.",
+  "symbols": [
+    "BTCUSDT",
+    "ETHUSDT",
+    "SOLUSDT",
+    "BNBUSDT",
+    "TRXUSDT"
   ]
 }
