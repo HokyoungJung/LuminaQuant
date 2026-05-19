@@ -522,3 +522,42 @@ Best live-gate candidate at round-trip `10bps`:
 The selected live-gate candidate satisfies the requested dominance shape: train return/Sharpe/Sortino/smart Sortino/Calmar are all above validation and locked-OOS; validation and locked-OOS returns are positive; locked-OOS was not used for variant selection, pruning, objective scoring, or parameter fitting. Calendar/date rules remain rejected.
 
 Fresh verification passed on 2026-05-19 UTC: artifact assertion passed (`798` models, `2394` metric rows, `56` promotable); 10bps retune tests `15 passed`; top-seed/hybrid split tests `19 passed`; live/liquidation/state tests `49 passed`; full pytest `1360 passed`; `ruff check .`, `compileall`, and diff checks passed. Research history/source ledger not regenerated: this session reused the already-refreshed 2026-05-17 current-tail data and same Alpha Zoo artifact lineage, adding a same-lineage 10bps retune/validation bundle rather than a new market-data source family or chronology refresh.
+
+## 2026-05-19 KST — Risk-selection and low-correlation verification contract
+
+The follow-up risk-selection plan keeps locked-OOS as post-freeze gate/report-only evidence while predeclaring two train+validation-only selection profiles:
+
+- `balanced_train_validation_v1` remains the balanced reference and must report `fresh_tv10_filter_abs_score_ge_1p5_alpha_zoo_quality_single_pair_6p0x_0p175alloc`.
+- `higher_risk_train_return_tilt_v1` is the active final profile and may select `fresh_tv10_filter_abs_score_ge_1p5_alpha_zoo_quality_single_pair_7p0x_0p2alloc` only after the existing 10bps promotion gates pass.
+
+The artifact validator now requires explicit profile metadata, score-formula inputs, `uses_locked_oos_* = false` flags, balanced-reference preservation, and a separate `low_correlation_discovery_latest.json/csv` surface. Low-correlation discovery rows must compute correlations from train+validation returns only, label deployable 10bps gate passers separately from research-only locked-OOS gate failures, keep `real_money_execution=false`, and preserve the `<8192 MiB` memory guard.
+
+## 2026-05-19 KST — Higher-risk 10bps selection profile and low-correlation discovery result
+
+The follow-up risk-selection run finalized the active 10bps model by a predeclared train+validation-only higher-risk profile, not by locked-OOS ranking. The runner now replays all `600` source candidates by default, records the selected profile metadata in the artifact, and emits low-correlation discovery sidecars. Locked-OOS remains gate/report-only after candidate/profile freeze; `real_money_execution=false` throughout.
+
+Final artifact summary:
+
+- Artifact dir: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_10bps_full_retune_20260519/`.
+- Latest main JSON/Markdown: `alpha_zoo_10bps_full_retune_latest.json`, `alpha_zoo_10bps_full_retune_latest.md`.
+- Timestamped final JSON/Markdown: `alpha_zoo_10bps_full_retune_20260519T140542Z.json`, `alpha_zoo_10bps_full_retune_20260519T140542Z.md`.
+- Candidate accounting: `796` models / `2388` split metric rows; `600` source candidates selected before locked-OOS gates; `775` low-correlation candidate streams compared against the active reference.
+- Memory: artifact peak RSS `385.7539 MiB`; `/usr/bin/time` max RSS `395,012 KiB`, under the 8 GiB session limit.
+
+Selection profiles:
+
+- Active final profile: `higher_risk_train_return_tilt_v1` -> `fresh_tv10_filter_abs_score_ge_1p5_alpha_zoo_quality_single_pair_7p0x_0p2alloc`; profile score `0.5139152402359146`.
+- Balanced reference profile: `balanced_train_validation_v1` -> `fresh_tv10_filter_abs_score_ge_1p5_alpha_zoo_quality_single_pair_6p0x_0p175alloc`; profile score `0.20188310617174543`.
+- Both profile definitions record train+validation as objective/selection/optimization/pruning/parameter-fit/score-formula inputs and all `uses_locked_oos_*` selector flags as `false`.
+
+Active final 10bps profile split metrics (`7x`, allocation `0.20`, non-calendar `abs_score_ge_1.5` quality-single-pair filter):
+
+- Train: return `+45.6916%`, MDD `31.6050%`, Sharpe `0.994753`, Sortino `0.287423`, Calmar `1.445708`, trades `405`, liquidation `0`.
+- Validation: return `+0.4724%`, MDD `14.9117%`, Sharpe `0.219005`, Sortino `0.047090`, Calmar `0.129660`, trades `86`, liquidation `0`.
+- Locked-OOS gate/report-only: return `+1.8382%`, MDD `14.3237%`, Sharpe `0.556723`, Sortino `0.169307`, Calmar `1.074121`, trades `53`, liquidation `0`.
+
+Balanced reference 10bps split metrics (`6x`, allocation `0.175`, same non-calendar filter): train `+36.0268%`, validation `+0.5942%`, locked-OOS `+1.5464%`; all splits liquidation `0`.
+
+Low-correlation discovery sidecars: `low_correlation_discovery_latest.json` and `low_correlation_discovery_latest.csv`. Correlations are computed from train+validation returns only against the active higher-risk reference; `423` streams are below the `0.35` absolute-correlation threshold, but `0` are deployable 10bps gate passers independent of the reference in this run, so the discovery rows are research-only until a low-correlation stream also clears locked-OOS gate/report checks.
+
+Verification passed on 2026-05-19 UTC: artifact assertion passed (`796` models, `2388` metric rows, `50` low-correlation rows); focused 10bps retune and artifact assertion tests `19 passed`; `ruff` passed on changed runner/assertion/tests; `compileall` passed. Full `n_trials=80` hybrid optimizer was not rerun in this final profile pass; the required deliverable was profile-safe selection plus low-correlation discovery under the 8 GiB guard.

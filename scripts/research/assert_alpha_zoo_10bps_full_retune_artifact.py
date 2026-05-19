@@ -38,12 +38,22 @@ SELECTION_INPUT_KEYS = (
 )
 CALENDAR_KEY_TOKENS = ("calendar", "date", "month", "day")
 REQUIRED_COST_SYMBOLS = {"BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "TRXUSDT"}
+ACTIVE_SELECTION_PROFILE = "higher_risk_train_return_tilt_v1"
+BALANCED_SELECTION_PROFILE = "balanced_train_validation_v1"
+EXPECTED_HIGHER_RISK_MODEL_ID = (
+    "fresh_tv10_filter_abs_score_ge_1p5_alpha_zoo_quality_single_pair_7p0x_0p2alloc"
+)
+EXPECTED_BALANCED_REFERENCE_MODEL_ID = (
+    "fresh_tv10_filter_abs_score_ge_1p5_alpha_zoo_quality_single_pair_6p0x_0p175alloc"
+)
 EXPECTED_TIMESTAMP_INDEX_HASH = "b973165bc1057f3aaa08ea637b73a45df3e84fdb7d1337b1637233d205696bb0"
 EXPECTED_SPLIT_CONTRACT = {
     "train": {"start": "2025-01-01T00:00:00Z", "end": "2025-12-31T23:00:00Z"},
     "validation": {"start": "2026-01-01T00:00:00Z", "end": "2026-03-31T23:00:00Z"},
     "locked_oos": {"start": "2026-04-01T00:00:00Z", "end": "2026-05-17T10:00:00Z"},
 }
+LOW_CORRELATION_DISCOVERY_JSON = "low_correlation_discovery_latest.json"
+LOW_CORRELATION_DISCOVERY_CSV = "low_correlation_discovery_latest.csv"
 REQUIRED_FILES = (
     "alpha_zoo_10bps_full_retune_latest.json",
     "candidate_model_metrics_latest.csv",
@@ -51,6 +61,8 @@ REQUIRED_FILES = (
     "tuned_seed_selection_latest.csv",
     "tuned_seed_selection_latest.json",
     "execution_cost_evidence_latest.json",
+    LOW_CORRELATION_DISCOVERY_JSON,
+    LOW_CORRELATION_DISCOVERY_CSV,
 )
 
 
@@ -158,6 +170,70 @@ def _input_values_include_locked_oos(values: Any) -> bool:
     return False
 
 
+def _normalised_input_list(values: Any) -> list[str]:
+    if values is None:
+        return []
+    if isinstance(values, str):
+        text = values.strip()
+        if not text:
+            return []
+        if text.startswith("["):
+            try:
+                parsed = json.loads(text)
+            except json.JSONDecodeError:
+                parsed = None
+            if isinstance(parsed, Sequence) and not isinstance(
+                parsed, (str, bytes, bytearray)
+            ):
+                return _normalised_input_list(parsed)
+        separator = ";" if ";" in text else ","
+        return [item.strip().lower() for item in text.split(separator) if item.strip()]
+    if isinstance(values, Sequence) and not isinstance(values, (bytes, bytearray)):
+        return [str(item).strip().lower() for item in values if str(item).strip()]
+    return [str(values).strip().lower()]
+
+
+def _validate_exact_train_validation_inputs(
+    container: Mapping[str, Any],
+    *,
+    prefix: str,
+    keys: Sequence[str],
+    required: bool = False,
+) -> None:
+    for key in keys:
+        if key not in container:
+            if required:
+                _fail(f"{prefix}.{key} is required")
+            continue
+        values = _normalised_input_list(container.get(key))
+        if values != ["train", "validation"]:
+            _fail(f"{prefix}.{key} must be exactly ['train', 'validation']")
+
+
+def _validate_any_exact_train_validation_input(
+    container: Mapping[str, Any],
+    *,
+    prefix: str,
+    keys: Sequence[str],
+) -> None:
+    seen = False
+    for key in keys:
+        if key not in container:
+            continue
+        seen = True
+        _validate_exact_train_validation_inputs(
+            container, prefix=prefix, keys=(key,), required=True
+        )
+    if not seen:
+        _fail(f"{prefix} must include at least one train/validation input field")
+
+
+def _validate_locked_oos_flags(container: Mapping[str, Any], *, prefix: str) -> None:
+    for key in LOCKED_OOS_FLAGS:
+        if key in container and container.get(key) is not False:
+            _fail(f"{prefix}.{key} must be false")
+
+
 def _validate_selection_inputs(container: Mapping[str, Any], *, prefix: str) -> None:
     for key in SELECTION_INPUT_KEYS:
         if _input_values_include_locked_oos(container.get(key)):
@@ -175,8 +251,18 @@ def _validate_locked_oos_audit(payload: Mapping[str, Any]) -> None:
     if "gate" not in role or "report" not in role:
         _fail("locked_oos_contamination_audit.locked_oos_role must be gate/report-only")
     _validate_selection_inputs(audit, prefix="locked_oos_contamination_audit")
+    _validate_exact_train_validation_inputs(
+        audit,
+        prefix="locked_oos_contamination_audit",
+        keys=SELECTION_INPUT_KEYS,
+    )
     selection_policy = _as_mapping(payload.get("selection_policy"))
     _validate_selection_inputs(selection_policy, prefix="selection_policy")
+    _validate_exact_train_validation_inputs(
+        selection_policy,
+        prefix="selection_policy",
+        keys=SELECTION_INPUT_KEYS,
+    )
     for key in LOCKED_OOS_FLAGS:
         if key in selection_policy and selection_policy.get(key) is not False:
             _fail(f"selection_policy.{key} must be false")
@@ -363,6 +449,97 @@ def _validate_metric_rows(rows: Sequence[Mapping[str, Any]]) -> dict[str, list[M
     return grouped
 
 
+def _require_profile_model(
+    profile: Mapping[str, Any],
+    *,
+    profile_id: str,
+    grouped_rows: Mapping[str, Sequence[Mapping[str, Any]]],
+) -> str:
+    selected_model_id = str(profile.get("selected_model_id") or "")
+    if not selected_model_id:
+        _fail(f"selection_profiles.{profile_id}.selected_model_id is required")
+    if selected_model_id not in grouped_rows:
+        _fail(
+            f"selection_profiles.{profile_id}.selected_model_id missing from 10bps metric rows: "
+            f"{selected_model_id}"
+        )
+    return selected_model_id
+
+
+def _validate_selection_profile(
+    profile: Mapping[str, Any],
+    *,
+    profile_id: str,
+    grouped_rows: Mapping[str, Sequence[Mapping[str, Any]]],
+) -> str:
+    if not profile:
+        _fail(f"selection_profiles.{profile_id} is required")
+    _validate_locked_oos_flags(profile, prefix=f"selection_profiles.{profile_id}")
+    _validate_selection_inputs(profile, prefix=f"selection_profiles.{profile_id}")
+    _validate_exact_train_validation_inputs(
+        profile,
+        prefix=f"selection_profiles.{profile_id}",
+        keys=(
+            "objective_inputs",
+            "selection_inputs",
+            "optimization_input_splits",
+            "parameter_fit_inputs",
+            "pruning_inputs",
+            "score_formula_inputs",
+        ),
+        required=True,
+    )
+    formula = str(profile.get("score_formula") or "").strip()
+    if not formula:
+        _fail(f"selection_profiles.{profile_id}.score_formula is required")
+    if "locked_oos" in formula.lower() or "oos" in formula.lower():
+        _fail(f"selection_profiles.{profile_id}.score_formula must not reference locked_oos/oos")
+    if not str(profile.get("risk_profile_consequence") or "").strip():
+        _fail(f"selection_profiles.{profile_id}.risk_profile_consequence is required")
+    return _require_profile_model(
+        profile,
+        profile_id=profile_id,
+        grouped_rows=grouped_rows,
+    )
+
+
+def _validate_selection_profiles(
+    payload: Mapping[str, Any],
+    grouped_rows: Mapping[str, Sequence[Mapping[str, Any]]],
+) -> str:
+    profiles = _as_mapping(payload.get("selection_profiles"))
+    balanced = _validate_selection_profile(
+        _as_mapping(profiles.get(BALANCED_SELECTION_PROFILE)),
+        profile_id=BALANCED_SELECTION_PROFILE,
+        grouped_rows=grouped_rows,
+    )
+    higher_risk = _validate_selection_profile(
+        _as_mapping(profiles.get(ACTIVE_SELECTION_PROFILE)),
+        profile_id=ACTIVE_SELECTION_PROFILE,
+        grouped_rows=grouped_rows,
+    )
+    if payload.get("active_selection_profile") != ACTIVE_SELECTION_PROFILE:
+        _fail(f"active_selection_profile must be {ACTIVE_SELECTION_PROFILE!r}")
+    if balanced != EXPECTED_BALANCED_REFERENCE_MODEL_ID:
+        _fail(
+            "balanced_train_validation_v1 selected_model_id must be "
+            f"{EXPECTED_BALANCED_REFERENCE_MODEL_ID!r}"
+        )
+    if higher_risk != EXPECTED_HIGHER_RISK_MODEL_ID:
+        _fail(
+            "higher_risk_train_return_tilt_v1 selected_model_id must be "
+            f"{EXPECTED_HIGHER_RISK_MODEL_ID!r}"
+        )
+    if payload.get("balanced_reference_10bps_model_id") != balanced:
+        _fail("balanced_reference_10bps_model_id must match balanced profile selected_model_id")
+    if payload.get("live_promotable_10bps_model_id") != higher_risk:
+        _fail("live_promotable_10bps_model_id must match active higher-risk profile")
+    failures = _promotion_gate_failures_for_model(grouped_rows[higher_risk])
+    if failures:
+        _fail(f"active higher-risk model failed 10bps promotion gates: {failures}")
+    return higher_risk
+
+
 def _validate_promotions(
     payload: Mapping[str, Any], grouped_rows: Mapping[str, Sequence[Mapping[str, Any]]]
 ) -> list[str]:
@@ -385,13 +562,132 @@ def _validate_promotions(
     return sorted(promotable_ids)
 
 
+def _validate_low_correlation_policy(policy: Mapping[str, Any], *, prefix: str) -> None:
+    if not policy:
+        _fail(f"{prefix} is required")
+    _validate_locked_oos_flags(policy, prefix=prefix)
+    _validate_selection_inputs(policy, prefix=prefix)
+    for key in ("uses_locked_oos_for_correlation", "uses_locked_oos_for_discovery"):
+        if key in policy and policy.get(key) is not False:
+            _fail(f"{prefix}.{key} must be false")
+    _validate_exact_train_validation_inputs(
+        policy,
+        prefix=prefix,
+        keys=(
+            "objective_inputs",
+            "selection_inputs",
+            "optimization_input_splits",
+            "parameter_fit_inputs",
+            "pruning_inputs",
+            "correlation_inputs",
+            "correlation_split_inputs",
+            "candidate_freeze_inputs",
+        ),
+        required=True,
+    )
+    role = str(policy.get("locked_oos_role") or "")
+    if "gate" not in role or "report" not in role:
+        _fail(f"{prefix}.locked_oos_role must be gate/report-only")
+
+
+def _validate_low_correlation_discovery(
+    payload: Mapping[str, Any],
+    discovery: Mapping[str, Any],
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    reference_model_id: str,
+) -> None:
+    payload_discovery = _as_mapping(payload.get("low_correlation_discovery"))
+    if not payload_discovery:
+        _fail("payload.low_correlation_discovery is required")
+    payload_policy = _as_mapping(payload_discovery.get("discovery_policy"))
+    _validate_low_correlation_policy(
+        payload_policy, prefix="payload.low_correlation_discovery.discovery_policy"
+    )
+    discovery_policy = _as_mapping(discovery.get("discovery_policy"))
+    _validate_low_correlation_policy(discovery_policy, prefix="low_correlation.discovery_policy")
+    for prefix, container in (
+        ("payload.low_correlation_discovery", payload_discovery),
+        ("low_correlation_discovery_latest.json", discovery),
+    ):
+        selection_profile = str(container.get("selection_profile") or "")
+        reference_profile = str(container.get("reference_profile") or "")
+        if selection_profile and selection_profile != ACTIVE_SELECTION_PROFILE:
+            _fail(f"{prefix}.selection_profile must be {ACTIVE_SELECTION_PROFILE!r}")
+        if reference_profile and reference_profile != ACTIVE_SELECTION_PROFILE:
+            _fail(f"{prefix}.reference_profile must be {ACTIVE_SELECTION_PROFILE!r}")
+        observed_reference = str(
+            container.get("reference_model_id")
+            or _as_mapping(container.get("discovery_policy")).get("reference_model_id")
+            or ""
+        )
+        if observed_reference != reference_model_id:
+            _fail(f"{prefix}.reference_model_id must match active higher-risk model")
+    if not rows:
+        _fail("low_correlation_discovery_latest.csv must contain at least one row")
+    labels: set[str] = set()
+    for index, row in enumerate(rows, start=1):
+        row_prefix = f"low correlation row {index}"
+        if not str(row.get("candidate_model_id") or "").strip():
+            _fail(f"{row_prefix} missing candidate_model_id")
+        if not str(row.get("candidate_family") or "").strip():
+            _fail(f"{row_prefix} missing candidate_family")
+        if not str(row.get("candidate_variant_name") or row.get("variant_name") or "").strip():
+            _fail(f"{row_prefix} missing candidate_variant_name")
+        _validate_any_exact_train_validation_input(
+            row,
+            prefix=row_prefix,
+            keys=("selection_correlation_split_inputs", "correlation_inputs", "selection_inputs"),
+        )
+        if _is_true(row.get("uses_locked_oos_for_selection")):
+            _fail(f"{row_prefix} uses locked_oos for selection")
+        if _is_true(row.get("uses_locked_oos_for_correlation")):
+            _fail(f"{row_prefix} uses locked_oos for correlation")
+        corr = _safe_float(
+            row.get(
+                "train_validation_correlation_to_reference",
+                row.get("correlation_train_validation"),
+            ),
+            float("nan"),
+        )
+        if not math.isfinite(corr) or not -1.0 <= corr <= 1.0:
+            _fail(f"{row_prefix} has invalid train+validation correlation")
+        corr_abs = row.get("correlation_train_validation_abs")
+        if corr_abs not in {None, ""} and not math.isclose(
+            _safe_float(corr_abs, float("nan")), abs(corr), rel_tol=0.0, abs_tol=1e-9
+        ):
+            _fail(f"{row_prefix} correlation_train_validation_abs does not match correlation")
+        label = str(
+            row.get("deployability_label")
+            or row.get("research_deployability_label")
+            or ""
+        ).strip()
+        if not label:
+            _fail(f"{row_prefix} missing deployability_label")
+        labels.add(label)
+        gate_pass = _is_true(row.get("locked_oos_gate_pass"))
+        gate_reasons = str(row.get("locked_oos_gate_reasons") or "")
+        if gate_pass and "deployable" not in label:
+            _fail(f"{row_prefix} passing locked-OOS gate must be labelled deployable")
+        if not gate_pass and "locked_oos" in gate_reasons and "research" not in label:
+            _fail(
+                f"{row_prefix} failing locked-OOS gate must be labelled as research-only"
+            )
+    if not any("deployable" in label for label in labels) and not any(
+        "research" in label for label in labels
+    ):
+        _fail("low-correlation discovery rows must include deployability/research labels")
+
+
 def validate_artifact(root: str | Path = TARGET_ARTIFACT_DIR) -> dict[str, Any]:
     root = Path(root)
     _require_files(root)
     payload = _load_json(root / "alpha_zoo_10bps_full_retune_latest.json")
     cost_evidence = _load_json(root / "execution_cost_evidence_latest.json")
+    discovery = _load_json(root / LOW_CORRELATION_DISCOVERY_JSON)
     metric_rows = _load_csv(root / "candidate_model_metrics_latest.csv")
     variant_rows = _load_csv(root / "candidate_variant_inventory_latest.csv")
+    discovery_rows = _load_csv(root / LOW_CORRELATION_DISCOVERY_CSV)
     tuned_seed_json = _load_json(root / "tuned_seed_selection_latest.json")
     tuned_seed_rows = _load_csv(root / "tuned_seed_selection_latest.csv")
 
@@ -406,11 +702,19 @@ def validate_artifact(root: str | Path = TARGET_ARTIFACT_DIR) -> dict[str, Any]:
     _validate_cost_evidence(payload, cost_evidence)
     _validate_variant_inventory(variant_rows)
     grouped_rows = _validate_metric_rows(metric_rows)
+    reference_model_id = _validate_selection_profiles(payload, grouped_rows)
+    _validate_low_correlation_discovery(
+        payload,
+        discovery,
+        discovery_rows,
+        reference_model_id=reference_model_id,
+    )
     promotable_ids = _validate_promotions(payload, grouped_rows)
     return {
         "artifact_dir": str(root),
         "models": len(grouped_rows),
         "metric_rows": len(metric_rows),
+        "low_correlation_rows": len(discovery_rows),
         "promotable": promotable_ids,
     }
 

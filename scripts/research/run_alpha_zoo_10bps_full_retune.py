@@ -53,6 +53,28 @@ SPLIT_ORDER = ("train", "validation", "locked_oos")
 TV_SPLITS = ("train", "validation")
 PROMOTION_METRIC_KEYS = ("total_return", "sharpe", "sortino", "smart_sortino", "calmar")
 POSITIVE_PROMOTION_METRIC_KEYS = ("sharpe", "sortino", "smart_sortino", "calmar")
+SELECTION_PROFILE_BALANCED = "balanced_train_validation_v1"
+SELECTION_PROFILE_HIGHER_RISK = "higher_risk_train_return_tilt_v1"
+LOW_CORRELATION_MAX_ABS = 0.35
+LOW_CORRELATION_TOP_N = 50
+SELECTION_PROFILES = {
+    SELECTION_PROFILE_BALANCED: {
+        "description": "train+validation score with modest train-return uplift",
+        "higher_risk_allowed": False,
+        "profile_id": SELECTION_PROFILE_BALANCED,
+        "profile_label": "balanced train+validation score",
+        "risk_profile_consequence": "Balanced reference preserves lower leverage/allocation and lower drawdown.",
+        "score_formula": "10*validation_return + 0.25*train_return + risk/quality validation metrics - mdd penalties",
+    },
+    SELECTION_PROFILE_HIGHER_RISK: {
+        "description": "train-return-tilted score with higher train exposure and relaxed drawdown asymmetry",
+        "higher_risk_allowed": True,
+        "profile_id": SELECTION_PROFILE_HIGHER_RISK,
+        "profile_label": "higher-risk train-return tilt",
+        "risk_profile_consequence": "Final profile accepts higher 7x/0.20 exposure and drawdown after 10bps gates pass.",
+        "score_formula": "6*validation_return + 0.75*train_return + 0.08*validation_sharpe + 0.08*validation_sortino + 0.08*validation_smart_sortino + 0.08*validation_calmar + 0.04*train_sharpe + 0.04*train_sortino + 0.04*train_smart_sortino + 0.04*train_calmar - 2.0*max(0, validation_mdd-0.25) - 0.15*max(0, train_mdd-0.25)",
+    },
+}
 CALENDAR_PARAM_KEYS = {
     "calendar_long_months",
     "calendar_short_months",
@@ -196,6 +218,62 @@ def _train_validation_score(split_metrics: Mapping[str, Mapping[str, Any]]) -> f
     if train_return <= 0.0:
         score -= 50.0 + abs(train_return) * 5.0
     return float(score)
+
+
+def _higher_risk_train_validation_score(split_metrics: Mapping[str, Mapping[str, Any]]) -> float:
+    train = dict(split_metrics.get("train") or {})
+    validation = dict(split_metrics.get("validation") or {})
+    val_return = _safe_float(validation.get("total_return"))
+    train_return = _safe_float(train.get("total_return"))
+    val_mdd = _safe_float(validation.get("max_drawdown"), 1.0)
+    train_mdd = _safe_float(train.get("max_drawdown"), 1.0)
+    score = (
+        6.0 * val_return
+        + 0.75 * train_return
+        + 0.08 * _safe_float(validation.get("sharpe"))
+        + 0.08 * _safe_float(validation.get("sortino"))
+        + 0.08 * _safe_float(validation.get("smart_sortino"))
+        + 0.08 * _safe_float(validation.get("calmar"))
+        + 0.04 * _safe_float(train.get("sharpe"))
+        + 0.04 * _safe_float(train.get("sortino"))
+        + 0.04 * _safe_float(train.get("smart_sortino"))
+        + 0.04 * _safe_float(train.get("calmar"))
+        - 2.0 * max(0.0, val_mdd - high.OOS_MDD_BUDGET)
+        - 0.15 * max(0.0, train_mdd - high.OOS_MDD_BUDGET)
+    )
+    if val_return <= 0.0:
+        score -= 100.0 + abs(val_return) * 10.0
+    if train_return <= 0.0:
+        score -= 40.0 + abs(train_return) * 5.0
+    return float(score)
+
+
+def _selection_score_for_profile(
+    split_metrics: Mapping[str, Mapping[str, Any]],
+    *,
+    profile: str,
+) -> float:
+    if profile == SELECTION_PROFILE_HIGHER_RISK:
+        return _higher_risk_train_validation_score(split_metrics)
+    return _train_validation_score(split_metrics)
+
+
+def _candidate_family_from_name(candidate_name: str) -> str:
+    text = str(candidate_name)
+    for marker in (
+        "quality_single_pair",
+        "slow_residual_pair",
+        "fast_residual",
+        "conservative_exit",
+        "state_distilled",
+    ):
+        if marker in text:
+            return marker
+    parts = [str(part) for part in text.split("_") if str(part)]
+    for marker in ("quality", "momentum", "trend", "volatility", "carry", "mean_reversion"):
+        if marker in parts:
+            return marker
+    return "unknown"
 
 
 def _split_metrics_from_rows(rows: Sequence[Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
@@ -816,6 +894,334 @@ def _maybe_keep_top_variant(
         heapq.heapreplace(heap, item)
 
 
+def _selection_candidate_score(summary: Mapping[str, Any], *, profile: str) -> float:
+    return _selection_score_for_profile(
+        {"train": dict(summary.get("train") or {}), "validation": dict(summary.get("validation") or {})},
+        profile=profile,
+    )
+
+
+def _profile_selected_model(
+    summaries: Sequence[Mapping[str, Any]],
+    *,
+    profile: str,
+    require_live_promotable: bool,
+    fallback_to_fallback_profile: bool = False,
+) -> dict[str, Any] | None:
+    candidates: list[tuple[float, dict[str, Any]]] = []
+    for item in summaries:
+        if require_live_promotable and not _as_bool(item.get("live_promotable_10bps")):
+            continue
+        candidates.append((_selection_candidate_score(item, profile=profile), dict(item)))
+    if not candidates and require_live_promotable and fallback_to_fallback_profile:
+        candidates = [(_selection_candidate_score(item, profile=profile), dict(item)) for item in summaries]
+    if not candidates:
+        return None
+    candidates.sort(
+        key=lambda pair: (
+            _as_bool(pair[1].get("live_promotable_10bps")),
+            pair[0],
+            _safe_float(dict(pair[1].get("train") or {}).get("total_return")),
+            _safe_float(dict(pair[1].get("validation") or {}).get("total_return")),
+            str(pair[1].get("model_id") or ""),
+        ),
+        reverse=True,
+    )
+    selected = dict(candidates[0][1])
+    selected["selection_profile_score"] = float(candidates[0][0])
+    return selected
+
+
+def _selection_profiles_payload(
+    summaries: Sequence[Mapping[str, Any]],
+) -> tuple[dict[str, Any], dict[str, Any] | None, dict[str, Any] | None]:
+    profile_models = {
+        profile: _profile_selected_model(
+            summaries,
+            profile=profile,
+            require_live_promotable=True,
+        )
+        for profile in SELECTION_PROFILES
+    }
+    profile_payload: dict[str, Any] = {}
+    for profile, definition in SELECTION_PROFILES.items():
+        selected = profile_models.get(profile)
+        profile_payload[profile] = {
+            **dict(definition),
+            "objective_inputs": list(TV_SPLITS),
+            "selection_inputs": list(TV_SPLITS),
+            "optimization_input_splits": list(TV_SPLITS),
+            "parameter_fit_inputs": list(TV_SPLITS),
+            "pruning_inputs": list(TV_SPLITS),
+            "score_formula_inputs": list(TV_SPLITS),
+            "uses_locked_oos_for_objective": False,
+            "uses_locked_oos_for_selection": False,
+            "uses_locked_oos_for_pruning": False,
+            "uses_locked_oos_for_parameter_fitting": False,
+            "locked_oos_role": "gate_report_only_after_candidate_freeze",
+            "selected_model_id": None if selected is None else selected.get("model_id"),
+            "selected_model_kind": None if selected is None else selected.get("model_kind"),
+            "selected_candidate_name": None if selected is None else selected.get("candidate_name"),
+            "selected_variant_name": None if selected is None else selected.get("variant_name"),
+            "selected_leverage": None if selected is None else selected.get("leverage"),
+            "selected_allocation_fraction": None
+            if selected is None
+            else selected.get("allocation_fraction"),
+            "selected_train_validation_score": None
+            if selected is None
+            else selected.get("train_validation_score"),
+            "selected_profile_score": None
+            if selected is None
+            else selected.get("selection_profile_score"),
+            "selected_live_promotable_10bps": None
+            if selected is None
+            else bool(selected.get("live_promotable_10bps")),
+        }
+    return (
+        {
+            "active_profile_id": SELECTION_PROFILE_HIGHER_RISK,
+            "balanced_reference_profile_id": SELECTION_PROFILE_BALANCED,
+            "profile_selection_universe": "fresh_train_validation_10bps_live_promotable_models",
+            "selection_profiles": profile_payload,
+            "objective_inputs": list(TV_SPLITS),
+            "selection_inputs": list(TV_SPLITS),
+            "optimization_input_splits": list(TV_SPLITS),
+            "uses_locked_oos_for_objective": False,
+            "uses_locked_oos_for_selection": False,
+            "uses_locked_oos_for_pruning": False,
+            "uses_locked_oos_for_parameter_fitting": False,
+            "locked_oos_role": "gate_report_only_after_candidate_freeze",
+            "predeclared_change_reason": (
+                "Final selection is allowed to tilt from the balanced profile to "
+                "higher train-return exposure before locked-OOS gate/report is read."
+            ),
+        },
+        profile_models.get(SELECTION_PROFILE_BALANCED),
+        profile_models.get(SELECTION_PROFILE_HIGHER_RISK),
+    )
+
+
+def _train_validation_series_from_stream(stream: Mapping[str, Any], *, split_masks: Mapping[str, Any]) -> np.ndarray:
+    raw_returns = stream.get("returns")
+    returns = np.asarray([] if raw_returns is None else raw_returns, dtype=float)
+    train_mask = np.asarray(split_masks.get("train"), dtype=bool)
+    val_mask = np.asarray(split_masks.get("validation"), dtype=bool)
+    if returns.size == 0 or train_mask.size != returns.size or val_mask.size != returns.size:
+        return np.asarray([], dtype=float)
+    return np.concatenate([returns[train_mask], returns[val_mask]])
+
+
+def _pearson_correlation(left: np.ndarray, right: np.ndarray) -> float | None:
+    if left.size == 0 or right.size == 0 or left.size != right.size:
+        return None
+    if left.size < 2:
+        return None
+    finite_mask = np.isfinite(left) & np.isfinite(right)
+    left_safe = left[finite_mask]
+    right_safe = right[finite_mask]
+    if left_safe.size < 2:
+        return None
+    left_std = float(np.std(left_safe))
+    right_std = float(np.std(right_safe))
+    if not np.isfinite(left_std) or not np.isfinite(right_std) or left_std <= 0.0 or right_std <= 0.0:
+        return None
+    corr = float(np.corrcoef(left_safe, right_safe)[0, 1])
+    if not math.isfinite(corr):
+        return None
+    return corr
+
+
+def _deployability_label(
+    summary: Mapping[str, Any],
+    *,
+    low_correlation: float | None,
+    correlation_threshold: float,
+    selected_profile: str,
+) -> str:
+    if low_correlation is None:
+        return "research_low_data"
+    if not _as_bool(summary.get("primary_10bps_promotion_gate_pass")):
+        return "research_only_locked_oos_gate_fail"
+    if not _as_bool(summary.get("live_promotable_10bps")):
+        return "research_passing_gate_not_live"
+    if abs(low_correlation) < correlation_threshold:
+        return "deployable_10bps_gate_pass"
+    return f"deployable_profile_{selected_profile}_lowcorr_blocked_by_correlation"
+
+
+def _discovery_policy(reference_model_id: str) -> dict[str, Any]:
+    return {
+        "reference_model_id": reference_model_id,
+        "objective_inputs": list(TV_SPLITS),
+        "selection_inputs": list(TV_SPLITS),
+        "optimization_input_splits": list(TV_SPLITS),
+        "parameter_fit_inputs": list(TV_SPLITS),
+        "pruning_inputs": list(TV_SPLITS),
+        "correlation_inputs": list(TV_SPLITS),
+        "correlation_split_inputs": list(TV_SPLITS),
+        "candidate_freeze_inputs": list(TV_SPLITS),
+        "uses_locked_oos_for_objective": False,
+        "uses_locked_oos_for_selection": False,
+        "uses_locked_oos_for_pruning": False,
+        "uses_locked_oos_for_parameter_fitting": False,
+        "uses_locked_oos_for_correlation": False,
+        "uses_locked_oos_for_discovery": False,
+        "locked_oos_role": "gate_report_only_after_candidate_freeze",
+        "correlation_threshold_abs": float(LOW_CORRELATION_MAX_ABS),
+    }
+
+
+def _discover_low_correlation_candidates(
+    stream_records: list[dict[str, Any]],
+    split_masks: Mapping[str, Any],
+    *,
+    profile_name: str,
+    profile_reference: Mapping[str, Any],
+    correlation_threshold: float,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    if not stream_records:
+        return [], {
+            "discovery_policy": _discovery_policy(""),
+            "reference_stream_count": 0,
+            "candidate_stream_count": 0,
+            "low_correlation_candidates": 0,
+            "deployable_candidates": 0,
+            "research_candidates": 0,
+        }
+    reference_model_id = str(profile_reference.get("model_id") or "")
+    reference_row = None
+    for record in stream_records:
+        if str(record["summary"].get("model_id") or "") == reference_model_id:
+            reference_row = record
+            break
+    if reference_row is None:
+        return [], {
+            "discovery_policy": _discovery_policy(reference_model_id),
+            "reference_stream_count": 0,
+            "candidate_stream_count": 0,
+            "low_correlation_candidates": 0,
+            "deployable_candidates": 0,
+            "research_candidates": 0,
+        }
+    reference_series = _train_validation_series_from_stream(
+        dict(reference_row["stream"]), split_masks=split_masks
+    )
+    discovery_rows: list[dict[str, Any]] = []
+    deployable_count = 0
+    low_correlation_count = 0
+    research_count = 0
+    for record in stream_records:
+        summary = dict(record.get("summary") or {})
+        model_id = str(summary.get("model_id") or "")
+        if model_id == reference_model_id:
+            continue
+        stream = dict(record.get("stream") or {})
+        candidate_series = _train_validation_series_from_stream(stream, split_masks=split_masks)
+        correlation = _pearson_correlation(reference_series, candidate_series)
+        train_total_return = dict(summary.get("train") or {}).get("total_return")
+        validation_total_return = dict(summary.get("validation") or {}).get("total_return")
+        candidate_split_metrics = {
+            "train": _json_safe(dict(summary.get("train") or {})),
+            "validation": _json_safe(dict(summary.get("validation") or {})),
+            "locked_oos": _json_safe(dict(summary.get("locked_oos") or {})),
+        }
+        label = _deployability_label(
+            summary,
+            low_correlation=correlation,
+            correlation_threshold=correlation_threshold,
+            selected_profile=profile_name,
+        )
+        if correlation is not None and abs(correlation) < correlation_threshold:
+            low_correlation_count += 1
+        if label == "deployable_10bps_gate_pass":
+            deployable_count += 1
+        else:
+            research_count += 1
+        candidate_variant_name = str(summary.get("variant_name") or "base")
+        discovery_rows.append(
+            {
+                "selection_profile": profile_name,
+                "reference_model_id": reference_model_id,
+                "reference_profile": "higher_risk_train_return_tilt_v1",
+                "reference_candidate_name": str(
+                    dict(reference_row.get("summary") or {}).get("candidate_name") or ""
+                ),
+                "reference_candidate_family": _candidate_family_from_name(
+                    str(dict(reference_row.get("summary") or {}).get("candidate_name") or "")
+                ),
+                "candidate_model_id": model_id,
+                "candidate_model_kind": str(summary.get("model_kind") or ""),
+                "candidate_role": str(summary.get("role") or ""),
+                "candidate_name": str(summary.get("candidate_name") or ""),
+                "candidate_family": _candidate_family_from_name(
+                    str(summary.get("candidate_name") or "")
+                ),
+                "candidate_variant_name": candidate_variant_name,
+                "variant_name": candidate_variant_name,
+                "candidate_source": str(summary.get("source") or ""),
+                "correlation_train_validation": correlation,
+                "train_validation_correlation_to_reference": correlation,
+                "correlation_train_validation_abs": abs(correlation) if correlation is not None else None,
+                "selection_correlation_split_inputs": list(TV_SPLITS),
+                "correlation_inputs": list(TV_SPLITS),
+                "selection_inputs": list(TV_SPLITS),
+                "uses_locked_oos_for_selection": False,
+                "uses_locked_oos_for_correlation": False,
+                "locked_oos_gate_pass": _as_bool(
+                    summary.get("primary_10bps_promotion_gate_pass")
+                ),
+                "locked_oos_gate_reasons": ";".join(
+                    summary.get("primary_10bps_promotion_gate_reasons") or []
+                ),
+                "primary_10bps_promotion_gate_pass": _safe_int(summary.get("primary_10bps_promotion_gate_pass"), 0),
+                "primary_10bps_promotion_gate_reasons": ";".join(
+                    summary.get("primary_10bps_promotion_gate_reasons") or []
+                ),
+                "live_promotable_10bps": _safe_int(summary.get("live_promotable_10bps"), 0),
+                "train_validation_score": _safe_float(summary.get("train_validation_score")),
+                "train_total_return": train_total_return,
+                "validation_total_return": validation_total_return,
+                "locked_oos_total_return": dict(summary.get("locked_oos") or {}).get(
+                    "total_return"
+                ),
+                "candidate_split_metrics": json.dumps(
+                    {
+                        "train_total_return": train_total_return,
+                        "validation_total_return": validation_total_return,
+                        "train_validation": candidate_split_metrics,
+                    },
+                    sort_keys=True,
+                    default=str,
+                ),
+                "deployability_label": label,
+            }
+        )
+    summary = {
+        "discovery_policy": _discovery_policy(reference_model_id),
+        "reference_model_id": reference_model_id,
+        "reference_candidate_name": str(profile_reference.get("candidate_name") or ""),
+        "selection_inputs": list(TV_SPLITS),
+        "uses_locked_oos_for_selection": False,
+        "locked_oos_role": "gate_report_only_after_candidate_freeze",
+        "candidate_stream_count": len(discovery_rows),
+        "low_correlation_candidates": low_correlation_count,
+        "deployable_candidates": deployable_count,
+        "research_candidates": research_count,
+        "correlation_threshold": float(correlation_threshold),
+    }
+    discovery_rows = sorted(
+        discovery_rows,
+        key=lambda row: (
+            str(row.get("deployability_label") or "") == "research_&_deployability_candidate",
+            -_safe_float(row.get("correlation_train_validation_abs"), 999.0),
+            _safe_float(row.get("train_validation_score")),
+            str(row.get("candidate_model_id") or ""),
+        ),
+        reverse=True,
+    )
+    return discovery_rows, summary
+
+
 def _fresh_train_validation_retune(
     args: argparse.Namespace,
     *,
@@ -847,6 +1253,33 @@ def _fresh_train_validation_retune(
             "selected_trade_filter_variants": 0,
             "trade_filter_gate_pass_count": 0,
             "skipped_candidate_names": [],
+            "selection_profiles_10bps": {
+                "active_profile_id": SELECTION_PROFILE_HIGHER_RISK,
+                "balanced_reference_profile_id": SELECTION_PROFILE_BALANCED,
+                "profile_selection_universe": "fresh_train_validation_10bps_live_promotable_models",
+                "selection_profiles": {},
+                "objective_inputs": list(TV_SPLITS),
+                "selection_inputs": list(TV_SPLITS),
+                "optimization_input_splits": list(TV_SPLITS),
+                "uses_locked_oos_for_objective": False,
+                "uses_locked_oos_for_selection": False,
+                "uses_locked_oos_for_pruning": False,
+                "uses_locked_oos_for_parameter_fitting": False,
+                "locked_oos_role": "gate_report_only_after_candidate_freeze",
+            },
+            "balanced_profile_model": {},
+            "higher_risk_profile_model": {},
+            "low_correlation_discovery_rows": [],
+            "low_correlation_discovery_summary": {
+                "selection_inputs": list(TV_SPLITS),
+                "uses_locked_oos_for_selection": False,
+                "locked_oos_role": "gate_report_only_after_candidate_freeze",
+                "candidate_stream_count": 0,
+                "low_correlation_candidates": 0,
+                "deployable_candidates": 0,
+                "research_candidates": 0,
+                "correlation_threshold": float(LOW_CORRELATION_MAX_ABS),
+            },
         }
 
     runtime = cost._build_alpha_runtime(args, source_live_payload)
@@ -1051,6 +1484,30 @@ def _fresh_train_validation_retune(
         key=lambda item: _safe_float(item["summary"].get("train_validation_score")),
         reverse=True,
     )
+    profile_policy, balanced_model, higher_risk_model = _selection_profiles_payload(
+        [dict(item["summary"]) for item in ranked_records]
+    )
+    low_correlation_rows: list[dict[str, Any]] = []
+    low_correlation_summary: dict[str, Any] = {
+        "selection_inputs": list(TV_SPLITS),
+        "uses_locked_oos_for_selection": False,
+        "locked_oos_role": "gate_report_only_after_candidate_freeze",
+        "candidate_stream_count": 0,
+        "low_correlation_candidates": 0,
+        "deployable_candidates": 0,
+        "research_candidates": 0,
+        "correlation_threshold": float(LOW_CORRELATION_MAX_ABS),
+    }
+    reference_model = higher_risk_model or balanced_model
+    if reference_model is not None:
+        low_correlation_rows, low_correlation_summary = _discover_low_correlation_candidates(
+            ranked_records,
+            runtime["split_masks"],
+            profile_name=SELECTION_PROFILE_HIGHER_RISK,
+            profile_reference=reference_model,
+            correlation_threshold=LOW_CORRELATION_MAX_ABS,
+        )
+        low_correlation_rows = low_correlation_rows[:LOW_CORRELATION_TOP_N]
     hybrid_seed_count = max(0, _safe_int(getattr(args, "hybrid_seed_count", 0), 0))
     hybrid_records = ranked_records[:hybrid_seed_count]
     hybrid_weights: list[dict[str, Any]] = []
@@ -1134,6 +1591,11 @@ def _fresh_train_validation_retune(
         "selected_trade_filter_variants": len(selected_variant_records),
         "trade_filter_gate_pass_count": trade_filter_gate_pass_count,
         "skipped_candidate_names": sorted(skipped_names),
+        "selection_profiles_10bps": profile_policy,
+        "balanced_profile_model": balanced_model or {},
+        "higher_risk_profile_model": higher_risk_model or {},
+        "low_correlation_discovery_rows": low_correlation_rows,
+        "low_correlation_discovery_summary": low_correlation_summary,
     }
 
 
@@ -1271,7 +1733,8 @@ def _best_model(
         key=lambda row: (
             _as_bool(row.get("live_promotable_10bps")),
             _safe_float(row.get("train_validation_score")),
-            _safe_float(dict(row.get("locked_oos") or {}).get("total_return")),
+            _safe_float(dict(row.get("train") or {}).get("total_return")),
+            _safe_float(dict(row.get("validation") or {}).get("total_return")),
             str(row.get("model_id") or ""),
         ),
         reverse=True,
@@ -1318,7 +1781,11 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
         for item in list(fresh_retune["summaries"])
         if not _as_bool(dict(item).get("shadow_only"))
     ]
-    live_model = _best_model(fresh_summaries, require_live_promotable=True)
+    selection_profiles_10bps = dict(fresh_retune.get("selection_profiles_10bps") or {})
+    profile_rows_10bps = dict(selection_profiles_10bps.get("selection_profiles") or {})
+    balanced_profile_model = dict(fresh_retune.get("balanced_profile_model") or {})
+    higher_risk_profile_model = dict(fresh_retune.get("higher_risk_profile_model") or {})
+    live_model = higher_risk_profile_model or _best_model(fresh_summaries, require_live_promotable=True)
     best_fresh = _best_model(fresh_summaries, require_live_promotable=False)
     best_shadow = _best_model(shadow_summaries, require_live_promotable=False)
     execution_cost = _execution_cost_evidence()
@@ -1341,6 +1808,7 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
             "source_cost_rows": len(source_rows),
             "shadow_primary_10bps_metric_rows": len(shadow_metric_rows),
             "fresh_primary_10bps_metric_rows": len(list(fresh_retune["metric_rows"])),
+            "fresh_candidate_limit_requested": int(getattr(args, "fresh_candidate_limit", 0)),
             "primary_10bps_metric_rows": len(metric_rows),
             "candidate_csv_rows_seen": len(source_candidate_rows),
             "variant_inventory_rows": len(variant_inventory),
@@ -1348,6 +1816,8 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
             "fresh_train_validation_retune": {
                 "selection_inputs": list(TV_SPLITS),
                 "uses_locked_oos_for_selection": False,
+                "active_selection_profile_id": SELECTION_PROFILE_HIGHER_RISK,
+                "balanced_reference_profile_id": SELECTION_PROFILE_BALANCED,
                 "candidate_rows_selected_before_oos_gate": fresh_retune["selected_source_rows"],
                 "evaluated_10bps_streams": fresh_retune["evaluated_streams"],
                 "evaluated_trade_filter_variants": fresh_retune[
@@ -1360,11 +1830,23 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
                 "trade_filter_selection_inputs": list(TV_SPLITS),
                 "trade_filter_locked_oos_role": "gate_report_only_after_variant_freeze",
                 "skipped_candidate_names": fresh_retune["skipped_candidate_names"],
+                "low_correlation_discovery": fresh_retune[
+                    "low_correlation_discovery_summary"
+                ],
             },
         },
         "selection_policy": {
             "selection_inputs": list(TV_SPLITS),
             "optimization_input_splits": list(TV_SPLITS),
+            "parameter_fit_inputs": list(TV_SPLITS),
+            "pruning_inputs": list(TV_SPLITS),
+            "active_profile_id": SELECTION_PROFILE_HIGHER_RISK,
+            "active_profile_reason": (
+                "higher risk allowed: train-return-tilted train+validation score is "
+                "predeclared before locked-OOS gate/report."
+            ),
+            "balanced_reference_profile_id": SELECTION_PROFILE_BALANCED,
+            "selection_profiles_10bps": selection_profiles_10bps,
             "hybrid_selection_inputs": list(TV_SPLITS),
             "uses_locked_oos_for_objective": False,
             "uses_locked_oos_for_pruning": False,
@@ -1372,6 +1854,9 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
             "uses_locked_oos_for_parameter_fitting": False,
             "locked_oos_role": "gate_report_only_after_candidate_freeze",
         },
+        "active_selection_profile": SELECTION_PROFILE_HIGHER_RISK,
+        "selection_profiles": profile_rows_10bps,
+        "balanced_reference_10bps_model_id": balanced_profile_model.get("model_id"),
         "candidate_universe_summary": {
             "model_count": len(summaries),
             "fresh_train_validation_model_count": len(fresh_summaries),
@@ -1392,13 +1877,41 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
         "model_gate_summaries": summaries,
         "candidate_model_metrics": metric_rows,
         "candidate_variant_inventory": variant_inventory,
+        "low_correlation_discovery_10bps": {
+            "summary": fresh_retune["low_correlation_discovery_summary"],
+            "rows": fresh_retune["low_correlation_discovery_rows"],
+            "selection_inputs": list(TV_SPLITS),
+            "uses_locked_oos_for_objective": False,
+            "uses_locked_oos_for_selection": False,
+            "uses_locked_oos_for_pruning": False,
+            "uses_locked_oos_for_parameter_fitting": False,
+            "locked_oos_role": "gate_report_only_after_candidate_freeze",
+        },
+        "low_correlation_discovery": {
+            "reference_model_id": None if live_model is None else live_model.get("model_id"),
+            "selection_profile": SELECTION_PROFILE_HIGHER_RISK,
+            "reference_profile": SELECTION_PROFILE_HIGHER_RISK,
+            "discovery_policy": dict(
+                dict(fresh_retune["low_correlation_discovery_summary"]).get(
+                    "discovery_policy"
+                )
+                or _discovery_policy("" if live_model is None else str(live_model.get("model_id") or ""))
+            ),
+            "summary": dict(fresh_retune["low_correlation_discovery_summary"]),
+        },
         "tuned_seed_selection": {
             "selection_inputs": list(TV_SPLITS),
             "uses_locked_oos_for_selection": False,
+            "active_profile_id": SELECTION_PROFILE_HIGHER_RISK,
+            "balanced_reference_profile_id": SELECTION_PROFILE_BALANCED,
+            "selected_model_id": None if live_model is None else live_model.get("model_id"),
+            "balanced_reference_model_id": balanced_profile_model.get("model_id"),
             "primary_cost_bps": PRIMARY_COST_BPS,
             "rows": sorted(
                 fresh_summaries,
-                key=lambda row: _safe_float(row.get("train_validation_score")),
+                key=lambda row: _selection_candidate_score(
+                    row, profile=SELECTION_PROFILE_HIGHER_RISK
+                ),
                 reverse=True,
             )[: int(getattr(args, "top_n", 50))],
             "shadow_reference_rows": sorted(
@@ -1414,7 +1927,10 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
             if math.isclose(_safe_float(dict(row).get("round_trip_slippage_fee_bps")), PRIMARY_COST_BPS)
         ],
         "live_promotable_10bps_model_id": None if live_model is None else live_model.get("model_id"),
+        "balanced_live_promotable_10bps_model_id": balanced_profile_model.get("model_id"),
         "no_10bps_live_ready_model": live_model is None,
+        "higher_risk_selected_10bps_model": live_model or {},
+        "balanced_reference_10bps_model": balanced_profile_model,
         "best_fresh_10bps_model": best_fresh or {},
         "best_shadow_10bps_model": best_shadow or {},
     }
@@ -1446,6 +1962,25 @@ def _markdown(payload: Mapping[str, Any]) -> str:
         lines.append(f"- live-promotable model: `{payload.get('live_promotable_10bps_model_id')}`")
     else:
         lines.append("- no 10bps live-ready model passed all promotion gates.")
+    selection_policy = dict(payload.get("selection_policy") or {})
+    lines.extend(
+        [
+            f"- active selection profile: `{selection_policy.get('active_profile_id')}`",
+            "- balanced reference model: "
+            f"`{payload.get('balanced_live_promotable_10bps_model_id')}`",
+        ]
+    )
+    low_corr = dict(payload.get("low_correlation_discovery_10bps") or {})
+    low_summary = dict(low_corr.get("summary") or {})
+    if low_summary:
+        lines.extend(
+            [
+                "- low-correlation discovery candidates: "
+                f"`{low_summary.get('candidate_stream_count')}`",
+                "- low-correlation deployable candidates: "
+                f"`{low_summary.get('deployable_candidates')}`",
+            ]
+        )
     if best:
         lines.extend(
             [
@@ -1474,6 +2009,8 @@ def write_outputs(payload: Mapping[str, Any], output_dir: Path) -> dict[str, str
     seed_csv = output_dir / "tuned_seed_selection_latest.csv"
     weights_csv = output_dir / "hybrid_weights_latest.csv"
     cost_json = output_dir / "execution_cost_evidence_latest.json"
+    low_corr_csv = output_dir / "low_correlation_discovery_latest.csv"
+    low_corr_json = output_dir / "low_correlation_discovery_latest.json"
     output_paths = {
         "latest_json": str(latest_json),
         "timestamped_json": str(timestamped_json),
@@ -1485,12 +2022,15 @@ def write_outputs(payload: Mapping[str, Any], output_dir: Path) -> dict[str, str
         "tuned_seed_selection_csv": str(seed_csv),
         "hybrid_weights_csv": str(weights_csv),
         "execution_cost_evidence_json": str(cost_json),
+        "low_correlation_discovery_csv": str(low_corr_csv),
+        "low_correlation_discovery_json": str(low_corr_json),
     }
     payload = {**dict(payload), "output_paths": output_paths}
     _write_json(latest_json, payload)
     _write_json(timestamped_json, payload)
     _write_json(seed_json, dict(payload.get("tuned_seed_selection") or {}))
     _write_json(cost_json, dict(payload.get("execution_cost_evidence") or {}))
+    _write_json(low_corr_json, dict(payload.get("low_correlation_discovery") or {}))
     latest_md.write_text(_markdown(payload), encoding="utf-8")
     timestamped_md.write_text(_markdown(payload), encoding="utf-8")
     metric_fields = [
@@ -1558,6 +2098,39 @@ def write_outputs(payload: Mapping[str, Any], output_dir: Path) -> dict[str, str
         "primary_10bps_promotion_gate_reasons",
         "live_promotable_10bps",
     ]
+    low_corr_fields = [
+        "selection_profile",
+        "reference_model_id",
+        "reference_profile",
+        "reference_candidate_name",
+        "reference_candidate_family",
+        "candidate_model_id",
+        "candidate_model_kind",
+        "candidate_role",
+        "candidate_name",
+        "candidate_family",
+        "candidate_variant_name",
+        "candidate_source",
+        "correlation_train_validation",
+        "train_validation_correlation_to_reference",
+        "correlation_train_validation_abs",
+        "selection_correlation_split_inputs",
+        "correlation_inputs",
+        "selection_inputs",
+        "uses_locked_oos_for_selection",
+        "uses_locked_oos_for_correlation",
+        "locked_oos_gate_pass",
+        "locked_oos_gate_reasons",
+        "primary_10bps_promotion_gate_pass",
+        "primary_10bps_promotion_gate_reasons",
+        "live_promotable_10bps",
+        "train_validation_score",
+        "train_total_return",
+        "validation_total_return",
+        "locked_oos_total_return",
+        "candidate_split_metrics",
+        "deployability_label",
+    ]
     _write_csv(metrics_csv, list(payload.get("candidate_model_metrics") or []), metric_fields)
     _write_csv(variants_csv, list(payload.get("candidate_variant_inventory") or []), variant_fields)
     _write_csv(
@@ -1569,6 +2142,11 @@ def write_outputs(payload: Mapping[str, Any], output_dir: Path) -> dict[str, str
         weights_csv,
         list(payload.get("hybrid_weights_10bps") or []),
         ["round_trip_slippage_fee_bps", "model_id", "candidate_label", "weight"],
+    )
+    _write_csv(
+        low_corr_csv,
+        list(dict(payload.get("low_correlation_discovery_10bps") or {}).get("rows") or []),
+        low_corr_fields,
     )
     return output_paths
 
@@ -1583,7 +2161,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--n-trials", type=int, default=80)
     parser.add_argument("--top-n", type=int, default=50)
     parser.add_argument("--allow-split-hash-drift", action="store_true")
-    parser.add_argument("--fresh-candidate-limit", type=int, default=80)
+    parser.add_argument("--fresh-candidate-limit", type=int, default=600)
     parser.add_argument("--hybrid-seed-count", type=int, default=8)
     parser.add_argument("--trade-filter-top-n", type=int, default=120)
     parser.add_argument("--min-trade-filter-trades", type=int, default=20)

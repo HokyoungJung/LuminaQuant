@@ -35,15 +35,74 @@ def _write_csv(path: Path, rows: list[dict[str, object]]) -> None:
         writer.writerows(rows)
 
 
-def _payload(*, winner: str | None = "candidate_a") -> dict[str, object]:
+def _tv_only_policy() -> dict[str, object]:
+    return {
+        "objective_inputs": ["train", "validation"],
+        "selection_inputs": ["train", "validation"],
+        "optimization_input_splits": ["train", "validation"],
+        "parameter_fit_inputs": ["train", "validation"],
+        "pruning_inputs": ["train", "validation"],
+    }
+
+
+def _selection_profile(*, selected_model_id: str, formula: str, consequence: str) -> dict[str, object]:
+    return {
+        **_tv_only_policy(),
+        "score_formula_inputs": ["train", "validation"],
+        "uses_locked_oos_for_objective": False,
+        "uses_locked_oos_for_selection": False,
+        "uses_locked_oos_for_pruning": False,
+        "uses_locked_oos_for_parameter_fitting": False,
+        "score_formula": formula,
+        "selected_model_id": selected_model_id,
+        "risk_profile_consequence": consequence,
+    }
+
+
+def _low_correlation_policy() -> dict[str, object]:
+    return {
+        **_tv_only_policy(),
+        "correlation_inputs": ["train", "validation"],
+        "correlation_split_inputs": ["train", "validation"],
+        "candidate_freeze_inputs": ["train", "validation"],
+        "uses_locked_oos_for_objective": False,
+        "uses_locked_oos_for_selection": False,
+        "uses_locked_oos_for_pruning": False,
+        "uses_locked_oos_for_parameter_fitting": False,
+        "uses_locked_oos_for_correlation": False,
+        "uses_locked_oos_for_discovery": False,
+        "locked_oos_role": "gate_report_only_after_candidate_freeze",
+        "reference_model_id": ASSERTION.EXPECTED_HIGHER_RISK_MODEL_ID,
+    }
+
+
+def _payload(
+    *, winner: str | None = ASSERTION.EXPECTED_HIGHER_RISK_MODEL_ID
+) -> dict[str, object]:
     evidence = {
         "diagnostic_only": True,
         "symbols": ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "TRXUSDT"],
     }
+    higher_risk_model = ASSERTION.EXPECTED_HIGHER_RISK_MODEL_ID
+    balanced_model = ASSERTION.EXPECTED_BALANCED_REFERENCE_MODEL_ID
     return {
         "real_money_execution": False,
         "round_trip_slippage_fee_bps_primary": 10.0,
         "live_promotable_10bps_model_id": winner,
+        "active_selection_profile": ASSERTION.ACTIVE_SELECTION_PROFILE,
+        "balanced_reference_10bps_model_id": balanced_model,
+        "selection_profiles": {
+            ASSERTION.BALANCED_SELECTION_PROFILE: _selection_profile(
+                selected_model_id=balanced_model,
+                formula="8.0*validation_total_return + 0.5*train_total_return - validation_drawdown_penalty",
+                consequence="Balanced reference preserves lower leverage and allocation.",
+            ),
+            ASSERTION.ACTIVE_SELECTION_PROFILE: _selection_profile(
+                selected_model_id=higher_risk_model,
+                formula="6.0*train_total_return + 3.0*validation_total_return - validation_drawdown_penalty",
+                consequence="Higher-risk final accepts 7x/0.20 drawdown risk after 10bps gates.",
+            ),
+        },
         "split_manifest": {
             "split_contract": ASSERTION.EXPECTED_SPLIT_CONTRACT,
             "timestamp_index_hash": ASSERTION.EXPECTED_TIMESTAMP_INDEX_HASH,
@@ -63,13 +122,19 @@ def _payload(*, winner: str | None = "candidate_a") -> dict[str, object]:
             "locked_oos_role": "gate_report_only_after_candidate_freeze",
             "objective_inputs": ["train", "validation"],
             "selection_inputs": ["train", "validation"],
+            "parameter_fit_inputs": ["train", "validation"],
+            "pruning_inputs": ["train", "validation"],
         },
         "selection_policy": {
+            **_tv_only_policy(),
             "uses_locked_oos_for_objective": False,
             "uses_locked_oos_for_selection": False,
             "uses_locked_oos_for_pruning": False,
             "uses_locked_oos_for_parameter_fitting": False,
-            "optimization_input_splits": ["train", "validation"],
+        },
+        "low_correlation_discovery": {
+            "reference_model_id": higher_risk_model,
+            "discovery_policy": _low_correlation_policy(),
         },
         "execution_cost_evidence": evidence,
     }
@@ -77,6 +142,7 @@ def _payload(*, winner: str | None = "candidate_a") -> dict[str, object]:
 
 def _metric_rows(
     *,
+    model_id: str = ASSERTION.EXPECTED_HIGHER_RISK_MODEL_ID,
     cost_bps: float = 10.0,
     promotable: bool = True,
     overrides: dict[tuple[str, str], object] | None = None,
@@ -114,7 +180,7 @@ def _metric_rows(
     for split, values in split_values.items():
         rows.append(
             {
-                "model_id": "candidate_a",
+                "model_id": model_id,
                 "round_trip_slippage_fee_bps": cost_bps,
                 "split": split,
                 "liquidation_count": 0,
@@ -131,6 +197,17 @@ def _metric_rows(
     return rows
 
 
+def _default_metric_rows() -> list[dict[str, object]]:
+    return [
+        *_metric_rows(model_id=ASSERTION.EXPECTED_HIGHER_RISK_MODEL_ID, promotable=True),
+        *_metric_rows(
+            model_id=ASSERTION.EXPECTED_BALANCED_REFERENCE_MODEL_ID,
+            promotable=False,
+            metadata={"role": "balanced_reference"},
+        ),
+    ]
+
+
 def _variant_rows(
     *, calendar_primary: bool = False, params: dict[str, object] | None = None
 ) -> list[dict[str, object]]:
@@ -145,12 +222,73 @@ def _variant_rows(
     ]
 
 
+def _low_correlation_json() -> dict[str, object]:
+    return {
+        "reference_model_id": ASSERTION.EXPECTED_HIGHER_RISK_MODEL_ID,
+        "selection_profile": ASSERTION.ACTIVE_SELECTION_PROFILE,
+        "reference_profile": ASSERTION.ACTIVE_SELECTION_PROFILE,
+        "discovery_policy": _low_correlation_policy(),
+        "summary": {
+            "row_count": 2,
+            "deployable_pass_count": 1,
+            "research_only_locked_oos_fail_count": 1,
+        },
+    }
+
+
+def _low_correlation_rows() -> list[dict[str, object]]:
+    return [
+        {
+            "candidate_model_id": "low_corr_deployable",
+            "candidate_family": "carry_cross_section",
+            "variant_name": "base",
+            "candidate_variant_name": "base",
+            "train_validation_correlation_to_reference": 0.21,
+            "correlation_train_validation": 0.21,
+            "correlation_train_validation_abs": 0.21,
+            "selection_correlation_split_inputs": "train;validation",
+            "correlation_inputs": "train;validation",
+            "selection_inputs": "train;validation",
+            "uses_locked_oos_for_selection": False,
+            "uses_locked_oos_for_correlation": False,
+            "locked_oos_gate_pass": True,
+            "locked_oos_gate_reasons": "",
+            "deployability_label": "deployable_10bps_gate_pass",
+            "train_total_return": 0.11,
+            "validation_total_return": 0.05,
+            "locked_oos_total_return": 0.03,
+        },
+        {
+            "candidate_model_id": "low_corr_research_only",
+            "candidate_family": "mean_reversion_tail",
+            "variant_name": "base",
+            "candidate_variant_name": "base",
+            "train_validation_correlation_to_reference": -0.13,
+            "correlation_train_validation": -0.13,
+            "correlation_train_validation_abs": 0.13,
+            "selection_correlation_split_inputs": "train;validation",
+            "correlation_inputs": "train;validation",
+            "selection_inputs": "train;validation",
+            "uses_locked_oos_for_selection": False,
+            "uses_locked_oos_for_correlation": False,
+            "locked_oos_gate_pass": False,
+            "locked_oos_gate_reasons": "locked_oos_sharpe_non_positive",
+            "deployability_label": "research_only_locked_oos_gate_fail",
+            "train_total_return": 0.14,
+            "validation_total_return": 0.06,
+            "locked_oos_total_return": -0.01,
+        },
+    ]
+
+
 def _write_artifact(
     root: Path,
     *,
     payload: dict[str, object] | None = None,
     metric_rows: list[dict[str, object]] | None = None,
     variant_rows: list[dict[str, object]] | None = None,
+    low_correlation_json: dict[str, object] | None = None,
+    low_correlation_rows: list[dict[str, object]] | None = None,
 ) -> None:
     root.mkdir(parents=True, exist_ok=True)
     payload = _payload() if payload is None else payload
@@ -158,10 +296,18 @@ def _write_artifact(
     _write_json(
         root / "execution_cost_evidence_latest.json", dict(payload["execution_cost_evidence"])
     )
+    _write_json(
+        root / ASSERTION.LOW_CORRELATION_DISCOVERY_JSON,
+        low_correlation_json or _low_correlation_json(),
+    )
     _write_json(root / "tuned_seed_selection_latest.json", {"selected": ["candidate_a"]})
     _write_csv(root / "tuned_seed_selection_latest.csv", [{"model_id": "candidate_a", "rank": 1}])
-    _write_csv(root / "candidate_model_metrics_latest.csv", metric_rows or _metric_rows())
+    _write_csv(root / "candidate_model_metrics_latest.csv", metric_rows or _default_metric_rows())
     _write_csv(root / "candidate_variant_inventory_latest.csv", variant_rows or _variant_rows())
+    _write_csv(
+        root / ASSERTION.LOW_CORRELATION_DISCOVERY_CSV,
+        low_correlation_rows or _low_correlation_rows(),
+    )
 
 
 def test_artifact_assertion_accepts_locked_oos_report_only_contract(tmp_path: Path) -> None:
@@ -171,9 +317,10 @@ def test_artifact_assertion_accepts_locked_oos_report_only_contract(tmp_path: Pa
 
     assert summary == {
         "artifact_dir": str(tmp_path),
-        "models": 1,
-        "metric_rows": 3,
-        "promotable": ["candidate_a"],
+        "models": 2,
+        "metric_rows": 6,
+        "low_correlation_rows": 2,
+        "promotable": [ASSERTION.EXPECTED_HIGHER_RISK_MODEL_ID],
     }
 
 
@@ -205,6 +352,48 @@ def test_artifact_assertion_rejects_locked_oos_selection_inputs(
     _write_artifact(tmp_path, payload=payload)
 
     with pytest.raises(ASSERTION.ArtifactAssertionError, match=message):
+        ASSERTION.validate_artifact(tmp_path)
+
+
+def test_artifact_assertion_requires_active_higher_risk_profile(tmp_path: Path) -> None:
+    payload = _payload()
+    payload["active_selection_profile"] = ASSERTION.BALANCED_SELECTION_PROFILE
+    _write_artifact(tmp_path, payload=payload)
+
+    with pytest.raises(ASSERTION.ArtifactAssertionError, match="active_selection_profile"):
+        ASSERTION.validate_artifact(tmp_path)
+
+
+def test_artifact_assertion_rejects_locked_oos_profile_inputs(tmp_path: Path) -> None:
+    payload = _payload()
+    profiles = dict(payload["selection_profiles"])
+    higher = dict(profiles[ASSERTION.ACTIVE_SELECTION_PROFILE])
+    higher["selection_inputs"] = ["train", "locked_oos"]
+    profiles[ASSERTION.ACTIVE_SELECTION_PROFILE] = higher
+    payload["selection_profiles"] = profiles
+    _write_artifact(tmp_path, payload=payload)
+
+    with pytest.raises(ASSERTION.ArtifactAssertionError, match="selection_inputs"):
+        ASSERTION.validate_artifact(tmp_path)
+
+
+def test_artifact_assertion_rejects_locked_oos_discovery_inputs(tmp_path: Path) -> None:
+    discovery = _low_correlation_json()
+    policy = dict(discovery["discovery_policy"])
+    policy["correlation_inputs"] = ["train", "validation", "locked_oos"]
+    discovery["discovery_policy"] = policy
+    _write_artifact(tmp_path, low_correlation_json=discovery)
+
+    with pytest.raises(ASSERTION.ArtifactAssertionError, match="correlation_inputs"):
+        ASSERTION.validate_artifact(tmp_path)
+
+
+def test_artifact_assertion_requires_low_correlation_label_consistency(tmp_path: Path) -> None:
+    rows = _low_correlation_rows()
+    rows[1]["deployability_label"] = "deployable_10bps_gate_pass"
+    _write_artifact(tmp_path, low_correlation_rows=rows)
+
+    with pytest.raises(ASSERTION.ArtifactAssertionError, match="research-only"):
         ASSERTION.validate_artifact(tmp_path)
 
 
