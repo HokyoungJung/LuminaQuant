@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import heapq
 import json
 import math
 import resource
@@ -126,7 +127,12 @@ def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
 def _write_csv(path: Path, rows: Sequence[Mapping[str, Any]], fieldnames: Sequence[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="utf-8") as fh:
-        writer = csv.DictWriter(fh, fieldnames=list(fieldnames), extrasaction="ignore")
+        writer = csv.DictWriter(
+            fh,
+            fieldnames=list(fieldnames),
+            extrasaction="ignore",
+            lineterminator="\n",
+        )
         writer.writeheader()
         for row in rows:
             writer.writerow({key: _csv_value(row.get(key)) for key in fieldnames})
@@ -219,6 +225,27 @@ def _split_metrics_from_rows(rows: Sequence[Mapping[str, Any]]) -> dict[str, dic
     return out
 
 
+def _split_metrics_from_prefixed_row(row: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+    """Build split metrics from a flat row using ``train_*``/``validation_*`` keys."""
+    out: dict[str, dict[str, Any]] = {}
+    for split in SPLIT_ORDER:
+        out[split] = {
+            "total_return": _safe_float(row.get(f"{split}_total_return"), _safe_float(row.get(f"{split}_return"))),
+            "max_drawdown": _safe_float(row.get(f"{split}_max_drawdown"), _safe_float(row.get(f"{split}_mdd"))),
+            "sharpe": _safe_float(row.get(f"{split}_sharpe")),
+            "sortino": _safe_float(row.get(f"{split}_sortino")),
+            "smart_sortino": _safe_float(row.get(f"{split}_smart_sortino")),
+            "calmar": _safe_float(row.get(f"{split}_calmar")),
+            "return_mdd": _safe_float(row.get(f"{split}_return_mdd")),
+            "trade_count": _safe_int(row.get(f"{split}_trade_count")),
+            "active_return_hours": _safe_int(row.get(f"{split}_active_return_hours")),
+            "liquidation_count": _safe_int(row.get(f"{split}_liquidation_count")),
+            "account_wipeout_count": _safe_int(row.get(f"{split}_account_wipeout_count")),
+            "minimum_margin_buffer": row.get(f"{split}_minimum_margin_buffer", row.get("minimum_margin_buffer")),
+        }
+    return out
+
+
 def _promotion_gate_reasons(
     split_metrics: Mapping[str, Mapping[str, Any]],
     *,
@@ -235,7 +262,7 @@ def _promotion_gate_reasons(
     if missing:
         reasons.append("missing_split_metrics:" + ",".join(missing))
 
-    if candidate_universe_uses_locked_oos_bucket and not regenerated_train_validation_only:
+    if candidate_universe_uses_locked_oos_bucket:
         reasons.append("candidate_universe_uses_locked_oos_bucket")
     if promotability_scope == "shadow_only":
         reasons.append("shadow_only_historical_oos_bucket_lineage")
@@ -306,6 +333,47 @@ def _promotion_gate_result(
         "regenerated_train_validation_only": bool(regenerated_train_validation_only),
         "promotability_scope": str(promotability_scope),
         "strict_zero_liquidation": bool(strict_zero_liquidation),
+    }
+
+
+def promotion_gate(row: Mapping[str, Any]) -> dict[str, Any]:
+    """Compatibility wrapper for tests and ad-hoc gate probes over flat rows."""
+    split_metrics = _split_metrics_from_prefixed_row(row)
+    result = _promotion_gate_result(
+        split_metrics,
+        cost_bps=_safe_float(row.get("round_trip_slippage_fee_bps"), PRIMARY_COST_BPS),
+        candidate_universe_uses_locked_oos_bucket=_as_bool(
+            row.get("candidate_universe_uses_locked_oos_bucket")
+        ),
+        regenerated_train_validation_only=_as_bool(row.get("regenerated_train_validation_only")),
+        promotability_scope="shadow_only"
+        if _as_bool(row.get("shadow_only"))
+        else str(row.get("promotability_scope") or "live_candidate"),
+        strict_zero_liquidation=True,
+    )
+    raw_params = row.get("params", row.get("params_json", {}))
+    if isinstance(raw_params, Mapping):
+        params = dict(raw_params)
+    elif isinstance(raw_params, str) and raw_params.strip():
+        try:
+            loaded_params = json.loads(raw_params)
+        except json.JSONDecodeError:
+            loaded_params = {}
+        params = dict(loaded_params) if isinstance(loaded_params, Mapping) else {}
+    else:
+        params = {}
+    reasons = list(result["primary_10bps_promotion_gate_reasons"])
+    if _as_bool(row.get("calendar_primary")) or _variant_has_calendar_rule(params):
+        reasons.append("calendar_or_date_rule_forbidden")
+    compatibility_reason_names = {
+        "train_total_return_not_above_validation": "train_return_not_above_validation",
+        "train_total_return_not_above_locked_oos": "train_return_not_above_locked_oos",
+    }
+    reasons = [compatibility_reason_names.get(reason, reason) for reason in reasons]
+    reasons = sorted(set(reasons))
+    return {
+        "promotion_gate_pass": not reasons,
+        "promotion_gate_reasons": reasons,
     }
 
 
@@ -450,6 +518,625 @@ def _source_rows_are_shadow_only(source_payload: Mapping[str, Any]) -> bool:
     return _as_bool(policy.get("post_hoc_seed_basket_uses_leaderboard_oos_buckets_by_request"))
 
 
+def _slug(value: Any) -> str:
+    text = str(value or "").strip().lower()
+    out = []
+    for ch in text:
+        if ch.isalnum():
+            out.append(ch)
+        elif ch == ".":
+            out.append("p")
+        else:
+            out.append("_")
+    return "_".join("".join(out).split("_")).strip("_") or "model"
+
+
+def _candidate_key(row: Mapping[str, Any]) -> tuple[str, float, float]:
+    return (
+        str(row.get("candidate_name") or ""),
+        _safe_float(row.get("leverage")),
+        _safe_float(row.get("allocation_fraction")),
+    )
+
+
+def _fresh_model_id(prefix: str, row: Mapping[str, Any]) -> str:
+    return (
+        f"{prefix}_{_slug(row.get('candidate_name'))}_"
+        f"{_slug(_safe_float(row.get('leverage')))}x_"
+        f"{_slug(_safe_float(row.get('allocation_fraction')))}alloc"
+    )
+
+
+def _candidate_rows_for_fresh_retune(
+    source_candidate_rows: Sequence[Mapping[str, Any]],
+    *,
+    limit: int,
+) -> list[dict[str, Any]]:
+    """Return TV-frozen candidate rows to recompute at the primary 10bps cost."""
+    if int(limit) <= 0:
+        return []
+    deduped: dict[tuple[str, float, float], dict[str, Any]] = {}
+    for raw in source_candidate_rows:
+        row = dict(raw)
+        key = _candidate_key(row)
+        if not key[0]:
+            continue
+        if key not in deduped:
+            deduped[key] = row
+
+    def sort_key(row: Mapping[str, Any]) -> tuple[int, float, str]:
+        rank = _safe_int(row.get("frozen_train_validation_rank"), 10**9)
+        score = _safe_float(row.get("tv_selection_score"), -1e9)
+        return (rank, -score, str(row.get("candidate_name") or ""))
+
+    return sorted(deduped.values(), key=sort_key)[: int(limit)]
+
+
+def _summary_from_split_metrics(
+    *,
+    model_id: str,
+    model_kind: str,
+    role: str,
+    split_metrics: Mapping[str, Mapping[str, Any]],
+    score: float,
+    gate: Mapping[str, Any],
+    candidate_name: str = "",
+    leverage: float | None = None,
+    allocation_fraction: float | None = None,
+    extra_fields: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    return {
+        "model_id": model_id,
+        "model_kind": model_kind,
+        "role": role,
+        "candidate_name": candidate_name,
+        "leverage": "" if leverage is None else float(leverage),
+        "allocation_fraction": "" if allocation_fraction is None else float(allocation_fraction),
+        "round_trip_slippage_fee_bps": PRIMARY_COST_BPS,
+        "train_validation_score": float(score),
+        "candidate_universe_uses_locked_oos_bucket": gate[
+            "candidate_universe_uses_locked_oos_bucket"
+        ],
+        "regenerated_train_validation_only": gate["regenerated_train_validation_only"],
+        "promotability_scope": gate["promotability_scope"],
+        "shadow_only": gate["promotability_scope"] == "shadow_only",
+        "primary_10bps_promotion_gate_pass": gate["primary_10bps_promotion_gate_pass"],
+        "primary_10bps_promotion_gate_reasons": gate[
+            "primary_10bps_promotion_gate_reasons"
+        ],
+        "live_promotable_10bps": gate["live_promotable_10bps"],
+        "train": dict(split_metrics.get("train") or {}),
+        "validation": dict(split_metrics.get("validation") or {}),
+        "locked_oos": dict(split_metrics.get("locked_oos") or {}),
+        **dict(extra_fields or {}),
+    }
+
+
+def _metric_rows_from_split_metrics(
+    *,
+    model_id: str,
+    model_kind: str,
+    role: str,
+    split_metrics: Mapping[str, Mapping[str, Any]],
+    score: float,
+    gate: Mapping[str, Any],
+    candidate_name: str = "",
+    leverage: float | None = None,
+    allocation_fraction: float | None = None,
+    strict_zero_liquidation: bool = True,
+    extra_fields: Mapping[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    rows = cost._metric_rows_for_model(
+        model_id=model_id,
+        model_kind=model_kind,
+        role=role,
+        cost_bps=PRIMARY_COST_BPS,
+        split_metrics=split_metrics,
+        candidate_name=candidate_name,
+        leverage=leverage,
+        allocation_fraction=allocation_fraction,
+        strict_zero_liquidation=bool(strict_zero_liquidation),
+    )
+    for row in rows:
+        row.update(
+            {
+                "train_validation_score": float(score),
+                "candidate_universe_uses_locked_oos_bucket": gate[
+                    "candidate_universe_uses_locked_oos_bucket"
+                ],
+                "regenerated_train_validation_only": gate[
+                    "regenerated_train_validation_only"
+                ],
+                "promotability_scope": gate["promotability_scope"],
+                "shadow_only": gate["promotability_scope"] == "shadow_only",
+                "calendar_primary": False,
+                "primary_10bps_promotion_gate_pass": gate[
+                    "primary_10bps_promotion_gate_pass"
+                ],
+                "primary_10bps_promotion_gate_reasons": ";".join(
+                    gate["primary_10bps_promotion_gate_reasons"]
+                ),
+                "live_promotable_10bps": gate["live_promotable_10bps"],
+                **dict(extra_fields or {}),
+            }
+        )
+    return rows
+
+
+def _trade_entry_metadata(trade: Mapping[str, Any]) -> Mapping[str, Any]:
+    metadata = trade.get("entry_metadata")
+    return metadata if isinstance(metadata, Mapping) else {}
+
+
+def _trade_factor_family(trade: Mapping[str, Any]) -> str:
+    return str(_trade_entry_metadata(trade).get("dominant_factor_family") or "")
+
+
+def _trade_abs_factor_score(trade: Mapping[str, Any]) -> float:
+    return abs(_safe_float(_trade_entry_metadata(trade).get("factor_score")))
+
+
+def _trade_hold_hours(trade: Mapping[str, Any]) -> float:
+    try:
+        return max(
+            0.0,
+            (
+                cost._timestamp_seconds(trade.get("exit_time"))
+                - cost._timestamp_seconds(trade.get("entry_time"))
+            )
+            / 3600.0,
+        )
+    except (TypeError, ValueError, OverflowError):
+        return 0.0
+
+
+def _trade_filter_variant_specs(
+    trades: Sequence[Mapping[str, Any]],
+) -> list[tuple[str, dict[str, Any], Any]]:
+    """Return a fixed non-calendar trade-filter grid.
+
+    The grid is intentionally expressed in trade metadata dimensions that are
+    strategy-theoretic (side, symbol, factor family, factor-score strength, and
+    holding-time cap).  It never uses calendar/date fields and is ranked only on
+    train+validation metrics before locked-OOS gates are attached.
+    """
+    symbols = sorted({str(trade.get("symbol") or "") for trade in trades if trade.get("symbol")})
+    families = sorted({_trade_factor_family(trade) for trade in trades if _trade_factor_family(trade)})
+    specs: list[tuple[str, dict[str, Any], Any]] = []
+    for side in ("LONG", "SHORT"):
+        specs.append(
+            (
+                f"side_{side.lower()}",
+                {"side": side},
+                lambda trade, side=side: str(trade.get("side") or "") == side,
+            )
+        )
+    for symbol in symbols:
+        specs.append(
+            (
+                f"symbol_{_slug(symbol)}",
+                {"symbol": symbol},
+                lambda trade, symbol=symbol: str(trade.get("symbol") or "") == symbol,
+            )
+        )
+    for family in families:
+        specs.append(
+            (
+                f"family_{_slug(family)}",
+                {"dominant_factor_family": family},
+                lambda trade, family=family: _trade_factor_family(trade) == family,
+            )
+        )
+    for threshold in (1.0, 1.5, 2.0, 2.5, 3.0):
+        specs.append(
+            (
+                f"abs_score_ge_{threshold:g}",
+                {"abs_factor_score_min": threshold},
+                lambda trade, threshold=threshold: _trade_abs_factor_score(trade) >= threshold,
+            )
+        )
+    for max_hold in (4, 8, 12, 24, 48, 72):
+        specs.append(
+            (
+                f"max_hold_le_{max_hold}h",
+                {"max_hold_hours": max_hold},
+                lambda trade, max_hold=max_hold: _trade_hold_hours(trade) <= max_hold,
+            )
+        )
+    for side in ("LONG", "SHORT"):
+        for threshold in (1.0, 1.5, 2.0, 2.5):
+            specs.append(
+                (
+                    f"side_{side.lower()}_abs_score_ge_{threshold:g}",
+                    {"side": side, "abs_factor_score_min": threshold},
+                    lambda trade, side=side, threshold=threshold: str(trade.get("side") or "") == side
+                    and _trade_abs_factor_score(trade) >= threshold,
+                )
+            )
+    for family in families:
+        for threshold in (1.0, 1.5, 2.0, 2.5):
+            specs.append(
+                (
+                    f"family_{_slug(family)}_abs_score_ge_{threshold:g}",
+                    {"dominant_factor_family": family, "abs_factor_score_min": threshold},
+                    lambda trade, family=family, threshold=threshold: _trade_factor_family(trade) == family
+                    and _trade_abs_factor_score(trade) >= threshold,
+                )
+            )
+    for side in ("LONG", "SHORT"):
+        for family in families:
+            specs.append(
+                (
+                    f"side_{side.lower()}_family_{_slug(family)}",
+                    {"side": side, "dominant_factor_family": family},
+                    lambda trade, side=side, family=family: str(trade.get("side") or "") == side
+                    and _trade_factor_family(trade) == family,
+                )
+            )
+    for side in ("LONG", "SHORT"):
+        for symbol in symbols:
+            specs.append(
+                (
+                    f"side_{side.lower()}_symbol_{_slug(symbol)}",
+                    {"side": side, "symbol": symbol},
+                    lambda trade, side=side, symbol=symbol: str(trade.get("side") or "") == side
+                    and str(trade.get("symbol") or "") == symbol,
+                )
+            )
+    return specs
+
+
+def _variant_selection_key(summary: Mapping[str, Any]) -> tuple[float, float, float, str]:
+    """Train+validation-only key; locked-OOS is deliberately excluded."""
+    validation = dict(summary.get("validation") or {})
+    train = dict(summary.get("train") or {})
+    return (
+        _safe_float(summary.get("train_validation_score")),
+        _safe_float(validation.get("total_return")),
+        _safe_float(train.get("total_return")),
+        str(summary.get("model_id") or ""),
+    )
+
+
+def _maybe_keep_top_variant(
+    heap: list[tuple[tuple[float, float, float, str], int, dict[str, Any]]],
+    *,
+    limit: int,
+    serial: int,
+    record: Mapping[str, Any],
+) -> None:
+    if limit <= 0:
+        return
+    key = _variant_selection_key(dict(record.get("summary") or {}))
+    item = (key, serial, dict(record))
+    if len(heap) < limit:
+        heapq.heappush(heap, item)
+        return
+    if item[0] > heap[0][0]:
+        heapq.heapreplace(heap, item)
+
+
+def _fresh_train_validation_retune(
+    args: argparse.Namespace,
+    *,
+    source_live_payload: Mapping[str, Any],
+    source_candidate_rows: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Recompute TV-frozen Alpha Zoo candidates under the primary 10bps cost.
+
+    The source candidate CSV was generated by the high-leverage lane with
+    train+validation ranking before locked-OOS gates were attached.  This step
+    replays those candidate trades at 10bps, then re-ranks only train+validation
+    cost-adjusted metrics.  Locked-OOS metrics are attached only after the fresh
+    10bps candidate rows and hybrid inputs are frozen.
+    """
+    selected_rows = _candidate_rows_for_fresh_retune(
+        source_candidate_rows,
+        limit=_safe_int(getattr(args, "fresh_candidate_limit", 0), 0),
+    )
+    if not selected_rows:
+        return {
+            "metric_rows": [],
+            "summaries": [],
+            "hybrid_weights": [],
+            "hybrid_results": {},
+            "variant_inventory_rows": [],
+            "selected_source_rows": 0,
+            "evaluated_streams": 0,
+            "evaluated_trade_filter_variants": 0,
+            "selected_trade_filter_variants": 0,
+            "trade_filter_gate_pass_count": 0,
+            "skipped_candidate_names": [],
+        }
+
+    runtime = cost._build_alpha_runtime(args, source_live_payload)
+    alpha = runtime["alpha"]
+    specs = cost._spec_by_name(alpha, runtime["old_replay"])
+    available_rows: list[dict[str, Any]] = []
+    skipped_names: set[str] = set()
+    for row in selected_rows:
+        name = str(row.get("candidate_name") or "")
+        if name in specs:
+            available_rows.append(dict(row))
+        else:
+            skipped_names.add(name)
+    trade_cache = cost._build_trade_cache(
+        alpha=alpha,
+        data=runtime["data"],
+        calibrated_edges=runtime["calibrated_edges"],
+        specs=specs,
+        candidate_names=[row["candidate_name"] for row in available_rows],
+    )
+
+    metric_rows: list[dict[str, Any]] = []
+    summaries: list[dict[str, Any]] = []
+    stream_records: list[dict[str, Any]] = []
+    variant_inventory_rows: list[dict[str, Any]] = []
+    variant_top_heap: list[tuple[tuple[float, float, float, str], int, dict[str, Any]]] = []
+    variant_gate_pass_records: dict[str, dict[str, Any]] = {}
+    evaluated_trade_filter_variants = 0
+    trade_filter_gate_pass_count = 0
+    variant_serial = 0
+    enable_trade_filter_variants = not bool(getattr(args, "disable_trade_filter_variants", False))
+    trade_filter_top_n = max(0, _safe_int(getattr(args, "trade_filter_top_n", 0), 0))
+    min_trade_filter_trades = max(1, _safe_int(getattr(args, "min_trade_filter_trades", 20), 20))
+    for source_row in available_rows:
+        candidate_name = str(source_row.get("candidate_name") or "")
+        leverage = _safe_float(source_row.get("leverage"))
+        allocation = _safe_float(source_row.get("allocation_fraction"))
+        cache = trade_cache[candidate_name]
+        trades = list(cache["trades"])
+        stream = cost._stream_from_trades(
+            alpha=alpha,
+            trades=trades,
+            timestamps=runtime["timestamps"],
+            ts_to_idx=runtime["ts_to_idx"],
+            split_masks=runtime["split_masks"],
+            candidate_row=source_row,
+            round_trip_slippage_bps=PRIMARY_COST_BPS,
+        )
+        split_metrics = dict(stream.get("split_metrics") or {})
+        score = _train_validation_score(split_metrics)
+        gate = _promotion_gate_result(
+            split_metrics,
+            cost_bps=PRIMARY_COST_BPS,
+            candidate_universe_uses_locked_oos_bucket=False,
+            regenerated_train_validation_only=True,
+            promotability_scope="live_candidate",
+            strict_zero_liquidation=True,
+        )
+        model_id = _fresh_model_id("fresh_tv10_seed", source_row)
+        summaries.append(
+            _summary_from_split_metrics(
+                model_id=model_id,
+                model_kind="individual_seed",
+                role="fresh_train_validation_10bps_retune",
+                split_metrics=split_metrics,
+                score=score,
+                gate=gate,
+                candidate_name=candidate_name,
+                leverage=leverage,
+                allocation_fraction=allocation,
+            )
+        )
+        metric_rows.extend(
+            _metric_rows_from_split_metrics(
+                model_id=model_id,
+                model_kind="individual_seed",
+                role="fresh_train_validation_10bps_retune",
+                split_metrics=split_metrics,
+                score=score,
+                gate=gate,
+                candidate_name=candidate_name,
+                leverage=leverage,
+                allocation_fraction=allocation,
+                strict_zero_liquidation=True,
+            )
+        )
+        stream_records.append({"stream": stream, "summary": summaries[-1]})
+        if not enable_trade_filter_variants:
+            continue
+        for variant_name, variant_params, predicate in _trade_filter_variant_specs(trades):
+            filtered_trades = [trade for trade in trades if predicate(trade)]
+            if len(filtered_trades) < min_trade_filter_trades:
+                continue
+            evaluated_trade_filter_variants += 1
+            variant_stream = cost._stream_from_trades(
+                alpha=alpha,
+                trades=filtered_trades,
+                timestamps=runtime["timestamps"],
+                ts_to_idx=runtime["ts_to_idx"],
+                split_masks=runtime["split_masks"],
+                candidate_row=source_row,
+                round_trip_slippage_bps=PRIMARY_COST_BPS,
+            )
+            variant_split_metrics = dict(variant_stream.get("split_metrics") or {})
+            variant_score = _train_validation_score(variant_split_metrics)
+            variant_gate = _promotion_gate_result(
+                variant_split_metrics,
+                cost_bps=PRIMARY_COST_BPS,
+                candidate_universe_uses_locked_oos_bucket=False,
+                regenerated_train_validation_only=True,
+                promotability_scope="live_candidate",
+                strict_zero_liquidation=True,
+            )
+            if variant_gate["primary_10bps_promotion_gate_pass"]:
+                trade_filter_gate_pass_count += 1
+            variant_model_id = _fresh_model_id(f"fresh_tv10_filter_{_slug(variant_name)}", source_row)
+            extra_fields = {
+                "variant_name": variant_name,
+                "trade_filter_params": dict(variant_params),
+                "filter_trade_count": len(filtered_trades),
+            }
+            variant_summary = _summary_from_split_metrics(
+                model_id=variant_model_id,
+                model_kind="individual_seed_trade_filter",
+                role="fresh_train_validation_10bps_trade_filter",
+                split_metrics=variant_split_metrics,
+                score=variant_score,
+                gate=variant_gate,
+                candidate_name=candidate_name,
+                leverage=leverage,
+                allocation_fraction=allocation,
+                extra_fields=extra_fields,
+            )
+            variant_record = {
+                "summary": variant_summary,
+                "split_metrics": variant_split_metrics,
+                "gate": variant_gate,
+                "stream": variant_stream,
+                "extra_fields": extra_fields,
+                "candidate_name": candidate_name,
+                "leverage": leverage,
+                "allocation_fraction": allocation,
+                "variant_model_id": variant_model_id,
+            }
+            variant_serial += 1
+            _maybe_keep_top_variant(
+                variant_top_heap,
+                limit=trade_filter_top_n,
+                serial=variant_serial,
+                record=variant_record,
+            )
+            if variant_gate["primary_10bps_promotion_gate_pass"]:
+                variant_gate_pass_records[variant_model_id] = variant_record
+
+    selected_variant_records: dict[str, dict[str, Any]] = {
+        str(record["variant_model_id"]): record for _key, _serial, record in variant_top_heap
+    }
+    selected_variant_records.update(variant_gate_pass_records)
+    for record in sorted(
+        selected_variant_records.values(),
+        key=lambda item: _variant_selection_key(dict(item.get("summary") or {})),
+        reverse=True,
+    ):
+        summary = dict(record["summary"])
+        split_metrics = dict(record["split_metrics"])
+        gate = dict(record["gate"])
+        extra_fields = dict(record["extra_fields"])
+        model_id = str(record["variant_model_id"])
+        summaries.append(summary)
+        metric_rows.extend(
+            _metric_rows_from_split_metrics(
+                model_id=model_id,
+                model_kind="individual_seed_trade_filter",
+                role="fresh_train_validation_10bps_trade_filter",
+                split_metrics=split_metrics,
+                score=_safe_float(summary.get("train_validation_score")),
+                gate=gate,
+                candidate_name=str(record.get("candidate_name") or ""),
+                leverage=_safe_float(record.get("leverage")),
+                allocation_fraction=_safe_float(record.get("allocation_fraction")),
+                strict_zero_liquidation=True,
+                extra_fields=extra_fields,
+            )
+        )
+        stream_records.append({"stream": dict(record["stream"]), "summary": summary})
+        variant_inventory_rows.append(
+            _variant_row(
+                candidate_name=str(record.get("candidate_name") or ""),
+                variant_name=str(extra_fields.get("variant_name") or ""),
+                params={
+                    **dict(extra_fields.get("trade_filter_params") or {}),
+                    "filter_trade_count": int(extra_fields.get("filter_trade_count") or 0),
+                    "selection_inputs": list(TV_SPLITS),
+                    "round_trip_slippage_fee_bps": PRIMARY_COST_BPS,
+                },
+                source="fresh_train_validation_trade_filter_grid",
+            )
+        )
+
+    ranked_records = sorted(
+        stream_records,
+        key=lambda item: _safe_float(item["summary"].get("train_validation_score")),
+        reverse=True,
+    )
+    hybrid_seed_count = max(0, _safe_int(getattr(args, "hybrid_seed_count", 0), 0))
+    hybrid_records = ranked_records[:hybrid_seed_count]
+    hybrid_weights: list[dict[str, Any]] = []
+    hybrid_results: dict[str, Any] = {}
+    if len(hybrid_records) >= 2 and _safe_int(getattr(args, "n_trials", 0), 0) > 0:
+        seed_streams = [dict(item["stream"]) for item in hybrid_records]
+        returns = np.column_stack(
+            [np.asarray(stream["returns"], dtype=float) for stream in seed_streams]
+        )
+        labels = [str(stream["label"]) for stream in seed_streams]
+        for model_id, version in (
+            ("hybrid_v3_5_fresh_tv10", "v3_5"),
+            ("hybrid_v3_6_fresh_tv10", "v3_6"),
+        ):
+            result = cost.hybrid._run_optuna(
+                returns,
+                runtime["split_masks"],
+                version=version,
+                n_trials=_safe_int(getattr(args, "n_trials", 0), 0),
+                seed=_safe_int(getattr(args, "seed", 20260519), 20260519),
+            )
+            public = cost._public_hybrid_result(
+                result,
+                labels=labels,
+                returns=returns,
+                split_masks=runtime["split_masks"],
+                timestamps=runtime["timestamps"],
+                streams=seed_streams,
+            )
+            public.pop("portfolio_returns", None)
+            split_metrics = dict(public.get("splits") or {})
+            score = _train_validation_score(split_metrics)
+            gate = _promotion_gate_result(
+                split_metrics,
+                cost_bps=PRIMARY_COST_BPS,
+                candidate_universe_uses_locked_oos_bucket=False,
+                regenerated_train_validation_only=True,
+                promotability_scope="live_candidate",
+                strict_zero_liquidation=True,
+            )
+            hybrid_results[model_id] = public
+            summaries.append(
+                _summary_from_split_metrics(
+                    model_id=model_id,
+                    model_kind="hybrid",
+                    role="fresh_train_validation_10bps_hybrid",
+                    split_metrics=split_metrics,
+                    score=score,
+                    gate=gate,
+                )
+            )
+            metric_rows.extend(
+                _metric_rows_from_split_metrics(
+                    model_id=model_id,
+                    model_kind="hybrid",
+                    role="fresh_train_validation_10bps_hybrid",
+                    split_metrics=split_metrics,
+                    score=score,
+                    gate=gate,
+                    strict_zero_liquidation=True,
+                )
+            )
+            for label, weight in dict(public.get("final_weight_by_candidate") or {}).items():
+                hybrid_weights.append(
+                    {
+                        "round_trip_slippage_fee_bps": PRIMARY_COST_BPS,
+                        "model_id": model_id,
+                        "candidate_label": label,
+                        "weight": float(weight),
+                    }
+                )
+    return {
+        "metric_rows": metric_rows,
+        "summaries": summaries,
+        "hybrid_weights": hybrid_weights,
+        "hybrid_results": hybrid_results,
+        "variant_inventory_rows": variant_inventory_rows,
+        "selected_source_rows": len(selected_rows),
+        "evaluated_streams": len(stream_records),
+        "evaluated_trade_filter_variants": evaluated_trade_filter_variants,
+        "selected_trade_filter_variants": len(selected_variant_records),
+        "trade_filter_gate_pass_count": trade_filter_gate_pass_count,
+        "skipped_candidate_names": sorted(skipped_names),
+    }
+
+
 def _metric_rows_with_primary_gates(
     grouped: Mapping[str, Sequence[Mapping[str, Any]]],
     *,
@@ -495,6 +1182,7 @@ def _metric_rows_with_primary_gates(
                         ],
                         "promotability_scope": gate["promotability_scope"],
                         "shadow_only": summary["shadow_only"],
+                        "calendar_primary": False,
                         "primary_10bps_promotion_gate_pass": gate[
                             "primary_10bps_promotion_gate_pass"
                         ],
@@ -591,23 +1279,48 @@ def _best_model(
 
 
 def build_payload(args: argparse.Namespace) -> dict[str, Any]:
-    source_cost_json = Path(args.source_cost_json).expanduser().resolve()
-    source_cost_metrics_csv = Path(args.source_cost_metrics_csv).expanduser().resolve()
-    source_live_json = Path(args.source_live_json).expanduser().resolve()
-    source_candidate_csv = Path(args.source_candidate_csv).expanduser().resolve()
+    source_cost_json = Path(
+        getattr(args, "source_cost_json", getattr(args, "cost_validation_json", DEFAULT_SOURCE_COST_JSON))
+    ).expanduser().resolve()
+    source_cost_metrics_csv = Path(
+        getattr(args, "source_cost_metrics_csv", DEFAULT_SOURCE_COST_METRICS_CSV)
+    ).expanduser().resolve()
+    source_live_json = Path(getattr(args, "source_live_json", DEFAULT_SOURCE_LIVE_JSON)).expanduser().resolve()
+    source_candidate_csv = Path(
+        getattr(args, "source_candidate_csv", getattr(args, "candidate_csv", DEFAULT_SOURCE_CANDIDATE_CSV))
+    ).expanduser().resolve()
     source_payload = _load_json(source_cost_json)
     source_live_payload = _load_json(source_live_json)
     source_candidate_rows = _read_csv(source_candidate_csv) if source_candidate_csv.exists() else []
     split_manifest = _validate_split_manifest(
         source_payload,
-        allow_split_hash_drift=bool(args.allow_split_hash_drift),
+        allow_split_hash_drift=bool(getattr(args, "allow_split_hash_drift", False)),
     )
     source_rows = _load_source_metric_rows(source_payload, source_cost_metrics_csv)
     grouped = _group_metric_rows_by_model(source_rows)
-    metric_rows, summaries = _metric_rows_with_primary_gates(grouped, source_payload=source_payload)
-    variant_inventory = _build_variant_inventory(source_live_payload)
-    live_model = _best_model(summaries, require_live_promotable=True)
-    best_shadow = _best_model(summaries, require_live_promotable=False)
+    shadow_metric_rows, shadow_summaries = _metric_rows_with_primary_gates(
+        grouped,
+        source_payload=source_payload,
+    )
+    fresh_retune = _fresh_train_validation_retune(
+        args,
+        source_live_payload=source_live_payload,
+        source_candidate_rows=source_candidate_rows,
+    )
+    metric_rows = [*list(fresh_retune["metric_rows"]), *shadow_metric_rows]
+    summaries = [*list(fresh_retune["summaries"]), *shadow_summaries]
+    variant_inventory = [
+        *_build_variant_inventory(source_live_payload),
+        *list(fresh_retune.get("variant_inventory_rows") or []),
+    ]
+    fresh_summaries = [
+        dict(item)
+        for item in list(fresh_retune["summaries"])
+        if not _as_bool(dict(item).get("shadow_only"))
+    ]
+    live_model = _best_model(fresh_summaries, require_live_promotable=True)
+    best_fresh = _best_model(fresh_summaries, require_live_promotable=False)
+    best_shadow = _best_model(shadow_summaries, require_live_promotable=False)
     execution_cost = _execution_cost_evidence()
     return {
         "artifact_kind": "alpha_zoo_10bps_full_retune",
@@ -624,15 +1337,49 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
         "method_contract": {
             "runner_lane": "candidate_and_cost_promotion_gates",
             "primary_cost_only_for_promotion": PRIMARY_COST_BPS,
-            "n_trials_requested": int(args.n_trials),
+            "n_trials_requested": int(getattr(args, "n_trials", 0)),
             "source_cost_rows": len(source_rows),
+            "shadow_primary_10bps_metric_rows": len(shadow_metric_rows),
+            "fresh_primary_10bps_metric_rows": len(list(fresh_retune["metric_rows"])),
             "primary_10bps_metric_rows": len(metric_rows),
             "candidate_csv_rows_seen": len(source_candidate_rows),
             "variant_inventory_rows": len(variant_inventory),
             "historical_top_bucket_rows_shadow_only": _source_rows_are_shadow_only(source_payload),
+            "fresh_train_validation_retune": {
+                "selection_inputs": list(TV_SPLITS),
+                "uses_locked_oos_for_selection": False,
+                "candidate_rows_selected_before_oos_gate": fresh_retune["selected_source_rows"],
+                "evaluated_10bps_streams": fresh_retune["evaluated_streams"],
+                "evaluated_trade_filter_variants": fresh_retune[
+                    "evaluated_trade_filter_variants"
+                ],
+                "selected_trade_filter_variants": fresh_retune[
+                    "selected_trade_filter_variants"
+                ],
+                "trade_filter_gate_pass_count": fresh_retune["trade_filter_gate_pass_count"],
+                "trade_filter_selection_inputs": list(TV_SPLITS),
+                "trade_filter_locked_oos_role": "gate_report_only_after_variant_freeze",
+                "skipped_candidate_names": fresh_retune["skipped_candidate_names"],
+            },
+        },
+        "selection_policy": {
+            "selection_inputs": list(TV_SPLITS),
+            "optimization_input_splits": list(TV_SPLITS),
+            "hybrid_selection_inputs": list(TV_SPLITS),
+            "uses_locked_oos_for_objective": False,
+            "uses_locked_oos_for_pruning": False,
+            "uses_locked_oos_for_selection": False,
+            "uses_locked_oos_for_parameter_fitting": False,
+            "locked_oos_role": "gate_report_only_after_candidate_freeze",
         },
         "candidate_universe_summary": {
             "model_count": len(summaries),
+            "fresh_train_validation_model_count": len(fresh_summaries),
+            "fresh_trade_filter_model_count": sum(
+                1
+                for item in fresh_summaries
+                if str(item.get("role") or "") == "fresh_train_validation_10bps_trade_filter"
+            ),
             "primary_10bps_models": sorted(grouped),
             "live_promotable_count": sum(
                 1 for item in summaries if _as_bool(item.get("live_promotable_10bps"))
@@ -650,18 +1397,25 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
             "uses_locked_oos_for_selection": False,
             "primary_cost_bps": PRIMARY_COST_BPS,
             "rows": sorted(
-                summaries,
+                fresh_summaries,
                 key=lambda row: _safe_float(row.get("train_validation_score")),
                 reverse=True,
-            )[: int(args.top_n)],
+            )[: int(getattr(args, "top_n", 50))],
+            "shadow_reference_rows": sorted(
+                shadow_summaries,
+                key=lambda row: _safe_float(row.get("train_validation_score")),
+                reverse=True,
+            )[: int(getattr(args, "top_n", 50))],
         },
-        "hybrid_weights_10bps": [
+        "fresh_hybrid_results_10bps": fresh_retune["hybrid_results"],
+        "hybrid_weights_10bps": list(fresh_retune["hybrid_weights"]) or [
             dict(row)
             for row in list(source_payload.get("hybrid_weights") or [])
             if math.isclose(_safe_float(dict(row).get("round_trip_slippage_fee_bps")), PRIMARY_COST_BPS)
         ],
         "live_promotable_10bps_model_id": None if live_model is None else live_model.get("model_id"),
         "no_10bps_live_ready_model": live_model is None,
+        "best_fresh_10bps_model": best_fresh or {},
         "best_shadow_10bps_model": best_shadow or {},
     }
 
@@ -744,6 +1498,7 @@ def write_outputs(payload: Mapping[str, Any], output_dir: Path) -> dict[str, str
         "model_kind",
         "role",
         "candidate_name",
+        "variant_name",
         "leverage",
         "allocation_fraction",
         "round_trip_slippage_fee_bps",
@@ -765,10 +1520,13 @@ def write_outputs(payload: Mapping[str, Any], output_dir: Path) -> dict[str, str
         "locked_oos_deployable_gate_pass",
         "locked_oos_deployable_gate_reasons",
         "train_validation_score",
+        "filter_trade_count",
+        "trade_filter_params",
         "candidate_universe_uses_locked_oos_bucket",
         "regenerated_train_validation_only",
         "promotability_scope",
         "shadow_only",
+        "calendar_primary",
         "primary_10bps_promotion_gate_pass",
         "primary_10bps_promotion_gate_reasons",
         "live_promotable_10bps",
@@ -787,10 +1545,13 @@ def write_outputs(payload: Mapping[str, Any], output_dir: Path) -> dict[str, str
         "model_kind",
         "role",
         "candidate_name",
+        "variant_name",
         "leverage",
         "allocation_fraction",
         "round_trip_slippage_fee_bps",
         "train_validation_score",
+        "filter_trade_count",
+        "trade_filter_params",
         "promotability_scope",
         "shadow_only",
         "primary_10bps_promotion_gate_pass",
@@ -822,6 +1583,24 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--n-trials", type=int, default=80)
     parser.add_argument("--top-n", type=int, default=50)
     parser.add_argument("--allow-split-hash-drift", action="store_true")
+    parser.add_argument("--fresh-candidate-limit", type=int, default=80)
+    parser.add_argument("--hybrid-seed-count", type=int, default=8)
+    parser.add_argument("--trade-filter-top-n", type=int, default=120)
+    parser.add_argument("--min-trade-filter-trades", type=int, default=20)
+    parser.add_argument("--disable-trade-filter-variants", action="store_true")
+    parser.add_argument("--seed", type=int, default=20260519)
+    parser.add_argument("--input", default="")
+    parser.add_argument("--current-tail-cache", default=str(high.DEFAULT_CURRENT_TAIL_CACHE))
+    parser.add_argument("--external-state-csv", default=str(high.DEFAULT_EXTERNAL_STATE_CSV))
+    parser.add_argument("--old-alpha-replay-json", default=str(high.DEFAULT_OLD_ALPHA_REPLAY))
+    parser.add_argument("--alpha-calibration-json", default="")
+    parser.add_argument("--train-start", default=high.DEFAULT_TRAIN_START)
+    parser.add_argument("--train-end", default=high.DEFAULT_TRAIN_END)
+    parser.add_argument("--validation-start", default=high.DEFAULT_VALIDATION_START)
+    parser.add_argument("--validation-end", default=high.DEFAULT_VALIDATION_END)
+    parser.add_argument("--locked-oos-start", default=high.DEFAULT_LOCKED_OOS_START)
+    parser.add_argument("--locked-oos-end", default=high.DEFAULT_LOCKED_OOS_END)
+    parser.add_argument("--horizon", type=int, default=high.DEFAULT_HORIZON)
     return parser.parse_args(argv)
 
 

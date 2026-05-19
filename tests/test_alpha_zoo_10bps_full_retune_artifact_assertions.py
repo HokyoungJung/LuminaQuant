@@ -121,6 +121,7 @@ def _metric_rows(
                 "account_wipeout_count": 0,
                 "minimum_margin_buffer": 100.0,
                 "candidate_universe_uses_locked_oos_bucket": False,
+                "regenerated_train_validation_only": True,
                 "promotability_scope": "live_candidate",
                 "live_promotable_10bps": promotable,
                 **values,
@@ -237,6 +238,26 @@ def test_artifact_assertion_requires_exact_10bps_train_validation_locked_oos_row
     _write_artifact(tmp_path, metric_rows=missing_locked_oos)
 
     with pytest.raises(ASSERTION.ArtifactAssertionError, match="10bps splits"):
+        ASSERTION.validate_artifact(tmp_path)
+
+
+def test_artifact_assertion_rejects_shadow_only_without_fresh_train_validation_model(
+    tmp_path: Path,
+) -> None:
+    _write_artifact(
+        tmp_path,
+        payload=_payload(winner=None),
+        metric_rows=_metric_rows(
+            promotable=False,
+            metadata={
+                "candidate_universe_uses_locked_oos_bucket": True,
+                "regenerated_train_validation_only": False,
+                "promotability_scope": "shadow_only",
+            },
+        ),
+    )
+
+    with pytest.raises(ASSERTION.ArtifactAssertionError, match="fresh train\\+validation-only"):
         ASSERTION.validate_artifact(tmp_path)
 
 

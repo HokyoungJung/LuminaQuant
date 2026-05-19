@@ -492,3 +492,33 @@ Artifacts:
 Fresh local verification passed on 2026-05-19 UTC: artifact assertion passed (`seed_count=16`, `metric_rows=120`, max liquidation count `9`, account wipeout max `0`); new Alpha Zoo top-seed tests `5 passed`; hybrid/common split tests `14 passed`; live/liquidation/state tests `46 passed`; full pytest `1345 passed`; ruff, compileall, and `git diff --check` all passed. Post-deslop verification re-ran after narrowing broad exception handling in the new runner: artifact assertion passed; new tests `5 passed`; full pytest `1345 passed`; ruff, compileall, and `git diff --check` passed.
 
 Research history/source ledger not regenerated: this session reused the already-refreshed 2026-05-17 current-tail data and the 2026-05-18 live-notional/risk-aligned Alpha Zoo artifact family; it added a same-lineage research-only cost-validation bundle, not a new market-data source family or global chronology refresh.
+
+## 2026-05-19 KST — Alpha Zoo full 10bps round-trip retune and live-gate repair
+
+Re-ran the Alpha Zoo backtest-to-live candidate family under the latest split and locked promotion cost of round-trip slippage/fee `10bps`. The run covers historical top-bucket / live-ranked Alpha Zoo seed streams, the prior Hybrid v3.5/v3.6 seed-union rows, references, and fresh train+validation-only variants. Locked-OOS stayed strictly post-freeze gate/report-only: the artifact records selection inputs `['train', 'validation']`, `uses_locked_oos_for_selection=false`, and trade-filter locked-OOS role `gate_report_only_after_variant_freeze`. No real-money execution was attempted.
+
+The earlier top-bucket/hybrid rows did not survive as live candidates at `10bps`: `hybrid_v3_5_seed_union` remains a shadow-only historical OOS-bucket row and fails the fresh live gate because locked-OOS return/Sharpe/Sortino/smart Sortino/Calmar are non-positive and because its lineage uses OOS-derived bucket selection. The plain fresh 10bps seed/hybrid retune also found no live-ready model with positive validation and locked-OOS performance, so a non-calendar fixed trade-filter retune lane was added. The lane evaluates only signal-structure filters such as side/symbol/factor-family/absolute factor-score/hold cap over train+validation, then freezes the variant before locked-OOS reporting.
+
+Final full retune summary:
+
+- Artifact dir: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_10bps_full_retune_20260519/`.
+- Latest main JSON/Markdown: `alpha_zoo_10bps_full_retune_latest.json`, `alpha_zoo_10bps_full_retune_latest.md`.
+- Timestamped final JSON/Markdown: `alpha_zoo_10bps_full_retune_20260519T121224Z.json`, `alpha_zoo_10bps_full_retune_20260519T121224Z.md`.
+- Split: train `2025-01-01T00:00:00Z..2025-12-31T23:00:00Z`; validation `2026-01-01T00:00:00Z..2026-03-31T23:00:00Z`; locked-OOS `2026-04-01T00:00:00Z..2026-05-17T10:00:00Z`; timestamp-index hash `b973165bc1057f3aaa08ea637b73a45df3e84fdb7d1337b1637233d205696bb0`.
+- Candidate accounting: `798` models / `2394` split metric rows; `778` fresh train+validation models; `176` fresh trade-filter models; `20` shadow-only historical rows.
+- Search accounting: `600` source candidate rows replayed, `776` fresh 10bps streams evaluated, `30,354` trade-filter variants evaluated, `176` selected variants, `56` passing the final 10bps live gate.
+- Memory: runner peak RSS `400.9883 MiB` by artifact memory summary and `/usr/bin/time` max RSS `420,012 KiB`; full pytest post-LF max RSS `2,722,856 KiB`, both under the 8 GiB session limit.
+
+Best live-gate candidate at round-trip `10bps`:
+
+- Model id: `fresh_tv10_filter_abs_score_ge_1p5_alpha_zoo_quality_single_pair_6p0x_0p175alloc`.
+- Strategy family: `CryptoFxAlphaZooStateStrategy` / `alpha_zoo_quality_single_pair`.
+- Variant: non-calendar `abs_factor_score_min=1.5` (`abs_score_ge_1.5`).
+- Sizing: isolated `6x`, allocation fraction `0.175`, `544` filtered trades; liquidation/account-wipeout counts are `0` on all splits and margin buffers stay positive.
+- Train: return `+36.0268%`, MDD `24.6028%`, Sharpe `1.002645`, Sortino `0.289764`, smart Sortino `0.232550`, Calmar `1.464340`, trades `405`, min margin buffer `8514.118330`.
+- Validation: return `+0.5942%`, MDD `11.3653%`, Sharpe `0.219846`, Sortino `0.047272`, smart Sortino `0.042448`, Calmar `0.214374`, trades `86`, min margin buffer `9251.785896`.
+- Locked-OOS gate/report-only: return `+1.5464%`, MDD `10.9211%`, Sharpe `0.554965`, Sortino `0.168704`, smart Sortino `0.152094`, Calmar `1.173217`, trades `53`, min margin buffer `9383.460782`.
+
+The selected live-gate candidate satisfies the requested dominance shape: train return/Sharpe/Sortino/smart Sortino/Calmar are all above validation and locked-OOS; validation and locked-OOS returns are positive; locked-OOS was not used for variant selection, pruning, objective scoring, or parameter fitting. Calendar/date rules remain rejected.
+
+Fresh verification passed on 2026-05-19 UTC: artifact assertion passed (`798` models, `2394` metric rows, `56` promotable); 10bps retune tests `15 passed`; top-seed/hybrid split tests `19 passed`; live/liquidation/state tests `49 passed`; full pytest `1360 passed`; `ruff check .`, `compileall`, and diff checks passed. Research history/source ledger not regenerated: this session reused the already-refreshed 2026-05-17 current-tail data and same Alpha Zoo artifact lineage, adding a same-lineage 10bps retune/validation bundle rather than a new market-data source family or chronology refresh.

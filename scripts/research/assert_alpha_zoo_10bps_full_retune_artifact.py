@@ -345,6 +345,21 @@ def _validate_metric_rows(rows: Sequence[Mapping[str, Any]]) -> dict[str, list[M
             ):
                 if not math.isfinite(_metric(row, metric)):
                     _fail(f"model {model_id} split {row.get('split')} missing finite {metric}")
+    fresh_model_ids = {
+        model_id
+        for model_id, model_rows in grouped.items()
+        if all(
+            _is_true(row.get("regenerated_train_validation_only"))
+            and not _is_true(row.get("candidate_universe_uses_locked_oos_bucket"))
+            and str(row.get("promotability_scope") or "").strip().lower() != "shadow_only"
+            for row in model_rows
+        )
+    }
+    if not fresh_model_ids:
+        _fail(
+            "candidate_model_metrics_latest.csv must include at least one fresh "
+            "train+validation-only 10bps model"
+        )
     return grouped
 
 
