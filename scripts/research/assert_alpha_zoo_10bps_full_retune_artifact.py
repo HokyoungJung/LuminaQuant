@@ -182,24 +182,6 @@ def _validate_locked_oos_audit(payload: Mapping[str, Any]) -> None:
             _fail(f"selection_policy.{key} must be false")
 
 
-def _evidence_symbols(evidence: Mapping[str, Any]) -> set[str]:
-    symbols = {str(item) for item in list(evidence.get("symbols") or [])}
-    depth_schema = _as_mapping(evidence.get("depth_snapshot_schema"))
-    symbols.update(str(item) for item in list(depth_schema.get("symbols") or []))
-    leader_summary = _as_mapping(evidence.get("leader_snapshot_summary"))
-    symbols.update(str(key) for key in leader_summary)
-    snapshots = evidence.get("symbol_snapshots") or evidence.get("depth_snapshots")
-    if isinstance(snapshots, Mapping):
-        symbols.update(str(key) for key in snapshots)
-    elif isinstance(snapshots, Sequence) and not isinstance(snapshots, (str, bytes, bytearray)):
-        for item in snapshots:
-            item_map = _as_mapping(item)
-            symbol = item_map.get("symbol") or item_map.get("ticker")
-            if symbol:
-                symbols.add(str(symbol))
-    return symbols
-
-
 def _validate_cost_evidence(
     payload: Mapping[str, Any],
     execution_cost_evidence: Mapping[str, Any],
@@ -213,15 +195,10 @@ def _validate_cost_evidence(
     ):
         if evidence.get("diagnostic_only") is not True:
             _fail(f"{label}.diagnostic_only must be true")
-    payload_missing = sorted(REQUIRED_COST_SYMBOLS - _evidence_symbols(payload_evidence))
-    if payload_missing:
-        _fail(f"payload.execution_cost_evidence.symbols missing {payload_missing}")
-    combined_symbols = _evidence_symbols(payload_evidence) | _evidence_symbols(
-        execution_cost_evidence
-    )
-    missing = sorted(REQUIRED_COST_SYMBOLS - combined_symbols)
-    if missing:
-        _fail(f"execution cost evidence missing required symbols {missing}")
+        symbols = {str(item) for item in list(evidence.get("symbols") or [])}
+        missing = sorted(REQUIRED_COST_SYMBOLS - symbols)
+        if missing:
+            _fail(f"{label}.symbols missing {missing}")
 
 
 def _param_key_paths(value: Any, *, prefix: str = "") -> list[str]:
