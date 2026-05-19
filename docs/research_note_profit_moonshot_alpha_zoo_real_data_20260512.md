@@ -561,3 +561,16 @@ Balanced reference 10bps split metrics (`6x`, allocation `0.175`, same non-calen
 Low-correlation discovery sidecars: `low_correlation_discovery_latest.json` and `low_correlation_discovery_latest.csv`. Correlations are computed from train+validation returns only against the active higher-risk reference; `423` streams are below the `0.35` absolute-correlation threshold, but `0` are deployable 10bps gate passers independent of the reference in this run, so the discovery rows are research-only until a low-correlation stream also clears locked-OOS gate/report checks.
 
 Verification passed on 2026-05-19 UTC: artifact assertion passed (`796` models, `2388` metric rows, `50` low-correlation rows); focused 10bps retune and artifact assertion tests `19 passed`; `ruff` passed on changed runner/assertion/tests; `compileall` passed. Full `n_trials=80` hybrid optimizer was not rerun in this final profile pass; the required deliverable was profile-safe selection plus low-correlation discovery under the 8 GiB guard.
+
+## 2026-05-19 KST — Next plan: 7x/0.20 paper-forward live preflight
+
+Saved next-session plan: `.omx/plans/plan-alpha-zoo-7x-paper-forward-live-preflight-20260519.md`.
+
+The next step is **not real-money execution**. It is a paper/testnet-only live decision, preflight, and forward-monitoring handoff for the active 10bps profile and the balanced reference:
+
+- Active paper candidate: `fresh_tv10_filter_abs_score_ge_1p5_alpha_zoo_quality_single_pair_7p0x_0p2alloc` (`higher_risk_train_return_tilt_v1`, isolated `7x`, allocation `0.20`).
+- Balanced reference: `fresh_tv10_filter_abs_score_ge_1p5_alpha_zoo_quality_single_pair_6p0x_0p175alloc` (`balanced_train_validation_v1`, isolated `6x`, allocation `0.175`).
+- Required governance: `real_money_execution=false`, `ready_for_real=false`, locked-OOS gate/report-only, replay/live sizing parity, liquidation-inclusive MDD, and realized round-trip cost monitoring against the 10bps research assumption.
+- Recommended artifact dir for the follow-up: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_7x_paper_forward_preflight_20260519/`.
+
+The plan rejects immediate real-money promotion because the 7x/0.20 validation return is still weak and the low-correlation discovery found `0` independently deployable low-correlation gate-pass streams. The next evidence needed is paper/testnet fill-quality and risk monitoring for active vs balanced side-by-side.
