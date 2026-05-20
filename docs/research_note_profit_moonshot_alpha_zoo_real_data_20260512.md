@@ -613,3 +613,18 @@ Selected paper/testnet validation-first candidates:
 The frozen 10bps universe has `56` live-gate-passed candidates, but the best live-gate validation return is only `+0.5986%`. A material validation-edge audit found `0` zero-liquidation candidates with validation return `>1%` and positive locked-OOS return. High-validation alternatives do exist, especially `conservative_exit` variants with validation around `+20%` to `+27%`, but they fail promotion gates because locked-OOS returns are negative and train metrics are not above validation; they are shadow-only strategy hypotheses, not paper candidates.
 
 Recommended next experiments are therefore not immediate real-money promotion: run a train+validation-only regime-gated `conservative_exit` rescue, side/symbol-specific `abs_score` thresholds for `quality_single_pair`, and continue paper-forward monitoring of the validation-first 5x/0.20 and 4x/0.175 lanes beside the existing active/balanced lanes. Real fill monitoring must still compare all-in round-trip bps to the 10bps mean / 15bps p95 contract before any real-money discussion.
+
+## 2026-05-20 KST — Four-lane paper-forward contract and shadow strategy audit
+
+A follow-up four-lane artifact now joins the original active/balanced paper handoff with the validation-first handoff under `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_four_lane_shadow_discovery_20260520/`. The contract stays paper/testnet-only: `ready_for_paper=true`, `ready_for_real=false`, `real_money_execution=false`, and the primary research cost is still `10.0bps` all-in round-trip.
+
+Four lanes to run side-by-side in paper/testnet:
+
+| Lane | Model | Notional/equity | Validation return | Validation MDD | Locked-OOS return | Status |
+| --- | --- | ---: | ---: | ---: | ---: | --- |
+| Active | `fresh_tv10_filter_abs_score_ge_1p5_alpha_zoo_quality_single_pair_7p0x_0p2alloc` | `140%` | `+0.4724%` | `14.9117%` | `+1.8382%` | paper only |
+| Balanced | `fresh_tv10_filter_abs_score_ge_1p5_alpha_zoo_quality_single_pair_6p0x_0p175alloc` | `105%` | `+0.5942%` | `11.3653%` | `+1.5464%` | paper only |
+| Validation leader | `fresh_tv10_filter_abs_score_ge_1p5_alpha_zoo_quality_single_pair_5p0x_0p2alloc` | `100%` | `+0.5986%` | `10.8490%` | `+1.4956%` | paper only |
+| Efficiency reference | `fresh_tv10_filter_abs_score_ge_1p5_alpha_zoo_quality_single_pair_4p0x_0p175alloc` | `70%` | `+0.5561%` | `7.6999%` | `+1.1432%` | paper only |
+
+The shadow strategy audit found higher validation families but no frozen-universe non-quality paper candidate. Top `conservative_exit` rows reach validation `+27.3844%`, yet locked-OOS is `-4.2507%`; top side/family threshold rows reach validation `+5.9487%`, yet locked-OOS is `-4.5444%`. Both remain shadow-only. The next true strategy-search step is an expanded train+validation-only retune/rescue pass, not real-money promotion.

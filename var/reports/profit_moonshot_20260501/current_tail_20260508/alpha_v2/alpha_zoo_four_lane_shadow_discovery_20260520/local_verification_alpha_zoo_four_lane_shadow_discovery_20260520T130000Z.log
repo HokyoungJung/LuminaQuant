@@ -1,0 +1,13 @@
+Alpha Zoo four-lane shadow discovery checkpoint verification
+generated_at_utc=2026-05-20T12:58:01Z
+head=07539f3ff319d2a2b969a162b41f88849c22bcfb
+== regenerate artifacts ==
+{"artifact_generation_validation_log": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_four_lane_shadow_discovery_20260520/artifact_generation_validation_latest.log", "four_lane_csv": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_four_lane_shadow_discovery_20260520/four_lane_paper_forward_candidates_latest.csv", "latest_json": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_four_lane_shadow_discovery_20260520/alpha_zoo_four_lane_shadow_discovery_latest.json", "latest_markdown": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_four_lane_shadow_discovery_20260520/alpha_zoo_four_lane_shadow_discovery_latest.md", "monitoring_contract_csv": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_four_lane_shadow_discovery_20260520/four_lane_monitoring_contract_latest.csv", "monitoring_contract_json": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_four_lane_shadow_discovery_20260520/four_lane_monitoring_contract_latest.json", "shadow_csv": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_four_lane_shadow_discovery_20260520/shadow_strategy_hypotheses_latest.csv", "timestamped_json": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_four_lane_shadow_discovery_20260520/alpha_zoo_four_lane_shadow_discovery_20260520T125802Z.json"}
+== targeted pytest ==
+........                                                                 [100%]
+8 passed in 0.37s
+== ruff ==
+All checks passed!
+== compileall ==
+== diff checks ==
+checkpoint_verification=PASS
