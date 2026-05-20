@@ -600,3 +600,16 @@ Artifacts:
 Monitoring contract status is `pending_paper_forward_fills`; it defines realized `fee_bps`, `slippage_bps`, and `all_in_round_trip_bps` fields, active-vs-balanced grouping keys, maker/taker/partial-fill/missed-signal fields, and liquidation-inclusive equity/MDD/account-wipeout checks. The cost audit keeps the research assumption fixed at `10.0bps` all-in round-trip with pass thresholds `mean <= 10bps` and `p95 <= 15bps`; actual paper/testnet fills must be collected before any real-money discussion.
 
 Verification passed on 2026-05-20 UTC: artifact generation smoke; CSV-LF final verification: artifact regeneration; targeted tests `17 passed`; full pytest `1369 passed`; max RSS `2,877,880 KiB` (<8 GiB); `ruff check .`; `python -m compileall -q src scripts tests`; `git diff --check`; and staged `git diff --cached --check` after index sync.
+
+## 2026-05-20 KST — Validation-first 10bps discovery after weak validation check
+
+Follow-up validation-first discovery confirmed that the prior active 7x/0.20 handoff is not the best validation performer inside the frozen 10bps universe. The new artifact is under `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_validation_first_discovery_20260520/` and keeps `real_money_execution=false`, `ready_for_real=false`, and locked-OOS gate/report-only after train+validation ranking freeze.
+
+Selected paper/testnet validation-first candidates:
+
+- Validation return leader: `fresh_tv10_filter_abs_score_ge_1p5_alpha_zoo_quality_single_pair_5p0x_0p2alloc` (`5x`, allocation `0.20`, isolated notional/equity `100%`). Validation return `+0.5986%`, validation MDD `10.8490%`, train return `+34.5152%`, locked-OOS return `+1.4956%`, liquidation `0`; preflight `ready_for_paper=true`, `ready_for_real=false`.
+- Validation efficiency reference: `fresh_tv10_filter_abs_score_ge_1p5_alpha_zoo_quality_single_pair_4p0x_0p175alloc` (`4x`, allocation `0.175`, isolated notional/equity `70%`). Validation return `+0.5561%`, validation MDD `7.6999%`, train return `+24.8845%`, locked-OOS return `+1.1432%`, liquidation `0`; preflight `ready_for_paper=true`, `ready_for_real=false`.
+
+The frozen 10bps universe has `56` live-gate-passed candidates, but the best live-gate validation return is only `+0.5986%`. A material validation-edge audit found `0` zero-liquidation candidates with validation return `>1%` and positive locked-OOS return. High-validation alternatives do exist, especially `conservative_exit` variants with validation around `+20%` to `+27%`, but they fail promotion gates because locked-OOS returns are negative and train metrics are not above validation; they are shadow-only strategy hypotheses, not paper candidates.
+
+Recommended next experiments are therefore not immediate real-money promotion: run a train+validation-only regime-gated `conservative_exit` rescue, side/symbol-specific `abs_score` thresholds for `quality_single_pair`, and continue paper-forward monitoring of the validation-first 5x/0.20 and 4x/0.175 lanes beside the existing active/balanced lanes. Real fill monitoring must still compare all-in round-trip bps to the 10bps mean / 15bps p95 contract before any real-money discussion.
