@@ -574,3 +574,29 @@ The next step is **not real-money execution**. It is a paper/testnet-only live d
 - Recommended artifact dir for the follow-up: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_7x_paper_forward_preflight_20260519/`.
 
 The plan rejects immediate real-money promotion because the 7x/0.20 validation return is still weak and the low-correlation discovery found `0` independently deployable low-correlation gate-pass streams. The next evidence needed is paper/testnet fill-quality and risk monitoring for active vs balanced side-by-side.
+
+## 2026-05-20 KST — 10bps Alpha Zoo paper/testnet preflight and monitoring handoff
+
+Built the paper/testnet-only handoff bundle for the final 10bps active profile and balanced reference under `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_7x_paper_forward_preflight_20260519/`. This is not a real-money promotion: every decision/preflight artifact keeps `real_money_execution=false` and `ready_for_real=false`.
+
+Side-by-side paper candidates:
+
+- Active: `fresh_tv10_filter_abs_score_ge_1p5_alpha_zoo_quality_single_pair_7p0x_0p2alloc` (`higher_risk_train_return_tilt_v1`, isolated `7x`, allocation `0.20`, target notional/equity `140%`, paper-equivalent `$10,000 -> $14,000` notional). Preflight status: `ready_for_paper=true`, `ready_for_real=false`.
+- Balanced reference: `fresh_tv10_filter_abs_score_ge_1p5_alpha_zoo_quality_single_pair_6p0x_0p175alloc` (`balanced_train_validation_v1`, isolated `6x`, allocation `0.175`, target notional/equity `105%`, paper-equivalent `$10,000 -> $10,500` notional). Preflight status: `ready_for_paper=true`, `ready_for_real=false`.
+
+The live strategy now supports the retuned `abs_factor_score_min=1.5` gate directly, preserving the 10bps trade-filter contract in paper/testnet runtime instead of only recording it as offline metadata. The bundle reuses the notional-risk-aligned `isolated_margin_fraction` sizing parity path and carries split/source/profile lineage from the frozen 10bps retune source, low-correlation sidecar, and notional-risk-aligned live artifact. Locked-OOS remains gate/report-only after candidate/profile freeze; selection/profile metadata continues to record `uses_locked_oos_for_objective=false`, `uses_locked_oos_for_pruning=false`, `uses_locked_oos_for_parameter_fitting=false`, and `uses_locked_oos_for_selection=false`.
+
+Artifacts:
+
+- Bundle JSON/Markdown: `alpha_zoo_7x_paper_forward_preflight_latest.json`, `alpha_zoo_7x_paper_forward_preflight_latest.md`.
+- Timestamped bundle: `alpha_zoo_7x_paper_forward_preflight_20260520T112422Z.json`.
+- Active decision: `live_alpha_zoo_quality_single_pair_7x_0p20_paper_decision_latest.json`.
+- Balanced decision: `live_alpha_zoo_quality_single_pair_6x_0p175_balanced_reference_decision_latest.json`.
+- Active preflight: `live_readiness_preflight_alpha_zoo_7x_0p20_paper_latest.json`.
+- Balanced preflight: `live_readiness_preflight_alpha_zoo_6x_0p175_balanced_reference_paper_latest.json`.
+- Monitoring contract: `paper_forward_monitoring_contract_latest.json` and `paper_forward_monitoring_contract_latest.csv`.
+- Verification log: `local_verification_alpha_zoo_7x_paper_forward_preflight_20260520T111631Z.log`.
+
+Monitoring contract status is `pending_paper_forward_fills`; it defines realized `fee_bps`, `slippage_bps`, and `all_in_round_trip_bps` fields, active-vs-balanced grouping keys, maker/taker/partial-fill/missed-signal fields, and liquidation-inclusive equity/MDD/account-wipeout checks. The cost audit keeps the research assumption fixed at `10.0bps` all-in round-trip with pass thresholds `mean <= 10bps` and `p95 <= 15bps`; actual paper/testnet fills must be collected before any real-money discussion.
+
+Verification passed on 2026-05-20 UTC: artifact generation smoke; CSV-LF final verification: artifact regeneration; targeted tests `17 passed`; full pytest `1369 passed`; max RSS `2,877,880 KiB` (<8 GiB); `ruff check .`; `python -m compileall -q src scripts tests`; `git diff --check`; and staged `git diff --cached --check` after index sync.

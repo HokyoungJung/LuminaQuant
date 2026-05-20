@@ -1,0 +1,244 @@
+{
+  "artifact_kind": "alpha_zoo_paper_forward_monitoring_contract",
+  "fill_observation_schema": [
+    "timestamp_utc",
+    "round_trip_id",
+    "role",
+    "profile_id",
+    "model_id",
+    "symbol",
+    "side",
+    "entry_order_id",
+    "exit_order_id",
+    "entry_notional_quote",
+    "exit_notional_quote",
+    "fee_quote",
+    "expected_entry_price",
+    "entry_fill_price",
+    "expected_exit_price",
+    "exit_fill_price",
+    "realized_fee_bps",
+    "realized_slippage_bps",
+    "all_in_round_trip_bps",
+    "maker_fill_count",
+    "taker_fill_count",
+    "partial_fill_ratio",
+    "missed_signal",
+    "equity_before",
+    "equity_after",
+    "isolated_margin_fraction",
+    "target_notional_fraction",
+    "minimum_margin_buffer",
+    "liquidation_count",
+    "account_wipeout_count",
+    "drawdown"
+  ],
+  "formulas": {
+    "all_in_round_trip_bps": "realized_fee_bps + realized_slippage_bps",
+    "isolated_margin": "equity * allocation_fraction",
+    "liquidation_inclusive_equity": "equity path includes isolated liquidation loss before MDD/account-wipeout checks",
+    "realized_fee_bps": "10000 * fee_quote / round_trip_notional_quote",
+    "realized_slippage_bps": "10000 * signed_slippage_quote / round_trip_notional_quote; positive values are costs",
+    "target_notional": "equity * allocation_fraction * leverage"
+  },
+  "generated_at_utc": "2026-05-20T11:24:22.597082Z",
+  "pass_fail_rules": {
+    "active_drawdown_pass": "active drawdown <= 0.30 and liquidation_count == 0",
+    "balanced_drawdown_pass": "balanced drawdown <= 0.25 and liquidation_count == 0",
+    "real_money_gate": "always false for this artifact bundle",
+    "realized_mean_cost_pass": "mean(all_in_round_trip_bps) <= 10.0",
+    "realized_p95_cost_pass": "p95(all_in_round_trip_bps) <= 15.0"
+  },
+  "profile_rows": [
+    {
+      "allocation_fraction": 0.2,
+      "cost_status": "pending_no_fills",
+      "expected_replay_notional_for_10000_equity": 14000.0,
+      "isolated_margin_fraction_of_equity": 0.2,
+      "leverage": 7.0,
+      "live_notional_for_10000_equity": 14000.000000000004,
+      "mean_all_in_round_trip_bps": null,
+      "model_id": "fresh_tv10_filter_abs_score_ge_1p5_alpha_zoo_quality_single_pair_7p0x_0p2alloc",
+      "notional_parity_passed": true,
+      "observed_round_trips": 0,
+      "p95_all_in_round_trip_bps": null,
+      "profile_id": "higher_risk_train_return_tilt_v1",
+      "ready_for_paper": true,
+      "ready_for_real": false,
+      "research_round_trip_cost_bps": 10.0,
+      "role": "active",
+      "sizing_mode": "isolated_margin_fraction",
+      "target_notional_fraction_of_equity": 1.4000000000000001
+    },
+    {
+      "allocation_fraction": 0.175,
+      "cost_status": "pending_no_fills",
+      "expected_replay_notional_for_10000_equity": 10500.0,
+      "isolated_margin_fraction_of_equity": 0.175,
+      "leverage": 6.0,
+      "live_notional_for_10000_equity": 10499.999999999998,
+      "mean_all_in_round_trip_bps": null,
+      "model_id": "fresh_tv10_filter_abs_score_ge_1p5_alpha_zoo_quality_single_pair_6p0x_0p175alloc",
+      "notional_parity_passed": true,
+      "observed_round_trips": 0,
+      "p95_all_in_round_trip_bps": null,
+      "profile_id": "balanced_train_validation_v1",
+      "ready_for_paper": true,
+      "ready_for_real": false,
+      "research_round_trip_cost_bps": 10.0,
+      "role": "balanced",
+      "sizing_mode": "isolated_margin_fraction",
+      "target_notional_fraction_of_equity": 1.0499999999999998
+    }
+  ],
+  "ready_for_real": false,
+  "real_money_execution": false,
+  "required_grouping_keys": [
+    "timestamp_utc",
+    "role",
+    "model_id",
+    "symbol",
+    "side"
+  ],
+  "research_assumption": {
+    "mean_all_in_round_trip_bps_limit": 10.0,
+    "p95_all_in_round_trip_bps_limit": 15.0,
+    "primary_round_trip_cost_bps": 10.0
+  },
+  "source_lineage": {
+    "locked_oos_contamination_audit": {
+      "evidence": [
+        "train_validation_score reads train and validation metrics only",
+        "primary promotion gate reads locked-OOS only after model rows are frozen",
+        "historical OOS/top-bucket seed-union rows are marked shadow_only"
+      ],
+      "locked_oos_role": "gate_report_only_after_candidate_freeze",
+      "uses_locked_oos_for_objective": false,
+      "uses_locked_oos_for_parameter_fitting": false,
+      "uses_locked_oos_for_pruning": false,
+      "uses_locked_oos_for_selection": false
+    },
+    "low_correlation_discovery": {
+      "path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_10bps_full_retune_20260519/low_correlation_discovery_latest.json",
+      "sha256": "1fc2dc58aa530a540adf6d9fb5ed0c2d00df96cee49adc68b3cfd5da58f08066",
+      "summary": {
+        "candidate_stream_count": 775,
+        "correlation_threshold": 0.35,
+        "deployable_candidates": 0,
+        "discovery_policy": {
+          "candidate_freeze_inputs": [
+            "train",
+            "validation"
+          ],
+          "correlation_inputs": [
+            "train",
+            "validation"
+          ],
+          "correlation_split_inputs": [
+            "train",
+            "validation"
+          ],
+          "correlation_threshold_abs": 0.35,
+          "locked_oos_role": "gate_report_only_after_candidate_freeze",
+          "objective_inputs": [
+            "train",
+            "validation"
+          ],
+          "optimization_input_splits": [
+            "train",
+            "validation"
+          ],
+          "parameter_fit_inputs": [
+            "train",
+            "validation"
+          ],
+          "pruning_inputs": [
+            "train",
+            "validation"
+          ],
+          "reference_model_id": "fresh_tv10_filter_abs_score_ge_1p5_alpha_zoo_quality_single_pair_7p0x_0p2alloc",
+          "selection_inputs": [
+            "train",
+            "validation"
+          ],
+          "uses_locked_oos_for_correlation": false,
+          "uses_locked_oos_for_discovery": false,
+          "uses_locked_oos_for_objective": false,
+          "uses_locked_oos_for_parameter_fitting": false,
+          "uses_locked_oos_for_pruning": false,
+          "uses_locked_oos_for_selection": false
+        },
+        "locked_oos_role": "gate_report_only_after_candidate_freeze",
+        "low_correlation_candidates": 423,
+        "reference_candidate_name": "alpha_zoo_quality_single_pair",
+        "reference_model_id": "fresh_tv10_filter_abs_score_ge_1p5_alpha_zoo_quality_single_pair_7p0x_0p2alloc",
+        "research_candidates": 775,
+        "selection_inputs": [
+          "train",
+          "validation"
+        ],
+        "uses_locked_oos_for_selection": false
+      }
+    },
+    "notional_risk_alignment": {
+      "artifact_kind": "live_notional_risk_aligned_alpha_zoo_report",
+      "generated_at_utc": "2026-05-18T11:26:42.257560Z",
+      "path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/live_notional_risk_aligned_alpha_zoo_20260518/live_notional_risk_aligned_alpha_zoo_latest.json",
+      "sha256": "b5e1356d2eee800e474084d2c471f56f5c1896e05cf03c86c36cdf0fa6dc2f19"
+    },
+    "retune_10bps": {
+      "generated_at_utc": "2026-05-19T14:05:42.474198Z",
+      "path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_10bps_full_retune_20260519/alpha_zoo_10bps_full_retune_latest.json",
+      "primary_round_trip_cost_bps": 10.0,
+      "sha256": "3b450967e7eba9d1036ff810468071e0bd13205083fc7391427ba391c8fb404d"
+    },
+    "source_inputs": {
+      "source_candidate_csv": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/live_notional_risk_aligned_alpha_zoo_20260518/alpha_zoo_validation_march_high_leverage_candidates_latest.csv",
+      "source_cost_json": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_top_seed_hybrid_cost_validation_20260518/alpha_zoo_top_seed_hybrid_cost_validation_latest.json",
+      "source_cost_metrics_csv": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_top_seed_hybrid_cost_validation_20260518/model_cost_metrics_latest.csv",
+      "source_live_json": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/live_notional_risk_aligned_alpha_zoo_20260518/alpha_zoo_validation_march_high_leverage_latest.json"
+    },
+    "split_manifest": {
+      "frame_rows": 60155,
+      "split_contract": {
+        "locked_oos": {
+          "end": "2026-05-17T10:00:00Z",
+          "role": "gate_report_only_after_candidate_freeze",
+          "start": "2026-04-01T00:00:00Z"
+        },
+        "train": {
+          "end": "2025-12-31T23:00:00Z",
+          "role": "objective_calibration_selection",
+          "start": "2025-01-01T00:00:00Z"
+        },
+        "validation": {
+          "end": "2026-03-31T23:00:00Z",
+          "role": "objective_selection_extended_to_march_end",
+          "start": "2026-01-01T00:00:00Z"
+        }
+      },
+      "split_periods": {
+        "locked_oos": {
+          "end_timestamp": "2026-05-17T10:00:00Z",
+          "row_count": 5575,
+          "start_timestamp": "2026-04-01T00:00:00Z",
+          "unique_timestamp_count": 1115
+        },
+        "train": {
+          "end_timestamp": "2025-12-31T23:00:00Z",
+          "row_count": 43800,
+          "start_timestamp": "2025-01-01T00:00:00Z",
+          "unique_timestamp_count": 8760
+        },
+        "validation": {
+          "end_timestamp": "2026-03-31T23:00:00Z",
+          "row_count": 10780,
+          "start_timestamp": "2026-01-01T00:00:00Z",
+          "unique_timestamp_count": 2156
+        }
+      },
+      "timestamp_index_hash": "b973165bc1057f3aaa08ea637b73a45df3e84fdb7d1337b1637233d205696bb0"
+    }
+  },
+  "status": "pending_paper_forward_fills"
+}

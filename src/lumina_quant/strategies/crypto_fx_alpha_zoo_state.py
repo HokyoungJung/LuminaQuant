@@ -133,6 +133,7 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
             "slow_lookback_bars": HyperParam.integer("slow_lookback_bars", default=24, low=2, high=10080, tunable=False),
             "history_window": HyperParam.integer("history_window", default=96, low=16, high=20000, tunable=False),
             "entry_threshold": HyperParam.floating("entry_threshold", default=0.75, low=0.0, high=10.0, tunable=False),
+            "abs_factor_score_min": HyperParam.floating("abs_factor_score_min", default=0.0, low=0.0, high=10.0, tunable=False),
             "exit_threshold": HyperParam.floating("exit_threshold", default=0.20, low=0.0, high=10.0, tunable=False),
             "stop_loss_pct": HyperParam.floating("stop_loss_pct", default=0.035, low=0.0, high=1.0, tunable=False),
             "take_profit_pct": HyperParam.floating("take_profit_pct", default=0.075, low=0.0, high=2.0, tunable=False),
@@ -180,6 +181,7 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
         self.slow_lookback_bars = max(self.fast_lookback_bars + 1, int(resolved["slow_lookback_bars"]))
         self.history_window = max(self.slow_lookback_bars + 8, int(resolved["history_window"]))
         self.entry_threshold = max(0.0, float(resolved["entry_threshold"]))
+        self.abs_factor_score_min = max(0.0, float(resolved["abs_factor_score_min"]))
         self.exit_threshold = max(0.0, float(resolved["exit_threshold"]))
         self.stop_loss_pct = max(0.0, float(resolved["stop_loss_pct"]))
         self.take_profit_pct = max(0.0, float(resolved["take_profit_pct"]))
@@ -431,6 +433,7 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
             "dominant_factor_family": dominant,
             "fx_risk_state": risk_state,
             "calibrated_lower_bound_edge_bps": edge_bps,
+            "abs_factor_score_min": self.abs_factor_score_min,
             "calendar_primary": False,
             "uses_locked_oos_for_selection": False,
         }
@@ -457,8 +460,9 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
         scores = {symbol: self._adjust_for_fx(score, risk_state) for symbol, score in raw_scores.items() if score is not None}
         if not scores:
             return
-        longs = [symbol for symbol, score in sorted(scores.items(), key=lambda item: item[1], reverse=True) if score > self.entry_threshold][: self.max_longs]
-        shorts = [symbol for symbol, score in sorted(scores.items(), key=lambda item: item[1]) if score < -self.entry_threshold][: self.max_shorts]
+        entry_threshold = max(self.entry_threshold, self.abs_factor_score_min)
+        longs = [symbol for symbol, score in sorted(scores.items(), key=lambda item: item[1], reverse=True) if score > entry_threshold][: self.max_longs]
+        shorts = [symbol for symbol, score in sorted(scores.items(), key=lambda item: item[1]) if score < -entry_threshold][: self.max_shorts]
         for symbol, score in scores.items():
             item = self._state[symbol]
             close = float(item.closes[-1])

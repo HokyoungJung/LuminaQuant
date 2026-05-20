@@ -88,7 +88,12 @@ def _window_from_batch(batch: MarketBatchEvent):
     )
 
 
-def _run_strategy(*, require_edge: bool = True, calibrated_edges: dict[str, float] | None = None):
+def _run_strategy(
+    *,
+    require_edge: bool = True,
+    calibrated_edges: dict[str, float] | None = None,
+    abs_factor_score_min: float = 0.0,
+):
     events: queue.Queue = queue.Queue()
     strategy = CryptoFxAlphaZooStateStrategy(
         _Bars(["BTC/USDT", "ETH/USDT", "SOL/USDT", "EURUSD", "GBPUSD", "AUDUSD", "USDJPY"]),
@@ -101,6 +106,7 @@ def _run_strategy(*, require_edge: bool = True, calibrated_edges: dict[str, floa
         use_fx_filter=False,
         require_calibrated_edge=require_edge,
         calibrated_edges=calibrated_edges or {},
+        abs_factor_score_min=abs_factor_score_min,
         max_longs=1,
         max_shorts=1,
     )
@@ -132,6 +138,22 @@ def test_strategy_requires_calibrated_edge_for_entries() -> None:
     assert first_entry.metadata["calibrated_lower_bound_edge_bps"] == 5.0
     assert first_entry.metadata["dominant_factor_family"]
     assert first_entry.metadata["factor_family_scores"]
+
+
+def test_strategy_abs_factor_score_min_blocks_low_confidence_entries() -> None:
+    _, allowed = _run_strategy(
+        require_edge=True,
+        calibrated_edges={"default:LONG": 5.0, "default:SHORT": 5.0},
+        abs_factor_score_min=0.0,
+    )
+    assert any(signal.signal_type in {"LONG", "SHORT"} for signal in allowed)
+
+    _, blocked = _run_strategy(
+        require_edge=True,
+        calibrated_edges={"default:LONG": 5.0, "default:SHORT": 5.0},
+        abs_factor_score_min=999.0,
+    )
+    assert [signal for signal in blocked if signal.signal_type in {"LONG", "SHORT"}] == []
 
 
 def test_strategy_state_roundtrip_preserves_signal_sequence() -> None:
