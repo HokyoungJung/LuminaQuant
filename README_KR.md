@@ -24,14 +24,14 @@
 
 ## Generic metrics / optimization
 
-공개 optimizer는 샘플 이동평균 window만 탐색하며 deterministic grid와
-Optuna 기반 search를 모두 지원합니다. 점수는
-`total_return - 2 * max_drawdown - 0.0001 * trade_count`인 범용 예시이며
-민감 전략이나 연구 로직을 포함하지 않습니다.
+공개 optimizer는 기본적으로 Optuna로 동작하며 deterministic grid도
+지원합니다. import 가능한 strategy class와 TOML search space만 주면
+샘플 목적함수 `total_return - 2 * max_drawdown - 0.0001 * trade_count`로
+튜닝합니다. 민감 전략이나 연구 로직은 포함하지 않습니다.
 
 ```bash
+lq-public optimize --data sample_data/sample_ohlcv.csv --n-trials 16
 lq-public optimize --method grid --data sample_data/sample_ohlcv.csv --fast-grid 2,3,4 --slow-grid 6,8,10
-lq-public optimize --method optuna --data sample_data/sample_ohlcv.csv --fast-grid 2,3,4 --slow-grid 6,8,10 --n-trials 16
 lq-public optimize --config sample_configs/public_sample_pipeline.toml
 ```
 
@@ -46,6 +46,19 @@ lq-public optimize --config sample_configs/public_sample_pipeline.toml
 lq-public backtest --config sample_configs/public_sample_pipeline.toml
 lq-public paper-live --config sample_configs/public_sample_pipeline.toml
 lq-public optimize --config sample_configs/public_sample_pipeline.toml --fast-grid 2,3 --slow-grid 6,8
+```
+
+## 내 데이터와 전략 연결하기
+
+외부 사용자는 파이프라인을 고치지 않고 로컬 CSV와 import 가능한 strategy
+class만 넣으면 됩니다. strategy class는 `on_bar(bar)`를 구현하고
+`lumina_quant.models.Signal`을 반환해야 합니다. 생성자 값은 CLI의
+`--strategy-param key=value` 또는 TOML `strategy_params`로 넣고, Optuna
+탐색 범위는 `[optimization.search_space.<param>]` 아래에 둡니다.
+
+```bash
+lq-public backtest --data your_ohlcv.csv --strategy your_pkg.module:YourStrategy --strategy-param lookback=20
+lq-public optimize --config sample_configs/public_sample_pipeline.toml
 ```
 
 ## 선택적 Rust 커널

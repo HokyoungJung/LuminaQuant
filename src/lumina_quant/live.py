@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 from lumina_quant.backtesting import BacktestResult, run_backtest
 from lumina_quant.models import Bar
-from lumina_quant.sample_strategy import MovingAverageCrossStrategy
+from lumina_quant.strategy_loader import StrategyProtocol
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,7 +30,7 @@ class PaperLiveResult:
 
 def run_paper_live(
     bars: Iterable[Bar],
-    strategy: MovingAverageCrossStrategy,
+    strategy: StrategyProtocol,
     *,
     initial_cash: float = 10_000.0,
     fee_bps: float = 1.0,

@@ -30,7 +30,8 @@ jobs:
           lq-public backtest --engine rust --data sample_data/sample_ohlcv.csv
           lq-public paper-live --data sample_data/sample_ohlcv.csv
           lq-public optimize --method grid --data sample_data/sample_ohlcv.csv
-          lq-public optimize --method optuna --data sample_data/sample_ohlcv.csv --n-trials 8 --sampler-seed 11
+          lq-public optimize --data sample_data/sample_ohlcv.csv --n-trials 8 --sampler-seed 11
           lq-public backtest --config sample_configs/public_sample_pipeline.toml
           lq-public paper-live --config sample_configs/public_sample_pipeline.toml
           lq-public optimize --config sample_configs/public_sample_pipeline.toml --fast-grid 2,3 --slow-grid 6,8
+          lq-public backtest --data sample_data/sample_ohlcv.csv --strategy sample_ma --strategy-param fast_window=3 --strategy-param slow_window=8

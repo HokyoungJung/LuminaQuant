@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 
 from lumina_quant.models import Bar, EquityPoint, TargetPosition, Trade
-from lumina_quant.sample_strategy import MovingAverageCrossStrategy
+from lumina_quant.strategy_loader import StrategyProtocol
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,7 +38,7 @@ def _max_drawdown(values: list[float]) -> float:
 
 def run_backtest(
     bars: Iterable[Bar],
-    strategy: MovingAverageCrossStrategy,
+    strategy: StrategyProtocol,
     *,
     initial_cash: float = 10_000.0,
     fee_bps: float = 1.0,

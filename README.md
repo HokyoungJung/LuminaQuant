@@ -35,14 +35,14 @@ ruff check .
 
 ## Generic metrics and optimization
 
-The public optimizer is intentionally generic. It supports both deterministic
-grid search and Optuna-based search over the sample moving-average windows.
-Both methods score candidates with
+The public optimizer is intentionally generic and defaults to Optuna. It can
+optimize any importable strategy class whose constructor parameters are defined
+in the public TOML search space. The sample objective is
 `total_return - 2 * max_drawdown - 0.0001 * trade_count`.
 
 ```bash
+lq-public optimize --data sample_data/sample_ohlcv.csv --n-trials 16
 lq-public optimize --method grid --data sample_data/sample_ohlcv.csv --fast-grid 2,3,4 --slow-grid 6,8,10
-lq-public optimize --method optuna --data sample_data/sample_ohlcv.csv --fast-grid 2,3,4 --slow-grid 6,8,10 --n-trials 16
 lq-public optimize --config sample_configs/public_sample_pipeline.toml
 ```
 
@@ -56,6 +56,19 @@ values, so the same public pipeline can be smoke-tested without private files.
 lq-public backtest --config sample_configs/public_sample_pipeline.toml
 lq-public paper-live --config sample_configs/public_sample_pipeline.toml
 lq-public optimize --config sample_configs/public_sample_pipeline.toml --fast-grid 2,3 --slow-grid 6,8
+```
+
+## Bring your own data and strategy
+
+A user can plug in a local CSV and an importable strategy class without editing
+the pipeline. The strategy class must implement `on_bar(bar)` and return a
+`lumina_quant.models.Signal`. Constructor values can come from CLI
+`--strategy-param key=value` overrides or from TOML `strategy_params`; Optuna
+search ranges live under `[optimization.search_space.<param>]`.
+
+```bash
+lq-public backtest --data your_ohlcv.csv --strategy your_pkg.module:YourStrategy --strategy-param lookback=20
+lq-public optimize --config sample_configs/public_sample_pipeline.toml
 ```
 
 ## Optional Rust kernel

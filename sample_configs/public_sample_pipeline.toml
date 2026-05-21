@@ -7,18 +7,38 @@ data_path = "sample_data/sample_ohlcv.csv"
 initial_cash = 10000.0
 fee_bps = 1.0
 
+[strategy]
+# External users can replace this with "your_package.your_module:YourStrategy".
+# The class only needs an on_bar(bar) method returning lumina_quant.models.Signal.
+class_path = "lumina_quant.sample_strategy:MovingAverageCrossStrategy"
+
 [backtest]
 engine = "python"
+
+[backtest.strategy_params]
 fast_window = 3
 slow_window = 8
 
 [paper_live]
+
+[paper_live.strategy_params]
 fast_window = 3
 slow_window = 8
 
 [optimization]
+# Optuna is the default public tuning path. Use method = "grid" for deterministic enumeration.
 method = "optuna"
-fast_grid = [2, 3, 4]
-slow_grid = [6, 8, 10]
 n_trials = 16
 sampler_seed = 7
+
+[optimization.search_space.fast_window]
+type = "int"
+low = 2
+high = 4
+step = 1
+
+[optimization.search_space.slow_window]
+type = "int"
+low = 6
+high = 10
+step = 1
