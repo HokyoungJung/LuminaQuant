@@ -19,6 +19,27 @@
 
 `paper-live`는 로컬 시뮬레이터이며 실제 주문을 낼 수 없습니다.
 
+
+## Generic metrics / optimization
+
+공개 optimizer는 샘플 이동평균 window만 탐색합니다. 점수는
+`total_return - 2 * max_drawdown - 0.0001 * trade_count`인 범용 예시이며
+민감 전략이나 연구 로직을 포함하지 않습니다.
+
+```bash
+lq-public optimize --data sample_data/sample_ohlcv.csv --fast-grid 2,3,4 --slow-grid 6,8,10
+```
+
+## 선택적 Rust 커널
+
+`native/rust_backtest_kernel/`에 source checkout용 Rust 백테스트 커널을
+포함했습니다. Python 샘플 백테스트 요약과 parity를 맞추며 CI에서 검사합니다.
+
+```bash
+lq-public backtest --engine rust --data sample_data/sample_ohlcv.csv
+cargo test --manifest-path native/rust_backtest_kernel/Cargo.toml
+```
+
 ## 문서
 
 - [공개 범위](docs/PUBLIC_SCOPE_KR.md)

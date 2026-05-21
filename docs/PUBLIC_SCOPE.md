@@ -8,6 +8,8 @@ Allowed content:
 - one educational moving-average sample strategy,
 - local backtesting pipeline,
 - local paper-live replay pipeline,
+- generic metrics/scoring and sample parameter optimization,
+- optional Rust sample backtest kernel,
 - CI checks, tests, and public usage documentation.
 
 Forbidden content:

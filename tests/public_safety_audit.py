@@ -36,15 +36,23 @@ FORBIDDEN_TEXT = {
     "secret_key",
     "access_key",
 }
-ALLOWED_SUFFIXES = {".py", ".md", ".toml", ".yml", ".yaml", ".csv", ".txt", ""}
+ALLOWED_SUFFIXES = {".py", ".rs", ".md", ".toml", ".yml", ".yaml", ".csv", ".txt", ""}
 
 
 def _iter_repo_files() -> list[Path]:
     files: list[Path] = []
     for path in ROOT.rglob("*"):
         rel = path.relative_to(ROOT).as_posix()
-        ignored_parts = {".git", "__pycache__", ".pytest_cache", ".ruff_cache", ".venv"}
-        if path.name == "uv.lock" or any(part in ignored_parts for part in path.parts):
+        ignored_parts = {
+            ".git",
+            "__pycache__",
+            ".pytest_cache",
+            ".ruff_cache",
+            ".venv",
+            "target",
+        }
+        lock_files = {"uv.lock", "Cargo.lock"}
+        if path.name in lock_files or any(part in ignored_parts for part in path.parts):
             continue
         if rel == "tests/public_safety_audit.py":
             continue

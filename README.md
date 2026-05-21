@@ -30,6 +30,28 @@ pytest
 ruff check .
 ```
 
+
+## Generic metrics and optimization
+
+The public optimizer is intentionally generic. It only searches the sample
+moving-average windows over local sample data and scores candidates with
+`total_return - 2 * max_drawdown - 0.0001 * trade_count`.
+
+```bash
+lq-public optimize --data sample_data/sample_ohlcv.csv --fast-grid 2,3,4 --slow-grid 6,8,10
+```
+
+## Optional Rust kernel
+
+A source-checkout Rust backtest kernel is included under
+`native/rust_backtest_kernel/`. It mirrors the sample Python backtest summary
+and is checked in CI.
+
+```bash
+lq-public backtest --engine rust --data sample_data/sample_ohlcv.csv
+cargo test --manifest-path native/rust_backtest_kernel/Cargo.toml
+```
+
 ## Commands
 
 ### Backtest
