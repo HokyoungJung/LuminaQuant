@@ -34,6 +34,7 @@ research objectives or production parameters.
 
 ```bash
 lq-public backtest --config sample_configs/public_sample_pipeline.toml
+lq-public backtest --config sample_configs/public_sample_pipeline.toml --engine python
 lq-public paper-live --config sample_configs/public_sample_pipeline.toml
 lq-public optimize --config sample_configs/public_sample_pipeline.toml --fast-grid 2,3 --slow-grid 6,8
 ```

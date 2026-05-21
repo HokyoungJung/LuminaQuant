@@ -37,13 +37,15 @@ lq-public optimize --config sample_configs/public_sample_pipeline.toml
 
 ## 공개용 샘플 config
 
-`sample_configs/public_sample_pipeline.toml`에는 샘플 데이터 경로, window
-범위, optimization method, Optuna trial count/seed, 시작 현금, 수수료 설정만 들어 있습니다. CLI 인자는 config 값을
-덮어쓰므로 private 파일 없이도 같은 공개 파이프라인을 smoke-test할 수
-있습니다.
+`sample_configs/public_sample_pipeline.toml`에는 샘플 데이터 경로,
+strategy class path, strategy params, Rust/Python backtest engine 선택,
+optimization method, Optuna trial count/seed, 시작 현금, 수수료 설정만
+들어 있습니다. CLI 인자는 config 값을 덮어쓰므로 private 파일 없이도
+같은 공개 파이프라인을 smoke-test할 수 있습니다.
 
 ```bash
 lq-public backtest --config sample_configs/public_sample_pipeline.toml
+lq-public backtest --config sample_configs/public_sample_pipeline.toml --engine python
 lq-public paper-live --config sample_configs/public_sample_pipeline.toml
 lq-public optimize --config sample_configs/public_sample_pipeline.toml --fast-grid 2,3 --slow-grid 6,8
 ```
@@ -64,7 +66,11 @@ lq-public optimize --config sample_configs/public_sample_pipeline.toml
 ## 선택적 Rust 커널
 
 `native/rust_backtest_kernel/`에 source checkout용 Rust 백테스트 커널을
-포함했습니다. Python 샘플 백테스트 요약과 parity를 맞추며 CI에서 검사합니다.
+포함했습니다. bundled sample Python 백테스트 요약과 parity를 맞추고,
+`--engine rust` 또는 `[backtest].engine = "rust"`로 선택되며 CI에서
+검사합니다. Rust 경로는 generic native strategy ABI를 설계하기 전까지
+bundled sample strategy 전용입니다. 외부 Python strategy class는 Python
+파이프라인으로 실행됩니다.
 
 ```bash
 lq-public backtest --engine rust --data sample_data/sample_ohlcv.csv

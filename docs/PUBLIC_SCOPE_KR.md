@@ -10,7 +10,7 @@
 - 로컬 paper-live 리플레이 파이프라인
 - 범용 metrics/scoring 및 기본 Optuna/grid 파라미터 최적화
 - `sample_configs/` 아래 공개용 샘플 TOML 설정
-- 선택적 Rust 샘플 백테스트 커널
+- CLI/config에서 선택 가능한 Rust 샘플 백테스트 커널
 - CI 검사, 테스트, 공개 사용 문서
 
 금지 항목:

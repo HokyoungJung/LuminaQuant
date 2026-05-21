@@ -13,7 +13,9 @@ fee_bps = 1.0
 class_path = "lumina_quant.sample_strategy:MovingAverageCrossStrategy"
 
 [backtest]
-engine = "python"
+# The bundled sample strategy can run through the Rust backtest kernel.
+# Set to "python" when using an external Python strategy class.
+engine = "rust"
 
 [backtest.strategy_params]
 fast_window = 3

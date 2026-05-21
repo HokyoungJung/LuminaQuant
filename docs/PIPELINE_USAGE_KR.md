@@ -35,6 +35,7 @@ optimizer는 기본적으로 Optuna를 사용하고 deterministic grid도 지원
 
 ```bash
 lq-public backtest --config sample_configs/public_sample_pipeline.toml
+lq-public backtest --config sample_configs/public_sample_pipeline.toml --engine python
 lq-public paper-live --config sample_configs/public_sample_pipeline.toml
 lq-public optimize --config sample_configs/public_sample_pipeline.toml --fast-grid 2,3 --slow-grid 6,8
 ```

@@ -10,7 +10,7 @@ Allowed content:
 - local paper-live replay pipeline,
 - generic metrics/scoring plus grid and default Optuna parameter optimization,
 - public sample TOML configuration under `sample_configs/`,
-- optional Rust sample backtest kernel,
+- optional Rust sample backtest kernel selectable from CLI/config,
 - CI checks, tests, and public usage documentation.
 
 Forbidden content:

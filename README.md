@@ -49,11 +49,14 @@ lq-public optimize --config sample_configs/public_sample_pipeline.toml
 ## Public sample config
 
 `sample_configs/public_sample_pipeline.toml` holds only sample-data paths,
-window ranges, optimization method, Optuna trial count/seed, starting cash, and fee settings. CLI arguments override config
-values, so the same public pipeline can be smoke-tested without private files.
+strategy class path, strategy params, Rust/Python backtest engine selection,
+optimization method, Optuna trial count/seed, starting cash, and fee settings.
+CLI arguments override config values, so the same public pipeline can be
+smoke-tested without private files.
 
 ```bash
 lq-public backtest --config sample_configs/public_sample_pipeline.toml
+lq-public backtest --config sample_configs/public_sample_pipeline.toml --engine python
 lq-public paper-live --config sample_configs/public_sample_pipeline.toml
 lq-public optimize --config sample_configs/public_sample_pipeline.toml --fast-grid 2,3 --slow-grid 6,8
 ```
@@ -74,8 +77,11 @@ lq-public optimize --config sample_configs/public_sample_pipeline.toml
 ## Optional Rust kernel
 
 A source-checkout Rust backtest kernel is included under
-`native/rust_backtest_kernel/`. It mirrors the sample Python backtest summary
-and is checked in CI.
+`native/rust_backtest_kernel/`. It mirrors the bundled sample Python backtest
+summary, is selected by `--engine rust` or `[backtest].engine = "rust"`, and
+is checked in CI. The Rust path is intentionally limited to the bundled sample
+strategy until a generic native strategy ABI is designed; external Python
+strategy classes run through the Python pipeline.
 
 ```bash
 lq-public backtest --engine rust --data sample_data/sample_ohlcv.csv
