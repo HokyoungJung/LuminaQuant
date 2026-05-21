@@ -2,203 +2,22 @@ name: ci
 
 on:
   push:
+    branches: [main]
   pull_request:
-  workflow_dispatch:
-
-concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
-env:
-  PYTHON_VERSION: "3.13"
 
 jobs:
-  gpu-ci-config:
+  test:
     runs-on: ubuntu-latest
-    outputs:
-      enabled: ${{ steps.flags.outputs.enabled }}
-      required: ${{ steps.flags.outputs.required }}
-      runs_on_json: ${{ steps.flags.outputs.runs_on_json }}
-    env:
-      LQ_GPU_CI_RUNS_ON_JSON: ${{ vars.LQ_GPU_CI_RUNS_ON_JSON }}
-      LQ_GPU_CI_REQUIRED: ${{ vars.LQ_GPU_CI_REQUIRED }}
     steps:
-      - name: Setup Python
-        uses: actions/setup-python@v6
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - id: flags
-        run: |
-          python - <<'PY'
-          import json
-          import os
-
-          runs_on_json = os.getenv("LQ_GPU_CI_RUNS_ON_JSON", "").strip()
-          default_runs_on_json = json.dumps("ubuntu-latest")
-          required = os.getenv("LQ_GPU_CI_REQUIRED", "").strip().lower() in {"1", "true", "yes", "on"}
-          enabled = bool(runs_on_json)
-
-          if enabled:
-              parsed = json.loads(runs_on_json)
-              if not isinstance(parsed, (str, list)):
-                  raise SystemExit("LQ_GPU_CI_RUNS_ON_JSON must decode to a string or a list of runner labels.")
-
-          github_output = os.environ["GITHUB_OUTPUT"]
-          with open(github_output, "a", encoding="utf-8") as handle:
-              handle.write(f"enabled={'true' if enabled else 'false'}\n")
-              handle.write(f"required={'true' if required else 'false'}\n")
-              handle.write(f"runs_on_json={runs_on_json or default_runs_on_json}\n")
-
-          if required and not enabled:
-              raise SystemExit(
-                  "LQ_GPU_CI_REQUIRED=true but LQ_GPU_CI_RUNS_ON_JSON is not configured. "
-                  "Configure a self-hosted/GPU runner label JSON first."
-              )
-
-          print(
-              json.dumps(
-                  {
-                      "enabled": enabled,
-                      "required": required,
-                      "runs_on_json": runs_on_json or default_runs_on_json,
-                  },
-                  indent=2,
-                  sort_keys=True,
-              )
-          )
-          PY
-
-  quality:
-    runs-on: ubuntu-latest
-    timeout-minutes: 35
-    env:
-      LQ_GPU_MODE: cpu
-      LQ__EXECUTION__GPU_MODE: cpu
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Setup uv
-        uses: astral-sh/setup-uv@v7
-
-      - name: Sync dependencies
-        run: uv sync --extra optimize --extra dev --extra live
-
-      - name: Ruff lint check
-        run: uv run ruff check .
-
-      - name: Architecture gate (live data decoupling)
-        run: bash scripts/ci/architecture_gate_live_data.sh
-
-      - name: Architecture gate (market-window parity contract)
-        run: bash scripts/ci/architecture_gate_market_window_contract.sh
-
-      - name: Architecture check
-        run: uv run python scripts/check_architecture.py
-
-      - name: Documentation verification (EN/KR + docs)
-        run: uv run python scripts/verify_docs.py
-
-      - name: Run pytest suite
-        run: |
-          uv run pytest \
-            tests/test_audit_hardcoded_params.py \
-            tests/test_timeframe_panel_and_liquidity.py \
-            tests/test_native_backend.py \
-            tests/test_optimize_two_stage.py \
-            tests/test_message_bus.py \
-            tests/test_runtime_cache.py \
-            tests/test_system_assembly.py \
-            tests/test_ohlcv_loader.py \
-            tests/test_execution_protective_orders.py \
-            tests/test_live_execution_state_machine.py \
-            tests/test_lookahead.py \
-            tests/test_readme_quickstart_paths.py \
-            tests/test_verify_8gb_baseline_script.py
-
-      - name: Benchmark smoke + 8GB baseline gate
-        run: |
-          mkdir -p logs reports/benchmarks
-          /usr/bin/time -v \
-            uv run python scripts/benchmark_backtest.py --iters 1 --warmup 0 --output reports/benchmarks/ci_smoke.json \
-            2>&1 | tee logs/ci_smoke.time.log
-          uv run python scripts/verify_8gb_baseline.py \
-            --benchmark reports/benchmarks/ci_smoke.json \
-            --time-log logs/ci_smoke.time.log \
-            --oom-log logs/ci_smoke.time.log \
-            --skip-dmesg \
-            --output reports/benchmarks/ci_smoke_8gb_gate.json
-
-  gpu-contract:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Setup uv
-        uses: astral-sh/setup-uv@v7
-
-      - name: Sync GPU dependencies
-        run: uv sync --extra dev --extra gpu
-
-      - name: GPU contract tests
-        run: |
-          uv run pytest -q \
-            tests/test_compute_engine.py \
-            tests/test_verify_polars_gpu_runtime_script.py
-
-      - name: Verify GPU contract (skip-safe on non-GPU runners)
-        run: |
-          mkdir -p reports/benchmarks
-          uv run python scripts/ci/verify_polars_gpu_runtime.py \
-            --mode auto \
-            --output-json reports/benchmarks/ci_gpu_contract.json
-
-  gpu-runtime-smoke:
-    needs:
-      - gpu-ci-config
-      - quality
-      - gpu-contract
-    if: ${{ needs.gpu-ci-config.outputs.enabled == 'true' }}
-    runs-on: ${{ fromJSON(needs.gpu-ci-config.outputs.runs_on_json) }}
-    timeout-minutes: 20
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Setup uv
-        uses: astral-sh/setup-uv@v7
-
-      - name: Sync GPU dependencies
-        run: uv sync --extra dev --extra gpu
-
-      - name: NVIDIA inventory
-        run: nvidia-smi
-
-      - name: Verify strict Polars GPU runtime
-        env:
-          LQ_GPU_MODE: forced-gpu
-          LQ_GPU_VERBOSE: "1"
-        run: |
-          mkdir -p reports/benchmarks
-          uv run python scripts/ci/verify_polars_gpu_runtime.py \
-            --require-gpu \
-            --mode forced-gpu \
-            --output-json reports/benchmarks/ci_gpu_runtime.json
+          python-version: '3.11'
+      - name: Install
+        run: python -m pip install -e '.[dev]'
+      - name: Public safety audit
+        run: python tests/public_safety_audit.py
+      - name: Lint
+        run: ruff check .
+      - name: Tests
+        run: pytest

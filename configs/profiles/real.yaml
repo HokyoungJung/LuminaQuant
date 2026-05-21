@@ -1,4 +1,0 @@
-profile: real
-live:
-  is_testnet: false
-  enable_live_real: true
