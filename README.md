@@ -88,6 +88,17 @@ lq-public backtest --engine rust --data sample_data/sample_ohlcv.csv
 cargo test --manifest-path native/rust_backtest_kernel/Cargo.toml
 ```
 
+### Engine support matrix
+
+| Use case | Engine | Status |
+| --- | --- | --- |
+| Bundled sample strategy backtest | Rust or Python | Supported and checked in CI |
+| Config default backtest | Rust | `[backtest].engine = "rust"` in the sample TOML |
+| External import-path Python strategy | Python | Supported via `--strategy your_pkg.module:YourStrategy` |
+| External strategy on Rust | Not yet | Requires a future native strategy ABI/plugin contract |
+| Paper-live replay | Python simulator | Local paper replay only; no real order routing |
+| Optimization | Python/Optuna | Optimizes public TOML search spaces; Rust optimizer is not exposed |
+
 ## Commands
 
 ### Backtest

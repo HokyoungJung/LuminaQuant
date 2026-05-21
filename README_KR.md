@@ -77,6 +77,17 @@ lq-public backtest --engine rust --data sample_data/sample_ohlcv.csv
 cargo test --manifest-path native/rust_backtest_kernel/Cargo.toml
 ```
 
+### 엔진 지원 범위
+
+| 사용 사례 | 엔진 | 상태 |
+| --- | --- | --- |
+| bundled sample strategy 백테스트 | Rust 또는 Python | 지원하며 CI에서 검사 |
+| config 기본 백테스트 | Rust | sample TOML의 `[backtest].engine = "rust"` |
+| 외부 import-path Python strategy | Python | `--strategy your_pkg.module:YourStrategy`로 지원 |
+| 외부 strategy의 Rust 실행 | 아직 아님 | 향후 native strategy ABI/plugin 계약 필요 |
+| paper-live 리플레이 | Python simulator | 로컬 paper replay 전용; 실제 주문 라우팅 없음 |
+| optimization | Python/Optuna | 공개 TOML search space 튜닝; Rust optimizer는 공개하지 않음 |
+
 ## 문서
 
 - [공개 범위](docs/PUBLIC_SCOPE_KR.md)
