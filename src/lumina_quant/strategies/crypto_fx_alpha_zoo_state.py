@@ -167,6 +167,10 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
             "range_expansion_fade_weight": HyperParam.floating(
                 "range_expansion_fade_weight", default=0.0, low=0.0, high=1.0, tunable=False
             ),
+            "liquidity_sweep_min_wick_fraction": HyperParam.floating(
+                "liquidity_sweep_min_wick_fraction", default=0.30, low=0.0, high=1.0, tunable=False
+            ),
+            "event_volume_z_cap": HyperParam.floating("event_volume_z_cap", default=3.0, low=0.0, high=10.0, tunable=False),
             "risk_off_long_multiplier": HyperParam.floating("risk_off_long_multiplier", default=0.25, low=0.0, high=2.0, tunable=False),
             "risk_off_short_multiplier": HyperParam.floating("risk_off_short_multiplier", default=1.15, low=0.0, high=2.0, tunable=False),
             "risk_on_long_multiplier": HyperParam.floating("risk_on_long_multiplier", default=1.10, low=0.0, high=2.0, tunable=False),
@@ -219,6 +223,8 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
         self.liquidity_sweep_continuation_weight = float(resolved["liquidity_sweep_continuation_weight"])
         self.range_expansion_breakout_weight = float(resolved["range_expansion_breakout_weight"])
         self.range_expansion_fade_weight = float(resolved["range_expansion_fade_weight"])
+        self.liquidity_sweep_min_wick_fraction = float(resolved["liquidity_sweep_min_wick_fraction"])
+        self.event_volume_z_cap = max(1e-12, float(resolved["event_volume_z_cap"]))
         self.risk_off_long_multiplier = float(resolved["risk_off_long_multiplier"])
         self.risk_off_short_multiplier = float(resolved["risk_off_short_multiplier"])
         self.risk_on_long_multiplier = float(resolved["risk_on_long_multiplier"])
@@ -406,10 +412,19 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
         elif item.lows[-1] < prior_low and item.closes[-1] > prior_low:
             breakout_failure = 1.0
         liquidity_sweep_reversal = 0.0
-        if item.highs[-1] > prior_high and item.closes[-1] < prior_high and upper_wick >= 0.30:
-            liquidity_sweep_reversal = -1.0 * (1.0 + min(volume_shock, 3.0) / 3.0)
-        elif item.lows[-1] < prior_low and item.closes[-1] > prior_low and lower_wick >= 0.30:
-            liquidity_sweep_reversal = 1.0 * (1.0 + min(volume_shock, 3.0) / 3.0)
+        event_volume_boost = 1.0 + min(volume_shock, self.event_volume_z_cap) / self.event_volume_z_cap
+        if (
+            item.highs[-1] > prior_high
+            and item.closes[-1] < prior_high
+            and upper_wick >= self.liquidity_sweep_min_wick_fraction
+        ):
+            liquidity_sweep_reversal = -1.0 * event_volume_boost
+        elif (
+            item.lows[-1] < prior_low
+            and item.closes[-1] > prior_low
+            and lower_wick >= self.liquidity_sweep_min_wick_fraction
+        ):
+            liquidity_sweep_reversal = 1.0 * event_volume_boost
         prior_ranges = [
             max(0.0, float(high) - float(low))
             for high, low in zip(
@@ -420,9 +435,7 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
         ]
         avg_prior_range = mean(prior_ranges) if prior_ranges else bar_range
         range_expansion = max(0.0, (bar_range / max(avg_prior_range, 1e-12)) - 1.0)
-        range_expansion_breakout = (1.0 if residual_fast >= 0.0 else -1.0) * range_expansion * (
-            1.0 + min(volume_shock, 3.0) / 3.0
-        )
+        range_expansion_breakout = (1.0 if residual_fast >= 0.0 else -1.0) * range_expansion * event_volume_boost
         trend_eff = _trend_efficiency(item.closes, self.fast_lookback_bars)
         components = {
             "crypto_residual_momentum": self.residual_momentum_weight * residual_mom,
