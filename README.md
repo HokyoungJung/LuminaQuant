@@ -9,6 +9,7 @@ It intentionally contains only:
 - a paper-live replay runner,
 - generic metrics, scoring, and sample-only tuning,
 - a public sample TOML configuration file,
+- a sample/reference Rust backtest kernel for the bundled strategy,
 - a small CLI and CI test suite.
 
 It does **not** contain proprietary strategies, production data, data collection code,
@@ -33,12 +34,14 @@ ruff check .
 ```
 
 
-## Generic metrics and optimization
+## Generic sample metrics and optimization
 
-The public optimizer is intentionally generic and defaults to Optuna. It can
-optimize any importable strategy class whose constructor parameters are defined
-in the public TOML search space. The sample objective is
-`total_return - 2 * max_drawdown - 0.0001 * trade_count`.
+The public optimizer is intentionally generic and sample-level. It defaults to
+Optuna, can run deterministic grid search for smoke tests, and can optimize any
+importable strategy class whose constructor parameters are defined in the public
+TOML search space. The included reference objective is
+`total_return - 2 * max_drawdown - 0.0001 * trade_count`; it is not a private
+research objective or production ranking rule.
 
 ```bash
 lq-public optimize --data sample_data/sample_ohlcv.csv --n-trials 16
@@ -48,9 +51,10 @@ lq-public optimize --config sample_configs/public_sample_pipeline.toml
 
 ## Public sample config
 
-`sample_configs/public_sample_pipeline.toml` holds only sample-data paths,
-strategy class path, strategy params, Rust/Python backtest engine selection,
-optimization method, Optuna trial count/seed, starting cash, and fee settings.
+`sample_configs/public_sample_pipeline.toml` is a sample template. It holds only
+sample-data paths, strategy class path, strategy params, Rust/Python backtest
+engine selection, optimization method, Optuna trial count/seed, starting cash,
+and fee settings.
 CLI arguments override config values, so the same public pipeline can be
 smoke-tested without private files.
 
@@ -74,14 +78,15 @@ lq-public backtest --data your_ohlcv.csv --strategy your_pkg.module:YourStrategy
 lq-public optimize --config sample_configs/public_sample_pipeline.toml
 ```
 
-## Optional Rust kernel
+## Sample Rust kernel
 
 A source-checkout Rust backtest kernel is included under
-`native/rust_backtest_kernel/`. It mirrors the bundled sample Python backtest
-summary, is selected by `--engine rust` or `[backtest].engine = "rust"`, and
-is checked in CI. The Rust path is intentionally limited to the bundled sample
-strategy until a generic native strategy ABI is designed; external Python
-strategy classes run through the Python pipeline.
+`native/rust_backtest_kernel/` as a reference sample, not as the public native
+extension contract. It mirrors the bundled sample Python backtest summary, is
+selected by `--engine rust` or `[backtest].engine = "rust"`, and is checked in
+CI. The Rust path is intentionally limited to the bundled sample strategy until
+a generic native strategy ABI is designed; external Python strategy classes run
+through the Python pipeline.
 
 ```bash
 lq-public backtest --engine rust --data sample_data/sample_ohlcv.csv
@@ -92,12 +97,12 @@ cargo test --manifest-path native/rust_backtest_kernel/Cargo.toml
 
 | Use case | Engine | Status |
 | --- | --- | --- |
-| Bundled sample strategy backtest | Rust or Python | Supported and checked in CI |
-| Config default backtest | Rust | `[backtest].engine = "rust"` in the sample TOML |
+| Bundled sample strategy backtest | Rust or Python | Sample/reference path checked in CI |
+| Config sample backtest | Rust | `[backtest].engine = "rust"` in the sample TOML |
 | External import-path Python strategy | Python | Supported via `--strategy your_pkg.module:YourStrategy` |
-| External strategy on Rust | Not yet | Requires a future native strategy ABI/plugin contract |
+| External strategy on Rust | Not part of this sample | Requires a future native strategy ABI/plugin contract |
 | Paper-live replay | Python simulator | Local paper replay only; no real order routing |
-| Optimization | Python/Optuna | Optimizes public TOML search spaces; Rust optimizer is not exposed |
+| Optimization | Python/Optuna | Sample/public TOML search spaces only; Rust optimizer is not exposed |
 
 ## Commands
 

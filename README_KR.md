@@ -10,6 +10,7 @@
 - 로컬 paper-live 리플레이 파이프라인
 - 범용 metrics/scoring 및 샘플-only 튜닝
 - 공개용 샘플 TOML 설정 파일
+- bundled sample strategy용 sample/reference Rust 백테스트 커널
 - CLI와 CI 테스트
 
 제외 항목:
@@ -22,12 +23,14 @@
 `paper-live`는 로컬 시뮬레이터이며 실제 주문을 낼 수 없습니다.
 
 
-## Generic metrics / optimization
+## 샘플용 generic metrics / optimization
 
-공개 optimizer는 기본적으로 Optuna로 동작하며 deterministic grid도
-지원합니다. import 가능한 strategy class와 TOML search space만 주면
-샘플 목적함수 `total_return - 2 * max_drawdown - 0.0001 * trade_count`로
-튜닝합니다. 민감 전략이나 연구 로직은 포함하지 않습니다.
+공개 optimizer는 sample-level generic 구현입니다. 기본적으로 Optuna로
+동작하며 smoke test용 deterministic grid도 지원합니다. import 가능한
+strategy class와 TOML search space만 주면 reference 목적함수
+`total_return - 2 * max_drawdown - 0.0001 * trade_count`로 튜닝합니다.
+이 목적함수는 private 연구 objective나 production ranking rule이
+아닙니다.
 
 ```bash
 lq-public optimize --data sample_data/sample_ohlcv.csv --n-trials 16
@@ -37,7 +40,8 @@ lq-public optimize --config sample_configs/public_sample_pipeline.toml
 
 ## 공개용 샘플 config
 
-`sample_configs/public_sample_pipeline.toml`에는 샘플 데이터 경로,
+`sample_configs/public_sample_pipeline.toml`은 샘플 템플릿입니다.
+샘플 데이터 경로,
 strategy class path, strategy params, Rust/Python backtest engine 선택,
 optimization method, Optuna trial count/seed, 시작 현금, 수수료 설정만
 들어 있습니다. CLI 인자는 config 값을 덮어쓰므로 private 파일 없이도
@@ -63,10 +67,11 @@ lq-public backtest --data your_ohlcv.csv --strategy your_pkg.module:YourStrategy
 lq-public optimize --config sample_configs/public_sample_pipeline.toml
 ```
 
-## 선택적 Rust 커널
+## 샘플 Rust 커널
 
 `native/rust_backtest_kernel/`에 source checkout용 Rust 백테스트 커널을
-포함했습니다. bundled sample Python 백테스트 요약과 parity를 맞추고,
+sample/reference로 포함했습니다. 이는 공개 native extension contract가
+아닙니다. bundled sample Python 백테스트 요약과 parity를 맞추고,
 `--engine rust` 또는 `[backtest].engine = "rust"`로 선택되며 CI에서
 검사합니다. Rust 경로는 generic native strategy ABI를 설계하기 전까지
 bundled sample strategy 전용입니다. 외부 Python strategy class는 Python
@@ -81,12 +86,12 @@ cargo test --manifest-path native/rust_backtest_kernel/Cargo.toml
 
 | 사용 사례 | 엔진 | 상태 |
 | --- | --- | --- |
-| bundled sample strategy 백테스트 | Rust 또는 Python | 지원하며 CI에서 검사 |
-| config 기본 백테스트 | Rust | sample TOML의 `[backtest].engine = "rust"` |
+| bundled sample strategy 백테스트 | Rust 또는 Python | sample/reference 경로이며 CI에서 검사 |
+| config sample 백테스트 | Rust | sample TOML의 `[backtest].engine = "rust"` |
 | 외부 import-path Python strategy | Python | `--strategy your_pkg.module:YourStrategy`로 지원 |
-| 외부 strategy의 Rust 실행 | 아직 아님 | 향후 native strategy ABI/plugin 계약 필요 |
+| 외부 strategy의 Rust 실행 | 이 샘플 범위 아님 | 향후 native strategy ABI/plugin 계약 필요 |
 | paper-live 리플레이 | Python simulator | 로컬 paper replay 전용; 실제 주문 라우팅 없음 |
-| optimization | Python/Optuna | 공개 TOML search space 튜닝; Rust optimizer는 공개하지 않음 |
+| optimization | Python/Optuna | sample/public TOML search space만 튜닝; Rust optimizer는 공개하지 않음 |
 
 ## 문서
 

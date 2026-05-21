@@ -8,9 +8,9 @@ Allowed content:
 - one educational moving-average sample strategy,
 - local backtesting pipeline,
 - local paper-live replay pipeline,
-- generic metrics/scoring plus grid and default Optuna parameter optimization,
+- sample-level generic metrics/scoring plus grid and default Optuna parameter optimization,
 - public sample TOML configuration under `sample_configs/`,
-- optional Rust sample backtest kernel selectable from CLI/config,
+- Rust sample/reference backtest kernel selectable from CLI/config for the bundled sample strategy,
 - CI checks, tests, and public usage documentation.
 
 Forbidden content:

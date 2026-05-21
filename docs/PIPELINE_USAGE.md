@@ -27,8 +27,8 @@ lq-public optimize --config sample_configs/public_sample_pipeline.toml
 ```
 
 The optimizer defaults to Optuna and can also run deterministic grid search.
-It optimizes public TOML search spaces only and does not include proprietary
-research objectives or production parameters.
+This is a sample/reference optimizer: it tunes public TOML search spaces only
+and does not include proprietary research objectives or production parameters.
 
 ## Public sample config
 
@@ -39,10 +39,10 @@ lq-public paper-live --config sample_configs/public_sample_pipeline.toml
 lq-public optimize --config sample_configs/public_sample_pipeline.toml --fast-grid 2,3 --slow-grid 6,8
 ```
 
-The TOML config is intentionally sample-only. It includes a strategy class
-path, strategy constructor params, and an Optuna search space. CLI flags
-override the config, which lets CI verify default settings and override
-behavior without private inputs.
+The TOML config is intentionally sample-only. It is a template that includes a
+strategy class path, strategy constructor params, and an Optuna search space.
+CLI flags override the config, which lets CI verify default settings and
+override behavior without private inputs.
 
 ## External strategy contract
 
@@ -61,7 +61,11 @@ class YourStrategy:
 lq-public backtest --data your_ohlcv.csv --strategy your_pkg.module:YourStrategy --strategy-param lookback=20
 ```
 
-## Rust kernel check
+## Sample Rust kernel check
+
+The Rust path is included as a sample/reference parity check for the bundled
+sample strategy. External Python strategy classes should use the Python engine
+until a public native strategy ABI exists.
 
 ```bash
 lq-public backtest --engine rust --data sample_data/sample_ohlcv.csv

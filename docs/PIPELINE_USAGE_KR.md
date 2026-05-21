@@ -28,8 +28,8 @@ lq-public optimize --config sample_configs/public_sample_pipeline.toml
 ```
 
 optimizer는 기본적으로 Optuna를 사용하고 deterministic grid도 지원합니다.
-공개 TOML search space만 튜닝하며 비공개 연구 목적함수나 프로덕션
-파라미터는 포함하지 않습니다.
+이는 sample/reference optimizer입니다. 공개 TOML search space만 튜닝하며
+비공개 연구 목적함수나 프로덕션 파라미터는 포함하지 않습니다.
 
 ## 공개용 샘플 config
 
@@ -40,7 +40,7 @@ lq-public paper-live --config sample_configs/public_sample_pipeline.toml
 lq-public optimize --config sample_configs/public_sample_pipeline.toml --fast-grid 2,3 --slow-grid 6,8
 ```
 
-TOML config는 샘플 전용입니다. strategy class path, strategy 생성자
+TOML config는 샘플 전용 템플릿입니다. strategy class path, strategy 생성자
 params, Optuna search space를 포함합니다. CLI flag가 config 값을
 덮어쓰므로 private 입력 없이도 기본 설정과 override 동작을 CI에서
 확인할 수 있습니다.
@@ -62,7 +62,11 @@ class YourStrategy:
 lq-public backtest --data your_ohlcv.csv --strategy your_pkg.module:YourStrategy --strategy-param lookback=20
 ```
 
-## Rust 커널 확인
+## 샘플 Rust 커널 확인
+
+Rust 경로는 bundled sample strategy에 대한 sample/reference parity check로
+포함한 것입니다. 공개 native strategy ABI가 생기기 전까지 외부 Python
+strategy class는 Python engine을 사용해야 합니다.
 
 ```bash
 lq-public backtest --engine rust --data sample_data/sample_ohlcv.csv
