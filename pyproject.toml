@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [{name = "LuminaQuant"}]
-dependencies = []
+dependencies = ["optuna>=4.4,<5"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "ruff>=0.8"]

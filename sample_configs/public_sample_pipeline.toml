@@ -1,0 +1,24 @@
+# Public sample-only pipeline configuration.
+# This file intentionally contains no credentials, connectors, private data paths,
+# research metadata, or proprietary strategy parameters.
+
+[sample]
+data_path = "sample_data/sample_ohlcv.csv"
+initial_cash = 10000.0
+fee_bps = 1.0
+
+[backtest]
+engine = "python"
+fast_window = 3
+slow_window = 8
+
+[paper_live]
+fast_window = 3
+slow_window = 8
+
+[optimization]
+method = "optuna"
+fast_grid = [2, 3, 4]
+slow_grid = [6, 8, 10]
+n_trials = 16
+sampler_seed = 7

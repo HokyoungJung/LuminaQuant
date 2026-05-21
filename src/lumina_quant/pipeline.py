@@ -5,7 +5,11 @@ from __future__ import annotations
 from lumina_quant.backtesting import BacktestResult, run_backtest
 from lumina_quant.data import load_ohlcv_csv
 from lumina_quant.live import PaperLiveResult, run_paper_live
-from lumina_quant.optimization import OptimizationResult, run_grid_optimization
+from lumina_quant.optimization import (
+    OptimizationResult,
+    run_grid_optimization,
+    run_optuna_optimization,
+)
 from lumina_quant.sample_strategy import MovingAverageCrossStrategy
 
 
@@ -42,15 +46,30 @@ def run_paper_live_pipeline(
 def run_optimization_pipeline(
     data_path: str,
     *,
+    method: str = "grid",
     fast_grid: str = "2,3,4",
     slow_grid: str = "6,8,10",
     initial_cash: float = 10_000.0,
     fee_bps: float = 1.0,
+    n_trials: int = 16,
+    sampler_seed: int = 7,
 ) -> OptimizationResult:
-    return run_grid_optimization(
-        data_path,
-        fast_grid=fast_grid,
-        slow_grid=slow_grid,
-        initial_cash=initial_cash,
-        fee_bps=fee_bps,
-    )
+    if method == "grid":
+        return run_grid_optimization(
+            data_path,
+            fast_grid=fast_grid,
+            slow_grid=slow_grid,
+            initial_cash=initial_cash,
+            fee_bps=fee_bps,
+        )
+    if method == "optuna":
+        return run_optuna_optimization(
+            data_path,
+            fast_grid=fast_grid,
+            slow_grid=slow_grid,
+            initial_cash=initial_cash,
+            fee_bps=fee_bps,
+            n_trials=n_trials,
+            sampler_seed=sampler_seed,
+        )
+    raise ValueError("optimization method must be 'grid' or 'optuna'")

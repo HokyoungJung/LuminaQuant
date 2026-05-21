@@ -4,13 +4,15 @@ This repository is a sanitized public sample of the LuminaQuant testing pipeline
 It intentionally contains only:
 
 - a deterministic sample OHLCV dataset,
-- one educational moving-average sample strategy,
+- one educational moving-average sample strategy at `src/lumina_quant/sample_strategy.py`,
 - a lightweight backtest runner,
 - a paper-live replay runner,
+- generic metrics, scoring, and sample-only tuning,
+- a public sample TOML configuration file,
 - a small CLI and CI test suite.
 
 It does **not** contain proprietary strategies, production data, data collection code,
-research notes, exchange connectors, credentials, optimization artifacts, or deployment
+research notes, exchange connectors, credentials, private optimization artifacts, or deployment
 configuration. The paper-live runner is a local simulator only; it cannot place orders.
 
 ## Documentation
@@ -33,12 +35,27 @@ ruff check .
 
 ## Generic metrics and optimization
 
-The public optimizer is intentionally generic. It only searches the sample
-moving-average windows over local sample data and scores candidates with
+The public optimizer is intentionally generic. It supports both deterministic
+grid search and Optuna-based search over the sample moving-average windows.
+Both methods score candidates with
 `total_return - 2 * max_drawdown - 0.0001 * trade_count`.
 
 ```bash
-lq-public optimize --data sample_data/sample_ohlcv.csv --fast-grid 2,3,4 --slow-grid 6,8,10
+lq-public optimize --method grid --data sample_data/sample_ohlcv.csv --fast-grid 2,3,4 --slow-grid 6,8,10
+lq-public optimize --method optuna --data sample_data/sample_ohlcv.csv --fast-grid 2,3,4 --slow-grid 6,8,10 --n-trials 16
+lq-public optimize --config sample_configs/public_sample_pipeline.toml
+```
+
+## Public sample config
+
+`sample_configs/public_sample_pipeline.toml` holds only sample-data paths,
+window ranges, optimization method, Optuna trial count/seed, starting cash, and fee settings. CLI arguments override config
+values, so the same public pipeline can be smoke-tested without private files.
+
+```bash
+lq-public backtest --config sample_configs/public_sample_pipeline.toml
+lq-public paper-live --config sample_configs/public_sample_pipeline.toml
+lq-public optimize --config sample_configs/public_sample_pipeline.toml --fast-grid 2,3 --slow-grid 6,8
 ```
 
 ## Optional Rust kernel

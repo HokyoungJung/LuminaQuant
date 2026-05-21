@@ -8,14 +8,15 @@ Allowed content:
 - one educational moving-average sample strategy,
 - local backtesting pipeline,
 - local paper-live replay pipeline,
-- generic metrics/scoring and sample parameter optimization,
+- generic metrics/scoring plus grid and Optuna sample parameter optimization,
+- public sample TOML configuration under `sample_configs/`,
 - optional Rust sample backtest kernel,
 - CI checks, tests, and public usage documentation.
 
 Forbidden content:
 
 - proprietary or production strategies,
-- research notes, research reports, experiment artifacts, or optimized parameters,
+- research notes, research reports, experiment artifacts, or private optimized parameters,
 - production data, private datasets, or data collection code,
 - exchange connectors or real order routing,
 - credentials, environment files, deployment configuration, or private remotes.
