@@ -279,6 +279,42 @@ def test_build_payload_persists_10bps_report_only_contract(
     )
 
 
+def test_sample_guarded_composite_trade_filter_grid_adds_non_calendar_specs() -> None:
+    trades = [
+        {
+            "side": "LONG",
+            "symbol": "BTCUSDT",
+            "entry_time": "2026-01-01T00:00:00Z",
+            "exit_time": "2026-01-01T12:00:00Z",
+            "entry_metadata": {
+                "dominant_factor_family": "liquidity_sweep_reversal",
+                "factor_score": 1.8,
+            },
+        },
+        {
+            "side": "SHORT",
+            "symbol": "ETHUSDT",
+            "entry_time": "2026-01-02T00:00:00Z",
+            "exit_time": "2026-01-02T06:00:00Z",
+            "entry_metadata": {
+                "dominant_factor_family": "range_expansion_breakout",
+                "factor_score": -2.1,
+            },
+        },
+    ]
+
+    base_names = {name for name, _params, _predicate in MODULE._trade_filter_variant_specs(trades)}
+    composite = MODULE._sample_guarded_composite_trade_filter_variant_specs(trades)
+    composite_names = {name for name, _params, _predicate in composite}
+
+    assert composite_names > base_names
+    assert "symbol_btcusdt_abs_score_ge_1.5" in composite_names
+    assert "symbol_btcusdt_family_liquidity_sweep_reversal" in composite_names
+    assert "side_long_family_liquidity_sweep_reversal_abs_score_ge_1.5" in composite_names
+    assert all("calendar" not in name for name in composite_names)
+    assert all("date" not in name for name in composite_names)
+
+
 def test_promotion_gate_requires_train_validation_and_locked_oos_dominance() -> None:
     promotable_row = {
         "round_trip_slippage_fee_bps": 10.0,

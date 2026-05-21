@@ -126,6 +126,48 @@ def test_strategy_is_registered_live_opt_in_and_calendar_safe() -> None:
     assert CryptoFxAlphaZooStateStrategy.strategy_validity["locked_oos_role"] == "gate_report_only"
 
 
+def test_sample_guarded_new_alpha_specs_are_opt_in_and_non_calendar() -> None:
+    specs = _REPLAY_MODULE._sample_guarded_new_alpha_grid_specs()
+    names = {spec.name for spec in specs}
+
+    assert "alpha_zoo_liquidity_sweep_reversal" in names
+    assert "alpha_zoo_liquidity_sweep_continuation" in names
+    assert "alpha_zoo_range_expansion_breakout" in names
+    assert "alpha_zoo_range_expansion_fade" in names
+    assert all(str(spec.source).startswith("sample_guarded_new_alpha") for spec in specs)
+    assert all("calendar" not in spec.name for spec in specs)
+    assert all("date" not in spec.name for spec in specs)
+    assert any(float(spec.params.get("liquidity_sweep_reversal_weight") or 0.0) > 0.0 for spec in specs)
+    assert any(float(spec.params.get("liquidity_sweep_continuation_weight") or 0.0) > 0.0 for spec in specs)
+    assert any(float(spec.params.get("range_expansion_breakout_weight") or 0.0) > 0.0 for spec in specs)
+    assert any(float(spec.params.get("range_expansion_fade_weight") or 0.0) > 0.0 for spec in specs)
+
+
+def test_new_alpha_factor_weights_are_disabled_by_default_but_reported() -> None:
+    schema = CryptoFxAlphaZooStateStrategy.get_param_schema()
+
+    assert schema["liquidity_sweep_reversal_weight"].default == 0.0
+    assert schema["liquidity_sweep_continuation_weight"].default == 0.0
+    assert schema["range_expansion_breakout_weight"].default == 0.0
+    assert schema["range_expansion_fade_weight"].default == 0.0
+
+    _, allowed = _run_strategy(
+        require_edge=True,
+        calibrated_edges={"default:LONG": 5.0, "default:SHORT": 5.0},
+    )
+    first_entry = next(signal for signal in allowed if signal.signal_type in {"LONG", "SHORT"})
+    components = first_entry.metadata["factor_family_scores"]
+
+    assert "liquidity_sweep_reversal" in components
+    assert "liquidity_sweep_continuation" in components
+    assert "range_expansion_breakout" in components
+    assert "range_expansion_fade" in components
+    assert components["liquidity_sweep_reversal"] == 0.0
+    assert components["liquidity_sweep_continuation"] == 0.0
+    assert components["range_expansion_breakout"] == 0.0
+    assert components["range_expansion_fade"] == 0.0
+
+
 def test_strategy_requires_calibrated_edge_for_entries() -> None:
     _, blocked = _run_strategy(require_edge=True, calibrated_edges={})
     assert [signal for signal in blocked if signal.signal_type in {"LONG", "SHORT"}] == []

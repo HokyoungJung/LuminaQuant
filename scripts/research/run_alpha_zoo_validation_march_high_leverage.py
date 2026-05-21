@@ -423,8 +423,11 @@ def _build_rows(
     allocation_grid: list[float],
     leverage_min: int,
     leverage_max: int,
+    include_sample_guarded_new_alpha_grid: bool = False,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     specs = [common._old_selected_spec(old_replay, alpha), *alpha._default_grid_specs()]
+    if include_sample_guarded_new_alpha_grid and hasattr(alpha, "_sample_guarded_new_alpha_grid_specs"):
+        specs.extend(alpha._sample_guarded_new_alpha_grid_specs())
     unique: dict[str, Any] = {}
     for spec in specs:
         key = json.dumps([spec.name, spec.params], sort_keys=True, default=str)
@@ -539,6 +542,12 @@ def _build_rows(
             key=lambda row: float(row["base_unlevered_tv_score"]),
             reverse=True,
         ),
+        "sample_guarded_new_alpha_grid_enabled": bool(include_sample_guarded_new_alpha_grid),
+        "sample_guarded_new_alpha_strategy_count": sum(
+            1
+            for row in strategy_summaries
+            if str(row.get("candidate_source") or "").startswith("sample_guarded_new_alpha")
+        ),
         "top_train_validation_candidate": _public_candidate(top_tv),
         "live_promoted_candidate": _public_candidate(promoted),
     }
@@ -574,7 +583,10 @@ def _strict_lane(alpha: Any, data: pd.DataFrame, promoted: Mapping[str, Any] | N
     params = dict(promoted.get("params") or {})
     # Rows do not retain params to keep top-level compact; recover from candidate source via default specs.
     candidate_name = str(promoted.get("candidate_name") or "")
-    for spec in alpha._default_grid_specs():
+    specs = list(alpha._default_grid_specs())
+    if hasattr(alpha, "_sample_guarded_new_alpha_grid_specs"):
+        specs.extend(alpha._sample_guarded_new_alpha_grid_specs())
+    for spec in specs:
         if spec.name == candidate_name:
             params = dict(spec.params)
             break
@@ -754,6 +766,9 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
         allocation_grid=_parse_allocation_grid(args.allocation_grid),
         leverage_min=int(args.leverage_min),
         leverage_max=int(args.leverage_max),
+        include_sample_guarded_new_alpha_grid=bool(
+            getattr(args, "include_sample_guarded_new_alpha_grid", False)
+        ),
     )
     live_promoted = dict(selection.get("live_promoted_candidate") or {})
     promoted_row = next(
@@ -796,6 +811,12 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
             "leverage_max": int(args.leverage_max),
             "allocation_grid": _parse_allocation_grid(args.allocation_grid),
             "row_count": len(rows),
+            "sample_guarded_new_alpha_grid_enabled": bool(
+                getattr(args, "include_sample_guarded_new_alpha_grid", False)
+            ),
+            "sample_guarded_new_alpha_strategy_count": int(
+                selection.get("sample_guarded_new_alpha_strategy_count") or 0
+            ),
         },
         "candidate_rows_top50_path": str(csv_path),
         "screen_payload_path": str(output_dir / "alpha_zoo_validation_march_high_leverage/crypto_fx_alpha_zoo_screen_validation_march_latest.json"),
@@ -862,6 +883,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--horizon", type=int, default=DEFAULT_HORIZON)
     parser.add_argument("--top-n", type=int, default=DEFAULT_TOP_N)
     parser.add_argument("--entry-quantile", type=float, default=DEFAULT_ENTRY_QUANTILE)
+    parser.add_argument("--include-sample-guarded-new-alpha-grid", action="store_true")
     parser.add_argument(
         "--max-ledger-records-per-factor-side-split",
         type=int,

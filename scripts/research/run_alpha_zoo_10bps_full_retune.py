@@ -864,6 +864,83 @@ def _trade_filter_variant_specs(
     return specs
 
 
+def _dedupe_trade_filter_specs(
+    specs: Sequence[tuple[str, dict[str, Any], Any]],
+) -> list[tuple[str, dict[str, Any], Any]]:
+    deduped: dict[str, tuple[str, dict[str, Any], Any]] = {}
+    for name, params, predicate in specs:
+        deduped.setdefault(str(name), (str(name), dict(params), predicate))
+    return list(deduped.values())
+
+
+def _sample_guarded_composite_trade_filter_variant_specs(
+    trades: Sequence[Mapping[str, Any]],
+) -> list[tuple[str, dict[str, Any], Any]]:
+    """Return an expanded non-calendar trade-filter grid for sample-guarded search."""
+    symbols = sorted({str(trade.get("symbol") or "") for trade in trades if trade.get("symbol")})
+    families = sorted({_trade_factor_family(trade) for trade in trades if _trade_factor_family(trade)})
+    specs = list(_trade_filter_variant_specs(trades))
+    for symbol in symbols:
+        for threshold in (1.0, 1.5, 2.0, 2.5):
+            specs.append(
+                (
+                    f"symbol_{_slug(symbol)}_abs_score_ge_{threshold:g}",
+                    {"symbol": symbol, "abs_factor_score_min": threshold},
+                    lambda trade, symbol=symbol, threshold=threshold: str(trade.get("symbol") or "") == symbol
+                    and _trade_abs_factor_score(trade) >= threshold,
+                )
+            )
+    for symbol in symbols:
+        for family in families:
+            specs.append(
+                (
+                    f"symbol_{_slug(symbol)}_family_{_slug(family)}",
+                    {"symbol": symbol, "dominant_factor_family": family},
+                    lambda trade, symbol=symbol, family=family: str(trade.get("symbol") or "") == symbol
+                    and _trade_factor_family(trade) == family,
+                )
+            )
+    for side in ("LONG", "SHORT"):
+        for family in families:
+            for threshold in (1.0, 1.5, 2.0, 2.5):
+                specs.append(
+                    (
+                        f"side_{side.lower()}_family_{_slug(family)}_abs_score_ge_{threshold:g}",
+                        {
+                            "side": side,
+                            "dominant_factor_family": family,
+                            "abs_factor_score_min": threshold,
+                        },
+                        lambda trade, side=side, family=family, threshold=threshold: str(trade.get("side") or "") == side
+                        and _trade_factor_family(trade) == family
+                        and _trade_abs_factor_score(trade) >= threshold,
+                    )
+                )
+    for side in ("LONG", "SHORT"):
+        for symbol in symbols:
+            for threshold in (1.0, 1.5, 2.0, 2.5):
+                specs.append(
+                    (
+                        f"side_{side.lower()}_symbol_{_slug(symbol)}_abs_score_ge_{threshold:g}",
+                        {"side": side, "symbol": symbol, "abs_factor_score_min": threshold},
+                        lambda trade, side=side, symbol=symbol, threshold=threshold: str(trade.get("side") or "") == side
+                        and str(trade.get("symbol") or "") == symbol
+                        and _trade_abs_factor_score(trade) >= threshold,
+                    )
+                )
+    for family in families:
+        for max_hold in (12, 24, 48):
+            specs.append(
+                (
+                    f"family_{_slug(family)}_max_hold_le_{max_hold}h",
+                    {"dominant_factor_family": family, "max_hold_hours": max_hold},
+                    lambda trade, family=family, max_hold=max_hold: _trade_factor_family(trade) == family
+                    and _trade_hold_hours(trade) <= max_hold,
+                )
+            )
+    return _dedupe_trade_filter_specs(specs)
+
+
 def _variant_selection_key(summary: Mapping[str, Any]) -> tuple[float, float, float, str]:
     """Train+validation-only key; locked-OOS is deliberately excluded."""
     validation = dict(summary.get("validation") or {})
@@ -1252,6 +1329,12 @@ def _fresh_train_validation_retune(
             "evaluated_trade_filter_variants": 0,
             "selected_trade_filter_variants": 0,
             "trade_filter_gate_pass_count": 0,
+            "trade_filter_grid_mode": "sample_guarded_composite"
+            if bool(getattr(args, "sample_guarded_composite_grid", False))
+            else "default",
+            "sample_guarded_composite_grid_enabled": bool(
+                getattr(args, "sample_guarded_composite_grid", False)
+            ),
             "skipped_candidate_names": [],
             "selection_profiles_10bps": {
                 "active_profile_id": SELECTION_PROFILE_HIGHER_RISK,
@@ -1313,6 +1396,12 @@ def _fresh_train_validation_retune(
     enable_trade_filter_variants = not bool(getattr(args, "disable_trade_filter_variants", False))
     trade_filter_top_n = max(0, _safe_int(getattr(args, "trade_filter_top_n", 0), 0))
     min_trade_filter_trades = max(1, _safe_int(getattr(args, "min_trade_filter_trades", 20), 20))
+    use_composite_grid = bool(getattr(args, "sample_guarded_composite_grid", False))
+    trade_filter_spec_builder = (
+        _sample_guarded_composite_trade_filter_variant_specs
+        if use_composite_grid
+        else _trade_filter_variant_specs
+    )
     for source_row in available_rows:
         candidate_name = str(source_row.get("candidate_name") or "")
         leverage = _safe_float(source_row.get("leverage"))
@@ -1369,7 +1458,7 @@ def _fresh_train_validation_retune(
         stream_records.append({"stream": stream, "summary": summaries[-1]})
         if not enable_trade_filter_variants:
             continue
-        for variant_name, variant_params, predicate in _trade_filter_variant_specs(trades):
+        for variant_name, variant_params, predicate in trade_filter_spec_builder(trades):
             filtered_trades = [trade for trade in trades if predicate(trade)]
             if len(filtered_trades) < min_trade_filter_trades:
                 continue
@@ -1590,6 +1679,8 @@ def _fresh_train_validation_retune(
         "evaluated_trade_filter_variants": evaluated_trade_filter_variants,
         "selected_trade_filter_variants": len(selected_variant_records),
         "trade_filter_gate_pass_count": trade_filter_gate_pass_count,
+        "trade_filter_grid_mode": "sample_guarded_composite" if use_composite_grid else "default",
+        "sample_guarded_composite_grid_enabled": use_composite_grid,
         "skipped_candidate_names": sorted(skipped_names),
         "selection_profiles_10bps": profile_policy,
         "balanced_profile_model": balanced_model or {},
@@ -1827,6 +1918,10 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
                     "selected_trade_filter_variants"
                 ],
                 "trade_filter_gate_pass_count": fresh_retune["trade_filter_gate_pass_count"],
+                "trade_filter_grid_mode": fresh_retune["trade_filter_grid_mode"],
+                "sample_guarded_composite_grid_enabled": fresh_retune[
+                    "sample_guarded_composite_grid_enabled"
+                ],
                 "trade_filter_selection_inputs": list(TV_SPLITS),
                 "trade_filter_locked_oos_role": "gate_report_only_after_variant_freeze",
                 "skipped_candidate_names": fresh_retune["skipped_candidate_names"],
@@ -2166,6 +2261,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--trade-filter-top-n", type=int, default=120)
     parser.add_argument("--min-trade-filter-trades", type=int, default=20)
     parser.add_argument("--disable-trade-filter-variants", action="store_true")
+    parser.add_argument("--sample-guarded-composite-grid", action="store_true")
     parser.add_argument("--seed", type=int, default=20260519)
     parser.add_argument("--input", default="")
     parser.add_argument("--current-tail-cache", default=str(high.DEFAULT_CURRENT_TAIL_CACHE))

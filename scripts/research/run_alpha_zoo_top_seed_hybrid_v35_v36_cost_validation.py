@@ -344,6 +344,8 @@ def _find_candidate_row(
 
 def _spec_by_name(alpha: Any, old_replay: Mapping[str, Any]) -> dict[str, Any]:
     specs = [common._old_selected_spec(old_replay, alpha), *alpha._default_grid_specs()]
+    if hasattr(alpha, "_sample_guarded_new_alpha_grid_specs"):
+        specs.extend(alpha._sample_guarded_new_alpha_grid_specs())
     out: dict[str, Any] = {}
     for spec in specs:
         out.setdefault(str(spec.name), spec)

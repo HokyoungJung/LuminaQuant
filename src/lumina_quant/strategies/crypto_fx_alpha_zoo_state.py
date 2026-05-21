@@ -114,6 +114,10 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
         "volume_vwap_pressure",
         "breakout_failure",
         "fx_usd_jpy_risk_regime",
+        "liquidity_sweep_reversal",
+        "liquidity_sweep_continuation",
+        "range_expansion_breakout",
+        "range_expansion_fade",
         "calibrated_edge_lower_bound",
     )
     strategy_validity = {
@@ -151,6 +155,18 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
             "vwap_pressure_weight": HyperParam.floating("vwap_pressure_weight", default=0.15, low=0.0, high=1.0, tunable=False),
             "breakout_failure_weight": HyperParam.floating("breakout_failure_weight", default=0.15, low=0.0, high=1.0, tunable=False),
             "trend_efficiency_weight": HyperParam.floating("trend_efficiency_weight", default=0.10, low=0.0, high=1.0, tunable=False),
+            "liquidity_sweep_reversal_weight": HyperParam.floating(
+                "liquidity_sweep_reversal_weight", default=0.0, low=0.0, high=1.0, tunable=False
+            ),
+            "liquidity_sweep_continuation_weight": HyperParam.floating(
+                "liquidity_sweep_continuation_weight", default=0.0, low=0.0, high=1.0, tunable=False
+            ),
+            "range_expansion_breakout_weight": HyperParam.floating(
+                "range_expansion_breakout_weight", default=0.0, low=0.0, high=1.0, tunable=False
+            ),
+            "range_expansion_fade_weight": HyperParam.floating(
+                "range_expansion_fade_weight", default=0.0, low=0.0, high=1.0, tunable=False
+            ),
             "risk_off_long_multiplier": HyperParam.floating("risk_off_long_multiplier", default=0.25, low=0.0, high=2.0, tunable=False),
             "risk_off_short_multiplier": HyperParam.floating("risk_off_short_multiplier", default=1.15, low=0.0, high=2.0, tunable=False),
             "risk_on_long_multiplier": HyperParam.floating("risk_on_long_multiplier", default=1.10, low=0.0, high=2.0, tunable=False),
@@ -199,6 +215,10 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
         self.vwap_pressure_weight = float(resolved["vwap_pressure_weight"])
         self.breakout_failure_weight = float(resolved["breakout_failure_weight"])
         self.trend_efficiency_weight = float(resolved["trend_efficiency_weight"])
+        self.liquidity_sweep_reversal_weight = float(resolved["liquidity_sweep_reversal_weight"])
+        self.liquidity_sweep_continuation_weight = float(resolved["liquidity_sweep_continuation_weight"])
+        self.range_expansion_breakout_weight = float(resolved["range_expansion_breakout_weight"])
+        self.range_expansion_fade_weight = float(resolved["range_expansion_fade_weight"])
         self.risk_off_long_multiplier = float(resolved["risk_off_long_multiplier"])
         self.risk_off_short_multiplier = float(resolved["risk_off_short_multiplier"])
         self.risk_on_long_multiplier = float(resolved["risk_on_long_multiplier"])
@@ -376,11 +396,33 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
         vwap_pressure = _volume_z(item.volumes, self.slow_lookback_bars) * (1.0 if item.closes[-1] >= vwap_proxy else -1.0)
         prior_high = max(list(item.highs)[-self.slow_lookback_bars - 1 : -1]) if len(item.highs) > self.slow_lookback_bars else item.highs[-1]
         prior_low = min(list(item.lows)[-self.slow_lookback_bars - 1 : -1]) if len(item.lows) > self.slow_lookback_bars else item.lows[-1]
+        bar_range = max(1e-12, float(item.highs[-1]) - float(item.lows[-1]))
+        upper_wick = (float(item.highs[-1]) - max(float(item.opens[-1]), float(item.closes[-1]))) / bar_range
+        lower_wick = (min(float(item.opens[-1]), float(item.closes[-1])) - float(item.lows[-1])) / bar_range
+        volume_shock = max(0.0, _volume_z(item.volumes, self.slow_lookback_bars))
         breakout_failure = 0.0
         if item.highs[-1] > prior_high and item.closes[-1] < prior_high:
             breakout_failure = -1.0
         elif item.lows[-1] < prior_low and item.closes[-1] > prior_low:
             breakout_failure = 1.0
+        liquidity_sweep_reversal = 0.0
+        if item.highs[-1] > prior_high and item.closes[-1] < prior_high and upper_wick >= 0.30:
+            liquidity_sweep_reversal = -1.0 * (1.0 + min(volume_shock, 3.0) / 3.0)
+        elif item.lows[-1] < prior_low and item.closes[-1] > prior_low and lower_wick >= 0.30:
+            liquidity_sweep_reversal = 1.0 * (1.0 + min(volume_shock, 3.0) / 3.0)
+        prior_ranges = [
+            max(0.0, float(high) - float(low))
+            for high, low in zip(
+                list(item.highs)[-self.slow_lookback_bars - 1 : -1],
+                list(item.lows)[-self.slow_lookback_bars - 1 : -1],
+                strict=False,
+            )
+        ]
+        avg_prior_range = mean(prior_ranges) if prior_ranges else bar_range
+        range_expansion = max(0.0, (bar_range / max(avg_prior_range, 1e-12)) - 1.0)
+        range_expansion_breakout = (1.0 if residual_fast >= 0.0 else -1.0) * range_expansion * (
+            1.0 + min(volume_shock, 3.0) / 3.0
+        )
         trend_eff = _trend_efficiency(item.closes, self.fast_lookback_bars)
         components = {
             "crypto_residual_momentum": self.residual_momentum_weight * residual_mom,
@@ -388,6 +430,10 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
             "volume_vwap_pressure": self.vwap_pressure_weight * vwap_pressure,
             "breakout_failure": self.breakout_failure_weight * breakout_failure,
             "trend_efficiency": self.trend_efficiency_weight * trend_eff * (1.0 if residual_fast >= 0.0 else -1.0),
+            "liquidity_sweep_reversal": self.liquidity_sweep_reversal_weight * liquidity_sweep_reversal,
+            "liquidity_sweep_continuation": self.liquidity_sweep_continuation_weight * (-liquidity_sweep_reversal),
+            "range_expansion_breakout": self.range_expansion_breakout_weight * range_expansion_breakout,
+            "range_expansion_fade": self.range_expansion_fade_weight * (-range_expansion_breakout),
         }
         self._last_score_components[symbol] = {key: float(value) for key, value in components.items()}
         return sum(components.values())
