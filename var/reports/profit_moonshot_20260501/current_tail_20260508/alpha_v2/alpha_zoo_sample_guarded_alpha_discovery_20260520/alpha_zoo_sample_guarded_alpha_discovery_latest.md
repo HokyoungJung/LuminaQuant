@@ -1,6 +1,6 @@
 # Alpha Zoo sample-guarded alpha discovery
 
-Generated: `2026-05-21T11:01:18.631303Z`
+Generated: `2026-05-22T10:30:13.295045Z`
 
 This artifact is paper/testnet research only. `ready_for_real=false` and `real_money_execution=false`.
 Locked-OOS is attached only after train+validation profile ranking freezes.

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import importlib.util
 import sys
 from pathlib import Path
@@ -13,6 +14,10 @@ assert SPEC is not None and SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
+
+
+def _model_ids(rows: list[dict[str, object]]) -> list[str]:
+    return [str(row["model_id"]) for row in rows]
 
 
 def test_sample_guarded_discovery_builds_no_promotion_shadow_bundle(tmp_path: Path) -> None:
@@ -99,12 +104,53 @@ def test_sample_guarded_discovery_builds_no_promotion_shadow_bundle(tmp_path: Pa
     baseline_ids = {row["model_id"] for row in payload["baseline_paper_lanes"]}
     assert MODULE.paper_preflight.ACTIVE_MODEL_ID in baseline_ids
     assert MODULE.paper_preflight.BALANCED_MODEL_ID in baseline_ids
+    baseline_contract = {
+        row["role"]: (
+            row["model_id"],
+            row["leverage"],
+            row["allocation_fraction"],
+            row["expected_replay_notional_for_10000_equity"],
+            row["live_notional_for_10000_equity"],
+        )
+        for row in payload["baseline_paper_lanes"]
+    }
+    assert baseline_contract == {
+        "active": (
+            MODULE.paper_preflight.ACTIVE_MODEL_ID,
+            7.0,
+            0.20,
+            pytest.approx(14_000.0),
+            pytest.approx(14_000.0),
+        ),
+        "balanced": (
+            MODULE.paper_preflight.BALANCED_MODEL_ID,
+            6.0,
+            0.175,
+            pytest.approx(10_500.0),
+            pytest.approx(10_500.0),
+        ),
+        "validation_return_leader": (
+            "fresh_tv10_filter_abs_score_ge_1p5_alpha_zoo_quality_single_pair_5p0x_0p2alloc",
+            5.0,
+            0.20,
+            pytest.approx(10_000.0),
+            pytest.approx(10_000.0),
+        ),
+        "validation_efficiency_reference": (
+            "fresh_tv10_filter_abs_score_ge_1p5_alpha_zoo_quality_single_pair_4p0x_0p175alloc",
+            4.0,
+            0.175,
+            pytest.approx(7_000.0),
+            pytest.approx(7_000.0),
+        ),
+    }
     assert all(row["ready_for_real"] is False for row in payload["baseline_paper_lanes"])
     assert all(row["real_money_execution"] is False for row in payload["baseline_paper_lanes"])
 
     decisions = payload["paper_candidate_decisions"]
     assert decisions
     assert {row["decision"] for row in decisions} == {"no_promotion"}
+    assert all(row["rejection_reasons"] for row in decisions)
     assert all(row["ready_for_real"] is False for row in decisions)
     assert all(row["real_money_execution"] is False for row in decisions)
 
@@ -130,6 +176,36 @@ def test_sample_guarded_discovery_builds_no_promotion_shadow_bundle(tmp_path: Pa
         "artifact_generation_validation_log",
     ):
         assert Path(payload["output_paths"][key]).exists()
+
+    candidates_csv = Path(payload["output_paths"]["sample_guarded_candidates_csv"])
+    with candidates_csv.open(newline="", encoding="utf-8") as handle:
+        reader = csv.reader(handle)
+        assert next(reader)[:4] == ["selection_rank", "status", "decision", "model_id"]
+        assert next(reader)
+
+    decisions_csv = Path(payload["output_paths"]["paper_candidate_decisions_csv"])
+    with decisions_csv.open(newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        first_decision = next(reader)
+    assert first_decision["decision"] == "no_promotion"
+    assert first_decision["rejection_reasons"]
+
+    markdown = Path(payload["output_paths"]["latest_markdown"]).read_text(encoding="utf-8")
+    assert "no_new_paper_promotion_shadow_shortlist" in markdown
+    assert "ready_for_real=false" in markdown
+
+    generation_log = Path(payload["output_paths"]["artifact_generation_validation_log"]).read_text(
+        encoding="utf-8"
+    )
+    for needle in (
+        "primary_round_trip_cost_bps=10.0",
+        "paper_candidate_count=0",
+        "ready_for_real=false",
+        "real_money_execution=false",
+        "uses_locked_oos_for_selection=false",
+        "memory_guard_status=pass",
+    ):
+        assert needle in generation_log
 
 
 def test_calendar_primary_rows_are_quarantined_before_ranking() -> None:
@@ -170,3 +246,77 @@ def test_calendar_primary_rows_are_quarantined_before_ranking() -> None:
     assert summary["ready_for_real"] is False
     assert summary["real_money_execution"] is False
     assert "calendar_primary_or_calendar_rule_quarantine" in summary["rejection_reasons"]
+
+
+def test_sample_guarded_rankings_ignore_locked_oos_values() -> None:
+    base_rows = [
+        {
+            "model_id": "alpha",
+            "validation_return": 0.04,
+            "validation_sharpe": 1.1,
+            "validation_sortino": 1.2,
+            "validation_calmar": 0.9,
+            "validation_mdd": 0.04,
+            "train_return": 0.06,
+            "train_validation_return_ratio": 1.5,
+            "train_trade_event_count": 100,
+            "validation_trade_event_count": 40,
+            "target_notional_fraction_of_equity": 0.7,
+            "locked_oos_return": -0.99,
+            "locked_oos_trade_event_count": 1,
+            "locked_oos_liquidation_count": 9,
+        },
+        {
+            "model_id": "beta",
+            "validation_return": 0.03,
+            "validation_sharpe": 1.0,
+            "validation_sortino": 1.1,
+            "validation_calmar": 0.8,
+            "validation_mdd": 0.05,
+            "train_return": 0.05,
+            "train_validation_return_ratio": 1.4,
+            "train_trade_event_count": 120,
+            "validation_trade_event_count": 45,
+            "target_notional_fraction_of_equity": 0.6,
+            "locked_oos_return": 0.99,
+            "locked_oos_trade_event_count": 500,
+            "locked_oos_liquidation_count": 0,
+        },
+    ]
+    mutated_rows = [dict(row) for row in base_rows]
+    mutated_rows[0].update(
+        locked_oos_return=100.0,
+        locked_oos_trade_event_count=10_000,
+        locked_oos_liquidation_count=0,
+    )
+    mutated_rows[1].update(
+        locked_oos_return=-100.0,
+        locked_oos_trade_event_count=0,
+        locked_oos_liquidation_count=99,
+    )
+
+    assert _model_ids(MODULE._all_ranked_candidates(base_rows)) == _model_ids(
+        MODULE._all_ranked_candidates(mutated_rows)
+    )
+    for profile_id in (
+        "validation_strength_v1",
+        "train_validation_robustness_v1",
+        "cost_efficiency_v1",
+    ):
+        assert _model_ids(MODULE._rank_candidates(base_rows, profile_id, 2)) == _model_ids(
+            MODULE._rank_candidates(mutated_rows, profile_id, 2)
+        )
+
+
+def test_non_10bps_source_retune_is_rejected(tmp_path: Path) -> None:
+    non_10bps = tmp_path / "non_10bps_retune.json"
+    non_10bps.write_text(
+        '{"artifact_kind":"alpha_zoo_10bps_full_retune",'
+        '"round_trip_slippage_fee_bps_primary":5.0,'
+        '"real_money_execution":false}\n',
+        encoding="utf-8",
+    )
+
+    args = MODULE.parse_args(["--expanded-retune-json", str(non_10bps), "--output-dir", str(tmp_path / "out")])
+    with pytest.raises(ValueError, match="requires a 10bps expanded retune artifact"):
+        MODULE.build_payload(args)
