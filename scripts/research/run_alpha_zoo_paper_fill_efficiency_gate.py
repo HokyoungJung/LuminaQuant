@@ -47,6 +47,7 @@ DEFAULT_MAX_P95_ALL_IN_COST_BPS = 15.0
 DEFAULT_MAX_TIMEOUT_RATE = 0.0
 DEFAULT_MAX_CANCEL_RATE = 0.0
 DEFAULT_MAX_PARTIAL_FILL_RATE = 0.10
+DEFAULT_BACKTEST_FALLBACK_TOP_N = 60
 
 DECISION_FIELDS = [
     "decision_rank",
@@ -64,6 +65,32 @@ DECISION_FIELDS = [
     "cancel_rate",
     "partial_fill_rate",
     "actual_fill_efficiency_gate_pass",
+    "ready_for_real",
+    "real_money_execution",
+    "rejection_reasons",
+]
+
+BACKTEST_FALLBACK_FIELDS = [
+    "fallback_rank",
+    "status",
+    "decision",
+    "model_id",
+    "candidate_name",
+    "train_return",
+    "validation_return",
+    "locked_oos_return",
+    "train_trade_event_count",
+    "validation_trade_event_count",
+    "locked_oos_trade_event_count",
+    "validation_mdd",
+    "train_validation_return_ratio",
+    "primary_10bps_promotion_gate_pass",
+    "execution_efficiency_proxy_gate_pass",
+    "train_return_per_turnover_proxy_bps",
+    "validation_return_per_turnover_proxy_bps",
+    "locked_oos_return_per_turnover_proxy_bps",
+    "return_per_turnover_proxy_threshold_bps",
+    "ready_for_paper",
     "ready_for_real",
     "real_money_execution",
     "rejection_reasons",
@@ -355,17 +382,127 @@ def _decision_rows(summary: Mapping[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
+def _as_reason_text(value: Any) -> str:
+    if isinstance(value, str):
+        return value
+    if isinstance(value, Sequence) and not isinstance(value, (bytes, bytearray)):
+        return ";".join(str(item) for item in value if str(item))
+    return str(value) if value else ""
+
+
+def _backtest_fallback_pass(row: Mapping[str, Any]) -> bool:
+    return (
+        bool(row.get("ready_for_paper"))
+        and bool(row.get("primary_10bps_promotion_gate_pass"))
+        and bool(row.get("execution_efficiency_proxy_gate_pass"))
+        and not bool(row.get("ready_for_real"))
+        and not bool(row.get("real_money_execution"))
+    )
+
+
+def _backtest_fallback_rows(sample_guarded: Mapping[str, Any], *, limit: int) -> list[dict[str, Any]]:
+    source_rows = [dict(row) for row in sample_guarded.get("sample_guarded_candidates") or [] if isinstance(row, Mapping)]
+    passing = [row for row in source_rows if _backtest_fallback_pass(row)]
+    display_rows = passing if passing else source_rows[:limit]
+    rows: list[dict[str, Any]] = []
+    for rank, row in enumerate(display_rows[:limit], start=1):
+        passed = _backtest_fallback_pass(row)
+        rows.append(
+            {
+                "fallback_rank": rank,
+                "status": "backtest_fallback_pass" if passed else "backtest_fallback_reject",
+                "decision": "paper_testnet_review_only" if passed else "no_promotion",
+                "model_id": row.get("model_id"),
+                "candidate_name": row.get("candidate_name"),
+                "train_return": row.get("train_return"),
+                "validation_return": row.get("validation_return"),
+                "locked_oos_return": row.get("locked_oos_return"),
+                "train_trade_event_count": row.get("train_trade_event_count"),
+                "validation_trade_event_count": row.get("validation_trade_event_count"),
+                "locked_oos_trade_event_count": row.get("locked_oos_trade_event_count"),
+                "validation_mdd": row.get("validation_mdd"),
+                "train_validation_return_ratio": row.get("train_validation_return_ratio"),
+                "primary_10bps_promotion_gate_pass": bool(row.get("primary_10bps_promotion_gate_pass")),
+                "execution_efficiency_proxy_gate_pass": bool(row.get("execution_efficiency_proxy_gate_pass")),
+                "train_return_per_turnover_proxy_bps": row.get("train_return_per_turnover_proxy_bps"),
+                "validation_return_per_turnover_proxy_bps": row.get("validation_return_per_turnover_proxy_bps"),
+                "locked_oos_return_per_turnover_proxy_bps": row.get("locked_oos_return_per_turnover_proxy_bps"),
+                "return_per_turnover_proxy_threshold_bps": row.get("return_per_turnover_proxy_threshold_bps"),
+                "ready_for_paper": bool(row.get("ready_for_paper")),
+                "ready_for_real": False,
+                "real_money_execution": False,
+                "rejection_reasons": _as_reason_text(row.get("rejection_reasons")),
+            }
+        )
+    return rows
+
+
+def build_backtest_fallback_cut(sample_guarded: Mapping[str, Any], *, limit: int) -> dict[str, Any]:
+    candidates = [row for row in sample_guarded.get("sample_guarded_candidates") or [] if isinstance(row, Mapping)]
+    fallback_pass_count = sum(_backtest_fallback_pass(row) for row in candidates)
+    rows = _backtest_fallback_rows(sample_guarded, limit=limit)
+    return {
+        "status": "backtest_fallback_candidates_found" if fallback_pass_count else "no_backtest_fallback_promotion",
+        "reason": (
+            "actual paper/testnet fill telemetry is absent; applying existing sample-guarded backtest cut instead"
+        ),
+        "candidate_count": len(candidates),
+        "backtest_fallback_pass_count": fallback_pass_count,
+        "backtest_fallback_reject_count": len(candidates) - fallback_pass_count,
+        "rows_emitted": len(rows),
+        "policy": {
+            "input_artifact": "alpha_zoo_sample_guarded_alpha_discovery_latest.json",
+            "primary_cost_bps": PRIMARY_ROUND_TRIP_COST_BPS,
+            "selection_source": "existing sample-guarded backtest metrics",
+            "required_backtest_fields": [
+                "ready_for_paper",
+                "primary_10bps_promotion_gate_pass",
+                "execution_efficiency_proxy_gate_pass",
+                "train/validation/locked_oos sample guards",
+                "locked_oos liquidation/account_wipeout zero report gate",
+            ],
+            "locked_oos_role": "gate_report_only_after_train_validation_profile_freeze",
+            "real_money_gate": "always_false",
+            "memory_rule": "persist this fallback rule in .omx/notepad.md and research note before handoff",
+        },
+        "fallback_candidates": rows,
+    }
+
+
+def _csv_value(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return json.dumps(high._json_safe(value), ensure_ascii=False, sort_keys=True)
+    if isinstance(value, (list, tuple, set)):
+        return ";".join(str(item) for item in value)
+    return high._json_safe(value)
+
+
 def _write_csv(path: Path, rows: Sequence[Mapping[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=DECISION_FIELDS, lineterminator="\n", extrasaction="ignore")
         writer.writeheader()
         for row in rows:
-            writer.writerow({field: high._json_safe(row.get(field)) for field in DECISION_FIELDS})
+            writer.writerow({field: _csv_value(row.get(field)) for field in DECISION_FIELDS})
+
+
+def _write_backtest_fallback_csv(path: Path, rows: Sequence[Mapping[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=BACKTEST_FALLBACK_FIELDS,
+            lineterminator="\n",
+            extrasaction="ignore",
+        )
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({field: _csv_value(row.get(field)) for field in BACKTEST_FALLBACK_FIELDS})
 
 
 def _markdown(payload: Mapping[str, Any]) -> str:
     summary = dict(payload.get("actual_fill_efficiency_summary") or {})
+    fallback = dict(payload.get("backtest_fallback_cut") or {})
     return "\n".join(
         [
             "# Alpha Zoo paper fill efficiency gate",
@@ -380,6 +517,12 @@ def _markdown(payload: Mapping[str, Any]) -> str:
             f"- Avg BBO spread: `{summary.get('avg_bbo_spread_bps')}` bps",
             f"- Threshold: `{summary.get('return_per_turnover_threshold_bps')}` bps",
             f"- Gate pass: `{summary.get('actual_fill_efficiency_gate_pass')}`",
+            "",
+            "## Backtest fallback cut",
+            "",
+            f"- Fallback status: `{fallback.get('status')}`",
+            f"- Backtest fallback pass count: `{fallback.get('backtest_fallback_pass_count')}`",
+            f"- Rows emitted: `{fallback.get('rows_emitted')}`",
             "- `ready_for_real=false`, `real_money_execution=false`",
             "",
         ]
@@ -411,7 +554,9 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     timestamped_json = output_dir / f"alpha_zoo_paper_fill_efficiency_gate_{timestamp}.json"
     latest_md = output_dir / "alpha_zoo_paper_fill_efficiency_gate_latest.md"
     decisions_csv = output_dir / "paper_fill_efficiency_decisions_latest.csv"
+    backtest_fallback_csv = output_dir / "backtest_fallback_candidates_latest.csv"
     generation_log = output_dir / "artifact_generation_validation_latest.log"
+    backtest_fallback = build_backtest_fallback_cut(sample_guarded, limit=int(args.backtest_fallback_top_n))
     payload: dict[str, Any] = {
         "artifact_kind": "alpha_zoo_paper_fill_efficiency_gate",
         "generated_at_utc": _utc_now_iso(),
@@ -433,15 +578,20 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
             "avg_bbo_spread_formula": "notional-weighted average spread_bps_at_submit",
             "threshold_formula": "avg_bbo_spread_bps * bbo_spread_multiplier",
             "real_money_gate": "always_false",
-            "missing_telemetry_policy": "fail_closed_pending_paper_testnet_fills",
+            "missing_telemetry_policy": (
+                "fail_closed_pending_paper_testnet_fills; also apply existing sample-guarded backtest cut"
+            ),
+            "backtest_fallback_policy": backtest_fallback["policy"],
         },
         "actual_fill_efficiency_summary": summary,
+        "backtest_fallback_cut": backtest_fallback,
         "paper_fill_efficiency_decisions": _decision_rows(summary),
         "output_paths": {
             "latest_json": str(latest_json),
             "timestamped_json": str(timestamped_json),
             "latest_markdown": str(latest_md),
             "paper_fill_efficiency_decisions_csv": str(decisions_csv),
+            "backtest_fallback_candidates_csv": str(backtest_fallback_csv),
             "artifact_generation_validation_log": str(generation_log),
         },
     }
@@ -449,6 +599,7 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     _write_json(timestamped_json, payload)
     latest_md.write_text(_markdown(payload), encoding="utf-8")
     _write_csv(decisions_csv, payload["paper_fill_efficiency_decisions"])
+    _write_backtest_fallback_csv(backtest_fallback_csv, backtest_fallback["fallback_candidates"])
     generation_log.write_text(
         "\n".join(
             [
@@ -457,11 +608,14 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
                 f"status={summary['status']}",
                 f"fill_count={summary['fill_count']}",
                 f"actual_fill_efficiency_gate_pass={str(summary['actual_fill_efficiency_gate_pass']).lower()}",
+                f"backtest_fallback_status={backtest_fallback['status']}",
+                f"backtest_fallback_pass_count={backtest_fallback['backtest_fallback_pass_count']}",
                 "ready_for_real=false",
                 "real_money_execution=false",
                 f"latest_json={latest_json}",
                 f"timestamped_json={timestamped_json}",
                 f"paper_fill_efficiency_decisions_csv={decisions_csv}",
+                f"backtest_fallback_candidates_csv={backtest_fallback_csv}",
             ]
         )
         + "\n",
@@ -483,6 +637,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--max-timeout-rate", type=float, default=DEFAULT_MAX_TIMEOUT_RATE)
     parser.add_argument("--max-cancel-rate", type=float, default=DEFAULT_MAX_CANCEL_RATE)
     parser.add_argument("--max-partial-fill-rate", type=float, default=DEFAULT_MAX_PARTIAL_FILL_RATE)
+    parser.add_argument("--backtest-fallback-top-n", type=int, default=DEFAULT_BACKTEST_FALLBACK_TOP_N)
     return parser.parse_args(argv)
 
 
