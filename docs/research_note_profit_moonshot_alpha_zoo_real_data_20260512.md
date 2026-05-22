@@ -684,3 +684,19 @@ The rerun again found `0` new paper candidates across `976` complete 10bps model
 No real-money handoff was created. The generated decision status is `no_new_paper_promotion_shadow_shortlist`, with `ready_for_paper=false`, `ready_for_real=false`, `real_money_execution=false`, and `paper_execution_allowed=false`. The four existing `quality_single_pair` paper/testnet baseline lanes remain unchanged: active `7x/0.20`, balanced `6x/0.175`, validation leader `5x/0.20`, and efficiency reference `4x/0.175`. Replay/live notional parity remains recorded for candidates and baseline lanes.
 
 Test hardening added regressions for locked-OOS-insensitive sample-guarded ranking, non-10bps source rejection, exact four-lane baseline preservation, non-empty no-promotion rejection reasons, and output CSV/markdown/generation-log content. Local verification passed on 2026-05-22 UTC: artifact regeneration; targeted sample-guarded/long-only/expanded-shadow/10bps retune tests `26 passed`; full pytest `1382 passed`; `ruff check .`; `compileall` over `src scripts tests`; `git diff --check`; and `git diff --cached --check`. Verification log: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_sample_guarded_alpha_discovery_20260520/local_verification_alpha_zoo_sample_guarded_alpha_discovery_20260522T103012Z.log`.
+
+## 2026-05-22 KST — Sample-guarded discovery adds return/turnover-vs-spread proxy gate
+
+The sample-guarded 10bps discovery runner was tuned to incorporate the execution-quality hint `return per turnover > avg BBO spread * 5`. The current frozen expanded-retune metric surface does **not** contain actual average BBO spread or exact turnover fields, so the artifact now records this as an explicit proxy rather than claiming live microstructure evidence:
+
+- Average BBO spread assumption: `2.0bps`.
+- Multiplier: `5.0`.
+- Return/turnover proxy threshold: `10.0bps`.
+- Turnover proxy formula: `trade_event_count * abs(leverage * allocation_fraction)`.
+- Return/turnover proxy formula: `total_return * 10000 / turnover_proxy`.
+- Train+validation proxy profile: `execution_efficiency_proxy_v1`, with locked-OOS excluded from ranking/objective/pruning/parameter-fitting.
+- Locked-OOS proxy role: attached only after train+validation freeze as a report-only promotion gate.
+
+Regenerated artifacts under `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_sample_guarded_alpha_discovery_20260520/`, including timestamped JSON `alpha_zoo_sample_guarded_alpha_discovery_20260522T105008Z.json`, latest JSON/Markdown/CSVs, and `artifact_generation_validation_latest.log`. The updated run still found `0` new paper candidates across `976` complete 10bps models: `252` thin-sample shadows, `724` reject/quarantine, `20` historical OOS-bucket quarantines, and `0` calendar quarantines. Execution-efficiency proxy pass counts were: train `184`, validation `376`, locked-OOS report gate `57`, and full proxy gate `40`; those rows still failed other sample, locked-OOS, or primary 10bps promotion requirements. The four existing `quality_single_pair` paper/testnet baseline lanes remain unchanged, and all artifacts keep `ready_for_real=false` and `real_money_execution=false`.
+
+Verification passed on 2026-05-22 UTC: artifact regeneration; targeted sample-guarded tests `6 passed`; full pytest `1384 passed` with max RSS `2,729,152 KiB` (<8 GiB); `ruff check .`; `python -m compileall -q src scripts tests`; `git diff --check`; and `git diff --cached --check`. Verification log: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_sample_guarded_alpha_discovery_20260520/local_verification_sample_guarded_turnover_proxy_20260522T105007Z.log`.

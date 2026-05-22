@@ -52,6 +52,8 @@ DEFAULT_FOUR_LANE_JSON = (
 DEFAULT_OUTPUT_DIR = DEFAULT_ALPHA_V2 / "alpha_zoo_sample_guarded_alpha_discovery_20260520"
 
 PRIMARY_ROUND_TRIP_COST_BPS = 10.0
+DEFAULT_AVG_BBO_SPREAD_BPS_ASSUMPTION = PRIMARY_ROUND_TRIP_COST_BPS / 5.0
+DEFAULT_BBO_SPREAD_MULTIPLIER = 5.0
 MEMORY_LIMIT_MIB = 8192.0
 MIN_TRAIN_TRADES = 80
 MIN_VALIDATION_TRADES = 30
@@ -124,6 +126,9 @@ CANDIDATE_FIELDS = [
     "train_smart_sortino",
     "train_calmar",
     "train_trade_event_count",
+    "train_turnover_proxy",
+    "train_return_per_turnover_proxy_bps",
+    "train_return_per_turnover_proxy_pass",
     "validation_return",
     "validation_mdd",
     "validation_sharpe",
@@ -131,6 +136,9 @@ CANDIDATE_FIELDS = [
     "validation_smart_sortino",
     "validation_calmar",
     "validation_trade_event_count",
+    "validation_turnover_proxy",
+    "validation_return_per_turnover_proxy_bps",
+    "validation_return_per_turnover_proxy_pass",
     "train_validation_return_ratio",
     "locked_oos_return",
     "locked_oos_mdd",
@@ -139,8 +147,15 @@ CANDIDATE_FIELDS = [
     "locked_oos_smart_sortino",
     "locked_oos_calmar",
     "locked_oos_trade_event_count",
+    "locked_oos_turnover_proxy",
+    "locked_oos_return_per_turnover_proxy_bps",
+    "locked_oos_return_per_turnover_proxy_pass",
     "locked_oos_liquidation_count",
     "locked_oos_account_wipeout_count",
+    "avg_bbo_spread_bps_assumption",
+    "bbo_spread_multiplier",
+    "return_per_turnover_proxy_threshold_bps",
+    "execution_efficiency_proxy_gate_pass",
     "selection_eligible",
     "calendar_quarantined",
     "historical_oos_bucket_quarantined",
@@ -168,6 +183,11 @@ DECISION_FIELDS = [
     "train_trade_event_count",
     "validation_trade_event_count",
     "locked_oos_trade_event_count",
+    "train_return_per_turnover_proxy_bps",
+    "validation_return_per_turnover_proxy_bps",
+    "locked_oos_return_per_turnover_proxy_bps",
+    "return_per_turnover_proxy_threshold_bps",
+    "execution_efficiency_proxy_gate_pass",
     "replay_live_notional_parity",
     "rejection_reasons",
 ]
@@ -297,6 +317,27 @@ def _split_value(row: Mapping[str, Any], key: str) -> float:
     return _safe_float(row.get(key))
 
 
+def _return_per_turnover_threshold_bps(avg_bbo_spread_bps: float, multiplier: float) -> float:
+    return avg_bbo_spread_bps * multiplier
+
+
+def _turnover_proxy(trade_event_count: int, target_notional_fraction_of_equity: float) -> float:
+    """Approximate notional turnover when exact BBO/turnover telemetry is absent."""
+    return max(float(trade_event_count) * abs(target_notional_fraction_of_equity), 0.0)
+
+
+def _return_per_turnover_proxy_bps(
+    *,
+    total_return: float,
+    trade_event_count: int,
+    target_notional_fraction_of_equity: float,
+) -> float:
+    turnover = _turnover_proxy(trade_event_count, target_notional_fraction_of_equity)
+    if turnover <= 0.0:
+        return 0.0
+    return total_return * 10_000.0 / turnover
+
+
 def _variant_inventory_summary(retune: Mapping[str, Any]) -> dict[str, Any]:
     inventory = [row for row in retune.get("candidate_variant_inventory") or [] if isinstance(row, Mapping)]
     source_counts = Counter(str(row.get("source") or "") for row in inventory)
@@ -358,10 +399,28 @@ def _rejection_reasons(checks: Mapping[str, bool], values: Mapping[str, Any]) ->
             f"train_validation_return_ratio_{_safe_float(values['train_validation_return_ratio']):.4f}_below_"
             f"{MIN_TRAIN_VALIDATION_RETURN_RATIO:.2f}"
         )
+    if not checks["train_return_per_turnover_proxy"]:
+        reasons.append(
+            f"train_return_per_turnover_proxy_bps_"
+            f"{_safe_float(values['train_return_per_turnover_proxy_bps']):.3f}_not_above_"
+            f"{_safe_float(values['return_per_turnover_proxy_threshold_bps']):.3f}"
+        )
+    if not checks["validation_return_per_turnover_proxy"]:
+        reasons.append(
+            f"validation_return_per_turnover_proxy_bps_"
+            f"{_safe_float(values['validation_return_per_turnover_proxy_bps']):.3f}_not_above_"
+            f"{_safe_float(values['return_per_turnover_proxy_threshold_bps']):.3f}"
+        )
     if not checks["validation_mdd"]:
         reasons.append(f"validation_mdd_{_safe_float(values['validation_mdd']):.4f}_above_{MAX_VALIDATION_MDD:.2f}")
     if not checks["locked_oos_return"]:
         reasons.append("locked_oos_return_not_positive")
+    if not checks["locked_oos_return_per_turnover_proxy"]:
+        reasons.append(
+            f"locked_oos_return_per_turnover_proxy_bps_"
+            f"{_safe_float(values['locked_oos_return_per_turnover_proxy_bps']):.3f}_not_above_"
+            f"{_safe_float(values['return_per_turnover_proxy_threshold_bps']):.3f}"
+        )
     if not checks["locked_oos_no_liquidation"]:
         reasons.append("locked_oos_liquidation_count_nonzero")
     if not checks["locked_oos_no_account_wipeout"]:
@@ -392,8 +451,11 @@ def _status_from_checks(
             "validation_return",
             "train_return",
             "train_validation_return_ratio",
+            "train_return_per_turnover_proxy",
+            "validation_return_per_turnover_proxy",
             "validation_mdd",
             "locked_oos_return",
+            "locked_oos_return_per_turnover_proxy",
             "locked_oos_no_liquidation",
             "locked_oos_no_account_wipeout",
         )
@@ -412,7 +474,13 @@ def _status_from_checks(
     return "reject_or_quarantine"
 
 
-def _candidate_summary(model_id: str, splits: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
+def _candidate_summary(
+    model_id: str,
+    splits: Mapping[str, Mapping[str, Any]],
+    *,
+    avg_bbo_spread_bps_assumption: float = DEFAULT_AVG_BBO_SPREAD_BPS_ASSUMPTION,
+    bbo_spread_multiplier: float = DEFAULT_BBO_SPREAD_MULTIPLIER,
+) -> dict[str, Any]:
     train = dict(splits["train"])
     validation = dict(splits["validation"])
     locked = dict(splits["locked_oos"])
@@ -426,6 +494,25 @@ def _candidate_summary(model_id: str, splits: Mapping[str, Mapping[str, Any]]) -
     validation_trades = _safe_int(validation.get("trade_event_count"))
     locked_trades = _safe_int(locked.get("trade_event_count"))
     ratio = train_return / validation_return if validation_return > 0.0 else 0.0
+    threshold_bps = _return_per_turnover_threshold_bps(avg_bbo_spread_bps_assumption, bbo_spread_multiplier)
+    train_turnover_proxy = _turnover_proxy(train_trades, target_notional)
+    validation_turnover_proxy = _turnover_proxy(validation_trades, target_notional)
+    locked_turnover_proxy = _turnover_proxy(locked_trades, target_notional)
+    train_return_per_turnover_proxy_bps = _return_per_turnover_proxy_bps(
+        total_return=train_return,
+        trade_event_count=train_trades,
+        target_notional_fraction_of_equity=target_notional,
+    )
+    validation_return_per_turnover_proxy_bps = _return_per_turnover_proxy_bps(
+        total_return=validation_return,
+        trade_event_count=validation_trades,
+        target_notional_fraction_of_equity=target_notional,
+    )
+    locked_return_per_turnover_proxy_bps = _return_per_turnover_proxy_bps(
+        total_return=locked_return,
+        trade_event_count=locked_trades,
+        target_notional_fraction_of_equity=target_notional,
+    )
     calendar_quarantined = any(_as_bool(dict(splits[split]).get("calendar_primary")) for split in high.SPLIT_ORDER)
     historical_oos_bucket = any(
         _as_bool(dict(splits[split]).get("candidate_universe_uses_locked_oos_bucket")) for split in high.SPLIT_ORDER
@@ -441,6 +528,10 @@ def _candidate_summary(model_id: str, splits: Mapping[str, Mapping[str, Any]]) -
         "validation_return": validation_return,
         "train_validation_return_ratio": ratio,
         "validation_mdd": _split_value(validation, "max_drawdown"),
+        "train_return_per_turnover_proxy_bps": train_return_per_turnover_proxy_bps,
+        "validation_return_per_turnover_proxy_bps": validation_return_per_turnover_proxy_bps,
+        "locked_oos_return_per_turnover_proxy_bps": locked_return_per_turnover_proxy_bps,
+        "return_per_turnover_proxy_threshold_bps": threshold_bps,
     }
     checks: dict[str, bool] = {
         "selection_eligible": not calendar_quarantined and not historical_oos_bucket,
@@ -450,8 +541,11 @@ def _candidate_summary(model_id: str, splits: Mapping[str, Mapping[str, Any]]) -
         "validation_return": validation_return >= MIN_VALIDATION_RETURN,
         "train_return": train_return > 0.0,
         "train_validation_return_ratio": ratio >= MIN_TRAIN_VALIDATION_RETURN_RATIO,
+        "train_return_per_turnover_proxy": train_return_per_turnover_proxy_bps > threshold_bps,
+        "validation_return_per_turnover_proxy": validation_return_per_turnover_proxy_bps > threshold_bps,
         "validation_mdd": _split_value(validation, "max_drawdown") <= MAX_VALIDATION_MDD,
         "locked_oos_return": locked_return > 0.0,
+        "locked_oos_return_per_turnover_proxy": locked_return_per_turnover_proxy_bps > threshold_bps,
         "locked_oos_no_liquidation": _split_value(locked, "liquidation_count") == 0.0,
         "locked_oos_no_account_wipeout": _split_value(locked, "account_wipeout_count") == 0.0,
         "primary_10bps_promotion_gate": primary_gate,
@@ -487,6 +581,9 @@ def _candidate_summary(model_id: str, splits: Mapping[str, Mapping[str, Any]]) -
         "train_smart_sortino": _split_value(train, "smart_sortino"),
         "train_calmar": _split_value(train, "calmar"),
         "train_trade_event_count": train_trades,
+        "train_turnover_proxy": train_turnover_proxy,
+        "train_return_per_turnover_proxy_bps": train_return_per_turnover_proxy_bps,
+        "train_return_per_turnover_proxy_pass": checks["train_return_per_turnover_proxy"],
         "validation_return": validation_return,
         "validation_mdd": _split_value(validation, "max_drawdown"),
         "validation_sharpe": _split_value(validation, "sharpe"),
@@ -494,6 +591,9 @@ def _candidate_summary(model_id: str, splits: Mapping[str, Mapping[str, Any]]) -
         "validation_smart_sortino": _split_value(validation, "smart_sortino"),
         "validation_calmar": _split_value(validation, "calmar"),
         "validation_trade_event_count": validation_trades,
+        "validation_turnover_proxy": validation_turnover_proxy,
+        "validation_return_per_turnover_proxy_bps": validation_return_per_turnover_proxy_bps,
+        "validation_return_per_turnover_proxy_pass": checks["validation_return_per_turnover_proxy"],
         "train_validation_return_ratio": ratio,
         "locked_oos_return": locked_return,
         "locked_oos_mdd": _split_value(locked, "max_drawdown"),
@@ -502,8 +602,19 @@ def _candidate_summary(model_id: str, splits: Mapping[str, Mapping[str, Any]]) -
         "locked_oos_smart_sortino": _split_value(locked, "smart_sortino"),
         "locked_oos_calmar": _split_value(locked, "calmar"),
         "locked_oos_trade_event_count": locked_trades,
+        "locked_oos_turnover_proxy": locked_turnover_proxy,
+        "locked_oos_return_per_turnover_proxy_bps": locked_return_per_turnover_proxy_bps,
+        "locked_oos_return_per_turnover_proxy_pass": checks["locked_oos_return_per_turnover_proxy"],
         "locked_oos_liquidation_count": _split_value(locked, "liquidation_count"),
         "locked_oos_account_wipeout_count": _split_value(locked, "account_wipeout_count"),
+        "avg_bbo_spread_bps_assumption": avg_bbo_spread_bps_assumption,
+        "bbo_spread_multiplier": bbo_spread_multiplier,
+        "return_per_turnover_proxy_threshold_bps": threshold_bps,
+        "execution_efficiency_proxy_gate_pass": (
+            checks["train_return_per_turnover_proxy"]
+            and checks["validation_return_per_turnover_proxy"]
+            and checks["locked_oos_return_per_turnover_proxy"]
+        ),
         "guard_checks": checks,
         "selection_eligible": checks["selection_eligible"],
         "calendar_quarantined": calendar_quarantined,
@@ -560,11 +671,25 @@ def _cost_efficiency_key(row: Mapping[str, Any]) -> tuple[float, float, float, s
     )
 
 
+def _execution_efficiency_proxy_key(row: Mapping[str, Any]) -> tuple[float, float, float, float, float, str]:
+    train_proxy = _safe_float(row.get("train_return_per_turnover_proxy_bps"))
+    validation_proxy = _safe_float(row.get("validation_return_per_turnover_proxy_bps"))
+    return (
+        min(train_proxy, validation_proxy),
+        0.5 * (train_proxy + validation_proxy),
+        _safe_float(row.get("validation_return")),
+        _safe_float(row.get("train_return")),
+        -_safe_float(row.get("validation_mdd")),
+        str(row.get("model_id") or ""),
+    )
+
+
 def _rank_candidates(rows: Sequence[Mapping[str, Any]], key_name: str, limit: int) -> list[dict[str, Any]]:
     key_map = {
         "validation_strength_v1": _validation_strength_key,
         "train_validation_robustness_v1": _robustness_key,
         "cost_efficiency_v1": _cost_efficiency_key,
+        "execution_efficiency_proxy_v1": _execution_efficiency_proxy_key,
     }
     ranked = [dict(row) for row in sorted(rows, key=key_map[key_name], reverse=True)[:limit]]
     for rank, row in enumerate(ranked, start=1):
@@ -601,6 +726,11 @@ def _paper_decision_rows(candidates: Sequence[Mapping[str, Any]], *, limit: int)
                 "train_trade_event_count": row.get("train_trade_event_count"),
                 "validation_trade_event_count": row.get("validation_trade_event_count"),
                 "locked_oos_trade_event_count": row.get("locked_oos_trade_event_count"),
+                "train_return_per_turnover_proxy_bps": row.get("train_return_per_turnover_proxy_bps"),
+                "validation_return_per_turnover_proxy_bps": row.get("validation_return_per_turnover_proxy_bps"),
+                "locked_oos_return_per_turnover_proxy_bps": row.get("locked_oos_return_per_turnover_proxy_bps"),
+                "return_per_turnover_proxy_threshold_bps": row.get("return_per_turnover_proxy_threshold_bps"),
+                "execution_efficiency_proxy_gate_pass": bool(row.get("execution_efficiency_proxy_gate_pass")),
                 "replay_live_notional_parity": bool(row.get("notional_parity_passed")),
                 "rejection_reasons": row.get("rejection_reasons"),
             }
@@ -696,7 +826,22 @@ def _status_summary(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "selection_eligible_count": sum(bool(row.get("selection_eligible")) for row in rows),
         "calendar_quarantined_count": sum(bool(row.get("calendar_quarantined")) for row in rows),
         "historical_oos_bucket_quarantined_count": sum(bool(row.get("historical_oos_bucket_quarantined")) for row in rows),
+        "execution_efficiency_proxy_gate_pass_count": sum(
+            bool(row.get("execution_efficiency_proxy_gate_pass")) for row in rows
+        ),
+        "train_return_per_turnover_proxy_pass_count": sum(
+            bool(row.get("train_return_per_turnover_proxy_pass")) for row in rows
+        ),
+        "validation_return_per_turnover_proxy_pass_count": sum(
+            bool(row.get("validation_return_per_turnover_proxy_pass")) for row in rows
+        ),
+        "locked_oos_return_per_turnover_proxy_pass_count": sum(
+            bool(row.get("locked_oos_return_per_turnover_proxy_pass")) for row in rows
+        ),
         "max_validation_return": max((_safe_float(row.get("validation_return")) for row in rows), default=0.0),
+        "max_validation_return_per_turnover_proxy_bps": max(
+            (_safe_float(row.get("validation_return_per_turnover_proxy_bps")) for row in rows), default=0.0
+        ),
         "max_validation_trade_event_count": max((_safe_int(row.get("validation_trade_event_count")) for row in rows), default=0),
         "max_locked_oos_trade_event_count": max((_safe_int(row.get("locked_oos_trade_event_count")) for row in rows), default=0),
         "max_train_validation_return_ratio": max(
@@ -710,6 +855,7 @@ def _profile_metadata(profile_id: str) -> dict[str, Any]:
         "validation_strength_v1": "validation return, validation Sharpe/Sortino/Calmar, validation MDD penalty",
         "train_validation_robustness_v1": "validation return plus train return, train/validation return ratio, train+validation sample reward, validation MDD penalty",
         "cost_efficiency_v1": "validation return per validation trade, 10bps cost and notional exposure, with lower notional preference",
+        "execution_efficiency_proxy_v1": "minimum and average train+validation return-per-turnover proxy bps; locked-OOS excluded from ranking",
     }
     return {
         "profile_id": profile_id,
@@ -733,6 +879,7 @@ def _profile_metadata(profile_id: str) -> dict[str, Any]:
 def _markdown(payload: Mapping[str, Any]) -> str:
     summary = dict(payload.get("sample_guarded_summary") or {})
     decision = dict(payload.get("decision") or {})
+    execution_policy = dict(payload.get("execution_efficiency_policy") or {})
     lines = [
         "# Alpha Zoo sample-guarded alpha discovery",
         "",
@@ -748,11 +895,15 @@ def _markdown(payload: Mapping[str, Any]) -> str:
         f"- Shadow/thin sample count: `{summary.get('shadow_only_thin_sample_count')}`",
         f"- Reject/quarantine count: `{summary.get('reject_or_quarantine_count')}`",
         f"- Primary cost: `{payload.get('research_primary_round_trip_cost_bps')}` bps round-trip",
+        f"- Return/turnover proxy threshold: `{execution_policy.get('return_per_turnover_proxy_threshold_bps')}` bps "
+        f"(avg BBO spread assumption `{execution_policy.get('avg_bbo_spread_bps_assumption')}` x "
+        f"`{execution_policy.get('bbo_spread_multiplier')}`)",
+        f"- Execution-efficiency proxy pass count: `{summary.get('execution_efficiency_proxy_gate_pass_count')}`",
         "",
         "## Top train+validation-ranked candidates",
         "",
-        "| Rank | Status | Model | Val return | Train return | OOS return | Trades T/V/O | Reasons |",
-        "| ---: | --- | --- | ---: | ---: | ---: | ---: | --- |",
+        "| Rank | Status | Model | Val return | Train return | OOS return | R/T proxy bps T/V/O | Trades T/V/O | Reasons |",
+        "| ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |",
     ]
     for row in (payload.get("sample_guarded_candidates") or [])[:15]:
         reasons = ", ".join((row.get("rejection_reasons") or [])[:3])
@@ -761,6 +912,9 @@ def _markdown(payload: Mapping[str, Any]) -> str:
             f"{_safe_float(row.get('validation_return')):.4%} | "
             f"{_safe_float(row.get('train_return')):.4%} | "
             f"{_safe_float(row.get('locked_oos_return')):.4%} | "
+            f"{_safe_float(row.get('train_return_per_turnover_proxy_bps')):.3f}/"
+            f"{_safe_float(row.get('validation_return_per_turnover_proxy_bps')):.3f}/"
+            f"{_safe_float(row.get('locked_oos_return_per_turnover_proxy_bps')):.3f} | "
             f"{row.get('train_trade_event_count')}/{row.get('validation_trade_event_count')}/{row.get('locked_oos_trade_event_count')} | "
             f"{reasons} |"
         )
@@ -785,6 +939,16 @@ def _markdown(payload: Mapping[str, Any]) -> str:
 def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     output_dir = Path(args.output_dir).expanduser().resolve()
     expanded_path = Path(args.expanded_retune_json).expanduser().resolve()
+    avg_bbo_spread_bps = _safe_float(args.avg_bbo_spread_bps_assumption)
+    bbo_spread_multiplier = _safe_float(args.bbo_spread_multiplier)
+    if avg_bbo_spread_bps <= 0.0:
+        raise ValueError("--avg-bbo-spread-bps-assumption must be positive")
+    if bbo_spread_multiplier <= 0.0:
+        raise ValueError("--bbo-spread-multiplier must be positive")
+    return_per_turnover_threshold_bps = _return_per_turnover_threshold_bps(
+        avg_bbo_spread_bps,
+        bbo_spread_multiplier,
+    )
     retune = _load_json(expanded_path)
     if _safe_float(retune.get("round_trip_slippage_fee_bps_primary")) != PRIMARY_ROUND_TRIP_COST_BPS:
         raise ValueError("sample-guarded discovery requires a 10bps expanded retune artifact")
@@ -795,7 +959,15 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     expanded_shadow = _load_json_if_exists(args.expanded_shadow_json)
     four_lane = _load_json_if_exists(args.four_lane_json)
 
-    raw_rows = [_candidate_summary(model_id, splits) for model_id, splits in _metrics_by_model(retune).items()]
+    raw_rows = [
+        _candidate_summary(
+            model_id,
+            splits,
+            avg_bbo_spread_bps_assumption=avg_bbo_spread_bps,
+            bbo_spread_multiplier=bbo_spread_multiplier,
+        )
+        for model_id, splits in _metrics_by_model(retune).items()
+    ]
     selection_eligible_rows = [row for row in raw_rows if row.get("selection_eligible")]
     ranked_rows = _all_ranked_candidates(selection_eligible_rows)
     quarantined = [dict(row, selection_rank=0) for row in raw_rows if not row.get("selection_eligible")]
@@ -814,7 +986,12 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     cost_csv = output_dir / "cost_sensitivity_latest.csv"
     generation_log = output_dir / "artifact_generation_validation_latest.log"
 
-    profile_ids = ["validation_strength_v1", "train_validation_robustness_v1", "cost_efficiency_v1"]
+    profile_ids = [
+        "validation_strength_v1",
+        "train_validation_robustness_v1",
+        "cost_efficiency_v1",
+        "execution_efficiency_proxy_v1",
+    ]
     profile_rankings = {
         profile_id: _rank_candidates(selection_eligible_rows, profile_id, int(args.profile_top_n))
         for profile_id in profile_ids
@@ -876,6 +1053,12 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
             "require_zero_locked_oos_liquidation": True,
             "require_zero_locked_oos_account_wipeout": True,
             "require_primary_10bps_promotion_gate": True,
+            "avg_bbo_spread_bps_assumption": avg_bbo_spread_bps,
+            "bbo_spread_multiplier": bbo_spread_multiplier,
+            "min_return_per_turnover_proxy_bps": return_per_turnover_threshold_bps,
+            "require_train_return_per_turnover_proxy_above_threshold": True,
+            "require_validation_return_per_turnover_proxy_above_threshold": True,
+            "require_locked_oos_return_per_turnover_proxy_above_threshold_report_gate": True,
         },
         "selection_policy": {
             "candidate_freeze_inputs": ["train", "validation"],
@@ -891,6 +1074,29 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
             "uses_locked_oos_for_correlation": False,
             "locked_oos_role": "gate_report_only_after_train_validation_profile_freeze",
             "calendar_rule_policy": "calendar_primary rows are quarantined before ranking",
+            "execution_efficiency_proxy_policy": (
+                "return_per_turnover_proxy_bps is computed from train+validation only for ranking; "
+                "locked-OOS proxy is attached after ranking as a report-only promotion gate"
+            ),
+        },
+        "execution_efficiency_policy": {
+            "actual_avg_bbo_spread_source": "not_available_in_10bps_expanded_retune_artifact",
+            "actual_turnover_source": "not_available_in_10bps_expanded_retune_artifact",
+            "avg_bbo_spread_bps_assumption": avg_bbo_spread_bps,
+            "bbo_spread_multiplier": bbo_spread_multiplier,
+            "return_per_turnover_proxy_threshold_bps": return_per_turnover_threshold_bps,
+            "threshold_formula": "avg_bbo_spread_bps_assumption * bbo_spread_multiplier",
+            "turnover_proxy_formula": "trade_event_count * abs(leverage * allocation_fraction)",
+            "return_per_turnover_proxy_bps_formula": "total_return * 10000 / turnover_proxy",
+            "profile_ranking_inputs": ["train", "validation"],
+            "promotion_gate_inputs": ["train", "validation", "locked_oos_report_gate"],
+            "locked_oos_role": "gate_report_only_after_train_validation_profile_freeze",
+            "uses_locked_oos_for_discovery": False,
+            "uses_locked_oos_for_selection": False,
+            "uses_locked_oos_for_objective": False,
+            "uses_locked_oos_for_pruning": False,
+            "uses_locked_oos_for_parameter_fitting": False,
+            "actual_bbo_required_before_real_money": True,
         },
         "selection_profiles": {profile_id: _profile_metadata(profile_id) for profile_id in profile_ids},
         "profile_rankings": profile_rankings,
@@ -941,6 +1147,10 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
                 f"primary_round_trip_cost_bps={PRIMARY_ROUND_TRIP_COST_BPS}",
                 f"candidate_count={summary['candidate_count']}",
                 f"paper_candidate_count={summary['paper_candidate_count']}",
+                f"avg_bbo_spread_bps_assumption={avg_bbo_spread_bps}",
+                f"bbo_spread_multiplier={bbo_spread_multiplier}",
+                f"return_per_turnover_proxy_threshold_bps={return_per_turnover_threshold_bps}",
+                f"execution_efficiency_proxy_gate_pass_count={summary['execution_efficiency_proxy_gate_pass_count']}",
                 f"ready_for_paper={str(payload['ready_for_paper']).lower()}",
                 f"ready_for_real={str(payload['ready_for_real']).lower()}",
                 f"real_money_execution={str(payload['real_money_execution']).lower()}",
@@ -971,6 +1181,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--decision-top-n", type=int, default=25)
     parser.add_argument("--shadow-top-n", type=int, default=60)
     parser.add_argument("--cost-top-n", type=int, default=25)
+    parser.add_argument("--avg-bbo-spread-bps-assumption", type=float, default=DEFAULT_AVG_BBO_SPREAD_BPS_ASSUMPTION)
+    parser.add_argument("--bbo-spread-multiplier", type=float, default=DEFAULT_BBO_SPREAD_MULTIPLIER)
     return parser.parse_args(argv)
 
 
