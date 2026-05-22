@@ -700,3 +700,19 @@ The sample-guarded 10bps discovery runner was tuned to incorporate the execution
 Regenerated artifacts under `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_sample_guarded_alpha_discovery_20260520/`, including timestamped JSON `alpha_zoo_sample_guarded_alpha_discovery_20260522T105008Z.json`, latest JSON/Markdown/CSVs, and `artifact_generation_validation_latest.log`. The updated run still found `0` new paper candidates across `976` complete 10bps models: `252` thin-sample shadows, `724` reject/quarantine, `20` historical OOS-bucket quarantines, and `0` calendar quarantines. Execution-efficiency proxy pass counts were: train `184`, validation `376`, locked-OOS report gate `57`, and full proxy gate `40`; those rows still failed other sample, locked-OOS, or primary 10bps promotion requirements. The four existing `quality_single_pair` paper/testnet baseline lanes remain unchanged, and all artifacts keep `ready_for_real=false` and `real_money_execution=false`.
 
 Verification passed on 2026-05-22 UTC: artifact regeneration; targeted sample-guarded tests `6 passed`; full pytest `1384 passed` with max RSS `2,729,152 KiB` (<8 GiB); `ruff check .`; `python -m compileall -q src scripts tests`; `git diff --check`; and `git diff --cached --check`. Verification log: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_sample_guarded_alpha_discovery_20260520/local_verification_sample_guarded_turnover_proxy_20260522T105007Z.log`.
+
+## 2026-05-22 KST — Actual fill/BBO efficiency gate added, pending telemetry
+
+Added a fail-closed actual paper/testnet telemetry gate for the Alpha Zoo sample-guarded path: `scripts/research/run_alpha_zoo_paper_fill_efficiency_gate.py`. It consumes the sample-guarded discovery artifact, the paper-forward monitoring contract, and an optional fill JSONL. This is not an execution runner and it never enables real-money trading.
+
+The gate converts the earlier proxy condition into the actual telemetry contract to use once paper/testnet fills exist:
+
+- Return per turnover: `sum(realized_pnl_quote) * 10000 / sum(abs(notional_quote))`.
+- Average BBO spread: notional-weighted average `spread_bps_at_submit`.
+- Primary edge gate: `realized_return_per_turnover_bps > avg_bbo_spread_bps * 5`.
+- Cost gates: mean all-in cost `<=10bps`, p95 all-in cost `<=15bps`.
+- Execution hygiene: timeout/cancel/partial-fill limits, zero liquidation, zero account wipeout.
+
+No paper/testnet fill JSONL is available in the repo yet, so the generated artifact is intentionally fail-closed: status `pending_paper_testnet_fill_telemetry`, `fill_count=0`, `actual_fill_efficiency_gate_pass=false`, `ready_for_real=false`, and `real_money_execution=false`. Artifact dir: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_paper_fill_efficiency_gate_20260522/`; timestamped JSON `alpha_zoo_paper_fill_efficiency_gate_20260522T110432Z.json`, latest JSON/MD, `paper_fill_efficiency_decisions_latest.csv`, and `artifact_generation_validation_latest.log` were written.
+
+Verification passed on 2026-05-22 UTC: artifact regeneration; new fill-efficiency gate tests `4 passed`; sample-guarded regression tests `6 passed`; full pytest `1388 passed` with max RSS `2,732,348 KiB` (<8 GiB); `ruff check .`; `python -m compileall -q src scripts tests`; `git diff --check`; and `git diff --cached --check`. Verification log: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_paper_fill_efficiency_gate_20260522/local_verification_alpha_zoo_paper_fill_efficiency_gate_20260522T110431Z.log`.
