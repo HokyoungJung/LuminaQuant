@@ -1,0 +1,9 @@
+artifact_kind=alpha_zoo_corr_integer_leverage_portfolio
+candidate_count=11
+captured_pnl_candidate_count=11
+ready_for_paper=True
+ready_for_real=False
+real_money_execution=False
+shadow_monitoring_review_only=False
+locked_oos_used_for_selection=False
+runner_peak_rss_mib=6340.18

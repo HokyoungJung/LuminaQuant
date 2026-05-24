@@ -1,0 +1,126 @@
+{
+  "output_paths": {
+    "artifact_generation_validation_log": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_corr_integer_leverage_portfolio_20260524/artifact_generation_validation_latest.log",
+    "latest_json": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_corr_integer_leverage_portfolio_20260524/alpha_zoo_corr_integer_leverage_portfolio_latest.json",
+    "latest_markdown": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_corr_integer_leverage_portfolio_20260524/alpha_zoo_corr_integer_leverage_portfolio_latest.md",
+    "paper_testnet_handoff_json": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_corr_integer_leverage_portfolio_20260524/paper_testnet_integer_leverage_handoff_latest.json",
+    "paper_testnet_handoff_markdown": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_corr_integer_leverage_portfolio_20260524/paper_testnet_integer_leverage_handoff_latest.md",
+    "paper_testnet_preflight_json": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_corr_integer_leverage_portfolio_20260524/paper_testnet_integer_leverage_preflight_latest.json",
+    "paper_testnet_preflight_markdown": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_corr_integer_leverage_portfolio_20260524/paper_testnet_integer_leverage_preflight_latest.md",
+    "profile_decisions_csv": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_corr_integer_leverage_portfolio_20260524/integer_leverage_profile_decisions_latest.csv",
+    "timestamped_json": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_corr_integer_leverage_portfolio_20260524/alpha_zoo_corr_integer_leverage_portfolio_20260524T122556Z.json"
+  },
+  "ready_for_paper": true,
+  "selected_profile": {
+    "gross_notional_fraction": 1.0,
+    "leverage_map": {
+      "SOLUSDT": 2,
+      "TRXUSDT": 1
+    },
+    "locked_oos_account_wipeout_count_report_only": 0,
+    "locked_oos_liquidation_count_report_only": 0,
+    "locked_oos_mdd_report_only": 0.07200251885357589,
+    "locked_oos_return_per_turnover_proxy_bps_report_only": 22.209026828164,
+    "locked_oos_return_report_only": 0.05530047680212835,
+    "locked_oos_trade_event_count_report_only": 100,
+    "profile_id": "balanced_mdd12_gross5",
+    "promotion_gate_pass": true,
+    "rank": 1,
+    "ready_for_paper": true,
+    "ready_for_real": false,
+    "real_money_execution": false,
+    "rejection_reasons": [],
+    "selected_candidate_count": 4,
+    "selected_model_ids": [
+      "debrepair_debounced_efficiency_repair_1h_solusdt_short_only_lb12_e0p02_x0p005_hold36_cool0_none_3p0x_0p15_1e40357d",
+      "debrepair_debounced_efficiency_repair_1h_solusdt_long_short_lb12_e0p03_x-0p005_hold48_cool0_none_3p0x_0p15_d6eac828",
+      "a30fb_booster_rs_chandelier_2h_solusdt_lb12_atr0p25_rel0p005_trail3p0_hold18_4p0x_0p125_9eeb8c26",
+      "a30fb_voladj_trend_4h_trxusdt_lb6_z1p5_hold12_cool2_adx15_3p0x_0p15_cca555d7"
+    ],
+    "shadow_gate_pass": true,
+    "strict_promotion_profile": true,
+    "train_account_wipeout_count": 0,
+    "train_liquidation_count": 0,
+    "train_mdd": 0.2925308385690246,
+    "train_return": 0.7466849278491126,
+    "train_return_per_turnover_proxy_bps": 30.912230505034675,
+    "train_trade_event_count": 945,
+    "train_validation_score": 3.496227124630141,
+    "validation_account_wipeout_count": 0,
+    "validation_liquidation_count": 0,
+    "validation_mdd": 0.11613374478879657,
+    "validation_return": 0.3321534933766208,
+    "validation_return_per_turnover_proxy_bps": 57.022058948776106,
+    "validation_trade_event_count": 229
+  },
+  "selected_shadow_profile": {
+    "gross_notional_fraction": 4.9,
+    "leverage_map": {
+      "ETHUSDT": 8,
+      "SOLUSDT": 4,
+      "TRXUSDT": 12
+    },
+    "locked_oos_account_wipeout_count_report_only": 0,
+    "locked_oos_liquidation_count_report_only": 0,
+    "locked_oos_mdd_report_only": 0.12363018269476478,
+    "locked_oos_return_per_turnover_proxy_bps_report_only": 21.8693172067669,
+    "locked_oos_return_report_only": 0.2757720899773306,
+    "locked_oos_trade_event_count_report_only": 158,
+    "profile_id": "aggressive_mdd30_gross10_shadow",
+    "promotion_gate_pass": false,
+    "rank": 1,
+    "ready_for_paper": false,
+    "ready_for_real": false,
+    "real_money_execution": false,
+    "rejection_reasons": [
+      "relaxed_shadow_profile_not_strict_12pct_mdd_promotion"
+    ],
+    "selected_candidate_count": 6,
+    "selected_model_ids": [
+      "debrepair_debounced_efficiency_repair_1h_solusdt_short_only_lb12_e0p02_x0p005_hold36_cool0_none_3p0x_0p15_1e40357d",
+      "debrepair_debounced_efficiency_repair_1h_solusdt_long_short_lb12_e0p03_x-0p005_hold48_cool0_none_3p0x_0p15_d6eac828",
+      "a30fb_booster_rs_chandelier_2h_solusdt_lb12_atr0p25_rel0p005_trail3p0_hold18_4p0x_0p125_9eeb8c26",
+      "a30fb_asset_diverse_residual_reclaim_2h_ethusdt_btcusdt_lb48_z1p0_hold6_4p0x_0p125_fa49c5d5",
+      "debrepair_debounced_efficiency_repair_1h_solusdt_short_only_lb6_e0p02_x0p005_hold12_cool6_none_4p0x_0p1_b27a86b8",
+      "a30fb_voladj_trend_4h_trxusdt_lb6_z1p5_hold12_cool2_adx15_3p0x_0p15_cca555d7"
+    ],
+    "shadow_gate_pass": true,
+    "strict_promotion_profile": false,
+    "train_account_wipeout_count": 0,
+    "train_liquidation_count": 0,
+    "train_mdd": 0.5479880361195086,
+    "train_return": 4.384462025211174,
+    "train_return_per_turnover_proxy_bps": 38.814288466812805,
+    "train_trade_event_count": 1539,
+    "train_validation_score": 11.689930334157077,
+    "validation_account_wipeout_count": 0,
+    "validation_liquidation_count": 0,
+    "validation_mdd": 0.29404394589156757,
+    "validation_return": 1.174976380893983,
+    "validation_return_per_turnover_proxy_bps": 44.155444603306385,
+    "validation_trade_event_count": 360
+  }
+}
+	Command being timed: ".venv/bin/python scripts/research/run_alpha_zoo_corr_integer_leverage_portfolio.py"
+	User time (seconds): 381.30
+	System time (seconds): 20.99
+	Percent of CPU this job got: 153%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 4:22.47
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 6492344
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 4
+	Minor (reclaiming a frame) page faults: 2539465
+	Voluntary context switches: 307011
+	Involuntary context switches: 5885
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 144
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

@@ -1,0 +1,76 @@
+verification_started_utc=2026-05-24T12:26:17Z
+artifact_invariant_ok {"leverage_map": {"SOLUSDT": 2, "TRXUSDT": 1}, "locked_oos": 0.05530047680212835, "rss_mib": 6340.1796875, "selected": "balanced_mdd12_gross5", "train": 0.7466849278491126, "validation": 0.3321534933766208}
+.............                                                            [100%]
+13 passed in 0.18s
+	Command being timed: ".venv/bin/python -m pytest tests/test_alpha_zoo_corr_integer_leverage_portfolio.py tests/test_alpha_zoo_pnl_correlation_decision.py tests/test_alpha_zoo_multi_asset_monitoring_slate.py -q"
+	User time (seconds): 1.76
+	System time (seconds): 0.15
+	Percent of CPU this job got: 203%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.94
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 176516
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 27428
+	Voluntary context switches: 23
+	Involuntary context switches: 59
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 592
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+All checks passed!
+Hardcoded parameter audit: total=567 new=0 baselined=567
+JSON report: reports/quality/hardcoded_params_report.json
+Markdown report: reports/quality/hardcoded_params_report.md
+........................................................................ [  5%]
+........................................................................ [ 10%]
+........................................................................ [ 15%]
+........................................................................ [ 20%]
+........................................................................ [ 25%]
+........................................................................ [ 30%]
+........................................................................ [ 35%]
+........................................................................ [ 40%]
+........................................................................ [ 45%]
+........................................................................ [ 50%]
+........................................................................ [ 55%]
+........................................................................ [ 60%]
+........................................................................ [ 65%]
+........................................................................ [ 70%]
+........................................................................ [ 75%]
+........................................................................ [ 80%]
+........................................................................ [ 85%]
+........................................................................ [ 90%]
+........................................................................ [ 95%]
+...................................................................      [100%]
+1435 passed in 64.41s (0:01:04)
+	Command being timed: ".venv/bin/python -m pytest -q"
+	User time (seconds): 66.86
+	System time (seconds): 14.68
+	Percent of CPU this job got: 132%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:01.41
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 2755288
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 315
+	Minor (reclaiming a frame) page faults: 1898765
+	Voluntary context switches: 315855
+	Involuntary context switches: 2986
+	Swaps: 0
+	File system inputs: 38536
+	File system outputs: 210696
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+verification_finished_utc=2026-05-24T12:27:21Z

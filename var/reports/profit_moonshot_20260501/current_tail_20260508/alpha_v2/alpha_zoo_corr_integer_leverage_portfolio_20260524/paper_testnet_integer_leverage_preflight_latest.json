@@ -1,0 +1,60 @@
+{
+  "blocked_real_money_reason": "research_artifact_only_real_money_execution_forbidden",
+  "paper_testnet_only": true,
+  "preflight_kind": "paper_testnet_integer_asset_leverage_preflight",
+  "ready_for_paper": true,
+  "ready_for_real": false,
+  "real_execution_allowed": false,
+  "real_money_execution": false,
+  "required_before_any_monitoring": {
+    "confirm_replay_live_notional_parity": true,
+    "enforce_integer_asset_leverage": true,
+    "record_account_wipeout": true,
+    "record_liquidation_inclusive_mdd": true,
+    "record_realized_bbo_spread": true,
+    "record_realized_fee_slippage_round_trip_cost": true
+  },
+  "selected_profile": {
+    "gross_notional_fraction": 1.0,
+    "leverage_map": {
+      "SOLUSDT": 2,
+      "TRXUSDT": 1
+    },
+    "locked_oos_account_wipeout_count_report_only": 0,
+    "locked_oos_liquidation_count_report_only": 0,
+    "locked_oos_mdd_report_only": 0.07200251885357589,
+    "locked_oos_return_per_turnover_proxy_bps_report_only": 22.209026828164,
+    "locked_oos_return_report_only": 0.05530047680212835,
+    "locked_oos_trade_event_count_report_only": 100,
+    "profile_id": "balanced_mdd12_gross5",
+    "promotion_gate_pass": true,
+    "rank": 1,
+    "ready_for_paper": true,
+    "ready_for_real": false,
+    "real_money_execution": false,
+    "rejection_reasons": [],
+    "selected_candidate_count": 4,
+    "selected_model_ids": [
+      "debrepair_debounced_efficiency_repair_1h_solusdt_short_only_lb12_e0p02_x0p005_hold36_cool0_none_3p0x_0p15_1e40357d",
+      "debrepair_debounced_efficiency_repair_1h_solusdt_long_short_lb12_e0p03_x-0p005_hold48_cool0_none_3p0x_0p15_d6eac828",
+      "a30fb_booster_rs_chandelier_2h_solusdt_lb12_atr0p25_rel0p005_trail3p0_hold18_4p0x_0p125_9eeb8c26",
+      "a30fb_voladj_trend_4h_trxusdt_lb6_z1p5_hold12_cool2_adx15_3p0x_0p15_cca555d7"
+    ],
+    "shadow_gate_pass": true,
+    "strict_promotion_profile": true,
+    "train_account_wipeout_count": 0,
+    "train_liquidation_count": 0,
+    "train_mdd": 0.2925308385690246,
+    "train_return": 0.7466849278491126,
+    "train_return_per_turnover_proxy_bps": 30.912230505034675,
+    "train_trade_event_count": 945,
+    "train_validation_score": 3.496227124630141,
+    "validation_account_wipeout_count": 0,
+    "validation_liquidation_count": 0,
+    "validation_mdd": 0.11613374478879657,
+    "validation_return": 0.3321534933766208,
+    "validation_return_per_turnover_proxy_bps": 57.022058948776106,
+    "validation_trade_event_count": 229
+  },
+  "status": "paper_testnet_allowed_real_money_blocked"
+}
