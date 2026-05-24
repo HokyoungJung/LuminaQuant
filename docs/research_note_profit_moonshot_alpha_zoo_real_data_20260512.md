@@ -900,3 +900,33 @@ Selected hybrid: `hybrid_mdd20_three_profile_blend`, weights `balanced_mdd12_gro
 Interpretation: the hybrid slightly improves validation return and validation MDD versus the growth profile while keeping the MDD~20 risk label and preserving positive locked-OOS/RPT/liquidation gates. It does not dominate growth on locked-OOS return (`+21.30%` vs `+23.37%`) and it does not match aggressive return, because the aggressive profile's drawdown is deliberately diluted. Train+validation PnL correlations show why: balanced-growth is moderately correlated (`0.5790`), but balanced-aggressive (`0.8493`) and growth-aggressive (`0.8680`) are high, so the hybrid is a risk-return compromise rather than a new independent alpha sleeve.
 
 Verification passed locally. Artifact dir: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_integer_leverage_hybrid_decision_20260524/`; latest JSON/Markdown, timestamped JSON, comparison CSV, weight-candidate CSV, methodology note, runner log, and `verification_summary_latest.md` were written. Verification log `local_verification_hybrid_decision_20260524T132911Z.log`: artifact invariant pass, targeted tests `9 passed`, `ruff check .`, `compileall`, hardcoded audit `total=567 new=0`, diff checks, and full pytest `1440 passed in 68.46s`. Runner max RSS `6,505,524 KiB` and full pytest max RSS `2,771,296 KiB`, both below 8 GiB.
+
+## 2026-05-24 KST — Optuna v3.5/v3.6 correction for the integer-leverage hybrid
+
+The previous three-profile hybrid decision used a coarse `5%` grid and therefore was **not** equivalent to the repository's hybrid v3.5/v3.6 Optuna workflow. This was corrected with `scripts/research/run_alpha_zoo_integer_leverage_optuna_hybrid_decision.py` and `tests/test_alpha_zoo_integer_leverage_optuna_hybrid_decision.py`.
+
+Artifact dir: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_integer_leverage_optuna_hybrid_decision_20260524/`. Latest outputs include `alpha_zoo_integer_leverage_optuna_hybrid_decision_latest.json|md`, comparison CSV, top-trials CSV, methodology note, paper/testnet handoff, hardcoded audit report, and `verification_summary_latest.md`.
+
+Method correction:
+
+- Source universe remains the same three paper/testnet integer-leverage profiles: `balanced_mdd12_gross5`, `growth_mdd20_gross8`, and `aggressive_mdd30_gross10_shadow`.
+- The prior grid hybrid is retained only as a comparison row, not the optimizer-selected decision surface.
+- Optuna uses `TPESampler`, `240` trials per version, and the same parameter family as `run_profit_moonshot_hybrid_v35_v36_fixed_inputs.py`: bias alpha/combine ratio, max single weight, MAPE/rolling score window, bias window, and short-volatility window.
+- v3.5 mapping: warmup-learned default profile + rolling return/error weights + high-volatility boost + bias/exposure dampening.
+- v3.6 mapping: v3.5 mechanics plus online adaptive default-profile refresh from rolling score evidence.
+- Objective/learning/selection use train+validation only. locked-OOS is attached after frozen Optuna params and remains gate/report-only; all locked-OOS discovery/selection/objective/pruning/parameter-fitting flags are false.
+
+Result after embedded `10bps` round-trip friction proxy:
+
+| Profile | Optimizer | Train | Validation | locked-OOS report-only | Validation MDD | OOS MDD | RPT bps T/V/OOS |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `balanced_mdd12_gross5` | source | `+74.6685%` | `+33.2153%` | `+5.5300%` | `11.6134%` | `7.2003%` | `30.91/57.02/22.21` |
+| `growth_mdd20_gross8` | source | `+262.3353%` | `+71.6291%` | `+23.3695%` | `19.9983%` | `9.2371%` | `32.16/37.72/23.35` |
+| `aggressive_mdd30_gross10_shadow` | source | `+438.4462%` | `+117.4976%` | `+27.5772%` | `29.4044%` | `12.3630%` | `38.81/44.16/21.87` |
+| `hybrid_mdd20_three_profile_blend` | old grid baseline | `+262.3642%` | `+72.5692%` | `+21.2977%` | `19.9330%` | `9.0718%` | `33.78/39.96/22.97` |
+| `hybrid_v3_5_optuna_three_profile_blend` | Optuna v3.5 | `+611.5025%` | `+138.3170%` | `+20.8319%` | `18.9796%` | `10.5735%` | `83.39/79.17/25.29` |
+| `hybrid_v3_6_optuna_three_profile_blend` | Optuna v3.6 | `+296.4869%` | `+85.9099%` | `+11.5273%` | `15.7399%` | `8.4448%` | `51.05/62.78/17.91` |
+
+Selected Optuna hybrid: `hybrid_v3_5_optuna_three_profile_blend`. Average train+validation profile weights are approximately aggressive `78.11%`, balanced `10.91%`, and growth `10.98%`; final active weights are lower because the v3.5 exposure-dampening rule can hold cash. It passes the paper/testnet candidate gates, but remains non-real-money: `ready_for_real=false`, `real_money_execution=false`, and `real_execution_allowed=false`. The paper/testnet handoff requires realized BBO/fill/all-in cost telemetry, replay/live notional parity, liquidation-inclusive MDD, account wipeout, and margin-buffer monitoring before any future review.
+
+Verification passed locally: artifact invariant check; runner max RSS `6,357,368 KiB` (<8 GiB), elapsed `32:37.97`; targeted tests `13 passed`; `ruff check .`; `python -m compileall -q src scripts tests`; hardcoded audit `total=567 new=0`; diff checks; full pytest `1444 passed in 76.49s` with max RSS `2,723,060 KiB` (<8 GiB).
