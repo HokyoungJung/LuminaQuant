@@ -8,10 +8,13 @@
     "paper_testnet_preflight_json": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_corr_integer_leverage_portfolio_20260524/paper_testnet_integer_leverage_preflight_latest.json",
     "paper_testnet_preflight_markdown": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_corr_integer_leverage_portfolio_20260524/paper_testnet_integer_leverage_preflight_latest.md",
     "profile_decisions_csv": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_corr_integer_leverage_portfolio_20260524/integer_leverage_profile_decisions_latest.csv",
-    "timestamped_json": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_corr_integer_leverage_portfolio_20260524/alpha_zoo_corr_integer_leverage_portfolio_20260524T122556Z.json"
+    "strategy_integrity_review_json": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_corr_integer_leverage_portfolio_20260524/strategy_integrity_review_latest.json",
+    "strategy_integrity_review_markdown": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_corr_integer_leverage_portfolio_20260524/strategy_integrity_review_latest.md",
+    "timestamped_json": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_corr_integer_leverage_portfolio_20260524/alpha_zoo_corr_integer_leverage_portfolio_20260524T124248Z.json"
   },
   "ready_for_paper": true,
   "selected_profile": {
+    "candidate_tier": "strict_promotion_paper_testnet_candidate",
     "gross_notional_fraction": 1.0,
     "leverage_map": {
       "SOLUSDT": 2,
@@ -23,6 +26,7 @@
     "locked_oos_return_per_turnover_proxy_bps_report_only": 22.209026828164,
     "locked_oos_return_report_only": 0.05530047680212835,
     "locked_oos_trade_event_count_report_only": 100,
+    "paper_testnet_candidate": true,
     "profile_id": "balanced_mdd12_gross5",
     "promotion_gate_pass": true,
     "rank": 1,
@@ -39,6 +43,7 @@
     ],
     "shadow_gate_pass": true,
     "strict_promotion_profile": true,
+    "strict_promotion_rejection_reasons": [],
     "train_account_wipeout_count": 0,
     "train_liquidation_count": 0,
     "train_mdd": 0.2925308385690246,
@@ -54,6 +59,7 @@
     "validation_trade_event_count": 229
   },
   "selected_shadow_profile": {
+    "candidate_tier": "relaxed_paper_testnet_candidate",
     "gross_notional_fraction": 4.9,
     "leverage_map": {
       "ETHUSDT": 8,
@@ -66,15 +72,14 @@
     "locked_oos_return_per_turnover_proxy_bps_report_only": 21.8693172067669,
     "locked_oos_return_report_only": 0.2757720899773306,
     "locked_oos_trade_event_count_report_only": 158,
+    "paper_testnet_candidate": true,
     "profile_id": "aggressive_mdd30_gross10_shadow",
     "promotion_gate_pass": false,
     "rank": 1,
-    "ready_for_paper": false,
+    "ready_for_paper": true,
     "ready_for_real": false,
     "real_money_execution": false,
-    "rejection_reasons": [
-      "relaxed_shadow_profile_not_strict_12pct_mdd_promotion"
-    ],
+    "rejection_reasons": [],
     "selected_candidate_count": 6,
     "selected_model_ids": [
       "debrepair_debounced_efficiency_repair_1h_solusdt_short_only_lb12_e0p02_x0p005_hold36_cool0_none_3p0x_0p15_1e40357d",
@@ -86,6 +91,9 @@
     ],
     "shadow_gate_pass": true,
     "strict_promotion_profile": false,
+    "strict_promotion_rejection_reasons": [
+      "relaxed_profile_not_strict_12pct_mdd_promotion"
+    ],
     "train_account_wipeout_count": 0,
     "train_liquidation_count": 0,
     "train_mdd": 0.5479880361195086,
@@ -102,23 +110,23 @@
   }
 }
 	Command being timed: ".venv/bin/python scripts/research/run_alpha_zoo_corr_integer_leverage_portfolio.py"
-	User time (seconds): 381.30
-	System time (seconds): 20.99
-	Percent of CPU this job got: 153%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 4:22.47
+	User time (seconds): 387.86
+	System time (seconds): 20.96
+	Percent of CPU this job got: 151%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 4:30.02
 	Average shared text size (kbytes): 0
 	Average unshared data size (kbytes): 0
 	Average stack size (kbytes): 0
 	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 6492344
+	Maximum resident set size (kbytes): 6396380
 	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 4
-	Minor (reclaiming a frame) page faults: 2539465
-	Voluntary context switches: 307011
-	Involuntary context switches: 5885
+	Major (requiring I/O) page faults: 2722
+	Minor (reclaiming a frame) page faults: 2527165
+	Voluntary context switches: 318100
+	Involuntary context switches: 6267
 	Swaps: 0
-	File system inputs: 0
-	File system outputs: 144
+	File system inputs: 459136
+	File system outputs: 296
 	Socket messages sent: 0
 	Socket messages received: 0
 	Signals delivered: 0

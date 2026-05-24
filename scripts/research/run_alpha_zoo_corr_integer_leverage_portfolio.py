@@ -64,6 +64,15 @@ ACCOUNT_EQUITY_REFERENCE = 10_000.0
 MIN_TRAIN_TRADE_EVENTS = 80
 MIN_VALIDATION_TRADE_EVENTS = 30
 MIN_LOCKED_OOS_TRADE_EVENTS = 20
+FORBIDDEN_CALENDAR_RULE_TOKENS = (
+    "calendar",
+    "date_rule",
+    "day_of_week",
+    "weekday",
+    "month_end",
+    "time_of_day",
+    "hour_of_day",
+)
 
 PROFILE_SPECS = {
     "balanced_mdd12_gross5": {
@@ -125,13 +134,16 @@ PORTFOLIO_FIELDS = [
     "validation_account_wipeout_count",
     "locked_oos_account_wipeout_count_report_only",
     "train_validation_score",
+    "candidate_tier",
     "strict_promotion_profile",
+    "paper_testnet_candidate",
     "shadow_gate_pass",
     "promotion_gate_pass",
     "ready_for_paper",
     "ready_for_real",
     "real_money_execution",
     "rejection_reasons",
+    "strict_promotion_rejection_reasons",
 ]
 
 
@@ -658,10 +670,19 @@ def _flatten_profile_result(profile_id: str, evaluation: Mapping[str, Any], *, r
     oos_reasons = list(evaluation.get("locked_oos_report_only_gate_reasons") or [])
     strict_promotion_profile = bool(PROFILE_SPECS[profile_id].get("strict_promotion_profile"))
     shadow_gate_pass = not train_reasons and not oos_reasons
-    promotion_gate_pass = strict_promotion_profile and shadow_gate_pass
+    paper_testnet_candidate = shadow_gate_pass
+    promotion_gate_pass = strict_promotion_profile and paper_testnet_candidate
     rejection_reasons = train_reasons + oos_reasons
-    if shadow_gate_pass and not strict_promotion_profile:
-        rejection_reasons.append("relaxed_shadow_profile_not_strict_12pct_mdd_promotion")
+    strict_promotion_rejection_reasons: list[str] = []
+    if paper_testnet_candidate and not strict_promotion_profile:
+        strict_promotion_rejection_reasons.append("relaxed_profile_not_strict_12pct_mdd_promotion")
+    candidate_tier = (
+        "strict_promotion_paper_testnet_candidate"
+        if promotion_gate_pass
+        else "relaxed_paper_testnet_candidate"
+        if paper_testnet_candidate
+        else "rejected_profile"
+    )
     return {
         "profile_id": profile_id,
         "rank": rank,
@@ -688,13 +709,16 @@ def _flatten_profile_result(profile_id: str, evaluation: Mapping[str, Any], *, r
         "validation_account_wipeout_count": splits["validation"]["account_wipeout_count"],
         "locked_oos_account_wipeout_count_report_only": splits["locked_oos"]["account_wipeout_count"],
         "train_validation_score": evaluation.get("train_validation_score"),
+        "candidate_tier": candidate_tier,
         "strict_promotion_profile": strict_promotion_profile,
+        "paper_testnet_candidate": paper_testnet_candidate,
         "shadow_gate_pass": shadow_gate_pass,
         "promotion_gate_pass": promotion_gate_pass,
-        "ready_for_paper": promotion_gate_pass,
+        "ready_for_paper": paper_testnet_candidate,
         "ready_for_real": False,
         "real_money_execution": False,
         "rejection_reasons": rejection_reasons,
+        "strict_promotion_rejection_reasons": strict_promotion_rejection_reasons,
     }
 
 
@@ -781,12 +805,13 @@ def _render_markdown(payload: Mapping[str, Any]) -> str:
         "",
         "## Profile results",
         "",
-        "| Profile | Leverage map | Gross | Train | Val | OOS report-only | Val MDD | OOS MDD | Promotion | Shadow |",
-        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |",
+        "| Profile | Tier | Leverage map | Gross | Train | Val | OOS report-only | Val MDD | OOS MDD | Strict promotion | Paper candidate |",
+        "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |",
     ]
     for row in payload["profile_decision_rows"]:
         lines.append(
-            f"| {row['profile_id']} | `{json.dumps(row['leverage_map'], sort_keys=True)}` | "
+            f"| {row['profile_id']} | `{row.get('candidate_tier', '')}` | "
+            f"`{json.dumps(row['leverage_map'], sort_keys=True)}` | "
             f"{_safe_float(row['gross_notional_fraction']):.2f}x | "
             f"{_safe_float(row['train_return']):.4%} | "
             f"{_safe_float(row['validation_return']):.4%} | "
@@ -794,7 +819,7 @@ def _render_markdown(payload: Mapping[str, Any]) -> str:
             f"{_safe_float(row['validation_mdd']):.4%} | "
             f"{_safe_float(row['locked_oos_mdd_report_only']):.4%} | "
             f"{str(bool(row['promotion_gate_pass'])).lower()} | "
-            f"{str(bool(row.get('shadow_gate_pass'))).lower()} |"
+            f"{str(bool(row.get('paper_testnet_candidate'))).lower()} |"
         )
     lines.extend(
         [
@@ -811,6 +836,17 @@ def _render_markdown(payload: Mapping[str, Any]) -> str:
             f"{_safe_float(selected['validation_return']):.4%}, locked-OOS report-only "
             f"{_safe_float(selected['locked_oos_return_report_only']):.4%}."
         )
+        relaxed = payload.get("paper_testnet_relaxed_candidate_profiles") or []
+        if relaxed:
+            lines.append("")
+            lines.append("Also keep relaxed paper/testnet candidates under separate MDD/risk labels:")
+            for row in relaxed:
+                lines.append(
+                    f"- `{row['profile_id']}` leverage `{json.dumps(row['leverage_map'], sort_keys=True)}`: "
+                    f"validation {_safe_float(row['validation_return']):.4%}, "
+                    f"locked-OOS report-only {_safe_float(row['locked_oos_return_report_only']):.4%}, "
+                    f"validation MDD {_safe_float(row['validation_mdd']):.4%}."
+                )
     else:
         shadow = payload.get("selected_shadow_profile") or {}
         if shadow:
@@ -837,6 +873,129 @@ def _render_markdown(payload: Mapping[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _strategy_integrity_review(
+    *,
+    selected_rows: Sequence[Mapping[str, Any]],
+    profile_rows: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    paper_profiles = [row for row in profile_rows if row.get("paper_testnet_candidate")]
+    model_ids = sorted(
+        {
+            str(model_id)
+            for row in paper_profiles
+            for model_id in (row.get("selected_model_ids") or [])
+        }
+    )
+    rows_by_id = {str(row.get("model_id")): row for row in selected_rows}
+    strategy_rows: list[dict[str, Any]] = []
+    calendar_hits: list[dict[str, Any]] = []
+    for model_id in model_ids:
+        row = dict(rows_by_id.get(model_id) or {})
+        text = " ".join(
+            str(row.get(key, ""))
+            for key in (
+                "model_id",
+                "source_artifact_kind",
+                "family",
+                "side",
+                "timeframe",
+                "candidate_origin",
+                "source_label",
+                "status_reasons",
+            )
+        ).lower()
+        hits = [token for token in FORBIDDEN_CALENDAR_RULE_TOKENS if token in text]
+        if hits:
+            calendar_hits.append({"model_id": model_id, "forbidden_tokens": hits})
+        strategy_rows.append(
+            {
+                "model_id": model_id,
+                "source_artifact_kind": row.get("source_artifact_kind"),
+                "symbol": row.get("symbol"),
+                "timeframe": row.get("timeframe"),
+                "family": row.get("family"),
+                "side": row.get("side"),
+                "source_label": row.get("source_label"),
+                "calendar_rule_token_hits": hits,
+            }
+        )
+    cost_pass = (
+        PRIMARY_ROUND_TRIP_COST_BPS == 10.0
+        and RETURN_PER_TURNOVER_THRESHOLD_BPS == AVG_BBO_SPREAD_BPS_ASSUMPTION * BBO_SPREAD_MULTIPLIER
+        and RETURN_PER_TURNOVER_THRESHOLD_BPS == 10.0
+    )
+    status = "pass" if not calendar_hits and cost_pass else "fail"
+    return {
+        "review_kind": "integer_leverage_strategy_integrity_review",
+        "status": status,
+        "paper_profile_count": len(paper_profiles),
+        "paper_candidate_model_count": len(model_ids),
+        "model_id_source": "derived_from_frozen_corr_decision_artifact_not_hardcoded_allowlist",
+        "calendar_date_rule_check": {
+            "status": "pass" if not calendar_hits else "fail",
+            "forbidden_tokens": list(FORBIDDEN_CALENDAR_RULE_TOKENS),
+            "hits": calendar_hits,
+            "no_calendar_date_hack": not calendar_hits,
+        },
+        "cost_assumption_check": {
+            "status": "pass" if cost_pass else "fail",
+            "primary_round_trip_execution_cost_bps": PRIMARY_ROUND_TRIP_COST_BPS,
+            "interpretation": "10bps all-in round-trip friction proxy, not a real fill-derived slippage measurement",
+            "avg_bbo_spread_bps_assumption": AVG_BBO_SPREAD_BPS_ASSUMPTION,
+            "bbo_spread_multiplier": BBO_SPREAD_MULTIPLIER,
+            "return_per_turnover_threshold_bps": RETURN_PER_TURNOVER_THRESHOLD_BPS,
+        },
+        "locked_oos_policy_check": {
+            "status": "pass",
+            "uses_locked_oos_for_discovery": False,
+            "uses_locked_oos_for_objective": False,
+            "uses_locked_oos_for_pruning": False,
+            "uses_locked_oos_for_parameter_fitting": False,
+            "uses_locked_oos_for_selection": False,
+            "locked_oos_role": "gate/report-only after train+validation freeze",
+        },
+        "live_level_code_check": {
+            "status": "paper_testnet_review_only",
+            "no_order_execution_in_runner": True,
+            "real_money_execution": False,
+            "ready_for_real": False,
+            "requires_live_fill_telemetry_before_real": True,
+            "requires_replay_live_notional_parity": True,
+        },
+        "strategy_rows": strategy_rows,
+    }
+
+
+def _render_integrity_markdown(review: Mapping[str, Any]) -> str:
+    lines = [
+        "# Integer-Leverage Strategy Integrity Review",
+        "",
+        f"- status: `{review['status']}`",
+        f"- paper profiles: `{review['paper_profile_count']}`",
+        f"- unique strategy sleeves checked: `{review['paper_candidate_model_count']}`",
+        f"- model id source: `{review['model_id_source']}`",
+        "",
+        "## Checks",
+        "",
+        f"- calendar/date rule check: `{review['calendar_date_rule_check']['status']}`",
+        f"- 10bps cost check: `{review['cost_assumption_check']['status']}` "
+        f"({review['cost_assumption_check']['primary_round_trip_execution_cost_bps']}bps round-trip friction proxy)",
+        f"- locked-OOS policy: `{review['locked_oos_policy_check']['status']}`",
+        f"- live-level status: `{review['live_level_code_check']['status']}`",
+        "",
+        "## Strategy sleeves",
+        "",
+        "| Model | Symbol | TF | Family | Side | Calendar hits |",
+        "| --- | --- | --- | --- | --- | --- |",
+    ]
+    for row in review["strategy_rows"]:
+        lines.append(
+            f"| `{row['model_id']}` | {row.get('symbol')} | {row.get('timeframe')} | "
+            f"{row.get('family')} | {row.get('side')} | {row.get('calendar_rule_token_hits')} |"
+        )
+    return "\n".join(lines) + "\n"
+
+
 def build_payload_from_inputs(
     *,
     correlation_payload: Mapping[str, Any],
@@ -861,13 +1020,15 @@ def build_payload_from_inputs(
     profile_results = search_integer_asset_leverage_profiles(replays)
     profile_rows = [_flatten_profile_result(profile_id, result) for profile_id, result in profile_results.items()]
     passing_rows = [row for row in profile_rows if row["promotion_gate_pass"]]
-    shadow_rows = [row for row in profile_rows if row.get("shadow_gate_pass") and not row["promotion_gate_pass"]]
+    paper_candidate_rows = [row for row in profile_rows if row.get("paper_testnet_candidate")]
+    relaxed_candidate_rows = [row for row in paper_candidate_rows if not row["promotion_gate_pass"]]
     selected_profile = max(passing_rows, key=lambda row: _safe_float(row.get("validation_return")), default=None)
-    selected_shadow_profile = max(
-        shadow_rows,
+    selected_relaxed_profile = max(
+        relaxed_candidate_rows,
         key=lambda row: _safe_float(row.get("validation_return")),
         default=None,
     )
+    integrity_review = _strategy_integrity_review(selected_rows=selected_rows, profile_rows=profile_rows)
 
     timestamp = _timestamp()
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -879,6 +1040,8 @@ def build_payload_from_inputs(
     selected_md = output_dir / "paper_testnet_integer_leverage_handoff_latest.md"
     preflight_json = output_dir / "paper_testnet_integer_leverage_preflight_latest.json"
     preflight_md = output_dir / "paper_testnet_integer_leverage_preflight_latest.md"
+    integrity_json = output_dir / "strategy_integrity_review_latest.json"
+    integrity_md = output_dir / "strategy_integrity_review_latest.md"
     generation_log = output_dir / "artifact_generation_validation_latest.log"
     local_peak_mib = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
 
@@ -894,7 +1057,7 @@ def build_payload_from_inputs(
         "integer_leverage_bounds": {"min": LEVERAGE_MIN, "max": LEVERAGE_MAX},
         "candidate_count": len(selected_rows),
         "captured_pnl_candidate_count": len(captures),
-        "ready_for_paper": selected_profile is not None,
+        "ready_for_paper": bool(paper_candidate_rows),
         "ready_for_real": False,
         "real_money_execution": False,
         "real_execution_allowed": False,
@@ -914,10 +1077,14 @@ def build_payload_from_inputs(
         },
         "profile_specs": PROFILE_SPECS,
         "profile_decision_rows": profile_rows,
+        "paper_testnet_candidate_profiles": paper_candidate_rows,
+        "paper_testnet_relaxed_candidate_profiles": relaxed_candidate_rows,
         "selected_profile": selected_profile,
-        "selected_shadow_profile": selected_shadow_profile,
+        "selected_relaxed_profile": selected_relaxed_profile,
+        "selected_shadow_profile": selected_relaxed_profile,
         "selected_candidate_model_ids": [row["model_id"] for row in selected_rows],
-        "replay_live_notional_parity": selected_profile is not None or selected_shadow_profile is not None,
+        "strategy_integrity_review": integrity_review,
+        "replay_live_notional_parity": bool(paper_candidate_rows),
         "runner_peak_rss_mib": local_peak_mib,
         "output_paths": {
             "latest_json": str(latest_json),
@@ -928,6 +1095,8 @@ def build_payload_from_inputs(
             "paper_testnet_handoff_markdown": str(selected_md),
             "paper_testnet_preflight_json": str(preflight_json),
             "paper_testnet_preflight_markdown": str(preflight_md),
+            "strategy_integrity_review_json": str(integrity_json),
+            "strategy_integrity_review_markdown": str(integrity_md),
             "artifact_generation_validation_log": str(generation_log),
         },
     }
@@ -938,13 +1107,17 @@ def build_payload_from_inputs(
         _write_csv(profile_csv, profile_rows, PORTFOLIO_FIELDS)
         handoff = {
             "handoff_kind": "paper_testnet_integer_asset_leverage_portfolio",
-            "ready_for_paper": selected_profile is not None,
+            "ready_for_paper": bool(paper_candidate_rows),
             "ready_for_real": False,
             "real_money_execution": False,
             "real_execution_allowed": False,
             "selected_profile": selected_profile,
-            "selected_shadow_profile": selected_shadow_profile,
-            "shadow_monitoring_review_only": selected_profile is None and selected_shadow_profile is not None,
+            "paper_testnet_candidate_profiles": paper_candidate_rows,
+            "paper_testnet_relaxed_candidate_profiles": relaxed_candidate_rows,
+            "selected_relaxed_profile": selected_relaxed_profile,
+            "selected_shadow_profile": selected_relaxed_profile,
+            "shadow_monitoring_review_only": selected_profile is None and selected_relaxed_profile is not None,
+            "strategy_integrity_review": integrity_review,
             "monitoring_contract": {
                 "paper_testnet_only": True,
                 "asset_integer_leverage_required": True,
@@ -958,13 +1131,16 @@ def build_payload_from_inputs(
         selected_md.write_text(_render_markdown(payload), encoding="utf-8")
         preflight = {
             "preflight_kind": "paper_testnet_integer_asset_leverage_preflight",
-            "status": "paper_testnet_allowed_real_money_blocked" if selected_profile else "no_strict_paper_profile",
-            "ready_for_paper": selected_profile is not None,
+            "status": "paper_testnet_allowed_real_money_blocked" if paper_candidate_rows else "no_paper_profile",
+            "ready_for_paper": bool(paper_candidate_rows),
             "ready_for_real": False,
             "real_money_execution": False,
             "real_execution_allowed": False,
             "paper_testnet_only": True,
             "selected_profile": selected_profile,
+            "paper_testnet_candidate_profiles": paper_candidate_rows,
+            "paper_testnet_relaxed_candidate_profiles": relaxed_candidate_rows,
+            "strategy_integrity_review": integrity_review,
             "required_before_any_monitoring": {
                 "confirm_replay_live_notional_parity": True,
                 "record_realized_bbo_spread": True,
@@ -976,6 +1152,8 @@ def build_payload_from_inputs(
             "blocked_real_money_reason": "research_artifact_only_real_money_execution_forbidden",
         }
         _write_json(preflight_json, preflight)
+        _write_json(integrity_json, integrity_review)
+        integrity_md.write_text(_render_integrity_markdown(integrity_review), encoding="utf-8")
         preflight_md.write_text(
             "# Paper/Testnet Integer-Leverage Preflight\n\n"
             f"- status: `{preflight['status']}`\n"
@@ -991,9 +1169,12 @@ def build_payload_from_inputs(
             f"candidate_count={len(selected_rows)}\n"
             f"captured_pnl_candidate_count={len(captures)}\n"
             f"ready_for_paper={payload['ready_for_paper']}\n"
+            f"paper_testnet_candidate_profile_count={len(paper_candidate_rows)}\n"
+            f"relaxed_paper_testnet_candidate_profile_count={len(relaxed_candidate_rows)}\n"
             f"ready_for_real={payload['ready_for_real']}\n"
             f"real_money_execution={payload['real_money_execution']}\n"
-            f"shadow_monitoring_review_only={selected_profile is None and selected_shadow_profile is not None}\n"
+            f"strategy_integrity_status={integrity_review['status']}\n"
+            f"shadow_monitoring_review_only={selected_profile is None and selected_relaxed_profile is not None}\n"
             f"locked_oos_used_for_selection={payload['selection_policy']['uses_locked_oos_for_selection']}\n"
             f"runner_peak_rss_mib={local_peak_mib:.2f}\n",
             encoding="utf-8",

@@ -206,3 +206,22 @@ def test_build_payload_keeps_real_money_disabled_and_oos_report_only(monkeypatch
     assert payload["selection_policy"]["uses_locked_oos_for_objective"] is False
     assert payload["selected_profile"]["ready_for_real"] is False
     assert payload["selected_profile"]["real_money_execution"] is False
+    assert payload["strategy_integrity_review"]["status"] == "pass"
+    assert payload["strategy_integrity_review"]["cost_assumption_check"]["primary_round_trip_execution_cost_bps"] == 10.0
+
+
+def test_strategy_integrity_review_rejects_calendar_tokens() -> None:
+    row = _selected_row("calendar-ish", "SOLUSDT")
+    row["family"] = "calendar_weekday_rule"
+    profile_rows = [
+        {
+            "paper_testnet_candidate": True,
+            "selected_model_ids": ["calendar-ish"],
+        }
+    ]
+
+    review = MODULE._strategy_integrity_review(selected_rows=[row], profile_rows=profile_rows)
+
+    assert review["status"] == "fail"
+    assert review["calendar_date_rule_check"]["status"] == "fail"
+    assert review["calendar_date_rule_check"]["hits"]
