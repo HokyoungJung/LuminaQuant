@@ -44,6 +44,11 @@ BALANCED_MODEL_ID = "fresh_tv10_filter_abs_score_ge_1p5_alpha_zoo_quality_single
 PRIMARY_ROUND_TRIP_COST_BPS = 10.0
 SIZING_MODE = "isolated_margin_fraction"
 SYMBOLS = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "TRX/USDT"]
+# Historical paper/testnet handoff artifacts intentionally use a frozen data
+# refresh snapshot. Keep this override date-stable so research artifact tests do
+# not start failing merely because wall-clock time moved past the old 10k-minute
+# freshness window; real-money readiness is still forced false below.
+PAPER_FORWARD_STALE_MINUTES = 60 * 24 * 30
 
 MONITORING_CSV_FIELDS = [
     "role",
@@ -369,7 +374,7 @@ def _preflight_payload(decision_path: Path) -> dict[str, Any]:
         config_path=Path("config.yaml"),
         refresh_json=aligned.DEFAULT_REFRESH_JSON,
         decision_json=decision_path,
-        stale_minutes=10_000,
+        stale_minutes=PAPER_FORWARD_STALE_MINUTES,
         env=env,
     )
     payload["paper_testnet_only_governance"] = {
