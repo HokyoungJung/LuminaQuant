@@ -1,0 +1,79 @@
+{
+  "output_paths": {
+    "artifact_generation_validation_log": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_integer_leverage_hybrid_decision_20260524/artifact_generation_validation_latest.log",
+    "comparison_csv": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_integer_leverage_hybrid_decision_20260524/integer_leverage_hybrid_comparison_latest.csv",
+    "latest_json": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_integer_leverage_hybrid_decision_20260524/alpha_zoo_integer_leverage_hybrid_decision_latest.json",
+    "latest_markdown": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_integer_leverage_hybrid_decision_20260524/alpha_zoo_integer_leverage_hybrid_decision_latest.md",
+    "methodology_markdown": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_integer_leverage_hybrid_decision_20260524/integer_leverage_hybrid_methodology_latest.md",
+    "timestamped_json": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_integer_leverage_hybrid_decision_20260524/alpha_zoo_integer_leverage_hybrid_decision_20260524T132852Z.json",
+    "weight_candidates_csv": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_integer_leverage_hybrid_decision_20260524/integer_leverage_hybrid_weight_candidates_latest.csv"
+  },
+  "ready_for_paper": true,
+  "selected_hybrid_profile": {
+    "asset_gross_notional_fraction": {
+      "ETHUSDT": 0.85,
+      "SOLUSDT": 1.2125,
+      "TRXUSDT": 1.5524999999999998
+    },
+    "candidate_tier": "hybrid_relaxed_paper_testnet_candidate",
+    "gross_notional_fraction": 3.6149999999999998,
+    "leverage_map": {},
+    "locked_oos_account_wipeout_count_report_only": 0,
+    "locked_oos_liquidation_count_report_only": 0,
+    "locked_oos_mdd_report_only": 0.09071846542364759,
+    "locked_oos_return_per_turnover_proxy_bps_report_only": 22.969925172674497,
+    "locked_oos_return_report_only": 0.21297714620103791,
+    "locked_oos_trade_event_count_report_only": 362,
+    "paper_testnet_candidate": true,
+    "profile_id": "hybrid_mdd20_three_profile_blend",
+    "profile_kind": "hybrid_train_validation_selected",
+    "promotion_gate_pass": false,
+    "ready_for_paper": true,
+    "ready_for_real": false,
+    "real_money_execution": false,
+    "report_only_gate_reasons": [],
+    "selection_reasons": [],
+    "strict_promotion_profile": false,
+    "train_account_wipeout_count": 0,
+    "train_liquidation_count": 0,
+    "train_mdd": 0.4288755407393703,
+    "train_return": 2.6236419644372,
+    "train_return_per_turnover_proxy_bps": 33.78402398216826,
+    "train_trade_event_count": 3363,
+    "train_validation_score": 7.206864397569471,
+    "validation_account_wipeout_count": 0,
+    "validation_liquidation_count": 0,
+    "validation_mdd": 0.19932978467146412,
+    "validation_return": 0.7256916003246558,
+    "validation_return_per_turnover_proxy_bps": 39.964842444875245,
+    "validation_trade_event_count": 789,
+    "weights": {
+      "aggressive_mdd30_gross10_shadow": 0.15,
+      "balanced_mdd12_gross5": 0.15,
+      "growth_mdd20_gross8": 0.7
+    }
+  }
+}
+	Command being timed: ".venv/bin/python scripts/research/run_alpha_zoo_integer_leverage_hybrid_decision.py"
+	User time (seconds): 527.68
+	System time (seconds): 33.50
+	Percent of CPU this job got: 160%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 5:50.53
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 6505524
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 2
+	Minor (reclaiming a frame) page faults: 2717510
+	Voluntary context switches: 315831
+	Involuntary context switches: 9890
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 360
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
