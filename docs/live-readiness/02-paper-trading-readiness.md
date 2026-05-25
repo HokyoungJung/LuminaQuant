@@ -38,12 +38,20 @@
   - client order id dedupe
 - `src/lumina_quant/live/shadow_live_runner.py`
   - baseline vs candidate divergence 비교용 shadow helper
+- `src/lumina_quant/live/execution_live.py` / `src/lumina_quant/exchanges/binance_futures_exchange.py`
+  - 2026-05-25 기준 paper/testnet 전용 Binance USD-M conditional algo 보호 주문 경로
+  - entry fill 이후 `STOP_MARKET` / `TAKE_PROFIT_MARKET` 제출
+  - `/fapi/v1/algoOrder` request payload allowlist 적용; parent/protection telemetry는 local record에만 저장
+- `AlphaZooOptunaHybridLiveStrategy` handoff artifact
+  - `ready_for_real=false`, `real_money_execution=false`, `real_execution_allowed=false` 유지
+  - selected frozen source assets `ETHUSDT`, `SOLUSDT`, `TRXUSDT` asset-generic regression coverage
 
 ### 아직 고정해야 하는 것
 
 - paper 운영 기간
 - paper pass/fail 지표
 - operator check cadence
+- 실제 Binance testnet conditional algo fill / sibling cancellation / reconciliation telemetry
 - paper → real 승격 gate
 
 ---
@@ -100,6 +108,8 @@ pass 조건:
 
 확인 항목:
 - [ ] submit → ack → fill / cancel / timeout 상태 전이
+- [ ] entry fill 이후 paper/testnet `STOP_MARKET` / `TAKE_PROFIT_MARKET` protective algo order 제출 확인
+- [ ] protective leg trigger 후 sibling cancellation/reconciliation 정책 확인
 - [ ] open order snapshot readiness
 - [ ] timeout 후 cancel/reconcile
 - [ ] reduce-only 주문 허용 여부
@@ -221,7 +231,9 @@ real 전환 전에 아래 문서가 최신이어야 한다.
 
 - `01-live-trading-checklist.md`
 - `03-aggressive-sleeve-local-retune-plan.md` (추가 성능 개선 필요 시)
-- `var/reports/exact_window_backtests/followup_status/portfolio_live_readiness_decision_latest.md`
+- `04-paper-trading-runbook.md`
+- `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_integer_leverage_optuna_hybrid_decision_20260524/paper_testnet_live_decision_latest.md`
+- `var/reports/exact_window_backtests/followup_status/portfolio_live_readiness_decision_latest.md` (legacy incumbent 경로 참고용)
 
 ---
 
@@ -230,8 +242,10 @@ real 전환 전에 아래 문서가 최신이어야 한다.
 현재 저장소는:
 
 - **paper/testnet 시작은 가능**
-- **real 전환은 아직 이름 붙일 수 없음**
+- **Alpha Zoo Optuna hybrid handoff도 paper/testnet-only로 저장됨**
+- **real 전환은 아직 금지**
 
 즉,
 - **paper readiness: 진행 가능**
-- **real readiness: 추가 운영 검증 필요**
+- **paper protective-order readiness: 코드/테스트는 있음, 실제 testnet fill telemetry 필요**
+- **real readiness: 추가 운영 검증 필요, 현재 artifact veto 유지**

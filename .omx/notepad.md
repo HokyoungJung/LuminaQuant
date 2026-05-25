@@ -857,3 +857,5 @@ Verification passed: runner max RSS `6,492,344 KiB` (<8 GiB); artifact invariant
 [2026-05-25T20:30:00+09:00] Follow-up payload hardening: Binance algo protective order submission now whitelists only documented `/fapi/v1/algoOrder` fields. Internal telemetry keys such as parent order id/client id and protection role are retained locally for reconciliation but are not sent to the exchange. Targeted exchange/state-machine/live-strategy tests passed (`25 passed`).
 
 [2026-05-25T20:35:00+09:00] Final follow-up validation after Binance algo payload allowlist hardening passed: `ruff check .`, architecture check, `compileall`, hardcoded-parameter audit (`new=0`), `git diff --check`, and full `pytest -q` (`1460 passed`, max RSS `2,724,568 KiB` < 8 GiB).
+
+[2026-05-25T21:32:00+09:00] Documentation/save pass started after implementation commit `6a01168b` and CI success. README/README_KR now surface the current Alpha Zoo paper/testnet-only state, Binance conditional algo protective-order contract, asset applicability ETH/SOL/TRX, and real-money veto. Live readiness/deployment docs and a session handoff doc are being updated as a docs-only follow-up.

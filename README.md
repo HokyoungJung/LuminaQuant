@@ -18,6 +18,7 @@
 | :--- | :--- |
 | **[Installation & Setup](#installation)** | Getting started with LuminaQuant. |
 | **[Deployment Guide](docs/DEPLOYMENT.md)** | Deployment notes and operational checklist. |
+| **[Live Readiness Runbook](docs/live-readiness/04-paper-trading-runbook.md)** | Paper/testnet-only live handoff, protective-order contract, and real-money blockers. |
 | **[Migration Guide](docs/MIGRATION_GUIDE_POSTGRES_PARQUET.md)** | Local-only migration to Parquet + PostgreSQL. |
 | **[GPU Auto Notes](docs/DESIGN_NOTES_GPU_AUTO.md)** | Polars GPU/CPU auto-selection and fallback design. |
 | **[Validation Report](docs/VALIDATION_REPORT.md)** | Verification + optimization report for core workflows. |
@@ -58,6 +59,19 @@ Current local-first stack defaults:
 - **1s market store**: Parquet (ZSTD, exchange/symbol/date partitioning)
 - **State/audit/job control**: PostgreSQL (local)
 - **Backtest/optimization compute**: Polars Lazy with GPU-first execution (`gpu` by default; CI/non-GPU environments can override to `cpu` or `auto`)
+
+## Current Private Paper/Testnet Status (2026-05-25)
+
+The current private Alpha Zoo live handoff is **paper/testnet-only**. It is not a real-money approval.
+
+- Selected runtime: `AlphaZooOptunaHybridLiveStrategy` for the frozen Optuna v3.5 hybrid artifact.
+- Safety flags remain hard-false in the latest handoff artifact: `ready_for_real=false`, `real_money_execution=false`, `real_execution_allowed=false`.
+- Paper/testnet protection now covers both local intrabar component exits and exchange-side Binance USDⓈ-M conditional algo protection after an entry fill: `STOP_MARKET` / `TAKE_PROFIT_MARKET` through `POST /fapi/v1/algoOrder`.
+- The Binance algo request path is allowlisted to documented exchange fields; internal parent/protection telemetry stays local for reconciliation.
+- Asset applicability is regression-tested across the selected frozen source assets `ETHUSDT`, `SOLUSDT`, and `TRXUSDT`; broader assets still need the same paper/testnet evidence before promotion.
+- Real-money remains blocked until actual paper/testnet fill, BBO spread, slippage, reject/timeout, reconciliation, and protective-order telemetry prove the 10bps/replay-live parity assumptions.
+
+See `docs/live-readiness/04-paper-trading-runbook.md` and `docs/research_note_profit_moonshot_alpha_zoo_real_data_20260512.md` for the current operator handoff.
 
 ---
 
@@ -426,7 +440,8 @@ uv run lq live --transport ws
 # optional: live.order_state_source: user_stream
 uv run lq live --transport ws
 
-# Real mode requires explicit safety flag:
+# Real mode requires explicit safety flag and artifact approval.
+# The current Alpha Zoo handoff artifact still vetoes real money.
 # LUMINA_ENABLE_LIVE_REAL=true uv run lq live --enable-live-real
 
 # Easy real-mode helpers

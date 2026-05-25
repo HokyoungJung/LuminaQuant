@@ -18,6 +18,7 @@
 | :--- | :--- |
 | **[설치 및 설정](#설치-installation)** | LuminaQuant 시작하기. |
 | **[운영 워크플로우](docs/kr/WORKFLOW.md)** | Private/Public 브랜치 운영 및 공개 배포 체크리스트. |
+| **[Live Readiness 런북](docs/live-readiness/04-paper-trading-runbook.md)** | paper/testnet 전용 live handoff, protective-order 계약, real-money blocker. |
 | **[8GB 기준 Quickstart](docs/kr/QUICKSTART_8GB_BASELINE.md)** | 설치/스모크/섀도우라이브/대시보드/안전종료/정리 최소 절차. |
 | **[마이그레이션 가이드](docs/kr/MIGRATION_GUIDE_POSTGRES_PARQUET.md)** | 레거시 저장소 제거 후 Parquet + PostgreSQL 전환 가이드. |
 | **[GPU 자동 실행 설계](docs/kr/DESIGN_NOTES_GPU_AUTO.md)** | Polars GPU/CPU 선택, GPU-first 기본값, CI 검증 전략 설명. |
@@ -58,6 +59,19 @@ graph TD
 - **1초 캔들 저장소**: Parquet(ZSTD, exchange/symbol/date 파티션)
 - **상태/감사/잡 관리**: PostgreSQL(local)
 - **백테스트/최적화 계산**: Polars Lazy + GPU 우선 실행(`gpu` 기본, CI/비GPU 환경은 `cpu` 또는 `auto` override 가능)
+
+## 현재 Private Paper/Testnet 상태 (2026-05-25)
+
+현재 private Alpha Zoo live handoff는 **paper/testnet 전용**이며 real-money 승인이 아닙니다.
+
+- 선택 runtime: frozen Optuna v3.5 hybrid artifact용 `AlphaZooOptunaHybridLiveStrategy`.
+- 최신 handoff artifact의 안전 플래그는 계속 hard-false입니다: `ready_for_real=false`, `real_money_execution=false`, `real_execution_allowed=false`.
+- paper/testnet 보호 경로는 local intrabar component exit와 entry fill 이후 Binance USDⓈ-M conditional algo 보호 주문을 모두 포함합니다: `POST /fapi/v1/algoOrder`의 `STOP_MARKET` / `TAKE_PROFIT_MARKET`.
+- Binance algo request payload는 문서화된 거래소 field allowlist만 통과하고, parent/protection telemetry는 reconciliation용 local record에만 남깁니다.
+- 선택된 frozen source asset `ETHUSDT`, `SOLUSDT`, `TRXUSDT`에 대해 asset-generic 동작을 regression test로 확인했습니다. 더 넓은 asset은 동일한 paper/testnet evidence가 필요합니다.
+- 실제 paper/testnet fill, BBO spread, slippage, reject/timeout, reconciliation, protective-order telemetry가 10bps/replay-live parity 가정을 증명하기 전까지 real-money는 계속 차단됩니다.
+
+현재 operator handoff는 `docs/live-readiness/04-paper-trading-runbook.md`와 `docs/research_note_profit_moonshot_alpha_zoo_real_data_20260512.md`를 기준으로 합니다.
 
 ---
 
@@ -461,7 +475,8 @@ bash scripts/ops/stop_live_session.sh
 # WebSocket 엔트리포인트 (더 낮은 지연)
 uv run lq live --transport ws
 
-# real 모드는 명시적 안전 플래그가 필요
+# real 모드는 명시적 안전 플래그와 artifact 승인이 모두 필요합니다.
+# 현재 Alpha Zoo handoff artifact는 여전히 real money를 veto합니다.
 # LUMINA_ENABLE_LIVE_REAL=true uv run lq live --enable-live-real
 
 # 쉬운 real 모드 래퍼

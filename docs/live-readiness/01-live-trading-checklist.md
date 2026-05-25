@@ -2,7 +2,7 @@
 
 작성일: 2026-03-19  
 대상 저장소: `LuminaQuant`  
-현재 포트폴리오 상태: **incumbent 유지 권고**
+현재 포트폴리오 상태: **legacy incumbent 문서 + 2026-05-25 Alpha Zoo paper/testnet override 참고**
 
 ## 목적
 
@@ -20,6 +20,24 @@
 
 - `var/reports/exact_window_backtests/followup_status/portfolio_live_readiness_decision_latest.json`
 - `var/reports/exact_window_backtests/followup_status/portfolio_live_readiness_decision_latest.md`
+
+## 2026-05-25 최신 Alpha Zoo paper/testnet override
+
+아래 2026-03 legacy incumbent 체크리스트는 일반 live 전환 기준으로 유지한다. 현재 private Alpha Zoo 경로의 최신 결론은 다음 artifact와 문서를 우선한다.
+
+- 최신 paper/testnet handoff: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_integer_leverage_optuna_hybrid_decision_20260524/paper_testnet_live_decision_latest.json`
+- 요약 문서: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_integer_leverage_optuna_hybrid_decision_20260524/paper_testnet_live_decision_latest.md`
+- 운영 런북: `docs/live-readiness/04-paper-trading-runbook.md`
+- 연구 노트: `docs/research_note_profit_moonshot_alpha_zoo_real_data_20260512.md`
+
+현재 판정:
+
+- `AlphaZooOptunaHybridLiveStrategy`는 paper/testnet monitoring 대상으로 유지한다.
+- real-money는 아직 금지한다: `ready_for_real=false`, `real_money_execution=false`, `real_execution_allowed=false`.
+- entry fill 이후 paper/testnet 전용 Binance USD-M conditional algo `STOP_MARKET`/`TAKE_PROFIT_MARKET` 보호 주문 경로가 있다.
+- 거래소 request payload는 문서화된 `/fapi/v1/algoOrder` allowlist만 보내며, parent/protection telemetry는 local reconciliation record에만 저장한다.
+- selected frozen source asset 적용성은 `ETHUSDT`, `SOLUSDT`, `TRXUSDT`에 대해 검증했다.
+- 실제 testnet fill/slippage/reconciliation/protective-order telemetry와 2주 이상 관찰 전에는 real 전환 논의 금지.
 
 ---
 
