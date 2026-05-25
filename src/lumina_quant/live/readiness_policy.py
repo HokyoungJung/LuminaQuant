@@ -17,6 +17,25 @@ DEFAULT_FOLLOWUP_ROOT = Path("var/reports/exact_window_backtests/followup_status
 DEFAULT_REFRESH_JSON = DEFAULT_FOLLOWUP_ROOT / "final_portfolio_validation_data_refresh_latest.json"
 DEFAULT_DECISION_JSON = DEFAULT_FOLLOWUP_ROOT / "portfolio_live_readiness_decision_latest.json"
 DEFAULT_PREFLIGHT_STALE_MINUTES = 30
+DEFAULT_ALPHA_ZOO_OPTUNA_HYBRID_ARTIFACT = (
+    Path("var")
+    / "reports"
+    / "profit_moonshot_20260501"
+    / "current_tail_20260508"
+    / "alpha_v2"
+    / "alpha_zoo_integer_leverage_optuna_hybrid_decision_20260524"
+    / "alpha_zoo_integer_leverage_optuna_hybrid_decision_latest.json"
+)
+DEFAULT_ALPHA_ZOO_INTEGER_PORTFOLIO_ARTIFACT = (
+    Path("var")
+    / "reports"
+    / "profit_moonshot_20260501"
+    / "current_tail_20260508"
+    / "alpha_v2"
+    / "alpha_zoo_corr_integer_leverage_portfolio_20260524"
+    / "alpha_zoo_corr_integer_leverage_portfolio_latest.json"
+)
+_ALPHA_ZOO_OPTUNA_STRATEGY = "AlphaZooOptunaHybridLiveStrategy"
 
 _TRUTHY = {"1", "true", "yes", "on"}
 
@@ -112,6 +131,7 @@ def _decision_allows_live_start(decision: Mapping[str, Any]) -> tuple[bool, bool
     decision_keep = decision_value == "keep_incumbent"
     selected_reference = str(
         decision.get("selected_mode")
+        or decision.get("selected_live_mode")
         or decision.get("candidate_mode")
         or decision.get("candidate_key")
         or ""
@@ -132,6 +152,111 @@ def _decision_runtime_compatible(
     if decision_keep:
         return True
     return bool(infer_strategy_class_name(selected_reference) or supports_live_portfolio_mode(selected_reference))
+
+
+def _decision_strategy_params(decision: Mapping[str, Any]) -> dict[str, Any]:
+    params = decision.get("strategy_params")
+    if not isinstance(params, Mapping):
+        params = decision.get("params")
+    return dict(params) if isinstance(params, Mapping) else {}
+
+
+def _is_alpha_zoo_optuna_hybrid_decision(
+    decision: Mapping[str, Any],
+    *,
+    selected_reference: str,
+) -> bool:
+    explicit_strategy = str(
+        decision.get("strategy_name") or decision.get("strategy_class") or ""
+    ).strip()
+    inferred = infer_strategy_class_name(selected_reference)
+    params = _decision_strategy_params(decision)
+    return bool(
+        explicit_strategy == _ALPHA_ZOO_OPTUNA_STRATEGY
+        or inferred == _ALPHA_ZOO_OPTUNA_STRATEGY
+        or params.get("optuna_hybrid_artifact_path")
+        or params.get("integer_portfolio_artifact_path")
+    )
+
+
+def _artifact_real_money_veto_checks(
+    decision: Mapping[str, Any],
+    *,
+    selected_reference: str,
+) -> dict[str, Any]:
+    target = _is_alpha_zoo_optuna_hybrid_decision(
+        decision,
+        selected_reference=selected_reference,
+    )
+    if not target:
+        return {
+            "artifact_real_money_veto": False,
+            "artifact_paper_testnet_only": False,
+            "artifact_ready_for_real": None,
+            "artifact_real_execution_allowed": None,
+            "artifact_real_money_execution": None,
+            "artifact_validation_error": "",
+        }
+
+    params = _decision_strategy_params(decision)
+    optuna_path = _resolve_repo_artifact_path(
+        Path(params.get("optuna_hybrid_artifact_path") or DEFAULT_ALPHA_ZOO_OPTUNA_HYBRID_ARTIFACT)
+    )
+    integer_path = _resolve_repo_artifact_path(
+        Path(
+            params.get("integer_portfolio_artifact_path")
+            or DEFAULT_ALPHA_ZOO_INTEGER_PORTFOLIO_ARTIFACT
+        )
+    )
+    try:
+        optuna = _read_json(optuna_path)
+        integer = _read_json(integer_path)
+        selected = dict(optuna.get("selected_optuna_hybrid_profile") or {})
+        paper_only = bool(
+            optuna.get("paper_testnet_only") is True
+            and integer.get("paper_testnet_only") is True
+            and selected.get("paper_testnet_candidate") is True
+        )
+        ready_for_real = bool(
+            optuna.get("ready_for_real") is True
+            and integer.get("ready_for_real") is True
+            and selected.get("ready_for_real") is True
+        )
+        real_execution_allowed = bool(
+            optuna.get("real_execution_allowed") is True
+            and integer.get("real_execution_allowed") is True
+        )
+        real_money_execution = bool(
+            optuna.get("real_money_execution") is True
+            and integer.get("real_money_execution") is True
+            and selected.get("real_money_execution") is True
+        )
+        return {
+            "artifact_real_money_veto": bool(
+                paper_only
+                or not ready_for_real
+                or not real_execution_allowed
+                or not real_money_execution
+            ),
+            "artifact_paper_testnet_only": paper_only,
+            "artifact_ready_for_real": ready_for_real,
+            "artifact_real_execution_allowed": real_execution_allowed,
+            "artifact_real_money_execution": real_money_execution,
+            "artifact_validation_error": "",
+            "artifact_optuna_hybrid_path": str(optuna_path),
+            "artifact_integer_portfolio_path": str(integer_path),
+        }
+    except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+        return {
+            "artifact_real_money_veto": True,
+            "artifact_paper_testnet_only": None,
+            "artifact_ready_for_real": None,
+            "artifact_real_execution_allowed": None,
+            "artifact_real_money_execution": None,
+            "artifact_validation_error": str(exc),
+            "artifact_optuna_hybrid_path": str(optuna_path),
+            "artifact_integer_portfolio_path": str(integer_path),
+        }
 
 
 def _build_live_readiness_verdict(
@@ -169,6 +294,11 @@ def _build_live_readiness_verdict(
         decision_keep=decision_keep,
         selected_reference=decision_reference,
     )
+    artifact_veto_checks = _artifact_real_money_veto_checks(
+        decision,
+        selected_reference=decision_reference,
+    )
+    artifact_real_money_veto = bool(artifact_veto_checks.get("artifact_real_money_veto"))
 
     postgres_dsn_env_name = str(
         runtime_storage.get("postgres_dsn_env", "")
@@ -207,6 +337,7 @@ def _build_live_readiness_verdict(
         and not refresh_is_stale
         and decision_allowed
         and decision_runtime_compatible
+        and not artifact_real_money_veto
         and postgres_dsn_present
     )
 
@@ -245,6 +376,7 @@ def _build_live_readiness_verdict(
             "decision_reference": decision_reference,
             "decision_allows_live_start": decision_allowed,
             "decision_runtime_compatible": decision_runtime_compatible,
+            **artifact_veto_checks,
             "refresh_completed": refresh_completed,
             "decision_completed": decision_completed,
             "refresh_is_stale": refresh_is_stale,

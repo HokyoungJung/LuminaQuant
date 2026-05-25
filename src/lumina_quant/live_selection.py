@@ -293,6 +293,13 @@ def infer_strategy_class_name(candidate_name: str) -> str | None:
     if not token:
         return None
     if (
+        token.startswith("alpha_zoo_integer_leverage_optuna_hybrid")
+        or token.startswith("alpha_zoo_optuna_hybrid")
+        or token.startswith("hybrid_v3_5_optuna_three_profile_blend")
+        or token.startswith("hybrid_v3_6_optuna_three_profile_blend")
+    ):
+        return "AlphaZooOptunaHybridLiveStrategy"
+    if (
         token.startswith("crypto_fx_alpha_zoo")
         or token.startswith("alpha_zoo")
         or token.startswith("profit_moonshot_alpha_zoo")

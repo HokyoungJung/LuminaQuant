@@ -12,6 +12,14 @@ def test_infer_strategy_class_name_extended_catalog():
     assert infer_strategy_class_name("crypto_fx_alpha_zoo_state_calibrated") == "CryptoFxAlphaZooStateStrategy"
     assert infer_strategy_class_name("alpha_zoo_conservative_exit") == "CryptoFxAlphaZooStateStrategy"
     assert (
+        infer_strategy_class_name("alpha_zoo_integer_leverage_optuna_hybrid")
+        == "AlphaZooOptunaHybridLiveStrategy"
+    )
+    assert (
+        infer_strategy_class_name("hybrid_v3_5_optuna_three_profile_blend")
+        == "AlphaZooOptunaHybridLiveStrategy"
+    )
+    assert (
         infer_strategy_class_name("alpha_zoo_strict_6x_common_split_reselected:alpha_zoo_conservative_exit")
         == "CryptoFxAlphaZooStateStrategy"
     )

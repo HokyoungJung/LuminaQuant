@@ -930,3 +930,23 @@ Result after embedded `10bps` round-trip friction proxy:
 Selected Optuna hybrid: `hybrid_v3_5_optuna_three_profile_blend`. Average train+validation profile weights are approximately aggressive `78.11%`, balanced `10.91%`, and growth `10.98%`; final active weights are lower because the v3.5 exposure-dampening rule can hold cash. It passes the paper/testnet candidate gates, but remains non-real-money: `ready_for_real=false`, `real_money_execution=false`, and `real_execution_allowed=false`. The paper/testnet handoff requires realized BBO/fill/all-in cost telemetry, replay/live notional parity, liquidation-inclusive MDD, account wipeout, and margin-buffer monitoring before any future review.
 
 Verification passed locally: artifact invariant check; runner max RSS `6,357,368 KiB` (<8 GiB), elapsed `32:37.97`; targeted tests `13 passed`; `ruff check .`; `python -m compileall -q src scripts tests`; hardcoded audit `total=567 new=0`; diff checks; full pytest `1444 passed in 76.49s` with max RSS `2,723,060 KiB` (<8 GiB).
+
+## 2026-05-25 KST — Optuna hybrid paper/testnet live adapter implemented
+
+Implemented a live-ready but real-money-vetoed adapter for the selected `hybrid_v3_5_optuna_three_profile_blend` from `alpha_zoo_integer_leverage_optuna_hybrid_decision_20260524`. The runtime class is `AlphaZooOptunaHybridLiveStrategy`, registered as `live_opt_in`; its implementation lives in `src/lumina_quant/alpha_zoo/optuna_hybrid_live_strategy.py` with a thin strategy-registry wrapper at `src/lumina_quant/strategies/alpha_zoo_optuna_hybrid_live.py`.
+
+Key live-readiness choices:
+
+- Source universe is reconstructed from the frozen Optuna and integer-leverage artifacts, not a hand-picked allowlist. The exact six sleeves are SOL 1h debounced short-only, SOL 1h debounced long/short, SOL 1h shorter-hold debounced short-only, SOL 2h relative-strength chandelier breakout, ETH/BTC 2h residual reclaim, and TRX 4h volatility-adjusted trend.
+- Runtime evaluates completed bars only and drops the active working bar. Required timeframes are `1h`, `2h`, and `4h`; watch symbols are `BTC/USDT`, `ETH/USDT`, `SOL/USDT`, `BNB/USDT`, and `TRX/USDT`.
+- The v3.5 allocator is frozen from the artifact; there is no Optuna runtime dependency and no locked-OOS learning. locked-OOS remains gate/report-only.
+- Live sizing uses `notional_fraction` and each signal emits `metadata.target_allocation = source_allocation_fraction * sum(final_profile_weight * integer_leverage)`. The decision artifact keeps global `target_allocation=0.0` so missing signal metadata fails closed. Generated risk caps are equity-scaled: max order notional `1.247444x`, max symbol exposure `1.427227x`, and total notional/margin `3.520744x`.
+- The adapter and preflight policy keep the real-money veto: `paper_testnet_only=true`, `ready_for_real=false`, `real_money_execution=false`, and `real_execution_allowed=false`. Real-mode preflight is blocked by artifact veto while paper/testnet can pass when other operational checks are healthy.
+- Strategy logic has a no-calendar/date-rule regression check; the paper/testnet handoff records the same `10bps` round-trip cost and RPT threshold assumption as the research artifacts.
+
+New handoff writer: `scripts/ops/write_alpha_zoo_optuna_hybrid_live_decision.py`. Latest outputs:
+
+- `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_integer_leverage_optuna_hybrid_decision_20260524/paper_testnet_live_decision_latest.json`
+- `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_integer_leverage_optuna_hybrid_decision_20260524/paper_testnet_live_decision_latest.md`
+
+Operator runbook updated at `docs/live-readiness/04-paper-trading-runbook.md` with the `--check-only` and writer commands plus the sizing/real-veto invariants. Verification on 2026-05-25 KST passed: targeted live adapter/readiness/start-live tests `32 passed`; post-architecture-fix full pytest `1455 passed in 102.70s` with max RSS `2,946,288 KiB` (<8 GiB); `ruff check .`; `uv run python scripts/check_architecture.py`; `python3 -m compileall -q src scripts tests`; hardcoded-parameter audit `total=567 new=0 baselined=567`; `git diff --check`; and `git diff --cached --check`. Real-money execution remains prohibited.

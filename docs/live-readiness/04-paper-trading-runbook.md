@@ -175,7 +175,41 @@ lq-paper-off
 
 ---
 
-## 2.3 shadow 비교가 필요한 경우
+## 2.3 Alpha Zoo Optuna hybrid paper/testnet handoff
+
+최신 integer-leverage Optuna hybrid는 `AlphaZooOptunaHybridLiveStrategy`로
+paper/testnet에서만 실행 가능한 handoff를 만든다. 실제 real-money 허가는 아니다.
+
+```bash
+cd /home/hoky/Quants-agent/LuminaQuant
+uv run python scripts/ops/write_alpha_zoo_optuna_hybrid_live_decision.py --check-only
+uv run python scripts/ops/write_alpha_zoo_optuna_hybrid_live_decision.py
+```
+
+기본 출력:
+- `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_integer_leverage_optuna_hybrid_decision_20260524/paper_testnet_live_decision_latest.json`
+- `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_integer_leverage_optuna_hybrid_decision_20260524/paper_testnet_live_decision_latest.md`
+
+필수 불변식:
+- `strategy_name=AlphaZooOptunaHybridLiveStrategy`
+- `selected_profile_id=hybrid_v3_5_optuna_three_profile_blend`
+- `paper_testnet_only=true`
+- `ready_for_real=false`
+- `real_money_execution=false`
+- `real_execution_allowed=false`
+- `research_primary_round_trip_cost_bps=10.0`
+- `target_allocation_mode=notional_fraction`
+- sizing source is `SignalEvent.metadata.target_allocation`; the global
+  decision artifact keeps `target_allocation=0.0` so missing strategy metadata
+  fails closed instead of opening a fallback allocation.
+- watch symbols include `BTC/USDT`, `ETH/USDT`, `SOL/USDT`, `BNB/USDT`, `TRX/USDT`
+
+preflight는 real mode에서 artifact veto를 유지해야 하고, paper/testnet 모드에서만
+operator가 start/live dry-run 경로로 이어갈 수 있다.
+
+---
+
+## 2.4 shadow 비교가 필요한 경우
 
 `src/lumina_quant/live/shadow_live_runner.py`가 있으므로,
 baseline vs candidate divergence를 보는 shadow 경로를 운영 가능하게 설계할 수 있다.

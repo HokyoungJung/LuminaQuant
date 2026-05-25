@@ -12,6 +12,7 @@ from lumina_quant.tuning import ParamRegistry
 
 from .adaptive_regime_momentum import AdaptiveRegimeMomentumStrategy
 from .alpha101_formula import Alpha101FormulaStrategy
+from .alpha_zoo_optuna_hybrid_live import AlphaZooOptunaHybridLiveStrategy
 from .bitcoin_buy_hold import BitcoinBuyHoldStrategy
 from .compression_breakout_continuation import CompressionBreakoutContinuationStrategy
 from .crypto_fx_alpha_zoo_state import CryptoFxAlphaZooStateStrategy
@@ -105,6 +106,7 @@ DEFAULT_STRATEGY_NAME = "RsiStrategy" if RsiStrategy is not None else "MeanRever
 _RAW_STRATEGY_MAP: dict[str, StrategyClass | None] = {
     "AdaptiveRegimeMomentumStrategy": AdaptiveRegimeMomentumStrategy,
     "Alpha101FormulaStrategy": Alpha101FormulaStrategy,
+    "AlphaZooOptunaHybridLiveStrategy": AlphaZooOptunaHybridLiveStrategy,
     "BitcoinBuyHoldStrategy": BitcoinBuyHoldStrategy,
     "CompressionBreakoutContinuationStrategy": CompressionBreakoutContinuationStrategy,
     "CryptoFxAlphaZooStateStrategy": CryptoFxAlphaZooStateStrategy,
@@ -153,6 +155,7 @@ _STRATEGY_MAP: dict[str, StrategyClass] = {
 _STRATEGY_TIER_HINTS: dict[str, str] = {
     "AdaptiveRegimeMomentumStrategy": "live_opt_in",
     "Alpha101FormulaStrategy": "research_only",
+    "AlphaZooOptunaHybridLiveStrategy": "live_opt_in",
     "BitcoinBuyHoldStrategy": "live_default",
     "CompressionBreakoutContinuationStrategy": "live_opt_in",
     "CryptoFxAlphaZooStateStrategy": "live_opt_in",
@@ -199,6 +202,7 @@ _STRATEGY_METADATA: dict[str, dict[str, Any]] = {
 _OPTUNA_TRIAL_OVERRIDES: dict[str, str] = {
     "AdaptiveRegimeMomentumStrategy": "24",
     "Alpha101FormulaStrategy": "24",
+    "AlphaZooOptunaHybridLiveStrategy": "12",
     "LagConvergenceStrategy": "24",
     "CompressionBreakoutContinuationStrategy": "20",
     "CryptoFxAlphaZooStateStrategy": "16",

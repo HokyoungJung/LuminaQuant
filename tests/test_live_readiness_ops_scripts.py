@@ -167,6 +167,128 @@ def test_live_readiness_preflight_accepts_explicit_promoted_candidate(tmp_path: 
     assert payload["status"]["ready_for_paper"] is True
 
 
+def test_alpha_zoo_optuna_hybrid_real_mode_is_vetoed_by_artifact_flags(
+    monkeypatch, tmp_path: Path
+) -> None:
+    fresh_cutoff = (datetime.now(UTC) - timedelta(minutes=5)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "storage:",
+                '  postgres_dsn: "postgresql://demo"',
+                "live:",
+                '  mode: "real"',
+                "  testnet: false",
+                "  require_real_enable_flag: true",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    refresh = tmp_path / "refresh.json"
+    refresh.write_text(
+        json.dumps(
+            {
+                "status": "completed",
+                "collection_cutoff_utc": fresh_cutoff,
+                "feature_results": [{"last_timestamp_utc": fresh_cutoff}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    decision = tmp_path / "decision.json"
+    decision.write_text(
+        json.dumps(
+            {
+                "decision": "selected_live_mode",
+                "selected_mode": "alpha_zoo_integer_leverage_optuna_hybrid",
+                "strategy_name": "AlphaZooOptunaHybridLiveStrategy",
+                "strategy_params": {
+                    "optuna_hybrid_artifact_path": str(
+                        ROOT
+                        / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/"
+                        "alpha_zoo_integer_leverage_optuna_hybrid_decision_20260524/"
+                        "alpha_zoo_integer_leverage_optuna_hybrid_decision_latest.json"
+                    ),
+                    "integer_portfolio_artifact_path": str(
+                        ROOT
+                        / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/"
+                        "alpha_zoo_corr_integer_leverage_portfolio_20260524/"
+                        "alpha_zoo_corr_integer_leverage_portfolio_latest.json"
+                    ),
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("LUMINA_ENABLE_LIVE_REAL", "true")
+
+    payload = PREFLIGHT.build_preflight_payload(
+        config_path=config_path,
+        refresh_json=refresh,
+        decision_json=decision,
+        stale_minutes=10_000,
+    )
+
+    assert payload["checks"]["decision_runtime_compatible"] is True
+    assert payload["checks"]["artifact_real_money_veto"] is True
+    assert payload["checks"]["artifact_paper_testnet_only"] is True
+    assert payload["checks"]["artifact_ready_for_real"] is False
+    assert payload["status"]["ready_for_real"] is False
+    assert payload["recommended_action"] == "block_until_preflight_gaps_closed"
+
+
+def test_alpha_zoo_optuna_hybrid_paper_mode_can_pass_with_testnet(tmp_path: Path) -> None:
+    fresh_cutoff = (datetime.now(UTC) - timedelta(minutes=5)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "storage:",
+                '  postgres_dsn: "postgresql://demo"',
+                "live:",
+                '  mode: "paper"',
+                "  testnet: true",
+                "  require_real_enable_flag: true",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    refresh = tmp_path / "refresh.json"
+    refresh.write_text(
+        json.dumps(
+            {
+                "status": "completed",
+                "collection_cutoff_utc": fresh_cutoff,
+                "feature_results": [{"last_timestamp_utc": fresh_cutoff}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    decision = tmp_path / "decision.json"
+    decision.write_text(
+        json.dumps(
+            {
+                "decision": "selected_live_mode",
+                "selected_live_mode": "alpha_zoo_integer_leverage_optuna_hybrid",
+                "strategy_name": "AlphaZooOptunaHybridLiveStrategy",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    payload = PREFLIGHT.build_preflight_payload(
+        config_path=config_path,
+        refresh_json=refresh,
+        decision_json=decision,
+        stale_minutes=10_000,
+    )
+
+    assert payload["checks"]["artifact_real_money_veto"] is True
+    assert payload["status"]["ready_for_paper"] is True
+    assert payload["status"]["ready_for_real"] is False
+
+
 def test_live_readiness_preflight_honors_runtime_env_mode_override(monkeypatch, tmp_path: Path) -> None:
     fresh_cutoff = (datetime.now(UTC) - timedelta(minutes=5)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     config_path = tmp_path / "config.yaml"

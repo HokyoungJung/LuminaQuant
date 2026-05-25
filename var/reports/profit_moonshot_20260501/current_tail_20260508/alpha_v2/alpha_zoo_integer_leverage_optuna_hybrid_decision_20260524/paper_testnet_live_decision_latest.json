@@ -1,0 +1,63 @@
+{
+  "artifact_kind": "alpha_zoo_optuna_hybrid_paper_testnet_live_decision",
+  "decision": "selected_live_mode",
+  "decision_cadence_seconds": 3600,
+  "exchange": {
+    "driver": "binance_futures",
+    "leverage": 12,
+    "margin_mode": "isolated",
+    "market_type": "future",
+    "name": "binance",
+    "position_mode": "HEDGE",
+    "testnet": true
+  },
+  "generated_at_utc": "2026-05-25T05:02:08Z",
+  "ingest_window_seconds": 3600,
+  "live_replay_sizing_contract": {
+    "absolute_cap_policy": "only explicit positive max_order_value is an emergency ceiling",
+    "exchange_leverage_cap": 12,
+    "fixed_dollar_max_order_value_applies": false,
+    "sizing_mode": "notional_fraction",
+    "target_allocation_meaning": "notional_fraction_of_account_equity",
+    "target_allocation_source": "SignalEvent.metadata.target_allocation",
+    "target_notional_formula": "source_allocation_fraction*sum(final_profile_weight*integer_leverage)"
+  },
+  "locked_oos_role": "gate_report_only",
+  "operator_warning": "paper/testnet only; real-money startup remains vetoed by artifacts",
+  "paper_testnet_only": true,
+  "ready_for_paper": true,
+  "ready_for_real": false,
+  "real_execution_allowed": false,
+  "real_money_execution": false,
+  "replay_live_notional_parity": true,
+  "research_primary_round_trip_cost_bps": 10.0,
+  "return_per_turnover_threshold_bps": 10.0,
+  "risk_caps": {
+    "max_order_notional_pct": 1.247444,
+    "max_order_value": 0.0,
+    "max_symbol_exposure_pct": 1.427227,
+    "max_total_margin_pct": 3.520744,
+    "max_total_notional_pct": 3.520744
+  },
+  "selected_mode": "alpha_zoo_integer_leverage_optuna_hybrid",
+  "sizing_mode": "notional_fraction",
+  "strategy_name": "AlphaZooOptunaHybridLiveStrategy",
+  "strategy_params": {
+    "allow_real_money": false,
+    "integer_portfolio_artifact_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_corr_integer_leverage_portfolio_20260524/alpha_zoo_corr_integer_leverage_portfolio_latest.json",
+    "optuna_hybrid_artifact_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_integer_leverage_optuna_hybrid_decision_20260524/alpha_zoo_integer_leverage_optuna_hybrid_decision_latest.json",
+    "paper_testnet_only": true,
+    "selected_profile_id": "hybrid_v3_5_optuna_three_profile_blend"
+  },
+  "strategy_timeframe": "1h",
+  "symbols": [
+    "BTC/USDT",
+    "ETH/USDT",
+    "SOL/USDT",
+    "BNB/USDT",
+    "TRX/USDT"
+  ],
+  "target_allocation": 0.0,
+  "target_allocation_mode": "notional_fraction",
+  "window_seconds": 3600
+}
