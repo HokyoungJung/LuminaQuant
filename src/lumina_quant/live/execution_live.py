@@ -31,6 +31,7 @@ _PROTECTIVE_PARAM_KEYS = {
     "stopLossTriggerPrice",
     "takeProfitTriggerPrice",
 }
+_PROTECTIVE_CLIENT_DIGEST_LEN = len("0123456789abcdef01234567")
 
 
 def _is_retryable_exception(exc: Exception) -> bool:
@@ -77,6 +78,8 @@ class LiveExecutionHandler(ExecutionHandler):
         self._last_exchange_open_signature: tuple[tuple[str, ...], ...] = tuple()
         self._last_exchange_open_snapshot_ok = False
         self._last_exchange_open_snapshot_ts = 0.0
+        self.protective_orders: dict[str, dict[str, Any]] = {}
+        self._protected_parent_client_ids: set[str] = set()
 
     def set_order_state_callback(self, callback) -> None:
         """Set a callback to receive order-state transition events."""
@@ -333,6 +336,8 @@ class LiveExecutionHandler(ExecutionHandler):
             metadata={"event_key": projection.event_key},
         )
         if str(entry["state"]).upper() in TERMINAL_STATES:
+            if str(entry["state"]).upper() == STATE_FILLED:
+                self._submit_paper_exchange_protection(entry.get("event"), parent_order_id=order_id)
             self._forget_order(order_id, entry)
 
     def _build_reconciliation_payload(
@@ -540,6 +545,8 @@ class LiveExecutionHandler(ExecutionHandler):
                         reason="TERMINAL_RESOLVED",
                     )
                 )
+                if entry["state"] == STATE_FILLED:
+                    self._submit_paper_exchange_protection(order_event, parent_order_id=order_id)
                 self._forget_order(order_id, entry)
         return records
 
@@ -597,6 +604,8 @@ class LiveExecutionHandler(ExecutionHandler):
             return
         live_mode = str(getattr(self.config, "MODE", "paper") or "paper").strip().lower()
         if live_mode != "real":
+            if self._paper_exchange_protection_enabled():
+                return
             self.logger.warning(
                 "Proceeding without exchange-side protective params in %s mode for %s; "
                 "stop_loss/take_profit remain unmanaged unless explicit exchange_params are provided.",
@@ -607,6 +616,173 @@ class LiveExecutionHandler(ExecutionHandler):
         raise RuntimeError(
             "Real-mode live protective orders require explicit exchange_params mapping. "
             "Provide stop/take-profit exchange_params or omit stop_loss/take_profit."
+        )
+
+    def _paper_exchange_protection_enabled(self) -> bool:
+        live_mode = str(getattr(self.config, "MODE", "paper") or "paper").strip().lower()
+        if live_mode == "real":
+            return False
+        market_type = str(getattr(self.config, "MARKET_TYPE", "spot") or "spot").strip().lower()
+        if market_type != "future":
+            return False
+        return bool(getattr(self.config, "PAPER_EXCHANGE_PROTECTIVE_ORDERS", True))
+
+    @staticmethod
+    def _protective_close_side(event) -> str:
+        return "sell" if str(getattr(event, "direction", "")).upper() == "BUY" else "buy"
+
+    @staticmethod
+    def _protective_position_side(event) -> str | None:
+        position_side = str(getattr(event, "position_side", "") or "").strip().upper()
+        if position_side in {"LONG", "SHORT"}:
+            return position_side
+        return "LONG" if str(getattr(event, "direction", "")).upper() == "BUY" else "SHORT"
+
+    @staticmethod
+    def _protective_client_algo_id(parent_client_order_id: str, suffix: str) -> str:
+        digest = hashlib.sha256(f"{parent_client_order_id}|{suffix}".encode()).hexdigest()
+        return f"LQ-P-{suffix}-{digest[:_PROTECTIVE_CLIENT_DIGEST_LEN]}"
+
+    def _build_paper_protective_algo_specs(self, event) -> list[dict[str, Any]]:
+        if bool(getattr(event, "reduce_only", False)):
+            return []
+        if not self._paper_exchange_protection_enabled():
+            return []
+        metadata = dict(getattr(event, "metadata", None) or {})
+        exchange_params = dict(metadata.get("exchange_params") or {})
+        if any(key in exchange_params for key in _PROTECTIVE_PARAM_KEYS):
+            return []
+        quantity = float(getattr(event, "quantity", 0.0) or 0.0)
+        if quantity <= 0.0:
+            return []
+        side = self._protective_close_side(event)
+        position_side = self._protective_position_side(event)
+        parent_client_id = str(getattr(event, "client_order_id", "") or "")
+        base_params = {
+            "algoType": "CONDITIONAL",
+            "positionSide": position_side,
+            "workingType": "CONTRACT_PRICE",
+            "priceProtect": "true",
+            "parentClientOrderId": parent_client_id,
+        }
+        specs: list[dict[str, Any]] = []
+        stop_loss = getattr(event, "stop_loss", None)
+        if stop_loss is not None:
+            params = dict(base_params)
+            params.update(
+                {
+                    "triggerPrice": float(stop_loss),
+                    "clientAlgoId": self._protective_client_algo_id(parent_client_id, "SL"),
+                    "protectionRole": "stop_loss",
+                }
+            )
+            specs.append(
+                {
+                    "type": "STOP_MARKET",
+                    "side": side,
+                    "quantity": quantity,
+                    "params": params,
+                }
+            )
+        take_profit = getattr(event, "take_profit", None)
+        if take_profit is not None:
+            params = dict(base_params)
+            params.update(
+                {
+                    "triggerPrice": float(take_profit),
+                    "clientAlgoId": self._protective_client_algo_id(parent_client_id, "TP"),
+                    "protectionRole": "take_profit",
+                }
+            )
+            specs.append(
+                {
+                    "type": "TAKE_PROFIT_MARKET",
+                    "side": side,
+                    "quantity": quantity,
+                    "params": params,
+                }
+            )
+        return specs
+
+    def _submit_paper_exchange_protection(self, event, *, parent_order_id: str | None) -> None:
+        if event is None:
+            return
+        parent_client_id = str(getattr(event, "client_order_id", "") or "")
+        if not parent_client_id or parent_client_id in self._protected_parent_client_ids:
+            return
+        specs = self._build_paper_protective_algo_specs(event)
+        if not specs:
+            return
+        submitted: list[dict[str, Any]] = []
+        for spec in specs:
+            params = dict(spec["params"])
+            params["parentOrderId"] = parent_order_id
+            try:
+                order = self._call_with_retry(
+                    self.order_gateway.submit_algo,
+                    symbol=event.symbol,
+                    type=str(spec["type"]),
+                    side=str(spec["side"]),
+                    quantity=float(spec["quantity"]),
+                    params=params,
+                )
+            except Exception as exc:
+                self.logger.error("Paper/testnet protective algo order submit failed: %s", exc)
+                self._notify_state(
+                    order_id=parent_order_id,
+                    entry={
+                        "event": event,
+                        "symbol": event.symbol,
+                        "last_filled": float(getattr(event, "quantity", 0.0) or 0.0),
+                        "created_at": time.time(),
+                    },
+                    state=STATE_REJECTED,
+                    message="paper_protective_order_submit_failed",
+                    metadata={
+                        "error": str(exc),
+                        "protective_type": str(spec["type"]),
+                        "parent_client_order_id": parent_client_id,
+                    },
+                )
+                continue
+            protective_id = str(order.get("id") or params.get("clientAlgoId") or "")
+            record = {
+                "parent_order_id": parent_order_id,
+                "parent_client_order_id": parent_client_id,
+                "symbol": event.symbol,
+                "type": str(spec["type"]),
+                "side": str(spec["side"]),
+                "quantity": float(spec["quantity"]),
+                "params": params,
+                "order": dict(order),
+                "created_at": time.time(),
+                "status": str(order.get("status") or STATE_SUBMITTED).upper(),
+            }
+            if protective_id:
+                self.protective_orders[protective_id] = record
+            submitted.append(record)
+        if not submitted:
+            return
+        self._protected_parent_client_ids.add(parent_client_id)
+        metadata = {
+            "parent_order_id": parent_order_id,
+            "parent_client_order_id": parent_client_id,
+            "protective_order_count": len(submitted),
+            "protective_order_types": [str(item["type"]) for item in submitted],
+            "paper_testnet_only": True,
+            "real_money_execution": False,
+        }
+        self._notify_state(
+            order_id=parent_order_id,
+            entry={
+                "event": event,
+                "symbol": event.symbol,
+                "last_filled": float(getattr(event, "quantity", 0.0) or 0.0),
+                "created_at": time.time(),
+            },
+            state=STATE_SUBMITTED,
+            message="paper_exchange_protective_orders_submitted",
+            metadata=metadata,
         )
 
     def _estimate_commission(self, fill_price, quantity):
@@ -772,6 +948,7 @@ class LiveExecutionHandler(ExecutionHandler):
                 status="filled",
                 submitted_at=self.tracked_orders.get(order_id, {}).get("created_at"),
             )
+            self._submit_paper_exchange_protection(event, parent_order_id=order_id)
             self._forget_order(order_id, self.tracked_orders.get(order_id, {}))
         elif state in {STATE_OPEN, STATE_NEW, STATE_ACKED, STATE_PARTIAL}:
             self.logger.info("Order tracked order_id=%s state=%s", order_id, state)
@@ -859,6 +1036,8 @@ class LiveExecutionHandler(ExecutionHandler):
                         state=entry["state"],
                         message=timeout_message,
                     )
+                    if entry["state"] == STATE_FILLED:
+                        self._submit_paper_exchange_protection(order_event, parent_order_id=order_id)
                     self._forget_order(order_id, entry)
                     continue
 
@@ -895,4 +1074,6 @@ class LiveExecutionHandler(ExecutionHandler):
             if entry["state"] != previous_state:
                 self._notify_state(order_id=order_id, entry=entry, state=entry["state"])
             if entry["state"] in TERMINAL_STATES:
+                if entry["state"] == STATE_FILLED:
+                    self._submit_paper_exchange_protection(order_event, parent_order_id=order_id)
                 self._forget_order(order_id, entry)

@@ -223,19 +223,26 @@ operator가 start/live dry-run 경로로 이어갈 수 있다.
 - 선택된 v3.5 Optuna blend는 aggressive source profile 의존도가 높고 validation MDD가
   relaxed 20% 라벨 근처다. 독립 alpha라기보다 고위험 source profile을 완화한 allocator에
   가깝다.
-- completed 1h/2h/4h bar 기반이라 intrabar stop/exit와 real exchange microstructure는
-  아직 real exchange-side 주문으로 승인된 것은 아니다. 다만 최신 adapter는
-  paper/local simulation용 intrabar component EXIT guard와 microstructure telemetry
-  contract를 포함한다.
+- completed 1h/2h/4h bar 기반 alpha decision은 유지한다. 다만 최신 adapter는
+  paper/local simulation용 intrabar component EXIT guard, paper/testnet 전용
+  Binance USD-M conditional algo protective order(`POST /fapi/v1/algoOrder`), 그리고
+  microstructure telemetry contract를 포함한다. real-money protective order 승인은
+  여전히 별도 telemetry review 전까지 금지다.
 
 intrabar / microstructure 추가 계약:
 - strategy entry signal은 `component_id`, `stop_loss`, `trailing_percent`(chandelier 계열),
   `intrabar_protection`, `microstructure_telemetry_required` metadata를 포함한다.
 - paper/local simulation에서는 1m/5m/source-timeframe risk frame을 보고 stop breach 시
   component-level `EXIT` signal을 낼 수 있다.
-- real exchange-side protective order는 아직 별도 승인된 경로가 아니다. 실제 real mode는
-  exchange-specific STOP/TAKE_PROFIT order support와 paper/testnet fill telemetry가 쌓일
-  때까지 계속 veto한다.
+- paper/testnet exchange path는 entry fill 이후 같은 component quantity로
+  `STOP_MARKET`/`TAKE_PROFIT_MARKET` conditional algo order를 제출할 수 있다.
+- algo-order request payload는 Binance-supported field allowlist만 통과시키고,
+  parent/protection telemetry key는 reconciliation용 local record에만 남긴다.
+- selected frozen source asset 적용성은 `ETHUSDT`, `SOLUSDT`, `TRXUSDT`에 대해
+  guard/protective-order tests로 확인했다.
+- real-money exchange-side protective order는 아직 별도 승인된 경로가 아니다. 실제 real
+  mode는 paper/testnet fill telemetry와 별도 real-readiness review가 쌓일 때까지 계속
+  veto한다.
 - queue priority는 거래소가 정확한 내 대기열 위치를 주지 않으므로 BBO/depth/fill-latency
   proxy로만 판단한다.
 

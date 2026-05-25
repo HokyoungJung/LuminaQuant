@@ -5,6 +5,7 @@ import json
 import sys
 from collections import deque
 from pathlib import Path
+from types import SimpleNamespace
 
 import pandas as pd
 import pytest
@@ -214,6 +215,48 @@ def test_intrabar_guard_emits_component_exit_from_market_event() -> None:
     assert exit_signal.metadata["intrabar_exit_reason"] == "intrabar_stop_loss_or_trailing_short"
 
 
+def test_intrabar_protection_is_generic_for_selected_eth_sol_trx_sleeves() -> None:
+    selected_symbols = set()
+    for sleeve in load_alpha_zoo_optuna_hybrid_live_config().source_sleeves:
+        selected_symbols.add(sleeve.symbol)
+        price = 0.1 if sleeve.symbol == "TRXUSDT" else 100.0
+        intrabar_rows = _ohlcv_rows([price + idx * price * 0.001 for idx in range(32)])
+        active_row = (32, price, price, price, price, 1000.0)
+        aggregator = _Aggregator(_bars_with_aliases(sleeve.symbol, "1m", [*intrabar_rows, active_row]))
+        queue = _Queue()
+        strategy = AlphaZooOptunaHybridLiveStrategy(_Bars(), queue)
+        signal_type = "SHORT" if sleeve.side == "short_only" else "LONG"
+        decision = SimpleNamespace(price=price, completed_key=f"asset-check-{sleeve.symbol}")
+
+        plan = strategy._build_intrabar_protection_plan(aggregator, sleeve, decision, signal_type)
+        assert plan.enabled is True
+        assert plan.source_timeframe == "1m"
+        strategy._activate_intrabar_guard(sleeve, decision, signal_type, plan)
+        stop = float(plan.stop_loss)
+        if signal_type == "SHORT":
+            high = stop * 1.01
+            low = stop * 0.99
+        else:
+            high = stop * 1.01
+            low = stop * 0.99
+        strategy.calculate_signals(
+            MarketEvent(
+                time=f"risk-{sleeve.symbol}",
+                symbol=sleeve.symbol,
+                open=price,
+                high=high,
+                low=low,
+                close=stop,
+                volume=1000.0,
+            )
+        )
+        exits = [item for item in queue.items if getattr(item, "signal_type", "") == "EXIT"]
+        assert exits, sleeve.symbol
+        assert exits[-1].metadata["component_id"] == sleeve.model_id
+
+    assert selected_symbols == {"ETHUSDT", "SOLUSDT", "TRXUSDT"}
+
+
 def test_target_notional_uses_final_weights_and_integer_leverage() -> None:
     queue = _Queue()
     strategy = AlphaZooOptunaHybridLiveStrategy(_Bars(), queue)
@@ -292,6 +335,18 @@ def test_ops_decision_payload_is_paper_testnet_only() -> None:
     assert payload["microstructure_telemetry_contract"]["required_fields"][0] == (
         "bbo_spread_bps_at_submit"
     )
+    assert payload["paper_testnet_exchange_protection_contract"]["enabled"] is True
+    assert payload["paper_testnet_exchange_protection_contract"]["endpoint"] == (
+        "POST /fapi/v1/algoOrder"
+    )
+    assert payload["paper_testnet_exchange_protection_contract"]["real_money_policy"] == (
+        "blocked_until_separate_exchange_side_order_telemetry_review"
+    )
+    assert payload["asset_applicability_contract"]["verified_symbols"] == [
+        "ETHUSDT",
+        "SOLUSDT",
+        "TRXUSDT",
+    ]
     runtime = extract_live_decision_config(payload)
     assert runtime["strategy_name"] == "AlphaZooOptunaHybridLiveStrategy"
     assert runtime["target_allocation"] == 0.0

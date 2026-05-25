@@ -15,6 +15,27 @@ from lumina_quant.exchanges.binance_futures_client import (
 from lumina_quant.storage.parquet import normalize_symbol
 
 
+_BINANCE_ALGO_ORDER_PARAM_KEYS = (
+    "clientAlgoId",
+    "positionSide",
+    "timeInForce",
+    "quantity",
+    "price",
+    "triggerPrice",
+    "workingType",
+    "priceProtect",
+    "priceMatch",
+    "closePosition",
+    "reduceOnly",
+    "activatePrice",
+    "callbackRate",
+    "newOrderRespType",
+    "selfTradePreventionMode",
+    "goodTillDate",
+    "recvWindow",
+)
+
+
 class BinanceFuturesExchange(ExchangeInterface):
     """ExchangeInterface backed by official Binance USDⓈ-M Futures APIs only."""
 
@@ -300,6 +321,19 @@ class BinanceFuturesExchange(ExchangeInterface):
         }
         return mapping.get(token, token.lower() or "unknown")
 
+    @staticmethod
+    def _normalize_algo_order_status(value: Any) -> str:
+        token = str(value or "").strip().upper()
+        mapping = {
+            "NEW": "open",
+            "PARTIALLY_FILLED": "partially_filled",
+            "FILLED": "closed",
+            "CANCELED": "canceled",
+            "EXPIRED": "canceled",
+            "REJECTED": "rejected",
+        }
+        return mapping.get(token, token.lower() or "unknown")
+
     def _normalize_order(self, row: dict[str, Any]) -> dict[str, Any]:
         amount = self._as_float(row.get("origQty"), 0.0)
         filled = self._as_float(row.get("executedQty"), 0.0)
@@ -323,6 +357,29 @@ class BinanceFuturesExchange(ExchangeInterface):
             "type": str(row.get("type") or row.get("origType") or "").lower(),
             "clientOrderId": row.get("clientOrderId"),
             "client_order_id": row.get("clientOrderId"),
+            "positionSide": row.get("positionSide"),
+            "reduceOnly": self._as_bool(row.get("reduceOnly")),
+            "timeInForce": row.get("timeInForce"),
+        }
+
+    def _normalize_algo_order(self, row: dict[str, Any]) -> dict[str, Any]:
+        amount = self._as_float(row.get("quantity"), 0.0)
+        return {
+            "id": str(row.get("algoId") or row.get("orderId") or ""),
+            "status": self._normalize_algo_order_status(row.get("algoStatus") or row.get("status")),
+            "filled": 0.0,
+            "average": self._as_float(row.get("price"), 0.0),
+            "price": self._as_float(row.get("price"), 0.0),
+            "amount": amount,
+            "remaining": amount,
+            "timestamp": int(row.get("createTime") or row.get("updateTime") or 0),
+            "fee": row.get("fee"),
+            "info": dict(row),
+            "symbol": self._normalize_symbol(str(row.get("symbol") or "")),
+            "side": str(row.get("side") or "").lower(),
+            "type": str(row.get("orderType") or row.get("type") or "").lower(),
+            "clientOrderId": row.get("clientAlgoId") or row.get("clientOrderId"),
+            "client_order_id": row.get("clientAlgoId") or row.get("clientOrderId"),
             "positionSide": row.get("positionSide"),
             "reduceOnly": self._as_bool(row.get("reduceOnly")),
             "timeInForce": row.get("timeInForce"),
@@ -381,6 +438,38 @@ class BinanceFuturesExchange(ExchangeInterface):
             payload.pop("reduceOnly", None)
         payload.update({key: value for key, value in request_params.items() if value is not None})
         return self._normalize_order(self._client().new_order(**payload))
+
+    def execute_algo_order(
+        self,
+        symbol: str,
+        type: str,
+        side: str,
+        quantity: float,
+        params: dict | None = None,
+    ) -> dict:
+        request_params = dict(params or {})
+        payload: dict[str, Any] = {
+            "algoType": request_params.pop("algoType", "CONDITIONAL"),
+            "symbol": normalize_futures_symbol(symbol),
+            "side": str(side).strip().upper(),
+            "type": str(type).strip().upper(),
+            "quantity": quantity,
+        }
+        if "clientOrderId" in request_params and request_params.get("clientAlgoId") is None:
+            request_params["clientAlgoId"] = request_params.pop("clientOrderId")
+        if "client_order_id" in request_params and request_params.get("clientAlgoId") is None:
+            request_params["clientAlgoId"] = request_params.pop("client_order_id")
+        for key in _BINANCE_ALGO_ORDER_PARAM_KEYS:
+            if key == "quantity":
+                continue
+            if key in request_params and request_params[key] is not None:
+                payload[key] = request_params.pop(key)
+        if (
+            str(getattr(self.config, "POSITION_MODE", "HEDGE") or "HEDGE").upper() == "HEDGE"
+            and str(payload.get("positionSide") or "").upper() in {"LONG", "SHORT"}
+        ):
+            payload.pop("reduceOnly", None)
+        return self._normalize_algo_order(self._client().new_algo_order(**payload))
 
     def fetch_open_orders(self, symbol: str | None = None) -> list[dict]:
         return [self._normalize_order(item) for item in self._client().query_open_orders(symbol=symbol)]

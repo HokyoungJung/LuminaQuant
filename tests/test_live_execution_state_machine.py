@@ -89,10 +89,38 @@ class MockProtectiveExchange(MockExchange):
     def __init__(self):
         super().__init__()
         self.last_params = None
+        self.algo_orders = []
 
     def execute_order(self, **kwargs):
         self.last_params = dict(kwargs.get("params") or {})
         return super().execute_order(**kwargs)
+
+    def execute_algo_order(self, **kwargs):
+        self.algo_orders.append(dict(kwargs))
+        params = dict(kwargs.get("params") or {})
+        return {
+            "id": f"algo-{len(self.algo_orders)}",
+            "status": "open",
+            "amount": kwargs.get("quantity", 0.0),
+            "price": params.get("triggerPrice", 0.0),
+            "clientOrderId": params.get("clientAlgoId"),
+            "type": kwargs.get("type"),
+            "side": kwargs.get("side"),
+            "positionSide": params.get("positionSide"),
+        }
+
+
+class MockFilledProtectiveExchange(MockProtectiveExchange):
+    def execute_order(self, **kwargs):
+        self.last_params = dict(kwargs.get("params") or {})
+        return {
+            "id": "entry-filled",
+            "status": "closed",
+            "filled": kwargs.get("quantity", 0.0),
+            "amount": kwargs.get("quantity", 0.0),
+            "price": 100.0,
+            "average": 100.0,
+        }
 
 
 class MockTimeoutExchange:
@@ -203,7 +231,7 @@ class TestLiveExecutionStateMachine(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "Real-mode live protective orders require"):
             handler.execute_order(order)
 
-    def test_live_protective_orders_allow_unmanaged_protection_in_paper_mode(self):
+    def test_live_protective_orders_are_not_embedded_in_parent_market_order(self):
         events = queue.Queue()
         exchange = MockProtectiveExchange()
         handler = LiveExecutionHandler(events, MockBars(), MockConfig, exchange)
@@ -221,6 +249,62 @@ class TestLiveExecutionStateMachine(unittest.TestCase):
         assert exchange.last_params is not None
         self.assertNotIn("stopLossPrice", exchange.last_params)
         self.assertNotIn("takeProfitPrice", exchange.last_params)
+
+    def test_paper_mode_submits_exchange_algo_protection_after_entry_fill(self):
+        events = queue.Queue()
+        exchange = MockFilledProtectiveExchange()
+        handler = LiveExecutionHandler(events, MockBars(), MockConfig, exchange)
+        states = []
+        handler.set_order_state_callback(states.append)
+
+        order = OrderEvent(
+            "ETH/USDT",
+            "MKT",
+            1.5,
+            "BUY",
+            position_side="LONG",
+            stop_loss=95.0,
+            take_profit=110.0,
+            metadata={"component_id": "eth-component"},
+        )
+
+        handler.execute_order(order)
+
+        self.assertEqual([item["type"] for item in exchange.algo_orders], ["STOP_MARKET", "TAKE_PROFIT_MARKET"])
+        self.assertEqual({item["side"] for item in exchange.algo_orders}, {"sell"})
+        self.assertTrue(all(item["symbol"] == "ETH/USDT" for item in exchange.algo_orders))
+        self.assertEqual([item["params"]["triggerPrice"] for item in exchange.algo_orders], [95.0, 110.0])
+        self.assertTrue(all(item["params"]["positionSide"] == "LONG" for item in exchange.algo_orders))
+        self.assertTrue(any(payload["message"] == "paper_exchange_protective_orders_submitted" for payload in states))
+        self.assertEqual(len(handler.protective_orders), 2)
+
+    def test_paper_exchange_algo_protection_is_generic_across_assets_and_sides(self):
+        events = queue.Queue()
+        exchange = MockFilledProtectiveExchange()
+        handler = LiveExecutionHandler(events, MockBars(), MockConfig, exchange)
+
+        for symbol, direction, position_side, stop in (
+            ("SOL/USDT", "SELL", "SHORT", 105.0),
+            ("TRX/USDT", "BUY", "LONG", 0.09),
+        ):
+            order = OrderEvent(
+                symbol,
+                "MKT",
+                2.0,
+                direction,
+                position_side=position_side,
+                stop_loss=stop,
+            )
+            handler.execute_order(order)
+
+        self.assertEqual(len(exchange.algo_orders), 2)
+        sol_order, trx_order = exchange.algo_orders
+        self.assertEqual(sol_order["symbol"], "SOL/USDT")
+        self.assertEqual(sol_order["side"], "buy")
+        self.assertEqual(sol_order["params"]["positionSide"], "SHORT")
+        self.assertEqual(trx_order["symbol"], "TRX/USDT")
+        self.assertEqual(trx_order["side"], "sell")
+        self.assertEqual(trx_order["params"]["positionSide"], "LONG")
 
     def test_live_protective_orders_allow_explicit_exchange_params_mapping(self):
         events = queue.Queue()

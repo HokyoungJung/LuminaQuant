@@ -7,7 +7,9 @@
 - target_allocation_mode: `notional_fraction`
 - target_allocation source: `SignalEvent.metadata.target_allocation`
 - risk_caps: `{"max_order_notional_pct": 1.247444, "max_order_value": 0.0, "max_symbol_exposure_pct": 1.427227, "max_total_margin_pct": 3.520744, "max_total_notional_pct": 3.520744}`
-- intrabar protection: `paper_local_or_simulated_component_exit`
+- intrabar protection: `paper_local_or_simulated_component_exit_plus_paper_testnet_exchange_algo_stop`
+- paper/testnet exchange protection: `STOP_MARKET/TAKE_PROFIT_MARKET after entry fill`
+- asset applicability: `ETHUSDT, SOLUSDT, TRXUSDT`
 - microstructure telemetry: `required before real-money review`
 - ready_for_real: `false`
 - real_money_execution: `false`
@@ -28,7 +30,7 @@ This is a paper/testnet handoff artifact only; it is not a real-money approval.
 - The selected v3.5 Optuna blend is dominated by the aggressive source profile, so independent-alpha diversification is limited.
 - Validation MDD is near the relaxed 20% label and exceeds the strict 12% promotion cap.
 - locked-OOS remains gate/report-only; it is not a parameter-fitting or selection surface.
-- Alpha decisions use completed 1h/2h/4h bars; intrabar exits are paper/local simulated guards, not approved real exchange-side protective orders.
+- Alpha decisions use completed 1h/2h/4h bars; paper/testnet exchange-side STOP_MARKET/TAKE_PROFIT_MARKET protection is supported after entry fill, but real-money remains unapproved.
 - Paper/testnet liquidity can diverge from real exchange liquidity, funding, fees, and liquidation mechanics.
 - Frozen-artifact replay avoids online learning; stale artifacts or regime drift require a new research/paper review.
 
@@ -45,5 +47,8 @@ This is a paper/testnet handoff artifact only; it is not a real-money approval.
 
 - Entry signals attach stop-loss and chandelier-style trailing protection where available.
 - Paper/local simulation can emit component-level EXIT signals from intrabar guard breaches.
-- Real exchange-side protective orders are still not approved without explicit exchange order support.
+- Paper/testnet can submit Binance USD-M conditional algo `STOP_MARKET`/`TAKE_PROFIT_MARKET` protection after entry fill.
+- Algo-order request payloads are whitelisted to Binance-supported fields; internal parent/protection telemetry is not sent to the exchange.
+- Real-money exchange-side protective orders are still not approved without separate telemetry review.
+- Selected-source asset applicability is verified for ETHUSDT, SOLUSDT, and TRXUSDT.
 - Exact queue priority is unavailable from the exchange; use BBO/depth/fill-latency proxies.

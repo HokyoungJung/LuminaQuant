@@ -264,6 +264,10 @@ class BinanceFuturesRESTClient:
         payload = self.signed_post("/fapi/v1/order", params=params)
         return dict(payload or {}) if isinstance(payload, dict) else {}
 
+    def new_algo_order(self, **params: Any) -> dict[str, Any]:
+        payload = self.signed_post("/fapi/v1/algoOrder", params=params)
+        return dict(payload or {}) if isinstance(payload, dict) else {}
+
     def cancel_order(
         self,
         *,

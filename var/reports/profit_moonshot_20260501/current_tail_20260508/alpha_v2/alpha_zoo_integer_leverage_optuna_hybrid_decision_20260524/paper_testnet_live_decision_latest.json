@@ -1,5 +1,19 @@
 {
   "artifact_kind": "alpha_zoo_optuna_hybrid_paper_testnet_live_decision",
+  "asset_applicability_contract": {
+    "guard_is_symbol_generic": true,
+    "selected_source_symbols": [
+      "ETHUSDT",
+      "SOLUSDT",
+      "TRXUSDT"
+    ],
+    "verification": "tests cover intrabar guard and paper exchange protection across selected source assets/sides",
+    "verified_symbols": [
+      "ETHUSDT",
+      "SOLUSDT",
+      "TRXUSDT"
+    ]
+  },
   "decision": "selected_live_mode",
   "decision_cadence_seconds": 3600,
   "exchange": {
@@ -11,7 +25,7 @@
     "position_mode": "HEDGE",
     "testnet": true
   },
-  "generated_at_utc": "2026-05-25T10:59:31Z",
+  "generated_at_utc": "2026-05-25T11:27:31Z",
   "ingest_window_seconds": 3600,
   "intrabar_protection_contract": {
     "component_exit_key": "SignalEvent.metadata.component_id",
@@ -20,7 +34,7 @@
       "stop_loss",
       "trailing_percent_when_source_uses_chandelier"
     ],
-    "mode": "paper_local_or_simulated_component_exit",
+    "mode": "paper_local_or_simulated_component_exit_plus_paper_testnet_exchange_algo_stop",
     "monitoring_timeframes_preference": [
       "1m",
       "5m",
@@ -33,7 +47,7 @@
     "The selected v3.5 Optuna blend is dominated by the aggressive source profile, so independent-alpha diversification is limited.",
     "Validation MDD is near the relaxed 20% label and exceeds the strict 12% promotion cap.",
     "locked-OOS remains gate/report-only; it is not a parameter-fitting or selection surface.",
-    "Alpha decisions use completed 1h/2h/4h bars; intrabar exits are paper/local simulated guards, not approved real exchange-side protective orders.",
+    "Alpha decisions use completed 1h/2h/4h bars; paper/testnet exchange-side STOP_MARKET/TAKE_PROFIT_MARKET protection is supported after entry fill, but real-money remains unapproved.",
     "Paper/testnet liquidity can diverge from real exchange liquidity, funding, fees, and liquidation mechanics.",
     "Frozen-artifact replay avoids online learning; stale artifacts or regime drift require a new research/paper review."
   ],
@@ -61,6 +75,20 @@
     ]
   },
   "operator_warning": "paper/testnet only; real-money startup remains vetoed by artifacts",
+  "paper_testnet_exchange_protection_contract": {
+    "enabled": true,
+    "endpoint": "POST /fapi/v1/algoOrder",
+    "endpoint_family": "Binance USD-M Futures conditional algo orders",
+    "position_side": "SignalEvent.position_side or direction-derived LONG/SHORT",
+    "real_money_policy": "blocked_until_separate_exchange_side_order_telemetry_review",
+    "request_payload_policy": "Binance-doc allowlist only; internal parent/protection telemetry keys are retained locally and not sent to the exchange",
+    "sizing": "same_quantity_as_filled_parent_component_order",
+    "submitted_after": "entry_order_filled",
+    "supported_types": [
+      "STOP_MARKET",
+      "TAKE_PROFIT_MARKET"
+    ]
+  },
   "paper_testnet_only": true,
   "paper_testnet_validation_requirements": [
     "realized BBO spread and all-in round-trip cost by symbol/timeframe",

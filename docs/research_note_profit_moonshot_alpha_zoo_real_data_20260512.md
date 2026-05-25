@@ -980,3 +980,17 @@ The prior live-readiness caveat about intrabar exits and microstructure was narr
 This does **not** change the real-money conclusion. Real exchange-side protective orders remain unapproved until exchange-specific STOP/TAKE_PROFIT order support is wired and observed in paper/testnet. Exact queue priority remains impossible to know from exchange APIs; monitoring must use BBO/depth/fill-latency/partial-fill proxies. The refreshed `paper_testnet_live_decision_latest.json|md` records the `intrabar_protection_contract` and `microstructure_telemetry_contract`. Real-money flags remain false and the artifact veto stays active.
 
 Local verification after the guard update: `ruff check .`, architecture check, `compileall`, hardcoded-parameter audit (`new=0`), `git diff --check`, and full `pytest -q` all passed; full pytest was `1456 passed` with max RSS `2,933,144 KiB`, below the 8 GiB session limit.
+
+## 2026-05-25 KST — Paper/testnet exchange-side protective orders and asset applicability
+
+One additional live-readiness gap was closed for paper/testnet: after an entry order is confirmed filled, `LiveExecutionHandler` can submit Binance USD-M Futures conditional algo protective orders through the request gateway. The supported paper/testnet protective types are `STOP_MARKET` and `TAKE_PROFIT_MARKET`, routed through the repo-native Binance Futures adapter to `POST /fapi/v1/algoOrder`. The order uses the same parent component quantity and the signal/component `position_side`; it intentionally remains paper/testnet-only. Real mode still fails closed unless a separate artifact explicitly approves exchange-side protective order handling and measured paper/testnet telemetry.
+
+Asset applicability was checked beyond the dominant SOL sleeve. The intrabar guard/protective-order logic is symbol-generic and now has tests for the selected frozen source assets `ETHUSDT`, `SOLUSDT`, and `TRXUSDT`, including both long and short protective directions. This does not add new alpha assets or change the frozen hybrid portfolio; it verifies that the live protective machinery is not hard-coded to one asset family.
+
+Remaining live limitations after this pass: no actual exchange paper/testnet fill sample has been collected yet, exact queue priority is still unknowable and proxy-only, and real-money remains vetoed until at least two weeks of fill/slippage/reconciliation telemetry confirms the 10bps cost and notional-parity assumptions.
+
+Local verification for this follow-up passed: `ruff check .`, architecture check, `compileall`, hardcoded-parameter audit (`new=0`), `git diff --check`, and full `pytest -q`; full pytest was `1460 passed` with max RSS `2,752,152 KiB`, below the 8 GiB limit.
+
+Payload-hardening update: the Binance conditional algo order adapter now uses a documented-field allowlist for `/fapi/v1/algoOrder`; internal parent/protection telemetry fields are not forwarded to the exchange request payload. Targeted exchange/state-machine/live-strategy regression tests passed (`25 passed`).
+
+Final validation after payload hardening: `ruff check .`, architecture check, `compileall`, hardcoded-parameter audit (`new=0`), `git diff --check`, and full `pytest -q` passed; full pytest was `1460 passed` with max RSS `2,724,568 KiB`, below the 8 GiB limit.

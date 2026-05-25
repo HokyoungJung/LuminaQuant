@@ -119,6 +119,58 @@ def test_exchange_normalizes_open_orders(monkeypatch) -> None:
     assert rows[0]["reduceOnly"] is False
 
 
+def test_exchange_submits_conditional_algo_order(monkeypatch) -> None:
+    _stub_exchange_bootstrap(monkeypatch)
+    exchange = BinanceFuturesExchange(MockConfig())
+    captured = {}
+
+    def _new_algo_order(**kwargs):
+        captured.update(kwargs)
+        return {
+            "algoId": 456,
+            "algoStatus": "NEW",
+            "quantity": "1.5",
+            "price": "0",
+            "symbol": "ETHUSDT",
+            "side": "SELL",
+            "orderType": "STOP_MARKET",
+            "clientAlgoId": "LQ-P-SL-test",
+            "positionSide": "LONG",
+            "reduceOnly": "false",
+        }
+
+    monkeypatch.setattr(exchange._client(), "new_algo_order", _new_algo_order)
+
+    order = exchange.execute_algo_order(
+        symbol="ETH/USDT",
+        type="STOP_MARKET",
+        side="sell",
+        quantity=1.5,
+        params={
+            "clientAlgoId": "LQ-P-SL-test",
+            "positionSide": "LONG",
+            "triggerPrice": 95.0,
+            "workingType": "CONTRACT_PRICE",
+            "priceProtect": "true",
+            "parentOrderId": "entry-filled",
+            "parentClientOrderId": "LQ-entry",
+            "protectionRole": "stop_loss",
+        },
+    )
+
+    assert captured["algoType"] == "CONDITIONAL"
+    assert captured["symbol"] == "ETHUSDT"
+    assert captured["type"] == "STOP_MARKET"
+    assert captured["triggerPrice"] == 95.0
+    assert "parentOrderId" not in captured
+    assert "parentClientOrderId" not in captured
+    assert "protectionRole" not in captured
+    assert order["id"] == "456"
+    assert order["status"] == "open"
+    assert order["symbol"] == "ETH/USDT"
+    assert order["type"] == "stop_market"
+
+
 def test_exchange_exposes_side_aware_position_legs(monkeypatch) -> None:
     _stub_exchange_bootstrap(monkeypatch)
     exchange = BinanceFuturesExchange(MockConfig())

@@ -31,6 +31,35 @@ class OrderGateway:
             or {}
         )
 
+    def submit_algo(
+        self,
+        *,
+        symbol: str,
+        type: str,
+        side: str,
+        quantity: float,
+        params: dict | None = None,
+    ) -> dict:
+        submitter = getattr(self.exchange, "execute_algo_order", None)
+        if callable(submitter):
+            return dict(
+                submitter(
+                    symbol=symbol,
+                    type=type,
+                    side=side,
+                    quantity=quantity,
+                    params=params,
+                )
+                or {}
+            )
+        return self.submit(
+            symbol=symbol,
+            type=type,
+            side=side,
+            quantity=quantity,
+            params=params,
+        )
+
     def cancel(self, order_id: str, symbol: str | None = None) -> bool:
         return bool(self.exchange.cancel_order(order_id, symbol))
 
