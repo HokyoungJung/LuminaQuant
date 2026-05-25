@@ -225,6 +225,12 @@ def test_ops_decision_payload_is_paper_testnet_only() -> None:
     assert payload["risk_caps"]["max_order_notional_pct"] > 1.18
     assert payload["risk_caps"]["max_symbol_exposure_pct"] > 1.35
     assert payload["risk_caps"]["max_total_notional_pct"] > 3.2
+    assert any("no_exchange_paper_fill_telemetry" in item for item in payload["real_money_blockers"])
+    assert any("backtest_cost_is_proxy" in item for item in payload["real_money_blockers"])
+    assert any("Validation MDD" in item for item in payload["known_limitations"])
+    assert "minimum 2 weeks paper/testnet observation before any real-money review" in payload[
+        "paper_testnet_validation_requirements"
+    ]
     runtime = extract_live_decision_config(payload)
     assert runtime["strategy_name"] == "AlphaZooOptunaHybridLiveStrategy"
     assert runtime["target_allocation"] == 0.0

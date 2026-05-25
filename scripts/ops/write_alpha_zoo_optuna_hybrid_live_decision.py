@@ -84,6 +84,20 @@ def build_decision_payload(
         for leverage in profile.leverage_map.values()
     )
     risk_caps = _notional_risk_caps(config)
+    real_money_blockers = [
+        "paper_testnet_artifacts_only: ready_for_real, real_money_execution, and real_execution_allowed are false",
+        "no_exchange_paper_fill_telemetry: realized BBO spread, fees, slippage, rejects, partial fills, and cancels are not observed yet",
+        "backtest_cost_is_proxy: 10bps round-trip friction is enforced in replay and gates but is not a live measured all-in cost",
+        "fail_closed_allocation: decision target_allocation is 0.0 and live sizing depends on SignalEvent.metadata.target_allocation",
+    ]
+    known_limitations = [
+        "The selected v3.5 Optuna blend is dominated by the aggressive source profile, so independent-alpha diversification is limited.",
+        "Validation MDD is near the relaxed 20% label and exceeds the strict 12% promotion cap.",
+        "locked-OOS remains gate/report-only; it is not a parameter-fitting or selection surface.",
+        "The live adapter uses completed 1h/2h/4h bars, so it does not model intrabar exits or exchange microstructure timing.",
+        "Paper/testnet liquidity can diverge from real exchange liquidity, funding, fees, and liquidation mechanics.",
+        "Frozen-artifact replay avoids online learning; stale artifacts or regime drift require a new research/paper review.",
+    ]
     return {
         "artifact_kind": "alpha_zoo_optuna_hybrid_paper_testnet_live_decision",
         "generated_at_utc": datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
@@ -133,6 +147,16 @@ def build_decision_payload(
         "return_per_turnover_threshold_bps": RETURN_PER_TURNOVER_THRESHOLD_BPS,
         "locked_oos_role": "gate_report_only",
         "replay_live_notional_parity": True,
+        "real_money_blockers": real_money_blockers,
+        "known_limitations": known_limitations,
+        "paper_testnet_validation_requirements": [
+            "realized BBO spread and all-in round-trip cost by symbol/timeframe",
+            "order reject, timeout, cancel, and partial-fill rates",
+            "replay/live notional parity from SignalEvent metadata to submitted order notional",
+            "position reconciliation drift and stale-data blocks/recoveries",
+            "liquidation-inclusive MDD and account-wipeout telemetry",
+            "minimum 2 weeks paper/testnet observation before any real-money review",
+        ],
         "operator_warning": "paper/testnet only; real-money startup remains vetoed by artifacts",
     }
 
@@ -195,6 +219,18 @@ def main(argv: list[str] | None = None) -> int:
                 "- primary round-trip cost: `10bps`",
                 "",
                 "This is a paper/testnet handoff artifact only; it is not a real-money approval.",
+                "",
+                "## Real-money blockers",
+                "",
+                *[f"- {item}" for item in payload["real_money_blockers"]],
+                "",
+                "## Known limitations",
+                "",
+                *[f"- {item}" for item in payload["known_limitations"]],
+                "",
+                "## Paper/testnet validation requirements",
+                "",
+                *[f"- {item}" for item in payload["paper_testnet_validation_requirements"]],
                 "",
             ]
         ),

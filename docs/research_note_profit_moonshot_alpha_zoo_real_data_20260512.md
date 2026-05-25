@@ -950,3 +950,25 @@ New handoff writer: `scripts/ops/write_alpha_zoo_optuna_hybrid_live_decision.py`
 - `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_integer_leverage_optuna_hybrid_decision_20260524/paper_testnet_live_decision_latest.md`
 
 Operator runbook updated at `docs/live-readiness/04-paper-trading-runbook.md` with the `--check-only` and writer commands plus the sizing/real-veto invariants. Verification on 2026-05-25 KST passed: targeted live adapter/readiness/start-live tests `32 passed`; post-architecture-fix full pytest `1455 passed in 102.70s` with max RSS `2,946,288 KiB` (<8 GiB); `ruff check .`; `uv run python scripts/check_architecture.py`; `python3 -m compileall -q src scripts tests`; hardcoded-parameter audit `total=567 new=0 baselined=567`; `git diff --check`; and `git diff --cached --check`. Real-money execution remains prohibited.
+
+## 2026-05-25 KST — Live adapter limitation audit and paper/testnet blockers
+
+After the paper/testnet live adapter was implemented, the live-readiness interpretation was tightened: the adapter is live-compatible for paper/testnet monitoring, but real-money startup remains intentionally blocked. The refreshed `paper_testnet_live_decision_latest.json|md` now records explicit `real_money_blockers`, `known_limitations`, and `paper_testnet_validation_requirements` alongside the existing `ready_for_real=false`, `real_money_execution=false`, and `real_execution_allowed=false` flags.
+
+Current real-money blockers:
+
+- The governing artifacts are still paper/testnet-only: `ready_for_real=false`, `real_money_execution=false`, and `real_execution_allowed=false`; readiness policy should keep `artifact_real_money_veto=true` for real mode.
+- There is no exchange paper/testnet fill telemetry yet. Realized BBO spread, fees, slippage, rejects, timeouts, cancels, partial fills, position reconciliation drift, and stale-data recovery must be observed before any real-money review.
+- The `10bps` assumption is a replay/gate round-trip friction proxy, not a live measured all-in cost. Paper/testnet monitoring must show realized all-in costs remain compatible with that assumption.
+- The decision artifact deliberately keeps global `target_allocation=0.0` fail-closed. Live sizing depends on `SignalEvent.metadata.target_allocation`; paper/testnet must verify signal metadata to submitted-order notional parity.
+
+Known disadvantages and research risks:
+
+- The selected `hybrid_v3_5_optuna_three_profile_blend` is dominated by the aggressive source profile. It is a risk-managed allocator over correlated source profiles, not a clearly independent new alpha sleeve.
+- Validation MDD `18.9796%` is near the relaxed 20% label and above the strict 12% promotion cap; locked-OOS report-only MDD is `10.5735%`.
+- Train return `+611.5025%` versus validation `+138.3170%` indicates strong train dominance and potential optimizer overfit despite positive validation and locked-OOS report-only results.
+- Source universe breadth is still limited in the promoted live adapter: the frozen sleeves are concentrated in SOL/ETH/TRX with BTC/BNB mainly as reference/watch symbols; broader assets remain shadow/data-extension work until OOS coverage and live telemetry exist.
+- The live adapter evaluates completed `1h/2h/4h` bars only, so it does not model intrabar exits, queue priority, funding/fee drift, liquidation-engine edge cases, or exchange microstructure timing.
+- Frozen-artifact replay avoids online learning and locked-OOS leakage, but regime drift or stale artifacts require a new train+validation-first research cycle rather than live self-tuning.
+
+Paper/testnet evidence required next: realized BBO/all-in round-trip cost by symbol and timeframe, reject/timeout/cancel/partial-fill rates, signal-metadata-to-order-notional parity, position reconciliation drift, stale-data block/recovery behavior, liquidation-inclusive MDD/account wipeout telemetry, and at least two continuous weeks of observation before any future real-money discussion. Until then the correct conclusion remains: paper/testnet launch is allowed for evidence gathering; real-money launch is prohibited.

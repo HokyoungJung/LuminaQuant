@@ -13,3 +13,28 @@
 - primary round-trip cost: `10bps`
 
 This is a paper/testnet handoff artifact only; it is not a real-money approval.
+
+## Real-money blockers
+
+- paper_testnet_artifacts_only: ready_for_real, real_money_execution, and real_execution_allowed are false
+- no_exchange_paper_fill_telemetry: realized BBO spread, fees, slippage, rejects, partial fills, and cancels are not observed yet
+- backtest_cost_is_proxy: 10bps round-trip friction is enforced in replay and gates but is not a live measured all-in cost
+- fail_closed_allocation: decision target_allocation is 0.0 and live sizing depends on SignalEvent.metadata.target_allocation
+
+## Known limitations
+
+- The selected v3.5 Optuna blend is dominated by the aggressive source profile, so independent-alpha diversification is limited.
+- Validation MDD is near the relaxed 20% label and exceeds the strict 12% promotion cap.
+- locked-OOS remains gate/report-only; it is not a parameter-fitting or selection surface.
+- The live adapter uses completed 1h/2h/4h bars, so it does not model intrabar exits or exchange microstructure timing.
+- Paper/testnet liquidity can diverge from real exchange liquidity, funding, fees, and liquidation mechanics.
+- Frozen-artifact replay avoids online learning; stale artifacts or regime drift require a new research/paper review.
+
+## Paper/testnet validation requirements
+
+- realized BBO spread and all-in round-trip cost by symbol/timeframe
+- order reject, timeout, cancel, and partial-fill rates
+- replay/live notional parity from SignalEvent metadata to submitted order notional
+- position reconciliation drift and stale-data blocks/recoveries
+- liquidation-inclusive MDD and account-wipeout telemetry
+- minimum 2 weeks paper/testnet observation before any real-money review

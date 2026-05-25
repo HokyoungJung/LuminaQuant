@@ -207,6 +207,25 @@ uv run python scripts/ops/write_alpha_zoo_optuna_hybrid_live_decision.py
 preflight는 real mode에서 artifact veto를 유지해야 하고, paper/testnet 모드에서만
 operator가 start/live dry-run 경로로 이어갈 수 있다.
 
+현재 알려진 단점/차단 사유:
+- real-money 차단은 의도된 상태다. artifact와 readiness policy가
+  `ready_for_real=false`, `real_money_execution=false`,
+  `real_execution_allowed=false`를 요구대로 유지한다.
+- 아직 exchange paper/testnet 체결 telemetry가 없다. 실측 BBO spread, fee,
+  slippage, reject, timeout, cancel, partial fill, 포지션 reconciliation drift를
+  관찰하기 전에는 real 승격 금지.
+- `10bps`는 replay와 gate에 박힌 round-trip friction proxy이지 live 실측 비용이
+  아니다. paper/testnet에서 realized all-in round-trip cost가 10bps 이하로 안정되는지
+  별도 확인해야 한다.
+- decision artifact의 전역 `target_allocation=0.0`은 fail-closed 장치다. 실제 주문
+  sizing은 `SignalEvent.metadata.target_allocation`을 따라야 하므로 paper/testnet에서
+  signal metadata → order notional parity를 반드시 검증해야 한다.
+- 선택된 v3.5 Optuna blend는 aggressive source profile 의존도가 높고 validation MDD가
+  relaxed 20% 라벨 근처다. 독립 alpha라기보다 고위험 source profile을 완화한 allocator에
+  가깝다.
+- completed 1h/2h/4h bar 기반이라 intrabar stop/exit와 real exchange microstructure는
+  아직 모델링하지 않는다.
+
 ---
 
 ## 2.4 shadow 비교가 필요한 경우
