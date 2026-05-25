@@ -224,7 +224,20 @@ operator가 start/live dry-run 경로로 이어갈 수 있다.
   relaxed 20% 라벨 근처다. 독립 alpha라기보다 고위험 source profile을 완화한 allocator에
   가깝다.
 - completed 1h/2h/4h bar 기반이라 intrabar stop/exit와 real exchange microstructure는
-  아직 모델링하지 않는다.
+  아직 real exchange-side 주문으로 승인된 것은 아니다. 다만 최신 adapter는
+  paper/local simulation용 intrabar component EXIT guard와 microstructure telemetry
+  contract를 포함한다.
+
+intrabar / microstructure 추가 계약:
+- strategy entry signal은 `component_id`, `stop_loss`, `trailing_percent`(chandelier 계열),
+  `intrabar_protection`, `microstructure_telemetry_required` metadata를 포함한다.
+- paper/local simulation에서는 1m/5m/source-timeframe risk frame을 보고 stop breach 시
+  component-level `EXIT` signal을 낼 수 있다.
+- real exchange-side protective order는 아직 별도 승인된 경로가 아니다. 실제 real mode는
+  exchange-specific STOP/TAKE_PROFIT order support와 paper/testnet fill telemetry가 쌓일
+  때까지 계속 veto한다.
+- queue priority는 거래소가 정확한 내 대기열 위치를 주지 않으므로 BBO/depth/fill-latency
+  proxy로만 판단한다.
 
 ---
 

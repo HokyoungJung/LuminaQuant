@@ -9,6 +9,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from lumina_quant.core.events import MarketEvent
 from lumina_quant.services.portfolio import PortfolioSizingService
 from lumina_quant.live_selection import extract_live_decision_config
 from lumina_quant.strategies.alpha_zoo_optuna_hybrid_live import (
@@ -86,6 +87,9 @@ def test_load_config_validates_frozen_artifacts_and_registers_strategy() -> None
     }
     assert resolve_strategy_class("AlphaZooOptunaHybridLiveStrategy") is AlphaZooOptunaHybridLiveStrategy
     assert get_strategy_tier("AlphaZooOptunaHybridLiveStrategy") == "live_opt_in"
+    assert {"1m", "5m", "1h", "2h", "4h"}.issubset(
+        set(AlphaZooOptunaHybridLiveStrategy.required_timeframes)
+    )
 
 
 def test_fractional_source_integer_leverage_fails_closed(tmp_path: Path) -> None:
@@ -130,12 +134,16 @@ def test_debounced_state_signal_honors_min_hold_and_cooldown() -> None:
 
 def test_strategy_emits_paper_testnet_short_signal_from_completed_1h_bars() -> None:
     completed_sol = _ohlcv_rows([100.0 - idx * 0.8 for idx in range(70)])
+    intrabar_sol = _ohlcv_rows([100.0 - idx * 0.1 for idx in range(32)])
     active_sol = [(70, 55.0, 200.0, 55.0, 200.0, 1000.0)]
     completed_btc = _ohlcv_rows([100.0 for _ in range(70)])
+    intrabar_btc = _ohlcv_rows([100.0 for _ in range(32)])
     active_btc = [(70, 100.0, 100.0, 100.0, 100.0, 1000.0)]
     bars = {}
     bars.update(_bars_with_aliases("SOLUSDT", "1h", completed_sol + active_sol))
+    bars.update(_bars_with_aliases("SOLUSDT", "1m", [*intrabar_sol, active_sol[-1]]))
     bars.update(_bars_with_aliases("BTCUSDT", "1h", completed_btc + active_btc))
+    bars.update(_bars_with_aliases("BTCUSDT", "1m", [*intrabar_btc, active_btc[-1]]))
     aggregator = _Aggregator(bars)
     queue = _Queue()
     strategy = AlphaZooOptunaHybridLiveStrategy(_Bars(), queue)
@@ -158,6 +166,52 @@ def test_strategy_emits_paper_testnet_short_signal_from_completed_1h_bars() -> N
         signal.metadata["target_notional_fraction"]
     )
     assert signal.metadata["target_allocation_mode"] == "notional_fraction"
+    assert signal.metadata["component_id"] == signal.metadata["source_model_id"]
+    assert signal.metadata["intrabar_protection_enabled"] is True
+    assert signal.metadata["intrabar_protection"]["source_timeframe"] == "1m"
+    assert signal.metadata["intrabar_protection"]["stop_loss"] == pytest.approx(signal.stop_loss)
+    assert signal.stop_loss is not None and signal.stop_loss > float(signal.price)
+    assert "bbo_spread_bps_at_submit" in signal.metadata["microstructure_telemetry_required"]
+
+
+def test_intrabar_guard_emits_component_exit_from_market_event() -> None:
+    completed_sol = _ohlcv_rows([100.0 - idx * 0.8 for idx in range(70)])
+    intrabar_sol = _ohlcv_rows([100.0 - idx * 0.1 for idx in range(32)])
+    active_sol = [(70, 55.0, 200.0, 55.0, 200.0, 1000.0)]
+    completed_btc = _ohlcv_rows([100.0 for _ in range(70)])
+    active_btc = [(70, 100.0, 100.0, 100.0, 100.0, 1000.0)]
+    bars = {}
+    bars.update(_bars_with_aliases("SOLUSDT", "1h", completed_sol + active_sol))
+    bars.update(_bars_with_aliases("SOLUSDT", "1m", [*intrabar_sol, active_sol[-1]]))
+    bars.update(_bars_with_aliases("BTCUSDT", "1h", completed_btc + active_btc))
+    aggregator = _Aggregator(bars)
+    queue = _Queue()
+    strategy = AlphaZooOptunaHybridLiveStrategy(_Bars(), queue)
+
+    strategy.calculate_signals_window(object(), aggregator)
+    short_entries = [item for item in queue.items if getattr(item, "signal_type", "") == "SHORT"]
+    entry = short_entries[0]
+    stop = float(entry.stop_loss)
+    strategy.calculate_signals(
+        MarketEvent(
+            time="risk-tick",
+            symbol="SOL/USDT",
+            open=stop * 0.99,
+            high=stop * 1.01,
+            low=stop * 0.98,
+            close=stop,
+            volume=1000.0,
+        )
+    )
+
+    exits = [item for item in queue.items if getattr(item, "signal_type", "") == "EXIT"]
+    assert exits
+    exit_signal = exits[-1]
+    assert exit_signal.position_side == "SHORT"
+    assert exit_signal.metadata["component_id"] in {
+        item.metadata["component_id"] for item in short_entries
+    }
+    assert exit_signal.metadata["intrabar_exit_reason"] == "intrabar_stop_loss_or_trailing_short"
 
 
 def test_target_notional_uses_final_weights_and_integer_leverage() -> None:
@@ -231,6 +285,13 @@ def test_ops_decision_payload_is_paper_testnet_only() -> None:
     assert "minimum 2 weeks paper/testnet observation before any real-money review" in payload[
         "paper_testnet_validation_requirements"
     ]
+    assert payload["intrabar_protection_contract"]["enabled"] is True
+    assert payload["intrabar_protection_contract"]["component_exit_key"] == (
+        "SignalEvent.metadata.component_id"
+    )
+    assert payload["microstructure_telemetry_contract"]["required_fields"][0] == (
+        "bbo_spread_bps_at_submit"
+    )
     runtime = extract_live_decision_config(payload)
     assert runtime["strategy_name"] == "AlphaZooOptunaHybridLiveStrategy"
     assert runtime["target_allocation"] == 0.0
