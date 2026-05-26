@@ -55,6 +55,11 @@ PostgreSQL 상태 저장은 `run_id`, `dedupe_key`, `fingerprint` 같은 결정�
 - GPU 가용성이 보장되는 환경에서만 `LQ_GPU_MODE=forced-gpu`를 사용합니다
 - GPU 활성화 전 extras 설치:
 - `uv sync --extra gpu` (`cudf-polars-cu12>=26.2,<26.3`로 pin, `nvidia-nvjitlink-cu12` 포함)
+- 의존성 업데이트 가드레일: 일반 Dependabot 정리 중에는 `polars>=1.35.2,<1.36` 범위를
+  넓히거나 pandas를 `>=3`으로 올리지 않습니다. 둘 중 하나라도 바꾸려면 별도 GPU/parity
+  migration으로 다루고 `tests/test_compute_engine.py`,
+  `tests/test_verify_polars_gpu_runtime_script.py`, NVIDIA 러너의 strict GPU smoke, full pytest
+  증거를 남겨야 합니다.
 - 파이프라인/집계 변경 뒤에는 determinism 테스트를 다시 수행합니다
 
 ## CI 설계

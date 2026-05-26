@@ -82,7 +82,7 @@ graph TD
 ### 필수 요구사항 (Prerequisites)
 - Python 3.11 이상 3.14 미만
 - [uv](https://docs.astral.sh/uv/) (의존성/실행 환경 관리)
-- [Polars](https://pola.rs/) `polars>=1.35.2,<1.36` 고정 + GPU extra는 `cudf-polars-cu12>=26.2,<26.3`로 고정 (현재 CI/runtime 계약에서 검증된 RAPIDS 라인)
+- [Polars](https://pola.rs/) `polars>=1.35.2,<1.36` 고정 + GPU extra는 `cudf-polars-cu12>=26.2,<26.3`로 고정 (현재 CI/runtime 계약에서 검증된 RAPIDS 라인); pandas는 별도 pandas-3 호환성 검증 전까지 검증된 2.x 라인(`pandas>=2.2.0,<3`) 유지
 - [Talib](https://github.com/TA-Lib/ta-lib-python) (기술적 지표 계산을 위해 사용)
 
 ### 환경 변수 (Environment Variables)

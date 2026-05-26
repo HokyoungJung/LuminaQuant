@@ -82,7 +82,7 @@ See `docs/live-readiness/04-paper-trading-runbook.md` and `docs/research_note_pr
 ### Prerequisites
 - Python 3.11 to 3.13
 - [uv](https://docs.astral.sh/uv/) for dependency/runtime management
-- [Polars](https://pola.rs/) pinned to `polars>=1.35.2,<1.36` and GPU extra pinned to `cudf-polars-cu12>=26.2,<26.3` (validated RAPIDS line for current CI/runtime contract)
+- [Polars](https://pola.rs/) pinned to `polars>=1.35.2,<1.36` and GPU extra pinned to `cudf-polars-cu12>=26.2,<26.3` (validated RAPIDS line for current CI/runtime contract); keep pandas on the validated 2.x line (`pandas>=2.2.0,<3`) until a separate pandas-3 compatibility pass proves parity
 - [Talib](https://github.com/TA-Lib/ta-lib-python) (for technical indicators)
 
 ### Environment Variables

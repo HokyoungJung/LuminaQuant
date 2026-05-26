@@ -11,3 +11,12 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    ignore:
+      # Polars GPU support is tied to the validated RAPIDS/cudf-polars line.
+      # Widening this must be handled as a separate GPU parity migration.
+      - dependency-name: "polars"
+        versions: [">=1.36"]
+      # Keep pandas on the validated 2.x API line until a dedicated pandas-3
+      # compatibility pass proves dashboard/research/runtime parity.
+      - dependency-name: "pandas"
+        versions: [">=3"]

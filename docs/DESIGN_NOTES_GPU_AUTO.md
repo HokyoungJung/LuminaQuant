@@ -53,6 +53,10 @@ and `ON CONFLICT DO UPDATE` to prevent duplicate semantic rows during retries/re
 - use `LQ_GPU_MODE=forced-gpu` only when GPU availability is guaranteed
 - install GPU runtime extras before enabling GPU mode:
 - `uv sync --extra gpu` (pins `cudf-polars-cu12>=26.2,<26.3` and includes `nvidia-nvjitlink-cu12`)
+- dependency update guardrail: do not widen `polars` beyond `>=1.35.2,<1.36` or move pandas to `>=3`
+  inside routine Dependabot cleanup. Treat either change as a separate GPU/parity migration with
+  `tests/test_compute_engine.py`, `tests/test_verify_polars_gpu_runtime_script.py`, strict GPU smoke
+  on an NVIDIA runner, and full pytest evidence.
 - run determinism tests after any pipeline/grouping change
 
 ## CI Design
