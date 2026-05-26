@@ -27,6 +27,11 @@ class MockBars:
         _ = symbol
         return datetime(2026, 1, 1)
 
+    @staticmethod
+    def get_market_spec(symbol):
+        _ = symbol
+        return {"price_tick_size": 0.1}
+
 
 class MockConfig:
     """Minimal config for live execution tests."""
@@ -43,9 +48,10 @@ class MockExchange:
 
     def __init__(self):
         self.fetch_calls = 0
+        self.orders = []
 
     def execute_order(self, **kwargs):
-        _ = kwargs
+        self.orders.append(dict(kwargs))
         return {
             "id": "order-1",
             "status": "open",
@@ -212,6 +218,42 @@ class TestLiveExecutionStateMachine(unittest.TestCase):
         self.assertEqual(len(handler.tracked_orders), 0)
         self.assertTrue(any(payload["state"] == STATE_TIMEOUT for payload in state_events))
 
+    def test_limit_order_submits_limit_price_and_time_in_force(self):
+        events = queue.Queue()
+        exchange = MockExchange()
+        handler = LiveExecutionHandler(events, MockBars(), MockConfig, exchange)
+
+        order = OrderEvent(
+            "BTC/USDT",
+            "LMT",
+            1.0,
+            "SELL",
+            price=99.9,
+            position_side="LONG",
+            reduce_only=True,
+            time_in_force="GTC",
+        )
+        handler.execute_order(order)
+
+        submitted = exchange.orders[-1]
+        self.assertEqual(submitted["type"], "limit")
+        self.assertEqual(submitted["side"], "sell")
+        self.assertEqual(submitted["price"], 99.9)
+        self.assertEqual(submitted["params"]["timeInForce"], "GTC")
+        self.assertTrue(submitted["params"]["reduceOnly"])
+
+    def test_market_order_requires_explicit_live_opt_in_when_guard_present(self):
+        events = queue.Queue()
+        exchange = MockExchange()
+
+        class _StrictConfig(MockConfig):
+            ALLOW_MARKET_ORDERS = False
+
+        handler = LiveExecutionHandler(events, MockBars(), _StrictConfig, exchange)
+
+        with self.assertRaisesRegex(RuntimeError, "Market orders are disabled"):
+            handler.execute_order(OrderEvent("BTC/USDT", "MKT", 1.0, "BUY"))
+
     def test_live_protective_orders_fail_fast_without_exchange_params(self):
         events = queue.Queue()
         exchange = MockProtectiveExchange()
@@ -270,13 +312,42 @@ class TestLiveExecutionStateMachine(unittest.TestCase):
 
         handler.execute_order(order)
 
-        self.assertEqual([item["type"] for item in exchange.algo_orders], ["STOP_MARKET", "TAKE_PROFIT_MARKET"])
+        self.assertEqual([item["type"] for item in exchange.algo_orders], ["STOP", "TAKE_PROFIT"])
         self.assertEqual({item["side"] for item in exchange.algo_orders}, {"sell"})
         self.assertTrue(all(item["symbol"] == "ETH/USDT" for item in exchange.algo_orders))
         self.assertEqual([item["params"]["triggerPrice"] for item in exchange.algo_orders], [95.0, 110.0])
+        self.assertEqual([item["params"]["price"] for item in exchange.algo_orders], [94.9, 109.9])
+        self.assertTrue(all(item["params"]["timeInForce"] == "GTC" for item in exchange.algo_orders))
         self.assertTrue(all(item["params"]["positionSide"] == "LONG" for item in exchange.algo_orders))
         self.assertTrue(any(payload["message"] == "paper_exchange_protective_orders_submitted" for payload in states))
         self.assertEqual(len(handler.protective_orders), 2)
+
+    def test_market_style_protective_orders_require_explicit_opt_in(self):
+        events = queue.Queue()
+        exchange = MockFilledProtectiveExchange()
+
+        class _MarketProtectiveConfig(MockConfig):
+            ALLOW_MARKET_ORDERS = True
+            PROTECTIVE_ORDER_STYLE = "market"
+
+        handler = LiveExecutionHandler(events, MockBars(), _MarketProtectiveConfig, exchange)
+        order = OrderEvent(
+            "ETH/USDT",
+            "MKT",
+            1.5,
+            "BUY",
+            position_side="LONG",
+            stop_loss=95.0,
+            take_profit=110.0,
+        )
+
+        handler.execute_order(order)
+
+        self.assertEqual(
+            [item["type"] for item in exchange.algo_orders],
+            ["STOP_MARKET", "TAKE_PROFIT_MARKET"],
+        )
+        self.assertNotIn("price", exchange.algo_orders[0]["params"])
 
     def test_paper_exchange_algo_protection_is_generic_across_assets_and_sides(self):
         events = queue.Queue()

@@ -10,6 +10,14 @@ from lumina_quant.config import LiveConfig
 from lumina_quant.core.engine import TradingEngine
 from lumina_quant.core.events import OrderEvent
 from lumina_quant.core.market_window_contract import MarketWindowContractError
+from lumina_quant.core.order_policy import (
+    canonical_order_type,
+    limit_price_for_direction,
+    merge_order_policy_metadata,
+    normalize_limit_price_mode,
+    policy_order_type,
+    price_tick_size_from_sources,
+)
 from lumina_quant.core.protocols import ExchangeInterface
 from lumina_quant.exchanges import get_exchange
 from lumina_quant.live.binance_market_stream import normalize_stream_symbol
@@ -814,16 +822,102 @@ class LiveTrader(TradingEngine):
         status = "ON" if enabled else "OFF"
         self.notifier.send_message(f"⚠️ **Trade Freeze {status}**: {reason}")
 
+    def _market_spec_for_order(self, symbol):
+        if hasattr(self.data_handler, "get_market_spec"):
+            try:
+                spec = self.data_handler.get_market_spec(symbol) or {}
+                if isinstance(spec, dict) and spec:
+                    return dict(spec)
+            except Exception:
+                pass
+        if hasattr(self.exchange, "get_market_spec"):
+            try:
+                spec = self.exchange.get_market_spec(symbol) or {}
+                if isinstance(spec, dict):
+                    return dict(spec)
+            except Exception:
+                pass
+        return {}
+
+    def _latest_limit_reference_price(self, symbol):
+        if hasattr(self.data_handler, "get_latest_bar_value"):
+            try:
+                price = float(self.data_handler.get_latest_bar_value(symbol, "close") or 0.0)
+                if price > 0.0:
+                    return price
+            except Exception:
+                pass
+        return 0.0
+
+    def _reduce_only_order_policy_fields(self, *, symbol, direction):
+        requested = getattr(self.config, "DEFAULT_ORDER_TYPE", "MKT")
+        order_type = policy_order_type(
+            requested,
+            default=getattr(self.config, "DEFAULT_ORDER_TYPE", "MKT"),
+            allow_market_orders=bool(getattr(self.config, "ALLOW_MARKET_ORDERS", True)),
+        )
+        if canonical_order_type(order_type, default="LMT") != "LMT":
+            return order_type, None, None, {}
+
+        reference_price = self._latest_limit_reference_price(symbol)
+        if reference_price <= 0.0:
+            self.logger.error(
+                "Refusing reduce-only LIMIT order for %s without a positive reference price.",
+                symbol,
+            )
+            return None, None, None, {}
+        market_spec = self._market_spec_for_order(symbol)
+        tick_size = price_tick_size_from_sources(
+            symbol,
+            market_spec=market_spec,
+            config=self.config,
+        )
+        mode = normalize_limit_price_mode(getattr(self.config, "LIMIT_PRICE_MODE", "one_tick_worse"))
+        offset_ticks = int(getattr(self.config, "LIMIT_PRICE_OFFSET_TICKS", 1) or 0)
+        price = limit_price_for_direction(
+            reference_price=reference_price,
+            direction=direction,
+            tick_size=tick_size,
+            mode=mode,
+            offset_ticks=offset_ticks,
+        )
+        time_in_force = str(getattr(self.config, "LIMIT_TIME_IN_FORCE", "GTC") or "GTC").upper()
+        metadata = merge_order_policy_metadata(
+            None,
+            {
+                "source": "live_trader_reduce_only_flatten",
+                "default_order_type": str(getattr(self.config, "DEFAULT_ORDER_TYPE", "MKT")),
+                "resolved_order_type": "LMT",
+                "direction": str(direction),
+                "limit_price_mode": mode,
+                "limit_price_offset_ticks": offset_ticks,
+                "limit_reference_price": float(reference_price),
+                "limit_price": float(price),
+                "price_tick_size": float(tick_size or 0.0),
+                "time_in_force": time_in_force,
+            },
+        )
+        return order_type, price, time_in_force, metadata
+
     def _queue_reduce_only_order(self, *, symbol, quantity, direction, position_side):
         if float(quantity) <= 1e-12:
             return False
+        order_type, price, time_in_force, metadata = self._reduce_only_order_policy_fields(
+            symbol=symbol,
+            direction=direction,
+        )
+        if not order_type:
+            return False
         event = OrderEvent(
             symbol=symbol,
-            order_type="MKT",
+            order_type=order_type,
             quantity=abs(float(quantity)),
             direction=direction,
+            price=price,
             position_side=position_side,
             reduce_only=True,
+            time_in_force=time_in_force,
+            metadata=metadata,
         )
         self.events.put(event)
         return True

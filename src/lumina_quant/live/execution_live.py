@@ -6,6 +6,12 @@ from typing import Any
 
 from lumina_quant.backtesting.execution_sim import ExecutionHandler
 from lumina_quant.core.events import FillEvent
+from lumina_quant.core.order_policy import (
+    canonical_order_type,
+    limit_price_for_direction,
+    normalize_limit_price_mode,
+    price_tick_size_from_sources,
+)
 from lumina_quant.core.protocols import ExchangeInterface
 from lumina_quant.live.binance_market_stream import normalize_stream_symbol
 from lumina_quant.live.order_gateway import OrderGateway
@@ -643,6 +649,53 @@ class LiveExecutionHandler(ExecutionHandler):
         digest = hashlib.sha256(f"{parent_client_order_id}|{suffix}".encode()).hexdigest()
         return f"LQ-P-{suffix}-{digest[:_PROTECTIVE_CLIENT_DIGEST_LEN]}"
 
+    def _protective_order_style(self) -> str:
+        style = str(getattr(self.config, "PROTECTIVE_ORDER_STYLE", "limit") or "limit")
+        style = style.strip().lower()
+        if style == "market" and bool(getattr(self.config, "ALLOW_MARKET_ORDERS", False)):
+            return "market"
+        return "limit"
+
+    def _market_spec_for_order(self, symbol: str) -> dict[str, Any]:
+        if hasattr(self.bars, "get_market_spec"):
+            try:
+                spec = self.bars.get_market_spec(symbol) or {}
+                if isinstance(spec, dict):
+                    return dict(spec)
+            except Exception:
+                pass
+        return {}
+
+    def _protective_limit_params(
+        self,
+        *,
+        symbol: str,
+        close_side: str,
+        trigger_price: float,
+    ) -> dict[str, Any]:
+        market_spec = self._market_spec_for_order(symbol)
+        tick_size = price_tick_size_from_sources(
+            symbol,
+            market_spec=market_spec,
+            config=self.config,
+        )
+        mode = normalize_limit_price_mode(getattr(self.config, "LIMIT_PRICE_MODE", "one_tick_worse"))
+        offset_ticks = int(getattr(self.config, "LIMIT_PRICE_OFFSET_TICKS", 1) or 0)
+        limit_price = limit_price_for_direction(
+            reference_price=float(trigger_price),
+            direction=str(close_side).upper(),
+            tick_size=tick_size,
+            mode=mode,
+            offset_ticks=offset_ticks,
+        )
+        return {
+            "price": float(limit_price),
+            "timeInForce": str(getattr(self.config, "LIMIT_TIME_IN_FORCE", "GTC") or "GTC").upper(),
+            "limitPriceMode": mode,
+            "limitPriceOffsetTicks": offset_ticks,
+            "priceTickSize": float(tick_size or 0.0),
+        }
+
     def _build_paper_protective_algo_specs(self, event) -> list[dict[str, Any]]:
         if bool(getattr(event, "reduce_only", False)):
             return []
@@ -656,6 +709,7 @@ class LiveExecutionHandler(ExecutionHandler):
         if quantity <= 0.0:
             return []
         side = self._protective_close_side(event)
+        style = self._protective_order_style()
         position_side = self._protective_position_side(event)
         parent_client_id = str(getattr(event, "client_order_id", "") or "")
         base_params = {
@@ -676,9 +730,19 @@ class LiveExecutionHandler(ExecutionHandler):
                     "protectionRole": "stop_loss",
                 }
             )
+            order_type = "STOP_MARKET"
+            if style == "limit":
+                params.update(
+                    self._protective_limit_params(
+                        symbol=event.symbol,
+                        close_side=side,
+                        trigger_price=float(stop_loss),
+                    )
+                )
+                order_type = "STOP"
             specs.append(
                 {
-                    "type": "STOP_MARKET",
+                    "type": order_type,
                     "side": side,
                     "quantity": quantity,
                     "params": params,
@@ -694,9 +758,19 @@ class LiveExecutionHandler(ExecutionHandler):
                     "protectionRole": "take_profit",
                 }
             )
+            order_type = "TAKE_PROFIT_MARKET"
+            if style == "limit":
+                params.update(
+                    self._protective_limit_params(
+                        symbol=event.symbol,
+                        close_side=side,
+                        trigger_price=float(take_profit),
+                    )
+                )
+                order_type = "TAKE_PROFIT"
             specs.append(
                 {
-                    "type": "TAKE_PROFIT_MARKET",
+                    "type": order_type,
                     "side": side,
                     "quantity": quantity,
                     "params": params,
@@ -872,7 +946,23 @@ class LiveExecutionHandler(ExecutionHandler):
             return
 
         side = "buy" if event.direction == "BUY" else "sell"
-        order_type = "market" if event.order_type != "LMT" else "limit"
+        requested_order_type = canonical_order_type(getattr(event, "order_type", "LMT"), default="LMT")
+        market_guard_configured = hasattr(self.config, "ALLOW_MARKET_ORDERS")
+        if (
+            requested_order_type == "MKT"
+            and market_guard_configured
+            and not bool(getattr(self.config, "ALLOW_MARKET_ORDERS", False))
+        ):
+            raise RuntimeError(
+                "Market orders are disabled by live.allow_market_orders=false; "
+                "set live.default_order_type=LMT or explicitly enable market orders."
+            )
+        if requested_order_type == "LMT" and (
+            getattr(event, "price", None) is None or float(getattr(event, "price", 0.0) or 0.0) <= 0.0
+        ):
+            raise RuntimeError("LIMIT orders require a positive limit price before live submission.")
+        event.order_type = requested_order_type
+        order_type = "limit" if requested_order_type == "LMT" else "market"
         event.client_order_id = event.client_order_id or self._make_client_order_id(event)
 
         if event.client_order_id in self.client_id_to_order:

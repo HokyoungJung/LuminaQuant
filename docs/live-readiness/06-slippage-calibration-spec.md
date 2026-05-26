@@ -45,6 +45,11 @@
 - `symbol`
 - `side`
 - `order_type`
+- `limit_reference_price`
+- `limit_price`
+- `limit_price_mode`
+- `limit_price_offset_ticks`
+- `time_in_force`
 - `submit_ts_utc`
 - `ack_ts_utc`
 - `fill_ts_utc`
@@ -82,7 +87,12 @@
   "env": "paper",
   "symbol": "BTC/USDT",
   "side": "BUY",
-  "order_type": "MKT",
+  "order_type": "LMT",
+  "limit_reference_price": 73500.25,
+  "limit_price": 73500.35,
+  "limit_price_mode": "one_tick_worse",
+  "limit_price_offset_ticks": 1,
+  "time_in_force": "GTC",
   "submit_ts_utc": "2026-03-19T12:00:01.000Z",
   "ack_ts_utc": "2026-03-19T12:00:01.120Z",
   "fill_ts_utc": "2026-03-19T12:00:01.350Z",

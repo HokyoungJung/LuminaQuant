@@ -4,6 +4,14 @@ from datetime import UTC, date, datetime
 
 import polars as pl
 from lumina_quant.core.events import FillEvent, OrderEvent
+from lumina_quant.core.order_policy import (
+    canonical_order_type,
+    limit_price_for_direction,
+    merge_order_policy_metadata,
+    normalize_limit_price_mode,
+    policy_order_type,
+    price_tick_size_from_sources,
+)
 from lumina_quant.market_data import normalize_timeframe_token, timeframe_to_milliseconds
 from lumina_quant.services.portfolio import PortfolioPerformanceService, PortfolioSizingService
 
@@ -702,19 +710,25 @@ class Portfolio:
 
     def _get_symbol_limits(self, symbol):
         """Returns fallback limits from config for symbols that don't have exchange metadata."""
+        market_spec = {}
         if hasattr(self.bars, "get_market_spec"):
             try:
-                spec = self.bars.get_market_spec(symbol) or {}
-                if spec:
-                    min_qty = spec.get("min_qty")
-                    qty_step = spec.get("qty_step")
-                    min_notional = spec.get("min_notional")
+                market_spec = self.bars.get_market_spec(symbol) or {}
+                if market_spec:
+                    min_qty = market_spec.get("min_qty")
+                    qty_step = market_spec.get("qty_step")
+                    min_notional = market_spec.get("min_notional")
                     return {
                         "min_qty": float(min_qty) if min_qty else float(self.config.MIN_TRADE_QTY),
                         "qty_step": float(qty_step)
                         if qty_step
                         else float(self.config.MIN_TRADE_QTY),
                         "min_notional": float(min_notional) if min_notional else 5.0,
+                        "price_tick_size": price_tick_size_from_sources(
+                            symbol,
+                            market_spec=market_spec,
+                            config=self.config,
+                        ),
                     }
             except Exception:
                 pass
@@ -725,6 +739,11 @@ class Portfolio:
             "min_qty": float(limits.get("min_qty", self.config.MIN_TRADE_QTY)),
             "qty_step": float(limits.get("qty_step", self.config.MIN_TRADE_QTY)),
             "min_notional": float(limits.get("min_notional", 5.0)),
+            "price_tick_size": price_tick_size_from_sources(
+                symbol,
+                market_spec=market_spec,
+                config=self.config,
+            ),
         }
 
     def _round_quantity(self, quantity, step):
@@ -760,6 +779,66 @@ class Portfolio:
             min_notional=float(limits["min_notional"]),
         )
 
+    def _signal_order_type(self, signal) -> str:
+        metadata = dict(getattr(signal, "metadata", {}) or {})
+        requested = metadata.get("order_type")
+        if requested is None:
+            requested = getattr(self.config, "DEFAULT_ORDER_TYPE", "MKT")
+        return policy_order_type(
+            requested,
+            default=getattr(self.config, "DEFAULT_ORDER_TYPE", "MKT"),
+            allow_market_orders=bool(getattr(self.config, "ALLOW_MARKET_ORDERS", True)),
+        )
+
+    def _order_time_in_force(self, signal, order_type: str) -> str | None:
+        if canonical_order_type(order_type, default="LMT") != "LMT":
+            return None
+        return str(
+            getattr(signal, "time_in_force", None)
+            or getattr(self.config, "LIMIT_TIME_IN_FORCE", "GTC")
+            or "GTC"
+        ).strip().upper()
+
+    def _order_metadata(self, signal, *, order_type, direction, reference_price, price, limits):
+        if canonical_order_type(order_type, default="LMT") != "LMT":
+            return dict(getattr(signal, "metadata", {}) or {})
+        mode = normalize_limit_price_mode(
+            getattr(self.config, "LIMIT_PRICE_MODE", "one_tick_worse")
+        )
+        return merge_order_policy_metadata(
+            getattr(signal, "metadata", None),
+            {
+                "default_order_type": str(getattr(self.config, "DEFAULT_ORDER_TYPE", "MKT")),
+                "resolved_order_type": "LMT",
+                "direction": str(direction),
+                "limit_price_mode": mode,
+                "limit_price_offset_ticks": int(
+                    getattr(self.config, "LIMIT_PRICE_OFFSET_TICKS", 1) or 0
+                ),
+                "limit_reference_price": float(reference_price),
+                "limit_price": float(price),
+                "price_tick_size": float(limits.get("price_tick_size", 0.0) or 0.0),
+                "time_in_force": self._order_time_in_force(signal, order_type),
+            },
+        )
+
+    def _order_price(self, signal, *, symbol: str, direction: str, current_price: float, order_type: str):
+        if canonical_order_type(order_type, default="LMT") != "LMT":
+            return None, self._get_symbol_limits(symbol)
+        reference_price = (
+            float(signal.price) if getattr(signal, "price", None) is not None else float(current_price)
+        )
+        limits = self._get_symbol_limits(symbol)
+        tick_size = float(limits.get("price_tick_size", 0.0) or 0.0)
+        price = limit_price_for_direction(
+            reference_price=reference_price,
+            direction=direction,
+            tick_size=tick_size,
+            mode=getattr(self.config, "LIMIT_PRICE_MODE", "one_tick_worse"),
+            offset_ticks=int(getattr(self.config, "LIMIT_PRICE_OFFSET_TICKS", 1) or 0),
+        )
+        return price, limits
+
     def generate_order_from_signal(self, signal) -> OrderEvent | None:
         """Generates an OrderEvent from a SignalEvent.
         Uses risk-based sizing with exchange constraints.
@@ -784,38 +863,70 @@ class Portfolio:
             qty = self._validate_and_round_quantity(symbol, qty, current_price)
             if qty <= 0:
                 return None
+            order_type = self._signal_order_type(signal)
+            price, limits = self._order_price(
+                signal,
+                symbol=symbol,
+                direction="BUY",
+                current_price=current_price,
+                order_type=order_type,
+            )
             order = OrderEvent(
                 symbol=symbol,
-                order_type="MKT",
+                order_type=order_type,
                 quantity=qty,
                 direction="BUY",
+                price=price,
                 position_side=position_side,
                 reduce_only=False,
                 client_order_id=signal.client_order_id,
                 stop_loss=signal.stop_loss,
                 take_profit=signal.take_profit,
                 trailing_percent=signal.trailing_percent,
-                time_in_force=signal.time_in_force,
-                metadata=signal.metadata,
+                time_in_force=self._order_time_in_force(signal, order_type),
+                metadata=self._order_metadata(
+                    signal,
+                    order_type=order_type,
+                    direction="BUY",
+                    reference_price=signal.price if signal.price is not None else current_price,
+                    price=price,
+                    limits=limits,
+                ),
             )
         elif direction == "SHORT":
             qty = self._risk_based_quantity(signal, current_price)
             qty = self._validate_and_round_quantity(symbol, qty, current_price)
             if qty <= 0:
                 return None
+            order_type = self._signal_order_type(signal)
+            price, limits = self._order_price(
+                signal,
+                symbol=symbol,
+                direction="SELL",
+                current_price=current_price,
+                order_type=order_type,
+            )
             order = OrderEvent(
                 symbol=symbol,
-                order_type="MKT",
+                order_type=order_type,
                 quantity=qty,
                 direction="SELL",
+                price=price,
                 position_side=position_side,
                 reduce_only=False,
                 client_order_id=signal.client_order_id,
                 stop_loss=signal.stop_loss,
                 take_profit=signal.take_profit,
                 trailing_percent=signal.trailing_percent,
-                time_in_force=signal.time_in_force,
-                metadata=signal.metadata,
+                time_in_force=self._order_time_in_force(signal, order_type),
+                metadata=self._order_metadata(
+                    signal,
+                    order_type=order_type,
+                    direction="SELL",
+                    reference_price=signal.price if signal.price is not None else current_price,
+                    price=price,
+                    limits=limits,
+                ),
             )
         elif direction == "EXIT":
             component_id = self._component_id_from_metadata(signal.metadata)
@@ -824,16 +935,33 @@ class Portfolio:
             else:
                 cur_qty = self.current_positions[symbol]
             if cur_qty != 0:
+                exit_direction = "SELL" if cur_qty > 0 else "BUY"
+                order_type = self._signal_order_type(signal)
+                price, limits = self._order_price(
+                    signal,
+                    symbol=symbol,
+                    direction=exit_direction,
+                    current_price=current_price,
+                    order_type=order_type,
+                )
                 order = OrderEvent(
                     symbol=symbol,
-                    order_type="MKT",
+                    order_type=order_type,
                     quantity=abs(cur_qty),
-                    direction="SELL" if cur_qty > 0 else "BUY",
+                    direction=exit_direction,
+                    price=price,
                     position_side="LONG" if cur_qty > 0 else "SHORT",
                     reduce_only=True,
                     client_order_id=signal.client_order_id,
-                    time_in_force=signal.time_in_force,
-                    metadata=signal.metadata,
+                    time_in_force=self._order_time_in_force(signal, order_type),
+                    metadata=self._order_metadata(
+                        signal,
+                        order_type=order_type,
+                        direction=exit_direction,
+                        reference_price=signal.price if signal.price is not None else current_price,
+                        price=price,
+                        limits=limits,
+                    ),
                 )
 
         return order

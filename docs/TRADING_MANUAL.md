@@ -187,8 +187,12 @@ Leverage is determined by your **Broker Account Settings**. You cannot change it
 
 ## 5. Order Types
 
-By default, LuminaQuant uses **Market Orders** for immediate execution.
-To use **Limit Orders**, you must modify the `ExecutionHandler` or extending `SignalEvent` to carry a `price`.
+By default, LuminaQuant live execution is **limit-first**. Market orders are
+available only as an explicit operator override.
 
 **Current Default**:
-- Signal `LONG`/`SHORT` -> `OrderEvent(type='MKT')` -> `execute_order(type='market')`.
+- Signal `LONG`/`SHORT`/`EXIT` -> `OrderEvent(type='LMT')` -> `execute_order(type='limit')`.
+- `live.limit_price_mode: "one_tick_worse"` prices BUY one exchange tick above the reference and SELL one tick below it for fast bounded execution.
+- `live.limit_price_mode: "same_price"` uses the reference price; `one_tick_better` is the passive option.
+- Market orders require both `live.default_order_type: "MKT"` and `live.allow_market_orders: true`.
+- Paper/testnet protective algo orders also default to conditional limit `STOP` / `TAKE_PROFIT`; market-style `STOP_MARKET` / `TAKE_PROFIT_MARKET` requires the same market opt-in review.

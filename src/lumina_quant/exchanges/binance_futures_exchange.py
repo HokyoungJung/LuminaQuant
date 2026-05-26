@@ -211,6 +211,7 @@ class BinanceFuturesExchange(ExchangeInterface):
             "min_qty": self._as_float((limits.get("amount") or {}).get("min"), 0.0),
             "qty_step": self._as_float(precision.get("amount"), 0.0),
             "min_notional": self._as_float((limits.get("cost") or {}).get("min"), 0.0),
+            "price_tick_size": self._as_float(precision.get("price"), 0.0),
         }
 
     def get_balance(self, currency: str = "USDT") -> float:

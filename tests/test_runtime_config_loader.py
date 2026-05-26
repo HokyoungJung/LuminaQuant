@@ -192,6 +192,67 @@ class TestRuntimeConfigLoader(unittest.TestCase):
         finally:
             os.remove(path)
 
+    def test_live_order_policy_defaults_limit_first(self):
+        yaml_text = textwrap.dedent(
+            """
+            trading:
+              symbols: ["BTC/USDT"]
+            live:
+              mode: "paper"
+              exchange:
+                driver: "binance_futures"
+                name: "binance"
+                market_type: "future"
+                position_mode: "HEDGE"
+                margin_mode: "isolated"
+                leverage: 2
+            """
+        ).strip()
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False, encoding="utf-8") as fp:
+            fp.write(yaml_text)
+            path = fp.name
+        try:
+            env = {key: value for key, value in os.environ.items() if not key.startswith("LQ__")}
+            runtime = load_runtime_config(config_path=path, env=env)
+            validate_runtime_config(runtime)
+            self.assertEqual(runtime.live.default_order_type, "LMT")
+            self.assertFalse(runtime.live.allow_market_orders)
+            self.assertEqual(runtime.live.limit_price_mode, "one_tick_worse")
+            self.assertEqual(runtime.live.limit_price_offset_ticks, 1)
+            self.assertEqual(runtime.live.limit_time_in_force, "GTC")
+            self.assertEqual(runtime.live.protective_order_style, "limit")
+        finally:
+            os.remove(path)
+
+    def test_market_default_requires_explicit_live_opt_in(self):
+        yaml_text = textwrap.dedent(
+            """
+            trading:
+              symbols: ["BTC/USDT"]
+            live:
+              mode: "paper"
+              default_order_type: "MKT"
+              allow_market_orders: false
+              exchange:
+                driver: "binance_futures"
+                name: "binance"
+                market_type: "future"
+                position_mode: "HEDGE"
+                margin_mode: "isolated"
+                leverage: 2
+            """
+        ).strip()
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False, encoding="utf-8") as fp:
+            fp.write(yaml_text)
+            path = fp.name
+        try:
+            env = {key: value for key, value in os.environ.items() if not key.startswith("LQ__")}
+            runtime = load_runtime_config(config_path=path, env=env)
+            with self.assertRaisesRegex(ValueError, "requires live.allow_market_orders=true"):
+                validate_runtime_config(runtime)
+        finally:
+            os.remove(path)
+
     def test_execution_defaults_are_gpu_first(self):
         yaml_text = textwrap.dedent(
             """

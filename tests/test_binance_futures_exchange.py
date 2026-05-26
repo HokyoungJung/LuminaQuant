@@ -57,6 +57,7 @@ def test_exchange_uses_native_rest_client(monkeypatch) -> None:
     assert isinstance(exchange.exchange.config, BinanceFuturesClientConfig)
     assert exchange.exchange.config.api_key == "test_key"
     assert exchange.exchange.config.secret_key == "test_secret"
+    assert exchange.get_market_spec("BTC/USDT")["price_tick_size"] == 0.1
 
 
 def test_exchange_normalizes_aggtrade_rows(monkeypatch) -> None:

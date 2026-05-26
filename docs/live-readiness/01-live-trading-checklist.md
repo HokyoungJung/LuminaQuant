@@ -34,7 +34,8 @@
 
 - `AlphaZooOptunaHybridLiveStrategy`는 paper/testnet monitoring 대상으로 유지한다.
 - real-money는 아직 금지한다: `ready_for_real=false`, `real_money_execution=false`, `real_execution_allowed=false`.
-- entry fill 이후 paper/testnet 전용 Binance USD-M conditional algo `STOP_MARKET`/`TAKE_PROFIT_MARKET` 보호 주문 경로가 있다.
+- live 주문은 기본 limit-first다. 진입/숏/exit/flatten은 `LMT`, `one_tick_worse` 가격 정책(BUY +1 tick, SELL -1 tick)을 기본으로 쓰며 시장가는 명시적 opt-in(`live.default_order_type=MKT`, `live.allow_market_orders=true`)이 필요하다.
+- entry fill 이후 paper/testnet 전용 Binance USD-M conditional algo `STOP`/`TAKE_PROFIT` limit 보호 주문 경로가 있다.
 - 거래소 request payload는 문서화된 `/fapi/v1/algoOrder` allowlist만 보내며, parent/protection telemetry는 local reconciliation record에만 저장한다.
 - selected frozen source asset 적용성은 `ETHUSDT`, `SOLUSDT`, `TRXUSDT`에 대해 검증했다.
 - 실제 testnet fill/slippage/reconciliation/protective-order telemetry와 2주 이상 관찰 전에는 real 전환 논의 금지.

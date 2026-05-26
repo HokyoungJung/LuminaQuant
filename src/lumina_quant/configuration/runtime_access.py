@@ -109,6 +109,23 @@ def _runtime_env_defaults(runtime) -> dict[str, str]:
         "LQ__LIVE__BOOK_TICKER_ENABLED": _bool_to_env(
             bool(getattr(live, "book_ticker_enabled", False))
         ),
+        "LQ__LIVE__DEFAULT_ORDER_TYPE": str(getattr(live, "default_order_type", "LMT")),
+        "LQ__LIVE__ALLOW_MARKET_ORDERS": _bool_to_env(
+            bool(getattr(live, "allow_market_orders", False))
+        ),
+        "LQ__LIVE__LIMIT_PRICE_MODE": str(
+            getattr(live, "limit_price_mode", "one_tick_worse")
+        ),
+        "LQ__LIVE__LIMIT_PRICE_OFFSET_TICKS": str(
+            int(getattr(live, "limit_price_offset_ticks", 1))
+        ),
+        "LQ__LIVE__LIMIT_PRICE_TICK_FALLBACK": str(
+            float(getattr(live, "limit_price_tick_fallback", 0.0))
+        ),
+        "LQ__LIVE__LIMIT_TIME_IN_FORCE": str(getattr(live, "limit_time_in_force", "GTC")),
+        "LQ__LIVE__PROTECTIVE_ORDER_STYLE": str(
+            getattr(live, "protective_order_style", "limit")
+        ),
         "LQ__LIVE__STARTUP_RECONCILIATION_HARD_FAIL": _bool_to_env(
             bool(getattr(live, "startup_reconciliation_hard_fail", False))
         ),
@@ -619,6 +636,29 @@ def _live_config_values(runtime) -> dict[str, object]:
             getattr(live, "reconciliation_poll_fallback_enabled", True)
         ),
         "BOOK_TICKER_ENABLED": bool(getattr(live, "book_ticker_enabled", False)),
+        "DEFAULT_ORDER_TYPE": str(getattr(live, "default_order_type", "LMT") or "LMT")
+        .strip()
+        .upper(),
+        "ALLOW_MARKET_ORDERS": bool(getattr(live, "allow_market_orders", False)),
+        "LIMIT_PRICE_MODE": str(
+            getattr(live, "limit_price_mode", "one_tick_worse") or "one_tick_worse"
+        )
+        .strip()
+        .lower(),
+        "LIMIT_PRICE_OFFSET_TICKS": int(
+            getattr(live, "limit_price_offset_ticks", 1) or 1
+        ),
+        "LIMIT_PRICE_TICK_FALLBACK": float(
+            getattr(live, "limit_price_tick_fallback", 0.0) or 0.0
+        ),
+        "LIMIT_TIME_IN_FORCE": str(getattr(live, "limit_time_in_force", "GTC") or "GTC")
+        .strip()
+        .upper(),
+        "PROTECTIVE_ORDER_STYLE": str(
+            getattr(live, "protective_order_style", "limit") or "limit"
+        )
+        .strip()
+        .lower(),
         "STARTUP_RECONCILIATION_HARD_FAIL": effective_startup_reconciliation_hard_fail(
             mode=str(live.mode),
             configured=bool(getattr(live, "startup_reconciliation_hard_fail", False)),
@@ -712,6 +752,13 @@ class LiveConfig(BaseConfig):
             cls.RECONCILIATION_POLL_FALLBACK_ENABLED
         )
         runtime.live.book_ticker_enabled = bool(cls.BOOK_TICKER_ENABLED)
+        runtime.live.default_order_type = str(cls.DEFAULT_ORDER_TYPE)
+        runtime.live.allow_market_orders = bool(cls.ALLOW_MARKET_ORDERS)
+        runtime.live.limit_price_mode = str(cls.LIMIT_PRICE_MODE)
+        runtime.live.limit_price_offset_ticks = int(cls.LIMIT_PRICE_OFFSET_TICKS)
+        runtime.live.limit_price_tick_fallback = float(cls.LIMIT_PRICE_TICK_FALLBACK)
+        runtime.live.limit_time_in_force = str(cls.LIMIT_TIME_IN_FORCE)
+        runtime.live.protective_order_style = str(cls.PROTECTIVE_ORDER_STYLE)
         runtime.live.startup_reconciliation_hard_fail = bool(cls.STARTUP_RECONCILIATION_HARD_FAIL)
         runtime.live.main_loop_error_retry_limit = int(cls.MAIN_LOOP_ERROR_RETRY_LIMIT)
         runtime.live.main_loop_error_window_seconds = int(cls.MAIN_LOOP_ERROR_WINDOW_SECONDS)

@@ -203,6 +203,13 @@ class LiveRuntimeConfig:
     shadow_live_enabled: bool = False
     reconciliation_poll_fallback_enabled: bool = True
     book_ticker_enabled: bool = False
+    default_order_type: str = "LMT"
+    allow_market_orders: bool = False
+    limit_price_mode: str = "one_tick_worse"
+    limit_price_offset_ticks: int = 1
+    limit_price_tick_fallback: float = 0.0
+    limit_time_in_force: str = "GTC"
+    protective_order_style: str = "limit"
     startup_reconciliation_hard_fail: bool = False
     main_loop_error_retry_limit: int = 3
     main_loop_error_window_seconds: int = 60

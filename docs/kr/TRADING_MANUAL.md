@@ -177,5 +177,12 @@ if self.exchange.name == "binance":
 
 ## 5. 주문 유형 (Order Types)
 
-기본적으로 LuminaQuant는 즉시 체결을 위해 **시장가 주문 (Market Orders)**을 사용합니다.
-**지정가 주문 (Limit Orders)**을 사용하려면 `ExecutionHandler`를 수정하거나 `SignalEvent`가 `price` 정보를 전달하도록 확장해야 합니다.
+기본적으로 LuminaQuant live execution은 **limit-first**입니다. 시장가 주문은 명시적
+operator override로만 켤 수 있습니다.
+
+**현재 기본값**:
+- Signal `LONG`/`SHORT`/`EXIT` -> `OrderEvent(type='LMT')` -> `execute_order(type='limit')`.
+- `live.limit_price_mode: "one_tick_worse"`는 빠른 bounded execution을 위해 BUY를 기준가보다 1 exchange tick 위, SELL을 1 tick 아래로 냅니다.
+- `live.limit_price_mode: "same_price"`는 기준가 그대로, `one_tick_better`는 passive 옵션입니다.
+- 시장가 주문은 `live.default_order_type: "MKT"`와 `live.allow_market_orders: true`를 둘 다 명시해야 합니다.
+- paper/testnet protective algo 주문도 기본은 conditional limit `STOP` / `TAKE_PROFIT`입니다. `STOP_MARKET` / `TAKE_PROFIT_MARKET` 스타일은 같은 market opt-in review가 필요합니다.

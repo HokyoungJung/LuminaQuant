@@ -28,6 +28,7 @@ from lumina_quant.configuration.schema import (
     SystemConfig,
     TradingConfig,
 )
+from lumina_quant.core.order_policy import canonical_order_type, normalize_limit_price_mode
 
 DEFAULT_MARKET_DATA_PARQUET_PATH = "data/market_parquet"
 
@@ -494,6 +495,34 @@ def _normalize_live_runtime_section(runtime: RuntimeConfig, live_raw: dict[str, 
     runtime.live.book_ticker_enabled = _as_bool(
         getattr(runtime.live, "book_ticker_enabled", False),
         False,
+    )
+    runtime.live.default_order_type = canonical_order_type(
+        getattr(runtime.live, "default_order_type", "LMT"),
+        default="LMT",
+    )
+    runtime.live.allow_market_orders = _as_bool(
+        getattr(runtime.live, "allow_market_orders", False),
+        False,
+    )
+    runtime.live.limit_price_mode = normalize_limit_price_mode(
+        getattr(runtime.live, "limit_price_mode", "one_tick_worse"),
+    )
+    runtime.live.limit_price_offset_ticks = max(
+        0,
+        _as_int(getattr(runtime.live, "limit_price_offset_ticks", 1), 1),
+    )
+    runtime.live.limit_price_tick_fallback = max(
+        0.0,
+        _as_float(getattr(runtime.live, "limit_price_tick_fallback", 0.0), 0.0),
+    )
+    runtime.live.limit_time_in_force = str(
+        getattr(runtime.live, "limit_time_in_force", "GTC") or "GTC"
+    ).strip().upper()
+    protective_style = str(
+        getattr(runtime.live, "protective_order_style", "limit") or "limit"
+    ).strip().lower()
+    runtime.live.protective_order_style = (
+        protective_style if protective_style in {"limit", "market"} else "limit"
     )
     runtime.live.startup_reconciliation_hard_fail = _as_bool(
         getattr(runtime.live, "startup_reconciliation_hard_fail", False),

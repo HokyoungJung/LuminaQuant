@@ -235,7 +235,13 @@ intrabar / microstructure 추가 계약:
 - paper/local simulation에서는 1m/5m/source-timeframe risk frame을 보고 stop breach 시
   component-level `EXIT` signal을 낼 수 있다.
 - paper/testnet exchange path는 entry fill 이후 같은 component quantity로
-  `STOP_MARKET`/`TAKE_PROFIT_MARKET` conditional algo order를 제출할 수 있다.
+  `STOP`/`TAKE_PROFIT` conditional limit algo order를 제출할 수 있다.
+- live 주문은 limit-first다. entry/short-entry/reduce-only exit/risk-flatten 주문은
+  기본 `LMT`, `one_tick_worse` 가격 정책(BUY는 기준가 +1 tick, SELL은 기준가 -1 tick),
+  `GTC` time-in-force를 쓴다.
+- 시장가 또는 `STOP_MARKET`/`TAKE_PROFIT_MARKET` 스타일은 옵션으로만 남긴다. 사용하려면
+  `live.default_order_type=MKT`, `live.allow_market_orders=true`, 또는
+  `live.protective_order_style=market`과 별도 review가 필요하다.
 - algo-order request payload는 Binance-supported field allowlist만 통과시키고,
   parent/protection telemetry key는 reconciliation용 local record에만 남긴다.
 - selected frozen source asset 적용성은 `ETHUSDT`, `SOLUSDT`, `TRXUSDT`에 대해

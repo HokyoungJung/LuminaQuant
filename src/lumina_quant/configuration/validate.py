@@ -7,6 +7,11 @@ import re
 from collections.abc import Iterable
 
 from lumina_quant.configuration.schema import RuntimeConfig
+from lumina_quant.core.order_policy import (
+    SUPPORTED_LIMIT_PRICE_MODES,
+    canonical_order_type,
+    normalize_limit_price_mode,
+)
 
 SYMBOL_RE = re.compile(r"^[A-Z0-9]+/[A-Z0-9]+$")
 TIMEFRAME_RE = re.compile(r"^[1-9][0-9]*[smhdwM]$")
@@ -323,6 +328,39 @@ def _validate_live_and_optimization_runtime_invariants(runtime: RuntimeConfig) -
         raise ValueError("live.order_timeout must be >= 1.")
     if runtime.live.reconciliation_interval_sec < 1:
         raise ValueError("live.reconciliation_interval_sec must be >= 1.")
+    default_order_type = canonical_order_type(
+        getattr(runtime.live, "default_order_type", "LMT"),
+        default="LMT",
+    )
+    if default_order_type == "MKT" and not bool(getattr(runtime.live, "allow_market_orders", False)):
+        raise ValueError(
+            "live.default_order_type=MKT requires live.allow_market_orders=true; "
+            "live defaults must remain limit-first."
+        )
+    limit_price_mode = normalize_limit_price_mode(
+        getattr(runtime.live, "limit_price_mode", "one_tick_worse")
+    )
+    if limit_price_mode not in SUPPORTED_LIMIT_PRICE_MODES:
+        raise ValueError(
+            "live.limit_price_mode must be one of: "
+            + ", ".join(sorted(SUPPORTED_LIMIT_PRICE_MODES))
+        )
+    if int(getattr(runtime.live, "limit_price_offset_ticks", 1)) < 0:
+        raise ValueError("live.limit_price_offset_ticks must be >= 0.")
+    if float(getattr(runtime.live, "limit_price_tick_fallback", 0.0)) < 0.0:
+        raise ValueError("live.limit_price_tick_fallback must be >= 0.")
+    if not str(getattr(runtime.live, "limit_time_in_force", "GTC") or "").strip():
+        raise ValueError("live.limit_time_in_force must be non-empty for limit orders.")
+    protective_style = str(
+        getattr(runtime.live, "protective_order_style", "limit") or "limit"
+    ).strip().lower()
+    if protective_style not in {"limit", "market"}:
+        raise ValueError("live.protective_order_style must be 'limit' or 'market'.")
+    if protective_style == "market" and not bool(getattr(runtime.live, "allow_market_orders", False)):
+        raise ValueError(
+            "live.protective_order_style=market requires live.allow_market_orders=true; "
+            "protective orders default to STOP/TAKE_PROFIT limit."
+        )
     if runtime.optimization.max_workers < 1:
         raise ValueError("optimization.max_workers must be >= 1.")
     if int(getattr(runtime.optimization, "validation_days", 0)) < 0:

@@ -153,6 +153,15 @@ live:
   shadow_live_enabled: false
   reconciliation_poll_fallback_enabled: true
   book_ticker_enabled: false
+  # Limit-first live execution. Market orders are disabled unless both
+  # default_order_type: "MKT" and allow_market_orders: true are set explicitly.
+  default_order_type: "LMT" # LMT|MKT; default must remain limit-first
+  allow_market_orders: false
+  limit_price_mode: "one_tick_worse" # same_price|one_tick_worse|one_tick_better
+  limit_price_offset_ticks: 1 # default: BUY one tick above / SELL one tick below reference
+  limit_price_tick_fallback: 0.0 # use exchange tick metadata; nonzero only for offline fallback
+  limit_time_in_force: "GTC"
+  protective_order_style: "limit" # limit => STOP/TAKE_PROFIT limit; market requires allow_market_orders=true
   startup_reconciliation_hard_fail: false
   exchange:
     driver: "binance_futures" # Options: "binance_futures", "mt5", "polymarket"

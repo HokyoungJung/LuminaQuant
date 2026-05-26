@@ -105,7 +105,8 @@ Real mode safety:
 - arm real mode explicitly with `LUMINA_ENABLE_LIVE_REAL=true` and `--enable-live-real`
 - require a strategy/artifact-level real-money approval in addition to CLI flags
 - for the current Alpha Zoo Optuna hybrid handoff, keep paper/testnet only: `ready_for_real=false`, `real_money_execution=false`, `real_execution_allowed=false`
-- paper/testnet protective orders may use Binance USD-M conditional algo `STOP_MARKET` / `TAKE_PROFIT_MARKET` after entry fill, but actual testnet fill/reconciliation telemetry is still required before any real review
+- paper/testnet live orders are limit-first (`LMT`, default `one_tick_worse`); market orders require explicit opt-in
+- paper/testnet protective orders use Binance USD-M conditional algo limit `STOP` / `TAKE_PROFIT` after entry fill by default, but actual testnet fill/reconciliation telemetry is still required before any real review
 - for controlled shutdown, pass `--stop-file /tmp/lq.stop`
 
 ### 3. Enable & Start

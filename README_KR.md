@@ -60,13 +60,15 @@ graph TD
 - **상태/감사/잡 관리**: PostgreSQL(local)
 - **백테스트/최적화 계산**: Polars Lazy + GPU 우선 실행(`gpu` 기본, CI/비GPU 환경은 `cpu` 또는 `auto` override 가능)
 
-## 현재 Private Paper/Testnet 상태 (2026-05-25)
+## 현재 Private Paper/Testnet 상태 (2026-05-26)
 
 현재 private Alpha Zoo live handoff는 **paper/testnet 전용**이며 real-money 승인이 아닙니다.
 
 - 선택 runtime: frozen Optuna v3.5 hybrid artifact용 `AlphaZooOptunaHybridLiveStrategy`.
 - 최신 handoff artifact의 안전 플래그는 계속 hard-false입니다: `ready_for_real=false`, `real_money_execution=false`, `real_execution_allowed=false`.
-- paper/testnet 보호 경로는 local intrabar component exit와 entry fill 이후 Binance USDⓈ-M conditional algo 보호 주문을 모두 포함합니다: `POST /fapi/v1/algoOrder`의 `STOP_MARKET` / `TAKE_PROFIT_MARKET`.
+- live 주문 생성은 기본적으로 limit-first입니다. 진입, 숏 진입, reduce-only exit, risk-flatten 주문은 `LMT`를 쓰며, 시장가는 `live.default_order_type: "MKT"`와 `live.allow_market_orders: true`를 명시해야만 옵션으로 켤 수 있습니다.
+- 기본 limit 가격은 빠른 bounded execution을 위해 `one_tick_worse`입니다. BUY는 기준가보다 1 tick 위, SELL은 기준가보다 1 tick 아래이며, `same_price`와 `one_tick_better`도 설정 가능합니다.
+- paper/testnet 보호 경로는 local intrabar component exit와 entry fill 이후 Binance USDⓈ-M conditional algo limit 보호 주문을 모두 포함합니다: `POST /fapi/v1/algoOrder`의 `STOP` / `TAKE_PROFIT`.
 - Binance algo request payload는 문서화된 거래소 field allowlist만 통과하고, parent/protection telemetry는 reconciliation용 local record에만 남깁니다.
 - 선택된 frozen source asset `ETHUSDT`, `SOLUSDT`, `TRXUSDT`에 대해 asset-generic 동작을 regression test로 확인했습니다. 더 넓은 asset은 동일한 paper/testnet evidence가 필요합니다.
 - 실제 paper/testnet fill, BBO spread, slippage, reject/timeout, reconciliation, protective-order telemetry가 10bps/replay-live parity 가정을 증명하기 전까지 real-money는 계속 차단됩니다.

@@ -1,6 +1,6 @@
 # Session Handoff — Alpha Zoo Hybrid Paper/Testnet Live Protection
 
-Date: 2026-05-25 KST
+Date: 2026-05-25 KST; amended 2026-05-26 KST for limit-first execution
 Scope: `private-main` / `private/main` private source-of-truth
 
 ## Current conclusion
@@ -16,11 +16,14 @@ Hard safety flags remain:
 ## What is now implemented
 
 - `AlphaZooOptunaHybridLiveStrategy` remains the selected runtime handoff for the frozen Optuna v3.5 hybrid artifact.
+- Entry, short-entry, reduce-only exit, and risk-flatten parent orders are now limit-first: `LMT`, `one_tick_worse`, BUY reference +1 tick, SELL reference -1 tick. Market parent orders require explicit `allow_market_orders=true`.
 - Entry signals carry component-level stop/trailing metadata for paper/local intrabar guard handling.
 - After an entry order is confirmed filled, the paper/testnet execution path can submit Binance USD-M Futures conditional algo protection:
-  - `STOP_MARKET`
-  - `TAKE_PROFIT_MARKET`
+  - `STOP`
+  - `TAKE_PROFIT`
+  - side-aware one-tick-worse limit `price` plus `GTC`
   - endpoint family: `POST /fapi/v1/algoOrder`
+- Market-style `STOP_MARKET` / `TAKE_PROFIT_MARKET` remains optional only behind explicit market opt-in and separate review.
 - The exchange request payload is allowlisted to Binance-supported fields. Internal parent/protection telemetry keys are retained in local reconciliation records and are not forwarded to the exchange.
 - Asset-generic behavior is regression-tested across selected frozen source assets:
   - `ETHUSDT`

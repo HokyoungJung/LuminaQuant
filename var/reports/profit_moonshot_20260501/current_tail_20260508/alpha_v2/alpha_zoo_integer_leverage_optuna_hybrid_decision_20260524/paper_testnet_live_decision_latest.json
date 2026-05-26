@@ -25,7 +25,7 @@
     "position_mode": "HEDGE",
     "testnet": true
   },
-  "generated_at_utc": "2026-05-25T11:27:31Z",
+  "generated_at_utc": "2026-05-26T10:42:15Z",
   "ingest_window_seconds": 3600,
   "intrabar_protection_contract": {
     "component_exit_key": "SignalEvent.metadata.component_id",
@@ -34,7 +34,7 @@
       "stop_loss",
       "trailing_percent_when_source_uses_chandelier"
     ],
-    "mode": "paper_local_or_simulated_component_exit_plus_paper_testnet_exchange_algo_stop",
+    "mode": "paper_local_or_simulated_component_exit_plus_paper_testnet_exchange_algo_limit_stop",
     "monitoring_timeframes_preference": [
       "1m",
       "5m",
@@ -47,10 +47,27 @@
     "The selected v3.5 Optuna blend is dominated by the aggressive source profile, so independent-alpha diversification is limited.",
     "Validation MDD is near the relaxed 20% label and exceeds the strict 12% promotion cap.",
     "locked-OOS remains gate/report-only; it is not a parameter-fitting or selection surface.",
-    "Alpha decisions use completed 1h/2h/4h bars; paper/testnet exchange-side STOP_MARKET/TAKE_PROFIT_MARKET protection is supported after entry fill, but real-money remains unapproved.",
+    "Alpha decisions use completed 1h/2h/4h bars; paper/testnet exchange-side STOP/TAKE_PROFIT limit protection is supported after entry fill, but real-money remains unapproved.",
+    "Default one_tick_worse limit prices are marketable limits for fast fill control, not a maker-fee guarantee; realized fee_bps must be measured in paper/testnet.",
     "Paper/testnet liquidity can diverge from real exchange liquidity, funding, fees, and liquidation mechanics.",
     "Frozen-artifact replay avoids online learning; stale artifacts or regime drift require a new research/paper review."
   ],
+  "limit_order_contract": {
+    "allow_market_orders": false,
+    "default_order_type": "LMT",
+    "entry_order_policy": "BUY limit one tick above reference; SELL limit one tick below reference",
+    "exit_order_policy": "reduce-only exits use the same side-aware limit policy",
+    "limit_price_mode": "one_tick_worse",
+    "limit_price_offset_ticks": 1,
+    "limit_time_in_force": "GTC",
+    "market_order_policy": "optional only via explicit live.default_order_type=MKT plus live.allow_market_orders=true",
+    "price_reference": "SignalEvent.price when present, otherwise latest completed live close; tick size from exchange market metadata",
+    "protective_order_style": "limit",
+    "protective_order_types": [
+      "STOP",
+      "TAKE_PROFIT"
+    ]
+  },
   "live_replay_sizing_contract": {
     "absolute_cap_policy": "only explicit positive max_order_value is an emergency ceiling",
     "exchange_leverage_cap": 12,
@@ -65,6 +82,9 @@
     "realized_cost_gate": "compare realized all-in round-trip cost against 10bps replay/gate assumption",
     "required_fields": [
       "bbo_spread_bps_at_submit",
+      "limit_reference_price",
+      "limit_price",
+      "limit_price_mode",
       "order_book_depth_or_liquidity_proxy",
       "submit_to_fill_ms",
       "realized_slippage_bps",
@@ -79,14 +99,15 @@
     "enabled": true,
     "endpoint": "POST /fapi/v1/algoOrder",
     "endpoint_family": "Binance USD-M Futures conditional algo orders",
+    "limit_order_policy": "triggerPrice plus side-aware one_tick_worse price and GTC timeInForce",
     "position_side": "SignalEvent.position_side or direction-derived LONG/SHORT",
     "real_money_policy": "blocked_until_separate_exchange_side_order_telemetry_review",
     "request_payload_policy": "Binance-doc allowlist only; internal parent/protection telemetry keys are retained locally and not sent to the exchange",
     "sizing": "same_quantity_as_filled_parent_component_order",
     "submitted_after": "entry_order_filled",
     "supported_types": [
-      "STOP_MARKET",
-      "TAKE_PROFIT_MARKET"
+      "STOP",
+      "TAKE_PROFIT"
     ]
   },
   "paper_testnet_only": true,
@@ -105,7 +126,8 @@
     "paper_testnet_artifacts_only: ready_for_real, real_money_execution, and real_execution_allowed are false",
     "no_exchange_paper_fill_telemetry: realized BBO spread, fees, slippage, rejects, partial fills, and cancels are not observed yet",
     "backtest_cost_is_proxy: 10bps round-trip friction is enforced in replay and gates but is not a live measured all-in cost",
-    "fail_closed_allocation: decision target_allocation is 0.0 and live sizing depends on SignalEvent.metadata.target_allocation"
+    "fail_closed_allocation: decision target_allocation is 0.0 and live sizing depends on SignalEvent.metadata.target_allocation",
+    "live_market_orders_disabled_by_default: any market-style execution requires an explicit allow_market_orders=true override and a separate review"
   ],
   "real_money_execution": false,
   "replay_live_notional_parity": true,

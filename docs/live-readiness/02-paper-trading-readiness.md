@@ -40,7 +40,8 @@
   - baseline vs candidate divergence 비교용 shadow helper
 - `src/lumina_quant/live/execution_live.py` / `src/lumina_quant/exchanges/binance_futures_exchange.py`
   - 2026-05-25 기준 paper/testnet 전용 Binance USD-M conditional algo 보호 주문 경로
-  - entry fill 이후 `STOP_MARKET` / `TAKE_PROFIT_MARKET` 제출
+  - 2026-05-26 기준 live 주문은 기본 limit-first: 진입/숏/exit/flatten `LMT`, `one_tick_worse`, 시장가는 명시적 opt-in 필요
+  - entry fill 이후 `STOP` / `TAKE_PROFIT` conditional limit 제출
   - `/fapi/v1/algoOrder` request payload allowlist 적용; parent/protection telemetry는 local record에만 저장
 - `AlphaZooOptunaHybridLiveStrategy` handoff artifact
   - `ready_for_real=false`, `real_money_execution=false`, `real_execution_allowed=false` 유지
@@ -108,7 +109,8 @@ pass 조건:
 
 확인 항목:
 - [ ] submit → ack → fill / cancel / timeout 상태 전이
-- [ ] entry fill 이후 paper/testnet `STOP_MARKET` / `TAKE_PROFIT_MARKET` protective algo order 제출 확인
+- [ ] entry/short/exit/flatten 주문이 paper/testnet에서 `LMT` + `one_tick_worse`로 제출되는지 확인
+- [ ] entry fill 이후 paper/testnet `STOP` / `TAKE_PROFIT` protective limit algo order 제출 확인
 - [ ] protective leg trigger 후 sibling cancellation/reconciliation 정책 확인
 - [ ] open order snapshot readiness
 - [ ] timeout 후 cancel/reconcile
