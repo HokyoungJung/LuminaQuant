@@ -21,6 +21,7 @@
 | **[Live Readiness Runbook](docs/live-readiness/04-paper-trading-runbook.md)** | Paper/testnet-only live handoff, protective-order contract, and real-money blockers. |
 | **[Migration Guide](docs/MIGRATION_GUIDE_POSTGRES_PARQUET.md)** | Local-only migration to Parquet + PostgreSQL. |
 | **[GPU Auto Notes](docs/DESIGN_NOTES_GPU_AUTO.md)** | Polars GPU/CPU auto-selection and fallback design. |
+| **[Optimization Refactor Notes](docs/OPTIMIZATION_REFACTOR_NOTES.md)** | Shared Optuna/search policy, bounded-grid exceptions, and cleanup rules. |
 | **[Validation Report](docs/VALIDATION_REPORT.md)** | Verification + optimization report for core workflows. |
 | **[Final Validation Guide](docs/FINAL_VALIDATION.md)** | Real-data-only final validation vs continuity validation and raw-first lineage policy. |
 | **[Futures Strategy Factory](docs/FUTURES_STRATEGY_FACTORY.md)** | Candidate generation, weighted shortlist, and portfolio-set policy. |
@@ -368,6 +369,18 @@ When installed, `lumina_quant.strategies.registry` and `lumina_quant.indicators`
   - `storage.wal_compact_on_threshold`
   - `storage.wal_compaction_interval_seconds`
   - canonical compaction script: `scripts/compact_wal_to_monthly_parquet.py`
+
+### Optimization search policy
+
+- Shared search-loop mechanics live in `lumina_quant.optimization.search_policy`.
+- Use Optuna for tunable/high-dimensional optimization; do not open-code new
+  `optuna.create_study(...)` loops in research scripts when the shared
+  `run_optuna_study(...)` helper can express the same workflow.
+- Direct cartesian grid enumeration is limited to small deterministic policy
+  enumerations and must go through `build_bounded_grid_combinations(...)` with
+  a justification/cap so artifacts explain why grid search was acceptable.
+- Strategy search spaces should remain sourced from `lumina_quant.tuning.param_registry`
+  or strategy registry defaults rather than duplicated ad-hoc parameter domains.
 
 **Architecture/Lint Gate:**
 ```bash

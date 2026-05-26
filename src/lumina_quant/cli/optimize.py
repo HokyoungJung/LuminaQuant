@@ -1,5 +1,4 @@
 import argparse
-import itertools
 import json
 import math
 import multiprocessing
@@ -41,6 +40,11 @@ from lumina_quant.market_data import (
     timeframe_to_milliseconds,
 )
 from lumina_quant.optimization.storage import save_optimization_rows
+from lumina_quant.optimization.search_policy import (
+    build_bounded_grid_combinations,
+    run_optuna_study,
+    suggest_params_from_optuna_config,
+)
 from lumina_quant.optimization.threading_control import configure_numba_threads
 from lumina_quant.optimization.walkers import build_walk_forward_splits
 from lumina_quant.storage.parquet import (
@@ -893,10 +897,11 @@ class GridSearchOptimizer:
         self.end_date = end_date
 
     def generate_param_combinations(self):
-        keys = self.param_grid.keys()
-        values = self.param_grid.values()
-        combinations = list(itertools.product(*values))
-        return [dict(zip(keys, combo)) for combo in combinations]
+        result = build_bounded_grid_combinations(
+            self.param_grid,
+            justification="cli grid-search mode over strategy parameter registry values",
+        )
+        return result.combinations
 
     def run(self, max_workers=4):
         combinations = self.generate_param_combinations()
@@ -986,16 +991,7 @@ class OptunaOptimizer:
         self.prefilter_start, self.prefilter_end = _resolve_prefilter_window(start_date, end_date)
 
     def objective(self, trial):
-        params = {}
-        for key, conf in self.optuna_config.items():
-            p_type = conf.get("type")
-            if p_type == "int":
-                params[key] = trial.suggest_int(key, conf["low"], conf["high"])
-            elif p_type == "float":
-                step = conf.get("step", None)
-                params[key] = trial.suggest_float(key, conf["low"], conf["high"], step=step)
-            elif p_type == "categorical":
-                params[key] = trial.suggest_categorical(key, conf["choices"])
+        params = suggest_params_from_optuna_config(trial, self.optuna_config)
 
         eval_start = self.start_date
         eval_end = self.end_date
@@ -1021,9 +1017,13 @@ class OptunaOptimizer:
             print("Error: Optuna not installed.")
             return []
 
-        study = optuna.create_study(direction="maximize")
         worker_count = max(1, int(n_jobs))
-        study.optimize(self.objective, n_trials=n_trials, n_jobs=worker_count)
+        study = run_optuna_study(
+            optuna_module=optuna,
+            objective=self.objective,
+            n_trials=n_trials,
+            n_jobs=worker_count,
+        )
 
         best_trials = sorted(study.trials, key=lambda t: t.value if t.value else -999, reverse=True)
         complete_trials = [t for t in best_trials if t.state == TrialState.COMPLETE]

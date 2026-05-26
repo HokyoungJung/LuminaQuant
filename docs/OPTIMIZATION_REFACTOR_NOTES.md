@@ -11,6 +11,24 @@ existing behavior while reducing runtime and temporary allocations.
 
 ## Module Boundary Updates
 
+### Shared search policy module
+
+- Added `lumina_quant/optimization/search_policy.py`.
+- Purpose: centralize Optuna study creation, Optuna parameter suggestion from
+  the canonical config schema, bounded deterministic grid enumeration, and
+  optimization-result policy metadata.
+- Public helpers:
+  - `run_optuna_study(...)`
+  - `suggest_params_from_optuna_config(...)`
+  - `build_bounded_grid_combinations(...)`
+  - `optimization_search_policy_payload(...)`
+- Policy:
+  - use Optuna for tunable/high-dimensional search;
+  - use bounded grid only for small deterministic enumerations with an explicit
+    justification and optional cap;
+  - keep locked-OOS flags false for selection/objective/pruning/parameter fitting
+    unless a diagnostic artifact explicitly labels otherwise.
+
 ### New compute loader module
 
 - Added `lumina_quant/compute/ohlcv_loader.py`.
@@ -26,6 +44,11 @@ existing behavior while reducing runtime and temporary allocations.
 - `lumina_quant/data.py` now uses `OHLCVFrameLoader` for preloaded and CSV data.
 - `src/lumina_quant/cli/optimize.py` now uses the same loader for CSV fallback and DB frame
   normalization.
+- `src/lumina_quant/cli/optimize.py` now delegates grid combination generation
+  and Optuna study creation to `lumina_quant.optimization.search_policy`.
+- `scripts/research/optuna_tune_hybrid_online_portfolio.py` now uses
+  `run_optuna_study(...)` instead of open-coding a local `create_study(...)`
+  loop.
 
 ## Performance Changes
 
@@ -61,6 +84,13 @@ existing behavior while reducing runtime and temporary allocations.
 All tests pass after refactor:
 
 - `51 passed` via `uv run python -m pytest`
+
+Search-policy tranche:
+
+- `uv run pytest -q tests/test_optimization_search_policy.py tests/test_param_registry.py tests/test_portfolio_optimizer_core.py tests/test_strategy_alias_compat.py`
+  → `19 passed`
+- `uv run ruff check src/lumina_quant/optimization/search_policy.py src/lumina_quant/optimization/__init__.py src/lumina_quant/cli/optimize.py scripts/research/optuna_tune_hybrid_online_portfolio.py tests/test_optimization_search_policy.py`
+  → passed
 
 Benchmarks (median of 2 measured iterations, 1 warmup):
 

@@ -158,6 +158,7 @@ src/lumina_quant/
     src/lumina_quant/optimization/fast_eval.py
     src/lumina_quant/optimization/frozen_dataset.py
     src/lumina_quant/optimization/native_backend.py
+    src/lumina_quant/optimization/search_policy.py
     src/lumina_quant/optimization/storage.py
     src/lumina_quant/optimization/threading_control.py
     src/lumina_quant/optimization/walkers.py
@@ -384,9 +385,9 @@ docs/
 
 - **Portfolio optimizer shared core**: `src/lumina_quant/portfolio/` owns reusable portfolio stream/split/constraint/allocation helpers. Keep script CLIs as thin compatibility wrappers around shared code.
 - **Generic portfolio optimizer CLI**: `scripts/run_portfolio_optimization.py` owns user-facing arguments, report writing, memory-guard lifecycle, and compatibility output schema.
-- **Research tuners and Optuna lanes**: `scripts/research/*tune*portfolio*.py` and `scripts/research/optuna_tune_*.py` own experiment orchestration. Selection objectives must declare whether they are `train_val_only_locked_oos_report` or diagnostic; OOS is not selection authority unless explicitly diagnostic-labeled.
+- **Research tuners and Optuna lanes**: `scripts/research/*tune*portfolio*.py` and `scripts/research/optuna_tune_*.py` own experiment orchestration. Selection objectives must declare whether they are `train_val_only_locked_oos_report` or diagnostic; OOS is not selection authority unless explicitly diagnostic-labeled. New tunable search loops should use `src/lumina_quant/optimization/search_policy.py` instead of open-coding Optuna study creation or unbounded cartesian grids.
 - **Validator / evidence gates**: `scripts/research/validate_*` and `src/lumina_quant/portfolio_split_contract.py` own RSS/CI/git evidence parsing and pass/fail reports. Preserve `<8GiB` memory checks.
-- **Core optimization engine**: `src/lumina_quant/optimization/`, `src/lumina_quant/cli/optimize.py`, and `src/lumina_quant/tuning/` own strategy parameter optimization, Optuna/grid execution, walk-forward windows, storage, and runtime threading.
+- **Core optimization engine**: `src/lumina_quant/optimization/`, `src/lumina_quant/cli/optimize.py`, and `src/lumina_quant/tuning/` own strategy parameter optimization, Optuna/grid execution, walk-forward windows, storage, and runtime threading. `optimization/search_policy.py` is the shared boundary for Optuna study execution, bounded-grid metadata, and locked-OOS non-use flags.
 - **Tests**: `tests/test_run_portfolio_optimization_script.py`, `tests/test_profit_moonshot_fresh_portfolio_tuning.py`, `tests/test_optuna_tune_profit_moonshot_calendar.py`, `tests/test_profit_moonshot_pass_under_8gb_validator.py`, and new `tests/test_portfolio_optimizer_core.py` lock behavior before cleanup.
 - **Docs / handoff**: `docs/session_handoff_*`, `.omx/plans/*`, and `.omx/notepad.md` hold reboot-safe state. Commit concise handoffs; avoid raw report payloads.
 - **Artifacts**: `var/reports/` contains generated evidence; commit only intentional concise PASS/readiness artifacts. `var/cache/` remains ignored.
@@ -398,12 +399,14 @@ docs/
 3. Keep the outer portfolio memory guard in CLI paths and preserve RSS evidence fields.
 4. Treat locked OOS as report/gate evidence; train/validation drive selection by default.
 5. Prefer shared helpers under `src/lumina_quant/portfolio/` over copying stream alignment, split aliasing, or constraint logic into more scripts.
+6. Prefer `run_optuna_study(...)` / `suggest_params_from_optuna_config(...)` for tunable optimization and `build_bounded_grid_combinations(...)` only for justified small enumerations.
+7. Keep leader `private-main` clean before launching OMX team worktree mode. Worker worktrees are temporary evidence lanes; final merge, Lore commit, and push stay leader-owned after full verification.
 <!-- LQ:TREE:END -->
 
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **LuminaQuant** (44008 symbols, 65963 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **LuminaQuant** (44071 symbols, 66042 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 

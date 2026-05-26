@@ -34,3 +34,13 @@ uv run python scripts/run_research_hurdle.py \
 - Each script only reads its own section.
 - Unknown keys are ignored.
 - For portability, keep all scoring sections in one file and version it with your experiment reports.
+
+## Optimization search-policy guardrails
+
+- Tunable/high-dimensional optimization should use the shared Optuna runner in
+  `lumina_quant.optimization.search_policy` or carry an explicit tested exception.
+- Bounded grid enumeration is only for small deterministic policy/profile sweeps;
+  record the cap, justification, search-space provenance, and skipped/truncated
+  count in the artifact.
+- Keep locked-OOS out of selection/objective/pruning/parameter-fitting metadata
+  unless the artifact is explicitly diagnostic and labeled as such.

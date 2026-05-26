@@ -17,6 +17,10 @@ from lumina_quant.portfolio.hybrid_objective import (
     hybrid_online_objective_policy,
 )
 from lumina_quant.portfolio.optimizer_core import safe_float as _safe_float
+from lumina_quant.optimization.search_policy import (
+    optimization_search_policy_payload,
+    run_optuna_study,
+)
 
 try:
     import optuna
@@ -120,6 +124,22 @@ def _build_config(
     )
 
 
+def _search_policy_for_profile(profile: str, *, n_trials: int) -> dict:
+    return optimization_search_policy_payload(
+        search_method="optuna",
+        objective_policy=_objective_policy_for_profile(profile),
+        selection_inputs=("train", "validation"),
+        extra={
+            "requested_trials": max(1, int(n_trials)),
+            "direction": "maximize",
+            "sampler": "TPESampler",
+            "seed": 42,
+            "selection_policy": "best_objective_desc",
+            "search_space_source": "scripts/research/optuna_tune_hybrid_online_portfolio.py::_build_config",
+        },
+    )
+
+
 def main() -> None:
     optuna_mod = _require_optuna()
     parser = argparse.ArgumentParser(description=__doc__)
@@ -157,9 +177,13 @@ def main() -> None:
             best_payload = payload
         return trial_score
 
-    sampler = optuna_mod.samplers.TPESampler(seed=42)
-    study = optuna_mod.create_study(direction="maximize", sampler=sampler)
-    study.optimize(objective, n_trials=max(1, int(args.n_trials)), show_progress_bar=False)
+    study = run_optuna_study(
+        optuna_module=optuna_mod,
+        objective=objective,
+        n_trials=max(1, int(args.n_trials)),
+        seed=42,
+        show_progress_bar=False,
+    )
 
     trials = []
     for trial in study.trials:
@@ -182,6 +206,10 @@ def main() -> None:
         "generated_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "objective_profile": args.objective_profile,
         "objective_policy": _objective_policy_for_profile(args.objective_profile),
+        "search_policy": _search_policy_for_profile(
+            args.objective_profile,
+            n_trials=int(args.n_trials),
+        ),
         "split_windows": split_config.as_payload(),
         "warmup_ratio": float(args.warmup_ratio),
         "fixed_warmup_days": None if args.warmup_days is None else int(args.warmup_days),

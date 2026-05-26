@@ -22,6 +22,7 @@
 | **[8GB 기준 Quickstart](docs/kr/QUICKSTART_8GB_BASELINE.md)** | 설치/스모크/섀도우라이브/대시보드/안전종료/정리 최소 절차. |
 | **[마이그레이션 가이드](docs/kr/MIGRATION_GUIDE_POSTGRES_PARQUET.md)** | 레거시 저장소 제거 후 Parquet + PostgreSQL 전환 가이드. |
 | **[GPU 자동 실행 설계](docs/kr/DESIGN_NOTES_GPU_AUTO.md)** | Polars GPU/CPU 선택, GPU-first 기본값, CI 검증 전략 설명. |
+| **[최적화 리팩터링 노트](docs/kr/OPTIMIZATION_REFACTOR_NOTES.md)** | 공용 Optuna/search policy, bounded-grid 예외, cleanup 규칙. |
 | **[1년+ 1초 로컬 런북](docs/kr/RUNBOOK_1Y_1S_LOCAL.md)** | 8GB RAM / 8GB VRAM 기준 장기 로컬 실행/튜닝 절차. |
 | **[선물 전략 팩토리](docs/kr/FUTURES_STRATEGY_FACTORY.md)** | 후보 생성, 가중치 기반 숏리스트, 단일-자산 조합 정책. |
 | **[스코어 설정 가이드](docs/kr/SCORING_CONFIG_GUIDE.md)** | 리서치/숏리스트/최적화 스크립트 공용 score-config 템플릿 사용법. |
@@ -361,6 +362,17 @@ uv run python scripts/run_research_pipeline.py \
 - **단일 전략**은 score/return/sharpe/trades 기준을 통과하지 못하면 제외
 - `--allow-multi-asset`을 명시하지 않으면 **직접 multi-asset 전략은 포트폴리오 숏리스트에서 제외**
 - 최종 포트폴리오 후보는 성과가 검증된 단일 전략을 자산별로 묶은 **`portfolio_sets`**(가중치 `portfolio_weight`)로 생성
+
+### 최적화 search policy
+
+- 공통 search-loop 메커니즘은 `lumina_quant.optimization.search_policy`에 둡니다.
+- 튜닝 가능하거나 차원이 큰 최적화는 Optuna를 기본으로 사용합니다. 동일한
+  workflow를 `run_optuna_study(...)`로 표현할 수 있다면 research script 안에서
+  새 `optuna.create_study(...)` 루프를 직접 만들지 않습니다.
+- 직접 cartesian grid를 쓰는 경우는 작은 deterministic policy enumeration에 한정하며,
+  `build_bounded_grid_combinations(...)`를 통해 justification/cap metadata를 남겨야 합니다.
+- 전략 search space는 `lumina_quant.tuning.param_registry` 또는 strategy registry 기본값을
+  원천으로 삼고, ad-hoc parameter domain 중복 구현을 피합니다.
 
 **아키텍처/린트 검증:**
 ```bash

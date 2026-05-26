@@ -184,3 +184,21 @@ def test_hybrid_optuna_locked_profile_ignores_oos_metrics() -> None:
     assert hybrid_optuna._objective_from_payload(base, profile="live_guarded") != pytest.approx(
         hybrid_optuna._objective_from_payload(better_oos_only, profile="live_guarded")
     )
+
+
+def test_hybrid_optuna_search_policy_records_locked_oos_non_use() -> None:
+    payload = hybrid_optuna._search_policy_for_profile("locked_train_val", n_trials=0)
+
+    assert payload["search_method"] == "optuna"
+    assert payload["requested_trials"] == 1
+    assert payload["direction"] == "maximize"
+    assert payload["sampler"] == "TPESampler"
+    assert payload["seed"] == 42
+    assert payload["selection_policy"] == "best_objective_desc"
+    assert payload["selection_inputs"] == ["train", "validation"]
+    assert payload["search_space_source"].endswith("::_build_config")
+    assert payload["objective_policy"]["objective_policy"] == LOCKED_OOS_OBJECTIVE_POLICY
+    assert payload["uses_locked_oos_for_selection"] is False
+    assert payload["uses_locked_oos_for_objective"] is False
+    assert payload["uses_locked_oos_for_pruning"] is False
+    assert payload["uses_locked_oos_for_parameter_fitting"] is False
