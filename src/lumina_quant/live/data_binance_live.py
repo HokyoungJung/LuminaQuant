@@ -206,18 +206,7 @@ class BinanceLiveDataHandler:
                 if key not in self.latest_symbol_data:
                     self.latest_symbol_data[key] = deque(maxlen=500)
                 self.latest_symbol_data[key].clear()
-                for row in rows:
-                    if isinstance(row, (tuple, list)) and len(row) >= 6:
-                        self.latest_symbol_data[key].append(
-                            (
-                                int(row[0]),
-                                float(row[1]),
-                                float(row[2]),
-                                float(row[3]),
-                                float(row[4]),
-                                float(row[5]),
-                            )
-                        )
+                self.latest_symbol_data[key].extend(rows)
         self.events.put(event)
 
     def _emit_from_tick(self, tick: NormalizedTradeTick) -> None:

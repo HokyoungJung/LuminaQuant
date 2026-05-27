@@ -9,6 +9,7 @@ LuminaQuant keeps the public/runtime API in Python and moves only proven hot ker
 | Raw aggTrades → canonical 1s OHLCV | `lumina_quant.data.raw_first_lineage.raw_aggtrades_to_1s_frame` | `native/rust_rawfirst` | **Use Rust automatically when the release library is built** | Local 200k-trade synthetic benchmark: Python `0.0496s/eval`, Rust `0.0246s/eval`, about `2.01x` faster with frame parity. |
 | Alpha Zoo Optuna hybrid portfolio loop | `scripts/research/run_alpha_zoo_integer_leverage_optuna_hybrid_decision.py::_portfolio_returns_for_params` | `native/rust_hybrid_optuna` | **Use Rust automatically when the release library is built and input is finite** | Local 20k×3 synthetic benchmark: Python `2.5493s/eval`, Rust `0.0107s/eval`, about `238.07x` faster; return diff `1.01e-11`, exposed-weight diff `9.15e-09` within `1e-8` tolerance. |
 | Alpha Zoo live state-signal machines | `lumina_quant.alpha_zoo.optuna_hybrid_signals.debounced_state_signal` / `trailing_state_signal` | `native/rust_live_signals` | **Use Rust automatically when the release library is built** | Local 50k-row synthetic benchmark: Python `0.1349s/eval`, Rust `0.000544s/eval`, about `247.80x` faster; debounced/trailing state arrays matched exactly. |
+| Live `MARKET_WINDOW` event construction / rolling aggregation | `lumina_quant.core.market_window_contract.build_market_window_event` / `lumina_quant.live.market_window_rolling.RollingWindowAggregator` | None: trusted Python fast path | **Do not add Rust for this boundary yet; use the internal canonical-row fast path** | Profiling showed repeated Python row normalization/schema validation, not numeric compute, dominated the live window path. Local 5-symbol/300s benchmark: generic builder `0.0005508s/eval`, trusted builder `0.000001006s/eval` (`~547x` for the builder) and rolling aggregation `16.5k ticks/s`, RSS `42.5MB`. Rust FFI would still need Python tuple conversion for `MarketWindowEvent`. |
 | Optimization metric evaluator | `lumina_quant.optimization.fast_eval.evaluate_threshold_strategy` | `native/rust_metrics` / `native/c_metrics` | **Keep Numba/Python auto-selection; do not force Rust yet** | Local native-compare benchmark: auto-selected Numba around `11.1k eval/s`; forced Rust around `7.9k eval/s`, parity OK but slower on this host. |
 
 ## Build and benchmark
@@ -54,6 +55,16 @@ uv run python scripts/benchmark_live_signal_backend.py \
   --evals 20 \
   --backend both \
   --require-rust
+```
+
+Benchmark live `MARKET_WINDOW` construction/rolling aggregation:
+
+```bash
+uv run python scripts/benchmark_market_window_contract.py \
+  --symbols 5 \
+  --window-seconds 300 \
+  --ticks 5000 \
+  --evals 500
 ```
 
 Benchmark metric evaluator backend selection:

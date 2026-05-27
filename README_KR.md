@@ -62,7 +62,7 @@ graph TD
 - **1초 캔들 저장소**: Parquet(ZSTD, exchange/symbol/date 파티션)
 - **상태/감사/잡 관리**: PostgreSQL(local)
 - **백테스트/최적화 계산**: Polars Lazy + GPU 우선 실행(`gpu` 기본, CI/비GPU 환경은 `cpu` 또는 `auto` override 가능)
-- **Native 가속**: Python API는 안정적으로 유지하고, 효과가 검증된 hot kernel만 Rust를 내부에서 사용합니다. raw-first aggTrades→1초 OHLCV, Alpha Zoo Optuna hybrid portfolio loop, Alpha Zoo live state-signal state machine은 Rust backend가 빌드되어 있으면 자동 로드하고, metrics evaluator는 현재 로컬 Rust metrics가 Numba보다 빠르지 않아 Numba/Python auto-selection을 유지합니다.
+- **Native/fast-path 가속**: Python API는 안정적으로 유지하고, 효과가 검증된 hot kernel만 Rust를 내부에서 사용합니다. raw-first aggTrades→1초 OHLCV, Alpha Zoo Optuna hybrid portfolio loop, Alpha Zoo live state-signal state machine은 Rust backend가 빌드되어 있으면 자동 로드합니다. live `MARKET_WINDOW` 생성은 Rust로 넘겨도 Python tuple 변환 비용이 남는 경계라 trusted Python fast path로 최적화했고, metrics evaluator는 현재 로컬 Rust metrics가 Numba보다 빠르지 않아 Numba/Python auto-selection을 유지합니다.
 
 ## 현재 Private Paper/Testnet 상태 (2026-05-27)
 
@@ -75,6 +75,7 @@ graph TD
   `lumina_quant.alpha_zoo.optuna_hybrid_live_strategy`는 orchestration/event emission을 담당합니다.
 - regression test가 선택 artifact 성적, live limit-first decision contract, sleeve/weight 재구성을
   먼저 고정하므로 이후 refactor에서 결과 drift를 잡습니다.
+- live rolling `MARKET_WINDOW` 경로는 내부 canonical producer(`RollingWindowAggregator`, committed materialized snapshot)에 한해서만 중복 row normalization을 건너뜁니다. 외부 payload는 계속 전체 schema normalization을 탑니다.
 - 최신 handoff artifact의 안전 플래그는 계속 hard-false입니다: `ready_for_real=false`, `real_money_execution=false`, `real_execution_allowed=false`.
 - live 주문 생성은 기본적으로 limit-first입니다. 진입, 숏 진입, reduce-only exit, risk-flatten 주문은 `LMT`를 쓰며, 시장가는 `live.default_order_type: "MKT"`와 `live.allow_market_orders: true`를 명시해야만 옵션으로 켤 수 있습니다.
 - 기본 limit 가격은 빠른 bounded execution을 위해 `one_tick_worse`입니다. BUY는 기준가보다 1 tick 위, SELL은 기준가보다 1 tick 아래이며, `same_price`와 `one_tick_better`도 설정 가능합니다.

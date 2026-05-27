@@ -1,0 +1,19 @@
+{
+  "aggregator": {
+    "elapsed_seconds": 0.302669282998977,
+    "emitted_events": 1000,
+    "symbols": 5,
+    "ticks": 5000,
+    "ticks_per_second": 16519.680987967648,
+    "window_seconds": 300
+  },
+  "builder": {
+    "generic_seconds_per_eval": 0.0005507677820023673,
+    "payloads_match": true,
+    "trusted_seconds_per_eval": 1.0060319982585496e-06,
+    "trusted_speedup": 547.4654712332722
+  },
+  "generated_at_utc": "2026-05-27T14:06:59.077669+00:00",
+  "memory_note": "Synthetic MARKET_WINDOW benchmark; inputs bounded for <8GB sessions.",
+  "status": "pass"
+}

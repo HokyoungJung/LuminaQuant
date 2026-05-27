@@ -83,6 +83,35 @@ def normalize_bars_1s(
     return normalized
 
 
+def _reuse_normalized_bars_1s(
+    bars_1s: dict[str, tuple[Any, ...]] | dict[str, list[Any]] | None,
+) -> dict[str, tuple[tuple[int, float, float, float, float, float], ...]]:
+    """Reuse trusted canonical MARKET_WINDOW rows without per-row validation.
+
+    This is only for internal producers that already materialize rows as
+    `(epoch_ms:int, open:float, high:float, low:float, close:float, volume:float)`
+    in ascending order. External/user payloads must continue through
+    `normalize_bars_1s`.
+    """
+    if not isinstance(bars_1s, dict):
+        raise MarketWindowContractError("bars_1s must be a dict[str, rows].")
+
+    normalized: dict[str, tuple[tuple[int, float, float, float, float, float], ...]] = {}
+    for symbol, rows in bars_1s.items():
+        symbol_key = str(symbol)
+        if rows is None:
+            normalized[symbol_key] = tuple()
+            continue
+        if isinstance(rows, tuple):
+            normalized[symbol_key] = rows
+            continue
+        if isinstance(rows, list):
+            normalized[symbol_key] = tuple(rows)
+            continue
+        raise MarketWindowContractError(f"bars_1s[{symbol_key}] must be tuple/list of OHLCV rows.")
+    return normalized
+
+
 def _normalized_sorted_rows_fast_path(
     rows: tuple[Any, ...] | list[Any],
 ) -> tuple[tuple[int, float, float, float, float, float], ...] | None:
@@ -116,7 +145,11 @@ def _normalized_sorted_rows_fast_path(
     return tuple(out)
 
 
-def validate_market_window_event_schema(event: MarketWindowEvent) -> None:
+def validate_market_window_event_schema(
+    event: MarketWindowEvent,
+    *,
+    bars_1s_already_normalized: bool = False,
+) -> None:
     if str(getattr(event, "type", "")) != "MARKET_WINDOW":
         raise MarketWindowContractError("type must equal 'MARKET_WINDOW'.")
     if not isinstance(getattr(event, "time", None), int):
@@ -126,8 +159,12 @@ def validate_market_window_event_schema(event: MarketWindowEvent) -> None:
     if int(event.window_seconds) < 1:
         raise MarketWindowContractError("window_seconds must be >= 1.")
 
-    normalized = normalize_bars_1s(getattr(event, "bars_1s", None))
-    event.bars_1s = normalized
+    if bool(bars_1s_already_normalized):
+        if not isinstance(getattr(event, "bars_1s", None), dict):
+            raise MarketWindowContractError("bars_1s must be a dict[str, rows].")
+    else:
+        normalized = normalize_bars_1s(getattr(event, "bars_1s", None))
+        event.bars_1s = normalized
 
     watermark = getattr(event, "event_time_watermark_ms", None)
     if watermark is not None and not isinstance(watermark, int):
@@ -260,9 +297,14 @@ def build_market_window_event(
     parity_v2_enabled: bool = False,
     metrics_log_path: str = "logs/live/market_window_metrics.ndjson",
     emit_metrics: bool = False,
+    bars_1s_already_normalized: bool = False,
 ) -> MarketWindowEvent:
     time_ms = _to_epoch_ms(time, field_name="time")
-    normalized_rows = normalize_bars_1s(bars_1s)
+    normalized_rows = (
+        _reuse_normalized_bars_1s(bars_1s)
+        if bool(bars_1s_already_normalized)
+        else normalize_bars_1s(bars_1s)
+    )
 
     watermark_ms = (
         _to_epoch_ms(event_time_watermark_ms, field_name="event_time_watermark_ms")
@@ -286,7 +328,7 @@ def build_market_window_event(
         timestamp_ns=ts_ns,
         sequence=seq,
     )
-    validate_market_window_event_schema(event)
+    validate_market_window_event_schema(event, bars_1s_already_normalized=True)
 
     if emit_metrics and bool(parity_v2_enabled):
         emit_market_window_metrics(

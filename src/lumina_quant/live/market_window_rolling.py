@@ -86,7 +86,7 @@ class RollingWindowAggregator:
             bar[3] = float(tick.price)
             bar[4] = float(bar[4]) + float(qty)
 
-        self._prune_history(anchor_sec_ms=bucket_sec_ms)
+        self._prune_history(anchor_sec_ms=bucket_sec_ms, symbol=symbol)
         return self.flush_until(now_ms=int(tick.receive_ts_ms or int(time.time() * 1000)))
 
     def flush_until(self, *, now_ms: int | None = None) -> list[MarketWindowEvent]:
@@ -117,6 +117,7 @@ class RollingWindowAggregator:
                 lag_ms=int(lag_ms),
                 is_stale=False,
                 emit_metrics=False,
+                bars_1s_already_normalized=True,
             )
             events.append(event)
             self._last_emitted_sec_ms = int(emit_sec_ms)
@@ -166,10 +167,12 @@ class RollingWindowAggregator:
         symbol_bars = self._bars.get(symbol, {})
         if not symbol_bars:
             return None
-        prior_seconds = [timestamp for timestamp in symbol_bars if int(timestamp) < int(sec_ms)]
-        if not prior_seconds:
+        nearest = max(
+            (int(timestamp) for timestamp in symbol_bars if int(timestamp) < int(sec_ms)),
+            default=None,
+        )
+        if nearest is None:
             return None
-        nearest = max(prior_seconds)
         bar = symbol_bars.get(nearest)
         if not bar:
             return None
@@ -185,13 +188,18 @@ class RollingWindowAggregator:
                 earliest = int(candidate)
         return earliest
 
-    def _prune_history(self, *, anchor_sec_ms: int) -> None:
+    def _prune_history(self, *, anchor_sec_ms: int, symbol: str | None = None) -> None:
         lower_bound = int(anchor_sec_ms) - (int(self.max_history_seconds) * 1000)
-        for symbol, bars in self._bars.items():
+        targets = (
+            [(str(symbol), self._bars.get(str(symbol), {}))]
+            if symbol is not None
+            else list(self._bars.items())
+        )
+        for symbol_key, bars in targets:
             stale_seconds = [timestamp for timestamp in bars if int(timestamp) < int(lower_bound)]
             for stale in stale_seconds:
                 bars.pop(stale, None)
-            self._bars[symbol] = bars
+            self._bars[symbol_key] = bars
 
     def _is_duplicate(self, event_id: str, ts_ms: int) -> bool:
         token = str(event_id or "")

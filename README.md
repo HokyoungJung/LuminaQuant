@@ -62,7 +62,7 @@ Current local-first stack defaults:
 - **1s market store**: Parquet (ZSTD, exchange/symbol/date partitioning)
 - **State/audit/job control**: PostgreSQL (local)
 - **Backtest/optimization compute**: Polars Lazy with GPU-first execution (`gpu` by default; CI/non-GPU environments can override to `cpu` or `auto`)
-- **Native acceleration**: Python APIs stay stable; proven hot kernels use Rust underneath when built. Raw-first aggTrades→1s OHLCV, the Alpha Zoo Optuna hybrid portfolio loop, and Alpha Zoo live state-signal machines auto-load Rust backends when available; metrics evaluation still auto-selects Numba/Python because local Rust metrics is not faster yet.
+- **Native/fast-path acceleration**: Python APIs stay stable; proven hot kernels use Rust underneath when built. Raw-first aggTrades→1s OHLCV, the Alpha Zoo Optuna hybrid portfolio loop, and Alpha Zoo live state-signal machines auto-load Rust backends when available; live `MARKET_WINDOW` construction uses a trusted Python fast path where Rust would still pay Python tuple conversion costs; metrics evaluation still auto-selects Numba/Python because local Rust metrics is not faster yet.
 
 ## Current Private Paper/Testnet Status (2026-05-27)
 
@@ -75,6 +75,7 @@ The current private Alpha Zoo live handoff is **paper/testnet-only**. It is not 
   `lumina_quant.alpha_zoo.optuna_hybrid_live_strategy`.
 - Regression tests freeze the selected artifact metrics, live limit-first decision contract, and
   reconstructed sleeve/weight config before further refactors.
+- The live rolling `MARKET_WINDOW` path now skips duplicate row normalization only for internal canonical producers (`RollingWindowAggregator` and committed materialized snapshots); external payloads still go through full schema normalization.
 - Safety flags remain hard-false in the latest handoff artifact: `ready_for_real=false`, `real_money_execution=false`, `real_execution_allowed=false`.
 - Live order generation is limit-first by default: entry, short-entry, reduce-only exit, and risk-flatten orders use `LMT`; market orders require explicit `live.default_order_type: "MKT"` plus `live.allow_market_orders: true`.
 - Default limit pricing is `one_tick_worse` for fast bounded execution: BUY one tick above the reference, SELL one tick below it; `same_price` and `one_tick_better` remain config options.

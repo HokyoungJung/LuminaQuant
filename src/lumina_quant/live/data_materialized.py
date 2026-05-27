@@ -282,6 +282,7 @@ class CommittedWindowDataHandler:
                     parity_v2_enabled=self._parity_v2_enabled,
                     metrics_log_path=self._metrics_log_path,
                     emit_metrics=True,
+                    bars_1s_already_normalized=True,
                 )
                 self.events.put(event)
             except (RawFirstDataMissingError, MarketWindowContractError) as exc:
