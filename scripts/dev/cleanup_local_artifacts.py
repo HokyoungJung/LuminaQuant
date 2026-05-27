@@ -55,11 +55,14 @@ DEFAULT_TARGETS: tuple[tuple[str, str], ...] = (
     ("apps/dashboard_web/node_modules", "dashboard dependency install"),
     ("apps/dashboard_web/tsconfig.tsbuildinfo", "TypeScript incremental cache"),
     ("apps/dashboard_web/package-lock.json", "ignored dashboard install lock"),
-    ("native/rust_metrics/target", "Rust build target"),
-    ("native/rust_rawfirst/target", "Rust build target"),
     (".omx/cache", "OMX runtime cache"),
     (".omx/tmp", "OMX runtime temp files"),
     (".omx/logs", "OMX runtime logs"),
+)
+
+OPTIONAL_NATIVE_TARGETS: tuple[tuple[str, str], ...] = (
+    ("native/rust_metrics/target", "optional Rust metrics build target"),
+    ("native/rust_rawfirst/target", "optional Rust raw-first build target"),
 )
 
 DEFAULT_PATTERNS: tuple[tuple[str, str], ...] = (
@@ -84,6 +87,8 @@ PRESERVED_ROOTS: tuple[Path, ...] = (
     Path(".omx/goals"),
     Path(".omx/interviews"),
     Path(".omx/manual-worktrees"),
+    Path("native/rust_metrics/target"),
+    Path("native/rust_rawfirst/target"),
 )
 
 WALK_PRUNE_DIRS: tuple[Path, ...] = (
@@ -134,12 +139,19 @@ def _explicit_candidates(
     *,
     include_gitnexus_parse_cache: bool = False,
     include_venv: bool = False,
+    include_native_targets: bool = False,
 ) -> list[CleanupCandidate]:
     candidates: list[CleanupCandidate] = []
     for rel_text, reason in DEFAULT_TARGETS:
         candidate = _make_candidate(root, rel_text, reason)
         if candidate is not None:
             candidates.append(candidate)
+
+    if include_native_targets:
+        for rel_text, reason in OPTIONAL_NATIVE_TARGETS:
+            candidate = _make_candidate(root, rel_text, reason, allow_preserved=True)
+            if candidate is not None:
+                candidates.append(candidate)
 
     if include_gitnexus_parse_cache:
         candidate = _make_candidate(
@@ -217,6 +229,7 @@ def discover_candidates(
     *,
     include_gitnexus_parse_cache: bool = False,
     include_venv: bool = False,
+    include_native_targets: bool = False,
 ) -> tuple[CleanupCandidate, ...]:
     """Return generated local paths eligible for cleanup."""
     root = _normalize_repo_root(repo_root)
@@ -224,6 +237,7 @@ def discover_candidates(
         root,
         include_gitnexus_parse_cache=include_gitnexus_parse_cache,
         include_venv=include_venv,
+        include_native_targets=include_native_targets,
     )
     candidates.extend(_python_artifact_candidates(root))
     return _collapse_candidates(candidates)
@@ -248,6 +262,7 @@ def run_cleanup(
     apply: bool = False,
     include_gitnexus_parse_cache: bool = False,
     include_venv: bool = False,
+    include_native_targets: bool = False,
 ) -> CleanupSummary:
     """Discover, and optionally remove, local generated artifacts."""
     root = _normalize_repo_root(repo_root)
@@ -255,6 +270,7 @@ def run_cleanup(
         root,
         include_gitnexus_parse_cache=include_gitnexus_parse_cache,
         include_venv=include_venv,
+        include_native_targets=include_native_targets,
     )
     removed: list[str] = []
     missing_count = 0
@@ -296,6 +312,14 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="also remove .venv; off by default to keep local verification cheap",
     )
+    parser.add_argument(
+        "--include-native-targets",
+        action="store_true",
+        help=(
+            "also remove native Rust target directories; off by default so Python wrappers "
+            "can keep loading proven release shared libraries"
+        ),
+    )
     parser.add_argument("--json", action="store_true", help="emit JSON summary")
     return parser
 
@@ -308,6 +332,7 @@ def main(argv: list[str] | None = None) -> int:
         apply=args.apply,
         include_gitnexus_parse_cache=args.include_gitnexus_parse_cache,
         include_venv=args.include_venv,
+        include_native_targets=args.include_native_targets,
     )
     if args.json:
         print(json.dumps(asdict(summary), ensure_ascii=False, indent=2, sort_keys=True))

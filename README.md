@@ -21,6 +21,7 @@
 | **[Live Readiness Runbook](docs/live-readiness/04-paper-trading-runbook.md)** | Paper/testnet-only live handoff, protective-order contract, and real-money blockers. |
 | **[Migration Guide](docs/MIGRATION_GUIDE_POSTGRES_PARQUET.md)** | Local-only migration to Parquet + PostgreSQL. |
 | **[GPU Auto Notes](docs/DESIGN_NOTES_GPU_AUTO.md)** | Polars GPU/CPU auto-selection and fallback design. |
+| **[Rust Native Acceleration](docs/RUST_NATIVE_ACCELERATION.md)** | Hotspot-only Rust migration policy, build commands, and benchmark evidence. |
 | **[Optimization Refactor Notes](docs/OPTIMIZATION_REFACTOR_NOTES.md)** | Shared Optuna/search policy, bounded-grid exceptions, and cleanup rules. |
 | **[Validation Report](docs/VALIDATION_REPORT.md)** | Verification + optimization report for core workflows. |
 | **[Final Validation Guide](docs/FINAL_VALIDATION.md)** | Real-data-only final validation vs continuity validation and raw-first lineage policy. |
@@ -61,6 +62,7 @@ Current local-first stack defaults:
 - **1s market store**: Parquet (ZSTD, exchange/symbol/date partitioning)
 - **State/audit/job control**: PostgreSQL (local)
 - **Backtest/optimization compute**: Polars Lazy with GPU-first execution (`gpu` by default; CI/non-GPU environments can override to `cpu` or `auto`)
+- **Native acceleration**: Python APIs stay stable; proven hot kernels use Rust underneath when built. Raw-first aggTrades→1s OHLCV now auto-loads `native/rust_rawfirst` when available; metrics evaluation still auto-selects Numba/Python because local Rust metrics is not faster yet.
 
 ## Current Private Paper/Testnet Status (2026-05-27)
 

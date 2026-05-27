@@ -1,0 +1,8 @@
+benchmark_native_compare
+native_backend_name=native:explicit
+python_eval_per_sec=3428.63
+numba_available=True
+numba_eval_per_sec=10600.59
+native_eval_per_sec=7946.02
+python_vs_native_abs_diff=(0.000000000000, 0.000000000000, 0.000000000000)
+numba_vs_native_abs_diff=(0.000000000000, 0.000000000000, 0.000000000000)

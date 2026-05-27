@@ -27,7 +27,9 @@ uv run python scripts/dev/cleanup_local_artifacts.py --json
 uv run python scripts/dev/cleanup_local_artifacts.py --apply
 ```
 
-기본 정리는 로컬 생성물만 삭제합니다: Python/Ruff/test cache, 루트 runtime `logs/`, dashboard `.next`/`node_modules`, 무시되는 dashboard incremental 파일, Python build/egg 출력, Rust `target/`, root `reports/quality`, OMX runtime `cache/tmp/logs`.
+기본 정리는 로컬 생성물만 삭제합니다: Python/Ruff/test cache, 루트 runtime `logs/`, dashboard `.next`/`node_modules`, 무시되는 dashboard incremental 파일, Python build/egg 출력, root `reports/quality`, OMX runtime `cache/tmp/logs`.
+
+Native Rust `target/` 디렉터리는 기본 보존합니다. 그래야 Python wrapper가 검증된 release shared library(예: `native/rust_rawfirst/target/release/liblumina_rawfirst.so`)를 계속 로드할 수 있습니다. 일부러 재빌드시키고 싶을 때만 `--include-native-targets`를 사용하세요.
 
 ## 기본 보존 대상
 
@@ -42,5 +44,6 @@ uv run python scripts/dev/cleanup_local_artifacts.py --apply
 - `.venv` (재설치 없이 verification을 돌리기 위해 보존)
 - `best_optimized_parameters/`
 - `.gitnexus/` (source 변경 후 `npx gitnexus analyze`로 refresh)
+- `native/rust_*/target/` 아래 native Rust release build 출력(Python wrapper가 로드하는 optional accelerator)
 
-`.gitnexus/parse-cache` 또는 `.venv`까지 지우는 optional flag가 있지만 기본값은 꺼져 있습니다.
+`.gitnexus/parse-cache`, `.venv`, native Rust `target/`까지 지우는 optional flag가 있지만 기본값은 꺼져 있습니다.

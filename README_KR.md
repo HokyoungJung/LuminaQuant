@@ -23,6 +23,7 @@
 | **[8GB 기준 Quickstart](docs/kr/QUICKSTART_8GB_BASELINE.md)** | 설치/스모크/섀도우라이브/대시보드/안전종료/정리 최소 절차. |
 | **[마이그레이션 가이드](docs/kr/MIGRATION_GUIDE_POSTGRES_PARQUET.md)** | 레거시 저장소 제거 후 Parquet + PostgreSQL 전환 가이드. |
 | **[GPU 자동 실행 설계](docs/kr/DESIGN_NOTES_GPU_AUTO.md)** | Polars GPU/CPU 선택, GPU-first 기본값, CI 검증 전략 설명. |
+| **[Rust Native 가속](docs/kr/RUST_NATIVE_ACCELERATION.md)** | hotspot만 Rust로 전환하는 정책, 빌드 명령, 벤치마크 근거. |
 | **[최적화 리팩터링 노트](docs/kr/OPTIMIZATION_REFACTOR_NOTES.md)** | 공용 Optuna/search policy, bounded-grid 예외, cleanup 규칙. |
 | **[1년+ 1초 로컬 런북](docs/kr/RUNBOOK_1Y_1S_LOCAL.md)** | 8GB RAM / 8GB VRAM 기준 장기 로컬 실행/튜닝 절차. |
 | **[선물 전략 팩토리](docs/kr/FUTURES_STRATEGY_FACTORY.md)** | 후보 생성, 가중치 기반 숏리스트, 단일-자산 조합 정책. |
@@ -61,6 +62,7 @@ graph TD
 - **1초 캔들 저장소**: Parquet(ZSTD, exchange/symbol/date 파티션)
 - **상태/감사/잡 관리**: PostgreSQL(local)
 - **백테스트/최적화 계산**: Polars Lazy + GPU 우선 실행(`gpu` 기본, CI/비GPU 환경은 `cpu` 또는 `auto` override 가능)
+- **Native 가속**: Python API는 안정적으로 유지하고, 효과가 검증된 hot kernel만 Rust를 내부에서 사용합니다. raw-first aggTrades→1초 OHLCV는 `native/rust_rawfirst`가 빌드되어 있으면 자동 로드하고, metrics evaluator는 현재 로컬 Rust metrics가 Numba보다 빠르지 않아 Numba/Python auto-selection을 유지합니다.
 
 ## 현재 Private Paper/Testnet 상태 (2026-05-27)
 

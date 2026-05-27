@@ -75,8 +75,8 @@ def test_discovery_preserves_research_notes_data_and_evidence_roots(tmp_path: Pa
     assert "apps/dashboard_web/.next" in candidates
     assert "apps/dashboard_web/node_modules" in candidates
     assert "apps/dashboard_web/tsconfig.tsbuildinfo" in candidates
-    assert "native/rust_metrics/target" in candidates
-    assert "native/rust_rawfirst/target" in candidates
+    assert "native/rust_metrics/target" not in candidates
+    assert "native/rust_rawfirst/target" not in candidates
     assert ".omx/cache" in candidates
     assert ".omx/tmp" in candidates
     assert ".omx/logs" in candidates
@@ -120,13 +120,22 @@ def test_optional_cleanup_flags_are_explicit(tmp_path: Path) -> None:
     root = _repo(tmp_path)
     _touch(root / ".gitnexus/parse-cache/cache.bin")
     _touch(root / ".venv/lib/python/site-packages/pkg.py")
+    _touch(root / "native/rust_metrics/target/release/liblumina_metrics.so")
+    _touch(root / "native/rust_rawfirst/target/release/liblumina_rawfirst.so")
 
     default_candidates = _candidate_paths(root)
     explicit_candidates = _candidate_paths(
-        root, include_gitnexus_parse_cache=True, include_venv=True
+        root,
+        include_gitnexus_parse_cache=True,
+        include_venv=True,
+        include_native_targets=True,
     )
 
     assert ".gitnexus/parse-cache" not in default_candidates
     assert ".venv" not in default_candidates
+    assert "native/rust_metrics/target" not in default_candidates
+    assert "native/rust_rawfirst/target" not in default_candidates
     assert ".gitnexus/parse-cache" in explicit_candidates
     assert ".venv" in explicit_candidates
+    assert "native/rust_metrics/target" in explicit_candidates
+    assert "native/rust_rawfirst/target" in explicit_candidates
