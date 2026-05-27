@@ -27,6 +27,7 @@
 | **[Futures Strategy Factory](docs/FUTURES_STRATEGY_FACTORY.md)** | Candidate generation, weighted shortlist, and portfolio-set policy. |
 | **[Scoring Config Guide](docs/SCORING_CONFIG_GUIDE.md)** | Shared score-config template usage across research/shortlist/optimization scripts. |
 | **[Workflow Guide](docs/WORKFLOW.md)** | Private/Public branch operation and publish checklist. |
+| **[Local Artifact Cleanup](docs/LOCAL_ARTIFACT_CLEANUP.md)** | Safe cache/log/build cleanup while preserving research notes, results, and data. |
 | **[8GB Baseline Quickstart](docs/QUICKSTART_8GB_BASELINE.md)** | Minimal install/smoke/replay/shadow-live/dashboard/safe-stop/cleanup flow. |
 | **[Exchange Guide](docs/EXCHANGES.md)** | Detailed setup for **Binance USDⓈ-M Futures**, **MetaTrader 5**, and **Polymarket**. |
 | **[External Data Guide](docs/EXTERNAL_DATA.md)** | Canonical contracts for user-managed backtest/live data. |
@@ -81,6 +82,8 @@ The current private Alpha Zoo live handoff is **paper/testnet-only**. It is not 
 - Real-money remains blocked until actual paper/testnet fill, BBO spread, slippage, reject/timeout, reconciliation, and protective-order telemetry prove the 10bps/replay-live parity assumptions.
 
 See `docs/live-readiness/04-paper-trading-runbook.md` and `docs/research_note_profit_moonshot_alpha_zoo_real_data_20260512.md` for the current operator handoff.
+
+Research notes are intentionally kept under `docs/` rather than local caches: the primary current note is `docs/research_note_profit_moonshot_alpha_zoo_real_data_20260512.md`, global history is `docs/profit_moonshot_research_history_20260510.md`, session checkpoints live in `.omx/notepad.md`, and large generated evidence remains under `var/reports/`. See `docs/LOCAL_ARTIFACT_CLEANUP.md` before deleting local artifacts.
 
 ---
 

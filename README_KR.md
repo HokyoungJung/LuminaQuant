@@ -18,6 +18,7 @@
 | :--- | :--- |
 | **[설치 및 설정](#설치-installation)** | LuminaQuant 시작하기. |
 | **[운영 워크플로우](docs/kr/WORKFLOW.md)** | Private/Public 브랜치 운영 및 공개 배포 체크리스트. |
+| **[로컬 산출물 정리](docs/kr/LOCAL_ARTIFACT_CLEANUP.md)** | 연구노트/결과/data를 보존하면서 cache/log/build 산출물을 안전하게 정리. |
 | **[Live Readiness 런북](docs/live-readiness/04-paper-trading-runbook.md)** | paper/testnet 전용 live handoff, protective-order 계약, real-money blocker. |
 | **[8GB 기준 Quickstart](docs/kr/QUICKSTART_8GB_BASELINE.md)** | 설치/스모크/섀도우라이브/대시보드/안전종료/정리 최소 절차. |
 | **[마이그레이션 가이드](docs/kr/MIGRATION_GUIDE_POSTGRES_PARQUET.md)** | 레거시 저장소 제거 후 Parquet + PostgreSQL 전환 가이드. |
@@ -81,6 +82,8 @@ graph TD
 - 실제 paper/testnet fill, BBO spread, slippage, reject/timeout, reconciliation, protective-order telemetry가 10bps/replay-live parity 가정을 증명하기 전까지 real-money는 계속 차단됩니다.
 
 현재 operator handoff는 `docs/live-readiness/04-paper-trading-runbook.md`와 `docs/research_note_profit_moonshot_alpha_zoo_real_data_20260512.md`를 기준으로 합니다.
+
+연구노트는 cache가 아니라 `docs/`에 둡니다. 현재 기본 노트는 `docs/research_note_profit_moonshot_alpha_zoo_real_data_20260512.md`, 전체 이력은 `docs/profit_moonshot_research_history_20260510.md`, 세션 checkpoint는 `.omx/notepad.md`, 큰 생성 증거는 `var/reports/`에 보존합니다. 삭제 전 `docs/kr/LOCAL_ARTIFACT_CLEANUP.md`를 기준으로 확인하세요.
 
 ---
 
