@@ -63,6 +63,7 @@ DEFAULT_TARGETS: tuple[tuple[str, str], ...] = (
 OPTIONAL_NATIVE_TARGETS: tuple[tuple[str, str], ...] = (
     ("native/rust_metrics/target", "optional Rust metrics build target"),
     ("native/rust_rawfirst/target", "optional Rust raw-first build target"),
+    ("native/rust_hybrid_optuna/target", "optional Rust Optuna hybrid build target"),
 )
 
 DEFAULT_PATTERNS: tuple[tuple[str, str], ...] = (
@@ -89,6 +90,7 @@ PRESERVED_ROOTS: tuple[Path, ...] = (
     Path(".omx/manual-worktrees"),
     Path("native/rust_metrics/target"),
     Path("native/rust_rawfirst/target"),
+    Path("native/rust_hybrid_optuna/target"),
 )
 
 WALK_PRUNE_DIRS: tuple[Path, ...] = (

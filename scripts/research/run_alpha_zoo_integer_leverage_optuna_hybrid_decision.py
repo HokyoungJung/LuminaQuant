@@ -38,6 +38,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from lumina_quant.alpha_zoo.native_hybrid_optuna_backend import (  # noqa: E402
+    evaluate_hybrid_portfolio_native,
+)
 from scripts.research import run_alpha_zoo_integer_leverage_hybrid_decision as grid_hybrid  # noqa: E402
 
 ilp = grid_hybrid.ilp
@@ -305,6 +308,44 @@ def _portfolio_returns_for_params(
     initial_portfolio_history: list[float] | None = None,
     allocation_stride: int = 24,
 ) -> tuple[np.ndarray, np.ndarray, list[dict[str, Any]]]:
+    native = None
+    if initial_portfolio_history is None:
+        native = evaluate_hybrid_portfolio_native(
+            returns,
+            version=version,
+            start_idx=start_idx,
+            mape_window=max(2, params.mape_window),
+            bias_window=max(1, params.bias_window),
+            short_vol_window=max(2, params.short_vol_window),
+            bias_correction_alpha=params.bias_correction_alpha,
+            bias_combine_ratio=params.bias_combine_ratio,
+            max_single_weight=params.max_single_weight,
+            default_idx=learned.default_idx,
+            high_vol_best_idx=learned.high_vol_best_idx,
+            default_weight_ratio=learned.default_weight_ratio,
+            high_vol_threshold=learned.high_vol_threshold,
+            high_vol_weight_boost=learned.high_vol_weight_boost,
+        )
+    if native is not None:
+        portfolio, weights_out, raw_weights, default_indices, high_vol_features, exposures = native
+        stride = max(1, int(allocation_stride))
+        allocations = []
+        for t in range(max(0, int(start_idx)), returns.shape[0]):
+            if t == returns.shape[0] - 1 or t % stride == 0:
+                allocations.append(
+                    {
+                        "index": int(t),
+                        "default_idx": int(default_indices[t]),
+                        "high_vol_feature": float(high_vol_features[t]),
+                        "exposure": float(exposures[t]),
+                        "adaptive_weight_ratio": float(learned.default_weight_ratio),
+                        "adaptive_high_vol_boost": float(learned.high_vol_weight_boost),
+                        "adaptive_max_single_weight": float(params.max_single_weight),
+                        "weights": [float(x) for x in raw_weights[t]],
+                    }
+                )
+        return portfolio, weights_out, allocations
+
     k = returns.shape[1]
     out = np.zeros(returns.shape[0], dtype=float)
     weights_out = np.zeros((returns.shape[0], k), dtype=float)

@@ -29,7 +29,7 @@ uv run python scripts/dev/cleanup_local_artifacts.py --apply
 
 기본 정리는 로컬 생성물만 삭제합니다: Python/Ruff/test cache, 루트 runtime `logs/`, dashboard `.next`/`node_modules`, 무시되는 dashboard incremental 파일, Python build/egg 출력, root `reports/quality`, OMX runtime `cache/tmp/logs`.
 
-Native Rust `target/` 디렉터리는 기본 보존합니다. 그래야 Python wrapper가 검증된 release shared library(예: `native/rust_rawfirst/target/release/liblumina_rawfirst.so`)를 계속 로드할 수 있습니다. 일부러 재빌드시키고 싶을 때만 `--include-native-targets`를 사용하세요.
+Native Rust `target/` 디렉터리는 기본 보존합니다. 그래야 Python wrapper가 검증된 release shared library(예: `native/rust_rawfirst/target/release/liblumina_rawfirst.so`, `native/rust_hybrid_optuna/target/release/liblumina_hybrid_optuna.so`)를 계속 로드할 수 있습니다. 일부러 재빌드시키고 싶을 때만 `--include-native-targets`를 사용하세요.
 
 ## 기본 보존 대상
 

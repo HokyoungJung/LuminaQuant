@@ -172,11 +172,16 @@ def _build_rust_rawfirst(root: Path) -> tuple[bool, Path | None]:
     return _build_rust_dir(rust_dir, "lumina_rawfirst")
 
 
+def _build_rust_hybrid_optuna(root: Path) -> tuple[bool, Path | None]:
+    rust_dir = root / "native" / "rust_hybrid_optuna"
+    return _build_rust_dir(rust_dir, "lumina_hybrid_optuna")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build LuminaQuant native backends")
     parser.add_argument(
         "--backend",
-        choices=["all", "c", "rust", "rust-rawfirst"],
+        choices=["all", "c", "rust", "rust-rawfirst", "rust-hybrid-optuna"],
         default="all",
         help="Which backend(s) to build",
     )
@@ -186,13 +191,16 @@ def main() -> None:
     build_c = args.backend in {"all", "c"}
     build_rust = args.backend in {"all", "rust"}
     build_rust_rawfirst = args.backend in {"all", "rust-rawfirst"}
+    build_rust_hybrid_optuna = args.backend in {"all", "rust-hybrid-optuna"}
 
     c_ok = False
     rust_ok = False
     rust_rawfirst_ok = False
+    rust_hybrid_optuna_ok = False
     c_lib: Path | None = None
     rust_lib: Path | None = None
     rust_rawfirst_lib: Path | None = None
+    rust_hybrid_optuna_lib: Path | None = None
 
     if build_c:
         c_ok, c_lib = _build_c(root)
@@ -200,6 +208,8 @@ def main() -> None:
         rust_ok, rust_lib = _build_rust(root)
     if build_rust_rawfirst:
         rust_rawfirst_ok, rust_rawfirst_lib = _build_rust_rawfirst(root)
+    if build_rust_hybrid_optuna:
+        rust_hybrid_optuna_ok, rust_hybrid_optuna_lib = _build_rust_hybrid_optuna(root)
 
     print("build_native_backends summary")
     if build_c:
@@ -208,11 +218,17 @@ def main() -> None:
         print(f"rust_ok={rust_ok} rust_lib={rust_lib}")
     if build_rust_rawfirst:
         print(f"rust_rawfirst_ok={rust_rawfirst_ok} rust_rawfirst_lib={rust_rawfirst_lib}")
+    if build_rust_hybrid_optuna:
+        print(
+            "rust_hybrid_optuna_ok="
+            f"{rust_hybrid_optuna_ok} rust_hybrid_optuna_lib={rust_hybrid_optuna_lib}"
+        )
 
     if (
         (build_c and not c_ok)
         or (build_rust and not rust_ok)
         or (build_rust_rawfirst and not rust_rawfirst_ok)
+        or (build_rust_hybrid_optuna and not rust_hybrid_optuna_ok)
     ):
         sys.exit(1)
 

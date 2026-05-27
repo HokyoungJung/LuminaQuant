@@ -7,6 +7,7 @@ LuminaQuant keeps the public/runtime API in Python and moves only proven hot ker
 | Kernel | Python API | Native backend | Default decision | Evidence |
 | :--- | :--- | :--- | :--- | :--- |
 | Raw aggTrades → canonical 1s OHLCV | `lumina_quant.data.raw_first_lineage.raw_aggtrades_to_1s_frame` | `native/rust_rawfirst` | **Use Rust automatically when the release library is built** | Local 200k-trade synthetic benchmark: Python `0.0496s/eval`, Rust `0.0246s/eval`, about `2.01x` faster with frame parity. |
+| Alpha Zoo Optuna hybrid portfolio loop | `scripts/research/run_alpha_zoo_integer_leverage_optuna_hybrid_decision.py::_portfolio_returns_for_params` | `native/rust_hybrid_optuna` | **Use Rust automatically when the release library is built and input is finite** | Local 20k×3 synthetic benchmark: Python `2.5493s/eval`, Rust `0.0107s/eval`, about `238.07x` faster; return diff `1.01e-11`, exposed-weight diff `9.15e-09` within `1e-8` tolerance. |
 | Optimization metric evaluator | `lumina_quant.optimization.fast_eval.evaluate_threshold_strategy` | `native/rust_metrics` / `native/c_metrics` | **Keep Numba/Python auto-selection; do not force Rust yet** | Local native-compare benchmark: auto-selected Numba around `11.1k eval/s`; forced Rust around `7.9k eval/s`, parity OK but slower on this host. |
 
 ## Build and benchmark
@@ -30,6 +31,20 @@ uv run python scripts/benchmark_rawfirst_backend.py \
   --min-speedup 1.05
 ```
 
+Benchmark Optuna hybrid portfolio loop Python vs Rust:
+
+```bash
+uv run python scripts/benchmark_optuna_hybrid_backend.py \
+  --rows 20000 \
+  --columns 3 \
+  --evals 10 \
+  --version v3_5 \
+  --backend both \
+  --require-rust \
+  --require-speedup \
+  --min-speedup 1.2
+```
+
 Benchmark metric evaluator backend selection:
 
 ```bash
@@ -46,6 +61,13 @@ Raw-first backend:
 - `LQ_RAW_FIRST_BACKEND=rust`: require Rust and fail if unavailable.
 - `LQ_RAW_FIRST_BACKEND=python`: force the Python/Polars path.
 - `LQ_RAW_FIRST_BACKEND_DLL=/path/to/liblumina_rawfirst.so`: explicit Rust library override.
+
+Optuna hybrid portfolio backend:
+
+- `LQ_HYBRID_OPTUNA_BACKEND=auto` (default): load Rust when `native/rust_hybrid_optuna/target/release/liblumina_hybrid_optuna.so` exists and the return matrix is finite; otherwise fall back to Python.
+- `LQ_HYBRID_OPTUNA_BACKEND=rust`: require Rust and fail if unavailable.
+- `LQ_HYBRID_OPTUNA_BACKEND=python`: force the original Python loop.
+- `LQ_HYBRID_OPTUNA_DLL=/path/to/liblumina_hybrid_optuna.so`: explicit Rust library override.
 
 Metric evaluator backend:
 

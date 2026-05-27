@@ -29,7 +29,7 @@ uv run python scripts/dev/cleanup_local_artifacts.py --apply
 
 Default cleanup removes local generated artifacts only: Python/Ruff/test caches, root runtime `logs/`, dashboard `.next`/`node_modules`, ignored dashboard incremental files, Python build/egg outputs, root `reports/quality`, and OMX runtime `cache/tmp/logs`.
 
-Native Rust `target/` directories are preserved by default so Python wrappers can keep loading proven release shared libraries such as `native/rust_rawfirst/target/release/liblumina_rawfirst.so`. Use `--include-native-targets` only when you intentionally want to force a rebuild.
+Native Rust `target/` directories are preserved by default so Python wrappers can keep loading proven release shared libraries such as `native/rust_rawfirst/target/release/liblumina_rawfirst.so` and `native/rust_hybrid_optuna/target/release/liblumina_hybrid_optuna.so`. Use `--include-native-targets` only when you intentionally want to force a rebuild.
 
 ## Preserved by default
 
