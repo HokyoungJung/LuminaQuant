@@ -61,11 +61,17 @@ Current local-first stack defaults:
 - **State/audit/job control**: PostgreSQL (local)
 - **Backtest/optimization compute**: Polars Lazy with GPU-first execution (`gpu` by default; CI/non-GPU environments can override to `cpu` or `auto`)
 
-## Current Private Paper/Testnet Status (2026-05-26)
+## Current Private Paper/Testnet Status (2026-05-27)
 
 The current private Alpha Zoo live handoff is **paper/testnet-only**. It is not a real-money approval.
 
 - Selected runtime: `AlphaZooOptunaHybridLiveStrategy` for the frozen Optuna v3.5 hybrid artifact.
+- Live implementation is split into reproducibility-safe modules: frozen artifact/config loading in
+  `lumina_quant.alpha_zoo.optuna_hybrid_config`, signal/bar math in
+  `lumina_quant.alpha_zoo.optuna_hybrid_signals`, and orchestration/event emission in
+  `lumina_quant.alpha_zoo.optuna_hybrid_live_strategy`.
+- Regression tests freeze the selected artifact metrics, live limit-first decision contract, and
+  reconstructed sleeve/weight config before further refactors.
 - Safety flags remain hard-false in the latest handoff artifact: `ready_for_real=false`, `real_money_execution=false`, `real_execution_allowed=false`.
 - Live order generation is limit-first by default: entry, short-entry, reduce-only exit, and risk-flatten orders use `LMT`; market orders require explicit `live.default_order_type: "MKT"` plus `live.allow_market_orders: true`.
 - Default limit pricing is `one_tick_worse` for fast bounded execution: BUY one tick above the reference, SELL one tick below it; `same_price` and `one_tick_better` remain config options.

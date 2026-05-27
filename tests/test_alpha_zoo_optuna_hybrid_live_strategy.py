@@ -16,6 +16,7 @@ from lumina_quant.live_selection import extract_live_decision_config
 from lumina_quant.strategies.alpha_zoo_optuna_hybrid_live import (
     DEFAULT_INTEGER_PORTFOLIO_ARTIFACT,
     DEFAULT_OPTUNA_HYBRID_ARTIFACT,
+    DEFAULT_SELECTED_PROFILE_ID,
     AlphaZooOptunaHybridLiveStrategy,
     completed_bars_only,
     debounced_state_signal,
@@ -24,11 +25,18 @@ from lumina_quant.strategies.alpha_zoo_optuna_hybrid_live import (
 from lumina_quant.strategies.registry import get_strategy_tier, resolve_strategy_class
 
 ROOT = Path(__file__).resolve().parents[1]
+LIVE_DECISION_ARTIFACT = (
+    ROOT / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/"
+    "alpha_zoo_integer_leverage_optuna_hybrid_decision_20260524/"
+    "paper_testnet_live_decision_latest.json"
+)
 
 
 def _load_ops_module():
     path = ROOT / "scripts" / "ops" / "write_alpha_zoo_optuna_hybrid_live_decision.py"
-    spec = importlib.util.spec_from_file_location("write_alpha_zoo_optuna_hybrid_live_decision", path)
+    spec = importlib.util.spec_from_file_location(
+        "write_alpha_zoo_optuna_hybrid_live_decision", path
+    )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
@@ -49,7 +57,9 @@ class _Bars:
 
 
 class _Aggregator:
-    def __init__(self, bars: dict[tuple[str, str], list[tuple[object, float, float, float, float, float]]]) -> None:
+    def __init__(
+        self, bars: dict[tuple[str, str], list[tuple[object, float, float, float, float, float]]]
+    ) -> None:
         self._bars = bars
 
     def get_bars(self, symbol: str, timeframe: str, n: int | None = None, lookback_bars: int = 1):
@@ -66,7 +76,9 @@ def _ohlcv_rows(closes: list[float]) -> list[tuple[object, float, float, float, 
     return rows
 
 
-def _bars_with_aliases(symbol: str, timeframe: str, rows: list[tuple[object, float, float, float, float, float]]):
+def _bars_with_aliases(
+    symbol: str, timeframe: str, rows: list[tuple[object, float, float, float, float, float]]
+):
     compact = symbol.replace("/", "")
     live = f"{compact[:-4]}/USDT" if compact.endswith("USDT") else compact
     return {(compact, timeframe): rows, (live, timeframe): rows}
@@ -86,11 +98,116 @@ def test_load_config_validates_frozen_artifacts_and_registers_strategy() -> None
         "growth_mdd20_gross8",
         "aggressive_mdd30_gross10_shadow",
     }
-    assert resolve_strategy_class("AlphaZooOptunaHybridLiveStrategy") is AlphaZooOptunaHybridLiveStrategy
+    assert (
+        resolve_strategy_class("AlphaZooOptunaHybridLiveStrategy")
+        is AlphaZooOptunaHybridLiveStrategy
+    )
     assert get_strategy_tier("AlphaZooOptunaHybridLiveStrategy") == "live_opt_in"
     assert {"1m", "5m", "1h", "2h", "4h"}.issubset(
         set(AlphaZooOptunaHybridLiveStrategy.required_timeframes)
     )
+
+
+def test_selected_optuna_hybrid_artifact_metrics_are_reproducible() -> None:
+    payload = json.loads((ROOT / DEFAULT_OPTUNA_HYBRID_ARTIFACT).read_text(encoding="utf-8"))
+    profile = payload["selected_optuna_hybrid_profile"]
+
+    assert profile["profile_id"] == DEFAULT_SELECTED_PROFILE_ID
+    assert profile["optimizer"] == "optuna_tpe"
+    assert profile["hybrid_version"] == "v3_5"
+    assert payload["research_primary_round_trip_cost_bps"] == pytest.approx(10.0)
+    assert payload["return_per_turnover_threshold_bps"] == pytest.approx(10.0)
+    assert profile["train_return"] == pytest.approx(6.115025409235648)
+    assert profile["validation_return"] == pytest.approx(1.383170167165988)
+    assert profile["locked_oos_return_report_only"] == pytest.approx(0.20831879565672073)
+    assert profile["train_mdd"] == pytest.approx(0.4499205591420494)
+    assert profile["validation_mdd"] == pytest.approx(0.18979613277334306)
+    assert profile["locked_oos_mdd_report_only"] == pytest.approx(0.10573491360821108)
+    assert profile["train_return_per_turnover_proxy_bps"] == pytest.approx(83.38758913570169)
+    assert profile["validation_return_per_turnover_proxy_bps"] == pytest.approx(79.16658755661159)
+    assert profile["locked_oos_return_per_turnover_proxy_bps_report_only"] == pytest.approx(
+        25.28692876873372
+    )
+    assert profile["train_trade_event_count"] == 3363
+    assert profile["validation_trade_event_count"] == 789
+    assert profile["locked_oos_trade_event_count_report_only"] == 362
+    assert profile["gross_notional_fraction"] == pytest.approx(4.364588908272355)
+    assert profile["final_weights"] == pytest.approx(
+        {
+            "aggressive_mdd30_gross10_shadow": 0.5726993181554131,
+            "balanced_mdd12_gross5": 0.07983098667432496,
+            "growth_mdd20_gross8": 0.08067156944866473,
+        }
+    )
+    assert profile["average_weights_train_validation"] == pytest.approx(
+        {
+            "aggressive_mdd30_gross10_shadow": 0.781093636345445,
+            "balanced_mdd12_gross5": 0.10913956140451388,
+            "growth_mdd20_gross8": 0.10976680225004104,
+        }
+    )
+    assert payload["ready_for_paper"] is True
+    assert payload["ready_for_real"] is False
+    assert payload["real_money_execution"] is False
+    assert payload["real_execution_allowed"] is False
+    assert profile["ready_for_real"] is False
+    assert profile["real_money_execution"] is False
+
+
+def test_live_decision_artifact_is_limit_first_paper_testnet_only() -> None:
+    payload = json.loads(LIVE_DECISION_ARTIFACT.read_text(encoding="utf-8"))
+
+    assert payload["selected_mode"] == "alpha_zoo_integer_leverage_optuna_hybrid"
+    assert payload["strategy_name"] == "AlphaZooOptunaHybridLiveStrategy"
+    assert payload["strategy_params"]["selected_profile_id"] == DEFAULT_SELECTED_PROFILE_ID
+    assert payload["strategy_params"]["allow_real_money"] is False
+    assert payload["ready_for_paper"] is True
+    assert payload["ready_for_real"] is False
+    assert payload["real_money_execution"] is False
+    assert payload["real_execution_allowed"] is False
+    assert payload["limit_order_contract"] == {
+        "allow_market_orders": False,
+        "default_order_type": "LMT",
+        "entry_order_policy": "BUY limit one tick above reference; SELL limit one tick below reference",
+        "exit_order_policy": "reduce-only exits use the same side-aware limit policy",
+        "limit_price_mode": "one_tick_worse",
+        "limit_price_offset_ticks": 1,
+        "limit_time_in_force": "GTC",
+        "market_order_policy": (
+            "optional only via explicit live.default_order_type=MKT plus live.allow_market_orders=true"
+        ),
+        "price_reference": (
+            "SignalEvent.price when present, otherwise latest completed live close; "
+            "tick size from exchange market metadata"
+        ),
+        "protective_order_style": "limit",
+        "protective_order_types": ["STOP", "TAKE_PROFIT"],
+    }
+
+
+def test_live_config_reconstructs_selected_sleeves_and_weights() -> None:
+    config = load_alpha_zoo_optuna_hybrid_live_config()
+
+    assert config.selected_profile_id == DEFAULT_SELECTED_PROFILE_ID
+    assert {sleeve.symbol for sleeve in config.source_sleeves} == {"ETHUSDT", "SOLUSDT", "TRXUSDT"}
+    assert len(config.source_sleeves) == 6
+    assert config.final_profile_weights == pytest.approx(
+        {
+            "aggressive_mdd30_gross10_shadow": 0.5726993181554131,
+            "balanced_mdd12_gross5": 0.07983098667432496,
+            "growth_mdd20_gross8": 0.08067156944866473,
+        }
+    )
+    assert config.average_profile_weights == pytest.approx(
+        {
+            "aggressive_mdd30_gross10_shadow": 0.781093636345445,
+            "balanced_mdd12_gross5": 0.10913956140451388,
+            "growth_mdd20_gross8": 0.10976680225004104,
+        }
+    )
+    assert config.governance["research_primary_round_trip_cost_bps"] == pytest.approx(10.0)
+    assert config.governance["return_per_turnover_threshold_bps"] == pytest.approx(10.0)
+    assert config.governance["locked_oos_role"] == "gate_report_only"
 
 
 def test_fractional_source_integer_leverage_fails_closed(tmp_path: Path) -> None:
@@ -162,7 +279,10 @@ def test_strategy_emits_paper_testnet_short_signal_from_completed_1h_bars() -> N
     assert signal.metadata["real_money_execution"] is False
     assert signal.metadata["real_execution_allowed"] is False
     assert signal.metadata["round_trip_cost_bps"] == 10.0
-    assert signal.metadata["target_notional_formula"] == "allocation_fraction*sum(profile_weight*integer_leverage)"
+    assert (
+        signal.metadata["target_notional_formula"]
+        == "allocation_fraction*sum(profile_weight*integer_leverage)"
+    )
     assert signal.metadata["target_allocation"] == pytest.approx(
         signal.metadata["target_notional_fraction"]
     )
@@ -222,7 +342,9 @@ def test_intrabar_protection_is_generic_for_selected_eth_sol_trx_sleeves() -> No
         price = 0.1 if sleeve.symbol == "TRXUSDT" else 100.0
         intrabar_rows = _ohlcv_rows([price + idx * price * 0.001 for idx in range(32)])
         active_row = (32, price, price, price, price, 1000.0)
-        aggregator = _Aggregator(_bars_with_aliases(sleeve.symbol, "1m", [*intrabar_rows, active_row]))
+        aggregator = _Aggregator(
+            _bars_with_aliases(sleeve.symbol, "1m", [*intrabar_rows, active_row])
+        )
         queue = _Queue()
         strategy = AlphaZooOptunaHybridLiveStrategy(_Bars(), queue)
         signal_type = "SHORT" if sleeve.side == "short_only" else "LONG"
@@ -322,12 +444,15 @@ def test_ops_decision_payload_is_paper_testnet_only() -> None:
     assert payload["risk_caps"]["max_order_notional_pct"] > 1.18
     assert payload["risk_caps"]["max_symbol_exposure_pct"] > 1.35
     assert payload["risk_caps"]["max_total_notional_pct"] > 3.2
-    assert any("no_exchange_paper_fill_telemetry" in item for item in payload["real_money_blockers"])
+    assert any(
+        "no_exchange_paper_fill_telemetry" in item for item in payload["real_money_blockers"]
+    )
     assert any("backtest_cost_is_proxy" in item for item in payload["real_money_blockers"])
     assert any("Validation MDD" in item for item in payload["known_limitations"])
-    assert "minimum 2 weeks paper/testnet observation before any real-money review" in payload[
-        "paper_testnet_validation_requirements"
-    ]
+    assert (
+        "minimum 2 weeks paper/testnet observation before any real-money review"
+        in payload["paper_testnet_validation_requirements"]
+    )
     assert payload["intrabar_protection_contract"]["enabled"] is True
     assert payload["intrabar_protection_contract"]["component_exit_key"] == (
         "SignalEvent.metadata.component_id"
@@ -355,9 +480,14 @@ def test_ops_decision_payload_is_paper_testnet_only() -> None:
 
 
 def test_adapter_rule_logic_has_no_calendar_rule_tokens() -> None:
-    source = (
-        (ROOT / "src/lumina_quant/strategies/alpha_zoo_optuna_hybrid_live.py").read_text()
-        + (ROOT / "src/lumina_quant/alpha_zoo/optuna_hybrid_live_strategy.py").read_text()
+    module_paths = [
+        ROOT / "src/lumina_quant/strategies/alpha_zoo_optuna_hybrid_live.py",
+        ROOT / "src/lumina_quant/alpha_zoo/optuna_hybrid_live_strategy.py",
+        ROOT / "src/lumina_quant/alpha_zoo/optuna_hybrid_config.py",
+        ROOT / "src/lumina_quant/alpha_zoo/optuna_hybrid_signals.py",
+    ]
+    source = "".join(
+        path.read_text(encoding="utf-8") for path in module_paths if path.exists()
     ).lower()
     forbidden = ["dayofweek", "weekday", "isocalendar", "month ==", "strftime", "timedelta"]
     assert not [token for token in forbidden if token in source]

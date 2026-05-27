@@ -180,6 +180,21 @@ lq-paper-off
 최신 integer-leverage Optuna hybrid는 `AlphaZooOptunaHybridLiveStrategy`로
 paper/testnet에서만 실행 가능한 handoff를 만든다. 실제 real-money 허가는 아니다.
 
+구현 경계:
+- `lumina_quant.alpha_zoo.optuna_hybrid_config` — frozen Optuna/integer-leverage
+  artifact 검증, paper/testnet governance, selected sleeve/profile reconstruction.
+- `lumina_quant.alpha_zoo.optuna_hybrid_signals` — completed-bar 처리,
+  debounced/trailing state signal, intrabar risk-frame helper, source-family
+  evaluation math.
+- `lumina_quant.alpha_zoo.optuna_hybrid_live_strategy` — runtime state,
+  component-level intrabar guard, notional-fraction metadata, SignalEvent emission.
+
+Refactor/release gate: 선택된
+`hybrid_v3_5_optuna_three_profile_blend` 성적, `limit_order_contract`, 그리고
+reconstructed sleeve/weight config는
+`tests/test_alpha_zoo_optuna_hybrid_live_strategy.py`의 golden regression으로 먼저
+고정되어야 한다.
+
 ```bash
 cd /home/hoky/Quants-agent/LuminaQuant
 uv run python scripts/ops/write_alpha_zoo_optuna_hybrid_live_decision.py --check-only

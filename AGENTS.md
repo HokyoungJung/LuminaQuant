@@ -70,6 +70,7 @@ python3 scripts/dev/generate_agents_tree.py  # if absent, use find/tree with the
 
 ```text
 src/lumina_quant/
+    src/lumina_quant/alpha_zoo/
     src/lumina_quant/backtesting/
     src/lumina_quant/calibration/
     src/lumina_quant/cli/
@@ -138,6 +139,12 @@ src/lumina_quant/
     src/lumina_quant/data/timeframe.py
       src/lumina_quant/data/loaders/__init__.py
       src/lumina_quant/data/loaders/ohlcv_loader.py
+    src/lumina_quant/alpha_zoo/crypto_fx_factors.py
+    src/lumina_quant/alpha_zoo/factor_card.py
+    src/lumina_quant/alpha_zoo/operators.py
+    src/lumina_quant/alpha_zoo/optuna_hybrid_config.py
+    src/lumina_quant/alpha_zoo/optuna_hybrid_live_strategy.py
+    src/lumina_quant/alpha_zoo/optuna_hybrid_signals.py
     src/lumina_quant/eval/exact_window_decision.py
     src/lumina_quant/exchanges/__init__.py
     src/lumina_quant/exchanges/binance_futures_client.py
@@ -406,7 +413,7 @@ docs/
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **LuminaQuant** (44071 symbols, 66042 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **LuminaQuant** (44104 symbols, 66081 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
