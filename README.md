@@ -62,7 +62,7 @@ Current local-first stack defaults:
 - **1s market store**: Parquet (ZSTD, exchange/symbol/date partitioning)
 - **State/audit/job control**: PostgreSQL (local)
 - **Backtest/optimization compute**: Polars Lazy with GPU-first execution (`gpu` by default; CI/non-GPU environments can override to `cpu` or `auto`)
-- **Native acceleration**: Python APIs stay stable; proven hot kernels use Rust underneath when built. Raw-first aggTrades→1s OHLCV and the Alpha Zoo Optuna hybrid portfolio loop auto-load Rust backends when available; metrics evaluation still auto-selects Numba/Python because local Rust metrics is not faster yet.
+- **Native acceleration**: Python APIs stay stable; proven hot kernels use Rust underneath when built. Raw-first aggTrades→1s OHLCV, the Alpha Zoo Optuna hybrid portfolio loop, and Alpha Zoo live state-signal machines auto-load Rust backends when available; metrics evaluation still auto-selects Numba/Python because local Rust metrics is not faster yet.
 
 ## Current Private Paper/Testnet Status (2026-05-27)
 
@@ -71,7 +71,7 @@ The current private Alpha Zoo live handoff is **paper/testnet-only**. It is not 
 - Selected runtime: `AlphaZooOptunaHybridLiveStrategy` for the frozen Optuna v3.5 hybrid artifact.
 - Live implementation is split into reproducibility-safe modules: frozen artifact/config loading in
   `lumina_quant.alpha_zoo.optuna_hybrid_config`, signal/bar math in
-  `lumina_quant.alpha_zoo.optuna_hybrid_signals`, and orchestration/event emission in
+  `lumina_quant.alpha_zoo.optuna_hybrid_signals` with optional Rust state-machine acceleration, and orchestration/event emission in
   `lumina_quant.alpha_zoo.optuna_hybrid_live_strategy`.
 - Regression tests freeze the selected artifact metrics, live limit-first decision contract, and
   reconstructed sleeve/weight config before further refactors.
@@ -400,7 +400,7 @@ bash scripts/ci/architecture_gate_market_window_contract.sh
 uv run python scripts/check_architecture.py
 uv run ruff format --check .
 uv run ruff check .
-for crate in native/rust_metrics native/rust_rawfirst native/rust_hybrid_optuna; do
+for crate in native/rust_metrics native/rust_rawfirst native/rust_hybrid_optuna native/rust_live_signals; do
   (cd "$crate" && cargo fmt --check && cargo check --quiet && cargo test --quiet)
 done
 ```

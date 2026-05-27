@@ -21,6 +21,10 @@ from .optuna_hybrid_config import (
     SleeveDecision,
     _symbol_aliases,
 )
+from .native_live_signal_backend import (
+    evaluate_debounced_state_native,
+    evaluate_trailing_state_native,
+)
 
 
 def _bars_to_frame(bars: list[Any]) -> pd.DataFrame:
@@ -132,6 +136,18 @@ def debounced_state_signal(
         if short_exit is None
         else short_exit.fillna(False).astype(bool)
     )
+    native = evaluate_debounced_state_native(
+        long_entry,
+        long_exit,
+        short_entry,
+        short_exit,
+        side=side,
+        min_hold_bars=min_hold_bars,
+        cooldown_bars=cooldown_bars,
+    )
+    if native is not None:
+        return native
+
     out = np.zeros(len(long_entry), dtype=float)
     state = 0.0
     bars_held = 10**9
@@ -175,12 +191,32 @@ def trailing_state_signal(
     cooldown_bars: int,
     trail_atr_mult: float,
 ) -> np.ndarray:
+    long_entry = long_entry.fillna(False).astype(bool)
+    short_entry = short_entry.fillna(False).astype(bool)
+    long_exit = long_exit.fillna(False).astype(bool)
+    short_exit = short_exit.fillna(False).astype(bool)
+    native = evaluate_trailing_state_native(
+        close,
+        long_entry,
+        short_entry,
+        long_exit,
+        short_exit,
+        atr,
+        side=side,
+        min_hold_bars=min_hold_bars,
+        cooldown_bars=cooldown_bars,
+        trail_atr_mult=trail_atr_mult,
+    )
+    if native is not None:
+        return native
+
     close_values = close.astype(float).to_numpy()
     atr_values = atr.astype(float).to_numpy()
-    long_entry_values = long_entry.fillna(False).astype(bool).to_numpy()
-    short_entry_values = short_entry.fillna(False).astype(bool).to_numpy()
-    long_exit_values = long_exit.fillna(False).astype(bool).to_numpy()
-    short_exit_values = short_exit.fillna(False).astype(bool).to_numpy()
+    long_entry_values = long_entry.to_numpy()
+    short_entry_values = short_entry.to_numpy()
+    long_exit_values = long_exit.to_numpy()
+    short_exit_values = short_exit.to_numpy()
+
     signal = np.zeros(len(close_values), dtype=float)
     state = 0.0
     stop = np.nan

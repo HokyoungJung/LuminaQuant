@@ -62,7 +62,7 @@ graph TD
 - **1초 캔들 저장소**: Parquet(ZSTD, exchange/symbol/date 파티션)
 - **상태/감사/잡 관리**: PostgreSQL(local)
 - **백테스트/최적화 계산**: Polars Lazy + GPU 우선 실행(`gpu` 기본, CI/비GPU 환경은 `cpu` 또는 `auto` override 가능)
-- **Native 가속**: Python API는 안정적으로 유지하고, 효과가 검증된 hot kernel만 Rust를 내부에서 사용합니다. raw-first aggTrades→1초 OHLCV와 Alpha Zoo Optuna hybrid portfolio loop는 Rust backend가 빌드되어 있으면 자동 로드하고, metrics evaluator는 현재 로컬 Rust metrics가 Numba보다 빠르지 않아 Numba/Python auto-selection을 유지합니다.
+- **Native 가속**: Python API는 안정적으로 유지하고, 효과가 검증된 hot kernel만 Rust를 내부에서 사용합니다. raw-first aggTrades→1초 OHLCV, Alpha Zoo Optuna hybrid portfolio loop, Alpha Zoo live state-signal state machine은 Rust backend가 빌드되어 있으면 자동 로드하고, metrics evaluator는 현재 로컬 Rust metrics가 Numba보다 빠르지 않아 Numba/Python auto-selection을 유지합니다.
 
 ## 현재 Private Paper/Testnet 상태 (2026-05-27)
 
@@ -71,7 +71,7 @@ graph TD
 - 선택 runtime: frozen Optuna v3.5 hybrid artifact용 `AlphaZooOptunaHybridLiveStrategy`.
 - live 구현은 재현성 기준으로 모듈을 분리했습니다:
   `lumina_quant.alpha_zoo.optuna_hybrid_config`는 frozen artifact/config 로딩,
-  `lumina_quant.alpha_zoo.optuna_hybrid_signals`는 signal/bar 연산,
+  `lumina_quant.alpha_zoo.optuna_hybrid_signals`는 optional Rust state-machine 가속을 포함한 signal/bar 연산,
   `lumina_quant.alpha_zoo.optuna_hybrid_live_strategy`는 orchestration/event emission을 담당합니다.
 - regression test가 선택 artifact 성적, live limit-first decision contract, sleeve/weight 재구성을
   먼저 고정하므로 이후 refactor에서 결과 drift를 잡습니다.
@@ -392,7 +392,7 @@ bash scripts/ci/architecture_gate_market_window_contract.sh
 uv run python scripts/check_architecture.py
 uv run ruff format --check .
 uv run ruff check .
-for crate in native/rust_metrics native/rust_rawfirst native/rust_hybrid_optuna; do
+for crate in native/rust_metrics native/rust_rawfirst native/rust_hybrid_optuna native/rust_live_signals; do
   (cd "$crate" && cargo fmt --check && cargo check --quiet && cargo test --quiet)
 done
 ```

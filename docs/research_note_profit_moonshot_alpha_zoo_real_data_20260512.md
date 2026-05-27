@@ -1028,3 +1028,13 @@ Changes made:
 - Added CI `ruff format --check .` so future pushes fail on format drift instead of relying on local-only checks.
 
 Validation evidence for this pass: full pytest `1480 passed` with max RSS `2,746,164 KiB` (<8 GiB); Ruff format/check pass; compileall pass; docs verification pass; architecture check pass; hardcoded-parameter audit `new=0`; `uv lock --check` pass; `git diff --check` pass; native Rust format/check/tests pass; GPU auto and forced runtime smokes pass with CPU/GPU row parity.
+
+## 2026-05-27 KST — Python-wrapped Rust live state-signal acceleration
+
+After the operator clarified that useful Rust conversions should still be exposed through Python, the live Alpha Zoo state-machine kernels were moved behind an optional Rust backend without changing the public API. New backend: `native/rust_live_signals`; Python wrapper: `lumina_quant.alpha_zoo.native_live_signal_backend`; runtime control: `LQ_LIVE_SIGNAL_BACKEND=auto|python|rust` and `LQ_LIVE_SIGNAL_BACKEND_DLL`.
+
+The accelerated functions are `debounced_state_signal` and `trailing_state_signal` in `lumina_quant.alpha_zoo.optuna_hybrid_signals`, which are pure deterministic loops used by `AlphaZooOptunaHybridLiveStrategy`. The Python wrapper remains the final interface and falls back to the original Python implementation when the Rust release library is unavailable. Explicit `rust` mode fails fast for diagnostics.
+
+Local benchmark evidence is stored at `var/reports/native_acceleration_20260527/live_signal_backend_benchmark_latest.json`: 50,000 rows, 20 evaluations, Python `0.1349s/eval`, Rust `0.000544s/eval`, total speedup `247.80x`, exact debounced/trailing state-array parity (`max_abs_diff=0.0`). The benchmark max RSS was `97,200 KiB`, below the 8 GiB budget.
+
+Scope boundary: exchange order submission, Binance/MT5/Polymarket HTTP/WebSocket clients, and raw network data collection were not moved in this pass because they are protocol/I/O-bound and safety/venue semantics dominate latency. Existing raw aggTrades→1s OHLCV and 1s WAL append acceleration remains under `native/rust_rawfirst`. Real-money safety is unchanged: paper/testnet-only artifacts still keep `ready_for_real=false`, `real_money_execution=false`, and `real_execution_allowed=false`.

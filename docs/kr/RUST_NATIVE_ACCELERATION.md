@@ -8,6 +8,7 @@ LuminaQuant는 외부/운영 API를 Python으로 유지하고, 실제로 빠른 
 | :--- | :--- | :--- | :--- | :--- |
 | raw aggTrades → canonical 1s OHLCV | `lumina_quant.data.raw_first_lineage.raw_aggtrades_to_1s_frame` | `native/rust_rawfirst` | **release library가 빌드되어 있으면 Rust를 자동 사용** | 로컬 200k-trade synthetic benchmark: Python `0.0496s/eval`, Rust `0.0246s/eval`, frame parity 유지, 약 `2.01x` 빠름. |
 | Alpha Zoo Optuna hybrid portfolio loop | `scripts/research/run_alpha_zoo_integer_leverage_optuna_hybrid_decision.py::_portfolio_returns_for_params` | `native/rust_hybrid_optuna` | **release library가 빌드되어 있고 input이 finite이면 Rust를 자동 사용** | 로컬 20k×3 synthetic benchmark: Python `2.5493s/eval`, Rust `0.0107s/eval`, 약 `238.07x` 빠름; return diff `1.01e-11`, exposed-weight diff `9.15e-09`로 `1e-8` tolerance 이내. |
+| Alpha Zoo live state-signal state machine | `lumina_quant.alpha_zoo.optuna_hybrid_signals.debounced_state_signal` / `trailing_state_signal` | `native/rust_live_signals` | **release library가 빌드되어 있으면 Rust를 자동 사용** | 로컬 50k-row synthetic benchmark: Python `0.1349s/eval`, Rust `0.000544s/eval`, 약 `247.80x` 빠름; debounced/trailing state 배열이 정확히 일치. |
 | optimization metric evaluator | `lumina_quant.optimization.fast_eval.evaluate_threshold_strategy` | `native/rust_metrics` / `native/c_metrics` | **Numba/Python auto-selection 유지, Rust 강제 전환 금지** | 로컬 native-compare benchmark: auto-selected Numba 약 `11.1k eval/s`, forced Rust 약 `7.9k eval/s`; parity는 맞지만 현재 host에서는 Rust가 더 느림. |
 
 ## 빌드와 벤치마크
@@ -45,6 +46,16 @@ uv run python scripts/benchmark_optuna_hybrid_backend.py \
   --min-speedup 1.2
 ```
 
+live state-signal Python/Rust 비교:
+
+```bash
+uv run python scripts/benchmark_live_signal_backend.py \
+  --rows 50000 \
+  --evals 20 \
+  --backend both \
+  --require-rust
+```
+
 metric evaluator backend 선택 확인:
 
 ```bash
@@ -68,6 +79,13 @@ Optuna hybrid portfolio backend:
 - `LQ_HYBRID_OPTUNA_BACKEND=rust`: Rust를 필수로 요구하고 없으면 실패.
 - `LQ_HYBRID_OPTUNA_BACKEND=python`: 기존 Python loop 강제.
 - `LQ_HYBRID_OPTUNA_DLL=/path/to/liblumina_hybrid_optuna.so`: Rust library 명시 경로.
+
+Live Alpha Zoo state-signal backend:
+
+- `LQ_LIVE_SIGNAL_BACKEND=auto` (기본): `native/rust_live_signals/target/release/liblumina_live_signals.so`가 있으면 Rust를 로드하고, 없으면 Python으로 fallback합니다.
+- `LQ_LIVE_SIGNAL_BACKEND=rust`: Rust를 필수로 요구하고 없으면 실패.
+- `LQ_LIVE_SIGNAL_BACKEND=python`: 기존 Python state-machine loop 강제.
+- `LQ_LIVE_SIGNAL_BACKEND_DLL=/path/to/liblumina_live_signals.so`: Rust library 명시 경로.
 
 Metric evaluator backend:
 

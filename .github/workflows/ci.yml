@@ -107,7 +107,7 @@ jobs:
 
       - name: Native Rust checks
         run: |
-          for crate in native/rust_metrics native/rust_rawfirst; do
+          for crate in native/rust_metrics native/rust_rawfirst native/rust_hybrid_optuna native/rust_live_signals; do
             (
               cd "$crate"
               cargo fmt --check
