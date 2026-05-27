@@ -52,16 +52,18 @@ def _notional_risk_caps(config: AlphaZooOptunaHybridLiveConfig) -> dict[str, flo
     }
     target_by_symbol: dict[str, float] = {}
     for sleeve in config.source_sleeves:
-        target_by_symbol[sleeve.symbol] = target_by_symbol.get(sleeve.symbol, 0.0) + target_by_model[
-            sleeve.model_id
-        ]
+        target_by_symbol[sleeve.symbol] = (
+            target_by_symbol.get(sleeve.symbol, 0.0) + target_by_model[sleeve.model_id]
+        )
     max_order_target = max(target_by_model.values())
     max_symbol_target = max(target_by_symbol.values())
     gross_target = sum(target_by_model.values())
     return {
         "max_order_value": 0.0,
         "max_order_notional_pct": round(max(max_order_target + 0.05, max_order_target * 1.05), 6),
-        "max_symbol_exposure_pct": round(max(max_symbol_target + 0.05, max_symbol_target * 1.05), 6),
+        "max_symbol_exposure_pct": round(
+            max(max_symbol_target + 0.05, max_symbol_target * 1.05), 6
+        ),
         "max_total_margin_pct": round(max(gross_target + 0.25, gross_target * 1.10), 6),
         "max_total_notional_pct": round(max(gross_target + 0.25, gross_target * 1.10), 6),
     }
@@ -79,9 +81,7 @@ def build_decision_payload(
         selected_profile_id=selected_profile_id,
     )
     max_integer_leverage = max(
-        leverage
-        for profile in config.source_profiles
-        for leverage in profile.leverage_map.values()
+        leverage for profile in config.source_profiles for leverage in profile.leverage_map.values()
     )
     risk_caps = _notional_risk_caps(config)
     real_money_blockers = [
@@ -102,7 +102,10 @@ def build_decision_payload(
     ]
     return {
         "artifact_kind": "alpha_zoo_optuna_hybrid_paper_testnet_live_decision",
-        "generated_at_utc": datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        "generated_at_utc": datetime.now(UTC)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z"),
         "decision": "selected_live_mode",
         "selected_mode": "alpha_zoo_integer_leverage_optuna_hybrid",
         "strategy_name": "AlphaZooOptunaHybridLiveStrategy",
@@ -223,7 +226,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT_PATH))
     parser.add_argument("--optuna-hybrid-artifact", default=str(DEFAULT_OPTUNA_HYBRID_ARTIFACT))
-    parser.add_argument("--integer-portfolio-artifact", default=str(DEFAULT_INTEGER_PORTFOLIO_ARTIFACT))
+    parser.add_argument(
+        "--integer-portfolio-artifact", default=str(DEFAULT_INTEGER_PORTFOLIO_ARTIFACT)
+    )
     parser.add_argument("--selected-profile-id", default=DEFAULT_SELECTED_PROFILE_ID)
     parser.add_argument(
         "--check-only",

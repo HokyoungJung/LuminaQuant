@@ -22,13 +22,17 @@ DEFAULT_SWITCH_RECOMMENDATION = (
     / "portfolio_operating_switch_latest.json"
 )
 DEFAULT_SWITCH_VALIDATION = (
-    GROUP_ROOT / "current_switch_validation_current" / "refreshed_switch_vs_strategy1_validation_latest.json"
+    GROUP_ROOT
+    / "current_switch_validation_current"
+    / "refreshed_switch_vs_strategy1_validation_latest.json"
 )
 DEFAULT_HYBRID_PORTFOLIO = (
     GROUP_ROOT / "portfolio_hybrid_online_current" / "hybrid_online_portfolio_latest.json"
 )
 DEFAULT_PAIR_CANDIDATE = (
-    GROUP_ROOT / "current_switch_validation_current" / "refreshed_pair_fast_exit_candidate_latest.json"
+    GROUP_ROOT
+    / "current_switch_validation_current"
+    / "refreshed_pair_fast_exit_candidate_latest.json"
 )
 DEFAULT_HYBRID_TUNING = (
     GROUP_ROOT / "portfolio_hybrid_online_tuning_current" / "hybrid_online_tuning_latest.json"
@@ -80,7 +84,9 @@ def _mode_metrics(metrics: dict[str, Any] | None) -> dict[str, float]:
 
 
 def _comparison_row_map(hybrid_payload: dict[str, Any]) -> dict[str, dict[str, float]]:
-    scenario = dict(dict((hybrid_payload.get("scenarios") or {}).get("refreshed_latest_tail") or {}))
+    scenario = dict(
+        dict((hybrid_payload.get("scenarios") or {}).get("refreshed_latest_tail") or {})
+    )
     rows = list(scenario.get("comparison_rows") or [])
     out: dict[str, dict[str, float]] = {}
     for row in rows:
@@ -104,7 +110,9 @@ def _scoreboard_row(
 ) -> dict[str, Any]:
     resolved_comparison = str(comparison_name or name)
     resolved_source = str(source_name or resolved_comparison)
-    metrics = comparison_rows.get(resolved_comparison) or _mode_metrics(source_metrics.get(resolved_source))
+    metrics = comparison_rows.get(resolved_comparison) or _mode_metrics(
+        source_metrics.get(resolved_source)
+    )
     return {
         "name": name,
         **metrics,
@@ -128,7 +136,15 @@ def _scoreboard_rows(
         )
     )
     hybrid_oos = dict(
-        dict((dict((hybrid_payload.get("scenarios") or {}).get("refreshed_latest_tail") or {}).get("split_metrics") or {}).get("oos") or {})
+        dict(
+            (
+                dict(
+                    (hybrid_payload.get("scenarios") or {}).get("refreshed_latest_tail") or {}
+                ).get("split_metrics")
+                or {}
+            ).get("oos")
+            or {}
+        )
     )
     rows = [
         _scoreboard_row(
@@ -140,13 +156,17 @@ def _scoreboard_rows(
         {
             "name": "hybrid_guarded_mode",
             **_mode_metrics(hybrid_oos),
-            "status": "switch_default" if switch_mode == "hybrid_guarded_mode" else "guarded_challenger",
+            "status": "switch_default"
+            if switch_mode == "hybrid_guarded_mode"
+            else "guarded_challenger",
         },
         _scoreboard_row(
             name="balanced_overlay_mode",
             comparison_name="balanced_overlay_80_20",
             source_name="balanced_overlay_80_20",
-            status="switch_default" if switch_mode == "balanced_overlay_mode" else "small_overlay_backup",
+            status="switch_default"
+            if switch_mode == "balanced_overlay_mode"
+            else "small_overlay_backup",
             comparison_rows=comparison_rows,
             source_metrics=source_metrics,
         ),
@@ -169,7 +189,9 @@ def _scoreboard_rows(
         _scoreboard_row(
             name="production_guarded_mode",
             comparison_name="production_guarded_portfolio",
-            status="switch_default" if switch_mode == "production_guarded_mode" else "production_candidate",
+            status="switch_default"
+            if switch_mode == "production_guarded_mode"
+            else "production_candidate",
             comparison_rows=comparison_rows,
             source_metrics=source_metrics,
         ),
@@ -196,9 +218,8 @@ def _scoreboard_rows(
     rows = [
         row
         for row in rows
-        if row["name"] == "risk_off_cash" or any(
-            key in row for key in ("oos_total_return", "sharpe", "max_drawdown")
-        )
+        if row["name"] == "risk_off_cash"
+        or any(key in row for key in ("oos_total_return", "sharpe", "max_drawdown"))
     ]
     return sorted(rows, key=lambda item: item["oos_total_return"], reverse=True)
 
@@ -214,7 +235,11 @@ def _tuning_summary(
     return {
         **({"config_name": config_name} if config_name else {}),
         **({"trial_number": root.get("trial_number")} if "trial_number" in root else {}),
-        **({"objective_profile": root.get("objective_profile")} if "objective_profile" in root else {}),
+        **(
+            {"objective_profile": root.get("objective_profile")}
+            if "objective_profile" in root
+            else {}
+        ),
         "objective": _safe_float(root.get("objective"), 0.0),
         "config": dict(root.get("config") or {}),
         "readiness": dict(root.get("readiness") or {}),
@@ -304,7 +329,9 @@ def build_master_scoreboard(
         "artifact_refresh_basis": ARTIFACT_REFRESH_BASIS,
         "generated_at": generated_at,
         "refresh_cutoff_utc": str(switch_payload.get("as_of_date") or ""),
-        "latest_common_complete_utc": str(switch_validation.get("latest_common_complete_utc") or ""),
+        "latest_common_complete_utc": str(
+            switch_validation.get("latest_common_complete_utc") or ""
+        ),
         "split_windows": dict(hybrid_payload.get("split_windows") or {}),
         "online_policy": dict(hybrid_payload.get("online_policy") or {}),
         "switch_recommended_mode": switch_mode,
@@ -329,19 +356,36 @@ def build_master_scoreboard(
             "summary": summary,
         },
         "upstream_reboot_inputs": {
-            "incumbent_only": str(switch_validation.get("artifact_paths", {}).get("refreshed_incumbent") or ""),
-            "autoresearch_55_45": str(switch_validation.get("artifact_paths", {}).get("refreshed_autoresearch") or ""),
-            "static_blend_re_tuned": str(switch_validation.get("artifact_paths", {}).get("refreshed_blend") or ""),
-            "soft_three_way_re_tuned": str(switch_validation.get("artifact_paths", {}).get("refreshed_soft_allocator") or ""),
-            "three_way_re_tuned": str(switch_validation.get("artifact_paths", {}).get("refreshed_three_way_allocator") or ""),
-            "pair_tactical_re_tuned": str(switch_validation.get("artifact_paths", {}).get("refreshed_pair_candidate") or ""),
-            "balanced_overlay_re_tuned": str(switch_validation.get("artifact_paths", {}).get("refreshed_balanced_overlay") or ""),
+            "incumbent_only": str(
+                switch_validation.get("artifact_paths", {}).get("refreshed_incumbent") or ""
+            ),
+            "autoresearch_55_45": str(
+                switch_validation.get("artifact_paths", {}).get("refreshed_autoresearch") or ""
+            ),
+            "static_blend_re_tuned": str(
+                switch_validation.get("artifact_paths", {}).get("refreshed_blend") or ""
+            ),
+            "soft_three_way_re_tuned": str(
+                switch_validation.get("artifact_paths", {}).get("refreshed_soft_allocator") or ""
+            ),
+            "three_way_re_tuned": str(
+                switch_validation.get("artifact_paths", {}).get("refreshed_three_way_allocator")
+                or ""
+            ),
+            "pair_tactical_re_tuned": str(
+                switch_validation.get("artifact_paths", {}).get("refreshed_pair_candidate") or ""
+            ),
+            "balanced_overlay_re_tuned": str(
+                switch_validation.get("artifact_paths", {}).get("refreshed_balanced_overlay") or ""
+            ),
         },
         "tuning_comparison": {
             "curated_best": _tuning_summary(
                 hybrid_tuning_payload,
                 root_key="best",
-                config_name=str(dict((hybrid_tuning_payload or {}).get("best") or {}).get("config_name") or ""),
+                config_name=str(
+                    dict((hybrid_tuning_payload or {}).get("best") or {}).get("config_name") or ""
+                ),
             ),
             "optuna_live_guarded_best": _tuning_summary(
                 hybrid_optuna_payload,
@@ -530,22 +574,22 @@ def _build_onepager_markdown(onepager: dict[str, Any]) -> str:
         )
     lines.extend(
         [
-        "",
-        (
-            "> 현재 live default는 tuned mixed/calm superiority gate를 통과한 hybrid guarded입니다.  \n"
-            "> pair는 계속 tactical-only이며, balanced overlay는 소형 overlay backup으로 남겨둡니다."
-            if default_mode.get("mode") == "hybrid_guarded_mode"
-            else "> 현재 live default는 switch/gate 정책상 balanced overlay입니다.  \n> 하지만 **hybrid는 현재 재구성된 diversified/guarded stack 안에서는 best**입니다."
-        ),
-        "",
-        "## 4) Current market state",
-        "",
-        f"- favored_group: `{market.get('favored_group')}`",
-        f"- confidence: `{_safe_float(market.get('confidence'), 0.0):.4f}`",
-        f"- trend_state: `{market.get('trend_state')}`",
-        f"- breadth_state: `{market.get('breadth_state')}`",
-        f"- volatility_state: `{market.get('volatility_state')}`",
-        f"- pair_liquidity_state: `{market.get('pair_liquidity_state')}`",
+            "",
+            (
+                "> 현재 live default는 tuned mixed/calm superiority gate를 통과한 hybrid guarded입니다.  \n"
+                "> pair는 계속 tactical-only이며, balanced overlay는 소형 overlay backup으로 남겨둡니다."
+                if default_mode.get("mode") == "hybrid_guarded_mode"
+                else "> 현재 live default는 switch/gate 정책상 balanced overlay입니다.  \n> 하지만 **hybrid는 현재 재구성된 diversified/guarded stack 안에서는 best**입니다."
+            ),
+            "",
+            "## 4) Current market state",
+            "",
+            f"- favored_group: `{market.get('favored_group')}`",
+            f"- confidence: `{_safe_float(market.get('confidence'), 0.0):.4f}`",
+            f"- trend_state: `{market.get('trend_state')}`",
+            f"- breadth_state: `{market.get('breadth_state')}`",
+            f"- volatility_state: `{market.get('volatility_state')}`",
+            f"- pair_liquidity_state: `{market.get('pair_liquidity_state')}`",
         ]
     )
     return "\n".join(lines) + "\n"
@@ -556,7 +600,9 @@ def _build_hybrid_runbook_markdown(scoreboard: dict[str, Any]) -> str:
     policy = dict(scoreboard.get("online_policy") or {})
     default_mode = dict(scoreboard.get("current_default") or {})
     hybrid = dict(scoreboard.get("hybrid_challenger") or {})
-    balanced = _find_row(list(scoreboard.get("refreshed_live_scoreboard") or []), "balanced_overlay_mode")
+    balanced = _find_row(
+        list(scoreboard.get("refreshed_live_scoreboard") or []), "balanced_overlay_mode"
+    )
     lines = [
         "# Hybrid Guarded Mode Runbook",
         "",
@@ -657,13 +703,17 @@ def write_outputs(
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--switch-recommendation-path", type=Path, default=DEFAULT_SWITCH_RECOMMENDATION)
+    parser.add_argument(
+        "--switch-recommendation-path", type=Path, default=DEFAULT_SWITCH_RECOMMENDATION
+    )
     parser.add_argument("--switch-validation-path", type=Path, default=DEFAULT_SWITCH_VALIDATION)
     parser.add_argument("--hybrid-portfolio-path", type=Path, default=DEFAULT_HYBRID_PORTFOLIO)
     parser.add_argument("--pair-candidate-path", type=Path, default=DEFAULT_PAIR_CANDIDATE)
     parser.add_argument("--hybrid-tuning-path", type=Path, default=DEFAULT_HYBRID_TUNING)
     parser.add_argument("--hybrid-optuna-path", type=Path, default=DEFAULT_HYBRID_OPTUNA)
-    parser.add_argument("--hybrid-train-aware-path", type=Path, default=DEFAULT_HYBRID_OPTUNA_TRAIN_AWARE)
+    parser.add_argument(
+        "--hybrid-train-aware-path", type=Path, default=DEFAULT_HYBRID_OPTUNA_TRAIN_AWARE
+    )
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     return parser
 
@@ -688,7 +738,9 @@ def main() -> None:
         hybrid_train_aware_payload=hybrid_train_aware_payload,
     )
     onepager = build_onepager_payload(scoreboard)
-    written = write_outputs(scoreboard=scoreboard, onepager=onepager, output_dir=Path(args.output_dir).resolve())
+    written = write_outputs(
+        scoreboard=scoreboard, onepager=onepager, output_dir=Path(args.output_dir).resolve()
+    )
     for path in written:
         print(str(path.resolve()))
 

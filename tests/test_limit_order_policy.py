@@ -76,16 +76,13 @@ def _signal(signal_type: str, *, metadata=None):
     ],
 )
 def test_one_tick_worse_limit_price_is_side_safe(direction: str, expected: float) -> None:
-    assert (
-        limit_price_for_direction(
-            reference_price=100.0,
-            direction=direction,
-            tick_size=0.1,
-            mode="one_tick_worse",
-            offset_ticks=1,
-        )
-        == pytest.approx(expected)
-    )
+    assert limit_price_for_direction(
+        reference_price=100.0,
+        direction=direction,
+        tick_size=0.1,
+        mode="one_tick_worse",
+        offset_ticks=1,
+    ) == pytest.approx(expected)
 
 
 def test_portfolio_generates_limit_buy_with_one_tick_worse_price() -> None:

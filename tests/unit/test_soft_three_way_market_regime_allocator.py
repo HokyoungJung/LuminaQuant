@@ -10,7 +10,9 @@ MODULE_PATH = (
     / "research"
     / "run_soft_three_way_market_regime_allocator.py"
 )
-SPEC = importlib.util.spec_from_file_location("run_soft_three_way_market_regime_allocator", MODULE_PATH)
+SPEC = importlib.util.spec_from_file_location(
+    "run_soft_three_way_market_regime_allocator", MODULE_PATH
+)
 MODULE = importlib.util.module_from_spec(SPEC)
 assert SPEC is not None and SPEC.loader is not None
 sys.modules[SPEC.name] = MODULE
@@ -60,8 +62,32 @@ def test_apply_smoothing_respects_turnover_cap() -> None:
 def test_run_soft_allocator_computes_weighted_returns() -> None:
     frame = pd.DataFrame(
         [
-            {"date": pd.Timestamp("2025-01-01", tz="UTC"), "split_group": "train", "incumbent": 0.01, "blend_85_15": 0.005, "autoresearch_55_45": 0.0, "favored_group": "mixed", "confidence": 0.0, "incumbent_score": 0.0, "autoresearch_score": 0.0, "max_signal_score": 0.0, "active_rules": []},
-            {"date": pd.Timestamp("2025-01-02", tz="UTC"), "split_group": "train", "incumbent": 0.02, "blend_85_15": 0.01, "autoresearch_55_45": -0.01, "favored_group": "incumbent", "confidence": 1.0, "incumbent_score": 0.08, "autoresearch_score": 0.0, "max_signal_score": 0.08, "active_rules": []},
+            {
+                "date": pd.Timestamp("2025-01-01", tz="UTC"),
+                "split_group": "train",
+                "incumbent": 0.01,
+                "blend_85_15": 0.005,
+                "autoresearch_55_45": 0.0,
+                "favored_group": "mixed",
+                "confidence": 0.0,
+                "incumbent_score": 0.0,
+                "autoresearch_score": 0.0,
+                "max_signal_score": 0.0,
+                "active_rules": [],
+            },
+            {
+                "date": pd.Timestamp("2025-01-02", tz="UTC"),
+                "split_group": "train",
+                "incumbent": 0.02,
+                "blend_85_15": 0.01,
+                "autoresearch_55_45": -0.01,
+                "favored_group": "incumbent",
+                "confidence": 1.0,
+                "incumbent_score": 0.08,
+                "autoresearch_score": 0.0,
+                "max_signal_score": 0.08,
+                "active_rules": [],
+            },
         ]
     )
     params = MODULE.SoftAllocatorParams(

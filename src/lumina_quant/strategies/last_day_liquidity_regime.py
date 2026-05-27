@@ -286,13 +286,20 @@ class LastDayLiquidityRegimeStrategy(Strategy):
         return value if math.isfinite(value) else None
 
     def _liquidity_threshold(self, rows: list[dict[str, Any]]) -> float | None:
-        liquidities = sorted(float(row["liquidity"]) for row in rows if float(row["liquidity"]) > 0.0)
+        liquidities = sorted(
+            float(row["liquidity"]) for row in rows if float(row["liquidity"]) > 0.0
+        )
         if not liquidities:
             return None
-        idx = min(len(liquidities) - 1, max(0, math.floor((len(liquidities) - 1) * self.liquidity_quantile)))
+        idx = min(
+            len(liquidities) - 1,
+            max(0, math.floor((len(liquidities) - 1) * self.liquidity_quantile)),
+        )
         return float(liquidities[idx])
 
-    def _build_targets(self, aligned_symbols: list[str]) -> tuple[dict[str, str], dict[str, float], dict[str, str], float | None]:
+    def _build_targets(
+        self, aligned_symbols: list[str]
+    ) -> tuple[dict[str, str], dict[str, float], dict[str, str], float | None]:
         signal_rows: list[dict[str, Any]] = []
         for symbol in aligned_symbols:
             item = self._state[symbol]
@@ -336,7 +343,9 @@ class LastDayLiquidityRegimeStrategy(Strategy):
         for row in signal_rows:
             symbol = str(row["symbol"])
             momentum = float(row["momentum"])
-            is_liquid = liquidity_threshold is None or float(row["liquidity"]) >= liquidity_threshold
+            is_liquid = (
+                liquidity_threshold is None or float(row["liquidity"]) >= liquidity_threshold
+            )
             if is_liquid:
                 adjusted_scores[symbol] = momentum
                 liquidity_regimes[symbol] = "liquid_momentum"
@@ -348,14 +357,14 @@ class LastDayLiquidityRegimeStrategy(Strategy):
                 liquidity_regimes[symbol] = "filtered_illiquid"
 
         ordered = sorted(adjusted_scores.items(), key=lambda item: item[1])
-        longs = [
-            symbol for symbol, score in reversed(ordered) if score >= self.signal_threshold
-        ][: self.max_longs]
+        longs = [symbol for symbol, score in reversed(ordered) if score >= self.signal_threshold][
+            : self.max_longs
+        ]
         shorts = []
         if self.allow_short and self.max_shorts > 0:
-            shorts = [
-                symbol for symbol, score in ordered if score <= -self.signal_threshold
-            ][: self.max_shorts]
+            shorts = [symbol for symbol, score in ordered if score <= -self.signal_threshold][
+                : self.max_shorts
+            ]
         long_set = set(longs)
         shorts = [symbol for symbol in shorts if symbol not in long_set]
 
@@ -453,7 +462,9 @@ class LastDayLiquidityRegimeStrategy(Strategy):
         if self._tick % self.rebalance_bars != 0:
             return
 
-        targets, adjusted_scores, liquidity_regimes, liquidity_threshold = self._build_targets(aligned_symbols)
+        targets, adjusted_scores, liquidity_regimes, liquidity_threshold = self._build_targets(
+            aligned_symbols
+        )
 
         for symbol, state in [(key, value.mode) for key, value in self._state.items()]:
             target_state = targets.get(symbol, "OUT")
@@ -472,12 +483,40 @@ class LastDayLiquidityRegimeStrategy(Strategy):
                 )
                 self._state[symbol].mode = "OUT"
             elif state == "LONG" and target_state == "SHORT":
-                self._emit_signal(symbol, event_time, "EXIT", adjusted_score=adjusted_score, liquidity_regime=liquidity_regime, liquidity_threshold=liquidity_threshold)
-                self._emit_signal(symbol, event_time, "SHORT", adjusted_score=adjusted_score, liquidity_regime=liquidity_regime, liquidity_threshold=liquidity_threshold)
+                self._emit_signal(
+                    symbol,
+                    event_time,
+                    "EXIT",
+                    adjusted_score=adjusted_score,
+                    liquidity_regime=liquidity_regime,
+                    liquidity_threshold=liquidity_threshold,
+                )
+                self._emit_signal(
+                    symbol,
+                    event_time,
+                    "SHORT",
+                    adjusted_score=adjusted_score,
+                    liquidity_regime=liquidity_regime,
+                    liquidity_threshold=liquidity_threshold,
+                )
                 self._state[symbol].mode = "SHORT"
             elif state == "SHORT" and target_state == "LONG":
-                self._emit_signal(symbol, event_time, "EXIT", adjusted_score=adjusted_score, liquidity_regime=liquidity_regime, liquidity_threshold=liquidity_threshold)
-                self._emit_signal(symbol, event_time, "LONG", adjusted_score=adjusted_score, liquidity_regime=liquidity_regime, liquidity_threshold=liquidity_threshold)
+                self._emit_signal(
+                    symbol,
+                    event_time,
+                    "EXIT",
+                    adjusted_score=adjusted_score,
+                    liquidity_regime=liquidity_regime,
+                    liquidity_threshold=liquidity_threshold,
+                )
+                self._emit_signal(
+                    symbol,
+                    event_time,
+                    "LONG",
+                    adjusted_score=adjusted_score,
+                    liquidity_regime=liquidity_regime,
+                    liquidity_threshold=liquidity_threshold,
+                )
                 self._state[symbol].mode = "LONG"
 
         for symbol, target_state in targets.items():

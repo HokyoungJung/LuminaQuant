@@ -34,11 +34,9 @@ class _MetricConfig:
     ANNUAL_PERIODS = 365
 
 
-
 def test_annual_to_periodic_rate_matches_compound_formula() -> None:
     expected = (1.0 + 0.052) ** (1.0 / 365.0) - 1.0
     assert annual_to_periodic_rate(0.052, 365) == pytest.approx(expected)
-
 
 
 def test_sharpe_and_sortino_are_consistent_across_validation_research_and_summary_paths() -> None:

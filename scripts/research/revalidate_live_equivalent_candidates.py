@@ -42,7 +42,9 @@ from lumina_quant.symbols import canonical_symbol
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FOLLOWUP_ROOT = REPO_ROOT / "var/reports/exact_window_backtests/followup_status"
 GROUP_ROOT = FOLLOWUP_ROOT / "portfolio_incumbent_autoresearch_grouped"
-FULL_UNIVERSE_PATH = GROUP_ROOT / "full_universe_selection_20260426" / "full_universe_selection_latest.json"
+FULL_UNIVERSE_PATH = (
+    GROUP_ROOT / "full_universe_selection_20260426" / "full_universe_selection_latest.json"
+)
 OUTPUT_DIR = GROUP_ROOT / "live_equivalent_revalidation_20260426"
 LIVE_DECISION_PATH = FOLLOWUP_ROOT / "portfolio_live_readiness_decision_latest.json"
 DEFAULT_BACKTEST_CHECKPOINT_PATH = OUTPUT_DIR / "live_equivalent_backtest_checkpoint_20260426.json"
@@ -269,7 +271,9 @@ def _coverage_for_symbol(
             "committed_day_count": len(present_days),
             "missing_day_count": max(0, len(days) - len(present_days)),
             "complete_raw_first": len(days) > 0 and len(present_days) == len(days),
-            "first_missing_days": [day.isoformat() for day in days if day.isoformat() not in set(present_days)][:5],
+            "first_missing_days": [
+                day.isoformat() for day in days if day.isoformat() not in set(present_days)
+            ][:5],
             "legacy_monthly_files_present": len(legacy_files),
             "legacy_monthly_files": legacy_files[:5],
         }
@@ -323,7 +327,11 @@ def _mode_preflight(
         for split_name in ("train", "val"):
             if not bool(dict(split_payload.get(split_name) or {}).get("complete_raw_first")):
                 blocking_reasons.append(f"{symbol}:{split_name}_raw_first_incomplete")
-    status = "ready_for_live_equivalent_backtest" if not blocking_reasons else "blocked_missing_raw_first_market_data"
+    status = (
+        "ready_for_live_equivalent_backtest"
+        if not blocking_reasons
+        else "blocked_missing_raw_first_market_data"
+    )
     return ModePreflight(
         mode=mode,
         symbols=symbols,
@@ -399,9 +407,15 @@ def _metrics_from_equity_totals(values: list[float], *, periods: int) -> dict[st
     sharpe = float((mean / std) * math.sqrt(periods_per_year)) if std > 0.0 else 0.0
     downside = returns[returns < 0.0]
     downside_std = float(np.std(downside, ddof=1)) if downside.size > 1 else 0.0
-    sortino = float((mean / downside_std) * math.sqrt(periods_per_year)) if downside_std > 0.0 else 0.0
+    sortino = (
+        float((mean / downside_std) * math.sqrt(periods_per_year)) if downside_std > 0.0 else 0.0
+    )
     max_drawdown = min(raw_max_drawdown, 1.0)
-    cagr = float((1.0 + total_return) ** (periods_per_year / returns.size) - 1.0) if total_return > -1.0 else -1.0
+    cagr = (
+        float((1.0 + total_return) ** (periods_per_year / returns.size) - 1.0)
+        if total_return > -1.0
+        else -1.0
+    )
     calmar = float(cagr / max_drawdown) if max_drawdown > 1e-12 else 0.0
     return {
         "total_return": total_return,
@@ -757,7 +771,9 @@ def _run_mode_backtests(
                         (str(cached.get("equivalence_key") or equivalence_key), split.name),
                         dict(cached),
                     )
-                _progress_event("live_equivalent_split_resume", mode=preflight.mode, split=split.name)
+                _progress_event(
+                    "live_equivalent_split_resume", mode=preflight.mode, split=split.name
+                )
                 continue
         if equivalence_cache is not None:
             source_run = equivalence_cache.get((equivalence_key, split.name))
@@ -793,7 +809,11 @@ def _run_mode_backtests(
                 continue
         if split.name == "oos":
             oos_complete = all(
-                bool(dict(dict(preflight.coverage.get(symbol) or {}).get("oos") or {}).get("complete_raw_first"))
+                bool(
+                    dict(dict(preflight.coverage.get(symbol) or {}).get("oos") or {}).get(
+                        "complete_raw_first"
+                    )
+                )
                 for symbol in preflight.symbols
             )
             if not oos_complete:
@@ -869,13 +889,16 @@ def _run_mode_backtests(
         metrics.setdefault(split.name, _empty_metrics())
     scores = _score_from_split_metrics(metrics)
     skipped_by_train_gate = any(
-        str(run.get("status") or "") == "skipped_train_alpha_gate_failed"
-        for run in split_runs
+        str(run.get("status") or "") == "skipped_train_alpha_gate_failed" for run in split_runs
     )
     if skipped_by_train_gate:
         status = "failed_train_alpha_gate"
     else:
-        status = "live_equivalent_validated" if bool(scores.get("train_val_mdd_ok")) else "failed_train_val_mdd_gate"
+        status = (
+            "live_equivalent_validated"
+            if bool(scores.get("train_val_mdd_ok"))
+            else "failed_train_val_mdd_gate"
+        )
     return {
         "mode": preflight.mode,
         "status": status,
@@ -937,7 +960,9 @@ def _artifact_candidate_reset_rows(full_universe: dict[str, Any]) -> list[dict[s
     return rows
 
 
-def _mode_candidate_rows(mode_results: list[dict[str, Any]], preflights: dict[str, ModePreflight]) -> list[dict[str, Any]]:
+def _mode_candidate_rows(
+    mode_results: list[dict[str, Any]], preflights: dict[str, ModePreflight]
+) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for result in mode_results:
         mode = str(result.get("mode") or "")
@@ -1008,7 +1033,9 @@ def _best(rows: list[dict[str, Any]], *, predicate) -> dict[str, Any] | None:
     eligible = [row for row in rows if predicate(row)]
     if not eligible:
         return None
-    return sorted(eligible, key=lambda row: _safe_float(row.get("selection_score"), -1e9), reverse=True)[0]
+    return sorted(
+        eligible, key=lambda row: _safe_float(row.get("selection_score"), -1e9), reverse=True
+    )[0]
 
 
 def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
@@ -1041,7 +1068,9 @@ def _load_backtest_checkpoint(path: Path) -> dict[str, Any]:
 def _write_backtest_checkpoint(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     payload["updated_at"] = datetime.now(UTC).isoformat().replace("+00:00", "Z")
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
 
 def _checkpointed_split_run(
@@ -1110,13 +1139,25 @@ def _fmt_float(value: Any) -> str:
     return f"{parsed:.4f}"
 
 
-def _markdown_report(payload: dict[str, Any], mode_rows: list[dict[str, Any]], artifact_rows: list[dict[str, Any]]) -> str:
+def _markdown_report(
+    payload: dict[str, Any], mode_rows: list[dict[str, Any]], artifact_rows: list[dict[str, Any]]
+) -> str:
     recs = dict(payload.get("final_recommendations") or {})
     backtests_executed = bool(payload.get("backtests_executed"))
-    validated_count = sum(1 for row in mode_rows if str(row.get("status") or "") == "live_equivalent_validated")
+    validated_count = sum(
+        1 for row in mode_rows if str(row.get("status") or "") == "live_equivalent_validated"
+    )
     alpha_eligible_count = sum(1 for row in mode_rows if bool(row.get("selection_eligible")))
-    ready_count = sum(1 for row in mode_rows if str(row.get("status") or "") == "ready_for_live_equivalent_backtest")
-    blocked_count = sum(1 for row in mode_rows if str(row.get("status") or "") == "blocked_missing_raw_first_market_data")
+    ready_count = sum(
+        1
+        for row in mode_rows
+        if str(row.get("status") or "") == "ready_for_live_equivalent_backtest"
+    )
+    blocked_count = sum(
+        1
+        for row in mode_rows
+        if str(row.get("status") or "") == "blocked_missing_raw_first_market_data"
+    )
     lines = [
         "# Live-equivalent candidate revalidation — 2026-04-26",
         "",
@@ -1138,13 +1179,19 @@ def _markdown_report(payload: dict[str, Any], mode_rows: list[dict[str, Any]], a
     if best_live:
         lines.append(f"- Best full-universe live-equivalent candidate: `{best_live['mode']}`")
     else:
-        lines.append("- Best full-universe live-equivalent candidate: `NONE` — profit alpha gate를 통과한 후보가 없다.")
+        lines.append(
+            "- Best full-universe live-equivalent candidate: `NONE` — profit alpha gate를 통과한 후보가 없다."
+        )
     if best_hybrid:
         lines.append(f"- Best deployable true-HYBRID candidate: `{best_hybrid['mode']}`")
     else:
-        lines.append("- Best deployable true-HYBRID candidate: `NONE` — dynamic/true HYBRID는 아직 live-equivalent engine validation 미완료다.")
+        lines.append(
+            "- Best deployable true-HYBRID candidate: `NONE` — dynamic/true HYBRID는 아직 live-equivalent engine validation 미완료다."
+        )
     if fallback:
-        lines.append(f"- Conservative fallback/shadow: `{fallback['mode']}` (`{fallback['status']}`)")
+        lines.append(
+            f"- Conservative fallback/shadow: `{fallback['mode']}` (`{fallback['status']}`)"
+        )
     lines.extend(
         [
             "",
@@ -1165,7 +1212,9 @@ def _markdown_report(payload: dict[str, Any], mode_rows: list[dict[str, Any]], a
             or row.get("symbols")
             or ""
         )
-        alpha = "yes" if bool(row.get("selection_eligible")) else str(row.get("selection_role") or "no")
+        alpha = (
+            "yes" if bool(row.get("selection_eligible")) else str(row.get("selection_role") or "no")
+        )
         lines.append(
             f"| {rank} | `{row['mode']}` | `{row['status']}` | "
             f"{alpha} | "
@@ -1211,7 +1260,9 @@ def _markdown_report(payload: dict[str, Any], mode_rows: list[dict[str, Any]], a
             "하지만 profit alpha gate를 통과한 후보가 없어 fallback/shadow-only 상태를 유지한다."
         )
     else:
-        coverage_caveat = "- train/val live-equivalent alpha 후보는 아직 selection eligible 상태가 아니다."
+        coverage_caveat = (
+            "- train/val live-equivalent alpha 후보는 아직 selection eligible 상태가 아니다."
+        )
     lines.extend(
         [
             "",
@@ -1224,16 +1275,29 @@ def _markdown_report(payload: dict[str, Any], mode_rows: list[dict[str, Any]], a
         ]
     )
     if ready_count and not backtests_executed:
-        lines.append("- 다음 단계는 `--execute-backtests`로 같은 live portfolio mode 후보들을 train/val/OOS 재랭킹하는 것이다.")
+        lines.append(
+            "- 다음 단계는 `--execute-backtests`로 같은 live portfolio mode 후보들을 train/val/OOS 재랭킹하는 것이다."
+        )
     return "\n".join(lines) + "\n"
 
 
 def _write_live_decision(payload: dict[str, Any], path: Path) -> None:
-    best_live = dict(payload.get("final_recommendations", {}).get("best_full_universe_live_equivalent_candidate") or {})
-    fallback = dict(payload.get("final_recommendations", {}).get("best_conservative_fallback_candidate") or {})
+    best_live = dict(
+        payload.get("final_recommendations", {}).get("best_full_universe_live_equivalent_candidate")
+        or {}
+    )
+    fallback = dict(
+        payload.get("final_recommendations", {}).get("best_conservative_fallback_candidate") or {}
+    )
     mode_rows = list(payload.get("mode_candidate_rows") or [])
-    ready_count = sum(1 for row in mode_rows if str(dict(row).get("status") or "") == "ready_for_live_equivalent_backtest")
-    validated_count = sum(1 for row in mode_rows if str(dict(row).get("status") or "") == "live_equivalent_validated")
+    ready_count = sum(
+        1
+        for row in mode_rows
+        if str(dict(row).get("status") or "") == "ready_for_live_equivalent_backtest"
+    )
+    validated_count = sum(
+        1 for row in mode_rows if str(dict(row).get("status") or "") == "live_equivalent_validated"
+    )
     selected_mode = str(best_live.get("mode") or fallback.get("mode") or "risk_off_mode")
     if best_live:
         decision_state = "live_equivalent_validated_candidate_ready_for_review"
@@ -1274,7 +1338,9 @@ def _write_live_decision(payload: dict[str, Any], path: Path) -> None:
         },
     }
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(decision, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(decision, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
 
 def build_live_equivalent_revalidation(
@@ -1358,8 +1424,9 @@ def build_live_equivalent_revalidation(
     mode_rows = _mode_candidate_rows(mode_results, preflights)
     best_live = _best(
         mode_rows,
-        predicate=lambda row: bool(row.get("selection_eligible"))
-        and str(row.get("selection_role") or "") == "alpha",
+        predicate=lambda row: (
+            bool(row.get("selection_eligible")) and str(row.get("selection_role") or "") == "alpha"
+        ),
     )
     true_hybrid_modes = {
         "hybrid_guarded_mode",
@@ -1368,16 +1435,19 @@ def build_live_equivalent_revalidation(
     }
     best_hybrid = _best(
         mode_rows,
-        predicate=lambda row: bool(row.get("selection_eligible"))
-        and str(row.get("selection_role") or "") == "alpha"
-        and str(row.get("mode")) in true_hybrid_modes,
+        predicate=lambda row: (
+            bool(row.get("selection_eligible"))
+            and str(row.get("selection_role") or "") == "alpha"
+            and str(row.get("mode")) in true_hybrid_modes
+        ),
     )
     fallback = next((row for row in mode_rows if row.get("mode") == "risk_off_mode"), None)
     shadow_queue = [
         row
         for row in mode_rows
         if row.get("mode") != "risk_off_mode"
-        and str(row.get("status")) in {"blocked_missing_raw_first_market_data", "ready_for_live_equivalent_backtest"}
+        and str(row.get("status"))
+        in {"blocked_missing_raw_first_market_data", "ready_for_live_equivalent_backtest"}
     ][:10]
 
     payload: dict[str, Any] = {
@@ -1438,7 +1508,9 @@ def build_live_equivalent_revalidation(
     latest_md = output_dir / "live_equivalent_revalidation_latest.md"
     mode_csv = output_dir / "live_equivalent_revalidation_candidates_20260426.csv"
     artifact_csv = output_dir / "live_equivalent_revalidation_artifact_reset_20260426.csv"
-    latest_json.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    latest_json.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     latest_md.write_text(_markdown_report(payload, mode_rows, artifact_rows), encoding="utf-8")
     _write_csv(mode_csv, mode_rows)
     _write_csv(artifact_csv, artifact_rows)
@@ -1513,9 +1585,7 @@ def main(argv: list[str] | None = None) -> int:
         backtest_window_seconds=max(1, int(args.backtest_window_seconds)),
         backtest_checkpoint_path=Path(args.backtest_checkpoint_path),
         portfolio_modes=[
-            item.strip()
-            for item in str(args.portfolio_modes or "").split(",")
-            if item.strip()
+            item.strip() for item in str(args.portfolio_modes or "").split(",") if item.strip()
         ]
         or None,
         fail_fast_alpha_gate=bool(args.fail_fast_alpha_gate),

@@ -6,6 +6,7 @@ import importlib
 import os
 
 from lumina_quant.configuration.loader import load_yaml_config
+
 _runtime_access = importlib.import_module("lumina_quant.configuration.runtime_access")
 
 _runtime_access.clear_runtime_config_views()

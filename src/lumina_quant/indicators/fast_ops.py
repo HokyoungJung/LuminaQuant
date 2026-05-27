@@ -91,7 +91,9 @@ def _rolling_percentile_rank_kernel(values: np.ndarray, window: int) -> np.ndarr
     return out
 
 
-def rolling_zscore(values: Iterable[float], *, window: int = 64, min_std: float = 1e-12) -> np.ndarray:
+def rolling_zscore(
+    values: Iterable[float], *, window: int = 64, min_std: float = 1e-12
+) -> np.ndarray:
     """Return rolling z-score series using a Numba-friendly kernel."""
     arr = _as_float_array(values)
     if arr.size == 0:

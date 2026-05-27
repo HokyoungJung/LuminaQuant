@@ -30,8 +30,7 @@ if str(REPO_ROOT) not in sys.path:
 from scripts.research import run_alpha_zoo_30m_plus_alpha_feedback_discovery as feedback  # noqa: E402
 
 DEFAULT_OUTPUT_DIR = (
-    REPO_ROOT
-    / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/"
+    REPO_ROOT / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/"
     "alpha_zoo_30m_plus_alpha_booster_discovery_20260523"
 )
 DEFAULT_SYMBOLS = feedback.DEFAULT_SYMBOLS
@@ -113,25 +112,45 @@ def _booster_score(row: Mapping[str, Any]) -> float:
 
 def _apply_booster_targets(row: dict[str, Any]) -> dict[str, Any]:
     reasons: list[str] = []
-    if float(row.get("validation_return") or 0.0) < BOOSTER_TARGETS["preferred_min_validation_return"]:
+    if (
+        float(row.get("validation_return") or 0.0)
+        < BOOSTER_TARGETS["preferred_min_validation_return"]
+    ):
         reasons.append(
             f"validation_return_{float(row.get('validation_return') or 0.0):.4f}_below_preferred_0.10"
         )
-    if float(row.get("locked_oos_return") or 0.0) < BOOSTER_TARGETS["preferred_min_locked_oos_return_report_gate"]:
+    if (
+        float(row.get("locked_oos_return") or 0.0)
+        < BOOSTER_TARGETS["preferred_min_locked_oos_return_report_gate"]
+    ):
         reasons.append(
             f"locked_oos_return_{float(row.get('locked_oos_return') or 0.0):.4f}_below_preferred_0.03"
         )
     if float(row.get("validation_mdd") or 0.0) > BOOSTER_TARGETS["preferred_max_validation_mdd"]:
-        reasons.append(f"validation_mdd_{float(row.get('validation_mdd') or 0.0):.4f}_above_preferred_0.10")
-    if int(row.get("locked_oos_trade_event_count") or 0) < BOOSTER_TARGETS["preferred_min_locked_oos_trade_event_count"]:
-        reasons.append(f"locked_oos_trade_event_count_{int(row.get('locked_oos_trade_event_count') or 0)}_below_20")
-    if float(row.get("validation_min_half_return") or 0.0) < BOOSTER_TARGETS["preferred_min_validation_half_return"]:
+        reasons.append(
+            f"validation_mdd_{float(row.get('validation_mdd') or 0.0):.4f}_above_preferred_0.10"
+        )
+    if (
+        int(row.get("locked_oos_trade_event_count") or 0)
+        < BOOSTER_TARGETS["preferred_min_locked_oos_trade_event_count"]
+    ):
+        reasons.append(
+            f"locked_oos_trade_event_count_{int(row.get('locked_oos_trade_event_count') or 0)}_below_20"
+        )
+    if (
+        float(row.get("validation_min_half_return") or 0.0)
+        < BOOSTER_TARGETS["preferred_min_validation_half_return"]
+    ):
         reasons.append(
             f"validation_min_half_return_{float(row.get('validation_min_half_return') or 0.0):.4f}_below_0"
         )
     for split in feedback.SPLIT_ORDER:
         value = row.get(f"{split}_return_per_turnover_proxy_bps")
-        if value is None or float(value) < BOOSTER_TARGETS["preferred_min_all_split_return_per_turnover_bps_report_gate"]:
+        if (
+            value is None
+            or float(value)
+            < BOOSTER_TARGETS["preferred_min_all_split_return_per_turnover_bps_report_gate"]
+        ):
             rendered = "missing" if value is None else f"{float(value):.3f}"
             reasons.append(f"{split}_rpt_{rendered}_below_preferred_20bps")
     row["booster_target_reasons"] = reasons
@@ -193,7 +212,11 @@ def _trailing_state_signal(
         can_exit = bars_held >= min_hold_bars
         exited = False
         if state > 0.0:
-            stop = price - trail_atr_mult * atr_value if not np.isfinite(stop) else max(stop, price - trail_atr_mult * atr_value)
+            stop = (
+                price - trail_atr_mult * atr_value
+                if not np.isfinite(stop)
+                else max(stop, price - trail_atr_mult * atr_value)
+            )
             if can_exit and (long_exit_values[idx] or price < stop):
                 state = 0.0
                 stop = np.nan
@@ -201,7 +224,11 @@ def _trailing_state_signal(
                 cooldown = cooldown_bars
                 exited = True
         elif state < 0.0:
-            stop = price + trail_atr_mult * atr_value if not np.isfinite(stop) else min(stop, price + trail_atr_mult * atr_value)
+            stop = (
+                price + trail_atr_mult * atr_value
+                if not np.isfinite(stop)
+                else min(stop, price + trail_atr_mult * atr_value)
+            )
             if can_exit and (short_exit_values[idx] or price > stop):
                 state = 0.0
                 stop = np.nan
@@ -287,14 +314,23 @@ def discover_booster_candidates(
     timeframes: Sequence[str],
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
-    leverage_allocs = ((2.0, 0.15), (3.0, 0.10), (3.0, 0.15), (4.0, 0.125), (5.0, 0.10), (4.0, 0.15))
+    leverage_allocs = (
+        (2.0, 0.15),
+        (3.0, 0.10),
+        (3.0, 0.15),
+        (4.0, 0.125),
+        (5.0, 0.10),
+        (4.0, 0.15),
+    )
     for timeframe in timeframes:
-        btc = bars_by_symbol_tf[(feedback.BTC_REGIME_SYMBOL, timeframe)][["datetime", "close"]].rename(
-            columns={"close": "btc_close"}
-        )
+        btc = bars_by_symbol_tf[(feedback.BTC_REGIME_SYMBOL, timeframe)][
+            ["datetime", "close"]
+        ].rename(columns={"close": "btc_close"})
         hours = feedback._timeframe_hours(timeframe)
         for symbol in symbols:
-            frame = bars_by_symbol_tf[(symbol, timeframe)].merge(btc, on="datetime", how="left").ffill()
+            frame = (
+                bars_by_symbol_tf[(symbol, timeframe)].merge(btc, on="datetime", how="left").ffill()
+            )
             close = frame["close"].astype(float)
             high = frame["high"].astype(float)
             low = frame["low"].astype(float)
@@ -311,8 +347,12 @@ def discover_booster_candidates(
                 adx = feedback._adx_proxy(high, low, close, max(6, lookback // 2))
                 for atr_mult in (0.0, 0.25, 0.50):
                     for rel_threshold in (0.0, 0.005, 0.010, 0.015):
-                        common_long = (rel_momentum > rel_threshold) & (btc_momentum > -0.015) & (adx >= 15.0)
-                        common_short = (rel_momentum < -rel_threshold) & (btc_momentum < 0.015) & (adx >= 15.0)
+                        common_long = (
+                            (rel_momentum > rel_threshold) & (btc_momentum > -0.015) & (adx >= 15.0)
+                        )
+                        common_short = (
+                            (rel_momentum < -rel_threshold) & (btc_momentum < 0.015) & (adx >= 15.0)
+                        )
                         long_entry = (close > roll_high + atr_mult * atr) & common_long
                         short_entry = (close < roll_low - atr_mult * atr) & common_short
                         long_exit = (close < mid) | (rel_momentum < -0.005)
@@ -358,8 +398,17 @@ def discover_booster_candidates(
                                         leverage=leverage,
                                         allocation=allocation,
                                     )
-                                    sim = feedback.simulate_symbol(frame, signal, leverage=leverage, allocation_fraction=allocation)
-                                    rows.append(_finalize_booster_candidate(base, sim, frame["datetime"], timeframe=timeframe))
+                                    sim = feedback.simulate_symbol(
+                                        frame,
+                                        signal,
+                                        leverage=leverage,
+                                        allocation_fraction=allocation,
+                                    )
+                                    rows.append(
+                                        _finalize_booster_candidate(
+                                            base, sim, frame["datetime"], timeframe=timeframe
+                                        )
+                                    )
 
             # Family 2: multi-horizon consensus momentum. This is simpler than the
             # chandelier lane and should trade less frequently with higher RPT.
@@ -430,8 +479,17 @@ def discover_booster_candidates(
                                         leverage=leverage,
                                         allocation=allocation,
                                     )
-                                    sim = feedback.simulate_symbol(frame, signal, leverage=leverage, allocation_fraction=allocation)
-                                    rows.append(_finalize_booster_candidate(base, sim, frame["datetime"], timeframe=timeframe))
+                                    sim = feedback.simulate_symbol(
+                                        frame,
+                                        signal,
+                                        leverage=leverage,
+                                        allocation_fraction=allocation,
+                                    )
+                                    rows.append(
+                                        _finalize_booster_candidate(
+                                            base, sim, frame["datetime"], timeframe=timeframe
+                                        )
+                                    )
 
             # Family 3: trend pullback reclaim. It intentionally waits for a pullback
             # and reclaim instead of buying every momentum extension.
@@ -497,8 +555,14 @@ def discover_booster_candidates(
                                 leverage=leverage,
                                 allocation=allocation,
                             )
-                            sim = feedback.simulate_symbol(frame, signal, leverage=leverage, allocation_fraction=allocation)
-                            rows.append(_finalize_booster_candidate(base, sim, frame["datetime"], timeframe=timeframe))
+                            sim = feedback.simulate_symbol(
+                                frame, signal, leverage=leverage, allocation_fraction=allocation
+                            )
+                            rows.append(
+                                _finalize_booster_candidate(
+                                    base, sim, frame["datetime"], timeframe=timeframe
+                                )
+                            )
 
             # Family 4: volatility squeeze then volume-confirmed range expansion.
             for lookback in (24, 36, 48):
@@ -506,7 +570,9 @@ def discover_booster_candidates(
                 natr = atr / close.replace(0.0, np.nan)
                 squeeze_threshold = natr.rolling(max(72, lookback * 3)).quantile(0.35)
                 in_squeeze = natr <= squeeze_threshold
-                squeeze_recent = in_squeeze.rolling(max(3, int(12 / max(hours, 0.5)))).max().fillna(0.0) > 0.0
+                squeeze_recent = (
+                    in_squeeze.rolling(max(3, int(12 / max(hours, 0.5)))).max().fillna(0.0) > 0.0
+                )
                 volume_z = _rolling_zscore(volume, max(24, lookback))
                 roll_high = high.shift(1).rolling(lookback).max()
                 roll_low = low.shift(1).rolling(lookback).min()
@@ -566,27 +632,41 @@ def discover_booster_candidates(
                                 leverage=leverage,
                                 allocation=allocation,
                             )
-                            sim = feedback.simulate_symbol(frame, signal, leverage=leverage, allocation_fraction=allocation)
-                            rows.append(_finalize_booster_candidate(base, sim, frame["datetime"], timeframe=timeframe))
+                            sim = feedback.simulate_symbol(
+                                frame, signal, leverage=leverage, allocation_fraction=allocation
+                            )
+                            rows.append(
+                                _finalize_booster_candidate(
+                                    base, sim, frame["datetime"], timeframe=timeframe
+                                )
+                            )
     return rows
 
 
 def _rank_rows(rows: Sequence[dict[str, Any]], *, limit: int | None = None) -> list[dict[str, Any]]:
-    ranked = sorted(rows, key=lambda row: float(row.get("booster_train_validation_score") or -1e9), reverse=True)
+    ranked = sorted(
+        rows, key=lambda row: float(row.get("booster_train_validation_score") or -1e9), reverse=True
+    )
     if limit is not None:
         ranked = ranked[:limit]
     return [dict(row, rank=rank) for rank, row in enumerate(ranked, start=1)]
 
 
-def _selected_output_rows(ranked_rows: Sequence[dict[str, Any]], *, top_n: int) -> list[dict[str, Any]]:
+def _selected_output_rows(
+    ranked_rows: Sequence[dict[str, Any]], *, top_n: int
+) -> list[dict[str, Any]]:
     selected_ids = {str(row["model_id"]) for row in ranked_rows[:top_n]}
     for row in ranked_rows:
-        if row.get("paper_candidate_gate_pass") or row.get("booster_target_gate_pass") or row.get(
-            "execution_efficiency_proxy_gate_pass"
+        if (
+            row.get("paper_candidate_gate_pass")
+            or row.get("booster_target_gate_pass")
+            or row.get("execution_efficiency_proxy_gate_pass")
         ):
             selected_ids.add(str(row["model_id"]))
     if ranked_rows:
-        best_validation = max(ranked_rows, key=lambda row: float(row.get("validation_return") or -1e9))
+        best_validation = max(
+            ranked_rows, key=lambda row: float(row.get("validation_return") or -1e9)
+        )
         selected_ids.add(str(best_validation["model_id"]))
     return [dict(row) for row in ranked_rows if str(row["model_id"]) in selected_ids]
 
@@ -594,7 +674,13 @@ def _selected_output_rows(ranked_rows: Sequence[dict[str, Any]], *, top_n: int) 
 def _decision_rows(rows: Sequence[dict[str, Any]], *, limit: int) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for row in _selected_output_rows(_rank_rows(rows), top_n=limit):
-        out.append({field: row.get(field) for field in DECISION_FIELDS if field in row or field in feedback.DECISION_FIELDS})
+        out.append(
+            {
+                field: row.get(field)
+                for field in DECISION_FIELDS
+                if field in row or field in feedback.DECISION_FIELDS
+            }
+        )
         out[-1]["decision_rank"] = row["rank"]
     return out
 
@@ -625,7 +711,9 @@ def _summary(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         decisions[str(row.get("decision"))] = decisions.get(str(row.get("decision")), 0) + 1
         families[str(row.get("family"))] = families.get(str(row.get("family")), 0) + 1
         symbols[str(row.get("symbol"))] = symbols.get(str(row.get("symbol")), 0) + 1
-    best_validation = max(rows, key=lambda row: float(row.get("validation_return") or -1e9)) if rows else {}
+    best_validation = (
+        max(rows, key=lambda row: float(row.get("validation_return") or -1e9)) if rows else {}
+    )
     return {
         "candidate_count": len(rows),
         "decision_counts": dict(sorted(decisions.items())),
@@ -636,7 +724,9 @@ def _summary(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         ),
         "paper_candidate_gate_pass_count": len(paper),
         "booster_target_gate_pass_count": len(booster),
-        "max_validation_return": float(best_validation.get("validation_return") or 0.0) if best_validation else None,
+        "max_validation_return": float(best_validation.get("validation_return") or 0.0)
+        if best_validation
+        else None,
         "best_validation_model_id": best_validation.get("model_id") if best_validation else None,
         "best_paper_candidate_model_id": paper[0].get("model_id") if paper else None,
         "best_booster_target_model_id": booster[0].get("model_id") if booster else None,
@@ -650,15 +740,21 @@ def _paper_handoff(paper_rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     handoff = feedback._paper_testnet_handoff(paper_rows)
     handoff["handoff_kind"] = "paper_testnet_only_30m_plus_alpha_booster_discovery"
     handoff["booster_targets"] = BOOSTER_TARGETS
-    handoff["booster_target_candidate_count"] = sum(bool(row.get("booster_target_gate_pass")) for row in paper_rows)
+    handoff["booster_target_candidate_count"] = sum(
+        bool(row.get("booster_target_gate_pass")) for row in paper_rows
+    )
     return handoff
 
 
 def _markdown(payload: Mapping[str, Any]) -> str:
     summary = dict(payload.get("discovery_summary") or {})
     top = list(payload.get("top_candidates") or [])[:12]
-    paper = [row for row in payload.get("top_candidates", []) if row.get("paper_candidate_gate_pass")][:12]
-    booster = [row for row in payload.get("top_candidates", []) if row.get("booster_target_gate_pass")][:12]
+    paper = [
+        row for row in payload.get("top_candidates", []) if row.get("paper_candidate_gate_pass")
+    ][:12]
+    booster = [
+        row for row in payload.get("top_candidates", []) if row.get("booster_target_gate_pass")
+    ][:12]
     lines = [
         "# Alpha Zoo 30m+ booster discovery",
         "",
@@ -685,7 +781,9 @@ def _markdown(payload: Mapping[str, Any]) -> str:
             else f"{float(row[f'{split}_return_per_turnover_proxy_bps']):.2f}"
             for split in feedback.SPLIT_ORDER
         )
-        reasons = "; ".join((row.get("rejection_reasons") or row.get("booster_target_reasons") or [])[:3])
+        reasons = "; ".join(
+            (row.get("rejection_reasons") or row.get("booster_target_reasons") or [])[:3]
+        )
         lines.append(
             f"| {row.get('rank')} | {row.get('symbol')} | {row.get('timeframe')} | {row.get('family')} | "
             f"{float(row.get('train_return') or 0.0):.4%} | {float(row.get('validation_return') or 0.0):.4%} | "
@@ -724,11 +822,15 @@ def _markdown(payload: Mapping[str, Any]) -> str:
 def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     output_dir = Path(args.output_dir)
     symbols = tuple(symbol.strip().upper() for symbol in args.symbols.split(",") if symbol.strip())
-    timeframes = feedback._validate_timeframes(tuple(tf.strip().lower() for tf in args.timeframes.split(",") if tf.strip()))
+    timeframes = feedback._validate_timeframes(
+        tuple(tf.strip().lower() for tf in args.timeframes.split(",") if tf.strip())
+    )
     data_root = Path(args.data_root)
     feature_root = Path(args.feature_root)
     data_symbols = tuple(dict.fromkeys([feedback.BTC_REGIME_SYMBOL, *symbols]))
-    bars_by_symbol_tf = feedback.load_requested_bars(data_symbols, timeframes=timeframes, data_root=data_root)
+    bars_by_symbol_tf = feedback.load_requested_bars(
+        data_symbols, timeframes=timeframes, data_root=data_root
+    )
     for symbol in data_symbols:
         features = feedback.load_feature_points(symbol, feature_root=feature_root)
         for timeframe in timeframes:
@@ -745,7 +847,9 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     shadow = _shadow_shortlist(ranked, limit=int(args.shadow_limit))
 
     latest_json = output_dir / "alpha_zoo_30m_plus_alpha_booster_discovery_latest.json"
-    timestamped_json = output_dir / f"alpha_zoo_30m_plus_alpha_booster_discovery_{_timestamp()}.json"
+    timestamped_json = (
+        output_dir / f"alpha_zoo_30m_plus_alpha_booster_discovery_{_timestamp()}.json"
+    )
     latest_md = output_dir / "alpha_zoo_30m_plus_alpha_booster_discovery_latest.md"
     candidates_csv = output_dir / "alpha_zoo_30m_plus_alpha_booster_candidates_latest.csv"
     decisions_csv = output_dir / "alpha_zoo_30m_plus_alpha_booster_decisions_latest.csv"
@@ -786,7 +890,8 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
         "promotion_thresholds": feedback.PROMOTION_THRESHOLDS,
         "booster_targets": BOOSTER_TARGETS,
         "split_manifest": {
-            split: {"start": start.isoformat(), "end": end.isoformat()} for split, (start, end) in feedback.SPLITS.items()
+            split: {"start": start.isoformat(), "end": end.isoformat()}
+            for split, (start, end) in feedback.SPLITS.items()
         },
         "strategy_families": [
             "relative_strength_chandelier_breakout",

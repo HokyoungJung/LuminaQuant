@@ -44,15 +44,25 @@ class CompositeTrendStrategy(Strategy):
     @classmethod
     def get_param_schema(cls) -> dict[str, HyperParam]:
         return {
-            "long_threshold": HyperParam.floating("long_threshold", default=0.55, low=0.05, high=5.0),
-            "short_threshold": HyperParam.floating("short_threshold", default=0.55, low=0.05, high=5.0),
-            "exit_score_cross": HyperParam.floating("exit_score_cross", default=0.05, low=0.0, high=2.0),
+            "long_threshold": HyperParam.floating(
+                "long_threshold", default=0.55, low=0.05, high=5.0
+            ),
+            "short_threshold": HyperParam.floating(
+                "short_threshold", default=0.55, low=0.05, high=5.0
+            ),
+            "exit_score_cross": HyperParam.floating(
+                "exit_score_cross", default=0.05, low=0.0, high=2.0
+            ),
             "te_min": HyperParam.floating("te_min", default=0.25, low=0.0, high=1.0),
             "vr_min": HyperParam.floating("vr_min", default=0.85, low=0.1, high=3.0),
             "chop_max": HyperParam.floating("chop_max", default=62.0, low=10.0, high=100.0),
             "vol_window": HyperParam.integer("vol_window", default=120, low=16, high=4000),
-            "risk_target_vol": HyperParam.floating("risk_target_vol", default=0.004, low=0.0001, high=0.5),
-            "max_signal_strength": HyperParam.floating("max_signal_strength", default=2.0, low=0.1, high=10.0),
+            "risk_target_vol": HyperParam.floating(
+                "risk_target_vol", default=0.004, low=0.0001, high=0.5
+            ),
+            "max_signal_strength": HyperParam.floating(
+                "max_signal_strength", default=2.0, low=0.1, high=10.0
+            ),
             "min_signal_strength_pre_crowding": HyperParam.floating(
                 "min_signal_strength_pre_crowding",
                 default=0.10,
@@ -76,7 +86,9 @@ class CompositeTrendStrategy(Strategy):
                 tunable=False,
             ),
             "atr_stop_mult": HyperParam.floating("atr_stop_mult", default=2.0, low=0.2, high=20.0),
-            "trail_atr_mult": HyperParam.floating("trail_atr_mult", default=2.8, low=0.2, high=20.0),
+            "trail_atr_mult": HyperParam.floating(
+                "trail_atr_mult", default=2.8, low=0.2, high=20.0
+            ),
             "take_profit_atr_mult": HyperParam.floating(
                 "take_profit_atr_mult",
                 default=1.8,
@@ -118,8 +130,12 @@ class CompositeTrendStrategy(Strategy):
             ),
             "allow_short": HyperParam.boolean("allow_short", default=True),
             # Backwards-compatible legacy knobs retained for saved param payloads.
-            "short_window": HyperParam.integer("short_window", default=20, low=2, high=8192, tunable=False),
-            "long_window": HyperParam.integer("long_window", default=72, low=3, high=8192, tunable=False),
+            "short_window": HyperParam.integer(
+                "short_window", default=20, low=2, high=8192, tunable=False
+            ),
+            "long_window": HyperParam.integer(
+                "long_window", default=72, low=3, high=8192, tunable=False
+            ),
             "breakout_window": HyperParam.integer(
                 "breakout_window",
                 default=48,
@@ -218,7 +234,9 @@ class CompositeTrendStrategy(Strategy):
         self.risk_target_vol = float(resolved["risk_target_vol"])
         self.max_signal_strength = float(resolved["max_signal_strength"])
         self.min_signal_strength_pre_crowding = float(resolved["min_signal_strength_pre_crowding"])
-        self.min_signal_strength_post_crowding = float(resolved["min_signal_strength_post_crowding"])
+        self.min_signal_strength_post_crowding = float(
+            resolved["min_signal_strength_post_crowding"]
+        )
         self.atr_window = int(resolved["atr_window"])
         self.atr_abs_floor = float(resolved["atr_abs_floor"])
         self.atr_stop_mult = float(resolved["atr_stop_mult"])
@@ -230,9 +248,17 @@ class CompositeTrendStrategy(Strategy):
         self.crowding_block_threshold = float(resolved["crowding_block_threshold"])
         self.benchmark_regime_ma = int(resolved["benchmark_regime_ma"])
         self.allow_short = bool(resolved["allow_short"])
-        default_benchmark = "BTC/USDT" if "BTC/USDT" in self.symbol_list else (self.symbol_list[0] if self.symbol_list else "")
+        default_benchmark = (
+            "BTC/USDT"
+            if "BTC/USDT" in self.symbol_list
+            else (self.symbol_list[0] if self.symbol_list else "")
+        )
         benchmark_symbol_value = str(resolved["benchmark_symbol"] or default_benchmark)
-        self.benchmark_symbol = benchmark_symbol_value if benchmark_symbol_value in self.symbol_list else default_benchmark
+        self.benchmark_symbol = (
+            benchmark_symbol_value
+            if benchmark_symbol_value in self.symbol_list
+            else default_benchmark
+        )
 
         maxlen = max(256, self.vol_window + 64, self.atr_window + 64)
         self._state = {
@@ -343,7 +369,9 @@ class CompositeTrendStrategy(Strategy):
         return float(np.std(returns, ddof=1))
 
     @staticmethod
-    def _atr_abs(highs: deque[float], lows: deque[float], closes: deque[float], window: int) -> float:
+    def _atr_abs(
+        highs: deque[float], lows: deque[float], closes: deque[float], window: int
+    ) -> float:
         if len(closes) < int(window):
             return 0.0
         h = np.asarray(list(highs)[-int(window) :], dtype=float)
@@ -370,7 +398,10 @@ class CompositeTrendStrategy(Strategy):
             self.max_signal_strength,
             max(self.min_signal_strength_pre_crowding, strength),
         )
-        if crowding_score is not None and abs(float(crowding_score)) >= self.crowding_reduce_threshold:
+        if (
+            crowding_score is not None
+            and abs(float(crowding_score)) >= self.crowding_reduce_threshold
+        ):
             strength *= 0.5
         return float(max(self.min_signal_strength_post_crowding, strength))
 
@@ -453,11 +484,17 @@ class CompositeTrendStrategy(Strategy):
         long_gate = gate and benchmark_risk_on is not False
 
         sigma = self._rolling_volatility(item.closes, self.vol_window)
-        atr_abs = max(self.atr_abs_floor, self._atr_abs(item.highs, item.lows, item.closes, self.atr_window))
+        atr_abs = max(
+            self.atr_abs_floor, self._atr_abs(item.highs, item.lows, item.closes, self.atr_window)
+        )
         crowding = self._extract_crowding_score(symbol, event)
 
         strength = self._signal_strength(sigma, crowding)
-        if crowding is not None and abs(float(crowding)) >= self.crowding_block_threshold and item.mode == "OUT":
+        if (
+            crowding is not None
+            and abs(float(crowding)) >= self.crowding_block_threshold
+            and item.mode == "OUT"
+        ):
             return
 
         metadata = {
@@ -526,7 +563,9 @@ class CompositeTrendStrategy(Strategy):
         if long_gate and score >= self.long_threshold:
             stop = float(close) - (self.atr_stop_mult * atr_abs)
             take = float(close) + (self.atr_stop_mult * atr_abs * self.take_profit_atr_mult)
-            trailing_percent = max(0.0, (float(close) - stop) / max(float(close), self.atr_abs_floor))
+            trailing_percent = max(
+                0.0, (float(close) - stop) / max(float(close), self.atr_abs_floor)
+            )
             self._emit(
                 symbol,
                 event_time,
@@ -546,7 +585,9 @@ class CompositeTrendStrategy(Strategy):
         if self.allow_short and gate and score <= -self.short_threshold:
             stop = float(close) + (self.atr_stop_mult * atr_abs)
             take = float(close) - (self.atr_stop_mult * atr_abs * self.take_profit_atr_mult)
-            trailing_percent = max(0.0, (stop - float(close)) / max(float(close), self.atr_abs_floor))
+            trailing_percent = max(
+                0.0, (stop - float(close)) / max(float(close), self.atr_abs_floor)
+            )
             self._emit(
                 symbol,
                 event_time,

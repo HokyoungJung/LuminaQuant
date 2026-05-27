@@ -14,7 +14,9 @@ from lumina_quant.core.market_window_contract import build_market_window_event
 from lumina_quant.strategies.crypto_fx_alpha_zoo_state import CryptoFxAlphaZooStateStrategy
 from lumina_quant.strategies.registry import get_strategy_map, get_strategy_tier
 
-_REPLAY_SPEC = importlib.util.spec_from_file_location("replay_crypto_fx_alpha_zoo_state", Path("scripts/research/replay_crypto_fx_alpha_zoo_state.py"))
+_REPLAY_SPEC = importlib.util.spec_from_file_location(
+    "replay_crypto_fx_alpha_zoo_state", Path("scripts/research/replay_crypto_fx_alpha_zoo_state.py")
+)
 _REPLAY_MODULE = importlib.util.module_from_spec(_REPLAY_SPEC)
 assert _REPLAY_SPEC.loader is not None
 sys.modules[_REPLAY_SPEC.name] = _REPLAY_MODULE
@@ -26,7 +28,8 @@ _paper_forward_diagnostics = _REPLAY_MODULE._paper_forward_diagnostics
 replay_frame = _REPLAY_MODULE.replay_frame
 
 _SUMMARY_SPEC = importlib.util.spec_from_file_location(
-    "write_crypto_fx_alpha_zoo_real_data_summary", Path("scripts/research/write_crypto_fx_alpha_zoo_real_data_summary.py")
+    "write_crypto_fx_alpha_zoo_real_data_summary",
+    Path("scripts/research/write_crypto_fx_alpha_zoo_real_data_summary.py"),
 )
 _SUMMARY_MODULE = importlib.util.module_from_spec(_SUMMARY_SPEC)
 assert _SUMMARY_SPEC.loader is not None
@@ -58,7 +61,9 @@ def _batch(ts: int, eth_mult: float = 1.0, sol_mult: float = 1.0) -> MarketBatch
         ("AUDUSD", audusd, 0.0),
         ("USDJPY", usdjpy, 0.0),
     ):
-        bars.append(MarketEvent(ts, symbol, close * 0.999, close * 1.002, close * 0.998, close, volume))
+        bars.append(
+            MarketEvent(ts, symbol, close * 0.999, close * 1.002, close * 0.998, close, volume)
+        )
     return MarketBatchEvent(time=ts, bars=tuple(bars))
 
 
@@ -137,9 +142,15 @@ def test_sample_guarded_new_alpha_specs_are_opt_in_and_non_calendar() -> None:
     assert all(str(spec.source).startswith("sample_guarded_new_alpha") for spec in specs)
     assert all("calendar" not in spec.name for spec in specs)
     assert all("date" not in spec.name for spec in specs)
-    assert any(float(spec.params.get("liquidity_sweep_reversal_weight") or 0.0) > 0.0 for spec in specs)
-    assert any(float(spec.params.get("liquidity_sweep_continuation_weight") or 0.0) > 0.0 for spec in specs)
-    assert any(float(spec.params.get("range_expansion_breakout_weight") or 0.0) > 0.0 for spec in specs)
+    assert any(
+        float(spec.params.get("liquidity_sweep_reversal_weight") or 0.0) > 0.0 for spec in specs
+    )
+    assert any(
+        float(spec.params.get("liquidity_sweep_continuation_weight") or 0.0) > 0.0 for spec in specs
+    )
+    assert any(
+        float(spec.params.get("range_expansion_breakout_weight") or 0.0) > 0.0 for spec in specs
+    )
     assert any(float(spec.params.get("range_expansion_fade_weight") or 0.0) > 0.0 for spec in specs)
 
 
@@ -172,7 +183,9 @@ def test_strategy_requires_calibrated_edge_for_entries() -> None:
     _, blocked = _run_strategy(require_edge=True, calibrated_edges={})
     assert [signal for signal in blocked if signal.signal_type in {"LONG", "SHORT"}] == []
 
-    _, allowed = _run_strategy(require_edge=True, calibrated_edges={"default:LONG": 5.0, "default:SHORT": 5.0})
+    _, allowed = _run_strategy(
+        require_edge=True, calibrated_edges={"default:LONG": 5.0, "default:SHORT": 5.0}
+    )
     assert any(signal.signal_type in {"LONG", "SHORT"} for signal in allowed)
     first_entry = next(signal for signal in allowed if signal.signal_type in {"LONG", "SHORT"})
     assert first_entry.symbol.endswith("USDT")
@@ -212,7 +225,9 @@ def test_strategy_state_roundtrip_preserves_signal_sequence() -> None:
     )
     for ts in range(30):
         full.calculate_signals(_batch(ts))
-    full_signals = [(item.datetime, item.symbol, item.signal_type) for item in list(events_full.queue)]
+    full_signals = [
+        (item.datetime, item.symbol, item.signal_type) for item in list(events_full.queue)
+    ]
 
     events_split: queue.Queue = queue.Queue()
     split_a = CryptoFxAlphaZooStateStrategy(
@@ -241,7 +256,9 @@ def test_strategy_state_roundtrip_preserves_signal_sequence() -> None:
     split_b.set_state(state)
     for ts in range(15, 30):
         split_b.calculate_signals(_batch(ts))
-    split_signals = [(item.datetime, item.symbol, item.signal_type) for item in list(events_split.queue)]
+    split_signals = [
+        (item.datetime, item.symbol, item.signal_type) for item in list(events_split.queue)
+    ]
     assert split_signals == full_signals
 
 
@@ -266,7 +283,9 @@ def test_market_window_live_path_matches_batch_path_for_hourly_alpha_zoo_decisio
 
     for ts in range(30):
         batch = _batch(ts)
-        batch_strategy.calculate_signals(MarketBatchEvent(time=int(batch.time) * 1000, bars=batch.bars))
+        batch_strategy.calculate_signals(
+            MarketBatchEvent(time=int(batch.time) * 1000, bars=batch.bars)
+        )
         window_strategy.calculate_signals_window(_window_from_batch(batch), None)
 
     batch_signals = [
@@ -306,7 +325,12 @@ def test_replay_grid_hides_locked_oos_until_after_train_validation_selection() -
         pd.DataFrame(rows),
         require_calibrated_edge=True,
         calibrated_edges={"default:LONG": 5.0, "default:SHORT": 5.0},
-        strategy_params={"fast_lookback_bars": 2, "slow_lookback_bars": 8, "history_window": 16, "entry_threshold": 0.15},
+        strategy_params={
+            "fast_lookback_bars": 2,
+            "slow_lookback_bars": 8,
+            "history_window": 16,
+            "entry_threshold": 0.15,
+        },
         grid_specs=[
             _GridSpec("low_threshold", "unit", {"entry_threshold": 0.15}),
             _GridSpec("higher_threshold", "unit", {"entry_threshold": 0.30}),
@@ -323,7 +347,9 @@ def test_replay_grid_hides_locked_oos_until_after_train_validation_selection() -
 
 
 def test_return_mdd_reference_hurdle_is_diagnostic_not_promotion_gate() -> None:
-    data = pd.DataFrame(columns=["timestamp", "symbol", "open", "high", "low", "close", "volume", "split"])
+    data = pd.DataFrame(
+        columns=["timestamp", "symbol", "open", "high", "low", "close", "volume", "split"]
+    )
     trades = [
         {
             "symbol": "BTC/USDT",
@@ -381,7 +407,10 @@ def test_replay_preserves_exit_reason_from_strategy_metadata() -> None:
             "symbol": "BTC/USDT",
             "signal_type": "LONG",
             "price": 100.0,
-            "metadata": {"fx_risk_state": "risk_on", "dominant_factor_family": "crypto_residual_momentum"},
+            "metadata": {
+                "fx_risk_state": "risk_on",
+                "dominant_factor_family": "crypto_residual_momentum",
+            },
         },
         {
             "datetime": pd.Timestamp("2026-01-01T01:00:00Z").isoformat(),
@@ -444,7 +473,9 @@ def test_paper_forward_diagnostics_report_breakdowns_and_cost_sensitivity() -> N
         },
     ]
 
-    diagnostics = _paper_forward_diagnostics(trades, leverage=6.0, allocation_fraction=0.10, candidate_name="unit")
+    diagnostics = _paper_forward_diagnostics(
+        trades, leverage=6.0, allocation_fraction=0.10, candidate_name="unit"
+    )
     breakdowns = diagnostics["breakdowns"]
 
     assert diagnostics["promotion_allowed"] is False
@@ -456,8 +487,14 @@ def test_paper_forward_diagnostics_report_breakdowns_and_cost_sensitivity() -> N
 
     slippage_rows = diagnostics["slippage_sensitivity"]["rows"]
     funding_rows = diagnostics["funding_cost_sensitivity"]["rows"]
-    assert slippage_rows[-1]["locked_oos"]["total_return"] < slippage_rows[0]["locked_oos"]["total_return"]
-    assert funding_rows[-1]["locked_oos"]["total_return"] < funding_rows[0]["locked_oos"]["total_return"]
+    assert (
+        slippage_rows[-1]["locked_oos"]["total_return"]
+        < slippage_rows[0]["locked_oos"]["total_return"]
+    )
+    assert (
+        funding_rows[-1]["locked_oos"]["total_return"]
+        < funding_rows[0]["locked_oos"]["total_return"]
+    )
 
 
 def test_real_data_summary_fails_closed_when_return_mdd_is_a_strict_gate(tmp_path: Path) -> None:
@@ -473,7 +510,11 @@ def test_real_data_summary_fails_closed_when_return_mdd_is_a_strict_gate(tmp_pat
                 "uses_locked_oos_for_selection": False,
                 "screen": {"selected_factors": []},
                 "source_coverage": {"input": {"symbols": ["BTC/USDT"]}},
-                "candidate_outcome_ledger": {"record_count": 1, "train_validation_record_count": 1, "locked_oos_record_count": 0},
+                "candidate_outcome_ledger": {
+                    "record_count": 1,
+                    "train_validation_record_count": 1,
+                    "locked_oos_record_count": 0,
+                },
             }
         ),
         encoding="utf-8",
@@ -493,7 +534,10 @@ def test_real_data_summary_fails_closed_when_return_mdd_is_a_strict_gate(tmp_pat
     replay_path.write_text(
         json.dumps(
             {
-                "promotion_policy": {"return_mdd_hurdle_required": True, "return_mdd_role": "strict_promotion_gate"},
+                "promotion_policy": {
+                    "return_mdd_hurdle_required": True,
+                    "return_mdd_role": "strict_promotion_gate",
+                },
                 "integer_grid_results": [
                     {
                         "performance_gates": {
@@ -522,4 +566,6 @@ def test_real_data_summary_fails_closed_when_return_mdd_is_a_strict_gate(tmp_pat
     except ValueError as exc:
         assert "return/MDD" in str(exc)
     else:
-        raise AssertionError("summary writer must fail closed if return/MDD is a strict promotion gate")
+        raise AssertionError(
+            "summary writer must fail closed if return/MDD is a strict promotion gate"
+        )

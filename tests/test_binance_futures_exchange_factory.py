@@ -19,7 +19,9 @@ class _Config(SimpleNamespace):
 def test_get_exchange_routes_binance_futures_driver_to_native_exchange(monkeypatch) -> None:
     monkeypatch.setattr(BinanceFuturesExchange, "load_markets", lambda self: {})
     monkeypatch.setattr(BinanceFuturesExchange, "set_position_mode", lambda self, _mode: True)
-    monkeypatch.setattr(BinanceFuturesExchange, "set_margin_mode", lambda self, _symbol, _mode: True)
+    monkeypatch.setattr(
+        BinanceFuturesExchange, "set_margin_mode", lambda self, _symbol, _mode: True
+    )
     monkeypatch.setattr(BinanceFuturesExchange, "set_leverage", lambda self, _symbol, _lev: True)
 
     cfg = _Config(

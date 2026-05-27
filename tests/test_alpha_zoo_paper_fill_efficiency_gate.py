@@ -9,7 +9,9 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT / "scripts" / "research" / "run_alpha_zoo_paper_fill_efficiency_gate.py"
-SPEC = importlib.util.spec_from_file_location("run_alpha_zoo_paper_fill_efficiency_gate", MODULE_PATH)
+SPEC = importlib.util.spec_from_file_location(
+    "run_alpha_zoo_paper_fill_efficiency_gate", MODULE_PATH
+)
 assert SPEC is not None and SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = MODULE
@@ -49,7 +51,9 @@ def _write_sources(
                 "artifact_kind": "alpha_zoo_sample_guarded_alpha_discovery",
                 "real_money_execution": False,
                 "decision": {"status": "no_new_paper_promotion_shadow_shortlist"},
-                "sample_guarded_candidates": candidates if candidates is not None else [_candidate_row()],
+                "sample_guarded_candidates": candidates
+                if candidates is not None
+                else [_candidate_row()],
             }
         )
         + "\n",
@@ -129,7 +133,9 @@ def test_paper_fill_efficiency_gate_fails_closed_without_fills(tmp_path: Path) -
     assert Path(payload["output_paths"]["backtest_fallback_candidates_csv"]).exists()
 
 
-def test_paper_fill_efficiency_gate_passes_with_realized_edge_above_spread_multiple(tmp_path: Path) -> None:
+def test_paper_fill_efficiency_gate_passes_with_realized_edge_above_spread_multiple(
+    tmp_path: Path,
+) -> None:
     sample, monitoring = _write_sources(tmp_path)
     fills = tmp_path / "fills.jsonl"
     _write_jsonl(fills, [_fill_row(pnl=2.0) for _ in range(30)])

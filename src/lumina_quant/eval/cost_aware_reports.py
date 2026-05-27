@@ -23,9 +23,17 @@ def _max_drawdown(equity: list[float]) -> float:
     return abs(worst)
 
 
-def compute_perf_metrics(returns: list[float], equity: list[float], periods_per_year: int) -> dict[str, float]:
+def compute_perf_metrics(
+    returns: list[float], equity: list[float], periods_per_year: int
+) -> dict[str, float]:
     if not returns:
-        return {"cagr": 0.0, "sharpe": 0.0, "max_drawdown": 0.0, "total_return": 0.0, "volatility": 0.0}
+        return {
+            "cagr": 0.0,
+            "sharpe": 0.0,
+            "max_drawdown": 0.0,
+            "total_return": 0.0,
+            "volatility": 0.0,
+        }
     mean_r = sum(returns) / len(returns)
     variance = sum((item - mean_r) ** 2 for item in returns) / max(1, len(returns) - 1)
     std_r = variance**0.5

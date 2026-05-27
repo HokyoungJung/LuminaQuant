@@ -7,7 +7,9 @@ from lumina_quant.cli import backtest as run_backtest
 
 
 def test_raw_first_requires_parquet_store(monkeypatch):
-    monkeypatch.setattr(run_backtest, "is_parquet_market_data_store", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(
+        run_backtest, "is_parquet_market_data_store", lambda *_args, **_kwargs: False
+    )
 
     with pytest.raises(RawFirstDataMissingError):
         run_backtest._load_data_dict(
@@ -34,7 +36,9 @@ def test_raw_first_loader_passes_data_mode_to_owner_entrypoint(monkeypatch):
         }
     ).with_columns(pl.from_epoch("datetime", time_unit="ms").alias("datetime"))
 
-    monkeypatch.setattr(run_backtest, "is_parquet_market_data_store", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(
+        run_backtest, "is_parquet_market_data_store", lambda *_args, **_kwargs: True
+    )
     monkeypatch.setattr(run_backtest, "SYMBOL_LIST", ["BTC/USDT"])
 
     def _loader(*args, **kwargs):

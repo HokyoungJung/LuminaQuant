@@ -42,7 +42,6 @@ def _load_fresh_module() -> Any:
     return module
 
 
-
 def _rss_mib() -> float:
     peak = int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss or 0)
     if sys.platform == "darwin":
@@ -222,7 +221,9 @@ def build_payload(args: argparse.Namespace) -> tuple[dict[str, Any], list[dict[s
         trial.set_user_attr("train_val_results", train_val_results)
         return score
 
-    sampler = optuna.samplers.TPESampler(seed=int(args.seed), n_startup_trials=min(12, int(args.n_trials)))
+    sampler = optuna.samplers.TPESampler(
+        seed=int(args.seed), n_startup_trials=min(12, int(args.n_trials))
+    )
     study = optuna.create_study(direction="maximize", sampler=sampler)
     if bool(args.enqueue_known_good):
         for params in (
@@ -250,10 +251,11 @@ def build_payload(args: argparse.Namespace) -> tuple[dict[str, Any], list[dict[s
         params = dict(trial.user_attrs.get("params") or trial.params)
         spec = _spec_from_params(fresh, params, trial_number=int(trial.number))
         split_results = {
-            split.name: fresh._run_split(spec=spec, arrays=arrays, split=split)
-            for split in splits
+            split.name: fresh._run_split(spec=spec, arrays=arrays, split=split) for split in splits
         }
-        metrics = {name: dict(result.get("metrics") or {}) for name, result in split_results.items()}
+        metrics = {
+            name: dict(result.get("metrics") or {}) for name, result in split_results.items()
+        }
         train = metrics.get("train", {})
         val = metrics.get("val", {})
         oos = metrics.get("oos", {})
@@ -293,7 +295,13 @@ def build_payload(args: argparse.Namespace) -> tuple[dict[str, Any], list[dict[s
     trials.sort(
         key=lambda row: (
             not bool((row.get("result") or {}).get("success_candidate")),
-            -_safe_float((row.get("result") or {}).get("split_results", {}).get("oos", {}).get("metrics", {}).get("total_return")),
+            -_safe_float(
+                (row.get("result") or {})
+                .get("split_results", {})
+                .get("oos", {})
+                .get("metrics", {})
+                .get("total_return")
+            ),
             -_safe_float(row.get("objective")),
         )
     )

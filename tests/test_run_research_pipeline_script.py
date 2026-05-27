@@ -34,5 +34,9 @@ def test_run_research_pipeline_dry_run_skips_outputs(tmp_path: Path):
 
     assert result.returncode == 0, result.stderr
     assert "dry-run mode: no output files written" in result.stdout
-    assert not list(tmp_path.glob("strategy_factory_*.json")), "dry-run should not write pipeline output json"
-    assert not list(tmp_path.glob("strategy_factory_*.md")), "dry-run should not write pipeline output markdown"
+    assert not list(tmp_path.glob("strategy_factory_*.json")), (
+        "dry-run should not write pipeline output json"
+    )
+    assert not list(tmp_path.glob("strategy_factory_*.md")), (
+        "dry-run should not write pipeline output markdown"
+    )

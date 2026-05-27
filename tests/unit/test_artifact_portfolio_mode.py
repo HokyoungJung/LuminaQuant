@@ -60,7 +60,9 @@ def test_portfolio_mode_does_not_propagate_child_timeframes_without_explicit_agg
     _patch_single_component(monkeypatch, _LegacyWindowChild)
 
     strategy = MODULE.ArtifactPortfolioModeStrategy(
-        bars=SimpleNamespace(symbol_list=["BNB/USDT"], get_latest_bar_value=lambda *args, **kwargs: 100.0),
+        bars=SimpleNamespace(
+            symbol_list=["BNB/USDT"], get_latest_bar_value=lambda *args, **kwargs: 100.0
+        ),
         events=SimpleNamespace(put=lambda item: None),
         portfolio_mode="hybrid_guarded_mode",
     )
@@ -69,7 +71,9 @@ def test_portfolio_mode_does_not_propagate_child_timeframes_without_explicit_agg
     assert strategy.required_timeframes == ()
 
 
-def test_portfolio_mode_propagates_child_timeframes_for_explicit_aggregator_use(monkeypatch) -> None:
+def test_portfolio_mode_propagates_child_timeframes_for_explicit_aggregator_use(
+    monkeypatch,
+) -> None:
     class _AggregatorChild:
         uses_timeframe_aggregator = True
         required_timeframes = ("20s", "1m")
@@ -83,7 +87,9 @@ def test_portfolio_mode_propagates_child_timeframes_for_explicit_aggregator_use(
     _patch_single_component(monkeypatch, _AggregatorChild)
 
     strategy = MODULE.ArtifactPortfolioModeStrategy(
-        bars=SimpleNamespace(symbol_list=["BNB/USDT"], get_latest_bar_value=lambda *args, **kwargs: 100.0),
+        bars=SimpleNamespace(
+            symbol_list=["BNB/USDT"], get_latest_bar_value=lambda *args, **kwargs: 100.0
+        ),
         events=SimpleNamespace(put=lambda item: None),
         portfolio_mode="hybrid_guarded_mode",
     )
@@ -106,7 +112,9 @@ def test_portfolio_mode_applies_research_only_component_param_overrides(monkeypa
     _patch_single_component(monkeypatch, _ParamChild)
 
     strategy = MODULE.ArtifactPortfolioModeStrategy(
-        bars=SimpleNamespace(symbol_list=["BNB/USDT"], get_latest_bar_value=lambda *args, **kwargs: 100.0),
+        bars=SimpleNamespace(
+            symbol_list=["BNB/USDT"], get_latest_bar_value=lambda *args, **kwargs: 100.0
+        ),
         events=SimpleNamespace(put=lambda item: None),
         portfolio_mode="hybrid_guarded_mode",
         component_param_overrides={
@@ -148,7 +156,9 @@ def test_portfolio_mode_propagates_child_features_and_context(monkeypatch) -> No
 
     events = []
     strategy = MODULE.ArtifactPortfolioModeStrategy(
-        bars=SimpleNamespace(symbol_list=["BNB/USDT"], get_latest_bar_value=lambda *args, **kwargs: 100.0),
+        bars=SimpleNamespace(
+            symbol_list=["BNB/USDT"], get_latest_bar_value=lambda *args, **kwargs: 100.0
+        ),
         events=SimpleNamespace(put=lambda item: events.append(item)),
         portfolio_mode="hybrid_guarded_mode",
     )
@@ -201,7 +211,9 @@ def test_portfolio_mode_strategy_forwards_component_weighted_signals(monkeypatch
 
     events = []
     strategy = MODULE.ArtifactPortfolioModeStrategy(
-        bars=SimpleNamespace(symbol_list=["BNB/USDT"], get_latest_bar_value=lambda *args, **kwargs: 100.0),
+        bars=SimpleNamespace(
+            symbol_list=["BNB/USDT"], get_latest_bar_value=lambda *args, **kwargs: 100.0
+        ),
         events=SimpleNamespace(put=lambda item: events.append(item)),
         portfolio_mode="hybrid_guarded_mode",
     )
@@ -226,7 +238,9 @@ def test_portfolio_mode_strategy_forwards_component_weighted_signals(monkeypatch
     assert signal.metadata["max_symbol_exposure_pct"] == 0.06
     assert signal.metadata["max_order_value"] == 150.0
     assert signal.strength == 0.075
-    assert signal.client_order_id.startswith("LQPM-") or signal.client_order_id.startswith("comp-a-")
+    assert signal.client_order_id.startswith("LQPM-") or signal.client_order_id.startswith(
+        "comp-a-"
+    )
 
 
 def test_profit_portfolio_mode_caps_unbounded_child_signals(monkeypatch) -> None:
@@ -251,7 +265,9 @@ def test_profit_portfolio_mode_caps_unbounded_child_signals(monkeypatch) -> None
 
     events = []
     strategy = MODULE.ArtifactPortfolioModeStrategy(
-        bars=SimpleNamespace(symbol_list=["BNB/USDT"], get_latest_bar_value=lambda *args, **kwargs: 100.0),
+        bars=SimpleNamespace(
+            symbol_list=["BNB/USDT"], get_latest_bar_value=lambda *args, **kwargs: 100.0
+        ),
         events=SimpleNamespace(put=lambda item: events.append(item)),
         portfolio_mode="profit_moonshot_balanced_mode",
     )
@@ -294,7 +310,9 @@ def test_derivatives_flow_squeeze_mode_resolves_new_alpha_components() -> None:
 
 
 def test_profit_moonshot_derivatives_taker_flow_mode_uses_strict_raw_taker_replay() -> None:
-    definition = MODULE.resolve_portfolio_mode_definition("profit_moonshot_derivatives_taker_flow_mode")
+    definition = MODULE.resolve_portfolio_mode_definition(
+        "profit_moonshot_derivatives_taker_flow_mode"
+    )
 
     assert supports_live_portfolio_mode("profit_moonshot_derivatives_taker_flow_mode")
     assert [component.component_id for component in definition.components] == [
@@ -305,13 +323,19 @@ def test_profit_moonshot_derivatives_taker_flow_mode_uses_strict_raw_taker_repla
     assert {component.strategy_class for component in definition.components} == {
         "DerivativesFlowSqueezeStrategy"
     }
-    assert all(component.params["allow_ohlcv_flow_proxy"] is False for component in definition.components)
+    assert all(
+        component.params["allow_ohlcv_flow_proxy"] is False for component in definition.components
+    )
     assert definition.components[0].params["enable_continuation"] is True
     assert definition.components[1].params["enable_exhaustion"] is True
 
 
-def test_profit_moonshot_derivatives_sparse_mode_reduces_overtrading_without_exposure_increase() -> None:
-    definition = MODULE.resolve_portfolio_mode_definition("profit_moonshot_derivatives_taker_flow_sparse_mode")
+def test_profit_moonshot_derivatives_sparse_mode_reduces_overtrading_without_exposure_increase() -> (
+    None
+):
+    definition = MODULE.resolve_portfolio_mode_definition(
+        "profit_moonshot_derivatives_taker_flow_sparse_mode"
+    )
 
     assert supports_live_portfolio_mode("profit_moonshot_derivatives_taker_flow_sparse_mode")
     assert definition.symbols == ["BTC/USDT", "ETH/USDT", "SOL/USDT"]
@@ -324,7 +348,9 @@ def test_profit_moonshot_derivatives_sparse_mode_reduces_overtrading_without_exp
 
 
 def test_profit_moonshot_leadlag_slow_diffusion_mode_uses_screened_btc_eth_candidate() -> None:
-    definition = MODULE.resolve_portfolio_mode_definition("profit_moonshot_leadlag_slow_diffusion_mode")
+    definition = MODULE.resolve_portfolio_mode_definition(
+        "profit_moonshot_leadlag_slow_diffusion_mode"
+    )
 
     assert supports_live_portfolio_mode("profit_moonshot_leadlag_slow_diffusion_mode")
     assert definition.symbols == ["BTC/USDT", "ETH/USDT"]
@@ -377,10 +403,17 @@ def test_profit_moonshot_leadlag_slow_diffusion_ensemble_splits_same_target_risk
         "SOL/USDT",
     ]
     assert [component.params["lag_bars"] for component in definition.components] == [2, 1]
-    assert all(component.params["target_symbol"] == "ETH/USDT" for component in definition.components)
-    assert all(component.params["target_allocation"] == 0.008 for component in definition.components)
+    assert all(
+        component.params["target_symbol"] == "ETH/USDT" for component in definition.components
+    )
+    assert all(
+        component.params["target_allocation"] == 0.008 for component in definition.components
+    )
     assert (
-        sum(component.weight * component.params["target_allocation"] for component in definition.components)
+        sum(
+            component.weight * component.params["target_allocation"]
+            for component in definition.components
+        )
         == 0.008
     )
 
@@ -476,7 +509,9 @@ def test_profit_moonshot_hourly_shock_reversion_taker_flow_guard_mode_requires_f
     assert component.params["target_allocation"] == 0.008
     assert component.weight == 1.0
     strategy = MODULE.ArtifactPortfolioModeStrategy(
-        bars=SimpleNamespace(symbol_list=["ETH/USDT"], get_latest_bar_value=lambda *args, **kwargs: 100.0),
+        bars=SimpleNamespace(
+            symbol_list=["ETH/USDT"], get_latest_bar_value=lambda *args, **kwargs: 100.0
+        ),
         events=SimpleNamespace(put=lambda item: None),
         portfolio_mode="profit_moonshot_hourly_shock_reversion_eth_12h_taker_flow_guard_mode",
     )
@@ -488,7 +523,9 @@ def test_profit_moonshot_hourly_shock_reversion_taker_flow_guard_mode_requires_f
     }
 
 
-def test_profit_moonshot_hourly_shock_reversion_funding_taker_flow_guard_mode_combines_filters() -> None:
+def test_profit_moonshot_hourly_shock_reversion_funding_taker_flow_guard_mode_combines_filters() -> (
+    None
+):
     definition = MODULE.resolve_portfolio_mode_definition(
         "profit_moonshot_hourly_shock_reversion_eth_12h_funding_taker_flow_guard_mode"
     )
@@ -508,7 +545,9 @@ def test_profit_moonshot_hourly_shock_reversion_funding_taker_flow_guard_mode_co
     assert component.weight == 1.0
 
 
-def test_profit_moonshot_hourly_shock_reversion_sol_regime_guard_mode_uses_replay_survivor() -> None:
+def test_profit_moonshot_hourly_shock_reversion_sol_regime_guard_mode_uses_replay_survivor() -> (
+    None
+):
     definition = MODULE.resolve_portfolio_mode_definition(
         "profit_moonshot_hourly_shock_reversion_eth_12h_sol_regime_guard_mode"
     )
@@ -545,10 +584,15 @@ def test_profit_moonshot_precious_metal_pair_mode_includes_four_metals_with_caps
     ]
     assert [component.weight for component in definition.components] == [0.65, 0.35]
     assert all(component.params["timeframe"] == "1h" for component in definition.components)
-    assert all(component.params["target_allocation"] == 0.024 for component in definition.components)
+    assert all(
+        component.params["target_allocation"] == 0.024 for component in definition.components
+    )
     assert all(component.params["max_order_value"] == 350.0 for component in definition.components)
     assert (
-        sum(component.weight * component.params["target_allocation"] for component in definition.components)
+        sum(
+            component.weight * component.params["target_allocation"]
+            for component in definition.components
+        )
         == 0.024
     )
 
@@ -562,7 +606,9 @@ def test_profit_moonshot_filtered_shock_reversion_diversified_mode_keeps_gross_c
     assert supports_live_portfolio_mode("profit_moonshot_taker_flow_exhaustion_eth_mode")
     assert supports_live_portfolio_mode("profit_moonshot_taker_flow_exhaustion_eth_reactive_mode")
     assert supports_live_portfolio_mode("profit_moonshot_taker_flow_exhaustion_eth_hold_mode")
-    assert supports_live_portfolio_mode("profit_moonshot_taker_flow_exhaustion_eth_slow_momentum_mode")
+    assert supports_live_portfolio_mode(
+        "profit_moonshot_taker_flow_exhaustion_eth_slow_momentum_mode"
+    )
     assert definition.symbols == ["ETH/USDT", "SOL/USDT"]
     assert [component.strategy_class for component in definition.components] == [
         "HourlyShockReversionStrategy",
@@ -570,7 +616,10 @@ def test_profit_moonshot_filtered_shock_reversion_diversified_mode_keeps_gross_c
     ]
     assert sum(component.weight for component in definition.components) == 1.0
     assert (
-        sum(component.weight * component.params["target_allocation"] for component in definition.components)
+        sum(
+            component.weight * component.params["target_allocation"]
+            for component in definition.components
+        )
         == 0.008
     )
     sol_component = next(
@@ -597,7 +646,9 @@ def test_profit_moonshot_taker_flow_exhaustion_eth_mode_uses_same_risk_cap() -> 
     assert component.weight == 1.0
 
 
-def test_resolve_portfolio_mode_definition_supports_recursive_allocator_sleeves(monkeypatch, tmp_path: Path) -> None:
+def test_resolve_portfolio_mode_definition_supports_recursive_allocator_sleeves(
+    monkeypatch, tmp_path: Path
+) -> None:
     def _write(path: Path, payload: dict) -> Path:
         path.write_text(json.dumps(payload), encoding="utf-8")
         return path
@@ -764,17 +815,25 @@ def test_resolve_portfolio_mode_definition_supports_recursive_allocator_sleeves(
     monkeypatch.setattr(MODULE, "HYBRID_PATH", hybrid_path)
     monkeypatch.setattr(MODULE, "LEGACY_NO_HIGHVOL_HYBRID_PATH", legacy_hybrid_path)
     monkeypatch.setattr(MODULE, "RETUNED_LIVE_PORTFOLIO_HYBRID_PATH", retuned_hybrid_path)
-    monkeypatch.setattr(MODULE, "PRODUCTION_GUARDED_PATH", _write(
-        tmp_path / "production_guarded.json",
-        {
-            "weights": [
-                {"candidate_id": "incumbent_only", "name": "incumbent_only", "weight": 0.4},
-                {"candidate_id": "blend_85_15", "name": "blend_85_15", "weight": 0.35},
-                {"candidate_id": "autoresearch_55_45", "name": "autoresearch_55_45", "weight": 0.2},
-            ],
-            "cash_weight": 0.05,
-        },
-    ))
+    monkeypatch.setattr(
+        MODULE,
+        "PRODUCTION_GUARDED_PATH",
+        _write(
+            tmp_path / "production_guarded.json",
+            {
+                "weights": [
+                    {"candidate_id": "incumbent_only", "name": "incumbent_only", "weight": 0.4},
+                    {"candidate_id": "blend_85_15", "name": "blend_85_15", "weight": 0.35},
+                    {
+                        "candidate_id": "autoresearch_55_45",
+                        "name": "autoresearch_55_45",
+                        "weight": 0.2,
+                    },
+                ],
+                "cash_weight": 0.05,
+            },
+        ),
+    )
     monkeypatch.setattr(MODULE, "STRICT_AUTORESEARCH_1X_PATH", autoresearch_path)
 
     defensive = MODULE.resolve_portfolio_mode_definition("defensive_overlay_mode")
@@ -787,7 +846,9 @@ def test_resolve_portfolio_mode_definition_supports_recursive_allocator_sleeves(
     risk_off = MODULE.resolve_portfolio_mode_definition("risk_off_mode")
 
     defensive_weights = {item.component_id: round(item.weight, 6) for item in defensive.components}
-    aggressive_weights = {item.component_id: round(item.weight, 6) for item in aggressive.components}
+    aggressive_weights = {
+        item.component_id: round(item.weight, 6) for item in aggressive.components
+    }
     hybrid_weights = {item.component_id: round(item.weight, 6) for item in hybrid.components}
     legacy_hybrid_weights = {
         item.component_id: round(item.weight, 6) for item in legacy_hybrid.components
@@ -858,20 +919,38 @@ def test_resolve_portfolio_mode_definition_supports_recursive_allocator_sleeves(
     assert "profit_moonshot_adaptive_momentum_boost_mode" in MODULE.supported_portfolio_modes()
     assert "profit_moonshot_adaptive_momentum_governed_mode" in MODULE.supported_portfolio_modes()
     assert "profit_moonshot_adaptive_momentum_vol_target_mode" in MODULE.supported_portfolio_modes()
-    assert "profit_moonshot_adaptive_momentum_vol_target_132_mode" in MODULE.supported_portfolio_modes()
-    assert "profit_moonshot_adaptive_momentum_asym_dynamic_mode" in MODULE.supported_portfolio_modes()
-    assert "profit_moonshot_adaptive_momentum_volume_guard_mode" in MODULE.supported_portfolio_modes()
+    assert (
+        "profit_moonshot_adaptive_momentum_vol_target_132_mode"
+        in MODULE.supported_portfolio_modes()
+    )
+    assert (
+        "profit_moonshot_adaptive_momentum_asym_dynamic_mode" in MODULE.supported_portfolio_modes()
+    )
+    assert (
+        "profit_moonshot_adaptive_momentum_volume_guard_mode" in MODULE.supported_portfolio_modes()
+    )
     assert "profit_moonshot_momentum_hybrid_return_mode" in MODULE.supported_portfolio_modes()
     assert "profit_moonshot_momentum_hybrid_safe_mode" in MODULE.supported_portfolio_modes()
     assert "profit_moonshot_momentum_hybrid_core_mode" in MODULE.supported_portfolio_modes()
     assert "profit_moonshot_ensemble_mode" in MODULE.supported_portfolio_modes()
     assert "profit_moonshot_derivatives_taker_flow_mode" in MODULE.supported_portfolio_modes()
-    assert "profit_moonshot_derivatives_taker_flow_sparse_mode" in MODULE.supported_portfolio_modes()
-    assert "profit_moonshot_leadlag_slow_diffusion_sol_eth_mode" in MODULE.supported_portfolio_modes()
-    assert "profit_moonshot_leadlag_slow_diffusion_ensemble_mode" in MODULE.supported_portfolio_modes()
+    assert (
+        "profit_moonshot_derivatives_taker_flow_sparse_mode" in MODULE.supported_portfolio_modes()
+    )
+    assert (
+        "profit_moonshot_leadlag_slow_diffusion_sol_eth_mode" in MODULE.supported_portfolio_modes()
+    )
+    assert (
+        "profit_moonshot_leadlag_slow_diffusion_ensemble_mode" in MODULE.supported_portfolio_modes()
+    )
     assert "profit_moonshot_hourly_shock_reversion_eth_mode" in MODULE.supported_portfolio_modes()
-    assert "profit_moonshot_hourly_shock_reversion_eth_12h_mode" in MODULE.supported_portfolio_modes()
-    assert "profit_moonshot_hourly_shock_reversion_eth_12h_dense_mode" in MODULE.supported_portfolio_modes()
+    assert (
+        "profit_moonshot_hourly_shock_reversion_eth_12h_mode" in MODULE.supported_portfolio_modes()
+    )
+    assert (
+        "profit_moonshot_hourly_shock_reversion_eth_12h_dense_mode"
+        in MODULE.supported_portfolio_modes()
+    )
     assert (
         "profit_moonshot_hourly_shock_reversion_eth_12h_funding_guard_mode"
         in MODULE.supported_portfolio_modes()
@@ -880,15 +959,25 @@ def test_resolve_portfolio_mode_definition_supports_recursive_allocator_sleeves(
         "profit_moonshot_hourly_shock_reversion_eth_12h_taker_flow_guard_mode"
         in MODULE.supported_portfolio_modes()
     )
-    assert "profit_moonshot_filtered_shock_reversion_diversified_mode" in MODULE.supported_portfolio_modes()
+    assert (
+        "profit_moonshot_filtered_shock_reversion_diversified_mode"
+        in MODULE.supported_portfolio_modes()
+    )
     assert "profit_moonshot_taker_flow_exhaustion_eth_mode" in MODULE.supported_portfolio_modes()
-    assert "profit_moonshot_taker_flow_exhaustion_eth_reactive_mode" in MODULE.supported_portfolio_modes()
-    assert "profit_moonshot_taker_flow_exhaustion_eth_hold_mode" in MODULE.supported_portfolio_modes()
+    assert (
+        "profit_moonshot_taker_flow_exhaustion_eth_reactive_mode"
+        in MODULE.supported_portfolio_modes()
+    )
+    assert (
+        "profit_moonshot_taker_flow_exhaustion_eth_hold_mode" in MODULE.supported_portfolio_modes()
+    )
     assert (
         "profit_moonshot_taker_flow_exhaustion_eth_slow_momentum_mode"
         in MODULE.supported_portfolio_modes()
     )
-    assert "profit_moonshot_precious_metal_pair_aggressive_mode" in MODULE.supported_portfolio_modes()
+    assert (
+        "profit_moonshot_precious_metal_pair_aggressive_mode" in MODULE.supported_portfolio_modes()
+    )
     assert supports_live_portfolio_mode("legacy_no_highvol_hybrid_mode")
     assert supports_live_portfolio_mode("retuned_live_portfolio_hybrid_mode")
     assert supports_live_portfolio_mode("profit_reboot_panic_rebound_mode")
@@ -939,10 +1028,18 @@ def test_profit_reboot_synthetic_modes_resolve_new_strategy_families() -> None:
 
 def test_profit_moonshot_synthetic_modes_resolve_no_aggregator_strategy_families() -> None:
     boost = MODULE.resolve_portfolio_mode_definition("profit_moonshot_adaptive_momentum_boost_mode")
-    ladder_120 = MODULE.resolve_portfolio_mode_definition("profit_moonshot_adaptive_momentum_120_mode")
-    ladder_130 = MODULE.resolve_portfolio_mode_definition("profit_moonshot_adaptive_momentum_130_mode")
-    ladder_140 = MODULE.resolve_portfolio_mode_definition("profit_moonshot_adaptive_momentum_140_mode")
-    governed = MODULE.resolve_portfolio_mode_definition("profit_moonshot_adaptive_momentum_governed_mode")
+    ladder_120 = MODULE.resolve_portfolio_mode_definition(
+        "profit_moonshot_adaptive_momentum_120_mode"
+    )
+    ladder_130 = MODULE.resolve_portfolio_mode_definition(
+        "profit_moonshot_adaptive_momentum_130_mode"
+    )
+    ladder_140 = MODULE.resolve_portfolio_mode_definition(
+        "profit_moonshot_adaptive_momentum_140_mode"
+    )
+    governed = MODULE.resolve_portfolio_mode_definition(
+        "profit_moonshot_adaptive_momentum_governed_mode"
+    )
     vol_target = MODULE.resolve_portfolio_mode_definition(
         "profit_moonshot_adaptive_momentum_vol_target_mode"
     )
@@ -955,9 +1052,15 @@ def test_profit_moonshot_synthetic_modes_resolve_no_aggregator_strategy_families
     volume_guard = MODULE.resolve_portfolio_mode_definition(
         "profit_moonshot_adaptive_momentum_volume_guard_mode"
     )
-    hybrid_return = MODULE.resolve_portfolio_mode_definition("profit_moonshot_momentum_hybrid_return_mode")
-    hybrid_safe = MODULE.resolve_portfolio_mode_definition("profit_moonshot_momentum_hybrid_safe_mode")
-    hybrid_core = MODULE.resolve_portfolio_mode_definition("profit_moonshot_momentum_hybrid_core_mode")
+    hybrid_return = MODULE.resolve_portfolio_mode_definition(
+        "profit_moonshot_momentum_hybrid_return_mode"
+    )
+    hybrid_safe = MODULE.resolve_portfolio_mode_definition(
+        "profit_moonshot_momentum_hybrid_safe_mode"
+    )
+    hybrid_core = MODULE.resolve_portfolio_mode_definition(
+        "profit_moonshot_momentum_hybrid_core_mode"
+    )
     trend = MODULE.resolve_portfolio_mode_definition("profit_moonshot_trend_mode")
     breakout = MODULE.resolve_portfolio_mode_definition("profit_moonshot_breakout_mode")
     reversion = MODULE.resolve_portfolio_mode_definition("profit_moonshot_reversion_mode")
@@ -1005,7 +1108,9 @@ def test_profit_moonshot_synthetic_modes_resolve_no_aggregator_strategy_families
     }
     assert {
         component.strategy_class
-        for component in MODULE.resolve_portfolio_mode_definition("profit_moonshot_balanced_mode").components
+        for component in MODULE.resolve_portfolio_mode_definition(
+            "profit_moonshot_balanced_mode"
+        ).components
     } == {
         "ProfitMoonshotTrendStrategy",
         "ProfitMoonshotBreakoutStrategy",

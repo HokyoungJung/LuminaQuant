@@ -450,7 +450,10 @@ class SimulatedExecutionHandler(ExecutionHandler):
                     metadata={
                         "reduce_only": order.get("reduce_only", False),
                         "signal_metadata": dict(order.get("metadata") or {}),
-                        "component_id": str(dict(order.get("metadata") or {}).get("component_id") or "").strip() or None,
+                        "component_id": str(
+                            dict(order.get("metadata") or {}).get("component_id") or ""
+                        ).strip()
+                        or None,
                     },
                 )
                 self.events.put(fill_event)

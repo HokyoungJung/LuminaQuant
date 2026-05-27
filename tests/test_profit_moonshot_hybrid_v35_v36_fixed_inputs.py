@@ -10,7 +10,9 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT / "scripts" / "research" / "run_profit_moonshot_hybrid_v35_v36_fixed_inputs.py"
-SPEC = importlib.util.spec_from_file_location("run_profit_moonshot_hybrid_v35_v36_fixed_inputs", MODULE_PATH)
+SPEC = importlib.util.spec_from_file_location(
+    "run_profit_moonshot_hybrid_v35_v36_fixed_inputs", MODULE_PATH
+)
 assert SPEC is not None and SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = MODULE
@@ -30,8 +32,7 @@ def test_v36_only_refreshes_default_candidate_from_v35_core_params() -> None:
     # rolling-score leader later.  V3.5 must keep default_idx=0; V3.6 should
     # dynamically refresh only the default candidate, not weight/boost/cap knobs.
     returns = np.array(
-        [[0.010, -0.010]] * 5
-        + [[-0.010, 0.020]] * 30,
+        [[0.010, -0.010]] * 5 + [[-0.010, 0.020]] * 30,
         dtype=float,
     )
     params = MODULE.HybridParams(
@@ -123,9 +124,30 @@ def test_live_policy_can_promote_after_safe_integrated_margin_replay() -> None:
             cv_score=0.0,
         ).__dict__,
         "splits": {
-            "train": {"total_return": 0.10, "max_drawdown": 0.01, "sharpe": 1.0, "sortino": 1.0, "smart_sortino": 1.0, "calmar": 1.0},
-            "validation": {"total_return": 0.10, "max_drawdown": 0.01, "sharpe": 1.0, "sortino": 1.0, "smart_sortino": 1.0, "calmar": 1.0},
-            "locked_oos": {"total_return": 0.10, "max_drawdown": 0.01, "sharpe": 1.0, "sortino": 1.0, "smart_sortino": 1.0, "calmar": 1.0},
+            "train": {
+                "total_return": 0.10,
+                "max_drawdown": 0.01,
+                "sharpe": 1.0,
+                "sortino": 1.0,
+                "smart_sortino": 1.0,
+                "calmar": 1.0,
+            },
+            "validation": {
+                "total_return": 0.10,
+                "max_drawdown": 0.01,
+                "sharpe": 1.0,
+                "sortino": 1.0,
+                "smart_sortino": 1.0,
+                "calmar": 1.0,
+            },
+            "locked_oos": {
+                "total_return": 0.10,
+                "max_drawdown": 0.01,
+                "sharpe": 1.0,
+                "sortino": 1.0,
+                "smart_sortino": 1.0,
+                "calmar": 1.0,
+            },
         },
         "train_val_score": 1.0,
         "train_val_gate": True,

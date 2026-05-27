@@ -51,7 +51,9 @@ def main() -> None:
     exchange = str(args.exchange).strip().lower()
 
     if str(args.symbols).strip():
-        symbols = [normalize_symbol(item.strip()) for item in str(args.symbols).split(",") if item.strip()]
+        symbols = [
+            normalize_symbol(item.strip()) for item in str(args.symbols).split(",") if item.strip()
+        ]
     else:
         symbols = _discover_symbols(root, exchange)
 

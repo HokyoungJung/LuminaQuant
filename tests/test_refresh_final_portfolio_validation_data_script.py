@@ -14,7 +14,9 @@ from lumina_quant.storage.parquet import ParquetMarketDataRepository
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT / "scripts" / "research" / "refresh_final_portfolio_validation_data.py"
-SPEC = importlib.util.spec_from_file_location("refresh_final_portfolio_validation_data", MODULE_PATH)
+SPEC = importlib.util.spec_from_file_location(
+    "refresh_final_portfolio_validation_data", MODULE_PATH
+)
 if SPEC is None or SPEC.loader is None:
     raise RuntimeError("Failed to load refresh_final_portfolio_validation_data module")
 MODULE = importlib.util.module_from_spec(SPEC)
@@ -39,7 +41,10 @@ def test_load_feature_symbols_filters_to_required_strategy_classes(tmp_path: Pat
     payload = {
         "selected_team": [
             {"strategy_class": "CompositeTrendStrategy", "symbols": ["BTC/USDT", "ETH/USDT"]},
-            {"strategy_class": "TopCapTimeSeriesMomentumStrategy", "symbols": ["BTC/USDT", "BNB/USDT"]},
+            {
+                "strategy_class": "TopCapTimeSeriesMomentumStrategy",
+                "symbols": ["BTC/USDT", "BNB/USDT"],
+            },
             {"strategy_class": "PerpCrowdingCarryStrategy", "symbols": ["SOL/USDT"]},
         ]
     }
@@ -87,7 +92,9 @@ def test_refresh_symbol_raw_first_ohlcv_derives_from_stored_raw_aggtrades(
     )
 
     monkeypatch.setattr(MODULE, "_download_zip_bytes", lambda *args, **kwargs: archive_zip)
-    monkeypatch.setattr(MODULE, "_binance_archive_url", lambda *args, **kwargs: "https://example.test")
+    monkeypatch.setattr(
+        MODULE, "_binance_archive_url", lambda *args, **kwargs: "https://example.test"
+    )
     monkeypatch.setattr(
         MODULE,
         "_collect_live_raw_rows",
@@ -223,7 +230,6 @@ def test_collect_live_raw_rows_scans_across_sparse_hour_windows(monkeypatch) -> 
     assert [row["agg_trade_id"] for row in rows] == [10, 20]
 
 
-
 def test_collect_live_raw_rows_skips_empty_windows_before_later_trades(monkeypatch) -> None:
     class _Exchange:
         def close(self):
@@ -280,7 +286,11 @@ def test_current_utc_day_skips_archive_probe(monkeypatch, tmp_path: Path) -> Non
     assert floor_dt is not None
 
     monkeypatch.setattr(MODULE, "_utc_today", lambda: date(2026, 3, 28))
-    monkeypatch.setattr(MODULE, "_download_zip_bytes", lambda *args, **kwargs: pytest.fail("archive probe should be skipped"))
+    monkeypatch.setattr(
+        MODULE,
+        "_download_zip_bytes",
+        lambda *args, **kwargs: pytest.fail("archive probe should be skipped"),
+    )
 
     live_calls: list[dict[str, int]] = []
 
@@ -314,7 +324,9 @@ def test_current_utc_day_skips_archive_probe(monkeypatch, tmp_path: Path) -> Non
     assert live_calls and live_calls[0]["start_ms"] == int(floor_dt.timestamp() * 1000)
 
 
-def test_unsupported_live_symbol_skips_live_tail_without_failing(monkeypatch, tmp_path: Path) -> None:
+def test_unsupported_live_symbol_skips_live_tail_without_failing(
+    monkeypatch, tmp_path: Path
+) -> None:
     repo = ParquetMarketDataRepository(str(tmp_path))
     cutoff_dt = MODULE.parse_utc("2026-03-28T00:10:00Z")
     floor_dt = MODULE.parse_utc("2026-03-28T00:00:00Z")
@@ -322,9 +334,17 @@ def test_unsupported_live_symbol_skips_live_tail_without_failing(monkeypatch, tm
     assert floor_dt is not None
 
     monkeypatch.setattr(MODULE, "_utc_today", lambda: date(2026, 3, 28))
-    monkeypatch.setattr(MODULE, "_download_zip_bytes", lambda *args, **kwargs: pytest.fail("archive probe should be skipped"))
+    monkeypatch.setattr(
+        MODULE,
+        "_download_zip_bytes",
+        lambda *args, **kwargs: pytest.fail("archive probe should be skipped"),
+    )
     monkeypatch.setattr(MODULE, "_supports_live_raw_symbol", lambda _symbol: False)
-    monkeypatch.setattr(MODULE, "_collect_live_raw_rows", lambda **_kwargs: pytest.fail("live fetch should be skipped"))
+    monkeypatch.setattr(
+        MODULE,
+        "_collect_live_raw_rows",
+        lambda **_kwargs: pytest.fail("live fetch should be skipped"),
+    )
 
     result = MODULE.refresh_symbol_raw_first_ohlcv(
         repo=repo,
@@ -343,7 +363,9 @@ def test_unsupported_live_symbol_skips_live_tail_without_failing(monkeypatch, tm
     assert result.live_raw_rows_upserted == 0
 
 
-def test_invalid_symbol_error_from_live_fetch_falls_back_to_skip(monkeypatch, tmp_path: Path) -> None:
+def test_invalid_symbol_error_from_live_fetch_falls_back_to_skip(
+    monkeypatch, tmp_path: Path
+) -> None:
     repo = ParquetMarketDataRepository(str(tmp_path))
     cutoff_dt = MODULE.parse_utc("2026-03-28T00:10:00Z")
     floor_dt = MODULE.parse_utc("2026-03-28T00:00:00Z")
@@ -352,7 +374,11 @@ def test_invalid_symbol_error_from_live_fetch_falls_back_to_skip(monkeypatch, tm
 
     monkeypatch.setattr(MODULE, "_utc_today", lambda: date(2026, 3, 28))
     monkeypatch.setattr(MODULE, "_supports_live_raw_symbol", lambda _symbol: True)
-    monkeypatch.setattr(MODULE, "_download_zip_bytes", lambda *args, **kwargs: pytest.fail("archive probe should be skipped"))
+    monkeypatch.setattr(
+        MODULE,
+        "_download_zip_bytes",
+        lambda *args, **kwargs: pytest.fail("archive probe should be skipped"),
+    )
 
     def _raise_invalid(**_kwargs):
         raise MODULE.LiveRawSymbolUnsupportedError("invalid symbol")
@@ -401,7 +427,9 @@ def test_order_symbols_for_parallel_refresh_dedupes_aliases(monkeypatch) -> None
     assert ordered == ["BTC/USDT", "XAU/USDT"]
 
 
-def test_order_symbols_for_parallel_refresh_uses_previous_costs_and_live_support(monkeypatch) -> None:
+def test_order_symbols_for_parallel_refresh_uses_previous_costs_and_live_support(
+    monkeypatch,
+) -> None:
     monkeypatch.setattr(
         MODULE,
         "_supports_live_raw_symbol",
@@ -482,9 +510,7 @@ def test_estimate_parallel_workers_respects_memory_budget() -> None:
 def test_resolve_effective_memory_budget_bytes_clamps_to_safe_session_cap(monkeypatch) -> None:
     monkeypatch.setattr(MODULE, "resolve_memory_budget_bytes", lambda: 32 * 1024 * 1024 * 1024)
 
-    effective, system_budget = MODULE.resolve_effective_memory_budget_bytes(
-        12 * 1024 * 1024 * 1024
-    )
+    effective, system_budget = MODULE.resolve_effective_memory_budget_bytes(12 * 1024 * 1024 * 1024)
 
     assert effective == MODULE.DEFAULT_HEAVY_RUN_MEMORY_BUDGET_BYTES
     assert system_budget == 32 * 1024 * 1024 * 1024
@@ -500,7 +526,9 @@ def test_recent_archive_404_cuts_over_to_live_tail(monkeypatch, tmp_path: Path) 
     monkeypatch.setenv("LQ_RECENT_ARCHIVE_LIVE_CUTOVER_DAYS", "3")
     monkeypatch.setenv("LQ_ARCHIVE_MISS_STREAK_FOR_LIVE_CUTOVER", "1")
     monkeypatch.setattr(MODULE, "_download_zip_bytes", lambda *args, **kwargs: None)
-    monkeypatch.setattr(MODULE, "_binance_archive_url", lambda *args, **kwargs: "https://example.test")
+    monkeypatch.setattr(
+        MODULE, "_binance_archive_url", lambda *args, **kwargs: "https://example.test"
+    )
 
     live_calls: list[dict[str, int]] = []
 
@@ -553,7 +581,9 @@ def test_refresh_payload_reports_backend(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(MODULE, "load_portfolio_symbols", lambda *_args, **_kwargs: [])
     monkeypatch.setattr(MODULE, "load_feature_symbols", lambda *_args, **_kwargs: [])
     monkeypatch.setattr(MODULE, "acquire_session_memory_lease", lambda **_kwargs: _Lease())
-    monkeypatch.setattr(MODULE, "resolve_raw_aggtrades_backend_name", lambda *_args, **_kwargs: "python")
+    monkeypatch.setattr(
+        MODULE, "resolve_raw_aggtrades_backend_name", lambda *_args, **_kwargs: "python"
+    )
     monkeypatch.setattr(
         MODULE,
         "raw_first_backend_diagnostics",
@@ -592,7 +622,9 @@ def test_refresh_payload_reports_backend(monkeypatch, tmp_path: Path) -> None:
     assert payload["aggregation_backend_diagnostics"]["native_load_error"] == "test missing library"
 
 
-def test_refresh_payload_blocks_when_session_memory_lease_is_active(monkeypatch, tmp_path: Path) -> None:
+def test_refresh_payload_blocks_when_session_memory_lease_is_active(
+    monkeypatch, tmp_path: Path
+) -> None:
     output_json = tmp_path / "out.json"
     output_md = tmp_path / "out.md"
     rss_log = tmp_path / "rss.jsonl"

@@ -215,7 +215,9 @@ def merge_feature_points(existing: pl.DataFrame, incoming: pl.DataFrame) -> pl.D
         pl.col("source").drop_nulls().last().alias("source"),
         *[pl.col(column).drop_nulls().last().alias(column) for column in FEATURE_COLUMNS],
     ]
-    return _align_feature_frame(merged.group_by("timestamp_ms").agg(grouped_expr).sort("timestamp_ms"))
+    return _align_feature_frame(
+        merged.group_by("timestamp_ms").agg(grouped_expr).sort("timestamp_ms")
+    )
 
 
 def _write_feature_partitions(
@@ -304,11 +306,15 @@ def backfill_symbol_day(
         cadence_seconds=cadence_seconds,
         source=source,
     )
-    written = 0 if dry_run else _write_feature_partitions(
-        db_path=db_path,
-        exchange=exchange,
-        symbol=symbol,
-        incoming=features,
+    written = (
+        0
+        if dry_run
+        else _write_feature_partitions(
+            db_path=db_path,
+            exchange=exchange,
+            symbol=symbol,
+            incoming=features,
+        )
     )
     return {
         "symbol": normalize_symbol(symbol),
@@ -370,7 +376,9 @@ def run_backfill(
         },
     }
     output_json.parent.mkdir(parents=True, exist_ok=True)
-    output_json.write_text(json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    output_json.write_text(
+        json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     return summary
 
 
@@ -399,7 +407,12 @@ def main(argv: list[str] | None = None) -> int:
         output_json=Path(args.output_json),
         dry_run=bool(args.dry_run),
     )
-    print(json.dumps({"output_json": str(Path(args.output_json).resolve()), "totals": summary["totals"]}, indent=2))
+    print(
+        json.dumps(
+            {"output_json": str(Path(args.output_json).resolve()), "totals": summary["totals"]},
+            indent=2,
+        )
+    )
     return 0
 
 

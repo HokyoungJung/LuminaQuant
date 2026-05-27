@@ -42,7 +42,9 @@ def load_exact_window_bundle(root: str | Path | None = None) -> dict[str, Any]:
         "root": str(paths["root"]),
         "run_root": str(paths["run_root"]),
         "latest_pointer": str(paths["latest_pointer"]) if paths.get("latest_pointer") else None,
-        "decision_paths": {key: str(value) for key, value in decision_paths.items() if key != "root"},
+        "decision_paths": {
+            key: str(value) for key, value in decision_paths.items() if key != "root"
+        },
     }
     payload["registry"] = resolve_backtest_registry(resolved_root)
     payload["paths"]["decision"] = str(decision_paths["json_latest"])
@@ -53,7 +55,9 @@ def load_exact_window_bundle(root: str | Path | None = None) -> dict[str, Any]:
     payload["paths"]["pipeline_manifest"] = str(pipeline_manifest_path)
     for key in ("summary", "details", "fail_analysis", "memory_evidence"):
         candidate = paths.get(key)
-        payload[key] = _read_json(candidate) if isinstance(candidate, Path) and candidate.exists() else None
+        payload[key] = (
+            _read_json(candidate) if isinstance(candidate, Path) and candidate.exists() else None
+        )
     payload["pipeline_manifest"] = (
         _read_json(pipeline_manifest_path) if pipeline_manifest_path.exists() else None
     )
@@ -61,7 +65,9 @@ def load_exact_window_bundle(root: str | Path | None = None) -> dict[str, Any]:
     if recovered_registry_path.exists():
         recovered_payload = _read_json(recovered_registry_path)
         payload["recovered_registry"] = list(recovered_payload.get("entries") or [])
-    payload["archive_payload"] = _read_json(archive_json_path) if archive_json_path.exists() else None
+    payload["archive_payload"] = (
+        _read_json(archive_json_path) if archive_json_path.exists() else None
+    )
     payload["decision"] = load_exact_window_decision_artifact(resolved_root)
     payload["followup_status_root"] = str(followup_status_root)
     payload["followup_status"] = {}
@@ -73,8 +79,16 @@ def load_exact_window_bundle(root: str | Path | None = None) -> dict[str, Any]:
                 stage_payload = _read_json(candidate)
                 payload["followup_status"][candidate.stem] = stage_payload
                 if isinstance(stage_payload, dict):
-                    summary_path = Path(str(stage_payload.get("summary_path") or "")).resolve() if stage_payload.get("summary_path") else None
-                    details_path = Path(str(stage_payload.get("details_path") or "")).resolve() if stage_payload.get("details_path") else None
+                    summary_path = (
+                        Path(str(stage_payload.get("summary_path") or "")).resolve()
+                        if stage_payload.get("summary_path")
+                        else None
+                    )
+                    details_path = (
+                        Path(str(stage_payload.get("details_path") or "")).resolve()
+                        if stage_payload.get("details_path")
+                        else None
+                    )
                     if summary_path and summary_path.exists():
                         payload["followup_summaries"][candidate.stem] = _read_json(summary_path)
                     if details_path and details_path.exists():

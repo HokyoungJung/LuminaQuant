@@ -61,7 +61,9 @@ def infer_market(symbol: Any) -> str:
     return "unknown"
 
 
-def _spec(name: str, family: str, market: str, inputs: Iterable[str], description: str, **params: Any) -> FactorSpec:
+def _spec(
+    name: str, family: str, market: str, inputs: Iterable[str], description: str, **params: Any
+) -> FactorSpec:
     return FactorSpec(
         name=name,
         family=family,
@@ -84,14 +86,25 @@ def build_crypto_fx_factor_specs() -> tuple[FactorSpec, ...]:
         [
             _spec("kmid", "price_shape", "crypto_fx", ("open", "close"), "candle body / open"),
             _spec("klen", "price_shape", "crypto_fx", ("open", "high", "low"), "range / open"),
-            _spec("kup", "price_shape", "crypto_fx", ("open", "high", "close"), "upper wick / open"),
-            _spec("klow", "price_shape", "crypto_fx", ("open", "low", "close"), "lower wick / open"),
+            _spec(
+                "kup", "price_shape", "crypto_fx", ("open", "high", "close"), "upper wick / open"
+            ),
+            _spec(
+                "klow", "price_shape", "crypto_fx", ("open", "low", "close"), "lower wick / open"
+            ),
         ]
     )
     for window in (2, 4, 8, 12, 24, 48):
         specs.extend(
             [
-                _spec(f"ret_{window}", "momentum_reversal", "crypto_fx", ("close",), f"{window}-bar return", window=window),
+                _spec(
+                    f"ret_{window}",
+                    "momentum_reversal",
+                    "crypto_fx",
+                    ("close",),
+                    f"{window}-bar return",
+                    window=window,
+                ),
                 _spec(
                     f"mom_z_{window}",
                     "momentum_reversal",
@@ -266,12 +279,16 @@ def _basket_return(out: pd.DataFrame, ret_col: str, weights: Mapping[str, float]
     rows = out[out["symbol"].map(lambda value: normalize_symbol(value) in weights)]
     if rows.empty:
         return pd.Series(0.0, index=out.index, dtype=float)
-    tmp = rows.assign(_name=rows["symbol"].map(normalize_symbol), _weight=lambda df: df["_name"].map(weights))
+    tmp = rows.assign(
+        _name=rows["symbol"].map(normalize_symbol), _weight=lambda df: df["_name"].map(weights)
+    )
     basket = (tmp[ret_col] * tmp["_weight"]).groupby(tmp["timestamp"], sort=False).sum()
     return out["timestamp"].map(basket).astype(float).fillna(0.0)
 
 
-def compute_factor_frame(frame: pd.DataFrame, *, specs: Sequence[FactorSpec] | None = None) -> pd.DataFrame:
+def compute_factor_frame(
+    frame: pd.DataFrame, *, specs: Sequence[FactorSpec] | None = None
+) -> pd.DataFrame:
     """Compute the v0 crypto/FX alpha-zoo factor panel.
 
     All rolling features are grouped by symbol and use trailing values only.  FX
@@ -302,9 +319,14 @@ def compute_factor_frame(frame: pd.DataFrame, *, specs: Sequence[FactorSpec] | N
         out[f"mom_z_{window}"] = ops.zscore(out[ret_col], max(8, window * 2), by=symbol)
         low_roll = ops.rolling_min(out["low"], window, by=symbol)
         high_roll = ops.rolling_max(out["high"], window, by=symbol)
-        out[f"range_position_{window}"] = ((out["close"] - low_roll) / (high_roll - low_roll).where((high_roll - low_roll).abs() > 1e-12)) - 0.5
+        out[f"range_position_{window}"] = (
+            (out["close"] - low_roll)
+            / (high_roll - low_roll).where((high_roll - low_roll).abs() > 1e-12)
+        ) - 0.5
         path = ops.rolling_sum(ret_1.abs(), window, by=symbol)
-        out[f"trend_efficiency_{window}"] = (out["close"] - ops.delay(out["close"], window, by=symbol)).abs() / (
+        out[f"trend_efficiency_{window}"] = (
+            out["close"] - ops.delay(out["close"], window, by=symbol)
+        ).abs() / (
             ops.delay(out["close"], window, by=symbol).abs() * path.where(path.abs() > 1e-12)
         )
         out[f"realized_vol_{window}"] = ops.rolling_std(ret_1, window, by=symbol)
@@ -316,11 +338,16 @@ def compute_factor_frame(frame: pd.DataFrame, *, specs: Sequence[FactorSpec] | N
         low_fail = (out["low"] < prev_low) & (out["close"] > prev_low)
         out[f"breakout_failure_{window}"] = np.select(
             [high_fail, low_fail],
-            [-((out["high"] - out["close"]) / range_denom), (out["close"] - out["low"]) / range_denom],
+            [
+                -((out["high"] - out["close"]) / range_denom),
+                (out["close"] - out["low"]) / range_denom,
+            ],
             default=0.0,
         )
         volume_z = ops.zscore(out["volume"], window, by=symbol).where(crypto_mask)
-        close_vwap_dist = ((out["close"] / out["vwap"].where(out["vwap"].abs() > 1e-12)) - 1.0).where(crypto_mask)
+        close_vwap_dist = (
+            (out["close"] / out["vwap"].where(out["vwap"].abs() > 1e-12)) - 1.0
+        ).where(crypto_mask)
         out[f"volume_shock_z_{window}"] = volume_z
         out[f"volume_vwap_pressure_{window}"] = volume_z * np.sign(close_vwap_dist)
 
@@ -329,19 +356,27 @@ def compute_factor_frame(frame: pd.DataFrame, *, specs: Sequence[FactorSpec] | N
         btc_ret = _map_btc_return(out, ret_col)
         residual = (out[ret_col] - btc_ret).where(crypto_mask)
         out[f"btc_residual_ret_{window}"] = residual
-        out[f"btc_residual_z_{window}"] = ops.zscore(residual.fillna(0.0), max(8, window * 2), by=symbol).where(crypto_mask)
-        out[f"crypto_leadership_rank_{window}"] = ops.rank(residual.where(crypto_mask), by=out["timestamp"]).where(crypto_mask)
+        out[f"btc_residual_z_{window}"] = ops.zscore(
+            residual.fillna(0.0), max(8, window * 2), by=symbol
+        ).where(crypto_mask)
+        out[f"crypto_leadership_rank_{window}"] = ops.rank(
+            residual.where(crypto_mask), by=out["timestamp"]
+        ).where(crypto_mask)
 
     for window in (12, 24):
         funding_z = ops.zscore(out["funding_rate"], window, by=symbol).where(crypto_mask)
         out[f"funding_z_{window}"] = funding_z
-        out[f"funding_crowding_reversal_{window}"] = (-funding_z * np.sign(out[f"ret_{min(window, 24)}"])).where(crypto_mask)
+        out[f"funding_crowding_reversal_{window}"] = (
+            -funding_z * np.sign(out[f"ret_{min(window, 24)}"])
+        ).where(crypto_mask)
         out[f"fx_usd_strength_{window}"] = _basket_return(
             out,
             f"ret_{window}",
             {"EURUSD": -1.0, "GBPUSD": -1.0, "AUDUSD": -1.0, "USDJPY": 1.0, "USDCHF": 1.0},
         )
-        out[f"fx_jpy_risk_off_{window}"] = _basket_return(out, f"ret_{window}", {"USDJPY": -1.0, "AUDJPY": -1.0})
+        out[f"fx_jpy_risk_off_{window}"] = _basket_return(
+            out, f"ret_{window}", {"USDJPY": -1.0, "AUDJPY": -1.0}
+        )
 
     for col in factor_columns(selected_specs):
         if col not in out.columns:
@@ -366,7 +401,9 @@ def assign_time_splits(
         out[split_column] = "train"
         return out
     train_cut = max(1, math.floor(len(unique_times) * float(train_fraction)))
-    validation_cut = max(train_cut + 1, math.floor(len(unique_times) * float(train_fraction + validation_fraction)))
+    validation_cut = max(
+        train_cut + 1, math.floor(len(unique_times) * float(train_fraction + validation_fraction))
+    )
     validation_cut = min(validation_cut, len(unique_times))
     train_times = set(unique_times[:train_cut])
     validation_times = set(unique_times[train_cut:validation_cut])
@@ -383,7 +420,9 @@ def assign_time_splits(
     return out
 
 
-def add_forward_return_label(frame: pd.DataFrame, *, horizon: int = 4, label_column: str = "forward_return") -> pd.DataFrame:
+def add_forward_return_label(
+    frame: pd.DataFrame, *, horizon: int = 4, label_column: str = "forward_return"
+) -> pd.DataFrame:
     """Add a simple causal forward-return label for factor IC screening.
 
     Labels are allowed for report/gate evaluation, but selection code below uses
@@ -440,7 +479,9 @@ def screen_factor_frame(
             split_stats[split] = {
                 "n": int(part[[factor, label_column]].dropna().shape[0]) if factor in part else 0,
                 "rank_ic": _ic(part[factor], part[label_column]) if factor in part else None,
-                "quantile_spread": _quantile_spread(part[factor], part[label_column]) if factor in part else None,
+                "quantile_spread": _quantile_spread(part[factor], part[label_column])
+                if factor in part
+                else None,
             }
         train_ic = split_stats["train"]["rank_ic"]
         val_ic = split_stats["validation"]["rank_ic"]

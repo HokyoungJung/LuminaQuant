@@ -113,7 +113,9 @@ def test_prepare_shared_resources_uses_disk_cache(tmp_path: Path, monkeypatch) -
     assert sorted(tmp_path.glob("*.meta.json"))
 
 
-def test_shared_resource_cache_key_changes_with_feature_symbols(tmp_path: Path, monkeypatch) -> None:
+def test_shared_resource_cache_key_changes_with_feature_symbols(
+    tmp_path: Path, monkeypatch
+) -> None:
     monkeypatch.setattr(
         MODULE,
         "current_research_market_data_settings",
@@ -153,7 +155,9 @@ def test_shared_resource_cache_key_changes_with_feature_symbols(tmp_path: Path, 
         market_data_settings=MODULE.current_research_market_data_settings(),
     )
 
-    assert MODULE._shared_resource_cache_key(base_payload) != MODULE._shared_resource_cache_key(changed_payload)
+    assert MODULE._shared_resource_cache_key(base_payload) != MODULE._shared_resource_cache_key(
+        changed_payload
+    )
 
 
 def test_build_parser_exposes_shared_cache_controls() -> None:
@@ -182,7 +186,9 @@ def test_candidate_universe_and_timeframes_are_minimal() -> None:
     assert MODULE._candidate_universe(candidates) == ["BTC/USDT", "ETH/USDT", "SOL/USDT"]
 
 
-def test_load_legacy_shared_resources_fast_resamples_once_per_symbol(tmp_path: Path, monkeypatch) -> None:
+def test_load_legacy_shared_resources_fast_resamples_once_per_symbol(
+    tmp_path: Path, monkeypatch
+) -> None:
     one_second_frame = pl.DataFrame(
         {
             "datetime": [1, 2, 3],
@@ -213,12 +219,16 @@ def test_load_legacy_shared_resources_fast_resamples_once_per_symbol(tmp_path: P
     monkeypatch.setattr(
         MODULE,
         "resample_1s_frame",
-        lambda frame, *, timeframe: (resample_calls.append(timeframe) or frame),
+        lambda frame, *, timeframe: resample_calls.append(timeframe) or frame,
     )
     monkeypatch.setattr(
         MODULE._runner,
         "_frame_to_bundle",
-        lambda symbol, timeframe, frame: {"symbol": symbol, "timeframe": timeframe, "rows": frame.height},
+        lambda symbol, timeframe, frame: {
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "rows": frame.height,
+        },
     )
     monkeypatch.setattr(
         MODULE._runner,

@@ -35,6 +35,7 @@ def _load_indicator_primitives():
 
         return alpha_001, alpha_005, alpha_011, alpha_025, alpha_101, False
     except Exception:
+
         def _noop(*_args, **_kwargs):
             return 0.0
 
@@ -47,6 +48,7 @@ def _load_formulaic_compute():
 
         return compute_alpha101, False
     except Exception:
+
         def _compute_alpha101(*_args, **_kwargs):
             return 0.0
 
@@ -66,17 +68,27 @@ class SectionSummary:
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Benchmark formulaic alpha execution pipeline.")
     parser.add_argument("--rows", type=int, default=6000, help="Synthetic OHLCV row count.")
-    parser.add_argument("--indicator-iters", type=int, default=250, help="Indicator workload iterations.")
-    parser.add_argument("--formula-iters", type=int, default=10, help="Formulaic workload iterations.")
+    parser.add_argument(
+        "--indicator-iters", type=int, default=250, help="Indicator workload iterations."
+    )
+    parser.add_argument(
+        "--formula-iters", type=int, default=10, help="Formulaic workload iterations."
+    )
     parser.add_argument("--alpha-start", type=int, default=1, help="First Alpha id (inclusive).")
     parser.add_argument("--alpha-end", type=int, default=101, help="Last Alpha id (inclusive).")
     parser.add_argument("--backend", choices=("auto", "numpy", "polars"), default="auto")
     parser.add_argument("--config", default="config.yaml", help="Backtest config path.")
     parser.add_argument("--strategy", default=None, help="Backtest strategy override.")
     parser.add_argument("--symbols", default="", help="Backtest symbols override.")
-    parser.add_argument("--backtest-iters", type=int, default=1, help="Backtest benchmark iterations.")
-    parser.add_argument("--backtest-warmup", type=int, default=0, help="Backtest warmup iterations.")
-    parser.add_argument("--seed", type=int, default=42, help="Deterministic seed for backtest benchmark.")
+    parser.add_argument(
+        "--backtest-iters", type=int, default=1, help="Backtest benchmark iterations."
+    )
+    parser.add_argument(
+        "--backtest-warmup", type=int, default=0, help="Backtest warmup iterations."
+    )
+    parser.add_argument(
+        "--seed", type=int, default=42, help="Deterministic seed for backtest benchmark."
+    )
     parser.add_argument(
         "--output",
         default="reports/benchmarks/formulaic_pipeline.json",

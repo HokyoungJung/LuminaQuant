@@ -349,7 +349,9 @@ def compute_metric_summary(
     risk_free_annual = 0.0 if resolved_rf is None else float(resolved_rf.annual_rate)
     risk_free_per_period = 0.0 if resolved_rf is None else float(resolved_rf.per_period_rate)
     sortino_target_annual = 0.0 if resolved_rf is None else float(resolved_rf.sortino_target_annual)
-    sortino_target_per_period = 0.0 if resolved_rf is None else float(resolved_rf.sortino_target_per_period)
+    sortino_target_per_period = (
+        0.0 if resolved_rf is None else float(resolved_rf.sortino_target_per_period)
+    )
     return {
         "return": metric_payload.total_return,
         "total_return": metric_payload.total_return,

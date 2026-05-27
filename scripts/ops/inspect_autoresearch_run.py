@@ -38,7 +38,10 @@ def _resolve_run_id(*, repo_root: Path, run_id: str, latest: bool) -> str:
             except Exception:
                 payload = {}
             updated_at = str(
-                payload.get("updated_at") or payload.get("completed_at") or payload.get("created_at") or ""
+                payload.get("updated_at")
+                or payload.get("completed_at")
+                or payload.get("created_at")
+                or ""
             )
         return (updated_at, path.stat().st_mtime_ns, path.name)
 
@@ -124,7 +127,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     repo_root = Path(args.repo_root).resolve()
     run_id = _resolve_run_id(repo_root=repo_root, run_id=args.run_id, latest=bool(args.latest))
-    summary = build_summary(repo_root=repo_root, run_id=run_id, tail_entries=max(0, int(args.tail_entries)))
+    summary = build_summary(
+        repo_root=repo_root, run_id=run_id, tail_entries=max(0, int(args.tail_entries))
+    )
     print(json.dumps(summary, indent=2, sort_keys=True))
     return 0
 

@@ -15,11 +15,23 @@ DEFAULT_OUTPUT_DIR = (
     Path(__file__).resolve().parents[2]
     / "var/reports/profit_moonshot_20260501/current_tail_20260506/multiasset_exchange_expansion"
 )
-DEFAULT_SYMBOLS = ("EURUSD", "GBPUSD", "USDJPY", "XAUUSD", "XAGUSD", "US500", "USTEC", "US30", "DE40")
+DEFAULT_SYMBOLS = (
+    "EURUSD",
+    "GBPUSD",
+    "USDJPY",
+    "XAUUSD",
+    "XAGUSD",
+    "US500",
+    "USTEC",
+    "US30",
+    "DE40",
+)
 
 
 def _bridge_python() -> str:
-    return str(os.getenv("LQ_MT5_BRIDGE_PYTHON") or os.getenv("LQ__LIVE__MT5_BRIDGE_PYTHON") or "").strip()
+    return str(
+        os.getenv("LQ_MT5_BRIDGE_PYTHON") or os.getenv("LQ__LIVE__MT5_BRIDGE_PYTHON") or ""
+    ).strip()
 
 
 def _is_wsl() -> bool:
@@ -31,13 +43,21 @@ def _is_wsl() -> bool:
 
 
 def _bridge_script_path() -> str:
-    explicit = str(os.getenv("LQ_MT5_BRIDGE_SCRIPT") or os.getenv("LQ__LIVE__MT5_BRIDGE_SCRIPT") or "").strip()
-    path = Path(explicit) if explicit else Path(__file__).resolve().parents[2] / "scripts/mt5_bridge_worker.py"
+    explicit = str(
+        os.getenv("LQ_MT5_BRIDGE_SCRIPT") or os.getenv("LQ__LIVE__MT5_BRIDGE_SCRIPT") or ""
+    ).strip()
+    path = (
+        Path(explicit)
+        if explicit
+        else Path(__file__).resolve().parents[2] / "scripts/mt5_bridge_worker.py"
+    )
     if not path.is_absolute():
         path = Path.cwd() / path
     token = _bridge_python().lower()
     if _is_wsl() and (token.endswith(".exe") or "\\" in token):
-        proc = subprocess.run(["wslpath", "-w", str(path)], capture_output=True, text=True, check=False)
+        proc = subprocess.run(
+            ["wslpath", "-w", str(path)], capture_output=True, text=True, check=False
+        )
         converted = (proc.stdout or "").strip()
         if proc.returncode == 0 and converted:
             return converted
@@ -49,7 +69,14 @@ def _call_bridge(action: str, payload: dict[str, Any]) -> dict[str, Any]:
     if not python:
         raise RuntimeError("MT5 bridge is not configured")
     proc = subprocess.run(
-        [python, _bridge_script_path(), "--action", action, "--payload", json.dumps(payload, ensure_ascii=True)],
+        [
+            python,
+            _bridge_script_path(),
+            "--action",
+            action,
+            "--payload",
+            json.dumps(payload, ensure_ascii=True),
+        ],
         capture_output=True,
         text=True,
         check=False,
@@ -71,7 +98,14 @@ def _call_bridge_list(action: str, payload: dict[str, Any]) -> list[Any]:
     if not python:
         raise RuntimeError("MT5 bridge is not configured")
     proc = subprocess.run(
-        [python, _bridge_script_path(), "--action", action, "--payload", json.dumps(payload, ensure_ascii=True)],
+        [
+            python,
+            _bridge_script_path(),
+            "--action",
+            action,
+            "--payload",
+            json.dumps(payload, ensure_ascii=True),
+        ],
         capture_output=True,
         text=True,
         check=False,
@@ -138,7 +172,9 @@ def _markdown(payload: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def collect_tickmill(*, output_dir: Path, symbols: list[str], timeframe: str, limit: int) -> dict[str, Any]:
+def collect_tickmill(
+    *, output_dir: Path, symbols: list[str], timeframe: str, limit: int
+) -> dict[str, Any]:
     status = "blocked"
     blocked_reason = ""
     symbol_rows: list[dict[str, Any]] = []
@@ -151,10 +187,16 @@ def collect_tickmill(*, output_dir: Path, symbols: list[str], timeframe: str, li
             for symbol in symbols:
                 try:
                     symbol_info = _call_bridge("fetch_symbol_info", {"symbol": symbol})
-                    ohlcv = _call_bridge_list("fetch_ohlcv", {"symbol": symbol, "timeframe": timeframe, "limit": limit})
-                    symbol_rows.append({"symbol": symbol, "symbol_info": symbol_info, "ohlcv": ohlcv})
+                    ohlcv = _call_bridge_list(
+                        "fetch_ohlcv", {"symbol": symbol, "timeframe": timeframe, "limit": limit}
+                    )
+                    symbol_rows.append(
+                        {"symbol": symbol, "symbol_info": symbol_info, "ohlcv": ohlcv}
+                    )
                 except Exception as exc:
-                    symbol_rows.append({"symbol": symbol, "error": str(exc), "symbol_info": {}, "ohlcv": []})
+                    symbol_rows.append(
+                        {"symbol": symbol, "error": str(exc), "symbol_info": {}, "ohlcv": []}
+                    )
             status = "collected"
             blocked_reason = ""
             _ = connect
@@ -180,7 +222,9 @@ def collect_tickmill(*, output_dir: Path, symbols: list[str], timeframe: str, li
     output_dir.mkdir(parents=True, exist_ok=True)
     json_path = output_dir / "tickmill_mt5_readonly_collection_latest.json"
     md_path = output_dir / "tickmill_mt5_readonly_collection_latest.md"
-    json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    json_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     md_path.write_text(_markdown(payload), encoding="utf-8")
     return {"payload": payload, "paths": {"json": str(json_path), "markdown": str(md_path)}}
 

@@ -17,8 +17,19 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
-GROUP_ROOT = ROOT / "var" / "reports" / "exact_window_backtests" / "followup_status" / "portfolio_incumbent_autoresearch_grouped"
-DEFAULT_MANIFEST = GROUP_ROOT / "carry_trend_production_retune_current" / "carry_trend_production_manifest_latest.json"
+GROUP_ROOT = (
+    ROOT
+    / "var"
+    / "reports"
+    / "exact_window_backtests"
+    / "followup_status"
+    / "portfolio_incumbent_autoresearch_grouped"
+)
+DEFAULT_MANIFEST = (
+    GROUP_ROOT
+    / "carry_trend_production_retune_current"
+    / "carry_trend_production_manifest_latest.json"
+)
 DEFAULT_OUTPUT_DIR = GROUP_ROOT / "carry_trend_production_retune_current" / "research_run"
 DEFAULT_SCORE_CONFIG = ROOT / "configs" / "score_config.example.json"
 DEFAULT_TIMEFRAMES = ["1h", "4h"]
@@ -87,7 +98,9 @@ def run_retune(**kwargs: Any) -> subprocess.CompletedProcess[str]:
     command = build_command(**kwargs)
     env = os.environ.copy()
     env.update(LOW_MEMORY_ENV)
-    return subprocess.run(command, cwd=str(ROOT), env=env, text=True, capture_output=True, check=False)
+    return subprocess.run(
+        command, cwd=str(ROOT), env=env, text=True, capture_output=True, check=False
+    )
 
 
 def _load_manifest_payload(path: Path) -> dict[str, Any]:
@@ -99,7 +112,9 @@ def _load_manifest_payload(path: Path) -> dict[str, Any]:
 
 def _manifest_symbols_and_timeframes(path: Path) -> tuple[list[str], list[str]]:
     payload = _load_manifest_payload(path)
-    candidates = [dict(row) for row in list(payload.get("candidates") or []) if isinstance(row, dict)]
+    candidates = [
+        dict(row) for row in list(payload.get("candidates") or []) if isinstance(row, dict)
+    ]
     symbol_order: list[str] = []
     timeframe_order: list[str] = []
     for row in candidates:
@@ -139,7 +154,9 @@ def main(argv: list[str] | None = None) -> int:
         output_dir=Path(args.output_dir).resolve(),
         score_config=Path(args.score_config).resolve(),
         symbols=[str(item) for item in list(args.symbols or manifest_symbols)],
-        timeframes=[str(item) for item in list(args.timeframes or manifest_timeframes or DEFAULT_TIMEFRAMES)],
+        timeframes=[
+            str(item) for item in list(args.timeframes or manifest_timeframes or DEFAULT_TIMEFRAMES)
+        ],
         base_timeframe=str(args.base_timeframe),
         train_start=str(args.train_start),
         train_end=str(args.train_end),

@@ -49,13 +49,11 @@ from scripts.research.run_alpha_zoo_htf_momentum_crowding_discovery import (  # 
 )
 
 DEFAULT_OUTPUT_DIR = (
-    REPO_ROOT
-    / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/"
+    REPO_ROOT / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/"
     "alpha_zoo_30m_plus_alpha_feedback_discovery_20260523"
 )
 DEFAULT_PRIOR_ARTIFACT = (
-    REPO_ROOT
-    / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/"
+    REPO_ROOT / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/"
     "alpha_zoo_debounced_efficiency_repair_discovery_20260523/"
     "alpha_zoo_debounced_efficiency_repair_discovery_latest.json"
 )
@@ -123,10 +121,30 @@ EXTERNAL_RESEARCH_REFERENCES = [
 ]
 
 BASELINE_LANES = [
-    {"lane": "active", "leverage": 7.0, "allocation_fraction": 0.20, "status": "baseline_preserved"},
-    {"lane": "balanced", "leverage": 6.0, "allocation_fraction": 0.175, "status": "baseline_preserved"},
-    {"lane": "validation_leader", "leverage": 5.0, "allocation_fraction": 0.20, "status": "baseline_preserved"},
-    {"lane": "efficiency_reference", "leverage": 4.0, "allocation_fraction": 0.175, "status": "baseline_preserved"},
+    {
+        "lane": "active",
+        "leverage": 7.0,
+        "allocation_fraction": 0.20,
+        "status": "baseline_preserved",
+    },
+    {
+        "lane": "balanced",
+        "leverage": 6.0,
+        "allocation_fraction": 0.175,
+        "status": "baseline_preserved",
+    },
+    {
+        "lane": "validation_leader",
+        "leverage": 5.0,
+        "allocation_fraction": 0.20,
+        "status": "baseline_preserved",
+    },
+    {
+        "lane": "efficiency_reference",
+        "leverage": 4.0,
+        "allocation_fraction": 0.175,
+        "status": "baseline_preserved",
+    },
 ]
 for _lane in BASELINE_LANES:
     _lane["notional_fraction"] = _lane["leverage"] * _lane["allocation_fraction"]
@@ -228,7 +246,9 @@ def _timestamp() -> str:
 
 def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(_json_safe(payload), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(_json_safe(payload), indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
 
 def _csv_value(value: Any) -> Any:
@@ -244,7 +264,9 @@ def _csv_value(value: Any) -> Any:
 def _write_csv(path: Path, rows: Sequence[Mapping[str, Any]], fields: Sequence[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(fields), lineterminator="\n", extrasaction="ignore")
+        writer = csv.DictWriter(
+            handle, fieldnames=list(fields), lineterminator="\n", extrasaction="ignore"
+        )
         writer.writeheader()
         for row in rows:
             writer.writerow({field: _csv_value(row.get(field)) for field in fields})
@@ -354,7 +376,14 @@ def _resample_from_base_30m(base_30m: pd.DataFrame, timeframe: str) -> pd.DataFr
         return base_30m.copy().reset_index(drop=True)
     frame = base_30m.sort_values("datetime").set_index("datetime")
     resampled = frame.resample(_pandas_rule(timeframe), label="left", closed="left").agg(
-        {"open": "first", "high": "max", "low": "min", "close": "last", "volume": "sum", "symbol": "first"}
+        {
+            "open": "first",
+            "high": "max",
+            "low": "min",
+            "close": "last",
+            "volume": "sum",
+            "symbol": "first",
+        }
     )
     return resampled.dropna(subset=["open", "high", "low", "close"]).reset_index()
 
@@ -374,7 +403,9 @@ def load_requested_bars(
     return out
 
 
-def _attach_features_with_age(bars: pd.DataFrame, features: pd.DataFrame, *, timeframe: str) -> pd.DataFrame:
+def _attach_features_with_age(
+    bars: pd.DataFrame, features: pd.DataFrame, *, timeframe: str
+) -> pd.DataFrame:
     out = bars.copy().sort_values("datetime")
     max_age = max_asof_feature_age_hours(timeframe)
     if features.empty:
@@ -441,7 +472,9 @@ def _feature_coverage_reasons(row: Mapping[str, Any]) -> list[str]:
     return reasons
 
 
-def _return_per_turnover(total_return: float, trade_events: int, notional_fraction: float) -> float | None:
+def _return_per_turnover(
+    total_return: float, trade_events: int, notional_fraction: float
+) -> float | None:
     turnover = float(trade_events) * abs(float(notional_fraction))
     if turnover <= 0.0:
         return None
@@ -470,10 +503,20 @@ def _gate_candidate(row: dict[str, Any]) -> dict[str, Any]:
     reasons: list[str] = []
     if int(row["train_trade_event_count"]) < PROMOTION_THRESHOLDS["min_train_trade_event_count"]:
         reasons.append(f"train_trade_event_count_{row['train_trade_event_count']}_below_80")
-    if int(row["validation_trade_event_count"]) < PROMOTION_THRESHOLDS["min_validation_trade_event_count"]:
-        reasons.append(f"validation_trade_event_count_{row['validation_trade_event_count']}_below_30")
-    if int(row["locked_oos_trade_event_count"]) < PROMOTION_THRESHOLDS["min_locked_oos_trade_event_count_report_gate"]:
-        reasons.append(f"locked_oos_trade_event_count_{row['locked_oos_trade_event_count']}_below_20")
+    if (
+        int(row["validation_trade_event_count"])
+        < PROMOTION_THRESHOLDS["min_validation_trade_event_count"]
+    ):
+        reasons.append(
+            f"validation_trade_event_count_{row['validation_trade_event_count']}_below_30"
+        )
+    if (
+        int(row["locked_oos_trade_event_count"])
+        < PROMOTION_THRESHOLDS["min_locked_oos_trade_event_count_report_gate"]
+    ):
+        reasons.append(
+            f"locked_oos_trade_event_count_{row['locked_oos_trade_event_count']}_below_20"
+        )
     if float(row["validation_return"]) < PROMOTION_THRESHOLDS["min_validation_return"]:
         reasons.append(f"validation_return_{row['validation_return']:.4f}_below_0.02")
     if float(row["train_return"]) <= 0.0:
@@ -482,7 +525,9 @@ def _gate_candidate(row: dict[str, Any]) -> dict[str, Any]:
         reasons.append("train_return_below_validation_return")
     ratio = row.get("train_validation_return_ratio")
     if ratio is None or float(ratio) < PROMOTION_THRESHOLDS["min_train_validation_return_ratio"]:
-        reasons.append(f"train_validation_return_ratio_{0.0 if ratio is None else float(ratio):.4f}_below_1.00")
+        reasons.append(
+            f"train_validation_return_ratio_{0.0 if ratio is None else float(ratio):.4f}_below_1.00"
+        )
     if float(row["validation_mdd"]) > PROMOTION_THRESHOLDS["max_validation_mdd"]:
         reasons.append(f"validation_mdd_{row['validation_mdd']:.4f}_above_0.12")
     if float(row["locked_oos_return"]) <= 0.0:
@@ -506,7 +551,9 @@ def _gate_candidate(row: dict[str, Any]) -> dict[str, Any]:
                 f"{RETURN_PER_TURNOVER_THRESHOLD_BPS:.3f}"
             )
     execution_efficiency_proxy_gate_pass = not efficiency_reasons
-    paper_candidate_gate_pass = sample_gate_pass and feature_coverage_gate_pass and execution_efficiency_proxy_gate_pass
+    paper_candidate_gate_pass = (
+        sample_gate_pass and feature_coverage_gate_pass and execution_efficiency_proxy_gate_pass
+    )
     if paper_candidate_gate_pass:
         decision = "paper_testnet_candidate_after_fill_preflight"
     elif sample_gate_pass and feature_coverage_gate_pass:
@@ -530,7 +577,9 @@ def _gate_candidate(row: dict[str, Any]) -> dict[str, Any]:
     return row
 
 
-def _finalize_candidate(base: dict[str, Any], sim: SimResult, datetimes: pd.Series, *, timeframe: str) -> dict[str, Any]:
+def _finalize_candidate(
+    base: dict[str, Any], sim: SimResult, datetimes: pd.Series, *, timeframe: str
+) -> dict[str, Any]:
     row = dict(base)
     split_payload: dict[str, dict[str, Any]] = {}
     for split in SPLIT_ORDER:
@@ -555,7 +604,9 @@ def _finalize_candidate(base: dict[str, Any], sim: SimResult, datetimes: pd.Seri
     row["train_validation_return_ratio"] = train / validation if validation > 0.0 else 0.0
     row["train_minus_validation_return"] = train - validation
     row["locked_oos_liquidation_count"] = int(split_payload["locked_oos"]["liquidation_count"])
-    row["locked_oos_account_wipeout_count"] = int(split_payload["locked_oos"]["account_wipeout_count"])
+    row["locked_oos_account_wipeout_count"] = int(
+        split_payload["locked_oos"]["account_wipeout_count"]
+    )
     notional = float(row["notional_fraction"])
     for split in SPLIT_ORDER:
         row[f"{split}_return_per_turnover_proxy_bps"] = _return_per_turnover(
@@ -587,7 +638,9 @@ def _model_id(parts: Iterable[Any]) -> str:
 def _adx_proxy(high: pd.Series, low: pd.Series, close: pd.Series, lookback: int) -> pd.Series:
     up_move = high.diff()
     down_move = -low.diff()
-    plus_dm = pd.Series(np.where((up_move > down_move) & (up_move > 0.0), up_move, 0.0), index=high.index)
+    plus_dm = pd.Series(
+        np.where((up_move > down_move) & (up_move > 0.0), up_move, 0.0), index=high.index
+    )
     minus_dm = pd.Series(
         np.where((down_move > up_move) & (down_move > 0.0), down_move, 0.0),
         index=high.index,
@@ -611,7 +664,9 @@ def _atr(high: pd.Series, low: pd.Series, close: pd.Series, lookback: int) -> pd
     return true_range.rolling(lookback).mean()
 
 
-def _volatility_quantile_mask(close: pd.Series, lookback: int, quantile_max: float | None) -> pd.Series:
+def _volatility_quantile_mask(
+    close: pd.Series, lookback: int, quantile_max: float | None
+) -> pd.Series:
     if quantile_max is None:
         return pd.Series(True, index=close.index)
     realized = close.pct_change().rolling(max(4, lookback // 2)).std(ddof=1)
@@ -640,7 +695,9 @@ def _debounced_state_signal(
     for i in range(len(long_entry)):
         can_exit = bars_held >= min_hold_bars
         exited = False
-        if can_exit and ((state > 0.0 and bool(long_exit.iloc[i])) or (state < 0.0 and bool(short_exit.iloc[i]))):
+        if can_exit and (
+            (state > 0.0 and bool(long_exit.iloc[i])) or (state < 0.0 and bool(short_exit.iloc[i]))
+        ):
             state = 0.0
             bars_held = 0
             cooldown_remaining = cooldown_bars
@@ -671,9 +728,15 @@ def _filter_profiles() -> tuple[FilterProfile, ...]:
 
 
 def _base_feature_fields(frame: pd.DataFrame) -> tuple[pd.Series, pd.Series, pd.Series, pd.Series]:
-    valid = frame.get("feature_valid", pd.Series(False, index=frame.index)).fillna(False).astype(bool)
-    funding = pd.to_numeric(frame.get("funding_rate", pd.Series(np.nan, index=frame.index)), errors="coerce")
-    oi = pd.to_numeric(frame.get("open_interest", pd.Series(np.nan, index=frame.index)), errors="coerce")
+    valid = (
+        frame.get("feature_valid", pd.Series(False, index=frame.index)).fillna(False).astype(bool)
+    )
+    funding = pd.to_numeric(
+        frame.get("funding_rate", pd.Series(np.nan, index=frame.index)), errors="coerce"
+    )
+    oi = pd.to_numeric(
+        frame.get("open_interest", pd.Series(np.nan, index=frame.index)), errors="coerce"
+    )
     imbalance = pd.to_numeric(
         frame.get("taker_buy_sell_imbalance", pd.Series(np.nan, index=frame.index)), errors="coerce"
     )
@@ -696,12 +759,16 @@ def discover_candidates(
             columns={"close": "btc_close"}
         )
         for symbol in symbols:
-            frame = bars_by_symbol_tf[(symbol, timeframe)].merge(btc, on="datetime", how="left").ffill()
+            frame = (
+                bars_by_symbol_tf[(symbol, timeframe)].merge(btc, on="datetime", how="left").ffill()
+            )
             close = frame["close"].astype(float)
             high = frame["high"].astype(float)
             low = frame["low"].astype(float)
             btc_close = frame["btc_close"].astype(float)
-            btc_momentum = btc_close / btc_close.shift(max(2, int(12 / _timeframe_hours(timeframe)))) - 1.0
+            btc_momentum = (
+                btc_close / btc_close.shift(max(2, int(12 / _timeframe_hours(timeframe)))) - 1.0
+            )
 
             for lookback in (6, 12, 24):
                 momentum = close / close.shift(lookback) - 1.0
@@ -712,11 +779,17 @@ def discover_candidates(
                     for min_hold in min_holds:
                         for cooldown in cooldowns:
                             for profile in _filter_profiles():
-                                vol_ok = _volatility_quantile_mask(close, lookback, profile.max_vol_quantile)
+                                vol_ok = _volatility_quantile_mask(
+                                    close, lookback, profile.max_vol_quantile
+                                )
                                 adx_ok = adx >= profile.min_adx if profile.min_adx > 0.0 else True
                                 common = vol_ok & adx_ok
-                                long_entry = (vol_adjusted > threshold) & (btc_momentum > -0.02) & common
-                                short_entry = (vol_adjusted < -threshold) & (btc_momentum < 0.02) & common
+                                long_entry = (
+                                    (vol_adjusted > threshold) & (btc_momentum > -0.02) & common
+                                )
+                                short_entry = (
+                                    (vol_adjusted < -threshold) & (btc_momentum < 0.02) & common
+                                )
                                 long_exit = (vol_adjusted < 0.25) | (~common)
                                 short_exit = (vol_adjusted > -0.25) | (~common)
                                 signal = _debounced_state_signal(
@@ -761,8 +834,17 @@ def discover_candidates(
                                         "allocation_fraction": allocation,
                                         "notional_fraction": leverage * allocation,
                                     }
-                                    sim = simulate_symbol(frame, signal, leverage=leverage, allocation_fraction=allocation)
-                                    rows.append(_finalize_candidate(base, sim, frame["datetime"], timeframe=timeframe))
+                                    sim = simulate_symbol(
+                                        frame,
+                                        signal,
+                                        leverage=leverage,
+                                        allocation_fraction=allocation,
+                                    )
+                                    rows.append(
+                                        _finalize_candidate(
+                                            base, sim, frame["datetime"], timeframe=timeframe
+                                        )
+                                    )
 
             for lookback in (12, 24, 48):
                 atr = _atr(high, low, close, max(6, lookback))
@@ -815,8 +897,14 @@ def discover_candidates(
                                 "allocation_fraction": allocation,
                                 "notional_fraction": leverage * allocation,
                             }
-                            sim = simulate_symbol(frame, signal, leverage=leverage, allocation_fraction=allocation)
-                            rows.append(_finalize_candidate(base, sim, frame["datetime"], timeframe=timeframe))
+                            sim = simulate_symbol(
+                                frame, signal, leverage=leverage, allocation_fraction=allocation
+                            )
+                            rows.append(
+                                _finalize_candidate(
+                                    base, sim, frame["datetime"], timeframe=timeframe
+                                )
+                            )
 
             for fast, slow in ((6, 24), (12, 48)):
                 ema_fast = close.ewm(span=fast, adjust=False).mean()
@@ -825,8 +913,12 @@ def discover_candidates(
                 adx = _adx_proxy(high, low, close, max(6, fast))
                 for adx_threshold in (15.0, 20.0):
                     common = adx >= adx_threshold
-                    long_entry = (ema_fast > ema_slow) & (slope > 0.0) & (btc_momentum > -0.02) & common
-                    short_entry = (ema_fast < ema_slow) & (slope < 0.0) & (btc_momentum < 0.02) & common
+                    long_entry = (
+                        (ema_fast > ema_slow) & (slope > 0.0) & (btc_momentum > -0.02) & common
+                    )
+                    short_entry = (
+                        (ema_fast < ema_slow) & (slope < 0.0) & (btc_momentum < 0.02) & common
+                    )
                     long_exit = (ema_fast < ema_slow) | (~common)
                     short_exit = (ema_fast > ema_slow) | (~common)
                     signal = _debounced_state_signal(
@@ -869,8 +961,12 @@ def discover_candidates(
                             "allocation_fraction": allocation,
                             "notional_fraction": leverage * allocation,
                         }
-                        sim = simulate_symbol(frame, signal, leverage=leverage, allocation_fraction=allocation)
-                        rows.append(_finalize_candidate(base, sim, frame["datetime"], timeframe=timeframe))
+                        sim = simulate_symbol(
+                            frame, signal, leverage=leverage, allocation_fraction=allocation
+                        )
+                        rows.append(
+                            _finalize_candidate(base, sim, frame["datetime"], timeframe=timeframe)
+                        )
 
             feature_valid, funding, oi, imbalance = _base_feature_fields(frame)
             feature_coverage = _feature_coverage_by_split(frame)
@@ -937,25 +1033,37 @@ def discover_candidates(
                                 "allocation_fraction": allocation,
                                 "notional_fraction": leverage * allocation,
                             }
-                            sim = simulate_symbol(frame, signal, leverage=leverage, allocation_fraction=allocation)
-                            rows.append(_finalize_candidate(base, sim, frame["datetime"], timeframe=timeframe))
+                            sim = simulate_symbol(
+                                frame, signal, leverage=leverage, allocation_fraction=allocation
+                            )
+                            rows.append(
+                                _finalize_candidate(
+                                    base, sim, frame["datetime"], timeframe=timeframe
+                                )
+                            )
     return rows
 
 
 def _rank_rows(rows: Sequence[dict[str, Any]], *, limit: int | None = None) -> list[dict[str, Any]]:
-    ranked = sorted(rows, key=lambda row: float(row.get("train_validation_score") or -1e9), reverse=True)
+    ranked = sorted(
+        rows, key=lambda row: float(row.get("train_validation_score") or -1e9), reverse=True
+    )
     if limit is not None:
         ranked = ranked[:limit]
     return [dict(row, rank=rank) for rank, row in enumerate(ranked, start=1)]
 
 
-def _selected_output_rows(ranked_rows: Sequence[dict[str, Any]], *, top_n: int) -> list[dict[str, Any]]:
+def _selected_output_rows(
+    ranked_rows: Sequence[dict[str, Any]], *, top_n: int
+) -> list[dict[str, Any]]:
     selected_ids = {str(row["model_id"]) for row in ranked_rows[:top_n]}
     for row in ranked_rows:
         if any(bool(row.get(flag)) for flag in SPECIAL_OUTPUT_FLAGS):
             selected_ids.add(str(row["model_id"]))
     if ranked_rows:
-        best_validation = max(ranked_rows, key=lambda row: float(row.get("validation_return") or -1e9))
+        best_validation = max(
+            ranked_rows, key=lambda row: float(row.get("validation_return") or -1e9)
+        )
         selected_ids.add(str(best_validation["model_id"]))
     return [dict(row) for row in ranked_rows if str(row["model_id"]) in selected_ids]
 
@@ -984,7 +1092,11 @@ def _decision_rows(rows: Sequence[dict[str, Any]], *, limit: int) -> list[dict[s
 
 
 def _shadow_rows(ranked_rows: Sequence[dict[str, Any]], *, limit: int) -> list[dict[str, Any]]:
-    shadows = [row for row in ranked_rows if row.get("decision") != "paper_testnet_candidate_after_fill_preflight"]
+    shadows = [
+        row
+        for row in ranked_rows
+        if row.get("decision") != "paper_testnet_candidate_after_fill_preflight"
+    ]
     sample_shadows = [row for row in shadows if row.get("train_dominant_sample_gate_pass")]
     if sample_shadows:
         return _selected_output_rows(sample_shadows, top_n=limit)
@@ -999,7 +1111,9 @@ def _summary(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         decisions[str(row["decision"])] = decisions.get(str(row["decision"]), 0) + 1
         by_symbol[str(row["symbol"])] = by_symbol.get(str(row["symbol"]), 0) + 1
         by_family[str(row["family"])] = by_family.get(str(row["family"]), 0) + 1
-    best_validation = max(rows, key=lambda row: float(row.get("validation_return") or -1e9)) if rows else {}
+    best_validation = (
+        max(rows, key=lambda row: float(row.get("validation_return") or -1e9)) if rows else {}
+    )
     sample_pass = [row for row in rows if row.get("train_dominant_sample_gate_pass")]
     paper_candidates = [row for row in rows if row.get("paper_candidate_gate_pass")]
     return {
@@ -1008,18 +1122,27 @@ def _summary(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "family_counts": dict(sorted(by_family.items())),
         "decision_counts": dict(sorted(decisions.items())),
         "train_return_gte_validation_return_count": sum(
-            float(row.get("train_return") or 0.0) >= float(row.get("validation_return") or 0.0) for row in rows
+            float(row.get("train_return") or 0.0) >= float(row.get("validation_return") or 0.0)
+            for row in rows
         ),
         "train_dominant_sample_gate_pass_count": len(sample_pass),
-        "feature_coverage_gate_pass_count": sum(bool(row.get("feature_coverage_gate_pass")) for row in rows),
+        "feature_coverage_gate_pass_count": sum(
+            bool(row.get("feature_coverage_gate_pass")) for row in rows
+        ),
         "execution_efficiency_proxy_gate_pass_count": sum(
             bool(row.get("execution_efficiency_proxy_gate_pass")) for row in rows
         ),
         "paper_candidate_gate_pass_count": len(paper_candidates),
-        "max_validation_return": float(best_validation.get("validation_return") or 0.0) if best_validation else None,
+        "max_validation_return": float(best_validation.get("validation_return") or 0.0)
+        if best_validation
+        else None,
         "best_validation_model_id": best_validation.get("model_id") if best_validation else None,
-        "best_train_dominant_sample_gate_model_id": sample_pass[0].get("model_id") if sample_pass else None,
-        "best_paper_candidate_model_id": paper_candidates[0].get("model_id") if paper_candidates else None,
+        "best_train_dominant_sample_gate_model_id": sample_pass[0].get("model_id")
+        if sample_pass
+        else None,
+        "best_paper_candidate_model_id": paper_candidates[0].get("model_id")
+        if paper_candidates
+        else None,
         "ready_for_paper": bool(paper_candidates),
         "ready_for_real": False,
         "real_money_execution": False,
@@ -1112,7 +1235,9 @@ def _handoff_markdown(handoff: Mapping[str, Any]) -> str:
 def _markdown(payload: Mapping[str, Any]) -> str:
     summary = dict(payload.get("discovery_summary") or {})
     top = list(payload.get("top_candidates") or [])[:10]
-    paper_rows = [row for row in payload.get("top_candidates", []) if row.get("paper_candidate_gate_pass")][:10]
+    paper_rows = [
+        row for row in payload.get("top_candidates", []) if row.get("paper_candidate_gate_pass")
+    ][:10]
     lines = [
         "# Alpha Zoo 30m+ feedback discovery",
         "",
@@ -1188,10 +1313,14 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     feature_root = Path(args.feature_root).expanduser().resolve()
     prior_artifact = Path(args.prior_artifact).expanduser().resolve()
     symbols = tuple(symbol.strip().upper() for symbol in args.symbols.split(",") if symbol.strip())
-    timeframes = _validate_timeframes(tuple(tf.strip().lower() for tf in args.timeframes.split(",") if tf.strip()))
+    timeframes = _validate_timeframes(
+        tuple(tf.strip().lower() for tf in args.timeframes.split(",") if tf.strip())
+    )
     data_symbols = tuple(dict.fromkeys((BTC_REGIME_SYMBOL, *symbols)))
 
-    bars_by_symbol_tf = load_requested_bars(data_symbols, timeframes=timeframes, data_root=data_root)
+    bars_by_symbol_tf = load_requested_bars(
+        data_symbols, timeframes=timeframes, data_root=data_root
+    )
     for symbol in data_symbols:
         features = load_feature_points(symbol, feature_root=feature_root)
         for timeframe in timeframes:
@@ -1209,7 +1338,9 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     paper_rows = [row for row in ranked_rows if row.get("paper_candidate_gate_pass")]
     handoff = _paper_testnet_handoff(paper_rows)
     decision_status = (
-        "paper_testnet_candidate_after_fill_preflight" if paper_rows else "no_new_paper_promotion_shadow_shortlist"
+        "paper_testnet_candidate_after_fill_preflight"
+        if paper_rows
+        else "no_new_paper_promotion_shadow_shortlist"
     )
 
     timestamp = _timestamp()

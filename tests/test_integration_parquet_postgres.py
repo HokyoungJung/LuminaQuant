@@ -60,7 +60,9 @@ def test_parquet_and_postgres_state_smoke_flow(tmp_path: Path):
     parquet_root = tmp_path / "market"
     parquet_repo = ParquetMarketDataRepository(parquet_root)
 
-    rows_written = parquet_repo.upsert_1s(exchange="binance", symbol="BTC/USDT", rows=_sample_1s_frame())
+    rows_written = parquet_repo.upsert_1s(
+        exchange="binance", symbol="BTC/USDT", rows=_sample_1s_frame()
+    )
     assert rows_written == 4
 
     minute_frame = parquet_repo.load_ohlcv(exchange="binance", symbol="BTC/USDT", timeframe="1m")
@@ -71,7 +73,9 @@ def test_parquet_and_postgres_state_smoke_flow(tmp_path: Path):
     state_repo = PostgresStateRepository(connection=conn)
     state_repo.initialize_schema()
 
-    run_id = state_repo.start_run(mode="backtest", metadata={"symbol": "BTC/USDT"}, run_id="run-smoke")
+    run_id = state_repo.start_run(
+        mode="backtest", metadata={"symbol": "BTC/USDT"}, run_id="run-smoke"
+    )
     now = datetime(2026, 1, 5, tzinfo=UTC)
 
     state_repo.upsert_equity(run_id=run_id, timeindex=now, total=10000.0, cash=9800.0)

@@ -84,7 +84,9 @@ def is_exempt_constant(value: float) -> bool:
     abs_value = abs(float(value))
     if math.isnan(abs_value) or math.isinf(abs_value):
         return True
-    if any(math.isclose(abs_value, base, rel_tol=0.0, abs_tol=1e-15) for base in _EXEMPT_ABS_VALUES):
+    if any(
+        math.isclose(abs_value, base, rel_tol=0.0, abs_tol=1e-15) for base in _EXEMPT_ABS_VALUES
+    ):
         return True
     if any(math.isclose(abs_value, eps, rel_tol=0.0, abs_tol=1e-18) for eps in _EXEMPT_EPSILONS):
         return True

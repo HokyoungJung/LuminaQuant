@@ -9,7 +9,9 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT / "scripts" / "research" / "validate_profit_moonshot_pass_under_8gb.py"
-SPEC = importlib.util.spec_from_file_location("validate_profit_moonshot_pass_under_8gb", MODULE_PATH)
+SPEC = importlib.util.spec_from_file_location(
+    "validate_profit_moonshot_pass_under_8gb", MODULE_PATH
+)
 assert SPEC is not None and SPEC.loader is not None
 validator = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = validator
@@ -114,7 +116,9 @@ def test_validator_passes_with_candidate_rss_tests_ci_and_push(tmp_path: Path) -
     assert [item["under_8gib"] for item in payload["rss_evidence"]] == [True, True]
 
 
-def test_validator_rejects_low_monthly_return_candidate_even_with_old_pass_label(tmp_path: Path) -> None:
+def test_validator_rejects_low_monthly_return_candidate_even_with_old_pass_label(
+    tmp_path: Path,
+) -> None:
     candidate_path = tmp_path / "candidate.json"
     source_artifact = tmp_path / "source.json"
     rss_summary = tmp_path / "rss_summary.json"
@@ -175,7 +179,9 @@ def test_validator_rejects_low_monthly_return_candidate_even_with_old_pass_label
     assert details["locked_oos_monthlyized_return"] < validator.MIN_STABLE_MONTHLY_RETURN
 
 
-def test_validator_rejects_candidate_that_beats_old_champion_but_not_current_base(tmp_path: Path) -> None:
+def test_validator_rejects_candidate_that_beats_old_champion_but_not_current_base(
+    tmp_path: Path,
+) -> None:
     candidate_path = tmp_path / "candidate.json"
     rss_summary = tmp_path / "rss_summary.json"
     result_path = tmp_path / "result.json"
@@ -206,7 +212,9 @@ def test_validator_rejects_candidate_that_beats_old_champion_but_not_current_bas
     details = json.loads(quality_check["detail"])
     assert details["current_champion_oos_return"] == validator.CURRENT_CHAMPION_OOS_RETURN
     assert details["current_base_oos_return"] == validator.CURRENT_BASE_OOS_RETURN
-    assert details["locked_oos_total_return"] == pytest.approx(validator.CURRENT_BASE_OOS_RETURN - 0.001)
+    assert details["locked_oos_total_return"] == pytest.approx(
+        validator.CURRENT_BASE_OOS_RETURN - 0.001
+    )
 
 
 def test_validator_rejects_floor_fit_candidate_with_weak_raw_train(tmp_path: Path) -> None:
@@ -215,7 +223,9 @@ def test_validator_rejects_floor_fit_candidate_with_weak_raw_train(tmp_path: Pat
     result_path = tmp_path / "result.json"
     candidate = _passing_candidate_payload()
     candidate["metrics"]["train_monthlyized_return"] = 0.030
-    candidate["metrics"]["raw_train_monthlyized_return"] = validator.MIN_RAW_TRAIN_MONTHLY_RETURN - 0.001
+    candidate["metrics"]["raw_train_monthlyized_return"] = (
+        validator.MIN_RAW_TRAIN_MONTHLY_RETURN - 0.001
+    )
     _write_json(candidate_path, candidate)
     _write_json(rss_summary, {"peak_rss_bytes": 512 * 1024 * 1024})
     _write_json(
@@ -434,7 +444,9 @@ def test_validator_requires_mutex_evidence_when_heavy_run_is_declared(tmp_path: 
     )
 
     missing = validator.validate(result_path, repo_root=tmp_path)
-    mutex_check = next(check for check in missing["checks"] if check["name"] == "heavy_run_mutex_evidence")
+    mutex_check = next(
+        check for check in missing["checks"] if check["name"] == "heavy_run_mutex_evidence"
+    )
     assert mutex_check["passed"] is False
 
     payload = json.loads(result_path.read_text(encoding="utf-8"))
@@ -449,7 +461,9 @@ def test_validator_requires_mutex_evidence_when_heavy_run_is_declared(tmp_path: 
     _write_json(result_path, payload)
 
     present = validator.validate(result_path, repo_root=tmp_path)
-    mutex_check = next(check for check in present["checks"] if check["name"] == "heavy_run_mutex_evidence")
+    mutex_check = next(
+        check for check in present["checks"] if check["name"] == "heavy_run_mutex_evidence"
+    )
     assert mutex_check["passed"] is True
 
 
@@ -475,5 +489,7 @@ def test_validator_rejects_over_budget_rss_evidence(tmp_path: Path) -> None:
     payload = validator.validate(result_path, repo_root=tmp_path)
 
     assert payload["passed"] is False
-    rss_check = next(check for check in payload["checks"] if check["name"] == "rss_under_8gib_evidence")
+    rss_check = next(
+        check for check in payload["checks"] if check["name"] == "rss_under_8gib_evidence"
+    )
     assert rss_check["passed"] is False

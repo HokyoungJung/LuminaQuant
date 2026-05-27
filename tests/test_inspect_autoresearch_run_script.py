@@ -43,7 +43,9 @@ def test_inspect_autoresearch_run_latest_summary(tmp_path: Path):
             "updated_at": "2026-03-18T12:00:00Z",
         },
     )
-    _write_json(newer / "latest-evaluator-result.json", {"pass": True, "score": 1.4, "status": "pass"})
+    _write_json(
+        newer / "latest-evaluator-result.json", {"pass": True, "score": 1.4, "status": "pass"}
+    )
     _write_json(
         newer / "candidate.json",
         {

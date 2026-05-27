@@ -138,7 +138,9 @@ def _load_group_portfolio(*, label: str, path: Path) -> GroupPortfolio:
         .reset_index(drop=True)
     )
     symbols = sorted({str(symbol) for row in weights for symbol in list(row.get("symbols") or [])})
-    return GroupPortfolio(label=label, path=path.resolve(), weights=weights, returns=returns, symbols=symbols)
+    return GroupPortfolio(
+        label=label, path=path.resolve(), weights=weights, returns=returns, symbols=symbols
+    )
 
 
 def _forward_compound(series: pd.Series, horizon_days: int) -> pd.Series:
@@ -157,7 +159,9 @@ def _split_group(day_value: pd.Timestamp) -> str:
 
 
 def _backward_compound(series: pd.Series, window: int) -> pd.Series:
-    return (1.0 + series.astype(float)).rolling(window, min_periods=window).apply(np.prod, raw=True) - 1.0
+    return (1.0 + series.astype(float)).rolling(window, min_periods=window).apply(
+        np.prod, raw=True
+    ) - 1.0
 
 
 def _rolling_max_drawdown(series: pd.Series, window: int) -> pd.Series:
@@ -167,7 +171,9 @@ def _rolling_max_drawdown(series: pd.Series, window: int) -> pd.Series:
         drawdown = equity / np.where(peaks == 0.0, 1.0, peaks) - 1.0
         return float(drawdown.min())
 
-    return series.astype(float).rolling(window, min_periods=window).apply(_window_drawdown, raw=True)
+    return (
+        series.astype(float).rolling(window, min_periods=window).apply(_window_drawdown, raw=True)
+    )
 
 
 def _build_performance_feature_frame(frame: pd.DataFrame) -> pd.DataFrame:
@@ -175,7 +181,9 @@ def _build_performance_feature_frame(frame: pd.DataFrame) -> pd.DataFrame:
     for label in ("incumbent", "autoresearch"):
         out[f"{label}_ret_5d"] = _backward_compound(out[label], 5)
         out[f"{label}_ret_20d"] = _backward_compound(out[label], 20)
-        out[f"{label}_vol_20d"] = out[label].astype(float).rolling(20, min_periods=20).std(ddof=0) * math.sqrt(20.0)
+        out[f"{label}_vol_20d"] = out[label].astype(float).rolling(20, min_periods=20).std(
+            ddof=0
+        ) * math.sqrt(20.0)
         out[f"{label}_drawdown_20d"] = _rolling_max_drawdown(out[label], 20)
 
     out["rel_ret_5d"] = out["autoresearch_ret_5d"] - out["incumbent_ret_5d"]
@@ -185,10 +193,12 @@ def _build_performance_feature_frame(frame: pd.DataFrame) -> pd.DataFrame:
         out["autoresearch_vol_20d"].astype(float) / out["incumbent_vol_20d"].astype(float),
         np.nan,
     )
-    out["rel_drawdown_20d"] = (
-        out["autoresearch_drawdown_20d"].astype(float) - out["incumbent_drawdown_20d"].astype(float)
-    )
-    relative_daily_edge = (out["autoresearch"].astype(float) > out["incumbent"].astype(float)).astype(float)
+    out["rel_drawdown_20d"] = out["autoresearch_drawdown_20d"].astype(float) - out[
+        "incumbent_drawdown_20d"
+    ].astype(float)
+    relative_daily_edge = (
+        out["autoresearch"].astype(float) > out["incumbent"].astype(float)
+    ).astype(float)
     out["relative_hit_rate_20d"] = relative_daily_edge.rolling(20, min_periods=20).mean()
 
     out["autoresearch_leading_5d"] = out["rel_ret_5d"].astype(float) > 0.0
@@ -343,7 +353,9 @@ def _rule_split_stats(
     return stats
 
 
-def _select_rules(frame: pd.DataFrame, *, horizon_days: int) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+def _select_rules(
+    frame: pd.DataFrame, *, horizon_days: int
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     train_val = frame.loc[frame["split_group"].isin(("train", "val"))].copy()
     candidates = _candidate_rules(train_val)
     forward_column = f"forward_{horizon_days}d_rel"
@@ -377,7 +389,11 @@ def _select_rules(frame: pd.DataFrame, *, horizon_days: int) -> tuple[list[dict[
 
         train_mean = float(train_stats["mean_rel_delta"])
         val_mean = float(val_stats["mean_rel_delta"])
-        if train_mean == 0.0 or val_mean == 0.0 or math.copysign(1.0, train_mean) != math.copysign(1.0, val_mean):
+        if (
+            train_mean == 0.0
+            or val_mean == 0.0
+            or math.copysign(1.0, train_mean) != math.copysign(1.0, val_mean)
+        ):
             diagnostics.append(
                 {
                     **asdict(candidate),
@@ -403,9 +419,9 @@ def _select_rules(frame: pd.DataFrame, *, horizon_days: int) -> tuple[list[dict[
             )
             continue
 
-        score = (
-            (0.65 * abs(train_mean)) + (0.35 * abs(val_mean))
-        ) * math.sqrt(float(min(int(train_stats["count"]), int(val_stats["count"]))))
+        score = ((0.65 * abs(train_mean)) + (0.35 * abs(val_mean))) * math.sqrt(
+            float(min(int(train_stats["count"]), int(val_stats["count"])))
+        )
         qualified = {
             **asdict(candidate),
             "qualified": True,
@@ -630,7 +646,9 @@ def run_group_regime_judgement(
         output_dir=output_dir,
         input_path=incumbent_path,
         rss_log_path=output_dir / MEMORY_GUARD_DIRNAME / "group_regime_judgement_rss_latest.jsonl",
-        summary_path=output_dir / MEMORY_GUARD_DIRNAME / "group_regime_judgement_memory_latest.json",
+        summary_path=output_dir
+        / MEMORY_GUARD_DIRNAME
+        / "group_regime_judgement_memory_latest.json",
         budget_bytes=hard_rss_bytes,
         soft_limit_bytes=soft_rss_bytes,
         hard_limit_bytes=hard_rss_bytes,
@@ -742,7 +760,9 @@ def run_group_regime_judgement(
     out_md = output_dir / f"group_regime_judgement_{timestamp}.md"
     latest_json = output_dir / "group_regime_judgement_latest.json"
     latest_md = output_dir / "group_regime_judgement_latest.md"
-    out_json.write_text(json.dumps(payload, indent=2, sort_keys=True, default=_json_default), encoding="utf-8")
+    out_json.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=_json_default), encoding="utf-8"
+    )
     markdown = _build_markdown(payload)
     out_md.write_text(markdown, encoding="utf-8")
     latest_json.write_text(out_json.read_text(encoding="utf-8"), encoding="utf-8")

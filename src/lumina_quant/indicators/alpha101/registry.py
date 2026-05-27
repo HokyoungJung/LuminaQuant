@@ -77,7 +77,11 @@ def list_alpha_ids() -> tuple[int, ...]:
 
 def missing_alpha_ids() -> tuple[int, ...]:
     available = set(list_alpha_ids())
-    return tuple(alpha_id for alpha_id in range(_ALPHA_ID_MIN, _ALPHA_ID_MAX + 1) if alpha_id not in available)
+    return tuple(
+        alpha_id
+        for alpha_id in range(_ALPHA_ID_MIN, _ALPHA_ID_MAX + 1)
+        if alpha_id not in available
+    )
 
 
 @lru_cache(maxsize=256)

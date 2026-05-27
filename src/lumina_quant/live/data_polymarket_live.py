@@ -40,11 +40,19 @@ class PolymarketLiveDataHandler:
         }
         self._poll_seconds = max(
             1.0,
-            float(getattr(self.config, "LIVE_POLL_SECONDS", getattr(self.config, "POLL_SECONDS", 2)) or 2),
+            float(
+                getattr(self.config, "LIVE_POLL_SECONDS", getattr(self.config, "POLL_SECONDS", 2))
+                or 2
+            ),
         )
         self._window_seconds = max(
             1,
-            int(getattr(self.config, "INGEST_WINDOW_SECONDS", getattr(self.config, "WINDOW_SECONDS", 20)) or 20),
+            int(
+                getattr(
+                    self.config, "INGEST_WINDOW_SECONDS", getattr(self.config, "WINDOW_SECONDS", 20)
+                )
+                or 20
+            ),
         )
         self._fatal_channel: queue.Queue[BaseException] = queue.Queue(maxsize=1)
         self._fatal_error: BaseException | None = None
@@ -134,7 +142,11 @@ class PolymarketLiveDataHandler:
             return None
         if price_value <= 0.0:
             return None
-        event_id = str(payload.get("event_id") or payload.get("id") or f"{symbol}:{exchange_ts_ms}:{price_value}:{size_value}")
+        event_id = str(
+            payload.get("event_id")
+            or payload.get("id")
+            or f"{symbol}:{exchange_ts_ms}:{price_value}:{size_value}"
+        )
         return NormalizedTradeTick(
             symbol=symbol,
             exchange_ts_ms=exchange_ts_ms,

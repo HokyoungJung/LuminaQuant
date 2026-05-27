@@ -24,7 +24,9 @@ class _StubAuditStore:
 def test_create_audit_store_falls_back_when_postgres_dsn_missing(monkeypatch):
     class _MissingDsnAuditStore:
         def __init__(self, _dsn):
-            raise ValueError("Postgres DSN is required. Set LQ_POSTGRES_DSN (or storage.postgres_dsn).")
+            raise ValueError(
+                "Postgres DSN is required. Set LQ_POSTGRES_DSN (or storage.postgres_dsn)."
+            )
 
     monkeypatch.setattr(run_backtest, "AuditStore", _MissingDsnAuditStore)
     store, enabled = run_backtest._create_audit_store()

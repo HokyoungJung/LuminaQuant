@@ -82,7 +82,11 @@ def _row_timeframe(row: dict[str, Any]) -> str:
 
 
 def _extract_timeframes(summary: dict[str, Any], details: list[dict[str, Any]]) -> list[str]:
-    requested = [str(tf) for tf in list((summary.get("execution_profile") or {}).get("requested_timeframes") or []) if str(tf)]
+    requested = [
+        str(tf)
+        for tf in list((summary.get("execution_profile") or {}).get("requested_timeframes") or [])
+        if str(tf)
+    ]
     if requested:
         return sorted(dict.fromkeys(requested), key=_timeframe_sort_key)
     inferred = [_row_timeframe(row) for row in details if _row_timeframe(row) != "unknown"]
@@ -138,7 +142,9 @@ def _resolve_rank_weights(scoring_config: dict[str, Any] | None) -> dict[str, fl
     return resolved
 
 
-def _validation_score(row: dict[str, Any], *, scoring_config: dict[str, Any] | None = None) -> float:
+def _validation_score(
+    row: dict[str, Any], *, scoring_config: dict[str, Any] | None = None
+) -> float:
     weights = _resolve_rank_weights(scoring_config)
     metrics = dict(row.get("val") or {})
     return float(
@@ -200,8 +206,12 @@ def _aggregate_stream_by_month(stream: list[dict[str, Any]]) -> list[dict[str, A
     ]
 
 
-def _monthly_hurdle_rows(stream: list[dict[str, Any]], thresholds: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
-    realized = {str(row["period"]): float(row["return"]) for row in _aggregate_stream_by_month(stream)}
+def _monthly_hurdle_rows(
+    stream: list[dict[str, Any]], thresholds: dict[str, dict[str, Any]]
+) -> list[dict[str, Any]]:
+    realized = {
+        str(row["period"]): float(row["return"]) for row in _aggregate_stream_by_month(stream)
+    }
     rows: list[dict[str, Any]] = []
     for month in sorted(realized):
         benchmark = dict(thresholds.get(month) or {})
@@ -242,7 +252,9 @@ def _recent_three_month_two_pct_pass(*row_groups: list[dict[str, Any]]) -> bool:
     return all(float(row.get("strategy_return", 0.0)) >= 0.02 for row in latest_rows)
 
 
-def _summary_candidates(output_dir: str | Path = "var/reports/exact_window_backtests") -> list[_SummaryCandidate]:
+def _summary_candidates(
+    output_dir: str | Path = "var/reports/exact_window_backtests",
+) -> list[_SummaryCandidate]:
     root = Path(output_dir).resolve()
     candidates: list[_SummaryCandidate] = []
     for summary_path in sorted(root.rglob(SUMMARY_LATEST)):
@@ -268,7 +280,9 @@ def _summary_candidates(output_dir: str | Path = "var/reports/exact_window_backt
         except Exception:
             fail_analysis = None
         try:
-            memory_evidence = _json_load(memory_evidence_path) if memory_evidence_path.exists() else None
+            memory_evidence = (
+                _json_load(memory_evidence_path) if memory_evidence_path.exists() else None
+            )
         except Exception:
             memory_evidence = None
         generated_at = _parse_datetime(
@@ -279,8 +293,12 @@ def _summary_candidates(output_dir: str | Path = "var/reports/exact_window_backt
             _SummaryCandidate(
                 summary_path=summary_path.resolve(),
                 details_path=details_path.resolve() if details_path.exists() else None,
-                fail_analysis_path=fail_analysis_path.resolve() if fail_analysis_path.exists() else None,
-                memory_evidence_path=memory_evidence_path.resolve() if memory_evidence_path.exists() else None,
+                fail_analysis_path=fail_analysis_path.resolve()
+                if fail_analysis_path.exists()
+                else None,
+                memory_evidence_path=memory_evidence_path.resolve()
+                if memory_evidence_path.exists()
+                else None,
                 latest_pointer_path=_find_latest_pointer(root, summary_path.parent),
                 generated_at=generated_at,
                 summary=summary,
@@ -293,7 +311,9 @@ def _summary_candidates(output_dir: str | Path = "var/reports/exact_window_backt
     return candidates
 
 
-def _select_latest_by_timeframe(candidates: list[_SummaryCandidate]) -> dict[str, _SummaryCandidate]:
+def _select_latest_by_timeframe(
+    candidates: list[_SummaryCandidate],
+) -> dict[str, _SummaryCandidate]:
     selected: dict[str, _SummaryCandidate] = {}
     for candidate in candidates:
         for timeframe in candidate.selected_timeframes:
@@ -304,7 +324,9 @@ def _select_latest_by_timeframe(candidates: list[_SummaryCandidate]) -> dict[str
             if candidate.generated_at > previous.generated_at:
                 selected[timeframe] = candidate
                 continue
-            if candidate.generated_at == previous.generated_at and str(candidate.summary_path) > str(previous.summary_path):
+            if candidate.generated_at == previous.generated_at and str(
+                candidate.summary_path
+            ) > str(previous.summary_path):
                 selected[timeframe] = candidate
     return selected
 
@@ -323,7 +345,11 @@ def _timeframe_rows(candidate: _SummaryCandidate, timeframe: str) -> list[dict[s
     rows = [dict(row) for row in candidate.details if _row_timeframe(dict(row)) == timeframe]
     if rows:
         return rows
-    return [dict(row) for row in list(candidate.summary.get("best_per_strategy") or []) if _row_timeframe(dict(row)) == timeframe]
+    return [
+        dict(row)
+        for row in list(candidate.summary.get("best_per_strategy") or [])
+        if _row_timeframe(dict(row)) == timeframe
+    ]
 
 
 def _timeframe_reason_counts(candidate: _SummaryCandidate, timeframe: str) -> Counter[str]:
@@ -358,17 +384,31 @@ def _best_row_for_timeframe(
     )
     top = dict(ranked[0])
     thresholds = dict(candidate.summary.get("monthly_thresholds") or {})
-    val_months = _monthly_hurdle_rows(list((top.get("return_streams") or {}).get("val") or []), thresholds)
-    oos_months = _monthly_hurdle_rows(list((top.get("return_streams") or {}).get("oos") or []), thresholds)
-    val_hurdle_pass = all(bool(row.get("strict_pass")) for row in val_months if str(row.get("month", "")).startswith("2026-01"))
-    val_btc_hurdle_pass = all(bool(row.get("btc_pass")) for row in val_months if str(row.get("month", "")).startswith("2026-01"))
+    val_months = _monthly_hurdle_rows(
+        list((top.get("return_streams") or {}).get("val") or []), thresholds
+    )
+    oos_months = _monthly_hurdle_rows(
+        list((top.get("return_streams") or {}).get("oos") or []), thresholds
+    )
+    val_hurdle_pass = all(
+        bool(row.get("strict_pass"))
+        for row in val_months
+        if str(row.get("month", "")).startswith("2026-01")
+    )
+    val_btc_hurdle_pass = all(
+        bool(row.get("btc_pass"))
+        for row in val_months
+        if str(row.get("month", "")).startswith("2026-01")
+    )
     oos_btc_hurdle_pass = all(bool(row.get("btc_pass")) for row in oos_months)
     recent_three_months = _latest_three_month_rows(val_months, oos_months)
     recent_three_month_two_pct_pass = _recent_three_month_two_pct_pass(val_months, oos_months)
     train_pass = bool((top.get("hurdle_fields") or {}).get("train", {}).get("pass"))
     val_pass = bool((top.get("hurdle_fields") or {}).get("val", {}).get("pass"))
     top["validation_score"] = _validation_score(top, scoring_config=scoring_config)
-    top["timeframe_selection_score"] = _timeframe_selection_score(top, scoring_config=scoring_config)
+    top["timeframe_selection_score"] = _timeframe_selection_score(
+        top, scoring_config=scoring_config
+    )
     top["validation_monthly_hurdle"] = val_months
     top["oos_monthly_hurdle"] = oos_months
     top["recent_three_months"] = recent_three_months
@@ -378,7 +418,9 @@ def _best_row_for_timeframe(
     top["recent_three_month_two_pct_pass"] = bool(recent_three_month_two_pct_pass)
     top["promoted"] = str(top.get("candidate_id") or "") in promoted_ids
     top["btc_beating_candidate"] = train_pass and val_pass and bool(val_btc_hurdle_pass)
-    top["three_month_two_pct_candidate"] = train_pass and val_pass and bool(recent_three_month_two_pct_pass)
+    top["three_month_two_pct_candidate"] = (
+        train_pass and val_pass and bool(recent_three_month_two_pct_pass)
+    )
     top["candidate_pool_eligible"] = bool(
         top.get("promoted")
         or top.get("btc_beating_candidate")
@@ -401,7 +443,9 @@ def _memory_summary(candidate: _SummaryCandidate) -> dict[str, Any] | None:
         "soft_limit_mib": float(payload.get("soft_limit_mib") or 0.0),
         "hard_limit_mib": float(payload.get("hard_limit_mib") or 0.0),
         "rss_log_path": str(payload.get("rss_log_path") or ""),
-        "memory_evidence_path": str(candidate.memory_evidence_path) if candidate.memory_evidence_path else None,
+        "memory_evidence_path": str(candidate.memory_evidence_path)
+        if candidate.memory_evidence_path
+        else None,
     }
 
 
@@ -449,30 +493,48 @@ def build_exact_window_decision(
         ]
         annotated_summary_rows = []
         for row in summary_rows:
-            val_months = _monthly_hurdle_rows(list((row.get("return_streams") or {}).get("val") or []), thresholds)
-            oos_months = _monthly_hurdle_rows(list((row.get("return_streams") or {}).get("oos") or []), thresholds)
+            val_months = _monthly_hurdle_rows(
+                list((row.get("return_streams") or {}).get("val") or []), thresholds
+            )
+            oos_months = _monthly_hurdle_rows(
+                list((row.get("return_streams") or {}).get("oos") or []), thresholds
+            )
             train_pass = bool((row.get("hurdle_fields") or {}).get("train", {}).get("pass"))
             val_pass = bool((row.get("hurdle_fields") or {}).get("val", {}).get("pass"))
-            btc_pass = all(bool(item.get("btc_pass")) for item in val_months if str(item.get("month", "")).startswith("2026-01"))
+            btc_pass = all(
+                bool(item.get("btc_pass"))
+                for item in val_months
+                if str(item.get("month", "")).startswith("2026-01")
+            )
             three_month_two_pct_pass = _recent_three_month_two_pct_pass(val_months, oos_months)
             copied = dict(row)
             copied["btc_beating_candidate"] = train_pass and val_pass and bool(btc_pass)
-            copied["three_month_two_pct_candidate"] = train_pass and val_pass and bool(three_month_two_pct_pass)
+            copied["three_month_two_pct_candidate"] = (
+                train_pass and val_pass and bool(three_month_two_pct_pass)
+            )
             copied["candidate_pool_eligible"] = bool(
                 copied.get("promoted")
                 or copied.get("btc_beating_candidate")
                 or copied.get("three_month_two_pct_candidate")
             )
             annotated_summary_rows.append(copied)
-        promoted_strategy_count = sum(1 for row in annotated_summary_rows if bool(row.get("promoted")))
-        btc_beating_strategy_count = sum(1 for row in annotated_summary_rows if bool(row.get("btc_beating_candidate")))
+        promoted_strategy_count = sum(
+            1 for row in annotated_summary_rows if bool(row.get("promoted"))
+        )
+        btc_beating_strategy_count = sum(
+            1 for row in annotated_summary_rows if bool(row.get("btc_beating_candidate"))
+        )
         three_month_two_pct_strategy_count = sum(
             1 for row in annotated_summary_rows if bool(row.get("three_month_two_pct_candidate"))
         )
         provisional_strategy_count = sum(
-            1 for row in annotated_summary_rows if bool(row.get("candidate_pool_eligible")) and not bool(row.get("promoted"))
+            1
+            for row in annotated_summary_rows
+            if bool(row.get("candidate_pool_eligible")) and not bool(row.get("promoted"))
         )
-        candidate_pool_strategy_count = sum(1 for row in annotated_summary_rows if bool(row.get("candidate_pool_eligible")))
+        candidate_pool_strategy_count = sum(
+            1 for row in annotated_summary_rows if bool(row.get("candidate_pool_eligible"))
+        )
         timeframe_rows.append(
             {
                 "timeframe": timeframe,
@@ -494,7 +556,9 @@ def build_exact_window_decision(
                     "recent_three_months": list((best_row or {}).get("recent_three_months") or []),
                     "validation_pass": bool((best_row or {}).get("validation_hurdle_pass")),
                     "validation_btc_pass": bool((best_row or {}).get("validation_btc_hurdle_pass")),
-                    "recent_three_month_two_pct_pass": bool((best_row or {}).get("recent_three_month_two_pct_pass")),
+                    "recent_three_month_two_pct_pass": bool(
+                        (best_row or {}).get("recent_three_month_two_pct_pass")
+                    ),
                     "oos_pass": all(
                         bool(row.get("pass"))
                         for row in list((best_row or {}).get("oos_monthly_hurdle") or [])
@@ -507,7 +571,9 @@ def build_exact_window_decision(
                 "windows": dict(candidate.summary.get("windows") or {}),
                 "summary_path": str(candidate.summary_path),
                 "details_path": str(candidate.details_path) if candidate.details_path else None,
-                "fail_analysis_path": str(candidate.fail_analysis_path) if candidate.fail_analysis_path else None,
+                "fail_analysis_path": str(candidate.fail_analysis_path)
+                if candidate.fail_analysis_path
+                else None,
             }
         )
 
@@ -518,29 +584,45 @@ def build_exact_window_decision(
         if candidate.summary_path in seen_paths:
             continue
         seen_paths.add(candidate.summary_path)
-        selected_timeframes = sorted(source_timeframes[candidate.summary_path], key=_timeframe_sort_key)
+        selected_timeframes = sorted(
+            source_timeframes[candidate.summary_path], key=_timeframe_sort_key
+        )
         source_batches.append(
             {
                 "summary_path": str(candidate.summary_path),
                 "details_path": str(candidate.details_path) if candidate.details_path else None,
-                "fail_analysis_path": str(candidate.fail_analysis_path) if candidate.fail_analysis_path else None,
-                "memory_evidence_path": str(candidate.memory_evidence_path) if candidate.memory_evidence_path else None,
-                "latest_pointer_path": str(candidate.latest_pointer_path) if candidate.latest_pointer_path else None,
+                "fail_analysis_path": str(candidate.fail_analysis_path)
+                if candidate.fail_analysis_path
+                else None,
+                "memory_evidence_path": str(candidate.memory_evidence_path)
+                if candidate.memory_evidence_path
+                else None,
+                "latest_pointer_path": str(candidate.latest_pointer_path)
+                if candidate.latest_pointer_path
+                else None,
                 "generated_at": candidate.generated_at.isoformat(),
                 "selected_timeframes": selected_timeframes,
-                "actual_max_timestamp": str((candidate.summary.get("windows") or {}).get("actual_max_timestamp") or ""),
+                "actual_max_timestamp": str(
+                    (candidate.summary.get("windows") or {}).get("actual_max_timestamp") or ""
+                ),
                 "peak_rss_mib": float((candidate.memory_evidence or {}).get("peak_rss_mib") or 0.0),
             }
         )
 
     total_evaluated = sum(int(row.get("evaluated_count") or 0) for row in timeframe_rows)
     promoted_total = sum(int(row.get("promoted_strategy_count") or 0) for row in timeframe_rows)
-    btc_beating_candidate_total = sum(int(row.get("btc_beating_strategy_count") or 0) for row in timeframe_rows)
+    btc_beating_candidate_total = sum(
+        int(row.get("btc_beating_strategy_count") or 0) for row in timeframe_rows
+    )
     three_month_two_pct_candidate_total = sum(
         int(row.get("three_month_two_pct_strategy_count") or 0) for row in timeframe_rows
     )
-    provisional_candidate_total = sum(int(row.get("provisional_strategy_count") or 0) for row in timeframe_rows)
-    candidate_pool_total = sum(int(row.get("candidate_pool_strategy_count") or 0) for row in timeframe_rows)
+    provisional_candidate_total = sum(
+        int(row.get("provisional_strategy_count") or 0) for row in timeframe_rows
+    )
+    candidate_pool_total = sum(
+        int(row.get("candidate_pool_strategy_count") or 0) for row in timeframe_rows
+    )
     common_clamp_values = sorted(
         {
             str((row.get("windows") or {}).get("actual_max_timestamp") or "")
@@ -549,7 +631,11 @@ def build_exact_window_decision(
         }
     )
     max_peak_rss_mib = max(
-        [float((row.get("memory_evidence") or {}).get("peak_rss_mib") or 0.0) for row in timeframe_rows] or [0.0]
+        [
+            float((row.get("memory_evidence") or {}).get("peak_rss_mib") or 0.0)
+            for row in timeframe_rows
+        ]
+        or [0.0]
     )
 
     return {
@@ -572,7 +658,9 @@ def build_exact_window_decision(
         "three_month_two_pct_candidate_total": int(three_month_two_pct_candidate_total),
         "provisional_candidate_total": int(provisional_candidate_total),
         "candidate_pool_total": int(candidate_pool_total),
-        "common_actual_max_timestamp": common_clamp_values[0] if len(common_clamp_values) == 1 else None,
+        "common_actual_max_timestamp": common_clamp_values[0]
+        if len(common_clamp_values) == 1
+        else None,
         "actual_max_timestamps": common_clamp_values,
         "reject_counts_all_rows": [
             {"rejection_reason": reason, "count": int(count)}
@@ -612,14 +700,16 @@ def _render_exact_window_decision_markdown(payload: dict[str, Any]) -> str:
         best = dict(row.get("best_row") or {})
         memory = dict(row.get("memory_evidence") or {})
         lines.append(
-            f"| {row.get('timeframe','')} | {best.get('strategy_class','')} | {best.get('name','')} | "
+            f"| {row.get('timeframe', '')} | {best.get('strategy_class', '')} | {best.get('name', '')} | "
             f"{float(best.get('validation_score', 0.0)):.3f} | {int(best.get('promoted', False))} | {int(best.get('btc_beating_candidate', False))} | {int(best.get('three_month_two_pct_candidate', False))} | "
             f"{float((best.get('oos') or {}).get('return', 0.0)):.2%} | {float((best.get('oos') or {}).get('sharpe', 0.0)):.3f} | "
             f"{', '.join(best.get('rejection_reasons') or [])} | {float(memory.get('peak_rss_mib', 0.0)):.2f} |"
         )
-    lines.extend(["", "## Reject Counts (All Selected Rows)", "", "| Reason | Count |", "|---|---:|"])
+    lines.extend(
+        ["", "## Reject Counts (All Selected Rows)", "", "| Reason | Count |", "|---|---:|"]
+    )
     for row in list(payload.get("reject_counts_all_rows") or []):
-        lines.append(f"| {row.get('rejection_reason','')} | {int(row.get('count', 0))} |")
+        lines.append(f"| {row.get('rejection_reason', '')} | {int(row.get('count', 0))} |")
     return "\n".join(lines) + "\n"
 
 
@@ -643,8 +733,10 @@ def build_strict_valid_strategy_artifact(payload: dict[str, Any]) -> dict[str, A
                 "oos": dict(best.get("oos") or {}),
                 "validation_monthly_hurdle": list(best.get("validation_monthly_hurdle") or []),
                 "oos_monthly_hurdle": list(best.get("oos_monthly_hurdle") or []),
-                "source_summary_path": best.get("source_summary_path") or timeframe_row.get("summary_path"),
-                "source_details_path": best.get("source_details_path") or timeframe_row.get("details_path"),
+                "source_summary_path": best.get("source_summary_path")
+                or timeframe_row.get("summary_path"),
+                "source_details_path": best.get("source_details_path")
+                or timeframe_row.get("details_path"),
             }
         )
     strategies.sort(

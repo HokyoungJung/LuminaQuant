@@ -54,7 +54,9 @@ def build_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
         by_symbol[str(row.get("symbol") or "UNKNOWN")].append(row)
 
     def _section(items: list[dict[str, Any]]) -> dict[str, Any]:
-        slips = [value for value in (_derive_slippage_bps(item) for item in items) if value is not None]
+        slips = [
+            value for value in (_derive_slippage_bps(item) for item in items) if value is not None
+        ]
         metadata_rows = [dict(item.get("metadata") or {}) for item in items]
         timeout_count = sum(1 for m in metadata_rows if bool(m.get("timeout_flag")))
         partial_fill_count = sum(1 for m in metadata_rows if bool(m.get("partial_fill_flag")))

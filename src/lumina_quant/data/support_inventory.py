@@ -112,7 +112,9 @@ def build_strategy_support_inventory(
     exchange: str = "binance",
     symbols: list[str] | None = None,
 ) -> dict[str, Any]:
-    requested_symbols = list(symbols or discover_feature_point_symbols(db_path=db_path, exchange=exchange))
+    requested_symbols = list(
+        symbols or discover_feature_point_symbols(db_path=db_path, exchange=exchange)
+    )
     inventory_rows: list[dict[str, Any]] = []
     liquidation_expr = _liquidation_present_expr()
 
@@ -190,8 +192,12 @@ def build_strategy_support_inventory(
             {
                 "symbol": str(symbol).replace("/", ""),
                 "rows": int(cleaned.height),
-                "first_timestamp_ms": int(first_timestamp_ms) if first_timestamp_ms is not None else None,
-                "last_timestamp_ms": int(last_timestamp_ms) if last_timestamp_ms is not None else None,
+                "first_timestamp_ms": int(first_timestamp_ms)
+                if first_timestamp_ms is not None
+                else None,
+                "last_timestamp_ms": int(last_timestamp_ms)
+                if last_timestamp_ms is not None
+                else None,
                 "funding_rows": funding_rows,
                 "funding_fee_rows": funding_fee_rows,
                 "mark_rows": mark_rows,

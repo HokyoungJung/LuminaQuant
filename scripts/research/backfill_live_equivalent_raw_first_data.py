@@ -156,7 +156,9 @@ def _last_json_payload(text: str) -> dict[str, Any] | None:
     return None
 
 
-def _materializer_payload_committed(payload: dict[str, Any] | None, *, symbol: str, run: DateRun) -> bool:
+def _materializer_payload_committed(
+    payload: dict[str, Any] | None, *, symbol: str, run: DateRun
+) -> bool:
     """Return true when materializer stdout proves the requested day(s) committed.
 
     Some parquet/arrow shutdown paths can print a complete successful JSON
@@ -175,7 +177,7 @@ def _materializer_payload_committed(payload: dict[str, Any] | None, *, symbol: s
             continue
         if str(item.get("status") or "").strip().lower() != "committed":
             continue
-        commits = ((item.get("timeframes") or {}).get("1s") or [])
+        commits = (item.get("timeframes") or {}).get("1s") or []
         committed_partitions: set[str] = set()
         for commit in commits:
             if not isinstance(commit, dict):
@@ -191,7 +193,6 @@ def _materializer_payload_committed(payload: dict[str, Any] | None, *, symbol: s
                 committed_partitions.add(partition)
         return required_partitions.issubset(committed_partitions)
     return False
-
 
 
 def _run_raw_child(
@@ -322,6 +323,7 @@ def _run_raw_guarded(
     payload.update({"elapsed_sec": round(elapsed, 3), "peak_rss_mb": round(peak_rss_kb / 1024, 3)})
     return payload
 
+
 def _run_materializer_guarded(
     *,
     symbol: str,
@@ -377,7 +379,9 @@ def _run_materializer_guarded(
     elapsed = time.monotonic() - started
     payload = _last_json_payload(stdout)
     if proc.returncode != 0:
-        if not killed_for_memory and _materializer_payload_committed(payload, symbol=symbol, run=run):
+        if not killed_for_memory and _materializer_payload_committed(
+            payload, symbol=symbol, run=run
+        ):
             return {
                 **run.as_payload(),
                 "elapsed_sec": round(elapsed, 3),
@@ -443,16 +447,21 @@ def build_backfill(
         if collect_raw:
             for run in _group_days(missing_raw, max_days=raw_chunk_days):
                 row = _run_raw_guarded(
-                        symbol=symbol,
-                        db_path=db_path,
-                        exchange=exchange_id,
-                        run=run,
-                        retries=retries,
-                        base_wait_sec=base_wait_sec,
-                        max_rss_mb=max_rss_mb,
-                    )
+                    symbol=symbol,
+                    db_path=db_path,
+                    exchange=exchange_id,
+                    run=run,
+                    retries=retries,
+                    base_wait_sec=base_wait_sec,
+                    max_rss_mb=max_rss_mb,
+                )
                 raw_runs_payload.append(row)
-                print(json.dumps({"event": "raw_backfill_run", "symbol": symbol, **row}, ensure_ascii=False), flush=True)
+                print(
+                    json.dumps(
+                        {"event": "raw_backfill_run", "symbol": symbol, **row}, ensure_ascii=False
+                    ),
+                    flush=True,
+                )
 
         after_raw = _raw_days(db_path, exchange=exchange_id, symbol=symbol)
         before_mat = _manifest_days(db_path, exchange=exchange_id, symbol=symbol, timeframe="1s")
@@ -463,17 +472,25 @@ def build_backfill(
             # manifests are absent.  Chunked child processes keep RSS bounded.
             for run in _group_days(missing_mat, max_days=chunk_days):
                 row = _run_materializer_guarded(
-                        symbol=symbol,
-                        db_path=db_path,
-                        exchange=exchange_id,
-                        run=run,
-                        producer="live_equivalent_data_backfill_20260426",
-                        max_rss_mb=max_rss_mb,
-                    )
+                    symbol=symbol,
+                    db_path=db_path,
+                    exchange=exchange_id,
+                    run=run,
+                    producer="live_equivalent_data_backfill_20260426",
+                    max_rss_mb=max_rss_mb,
+                )
                 materialize_runs_payload.append(row)
                 print(
                     json.dumps(
-                        {"event": "materialize_run", "symbol": symbol, **{k: v for k, v in row.items() if k not in {"stdout_tail", "stderr_tail"}}},
+                        {
+                            "event": "materialize_run",
+                            "symbol": symbol,
+                            **{
+                                k: v
+                                for k, v in row.items()
+                                if k not in {"stdout_tail", "stderr_tail"}
+                            },
+                        },
                         ensure_ascii=False,
                     ),
                     flush=True,
@@ -491,13 +508,30 @@ def build_backfill(
             "materialized_missing_before": len(missing_mat),
             "materialized_present_after": len(required_days & after_mat),
             "materialized_missing_after": len(required_days - after_mat),
-            "first_raw_missing_after": [d.isoformat() for d in sorted(required_days - after_raw)[:10]],
-            "first_materialized_missing_after": [d.isoformat() for d in sorted(required_days - after_mat)[:10]],
+            "first_raw_missing_after": [
+                d.isoformat() for d in sorted(required_days - after_raw)[:10]
+            ],
+            "first_materialized_missing_after": [
+                d.isoformat() for d in sorted(required_days - after_mat)[:10]
+            ],
             "raw_runs": raw_runs_payload,
             "materialize_runs": materialize_runs_payload,
         }
         symbol_payloads.append(payload)
-        print(json.dumps({"event": "symbol_complete", **{k: v for k, v in payload.items() if k not in {"raw_runs", "materialize_runs"}}}, ensure_ascii=False), flush=True)
+        print(
+            json.dumps(
+                {
+                    "event": "symbol_complete",
+                    **{
+                        k: v
+                        for k, v in payload.items()
+                        if k not in {"raw_runs", "materialize_runs"}
+                    },
+                },
+                ensure_ascii=False,
+            ),
+            flush=True,
+        )
 
     result = {
         "artifact_kind": "live_equivalent_raw_first_backfill",
@@ -510,7 +544,10 @@ def build_backfill(
         "raw_chunk_days": int(raw_chunk_days),
         "max_rss_mb": int(max_rss_mb),
         "symbols": symbol_payloads,
-        "success": all(item["raw_missing_after"] == 0 and item["materialized_missing_after"] == 0 for item in symbol_payloads),
+        "success": all(
+            item["raw_missing_after"] == 0 and item["materialized_missing_after"] == 0
+            for item in symbol_payloads
+        ),
     }
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")

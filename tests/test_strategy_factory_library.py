@@ -142,15 +142,9 @@ def test_mean_reversion_candidate_builder_uses_bounded_5m_15m_slice_only():
         symbols=["BTC/USDT", "ETH/USDT", "BNB/USDT", "TRX/USDT"],
     )
     volcomp_rows = [
-        row
-        for row in rows
-        if row.strategy_class == "VolCompressionVWAPReversionStrategy"
+        row for row in rows if row.strategy_class == "VolCompressionVWAPReversionStrategy"
     ]
-    leadlag_rows = [
-        row
-        for row in rows
-        if row.strategy_class == "LeadLagSpilloverStrategy"
-    ]
+    leadlag_rows = [row for row in rows if row.strategy_class == "LeadLagSpilloverStrategy"]
 
     assert {row.timeframe for row in volcomp_rows} == {"5m", "15m"}
     assert {row.timeframe for row in leadlag_rows} == {"5m", "15m"}
@@ -174,11 +168,7 @@ def test_pair_candidate_builder_prunes_5m_and_focuses_15m_pairs():
             "XPD/USDT",
         ],
     )
-    pair_rows = [
-        row
-        for row in rows
-        if row.strategy_class == "PairSpreadZScoreStrategy"
-    ]
+    pair_rows = [row for row in rows if row.strategy_class == "PairSpreadZScoreStrategy"]
     pair_set = {tuple(row.symbols) for row in pair_rows}
 
     assert {row.timeframe for row in pair_rows} == {"15m"}
@@ -204,11 +194,7 @@ def test_pair_candidate_builder_includes_4h_and_1d_rows():
             "XPD/USDT",
         ],
     )
-    pair_rows = [
-        row
-        for row in rows
-        if row.strategy_class == "PairSpreadZScoreStrategy"
-    ]
+    pair_rows = [row for row in rows if row.strategy_class == "PairSpreadZScoreStrategy"]
     pair_timeframes = {row.timeframe for row in pair_rows}
     pair_set = {(row.timeframe, tuple(row.symbols)) for row in pair_rows}
 
@@ -247,19 +233,21 @@ def test_candidate_library_includes_article_inspired_carry_trend_factor_rotation
         timeframes=["1h", "4h"],
         symbols=["BTC/USDT", "ETH/USDT", "BNB/USDT", "SOL/USDT", "TRX/USDT"],
     )
-    factor_rows = [
-        row
-        for row in rows
-        if row.strategy_class == "CarryTrendFactorRotationStrategy"
-    ]
+    factor_rows = [row for row in rows if row.strategy_class == "CarryTrendFactorRotationStrategy"]
 
     assert {row.timeframe for row in factor_rows} == {"1h", "4h"}
     assert len(factor_rows) == 6
     assert all(row.family == "cross_sectional" for row in factor_rows)
-    assert all(row.symbols == ("BTC/USDT", "ETH/USDT", "BNB/USDT", "SOL/USDT", "TRX/USDT") for row in factor_rows)
+    assert all(
+        row.symbols == ("BTC/USDT", "ETH/USDT", "BNB/USDT", "SOL/USDT", "TRX/USDT")
+        for row in factor_rows
+    )
     assert all("carry_trend_factor_rotation_" in row.name for row in factor_rows)
     assert all("article_family:carry-trend-factor-rotation" in row.tags for row in factor_rows)
-    assert all(row.metadata.get("article_reference") == "quant-company-profit-mechanisms" for row in factor_rows)
+    assert all(
+        row.metadata.get("article_reference") == "quant-company-profit-mechanisms"
+        for row in factor_rows
+    )
     production_ready = [row for row in factor_rows if row.metadata.get("production_ready") is True]
     assert {row.timeframe for row in production_ready} == {"1h", "4h"}
     assert all(bool(row.params["allow_short"]) is False for row in production_ready)
@@ -270,11 +258,7 @@ def test_candidate_library_includes_last_day_liquidity_regime_family():
         timeframes=["1h"],
         symbols=["BTC/USDT", "ETH/USDT", "BNB/USDT", "SOL/USDT", "TRX/USDT"],
     )
-    regime_rows = [
-        row
-        for row in rows
-        if row.strategy_class == "LastDayLiquidityRegimeStrategy"
-    ]
+    regime_rows = [row for row in rows if row.strategy_class == "LastDayLiquidityRegimeStrategy"]
 
     assert len(regime_rows) == 2
     assert {row.timeframe for row in regime_rows} == {"1h"}
@@ -289,11 +273,7 @@ def test_candidate_library_includes_abnormal_return_continuation_family():
         timeframes=["1d"],
         symbols=["BNB/USDT", "TRX/USDT"],
     )
-    event_rows = [
-        row
-        for row in rows
-        if row.strategy_class == "AbnormalReturnContinuationStrategy"
-    ]
+    event_rows = [row for row in rows if row.strategy_class == "AbnormalReturnContinuationStrategy"]
 
     assert len(event_rows) == 4
     assert {row.timeframe for row in event_rows} == {"1d"}
@@ -304,7 +284,15 @@ def test_candidate_library_includes_abnormal_return_continuation_family():
 def test_build_article_pipeline_manifest_collects_existing_and_new_article_candidates():
     rows = build_article_pipeline_candidates(
         timeframes=["5m", "15m", "30m", "1h", "4h"],
-        symbols=["BTC/USDT", "ETH/USDT", "BNB/USDT", "SOL/USDT", "TRX/USDT", "XAU/USDT", "XAG/USDT"],
+        symbols=[
+            "BTC/USDT",
+            "ETH/USDT",
+            "BNB/USDT",
+            "SOL/USDT",
+            "TRX/USDT",
+            "XAU/USDT",
+            "XAG/USDT",
+        ],
         max_per_family=0,
         max_total=0,
     )
@@ -319,7 +307,15 @@ def test_build_article_pipeline_manifest_collects_existing_and_new_article_candi
 
     manifest = build_article_pipeline_manifest(
         timeframes=["5m", "15m", "30m", "1h", "4h"],
-        symbols=["BTC/USDT", "ETH/USDT", "BNB/USDT", "SOL/USDT", "TRX/USDT", "XAU/USDT", "XAG/USDT"],
+        symbols=[
+            "BTC/USDT",
+            "ETH/USDT",
+            "BNB/USDT",
+            "SOL/USDT",
+            "TRX/USDT",
+            "XAU/USDT",
+            "XAG/USDT",
+        ],
         max_per_family=3,
         max_total=0,
     )
@@ -397,18 +393,30 @@ def test_composite_trend_candidate_builder_uses_explicit_30m_1h_stability_slice(
     assert all(row.params["allow_short"] is False for row in one_hour_rows)
     assert all(float(row.params["crowding_block_threshold"]) <= 0.70 for row in one_hour_rows)
 
-    crashguard_row = next(row for row in trend_rows if row.name == "composite_trend_stable_30m_stable_ls_crashguard_ls_0.75_0.45_0.20_0.82")
+    crashguard_row = next(
+        row
+        for row in trend_rows
+        if row.name == "composite_trend_stable_30m_stable_ls_crashguard_ls_0.75_0.45_0.20_0.82"
+    )
     assert crashguard_row.params["benchmark_regime_ma"] == 96
     assert crashguard_row.params["benchmark_symbol"] == "BTC/USDT"
     assert crashguard_row.metadata["benchmark_regime_ma"] == 96
     assert "crash_aware" in crashguard_row.tags
 
-    exec_trail_row = next(row for row in trend_rows if row.name == "composite_trend_stable_30m_stable_ls_exec_trail_ls_0.75_0.45_0.20_0.80")
+    exec_trail_row = next(
+        row
+        for row in trend_rows
+        if row.name == "composite_trend_stable_30m_stable_ls_exec_trail_ls_0.75_0.45_0.20_0.80"
+    )
     assert exec_trail_row.params["trail_atr_mult"] == 2.4
     assert exec_trail_row.params["atr_stop_mult"] == 1.8
     assert "execution_risk" in exec_trail_row.tags
 
-    exec_shorthold_row = next(row for row in trend_rows if row.name == "composite_trend_stable_30m_stable_ls_exec_shorthold_ls_0.75_0.45_0.20_0.80")
+    exec_shorthold_row = next(
+        row
+        for row in trend_rows
+        if row.name == "composite_trend_stable_30m_stable_ls_exec_shorthold_ls_0.75_0.45_0.20_0.80"
+    )
     assert exec_shorthold_row.params["max_hold_bars"] == 640
     assert exec_shorthold_row.params["exit_score_cross"] == 0.04
     assert "execution_risk" in exec_shorthold_row.tags
@@ -477,14 +485,18 @@ def test_candidate_library_adds_article_pipeline_provenance_tags_and_metadata():
     by_name = {row.name: row for row in rows}
 
     trend_row = next(row for row in rows if row.strategy_class == "CompositeTrendStrategy")
-    assert trend_row.metadata["article_pipeline_family_ids"] == ["regime-conditioned-composite-trend"]
+    assert trend_row.metadata["article_pipeline_family_ids"] == [
+        "regime-conditioned-composite-trend"
+    ]
     assert "article_pipeline" in trend_row.tags
     assert "article_family:regime-conditioned-composite-trend" in trend_row.tags
 
     volcomp_row = next(
         row for row in rows if row.strategy_class == "VolCompressionVWAPReversionStrategy"
     )
-    assert volcomp_row.metadata["article_pipeline_family_ids"] == ["vol-compression-break-reversion"]
+    assert volcomp_row.metadata["article_pipeline_family_ids"] == [
+        "vol-compression-break-reversion"
+    ]
     assert "article_family:vol-compression-break-reversion" in volcomp_row.tags
 
     vwap_row = next(row for row in rows if row.strategy_class == "VwapReversionStrategy")
@@ -501,7 +513,9 @@ def test_candidate_library_adds_article_pipeline_provenance_tags_and_metadata():
     assert residual_std_row.metadata["residualize_btc"] is True
     assert "btc_beta_neutral" in residual_std_row.tags
 
-    liquidity_row = next(row for row in rows if row.strategy_class == "LiquidityShockReversionStrategy")
+    liquidity_row = next(
+        row for row in rows if row.strategy_class == "LiquidityShockReversionStrategy"
+    )
     assert liquidity_row.metadata["article_pipeline_family_ids"] == ["liquidity-shock-reversion"]
     assert "article_family:liquidity-shock-reversion" in liquidity_row.tags
 
@@ -564,7 +578,9 @@ def test_candidate_library_adds_article_pipeline_provenance_tags_and_metadata():
     assert "article_family:sector-dispersion-reversion" in sector_30m_row.tags
 
     crypto_pair_row = by_name["pair_spread_1h_core_btcusdt_trxusdt_1.8_0.45"]
-    assert crypto_pair_row.metadata["article_pipeline_family_ids"] == ["sector-dispersion-reversion"]
+    assert crypto_pair_row.metadata["article_pipeline_family_ids"] == [
+        "sector-dispersion-reversion"
+    ]
     assert "article_family:sector-dispersion-reversion" in crypto_pair_row.tags
 
     lag_row = by_name["lag_convergence_4h_metals_core_xauusdt_xagusdt_2_0.018"]
@@ -580,11 +596,15 @@ def test_candidate_library_adds_article_pipeline_provenance_tags_and_metadata():
     assert "article_family:regime-breakout-thrust" in regime_row.tags
 
     topcap_row = by_name["topcap_tsmom_1h_balanced_16_4_0.015"]
-    assert topcap_row.metadata["article_pipeline_family_ids"] == ["topcap-rotation-relative-momentum"]
+    assert topcap_row.metadata["article_pipeline_family_ids"] == [
+        "topcap-rotation-relative-momentum"
+    ]
     assert "article_family:topcap-rotation-relative-momentum" in topcap_row.tags
 
     breadth_row = by_name["breadth_thrust_failure_reversal_30m_balanced_ls_16_0.80"]
-    assert breadth_row.metadata["article_pipeline_family_ids"] == ["breadth-thrust-failure-reversal"]
+    assert breadth_row.metadata["article_pipeline_family_ids"] == [
+        "breadth-thrust-failure-reversal"
+    ]
     assert "article_family:breadth-thrust-failure-reversal" in breadth_row.tags
 
     trend_exhaustion_row = by_name["multi_horizon_trend_exhaustion_fade_30m_balanced_ls_16_1.6"]

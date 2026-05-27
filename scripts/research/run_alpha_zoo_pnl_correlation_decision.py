@@ -46,13 +46,11 @@ from scripts.research.run_alpha_zoo_htf_momentum_crowding_discovery import (  # 
 )
 
 DEFAULT_MONITORING_ARTIFACT = (
-    REPO_ROOT
-    / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/"
+    REPO_ROOT / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/"
     "alpha_zoo_multi_asset_monitoring_slate_20260524/multi_asset_monitoring_slate_latest.json"
 )
 DEFAULT_OUTPUT_DIR = (
-    REPO_ROOT
-    / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/"
+    REPO_ROOT / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/"
     "alpha_zoo_pnl_correlation_decision_20260524"
 )
 
@@ -147,7 +145,9 @@ def _timestamp() -> str:
 
 def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(_json_safe(payload), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(_json_safe(payload), indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
 
 def _csv_value(value: Any) -> Any:
@@ -163,7 +163,9 @@ def _csv_value(value: Any) -> Any:
 def _write_csv(path: Path, rows: Sequence[Mapping[str, Any]], fields: Sequence[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(fields), lineterminator="\n", extrasaction="ignore")
+        writer = csv.DictWriter(
+            handle, fieldnames=list(fields), lineterminator="\n", extrasaction="ignore"
+        )
         writer.writeheader()
         for row in rows:
             writer.writerow({field: _csv_value(row.get(field)) for field in fields})
@@ -225,7 +227,10 @@ def _monitoring_score_train_validation_only(row: Mapping[str, Any]) -> float:
 
 def _load_monitoring_payload(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
-    if payload.get("ready_for_real") is not False or payload.get("real_money_execution") is not False:
+    if (
+        payload.get("ready_for_real") is not False
+        or payload.get("real_money_execution") is not False
+    ):
         raise ValueError(f"real-money guard violation in monitoring artifact: {path}")
     if payload.get("selection_policy", {}).get("uses_locked_oos_for_discovery") is not False:
         raise ValueError("monitoring artifact does not fail closed on locked-OOS discovery usage")
@@ -244,11 +249,17 @@ def _dedupe_rows(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _paper_rows_from_monitoring(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
-    rows = _dedupe_rows(row for row in payload.get("monitoring_rows", []) if row.get("monitoring_status") == PAPER_STATUS)
+    rows = _dedupe_rows(
+        row
+        for row in payload.get("monitoring_rows", [])
+        if row.get("monitoring_status") == PAPER_STATUS
+    )
     return sorted(rows, key=_monitoring_score_train_validation_only, reverse=True)
 
 
-def _strict_shadow_rows_from_monitoring(payload: Mapping[str, Any], *, limit: int) -> list[dict[str, Any]]:
+def _strict_shadow_rows_from_monitoring(
+    payload: Mapping[str, Any], *, limit: int
+) -> list[dict[str, Any]]:
     if limit <= 0:
         return []
     shadows: list[dict[str, Any]] = []
@@ -261,14 +272,25 @@ def _strict_shadow_rows_from_monitoring(payload: Mapping[str, Any], *, limit: in
             continue
         if _safe_float(row.get("locked_oos_return")) < 0.02:
             continue
-        if _safe_float(row.get("train_return_per_turnover_proxy_bps")) <= RETURN_PER_TURNOVER_THRESHOLD_BPS:
+        if (
+            _safe_float(row.get("train_return_per_turnover_proxy_bps"))
+            <= RETURN_PER_TURNOVER_THRESHOLD_BPS
+        ):
             continue
-        if _safe_float(row.get("validation_return_per_turnover_proxy_bps")) <= RETURN_PER_TURNOVER_THRESHOLD_BPS:
+        if (
+            _safe_float(row.get("validation_return_per_turnover_proxy_bps"))
+            <= RETURN_PER_TURNOVER_THRESHOLD_BPS
+        ):
             continue
-        if _safe_float(row.get("locked_oos_return_per_turnover_proxy_bps")) <= RETURN_PER_TURNOVER_THRESHOLD_BPS:
+        if (
+            _safe_float(row.get("locked_oos_return_per_turnover_proxy_bps"))
+            <= RETURN_PER_TURNOVER_THRESHOLD_BPS
+        ):
             continue
         shadows.append(dict(row))
-    return sorted(_dedupe_rows(shadows), key=_monitoring_score_train_validation_only, reverse=True)[:limit]
+    return sorted(_dedupe_rows(shadows), key=_monitoring_score_train_validation_only, reverse=True)[
+        :limit
+    ]
 
 
 def _capture_finalizer(
@@ -278,7 +300,9 @@ def _capture_finalizer(
     captures: dict[str, CapturedPnl],
     original: Callable[..., dict[str, Any]],
 ) -> Callable[..., dict[str, Any]]:
-    def wrapped(base: dict[str, Any], sim: SimResult, datetimes: pd.Series, *, timeframe: str) -> dict[str, Any]:
+    def wrapped(
+        base: dict[str, Any], sim: SimResult, datetimes: pd.Series, *, timeframe: str
+    ) -> dict[str, Any]:
         row = original(base, sim, datetimes, timeframe=timeframe)
         model_id = str(row.get("model_id") or base.get("model_id") or "")
         if model_id in target_ids and model_id not in captures:
@@ -301,15 +325,22 @@ def _group_requests(rows: Sequence[Mapping[str, Any]]) -> dict[str, SourceReplay
         source_kind = str(row.get("source_artifact_kind") or "")
         if source_kind in SOURCE_KINDS:
             grouped[source_kind].append(dict(row))
-    return {kind: SourceReplayRequest(source_kind=kind, rows=tuple(rows_)) for kind, rows_ in grouped.items()}
+    return {
+        kind: SourceReplayRequest(source_kind=kind, rows=tuple(rows_))
+        for kind, rows_ in grouped.items()
+    }
 
 
 def _target_symbols(rows: Sequence[Mapping[str, Any]]) -> tuple[str, ...]:
-    return tuple(sorted({str(row.get("symbol") or "").upper() for row in rows if row.get("symbol")}))
+    return tuple(
+        sorted({str(row.get("symbol") or "").upper() for row in rows if row.get("symbol")})
+    )
 
 
 def _target_timeframes(rows: Sequence[Mapping[str, Any]]) -> tuple[str, ...]:
-    return tuple(sorted({str(row.get("timeframe") or "").lower() for row in rows if row.get("timeframe")}))
+    return tuple(
+        sorted({str(row.get("timeframe") or "").lower() for row in rows if row.get("timeframe")})
+    )
 
 
 def _capture_debounced_repair(
@@ -358,7 +389,9 @@ def _capture_feedback(
     symbols = _target_symbols(request.rows)
     timeframes = feedback._validate_timeframes(_target_timeframes(request.rows))
     data_symbols = tuple(dict.fromkeys((feedback.BTC_REGIME_SYMBOL, *symbols)))
-    bars_by_symbol_tf = feedback.load_requested_bars(data_symbols, timeframes=timeframes, data_root=data_root)
+    bars_by_symbol_tf = feedback.load_requested_bars(
+        data_symbols, timeframes=timeframes, data_root=data_root
+    )
     for symbol in data_symbols:
         features = feedback.load_feature_points(symbol, feature_root=feature_root)
         for timeframe in timeframes:
@@ -396,7 +429,9 @@ def _capture_booster(
     symbols = _target_symbols(request.rows)
     timeframes = feedback._validate_timeframes(_target_timeframes(request.rows))
     data_symbols = tuple(dict.fromkeys((feedback.BTC_REGIME_SYMBOL, *symbols)))
-    bars_by_symbol_tf = feedback.load_requested_bars(data_symbols, timeframes=timeframes, data_root=data_root)
+    bars_by_symbol_tf = feedback.load_requested_bars(
+        data_symbols, timeframes=timeframes, data_root=data_root
+    )
     for symbol in data_symbols:
         features = feedback.load_feature_points(symbol, feature_root=feature_root)
         for timeframe in timeframes:
@@ -413,14 +448,18 @@ def _capture_booster(
         original=original,
     )
     try:
-        booster.discover_booster_candidates(bars_by_symbol_tf, symbols=symbols, timeframes=timeframes)
+        booster.discover_booster_candidates(
+            bars_by_symbol_tf, symbols=symbols, timeframes=timeframes
+        )
     finally:
         booster._finalize_booster_candidate = original
     del bars_by_symbol_tf
     gc.collect()
 
 
-def _source_symbols_from_payload(payload: Mapping[str, Any], source_kind: str) -> tuple[tuple[str, ...], tuple[str, ...]]:
+def _source_symbols_from_payload(
+    payload: Mapping[str, Any], source_kind: str
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
     for source in payload.get("source_artifacts", []):
         if source.get("artifact_kind") != source_kind:
             continue
@@ -428,9 +467,16 @@ def _source_symbols_from_payload(payload: Mapping[str, Any], source_kind: str) -
         if source_path.exists():
             source_payload = json.loads(source_path.read_text(encoding="utf-8"))
             source_data = source_payload.get("source_data") or {}
-            promotion = tuple(source_data.get("promotion_symbols") or source_data.get("symbols") or source.get("source_symbols") or ())
+            promotion = tuple(
+                source_data.get("promotion_symbols")
+                or source_data.get("symbols")
+                or source.get("source_symbols")
+                or ()
+            )
             shadow = tuple(source_data.get("shadow_symbols") or ())
-            return tuple(str(item).upper() for item in promotion), tuple(str(item).upper() for item in shadow)
+            return tuple(str(item).upper() for item in promotion), tuple(
+                str(item).upper() for item in shadow
+            )
     return (), ()
 
 
@@ -446,11 +492,15 @@ def _capture_asset_diverse(
 
     target_ids = {str(row["model_id"]) for row in request.rows}
     target_timeframes = feedback._validate_timeframes(_target_timeframes(request.rows))
-    promotion_symbols, shadow_symbols = _source_symbols_from_payload(monitoring_payload, request.source_kind)
+    promotion_symbols, shadow_symbols = _source_symbols_from_payload(
+        monitoring_payload, request.source_kind
+    )
     if not promotion_symbols:
         promotion_symbols = _target_symbols(request.rows)
     all_symbols = tuple(dict.fromkeys((*promotion_symbols, *shadow_symbols)))
-    bars_by_symbol_tf = feedback.load_requested_bars(all_symbols, timeframes=target_timeframes, data_root=data_root)
+    bars_by_symbol_tf = feedback.load_requested_bars(
+        all_symbols, timeframes=target_timeframes, data_root=data_root
+    )
     original = asset._finalize_asset_candidate
     asset._finalize_asset_candidate = _capture_finalizer(
         source_kind=request.source_kind,
@@ -481,11 +531,23 @@ def capture_pnl_series(
     captures: dict[str, CapturedPnl] = {}
     requests = _group_requests(rows)
     if SOURCE_KIND_DEBOUNCED_REPAIR in requests:
-        _capture_debounced_repair(requests[SOURCE_KIND_DEBOUNCED_REPAIR], data_root=data_root, captures=captures)
+        _capture_debounced_repair(
+            requests[SOURCE_KIND_DEBOUNCED_REPAIR], data_root=data_root, captures=captures
+        )
     if SOURCE_KIND_FEEDBACK in requests:
-        _capture_feedback(requests[SOURCE_KIND_FEEDBACK], data_root=data_root, feature_root=feature_root, captures=captures)
+        _capture_feedback(
+            requests[SOURCE_KIND_FEEDBACK],
+            data_root=data_root,
+            feature_root=feature_root,
+            captures=captures,
+        )
     if SOURCE_KIND_BOOSTER in requests:
-        _capture_booster(requests[SOURCE_KIND_BOOSTER], data_root=data_root, feature_root=feature_root, captures=captures)
+        _capture_booster(
+            requests[SOURCE_KIND_BOOSTER],
+            data_root=data_root,
+            feature_root=feature_root,
+            captures=captures,
+        )
     if SOURCE_KIND_ASSET_DIVERSE in requests:
         _capture_asset_diverse(
             requests[SOURCE_KIND_ASSET_DIVERSE],
@@ -507,8 +569,14 @@ def _series_for_split(capture: CapturedPnl, split: str) -> pd.Series:
     return pd.Series(capture.returns[mask], index=dt[mask], name=capture.model_id, dtype=float)
 
 
-def _aligned_pnl_frame(captures: Mapping[str, CapturedPnl], model_ids: Sequence[str], *, split: str) -> pd.DataFrame:
-    series = [_series_for_split(captures[model_id], split) for model_id in model_ids if model_id in captures]
+def _aligned_pnl_frame(
+    captures: Mapping[str, CapturedPnl], model_ids: Sequence[str], *, split: str
+) -> pd.DataFrame:
+    series = [
+        _series_for_split(captures[model_id], split)
+        for model_id in model_ids
+        if model_id in captures
+    ]
     if not series:
         return pd.DataFrame()
     frame = pd.concat(series, axis=1).sort_index().fillna(0.0)
@@ -542,7 +610,9 @@ def _matrix_pair_stats(corr: pd.DataFrame) -> dict[str, Any]:
         "mean_pairwise_corr": float(np.mean(upper)) if upper.size else 0.0,
         "mean_pairwise_abs_corr": float(np.mean(np.abs(upper))) if upper.size else 0.0,
         "max_pairwise_abs_corr": float(np.max(np.abs(upper))) if upper.size else 0.0,
-        "high_corr_pair_count_ge_0p85_abs": int(np.count_nonzero(np.abs(upper) >= HIGH_CORR_CLUSTER_THRESHOLD)),
+        "high_corr_pair_count_ge_0p85_abs": int(
+            np.count_nonzero(np.abs(upper) >= HIGH_CORR_CLUSTER_THRESHOLD)
+        ),
     }
 
 
@@ -552,7 +622,14 @@ def _top_abs_corr_pairs(corr: pd.DataFrame, *, limit: int = 25) -> list[dict[str
     for i, left in enumerate(cols):
         for right in cols[i + 1 :]:
             value = float(corr.loc[left, right])
-            pairs.append({"left_model_id": left, "right_model_id": right, "corr": value, "abs_corr": abs(value)})
+            pairs.append(
+                {
+                    "left_model_id": left,
+                    "right_model_id": right,
+                    "corr": value,
+                    "abs_corr": abs(value),
+                }
+            )
     return sorted(pairs, key=lambda row: row["abs_corr"], reverse=True)[:limit]
 
 
@@ -585,7 +662,9 @@ def _correlation_clusters(corr: pd.DataFrame, *, threshold: float) -> list[list[
     return sorted(clusters, key=lambda item: (-len(item), item[0]))
 
 
-def _nearest_selected_corr(candidate_id: str, selected_ids: Sequence[str], corr: pd.DataFrame) -> tuple[float, str | None]:
+def _nearest_selected_corr(
+    candidate_id: str, selected_ids: Sequence[str], corr: pd.DataFrame
+) -> tuple[float, str | None]:
     if not selected_ids or candidate_id not in corr.index:
         return 0.0, None
     best_abs = 0.0
@@ -608,7 +687,9 @@ def greedy_correlation_selection(
     max_train_validation_abs_corr: float = MAX_TRAIN_VALIDATION_ABS_CORR,
     max_validation_abs_corr: float = MAX_VALIDATION_ABS_CORR,
 ) -> list[dict[str, Any]]:
-    ordered = sorted((dict(row) for row in rows), key=_monitoring_score_train_validation_only, reverse=True)
+    ordered = sorted(
+        (dict(row) for row in rows), key=_monitoring_score_train_validation_only, reverse=True
+    )
     selected_ids: list[str] = []
     decision_rows: list[dict[str, Any]] = []
     for row in ordered:
@@ -631,7 +712,9 @@ def greedy_correlation_selection(
                 "max_abs_corr_to_prior_train_validation": tv_abs,
                 "max_abs_corr_to_prior_validation": val_abs,
                 "nearest_prior_model_id_train_validation": tv_nearest,
-                "correlation_decision": "selected_corr_diversified_paper_monitor" if accepted else "rejected_high_pnl_correlation_duplicate",
+                "correlation_decision": "selected_corr_diversified_paper_monitor"
+                if accepted
+                else "rejected_high_pnl_correlation_duplicate",
                 "correlation_rejection_reasons": reasons,
                 "ready_for_paper": bool(row.get("ready_for_paper")) and accepted,
                 "ready_for_real": False,
@@ -639,7 +722,11 @@ def greedy_correlation_selection(
             }
         )
         decision_rows.append(row)
-    selected_rows = [row for row in decision_rows if row["correlation_decision"] == "selected_corr_diversified_paper_monitor"]
+    selected_rows = [
+        row
+        for row in decision_rows
+        if row["correlation_decision"] == "selected_corr_diversified_paper_monitor"
+    ]
     for idx, row in enumerate(selected_rows, start=1):
         row["selection_rank"] = idx
     return decision_rows
@@ -662,7 +749,11 @@ def _portfolio_stats(
     model_ids: Sequence[str],
     rows_by_id: Mapping[str, Mapping[str, Any]],
 ) -> dict[str, Any]:
-    gross_notional = sum(_safe_float(rows_by_id[model_id].get("notional_fraction")) for model_id in model_ids if model_id in rows_by_id)
+    gross_notional = sum(
+        _safe_float(rows_by_id[model_id].get("notional_fraction"))
+        for model_id in model_ids
+        if model_id in rows_by_id
+    )
     out: dict[str, Any] = {
         "candidate_count": len(model_ids),
         "gross_notional_fraction_unscaled_sum": gross_notional,
@@ -678,7 +769,9 @@ def _portfolio_stats(
             series = _portfolio_series(frame, model_ids, mode=mode)
             split_stats[mode] = {
                 "total_return": _period_return(series),
-                "max_drawdown": max_drawdown(series.to_numpy(dtype=float)) if not series.empty else 0.0,
+                "max_drawdown": max_drawdown(series.to_numpy(dtype=float))
+                if not series.empty
+                else 0.0,
                 "bar_count": int(series.size),
             }
         out["splits"][split] = split_stats
@@ -690,7 +783,11 @@ def _candidate_label(row: Mapping[str, Any]) -> str:
 
 
 def _selected_summary_rows(decision_rows: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    selected = [row for row in decision_rows if row.get("correlation_decision") == "selected_corr_diversified_paper_monitor"]
+    selected = [
+        row
+        for row in decision_rows
+        if row.get("correlation_decision") == "selected_corr_diversified_paper_monitor"
+    ]
     return [
         {
             "selection_rank": row.get("selection_rank"),
@@ -701,7 +798,9 @@ def _selected_summary_rows(decision_rows: Sequence[Mapping[str, Any]]) -> list[d
             "train_return": row.get("train_return"),
             "validation_return": row.get("validation_return"),
             "locked_oos_return_report_only": row.get("locked_oos_return"),
-            "max_abs_corr_to_prior_train_validation": row.get("max_abs_corr_to_prior_train_validation"),
+            "max_abs_corr_to_prior_train_validation": row.get(
+                "max_abs_corr_to_prior_train_validation"
+            ),
             "max_abs_corr_to_prior_validation": row.get("max_abs_corr_to_prior_validation"),
             "ready_for_paper": row.get("ready_for_paper"),
             "ready_for_real": False,
@@ -718,24 +817,41 @@ def _matrix_subset(corr: pd.DataFrame, model_ids: Sequence[str], *, limit: int) 
     return corr.loc[ids, ids]
 
 
-def _small_matrix_markdown(corr: pd.DataFrame, rows_by_id: Mapping[str, Mapping[str, Any]], *, limit: int = 12) -> str:
+def _small_matrix_markdown(
+    corr: pd.DataFrame, rows_by_id: Mapping[str, Mapping[str, Any]], *, limit: int = 12
+) -> str:
     if corr.empty:
         return "_No matrix available._\n"
     ids = list(corr.columns)[:limit]
     aliases = {model_id: f"S{idx + 1}" for idx, model_id in enumerate(ids)}
     lines = ["| ID | Strategy |", "| --- | --- |"]
     for model_id in ids:
-        lines.append(f"| {aliases[model_id]} | `{model_id}` { _candidate_label(rows_by_id.get(model_id, {})) } |")
-    lines.extend(["", "| | " + " | ".join(aliases[model_id] for model_id in ids) + " |", "| --- | " + " | ".join("---:" for _ in ids) + " |"])
+        lines.append(
+            f"| {aliases[model_id]} | `{model_id}` {_candidate_label(rows_by_id.get(model_id, {}))} |"
+        )
+    lines.extend(
+        [
+            "",
+            "| | " + " | ".join(aliases[model_id] for model_id in ids) + " |",
+            "| --- | " + " | ".join("---:" for _ in ids) + " |",
+        ]
+    )
     for left in ids:
         values = " | ".join(f"{float(corr.loc[left, right]):.3f}" for right in ids)
         lines.append(f"| {aliases[left]} | {values} |")
     if len(corr.columns) > limit:
-        lines.append(f"\n_Showing first {limit} of {len(corr.columns)} IDs; full matrix is in CSV artifacts._")
+        lines.append(
+            f"\n_Showing first {limit} of {len(corr.columns)} IDs; full matrix is in CSV artifacts._"
+        )
     return "\n".join(lines) + "\n"
 
 
-def _render_markdown(payload: Mapping[str, Any], *, rows_by_id: Mapping[str, Mapping[str, Any]], selected_corr: pd.DataFrame) -> str:
+def _render_markdown(
+    payload: Mapping[str, Any],
+    *,
+    rows_by_id: Mapping[str, Mapping[str, Any]],
+    selected_corr: pd.DataFrame,
+) -> str:
     summary = payload["correlation_decision_summary"]
     selected = payload["selected_corr_diversified_candidates"]
     portfolio = payload["portfolio_comparison"]
@@ -839,7 +955,9 @@ def build_payload_from_monitoring(
     write_outputs: bool = True,
 ) -> dict[str, Any]:
     paper_rows = _paper_rows_from_monitoring(monitoring_payload)
-    strict_shadow_rows = _strict_shadow_rows_from_monitoring(monitoring_payload, limit=shadow_matrix_limit)
+    strict_shadow_rows = _strict_shadow_rows_from_monitoring(
+        monitoring_payload, limit=shadow_matrix_limit
+    )
     replay_rows = _dedupe_rows([*paper_rows, *strict_shadow_rows])
     captures = capture_pnl_series(
         replay_rows,
@@ -849,27 +967,45 @@ def build_payload_from_monitoring(
     )
     rows_by_id = {str(row["model_id"]): row for row in replay_rows}
     paper_ids = [str(row["model_id"]) for row in paper_rows if str(row.get("model_id")) in captures]
-    shadow_ids = [str(row["model_id"]) for row in strict_shadow_rows if str(row.get("model_id")) in captures]
-    split_frames = {split: _aligned_pnl_frame(captures, paper_ids, split=split) for split in (*SPLIT_ORDER, "train_validation")}
+    shadow_ids = [
+        str(row["model_id"]) for row in strict_shadow_rows if str(row.get("model_id")) in captures
+    ]
+    split_frames = {
+        split: _aligned_pnl_frame(captures, paper_ids, split=split)
+        for split in (*SPLIT_ORDER, "train_validation")
+    }
     corr_by_split = {split: _corr_matrix(frame) for split, frame in split_frames.items()}
     decision_rows = greedy_correlation_selection(
         [rows_by_id[model_id] for model_id in paper_ids],
         train_validation_corr=corr_by_split["train_validation"],
         validation_corr=corr_by_split["validation"],
     )
-    selected_ids = [str(row["model_id"]) for row in decision_rows if row.get("correlation_decision") == "selected_corr_diversified_paper_monitor"]
-    selected_corr = _matrix_subset(corr_by_split["train_validation"], selected_ids, limit=REPRESENTATIVE_MATRIX_LIMIT)
-    all_clusters = _correlation_clusters(corr_by_split["train_validation"], threshold=HIGH_CORR_CLUSTER_THRESHOLD)
+    selected_ids = [
+        str(row["model_id"])
+        for row in decision_rows
+        if row.get("correlation_decision") == "selected_corr_diversified_paper_monitor"
+    ]
+    selected_corr = _matrix_subset(
+        corr_by_split["train_validation"], selected_ids, limit=REPRESENTATIVE_MATRIX_LIMIT
+    )
+    all_clusters = _correlation_clusters(
+        corr_by_split["train_validation"], threshold=HIGH_CORR_CLUSTER_THRESHOLD
+    )
     multi_member_clusters = [cluster for cluster in all_clusters if len(cluster) > 1]
     shadow_frames = {
-        split: _aligned_pnl_frame(captures, shadow_ids, split=split) for split in ("validation", "locked_oos", "train_validation")
+        split: _aligned_pnl_frame(captures, shadow_ids, split=split)
+        for split in ("validation", "locked_oos", "train_validation")
     }
     shadow_corr = _corr_matrix(shadow_frames["train_validation"])
-    frames_for_portfolio = {split: frame for split, frame in split_frames.items() if split in SPLIT_ORDER}
+    frames_for_portfolio = {
+        split: frame for split, frame in split_frames.items() if split in SPLIT_ORDER
+    }
     selected_stats = _portfolio_stats(frames_for_portfolio, selected_ids, rows_by_id)
     all_paper_stats = _portfolio_stats(frames_for_portfolio, paper_ids, rows_by_id)
     selected_rows = _selected_summary_rows(decision_rows)
-    missing = sorted(str(row["model_id"]) for row in replay_rows if str(row.get("model_id")) not in captures)
+    missing = sorted(
+        str(row["model_id"]) for row in replay_rows if str(row.get("model_id")) not in captures
+    )
     timestamp = _timestamp()
     output_dir.mkdir(parents=True, exist_ok=True)
     latest_json = output_dir / "alpha_zoo_pnl_correlation_decision_latest.json"
@@ -940,7 +1076,9 @@ def build_payload_from_monitoring(
             "missing_pnl_model_ids": missing,
             "selected_candidate_count": len(selected_rows),
             "high_corr_cluster_count": len(multi_member_clusters),
-            "largest_high_corr_cluster_size": max((len(cluster) for cluster in multi_member_clusters), default=0),
+            "largest_high_corr_cluster_size": max(
+                (len(cluster) for cluster in multi_member_clusters), default=0
+            ),
             "decision": (
                 "do_not_adopt_all_paper_candidates; use corr-diversified paper/testnet-only subset"
                 if selected_rows and len(selected_rows) < len(paper_ids)
@@ -954,9 +1092,12 @@ def build_payload_from_monitoring(
             "paper_locked_oos_report_only": _matrix_pair_stats(corr_by_split["locked_oos"]),
             "selected_train_validation": _matrix_pair_stats(selected_corr),
             "shadow_representative_train_validation": _matrix_pair_stats(shadow_corr),
-            "top_abs_corr_pairs_train_validation": _top_abs_corr_pairs(corr_by_split["train_validation"], limit=25),
+            "top_abs_corr_pairs_train_validation": _top_abs_corr_pairs(
+                corr_by_split["train_validation"], limit=25
+            ),
             "high_corr_clusters_train_validation_abs_ge_0p85": [
-                {"cluster_size": len(cluster), "model_ids": cluster[:25]} for cluster in multi_member_clusters[:25]
+                {"cluster_size": len(cluster), "model_ids": cluster[:25]}
+                for cluster in multi_member_clusters[:25]
             ],
         },
         "portfolio_comparison": {
@@ -989,7 +1130,9 @@ def build_payload_from_monitoring(
         latest_md.write_text(markdown, encoding="utf-8")
         methodology_md.write_text(_methodology_markdown(payload), encoding="utf-8")
         _write_csv(decision_csv, decision_rows, CSV_FIELDS)
-        _write_csv(selected_csv, [row for row in decision_rows if row.get("ready_for_paper")], CSV_FIELDS)
+        _write_csv(
+            selected_csv, [row for row in decision_rows if row.get("ready_for_paper")], CSV_FIELDS
+        )
         _write_matrix_csv(paper_corr_tv_csv, corr_by_split["train_validation"])
         _write_matrix_csv(paper_corr_validation_csv, corr_by_split["validation"])
         _write_matrix_csv(paper_corr_oos_csv, corr_by_split["locked_oos"])
@@ -1088,7 +1231,18 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
     payload = build_payload(args)
-    print(json.dumps(_json_safe({"output_paths": payload["output_paths"], "summary": payload["correlation_decision_summary"]}), indent=2, sort_keys=True))
+    print(
+        json.dumps(
+            _json_safe(
+                {
+                    "output_paths": payload["output_paths"],
+                    "summary": payload["correlation_decision_summary"],
+                }
+            ),
+            indent=2,
+            sort_keys=True,
+        )
+    )
     return 0
 
 

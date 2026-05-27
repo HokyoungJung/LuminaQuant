@@ -87,4 +87,6 @@ def test_timeframe_pair_zscore_reversion_uses_completed_pair_bars_with_caps() ->
         _event("XAU/USDT", start + timedelta(hours=59, minutes=1), x_close),
         aggregator,
     )
-    assert len([item for item in queue.items if item.signal_type in {"LONG", "SHORT"}]) == len(entries)
+    assert len([item for item in queue.items if item.signal_type in {"LONG", "SHORT"}]) == len(
+        entries
+    )

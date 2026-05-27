@@ -230,7 +230,10 @@ class MeanReversionStdStrategy(Strategy):
         if btc_var <= 1e-12:
             beta = 0.0
         else:
-            cov = sum((asset - mean_asset) * (btc - mean_btc) for asset, btc in zip(asset_rets, btc_rets, strict=True))
+            cov = sum(
+                (asset - mean_asset) * (btc - mean_btc)
+                for asset, btc in zip(asset_rets, btc_rets, strict=True)
+            )
             beta = cov / btc_var
         residual_ret = asset_rets[-1] - (beta * btc_rets[-1])
         base_price = (

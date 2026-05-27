@@ -56,7 +56,9 @@ class TakerFlowExhaustionReversalStrategy(Strategy):
     def get_param_schema(cls) -> dict[str, HyperParam]:
         return {
             "target_symbol": HyperParam.string("target_symbol", default="ETH/USDT", tunable=False),
-            "flow_lookback_bars": HyperParam.integer("flow_lookback_bars", default=90, low=4, high=2_880),
+            "flow_lookback_bars": HyperParam.integer(
+                "flow_lookback_bars", default=90, low=4, high=2_880
+            ),
             "momentum_lookback_bars": HyperParam.integer(
                 "momentum_lookback_bars", default=180, low=4, high=2_880
             ),
@@ -66,11 +68,15 @@ class TakerFlowExhaustionReversalStrategy(Strategy):
             "evaluation_cadence_bars": HyperParam.integer(
                 "evaluation_cadence_bars", default=180, low=1, high=10_080, tunable=False
             ),
-            "flow_imbalance_min": HyperParam.floating("flow_imbalance_min", default=0.14, low=0.0, high=1.0),
+            "flow_imbalance_min": HyperParam.floating(
+                "flow_imbalance_min", default=0.14, low=0.0, high=1.0
+            ),
             "price_extension_min": HyperParam.floating(
                 "price_extension_min", default=0.006, low=0.0, high=0.50
             ),
-            "funding_abs_cap": HyperParam.floating("funding_abs_cap", default=0.00015, low=0.0, high=0.10),
+            "funding_abs_cap": HyperParam.floating(
+                "funding_abs_cap", default=0.00015, low=0.0, high=0.10
+            ),
             "max_realized_volatility": HyperParam.floating(
                 "max_realized_volatility", default=0.008, low=0.0, high=1.0
             ),
@@ -93,7 +99,9 @@ class TakerFlowExhaustionReversalStrategy(Strategy):
                 "max_volatility_multiplier", default=1.0, low=0.0, high=5.0
             ),
             "stop_loss_pct": HyperParam.floating("stop_loss_pct", default=0.025, low=0.0, high=0.5),
-            "take_profit_pct": HyperParam.floating("take_profit_pct", default=0.050, low=0.0, high=1.0),
+            "take_profit_pct": HyperParam.floating(
+                "take_profit_pct", default=0.050, low=0.0, high=1.0
+            ),
             "trailing_exit_pct": HyperParam.floating(
                 "trailing_exit_pct", default=0.018, low=0.0, high=0.5
             ),
@@ -186,12 +194,15 @@ class TakerFlowExhaustionReversalStrategy(Strategy):
         self.cooldown_bars = max(0, int(resolved["cooldown_bars"]))
         self.allow_short = bool(resolved["allow_short"])
         self.min_price = max(0.0, float(resolved["min_price"]))
-        size = max(
-            self.flow_lookback_bars,
-            self.momentum_lookback_bars,
-            self.volatility_lookback_bars,
-            self.max_hold_bars,
-        ) + 8
+        size = (
+            max(
+                self.flow_lookback_bars,
+                self.momentum_lookback_bars,
+                self.volatility_lookback_bars,
+                self.max_hold_bars,
+            )
+            + 8
+        )
         self._state = _FlowState(
             closes=deque(maxlen=size),
             taker_buy_quote_volume=deque(maxlen=size),
@@ -301,7 +312,9 @@ class TakerFlowExhaustionReversalStrategy(Strategy):
                 return None
         return None
 
-    def _resolve_flow_values(self, event: Any, snapshot: dict[str, float | None], close: float) -> tuple[float, float, str]:
+    def _resolve_flow_values(
+        self, event: Any, snapshot: dict[str, float | None], close: float
+    ) -> tuple[float, float, str]:
         buy_quote = self._extract_feature(event, "taker_buy_quote_volume")
         sell_quote = self._extract_feature(event, "taker_sell_quote_volume")
         if buy_quote is None:
@@ -317,7 +330,11 @@ class TakerFlowExhaustionReversalStrategy(Strategy):
         if sell_base is None:
             sell_base = snapshot.get("taker_sell_base_volume")
         if buy_base is not None and sell_base is not None and buy_base + sell_base > 0.0:
-            return max(0.0, float(buy_base) * close), max(0.0, float(sell_base) * close), "feature_base"
+            return (
+                max(0.0, float(buy_base) * close),
+                max(0.0, float(sell_base) * close),
+                "feature_base",
+            )
         return 0.0, 0.0, "missing"
 
     @staticmethod
@@ -343,7 +360,9 @@ class TakerFlowExhaustionReversalStrategy(Strategy):
             previous = current
         if not returns:
             return 0.0
-        return math.sqrt(sum(value * value for value in returns) / len(returns)) * math.sqrt(len(returns))
+        return math.sqrt(sum(value * value for value in returns) / len(returns)) * math.sqrt(
+            len(returns)
+        )
 
     def _flow_imbalance(self) -> float:
         buy = sum(list(self._state.taker_buy_quote_volume)[-self.flow_lookback_bars :])
@@ -428,18 +447,51 @@ class TakerFlowExhaustionReversalStrategy(Strategy):
         state.bars_held += 1
         if state.mode == "LONG":
             state.high_watermark = max(float(state.high_watermark or close), close)
-            stop_hit = state.entry_price is not None and self.stop_loss_pct > 0.0 and close <= state.entry_price * (1.0 - self.stop_loss_pct)
-            take_hit = state.entry_price is not None and self.take_profit_pct > 0.0 and close >= state.entry_price * (1.0 + self.take_profit_pct)
-            trail_hit = self.trailing_exit_pct > 0.0 and state.high_watermark is not None and close <= state.high_watermark * (1.0 - self.trailing_exit_pct)
-            opposing_flow = metrics["flow_imbalance"] >= self.flow_imbalance_min and metrics["price_extension"] <= -self.price_extension_min * 0.25
+            stop_hit = (
+                state.entry_price is not None
+                and self.stop_loss_pct > 0.0
+                and close <= state.entry_price * (1.0 - self.stop_loss_pct)
+            )
+            take_hit = (
+                state.entry_price is not None
+                and self.take_profit_pct > 0.0
+                and close >= state.entry_price * (1.0 + self.take_profit_pct)
+            )
+            trail_hit = (
+                self.trailing_exit_pct > 0.0
+                and state.high_watermark is not None
+                and close <= state.high_watermark * (1.0 - self.trailing_exit_pct)
+            )
+            opposing_flow = (
+                metrics["flow_imbalance"] >= self.flow_imbalance_min
+                and metrics["price_extension"] <= -self.price_extension_min * 0.25
+            )
         else:
             state.low_watermark = min(float(state.low_watermark or close), close)
-            stop_hit = state.entry_price is not None and self.stop_loss_pct > 0.0 and close >= state.entry_price * (1.0 + self.stop_loss_pct)
-            take_hit = state.entry_price is not None and self.take_profit_pct > 0.0 and close <= state.entry_price * (1.0 - self.take_profit_pct)
-            trail_hit = self.trailing_exit_pct > 0.0 and state.low_watermark is not None and close >= state.low_watermark * (1.0 + self.trailing_exit_pct)
-            opposing_flow = metrics["flow_imbalance"] <= -self.flow_imbalance_min and metrics["price_extension"] >= self.price_extension_min * 0.25
+            stop_hit = (
+                state.entry_price is not None
+                and self.stop_loss_pct > 0.0
+                and close >= state.entry_price * (1.0 + self.stop_loss_pct)
+            )
+            take_hit = (
+                state.entry_price is not None
+                and self.take_profit_pct > 0.0
+                and close <= state.entry_price * (1.0 - self.take_profit_pct)
+            )
+            trail_hit = (
+                self.trailing_exit_pct > 0.0
+                and state.low_watermark is not None
+                and close >= state.low_watermark * (1.0 + self.trailing_exit_pct)
+            )
+            opposing_flow = (
+                metrics["flow_imbalance"] <= -self.flow_imbalance_min
+                and metrics["price_extension"] >= self.price_extension_min * 0.25
+            )
         max_hold = state.bars_held >= self.max_hold_bars
-        hard_vol = self.max_realized_volatility > 0.0 and metrics["realized_volatility"] > self.max_realized_volatility * 1.35
+        hard_vol = (
+            self.max_realized_volatility > 0.0
+            and metrics["realized_volatility"] > self.max_realized_volatility * 1.35
+        )
         reasons = [
             name
             for name, flag in (
@@ -475,7 +527,9 @@ class TakerFlowExhaustionReversalStrategy(Strategy):
         state.cooldown_remaining = self.cooldown_bars
         return True
 
-    def _enter(self, event: Any, signal_type: str, close: float, reason: str, metrics: dict[str, float]) -> None:
+    def _enter(
+        self, event: Any, signal_type: str, close: float, reason: str, metrics: dict[str, float]
+    ) -> None:
         state = self._state
         vol_multiplier = metrics["volatility_multiplier"]
         target_allocation = self.target_allocation * vol_multiplier
@@ -492,17 +546,24 @@ class TakerFlowExhaustionReversalStrategy(Strategy):
         )
         if signal_type == "LONG":
             stop_loss = close * (1.0 - self.stop_loss_pct) if self.stop_loss_pct > 0.0 else None
-            take_profit = close * (1.0 + self.take_profit_pct) if self.take_profit_pct > 0.0 else None
+            take_profit = (
+                close * (1.0 + self.take_profit_pct) if self.take_profit_pct > 0.0 else None
+            )
             state.mode = "LONG"
             state.high_watermark = close
             state.low_watermark = None
         else:
             stop_loss = close * (1.0 + self.stop_loss_pct) if self.stop_loss_pct > 0.0 else None
-            take_profit = close * (1.0 - self.take_profit_pct) if self.take_profit_pct > 0.0 else None
+            take_profit = (
+                close * (1.0 - self.take_profit_pct) if self.take_profit_pct > 0.0 else None
+            )
             state.mode = "SHORT"
             state.low_watermark = close
             state.high_watermark = None
-        strength = 0.55 + min(1.0, abs(metrics["price_extension"]) / max(self.price_extension_min, 1e-9)) * 0.35
+        strength = (
+            0.55
+            + min(1.0, abs(metrics["price_extension"]) / max(self.price_extension_min, 1e-9)) * 0.35
+        )
         strength += min(1.0, abs(metrics["flow_imbalance"])) * 0.35
         self._emit(
             getattr(event, "time", None),
@@ -541,7 +602,10 @@ class TakerFlowExhaustionReversalStrategy(Strategy):
         self._state.taker_sell_quote_volume.append(float(sell_quote))
         self._state.funding_rate.append(float(funding) if funding is not None else 0.0)
         self._state.ticks_seen += 1
-        if self.evaluation_cadence_bars > 1 and self._state.ticks_seen % self.evaluation_cadence_bars:
+        if (
+            self.evaluation_cadence_bars > 1
+            and self._state.ticks_seen % self.evaluation_cadence_bars
+        ):
             return
         if len(self._state.closes) <= max(self.momentum_lookback_bars, self.flow_lookback_bars):
             return
@@ -571,7 +635,10 @@ class TakerFlowExhaustionReversalStrategy(Strategy):
             return
         if self.funding_abs_cap > 0.0 and abs(funding_rate) > self.funding_abs_cap:
             return
-        if self.max_realized_volatility > 0.0 and realized_volatility > self.max_realized_volatility:
+        if (
+            self.max_realized_volatility > 0.0
+            and realized_volatility > self.max_realized_volatility
+        ):
             return
         long_exhaustion = (
             flow_imbalance <= -self.flow_imbalance_min
@@ -585,7 +652,9 @@ class TakerFlowExhaustionReversalStrategy(Strategy):
         if long_exhaustion:
             self._enter(event, "LONG", float(close), "taker_sell_exhaustion_reversal_long", metrics)
         elif short_exhaustion:
-            self._enter(event, "SHORT", float(close), "taker_buy_exhaustion_reversal_short", metrics)
+            self._enter(
+                event, "SHORT", float(close), "taker_buy_exhaustion_reversal_short", metrics
+            )
 
     def calculate_signals_window(self, event: Any, aggregator: Any) -> None:
         _ = aggregator

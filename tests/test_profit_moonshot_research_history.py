@@ -79,7 +79,8 @@ def test_research_history_payload_schema_and_duplicate_ledger_collapse(tmp_path:
         repeated_text + "\nCalendar-primary invalidation and dynamic restart.\n", encoding="utf-8"
     )
     (reports / "profit_moonshot_strategy_validity_audit_result_20260510.md").write_text(
-        "calendar-primary invalid; source ledger required; locked-OOS report-only.\n", encoding="utf-8"
+        "calendar-primary invalid; source ledger required; locked-OOS report-only.\n",
+        encoding="utf-8",
     )
 
     payload = MODULE.build_research_history_payload(
@@ -95,7 +96,8 @@ def test_research_history_payload_schema_and_duplicate_ledger_collapse(tmp_path:
     assert REQUIRED_STRATEGY_FIELDS.issubset(payload["strategy_chronology"][0])
     assert all(REQUIRED_LEDGER_FIELDS.issubset(entry) for entry in payload["source_search_ledger"])
     assert all(
-        item.get("ledger_refs") or (item.get("not_reconstructable") and item.get("not_reconstructable_reason"))
+        item.get("ledger_refs")
+        or (item.get("not_reconstructable") and item.get("not_reconstructable_reason"))
         for item in payload["source_history_inventory"]
     )
 
@@ -126,12 +128,16 @@ def test_research_history_writer_emits_markdown_and_json(tmp_path: Path) -> None
         generated_at_utc="2026-05-10T12:00:00Z",
         include_git_history=False,
     )
-    paths = MODULE.write_research_history_outputs(payload, docs_path=output_doc, report_dir=report_dir)
+    paths = MODULE.write_research_history_outputs(
+        payload, docs_path=output_doc, report_dir=report_dir
+    )
 
     assert paths["docs_markdown"] == output_doc
     assert output_doc.exists()
     assert (report_dir / "profit_moonshot_research_history_latest.md").exists()
-    json_payload = json.loads((report_dir / "profit_moonshot_research_history_latest.json").read_text(encoding="utf-8"))
+    json_payload = json.loads(
+        (report_dir / "profit_moonshot_research_history_latest.json").read_text(encoding="utf-8")
+    )
     assert json_payload["generation_metadata"]["schema_version"] == MODULE.SCHEMA_VERSION
     assert json_payload["generation_metadata"]["date_range"] == "2026-03-01..2026-05-10"
     assert "source/search ledger" in output_doc.read_text(encoding="utf-8").lower()

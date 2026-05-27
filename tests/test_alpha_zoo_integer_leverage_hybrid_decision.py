@@ -10,7 +10,9 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT / "scripts" / "research" / "run_alpha_zoo_integer_leverage_hybrid_decision.py"
-SPEC = importlib.util.spec_from_file_location("run_alpha_zoo_integer_leverage_hybrid_decision", MODULE_PATH)
+SPEC = importlib.util.spec_from_file_location(
+    "run_alpha_zoo_integer_leverage_hybrid_decision", MODULE_PATH
+)
 assert SPEC is not None and SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = MODULE
@@ -49,7 +51,9 @@ def _stream(profile_id: str, returns: list[float]) -> object:
 
 
 def test_weight_grid_uses_all_three_profiles_with_minimum_weight() -> None:
-    weights = list(MODULE._iter_weight_grid(["balanced", "growth", "aggressive"], step=0.05, min_weight=0.10))
+    weights = list(
+        MODULE._iter_weight_grid(["balanced", "growth", "aggressive"], step=0.05, min_weight=0.10)
+    )
 
     assert weights
     assert all(sum(row.values()) == pytest.approx(1.0) for row in weights)

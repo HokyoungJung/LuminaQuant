@@ -53,7 +53,9 @@ def risk_free_policy_from_config(config: Any | None = None) -> RiskFreePolicy:
         or 0.0
     )
     return RiskFreePolicy(
-        mode=str(_read_attr(config, "RISK_FREE_MODE", "us_treasury_constant") or "us_treasury_constant")
+        mode=str(
+            _read_attr(config, "RISK_FREE_MODE", "us_treasury_constant") or "us_treasury_constant"
+        )
         .strip()
         .lower(),
         tenor=str(_read_attr(config, "RISK_FREE_TENOR", "3m") or "3m").strip().lower(),
@@ -347,9 +349,7 @@ def sortino_ratio(
     downside_std = float(np.std(downside, ddof=1)) if downside.size > 1 else 0.0
     if downside_std <= 1e-12:
         return 0.0
-    value = (
-        float(np.mean(clean - target_clean)) / downside_std
-    ) * float(np.sqrt(periods_per_year))
+    value = (float(np.mean(clean - target_clean)) / downside_std) * float(np.sqrt(periods_per_year))
     return float(value) if np.isfinite(value) else 0.0
 
 

@@ -24,4 +24,3 @@ def test_calibration_uses_realized_impact_and_reports_error_reduction():
     assert payload["observations"] == 2
     assert payload["mae_after_bps"] <= payload["mae_before_bps"]
     assert payload["error_reduction_pct"] >= 0.0
-

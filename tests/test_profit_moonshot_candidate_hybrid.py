@@ -18,7 +18,11 @@ def test_candidate_hybrid_discards_fractional_or_missing_source_leverage() -> No
     accepted, discarded = MODULE._partition_live_integer_candidate_rows(
         [
             {"name": "integer_ok", "leverage": 5.0, "_candidate_hybrid_source_kind": "liquidation"},
-            {"name": "fractional_bad", "leverage": 2.3427334297703024, "_candidate_hybrid_source_kind": "candidate"},
+            {
+                "name": "fractional_bad",
+                "leverage": 2.3427334297703024,
+                "_candidate_hybrid_source_kind": "candidate",
+            },
             {"name": "missing_bad", "_candidate_hybrid_source_kind": "candidate"},
         ]
     )
@@ -110,12 +114,8 @@ def test_candidate_hybrid_rejects_nested_hybrid_sources_only() -> None:
             "name": "portfolio_allocator_static_blend_plain",
             "leverage": 3.0,
             "strategy_validity": {"pass": True, "primary_signal_type": "state_signal"},
-            "research_history_refs": [
-                "strategy_chronology:portfolio_allocator_static_blend_plain"
-            ],
-            "source_search_ledger_refs": [
-                "local_artifact:portfolio_allocator_static_blend_plain"
-            ],
+            "research_history_refs": ["strategy_chronology:portfolio_allocator_static_blend_plain"],
+            "source_search_ledger_refs": ["local_artifact:portfolio_allocator_static_blend_plain"],
             "sleeves": [
                 "prior_portfolio_governor",
                 "allocator_leverage_sweep",

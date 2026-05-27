@@ -291,7 +291,11 @@ def _apply_portfolio_weights(
         score = _safe_float(row.get("selection_score"), missing_selection_score)
         scaled = (score - best) / temp
         base = math.exp(max(weight_exp_clamp_floor, min(0.0, scaled)))
-        mdd = abs(_safe_float(((row.get("oos") or {}) if isinstance(row.get("oos"), dict) else {}).get("mdd"), 0.0))
+        mdd = abs(
+            _safe_float(
+                ((row.get("oos") or {}) if isinstance(row.get("oos"), dict) else {}).get("mdd"), 0.0
+            )
+        )
         risk_penalty = 1.0 / (1.0 + (mdd_risk_penalty_coeff * mdd))
         raw.append(base * risk_penalty)
 
@@ -353,14 +357,19 @@ def _build_single_asset_sets(
         return []
 
     def _weight(items: list[dict]) -> list[dict]:
-        scores = [_safe_float(item.get("selection_score"), missing_selection_score) for item in items]
+        scores = [
+            _safe_float(item.get("selection_score"), missing_selection_score) for item in items
+        ]
         best = max(scores)
         raw = [math.exp(max(weight_exp_clamp_floor, min(0.0, score - best))) for score in scores]
         total = float(sum(raw))
         if total <= 0.0:
             eq = 1.0 / float(len(items))
             return [{**item, "portfolio_weight": eq} for item in items]
-        return [{**item, "portfolio_weight": float(value / total)} for item, value in zip(items, raw, strict=True)]
+        return [
+            {**item, "portfolio_weight": float(value / total)}
+            for item, value in zip(items, raw, strict=True)
+        ]
 
     out = [
         {
@@ -424,7 +433,9 @@ def _build_parser() -> argparse.ArgumentParser:
         default="reports/oos_guarded_multistrategy_oos_*.json",
         help="Glob pattern for input report files.",
     )
-    parser.add_argument("--score-config", default="", help="Optional shortlist scoring config JSON path.")
+    parser.add_argument(
+        "--score-config", default="", help="Optional shortlist scoring config JSON path."
+    )
     parser.add_argument("--mode", choices=["train", "val", "oos"], default="oos")
     parser.add_argument("--max-selected", type=int, default=32)
     parser.add_argument("--max-per-strategy", type=int, default=8)
@@ -521,7 +532,9 @@ def main() -> None:
         "portfolio_sets": portfolio_sets,
         "scoring": {
             **resolved_score_config,
-            "source": str(Path(str(args.score_config)).resolve()) if str(args.score_config).strip() else "",
+            "source": str(Path(str(args.score_config)).resolve())
+            if str(args.score_config).strip()
+            else "",
         },
         "selected_summary": _summarize(selected),
         "selected": selected,

@@ -8,7 +8,9 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT / "scripts" / "research" / "validate_saved_incumbent_portfolio_continuity.py"
-SPEC = importlib.util.spec_from_file_location("validate_saved_incumbent_portfolio_continuity", MODULE_PATH)
+SPEC = importlib.util.spec_from_file_location(
+    "validate_saved_incumbent_portfolio_continuity", MODULE_PATH
+)
 if SPEC is None or SPEC.loader is None:
     raise RuntimeError("Failed to load validate_saved_incumbent_portfolio_continuity module")
 MODULE = importlib.util.module_from_spec(SPEC)
@@ -145,7 +147,9 @@ def test_run_strict_research_executes_candidates_sequentially_with_candidate_spe
     assert [row["candidate_id"] for row in report["candidates"]] == ["pair", "trend"]
 
 
-def test_run_strict_research_reuses_disk_cache(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_run_strict_research_reuses_disk_cache(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     calls: list[dict[str, object]] = []
 
     def _fake_run_candidate_research(**kwargs):

@@ -23,15 +23,23 @@ from lumina_quant.portfolio_followup_rules import evaluate_weighted_portfolio, v
 ROOT = Path(__file__).resolve().parents[2]
 FOLLOWUP_ROOT = ROOT / "var" / "reports" / "exact_window_backtests" / "followup_status"
 GROUP_ROOT = FOLLOWUP_ROOT / "portfolio_incumbent_autoresearch_grouped"
-DEFAULT_HYBRID_PATH = GROUP_ROOT / "portfolio_hybrid_online_current" / "hybrid_online_portfolio_latest.json"
+DEFAULT_HYBRID_PATH = (
+    GROUP_ROOT / "portfolio_hybrid_online_current" / "hybrid_online_portfolio_latest.json"
+)
 DEFAULT_STATIC_BLEND_PATH = (
     GROUP_ROOT / "current_switch_validation_current" / "refreshed_grouped_static_blend_latest.json"
 )
 DEFAULT_INCUMBENT_PATH = (
-    GROUP_ROOT / "current_switch_validation_current" / "refreshed_current_one_shot_incumbent_portfolio_latest.json"
+    GROUP_ROOT
+    / "current_switch_validation_current"
+    / "refreshed_current_one_shot_incumbent_portfolio_latest.json"
 )
 DEFAULT_CARRY_REPORT_GLOB = str(
-    GROUP_ROOT / "article_inspired_research_current" / "batch_runs" / "batch_*" / "candidate_research_latest.json"
+    GROUP_ROOT
+    / "article_inspired_research_current"
+    / "batch_runs"
+    / "batch_*"
+    / "candidate_research_latest.json"
 )
 DEFAULT_OUTPUT_DIR = GROUP_ROOT / "portfolio_production_guarded_current"
 ARTIFACT_KIND = "production_guarded_portfolio"
@@ -161,13 +169,18 @@ def _carry_candidate_score(row: Mapping[str, Any]) -> float:
         return float("-inf")
     if _safe_float(oos.get("total_return", oos.get("return")), 0.0) <= 0.0:
         return float("-inf")
-    if max(
-        _safe_float(train.get("max_drawdown", train.get("mdd")), 0.0),
-        _safe_float(val.get("max_drawdown", val.get("mdd")), 0.0),
-        _safe_float(oos.get("max_drawdown", oos.get("mdd")), 0.0),
-    ) > 0.20:
+    if (
+        max(
+            _safe_float(train.get("max_drawdown", train.get("mdd")), 0.0),
+            _safe_float(val.get("max_drawdown", val.get("mdd")), 0.0),
+            _safe_float(oos.get("max_drawdown", oos.get("mdd")), 0.0),
+        )
+        > 0.20
+    ):
         return float("-inf")
-    return float(validation_objective(val)) + (0.5 * _safe_float(oos.get("total_return", oos.get("return")), 0.0))
+    return float(validation_objective(val)) + (
+        0.5 * _safe_float(oos.get("total_return", oos.get("return")), 0.0)
+    )
 
 
 def _best_carry_candidate(report_glob: str) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
@@ -179,7 +192,9 @@ def _best_carry_candidate(report_glob: str) -> tuple[dict[str, Any] | None, list
     if _carry_candidate_score(best) == float("-inf"):
         return None, ranked
     best_row = dict(best)
-    best_row["candidate_key"] = str(best_row.get("candidate_id") or best_row.get("name") or "carry_trend_factor_rotation")
+    best_row["candidate_key"] = str(
+        best_row.get("candidate_id") or best_row.get("name") or "carry_trend_factor_rotation"
+    )
     return best_row, ranked
 
 
@@ -193,7 +208,9 @@ def _drawdown_scale(drawdown: float, cfg: DrawdownThrottleConfig) -> float:
     return 1.0
 
 
-def _apply_drawdown_throttle(streams: Mapping[str, list[dict[str, Any]]], cfg: DrawdownThrottleConfig) -> tuple[dict[str, list[dict[str, Any]]], list[dict[str, Any]]]:
+def _apply_drawdown_throttle(
+    streams: Mapping[str, list[dict[str, Any]]], cfg: DrawdownThrottleConfig
+) -> tuple[dict[str, list[dict[str, Any]]], list[dict[str, Any]]]:
     adjusted: dict[str, list[dict[str, Any]]] = {"train": [], "val": [], "oos": []}
     schedule: list[dict[str, Any]] = []
     equity = 1.0
@@ -210,14 +227,16 @@ def _apply_drawdown_throttle(streams: Mapping[str, list[dict[str, Any]]], cfg: D
                 "v": adj_return,
             }
             adjusted[split].append(adjusted_point)
-            schedule.append({
-                "split": split,
-                "datetime": adjusted_point["datetime"],
-                "raw_return": raw_return,
-                "scaled_return": adj_return,
-                "drawdown_before": drawdown,
-                "exposure_scale": scale,
-            })
+            schedule.append(
+                {
+                    "split": split,
+                    "datetime": adjusted_point["datetime"],
+                    "raw_return": raw_return,
+                    "scaled_return": adj_return,
+                    "drawdown_before": drawdown,
+                    "exposure_scale": scale,
+                }
+            )
             equity *= 1.0 + adj_return
             peak = max(peak, equity)
     return adjusted, schedule
@@ -238,7 +257,9 @@ def _score_combo(payload: dict[str, Any]) -> float:
         for block in (train, val, oos)
     ):
         return float("-inf")
-    return float(validation_objective(val)) + (0.75 * _safe_float(oos.get("total_return", oos.get("return")), 0.0))
+    return float(validation_objective(val)) + (
+        0.75 * _safe_float(oos.get("total_return", oos.get("return")), 0.0)
+    )
 
 
 def build_production_guarded_portfolio(
@@ -250,8 +271,12 @@ def build_production_guarded_portfolio(
     throttle: DrawdownThrottleConfig = DEFAULT_DRAWDOWN_THROTTLE,
 ) -> dict[str, Any]:
     hybrid = _hybrid_row(hybrid_path)
-    static_blend = _portfolio_row(static_blend_path, candidate_key="static_blend_76_24", label="static_blend_76_24")
-    incumbent = _portfolio_row(incumbent_path, candidate_key="incumbent_only", label="incumbent_only")
+    static_blend = _portfolio_row(
+        static_blend_path, candidate_key="static_blend_76_24", label="static_blend_76_24"
+    )
+    incumbent = _portfolio_row(
+        incumbent_path, candidate_key="incumbent_only", label="incumbent_only"
+    )
     carry_candidate, ranked_carry = _best_carry_candidate(carry_report_glob)
 
     components = [hybrid, static_blend, incumbent]
@@ -282,48 +307,72 @@ def build_production_guarded_portfolio(
                         base_eval.get("portfolio_daily_return_streams") or {},
                         throttle,
                     )
-                    throttled_eval = evaluate_weighted_portfolio([
-                        {
-                            "candidate_key": "production_guarded_portfolio",
-                            "name": "production_guarded_portfolio",
-                            "_saved_weight": 1.0,
-                            "return_streams": throttled_streams,
-                            "train": {},
-                            "val": {},
-                            "oos": {},
-                        }
-                    ])
+                    throttled_eval = evaluate_weighted_portfolio(
+                        [
+                            {
+                                "candidate_key": "production_guarded_portfolio",
+                                "name": "production_guarded_portfolio",
+                                "_saved_weight": 1.0,
+                                "return_streams": throttled_streams,
+                                "train": {},
+                                "val": {},
+                                "oos": {},
+                            }
+                        ]
+                    )
                     payload = {
                         "artifact_kind": ARTIFACT_KIND,
                         "generated_at": _utc_now_iso(),
                         "selection_basis": "saved_sleeve_blend_with_drawdown_throttle",
                         "portfolio_metrics": throttled_eval["portfolio_metrics"],
                         "portfolio_return_streams": throttled_eval["portfolio_return_streams"],
-                        "portfolio_daily_return_streams": throttled_eval["portfolio_daily_return_streams"],
+                        "portfolio_daily_return_streams": throttled_eval[
+                            "portfolio_daily_return_streams"
+                        ],
                         "oos_monthly_returns": throttled_eval["oos_monthly_returns"],
-                        "weighted_component_summaries": base_eval.get("weighted_component_summaries"),
+                        "weighted_component_summaries": base_eval.get(
+                            "weighted_component_summaries"
+                        ),
                         "weights": [
-                            {"candidate_id": row["candidate_key"], "name": row["name"], "weight": float(row["_saved_weight"])}
+                            {
+                                "candidate_id": row["candidate_key"],
+                                "name": row["name"],
+                                "weight": float(row["_saved_weight"]),
+                            }
                             for row in rows
                         ],
                         "active_exposure": active_exposure,
                         "cash_weight": max(0.0, 1.0 - active_exposure),
                         "drawdown_throttle": asdict(throttle),
                         "drawdown_schedule": schedule,
-                        "component_sources": {row["candidate_key"]: row.get("artifact_path") for row in rows},
-                        "validation_objective": float(validation_objective(dict((throttled_eval["portfolio_metrics"] or {}).get("val") or {}))),
-                        "score": _score_combo({"portfolio_metrics": throttled_eval["portfolio_metrics"]}),
+                        "component_sources": {
+                            row["candidate_key"]: row.get("artifact_path") for row in rows
+                        },
+                        "validation_objective": float(
+                            validation_objective(
+                                dict((throttled_eval["portfolio_metrics"] or {}).get("val") or {})
+                            )
+                        ),
+                        "score": _score_combo(
+                            {"portfolio_metrics": throttled_eval["portfolio_metrics"]}
+                        ),
                     }
                     candidate_payloads.append(payload)
 
     candidate_payloads = [item for item in candidate_payloads if item["score"] != float("-inf")]
     if not candidate_payloads:
-        raise RuntimeError("no production-guarded combination cleared the positive-return / drawdown gates")
+        raise RuntimeError(
+            "no production-guarded combination cleared the positive-return / drawdown gates"
+        )
     candidate_payloads.sort(
         key=lambda item: (
             float(item["score"]),
-            _safe_float(((item.get("portfolio_metrics") or {}).get("oos") or {}).get("total_return"), 0.0),
-            -_safe_float(((item.get("portfolio_metrics") or {}).get("oos") or {}).get("max_drawdown"), 0.0),
+            _safe_float(
+                ((item.get("portfolio_metrics") or {}).get("oos") or {}).get("total_return"), 0.0
+            ),
+            -_safe_float(
+                ((item.get("portfolio_metrics") or {}).get("oos") or {}).get("max_drawdown"), 0.0
+            ),
         ),
         reverse=True,
     )
@@ -347,7 +396,9 @@ def build_production_guarded_portfolio(
         "included": best["carry_candidate_included"],
         "selected_name": None if carry_candidate is None else carry_candidate.get("name"),
         "available_count": len(ranked_carry),
-        "excluded_reason": None if carry_candidate is not None else "no_carry_candidate_cleared_production_safety_filters",
+        "excluded_reason": None
+        if carry_candidate is not None
+        else "no_carry_candidate_cleared_production_safety_filters",
     }
     best["recommended_stage"] = "production_candidate"
     return best
@@ -368,14 +419,14 @@ def write_production_guarded_portfolio(
         carry_report_glob=carry_report_glob,
     )
     output_dir.mkdir(parents=True, exist_ok=True)
-    json_path = output_dir / 'production_guarded_portfolio_latest.json'
-    md_path = output_dir / 'production_guarded_portfolio_latest.md'
-    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding='utf-8')
+    json_path = output_dir / "production_guarded_portfolio_latest.json"
+    md_path = output_dir / "production_guarded_portfolio_latest.md"
+    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
-    oos = dict((payload.get('portfolio_metrics') or {}).get('oos') or {})
+    oos = dict((payload.get("portfolio_metrics") or {}).get("oos") or {})
     lines = [
-        '# production guarded portfolio',
-        '',
+        "# production guarded portfolio",
+        "",
         f"- generated_at: `{payload.get('generated_at')}`",
         f"- selection_basis: `{payload.get('selection_basis')}`",
         f"- active_exposure: `{_safe_float(payload.get('active_exposure'), 0.0):.2%}`",
@@ -383,30 +434,36 @@ def write_production_guarded_portfolio(
         f"- oos_return: `{_safe_float(oos.get('total_return', oos.get('return')), 0.0):+.4%}`",
         f"- oos_sharpe: `{_safe_float(oos.get('sharpe'), 0.0):.4f}`",
         f"- oos_max_drawdown: `{_safe_float(oos.get('max_drawdown', oos.get('mdd')), 0.0):.4%}`",
-        '',
-        '## selected components',
+        "",
+        "## selected components",
     ]
-    for row in list(payload.get('weights') or []):
-        lines.append(f"- `{row.get('name')}`: `{_safe_float(row.get('weight'),0.0):.2%}`")
-    carry = dict(payload.get('carry_candidate_considered') or {})
-    lines.extend([
-        '',
-        '## carry candidate',
-        f"- selected_name: `{carry.get('selected_name')}`",
-        f"- included: `{carry.get('included')}`",
-        f"- excluded_reason: `{carry.get('excluded_reason')}`",
-    ])
-    md_path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
-    return {'payload': payload, 'json_path': str(json_path.resolve()), 'md_path': str(md_path.resolve())}
+    for row in list(payload.get("weights") or []):
+        lines.append(f"- `{row.get('name')}`: `{_safe_float(row.get('weight'), 0.0):.2%}`")
+    carry = dict(payload.get("carry_candidate_considered") or {})
+    lines.extend(
+        [
+            "",
+            "## carry candidate",
+            f"- selected_name: `{carry.get('selected_name')}`",
+            f"- included: `{carry.get('included')}`",
+            f"- excluded_reason: `{carry.get('excluded_reason')}`",
+        ]
+    )
+    md_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return {
+        "payload": payload,
+        "json_path": str(json_path.resolve()),
+        "md_path": str(md_path.resolve()),
+    }
 
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--hybrid-path', type=Path, default=DEFAULT_HYBRID_PATH)
-    parser.add_argument('--static-blend-path', type=Path, default=DEFAULT_STATIC_BLEND_PATH)
-    parser.add_argument('--incumbent-path', type=Path, default=DEFAULT_INCUMBENT_PATH)
-    parser.add_argument('--carry-report-glob', default=DEFAULT_CARRY_REPORT_GLOB)
-    parser.add_argument('--output-dir', type=Path, default=DEFAULT_OUTPUT_DIR)
+    parser.add_argument("--hybrid-path", type=Path, default=DEFAULT_HYBRID_PATH)
+    parser.add_argument("--static-blend-path", type=Path, default=DEFAULT_STATIC_BLEND_PATH)
+    parser.add_argument("--incumbent-path", type=Path, default=DEFAULT_INCUMBENT_PATH)
+    parser.add_argument("--carry-report-glob", default=DEFAULT_CARRY_REPORT_GLOB)
+    parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     return parser
 
 
@@ -419,10 +476,10 @@ def main(argv: list[str] | None = None) -> int:
         carry_report_glob=str(args.carry_report_glob),
         output_dir=Path(args.output_dir).resolve(),
     )
-    print(result['json_path'])
-    print(result['md_path'])
+    print(result["json_path"])
+    print(result["md_path"])
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     raise SystemExit(main())

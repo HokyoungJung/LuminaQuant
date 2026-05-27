@@ -55,9 +55,30 @@ def _payload(
 
 def test_validate_basis_universe_rejects_raw_and_derived_same_family() -> None:
     rows = [
-        {"candidate_id": "incumbent", "metadata": {"basis_family": "incumbent", "basis_variant": "incumbent", "basis_universe": "shared"}},
-        {"candidate_id": "raw", "metadata": {"basis_family": "static_blend", "basis_variant": "raw_55_45", "basis_universe": "raw_basis"}},
-        {"candidate_id": "derived", "metadata": {"basis_family": "static_blend", "basis_variant": "derived_80_20", "basis_universe": "derived_basis"}},
+        {
+            "candidate_id": "incumbent",
+            "metadata": {
+                "basis_family": "incumbent",
+                "basis_variant": "incumbent",
+                "basis_universe": "shared",
+            },
+        },
+        {
+            "candidate_id": "raw",
+            "metadata": {
+                "basis_family": "static_blend",
+                "basis_variant": "raw_55_45",
+                "basis_universe": "raw_basis",
+            },
+        },
+        {
+            "candidate_id": "derived",
+            "metadata": {
+                "basis_family": "static_blend",
+                "basis_variant": "derived_80_20",
+                "basis_universe": "derived_basis",
+            },
+        },
     ]
 
     validation = validate_basis_universe(rows)
@@ -66,20 +87,50 @@ def test_validate_basis_universe_rejects_raw_and_derived_same_family() -> None:
     assert validation["conflicts"][0]["family"] == "static_blend"
 
 
-
 def test_build_basis_search_universes_splits_raw_and_derived_rows() -> None:
     rows = [
-        {"candidate_id": "incumbent", "metadata": {"basis_family": "incumbent", "basis_variant": "incumbent", "basis_universe": "shared"}},
-        {"candidate_id": "soft", "metadata": {"basis_family": "soft_allocator", "basis_variant": "soft_allocator", "basis_universe": "shared"}},
-        {"candidate_id": "raw", "metadata": {"basis_family": "static_blend", "basis_variant": "raw_55_45", "basis_universe": "raw_basis"}},
-        {"candidate_id": "derived", "metadata": {"basis_family": "static_blend", "basis_variant": "derived_80_20", "basis_universe": "derived_basis"}},
+        {
+            "candidate_id": "incumbent",
+            "metadata": {
+                "basis_family": "incumbent",
+                "basis_variant": "incumbent",
+                "basis_universe": "shared",
+            },
+        },
+        {
+            "candidate_id": "soft",
+            "metadata": {
+                "basis_family": "soft_allocator",
+                "basis_variant": "soft_allocator",
+                "basis_universe": "shared",
+            },
+        },
+        {
+            "candidate_id": "raw",
+            "metadata": {
+                "basis_family": "static_blend",
+                "basis_variant": "raw_55_45",
+                "basis_universe": "raw_basis",
+            },
+        },
+        {
+            "candidate_id": "derived",
+            "metadata": {
+                "basis_family": "static_blend",
+                "basis_variant": "derived_80_20",
+                "basis_universe": "derived_basis",
+            },
+        },
     ]
 
     universes = build_basis_search_universes(rows)
 
     assert [row["candidate_id"] for row in universes["raw_basis"]] == ["incumbent", "soft", "raw"]
-    assert [row["candidate_id"] for row in universes["derived_basis"]] == ["incumbent", "soft", "derived"]
-
+    assert [row["candidate_id"] for row in universes["derived_basis"]] == [
+        "incumbent",
+        "soft",
+        "derived",
+    ]
 
 
 def test_evaluate_robustness_gates_accepts_candidate_that_clears_all_rules() -> None:
@@ -107,7 +158,6 @@ def test_evaluate_robustness_gates_accepts_candidate_that_clears_all_rules() -> 
     assert result["promotable"] is True
     assert result["rejection_reasons"] == []
     assert result["oos_monthly_mean"] == mean_monthly_return(candidate["oos_monthly_returns"])
-
 
 
 def test_evaluate_robustness_gates_rejects_negative_train_return() -> None:
@@ -302,7 +352,6 @@ def test_evaluate_robustness_gates_rejects_strict_average_leverage_above_cap() -
     assert "strict_average_leverage_above_cap" in result["rejection_reasons"]
 
 
-
 def test_memory_ledger_row_round_trips() -> None:
     row = build_memory_ledger_row(
         run_name="portfolio_meta_search",
@@ -389,7 +438,12 @@ def test_correlation_aware_sparse_fold_ensemble_prefers_orthogonal_candidate() -
         "return_streams": {
             "train": [{"t": 1, "v": 0.01}, {"t": 2, "v": 0.0}],
             "val": [{"t": 3, "v": 0.01}, {"t": 4, "v": 0.0}],
-            "oos": [{"datetime": "2026-02-01T00:00:00Z", "v": 0.01}, {"datetime": "2026-02-02T00:00:00Z", "v": -0.01}, {"datetime": "2026-02-03T00:00:00Z", "v": 0.01}, {"datetime": "2026-02-04T00:00:00Z", "v": -0.01}],
+            "oos": [
+                {"datetime": "2026-02-01T00:00:00Z", "v": 0.01},
+                {"datetime": "2026-02-02T00:00:00Z", "v": -0.01},
+                {"datetime": "2026-02-03T00:00:00Z", "v": 0.01},
+                {"datetime": "2026-02-04T00:00:00Z", "v": -0.01},
+            ],
         },
     }
     highly_correlated = {
@@ -409,7 +463,12 @@ def test_correlation_aware_sparse_fold_ensemble_prefers_orthogonal_candidate() -
         "return_streams": {
             "train": [{"t": 1, "v": 0.01}, {"t": 2, "v": 0.0}],
             "val": [{"t": 3, "v": 0.01}, {"t": 4, "v": 0.0}],
-            "oos": [{"datetime": "2026-02-01T00:00:00Z", "v": 0.009}, {"datetime": "2026-02-02T00:00:00Z", "v": -0.011}, {"datetime": "2026-02-03T00:00:00Z", "v": 0.009}, {"datetime": "2026-02-04T00:00:00Z", "v": -0.011}],
+            "oos": [
+                {"datetime": "2026-02-01T00:00:00Z", "v": 0.009},
+                {"datetime": "2026-02-02T00:00:00Z", "v": -0.011},
+                {"datetime": "2026-02-03T00:00:00Z", "v": 0.009},
+                {"datetime": "2026-02-04T00:00:00Z", "v": -0.011},
+            ],
         },
     }
     orthogonal = {
@@ -429,7 +488,12 @@ def test_correlation_aware_sparse_fold_ensemble_prefers_orthogonal_candidate() -
         "return_streams": {
             "train": [{"t": 1, "v": 0.01}, {"t": 2, "v": 0.0}],
             "val": [{"t": 3, "v": 0.01}, {"t": 4, "v": 0.0}],
-            "oos": [{"datetime": "2026-02-01T00:00:00Z", "v": 0.01}, {"datetime": "2026-02-02T00:00:00Z", "v": 0.01}, {"datetime": "2026-02-03T00:00:00Z", "v": -0.01}, {"datetime": "2026-02-04T00:00:00Z", "v": -0.01}],
+            "oos": [
+                {"datetime": "2026-02-01T00:00:00Z", "v": 0.01},
+                {"datetime": "2026-02-02T00:00:00Z", "v": 0.01},
+                {"datetime": "2026-02-03T00:00:00Z", "v": -0.01},
+                {"datetime": "2026-02-04T00:00:00Z", "v": -0.01},
+            ],
         },
     }
 
@@ -445,4 +509,7 @@ def test_correlation_aware_sparse_fold_ensemble_prefers_orthogonal_candidate() -
     assert "orthogonal_candidate" in selected_names
     assert "high_corr_candidate" not in selected_names
     excluded = {row["name"]: row["reason"] for row in payload["excluded_candidates"]}
-    assert excluded["high_corr_candidate"] in {"correlation_penalty_dominated", "max_members_reached"}
+    assert excluded["high_corr_candidate"] in {
+        "correlation_penalty_dominated",
+        "max_members_reached",
+    }

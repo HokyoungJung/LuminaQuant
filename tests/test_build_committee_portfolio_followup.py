@@ -94,7 +94,10 @@ def _row(name: str, split_return: float) -> dict[str, object]:
 def test_build_committee_portfolio_followup_uses_provided_rows():
     payload = build_committee_portfolio_followup(
         component_rows=[_row("a", 0.01), _row("b", 0.02)],
-        pair_payload={"survives": False, "coverage_guard": {"pass": False, "observed_total_days": 36, "min_total_days": 60}},
+        pair_payload={
+            "survives": False,
+            "coverage_guard": {"pass": False, "observed_total_days": 36, "min_total_days": 60},
+        },
     )
 
     assert payload["component_count"] == 2

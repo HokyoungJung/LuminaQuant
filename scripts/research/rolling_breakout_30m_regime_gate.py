@@ -106,7 +106,9 @@ def _coerce_timestamp(value: Any) -> pd.Timestamp | None:
     return pd.to_datetime(value, utc=True, errors="coerce")
 
 
-def _candidate_timeframe_row(decision: Mapping[str, Any], *, candidate: str) -> tuple[dict[str, Any], dict[str, Any]]:
+def _candidate_timeframe_row(
+    decision: Mapping[str, Any], *, candidate: str
+) -> tuple[dict[str, Any], dict[str, Any]]:
     target = candidate.strip()
     for timeframe_row in list(decision.get("timeframe_rows") or []):
         best_row = dict(timeframe_row.get("best_row") or {})
@@ -126,7 +128,8 @@ def _split_config_from_windows(windows: Mapping[str, Any]) -> dict[str, Any]:
         "val_start": windows.get("val_start"),
         "val_end": windows.get("val_end_exclusive"),
         "oos_start": windows.get("val_end_exclusive"),
-        "oos_end": windows.get("actual_oos_end_exclusive") or windows.get("requested_oos_end_exclusive"),
+        "oos_end": windows.get("actual_oos_end_exclusive")
+        or windows.get("requested_oos_end_exclusive"),
         "strategy_timeframe": TARGET_TIMEFRAME,
         "mode": "exact_dates",
     }
@@ -137,7 +140,10 @@ def _normalize_evaluation_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
         [
             np.datetime64(pd.Timestamp(ts).tz_convert("UTC").tz_localize(None), "ms")
             if isinstance(ts, pd.Timestamp)
-            else np.datetime64(pd.Timestamp(ts).tz_localize(None) if pd.Timestamp(ts).tzinfo else pd.Timestamp(ts), "ms")
+            else np.datetime64(
+                pd.Timestamp(ts).tz_localize(None) if pd.Timestamp(ts).tzinfo else pd.Timestamp(ts),
+                "ms",
+            )
             for ts in payload.get("timestamps") or []
         ],
         dtype="datetime64[ms]",
@@ -381,7 +387,9 @@ def _split_metrics(
             {
                 "gate_days": gate_days,
                 "total_days": total_days,
-                "activation_ratio": (float(gate_days) / float(total_days)) if total_days > 0 else 0.0,
+                "activation_ratio": (float(gate_days) / float(total_days))
+                if total_days > 0
+                else 0.0,
             }
         )
         payload[split] = metrics
@@ -420,8 +428,20 @@ def _rule_score(
             + (12.0 * _safe_float(val.get("return"), 0.0))
             + (2.0 * _safe_float(train.get("return"), 0.0))
             + (0.25 * _safe_float(train.get("sharpe"), 0.0))
-            - (2.0 * max(0.0, TRAIN_VAL_ONLY_SURVIVAL_THRESHOLDS["min_activation_ratio"] - activation_ratio))
-            - (2.0 * max(0.0, activation_ratio - TRAIN_VAL_ONLY_SURVIVAL_THRESHOLDS["max_activation_ratio"]))
+            - (
+                2.0
+                * max(
+                    0.0,
+                    TRAIN_VAL_ONLY_SURVIVAL_THRESHOLDS["min_activation_ratio"] - activation_ratio,
+                )
+            )
+            - (
+                2.0
+                * max(
+                    0.0,
+                    activation_ratio - TRAIN_VAL_ONLY_SURVIVAL_THRESHOLDS["max_activation_ratio"],
+                )
+            )
         )
     return float(
         (2.5 * _safe_float(oos.get("sharpe"), 0.0))
@@ -446,11 +466,20 @@ def _survivor_blockers(
     oos = dict(metrics.get("oos") or {})
     blockers: list[str] = []
     if mode == TRAIN_VAL_SELECTION_BASIS:
-        if _safe_float(val.get("sharpe"), 0.0) < TRAIN_VAL_ONLY_SURVIVAL_THRESHOLDS["val_sharpe_min"]:
+        if (
+            _safe_float(val.get("sharpe"), 0.0)
+            < TRAIN_VAL_ONLY_SURVIVAL_THRESHOLDS["val_sharpe_min"]
+        ):
             blockers.append("val_sharpe")
-        if _safe_float(val.get("return"), 0.0) <= TRAIN_VAL_ONLY_SURVIVAL_THRESHOLDS["val_return_min"]:
+        if (
+            _safe_float(val.get("return"), 0.0)
+            <= TRAIN_VAL_ONLY_SURVIVAL_THRESHOLDS["val_return_min"]
+        ):
             blockers.append("val_return")
-        if _safe_float(train.get("return"), 0.0) < TRAIN_VAL_ONLY_SURVIVAL_THRESHOLDS["train_return_min"]:
+        if (
+            _safe_float(train.get("return"), 0.0)
+            < TRAIN_VAL_ONLY_SURVIVAL_THRESHOLDS["train_return_min"]
+        ):
             blockers.append("train_return")
         activation_ratio = _safe_float(val.get("activation_ratio"), 0.0)
         if activation_ratio < TRAIN_VAL_ONLY_SURVIVAL_THRESHOLDS["min_activation_ratio"]:
@@ -466,7 +495,10 @@ def _survivor_blockers(
         blockers.append("pbo")
     if _safe_float(val.get("sharpe"), 0.0) < ROLLING_SURVIVAL_THRESHOLDS["val_sharpe_min"]:
         blockers.append("val_sharpe")
-    if _safe_float(oos.get("trade_count"), 0.0) < ROLLING_SURVIVAL_THRESHOLDS["oos_trade_count_min"]:
+    if (
+        _safe_float(oos.get("trade_count"), 0.0)
+        < ROLLING_SURVIVAL_THRESHOLDS["oos_trade_count_min"]
+    ):
         blockers.append("oos_trade_count")
     activation_ratio = _safe_float(oos.get("activation_ratio"), 0.0)
     if activation_ratio < ROLLING_SURVIVAL_THRESHOLDS["min_activation_ratio"]:
@@ -638,21 +670,26 @@ def build_rolling_breakout_30m_gate(
         ),
         "survives": recommended_survives,
         "survives_train_val": survives_train_val,
-        "recommended_action": "activate_conditionally" if recommended_survives else "do_not_activate",
+        "recommended_action": "activate_conditionally"
+        if recommended_survives
+        else "do_not_activate",
         "windows": windows,
         "selected_rule": chosen,
         "evaluated_rules": evaluated_rules,
         "baseline_metrics": {
-            split: dict(candidate_row.get(split) or {})
-            for split in ("train", "val", "oos")
+            split: dict(candidate_row.get(split) or {}) for split in ("train", "val", "oos")
         },
         "feature_snapshot": {
             "rows": len(features),
             "start_date": str(features["date"].min()) if not features.empty else "",
             "end_date": str(features["date"].max()) if not features.empty else "",
             "signal_lag_days": REGIME_SIGNAL_LAG_DAYS,
-            "median_breadth_ma96": _safe_float(features.get("breadth_ma96", pd.Series(dtype=float)).median(), 0.0),
-            "median_breadth_ma192": _safe_float(features.get("breadth_ma192", pd.Series(dtype=float)).median(), 0.0),
+            "median_breadth_ma96": _safe_float(
+                features.get("breadth_ma96", pd.Series(dtype=float)).median(), 0.0
+            ),
+            "median_breadth_ma192": _safe_float(
+                features.get("breadth_ma192", pd.Series(dtype=float)).median(), 0.0
+            ),
             "median_basket_vol_ratio": _safe_float(
                 features.get("basket_vol_ratio", pd.Series(dtype=float)).median(),
                 0.0,

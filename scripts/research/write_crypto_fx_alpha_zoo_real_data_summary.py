@@ -44,7 +44,10 @@ def _as_dict(value: Any) -> dict[str, Any]:
 def _time_log_rss_kb(path: Path) -> int | None:
     if not path.exists():
         return None
-    match = re.search(r"Maximum resident set size \(kbytes\):\s*(\d+)", path.read_text(encoding="utf-8", errors="ignore"))
+    match = re.search(
+        r"Maximum resident set size \(kbytes\):\s*(\d+)",
+        path.read_text(encoding="utf-8", errors="ignore"),
+    )
     if not match:
         return None
     return int(match.group(1))
@@ -132,7 +135,9 @@ def build_summary_payload(
         "input_record_count": calibration.get("input_record_count"),
         "calibration_record_count": calibration.get("calibration_record_count"),
         "input_locked_oos_record_count": calibration.get("input_locked_oos_record_count"),
-        "locked_oos_calibration_record_count": calibration.get("locked_oos_calibration_record_count"),
+        "locked_oos_calibration_record_count": calibration.get(
+            "locked_oos_calibration_record_count"
+        ),
         "excluded_locked_oos_record_count": calibration.get("excluded_locked_oos_record_count"),
         "uses_locked_oos_for_calibration": calibration.get("uses_locked_oos_for_calibration"),
         "calibrated_edge_count": len(_as_dict(calibration.get("calibrated_edges_for_strategy"))),
@@ -173,7 +178,9 @@ def build_summary_payload(
             "path": str(Path(screen_path).expanduser().resolve()),
             "factor_count": screen.get("factor_count"),
             "row_count": screen.get("row_count"),
-            "selected_factor_count": len(list(_as_dict(screen.get("screen")).get("selected_factors") or [])),
+            "selected_factor_count": len(
+                list(_as_dict(screen.get("screen")).get("selected_factors") or [])
+            ),
             "calendar_primary": screen.get("calendar_primary"),
             "uses_locked_oos_for_selection": screen.get("uses_locked_oos_for_selection"),
             "strategy_validity": screen.get("strategy_validity"),
@@ -205,7 +212,9 @@ def build_summary_payload(
         "paper_forward_diagnostics": replay.get("paper_forward_diagnostics"),
         "front_runner_candidate": {
             "designation": "strict_candidate_after_train_validation_freeze",
-            "live_promotion_status": "deployable_success_true" if deployable_success else "no_live_promotion_strict_gate_failed",
+            "live_promotion_status": "deployable_success_true"
+            if deployable_success
+            else "no_live_promotion_strict_gate_failed",
             "candidate_name": front_runner.get("candidate_name"),
             "candidate_source": front_runner.get("candidate_source"),
             "strategy": front_runner.get("strategy"),
@@ -220,8 +229,12 @@ def build_summary_payload(
             "performance_diagnostics": front_runner.get("performance_diagnostics"),
             "strict_safety": {
                 "strict_safe": front_runner.get("strict_safe"),
-                "liquidation_count": _as_dict(front_runner.get("liquidation_audit")).get("total_liquidation_count"),
-                "minimum_margin_buffer": _as_dict(front_runner.get("liquidation_audit")).get("minimum_margin_buffer"),
+                "liquidation_count": _as_dict(front_runner.get("liquidation_audit")).get(
+                    "total_liquidation_count"
+                ),
+                "minimum_margin_buffer": _as_dict(front_runner.get("liquidation_audit")).get(
+                    "minimum_margin_buffer"
+                ),
             },
             "allowed_use": ["hypothesis_reference", "next_train_validation_research_seed"],
             "forbidden_use_without_new_validation": [
@@ -328,9 +341,18 @@ def write_summary_markdown(payload: dict[str, Any], path: str | Path) -> None:
         locked_rows = []
         for group_name, metrics_by_split in groups.items():
             locked = _as_dict(_as_dict(metrics_by_split).get("locked_oos"))
-            locked_rows.append((group_name, _safe_float(locked.get("total_return")), int(locked.get("trade_count") or 0)))
+            locked_rows.append(
+                (
+                    group_name,
+                    _safe_float(locked.get("total_return")),
+                    int(locked.get("trade_count") or 0),
+                )
+            )
         locked_rows.sort(key=lambda item: item[1], reverse=True)
-        preview = ", ".join(f"{name}: {_fmt_pct(ret)} ({count})" for name, ret, count in locked_rows[:5]) or "none"
+        preview = (
+            ", ".join(f"{name}: {_fmt_pct(ret)} ({count})" for name, ret, count in locked_rows[:5])
+            or "none"
+        )
         lines.append(f"- locked-OOS by {label}: {preview}")
     for sensitivity_key, value_field in (
         ("slippage_sensitivity", "round_trip_slippage_bps"),
@@ -368,11 +390,15 @@ def write_summary_markdown(payload: dict[str, Any], path: str | Path) -> None:
     Path(path).expanduser().write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def write_summary(payload: dict[str, Any], *, output_json: str | Path, output_md: str | Path) -> None:
+def write_summary(
+    payload: dict[str, Any], *, output_json: str | Path, output_md: str | Path
+) -> None:
     json_path = Path(output_json).expanduser().resolve()
     md_path = Path(output_md).expanduser().resolve()
     json_path.parent.mkdir(parents=True, exist_ok=True)
-    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8")
+    json_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8"
+    )
     write_summary_markdown(payload, md_path)
 
 

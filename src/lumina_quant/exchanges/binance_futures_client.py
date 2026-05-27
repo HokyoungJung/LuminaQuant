@@ -46,7 +46,6 @@ class BinanceFuturesClientConfig:
     timeout_sec: float = 30.0
 
 
-
 def normalize_futures_symbol(symbol: str) -> str:
     """Normalize user symbol into Binance compact futures symbol token."""
     return canonical_symbol(str(symbol or "")).replace("/", "")
@@ -72,7 +71,9 @@ class BinanceFuturesRESTClient:
     def _sign(self, payload: str) -> str:
         secret = self.secret_key
         if not secret:
-            raise BinanceFuturesAPIError("Binance Futures secret key is required for signed requests.")
+            raise BinanceFuturesAPIError(
+                "Binance Futures secret key is required for signed requests."
+            )
         digest = hmac.new(secret.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256)
         return digest.hexdigest()
 
@@ -124,7 +125,9 @@ class BinanceFuturesRESTClient:
             payload.setdefault("recvWindow", int(self.config.recv_window))
             payload["timestamp"] = int(time.time() * 1000)
             query = self._encode_params(payload)
-            query = f"{query}&signature={self._sign(query)}" if query else f"signature={self._sign('')}"
+            query = (
+                f"{query}&signature={self._sign(query)}" if query else f"signature={self._sign('')}"
+            )
         else:
             query = self._encode_params(payload)
 
@@ -137,9 +140,13 @@ class BinanceFuturesRESTClient:
             data = query.encode("utf-8") if query else b""
             headers["Content-Type"] = "application/x-www-form-urlencoded"
 
-        request = urllib.request.Request(url=target, method=method.upper(), headers=headers, data=data)
+        request = urllib.request.Request(
+            url=target, method=method.upper(), headers=headers, data=data
+        )
         try:
-            with urllib.request.urlopen(request, timeout=float(self.config.timeout_sec)) as response:
+            with urllib.request.urlopen(
+                request, timeout=float(self.config.timeout_sec)
+            ) as response:
                 return self._decode_json(response.read())
         except urllib.error.HTTPError as exc:
             payload_obj = self._decode_json(exc.read())
@@ -148,7 +155,11 @@ class BinanceFuturesRESTClient:
             if isinstance(payload_obj, dict):
                 message = payload_obj.get("msg") or payload_obj.get("message")
                 try:
-                    error_code = int(payload_obj.get("code")) if payload_obj.get("code") is not None else None
+                    error_code = (
+                        int(payload_obj.get("code"))
+                        if payload_obj.get("code") is not None
+                        else None
+                    )
                 except Exception:
                     error_code = None
             raise BinanceFuturesAPIError(
@@ -228,7 +239,9 @@ class BinanceFuturesRESTClient:
                 "limit": limit,
             },
         )
-        return [dict(item or {}) for item in list(payload or [])] if isinstance(payload, list) else []
+        return (
+            [dict(item or {}) for item in list(payload or [])] if isinstance(payload, list) else []
+        )
 
     def create_user_data_stream(self) -> str:
         payload = self.api_key_post("/fapi/v1/listenKey")
@@ -247,7 +260,9 @@ class BinanceFuturesRESTClient:
 
     def account_balance_v3(self) -> list[dict[str, Any]]:
         payload = self.signed_get("/fapi/v3/balance")
-        return [dict(item or {}) for item in list(payload or [])] if isinstance(payload, list) else []
+        return (
+            [dict(item or {}) for item in list(payload or [])] if isinstance(payload, list) else []
+        )
 
     def account_info_v3(self) -> dict[str, Any]:
         payload = self.signed_get("/fapi/v3/account")
@@ -258,7 +273,9 @@ class BinanceFuturesRESTClient:
             "/fapi/v3/positionRisk",
             params={"symbol": normalize_futures_symbol(symbol) if symbol else None},
         )
-        return [dict(item or {}) for item in list(payload or [])] if isinstance(payload, list) else []
+        return (
+            [dict(item or {}) for item in list(payload or [])] if isinstance(payload, list) else []
+        )
 
     def new_order(self, **params: Any) -> dict[str, Any]:
         payload = self.signed_post("/fapi/v1/order", params=params)
@@ -307,7 +324,9 @@ class BinanceFuturesRESTClient:
             "/fapi/v1/openOrders",
             params={"symbol": normalize_futures_symbol(symbol) if symbol else None},
         )
-        return [dict(item or {}) for item in list(payload or [])] if isinstance(payload, list) else []
+        return (
+            [dict(item or {}) for item in list(payload or [])] if isinstance(payload, list) else []
+        )
 
     def change_position_mode(self, *, hedge_mode: bool) -> dict[str, Any]:
         payload = self.signed_post(

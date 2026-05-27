@@ -71,7 +71,9 @@ def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
 
 def _final_selection_module() -> Any:
     module_path = Path(__file__).with_name("write_profit_moonshot_live_final_selection.py")
-    spec = importlib.util.spec_from_file_location("write_profit_moonshot_live_final_selection_for_audit", module_path)
+    spec = importlib.util.spec_from_file_location(
+        "write_profit_moonshot_live_final_selection_for_audit", module_path
+    )
     if spec is None or spec.loader is None:
         raise RuntimeError(f"Unable to import final selection module from {module_path}")
     module = importlib.util.module_from_spec(spec)
@@ -178,7 +180,11 @@ def build_strategy_validity_audit_payload(
     source_artifacts: Mapping[str, str],
 ) -> dict[str, Any]:
     final_module = _final_selection_module()
-    rows = [_as_dict(row) for row in _as_list(final_selection_payload.get("rows")) if isinstance(row, Mapping)]
+    rows = [
+        _as_dict(row)
+        for row in _as_list(final_selection_payload.get("rows"))
+        if isinstance(row, Mapping)
+    ]
     audit_rows = []
     missing_metadata_rows: list[str] = []
     invalid_rows: list[str] = []
@@ -200,7 +206,9 @@ def build_strategy_validity_audit_payload(
                 "kind": row.get("kind"),
                 "candidate_derived": bool(row.get("candidate_derived")),
                 "benchmark_only": bool(row.get("benchmark_only")),
-                "deployable_candidate": bool(_as_dict(row.get("decision_gates")).get("deployable_candidate")),
+                "deployable_candidate": bool(
+                    _as_dict(row.get("decision_gates")).get("deployable_candidate")
+                ),
                 "source_artifact": row.get("source_artifact"),
                 "sleeves": list(row.get("sleeves") or []),
                 "strategy_validity": validity,
@@ -242,7 +250,8 @@ def build_strategy_validity_audit_payload(
             "deployable_valid_count": sum(
                 1
                 for row in audit_rows
-                if row["deployable_candidate"] and final_module._strategy_validity_passes(row["strategy_validity"])
+                if row["deployable_candidate"]
+                and final_module._strategy_validity_passes(row["strategy_validity"])
             ),
         },
         "missing_metadata_rows": missing_metadata_rows,
@@ -301,8 +310,12 @@ def _source_pool_summary(path_value: Path | str, *, final_module: Any) -> dict[s
     calendar_rows = [row for row in rows if not bool(row["strategy_validity_pass"])]
     dynamic_success = [row for row in dynamic_rows if bool(row["success_candidate"])]
     dynamic_ranked = list(dynamic_rows)
-    dynamic_success.sort(key=lambda row: (_safe_float(row["train_val_screen_score"]), row["name"]), reverse=True)
-    dynamic_ranked.sort(key=lambda row: (_safe_float(row["train_val_screen_score"]), row["name"]), reverse=True)
+    dynamic_success.sort(
+        key=lambda row: (_safe_float(row["train_val_screen_score"]), row["name"]), reverse=True
+    )
+    dynamic_ranked.sort(
+        key=lambda row: (_safe_float(row["train_val_screen_score"]), row["name"]), reverse=True
+    )
     return {
         "available": True,
         "path": str(path),
@@ -367,7 +380,9 @@ def build_markdown(payload: Mapping[str, Any]) -> str:
                 f"train=`{row.get('train_total_return')}` val=`{row.get('validation_total_return')}` "
                 f"oos=`{row.get('oos_total_return')}` score=`{row.get('train_val_screen_score')}`"
             )
-    lines.extend(["", "### Top strategy-valid candidates before success/liquidation promotion gates", ""])
+    lines.extend(
+        ["", "### Top strategy-valid candidates before success/liquidation promotion gates", ""]
+    )
     for row in _as_list(pool.get("top_strategy_valid_candidates"))[:20]:
         if isinstance(row, Mapping):
             lines.append(
@@ -382,11 +397,15 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--final-selection-json",
-        default=str(DEFAULT_BASE_DIR / "final_decision" / "profit_moonshot_live_final_selection_latest.json"),
+        default=str(
+            DEFAULT_BASE_DIR / "final_decision" / "profit_moonshot_live_final_selection_latest.json"
+        ),
     )
     parser.add_argument(
         "--final-selection-md",
-        default=str(DEFAULT_BASE_DIR / "final_decision" / "profit_moonshot_live_final_selection_latest.md"),
+        default=str(
+            DEFAULT_BASE_DIR / "final_decision" / "profit_moonshot_live_final_selection_latest.md"
+        ),
     )
     parser.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_DIR))
     parser.add_argument("--merged-candidate-csv", default="")
@@ -418,7 +437,15 @@ def main(argv: list[str] | None = None) -> int:
     md_path = output_dir / "strategy_validity_audit_latest.md"
     _write_json(json_path, payload)
     md_path.write_text(build_markdown(payload), encoding="utf-8")
-    print(json.dumps({"json_path": str(json_path), "markdown_path": str(md_path), "status": payload["status"]}))
+    print(
+        json.dumps(
+            {
+                "json_path": str(json_path),
+                "markdown_path": str(md_path),
+                "status": payload["status"],
+            }
+        )
+    )
     return 1 if payload.get("status") == "fail" else 0
 
 

@@ -41,7 +41,9 @@ DEFAULT_REPLAY_PATH = (
     / "performance_first_switch_replay_current"
     / "performance_first_switch_replay_latest.json"
 )
-DEFAULT_HYBRID_PATH = GROUP_ROOT / "portfolio_hybrid_online_current" / "hybrid_online_portfolio_latest.json"
+DEFAULT_HYBRID_PATH = (
+    GROUP_ROOT / "portfolio_hybrid_online_current" / "hybrid_online_portfolio_latest.json"
+)
 DEFAULT_REFRESH_PATH = FOLLOWUP_ROOT / "final_portfolio_validation_data_refresh_latest.json"
 DEFAULT_DECISION_PATH = FOLLOWUP_ROOT / "portfolio_live_readiness_decision_latest.json"
 DEFAULT_CONFIG_PATH = ROOT / "config.yaml"
@@ -102,7 +104,9 @@ def _decision_allows_live_start(decision: Mapping[str, Any]) -> tuple[bool, bool
     return bool(allowed), decision_value == "keep_incumbent", reference
 
 
-def _decision_runtime_compatible(*, decision_allowed: bool, decision_keep: bool, reference: str) -> bool:
+def _decision_runtime_compatible(
+    *, decision_allowed: bool, decision_keep: bool, reference: str
+) -> bool:
     if not decision_allowed:
         return False
     if decision_keep:
@@ -117,7 +121,9 @@ def _parse_utc(value: Any) -> datetime | None:
     return datetime.fromisoformat(token.replace("Z", "+00:00")).astimezone(UTC)
 
 
-def _daily_metrics(returns: Sequence[float], *, periods_per_year: float = 365.0) -> dict[str, float]:
+def _daily_metrics(
+    returns: Sequence[float], *, periods_per_year: float = 365.0
+) -> dict[str, float]:
     series = [float(item) for item in returns]
     if not series:
         return {"total_return": 0.0, "sharpe": 0.0, "max_drawdown": 0.0, "volatility": 0.0}
@@ -147,9 +153,13 @@ def _daily_metrics(returns: Sequence[float], *, periods_per_year: float = 365.0)
     }
 
 
-def _scenario_payloads(hybrid_payload: Mapping[str, Any]) -> tuple[list[dict[str, Any]], list[float], list[float]]:
+def _scenario_payloads(
+    hybrid_payload: Mapping[str, Any],
+) -> tuple[list[dict[str, Any]], list[float], list[float]]:
     scenario = dict(dict(hybrid_payload.get("scenarios") or {}).get("refreshed_latest_tail") or {})
-    allocations = [dict(item) for item in list(scenario.get("allocations") or []) if isinstance(item, Mapping)]
+    allocations = [
+        dict(item) for item in list(scenario.get("allocations") or []) if isinstance(item, Mapping)
+    ]
     daily_returns = [_safe_float(item, 0.0) for item in list(scenario.get("daily_returns") or [])]
     if allocations and len(allocations) != len(daily_returns):
         raise ValueError("hybrid allocations and daily_returns length mismatch")
@@ -157,16 +167,27 @@ def _scenario_payloads(hybrid_payload: Mapping[str, Any]) -> tuple[list[dict[str
     turnover_by_index: list[float] = []
     previous_weights: dict[str, float] = {}
     for allocation in allocations:
-        current_weights = {str(key): _safe_float(value, 0.0) for key, value in dict(allocation.get("weights") or {}).items()}
+        current_weights = {
+            str(key): _safe_float(value, 0.0)
+            for key, value in dict(allocation.get("weights") or {}).items()
+        }
         keys = set(previous_weights) | set(current_weights)
-        turnover = 0.5 * sum(abs(_safe_float(current_weights.get(key), 0.0) - _safe_float(previous_weights.get(key), 0.0)) for key in keys)
+        turnover = 0.5 * sum(
+            abs(
+                _safe_float(current_weights.get(key), 0.0)
+                - _safe_float(previous_weights.get(key), 0.0)
+            )
+            for key in keys
+        )
         turnover_by_index.append(float(turnover))
         previous_weights = current_weights
 
     oos_allocations: list[dict[str, Any]] = []
     oos_returns: list[float] = []
     oos_turnovers: list[float] = []
-    for allocation, ret, turnover in zip(allocations, daily_returns, turnover_by_index, strict=True):
+    for allocation, ret, turnover in zip(
+        allocations, daily_returns, turnover_by_index, strict=True
+    ):
         if str(allocation.get("split") or "").strip().lower() != "oos":
             continue
         oos_allocations.append(allocation)
@@ -208,7 +229,10 @@ def _allocation_summary(hybrid_payload: Mapping[str, Any]) -> dict[str, Any]:
             default_switches += 1
         previous_default = default_sleeve
 
-        weights = {str(key): _safe_float(value, 0.0) for key, value in dict(allocation.get("weights") or {}).items()}
+        weights = {
+            str(key): _safe_float(value, 0.0)
+            for key, value in dict(allocation.get("weights") or {}).items()
+        }
         pair_weight = _safe_float(weights.get("pair_tactical_mode"), 0.0)
         cash_weight = _safe_float(allocation.get("cash_weight"), 0.0)
         pair_weights.append(pair_weight)
@@ -227,7 +251,9 @@ def _allocation_summary(hybrid_payload: Mapping[str, Any]) -> dict[str, Any]:
         "median_daily_turnover_proxy": float(ordered_turnovers[len(ordered_turnovers) // 2]),
         "p90_daily_turnover_proxy": float(ordered_turnovers[p90_index]),
         "pair_active_days": int(sum(1 for item in pair_weights if item > 0.0)),
-        "pair_active_ratio": float(sum(1 for item in pair_weights if item > 0.0) / len(pair_weights)),
+        "pair_active_ratio": float(
+            sum(1 for item in pair_weights if item > 0.0) / len(pair_weights)
+        ),
         "avg_pair_weight": float(sum(pair_weights) / len(pair_weights)),
         "max_pair_weight": float(max(pair_weights)),
         "avg_cash_weight": float(sum(cash_weights) / len(cash_weights)),
@@ -236,7 +262,9 @@ def _allocation_summary(hybrid_payload: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def _cost_stress(hybrid_payload: Mapping[str, Any], *, one_way_cost_bps_grid: Sequence[float]) -> list[dict[str, Any]]:
+def _cost_stress(
+    hybrid_payload: Mapping[str, Any], *, one_way_cost_bps_grid: Sequence[float]
+) -> list[dict[str, Any]]:
     _oos_allocations, oos_returns, oos_turnovers = _scenario_payloads(hybrid_payload)
     scenarios: list[dict[str, Any]] = []
     for cost_bps in one_way_cost_bps_grid:
@@ -274,7 +302,9 @@ def _live_readiness_summary(
     mode = str(live.get("mode") or "").strip().lower()
     testnet = bool(live.get("testnet"))
     require_real_enable_flag = bool(live.get("require_real_enable_flag"))
-    env_real_enabled = str(__import__("os").environ.get("LUMINA_ENABLE_LIVE_REAL", "")).strip().lower() in {"1", "true", "yes", "on"}
+    env_real_enabled = str(
+        __import__("os").environ.get("LUMINA_ENABLE_LIVE_REAL", "")
+    ).strip().lower() in {"1", "true", "yes", "on"}
     refresh_completed = str(refresh.get("status") or "").strip().lower() == "completed"
     decision_allowed, decision_keep, decision_reference = _decision_allows_live_start(decision)
     decision_runtime_compatible = _decision_runtime_compatible(
@@ -316,7 +346,9 @@ def _live_readiness_summary(
         "testnet": testnet,
         "require_real_enable_flag": require_real_enable_flag,
         "env_real_enabled": env_real_enabled,
-        "startup_reconciliation_hard_fail": bool(live.get("startup_reconciliation_hard_fail", False)),
+        "startup_reconciliation_hard_fail": bool(
+            live.get("startup_reconciliation_hard_fail", False)
+        ),
         "refresh_artifact_exists": refresh_exists,
         "refresh_status": refresh.get("status"),
         "refresh_cutoff_utc": refresh.get("collection_cutoff_utc"),
@@ -376,18 +408,33 @@ def build_report(
         refresh_path=refresh_path,
         decision_path=decision_path,
     )
-    hybrid_split_metrics = dict(dict((dict(hybrid_payload.get("scenarios") or {}).get("refreshed_latest_tail") or {}).get("split_metrics") or {}).get("oos") or {})
+    hybrid_split_metrics = dict(
+        dict(
+            (dict(hybrid_payload.get("scenarios") or {}).get("refreshed_latest_tail") or {}).get(
+                "split_metrics"
+            )
+            or {}
+        ).get("oos")
+        or {}
+    )
     current_replay = dict(replay_payload.get("current_profile_result") or {})
     strict_replay = dict(replay_payload.get("strict_current_profile_result") or {})
 
     structure_ready = bool(
-        allocation_summary.get("max_pair_weight", 0.0) <= _safe_float(dict(hybrid_payload.get("config") or {}).get("pair_weight_cap"), 1.0) + 1e-12
+        allocation_summary.get("max_pair_weight", 0.0)
+        <= _safe_float(dict(hybrid_payload.get("config") or {}).get("pair_weight_cap"), 1.0) + 1e-12
         and allocation_summary.get("avg_daily_turnover_proxy", 0.0) <= 0.15
         and _safe_float(hybrid_split_metrics.get("total_return"), 0.0) > 0.0
         and _safe_float(hybrid_split_metrics.get("sharpe"), 0.0) > 0.0
     )
-    operationally_blocked = not bool(live_readiness.get("paper_ready_now")) or not bool(live_readiness.get("real_ready_now"))
-    verdict = "research_ready_but_not_real_ready" if structure_ready and operationally_blocked else "not_ready_for_live_capital"
+    operationally_blocked = not bool(live_readiness.get("paper_ready_now")) or not bool(
+        live_readiness.get("real_ready_now")
+    )
+    verdict = (
+        "research_ready_but_not_real_ready"
+        if structure_ready and operationally_blocked
+        else "not_ready_for_live_capital"
+    )
     if structure_ready and bool(live_readiness.get("real_ready_now")):
         verdict = "operationally_ready_for_real_mode"
 
@@ -396,7 +443,8 @@ def build_report(
         "generated_at": _utc_now_iso(),
         "current_switch": {
             "mode": dict(switch_payload.get("recommended_mode") or {}).get("mode"),
-            "allocation": dict(switch_payload.get("recommended_mode") or {}).get("allocation") or {},
+            "allocation": dict(switch_payload.get("recommended_mode") or {}).get("allocation")
+            or {},
             "market_state": dict(switch_payload.get("current_market_state") or {}),
         },
         "switch_replay": {
@@ -416,7 +464,9 @@ def build_report(
         "hybrid_oos": {
             "split_metrics": hybrid_split_metrics,
             "allocation_summary": allocation_summary,
-            "pair_weight_cap_config": _safe_float(dict(hybrid_payload.get("config") or {}).get("pair_weight_cap"), 0.0),
+            "pair_weight_cap_config": _safe_float(
+                dict(hybrid_payload.get("config") or {}).get("pair_weight_cap"), 0.0
+            ),
             "cash_buffer_observed_max": allocation_summary.get("max_cash_weight"),
             "cost_stress": cost_stress,
         },

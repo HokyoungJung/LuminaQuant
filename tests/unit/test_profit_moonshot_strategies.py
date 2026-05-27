@@ -251,16 +251,12 @@ def test_panic_rebound_requires_later_confirmation_before_long_entry() -> None:
 
     shock_time = start + timedelta(minutes=len(closes))
     bars.set_bar("BTC/USDT", shock_time, 94.0, volume=500.0)
-    strategy.calculate_signals(
-        MarketEvent(shock_time, "BTC/USDT", 94.0, 94.2, 93.8, 94.0, 500.0)
-    )
+    strategy.calculate_signals(MarketEvent(shock_time, "BTC/USDT", 94.0, 94.2, 93.8, 94.0, 500.0))
     assert _drain(events) == []
 
     confirm_time = shock_time + timedelta(minutes=1)
     bars.set_bar("BTC/USDT", confirm_time, 96.0, volume=160.0)
-    strategy.calculate_signals(
-        MarketEvent(confirm_time, "BTC/USDT", 96.0, 96.2, 95.8, 96.0, 160.0)
-    )
+    strategy.calculate_signals(MarketEvent(confirm_time, "BTC/USDT", 96.0, 96.2, 95.8, 96.0, 160.0))
     signals = _drain(events)
 
     assert [signal.signal_type for signal in signals] == ["LONG"]
@@ -269,9 +265,7 @@ def test_panic_rebound_requires_later_confirmation_before_long_entry() -> None:
 
     exit_time = confirm_time + timedelta(minutes=1)
     bars.set_bar("BTC/USDT", exit_time, 100.0, volume=120.0)
-    strategy.calculate_signals(
-        MarketEvent(exit_time, "BTC/USDT", 100.0, 100.2, 99.8, 100.0, 120.0)
-    )
+    strategy.calculate_signals(MarketEvent(exit_time, "BTC/USDT", 100.0, 100.2, 99.8, 100.0, 120.0))
     exit_signals = _drain(events)
 
     assert [signal.signal_type for signal in exit_signals] == ["EXIT"]

@@ -196,7 +196,8 @@ class RareEventScoreStrategy(Strategy):
         self._history_bars = max(base_history, min_required)
 
         self._state = {
-            symbol: _SymbolState(closes=deque(maxlen=self._history_bars)) for symbol in self.symbol_list
+            symbol: _SymbolState(closes=deque(maxlen=self._history_bars))
+            for symbol in self.symbol_list
         }
 
     def get_state(self):
@@ -325,7 +326,10 @@ class RareEventScoreStrategy(Strategy):
                     symbol,
                     event_time,
                     "EXIT",
-                    metadata={**metadata, "reason": "short_stop" if stop_hit else "short_normalize"},
+                    metadata={
+                        **metadata,
+                        "reason": "short_stop" if stop_hit else "short_normalize",
+                    },
                 )
                 item.mode = "OUT"
                 item.entry_price = None

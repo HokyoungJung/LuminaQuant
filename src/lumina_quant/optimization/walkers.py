@@ -12,11 +12,7 @@ def add_months(dt: datetime, months: int) -> datetime:
     year = dt.year + (dt.month - 1 + months) // 12
     month = (dt.month - 1 + months) % 12 + 1
     is_leap_year = year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
-    max_day = (
-        29
-        if month == 2 and is_leap_year
-        else MONTH_MAX_DAYS_COMMON_YEAR[month - 1]
-    )
+    max_day = 29 if month == 2 and is_leap_year else MONTH_MAX_DAYS_COMMON_YEAR[month - 1]
     day = min(dt.day, max_day)
     return datetime(year, month, day)
 

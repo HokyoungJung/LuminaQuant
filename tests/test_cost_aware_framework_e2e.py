@@ -52,7 +52,12 @@ def test_cost_aware_framework_e2e(tmp_path: Path):
     assert "post_cost_timeframe_ranking" in summary
     assert "best_timeframe" in summary
     assert "ranking_objective" in summary
-    assert summary["ranking_objective"]["name"] in {"composite", "sharpe", "total_return", "drawdown"}
+    assert summary["ranking_objective"]["name"] in {
+        "composite",
+        "sharpe",
+        "total_return",
+        "drawdown",
+    }
     for strategy_name, rows in summary["post_cost_timeframe_ranking"].items():
         _ = strategy_name
         assert rows

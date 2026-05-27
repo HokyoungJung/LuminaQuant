@@ -91,11 +91,15 @@ def _write_slice(
     for row in details:
         strategy_class = str(row["strategy_class"])
         current = by_strategy.get(strategy_class)
-        if current is None or float((row["val"] or {}).get("sharpe", 0.0)) > float((current["val"] or {}).get("sharpe", 0.0)):
+        if current is None or float((row["val"] or {}).get("sharpe", 0.0)) > float(
+            (current["val"] or {}).get("sharpe", 0.0)
+        ):
             by_strategy[strategy_class] = row
     for row in by_strategy.values():
         copied = json.loads(json.dumps(row))
-        copied["promoted"] = str(copied.get("strategy_class")) in set(promoted_strategy_classes or set())
+        copied["promoted"] = str(copied.get("strategy_class")) in set(
+            promoted_strategy_classes or set()
+        )
         copied["validation_hurdle_pass"] = True
         best_per_strategy.append(copied)
     summary = {
@@ -115,8 +119,12 @@ def _write_slice(
             "2026-03": {"btc_buy_hold_return": 0.04, "threshold": 0.04},
         },
     }
-    (out_dir / "exact_window_suite_summary_latest.json").write_text(json.dumps(summary), encoding="utf-8")
-    (out_dir / "exact_window_candidate_details_latest.json").write_text(json.dumps(details), encoding="utf-8")
+    (out_dir / "exact_window_suite_summary_latest.json").write_text(
+        json.dumps(summary), encoding="utf-8"
+    )
+    (out_dir / "exact_window_candidate_details_latest.json").write_text(
+        json.dumps(details), encoding="utf-8"
+    )
     (out_dir / "exact_window_fail_analysis_latest.json").write_text(
         json.dumps({"counts_by_rejection_reason": []}),
         encoding="utf-8",
@@ -268,7 +276,9 @@ def test_write_exact_window_decision_bundle_consolidates_latest_timeframe_slices
     assert payload["timeframes"] == ["1m", "5m", "1h", "4h", "1d"]
     assert payload["common_actual_max_timestamp"] == "2026-03-07T10:00:00+00:00"
     assert payload["max_peak_rss_mib"] == 512.0
-    reject_counts = {row["rejection_reason"]: row["count"] for row in payload["reject_counts_all_rows"]}
+    reject_counts = {
+        row["rejection_reason"]: row["count"] for row in payload["reject_counts_all_rows"]
+    }
     assert reject_counts["oos_sharpe"] == 4
     assert reject_counts["trade_count"] == 2
     assert reject_counts["pbo"] == 1
@@ -276,7 +286,9 @@ def test_write_exact_window_decision_bundle_consolidates_latest_timeframe_slices
 
     timeframe_rows = {row["timeframe"]: row for row in payload["timeframe_rows"]}
     assert timeframe_rows["5m"]["best_row"]["candidate_id"] == "5m-best"
-    assert timeframe_rows["5m"]["summary_path"] == str((new_5m_dir / "exact_window_suite_summary_latest.json").resolve())
+    assert timeframe_rows["5m"]["summary_path"] == str(
+        (new_5m_dir / "exact_window_suite_summary_latest.json").resolve()
+    )
     assert timeframe_rows["1m"]["best_row"].get("committee") is not None
     assert timeframe_rows["1m"]["monthly_hurdle_outcomes"]["validation"]
     assert timeframe_rows["1m"]["monthly_hurdle_outcomes"]["validation_btc_pass"] is True
@@ -294,7 +306,9 @@ def test_write_exact_window_decision_bundle_consolidates_latest_timeframe_slices
     assert latest_payload["total_evaluated"] == 7
 
 
-def test_write_exact_window_decision_bundle_tracks_recent_three_month_two_pct_candidates(tmp_path: Path):
+def test_write_exact_window_decision_bundle_tracks_recent_three_month_two_pct_candidates(
+    tmp_path: Path,
+):
     _write_slice(
         tmp_path,
         "timeframe_1h",

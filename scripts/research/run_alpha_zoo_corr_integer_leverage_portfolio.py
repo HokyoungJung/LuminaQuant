@@ -46,14 +46,12 @@ from scripts.research.run_alpha_zoo_htf_momentum_crowding_discovery import (  # 
 from scripts.research import run_alpha_zoo_pnl_correlation_decision as corr  # noqa: E402
 
 DEFAULT_CORRELATION_ARTIFACT = (
-    REPO_ROOT
-    / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/"
+    REPO_ROOT / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/"
     "alpha_zoo_pnl_correlation_decision_20260524/alpha_zoo_pnl_correlation_decision_latest.json"
 )
 DEFAULT_MONITORING_ARTIFACT = corr.DEFAULT_MONITORING_ARTIFACT
 DEFAULT_OUTPUT_DIR = (
-    REPO_ROOT
-    / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/"
+    REPO_ROOT / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/"
     "alpha_zoo_corr_integer_leverage_portfolio_20260524"
 )
 
@@ -197,7 +195,9 @@ def _timestamp() -> str:
 
 def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(_json_safe(payload), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(_json_safe(payload), indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
 
 def _csv_value(value: Any) -> Any:
@@ -213,7 +213,9 @@ def _csv_value(value: Any) -> Any:
 def _write_csv(path: Path, rows: Sequence[Mapping[str, Any]], fields: Sequence[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(fields), extrasaction="ignore", lineterminator="\n")
+        writer = csv.DictWriter(
+            handle, fieldnames=list(fields), extrasaction="ignore", lineterminator="\n"
+        )
         writer.writeheader()
         for row in rows:
             writer.writerow({field: _csv_value(row.get(field)) for field in fields})
@@ -254,9 +256,14 @@ def _selected_rows_from_corr_payload(payload: Mapping[str, Any]) -> list[dict[st
     return sorted(rows, key=lambda row: _safe_int(row.get("selection_rank"), 10**9))
 
 
-def _assert_governance(correlation_payload: Mapping[str, Any], monitoring_payload: Mapping[str, Any]) -> None:
+def _assert_governance(
+    correlation_payload: Mapping[str, Any], monitoring_payload: Mapping[str, Any]
+) -> None:
     for name, payload in (("correlation", correlation_payload), ("monitoring", monitoring_payload)):
-        if payload.get("ready_for_real") is not False or payload.get("real_money_execution") is not False:
+        if (
+            payload.get("ready_for_real") is not False
+            or payload.get("real_money_execution") is not False
+        ):
             raise ValueError(f"{name} artifact violates real-money disabled guard")
     policy = dict(correlation_payload.get("selection_policy") or {})
     forbidden = [
@@ -268,7 +275,9 @@ def _assert_governance(correlation_payload: Mapping[str, Any], monitoring_payloa
     ]
     for key in forbidden:
         if policy.get(key) is not False:
-            raise ValueError(f"correlation artifact has unsafe locked-OOS policy: {key}={policy.get(key)!r}")
+            raise ValueError(
+                f"correlation artifact has unsafe locked-OOS policy: {key}={policy.get(key)!r}"
+            )
 
 
 def _align_bars_to_capture(capture: corr.CapturedPnl, bars: pd.DataFrame) -> pd.DataFrame:
@@ -278,7 +287,9 @@ def _align_bars_to_capture(capture: corr.CapturedPnl, bars: pd.DataFrame) -> pd.
     aligned = indexed.reindex(pd.DatetimeIndex(capture.datetimes))
     if aligned[["close", "high", "low"]].isna().any().any():
         missing = aligned[aligned["close"].isna()].index[:5]
-        raise ValueError(f"bars missing for captured timestamps in {capture.model_id}: {list(missing)}")
+        raise ValueError(
+            f"bars missing for captured timestamps in {capture.model_id}: {list(missing)}"
+        )
     return aligned.reset_index(names="datetime")
 
 
@@ -291,8 +302,12 @@ def _load_bars_for_rows(
     from scripts.research import run_alpha_zoo_debounced_efficiency_repair_discovery as repair
 
     out: dict[tuple[str, str, str], pd.DataFrame] = {}
-    repair_rows = [row for row in rows if row.get("source_artifact_kind") == corr.SOURCE_KIND_DEBOUNCED_REPAIR]
-    other_rows = [row for row in rows if row.get("source_artifact_kind") != corr.SOURCE_KIND_DEBOUNCED_REPAIR]
+    repair_rows = [
+        row for row in rows if row.get("source_artifact_kind") == corr.SOURCE_KIND_DEBOUNCED_REPAIR
+    ]
+    other_rows = [
+        row for row in rows if row.get("source_artifact_kind") != corr.SOURCE_KIND_DEBOUNCED_REPAIR
+    ]
     if repair_rows:
         symbols = tuple(sorted({str(row["symbol"]).upper() for row in repair_rows}))
         timeframes = tuple(sorted({str(row["timeframe"]).lower() for row in repair_rows}))
@@ -307,7 +322,9 @@ def _load_bars_for_rows(
         timeframes = feedback._validate_timeframes(
             tuple(sorted({str(row["timeframe"]).lower() for row in other_rows}))
         )
-        bars_by_key = feedback.load_requested_bars(symbols, timeframes=timeframes, data_root=data_root)
+        bars_by_key = feedback.load_requested_bars(
+            symbols, timeframes=timeframes, data_root=data_root
+        )
         for row in other_rows:
             source_kind = str(row["source_artifact_kind"])
             symbol = str(row["symbol"]).upper()
@@ -349,7 +366,9 @@ def build_candidate_replays(
     return replays
 
 
-def simulate_candidate_with_integer_leverage(replay: CandidateReplay, *, integer_leverage: int) -> CandidateSim:
+def simulate_candidate_with_integer_leverage(
+    replay: CandidateReplay, *, integer_leverage: int
+) -> CandidateSim:
     if int(integer_leverage) != integer_leverage or integer_leverage < 1:
         raise ValueError("integer_leverage must be a positive integer")
     signal = replay.signal.astype(float)
@@ -361,8 +380,12 @@ def simulate_candidate_with_integer_leverage(replay: CandidateReplay, *, integer
     transition = np.abs(np.diff(np.r_[0.0, signal]))
     costs = (PRIMARY_ROUND_TRIP_COST_BPS / 10_000.0) * notional * transition / 2.0
     returns = signal * notional * next_return - costs
-    long_liq = (signal > 0.0) & (((low / np.maximum(close, 1e-12)) - 1.0) * float(integer_leverage) <= -0.95)
-    short_liq = (signal < 0.0) & (((high / np.maximum(close, 1e-12)) - 1.0) * float(integer_leverage) >= 0.95)
+    long_liq = (signal > 0.0) & (
+        ((low / np.maximum(close, 1e-12)) - 1.0) * float(integer_leverage) <= -0.95
+    )
+    short_liq = (signal < 0.0) & (
+        ((high / np.maximum(close, 1e-12)) - 1.0) * float(integer_leverage) >= 0.95
+    )
     liquidation = long_liq | short_liq
     equity = np.cumprod(1.0 + returns)
     return CandidateSim(
@@ -394,7 +417,9 @@ def _trade_count_for_split(sim: CandidateSim, split: str) -> int:
 
 
 def _turnover_proxy_for_split(sims: Sequence[CandidateSim], split: str) -> float:
-    return float(sum(_trade_count_for_split(sim, split) * abs(sim.notional_fraction) for sim in sims))
+    return float(
+        sum(_trade_count_for_split(sim, split) * abs(sim.notional_fraction) for sim in sims)
+    )
 
 
 def _candidate_liquidation_count_for_split(sims: Sequence[CandidateSim], split: str) -> int:
@@ -406,7 +431,9 @@ def _candidate_liquidation_count_for_split(sims: Sequence[CandidateSim], split: 
 
 
 def _portfolio_frame(sims: Sequence[CandidateSim]) -> pd.DataFrame:
-    series = [pd.Series(sim.returns, index=sim.datetimes, name=sim.model_id, dtype=float) for sim in sims]
+    series = [
+        pd.Series(sim.returns, index=sim.datetimes, name=sim.model_id, dtype=float) for sim in sims
+    ]
     if not series:
         return pd.DataFrame()
     return pd.concat(series, axis=1).sort_index().fillna(0.0)
@@ -436,14 +463,18 @@ def evaluate_integer_leverage_map(
         returns_array = split_returns.to_numpy(dtype=float)
         turnover = _turnover_proxy_for_split(sims, split)
         total_return = _period_return(returns_array)
-        equity = np.cumprod(1.0 + returns_array) if returns_array.size else np.asarray([], dtype=float)
+        equity = (
+            np.cumprod(1.0 + returns_array) if returns_array.size else np.asarray([], dtype=float)
+        )
         split_metrics[split] = {
             "total_return": total_return,
             "max_drawdown": max_drawdown(returns_array),
             "bar_count": int(returns_array.size),
             "trade_event_count": int(sum(_trade_count_for_split(sim, split) for sim in sims)),
             "turnover_proxy": turnover,
-            "return_per_turnover_proxy_bps": total_return * 10_000.0 / turnover if turnover > 0.0 else None,
+            "return_per_turnover_proxy_bps": total_return * 10_000.0 / turnover
+            if turnover > 0.0
+            else None,
             "liquidation_count": _candidate_liquidation_count_for_split(sims, split),
             "account_wipeout_count": int(np.count_nonzero(equity <= 0.0)) if equity.size else 0,
         }
@@ -462,7 +493,9 @@ def evaluate_integer_leverage_map(
             "recorded": True,
             "sizing_mode": "asset_integer_leverage_times_candidate_allocation_fraction",
             "account_equity_reference": ACCOUNT_EQUITY_REFERENCE,
-            "asset_integer_leverage": {asset: int(leverage_by_asset[asset]) for asset in active_assets},
+            "asset_integer_leverage": {
+                asset: int(leverage_by_asset[asset]) for asset in active_assets
+            },
             "candidate_notional_formula": "account_equity * candidate_allocation_fraction * asset_integer_leverage",
             "parity": True,
         },
@@ -475,7 +508,9 @@ def _build_fast_replay_cache(
     leverage_min: int,
     leverage_max: int,
 ) -> FastReplayCache:
-    union_index = pd.DatetimeIndex(sorted(set().union(*(set(replay.datetimes) for replay in replays))))
+    union_index = pd.DatetimeIndex(
+        sorted(set().union(*(set(replay.datetimes) for replay in replays)))
+    )
     split_masks = {split: _split_mask(union_index, split) for split in SPLIT_ORDER}
     aligned_returns: dict[tuple[int, int], np.ndarray] = {}
     notional_fraction: dict[tuple[int, int], float] = {}
@@ -498,7 +533,9 @@ def _build_fast_replay_cache(
             notional_fraction[(replay_index, leverage)] = sim.notional_fraction
             for split in SPLIT_ORDER:
                 mask = _split_mask(sim.datetimes, split)
-                liquidation_count[(replay_index, leverage, split)] = int(np.count_nonzero(sim.liquidation_flags[mask]))
+                liquidation_count[(replay_index, leverage, split)] = int(
+                    np.count_nonzero(sim.liquidation_flags[mask])
+                )
     return FastReplayCache(
         replays=tuple(replays),
         union_index=union_index,
@@ -534,20 +571,32 @@ def _evaluate_fast_integer_leverage_map(
     for split in SPLIT_ORDER:
         split_returns = portfolio_returns[cache.split_masks[split]]
         turnover = float(
-            sum(cache.trade_count[(replay_index, split)] * abs(cache.notional_fraction[(replay_index, leverage)])
-                for replay_index, leverage in selected_keys)
+            sum(
+                cache.trade_count[(replay_index, split)]
+                * abs(cache.notional_fraction[(replay_index, leverage)])
+                for replay_index, leverage in selected_keys
+            )
         )
         total_return = _period_return(split_returns)
-        equity = np.cumprod(1.0 + split_returns) if split_returns.size else np.asarray([], dtype=float)
+        equity = (
+            np.cumprod(1.0 + split_returns) if split_returns.size else np.asarray([], dtype=float)
+        )
         split_metrics[split] = {
             "total_return": total_return,
             "max_drawdown": max_drawdown(split_returns),
             "bar_count": int(split_returns.size),
-            "trade_event_count": int(sum(cache.trade_count[(replay_index, split)] for replay_index, _ in selected_keys)),
+            "trade_event_count": int(
+                sum(cache.trade_count[(replay_index, split)] for replay_index, _ in selected_keys)
+            ),
             "turnover_proxy": turnover,
-            "return_per_turnover_proxy_bps": total_return * 10_000.0 / turnover if turnover > 0.0 else None,
+            "return_per_turnover_proxy_bps": total_return * 10_000.0 / turnover
+            if turnover > 0.0
+            else None,
             "liquidation_count": int(
-                sum(cache.liquidation_count[(replay_index, leverage, split)] for replay_index, leverage in selected_keys)
+                sum(
+                    cache.liquidation_count[(replay_index, leverage, split)]
+                    for replay_index, leverage in selected_keys
+                )
             ),
             "account_wipeout_count": int(np.count_nonzero(equity <= 0.0)) if equity.size else 0,
         }
@@ -566,7 +615,9 @@ def _evaluate_fast_integer_leverage_map(
             "recorded": True,
             "sizing_mode": "asset_integer_leverage_times_candidate_allocation_fraction",
             "account_equity_reference": ACCOUNT_EQUITY_REFERENCE,
-            "asset_integer_leverage": {asset: int(leverage_by_asset[asset]) for asset in active_assets},
+            "asset_integer_leverage": {
+                asset: int(leverage_by_asset[asset]) for asset in active_assets
+            },
             "candidate_notional_formula": "account_equity * candidate_allocation_fraction * asset_integer_leverage",
             "parity": True,
         },
@@ -595,7 +646,9 @@ def _train_validation_score(evaluation: Mapping[str, Any]) -> float:
     )
 
 
-def _train_validation_rejection_reasons(evaluation: Mapping[str, Any], profile: Mapping[str, Any]) -> list[str]:
+def _train_validation_rejection_reasons(
+    evaluation: Mapping[str, Any], profile: Mapping[str, Any]
+) -> list[str]:
     reasons: list[str] = []
     splits = evaluation["split_metrics"]
     train = _safe_float(splits["train"].get("total_return"))
@@ -603,7 +656,9 @@ def _train_validation_rejection_reasons(evaluation: Mapping[str, Any], profile: 
     if train <= 0.0:
         reasons.append("train_return_not_positive")
     if validation < _safe_float(profile.get("min_validation_return")):
-        reasons.append(f"validation_return_{validation:.4f}_below_{_safe_float(profile.get('min_validation_return')):.4f}")
+        reasons.append(
+            f"validation_return_{validation:.4f}_below_{_safe_float(profile.get('min_validation_return')):.4f}"
+        )
     if train < validation:
         reasons.append(f"train_return_{train:.4f}_below_validation_return_{validation:.4f}")
     if _safe_int(splits["train"].get("trade_event_count")) < MIN_TRAIN_TRADE_EVENTS:
@@ -615,7 +670,9 @@ def _train_validation_rejection_reasons(evaluation: Mapping[str, Any], profile: 
             "validation_trade_event_count_"
             f"{_safe_int(splits['validation'].get('trade_event_count'))}_below_{MIN_VALIDATION_TRADE_EVENTS}"
         )
-    if _safe_float(splits["validation"].get("max_drawdown")) > _safe_float(profile.get("max_validation_mdd")):
+    if _safe_float(splits["validation"].get("max_drawdown")) > _safe_float(
+        profile.get("max_validation_mdd")
+    ):
         reasons.append(
             f"validation_mdd_{_safe_float(splits['validation'].get('max_drawdown')):.4f}_above_{_safe_float(profile.get('max_validation_mdd')):.4f}"
         )
@@ -623,7 +680,9 @@ def _train_validation_rejection_reasons(evaluation: Mapping[str, Any], profile: 
         reasons.append(
             f"train_mdd_{_safe_float(splits['train'].get('max_drawdown')):.4f}_above_{_safe_float(profile.get('max_train_mdd')):.4f}"
         )
-    if _safe_float(evaluation.get("gross_notional_fraction")) > _safe_float(profile.get("max_gross_notional")):
+    if _safe_float(evaluation.get("gross_notional_fraction")) > _safe_float(
+        profile.get("max_gross_notional")
+    ):
         reasons.append(
             f"gross_notional_{_safe_float(evaluation.get('gross_notional_fraction')):.4f}_above_{_safe_float(profile.get('max_gross_notional')):.4f}"
         )
@@ -660,11 +719,15 @@ def _oos_gate_reasons(evaluation: Mapping[str, Any]) -> list[str]:
     rpt = locked.get("return_per_turnover_proxy_bps")
     if rpt is None or _safe_float(rpt) <= RETURN_PER_TURNOVER_THRESHOLD_BPS:
         rendered = "missing" if rpt is None else f"{_safe_float(rpt):.3f}"
-        reasons.append(f"locked_oos_return_per_turnover_proxy_bps_{rendered}_not_above_10bps_report_only")
+        reasons.append(
+            f"locked_oos_return_per_turnover_proxy_bps_{rendered}_not_above_10bps_report_only"
+        )
     return reasons
 
 
-def _flatten_profile_result(profile_id: str, evaluation: Mapping[str, Any], *, rank: int = 1) -> dict[str, Any]:
+def _flatten_profile_result(
+    profile_id: str, evaluation: Mapping[str, Any], *, rank: int = 1
+) -> dict[str, Any]:
     splits = evaluation["split_metrics"]
     train_reasons = list(evaluation.get("train_validation_rejection_reasons") or [])
     oos_reasons = list(evaluation.get("locked_oos_report_only_gate_reasons") or [])
@@ -700,14 +763,20 @@ def _flatten_profile_result(profile_id: str, evaluation: Mapping[str, Any], *, r
         "validation_trade_event_count": splits["validation"]["trade_event_count"],
         "locked_oos_trade_event_count_report_only": splits["locked_oos"]["trade_event_count"],
         "train_return_per_turnover_proxy_bps": splits["train"]["return_per_turnover_proxy_bps"],
-        "validation_return_per_turnover_proxy_bps": splits["validation"]["return_per_turnover_proxy_bps"],
-        "locked_oos_return_per_turnover_proxy_bps_report_only": splits["locked_oos"]["return_per_turnover_proxy_bps"],
+        "validation_return_per_turnover_proxy_bps": splits["validation"][
+            "return_per_turnover_proxy_bps"
+        ],
+        "locked_oos_return_per_turnover_proxy_bps_report_only": splits["locked_oos"][
+            "return_per_turnover_proxy_bps"
+        ],
         "train_liquidation_count": splits["train"]["liquidation_count"],
         "validation_liquidation_count": splits["validation"]["liquidation_count"],
         "locked_oos_liquidation_count_report_only": splits["locked_oos"]["liquidation_count"],
         "train_account_wipeout_count": splits["train"]["account_wipeout_count"],
         "validation_account_wipeout_count": splits["validation"]["account_wipeout_count"],
-        "locked_oos_account_wipeout_count_report_only": splits["locked_oos"]["account_wipeout_count"],
+        "locked_oos_account_wipeout_count_report_only": splits["locked_oos"][
+            "account_wipeout_count"
+        ],
         "train_validation_score": evaluation.get("train_validation_score"),
         "candidate_tier": candidate_tier,
         "strict_promotion_profile": strict_promotion_profile,
@@ -750,7 +819,9 @@ def search_integer_asset_leverage_profiles(
         leverage_map = dict(zip(assets, values, strict=True))
         ranked_replays: list[tuple[float, int]] = []
         for replay_index in range(len(replays)):
-            single_evaluation = _evaluate_fast_integer_leverage_map(cache, [replay_index], leverage_map)
+            single_evaluation = _evaluate_fast_integer_leverage_map(
+                cache, [replay_index], leverage_map
+            )
             ranked_replays.append((_train_validation_score(single_evaluation), replay_index))
         ranked_replays.sort(key=lambda item: item[0], reverse=True)
         for profile_id in PROFILE_SPECS:
@@ -761,7 +832,9 @@ def search_integer_asset_leverage_profiles(
                 trial = _evaluate_fast_integer_leverage_map(cache, trial_subset, leverage_map)
                 enriched = _enrich_profile_evaluation(profile_id, trial)
                 current_shadow = profile_best_shadow.get(profile_id)
-                if current_shadow is None or _safe_float(enriched.get("train_validation_score"), -1e9) > _safe_float(
+                if current_shadow is None or _safe_float(
+                    enriched.get("train_validation_score"), -1e9
+                ) > _safe_float(
                     current_shadow.get("train_validation_score"),
                     -1e9,
                 ):
@@ -777,7 +850,9 @@ def search_integer_asset_leverage_profiles(
             if selected_enriched is None:
                 continue
             current = profile_best.get(profile_id)
-            if current is None or _safe_float(selected_enriched.get("train_validation_score"), -1e9) > _safe_float(
+            if current is None or _safe_float(
+                selected_enriched.get("train_validation_score"), -1e9
+            ) > _safe_float(
                 current.get("train_validation_score"),
                 -1e9,
             ):
@@ -839,7 +914,9 @@ def _render_markdown(payload: Mapping[str, Any]) -> str:
         relaxed = payload.get("paper_testnet_relaxed_candidate_profiles") or []
         if relaxed:
             lines.append("")
-            lines.append("Also keep relaxed paper/testnet candidates under separate MDD/risk labels:")
+            lines.append(
+                "Also keep relaxed paper/testnet candidates under separate MDD/risk labels:"
+            )
             for row in relaxed:
                 lines.append(
                     f"- `{row['profile_id']}` leverage `{json.dumps(row['leverage_map'], sort_keys=True)}`: "
@@ -858,7 +935,9 @@ def _render_markdown(payload: Mapping[str, Any]) -> str:
                 f"{_safe_float(shadow['locked_oos_return_report_only']):.4%}."
             )
         else:
-            lines.append("No profile passed the train/validation and report-only gates; keep as shadow.")
+            lines.append(
+                "No profile passed the train/validation and report-only gates; keep as shadow."
+            )
     lines.extend(
         [
             "",
@@ -921,7 +1000,8 @@ def _strategy_integrity_review(
         )
     cost_pass = (
         PRIMARY_ROUND_TRIP_COST_BPS == 10.0
-        and RETURN_PER_TURNOVER_THRESHOLD_BPS == AVG_BBO_SPREAD_BPS_ASSUMPTION * BBO_SPREAD_MULTIPLIER
+        and RETURN_PER_TURNOVER_THRESHOLD_BPS
+        == AVG_BBO_SPREAD_BPS_ASSUMPTION * BBO_SPREAD_MULTIPLIER
         and RETURN_PER_TURNOVER_THRESHOLD_BPS == 10.0
     )
     status = "pass" if not calendar_hits and cost_pass else "fail"
@@ -1018,17 +1098,24 @@ def build_payload_from_inputs(
     bars_by_key = _load_bars_for_rows(selected_rows, data_root=data_root)
     replays = build_candidate_replays(selected_rows, captures, bars_by_key=bars_by_key)
     profile_results = search_integer_asset_leverage_profiles(replays)
-    profile_rows = [_flatten_profile_result(profile_id, result) for profile_id, result in profile_results.items()]
+    profile_rows = [
+        _flatten_profile_result(profile_id, result)
+        for profile_id, result in profile_results.items()
+    ]
     passing_rows = [row for row in profile_rows if row["promotion_gate_pass"]]
     paper_candidate_rows = [row for row in profile_rows if row.get("paper_testnet_candidate")]
     relaxed_candidate_rows = [row for row in paper_candidate_rows if not row["promotion_gate_pass"]]
-    selected_profile = max(passing_rows, key=lambda row: _safe_float(row.get("validation_return")), default=None)
+    selected_profile = max(
+        passing_rows, key=lambda row: _safe_float(row.get("validation_return")), default=None
+    )
     selected_relaxed_profile = max(
         relaxed_candidate_rows,
         key=lambda row: _safe_float(row.get("validation_return")),
         default=None,
     )
-    integrity_review = _strategy_integrity_review(selected_rows=selected_rows, profile_rows=profile_rows)
+    integrity_review = _strategy_integrity_review(
+        selected_rows=selected_rows, profile_rows=profile_rows
+    )
 
     timestamp = _timestamp()
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -1116,7 +1203,8 @@ def build_payload_from_inputs(
             "paper_testnet_relaxed_candidate_profiles": relaxed_candidate_rows,
             "selected_relaxed_profile": selected_relaxed_profile,
             "selected_shadow_profile": selected_relaxed_profile,
-            "shadow_monitoring_review_only": selected_profile is None and selected_relaxed_profile is not None,
+            "shadow_monitoring_review_only": selected_profile is None
+            and selected_relaxed_profile is not None,
             "strategy_integrity_review": integrity_review,
             "monitoring_contract": {
                 "paper_testnet_only": True,
@@ -1131,7 +1219,9 @@ def build_payload_from_inputs(
         selected_md.write_text(_render_markdown(payload), encoding="utf-8")
         preflight = {
             "preflight_kind": "paper_testnet_integer_asset_leverage_preflight",
-            "status": "paper_testnet_allowed_real_money_blocked" if paper_candidate_rows else "no_paper_profile",
+            "status": "paper_testnet_allowed_real_money_blocked"
+            if paper_candidate_rows
+            else "no_paper_profile",
             "ready_for_paper": bool(paper_candidate_rows),
             "ready_for_real": False,
             "real_money_execution": False,

@@ -48,7 +48,11 @@ pub extern "C" fn evaluate_metrics(
         return 0;
     }
 
-    let periods = if annual_periods <= 0 { 252 } else { annual_periods } as f64;
+    let periods = if annual_periods <= 0 {
+        252
+    } else {
+        annual_periods
+    } as f64;
 
     let mut mean_r = 0.0;
     for pair in bars.windows(2) {

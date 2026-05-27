@@ -8,8 +8,12 @@ import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-RUNNER_PATH = ROOT / "scripts" / "research" / "run_alpha_zoo_top_seed_hybrid_v35_v36_cost_validation.py"
-SPEC = importlib.util.spec_from_file_location("run_alpha_zoo_top_seed_hybrid_cost_validation", RUNNER_PATH)
+RUNNER_PATH = (
+    ROOT / "scripts" / "research" / "run_alpha_zoo_top_seed_hybrid_v35_v36_cost_validation.py"
+)
+SPEC = importlib.util.spec_from_file_location(
+    "run_alpha_zoo_top_seed_hybrid_cost_validation", RUNNER_PATH
+)
 MODULE = importlib.util.module_from_spec(SPEC)
 assert SPEC and SPEC.loader
 SPEC.loader.exec_module(MODULE)
@@ -133,8 +137,10 @@ class _FakeAlpha:
         allocation_fraction: float,
         round_trip_slippage_bps: float = 0.0,
     ) -> float:
-        return float(allocation_fraction) * float(leverage) * (
-            float(trade["gross_return"]) - float(round_trip_slippage_bps) / 10000.0
+        return (
+            float(allocation_fraction)
+            * float(leverage)
+            * (float(trade["gross_return"]) - float(round_trip_slippage_bps) / 10000.0)
         )
 
 
@@ -185,8 +191,22 @@ def test_isolated_liquidation_caps_trade_loss_at_allocation() -> None:
 
 def test_metric_rows_include_required_cost_splits_and_gate_fields() -> None:
     split_metrics = {
-        "train": {"total_return": 0.1, "max_drawdown": 0.02, "sharpe": 1, "sortino": 2, "smart_sortino": 1.9, "calmar": 5},
-        "validation": {"total_return": 0.2, "max_drawdown": 0.03, "sharpe": 1, "sortino": 2, "smart_sortino": 1.9, "calmar": 6},
+        "train": {
+            "total_return": 0.1,
+            "max_drawdown": 0.02,
+            "sharpe": 1,
+            "sortino": 2,
+            "smart_sortino": 1.9,
+            "calmar": 5,
+        },
+        "validation": {
+            "total_return": 0.2,
+            "max_drawdown": 0.03,
+            "sharpe": 1,
+            "sortino": 2,
+            "smart_sortino": 1.9,
+            "calmar": 6,
+        },
         "locked_oos": {
             "total_return": 0.3,
             "max_drawdown": 0.04,
@@ -249,7 +269,10 @@ def test_hybrid_public_result_marks_locked_oos_report_only() -> None:
             "high_vol_weight_boost": 0.1,
             "cv_score": 1.0,
         },
-        "splits": {name: MODULE.hybrid._metrics_from_returns(returns[mask, 0]) for name, mask in split_masks.items()},
+        "splits": {
+            name: MODULE.hybrid._metrics_from_returns(returns[mask, 0])
+            for name, mask in split_masks.items()
+        },
         "train_val_score": 1.0,
         "train_val_gate": True,
         "allocations": [{"index": 5, "weights": [0.5, 0.5]}],
@@ -257,8 +280,18 @@ def test_hybrid_public_result_marks_locked_oos_report_only() -> None:
         "portfolio_returns": np.zeros(returns.shape[0]),
     }
     streams = [
-        {"label": "seed_a", "leverage": 2.0, "target_allocation": 0.10, "sleeve_gross_weight_sum": 1.0},
-        {"label": "seed_b", "leverage": 3.0, "target_allocation": 0.10, "sleeve_gross_weight_sum": 1.0},
+        {
+            "label": "seed_a",
+            "leverage": 2.0,
+            "target_allocation": 0.10,
+            "sleeve_gross_weight_sum": 1.0,
+        },
+        {
+            "label": "seed_b",
+            "leverage": 3.0,
+            "target_allocation": 0.10,
+            "sleeve_gross_weight_sum": 1.0,
+        },
     ]
 
     public = MODULE._public_hybrid_result(

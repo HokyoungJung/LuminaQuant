@@ -213,9 +213,7 @@ def _decision_strategy_params(payload: dict) -> dict[str, Any]:
 def _decision_runtime_overrides(payload: dict) -> dict[str, Any]:
     overrides: dict[str, Any] = {}
     symbols = _normalize_symbol_list(
-        payload.get("symbols")
-        or payload.get("trading_symbols")
-        or payload.get("selected_symbols")
+        payload.get("symbols") or payload.get("trading_symbols") or payload.get("selected_symbols")
     )
     if symbols:
         overrides["symbols"] = symbols
@@ -225,9 +223,7 @@ def _decision_runtime_overrides(payload: dict) -> dict[str, Any]:
         overrides["strategy_params"] = params
 
     strategy_timeframe = str(
-        payload.get("strategy_timeframe")
-        or payload.get("timeframe")
-        or ""
+        payload.get("strategy_timeframe") or payload.get("timeframe") or ""
     ).strip()
     if strategy_timeframe:
         overrides["strategy_timeframe"] = strategy_timeframe
@@ -236,9 +232,7 @@ def _decision_runtime_overrides(payload: dict) -> dict[str, Any]:
     live_exchange = _as_mapping(payload.get("live_exchange"))
     exchange_override = {**exchange, **live_exchange}
     leverage = _optional_int(
-        payload.get("leverage")
-        or payload.get("live_leverage")
-        or exchange_override.get("leverage")
+        payload.get("leverage") or payload.get("live_leverage") or exchange_override.get("leverage")
     )
     if leverage is not None:
         exchange_override["leverage"] = int(leverage)
@@ -364,7 +358,9 @@ def infer_strategy_class_name(candidate_name: str) -> str | None:
         return "ProfitMoonshotBreakoutStrategy"
     if token.startswith("profit_moonshot_reversion"):
         return "ProfitMoonshotReversionStrategy"
-    if token.startswith("compression_breakout") or token.startswith("profit_reboot_compression_breakout"):
+    if token.startswith("compression_breakout") or token.startswith(
+        "profit_reboot_compression_breakout"
+    ):
         return "CompressionBreakoutContinuationStrategy"
     if token.startswith("pair_"):
         return "PairTradingZScoreStrategy"
@@ -386,9 +382,7 @@ def extract_live_decision_config(payload: dict) -> dict:
         or ""
     ).strip()
     explicit_strategy_name = str(
-        payload.get("strategy_name")
-        or payload.get("strategy_class")
-        or ""
+        payload.get("strategy_name") or payload.get("strategy_class") or ""
     ).strip()
     strategy_name = explicit_strategy_name or infer_strategy_class_name(reference)
     overrides = _decision_runtime_overrides(payload)

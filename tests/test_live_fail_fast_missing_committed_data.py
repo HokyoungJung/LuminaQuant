@@ -254,7 +254,9 @@ def test_selection_overrides_are_applied_before_live_config_validation(monkeypat
     assert observed["kwargs"]["strategy_params"] == {"fast": 3}
 
 
-def test_live_cli_fails_closed_when_decision_points_to_unsupported_portfolio_mode(monkeypatch, capsys):
+def test_live_cli_fails_closed_when_decision_points_to_unsupported_portfolio_mode(
+    monkeypatch, capsys
+):
     class _LiveConfig:
         SYMBOLS = ["BTC/USDT"]
         IS_TESTNET = True
@@ -283,7 +285,9 @@ def test_live_cli_fails_closed_when_decision_points_to_unsupported_portfolio_mod
         ),
     )
     monkeypatch.setattr(live_cli, "resolve_live_decision_file", lambda _path="": "decision.json")
-    monkeypatch.setattr(live_cli, "load_live_decision_payload", lambda _path: {"decision": "selected_live_mode"})
+    monkeypatch.setattr(
+        live_cli, "load_live_decision_payload", lambda _path: {"decision": "selected_live_mode"}
+    )
     monkeypatch.setattr(
         live_cli,
         "extract_live_decision_config",
@@ -350,7 +354,9 @@ def test_live_cli_uses_supported_portfolio_mode_strategy(monkeypatch):
         ),
     )
     monkeypatch.setattr(live_cli, "resolve_live_decision_file", lambda _path="": "decision.json")
-    monkeypatch.setattr(live_cli, "load_live_decision_payload", lambda _path: {"decision": "selected_live_mode"})
+    monkeypatch.setattr(
+        live_cli, "load_live_decision_payload", lambda _path: {"decision": "selected_live_mode"}
+    )
     monkeypatch.setattr(
         live_cli,
         "extract_live_decision_config",
@@ -381,12 +387,16 @@ def test_live_cli_uses_supported_portfolio_mode_strategy(monkeypatch):
     )
 
     assert live_cli.main([]) == 0
-    assert observed["kwargs"]["strategy_name"] == "ArtifactPortfolioModeStrategy[hybrid_guarded_mode]"
+    assert (
+        observed["kwargs"]["strategy_name"] == "ArtifactPortfolioModeStrategy[hybrid_guarded_mode]"
+    )
     assert observed["kwargs"]["strategy_params"] == {"portfolio_mode": "hybrid_guarded_mode"}
     assert observed["kwargs"]["symbol_list"] == ["BNB/USDT", "TRX/USDT", "BTC/USDT"]
 
 
-def test_live_cli_uses_decision_strategy_target_without_falling_back_to_stale_selection(monkeypatch):
+def test_live_cli_uses_decision_strategy_target_without_falling_back_to_stale_selection(
+    monkeypatch,
+):
     observed: dict[str, object] = {}
 
     class _LiveConfig:
@@ -425,12 +435,19 @@ def test_live_cli_uses_decision_strategy_target_without_falling_back_to_stale_se
         "_strategy_helpers",
         lambda: (
             "MovingAverageCrossStrategy",
-            lambda include_opt_in=True: {"MovingAverageCrossStrategy": _Moving, "RsiStrategy": _Rsi},
-            lambda name, **_kwargs: {"MovingAverageCrossStrategy": _Moving, "RsiStrategy": _Rsi}[name],
+            lambda include_opt_in=True: {
+                "MovingAverageCrossStrategy": _Moving,
+                "RsiStrategy": _Rsi,
+            },
+            lambda name, **_kwargs: {"MovingAverageCrossStrategy": _Moving, "RsiStrategy": _Rsi}[
+                name
+            ],
         ),
     )
     monkeypatch.setattr(live_cli, "resolve_live_decision_file", lambda _path="": "decision.json")
-    monkeypatch.setattr(live_cli, "load_live_decision_payload", lambda _path: {"decision": "selected_live_mode"})
+    monkeypatch.setattr(
+        live_cli, "load_live_decision_payload", lambda _path: {"decision": "selected_live_mode"}
+    )
     monkeypatch.setattr(
         live_cli,
         "extract_live_decision_config",
@@ -444,7 +461,9 @@ def test_live_cli_uses_decision_strategy_target_without_falling_back_to_stale_se
     monkeypatch.setattr(
         live_cli,
         "resolve_selection_file",
-        lambda _path="": (_ for _ in ()).throw(AssertionError("stale selection should not be consulted")),
+        lambda _path="": (_ for _ in ()).throw(
+            AssertionError("stale selection should not be consulted")
+        ),
     )
     monkeypatch.setattr(
         live_cli,
@@ -492,7 +511,9 @@ def test_live_cli_fails_closed_when_decision_strategy_is_not_registered(monkeypa
         ),
     )
     monkeypatch.setattr(live_cli, "resolve_live_decision_file", lambda _path="": "decision.json")
-    monkeypatch.setattr(live_cli, "load_live_decision_payload", lambda _path: {"decision": "selected_live_mode"})
+    monkeypatch.setattr(
+        live_cli, "load_live_decision_payload", lambda _path: {"decision": "selected_live_mode"}
+    )
     monkeypatch.setattr(
         live_cli,
         "extract_live_decision_config",
@@ -506,7 +527,9 @@ def test_live_cli_fails_closed_when_decision_strategy_is_not_registered(monkeypa
     monkeypatch.setattr(
         live_cli,
         "resolve_selection_file",
-        lambda _path="": (_ for _ in ()).throw(AssertionError("stale selection should not be consulted")),
+        lambda _path="": (_ for _ in ()).throw(
+            AssertionError("stale selection should not be consulted")
+        ),
     )
     monkeypatch.setattr(
         live_cli,
@@ -648,7 +671,9 @@ def test_live_cli_applies_alpha_zoo_decision_params_and_6x_runtime_overrides(mon
     monkeypatch.setattr(
         live_cli,
         "resolve_selection_file",
-        lambda _path="": (_ for _ in ()).throw(AssertionError("stale selection should not be consulted")),
+        lambda _path="": (_ for _ in ()).throw(
+            AssertionError("stale selection should not be consulted")
+        ),
     )
     monkeypatch.setattr(
         live_cli,

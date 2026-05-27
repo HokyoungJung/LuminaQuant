@@ -289,7 +289,6 @@ def test_state_roundtrip_preserves_signal_sequence() -> None:
     signals_b = _feed(strategy_b, bars_b, rows[split:])
 
     split_signals = [
-        (signal.datetime, signal.symbol, signal.signal_type)
-        for signal in [*signals_a, *signals_b]
+        (signal.datetime, signal.symbol, signal.signal_type) for signal in [*signals_a, *signals_b]
     ]
     assert split_signals == full_signals

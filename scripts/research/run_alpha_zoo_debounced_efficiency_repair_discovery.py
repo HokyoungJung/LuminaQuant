@@ -48,13 +48,11 @@ from scripts.research.run_alpha_zoo_htf_momentum_crowding_discovery import (  # 
 )
 
 DEFAULT_OUTPUT_DIR = (
-    REPO_ROOT
-    / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/"
+    REPO_ROOT / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/"
     "alpha_zoo_debounced_efficiency_repair_discovery_20260523"
 )
 DEFAULT_PRIOR_ARTIFACT = (
-    REPO_ROOT
-    / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/"
+    REPO_ROOT / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/"
     "alpha_zoo_diverse_train_dominant_discovery_20260522/"
     "alpha_zoo_diverse_train_dominant_discovery_latest.json"
 )
@@ -238,7 +236,9 @@ def _timestamp() -> str:
 
 def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(_json_safe(payload), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(_json_safe(payload), indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
 
 def _csv_value(value: Any) -> Any:
@@ -254,7 +254,9 @@ def _csv_value(value: Any) -> Any:
 def _write_csv(path: Path, rows: Sequence[Mapping[str, Any]], fields: Sequence[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(fields), lineterminator="\n", extrasaction="ignore")
+        writer = csv.DictWriter(
+            handle, fieldnames=list(fields), lineterminator="\n", extrasaction="ignore"
+        )
         writer.writeheader()
         for row in rows:
             writer.writerow({field: _csv_value(row.get(field)) for field in fields})
@@ -272,7 +274,9 @@ def _model_id(parts: Iterable[Any]) -> str:
     return f"debrepair_{text}_{digest}".lower()
 
 
-def _return_per_turnover(total_return: float, trade_events: int, notional_fraction: float) -> float | None:
+def _return_per_turnover(
+    total_return: float, trade_events: int, notional_fraction: float
+) -> float | None:
     turnover = float(trade_events) * abs(float(notional_fraction))
     if turnover <= 0:
         return None
@@ -306,10 +310,20 @@ def _gate_candidate(row: dict[str, Any]) -> dict[str, Any]:
     ratio = row.get("train_validation_return_ratio")
     if int(row["train_trade_event_count"]) < PROMOTION_THRESHOLDS["min_train_trade_event_count"]:
         reasons.append(f"train_trade_event_count_{row['train_trade_event_count']}_below_80")
-    if int(row["validation_trade_event_count"]) < PROMOTION_THRESHOLDS["min_validation_trade_event_count"]:
-        reasons.append(f"validation_trade_event_count_{row['validation_trade_event_count']}_below_30")
-    if int(row["locked_oos_trade_event_count"]) < PROMOTION_THRESHOLDS["min_locked_oos_trade_event_count_report_gate"]:
-        reasons.append(f"locked_oos_trade_event_count_{row['locked_oos_trade_event_count']}_below_20")
+    if (
+        int(row["validation_trade_event_count"])
+        < PROMOTION_THRESHOLDS["min_validation_trade_event_count"]
+    ):
+        reasons.append(
+            f"validation_trade_event_count_{row['validation_trade_event_count']}_below_30"
+        )
+    if (
+        int(row["locked_oos_trade_event_count"])
+        < PROMOTION_THRESHOLDS["min_locked_oos_trade_event_count_report_gate"]
+    ):
+        reasons.append(
+            f"locked_oos_trade_event_count_{row['locked_oos_trade_event_count']}_below_20"
+        )
     if validation < PROMOTION_THRESHOLDS["min_validation_return"]:
         reasons.append(f"validation_return_{validation:.4f}_below_0.02")
     if train <= 0:
@@ -317,7 +331,9 @@ def _gate_candidate(row: dict[str, Any]) -> dict[str, Any]:
     if train < validation:
         reasons.append(f"train_return_{train:.4f}_below_validation_return_{validation:.4f}")
     if ratio is None or float(ratio) < PROMOTION_THRESHOLDS["min_train_validation_return_ratio"]:
-        reasons.append(f"train_validation_return_ratio_{0.0 if ratio is None else ratio:.4f}_below_1.00")
+        reasons.append(
+            f"train_validation_return_ratio_{0.0 if ratio is None else ratio:.4f}_below_1.00"
+        )
     if float(row["validation_mdd"]) > PROMOTION_THRESHOLDS["max_validation_mdd"]:
         reasons.append(f"validation_mdd_{row['validation_mdd']:.4f}_above_0.12")
     if float(row["locked_oos_return"]) <= 0:
@@ -338,7 +354,9 @@ def _gate_candidate(row: dict[str, Any]) -> dict[str, Any]:
                 f"{RETURN_PER_TURNOVER_THRESHOLD_BPS:.3f}"
             )
     execution_efficiency_proxy_gate_pass = not efficiency_reasons
-    paper_candidate_gate_pass = train_dominant_sample_gate_pass and execution_efficiency_proxy_gate_pass
+    paper_candidate_gate_pass = (
+        train_dominant_sample_gate_pass and execution_efficiency_proxy_gate_pass
+    )
     if paper_candidate_gate_pass:
         decision = "paper_testnet_candidate_after_fill_preflight"
     elif train_dominant_sample_gate_pass:
@@ -361,7 +379,9 @@ def _gate_candidate(row: dict[str, Any]) -> dict[str, Any]:
     return row
 
 
-def _finalize_candidate(base: dict[str, Any], sim: SimResult, datetimes: pd.Series, *, timeframe: str) -> dict[str, Any]:
+def _finalize_candidate(
+    base: dict[str, Any], sim: SimResult, datetimes: pd.Series, *, timeframe: str
+) -> dict[str, Any]:
     row = dict(base)
     split_payload: dict[str, dict[str, Any]] = {}
     for split in SPLIT_ORDER:
@@ -386,7 +406,9 @@ def _finalize_candidate(base: dict[str, Any], sim: SimResult, datetimes: pd.Seri
     row["train_validation_return_ratio"] = train / validation if validation > 0 else 0.0
     row["train_minus_validation_return"] = train - validation
     row["locked_oos_liquidation_count"] = int(split_payload["locked_oos"]["liquidation_count"])
-    row["locked_oos_account_wipeout_count"] = int(split_payload["locked_oos"]["account_wipeout_count"])
+    row["locked_oos_account_wipeout_count"] = int(
+        split_payload["locked_oos"]["account_wipeout_count"]
+    )
     notional = float(row["notional_fraction"])
     for split in SPLIT_ORDER:
         row[f"{split}_return_per_turnover_proxy_bps"] = _return_per_turnover(
@@ -445,8 +467,16 @@ def _debounced_state_signal(
 ) -> np.ndarray:
     long_entry = long_entry.fillna(False).astype(bool)
     long_exit = long_exit.fillna(False).astype(bool)
-    short_entry = pd.Series(False, index=long_entry.index) if short_entry is None else short_entry.fillna(False).astype(bool)
-    short_exit = pd.Series(False, index=long_entry.index) if short_exit is None else short_exit.fillna(False).astype(bool)
+    short_entry = (
+        pd.Series(False, index=long_entry.index)
+        if short_entry is None
+        else short_entry.fillna(False).astype(bool)
+    )
+    short_exit = (
+        pd.Series(False, index=long_entry.index)
+        if short_exit is None
+        else short_exit.fillna(False).astype(bool)
+    )
     out = np.zeros(len(long_entry), dtype=float)
     state = 0.0
     bars_held = 10**9
@@ -511,7 +541,9 @@ def discover_repair_candidates(
             columns={"close": "btc_close"}
         )
         for symbol in symbols:
-            frame = bars_by_symbol_tf[(symbol, timeframe)].merge(btc, on="datetime", how="left").ffill()
+            frame = (
+                bars_by_symbol_tf[(symbol, timeframe)].merge(btc, on="datetime", how="left").ffill()
+            )
             close = frame["close"].astype(float)
             high = frame["high"].astype(float)
             low = frame["low"].astype(float)
@@ -520,14 +552,20 @@ def discover_repair_candidates(
             for lookback in lookbacks:
                 momentum = close / close.shift(lookback) - 1.0
                 realized = close.pct_change().rolling(max(4, lookback // 2)).std(ddof=1)
-                trend_strength = momentum.abs() / (realized * np.sqrt(float(lookback))).replace(0.0, np.nan)
+                trend_strength = momentum.abs() / (realized * np.sqrt(float(lookback))).replace(
+                    0.0, np.nan
+                )
                 adx = _adx_proxy(high, low, close, max(6, lookback))
                 for entry_threshold, exit_threshold in entry_exit_profiles:
                     for min_hold_bars in min_holds:
                         for cooldown_bars in cooldowns:
                             for profile in _filter_profiles():
                                 vol_ok = _volatility_mask(close, lookback, profile.vol_quantile_max)
-                                adx_ok = adx >= profile.adx_threshold if profile.adx_threshold > 0 else True
+                                adx_ok = (
+                                    adx >= profile.adx_threshold
+                                    if profile.adx_threshold > 0
+                                    else True
+                                )
                                 strength_ok = (
                                     trend_strength >= profile.trend_strength_threshold
                                     if profile.trend_strength_threshold > 0
@@ -609,7 +647,9 @@ def discover_repair_candidates(
 
 
 def _rank_rows(rows: Sequence[dict[str, Any]], *, limit: int | None = None) -> list[dict[str, Any]]:
-    ranked = sorted(rows, key=lambda row: float(row.get("train_validation_score") or -1e9), reverse=True)
+    ranked = sorted(
+        rows, key=lambda row: float(row.get("train_validation_score") or -1e9), reverse=True
+    )
     if limit is not None:
         ranked = ranked[:limit]
     out: list[dict[str, Any]] = []
@@ -620,13 +660,17 @@ def _rank_rows(rows: Sequence[dict[str, Any]], *, limit: int | None = None) -> l
     return out
 
 
-def _selected_output_rows(ranked_rows: Sequence[dict[str, Any]], *, top_n: int) -> list[dict[str, Any]]:
+def _selected_output_rows(
+    ranked_rows: Sequence[dict[str, Any]], *, top_n: int
+) -> list[dict[str, Any]]:
     selected_ids = {str(row["model_id"]) for row in ranked_rows[:top_n]}
     for row in ranked_rows:
         if any(bool(row.get(flag)) for flag in SPECIAL_OUTPUT_FLAGS):
             selected_ids.add(str(row["model_id"]))
     if ranked_rows:
-        best_validation = max(ranked_rows, key=lambda row: float(row.get("validation_return") or -1e9))
+        best_validation = max(
+            ranked_rows, key=lambda row: float(row.get("validation_return") or -1e9)
+        )
         selected_ids.add(str(best_validation["model_id"]))
     return [dict(row) for row in ranked_rows if str(row["model_id"]) in selected_ids]
 
@@ -655,7 +699,11 @@ def _decision_rows(rows: Sequence[dict[str, Any]], *, limit: int) -> list[dict[s
 
 
 def _shadow_rows(ranked_rows: Sequence[dict[str, Any]], *, limit: int) -> list[dict[str, Any]]:
-    shadows = [row for row in ranked_rows if row.get("decision") != "paper_testnet_candidate_after_fill_preflight"]
+    shadows = [
+        row
+        for row in ranked_rows
+        if row.get("decision") != "paper_testnet_candidate_after_fill_preflight"
+    ]
     sample_shadows = [row for row in shadows if row.get("train_dominant_sample_gate_pass")]
     if sample_shadows:
         return _selected_output_rows(sample_shadows, top_n=limit)
@@ -668,8 +716,12 @@ def _summary(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     for row in rows:
         decisions[str(row["decision"])] = decisions.get(str(row["decision"]), 0) + 1
         by_symbol[str(row["symbol"])] = by_symbol.get(str(row["symbol"]), 0) + 1
-    best_validation = max(rows, key=lambda row: float(row.get("validation_return") or -1e9)) if rows else {}
-    best_gate = next((row for row in _rank_rows(rows) if row.get("train_dominant_sample_gate_pass")), None)
+    best_validation = (
+        max(rows, key=lambda row: float(row.get("validation_return") or -1e9)) if rows else {}
+    )
+    best_gate = next(
+        (row for row in _rank_rows(rows) if row.get("train_dominant_sample_gate_pass")), None
+    )
     paper_candidates = [row for row in rows if row.get("paper_candidate_gate_pass")]
     return {
         "candidate_count": len(rows),
@@ -686,10 +738,16 @@ def _summary(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
             bool(row.get("execution_efficiency_proxy_gate_pass")) for row in rows
         ),
         "paper_candidate_gate_pass_count": len(paper_candidates),
-        "max_validation_return": float(best_validation.get("validation_return") or 0.0) if best_validation else None,
+        "max_validation_return": float(best_validation.get("validation_return") or 0.0)
+        if best_validation
+        else None,
         "best_validation_model_id": best_validation.get("model_id") if best_validation else None,
-        "best_train_dominant_sample_gate_model_id": best_gate.get("model_id") if best_gate else None,
-        "best_paper_candidate_model_id": paper_candidates[0].get("model_id") if paper_candidates else None,
+        "best_train_dominant_sample_gate_model_id": best_gate.get("model_id")
+        if best_gate
+        else None,
+        "best_paper_candidate_model_id": paper_candidates[0].get("model_id")
+        if paper_candidates
+        else None,
         "ready_for_paper": bool(paper_candidates),
         "ready_for_real": False,
         "real_money_execution": False,
@@ -822,7 +880,9 @@ def _markdown(payload: Mapping[str, Any]) -> str:
     ]
     for row in top:
         rpt = "/".join(
-            "NA" if row.get(f"{split}_return_per_turnover_proxy_bps") is None else f"{float(row[f'{split}_return_per_turnover_proxy_bps']):.2f}"
+            "NA"
+            if row.get(f"{split}_return_per_turnover_proxy_bps") is None
+            else f"{float(row[f'{split}_return_per_turnover_proxy_bps']):.2f}"
             for split in SPLIT_ORDER
         )
         rule = (
@@ -925,7 +985,9 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
 
     timestamp = _timestamp()
     latest_json = output_dir / "alpha_zoo_debounced_efficiency_repair_discovery_latest.json"
-    timestamped_json = output_dir / f"alpha_zoo_debounced_efficiency_repair_discovery_{timestamp}.json"
+    timestamped_json = (
+        output_dir / f"alpha_zoo_debounced_efficiency_repair_discovery_{timestamp}.json"
+    )
     latest_md = output_dir / "alpha_zoo_debounced_efficiency_repair_discovery_latest.md"
     candidates_csv = output_dir / "debounced_efficiency_repair_candidates_latest.csv"
     decisions_csv = output_dir / "debounced_efficiency_repair_decisions_latest.csv"

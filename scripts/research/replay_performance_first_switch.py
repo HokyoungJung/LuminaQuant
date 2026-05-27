@@ -50,13 +50,19 @@ HARD_ALLOCATOR_PATH = (
     / "three_way_market_regime_allocator_latest.json"
 )
 BALANCED_PATH = (
-    GROUP_ROOT / "current_switch_validation_current" / "refreshed_balanced_overlay_strategy_latest.json"
+    GROUP_ROOT
+    / "current_switch_validation_current"
+    / "refreshed_balanced_overlay_strategy_latest.json"
 )
 PAIR_PATH = (
-    GROUP_ROOT / "current_switch_validation_current" / "refreshed_pair_fast_exit_candidate_latest.json"
+    GROUP_ROOT
+    / "current_switch_validation_current"
+    / "refreshed_pair_fast_exit_candidate_latest.json"
 )
 HYBRID_PATH = GROUP_ROOT / "portfolio_hybrid_online_current" / "hybrid_online_portfolio_latest.json"
-OUTPUT_DIR = GROUP_ROOT / "current_switch_validation_current" / "performance_first_switch_replay_current"
+OUTPUT_DIR = (
+    GROUP_ROOT / "current_switch_validation_current" / "performance_first_switch_replay_current"
+)
 REPLAY_COVERAGE_GAP_MAX_DAYS = 21
 REPLAY_STALE_GAP_MIN_DAYS = 14
 
@@ -139,7 +145,10 @@ def _parse_day(value: str) -> date:
 
 
 def _state_series(states: list[dict[str, Any]]) -> tuple[list[date], list[dict[str, Any]]]:
-    keyed = sorted(((_parse_day(item["date"]), dict(item)) for item in list(states or [])), key=lambda item: item[0])
+    keyed = sorted(
+        ((_parse_day(item["date"]), dict(item)) for item in list(states or [])),
+        key=lambda item: item[0],
+    )
     return [day for day, _ in keyed], [item for _, item in keyed]
 
 
@@ -175,7 +184,9 @@ def _adjust_pair_liquidity_state_for_coverage(
         latest_available = None
         if signal.latest_available_date:
             latest_available = _parse_day(signal.latest_available_date)
-        stale_gap_days = (as_of_date - latest_available).days if latest_available is not None else None
+        stale_gap_days = (
+            (as_of_date - latest_available).days if latest_available is not None else None
+        )
         coverage_gap = bool(
             signal.state in {"stale", "missing"}
             and next_available is not None
@@ -199,7 +210,9 @@ def _adjust_pair_liquidity_state_for_coverage(
     return "weak", coverage_gap_symbols
 
 
-def _carry_forward(days: list[date], items: list[dict[str, Any]], target_day: date) -> dict[str, Any]:
+def _carry_forward(
+    days: list[date], items: list[dict[str, Any]], target_day: date
+) -> dict[str, Any]:
     idx = bisect_right(days, target_day) - 1
     if idx < 0:
         return {}
@@ -223,12 +236,20 @@ def _daily_map_from_dates(dates: list[str], returns: list[float]) -> dict[str, f
     }
 
 
-def _blend_daily_map(left: dict[str, float], right: dict[str, float], *, left_weight: float, right_weight: float) -> dict[str, float]:
+def _blend_daily_map(
+    left: dict[str, float], right: dict[str, float], *, left_weight: float, right_weight: float
+) -> dict[str, float]:
     keys = sorted(set(left) | set(right))
-    return {key: (left_weight * _safe_float(left.get(key), 0.0)) + (right_weight * _safe_float(right.get(key), 0.0)) for key in keys}
+    return {
+        key: (left_weight * _safe_float(left.get(key), 0.0))
+        + (right_weight * _safe_float(right.get(key), 0.0))
+        for key in keys
+    }
 
 
-def _metrics_until(day_keys: list[str], daily_map: dict[str, float], *, upto_day: str) -> dict[str, float]:
+def _metrics_until(
+    day_keys: list[str], daily_map: dict[str, float], *, upto_day: str
+) -> dict[str, float]:
     returns = [_safe_float(daily_map.get(day), 0.0) for day in day_keys if day <= upto_day]
     if not returns:
         return {"total_return": 0.0, "sharpe": 0.0, "max_drawdown": 0.0}
@@ -249,8 +270,12 @@ def _hybrid_health_for_day(
     balanced_oos = _metrics_until(oos_days, balanced_map, upto_day=current_day)
     pair_oos = _metrics_until(oos_days, pair_map, upto_day=current_day)
     beats_cash = _safe_float(hybrid_oos.get("total_return"), 0.0) > 0.0
-    beats_pair = _safe_float(hybrid_oos.get("total_return"), 0.0) > _safe_float(pair_oos.get("total_return"), 0.0)
-    beats_balanced = _safe_float(hybrid_oos.get("total_return"), 0.0) > _safe_float(balanced_oos.get("total_return"), 0.0)
+    beats_pair = _safe_float(hybrid_oos.get("total_return"), 0.0) > _safe_float(
+        pair_oos.get("total_return"), 0.0
+    )
+    beats_balanced = _safe_float(hybrid_oos.get("total_return"), 0.0) > _safe_float(
+        balanced_oos.get("total_return"), 0.0
+    )
     return {
         "healthy": (
             beats_cash
@@ -260,7 +285,9 @@ def _hybrid_health_for_day(
             and _safe_float(hybrid_val_metrics.get("total_return"), 0.0) >= 0.0
             and _safe_float(hybrid_val_metrics.get("sharpe"), 0.0) > 0.0
         ),
-        "recommended_stage": "pilot_candidate" if (beats_cash and pair_cap_respected and beats_pair) else ("guarded_candidate" if beats_cash and pair_cap_respected else "do_not_integrate"),
+        "recommended_stage": "pilot_candidate"
+        if (beats_cash and pair_cap_respected and beats_pair)
+        else ("guarded_candidate" if beats_cash and pair_cap_respected else "do_not_integrate"),
         "beats_balanced_refreshed": beats_balanced,
         "beats_pair_tactical_refreshed": beats_pair,
         "beats_cash_refreshed": beats_cash,
@@ -283,7 +310,8 @@ def _balanced_health_for_day(
 ) -> dict[str, Any]:
     oos = _metrics_until(oos_days, balanced_map, upto_day=current_day)
     return {
-        "healthy": _safe_float(oos.get("total_return"), 0.0) > 0.0 and _safe_float(oos.get("sharpe"), 0.0) > 0.0,
+        "healthy": _safe_float(oos.get("total_return"), 0.0) > 0.0
+        and _safe_float(oos.get("sharpe"), 0.0) > 0.0,
         "val_total_return": _safe_float(balanced_val_metrics.get("total_return"), 0.0),
         "val_sharpe": _safe_float(balanced_val_metrics.get("sharpe"), 0.0),
         "oos_total_return": _safe_float(oos.get("total_return"), 0.0),
@@ -292,10 +320,13 @@ def _balanced_health_for_day(
     }
 
 
-def _allocator_health_for_day(*, oos_days: list[str], current_day: str, daily_map: dict[str, float]) -> dict[str, Any]:
+def _allocator_health_for_day(
+    *, oos_days: list[str], current_day: str, daily_map: dict[str, float]
+) -> dict[str, Any]:
     oos = _metrics_until(oos_days, daily_map, upto_day=current_day)
     return {
-        "healthy": _safe_float(oos.get("total_return"), 0.0) > 0.0 and _safe_float(oos.get("sharpe"), 0.0) > 0.0,
+        "healthy": _safe_float(oos.get("total_return"), 0.0) > 0.0
+        and _safe_float(oos.get("sharpe"), 0.0) > 0.0,
         "oos_total_return": _safe_float(oos.get("total_return"), 0.0),
         "oos_sharpe": _safe_float(oos.get("sharpe"), 0.0),
         "oos_max_drawdown": _safe_float(oos.get("max_drawdown"), 0.0),
@@ -307,8 +338,16 @@ def _market_judgements_by_day(
     market_payload: Mapping[str, Any],
     replay_days: list[str],
 ) -> dict[str, dict[str, Any]]:
-    selected_rules = [dict(rule) for rule in list(market_payload.get("selected_rules") or []) if isinstance(rule, dict)]
-    symbol_universe = [str(symbol) for symbol in list(market_payload.get("symbol_universe") or []) if str(symbol).strip()]
+    selected_rules = [
+        dict(rule)
+        for rule in list(market_payload.get("selected_rules") or [])
+        if isinstance(rule, dict)
+    ]
+    symbol_universe = [
+        str(symbol)
+        for symbol in list(market_payload.get("symbol_universe") or [])
+        if str(symbol).strip()
+    ]
     if not replay_days or not selected_rules or not symbol_universe:
         return {}
     start_day = _parse_day(min(replay_days))
@@ -364,14 +403,20 @@ def _replay_profile(
                 current_judgement=dict(context["current_judgement"]),
                 soft_current_state=dict(context["soft_state"]),
                 hard_current_state=dict(context["hard_state"]),
-                operating_plan_payload={"deployment_modes": {
-                    "core_mode": {"allocation": {"soft_three_way_regime": 1.0}},
-                    "balanced_overlay_mode": {"allocation": {"soft_three_way_regime": 0.8, "pair_fast_exit": 0.2}},
-                    "defensive_overlay_mode": {"allocation": {"soft_three_way_regime": 0.7, "pair_fast_exit": 0.3}},
-                    "aggressive_realized_mode": {"allocation": {"three_way_regime": 1.0}},
-                    "hybrid_guarded_mode": {"allocation": {"hybrid_online_portfolio": 1.0}},
-                    "risk_off_mode": {"allocation": {"cash": 1.0}},
-                }},
+                operating_plan_payload={
+                    "deployment_modes": {
+                        "core_mode": {"allocation": {"soft_three_way_regime": 1.0}},
+                        "balanced_overlay_mode": {
+                            "allocation": {"soft_three_way_regime": 0.8, "pair_fast_exit": 0.2}
+                        },
+                        "defensive_overlay_mode": {
+                            "allocation": {"soft_three_way_regime": 0.7, "pair_fast_exit": 0.3}
+                        },
+                        "aggressive_realized_mode": {"allocation": {"three_way_regime": 1.0}},
+                        "hybrid_guarded_mode": {"allocation": {"hybrid_online_portfolio": 1.0}},
+                        "risk_off_mode": {"allocation": {"cash": 1.0}},
+                    }
+                },
                 pair_liquidity_state=str(context["pair_liquidity_state"]),
                 balanced_health=dict(context["balanced_health"]),
                 hybrid_health=dict(context["hybrid_health"]),
@@ -425,10 +470,12 @@ def _build_day_contexts(
             for symbol in _SWITCH.DEFAULT_PAIR_SYMBOLS
         ]
         strict_pair_liquidity_state = _SWITCH._pair_liquidity_state(pair_signals)
-        adjusted_pair_liquidity_state, coverage_gap_symbols = _adjust_pair_liquidity_state_for_coverage(
-            signals=pair_signals,
-            as_of_date=day_date,
-            coverage_index=coverage_index or {},
+        adjusted_pair_liquidity_state, coverage_gap_symbols = (
+            _adjust_pair_liquidity_state_for_coverage(
+                signals=pair_signals,
+                as_of_date=day_date,
+                coverage_index=coverage_index or {},
+            )
         )
         pair_liquidity_state = (
             adjusted_pair_liquidity_state
@@ -481,7 +528,9 @@ def _build_day_contexts(
 
 def _coverage_summary(day_contexts: list[dict[str, Any]]) -> dict[str, Any]:
     total_days = len(day_contexts)
-    market_days = sum(1 for item in day_contexts if dict(item.get("current_judgement") or {}).get("date"))
+    market_days = sum(
+        1 for item in day_contexts if dict(item.get("current_judgement") or {}).get("date")
+    )
     liquidity_counts: dict[str, int] = {}
     strict_liquidity_counts: dict[str, int] = {}
     coverage_gap_day_count = 0
@@ -516,7 +565,9 @@ def build_replay_report(
     val_return_grid: list[float],
     val_sharpe_grid: list[float],
 ) -> dict[str, Any]:
-    hybrid_ref = dict(dict(hybrid_payload.get("scenarios") or {}).get("refreshed_latest_tail") or {})
+    hybrid_ref = dict(
+        dict(hybrid_payload.get("scenarios") or {}).get("refreshed_latest_tail") or {}
+    )
     replay_days = [
         str(day)
         for day, split in zip(
@@ -529,15 +580,25 @@ def build_replay_report(
     if not replay_days:
         raise RuntimeError("hybrid payload has no OOS replay days")
 
-    judgement_by_day = _market_judgements_by_day(market_payload=market_payload, replay_days=replay_days)
+    judgement_by_day = _market_judgements_by_day(
+        market_payload=market_payload, replay_days=replay_days
+    )
     soft_days, soft_states = _state_series(list(soft_payload.get("states") or []))
     hard_days, hard_states = _state_series(list(hard_payload.get("states") or []))
 
-    soft_map = _daily_map_from_dates(list(soft_payload.get("dates") or []), list(soft_payload.get("daily_returns") or []))
-    hard_map = _daily_map_from_dates(list(hard_payload.get("dates") or []), list(hard_payload.get("daily_returns") or []))
-    balanced_map = _daily_map_from_streams(dict(balanced_payload.get("portfolio_return_streams") or {}))
+    soft_map = _daily_map_from_dates(
+        list(soft_payload.get("dates") or []), list(soft_payload.get("daily_returns") or [])
+    )
+    hard_map = _daily_map_from_dates(
+        list(hard_payload.get("dates") or []), list(hard_payload.get("daily_returns") or [])
+    )
+    balanced_map = _daily_map_from_streams(
+        dict(balanced_payload.get("portfolio_return_streams") or {})
+    )
     pair_map = _daily_map_from_streams(dict(pair_payload.get("return_streams") or {}))
-    hybrid_map = _daily_map_from_dates(list(hybrid_ref.get("dates") or []), list(hybrid_ref.get("daily_returns") or []))
+    hybrid_map = _daily_map_from_dates(
+        list(hybrid_ref.get("dates") or []), list(hybrid_ref.get("daily_returns") or [])
+    )
     defensive_map = _blend_daily_map(soft_map, pair_map, left_weight=0.7, right_weight=0.3)
 
     mode_maps = {
@@ -632,7 +693,9 @@ def build_replay_report(
         "replay_start": replay_days[0],
         "replay_end": replay_days[-1],
         "pair_liquidity_policy": "coverage_adjusted",
-        "current_switch_mode": str(dict(switch_payload.get("recommended_mode") or {}).get("mode") or ""),
+        "current_switch_mode": str(
+            dict(switch_payload.get("recommended_mode") or {}).get("mode") or ""
+        ),
         "current_market_state": dict(switch_payload.get("current_market_state") or {}),
         "coverage_summary": coverage,
         "current_profile": asdict(current_profile),

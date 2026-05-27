@@ -23,7 +23,9 @@ def test_backtest_help_does_not_force_strategy_registry_loading(monkeypatch):
     monkeypatch.setattr(
         backtest_cli,
         "_get_strategy_registry",
-        lambda: (_ for _ in ()).throw(AssertionError("strategy registry loaded during backtest help")),
+        lambda: (_ for _ in ()).throw(
+            AssertionError("strategy registry loaded during backtest help")
+        ),
     )
     assert cli_main.main(["backtest", "--help"]) == 0
 
@@ -34,7 +36,9 @@ def test_optimize_help_does_not_force_strategy_registry_loading(monkeypatch):
     monkeypatch.setattr(
         optimize_cli,
         "_get_strategy_registry",
-        lambda: (_ for _ in ()).throw(AssertionError("strategy registry loaded during optimize help")),
+        lambda: (_ for _ in ()).throw(
+            AssertionError("strategy registry loaded during optimize help")
+        ),
     )
     assert cli_main.main(["optimize", "--help"]) == 0
 

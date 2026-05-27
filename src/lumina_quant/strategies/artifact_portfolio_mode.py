@@ -30,20 +30,24 @@ WAVE2_PAIR_PATH = (
     / "legacy_metric_live_materialization_20260426"
     / "wave2_pair_live_candidate_latest.json"
 )
-REFRESHED_INCUMBENT_PATH = REFRESH_ROOT / "refreshed_current_one_shot_incumbent_portfolio_latest.json"
+REFRESHED_INCUMBENT_PATH = (
+    REFRESH_ROOT / "refreshed_current_one_shot_incumbent_portfolio_latest.json"
+)
 REFRESHED_BLEND_PATH = REFRESH_ROOT / "refreshed_grouped_static_blend_latest.json"
 REFRESHED_AUTORESEARCH_55_45_PATH = (
     REFRESH_ROOT / "refreshed_autoresearch_pair_55_45_portfolio_latest.json"
 )
 SOFT_THREE_WAY_ALLOCATOR_PATH = (
-    REFRESH_ROOT / "refreshed_soft_three_way_allocator_current" / "soft_three_way_market_regime_allocator_latest.json"
+    REFRESH_ROOT
+    / "refreshed_soft_three_way_allocator_current"
+    / "soft_three_way_market_regime_allocator_latest.json"
 )
 THREE_WAY_ALLOCATOR_PATH = (
-    REFRESH_ROOT / "refreshed_three_way_allocator_current" / "three_way_market_regime_allocator_latest.json"
+    REFRESH_ROOT
+    / "refreshed_three_way_allocator_current"
+    / "three_way_market_regime_allocator_latest.json"
 )
-PAIR_TACTICAL_PATH = (
-    REFRESH_ROOT / "refreshed_pair_fast_exit_candidate_latest.json"
-)
+PAIR_TACTICAL_PATH = REFRESH_ROOT / "refreshed_pair_fast_exit_candidate_latest.json"
 PRODUCTION_GUARDED_PATH = (
     GROUP_ROOT / "portfolio_production_guarded_current" / "production_guarded_portfolio_latest.json"
 )
@@ -243,7 +247,9 @@ def _component_from_row(
         component_id=str(row.get("candidate_id") or row.get("name") or strategy_class),
         label=str(row.get("name") or strategy_class),
         strategy_class=strategy_class,
-        symbols=tuple(str(symbol) for symbol in list(row.get("symbols") or []) if str(symbol).strip()),
+        symbols=tuple(
+            str(symbol) for symbol in list(row.get("symbols") or []) if str(symbol).strip()
+        ),
         params=params,
         weight=float(weight),
         source=source,
@@ -736,7 +742,9 @@ def _state_weight_rows(path: Path) -> list[dict[str, Any]]:
 def _hybrid_weight_rows(path: Path) -> list[dict[str, Any]]:
     payload = _read_json(path)
     final_allocation = dict(
-        dict((payload.get("scenarios") or {}).get("refreshed_latest_tail") or {}).get("final_allocation")
+        dict((payload.get("scenarios") or {}).get("refreshed_latest_tail") or {}).get(
+            "final_allocation"
+        )
         or {}
     )
     state_weights = dict(final_allocation.get("weights") or {})
@@ -776,13 +784,25 @@ def _alias_rows(token: str) -> list[dict[str, Any]] | None:
     }
     synthetic_rows = {
         "core_mode": [
-            {"candidate_id": "soft_three_way_regime", "name": "soft_three_way_regime", "weight": 1.0},
+            {
+                "candidate_id": "soft_three_way_regime",
+                "name": "soft_three_way_regime",
+                "weight": 1.0,
+            },
         ],
         "balanced_overlay_mode": [
-            {"candidate_id": "balanced_overlay_80_20", "name": "balanced_overlay_80_20", "weight": 1.0},
+            {
+                "candidate_id": "balanced_overlay_80_20",
+                "name": "balanced_overlay_80_20",
+                "weight": 1.0,
+            },
         ],
         "defensive_overlay_mode": [
-            {"candidate_id": "soft_three_way_regime", "name": "soft_three_way_regime", "weight": 0.7},
+            {
+                "candidate_id": "soft_three_way_regime",
+                "name": "soft_three_way_regime",
+                "weight": 0.7,
+            },
             {"candidate_id": "pair_tactical_mode", "name": "pair_tactical_mode", "weight": 0.3},
         ],
         "aggressive_realized_mode": [
@@ -792,19 +812,39 @@ def _alias_rows(token: str) -> list[dict[str, Any]] | None:
             {"candidate_id": "cash", "name": "cash", "weight": 1.0},
         ],
         "balanced_overlay_80_20": [
-            {"candidate_id": "soft_three_way_regime", "name": "soft_three_way_regime", "weight": 0.8},
+            {
+                "candidate_id": "soft_three_way_regime",
+                "name": "soft_three_way_regime",
+                "weight": 0.8,
+            },
             {"candidate_id": "pair_fast_exit", "name": "pair_fast_exit", "weight": 0.2},
         ],
         "pair_tactical_mode": [
             {"candidate_id": "pair_fast_exit", "name": "pair_fast_exit", "weight": 1.0},
         ],
         "strict_autoresearch_practical_mode": [
-            {"candidate_id": "production_guarded_portfolio", "name": "production_guarded_portfolio", "weight": 0.8},
-            {"candidate_id": "strict_autoresearch_1x", "name": "strict_autoresearch_1x", "weight": 0.2},
+            {
+                "candidate_id": "production_guarded_portfolio",
+                "name": "production_guarded_portfolio",
+                "weight": 0.8,
+            },
+            {
+                "candidate_id": "strict_autoresearch_1x",
+                "name": "strict_autoresearch_1x",
+                "weight": 0.2,
+            },
         ],
         "production_guarded_state_vwap_pair_mode": [
-            {"candidate_id": "production_guarded_portfolio", "name": "production_guarded_portfolio", "weight": 0.4},
-            {"candidate_id": "state_vwap_pair_leaf", "name": "state_vwap_pair_leaf", "weight": 0.25},
+            {
+                "candidate_id": "production_guarded_portfolio",
+                "name": "production_guarded_portfolio",
+                "weight": 0.4,
+            },
+            {
+                "candidate_id": "state_vwap_pair_leaf",
+                "name": "state_vwap_pair_leaf",
+                "weight": 0.25,
+            },
             {"candidate_id": "cash", "name": "cash", "weight": 0.35},
         ],
         "state_vwap_pair": [
@@ -1670,7 +1710,11 @@ def _watch_symbols() -> tuple[str, ...]:
         if not path.exists():
             continue
         payload = _read_json(path)
-        rows = [payload] if isinstance(payload.get("strategy_class"), str) else list(payload.get("weights") or [])
+        rows = (
+            [payload]
+            if isinstance(payload.get("strategy_class"), str)
+            else list(payload.get("weights") or [])
+        )
         for row in rows:
             if not isinstance(row, dict):
                 continue
@@ -1848,19 +1892,31 @@ def resolve_portfolio_mode_definition(portfolio_mode: str) -> PortfolioModeDefin
         cash_weight = 1.0
         watch_symbols = _watch_symbols()
     elif token == "pair_tactical_mode":
-        components, cash_weight = _expand_reference("pair_tactical_mode", weight_scale=1.0, source=token)
+        components, cash_weight = _expand_reference(
+            "pair_tactical_mode", weight_scale=1.0, source=token
+        )
     elif token == "core_mode":
-        components, cash_weight = _expand_reference("soft_three_way_regime", weight_scale=1.0, source=token)
+        components, cash_weight = _expand_reference(
+            "soft_three_way_regime", weight_scale=1.0, source=token
+        )
     elif token == "balanced_overlay_mode":
-        components, cash_weight = _expand_reference("balanced_overlay_80_20", weight_scale=1.0, source=token)
+        components, cash_weight = _expand_reference(
+            "balanced_overlay_80_20", weight_scale=1.0, source=token
+        )
     elif token == "defensive_overlay_mode":
-        soft_components, soft_cash = _expand_reference("soft_three_way_regime", weight_scale=0.7, source=token)
-        pair_components, pair_cash = _expand_reference("pair_tactical_mode", weight_scale=0.3, source=token)
+        soft_components, soft_cash = _expand_reference(
+            "soft_three_way_regime", weight_scale=0.7, source=token
+        )
+        pair_components, pair_cash = _expand_reference(
+            "pair_tactical_mode", weight_scale=0.3, source=token
+        )
         components.extend(soft_components)
         components.extend(pair_components)
         cash_weight = soft_cash + pair_cash
     elif token == "aggressive_realized_mode":
-        components, cash_weight = _expand_reference("three_way_regime", weight_scale=1.0, source=token)
+        components, cash_weight = _expand_reference(
+            "three_way_regime", weight_scale=1.0, source=token
+        )
     elif token in {
         "hybrid_guarded_mode",
         "legacy_no_highvol_hybrid_mode",
@@ -1874,7 +1930,9 @@ def resolve_portfolio_mode_definition(portfolio_mode: str) -> PortfolioModeDefin
         hybrid_path = hybrid_paths[token]
         hybrid_payload = _read_json(hybrid_path)
         final_allocation = dict(
-            dict((hybrid_payload.get("scenarios") or {}).get("refreshed_latest_tail") or {}).get("final_allocation")
+            dict((hybrid_payload.get("scenarios") or {}).get("refreshed_latest_tail") or {}).get(
+                "final_allocation"
+            )
             or {}
         )
         sleeve_weights = {
@@ -1970,16 +2028,16 @@ class ArtifactPortfolioModeStrategy(Strategy):
         required_timeframes: set[str] = set()
         uses_timeframe_aggregator = False
         for component in self.definition.components:
-            strategy_cls = resolve_strategy_class(component.strategy_class, default_name=component.strategy_class)
+            strategy_cls = resolve_strategy_class(
+                component.strategy_class, default_name=component.strategy_class
+            )
             child_queue = _SignalCaptureQueue()
             child_bars = _BarsSubsetProxy(self.bars, list(component.symbols))
             child = strategy_cls(child_bars, child_queue, **dict(component.params))
             child_required_features = getattr(child, "required_features", ()) or ()
             try:
                 required_features.update(
-                    str(token).strip()
-                    for token in child_required_features
-                    if str(token).strip()
+                    str(token).strip() for token in child_required_features if str(token).strip()
                 )
             except TypeError:
                 pass
@@ -1987,7 +2045,9 @@ class ArtifactPortfolioModeStrategy(Strategy):
             uses_timeframe_aggregator = uses_timeframe_aggregator or child_uses_timeframe_aggregator
             if child_uses_timeframe_aggregator:
                 raw_timeframes = getattr(child, "required_timeframes", ()) or ()
-                required_timeframes.update(str(token) for token in raw_timeframes if str(token).strip())
+                required_timeframes.update(
+                    str(token) for token in raw_timeframes if str(token).strip()
+                )
             self._children.append((component, child, child_queue))
         self.uses_timeframe_aggregator = bool(uses_timeframe_aggregator)
         self.required_features = tuple(sorted(required_features))
@@ -2012,7 +2072,9 @@ class ArtifactPortfolioModeStrategy(Strategy):
             if callable(setter) and isinstance(child_state, dict):
                 setter(child_state)
 
-    def _component_client_order_id(self, *, component: PortfolioModeComponent, signal: SignalEvent) -> str:
+    def _component_client_order_id(
+        self, *, component: PortfolioModeComponent, signal: SignalEvent
+    ) -> str:
         base = str(signal.client_order_id or "").strip()
         if base:
             return f"{component.component_id[:12]}-{base}"
@@ -2037,8 +2099,8 @@ class ArtifactPortfolioModeStrategy(Strategy):
             metadata["child_target_allocation"] = child_target_allocation
             metadata["target_allocation"] = child_target_allocation * float(component.weight)
         elif is_profit_mode:
-            fallback_target_allocation = (
-                _PROFIT_MODE_UNBOUNDED_CHILD_TARGET_ALLOCATION * float(component.weight)
+            fallback_target_allocation = _PROFIT_MODE_UNBOUNDED_CHILD_TARGET_ALLOCATION * float(
+                component.weight
             )
             metadata["target_allocation"] = fallback_target_allocation
             metadata["max_symbol_exposure_pct"] = fallback_target_allocation
@@ -2048,15 +2110,17 @@ class ArtifactPortfolioModeStrategy(Strategy):
 
         if child_max_symbol_exposure > 0.0:
             metadata["child_max_symbol_exposure_pct"] = child_max_symbol_exposure
-            metadata["max_symbol_exposure_pct"] = child_max_symbol_exposure * float(component.weight)
+            metadata["max_symbol_exposure_pct"] = child_max_symbol_exposure * float(
+                component.weight
+            )
 
         child_max_order_value = _safe_float(metadata.get("max_order_value"), 0.0)
         if child_max_order_value > 0.0:
             metadata["child_max_order_value"] = child_max_order_value
             metadata["max_order_value"] = child_max_order_value * float(component.weight)
         elif is_profit_mode:
-            metadata["max_order_value"] = (
-                _PROFIT_MODE_UNBOUNDED_CHILD_MAX_ORDER_VALUE * float(component.weight)
+            metadata["max_order_value"] = _PROFIT_MODE_UNBOUNDED_CHILD_MAX_ORDER_VALUE * float(
+                component.weight
             )
             metadata["portfolio_mode_unbounded_child_max_order_value"] = (
                 _PROFIT_MODE_UNBOUNDED_CHILD_MAX_ORDER_VALUE
@@ -2088,7 +2152,9 @@ class ArtifactPortfolioModeStrategy(Strategy):
         )
         self.events.put(forwarded)
 
-    def _drain_child_queue(self, component: PortfolioModeComponent, queue: _SignalCaptureQueue) -> None:
+    def _drain_child_queue(
+        self, component: PortfolioModeComponent, queue: _SignalCaptureQueue
+    ) -> None:
         for item in queue.drain():
             if isinstance(item, SignalEvent):
                 self._forward_child_signal(component, item)

@@ -63,7 +63,9 @@ def test_write_overlay_comparison_adds_scope(tmp_path: Path, monkeypatch) -> Non
     monkeypatch.setattr(MODULE, "COMPARISON_INPUT", comparison)
     monkeypatch.setattr(MODULE, "FOLLOWUP_ROOT", tmp_path)
     monkeypatch.setattr(MODULE, "DEFAULT_OUTPUT_DIR", tmp_path)
-    monkeypatch.setattr(MODULE._helper, "PORTFOLIO_ONE_SHOT_CURRENT_BUNDLE", tmp_path / "missing_bundle.json")
+    monkeypatch.setattr(
+        MODULE._helper, "PORTFOLIO_ONE_SHOT_CURRENT_BUNDLE", tmp_path / "missing_bundle.json"
+    )
     monkeypatch.setattr(
         MODULE._helper,
         "PORTFOLIO_CURRENT_OPTIMIZATION",

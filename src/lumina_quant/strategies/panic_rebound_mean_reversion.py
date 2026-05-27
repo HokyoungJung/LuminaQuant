@@ -254,7 +254,9 @@ class PanicReboundMeanReversionStrategy(Strategy):
             return None
         return (float(value) - mean(values)) / sigma
 
-    def _latest_bar(self, symbol: str, row: Any | None = None) -> tuple[float, float, float, float] | None:
+    def _latest_bar(
+        self, symbol: str, row: Any | None = None
+    ) -> tuple[float, float, float, float] | None:
         if isinstance(row, dict):
             close = safe_float(row.get("close"))
             high = safe_float(row.get("high"))
@@ -283,7 +285,9 @@ class PanicReboundMeanReversionStrategy(Strategy):
         volumes = list(item.volumes)[-self.vwap_window :]
         if not closes:
             return None
-        weighted = sum(close * max(0.0, volume) for close, volume in zip(closes, volumes, strict=False))
+        weighted = sum(
+            close * max(0.0, volume) for close, volume in zip(closes, volumes, strict=False)
+        )
         total_volume = sum(max(0.0, volume) for volume in volumes)
         if total_volume <= 1e-12:
             return mean(closes)
@@ -430,7 +434,9 @@ class PanicReboundMeanReversionStrategy(Strategy):
             if invalidated or pending["age"] >= self.confirmation_bars:
                 item.pending_shock = {}
 
-        enough_history = len(item.returns) >= self.return_window and len(item.volumes) >= self.volume_window
+        enough_history = (
+            len(item.returns) >= self.return_window and len(item.volumes) >= self.volume_window
+        )
         if not enough_history or current_return is None:
             return
         negative_shock = current_return <= -self.shock_return_pct

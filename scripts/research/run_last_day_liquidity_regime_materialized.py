@@ -43,7 +43,13 @@ def _materialized_file_paths(
 ) -> list[str]:
     start_dt = _parse_date_token(start_date).date()
     end_dt = _parse_date_token(end_date).date()
-    base = parquet_root / "market_data_materialized" / str(exchange).lower() / _compact_symbol(symbol) / f"timeframe={timeframe}"
+    base = (
+        parquet_root
+        / "market_data_materialized"
+        / str(exchange).lower()
+        / _compact_symbol(symbol)
+        / f"timeframe={timeframe}"
+    )
     if not base.exists():
         return []
 
@@ -143,7 +149,9 @@ def main() -> None:
     if not candidates:
         raise SystemExit("no candidates in manifest")
 
-    timeframe = str(candidates[0].get("strategy_timeframe") or candidates[0].get("timeframe") or "1d")
+    timeframe = str(
+        candidates[0].get("strategy_timeframe") or candidates[0].get("timeframe") or "1d"
+    )
     _, universe = research_run_support._resolve_research_run_timeframes_and_universe(
         adapted=candidates,
         strategy_timeframes=[timeframe],
@@ -166,7 +174,9 @@ def main() -> None:
         )
 
     benchmark_cache = research_runner._benchmark_cache(cache, [timeframe])
-    scoring = research_run_support._resolve_research_run_scoring_config(score_config=None, stage1_keep_ratio=1.0)
+    scoring = research_run_support._resolve_research_run_scoring_config(
+        score_config=None, stage1_keep_ratio=1.0
+    )
     stage2_results = [
         research_runner._evaluate_candidate(
             candidate,
@@ -185,7 +195,9 @@ def main() -> None:
         resolved_split=resolved_split,
         scoring=scoring,
     )
-    report_candidates = research_runner._sorted_report_candidates(report_candidates, scoring=scoring)
+    report_candidates = research_runner._sorted_report_candidates(
+        report_candidates, scoring=scoring
+    )
 
     output_dir = Path(args.output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)

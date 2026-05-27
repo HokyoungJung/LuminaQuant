@@ -36,7 +36,11 @@ from lumina_quant.strategies.plugin_interface import get_plugin
 
 
 def _coerce_datetime(value: str) -> datetime:
-    return datetime.fromisoformat(str(value).replace("Z", "+00:00")).astimezone(UTC).replace(tzinfo=None)
+    return (
+        datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        .astimezone(UTC)
+        .replace(tzinfo=None)
+    )
 
 
 def _bars_per_year(timeframe: str) -> int:
@@ -144,9 +148,15 @@ def _run_single_backtest(
 
     constructor = CostAwarePortfolioConstructor(
         ConstructorParams(
-            no_trade_band_bps=float(strategy_block.get("portfolio_construction", {}).get("no_trade_band_bps", 8.0)),
-            turnover_penalty=float(strategy_block.get("portfolio_construction", {}).get("turnover_penalty", 0.0)),
-            cost_penalty=float(strategy_block.get("portfolio_construction", {}).get("cost_penalty", 1.0)),
+            no_trade_band_bps=float(
+                strategy_block.get("portfolio_construction", {}).get("no_trade_band_bps", 8.0)
+            ),
+            turnover_penalty=float(
+                strategy_block.get("portfolio_construction", {}).get("turnover_penalty", 0.0)
+            ),
+            cost_penalty=float(
+                strategy_block.get("portfolio_construction", {}).get("cost_penalty", 1.0)
+            ),
             participation_penalty=float(
                 strategy_block.get("portfolio_construction", {}).get("participation_penalty", 0.0)
             ),
@@ -158,14 +168,22 @@ def _run_single_backtest(
         impact_k=float(strategy_block.get("cost_model", {}).get("k_strategy", 1.0)),
         fees_bps=float(cost_global.get("fees_bps", 0.0)),
         tax_bps=float(cost_global.get("tax_bps", 0.0)),
-        participation_lambda=float(strategy_block.get("cost_model", {}).get("participation_lambda", 0.0)),
-        participation_power=float(strategy_block.get("cost_model", {}).get("participation_power", 1.0)),
+        participation_lambda=float(
+            strategy_block.get("cost_model", {}).get("participation_lambda", 0.0)
+        ),
+        participation_power=float(
+            strategy_block.get("cost_model", {}).get("participation_power", 1.0)
+        ),
     )
 
     execution_policy = ExecutionPolicy(
         fill_basis=str(strategy_block.get("execution_model", {}).get("fill_basis", "next_open")),
-        max_participation=float(strategy_block.get("execution_model", {}).get("max_participation", 0.1)),
-        unfilled_policy=str(strategy_block.get("execution_model", {}).get("unfilled_policy", "carry")),
+        max_participation=float(
+            strategy_block.get("execution_model", {}).get("max_participation", 0.1)
+        ),
+        unfilled_policy=str(
+            strategy_block.get("execution_model", {}).get("unfilled_policy", "carry")
+        ),
         carry_decay=float(strategy_block.get("execution_model", {}).get("carry_decay", 1.0)),
     )
 
@@ -282,8 +300,12 @@ def _run_single_backtest(
                 }
             )
 
-        net_value = net_cash + sum(positions[asset] * float(next_slice[asset]["close"]) for asset in assets)
-        gross_value = gross_cash + sum(positions[asset] * float(next_slice[asset]["close"]) for asset in assets)
+        net_value = net_cash + sum(
+            positions[asset] * float(next_slice[asset]["close"]) for asset in assets
+        )
+        gross_value = gross_cash + sum(
+            positions[asset] * float(next_slice[asset]["close"]) for asset in assets
+        )
 
         net_ret = (net_value / prev_net) - 1.0 if prev_net > 0 else 0.0
         gross_ret = (gross_value / prev_gross) - 1.0 if prev_gross > 0 else 0.0
@@ -305,15 +327,21 @@ def _run_single_backtest(
         "p99": float(pl.Series(participation_values).quantile(0.99, interpolation="nearest")),
     }
 
-    avg_cost_bps = 0.0 if total_notional <= 0 else (cost_totals["total"] / total_notional) * 10_000.0
+    avg_cost_bps = (
+        0.0 if total_notional <= 0 else (cost_totals["total"] / total_notional) * 10_000.0
+    )
     sensitivity = {
         "x1.5": {
             "post_cost_sharpe": float(post_metrics["sharpe"] - (avg_cost_bps * 0.5 / 100.0)),
-            "post_cost_total_return": float(post_metrics["total_return"] - (avg_cost_bps * 0.5 / 10_000.0)),
+            "post_cost_total_return": float(
+                post_metrics["total_return"] - (avg_cost_bps * 0.5 / 10_000.0)
+            ),
         },
         "x2.0": {
             "post_cost_sharpe": float(post_metrics["sharpe"] - (avg_cost_bps / 100.0)),
-            "post_cost_total_return": float(post_metrics["total_return"] - (avg_cost_bps / 10_000.0)),
+            "post_cost_total_return": float(
+                post_metrics["total_return"] - (avg_cost_bps / 10_000.0)
+            ),
         },
     }
 
@@ -324,7 +352,8 @@ def _run_single_backtest(
             {
                 "aum_scale": scale,
                 "estimated_post_cost_sharpe": float(
-                    post_metrics["sharpe"] / (1.0 + max(0.0, mean_participation) * max(0.0, scale - 1.0) * 5.0)
+                    post_metrics["sharpe"]
+                    / (1.0 + max(0.0, mean_participation) * max(0.0, scale - 1.0) * 5.0)
                 ),
             }
         )
@@ -502,7 +531,9 @@ def run_cost_aware_framework(
             panel = panels.get(timeframe, pl.DataFrame())
             if panel.is_empty():
                 continue
-            enriched = compute_liquidity_metrics(panel, rolling_window=int(strategy.signal_params.get("liquidity_window", 20)))
+            enriched = compute_liquidity_metrics(
+                panel, rolling_window=int(strategy.signal_params.get("liquidity_window", 20))
+            )
             result = _run_single_backtest(
                 panel=enriched,
                 strategy_block=strategy_block,
@@ -514,7 +545,9 @@ def run_cost_aware_framework(
             all_fills.extend(result["fills"])
 
     calibrations = calibrate_impact_coefficients(all_fills, strategy_k)
-    run_token = str(run_id or f"{config.experiment_id}_{datetime.now(tz=UTC).strftime('%Y%m%dT%H%M%SZ')}")
+    run_token = str(
+        run_id or f"{config.experiment_id}_{datetime.now(tz=UTC).strftime('%Y%m%dT%H%M%SZ')}"
+    )
     summary, table_rows = _build_summary(
         run_token,
         config.experiment_id,

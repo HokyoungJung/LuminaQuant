@@ -16,7 +16,15 @@ DEFAULT_OUTPUT_DIR = (
     Path(__file__).resolve().parents[2]
     / "var/reports/profit_moonshot_20260501/current_tail_20260506/multiasset_exchange_expansion"
 )
-DEFAULT_SYMBOLS = ("BTC/USDT", "ETH/USDT", "SOL/USDT", "XAU/USDT", "XAG/USDT", "XPT/USDT", "XPD/USDT")
+DEFAULT_SYMBOLS = (
+    "BTC/USDT",
+    "ETH/USDT",
+    "SOL/USDT",
+    "XAU/USDT",
+    "XAG/USDT",
+    "XPT/USDT",
+    "XPD/USDT",
+)
 SPLITS = {
     "train": ("2025-01-01", "2025-12-31"),
     "val": ("2026-01-01", "2026-02-28"),
@@ -57,7 +65,9 @@ def _committed_day(market_root: Path, *, exchange: str, symbol: str, day: date) 
     return any((root / str(item)).exists() for item in list(payload.get("data_files") or []))
 
 
-def _legacy_monthly_files(market_root: Path, *, exchange: str, symbol: str, start: date, end: date) -> list[str]:
+def _legacy_monthly_files(
+    market_root: Path, *, exchange: str, symbol: str, start: date, end: date
+) -> list[str]:
     months: list[str] = []
     cursor = date(start.year, start.month, 1)
     while cursor <= end:
@@ -85,7 +95,11 @@ def _raw_symbol_coverage(market_root: Path, *, exchange: str, symbols: list[str]
             start = _parse_day(start_raw)
             end = _parse_day(end_raw)
             days = _date_iter(start, end)
-            missing = [day.isoformat() for day in days if not _committed_day(market_root, exchange=exchange, symbol=symbol, day=day)]
+            missing = [
+                day.isoformat()
+                for day in days
+                if not _committed_day(market_root, exchange=exchange, symbol=symbol, day=day)
+            ]
             split_payload[split_name] = {
                 "start": start.isoformat(),
                 "end_inclusive": end.isoformat(),
@@ -94,7 +108,9 @@ def _raw_symbol_coverage(market_root: Path, *, exchange: str, symbols: list[str]
                 "missing_day_count": len(missing),
                 "first_missing_days": missing[:10],
                 "complete_raw_first": not missing,
-                "legacy_monthly_files": _legacy_monthly_files(market_root, exchange=exchange, symbol=symbol, start=start, end=end)[:12],
+                "legacy_monthly_files": _legacy_monthly_files(
+                    market_root, exchange=exchange, symbol=symbol, start=start, end=end
+                )[:12],
             }
         out[symbol] = split_payload
     return out
@@ -103,7 +119,9 @@ def _raw_symbol_coverage(market_root: Path, *, exchange: str, symbols: list[str]
 def _safe_common_oos_end(raw_coverage: dict[str, Any], *, symbols: list[str]) -> str | None:
     candidates: list[date] = []
     for symbol in symbols:
-        first_missing = list(raw_coverage.get(symbol, {}).get("oos", {}).get("first_missing_days") or [])
+        first_missing = list(
+            raw_coverage.get(symbol, {}).get("oos", {}).get("first_missing_days") or []
+        )
         if first_missing:
             candidates.append(_parse_day(first_missing[0]) - timedelta(days=1))
         else:
@@ -128,7 +146,9 @@ def _feature_inventory(market_root: Path, *, exchange: str, symbols: list[str]) 
                 for symbol in symbols
             ],
         }
-    return build_strategy_support_inventory(db_path=str(market_root), exchange=exchange, symbols=symbols)
+    return build_strategy_support_inventory(
+        db_path=str(market_root), exchange=exchange, symbols=symbols
+    )
 
 
 def _markdown(payload: dict[str, Any]) -> str:
@@ -185,26 +205,36 @@ def _markdown(payload: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def build_inventory(*, market_root: Path, exchange: str, output_dir: Path, symbols: list[str]) -> dict[str, Any]:
+def build_inventory(
+    *, market_root: Path, exchange: str, output_dir: Path, symbols: list[str]
+) -> dict[str, Any]:
     raw_coverage = _raw_symbol_coverage(market_root, exchange=exchange, symbols=symbols)
-    crypto_symbols = [symbol for symbol in symbols if symbol in {"BTC/USDT", "ETH/USDT", "SOL/USDT"}]
+    crypto_symbols = [
+        symbol for symbol in symbols if symbol in {"BTC/USDT", "ETH/USDT", "SOL/USDT"}
+    ]
     payload: dict[str, Any] = {
         "artifact_kind": "multiasset_exchange_coverage_inventory",
         "generated_at_utc": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "market_root": str(market_root),
         "raw_exchange": str(exchange).lower(),
-        "split_windows": {key: {"start": value[0], "end_inclusive": value[1]} for key, value in SPLITS.items()},
+        "split_windows": {
+            key: {"start": value[0], "end_inclusive": value[1]} for key, value in SPLITS.items()
+        },
         "safe_crypto_oos_end_date": _safe_common_oos_end(raw_coverage, symbols=crypto_symbols),
         "raw_first_coverage": raw_coverage,
         "feature_inventories": {
             "binance": _feature_inventory(market_root, exchange="binance", symbols=symbols),
-            "hyperliquid": _feature_inventory(market_root, exchange="hyperliquid", symbols=crypto_symbols),
+            "hyperliquid": _feature_inventory(
+                market_root, exchange="hyperliquid", symbols=crypto_symbols
+            ),
         },
     }
     output_dir.mkdir(parents=True, exist_ok=True)
     json_path = output_dir / "coverage_inventory_latest.json"
     md_path = output_dir / "coverage_inventory_latest.md"
-    json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    json_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     md_path.write_text(_markdown(payload), encoding="utf-8")
     return {"payload": payload, "paths": {"json": str(json_path), "markdown": str(md_path)}}
 

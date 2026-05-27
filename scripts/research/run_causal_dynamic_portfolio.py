@@ -785,7 +785,9 @@ def write_dynamic_allocator_report(
         "selection_basis": "validation_only_dynamic_search_on_preselected_current_sleeves",
         "objective_profile": "balanced_multi_metric",
         "split_windows": split_windows(),
-        "memory_policy": memory_policy_payload(budget_bytes=PORTFOLIO_FOLLOWUP_EXPLICIT_BUDGET_BYTES),
+        "memory_policy": memory_policy_payload(
+            budget_bytes=PORTFOLIO_FOLLOWUP_EXPLICIT_BUDGET_BYTES
+        ),
         "memory_summary": memory_summary,
         "best_params": dict(best["params"]),
         "validation_objective": float(best["objective"]),

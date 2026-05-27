@@ -5,7 +5,12 @@ import json
 import sys
 from pathlib import Path
 
-_SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "research" / "run_four_sleeve_regime_portfolio.py"
+_SCRIPT_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "scripts"
+    / "research"
+    / "run_four_sleeve_regime_portfolio.py"
+)
 _SPEC = importlib.util.spec_from_file_location("run_four_sleeve_regime_portfolio", _SCRIPT_PATH)
 if _SPEC is None or _SPEC.loader is None:
     raise RuntimeError("failed to load run_four_sleeve_regime_portfolio.py")

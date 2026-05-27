@@ -18,8 +18,7 @@ def _sample_context(size: int = 256):
     lows = [value - 0.35 for value in closes]
     volumes = [1000.0 + (3.0 * idx) for idx in range(size)]
     vwaps = [
-        ((high + low + close) / 3.0)
-        for high, low, close in zip(highs, lows, closes, strict=False)
+        ((high + low + close) / 3.0) for high, low, close in zip(highs, lows, closes, strict=False)
     ]
     return build_context(
         opens=opens,

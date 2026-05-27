@@ -50,7 +50,10 @@ def test_bounded_grid_requires_justification_and_records_truncation_metadata() -
     assert result.metadata["raw_candidate_count"] == 4
     assert result.metadata["candidate_count"] == 3
     assert result.metadata["truncated"] is True
-    assert result.metadata["bounded_grid_justification"] == "finite integer leverage policy enumeration"
+    assert (
+        result.metadata["bounded_grid_justification"]
+        == "finite integer leverage policy enumeration"
+    )
     assert result.metadata["uses_locked_oos_for_selection"] is False
     assert result.metadata["uses_locked_oos_for_objective"] is False
 

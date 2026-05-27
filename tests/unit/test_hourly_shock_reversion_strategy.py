@@ -158,12 +158,12 @@ def test_hourly_shock_reversion_requires_taker_flow_confirmation() -> None:
     )
     aggregator = TimeframeAggregator(timeframes=["1h"], lookbacks={"1h": 16})
     start = datetime(2026, 1, 1, tzinfo=UTC)
-    buy_dominant = _FeatureLookup(
-        {"taker_buy_quote_volume": 70.0, "taker_sell_quote_volume": 30.0}
-    )
+    buy_dominant = _FeatureLookup({"taker_buy_quote_volume": 70.0, "taker_sell_quote_volume": 30.0})
 
     for offset, close in enumerate([100.0, 100.0, 100.0, 100.0, 99.0, 99.0]):
-        _step_with_features(strategy, aggregator, start + timedelta(hours=offset), close, buy_dominant)
+        _step_with_features(
+            strategy, aggregator, start + timedelta(hours=offset), close, buy_dominant
+        )
 
     assert queue.items == []
 
@@ -185,7 +185,9 @@ def test_hourly_shock_reversion_accepts_confirming_taker_flow() -> None:
     )
 
     for offset, close in enumerate([100.0, 100.0, 100.0, 100.0, 99.0, 99.0]):
-        _step_with_features(strategy, aggregator, start + timedelta(hours=offset), close, sell_dominant)
+        _step_with_features(
+            strategy, aggregator, start + timedelta(hours=offset), close, sell_dominant
+        )
 
     assert len(queue.items) == 1
     signal = queue.items[0]

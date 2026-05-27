@@ -63,7 +63,9 @@ class VolatilityCompressionReversionStrategy(Strategy):
                 high=3.0,
                 tunable=False,
             ),
-            "stop_loss_pct": HyperParam.floating("stop_loss_pct", default=0.02, low=0.001, high=0.5, tunable=False),
+            "stop_loss_pct": HyperParam.floating(
+                "stop_loss_pct", default=0.02, low=0.001, high=0.5, tunable=False
+            ),
             "exit_compression_multiplier": HyperParam.floating(
                 "exit_compression_multiplier",
                 default=1.2,
@@ -71,8 +73,12 @@ class VolatilityCompressionReversionStrategy(Strategy):
                 high=10.0,
                 tunable=False,
             ),
-            "fast_vol_window": HyperParam.integer("fast_vol_window", default=12, low=2, high=4096, tunable=False),
-            "slow_vol_window": HyperParam.integer("slow_vol_window", default=60, low=4, high=8192, tunable=False),
+            "fast_vol_window": HyperParam.integer(
+                "fast_vol_window", default=12, low=2, high=4096, tunable=False
+            ),
+            "slow_vol_window": HyperParam.integer(
+                "slow_vol_window", default=60, low=4, high=8192, tunable=False
+            ),
         }
 
     def __init__(
@@ -98,7 +104,9 @@ class VolatilityCompressionReversionStrategy(Strategy):
 
         # Legacy parameter mapping.
         if "compression_threshold" in legacy and "compression_vol_ratio" not in legacy:
-            compression_vol_ratio = float(legacy.get("compression_threshold") or compression_vol_ratio)
+            compression_vol_ratio = float(
+                legacy.get("compression_threshold") or compression_vol_ratio
+            )
         if "stop_loss_pct" in legacy and "atr_stop_pct" not in legacy:
             atr_stop_pct = float(legacy.get("stop_loss_pct") or atr_stop_pct)
         if "fast_vol_window" in legacy:
@@ -213,7 +221,17 @@ class VolatilityCompressionReversionStrategy(Strategy):
             return None, None, None, None, None
         return event_time, high, low, close, (0.0 if volume is None else volume)
 
-    def _emit(self, symbol, event_time, signal_type, *, stop_loss=None, take_profit=None, strength=1.0, metadata=None):
+    def _emit(
+        self,
+        symbol,
+        event_time,
+        signal_type,
+        *,
+        stop_loss=None,
+        take_profit=None,
+        strength=1.0,
+        metadata=None,
+    ):
         self.events.put(
             SignalEvent(
                 strategy_id="vol_compression_vwap_reversion",
@@ -319,7 +337,9 @@ class VolatilityCompressionReversionStrategy(Strategy):
                 or (item.bars_held >= self.max_hold_bars)
             )
             if should_exit:
-                self._emit(symbol, event_time, "EXIT", metadata={**metadata, "reason": "short_exit"})
+                self._emit(
+                    symbol, event_time, "EXIT", metadata={**metadata, "reason": "short_exit"}
+                )
                 item.mode = "OUT"
                 item.entry_price = None
                 item.bars_held = 0

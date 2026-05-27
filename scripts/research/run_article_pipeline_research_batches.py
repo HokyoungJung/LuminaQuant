@@ -54,13 +54,11 @@ def _load_payload(path: Path) -> dict[str, Any]:
     return payload
 
 
-def _selected_batches(payload: dict[str, Any], raw_batch_ids: str, max_batches: int) -> list[dict[str, Any]]:
+def _selected_batches(
+    payload: dict[str, Any], raw_batch_ids: str, max_batches: int
+) -> list[dict[str, Any]]:
     rows = [dict(row) for row in list(payload.get("batches") or []) if isinstance(row, dict)]
-    wanted = {
-        token.strip()
-        for token in str(raw_batch_ids or "").split(",")
-        if token.strip()
-    }
+    wanted = {token.strip() for token in str(raw_batch_ids or "").split(",") if token.strip()}
     if wanted:
         rows = [row for row in rows if str(row.get("batch_id")) in wanted]
     if max_batches > 0:
@@ -103,7 +101,9 @@ def _extract_max_rss_kb(log_path: Path) -> int | None:
 
 def _run_batch(*, repo_root: Path, manifest_path: Path, run_dir: Path) -> int:
     batch_manifest = _load_payload(manifest_path)
-    candidates = [dict(row) for row in list(batch_manifest.get("candidates") or []) if isinstance(row, dict)]
+    candidates = [
+        dict(row) for row in list(batch_manifest.get("candidates") or []) if isinstance(row, dict)
+    ]
     timeframes = sorted(
         {
             str(row.get("strategy_timeframe") or row.get("timeframe") or "").strip().lower()

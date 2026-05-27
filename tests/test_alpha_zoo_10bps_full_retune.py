@@ -243,9 +243,7 @@ def test_build_payload_persists_10bps_report_only_contract(
     assert fresh_contract["trade_filter_locked_oos_role"] == "gate_report_only_after_variant_freeze"
     assert fresh_contract["skipped_candidate_names"] == []
     assert payload["execution_cost_evidence"]["diagnostic_only"] is True
-    assert payload["execution_cost_evidence"]["primary_round_trip_cost_bps"] == pytest.approx(
-        10.0
-    )
+    assert payload["execution_cost_evidence"]["primary_round_trip_cost_bps"] == pytest.approx(10.0)
     assert payload["execution_cost_evidence"]["symbols"] == list(MODULE.EXECUTION_COST_SYMBOLS)
     assert _normalized_cost_model(payload) == "round_trip_all_in"
     assert payload["memory_summary"]["peak_rss_mib"] == pytest.approx(80.0)

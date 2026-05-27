@@ -33,9 +33,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_REPORT_ROOT = REPO_ROOT / "var" / "reports" / "exact_window_backtests"
 DEFAULT_OUTPUT_DIR = DEFAULT_REPORT_ROOT / "followup_status" / "autonomous_research_loop"
 DEFAULT_FOLLOWUP_ROOT = DEFAULT_REPORT_ROOT / "followup_status"
-DEFAULT_ARTICLE_URL = (
-    "https://www.linkedin.com/pulse/ko-managing-real-life-portfolio-based-multi-agent-llms-yeachan-heo-fcmac"
-)
+DEFAULT_ARTICLE_URL = "https://www.linkedin.com/pulse/ko-managing-real-life-portfolio-based-multi-agent-llms-yeachan-heo-fcmac"
 DEFAULT_IMAGE_PATHS = [
     str(REPO_ROOT.parent / "KakaoTalk_20260309_210834478.jpg"),
     str(REPO_ROOT.parent / "KakaoTalk_20260309_210834478_01.jpg"),
@@ -173,7 +171,10 @@ def classify_experiment_error(error: str | BaseException | None) -> str:
     else:
         text = str(error or "")
     lowered = text.lower()
-    if any(token in lowered for token in ("rss hard limit", "out of memory", "memory", "heavy exact-window run")):
+    if any(
+        token in lowered
+        for token in ("rss hard limit", "out of memory", "memory", "heavy exact-window run")
+    ):
         return "resource_limit"
     if any(
         token in lowered
@@ -249,7 +250,9 @@ def _default_paths(
         "stack_audit": resolved_output_dir / STACK_AUDIT_LATEST,
         "ideas_backlog": resolved_output_dir / IDEAS_BACKLOG_LATEST,
         "state": resolved_output_dir / RESEARCH_STATE_LATEST,
-        "portfolio_decision": resolved_report_root / "followup_status" / "portfolio_max_performance_decision_latest.json",
+        "portfolio_decision": resolved_report_root
+        / "followup_status"
+        / "portfolio_max_performance_decision_latest.json",
         "incumbent_portfolio": resolved_report_root
         / "followup_status"
         / "portfolio_one_shot_current_opt"
@@ -258,16 +261,24 @@ def _default_paths(
         / "followup_status"
         / "portfolio_one_shot_incumbent_bundle_latest.json",
         "exact_window_decision": resolved_report_root / "exact_window_decision_latest.json",
-        "log_archive": resolved_report_root / "followup_status" / "backtest_log_archive_latest.json",
+        "log_archive": resolved_report_root
+        / "followup_status"
+        / "backtest_log_archive_latest.json",
         "pipeline_root": resolved_report_root / "pipeline",
     }
 
 
-def _best_exact_window_row(summary_path: str | Path | None, details_path: str | Path | None = None) -> dict[str, Any]:
+def _best_exact_window_row(
+    summary_path: str | Path | None, details_path: str | Path | None = None
+) -> dict[str, Any]:
     summary = _json_load(summary_path)
     rows = []
     if isinstance(summary, dict):
-        rows.extend(dict(row) for row in list(summary.get("best_per_strategy") or []) if isinstance(row, dict))
+        rows.extend(
+            dict(row)
+            for row in list(summary.get("best_per_strategy") or [])
+            if isinstance(row, dict)
+        )
     details = _json_load(details_path)
     if isinstance(details, list):
         rows.extend(dict(row) for row in details if isinstance(row, dict))
@@ -279,7 +290,8 @@ def _best_exact_window_row(summary_path: str | Path | None, details_path: str | 
         oos = dict(row.get("oos") or {})
         return (
             1.0 if bool(row.get("promoted")) else 0.0,
-            float(_safe_float(val.get("sharpe")) or 0.0) + (20.0 * float(_safe_float(val.get("return")) or 0.0)),
+            float(_safe_float(val.get("sharpe")) or 0.0)
+            + (20.0 * float(_safe_float(val.get("return")) or 0.0)),
             float(_safe_float(oos.get("sharpe")) or 0.0),
             float(_safe_float(oos.get("return")) or 0.0),
             str(row.get("candidate_id") or row.get("name") or ""),
@@ -312,7 +324,9 @@ def _memory_evidence_for_artifact(artifact_path: str | Path | None) -> str | Non
     return None
 
 
-def collect_exact_window_registry_records(*, report_root: str | Path = DEFAULT_REPORT_ROOT) -> list[ExperimentLedgerRow]:
+def collect_exact_window_registry_records(
+    *, report_root: str | Path = DEFAULT_REPORT_ROOT
+) -> list[ExperimentLedgerRow]:
     resolved_report_root = Path(report_root).resolve()
     write_exact_window_canonical_registry(report_root=resolved_report_root)
     payload = _json_load(resolved_report_root / CANONICAL_REGISTRY_LATEST)
@@ -337,7 +351,11 @@ def collect_exact_window_registry_records(*, report_root: str | Path = DEFAULT_R
                     f"{', '.join(str(token) for token in requested_timeframes) or 'unspecified timeframes'}"
                 ),
                 changed_files=[],
-                artifact_inputs=[path for path in (entry.get("manifest_path"), summary_path, details_path) if _path_text(path)],
+                artifact_inputs=[
+                    path
+                    for path in (entry.get("manifest_path"), summary_path, details_path)
+                    if _path_text(path)
+                ],
                 method_category="validation",
                 status=status,
                 train_total_return=_metric(best_row.get("train"), "total_return"),
@@ -366,7 +384,9 @@ def collect_archive_crash_records(
     max_records: int = 8,
 ) -> list[ExperimentLedgerRow]:
     resolved_report_root = Path(report_root).resolve()
-    payload = _json_load(resolved_report_root / "followup_status" / "backtest_log_archive_latest.json")
+    payload = _json_load(
+        resolved_report_root / "followup_status" / "backtest_log_archive_latest.json"
+    )
     entries = list((payload or {}).get("entries") or []) if isinstance(payload, dict) else []
     rows: list[ExperimentLedgerRow] = []
     for entry in sorted(
@@ -414,7 +434,9 @@ def collect_archive_crash_records(
     return rows
 
 
-def collect_portfolio_decision_records(*, followup_root: str | Path = DEFAULT_FOLLOWUP_ROOT) -> list[ExperimentLedgerRow]:
+def collect_portfolio_decision_records(
+    *, followup_root: str | Path = DEFAULT_FOLLOWUP_ROOT
+) -> list[ExperimentLedgerRow]:
     resolved_followup_root = Path(followup_root).resolve()
     payload = _json_load(resolved_followup_root / "portfolio_max_performance_decision_latest.json")
     if not isinstance(payload, dict):
@@ -431,7 +453,11 @@ def collect_portfolio_decision_records(*, followup_root: str | Path = DEFAULT_FO
             ExperimentLedgerRow(
                 timestamp=generated_at,
                 experiment_id=f"portfolio::{candidate_key or candidate.get('label')}",
-                hypothesis=str(candidate.get("decision_reason") or candidate.get("label") or "portfolio comparison"),
+                hypothesis=str(
+                    candidate.get("decision_reason")
+                    or candidate.get("label")
+                    or "portfolio comparison"
+                ),
                 changed_files=[],
                 artifact_inputs=[
                     path
@@ -472,13 +498,20 @@ def build_stack_audit(
     report_root: str | Path = DEFAULT_REPORT_ROOT,
     output_path: str | Path | None = None,
 ) -> dict[str, Any]:
-    paths = _default_paths(report_root=report_root, output_dir=DEFAULT_OUTPUT_DIR if output_path is None else Path(output_path).resolve().parent)
+    paths = _default_paths(
+        report_root=report_root,
+        output_dir=DEFAULT_OUTPUT_DIR
+        if output_path is None
+        else Path(output_path).resolve().parent,
+    )
     incumbent_portfolio = _json_load(paths["incumbent_portfolio"]) or {}
     incumbent_bundle = _json_load(paths["incumbent_bundle"]) or {}
     portfolio_decision = _json_load(paths["portfolio_decision"]) or {}
     exact_window_decision = _json_load(paths["exact_window_decision"]) or {}
 
-    bundle_rows = [dict(row) for row in list(incumbent_bundle.get("candidates") or []) if isinstance(row, dict)]
+    bundle_rows = [
+        dict(row) for row in list(incumbent_bundle.get("candidates") or []) if isinstance(row, dict)
+    ]
     contributors: list[dict[str, Any]] = []
     for row in bundle_rows:
         weight = float(_safe_float(row.get("portfolio_weight")) or 0.0)
@@ -491,11 +524,14 @@ def build_stack_audit(
                 "strategy_class": str(row.get("strategy_class") or ""),
                 "timeframe": str(row.get("strategy_timeframe") or row.get("timeframe") or ""),
                 "weight": weight,
-                "weighted_train_return": weight * float(_safe_float(train.get("total_return")) or 0.0),
+                "weighted_train_return": weight
+                * float(_safe_float(train.get("total_return")) or 0.0),
                 "train_total_return": float(_safe_float(train.get("total_return")) or 0.0),
                 "train_sharpe": float(_safe_float(train.get("sharpe")) or 0.0),
                 "train_stability": float(_safe_float(train.get("stability")) or 0.0),
-                "train_rolling_sharpe_min": float(_safe_float(train.get("rolling_sharpe_min")) or 0.0),
+                "train_rolling_sharpe_min": float(
+                    _safe_float(train.get("rolling_sharpe_min")) or 0.0
+                ),
                 "val_total_return": float(_safe_float(val.get("total_return")) or 0.0),
                 "oos_total_return": float(_safe_float(oos.get("total_return")) or 0.0),
             }
@@ -618,7 +654,9 @@ def build_stack_audit(
     target.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return {
         "path": str(target),
-        "incumbent_train_total_return": float(_safe_float(train_metrics.get("total_return")) or 0.0),
+        "incumbent_train_total_return": float(
+            _safe_float(train_metrics.get("total_return")) or 0.0
+        ),
         "incumbent_val_total_return": float(_safe_float(val_metrics.get("total_return")) or 0.0),
         "incumbent_oos_total_return": float(_safe_float(oos_metrics.get("total_return")) or 0.0),
         "top_negative_contributors": contributors[:3],
@@ -635,7 +673,12 @@ def build_ideas_backlog(
     resolved_symbols = list(symbols or DEFAULT_BINANCE_TOP10_PLUS_METALS)
     resolved_timeframes = list(timeframes or DEFAULT_BACKLOG_TIMEFRAMES)
     manifest = build_candidate_manifest(timeframes=resolved_timeframes, symbols=resolved_symbols)
-    paths = _default_paths(report_root=report_root, output_dir=DEFAULT_OUTPUT_DIR if output_path is None else Path(output_path).resolve().parent)
+    paths = _default_paths(
+        report_root=report_root,
+        output_dir=DEFAULT_OUTPUT_DIR
+        if output_path is None
+        else Path(output_path).resolve().parent,
+    )
     incumbent_bundle = _json_load(paths["incumbent_bundle"]) or {}
     current_strategy_classes = {
         str(row.get("strategy_class") or "")
@@ -739,7 +782,9 @@ def build_private_git_milestone_gate(
     followup_root: str | Path = DEFAULT_FOLLOWUP_ROOT,
 ) -> dict[str, Any]:
     resolved_repo_root = Path(repo_root).resolve()
-    decision_payload = _json_load(Path(followup_root).resolve() / "portfolio_max_performance_decision_latest.json")
+    decision_payload = _json_load(
+        Path(followup_root).resolve() / "portfolio_max_performance_decision_latest.json"
+    )
     winner = dict((decision_payload or {}).get("winner") or {})
     branch = ""
     clean = False
@@ -831,7 +876,9 @@ def build_autonomous_experiment_ledger(
         )
     for row in (
         collect_exact_window_registry_records(report_root=paths["report_root"])
-        + collect_archive_crash_records(report_root=paths["report_root"], max_records=max_archive_crashes)
+        + collect_archive_crash_records(
+            report_root=paths["report_root"], max_records=max_archive_crashes
+        )
         + collect_portfolio_decision_records(followup_root=paths["followup_root"])
     ):
         collected[row.experiment_id] = row
@@ -892,7 +939,9 @@ def run_autonomous_portfolio_research_loop(
                 PORTFOLIO_FOLLOWUP_SESSION_MEMORY_LEASE_PATH.resolve()
             ),
             "single_heavy_lane": True,
-            "registry_only_duplicate_guard": str((paths["report_root"] / "exact_window_run_registry.jsonl").resolve()),
+            "registry_only_duplicate_guard": str(
+                (paths["report_root"] / "exact_window_run_registry.jsonl").resolve()
+            ),
             "explicit_budget_injection": {
                 "portfolio_optimizer": PORTFOLIO_FOLLOWUP_EXPLICIT_BUDGET_BYTES,
                 "causal_dynamic_portfolio": PORTFOLIO_FOLLOWUP_EXPLICIT_BUDGET_BYTES,
@@ -913,7 +962,9 @@ def run_autonomous_portfolio_research_loop(
         "ideas_backlog_path": str(paths["ideas_backlog"]),
         "ledger_path": str(paths["ledger"]),
         "canonical_registry_path": str(paths["canonical_registry"]),
-        "pipeline_manifest_json": str(paths["pipeline_root"] / "alpha_research_pipeline_latest.json"),
+        "pipeline_manifest_json": str(
+            paths["pipeline_root"] / "alpha_research_pipeline_latest.json"
+        ),
         "pipeline_manifest_md": str(paths["pipeline_root"] / "alpha_research_pipeline_latest.md"),
         "counts_by_status": dict(ledger.get("counts_by_status") or {}),
         "milestone_gate_ready": bool(milestone_gate.get("ready")),

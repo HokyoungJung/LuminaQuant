@@ -10,7 +10,9 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT / "scripts" / "research" / "run_alpha_zoo_corr_integer_leverage_portfolio.py"
-SPEC = importlib.util.spec_from_file_location("run_alpha_zoo_corr_integer_leverage_portfolio", MODULE_PATH)
+SPEC = importlib.util.spec_from_file_location(
+    "run_alpha_zoo_corr_integer_leverage_portfolio", MODULE_PATH
+)
 assert SPEC is not None and SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = MODULE
@@ -116,23 +118,41 @@ def test_train_validation_score_ignores_locked_oos_metrics() -> None:
     base = {
         "gross_notional_fraction": 1.0,
         "split_metrics": {
-            "train": {"total_return": 0.12, "max_drawdown": 0.02, "return_per_turnover_proxy_bps": 30.0},
-            "validation": {"total_return": 0.08, "max_drawdown": 0.03, "return_per_turnover_proxy_bps": 40.0},
-            "locked_oos": {"total_return": -0.50, "max_drawdown": 0.80, "return_per_turnover_proxy_bps": -100.0},
+            "train": {
+                "total_return": 0.12,
+                "max_drawdown": 0.02,
+                "return_per_turnover_proxy_bps": 30.0,
+            },
+            "validation": {
+                "total_return": 0.08,
+                "max_drawdown": 0.03,
+                "return_per_turnover_proxy_bps": 40.0,
+            },
+            "locked_oos": {
+                "total_return": -0.50,
+                "max_drawdown": 0.80,
+                "return_per_turnover_proxy_bps": -100.0,
+            },
         },
     }
     better_oos = {
         **base,
         "split_metrics": {
             **base["split_metrics"],
-            "locked_oos": {"total_return": 0.90, "max_drawdown": 0.01, "return_per_turnover_proxy_bps": 300.0},
+            "locked_oos": {
+                "total_return": 0.90,
+                "max_drawdown": 0.01,
+                "return_per_turnover_proxy_bps": 300.0,
+            },
         },
     }
 
     assert MODULE._train_validation_score(base) == MODULE._train_validation_score(better_oos)
 
 
-def test_search_integer_asset_leverage_profiles_emits_integer_asset_maps(monkeypatch: object) -> None:
+def test_search_integer_asset_leverage_profiles_emits_integer_asset_maps(
+    monkeypatch: object,
+) -> None:
     monkeypatch.setattr(MODULE, "MIN_TRAIN_TRADE_EVENTS", 1)
     monkeypatch.setattr(MODULE, "MIN_VALIDATION_TRADE_EVENTS", 1)
     monkeypatch.setattr(MODULE, "MIN_LOCKED_OOS_TRADE_EVENTS", 1)
@@ -141,7 +161,9 @@ def test_search_integer_asset_leverage_profiles_emits_integer_asset_maps(monkeyp
         _replay(model_id="eth", symbol="ETHUSDT", allocation_fraction=0.2),
     ]
 
-    results = MODULE.search_integer_asset_leverage_profiles(replays, leverage_min=1, leverage_max=12)
+    results = MODULE.search_integer_asset_leverage_profiles(
+        replays, leverage_min=1, leverage_max=12
+    )
     balanced = results["balanced_mdd12_gross5"]
 
     assert balanced["train_validation_rejection_reasons"] == []
@@ -151,7 +173,9 @@ def test_search_integer_asset_leverage_profiles_emits_integer_asset_maps(monkeyp
     assert balanced["split_metrics"]["validation"]["total_return"] > 0.02
 
 
-def test_build_payload_keeps_real_money_disabled_and_oos_report_only(monkeypatch: object, tmp_path: Path) -> None:
+def test_build_payload_keeps_real_money_disabled_and_oos_report_only(
+    monkeypatch: object, tmp_path: Path
+) -> None:
     monkeypatch.setattr(MODULE, "MIN_TRAIN_TRADE_EVENTS", 1)
     monkeypatch.setattr(MODULE, "MIN_VALIDATION_TRADE_EVENTS", 1)
     monkeypatch.setattr(MODULE, "MIN_LOCKED_OOS_TRADE_EVENTS", 1)
@@ -174,7 +198,9 @@ def test_build_payload_keeps_real_money_disabled_and_oos_report_only(monkeypatch
     def fake_capture(*_: object, **__: object) -> dict[str, object]:
         return captures
 
-    def fake_load_bars(selected_rows: object, **_: object) -> dict[tuple[str, str, str], pd.DataFrame]:
+    def fake_load_bars(
+        selected_rows: object, **_: object
+    ) -> dict[tuple[str, str, str], pd.DataFrame]:
         del selected_rows
         return {
             (MODULE.corr.SOURCE_KIND_DEBOUNCED_REPAIR, "SOLUSDT", "1h"): _bars(
@@ -207,7 +233,12 @@ def test_build_payload_keeps_real_money_disabled_and_oos_report_only(monkeypatch
     assert payload["selected_profile"]["ready_for_real"] is False
     assert payload["selected_profile"]["real_money_execution"] is False
     assert payload["strategy_integrity_review"]["status"] == "pass"
-    assert payload["strategy_integrity_review"]["cost_assumption_check"]["primary_round_trip_execution_cost_bps"] == 10.0
+    assert (
+        payload["strategy_integrity_review"]["cost_assumption_check"][
+            "primary_round_trip_execution_cost_bps"
+        ]
+        == 10.0
+    )
 
 
 def test_strategy_integrity_review_rejects_calendar_tokens() -> None:

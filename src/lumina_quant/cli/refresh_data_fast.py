@@ -34,9 +34,22 @@ def _refresh_script_path() -> Path:
 
 
 def _native_rawfirst_library_path() -> Path:
-    suffix = ".dll" if sys.platform.startswith("win") else ".dylib" if sys.platform == "darwin" else ".so"
+    suffix = (
+        ".dll"
+        if sys.platform.startswith("win")
+        else ".dylib"
+        if sys.platform == "darwin"
+        else ".so"
+    )
     prefix = "" if sys.platform.startswith("win") else "lib"
-    return _repo_root() / "native" / "rust_rawfirst" / "target" / "release" / f"{prefix}lumina_rawfirst{suffix}"
+    return (
+        _repo_root()
+        / "native"
+        / "rust_rawfirst"
+        / "target"
+        / "release"
+        / f"{prefix}lumina_rawfirst{suffix}"
+    )
 
 
 def build_refresh_command(extra_args: list[str]) -> list[str]:

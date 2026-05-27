@@ -31,7 +31,11 @@ def test_strategy_signal_dispatcher_routes_to_explicit_handler():
 
 def test_strategy_signal_dispatcher_falls_back_when_handler_requires_more_symbols():
     dispatcher = StrategySignalDispatcher(
-        handlers={"PairStrategy": lambda *args: (_ for _ in ()).throw(AssertionError("handler should not run"))},
+        handlers={
+            "PairStrategy": lambda *args: (_ for _ in ()).throw(
+                AssertionError("handler should not run")
+            )
+        },
         minimum_symbol_counts={"PairStrategy": 2},
     )
     aligned = {"BTC/USDT:close": np.array([100.0, 102.0, 104.0], dtype=float)}

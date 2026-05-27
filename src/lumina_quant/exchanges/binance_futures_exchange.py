@@ -123,7 +123,9 @@ class BinanceFuturesExchange(ExchangeInterface):
             raise ValueError(f"Unsupported Binance futures driver: {driver}")
         market_type = str(exchange_config.get("market_type", "future") or "future").strip().lower()
         if market_type != "future":
-            raise ValueError("BinanceFuturesExchange only supports USDⓈ-M Futures market_type='future'.")
+            raise ValueError(
+                "BinanceFuturesExchange only supports USDⓈ-M Futures market_type='future'."
+            )
         name = str(exchange_config.get("name", "binance") or "binance").strip().lower()
         if name != "binance":
             raise ValueError("BinanceFuturesExchange requires EXCHANGE.name='binance'.")
@@ -185,7 +187,9 @@ class BinanceFuturesExchange(ExchangeInterface):
                 "contractType": str(item.get("contractType") or ""),
                 "precision": {
                     "amount": self._as_float(lot.get("stepSize"), 0.0),
-                    "price": self._as_float((filters.get("PRICE_FILTER") or {}).get("tickSize"), 0.0),
+                    "price": self._as_float(
+                        (filters.get("PRICE_FILTER") or {}).get("tickSize"), 0.0
+                    ),
                 },
                 "limits": {
                     "amount": {
@@ -193,7 +197,10 @@ class BinanceFuturesExchange(ExchangeInterface):
                         "max": self._as_float(market_lot.get("maxQty"), 0.0),
                     },
                     "cost": {
-                        "min": self._as_float(notional.get("notional"), self._as_float(notional.get("minNotional"), 0.0)),
+                        "min": self._as_float(
+                            notional.get("notional"),
+                            self._as_float(notional.get("minNotional"), 0.0),
+                        ),
                     },
                 },
                 "info": dict(item),
@@ -219,7 +226,9 @@ class BinanceFuturesExchange(ExchangeInterface):
         for row in self._client().account_balance_v3():
             if str(row.get("asset") or "").upper() != asset:
                 continue
-            return self._as_float(row.get("availableBalance"), self._as_float(row.get("balance"), 0.0))
+            return self._as_float(
+                row.get("availableBalance"), self._as_float(row.get("balance"), 0.0)
+            )
         return 0.0
 
     def _position_payload(self, row: dict[str, Any]) -> dict[str, Any]:
@@ -241,7 +250,9 @@ class BinanceFuturesExchange(ExchangeInterface):
 
     def fetch_positions(self, symbol: str | None = None) -> list[dict]:
         rows = self._client().position_risk_v3(symbol=symbol)
-        return [self._position_payload(dict(row or {})) for row in rows if dict(row or {}).get("symbol")]
+        return [
+            self._position_payload(dict(row or {})) for row in rows if dict(row or {}).get("symbol")
+        ]
 
     def get_all_positions(self) -> dict[str, float]:
         positions: dict[str, float] = {}
@@ -269,22 +280,41 @@ class BinanceFuturesExchange(ExchangeInterface):
                 bucket["SHORT"] += qty
             else:
                 bucket["LONG"] += qty
-        return {symbol: payload for symbol, payload in legs.items() if payload["LONG"] > 0.0 or payload["SHORT"] > 0.0}
+        return {
+            symbol: payload
+            for symbol, payload in legs.items()
+            if payload["LONG"] > 0.0 or payload["SHORT"] > 0.0
+        }
 
     def fetch_ohlcv(self, symbol: str, timeframe: str, limit: int = 100) -> list[tuple]:
-        rows = self._client().klines(symbol=symbol, interval=str(timeframe), limit=max(1, int(limit)))
+        rows = self._client().klines(
+            symbol=symbol, interval=str(timeframe), limit=max(1, int(limit))
+        )
         out: list[tuple] = []
         for row in rows:
             if not isinstance(row, list) or len(row) < 6:
                 continue
-            out.append((int(row[0]), float(row[1]), float(row[2]), float(row[3]), float(row[4]), float(row[5])))
+            out.append(
+                (
+                    int(row[0]),
+                    float(row[1]),
+                    float(row[2]),
+                    float(row[3]),
+                    float(row[4]),
+                    float(row[5]),
+                )
+            )
         return out
 
-    def fetch_trades(self, symbol: str, since: int | None = None, limit: int | None = None) -> list[dict]:
+    def fetch_trades(
+        self, symbol: str, since: int | None = None, limit: int | None = None
+    ) -> list[dict]:
         rows = self._client().agg_trades(
             symbol=symbol,
             start_time=int(since) if since is not None else None,
-            end_time=(min(int(since) + 3_599_999, int(time.time() * 1000)) if since is not None else None),
+            end_time=(
+                min(int(since) + 3_599_999, int(time.time() * 1000)) if since is not None else None
+            ),
             limit=max(1, min(int(limit or 1000), 1000)),
         )
         out: list[dict[str, Any]] = []
@@ -406,7 +436,9 @@ class BinanceFuturesExchange(ExchangeInterface):
             if price is None:
                 raise ValueError("LIMIT orders require price.")
             payload["price"] = price
-            payload["timeInForce"] = str(request_params.pop("timeInForce", request_params.pop("time_in_force", "GTC")))
+            payload["timeInForce"] = str(
+                request_params.pop("timeInForce", request_params.pop("time_in_force", "GTC"))
+            )
         elif price is not None and request_params.get("price") is None:
             payload["price"] = price
         if payload["type"] == "MARKET":
@@ -432,10 +464,12 @@ class BinanceFuturesExchange(ExchangeInterface):
             payload["newClientOrderId"] = request_params.pop("clientOrderId")
         if "client_order_id" in request_params and payload.get("newClientOrderId") is None:
             payload["newClientOrderId"] = request_params.pop("client_order_id")
-        if (
-            str(getattr(self.config, "POSITION_MODE", "HEDGE") or "HEDGE").upper() == "HEDGE"
-            and str(payload.get("positionSide") or "").upper() in {"LONG", "SHORT"}
-        ):
+        if str(
+            getattr(self.config, "POSITION_MODE", "HEDGE") or "HEDGE"
+        ).upper() == "HEDGE" and str(payload.get("positionSide") or "").upper() in {
+            "LONG",
+            "SHORT",
+        }:
             payload.pop("reduceOnly", None)
         payload.update({key: value for key, value in request_params.items() if value is not None})
         return self._normalize_order(self._client().new_order(**payload))
@@ -465,15 +499,19 @@ class BinanceFuturesExchange(ExchangeInterface):
                 continue
             if key in request_params and request_params[key] is not None:
                 payload[key] = request_params.pop(key)
-        if (
-            str(getattr(self.config, "POSITION_MODE", "HEDGE") or "HEDGE").upper() == "HEDGE"
-            and str(payload.get("positionSide") or "").upper() in {"LONG", "SHORT"}
-        ):
+        if str(
+            getattr(self.config, "POSITION_MODE", "HEDGE") or "HEDGE"
+        ).upper() == "HEDGE" and str(payload.get("positionSide") or "").upper() in {
+            "LONG",
+            "SHORT",
+        }:
             payload.pop("reduceOnly", None)
         return self._normalize_algo_order(self._client().new_algo_order(**payload))
 
     def fetch_open_orders(self, symbol: str | None = None) -> list[dict]:
-        return [self._normalize_order(item) for item in self._client().query_open_orders(symbol=symbol)]
+        return [
+            self._normalize_order(item) for item in self._client().query_open_orders(symbol=symbol)
+        ]
 
     def cancel_order(self, order_id: str, symbol: str | None = None) -> bool:
         if not symbol:

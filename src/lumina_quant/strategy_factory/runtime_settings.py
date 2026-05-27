@@ -81,7 +81,9 @@ def current_research_market_data_settings(
     return {
         "symbols": canonicalize_symbol_list(list(defaults["symbols"])),
         "parquet_root": str(
-            defaults.get("market_data_parquet_path", defaults.get("parquet_root", _DEFAULT_PARQUET_ROOT))
+            defaults.get(
+                "market_data_parquet_path", defaults.get("parquet_root", _DEFAULT_PARQUET_ROOT)
+            )
             or _DEFAULT_PARQUET_ROOT
         ),
         "exchange": str(

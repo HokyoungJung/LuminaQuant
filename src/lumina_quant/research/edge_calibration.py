@@ -107,7 +107,9 @@ def calibrate_edge_buckets(
     for bucket, values in bucket_values.items():
         n, mean, std, tail = _summary(values)
         parent_key = bucket_to_parent.get(bucket, ("__global__",))
-        parent_n, parent_mean, parent_std, parent_tail = _summary(parent_values.get(parent_key, global_values))
+        parent_n, parent_mean, parent_std, parent_tail = _summary(
+            parent_values.get(parent_key, global_values)
+        )
         if parent_n == 0:
             parent_mean = global_mean
             parent_std = global_std
@@ -120,11 +122,15 @@ def calibrate_edge_buckets(
         effective_tail = tail if n >= min_n else min(tail, parent_tail)
         tail_loss = max(0.0, -effective_tail)
         if lower <= float(min_lower_edge_bps):
-            decision = CalibrationDecision("block", "lower_confidence_edge_not_positive", lower, tail_loss)
+            decision = CalibrationDecision(
+                "block", "lower_confidence_edge_not_positive", lower, tail_loss
+            )
         elif tail_loss > float(max_tail_loss_bps):
             decision = CalibrationDecision("downsize", "tail_loss_exceeds_budget", lower, tail_loss)
         else:
-            decision = CalibrationDecision("allow", "edge_positive_after_shrinkage", lower, tail_loss)
+            decision = CalibrationDecision(
+                "allow", "edge_positive_after_shrinkage", lower, tail_loss
+            )
         out[bucket] = BucketCalibration(
             bucket=bucket,
             n=n,

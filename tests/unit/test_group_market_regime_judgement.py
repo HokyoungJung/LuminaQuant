@@ -117,18 +117,27 @@ def test_current_judgement_uses_market_rules() -> None:
 
 
 def test_oos_confirmation_override_triggers_only_for_small_train_val_mismatch() -> None:
-    assert MODULE._should_use_oos_confirmation_override(
-        combined_mean=-0.0003,
-        oos_mean=0.0015,
-        oos_count=6,
-    ) is True
-    assert MODULE._should_use_oos_confirmation_override(
-        combined_mean=-0.0020,
-        oos_mean=0.0015,
-        oos_count=6,
-    ) is False
-    assert MODULE._should_use_oos_confirmation_override(
-        combined_mean=-0.0003,
-        oos_mean=0.0004,
-        oos_count=6,
-    ) is False
+    assert (
+        MODULE._should_use_oos_confirmation_override(
+            combined_mean=-0.0003,
+            oos_mean=0.0015,
+            oos_count=6,
+        )
+        is True
+    )
+    assert (
+        MODULE._should_use_oos_confirmation_override(
+            combined_mean=-0.0020,
+            oos_mean=0.0015,
+            oos_count=6,
+        )
+        is False
+    )
+    assert (
+        MODULE._should_use_oos_confirmation_override(
+            combined_mean=-0.0003,
+            oos_mean=0.0004,
+            oos_count=6,
+        )
+        is False
+    )

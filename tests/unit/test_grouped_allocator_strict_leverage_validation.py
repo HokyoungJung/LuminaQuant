@@ -120,9 +120,15 @@ def test_apply_candidate_level_leverage_to_rows_transforms_streams() -> None:
             "name": "alpha",
             "params": {"leverage": 3},
             "return_streams": {
-                "train": [{"datetime": "2025-01-01T00:00:00Z", "t": "2025-01-01T00:00:00Z", "v": 0.01}],
-                "val": [{"datetime": "2026-01-01T00:00:00Z", "t": "2026-01-01T00:00:00Z", "v": 0.02}],
-                "oos": [{"datetime": "2026-02-01T00:00:00Z", "t": "2026-02-01T00:00:00Z", "v": 0.03}],
+                "train": [
+                    {"datetime": "2025-01-01T00:00:00Z", "t": "2025-01-01T00:00:00Z", "v": 0.01}
+                ],
+                "val": [
+                    {"datetime": "2026-01-01T00:00:00Z", "t": "2026-01-01T00:00:00Z", "v": 0.02}
+                ],
+                "oos": [
+                    {"datetime": "2026-02-01T00:00:00Z", "t": "2026-02-01T00:00:00Z", "v": 0.03}
+                ],
             },
         }
     ]
@@ -239,8 +245,7 @@ def test_apply_allocator_state_leverage_to_payload_updates_split_metrics(monkeyp
     def _fake_apply_state_leverage(frame, *, leverage_by_state):
         tuned = frame.copy()
         tuned["leveraged_return"] = [
-            row.base_return * leverage_by_state[row.state]
-            for row in tuned.itertuples(index=False)
+            row.base_return * leverage_by_state[row.state] for row in tuned.itertuples(index=False)
         ]
         tuned["leverage"] = [leverage_by_state[row.state] for row in tuned.itertuples(index=False)]
         tuned["segment_equity"] = [1.0, 1.1]
@@ -248,13 +253,19 @@ def test_apply_allocator_state_leverage_to_payload_updates_split_metrics(monkeyp
         tuned["liquidated"] = [False, False]
         return tuned, {"blend_85_15": 0, "autoresearch_55_45": 0, "incumbent": 0}
 
-    monkeypatch.setattr(MODULE._leverage_tuning, "_apply_state_leverage", _fake_apply_state_leverage)
+    monkeypatch.setattr(
+        MODULE._leverage_tuning, "_apply_state_leverage", _fake_apply_state_leverage
+    )
     monkeypatch.setattr(
         MODULE._three_way,
         "_metrics_by_split",
         lambda frame, return_col: {
-            "train": {"total_return": float(frame.loc[frame["split_group"] == "train", return_col].sum())},
-            "oos": {"total_return": float(frame.loc[frame["split_group"] == "oos", return_col].sum())},
+            "train": {
+                "total_return": float(frame.loc[frame["split_group"] == "train", return_col].sum())
+            },
+            "oos": {
+                "total_return": float(frame.loc[frame["split_group"] == "oos", return_col].sum())
+            },
         },
     )
 

@@ -70,7 +70,10 @@ class PortfolioSizingService:
     ) -> float:
         metadata = dict(getattr(signal, "metadata", None) or {})
         override_target_allocation = metadata.get("target_allocation")
-        if override_target_allocation is None and metadata.get("target_allocation_scale") is not None:
+        if (
+            override_target_allocation is None
+            and metadata.get("target_allocation_scale") is not None
+        ):
             override_target_allocation = float(target_allocation) * float(
                 metadata.get("target_allocation_scale")
             )
@@ -98,7 +101,9 @@ class PortfolioSizingService:
 
         override_max_order_value = metadata.get("max_order_value")
         if override_max_order_value is None and metadata.get("max_order_value_scale") is not None:
-            override_max_order_value = float(max_order_value) * float(metadata.get("max_order_value_scale"))
+            override_max_order_value = float(max_order_value) * float(
+                metadata.get("max_order_value_scale")
+            )
         if override_max_order_value is not None:
             max_order_value = max(0.0, float(override_max_order_value))
 

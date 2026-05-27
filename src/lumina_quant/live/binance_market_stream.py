@@ -139,7 +139,9 @@ class BinanceMarketStreamClient:
                 connected_at = time.monotonic()
                 with websockets.sync.client.connect(url, open_timeout=10, close_timeout=5) as ws:
                     while not stop_event.is_set():
-                        if time.monotonic() - connected_at >= max(60.0, float(self.config.max_connection_age_sec)):
+                        if time.monotonic() - connected_at >= max(
+                            60.0, float(self.config.max_connection_age_sec)
+                        ):
                             break
                         raw = ws.recv(timeout=1)
                         if raw is None:

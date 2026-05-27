@@ -47,9 +47,9 @@ class TimeframeAggregator:
                 value = default
             self._lookbacks[tf] = max(16, value)
 
-        self._history: dict[str, dict[str, deque[tuple[Any, float, float, float, float, float]]]] = (
-            defaultdict(dict)
-        )
+        self._history: dict[
+            str, dict[str, deque[tuple[Any, float, float, float, float, float]]]
+        ] = defaultdict(dict)
         self._working: dict[str, dict[str, dict[str, Any]]] = defaultdict(dict)
         self._last_seen_ms: dict[str, int] = {}
 
@@ -83,7 +83,9 @@ class TimeframeAggregator:
         return bucket[timeframe]
 
     @staticmethod
-    def _coerce_bar(symbol: str, bar: Any) -> tuple[int, tuple[Any, float, float, float, float, float]] | None:
+    def _coerce_bar(
+        symbol: str, bar: Any
+    ) -> tuple[int, tuple[Any, float, float, float, float, float]] | None:
         if isinstance(bar, MarketEvent):
             ts_ms = TimeframeAggregator._coerce_timestamp_ms(getattr(bar, "time", None))
             if ts_ms is None:
@@ -232,7 +234,9 @@ class TimeframeAggregator:
         processed timestamp per symbol are ignored to keep updates incremental.
         """
         if isinstance(symbol_or_bars, str):
-            bars_1s: dict[str, tuple[Any, ...] | list[Any]] = {str(symbol_or_bars): tuple(rows_1s or ())}
+            bars_1s: dict[str, tuple[Any, ...] | list[Any]] = {
+                str(symbol_or_bars): tuple(rows_1s or ())
+            }
         else:
             bars_1s = dict(symbol_or_bars or {})
 
@@ -339,7 +343,9 @@ class TimeframeAggregator:
             return []
         return history[-effective_n:]
 
-    def get_last_bar(self, symbol: str, timeframe: str) -> tuple[Any, float, float, float, float, float] | None:
+    def get_last_bar(
+        self, symbol: str, timeframe: str
+    ) -> tuple[Any, float, float, float, float, float] | None:
         bars = self.get_bars(symbol=str(symbol), timeframe=str(timeframe), n=1)
         return bars[-1] if bars else None
 

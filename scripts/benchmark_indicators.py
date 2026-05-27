@@ -41,6 +41,7 @@ def _load_alpha_functions():
 
         return alpha_001, alpha_005, alpha_011, alpha_025, alpha_101, False
     except Exception:
+
         def _noop(*_args, **_kwargs):
             return 0.0
 

@@ -504,8 +504,7 @@ def _load_grouped_rows_from_manifest(
                 if (not strategy_class or str(row.get("strategy_class") or "") == strategy_class)
                 and (
                     not timeframe
-                    or str(row.get("strategy_timeframe") or row.get("timeframe") or "")
-                    == timeframe
+                    or str(row.get("strategy_timeframe") or row.get("timeframe") or "") == timeframe
                 )
             ]
         grouped[sleeve] = rows
@@ -571,7 +570,9 @@ def _match_candidate_row(
     return None
 
 
-def _challenger_clears_anchor(anchor: dict[str, Any], challenger: dict[str, Any]) -> tuple[bool, dict[str, float]]:
+def _challenger_clears_anchor(
+    anchor: dict[str, Any], challenger: dict[str, Any]
+) -> tuple[bool, dict[str, float]]:
     anchor_val = dict(anchor.get("val") or {})
     anchor_train = dict(anchor.get("train") or {})
     challenger_val = dict(challenger.get("val") or {})
@@ -657,7 +658,9 @@ def _select_rolling_candidate(
         raise RuntimeError("rolling gate survived but no rolling candidate row was available")
     supplemented = _supplement_rolling_gate(base_row, gate_payload)
     supplemented["anchor_decision"] = "rolling_gate_admitted"
-    supplemented["anchor_decision_reason"] = "rolling breakout admitted only after train+val gate survival"
+    supplemented["anchor_decision_reason"] = (
+        "rolling breakout admitted only after train+val gate survival"
+    )
     supplemented["source_of_truth"] = "rolling_breakout_train_val_gate"
     supplemented["rolling_gate_status"] = "admitted"
     supplemented["rolling_gate_selection_basis"] = _rolling_gate_selection_basis(gate_payload)
@@ -972,7 +975,9 @@ def build_portfolio_exact_window_freeze(
             if isinstance(row, dict)
         ]
         if not incumbent_rows:
-            raise RuntimeError("incumbent-aware selection_mode requires incumbent bundle candidates")
+            raise RuntimeError(
+                "incumbent-aware selection_mode requires incumbent bundle candidates"
+            )
 
         grouped_by_strategy: dict[tuple[str, str], tuple[str, list[dict[str, Any]]]] = {}
         for sleeve_name, sleeve_candidates in grouped.items():
@@ -994,7 +999,10 @@ def build_portfolio_exact_window_freeze(
             for row in sleeve_candidates:
                 key = _strategy_key(dict(row))
                 if key != ("", "") and key not in grouped_by_strategy:
-                    grouped_by_strategy[key] = (sleeve_name, [dict(item) for item in sleeve_candidates])
+                    grouped_by_strategy[key] = (
+                        sleeve_name,
+                        [dict(item) for item in sleeve_candidates],
+                    )
                     break
 
         for incumbent_row in incumbent_rows:

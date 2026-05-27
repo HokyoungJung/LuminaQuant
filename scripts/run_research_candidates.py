@@ -179,7 +179,9 @@ def _resolve_shortlist_selection_config(
     if "weight_temperature" in shortlist_cfg:
         resolved["weight_temperature"] = max(
             0.0,
-            _safe_float(shortlist_cfg.get("weight_temperature"), float(resolved["weight_temperature"])),
+            _safe_float(
+                shortlist_cfg.get("weight_temperature"), float(resolved["weight_temperature"])
+            ),
         )
     if "max_weight" in shortlist_cfg:
         resolved["max_weight"] = max(
@@ -201,11 +203,19 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-candidates", type=int, default=512)
     parser.add_argument("--top-k", type=int, default=40)
     parser.add_argument("--score-config", default="", help="Optional scoring config JSON path.")
-    parser.add_argument("--train-start", default="", help="Exact split train window start (ISO/date).")
+    parser.add_argument(
+        "--train-start", default="", help="Exact split train window start (ISO/date)."
+    )
     parser.add_argument("--train-end", default="", help="Exact split train window end (ISO/date).")
-    parser.add_argument("--validation-start", default="", help="Exact split validation window start (ISO/date).")
-    parser.add_argument("--validation-end", default="", help="Exact split validation window end (ISO/date).")
-    parser.add_argument("--oos-start", default="", help="Exact split OOS/test window start (ISO/date).")
+    parser.add_argument(
+        "--validation-start", default="", help="Exact split validation window start (ISO/date)."
+    )
+    parser.add_argument(
+        "--validation-end", default="", help="Exact split validation window end (ISO/date)."
+    )
+    parser.add_argument(
+        "--oos-start", default="", help="Exact split OOS/test window start (ISO/date)."
+    )
     parser.add_argument("--oos-end", default="", help="Exact split OOS/test window end (ISO/date).")
     parser.add_argument(
         "--skip-coverage-rebuild",
@@ -294,15 +304,9 @@ def _build_exact_split(args: argparse.Namespace) -> dict[str, str] | None:
     missing = [field for field, value in raw.items() if not str(value or "").strip()]
     if missing:
         missing_text = ", ".join(sorted(missing))
-        raise ValueError(
-            "exact split requires all window boundaries; missing: "
-            f"{missing_text}"
-        )
+        raise ValueError(f"exact split requires all window boundaries; missing: {missing_text}")
 
-    resolved = {
-        field: _validate_split_token(value, field=field)
-        for field, value in raw.items()
-    }
+    resolved = {field: _validate_split_token(value, field=field) for field, value in raw.items()}
     resolved["mode"] = "exact_dates"
     return resolved
 
@@ -411,7 +415,8 @@ def _rebuild_candidates_after_coverage(
             available_symbol_count = sum(
                 1
                 for symbol in symbols
-                if int((coverage.get((symbol, timeframe)) or {}).get("rows", 0)) >= _MIN_COVERAGE_BARS
+                if int((coverage.get((symbol, timeframe)) or {}).get("rows", 0))
+                >= _MIN_COVERAGE_BARS
             )
             progress_callback(
                 "coverage_timeframe_loaded",
@@ -494,7 +499,9 @@ def _run_candidate_research_with_optional_split(
         parameter.kind is inspect.Parameter.VAR_KEYWORD
         for parameter in signature.parameters.values()
     )
-    if progress_callback is not None and ("progress_callback" in param_names or supports_var_kwargs):
+    if progress_callback is not None and (
+        "progress_callback" in param_names or supports_var_kwargs
+    ):
         kwargs["progress_callback"] = progress_callback
     if not exact_split:
         return run_candidate_research(**kwargs)
@@ -541,7 +548,9 @@ def _run_candidate_research_with_optional_split(
     )
     for mapping in family_mappings:
         if set(mapping).issubset(param_names):
-            kwargs.update({param_name: exact_split[split_key] for param_name, split_key in mapping.items()})
+            kwargs.update(
+                {param_name: exact_split[split_key] for param_name, split_key in mapping.items()}
+            )
             return run_candidate_research(**kwargs)
 
     raise ValueError(
@@ -834,7 +843,9 @@ class _ResearchProgressWriter:
         benchmark_state = dict(resource_load.get("benchmark") or {})
 
         if event == "resources_loaded":
-            progress["candidate_count"] = int(payload.get("candidate_count", progress.get("candidate_count", 0)) or 0)
+            progress["candidate_count"] = int(
+                payload.get("candidate_count", progress.get("candidate_count", 0)) or 0
+            )
             self.state["resources"] = dict(payload or {})
         elif event == "resource_bundle_load_started":
             bundle_state.update(
@@ -866,7 +877,9 @@ class _ResearchProgressWriter:
                 }
             )
         elif event == "resource_bundle_timeframe_completed":
-            recent_timeframes = [dict(row) for row in list(bundle_state.get("recent_timeframes") or [])]
+            recent_timeframes = [
+                dict(row) for row in list(bundle_state.get("recent_timeframes") or [])
+            ]
             recent_timeframes.append(dict(payload or {}))
             bundle_state.update(
                 {
@@ -908,8 +921,12 @@ class _ResearchProgressWriter:
             bundle_state.update(
                 {
                     "status": "running",
-                    "loaded_count": int(payload.get("loaded_count", bundle_state.get("loaded_count", 0)) or 0),
-                    "total_count": int(payload.get("total_count", bundle_state.get("total_count", 0)) or 0),
+                    "loaded_count": int(
+                        payload.get("loaded_count", bundle_state.get("loaded_count", 0)) or 0
+                    ),
+                    "total_count": int(
+                        payload.get("total_count", bundle_state.get("total_count", 0)) or 0
+                    ),
                     "source_counts": source_counts,
                     "latest_item": dict(payload or {}),
                     "slowest_items": _merge_slowest_entries(
@@ -922,11 +939,17 @@ class _ResearchProgressWriter:
             bundle_state.update(
                 {
                     "status": "completed",
-                    "loaded_count": int(payload.get("bundle_count", bundle_state.get("loaded_count", 0)) or 0),
+                    "loaded_count": int(
+                        payload.get("bundle_count", bundle_state.get("loaded_count", 0)) or 0
+                    ),
                     "bundle_count": int(payload.get("bundle_count", 0) or 0),
-                    "total_count": int(payload.get("total_count", bundle_state.get("total_count", 0)) or 0),
+                    "total_count": int(
+                        payload.get("total_count", bundle_state.get("total_count", 0)) or 0
+                    ),
                     "elapsed_seconds": _progress_elapsed_seconds(payload),
-                    "source_counts": dict(payload.get("source_counts") or bundle_state.get("source_counts") or {}),
+                    "source_counts": dict(
+                        payload.get("source_counts") or bundle_state.get("source_counts") or {}
+                    ),
                     "current_timeframe": {},
                     "current_symbol_fetch": {},
                 }
@@ -984,8 +1007,12 @@ class _ResearchProgressWriter:
             feature_state.update(
                 {
                     "status": "running",
-                    "loaded_count": int(payload.get("loaded_count", feature_state.get("loaded_count", 0)) or 0),
-                    "symbol_count": int(payload.get("symbol_count", feature_state.get("symbol_count", 0)) or 0),
+                    "loaded_count": int(
+                        payload.get("loaded_count", feature_state.get("loaded_count", 0)) or 0
+                    ),
+                    "symbol_count": int(
+                        payload.get("symbol_count", feature_state.get("symbol_count", 0)) or 0
+                    ),
                     "current_symbol": {},
                     "latest_symbol": dict(payload or {}),
                     "slowest_symbols": _merge_slowest_entries(
@@ -998,8 +1025,13 @@ class _ResearchProgressWriter:
             feature_state.update(
                 {
                     "status": "completed",
-                    "loaded_count": int(payload.get("feature_frame_count", feature_state.get("loaded_count", 0)) or 0),
-                    "symbol_count": int(payload.get("symbol_count", feature_state.get("symbol_count", 0)) or 0),
+                    "loaded_count": int(
+                        payload.get("feature_frame_count", feature_state.get("loaded_count", 0))
+                        or 0
+                    ),
+                    "symbol_count": int(
+                        payload.get("symbol_count", feature_state.get("symbol_count", 0)) or 0
+                    ),
                     "feature_frame_count": int(payload.get("feature_frame_count", 0) or 0),
                     "nonempty_symbol_count": int(payload.get("nonempty_symbol_count", 0) or 0),
                     "total_rows": int(payload.get("total_rows", 0) or 0),
@@ -1031,8 +1063,13 @@ class _ResearchProgressWriter:
             benchmark_state.update(
                 {
                     "status": "running",
-                    "built_count": int(payload.get("built_count", benchmark_state.get("built_count", 0)) or 0),
-                    "timeframe_count": int(payload.get("timeframe_count", benchmark_state.get("timeframe_count", 0)) or 0),
+                    "built_count": int(
+                        payload.get("built_count", benchmark_state.get("built_count", 0)) or 0
+                    ),
+                    "timeframe_count": int(
+                        payload.get("timeframe_count", benchmark_state.get("timeframe_count", 0))
+                        or 0
+                    ),
                     "current_timeframe": {},
                     "latest_timeframe": dict(payload or {}),
                     "slowest_timeframes": _merge_slowest_entries(
@@ -1045,23 +1082,36 @@ class _ResearchProgressWriter:
             benchmark_state.update(
                 {
                     "status": "completed",
-                    "built_count": int(payload.get("benchmark_count", benchmark_state.get("built_count", 0)) or 0),
+                    "built_count": int(
+                        payload.get("benchmark_count", benchmark_state.get("built_count", 0)) or 0
+                    ),
                     "benchmark_count": int(payload.get("benchmark_count", 0) or 0),
-                    "timeframe_count": int(payload.get("timeframe_count", benchmark_state.get("timeframe_count", 0)) or 0),
-                    "nonempty_timeframe_count": int(payload.get("nonempty_timeframe_count", 0) or 0),
+                    "timeframe_count": int(
+                        payload.get("timeframe_count", benchmark_state.get("timeframe_count", 0))
+                        or 0
+                    ),
+                    "nonempty_timeframe_count": int(
+                        payload.get("nonempty_timeframe_count", 0) or 0
+                    ),
                     "elapsed_seconds": _progress_elapsed_seconds(payload),
                     "current_timeframe": {},
                 }
             )
         elif event == "candidate_evaluated":
-            progress["candidate_count"] = int(payload.get("candidate_count", progress.get("candidate_count", 0)) or 0)
-            progress["evaluated_count"] = int(payload.get("candidate_index", progress.get("evaluated_count", 0)) or 0)
+            progress["candidate_count"] = int(
+                payload.get("candidate_count", progress.get("candidate_count", 0)) or 0
+            )
+            progress["evaluated_count"] = int(
+                payload.get("candidate_index", progress.get("evaluated_count", 0)) or 0
+            )
             candidate_snapshot = dict(payload or {})
             self.state["latest_candidate"] = candidate_snapshot
             top_rows = [dict(row) for row in list(self.state.get("top_stage1_candidates") or [])]
             top_rows.append(candidate_snapshot)
             top_rows.sort(
-                key=lambda row: float(row.get("stage1_prefilter_score", float("-inf")) or float("-inf")),
+                key=lambda row: float(
+                    row.get("stage1_prefilter_score", float("-inf")) or float("-inf")
+                ),
                 reverse=True,
             )
             deduped: list[dict[str, Any]] = []
@@ -1076,13 +1126,23 @@ class _ResearchProgressWriter:
                     break
             self.state["top_stage1_candidates"] = deduped
         elif event == "stage1_ranked":
-            progress["candidate_count"] = int(payload.get("candidate_count", progress.get("candidate_count", 0)) or 0)
-            progress["keep_count"] = int(payload.get("keep_count", progress.get("keep_count", 0)) or 0)
-            self.state["top_stage1_candidates"] = [dict(row) for row in list(payload.get("top_stage1_candidates") or [])]
+            progress["candidate_count"] = int(
+                payload.get("candidate_count", progress.get("candidate_count", 0)) or 0
+            )
+            progress["keep_count"] = int(
+                payload.get("keep_count", progress.get("keep_count", 0)) or 0
+            )
+            self.state["top_stage1_candidates"] = [
+                dict(row) for row in list(payload.get("top_stage1_candidates") or [])
+            ]
             self.state["keep_ratio_applied"] = float(payload.get("keep_ratio_applied", 0.0) or 0.0)
         elif event == "stage2_selected":
-            progress["selected_count"] = int(payload.get("selected_count", progress.get("selected_count", 0)) or 0)
-            self.state["selected_candidates"] = [dict(row) for row in list(payload.get("selected_candidates") or [])]
+            progress["selected_count"] = int(
+                payload.get("selected_count", progress.get("selected_count", 0)) or 0
+            )
+            self.state["selected_candidates"] = [
+                dict(row) for row in list(payload.get("selected_candidates") or [])
+            ]
         elif event == "report_ready":
             self.state["report_preview"] = dict(payload or {})
 
@@ -1260,7 +1320,9 @@ class _ResearchProgressWriter:
                         f"`{active_detail.get('timeframe', '')}` "
                         f"(`{int(active_detail.get('timeframe_index', 0))}/{int(active_detail.get('timeframe_count', 0))}`)"
                     )
-            recent_timeframes = [dict(row) for row in list(bundle_state.get("recent_timeframes") or [])]
+            recent_timeframes = [
+                dict(row) for row in list(bundle_state.get("recent_timeframes") or [])
+            ]
             if recent_timeframes:
                 rendered = ", ".join(
                     f"{row.get('timeframe', '')}:{int(row.get('parquet_symbol_count', 0) or 0)}/{int(row.get('symbol_count', 0) or 0)} "
@@ -1307,8 +1369,7 @@ class _ResearchProgressWriter:
             source_counts = dict(bundle_state.get("source_counts") or {})
             if source_counts:
                 rendered_counts = ", ".join(
-                    f"{source}={count}"
-                    for source, count in sorted(source_counts.items())
+                    f"{source}={count}" for source, count in sorted(source_counts.items())
                 )
                 lines.append(f"- Bundle sources: `{rendered_counts}`")
             slowest_bundle = list(bundle_state.get("slowest_items") or [])
@@ -1451,7 +1512,9 @@ def main() -> int:
     score_config_scope = _score_config_scope(score_config)
 
     symbols = canonicalize_symbol_list(list(args.symbols))
-    timeframes = [str(token).strip().lower() for token in list(args.timeframes) if str(token).strip()]
+    timeframes = [
+        str(token).strip().lower() for token in list(args.timeframes) if str(token).strip()
+    ]
 
     manifest_path = Path(str(args.manifest)).resolve() if str(args.manifest).strip() else None
     if manifest_path and manifest_path.exists():
@@ -1491,7 +1554,9 @@ def main() -> int:
     try:
         exact_split = _build_exact_split(args)
         if exact_split is not None and not bool(args.skip_coverage_rebuild):
-            exact_split["strategy_timeframe"] = timeframes[0] if timeframes else str(args.base_timeframe)
+            exact_split["strategy_timeframe"] = (
+                timeframes[0] if timeframes else str(args.base_timeframe)
+            )
             candidates, exact_split, coverage_summary = _rebuild_candidates_after_coverage(
                 candidates=list(candidates),
                 symbols=symbols,
@@ -1593,7 +1658,8 @@ def main() -> int:
         "split": report.get("split"),
         "requested_split": report.get("requested_split") or {},
         "effective_split": report.get("effective_split") or {},
-        "split_mode": report.get("split_mode") or ("exact" if exact_split is not None else "default"),
+        "split_mode": report.get("split_mode")
+        or ("exact" if exact_split is not None else "default"),
         "source_report": str(output_path),
         "selected_team": shortlisted,
         "risk_off_mode": risk_off_mode,

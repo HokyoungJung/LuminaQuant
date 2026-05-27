@@ -40,7 +40,9 @@ DEFAULT_OUTPUT_DIR = high.DEFAULT_ALPHA_V2 / "alpha_zoo_7x_paper_forward_preflig
 ACTIVE_PROFILE_ID = "higher_risk_train_return_tilt_v1"
 BALANCED_PROFILE_ID = "balanced_train_validation_v1"
 ACTIVE_MODEL_ID = "fresh_tv10_filter_abs_score_ge_1p5_alpha_zoo_quality_single_pair_7p0x_0p2alloc"
-BALANCED_MODEL_ID = "fresh_tv10_filter_abs_score_ge_1p5_alpha_zoo_quality_single_pair_6p0x_0p175alloc"
+BALANCED_MODEL_ID = (
+    "fresh_tv10_filter_abs_score_ge_1p5_alpha_zoo_quality_single_pair_6p0x_0p175alloc"
+)
 PRIMARY_ROUND_TRIP_COST_BPS = 10.0
 SIZING_MODE = "isolated_margin_fraction"
 SYMBOLS = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "TRX/USDT"]
@@ -109,8 +111,7 @@ def _required_finite_float(value: Any, *, field_name: str) -> float:
 def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
-        json.dumps(high._json_safe(payload), ensure_ascii=False, indent=2, sort_keys=True)
-        + "\n",
+        json.dumps(high._json_safe(payload), ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
 
@@ -184,7 +185,11 @@ def summarize_round_trip_costs(
         "p95_limit_bps": float(p95_limit_bps),
         "mean_cost_pass": bool(mean_pass),
         "p95_cost_pass": bool(p95_pass),
-        "cost_status": "pass" if mean_pass and p95_pass else "pending_no_fills" if not values else "fail",
+        "cost_status": "pass"
+        if mean_pass and p95_pass
+        else "pending_no_fills"
+        if not values
+        else "fail",
     }
 
 
@@ -192,12 +197,15 @@ def _selection_profile(retune: Mapping[str, Any], profile_id: str) -> dict[str, 
     profile = dict(dict(retune.get("selection_profiles") or {}).get(profile_id) or {})
     if not profile:
         raise ValueError(f"missing selection profile: {profile_id}")
-    if any(profile.get(key) for key in (
-        "uses_locked_oos_for_objective",
-        "uses_locked_oos_for_parameter_fitting",
-        "uses_locked_oos_for_pruning",
-        "uses_locked_oos_for_selection",
-    )):
+    if any(
+        profile.get(key)
+        for key in (
+            "uses_locked_oos_for_objective",
+            "uses_locked_oos_for_parameter_fitting",
+            "uses_locked_oos_for_pruning",
+            "uses_locked_oos_for_selection",
+        )
+    ):
         raise ValueError(f"profile {profile_id} violates locked-OOS report-only contract")
     return profile
 
@@ -216,7 +224,9 @@ def _model_metrics(retune: Mapping[str, Any], model_id: str) -> dict[str, dict[s
 
 
 def _model_summary(retune: Mapping[str, Any], *, role: str) -> dict[str, Any]:
-    key = "higher_risk_selected_10bps_model" if role == "active" else "balanced_reference_10bps_model"
+    key = (
+        "higher_risk_selected_10bps_model" if role == "active" else "balanced_reference_10bps_model"
+    )
     model = dict(retune.get(key) or {})
     expected = ACTIVE_MODEL_ID if role == "active" else BALANCED_MODEL_ID
     if model.get("model_id") != expected:
@@ -251,9 +261,7 @@ def _strategy_params_for_candidate(
     abs_min = trade_filter_params.get("abs_factor_score_min")
     if abs_min is not None:
         params["abs_factor_score_min"] = float(abs_min)
-    params["calibrated_edges"] = {
-        str(key): float(value) for key, value in calibrated_edges.items()
-    }
+    params["calibrated_edges"] = {str(key): float(value) for key, value in calibrated_edges.items()}
     params["decision_cadence_seconds"] = 3600
     params["paper_forward_trade_filter"] = dict(trade_filter_params)
     return params
@@ -568,7 +576,11 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     monitoring_rows: list[dict[str, Any]] = []
 
     configs = [
-        ("active", ACTIVE_PROFILE_ID, "live_alpha_zoo_quality_single_pair_7x_0p20_paper_decision_latest.json"),
+        (
+            "active",
+            ACTIVE_PROFILE_ID,
+            "live_alpha_zoo_quality_single_pair_7x_0p20_paper_decision_latest.json",
+        ),
         (
             "balanced",
             BALANCED_PROFILE_ID,
@@ -715,8 +727,12 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
         },
         "memory_summary": {
             "limit_mib": 8192.0,
-            "source_retune_peak_rss_mib": dict(retune.get("memory_summary") or {}).get("peak_rss_mib"),
-            "source_retune_pass_under_8gb": dict(retune.get("memory_summary") or {}).get("pass_under_8gb"),
+            "source_retune_peak_rss_mib": dict(retune.get("memory_summary") or {}).get(
+                "peak_rss_mib"
+            ),
+            "source_retune_pass_under_8gb": dict(retune.get("memory_summary") or {}).get(
+                "pass_under_8gb"
+            ),
         },
     }
     _write_json(latest_path, payload)

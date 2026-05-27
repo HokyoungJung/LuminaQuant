@@ -30,7 +30,9 @@ DEFAULT_HYBRID_PATH = (
     GROUP_ROOT / "portfolio_hybrid_online_current" / "hybrid_online_portfolio_latest.json"
 )
 DEFAULT_OUTPUT_DIR = (
-    GROUP_ROOT / "current_switch_validation_current" / "performance_first_threshold_frontier_current"
+    GROUP_ROOT
+    / "current_switch_validation_current"
+    / "performance_first_threshold_frontier_current"
 )
 
 _SWITCH_SPEC = importlib.util.spec_from_file_location(
@@ -75,7 +77,9 @@ def _parse_grid(value: str) -> list[float]:
 def _hybrid_health_from_payload(hybrid_payload: Mapping[str, Any]) -> dict[str, Any]:
     readiness = dict(hybrid_payload.get("readiness") or {})
     split_metrics = dict(
-        dict((hybrid_payload.get("scenarios") or {}).get("refreshed_latest_tail") or {}).get("split_metrics")
+        dict((hybrid_payload.get("scenarios") or {}).get("refreshed_latest_tail") or {}).get(
+            "split_metrics"
+        )
         or {}
     )
     val = dict(split_metrics.get("val") or {})
@@ -169,14 +173,21 @@ def _frontier_profiles(
     if not passing:
         return {
             "passing_count": 0,
-            "total_count": len(list(return_grid)) * len(list(sharpe_grid)) * len(list(val_return_grid)) * len(list(val_sharpe_grid)),
+            "total_count": len(list(return_grid))
+            * len(list(sharpe_grid))
+            * len(list(val_return_grid))
+            * len(list(val_sharpe_grid)),
             "frontier_maxima": {},
             "profiles": [],
         }
 
     frontier_maxima = {
-        "max_return_edge_threshold_that_still_promotes": max(item.min_oos_return_edge for item in passing),
-        "max_sharpe_edge_threshold_that_still_promotes": max(item.min_oos_sharpe_edge for item in passing),
+        "max_return_edge_threshold_that_still_promotes": max(
+            item.min_oos_return_edge for item in passing
+        ),
+        "max_sharpe_edge_threshold_that_still_promotes": max(
+            item.min_oos_sharpe_edge for item in passing
+        ),
         "max_min_val_return_that_still_promotes": max(item.min_val_return for item in passing),
         "max_min_val_sharpe_that_still_promotes": max(item.min_val_sharpe for item in passing),
     }
@@ -193,8 +204,12 @@ def _frontier_profiles(
         asdict(
             ThresholdProfile(
                 name="tightest_passing_on_grid",
-                min_oos_return_edge=float(frontier_maxima["max_return_edge_threshold_that_still_promotes"]),
-                min_oos_sharpe_edge=float(frontier_maxima["max_sharpe_edge_threshold_that_still_promotes"]),
+                min_oos_return_edge=float(
+                    frontier_maxima["max_return_edge_threshold_that_still_promotes"]
+                ),
+                min_oos_sharpe_edge=float(
+                    frontier_maxima["max_sharpe_edge_threshold_that_still_promotes"]
+                ),
                 min_val_return=float(frontier_maxima["max_min_val_return_that_still_promotes"]),
                 min_val_sharpe=float(frontier_maxima["max_min_val_sharpe_that_still_promotes"]),
             )
@@ -202,7 +217,10 @@ def _frontier_profiles(
     ]
     return {
         "passing_count": len(passing),
-        "total_count": len(list(return_grid)) * len(list(sharpe_grid)) * len(list(val_return_grid)) * len(list(val_sharpe_grid)),
+        "total_count": len(list(return_grid))
+        * len(list(sharpe_grid))
+        * len(list(val_return_grid))
+        * len(list(val_sharpe_grid)),
         "frontier_maxima": frontier_maxima,
         "profiles": profiles,
     }

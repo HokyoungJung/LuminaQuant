@@ -51,8 +51,12 @@ def _load_script_module(name: str, filename: str):
     return module
 
 
-_helper = _load_script_module("run_causal_dynamic_portfolio_helper", "run_causal_dynamic_portfolio.py")
-_switch = _load_script_module("run_regime_switching_portfolio_helper", "run_regime_switching_portfolio.py")
+_helper = _load_script_module(
+    "run_causal_dynamic_portfolio_helper", "run_causal_dynamic_portfolio.py"
+)
+_switch = _load_script_module(
+    "run_regime_switching_portfolio_helper", "run_regime_switching_portfolio.py"
+)
 
 DEFAULT_OUTPUT_DIR = FOLLOWUP_ROOT / "portfolio_four_sleeve_regime_current"
 DEFAULT_CONTINUITY_REPORT = FOLLOWUP_ROOT / "portfolio_continuity_validation_latest.json"
@@ -144,7 +148,9 @@ def _load_default_sleeves() -> list[dict[str, Any]]:
     ]
 
 
-def _candidate_runtime_risk(continuity_payload: dict[str, Any], *, require_continuity_pass: bool) -> dict[str, Any]:
+def _candidate_runtime_risk(
+    continuity_payload: dict[str, Any], *, require_continuity_pass: bool
+) -> dict[str, Any]:
     status = str(continuity_payload.get("status") or "missing").lower()
     continuity_failed = status not in {"completed", "passed", "ok", "success"}
     return {
@@ -204,7 +210,9 @@ def _weight_turnover(prev_weights: dict[str, float], next_weights: dict[str, flo
     )
 
 
-def _cap_transition(prev_weights: dict[str, float], next_weights: dict[str, float], *, max_turnover: float) -> dict[str, float]:
+def _cap_transition(
+    prev_weights: dict[str, float], next_weights: dict[str, float], *, max_turnover: float
+) -> dict[str, float]:
     current_turnover = _weight_turnover(prev_weights, next_weights)
     if current_turnover <= max_turnover or current_turnover <= 1e-12:
         return dict(next_weights)
@@ -284,9 +292,13 @@ def run_four_sleeve_allocator(
                     continue
 
                 persistence = 1.0 + (params.hysteresis_bonus if cid in weights else 0.0)
-                switch_drag = 1.0 if cid in weights else 1.0 / max(1.0, 1.0 + params.switch_score_hurdle)
+                switch_drag = (
+                    1.0 if cid in weights else 1.0 / max(1.0, 1.0 + params.switch_score_hurdle)
+                )
                 vol_inv = 1.0 / max(trailing_vol, 1e-6)
-                dd_penalty = max(0.05, 1.0 - (trailing_dd / max(params.max_trailing_drawdown, 1e-6)))
+                dd_penalty = max(
+                    0.05, 1.0 - (trailing_dd / max(params.max_trailing_drawdown, 1e-6))
+                )
                 raw_scores[cid] = float(
                     (1.0 + max(0.0, trailing_sharpe))
                     * (1.0 + (8.0 * max(0.0, trailing_return)))
@@ -322,7 +334,9 @@ def run_four_sleeve_allocator(
             )
             weight_turnover = _weight_turnover(weights, next_weights)
             if weights and weight_turnover > params.max_weight_turnover:
-                next_weights = _cap_transition(weights, next_weights, max_turnover=params.max_weight_turnover)
+                next_weights = _cap_transition(
+                    weights, next_weights, max_turnover=params.max_weight_turnover
+                )
                 weight_turnover = _weight_turnover(weights, next_weights)
 
             turnover_cost = (max(0.0, params.turnover_cost_bps) / 10_000.0) * weight_turnover
@@ -435,7 +449,9 @@ def _final_allocation_rows(result: dict[str, Any]) -> list[dict[str, Any]]:
     latest = allocations[-1]
     meta = dict(result.get("meta") or {})
     rows = []
-    for cid, weight in sorted(dict(latest.get("weights") or {}).items(), key=lambda item: float(item[1]), reverse=True):
+    for cid, weight in sorted(
+        dict(latest.get("weights") or {}).items(), key=lambda item: float(item[1]), reverse=True
+    ):
         row = dict(meta.get(cid) or {})
         row["candidate_id"] = cid
         row["weight"] = float(weight)
@@ -443,7 +459,9 @@ def _final_allocation_rows(result: dict[str, Any]) -> list[dict[str, Any]]:
     return rows
 
 
-def _allocation_summary(allocations: list[dict[str, Any]], *, candidate_ids: list[str]) -> dict[str, Any]:
+def _allocation_summary(
+    allocations: list[dict[str, Any]], *, candidate_ids: list[str]
+) -> dict[str, Any]:
     return _switch._allocation_summary(allocations, candidate_ids=candidate_ids)
 
 
@@ -459,7 +477,9 @@ def write_report(*, output_dir: Path = DEFAULT_OUTPUT_DIR) -> dict[str, Any]:
     memory_guard = acquire_portfolio_memory_guard(
         run_name="portfolio_four_sleeve_regime_allocator",
         output_dir=output_dir,
-        input_path="::".join(str(_resolve_candidate_source(spec["path"])) for spec in DEFAULT_SLEEVE_SPECS),
+        input_path="::".join(
+            str(_resolve_candidate_source(spec["path"])) for spec in DEFAULT_SLEEVE_SPECS
+        ),
         budget_bytes=PORTFOLIO_FOLLOWUP_EXPLICIT_BUDGET_BYTES,
     )
     status = "completed"
@@ -537,7 +557,9 @@ def write_report(*, output_dir: Path = DEFAULT_OUTPUT_DIR) -> dict[str, Any]:
         error = str(exc)
         raise
     finally:
-        memory_guard.sample(event="four_sleeve_regime_finish", context={"status": status, "error": error})
+        memory_guard.sample(
+            event="four_sleeve_regime_finish", context={"status": status, "error": error}
+        )
         memory_summary = memory_guard.finalize(
             status=status,
             error=error,

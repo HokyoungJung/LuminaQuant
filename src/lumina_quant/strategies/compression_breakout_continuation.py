@@ -105,7 +105,9 @@ class CompressionBreakoutContinuationStrategy(Strategy):
         self.events = events
         self.symbol_list = list(getattr(self.bars, "symbol_list", []) or [])
         if not self.symbol_list:
-            raise ValueError("CompressionBreakoutContinuationStrategy requires at least one symbol.")
+            raise ValueError(
+                "CompressionBreakoutContinuationStrategy requires at least one symbol."
+            )
 
         resolved = resolve_params_from_schema(
             self.get_param_schema(),
@@ -147,12 +149,15 @@ class CompressionBreakoutContinuationStrategy(Strategy):
         candidate_btc = str(resolved["btc_symbol"] or "").strip()
         self.btc_symbol = candidate_btc if candidate_btc in self.symbol_list else default_btc
 
-        history_len = max(
-            self.lookback_bars,
-            self.compression_window,
-            self.broad_lookback_bars,
-            self.compression_history_bars,
-        ) + 4
+        history_len = (
+            max(
+                self.lookback_bars,
+                self.compression_window,
+                self.broad_lookback_bars,
+                self.compression_history_bars,
+            )
+            + 4
+        )
         self._state = {
             symbol: _CompressionBreakoutState(
                 closes=deque(maxlen=history_len),
@@ -298,7 +303,9 @@ class CompressionBreakoutContinuationStrategy(Strategy):
             )
         )
 
-    def _process_bar(self, symbol: str, event_time: Any, close: float, high: float, low: float) -> None:
+    def _process_bar(
+        self, symbol: str, event_time: Any, close: float, high: float, low: float
+    ) -> None:
         item = self._state[symbol]
         event_time_key = time_key(event_time)
         if not event_time_key or item.last_time_key == event_time_key:

@@ -2057,7 +2057,9 @@ def _normalize_unique(values: Iterable[str]) -> tuple[str, ...]:
     return tuple(canonicalize_symbol_list(values))
 
 
-def _candidate_id(*, name: str, timeframe: str, params: dict[str, Any], symbols: tuple[str, ...]) -> str:
+def _candidate_id(
+    *, name: str, timeframe: str, params: dict[str, Any], symbols: tuple[str, ...]
+) -> str:
     payload = {
         "name": name,
         "timeframe": str(timeframe),
@@ -2134,7 +2136,11 @@ def _article_pipeline_family_ids(
     if strategy_token == "PairSpreadZScoreStrategy":
         if symbol_set.intersection(_METALS):
             return ("crypto-metal-residual-pairs",)
-        if timeframe_token in {"15m", "30m", "1h"} and symbol_set and symbol_set.isdisjoint(_METALS):
+        if (
+            timeframe_token in {"15m", "30m", "1h"}
+            and symbol_set
+            and symbol_set.isdisjoint(_METALS)
+        ):
             return ("sector-dispersion-reversion",)
     return ()
 
@@ -2164,11 +2170,7 @@ def _with_article_pipeline_provenance(
             )
         )
     )
-    merged_tags = [
-        str(tag).strip()
-        for tag in list(tags or [])
-        if str(tag).strip()
-    ]
+    merged_tags = [str(tag).strip() for tag in list(tags or []) if str(tag).strip()]
     if family_ids:
         merged_tags.extend(["article_pipeline", *[f"article_family:{item}" for item in family_ids]])
         merged_metadata["article_pipeline_family_ids"] = list(family_ids)
@@ -2360,32 +2362,34 @@ class _CandidateBuildContext:
 
     def __post_init__(self) -> None:
         self.pairs = list(_pairs_in_universe(self.normalized_symbols))
-        self.trend_tfs = self._present('30m', '1h')
-        self.mean_rev_tfs = self._present('5m', '15m')
-        self.std_mean_rev_tfs = self._present('15m', '30m')
-        self.liquidity_tfs = self._present('5m', '15m')
-        self.panic_rebound_tfs = self._present('5m', '15m')
-        self.session_liquidity_tfs = self._present('5m')
-        self.funding_crowding_tfs = self._present('30m')
-        self.basis_snapback_tfs = self._present('30m')
-        self.vol_of_vol_tfs = self._present('15m')
-        self.session_residual_tfs = self._present('5m')
-        self.contagion_tfs = self._present('5m')
-        self.breakout_tfs = self._present('30m', '1h')
-        self.compression_breakout_tfs = self._present('30m', '1h')
-        self.breadth_tfs = self._present('30m')
-        self.trend_exhaustion_tfs = self._present('30m')
-        self.topcap_tfs = self._present('1h', '4h')
-        self.liquidity_regime_tfs = self._present('1h', '1d')
-        self.abnormal_return_tfs = self._present('1d')
-        self.alpha101_tfs = self._present('1h', '4h')
-        self.pair_tfs = self._present('15m', '30m', '1h', '4h', '1d')
-        self.session_pair_carry_tfs = self._present('1h', '4h')
-        self.residual_basket_tfs = self._present('15m')
-        self.lag_convergence_tfs = self._present('4h', '1d')
-        self.carry_tfs = self._present('30m', '1h', '4h')
-        self.micro_tfs = self._present('1s')
-        self.crypto_symbols = [symbol for symbol in self.normalized_symbols if symbol not in _METALS]
+        self.trend_tfs = self._present("30m", "1h")
+        self.mean_rev_tfs = self._present("5m", "15m")
+        self.std_mean_rev_tfs = self._present("15m", "30m")
+        self.liquidity_tfs = self._present("5m", "15m")
+        self.panic_rebound_tfs = self._present("5m", "15m")
+        self.session_liquidity_tfs = self._present("5m")
+        self.funding_crowding_tfs = self._present("30m")
+        self.basis_snapback_tfs = self._present("30m")
+        self.vol_of_vol_tfs = self._present("15m")
+        self.session_residual_tfs = self._present("5m")
+        self.contagion_tfs = self._present("5m")
+        self.breakout_tfs = self._present("30m", "1h")
+        self.compression_breakout_tfs = self._present("30m", "1h")
+        self.breadth_tfs = self._present("30m")
+        self.trend_exhaustion_tfs = self._present("30m")
+        self.topcap_tfs = self._present("1h", "4h")
+        self.liquidity_regime_tfs = self._present("1h", "1d")
+        self.abnormal_return_tfs = self._present("1d")
+        self.alpha101_tfs = self._present("1h", "4h")
+        self.pair_tfs = self._present("15m", "30m", "1h", "4h", "1d")
+        self.session_pair_carry_tfs = self._present("1h", "4h")
+        self.residual_basket_tfs = self._present("15m")
+        self.lag_convergence_tfs = self._present("4h", "1d")
+        self.carry_tfs = self._present("30m", "1h", "4h")
+        self.micro_tfs = self._present("1s")
+        self.crypto_symbols = [
+            symbol for symbol in self.normalized_symbols if symbol not in _METALS
+        ]
         self.laggard_symbols = [
             symbol for symbol in self.crypto_symbols if symbol not in _CRYPTO_LEADERS
         ]
@@ -2447,7 +2451,11 @@ def _build_primary_trend_candidates(ctx: _CandidateBuildContext) -> None:
                 )
             if "exec_" in str(spec.get("variant") or ""):
                 tags.append("execution_risk")
-                note_suffix = f"{note_suffix} Execution-risk retune." if note_suffix else " Execution-risk retune."
+                note_suffix = (
+                    f"{note_suffix} Execution-risk retune."
+                    if note_suffix
+                    else " Execution-risk retune."
+                )
             _add_candidate(
                 candidates,
                 name=(
@@ -2642,7 +2650,13 @@ def _build_liquidity_event_reversion_candidates(ctx: _CandidateBuildContext) -> 
                     "Event-triggered liquidity-shock mean reversion that fades outsized intraday moves "
                     f"when range and volume dislocations spike on {timeframe} ({spec['variant']})."
                 ),
-                tags=("mean_reversion", "liquidity_shock", "event_driven", "single_asset", "bounded"),
+                tags=(
+                    "mean_reversion",
+                    "liquidity_shock",
+                    "event_driven",
+                    "single_asset",
+                    "bounded",
+                ),
                 metadata={
                     "timeframe": timeframe,
                     "allow_short": bool(spec["allow_short"]),
@@ -2681,7 +2695,13 @@ def _build_liquidity_event_reversion_candidates(ctx: _CandidateBuildContext) -> 
                     "Session-transition liquidity vacuum fade that only reacts around repeated UTC handoff windows "
                     f"for {timeframe} ({spec['variant']})."
                 ),
-                tags=("mean_reversion", "session_transition", "liquidity_shock", "event_driven", "bounded"),
+                tags=(
+                    "mean_reversion",
+                    "session_transition",
+                    "liquidity_shock",
+                    "event_driven",
+                    "bounded",
+                ),
                 metadata={
                     "timeframe": timeframe,
                     "allow_short": bool(spec["allow_short"]),
@@ -2736,12 +2756,12 @@ def _build_panic_rebound_candidates(ctx: _CandidateBuildContext) -> None:
                     "VWAP/rebound confirmation before entering and uses fast stop/time exits "
                     f"for {timeframe} ({spec['variant']})."
                 ),
-                    tags=(
-                        "profit_reboot_20260501",
-                        "profit_moonshot_20260501",
-                        "mean_reversion",
-                        "panic_rebound",
-                        "liquidation_rebound",
+                tags=(
+                    "profit_reboot_20260501",
+                    "profit_moonshot_20260501",
+                    "mean_reversion",
+                    "panic_rebound",
+                    "liquidation_rebound",
                     "crypto",
                 ),
                 metadata={
@@ -2904,7 +2924,10 @@ def _build_intraday_alpha_candidates(ctx: _CandidateBuildContext) -> None:
                     family="intraday_alpha",
                     strategy_class="LeadLagSpilloverStrategy",
                     timeframe=timeframe,
-                    symbols=tuple(sorted(set(_CRYPTO_LEADERS).intersection(normalized_symbols)) + laggard_symbols),
+                    symbols=tuple(
+                        sorted(set(_CRYPTO_LEADERS).intersection(normalized_symbols))
+                        + laggard_symbols
+                    ),
                     params=params,
                     notes="Cross-asset lead-lag predictor (crypto only, metals excluded).",
                     tags=("leadlag", "cross-asset", "intraday", "alpha"),
@@ -2912,8 +2935,8 @@ def _build_intraday_alpha_candidates(ctx: _CandidateBuildContext) -> None:
                         "timeframe": timeframe,
                         "symbol_scope": "crypto_excluding_metals",
                         "lag_bands": [2, 3, 4],
-                        },
-                    )
+                    },
+                )
 
 
 def _build_cross_sectional_rotation_candidates(ctx: _CandidateBuildContext) -> None:
@@ -2957,7 +2980,10 @@ def _build_cross_sectional_rotation_candidates(ctx: _CandidateBuildContext) -> N
                 if bool(spec.get("residualize_mean", False)):
                     tags.append("factor_neutral")
                     residual_notes.append("cross-sectional mean neutralization")
-                if int(spec.get("benchmark_drawdown_window", 0) or 0) > 0 and float(spec.get("benchmark_drawdown_limit", 0.0) or 0.0) > 0.0:
+                if (
+                    int(spec.get("benchmark_drawdown_window", 0) or 0) > 0
+                    and float(spec.get("benchmark_drawdown_limit", 0.0) or 0.0) > 0.0
+                ):
                     tags.append("crash_aware")
                     residual_notes.append(
                         f"benchmark drawdown gate {int(spec['benchmark_drawdown_window'])} bars/{float(spec['benchmark_drawdown_limit']):.1%}"
@@ -2968,11 +2994,7 @@ def _build_cross_sectional_rotation_candidates(ctx: _CandidateBuildContext) -> N
                 if float(spec.get("take_profit_pct", 0.0) or 0.0) > 0.0:
                     tags.append("take_profit")
                     residual_notes.append(f"take profit {float(spec['take_profit_pct']):.1%}")
-                note_suffix = (
-                    " with " + " + ".join(residual_notes) + "."
-                    if residual_notes
-                    else "."
-                )
+                note_suffix = " with " + " + ".join(residual_notes) + "." if residual_notes else "."
                 _add_candidate(
                     candidates,
                     name=(
@@ -2989,14 +3011,18 @@ def _build_cross_sectional_rotation_candidates(ctx: _CandidateBuildContext) -> N
                         f"for {timeframe} ({spec['variant']}){note_suffix}"
                     ),
                     tags=tuple(tags),
-                metadata={
-                    "timeframe": timeframe,
-                    "retune_profile": str(spec["variant"]),
-                    "symbol_scope": "crypto",
-                    "residualize_btc": bool(spec.get("residualize_btc", False)),
+                    metadata={
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": "crypto",
+                        "residualize_btc": bool(spec.get("residualize_btc", False)),
                         "residualize_mean": bool(spec.get("residualize_mean", False)),
-                        "benchmark_drawdown_window": int(spec.get("benchmark_drawdown_window", 0) or 0),
-                        "benchmark_drawdown_limit": float(spec.get("benchmark_drawdown_limit", 0.0) or 0.0),
+                        "benchmark_drawdown_window": int(
+                            spec.get("benchmark_drawdown_window", 0) or 0
+                        ),
+                        "benchmark_drawdown_limit": float(
+                            spec.get("benchmark_drawdown_limit", 0.0) or 0.0
+                        ),
                     },
                 )
 
@@ -3056,7 +3082,12 @@ def _build_cross_sectional_rotation_candidates(ctx: _CandidateBuildContext) -> N
                 )
 
         moonshot_specs = (
-            ("trend", "profit_moonshot_cross_sectional", "ProfitMoonshotTrendStrategy", _PROFIT_MOONSHOT_TREND_SLICE),
+            (
+                "trend",
+                "profit_moonshot_cross_sectional",
+                "ProfitMoonshotTrendStrategy",
+                _PROFIT_MOONSHOT_TREND_SLICE,
+            ),
             (
                 "breakout",
                 "profit_moonshot_breakout",
@@ -3261,7 +3292,13 @@ def _build_cross_sectional_rotation_candidates(ctx: _CandidateBuildContext) -> N
                             "Abnormal one-day return continuation sleeve that follows large daily shocks "
                             f"for {symbol} on {timeframe} ({spec['variant']})."
                         ),
-                        tags=("event_alpha", "abnormal_return", "continuation", "single_asset", "crypto"),
+                        tags=(
+                            "event_alpha",
+                            "abnormal_return",
+                            "continuation",
+                            "single_asset",
+                            "crypto",
+                        ),
                         metadata={
                             "timeframe": timeframe,
                             "retune_profile": str(spec["variant"]),
@@ -3340,7 +3377,13 @@ def _build_cross_sectional_rotation_candidates(ctx: _CandidateBuildContext) -> N
                         "Session-gated residual basket reversion using BTC-neutral residual zscores "
                         f"for {timeframe} ({spec['variant']})."
                     ),
-                    tags=("cross_sectional", "residual_reversion", "session_transition", "btc_beta_neutral", "crypto"),
+                    tags=(
+                        "cross_sectional",
+                        "residual_reversion",
+                        "session_transition",
+                        "btc_beta_neutral",
+                        "crypto",
+                    ),
                     metadata={
                         "timeframe": timeframe,
                         "retune_profile": str(spec["variant"]),
@@ -3665,7 +3708,9 @@ def _build_pair_and_intermarket_candidates(ctx: _CandidateBuildContext) -> None:
                         state_notes.append(f"VWAP normalization {int(tuned_spec['vwap_window'])}")
                     if float(tuned_spec.get("min_volume_ratio", 0.0) or 0.0) > 0.0:
                         tags.append("pair_state")
-                        state_notes.append(f"volume ratio >= {float(tuned_spec['min_volume_ratio']):.2f}")
+                        state_notes.append(
+                            f"volume ratio >= {float(tuned_spec['min_volume_ratio']):.2f}"
+                        )
                     if float(tuned_spec.get("min_vol_convergence", 0.0) or 0.0) > 0.0:
                         tags.append("pair_state")
                         state_notes.append(
@@ -3679,12 +3724,10 @@ def _build_pair_and_intermarket_candidates(ctx: _CandidateBuildContext) -> None:
                     if float(tuned_spec.get("take_profit_pct", 0.0) or 0.0) > 0.0:
                         tags.append("execution_risk")
                         tags.append("take_profit")
-                        state_notes.append(f"take profit {float(tuned_spec['take_profit_pct']):.1%}")
-                    note_suffix = (
-                        " " + "; ".join(state_notes) + "."
-                        if state_notes
-                        else ""
-                    )
+                        state_notes.append(
+                            f"take profit {float(tuned_spec['take_profit_pct']):.1%}"
+                        )
+                    note_suffix = " " + "; ".join(state_notes) + "." if state_notes else ""
                     _add_candidate(
                         candidates,
                         name=f"pair_spread_{tf_tag}_{variant}_{pair_token}_{entry_z:.1f}_{exit_z:.2f}",
@@ -3695,7 +3738,11 @@ def _build_pair_and_intermarket_candidates(ctx: _CandidateBuildContext) -> None:
                         params=params,
                         notes=(
                             "Rolling-beta spread z-score with bounded turnover/correlation guardrails"
-                            + (" and 15m evidence-focused pair pruning." if timeframe == "15m" else "")
+                            + (
+                                " and 15m evidence-focused pair pruning."
+                                if timeframe == "15m"
+                                else ""
+                            )
                             + (
                                 " and 30m sector-dispersion pair caps for the new-hypothesis refresh."
                                 if timeframe == "30m"
@@ -3754,7 +3801,14 @@ def _build_pair_and_intermarket_candidates(ctx: _CandidateBuildContext) -> None:
                         "Adaptive scalar-RLS hedge update for BNB/TRX 1h pair trading. "
                         "Focused broader-redesign follow-up candidate with capped count and explicit sparse-fold validation."
                     ),
-                    tags=("market_neutral", "pair", "spread", "zscore", "adaptive_hedge", "focused_followup"),
+                    tags=(
+                        "market_neutral",
+                        "pair",
+                        "spread",
+                        "zscore",
+                        "adaptive_hedge",
+                        "focused_followup",
+                    ),
                     metadata={
                         "timeframe": timeframe,
                         "pair": "BNB/USDT_TRX/USDT",
@@ -3802,12 +3856,12 @@ def _build_pair_and_intermarket_candidates(ctx: _CandidateBuildContext) -> None:
                     "positions during configured UTC sessions when expected move clears fee/slippage "
                     f"thresholds for {timeframe} ({spec['variant']})."
                 ),
-                    tags=(
-                        "profit_reboot_20260501",
-                        "profit_moonshot_20260501",
-                        "market_neutral",
-                        "pair",
-                        "session_filter",
+                tags=(
+                    "profit_reboot_20260501",
+                    "profit_moonshot_20260501",
+                    "market_neutral",
+                    "pair",
+                    "session_filter",
                     "expected_move_gate",
                 ),
                 metadata={
@@ -3942,9 +3996,9 @@ def build_binance_futures_candidates(
     )
     normalized_symbols = _normalize_unique(symbols)
     if not normalized_timeframes:
-        raise ValueError('timeframes must not be empty')
+        raise ValueError("timeframes must not be empty")
     if len(normalized_symbols) < 2:
-        raise ValueError('symbols must include at least two instruments')
+        raise ValueError("symbols must include at least two instruments")
 
     return _CandidateBuildContext(
         normalized_timeframes=normalized_timeframes,
@@ -4009,7 +4063,9 @@ def build_candidate_manifest(
 
     for candidate in candidates:
         family_counts[candidate.family] = family_counts.get(candidate.family, 0) + 1
-        strategy_counts[candidate.strategy_class] = strategy_counts.get(candidate.strategy_class, 0) + 1
+        strategy_counts[candidate.strategy_class] = (
+            strategy_counts.get(candidate.strategy_class, 0) + 1
+        )
         timeframe_counts[candidate.timeframe] = timeframe_counts.get(candidate.timeframe, 0) + 1
 
     return {
@@ -4052,7 +4108,9 @@ def build_article_pipeline_manifest(
     article_family_counts: dict[str, int] = {}
     for candidate in candidates:
         family_counts[candidate.family] = family_counts.get(candidate.family, 0) + 1
-        strategy_counts[candidate.strategy_class] = strategy_counts.get(candidate.strategy_class, 0) + 1
+        strategy_counts[candidate.strategy_class] = (
+            strategy_counts.get(candidate.strategy_class, 0) + 1
+        )
         timeframe_counts[candidate.timeframe] = timeframe_counts.get(candidate.timeframe, 0) + 1
         for family_id in list(candidate.metadata.get("article_pipeline_family_ids") or []):
             token = str(family_id)

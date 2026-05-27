@@ -28,7 +28,9 @@ def test_run_exact_window_suite_script_delegates_to_cli(monkeypatch):
         return 7
 
     monkeypatch.setattr(MODULE, "exact_window_main", _stub_main)
-    rc = MODULE.main(["--emit-memory-baseline", "--output-dir", "var/reports/exact_window_backtests"])
+    rc = MODULE.main(
+        ["--emit-memory-baseline", "--output-dir", "var/reports/exact_window_backtests"]
+    )
     assert rc == 7
     assert captured["argv"] == [
         "--emit-memory-baseline",

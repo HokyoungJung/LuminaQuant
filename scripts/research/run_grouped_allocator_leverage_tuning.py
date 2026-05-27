@@ -107,7 +107,13 @@ def _load_allocator_states(path: Path) -> pd.DataFrame:
     return states.sort_values("date").reset_index(drop=True)
 
 
-def _state_floor(*, leverage: int, maintenance_margin_rate: float, taker_fee_rate: float, liquidation_buffer_rate: float) -> float:
+def _state_floor(
+    *,
+    leverage: int,
+    maintenance_margin_rate: float,
+    taker_fee_rate: float,
+    liquidation_buffer_rate: float,
+) -> float:
     residual = float(leverage) * (
         float(maintenance_margin_rate) + float(taker_fee_rate) + float(liquidation_buffer_rate)
     )
@@ -187,7 +193,9 @@ def _objective(split_metrics: dict[str, dict[str, float]]) -> float:
     )
 
 
-def _is_feasible(split_metrics: dict[str, dict[str, float]], *, liquidation_counts: dict[str, int]) -> bool:
+def _is_feasible(
+    split_metrics: dict[str, dict[str, float]], *, liquidation_counts: dict[str, int]
+) -> bool:
     train = dict(split_metrics.get("train") or {})
     val = dict(split_metrics.get("val") or {})
     return bool(
@@ -200,7 +208,9 @@ def _is_feasible(split_metrics: dict[str, dict[str, float]], *, liquidation_coun
 
 
 def _metrics_by_split(frame: pd.DataFrame) -> dict[str, dict[str, float]]:
-    return _three_way._metrics_by_split(frame.rename(columns={"leveraged_return": "metric_return"}), "metric_return")
+    return _three_way._metrics_by_split(
+        frame.rename(columns={"leveraged_return": "metric_return"}), "metric_return"
+    )
 
 
 def _build_markdown(payload: dict[str, Any]) -> str:
@@ -248,8 +258,12 @@ def run_grouped_allocator_leverage_tuning(
         run_name="grouped_allocator_leverage_tuning",
         output_dir=output_dir,
         input_path=str(allocator_path),
-        rss_log_path=output_dir / MEMORY_GUARD_DIRNAME / "grouped_allocator_leverage_tuning_rss_latest.jsonl",
-        summary_path=output_dir / MEMORY_GUARD_DIRNAME / "grouped_allocator_leverage_tuning_memory_latest.json",
+        rss_log_path=output_dir
+        / MEMORY_GUARD_DIRNAME
+        / "grouped_allocator_leverage_tuning_rss_latest.jsonl",
+        summary_path=output_dir
+        / MEMORY_GUARD_DIRNAME
+        / "grouped_allocator_leverage_tuning_memory_latest.json",
         budget_bytes=hard_rss_bytes,
         soft_limit_bytes=soft_rss_bytes,
         hard_limit_bytes=hard_rss_bytes,
@@ -273,8 +287,7 @@ def run_grouped_allocator_leverage_tuning(
         if panel[["incumbent", "blend_85_15", "autoresearch_55_45"]].isna().any().any():
             raise RuntimeError("missing sleeve return data while assembling leverage tuning panel")
         panel["base_return"] = [
-            float(getattr(row, row.state))
-            for row in panel.itertuples(index=False)
+            float(getattr(row, row.state)) for row in panel.itertuples(index=False)
         ]
         guard.checkpoint("panel_loaded", {"rows": len(panel)})
 
@@ -302,7 +315,9 @@ def run_grouped_allocator_leverage_tuning(
                         "liquidation_counts": liquidation_counts,
                         "split_metrics": split_metrics,
                         "objective": float(objective),
-                        "feasible": _is_feasible(split_metrics, liquidation_counts=liquidation_counts),
+                        "feasible": _is_feasible(
+                            split_metrics, liquidation_counts=liquidation_counts
+                        ),
                     }
                     if best is None:
                         best = candidate
@@ -361,7 +376,9 @@ def run_grouped_allocator_leverage_tuning(
     out_md = output_dir / f"grouped_allocator_leverage_tuning_{timestamp}.md"
     latest_json = output_dir / "grouped_allocator_leverage_tuning_latest.json"
     latest_md = output_dir / "grouped_allocator_leverage_tuning_latest.md"
-    out_json.write_text(json.dumps(payload, indent=2, sort_keys=True, default=_json_default), encoding="utf-8")
+    out_json.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=_json_default), encoding="utf-8"
+    )
     markdown = _build_markdown(payload)
     out_md.write_text(markdown, encoding="utf-8")
     latest_json.write_text(out_json.read_text(encoding="utf-8"), encoding="utf-8")

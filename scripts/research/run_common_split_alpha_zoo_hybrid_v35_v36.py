@@ -88,7 +88,10 @@ def _load_json(path: Path) -> dict[str, Any]:
 
 def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(_json_safe(payload), ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(_json_safe(payload), ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
 
 
 def _json_safe(value: Any) -> Any:
@@ -178,7 +181,9 @@ def apply_common_split(
     out[split_column] = labels.to_numpy(dtype=object)
     if drop_outside:
         out = out[out[split_column].isin(SPLIT_ORDER)].copy()
-    return out.sort_values([timestamp_column, *(["symbol"] if "symbol" in out.columns else [])]).reset_index(drop=True)
+    return out.sort_values(
+        [timestamp_column, *(["symbol"] if "symbol" in out.columns else [])]
+    ).reset_index(drop=True)
 
 
 def add_split_bounded_forward_return_label(
@@ -209,12 +214,18 @@ def _timestamp_index_hash(frame: pd.DataFrame, *, split_column: str = "split") -
     data = frame[["timestamp", split_column]].dropna().copy()
     data["timestamp"] = _timestamp_utc(data["timestamp"])
     for split in SPLIT_ORDER:
-        stamps = data.loc[data[split_column].astype(str).eq(split), "timestamp"].drop_duplicates().sort_values()
+        stamps = (
+            data.loc[data[split_column].astype(str).eq(split), "timestamp"]
+            .drop_duplicates()
+            .sort_values()
+        )
         rows.extend(f"{split}|{_format_timestamp(ts)}" for ts in stamps)
     return hashlib.sha256("\n".join(rows).encode("utf-8")).hexdigest()
 
 
-def _split_periods(frame: pd.DataFrame, *, split_column: str = "split") -> dict[str, dict[str, Any]]:
+def _split_periods(
+    frame: pd.DataFrame, *, split_column: str = "split"
+) -> dict[str, dict[str, Any]]:
     out: dict[str, dict[str, Any]] = {}
     data = frame.copy()
     data["timestamp"] = _timestamp_utc(data["timestamp"])
@@ -281,7 +292,9 @@ def _build_common_screen_payload(
     )
     ledger_summary = write_candidate_outcome_ledger(ledger_output, records)
     ledger_summary["enabled"] = True
-    source_validity = dict(source_coverage.get("strategy_validity") or {"pass": True, "rejection_reasons": []})
+    source_validity = dict(
+        source_coverage.get("strategy_validity") or {"pass": True, "rejection_reasons": []}
+    )
     strategy_rejections = list(source_validity.get("rejection_reasons") or [])
     if not all(bool(card["strategy_validity"].get("pass")) for card in cards):
         strategy_rejections.append("selected_factor_card_invalid")
@@ -320,7 +333,14 @@ def _build_calibration_payload(ledger_path: Path, calibration_module: ModuleType
     return calibration_module.build_calibration_payload(
         records,
         ledger_summary=ledger.summary(),
-        bucket_fields=("candidate_id", "side", "symbol", "regime_bucket", "volatility_bucket", "factor_bucket"),
+        bucket_fields=(
+            "candidate_id",
+            "side",
+            "symbol",
+            "regime_bucket",
+            "volatility_bucket",
+            "factor_bucket",
+        ),
         parent_fields=("candidate_id", "side"),
         min_bucket_n=30,
         confidence_z=1.64,
@@ -420,7 +440,9 @@ def _alpha_rows_from_replay(
     row6 = next((dict(row) for row in rows if int(_safe_float(row.get("leverage"))) == 6), {})
     split_metrics = dict(row6.get("split_metrics") or {})
     split_status = dict(dict(row6.get("liquidation_audit") or {}).get("split_status") or {})
-    rejection = [] if bool(row6.get("deployable_success")) else list(row6.get("rejection_reasons") or [])
+    rejection = (
+        [] if bool(row6.get("deployable_success")) else list(row6.get("rejection_reasons") or [])
+    )
     if not row6:
         rejection.append("strict_6x_row_missing")
     active_periods = _alpha_split_active_periods(payload)
@@ -446,7 +468,9 @@ def _alpha_rows_from_replay(
     return out
 
 
-def _hybrid_active_periods(item: Mapping[str, Any], hybrid_payload: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+def _hybrid_active_periods(
+    item: Mapping[str, Any], hybrid_payload: Mapping[str, Any]
+) -> dict[str, dict[str, Any]]:
     # Public hybrid payload intentionally omits full return streams.  Its split
     # metrics are computed on the fixed hourly split periods, so expose those
     # same split min/max timestamps as the candidate's effective active window.
@@ -497,7 +521,10 @@ def _hybrid_live_promotion_possible(hybrid_payload: Mapping[str, Any]) -> bool:
 def _alpha_strict_integer_table(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
     rows = list(payload.get("integer_grid_results") or [])
     if not rows:
-        rows = list(dict(payload.get("strict_zero_liquidation_lane") or {}).get("integer_grid_results") or [])
+        rows = list(
+            dict(payload.get("strict_zero_liquidation_lane") or {}).get("integer_grid_results")
+            or []
+        )
     out = []
     for row in rows:
         item = dict(row)
@@ -507,7 +534,9 @@ def _alpha_strict_integer_table(payload: Mapping[str, Any]) -> list[dict[str, An
 
 
 def _alpha_diagnostic_5x_6x(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
-    return list(dict(payload.get("diagnostic_nonfatal_lane") or {}).get("high_leverage_5x_6x_report") or [])
+    return list(
+        dict(payload.get("diagnostic_nonfatal_lane") or {}).get("high_leverage_5x_6x_report") or []
+    )
 
 
 def _locked_oos_audit(
@@ -519,14 +548,30 @@ def _locked_oos_audit(
     hybrid_payload: Mapping[str, Any],
 ) -> dict[str, Any]:
     checks = {
-        "screen_uses_locked_oos_for_selection": bool(screen_payload.get("uses_locked_oos_for_selection")),
-        "calibration_uses_locked_oos": bool(calibration_payload.get("uses_locked_oos_for_calibration")),
-        "calibration_locked_oos_record_count": int(calibration_payload.get("locked_oos_calibration_record_count") or 0),
-        "reselected_uses_locked_oos_for_selection": bool(reselected.get("uses_locked_oos_for_selection")),
-        "carry_forward_uses_locked_oos_for_selection": bool(carry_forward.get("uses_locked_oos_for_selection")),
-        "hybrid_uses_locked_oos_for_objective": bool(dict(hybrid_payload.get("selection_policy") or {}).get("uses_locked_oos_for_objective")),
-        "hybrid_uses_locked_oos_for_pruning": bool(dict(hybrid_payload.get("selection_policy") or {}).get("uses_locked_oos_for_pruning")),
-        "hybrid_uses_locked_oos_for_selection": bool(dict(hybrid_payload.get("selection_policy") or {}).get("uses_locked_oos_for_selection")),
+        "screen_uses_locked_oos_for_selection": bool(
+            screen_payload.get("uses_locked_oos_for_selection")
+        ),
+        "calibration_uses_locked_oos": bool(
+            calibration_payload.get("uses_locked_oos_for_calibration")
+        ),
+        "calibration_locked_oos_record_count": int(
+            calibration_payload.get("locked_oos_calibration_record_count") or 0
+        ),
+        "reselected_uses_locked_oos_for_selection": bool(
+            reselected.get("uses_locked_oos_for_selection")
+        ),
+        "carry_forward_uses_locked_oos_for_selection": bool(
+            carry_forward.get("uses_locked_oos_for_selection")
+        ),
+        "hybrid_uses_locked_oos_for_objective": bool(
+            dict(hybrid_payload.get("selection_policy") or {}).get("uses_locked_oos_for_objective")
+        ),
+        "hybrid_uses_locked_oos_for_pruning": bool(
+            dict(hybrid_payload.get("selection_policy") or {}).get("uses_locked_oos_for_pruning")
+        ),
+        "hybrid_uses_locked_oos_for_selection": bool(
+            dict(hybrid_payload.get("selection_policy") or {}).get("uses_locked_oos_for_selection")
+        ),
     }
     violation_reasons = [key for key, value in checks.items() if bool(value)]
     if checks["calibration_locked_oos_record_count"] != 0:
@@ -577,7 +622,9 @@ def _markdown_report(payload: Mapping[str, Any]) -> str:
         "## Common split",
         "",
     ]
-    for split, item in dict(payload.get("common_split_manifest", {}).get("split_periods") or {}).items():
+    for split, item in dict(
+        payload.get("common_split_manifest", {}).get("split_periods") or {}
+    ).items():
         lines.append(
             f"- {split}: `{item.get('start_timestamp')}` ~ `{item.get('end_timestamp')}`; "
             f"unique timestamps `{item.get('unique_timestamp_count')}`, rows `{item.get('row_count')}`"
@@ -657,8 +704,13 @@ def _markdown_report(payload: Mapping[str, Any]) -> str:
 
 
 def build_payload(args: argparse.Namespace) -> dict[str, Any]:
-    alpha_module = _load_module(REPO_ROOT / "scripts/research/replay_crypto_fx_alpha_zoo_state.py", "common_split_alpha_replay")
-    calibration_module = _load_module(REPO_ROOT / "scripts/research/calibrate_crypto_fx_edges.py", "common_split_edge_calibration")
+    alpha_module = _load_module(
+        REPO_ROOT / "scripts/research/replay_crypto_fx_alpha_zoo_state.py",
+        "common_split_alpha_replay",
+    )
+    calibration_module = _load_module(
+        REPO_ROOT / "scripts/research/calibrate_crypto_fx_edges.py", "common_split_edge_calibration"
+    )
     hybrid_module = _load_module(
         REPO_ROOT / "scripts/research/run_profit_moonshot_hybrid_v35_v36_fixed_inputs.py",
         "common_split_hybrid_v35_v36",
@@ -671,8 +723,12 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     ledger_path = alpha_dir / "candidate_outcome_ledger_common_split_latest.jsonl"
     screen_path = alpha_dir / "crypto_fx_alpha_zoo_screen_common_split_latest.json"
     calibration_path = alpha_dir / "edge_calibration_common_split_latest.json"
-    carry_replay_path = alpha_dir / "crypto_fx_alpha_zoo_state_replay_carry_forward_common_split_latest.json"
-    reselected_replay_path = alpha_dir / "crypto_fx_alpha_zoo_state_replay_reselected_common_split_latest.json"
+    carry_replay_path = (
+        alpha_dir / "crypto_fx_alpha_zoo_state_replay_carry_forward_common_split_latest.json"
+    )
+    reselected_replay_path = (
+        alpha_dir / "crypto_fx_alpha_zoo_state_replay_reselected_common_split_latest.json"
+    )
 
     old_replay_path = Path(args.old_alpha_replay_json).expanduser().resolve()
     old_summary_path = Path(args.old_alpha_summary_json).expanduser().resolve()
@@ -695,7 +751,9 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
         "baseline_parent": BASELINE_HEAD,
         "source_path": str(source_path),
         "source_sha256": _file_sha256(source_path),
-        "external_state_csv": str(Path(args.external_state_csv).expanduser().resolve()) if str(args.external_state_csv).strip() else "",
+        "external_state_csv": str(Path(args.external_state_csv).expanduser().resolve())
+        if str(args.external_state_csv).strip()
+        else "",
         "external_state_sha256": _file_sha256(args.external_state_csv),
         "old_alpha_replay_json": str(old_replay_path),
         "old_alpha_replay_sha256": _file_sha256(old_replay_path),
@@ -817,7 +875,12 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     )
     for row in candidate_rows[-3:]:
         row["deployable_success"] = False
-        row["rejection_reasons"] = sorted({*(row.get("rejection_reasons") or []), "historical_old_split_only_not_common_split_selection"})
+        row["rejection_reasons"] = sorted(
+            {
+                *(row.get("rejection_reasons") or []),
+                "historical_old_split_only_not_common_split_selection",
+            }
+        )
     candidate_rows.extend(
         _alpha_rows_from_replay(
             carry_payload,
@@ -826,7 +889,12 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
             manifest_periods=manifest["split_periods"],
         )
     )
-    selected_name = str(dict(reselected_payload.get("candidate_selection_grid") or {}).get("selected_candidate_name") or "unknown")
+    selected_name = str(
+        dict(reselected_payload.get("candidate_selection_grid") or {}).get(
+            "selected_candidate_name"
+        )
+        or "unknown"
+    )
     candidate_rows.extend(
         _alpha_rows_from_replay(
             reselected_payload,
@@ -883,7 +951,9 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
             "calibration_json": str(calibration_path),
             "carry_forward_replay_json": str(carry_replay_path),
             "reselected_replay_json": str(reselected_replay_path),
-            "carry_forward_selected_candidate": dict(carry_payload.get("candidate_selection_grid") or {}).get("selected_candidate_name"),
+            "carry_forward_selected_candidate": dict(
+                carry_payload.get("candidate_selection_grid") or {}
+            ).get("selected_candidate_name"),
             "reselected_candidate": selected_name,
         },
         "hybrid_common_split": {
@@ -899,15 +969,25 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
         "hybrid_live_promotion_possible": _hybrid_live_promotion_possible(hybrid_payload),
         "hybrid_live_promotion_rejection_reasons": sorted(
             set(
-                list(dict(hybrid_payload.get("hybrid_v3_5_optuna") or {}).get("rejection_reasons") or [])
-                + list(dict(hybrid_payload.get("hybrid_v3_6_optuna") or {}).get("rejection_reasons") or [])
+                list(
+                    dict(hybrid_payload.get("hybrid_v3_5_optuna") or {}).get("rejection_reasons")
+                    or []
+                )
+                + list(
+                    dict(hybrid_payload.get("hybrid_v3_6_optuna") or {}).get("rejection_reasons")
+                    or []
+                )
             )
         ),
         "existing_best_vs_common_basis": {
             "old_alpha_best_split_role": "historical_only",
             "common_basis_winner": dict(promoted).get("candidate_name") or selected_name,
-            "common_basis_hybrid_v3_5_deployable": bool(dict(hybrid_payload.get("hybrid_v3_5_optuna") or {}).get("deployable_success")),
-            "common_basis_hybrid_v3_6_deployable": bool(dict(hybrid_payload.get("hybrid_v3_6_optuna") or {}).get("deployable_success")),
+            "common_basis_hybrid_v3_5_deployable": bool(
+                dict(hybrid_payload.get("hybrid_v3_5_optuna") or {}).get("deployable_success")
+            ),
+            "common_basis_hybrid_v3_6_deployable": bool(
+                dict(hybrid_payload.get("hybrid_v3_6_optuna") or {}).get("deployable_success")
+            ),
         },
         "memory_summary": {
             "peak_rss_mib": peak_rss,
@@ -931,8 +1011,12 @@ def build_payload_from_stage_artifacts(args: argparse.Namespace) -> dict[str, An
     hybrid_dir = output_dir / "hybrid_v35_v36_common_split"
     screen_path = alpha_dir / "crypto_fx_alpha_zoo_screen_common_split_latest.json"
     calibration_path = alpha_dir / "edge_calibration_common_split_latest.json"
-    carry_replay_path = alpha_dir / "crypto_fx_alpha_zoo_state_replay_carry_forward_common_split_latest.json"
-    reselected_replay_path = alpha_dir / "crypto_fx_alpha_zoo_state_replay_reselected_common_split_latest.json"
+    carry_replay_path = (
+        alpha_dir / "crypto_fx_alpha_zoo_state_replay_carry_forward_common_split_latest.json"
+    )
+    reselected_replay_path = (
+        alpha_dir / "crypto_fx_alpha_zoo_state_replay_reselected_common_split_latest.json"
+    )
     hybrid_latest = hybrid_dir / "hybrid_v35_v36_fixed_inputs_common_split_latest.json"
     hybrid_markdown = hybrid_dir / "hybrid_v35_v36_fixed_inputs_common_split_latest.md"
 
@@ -982,7 +1066,10 @@ def build_payload_from_stage_artifacts(args: argparse.Namespace) -> dict[str, An
     for row in candidate_rows[-3:]:
         row["deployable_success"] = False
         row["rejection_reasons"] = sorted(
-            {*(row.get("rejection_reasons") or []), "historical_old_split_only_not_common_split_selection"}
+            {
+                *(row.get("rejection_reasons") or []),
+                "historical_old_split_only_not_common_split_selection",
+            }
         )
     candidate_rows.extend(
         _alpha_rows_from_replay(
@@ -992,7 +1079,12 @@ def build_payload_from_stage_artifacts(args: argparse.Namespace) -> dict[str, An
             manifest_periods=dict(manifest["split_periods"]),
         )
     )
-    selected_name = str(dict(reselected_payload.get("candidate_selection_grid") or {}).get("selected_candidate_name") or "unknown")
+    selected_name = str(
+        dict(reselected_payload.get("candidate_selection_grid") or {}).get(
+            "selected_candidate_name"
+        )
+        or "unknown"
+    )
     candidate_rows.extend(
         _alpha_rows_from_replay(
             reselected_payload,
@@ -1048,7 +1140,9 @@ def build_payload_from_stage_artifacts(args: argparse.Namespace) -> dict[str, An
             "calibration_json": str(calibration_path),
             "carry_forward_replay_json": str(carry_replay_path),
             "reselected_replay_json": str(reselected_replay_path),
-            "carry_forward_selected_candidate": dict(carry_payload.get("candidate_selection_grid") or {}).get("selected_candidate_name"),
+            "carry_forward_selected_candidate": dict(
+                carry_payload.get("candidate_selection_grid") or {}
+            ).get("selected_candidate_name"),
             "reselected_candidate": selected_name,
         },
         "hybrid_common_split": {
@@ -1064,15 +1158,25 @@ def build_payload_from_stage_artifacts(args: argparse.Namespace) -> dict[str, An
         "hybrid_live_promotion_possible": _hybrid_live_promotion_possible(hybrid_payload),
         "hybrid_live_promotion_rejection_reasons": sorted(
             set(
-                list(dict(hybrid_payload.get("hybrid_v3_5_optuna") or {}).get("rejection_reasons") or [])
-                + list(dict(hybrid_payload.get("hybrid_v3_6_optuna") or {}).get("rejection_reasons") or [])
+                list(
+                    dict(hybrid_payload.get("hybrid_v3_5_optuna") or {}).get("rejection_reasons")
+                    or []
+                )
+                + list(
+                    dict(hybrid_payload.get("hybrid_v3_6_optuna") or {}).get("rejection_reasons")
+                    or []
+                )
             )
         ),
         "existing_best_vs_common_basis": {
             "old_alpha_best_split_role": "historical_only",
             "common_basis_winner": dict(promoted).get("candidate_name") or selected_name,
-            "common_basis_hybrid_v3_5_deployable": bool(dict(hybrid_payload.get("hybrid_v3_5_optuna") or {}).get("deployable_success")),
-            "common_basis_hybrid_v3_6_deployable": bool(dict(hybrid_payload.get("hybrid_v3_6_optuna") or {}).get("deployable_success")),
+            "common_basis_hybrid_v3_5_deployable": bool(
+                dict(hybrid_payload.get("hybrid_v3_5_optuna") or {}).get("deployable_success")
+            ),
+            "common_basis_hybrid_v3_6_deployable": bool(
+                dict(hybrid_payload.get("hybrid_v3_6_optuna") or {}).get("deployable_success")
+            ),
         },
         "memory_summary": {
             "peak_rss_mib": peak_rss,
@@ -1112,15 +1216,35 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", default="")
     parser.add_argument("--current-tail-cache", default="")
-    parser.add_argument("--external-state-csv", default=str(DEFAULT_ALPHA_V2 / "external_market_state_20260512/external_market_state_lagged.csv"))
+    parser.add_argument(
+        "--external-state-csv",
+        default=str(
+            DEFAULT_ALPHA_V2 / "external_market_state_20260512/external_market_state_lagged.csv"
+        ),
+    )
     parser.add_argument("--strict-real-data", action="store_true", default=True)
     parser.add_argument("--market-root", default=str(DEFAULT_MARKET_ROOT))
     parser.add_argument("--exchange", default="binance")
     parser.add_argument("--symbols", default=DEFAULT_SYMBOLS)
-    parser.add_argument("--portfolio-json", default=str(DEFAULT_ALPHA_V2 / "state_distilled_market_state_next_20260512/portfolio_tuning_leadership_unwind_top18/fresh_portfolio_tuning_latest.json"))
-    parser.add_argument("--old-alpha-summary-json", default=str(DEFAULT_OLD_ALPHA_DIR / "crypto_fx_alpha_zoo_real_data_summary_latest.json"))
-    parser.add_argument("--old-alpha-replay-json", default=str(DEFAULT_OLD_ALPHA_DIR / "crypto_fx_alpha_zoo_state_replay_latest.json"))
-    parser.add_argument("--old-hybrid-json", default=str(DEFAULT_OLD_HYBRID_DIR / "hybrid_v35_v36_fixed_inputs_latest.json"))
+    parser.add_argument(
+        "--portfolio-json",
+        default=str(
+            DEFAULT_ALPHA_V2
+            / "state_distilled_market_state_next_20260512/portfolio_tuning_leadership_unwind_top18/fresh_portfolio_tuning_latest.json"
+        ),
+    )
+    parser.add_argument(
+        "--old-alpha-summary-json",
+        default=str(DEFAULT_OLD_ALPHA_DIR / "crypto_fx_alpha_zoo_real_data_summary_latest.json"),
+    )
+    parser.add_argument(
+        "--old-alpha-replay-json",
+        default=str(DEFAULT_OLD_ALPHA_DIR / "crypto_fx_alpha_zoo_state_replay_latest.json"),
+    )
+    parser.add_argument(
+        "--old-hybrid-json",
+        default=str(DEFAULT_OLD_HYBRID_DIR / "hybrid_v35_v36_fixed_inputs_latest.json"),
+    )
     parser.add_argument("--horizon", type=int, default=4)
     parser.add_argument("--top-n", type=int, default=20)
     parser.add_argument("--entry-quantile", type=float, default=0.9)
@@ -1139,9 +1263,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    payload = build_payload_from_stage_artifacts(args) if args.reuse_stage_artifacts else build_payload(args)
+    payload = (
+        build_payload_from_stage_artifacts(args)
+        if args.reuse_stage_artifacts
+        else build_payload(args)
+    )
     outputs = write_outputs(payload, Path(args.output_dir).expanduser().resolve())
-    print(json.dumps({**outputs, "peak_rss_mib": payload["memory_summary"]["peak_rss_mib"]}, sort_keys=True))
+    print(
+        json.dumps(
+            {**outputs, "peak_rss_mib": payload["memory_summary"]["peak_rss_mib"]}, sort_keys=True
+        )
+    )
     return 0
 
 

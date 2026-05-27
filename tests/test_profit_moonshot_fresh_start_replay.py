@@ -573,6 +573,7 @@ def test_state_distilled_leadership_unwind_is_dynamic_and_calendar_free() -> Non
     )
     assert MODULE._candidate_signal(ext_gated, arrays, 2) == ("SOL/USDT", "LONG", "")
 
+
 def test_state_distilled_leadership_unwind_can_short_crowded_laggard() -> None:
     arrays = {
         "datetime": [datetime(2026, 2, 15, tzinfo=UTC)],
@@ -1166,7 +1167,9 @@ def test_spec_filters_are_train_validation_universe_controls() -> None:
 
 def test_external_state_panel_is_lagged_and_joined_to_hourly_panel(tmp_path: Path) -> None:
     module_path = ROOT / "scripts" / "research" / "fetch_profit_moonshot_external_state.py"
-    spec = importlib.util.spec_from_file_location("fetch_profit_moonshot_external_state", module_path)
+    spec = importlib.util.spec_from_file_location(
+        "fetch_profit_moonshot_external_state", module_path
+    )
     assert spec is not None and spec.loader is not None
     external_module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(external_module)

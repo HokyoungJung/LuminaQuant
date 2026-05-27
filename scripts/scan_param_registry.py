@@ -21,7 +21,9 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Scan Alpha101 formulas and emit tunable constant parameter keys."
     )
-    parser.add_argument("--alpha", type=int, default=None, help="Optional Alpha id filter (1..101).")
+    parser.add_argument(
+        "--alpha", type=int, default=None, help="Optional Alpha id filter (1..101)."
+    )
     parser.add_argument(
         "--format",
         choices=("json", "table"),

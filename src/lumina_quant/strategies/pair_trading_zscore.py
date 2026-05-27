@@ -522,7 +522,9 @@ class PairTradingZScoreStrategy(Strategy):
         self.hedge_mode = "rls" if hedge_mode == "rls" else "rolling"
         hedge_ff = safe_float(state.get("hedge_forgetting_factor"))
         if hedge_ff is not None:
-            self.hedge_forgetting_factor = max(0.5, min(MAX_HEDGE_FORGETTING_FACTOR, float(hedge_ff)))
+            self.hedge_forgetting_factor = max(
+                0.5, min(MAX_HEDGE_FORGETTING_FACTOR, float(hedge_ff))
+            )
         hedge_cov_init = safe_float(state.get("hedge_covariance_init"))
         if hedge_cov_init is not None:
             self.hedge_covariance_init = max(1e-6, float(hedge_cov_init))
@@ -1007,22 +1009,42 @@ class PairTradingZScoreStrategy(Strategy):
         self._bars_in_position += 1
         exit_reason = None
         if self._mode == "LONG_SPREAD" and self._entry_beta is not None:
-            stop_x = self._entry_stop_price("LONG", float(self._entry_x_price or close_x), float(self._entry_beta))
-            stop_y = self._entry_stop_price("SHORT", float(self._entry_y_price or close_y), float(self._entry_beta))
-            take_x = self._entry_take_profit_price("LONG", float(self._entry_x_price or close_x), float(self._entry_beta))
-            take_y = self._entry_take_profit_price("SHORT", float(self._entry_y_price or close_y), float(self._entry_beta))
+            stop_x = self._entry_stop_price(
+                "LONG", float(self._entry_x_price or close_x), float(self._entry_beta)
+            )
+            stop_y = self._entry_stop_price(
+                "SHORT", float(self._entry_y_price or close_y), float(self._entry_beta)
+            )
+            take_x = self._entry_take_profit_price(
+                "LONG", float(self._entry_x_price or close_x), float(self._entry_beta)
+            )
+            take_y = self._entry_take_profit_price(
+                "SHORT", float(self._entry_y_price or close_y), float(self._entry_beta)
+            )
             if close_x <= stop_x or close_y >= stop_y:
                 exit_reason = "stop_loss"
-            elif (take_x is not None and close_x >= take_x) or (take_y is not None and close_y <= take_y):
+            elif (take_x is not None and close_x >= take_x) or (
+                take_y is not None and close_y <= take_y
+            ):
                 exit_reason = "take_profit"
         elif self._mode == "SHORT_SPREAD" and self._entry_beta is not None:
-            stop_x = self._entry_stop_price("SHORT", float(self._entry_x_price or close_x), float(self._entry_beta))
-            stop_y = self._entry_stop_price("LONG", float(self._entry_y_price or close_y), float(self._entry_beta))
-            take_x = self._entry_take_profit_price("SHORT", float(self._entry_x_price or close_x), float(self._entry_beta))
-            take_y = self._entry_take_profit_price("LONG", float(self._entry_y_price or close_y), float(self._entry_beta))
+            stop_x = self._entry_stop_price(
+                "SHORT", float(self._entry_x_price or close_x), float(self._entry_beta)
+            )
+            stop_y = self._entry_stop_price(
+                "LONG", float(self._entry_y_price or close_y), float(self._entry_beta)
+            )
+            take_x = self._entry_take_profit_price(
+                "SHORT", float(self._entry_x_price or close_x), float(self._entry_beta)
+            )
+            take_y = self._entry_take_profit_price(
+                "LONG", float(self._entry_y_price or close_y), float(self._entry_beta)
+            )
             if close_x >= stop_x or close_y <= stop_y:
                 exit_reason = "stop_loss"
-            elif (take_x is not None and close_x <= take_x) or (take_y is not None and close_y >= take_y):
+            elif (take_x is not None and close_x <= take_x) or (
+                take_y is not None and close_y >= take_y
+            ):
                 exit_reason = "take_profit"
 
         if exit_reason is None and abs(zscore) <= self.exit_z:

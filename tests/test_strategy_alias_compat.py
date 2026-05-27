@@ -54,8 +54,14 @@ def test_registry_keeps_alias_strategy_entries_and_optuna_defaults():
     assert "LeadLagSpilloverStrategy" in mapping
     assert "VolCompressionVWAPReversionStrategy" in mapping
     assert "VolCompressionVwapReversionStrategy" in mapping
-    assert resolve_strategy_class("VolCompressionVWAPReversionStrategy").__name__ == "VolCompressionVWAPReversionStrategy"
-    assert resolve_strategy_class("VolCompressionVwapReversionStrategy").__name__ == "VolCompressionVwapReversionStrategy"
+    assert (
+        resolve_strategy_class("VolCompressionVWAPReversionStrategy").__name__
+        == "VolCompressionVWAPReversionStrategy"
+    )
+    assert (
+        resolve_strategy_class("VolCompressionVwapReversionStrategy").__name__
+        == "VolCompressionVwapReversionStrategy"
+    )
     assert get_strategy_tier("VolCompressionVWAPReversionStrategy") == "live_opt_in"
     assert get_strategy_tier("VolCompressionVwapReversionStrategy") == "live_opt_in"
     assert get_default_optuna_config("VolCompressionVWAPReversionStrategy")["n_trials"] == 24

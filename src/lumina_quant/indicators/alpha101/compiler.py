@@ -434,7 +434,9 @@ def evaluate_compiled_formula(
 
     if pl is not None and backend in {"auto", "polars"} and compiled.polars_capable:
         try:
-            frame = pl.DataFrame({name: np.asarray(series, dtype=float) for name, series in context.items()})
+            frame = pl.DataFrame(
+                {name: np.asarray(series, dtype=float) for name, series in context.items()}
+            )
             expr_pl = _build_polars_expr(
                 compiled.ir.tree.body,
                 compiled=compiled,

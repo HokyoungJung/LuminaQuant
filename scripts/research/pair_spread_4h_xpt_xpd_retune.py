@@ -320,7 +320,9 @@ def build_pair_spread_4h_xpt_xpd_retune(
     report_rows: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     manifest = _load_manifest(manifest_payload)
-    rows = [dict(row) for row in (report_rows if report_rows is not None else _run_report(manifest))]
+    rows = [
+        dict(row) for row in (report_rows if report_rows is not None else _run_report(manifest))
+    ]
     coverage_guard = _coverage_guard(manifest)
     ranked = _rank_rows(rows)
 

@@ -9,13 +9,19 @@ from pathlib import Path
 from lumina_quant.portfolio_followup_rules import build_sparse_fold_aware_ensemble
 
 ROOT = Path(
-    "var/reports/exact_window_backtests/followup_status/"
-    "portfolio_incumbent_autoresearch_grouped"
+    "var/reports/exact_window_backtests/followup_status/portfolio_incumbent_autoresearch_grouped"
 )
 DEFAULT_OUTPUT_DIR = ROOT / "sparse_fold_ensemble_followup_current"
-MIDBRIDGE_REPORT = ROOT / "pair_spread_robustness_midbridge25_followup_current/research_run/candidate_research_latest.json"
-ADAPTIVE_REPORT = ROOT / "pair_spread_adaptive_rls_followup_current/research_run/candidate_research_latest.json"
-BROADER_REPORT = ROOT / "volatility_regime_residual_followup_current/research_run/candidate_research_latest.json"
+MIDBRIDGE_REPORT = (
+    ROOT
+    / "pair_spread_robustness_midbridge25_followup_current/research_run/candidate_research_latest.json"
+)
+ADAPTIVE_REPORT = (
+    ROOT / "pair_spread_adaptive_rls_followup_current/research_run/candidate_research_latest.json"
+)
+BROADER_REPORT = (
+    ROOT / "volatility_regime_residual_followup_current/research_run/candidate_research_latest.json"
+)
 CURRENT_BEST_NAME = "pair_spread_1h_exec_tightstop_tp_bnbusdt_trxusdt_2.5_0.65"
 
 
@@ -38,12 +44,20 @@ def main() -> None:
     if current_best is None:
         raise SystemExit(f"missing current best row: {CURRENT_BEST_NAME}")
 
-    adaptive_best = max(adaptive_rows, key=lambda row: float((row.get("oos") or {}).get("sharpe", float("-inf"))))
-    broader_best = max(broader_rows, key=lambda row: float((row.get("oos") or {}).get("sharpe", float("-inf"))))
+    adaptive_best = max(
+        adaptive_rows, key=lambda row: float((row.get("oos") or {}).get("sharpe", float("-inf")))
+    )
+    broader_best = max(
+        broader_rows, key=lambda row: float((row.get("oos") or {}).get("sharpe", float("-inf")))
+    )
 
     incumbent_only = build_sparse_fold_aware_ensemble([current_best], max_members=1)
-    new_methods_only = build_sparse_fold_aware_ensemble([adaptive_best, broader_best], max_members=2)
-    combined = build_sparse_fold_aware_ensemble([current_best, adaptive_best, broader_best], max_members=3)
+    new_methods_only = build_sparse_fold_aware_ensemble(
+        [adaptive_best, broader_best], max_members=2
+    )
+    combined = build_sparse_fold_aware_ensemble(
+        [current_best, adaptive_best, broader_best], max_members=3
+    )
 
     payload = {
         "artifact_kind": "sparse_fold_ensemble_followup",
@@ -61,7 +75,10 @@ def main() -> None:
     json_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
     def _metrics(section: dict) -> dict:
-        return dict(((section.get("portfolio_payload") or {}).get("portfolio_metrics") or {}).get("oos") or {})
+        return dict(
+            ((section.get("portfolio_payload") or {}).get("portfolio_metrics") or {}).get("oos")
+            or {}
+        )
 
     inc_metrics = _metrics(incumbent_only)
     new_metrics = _metrics(new_methods_only)

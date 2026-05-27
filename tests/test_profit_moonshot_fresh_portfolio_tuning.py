@@ -132,7 +132,9 @@ class _FakeMemoryGuard:
             ),
         }
         self.finalize_calls.append(payload)
-        self.summary_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+        self.summary_path.write_text(
+            json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8"
+        )
         return payload
 
     def release(self) -> None:
@@ -204,7 +206,9 @@ def test_tuning_main_wraps_artifacts_with_memory_guard_and_lockbox_labels(
 ) -> None:
     output_dir = tmp_path / "fresh_overhaul"
     candidate_csv = tmp_path / "candidates.csv"
-    candidate_csv.write_text("name,train_total_return,val_total_return,val_round_trips\n", encoding="utf-8")
+    candidate_csv.write_text(
+        "name,train_total_return,val_total_return,val_round_trips\n", encoding="utf-8"
+    )
     captured: dict[str, Any] = {}
     guards: list[_FakeMemoryGuard] = []
 
@@ -277,7 +281,9 @@ def test_tuning_main_wraps_artifacts_with_memory_guard_and_lockbox_labels(
     assert guards[0].finalize_calls[0]["status"] == "completed"
     assert guards[0].released is True
 
-    payload = json.loads((output_dir / "fresh_portfolio_tuning_latest.json").read_text(encoding="utf-8"))
+    payload = json.loads(
+        (output_dir / "fresh_portfolio_tuning_latest.json").read_text(encoding="utf-8")
+    )
     assert payload["lockbox_policy"]["selection_label"] == "train_val_validation_only"
     assert payload["lockbox_policy"]["locked_oos_label"] == "locked_oos_report_only"
     assert payload["memory_policy"]["explicit_budget_bytes"] == expected_budget
@@ -561,7 +567,10 @@ def test_mode_weights_and_leverage_ignore_locked_oos_poison_inputs() -> None:
         },
     }
     inverted_oos_curves = {
-        "train_val_leader": {**split_curves["train_val_leader"], "oos": split_curves["oos_lure"]["oos"]},
+        "train_val_leader": {
+            **split_curves["train_val_leader"],
+            "oos": split_curves["oos_lure"]["oos"],
+        },
         "oos_lure": {**split_curves["oos_lure"], "oos": split_curves["train_val_leader"]["oos"]},
     }
 
@@ -628,10 +637,7 @@ def test_combo_validation_score_is_stable_under_locked_oos_poison() -> None:
             }
 
     split_payloads = {
-        name: {
-            split: {"round_trips": 8, "fills": 16}
-            for split in ("train", "val", "oos")
-        }
+        name: {split: {"round_trips": 8, "fills": 16} for split in ("train", "val", "oos")}
         for name in ("sleeve_a", "sleeve_b")
     }
     split_curves = {
@@ -647,8 +653,7 @@ def test_combo_validation_score_is_stable_under_locked_oos_poison() -> None:
         },
     }
     poisoned_oos_curves = {
-        name: {**curves, "oos": [10_000.0, 100_000.0]}
-        for name, curves in split_curves.items()
+        name: {**curves, "oos": [10_000.0, 100_000.0]} for name, curves in split_curves.items()
     }
 
     bad_oos_item = MODULE._combo_metrics(
@@ -718,7 +723,9 @@ def test_train_val_target_return_budget_scales_without_oos_selection() -> None:
     assert diagnostics["raw_val_return"] == pytest.approx(0.06)
 
 
-def test_train_val_monthly_return_budget_targets_two_percent_monthly_without_oos_selection() -> None:
+def test_train_val_monthly_return_budget_targets_two_percent_monthly_without_oos_selection() -> (
+    None
+):
     class _Fresh:
         HOURLY_PERIODS_PER_YEAR = 365 * 24
 
@@ -830,8 +837,13 @@ def test_train_val_monthly_return_budget_records_raw_floor_fit_gates() -> None:
     )
 
     assert item["leverage"] == float(round(item["leverage"]))
-    assert item["return_quality"]["raw_train_monthlyized_return"] < MODULE.MIN_RAW_TRAIN_MONTHLY_RETURN
-    assert item["return_quality"]["train_monthlyized_return"] >= MODULE.MIN_BUFFERED_TRAIN_MONTHLY_RETURN
+    assert (
+        item["return_quality"]["raw_train_monthlyized_return"] < MODULE.MIN_RAW_TRAIN_MONTHLY_RETURN
+    )
+    assert (
+        item["return_quality"]["train_monthlyized_return"]
+        >= MODULE.MIN_BUFFERED_TRAIN_MONTHLY_RETURN
+    )
     assert item["gates"]["integer_leverage"] is True
     assert item["gates"]["raw_train_monthly_return_gte_1pct"] is False
     assert item["promotion_status"] == "diagnostic_not_promoted"

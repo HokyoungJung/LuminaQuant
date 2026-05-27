@@ -48,24 +48,59 @@ GROUP_ROOT = FOLLOWUP_ROOT / "portfolio_incumbent_autoresearch_grouped"
 OUTPUT_DIR = GROUP_ROOT / "portfolio_hybrid_online_current"
 
 HISTORICAL_INPUTS = {
-    "soft_three_way_regime": GROUP_ROOT / "soft_three_way_market_regime_allocator_current" / "soft_three_way_market_regime_allocator_latest.json",
-    "three_way_regime": GROUP_ROOT / "three_way_market_regime_allocator_current" / "three_way_market_regime_allocator_latest.json",
+    "soft_three_way_regime": GROUP_ROOT
+    / "soft_three_way_market_regime_allocator_current"
+    / "soft_three_way_market_regime_allocator_latest.json",
+    "three_way_regime": GROUP_ROOT
+    / "three_way_market_regime_allocator_current"
+    / "three_way_market_regime_allocator_latest.json",
     "static_blend_76_24": GROUP_ROOT / "grouped_incumbent_autoresearch_static_blend_latest.json",
-    "incumbent_only": FOLLOWUP_ROOT / "portfolio_one_shot_current_opt" / "portfolio_optimization_latest.json",
-    "pair_tactical_mode": GROUP_ROOT / "pair_spread_robustness_cadence_refresh_followup_current" / "research_run" / "candidate_research_latest.json",
+    "incumbent_only": FOLLOWUP_ROOT
+    / "portfolio_one_shot_current_opt"
+    / "portfolio_optimization_latest.json",
+    "pair_tactical_mode": GROUP_ROOT
+    / "pair_spread_robustness_cadence_refresh_followup_current"
+    / "research_run"
+    / "candidate_research_latest.json",
 }
 REFRESHED_INPUTS = {
-    "soft_three_way_regime": GROUP_ROOT / "current_switch_validation_current" / "refreshed_soft_three_way_allocator_current" / "soft_three_way_market_regime_allocator_latest.json",
-    "three_way_regime": GROUP_ROOT / "current_switch_validation_current" / "refreshed_three_way_allocator_current" / "three_way_market_regime_allocator_latest.json",
-    "static_blend_76_24": GROUP_ROOT / "current_switch_validation_current" / "refreshed_grouped_static_blend_latest.json",
-    "incumbent_only": GROUP_ROOT / "current_switch_validation_current" / "refreshed_current_one_shot_incumbent_portfolio_latest.json",
-    "balanced_overlay_80_20": GROUP_ROOT / "current_switch_validation_current" / "refreshed_balanced_overlay_strategy_latest.json",
-    "pair_tactical_mode": GROUP_ROOT / "current_switch_validation_current" / "refreshed_pair_fast_exit_candidate_latest.json",
-    "production_guarded_portfolio": GROUP_ROOT / "portfolio_production_guarded_current" / "production_guarded_portfolio_latest.json",
+    "soft_three_way_regime": GROUP_ROOT
+    / "current_switch_validation_current"
+    / "refreshed_soft_three_way_allocator_current"
+    / "soft_three_way_market_regime_allocator_latest.json",
+    "three_way_regime": GROUP_ROOT
+    / "current_switch_validation_current"
+    / "refreshed_three_way_allocator_current"
+    / "three_way_market_regime_allocator_latest.json",
+    "static_blend_76_24": GROUP_ROOT
+    / "current_switch_validation_current"
+    / "refreshed_grouped_static_blend_latest.json",
+    "incumbent_only": GROUP_ROOT
+    / "current_switch_validation_current"
+    / "refreshed_current_one_shot_incumbent_portfolio_latest.json",
+    "balanced_overlay_80_20": GROUP_ROOT
+    / "current_switch_validation_current"
+    / "refreshed_balanced_overlay_strategy_latest.json",
+    "pair_tactical_mode": GROUP_ROOT
+    / "current_switch_validation_current"
+    / "refreshed_pair_fast_exit_candidate_latest.json",
+    "production_guarded_portfolio": GROUP_ROOT
+    / "portfolio_production_guarded_current"
+    / "production_guarded_portfolio_latest.json",
 }
-OPERATING_SWITCH_PATH = GROUP_ROOT / "current_switch_validation_current" / "refreshed_operating_switch_current" / "portfolio_operating_switch_latest.json"
+OPERATING_SWITCH_PATH = (
+    GROUP_ROOT
+    / "current_switch_validation_current"
+    / "refreshed_operating_switch_current"
+    / "portfolio_operating_switch_latest.json"
+)
 
-ACTIVE_SLEEVES = ("balanced_overlay_80_20", "soft_three_way_regime", "pair_tactical_mode", "production_guarded_portfolio")
+ACTIVE_SLEEVES = (
+    "balanced_overlay_80_20",
+    "soft_three_way_regime",
+    "pair_tactical_mode",
+    "production_guarded_portfolio",
+)
 BENCHMARK_SLEEVES = ("three_way_regime", "static_blend_76_24", "incumbent_only")
 PAIR_NAME = "pair_spread_1h_exec_tightstop_tp_fastexit_bnbusdt_trxusdt_2.5_0.75"
 
@@ -128,7 +163,9 @@ class HybridSplitConfig:
             "val_start": self.val_start_date().isoformat(),
             "val_end_inclusive": self.val_end_date().isoformat(),
             "oos_start": self.oos_start_date().isoformat(),
-            "oos_end_inclusive": self.oos_end_date().isoformat() if self.oos_end_date() else "latest",
+            "oos_end_inclusive": self.oos_end_date().isoformat()
+            if self.oos_end_date()
+            else "latest",
             "pre_oos_days": self.pre_oos_days(),
         }
 
@@ -204,7 +241,9 @@ def _load_hybrid_config_payload(path: Path) -> dict[str, Any]:
         return dict(payload.get("config") or {})
     if "best" in payload and isinstance(dict(payload.get("best") or {}).get("config"), dict):
         return dict((payload.get("best") or {}).get("config") or {})
-    if "best_trial" in payload and isinstance(dict(payload.get("best_trial") or {}).get("config"), dict):
+    if "best_trial" in payload and isinstance(
+        dict(payload.get("best_trial") or {}).get("config"), dict
+    ):
         return dict((payload.get("best_trial") or {}).get("config") or {})
     return payload
 
@@ -239,9 +278,16 @@ def _portfolio_return_streams_from_daily(
     return streams
 
 
-def _split_metrics_from_streams(streams: dict[str, list[dict[str, Any]]]) -> dict[str, dict[str, float]]:
+def _split_metrics_from_streams(
+    streams: dict[str, list[dict[str, Any]]],
+) -> dict[str, dict[str, float]]:
     return {
-        split: _DYN._metrics(np.asarray([_safe_float(point.get("v"), 0.0) for point in list(streams.get(split) or [])], dtype=float))
+        split: _DYN._metrics(
+            np.asarray(
+                [_safe_float(point.get("v"), 0.0) for point in list(streams.get(split) or [])],
+                dtype=float,
+            )
+        )
         for split in ("train", "val", "oos")
     }
 
@@ -264,7 +310,10 @@ def _payload_daily_map(payload: dict[str, Any]) -> dict[str, float]:
             if "T" in token:
                 token = token.split("T", 1)[0]
             normalized_dates.append(token)
-        return {day_key: _safe_float(day_return, 0.0) for day_key, day_return in zip(normalized_dates, daily_returns, strict=True)}
+        return {
+            day_key: _safe_float(day_return, 0.0)
+            for day_key, day_return in zip(normalized_dates, daily_returns, strict=True)
+        }
     raise RuntimeError("Could not resolve daily return streams from payload")
 
 
@@ -284,7 +333,9 @@ def _load_pair_candidate(path: Path, *, refreshed: bool) -> dict[str, Any]:
     if refreshed:
         row = payload
     else:
-        candidates = [dict(row) for row in list(payload.get("candidates") or []) if isinstance(row, dict)]
+        candidates = [
+            dict(row) for row in list(payload.get("candidates") or []) if isinstance(row, dict)
+        ]
         try:
             row = next(row for row in candidates if str(row.get("name")) == PAIR_NAME)
         except StopIteration as exc:
@@ -337,7 +388,8 @@ def _blend_streams(
     right_map = _merged_daily_map(right)
     all_days = sorted(set(left_map) | set(right_map))
     daily_returns = [
-        (left_weight * _safe_float(left_map.get(day), 0.0)) + (right_weight * _safe_float(right_map.get(day), 0.0))
+        (left_weight * _safe_float(left_map.get(day), 0.0))
+        + (right_weight * _safe_float(right_map.get(day), 0.0))
         for day in all_days
     ]
     return _portfolio_return_streams_from_daily(all_days, daily_returns, split_config=split_config)
@@ -366,7 +418,9 @@ def _cash_row(day_keys: list[str]) -> dict[str, Any]:
         "strategy_timeframe": "1d",
         "family": "cash",
         "symbols": [],
-        "return_streams": _DYN._portfolio_return_streams_from_daily(day_keys, [0.0] * len(day_keys)),
+        "return_streams": _DYN._portfolio_return_streams_from_daily(
+            day_keys, [0.0] * len(day_keys)
+        ),
         "metadata": {"source_payload_path": ""},
         "train": {"total_return": 0.0, "sharpe": 0.0, "max_drawdown": 0.0},
         "val": {"total_return": 0.0, "sharpe": 0.0, "max_drawdown": 0.0},
@@ -386,18 +440,37 @@ def _historical_active_rows(
             sleeve_name="soft_three_way_regime",
             source_payload=soft_payload,
             streams=_payload_daily_streams(soft_payload, split_config=split_config),
-            metadata={"strategy_class": "SoftThreeWayAllocator", "timeframe": "1d", "family": "portfolio", "source_payload_path": str(HISTORICAL_INPUTS["soft_three_way_regime"].resolve())},
+            metadata={
+                "strategy_class": "SoftThreeWayAllocator",
+                "timeframe": "1d",
+                "family": "portfolio",
+                "source_payload_path": str(HISTORICAL_INPUTS["soft_three_way_regime"].resolve()),
+            },
         ),
         _make_sleeve_row(
             sleeve_name="pair_tactical_mode",
             source_payload=pair_row,
             streams=_payload_daily_streams(pair_row, split_config=split_config),
-            metadata={"strategy_class": "PairSpreadZScoreStrategy", "timeframe": "1h", "family": "market_neutral_pair", "symbols": list(pair_row.get("symbols") or []), "source_payload_path": str(HISTORICAL_INPUTS["pair_tactical_mode"].resolve())},
+            metadata={
+                "strategy_class": "PairSpreadZScoreStrategy",
+                "timeframe": "1h",
+                "family": "market_neutral_pair",
+                "symbols": list(pair_row.get("symbols") or []),
+                "source_payload_path": str(HISTORICAL_INPUTS["pair_tactical_mode"].resolve()),
+            },
         ),
     ]
-    balanced_streams = _blend_streams(rows[0]["return_streams"], rows[1]["return_streams"], left_weight=0.8, right_weight=0.2, split_config=split_config)
+    balanced_streams = _blend_streams(
+        rows[0]["return_streams"],
+        rows[1]["return_streams"],
+        left_weight=0.8,
+        right_weight=0.2,
+        split_config=split_config,
+    )
     balanced_metrics = {
-        split: _DYN._metrics(np.asarray([point["v"] for point in balanced_streams[split]], dtype=float))
+        split: _DYN._metrics(
+            np.asarray([point["v"] for point in balanced_streams[split]], dtype=float)
+        )
         for split in ("train", "val", "oos")
     }
     rows.append(
@@ -413,7 +486,9 @@ def _historical_active_rows(
             **balanced_metrics,
         }
     )
-    all_day_keys = sorted(set().union(*(_merged_daily_map(row["return_streams"]).keys() for row in rows)))
+    all_day_keys = sorted(
+        set().union(*(_merged_daily_map(row["return_streams"]).keys() for row in rows))
+    )
     rows.insert(0, _cash_row(all_day_keys))
     return rows
 
@@ -431,7 +506,12 @@ def _historical_benchmark_rows(
                 sleeve_name=sleeve_name,
                 source_payload=payload,
                 streams=_payload_daily_streams(payload, split_config=split_config),
-                metadata={"strategy_class": sleeve_name, "timeframe": "1d", "family": "portfolio", "source_payload_path": str(HISTORICAL_INPUTS[sleeve_name].resolve())},
+                metadata={
+                    "strategy_class": sleeve_name,
+                    "timeframe": "1d",
+                    "family": "portfolio",
+                    "source_payload_path": str(HISTORICAL_INPUTS[sleeve_name].resolve()),
+                },
             )
         )
     return benchmarks
@@ -452,7 +532,12 @@ def _refreshed_rows(
             sleeve_name="soft_three_way_regime",
             source_payload=soft_payload,
             streams=_payload_daily_streams(soft_payload, split_config=split_config),
-            metadata={"strategy_class": "SoftThreeWayAllocator", "timeframe": "1d", "family": "portfolio", "source_payload_path": str(REFRESHED_INPUTS["soft_three_way_regime"].resolve())},
+            metadata={
+                "strategy_class": "SoftThreeWayAllocator",
+                "timeframe": "1d",
+                "family": "portfolio",
+                "source_payload_path": str(REFRESHED_INPUTS["soft_three_way_regime"].resolve()),
+            },
         )
     )
     active.append(
@@ -460,7 +545,12 @@ def _refreshed_rows(
             sleeve_name="balanced_overlay_80_20",
             source_payload=balanced_payload,
             streams=_payload_daily_streams(balanced_payload, split_config=split_config),
-            metadata={"strategy_class": "BalancedOverlayPortfolio", "timeframe": "1d", "family": "portfolio_overlay", "source_payload_path": str(REFRESHED_INPUTS["balanced_overlay_80_20"].resolve())},
+            metadata={
+                "strategy_class": "BalancedOverlayPortfolio",
+                "timeframe": "1d",
+                "family": "portfolio_overlay",
+                "source_payload_path": str(REFRESHED_INPUTS["balanced_overlay_80_20"].resolve()),
+            },
         )
     )
     active.append(
@@ -468,7 +558,13 @@ def _refreshed_rows(
             sleeve_name="pair_tactical_mode",
             source_payload=pair_payload,
             streams=_payload_daily_streams(pair_payload, split_config=split_config),
-            metadata={"strategy_class": "PairSpreadZScoreStrategy", "timeframe": "1h", "family": "market_neutral_pair", "symbols": list(pair_payload.get("symbols") or []), "source_payload_path": str(REFRESHED_INPUTS["pair_tactical_mode"].resolve())},
+            metadata={
+                "strategy_class": "PairSpreadZScoreStrategy",
+                "timeframe": "1h",
+                "family": "market_neutral_pair",
+                "symbols": list(pair_payload.get("symbols") or []),
+                "source_payload_path": str(REFRESHED_INPUTS["pair_tactical_mode"].resolve()),
+            },
         )
     )
     production_payload_path = Path(REFRESHED_INPUTS["production_guarded_portfolio"])
@@ -495,10 +591,19 @@ def _refreshed_rows(
                 sleeve_name=sleeve_name,
                 source_payload=payload,
                 streams=_payload_daily_streams(payload, split_config=split_config),
-                metadata={"strategy_class": sleeve_name, "timeframe": "1d", "family": "portfolio", "source_payload_path": str(REFRESHED_INPUTS[sleeve_name].resolve())},
+                metadata={
+                    "strategy_class": sleeve_name,
+                    "timeframe": "1d",
+                    "family": "portfolio",
+                    "source_payload_path": str(REFRESHED_INPUTS[sleeve_name].resolve()),
+                },
             )
         )
-    all_day_keys = sorted(set().union(*(_merged_daily_map(row["return_streams"]).keys() for row in active + benchmarks)))
+    all_day_keys = sorted(
+        set().union(
+            *(_merged_daily_map(row["return_streams"]).keys() for row in active + benchmarks)
+        )
+    )
     active.insert(0, _cash_row(all_day_keys))
     return active, benchmarks
 
@@ -594,7 +699,9 @@ def run_hybrid_online_allocator(
     split_config = split_config or HybridSplitConfig()
     ordered_days, matrix, _meta = _DYN._build_daily_panel(rows)
     ids = [str(row.get("candidate_id") or row.get("name")) for row in rows]
-    name_by_id = {str(row.get("candidate_id") or row.get("name")): str(row.get("name") or "") for row in rows}
+    name_by_id = {
+        str(row.get("candidate_id") or row.get("name")): str(row.get("name") or "") for row in rows
+    }
     row_by_id = {str(row.get("candidate_id") or row.get("name")): row for row in rows}
     requested_default = str(default_name or "").strip()
     default_id = requested_default if requested_default in ids else _historical_default_name(rows)
@@ -618,15 +725,24 @@ def run_hybrid_online_allocator(
             1.0
             if name_by_id[cid] == "risk_off_cash"
             else (
-                _safe_float(dict(row_by_id[cid].get("metadata") or {}).get("max_weight_cap"), config.diversified_weight_cap)
+                _safe_float(
+                    dict(row_by_id[cid].get("metadata") or {}).get("max_weight_cap"),
+                    config.diversified_weight_cap,
+                )
                 if dict(row_by_id[cid].get("metadata") or {}).get("max_weight_cap") is not None
-                else (config.pair_weight_cap if "pair" in name_by_id[cid] else config.diversified_weight_cap)
+                else (
+                    config.pair_weight_cap
+                    if "pair" in name_by_id[cid]
+                    else config.diversified_weight_cap
+                )
             )
         )
         for cid in ids
     }
 
-    resolved_warmup_days = max(resolve_warmup_days(config=config, split_config=split_config), int(config.lookback_days))
+    resolved_warmup_days = max(
+        resolve_warmup_days(config=config, split_config=split_config), int(config.lookback_days)
+    )
     for idx, day_key in enumerate(ordered_days):
         split = _split_index(day_key, split_config=split_config)
         if split is None:
@@ -646,17 +762,25 @@ def run_hybrid_online_allocator(
                 score = _DYN._search_objective(metrics, cash_fraction=0.0)
                 score *= health_priors[cid]
                 score -= fragility_penalties[cid]
-                if _safe_float(metrics.get("total_return"), 0.0) <= 0.0 or _safe_float(metrics.get("sharpe"), 0.0) <= 0.0:
+                if (
+                    _safe_float(metrics.get("total_return"), 0.0) <= 0.0
+                    or _safe_float(metrics.get("sharpe"), 0.0) <= 0.0
+                ):
                     score -= 0.5
                 raw_scores[cid] = float(score)
-            positive_scores = {cid: score for cid, score in raw_scores.items() if score > config.min_positive_score}
+            positive_scores = {
+                cid: score for cid, score in raw_scores.items() if score > config.min_positive_score
+            }
             if not positive_scores:
                 weights = {}
                 cash_weight = 1.0
                 current_default = "risk_off_cash"
             else:
                 adjusted_scores = dict(positive_scores)
-                pair_id = next((cid for cid in adjusted_scores if name_by_id[cid] == "pair_tactical_mode"), None)
+                pair_id = next(
+                    (cid for cid in adjusted_scores if name_by_id[cid] == "pair_tactical_mode"),
+                    None,
+                )
                 if pair_id is not None and config.pair_score_boost > 0.0:
                     adjusted_scores[pair_id] += config.pair_score_boost
                 if config.variant == "fixed_default":
@@ -694,9 +818,14 @@ def run_hybrid_online_allocator(
                         }
                 total_active = float(sum(weights.values()))
                 if total_active > 1e-12:
-                    weights = {cid: float(weight) / total_active * total_active for cid, weight in weights.items()}
+                    weights = {
+                        cid: float(weight) / total_active * total_active
+                        for cid, weight in weights.items()
+                    }
                 cash_weight = max(0.0, 1.0 - sum(weights.values()))
-        portfolio_ret = sum(float(matrix[cid][idx]) * float(weight) for cid, weight in weights.items())
+        portfolio_ret = sum(
+            float(matrix[cid][idx]) * float(weight) for cid, weight in weights.items()
+        )
         daily_returns.append(float(portfolio_ret))
         split_returns.setdefault(split, []).append(float(portfolio_ret))
         allocations.append(
@@ -715,14 +844,21 @@ def run_hybrid_online_allocator(
                 "selected_default_sleeve": name_by_id.get(current_default, current_default),
                 "raw_scores": {name_by_id[cid]: float(score) for cid, score in raw_scores.items()},
                 "health_priors": {name_by_id[cid]: float(health_priors[cid]) for cid in raw_scores},
-                "fragility_penalties": {name_by_id[cid]: float(fragility_penalties[cid]) for cid in raw_scores},
+                "fragility_penalties": {
+                    name_by_id[cid]: float(fragility_penalties[cid]) for cid in raw_scores
+                },
             }
         )
         previous_default_id = current_default if current_default in ids else previous_default_id
 
-    split_metrics = {split: _DYN._metrics(np.asarray(values, dtype=float)) for split, values in split_returns.items()}
+    split_metrics = {
+        split: _DYN._metrics(np.asarray(values, dtype=float))
+        for split, values in split_returns.items()
+    }
     all_metrics = _DYN._metrics(np.asarray(daily_returns, dtype=float))
-    final_allocation = allocations[-1] if allocations else {"date": None, "weights": {}, "cash_weight": 1.0}
+    final_allocation = (
+        allocations[-1] if allocations else {"date": None, "weights": {}, "cash_weight": 1.0}
+    )
     return {
         "dates": ordered_days,
         "daily_returns": daily_returns,
@@ -732,7 +868,11 @@ def run_hybrid_online_allocator(
         "allocations": allocations,
         "score_history": score_history,
         "final_allocation": final_allocation,
-        "health_priors": {name_by_id[cid]: float(prior) for cid, prior in health_priors.items() if name_by_id[cid] != "risk_off_cash"},
+        "health_priors": {
+            name_by_id[cid]: float(prior)
+            for cid, prior in health_priors.items()
+            if name_by_id[cid] != "risk_off_cash"
+        },
     }
 
 
@@ -753,7 +893,9 @@ def _comparison_rows(
         rows.append(
             {
                 "name": str(row.get("name")),
-                "kind": "active" if str(row.get("name")) in ACTIVE_SLEEVES or str(row.get("name")) == "risk_off_cash" else "benchmark",
+                "kind": "active"
+                if str(row.get("name")) in ACTIVE_SLEEVES or str(row.get("name")) == "risk_off_cash"
+                else "benchmark",
                 **dict(row.get("oos") or {}),
             }
         )
@@ -761,7 +903,12 @@ def _comparison_rows(
 
 
 def _scoreboard_markdown(title: str, rows: list[dict[str, Any]]) -> list[str]:
-    lines = [f"## {title}", "", "| Sleeve | Kind | OOS return | Sharpe | Max DD |", "| --- | --- | ---: | ---: | ---: |"]
+    lines = [
+        f"## {title}",
+        "",
+        "| Sleeve | Kind | OOS return | Sharpe | Max DD |",
+        "| --- | --- | ---: | ---: | ---: |",
+    ]
     for row in rows:
         lines.append(
             f"| `{row['name']}` | {row['kind']} | {_safe_float(row.get('total_return', row.get('return')), 0.0):+.4%} | {_safe_float(row.get('sharpe'), 0.0):.4f} | {_safe_float(row.get('max_drawdown', row.get('mdd')), 0.0):.4%} |"
@@ -790,24 +937,55 @@ def write_hybrid_online_report(
         historical_active = _historical_active_rows(split_config=split_config)
         historical_benchmarks = _historical_benchmark_rows(split_config=split_config)
         refreshed_active, refreshed_benchmarks = _refreshed_rows(split_config=split_config)
-        refreshed_health_metrics = {row["name"]: dict(row.get("oos") or {}) for row in refreshed_active + refreshed_benchmarks}
-        memory_guard.sample(event="hybrid_online_loaded", context={"historical_active_count": len(historical_active), "refreshed_active_count": len(refreshed_active)})
+        refreshed_health_metrics = {
+            row["name"]: dict(row.get("oos") or {})
+            for row in refreshed_active + refreshed_benchmarks
+        }
+        memory_guard.sample(
+            event="hybrid_online_loaded",
+            context={
+                "historical_active_count": len(historical_active),
+                "refreshed_active_count": len(refreshed_active),
+            },
+        )
 
-        historical_config = HybridOnlineConfig(**({**asdict(config), "use_current_health_priors": False}))
+        historical_config = HybridOnlineConfig(
+            **({**asdict(config), "use_current_health_priors": False})
+        )
         historical_result = run_hybrid_online_allocator(
             historical_active,
             config=historical_config,
             refreshed_health_metrics=None,
             split_config=split_config,
         )
-        memory_guard.sample(event="hybrid_online_historical_done", context={"oos_return": _safe_float((historical_result.get('split_metrics') or {}).get('oos', {}).get('total_return'), 0.0)})
+        memory_guard.sample(
+            event="hybrid_online_historical_done",
+            context={
+                "oos_return": _safe_float(
+                    (historical_result.get("split_metrics") or {})
+                    .get("oos", {})
+                    .get("total_return"),
+                    0.0,
+                )
+            },
+        )
         refreshed_result = run_hybrid_online_allocator(
             refreshed_active,
             config=config,
             refreshed_health_metrics=refreshed_health_metrics,
             split_config=split_config,
         )
-        memory_guard.sample(event="hybrid_online_refreshed_done", context={"oos_return": _safe_float((refreshed_result.get('split_metrics') or {}).get('oos', {}).get('total_return'), 0.0)})
+        memory_guard.sample(
+            event="hybrid_online_refreshed_done",
+            context={
+                "oos_return": _safe_float(
+                    (refreshed_result.get("split_metrics") or {})
+                    .get("oos", {})
+                    .get("total_return"),
+                    0.0,
+                )
+            },
+        )
     except RSSLimitExceeded as exc:
         status = "aborted_rss_guard"
         error = str(exc)
@@ -817,7 +995,9 @@ def write_hybrid_online_report(
         error = str(exc)
         raise
     finally:
-        memory_guard.sample(event="hybrid_online_finish", context={"status": status, "error": error})
+        memory_guard.sample(
+            event="hybrid_online_finish", context={"status": status, "error": error}
+        )
         memory_summary = memory_guard.finalize(
             status=status,
             error=error,
@@ -825,31 +1005,56 @@ def write_hybrid_online_report(
         )
         memory_guard.release()
 
-    refreshed_rows = _comparison_rows(hybrid_result=refreshed_result, benchmarks=refreshed_benchmarks, active_rows=refreshed_active)
+    refreshed_rows = _comparison_rows(
+        hybrid_result=refreshed_result,
+        benchmarks=refreshed_benchmarks,
+        active_rows=refreshed_active,
+    )
     refreshed_by_name = {row["name"]: row for row in refreshed_rows}
     pair_alloc_weights = [
         _safe_float((alloc.get("weights") or {}).get("pair_tactical_mode"), 0.0)
         for alloc in list(refreshed_result.get("allocations") or [])
     ]
     hybrid_total_return = _safe_float(
-        refreshed_by_name["hybrid_online_portfolio"].get("total_return", refreshed_by_name["hybrid_online_portfolio"].get("return")),
+        refreshed_by_name["hybrid_online_portfolio"].get(
+            "total_return", refreshed_by_name["hybrid_online_portfolio"].get("return")
+        ),
         0.0,
     )
     readiness = {
         "beats_cash_refreshed": bool(
             hybrid_total_return
-            > _safe_float(refreshed_by_name["risk_off_cash"].get("total_return", refreshed_by_name["risk_off_cash"].get("return")), 0.0)
+            > _safe_float(
+                refreshed_by_name["risk_off_cash"].get(
+                    "total_return", refreshed_by_name["risk_off_cash"].get("return")
+                ),
+                0.0,
+            )
         ),
         "beats_pair_tactical_refreshed": bool(
             hybrid_total_return
-            > _safe_float(refreshed_by_name["pair_tactical_mode"].get("total_return", refreshed_by_name["pair_tactical_mode"].get("return")), 0.0)
+            > _safe_float(
+                refreshed_by_name["pair_tactical_mode"].get(
+                    "total_return", refreshed_by_name["pair_tactical_mode"].get("return")
+                ),
+                0.0,
+            )
         ),
         "beats_balanced_refreshed": bool(
             hybrid_total_return
-            > _safe_float(refreshed_by_name["balanced_overlay_80_20"].get("total_return", refreshed_by_name["balanced_overlay_80_20"].get("return")), 0.0)
+            > _safe_float(
+                refreshed_by_name["balanced_overlay_80_20"].get(
+                    "total_return", refreshed_by_name["balanced_overlay_80_20"].get("return")
+                ),
+                0.0,
+            )
         ),
-        "max_rss_under_8gib": bool(_safe_float(dict(memory_summary).get("peak_rss_bytes"), 0.0) < (8 * 1024 * 1024 * 1024)),
-        "pair_cap_respected": bool(max(pair_alloc_weights or [0.0]) <= config.pair_weight_cap + 1e-9),
+        "max_rss_under_8gib": bool(
+            _safe_float(dict(memory_summary).get("peak_rss_bytes"), 0.0) < (8 * 1024 * 1024 * 1024)
+        ),
+        "pair_cap_respected": bool(
+            max(pair_alloc_weights or [0.0]) <= config.pair_weight_cap + 1e-9
+        ),
     }
     if "production_guarded_portfolio" in refreshed_by_name:
         readiness["beats_production_guarded_refreshed"] = bool(
@@ -861,7 +1066,11 @@ def write_hybrid_online_report(
                 0.0,
             )
         )
-    if readiness["beats_cash_refreshed"] and readiness["max_rss_under_8gib"] and readiness["pair_cap_respected"]:
+    if (
+        readiness["beats_cash_refreshed"]
+        and readiness["max_rss_under_8gib"]
+        and readiness["pair_cap_respected"]
+    ):
         readiness["recommended_stage"] = (
             "pilot_candidate" if readiness["beats_pair_tactical_refreshed"] else "guarded_candidate"
         )
@@ -875,27 +1084,45 @@ def write_hybrid_online_report(
         "split_windows": split_config.as_payload(),
         "online_policy": {
             "warmup_ratio": float(config.warmup_ratio),
-            "warmup_days": int(refreshed_result.get("resolved_warmup_days") or resolve_warmup_days(config=config, split_config=split_config)),
+            "warmup_days": int(
+                refreshed_result.get("resolved_warmup_days")
+                or resolve_warmup_days(config=config, split_config=split_config)
+            ),
             "lookback_days": int(config.lookback_days),
-            "online_start": split_config.online_start_date(refreshed_result.get("resolved_warmup_days") or resolve_warmup_days(config=config, split_config=split_config)),
+            "online_start": split_config.online_start_date(
+                refreshed_result.get("resolved_warmup_days")
+                or resolve_warmup_days(config=config, split_config=split_config)
+            ),
         },
-        "memory_policy": memory_policy_payload(budget_bytes=PORTFOLIO_FOLLOWUP_EXPLICIT_BUDGET_BYTES),
+        "memory_policy": memory_policy_payload(
+            budget_bytes=PORTFOLIO_FOLLOWUP_EXPLICIT_BUDGET_BYTES
+        ),
         "memory_summary": memory_summary,
         "config": asdict(config),
-        "current_market_state": dict(_load_json(OPERATING_SWITCH_PATH).get("current_market_state") or {}),
+        "current_market_state": dict(
+            _load_json(OPERATING_SWITCH_PATH).get("current_market_state") or {}
+        ),
         "readiness": readiness,
         "scenarios": {
             "historical_saved_baseline": {
                 "active_sleeves": [row["name"] for row in historical_active],
                 "benchmark_sleeves": [row["name"] for row in historical_benchmarks],
-                "source_sleeve_metrics": _source_sleeve_metrics(historical_active + historical_benchmarks),
+                "source_sleeve_metrics": _source_sleeve_metrics(
+                    historical_active + historical_benchmarks
+                ),
                 **historical_result,
-                "comparison_rows": _comparison_rows(hybrid_result=historical_result, benchmarks=historical_benchmarks, active_rows=historical_active),
+                "comparison_rows": _comparison_rows(
+                    hybrid_result=historical_result,
+                    benchmarks=historical_benchmarks,
+                    active_rows=historical_active,
+                ),
             },
             "refreshed_latest_tail": {
                 "active_sleeves": [row["name"] for row in refreshed_active],
                 "benchmark_sleeves": [row["name"] for row in refreshed_benchmarks],
-                "source_sleeve_metrics": _source_sleeve_metrics(refreshed_active + refreshed_benchmarks),
+                "source_sleeve_metrics": _source_sleeve_metrics(
+                    refreshed_active + refreshed_benchmarks
+                ),
                 **refreshed_result,
                 "comparison_rows": refreshed_rows,
             },
@@ -909,8 +1136,12 @@ def write_hybrid_online_report(
     json_path = output_dir / f"hybrid_online_portfolio_{stamp}.json"
     latest_path = output_dir / "hybrid_online_portfolio_latest.json"
     md_path = output_dir / f"hybrid_online_portfolio_{stamp}.md"
-    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=_json_default), encoding="utf-8")
-    latest_path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=_json_default), encoding="utf-8")
+    json_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=_json_default), encoding="utf-8"
+    )
+    latest_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=_json_default), encoding="utf-8"
+    )
 
     hist_rows = payload["scenarios"]["historical_saved_baseline"]["comparison_rows"]
     ref_rows = payload["scenarios"]["refreshed_latest_tail"]["comparison_rows"]
@@ -945,7 +1176,9 @@ def write_hybrid_online_report(
         f"- beats_pair_tactical_refreshed: `{readiness['beats_pair_tactical_refreshed']}`",
         f"- beats_balanced_refreshed: `{readiness['beats_balanced_refreshed']}`",
         *(
-            [f"- beats_production_guarded_refreshed: `{readiness['beats_production_guarded_refreshed']}`"]
+            [
+                f"- beats_production_guarded_refreshed: `{readiness['beats_production_guarded_refreshed']}`"
+            ]
             if "beats_production_guarded_refreshed" in readiness
             else []
         ),
@@ -969,7 +1202,11 @@ def write_hybrid_online_report(
             f"- cash_weight: `{_safe_float(refreshed_result['final_allocation'].get('cash_weight'), 0.0):.2%}`",
         ]
     )
-    for sleeve_name, weight in sorted(dict(refreshed_result["final_allocation"].get("weights") or {}).items(), key=lambda item: item[1], reverse=True):
+    for sleeve_name, weight in sorted(
+        dict(refreshed_result["final_allocation"].get("weights") or {}).items(),
+        key=lambda item: item[1],
+        reverse=True,
+    ):
         lines.append(f"- `{sleeve_name}`: `{_safe_float(weight, 0.0):.2%}`")
     lines.extend(
         [
@@ -987,6 +1224,7 @@ def write_hybrid_online_report(
         "latest_path": str(latest_path.resolve()),
         "md_path": str(md_path.resolve()),
     }
+
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)

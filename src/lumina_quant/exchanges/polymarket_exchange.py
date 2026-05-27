@@ -16,6 +16,7 @@ def _load_sdk_symbols() -> dict[str, Any]:
     from py_clob_client.clob_types import ApiCreds, OpenOrderParams  # type: ignore
     from py_clob_client.order_builder.constants import BUY, SELL  # type: ignore
     from py_clob_client.order_builder.constants import OrderType  # type: ignore
+
     try:
         from py_clob_client.clob_types import OrderArgs  # type: ignore
     except Exception:  # pragma: no cover - sdk version fallback
@@ -56,13 +57,22 @@ class PolymarketExchange(ExchangeInterface):
         self.connect()
 
     def _host(self) -> str:
-        return str(getattr(self.config, "POLYMARKET_HOST", "https://clob.polymarket.com") or "https://clob.polymarket.com")
+        return str(
+            getattr(self.config, "POLYMARKET_HOST", "https://clob.polymarket.com")
+            or "https://clob.polymarket.com"
+        )
 
     def _data_host(self) -> str:
-        return str(getattr(self.config, "POLYMARKET_DATA_HOST", "https://data-api.polymarket.com") or "https://data-api.polymarket.com")
+        return str(
+            getattr(self.config, "POLYMARKET_DATA_HOST", "https://data-api.polymarket.com")
+            or "https://data-api.polymarket.com"
+        )
 
     def _private_key(self) -> str:
-        env_name = str(getattr(self.config, "POLYMARKET_PRIVATE_KEY_ENV", "POLYMARKET_PRIVATE_KEY") or "POLYMARKET_PRIVATE_KEY")
+        env_name = str(
+            getattr(self.config, "POLYMARKET_PRIVATE_KEY_ENV", "POLYMARKET_PRIVATE_KEY")
+            or "POLYMARKET_PRIVATE_KEY"
+        )
         return str(os.getenv(env_name, "") or "").strip()
 
     def _account_address(self) -> str:
@@ -79,9 +89,23 @@ class PolymarketExchange(ExchangeInterface):
             return
 
         private_key = self._private_key()
-        api_key = str(os.getenv(getattr(self.config, "POLYMARKET_API_KEY_ENV", "POLYMARKET_API_KEY"), "") or "").strip()
-        api_secret = str(os.getenv(getattr(self.config, "POLYMARKET_API_SECRET_ENV", "POLYMARKET_API_SECRET"), "") or "").strip()
-        api_passphrase = str(os.getenv(getattr(self.config, "POLYMARKET_API_PASSPHRASE_ENV", "POLYMARKET_API_PASSPHRASE"), "") or "").strip()
+        api_key = str(
+            os.getenv(getattr(self.config, "POLYMARKET_API_KEY_ENV", "POLYMARKET_API_KEY"), "")
+            or ""
+        ).strip()
+        api_secret = str(
+            os.getenv(
+                getattr(self.config, "POLYMARKET_API_SECRET_ENV", "POLYMARKET_API_SECRET"), ""
+            )
+            or ""
+        ).strip()
+        api_passphrase = str(
+            os.getenv(
+                getattr(self.config, "POLYMARKET_API_PASSPHRASE_ENV", "POLYMARKET_API_PASSPHRASE"),
+                "",
+            )
+            or ""
+        ).strip()
         chain_id = int(getattr(self.config, "POLYMARKET_CHAIN_ID", 137) or 137)
         signature_type = int(getattr(self.config, "POLYMARKET_SIGNATURE_TYPE", 0) or 0)
         funder = self._account_address() or None
@@ -107,7 +131,11 @@ class PolymarketExchange(ExchangeInterface):
                 self.client.set_api_creds(self._creds)
             except Exception:
                 pass
-        elif private_key and hasattr(self.client, "create_or_derive_api_creds") and hasattr(self.client, "set_api_creds"):
+        elif (
+            private_key
+            and hasattr(self.client, "create_or_derive_api_creds")
+            and hasattr(self.client, "set_api_creds")
+        ):
             try:
                 self._creds = self.client.create_or_derive_api_creds()
                 self.client.set_api_creds(self._creds)
@@ -130,7 +158,9 @@ class PolymarketExchange(ExchangeInterface):
             raise RuntimeError("Polymarket real execution requires a configured private key env.")
         return self._require_client()
 
-    def _normalize_order(self, payload: dict[str, Any], *, symbol: str | None = None) -> dict[str, Any]:
+    def _normalize_order(
+        self, payload: dict[str, Any], *, symbol: str | None = None
+    ) -> dict[str, Any]:
         item = dict(payload or {})
         order_id = item.get("orderID") or item.get("orderId") or item.get("id")
         price = item.get("price") or item.get("average_price") or item.get("avgPrice")
@@ -153,7 +183,9 @@ class PolymarketExchange(ExchangeInterface):
     def _data_api_get(self, path: str, *, params: dict[str, Any] | None = None) -> Any:
         url = self._data_host().rstrip("/") + "/" + path.lstrip("/")
         if params:
-            url += "?" + urllib.parse.urlencode({key: value for key, value in params.items() if value is not None})
+            url += "?" + urllib.parse.urlencode(
+                {key: value for key, value in params.items() if value is not None}
+            )
         with urllib.request.urlopen(url, timeout=5) as response:
             return json.loads(response.read().decode("utf-8"))
 
@@ -173,7 +205,9 @@ class PolymarketExchange(ExchangeInterface):
         for row in list(payload or []):
             if not isinstance(row, dict):
                 continue
-            asset_id = str(row.get("asset") or row.get("asset_id") or row.get("assetId") or "").strip()
+            asset_id = str(
+                row.get("asset") or row.get("asset_id") or row.get("assetId") or ""
+            ).strip()
             if not asset_id:
                 continue
             positions[asset_id] = positions.get(asset_id, 0.0) + _safe_float(

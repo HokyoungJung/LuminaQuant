@@ -159,7 +159,15 @@ def _truthy(value: Any) -> bool:
         return value
     if isinstance(value, (int, float)):
         return bool(value)
-    return str(value or "").strip().lower() in {"1", "true", "yes", "y", "pass", "passed", "success"}
+    return str(value or "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "y",
+        "pass",
+        "passed",
+        "success",
+    }
 
 
 def _candidate_label_ok(result: Mapping[str, Any], candidate_payload: Mapping[str, Any]) -> bool:
@@ -218,7 +226,9 @@ def _no_improvement_base_retained(
     )
 
 
-def _source_candidate_from_artifact(candidate_payload: Mapping[str, Any], *, repo_root: Path) -> dict[str, Any]:
+def _source_candidate_from_artifact(
+    candidate_payload: Mapping[str, Any], *, repo_root: Path
+) -> dict[str, Any]:
     source_path = _resolve_path(candidate_payload.get("source_artifact"), repo_root=repo_root)
     if source_path is None or not source_path.exists() or source_path.suffix.lower() != ".json":
         return {}
@@ -269,7 +279,9 @@ def _metric_sources(
     return sources
 
 
-def _first_float_from_sources(sources: Iterable[Mapping[str, Any]], keys: Iterable[str]) -> float | None:
+def _first_float_from_sources(
+    sources: Iterable[Mapping[str, Any]], keys: Iterable[str]
+) -> float | None:
     for source in sources:
         for key in keys:
             parsed = _safe_float(source.get(key))
@@ -465,7 +477,9 @@ CURRENT_BASE_TRAIN_VAL_STABILITY_SCORE = _train_val_stability_score(
 )
 
 
-def _smart_sortino(monthly_return: float | None, max_drawdown: float | None, sortino: float | None) -> float | None:
+def _smart_sortino(
+    monthly_return: float | None, max_drawdown: float | None, sortino: float | None
+) -> float | None:
     if monthly_return is None or max_drawdown is None or sortino is None:
         return None
     return_floor_factor = max(0.0, min(1.0, monthly_return / MIN_STABLE_MONTHLY_RETURN))
@@ -563,10 +577,18 @@ def _liquidation_margin_evidence(
         "minimum_margin_buffer": min(buffers) if buffers else None,
         "minimum_margin_ratio": min(ratios) if ratios else None,
         "maximum_liquidation_event_drawdown": max(event_drawdowns) if event_drawdowns else None,
-        "maximum_liquidation_equity_loss_fraction": max(event_loss_fractions) if event_loss_fractions else None,
-        "allowed_total_liquidations": max(allowed_total_liquidations) if allowed_total_liquidations else None,
-        "max_liquidation_event_drawdown": min(max_allowed_event_drawdowns) if max_allowed_event_drawdowns else None,
-        "max_liquidation_equity_loss_fraction": min(max_allowed_loss_fractions) if max_allowed_loss_fractions else None,
+        "maximum_liquidation_equity_loss_fraction": max(event_loss_fractions)
+        if event_loss_fractions
+        else None,
+        "allowed_total_liquidations": max(allowed_total_liquidations)
+        if allowed_total_liquidations
+        else None,
+        "max_liquidation_event_drawdown": min(max_allowed_event_drawdowns)
+        if max_allowed_event_drawdowns
+        else None,
+        "max_liquidation_equity_loss_fraction": min(max_allowed_loss_fractions)
+        if max_allowed_loss_fractions
+        else None,
     }
 
 
@@ -626,10 +648,14 @@ def _candidate_return_quality_check(
     minimum_margin_buffer = liquidation_evidence["minimum_margin_buffer"]
     minimum_margin_ratio = liquidation_evidence["minimum_margin_ratio"]
     maximum_liquidation_event_drawdown = liquidation_evidence["maximum_liquidation_event_drawdown"]
-    maximum_liquidation_equity_loss_fraction = liquidation_evidence["maximum_liquidation_equity_loss_fraction"]
+    maximum_liquidation_equity_loss_fraction = liquidation_evidence[
+        "maximum_liquidation_equity_loss_fraction"
+    ]
     allowed_total_liquidations = liquidation_evidence["allowed_total_liquidations"]
     max_liquidation_event_drawdown = liquidation_evidence["max_liquidation_event_drawdown"]
-    max_liquidation_equity_loss_fraction = liquidation_evidence["max_liquidation_equity_loss_fraction"]
+    max_liquidation_equity_loss_fraction = liquidation_evidence[
+        "max_liquidation_equity_loss_fraction"
+    ]
     details = {
         "minimum_stable_monthly_return": MIN_STABLE_MONTHLY_RETURN,
         "minimum_buffered_train_monthly_return": MIN_BUFFERED_TRAIN_MONTHLY_RETURN,
@@ -683,29 +709,20 @@ def _candidate_return_quality_check(
         "max_liquidation_event_drawdown": max_liquidation_event_drawdown,
         "max_liquidation_equity_loss_fraction": max_liquidation_equity_loss_fraction,
     }
-    current_base_return_check = (
-        oos_return is not None
-        and (
-            oos_return >= CURRENT_BASE_OOS_RETURN
-            if no_improvement_base_retained
-            else oos_return > CURRENT_BASE_OOS_RETURN
-        )
+    current_base_return_check = oos_return is not None and (
+        oos_return >= CURRENT_BASE_OOS_RETURN
+        if no_improvement_base_retained
+        else oos_return > CURRENT_BASE_OOS_RETURN
     )
-    current_base_return_risk_check = (
-        oos_return_risk is not None
-        and (
-            oos_return_risk >= CURRENT_BASE_OOS_RETURN_RISK
-            if no_improvement_base_retained
-            else oos_return_risk > CURRENT_BASE_OOS_RETURN_RISK
-        )
+    current_base_return_risk_check = oos_return_risk is not None and (
+        oos_return_risk >= CURRENT_BASE_OOS_RETURN_RISK
+        if no_improvement_base_retained
+        else oos_return_risk > CURRENT_BASE_OOS_RETURN_RISK
     )
-    current_base_train_val_check = (
-        train_val_stability_score is not None
-        and (
-            train_val_stability_score >= CURRENT_BASE_TRAIN_VAL_STABILITY_SCORE
-            if no_improvement_base_retained
-            else train_val_stability_score > CURRENT_BASE_TRAIN_VAL_STABILITY_SCORE
-        )
+    current_base_train_val_check = train_val_stability_score is not None and (
+        train_val_stability_score >= CURRENT_BASE_TRAIN_VAL_STABILITY_SCORE
+        if no_improvement_base_retained
+        else train_val_stability_score > CURRENT_BASE_TRAIN_VAL_STABILITY_SCORE
     )
     raw_train_check = (
         no_improvement_base_retained
@@ -720,10 +737,14 @@ def _candidate_return_quality_check(
     integer_leverage_check = no_improvement_base_retained or abs(leverage - round(leverage)) <= 1e-9
     if no_improvement_base_retained:
         liquidation_check = True if liquidation_count is None else int(liquidation_count) == 0
-        margin_buffer_check = True if minimum_margin_buffer is None else float(minimum_margin_buffer) > 0.0
+        margin_buffer_check = (
+            True if minimum_margin_buffer is None else float(minimum_margin_buffer) > 0.0
+        )
     else:
         liquidation_check = liquidation_count is not None and int(liquidation_count) == 0
-        margin_buffer_check = minimum_margin_buffer is not None and float(minimum_margin_buffer) > 0.0
+        margin_buffer_check = (
+            minimum_margin_buffer is not None and float(minimum_margin_buffer) > 0.0
+        )
     if liquidation_count is None or int(liquidation_count) == 0:
         liquidation_event_drawdown_check = True
         liquidation_loss_fraction_check = True
@@ -736,7 +757,8 @@ def _candidate_return_quality_check(
         liquidation_loss_fraction_check = (
             maximum_liquidation_equity_loss_fraction is not None
             and max_liquidation_equity_loss_fraction is not None
-            and float(maximum_liquidation_equity_loss_fraction) <= float(max_liquidation_equity_loss_fraction)
+            and float(maximum_liquidation_equity_loss_fraction)
+            <= float(max_liquidation_equity_loss_fraction)
         )
     checks = (
         train_monthly is not None and train_monthly >= MIN_STABLE_MONTHLY_RETURN,
@@ -942,14 +964,20 @@ def _mutex_evidence_check(result: Mapping[str, Any]) -> EvidenceCheck:
             status = str(item.get("status") or item.get("conclusion") or "").strip().lower()
             lock_path = str(item.get("lock_path") or item.get("path") or "").strip()
             exclusive = _truthy(item.get("exclusive")) or _truthy(item.get("exclusive_lock"))
-            overlap_ok = str(item.get("overlap_check") or item.get("overlap_status") or "").lower() in {
+            overlap_ok = str(
+                item.get("overlap_check") or item.get("overlap_status") or ""
+            ).lower() in {
                 "passed",
                 "pass",
                 "ok",
                 "no_overlap",
                 "none",
             }
-            passed = bool(lock_path and exclusive and (status in {"passed", "completed", "success"} or overlap_ok))
+            passed = bool(
+                lock_path
+                and exclusive
+                and (status in {"passed", "completed", "success"} or overlap_ok)
+            )
             ok_items += int(passed)
             details.append(
                 {
@@ -974,17 +1002,23 @@ def _mutex_evidence_check(result: Mapping[str, Any]) -> EvidenceCheck:
     )
 
 
-def validate(result_path: Path = DEFAULT_RESULT_PATH, *, repo_root: Path = REPO_ROOT) -> dict[str, Any]:
+def validate(
+    result_path: Path = DEFAULT_RESULT_PATH, *, repo_root: Path = REPO_ROOT
+) -> dict[str, Any]:
     """Return a mission validation payload without mutating mission result state."""
     result = _load_json(result_path)
     checks: list[EvidenceCheck] = []
 
-    declared_pass = bool(result.get("passed") is True and str(result.get("status") or "").lower() == "passed")
+    declared_pass = bool(
+        result.get("passed") is True and str(result.get("status") or "").lower() == "passed"
+    )
     checks.append(
         EvidenceCheck(
             "declared_pass_status",
             declared_pass,
-            "result has passed=true and status=passed" if declared_pass else "result is not yet status=passed with passed=true",
+            "result has passed=true and status=passed"
+            if declared_pass
+            else "result is not yet status=passed with passed=true",
         )
     )
 
@@ -997,7 +1031,9 @@ def validate(result_path: Path = DEFAULT_RESULT_PATH, *, repo_root: Path = REPO_
         EvidenceCheck(
             "passing_candidate_artifact_exists",
             candidate_exists,
-            _compact_path(candidate_path, repo_root=repo_root) if candidate_path else "missing passing_candidate_artifact",
+            _compact_path(candidate_path, repo_root=repo_root)
+            if candidate_path
+            else "missing passing_candidate_artifact",
         )
     )
     label_ok = bool(candidate_exists and _candidate_label_ok(result, candidate_payload))
@@ -1005,7 +1041,9 @@ def validate(result_path: Path = DEFAULT_RESULT_PATH, *, repo_root: Path = REPO_
         EvidenceCheck(
             "candidate_lifecycle_label",
             label_ok,
-            "research/live-equivalent success label present" if label_ok else "missing research_success_candidate/live_equivalent label",
+            "research/live-equivalent success label present"
+            if label_ok
+            else "missing research_success_candidate/live_equivalent label",
         )
     )
     checks.append(
@@ -1037,23 +1075,34 @@ def validate(result_path: Path = DEFAULT_RESULT_PATH, *, repo_root: Path = REPO_
         EvidenceCheck(
             "rss_under_8gib_evidence",
             rss_ok,
-            json.dumps(rss_details, ensure_ascii=False, sort_keys=True) if rss_details else "missing RSS evidence paths",
+            json.dumps(rss_details, ensure_ascii=False, sort_keys=True)
+            if rss_details
+            else "missing RSS evidence paths",
         )
     )
     checks.append(_mutex_evidence_check(result))
 
     tests_items = _evidence_items(result, "test_evidence", "tests_and_ci_evidence", "tests")
-    tests_ok = bool(result.get("tests_passed") is True or _has_success_evidence(tests_items, accepted_keys=("passed", "success")))
+    tests_ok = bool(
+        result.get("tests_passed") is True
+        or _has_success_evidence(tests_items, accepted_keys=("passed", "success"))
+    )
     checks.append(
         EvidenceCheck(
             "local_tests_evidence",
             tests_ok,
-            f"{len(tests_items)} test evidence item(s)" if tests_ok else "missing successful local test evidence",
+            f"{len(tests_items)} test evidence item(s)"
+            if tests_ok
+            else "missing successful local test evidence",
         )
     )
 
     ci_items = _evidence_items(result, "ci_evidence", "tests_and_ci_evidence", "ci")
-    ci_ok = bool(result.get("ci_passed") is True or str(result.get("ci_status") or "").lower() == "success" or _has_success_evidence(ci_items, accepted_keys=("passed", "success")))
+    ci_ok = bool(
+        result.get("ci_passed") is True
+        or str(result.get("ci_status") or "").lower() == "success"
+        or _has_success_evidence(ci_items, accepted_keys=("passed", "success"))
+    )
     checks.append(
         EvidenceCheck(
             "ci_success_evidence",
@@ -1064,7 +1113,9 @@ def validate(result_path: Path = DEFAULT_RESULT_PATH, *, repo_root: Path = REPO_
 
     source_changed = result.get("source_changed")
     if source_changed is None:
-        source_changed = "git_push_if_code_changed" in set(result.get("required_final_evidence") or [])
+        source_changed = "git_push_if_code_changed" in set(
+            result.get("required_final_evidence") or []
+        )
     git_items = _evidence_items(result, "git_evidence", "git_push", "push_evidence")
     git_ok = (not bool(source_changed)) or bool(
         result.get("pushed_commit")
@@ -1075,7 +1126,9 @@ def validate(result_path: Path = DEFAULT_RESULT_PATH, *, repo_root: Path = REPO_
         EvidenceCheck(
             "git_push_evidence_if_source_changed",
             git_ok,
-            "source unchanged or push evidence present" if git_ok else "source_changed requires git push evidence",
+            "source unchanged or push evidence present"
+            if git_ok
+            else "source_changed requires git push evidence",
         )
     )
 
@@ -1127,7 +1180,9 @@ def main(argv: list[str] | None = None) -> int:
     markdown_path = Path(args.markdown_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     markdown_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    output_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     markdown_path.write_text(render_markdown(payload), encoding="utf-8")
     print(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
     return 0 if payload["passed"] else 1

@@ -6,10 +6,7 @@ import pandas as pd
 
 
 MODULE_PATH = (
-    Path(__file__).resolve().parents[2]
-    / "scripts"
-    / "research"
-    / "run_group_regime_judgement.py"
+    Path(__file__).resolve().parents[2] / "scripts" / "research" / "run_group_regime_judgement.py"
 )
 SPEC = importlib.util.spec_from_file_location("run_group_regime_judgement", MODULE_PATH)
 MODULE = importlib.util.module_from_spec(SPEC)
@@ -45,13 +42,13 @@ def test_select_rules_prefers_consistent_feature() -> None:
             "relative_hit_rate_20d": [0.7 if flag else 0.3 for flag in pattern],
         }
     )
-    frame["forward_5d_incumbent"] = [-0.01 if flag else 0.03 for flag in frame["autoresearch_leading_5d"]]
+    frame["forward_5d_incumbent"] = [
+        -0.01 if flag else 0.03 for flag in frame["autoresearch_leading_5d"]
+    ]
     frame["forward_5d_autoresearch"] = [
         0.04 if flag else -0.02 for flag in frame["autoresearch_leading_5d"]
     ]
-    frame["forward_5d_rel"] = (
-        frame["forward_5d_autoresearch"] - frame["forward_5d_incumbent"]
-    )
+    frame["forward_5d_rel"] = frame["forward_5d_autoresearch"] - frame["forward_5d_incumbent"]
 
     selected, diagnostics = MODULE._select_rules(frame, horizon_days=5)
 

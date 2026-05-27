@@ -94,7 +94,9 @@ def test_config_module_exposes_explicit_runtime_env_seeding(tmp_path, monkeypatc
 
     assert seeded["LQ__STORAGE__COLLECTOR_PERIODIC_ENABLED"] == "0"
     assert config_module.os.environ["LQ__STORAGE__COLLECTOR_PERIODIC_ENABLED"] == "0"
-    assert json.loads(config_module.os.environ["LQ__STORAGE__MATERIALIZER_REQUIRED_TIMEFRAMES"]) == [
+    assert json.loads(
+        config_module.os.environ["LQ__STORAGE__MATERIALIZER_REQUIRED_TIMEFRAMES"]
+    ) == [
         "1s",
         "5m",
     ]

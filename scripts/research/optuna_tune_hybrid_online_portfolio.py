@@ -64,11 +64,29 @@ def _evaluate_config(
 ) -> dict:
     historical_active = _MOD._historical_active_rows(split_config=split_config)
     refreshed_active, refreshed_benchmarks = _MOD._refreshed_rows(split_config=split_config)
-    refreshed_health_metrics = {row["name"]: dict(row.get("oos") or {}) for row in refreshed_active + refreshed_benchmarks}
-    historical_config = _MOD.HybridOnlineConfig(**({**asdict(config), "use_current_health_priors": False}))
-    historical_result = _MOD.run_hybrid_online_allocator(historical_active, config=historical_config, refreshed_health_metrics=None, split_config=split_config)
-    refreshed_result = _MOD.run_hybrid_online_allocator(refreshed_active, config=config, refreshed_health_metrics=refreshed_health_metrics, split_config=split_config)
-    refreshed_rows = _MOD._comparison_rows(hybrid_result=refreshed_result, benchmarks=refreshed_benchmarks, active_rows=refreshed_active)
+    refreshed_health_metrics = {
+        row["name"]: dict(row.get("oos") or {}) for row in refreshed_active + refreshed_benchmarks
+    }
+    historical_config = _MOD.HybridOnlineConfig(
+        **({**asdict(config), "use_current_health_priors": False})
+    )
+    historical_result = _MOD.run_hybrid_online_allocator(
+        historical_active,
+        config=historical_config,
+        refreshed_health_metrics=None,
+        split_config=split_config,
+    )
+    refreshed_result = _MOD.run_hybrid_online_allocator(
+        refreshed_active,
+        config=config,
+        refreshed_health_metrics=refreshed_health_metrics,
+        split_config=split_config,
+    )
+    refreshed_rows = _MOD._comparison_rows(
+        hybrid_result=refreshed_result,
+        benchmarks=refreshed_benchmarks,
+        active_rows=refreshed_active,
+    )
     refreshed_by_name = {row["name"]: row for row in refreshed_rows}
     pair_alloc_weights = [
         _safe_float((alloc.get("weights") or {}).get("pair_tactical_mode"), 0.0)
@@ -82,14 +100,36 @@ def _evaluate_config(
         },
         "readiness": {
             "beats_cash_refreshed": bool(
-                _safe_float(refreshed_by_name["hybrid_online_portfolio"].get("total_return", refreshed_by_name["hybrid_online_portfolio"].get("return")), 0.0)
-                > _safe_float(refreshed_by_name["risk_off_cash"].get("total_return", refreshed_by_name["risk_off_cash"].get("return")), 0.0)
+                _safe_float(
+                    refreshed_by_name["hybrid_online_portfolio"].get(
+                        "total_return", refreshed_by_name["hybrid_online_portfolio"].get("return")
+                    ),
+                    0.0,
+                )
+                > _safe_float(
+                    refreshed_by_name["risk_off_cash"].get(
+                        "total_return", refreshed_by_name["risk_off_cash"].get("return")
+                    ),
+                    0.0,
+                )
             ),
             "beats_pair_tactical_refreshed": bool(
-                _safe_float(refreshed_by_name["hybrid_online_portfolio"].get("total_return", refreshed_by_name["hybrid_online_portfolio"].get("return")), 0.0)
-                > _safe_float(refreshed_by_name["pair_tactical_mode"].get("total_return", refreshed_by_name["pair_tactical_mode"].get("return")), 0.0)
+                _safe_float(
+                    refreshed_by_name["hybrid_online_portfolio"].get(
+                        "total_return", refreshed_by_name["hybrid_online_portfolio"].get("return")
+                    ),
+                    0.0,
+                )
+                > _safe_float(
+                    refreshed_by_name["pair_tactical_mode"].get(
+                        "total_return", refreshed_by_name["pair_tactical_mode"].get("return")
+                    ),
+                    0.0,
+                )
             ),
-            "pair_cap_respected": bool(max(pair_alloc_weights or [0.0]) <= config.pair_weight_cap + 1e-9),
+            "pair_cap_respected": bool(
+                max(pair_alloc_weights or [0.0]) <= config.pair_weight_cap + 1e-9
+            ),
         },
     }
     return payload
@@ -102,7 +142,9 @@ def _build_config(
     warmup_days: int | None,
 ) -> _MOD.HybridOnlineConfig:
     return _MOD.HybridOnlineConfig(
-        variant=trial.suggest_categorical("variant", ["dynamic_default", "fixed_default", "disagreement_switching"]),
+        variant=trial.suggest_categorical(
+            "variant", ["dynamic_default", "fixed_default", "disagreement_switching"]
+        ),
         warmup_ratio=float(warmup_ratio),
         warmup_days=None if warmup_days is None else int(warmup_days),
         lookback_days=trial.suggest_int("lookback_days", 10, 28),
@@ -144,7 +186,9 @@ def main() -> None:
     optuna_mod = _require_optuna()
     parser = argparse.ArgumentParser(description=__doc__)
     _MOD.add_split_config_arguments(parser)
-    parser.add_argument("--warmup-ratio", type=float, default=_MOD.HybridOnlineConfig().warmup_ratio)
+    parser.add_argument(
+        "--warmup-ratio", type=float, default=_MOD.HybridOnlineConfig().warmup_ratio
+    )
     parser.add_argument("--warmup-days", type=int, default=None)
     parser.add_argument("--output-dir", type=Path, default=OUTPUT_DIR)
     parser.add_argument(
@@ -188,7 +232,9 @@ def main() -> None:
     trials = []
     for trial in study.trials:
         payload = trial.user_attrs["payload"]
-        payload["objective"] = float(_objective_from_payload(payload, profile=args.objective_profile))
+        payload["objective"] = float(
+            _objective_from_payload(payload, profile=args.objective_profile)
+        )
         payload = {
             "trial_number": trial.number,
             "objective": trial.value,
@@ -243,7 +289,7 @@ def main() -> None:
         ref = row["scenarios"]["refreshed_latest_tail"]["split_metrics"]
         cfg = row["config"]
         lines.append(
-            f"| {row['trial_number']} | {float(row['objective']):.4f} | `{cfg['variant']}` | {_safe_float(ref['oos'].get('total_return', ref['oos'].get('return')),0.0):+.4%} | {_safe_float(ref['oos'].get('sharpe'),0.0):.4f} | {_safe_float(ref['val'].get('total_return', ref['val'].get('return')),0.0):+.4%} | {_safe_float(ref['train'].get('total_return', ref['train'].get('return')),0.0):+.4%} | `{row['readiness']['beats_cash_refreshed']}` | `{row['readiness']['beats_pair_tactical_refreshed']}` |"
+            f"| {row['trial_number']} | {float(row['objective']):.4f} | `{cfg['variant']}` | {_safe_float(ref['oos'].get('total_return', ref['oos'].get('return')), 0.0):+.4%} | {_safe_float(ref['oos'].get('sharpe'), 0.0):.4f} | {_safe_float(ref['val'].get('total_return', ref['val'].get('return')), 0.0):+.4%} | {_safe_float(ref['train'].get('total_return', ref['train'].get('return')), 0.0):+.4%} | `{row['readiness']['beats_cash_refreshed']}` | `{row['readiness']['beats_pair_tactical_refreshed']}` |"
         )
     md_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(str(latest_json.resolve()))

@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import pytest
 
-from lumina_quant.strategy_factory.selection import hurdle_score, robust_score_from_metrics, safe_float
+from lumina_quant.strategy_factory.selection import (
+    hurdle_score,
+    robust_score_from_metrics,
+    safe_float,
+)
 
 
 def test_safe_float_only_falls_back_for_coercion_errors() -> None:

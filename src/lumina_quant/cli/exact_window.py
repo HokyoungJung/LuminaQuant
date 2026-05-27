@@ -105,11 +105,7 @@ def _git_commit_marker() -> tuple[str, bool]:
 
 
 def _candidate_library_hash() -> str:
-    path = (
-        Path(__file__).resolve().parents[1]
-        / "strategy_factory"
-        / "candidate_library.py"
-    )
+    path = Path(__file__).resolve().parents[1] / "strategy_factory" / "candidate_library.py"
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
@@ -122,9 +118,7 @@ def _normalize_signature_value(value: Any) -> Any:
         except Exception:
             return []
     if isinstance(value, dict):
-        return {
-            str(key).strip(): _normalize_signature_value(item) for key, item in value.items()
-        }
+        return {str(key).strip(): _normalize_signature_value(item) for key, item in value.items()}
     if isinstance(value, (str, int, float, bool)):
         return value
     return str(value)
@@ -164,7 +158,9 @@ def _candidate_run_signature(
         "symbols": _sorted_signature_list(symbols),
         "resolved_windows": {
             key: _normalize_signature_value(resolved_windows.get(key))
-            for key in sorted({"train_start", "val_start", "oos_start", "requested_oos_end_exclusive"})
+            for key in sorted(
+                {"train_start", "val_start", "oos_start", "requested_oos_end_exclusive"}
+            )
             if key in resolved_windows
         },
         "window_profile": str(window_profile or "default"),
@@ -338,8 +334,12 @@ def _registry_batch_payload(
     payload.setdefault("chunk_days", 0)
     payload.setdefault("status", status)
     payload.setdefault("error", error)
-    payload["evaluated_count"] = int(summary.get("evaluated_count") or 0) if isinstance(summary, dict) else 0
-    payload["promoted_count"] = int(summary.get("promoted_count") or 0) if isinstance(summary, dict) else 0
+    payload["evaluated_count"] = (
+        int(summary.get("evaluated_count") or 0) if isinstance(summary, dict) else 0
+    )
+    payload["promoted_count"] = (
+        int(summary.get("promoted_count") or 0) if isinstance(summary, dict) else 0
+    )
     if isinstance(memory_bundle, dict):
         mem_payload = memory_bundle.get("payload")
         if isinstance(mem_payload, dict):
@@ -352,9 +352,7 @@ def _registry_batch_payload(
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        description="Run exact-window low-RAM validation suite."
-    )
+    parser = argparse.ArgumentParser(description="Run exact-window low-RAM validation suite.")
     parser.add_argument("--output-dir", default="var/reports/exact_window_backtests")
     parser.add_argument("--score-config", default="configs/score_config.example.json")
     parser.add_argument("--timeframes", nargs="+", default=[])
@@ -602,9 +600,7 @@ def _build_running_manifest(
         "train_start": context.resolved_windows.get("train_start"),
         "val_start": context.resolved_windows.get("val_start"),
         "oos_start": context.resolved_windows.get("oos_start"),
-        "requested_oos_end_exclusive": context.resolved_windows.get(
-            "requested_oos_end_exclusive"
-        ),
+        "requested_oos_end_exclusive": context.resolved_windows.get("requested_oos_end_exclusive"),
         "run_root": str(context.run_root),
         "batch_dir": str(context.batch_dir),
         "artifacts": {
@@ -654,12 +650,8 @@ def _handle_duplicate_signature_skip(
     _ensure_exact_window_run_dirs(context)
     reused_summary = Path(str(registry_entry.get("summary_path") or "")).resolve()
     reused_details = Path(str(registry_entry.get("details_path") or "")).resolve()
-    reused_fail_analysis = Path(
-        str(registry_entry.get("fail_analysis_path") or "")
-    ).resolve()
-    reused_memory = Path(
-        str(registry_entry.get("memory_evidence_path") or "")
-    ).resolve()
+    reused_fail_analysis = Path(str(registry_entry.get("fail_analysis_path") or "")).resolve()
+    reused_memory = Path(str(registry_entry.get("memory_evidence_path") or "")).resolve()
     commit_sha, git_dirty = _git_commit_marker()
     latest_pointer = _build_running_latest_pointer(context)
     latest_pointer.update(
@@ -694,9 +686,7 @@ def _handle_duplicate_signature_skip(
         "train_start": context.resolved_windows.get("train_start"),
         "val_start": context.resolved_windows.get("val_start"),
         "oos_start": context.resolved_windows.get("oos_start"),
-        "requested_oos_end_exclusive": context.resolved_windows.get(
-            "requested_oos_end_exclusive"
-        ),
+        "requested_oos_end_exclusive": context.resolved_windows.get("requested_oos_end_exclusive"),
         "run_root": str(context.run_root),
         "batch_dir": str(context.batch_dir),
         "artifacts": {
@@ -861,18 +851,10 @@ def _handle_adopted_exact_window_run(
     memory_evidence_path = context.batch_dir / MEMORY_EVIDENCE_LATEST
     existing_pid = int(context.args.existing_pid or 0)
     pid_running = existing_pid > 0 and Path(f"/proc/{existing_pid}").exists()
-    status = (
-        "running"
-        if pid_running
-        else "completed"
-        if summary_path.exists()
-        else "pending"
-    )
+    status = "running" if pid_running else "completed" if summary_path.exists() else "pending"
     fail_bundle = (
         write_fail_analysis_bundle(output_dir=context.output_root)
-        if summary_path.exists()
-        and details_path.exists()
-        and not context.args.skip_fail_analysis
+        if summary_path.exists() and details_path.exists() and not context.args.skip_fail_analysis
         else None
     )
     memory_bundle = write_memory_evidence_bundle(
@@ -1266,11 +1248,7 @@ def main(argv: list[str] | None = None) -> int:
                 registry_entry=registry_entry,
             )
     run_lock = _acquire_exact_window_run_lock(context)
-    if (
-        run_lock is None
-        and not context.emit_memory_baseline
-        and context.adopt_run_dir is None
-    ):
+    if run_lock is None and not context.emit_memory_baseline and context.adopt_run_dir is None:
         return 3
     _ensure_exact_window_run_dirs(context)
     commit_sha, git_dirty = _git_commit_marker()

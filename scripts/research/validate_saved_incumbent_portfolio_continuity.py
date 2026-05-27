@@ -31,7 +31,9 @@ from lumina_quant.utils.risk_free import resolve_risk_free_config
 
 FEATURE_REQUIRED_STRATEGIES = {"CompositeTrendStrategy", "PerpCrowdingCarryStrategy"}
 DEFAULT_REFRESH_REPORT = FOLLOWUP_ROOT / "final_portfolio_validation_data_refresh_latest.json"
-DEFAULT_SUPPORT_INVENTORY_JSON = FOLLOWUP_ROOT / "final_portfolio_validation_support_inventory_latest.json"
+DEFAULT_SUPPORT_INVENTORY_JSON = (
+    FOLLOWUP_ROOT / "final_portfolio_validation_support_inventory_latest.json"
+)
 DEFAULT_OUTPUT_JSON = FOLLOWUP_ROOT / "portfolio_continuity_validation_latest.json"
 DEFAULT_OUTPUT_MD = FOLLOWUP_ROOT / "portfolio_continuity_validation_latest.md"
 DEFAULT_RSS_LOG = FOLLOWUP_ROOT / "portfolio_continuity_validation_rss_latest.jsonl"
@@ -211,7 +213,9 @@ def _metrics(
     cagr = float(math.exp(math.log1p(max(-0.999999, total_return)) / years) - 1.0)
     sigma = float(np.std(returns, ddof=1)) if returns.size > 1 else 0.0
     excess = returns - float(resolved_rf.per_period_rate)
-    sharpe = 0.0 if sigma <= 1e-12 else (float(np.mean(excess)) / sigma) * math.sqrt(periods_per_year)
+    sharpe = (
+        0.0 if sigma <= 1e-12 else (float(np.mean(excess)) / sigma) * math.sqrt(periods_per_year)
+    )
     relative = returns - float(resolved_rf.sortino_target_per_period)
     downside = relative[relative < 0.0]
     dsigma = float(np.std(downside, ddof=1)) if downside.size > 1 else 0.0
@@ -285,7 +289,9 @@ def _stream_end_utc(stream: list[dict[str, Any]]) -> datetime | None:
     return latest
 
 
-def _concat_streams(lhs_stream: list[dict[str, Any]], rhs_stream: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _concat_streams(
+    lhs_stream: list[dict[str, Any]], rhs_stream: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
     aggregated = _aggregate_stream(lhs_stream)
     for token, row in _aggregate_stream(rhs_stream).items():
         if token not in aggregated:
@@ -382,11 +388,15 @@ def _saved_weight_rows(
         row["_saved_weight"] = safe_float(weight_row.get("weight"), 0.0)
         resolved.append(row)
     if missing:
-        raise RuntimeError("saved incumbent weights missing refreshed candidates: " + ", ".join(missing))
+        raise RuntimeError(
+            "saved incumbent weights missing refreshed candidates: " + ", ".join(missing)
+        )
     return resolved
 
 
-def _component_summaries(rows: list[dict[str, Any]], oos_stream: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _component_summaries(
+    rows: list[dict[str, Any]], oos_stream: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for row in rows:
         component_oos = dict(row.get("oos") or {})
@@ -442,14 +452,18 @@ def _monthly_oos_returns(stream: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return out
 
 
-def evaluate_saved_weight_portfolio(rows: list[dict[str, Any]], *, metric_config: Any | None = None) -> dict[str, Any]:
+def evaluate_saved_weight_portfolio(
+    rows: list[dict[str, Any]], *, metric_config: Any | None = None
+) -> dict[str, Any]:
     streams = {split: _weighted_stream(rows, split) for split in ("train", "val", "oos")}
     portfolio_metrics: dict[str, dict[str, Any]] = {}
     weighted_component_summaries: dict[str, dict[str, float]] = {}
     for split, stream in streams.items():
         returns = np.asarray([safe_float(item.get("v"), 0.0) for item in stream], dtype=float)
         timestamps = _extract_stream_timestamps(stream)
-        metric = _metrics(returns, periods_per_year=365, timestamps=timestamps, metric_config=metric_config)
+        metric = _metrics(
+            returns, periods_per_year=365, timestamps=timestamps, metric_config=metric_config
+        )
         metric["return"] = metric["total_return"]
         portfolio_metrics[split] = metric
         weighted_component_summaries[split] = {
@@ -475,7 +489,9 @@ def evaluate_saved_weight_portfolio(rows: list[dict[str, Any]], *, metric_config
                 )
             ),
         }
-    oos_returns = np.asarray([safe_float(item.get("v"), 0.0) for item in streams["oos"]], dtype=float)
+    oos_returns = np.asarray(
+        [safe_float(item.get("v"), 0.0) for item in streams["oos"]], dtype=float
+    )
     weighted_turnover = float(weighted_component_summaries["oos"].get("turnover", 0.0))
     weighted_cost = float(
         sum(
@@ -489,8 +505,18 @@ def evaluate_saved_weight_portfolio(rows: list[dict[str, Any]], *, metric_config
     cost_x3 = oos_returns - (max(0.0, 3.0 - 1.0) * weighted_turnover * weighted_cost)
     sensitivity = {
         "cost_stress": {
-            "x2": _metrics(cost_x2, periods_per_year=365, timestamps=oos_timestamps, metric_config=metric_config),
-            "x3": _metrics(cost_x3, periods_per_year=365, timestamps=oos_timestamps, metric_config=metric_config),
+            "x2": _metrics(
+                cost_x2,
+                periods_per_year=365,
+                timestamps=oos_timestamps,
+                metric_config=metric_config,
+            ),
+            "x3": _metrics(
+                cost_x3,
+                periods_per_year=365,
+                timestamps=oos_timestamps,
+                metric_config=metric_config,
+            ),
         },
         "param_drift": {
             "minus_10pct_signal": _metrics(
@@ -566,7 +592,9 @@ def _load_support_inventory_rows(refresh_payload: dict[str, Any]) -> list[dict[s
     return []
 
 
-def _normalized_refresh_rows(refresh_payload: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+def _normalized_refresh_rows(
+    refresh_payload: dict[str, Any],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     ohlcv_rows = list(refresh_payload.get("ohlcv_results") or refresh_payload.get("results") or [])
     feature_rows = list(refresh_payload.get("feature_results") or [])
     if feature_rows:
@@ -629,7 +657,9 @@ def _latest_common_complete_time(
     for symbol, timeframe in required_pairs:
         dt_1s = ohlcv_last.get(symbol)
         if dt_1s is None:
-            raise ValueError(f"Missing refreshed 1s coverage for {symbol} required by {timeframe} validation.")
+            raise ValueError(
+                f"Missing refreshed 1s coverage for {symbol} required by {timeframe} validation."
+            )
         complete_dt = _latest_complete_bucket_start(dt_1s, timeframe)
         candidates.append(
             (
@@ -651,7 +681,9 @@ def _latest_common_complete_time(
             (
                 dt,
                 {
-                    "source": feature_source_by_symbol.get(_research_symbol(symbol), "feature_points"),
+                    "source": feature_source_by_symbol.get(
+                        _research_symbol(symbol), "feature_points"
+                    ),
                     "symbol": _research_symbol(symbol),
                     "timeframe": "feature",
                     "last_complete_utc": iso_utc(dt) or "",
@@ -666,7 +698,9 @@ def _latest_common_complete_time(
     return anchor_dt, evidence
 
 
-def _build_comparison(saved_metrics: dict[str, Any], refreshed_metrics: dict[str, Any]) -> dict[str, dict[str, float]]:
+def _build_comparison(
+    saved_metrics: dict[str, Any], refreshed_metrics: dict[str, Any]
+) -> dict[str, dict[str, float]]:
     comparison: dict[str, dict[str, float]] = {}
     for split in ("train", "val", "oos"):
         saved_split = dict(saved_metrics.get(split) or {})
@@ -694,7 +728,9 @@ def _candidate_symbols(candidate: dict[str, Any], fallback: list[str]) -> list[s
 
 
 def _candidate_timeframes(candidate: dict[str, Any], fallback: list[str]) -> list[str]:
-    timeframe = str(candidate.get("strategy_timeframe") or candidate.get("timeframe") or "").strip().lower()
+    timeframe = (
+        str(candidate.get("strategy_timeframe") or candidate.get("timeframe") or "").strip().lower()
+    )
     if timeframe:
         return [timeframe]
     return list(fallback)
@@ -723,14 +759,8 @@ def _matching_report_candidates(
     matched = [
         row
         for row in list(report_candidates or [])
-        if (
-            candidate_id
-            and str(row.get("candidate_id") or "").strip() == candidate_id
-        )
-        or (
-            candidate_name
-            and str(row.get("name") or "").strip() == candidate_name
-        )
+        if (candidate_id and str(row.get("candidate_id") or "").strip() == candidate_id)
+        or (candidate_name and str(row.get("name") or "").strip() == candidate_name)
     ]
     return matched or list(report_candidates or [])
 
@@ -771,7 +801,9 @@ def _strict_validation_cache_key(
             "strategy_name": str(candidate.get("strategy_name") or "").strip(),
             "strategy_timeframe": str(
                 candidate.get("strategy_timeframe") or candidate.get("timeframe") or ""
-            ).strip().lower(),
+            )
+            .strip()
+            .lower(),
             "symbols": sorted(
                 str(symbol).strip()
                 for symbol in list(candidate.get("symbols") or [])
@@ -820,7 +852,9 @@ def _run_strict_research(
     combined_data_sources: dict[str, list[Any]] = {}
     report_generated_at: str | None = None
 
-    for group in _group_candidates_for_strict_research(candidates, strategy_timeframes, symbol_universe):
+    for group in _group_candidates_for_strict_research(
+        candidates, strategy_timeframes, symbol_universe
+    ):
         cache_key = _strict_validation_cache_key(
             candidates=list(group["candidates"]),
             strategy_timeframes=list(group["timeframes"]),
@@ -853,8 +887,12 @@ def _run_strict_research(
         for candidate in list(group["candidates"]):
             matched_candidates = _matching_report_candidates(report_candidates, candidate)
             if not matched_candidates:
-                candidate_label = str(candidate.get("name") or candidate.get("candidate_id") or "unknown")
-                raise RuntimeError(f"Strict validation returned no candidate rows for {candidate_label}.")
+                candidate_label = str(
+                    candidate.get("name") or candidate.get("candidate_id") or "unknown"
+                )
+                raise RuntimeError(
+                    f"Strict validation returned no candidate rows for {candidate_label}."
+                )
             combined_candidates.extend(matched_candidates)
         _merge_data_sources(combined_data_sources, data_sources)
         report_generated_at = str(report.get("generated_at") or report_generated_at or "")
@@ -924,7 +962,9 @@ def build_markdown(payload: dict[str, Any]) -> str:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Run extension-style continuity validation for the saved incumbent portfolio.")
+    parser = argparse.ArgumentParser(
+        description="Run extension-style continuity validation for the saved incumbent portfolio."
+    )
     parser.add_argument("--bundle-path", default="")
     parser.add_argument("--portfolio-path", default=str(PORTFOLIO_CURRENT_OPTIMIZATION))
     parser.add_argument("--refresh-report", default=str(DEFAULT_REFRESH_REPORT))
@@ -954,7 +994,9 @@ def main(argv: list[str] | None = None) -> int:
     portfolio_payload = json.loads(portfolio_path.read_text(encoding="utf-8"))
     refresh_payload = json.loads(refresh_report_path.read_text(encoding="utf-8"))
 
-    selected_team = list(bundle_payload.get("selected_team") or bundle_payload.get("candidates") or [])
+    selected_team = list(
+        bundle_payload.get("selected_team") or bundle_payload.get("candidates") or []
+    )
     if not selected_team:
         raise RuntimeError(f"no incumbent candidate rows found in {bundle_path}")
     saved_weights = list(portfolio_payload.get("weights") or [])
@@ -980,7 +1022,8 @@ def main(argv: list[str] | None = None) -> int:
         {
             _research_symbol(symbol)
             for row in selected_team
-            if str(row.get("strategy_class") or row.get("strategy") or "") in FEATURE_REQUIRED_STRATEGIES
+            if str(row.get("strategy_class") or row.get("strategy") or "")
+            in FEATURE_REQUIRED_STRATEGIES
             for symbol in list(row.get("symbols") or [])
             if str(symbol).strip()
         }
@@ -1036,7 +1079,10 @@ def main(argv: list[str] | None = None) -> int:
         exact_split = _shift_validation_split(base_split, latest_common_complete - saved_oos_end)
         guard.checkpoint(
             "exact_validation_start",
-            {"candidate_count": len(selected_team), "latest_common_complete_utc": iso_utc(latest_common_complete)},
+            {
+                "candidate_count": len(selected_team),
+                "latest_common_complete_utc": iso_utc(latest_common_complete),
+            },
         )
         exact_report = _run_strict_research(
             candidates=selected_team,
@@ -1055,7 +1101,9 @@ def main(argv: list[str] | None = None) -> int:
             "exact_validation_evaluated",
             {
                 "oos_total_return": safe_float(
-                    ((exact_eval.get("portfolio_metrics") or {}).get("oos") or {}).get("total_return"),
+                    ((exact_eval.get("portfolio_metrics") or {}).get("oos") or {}).get(
+                        "total_return"
+                    ),
                     0.0,
                 )
             },

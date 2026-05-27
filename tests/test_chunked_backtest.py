@@ -96,6 +96,8 @@ def test_resolve_execution_profile_respects_env_and_override(monkeypatch):
     assert profile_env["low_memory"] is True
     assert profile_env["persist_output"] is True
 
-    profile_override = run_backtest._resolve_execution_profile(low_memory=None, persist_output=False)
+    profile_override = run_backtest._resolve_execution_profile(
+        low_memory=None, persist_output=False
+    )
     assert profile_override["low_memory"] is True
     assert profile_override["persist_output"] is False

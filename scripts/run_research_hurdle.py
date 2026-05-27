@@ -486,7 +486,12 @@ def _load_candidates_from_team_report(
 
     # Candidate report v2 direct path.
     if isinstance(doc.get("candidates"), list):
-        default_tf = str(((doc.get("split") or {}) if isinstance(doc.get("split"), dict) else {}).get("strategy_timeframe") or "")
+        default_tf = str(
+            ((doc.get("split") or {}) if isinstance(doc.get("split"), dict) else {}).get(
+                "strategy_timeframe"
+            )
+            or ""
+        )
         for raw in list(doc.get("candidates") or []):
             if not isinstance(raw, dict):
                 continue
@@ -600,7 +605,9 @@ def _load_symbol_ohlcv(path: Path) -> dict[str, list[float]]:
     return out
 
 
-def _build_symbol_regime_snapshot(data_dir: Path, symbols: list[str], window: int) -> dict[str, dict]:
+def _build_symbol_regime_snapshot(
+    data_dir: Path, symbols: list[str], window: int
+) -> dict[str, dict]:
     out: dict[str, dict] = {}
     for symbol in symbols:
         path = _symbol_csv_path(data_dir, symbol)
@@ -684,7 +691,9 @@ def _regime_bias(
         if mean_vshock is not None and abs(mean_vshock) >= float(neutral_cfg["vshock_abs_min"]):
             bias += float(neutral_cfg["vshock_bonus"])
     elif family == "momentum_mean_reversion":
-        if mean_eff is not None and float(momentum_cfg["eff_min"]) <= mean_eff <= float(momentum_cfg["eff_max"]):
+        if mean_eff is not None and float(momentum_cfg["eff_min"]) <= mean_eff <= float(
+            momentum_cfg["eff_max"]
+        ):
             bias += float(momentum_cfg["eff_bonus"])
         if mean_vshock is not None and mean_vshock >= float(momentum_cfg["vshock_min"]):
             bias += float(momentum_cfg["vshock_bonus"])
@@ -877,12 +886,16 @@ def _write_markdown_report(
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Build and rank Binance futures strategy candidates.")
+    parser = argparse.ArgumentParser(
+        description="Build and rank Binance futures strategy candidates."
+    )
     parser.add_argument("--symbols", nargs="+", default=list(DEFAULT_TOP10_PLUS_METALS))
     parser.add_argument("--timeframes", nargs="+", default=list(DEFAULT_TIMEFRAMES))
     parser.add_argument("--mode", choices=["oos", "live"], default="oos")
     parser.add_argument("--report-glob", default="reports/candidate_research_*.json")
-    parser.add_argument("--score-config", default="", help="Optional factory scoring config JSON path.")
+    parser.add_argument(
+        "--score-config", default="", help="Optional factory scoring config JSON path."
+    )
     parser.add_argument("--max-report-files", type=int, default=20)
     parser.add_argument("--data-dir", default="data")
     parser.add_argument("--regime-window", type=int, default=128)

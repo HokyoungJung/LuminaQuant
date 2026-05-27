@@ -105,5 +105,7 @@ def test_build_shortlist_payload_applies_filters_weights_and_sets():
     top_set = portfolio_sets[0]
     assert top_set.get("set_id") == "single_asset_top_set"
     assert int(top_set.get("member_count", 0)) == 2
-    member_weights = [float(row.get("portfolio_weight", 0.0)) for row in list(top_set.get("members") or [])]
+    member_weights = [
+        float(row.get("portfolio_weight", 0.0)) for row in list(top_set.get("members") or [])
+    ]
     assert abs(sum(member_weights) - 1.0) < 1e-9

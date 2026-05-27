@@ -126,7 +126,9 @@ def _validate_live_mode_and_sources(runtime: RuntimeConfig) -> tuple[str, str]:
     return market_data_source, order_state_source
 
 
-def _validate_live_exchange_runtime_invariants(runtime: RuntimeConfig, market_data_source: str, order_state_source: str) -> None:
+def _validate_live_exchange_runtime_invariants(
+    runtime: RuntimeConfig, market_data_source: str, order_state_source: str
+) -> None:
     exchange = runtime.live.exchange
     if exchange.driver not in {"binance_futures", "binance_native", "mt5", "polymarket"}:
         raise ValueError(
@@ -142,7 +144,10 @@ def _validate_live_exchange_runtime_invariants(runtime: RuntimeConfig, market_da
             )
     if exchange.market_type not in {"spot", "future"}:
         raise ValueError("live.exchange.market_type must be 'spot' or 'future'.")
-    if str(exchange.driver).lower() in {"binance_futures", "binance_native"} and str(exchange.market_type).lower() != "future":
+    if (
+        str(exchange.driver).lower() in {"binance_futures", "binance_native"}
+        and str(exchange.market_type).lower() != "future"
+    ):
         raise ValueError(
             "Binance USDⓈ-M Futures integration supports live.exchange.market_type='future' only."
         )
@@ -166,18 +171,14 @@ def _validate_live_exchange_runtime_invariants(runtime: RuntimeConfig, market_da
     if market_data_source == "external":
         external = runtime.live.external
         if str(getattr(external, "source_kind", "")).lower() not in {"jsonl", "parquet", "pipe"}:
-            raise ValueError(
-                "live.external.source_kind must be one of: jsonl, parquet, pipe."
-            )
+            raise ValueError("live.external.source_kind must be one of: jsonl, parquet, pipe.")
         if not str(getattr(external, "path", "") or "").strip():
             raise ValueError("live.market_data_source=external requires live.external.path.")
         if str(getattr(external, "schema", "market_window_v1")).lower() not in {
             "market_window_v1",
             "ohlcv_1s_v1",
         }:
-            raise ValueError(
-                "live.external.schema must be one of: market_window_v1, ohlcv_1s_v1."
-            )
+            raise ValueError("live.external.schema must be one of: market_window_v1, ohlcv_1s_v1.")
     if market_data_source == "polymarket_live":
         if str(exchange.driver).lower() != "polymarket":
             raise ValueError(
@@ -192,7 +193,9 @@ def _validate_live_exchange_runtime_invariants(runtime: RuntimeConfig, market_da
             raise ValueError(
                 "live.market_data_source=polymarket_live requires live.polymarket.asset_ids."
             )
-        if runtime.live.mode == "real" and not bool(getattr(runtime.live.polymarket, "allow_real_execution", False)):
+        if runtime.live.mode == "real" and not bool(
+            getattr(runtime.live.polymarket, "allow_real_execution", False)
+        ):
             raise ValueError(
                 "Polymarket Phase 1 does not support real execution. Use paper mode unless allow_real_execution is explicitly enabled for a later phase."
             )
@@ -244,7 +247,9 @@ def _validate_risk_and_execution_runtime_invariants(runtime: RuntimeConfig) -> N
 
 
 def _validate_backtest_runtime_invariants(runtime: RuntimeConfig) -> None:
-    if str(getattr(runtime.backtest, "risk_free_mode", "us_treasury_constant")).strip().lower() not in {
+    if str(
+        getattr(runtime.backtest, "risk_free_mode", "us_treasury_constant")
+    ).strip().lower() not in {
         "zero",
         "us_treasury_constant",
         "us_treasury_series",
@@ -257,9 +262,7 @@ def _validate_backtest_runtime_invariants(runtime: RuntimeConfig) -> None:
         "same_as_rf",
         "explicit",
     }:
-        raise ValueError(
-            "backtest.sortino_target_mode must be one of: zero, same_as_rf, explicit."
-        )
+        raise ValueError("backtest.sortino_target_mode must be one of: zero, same_as_rf, explicit.")
     if float(getattr(runtime.backtest, "risk_free_annual", 0.0)) <= -1.0:
         raise ValueError("backtest.risk_free_annual must be > -1.0.")
     if float(getattr(runtime.backtest, "sortino_target_annual", 0.0)) <= -1.0:
@@ -332,7 +335,9 @@ def _validate_live_and_optimization_runtime_invariants(runtime: RuntimeConfig) -
         getattr(runtime.live, "default_order_type", "LMT"),
         default="LMT",
     )
-    if default_order_type == "MKT" and not bool(getattr(runtime.live, "allow_market_orders", False)):
+    if default_order_type == "MKT" and not bool(
+        getattr(runtime.live, "allow_market_orders", False)
+    ):
         raise ValueError(
             "live.default_order_type=MKT requires live.allow_market_orders=true; "
             "live defaults must remain limit-first."
@@ -351,12 +356,14 @@ def _validate_live_and_optimization_runtime_invariants(runtime: RuntimeConfig) -
         raise ValueError("live.limit_price_tick_fallback must be >= 0.")
     if not str(getattr(runtime.live, "limit_time_in_force", "GTC") or "").strip():
         raise ValueError("live.limit_time_in_force must be non-empty for limit orders.")
-    protective_style = str(
-        getattr(runtime.live, "protective_order_style", "limit") or "limit"
-    ).strip().lower()
+    protective_style = (
+        str(getattr(runtime.live, "protective_order_style", "limit") or "limit").strip().lower()
+    )
     if protective_style not in {"limit", "market"}:
         raise ValueError("live.protective_order_style must be 'limit' or 'market'.")
-    if protective_style == "market" and not bool(getattr(runtime.live, "allow_market_orders", False)):
+    if protective_style == "market" and not bool(
+        getattr(runtime.live, "allow_market_orders", False)
+    ):
         raise ValueError(
             "live.protective_order_style=market requires live.allow_market_orders=true; "
             "protective orders default to STOP/TAKE_PROFIT limit."

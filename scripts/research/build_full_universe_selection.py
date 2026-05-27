@@ -214,7 +214,9 @@ def _split_for_day(day_key: str) -> str | None:
     return None
 
 
-def _metrics_from_returns(values: list[float] | np.ndarray, periods_per_year: int = 365) -> dict[str, float]:
+def _metrics_from_returns(
+    values: list[float] | np.ndarray, periods_per_year: int = 365
+) -> dict[str, float]:
     returns = np.asarray(values, dtype=float)
     returns = returns[np.isfinite(returns)]
     if returns.size == 0:
@@ -228,7 +230,9 @@ def _metrics_from_returns(values: list[float] | np.ndarray, periods_per_year: in
     sharpe = float((mean / std) * math.sqrt(periods_per_year)) if std > 1e-12 else 0.0
     downside = returns[returns < 0.0]
     downside_std = float(np.std(downside, ddof=1)) if downside.size > 1 else 0.0
-    sortino = float((mean / downside_std) * math.sqrt(periods_per_year)) if downside_std > 1e-12 else 0.0
+    sortino = (
+        float((mean / downside_std) * math.sqrt(periods_per_year)) if downside_std > 1e-12 else 0.0
+    )
     peak = np.maximum.accumulate(equity)
     drawdown = equity / np.maximum(peak, 1e-12) - 1.0
     max_drawdown = float(abs(np.min(drawdown))) if drawdown.size else 0.0
@@ -375,7 +379,9 @@ def _is_true_hybrid(path: Path, raw: dict[str, Any], kind: str) -> bool:
         return True
     if str(kind).startswith("true_hybrid"):
         return True
-    haystack = f"{path.as_posix()} {kind} {raw.get('name', '')} {raw.get('artifact_kind', '')}".lower()
+    haystack = (
+        f"{path.as_posix()} {kind} {raw.get('name', '')} {raw.get('artifact_kind', '')}".lower()
+    )
     if "not_true_hybrid" in haystack or "hybrid_guarded_state_vwap" in haystack:
         return False
     return "hybrid_online" in haystack or "true_hybrid" in haystack
@@ -428,8 +434,12 @@ def _score_and_mark(candidate: Candidate) -> Candidate:
     candidate.selection_score = candidate.val_scaled_score + 0.18 * candidate.train_scaled_score
     train_mdd = _safe_float(candidate.metrics.get("train", {}).get("max_drawdown"), 0.0)
     val_mdd = _safe_float(candidate.metrics.get("val", {}).get("max_drawdown"), 0.0)
-    train_has_metrics = any(abs(_safe_float(v, 0.0)) > 1e-12 for v in candidate.metrics.get("train", {}).values())
-    val_has_metrics = any(abs(_safe_float(v, 0.0)) > 1e-12 for v in candidate.metrics.get("val", {}).values())
+    train_has_metrics = any(
+        abs(_safe_float(v, 0.0)) > 1e-12 for v in candidate.metrics.get("train", {}).values()
+    )
+    val_has_metrics = any(
+        abs(_safe_float(v, 0.0)) > 1e-12 for v in candidate.metrics.get("val", {}).values()
+    )
     candidate.risk_eligible_mdd25_train_val = bool(train_mdd <= MDD_CAP and val_mdd <= MDD_CAP)
     reasons: list[str] = []
     if not train_has_metrics:
@@ -504,7 +514,9 @@ def _make_candidate(path: Path, raw: dict[str, Any], scope: str = "") -> Candida
         generated_at=str(raw.get("generated_at") or ""),
         diagnostic_oos_used=diagnostic_oos_used,
         oos_health_priors_enabled=oos_health_priors_enabled,
-        notes=[str(raw.get("notes"))] if raw.get("notes") and isinstance(raw.get("notes"), str) else [],
+        notes=[str(raw.get("notes"))]
+        if raw.get("notes") and isinstance(raw.get("notes"), str)
+        else [],
         config=config,
         allocation_summary=dict(raw.get("allocation_summary") or {})
         if isinstance(raw.get("allocation_summary"), dict)
@@ -616,7 +628,11 @@ def _csv_row_metrics(row: dict[str, str]) -> dict[str, dict[str, float]] | None:
             for suffix in suffixes:
                 for key in (f"{split}_{suffix}", f"{split}.{suffix}", f"{split} {suffix}"):
                     if key in row and str(row[key]).strip():
-                        metrics[split][target] = abs(_safe_float(row[key], 0.0)) if target == "max_drawdown" else _safe_float(row[key], 0.0)
+                        metrics[split][target] = (
+                            abs(_safe_float(row[key], 0.0))
+                            if target == "max_drawdown"
+                            else _safe_float(row[key], 0.0)
+                        )
                         any_value = True
                         break
                 if any_value and metrics[split][target] != 0.0:
@@ -634,7 +650,10 @@ def _load_csv_candidates(path: Path) -> list[Candidate]:
                 if metrics is None:
                     continue
                 raw: dict[str, Any] = {
-                    "name": row.get("name") or row.get("candidate") or row.get("candidate_id") or f"{path.stem}:{idx}",
+                    "name": row.get("name")
+                    or row.get("candidate")
+                    or row.get("candidate_id")
+                    or f"{path.stem}:{idx}",
                     "kind": row.get("kind") or row.get("family") or "csv_candidate",
                     "train": metrics["train"],
                     "val": metrics["val"],
@@ -656,10 +675,14 @@ def discover_candidates(scan_roots: list[Path]) -> tuple[list[Candidate], dict[s
     for root in scan_roots:
         if not root.exists():
             continue
-        scanned_roots.append(str(root.relative_to(REPO_ROOT) if root.is_relative_to(REPO_ROOT) else root))
+        scanned_roots.append(
+            str(root.relative_to(REPO_ROOT) if root.is_relative_to(REPO_ROOT) else root)
+        )
         json_files.extend(sorted(root.rglob("*.json")))
         csv_files.extend(sorted(root.rglob("*.csv")))
-    json_files = [path for path in json_files if "full_universe_selection_20260426" not in path.parts]
+    json_files = [
+        path for path in json_files if "full_universe_selection_20260426" not in path.parts
+    ]
     csv_files = [path for path in csv_files if "full_universe_selection_20260426" not in path.parts]
     for path in json_files:
         payload = _load_json(path)
@@ -721,7 +744,9 @@ def _dedupe_candidates(candidates: list[Candidate]) -> list[Candidate]:
             existing.stream_digest = candidate.stream_digest
             existing.combinable = True
         existing.combinable = existing.combinable or candidate.combinable
-        existing.category = _category_from_kind(existing.kind, existing.true_hybrid, existing.combinable)
+        existing.category = _category_from_kind(
+            existing.kind, existing.true_hybrid, existing.combinable
+        )
         existing.notes.extend(note for note in candidate.notes if note not in existing.notes)
         _score_and_mark(existing)
     rows = list(merged.values())
@@ -746,10 +771,14 @@ def _build_panel(candidates: list[Candidate]) -> Panel:
         all_days.update(candidate.daily_map)
     ordered_days = sorted(day for day in all_days if _split_for_day(day) is not None)
     matrix = {
-        name: np.asarray([_safe_float(maps[name].get(day), 0.0) for day in ordered_days], dtype=float)
+        name: np.asarray(
+            [_safe_float(maps[name].get(day), 0.0) for day in ordered_days], dtype=float
+        )
         for name in names
     }
-    split_by_day = {day: str(_split_for_day(day)) for day in ordered_days if _split_for_day(day) is not None}
+    split_by_day = {
+        day: str(_split_for_day(day)) for day in ordered_days if _split_for_day(day) is not None
+    }
     return Panel(names=names, days=ordered_days, matrix=matrix, split_by_day=split_by_day)
 
 
@@ -770,7 +799,10 @@ def _select_hybrid_sleeves(candidates: list[Candidate]) -> list[Candidate]:
     clean_streams = [
         row
         for row in candidates
-        if row.final_selection_eligible and row.combinable and not row.true_hybrid and row.stream_day_count >= 50
+        if row.final_selection_eligible
+        and row.combinable
+        and not row.true_hybrid
+        and row.stream_day_count >= 50
     ]
     preferred_tokens = (
         "three_way_regime",
@@ -812,7 +844,10 @@ def _train_best_sleeve(candidates: list[Candidate]) -> str:
 
 def _panel_split_indices(panel: Panel) -> dict[str, np.ndarray]:
     return {
-        split: np.asarray([idx for idx, day in enumerate(panel.days) if panel.split_by_day.get(day) == split], dtype=int)
+        split: np.asarray(
+            [idx for idx, day in enumerate(panel.days) if panel.split_by_day.get(day) == split],
+            dtype=int,
+        )
         for split in SPLITS
     }
 
@@ -843,14 +878,20 @@ def _softmax(scores: dict[str, float], temperature: float) -> dict[str, float]:
     denom = float(np.sum(exp_values))
     if denom <= 1e-12:
         return {key: 0.0 for key, _ in ordered}
-    return {key: float(weight / denom) for (key, _), weight in zip(ordered, exp_values, strict=True)}
+    return {
+        key: float(weight / denom) for (key, _), weight in zip(ordered, exp_values, strict=True)
+    }
 
 
 def _apply_caps(weights: dict[str, float], config: HybridGridConfig) -> dict[str, float]:
     capped: dict[str, float] = {}
     residual = 1.0
     for name, weight in sorted(weights.items(), key=lambda item: item[1], reverse=True):
-        cap = config.pair_weight_cap if "pair" in name.lower() or "spread" in name.lower() else config.diversified_weight_cap
+        cap = (
+            config.pair_weight_cap
+            if "pair" in name.lower() or "spread" in name.lower()
+            else config.diversified_weight_cap
+        )
         assigned = min(max(0.0, float(weight)), max(0.0, float(cap)), residual)
         if assigned > 1e-12:
             capped[name] = assigned
@@ -869,22 +910,32 @@ def _rolling_vol_ratios(panel: Panel, default_name: str, window: int = 20) -> np
         start = max(0, idx - window)
         segment = arr[start:idx]
         vols[idx] = float(np.std(segment, ddof=1)) if segment.size > 1 else 0.0
-    train_mask = np.asarray([panel.split_by_day.get(day) == "train" for day in panel.days], dtype=bool)
-    baseline = float(np.median(vols[train_mask & (vols > 0)])) if np.any(train_mask & (vols > 0)) else 1.0
+    train_mask = np.asarray(
+        [panel.split_by_day.get(day) == "train" for day in panel.days], dtype=bool
+    )
+    baseline = (
+        float(np.median(vols[train_mask & (vols > 0)])) if np.any(train_mask & (vols > 0)) else 1.0
+    )
     return vols / max(baseline, 1e-12)
 
 
 def _learn_high_vol_params(candidates: list[Candidate], panel: Panel) -> dict[str, Any]:
     default_name = _train_best_sleeve(candidates)
     vol_ratios = _rolling_vol_ratios(panel, default_name)
-    train_indices = [idx for idx, day in enumerate(panel.days) if panel.split_by_day.get(day) == "train"]
+    train_indices = [
+        idx for idx, day in enumerate(panel.days) if panel.split_by_day.get(day) == "train"
+    ]
     train_vol = vol_ratios[train_indices] if train_indices else np.asarray([], dtype=float)
     threshold = float(np.percentile(train_vol, 75)) if train_vol.size else 1.25
     high_vol_indices = [idx for idx in train_indices if vol_ratios[idx] > threshold]
     best_high_vol = default_name
     best_score = -1e9
     for name in panel.names:
-        values = panel.matrix[name][high_vol_indices] if high_vol_indices else np.asarray([], dtype=float)
+        values = (
+            panel.matrix[name][high_vol_indices]
+            if high_vol_indices
+            else np.asarray([], dtype=float)
+        )
         score = _scaled_score(_metrics_from_returns(values))
         if score > best_score:
             best_score = score
@@ -940,7 +991,9 @@ def _weights_for_day(
     if not positive:
         return {}, "risk_off_cash", raw
     if config.variant == "fixed_default":
-        current_default = default_name if default_name in positive else max(positive, key=positive.get)
+        current_default = (
+            default_name if default_name in positive else max(positive, key=positive.get)
+        )
     else:
         adjusted_for_default = dict(positive)
         if previous_default in adjusted_for_default:
@@ -949,7 +1002,8 @@ def _weights_for_day(
         if (
             previous_default in positive
             and candidate_default != previous_default
-            and adjusted_for_default[candidate_default] < positive[previous_default] + config.switch_margin
+            and adjusted_for_default[candidate_default]
+            < positive[previous_default] + config.switch_margin
         ):
             current_default = previous_default
         else:
@@ -1003,7 +1057,9 @@ def _run_online_allocator(
     vol_ratios = (
         precomputed_vol_ratios
         if precomputed_vol_ratios is not None
-        else _rolling_vol_ratios(panel, default_name, int((high_vol_params or {}).get("vol_window", 20)))
+        else _rolling_vol_ratios(
+            panel, default_name, int((high_vol_params or {}).get("vol_window", 20))
+        )
     )
     threshold = _safe_float((high_vol_params or {}).get("high_vol_threshold"), float("inf"))
     learned_high_vol_sleeve = str((high_vol_params or {}).get("high_vol_sleeve") or "")
@@ -1036,7 +1092,11 @@ def _run_online_allocator(
             if split in high_vol_counts:
                 high_vol_counts[split] += 1
             if dynamic_high_vol and idx >= max(config.warmup_days, config.lookback_days):
-                positive = {name: score for name, score in raw_scores.items() if score > config.min_positive_score}
+                positive = {
+                    name: score
+                    for name, score in raw_scores.items()
+                    if score > config.min_positive_score
+                }
                 if positive:
                     high_vol_sleeve = max(positive, key=positive.get)
             if high_vol_sleeve != previous_high_vol_target and high_vol_sleeve:
@@ -1054,7 +1114,9 @@ def _run_online_allocator(
         if total_weight > 1.0:
             weights = {name: value / total_weight for name, value in weights.items()}
             total_weight = 1.0
-        day_return = sum(float(panel.matrix[name][idx]) * float(weight) for name, weight in weights.items())
+        day_return = sum(
+            float(panel.matrix[name][idx]) * float(weight) for name, weight in weights.items()
+        )
         daily_returns.append(float(day_return))
         allocations.append(
             {
@@ -1075,10 +1137,19 @@ def _run_online_allocator(
         split_allocs = [row for row in allocations if row.get("split") == split]
         if not split_allocs:
             continue
-        avg_cash[split] = float(np.mean([_safe_float(row.get("cash_weight"), 0.0) for row in split_allocs]))
+        avg_cash[split] = float(
+            np.mean([_safe_float(row.get("cash_weight"), 0.0) for row in split_allocs])
+        )
         names = sorted({name for row in split_allocs for name in dict(row.get("weights") or {})})
         avg_weights[split] = {
-            name: float(np.mean([_safe_float(dict(row.get("weights") or {}).get(name), 0.0) for row in split_allocs]))
+            name: float(
+                np.mean(
+                    [
+                        _safe_float(dict(row.get("weights") or {}).get(name), 0.0)
+                        for row in split_allocs
+                    ]
+                )
+            )
             for name in names
         }
     return {
@@ -1136,7 +1207,12 @@ def _candidate_from_hybrid_result(
     config: dict[str, Any],
     learned: dict[str, Any] | None = None,
 ) -> Candidate:
-    daily_map = {day: ret for day, ret in zip(result.get("dates") or [], result.get("daily_returns") or [], strict=False)}
+    daily_map = {
+        day: ret
+        for day, ret in zip(
+            result.get("dates") or [], result.get("daily_returns") or [], strict=False
+        )
+    }
     raw = {
         "name": name,
         "kind": kind,
@@ -1162,13 +1238,18 @@ def _candidate_from_hybrid_result(
     return _score_and_mark(candidate)
 
 
-def run_hybrid_experiments(sleeves: list[Candidate], output_dir: Path) -> tuple[list[Candidate], dict[str, Any]]:
+def run_hybrid_experiments(
+    sleeves: list[Candidate], output_dir: Path
+) -> tuple[list[Candidate], dict[str, Any]]:
     panel = _build_panel(sleeves)
     if not panel.names:
         return [], {"error": "no stream-backed sleeves available"}
     default_name = _train_best_sleeve(sleeves)
     configs = _grid_configs()
-    score_cache = {lookback: _precompute_trailing_scores(panel, lookback) for lookback in sorted({cfg.lookback_days for cfg in configs})}
+    score_cache = {
+        lookback: _precompute_trailing_scores(panel, lookback)
+        for lookback in sorted({cfg.lookback_days for cfg in configs})
+    }
     vol_ratios_cache = _rolling_vol_ratios(panel, default_name)
     best: tuple[float, HybridGridConfig, dict[str, Any]] | None = None
     for config in configs:
@@ -1191,7 +1272,9 @@ def run_hybrid_experiments(sleeves: list[Candidate], output_dir: Path) -> tuple[
     if best is None:
         return [], {"error": "grid search produced no result"}
     _, best_config, best_result = best
-    source_label = str((output_dir / "generated_full_universe_hybrid_experiments").relative_to(REPO_ROOT))
+    source_label = str(
+        (output_dir / "generated_full_universe_hybrid_experiments").relative_to(REPO_ROOT)
+    )
     retuned = _candidate_from_hybrid_result(
         name="retuned_full_universe_hybrid_online",
         kind="true_hybrid_full_universe_retuned_clean",
@@ -1396,7 +1479,9 @@ def _write_csv(path: Path, candidates: list[Candidate]) -> None:
             }
             for split in SPLITS:
                 for key in METRIC_KEYS:
-                    payload[f"{split}_{key}"] = _safe_float(row.metrics.get(split, {}).get(key), 0.0)
+                    payload[f"{split}_{key}"] = _safe_float(
+                        row.metrics.get(split, {}).get(key), 0.0
+                    )
             writer.writerow(payload)
 
 
@@ -1505,7 +1590,11 @@ def build_report(output_dir: Path, scan_roots: list[Path]) -> dict[str, Any]:
         if row.final_selection_eligible and row.combinable and not row.oos_health_priors_enabled
     ]
     best_full = clean_ranked[0] if clean_ranked else ranked[0]
-    best_hybrid = deployable_true_hybrid[0] if deployable_true_hybrid else (true_hybrid[0] if true_hybrid else best_full)
+    best_hybrid = (
+        deployable_true_hybrid[0]
+        if deployable_true_hybrid
+        else (true_hybrid[0] if true_hybrid else best_full)
+    )
     shadow = _select_conservative_shadow(ranked)
     generated_hybrids.sort(key=lambda row: row.selection_score, reverse=True)
     payload = {
@@ -1522,13 +1611,21 @@ def build_report(output_dir: Path, scan_roots: list[Path]) -> dict[str, Any]:
         "final_recommendations": {
             "best_full_universe_candidate": best_full.public_dict(include_sources=True),
             "best_deployable_true_hybrid_candidate": best_hybrid.public_dict(include_sources=True),
-            "conservative_fallback_shadow_candidate": shadow.public_dict(include_sources=True) if shadow else None,
+            "conservative_fallback_shadow_candidate": shadow.public_dict(include_sources=True)
+            if shadow
+            else None,
         },
         "ranked_all_candidates": [row.public_dict(include_sources=True) for row in ranked],
         "ranked_clean_candidates": [row.public_dict(include_sources=True) for row in clean_ranked],
-        "ranked_true_hybrid_candidates": [row.public_dict(include_sources=True) for row in true_hybrid],
-        "ranked_non_hybrid_candidates": [row.public_dict(include_sources=True) for row in non_hybrid],
-        "generated_hybrid_candidates": [row.public_dict(include_sources=True) for row in generated_hybrids],
+        "ranked_true_hybrid_candidates": [
+            row.public_dict(include_sources=True) for row in true_hybrid
+        ],
+        "ranked_non_hybrid_candidates": [
+            row.public_dict(include_sources=True) for row in non_hybrid
+        ],
+        "generated_hybrid_candidates": [
+            row.public_dict(include_sources=True) for row in generated_hybrids
+        ],
     }
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     latest_json = output_dir / "full_universe_selection_latest.json"

@@ -16,7 +16,9 @@ sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
 
 
-def _stream(start_ts_ms: float, values: list[float], *, step_ms: float = 86_400_000.0) -> list[dict[str, float]]:
+def _stream(
+    start_ts_ms: float, values: list[float], *, step_ms: float = 86_400_000.0
+) -> list[dict[str, float]]:
     return [{"t": start_ts_ms + (idx * step_ms), "v": value} for idx, value in enumerate(values)]
 
 
@@ -72,12 +74,36 @@ def test_run_causal_dynamic_allocator_uses_only_prior_history() -> None:
 
 def test_search_dynamic_allocator_selects_by_validation_not_oos() -> None:
     rows = [
-        _row("sleeve_a", train=[0.02, 0.02, 0.02, 0.02, 0.02], val=[0.03, 0.03, 0.03], oos=[-0.04, -0.03, -0.02]),
-        _row("sleeve_b", train=[-0.01, -0.01, -0.01, -0.01, -0.01], val=[-0.01, -0.01, -0.01], oos=[0.03, 0.03, 0.03]),
+        _row(
+            "sleeve_a",
+            train=[0.02, 0.02, 0.02, 0.02, 0.02],
+            val=[0.03, 0.03, 0.03],
+            oos=[-0.04, -0.03, -0.02],
+        ),
+        _row(
+            "sleeve_b",
+            train=[-0.01, -0.01, -0.01, -0.01, -0.01],
+            val=[-0.01, -0.01, -0.01],
+            oos=[0.03, 0.03, 0.03],
+        ),
     ]
     grid = [
-        MODULE.AllocatorParams(lookback_days=3, rebalance_days=1, min_trailing_sharpe=0.0, min_trailing_return=0.0, max_trailing_drawdown=0.50, max_weight=1.0),
-        MODULE.AllocatorParams(lookback_days=3, rebalance_days=1, min_trailing_sharpe=-10.0, min_trailing_return=-1.0, max_trailing_drawdown=1.0, max_weight=1.0),
+        MODULE.AllocatorParams(
+            lookback_days=3,
+            rebalance_days=1,
+            min_trailing_sharpe=0.0,
+            min_trailing_return=0.0,
+            max_trailing_drawdown=0.50,
+            max_weight=1.0,
+        ),
+        MODULE.AllocatorParams(
+            lookback_days=3,
+            rebalance_days=1,
+            min_trailing_sharpe=-10.0,
+            min_trailing_return=-1.0,
+            max_trailing_drawdown=1.0,
+            max_weight=1.0,
+        ),
     ]
     best = MODULE.search_dynamic_allocator(rows, param_grid=grid)
     assert best["params"]["min_trailing_sharpe"] == 0.0
@@ -87,7 +113,9 @@ def test_search_dynamic_allocator_selects_by_validation_not_oos() -> None:
 def test_run_causal_dynamic_allocator_respects_max_weight_and_leaves_cash() -> None:
     rows = [
         _row("sleeve_a", train=[0.02, 0.02, 0.02, 0.02, 0.02], val=[0.03, 0.03], oos=[0.01]),
-        _row("sleeve_b", train=[-0.01, -0.01, -0.01, -0.01, -0.01], val=[-0.01, -0.01], oos=[-0.01]),
+        _row(
+            "sleeve_b", train=[-0.01, -0.01, -0.01, -0.01, -0.01], val=[-0.01, -0.01], oos=[-0.01]
+        ),
     ]
     params = MODULE.AllocatorParams(
         lookback_days=3,
@@ -124,7 +152,9 @@ def test_search_objective_uses_more_than_sharpe() -> None:
         "volatility": 0.10,
     }
     better_sortino = dict(base, sortino=3.0, calmar=2.0)
-    assert MODULE._search_objective(better_sortino, cash_fraction=0.0) > MODULE._search_objective(base, cash_fraction=0.0)
+    assert MODULE._search_objective(better_sortino, cash_fraction=0.0) > MODULE._search_objective(
+        base, cash_fraction=0.0
+    )
 
 
 def test_active_weighting_respects_family_cap() -> None:
@@ -192,7 +222,9 @@ def test_write_dynamic_comparison_refreshes_current_one_shot_snapshot(
     current_portfolio.write_text(
         json.dumps(
             {
-                "weights": [{"candidate_id": "probe", "name": "fresh-incumbent-123", "weight": 1.0}],
+                "weights": [
+                    {"candidate_id": "probe", "name": "fresh-incumbent-123", "weight": 1.0}
+                ],
                 "portfolio_metrics": {
                     "val": {"total_return": 0.012345, "sharpe": 1.12345},
                     "oos": {"total_return": 0.054321, "sharpe": 2.34567},
@@ -228,7 +260,9 @@ def test_regime_multiplier_can_disable_rolling_breakout_when_gate_fails() -> Non
         "metadata": {"activation_rule_conditions": ["basket_vol_ratio_moderate"]},
     }
     regime_row = {"basket_vol_ratio_moderate": False}
-    assert MODULE._regime_multiplier(meta_row, regime_row, previous_active=False, strength=1.0) == 0.0
+    assert (
+        MODULE._regime_multiplier(meta_row, regime_row, previous_active=False, strength=1.0) == 0.0
+    )
 
 
 def test_regime_multiplier_rewards_trend_when_btc_and_breadth_are_positive() -> None:

@@ -371,9 +371,13 @@ def _normalize_feature_frame(frame: pl.DataFrame) -> pl.DataFrame:
         if field not in cleaned.columns:
             cleaned = cleaned.with_columns(pl.lit(None, dtype=pl.Float64).alias(field))
 
-    cleaned = cleaned.select(["timestamp_ms", *_FEATURE_POINT_COLUMNS]).sort("timestamp_ms").unique(
-        subset=["timestamp_ms"],
-        keep="last",
+    cleaned = (
+        cleaned.select(["timestamp_ms", *_FEATURE_POINT_COLUMNS])
+        .sort("timestamp_ms")
+        .unique(
+            subset=["timestamp_ms"],
+            keep="last",
+        )
     )
     return cleaned.with_columns(
         [
@@ -426,12 +430,7 @@ def _crowding_support_series(
     oi_prev = np.roll(oi, 1)
     oi_prev[0] = np.nan
     oi_delta = np.full(n, np.nan, dtype=float)
-    oi_mask = (
-        np.isfinite(oi)
-        & np.isfinite(oi_prev)
-        & (oi > 0.0)
-        & (oi_prev > 0.0)
-    )
+    oi_mask = np.isfinite(oi) & np.isfinite(oi_prev) & (oi > 0.0) & (oi_prev > 0.0)
     oi_delta[oi_mask] = np.log(oi[oi_mask] / oi_prev[oi_mask])
 
     basis = np.full(n, np.nan, dtype=float)
@@ -501,7 +500,9 @@ def _to_numpy_datetime64_ms(value: datetime | None) -> np.datetime64 | None:
     return np.datetime64(value.astimezone(UTC).replace(tzinfo=None), "ms")
 
 
-def _split_window_bounds(split: Mapping[str, Any] | None) -> tuple[datetime | None, datetime | None]:
+def _split_window_bounds(
+    split: Mapping[str, Any] | None,
+) -> tuple[datetime | None, datetime | None]:
     return _research_run_support._split_window_bounds(split)
 
 
@@ -516,7 +517,9 @@ def _resolve_split_config(
     )
 
 
-def _split_lengths(total: int, *, train_frac: float = 0.60, val_frac: float = 0.20) -> tuple[slice, slice, slice]:
+def _split_lengths(
+    total: int, *, train_frac: float = 0.60, val_frac: float = 0.20
+) -> tuple[slice, slice, slice]:
     if total <= 0:
         return slice(0, 0), slice(0, 0), slice(0, 0)
     train_end = max(1, int(total * train_frac))
@@ -537,7 +540,9 @@ def _max_drawdown(returns: np.ndarray) -> float:
     return _research_metrics.max_drawdown(returns)
 
 
-def _rolling_sharpe_min(returns: np.ndarray, *, window: int = 64, periods_per_year: int = 365) -> float:
+def _rolling_sharpe_min(
+    returns: np.ndarray, *, window: int = 64, periods_per_year: int = 365
+) -> float:
     return _research_metrics.rolling_sharpe_min(
         returns,
         window=window,
@@ -724,7 +729,9 @@ def _resolve_hurdle_config(
     return _ResolvedHurdleConfig(
         weights={key: float(value) for key, value in dict(cfg["hurdle_score_weights"]).items()},
         in_sample_sharpe_min=float(thresholds["in_sample_sharpe_min"]),
-        oos_sharpe_min=float(thresholds["oos_sharpe_min"] if oos_sharpe_min is None else oos_sharpe_min),
+        oos_sharpe_min=float(
+            thresholds["oos_sharpe_min"] if oos_sharpe_min is None else oos_sharpe_min
+        ),
         max_pbo=float(thresholds["max_pbo"] if max_pbo is None else max_pbo),
         max_turnover=float(thresholds["max_turnover"] if max_turnover is None else max_turnover),
         max_drawdown=float(thresholds["max_drawdown"] if max_drawdown is None else max_drawdown),
@@ -743,8 +750,14 @@ def _pack_hurdle_stage(
         + (config.weights["return_weight"] * float(metrics.get("return", 0.0)))
         + (config.weights["deflated_sharpe_weight"] * float(metrics.get("deflated_sharpe", 0.0)))
         - (config.weights["pbo_penalty"] * float(metrics.get("pbo", 1.0)))
-        - (config.weights["turnover_penalty"] * max(0.0, float(metrics.get("turnover", 0.0)) - config.max_turnover))
-        - (config.weights["drawdown_penalty"] * max(0.0, float(metrics.get("mdd", 0.0)) - config.max_drawdown))
+        - (
+            config.weights["turnover_penalty"]
+            * max(0.0, float(metrics.get("turnover", 0.0)) - config.max_turnover)
+        )
+        - (
+            config.weights["drawdown_penalty"]
+            * max(0.0, float(metrics.get("mdd", 0.0)) - config.max_drawdown)
+        )
         - (config.weights["spa_pvalue_penalty"] * float(metrics.get("spa_pvalue", 1.0)))
     )
     sharpe_min = config.in_sample_sharpe_min if stage != "oos" else config.oos_sharpe_min
@@ -801,11 +814,15 @@ def _split_masks_from_datetimes(
         oos_mask[split_oos] = True
         return {"train": train_mask, "val": val_mask, "oos": oos_mask}
 
-    resolved = _resolve_split_config(split, strategy_timeframe=str(split.get("strategy_timeframe") or "1m"))
+    resolved = _resolve_split_config(
+        split, strategy_timeframe=str(split.get("strategy_timeframe") or "1m")
+    )
     stage_bounds = {
         "train": (
             _to_numpy_datetime64_ms(_coerce_utc_datetime(resolved.get("train_start"))),
-            _to_numpy_datetime64_ms(_coerce_utc_datetime(resolved.get("train_end"), end_of_day=True)),
+            _to_numpy_datetime64_ms(
+                _coerce_utc_datetime(resolved.get("train_end"), end_of_day=True)
+            ),
         ),
         "val": (
             _to_numpy_datetime64_ms(_coerce_utc_datetime(resolved.get("val_start"))),
@@ -972,7 +989,9 @@ def _composite_trend_signal_strength(
     sigma_floor = max(1e-6, float(sigma))
     strength = float(risk_target_vol) / sigma_floor
     strength = min(float(max_signal_strength), max(0.10, strength))
-    if crowding_score is not None and abs(float(crowding_score)) >= float(crowding_reduce_threshold):
+    if crowding_score is not None and abs(float(crowding_score)) >= float(
+        crowding_reduce_threshold
+    ):
         strength *= 0.5
     return float(max(0.05, strength))
 
@@ -1136,7 +1155,14 @@ def _composite_trend_entry_mode(
     return 0
 
 
-def _vwap_dev_z(high: np.ndarray, low: np.ndarray, close: np.ndarray, volume: np.ndarray, window: int = 60, z_window: int = 120) -> np.ndarray:
+def _vwap_dev_z(
+    high: np.ndarray,
+    low: np.ndarray,
+    close: np.ndarray,
+    volume: np.ndarray,
+    window: int = 60,
+    z_window: int = 120,
+) -> np.ndarray:
     n = close.size
     out = np.full(close.shape, np.nan, dtype=float)
     win = max(8, int(window))
@@ -1177,7 +1203,9 @@ def _rolling_vwap_deviation(close: np.ndarray, volume: np.ndarray, window: int) 
     return out
 
 
-def _rolling_channel(high: np.ndarray, low: np.ndarray, window: int) -> tuple[np.ndarray, np.ndarray]:
+def _rolling_channel(
+    high: np.ndarray, low: np.ndarray, window: int
+) -> tuple[np.ndarray, np.ndarray]:
     high_out = np.full(high.shape, np.nan, dtype=float)
     low_out = np.full(low.shape, np.nan, dtype=float)
     win = max(8, int(window))
@@ -2198,8 +2226,7 @@ def _apply_breadth_thrust_failure_reversal_strategy(
 ) -> None:
     config = _resolve_breadth_thrust_failure_reversal_config(params)
     close_map_np = {
-        symbol: np.asarray(aligned[f"{symbol}:close"], dtype=float)
-        for symbol in symbols
+        symbol: np.asarray(aligned[f"{symbol}:close"], dtype=float) for symbol in symbols
     }
 
     basket_position = _breadth_thrust_failure_reversal_position_series(
@@ -2291,13 +2318,11 @@ def _breadth_thrust_step(
 ) -> tuple[float, float, int, float]:
     if basket_state != 0.0 and np.isfinite(basket_entry):
         next_hold_bars = hold_bars + 1
-        stop_long = (
-            basket_state > 0.0
-            and step.basket_close <= float(basket_entry) * (1.0 - config.stop_loss_pct)
+        stop_long = basket_state > 0.0 and step.basket_close <= float(basket_entry) * (
+            1.0 - config.stop_loss_pct
         )
-        stop_short = (
-            basket_state < 0.0
-            and step.basket_close >= float(basket_entry) * (1.0 + config.stop_loss_pct)
+        stop_short = basket_state < 0.0 and step.basket_close >= float(basket_entry) * (
+            1.0 + config.stop_loss_pct
         )
         timeout_hit = next_hold_bars >= config.max_hold_bars
         if stop_long or stop_short or timeout_hit:
@@ -2406,16 +2431,22 @@ def _apply_lag_convergence_strategy(
     y_base = np.roll(y_close, config.lag_bars)
     x_base[: config.lag_bars] = x_close[: config.lag_bars]
     y_base[: config.lag_bars] = y_close[: config.lag_bars]
-    mom_x = np.divide(
-        x_close,
-        np.clip(x_base, 1e-12, np.inf),
-        out=np.ones_like(x_close),
-    ) - 1.0
-    mom_y = np.divide(
-        y_close,
-        np.clip(y_base, 1e-12, np.inf),
-        out=np.ones_like(y_close),
-    ) - 1.0
+    mom_x = (
+        np.divide(
+            x_close,
+            np.clip(x_base, 1e-12, np.inf),
+            out=np.ones_like(x_close),
+        )
+        - 1.0
+    )
+    mom_y = (
+        np.divide(
+            y_close,
+            np.clip(y_base, 1e-12, np.inf),
+            out=np.ones_like(y_close),
+        )
+        - 1.0
+    )
     spread = np.nan_to_num(mom_x - mom_y, nan=0.0)
 
     x_pos, y_pos = _lag_convergence_pair_positions(
@@ -2709,8 +2740,7 @@ def _apply_residual_basket_reversion_strategy(
 
     btc_close = np.asarray(aligned[f"{btc_symbol}:close"], dtype=float)
     close_map_np = {
-        symbol: np.asarray(aligned[f"{symbol}:close"], dtype=float)
-        for symbol in symbols
+        symbol: np.asarray(aligned[f"{symbol}:close"], dtype=float) for symbol in symbols
     }
     residual_z_map = _residual_basket_reversion_z_map(
         symbols=symbols,
@@ -2815,7 +2845,9 @@ def _residual_basket_reversion_z_map(
         if symbol == btc_symbol:
             residual_z_map[symbol] = np.zeros(close.shape, dtype=float)
             continue
-        residual_series = _beta_neutral_residual_series(close, btc_close, window=config.residual_window)
+        residual_series = _beta_neutral_residual_series(
+            close, btc_close, window=config.residual_window
+        )
         residual_z_map[symbol] = np.nan_to_num(
             _rolling_z(residual_series, config.residual_window),
             nan=0.0,
@@ -2837,13 +2869,11 @@ def _apply_residual_basket_reversion_exits(
         if position_state[s_idx] == 0.0 or not np.isfinite(entry_price[s_idx]):
             continue
         close_i = close_map[symbol]
-        stop_long = (
-            position_state[s_idx] > 0.0
-            and close_i <= float(entry_price[s_idx]) * (1.0 - config.stop_loss_pct)
+        stop_long = position_state[s_idx] > 0.0 and close_i <= float(entry_price[s_idx]) * (
+            1.0 - config.stop_loss_pct
         )
-        stop_short = (
-            position_state[s_idx] < 0.0
-            and close_i >= float(entry_price[s_idx]) * (1.0 + config.stop_loss_pct)
+        stop_short = position_state[s_idx] < 0.0 and close_i >= float(entry_price[s_idx]) * (
+            1.0 + config.stop_loss_pct
         )
         z_i = float(residual_z_map[symbol][idx]) if symbol in residual_z_map else 0.0
         exit_hit = abs(z_i) <= config.exit_z
@@ -2861,13 +2891,13 @@ def _residual_basket_reversion_targets(
     config: _ResidualBasketReversionConfig,
 ) -> tuple[set[str], list[str]]:
     ranked = [
-        (float(residual_z_map[symbol][idx]), symbol)
-        for symbol in symbols
-        if symbol != btc_symbol
+        (float(residual_z_map[symbol][idx]), symbol) for symbol in symbols if symbol != btc_symbol
     ]
     ranked.sort(key=lambda item: item[0])
     longs = [symbol for z_i, symbol in ranked if z_i <= -config.entry_z][: config.max_longs]
-    shorts = [symbol for z_i, symbol in reversed(ranked) if z_i >= config.entry_z][: config.max_shorts]
+    shorts = [symbol for z_i, symbol in reversed(ranked) if z_i >= config.entry_z][
+        : config.max_shorts
+    ]
     if not config.allow_short:
         shorts = []
     long_set = set(longs)
@@ -2937,13 +2967,18 @@ def _apply_cross_asset_liquidation_contagion_fade_strategy(
         close_arr = np.asarray(close, dtype=float)
         close_map_np[symbol] = close_arr
         prev_close = np.r_[close_arr[0], close_arr[:-1]]
-        returns = np.divide(
-            close_arr,
-            np.clip(prev_close, 1e-12, np.inf),
-            out=np.ones_like(close_arr),
-            where=np.isfinite(prev_close),
-        ) - 1.0
-        return_z_map[symbol] = np.nan_to_num(_rolling_z(np.nan_to_num(returns, nan=0.0), config.window), nan=0.0)
+        returns = (
+            np.divide(
+                close_arr,
+                np.clip(prev_close, 1e-12, np.inf),
+                out=np.ones_like(close_arr),
+                where=np.isfinite(prev_close),
+            )
+            - 1.0
+        )
+        return_z_map[symbol] = np.nan_to_num(
+            _rolling_z(np.nan_to_num(returns, nan=0.0), config.window), nan=0.0
+        )
         valid_symbols.append(symbol)
 
     for s_idx, symbol in enumerate(symbols):
@@ -3147,7 +3182,9 @@ def _aligned_bundle_indices(
 ) -> np.ndarray | None:
     bundle_datetime = np.asarray(bundle.datetime, dtype="datetime64[ms]")
     indices = np.searchsorted(bundle_datetime, common_datetime)
-    if np.any(indices >= bundle_datetime.size) or np.any(bundle_datetime[indices] != common_datetime):
+    if np.any(indices >= bundle_datetime.size) or np.any(
+        bundle_datetime[indices] != common_datetime
+    ):
         return None
     return indices
 
@@ -3331,8 +3368,7 @@ def _perp_carry_should_exit(
         or (np.isfinite(funding_i) and float(funding_i) <= -config.extreme_funding)
         or (bars_held >= config.max_hold_bars)
         or (
-            entry_price is not None
-            and close_i >= float(entry_price) * (1.0 + config.stop_loss_pct)
+            entry_price is not None and close_i >= float(entry_price) * (1.0 + config.stop_loss_pct)
         )
     )
 
@@ -3380,7 +3416,9 @@ def _perp_carry_entry_mode(
 def _returns_from_close(closes: np.ndarray) -> np.ndarray:
     if closes.size < 2:
         return np.zeros(closes.shape, dtype=float)
-    return np.diff(closes, prepend=closes[0]) / np.clip(np.r_[closes[0], closes[:-1]], 1e-12, np.inf)
+    return np.diff(closes, prepend=closes[0]) / np.clip(
+        np.r_[closes[0], closes[:-1]], 1e-12, np.inf
+    )
 
 
 def _resolve_strategy_anchor_symbol(
@@ -3582,8 +3620,12 @@ def _apply_topcap_risk_exits(
         if not np.isfinite(close_i) or close_i <= 0.0:
             continue
 
-        stop_long = position_state[s_idx] > 0.0 and close_i <= float(entry_price[s_idx]) * (1.0 - config.stop_loss_pct)
-        stop_short = position_state[s_idx] < 0.0 and close_i >= float(entry_price[s_idx]) * (1.0 + config.stop_loss_pct)
+        stop_long = position_state[s_idx] > 0.0 and close_i <= float(entry_price[s_idx]) * (
+            1.0 - config.stop_loss_pct
+        )
+        stop_short = position_state[s_idx] < 0.0 and close_i >= float(entry_price[s_idx]) * (
+            1.0 + config.stop_loss_pct
+        )
         tp_long = (
             config.take_profit_pct > 0.0
             and position_state[s_idx] > 0.0
@@ -3611,7 +3653,12 @@ def _topcap_ranked_momentum_rows(
         close_arr = close_by_symbol[symbol]
         latest = float(close_arr[idx])
         base = float(close_arr[idx - config.lookback_bars])
-        if latest < config.min_price or base <= 0.0 or not np.isfinite(latest) or not np.isfinite(base):
+        if (
+            latest < config.min_price
+            or base <= 0.0
+            or not np.isfinite(latest)
+            or not np.isfinite(base)
+        ):
             continue
         momentum = (latest / base) - 1.0
         if np.isfinite(momentum):
@@ -3675,9 +3722,7 @@ def _topcap_residualized_rows(
 
 def _cross_sectional_score_map(values: Mapping[str, float]) -> dict[str, float]:
     finite = {
-        str(symbol): float(value)
-        for symbol, value in values.items()
-        if np.isfinite(float(value))
+        str(symbol): float(value) for symbol, value in values.items() if np.isfinite(float(value))
     }
     out = {str(symbol): 0.0 for symbol in values}
     if len(finite) < 2:
@@ -3735,12 +3780,15 @@ def _carry_trend_factor_score_matrix(
     momentum_raw = np.zeros_like(close_matrix, dtype=float)
     latest = close_matrix[:, config.lookback_bars :]
     base = close_matrix[:, : bar_count - config.lookback_bars]
-    momentum_core = np.divide(
-        latest,
-        base,
-        out=np.full_like(latest, np.nan, dtype=float),
-        where=np.isfinite(base) & (base > 0.0),
-    ) - 1.0
+    momentum_core = (
+        np.divide(
+            latest,
+            base,
+            out=np.full_like(latest, np.nan, dtype=float),
+            where=np.isfinite(base) & (base > 0.0),
+        )
+        - 1.0
+    )
     valid_core = (
         np.isfinite(latest)
         & np.isfinite(base)
@@ -3875,7 +3923,12 @@ def _carry_trend_factor_rows(
         close_arr = close_by_symbol[symbol]
         latest = float(close_arr[idx])
         base = float(close_arr[idx - config.lookback_bars])
-        if latest < config.min_price or base <= 0.0 or not np.isfinite(latest) or not np.isfinite(base):
+        if (
+            latest < config.min_price
+            or base <= 0.0
+            or not np.isfinite(latest)
+            or not np.isfinite(base)
+        ):
             continue
 
         raw_momentum[symbol] = float((latest / base) - 1.0)
@@ -3894,7 +3947,11 @@ def _carry_trend_factor_rows(
             funding_z = 0.0
             basis_z = 0.0
             crowding_score = 0.0
-        raw_carry[symbol] = float(-(funding_z + (0.5 * basis_z))) if np.isfinite(funding_z) or np.isfinite(basis_z) else 0.0
+        raw_carry[symbol] = (
+            float(-(funding_z + (0.5 * basis_z)))
+            if np.isfinite(funding_z) or np.isfinite(basis_z)
+            else 0.0
+        )
         raw_crowding[symbol] = float(-crowding_score) if np.isfinite(crowding_score) else 0.0
 
     if not raw_momentum:
@@ -3927,10 +3984,14 @@ def _carry_trend_factor_target_sets(
     regime: str,
     config: _CarryTrendFactorRotationConfig,
 ) -> tuple[set[str], set[str]]:
-    longs = [symbol for score, symbol in reversed(score_rows) if score >= config.signal_threshold][: config.max_longs]
+    longs = [symbol for score, symbol in reversed(score_rows) if score >= config.signal_threshold][
+        : config.max_longs
+    ]
     shorts: list[str] = []
     if config.allow_short:
-        shorts = [symbol for score, symbol in score_rows if score <= -config.signal_threshold][: config.max_shorts]
+        shorts = [symbol for score, symbol in score_rows if score <= -config.signal_threshold][
+            : config.max_shorts
+        ]
     if regime == "RISK_ON":
         shorts = []
     elif regime == "RISK_OFF":
@@ -3959,7 +4020,10 @@ def _apply_carry_trend_factor_rotation_strategy(
     position_state = np.zeros(symbol_count, dtype=float)
     entry_price = np.full(symbol_count, np.nan, dtype=float)
     realized_vol_matrix = np.vstack(
-        [_rolling_realized_vol(close_matrix[s_idx], config.vol_window) for s_idx in range(symbol_count)]
+        [
+            _rolling_realized_vol(close_matrix[s_idx], config.vol_window)
+            for s_idx in range(symbol_count)
+        ]
     )
 
     crowding_support_by_symbol: dict[str, dict[str, np.ndarray]] = {}
@@ -3982,7 +4046,9 @@ def _apply_carry_trend_factor_rotation_strategy(
             window=config.crowding_window,
         )
         crowding_support_by_symbol[symbol] = support
-        _note_support_data_symbol(meta, symbol=symbol, values=np.asarray(support.get("crowding_score"), dtype=float))
+        _note_support_data_symbol(
+            meta, symbol=symbol, values=np.asarray(support.get("crowding_score"), dtype=float)
+        )
         funding_z_matrix[s_idx] = np.asarray(support.get("funding_z"), dtype=float)
         basis_z_matrix[s_idx] = np.asarray(support.get("basis_z"), dtype=float)
         crowding_score_matrix[s_idx] = np.asarray(support.get("crowding_score"), dtype=float)
@@ -3996,7 +4062,7 @@ def _apply_carry_trend_factor_rotation_strategy(
         crowding_score_matrix=crowding_score_matrix,
         config=config,
     )
-    rebalance_due = ((np.arange(n, dtype=np.int64) + 1) % max(1, config.rebalance_bars) == 0)
+    rebalance_due = (np.arange(n, dtype=np.int64) + 1) % max(1, config.rebalance_bars) == 0
     rebalance_due[: min(n, config.lookback_bars)] = False
 
     topcap_proxy_config = _TopCapTimeSeriesMomentumConfig(
@@ -4019,30 +4085,47 @@ def _apply_carry_trend_factor_rotation_strategy(
     for idx in range(n):
         close_column = close_matrix[:, idx]
         if topcap_proxy_config.stop_loss_pct > 0.0 or topcap_proxy_config.take_profit_pct > 0.0:
-            active_mask = (position_state != 0.0) & np.isfinite(entry_price) & np.isfinite(close_column) & (close_column > 0.0)
+            active_mask = (
+                (position_state != 0.0)
+                & np.isfinite(entry_price)
+                & np.isfinite(close_column)
+                & (close_column > 0.0)
+            )
             if np.any(active_mask):
                 exit_mask = np.zeros(symbol_count, dtype=bool)
                 if topcap_proxy_config.stop_loss_pct > 0.0:
                     exit_mask |= (
                         (position_state > 0.0)
                         & active_mask
-                        & (close_column <= (entry_price * (1.0 - topcap_proxy_config.stop_loss_pct)))
+                        & (
+                            close_column
+                            <= (entry_price * (1.0 - topcap_proxy_config.stop_loss_pct))
+                        )
                     )
                     exit_mask |= (
                         (position_state < 0.0)
                         & active_mask
-                        & (close_column >= (entry_price * (1.0 + topcap_proxy_config.stop_loss_pct)))
+                        & (
+                            close_column
+                            >= (entry_price * (1.0 + topcap_proxy_config.stop_loss_pct))
+                        )
                     )
                 if topcap_proxy_config.take_profit_pct > 0.0:
                     exit_mask |= (
                         (position_state > 0.0)
                         & active_mask
-                        & (close_column >= (entry_price * (1.0 + topcap_proxy_config.take_profit_pct)))
+                        & (
+                            close_column
+                            >= (entry_price * (1.0 + topcap_proxy_config.take_profit_pct))
+                        )
                     )
                     exit_mask |= (
                         (position_state < 0.0)
                         & active_mask
-                        & (close_column <= (entry_price * (1.0 - topcap_proxy_config.take_profit_pct)))
+                        & (
+                            close_column
+                            <= (entry_price * (1.0 - topcap_proxy_config.take_profit_pct))
+                        )
                     )
                 if np.any(exit_mask):
                     position_state[exit_mask] = 0.0
@@ -4096,9 +4179,11 @@ def _topcap_target_sets(
     regime: str,
     config: _TopCapTimeSeriesMomentumConfig,
 ) -> tuple[set[str], set[str]]:
-    longs = [symbol for momentum, symbol in reversed(momentum_rows) if momentum >= config.signal_threshold][
-        : config.max_longs
-    ]
+    longs = [
+        symbol
+        for momentum, symbol in reversed(momentum_rows)
+        if momentum >= config.signal_threshold
+    ][: config.max_longs]
     shorts = [symbol for momentum, symbol in momentum_rows if momentum <= -config.signal_threshold][
         : config.max_shorts
     ]
@@ -4196,18 +4281,14 @@ def _apply_topcap_tsmom_strategy(
 ) -> None:
     config = _resolve_topcap_tsmom_config(params, symbols)
     close_by_symbol = {
-        symbol: np.asarray(aligned[f"{symbol}:close"], dtype=float)
-        for symbol in symbols
+        symbol: np.asarray(aligned[f"{symbol}:close"], dtype=float) for symbol in symbols
     }
     btc_close = close_by_symbol[config.btc_symbol]
     position_state = np.zeros(len(symbols), dtype=float)
     entry_price = np.full(len(symbols), np.nan, dtype=float)
 
     for idx in range(n):
-        current_close_map = {
-            symbol: float(close_by_symbol[symbol][idx])
-            for symbol in symbols
-        }
+        current_close_map = {symbol: float(close_by_symbol[symbol][idx]) for symbol in symbols}
         _apply_topcap_risk_exits(
             current_close_map=current_close_map,
             symbols=symbols,
@@ -4314,7 +4395,12 @@ def _rolling_mean_dollar_volume_series(
     for idx in range(win - 1, close_arr.size):
         close_tail = close_arr[idx - win + 1 : idx + 1]
         volume_tail = volume_arr[idx - win + 1 : idx + 1]
-        valid = np.isfinite(close_tail) & np.isfinite(volume_tail) & (close_tail > 0.0) & (volume_tail >= 0.0)
+        valid = (
+            np.isfinite(close_tail)
+            & np.isfinite(volume_tail)
+            & (close_tail > 0.0)
+            & (volume_tail >= 0.0)
+        )
         if not np.any(valid):
             continue
         dollar_volume = close_tail[valid] * volume_tail[valid]
@@ -4388,14 +4474,14 @@ def _rebalance_last_day_liquidity_positions(
             liquidity_regimes[symbol] = "filtered_illiquid"
 
     ordered = sorted(adjusted_scores.items(), key=lambda item: item[1])
-    longs = [
-        symbol for symbol, score in reversed(ordered) if score >= config.signal_threshold
-    ][: config.max_longs]
+    longs = [symbol for symbol, score in reversed(ordered) if score >= config.signal_threshold][
+        : config.max_longs
+    ]
     shorts: list[str] = []
     if config.allow_short and config.max_shorts > 0:
-        shorts = [
-            symbol for symbol, score in ordered if score <= -config.signal_threshold
-        ][: config.max_shorts]
+        shorts = [symbol for symbol, score in ordered if score <= -config.signal_threshold][
+            : config.max_shorts
+        ]
     long_set = set(longs)
     shorts = [symbol for symbol in shorts if symbol not in long_set]
 
@@ -4422,12 +4508,10 @@ def _apply_last_day_liquidity_regime_strategy(
 ) -> None:
     config = _resolve_last_day_liquidity_regime_config(params)
     close_by_symbol = {
-        symbol: np.asarray(aligned[f"{symbol}:close"], dtype=float)
-        for symbol in symbols
+        symbol: np.asarray(aligned[f"{symbol}:close"], dtype=float) for symbol in symbols
     }
     volume_by_symbol = {
-        symbol: np.asarray(aligned[f"{symbol}:volume"], dtype=float)
-        for symbol in symbols
+        symbol: np.asarray(aligned[f"{symbol}:volume"], dtype=float) for symbol in symbols
     }
     momentum_by_symbol = {
         symbol: _lagged_return_series(
@@ -4457,10 +4541,7 @@ def _apply_last_day_liquidity_regime_strategy(
     last_liquidity_threshold: float | None = None
 
     for idx in range(n):
-        current_close_map = {
-            symbol: float(close_by_symbol[symbol][idx])
-            for symbol in symbols
-        }
+        current_close_map = {symbol: float(close_by_symbol[symbol][idx]) for symbol in symbols}
         for s_idx, symbol in enumerate(symbols):
             if not np.isfinite(entry_price[s_idx]) or abs(position_state[s_idx]) <= 0.0:
                 continue
@@ -4468,8 +4549,11 @@ def _apply_last_day_liquidity_regime_strategy(
             if not np.isfinite(current_close) or current_close <= 0.0:
                 continue
             if (
-                (position_state[s_idx] > 0.0 and current_close <= entry_price[s_idx] * (1.0 - config.stop_loss_pct))
-                or (position_state[s_idx] < 0.0 and current_close >= entry_price[s_idx] * (1.0 + config.stop_loss_pct))
+                position_state[s_idx] > 0.0
+                and current_close <= entry_price[s_idx] * (1.0 - config.stop_loss_pct)
+            ) or (
+                position_state[s_idx] < 0.0
+                and current_close >= entry_price[s_idx] * (1.0 + config.stop_loss_pct)
             ):
                 position_state[s_idx] = 0.0
                 entry_price[s_idx] = np.nan
@@ -4800,7 +4884,9 @@ def _resolve_shock_reversion_fade_config(
         volume_shock_z=float(params.get("volume_shock_z", volume_shock_z_default)),
         range_shock_z=float(params.get("range_shock_z", range_shock_z_default)),
         return_shock_pct=max(1e-6, float(params.get("return_shock_pct", return_shock_pct_default))),
-        revert_fraction=min(0.95, max(0.10, float(params.get("revert_fraction", revert_fraction_default)))),
+        revert_fraction=min(
+            0.95, max(0.10, float(params.get("revert_fraction", revert_fraction_default)))
+        ),
         max_hold_bars=max(1, int(params.get("max_hold_bars", 12))),
         stop_loss_pct=float(params.get("stop_loss_pct", 0.02)),
         allow_short=bool(params.get("allow_short", True)),
@@ -4833,7 +4919,9 @@ def _shock_reversion_support_series(
     returns = _returns_from_close(close)
     range_pct = _range_pct_from_prev_close(close=close, high=high, low=low)
     vol_z = np.nan_to_num(_rolling_z(np.nan_to_num(volume, nan=0.0), config.volume_window), nan=0.0)
-    range_z = np.nan_to_num(_rolling_z(np.nan_to_num(range_pct, nan=0.0), config.range_window), nan=0.0)
+    range_z = np.nan_to_num(
+        _rolling_z(np.nan_to_num(range_pct, nan=0.0), config.range_window), nan=0.0
+    )
     return returns, vol_z, range_z
 
 
@@ -4851,7 +4939,11 @@ def _shock_reversion_position_series(
     entry_price: float | None = None
     target_price: float | None = None
     hold_bars = 0
-    gate = np.ones(close.shape, dtype=bool) if entry_gate is None else np.asarray(entry_gate, dtype=bool)
+    gate = (
+        np.ones(close.shape, dtype=bool)
+        if entry_gate is None
+        else np.asarray(entry_gate, dtype=bool)
+    )
 
     for idx in range(close.size):
         step = _shock_reversion_step_input(
@@ -4886,7 +4978,11 @@ def _shock_reversion_step_input(
 ) -> _ShockReversionStepInput:
     close_i = float(close[idx])
     ret_i = float(returns[idx]) if np.isfinite(returns[idx]) else 0.0
-    shock_ok = bool(gate[idx]) and float(vol_z[idx]) >= config.volume_shock_z and float(range_z[idx]) >= config.range_shock_z
+    shock_ok = (
+        bool(gate[idx])
+        and float(vol_z[idx]) >= config.volume_shock_z
+        and float(range_z[idx]) >= config.range_shock_z
+    )
     return _ShockReversionStepInput(
         close_i=close_i,
         ret_i=ret_i,
@@ -5166,8 +5262,7 @@ def _funding_liquidation_crowding_should_exit(
         (np.isfinite(score_i) and score_i <= config.crowding_exit)
         or (bars_held >= config.max_hold_bars)
         or (
-            entry_price is not None
-            and close_i >= float(entry_price) * (1.0 + config.stop_loss_pct)
+            entry_price is not None and close_i >= float(entry_price) * (1.0 + config.stop_loss_pct)
         )
     )
 
@@ -5359,15 +5454,18 @@ def _apply_volatility_regime_residual_basket_reversion_strategy(
 
     btc_close = np.asarray(aligned[f"{btc_symbol}:close"], dtype=float)
     close_map_np = {
-        symbol: np.asarray(aligned[f"{symbol}:close"], dtype=float)
-        for symbol in symbols
+        symbol: np.asarray(aligned[f"{symbol}:close"], dtype=float) for symbol in symbols
     }
     vol_ratio = np.nan_to_num(
         _vol_ratio_series(btc_close, config.btc_vol_fast, config.btc_vol_slow),
         nan=0.0,
     )
     dispersion = np.nan_to_num(_cross_sectional_return_dispersion(close_map_np), nan=0.0)
-    entry_gate = (vol_ratio > 0.0) & (vol_ratio <= config.btc_vol_ratio_cap) & (dispersion >= config.dispersion_floor)
+    entry_gate = (
+        (vol_ratio > 0.0)
+        & (vol_ratio <= config.btc_vol_ratio_cap)
+        & (dispersion >= config.dispersion_floor)
+    )
 
     _apply_residual_basket_reversion_strategy(
         params=params,
@@ -5713,7 +5811,9 @@ def _candidate_benchmark_series(
                 benchmark_datetime if benchmark_datetime is not None else [],
                 dtype="datetime64[ms]",
             ),
-            values=np.asarray(benchmark_returns if benchmark_returns is not None else [], dtype=float),
+            values=np.asarray(
+                benchmark_returns if benchmark_returns is not None else [], dtype=float
+            ),
         )
 
     benchmark = np.asarray(benchmark_entry if benchmark_entry is not None else [], dtype=float)
@@ -5899,8 +5999,12 @@ def _load_candidate_signal_payload(
             (
                 bundle.symbol,
                 int(bundle.datetime.size),
-                int(np.asarray(bundle.datetime, dtype="datetime64[ms]")[0].astype(np.int64)) if bundle.datetime.size else -1,
-                int(np.asarray(bundle.datetime, dtype="datetime64[ms]")[-1].astype(np.int64)) if bundle.datetime.size else -1,
+                int(np.asarray(bundle.datetime, dtype="datetime64[ms]")[0].astype(np.int64))
+                if bundle.datetime.size
+                else -1,
+                int(np.asarray(bundle.datetime, dtype="datetime64[ms]")[-1].astype(np.int64))
+                if bundle.datetime.size
+                else -1,
             )
             for bundle in bundles
         ),
@@ -5913,7 +6017,9 @@ def _load_candidate_signal_payload(
     if aligned is None:
         return None
 
-    returns_raw, turnover, exposure, meta = _strategy_signal(candidate, aligned=aligned, symbols=symbols)
+    returns_raw, turnover, exposure, meta = _strategy_signal(
+        candidate, aligned=aligned, symbols=symbols
+    )
     cost_rate = _candidate_cost_rate(candidate)
     timestamps = np.asarray(aligned.get("datetime"), dtype="datetime64[ms]")
     return _CandidateSignalPayload(
@@ -6112,7 +6218,9 @@ def _candidate_sparse_fold_penalty(
     oos = dict(row.get("oos") or {})
     active_fold_ratio = max(0.0, min(1.0, float(oos.get("active_fold_ratio", 1.0))))
     inactive_fold_count = max(0.0, float(oos.get("inactive_fold_count", 0.0)))
-    failed_fold_ratio = max(0.0, min(1.0, float(oos.get("failed_fold_ratio", float(oos.get("pbo", 1.0))))))
+    failed_fold_ratio = max(
+        0.0, min(1.0, float(oos.get("failed_fold_ratio", float(oos.get("pbo", 1.0)))))
+    )
     return float(
         (float(weights["inactive_fold_penalty"]) * inactive_fold_count)
         + (float(weights["failed_fold_penalty"]) * failed_fold_ratio)
@@ -6138,7 +6246,9 @@ def _candidate_no_trade_train_penalty(
     return 0.0
 
 
-def _candidate_rank_score(row: dict[str, Any], *, scoring_config: Mapping[str, Any] | None = None) -> float:
+def _candidate_rank_score(
+    row: dict[str, Any], *, scoring_config: Mapping[str, Any] | None = None
+) -> float:
     cfg = _resolve_score_config(scoring_config)
     weights = dict(cfg["candidate_rank_score_weights"])
     oos = dict(row.get("oos") or {})
@@ -6176,7 +6286,9 @@ def _read_csv_ohlcv(path: Path) -> pl.DataFrame:
         dt_expr = pl.col(dt_col).cast(pl.Datetime(time_unit="ms"), strict=False)
     elif "timestamp" in cols:
         dt_col = cols["timestamp"]
-        dt_expr = pl.from_epoch(pl.col(dt_col).cast(pl.Int64), time_unit="s").cast(pl.Datetime(time_unit="ms"))
+        dt_expr = pl.from_epoch(pl.col(dt_col).cast(pl.Int64), time_unit="s").cast(
+            pl.Datetime(time_unit="ms")
+        )
     else:
         # Synthesize monotonic timestamps.
         dt_expr = pl.int_range(0, frame.height, eager=False).cast(pl.Int64) * 1000
@@ -6255,7 +6367,11 @@ def _synthetic_bundle_window(
     if start_bound is not None and end_bound is not None and end_bound > start_bound:
         requested_bars = int(((end_bound - start_bound).total_seconds()) // step_seconds) + 1
         bars = max(_MIN_BARS, min(max(bars, requested_bars), 20_000))
-        start = start_bound if requested_bars <= bars else end_bound - timedelta(seconds=(bars - 1) * step_seconds)
+        start = (
+            start_bound
+            if requested_bars <= bars
+            else end_bound - timedelta(seconds=(bars - 1) * step_seconds)
+        )
         return step_seconds, bars, start
     return step_seconds, bars, datetime.now(UTC) - timedelta(seconds=bars * step_seconds)
 
@@ -6292,7 +6408,9 @@ def _synthetic_bundle_arrays(
         low[idx] = min(o, c) * (1.0 - wiggle)
         close[idx] = c
         volume[idx] = max(1.0, 1200.0 * (1.0 + abs(regime)) + rng.uniform(-200.0, 200.0))
-        dt[idx] = np.datetime64((start + timedelta(seconds=idx * step_seconds)).replace(tzinfo=None), "ms")
+        dt[idx] = np.datetime64(
+            (start + timedelta(seconds=idx * step_seconds)).replace(tzinfo=None), "ms"
+        )
         price = c
     return open_, high, low, close, volume, dt
 
@@ -6468,7 +6586,9 @@ def _resolve_bundle_cache_entry(
     if not allow_synthetic_fallback:
         raise _synthetic_disabled_bundle_error(symbol=symbol, timeframe=timeframe)
 
-    return _synthetic_bundle(symbol, timeframe, start_date=start_date, end_date=end_date), "synthetic"
+    return _synthetic_bundle(
+        symbol, timeframe, start_date=start_date, end_date=end_date
+    ), "synthetic"
 
 
 def _load_bundle_cache(

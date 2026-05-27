@@ -30,7 +30,12 @@ def test_build_stack_audit_reflects_promoted_challenger(tmp_path: Path) -> None:
                 "strategy_class": "TopCapTimeSeriesMomentumStrategy",
                 "strategy_timeframe": "1h",
                 "portfolio_weight": 0.5,
-                "train": {"total_return": -0.10, "sharpe": -0.4, "stability": -1.5, "rolling_sharpe_min": -20.0},
+                "train": {
+                    "total_return": -0.10,
+                    "sharpe": -0.4,
+                    "stability": -1.5,
+                    "rolling_sharpe_min": -20.0,
+                },
                 "val": {"total_return": 0.02},
                 "oos": {"total_return": 0.03},
             },
@@ -39,7 +44,12 @@ def test_build_stack_audit_reflects_promoted_challenger(tmp_path: Path) -> None:
                 "strategy_class": "RegimeBreakoutCandidateStrategy",
                 "strategy_timeframe": "1h",
                 "portfolio_weight": 0.5,
-                "train": {"total_return": -0.12, "sharpe": -0.6, "stability": -1.6, "rolling_sharpe_min": -24.0},
+                "train": {
+                    "total_return": -0.12,
+                    "sharpe": -0.6,
+                    "stability": -1.6,
+                    "rolling_sharpe_min": -24.0,
+                },
                 "val": {"total_return": 0.03},
                 "oos": {"total_return": 0.04},
             },
@@ -84,7 +94,16 @@ def test_build_stack_audit_reflects_promoted_challenger(tmp_path: Path) -> None:
     rendered = output_path.read_text(encoding="utf-8")
 
     assert result["path"] == str(output_path.resolve())
-    assert "Current promotion winner: `Autonomous 1h tradecount pair+topcap challenger` (promoted_challenger)" in rendered
-    assert "A challenger now wins locked OOS while the current incumbent artifacts still describe the older baseline." in rendered
-    assert "The locked-OOS promotion flow now favors `Autonomous 1h tradecount pair+topcap challenger`" in rendered
+    assert (
+        "Current promotion winner: `Autonomous 1h tradecount pair+topcap challenger` (promoted_challenger)"
+        in rendered
+    )
+    assert (
+        "A challenger now wins locked OOS while the current incumbent artifacts still describe the older baseline."
+        in rendered
+    )
+    assert (
+        "The locked-OOS promotion flow now favors `Autonomous 1h tradecount pair+topcap challenger`"
+        in rendered
+    )
     assert "The incumbent is still the locked-OOS winner" not in rendered

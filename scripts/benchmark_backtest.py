@@ -41,6 +41,7 @@ except Exception as exc:
     def get_strategy_map() -> dict[str, type]:
         return {}
 
+
 try:
     import psutil
 except ImportError:

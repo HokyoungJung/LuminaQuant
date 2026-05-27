@@ -259,14 +259,18 @@ def test_materializer_incremental_cycle_keeps_earlier_same_day_rows(tmp_path):
         rows=[
             {
                 "agg_trade_id": 1,
-                "timestamp_ms": int(datetime(2026, 3, 7, 0, 1, 0, 100_000, tzinfo=UTC).timestamp() * 1000),
+                "timestamp_ms": int(
+                    datetime(2026, 3, 7, 0, 1, 0, 100_000, tzinfo=UTC).timestamp() * 1000
+                ),
                 "price": 100.0,
                 "quantity": 0.1,
                 "is_buyer_maker": False,
             },
             {
                 "agg_trade_id": 2,
-                "timestamp_ms": int(datetime(2026, 3, 7, 10, 0, 0, 100_000, tzinfo=UTC).timestamp() * 1000),
+                "timestamp_ms": int(
+                    datetime(2026, 3, 7, 10, 0, 0, 100_000, tzinfo=UTC).timestamp() * 1000
+                ),
                 "price": 110.0,
                 "quantity": 0.2,
                 "is_buyer_maker": True,
@@ -292,14 +296,18 @@ def test_materializer_incremental_cycle_keeps_earlier_same_day_rows(tmp_path):
         rows=[
             {
                 "agg_trade_id": 3,
-                "timestamp_ms": int(datetime(2026, 3, 7, 10, 5, 0, 100_000, tzinfo=UTC).timestamp() * 1000),
+                "timestamp_ms": int(
+                    datetime(2026, 3, 7, 10, 5, 0, 100_000, tzinfo=UTC).timestamp() * 1000
+                ),
                 "price": 120.0,
                 "quantity": 0.3,
                 "is_buyer_maker": False,
             },
             {
                 "agg_trade_id": 4,
-                "timestamp_ms": int(datetime(2026, 3, 7, 10, 5, 1, 100_000, tzinfo=UTC).timestamp() * 1000),
+                "timestamp_ms": int(
+                    datetime(2026, 3, 7, 10, 5, 1, 100_000, tzinfo=UTC).timestamp() * 1000
+                ),
                 "price": 121.0,
                 "quantity": 0.1,
                 "is_buyer_maker": True,

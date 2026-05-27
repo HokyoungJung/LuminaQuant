@@ -40,7 +40,8 @@ def main() -> None:
         selected_symbols = [
             symbol
             for symbol in list(settings["symbols"])
-            if str(symbol).endswith("/USDT") and str(symbol).split("/", 1)[0] not in {"XAU", "XAG", "XPT", "XPD"}
+            if str(symbol).endswith("/USDT")
+            and str(symbol).split("/", 1)[0] not in {"XAU", "XAG", "XPT", "XPD"}
         ][:4]
     if len(selected_symbols) < 2:
         raise SystemExit("last-day liquidity regime follow-up requires at least 2 symbols")
@@ -80,7 +81,10 @@ def main() -> None:
                 "batches": [
                     {
                         "batch_id": "last_day_liquidity_regime_batch_01",
-                        "candidate_ids": [str(item.get("candidate_id") or item.get("name") or "") for item in candidates],
+                        "candidate_ids": [
+                            str(item.get("candidate_id") or item.get("name") or "")
+                            for item in candidates
+                        ],
                         "candidate_names": [str(item.get("name") or "") for item in candidates],
                     }
                 ],

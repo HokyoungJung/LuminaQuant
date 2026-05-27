@@ -72,7 +72,9 @@ def test_fold_participation_stats_flags_inactive_and_failed_folds() -> None:
         ]
     )
 
-    active_fold_ratio, inactive_fold_count, failed_fold_ratio = research_metrics.fold_participation_stats(returns)
+    active_fold_ratio, inactive_fold_count, failed_fold_ratio = (
+        research_metrics.fold_participation_stats(returns)
+    )
 
     assert active_fold_ratio < 1.0
     assert inactive_fold_count >= 1.0

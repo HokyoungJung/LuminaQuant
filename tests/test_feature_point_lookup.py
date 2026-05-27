@@ -25,11 +25,19 @@ def test_feature_point_lookup_forward_fills_latest_non_null_value(tmp_path):
     lookup = FeaturePointLookup(db_path=str(db_path), exchange="binance")
 
     assert lookup.get_latest("BTC/USDT", "funding_rate", timestamp_ms=1_700_000_060_000) == 0.0001
-    assert lookup.get_latest("BTC/USDT", "funding_fee_rate", timestamp_ms=1_700_000_060_000) == 0.0001
-    assert lookup.get_latest("BTC/USDT", "funding_fee_quote_per_unit", timestamp_ms=1_700_000_060_000) == 5.0
+    assert (
+        lookup.get_latest("BTC/USDT", "funding_fee_rate", timestamp_ms=1_700_000_060_000) == 0.0001
+    )
+    assert (
+        lookup.get_latest("BTC/USDT", "funding_fee_quote_per_unit", timestamp_ms=1_700_000_060_000)
+        == 5.0
+    )
     assert lookup.get_latest("BTC/USDT", "mark_price", timestamp_ms=1_700_000_060_000) == 50_000.0
     assert lookup.get_latest("BTC/USDT", "open_interest", timestamp_ms=1_700_000_060_000) is None
-    assert lookup.get_latest("BTC/USDT", "open_interest", timestamp_ms=1_700_000_120_000) == 1_250_000.0
+    assert (
+        lookup.get_latest("BTC/USDT", "open_interest", timestamp_ms=1_700_000_120_000)
+        == 1_250_000.0
+    )
     assert lookup.get_latest("BTC/USDT", "funding_rate", timestamp_ms=1_699_999_000_000) is None
 
 
@@ -49,18 +57,24 @@ def test_feature_point_lookup_sums_raw_feature_window(tmp_path):
 
     lookup = FeaturePointLookup(db_path=str(db_path), exchange="binance")
 
-    assert lookup.sum_between(
-        "ETH/USDT",
-        "taker_buy_quote_volume",
-        start_timestamp_ms=1_700_000_000_000,
-        end_timestamp_ms=1_700_000_120_000,
-    ) == 25.0
-    assert lookup.sum_between(
-        "ETH/USDT",
-        "taker_buy_quote_volume",
-        start_timestamp_ms=1_700_000_120_001,
-        end_timestamp_ms=1_700_000_180_000,
-    ) == 5.0
+    assert (
+        lookup.sum_between(
+            "ETH/USDT",
+            "taker_buy_quote_volume",
+            start_timestamp_ms=1_700_000_000_000,
+            end_timestamp_ms=1_700_000_120_000,
+        )
+        == 25.0
+    )
+    assert (
+        lookup.sum_between(
+            "ETH/USDT",
+            "taker_buy_quote_volume",
+            start_timestamp_ms=1_700_000_120_001,
+            end_timestamp_ms=1_700_000_180_000,
+        )
+        == 5.0
+    )
     assert (
         lookup.sum_between(
             "ETH/USDT",

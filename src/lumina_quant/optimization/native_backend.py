@@ -262,11 +262,15 @@ def _select_fastest_backend() -> None:
 
     auto_select = _env_bool(NATIVE_AUTO_SELECT_ENV, True)
     min_gain = max(0.0, _env_float(NATIVE_MIN_SPEEDUP_ENV, 0.0))
-    loops = max(NATIVE_BENCH_MIN_LOOPS, _env_int(NATIVE_BENCH_LOOPS_ENV, NATIVE_BENCH_DEFAULT_LOOPS))
+    loops = max(
+        NATIVE_BENCH_MIN_LOOPS, _env_int(NATIVE_BENCH_LOOPS_ENV, NATIVE_BENCH_DEFAULT_LOOPS)
+    )
     tol = max(NATIVE_BENCH_MIN_TOL, _env_float(NATIVE_SELECTION_TOL_ENV, NATIVE_BENCH_DEFAULT_TOL))
 
     rng = np.random.default_rng(NATIVE_BENCH_RANDOM_SEED)
-    returns = rng.normal(0.0, NATIVE_BENCH_RETURNS_STD, size=NATIVE_BENCH_SAMPLE_SIZE).astype(np.float64)
+    returns = rng.normal(0.0, NATIVE_BENCH_RETURNS_STD, size=NATIVE_BENCH_SAMPLE_SIZE).astype(
+        np.float64
+    )
     series = (1.0 + returns).cumprod() * NATIVE_BENCH_STARTING_CAPITAL
 
     fallback_speed, fallback_out = _bench(fallback_fn, series, DEFAULT_ANNUAL_PERIODS, loops)

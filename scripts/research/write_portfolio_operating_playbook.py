@@ -11,15 +11,26 @@ from typing import Any
 GROUP_ROOT = Path(
     "var/reports/exact_window_backtests/followup_status/portfolio_incumbent_autoresearch_grouped"
 )
-DEFAULT_BASE_PLAN = GROUP_ROOT / "portfolio_candidate_overlay_review_current" / "portfolio_operating_plan_latest.json"
+DEFAULT_BASE_PLAN = (
+    GROUP_ROOT
+    / "portfolio_candidate_overlay_review_current"
+    / "portfolio_operating_plan_latest.json"
+)
 DEFAULT_SWITCH_VALIDATION = (
-    GROUP_ROOT / "current_switch_validation_current" / "refreshed_switch_vs_strategy1_validation_latest.json"
+    GROUP_ROOT
+    / "current_switch_validation_current"
+    / "refreshed_switch_vs_strategy1_validation_latest.json"
 )
 DEFAULT_SWITCH_RECOMMENDATION = (
-    GROUP_ROOT / "current_switch_validation_current" / "refreshed_operating_switch_current" / "portfolio_operating_switch_latest.json"
+    GROUP_ROOT
+    / "current_switch_validation_current"
+    / "refreshed_operating_switch_current"
+    / "portfolio_operating_switch_latest.json"
 )
 DEFAULT_BEARISH_SCAN = (
-    GROUP_ROOT / "current_switch_validation_current" / "current_regime_bearish_strategy_scan_latest.json"
+    GROUP_ROOT
+    / "current_switch_validation_current"
+    / "current_regime_bearish_strategy_scan_latest.json"
 )
 DEFAULT_HYBRID_PORTFOLIO = (
     GROUP_ROOT / "portfolio_hybrid_online_current" / "hybrid_online_portfolio_latest.json"
@@ -70,7 +81,9 @@ def _normalize_mode_metrics(metrics: dict[str, Any] | None) -> dict[str, float]:
 def _hybrid_mode_entry(hybrid_payload: dict[str, Any] | None) -> dict[str, Any]:
     payload = dict(hybrid_payload or {})
     refreshed = dict(
-        dict((payload.get("scenarios") or {}).get("refreshed_latest_tail") or {}).get("split_metrics")
+        dict((payload.get("scenarios") or {}).get("refreshed_latest_tail") or {}).get(
+            "split_metrics"
+        )
         or {}
     )
     readiness = dict(payload.get("readiness") or {})
@@ -85,7 +98,9 @@ def _hybrid_mode_entry(hybrid_payload: dict[str, Any] | None) -> dict[str, Any]:
 
 def _production_guarded_mode_entry(production_payload: dict[str, Any] | None) -> dict[str, Any]:
     payload = dict(production_payload or {})
-    metrics = _normalize_mode_metrics(dict((payload.get("portfolio_metrics") or {}).get("oos") or {}))
+    metrics = _normalize_mode_metrics(
+        dict((payload.get("portfolio_metrics") or {}).get("oos") or {})
+    )
     readiness = {
         "active_exposure": _safe_float(payload.get("active_exposure"), 0.0),
         "cash_weight": _safe_float(payload.get("cash_weight"), 0.0),
@@ -113,7 +128,15 @@ def _hybrid_source_sleeve_metrics(
     }
 
 
-def build_playbook(*, base_plan: dict[str, Any], switch_validation: dict[str, Any], switch_recommendation: dict[str, Any], bearish_scan: dict[str, Any], hybrid_payload: dict[str, Any] | None = None, production_guarded_payload: dict[str, Any] | None = None) -> dict[str, Any]:
+def build_playbook(
+    *,
+    base_plan: dict[str, Any],
+    switch_validation: dict[str, Any],
+    switch_recommendation: dict[str, Any],
+    bearish_scan: dict[str, Any],
+    hybrid_payload: dict[str, Any] | None = None,
+    production_guarded_payload: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     base_modes = dict(base_plan.get("deployment_modes") or {})
     refreshed_metrics = dict(switch_validation.get("refreshed_metrics") or {})
     hybrid_source_metrics = _hybrid_source_sleeve_metrics(hybrid_payload)
@@ -138,7 +161,14 @@ def build_playbook(*, base_plan: dict[str, Any], switch_validation: dict[str, An
         "metrics": _normalize_mode_metrics(refreshed_metrics.get("risk_off_cash")),
     }
     pair_rows = list(bearish_scan.get("ranked_by_oos_return_then_sharpe") or [])
-    pair_row = next((row for row in pair_rows if str(row.get("name") or "").startswith("pair_spread_1h_exec_tightstop_tp_fastexit")), None)
+    pair_row = next(
+        (
+            row
+            for row in pair_rows
+            if str(row.get("name") or "").startswith("pair_spread_1h_exec_tightstop_tp_fastexit")
+        ),
+        None,
+    )
     pair_tactical_mode = {
         "allocation": {"pair_fast_exit": 1.0},
         "why": "Tactical sleeve-only mode for operators who must keep active exposure in a hostile regime. Use only when accepting sparse / high-PBO behavior.",
@@ -279,7 +309,16 @@ def write_playbook(payload: dict[str, Any], *, output_dir: Path) -> tuple[Path, 
         "",
         "## Deployment modes",
     ]
-    for key in ["risk_off_mode", "hybrid_guarded_mode", "production_guarded_mode", "core_mode", "balanced_overlay_mode", "defensive_overlay_mode", "aggressive_realized_mode", "pair_tactical_mode"]:
+    for key in [
+        "risk_off_mode",
+        "hybrid_guarded_mode",
+        "production_guarded_mode",
+        "core_mode",
+        "balanced_overlay_mode",
+        "defensive_overlay_mode",
+        "aggressive_realized_mode",
+        "pair_tactical_mode",
+    ]:
         if key not in modes:
             continue
         item = dict(modes.get(key) or {})

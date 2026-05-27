@@ -194,7 +194,9 @@ class TimeframePairZScoreReversionStrategy(Strategy):
         self.min_entry_volume_x = max(0.0, float(resolved["min_entry_volume_x"]))
         self.min_entry_volume_y = max(0.0, float(resolved["min_entry_volume_y"]))
         self.required_timeframes = (self.timeframe,)
-        self.required_lookbacks = {self.timeframe: max(self.hedge_window + self.lookback_window + 4, 64)}
+        self.required_lookbacks = {
+            self.timeframe: max(self.hedge_window + self.lookback_window + 4, 64)
+        }
         self._state = _PairPositionState()
 
     def get_state(self) -> dict[str, Any]:
@@ -249,7 +251,9 @@ class TimeframePairZScoreReversionStrategy(Strategy):
         getter = getattr(aggregator, "get_bars", None)
         if not callable(getter):
             return []
-        bars = list(getter(symbol=str(symbol), timeframe=str(timeframe), n=max(lookback + 1, 2)) or [])
+        bars = list(
+            getter(symbol=str(symbol), timeframe=str(timeframe), n=max(lookback + 1, 2)) or []
+        )
         return bars[:-1] if len(bars) >= 2 else []
 
     @staticmethod
@@ -365,7 +369,11 @@ class TimeframePairZScoreReversionStrategy(Strategy):
         hour = self._bar_hour_utc(latest_bar)
         if self.entry_hours_utc and (hour is None or hour not in self.entry_hours_utc):
             return False
-        if self.excluded_entry_hours_utc and hour is not None and hour in self.excluded_entry_hours_utc:
+        if (
+            self.excluded_entry_hours_utc
+            and hour is not None
+            and hour in self.excluded_entry_hours_utc
+        ):
             return False
         if self.min_entry_volume_x > 0.0:
             volume_x = safe_float(self.bars.get_latest_bar_value(self.symbol_x, "volume"))
@@ -544,9 +552,9 @@ class TimeframePairZScoreReversionStrategy(Strategy):
             or close_y <= 0.0
         ):
             return 0.0
-        raw = math.log(close_x / self._state.entry_x_price) - float(self._state.entry_beta) * math.log(
-            close_y / self._state.entry_y_price
-        )
+        raw = math.log(close_x / self._state.entry_x_price) - float(
+            self._state.entry_beta
+        ) * math.log(close_y / self._state.entry_y_price)
         normalized = raw / max(1e-9, 1.0 + abs(float(self._state.entry_beta)))
         return normalized if self._state.mode == "LONG_SPREAD" else -normalized
 
@@ -608,7 +616,11 @@ class TimeframePairZScoreReversionStrategy(Strategy):
         self._state.last_completed_bar_key = completed_key
 
         zscore, beta, corr, close_x, close_y, _spread = stats
-        event_time = latest_x_bar[0] if isinstance(latest_x_bar, (tuple, list)) else getattr(event, "time", None)
+        event_time = (
+            latest_x_bar[0]
+            if isinstance(latest_x_bar, (tuple, list))
+            else getattr(event, "time", None)
+        )
         if self._maybe_exit(
             event_time=event_time,
             zscore=zscore,

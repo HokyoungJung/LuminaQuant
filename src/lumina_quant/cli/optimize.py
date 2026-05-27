@@ -55,12 +55,14 @@ from lumina_quant.utils.audit_store import AuditStore
 
 _strategy_registry = None
 
+
 def _auto_collect_market_data(*args, **kwargs):
     try:
         from lumina_quant.data_collector import auto_collect_market_data as collector
     except Exception as exc:
         raise RuntimeError("auto_collect_market_data is unavailable in this distribution.") from exc
     return collector(*args, **kwargs)
+
 
 # Optuna Import
 try:
@@ -220,7 +222,9 @@ def _normalize_backtest_mode(value: str | None, default: str = "windowed") -> st
     return str(default)
 
 
-BACKTEST_MODE = _normalize_backtest_mode(os.getenv("LQ_BACKTEST_MODE", "windowed"), default="windowed")
+BACKTEST_MODE = _normalize_backtest_mode(
+    os.getenv("LQ_BACKTEST_MODE", "windowed"), default="windowed"
+)
 
 
 TWO_STAGE_ENABLED = str(os.getenv("LQ_TWO_STAGE_OPT", "1")).strip().lower() not in {
@@ -768,7 +772,9 @@ def _execute_backtest(
                 record_trades=False,
             )
         else:
-            current_data = _slice_data_dict_frames(data_dict if data_dict is not None else DATA_DICT, start_date, end_date)
+            current_data = _slice_data_dict_frames(
+                data_dict if data_dict is not None else DATA_DICT, start_date, end_date
+            )
             backtest = Backtest(
                 csv_dir=csv_dir,
                 symbol_list=symbol_list,
@@ -882,9 +888,7 @@ def pool_initializer(context):
     ACTIVE_MARKET_DB_PATH = str(context.get("market_db_path", ACTIVE_MARKET_DB_PATH))
     ACTIVE_MARKET_EXCHANGE = str(context.get("market_exchange", ACTIVE_MARKET_EXCHANGE))
     ACTIVE_BASE_TIMEFRAME = str(context.get("base_timeframe", ACTIVE_BASE_TIMEFRAME))
-    PARQUET_REPO = (
-        ParquetMarketDataRepository(ACTIVE_MARKET_DB_PATH) if PARQUET_MODE else None
-    )
+    PARQUET_REPO = ParquetMarketDataRepository(ACTIVE_MARKET_DB_PATH) if PARQUET_MODE else None
 
 
 class GridSearchOptimizer:
@@ -1293,7 +1297,11 @@ def main(argv: list[str] | None = None) -> int:
             default_backtest_mode="windowed",
             default_data_source="auto",
         )
-    except (RawFirstDataMissingError, RawFirstManifestInvalidError, RawFirstStaleWindowError) as exc:
+    except (
+        RawFirstDataMissingError,
+        RawFirstManifestInvalidError,
+        RawFirstStaleWindowError,
+    ) as exc:
         return int(raw_first_exit_code(exc) or 1)
 
     run_id = str(args.run_id or "").strip() or str(uuid.uuid4())
@@ -1313,7 +1321,9 @@ def main(argv: list[str] | None = None) -> int:
             "market_exchange": str(args.market_exchange),
             "base_timeframe": str(args.base_timeframe),
             "strategy_timeframe": str(settings.strategy_timeframe),
-            "auto_collect_db": bool(not bool(args.no_auto_collect_db) and bool(settings.auto_collect_db)),
+            "auto_collect_db": bool(
+                not bool(args.no_auto_collect_db) and bool(settings.auto_collect_db)
+            ),
             "validation_days": int(max(0, int(args.validation_days))),
             "oos_days": int(max(0, int(args.oos_days))),
             "two_stage_enabled": bool(TWO_STAGE_ENABLED),
@@ -1451,7 +1461,9 @@ def main(argv: list[str] | None = None) -> int:
             )
 
         if not valid_splits:
-            fallback_split = strict_recent_split or _build_data_aware_split(data_start, in_sample_end)
+            fallback_split = strict_recent_split or _build_data_aware_split(
+                data_start, in_sample_end
+            )
             if fallback_split is None:
                 print(
                     "Could not build a valid walk-forward split from current data range. "
@@ -1600,7 +1612,11 @@ def main(argv: list[str] | None = None) -> int:
         final_status = "COMPLETED" if code == 0 else "FAILED"
         final_metadata = {"exit_code": code}
         return code
-    except (RawFirstDataMissingError, RawFirstManifestInvalidError, RawFirstStaleWindowError) as exc:
+    except (
+        RawFirstDataMissingError,
+        RawFirstManifestInvalidError,
+        RawFirstStaleWindowError,
+    ) as exc:
         code = int(raw_first_exit_code(exc) or 1)
         final_status = "FAILED"
         final_metadata = {"error": str(exc), "exit_code": int(code)}

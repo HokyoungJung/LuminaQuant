@@ -8,9 +8,16 @@ from typing import Any
 
 import polars as pl
 from lumina_quant.backtesting.cli_contract import RawFirstDataMissingError
-from lumina_quant.market_data import load_data_dict_from_parquet, load_futures_feature_points_from_db
+from lumina_quant.market_data import (
+    load_data_dict_from_parquet,
+    load_futures_feature_points_from_db,
+)
 from lumina_quant.portfolio_split_contract import OOS_START, TRAIN_START, VAL_START
-from lumina_quant.storage.parquet import normalize_symbol, normalize_timeframe_token, timeframe_to_milliseconds
+from lumina_quant.storage.parquet import (
+    normalize_symbol,
+    normalize_timeframe_token,
+    timeframe_to_milliseconds,
+)
 from lumina_quant.timeframe_aggregator import resample_ohlcv_frame_to_timeframe
 
 _TIMEFRAME_ORDER = ("1s", "1m", "5m", "15m", "30m", "1h", "4h", "1d")
@@ -60,7 +67,9 @@ def required_symbol_timeframes(rows: list[dict[str, Any]]) -> set[tuple[str, str
     return required
 
 
-def required_feature_symbols(rows: list[dict[str, Any]], *, feature_required_strategies: set[str]) -> list[str]:
+def required_feature_symbols(
+    rows: list[dict[str, Any]], *, feature_required_strategies: set[str]
+) -> list[str]:
     ordered: dict[str, None] = {}
     for row in list(rows or []):
         strategy_class = str(row.get("strategy_class") or row.get("strategy") or "")
@@ -196,7 +205,9 @@ def discover_latest_common_complete_timestamp(
         end_candidates.append(end_dt)
 
     if not end_candidates:
-        raise RawFirstDataMissingError("No real-data end timestamps were available for final validation.")
+        raise RawFirstDataMissingError(
+            "No real-data end timestamps were available for final validation."
+        )
     return min(end_candidates), infos
 
 

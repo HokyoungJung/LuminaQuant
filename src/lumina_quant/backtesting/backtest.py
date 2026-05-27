@@ -371,4 +371,5 @@ class Backtest(TradingEngine):
             verbose=verbose,
         )
 
+
 __all__ = ["Backtest", "FastQueue", "TimeframeGatedStrategy"]

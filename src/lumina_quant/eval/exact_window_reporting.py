@@ -53,8 +53,12 @@ def _now_iso() -> str:
 
 def _registry_signature(payload: dict[str, Any]) -> str:
     signature_payload = {
-        "requested_symbols": sorted([str(value or "") for value in list(payload.get("requested_symbols") or [])]),
-        "requested_timeframes": sorted([str(value or "") for value in list(payload.get("requested_timeframes") or [])]),
+        "requested_symbols": sorted(
+            [str(value or "") for value in list(payload.get("requested_symbols") or [])]
+        ),
+        "requested_timeframes": sorted(
+            [str(value or "") for value in list(payload.get("requested_timeframes") or [])]
+        ),
         "allow_metals": bool(payload.get("allow_metals")),
         "window_profile": str(payload.get("window_profile") or ""),
         "train_start": str(payload.get("train_start") or ""),
@@ -184,7 +188,9 @@ def sync_exact_window_latest_aliases(
     resolved_paths["latest_pointer"] = (
         Path(latest_pointer).resolve()
         if isinstance(latest_pointer, Path) and latest_pointer.exists()
-        else (root / "latest.json").resolve() if (root / "latest.json").exists() else None
+        else (root / "latest.json").resolve()
+        if (root / "latest.json").exists()
+        else None
     )
 
     registry_source = resolved_paths.get("registry")
@@ -192,12 +198,16 @@ def sync_exact_window_latest_aliases(
         source_payload = _json_load(registry_source)
         if isinstance(source_payload, dict):
             target = root / REGISTRY_LATEST
-            target.write_text(json.dumps(source_payload, sort_keys=True, indent=2), encoding="utf-8")
+            target.write_text(
+                json.dumps(source_payload, sort_keys=True, indent=2), encoding="utf-8"
+            )
             resolved_paths["registry"] = target.resolve()
     return resolved_paths
 
 
-def resolve_backtest_registry(output_dir: str | Path = "var/reports/exact_window_backtests") -> list[dict[str, Any]]:
+def resolve_backtest_registry(
+    output_dir: str | Path = "var/reports/exact_window_backtests",
+) -> list[dict[str, Any]]:
     paths = resolve_exact_window_artifact_paths(output_dir)
     registry_path = paths.get("registry")
     if not isinstance(registry_path, Path):
@@ -255,12 +265,9 @@ def upsert_backtest_registry(
     updated_entries: list[dict[str, Any]] = []
     replaced = False
     for entry in entries:
-        if (
-            str(entry.get("run_id") or "")
-            == str(new_entry.get("run_id") or "")
-            or str(entry.get("run_signature") or "")
-            == str(new_entry.get("run_signature") or "")
-        ):
+        if str(entry.get("run_id") or "") == str(new_entry.get("run_id") or "") or str(
+            entry.get("run_signature") or ""
+        ) == str(new_entry.get("run_signature") or ""):
             updated_entries.append(new_entry)
             replaced = True
             continue
@@ -379,7 +386,9 @@ def _proposal_text(reason: str, *, timeframes: list[str]) -> str:
         )
     if reason == "rss_guard":
         return "Reduce chunk_days or candidate batch size before the next monitored rerun."
-    return "Use the grouped fail counts to choose one bounded follow-up change set before rerunning."
+    return (
+        "Use the grouped fail counts to choose one bounded follow-up change set before rerunning."
+    )
 
 
 def build_fail_analysis(summary: dict[str, Any], details: list[dict[str, Any]]) -> dict[str, Any]:
@@ -411,7 +420,9 @@ def build_fail_analysis(summary: dict[str, Any], details: list[dict[str, Any]]) 
                 "oos_trade_count": float(oos.get("trade_count", 0.0)),
                 "oos_mdd": float(oos.get("mdd", 0.0)),
                 "oos_sharpe": float(oos.get("sharpe", 0.0)),
-                "rss_guard_triggered": bool(metadata.get("rss_guard_triggered") or reason == "rss_guard"),
+                "rss_guard_triggered": bool(
+                    metadata.get("rss_guard_triggered") or reason == "rss_guard"
+                ),
                 "skipped": bool(metadata.get("skipped") or reason == "skipped"),
                 "notes": _reason_note(reason, detail),
             }

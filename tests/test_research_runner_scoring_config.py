@@ -83,8 +83,15 @@ def test_run_candidate_research_scoring_config_defaults_and_override(monkeypatch
             "train": dict(metrics),
             "val": dict(metrics),
             "oos": dict(metrics),
-            "oos_cost_stress": {"x2": {"sharpe": 0.5, "return": 0.01}, "x3": {"sharpe": 0.2, "return": 0.005}},
-            "hurdle_fields": {"train": {"pass": True, "score": 1.0}, "val": {"pass": True, "score": 1.0}, "oos": {"pass": True, "score": 1.0}},
+            "oos_cost_stress": {
+                "x2": {"sharpe": 0.5, "return": 0.01},
+                "x3": {"sharpe": 0.2, "return": 0.005},
+            },
+            "hurdle_fields": {
+                "train": {"pass": True, "score": 1.0},
+                "val": {"pass": True, "score": 1.0},
+                "oos": {"pass": True, "score": 1.0},
+            },
             "pass": True,
             "hard_reject_reasons": {},
             "metadata": {"cost_rate": 0.0005},
@@ -156,13 +163,17 @@ def test_run_candidate_research_sorts_candidates_and_preserves_stage_metadata(mo
     ]
     captured: dict[str, object] = {}
 
-    monkeypatch.setattr(research_runner, "_adapt_candidate_inputs", lambda items, max_candidates: list(items))
+    monkeypatch.setattr(
+        research_runner, "_adapt_candidate_inputs", lambda items, max_candidates: list(items)
+    )
     monkeypatch.setattr(
         research_runner,
         "_resolve_research_run_timeframes_and_universe",
         lambda **kwargs: (["1m"], ["BTC/USDT"]),
     )
-    monkeypatch.setattr(research_runner, "_resolve_split_config", lambda split, strategy_timeframe: resolved_split)
+    monkeypatch.setattr(
+        research_runner, "_resolve_split_config", lambda split, strategy_timeframe: resolved_split
+    )
     monkeypatch.setattr(
         research_runner,
         "_load_research_run_resources",
@@ -202,11 +213,15 @@ def test_run_candidate_research_sorts_candidates_and_preserves_stage_metadata(mo
 
 
 def test_run_candidate_research_returns_empty_report_before_loading_resources(monkeypatch):
-    monkeypatch.setattr(research_runner, "_adapt_candidate_inputs", lambda items, max_candidates: [])
+    monkeypatch.setattr(
+        research_runner, "_adapt_candidate_inputs", lambda items, max_candidates: []
+    )
     monkeypatch.setattr(
         research_runner,
         "_load_research_run_resources",
-        lambda **kwargs: (_ for _ in ()).throw(AssertionError("resource loading should be skipped")),
+        lambda **kwargs: (_ for _ in ()).throw(
+            AssertionError("resource loading should be skipped")
+        ),
     )
 
     report = research_runner.run_candidate_research(
@@ -385,8 +400,14 @@ def test_evaluate_candidate_uses_signal_and_metric_payload_helpers(monkeypatch):
         oos_stress_x3={"sharpe": 0.2, "return": 0.003},
     )
 
-    monkeypatch.setattr(research_runner, "_load_candidate_signal_payload", lambda *args, **kwargs: signal_payload)
-    monkeypatch.setattr(research_runner, "_evaluate_candidate_metric_payload", lambda *args, **kwargs: metric_payload)
+    monkeypatch.setattr(
+        research_runner, "_load_candidate_signal_payload", lambda *args, **kwargs: signal_payload
+    )
+    monkeypatch.setattr(
+        research_runner,
+        "_evaluate_candidate_metric_payload",
+        lambda *args, **kwargs: metric_payload,
+    )
     monkeypatch.setattr(
         research_runner,
         "_hurdle_fields",
@@ -427,7 +448,9 @@ def test_evaluate_candidate_returns_insufficient_result_when_signal_payload_miss
     captured: dict[str, object] = {}
     cache = {("BTC/USDT", "1m"): object()}
 
-    monkeypatch.setattr(research_runner, "_load_candidate_signal_payload", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        research_runner, "_load_candidate_signal_payload", lambda *args, **kwargs: None
+    )
 
     def _capture_insufficient(candidate_arg, *, symbols, timeframe, cache):
         captured["candidate"] = candidate_arg
@@ -476,8 +499,14 @@ def test_evaluate_candidate_propagates_cost_stress_hard_rejects_to_stage_passes(
         oos_stress_x3={"sharpe": 0.2, "return": 0.003},
     )
 
-    monkeypatch.setattr(research_runner, "_load_candidate_signal_payload", lambda *args, **kwargs: signal_payload)
-    monkeypatch.setattr(research_runner, "_evaluate_candidate_metric_payload", lambda *args, **kwargs: metric_payload)
+    monkeypatch.setattr(
+        research_runner, "_load_candidate_signal_payload", lambda *args, **kwargs: signal_payload
+    )
+    monkeypatch.setattr(
+        research_runner,
+        "_evaluate_candidate_metric_payload",
+        lambda *args, **kwargs: metric_payload,
+    )
     monkeypatch.setattr(
         research_runner,
         "_hurdle_fields",

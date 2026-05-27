@@ -11,9 +11,13 @@ from lumina_quant.storage.wal.binary import BinaryWAL
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Benchmark WAL append/scan performance")
-    parser.add_argument("--records", type=int, default=1_000_000, help="Number of records to append")
+    parser.add_argument(
+        "--records", type=int, default=1_000_000, help="Number of records to append"
+    )
     parser.add_argument("--batch", type=int, default=60, help="Records per append batch")
-    parser.add_argument("--path", default="data/market_ohlcv_1s/bench/BTCUSDT/wal.bin", help="WAL file path")
+    parser.add_argument(
+        "--path", default="data/market_ohlcv_1s/bench/BTCUSDT/wal.bin", help="WAL file path"
+    )
     args = parser.parse_args()
 
     total_records = max(1, int(args.records))

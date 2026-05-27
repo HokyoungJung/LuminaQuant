@@ -11,7 +11,9 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT / "scripts" / "research" / "run_alpha_zoo_30m_plus_alpha_feedback_discovery.py"
-SPEC = importlib.util.spec_from_file_location("run_alpha_zoo_30m_plus_alpha_feedback_discovery", MODULE_PATH)
+SPEC = importlib.util.spec_from_file_location(
+    "run_alpha_zoo_30m_plus_alpha_feedback_discovery", MODULE_PATH
+)
 assert SPEC is not None and SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = MODULE
@@ -46,7 +48,13 @@ def _gate_row(**overrides: object) -> dict[str, object]:
 
 
 def test_validate_timeframes_enforces_30m_floor() -> None:
-    assert MODULE._validate_timeframes(["30m", "1h", "2h", "4h", "6h"]) == ("30m", "1h", "2h", "4h", "6h")
+    assert MODULE._validate_timeframes(["30m", "1h", "2h", "4h", "6h"]) == (
+        "30m",
+        "1h",
+        "2h",
+        "4h",
+        "6h",
+    )
 
     with pytest.raises(ValueError, match="below 30m"):
         MODULE._validate_timeframes(["15m"])
@@ -105,7 +113,10 @@ def test_gate_rejects_validation_spike_and_exact_10bps_rpt() -> None:
     assert any("below_validation_return" in reason for reason in spike["rejection_reasons"])
     assert exact_cost["execution_efficiency_proxy_gate_pass"] is False
     assert exact_cost["primary_10bps_promotion_gate_pass"] is False
-    assert any("validation_return_per_turnover_proxy_bps_10.000" in r for r in exact_cost["rejection_reasons"])
+    assert any(
+        "validation_return_per_turnover_proxy_bps_10.000" in r
+        for r in exact_cost["rejection_reasons"]
+    )
     assert exact_cost["ready_for_real"] is False
     assert exact_cost["real_money_execution"] is False
 
@@ -132,7 +143,9 @@ def test_feature_coverage_policy_fails_closed_including_locked_oos_gate() -> Non
 def test_attach_features_marks_stale_or_missing_points_invalid() -> None:
     bars = pd.DataFrame(
         {
-            "datetime": pd.to_datetime(["2025-01-01 00:00", "2025-01-01 12:00", "2025-01-02 12:00"]),
+            "datetime": pd.to_datetime(
+                ["2025-01-01 00:00", "2025-01-01 12:00", "2025-01-02 12:00"]
+            ),
             "open": [1.0, 1.0, 1.0],
             "high": [1.0, 1.0, 1.0],
             "low": [1.0, 1.0, 1.0],

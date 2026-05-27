@@ -120,9 +120,7 @@ def collect_strategy_support_data(
     if profile_token not in {"full", "strategy_used"}:
         raise ValueError("feature_profile must be one of: full, strategy_used")
 
-    resolved_include_funding = (
-        bool(include_funding) if include_funding is not None else True
-    )
+    resolved_include_funding = bool(include_funding) if include_funding is not None else True
     resolved_include_mark_index = (
         bool(include_mark_index) if include_mark_index is not None else profile_token == "full"
     )

@@ -20,10 +20,30 @@ SPEC.loader.exec_module(MODULE)
 def test_apply_state_leverage_marks_liquidation_and_stops_segment() -> None:
     frame = pd.DataFrame(
         [
-            {"date": pd.Timestamp("2025-01-01", tz="UTC"), "split_group": "train", "state": "incumbent", "base_return": 0.0},
-            {"date": pd.Timestamp("2025-01-02", tz="UTC"), "split_group": "train", "state": "incumbent", "base_return": -0.5},
-            {"date": pd.Timestamp("2025-01-03", tz="UTC"), "split_group": "train", "state": "incumbent", "base_return": 0.1},
-            {"date": pd.Timestamp("2025-01-04", tz="UTC"), "split_group": "train", "state": "autoresearch_55_45", "base_return": 0.1},
+            {
+                "date": pd.Timestamp("2025-01-01", tz="UTC"),
+                "split_group": "train",
+                "state": "incumbent",
+                "base_return": 0.0,
+            },
+            {
+                "date": pd.Timestamp("2025-01-02", tz="UTC"),
+                "split_group": "train",
+                "state": "incumbent",
+                "base_return": -0.5,
+            },
+            {
+                "date": pd.Timestamp("2025-01-03", tz="UTC"),
+                "split_group": "train",
+                "state": "incumbent",
+                "base_return": 0.1,
+            },
+            {
+                "date": pd.Timestamp("2025-01-04", tz="UTC"),
+                "split_group": "train",
+                "state": "autoresearch_55_45",
+                "base_return": 0.1,
+            },
         ]
     )
     tuned, liquidations = MODULE._apply_state_leverage(
@@ -39,8 +59,22 @@ def test_apply_state_leverage_marks_liquidation_and_stops_segment() -> None:
 
 def test_objective_uses_train_and_val_metrics() -> None:
     metrics = {
-        "train": {"sharpe": 1.0, "sortino": 1.5, "calmar": 2.0, "total_return": 0.1, "max_drawdown": 0.05, "volatility": 0.2},
-        "val": {"sharpe": 2.0, "sortino": 2.5, "calmar": 3.0, "total_return": 0.2, "max_drawdown": 0.04, "volatility": 0.15},
+        "train": {
+            "sharpe": 1.0,
+            "sortino": 1.5,
+            "calmar": 2.0,
+            "total_return": 0.1,
+            "max_drawdown": 0.05,
+            "volatility": 0.2,
+        },
+        "val": {
+            "sharpe": 2.0,
+            "sortino": 2.5,
+            "calmar": 3.0,
+            "total_return": 0.2,
+            "max_drawdown": 0.04,
+            "volatility": 0.15,
+        },
     }
     value = MODULE._objective(metrics)
     assert value > 0.0

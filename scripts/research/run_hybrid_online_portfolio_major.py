@@ -70,15 +70,32 @@ def write_major_report(
     status = "completed"
     error: str | None = None
     try:
-        historical_active = _majorize(_MOD._historical_active_rows(split_config=split_config) + _MOD._historical_benchmark_rows(split_config=split_config))
+        historical_active = _majorize(
+            _MOD._historical_active_rows(split_config=split_config)
+            + _MOD._historical_benchmark_rows(split_config=split_config)
+        )
         refreshed_active, refreshed_benchmarks = _MOD._refreshed_rows(split_config=split_config)
         refreshed_active = _majorize(refreshed_active + refreshed_benchmarks)
-        refreshed_health_metrics = {row["name"]: dict(row.get("oos") or {}) for row in refreshed_active}
+        refreshed_health_metrics = {
+            row["name"]: dict(row.get("oos") or {}) for row in refreshed_active
+        }
 
-        historical_config = _MOD.HybridOnlineConfig(**{**_MOD.asdict(config), "use_current_health_priors": False})
-        historical_result = _MOD.run_hybrid_online_allocator(historical_active, config=historical_config, refreshed_health_metrics=None, split_config=split_config)
+        historical_config = _MOD.HybridOnlineConfig(
+            **{**_MOD.asdict(config), "use_current_health_priors": False}
+        )
+        historical_result = _MOD.run_hybrid_online_allocator(
+            historical_active,
+            config=historical_config,
+            refreshed_health_metrics=None,
+            split_config=split_config,
+        )
         memory_guard.sample(event="major_historical_done")
-        refreshed_result = _MOD.run_hybrid_online_allocator(refreshed_active, config=config, refreshed_health_metrics=refreshed_health_metrics, split_config=split_config)
+        refreshed_result = _MOD.run_hybrid_online_allocator(
+            refreshed_active,
+            config=config,
+            refreshed_health_metrics=refreshed_health_metrics,
+            split_config=split_config,
+        )
         memory_guard.sample(event="major_refreshed_done")
     except _MOD.RSSLimitExceeded as exc:
         status = "aborted_rss_guard"
@@ -90,11 +107,17 @@ def write_major_report(
         raise
     finally:
         memory_guard.sample(event="major_finish", context={"status": status, "error": error})
-        memory_summary = memory_guard.finalize(status=status, error=error, context={"output_dir": str(output_dir.resolve())})
+        memory_summary = memory_guard.finalize(
+            status=status, error=error, context={"output_dir": str(output_dir.resolve())}
+        )
         memory_guard.release()
 
-    refreshed_rows = _MOD._comparison_rows(hybrid_result=refreshed_result, benchmarks=[], active_rows=refreshed_active)
-    hist_rows = _MOD._comparison_rows(hybrid_result=historical_result, benchmarks=[], active_rows=historical_active)
+    refreshed_rows = _MOD._comparison_rows(
+        hybrid_result=refreshed_result, benchmarks=[], active_rows=refreshed_active
+    )
+    hist_rows = _MOD._comparison_rows(
+        hybrid_result=historical_result, benchmarks=[], active_rows=historical_active
+    )
     payload = {
         "artifact_kind": "hybrid_online_portfolio_major",
         "generated_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
@@ -138,9 +161,13 @@ def write_major_report(
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     _MOD.add_split_config_arguments(parser)
-    parser.add_argument("--warmup-ratio", type=float, default=_MOD.HybridOnlineConfig().warmup_ratio)
+    parser.add_argument(
+        "--warmup-ratio", type=float, default=_MOD.HybridOnlineConfig().warmup_ratio
+    )
     parser.add_argument("--warmup-days", type=int, default=None)
-    parser.add_argument("--lookback-days", type=int, default=_MOD.HybridOnlineConfig().lookback_days)
+    parser.add_argument(
+        "--lookback-days", type=int, default=_MOD.HybridOnlineConfig().lookback_days
+    )
     parser.add_argument("--output-dir", type=Path, default=OUTPUT_DIR)
     return parser
 

@@ -30,7 +30,11 @@ from lumina_quant.dashboard.overview_service import (
     overview_metric,
     resolve_dashboard_postgres_dsn,
 )
-from lumina_quant.market_data import normalize_symbol, normalize_timeframe_token, timeframe_to_milliseconds
+from lumina_quant.market_data import (
+    normalize_symbol,
+    normalize_timeframe_token,
+    timeframe_to_milliseconds,
+)
 from lumina_quant.postgres_state import _connect_postgres
 
 
@@ -109,7 +113,9 @@ def _normalize_json_value(value: Any) -> Any:
     return str(value)
 
 
-def _frame_preview(frame: pd.DataFrame, *, row_limit: int = 5, column_limit: int = 8) -> list[dict[str, Any]]:
+def _frame_preview(
+    frame: pd.DataFrame, *, row_limit: int = 5, column_limit: int = 8
+) -> list[dict[str, Any]]:
     if frame.empty:
         return []
     preview = frame.copy()
@@ -451,7 +457,9 @@ def build_performance_price_payload(
                 "timestamp": _isoformat(row.datetime),
                 "price": float(row.benchmark_price),
             }
-            for row in metrics_frame.assign(benchmark_price=benchmark_series).itertuples(index=False)
+            for row in metrics_frame.assign(benchmark_price=benchmark_series).itertuples(
+                index=False
+            )
             if pd.notna(row.benchmark_price) and _isoformat(row.datetime) is not None
         ]
         payload["funding_curve"] = [
@@ -472,7 +480,9 @@ def build_performance_price_payload(
             "price": _safe_float(row.price),
             "quantity": _safe_float(row.quantity),
             "realized_pnl": _safe_float(row.realized_pnl),
-            "realized_return_pct": None if pd.isna(row.realized_return_pct) else _safe_float(row.realized_return_pct),
+            "realized_return_pct": None
+            if pd.isna(row.realized_return_pct)
+            else _safe_float(row.realized_return_pct),
             "position_after": _safe_float(row.position_after),
         }
         for row in trade_analytics.tail(12).itertuples(index=False)
@@ -523,11 +533,20 @@ def build_execution_analytics_payload(
     closed = _closed_trade_analytics(trade_analytics)
     summary = payload["summary"]
     if not fills_frame.empty:
-        direction = fills_frame.get("direction", pd.Series(dtype="object")).fillna("").astype(str).str.upper()
+        direction = (
+            fills_frame.get("direction", pd.Series(dtype="object"))
+            .fillna("")
+            .astype(str)
+            .str.upper()
+        )
         summary["buy_fills"] = int((direction == "BUY").sum())
         summary["sell_fills"] = int((direction == "SELL").sum())
-        summary["avg_qty"] = round(_safe_float(fills_frame.get("quantity", pd.Series(dtype="float64")).mean()), 6)
-        summary["avg_notional"] = round(_safe_float(trade_analytics.get("notional", pd.Series(dtype="float64")).mean()), 6)
+        summary["avg_qty"] = round(
+            _safe_float(fills_frame.get("quantity", pd.Series(dtype="float64")).mean()), 6
+        )
+        summary["avg_notional"] = round(
+            _safe_float(trade_analytics.get("notional", pd.Series(dtype="float64")).mean()), 6
+        )
         summary["total_commission"] = round(
             _safe_float(fills_frame.get("commission", pd.Series(dtype="float64")).sum()),
             6,
@@ -559,7 +578,9 @@ def build_execution_analytics_payload(
             trade_count = len(part.index)
             win_rate = 0.0
             if trade_count:
-                win_rate = float((pd.to_numeric(part["realized_pnl"], errors="coerce").fillna(0.0) > 0.0).mean())
+                win_rate = float(
+                    (pd.to_numeric(part["realized_pnl"], errors="coerce").fillna(0.0) > 0.0).mean()
+                )
             payload["direction_breakdown"].append(
                 {
                     "direction": label,
@@ -580,7 +601,9 @@ def build_execution_analytics_payload(
                 "symbol": str(row.symbol),
                 "close_side": str(row.close_side or "n/a"),
                 "realized_pnl": _safe_float(row.realized_pnl),
-                "realized_return_pct": None if pd.isna(row.realized_return_pct) else _safe_float(row.realized_return_pct),
+                "realized_return_pct": None
+                if pd.isna(row.realized_return_pct)
+                else _safe_float(row.realized_return_pct),
                 "holding_sec": None if pd.isna(row.holding_sec) else _safe_float(row.holding_sec),
             }
             for row in closed.tail(10).itertuples(index=False)
@@ -595,8 +618,7 @@ def build_execution_analytics_payload(
             .value_counts()
         )
         payload["order_status"] = [
-            {"status": str(status), "count": int(count)}
-            for status, count in order_status.items()
+            {"status": str(status), "count": int(count)} for status, count in order_status.items()
         ]
 
     return payload
@@ -651,7 +673,9 @@ def build_market_data_payload(
         ),
         overview_metric(
             "Latest Volume",
-            None if volume_series.dropna().empty else round(float(volume_series.dropna().iloc[-1]), 6),
+            None
+            if volume_series.dropna().empty
+            else round(float(volume_series.dropna().iloc[-1]), 6),
             key="latest_volume",
         ),
         overview_metric(
@@ -711,7 +735,9 @@ def build_optimization_insights_payload(
 
     sharpe = pd.to_numeric(optimization_frame.get("sharpe"), errors="coerce")
     robustness = pd.to_numeric(optimization_frame.get("robustness_score"), errors="coerce")
-    stages = optimization_frame.get("stage", pd.Series(dtype="object")).fillna("unknown").astype(str)
+    stages = (
+        optimization_frame.get("stage", pd.Series(dtype="object")).fillna("unknown").astype(str)
+    )
     payload["summary_metrics"] = [
         overview_metric("Rows", len(optimization_frame.index), key="rows"),
         overview_metric(
@@ -862,10 +888,14 @@ def build_report_export_payload(
         "mode": str(run_row.get("mode") or ""),
         "status": str(run_row.get("status") or ""),
         "period_start": _isoformat(run_row.get("started_at")),
-        "period_end": overview_payload.get("equity_curve", [{}])[-1].get("timestamp") if overview_payload.get("equity_curve") else None,
+        "period_end": overview_payload.get("equity_curve", [{}])[-1].get("timestamp")
+        if overview_payload.get("equity_curve")
+        else None,
         "total_return": total_return,
         "latest_equity": latest_equity,
-        "realized_pnl": round(_safe_float(closed.get("realized_pnl", pd.Series(dtype="float64")).sum()), 6),
+        "realized_pnl": round(
+            _safe_float(closed.get("realized_pnl", pd.Series(dtype="float64")).sum()), 6
+        ),
         "closed_trade_count": len(closed.index),
         "risk_event_count": len(risk_frame.index),
         "heartbeat_count": len(heartbeats_frame.index),
@@ -934,7 +964,9 @@ def load_performance_price_payload(
     overview_payload = build_overview_payload_from_frames(
         contract=_dashboard_contract(),
         runs_frame=runs,
-        equity_frame=metrics[["datetime", "total"]].copy() if {"datetime", "total"}.issubset(metrics.columns) else pd.DataFrame(),
+        equity_frame=metrics[["datetime", "total"]].copy()
+        if {"datetime", "total"}.issubset(metrics.columns)
+        else pd.DataFrame(),
     )
     return build_performance_price_payload(
         overview_payload=overview_payload,
@@ -1027,7 +1059,9 @@ def load_report_export_payload(
     overview_payload = build_overview_payload_from_frames(
         contract=_dashboard_contract(),
         runs_frame=runs,
-        equity_frame=metrics[["datetime", "total"]].copy() if {"datetime", "total"}.issubset(metrics.columns) else pd.DataFrame(),
+        equity_frame=metrics[["datetime", "total"]].copy()
+        if {"datetime", "total"}.issubset(metrics.columns)
+        else pd.DataFrame(),
     )
     return build_report_export_payload(
         run_row=run_row,

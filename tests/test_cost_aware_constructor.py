@@ -17,8 +17,16 @@ def test_penalty_effect_reduces_turnover():
     }
     cost_params = CostModelParams(spread_bps=2.0, impact_k=1.0, fees_bps=1.0)
 
-    baseline = CostAwarePortfolioConstructor(ConstructorParams(no_trade_band_bps=0.0, turnover_penalty=0.0, cost_penalty=0.0, participation_penalty=0.0))
-    penalized = CostAwarePortfolioConstructor(ConstructorParams(no_trade_band_bps=0.0, turnover_penalty=0.8, cost_penalty=1.5, participation_penalty=0.8))
+    baseline = CostAwarePortfolioConstructor(
+        ConstructorParams(
+            no_trade_band_bps=0.0, turnover_penalty=0.0, cost_penalty=0.0, participation_penalty=0.0
+        )
+    )
+    penalized = CostAwarePortfolioConstructor(
+        ConstructorParams(
+            no_trade_band_bps=0.0, turnover_penalty=0.8, cost_penalty=1.5, participation_penalty=0.8
+        )
+    )
 
     raw_orders, _ = baseline.construct_orders(
         target_weights=target_weights,

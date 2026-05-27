@@ -116,21 +116,49 @@ class _MoonshotWindowBase(Strategy, ABC):
     @classmethod
     def _base_schema(cls) -> dict[str, HyperParam]:
         return {
-            "lookback_bars": HyperParam.integer("lookback_bars", default=48, low=2, high=10080, tunable=False),
-            "fast_lookback_bars": HyperParam.integer("fast_lookback_bars", default=12, low=1, high=1440, tunable=False),
-            "slow_lookback_bars": HyperParam.integer("slow_lookback_bars", default=144, low=2, high=10080, tunable=False),
-            "rebalance_bars": HyperParam.integer("rebalance_bars", default=6, low=1, high=1440, tunable=False),
-            "entry_threshold": HyperParam.floating("entry_threshold", default=0.012, low=0.0, high=1.0, tunable=False),
-            "exit_threshold": HyperParam.floating("exit_threshold", default=0.002, low=0.0, high=1.0, tunable=False),
+            "lookback_bars": HyperParam.integer(
+                "lookback_bars", default=48, low=2, high=10080, tunable=False
+            ),
+            "fast_lookback_bars": HyperParam.integer(
+                "fast_lookback_bars", default=12, low=1, high=1440, tunable=False
+            ),
+            "slow_lookback_bars": HyperParam.integer(
+                "slow_lookback_bars", default=144, low=2, high=10080, tunable=False
+            ),
+            "rebalance_bars": HyperParam.integer(
+                "rebalance_bars", default=6, low=1, high=1440, tunable=False
+            ),
+            "entry_threshold": HyperParam.floating(
+                "entry_threshold", default=0.012, low=0.0, high=1.0, tunable=False
+            ),
+            "exit_threshold": HyperParam.floating(
+                "exit_threshold", default=0.002, low=0.0, high=1.0, tunable=False
+            ),
             "max_longs": HyperParam.integer("max_longs", default=2, low=0, high=32, tunable=False),
-            "max_shorts": HyperParam.integer("max_shorts", default=2, low=0, high=32, tunable=False),
-            "gross_exposure": HyperParam.floating("gross_exposure", default=0.08, low=0.0, high=2.0, tunable=False),
-            "max_order_value": HyperParam.floating("max_order_value", default=1000.0, low=0.0, high=1_000_000.0, tunable=False),
-            "stop_loss_pct": HyperParam.floating("stop_loss_pct", default=0.045, low=0.0, high=1.0, tunable=False),
-            "take_profit_pct": HyperParam.floating("take_profit_pct", default=0.12, low=0.0, high=2.0, tunable=False),
-            "trailing_exit_pct": HyperParam.floating("trailing_exit_pct", default=0.055, low=0.0, high=1.0, tunable=False),
-            "max_hold_bars": HyperParam.integer("max_hold_bars", default=240, low=0, high=10080, tunable=False),
-            "min_price": HyperParam.floating("min_price", default=0.10, low=0.0, high=1_000_000.0, tunable=False),
+            "max_shorts": HyperParam.integer(
+                "max_shorts", default=2, low=0, high=32, tunable=False
+            ),
+            "gross_exposure": HyperParam.floating(
+                "gross_exposure", default=0.08, low=0.0, high=2.0, tunable=False
+            ),
+            "max_order_value": HyperParam.floating(
+                "max_order_value", default=1000.0, low=0.0, high=1_000_000.0, tunable=False
+            ),
+            "stop_loss_pct": HyperParam.floating(
+                "stop_loss_pct", default=0.045, low=0.0, high=1.0, tunable=False
+            ),
+            "take_profit_pct": HyperParam.floating(
+                "take_profit_pct", default=0.12, low=0.0, high=2.0, tunable=False
+            ),
+            "trailing_exit_pct": HyperParam.floating(
+                "trailing_exit_pct", default=0.055, low=0.0, high=1.0, tunable=False
+            ),
+            "max_hold_bars": HyperParam.integer(
+                "max_hold_bars", default=240, low=0, high=10080, tunable=False
+            ),
+            "min_price": HyperParam.floating(
+                "min_price", default=0.10, low=0.0, high=1_000_000.0, tunable=False
+            ),
             "allow_shorts": HyperParam.boolean("allow_shorts", default=True, tunable=False),
         }
 
@@ -333,23 +361,34 @@ class _MoonshotWindowBase(Strategy, ABC):
         entry = float(self._entry_price.get(symbol, 0.0) or 0.0)
         if entry <= 0.0:
             return "missing_entry"
-        self._high_watermark[symbol] = max(float(self._high_watermark.get(symbol, price) or price), price)
-        self._low_watermark[symbol] = min(float(self._low_watermark.get(symbol, price) or price), price)
+        self._high_watermark[symbol] = max(
+            float(self._high_watermark.get(symbol, price) or price), price
+        )
+        self._low_watermark[symbol] = min(
+            float(self._low_watermark.get(symbol, price) or price), price
+        )
         if state == "LONG":
             if self.stop_loss_pct > 0.0 and price <= entry * (1.0 - self.stop_loss_pct):
                 return "stop_loss"
             if self.take_profit_pct > 0.0 and price >= entry * (1.0 + self.take_profit_pct):
                 return "take_profit"
-            if self.trailing_exit_pct > 0.0 and price <= self._high_watermark[symbol] * (1.0 - self.trailing_exit_pct):
+            if self.trailing_exit_pct > 0.0 and price <= self._high_watermark[symbol] * (
+                1.0 - self.trailing_exit_pct
+            ):
                 return "trailing_exit"
         if state == "SHORT":
             if self.stop_loss_pct > 0.0 and price >= entry * (1.0 + self.stop_loss_pct):
                 return "stop_loss"
             if self.take_profit_pct > 0.0 and price <= entry * (1.0 - self.take_profit_pct):
                 return "take_profit"
-            if self.trailing_exit_pct > 0.0 and price >= self._low_watermark[symbol] * (1.0 + self.trailing_exit_pct):
+            if self.trailing_exit_pct > 0.0 and price >= self._low_watermark[symbol] * (
+                1.0 + self.trailing_exit_pct
+            ):
                 return "trailing_exit"
-        if self.max_hold_bars > 0 and int(self._bars_held.get(symbol, 0) or 0) >= self.max_hold_bars:
+        if (
+            self.max_hold_bars > 0
+            and int(self._bars_held.get(symbol, 0) or 0) >= self.max_hold_bars
+        ):
             return "max_hold"
         return ""
 
@@ -377,10 +416,21 @@ class _MoonshotWindowBase(Strategy, ABC):
                 continue
             reason = self._risk_exit_reason(symbol, price)
             target_state = targets.get(symbol, "OUT") if should_rebalance else state
-            if should_rebalance and target_state != state and abs(scores.get(symbol, 0.0)) <= self.exit_threshold:
+            if (
+                should_rebalance
+                and target_state != state
+                and abs(scores.get(symbol, 0.0)) <= self.exit_threshold
+            ):
                 reason = reason or "signal_decay"
             if reason:
-                self._emit(symbol=symbol, event_time=event_time, signal_type="EXIT", price=price, score=scores.get(symbol, 0.0), reason=reason)
+                self._emit(
+                    symbol=symbol,
+                    event_time=event_time,
+                    signal_type="EXIT",
+                    price=price,
+                    score=scores.get(symbol, 0.0),
+                    reason=reason,
+                )
                 self._exit(symbol)
 
         if not should_rebalance:
@@ -396,7 +446,14 @@ class _MoonshotWindowBase(Strategy, ABC):
             if price is None:
                 continue
             if state != "OUT":
-                self._emit(symbol=symbol, event_time=event_time, signal_type="EXIT", price=price, score=scores.get(symbol, 0.0), reason="rebalance")
+                self._emit(
+                    symbol=symbol,
+                    event_time=event_time,
+                    signal_type="EXIT",
+                    price=price,
+                    score=scores.get(symbol, 0.0),
+                    reason="rebalance",
+                )
                 self._exit(symbol)
             if target_state in {"LONG", "SHORT"}:
                 self._emit(
@@ -456,7 +513,9 @@ class ProfitMoonshotTrendStrategy(_MoonshotWindowBase):
         schema = cls._base_schema()
         schema.update(
             {
-                "breadth_threshold": HyperParam.floating("breadth_threshold", default=0.0, low=-1.0, high=1.0, tunable=False),
+                "breadth_threshold": HyperParam.floating(
+                    "breadth_threshold", default=0.0, low=-1.0, high=1.0, tunable=False
+                ),
             }
         )
         return schema
@@ -506,9 +565,15 @@ class ProfitMoonshotBreakoutStrategy(_MoonshotWindowBase):
         schema = cls._base_schema()
         schema.update(
             {
-                "breakout_buffer": HyperParam.floating("breakout_buffer", default=0.002, low=0.0, high=1.0, tunable=False),
-                "squeeze_ratio_max": HyperParam.floating("squeeze_ratio_max", default=1.35, low=0.0, high=10.0, tunable=False),
-                "volume_z_min": HyperParam.floating("volume_z_min", default=0.0, low=-10.0, high=10.0, tunable=False),
+                "breakout_buffer": HyperParam.floating(
+                    "breakout_buffer", default=0.002, low=0.0, high=1.0, tunable=False
+                ),
+                "squeeze_ratio_max": HyperParam.floating(
+                    "squeeze_ratio_max", default=1.35, low=0.0, high=10.0, tunable=False
+                ),
+                "volume_z_min": HyperParam.floating(
+                    "volume_z_min", default=0.0, low=-10.0, high=10.0, tunable=False
+                ),
             }
         )
         return schema
@@ -557,12 +622,18 @@ class ProfitMoonshotBreakoutStrategy(_MoonshotWindowBase):
             elif down <= -self.breakout_buffer:
                 scores[symbol] = down - max(0.0, volume_z) * 0.001
         targets: dict[str, str] = {}
-        for symbol, score in sorted(scores.items(), key=lambda item: item[1], reverse=True)[: self.max_longs]:
+        for symbol, score in sorted(scores.items(), key=lambda item: item[1], reverse=True)[
+            : self.max_longs
+        ]:
             if score >= self.entry_threshold:
                 targets[symbol] = "LONG"
         short_count = 0
         for symbol, score in sorted(scores.items(), key=lambda item: item[1]):
-            if score <= -self.entry_threshold and symbol not in targets and short_count < self.max_shorts:
+            if (
+                score <= -self.entry_threshold
+                and symbol not in targets
+                and short_count < self.max_shorts
+            ):
                 targets[symbol] = "SHORT"
                 short_count += 1
         return targets, scores
@@ -578,9 +649,15 @@ class ProfitMoonshotReversionStrategy(_MoonshotWindowBase):
         schema = cls._base_schema()
         schema.update(
             {
-                "return_z_min": HyperParam.floating("return_z_min", default=1.4, low=0.0, high=10.0, tunable=False),
-                "volume_z_min": HyperParam.floating("volume_z_min", default=0.5, low=-10.0, high=10.0, tunable=False),
-                "range_z_min": HyperParam.floating("range_z_min", default=0.5, low=-10.0, high=10.0, tunable=False),
+                "return_z_min": HyperParam.floating(
+                    "return_z_min", default=1.4, low=0.0, high=10.0, tunable=False
+                ),
+                "volume_z_min": HyperParam.floating(
+                    "volume_z_min", default=0.5, low=-10.0, high=10.0, tunable=False
+                ),
+                "range_z_min": HyperParam.floating(
+                    "range_z_min", default=0.5, low=-10.0, high=10.0, tunable=False
+                ),
             }
         )
         return schema
@@ -625,7 +702,9 @@ class ProfitMoonshotReversionStrategy(_MoonshotWindowBase):
             ]
             latest_range = (float(highs[-1]) - float(lows[-1])) / float(close[-1])
             range_z = _zscore(latest_range, ranges)
-            volume_z = _zscore(float(volumes[-1]), [float(v) for v in list(volumes)[-self.lookback_bars - 1 : -1]])
+            volume_z = _zscore(
+                float(volumes[-1]), [float(v) for v in list(volumes)[-self.lookback_bars - 1 : -1]]
+            )
             if abs(return_z) < self.return_z_min:
                 continue
             if volume_z < self.volume_z_min and range_z < self.range_z_min:
@@ -633,12 +712,18 @@ class ProfitMoonshotReversionStrategy(_MoonshotWindowBase):
             # Fade extreme positive moves with shorts and extreme negative moves with longs.
             scores[symbol] = -return_z * max(1.0, 1.0 + 0.05 * max(volume_z, range_z, 0.0))
         targets: dict[str, str] = {}
-        for symbol, score in sorted(scores.items(), key=lambda item: item[1], reverse=True)[: self.max_longs]:
+        for symbol, score in sorted(scores.items(), key=lambda item: item[1], reverse=True)[
+            : self.max_longs
+        ]:
             if score >= self.entry_threshold:
                 targets[symbol] = "LONG"
         short_count = 0
         for symbol, score in sorted(scores.items(), key=lambda item: item[1]):
-            if score <= -self.entry_threshold and symbol not in targets and short_count < self.max_shorts:
+            if (
+                score <= -self.entry_threshold
+                and symbol not in targets
+                and short_count < self.max_shorts
+            ):
                 targets[symbol] = "SHORT"
                 short_count += 1
         return targets, scores

@@ -186,7 +186,9 @@ def run_check(
 
     if not nvidia_ok and not require_gpu:
         payload["status"] = "skipped"
-        payload["reason"] = "No NVIDIA GPU runner detected; contract check passed without hardware smoke."
+        payload["reason"] = (
+            "No NVIDIA GPU runner detected; contract check passed without hardware smoke."
+        )
         return 0, payload
 
     gpu_ok, gpu_reason = polars_gpu_available(

@@ -16,11 +16,20 @@ sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
 
 
-def _stream(start_ts_ms: float, values: list[float], *, step_ms: float = 86_400_000.0) -> list[dict[str, float]]:
+def _stream(
+    start_ts_ms: float, values: list[float], *, step_ms: float = 86_400_000.0
+) -> list[dict[str, float]]:
     return [{"t": start_ts_ms + (idx * step_ms), "v": value} for idx, value in enumerate(values)]
 
 
-def _row(name: str, *, train: list[float], val: list[float], oos: list[float], oos_extra: dict[str, Any] | None = None) -> dict[str, Any]:
+def _row(
+    name: str,
+    *,
+    train: list[float],
+    val: list[float],
+    oos: list[float],
+    oos_extra: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     return {
         "candidate_id": name,
         "name": name,
@@ -33,8 +42,16 @@ def _row(name: str, *, train: list[float], val: list[float], oos: list[float], o
             "val": _stream(1_767_225_600_000.0, val),
             "oos": _stream(1_769_904_000_000.0, oos),
         },
-        "train": {"total_return": sum(train), "sharpe": 1.0 if sum(train) > 0 else -1.0, "trade_count": 20.0},
-        "val": {"total_return": sum(val), "sharpe": 1.0 if sum(val) > 0 else -1.0, "trade_count": 10.0},
+        "train": {
+            "total_return": sum(train),
+            "sharpe": 1.0 if sum(train) > 0 else -1.0,
+            "trade_count": 20.0,
+        },
+        "val": {
+            "total_return": sum(val),
+            "sharpe": 1.0 if sum(val) > 0 else -1.0,
+            "trade_count": 10.0,
+        },
         "oos": {
             "total_return": sum(oos),
             "sharpe": 1.0 if sum(oos) > 0 else -1.0,
@@ -47,7 +64,9 @@ def _row(name: str, *, train: list[float], val: list[float], oos: list[float], o
     }
 
 
-def _portfolio_payload(name: str, *, train: list[float], val: list[float], oos: list[float]) -> dict[str, Any]:
+def _portfolio_payload(
+    name: str, *, train: list[float], val: list[float], oos: list[float]
+) -> dict[str, Any]:
     row = _row(name, train=train, val=val, oos=oos)
     return {
         "portfolio_return_streams": row["return_streams"],
@@ -88,8 +107,13 @@ def test_resolve_warmup_days_uses_ratio_when_days_not_explicit() -> None:
 def test_health_prior_shrinks_negative_sleeves() -> None:
     cfg = MODULE.HybridOnlineConfig()
     assert MODULE._health_prior({"total_return": 0.01, "sharpe": 0.5}, cfg) == 1.0
-    assert MODULE._health_prior({"total_return": 0.01, "sharpe": -0.5}, cfg) == cfg.mixed_health_floor
-    assert MODULE._health_prior({"total_return": -0.01, "sharpe": -0.5}, cfg) == cfg.negative_health_floor
+    assert (
+        MODULE._health_prior({"total_return": 0.01, "sharpe": -0.5}, cfg) == cfg.mixed_health_floor
+    )
+    assert (
+        MODULE._health_prior({"total_return": -0.01, "sharpe": -0.5}, cfg)
+        == cfg.negative_health_floor
+    )
 
 
 def test_fragility_penalty_demotes_sparse_pair() -> None:
@@ -110,7 +134,13 @@ def test_hybrid_online_allocator_uses_cash_fallback_when_all_non_cash_scores_are
         _row("risk_off_cash", train=[0.0, 0.0], val=[0.0], oos=[0.0]),
         _row("soft_three_way_regime", train=[-0.01] * 25, val=[-0.01] * 5, oos=[-0.01] * 5),
         _row("balanced_overlay_80_20", train=[-0.01] * 25, val=[-0.01] * 5, oos=[-0.01] * 5),
-        _row("pair_tactical_mode", train=[-0.01] * 25, val=[-0.01] * 5, oos=[-0.01] * 5, oos_extra={"trade_count": 4.0, "pbo": 0.625}),
+        _row(
+            "pair_tactical_mode",
+            train=[-0.01] * 25,
+            val=[-0.01] * 5,
+            oos=[-0.01] * 5,
+            oos_extra={"trade_count": 4.0, "pbo": 0.625},
+        ),
     ]
     result = MODULE.run_hybrid_online_allocator(
         rows,
@@ -131,11 +161,19 @@ def test_hybrid_online_allocator_enforces_pair_cap() -> None:
         _row("risk_off_cash", train=[0.0, 0.0], val=[0.0], oos=[0.0]),
         _row("soft_three_way_regime", train=[-0.005] * 30, val=[-0.005] * 5, oos=[-0.005] * 5),
         _row("balanced_overlay_80_20", train=[-0.004] * 30, val=[-0.004] * 5, oos=[-0.004] * 5),
-        _row("pair_tactical_mode", train=[0.02] * 30, val=[0.02] * 5, oos=[0.02] * 5, oos_extra={"trade_count": 20.0, "pbo": 0.2}),
+        _row(
+            "pair_tactical_mode",
+            train=[0.02] * 30,
+            val=[0.02] * 5,
+            oos=[0.02] * 5,
+            oos_extra={"trade_count": 20.0, "pbo": 0.2},
+        ),
     ]
     result = MODULE.run_hybrid_online_allocator(
         rows,
-        config=MODULE.HybridOnlineConfig(warmup_days=5, lookback_days=5, pair_weight_cap=0.3, min_positive_score=0.0),
+        config=MODULE.HybridOnlineConfig(
+            warmup_days=5, lookback_days=5, pair_weight_cap=0.3, min_positive_score=0.0
+        ),
         refreshed_health_metrics={
             "soft_three_way_regime": {"total_return": -0.02, "sharpe": -2.0},
             "balanced_overlay_80_20": {"total_return": -0.01, "sharpe": -1.0},
@@ -152,11 +190,19 @@ def test_hybrid_online_allocator_warmup_defaults_to_soft() -> None:
         _row("risk_off_cash", train=[0.0, 0.0], val=[0.0], oos=[0.0]),
         _row("soft_three_way_regime", train=[0.01] * 10, val=[0.01] * 2, oos=[0.01]),
         _row("balanced_overlay_80_20", train=[0.005] * 10, val=[0.005] * 2, oos=[0.005]),
-        _row("pair_tactical_mode", train=[0.02] * 10, val=[0.02] * 2, oos=[0.02], oos_extra={"trade_count": 8.0, "pbo": 0.625}),
+        _row(
+            "pair_tactical_mode",
+            train=[0.02] * 10,
+            val=[0.02] * 2,
+            oos=[0.02],
+            oos_extra={"trade_count": 8.0, "pbo": 0.625},
+        ),
     ]
     result = MODULE.run_hybrid_online_allocator(
         rows,
-        config=MODULE.HybridOnlineConfig(warmup_days=5, lookback_days=5, use_current_health_priors=False),
+        config=MODULE.HybridOnlineConfig(
+            warmup_days=5, lookback_days=5, use_current_health_priors=False
+        ),
         refreshed_health_metrics=None,
     )
     first = result["allocations"][0]
@@ -169,16 +215,27 @@ def test_hybrid_online_allocator_uses_warmup_days_not_just_lookback() -> None:
         _row("risk_off_cash", train=[0.0] * 20, val=[0.0] * 2, oos=[0.0]),
         _row("soft_three_way_regime", train=[0.01] * 20, val=[0.01] * 2, oos=[0.01]),
         _row("balanced_overlay_80_20", train=[0.02] * 20, val=[0.02] * 2, oos=[0.02]),
-        _row("pair_tactical_mode", train=[0.0] * 20, val=[0.0] * 2, oos=[0.0], oos_extra={"trade_count": 20.0, "pbo": 0.0}),
+        _row(
+            "pair_tactical_mode",
+            train=[0.0] * 20,
+            val=[0.0] * 2,
+            oos=[0.0],
+            oos_extra={"trade_count": 20.0, "pbo": 0.0},
+        ),
     ]
     result = MODULE.run_hybrid_online_allocator(
         rows,
-        config=MODULE.HybridOnlineConfig(warmup_days=10, lookback_days=5, min_positive_score=0.0, use_current_health_priors=False),
+        config=MODULE.HybridOnlineConfig(
+            warmup_days=10, lookback_days=5, min_positive_score=0.0, use_current_health_priors=False
+        ),
         refreshed_health_metrics=None,
     )
     warmup_defaults = [alloc["default_sleeve"] for alloc in result["allocations"][:10]]
     assert set(warmup_defaults) == {"soft_three_way_regime"}
-    assert result["allocations"][10]["default_sleeve"] in {"soft_three_way_regime", "balanced_overlay_80_20"}
+    assert result["allocations"][10]["default_sleeve"] in {
+        "soft_three_way_regime",
+        "balanced_overlay_80_20",
+    }
 
 
 def test_hybrid_online_allocator_respects_sticky_default_margin() -> None:
@@ -186,11 +243,24 @@ def test_hybrid_online_allocator_respects_sticky_default_margin() -> None:
         _row("risk_off_cash", train=[0.0, 0.0], val=[0.0], oos=[0.0]),
         _row("soft_three_way_regime", train=[0.01] * 30, val=[0.0105] * 5, oos=[0.01] * 5),
         _row("balanced_overlay_80_20", train=[0.0102] * 30, val=[0.0106] * 5, oos=[0.01] * 5),
-        _row("pair_tactical_mode", train=[0.0] * 30, val=[0.0] * 5, oos=[0.0] * 5, oos_extra={"trade_count": 20.0, "pbo": 0.0}),
+        _row(
+            "pair_tactical_mode",
+            train=[0.0] * 30,
+            val=[0.0] * 5,
+            oos=[0.0] * 5,
+            oos_extra={"trade_count": 20.0, "pbo": 0.0},
+        ),
     ]
     result = MODULE.run_hybrid_online_allocator(
         rows,
-        config=MODULE.HybridOnlineConfig(warmup_days=5, lookback_days=5, min_positive_score=0.0, sticky_default_bonus=0.2, switch_margin=0.2, use_current_health_priors=False),
+        config=MODULE.HybridOnlineConfig(
+            warmup_days=5,
+            lookback_days=5,
+            min_positive_score=0.0,
+            sticky_default_bonus=0.2,
+            switch_margin=0.2,
+            use_current_health_priors=False,
+        ),
         refreshed_health_metrics=None,
     )
     # After warmup, the default should remain sticky to soft_three_way_regime despite a small balanced edge.
@@ -203,11 +273,23 @@ def test_fixed_default_variant_keeps_previous_default_when_positive() -> None:
         _row("risk_off_cash", train=[0.0, 0.0], val=[0.0], oos=[0.0]),
         _row("soft_three_way_regime", train=[0.01] * 12, val=[0.01] * 2, oos=[0.01] * 2),
         _row("balanced_overlay_80_20", train=[0.02] * 12, val=[0.02] * 2, oos=[0.02] * 2),
-        _row("pair_tactical_mode", train=[0.0] * 12, val=[0.0] * 2, oos=[0.0] * 2, oos_extra={"trade_count": 20.0, "pbo": 0.0}),
+        _row(
+            "pair_tactical_mode",
+            train=[0.0] * 12,
+            val=[0.0] * 2,
+            oos=[0.0] * 2,
+            oos_extra={"trade_count": 20.0, "pbo": 0.0},
+        ),
     ]
     result = MODULE.run_hybrid_online_allocator(
         rows,
-        config=MODULE.HybridOnlineConfig(variant="fixed_default", warmup_days=5, lookback_days=5, min_positive_score=0.0, use_current_health_priors=False),
+        config=MODULE.HybridOnlineConfig(
+            variant="fixed_default",
+            warmup_days=5,
+            lookback_days=5,
+            min_positive_score=0.0,
+            use_current_health_priors=False,
+        ),
         refreshed_health_metrics=None,
     )
     later_defaults = [alloc["default_sleeve"] for alloc in result["allocations"][5:10]]
@@ -219,7 +301,13 @@ def test_disagreement_switching_variant_scales_down_active_weights_when_scores_a
         _row("risk_off_cash", train=[0.0] * 20, val=[0.0] * 2, oos=[0.0] * 2),
         _row("soft_three_way_regime", train=[0.01] * 20, val=[0.01] * 2, oos=[0.01] * 2),
         _row("balanced_overlay_80_20", train=[0.0101] * 20, val=[0.0101] * 2, oos=[0.0101] * 2),
-        _row("pair_tactical_mode", train=[0.0] * 20, val=[0.0] * 2, oos=[0.0] * 2, oos_extra={"trade_count": 20.0, "pbo": 0.0}),
+        _row(
+            "pair_tactical_mode",
+            train=[0.0] * 20,
+            val=[0.0] * 2,
+            oos=[0.0] * 2,
+            oos_extra={"trade_count": 20.0, "pbo": 0.0},
+        ),
     ]
     result = MODULE.run_hybrid_online_allocator(
         rows,
@@ -238,7 +326,9 @@ def test_disagreement_switching_variant_scales_down_active_weights_when_scores_a
     assert sample["cash_weight"] > 0.0
 
 
-def test_refreshed_rows_includes_production_guarded_when_artifact_exists(tmp_path, monkeypatch) -> None:
+def test_refreshed_rows_includes_production_guarded_when_artifact_exists(
+    tmp_path, monkeypatch
+) -> None:
     soft = tmp_path / "soft.json"
     balanced = tmp_path / "balanced.json"
     pair = tmp_path / "pair.json"
@@ -247,12 +337,30 @@ def test_refreshed_rows_includes_production_guarded_when_artifact_exists(tmp_pat
     incumbent = tmp_path / "incumbent.json"
     production = tmp_path / "production.json"
 
-    soft.write_text(json.dumps(_portfolio_payload("soft", train=[0.01], val=[0.01], oos=[0.01])), encoding="utf-8")
-    balanced.write_text(json.dumps(_portfolio_payload("balanced", train=[0.008], val=[0.008], oos=[0.008])), encoding="utf-8")
-    three_way.write_text(json.dumps(_portfolio_payload("three_way", train=[0.012], val=[0.012], oos=[0.012])), encoding="utf-8")
-    static_blend.write_text(json.dumps(_portfolio_payload("static", train=[0.009], val=[0.009], oos=[0.009])), encoding="utf-8")
-    incumbent.write_text(json.dumps(_portfolio_payload("incumbent", train=[0.007], val=[0.007], oos=[0.007])), encoding="utf-8")
-    production.write_text(json.dumps(_portfolio_payload("production", train=[0.011], val=[0.011], oos=[0.011])), encoding="utf-8")
+    soft.write_text(
+        json.dumps(_portfolio_payload("soft", train=[0.01], val=[0.01], oos=[0.01])),
+        encoding="utf-8",
+    )
+    balanced.write_text(
+        json.dumps(_portfolio_payload("balanced", train=[0.008], val=[0.008], oos=[0.008])),
+        encoding="utf-8",
+    )
+    three_way.write_text(
+        json.dumps(_portfolio_payload("three_way", train=[0.012], val=[0.012], oos=[0.012])),
+        encoding="utf-8",
+    )
+    static_blend.write_text(
+        json.dumps(_portfolio_payload("static", train=[0.009], val=[0.009], oos=[0.009])),
+        encoding="utf-8",
+    )
+    incumbent.write_text(
+        json.dumps(_portfolio_payload("incumbent", train=[0.007], val=[0.007], oos=[0.007])),
+        encoding="utf-8",
+    )
+    production.write_text(
+        json.dumps(_portfolio_payload("production", train=[0.011], val=[0.011], oos=[0.011])),
+        encoding="utf-8",
+    )
     pair.write_text(
         json.dumps(
             _row(
@@ -280,4 +388,8 @@ def test_refreshed_rows_includes_production_guarded_when_artifact_exists(tmp_pat
     assert "production_guarded_portfolio" in active_names
     production_row = next(row for row in active if row["name"] == "production_guarded_portfolio")
     assert float(production_row["metadata"]["max_weight_cap"]) == 0.45
-    assert {row["name"] for row in benchmarks} >= {"three_way_regime", "static_blend_76_24", "incumbent_only"}
+    assert {row["name"] for row in benchmarks} >= {
+        "three_way_regime",
+        "static_blend_76_24",
+        "incumbent_only",
+    }

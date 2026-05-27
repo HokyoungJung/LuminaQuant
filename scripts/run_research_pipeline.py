@@ -86,7 +86,9 @@ def main() -> int:
     report["stage1"] = research_report.get("stage1")
     report["data_sources"] = research_report.get("data_sources")
 
-    report_path = output_dir / f"strategy_factory_report_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}.json"
+    report_path = (
+        output_dir / f"strategy_factory_report_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}.json"
+    )
     report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
 
     shortlist_payload = build_shortlist_payload(
@@ -109,11 +111,16 @@ def main() -> int:
         manifest_path=manifest_path,
         research_report_path=report_path,
     )
-    shortlist_path = output_dir / f"strategy_factory_shortlist_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}.json"
+    shortlist_path = (
+        output_dir
+        / f"strategy_factory_shortlist_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}.json"
+    )
     shortlist_path.write_text(json.dumps(shortlist_payload, indent=2), encoding="utf-8")
     print(f"[PIPELINE] shortlist json: {shortlist_path}")
 
-    shortlist_md = output_dir / f"strategy_factory_shortlist_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}.md"
+    shortlist_md = (
+        output_dir / f"strategy_factory_shortlist_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}.md"
+    )
     shortlist_md.write_text(render_shortlist_markdown(shortlist_payload), encoding="utf-8")
     print(f"[PIPELINE] shortlist markdown: {shortlist_md}")
     return 0

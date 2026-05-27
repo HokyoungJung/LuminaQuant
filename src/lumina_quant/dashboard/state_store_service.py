@@ -82,10 +82,7 @@ class StateConnection:
 def resolve_postgres_dsn(dsn: str | None = None, *, base_config: Any = None) -> str:
     """Resolve dashboard Postgres DSN from explicit value, env, or config."""
     token = str(
-        dsn
-        or os.getenv("LQ_POSTGRES_DSN")
-        or getattr(base_config, "POSTGRES_DSN", "")
-        or ""
+        dsn or os.getenv("LQ_POSTGRES_DSN") or getattr(base_config, "POSTGRES_DSN", "") or ""
     ).strip()
     return token
 

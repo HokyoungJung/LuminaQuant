@@ -16,7 +16,9 @@ from typing import Any
 
 BASELINE_MODE = "profit_moonshot_adaptive_momentum_mode"
 BASELINE_VAL_RETURN = 0.0026493262
-DEFAULT_SUMMARY_PATH = Path("var/reports/profit_moonshot_20260501/profit_moonshot_summary_latest.json")
+DEFAULT_SUMMARY_PATH = Path(
+    "var/reports/profit_moonshot_20260501/profit_moonshot_summary_latest.json"
+)
 DEFAULT_RESULT_PATH = Path(".omx/specs/autoresearch-profit-moonshot-continuation/result.json")
 
 
@@ -40,7 +42,11 @@ def validate(summary_path: Path = DEFAULT_SUMMARY_PATH) -> dict[str, Any]:
     promoted = dict(summary.get("promoted_candidate") or {})
     override = dict(summary.get("operator_oos_override") or {})
     override_candidate = dict(override.get("candidate") or {})
-    ranked = [dict(item) for item in list(summary.get("ranked_candidates") or []) if isinstance(item, dict)]
+    ranked = [
+        dict(item)
+        for item in list(summary.get("ranked_candidates") or [])
+        if isinstance(item, dict)
+    ]
     improved_candidates = [
         item
         for item in ranked
@@ -56,10 +62,14 @@ def validate(summary_path: Path = DEFAULT_SUMMARY_PATH) -> dict[str, Any]:
     if override_active:
         override_candidate.setdefault("primary_split", "oos")
         override_candidate.setdefault("promotion_eligible", True)
-    best = override_candidate if override_active else (
-        max(improved_candidates, key=lambda item: _safe_float(item.get("total_return"), 0.0))
-        if improved_candidates
-        else promoted or (ranked[0] if ranked else {})
+    best = (
+        override_candidate
+        if override_active
+        else (
+            max(improved_candidates, key=lambda item: _safe_float(item.get("total_return"), 0.0))
+            if improved_candidates
+            else promoted or (ranked[0] if ranked else {})
+        )
     )
     mode = str(best.get("mode") or best.get("candidate_id") or "")
     val_return = _safe_float(best.get("total_return"), 0.0)
@@ -117,7 +127,9 @@ def main(argv: list[str] | None = None) -> int:
     result = validate(Path(args.summary_path))
     result_path = Path(args.result_path)
     result_path.parent.mkdir(parents=True, exist_ok=True)
-    result_path.write_text(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    result_path.write_text(
+        json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
     return 0 if result["passed"] else 1
 

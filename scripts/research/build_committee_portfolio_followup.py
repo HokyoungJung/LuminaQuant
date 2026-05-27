@@ -18,15 +18,24 @@ FOLLOWUP_ROOT = REPORT_ROOT / "followup_status"
 COMPONENT_SOURCES = (
     (
         "composite_trend_stable_30m_stable_ls_highconv_ls_0.75_0.45_0.20_0.80",
-        REPORT_ROOT / "expansion_crypto_15m_30m_1h_20260310T115853Z" / "15m-30m-1h" / "exact_window_candidate_details_latest.json",
+        REPORT_ROOT
+        / "expansion_crypto_15m_30m_1h_20260310T115853Z"
+        / "15m-30m-1h"
+        / "exact_window_candidate_details_latest.json",
     ),
     (
         "topcap_tsmom_1h_balanced_16_4_0.015",
-        REPORT_ROOT / "topcap_crypto_1h_focus_20260310T123813Z" / "1h" / "exact_window_candidate_details_latest.json",
+        REPORT_ROOT
+        / "topcap_crypto_1h_focus_20260310T123813Z"
+        / "1h"
+        / "exact_window_candidate_details_latest.json",
     ),
     (
         "regime_breakout_1h_trend_ls_48_0.70",
-        REPORT_ROOT / "topcap_crypto_1h_focus_20260310T123813Z" / "1h" / "exact_window_candidate_details_latest.json",
+        REPORT_ROOT
+        / "topcap_crypto_1h_focus_20260310T123813Z"
+        / "1h"
+        / "exact_window_candidate_details_latest.json",
     ),
 )
 
@@ -56,45 +65,82 @@ def _weighted_stream(rows: list[dict[str, Any]], split: str) -> list[dict[str, f
     bucket: dict[pd.Timestamp, float] = defaultdict(float)
     for row in rows:
         weight = _safe_float(row.get("_portfolio_weight"), 0.0)
-        for ts, value in _normalize_stream(list((row.get("return_streams") or {}).get(split) or [])):
+        for ts, value in _normalize_stream(
+            list((row.get("return_streams") or {}).get(split) or [])
+        ):
             bucket[ts] += weight * value
-    return [
-        {"t": float(ts.timestamp() * 1000.0), "v": float(bucket[ts])}
-        for ts in sorted(bucket)
-    ]
+    return [{"t": float(ts.timestamp() * 1000.0), "v": float(bucket[ts])} for ts in sorted(bucket)]
 
 
-def _metrics(rows: list[dict[str, Any]], split: str) -> tuple[dict[str, float], list[dict[str, float]]]:
+def _metrics(
+    rows: list[dict[str, Any]], split: str
+) -> tuple[dict[str, float], list[dict[str, float]]]:
     stream = _weighted_stream(rows, split)
     returns = np.asarray([point["v"] for point in stream], dtype=float)
     metrics = dict(_metrics_daily(returns))
     metrics["return"] = float(metrics.get("total_return", 0.0))
     metrics["trade_count"] = float(
-        sum(_safe_float((row.get(split) or {}).get("trade_count"), 0.0) * _safe_float(row.get("_portfolio_weight"), 0.0) for row in rows)
+        sum(
+            _safe_float((row.get(split) or {}).get("trade_count"), 0.0)
+            * _safe_float(row.get("_portfolio_weight"), 0.0)
+            for row in rows
+        )
     )
     metrics["turnover"] = float(
-        sum(_safe_float((row.get(split) or {}).get("turnover"), 0.0) * _safe_float(row.get("_portfolio_weight"), 0.0) for row in rows)
+        sum(
+            _safe_float((row.get(split) or {}).get("turnover"), 0.0)
+            * _safe_float(row.get("_portfolio_weight"), 0.0)
+            for row in rows
+        )
     )
     metrics["win_rate"] = float(
-        sum(_safe_float((row.get(split) or {}).get("win_rate"), 0.0) * _safe_float(row.get("_portfolio_weight"), 0.0) for row in rows)
+        sum(
+            _safe_float((row.get(split) or {}).get("win_rate"), 0.0)
+            * _safe_float(row.get("_portfolio_weight"), 0.0)
+            for row in rows
+        )
     )
     metrics["avg_trade"] = float(
-        sum(_safe_float((row.get(split) or {}).get("avg_trade"), 0.0) * _safe_float(row.get("_portfolio_weight"), 0.0) for row in rows)
+        sum(
+            _safe_float((row.get(split) or {}).get("avg_trade"), 0.0)
+            * _safe_float(row.get("_portfolio_weight"), 0.0)
+            for row in rows
+        )
     )
     metrics["exposure"] = float(
-        sum(_safe_float((row.get(split) or {}).get("exposure"), 0.0) * _safe_float(row.get("_portfolio_weight"), 0.0) for row in rows)
+        sum(
+            _safe_float((row.get(split) or {}).get("exposure"), 0.0)
+            * _safe_float(row.get("_portfolio_weight"), 0.0)
+            for row in rows
+        )
     )
     metrics["deflated_sharpe"] = float(
-        sum(_safe_float((row.get(split) or {}).get("deflated_sharpe"), 0.0) * _safe_float(row.get("_portfolio_weight"), 0.0) for row in rows)
+        sum(
+            _safe_float((row.get(split) or {}).get("deflated_sharpe"), 0.0)
+            * _safe_float(row.get("_portfolio_weight"), 0.0)
+            for row in rows
+        )
     )
     metrics["pbo"] = float(max(_safe_float((row.get(split) or {}).get("pbo"), 0.0) for row in rows))
-    metrics["spa_pvalue"] = float(max(_safe_float((row.get(split) or {}).get("spa_pvalue"), 0.0) for row in rows))
-    metrics["benchmark_corr"] = float(
-        sum(_safe_float((row.get(split) or {}).get("benchmark_corr"), 0.0) * _safe_float(row.get("_portfolio_weight"), 0.0) for row in rows)
+    metrics["spa_pvalue"] = float(
+        max(_safe_float((row.get(split) or {}).get("spa_pvalue"), 0.0) for row in rows)
     )
-    metrics["rolling_sharpe_min"] = float(min(_safe_float((row.get(split) or {}).get("rolling_sharpe_min"), 0.0) for row in rows))
-    metrics["stability"] = float(min(_safe_float((row.get(split) or {}).get("stability"), 0.0) for row in rows))
-    metrics["worst_month"] = float(min(_safe_float((row.get(split) or {}).get("worst_month"), 0.0) for row in rows))
+    metrics["benchmark_corr"] = float(
+        sum(
+            _safe_float((row.get(split) or {}).get("benchmark_corr"), 0.0)
+            * _safe_float(row.get("_portfolio_weight"), 0.0)
+            for row in rows
+        )
+    )
+    metrics["rolling_sharpe_min"] = float(
+        min(_safe_float((row.get(split) or {}).get("rolling_sharpe_min"), 0.0) for row in rows)
+    )
+    metrics["stability"] = float(
+        min(_safe_float((row.get(split) or {}).get("stability"), 0.0) for row in rows)
+    )
+    metrics["worst_month"] = float(
+        min(_safe_float((row.get(split) or {}).get("worst_month"), 0.0) for row in rows)
+    )
     metrics["component_count"] = len(rows)
     return metrics, stream
 
@@ -106,10 +152,18 @@ def _load_named_row(path: Path, name: str) -> dict[str, Any]:
 
 def _load_default_rows(report_root: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     rows = [_load_named_row(path, name) for name, path in COMPONENT_SOURCES]
-    rolling_payload = json.loads((report_root / "followup_status" / "rolling_breakout_30m_gate_latest.json").read_text(encoding="utf-8"))
+    rolling_payload = json.loads(
+        (report_root / "followup_status" / "rolling_breakout_30m_gate_latest.json").read_text(
+            encoding="utf-8"
+        )
+    )
     if rolling_payload.get("survives"):
         rows.append(dict(rolling_payload["gated_candidate_row"]))
-    pair_payload = json.loads((report_root / "followup_status" / "pair_spread_4h_xpt_xpd_retune_latest.json").read_text(encoding="utf-8"))
+    pair_payload = json.loads(
+        (report_root / "followup_status" / "pair_spread_4h_xpt_xpd_retune_latest.json").read_text(
+            encoding="utf-8"
+        )
+    )
     if pair_payload.get("survives") and pair_payload.get("survivor"):
         rows.append(dict(pair_payload["survivor"]))
     return rows, {
@@ -154,11 +208,15 @@ def build_committee_portfolio_followup(
     if loaded_pair_payload.get("rolling_survives"):
         notes.append("RollingBreakout 30m survived the ex-ante regime gate and was included.")
     else:
-        notes.append("RollingBreakout 30m was excluded because no regime gate survived the conditional sleeve thresholds.")
+        notes.append(
+            "RollingBreakout 30m was excluded because no regime gate survived the conditional sleeve thresholds."
+        )
     if loaded_pair_payload.get("survives"):
         notes.append("PairSpread 4h XPT/XPD survived and was included.")
     else:
-        notes.append("PairSpread 4h XPT/XPD was excluded because the retune artifact did not survive.")
+        notes.append(
+            "PairSpread 4h XPT/XPD was excluded because the retune artifact did not survive."
+        )
     if loaded_pair_payload:
         coverage = dict(loaded_pair_payload.get("coverage_guard") or {})
         if coverage and not coverage.get("pass"):

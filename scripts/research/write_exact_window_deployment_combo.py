@@ -189,7 +189,9 @@ def _weighted_candidate_stream(rows: list[dict[str, Any]], split: str) -> list[d
     if not rows:
         return []
     weight_map = {
-        str(row.get("candidate_id") or row.get("name") or idx): float(row.get("_deployment_weight", 0.0))
+        str(row.get("candidate_id") or row.get("name") or idx): float(
+            row.get("_deployment_weight", 0.0)
+        )
         for idx, row in enumerate(rows)
     }
     total_weight = float(sum(weight_map.values()))
@@ -213,10 +215,18 @@ def _weighted_candidate_stream(rows: list[dict[str, Any]], split: str) -> list[d
 def _combo_metrics(rows: list[dict[str, Any]], split: str) -> dict[str, float]:
     stream = _weighted_candidate_stream(rows, split)
     returns = np.asarray([float(point.get("v", 0.0)) for point in stream], dtype=float)
-    metrics = dict(_metrics_daily(returns)) if returns.size else dict(_metrics_daily(np.asarray([], dtype=float)))
+    metrics = (
+        dict(_metrics_daily(returns))
+        if returns.size
+        else dict(_metrics_daily(np.asarray([], dtype=float)))
+    )
     metrics["return"] = float(metrics.get("total_return", 0.0))
-    metrics["pbo"] = max((float((row.get(split) or {}).get("pbo", 0.0) or 0.0) for row in rows), default=0.0)
-    metrics["trade_count"] = float(sum(float((row.get(split) or {}).get("trade_count", 0.0) or 0.0) for row in rows))
+    metrics["pbo"] = max(
+        (float((row.get(split) or {}).get("pbo", 0.0) or 0.0) for row in rows), default=0.0
+    )
+    metrics["trade_count"] = float(
+        sum(float((row.get(split) or {}).get("trade_count", 0.0) or 0.0) for row in rows)
+    )
     metrics["component_count"] = float(len(rows))
     return metrics
 
@@ -280,12 +290,16 @@ def _build_payload(
         "source_stems": source_stems,
         "components": _component_rows(rows),
         "metrics": {split: _combo_metrics(rows, split) for split in ("train", "val", "oos")},
-        "combined_streams": {split: _weighted_candidate_stream(rows, split) for split in ("train", "val", "oos")},
+        "combined_streams": {
+            split: _weighted_candidate_stream(rows, split) for split in ("train", "val", "oos")
+        },
         "notes": notes,
     }
 
 
-def _scenario_rows(bundle: dict[str, Any], decision: dict[str, Any], spec: dict[str, Any]) -> list[dict[str, Any]]:
+def _scenario_rows(
+    bundle: dict[str, Any], decision: dict[str, Any], spec: dict[str, Any]
+) -> list[dict[str, Any]]:
     return _deployment_candidate_rows(
         bundle,
         decision,
@@ -397,7 +411,9 @@ def _experimental_watchlist_rows(
     return _with_equal_weights(selected)
 
 
-def _build_scenarios(bundle: dict[str, Any], decision: dict[str, Any], generated_at: str) -> list[dict[str, Any]]:
+def _build_scenarios(
+    bundle: dict[str, Any], decision: dict[str, Any], generated_at: str
+) -> list[dict[str, Any]]:
     scenarios: list[dict[str, Any]] = []
     for spec in SCENARIO_SPECS:
         rows = _scenario_rows(bundle, decision, spec)
@@ -478,10 +494,7 @@ def write_deployment_artifacts(report_root: Path = REPORT_ROOT) -> dict[str, Any
             "selection_basis": "unavailable",
             "source_stems": [],
             "components": [],
-            "metrics": {
-                split: _combo_metrics([], split)
-                for split in ("train", "val", "oos")
-            },
+            "metrics": {split: _combo_metrics([], split) for split in ("train", "val", "oos")},
             "combined_streams": {split: [] for split in ("train", "val", "oos")},
             "notes": [
                 "Primary decision/follow-up artifacts are currently missing or empty.",
@@ -499,7 +512,11 @@ def write_deployment_artifacts(report_root: Path = REPORT_ROOT) -> dict[str, Any
         }
     else:
         primary = next(
-            (scenario for scenario in scenarios if scenario.get("scenario_id") == "strict_plus_crypto_metal_watchlist"),
+            (
+                scenario
+                for scenario in scenarios
+                if scenario.get("scenario_id") == "strict_plus_crypto_metal_watchlist"
+            ),
             scenarios[0],
         )
         scenario_payload = {
@@ -542,7 +559,9 @@ def write_deployment_artifacts(report_root: Path = REPORT_ROOT) -> dict[str, Any
         )
     combo_md_path.write_text("\n".join(combo_lines) + "\n", encoding="utf-8")
 
-    scenario_json_path.write_text(json.dumps(scenario_payload, indent=2, sort_keys=True), encoding="utf-8")
+    scenario_json_path.write_text(
+        json.dumps(scenario_payload, indent=2, sort_keys=True), encoding="utf-8"
+    )
     scenario_lines = [
         "# deployment scenarios",
         "",

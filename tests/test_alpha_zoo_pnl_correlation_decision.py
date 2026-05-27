@@ -61,9 +61,9 @@ def test_train_validation_score_ignores_locked_oos_return_when_no_explicit_score
     high_oos = _row(locked_oos_return=0.90, locked_oos_return_per_turnover_proxy_bps=200.0)
     low_oos = _row(locked_oos_return=-0.90, locked_oos_return_per_turnover_proxy_bps=-200.0)
 
-    assert MODULE._monitoring_score_train_validation_only(high_oos) == MODULE._monitoring_score_train_validation_only(
-        low_oos
-    )
+    assert MODULE._monitoring_score_train_validation_only(
+        high_oos
+    ) == MODULE._monitoring_score_train_validation_only(low_oos)
 
 
 def test_aligned_pnl_frame_fills_missing_strategy_bars_with_zero() -> None:
@@ -111,7 +111,9 @@ def test_greedy_selection_rejects_high_train_validation_correlation_duplicate() 
     assert by_id["b"]["real_money_execution"] is False
 
 
-def test_build_payload_keeps_locked_oos_report_only_and_real_money_disabled(monkeypatch: object, tmp_path: Path) -> None:
+def test_build_payload_keeps_locked_oos_report_only_and_real_money_disabled(
+    monkeypatch: object, tmp_path: Path
+) -> None:
     rows = [
         _row(model_id="a", monitoring_score_train_validation_only=2.0),
         _row(model_id="b", monitoring_score_train_validation_only=1.0, symbol="ETHUSDT"),
@@ -127,12 +129,22 @@ def test_build_payload_keeps_locked_oos_report_only_and_real_money_disabled(monk
         "a": _capture(
             "a",
             [0.01, 0.02, 0.01, 0.003],
-            ["2025-01-01 00:00:00", "2026-01-01 00:00:00", "2026-01-02 00:00:00", "2026-04-01 00:00:00"],
+            [
+                "2025-01-01 00:00:00",
+                "2026-01-01 00:00:00",
+                "2026-01-02 00:00:00",
+                "2026-04-01 00:00:00",
+            ],
         ),
         "b": _capture(
             "b",
             [0.00, -0.01, 0.02, 0.004],
-            ["2025-01-01 00:00:00", "2026-01-01 00:00:00", "2026-01-02 00:00:00", "2026-04-01 00:00:00"],
+            [
+                "2025-01-01 00:00:00",
+                "2026-01-01 00:00:00",
+                "2026-01-02 00:00:00",
+                "2026-04-01 00:00:00",
+            ],
         ),
     }
 

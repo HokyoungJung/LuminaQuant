@@ -46,7 +46,9 @@ def _resample_bucket_weekly(frame: pl.DataFrame, *, bucket_ms: int) -> pl.LazyFr
     )
 
     return (
-        lazy_frame.with_columns(((pl.col("timestamp_ms") // bucket_ms) * bucket_ms).alias("bucket_ms"))
+        lazy_frame.with_columns(
+            ((pl.col("timestamp_ms") // bucket_ms) * bucket_ms).alias("bucket_ms")
+        )
         .group_by(["week_start", "bucket_ms"])
         .agg(
             [
@@ -74,7 +76,9 @@ def _run_once(frame: pl.DataFrame, *, mode: str, device: str | None, bucket_ms: 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Benchmark CPU vs GPU weekly chunked resampling.")
-    parser.add_argument("--bucket-ms", type=int, default=60_000, help="Resample bucket width in ms.")
+    parser.add_argument(
+        "--bucket-ms", type=int, default=60_000, help="Resample bucket width in ms."
+    )
     parser.add_argument(
         "--seconds",
         type=int,

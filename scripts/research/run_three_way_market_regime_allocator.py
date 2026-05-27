@@ -45,7 +45,9 @@ _market_spec.loader.exec_module(_market)
 
 SCHEMA_VERSION = "1.0"
 DEFAULT_OUTPUT_DIR = (
-    FOLLOWUP_ROOT / "portfolio_incumbent_autoresearch_grouped" / "three_way_market_regime_allocator_current"
+    FOLLOWUP_ROOT
+    / "portfolio_incumbent_autoresearch_grouped"
+    / "three_way_market_regime_allocator_current"
 )
 DEFAULT_BLEND_PATH = (
     FOLLOWUP_ROOT
@@ -131,7 +133,9 @@ def _load_json(path: Path) -> dict[str, Any]:
     return dict(json.loads(path.read_text(encoding="utf-8")))
 
 
-def _streams_from_daily_returns(dates: list[str], daily_returns: list[float]) -> list[dict[str, Any]]:
+def _streams_from_daily_returns(
+    dates: list[str], daily_returns: list[float]
+) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for raw_date, raw_return in zip(dates, daily_returns, strict=True):
         day = pd.Timestamp(str(raw_date), tz="UTC").floor("D")
@@ -161,7 +165,9 @@ def _load_candidate_frame(*, label: str, path: Path) -> pd.DataFrame:
                 )
     else:
         dates = [str(day) for day in list(payload.get("dates") or [])]
-        daily_returns = [_safe_float(value, 0.0) for value in list(payload.get("daily_returns") or [])]
+        daily_returns = [
+            _safe_float(value, 0.0) for value in list(payload.get("daily_returns") or [])
+        ]
         if not dates or len(dates) != len(daily_returns):
             raise ValueError(f"{label}: missing usable return stream in {path}")
         rows = _streams_from_daily_returns(dates, daily_returns)
@@ -176,8 +182,14 @@ def _compute_metrics_from_returns(returns: list[float]) -> dict[str, float]:
     for ret in returns:
         equity.append(equity[-1] * (1.0 + float(ret)))
     base = compute_perf_metrics(list(returns), equity, PERIODS_PER_YEAR)
-    sortino = float(create_sortino_ratio(np.asarray(returns, dtype=float), periods=PERIODS_PER_YEAR)) if returns else 0.0
-    calmar = float(create_calmar_ratio(float(base.get("cagr", 0.0)), float(base.get("max_drawdown", 0.0))))
+    sortino = (
+        float(create_sortino_ratio(np.asarray(returns, dtype=float), periods=PERIODS_PER_YEAR))
+        if returns
+        else 0.0
+    )
+    calmar = float(
+        create_calmar_ratio(float(base.get("cagr", 0.0)), float(base.get("max_drawdown", 0.0)))
+    )
     return {
         "total_return": float(base.get("total_return", 0.0)),
         "cagr": float(base.get("cagr", 0.0)),
@@ -192,7 +204,9 @@ def _compute_metrics_from_returns(returns: list[float]) -> dict[str, float]:
 def _metrics_by_split(frame: pd.DataFrame, value_column: str) -> dict[str, dict[str, float]]:
     out: dict[str, dict[str, float]] = {}
     for split_name in ("train", "val", "oos"):
-        returns = frame.loc[frame["split_group"].eq(split_name), value_column].astype(float).tolist()
+        returns = (
+            frame.loc[frame["split_group"].eq(split_name), value_column].astype(float).tolist()
+        )
         out[split_name] = _compute_metrics_from_returns(returns)
     return out
 
@@ -209,7 +223,9 @@ def _objective(metrics: dict[str, float], *, turnover_fraction: float) -> float:
     )
 
 
-def _build_market_feature_frame(*, incumbent_path: Path, autoresearch_path: Path) -> tuple[pd.DataFrame, list[dict[str, Any]]]:
+def _build_market_feature_frame(
+    *, incumbent_path: Path, autoresearch_path: Path
+) -> tuple[pd.DataFrame, list[dict[str, Any]]]:
     incumbent = _market._load_group_portfolio(label="incumbent", path=incumbent_path)
     autoresearch = _market._load_group_portfolio(label="autoresearch", path=autoresearch_path)
     merged = (
@@ -228,11 +244,15 @@ def _build_market_feature_frame(*, incumbent_path: Path, autoresearch_path: Path
     symbol_frames: list[pd.DataFrame] = []
     coverage_summary: list[dict[str, Any]] = []
     for symbol in symbols:
-        frame, coverage = _market._load_symbol_close_30m_from_feature_points(symbol, start_day=start_day, end_day=end_day)
+        frame, coverage = _market._load_symbol_close_30m_from_feature_points(
+            symbol, start_day=start_day, end_day=end_day
+        )
         symbol_frames.append(frame)
         coverage_summary.append(coverage)
     feature_frame = _market._daily_market_feature_frame(symbol_frames)
-    feature_frame["split_group"] = feature_frame["date"].map(lambda value: split_for_date(pd.Timestamp(value).date()))
+    feature_frame["split_group"] = feature_frame["date"].map(
+        lambda value: split_for_date(pd.Timestamp(value).date())
+    )
     return feature_frame.sort_values("date").reset_index(drop=True), coverage_summary
 
 
@@ -325,13 +345,18 @@ def _run_allocator(
                 raw_state=raw_state,
                 params=params,
             )
-            if days_in_state >= transition_min_hold_days and pending_streak >= transition_confirmation_days:
+            if (
+                days_in_state >= transition_min_hold_days
+                and pending_streak >= transition_confirmation_days
+            ):
                 current_state = raw_state
                 days_in_state = 0
                 pending_state = current_state
                 pending_streak = 0
 
-        prev_weights = _state_weights(state_rows[-1]["state"]) if state_rows else _state_weights("blend_85_15")
+        prev_weights = (
+            _state_weights(state_rows[-1]["state"]) if state_rows else _state_weights("blend_85_15")
+        )
         next_weights = _state_weights(current_state)
         turnover = 0.5 * sum(abs(next_weights[key] - prev_weights[key]) for key in next_weights)
         days_in_state += 1
@@ -357,8 +382,12 @@ def _run_allocator(
     state_frame = pd.DataFrame(state_rows)
     split_metrics = _metrics_by_split(state_frame, "return")
     val_mask = state_frame["split_group"].isin(["train", "val"])
-    val_metrics = _compute_metrics_from_returns(state_frame.loc[val_mask, "return"].astype(float).tolist())
-    turnover_fraction = float(state_frame.loc[val_mask, "turnover"].mean()) if val_mask.any() else 0.0
+    val_metrics = _compute_metrics_from_returns(
+        state_frame.loc[val_mask, "return"].astype(float).tolist()
+    )
+    turnover_fraction = (
+        float(state_frame.loc[val_mask, "turnover"].mean()) if val_mask.any() else 0.0
+    )
     objective = _objective(val_metrics, turnover_fraction=turnover_fraction)
     return {
         "state_frame": state_frame,
@@ -371,7 +400,11 @@ def _run_allocator(
 def _state_summary(state_frame: pd.DataFrame) -> dict[str, Any]:
     summary: dict[str, Any] = {}
     for split_name in ("train", "val", "oos", "all"):
-        sample = state_frame if split_name == "all" else state_frame.loc[state_frame["split_group"].eq(split_name)]
+        sample = (
+            state_frame
+            if split_name == "all"
+            else state_frame.loc[state_frame["split_group"].eq(split_name)]
+        )
         counts = sample["state"].value_counts().to_dict()
         summary[split_name] = {
             "days": len(sample),
@@ -389,7 +422,9 @@ def _compare_benchmarks(panel: pd.DataFrame, allocator_returns: pd.DataFrame) ->
     )
     out: dict[str, Any] = {}
     for label in ("incumbent", "blend_85_15", "autoresearch_55_45", "allocator"):
-        out[label] = _metrics_by_split(merged.rename(columns={label: "metric_return"}), "metric_return")
+        out[label] = _metrics_by_split(
+            merged.rename(columns={label: "metric_return"}), "metric_return"
+        )
     return out
 
 
@@ -441,7 +476,12 @@ def _build_markdown(payload: dict[str, Any]) -> str:
         lines.append(_metric_line(split_name, dict(split_metrics.get(split_name) or {})))
 
     lines.extend(["", "## Benchmark OOS Comparison"])
-    for label, title in (("incumbent", "incumbent"), ("blend_85_15", "blend_85_15"), ("autoresearch_55_45", "55/45"), ("allocator", "allocator")):
+    for label, title in (
+        ("incumbent", "incumbent"),
+        ("blend_85_15", "blend_85_15"),
+        ("autoresearch_55_45", "55/45"),
+        ("allocator", "allocator"),
+    ):
         lines.append(_metric_line(title, dict((benchmarks.get(label) or {}).get("oos") or {})))
 
     lines.extend(["", "## State Usage Summary"])
@@ -451,15 +491,17 @@ def _build_markdown(payload: dict[str, Any]) -> str:
             f"- {split_name}: days `{int(item.get('days') or 0)}` | avg_turnover `{float(item.get('avg_turnover') or 0.0):.6f}` | counts `{json.dumps(item.get('counts') or {}, sort_keys=True)}`"
         )
 
-    lines.extend([
-        "",
-        "## Interpretation",
-        "- incumbent state = 100% current incumbent portfolio",
-        "- blend_85_15 state = 100% grouped 85/15 blend portfolio",
-        "- autoresearch_55_45 state = 100% 55/45 pair portfolio",
-        "- all switching is done at the portfolio-group level; inner sleeve sets stay intact",
-        "- market regime features are rebuilt from feature_points so the 2025+ sparse materialized windows stay filled",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Interpretation",
+            "- incumbent state = 100% current incumbent portfolio",
+            "- blend_85_15 state = 100% grouped 85/15 blend portfolio",
+            "- autoresearch_55_45 state = 100% 55/45 pair portfolio",
+            "- all switching is done at the portfolio-group level; inner sleeve sets stay intact",
+            "- market regime features are rebuilt from feature_points so the 2025+ sparse materialized windows stay filled",
+        ]
+    )
     return "\n".join(lines).strip() + "\n"
 
 
@@ -478,8 +520,12 @@ def run_three_way_market_regime_allocator(
         run_name="three_way_market_regime_allocator",
         output_dir=output_dir,
         input_path=str(incumbent_path),
-        rss_log_path=output_dir / MEMORY_GUARD_DIRNAME / "three_way_market_regime_allocator_rss_latest.jsonl",
-        summary_path=output_dir / MEMORY_GUARD_DIRNAME / "three_way_market_regime_allocator_memory_latest.json",
+        rss_log_path=output_dir
+        / MEMORY_GUARD_DIRNAME
+        / "three_way_market_regime_allocator_rss_latest.jsonl",
+        summary_path=output_dir
+        / MEMORY_GUARD_DIRNAME
+        / "three_way_market_regime_allocator_memory_latest.json",
         budget_bytes=hard_rss_bytes,
         soft_limit_bytes=soft_rss_bytes,
         hard_limit_bytes=hard_rss_bytes,
@@ -489,9 +535,15 @@ def run_three_way_market_regime_allocator(
     payload: dict[str, Any] | None = None
     try:
         memory_guard.sample(event="three_way_market_regime_allocator_start", context={})
-        incumbent_frame = _load_candidate_frame(label="incumbent", path=incumbent_path).rename(columns={"return": "incumbent"})
-        blend_frame = _load_candidate_frame(label="blend_85_15", path=blend_path).rename(columns={"return": "blend_85_15"})
-        autoresearch_frame = _load_candidate_frame(label="autoresearch_55_45", path=autoresearch_path).rename(columns={"return": "autoresearch_55_45"})
+        incumbent_frame = _load_candidate_frame(label="incumbent", path=incumbent_path).rename(
+            columns={"return": "incumbent"}
+        )
+        blend_frame = _load_candidate_frame(label="blend_85_15", path=blend_path).rename(
+            columns={"return": "blend_85_15"}
+        )
+        autoresearch_frame = _load_candidate_frame(
+            label="autoresearch_55_45", path=autoresearch_path
+        ).rename(columns={"return": "autoresearch_55_45"})
         panel = (
             incumbent_frame[["date", "split_group", "incumbent"]]
             .merge(blend_frame[["date", "blend_85_15"]], on="date", how="inner")
@@ -507,16 +559,24 @@ def run_three_way_market_regime_allocator(
             incumbent_path=incumbent_path,
             autoresearch_path=autoresearch_path,
         )
-        signal_rows = [_signal_from_row(row, selected_rules=selected_rules) for _, row in feature_frame.iterrows()]
+        signal_rows = [
+            _signal_from_row(row, selected_rules=selected_rules)
+            for _, row in feature_frame.iterrows()
+        ]
         signal_frame = pd.DataFrame(signal_rows)
         merged = panel.merge(signal_frame, on=["date", "split_group"], how="inner")
-        memory_guard.checkpoint("three_way_signals_loaded", {"signal_rows": len(merged), "selected_rule_count": len(selected_rules)})
+        memory_guard.checkpoint(
+            "three_way_signals_loaded",
+            {"signal_rows": len(merged), "selected_rule_count": len(selected_rules)},
+        )
 
         best: dict[str, Any] | None = None
         for params in PARAM_GRID:
             result = _run_allocator(panel=merged, params=params)
             candidate = {"params": params, **result}
-            if best is None or float(candidate["validation_objective"]) > float(best["validation_objective"]):
+            if best is None or float(candidate["validation_objective"]) > float(
+                best["validation_objective"]
+            ):
                 best = candidate
             memory_guard.checkpoint(
                 "three_way_param_evaluated",
@@ -578,7 +638,10 @@ def run_three_way_market_regime_allocator(
         error = str(exc)
         raise
     finally:
-        memory_guard.sample(event="three_way_market_regime_allocator_finish", context={"status": status, "error": error})
+        memory_guard.sample(
+            event="three_way_market_regime_allocator_finish",
+            context={"status": status, "error": error},
+        )
         memory_summary = memory_guard.finalize(status=status, error=error, context={})
         memory_guard.release()
         if payload is not None:
@@ -592,7 +655,9 @@ def run_three_way_market_regime_allocator(
     out_md = output_dir / f"three_way_market_regime_allocator_{timestamp}.md"
     latest_json = output_dir / "three_way_market_regime_allocator_latest.json"
     latest_md = output_dir / "three_way_market_regime_allocator_latest.md"
-    out_json.write_text(json.dumps(payload, indent=2, sort_keys=True, default=_json_default), encoding="utf-8")
+    out_json.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=_json_default), encoding="utf-8"
+    )
     markdown = _build_markdown(payload)
     out_md.write_text(markdown, encoding="utf-8")
     latest_json.write_text(out_json.read_text(encoding="utf-8"), encoding="utf-8")
@@ -604,7 +669,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--incumbent-path", type=Path, default=resolve_current_optimization_path())
     parser.add_argument("--blend-path", type=Path, default=DEFAULT_BLEND_PATH)
-    parser.add_argument("--autoresearch-path", type=Path, default=_resolve_autoresearch_default_path())
+    parser.add_argument(
+        "--autoresearch-path", type=Path, default=_resolve_autoresearch_default_path()
+    )
     parser.add_argument("--market-judgement-path", type=Path, default=DEFAULT_MARKET_JUDGEMENT_PATH)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--soft-rss-bytes", type=int, default=DEFAULT_SOFT_RSS_BYTES)

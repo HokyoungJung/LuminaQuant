@@ -33,13 +33,11 @@ if str(REPO_ROOT) not in sys.path:
 from scripts.research import run_alpha_zoo_corr_integer_leverage_portfolio as ilp  # noqa: E402
 
 DEFAULT_INTEGER_PORTFOLIO_ARTIFACT = (
-    REPO_ROOT
-    / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/"
+    REPO_ROOT / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/"
     "alpha_zoo_corr_integer_leverage_portfolio_20260524/alpha_zoo_corr_integer_leverage_portfolio_latest.json"
 )
 DEFAULT_OUTPUT_DIR = (
-    REPO_ROOT
-    / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/"
+    REPO_ROOT / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/"
     "alpha_zoo_integer_leverage_hybrid_decision_20260524"
 )
 
@@ -117,7 +115,9 @@ def _json_safe(value: Any) -> Any:
 
 def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(_json_safe(payload), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(_json_safe(payload), indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
 
 def _csv_value(value: Any) -> Any:
@@ -133,7 +133,9 @@ def _csv_value(value: Any) -> Any:
 def _write_csv(path: Path, rows: Sequence[Mapping[str, Any]], fields: Sequence[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(fields), extrasaction="ignore", lineterminator="\n")
+        writer = csv.DictWriter(
+            handle, fieldnames=list(fields), extrasaction="ignore", lineterminator="\n"
+        )
         writer.writeheader()
         for row in rows:
             writer.writerow({field: _csv_value(row.get(field)) for field in fields})
@@ -198,21 +200,31 @@ def _metric_row_from_stream(
         turnover = _safe_float(turnover_by_split.get(split))
         total_return = _period_return(values)
         equity = np.cumprod(1.0 + values) if values.size else np.asarray([], dtype=float)
-        row[f"{split}_return" if split != "locked_oos" else "locked_oos_return_report_only"] = total_return
-        row[f"{split}_mdd" if split != "locked_oos" else "locked_oos_mdd_report_only"] = ilp.max_drawdown(values)
+        row[f"{split}_return" if split != "locked_oos" else "locked_oos_return_report_only"] = (
+            total_return
+        )
+        row[f"{split}_mdd" if split != "locked_oos" else "locked_oos_mdd_report_only"] = (
+            ilp.max_drawdown(values)
+        )
         row[
-            f"{split}_trade_event_count" if split != "locked_oos" else "locked_oos_trade_event_count_report_only"
+            f"{split}_trade_event_count"
+            if split != "locked_oos"
+            else "locked_oos_trade_event_count_report_only"
         ] = int(trade_events_by_split.get(split, 0))
         row[
             f"{split}_return_per_turnover_proxy_bps"
             if split != "locked_oos"
             else "locked_oos_return_per_turnover_proxy_bps_report_only"
         ] = total_return * 10_000.0 / turnover if turnover > 0.0 else None
-        row[f"{split}_liquidation_count" if split != "locked_oos" else "locked_oos_liquidation_count_report_only"] = int(
-            liquidation_count_by_split.get(split, 0)
-        )
         row[
-            f"{split}_account_wipeout_count" if split != "locked_oos" else "locked_oos_account_wipeout_count_report_only"
+            f"{split}_liquidation_count"
+            if split != "locked_oos"
+            else "locked_oos_liquidation_count_report_only"
+        ] = int(liquidation_count_by_split.get(split, 0))
+        row[
+            f"{split}_account_wipeout_count"
+            if split != "locked_oos"
+            else "locked_oos_account_wipeout_count_report_only"
         ] = int(np.count_nonzero(equity <= 0.0)) if equity.size else 0
     row["train_validation_score"] = _train_validation_score(row)
     return row
@@ -250,9 +262,13 @@ def _selection_reasons(row: Mapping[str, Any]) -> list[str]:
     if train < validation:
         reasons.append(f"train_return_{train:.4f}_below_validation_return_{validation:.4f}")
     if _safe_float(row.get("validation_mdd")) > MAX_VALIDATION_MDD:
-        reasons.append(f"validation_mdd_{_safe_float(row.get('validation_mdd')):.4f}_above_{MAX_VALIDATION_MDD:.4f}")
+        reasons.append(
+            f"validation_mdd_{_safe_float(row.get('validation_mdd')):.4f}_above_{MAX_VALIDATION_MDD:.4f}"
+        )
     if _safe_float(row.get("train_mdd")) > MAX_TRAIN_MDD:
-        reasons.append(f"train_mdd_{_safe_float(row.get('train_mdd')):.4f}_above_{MAX_TRAIN_MDD:.4f}")
+        reasons.append(
+            f"train_mdd_{_safe_float(row.get('train_mdd')):.4f}_above_{MAX_TRAIN_MDD:.4f}"
+        )
     if _safe_float(row.get("gross_notional_fraction")) > MAX_GROSS_NOTIONAL:
         reasons.append(
             f"gross_notional_{_safe_float(row.get('gross_notional_fraction')):.4f}_above_{MAX_GROSS_NOTIONAL:.4f}"
@@ -277,7 +293,10 @@ def _report_only_gate_reasons(row: Mapping[str, Any]) -> list[str]:
         reasons.append("locked_oos_liquidation_count_nonzero_report_only")
     if int(row.get("locked_oos_account_wipeout_count_report_only") or 0) != 0:
         reasons.append("locked_oos_account_wipeout_count_nonzero_report_only")
-    if int(row.get("locked_oos_trade_event_count_report_only") or 0) < ilp.MIN_LOCKED_OOS_TRADE_EVENTS:
+    if (
+        int(row.get("locked_oos_trade_event_count_report_only") or 0)
+        < ilp.MIN_LOCKED_OOS_TRADE_EVENTS
+    ):
         reasons.append(
             "locked_oos_trade_event_count_"
             f"{int(row.get('locked_oos_trade_event_count_report_only') or 0)}_below_"
@@ -286,11 +305,15 @@ def _report_only_gate_reasons(row: Mapping[str, Any]) -> list[str]:
     rpt = row.get("locked_oos_return_per_turnover_proxy_bps_report_only")
     if rpt is None or _safe_float(rpt) <= ilp.RETURN_PER_TURNOVER_THRESHOLD_BPS:
         rendered = "missing" if rpt is None else f"{_safe_float(rpt):.3f}"
-        reasons.append(f"locked_oos_return_per_turnover_proxy_bps_{rendered}_not_above_10bps_report_only")
+        reasons.append(
+            f"locked_oos_return_per_turnover_proxy_bps_{rendered}_not_above_10bps_report_only"
+        )
     return reasons
 
 
-def _iter_weight_grid(profile_ids: Sequence[str], *, step: float = WEIGHT_STEP, min_weight: float = MIN_PROFILE_WEIGHT):
+def _iter_weight_grid(
+    profile_ids: Sequence[str], *, step: float = WEIGHT_STEP, min_weight: float = MIN_PROFILE_WEIGHT
+):
     units = round(1.0 / step)
     min_units = round(min_weight / step)
     if len(profile_ids) != 3:
@@ -304,13 +327,20 @@ def _iter_weight_grid(profile_ids: Sequence[str], *, step: float = WEIGHT_STEP, 
             yield dict(zip(profile_ids, weights, strict=True))
 
 
-def _weighted_hybrid_row(profile_streams: Sequence[ProfileStream], weights: Mapping[str, float]) -> dict[str, Any]:
+def _weighted_hybrid_row(
+    profile_streams: Sequence[ProfileStream], weights: Mapping[str, float]
+) -> dict[str, Any]:
     by_id = {stream.profile_id: stream for stream in profile_streams}
     if set(weights) != set(by_id):
         raise ValueError("hybrid weights must cover exactly the source profiles")
     returns = sum(by_id[profile_id].returns * weight for profile_id, weight in weights.items())
     turnover_by_split = {
-        split: float(sum(by_id[profile_id].turnover_by_split[split] * weight for profile_id, weight in weights.items()))
+        split: float(
+            sum(
+                by_id[profile_id].turnover_by_split[split] * weight
+                for profile_id, weight in weights.items()
+            )
+        )
         for split in ilp.SPLIT_ORDER
     }
     trade_events_by_split = {
@@ -318,7 +348,9 @@ def _weighted_hybrid_row(profile_streams: Sequence[ProfileStream], weights: Mapp
         for split in ilp.SPLIT_ORDER
     }
     liquidation_count_by_split = {
-        split: int(sum(by_id[profile_id].liquidation_count_by_split[split] for profile_id in weights))
+        split: int(
+            sum(by_id[profile_id].liquidation_count_by_split[split] for profile_id in weights)
+        )
         for split in ilp.SPLIT_ORDER
     }
     asset_gross: dict[str, float] = defaultdict(float)
@@ -331,7 +363,12 @@ def _weighted_hybrid_row(profile_streams: Sequence[ProfileStream], weights: Mapp
         candidate_tier="hybrid_relaxed_paper_testnet_candidate",
         leverage_map={},
         weights=weights,
-        gross_notional_fraction=float(sum(by_id[profile_id].gross_notional_fraction * weight for profile_id, weight in weights.items())),
+        gross_notional_fraction=float(
+            sum(
+                by_id[profile_id].gross_notional_fraction * weight
+                for profile_id, weight in weights.items()
+            )
+        ),
         returns=returns,
         turnover_by_split=turnover_by_split,
         trade_events_by_split=trade_events_by_split,
@@ -350,7 +387,9 @@ def _weighted_hybrid_row(profile_streams: Sequence[ProfileStream], weights: Mapp
     return row
 
 
-def select_hybrid_row(profile_streams: Sequence[ProfileStream]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+def select_hybrid_row(
+    profile_streams: Sequence[ProfileStream],
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     profile_ids = [stream.profile_id for stream in profile_streams]
     candidates: list[dict[str, Any]] = []
     for weights in _iter_weight_grid(profile_ids):
@@ -360,7 +399,11 @@ def select_hybrid_row(profile_streams: Sequence[ProfileStream]) -> tuple[dict[st
     pool = train_validation_pass or candidates
     selected = max(pool, key=lambda row: _safe_float(row.get("train_validation_score"), -1e9))
     # OOS does not participate in the selection pool or score; it is attached after the frozen choice.
-    return selected, sorted(candidates, key=lambda row: _safe_float(row.get("train_validation_score"), -1e9), reverse=True)
+    return selected, sorted(
+        candidates,
+        key=lambda row: _safe_float(row.get("train_validation_score"), -1e9),
+        reverse=True,
+    )
 
 
 def _profile_stream_from_row(
@@ -369,7 +412,9 @@ def _profile_stream_from_row(
     replays_by_model_id: Mapping[str, ilp.CandidateReplay],
     union_index: pd.DatetimeIndex,
 ) -> ProfileStream:
-    leverage_map = {str(asset): int(value) for asset, value in dict(profile_row["leverage_map"]).items()}
+    leverage_map = {
+        str(asset): int(value) for asset, value in dict(profile_row["leverage_map"]).items()
+    }
     returns = pd.Series(0.0, index=union_index, dtype=float)
     turnover_by_split = dict.fromkeys(ilp.SPLIT_ORDER, 0.0)
     trade_events_by_split = dict.fromkeys(ilp.SPLIT_ORDER, 0)
@@ -378,15 +423,23 @@ def _profile_stream_from_row(
     selected_model_ids = tuple(str(model_id) for model_id in profile_row["selected_model_ids"])
     for model_id in selected_model_ids:
         replay = replays_by_model_id[model_id]
-        sim = ilp.simulate_candidate_with_integer_leverage(replay, integer_leverage=leverage_map[replay.symbol])
-        returns = returns.add(pd.Series(sim.returns, index=sim.datetimes, dtype=float).reindex(union_index, fill_value=0.0))
+        sim = ilp.simulate_candidate_with_integer_leverage(
+            replay, integer_leverage=leverage_map[replay.symbol]
+        )
+        returns = returns.add(
+            pd.Series(sim.returns, index=sim.datetimes, dtype=float).reindex(
+                union_index, fill_value=0.0
+            )
+        )
         asset_gross[sim.symbol] += sim.notional_fraction
         for split in ilp.SPLIT_ORDER:
             trade_events = ilp._trade_count_for_split(sim, split)
             trade_events_by_split[split] += trade_events
             turnover_by_split[split] += trade_events * abs(sim.notional_fraction)
             split_mask = ilp._split_mask(sim.datetimes, split)
-            liquidation_count_by_split[split] += int(np.count_nonzero(sim.liquidation_flags[split_mask]))
+            liquidation_count_by_split[split] += int(
+                np.count_nonzero(sim.liquidation_flags[split_mask])
+            )
     return ProfileStream(
         profile_id=str(profile_row["profile_id"]),
         candidate_tier=str(profile_row.get("candidate_tier", "")),
@@ -421,7 +474,9 @@ def _base_comparison_row(stream: ProfileStream, source_row: Mapping[str, Any]) -
     )
 
 
-def _profile_corr_matrix(profile_streams: Sequence[ProfileStream], *, split: str) -> dict[str, dict[str, float | None]]:
+def _profile_corr_matrix(
+    profile_streams: Sequence[ProfileStream], *, split: str
+) -> dict[str, dict[str, float | None]]:
     if split == "train_validation":
         mask = ilp._split_mask(profile_streams[0].returns.index, "train") | ilp._split_mask(
             profile_streams[0].returns.index,
@@ -429,7 +484,9 @@ def _profile_corr_matrix(profile_streams: Sequence[ProfileStream], *, split: str
         )
     else:
         mask = ilp._split_mask(profile_streams[0].returns.index, split)
-    frame = pd.DataFrame({stream.profile_id: stream.returns for stream in profile_streams}).loc[mask]
+    frame = pd.DataFrame({stream.profile_id: stream.returns for stream in profile_streams}).loc[
+        mask
+    ]
     corr = frame.corr()
     out: dict[str, dict[str, float | None]] = {}
     for left in corr.index:
@@ -512,13 +569,20 @@ def build_payload_from_inputs(
     feature_root: Path,
     write_outputs: bool = True,
 ) -> dict[str, Any]:
-    if integer_payload.get("ready_for_real") is not False or integer_payload.get("real_money_execution") is not False:
+    if (
+        integer_payload.get("ready_for_real") is not False
+        or integer_payload.get("real_money_execution") is not False
+    ):
         raise ValueError("integer portfolio artifact violates real-money disabled guard")
     if _safe_float(integer_payload.get("research_primary_round_trip_cost_bps")) != 10.0:
-        raise ValueError("integer portfolio artifact is not using the primary 10bps round-trip cost")
+        raise ValueError(
+            "integer portfolio artifact is not using the primary 10bps round-trip cost"
+        )
     source_profile_rows = list(integer_payload.get("paper_testnet_candidate_profiles") or [])
     if len(source_profile_rows) != 3:
-        raise ValueError(f"expected exactly three paper/testnet source profiles, found {len(source_profile_rows)}")
+        raise ValueError(
+            f"expected exactly three paper/testnet source profiles, found {len(source_profile_rows)}"
+        )
 
     correlation_payload = ilp._load_json(ilp.DEFAULT_CORRELATION_ARTIFACT)
     monitoring_payload = ilp._load_json(ilp.DEFAULT_MONITORING_ARTIFACT)
@@ -533,12 +597,19 @@ def build_payload_from_inputs(
     bars_by_key = ilp._load_bars_for_rows(selected_rows, data_root=data_root)
     replays = ilp.build_candidate_replays(selected_rows, captures, bars_by_key=bars_by_key)
     replays_by_model_id = {replay.model_id: replay for replay in replays}
-    union_index = pd.DatetimeIndex(sorted(set().union(*(set(replay.datetimes) for replay in replays))))
+    union_index = pd.DatetimeIndex(
+        sorted(set().union(*(set(replay.datetimes) for replay in replays)))
+    )
     profile_streams = [
-        _profile_stream_from_row(row, replays_by_model_id=replays_by_model_id, union_index=union_index)
+        _profile_stream_from_row(
+            row, replays_by_model_id=replays_by_model_id, union_index=union_index
+        )
         for row in source_profile_rows
     ]
-    base_rows = [_base_comparison_row(stream, source_row) for stream, source_row in zip(profile_streams, source_profile_rows, strict=True)]
+    base_rows = [
+        _base_comparison_row(stream, source_row)
+        for stream, source_row in zip(profile_streams, source_profile_rows, strict=True)
+    ]
     selected_hybrid, candidate_rows = select_hybrid_row(profile_streams)
     comparison_rows = [*base_rows, selected_hybrid]
     timestamp = _timestamp()
@@ -585,9 +656,13 @@ def build_payload_from_inputs(
         "selected_hybrid_profile": selected_hybrid,
         "comparison_rows": comparison_rows,
         "top_hybrid_weight_candidates": candidate_rows[:20],
-        "profile_train_validation_corr_matrix": _profile_corr_matrix(profile_streams, split="train_validation"),
+        "profile_train_validation_corr_matrix": _profile_corr_matrix(
+            profile_streams, split="train_validation"
+        ),
         "profile_validation_corr_matrix": _profile_corr_matrix(profile_streams, split="validation"),
-        "profile_locked_oos_corr_matrix_report_only": _profile_corr_matrix(profile_streams, split="locked_oos"),
+        "profile_locked_oos_corr_matrix_report_only": _profile_corr_matrix(
+            profile_streams, split="locked_oos"
+        ),
         "runner_peak_rss_mib": local_peak_mib,
         "output_paths": {
             "latest_json": str(latest_json),
@@ -645,7 +720,9 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--integer-portfolio-artifact", default=str(DEFAULT_INTEGER_PORTFOLIO_ARTIFACT))
+    parser.add_argument(
+        "--integer-portfolio-artifact", default=str(DEFAULT_INTEGER_PORTFOLIO_ARTIFACT)
+    )
     parser.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_DIR))
     parser.add_argument("--data-root", default=str(ilp.DEFAULT_DATA_ROOT))
     parser.add_argument("--feature-root", default=str(ilp.DEFAULT_FEATURE_ROOT))

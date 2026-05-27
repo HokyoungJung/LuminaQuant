@@ -367,16 +367,16 @@ class ParquetMarketDataRepository:
         timeframe: str,
         manifest_path: Path,
     ) -> dict[str, Any]:
-        missing = [field for field in _MANIFEST_REQUIRED_FIELDS if manifest.get(field) in {None, ""}]
+        missing = [
+            field for field in _MANIFEST_REQUIRED_FIELDS if manifest.get(field) in {None, ""}
+        ]
         if missing:
             raise RawFirstManifestInvalidError(
                 f"Manifest missing required fields {missing} at {manifest_path}."
             )
 
         if str(manifest.get("status", "")).strip().lower() != "committed":
-            raise RawFirstDataMissingError(
-                f"Manifest status is not committed at {manifest_path}."
-            )
+            raise RawFirstDataMissingError(f"Manifest status is not committed at {manifest_path}.")
 
         expected_exchange = self._normalize_exchange(exchange)
         expected_symbol = self._normalize_symbol_token(symbol)
@@ -384,9 +384,9 @@ class ParquetMarketDataRepository:
             raise RawFirstManifestInvalidError(
                 f"Manifest symbol mismatch at {manifest_path}: expected {symbol}."
             )
-        if normalize_timeframe_token(str(manifest.get("timeframe", ""))) != normalize_timeframe_token(
-            timeframe
-        ):
+        if normalize_timeframe_token(
+            str(manifest.get("timeframe", ""))
+        ) != normalize_timeframe_token(timeframe):
             raise RawFirstManifestInvalidError(
                 f"Manifest timeframe mismatch at {manifest_path}: expected {timeframe}."
             )
@@ -433,12 +433,16 @@ class ParquetMarketDataRepository:
             return ParquetMarketDataRepository._empty_ohlcv_frame()
         missing = [column for column in _OHLCV_COLUMNS if column not in frame.columns]
         if missing:
-            raise RawFirstManifestInvalidError(f"Materialized frame missing OHLCV columns: {missing}")
+            raise RawFirstManifestInvalidError(
+                f"Materialized frame missing OHLCV columns: {missing}"
+            )
         return (
             frame.select(_OHLCV_COLUMNS)
             .with_columns(
                 [
-                    ParquetMarketDataRepository._coerce_datetime_expr(pl.col("datetime")).alias("datetime"),
+                    ParquetMarketDataRepository._coerce_datetime_expr(pl.col("datetime")).alias(
+                        "datetime"
+                    ),
                     pl.col("open").cast(pl.Float64),
                     pl.col("high").cast(pl.Float64),
                     pl.col("low").cast(pl.Float64),
@@ -457,10 +461,13 @@ class ParquetMarketDataRepository:
         symbol: str,
         partition_date: str | date,
     ) -> Path:
-        return self._raw_symbol_root(
-            exchange=exchange,
-            symbol=symbol,
-        ) / f"date={self._partition_date_token(partition_date)}"
+        return (
+            self._raw_symbol_root(
+                exchange=exchange,
+                symbol=symbol,
+            )
+            / f"date={self._partition_date_token(partition_date)}"
+        )
 
     def _raw_wal_path(self, *, exchange: str, symbol: str) -> Path:
         return self._raw_symbol_root(exchange=exchange, symbol=symbol) / "wal.bin"
@@ -596,7 +603,9 @@ class ParquetMarketDataRepository:
         )
 
     @staticmethod
-    def _ensure_ohlcv_frame(rows: pl.DataFrame | list[dict[str, Any]] | list[tuple[Any, ...]]) -> pl.DataFrame:
+    def _ensure_ohlcv_frame(
+        rows: pl.DataFrame | list[dict[str, Any]] | list[tuple[Any, ...]],
+    ) -> pl.DataFrame:
         if isinstance(rows, pl.DataFrame):
             frame = rows
         else:
@@ -612,7 +621,9 @@ class ParquetMarketDataRepository:
 
         casted = frame.select(required).with_columns(
             [
-                ParquetMarketDataRepository._coerce_datetime_expr(pl.col("datetime")).alias("datetime"),
+                ParquetMarketDataRepository._coerce_datetime_expr(pl.col("datetime")).alias(
+                    "datetime"
+                ),
                 pl.col("open").cast(pl.Float64),
                 pl.col("high").cast(pl.Float64),
                 pl.col("low").cast(pl.Float64),
@@ -739,7 +750,9 @@ class ParquetMarketDataRepository:
     ) -> None:
         checkpoint_path = self._raw_checkpoint_path(exchange=exchange, symbol=symbol)
         checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
-        checkpoint_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        checkpoint_path.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
         self._fsync_file(checkpoint_path)
         self._fsync_dir(checkpoint_path.parent)
 
@@ -776,12 +789,18 @@ class ParquetMarketDataRepository:
         stamped = frame.with_columns(
             (pl.col("timestamp_ms") // 1000).cast(pl.Int64).alias("_ts_sec")
         ).with_columns(
-            pl.from_epoch(pl.col("_ts_sec"), time_unit="s").dt.strftime("%Y-%m-%d").alias("_partition_date")
+            pl.from_epoch(pl.col("_ts_sec"), time_unit="s")
+            .dt.strftime("%Y-%m-%d")
+            .alias("_partition_date")
         )
 
         total_rows = 0
-        for partition_date, partition in stamped.partition_by("_partition_date", as_dict=True).items():
-            part_key = str(partition_date[0] if isinstance(partition_date, tuple) else partition_date)
+        for partition_date, partition in stamped.partition_by(
+            "_partition_date", as_dict=True
+        ).items():
+            part_key = str(
+                partition_date[0] if isinstance(partition_date, tuple) else partition_date
+            )
             payload = (
                 partition.select(list(_RAW_AGGTRADES_REQUIRED_COLUMNS))
                 .sort(["timestamp_ms", "agg_trade_id"])
@@ -803,7 +822,10 @@ class ParquetMarketDataRepository:
             )
             try:
                 existing_paths = self._raw_part_paths(part_path)
-                incoming_first_key = (int(payload["timestamp_ms"][0]), int(payload["agg_trade_id"][0]))
+                incoming_first_key = (
+                    int(payload["timestamp_ms"][0]),
+                    int(payload["agg_trade_id"][0]),
+                )
                 existing_tail_key = (
                     checkpoint_key
                     if checkpoint_key is not None and existing_paths
@@ -815,7 +837,9 @@ class ParquetMarketDataRepository:
 
                 if append_only:
                     output_path = (
-                        part_path / "part-0000.parquet" if not existing_paths else self._next_raw_part_path(part_path)
+                        part_path / "part-0000.parquet"
+                        if not existing_paths
+                        else self._next_raw_part_path(part_path)
                     )
                     payload.write_parquet(output_path, compression="zstd", statistics=True)
                     self._fsync_dir(output_path.parent)
@@ -830,7 +854,9 @@ class ParquetMarketDataRepository:
                 existing_frames: list[pl.DataFrame] = []
                 for existing_path in existing_paths:
                     try:
-                        loaded = pl.read_parquet(existing_path).select(list(_RAW_AGGTRADES_REQUIRED_COLUMNS))
+                        loaded = pl.read_parquet(existing_path).select(
+                            list(_RAW_AGGTRADES_REQUIRED_COLUMNS)
+                        )
                     except BaseException:
                         self._rename_corrupt_raw_part(existing_path)
                         continue
@@ -899,9 +925,17 @@ class ParquetMarketDataRepository:
                 partition_dt = datetime.fromisoformat(partition_token)
             except Exception:
                 partition_dt = None
-            if start_dt is not None and partition_dt is not None and partition_dt.date() < start_dt.date():
+            if (
+                start_dt is not None
+                and partition_dt is not None
+                and partition_dt.date() < start_dt.date()
+            ):
                 continue
-            if end_dt is not None and partition_dt is not None and partition_dt.date() > end_dt.date():
+            if (
+                end_dt is not None
+                and partition_dt is not None
+                and partition_dt.date() > end_dt.date()
+            ):
                 continue
             filtered_paths.append(path)
 
@@ -933,7 +967,9 @@ class ParquetMarketDataRepository:
         if not frames:
             return self._empty_raw_aggtrades_frame()
 
-        merged = self._normalize_loaded_raw_aggtrades_frame(pl.concat(frames, how="vertical_relaxed"))
+        merged = self._normalize_loaded_raw_aggtrades_frame(
+            pl.concat(frames, how="vertical_relaxed")
+        )
         if start_dt is not None:
             merged = merged.filter(pl.col("timestamp_ms") >= int(start_ms or 0))
         if end_dt is not None:
@@ -1075,7 +1111,9 @@ class ParquetMarketDataRepository:
                     f"Manifest referenced data file does not exist: {data_path}"
                 )
             loaded = pl.read_parquet(data_path)
-            missing = [name for name in _MATERIALIZED_REQUIRED_COLUMNS if name not in loaded.columns]
+            missing = [
+                name for name in _MATERIALIZED_REQUIRED_COLUMNS if name not in loaded.columns
+            ]
             if missing:
                 raise RawFirstManifestInvalidError(
                     f"Manifest data file missing columns {missing}: {data_path}"
@@ -1135,7 +1173,9 @@ class ParquetMarketDataRepository:
         )
         manifest_path.parent.mkdir(parents=True, exist_ok=True)
         tmp_path = manifest_path.with_suffix(".tmp")
-        tmp_path.write_text(json.dumps(dict(payload or {}), ensure_ascii=False, indent=2), encoding="utf-8")
+        tmp_path.write_text(
+            json.dumps(dict(payload or {}), ensure_ascii=False, indent=2), encoding="utf-8"
+        )
         self._fsync_file(tmp_path)
         tmp_path.replace(manifest_path)
         self._fsync_dir(manifest_path.parent)
@@ -1228,7 +1268,11 @@ class ParquetMarketDataRepository:
             ],
             default=3600,
         )
-        return max(0, int(wal_max_bytes)), bool(compact_on_threshold), max(0, int(compaction_interval))
+        return (
+            max(0, int(wal_max_bytes)),
+            bool(compact_on_threshold),
+            max(0, int(compaction_interval)),
+        )
 
     @staticmethod
     def _parse_iso_utc(value: Any) -> datetime | None:
@@ -1244,7 +1288,9 @@ class ParquetMarketDataRepository:
         return parsed.astimezone(UTC)
 
     def _enforce_wal_growth_controls(self, *, exchange: str, symbol: str) -> None:
-        wal_max_bytes, compact_on_threshold, compaction_interval_seconds = self._resolve_wal_controls()
+        wal_max_bytes, compact_on_threshold, compaction_interval_seconds = (
+            self._resolve_wal_controls()
+        )
         if wal_max_bytes <= 0:
             return
 
@@ -1434,7 +1480,9 @@ class ParquetMarketDataRepository:
         if not frames:
             return 0
 
-        merged = self._normalize_loaded_raw_aggtrades_frame(pl.concat(frames, how="vertical_relaxed"))
+        merged = self._normalize_loaded_raw_aggtrades_frame(
+            pl.concat(frames, how="vertical_relaxed")
+        )
         output_path = partition_root / "part-0000.parquet"
         tmp_output_path = output_path.with_suffix(".tmp.parquet")
         merged.write_parquet(tmp_output_path, compression="zstd", statistics=True)
@@ -1604,7 +1652,9 @@ class ParquetMarketDataRepository:
             )
         if not wal.is_empty():
             frames.append(
-                wal.with_columns(pl.lit(1).cast(pl.Int8).alias("_source_priority")).select(merge_cols)
+                wal.with_columns(pl.lit(1).cast(pl.Int8).alias("_source_priority")).select(
+                    merge_cols
+                )
             )
 
         if not frames:
@@ -1709,9 +1759,11 @@ class ParquetMarketDataRepository:
             return merged_1s
 
         tf_ms = int(timeframe_to_milliseconds(timeframe_token))
-        source = merged_1s.lazy().with_columns(
-            pl.col("datetime").dt.epoch("ms").alias("timestamp_ms")
-        ).with_columns(((pl.col("timestamp_ms") // tf_ms) * tf_ms).alias("bucket_ms"))
+        source = (
+            merged_1s.lazy()
+            .with_columns(pl.col("datetime").dt.epoch("ms").alias("timestamp_ms"))
+            .with_columns(((pl.col("timestamp_ms") // tf_ms) * tf_ms).alias("bucket_ms"))
+        )
 
         # GPU-friendly aggregation: scalar expressions only, no UDF/group_by_dynamic.
         aggregated = (
@@ -1801,7 +1853,9 @@ class ParquetMarketDataRepository:
                 start_date=query_start,
                 end_date=chunk_end,
             )
-            trimmed = chunk.filter(pl.col("datetime") >= chunk_start) if not chunk.is_empty() else chunk
+            trimmed = (
+                chunk.filter(pl.col("datetime") >= chunk_start) if not chunk.is_empty() else chunk
+            )
             trimmed_row_count = int(trimmed.height) if trimmed is not None else 0
             if progress_callback is not None:
                 progress_callback(
@@ -1894,9 +1948,7 @@ class ParquetMarketDataRepository:
                 )
             out.append(candidate)
         if not out:
-            raise RawFirstDataMissingError(
-                f"Manifest has no readable data files: {manifest_path}"
-            )
+            raise RawFirstDataMissingError(f"Manifest has no readable data files: {manifest_path}")
         return out
 
     def _load_manifest_json(self, path: Path) -> dict[str, Any]:
@@ -2038,7 +2090,9 @@ class ParquetMarketDataRepository:
                 watermark_ms = int(manifest.get("event_time_watermark_ms", 0))
             except Exception:
                 watermark_ms = 0
-            if watermark_ms > 0 and (newest_watermark_ms is None or watermark_ms >= newest_watermark_ms):
+            if watermark_ms > 0 and (
+                newest_watermark_ms is None or watermark_ms >= newest_watermark_ms
+            ):
                 newest_watermark_ms = int(watermark_ms)
                 newest_commit_id = str(manifest.get("commit_id", "") or "")
 
@@ -2114,10 +2168,16 @@ class ParquetMarketDataRepository:
 
         results: list[CompactionResult] = []
         for month_token in sorted(by_month):
-            monthly_path = self._monthly_path(exchange=exchange, symbol=symbol, month_token=month_token)
+            monthly_path = self._monthly_path(
+                exchange=exchange, symbol=symbol, month_token=month_token
+            )
             monthly_path.parent.mkdir(parents=True, exist_ok=True)
 
-            existing = pl.read_parquet(monthly_path) if monthly_path.exists() else self._empty_ohlcv_frame()
+            existing = (
+                pl.read_parquet(monthly_path)
+                if monthly_path.exists()
+                else self._empty_ohlcv_frame()
+            )
             incoming_rows = by_month[month_token]
             incoming = pl.DataFrame(
                 {

@@ -20,4 +20,3 @@ def __getattr__(name: str) -> Any:
     if name in {"LivePortfolio", "Portfolio"}:
         return get_live_portfolio_cls()
     raise AttributeError(name)
-

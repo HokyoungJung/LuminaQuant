@@ -42,7 +42,17 @@ def test_load_exact_window_bundle_reads_latest_pointer(tmp_path: Path):
         encoding="utf-8",
     )
     (tmp_path / "exact_window_backtest_registry_latest.json").write_text(
-        json.dumps({"entries": [{"run_id": "run-123", "status": "completed", "requested_timeframes": ["1m", "5m"]}]}),
+        json.dumps(
+            {
+                "entries": [
+                    {
+                        "run_id": "run-123",
+                        "status": "completed",
+                        "requested_timeframes": ["1m", "5m"],
+                    }
+                ]
+            }
+        ),
         encoding="utf-8",
     )
     (tmp_path / "exact_window_decision_latest.json").write_text(
@@ -70,7 +80,9 @@ def test_load_exact_window_bundle_reads_latest_pointer(tmp_path: Path):
     assert payload["paths"]["pipeline_manifest"].endswith("alpha_research_pipeline_latest.json")
     assert payload["pipeline_manifest"]["families"][0]["family_id"] == "pairs"
     assert payload["paths"]["registry"].endswith("exact_window_backtest_registry_latest.json")
-    assert payload["paths"]["recovered_registry"].endswith("exact_window_backtest_registry_recovered_latest.json")
+    assert payload["paths"]["recovered_registry"].endswith(
+        "exact_window_backtest_registry_recovered_latest.json"
+    )
     assert payload["registry"][0]["run_id"] == "run-123"
     assert payload["recovered_registry"][0]["run_id"] == "recovered-run"
 
@@ -112,7 +124,17 @@ def test_load_exact_window_bundle_prefers_root_level_latest_aliases(tmp_path: Pa
         encoding="utf-8",
     )
     (tmp_path / "exact_window_backtest_registry_latest.json").write_text(
-        json.dumps({"entries": [{"run_id": "run-123", "status": "completed", "requested_timeframes": ["1m", "5m"]}]}),
+        json.dumps(
+            {
+                "entries": [
+                    {
+                        "run_id": "run-123",
+                        "status": "completed",
+                        "requested_timeframes": ["1m", "5m"],
+                    }
+                ]
+            }
+        ),
         encoding="utf-8",
     )
 
@@ -132,9 +154,12 @@ def test_load_exact_window_bundle_records_followup_parse_warnings(tmp_path: Path
     assert payload["warnings"]
     assert "broken.json" in payload["warnings"][0]
 
+
 def test_main_dashboard_stub_points_users_to_next_dashboard():
     root = Path(__file__).resolve().parents[1]
-    source = (root / "src" / "lumina_quant" / "dashboard" / "retired_stub.py").read_text(encoding="utf-8")
+    source = (root / "src" / "lumina_quant" / "dashboard" / "retired_stub.py").read_text(
+        encoding="utf-8"
+    )
 
     assert "Dashboard Runtime Retired" in source
     assert "uv run lq dashboard --run" in source

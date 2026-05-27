@@ -26,7 +26,9 @@ DEFAULT_TUNED_DIR = FOLLOWUP_ROOT / "portfolio_four_sleeve_tuned"
 DEFAULT_COMPARISON_JSON = FOLLOWUP_ROOT / "portfolio_four_sleeve_comparison_latest.json"
 DEFAULT_COMPARISON_MD = FOLLOWUP_ROOT / "portfolio_four_sleeve_comparison_latest.md"
 DEFAULT_EQUAL_WEIGHT_PATH = FOLLOWUP_ROOT / "committee_portfolio_followup_latest.json"
-DEFAULT_PRIOR_TUNED_PATH = FOLLOWUP_ROOT / "portfolio_opt_tuned" / "portfolio_optimization_latest.json"
+DEFAULT_PRIOR_TUNED_PATH = (
+    FOLLOWUP_ROOT / "portfolio_opt_tuned" / "portfolio_optimization_latest.json"
+)
 DEFAULT_ROLLING_GATE_PATH = FOLLOWUP_ROOT / "rolling_breakout_30m_gate_latest.json"
 SEARCH_GRID: dict[str, tuple[float, ...]] = {
     "correlation_threshold": (0.35, 0.45, 0.55, 0.65),
@@ -123,7 +125,9 @@ def _run_optimizer(bundle_path: Path, output_dir: Path, params: dict[str, float]
         text=True,
     )
     if result.returncode != 0:
-        raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "portfolio optimizer failed")
+        raise RuntimeError(
+            result.stderr.strip() or result.stdout.strip() or "portfolio optimizer failed"
+        )
     latest_json = output_dir / "portfolio_optimization_latest.json"
     latest_md = output_dir / "portfolio_optimization_latest.md"
     report = json.loads(latest_json.read_text(encoding="utf-8"))
@@ -135,7 +139,9 @@ def _run_optimizer(bundle_path: Path, output_dir: Path, params: dict[str, float]
     }
 
 
-def _realized_search_params(report: dict[str, Any], requested_params: dict[str, float]) -> dict[str, float]:
+def _realized_search_params(
+    report: dict[str, Any], requested_params: dict[str, float]
+) -> dict[str, float]:
     constraints = dict(report.get("constraints") or {})
     return {
         "correlation_threshold": float(requested_params["correlation_threshold"]),
@@ -167,7 +173,11 @@ def _portfolio_section(path: Path) -> dict[str, Any]:
         return {}
     payload = json.loads(path.read_text(encoding="utf-8"))
     metrics = dict(payload.get("portfolio_metrics") or payload.get("metrics") or {})
-    rows = [dict(row) for row in list(payload.get("weights") or payload.get("selection") or []) if isinstance(row, dict)]
+    rows = [
+        dict(row)
+        for row in list(payload.get("weights") or payload.get("selection") or [])
+        if isinstance(row, dict)
+    ]
     return {
         "path": str(path.resolve()),
         "val": dict(metrics.get("val") or {}),
@@ -197,13 +207,17 @@ def _build_comparison_payload(
             "path": str(best_json_path.resolve()),
             "val": dict((best_report.get("portfolio_metrics") or {}).get("val") or {}),
             "oos": dict((best_report.get("portfolio_metrics") or {}).get("oos") or {}),
-            "weights": [dict(row) for row in list(best_report.get("weights") or []) if isinstance(row, dict)],
+            "weights": [
+                dict(row) for row in list(best_report.get("weights") or []) if isinstance(row, dict)
+            ],
         },
         "portfolio_four_sleeve_tuned": {
             "path": str(best_json_path.resolve()),
             "val": dict((best_report.get("portfolio_metrics") or {}).get("val") or {}),
             "oos": dict((best_report.get("portfolio_metrics") or {}).get("oos") or {}),
-            "weights": [dict(row) for row in list(best_report.get("weights") or []) if isinstance(row, dict)],
+            "weights": [
+                dict(row) for row in list(best_report.get("weights") or []) if isinstance(row, dict)
+            ],
         },
         "current_one_shot_incumbent": _portfolio_section(incumbent_path),
         "equal_weight_diagnostic": _portfolio_section(equal_weight_path),
@@ -296,7 +310,9 @@ def run_search(
             result = _run_optimizer(resolved_bundle, tmp_run_dir, params)
             objective, metric_tuple = _objective_from_report(result["report"])
             realized_params = _realized_search_params(result["report"], params)
-            guard.sample(event="search_run_complete", context={"run_index": idx, "objective": objective})
+            guard.sample(
+                event="search_run_complete", context={"run_index": idx, "objective": objective}
+            )
             if best is None or objective > float(best["objective"]):
                 best_json, best_md = _copy_best_outputs(
                     result["json_path"],
@@ -351,7 +367,9 @@ def run_search(
             incumbent_path=resolved_incumbent,
             equal_weight_path=resolved_equal_weight,
             prior_tuned_path=resolved_prior_tuned,
-            selection_basis=str(bundle_payload.get("selection_basis") or "incumbent_anchor_rolling_gate"),
+            selection_basis=str(
+                bundle_payload.get("selection_basis") or "incumbent_anchor_rolling_gate"
+            ),
         )
         resolved_comparison_json.parent.mkdir(parents=True, exist_ok=True)
         resolved_comparison_json.write_text(

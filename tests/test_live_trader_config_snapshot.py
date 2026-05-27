@@ -129,7 +129,9 @@ def test_live_trader_uses_config_snapshot_without_mutating_global_live_config(mo
     monkeypatch.setattr("lumina_quant.live.trader.setup_logging", lambda _name: _Logger())
     monkeypatch.setattr("lumina_quant.live.trader.LiveConfig", _Config)
     monkeypatch.setattr("lumina_quant.live.trader.StateManager", _StateManager)
-    monkeypatch.setattr("lumina_quant.live.trader.RiskManager", lambda cfg: SimpleNamespace(config=cfg))
+    monkeypatch.setattr(
+        "lumina_quant.live.trader.RiskManager", lambda cfg: SimpleNamespace(config=cfg)
+    )
     monkeypatch.setattr("lumina_quant.live.trader.RuntimeCache", lambda: SimpleNamespace())
     monkeypatch.setattr("lumina_quant.live.trader.NotificationManager", _Notifier)
     monkeypatch.setattr("lumina_quant.live.trader.AuditStore", _AuditStore)

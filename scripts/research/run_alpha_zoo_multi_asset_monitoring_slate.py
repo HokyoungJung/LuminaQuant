@@ -28,34 +28,28 @@ if str(REPO_ROOT) not in sys.path:
 
 from scripts.research import run_alpha_zoo_30m_plus_alpha_feedback_discovery as feedback  # noqa: E402
 
-ALPHA_V2_ROOT = (
-    REPO_ROOT / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2"
-)
+ALPHA_V2_ROOT = REPO_ROOT / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2"
 DEFAULT_OUTPUT_DIR = ALPHA_V2_ROOT / "alpha_zoo_multi_asset_monitoring_slate_20260524"
 
 DEFAULT_SOURCE_ARTIFACTS: tuple[tuple[str, Path], ...] = (
     (
         "debounced_efficiency_repair",
-        ALPHA_V2_ROOT
-        / "alpha_zoo_debounced_efficiency_repair_discovery_20260523/"
+        ALPHA_V2_ROOT / "alpha_zoo_debounced_efficiency_repair_discovery_20260523/"
         "alpha_zoo_debounced_efficiency_repair_discovery_latest.json",
     ),
     (
         "thirty_m_plus_feedback",
-        ALPHA_V2_ROOT
-        / "alpha_zoo_30m_plus_alpha_feedback_discovery_20260523/"
+        ALPHA_V2_ROOT / "alpha_zoo_30m_plus_alpha_feedback_discovery_20260523/"
         "alpha_zoo_30m_plus_alpha_feedback_discovery_latest.json",
     ),
     (
         "thirty_m_plus_booster",
-        ALPHA_V2_ROOT
-        / "alpha_zoo_30m_plus_alpha_booster_discovery_20260523/"
+        ALPHA_V2_ROOT / "alpha_zoo_30m_plus_alpha_booster_discovery_20260523/"
         "alpha_zoo_30m_plus_alpha_booster_discovery_latest.json",
     ),
     (
         "asset_diverse_strategy",
-        ALPHA_V2_ROOT
-        / "alpha_zoo_asset_diverse_strategy_discovery_20260523/"
+        ALPHA_V2_ROOT / "alpha_zoo_asset_diverse_strategy_discovery_20260523/"
         "alpha_zoo_asset_diverse_strategy_discovery_latest.json",
     ),
 )
@@ -270,7 +264,9 @@ def _candidate_lists(payload: Mapping[str, Any]) -> list[tuple[str, list[Mapping
     if isinstance(handoff, Mapping):
         candidates = handoff.get("candidates")
         if isinstance(candidates, list):
-            lists.append(("paper_testnet_handoff", [row for row in candidates if isinstance(row, Mapping)]))
+            lists.append(
+                ("paper_testnet_handoff", [row for row in candidates if isinstance(row, Mapping)])
+            )
     top = payload.get("top_candidates")
     if isinstance(top, list):
         lists.append(("top_candidates", [row for row in top if isinstance(row, Mapping)]))
@@ -279,7 +275,10 @@ def _candidate_lists(payload: Mapping[str, Any]) -> list[tuple[str, list[Mapping
         shadows = shadow.get("shadows")
         if isinstance(shadows, list):
             lists.append(
-                ("no_promotion_shadow_shortlist", [row for row in shadows if isinstance(row, Mapping)])
+                (
+                    "no_promotion_shadow_shortlist",
+                    [row for row in shadows if isinstance(row, Mapping)],
+                )
             )
     return lists
 
@@ -377,16 +376,22 @@ def _normalize_row(
     candidate_origin: str,
     source_asset_groups: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
-    symbol = str(row.get("symbol") or row.get("pair") or row.get("target_symbol") or "UNKNOWN").upper()
+    symbol = str(
+        row.get("symbol") or row.get("pair") or row.get("target_symbol") or "UNKNOWN"
+    ).upper()
     normalized: dict[str, Any] = {
-        "model_id": str(row.get("model_id") or row.get("candidate_id") or f"{source.label}:{symbol}"),
+        "model_id": str(
+            row.get("model_id") or row.get("candidate_id") or f"{source.label}:{symbol}"
+        ),
         "source_artifact_kind": _source_artifact_kind(source),
         "source_label": source.label,
         "source_artifact_path": str(source.path),
         "candidate_origin": candidate_origin,
         "source_rank": _as_int(row.get("rank")),
         "symbol": symbol,
-        "asset_group": str(row.get("asset_group") or _asset_group_from_payloads(symbol, source_asset_groups)),
+        "asset_group": str(
+            row.get("asset_group") or _asset_group_from_payloads(symbol, source_asset_groups)
+        ),
         "timeframe": row.get("timeframe"),
         "family": row.get("family") or row.get("strategy_family"),
         "side": row.get("side"),
@@ -409,7 +414,9 @@ def _normalize_row(
         "locked_oos_account_wipeout_count": _as_int(row.get("locked_oos_account_wipeout_count"), 0),
         "paper_candidate_gate_pass": bool(row.get("paper_candidate_gate_pass")),
         "primary_10bps_promotion_gate_pass": bool(row.get("primary_10bps_promotion_gate_pass")),
-        "execution_efficiency_proxy_gate_pass": bool(row.get("execution_efficiency_proxy_gate_pass")),
+        "execution_efficiency_proxy_gate_pass": bool(
+            row.get("execution_efficiency_proxy_gate_pass")
+        ),
         "ready_for_paper": bool(row.get("ready_for_paper")),
         "ready_for_real": False,
         "real_money_execution": False,
@@ -448,9 +455,9 @@ def _merge_candidate_rows(rows: Sequence[dict[str, Any]]) -> list[dict[str, Any]
         if current is None:
             merged[key] = dict(row)
             continue
-        if _candidate_origin_priority(str(row.get("candidate_origin"))) > _candidate_origin_priority(
-            str(current.get("candidate_origin"))
-        ):
+        if _candidate_origin_priority(
+            str(row.get("candidate_origin"))
+        ) > _candidate_origin_priority(str(current.get("candidate_origin"))):
             replacement = dict(row)
             replacement["source_origins_seen"] = sorted(set(origins[key]))
             merged[key] = replacement
@@ -493,7 +500,9 @@ def _rank_monitoring_rows(rows: Sequence[dict[str, Any]]) -> list[dict[str, Any]
 def _best_by_score(rows: Sequence[Mapping[str, Any]]) -> Mapping[str, Any] | None:
     if not rows:
         return None
-    return max(rows, key=lambda row: float(row.get("monitoring_score_train_validation_only") or -1e18))
+    return max(
+        rows, key=lambda row: float(row.get("monitoring_score_train_validation_only") or -1e18)
+    )
 
 
 def _matrix_row(symbol: str, rows: Sequence[Mapping[str, Any]], asset_group: str) -> dict[str, Any]:
@@ -521,7 +530,9 @@ def _matrix_row(symbol: str, rows: Sequence[Mapping[str, Any]], asset_group: str
         "symbol": symbol,
         "asset_group": asset_group,
         "source_artifact_kinds": sorted({str(row.get("source_artifact_kind")) for row in rows}),
-        "timeframes_observed": sorted({str(row.get("timeframe")) for row in rows if row.get("timeframe")}),
+        "timeframes_observed": sorted(
+            {str(row.get("timeframe")) for row in rows if row.get("timeframe")}
+        ),
         "families_observed": sorted({str(row.get("family")) for row in rows if row.get("family")}),
         "total_candidate_rows": len(rows),
         "paper_monitor_count": status_counts["paper_testnet_monitor"],
@@ -571,7 +582,9 @@ def _asset_monitoring_matrix(
     return matrix
 
 
-def _summary(rows: Sequence[Mapping[str, Any]], matrix: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+def _summary(
+    rows: Sequence[Mapping[str, Any]], matrix: Sequence[Mapping[str, Any]]
+) -> dict[str, Any]:
     status_counts = Counter(str(row.get("monitoring_status")) for row in rows)
     symbol_counts = Counter(str(row.get("symbol")) for row in rows)
     asset_group_counts = Counter(str(row.get("asset_group")) for row in rows)
@@ -942,7 +955,9 @@ def _write_outputs(payload: Mapping[str, Any]) -> None:
         _handoff_markdown(payload.get("paper_monitoring_handoff") or {}),
         encoding="utf-8",
     )
-    feedback._write_json(Path(paths["no_real_money_guard_json"]), payload.get("no_real_money_guard") or {})
+    feedback._write_json(
+        Path(paths["no_real_money_guard_json"]), payload.get("no_real_money_guard") or {}
+    )
     Path(paths["artifact_generation_validation_log"]).write_text(
         "\n".join(
             [
@@ -1000,7 +1015,9 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=None,
         help="Override source artifact JSON path. May be passed multiple times.",
     )
-    parser.add_argument("--no-write", action="store_true", help="Build payload without writing artifacts.")
+    parser.add_argument(
+        "--no-write", action="store_true", help="Build payload without writing artifacts."
+    )
     return parser.parse_args(argv)
 
 

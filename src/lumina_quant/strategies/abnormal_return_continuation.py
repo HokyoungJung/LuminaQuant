@@ -33,11 +33,17 @@ class AbnormalReturnContinuationStrategy(Strategy):
     @classmethod
     def get_param_schema(cls) -> dict[str, HyperParam]:
         return {
-            "return_z_window": HyperParam.integer("return_z_window", default=20, low=4, high=1024, tunable=False),
-            "entry_z": HyperParam.floating("entry_z", default=1.5, low=0.1, high=10.0, tunable=False),
+            "return_z_window": HyperParam.integer(
+                "return_z_window", default=20, low=4, high=1024, tunable=False
+            ),
+            "entry_z": HyperParam.floating(
+                "entry_z", default=1.5, low=0.1, high=10.0, tunable=False
+            ),
             "exit_z": HyperParam.floating("exit_z", default=0.25, low=0.0, high=5.0, tunable=False),
             "hold_bars": HyperParam.integer("hold_bars", default=2, low=1, high=128, tunable=False),
-            "stop_loss_pct": HyperParam.floating("stop_loss_pct", default=0.06, low=0.001, high=0.5, tunable=False),
+            "stop_loss_pct": HyperParam.floating(
+                "stop_loss_pct", default=0.06, low=0.001, high=0.5, tunable=False
+            ),
             "allow_short": HyperParam.boolean("allow_short", default=True, tunable=False),
         }
 
@@ -74,7 +80,9 @@ class AbnormalReturnContinuationStrategy(Strategy):
         self.stop_loss_pct = float(resolved["stop_loss_pct"])
         self.allow_short = bool(resolved["allow_short"])
         history_len = self.return_z_window + self.hold_bars + 4
-        self._state = {symbol: _State(closes=deque(maxlen=history_len)) for symbol in self.symbol_list}
+        self._state = {
+            symbol: _State(closes=deque(maxlen=history_len)) for symbol in self.symbol_list
+        }
 
     def get_state(self) -> dict[str, Any]:
         return {
@@ -143,7 +151,9 @@ class AbnormalReturnContinuationStrategy(Strategy):
         value = (latest - avg) / std
         return value if math.isfinite(value) else None
 
-    def _emit(self, symbol: str, event_time: Any, signal_type: str, *, zscore: float | None) -> None:
+    def _emit(
+        self, symbol: str, event_time: Any, signal_type: str, *, zscore: float | None
+    ) -> None:
         close_price = safe_float(self.bars.get_latest_bar_value(symbol, "close"))
         stop_loss = None
         if close_price is not None and close_price > 0.0:
@@ -191,7 +201,11 @@ class AbnormalReturnContinuationStrategy(Strategy):
 
         if item.mode == "LONG":
             item.bars_held += 1
-            if item.bars_held >= self.hold_bars or zscore <= self.exit_z or (item.entry_price and close <= item.entry_price * (1.0 - self.stop_loss_pct)):
+            if (
+                item.bars_held >= self.hold_bars
+                or zscore <= self.exit_z
+                or (item.entry_price and close <= item.entry_price * (1.0 - self.stop_loss_pct))
+            ):
                 self._emit(symbol, event_time, "EXIT", zscore=zscore)
                 item.mode = "OUT"
                 item.entry_price = None
@@ -199,7 +213,11 @@ class AbnormalReturnContinuationStrategy(Strategy):
             return
         if item.mode == "SHORT":
             item.bars_held += 1
-            if item.bars_held >= self.hold_bars or zscore >= -self.exit_z or (item.entry_price and close >= item.entry_price * (1.0 + self.stop_loss_pct)):
+            if (
+                item.bars_held >= self.hold_bars
+                or zscore >= -self.exit_z
+                or (item.entry_price and close >= item.entry_price * (1.0 + self.stop_loss_pct))
+            ):
                 self._emit(symbol, event_time, "EXIT", zscore=zscore)
                 item.mode = "OUT"
                 item.entry_price = None

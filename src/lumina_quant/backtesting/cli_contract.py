@@ -64,8 +64,7 @@ def normalize_backtest_mode(value: str | None, default: str = "windowed") -> str
     if token in {"windowed", "legacy_batch", "legacy_1s"}:
         return token
     raise RawFirstDataMissingError(
-        "Unsupported backtest-mode "
-        f"'{value}'. Expected one of: windowed, legacy_batch, legacy_1s."
+        f"Unsupported backtest-mode '{value}'. Expected one of: windowed, legacy_batch, legacy_1s."
     )
 
 

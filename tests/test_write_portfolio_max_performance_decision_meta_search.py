@@ -6,7 +6,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT / "scripts" / "research" / "write_portfolio_max_performance_decision.py"
-SPEC = importlib.util.spec_from_file_location("write_portfolio_max_performance_decision", MODULE_PATH)
+SPEC = importlib.util.spec_from_file_location(
+    "write_portfolio_max_performance_decision", MODULE_PATH
+)
 if SPEC is None or SPEC.loader is None:
     raise RuntimeError("Failed to load write_portfolio_max_performance_decision module")
 MODULE = importlib.util.module_from_spec(SPEC)
@@ -42,7 +44,9 @@ def _incumbent_portfolio_payload() -> dict:
                 "volatility": 0.12,
             },
         },
-        "weights": [{"candidate_id": "incumbent_component", "name": "incumbent_component", "weight": 1.0}],
+        "weights": [
+            {"candidate_id": "incumbent_component", "name": "incumbent_component", "weight": 1.0}
+        ],
     }
 
 

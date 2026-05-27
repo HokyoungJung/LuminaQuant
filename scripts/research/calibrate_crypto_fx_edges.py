@@ -67,7 +67,9 @@ def build_calibration_payload(
     )
     calibration_dict = {"|".join(key): value.to_dict() for key, value in calibrated.items()}
     input_locked_oos = sum(input_split_counts.get(split, 0) for split in LOCKED_OOS_SPLITS)
-    calibration_locked_oos = sum(calibration_split_counts.get(split, 0) for split in LOCKED_OOS_SPLITS)
+    calibration_locked_oos = sum(
+        calibration_split_counts.get(split, 0) for split in LOCKED_OOS_SPLITS
+    )
     return {
         "artifact_kind": "crypto_fx_alpha_zoo_edge_calibration",
         "selection_policy": "train_validation_only_locked_oos_report_only",
@@ -95,9 +97,16 @@ def build_calibration_payload(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--ledger", required=True, help="JSONL ledger from candidate_outcome_ledger")
-    parser.add_argument("--output", default="var/reports/crypto_fx_alpha_zoo_v0/edge_calibration_latest.json")
-    parser.add_argument("--bucket-fields", default="candidate_id,side,symbol,regime_bucket,volatility_bucket,factor_bucket")
+    parser.add_argument(
+        "--ledger", required=True, help="JSONL ledger from candidate_outcome_ledger"
+    )
+    parser.add_argument(
+        "--output", default="var/reports/crypto_fx_alpha_zoo_v0/edge_calibration_latest.json"
+    )
+    parser.add_argument(
+        "--bucket-fields",
+        default="candidate_id,side,symbol,regime_bucket,volatility_bucket,factor_bucket",
+    )
     parser.add_argument("--parent-fields", default="candidate_id,side")
     parser.add_argument("--min-bucket-n", type=int, default=30)
     parser.add_argument("--confidence-z", type=float, default=1.64)

@@ -99,10 +99,7 @@ def _sample_grid_rows(
         seen_indexes.add(marker)
         deduped_indexes.append(marker)
 
-    return [
-        _grid_row_from_index(keys, values, flat_index)
-        for flat_index in deduped_indexes
-    ]
+    return [_grid_row_from_index(keys, values, flat_index) for flat_index in deduped_indexes]
 
 
 def _candidate_id(payload: dict[str, object]) -> str:

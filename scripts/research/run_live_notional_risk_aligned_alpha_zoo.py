@@ -27,12 +27,9 @@ from lumina_quant.services.portfolio import PortfolioSizingService  # noqa: E402
 from scripts.research import run_alpha_zoo_validation_march_high_leverage as high  # noqa: E402
 from scripts.research import run_common_split_alpha_zoo_hybrid_v35_v36 as common  # noqa: E402
 
-DEFAULT_OUTPUT_DIR = (
-    high.DEFAULT_ALPHA_V2 / "live_notional_risk_aligned_alpha_zoo_20260518"
-)
+DEFAULT_OUTPUT_DIR = high.DEFAULT_ALPHA_V2 / "live_notional_risk_aligned_alpha_zoo_20260518"
 DEFAULT_REFRESH_JSON = (
-    high.DEFAULT_ALPHA_V2
-    / "validation_to_20260331_latest_data_20260517/data_refresh_latest.json"
+    high.DEFAULT_ALPHA_V2 / "validation_to_20260331_latest_data_20260517/data_refresh_latest.json"
 )
 DEFAULT_SIZING_MODE = "isolated_margin_fraction"
 DEFAULT_ALLOCATION_GRID = "0.03,0.05,0.075,0.10,0.125,0.15,0.175,0.20"
@@ -59,8 +56,7 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
 def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
-        json.dumps(high._json_safe(payload), ensure_ascii=False, indent=2, sort_keys=True)
-        + "\n",
+        json.dumps(high._json_safe(payload), ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
 
@@ -107,7 +103,13 @@ def _rebuild_promoted_trades(
         strategy_params=dict(spec.params),
     )
     trades = high._attach_trade_path_extrema(alpha, data, alpha._build_trades(data, signals))
-    return alpha, data, trades, calibrated_edges, {"name": spec.name, "source": spec.source, "params": dict(spec.params)}
+    return (
+        alpha,
+        data,
+        trades,
+        calibrated_edges,
+        {"name": spec.name, "source": spec.source, "params": dict(spec.params)},
+    )
 
 
 def _isolated_cost_metrics(
@@ -254,10 +256,7 @@ def _prefer_incumbent_contract_on_tv_tie(
         (rows["candidate_name"].astype(str) == str(incumbent_candidate))
         & (rows["leverage"].astype(float).sub(float(incumbent_leverage)).abs() <= 1e-12)
         & (
-            rows["allocation_fraction"]
-            .astype(float)
-            .sub(float(incumbent_allocation))
-            .abs()
+            rows["allocation_fraction"].astype(float).sub(float(incumbent_allocation)).abs()
             <= 1e-12
         )
     ]
@@ -455,11 +454,16 @@ def _live_decision_payload(
             "candidate_metrics": promoted,
             "locked_oos_contamination_audit": base_payload.get("locked_oos_contamination_audit"),
             "memory_summary": base_payload.get("memory_summary"),
-            "split_contract": dict(dict(base_payload.get("split_manifest") or {}).get("split_contract") or {}),
-            "split_periods": dict(dict(base_payload.get("split_manifest") or {}).get("split_periods") or {}),
+            "split_contract": dict(
+                dict(base_payload.get("split_manifest") or {}).get("split_contract") or {}
+            ),
+            "split_periods": dict(
+                dict(base_payload.get("split_manifest") or {}).get("split_periods") or {}
+            ),
             "strict_zero_liquidation_1x_6x": dict(
-                dict(base_payload.get("strict_zero_liquidation_lane_1x_6x_at_10pct_allocation") or {})
-                .get("strict_zero_liquidation_lane")
+                dict(
+                    base_payload.get("strict_zero_liquidation_lane_1x_6x_at_10pct_allocation") or {}
+                ).get("strict_zero_liquidation_lane")
                 or {}
             ).get("promoted_candidate"),
         },

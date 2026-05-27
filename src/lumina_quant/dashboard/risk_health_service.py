@@ -65,7 +65,9 @@ def load_risk_health_payload(*, dsn: str | None = None, limit: int = 25) -> dict
                     if pd.isna(value):
                         record[str(key)] = None
                     elif "time" in str(key):
-                        record[str(key)] = pd.to_datetime(value, errors="coerce", utc=True).isoformat()
+                        record[str(key)] = pd.to_datetime(
+                            value, errors="coerce", utc=True
+                        ).isoformat()
                     else:
                         record[str(key)] = value
                 records.append(record)

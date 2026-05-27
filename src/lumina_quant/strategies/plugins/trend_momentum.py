@@ -13,15 +13,10 @@ class TrendMomentumPlugin(StrategyPlugin):
         by_keys = ["asset"]
         if "timeframe" in data.columns:
             by_keys.append("timeframe")
-        return (
-            data.sort([*by_keys, "datetime"])
-            .with_columns(
-                (
-                    (pl.col("close") / pl.col("close").shift(lookback).over(by_keys)) - 1.0
-                )
-                .fill_null(0.0)
-                .alias("momentum")
-            )
+        return data.sort([*by_keys, "datetime"]).with_columns(
+            ((pl.col("close") / pl.col("close").shift(lookback).over(by_keys)) - 1.0)
+            .fill_null(0.0)
+            .alias("momentum")
         )
 
     def compute_signal(self, features: pl.DataFrame, params: dict) -> pl.DataFrame:
@@ -35,8 +30,14 @@ class TrendMomentumPlugin(StrategyPlugin):
 
         ranked = raw_signal.with_columns(
             [
-                pl.col("signal").rank(method="ordinal", descending=True).over("datetime").alias("rank_desc"),
-                pl.col("signal").rank(method="ordinal", descending=False).over("datetime").alias("rank_asc"),
+                pl.col("signal")
+                .rank(method="ordinal", descending=True)
+                .over("datetime")
+                .alias("rank_desc"),
+                pl.col("signal")
+                .rank(method="ordinal", descending=False)
+                .over("datetime")
+                .alias("rank_asc"),
             ]
         )
 
@@ -50,4 +51,7 @@ class TrendMomentumPlugin(StrategyPlugin):
             .then(short_weight)
             .otherwise(0.0)
             .alias("target_weight")
-        ).select([column for column in raw_signal.columns if column != "signal"] + ["signal", "target_weight"])
+        ).select(
+            [column for column in raw_signal.columns if column != "signal"]
+            + ["signal", "target_weight"]
+        )

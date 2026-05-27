@@ -84,9 +84,7 @@ def normalize_exchange_timestamp_ms(value: Any, *, source: str) -> int:
 
     magnitude = abs(ts)
     if magnitude < 100_000_000_000:
-        raise ValueError(
-            f"{source} timestamp must be milliseconds, got seconds-like value {ts}."
-        )
+        raise ValueError(f"{source} timestamp must be milliseconds, got seconds-like value {ts}.")
     if magnitude >= 100_000_000_000_000:
         raise ValueError(
             f"{source} timestamp must be milliseconds, got microseconds-like value {ts}."
@@ -146,10 +144,14 @@ def _coerce_raw_aggtrades_frame_polars(frame: pl.DataFrame, *, source: str) -> p
     timestamp_abs = pl.col("timestamp_ms").abs()
     if normalized.select(timestamp_abs.lt(100_000_000_000).any()).item():
         example = int(normalized.filter(timestamp_abs.lt(100_000_000_000))["timestamp_ms"][0])
-        raise ValueError(f"{source} timestamp must be milliseconds, got seconds-like value {example}.")
+        raise ValueError(
+            f"{source} timestamp must be milliseconds, got seconds-like value {example}."
+        )
     if normalized.select(timestamp_abs.ge(100_000_000_000_000).any()).item():
         example = int(normalized.filter(timestamp_abs.ge(100_000_000_000_000))["timestamp_ms"][0])
-        raise ValueError(f"{source} timestamp must be milliseconds, got microseconds-like value {example}.")
+        raise ValueError(
+            f"{source} timestamp must be milliseconds, got microseconds-like value {example}."
+        )
 
     normalized = normalized.filter((pl.col("price") > 0.0) & (pl.col("quantity") >= 0.0))
     if normalized.is_empty():
@@ -252,15 +254,19 @@ def raw_aggtrades_to_1s_frame(
     if end_second < start_second:
         return _empty_ohlcv_frame()
 
-    filtered = raw.filter(
-        (pl.col("timestamp_ms") >= int(range_start_ms))
-        if range_start_ms is not None
-        else pl.lit(True)
-    ).filter(
-        (pl.col("timestamp_ms") <= int(range_end_ms))
-        if range_end_ms is not None
-        else pl.lit(True)
-    ).filter(pl.col("timestamp_ms") <= int(effective_complete_through_ms))
+    filtered = (
+        raw.filter(
+            (pl.col("timestamp_ms") >= int(range_start_ms))
+            if range_start_ms is not None
+            else pl.lit(True)
+        )
+        .filter(
+            (pl.col("timestamp_ms") <= int(range_end_ms))
+            if range_end_ms is not None
+            else pl.lit(True)
+        )
+        .filter(pl.col("timestamp_ms") <= int(effective_complete_through_ms))
+    )
 
     if filtered.is_empty():
         return _empty_ohlcv_frame()
@@ -390,9 +396,9 @@ def resample_1s_frame(
     )
     if latest_complete_bucket_ms is None:
         return output.clear()
-    return output.filter(
-        pl.col("datetime").dt.epoch("ms") <= int(latest_complete_bucket_ms)
-    ).sort("datetime")
+    return output.filter(pl.col("datetime").dt.epoch("ms") <= int(latest_complete_bucket_ms)).sort(
+        "datetime"
+    )
 
 
 __all__ = [

@@ -397,10 +397,14 @@ def _normalize_trading_and_risk_runtime_section(runtime: RuntimeConfig) -> None:
 
     runtime.trading.initial_capital = _as_float(runtime.trading.initial_capital, 10000.0)
     runtime.trading.target_allocation = _as_float(runtime.trading.target_allocation, 0.1)
-    runtime.trading.target_allocation_mode = str(
-        getattr(runtime.trading, "target_allocation_mode", "legacy_notional_cap")
-        or "legacy_notional_cap"
-    ).strip().lower()
+    runtime.trading.target_allocation_mode = (
+        str(
+            getattr(runtime.trading, "target_allocation_mode", "legacy_notional_cap")
+            or "legacy_notional_cap"
+        )
+        .strip()
+        .lower()
+    )
     runtime.trading.min_trade_qty = _as_float(runtime.trading.min_trade_qty, 0.001)
     runtime.risk.risk_per_trade = _as_float(runtime.risk.risk_per_trade, 0.005)
     runtime.risk.max_daily_loss_pct = _as_float(runtime.risk.max_daily_loss_pct, 0.03)
@@ -454,13 +458,17 @@ def _normalize_live_exchange_runtime_section(runtime: RuntimeConfig) -> None:
 
 
 def _normalize_backtest_risk_free_runtime_section(runtime: RuntimeConfig) -> None:
-    runtime.backtest.risk_free_mode = str(
-        getattr(runtime.backtest, "risk_free_mode", "us_treasury_constant")
-        or "us_treasury_constant"
-    ).strip().lower()
-    runtime.backtest.risk_free_tenor = str(
-        getattr(runtime.backtest, "risk_free_tenor", "3m") or "3m"
-    ).strip().lower()
+    runtime.backtest.risk_free_mode = (
+        str(
+            getattr(runtime.backtest, "risk_free_mode", "us_treasury_constant")
+            or "us_treasury_constant"
+        )
+        .strip()
+        .lower()
+    )
+    runtime.backtest.risk_free_tenor = (
+        str(getattr(runtime.backtest, "risk_free_tenor", "3m") or "3m").strip().lower()
+    )
     runtime.backtest.risk_free_annual = _as_float(
         getattr(runtime.backtest, "risk_free_annual", runtime.backtest.risk_free_rate),
         runtime.backtest.risk_free_rate,
@@ -468,9 +476,11 @@ def _normalize_backtest_risk_free_runtime_section(runtime: RuntimeConfig) -> Non
     runtime.backtest.risk_free_series_path = str(
         getattr(runtime.backtest, "risk_free_series_path", "") or ""
     ).strip()
-    runtime.backtest.sortino_target_mode = str(
-        getattr(runtime.backtest, "sortino_target_mode", "same_as_rf") or "same_as_rf"
-    ).strip().lower()
+    runtime.backtest.sortino_target_mode = (
+        str(getattr(runtime.backtest, "sortino_target_mode", "same_as_rf") or "same_as_rf")
+        .strip()
+        .lower()
+    )
     runtime.backtest.sortino_target_annual = _as_float(
         getattr(runtime.backtest, "sortino_target_annual", runtime.backtest.risk_free_annual),
         runtime.backtest.risk_free_annual,
@@ -515,12 +525,12 @@ def _normalize_live_runtime_section(runtime: RuntimeConfig, live_raw: dict[str, 
         0.0,
         _as_float(getattr(runtime.live, "limit_price_tick_fallback", 0.0), 0.0),
     )
-    runtime.live.limit_time_in_force = str(
-        getattr(runtime.live, "limit_time_in_force", "GTC") or "GTC"
-    ).strip().upper()
-    protective_style = str(
-        getattr(runtime.live, "protective_order_style", "limit") or "limit"
-    ).strip().lower()
+    runtime.live.limit_time_in_force = (
+        str(getattr(runtime.live, "limit_time_in_force", "GTC") or "GTC").strip().upper()
+    )
+    protective_style = (
+        str(getattr(runtime.live, "protective_order_style", "limit") or "limit").strip().lower()
+    )
     runtime.live.protective_order_style = (
         protective_style if protective_style in {"limit", "market"} else "limit"
     )
@@ -577,9 +587,9 @@ def _normalize_live_runtime_section(runtime: RuntimeConfig, live_raw: dict[str, 
         _as_int(getattr(runtime.live, "materialized_staleness_alert_cooldown_seconds", 60), 60),
     )
     runtime.live.reconciliation_interval_sec = _as_int(runtime.live.reconciliation_interval_sec, 30)
-    runtime.live.external.source_kind = str(
-        getattr(runtime.live.external, "source_kind", "jsonl") or "jsonl"
-    ).strip().lower()
+    runtime.live.external.source_kind = (
+        str(getattr(runtime.live.external, "source_kind", "jsonl") or "jsonl").strip().lower()
+    )
     runtime.live.external.path = str(getattr(runtime.live.external, "path", "") or "").strip()
     runtime.live.external.poll_seconds = max(
         1,
@@ -589,9 +599,11 @@ def _normalize_live_runtime_section(runtime: RuntimeConfig, live_raw: dict[str, 
         1,
         _as_int(getattr(runtime.live.external, "allow_stale_seconds", 45), 45),
     )
-    runtime.live.external.schema = str(
-        getattr(runtime.live.external, "schema", "market_window_v1") or "market_window_v1"
-    ).strip().lower()
+    runtime.live.external.schema = (
+        str(getattr(runtime.live.external, "schema", "market_window_v1") or "market_window_v1")
+        .strip()
+        .lower()
+    )
     runtime.live.external.symbol_map = dict(getattr(runtime.live.external, "symbol_map", {}) or {})
     runtime.live.polymarket.host = str(getattr(runtime.live.polymarket, "host", "") or "").strip()
     runtime.live.polymarket.gamma_host = str(
@@ -621,18 +633,20 @@ def _normalize_live_runtime_section(runtime: RuntimeConfig, live_raw: dict[str, 
     )
 
 
-def _normalize_backtest_runtime_section(runtime: RuntimeConfig, backtest_raw: dict[str, Any]) -> None:
+def _normalize_backtest_runtime_section(
+    runtime: RuntimeConfig, backtest_raw: dict[str, Any]
+) -> None:
     runtime.backtest.random_seed = _as_int(runtime.backtest.random_seed, 42)
     runtime.backtest.leverage = _as_int(runtime.backtest.leverage, 3)
-    runtime.backtest.margin_mode = str(
-        getattr(runtime.backtest, "margin_mode", "isolated") or "isolated"
-    ).strip().lower()
-    runtime.backtest.data_source = str(
-        getattr(runtime.backtest, "data_source", "auto") or "auto"
-    ).strip().lower()
-    runtime.backtest.external.source_kind = str(
-        getattr(runtime.backtest.external, "source_kind", "csv") or "csv"
-    ).strip().lower()
+    runtime.backtest.margin_mode = (
+        str(getattr(runtime.backtest, "margin_mode", "isolated") or "isolated").strip().lower()
+    )
+    runtime.backtest.data_source = (
+        str(getattr(runtime.backtest, "data_source", "auto") or "auto").strip().lower()
+    )
+    runtime.backtest.external.source_kind = (
+        str(getattr(runtime.backtest.external, "source_kind", "csv") or "csv").strip().lower()
+    )
     runtime.backtest.external.root_path = str(
         getattr(runtime.backtest.external, "root_path", "") or ""
     ).strip()
@@ -707,7 +721,12 @@ def _normalize_optimization_runtime_section(runtime: RuntimeConfig) -> None:
     )
 
 
-def _normalize_market_window_runtime_section(runtime: RuntimeConfig, live_raw: dict[str, Any], backtest_raw: dict[str, Any], market_window_raw: dict[str, Any]) -> None:
+def _normalize_market_window_runtime_section(
+    runtime: RuntimeConfig,
+    live_raw: dict[str, Any],
+    backtest_raw: dict[str, Any],
+    market_window_raw: dict[str, Any],
+) -> None:
     deprecated_live_parity = (
         live_raw.get("market_window_parity_v2_enabled")
         if isinstance(live_raw, dict) and "market_window_parity_v2_enabled" in live_raw
@@ -801,6 +820,7 @@ def _normalize_runtime_config(
         market_window_raw=market_window_raw,
     )
     _normalize_promotion_gate_runtime_section(runtime)
+
 
 def _build_runtime_config_tree(
     *,

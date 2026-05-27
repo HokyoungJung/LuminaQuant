@@ -187,7 +187,11 @@ def render_shortlist_markdown(shortlist_payload: dict[str, Any]) -> str:
         "",
     ]
 
-    summary = shortlist_payload.get("summary") if isinstance(shortlist_payload.get("summary"), dict) else {}
+    summary = (
+        shortlist_payload.get("summary")
+        if isinstance(shortlist_payload.get("summary"), dict)
+        else {}
+    )
     family_summary = summary.get("family") if isinstance(summary, dict) else {}
     timeframe_summary = summary.get("timeframe") if isinstance(summary, dict) else {}
 
@@ -225,9 +229,7 @@ def render_shortlist_markdown(shortlist_payload: dict[str, Any]) -> str:
     lines.append("## Usage")
     lines.append("")
     lines.append("```bash")
-    lines.append(
-        "uv run python scripts/run_research_pipeline.py --backend parquet-postgres"
-    )
+    lines.append("uv run python scripts/run_research_pipeline.py --backend parquet-postgres")
     lines.append("```")
     lines.append("")
 

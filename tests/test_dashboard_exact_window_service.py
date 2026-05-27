@@ -128,7 +128,11 @@ def test_load_exact_window_summary_payload_handles_missing_summary(monkeypatch) 
     monkeypatch.setattr(
         exact_window_service,
         "load_exact_window_bundle",
-        lambda root=None: {"root": "/tmp/exact-window", "run_root": "/tmp/exact-window/run-123", "summary": None},
+        lambda root=None: {
+            "root": "/tmp/exact-window",
+            "run_root": "/tmp/exact-window/run-123",
+            "summary": None,
+        },
     )
 
     payload = exact_window_service.load_exact_window_summary_payload()

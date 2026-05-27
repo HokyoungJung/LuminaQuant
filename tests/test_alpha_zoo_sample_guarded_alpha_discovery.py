@@ -9,7 +9,9 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT / "scripts" / "research" / "run_alpha_zoo_sample_guarded_alpha_discovery.py"
-SPEC = importlib.util.spec_from_file_location("run_alpha_zoo_sample_guarded_alpha_discovery", MODULE_PATH)
+SPEC = importlib.util.spec_from_file_location(
+    "run_alpha_zoo_sample_guarded_alpha_discovery", MODULE_PATH
+)
 assert SPEC is not None and SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = MODULE
@@ -76,7 +78,10 @@ def test_sample_guarded_discovery_builds_no_promotion_shadow_bundle(tmp_path: Pa
     assert thresholds["min_return_per_turnover_proxy_bps"] == pytest.approx(10.0)
     assert thresholds["require_train_return_per_turnover_proxy_above_threshold"] is True
     assert thresholds["require_validation_return_per_turnover_proxy_above_threshold"] is True
-    assert thresholds["require_locked_oos_return_per_turnover_proxy_above_threshold_report_gate"] is True
+    assert (
+        thresholds["require_locked_oos_return_per_turnover_proxy_above_threshold_report_gate"]
+        is True
+    )
 
     policy = payload["selection_policy"]
     assert policy["candidate_freeze_inputs"] == ["train", "validation"]
@@ -102,12 +107,25 @@ def test_sample_guarded_discovery_builds_no_promotion_shadow_bundle(tmp_path: Pa
     assert summary["max_validation_return_per_turnover_proxy_bps"] > 10.0
 
     execution_policy = payload["execution_efficiency_policy"]
-    assert execution_policy["actual_avg_bbo_spread_source"] == "not_available_in_10bps_expanded_retune_artifact"
-    assert execution_policy["actual_turnover_source"] == "not_available_in_10bps_expanded_retune_artifact"
-    assert execution_policy["turnover_proxy_formula"] == "trade_event_count * abs(leverage * allocation_fraction)"
+    assert (
+        execution_policy["actual_avg_bbo_spread_source"]
+        == "not_available_in_10bps_expanded_retune_artifact"
+    )
+    assert (
+        execution_policy["actual_turnover_source"]
+        == "not_available_in_10bps_expanded_retune_artifact"
+    )
+    assert (
+        execution_policy["turnover_proxy_formula"]
+        == "trade_event_count * abs(leverage * allocation_fraction)"
+    )
     assert execution_policy["return_per_turnover_proxy_threshold_bps"] == pytest.approx(10.0)
     assert execution_policy["profile_ranking_inputs"] == ["train", "validation"]
-    assert execution_policy["promotion_gate_inputs"] == ["train", "validation", "locked_oos_report_gate"]
+    assert execution_policy["promotion_gate_inputs"] == [
+        "train",
+        "validation",
+        "locked_oos_report_gate",
+    ]
     assert execution_policy["uses_locked_oos_for_selection"] is False
 
     assert set(payload["selection_profiles"]) == {
@@ -122,7 +140,9 @@ def test_sample_guarded_discovery_builds_no_promotion_shadow_bundle(tmp_path: Pa
         assert profile["uses_locked_oos_for_objective"] is False
 
     assert set(payload["profile_rankings"]) == set(payload["selection_profiles"])
-    assert all(payload["profile_rankings"][profile_id] for profile_id in payload["selection_profiles"])
+    assert all(
+        payload["profile_rankings"][profile_id] for profile_id in payload["selection_profiles"]
+    )
 
     grid = payload["grid_coverage"]
     assert "LONG" in grid["side_values_in_selected_metric_surface"]
@@ -139,8 +159,7 @@ def test_sample_guarded_discovery_builds_no_promotion_shadow_bundle(tmp_path: Pa
     long_only_leader = next(
         row
         for row in payload["sample_guarded_candidates"]
-        if row["model_id"]
-        == "fresh_tv10_filter_family_crypto_residual_reversal_abs_score_ge_1p5_"
+        if row["model_id"] == "fresh_tv10_filter_family_crypto_residual_reversal_abs_score_ge_1p5_"
         "alpha_zoo_high_confidence_long_only_8p0x_0p2alloc"
     )
     assert long_only_leader["status"] == "shadow_only_thin_sample"
@@ -370,8 +389,12 @@ def test_return_per_turnover_proxy_gate_uses_spread_multiple() -> None:
         "low_efficiency_model",
         {
             "train": _synthetic_split_row("train", total_return=0.02, trade_event_count=100),
-            "validation": _synthetic_split_row("validation", total_return=0.015, trade_event_count=50),
-            "locked_oos": _synthetic_split_row("locked_oos", total_return=0.03, trade_event_count=40),
+            "validation": _synthetic_split_row(
+                "validation", total_return=0.015, trade_event_count=50
+            ),
+            "locked_oos": _synthetic_split_row(
+                "locked_oos", total_return=0.03, trade_event_count=40
+            ),
         },
         avg_bbo_spread_bps_assumption=2.0,
         bbo_spread_multiplier=5.0,
@@ -386,9 +409,17 @@ def test_return_per_turnover_proxy_gate_uses_spread_multiple() -> None:
     assert summary["guard_checks"]["locked_oos_return_per_turnover_proxy"] is False
     assert summary["execution_efficiency_proxy_gate_pass"] is False
     assert summary["ready_for_paper"] is False
-    assert "train_return_per_turnover_proxy_bps_2.000_not_above_10.000" in summary["rejection_reasons"]
-    assert "validation_return_per_turnover_proxy_bps_3.000_not_above_10.000" in summary["rejection_reasons"]
-    assert "locked_oos_return_per_turnover_proxy_bps_7.500_not_above_10.000" in summary["rejection_reasons"]
+    assert (
+        "train_return_per_turnover_proxy_bps_2.000_not_above_10.000" in summary["rejection_reasons"]
+    )
+    assert (
+        "validation_return_per_turnover_proxy_bps_3.000_not_above_10.000"
+        in summary["rejection_reasons"]
+    )
+    assert (
+        "locked_oos_return_per_turnover_proxy_bps_7.500_not_above_10.000"
+        in summary["rejection_reasons"]
+    )
 
 
 def test_return_per_turnover_proxy_gate_can_pass_without_real_money_enablement() -> None:
@@ -396,8 +427,12 @@ def test_return_per_turnover_proxy_gate_can_pass_without_real_money_enablement()
         "high_efficiency_model",
         {
             "train": _synthetic_split_row("train", total_return=0.20, trade_event_count=100),
-            "validation": _synthetic_split_row("validation", total_return=0.08, trade_event_count=50),
-            "locked_oos": _synthetic_split_row("locked_oos", total_return=0.07, trade_event_count=40),
+            "validation": _synthetic_split_row(
+                "validation", total_return=0.08, trade_event_count=50
+            ),
+            "locked_oos": _synthetic_split_row(
+                "locked_oos", total_return=0.07, trade_event_count=40
+            ),
         },
         avg_bbo_spread_bps_assumption=2.0,
         bbo_spread_multiplier=5.0,
@@ -419,6 +454,8 @@ def test_non_10bps_source_retune_is_rejected(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    args = MODULE.parse_args(["--expanded-retune-json", str(non_10bps), "--output-dir", str(tmp_path / "out")])
+    args = MODULE.parse_args(
+        ["--expanded-retune-json", str(non_10bps), "--output-dir", str(tmp_path / "out")]
+    )
     with pytest.raises(ValueError, match="requires a 10bps expanded retune artifact"):
         MODULE.build_payload(args)

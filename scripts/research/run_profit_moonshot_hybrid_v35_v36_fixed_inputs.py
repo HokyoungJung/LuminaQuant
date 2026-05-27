@@ -122,7 +122,14 @@ def _split_mask(timestamps: np.ndarray, start: datetime, end: datetime) -> np.nd
 
 def _fresh_split_mask(timestamps: np.ndarray, split: Any) -> np.ndarray:
     start_ts = int(datetime.combine(split.start, datetime.min.time(), tzinfo=UTC).timestamp())
-    end_ts = int(datetime.combine(split.end + timedelta(days=1), datetime.min.time(), tzinfo=UTC).timestamp()) - 1
+    end_ts = (
+        int(
+            datetime.combine(
+                split.end + timedelta(days=1), datetime.min.time(), tzinfo=UTC
+            ).timestamp()
+        )
+        - 1
+    )
     return (timestamps >= start_ts) & (timestamps <= end_ts)
 
 
@@ -260,7 +267,9 @@ class LearnedParams:
     cv_score: float
 
 
-def _rolling_feature(returns: np.ndarray, end: int, window: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def _rolling_feature(
+    returns: np.ndarray, end: int, window: int
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     start = max(0, int(end) - max(1, int(window)))
     hist = returns[start:end]
     k = returns.shape[1]
@@ -275,7 +284,9 @@ def _rolling_feature(returns: np.ndarray, end: int, window: int) -> tuple[np.nda
     return mean, std, downside
 
 
-def _candidate_scores(returns: np.ndarray, end: int, window: int, priors: np.ndarray, prior_ratio: float) -> np.ndarray:
+def _candidate_scores(
+    returns: np.ndarray, end: int, window: int, priors: np.ndarray, prior_ratio: float
+) -> np.ndarray:
     mean, std, downside = _rolling_feature(returns, end, window)
     score = mean / (std + downside + 1e-9)
     score = np.where(np.isfinite(score), score, 0.0)
@@ -296,7 +307,9 @@ def _portfolio_returns_for_params(
     out = np.zeros(returns.shape[0], dtype=float)
     allocations: list[dict[str, Any]] = []
     portfolio_history = list(initial_portfolio_history or [])
-    prior_scores = _candidate_scores(returns, max(1, start_idx), max(2, params.mape_window), np.zeros(k), 0.0)
+    prior_scores = _candidate_scores(
+        returns, max(1, start_idx), max(2, params.mape_window), np.zeros(k), 0.0
+    )
     if not np.any(np.isfinite(prior_scores)):
         prior_scores = np.zeros(k)
     default_idx = int(learned.default_idx)
@@ -325,7 +338,7 @@ def _portfolio_returns_for_params(
         base = np.zeros(k, dtype=float)
         base[default_idx] = 1.0
         weights = adaptive_weight_ratio * base + (1.0 - adaptive_weight_ratio) * score_weights
-        recent = returns[max(0, t - max(2, params.short_vol_window)):t]
+        recent = returns[max(0, t - max(2, params.short_vol_window)) : t]
         vol_feature = 0.0
         if recent.size:
             vol_feature = float(np.nanstd(np.nanmean(recent, axis=1)))
@@ -352,14 +365,19 @@ def _portfolio_returns_for_params(
         # Bias correction analogue: damp exposure when recent blended model/ensemble bias is negative.
         exposure = 1.0
         if len(portfolio_history) >= max(2, params.bias_window):
-            ens = np.asarray(portfolio_history[-int(params.bias_window):], dtype=float)
-            model_hist = returns[max(0, t - int(params.bias_window)):t, default_idx]
+            ens = np.asarray(portfolio_history[-int(params.bias_window) :], dtype=float)
+            model_hist = returns[max(0, t - int(params.bias_window)) : t, default_idx]
             ens_bias = float(np.nanmean(ens)) if ens.size else 0.0
             model_bias = float(np.nanmean(model_hist)) if model_hist.size else 0.0
-            combined_bias = params.bias_combine_ratio * model_bias + (1.0 - params.bias_combine_ratio) * ens_bias
+            combined_bias = (
+                params.bias_combine_ratio * model_bias
+                + (1.0 - params.bias_combine_ratio) * ens_bias
+            )
             denom = float(np.nanmean(np.abs(ens))) + 1e-9
             if combined_bias < 0.0:
-                exposure = max(0.0, 1.0 - params.bias_correction_alpha * min(0.80, abs(combined_bias) / denom))
+                exposure = max(
+                    0.0, 1.0 - params.bias_correction_alpha * min(0.80, abs(combined_bias) / denom)
+                )
         ret = float(exposure * np.dot(weights, returns[t]))
         if not math.isfinite(ret):
             ret = 0.0
@@ -382,7 +400,9 @@ def _portfolio_returns_for_params(
     return out, allocations
 
 
-def _learn_params(returns: np.ndarray, params: HybridParams, opt_indices: np.ndarray) -> LearnedParams:
+def _learn_params(
+    returns: np.ndarray, params: HybridParams, opt_indices: np.ndarray
+) -> LearnedParams:
     opt = returns[opt_indices]
     n = opt.shape[0]
     warmup_n = max(10, min(n, int(n * params.warmup_ratio)))
@@ -393,12 +413,12 @@ def _learn_params(returns: np.ndarray, params: HybridParams, opt_indices: np.nda
     default_idx = int(np.nanargmax(scores))
     vol_series = []
     for t in range(max(2, params.short_vol_window), warmup_n):
-        recent = warmup[t - int(params.short_vol_window):t]
+        recent = warmup[t - int(params.short_vol_window) : t]
         vol_series.append(float(np.nanstd(np.nanmean(recent, axis=1))))
     threshold = float(np.nanpercentile(vol_series, 75)) if vol_series else 0.0
     hv_mask: list[int] = []
     for t in range(max(2, params.short_vol_window), warmup_n):
-        recent = warmup[t - int(params.short_vol_window):t]
+        recent = warmup[t - int(params.short_vol_window) : t]
         if float(np.nanstd(np.nanmean(recent, axis=1))) > threshold:
             hv_mask.append(t)
     if hv_mask:
@@ -410,7 +430,11 @@ def _learn_params(returns: np.ndarray, params: HybridParams, opt_indices: np.nda
     if hv_mask:
         hv_mean = np.nanmean(warmup[hv_mask], axis=0)
         best = float(hv_mean[high_vol_best])
-        others = [float(v) for i, v in enumerate(hv_mean) if i != high_vol_best and math.isfinite(float(v))]
+        others = [
+            float(v)
+            for i, v in enumerate(hv_mean)
+            if i != high_vol_best and math.isfinite(float(v))
+        ]
         if others:
             avg_other = float(np.nanmean(others))
             hv_gap = max(0.0, (best - avg_other) / (abs(avg_other) + abs(best) + 1e-9))
@@ -436,9 +460,9 @@ def _learn_params(returns: np.ndarray, params: HybridParams, opt_indices: np.nda
             version="v3_5",
             start_idx=cv_start,
         )
-        score = _safe_float(_metrics_from_returns(cv_returns[cv_start:]).get("calmar")) + _safe_float(
-            _metrics_from_returns(cv_returns[cv_start:]).get("sharpe")
-        )
+        score = _safe_float(
+            _metrics_from_returns(cv_returns[cv_start:]).get("calmar")
+        ) + _safe_float(_metrics_from_returns(cv_returns[cv_start:]).get("sharpe"))
         if score > best_score:
             best_score = score
             best_ratio = float(ratio)
@@ -549,11 +573,24 @@ def _run_optuna(
         "selection_inputs": ["train", "validation"],
         "uses_locked_oos_for_selection": False,
         "locked_oos_objective_columns_used": [],
-        "external_method_source": str(Path("/home/hoky/DeepLearning/ensemble_strategies/models/hybrid") / ("v3_5.py" if version == "v3_5" else "v3_6.py")),
+        "external_method_source": str(
+            Path("/home/hoky/DeepLearning/ensemble_strategies/models/hybrid")
+            / ("v3_5.py" if version == "v3_5" else "v3_6.py")
+        ),
     }
     trial_rows = []
-    for t in sorted(study.trials, key=lambda tr: float(tr.value) if tr.value is not None else -1e18, reverse=True)[:20]:
-        trial_rows.append({"number": int(t.number), "value": None if t.value is None else float(t.value), "params": dict(t.params)})
+    for t in sorted(
+        study.trials,
+        key=lambda tr: float(tr.value) if tr.value is not None else -1e18,
+        reverse=True,
+    )[:20]:
+        trial_rows.append(
+            {
+                "number": int(t.number),
+                "value": None if t.value is None else float(t.value),
+                "params": dict(t.params),
+            }
+        )
     final["top_trials"] = trial_rows
     return final
 
@@ -576,18 +613,28 @@ def _build_fresh_candidate_streams(
 ) -> dict[str, dict[str, Any]]:
     timestamps = np.asarray(arrays["timestamp"], dtype=np.int64)
     required_spec_names = {E0_NAME, S1_NAME, S2_NAME, S3_NAME, S4_NAME}
-    p0 = dict(portfolio_payload.get("selected_by_validation") or portfolio_payload.get("selected_by_train_val_stability") or {})
+    p0 = dict(
+        portfolio_payload.get("selected_by_validation")
+        or portfolio_payload.get("selected_by_train_val_stability")
+        or {}
+    )
     p0_sleeves = [str(item) for item in list(p0.get("sleeves") or [])]
     required_spec_names.update(p0_sleeves)
     missing = sorted(name for name in required_spec_names if name not in specs_by_name)
     if missing:
         raise RuntimeError("missing fixed input specs: " + ", ".join(missing))
     split_curves: dict[str, dict[str, list[float]]] = {name: {} for name in required_spec_names}
-    split_payloads: dict[str, dict[str, dict[str, Any]]] = {name: {} for name in required_spec_names}
+    split_payloads: dict[str, dict[str, dict[str, Any]]] = {
+        name: {} for name in required_spec_names
+    }
     for name in sorted(required_spec_names):
         for split in splits:
-            result = fresh._run_split(spec=specs_by_name[name], arrays=arrays, split=split, include_equity=True)
-            split_curves[name][str(split.name)] = [float(x) for x in list(result.get("equity_history") or [])]
+            result = fresh._run_split(
+                spec=specs_by_name[name], arrays=arrays, split=split, include_equity=True
+            )
+            split_curves[name][str(split.name)] = [
+                float(x) for x in list(result.get("equity_history") or [])
+            ]
             split_payloads[name][str(split.name)] = dict(result)
     streams: dict[str, dict[str, Any]] = {}
     for label, name, leverage, source in (
@@ -602,7 +649,11 @@ def _build_fresh_candidate_streams(
         for split in splits:
             raw_name = str(split.name)
             mask = _fresh_split_mask(timestamps, split)
-            curve = tuner._combine_equity([split_curves[name][raw_name]], mode="train_val_monthly_return_budget", leverage=leverage)
+            curve = tuner._combine_equity(
+                [split_curves[name][raw_name]],
+                mode="train_val_monthly_return_budget",
+                leverage=leverage,
+            )
             _add_returns(full, mask, _curve_total_returns_to_incremental(curve))
             target = "validation" if raw_name == "val" else raw_name
             source_metrics[target] = dict(split_payloads[name][raw_name].get("metrics") or {})
@@ -655,7 +706,9 @@ def _build_fresh_candidate_streams(
         "sleeves": p0_sleeves,
         "returns": full,
         "source_split_metrics": p0_metrics,
-        "uses_locked_oos_for_selection": bool(dict(p0.get("locked_oos_policy") or {}).get("uses_locked_oos_for_selection", False)),
+        "uses_locked_oos_for_selection": bool(
+            dict(p0.get("locked_oos_policy") or {}).get("uses_locked_oos_for_selection", False)
+        ),
         "structural_hybrid_input": False,
         "target_allocation": FRESH_TARGET_ALLOCATION,
         "sleeve_gross_weight_sum": p0_gross_weight_sum,
@@ -671,7 +724,9 @@ def _build_alpha_stream(
     calibration_path: Path,
     external_state_csv: Path,
 ) -> dict[str, Any]:
-    source_path = Path(str(dict(alpha_replay_payload.get("source_coverage") or {}).get("source_path") or ""))
+    source_path = Path(
+        str(dict(alpha_replay_payload.get("source_coverage") or {}).get("source_path") or "")
+    )
     if not source_path.is_absolute():
         source_path = REPO_ROOT / source_path
     from lumina_quant.research.crypto_fx_alpha_zoo_real_data import load_real_data_bundle
@@ -682,7 +737,9 @@ def _build_alpha_stream(
         strict_real_data=True,
     )
     data = alpha._ensure_replay_frame(
-        _apply_common_split_contract(bundle.frame, _common_split_contract_from_payload(alpha_replay_payload))
+        _apply_common_split_contract(
+            bundle.frame, _common_split_contract_from_payload(alpha_replay_payload)
+        )
     )
     edges = alpha._load_calibrated_edges(calibration_path)
     grid = dict(alpha_replay_payload.get("candidate_selection_grid") or {})
@@ -697,7 +754,9 @@ def _build_alpha_stream(
     bucket: dict[int, list[float]] = {}
     ts_to_idx = {int(ts): idx for idx, ts in enumerate(timestamps.tolist())}
     for trade in trades:
-        exit_ts = int(datetime.fromisoformat(str(trade["exit_time"])).replace(tzinfo=UTC).timestamp())
+        exit_ts = int(
+            datetime.fromisoformat(str(trade["exit_time"])).replace(tzinfo=UTC).timestamp()
+        )
         idx = ts_to_idx.get(exit_ts)
         if idx is None:
             continue
@@ -723,7 +782,9 @@ def _build_alpha_stream(
     }
 
 
-def _source_metrics_from_stream(stream: Mapping[str, Any], split_masks: Mapping[str, np.ndarray]) -> dict[str, Any]:
+def _source_metrics_from_stream(
+    stream: Mapping[str, Any], split_masks: Mapping[str, np.ndarray]
+) -> dict[str, Any]:
     arr = np.asarray(stream["returns"], dtype=float)
     return {name: _metrics_from_returns(arr[mask]) for name, mask in split_masks.items()}
 
@@ -787,7 +848,9 @@ def _public_result(result: Mapping[str, Any], candidate_labels: list[str]) -> di
     out = {k: v for k, v in result.items() if k not in {"portfolio_returns"}}
     final_weights = list(out.get("final_weights") or [])
     out["final_weight_by_candidate"] = {
-        label: float(final_weights[idx]) for idx, label in enumerate(candidate_labels) if idx < len(final_weights)
+        label: float(final_weights[idx])
+        for idx, label in enumerate(candidate_labels)
+        if idx < len(final_weights)
     }
     out["allocations_tail"] = list(out.get("allocations") or [])[-10:]
     out.pop("allocations", None)
@@ -806,7 +869,10 @@ def _stream_notional_fraction(stream: Mapping[str, Any]) -> float:
     label = str(stream.get("label") or "")
     leverage = max(0.0, _safe_float(stream.get("leverage"), 1.0))
     if label == "A0":
-        return max(0.0, _safe_float(stream.get("allocation_fraction"), ALPHA_ALLOCATION_FRACTION)) * leverage
+        return (
+            max(0.0, _safe_float(stream.get("allocation_fraction"), ALPHA_ALLOCATION_FRACTION))
+            * leverage
+        )
     target = max(0.0, _safe_float(stream.get("target_allocation"), FRESH_TARGET_ALLOCATION))
     gross_weight_sum = max(0.0, _safe_float(stream.get("sleeve_gross_weight_sum"), 1.0))
     return target * leverage * gross_weight_sum
@@ -848,8 +914,12 @@ def _integrated_margin_replay(
     if components.shape[1] != len(streams):
         raise ValueError("candidate return columns must match stream count")
 
-    notional_fractions = np.asarray([_stream_notional_fraction(stream) for stream in streams], dtype=float)
-    liquidation_thresholds = np.asarray([_stream_liquidation_threshold(stream) for stream in streams], dtype=float)
+    notional_fractions = np.asarray(
+        [_stream_notional_fraction(stream) for stream in streams], dtype=float
+    )
+    liquidation_thresholds = np.asarray(
+        [_stream_liquidation_threshold(stream) for stream in streams], dtype=float
+    )
     split_lookup: list[str | None] = [None] * ts.shape[0]
     for split, mask in split_masks.items():
         for idx in np.flatnonzero(np.asarray(mask, dtype=bool)):
@@ -867,7 +937,9 @@ def _integrated_margin_replay(
         }
         for split in ("train", "validation", "locked_oos")
     }
-    component_threshold_breaches = {str(stream.get("label") or idx): 0 for idx, stream in enumerate(streams)}
+    component_threshold_breaches = {
+        str(stream.get("label") or idx): 0 for idx, stream in enumerate(streams)
+    }
     equity = float(starting_equity)
     last_weights = np.full(len(streams), 1.0 / float(max(1, len(streams))), dtype=float)
     last_exposure = 0.0
@@ -882,7 +954,11 @@ def _integrated_margin_replay(
             if raw_weights.shape[0] == len(streams) and np.all(np.isfinite(raw_weights)):
                 weights = np.maximum(raw_weights, 0.0)
                 total = float(np.sum(weights))
-                last_weights = weights / total if total > 0.0 else np.full(len(streams), 1.0 / float(len(streams)), dtype=float)
+                last_weights = (
+                    weights / total
+                    if total > 0.0
+                    else np.full(len(streams), 1.0 / float(len(streams)), dtype=float)
+                )
             last_exposure = max(0.0, _safe_float(row.get("exposure"), 0.0))
         weights = last_weights
         exposure = last_exposure
@@ -910,8 +986,12 @@ def _integrated_margin_replay(
             component_weight = float(exposure * abs(weights[col]))
             if notional <= 1e-12 or component_weight <= 1e-12:
                 continue
-            inferred_component_adverse = -float(max(0.0, -components[idx, col])) / max(notional, 1e-12)
-            pressure = abs(min(0.0, inferred_component_adverse)) / max(float(liquidation_thresholds[col]), 1e-12)
+            inferred_component_adverse = -float(max(0.0, -components[idx, col])) / max(
+                notional, 1e-12
+            )
+            pressure = abs(min(0.0, inferred_component_adverse)) / max(
+                float(liquidation_thresholds[col]), 1e-12
+            )
             split_status[split]["maximum_component_liquidation_pressure"] = max(
                 float(split_status[split]["maximum_component_liquidation_pressure"]),
                 float(pressure),
@@ -921,9 +1001,13 @@ def _integrated_margin_replay(
                 # not intrabar mark paths.  Keep threshold breaches diagnostic
                 # only; the deployable liquidation count is the integrated
                 # account-margin breach above.
-                component_threshold_breaches[label] = int(component_threshold_breaches.get(label, 0)) + 1
+                component_threshold_breaches[label] = (
+                    int(component_threshold_breaches.get(label, 0)) + 1
+                )
         if liquidation_event:
-            split_status[split]["liquidation_count"] = int(split_status[split]["liquidation_count"]) + 1
+            split_status[split]["liquidation_count"] = (
+                int(split_status[split]["liquidation_count"]) + 1
+            )
         hourly_return = _safe_float(returns[idx])
         equity = max(0.0, equity * max(0.0, 1.0 + hourly_return))
 
@@ -931,7 +1015,9 @@ def _integrated_margin_replay(
         if not math.isfinite(float(status["minimum_margin_buffer"])):
             status["minimum_margin_buffer"] = float(starting_equity)
         status["margin_buffer_positive"] = float(status["minimum_margin_buffer"]) > 0.0
-        status["strict_safe"] = int(status["liquidation_count"]) == 0 and bool(status["margin_buffer_positive"])
+        status["strict_safe"] = int(status["liquidation_count"]) == 0 and bool(
+            status["margin_buffer_positive"]
+        )
     total_liq = sum(int(item["liquidation_count"]) for item in split_status.values())
     min_buffer = min(float(item["minimum_margin_buffer"]) for item in split_status.values())
     return {
@@ -946,10 +1032,12 @@ def _integrated_margin_replay(
         "starting_equity": float(starting_equity),
         "ending_equity": float(equity),
         "component_notional_fractions": {
-            str(stream.get("label") or idx): float(notional_fractions[idx]) for idx, stream in enumerate(streams)
+            str(stream.get("label") or idx): float(notional_fractions[idx])
+            for idx, stream in enumerate(streams)
         },
         "component_liquidation_thresholds": {
-            str(stream.get("label") or idx): float(liquidation_thresholds[idx]) for idx, stream in enumerate(streams)
+            str(stream.get("label") or idx): float(liquidation_thresholds[idx])
+            for idx, stream in enumerate(streams)
         },
         "component_threshold_breach_counts_diagnostic": component_threshold_breaches,
         "split_status": split_status,
@@ -1003,7 +1091,9 @@ def _annotate_live_policy(
     timestamps: np.ndarray,
     streams: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
-    portfolio, allocations = _full_resolution_allocations_for_result(item, returns=returns, split_masks=split_masks)
+    portfolio, allocations = _full_resolution_allocations_for_result(
+        item, returns=returns, split_masks=split_masks
+    )
     margin = _integrated_margin_replay(
         timestamps=timestamps,
         split_masks=split_masks,
@@ -1075,28 +1165,64 @@ def _markdown(payload: Mapping[str, Any]) -> str:
         "",
     ]
     for name, period in dict(payload.get("split_periods") or {}).items():
-        lines.append(f"- {name}: `{period.get('start_timestamp')}` ~ `{period.get('end_timestamp')}`")
-    lines.extend(["", "## Candidate inputs", "", "| label | candidate | source | train | validation | locked-OOS |", "|---|---|---|---:|---:|---:|"])
+        lines.append(
+            f"- {name}: `{period.get('start_timestamp')}` ~ `{period.get('end_timestamp')}`"
+        )
+    lines.extend(
+        [
+            "",
+            "## Candidate inputs",
+            "",
+            "| label | candidate | source | train | validation | locked-OOS |",
+            "|---|---|---|---:|---:|---:|",
+        ]
+    )
     for item in list(payload.get("candidate_inputs") or []):
         metrics = dict(item.get("hybrid_split_metrics") or {})
+
         def cell(split: str, metrics: Mapping[str, Any] = metrics) -> str:
             m = dict(metrics.get(split) or {})
-            liq = "not_replayed" if m.get("liquidation_count") is None else str(m.get("liquidation_count"))
-            buf = "not_replayed" if m.get("minimum_margin_buffer") is None else _fmt_num(m.get("minimum_margin_buffer"))
+            liq = (
+                "not_replayed"
+                if m.get("liquidation_count") is None
+                else str(m.get("liquidation_count"))
+            )
+            buf = (
+                "not_replayed"
+                if m.get("minimum_margin_buffer") is None
+                else _fmt_num(m.get("minimum_margin_buffer"))
+            )
             return f"{_fmt_pct(m.get('total_return'))} / MDD {_fmt_pct(m.get('max_drawdown'))} / Sh {_fmt_num(m.get('sharpe'))} / Liq {liq} / Buf {buf}"
+
         lines.append(
             f"| {item.get('label')} | `{item.get('candidate_name')}` | `{item.get('candidate_source')}` | "
             f"{cell('train')} | {cell('validation')} | {cell('locked_oos')} |"
         )
-    lines.extend(["", "## Hybrid Optuna results", "", "| model | TV score | train | validation | locked-OOS | OOS MDD | OOS Sharpe | OOS Sortino | OOS Calmar | OOS liquidation | OOS min buffer | deployable_success | rejection reasons |", "|---|---:|---:|---:|---:|---:|---:|---:|---:|---|---|---|---|"])
+    lines.extend(
+        [
+            "",
+            "## Hybrid Optuna results",
+            "",
+            "| model | TV score | train | validation | locked-OOS | OOS MDD | OOS Sharpe | OOS Sortino | OOS Calmar | OOS liquidation | OOS min buffer | deployable_success | rejection reasons |",
+            "|---|---:|---:|---:|---:|---:|---:|---:|---:|---|---|---|---|",
+        ]
+    )
     for key in ("hybrid_v3_5_optuna", "hybrid_v3_6_optuna"):
         item = dict(payload.get(key) or {})
         splits = dict(item.get("splits") or {})
         train = dict(splits.get("train") or {})
         val = dict(splits.get("validation") or {})
         oos = dict(splits.get("locked_oos") or {})
-        liq = "not_replayed" if oos.get("liquidation_count") is None else str(oos.get("liquidation_count"))
-        buf = "not_replayed" if oos.get("minimum_margin_buffer") is None else _fmt_num(oos.get("minimum_margin_buffer"))
+        liq = (
+            "not_replayed"
+            if oos.get("liquidation_count") is None
+            else str(oos.get("liquidation_count"))
+        )
+        buf = (
+            "not_replayed"
+            if oos.get("minimum_margin_buffer") is None
+            else _fmt_num(oos.get("minimum_margin_buffer"))
+        )
         reasons = ", ".join(str(x) for x in list(item.get("rejection_reasons") or []))
         lines.append(
             f"| {key} | {_fmt_num(item.get('train_val_score'))} | {_fmt_pct(train.get('total_return'))} | "
@@ -1162,23 +1288,25 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     returns = np.column_stack([np.asarray(item["returns"], dtype=float) for item in ordered])
     labels = [str(item["label"]) for item in ordered]
 
-    v35 = _run_optuna(returns, split_masks, version="v3_5", n_trials=int(args.n_trials), seed=int(args.seed))
-    v36 = _run_optuna(returns, split_masks, version="v3_6", n_trials=int(args.n_trials), seed=int(args.seed))
+    v35 = _run_optuna(
+        returns, split_masks, version="v3_5", n_trials=int(args.n_trials), seed=int(args.seed)
+    )
+    v36 = _run_optuna(
+        returns, split_masks, version="v3_6", n_trials=int(args.n_trials), seed=int(args.seed)
+    )
 
     candidate_inputs = []
     for item in ordered:
         candidate_inputs.append(
-            {
-                k: v
-                for k, v in item.items()
-                if k not in {"returns"}
-            }
+            {k: v for k, v in item.items() if k not in {"returns"}}
             | {
                 "hybrid_split_metrics": _source_metrics_from_stream(item, split_masks),
                 "hybrid_input_policy": {
                     "calendar_entry_rule": False,
                     "literal_hybrid_source": False,
-                    "uses_locked_oos_for_selection": bool(item.get("uses_locked_oos_for_selection", False)),
+                    "uses_locked_oos_for_selection": bool(
+                        item.get("uses_locked_oos_for_selection", False)
+                    ),
                 },
             }
         )
@@ -1222,7 +1350,11 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
             timestamps=timestamps,
             streams=ordered,
         ),
-        "memory_summary": {"peak_rss_mib": _rss_mib(), "limit_mib": 8192.0, "pass_under_8gb": _rss_mib() < 8192.0},
+        "memory_summary": {
+            "peak_rss_mib": _rss_mib(),
+            "limit_mib": 8192.0,
+            "pass_under_8gb": _rss_mib() < 8192.0,
+        },
     }
     return payload
 
@@ -1233,10 +1365,32 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--exchange", default="binance")
     parser.add_argument("--symbols", default=DEFAULT_SYMBOLS)
     parser.add_argument("--oos-end-date", default="2026-05-06")
-    parser.add_argument("--portfolio-json", default=str(DEFAULT_ALPHA_V2 / "state_distilled_market_state_next_20260512/portfolio_tuning_leadership_unwind_top18/fresh_portfolio_tuning_latest.json"))
-    parser.add_argument("--alpha-replay-json", default=str(DEFAULT_ALPHA_V2 / "crypto_fx_alpha_zoo_real_data_20260514/crypto_fx_alpha_zoo_state_replay_latest.json"))
-    parser.add_argument("--alpha-calibration-json", default=str(DEFAULT_ALPHA_V2 / "crypto_fx_alpha_zoo_real_data_20260514/edge_calibration_latest.json"))
-    parser.add_argument("--external-state-csv", default=str(DEFAULT_ALPHA_V2 / "external_market_state_20260512/external_market_state_lagged.csv"))
+    parser.add_argument(
+        "--portfolio-json",
+        default=str(
+            DEFAULT_ALPHA_V2
+            / "state_distilled_market_state_next_20260512/portfolio_tuning_leadership_unwind_top18/fresh_portfolio_tuning_latest.json"
+        ),
+    )
+    parser.add_argument(
+        "--alpha-replay-json",
+        default=str(
+            DEFAULT_ALPHA_V2
+            / "crypto_fx_alpha_zoo_real_data_20260514/crypto_fx_alpha_zoo_state_replay_latest.json"
+        ),
+    )
+    parser.add_argument(
+        "--alpha-calibration-json",
+        default=str(
+            DEFAULT_ALPHA_V2 / "crypto_fx_alpha_zoo_real_data_20260514/edge_calibration_latest.json"
+        ),
+    )
+    parser.add_argument(
+        "--external-state-csv",
+        default=str(
+            DEFAULT_ALPHA_V2 / "external_market_state_20260512/external_market_state_lagged.csv"
+        ),
+    )
     parser.add_argument("--n-trials", type=int, default=80)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_DIR))
@@ -1258,7 +1412,16 @@ def main(argv: list[str] | None = None) -> int:
     latest_md = output_dir / "hybrid_v35_v36_fixed_inputs_latest.md"
     latest_md.write_text(md, encoding="utf-8")
     timestamped.with_suffix(".md").write_text(md, encoding="utf-8")
-    print(json.dumps({"json": str(latest), "markdown": str(latest_md), "peak_rss_mib": payload["memory_summary"]["peak_rss_mib"]}, sort_keys=True))
+    print(
+        json.dumps(
+            {
+                "json": str(latest),
+                "markdown": str(latest_md),
+                "peak_rss_mib": payload["memory_summary"]["peak_rss_mib"],
+            },
+            sort_keys=True,
+        )
+    )
     return 0
 
 

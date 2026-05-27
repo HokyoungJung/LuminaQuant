@@ -45,7 +45,9 @@ from lumina_quant.portfolio_split_contract import (
 DEFAULT_OUTPUT_DIR = FOLLOWUP_ROOT / "portfolio_regime_switch_current"
 DEFAULT_COMPARISON_INPUT = FOLLOWUP_ROOT / "portfolio_max_performance_decision_latest.json"
 DEFAULT_CONTINUITY_REPORT = FOLLOWUP_ROOT / "portfolio_continuity_validation_latest.json"
-DEFAULT_OVERLAY_PORTFOLIO = FOLLOWUP_ROOT / "portfolio_overlay_current" / "causal_overlay_portfolio_latest.json"
+DEFAULT_OVERLAY_PORTFOLIO = (
+    FOLLOWUP_ROOT / "portfolio_overlay_current" / "causal_overlay_portfolio_latest.json"
+)
 DEFAULT_DYNAMIC_PORTFOLIO = (
     FOLLOWUP_ROOT / "portfolio_dynamic_online_current" / "causal_dynamic_portfolio_latest.json"
 )
@@ -118,7 +120,9 @@ def _cached_candidate_rows(input_path: Path) -> list[dict[str, Any]]:
     return rows
 
 
-def _cached_regime_features(input_path: Path, rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+def _cached_regime_features(
+    input_path: Path, rows: list[dict[str, Any]]
+) -> dict[str, dict[str, Any]]:
     key = str(input_path.resolve())
     cached = _REGIME_FEATURE_CACHE.get(key)
     if cached is not None:
@@ -166,7 +170,9 @@ def _rebuild_stream_cache_path(source_path: Path, payload: dict[str, Any]) -> Pa
     return _REBUILT_STREAM_CACHE_DIR / f"{_rebuild_stream_cache_key(source_path, payload)}.json"
 
 
-def _load_rebuilt_stream_cache(source_path: Path, payload: dict[str, Any]) -> dict[str, list[dict[str, Any]]] | None:
+def _load_rebuilt_stream_cache(
+    source_path: Path, payload: dict[str, Any]
+) -> dict[str, list[dict[str, Any]]] | None:
     cache_path = _rebuild_stream_cache_path(source_path, payload)
     if not cache_path.exists():
         return None
@@ -234,7 +240,9 @@ def _supports_allocation_reconstruction(payload: dict[str, Any]) -> bool:
 
 
 def _stream_mode(path: Path, payload: dict[str, Any]) -> str:
-    if isinstance(payload.get("portfolio_return_streams"), dict) and payload.get("portfolio_return_streams"):
+    if isinstance(payload.get("portfolio_return_streams"), dict) and payload.get(
+        "portfolio_return_streams"
+    ):
         return "saved_streams"
     if payload.get("daily_returns") and payload.get("dates"):
         return "saved_daily_returns"
@@ -304,9 +312,18 @@ def _extract_portfolio_components(payload: dict[str, Any]) -> list[dict[str, Any
             or _helper._strategy_family(source.get("strategy_class") or item.get("strategy_class"))
             or "other"
         )
-        item["strategy_class"] = str(item.get("strategy_class") or source.get("strategy_class") or "")
-        item["symbols"] = [str(symbol) for symbol in list(item.get("symbols") or source.get("symbols") or [])]
-        item["timeframe"] = str(item.get("timeframe") or source.get("strategy_timeframe") or source.get("timeframe") or "")
+        item["strategy_class"] = str(
+            item.get("strategy_class") or source.get("strategy_class") or ""
+        )
+        item["symbols"] = [
+            str(symbol) for symbol in list(item.get("symbols") or source.get("symbols") or [])
+        ]
+        item["timeframe"] = str(
+            item.get("timeframe")
+            or source.get("strategy_timeframe")
+            or source.get("timeframe")
+            or ""
+        )
         rows.append(item)
     return rows
 
@@ -338,9 +355,15 @@ def _reconstruct_streams_from_saved_allocations(
 
     series = {
         str(row.get("candidate_id") or row.get("name") or ""): {
-            **_helper._daily_compound_stream(list((row.get("return_streams") or {}).get("train") or [])),
-            **_helper._daily_compound_stream(list((row.get("return_streams") or {}).get("val") or [])),
-            **_helper._daily_compound_stream(list((row.get("return_streams") or {}).get("oos") or [])),
+            **_helper._daily_compound_stream(
+                list((row.get("return_streams") or {}).get("train") or [])
+            ),
+            **_helper._daily_compound_stream(
+                list((row.get("return_streams") or {}).get("val") or [])
+            ),
+            **_helper._daily_compound_stream(
+                list((row.get("return_streams") or {}).get("oos") or [])
+            ),
         }
         for row in rows
     }
@@ -488,9 +511,13 @@ def _build_candidate_metadata(
         "selection_basis": str(payload.get("selection_basis") or ""),
         "artifact_kind": str(payload.get("artifact_kind") or ""),
         "stream_mode": _stream_mode(path, payload),
-        "portfolio_metrics": dict(payload.get("portfolio_metrics") or payload.get("split_metrics") or {}),
+        "portfolio_metrics": dict(
+            payload.get("portfolio_metrics") or payload.get("split_metrics") or {}
+        ),
         "components": components,
-        "symbols": sorted({str(symbol) for row in components for symbol in list(row.get("symbols") or [])}),
+        "symbols": sorted(
+            {str(symbol) for row in components for symbol in list(row.get("symbols") or [])}
+        ),
     }
     return metadata, payload
 
@@ -576,7 +603,11 @@ def _candidate_panel(
         cid = str(row["candidate_id"])
         merged: dict[str, float] = {}
         for split in ("train", "val", "oos"):
-            merged.update(_helper._daily_compound_stream(list((row.get("return_streams") or {}).get(split) or [])))
+            merged.update(
+                _helper._daily_compound_stream(
+                    list((row.get("return_streams") or {}).get(split) or [])
+                )
+            )
         all_days.update(merged.keys())
         series[cid] = merged
         components = list(row.get("components") or [])
@@ -588,11 +619,15 @@ def _candidate_panel(
             "symbols": list(row.get("symbols") or []),
             "components": components,
             "component_count": len(components),
-            "families": sorted({str(component.get("family") or "other") for component in components}),
+            "families": sorted(
+                {str(component.get("family") or "other") for component in components}
+            ),
         }
     ordered_days = sorted(all_days)
     matrix = {
-        cid: np.asarray([_safe_float(series[cid].get(day_key), 0.0) for day_key in ordered_days], dtype=float)
+        cid: np.asarray(
+            [_safe_float(series[cid].get(day_key), 0.0) for day_key in ordered_days], dtype=float
+        )
         for cid in series
     }
     return ordered_days, matrix, meta
@@ -624,7 +659,9 @@ def _component_regime_multiplier(
         vol_moderate = bool(regime_row.get("basket_vol_ratio_moderate", False))
         trend_hot = btc_up and breadth_up
         multiplier = 1.0
-        multiplier *= (1.0 + (0.20 * strength)) if vol_moderate else max(0.55, 1.0 - (0.20 * strength))
+        multiplier *= (
+            (1.0 + (0.20 * strength)) if vol_moderate else max(0.55, 1.0 - (0.20 * strength))
+        )
         if trend_hot:
             multiplier *= max(0.70, 1.0 - (0.15 * strength))
         elif (not btc_up) and (not breadth_up):
@@ -659,7 +696,9 @@ def _portfolio_regime_score(
     components = list(candidate_meta.get("components") or [])
     if not components:
         return 1.0, []
-    total_weight = sum(max(0.0, _safe_float(component.get("weight"), 0.0)) for component in components)
+    total_weight = sum(
+        max(0.0, _safe_float(component.get("weight"), 0.0)) for component in components
+    )
     if total_weight <= 1e-12:
         total_weight = float(len(components))
     weighted = 0.0
@@ -748,7 +787,11 @@ def _blend_scores(
             if capacity - allowed <= 1e-12:
                 capped.append(cid)
         remaining = max(0.0, target_total_exposure - sum(out.values()))
-        unresolved = [cid for cid in unresolved if cid not in capped and (max_portfolio_weight - out[cid]) > 1e-12]
+        unresolved = [
+            cid
+            for cid in unresolved
+            if cid not in capped and (max_portfolio_weight - out[cid]) > 1e-12
+        ]
         if not capped:
             break
     if remaining > 1e-12 and unresolved:
@@ -798,7 +841,10 @@ def _aggregate_component_weights(
 def _turnover(prev_weights: dict[str, float], next_weights: dict[str, float]) -> float:
     ids = set(prev_weights) | set(next_weights)
     return float(
-        sum(abs(_safe_float(prev_weights.get(cid), 0.0) - _safe_float(next_weights.get(cid), 0.0)) for cid in ids)
+        sum(
+            abs(_safe_float(prev_weights.get(cid), 0.0) - _safe_float(next_weights.get(cid), 0.0))
+            for cid in ids
+        )
     )
 
 
@@ -825,7 +871,9 @@ def _apply_incumbent_floor(
     incumbent_weight = _safe_float(resolved.get(incumbent_id), 0.0)
     if incumbent_weight >= floor_weight:
         return resolved
-    donor_ids = [cid for cid in resolved if cid != incumbent_id and _safe_float(resolved.get(cid), 0.0) > 0.0]
+    donor_ids = [
+        cid for cid in resolved if cid != incumbent_id and _safe_float(resolved.get(cid), 0.0) > 0.0
+    ]
     donor_total = sum(_safe_float(resolved.get(cid), 0.0) for cid in donor_ids)
     needed = min(max(0.0, floor_weight - incumbent_weight), donor_total)
     if needed <= 1e-12:
@@ -853,7 +901,8 @@ def _cap_turnover_transition(
     ids = set(prev_weights) | set(target_weights)
     blended = {
         cid: _safe_float(prev_weights.get(cid), 0.0)
-        + blend * (_safe_float(target_weights.get(cid), 0.0) - _safe_float(prev_weights.get(cid), 0.0))
+        + blend
+        * (_safe_float(target_weights.get(cid), 0.0) - _safe_float(prev_weights.get(cid), 0.0))
         for cid in ids
     }
     return {cid: weight for cid, weight in blended.items() if weight > 1e-12}
@@ -909,7 +958,9 @@ def _kelly_target_exposure(
     if variance <= 1e-12 or not math.isfinite(variance):
         return base_exposure
     raw_fraction = max(0.0, mean_ret / variance)
-    kelly_fraction = max(0.0, min(1.0 - max(0.0, cash_buffer), raw_fraction * max(0.0, kelly_shrinkage)))
+    kelly_fraction = max(
+        0.0, min(1.0 - max(0.0, cash_buffer), raw_fraction * max(0.0, kelly_shrinkage))
+    )
     return max(base_exposure, kelly_fraction)
 
 
@@ -935,7 +986,9 @@ def _allocation_summary(
     summary["max_cash_weight"] = float(max(cash_values))
     summary["max_sleeve_turnover"] = float(max(turnover_values))
     summary["avg_candidate_weights"] = {
-        cid: float(np.mean([_safe_float((row.get("weights") or {}).get(cid), 0.0) for row in allocations]))
+        cid: float(
+            np.mean([_safe_float((row.get("weights") or {}).get(cid), 0.0) for row in allocations])
+        )
         for cid in candidate_ids
     }
     return summary
@@ -951,7 +1004,11 @@ def _candidate_runtime_risk(
 ) -> dict[str, Any]:
     symbols = {str(symbol) for symbol in list(candidate_meta.get("symbols") or [])}
     components = list(candidate_meta.get("components") or [])
-    timeframes = {str(component.get("timeframe") or "") for component in components if component.get("timeframe")}
+    timeframes = {
+        str(component.get("timeframe") or "")
+        for component in components
+        if component.get("timeframe")
+    }
     stream_mode = str(candidate_meta.get("stream_mode") or "unknown")
     rebuild_required = stream_mode == "rebuild_required"
     overlaps_continuity = bool(symbols & set(risk_state.get("symbols") or set())) and bool(
@@ -963,7 +1020,9 @@ def _candidate_runtime_risk(
         and overlaps_continuity
         and candidate_id != incumbent_id
     )
-    rebuild_blocked = bool(rebuild_required and not params.allow_rebuilt_candidates and candidate_id != incumbent_id)
+    rebuild_blocked = bool(
+        rebuild_required and not params.allow_rebuilt_candidates and candidate_id != incumbent_id
+    )
     return {
         "stream_mode": stream_mode,
         "rebuild_required": rebuild_required,
@@ -982,7 +1041,11 @@ def run_regime_switch_allocator(
 ) -> dict[str, Any]:
     ordered_days, matrix, meta = _candidate_panel(rows)
     ids = list(matrix.keys())
-    resolved_regime = regime_features if regime_features is not None else _helper._load_regime_features(_regime_feature_rows(rows))
+    resolved_regime = (
+        regime_features
+        if regime_features is not None
+        else _helper._load_regime_features(_regime_feature_rows(rows))
+    )
     incumbent_id = _infer_incumbent_id(meta)
     runtime_risk = _load_runtime_risk_state()
     allocations: list[dict[str, Any]] = []
@@ -993,7 +1056,9 @@ def run_regime_switch_allocator(
 
     for idx, day_key in enumerate(ordered_days):
         split = split_for_day_key(day_key)
-        rebalance_now = idx > 0 and (not portfolio_weights or (idx % max(1, params.rebalance_days) == 0))
+        rebalance_now = idx > 0 and (
+            not portfolio_weights or (idx % max(1, params.rebalance_days) == 0)
+        )
         turnover_cost = 0.0
         if rebalance_now:
             prior_day = ordered_days[idx - 1]
@@ -1043,7 +1108,9 @@ def run_regime_switch_allocator(
                 if regime_available and regime_score < params.min_regime_score:
                     continue
                 vol_inv = 1.0 / max(trailing_vol, 1e-6)
-                dd_penalty = max(0.05, 1.0 - (trailing_drawdown / max(params.max_trailing_drawdown, 1e-6)))
+                dd_penalty = max(
+                    0.05, 1.0 - (trailing_drawdown / max(params.max_trailing_drawdown, 1e-6))
+                )
                 persistence = 1.0 + (params.hysteresis_bonus if cid in portfolio_weights else 0.0)
                 switch_drag = 1.0
                 if cid not in portfolio_weights:
@@ -1106,7 +1173,8 @@ def run_regime_switch_allocator(
                 )
                 next_sleeve_map = _aggregate_component_weights(scaled_portfolio_weights, meta=meta)
                 next_sleeve_weights = {
-                    cid: _safe_float(item.get("weight"), 0.0) for cid, item in next_sleeve_map.items()
+                    cid: _safe_float(item.get("weight"), 0.0)
+                    for cid, item in next_sleeve_map.items()
                 }
                 sleeve_turnover = _turnover(sleeve_weights, next_sleeve_weights)
             turnover_cost = (max(0.0, params.turnover_cost_bps) / 10_000.0) * sleeve_turnover
@@ -1156,7 +1224,9 @@ def run_regime_switch_allocator(
                 }
             )
 
-        day_return = sum(float(portfolio_weights.get(cid, 0.0)) * float(matrix[cid][idx]) for cid in ids)
+        day_return = sum(
+            float(portfolio_weights.get(cid, 0.0)) * float(matrix[cid][idx]) for cid in ids
+        )
         day_return -= turnover_cost
         daily_returns.append(day_return)
         split_returns[split].append(day_return)
@@ -1335,7 +1405,9 @@ def write_regime_switch_report(
         error = str(exc)
         raise
     finally:
-        memory_guard.sample(event="regime_switch_finish", context={"status": status, "error": error})
+        memory_guard.sample(
+            event="regime_switch_finish", context={"status": status, "error": error}
+        )
         memory_summary = memory_guard.finalize(
             status=status,
             error=error,
@@ -1351,7 +1423,9 @@ def write_regime_switch_report(
         "selection_basis": "validation_only_regime_aware_portfolio_switching",
         "objective_profile": "balanced_multi_metric_with_turnover_penalty",
         "split_windows": split_windows(),
-        "memory_policy": memory_policy_payload(budget_bytes=PORTFOLIO_FOLLOWUP_EXPLICIT_BUDGET_BYTES),
+        "memory_policy": memory_policy_payload(
+            budget_bytes=PORTFOLIO_FOLLOWUP_EXPLICIT_BUDGET_BYTES
+        ),
         "memory_summary": memory_summary,
         "best_params": dict(best["params"]),
         "validation_objective": float(best["objective"]),
@@ -1362,17 +1436,32 @@ def write_regime_switch_report(
         "final_allocation": _final_allocation_rows(result),
         "allocations": list(result.get("allocations") or []),
         "allocation_summary": {
-            "all": _allocation_summary(list(result.get("allocations") or []), candidate_ids=[row["candidate_id"] for row in rows]),
+            "all": _allocation_summary(
+                list(result.get("allocations") or []),
+                candidate_ids=[row["candidate_id"] for row in rows],
+            ),
             "train": _allocation_summary(
-                [item for item in list(result.get("allocations") or []) if split_for_day_key(str(item.get("date") or "")) == "train"],
+                [
+                    item
+                    for item in list(result.get("allocations") or [])
+                    if split_for_day_key(str(item.get("date") or "")) == "train"
+                ],
                 candidate_ids=[row["candidate_id"] for row in rows],
             ),
             "val": _allocation_summary(
-                [item for item in list(result.get("allocations") or []) if split_for_day_key(str(item.get("date") or "")) == "val"],
+                [
+                    item
+                    for item in list(result.get("allocations") or [])
+                    if split_for_day_key(str(item.get("date") or "")) == "val"
+                ],
                 candidate_ids=[row["candidate_id"] for row in rows],
             ),
             "oos": _allocation_summary(
-                [item for item in list(result.get("allocations") or []) if split_for_day_key(str(item.get("date") or "")) == "oos"],
+                [
+                    item
+                    for item in list(result.get("allocations") or [])
+                    if split_for_day_key(str(item.get("date") or "")) == "oos"
+                ],
                 candidate_ids=[row["candidate_id"] for row in rows],
             ),
         },
@@ -1539,7 +1628,12 @@ def write_regime_switch_preflight(
                 "selection_basis": row.get("selection_basis"),
                 "stream_mode": row.get("stream_mode"),
                 "symbols": list(row.get("symbols") or []),
-                "families": sorted({str(component.get("family") or "other") for component in list(row.get("components") or [])}),
+                "families": sorted(
+                    {
+                        str(component.get("family") or "other")
+                        for component in list(row.get("components") or [])
+                    }
+                ),
                 "component_count": len(list(row.get("components") or [])),
                 "is_incumbent": cid == incumbent_id,
                 "blocking_reasons": blocking_reasons,
@@ -1556,8 +1650,12 @@ def write_regime_switch_preflight(
         "candidate_status": candidate_status,
         "summary": {
             "candidate_count": len(candidate_status),
-            "blocked_candidate_count": sum(1 for row in candidate_status if row["blocking_reasons"]),
-            "rebuild_blocked_count": sum(1 for row in candidate_status if "rebuild_blocked" in row["blocking_reasons"]),
+            "blocked_candidate_count": sum(
+                1 for row in candidate_status if row["blocking_reasons"]
+            ),
+            "rebuild_blocked_count": sum(
+                1 for row in candidate_status if "rebuild_blocked" in row["blocking_reasons"]
+            ),
             "continuity_blocked_count": sum(
                 1 for row in candidate_status if "continuity_blocked" in row["blocking_reasons"]
             ),

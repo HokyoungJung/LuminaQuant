@@ -172,8 +172,7 @@ class Portfolio:
         if "component_positions" in state and isinstance(state["component_positions"], dict):
             self.component_positions = {
                 str(component): {
-                    str(symbol): float(quantity)
-                    for symbol, quantity in dict(symbols or {}).items()
+                    str(symbol): float(quantity) for symbol, quantity in dict(symbols or {}).items()
                 }
                 for component, symbols in dict(state["component_positions"]).items()
             }
@@ -424,7 +423,9 @@ class Portfolio:
                         "fill_cost": event.fill_cost,
                         "commission": event.commission,
                         "price": event.fill_cost / event.quantity if event.quantity > 0 else 0.0,
-                        "component_id": self._component_id_from_metadata(getattr(event, "metadata", None)),
+                        "component_id": self._component_id_from_metadata(
+                            getattr(event, "metadata", None)
+                        ),
                     }
                 )
 
@@ -561,9 +562,9 @@ class Portfolio:
 
     def _check_liquidations(self, latest_datetime):
         leverage = max(1, int(getattr(self.config, "LEVERAGE", 1)))
-        configured_margin_mode = str(
-            getattr(self.config, "MARGIN_MODE", "isolated") or "isolated"
-        ).strip().lower()
+        configured_margin_mode = (
+            str(getattr(self.config, "MARGIN_MODE", "isolated") or "isolated").strip().lower()
+        )
         modeled_margin_mode = "isolated"
         mmr = float(getattr(self.config, "MAINTENANCE_MARGIN_RATE", 0.005))
         liq_buffer = float(getattr(self.config, "LIQUIDATION_BUFFER_RATE", 0.0))
@@ -793,11 +794,15 @@ class Portfolio:
     def _order_time_in_force(self, signal, order_type: str) -> str | None:
         if canonical_order_type(order_type, default="LMT") != "LMT":
             return None
-        return str(
-            getattr(signal, "time_in_force", None)
-            or getattr(self.config, "LIMIT_TIME_IN_FORCE", "GTC")
-            or "GTC"
-        ).strip().upper()
+        return (
+            str(
+                getattr(signal, "time_in_force", None)
+                or getattr(self.config, "LIMIT_TIME_IN_FORCE", "GTC")
+                or "GTC"
+            )
+            .strip()
+            .upper()
+        )
 
     def _order_metadata(self, signal, *, order_type, direction, reference_price, price, limits):
         if canonical_order_type(order_type, default="LMT") != "LMT":
@@ -822,11 +827,15 @@ class Portfolio:
             },
         )
 
-    def _order_price(self, signal, *, symbol: str, direction: str, current_price: float, order_type: str):
+    def _order_price(
+        self, signal, *, symbol: str, direction: str, current_price: float, order_type: str
+    ):
         if canonical_order_type(order_type, default="LMT") != "LMT":
             return None, self._get_symbol_limits(symbol)
         reference_price = (
-            float(signal.price) if getattr(signal, "price", None) is not None else float(current_price)
+            float(signal.price)
+            if getattr(signal, "price", None) is not None
+            else float(current_price)
         )
         limits = self._get_symbol_limits(symbol)
         tick_size = float(limits.get("price_tick_size", 0.0) or 0.0)
@@ -931,7 +940,9 @@ class Portfolio:
         elif direction == "EXIT":
             component_id = self._component_id_from_metadata(signal.metadata)
             if component_id:
-                cur_qty = float(dict(self.component_positions.get(component_id) or {}).get(symbol, 0.0))
+                cur_qty = float(
+                    dict(self.component_positions.get(component_id) or {}).get(symbol, 0.0)
+                )
             else:
                 cur_qty = self.current_positions[symbol]
             if cur_qty != 0:
@@ -1053,5 +1064,6 @@ class Portfolio:
             os.makedirs(parent, exist_ok=True)
         df.write_csv(str(filename))
         # print(f"Trade log saved to '{filename}'")
+
 
 __all__ = ["Portfolio"]

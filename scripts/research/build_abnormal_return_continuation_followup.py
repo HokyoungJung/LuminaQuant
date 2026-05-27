@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from lumina_quant.strategy_factory import build_binance_futures_candidates
+
 DEFAULT_OUTPUT_DIR = Path(
     "var/reports/exact_window_backtests/followup_status/"
     "portfolio_incumbent_autoresearch_grouped/abnormal_return_continuation_followup_current"

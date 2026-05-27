@@ -15,4 +15,3 @@ __all__ = [
     "resolve_params_from_schema",
     "strategy_slug",
 ]
-

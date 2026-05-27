@@ -257,7 +257,9 @@ class BinanceLiveDataHandler:
             tick = self._normalize_trade_row(symbol=symbol, row=dict(row or {}))
             if tick is None:
                 continue
-            if effective_until_ms is not None and int(tick.exchange_ts_ms) > int(effective_until_ms):
+            if effective_until_ms is not None and int(tick.exchange_ts_ms) > int(
+                effective_until_ms
+            ):
                 continue
             ticks.append(tick)
             if max_ts is None or int(tick.exchange_ts_ms) > int(max_ts):

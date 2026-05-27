@@ -8,8 +8,12 @@ import pandas as pd
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-MODULE_PATH = ROOT / "scripts" / "research" / "run_alpha_zoo_integer_leverage_optuna_hybrid_decision.py"
-SPEC = importlib.util.spec_from_file_location("run_alpha_zoo_integer_leverage_optuna_hybrid_decision", MODULE_PATH)
+MODULE_PATH = (
+    ROOT / "scripts" / "research" / "run_alpha_zoo_integer_leverage_optuna_hybrid_decision.py"
+)
+SPEC = importlib.util.spec_from_file_location(
+    "run_alpha_zoo_integer_leverage_optuna_hybrid_decision", MODULE_PATH
+)
 assert SPEC is not None and SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = MODULE
@@ -73,14 +77,26 @@ def test_v35_v36_run_model_keeps_real_money_disabled_and_cost_contract() -> None
     ]
 
     for version, profile_id in (("v3_5", MODULE.V35_PROFILE_ID), ("v3_6", MODULE.V36_PROFILE_ID)):
-        result = MODULE._run_model(streams, MODULE.HybridParams(), version=version, profile_id=profile_id)
+        result = MODULE._run_model(
+            streams, MODULE.HybridParams(), version=version, profile_id=profile_id
+        )
 
         assert result.row["ready_for_real"] is False
         assert result.row["real_money_execution"] is False
-        assert result.row["train_return_per_turnover_proxy_bps"] > MODULE.ilp.RETURN_PER_TURNOVER_THRESHOLD_BPS
-        assert result.row["validation_return_per_turnover_proxy_bps"] > MODULE.ilp.RETURN_PER_TURNOVER_THRESHOLD_BPS
+        assert (
+            result.row["train_return_per_turnover_proxy_bps"]
+            > MODULE.ilp.RETURN_PER_TURNOVER_THRESHOLD_BPS
+        )
+        assert (
+            result.row["validation_return_per_turnover_proxy_bps"]
+            > MODULE.ilp.RETURN_PER_TURNOVER_THRESHOLD_BPS
+        )
         assert MODULE.ilp.PRIMARY_ROUND_TRIP_COST_BPS == 10.0
-        assert set(result.row["average_weights_train_validation"]) == {"balanced", "growth", "aggressive"}
+        assert set(result.row["average_weights_train_validation"]) == {
+            "balanced",
+            "growth",
+            "aggressive",
+        }
         assert sum(result.row["average_weights_train_validation"].values()) == pytest.approx(1.0)
 
 
@@ -110,8 +126,22 @@ def test_selected_optuna_sort_key_does_not_prefer_oos_spike() -> None:
             "locked_oos_return_per_turnover_proxy_bps_report_only": 500.0,
         }
     )
-    fake_a = MODULE.OptunaModelResult(row=row_a, returns=pd.Series(dtype=float), weights=pd.DataFrame(), allocations=[], learned_params=MODULE.LearnedParams(0, 0, 0, 0.5, 0.1, 0), params=MODULE.HybridParams())
-    fake_b = MODULE.OptunaModelResult(row=row_b, returns=pd.Series(dtype=float), weights=pd.DataFrame(), allocations=[], learned_params=MODULE.LearnedParams(0, 0, 0, 0.5, 0.1, 0), params=MODULE.HybridParams())
+    fake_a = MODULE.OptunaModelResult(
+        row=row_a,
+        returns=pd.Series(dtype=float),
+        weights=pd.DataFrame(),
+        allocations=[],
+        learned_params=MODULE.LearnedParams(0, 0, 0, 0.5, 0.1, 0),
+        params=MODULE.HybridParams(),
+    )
+    fake_b = MODULE.OptunaModelResult(
+        row=row_b,
+        returns=pd.Series(dtype=float),
+        weights=pd.DataFrame(),
+        allocations=[],
+        learned_params=MODULE.LearnedParams(0, 0, 0, 0.5, 0.1, 0),
+        params=MODULE.HybridParams(),
+    )
 
     selected = MODULE._choose_selected_optuna([fake_a, fake_b])
 

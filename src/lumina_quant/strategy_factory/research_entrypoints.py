@@ -19,6 +19,7 @@ from lumina_quant.strategy_factory.runtime_settings import (
 
 from . import research_run_support as _research_run_support
 
+
 @lru_cache(maxsize=1)
 def _runner_module():
     """Resolve the legacy runner lazily to reduce import-time coupling."""
@@ -110,10 +111,12 @@ def _run_candidate_research_with_adapted_candidates(
     progress_callback: Callable[[str, Mapping[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     runner = _runner_module()
-    normalized_timeframes, universe = _research_run_support._resolve_research_run_timeframes_and_universe(
-        adapted=adapted,
-        strategy_timeframes=strategy_timeframes,
-        symbol_universe=symbol_universe,
+    normalized_timeframes, universe = (
+        _research_run_support._resolve_research_run_timeframes_and_universe(
+            adapted=adapted,
+            strategy_timeframes=strategy_timeframes,
+            symbol_universe=symbol_universe,
+        )
     )
     split_timeframe = normalized_timeframes[0] if normalized_timeframes else "1m"
     resolved_split = runner._resolve_split_config(split, strategy_timeframe=split_timeframe)

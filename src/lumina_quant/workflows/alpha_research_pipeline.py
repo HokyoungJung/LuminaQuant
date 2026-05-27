@@ -67,7 +67,13 @@ DEFAULT_FAMILIES: tuple[ResearchFamily, ...] = (
         target_timeframes=("30m", "1h", "4h"),
         target_universe=("BTC/USDT", "ETH/USDT", "BNB/USDT", "XAU/USDT", "XAG/USDT"),
         rationale="Build on current BTC/XAG watchlist progress while keeping execution deterministic.",
-        preferred_metrics=("oos_return", "oos_sharpe", "oos_pbo", "oos_trade_count", "oos_max_drawdown"),
+        preferred_metrics=(
+            "oos_return",
+            "oos_sharpe",
+            "oos_pbo",
+            "oos_trade_count",
+            "oos_max_drawdown",
+        ),
     ),
     ResearchFamily(
         family_id="sector-dispersion-reversion",
@@ -76,7 +82,13 @@ DEFAULT_FAMILIES: tuple[ResearchFamily, ...] = (
         target_timeframes=("15m", "30m", "1h"),
         target_universe=("BTC/USDT", "ETH/USDT", "BNB/USDT", "SOL/USDT", "TRX/USDT"),
         rationale="Matches the article's emphasis on many small-capacity ensemble alphas.",
-        preferred_metrics=("oos_return", "oos_sortino", "oos_trade_count", "oos_turnover", "oos_stability"),
+        preferred_metrics=(
+            "oos_return",
+            "oos_sortino",
+            "oos_trade_count",
+            "oos_turnover",
+            "oos_stability",
+        ),
     ),
     ResearchFamily(
         family_id="lead-lag-regime-spillover",
@@ -85,7 +97,13 @@ DEFAULT_FAMILIES: tuple[ResearchFamily, ...] = (
         target_timeframes=("5m", "15m", "30m"),
         target_universe=("BTC/USDT", "ETH/USDT", "BNB/USDT", "SOL/USDT"),
         rationale="Use LLM-style hypothesis generation but keep final execution rules explicit and auditable.",
-        preferred_metrics=("oos_return", "oos_sharpe", "oos_trade_count", "rolling_sharpe_min", "oos_max_drawdown"),
+        preferred_metrics=(
+            "oos_return",
+            "oos_sharpe",
+            "oos_trade_count",
+            "rolling_sharpe_min",
+            "oos_max_drawdown",
+        ),
     ),
     ResearchFamily(
         family_id="liquidity-shock-reversion",
@@ -94,7 +112,13 @@ DEFAULT_FAMILIES: tuple[ResearchFamily, ...] = (
         target_timeframes=("5m", "15m"),
         target_universe=("BTC/USDT", "ETH/USDT", "BNB/USDT"),
         rationale="Targets small-capacity intraday alpha consistent with the screenshots' discussion.",
-        preferred_metrics=("oos_return", "oos_avg_trade", "oos_trade_count", "oos_pbo", "peak_rss_mib"),
+        preferred_metrics=(
+            "oos_return",
+            "oos_avg_trade",
+            "oos_trade_count",
+            "oos_pbo",
+            "peak_rss_mib",
+        ),
     ),
     ResearchFamily(
         family_id="metals-lag-convergence",
@@ -103,7 +127,13 @@ DEFAULT_FAMILIES: tuple[ResearchFamily, ...] = (
         target_timeframes=("4h", "1d"),
         target_universe=("XAU/USDT", "XAG/USDT", "XPT/USDT", "XPD/USDT"),
         rationale="Targets XPT/XPD and XAU/XAG overlap windows where pair z-score can undertrade despite usable directional-relative structure.",
-        preferred_metrics=("oos_return", "oos_sharpe", "oos_trade_count", "oos_pbo", "oos_max_drawdown"),
+        preferred_metrics=(
+            "oos_return",
+            "oos_sharpe",
+            "oos_trade_count",
+            "oos_pbo",
+            "oos_max_drawdown",
+        ),
     ),
     ResearchFamily(
         family_id="regime-breakout-thrust",
@@ -112,16 +142,36 @@ DEFAULT_FAMILIES: tuple[ResearchFamily, ...] = (
         target_timeframes=("30m", "1h"),
         target_universe=("BTC/USDT", "ETH/USDT", "BNB/USDT", "SOL/USDT", "TRX/USDT"),
         rationale="Adds trend-following breadth without relying solely on the existing composite trend sleeve.",
-        preferred_metrics=("oos_return", "oos_sharpe", "oos_calmar", "oos_trade_count", "oos_max_drawdown"),
+        preferred_metrics=(
+            "oos_return",
+            "oos_sharpe",
+            "oos_calmar",
+            "oos_trade_count",
+            "oos_max_drawdown",
+        ),
     ),
     ResearchFamily(
         family_id="single-asset-zscore-reversion",
         thesis="Simple rolling z-score reversion is still useful as a low-complexity sleeve when crowding and trend overlays are absent.",
         execution_style="single_asset_mean_reversion",
         target_timeframes=("15m", "30m"),
-        target_universe=("BTC/USDT", "ETH/USDT", "BNB/USDT", "SOL/USDT", "TRX/USDT", "XAU/USDT", "XAG/USDT"),
+        target_universe=(
+            "BTC/USDT",
+            "ETH/USDT",
+            "BNB/USDT",
+            "SOL/USDT",
+            "TRX/USDT",
+            "XAU/USDT",
+            "XAG/USDT",
+        ),
         rationale="Provides a low-complexity baseline mean-reversion family for the automated research loop.",
-        preferred_metrics=("oos_return", "oos_sharpe", "oos_sortino", "oos_trade_count", "oos_max_drawdown"),
+        preferred_metrics=(
+            "oos_return",
+            "oos_sharpe",
+            "oos_sortino",
+            "oos_trade_count",
+            "oos_max_drawdown",
+        ),
     ),
     ResearchFamily(
         family_id="intraday-vwap-reversion",
@@ -130,7 +180,13 @@ DEFAULT_FAMILIES: tuple[ResearchFamily, ...] = (
         target_timeframes=("5m", "15m"),
         target_universe=("BTC/USDT", "ETH/USDT", "BNB/USDT", "SOL/USDT", "TRX/USDT", "XAG/USDT"),
         rationale="Adds a classic execution-friendly reversion sleeve aligned with the article's many-small-alpha framing.",
-        preferred_metrics=("oos_return", "oos_sharpe", "oos_trade_count", "oos_turnover", "oos_max_drawdown"),
+        preferred_metrics=(
+            "oos_return",
+            "oos_sharpe",
+            "oos_trade_count",
+            "oos_turnover",
+            "oos_max_drawdown",
+        ),
     ),
     ResearchFamily(
         family_id="topcap-rotation-relative-momentum",
@@ -139,7 +195,13 @@ DEFAULT_FAMILIES: tuple[ResearchFamily, ...] = (
         target_timeframes=("1h", "4h"),
         target_universe=("BTC/USDT", "ETH/USDT", "BNB/USDT", "SOL/USDT", "TRX/USDT"),
         rationale="Adds a lower-implementation-risk relative-value sleeve to complement pair-spread and lag-convergence stat-arb families.",
-        preferred_metrics=("oos_return", "oos_sharpe", "oos_trade_count", "oos_max_drawdown", "oos_pbo"),
+        preferred_metrics=(
+            "oos_return",
+            "oos_sharpe",
+            "oos_trade_count",
+            "oos_max_drawdown",
+            "oos_pbo",
+        ),
     ),
     ResearchFamily(
         family_id="vol-compression-break-reversion",
@@ -148,7 +210,13 @@ DEFAULT_FAMILIES: tuple[ResearchFamily, ...] = (
         target_timeframes=("5m", "15m", "1h"),
         target_universe=("BTC/USDT", "ETH/USDT", "BNB/USDT", "SOL/USDT", "XAG/USDT"),
         rationale="Extends existing vol-compression ideas with richer diagnostics instead of one-off tuning.",
-        preferred_metrics=("oos_return", "oos_sharpe", "oos_sortino", "oos_trade_count", "oos_max_drawdown"),
+        preferred_metrics=(
+            "oos_return",
+            "oos_sharpe",
+            "oos_sortino",
+            "oos_trade_count",
+            "oos_max_drawdown",
+        ),
     ),
     ResearchFamily(
         family_id="regime-conditioned-composite-trend",
@@ -262,12 +330,28 @@ def build_alpha_research_pipeline_manifest(
             "Prefer saved artifacts over recomputation for dashboards and deployment panels.",
         ],
         "recommended_outputs": {
-            "pipeline_manifest_json": str((output_root / "alpha_research_pipeline_latest.json").resolve()),
-            "pipeline_manifest_md": str((output_root / "alpha_research_pipeline_latest.md").resolve()),
-            "signature_registry": str((output_root.parent / "exact_window_run_registry.jsonl").resolve()),
-            "canonical_registry_snapshot": str((output_root.parent / "exact_window_backtest_registry_latest.json").resolve()),
-            "recovered_run_archive": str((output_root.parent / "followup_status" / "backtest_log_archive_latest.json").resolve()),
-            "deployment_scenarios": str((output_root.parent / "followup_status" / "deployment_scenarios_latest.json").resolve()),
+            "pipeline_manifest_json": str(
+                (output_root / "alpha_research_pipeline_latest.json").resolve()
+            ),
+            "pipeline_manifest_md": str(
+                (output_root / "alpha_research_pipeline_latest.md").resolve()
+            ),
+            "signature_registry": str(
+                (output_root.parent / "exact_window_run_registry.jsonl").resolve()
+            ),
+            "canonical_registry_snapshot": str(
+                (output_root.parent / "exact_window_backtest_registry_latest.json").resolve()
+            ),
+            "recovered_run_archive": str(
+                (
+                    output_root.parent / "followup_status" / "backtest_log_archive_latest.json"
+                ).resolve()
+            ),
+            "deployment_scenarios": str(
+                (
+                    output_root.parent / "followup_status" / "deployment_scenarios_latest.json"
+                ).resolve()
+            ),
         },
         "suggested_work_items": {
             "light_parallel": [

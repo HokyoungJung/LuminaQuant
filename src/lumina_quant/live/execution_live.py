@@ -679,7 +679,9 @@ class LiveExecutionHandler(ExecutionHandler):
             market_spec=market_spec,
             config=self.config,
         )
-        mode = normalize_limit_price_mode(getattr(self.config, "LIMIT_PRICE_MODE", "one_tick_worse"))
+        mode = normalize_limit_price_mode(
+            getattr(self.config, "LIMIT_PRICE_MODE", "one_tick_worse")
+        )
         offset_ticks = int(getattr(self.config, "LIMIT_PRICE_OFFSET_TICKS", 1) or 0)
         limit_price = limit_price_for_direction(
             reference_price=float(trigger_price),
@@ -888,9 +890,13 @@ class LiveExecutionHandler(ExecutionHandler):
         realized_slippage_bps = None
         if reference_price > 0.0 and float(fill_price or 0.0) > 0.0:
             if str(getattr(event, "direction", "")).upper() == "BUY":
-                realized_slippage_bps = ((float(fill_price) - reference_price) / reference_price) * 10_000.0
+                realized_slippage_bps = (
+                    (float(fill_price) - reference_price) / reference_price
+                ) * 10_000.0
             else:
-                realized_slippage_bps = ((reference_price - float(fill_price)) / reference_price) * 10_000.0
+                realized_slippage_bps = (
+                    (reference_price - float(fill_price)) / reference_price
+                ) * 10_000.0
         submit_to_fill_ms = None
         if submitted_at is not None:
             try:
@@ -919,7 +925,10 @@ class LiveExecutionHandler(ExecutionHandler):
                 "realized_slippage_bps": realized_slippage_bps,
                 "submit_to_fill_ms": submit_to_fill_ms,
                 "signal_metadata": dict(getattr(event, "metadata", None) or {}),
-                "component_id": str(dict(getattr(event, "metadata", None) or {}).get("component_id") or "").strip() or None,
+                "component_id": str(
+                    dict(getattr(event, "metadata", None) or {}).get("component_id") or ""
+                ).strip()
+                or None,
             },
         )
         self.events.put(fill_event)
@@ -946,7 +955,9 @@ class LiveExecutionHandler(ExecutionHandler):
             return
 
         side = "buy" if event.direction == "BUY" else "sell"
-        requested_order_type = canonical_order_type(getattr(event, "order_type", "LMT"), default="LMT")
+        requested_order_type = canonical_order_type(
+            getattr(event, "order_type", "LMT"), default="LMT"
+        )
         market_guard_configured = hasattr(self.config, "ALLOW_MARKET_ORDERS")
         if (
             requested_order_type == "MKT"
@@ -958,9 +969,12 @@ class LiveExecutionHandler(ExecutionHandler):
                 "set live.default_order_type=LMT or explicitly enable market orders."
             )
         if requested_order_type == "LMT" and (
-            getattr(event, "price", None) is None or float(getattr(event, "price", 0.0) or 0.0) <= 0.0
+            getattr(event, "price", None) is None
+            or float(getattr(event, "price", 0.0) or 0.0) <= 0.0
         ):
-            raise RuntimeError("LIMIT orders require a positive limit price before live submission.")
+            raise RuntimeError(
+                "LIMIT orders require a positive limit price before live submission."
+            )
         event.order_type = requested_order_type
         order_type = "limit" if requested_order_type == "LMT" else "market"
         event.client_order_id = event.client_order_id or self._make_client_order_id(event)
@@ -1127,7 +1141,9 @@ class LiveExecutionHandler(ExecutionHandler):
                         message=timeout_message,
                     )
                     if entry["state"] == STATE_FILLED:
-                        self._submit_paper_exchange_protection(order_event, parent_order_id=order_id)
+                        self._submit_paper_exchange_protection(
+                            order_event, parent_order_id=order_id
+                        )
                     self._forget_order(order_id, entry)
                     continue
 

@@ -109,24 +109,36 @@ def _load_hyperliquid_feature_hourly(
     )
     if frame.is_empty():
         empty = pl.DataFrame({"datetime": []}, schema={"datetime": pl.Datetime(time_unit="ms")})
-        return empty, {"rows": 0, "has_funding": False, "has_open_interest_history": False, "has_mark_history": False}
+        return empty, {
+            "rows": 0,
+            "has_funding": False,
+            "has_open_interest_history": False,
+            "has_mark_history": False,
+        }
     aligned = frame
     for column in ("timestamp_ms", "funding_rate", "mark_price", "index_price", "open_interest"):
         if column not in aligned.columns:
             dtype = pl.Int64 if column == "timestamp_ms" else pl.Float64
             aligned = aligned.with_columns(pl.lit(None, dtype=dtype).alias(column))
-    aligned = aligned.select(["timestamp_ms", "funding_rate", "mark_price", "index_price", "open_interest"]).filter(
-        pl.col("timestamp_ms").is_not_null()
-    )
+    aligned = aligned.select(
+        ["timestamp_ms", "funding_rate", "mark_price", "index_price", "open_interest"]
+    ).filter(pl.col("timestamp_ms").is_not_null())
     if aligned.is_empty():
         empty = pl.DataFrame({"datetime": []}, schema={"datetime": pl.Datetime(time_unit="ms")})
-        return empty, {"rows": 0, "has_funding": False, "has_open_interest_history": False, "has_mark_history": False}
+        return empty, {
+            "rows": 0,
+            "has_funding": False,
+            "has_open_interest_history": False,
+            "has_mark_history": False,
+        }
     metadata = {
         "rows": int(aligned.height),
         "first_timestamp_ms": int(aligned.select(pl.min("timestamp_ms")).item()),
         "last_timestamp_ms": int(aligned.select(pl.max("timestamp_ms")).item()),
         "funding_rows": int(aligned.select(pl.col("funding_rate").is_not_null().sum()).item()),
-        "open_interest_rows": int(aligned.select(pl.col("open_interest").is_not_null().sum()).item()),
+        "open_interest_rows": int(
+            aligned.select(pl.col("open_interest").is_not_null().sum()).item()
+        ),
         "mark_rows": int(aligned.select(pl.col("mark_price").is_not_null().sum()).item()),
     }
     metadata["first_timestamp_utc"] = _iso(metadata["first_timestamp_ms"])
@@ -136,7 +148,9 @@ def _load_hyperliquid_feature_hourly(
     metadata["has_open_interest_history"] = metadata["open_interest_rows"] > 24
     metadata["has_mark_history"] = metadata["mark_rows"] > 24
     hourly = (
-        aligned.with_columns(pl.from_epoch(pl.col("timestamp_ms"), time_unit="ms").alias("datetime"))
+        aligned.with_columns(
+            pl.from_epoch(pl.col("timestamp_ms"), time_unit="ms").alias("datetime")
+        )
         .sort("datetime")
         .group_by_dynamic("datetime", every="1h", period="1h", closed="left", label="left")
         .agg(
@@ -159,8 +173,12 @@ def _joined_exchange_panel(
     start: date,
     end: date,
 ) -> tuple[pl.DataFrame, dict[str, Any]]:
-    panel, data_metadata = _joined_panel(market_root=market_root, exchange=exchange, start=start, end=end)
-    hl_features, hl_metadata = _load_hyperliquid_feature_hourly(market_root=market_root, start=start, end=end)
+    panel, data_metadata = _joined_panel(
+        market_root=market_root, exchange=exchange, start=start, end=end
+    )
+    hl_features, hl_metadata = _load_hyperliquid_feature_hourly(
+        market_root=market_root, start=start, end=end
+    )
     if not hl_features.is_empty():
         panel = panel.join(hl_features, on="datetime", how="left")
     for column in ("hl_funding_rate", "hl_mark_price", "hl_index_price", "hl_open_interest"):
@@ -171,6 +189,7 @@ def _joined_exchange_panel(
 
 def _build_exchange_arrays(panel: pl.DataFrame) -> dict[str, Any]:
     arrays = _build_arrays(panel)
+
     def _ffill(values: np.ndarray) -> np.ndarray:
         out = np.asarray(values, dtype=float).copy()
         last = np.nan
@@ -193,12 +212,15 @@ def _build_exchange_arrays(panel: pl.DataFrame) -> dict[str, Any]:
     if hl_mark is None:
         arrays["hl_mark_basis"] = np.full(panel.height, np.nan, dtype=float)
     else:
-        arrays["hl_mark_basis"] = np.divide(
-            hl_mark,
-            eth_close,
-            out=np.full(eth_close.shape, np.nan, dtype=float),
-            where=np.isfinite(hl_mark) & np.isfinite(eth_close) & (eth_close > 0.0),
-        ) - 1.0
+        arrays["hl_mark_basis"] = (
+            np.divide(
+                hl_mark,
+                eth_close,
+                out=np.full(eth_close.shape, np.nan, dtype=float),
+                where=np.isfinite(hl_mark) & np.isfinite(eth_close) & (eth_close > 0.0),
+            )
+            - 1.0
+        )
     return arrays
 
 
@@ -250,7 +272,14 @@ def _run_split(
 ) -> dict[str, Any]:
     timestamps = arrays["timestamp"]
     start_ts = int(datetime.combine(split.start, datetime.min.time(), tzinfo=UTC).timestamp())
-    end_ts = int(datetime.combine(split.end + timedelta(days=1), datetime.min.time(), tzinfo=UTC).timestamp()) - 1
+    end_ts = (
+        int(
+            datetime.combine(
+                split.end + timedelta(days=1), datetime.min.time(), tzinfo=UTC
+            ).timestamp()
+        )
+        - 1
+    )
     indices = np.flatnonzero((timestamps >= start_ts) & (timestamps <= end_ts))
     if indices.size == 0:
         return {"metrics": {}, "round_trips": 0, "fills": 0, "reject_counts": {"split_empty": 1}}
@@ -389,7 +418,9 @@ def _run_split(
         round_trips += 1
         fills += 1
 
-    metrics = _metrics_from_equity_totals(equity_history, periods=int(getattr(BacktestConfig, "ANNUAL_PERIODS", 252)))
+    metrics = _metrics_from_equity_totals(
+        equity_history, periods=int(getattr(BacktestConfig, "ANNUAL_PERIODS", 252))
+    )
     return {
         "metrics": metrics,
         "round_trips": int(round_trips),
@@ -467,17 +498,24 @@ def _evaluate_specs(
     rows: list[dict[str, Any]] = []
     results: list[dict[str, Any]] = []
     for spec in specs:
-        split_results = {split.name: _run_split(spec=spec, arrays=arrays, split=split) for split in splits}
-        metrics = {name: dict(result.get("metrics") or {}) for name, result in split_results.items()}
+        split_results = {
+            split.name: _run_split(spec=spec, arrays=arrays, split=split) for split in splits
+        }
+        metrics = {
+            name: dict(result.get("metrics") or {}) for name, result in split_results.items()
+        }
         train = metrics.get("train", {})
         val = metrics.get("val", {})
         oos = metrics.get("oos", {})
         absolute_gates = {
             "train_positive": _safe_float(train.get("total_return"), 0.0) > 0.0,
             "val_positive": _safe_float(val.get("total_return"), 0.0) > 0.0,
-            "oos_return_beats_baseline": _safe_float(oos.get("total_return"), 0.0) > BASELINE_OOS_RETURN,
-            "oos_sharpe_beats_funding_guard": _safe_float(oos.get("sharpe"), 0.0) > FUNDING_GUARD_OOS_SHARPE,
-            "oos_mdd_beats_funding_guard": _safe_float(oos.get("max_drawdown"), 1.0) < FUNDING_GUARD_OOS_MDD,
+            "oos_return_beats_baseline": _safe_float(oos.get("total_return"), 0.0)
+            > BASELINE_OOS_RETURN,
+            "oos_sharpe_beats_funding_guard": _safe_float(oos.get("sharpe"), 0.0)
+            > FUNDING_GUARD_OOS_SHARPE,
+            "oos_mdd_beats_funding_guard": _safe_float(oos.get("max_drawdown"), 1.0)
+            < FUNDING_GUARD_OOS_MDD,
             "oos_sharpe_gt_1": _safe_float(oos.get("sharpe"), 0.0) > 1.0,
             "oos_trades_not_starved": int(split_results["oos"].get("round_trips") or 0) >= 5,
         }
@@ -495,7 +533,9 @@ def _evaluate_specs(
         row: dict[str, Any] = {
             "name": spec.name,
             "filters": json.dumps(spec.filters_payload(), sort_keys=True),
-            "reject_top": json.dumps(split_results["oos"].get("reject_counts") or {}, sort_keys=True),
+            "reject_top": json.dumps(
+                split_results["oos"].get("reject_counts") or {}, sort_keys=True
+            ),
             "absolute_gate_shape": bool(absolute_shape),
             "success_candidate": bool(absolute_shape and absolute_gates["oos_sharpe_gt_1"]),
             "replay_survivor": False,
@@ -523,17 +563,29 @@ def _evaluate_specs(
     by_name = {str(row["name"]): row for row in rows}
     replay_base = by_name.get("replay_base_12h_threshold_100bp", {})
     replay_guard = by_name.get("replay_funding_guard_current_threshold_80bp", {})
-    replay_return_floor = max(_safe_float(replay_base.get("oos_total_return"), 0.0), _safe_float(replay_guard.get("oos_total_return"), 0.0))
-    replay_sharpe_floor = max(_safe_float(replay_base.get("oos_sharpe"), 0.0), _safe_float(replay_guard.get("oos_sharpe"), 0.0))
-    replay_mdd_floor = min(_safe_float(replay_base.get("oos_max_drawdown"), 1.0), _safe_float(replay_guard.get("oos_max_drawdown"), 1.0))
+    replay_return_floor = max(
+        _safe_float(replay_base.get("oos_total_return"), 0.0),
+        _safe_float(replay_guard.get("oos_total_return"), 0.0),
+    )
+    replay_sharpe_floor = max(
+        _safe_float(replay_base.get("oos_sharpe"), 0.0),
+        _safe_float(replay_guard.get("oos_sharpe"), 0.0),
+    )
+    replay_mdd_floor = min(
+        _safe_float(replay_base.get("oos_max_drawdown"), 1.0),
+        _safe_float(replay_guard.get("oos_max_drawdown"), 1.0),
+    )
     result_by_name = {str(item["name"]): item for item in results}
     for row in rows:
         relative_gates = {
             "train_positive": _safe_float(row.get("train_total_return"), 0.0) > 0.0,
             "val_positive": _safe_float(row.get("val_total_return"), 0.0) > 0.0,
-            "oos_return_beats_replay_incumbents": _safe_float(row.get("oos_total_return"), 0.0) > replay_return_floor,
-            "oos_sharpe_beats_replay_incumbents": _safe_float(row.get("oos_sharpe"), 0.0) > replay_sharpe_floor,
-            "oos_mdd_beats_replay_incumbents": _safe_float(row.get("oos_max_drawdown"), 1.0) < replay_mdd_floor,
+            "oos_return_beats_replay_incumbents": _safe_float(row.get("oos_total_return"), 0.0)
+            > replay_return_floor,
+            "oos_sharpe_beats_replay_incumbents": _safe_float(row.get("oos_sharpe"), 0.0)
+            > replay_sharpe_floor,
+            "oos_mdd_beats_replay_incumbents": _safe_float(row.get("oos_max_drawdown"), 1.0)
+            < replay_mdd_floor,
             "oos_trades_not_starved": int(row.get("oos_round_trips") or 0) >= 5,
         }
         survivor = all(relative_gates.values())
@@ -643,7 +695,9 @@ def build_replay(
     splits = _split_windows(oos_end=oos_end)
     load_start = min(split.start for split in splits)
     load_end = max(split.end for split in splits)
-    panel, data_metadata = _joined_exchange_panel(market_root=market_root, exchange=exchange, start=load_start, end=load_end)
+    panel, data_metadata = _joined_exchange_panel(
+        market_root=market_root, exchange=exchange, start=load_start, end=load_end
+    )
     arrays = _build_exchange_arrays(panel)
     specs = _candidate_specs()
     rows, results = _evaluate_specs(specs=specs, arrays=arrays, splits=splits)
@@ -652,7 +706,9 @@ def build_replay(
     tickmill_status = "missing_report"
     if tickmill_path.exists():
         try:
-            tickmill_status = str(json.loads(tickmill_path.read_text(encoding="utf-8")).get("status") or "unknown")
+            tickmill_status = str(
+                json.loads(tickmill_path.read_text(encoding="utf-8")).get("status") or "unknown"
+            )
         except Exception:
             tickmill_status = "unreadable_report"
     payload: dict[str, Any] = {
@@ -688,10 +744,15 @@ def build_replay(
     json_path = output_dir / "stateful_replay_candidates_latest.json"
     csv_path = output_dir / "stateful_replay_candidates_latest.csv"
     md_path = output_dir / "stateful_replay_candidates_latest.md"
-    json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    json_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     _write_csv(csv_path, rows)
     md_path.write_text(_markdown(payload, rows), encoding="utf-8")
-    return {"payload": payload, "paths": {"json": str(json_path), "csv": str(csv_path), "markdown": str(md_path)}}
+    return {
+        "payload": payload,
+        "paths": {"json": str(json_path), "csv": str(csv_path), "markdown": str(md_path)},
+    }
 
 
 def _parser() -> argparse.ArgumentParser:

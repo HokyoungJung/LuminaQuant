@@ -22,7 +22,11 @@ SPEC.loader.exec_module(MODULE)
 def _portfolio_payload(*, returns: dict[str, list[float]]) -> dict:
     def _stream(values: list[float], start_day: int) -> list[dict[str, float | str]]:
         return [
-            {"datetime": f"2026-0{start_day + idx}-01T00:00:00Z", "t": f"2026-0{start_day + idx}-01T00:00:00Z", "v": value}
+            {
+                "datetime": f"2026-0{start_day + idx}-01T00:00:00Z",
+                "t": f"2026-0{start_day + idx}-01T00:00:00Z",
+                "v": value,
+            }
             for idx, value in enumerate(values)
         ]
 
@@ -31,9 +35,9 @@ def _portfolio_payload(*, returns: dict[str, list[float]]) -> dict:
         "val": _stream(returns["val"], 2),
         "oos": _stream(returns["oos"], 3),
     }
-    metrics = MODULE.evaluate_weighted_portfolio([
-        {"_saved_weight": 1.0, "return_streams": streams, "train": {}, "val": {}, "oos": {}}
-    ])["portfolio_metrics"]
+    metrics = MODULE.evaluate_weighted_portfolio(
+        [{"_saved_weight": 1.0, "return_streams": streams, "train": {}, "val": {}, "oos": {}}]
+    )["portfolio_metrics"]
     return {"portfolio_metrics": metrics, "portfolio_return_streams": streams}
 
 
@@ -65,7 +69,10 @@ def _hybrid_payload(*, returns: dict[str, list[float]]) -> dict:
                 "dates": expanded_dates,
                 "daily_returns": daily_returns,
                 "split_metrics": metrics,
-                "final_allocation": {"weights": {"balanced_overlay_80_20": 0.6}, "cash_weight": 0.4},
+                "final_allocation": {
+                    "weights": {"balanced_overlay_80_20": 0.6},
+                    "cash_weight": 0.4,
+                },
             }
         },
         "readiness": {"recommended_stage": "pilot_candidate"},
@@ -87,15 +94,38 @@ def _carry_report_row(name: str, *, train: list[float], val: list[float], oos: l
     }
 
 
-def test_build_production_guarded_portfolio_can_include_positive_carry_candidate(tmp_path: Path) -> None:
+def test_build_production_guarded_portfolio_can_include_positive_carry_candidate(
+    tmp_path: Path,
+) -> None:
     hybrid_path = tmp_path / "hybrid.json"
     static_path = tmp_path / "static.json"
     incumbent_path = tmp_path / "incumbent.json"
     carry_report = tmp_path / "candidate_research_latest.json"
 
-    hybrid_path.write_text(json.dumps(_hybrid_payload(returns={"train": [0.01, 0.01], "val": [0.015, 0.01], "oos": [0.02, 0.015]})), encoding="utf-8")
-    static_path.write_text(json.dumps(_portfolio_payload(returns={"train": [0.008, 0.009], "val": [0.01, 0.011], "oos": [0.012, 0.011]})), encoding="utf-8")
-    incumbent_path.write_text(json.dumps(_portfolio_payload(returns={"train": [0.007, 0.007], "val": [0.008, 0.008], "oos": [0.009, 0.009]})), encoding="utf-8")
+    hybrid_path.write_text(
+        json.dumps(
+            _hybrid_payload(
+                returns={"train": [0.01, 0.01], "val": [0.015, 0.01], "oos": [0.02, 0.015]}
+            )
+        ),
+        encoding="utf-8",
+    )
+    static_path.write_text(
+        json.dumps(
+            _portfolio_payload(
+                returns={"train": [0.008, 0.009], "val": [0.01, 0.011], "oos": [0.012, 0.011]}
+            )
+        ),
+        encoding="utf-8",
+    )
+    incumbent_path.write_text(
+        json.dumps(
+            _portfolio_payload(
+                returns={"train": [0.007, 0.007], "val": [0.008, 0.008], "oos": [0.009, 0.009]}
+            )
+        ),
+        encoding="utf-8",
+    )
     carry_report.write_text(
         json.dumps(
             {
@@ -129,21 +159,61 @@ def test_build_production_guarded_portfolio_can_include_positive_carry_candidate
 
     assert payload["artifact_kind"] == MODULE.ARTIFACT_KIND
     assert payload["cash_weight"] > 0.0
-    assert payload["carry_candidate_considered"]["selected_name"] == "carry_trend_factor_rotation_1h_guarded"
+    assert (
+        payload["carry_candidate_considered"]["selected_name"]
+        == "carry_trend_factor_rotation_1h_guarded"
+    )
     assert payload["carry_candidate_included"] is True
-    assert any(row["candidate_id"] == "carry_trend_factor_rotation_1h_guarded" for row in payload["weights"])
+    assert any(
+        row["candidate_id"] == "carry_trend_factor_rotation_1h_guarded"
+        for row in payload["weights"]
+    )
 
 
-
-def test_build_production_guarded_portfolio_excludes_unhealthy_carry_and_throttles_drawdown(tmp_path: Path) -> None:
+def test_build_production_guarded_portfolio_excludes_unhealthy_carry_and_throttles_drawdown(
+    tmp_path: Path,
+) -> None:
     hybrid_path = tmp_path / "hybrid.json"
     static_path = tmp_path / "static.json"
     incumbent_path = tmp_path / "incumbent.json"
     carry_report = tmp_path / "candidate_research_latest.json"
 
-    hybrid_path.write_text(json.dumps(_hybrid_payload(returns={"train": [0.02, -0.03, 0.03], "val": [0.015, -0.025, 0.02], "oos": [0.01, -0.03, 0.025]})), encoding="utf-8")
-    static_path.write_text(json.dumps(_portfolio_payload(returns={"train": [0.01, 0.0, 0.01], "val": [0.008, 0.0, 0.008], "oos": [0.006, 0.0, 0.006]})), encoding="utf-8")
-    incumbent_path.write_text(json.dumps(_portfolio_payload(returns={"train": [0.009, 0.0, 0.009], "val": [0.007, 0.0, 0.007], "oos": [0.005, 0.0, 0.005]})), encoding="utf-8")
+    hybrid_path.write_text(
+        json.dumps(
+            _hybrid_payload(
+                returns={
+                    "train": [0.02, -0.03, 0.03],
+                    "val": [0.015, -0.025, 0.02],
+                    "oos": [0.01, -0.03, 0.025],
+                }
+            )
+        ),
+        encoding="utf-8",
+    )
+    static_path.write_text(
+        json.dumps(
+            _portfolio_payload(
+                returns={
+                    "train": [0.01, 0.0, 0.01],
+                    "val": [0.008, 0.0, 0.008],
+                    "oos": [0.006, 0.0, 0.006],
+                }
+            )
+        ),
+        encoding="utf-8",
+    )
+    incumbent_path.write_text(
+        json.dumps(
+            _portfolio_payload(
+                returns={
+                    "train": [0.009, 0.0, 0.009],
+                    "val": [0.007, 0.0, 0.007],
+                    "oos": [0.005, 0.0, 0.005],
+                }
+            )
+        ),
+        encoding="utf-8",
+    )
     carry_report.write_text(
         json.dumps(
             {
@@ -176,7 +246,10 @@ def test_build_production_guarded_portfolio_excludes_unhealthy_carry_and_throttl
     )
 
     assert payload["carry_candidate_included"] is False
-    assert payload["carry_candidate_considered"]["excluded_reason"] == "no_carry_candidate_cleared_production_safety_filters"
+    assert (
+        payload["carry_candidate_considered"]["excluded_reason"]
+        == "no_carry_candidate_cleared_production_safety_filters"
+    )
     throttled, schedule = MODULE._apply_drawdown_throttle(
         {
             "train": [

@@ -24,9 +24,13 @@ _hard = importlib.util.module_from_spec(_hard_spec)
 sys.modules[_hard_spec.name] = _hard
 _hard_spec.loader.exec_module(_hard)
 
-DEFAULT_OUTPUT_DIR = FOLLOWUP_ROOT / "portfolio_incumbent_autoresearch_grouped" / "monthly_attribution_current"
+DEFAULT_OUTPUT_DIR = (
+    FOLLOWUP_ROOT / "portfolio_incumbent_autoresearch_grouped" / "monthly_attribution_current"
+)
 DEFAULT_BLEND_PATH = _hard.DEFAULT_BLEND_PATH
-DEFAULT_HARD_ALLOCATOR_PATH = _hard.DEFAULT_OUTPUT_DIR / "three_way_market_regime_allocator_latest.json"
+DEFAULT_HARD_ALLOCATOR_PATH = (
+    _hard.DEFAULT_OUTPUT_DIR / "three_way_market_regime_allocator_latest.json"
+)
 DEFAULT_SOFT_ALLOCATOR_PATH = (
     FOLLOWUP_ROOT
     / "portfolio_incumbent_autoresearch_grouped"
@@ -49,7 +53,9 @@ def _load_allocator_returns(path: Path, *, label: str) -> pd.DataFrame:
     )
     if frame.empty:
         raise ValueError(f"{label}: missing daily returns in {path}")
-    frame["split_group"] = frame["date"].map(lambda day: _hard.split_for_date(pd.Timestamp(day).date()))
+    frame["split_group"] = frame["date"].map(
+        lambda day: _hard.split_for_date(pd.Timestamp(day).date())
+    )
     return frame
 
 
@@ -106,7 +112,9 @@ def _build_markdown(payload: dict[str, Any]) -> str:
             f"- {item['label']}: train `{item['train_return']:.4%}` | val `{item['val_return']:.4%}` | oos `{item['oos_return']:.4%}` | oos_sharpe `{item['oos_sharpe']:.4f}`"
         )
     lines.extend(["", "## Monthly table"])
-    lines.append("| split | month | incumbent | blend_85_15 | autoresearch_55_45 | hard_allocator | soft_allocator | winner |")
+    lines.append(
+        "| split | month | incumbent | blend_85_15 | autoresearch_55_45 | hard_allocator | soft_allocator | winner |"
+    )
     lines.append("|---|---|---:|---:|---:|---:|---:|---|")
     for row in payload["monthly_rows"]:
         lines.append(
@@ -130,9 +138,15 @@ def run_grouped_regime_monthly_attribution(
     output_dir: Path,
 ) -> dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
-    incumbent = _hard._load_candidate_frame(label="incumbent", path=incumbent_path).rename(columns={"return": "incumbent"})
-    blend = _hard._load_candidate_frame(label="blend_85_15", path=blend_path).rename(columns={"return": "blend_85_15"})
-    autoresearch = _hard._load_candidate_frame(label="autoresearch_55_45", path=autoresearch_path).rename(columns={"return": "autoresearch_55_45"})
+    incumbent = _hard._load_candidate_frame(label="incumbent", path=incumbent_path).rename(
+        columns={"return": "incumbent"}
+    )
+    blend = _hard._load_candidate_frame(label="blend_85_15", path=blend_path).rename(
+        columns={"return": "blend_85_15"}
+    )
+    autoresearch = _hard._load_candidate_frame(
+        label="autoresearch_55_45", path=autoresearch_path
+    ).rename(columns={"return": "autoresearch_55_45"})
     hard_alloc = _load_allocator_returns(hard_allocator_path, label="hard_allocator")
     soft_alloc = _load_allocator_returns(soft_allocator_path, label="soft_allocator")
     panel = (
@@ -144,7 +158,13 @@ def run_grouped_regime_monthly_attribution(
         .sort_values("date")
         .reset_index(drop=True)
     )
-    value_columns = ["incumbent", "blend_85_15", "autoresearch_55_45", "hard_allocator", "soft_allocator"]
+    value_columns = [
+        "incumbent",
+        "blend_85_15",
+        "autoresearch_55_45",
+        "hard_allocator",
+        "soft_allocator",
+    ]
     monthly = _monthly_return_table(panel, value_columns=value_columns)
     hard_state = _monthly_state_summary(hard_allocator_path, label="hard")
     soft_state = _monthly_state_summary(soft_allocator_path, label="soft")
@@ -159,7 +179,9 @@ def run_grouped_regime_monthly_attribution(
 
     summary_rows = []
     for label in value_columns:
-        metrics = _hard._metrics_by_split(panel.rename(columns={label: "metric_return"}), "metric_return")
+        metrics = _hard._metrics_by_split(
+            panel.rename(columns={label: "metric_return"}), "metric_return"
+        )
         summary_rows.append(
             {
                 "label": label,
@@ -202,7 +224,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--incumbent-path", type=Path, default=resolve_current_optimization_path())
     parser.add_argument("--blend-path", type=Path, default=DEFAULT_BLEND_PATH)
-    parser.add_argument("--autoresearch-path", type=Path, default=_hard._resolve_autoresearch_default_path())
+    parser.add_argument(
+        "--autoresearch-path", type=Path, default=_hard._resolve_autoresearch_default_path()
+    )
     parser.add_argument("--hard-allocator-path", type=Path, default=DEFAULT_HARD_ALLOCATOR_PATH)
     parser.add_argument("--soft-allocator-path", type=Path, default=DEFAULT_SOFT_ALLOCATOR_PATH)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)

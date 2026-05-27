@@ -23,14 +23,18 @@ from lumina_quant.portfolio.optimizer_core import (
 ROOT = Path(__file__).resolve().parents[1]
 HYBRID_MODULE_PATH = ROOT / "scripts" / "research" / "optuna_tune_hybrid_online_portfolio.py"
 HYBRID_TUNING_MODULE_PATH = ROOT / "scripts" / "research" / "tune_hybrid_online_portfolio.py"
-SPEC = importlib.util.spec_from_file_location("optuna_tune_hybrid_online_portfolio", HYBRID_MODULE_PATH)
+SPEC = importlib.util.spec_from_file_location(
+    "optuna_tune_hybrid_online_portfolio", HYBRID_MODULE_PATH
+)
 if SPEC is None or SPEC.loader is None:
     raise RuntimeError("Failed to load optuna_tune_hybrid_online_portfolio module")
 hybrid_optuna = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = hybrid_optuna
 SPEC.loader.exec_module(hybrid_optuna)
 
-TUNING_SPEC = importlib.util.spec_from_file_location("tune_hybrid_online_portfolio", HYBRID_TUNING_MODULE_PATH)
+TUNING_SPEC = importlib.util.spec_from_file_location(
+    "tune_hybrid_online_portfolio", HYBRID_TUNING_MODULE_PATH
+)
 if TUNING_SPEC is None or TUNING_SPEC.loader is None:
     raise RuntimeError("Failed to load tune_hybrid_online_portfolio module")
 hybrid_tuning = importlib.util.module_from_spec(TUNING_SPEC)
@@ -70,12 +74,12 @@ def test_stream_cache_aggregates_timestamps_and_reuses_aligned_returns() -> None
         "2026-01-03T00:00:00Z",
     ]
     assert [point["v"] for point in stream] == pytest.approx([0.0075, 0.0175, 0.01])
-    assert build_portfolio_returns({"a": 0.5, "b": 0.25}, rows, split="val", cache=cache).tolist() == pytest.approx(
-        [0.0075, 0.0175, 0.01]
-    )
-    assert build_portfolio_returns({"b": 1.0}, rows, split="val", cache=StreamCache()).tolist() == pytest.approx(
-        [0.03, 0.04]
-    )
+    assert build_portfolio_returns(
+        {"a": 0.5, "b": 0.25}, rows, split="val", cache=cache
+    ).tolist() == pytest.approx([0.0075, 0.0175, 0.01])
+    assert build_portfolio_returns(
+        {"b": 1.0}, rows, split="val", cache=StreamCache()
+    ).tolist() == pytest.approx([0.03, 0.04])
     assert canonical_split("test_oos", default="val") == "oos"
 
 
@@ -91,7 +95,11 @@ def test_apply_caps_enforces_strategy_asset_and_metals_exposure() -> None:
     records = {
         "trend_btc": {"candidate_id": "trend_btc", "family": "trend", "symbols": ["BTC/USDT"]},
         "trend_eth": {"candidate_id": "trend_eth", "family": "trend", "symbols": ["ETH/USDT"]},
-        "metal_mix": {"candidate_id": "metal_mix", "family": "macro", "symbols": ["XAU/USDT", "BTC/USDT"]},
+        "metal_mix": {
+            "candidate_id": "metal_mix",
+            "family": "macro",
+            "symbols": ["XAU/USDT", "BTC/USDT"],
+        },
     }
     weights, caps = apply_caps(
         {"trend_btc": 0.80, "trend_eth": 0.10, "metal_mix": 0.10},
@@ -111,7 +119,11 @@ def test_apply_caps_enforces_strategy_asset_and_metals_exposure() -> None:
 
 def test_apply_caps_reserves_cash_when_asset_cap_limits_all_candidates() -> None:
     records = {
-        f"btc_{idx}": {"candidate_id": f"btc_{idx}", "family": f"family_{idx}", "symbols": ["BTC/USDT"]}
+        f"btc_{idx}": {
+            "candidate_id": f"btc_{idx}",
+            "family": f"family_{idx}",
+            "symbols": ["BTC/USDT"],
+        }
         for idx in range(3)
     }
 
@@ -173,14 +185,20 @@ def test_hybrid_optuna_locked_profile_ignores_oos_metrics() -> None:
         "max_drawdown": 0.0,
     }
 
-    assert hybrid_optuna._objective_policy_for_profile("locked_train_val")["objective_policy"] == LOCKED_OOS_OBJECTIVE_POLICY
+    assert (
+        hybrid_optuna._objective_policy_for_profile("locked_train_val")["objective_policy"]
+        == LOCKED_OOS_OBJECTIVE_POLICY
+    )
     assert hybrid_optuna._objective_from_payload(base, profile="locked_train_val") == pytest.approx(
         hybrid_optuna._objective_from_payload(better_oos_only, profile="locked_train_val")
     )
     assert hybrid_tuning._objective(base, profile="locked_train_val") == pytest.approx(
         hybrid_tuning._objective(better_oos_only, profile="locked_train_val")
     )
-    assert hybrid_tuning._objective_policy_for_profile("locked_train_val")["objective_policy"] == LOCKED_OOS_OBJECTIVE_POLICY
+    assert (
+        hybrid_tuning._objective_policy_for_profile("locked_train_val")["objective_policy"]
+        == LOCKED_OOS_OBJECTIVE_POLICY
+    )
     assert hybrid_optuna._objective_from_payload(base, profile="live_guarded") != pytest.approx(
         hybrid_optuna._objective_from_payload(better_oos_only, profile="live_guarded")
     )

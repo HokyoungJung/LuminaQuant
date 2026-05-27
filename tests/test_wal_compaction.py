@@ -57,7 +57,9 @@ def test_wal_compaction_merges_into_monthly_parquet_and_dedupes(tmp_path: Path):
         ),
     )
 
-    results = repo.compact_all(exchange="binance", symbol=symbol, timeframe="1s", remove_sources=True)
+    results = repo.compact_all(
+        exchange="binance", symbol=symbol, timeframe="1s", remove_sources=True
+    )
     assert results
 
     symbol_root = tmp_path / "market_ohlcv_1s" / "binance" / "BTCUSDT"

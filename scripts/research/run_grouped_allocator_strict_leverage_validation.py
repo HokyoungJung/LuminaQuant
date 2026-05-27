@@ -117,7 +117,9 @@ def _candidate_list_from_any_json(path: Path) -> list[dict[str, Any]]:
     if isinstance(payload, list):
         return [dict(row) for row in payload if isinstance(row, dict)]
     if isinstance(payload, dict):
-        rows = payload.get("candidates") or payload.get("selected_team") or payload.get("rows") or []
+        rows = (
+            payload.get("candidates") or payload.get("selected_team") or payload.get("rows") or []
+        )
         return [dict(row) for row in rows if isinstance(row, dict)]
     return []
 
@@ -129,7 +131,9 @@ def _matches_candidate_row(
     candidate_name: str,
 ) -> bool:
     row_id, row_name = _candidate_key(row)
-    return bool(candidate_id and row_id == candidate_id) or bool(candidate_name and row_name == candidate_name)
+    return bool(candidate_id and row_id == candidate_id) or bool(
+        candidate_name and row_name == candidate_name
+    )
 
 
 def _resolve_candidate_from_strict_cache(
@@ -152,7 +156,9 @@ def _resolve_candidate_from_strict_cache(
         for row in list(payload.get("candidates") or []):
             if not isinstance(row, dict):
                 continue
-            if _matches_candidate_row(row, candidate_id=candidate_id, candidate_name=candidate_name):
+            if _matches_candidate_row(
+                row, candidate_id=candidate_id, candidate_name=candidate_name
+            ):
                 resolved = dict(row)
                 resolved.setdefault("source_path", str(cache_path))
                 resolved.setdefault("artifact_path", str(cache_path))
@@ -180,11 +186,15 @@ def _resolve_candidate_from_source_component(component: dict[str, Any]) -> dict[
     candidate_id = str(component.get("candidate_id") or "").strip()
     candidate_name = str(component.get("name") or "").strip()
     raw_artifact_path = str(component.get("artifact_path") or "").strip()
-    artifact_path = resolve_followup_artifact_path(raw_artifact_path) if raw_artifact_path else Path()
+    artifact_path = (
+        resolve_followup_artifact_path(raw_artifact_path) if raw_artifact_path else Path()
+    )
     if raw_artifact_path and artifact_path.exists():
         rows = _candidate_list_from_any_json(artifact_path)
         for row in rows:
-            if _matches_candidate_row(row, candidate_id=candidate_id, candidate_name=candidate_name):
+            if _matches_candidate_row(
+                row, candidate_id=candidate_id, candidate_name=candidate_name
+            ):
                 return dict(row)
 
     cached = _resolve_candidate_from_strict_cache(
@@ -200,29 +210,43 @@ def _resolve_candidate_from_source_component(component: dict[str, Any]) -> dict[
     )
 
 
-def _resolve_portfolio_candidates(*, bundle_payload: dict[str, Any] | None = None, portfolio_payload: dict[str, Any]) -> list[dict[str, Any]]:
+def _resolve_portfolio_candidates(
+    *, bundle_payload: dict[str, Any] | None = None, portfolio_payload: dict[str, Any]
+) -> list[dict[str, Any]]:
     if bundle_payload is not None:
         rows = bundle_payload.get("selected_team") or bundle_payload.get("candidates") or []
         if rows:
             return [dict(row) for row in rows if isinstance(row, dict)]
 
-    direct_rows = portfolio_payload.get("selected_team") or portfolio_payload.get("candidates") or []
+    direct_rows = (
+        portfolio_payload.get("selected_team") or portfolio_payload.get("candidates") or []
+    )
     direct_candidates = [dict(row) for row in direct_rows if isinstance(row, dict)]
     if direct_candidates and any(isinstance(row.get("params"), dict) for row in direct_candidates):
         return direct_candidates
 
     source_components = list(portfolio_payload.get("source_components") or [])
     if source_components:
-        return [_resolve_candidate_from_source_component(dict(component)) for component in source_components if isinstance(component, dict)]
+        return [
+            _resolve_candidate_from_source_component(dict(component))
+            for component in source_components
+            if isinstance(component, dict)
+        ]
 
-    weights = [dict(row) for row in list(portfolio_payload.get("weights") or []) if isinstance(row, dict)]
+    weights = [
+        dict(row) for row in list(portfolio_payload.get("weights") or []) if isinstance(row, dict)
+    ]
     if weights and all(isinstance(row.get("params"), dict) for row in weights):
         return weights
 
-    raise RuntimeError("portfolio artifact does not contain resolvable candidate definitions with params")
+    raise RuntimeError(
+        "portfolio artifact does not contain resolvable candidate definitions with params"
+    )
 
 
-def _apply_group_leverage(candidates: list[dict[str, Any]], *, leverage: int) -> list[dict[str, Any]]:
+def _apply_group_leverage(
+    candidates: list[dict[str, Any]], *, leverage: int
+) -> list[dict[str, Any]]:
     resolved: list[dict[str, Any]] = []
     lev = max(1, int(leverage))
     for candidate in candidates:
@@ -256,7 +280,9 @@ def _strategy_timeframes(candidates: list[dict[str, Any]]) -> list[str]:
     )
 
 
-def _strict_candidate_report(*, candidates: list[dict[str, Any]], split: dict[str, str]) -> dict[str, Any]:
+def _strict_candidate_report(
+    *, candidates: list[dict[str, Any]], split: dict[str, str]
+) -> dict[str, Any]:
     symbols = _symbol_universe(candidates)
     timeframes = _strategy_timeframes(candidates)
     if not symbols or not timeframes:
@@ -298,7 +324,9 @@ def _apply_candidate_level_leverage_to_stream(
             except (TypeError, ValueError):
                 raw_numeric = None
             if raw_numeric is not None:
-                unit = "ms" if abs(raw_numeric) >= 1e12 else "s" if abs(raw_numeric) >= 1e9 else None
+                unit = (
+                    "ms" if abs(raw_numeric) >= 1e12 else "s" if abs(raw_numeric) >= 1e9 else None
+                )
                 parsed = (
                     pd.to_datetime(raw_numeric, unit=unit, utc=True, errors="coerce")
                     if unit is not None
@@ -331,7 +359,9 @@ def _apply_candidate_level_leverage_to_stream(
         leverage_by_state={str(label): int(leverage)},
     )
     out: list[dict[str, Any]] = []
-    for base_row, tuned_row in zip(frame.to_dict(orient="records"), tuned.to_dict(orient="records"), strict=False):
+    for base_row, tuned_row in zip(
+        frame.to_dict(orient="records"), tuned.to_dict(orient="records"), strict=False
+    ):
         item: dict[str, Any] = {
             "v": float(tuned_row.get("leveraged_return", 0.0)),
             "t": base_row.get("raw_t") or pd.Timestamp(base_row["date"]).isoformat(),
@@ -345,12 +375,16 @@ def _apply_candidate_level_leverage_to_stream(
     return out, int(liquidation_counts.get(str(label), 0))
 
 
-def _apply_candidate_level_leverage_to_rows(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, int]]:
+def _apply_candidate_level_leverage_to_rows(
+    rows: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, int]]:
     leveraged_rows: list[dict[str, Any]] = []
     liquidation_counts: dict[str, int] = {}
     for row in list(rows or []):
         updated = copy.deepcopy(row)
-        leverage = max(1, int((updated.get("params") or {}).get("leverage", updated.get("leverage", 1)) or 1))
+        leverage = max(
+            1, int((updated.get("params") or {}).get("leverage", updated.get("leverage", 1)) or 1)
+        )
         total_liquidations = 0
         original_streams = dict(updated.get("return_streams") or {})
         leveraged_streams: dict[str, list[dict[str, Any]]] = {}
@@ -367,7 +401,9 @@ def _apply_candidate_level_leverage_to_rows(rows: list[dict[str, Any]]) -> tuple
         metadata["candidate_level_leverage"] = leverage
         metadata["candidate_level_liquidation_count"] = total_liquidations
         updated["metadata"] = metadata
-        liquidation_counts[str(updated.get("candidate_id") or updated.get("name") or "candidate")] = total_liquidations
+        liquidation_counts[
+            str(updated.get("candidate_id") or updated.get("name") or "candidate")
+        ] = total_liquidations
         leveraged_rows.append(updated)
     return leveraged_rows, liquidation_counts
 
@@ -389,15 +425,25 @@ def _build_group_portfolio_payload(
         "generated_at": _utc_now_iso(),
         "selection_basis": "strict_candidate_level_leverage_research",
         "source_portfolio_path": str(source_path.resolve()),
-        "source_artifact_kind": str(source_payload.get("artifact_kind") or "portfolio_optimization"),
+        "source_artifact_kind": str(
+            source_payload.get("artifact_kind") or "portfolio_optimization"
+        ),
         "configured_group_leverage": int(leverage),
-        "weights": [dict(row) for row in list(source_payload.get("weights") or []) if isinstance(row, dict)],
-        "source_components": [dict(row) for row in list(source_payload.get("source_components") or []) if isinstance(row, dict)],
+        "weights": [
+            dict(row) for row in list(source_payload.get("weights") or []) if isinstance(row, dict)
+        ],
+        "source_components": [
+            dict(row)
+            for row in list(source_payload.get("source_components") or [])
+            if isinstance(row, dict)
+        ],
         "portfolio_metrics": dict(eval_payload.get("portfolio_metrics") or {}),
         "portfolio_return_streams": daily_streams,
         "portfolio_daily_return_streams": daily_streams,
         "portfolio_intraday_return_streams": raw_streams,
-        "weighted_component_summaries": dict(eval_payload.get("weighted_component_summaries") or {}),
+        "weighted_component_summaries": dict(
+            eval_payload.get("weighted_component_summaries") or {}
+        ),
         "component_rows": list(eval_payload.get("component_rows") or []),
         "oos_monthly_returns": list(eval_payload.get("oos_monthly_returns") or []),
         "sensitivity": dict(eval_payload.get("sensitivity") or {}),
@@ -413,7 +459,9 @@ def _build_group_portfolio_payload(
                 "strategy_class": row.get("strategy_class"),
                 "timeframe": row.get("strategy_timeframe") or row.get("timeframe"),
                 "symbols": list(row.get("symbols") or []),
-                "leverage": int((row.get("params") or {}).get("leverage", row.get("leverage", leverage))),
+                "leverage": int(
+                    (row.get("params") or {}).get("leverage", row.get("leverage", leverage))
+                ),
                 "liquidation_count": int((row.get("metadata") or {}).get("liquidation_count") or 0),
             }
             for row in refreshed_rows
@@ -475,12 +523,19 @@ def _build_blend_payload(
             str(Path(str(incumbent_payload.get("source_portfolio_path") or "")).resolve()),
             str(Path(str(autoresearch_payload.get("source_portfolio_path") or "")).resolve()),
         ],
-        "weight_grid": [{"current_one_shot_incumbent": incumbent_weight, "autoresearch_pair_55_45": autoresearch_weight}],
+        "weight_grid": [
+            {
+                "current_one_shot_incumbent": incumbent_weight,
+                "autoresearch_pair_55_45": autoresearch_weight,
+            }
+        ],
         "validation_objective": float(
             _three_way._objective(
                 dict((eval_payload.get("portfolio_metrics") or {}).get("val") or {}),
                 turnover_fraction=float(
-                    ((eval_payload.get("weighted_component_summaries") or {}).get("val") or {}).get("turnover", 0.0)
+                    ((eval_payload.get("weighted_component_summaries") or {}).get("val") or {}).get(
+                        "turnover", 0.0
+                    )
                 ),
             )
         ),
@@ -489,17 +544,36 @@ def _build_blend_payload(
         "portfolio_return_streams": daily_streams,
         "portfolio_daily_return_streams": daily_streams,
         "portfolio_intraday_return_streams": raw_streams,
-        "weighted_component_summaries": dict(eval_payload.get("weighted_component_summaries") or {}),
+        "weighted_component_summaries": dict(
+            eval_payload.get("weighted_component_summaries") or {}
+        ),
         "component_rows": list(eval_payload.get("component_rows") or []),
         "oos_monthly_returns": list(eval_payload.get("oos_monthly_returns") or []),
         "sensitivity": dict(eval_payload.get("sensitivity") or {}),
-        "dates": [str(item.get("t")) for item in list((eval_payload.get("portfolio_daily_return_streams") or {}).get("train") or [])]
-        + [str(item.get("t")) for item in list((eval_payload.get("portfolio_daily_return_streams") or {}).get("val") or [])]
-        + [str(item.get("t")) for item in list((eval_payload.get("portfolio_daily_return_streams") or {}).get("oos") or [])],
+        "dates": [
+            str(item.get("t"))
+            for item in list(
+                (eval_payload.get("portfolio_daily_return_streams") or {}).get("train") or []
+            )
+        ]
+        + [
+            str(item.get("t"))
+            for item in list(
+                (eval_payload.get("portfolio_daily_return_streams") or {}).get("val") or []
+            )
+        ]
+        + [
+            str(item.get("t"))
+            for item in list(
+                (eval_payload.get("portfolio_daily_return_streams") or {}).get("oos") or []
+            )
+        ],
         "daily_returns": [
             float(item.get("v", 0.0))
             for split in ("train", "val", "oos")
-            for item in list((eval_payload.get("portfolio_daily_return_streams") or {}).get(split) or [])
+            for item in list(
+                (eval_payload.get("portfolio_daily_return_streams") or {}).get(split) or []
+            )
         ],
         "group_universe": ["current_one_shot_incumbent", "autoresearch_pair_55_45"],
         "notes": [
@@ -509,21 +583,27 @@ def _build_blend_payload(
     }
 
 
-def _write_payload(*, payload: dict[str, Any], output_dir: Path, stem: str, markdown: str) -> dict[str, Path]:
+def _write_payload(
+    *, payload: dict[str, Any], output_dir: Path, stem: str, markdown: str
+) -> dict[str, Path]:
     output_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%SZ")
     out_json = output_dir / f"{stem}_{timestamp}.json"
     out_md = output_dir / f"{stem}_{timestamp}.md"
     latest_json = output_dir / f"{stem}_latest.json"
     latest_md = output_dir / f"{stem}_latest.md"
-    out_json.write_text(json.dumps(payload, indent=2, sort_keys=True, default=_json_default), encoding="utf-8")
+    out_json.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=_json_default), encoding="utf-8"
+    )
     out_md.write_text(markdown, encoding="utf-8")
     latest_json.write_text(out_json.read_text(encoding="utf-8"), encoding="utf-8")
     latest_md.write_text(markdown, encoding="utf-8")
     return {"json": latest_json, "md": latest_md}
 
 
-def _comparison_block(strict_metrics: dict[str, Any], baseline_metrics: dict[str, Any]) -> dict[str, dict[str, float]]:
+def _comparison_block(
+    strict_metrics: dict[str, Any], baseline_metrics: dict[str, Any]
+) -> dict[str, dict[str, float]]:
     return _validation._build_comparison(baseline_metrics, strict_metrics)
 
 
@@ -532,7 +612,9 @@ def _apply_allocator_state_leverage_to_payload(
     allocator_payload: dict[str, Any],
     leverage_by_state: dict[str, Any],
 ) -> dict[str, Any]:
-    resolved_leverage = {str(key): max(1, int(value)) for key, value in dict(leverage_by_state or {}).items()}
+    resolved_leverage = {
+        str(key): max(1, int(value)) for key, value in dict(leverage_by_state or {}).items()
+    }
     if not resolved_leverage:
         return dict(allocator_payload)
 
@@ -544,7 +626,9 @@ def _apply_allocator_state_leverage_to_payload(
     states = states.copy()
     states["date"] = pd.to_datetime(states["date"], utc=True)
     tuned, liquidation_counts = _leverage_tuning._apply_state_leverage(
-        states[["date", "split_group", "state", "return"]].rename(columns={"return": "base_return"}),
+        states[["date", "split_group", "state", "return"]].rename(
+            columns={"return": "base_return"}
+        ),
         leverage_by_state=resolved_leverage,
     )
     split_metrics = _three_way._metrics_by_split(
@@ -583,11 +667,15 @@ def _apply_allocator_state_leverage_to_payload(
 def _resolve_current_promoted_candidate(decision_payload: dict[str, Any]) -> dict[str, Any]:
     winner = dict(decision_payload.get("winner") or {})
     winner_key = str(winner.get("candidate_key") or "").strip()
-    candidates = [dict(row) for row in list(decision_payload.get("candidates") or []) if isinstance(row, dict)]
+    candidates = [
+        dict(row) for row in list(decision_payload.get("candidates") or []) if isinstance(row, dict)
+    ]
     for row in candidates:
         if str(row.get("candidate_key") or "").strip() == winner_key:
             return row
-    raise RuntimeError(f"unable to resolve promoted challenger {winner_key or 'unknown'} from decision artifact")
+    raise RuntimeError(
+        f"unable to resolve promoted challenger {winner_key or 'unknown'} from decision artifact"
+    )
 
 
 def _build_markdown(payload: dict[str, Any]) -> str:
@@ -656,17 +744,25 @@ def run_grouped_allocator_strict_leverage_validation(
     leverage_payload = _path_payload(leverage_tuning_path)
     decision_payload = _path_payload(decision_path)
 
-    leverage_by_state = dict((leverage_payload.get("best_result") or {}).get("leverage_by_state") or {})
-    resolved_incumbent_leverage = max(1, int(incumbent_leverage or leverage_by_state.get("incumbent") or 1))
+    leverage_by_state = dict(
+        (leverage_payload.get("best_result") or {}).get("leverage_by_state") or {}
+    )
+    resolved_incumbent_leverage = max(
+        1, int(incumbent_leverage or leverage_by_state.get("incumbent") or 1)
+    )
     resolved_autoresearch_leverage = max(
         1, int(autoresearch_leverage or leverage_by_state.get("autoresearch_55_45") or 1)
     )
 
-    common_oos_end = min(_portfolio_oos_end(incumbent_portfolio), _portfolio_oos_end(autoresearch_portfolio))
+    common_oos_end = min(
+        _portfolio_oos_end(incumbent_portfolio), _portfolio_oos_end(autoresearch_portfolio)
+    )
     validation_split = _validation.build_validation_split(common_oos_end)
 
     incumbent_candidates = _apply_group_leverage(
-        _resolve_portfolio_candidates(bundle_payload=incumbent_bundle, portfolio_payload=incumbent_portfolio),
+        _resolve_portfolio_candidates(
+            bundle_payload=incumbent_bundle, portfolio_payload=incumbent_portfolio
+        ),
         leverage=resolved_incumbent_leverage,
     )
     autoresearch_candidates = _apply_group_leverage(
@@ -674,10 +770,16 @@ def run_grouped_allocator_strict_leverage_validation(
         leverage=resolved_autoresearch_leverage,
     )
 
-    incumbent_report = _strict_candidate_report(candidates=incumbent_candidates, split=validation_split)
+    incumbent_report = _strict_candidate_report(
+        candidates=incumbent_candidates, split=validation_split
+    )
     incumbent_rows = _validation._saved_weight_rows(
         list(incumbent_report.get("candidates") or []),
-        [dict(row) for row in list(incumbent_portfolio.get("weights") or []) if isinstance(row, dict)],
+        [
+            dict(row)
+            for row in list(incumbent_portfolio.get("weights") or [])
+            if isinstance(row, dict)
+        ],
     )
     incumbent_rows = _apply_group_leverage(incumbent_rows, leverage=resolved_incumbent_leverage)
     incumbent_rows, incumbent_liquidations = _apply_candidate_level_leverage_to_rows(incumbent_rows)
@@ -699,13 +801,23 @@ def run_grouped_allocator_strict_leverage_validation(
         markdown=f"# strict incumbent portfolio\n\n- leverage: `{resolved_incumbent_leverage}x`\n",
     )
 
-    autoresearch_report = _strict_candidate_report(candidates=autoresearch_candidates, split=validation_split)
+    autoresearch_report = _strict_candidate_report(
+        candidates=autoresearch_candidates, split=validation_split
+    )
     autoresearch_rows = _validation._saved_weight_rows(
         list(autoresearch_report.get("candidates") or []),
-        [dict(row) for row in list(autoresearch_portfolio.get("weights") or []) if isinstance(row, dict)],
+        [
+            dict(row)
+            for row in list(autoresearch_portfolio.get("weights") or [])
+            if isinstance(row, dict)
+        ],
     )
-    autoresearch_rows = _apply_group_leverage(autoresearch_rows, leverage=resolved_autoresearch_leverage)
-    autoresearch_rows, autoresearch_liquidations = _apply_candidate_level_leverage_to_rows(autoresearch_rows)
+    autoresearch_rows = _apply_group_leverage(
+        autoresearch_rows, leverage=resolved_autoresearch_leverage
+    )
+    autoresearch_rows, autoresearch_liquidations = _apply_candidate_level_leverage_to_rows(
+        autoresearch_rows
+    )
     autoresearch_eval = _validation.evaluate_saved_weight_portfolio(autoresearch_rows)
     autoresearch_payload = _build_group_portfolio_payload(
         label="autoresearch_55_45",
@@ -824,14 +936,24 @@ def run_grouped_allocator_strict_leverage_validation(
         stem="grouped_allocator_strict_leverage_validation",
         markdown=markdown,
     )
-    return {"payload": payload, "latest_json_path": written["json"], "latest_md_path": written["md"]}
+    return {
+        "payload": payload,
+        "latest_json_path": written["json"],
+        "latest_md_path": written["md"],
+    }
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--incumbent-bundle-path", type=Path, default=DEFAULT_INCUMBENT_BUNDLE)
-    parser.add_argument("--incumbent-portfolio-path", type=Path, default=resolve_current_optimization_path())
-    parser.add_argument("--autoresearch-portfolio-path", type=Path, default=_market._resolve_autoresearch_default_path())
+    parser.add_argument(
+        "--incumbent-portfolio-path", type=Path, default=resolve_current_optimization_path()
+    )
+    parser.add_argument(
+        "--autoresearch-portfolio-path",
+        type=Path,
+        default=_market._resolve_autoresearch_default_path(),
+    )
     parser.add_argument("--leverage-tuning-path", type=Path, default=DEFAULT_LEVERAGE_TUNING_PATH)
     parser.add_argument("--decision-path", type=Path, default=DEFAULT_DECISION_PATH)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)

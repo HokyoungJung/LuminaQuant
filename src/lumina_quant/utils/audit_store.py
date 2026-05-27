@@ -33,16 +33,26 @@ class AuditStore:
         self._lock = threading.Lock()
         self._repo.initialize_schema()
 
-    def start_run(self, mode: str, metadata: dict[str, Any] | None = None, run_id: str | None = None) -> str:
+    def start_run(
+        self, mode: str, metadata: dict[str, Any] | None = None, run_id: str | None = None
+    ) -> str:
         resolved_run_id = str(run_id or uuid.uuid4())
         with self._lock:
             return self._repo.start_run(mode=mode, metadata=metadata or {}, run_id=resolved_run_id)
 
-    def end_run(self, run_id: str, status: str = "COMPLETED", metadata: dict[str, Any] | None = None) -> None:
+    def end_run(
+        self, run_id: str, status: str = "COMPLETED", metadata: dict[str, Any] | None = None
+    ) -> None:
         with self._lock:
             self._repo.end_run(run_id=run_id, status=status, metadata=metadata or {})
 
-    def log_order(self, run_id: str, order_event: Any, status: str = "NEW", exchange_order_id: str | None = None) -> None:
+    def log_order(
+        self,
+        run_id: str,
+        order_event: Any,
+        status: str = "NEW",
+        exchange_order_id: str | None = None,
+    ) -> None:
         payload = dict(getattr(order_event, "metadata", {}) or {})
         created_at = str(getattr(order_event, "created_at", "") or _utc_iso())
         with self._lock:
@@ -100,11 +110,15 @@ class AuditStore:
                 metadata=metadata or {},
             )
 
-    def log_risk_event(self, run_id: str, reason: str, details: dict[str, Any] | None = None) -> None:
+    def log_risk_event(
+        self, run_id: str, reason: str, details: dict[str, Any] | None = None
+    ) -> None:
         with self._lock:
             self._repo.upsert_risk_event(run_id=run_id, reason=reason, details=details or {})
 
-    def log_heartbeat(self, run_id: str, status: str = "ALIVE", details: dict[str, Any] | None = None) -> None:
+    def log_heartbeat(
+        self, run_id: str, status: str = "ALIVE", details: dict[str, Any] | None = None
+    ) -> None:
         with self._lock:
             self._repo.upsert_heartbeat(
                 run_id=run_id,

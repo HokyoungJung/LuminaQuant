@@ -32,7 +32,10 @@ def test_rss_guard_logs_samples_and_raises_on_hard_limit(tmp_path: Path, monkeyp
     assert summary["soft_trigger_count"] == 2
     assert summary["hard_trigger_count"] == 1
 
-    lines = [json.loads(line) for line in (tmp_path / "rss.jsonl").read_text(encoding="utf-8").splitlines()]
+    lines = [
+        json.loads(line)
+        for line in (tmp_path / "rss.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
     assert [line["event"] for line in lines] == ["start", "mid", "candidate_evaluated"]
 
 

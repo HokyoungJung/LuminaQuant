@@ -8,7 +8,10 @@ import subprocess
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 TEAM_NAME = "luminaquant-autonomous-researc"
 MAILBOX = REPO_ROOT / ".omx/state/team" / TEAM_NAME / "mailbox/leader-fixed.json"
-CURRENT_OPT = REPO_ROOT / "var/reports/exact_window_backtests/followup_status/portfolio_one_shot_current_opt/portfolio_optimization_latest.json"
+CURRENT_OPT = (
+    REPO_ROOT
+    / "var/reports/exact_window_backtests/followup_status/portfolio_one_shot_current_opt/portfolio_optimization_latest.json"
+)
 LATEST_RUN = REPO_ROOT / "var/reports/exact_window_backtests/latest.json"
 
 RELAUNCH_CMD = """cd /home/hoky/Quants-agent/LuminaQuant
@@ -58,7 +61,7 @@ def print_rss_tail(run_obj: dict | None) -> None:
     candidates = []
     if run_root:
         root = pathlib.Path(run_root)
-        candidates.extend(root.glob('**/exact_window_rss_latest.jsonl'))
+        candidates.extend(root.glob("**/exact_window_rss_latest.jsonl"))
     rss_path = run_obj.get("rss_log_path")
     if rss_path:
         candidates.append(pathlib.Path(rss_path))
@@ -81,7 +84,7 @@ def main() -> int:
     print(f"Repo: {REPO_ROOT}")
     print(f"Branch: {run(['git', 'branch', '--show-current'])}")
     print("\n## Team status")
-    team_status = run(['omx', 'team', 'status', TEAM_NAME, '--json'])
+    team_status = run(["omx", "team", "status", TEAM_NAME, "--json"])
     print(team_status)
     if "No such team" in team_status or "No resumable team" in team_status:
         print("\n## Relaunch")
@@ -90,10 +93,12 @@ def main() -> int:
     current_opt = load_json(CURRENT_OPT)
     print_json(
         "Current incumbent metrics",
-        None if current_opt is None else {
-            'selection_basis': current_opt.get('selection_basis'),
-            'portfolio_metrics': current_opt.get('portfolio_metrics'),
-            'weights': current_opt.get('weights'),
+        None
+        if current_opt is None
+        else {
+            "selection_basis": current_opt.get("selection_basis"),
+            "portfolio_metrics": current_opt.get("portfolio_metrics"),
+            "weights": current_opt.get("weights"),
         },
     )
 
@@ -106,5 +111,5 @@ def main() -> int:
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     raise SystemExit(main())

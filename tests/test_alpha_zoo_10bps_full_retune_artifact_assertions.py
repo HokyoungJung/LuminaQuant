@@ -45,7 +45,9 @@ def _tv_only_policy() -> dict[str, object]:
     }
 
 
-def _selection_profile(*, selected_model_id: str, formula: str, consequence: str) -> dict[str, object]:
+def _selection_profile(
+    *, selected_model_id: str, formula: str, consequence: str
+) -> dict[str, object]:
     return {
         **_tv_only_policy(),
         "score_formula_inputs": ["train", "validation"],
@@ -76,9 +78,7 @@ def _low_correlation_policy() -> dict[str, object]:
     }
 
 
-def _payload(
-    *, winner: str | None = ASSERTION.EXPECTED_HIGHER_RISK_MODEL_ID
-) -> dict[str, object]:
+def _payload(*, winner: str | None = ASSERTION.EXPECTED_HIGHER_RISK_MODEL_ID) -> dict[str, object]:
     evidence = {
         "diagnostic_only": True,
         "symbols": ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "TRXUSDT"],

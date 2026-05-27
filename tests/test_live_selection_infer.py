@@ -9,8 +9,13 @@ def test_infer_strategy_class_name_extended_catalog():
     assert infer_strategy_class_name("vwap_reversion_topcap") == "VwapReversionStrategy"
     assert infer_strategy_class_name("lag_convergence_xau_xag") == "LagConvergenceStrategy"
     assert infer_strategy_class_name("bitcoin_buy_hold") == "BitcoinBuyHoldStrategy"
-    assert infer_strategy_class_name("crypto_fx_alpha_zoo_state_calibrated") == "CryptoFxAlphaZooStateStrategy"
-    assert infer_strategy_class_name("alpha_zoo_conservative_exit") == "CryptoFxAlphaZooStateStrategy"
+    assert (
+        infer_strategy_class_name("crypto_fx_alpha_zoo_state_calibrated")
+        == "CryptoFxAlphaZooStateStrategy"
+    )
+    assert (
+        infer_strategy_class_name("alpha_zoo_conservative_exit") == "CryptoFxAlphaZooStateStrategy"
+    )
     assert (
         infer_strategy_class_name("alpha_zoo_integer_leverage_optuna_hybrid")
         == "AlphaZooOptunaHybridLiveStrategy"
@@ -20,7 +25,9 @@ def test_infer_strategy_class_name_extended_catalog():
         == "AlphaZooOptunaHybridLiveStrategy"
     )
     assert (
-        infer_strategy_class_name("alpha_zoo_strict_6x_common_split_reselected:alpha_zoo_conservative_exit")
+        infer_strategy_class_name(
+            "alpha_zoo_strict_6x_common_split_reselected:alpha_zoo_conservative_exit"
+        )
         == "CryptoFxAlphaZooStateStrategy"
     )
     assert infer_strategy_class_name("panic_rebound_mr_5m") == "PanicReboundMeanReversionStrategy"
@@ -28,7 +35,10 @@ def test_infer_strategy_class_name_extended_catalog():
         infer_strategy_class_name("session_filtered_pair_carry_1h")
         == "SessionFilteredPairCarryStrategy"
     )
-    assert infer_strategy_class_name("profit_moonshot_trend_1h_balanced") == "ProfitMoonshotTrendStrategy"
+    assert (
+        infer_strategy_class_name("profit_moonshot_trend_1h_balanced")
+        == "ProfitMoonshotTrendStrategy"
+    )
     assert (
         infer_strategy_class_name("profit_moonshot_breakout_1h_expansion")
         == "ProfitMoonshotBreakoutStrategy"

@@ -182,9 +182,7 @@ def _normalised_input_list(values: Any) -> list[str]:
                 parsed = json.loads(text)
             except json.JSONDecodeError:
                 parsed = None
-            if isinstance(parsed, Sequence) and not isinstance(
-                parsed, (str, bytes, bytearray)
-            ):
+            if isinstance(parsed, Sequence) and not isinstance(parsed, (str, bytes, bytearray)):
                 return _normalised_input_list(parsed)
         separator = ";" if ";" in text else ","
         return [item.strip().lower() for item in text.split(separator) if item.strip()]
@@ -658,9 +656,7 @@ def _validate_low_correlation_discovery(
         ):
             _fail(f"{row_prefix} correlation_train_validation_abs does not match correlation")
         label = str(
-            row.get("deployability_label")
-            or row.get("research_deployability_label")
-            or ""
+            row.get("deployability_label") or row.get("research_deployability_label") or ""
         ).strip()
         if not label:
             _fail(f"{row_prefix} missing deployability_label")
@@ -670,9 +666,7 @@ def _validate_low_correlation_discovery(
         if gate_pass and "deployable" not in label:
             _fail(f"{row_prefix} passing locked-OOS gate must be labelled deployable")
         if not gate_pass and "locked_oos" in gate_reasons and "research" not in label:
-            _fail(
-                f"{row_prefix} failing locked-OOS gate must be labelled as research-only"
-            )
+            _fail(f"{row_prefix} failing locked-OOS gate must be labelled as research-only")
     if not any("deployable" in label for label in labels) and not any(
         "research" in label for label in labels
     ):

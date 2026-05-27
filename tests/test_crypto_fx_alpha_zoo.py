@@ -19,7 +19,9 @@ from lumina_quant.alpha_zoo.factor_card import build_factor_card
 from lumina_quant.alpha_zoo.operators import delta, ts_rank
 from lumina_quant.research.crypto_fx_alpha_zoo_real_data import normalize_real_data_frame
 
-_SCREEN_SPEC = importlib.util.spec_from_file_location("run_crypto_fx_alpha_zoo_screen", Path("scripts/research/run_crypto_fx_alpha_zoo_screen.py"))
+_SCREEN_SPEC = importlib.util.spec_from_file_location(
+    "run_crypto_fx_alpha_zoo_screen", Path("scripts/research/run_crypto_fx_alpha_zoo_screen.py")
+)
 _SCREEN_MODULE = importlib.util.module_from_spec(_SCREEN_SPEC)
 assert _SCREEN_SPEC.loader is not None
 _SCREEN_SPEC.loader.exec_module(_SCREEN_MODULE)
@@ -112,7 +114,9 @@ def test_factor_card_fails_closed_on_calendar_or_oos_selection() -> None:
         description="invalid fixed hour entry",
         calendar_fields=("hour",),
     )
-    card = build_factor_card(calendar_spec, uses_locked_oos_for_selection=True, source_refs=("unit",))
+    card = build_factor_card(
+        calendar_spec, uses_locked_oos_for_selection=True, source_refs=("unit",)
+    )
     reasons = card.strategy_validity["rejection_reasons"]
     assert card.strategy_validity["pass"] is False
     assert "calendar_entry_field_forbidden:hour" in reasons
@@ -125,6 +129,7 @@ def test_valid_factor_card_records_gate_only_oos_provenance() -> None:
     assert card.strategy_validity["pass"] is True
     assert card.selection_provenance["selected_using_splits"] == ("train", "validation")
     assert card.selection_provenance["locked_oos_role"] == "gate_report_only"
+
 
 def _wide_current_tail_panel(periods: int = 80) -> pd.DataFrame:
     rows = []

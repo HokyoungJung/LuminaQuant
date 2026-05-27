@@ -102,6 +102,20 @@ jobs:
       - name: Ruff lint check
         run: uv run ruff check .
 
+      - name: Ruff format check
+        run: uv run ruff format --check .
+
+      - name: Native Rust checks
+        run: |
+          for crate in native/rust_metrics native/rust_rawfirst; do
+            (
+              cd "$crate"
+              cargo fmt --check
+              cargo check --quiet
+              cargo test --quiet
+            )
+          done
+
       - name: Architecture gate (live data decoupling)
         run: bash scripts/ci/architecture_gate_live_data.sh
 

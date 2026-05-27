@@ -23,7 +23,9 @@ def calibrate_impact_coefficients(
     output: dict[str, dict[str, float]] = {}
     for strategy, base_value in current_k.items():
         pairs = grouped_pairs.get(strategy, [])
-        ratios = [max(0.0, realized / predicted) for predicted, realized in pairs if predicted > 0.0]
+        ratios = [
+            max(0.0, realized / predicted) for predicted, realized in pairs if predicted > 0.0
+        ]
         ratio = sum(ratios) / len(ratios) if ratios else 1.0
         new_value = float(base_value) * float(ratio)
         mae_before = (

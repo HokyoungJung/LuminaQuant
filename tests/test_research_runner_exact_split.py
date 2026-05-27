@@ -48,7 +48,11 @@ def test_run_candidate_research_exact_split_emits_timestamped_streams(monkeypatc
 
     def _mock_load_bundle_cache(*, symbols, timeframes, start_date=None, end_date=None, **kwargs):
         _ = symbols, timeframes, start_date, end_date, kwargs
-        return {("BTC/USDT", "1d"): bundle}, {"parquet": ["BTC/USDT@1d"], "csv": [], "synthetic": []}
+        return {("BTC/USDT", "1d"): bundle}, {
+            "parquet": ["BTC/USDT@1d"],
+            "csv": [],
+            "synthetic": [],
+        }
 
     def _mock_load_feature_cache(*, symbols, start_date=None, end_date=None, **kwargs):
         _ = symbols, start_date, end_date, kwargs
@@ -114,7 +118,11 @@ def test_run_candidate_research_exact_split_accepts_end_exclusive_contract(monke
 
     def _mock_load_bundle_cache(*, symbols, timeframes, start_date=None, end_date=None, **kwargs):
         _ = symbols, timeframes, start_date, end_date, kwargs
-        return {("BTC/USDT", "1d"): bundle}, {"parquet": ["BTC/USDT@1d"], "csv": [], "synthetic": []}
+        return {("BTC/USDT", "1d"): bundle}, {
+            "parquet": ["BTC/USDT@1d"],
+            "csv": [],
+            "synthetic": [],
+        }
 
     def _mock_load_feature_cache(*, symbols, start_date=None, end_date=None, **kwargs):
         _ = symbols, start_date, end_date, kwargs

@@ -571,7 +571,8 @@ mod tests {
         let volumes = [1.25_f64, 2.5];
         let mut written = -1_i32;
 
-        let wal_c_string = std::ffi::CString::new(wal_path.to_string_lossy().as_bytes()).expect("cstring");
+        let wal_c_string =
+            std::ffi::CString::new(wal_path.to_string_lossy().as_bytes()).expect("cstring");
         let status = append_ohlcv_1s_wal(
             wal_c_string.as_ptr(),
             timestamps.as_ptr(),

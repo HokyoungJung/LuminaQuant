@@ -25,14 +25,28 @@ def _build_parser() -> argparse.ArgumentParser:
         description="Collect strategy support-data (funding/OI/mark/index/liquidations)."
     )
     parser.add_argument("--symbols", nargs="*", default=list(getattr(BaseConfig, "SYMBOLS", [])))
-    parser.add_argument("--db-path", default=getattr(BaseConfig, "MARKET_DATA_PARQUET_PATH", "data/market_parquet"))
-    parser.add_argument("--exchange-id", default=getattr(BaseConfig, "MARKET_DATA_EXCHANGE", "binance"))
-    parser.add_argument("--since", default="", help="Optional global lower bound. Default=per-symbol OHLCV start / resume.")
-    parser.add_argument("--until", default="", help="Optional global upper bound. Default=per-symbol latest OHLCV.")
+    parser.add_argument(
+        "--db-path", default=getattr(BaseConfig, "MARKET_DATA_PARQUET_PATH", "data/market_parquet")
+    )
+    parser.add_argument(
+        "--exchange-id", default=getattr(BaseConfig, "MARKET_DATA_EXCHANGE", "binance")
+    )
+    parser.add_argument(
+        "--since",
+        default="",
+        help="Optional global lower bound. Default=per-symbol OHLCV start / resume.",
+    )
+    parser.add_argument(
+        "--until", default="", help="Optional global upper bound. Default=per-symbol latest OHLCV."
+    )
     parser.add_argument("--mark-index-interval", default="1m")
     parser.add_argument("--open-interest-period", default="5m")
     parser.add_argument("--retries", type=int, default=3)
-    parser.add_argument("--force-full", action="store_true", help="Ignore feature-point resume and backfill full OHLCV-covered range.")
+    parser.add_argument(
+        "--force-full",
+        action="store_true",
+        help="Ignore feature-point resume and backfill full OHLCV-covered range.",
+    )
     parser.add_argument(
         "--report-path",
         default="var/reports/strategy_support_data_collection_latest.json",
@@ -56,20 +70,26 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _symbol_ohlcv_bounds(*, root: Path, exchange_id: str, symbol: str) -> tuple[int | None, int | None, int]:
+def _symbol_ohlcv_bounds(
+    *, root: Path, exchange_id: str, symbol: str
+) -> tuple[int | None, int | None, int]:
     compact = canonical_symbol(symbol).replace("/", "")
     pattern = root / "market_ohlcv_1s" / str(exchange_id).lower() / compact / "*.parquet"
     files = sorted(pattern.parent.glob(pattern.name))
     if not files:
         return None, None, 0
 
-    frame = pl.scan_parquet([str(path) for path in files]).select(
-        [
-            pl.min("datetime").dt.epoch("ms").alias("min_ts"),
-            pl.max("datetime").dt.epoch("ms").alias("max_ts"),
-            pl.len().alias("rows"),
-        ]
-    ).collect()
+    frame = (
+        pl.scan_parquet([str(path) for path in files])
+        .select(
+            [
+                pl.min("datetime").dt.epoch("ms").alias("min_ts"),
+                pl.max("datetime").dt.epoch("ms").alias("max_ts"),
+                pl.len().alias("rows"),
+            ]
+        )
+        .collect()
+    )
     if frame.is_empty():
         return None, None, 0
     row = frame.row(0, named=True)
@@ -123,10 +143,14 @@ def _collect_symbol(
             "ohlcv_rows": int(ohlcv_rows),
         }
 
-    feature_last_ts = None if force_full else _feature_last_timestamp(
-        db_path=db_path,
-        exchange_id=exchange_id,
-        symbol=symbol,
+    feature_last_ts = (
+        None
+        if force_full
+        else _feature_last_timestamp(
+            db_path=db_path,
+            exchange_id=exchange_id,
+            symbol=symbol,
+        )
     )
 
     start_ms = int(ohlcv_min_ts)
@@ -180,7 +204,9 @@ def main() -> None:
 
     db_path = str(args.db_path)
     exchange_id = str(args.exchange_id)
-    symbols = [canonical_symbol(symbol) for symbol in list(args.symbols or []) if str(symbol).strip()]
+    symbols = [
+        canonical_symbol(symbol) for symbol in list(args.symbols or []) if str(symbol).strip()
+    ]
     since_ms = parse_timestamp_input(args.since or None)
     until_ms = parse_timestamp_input(args.until or None)
     report_path = Path(str(args.report_path))

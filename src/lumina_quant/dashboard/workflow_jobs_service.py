@@ -16,7 +16,9 @@ from lumina_quant.postgres_state import _connect_postgres
 
 
 def resolve_dashboard_postgres_dsn(dsn: str | None = None) -> str:
-    return str(dsn or os.getenv("LQ_POSTGRES_DSN") or getattr(BaseConfig, "POSTGRES_DSN", "") or "").strip()
+    return str(
+        dsn or os.getenv("LQ_POSTGRES_DSN") or getattr(BaseConfig, "POSTGRES_DSN", "") or ""
+    ).strip()
 
 
 def request_job_stop(stop_file: str | None, *, timestamp: str) -> bool:

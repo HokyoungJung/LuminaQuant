@@ -130,9 +130,13 @@ def load_exact_window_summary_payload(*, root: str | None = None) -> dict[str, A
     try:
         bundle = load_exact_window_bundle(root)
     except FileNotFoundError as exc:
-        return empty_exact_window_payload(reason="missing_bundle", root=str(root or ""), error=str(exc))
+        return empty_exact_window_payload(
+            reason="missing_bundle", root=str(root or ""), error=str(exc)
+        )
     except Exception as exc:  # pragma: no cover - defensive runtime guard for artifact drift
-        return empty_exact_window_payload(reason="load_failed", root=str(root or ""), error=str(exc))
+        return empty_exact_window_payload(
+            reason="load_failed", root=str(root or ""), error=str(exc)
+        )
 
     summary = bundle.get("summary") if isinstance(bundle.get("summary"), dict) else None
     if summary is None:
@@ -143,18 +147,32 @@ def load_exact_window_summary_payload(*, root: str | None = None) -> dict[str, A
         )
 
     decision = bundle.get("decision") if isinstance(bundle.get("decision"), dict) else {}
-    memory = bundle.get("memory_evidence") if isinstance(bundle.get("memory_evidence"), dict) else {}
-    execution_profile = summary.get("execution_profile") if isinstance(summary.get("execution_profile"), dict) else {}
+    memory = (
+        bundle.get("memory_evidence") if isinstance(bundle.get("memory_evidence"), dict) else {}
+    )
+    execution_profile = (
+        summary.get("execution_profile")
+        if isinstance(summary.get("execution_profile"), dict)
+        else {}
+    )
     portfolio = summary.get("portfolio") if isinstance(summary.get("portfolio"), dict) else {}
     portfolio_oos = portfolio.get("oos") if isinstance(portfolio.get("oos"), dict) else {}
     notes = summary.get("notes") if isinstance(summary.get("notes"), dict) else {}
-    timeframe_rows = decision.get("timeframe_rows") if isinstance(decision.get("timeframe_rows"), list) else []
-    top_candidates = summary.get("best_per_strategy") if isinstance(summary.get("best_per_strategy"), list) else []
+    timeframe_rows = (
+        decision.get("timeframe_rows") if isinstance(decision.get("timeframe_rows"), list) else []
+    )
+    top_candidates = (
+        summary.get("best_per_strategy")
+        if isinstance(summary.get("best_per_strategy"), list)
+        else []
+    )
     weights = portfolio.get("weights") if isinstance(portfolio.get("weights"), list) else []
 
     return {
         "as_of": datetime.now(UTC).isoformat(),
-        "generated_at": summary.get("generated_at") or decision.get("generated_at") or memory.get("generated_at"),
+        "generated_at": summary.get("generated_at")
+        or decision.get("generated_at")
+        or memory.get("generated_at"),
         "status": "ok",
         "error": None,
         "root": str(bundle.get("root") or root or ""),
@@ -198,7 +216,9 @@ def load_exact_window_summary_payload(*, root: str | None = None) -> dict[str, A
             for key, value in notes.items()
             if str(value or "").strip()
         ],
-        "warnings": [str(item) for item in list(bundle.get("warnings") or []) if str(item or "").strip()],
+        "warnings": [
+            str(item) for item in list(bundle.get("warnings") or []) if str(item or "").strip()
+        ],
     }
 
 

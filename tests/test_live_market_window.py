@@ -51,8 +51,7 @@ def test_live_data_handler_emits_market_window_each_poll_with_configured_window(
             event_time_watermark_ms=1_700_000_000_000,
             bars_1s={
                 "BTC/USDT": tuple(
-                    (1_700_000_000_000 + (i * 1000), 1.0, 2.0, 0.5, 1.5, 10.0)
-                    for i in range(7)
+                    (1_700_000_000_000 + (i * 1000), 1.0, 2.0, 0.5, 1.5, 10.0) for i in range(7)
                 )
             },
             commit_id="commit-1",
@@ -64,8 +63,7 @@ def test_live_data_handler_emits_market_window_each_poll_with_configured_window(
             event_time_watermark_ms=1_700_000_000_500,
             bars_1s={
                 "BTC/USDT": tuple(
-                    (1_700_000_000_500 + (i * 1000), 1.0, 2.0, 0.5, 1.5, 10.0)
-                    for i in range(7)
+                    (1_700_000_000_500 + (i * 1000), 1.0, 2.0, 0.5, 1.5, 10.0) for i in range(7)
                 )
             },
             commit_id="commit-2",

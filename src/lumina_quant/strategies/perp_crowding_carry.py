@@ -38,9 +38,13 @@ class PerpCrowdingCarryStrategy(Strategy):
     @classmethod
     def get_param_schema(cls) -> dict[str, HyperParam]:
         return {
-            "window": HyperParam.integer("window", default=96, low=16, high=4096, grid=[64, 96, 144]),
+            "window": HyperParam.integer(
+                "window", default=96, low=16, high=4096, grid=[64, 96, 144]
+            ),
             "mild_funding": HyperParam.floating("mild_funding", default=0.0002, low=0.0, high=0.02),
-            "extreme_funding": HyperParam.floating("extreme_funding", default=0.0012, low=0.0001, high=0.05),
+            "extreme_funding": HyperParam.floating(
+                "extreme_funding", default=0.0012, low=0.0001, high=0.05
+            ),
             "entry_threshold": HyperParam.floating(
                 "entry_threshold",
                 default=0.30,
@@ -55,7 +59,9 @@ class PerpCrowdingCarryStrategy(Strategy):
                 high=0.8,
                 grid=[0.05, 0.1, 0.2],
             ),
-            "stop_loss_pct": HyperParam.floating("stop_loss_pct", default=0.02, low=0.001, high=0.5),
+            "stop_loss_pct": HyperParam.floating(
+                "stop_loss_pct", default=0.02, low=0.001, high=0.5
+            ),
             "max_hold_bars": HyperParam.integer("max_hold_bars", default=72, low=1, high=100_000),
             "allow_short": HyperParam.boolean("allow_short", default=True, grid=[True, False]),
             "target_allocation": HyperParam.floating(
@@ -219,7 +225,9 @@ class PerpCrowdingCarryStrategy(Strategy):
             return safe_float(row[4])
         return None
 
-    def _emit(self, symbol, event_time, signal_type, *, strength=1.0, stop_loss=None, metadata=None):
+    def _emit(
+        self, symbol, event_time, signal_type, *, strength=1.0, stop_loss=None, metadata=None
+    ):
         metadata = dict(metadata or {})
         if str(signal_type).upper() in {"LONG", "SHORT"}:
             if self.target_allocation > 0.0:
@@ -239,7 +247,9 @@ class PerpCrowdingCarryStrategy(Strategy):
             )
         )
 
-    def _process_symbol(self, event: Any, symbol: str, *, close_override: float | None = None) -> None:
+    def _process_symbol(
+        self, event: Any, symbol: str, *, close_override: float | None = None
+    ) -> None:
         item = self._state[symbol]
         key = time_key(getattr(event, "time", getattr(event, "datetime", None)))
         if key and key == item.last_time_key:
@@ -261,8 +271,12 @@ class PerpCrowdingCarryStrategy(Strategy):
         feature_map = {
             "funding_rate": self._extract_feature(event, symbol, "funding_rate"),
             "open_interest": self._extract_feature(event, symbol, "open_interest"),
-            "liquidation_long_notional": self._extract_feature(event, symbol, "liquidation_long_notional"),
-            "liquidation_short_notional": self._extract_feature(event, symbol, "liquidation_short_notional"),
+            "liquidation_long_notional": self._extract_feature(
+                event, symbol, "liquidation_long_notional"
+            ),
+            "liquidation_short_notional": self._extract_feature(
+                event, symbol, "liquidation_short_notional"
+            ),
         }
         if any(value is None for value in feature_map.values()):
             return
@@ -302,10 +316,19 @@ class PerpCrowdingCarryStrategy(Strategy):
                 (score <= self.exit_threshold)
                 or (funding >= self.extreme_funding)
                 or (item.bars_held >= self.max_hold_bars)
-                or (close_value > 0.0 and item.entry_price is not None and close_value <= item.entry_price * (1.0 - self.stop_loss_pct))
+                or (
+                    close_value > 0.0
+                    and item.entry_price is not None
+                    and close_value <= item.entry_price * (1.0 - self.stop_loss_pct)
+                )
             )
             if should_exit:
-                self._emit(symbol, getattr(event, "time", None), "EXIT", metadata={**metadata, "reason": "long_exit"})
+                self._emit(
+                    symbol,
+                    getattr(event, "time", None),
+                    "EXIT",
+                    metadata={**metadata, "reason": "long_exit"},
+                )
                 item.mode = "OUT"
                 item.entry_price = None
                 item.bars_held = 0
@@ -317,10 +340,19 @@ class PerpCrowdingCarryStrategy(Strategy):
                 (score >= -self.exit_threshold)
                 or (funding <= -self.extreme_funding)
                 or (item.bars_held >= self.max_hold_bars)
-                or (close_value > 0.0 and item.entry_price is not None and close_value >= item.entry_price * (1.0 + self.stop_loss_pct))
+                or (
+                    close_value > 0.0
+                    and item.entry_price is not None
+                    and close_value >= item.entry_price * (1.0 + self.stop_loss_pct)
+                )
             )
             if should_exit:
-                self._emit(symbol, getattr(event, "time", None), "EXIT", metadata={**metadata, "reason": "short_exit"})
+                self._emit(
+                    symbol,
+                    getattr(event, "time", None),
+                    "EXIT",
+                    metadata={**metadata, "reason": "short_exit"},
+                )
                 item.mode = "OUT"
                 item.entry_price = None
                 item.bars_held = 0
@@ -332,10 +364,18 @@ class PerpCrowdingCarryStrategy(Strategy):
         oi_delta_z = float(comps.get("oi_delta_z", 0.0))
         strength = min(2.0, max(PERP_CROWDING_MIN_SIGNAL_STRENGTH, abs(score)))
 
-        carry_long = funding > 0.0 and funding <= self.mild_funding and score >= self.entry_threshold
-        crowded_long = funding >= self.extreme_funding and oi_delta_z > 0.0 and score >= self.entry_threshold
-        carry_short = funding < 0.0 and abs(funding) <= self.mild_funding and score <= -self.entry_threshold
-        crowded_short = funding <= -self.extreme_funding and oi_delta_z < 0.0 and score <= -self.entry_threshold
+        carry_long = (
+            funding > 0.0 and funding <= self.mild_funding and score >= self.entry_threshold
+        )
+        crowded_long = (
+            funding >= self.extreme_funding and oi_delta_z > 0.0 and score >= self.entry_threshold
+        )
+        carry_short = (
+            funding < 0.0 and abs(funding) <= self.mild_funding and score <= -self.entry_threshold
+        )
+        crowded_short = (
+            funding <= -self.extreme_funding and oi_delta_z < 0.0 and score <= -self.entry_threshold
+        )
 
         if carry_long and not crowded_long:
             self._emit(

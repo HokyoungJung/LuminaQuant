@@ -257,6 +257,7 @@ class TestLiveExecutionStateMachine(unittest.TestCase):
     def test_live_protective_orders_fail_fast_without_exchange_params(self):
         events = queue.Queue()
         exchange = MockProtectiveExchange()
+
         class _RealConfig(MockConfig):
             MODE = "real"
 
@@ -315,11 +316,22 @@ class TestLiveExecutionStateMachine(unittest.TestCase):
         self.assertEqual([item["type"] for item in exchange.algo_orders], ["STOP", "TAKE_PROFIT"])
         self.assertEqual({item["side"] for item in exchange.algo_orders}, {"sell"})
         self.assertTrue(all(item["symbol"] == "ETH/USDT" for item in exchange.algo_orders))
-        self.assertEqual([item["params"]["triggerPrice"] for item in exchange.algo_orders], [95.0, 110.0])
+        self.assertEqual(
+            [item["params"]["triggerPrice"] for item in exchange.algo_orders], [95.0, 110.0]
+        )
         self.assertEqual([item["params"]["price"] for item in exchange.algo_orders], [94.9, 109.9])
-        self.assertTrue(all(item["params"]["timeInForce"] == "GTC" for item in exchange.algo_orders))
-        self.assertTrue(all(item["params"]["positionSide"] == "LONG" for item in exchange.algo_orders))
-        self.assertTrue(any(payload["message"] == "paper_exchange_protective_orders_submitted" for payload in states))
+        self.assertTrue(
+            all(item["params"]["timeInForce"] == "GTC" for item in exchange.algo_orders)
+        )
+        self.assertTrue(
+            all(item["params"]["positionSide"] == "LONG" for item in exchange.algo_orders)
+        )
+        self.assertTrue(
+            any(
+                payload["message"] == "paper_exchange_protective_orders_submitted"
+                for payload in states
+            )
+        )
         self.assertEqual(len(handler.protective_orders), 2)
 
     def test_market_style_protective_orders_require_explicit_opt_in(self):

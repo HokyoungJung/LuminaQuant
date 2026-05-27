@@ -9,7 +9,9 @@ MODULE_PATH = (
     / "research"
     / "write_portfolio_live_readiness_decision.py"
 )
-SPEC = importlib.util.spec_from_file_location("write_portfolio_live_readiness_decision", MODULE_PATH)
+SPEC = importlib.util.spec_from_file_location(
+    "write_portfolio_live_readiness_decision", MODULE_PATH
+)
 MODULE = importlib.util.module_from_spec(SPEC)
 assert SPEC is not None and SPEC.loader is not None
 sys.modules[SPEC.name] = MODULE
@@ -21,15 +23,23 @@ def test_build_live_readiness_decision_prefers_current_switch_mode(tmp_path: Pat
     switch_path.write_text(
         json.dumps(
             {
-                "recommended_mode": {"mode": "hybrid_guarded_mode", "allocation": {"hybrid_online_portfolio": 1.0}},
+                "recommended_mode": {
+                    "mode": "hybrid_guarded_mode",
+                    "allocation": {"hybrid_online_portfolio": 1.0},
+                },
                 "rationale": ["older", "Promote the current hybrid mode."],
-                "current_market_state": {"favored_group": "mixed", "pair_liquidity_state": "normal"},
+                "current_market_state": {
+                    "favored_group": "mixed",
+                    "pair_liquidity_state": "normal",
+                },
             }
         ),
         encoding="utf-8",
     )
     max_perf_path = tmp_path / "max_perf.json"
-    max_perf_path.write_text(json.dumps({"winner": {"status": "retained_incumbent"}}), encoding="utf-8")
+    max_perf_path.write_text(
+        json.dumps({"winner": {"status": "retained_incumbent"}}), encoding="utf-8"
+    )
 
     payload = MODULE.build_live_readiness_decision(
         switch_path=switch_path,
@@ -42,7 +52,9 @@ def test_build_live_readiness_decision_prefers_current_switch_mode(tmp_path: Pat
     assert payload["selection_basis"] == "current_operating_switch"
 
 
-def test_build_live_readiness_decision_supports_production_guarded_switch_mode(tmp_path: Path) -> None:
+def test_build_live_readiness_decision_supports_production_guarded_switch_mode(
+    tmp_path: Path,
+) -> None:
     switch_path = tmp_path / "switch.json"
     switch_path.write_text(
         json.dumps(
@@ -51,8 +63,14 @@ def test_build_live_readiness_decision_supports_production_guarded_switch_mode(t
                     "mode": "production_guarded_mode",
                     "allocation": {"production_guarded_portfolio": 1.0},
                 },
-                "rationale": ["older", "Use the current operating switch recommendation: production_guarded_mode."],
-                "current_market_state": {"favored_group": "mixed", "pair_liquidity_state": "strong"},
+                "rationale": [
+                    "older",
+                    "Use the current operating switch recommendation: production_guarded_mode.",
+                ],
+                "current_market_state": {
+                    "favored_group": "mixed",
+                    "pair_liquidity_state": "strong",
+                },
             }
         ),
         encoding="utf-8",
@@ -69,7 +87,9 @@ def test_build_live_readiness_decision_supports_production_guarded_switch_mode(t
     assert payload["decision_reason"].endswith("production_guarded_mode.")
 
 
-def test_build_live_readiness_decision_falls_back_to_max_perf_when_switch_missing(tmp_path: Path) -> None:
+def test_build_live_readiness_decision_falls_back_to_max_perf_when_switch_missing(
+    tmp_path: Path,
+) -> None:
     max_perf_path = tmp_path / "max_perf.json"
     max_perf_path.write_text(
         json.dumps(
@@ -103,7 +123,9 @@ def test_build_live_readiness_decision_can_prefer_promotion_review(tmp_path: Pat
             {
                 "status": "promotion_ready_with_review",
                 "recommendation": "promote_candidate_after_manual_review",
-                "review_target": str(tmp_path / "strict_autoresearch_1x_practical_shadow_latest.json"),
+                "review_target": str(
+                    tmp_path / "strict_autoresearch_1x_practical_shadow_latest.json"
+                ),
                 "selection_basis": "strict_autoresearch_1x_practical_candidate_review",
                 "current_live_default": "production_guarded_mode",
             }
@@ -114,7 +136,10 @@ def test_build_live_readiness_decision_can_prefer_promotion_review(tmp_path: Pat
     switch_path.write_text(
         json.dumps(
             {
-                "recommended_mode": {"mode": "production_guarded_mode", "allocation": {"production_guarded_portfolio": 1.0}},
+                "recommended_mode": {
+                    "mode": "production_guarded_mode",
+                    "allocation": {"production_guarded_portfolio": 1.0},
+                },
                 "rationale": ["keep current"],
             }
         ),
@@ -135,7 +160,9 @@ def test_build_live_readiness_decision_can_prefer_promotion_review(tmp_path: Pat
     assert payload["selection_basis"] == "strict_autoresearch_1x_practical_candidate_review"
 
 
-def test_build_live_readiness_decision_can_fallback_to_review_when_switch_missing(tmp_path: Path) -> None:
+def test_build_live_readiness_decision_can_fallback_to_review_when_switch_missing(
+    tmp_path: Path,
+) -> None:
     review_path = tmp_path / "review.json"
     review_path.write_text(
         json.dumps(
@@ -160,7 +187,9 @@ def test_build_live_readiness_decision_can_fallback_to_review_when_switch_missin
     assert payload["selection_basis"] == "portfolio_promotion_review"
 
 
-def test_build_live_readiness_decision_uses_explicit_candidate_mode_from_review(tmp_path: Path) -> None:
+def test_build_live_readiness_decision_uses_explicit_candidate_mode_from_review(
+    tmp_path: Path,
+) -> None:
     review_path = tmp_path / "review.json"
     review_path.write_text(
         json.dumps(

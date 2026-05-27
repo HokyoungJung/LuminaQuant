@@ -79,6 +79,4 @@ def test_execute_query_logs_when_fetchall_fails(caplog) -> None:
     assert rows == []
     assert conn.committed is True
     assert conn.closed is True
-    assert any(
-        "fell back to an empty result set" in record.message for record in caplog.records
-    )
+    assert any("fell back to an empty result set" in record.message for record in caplog.records)

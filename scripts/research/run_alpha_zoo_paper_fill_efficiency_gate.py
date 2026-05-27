@@ -167,7 +167,9 @@ def _field(row: Mapping[str, Any], *names: str) -> Any:
 
 
 def _row_abs_notional(row: Mapping[str, Any]) -> float | None:
-    direct = _field(row, "round_trip_notional_quote", "notional", "notional_quote", "executed_notional")
+    direct = _field(
+        row, "round_trip_notional_quote", "notional", "notional_quote", "executed_notional"
+    )
     if direct is not None:
         value = abs(_safe_float(direct, math.nan))
         return value if math.isfinite(value) and value > 0.0 else None
@@ -198,7 +200,9 @@ def _row_pnl_quote(row: Mapping[str, Any]) -> float | None:
 
 
 def _row_spread_bps(row: Mapping[str, Any]) -> float | None:
-    value = _field(row, "spread_bps_at_submit", "avg_bbo_spread_bps", "bbo_spread_bps", "spread_bps")
+    value = _field(
+        row, "spread_bps_at_submit", "avg_bbo_spread_bps", "bbo_spread_bps", "spread_bps"
+    )
     if value is None:
         return None
     parsed = _safe_float(value, math.nan)
@@ -268,7 +272,9 @@ def summarize_fill_efficiency(
     avg_spread = _weighted_average(weighted_spread_pairs)
     total_abs_notional = sum(valid_notionals)
     realized_pnl = sum(valid_pnls)
-    return_per_turnover = (realized_pnl * 10_000.0 / total_abs_notional) if total_abs_notional > 0.0 else None
+    return_per_turnover = (
+        (realized_pnl * 10_000.0 / total_abs_notional) if total_abs_notional > 0.0 else None
+    )
     threshold = avg_spread * spread_multiplier if avg_spread is not None else None
     mean_cost = mean(valid_costs) if valid_costs else None
     p95_cost = _percentile(valid_costs, 0.95)
@@ -285,7 +291,9 @@ def summarize_fill_efficiency(
         "spread_present": len(weighted_spread_pairs) == fill_count and avg_spread is not None,
         "all_in_cost_present": len(valid_costs) == fill_count,
         "return_per_turnover_above_spread_multiple": bool(
-            return_per_turnover is not None and threshold is not None and return_per_turnover > threshold
+            return_per_turnover is not None
+            and threshold is not None
+            and return_per_turnover > threshold
         ),
         "mean_all_in_cost": bool(mean_cost is not None and mean_cost <= max_mean_all_in_cost_bps),
         "p95_all_in_cost": bool(p95_cost is not None and p95_cost <= max_p95_all_in_cost_bps),
@@ -308,8 +316,14 @@ def summarize_fill_efficiency(
     ):
         if not checks[name]:
             reasons.append(reason)
-    if not checks["return_per_turnover_above_spread_multiple"] and return_per_turnover is not None and threshold is not None:
-        reasons.append(f"return_per_turnover_bps_{return_per_turnover:.3f}_not_above_{threshold:.3f}")
+    if (
+        not checks["return_per_turnover_above_spread_multiple"]
+        and return_per_turnover is not None
+        and threshold is not None
+    ):
+        reasons.append(
+            f"return_per_turnover_bps_{return_per_turnover:.3f}_not_above_{threshold:.3f}"
+        )
     if not checks["mean_all_in_cost"]:
         reasons.append("mean_all_in_cost_bps_above_limit_or_missing")
     if not checks["p95_all_in_cost"]:
@@ -326,7 +340,11 @@ def summarize_fill_efficiency(
         reasons.append("account_wipeout_count_nonzero")
 
     gate_pass = fill_count > 0 and all(checks.values())
-    status = "actual_fill_efficiency_gate_passed" if gate_pass else "pending_or_failed_actual_fill_efficiency_gate"
+    status = (
+        "actual_fill_efficiency_gate_passed"
+        if gate_pass
+        else "pending_or_failed_actual_fill_efficiency_gate"
+    )
     if fill_count == 0:
         status = "pending_paper_testnet_fill_telemetry"
     return {
@@ -374,10 +392,14 @@ def _decision_rows(summary: Mapping[str, Any]) -> list[dict[str, Any]]:
             "timeout_rate": summary.get("timeout_rate"),
             "cancel_rate": summary.get("cancel_rate"),
             "partial_fill_rate": summary.get("partial_fill_rate"),
-            "actual_fill_efficiency_gate_pass": bool(summary.get("actual_fill_efficiency_gate_pass")),
+            "actual_fill_efficiency_gate_pass": bool(
+                summary.get("actual_fill_efficiency_gate_pass")
+            ),
             "ready_for_real": False,
             "real_money_execution": False,
-            "rejection_reasons": ";".join(str(reason) for reason in summary.get("rejection_reasons") or []),
+            "rejection_reasons": ";".join(
+                str(reason) for reason in summary.get("rejection_reasons") or []
+            ),
         }
     ]
 
@@ -400,8 +422,14 @@ def _backtest_fallback_pass(row: Mapping[str, Any]) -> bool:
     )
 
 
-def _backtest_fallback_rows(sample_guarded: Mapping[str, Any], *, limit: int) -> list[dict[str, Any]]:
-    source_rows = [dict(row) for row in sample_guarded.get("sample_guarded_candidates") or [] if isinstance(row, Mapping)]
+def _backtest_fallback_rows(
+    sample_guarded: Mapping[str, Any], *, limit: int
+) -> list[dict[str, Any]]:
+    source_rows = [
+        dict(row)
+        for row in sample_guarded.get("sample_guarded_candidates") or []
+        if isinstance(row, Mapping)
+    ]
     passing = [row for row in source_rows if _backtest_fallback_pass(row)]
     display_rows = passing if passing else source_rows[:limit]
     rows: list[dict[str, Any]] = []
@@ -422,12 +450,24 @@ def _backtest_fallback_rows(sample_guarded: Mapping[str, Any], *, limit: int) ->
                 "locked_oos_trade_event_count": row.get("locked_oos_trade_event_count"),
                 "validation_mdd": row.get("validation_mdd"),
                 "train_validation_return_ratio": row.get("train_validation_return_ratio"),
-                "primary_10bps_promotion_gate_pass": bool(row.get("primary_10bps_promotion_gate_pass")),
-                "execution_efficiency_proxy_gate_pass": bool(row.get("execution_efficiency_proxy_gate_pass")),
-                "train_return_per_turnover_proxy_bps": row.get("train_return_per_turnover_proxy_bps"),
-                "validation_return_per_turnover_proxy_bps": row.get("validation_return_per_turnover_proxy_bps"),
-                "locked_oos_return_per_turnover_proxy_bps": row.get("locked_oos_return_per_turnover_proxy_bps"),
-                "return_per_turnover_proxy_threshold_bps": row.get("return_per_turnover_proxy_threshold_bps"),
+                "primary_10bps_promotion_gate_pass": bool(
+                    row.get("primary_10bps_promotion_gate_pass")
+                ),
+                "execution_efficiency_proxy_gate_pass": bool(
+                    row.get("execution_efficiency_proxy_gate_pass")
+                ),
+                "train_return_per_turnover_proxy_bps": row.get(
+                    "train_return_per_turnover_proxy_bps"
+                ),
+                "validation_return_per_turnover_proxy_bps": row.get(
+                    "validation_return_per_turnover_proxy_bps"
+                ),
+                "locked_oos_return_per_turnover_proxy_bps": row.get(
+                    "locked_oos_return_per_turnover_proxy_bps"
+                ),
+                "return_per_turnover_proxy_threshold_bps": row.get(
+                    "return_per_turnover_proxy_threshold_bps"
+                ),
                 "ready_for_paper": bool(row.get("ready_for_paper")),
                 "ready_for_real": False,
                 "real_money_execution": False,
@@ -438,11 +478,17 @@ def _backtest_fallback_rows(sample_guarded: Mapping[str, Any], *, limit: int) ->
 
 
 def build_backtest_fallback_cut(sample_guarded: Mapping[str, Any], *, limit: int) -> dict[str, Any]:
-    candidates = [row for row in sample_guarded.get("sample_guarded_candidates") or [] if isinstance(row, Mapping)]
+    candidates = [
+        row
+        for row in sample_guarded.get("sample_guarded_candidates") or []
+        if isinstance(row, Mapping)
+    ]
     fallback_pass_count = sum(_backtest_fallback_pass(row) for row in candidates)
     rows = _backtest_fallback_rows(sample_guarded, limit=limit)
     return {
-        "status": "backtest_fallback_candidates_found" if fallback_pass_count else "no_backtest_fallback_promotion",
+        "status": "backtest_fallback_candidates_found"
+        if fallback_pass_count
+        else "no_backtest_fallback_promotion",
         "reason": (
             "actual paper/testnet fill telemetry is absent; applying existing sample-guarded backtest cut instead"
         ),
@@ -480,7 +526,9 @@ def _csv_value(value: Any) -> Any:
 def _write_csv(path: Path, rows: Sequence[Mapping[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=DECISION_FIELDS, lineterminator="\n", extrasaction="ignore")
+        writer = csv.DictWriter(
+            handle, fieldnames=DECISION_FIELDS, lineterminator="\n", extrasaction="ignore"
+        )
         writer.writeheader()
         for row in rows:
             writer.writerow({field: _csv_value(row.get(field)) for field in DECISION_FIELDS})
@@ -497,7 +545,9 @@ def _write_backtest_fallback_csv(path: Path, rows: Sequence[Mapping[str, Any]]) 
         )
         writer.writeheader()
         for row in rows:
-            writer.writerow({field: _csv_value(row.get(field)) for field in BACKTEST_FALLBACK_FIELDS})
+            writer.writerow(
+                {field: _csv_value(row.get(field)) for field in BACKTEST_FALLBACK_FIELDS}
+            )
 
 
 def _markdown(payload: Mapping[str, Any]) -> str:
@@ -543,11 +593,17 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
         fill_rows,
         spread_multiplier=_safe_float(args.bbo_spread_multiplier, DEFAULT_BBO_SPREAD_MULTIPLIER),
         min_fill_count=int(args.min_fill_count),
-        max_mean_all_in_cost_bps=_safe_float(args.max_mean_all_in_cost_bps, DEFAULT_MAX_MEAN_ALL_IN_COST_BPS),
-        max_p95_all_in_cost_bps=_safe_float(args.max_p95_all_in_cost_bps, DEFAULT_MAX_P95_ALL_IN_COST_BPS),
+        max_mean_all_in_cost_bps=_safe_float(
+            args.max_mean_all_in_cost_bps, DEFAULT_MAX_MEAN_ALL_IN_COST_BPS
+        ),
+        max_p95_all_in_cost_bps=_safe_float(
+            args.max_p95_all_in_cost_bps, DEFAULT_MAX_P95_ALL_IN_COST_BPS
+        ),
         max_timeout_rate=_safe_float(args.max_timeout_rate, DEFAULT_MAX_TIMEOUT_RATE),
         max_cancel_rate=_safe_float(args.max_cancel_rate, DEFAULT_MAX_CANCEL_RATE),
-        max_partial_fill_rate=_safe_float(args.max_partial_fill_rate, DEFAULT_MAX_PARTIAL_FILL_RATE),
+        max_partial_fill_rate=_safe_float(
+            args.max_partial_fill_rate, DEFAULT_MAX_PARTIAL_FILL_RATE
+        ),
     )
     timestamp = _timestamp()
     latest_json = output_dir / "alpha_zoo_paper_fill_efficiency_gate_latest.json"
@@ -556,7 +612,9 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     decisions_csv = output_dir / "paper_fill_efficiency_decisions_latest.csv"
     backtest_fallback_csv = output_dir / "backtest_fallback_candidates_latest.csv"
     generation_log = output_dir / "artifact_generation_validation_latest.log"
-    backtest_fallback = build_backtest_fallback_cut(sample_guarded, limit=int(args.backtest_fallback_top_n))
+    backtest_fallback = build_backtest_fallback_cut(
+        sample_guarded, limit=int(args.backtest_fallback_top_n)
+    )
     payload: dict[str, Any] = {
         "artifact_kind": "alpha_zoo_paper_fill_efficiency_gate",
         "generated_at_utc": _utc_now_iso(),
@@ -573,7 +631,9 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
         "gate_policy": {
             "primary_round_trip_cost_bps": PRIMARY_ROUND_TRIP_COST_BPS,
             "min_fill_count": int(args.min_fill_count),
-            "bbo_spread_multiplier": _safe_float(args.bbo_spread_multiplier, DEFAULT_BBO_SPREAD_MULTIPLIER),
+            "bbo_spread_multiplier": _safe_float(
+                args.bbo_spread_multiplier, DEFAULT_BBO_SPREAD_MULTIPLIER
+            ),
             "return_per_turnover_formula": "sum(realized_pnl_quote) * 10000 / sum(abs(notional_quote))",
             "avg_bbo_spread_formula": "notional-weighted average spread_bps_at_submit",
             "threshold_formula": "avg_bbo_spread_bps * bbo_spread_multiplier",
@@ -630,14 +690,24 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--monitoring-contract-json", default=str(DEFAULT_MONITORING_CONTRACT_JSON))
     parser.add_argument("--fill-jsonl", default="")
     parser.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_DIR))
-    parser.add_argument("--bbo-spread-multiplier", type=float, default=DEFAULT_BBO_SPREAD_MULTIPLIER)
+    parser.add_argument(
+        "--bbo-spread-multiplier", type=float, default=DEFAULT_BBO_SPREAD_MULTIPLIER
+    )
     parser.add_argument("--min-fill-count", type=int, default=DEFAULT_MIN_FILL_COUNT)
-    parser.add_argument("--max-mean-all-in-cost-bps", type=float, default=DEFAULT_MAX_MEAN_ALL_IN_COST_BPS)
-    parser.add_argument("--max-p95-all-in-cost-bps", type=float, default=DEFAULT_MAX_P95_ALL_IN_COST_BPS)
+    parser.add_argument(
+        "--max-mean-all-in-cost-bps", type=float, default=DEFAULT_MAX_MEAN_ALL_IN_COST_BPS
+    )
+    parser.add_argument(
+        "--max-p95-all-in-cost-bps", type=float, default=DEFAULT_MAX_P95_ALL_IN_COST_BPS
+    )
     parser.add_argument("--max-timeout-rate", type=float, default=DEFAULT_MAX_TIMEOUT_RATE)
     parser.add_argument("--max-cancel-rate", type=float, default=DEFAULT_MAX_CANCEL_RATE)
-    parser.add_argument("--max-partial-fill-rate", type=float, default=DEFAULT_MAX_PARTIAL_FILL_RATE)
-    parser.add_argument("--backtest-fallback-top-n", type=int, default=DEFAULT_BACKTEST_FALLBACK_TOP_N)
+    parser.add_argument(
+        "--max-partial-fill-rate", type=float, default=DEFAULT_MAX_PARTIAL_FILL_RATE
+    )
+    parser.add_argument(
+        "--backtest-fallback-top-n", type=int, default=DEFAULT_BACKTEST_FALLBACK_TOP_N
+    )
     return parser.parse_args(argv)
 
 

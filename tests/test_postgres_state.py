@@ -148,7 +148,7 @@ def test_connect_postgres_retries_local_socket_on_localhost_passwordless_auth_er
         calls.append(str(dsn))
         if len(calls) == 1:
             raise FakeOperationalError(
-                "connection failed: connection to server at \"127.0.0.1\", port 5432 failed: "
+                'connection failed: connection to server at "127.0.0.1", port 5432 failed: '
                 "fe_sendauth: no password supplied"
             )
         return sentinel

@@ -189,9 +189,15 @@ def _headline(rows: list[dict[str, Any]]) -> dict[str, Any]:
 
 def _to_markdown(payload: dict[str, Any]) -> str:
     meta = payload.get("run_metadata") if isinstance(payload.get("run_metadata"), dict) else {}
-    headline = payload.get("headline_metrics") if isinstance(payload.get("headline_metrics"), dict) else {}
+    headline = (
+        payload.get("headline_metrics") if isinstance(payload.get("headline_metrics"), dict) else {}
+    )
     rows = list(payload.get("selected_team_table") or [])
-    weights = payload.get("recommended_weights") if isinstance(payload.get("recommended_weights"), dict) else {}
+    weights = (
+        payload.get("recommended_weights")
+        if isinstance(payload.get("recommended_weights"), dict)
+        else {}
+    )
     failures = list(payload.get("failed_runs") or [])
 
     lines = [
@@ -302,8 +308,10 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = _build_parser().parse_args()
-    report_path = Path(args.report).expanduser() if str(args.report).strip() else _latest_report_path(
-        str(args.report_glob)
+    report_path = (
+        Path(args.report).expanduser()
+        if str(args.report).strip()
+        else _latest_report_path(str(args.report_glob))
     )
     if not report_path.exists():
         raise FileNotFoundError(f"Report not found: {report_path}")
@@ -366,7 +374,9 @@ def main() -> None:
             "topcap_symbols": list(report.get("topcap_symbols") or []),
             "candidate_manifest": report.get("candidate_manifest"),
             "all_candidates_count": int(_safe_float(report.get("all_candidates_count"), 0.0)),
-            "selected_team_count": int(_safe_float(report.get("selected_team_count"), len(selected_rows))),
+            "selected_team_count": int(
+                _safe_float(report.get("selected_team_count"), len(selected_rows))
+            ),
         },
         "selected_team_table": selected_rows,
         "selected_summary": {

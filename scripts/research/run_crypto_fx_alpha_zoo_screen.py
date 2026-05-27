@@ -82,7 +82,9 @@ def build_screen_payload(
         )
         ledger_summary = write_candidate_outcome_ledger(ledger_output, records)
         ledger_summary["enabled"] = True
-    source_validity = dict((source_coverage or {}).get("strategy_validity") or {"pass": True, "rejection_reasons": []})
+    source_validity = dict(
+        (source_coverage or {}).get("strategy_validity") or {"pass": True, "rejection_reasons": []}
+    )
     card_valid = all(bool(card["strategy_validity"].get("pass")) for card in cards)
     strategy_rejections = list(source_validity.get("rejection_reasons") or [])
     if not card_valid:
@@ -123,20 +125,42 @@ def _bundle_from_args(args: argparse.Namespace) -> RealDataBundle:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--input", default="", help="CSV/parquet with long rows or current-tail wide panel; omitted discovers latest cache")
-    parser.add_argument("--current-tail-cache", default="", help="Explicit joined_panel_*.parquet current-tail cache path")
-    parser.add_argument("--external-state-csv", default="", help="Optional lagged external/FRED state CSV")
-    parser.add_argument("--strict-real-data", action="store_true", help="Fail if required real OHLCV coverage is missing")
+    parser.add_argument(
+        "--input",
+        default="",
+        help="CSV/parquet with long rows or current-tail wide panel; omitted discovers latest cache",
+    )
+    parser.add_argument(
+        "--current-tail-cache",
+        default="",
+        help="Explicit joined_panel_*.parquet current-tail cache path",
+    )
+    parser.add_argument(
+        "--external-state-csv", default="", help="Optional lagged external/FRED state CSV"
+    )
+    parser.add_argument(
+        "--strict-real-data",
+        action="store_true",
+        help="Fail if required real OHLCV coverage is missing",
+    )
     parser.add_argument("--output-dir", default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--horizon", type=int, default=4)
     parser.add_argument("--top-n", type=int, default=20)
-    parser.add_argument("--ledger-output", default="", help="JSONL ledger output; default is output-dir candidate_outcome_ledger_latest.jsonl")
+    parser.add_argument(
+        "--ledger-output",
+        default="",
+        help="JSONL ledger output; default is output-dir candidate_outcome_ledger_latest.jsonl",
+    )
     parser.add_argument("--entry-quantile", type=float, default=0.9)
     parser.add_argument("--max-ledger-records-per-factor-side-split", type=int, default=120)
     args = parser.parse_args()
 
     output_dir = Path(args.output_dir).expanduser().resolve()
-    ledger_output = Path(args.ledger_output).expanduser().resolve() if str(args.ledger_output).strip() else output_dir / "candidate_outcome_ledger_latest.jsonl"
+    ledger_output = (
+        Path(args.ledger_output).expanduser().resolve()
+        if str(args.ledger_output).strip()
+        else output_dir / "candidate_outcome_ledger_latest.jsonl"
+    )
     bundle = _bundle_from_args(args)
     source_ref = f"input:{bundle.metadata.get('source_path')}"
     payload = build_screen_payload(
@@ -147,10 +171,15 @@ def main() -> None:
         source_coverage=bundle.metadata,
         ledger_output=ledger_output,
         entry_quantile=float(args.entry_quantile),
-        max_ledger_records_per_factor_side_split=max(1, int(args.max_ledger_records_per_factor_side_split)),
+        max_ledger_records_per_factor_side_split=max(
+            1, int(args.max_ledger_records_per_factor_side_split)
+        ),
     )
     _write_json(output_dir / "crypto_fx_alpha_zoo_screen_latest.json", payload)
-    _write_json(output_dir / "candidate_outcome_ledger_summary_latest.json", dict(payload["candidate_outcome_ledger"]))
+    _write_json(
+        output_dir / "candidate_outcome_ledger_summary_latest.json",
+        dict(payload["candidate_outcome_ledger"]),
+    )
     summary = [
         "# Crypto/FX Alpha Zoo real-data screen",
         "",
@@ -173,7 +202,9 @@ def main() -> None:
     summary.extend(["", "## Selected factors"])
     for row in payload["screen"]["selected_factors"]:
         summary.append(f"- `{row['factor']}` score `{row['selection_score']}`")
-    (output_dir / "crypto_fx_alpha_zoo_screen_latest.md").write_text("\n".join(summary) + "\n", encoding="utf-8")
+    (output_dir / "crypto_fx_alpha_zoo_screen_latest.md").write_text(
+        "\n".join(summary) + "\n", encoding="utf-8"
+    )
 
 
 if __name__ == "__main__":

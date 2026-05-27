@@ -16,7 +16,9 @@ import numpy as np
 import pandas as pd
 
 
-def as_float_series(values: pd.Series | Sequence[float], *, index: pd.Index | None = None) -> pd.Series:
+def as_float_series(
+    values: pd.Series | Sequence[float], *, index: pd.Index | None = None
+) -> pd.Series:
     """Return a float Series, preserving ``index`` when supplied."""
     if isinstance(values, pd.Series):
         series = values.copy()
@@ -32,7 +34,9 @@ def _groupby(values: pd.Series, by: pd.Series | Sequence[Hashable] | None):
     return values.groupby(by, sort=False, group_keys=False)
 
 
-def delay(values: pd.Series, periods: int = 1, *, by: pd.Series | Sequence[Hashable] | None = None) -> pd.Series:
+def delay(
+    values: pd.Series, periods: int = 1, *, by: pd.Series | Sequence[Hashable] | None = None
+) -> pd.Series:
     """Causal delay/lag operator."""
     series = as_float_series(values)
     period_i = max(1, int(periods))
@@ -40,13 +44,17 @@ def delay(values: pd.Series, periods: int = 1, *, by: pd.Series | Sequence[Hasha
     return series.shift(period_i) if grouped is None else grouped.shift(period_i)
 
 
-def delta(values: pd.Series, periods: int = 1, *, by: pd.Series | Sequence[Hashable] | None = None) -> pd.Series:
+def delta(
+    values: pd.Series, periods: int = 1, *, by: pd.Series | Sequence[Hashable] | None = None
+) -> pd.Series:
     """Latest value minus delayed value."""
     series = as_float_series(values)
     return series - delay(series, periods=periods, by=by)
 
 
-def returns(values: pd.Series, periods: int = 1, *, by: pd.Series | Sequence[Hashable] | None = None) -> pd.Series:
+def returns(
+    values: pd.Series, periods: int = 1, *, by: pd.Series | Sequence[Hashable] | None = None
+) -> pd.Series:
     """Simple return over ``periods`` bars."""
     series = as_float_series(values)
     lagged = delay(series, periods=periods, by=by)
@@ -54,7 +62,9 @@ def returns(values: pd.Series, periods: int = 1, *, by: pd.Series | Sequence[Has
     return (series / denom) - 1.0
 
 
-def rolling_sum(values: pd.Series, window: int, *, by: pd.Series | Sequence[Hashable] | None = None) -> pd.Series:
+def rolling_sum(
+    values: pd.Series, window: int, *, by: pd.Series | Sequence[Hashable] | None = None
+) -> pd.Series:
     series = as_float_series(values)
     w = max(1, int(window))
     grouped = _groupby(series, by)
@@ -63,7 +73,9 @@ def rolling_sum(values: pd.Series, window: int, *, by: pd.Series | Sequence[Hash
     return grouped.rolling(w).sum().reset_index(level=0, drop=True)
 
 
-def rolling_mean(values: pd.Series, window: int, *, by: pd.Series | Sequence[Hashable] | None = None) -> pd.Series:
+def rolling_mean(
+    values: pd.Series, window: int, *, by: pd.Series | Sequence[Hashable] | None = None
+) -> pd.Series:
     series = as_float_series(values)
     w = max(1, int(window))
     grouped = _groupby(series, by)
@@ -72,7 +84,9 @@ def rolling_mean(values: pd.Series, window: int, *, by: pd.Series | Sequence[Has
     return grouped.rolling(w).mean().reset_index(level=0, drop=True)
 
 
-def rolling_std(values: pd.Series, window: int, *, by: pd.Series | Sequence[Hashable] | None = None) -> pd.Series:
+def rolling_std(
+    values: pd.Series, window: int, *, by: pd.Series | Sequence[Hashable] | None = None
+) -> pd.Series:
     series = as_float_series(values)
     w = max(2, int(window))
     grouped = _groupby(series, by)
@@ -81,7 +95,9 @@ def rolling_std(values: pd.Series, window: int, *, by: pd.Series | Sequence[Hash
     return grouped.rolling(w).std().reset_index(level=0, drop=True)
 
 
-def rolling_min(values: pd.Series, window: int, *, by: pd.Series | Sequence[Hashable] | None = None) -> pd.Series:
+def rolling_min(
+    values: pd.Series, window: int, *, by: pd.Series | Sequence[Hashable] | None = None
+) -> pd.Series:
     series = as_float_series(values)
     w = max(1, int(window))
     grouped = _groupby(series, by)
@@ -90,7 +106,9 @@ def rolling_min(values: pd.Series, window: int, *, by: pd.Series | Sequence[Hash
     return grouped.rolling(w).min().reset_index(level=0, drop=True)
 
 
-def rolling_max(values: pd.Series, window: int, *, by: pd.Series | Sequence[Hashable] | None = None) -> pd.Series:
+def rolling_max(
+    values: pd.Series, window: int, *, by: pd.Series | Sequence[Hashable] | None = None
+) -> pd.Series:
     series = as_float_series(values)
     w = max(1, int(window))
     grouped = _groupby(series, by)
@@ -117,7 +135,9 @@ def _latest_rank(window_values: np.ndarray) -> float:
     return (below + 0.5 * equal) / float(clean.size)
 
 
-def ts_rank(values: pd.Series, window: int, *, by: pd.Series | Sequence[Hashable] | None = None) -> pd.Series:
+def ts_rank(
+    values: pd.Series, window: int, *, by: pd.Series | Sequence[Hashable] | None = None
+) -> pd.Series:
     """Trailing percentile rank of the latest value."""
     series = as_float_series(values)
     w = max(2, int(window))
@@ -141,7 +161,11 @@ def corr(
     if by is None:
         return left_s.rolling(w).corr(right_s)
     pieces: list[pd.Series] = []
-    by_s = pd.Series(list(by), index=left_s.index) if not isinstance(by, pd.Series) else by.reindex(left_s.index)
+    by_s = (
+        pd.Series(list(by), index=left_s.index)
+        if not isinstance(by, pd.Series)
+        else by.reindex(left_s.index)
+    )
     for idx in by_s.groupby(by_s, sort=False).groups.values():
         left_g = left_s.loc[idx]
         right_g = right_s.loc[idx]
@@ -165,7 +189,11 @@ def cov(
     if by is None:
         return left_s.rolling(w).cov(right_s)
     pieces: list[pd.Series] = []
-    by_s = pd.Series(list(by), index=left_s.index) if not isinstance(by, pd.Series) else by.reindex(left_s.index)
+    by_s = (
+        pd.Series(list(by), index=left_s.index)
+        if not isinstance(by, pd.Series)
+        else by.reindex(left_s.index)
+    )
     for idx in by_s.groupby(by_s, sort=False).groups.values():
         left_g = left_s.loc[idx]
         right_g = right_s.loc[idx]
@@ -175,7 +203,9 @@ def cov(
     return pd.concat(pieces).sort_index()
 
 
-def decay_linear(values: pd.Series, window: int, *, by: pd.Series | Sequence[Hashable] | None = None) -> pd.Series:
+def decay_linear(
+    values: pd.Series, window: int, *, by: pd.Series | Sequence[Hashable] | None = None
+) -> pd.Series:
     """Linearly decayed trailing mean with greatest weight on the latest bar."""
     series = as_float_series(values)
     w = max(1, int(window))
@@ -204,7 +234,9 @@ def signed_power(values: pd.Series | float, power: float) -> pd.Series | float:
     return math.copysign(abs(value) ** float(power), value)
 
 
-def zscore(values: pd.Series, window: int, *, by: pd.Series | Sequence[Hashable] | None = None) -> pd.Series:
+def zscore(
+    values: pd.Series, window: int, *, by: pd.Series | Sequence[Hashable] | None = None
+) -> pd.Series:
     """Rolling z-score using only trailing observations."""
     series = as_float_series(values)
     mu = rolling_mean(series, window, by=by)
@@ -215,6 +247,10 @@ def zscore(values: pd.Series, window: int, *, by: pd.Series | Sequence[Hashable]
 def safe_divide(numerator: pd.Series, denominator: pd.Series | float) -> pd.Series:
     """Divide while converting zero denominators to NaN."""
     num = as_float_series(numerator)
-    den = denominator if isinstance(denominator, pd.Series) else pd.Series(float(denominator), index=num.index)
+    den = (
+        denominator
+        if isinstance(denominator, pd.Series)
+        else pd.Series(float(denominator), index=num.index)
+    )
     den_s = as_float_series(den, index=num.index)
     return num / den_s.where(den_s.abs() > 1e-12)

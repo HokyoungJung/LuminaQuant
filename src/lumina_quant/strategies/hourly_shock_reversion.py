@@ -431,7 +431,9 @@ class HourlyShockReversionStrategy(Strategy):
             metadata["entry_hour_utc"] = hour
 
         if self.max_realized_volatility > 0.0 and self.volatility_lookback_bars > 1:
-            realized_volatility = self._realized_volatility(target_bars, self.volatility_lookback_bars)
+            realized_volatility = self._realized_volatility(
+                target_bars, self.volatility_lookback_bars
+            )
             metadata["realized_volatility"] = float(realized_volatility)
             metadata["max_realized_volatility"] = float(self.max_realized_volatility)
             if realized_volatility > self.max_realized_volatility:
@@ -542,18 +544,16 @@ class HourlyShockReversionStrategy(Strategy):
         take_profit_hit = False
         if self._state.entry_price:
             if self._state.mode == "LONG":
-                stop_hit = (
-                    self.stop_loss_pct > 0.0
-                    and price <= self._state.entry_price * (1.0 - self.stop_loss_pct)
+                stop_hit = self.stop_loss_pct > 0.0 and price <= self._state.entry_price * (
+                    1.0 - self.stop_loss_pct
                 )
                 take_profit_hit = (
                     self.take_profit_pct > 0.0
                     and price >= self._state.entry_price * (1.0 + self.take_profit_pct)
                 )
             else:
-                stop_hit = (
-                    self.stop_loss_pct > 0.0
-                    and price >= self._state.entry_price * (1.0 + self.stop_loss_pct)
+                stop_hit = self.stop_loss_pct > 0.0 and price >= self._state.entry_price * (
+                    1.0 + self.stop_loss_pct
                 )
                 take_profit_hit = (
                     self.take_profit_pct > 0.0
@@ -588,7 +588,9 @@ class HourlyShockReversionStrategy(Strategy):
             feature_lookup=getattr(context, "feature_lookup", None),
         )
 
-    def calculate_signals_window(self, event: Any, aggregator: Any, feature_lookup: Any = None) -> None:
+    def calculate_signals_window(
+        self, event: Any, aggregator: Any, feature_lookup: Any = None
+    ) -> None:
         if aggregator is None:
             return
         bars = self._completed_bars(
@@ -608,12 +610,12 @@ class HourlyShockReversionStrategy(Strategy):
             return
 
         event_time = (
-            latest_bar[0]
-            if isinstance(latest_bar, (tuple, list))
-            else getattr(event, "time", None)
+            latest_bar[0] if isinstance(latest_bar, (tuple, list)) else getattr(event, "time", None)
         )
         shock_return = float(latest_close / base_close - 1.0)
-        if self._maybe_exit(event_time=event_time, price=float(latest_close), shock_return=shock_return):
+        if self._maybe_exit(
+            event_time=event_time, price=float(latest_close), shock_return=shock_return
+        ):
             return
         if self._state.mode != "OUT":
             return

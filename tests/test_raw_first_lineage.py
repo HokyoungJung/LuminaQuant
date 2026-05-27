@@ -16,7 +16,10 @@ def test_normalize_exchange_timestamp_ms_rejects_seconds_and_microseconds() -> N
         normalize_exchange_timestamp_ms(1_700_000_000, source="seconds")
     with pytest.raises(ValueError):
         normalize_exchange_timestamp_ms(1_700_000_000_000_000, source="microseconds")
-    assert normalize_exchange_timestamp_ms(1_700_000_000_000, source="milliseconds") == 1_700_000_000_000
+    assert (
+        normalize_exchange_timestamp_ms(1_700_000_000_000, source="milliseconds")
+        == 1_700_000_000_000
+    )
 
 
 def test_raw_aggtrades_to_1s_frame_forward_fills_missing_seconds() -> None:

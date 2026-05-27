@@ -168,9 +168,7 @@ def test_collect_binance_aggtrades_raw_bootstrap_lookback_used_without_checkpoin
     assert int(result["start_cursor_ms"]) == expected_since
 
 
-def test_collect_binance_aggtrades_raw_recovers_from_corrupt_partition(
-    tmp_path, monkeypatch
-):
+def test_collect_binance_aggtrades_raw_recovers_from_corrupt_partition(tmp_path, monkeypatch):
     monkeypatch.setattr(
         "lumina_quant.data_collector.create_binance_futures_client", lambda **_: _ExchangeStub()
     )
@@ -201,13 +199,7 @@ def test_collect_binance_aggtrades_raw_recovers_from_corrupt_partition(
 
     monkeypatch.setattr("lumina_quant.data_collector.sync_symbol_aggtrades_raw", _sync)
 
-    corrupt_dir = (
-        tmp_path
-        / "market_data_raw_aggtrades"
-        / "binance"
-        / "BTCUSDT"
-        / "date=2023-11-14"
-    )
+    corrupt_dir = tmp_path / "market_data_raw_aggtrades" / "binance" / "BTCUSDT" / "date=2023-11-14"
     corrupt_dir.mkdir(parents=True, exist_ok=True)
     (corrupt_dir / "part-0000.parquet").write_bytes(b"not-a-parquet-file")
 

@@ -27,7 +27,11 @@ class CrossSectionalMeanReversionPlugin(StrategyPlugin):
                 mean_col.alias("rolling_mean"),
                 std_col.alias("rolling_std"),
             ]
-        ).with_columns(((pl.col("close") - pl.col("rolling_mean")) / pl.col("rolling_std")).fill_null(0.0).alias("zscore"))
+        ).with_columns(
+            ((pl.col("close") - pl.col("rolling_mean")) / pl.col("rolling_std"))
+            .fill_null(0.0)
+            .alias("zscore")
+        )
 
     def compute_signal(self, features: pl.DataFrame, params: dict) -> pl.DataFrame:
         _ = params
@@ -40,8 +44,14 @@ class CrossSectionalMeanReversionPlugin(StrategyPlugin):
 
         ranked = raw_signal.with_columns(
             [
-                pl.col("signal").rank(method="ordinal", descending=True).over("datetime").alias("rank_desc"),
-                pl.col("signal").rank(method="ordinal", descending=False).over("datetime").alias("rank_asc"),
+                pl.col("signal")
+                .rank(method="ordinal", descending=True)
+                .over("datetime")
+                .alias("rank_desc"),
+                pl.col("signal")
+                .rank(method="ordinal", descending=False)
+                .over("datetime")
+                .alias("rank_asc"),
             ]
         )
 
@@ -55,4 +65,7 @@ class CrossSectionalMeanReversionPlugin(StrategyPlugin):
             .then(short_weight)
             .otherwise(0.0)
             .alias("target_weight")
-        ).select([column for column in raw_signal.columns if column != "signal"] + ["signal", "target_weight"])
+        ).select(
+            [column for column in raw_signal.columns if column != "signal"]
+            + ["signal", "target_weight"]
+        )

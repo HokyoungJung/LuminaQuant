@@ -15,7 +15,9 @@ def run_optional(cmd):
 
 def main():
     print(f"Platform: {platform.platform()}")
-    run(["uv", "sync", "--extra", "optimize", "--extra", "dev", "--extra", "live", "--extra", "gpu"])
+    run(
+        ["uv", "sync", "--extra", "optimize", "--extra", "dev", "--extra", "live", "--extra", "gpu"]
+    )
     run(["uv", "run", "ruff", "check", "."])
     run(["uv", "run", "python", "scripts/check_architecture.py"])
     run(["uv", "run", "python", "scripts/verify_docs.py"])

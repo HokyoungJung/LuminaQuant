@@ -60,7 +60,9 @@ def build_manifest(*, timeframes: list[str], symbols: list[str]) -> dict[str, An
     }
 
 
-def write_manifest(*, output_dir: Path, timeframes: list[str], symbols: list[str]) -> dict[str, str]:
+def write_manifest(
+    *, output_dir: Path, timeframes: list[str], symbols: list[str]
+) -> dict[str, str]:
     payload = build_manifest(timeframes=timeframes, symbols=symbols)
     output_dir.mkdir(parents=True, exist_ok=True)
     json_path = output_dir / "carry_trend_production_manifest_latest.json"

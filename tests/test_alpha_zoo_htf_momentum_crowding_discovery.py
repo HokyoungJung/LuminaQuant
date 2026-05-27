@@ -9,7 +9,9 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT / "scripts" / "research" / "run_alpha_zoo_htf_momentum_crowding_discovery.py"
-SPEC = importlib.util.spec_from_file_location("run_alpha_zoo_htf_momentum_crowding_discovery", MODULE_PATH)
+SPEC = importlib.util.spec_from_file_location(
+    "run_alpha_zoo_htf_momentum_crowding_discovery", MODULE_PATH
+)
 assert SPEC is not None and SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = MODULE
@@ -40,8 +42,18 @@ def _gate_row(**overrides: object) -> dict[str, object]:
 
 
 def test_candidate_score_ignores_locked_oos_return() -> None:
-    high_oos = {"train_return": 0.1, "validation_return": 0.05, "validation_mdd": 0.01, "locked_oos_return": 1.0}
-    low_oos = {"train_return": 0.1, "validation_return": 0.05, "validation_mdd": 0.01, "locked_oos_return": -1.0}
+    high_oos = {
+        "train_return": 0.1,
+        "validation_return": 0.05,
+        "validation_mdd": 0.01,
+        "locked_oos_return": 1.0,
+    }
+    low_oos = {
+        "train_return": 0.1,
+        "validation_return": 0.05,
+        "validation_mdd": 0.01,
+        "locked_oos_return": -1.0,
+    }
 
     assert MODULE._candidate_score(high_oos) == MODULE._candidate_score(low_oos)
 
@@ -80,7 +92,9 @@ def test_simulate_symbol_charges_round_trip_cost_on_entry_and_exit() -> None:
             "volume": [1.0, 1.0, 1.0, 1.0],
         }
     )
-    sim = MODULE.simulate_symbol(bars, np.array([1.0, 1.0, 0.0, 0.0]), leverage=1.0, allocation_fraction=1.0)
+    sim = MODULE.simulate_symbol(
+        bars, np.array([1.0, 1.0, 0.0, 0.0]), leverage=1.0, allocation_fraction=1.0
+    )
 
     assert sim.returns.sum() == -0.001
     assert not sim.liquidation_flags.any()
@@ -118,5 +132,8 @@ def test_selected_output_rows_keeps_gate_pass_beyond_top_n() -> None:
 
     selected = MODULE._selected_output_rows(ranked, top_n=1)
 
-    assert [row["model_id"] for row in selected] == ["high-validation-reject", "lower-score-sample-pass"]
+    assert [row["model_id"] for row in selected] == [
+        "high-validation-reject",
+        "lower-score-sample-pass",
+    ]
     assert selected[1]["backtest_sample_gate_pass"] is True

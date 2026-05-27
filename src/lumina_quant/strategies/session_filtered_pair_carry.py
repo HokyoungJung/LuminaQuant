@@ -161,7 +161,9 @@ class SessionFilteredPairCarryStrategy(PairTradingZScoreStrategy):
             take_profit=take_profit,
         )
 
-    def _emit_pair_entry(self, event_time: Any, mode: str, zscore: float, beta: float, corr: float | None) -> None:
+    def _emit_pair_entry(
+        self, event_time: Any, mode: str, zscore: float, beta: float, corr: float | None
+    ) -> None:
         if not self._entry_gate_passed(event_time, zscore, beta):
             self._entry_gate_blocked = True
             return

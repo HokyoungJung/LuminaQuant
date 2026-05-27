@@ -69,7 +69,16 @@ def _discover_dll_candidates() -> list[str]:
     if explicit:
         return [explicit]
     root = _project_root()
-    return [str(root / "native" / "rust_rawfirst" / "target" / "release" / _native_lib_filename("lumina_rawfirst"))]
+    return [
+        str(
+            root
+            / "native"
+            / "rust_rawfirst"
+            / "target"
+            / "release"
+            / _native_lib_filename("lumina_rawfirst")
+        )
+    ]
 
 
 def _warn_auto_fallback_once(reason: str) -> None:
@@ -87,7 +96,11 @@ def load_rawfirst_native_library() -> Any | None:
     last_error = ""
     for dll_path in _discover_dll_candidates():
         if not dll_path or not os.path.exists(dll_path):
-            last_error = f"native library missing at {dll_path}" if dll_path else "native library path missing"
+            last_error = (
+                f"native library missing at {dll_path}"
+                if dll_path
+                else "native library path missing"
+            )
             continue
         try:
             handle = ctypes.CDLL(dll_path)
@@ -166,7 +179,11 @@ def describe_raw_first_backend(requested: str | None = None) -> str:
         return RAW_FIRST_BACKEND_PYTHON
     fn = _load_native_function()
     if fn is None:
-        return RAW_FIRST_BACKEND_PYTHON if mode == RAW_FIRST_BACKEND_AUTO else f"{RAW_FIRST_BACKEND_RUST}:unavailable"
+        return (
+            RAW_FIRST_BACKEND_PYTHON
+            if mode == RAW_FIRST_BACKEND_AUTO
+            else f"{RAW_FIRST_BACKEND_RUST}:unavailable"
+        )
     return f"{RAW_FIRST_BACKEND_RUST}:{_NATIVE_DLL}"
 
 
@@ -205,7 +222,11 @@ def aggregate_raw_aggtrades_to_1s_native(
 
     first_trade_second = (int(timestamps[0]) // 1000) * 1000
     last_complete_second = (((int(complete_through_ms) + 1) // 1000) * 1000) - 1000
-    start_candidate = (int(range_start_ms) // 1000) * 1000 if range_start_ms is not None else int(first_trade_second)
+    start_candidate = (
+        (int(range_start_ms) // 1000) * 1000
+        if range_start_ms is not None
+        else int(first_trade_second)
+    )
     end_candidate = int(last_complete_second)
     if range_end_ms is not None:
         end_candidate = min(int(end_candidate), (int(range_end_ms) // 1000) * 1000)
@@ -261,7 +282,9 @@ def aggregate_raw_aggtrades_to_1s_native(
 
     return pl.DataFrame(
         {
-            "datetime": pl.Series("datetime", out_timestamps[:row_count], dtype=pl.Int64).cast(pl.Datetime(time_unit="ms")),
+            "datetime": pl.Series("datetime", out_timestamps[:row_count], dtype=pl.Int64).cast(
+                pl.Datetime(time_unit="ms")
+            ),
             "open": pl.Series("open", out_open[:row_count], dtype=pl.Float64),
             "high": pl.Series("high", out_high[:row_count], dtype=pl.Float64),
             "low": pl.Series("low", out_low[:row_count], dtype=pl.Float64),

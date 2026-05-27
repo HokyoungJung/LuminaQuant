@@ -234,7 +234,9 @@ class Alpha101FormulaStrategy(Strategy):
             item.entry_price = safe_float(raw.get("entry_price"))
             item.last_time_key = str(raw.get("last_time_key", ""))
 
-    def _resolve_bar(self, symbol: str, event) -> tuple[Any, float | None, float | None, float | None, float | None, float | None]:
+    def _resolve_bar(
+        self, symbol: str, event
+    ) -> tuple[Any, float | None, float | None, float | None, float | None, float | None]:
         if getattr(event, "symbol", None) == symbol:
             event_time = getattr(event, "time", getattr(event, "datetime", None))
             open_price = safe_float(getattr(event, "open", None))
@@ -277,7 +279,15 @@ class Alpha101FormulaStrategy(Strategy):
         value_f = float(value)
         return self.signal_sign * value_f if math.isfinite(value_f) else None
 
-    def _emit(self, symbol: str, event_time: Any, signal_type: str, *, zscore: float | None, stop_loss: float | None = None) -> None:
+    def _emit(
+        self,
+        symbol: str,
+        event_time: Any,
+        signal_type: str,
+        *,
+        zscore: float | None,
+        stop_loss: float | None = None,
+    ) -> None:
         self.events.put(
             SignalEvent(
                 strategy_id="alpha101_formula",
@@ -305,7 +315,9 @@ class Alpha101FormulaStrategy(Strategy):
             return
 
         item = self._state[symbol]
-        event_time, open_price, high_price, low_price, close_price, volume = self._resolve_bar(symbol, event)
+        event_time, open_price, high_price, low_price, close_price, volume = self._resolve_bar(
+            symbol, event
+        )
         if (
             open_price is None
             or high_price is None

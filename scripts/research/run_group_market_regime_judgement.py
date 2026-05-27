@@ -142,7 +142,9 @@ def _load_group_portfolio(*, label: str, path: Path) -> GroupPortfolio:
         .reset_index(drop=True)
     )
     symbols = sorted({str(symbol) for row in weights for symbol in list(row.get("symbols") or [])})
-    return GroupPortfolio(label=label, path=path.resolve(), weights=weights, returns=returns, symbols=symbols)
+    return GroupPortfolio(
+        label=label, path=path.resolve(), weights=weights, returns=returns, symbols=symbols
+    )
 
 
 def _forward_compound(series: pd.Series, horizon_days: int) -> pd.Series:
@@ -161,7 +163,11 @@ def _split_group(day_value: pd.Timestamp) -> str:
 def _materialized_date_coverage(symbol: str) -> dict[str, Any]:
     symbol_token = str(symbol).replace("/", "")
     timeframe_dir = MATERIALIZED_ROOT / symbol_token / "timeframe=30m"
-    dates = sorted(path.name.split("=", 1)[1] for path in timeframe_dir.glob("date=*")) if timeframe_dir.exists() else []
+    dates = (
+        sorted(path.name.split("=", 1)[1] for path in timeframe_dir.glob("date=*"))
+        if timeframe_dir.exists()
+        else []
+    )
     return {
         "first_date": dates[0] if dates else None,
         "last_date": dates[-1] if dates else None,
@@ -170,7 +176,9 @@ def _materialized_date_coverage(symbol: str) -> dict[str, Any]:
     }
 
 
-def _feature_point_files(symbol: str, *, start_day: pd.Timestamp, end_day: pd.Timestamp) -> list[str]:
+def _feature_point_files(
+    symbol: str, *, start_day: pd.Timestamp, end_day: pd.Timestamp
+) -> list[str]:
     symbol_token = str(symbol).replace("/", "")
     root = FEATURE_POINT_ROOT / f"symbol={symbol_token}"
     if not root.exists():
@@ -285,9 +293,11 @@ def _daily_market_feature_frame(symbol_closes: list[pd.DataFrame]) -> pd.DataFra
     basket_vol_ratio = vol_ratio_pivot.mean(axis=1)
     basket_ret96_dispersion = ret96_pivot.std(axis=1).fillna(0.0).astype(float)
     basket_ret96_top3_mean = ret96_pivot.apply(
-        lambda row: float(row.dropna().sort_values(ascending=False).head(min(3, row.notna().sum())).mean())
-        if row.notna().any()
-        else 0.0,
+        lambda row: (
+            float(row.dropna().sort_values(ascending=False).head(min(3, row.notna().sum())).mean())
+            if row.notna().any()
+            else 0.0
+        ),
         axis=1,
     ).astype(float)
     features["basket_ret96_pos"] = basket_ret96 > 0.0
@@ -319,7 +329,9 @@ def _daily_market_feature_frame(symbol_closes: list[pd.DataFrame]) -> pd.DataFra
         0.0,
     )
     features["btc_trend_accel_pos"] = features["btc_trend_accel"].astype(float) > 0.0
-    features["breadth_delta"] = features["breadth_ma96"].astype(float) - features["breadth_ma192"].astype(float)
+    features["breadth_delta"] = features["breadth_ma96"].astype(float) - features[
+        "breadth_ma192"
+    ].astype(float)
     features["breadth_expanding"] = features["breadth_delta"].astype(float) >= 0.10
     return features.reset_index(drop=True)
 
@@ -468,7 +480,9 @@ def _rule_split_stats(
     return stats
 
 
-def _select_rules(frame: pd.DataFrame, *, horizon_days: int) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+def _select_rules(
+    frame: pd.DataFrame, *, horizon_days: int
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     train_val = frame.loc[frame["split_group"].isin(("train", "val"))].copy()
     candidates = _candidate_rules(train_val)
     forward_column = f"forward_{horizon_days}d_rel"
@@ -492,7 +506,11 @@ def _select_rules(frame: pd.DataFrame, *, horizon_days: int) -> tuple[list[dict[
         train_count = int(train_stats["count"])
         val_count = int(val_stats["count"])
         combined_count = train_count + val_count
-        if train_count < MIN_TRAIN_COUNT or val_count < MIN_VAL_COUNT or combined_count < MIN_COMBINED_COUNT:
+        if (
+            train_count < MIN_TRAIN_COUNT
+            or val_count < MIN_VAL_COUNT
+            or combined_count < MIN_COMBINED_COUNT
+        ):
             diagnostics.append(
                 {
                     **asdict(candidate),
@@ -532,9 +550,13 @@ def _select_rules(frame: pd.DataFrame, *, horizon_days: int) -> tuple[list[dict[
             and abs(oos_mean) >= OOS_NEUTRAL_BAND
             and math.copysign(1.0, combined_mean) != math.copysign(1.0, oos_mean)
         ):
-            if _should_use_oos_confirmation_override(combined_mean=combined_mean, oos_mean=oos_mean, oos_count=oos_count):
+            if _should_use_oos_confirmation_override(
+                combined_mean=combined_mean, oos_mean=oos_mean, oos_count=oos_count
+            ):
                 confirmation_side = "autoresearch" if oos_mean > 0.0 else "incumbent"
-                confirmation_score = abs(oos_mean) * math.sqrt(float(oos_count)) * CONFIRMATION_SCORE_DISCOUNT
+                confirmation_score = (
+                    abs(oos_mean) * math.sqrt(float(oos_count)) * CONFIRMATION_SCORE_DISCOUNT
+                )
                 qualified = {
                     **asdict(candidate),
                     "qualified": True,
@@ -654,7 +676,9 @@ def _feature_value_snapshot(row: pd.Series) -> dict[str, Any]:
     return {key: row.get(key) for key in keys}
 
 
-def _current_judgement(*, latest_row: pd.Series, selected_rules: list[dict[str, Any]]) -> dict[str, Any]:
+def _current_judgement(
+    *, latest_row: pd.Series, selected_rules: list[dict[str, Any]]
+) -> dict[str, Any]:
     current_frame = pd.DataFrame([latest_row])
     incumbent_score = 0.0
     autoresearch_score = 0.0
@@ -678,14 +702,25 @@ def _current_judgement(*, latest_row: pd.Series, selected_rules: list[dict[str, 
             incumbent_score += score
         else:
             autoresearch_score += score
-        active_rules.append({"rule_id": rule["rule_id"], "label": rule["label"], "favored_group": side, "score": score})
+        active_rules.append(
+            {
+                "rule_id": rule["rule_id"],
+                "label": rule["label"],
+                "favored_group": side,
+                "score": score,
+            }
+        )
     total_score = incumbent_score + autoresearch_score
     if total_score <= 0.0:
         favored_group = "mixed"
         confidence = 0.0
     else:
         margin = abs(incumbent_score - autoresearch_score) / total_score
-        favored_group = "mixed" if margin < MIXED_MARGIN_THRESHOLD else ("incumbent" if incumbent_score > autoresearch_score else "autoresearch")
+        favored_group = (
+            "mixed"
+            if margin < MIXED_MARGIN_THRESHOLD
+            else ("incumbent" if incumbent_score > autoresearch_score else "autoresearch")
+        )
         confidence = margin
     return {
         "date": latest_row["date"],
@@ -782,11 +817,20 @@ def _build_markdown(payload: dict[str, Any]) -> str:
     active_rules = list(current.get("active_rules") or [])
     if active_rules:
         for rule in active_rules:
-            lines.append(f"- `{rule['label']}` -> `{rule['favored_group']}` (`score={float(rule.get('score') or 0.0):.6f}`)")
+            lines.append(
+                f"- `{rule['label']}` -> `{rule['favored_group']}` (`score={float(rule.get('score') or 0.0):.6f}`)"
+            )
     else:
         lines.append("- 현재 활성화된 선택 규칙 없음")
 
-    lines.extend(["", *_rule_lines("incumbent", "Incumbent 성적 좋을 때의 Market Regime"), "", *_rule_lines("autoresearch", "55/45 성적 좋을 때의 Market Regime")])
+    lines.extend(
+        [
+            "",
+            *_rule_lines("incumbent", "Incumbent 성적 좋을 때의 Market Regime"),
+            "",
+            *_rule_lines("autoresearch", "55/45 성적 좋을 때의 Market Regime"),
+        ]
+    )
     lines.extend(
         [
             "",
@@ -814,8 +858,12 @@ def run_group_market_regime_judgement(
         run_name="group_market_regime_judgement",
         output_dir=output_dir,
         input_path=incumbent_path,
-        rss_log_path=output_dir / MEMORY_GUARD_DIRNAME / "group_market_regime_judgement_rss_latest.jsonl",
-        summary_path=output_dir / MEMORY_GUARD_DIRNAME / "group_market_regime_judgement_memory_latest.json",
+        rss_log_path=output_dir
+        / MEMORY_GUARD_DIRNAME
+        / "group_market_regime_judgement_rss_latest.jsonl",
+        summary_path=output_dir
+        / MEMORY_GUARD_DIRNAME
+        / "group_market_regime_judgement_memory_latest.json",
         budget_bytes=hard_rss_bytes,
         soft_limit_bytes=soft_rss_bytes,
         hard_limit_bytes=hard_rss_bytes,
@@ -824,7 +872,9 @@ def run_group_market_regime_judgement(
     error: str | None = None
     payload: dict[str, Any] | None = None
     try:
-        memory_guard.sample(event="group_market_regime_judgement_start", context={"horizon_days": horizon_days})
+        memory_guard.sample(
+            event="group_market_regime_judgement_start", context={"horizon_days": horizon_days}
+        )
         incumbent = _load_group_portfolio(label="incumbent", path=incumbent_path)
         autoresearch = _load_group_portfolio(label="autoresearch", path=autoresearch_path)
         merged = (
@@ -838,9 +888,16 @@ def run_group_market_regime_judgement(
             .reset_index(drop=True)
         )
         merged["split_group"] = merged["date"].map(_split_group)
-        merged[f"forward_{horizon_days}d_incumbent"] = _forward_compound(merged["incumbent"], horizon_days)
-        merged[f"forward_{horizon_days}d_autoresearch"] = _forward_compound(merged["autoresearch"], horizon_days)
-        merged[f"forward_{horizon_days}d_rel"] = merged[f"forward_{horizon_days}d_autoresearch"] - merged[f"forward_{horizon_days}d_incumbent"]
+        merged[f"forward_{horizon_days}d_incumbent"] = _forward_compound(
+            merged["incumbent"], horizon_days
+        )
+        merged[f"forward_{horizon_days}d_autoresearch"] = _forward_compound(
+            merged["autoresearch"], horizon_days
+        )
+        merged[f"forward_{horizon_days}d_rel"] = (
+            merged[f"forward_{horizon_days}d_autoresearch"]
+            - merged[f"forward_{horizon_days}d_incumbent"]
+        )
         memory_guard.checkpoint("group_market_regime_returns_loaded", {"rows": len(merged)})
 
         start_day = pd.Timestamp(merged["date"].min()).tz_convert("UTC").floor("D")
@@ -849,15 +906,24 @@ def run_group_market_regime_judgement(
         symbol_frames: list[pd.DataFrame] = []
         coverage_summary: list[dict[str, Any]] = []
         for symbol in symbols:
-            frame, coverage = _load_symbol_close_30m_from_feature_points(symbol, start_day=start_day, end_day=end_day)
+            frame, coverage = _load_symbol_close_30m_from_feature_points(
+                symbol, start_day=start_day, end_day=end_day
+            )
             symbol_frames.append(frame)
             coverage_summary.append(coverage)
             memory_guard.checkpoint(
                 "group_market_regime_symbol_loaded",
-                {"symbol": symbol, "rows": len(frame), "filled_missing_day_count": int(coverage["filled_missing_day_count"])},
+                {
+                    "symbol": symbol,
+                    "rows": len(frame),
+                    "filled_missing_day_count": int(coverage["filled_missing_day_count"]),
+                },
             )
         feature_frame = _daily_market_feature_frame(symbol_frames)
-        memory_guard.checkpoint("group_market_regime_features_loaded", {"feature_rows": len(feature_frame), "symbol_count": len(symbols)})
+        memory_guard.checkpoint(
+            "group_market_regime_features_loaded",
+            {"feature_rows": len(feature_frame), "symbol_count": len(symbols)},
+        )
 
         combined = merged.merge(feature_frame, on="date", how="left")
         selected_rules, rule_selection = _select_rules(combined, horizon_days=horizon_days)
@@ -871,7 +937,10 @@ def run_group_market_regime_judgement(
             "selection_basis": "train_val_market_regime_rule_learning",
             "groups_move_as_set": True,
             "horizon_days": int(horizon_days),
-            "input_paths": {"incumbent": str(incumbent.path), "autoresearch": str(autoresearch.path)},
+            "input_paths": {
+                "incumbent": str(incumbent.path),
+                "autoresearch": str(autoresearch.path),
+            },
             "symbol_universe": symbols,
             "coverage_summary": coverage_summary,
             "current_judgement": current,
@@ -884,8 +953,12 @@ def run_group_market_regime_judgement(
         error = str(exc)
         raise
     finally:
-        memory_guard.sample(event="group_market_regime_judgement_finish", context={"status": status, "error": error})
-        memory_summary = memory_guard.finalize(status=status, error=error, context={"horizon_days": horizon_days})
+        memory_guard.sample(
+            event="group_market_regime_judgement_finish", context={"status": status, "error": error}
+        )
+        memory_summary = memory_guard.finalize(
+            status=status, error=error, context={"horizon_days": horizon_days}
+        )
         memory_guard.release()
         if payload is not None:
             payload["memory_summary"] = memory_summary
@@ -898,7 +971,9 @@ def run_group_market_regime_judgement(
     out_md = output_dir / f"group_market_regime_judgement_{timestamp}.md"
     latest_json = output_dir / "group_market_regime_judgement_latest.json"
     latest_md = output_dir / "group_market_regime_judgement_latest.md"
-    out_json.write_text(json.dumps(payload, indent=2, sort_keys=True, default=_json_default), encoding="utf-8")
+    out_json.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=_json_default), encoding="utf-8"
+    )
     markdown = _build_markdown(payload)
     out_md.write_text(markdown, encoding="utf-8")
     latest_json.write_text(out_json.read_text(encoding="utf-8"), encoding="utf-8")
@@ -909,7 +984,9 @@ def run_group_market_regime_judgement(
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--incumbent-path", type=Path, default=resolve_current_optimization_path())
-    parser.add_argument("--autoresearch-path", type=Path, default=_resolve_autoresearch_default_path())
+    parser.add_argument(
+        "--autoresearch-path", type=Path, default=_resolve_autoresearch_default_path()
+    )
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--horizon-days", type=int, default=DEFAULT_HORIZON_DAYS)
     parser.add_argument("--soft-rss-bytes", type=int, default=DEFAULT_SOFT_RSS_BYTES)

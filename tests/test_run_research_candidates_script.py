@@ -158,9 +158,16 @@ def test_run_research_candidates_script_smoke_with_score_config(tmp_path: Path):
     latest = tmp_path / "candidate_research_latest.json"
     assert latest.exists()
     payload = json.loads(latest.read_text(encoding="utf-8"))
-    assert payload.get("scoring_config", {}).get("candidate_rank_score_weights", {}).get("return_weight") == 45.0
+    assert (
+        payload.get("scoring_config", {})
+        .get("candidate_rank_score_weights", {})
+        .get("return_weight")
+        == 45.0
+    )
 
-    team_report = json.loads((tmp_path / "strategy_factory_report_latest.json").read_text(encoding="utf-8"))
+    team_report = json.loads(
+        (tmp_path / "strategy_factory_report_latest.json").read_text(encoding="utf-8")
+    )
     shortlist_config = dict(team_report.get("shortlist_config") or {})
     assert int(shortlist_config.get("max_per_family", 0)) == 3
     assert int(shortlist_config.get("max_per_timeframe", 0)) == 3
@@ -194,7 +201,9 @@ def test_shortlist_selection_config_nested_scope_and_cli_precedence():
     assert resolved["allow_multi_asset"] is False
 
 
-def test_run_research_candidates_forwards_max_per_lineage_and_persists_it(monkeypatch, tmp_path: Path):
+def test_run_research_candidates_forwards_max_per_lineage_and_persists_it(
+    monkeypatch, tmp_path: Path
+):
     root = Path(__file__).resolve().parents[1]
     score_cfg_path = tmp_path / "score_config.json"
     score_cfg_path.write_text(
@@ -270,7 +279,11 @@ def test_run_research_candidates_forwards_max_per_lineage_and_persists_it(monkey
         return list(rows)
 
     monkeypatch.setattr(MODULE, "build_default_candidate_rows", _stub_build_default_candidate_rows)
-    monkeypatch.setattr(MODULE, "_run_candidate_research_with_optional_split", _stub_run_candidate_research_with_optional_split)
+    monkeypatch.setattr(
+        MODULE,
+        "_run_candidate_research_with_optional_split",
+        _stub_run_candidate_research_with_optional_split,
+    )
     monkeypatch.setattr(MODULE, "select_diversified_shortlist", _stub_select_diversified_shortlist)
     monkeypatch.setattr(
         sys,
@@ -295,7 +308,9 @@ def test_run_research_candidates_forwards_max_per_lineage_and_persists_it(monkey
     assert MODULE.main() == 0
     assert int(captured["max_per_lineage"]) == 2
 
-    team_report = json.loads((tmp_path / "strategy_factory_report_latest.json").read_text(encoding="utf-8"))
+    team_report = json.loads(
+        (tmp_path / "strategy_factory_report_latest.json").read_text(encoding="utf-8")
+    )
     shortlist_config = dict(team_report.get("shortlist_config") or {})
     assert int(shortlist_config.get("max_per_lineage", 0)) == 2
 
@@ -864,7 +879,9 @@ def test_run_research_candidates_writes_stage_progress_artifacts(monkeypatch, tm
         }
 
     monkeypatch.setattr(MODULE, "run_candidate_research", _stub_run_candidate_research)
-    monkeypatch.setattr(MODULE, "select_diversified_shortlist", lambda *args, **kwargs: [candidate_row])
+    monkeypatch.setattr(
+        MODULE, "select_diversified_shortlist", lambda *args, **kwargs: [candidate_row]
+    )
 
     monkeypatch.setattr(
         sys,
@@ -886,7 +903,9 @@ def test_run_research_candidates_writes_stage_progress_artifacts(monkeypatch, tm
     exit_code = MODULE.main()
 
     assert exit_code == 0
-    progress_json = json.loads((tmp_path / "candidate_research_progress_latest.json").read_text(encoding="utf-8"))
+    progress_json = json.loads(
+        (tmp_path / "candidate_research_progress_latest.json").read_text(encoding="utf-8")
+    )
     progress_md = (tmp_path / "candidate_research_progress_latest.md").read_text(encoding="utf-8")
     progress_log = (tmp_path / "candidate_research_progress_latest.log").read_text(encoding="utf-8")
 
@@ -904,7 +923,9 @@ def test_run_research_candidates_writes_stage_progress_artifacts(monkeypatch, tm
     assert progress_json["resource_load"]["bundle"]["latest_window"]["unit_kind"] == "chunk"
     assert progress_json["resource_load"]["feature"]["total_rows"] == 256
     assert progress_json["resource_load"]["feature"]["elapsed_seconds"] == 0.5
-    assert progress_json["resource_load"]["feature"]["latest_partition_scan"]["partition_count"] == 3
+    assert (
+        progress_json["resource_load"]["feature"]["latest_partition_scan"]["partition_count"] == 3
+    )
     assert progress_json["resource_load"]["feature"]["latest_collect"]["status"] == "completed"
     assert progress_json["resource_load"]["benchmark"]["nonempty_timeframe_count"] == 1
     assert progress_json["resource_load"]["benchmark"]["elapsed_seconds"] == 0.2

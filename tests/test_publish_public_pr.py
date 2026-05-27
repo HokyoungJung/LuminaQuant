@@ -26,15 +26,23 @@ def test_sensitive_path_detection_blocks_private_trees():
     assert publish_public_pr.is_sensitive_path("lumina_quant/strategies/rsi_strategy.py")
     assert publish_public_pr.is_sensitive_path("strategies/rsi_strategy.py")
     assert publish_public_pr.is_sensitive_path("lumina_quant/indicators/formulaic_alpha.py")
-    assert publish_public_pr.is_sensitive_path("src/lumina_quant/strategy_factory/candidate_library.py")
-    assert publish_public_pr.is_sensitive_path("src/lumina_quant/strategy_factory/research_runner.py")
-    assert publish_public_pr.is_sensitive_path("src/lumina_quant/workflows/alpha_research_pipeline.py")
+    assert publish_public_pr.is_sensitive_path(
+        "src/lumina_quant/strategy_factory/candidate_library.py"
+    )
+    assert publish_public_pr.is_sensitive_path(
+        "src/lumina_quant/strategy_factory/research_runner.py"
+    )
+    assert publish_public_pr.is_sensitive_path(
+        "src/lumina_quant/workflows/alpha_research_pipeline.py"
+    )
     assert publish_public_pr.is_sensitive_path("src/lumina_quant/eval/exact_window_suite.py")
     assert publish_public_pr.is_sensitive_path("src/lumina_quant/dashboard/exact_window_bundle.py")
     assert publish_public_pr.is_sensitive_path("scripts/run_research_candidates.py")
     assert publish_public_pr.is_sensitive_path("tests/test_exact_window_suite.py")
     assert publish_public_pr.is_sensitive_path("scripts/research/run_llm_alpha_pipeline.py")
-    assert publish_public_pr.is_sensitive_path("scripts/research/write_exact_window_deployment_combo.py")
+    assert publish_public_pr.is_sensitive_path(
+        "scripts/research/write_exact_window_deployment_combo.py"
+    )
     assert publish_public_pr.is_sensitive_path("tests/test_strategy_factory_library.py")
     assert publish_public_pr.is_sensitive_path("tests/test_research_runner_feature_support.py")
     assert publish_public_pr.is_sensitive_path("scripts/run_bulk_research.py")
@@ -56,7 +64,9 @@ def test_sensitive_path_detection_allows_public_runtime_paths():
     assert not publish_public_pr.is_sensitive_path(".github/workflows/ci.yml")
     assert not publish_public_pr.is_sensitive_path("src/lumina_quant/strategy.py")
     assert not publish_public_pr.is_sensitive_path("src/lumina_quant/services/portfolio.py")
-    assert not publish_public_pr.is_sensitive_path("src/lumina_quant/backtesting/portfolio_backtest.py")
+    assert not publish_public_pr.is_sensitive_path(
+        "src/lumina_quant/backtesting/portfolio_backtest.py"
+    )
     assert not publish_public_pr.is_sensitive_path("tests/test_portfolio_sizing.py")
     assert not publish_public_pr.is_sensitive_path("src/lumina_quant/dashboard/retired_stub.py")
     assert not publish_public_pr.is_sensitive_path(
@@ -230,7 +240,9 @@ def test_publish_flow_keeps_source_gitignore_for_safe_generated_artifacts(tmp_pa
     assert "generated/artifact.txt" not in staged
 
 
-def test_content_sensitive_detection_blocks_public_path_with_private_reference(tmp_path, monkeypatch):
+def test_content_sensitive_detection_blocks_public_path_with_private_reference(
+    tmp_path, monkeypatch
+):
     repo = tmp_path / "repo"
     repo.mkdir()
     _init_repo(repo)
@@ -308,7 +320,9 @@ def test_content_sensitive_detection_allows_explicit_public_sample_terms(tmp_pat
     assert flagged == []
 
 
-def test_content_sensitive_detection_derives_module_patterns_from_protected_inventory(tmp_path, monkeypatch):
+def test_content_sensitive_detection_derives_module_patterns_from_protected_inventory(
+    tmp_path, monkeypatch
+):
     repo = tmp_path / "repo"
     repo.mkdir()
     _init_repo(repo)
@@ -324,7 +338,9 @@ def test_content_sensitive_detection_derives_module_patterns_from_protected_inve
     assert flagged == ["public_probe.py"]
 
 
-def test_content_sensitive_detection_blocks_root_level_exact_protected_file_references(tmp_path, monkeypatch):
+def test_content_sensitive_detection_blocks_root_level_exact_protected_file_references(
+    tmp_path, monkeypatch
+):
     repo = tmp_path / "repo"
     repo.mkdir()
     _init_repo(repo)
@@ -358,7 +374,9 @@ def test_content_sensitive_detection_blocks_protected_directory_descendants(tmp_
     assert flagged == [".github/workflows/release.yml"]
 
 
-def test_content_sensitive_detection_blocks_nested_protected_directory_descendants(tmp_path, monkeypatch):
+def test_content_sensitive_detection_blocks_nested_protected_directory_descendants(
+    tmp_path, monkeypatch
+):
     repo = tmp_path / "repo"
     repo.mkdir()
     _init_repo(repo)
@@ -375,7 +393,9 @@ def test_content_sensitive_detection_blocks_nested_protected_directory_descendan
     assert flagged == [".github/workflows/nested.yml"]
 
 
-def test_content_sensitive_detection_blocks_dot_prefixed_exact_protected_paths(tmp_path, monkeypatch):
+def test_content_sensitive_detection_blocks_dot_prefixed_exact_protected_paths(
+    tmp_path, monkeypatch
+):
     repo = tmp_path / "repo"
     repo.mkdir()
     _init_repo(repo)
@@ -388,7 +408,9 @@ def test_content_sensitive_detection_blocks_dot_prefixed_exact_protected_paths(t
     )
 
     monkeypatch.chdir(repo)
-    flagged = publish_public_pr._find_sensitive_content_paths([".github/workflows/dot-protected.yml"])
+    flagged = publish_public_pr._find_sensitive_content_paths(
+        [".github/workflows/dot-protected.yml"]
+    )
     assert flagged == [".github/workflows/dot-protected.yml"]
 
 
@@ -411,7 +433,9 @@ def test_public_tree_exposures_catch_preexisting_sensitive_public_tree_files(tmp
     assert content_hits == []
 
 
-def test_content_sensitive_detection_ignores_publish_sanitizer_self_test_file(tmp_path, monkeypatch):
+def test_content_sensitive_detection_ignores_publish_sanitizer_self_test_file(
+    tmp_path, monkeypatch
+):
     repo = tmp_path / "repo"
     repo.mkdir()
     _init_repo(repo)

@@ -199,21 +199,17 @@ SCHEMA_SQL: tuple[str, ...] = (
 class CursorLike(Protocol):
     """Structural protocol for DB cursor objects."""
 
-    def execute(self, query: str, params: tuple[Any, ...] | None = None) -> Any:
-        ...
+    def execute(self, query: str, params: tuple[Any, ...] | None = None) -> Any: ...
 
 
 class ConnectionLike(Protocol):
     """Structural protocol for DB connection objects."""
 
-    def cursor(self) -> Any:
-        ...
+    def cursor(self) -> Any: ...
 
-    def commit(self) -> None:
-        ...
+    def commit(self) -> None: ...
 
-    def close(self) -> None:
-        ...
+    def close(self) -> None: ...
 
 
 def _ensure_utc(value: datetime | str | None, *, fallback_now: bool) -> datetime:
@@ -337,7 +333,9 @@ class PostgresStateRepository:
                 cursor.execute(sql, (run_id, mode, started, ended, status, metadata_json, updated))
             conn.commit()
 
-    def start_run(self, mode: str, metadata: dict[str, Any] | None = None, run_id: str | None = None) -> str:
+    def start_run(
+        self, mode: str, metadata: dict[str, Any] | None = None, run_id: str | None = None
+    ) -> str:
         """Create or refresh a RUNNING run row and return run_id."""
         resolved_run_id = str(run_id or uuid.uuid4())
         self.upsert_run(
@@ -923,7 +921,9 @@ class PostgresStateRepository:
                         canonical_json_dumps(env if env is not None else {}),
                         int(pid) if pid is not None else None,
                         str(run_id) if run_id is not None else None,
-                        _ensure_utc(started_at, fallback_now=False) if started_at is not None else None,
+                        _ensure_utc(started_at, fallback_now=False)
+                        if started_at is not None
+                        else None,
                         _ensure_utc(ended_at, fallback_now=False) if ended_at is not None else None,
                         int(exit_code) if exit_code is not None else None,
                         str(log_path) if log_path is not None else None,
@@ -968,7 +968,9 @@ def _build_local_socket_fallback_dsn(dsn: str) -> str | None:
     return f"{parsed.scheme}:///{database}?{encoded_query}"
 
 
-def _connect_postgres_with_driver(connect_fn: Callable[[str], ConnectionLike], dsn: str) -> ConnectionLike:
+def _connect_postgres_with_driver(
+    connect_fn: Callable[[str], ConnectionLike], dsn: str
+) -> ConnectionLike:
     try:
         return connect_fn(dsn)
     except Exception as exc:

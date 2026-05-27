@@ -6,314 +6,2223 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+
 @dataclass(frozen=True, slots=True)
 class AlphaProgramDefinition:
     alpha_id: int
     program: Any
     tunable_constants: dict[str, float]
 
+
 def alpha_001_program(env, const):
-    return ((env["rank"](env["ts_argmax"](env["signed_power"](env["where"](((env["returns"]) < (0)), env["ts_stddev"](env["returns"], const("alpha101.1.const.001", 20.0)), env["close"]), 2.0), const("alpha101.1.const.002", 5.0)))) - (0.5))
+    return (
+        env["rank"](
+            env["ts_argmax"](
+                env["signed_power"](
+                    env["where"](
+                        ((env["returns"]) < (0)),
+                        env["ts_stddev"](env["returns"], const("alpha101.1.const.001", 20.0)),
+                        env["close"],
+                    ),
+                    2.0,
+                ),
+                const("alpha101.1.const.002", 5.0),
+            )
+        )
+    ) - (0.5)
+
 
 def alpha_002_program(env, const):
-    return (((-(1))) * (env["ts_corr"](env["rank"](env["delta"](env["log"](env["volume"]), 2)), env["rank"](((((env["close"]) - (env["open"]))) / (env["open"]))), const("alpha101.2.const.001", 6.0))))
+    return (-(1)) * (
+        env["ts_corr"](
+            env["rank"](env["delta"](env["log"](env["volume"]), 2)),
+            env["rank"]((((env["close"]) - (env["open"])) / (env["open"]))),
+            const("alpha101.2.const.001", 6.0),
+        )
+    )
+
 
 def alpha_003_program(env, const):
-    return (((-(1))) * (env["ts_corr"](env["rank"](env["open"]), env["rank"](env["volume"]), const("alpha101.3.const.001", 10.0))))
+    return (-(1)) * (
+        env["ts_corr"](
+            env["rank"](env["open"]),
+            env["rank"](env["volume"]),
+            const("alpha101.3.const.001", 10.0),
+        )
+    )
+
 
 def alpha_004_program(env, const):
-    return (((-(1))) * (env["ts_rank"](env["rank"](env["low"]), const("alpha101.4.const.001", 9.0))))
+    return (-(1)) * (env["ts_rank"](env["rank"](env["low"]), const("alpha101.4.const.001", 9.0)))
+
 
 def alpha_005_program(env, const):
-    return ((env["rank"](((env["open"]) - (((env["ts_sum"](env["vwap"], const("alpha101.5.const.001", 10.0))) / (const("alpha101.5.const.002", 10.0))))))) * ((((-(1))) * (env["abs"](env["rank"](((env["close"]) - (env["vwap"]))))))))
+    return (
+        env["rank"](
+            (
+                (env["open"])
+                - (
+                    (env["ts_sum"](env["vwap"], const("alpha101.5.const.001", 10.0)))
+                    / (const("alpha101.5.const.002", 10.0))
+                )
+            )
+        )
+    ) * ((-(1)) * (env["abs"](env["rank"](((env["close"]) - (env["vwap"]))))))
+
 
 def alpha_006_program(env, const):
-    return (((-(1))) * (env["ts_corr"](env["open"], env["volume"], const("alpha101.6.const.001", 10.0))))
+    return (-(1)) * (
+        env["ts_corr"](env["open"], env["volume"], const("alpha101.6.const.001", 10.0))
+    )
+
 
 def alpha_007_program(env, const):
-    return env["where"](((env["adv20"]) < (env["volume"])), (((((-(1))) * (env["ts_rank"](env["abs"](env["delta"](env["close"], const("alpha101.7.const.001", 7.0))), const("alpha101.7.const.002", 60.0))))) * (env["sign"](env["delta"](env["close"], const("alpha101.7.const.003", 7.0))))), (((-(1))) * (1)))
+    return env["where"](
+        ((env["adv20"]) < (env["volume"])),
+        (
+            (
+                (-(1))
+                * (
+                    env["ts_rank"](
+                        env["abs"](env["delta"](env["close"], const("alpha101.7.const.001", 7.0))),
+                        const("alpha101.7.const.002", 60.0),
+                    )
+                )
+            )
+            * (env["sign"](env["delta"](env["close"], const("alpha101.7.const.003", 7.0))))
+        ),
+        ((-(1)) * (1)),
+    )
+
 
 def alpha_008_program(env, const):
-    return (((-(1))) * (env["rank"](((((env["ts_sum"](env["open"], const("alpha101.8.const.001", 5.0))) * (env["ts_sum"](env["returns"], const("alpha101.8.const.002", 5.0))))) - (env["delay"](((env["ts_sum"](env["open"], const("alpha101.8.const.003", 5.0))) * (env["ts_sum"](env["returns"], const("alpha101.8.const.004", 5.0)))), const("alpha101.8.const.005", 10.0)))))))
+    return (-(1)) * (
+        env["rank"](
+            (
+                (
+                    (env["ts_sum"](env["open"], const("alpha101.8.const.001", 5.0)))
+                    * (env["ts_sum"](env["returns"], const("alpha101.8.const.002", 5.0)))
+                )
+                - (
+                    env["delay"](
+                        (
+                            (env["ts_sum"](env["open"], const("alpha101.8.const.003", 5.0)))
+                            * (env["ts_sum"](env["returns"], const("alpha101.8.const.004", 5.0)))
+                        ),
+                        const("alpha101.8.const.005", 10.0),
+                    )
+                )
+            )
+        )
+    )
+
 
 def alpha_009_program(env, const):
-    return env["where"](((0) < (env["ts_min"](env["delta"](env["close"], 1), const("alpha101.9.const.001", 5.0)))), env["delta"](env["close"], 1), env["where"](((env["ts_max"](env["delta"](env["close"], 1), const("alpha101.9.const.002", 5.0))) < (0)), env["delta"](env["close"], 1), (((-(1))) * (env["delta"](env["close"], 1)))))
+    return env["where"](
+        ((0) < (env["ts_min"](env["delta"](env["close"], 1), const("alpha101.9.const.001", 5.0)))),
+        env["delta"](env["close"], 1),
+        env["where"](
+            (
+                (env["ts_max"](env["delta"](env["close"], 1), const("alpha101.9.const.002", 5.0)))
+                < (0)
+            ),
+            env["delta"](env["close"], 1),
+            ((-(1)) * (env["delta"](env["close"], 1))),
+        ),
+    )
+
 
 def alpha_010_program(env, const):
-    return env["rank"](env["where"](((0) < (env["ts_min"](env["delta"](env["close"], 1), 4))), env["delta"](env["close"], 1), env["where"](((env["ts_max"](env["delta"](env["close"], 1), 4)) < (0)), env["delta"](env["close"], 1), (((-(1))) * (env["delta"](env["close"], 1))))))
+    return env["rank"](
+        env["where"](
+            ((0) < (env["ts_min"](env["delta"](env["close"], 1), 4))),
+            env["delta"](env["close"], 1),
+            env["where"](
+                ((env["ts_max"](env["delta"](env["close"], 1), 4)) < (0)),
+                env["delta"](env["close"], 1),
+                ((-(1)) * (env["delta"](env["close"], 1))),
+            ),
+        )
+    )
+
 
 def alpha_011_program(env, const):
-    return ((((env["rank"](env["ts_max"](((env["vwap"]) - (env["close"])), const("alpha101.11.const.001", 3.0)))) + (env["rank"](env["ts_min"](((env["vwap"]) - (env["close"])), const("alpha101.11.const.002", 3.0)))))) * (env["rank"](env["delta"](env["volume"], const("alpha101.11.const.003", 3.0)))))
+    return (
+        (
+            env["rank"](
+                env["ts_max"](((env["vwap"]) - (env["close"])), const("alpha101.11.const.001", 3.0))
+            )
+        )
+        + (
+            env["rank"](
+                env["ts_min"](((env["vwap"]) - (env["close"])), const("alpha101.11.const.002", 3.0))
+            )
+        )
+    ) * (env["rank"](env["delta"](env["volume"], const("alpha101.11.const.003", 3.0))))
+
 
 def alpha_012_program(env, const):
-    return ((env["sign"](env["delta"](env["volume"], 1))) * ((((-(1))) * (env["delta"](env["close"], 1)))))
+    return (env["sign"](env["delta"](env["volume"], 1))) * (
+        (-(1)) * (env["delta"](env["close"], 1))
+    )
+
 
 def alpha_013_program(env, const):
-    return (((-(1))) * (env["rank"](env["ts_cov"](env["rank"](env["close"]), env["rank"](env["volume"]), const("alpha101.13.const.001", 5.0)))))
+    return (-(1)) * (
+        env["rank"](
+            env["ts_cov"](
+                env["rank"](env["close"]),
+                env["rank"](env["volume"]),
+                const("alpha101.13.const.001", 5.0),
+            )
+        )
+    )
+
 
 def alpha_014_program(env, const):
-    return (((((-(1))) * (env["rank"](env["delta"](env["returns"], const("alpha101.14.const.001", 3.0)))))) * (env["ts_corr"](env["open"], env["volume"], const("alpha101.14.const.002", 10.0))))
+    return (
+        (-(1)) * (env["rank"](env["delta"](env["returns"], const("alpha101.14.const.001", 3.0))))
+    ) * (env["ts_corr"](env["open"], env["volume"], const("alpha101.14.const.002", 10.0)))
+
 
 def alpha_015_program(env, const):
-    return (((-(1))) * (env["ts_sum"](env["rank"](env["ts_corr"](env["rank"](env["high"]), env["rank"](env["volume"]), const("alpha101.15.const.001", 3.0))), const("alpha101.15.const.002", 3.0))))
+    return (-(1)) * (
+        env["ts_sum"](
+            env["rank"](
+                env["ts_corr"](
+                    env["rank"](env["high"]),
+                    env["rank"](env["volume"]),
+                    const("alpha101.15.const.001", 3.0),
+                )
+            ),
+            const("alpha101.15.const.002", 3.0),
+        )
+    )
+
 
 def alpha_016_program(env, const):
-    return (((-(1))) * (env["rank"](env["ts_cov"](env["rank"](env["high"]), env["rank"](env["volume"]), const("alpha101.16.const.001", 5.0)))))
+    return (-(1)) * (
+        env["rank"](
+            env["ts_cov"](
+                env["rank"](env["high"]),
+                env["rank"](env["volume"]),
+                const("alpha101.16.const.001", 5.0),
+            )
+        )
+    )
+
 
 def alpha_017_program(env, const):
-    return (((((((-(1))) * (env["rank"](env["ts_rank"](env["close"], const("alpha101.17.const.001", 10.0)))))) * (env["rank"](env["delta"](env["delta"](env["close"], 1), 1))))) * (env["rank"](env["ts_rank"](((env["volume"]) / (env["adv20"])), const("alpha101.17.const.002", 5.0)))))
+    return (
+        ((-(1)) * (env["rank"](env["ts_rank"](env["close"], const("alpha101.17.const.001", 10.0)))))
+        * (env["rank"](env["delta"](env["delta"](env["close"], 1), 1)))
+    ) * (
+        env["rank"](
+            env["ts_rank"](((env["volume"]) / (env["adv20"])), const("alpha101.17.const.002", 5.0))
+        )
+    )
+
 
 def alpha_018_program(env, const):
-    return (((-(1))) * (env["rank"](((((env["ts_stddev"](env["abs"](((env["close"]) - (env["open"]))), const("alpha101.18.const.001", 5.0))) + (((env["close"]) - (env["open"]))))) + (env["ts_corr"](env["close"], env["open"], const("alpha101.18.const.002", 10.0)))))))
+    return (-(1)) * (
+        env["rank"](
+            (
+                (
+                    (
+                        env["ts_stddev"](
+                            env["abs"](((env["close"]) - (env["open"]))),
+                            const("alpha101.18.const.001", 5.0),
+                        )
+                    )
+                    + ((env["close"]) - (env["open"]))
+                )
+                + (env["ts_corr"](env["close"], env["open"], const("alpha101.18.const.002", 10.0)))
+            )
+        )
+    )
+
 
 def alpha_019_program(env, const):
-    return (((((-(1))) * (env["sign"](((((env["close"]) - (env["delay"](env["close"], const("alpha101.19.const.001", 7.0))))) + (env["delta"](env["close"], const("alpha101.19.const.002", 7.0)))))))) * (((1) + (env["rank"](((1) + (env["ts_sum"](env["returns"], const("alpha101.19.const.003", 250.0)))))))))
+    return (
+        (-(1))
+        * (
+            env["sign"](
+                (
+                    (
+                        (env["close"])
+                        - (env["delay"](env["close"], const("alpha101.19.const.001", 7.0)))
+                    )
+                    + (env["delta"](env["close"], const("alpha101.19.const.002", 7.0)))
+                )
+            )
+        )
+    ) * (
+        (1)
+        + (
+            env["rank"](
+                ((1) + (env["ts_sum"](env["returns"], const("alpha101.19.const.003", 250.0))))
+            )
+        )
+    )
+
 
 def alpha_020_program(env, const):
-    return (((((((-(1))) * (env["rank"](((env["open"]) - (env["delay"](env["high"], 1))))))) * (env["rank"](((env["open"]) - (env["delay"](env["close"], 1))))))) * (env["rank"](((env["open"]) - (env["delay"](env["low"], 1))))))
+    return (
+        ((-(1)) * (env["rank"](((env["open"]) - (env["delay"](env["high"], 1))))))
+        * (env["rank"](((env["open"]) - (env["delay"](env["close"], 1)))))
+    ) * (env["rank"](((env["open"]) - (env["delay"](env["low"], 1)))))
+
 
 def alpha_021_program(env, const):
-    return env["where"](((((((env["ts_sum"](env["close"], 8)) / (8))) + (env["ts_stddev"](env["close"], 8)))) < (((env["ts_sum"](env["close"], 2)) / (2)))), (((-(1))) * (1)), env["where"](((((env["ts_sum"](env["close"], 2)) / (2))) < (((((env["ts_sum"](env["close"], 8)) / (8))) - (env["ts_stddev"](env["close"], 8))))), 1, env["where"](((((1) < (((env["volume"]) / (env["adv20"]))))) | (((((env["volume"]) / (env["adv20"]))) == (1)))), 1, (((-(1))) * (1)))))
+    return env["where"](
+        (
+            (((env["ts_sum"](env["close"], 8)) / (8)) + (env["ts_stddev"](env["close"], 8)))
+            < ((env["ts_sum"](env["close"], 2)) / (2))
+        ),
+        ((-(1)) * (1)),
+        env["where"](
+            (
+                ((env["ts_sum"](env["close"], 2)) / (2))
+                < (((env["ts_sum"](env["close"], 8)) / (8)) - (env["ts_stddev"](env["close"], 8)))
+            ),
+            1,
+            env["where"](
+                (
+                    ((1) < ((env["volume"]) / (env["adv20"])))
+                    | (((env["volume"]) / (env["adv20"])) == (1))
+                ),
+                1,
+                ((-(1)) * (1)),
+            ),
+        ),
+    )
+
 
 def alpha_022_program(env, const):
-    return (((-(1))) * (((env["delta"](env["ts_corr"](env["high"], env["volume"], const("alpha101.22.const.001", 5.0)), const("alpha101.22.const.002", 5.0))) * (env["rank"](env["ts_stddev"](env["close"], const("alpha101.22.const.003", 20.0)))))))
+    return (-(1)) * (
+        (
+            env["delta"](
+                env["ts_corr"](env["high"], env["volume"], const("alpha101.22.const.001", 5.0)),
+                const("alpha101.22.const.002", 5.0),
+            )
+        )
+        * (env["rank"](env["ts_stddev"](env["close"], const("alpha101.22.const.003", 20.0))))
+    )
+
 
 def alpha_023_program(env, const):
-    return env["where"](((((env["ts_sum"](env["high"], const("alpha101.23.const.001", 20.0))) / (const("alpha101.23.const.002", 20.0)))) < (env["high"])), (((-(1))) * (env["delta"](env["high"], 2))), 0)
+    return env["where"](
+        (
+            (
+                (env["ts_sum"](env["high"], const("alpha101.23.const.001", 20.0)))
+                / (const("alpha101.23.const.002", 20.0))
+            )
+            < (env["high"])
+        ),
+        ((-(1)) * (env["delta"](env["high"], 2))),
+        0,
+    )
+
 
 def alpha_024_program(env, const):
-    return env["where"](((((((env["delta"](((env["ts_sum"](env["close"], const("alpha101.24.const.001", 100.0))) / (const("alpha101.24.const.002", 100.0))), const("alpha101.24.const.003", 100.0))) / (env["delay"](env["close"], const("alpha101.24.const.004", 100.0))))) < (const("alpha101.24.const.005", 0.05)))) | (((((env["delta"](((env["ts_sum"](env["close"], const("alpha101.24.const.006", 100.0))) / (const("alpha101.24.const.007", 100.0))), const("alpha101.24.const.008", 100.0))) / (env["delay"](env["close"], const("alpha101.24.const.009", 100.0))))) == (const("alpha101.24.const.010", 0.05))))), (((-(1))) * (((env["close"]) - (env["ts_min"](env["close"], const("alpha101.24.const.011", 100.0)))))), (((-(1))) * (env["delta"](env["close"], const("alpha101.24.const.012", 3.0)))))
+    return env["where"](
+        (
+            (
+                (
+                    (
+                        env["delta"](
+                            (
+                                (env["ts_sum"](env["close"], const("alpha101.24.const.001", 100.0)))
+                                / (const("alpha101.24.const.002", 100.0))
+                            ),
+                            const("alpha101.24.const.003", 100.0),
+                        )
+                    )
+                    / (env["delay"](env["close"], const("alpha101.24.const.004", 100.0)))
+                )
+                < (const("alpha101.24.const.005", 0.05))
+            )
+            | (
+                (
+                    (
+                        env["delta"](
+                            (
+                                (env["ts_sum"](env["close"], const("alpha101.24.const.006", 100.0)))
+                                / (const("alpha101.24.const.007", 100.0))
+                            ),
+                            const("alpha101.24.const.008", 100.0),
+                        )
+                    )
+                    / (env["delay"](env["close"], const("alpha101.24.const.009", 100.0)))
+                )
+                == (const("alpha101.24.const.010", 0.05))
+            )
+        ),
+        (
+            (-(1))
+            * (
+                (env["close"])
+                - (env["ts_min"](env["close"], const("alpha101.24.const.011", 100.0)))
+            )
+        ),
+        ((-(1)) * (env["delta"](env["close"], const("alpha101.24.const.012", 3.0)))),
+    )
+
 
 def alpha_025_program(env, const):
-    return env["rank"]((((((((((-(1))) * (env["returns"]))) * (env["adv20"]))) * (env["vwap"]))) * (((env["high"]) - (env["close"])))))
+    return env["rank"](
+        (
+            ((((-(1)) * (env["returns"])) * (env["adv20"])) * (env["vwap"]))
+            * ((env["high"]) - (env["close"]))
+        )
+    )
+
 
 def alpha_026_program(env, const):
-    return (((-(1))) * (env["ts_max"](env["ts_corr"](env["ts_rank"](env["volume"], const("alpha101.26.const.001", 5.0)), env["ts_rank"](env["high"], const("alpha101.26.const.002", 5.0)), const("alpha101.26.const.003", 5.0)), const("alpha101.26.const.004", 3.0))))
+    return (-(1)) * (
+        env["ts_max"](
+            env["ts_corr"](
+                env["ts_rank"](env["volume"], const("alpha101.26.const.001", 5.0)),
+                env["ts_rank"](env["high"], const("alpha101.26.const.002", 5.0)),
+                const("alpha101.26.const.003", 5.0),
+            ),
+            const("alpha101.26.const.004", 3.0),
+        )
+    )
+
 
 def alpha_027_program(env, const):
-    return env["where"](((0.5) < (env["rank"](((env["ts_sum"](env["ts_corr"](env["rank"](env["volume"]), env["rank"](env["vwap"]), const("alpha101.27.const.001", 6.0)), 2)) / (2.0))))), (((-(1))) * (1)), 1)
+    return env["where"](
+        (
+            (0.5)
+            < (
+                env["rank"](
+                    (
+                        (
+                            env["ts_sum"](
+                                env["ts_corr"](
+                                    env["rank"](env["volume"]),
+                                    env["rank"](env["vwap"]),
+                                    const("alpha101.27.const.001", 6.0),
+                                ),
+                                2,
+                            )
+                        )
+                        / (2.0)
+                    )
+                )
+            )
+        ),
+        ((-(1)) * (1)),
+        1,
+    )
+
 
 def alpha_028_program(env, const):
-    return env["scale"](((((env["ts_corr"](env["adv20"], env["low"], const("alpha101.28.const.001", 5.0))) + (((((env["high"]) + (env["low"]))) / (2))))) - (env["close"])))
+    return env["scale"](
+        (
+            (
+                (env["ts_corr"](env["adv20"], env["low"], const("alpha101.28.const.001", 5.0)))
+                + (((env["high"]) + (env["low"])) / (2))
+            )
+            - (env["close"])
+        )
+    )
+
 
 def alpha_029_program(env, const):
-    return ((env["min"](env["ts_product"](env["rank"](env["rank"](env["scale"](env["log"](env["ts_sum"](env["ts_min"](env["rank"](env["rank"]((((-(1))) * (env["rank"](env["delta"](((env["close"]) - (1)), const("alpha101.29.const.001", 5.0))))))), 2), 1))))), 1), const("alpha101.29.const.002", 5.0))) + (env["ts_rank"](env["delay"]((((-(1))) * (env["returns"])), const("alpha101.29.const.003", 6.0)), const("alpha101.29.const.004", 5.0))))
+    return (
+        env["min"](
+            env["ts_product"](
+                env["rank"](
+                    env["rank"](
+                        env["scale"](
+                            env["log"](
+                                env["ts_sum"](
+                                    env["ts_min"](
+                                        env["rank"](
+                                            env["rank"](
+                                                (
+                                                    (-(1))
+                                                    * (
+                                                        env["rank"](
+                                                            env["delta"](
+                                                                ((env["close"]) - (1)),
+                                                                const("alpha101.29.const.001", 5.0),
+                                                            )
+                                                        )
+                                                    )
+                                                )
+                                            )
+                                        ),
+                                        2,
+                                    ),
+                                    1,
+                                )
+                            )
+                        )
+                    )
+                ),
+                1,
+            ),
+            const("alpha101.29.const.002", 5.0),
+        )
+    ) + (
+        env["ts_rank"](
+            env["delay"](((-(1)) * (env["returns"])), const("alpha101.29.const.003", 6.0)),
+            const("alpha101.29.const.004", 5.0),
+        )
+    )
+
 
 def alpha_030_program(env, const):
-    return ((((((1.0) - (env["rank"](((((env["sign"](((env["close"]) - (env["delay"](env["close"], 1))))) + (env["sign"](((env["delay"](env["close"], 1)) - (env["delay"](env["close"], 2))))))) + (env["sign"](((env["delay"](env["close"], 2)) - (env["delay"](env["close"], const("alpha101.30.const.001", 3.0))))))))))) * (env["ts_sum"](env["volume"], const("alpha101.30.const.002", 5.0))))) / (env["ts_sum"](env["volume"], const("alpha101.30.const.003", 20.0))))
+    return (
+        (
+            (1.0)
+            - (
+                env["rank"](
+                    (
+                        (
+                            (env["sign"](((env["close"]) - (env["delay"](env["close"], 1)))))
+                            + (
+                                env["sign"](
+                                    (
+                                        (env["delay"](env["close"], 1))
+                                        - (env["delay"](env["close"], 2))
+                                    )
+                                )
+                            )
+                        )
+                        + (
+                            env["sign"](
+                                (
+                                    (env["delay"](env["close"], 2))
+                                    - (
+                                        env["delay"](
+                                            env["close"], const("alpha101.30.const.001", 3.0)
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )
+        * (env["ts_sum"](env["volume"], const("alpha101.30.const.002", 5.0)))
+    ) / (env["ts_sum"](env["volume"], const("alpha101.30.const.003", 20.0)))
+
 
 def alpha_031_program(env, const):
-    return ((((env["rank"](env["rank"](env["rank"](env["decay_linear"]((((-(1))) * (env["rank"](env["rank"](env["delta"](env["close"], const("alpha101.31.const.001", 10.0)))))), const("alpha101.31.const.002", 10.0)))))) + (env["rank"]((((-(1))) * (env["delta"](env["close"], const("alpha101.31.const.003", 3.0)))))))) + (env["sign"](env["scale"](env["ts_corr"](env["adv20"], env["low"], const("alpha101.31.const.004", 12.0))))))
+    return (
+        (
+            env["rank"](
+                env["rank"](
+                    env["rank"](
+                        env["decay_linear"](
+                            (
+                                (-(1))
+                                * (
+                                    env["rank"](
+                                        env["rank"](
+                                            env["delta"](
+                                                env["close"], const("alpha101.31.const.001", 10.0)
+                                            )
+                                        )
+                                    )
+                                )
+                            ),
+                            const("alpha101.31.const.002", 10.0),
+                        )
+                    )
+                )
+            )
+        )
+        + (
+            env["rank"](
+                ((-(1)) * (env["delta"](env["close"], const("alpha101.31.const.003", 3.0))))
+            )
+        )
+    ) + (
+        env["sign"](
+            env["scale"](
+                env["ts_corr"](env["adv20"], env["low"], const("alpha101.31.const.004", 12.0))
+            )
+        )
+    )
+
 
 def alpha_032_program(env, const):
-    return ((env["scale"](((((env["ts_sum"](env["close"], const("alpha101.32.const.001", 7.0))) / (const("alpha101.32.const.002", 7.0)))) - (env["close"])))) + (((const("alpha101.32.const.003", 20.0)) * (env["scale"](env["ts_corr"](env["vwap"], env["delay"](env["close"], const("alpha101.32.const.004", 5.0)), const("alpha101.32.const.005", 230.0)))))))
+    return (
+        env["scale"](
+            (
+                (
+                    (env["ts_sum"](env["close"], const("alpha101.32.const.001", 7.0)))
+                    / (const("alpha101.32.const.002", 7.0))
+                )
+                - (env["close"])
+            )
+        )
+    ) + (
+        (const("alpha101.32.const.003", 20.0))
+        * (
+            env["scale"](
+                env["ts_corr"](
+                    env["vwap"],
+                    env["delay"](env["close"], const("alpha101.32.const.004", 5.0)),
+                    const("alpha101.32.const.005", 230.0),
+                )
+            )
+        )
+    )
+
 
 def alpha_033_program(env, const):
-    return env["rank"]((((-(1))) * (((((1) - (((env["open"]) / (env["close"]))))) ** (1)))))
+    return env["rank"](((-(1)) * (((1) - ((env["open"]) / (env["close"]))) ** (1))))
+
 
 def alpha_034_program(env, const):
-    return env["rank"](((((1) - (env["rank"](((env["ts_stddev"](env["returns"], 2)) / (env["ts_stddev"](env["returns"], const("alpha101.34.const.001", 5.0)))))))) + (((1) - (env["rank"](env["delta"](env["close"], 1)))))))
+    return env["rank"](
+        (
+            (
+                (1)
+                - (
+                    env["rank"](
+                        (
+                            (env["ts_stddev"](env["returns"], 2))
+                            / (
+                                env["ts_stddev"](
+                                    env["returns"], const("alpha101.34.const.001", 5.0)
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+            + ((1) - (env["rank"](env["delta"](env["close"], 1))))
+        )
+    )
+
 
 def alpha_035_program(env, const):
-    return ((((env["ts_rank"](env["volume"], 32)) * (((1) - (env["ts_rank"](((((env["close"]) + (env["high"]))) - (env["low"])), 16)))))) * (((1) - (env["ts_rank"](env["returns"], 32)))))
+    return (
+        (env["ts_rank"](env["volume"], 32))
+        * ((1) - (env["ts_rank"]((((env["close"]) + (env["high"])) - (env["low"])), 16)))
+    ) * ((1) - (env["ts_rank"](env["returns"], 32)))
+
 
 def alpha_036_program(env, const):
-    return ((((((((((const("alpha101.36.const.001", 2.21)) * (env["rank"](env["ts_corr"](((env["close"]) - (env["open"])), env["delay"](env["volume"], 1), const("alpha101.36.const.002", 15.0)))))) + (((const("alpha101.36.const.003", 0.7)) * (env["rank"](((env["open"]) - (env["close"])))))))) + (((const("alpha101.36.const.004", 0.73)) * (env["rank"](env["ts_rank"](env["delay"]((((-(1))) * (env["returns"])), const("alpha101.36.const.005", 6.0)), const("alpha101.36.const.006", 5.0)))))))) + (env["rank"](env["abs"](env["ts_corr"](env["vwap"], env["adv20"], const("alpha101.36.const.007", 6.0))))))) + (((const("alpha101.36.const.008", 0.6)) * (env["rank"](((((((env["ts_sum"](env["close"], const("alpha101.36.const.009", 200.0))) / (const("alpha101.36.const.010", 200.0)))) - (env["open"]))) * (((env["close"]) - (env["open"])))))))))
+    return (
+        (
+            (
+                (
+                    (const("alpha101.36.const.001", 2.21))
+                    * (
+                        env["rank"](
+                            env["ts_corr"](
+                                ((env["close"]) - (env["open"])),
+                                env["delay"](env["volume"], 1),
+                                const("alpha101.36.const.002", 15.0),
+                            )
+                        )
+                    )
+                )
+                + (
+                    (const("alpha101.36.const.003", 0.7))
+                    * (env["rank"](((env["open"]) - (env["close"]))))
+                )
+            )
+            + (
+                (const("alpha101.36.const.004", 0.73))
+                * (
+                    env["rank"](
+                        env["ts_rank"](
+                            env["delay"](
+                                ((-(1)) * (env["returns"])), const("alpha101.36.const.005", 6.0)
+                            ),
+                            const("alpha101.36.const.006", 5.0),
+                        )
+                    )
+                )
+            )
+        )
+        + (
+            env["rank"](
+                env["abs"](
+                    env["ts_corr"](env["vwap"], env["adv20"], const("alpha101.36.const.007", 6.0))
+                )
+            )
+        )
+    ) + (
+        (const("alpha101.36.const.008", 0.6))
+        * (
+            env["rank"](
+                (
+                    (
+                        (
+                            (env["ts_sum"](env["close"], const("alpha101.36.const.009", 200.0)))
+                            / (const("alpha101.36.const.010", 200.0))
+                        )
+                        - (env["open"])
+                    )
+                    * ((env["close"]) - (env["open"]))
+                )
+            )
+        )
+    )
+
 
 def alpha_037_program(env, const):
-    return ((env["rank"](env["ts_corr"](env["delay"](((env["open"]) - (env["close"])), 1), env["close"], const("alpha101.37.const.001", 200.0)))) + (env["rank"](((env["open"]) - (env["close"])))))
+    return (
+        env["rank"](
+            env["ts_corr"](
+                env["delay"](((env["open"]) - (env["close"])), 1),
+                env["close"],
+                const("alpha101.37.const.001", 200.0),
+            )
+        )
+    ) + (env["rank"](((env["open"]) - (env["close"]))))
+
 
 def alpha_038_program(env, const):
-    return (((((-(1))) * (env["rank"](env["ts_rank"](env["close"], const("alpha101.38.const.001", 10.0)))))) * (env["rank"](((env["close"]) / (env["open"])))))
+    return (
+        (-(1)) * (env["rank"](env["ts_rank"](env["close"], const("alpha101.38.const.001", 10.0))))
+    ) * (env["rank"](((env["close"]) / (env["open"]))))
+
 
 def alpha_039_program(env, const):
-    return (((((-(1))) * (env["rank"](((env["delta"](env["close"], const("alpha101.39.const.001", 7.0))) * (((1) - (env["rank"](env["decay_linear"](((env["volume"]) / (env["adv20"])), const("alpha101.39.const.002", 9.0))))))))))) * (((1) + (env["rank"](env["ts_sum"](env["returns"], const("alpha101.39.const.003", 250.0)))))))
+    return (
+        (-(1))
+        * (
+            env["rank"](
+                (
+                    (env["delta"](env["close"], const("alpha101.39.const.001", 7.0)))
+                    * (
+                        (1)
+                        - (
+                            env["rank"](
+                                env["decay_linear"](
+                                    ((env["volume"]) / (env["adv20"])),
+                                    const("alpha101.39.const.002", 9.0),
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    ) * ((1) + (env["rank"](env["ts_sum"](env["returns"], const("alpha101.39.const.003", 250.0)))))
+
 
 def alpha_040_program(env, const):
-    return (((((-(1))) * (env["rank"](env["ts_stddev"](env["high"], const("alpha101.40.const.001", 10.0)))))) * (env["ts_corr"](env["high"], env["volume"], const("alpha101.40.const.002", 10.0))))
+    return (
+        (-(1)) * (env["rank"](env["ts_stddev"](env["high"], const("alpha101.40.const.001", 10.0))))
+    ) * (env["ts_corr"](env["high"], env["volume"], const("alpha101.40.const.002", 10.0)))
+
 
 def alpha_041_program(env, const):
-    return ((((((env["high"]) * (env["low"]))) ** (0.5))) - (env["vwap"]))
+    return (((env["high"]) * (env["low"])) ** (0.5)) - (env["vwap"])
+
 
 def alpha_042_program(env, const):
-    return ((env["rank"](((env["vwap"]) - (env["close"])))) / (env["rank"](((env["vwap"]) + (env["close"])))))
+    return (env["rank"](((env["vwap"]) - (env["close"])))) / (
+        env["rank"](((env["vwap"]) + (env["close"])))
+    )
+
 
 def alpha_043_program(env, const):
-    return ((env["ts_rank"](((env["volume"]) / (env["adv20"])), const("alpha101.43.const.001", 20.0))) * (env["ts_rank"]((((-(1))) * (env["delta"](env["close"], const("alpha101.43.const.002", 7.0)))), 8)))
+    return (
+        env["ts_rank"](((env["volume"]) / (env["adv20"])), const("alpha101.43.const.001", 20.0))
+    ) * (
+        env["ts_rank"](
+            ((-(1)) * (env["delta"](env["close"], const("alpha101.43.const.002", 7.0)))), 8
+        )
+    )
+
 
 def alpha_044_program(env, const):
-    return (((-(1))) * (env["ts_corr"](env["high"], env["rank"](env["volume"]), const("alpha101.44.const.001", 5.0))))
+    return (-(1)) * (
+        env["ts_corr"](env["high"], env["rank"](env["volume"]), const("alpha101.44.const.001", 5.0))
+    )
+
 
 def alpha_045_program(env, const):
-    return (((-(1))) * (((((env["rank"](((env["ts_sum"](env["delay"](env["close"], const("alpha101.45.const.001", 5.0)), const("alpha101.45.const.002", 20.0))) / (const("alpha101.45.const.003", 20.0))))) * (env["ts_corr"](env["close"], env["volume"], 2)))) * (env["rank"](env["ts_corr"](env["ts_sum"](env["close"], const("alpha101.45.const.004", 5.0)), env["ts_sum"](env["close"], const("alpha101.45.const.005", 20.0)), 2))))))
+    return (-(1)) * (
+        (
+            (
+                env["rank"](
+                    (
+                        (
+                            env["ts_sum"](
+                                env["delay"](env["close"], const("alpha101.45.const.001", 5.0)),
+                                const("alpha101.45.const.002", 20.0),
+                            )
+                        )
+                        / (const("alpha101.45.const.003", 20.0))
+                    )
+                )
+            )
+            * (env["ts_corr"](env["close"], env["volume"], 2))
+        )
+        * (
+            env["rank"](
+                env["ts_corr"](
+                    env["ts_sum"](env["close"], const("alpha101.45.const.004", 5.0)),
+                    env["ts_sum"](env["close"], const("alpha101.45.const.005", 20.0)),
+                    2,
+                )
+            )
+        )
+    )
+
 
 def alpha_046_program(env, const):
-    return env["where"](((0.25) < (((((((env["delay"](env["close"], const("alpha101.46.const.001", 20.0))) - (env["delay"](env["close"], const("alpha101.46.const.002", 10.0))))) / (const("alpha101.46.const.003", 10.0)))) - (((((env["delay"](env["close"], const("alpha101.46.const.004", 10.0))) - (env["close"]))) / (const("alpha101.46.const.005", 10.0))))))), (((-(1))) * (1)), env["where"](((((((((env["delay"](env["close"], const("alpha101.46.const.006", 20.0))) - (env["delay"](env["close"], const("alpha101.46.const.007", 10.0))))) / (const("alpha101.46.const.008", 10.0)))) - (((((env["delay"](env["close"], const("alpha101.46.const.009", 10.0))) - (env["close"]))) / (const("alpha101.46.const.010", 10.0)))))) < (0)), 1, (((((-(1))) * (1))) * (((env["close"]) - (env["delay"](env["close"], 1)))))))
+    return env["where"](
+        (
+            (0.25)
+            < (
+                (
+                    (
+                        (env["delay"](env["close"], const("alpha101.46.const.001", 20.0)))
+                        - (env["delay"](env["close"], const("alpha101.46.const.002", 10.0)))
+                    )
+                    / (const("alpha101.46.const.003", 10.0))
+                )
+                - (
+                    (
+                        (env["delay"](env["close"], const("alpha101.46.const.004", 10.0)))
+                        - (env["close"])
+                    )
+                    / (const("alpha101.46.const.005", 10.0))
+                )
+            )
+        ),
+        ((-(1)) * (1)),
+        env["where"](
+            (
+                (
+                    (
+                        (
+                            (env["delay"](env["close"], const("alpha101.46.const.006", 20.0)))
+                            - (env["delay"](env["close"], const("alpha101.46.const.007", 10.0)))
+                        )
+                        / (const("alpha101.46.const.008", 10.0))
+                    )
+                    - (
+                        (
+                            (env["delay"](env["close"], const("alpha101.46.const.009", 10.0)))
+                            - (env["close"])
+                        )
+                        / (const("alpha101.46.const.010", 10.0))
+                    )
+                )
+                < (0)
+            ),
+            1,
+            (((-(1)) * (1)) * ((env["close"]) - (env["delay"](env["close"], 1)))),
+        ),
+    )
+
 
 def alpha_047_program(env, const):
-    return ((((((((env["rank"](((1) / (env["close"])))) * (env["volume"]))) / (env["adv20"]))) * (((((env["high"]) * (env["rank"](((env["high"]) - (env["close"])))))) / (((env["ts_sum"](env["high"], const("alpha101.47.const.001", 5.0))) / (const("alpha101.47.const.002", 5.0)))))))) - (env["rank"](((env["vwap"]) - (env["delay"](env["vwap"], const("alpha101.47.const.003", 5.0)))))))
+    return (
+        (((env["rank"](((1) / (env["close"])))) * (env["volume"])) / (env["adv20"]))
+        * (
+            ((env["high"]) * (env["rank"](((env["high"]) - (env["close"])))))
+            / (
+                (env["ts_sum"](env["high"], const("alpha101.47.const.001", 5.0)))
+                / (const("alpha101.47.const.002", 5.0))
+            )
+        )
+    ) - (
+        env["rank"](
+            ((env["vwap"]) - (env["delay"](env["vwap"], const("alpha101.47.const.003", 5.0))))
+        )
+    )
+
 
 def alpha_048_program(env, const):
-    return ((env["indneutralize"](((((env["ts_corr"](env["delta"](env["close"], 1), env["delta"](env["delay"](env["close"], 1), 1), const("alpha101.48.const.001", 250.0))) * (env["delta"](env["close"], 1)))) / (env["close"])), env["subindustry"])) / (env["ts_sum"](((((env["delta"](env["close"], 1)) / (env["delay"](env["close"], 1)))) ** (2)), const("alpha101.48.const.002", 250.0))))
+    return (
+        env["indneutralize"](
+            (
+                (
+                    (
+                        env["ts_corr"](
+                            env["delta"](env["close"], 1),
+                            env["delta"](env["delay"](env["close"], 1), 1),
+                            const("alpha101.48.const.001", 250.0),
+                        )
+                    )
+                    * (env["delta"](env["close"], 1))
+                )
+                / (env["close"])
+            ),
+            env["subindustry"],
+        )
+    ) / (
+        env["ts_sum"](
+            (((env["delta"](env["close"], 1)) / (env["delay"](env["close"], 1))) ** (2)),
+            const("alpha101.48.const.002", 250.0),
+        )
+    )
+
 
 def alpha_049_program(env, const):
-    return env["where"](((((((((env["delay"](env["close"], const("alpha101.49.const.001", 20.0))) - (env["delay"](env["close"], const("alpha101.49.const.002", 10.0))))) / (const("alpha101.49.const.003", 10.0)))) - (((((env["delay"](env["close"], const("alpha101.49.const.004", 10.0))) - (env["close"]))) / (const("alpha101.49.const.005", 10.0)))))) < ((((-(1))) * (const("alpha101.49.const.006", 0.1))))), 1, (((((-(1))) * (1))) * (((env["close"]) - (env["delay"](env["close"], 1))))))
+    return env["where"](
+        (
+            (
+                (
+                    (
+                        (env["delay"](env["close"], const("alpha101.49.const.001", 20.0)))
+                        - (env["delay"](env["close"], const("alpha101.49.const.002", 10.0)))
+                    )
+                    / (const("alpha101.49.const.003", 10.0))
+                )
+                - (
+                    (
+                        (env["delay"](env["close"], const("alpha101.49.const.004", 10.0)))
+                        - (env["close"])
+                    )
+                    / (const("alpha101.49.const.005", 10.0))
+                )
+            )
+            < ((-(1)) * (const("alpha101.49.const.006", 0.1)))
+        ),
+        1,
+        (((-(1)) * (1)) * ((env["close"]) - (env["delay"](env["close"], 1)))),
+    )
+
 
 def alpha_050_program(env, const):
-    return (((-(1))) * (env["ts_max"](env["rank"](env["ts_corr"](env["rank"](env["volume"]), env["rank"](env["vwap"]), const("alpha101.50.const.001", 5.0))), const("alpha101.50.const.002", 5.0))))
+    return (-(1)) * (
+        env["ts_max"](
+            env["rank"](
+                env["ts_corr"](
+                    env["rank"](env["volume"]),
+                    env["rank"](env["vwap"]),
+                    const("alpha101.50.const.001", 5.0),
+                )
+            ),
+            const("alpha101.50.const.002", 5.0),
+        )
+    )
+
 
 def alpha_051_program(env, const):
-    return env["where"](((((((((env["delay"](env["close"], const("alpha101.51.const.001", 20.0))) - (env["delay"](env["close"], const("alpha101.51.const.002", 10.0))))) / (const("alpha101.51.const.003", 10.0)))) - (((((env["delay"](env["close"], const("alpha101.51.const.004", 10.0))) - (env["close"]))) / (const("alpha101.51.const.005", 10.0)))))) < ((((-(1))) * (const("alpha101.51.const.006", 0.05))))), 1, (((((-(1))) * (1))) * (((env["close"]) - (env["delay"](env["close"], 1))))))
+    return env["where"](
+        (
+            (
+                (
+                    (
+                        (env["delay"](env["close"], const("alpha101.51.const.001", 20.0)))
+                        - (env["delay"](env["close"], const("alpha101.51.const.002", 10.0)))
+                    )
+                    / (const("alpha101.51.const.003", 10.0))
+                )
+                - (
+                    (
+                        (env["delay"](env["close"], const("alpha101.51.const.004", 10.0)))
+                        - (env["close"])
+                    )
+                    / (const("alpha101.51.const.005", 10.0))
+                )
+            )
+            < ((-(1)) * (const("alpha101.51.const.006", 0.05)))
+        ),
+        1,
+        (((-(1)) * (1)) * ((env["close"]) - (env["delay"](env["close"], 1)))),
+    )
+
 
 def alpha_052_program(env, const):
-    return (((((((((-(1))) * (env["ts_min"](env["low"], const("alpha101.52.const.001", 5.0))))) + (env["delay"](env["ts_min"](env["low"], const("alpha101.52.const.002", 5.0)), const("alpha101.52.const.003", 5.0))))) * (env["rank"](((((env["ts_sum"](env["returns"], const("alpha101.52.const.004", 240.0))) - (env["ts_sum"](env["returns"], const("alpha101.52.const.005", 20.0))))) / (const("alpha101.52.const.006", 220.0))))))) * (env["ts_rank"](env["volume"], const("alpha101.52.const.007", 5.0))))
+    return (
+        (
+            ((-(1)) * (env["ts_min"](env["low"], const("alpha101.52.const.001", 5.0))))
+            + (
+                env["delay"](
+                    env["ts_min"](env["low"], const("alpha101.52.const.002", 5.0)),
+                    const("alpha101.52.const.003", 5.0),
+                )
+            )
+        )
+        * (
+            env["rank"](
+                (
+                    (
+                        (env["ts_sum"](env["returns"], const("alpha101.52.const.004", 240.0)))
+                        - (env["ts_sum"](env["returns"], const("alpha101.52.const.005", 20.0)))
+                    )
+                    / (const("alpha101.52.const.006", 220.0))
+                )
+            )
+        )
+    ) * (env["ts_rank"](env["volume"], const("alpha101.52.const.007", 5.0)))
+
 
 def alpha_053_program(env, const):
-    return (((-(1))) * (env["delta"](((((((env["close"]) - (env["low"]))) - (((env["high"]) - (env["close"]))))) / (((env["close"]) - (env["low"])))), const("alpha101.53.const.001", 9.0))))
+    return (-(1)) * (
+        env["delta"](
+            (
+                (((env["close"]) - (env["low"])) - ((env["high"]) - (env["close"])))
+                / ((env["close"]) - (env["low"]))
+            ),
+            const("alpha101.53.const.001", 9.0),
+        )
+    )
+
 
 def alpha_054_program(env, const):
-    return (((((-(1))) * (((((env["low"]) - (env["close"]))) * (((env["open"]) ** (const("alpha101.54.const.001", 5.0)))))))) / (((((env["low"]) - (env["high"]))) * (((env["close"]) ** (const("alpha101.54.const.002", 5.0)))))))
+    return (
+        (-(1))
+        * (
+            ((env["low"]) - (env["close"]))
+            * ((env["open"]) ** (const("alpha101.54.const.001", 5.0)))
+        )
+    ) / (((env["low"]) - (env["high"])) * ((env["close"]) ** (const("alpha101.54.const.002", 5.0))))
+
 
 def alpha_055_program(env, const):
-    return (((-(1))) * (env["ts_corr"](env["rank"](((((env["close"]) - (env["ts_min"](env["low"], const("alpha101.55.const.001", 12.0))))) / (((env["ts_max"](env["high"], const("alpha101.55.const.002", 12.0))) - (env["ts_min"](env["low"], const("alpha101.55.const.003", 12.0))))))), env["rank"](env["volume"]), const("alpha101.55.const.004", 6.0))))
+    return (-(1)) * (
+        env["ts_corr"](
+            env["rank"](
+                (
+                    (
+                        (env["close"])
+                        - (env["ts_min"](env["low"], const("alpha101.55.const.001", 12.0)))
+                    )
+                    / (
+                        (env["ts_max"](env["high"], const("alpha101.55.const.002", 12.0)))
+                        - (env["ts_min"](env["low"], const("alpha101.55.const.003", 12.0)))
+                    )
+                )
+            ),
+            env["rank"](env["volume"]),
+            const("alpha101.55.const.004", 6.0),
+        )
+    )
+
 
 def alpha_056_program(env, const):
-    return ((0) - (((1) * (((env["rank"](((env["ts_sum"](env["returns"], const("alpha101.56.const.001", 10.0))) / (env["ts_sum"](env["ts_sum"](env["returns"], 2), const("alpha101.56.const.002", 3.0)))))) * (env["rank"](((env["returns"]) * (env["cap"])))))))))
+    return (0) - (
+        (1)
+        * (
+            (
+                env["rank"](
+                    (
+                        (env["ts_sum"](env["returns"], const("alpha101.56.const.001", 10.0)))
+                        / (
+                            env["ts_sum"](
+                                env["ts_sum"](env["returns"], 2),
+                                const("alpha101.56.const.002", 3.0),
+                            )
+                        )
+                    )
+                )
+            )
+            * (env["rank"](((env["returns"]) * (env["cap"]))))
+        )
+    )
+
 
 def alpha_057_program(env, const):
-    return ((0) - (((1) * (((((env["close"]) - (env["vwap"]))) / (env["decay_linear"](env["rank"](env["ts_argmax"](env["close"], const("alpha101.57.const.001", 30.0))), 2)))))))
+    return (0) - (
+        (1)
+        * (
+            ((env["close"]) - (env["vwap"]))
+            / (
+                env["decay_linear"](
+                    env["rank"](
+                        env["ts_argmax"](env["close"], const("alpha101.57.const.001", 30.0))
+                    ),
+                    2,
+                )
+            )
+        )
+    )
+
 
 def alpha_058_program(env, const):
-    return (((-(1))) * (env["ts_rank"](env["decay_linear"](env["ts_corr"](env["indneutralize"](env["vwap"], env["sector"]), env["volume"], const("alpha101.58.const.001", 3.92795)), const("alpha101.58.const.002", 7.89291)), const("alpha101.58.const.003", 5.50322))))
+    return (-(1)) * (
+        env["ts_rank"](
+            env["decay_linear"](
+                env["ts_corr"](
+                    env["indneutralize"](env["vwap"], env["sector"]),
+                    env["volume"],
+                    const("alpha101.58.const.001", 3.92795),
+                ),
+                const("alpha101.58.const.002", 7.89291),
+            ),
+            const("alpha101.58.const.003", 5.50322),
+        )
+    )
+
 
 def alpha_059_program(env, const):
-    return (((-(1))) * (env["ts_rank"](env["decay_linear"](env["ts_corr"](env["indneutralize"](((((env["vwap"]) * (const("alpha101.59.const.001", 0.728317)))) + (((env["vwap"]) * (((1) - (const("alpha101.59.const.002", 0.728317))))))), env["industry"]), env["volume"], const("alpha101.59.const.003", 4.25197)), const("alpha101.59.const.004", 16.2289)), const("alpha101.59.const.005", 8.19648))))
+    return (-(1)) * (
+        env["ts_rank"](
+            env["decay_linear"](
+                env["ts_corr"](
+                    env["indneutralize"](
+                        (
+                            ((env["vwap"]) * (const("alpha101.59.const.001", 0.728317)))
+                            + ((env["vwap"]) * ((1) - (const("alpha101.59.const.002", 0.728317))))
+                        ),
+                        env["industry"],
+                    ),
+                    env["volume"],
+                    const("alpha101.59.const.003", 4.25197),
+                ),
+                const("alpha101.59.const.004", 16.2289),
+            ),
+            const("alpha101.59.const.005", 8.19648),
+        )
+    )
+
 
 def alpha_060_program(env, const):
-    return ((0) - (((1) * (((((2) * (env["scale"](env["rank"](((((((((env["close"]) - (env["low"]))) - (((env["high"]) - (env["close"]))))) / (((env["high"]) - (env["low"]))))) * (env["volume"]))))))) - (env["scale"](env["rank"](env["ts_argmax"](env["close"], const("alpha101.60.const.001", 10.0))))))))))
+    return (0) - (
+        (1)
+        * (
+            (
+                (2)
+                * (
+                    env["scale"](
+                        env["rank"](
+                            (
+                                (
+                                    (
+                                        ((env["close"]) - (env["low"]))
+                                        - ((env["high"]) - (env["close"]))
+                                    )
+                                    / ((env["high"]) - (env["low"]))
+                                )
+                                * (env["volume"])
+                            )
+                        )
+                    )
+                )
+            )
+            - (
+                env["scale"](
+                    env["rank"](
+                        env["ts_argmax"](env["close"], const("alpha101.60.const.001", 10.0))
+                    )
+                )
+            )
+        )
+    )
+
 
 def alpha_061_program(env, const):
-    return ((env["rank"](((env["vwap"]) - (env["ts_min"](env["vwap"], const("alpha101.61.const.001", 16.1219)))))) < (env["rank"](env["ts_corr"](env["vwap"], env["adv180"], const("alpha101.61.const.002", 17.9282)))))
+    return (
+        env["rank"](
+            ((env["vwap"]) - (env["ts_min"](env["vwap"], const("alpha101.61.const.001", 16.1219))))
+        )
+    ) < (
+        env["rank"](
+            env["ts_corr"](env["vwap"], env["adv180"], const("alpha101.61.const.002", 17.9282))
+        )
+    )
+
 
 def alpha_062_program(env, const):
-    return ((((env["rank"](env["ts_corr"](env["vwap"], env["ts_sum"](env["adv20"], const("alpha101.62.const.001", 22.4101)), const("alpha101.62.const.002", 9.91009)))) < (env["rank"](((((env["rank"](env["open"])) + (env["rank"](env["open"])))) < (((env["rank"](((((env["high"]) + (env["low"]))) / (2)))) + (env["rank"](env["high"]))))))))) * ((-(1))))
+    return (
+        (
+            env["rank"](
+                env["ts_corr"](
+                    env["vwap"],
+                    env["ts_sum"](env["adv20"], const("alpha101.62.const.001", 22.4101)),
+                    const("alpha101.62.const.002", 9.91009),
+                )
+            )
+        )
+        < (
+            env["rank"](
+                (
+                    ((env["rank"](env["open"])) + (env["rank"](env["open"])))
+                    < (
+                        (env["rank"]((((env["high"]) + (env["low"])) / (2))))
+                        + (env["rank"](env["high"]))
+                    )
+                )
+            )
+        )
+    ) * (-(1))
+
 
 def alpha_063_program(env, const):
-    return ((((env["rank"](env["decay_linear"](env["delta"](env["indneutralize"](env["close"], env["industry"]), const("alpha101.63.const.001", 2.25164)), const("alpha101.63.const.002", 8.22237)))) - (env["rank"](env["decay_linear"](env["ts_corr"](((((env["vwap"]) * (const("alpha101.63.const.003", 0.318108)))) + (((env["open"]) * (((1) - (const("alpha101.63.const.004", 0.318108))))))), env["ts_sum"](env["adv180"], const("alpha101.63.const.005", 37.2467)), const("alpha101.63.const.006", 13.557)), const("alpha101.63.const.007", 12.2883)))))) * ((-(1))))
+    return (
+        (
+            env["rank"](
+                env["decay_linear"](
+                    env["delta"](
+                        env["indneutralize"](env["close"], env["industry"]),
+                        const("alpha101.63.const.001", 2.25164),
+                    ),
+                    const("alpha101.63.const.002", 8.22237),
+                )
+            )
+        )
+        - (
+            env["rank"](
+                env["decay_linear"](
+                    env["ts_corr"](
+                        (
+                            ((env["vwap"]) * (const("alpha101.63.const.003", 0.318108)))
+                            + ((env["open"]) * ((1) - (const("alpha101.63.const.004", 0.318108))))
+                        ),
+                        env["ts_sum"](env["adv180"], const("alpha101.63.const.005", 37.2467)),
+                        const("alpha101.63.const.006", 13.557),
+                    ),
+                    const("alpha101.63.const.007", 12.2883),
+                )
+            )
+        )
+    ) * (-(1))
+
 
 def alpha_064_program(env, const):
-    return ((((env["rank"](env["ts_corr"](env["ts_sum"](((((env["open"]) * (const("alpha101.64.const.001", 0.178404)))) + (((env["low"]) * (((1) - (const("alpha101.64.const.002", 0.178404))))))), const("alpha101.64.const.003", 12.7054)), env["ts_sum"](env["adv120"], const("alpha101.64.const.004", 12.7054)), const("alpha101.64.const.005", 16.6208)))) < (env["rank"](env["delta"](((((((((env["high"]) + (env["low"]))) / (2))) * (const("alpha101.64.const.006", 0.178404)))) + (((env["vwap"]) * (((1) - (const("alpha101.64.const.007", 0.178404))))))), const("alpha101.64.const.008", 3.69741)))))) * ((-(1))))
+    return (
+        (
+            env["rank"](
+                env["ts_corr"](
+                    env["ts_sum"](
+                        (
+                            ((env["open"]) * (const("alpha101.64.const.001", 0.178404)))
+                            + ((env["low"]) * ((1) - (const("alpha101.64.const.002", 0.178404))))
+                        ),
+                        const("alpha101.64.const.003", 12.7054),
+                    ),
+                    env["ts_sum"](env["adv120"], const("alpha101.64.const.004", 12.7054)),
+                    const("alpha101.64.const.005", 16.6208),
+                )
+            )
+        )
+        < (
+            env["rank"](
+                env["delta"](
+                    (
+                        (
+                            (((env["high"]) + (env["low"])) / (2))
+                            * (const("alpha101.64.const.006", 0.178404))
+                        )
+                        + ((env["vwap"]) * ((1) - (const("alpha101.64.const.007", 0.178404))))
+                    ),
+                    const("alpha101.64.const.008", 3.69741),
+                )
+            )
+        )
+    ) * (-(1))
+
 
 def alpha_065_program(env, const):
-    return ((((env["rank"](env["ts_corr"](((((env["open"]) * (const("alpha101.65.const.001", 0.00817205)))) + (((env["vwap"]) * (((1) - (const("alpha101.65.const.002", 0.00817205))))))), env["ts_sum"](env["adv60"], const("alpha101.65.const.003", 8.6911)), const("alpha101.65.const.004", 6.40374)))) < (env["rank"](((env["open"]) - (env["ts_min"](env["open"], const("alpha101.65.const.005", 13.635)))))))) * ((-(1))))
+    return (
+        (
+            env["rank"](
+                env["ts_corr"](
+                    (
+                        ((env["open"]) * (const("alpha101.65.const.001", 0.00817205)))
+                        + ((env["vwap"]) * ((1) - (const("alpha101.65.const.002", 0.00817205))))
+                    ),
+                    env["ts_sum"](env["adv60"], const("alpha101.65.const.003", 8.6911)),
+                    const("alpha101.65.const.004", 6.40374),
+                )
+            )
+        )
+        < (
+            env["rank"](
+                (
+                    (env["open"])
+                    - (env["ts_min"](env["open"], const("alpha101.65.const.005", 13.635)))
+                )
+            )
+        )
+    ) * (-(1))
+
 
 def alpha_066_program(env, const):
-    return ((((env["rank"](env["decay_linear"](env["delta"](env["vwap"], const("alpha101.66.const.001", 3.51013)), const("alpha101.66.const.002", 7.23052)))) + (env["ts_rank"](env["decay_linear"](((((((((env["low"]) * (const("alpha101.66.const.003", 0.96633)))) + (((env["low"]) * (((1) - (const("alpha101.66.const.004", 0.96633)))))))) - (env["vwap"]))) / (((env["open"]) - (((((env["high"]) + (env["low"]))) / (2)))))), const("alpha101.66.const.005", 11.4157)), const("alpha101.66.const.006", 6.72611))))) * ((-(1))))
+    return (
+        (
+            env["rank"](
+                env["decay_linear"](
+                    env["delta"](env["vwap"], const("alpha101.66.const.001", 3.51013)),
+                    const("alpha101.66.const.002", 7.23052),
+                )
+            )
+        )
+        + (
+            env["ts_rank"](
+                env["decay_linear"](
+                    (
+                        (
+                            (
+                                ((env["low"]) * (const("alpha101.66.const.003", 0.96633)))
+                                + ((env["low"]) * ((1) - (const("alpha101.66.const.004", 0.96633))))
+                            )
+                            - (env["vwap"])
+                        )
+                        / ((env["open"]) - (((env["high"]) + (env["low"])) / (2)))
+                    ),
+                    const("alpha101.66.const.005", 11.4157),
+                ),
+                const("alpha101.66.const.006", 6.72611),
+            )
+        )
+    ) * (-(1))
+
 
 def alpha_067_program(env, const):
-    return ((((env["rank"](((env["high"]) - (env["ts_min"](env["high"], const("alpha101.67.const.001", 2.14593)))))) ** (env["rank"](env["ts_corr"](env["indneutralize"](env["vwap"], env["sector"]), env["indneutralize"](env["adv20"], env["subindustry"]), const("alpha101.67.const.002", 6.02936)))))) * ((-(1))))
+    return (
+        (
+            env["rank"](
+                (
+                    (env["high"])
+                    - (env["ts_min"](env["high"], const("alpha101.67.const.001", 2.14593)))
+                )
+            )
+        )
+        ** (
+            env["rank"](
+                env["ts_corr"](
+                    env["indneutralize"](env["vwap"], env["sector"]),
+                    env["indneutralize"](env["adv20"], env["subindustry"]),
+                    const("alpha101.67.const.002", 6.02936),
+                )
+            )
+        )
+    ) * (-(1))
+
 
 def alpha_068_program(env, const):
-    return ((((env["ts_rank"](env["ts_corr"](env["rank"](env["high"]), env["rank"](env["adv15"]), const("alpha101.68.const.001", 8.91644)), const("alpha101.68.const.002", 13.9333))) < (env["rank"](env["delta"](((((env["close"]) * (const("alpha101.68.const.003", 0.518371)))) + (((env["low"]) * (((1) - (const("alpha101.68.const.004", 0.518371))))))), const("alpha101.68.const.005", 1.06157)))))) * ((-(1))))
+    return (
+        (
+            env["ts_rank"](
+                env["ts_corr"](
+                    env["rank"](env["high"]),
+                    env["rank"](env["adv15"]),
+                    const("alpha101.68.const.001", 8.91644),
+                ),
+                const("alpha101.68.const.002", 13.9333),
+            )
+        )
+        < (
+            env["rank"](
+                env["delta"](
+                    (
+                        ((env["close"]) * (const("alpha101.68.const.003", 0.518371)))
+                        + ((env["low"]) * ((1) - (const("alpha101.68.const.004", 0.518371))))
+                    ),
+                    const("alpha101.68.const.005", 1.06157),
+                )
+            )
+        )
+    ) * (-(1))
+
 
 def alpha_069_program(env, const):
-    return ((((env["rank"](env["ts_max"](env["delta"](env["indneutralize"](env["vwap"], env["industry"]), const("alpha101.69.const.001", 2.72412)), const("alpha101.69.const.002", 4.79344)))) ** (env["ts_rank"](env["ts_corr"](((((env["close"]) * (const("alpha101.69.const.003", 0.490655)))) + (((env["vwap"]) * (((1) - (const("alpha101.69.const.004", 0.490655))))))), env["adv20"], const("alpha101.69.const.005", 4.92416)), const("alpha101.69.const.006", 9.0615))))) * ((-(1))))
+    return (
+        (
+            env["rank"](
+                env["ts_max"](
+                    env["delta"](
+                        env["indneutralize"](env["vwap"], env["industry"]),
+                        const("alpha101.69.const.001", 2.72412),
+                    ),
+                    const("alpha101.69.const.002", 4.79344),
+                )
+            )
+        )
+        ** (
+            env["ts_rank"](
+                env["ts_corr"](
+                    (
+                        ((env["close"]) * (const("alpha101.69.const.003", 0.490655)))
+                        + ((env["vwap"]) * ((1) - (const("alpha101.69.const.004", 0.490655))))
+                    ),
+                    env["adv20"],
+                    const("alpha101.69.const.005", 4.92416),
+                ),
+                const("alpha101.69.const.006", 9.0615),
+            )
+        )
+    ) * (-(1))
+
 
 def alpha_070_program(env, const):
-    return ((((env["rank"](env["delta"](env["vwap"], const("alpha101.70.const.001", 1.29456)))) ** (env["ts_rank"](env["ts_corr"](env["indneutralize"](env["close"], env["industry"]), env["adv50"], const("alpha101.70.const.002", 17.8256)), const("alpha101.70.const.003", 17.9171))))) * ((-(1))))
+    return (
+        (env["rank"](env["delta"](env["vwap"], const("alpha101.70.const.001", 1.29456))))
+        ** (
+            env["ts_rank"](
+                env["ts_corr"](
+                    env["indneutralize"](env["close"], env["industry"]),
+                    env["adv50"],
+                    const("alpha101.70.const.002", 17.8256),
+                ),
+                const("alpha101.70.const.003", 17.9171),
+            )
+        )
+    ) * (-(1))
+
 
 def alpha_071_program(env, const):
-    return env["max"](env["ts_rank"](env["decay_linear"](env["ts_corr"](env["ts_rank"](env["close"], const("alpha101.71.const.001", 3.43976)), env["ts_rank"](env["adv180"], const("alpha101.71.const.002", 12.0647)), const("alpha101.71.const.003", 18.0175)), const("alpha101.71.const.004", 4.20501)), const("alpha101.71.const.005", 15.6948)), env["ts_rank"](env["decay_linear"](((env["rank"](((((env["low"]) + (env["open"]))) - (((env["vwap"]) + (env["vwap"])))))) ** (2)), const("alpha101.71.const.006", 16.4662)), const("alpha101.71.const.007", 4.4388)))
+    return env["max"](
+        env["ts_rank"](
+            env["decay_linear"](
+                env["ts_corr"](
+                    env["ts_rank"](env["close"], const("alpha101.71.const.001", 3.43976)),
+                    env["ts_rank"](env["adv180"], const("alpha101.71.const.002", 12.0647)),
+                    const("alpha101.71.const.003", 18.0175),
+                ),
+                const("alpha101.71.const.004", 4.20501),
+            ),
+            const("alpha101.71.const.005", 15.6948),
+        ),
+        env["ts_rank"](
+            env["decay_linear"](
+                (
+                    (
+                        env["rank"](
+                            (((env["low"]) + (env["open"])) - ((env["vwap"]) + (env["vwap"])))
+                        )
+                    )
+                    ** (2)
+                ),
+                const("alpha101.71.const.006", 16.4662),
+            ),
+            const("alpha101.71.const.007", 4.4388),
+        ),
+    )
+
 
 def alpha_072_program(env, const):
-    return ((env["rank"](env["decay_linear"](env["ts_corr"](((((env["high"]) + (env["low"]))) / (2)), env["adv40"], const("alpha101.72.const.001", 8.93345)), const("alpha101.72.const.002", 10.1519)))) / (env["rank"](env["decay_linear"](env["ts_corr"](env["ts_rank"](env["vwap"], const("alpha101.72.const.003", 3.72469)), env["ts_rank"](env["volume"], const("alpha101.72.const.004", 18.5188)), const("alpha101.72.const.005", 6.86671)), const("alpha101.72.const.006", 2.95011)))))
+    return (
+        env["rank"](
+            env["decay_linear"](
+                env["ts_corr"](
+                    (((env["high"]) + (env["low"])) / (2)),
+                    env["adv40"],
+                    const("alpha101.72.const.001", 8.93345),
+                ),
+                const("alpha101.72.const.002", 10.1519),
+            )
+        )
+    ) / (
+        env["rank"](
+            env["decay_linear"](
+                env["ts_corr"](
+                    env["ts_rank"](env["vwap"], const("alpha101.72.const.003", 3.72469)),
+                    env["ts_rank"](env["volume"], const("alpha101.72.const.004", 18.5188)),
+                    const("alpha101.72.const.005", 6.86671),
+                ),
+                const("alpha101.72.const.006", 2.95011),
+            )
+        )
+    )
+
 
 def alpha_073_program(env, const):
-    return ((env["max"](env["rank"](env["decay_linear"](env["delta"](env["vwap"], const("alpha101.73.const.001", 4.72775)), const("alpha101.73.const.002", 2.91864))), env["ts_rank"](env["decay_linear"](((((env["delta"](((((env["open"]) * (const("alpha101.73.const.003", 0.147155)))) + (((env["low"]) * (((1) - (const("alpha101.73.const.004", 0.147155))))))), const("alpha101.73.const.005", 2.03608))) / (((((env["open"]) * (const("alpha101.73.const.006", 0.147155)))) + (((env["low"]) * (((1) - (const("alpha101.73.const.007", 0.147155)))))))))) * ((-(1)))), const("alpha101.73.const.008", 3.33829)), const("alpha101.73.const.009", 16.7411)))) * ((-(1))))
+    return (
+        env["max"](
+            env["rank"](
+                env["decay_linear"](
+                    env["delta"](env["vwap"], const("alpha101.73.const.001", 4.72775)),
+                    const("alpha101.73.const.002", 2.91864),
+                )
+            ),
+            env["ts_rank"](
+                env["decay_linear"](
+                    (
+                        (
+                            (
+                                env["delta"](
+                                    (
+                                        ((env["open"]) * (const("alpha101.73.const.003", 0.147155)))
+                                        + (
+                                            (env["low"])
+                                            * ((1) - (const("alpha101.73.const.004", 0.147155)))
+                                        )
+                                    ),
+                                    const("alpha101.73.const.005", 2.03608),
+                                )
+                            )
+                            / (
+                                ((env["open"]) * (const("alpha101.73.const.006", 0.147155)))
+                                + (
+                                    (env["low"])
+                                    * ((1) - (const("alpha101.73.const.007", 0.147155)))
+                                )
+                            )
+                        )
+                        * (-(1))
+                    ),
+                    const("alpha101.73.const.008", 3.33829),
+                ),
+                const("alpha101.73.const.009", 16.7411),
+            ),
+        )
+    ) * (-(1))
+
 
 def alpha_074_program(env, const):
-    return ((((env["rank"](env["ts_corr"](env["close"], env["ts_sum"](env["adv30"], const("alpha101.74.const.001", 37.4843)), const("alpha101.74.const.002", 15.1365)))) < (env["rank"](env["ts_corr"](env["rank"](((((env["high"]) * (const("alpha101.74.const.003", 0.0261661)))) + (((env["vwap"]) * (((1) - (const("alpha101.74.const.004", 0.0261661)))))))), env["rank"](env["volume"]), const("alpha101.74.const.005", 11.4791)))))) * ((-(1))))
+    return (
+        (
+            env["rank"](
+                env["ts_corr"](
+                    env["close"],
+                    env["ts_sum"](env["adv30"], const("alpha101.74.const.001", 37.4843)),
+                    const("alpha101.74.const.002", 15.1365),
+                )
+            )
+        )
+        < (
+            env["rank"](
+                env["ts_corr"](
+                    env["rank"](
+                        (
+                            ((env["high"]) * (const("alpha101.74.const.003", 0.0261661)))
+                            + ((env["vwap"]) * ((1) - (const("alpha101.74.const.004", 0.0261661))))
+                        )
+                    ),
+                    env["rank"](env["volume"]),
+                    const("alpha101.74.const.005", 11.4791),
+                )
+            )
+        )
+    ) * (-(1))
+
 
 def alpha_075_program(env, const):
-    return ((env["rank"](env["ts_corr"](env["vwap"], env["volume"], const("alpha101.75.const.001", 4.24304)))) < (env["rank"](env["ts_corr"](env["rank"](env["low"]), env["rank"](env["adv50"]), const("alpha101.75.const.002", 12.4413)))))
+    return (
+        env["rank"](
+            env["ts_corr"](env["vwap"], env["volume"], const("alpha101.75.const.001", 4.24304))
+        )
+    ) < (
+        env["rank"](
+            env["ts_corr"](
+                env["rank"](env["low"]),
+                env["rank"](env["adv50"]),
+                const("alpha101.75.const.002", 12.4413),
+            )
+        )
+    )
+
 
 def alpha_076_program(env, const):
-    return ((env["max"](env["rank"](env["decay_linear"](env["delta"](env["vwap"], const("alpha101.76.const.001", 1.24383)), const("alpha101.76.const.002", 11.8259))), env["ts_rank"](env["decay_linear"](env["ts_rank"](env["ts_corr"](env["indneutralize"](env["low"], env["sector"]), env["adv81"], const("alpha101.76.const.003", 8.14941)), const("alpha101.76.const.004", 19.569)), const("alpha101.76.const.005", 17.1543)), const("alpha101.76.const.006", 19.383)))) * ((-(1))))
+    return (
+        env["max"](
+            env["rank"](
+                env["decay_linear"](
+                    env["delta"](env["vwap"], const("alpha101.76.const.001", 1.24383)),
+                    const("alpha101.76.const.002", 11.8259),
+                )
+            ),
+            env["ts_rank"](
+                env["decay_linear"](
+                    env["ts_rank"](
+                        env["ts_corr"](
+                            env["indneutralize"](env["low"], env["sector"]),
+                            env["adv81"],
+                            const("alpha101.76.const.003", 8.14941),
+                        ),
+                        const("alpha101.76.const.004", 19.569),
+                    ),
+                    const("alpha101.76.const.005", 17.1543),
+                ),
+                const("alpha101.76.const.006", 19.383),
+            ),
+        )
+    ) * (-(1))
+
 
 def alpha_077_program(env, const):
-    return env["min"](env["rank"](env["decay_linear"](((((((((env["high"]) + (env["low"]))) / (2))) + (env["high"]))) - (((env["vwap"]) + (env["high"])))), const("alpha101.77.const.001", 20.0451))), env["rank"](env["decay_linear"](env["ts_corr"](((((env["high"]) + (env["low"]))) / (2)), env["adv40"], const("alpha101.77.const.002", 3.1614)), const("alpha101.77.const.003", 5.64125))))
+    return env["min"](
+        env["rank"](
+            env["decay_linear"](
+                (
+                    ((((env["high"]) + (env["low"])) / (2)) + (env["high"]))
+                    - ((env["vwap"]) + (env["high"]))
+                ),
+                const("alpha101.77.const.001", 20.0451),
+            )
+        ),
+        env["rank"](
+            env["decay_linear"](
+                env["ts_corr"](
+                    (((env["high"]) + (env["low"])) / (2)),
+                    env["adv40"],
+                    const("alpha101.77.const.002", 3.1614),
+                ),
+                const("alpha101.77.const.003", 5.64125),
+            )
+        ),
+    )
+
 
 def alpha_078_program(env, const):
-    return ((env["rank"](env["ts_corr"](env["ts_sum"](((((env["low"]) * (const("alpha101.78.const.001", 0.352233)))) + (((env["vwap"]) * (((1) - (const("alpha101.78.const.002", 0.352233))))))), const("alpha101.78.const.003", 19.7428)), env["ts_sum"](env["adv40"], const("alpha101.78.const.004", 19.7428)), const("alpha101.78.const.005", 6.83313)))) ** (env["rank"](env["ts_corr"](env["rank"](env["vwap"]), env["rank"](env["volume"]), const("alpha101.78.const.006", 5.77492)))))
+    return (
+        env["rank"](
+            env["ts_corr"](
+                env["ts_sum"](
+                    (
+                        ((env["low"]) * (const("alpha101.78.const.001", 0.352233)))
+                        + ((env["vwap"]) * ((1) - (const("alpha101.78.const.002", 0.352233))))
+                    ),
+                    const("alpha101.78.const.003", 19.7428),
+                ),
+                env["ts_sum"](env["adv40"], const("alpha101.78.const.004", 19.7428)),
+                const("alpha101.78.const.005", 6.83313),
+            )
+        )
+    ) ** (
+        env["rank"](
+            env["ts_corr"](
+                env["rank"](env["vwap"]),
+                env["rank"](env["volume"]),
+                const("alpha101.78.const.006", 5.77492),
+            )
+        )
+    )
+
 
 def alpha_079_program(env, const):
-    return ((env["rank"](env["delta"](env["indneutralize"](((((env["close"]) * (const("alpha101.79.const.001", 0.60733)))) + (((env["open"]) * (((1) - (const("alpha101.79.const.002", 0.60733))))))), env["sector"]), const("alpha101.79.const.003", 1.23438)))) < (env["rank"](env["ts_corr"](env["ts_rank"](env["vwap"], const("alpha101.79.const.004", 3.60973)), env["ts_rank"](env["adv150"], const("alpha101.79.const.005", 9.18637)), const("alpha101.79.const.006", 14.6644)))))
+    return (
+        env["rank"](
+            env["delta"](
+                env["indneutralize"](
+                    (
+                        ((env["close"]) * (const("alpha101.79.const.001", 0.60733)))
+                        + ((env["open"]) * ((1) - (const("alpha101.79.const.002", 0.60733))))
+                    ),
+                    env["sector"],
+                ),
+                const("alpha101.79.const.003", 1.23438),
+            )
+        )
+    ) < (
+        env["rank"](
+            env["ts_corr"](
+                env["ts_rank"](env["vwap"], const("alpha101.79.const.004", 3.60973)),
+                env["ts_rank"](env["adv150"], const("alpha101.79.const.005", 9.18637)),
+                const("alpha101.79.const.006", 14.6644),
+            )
+        )
+    )
+
 
 def alpha_080_program(env, const):
-    return ((((env["rank"](env["sign"](env["delta"](env["indneutralize"](((((env["open"]) * (const("alpha101.80.const.001", 0.868128)))) + (((env["high"]) * (((1) - (const("alpha101.80.const.002", 0.868128))))))), env["industry"]), const("alpha101.80.const.003", 4.04545))))) ** (env["ts_rank"](env["ts_corr"](env["high"], env["adv10"], const("alpha101.80.const.004", 5.11456)), const("alpha101.80.const.005", 5.53756))))) * ((-(1))))
+    return (
+        (
+            env["rank"](
+                env["sign"](
+                    env["delta"](
+                        env["indneutralize"](
+                            (
+                                ((env["open"]) * (const("alpha101.80.const.001", 0.868128)))
+                                + (
+                                    (env["high"])
+                                    * ((1) - (const("alpha101.80.const.002", 0.868128)))
+                                )
+                            ),
+                            env["industry"],
+                        ),
+                        const("alpha101.80.const.003", 4.04545),
+                    )
+                )
+            )
+        )
+        ** (
+            env["ts_rank"](
+                env["ts_corr"](env["high"], env["adv10"], const("alpha101.80.const.004", 5.11456)),
+                const("alpha101.80.const.005", 5.53756),
+            )
+        )
+    ) * (-(1))
+
 
 def alpha_081_program(env, const):
-    return ((((env["rank"](env["log"](env["ts_product"](env["rank"](((env["rank"](env["ts_corr"](env["vwap"], env["ts_sum"](env["adv10"], const("alpha101.81.const.001", 49.6054)), const("alpha101.81.const.002", 8.47743)))) ** (4))), const("alpha101.81.const.003", 14.9655))))) < (env["rank"](env["ts_corr"](env["rank"](env["vwap"]), env["rank"](env["volume"]), const("alpha101.81.const.004", 5.07914)))))) * ((-(1))))
+    return (
+        (
+            env["rank"](
+                env["log"](
+                    env["ts_product"](
+                        env["rank"](
+                            (
+                                (
+                                    env["rank"](
+                                        env["ts_corr"](
+                                            env["vwap"],
+                                            env["ts_sum"](
+                                                env["adv10"],
+                                                const("alpha101.81.const.001", 49.6054),
+                                            ),
+                                            const("alpha101.81.const.002", 8.47743),
+                                        )
+                                    )
+                                )
+                                ** (4)
+                            )
+                        ),
+                        const("alpha101.81.const.003", 14.9655),
+                    )
+                )
+            )
+        )
+        < (
+            env["rank"](
+                env["ts_corr"](
+                    env["rank"](env["vwap"]),
+                    env["rank"](env["volume"]),
+                    const("alpha101.81.const.004", 5.07914),
+                )
+            )
+        )
+    ) * (-(1))
+
 
 def alpha_082_program(env, const):
-    return ((env["min"](env["rank"](env["decay_linear"](env["delta"](env["open"], const("alpha101.82.const.001", 1.46063)), const("alpha101.82.const.002", 14.8717))), env["ts_rank"](env["decay_linear"](env["ts_corr"](env["indneutralize"](env["volume"], env["sector"]), ((((env["open"]) * (const("alpha101.82.const.003", 0.634196)))) + (((env["open"]) * (((1) - (const("alpha101.82.const.004", 0.634196))))))), const("alpha101.82.const.005", 17.4842)), const("alpha101.82.const.006", 6.92131)), const("alpha101.82.const.007", 13.4283)))) * ((-(1))))
+    return (
+        env["min"](
+            env["rank"](
+                env["decay_linear"](
+                    env["delta"](env["open"], const("alpha101.82.const.001", 1.46063)),
+                    const("alpha101.82.const.002", 14.8717),
+                )
+            ),
+            env["ts_rank"](
+                env["decay_linear"](
+                    env["ts_corr"](
+                        env["indneutralize"](env["volume"], env["sector"]),
+                        (
+                            ((env["open"]) * (const("alpha101.82.const.003", 0.634196)))
+                            + ((env["open"]) * ((1) - (const("alpha101.82.const.004", 0.634196))))
+                        ),
+                        const("alpha101.82.const.005", 17.4842),
+                    ),
+                    const("alpha101.82.const.006", 6.92131),
+                ),
+                const("alpha101.82.const.007", 13.4283),
+            ),
+        )
+    ) * (-(1))
+
 
 def alpha_083_program(env, const):
-    return ((((env["rank"](env["delay"](((((env["high"]) - (env["low"]))) / (((env["ts_sum"](env["close"], const("alpha101.83.const.001", 5.0))) / (const("alpha101.83.const.002", 5.0))))), 2))) * (env["rank"](env["rank"](env["volume"]))))) / (((((((env["high"]) - (env["low"]))) / (((env["ts_sum"](env["close"], const("alpha101.83.const.003", 5.0))) / (const("alpha101.83.const.004", 5.0)))))) / (((env["vwap"]) - (env["close"]))))))
+    return (
+        (
+            env["rank"](
+                env["delay"](
+                    (
+                        ((env["high"]) - (env["low"]))
+                        / (
+                            (env["ts_sum"](env["close"], const("alpha101.83.const.001", 5.0)))
+                            / (const("alpha101.83.const.002", 5.0))
+                        )
+                    ),
+                    2,
+                )
+            )
+        )
+        * (env["rank"](env["rank"](env["volume"])))
+    ) / (
+        (
+            ((env["high"]) - (env["low"]))
+            / (
+                (env["ts_sum"](env["close"], const("alpha101.83.const.003", 5.0)))
+                / (const("alpha101.83.const.004", 5.0))
+            )
+        )
+        / ((env["vwap"]) - (env["close"]))
+    )
+
 
 def alpha_084_program(env, const):
-    return env["signed_power"](env["ts_rank"](((env["vwap"]) - (env["ts_max"](env["vwap"], const("alpha101.84.const.001", 15.3217)))), const("alpha101.84.const.002", 20.7127)), env["delta"](env["close"], const("alpha101.84.const.003", 4.96796)))
+    return env["signed_power"](
+        env["ts_rank"](
+            ((env["vwap"]) - (env["ts_max"](env["vwap"], const("alpha101.84.const.001", 15.3217)))),
+            const("alpha101.84.const.002", 20.7127),
+        ),
+        env["delta"](env["close"], const("alpha101.84.const.003", 4.96796)),
+    )
+
 
 def alpha_085_program(env, const):
-    return ((env["rank"](env["ts_corr"](((((env["high"]) * (const("alpha101.85.const.001", 0.876703)))) + (((env["close"]) * (((1) - (const("alpha101.85.const.002", 0.876703))))))), env["adv30"], const("alpha101.85.const.003", 9.61331)))) ** (env["rank"](env["ts_corr"](env["ts_rank"](((((env["high"]) + (env["low"]))) / (2)), const("alpha101.85.const.004", 3.70596)), env["ts_rank"](env["volume"], const("alpha101.85.const.005", 10.1595)), const("alpha101.85.const.006", 7.11408)))))
+    return (
+        env["rank"](
+            env["ts_corr"](
+                (
+                    ((env["high"]) * (const("alpha101.85.const.001", 0.876703)))
+                    + ((env["close"]) * ((1) - (const("alpha101.85.const.002", 0.876703))))
+                ),
+                env["adv30"],
+                const("alpha101.85.const.003", 9.61331),
+            )
+        )
+    ) ** (
+        env["rank"](
+            env["ts_corr"](
+                env["ts_rank"](
+                    (((env["high"]) + (env["low"])) / (2)), const("alpha101.85.const.004", 3.70596)
+                ),
+                env["ts_rank"](env["volume"], const("alpha101.85.const.005", 10.1595)),
+                const("alpha101.85.const.006", 7.11408),
+            )
+        )
+    )
+
 
 def alpha_086_program(env, const):
-    return ((((env["ts_rank"](env["ts_corr"](env["close"], env["ts_sum"](env["adv20"], const("alpha101.86.const.001", 14.7444)), const("alpha101.86.const.002", 6.00049)), const("alpha101.86.const.003", 20.4195))) < (env["rank"](((((env["open"]) + (env["close"]))) - (((env["vwap"]) + (env["open"])))))))) * ((-(1))))
+    return (
+        (
+            env["ts_rank"](
+                env["ts_corr"](
+                    env["close"],
+                    env["ts_sum"](env["adv20"], const("alpha101.86.const.001", 14.7444)),
+                    const("alpha101.86.const.002", 6.00049),
+                ),
+                const("alpha101.86.const.003", 20.4195),
+            )
+        )
+        < (env["rank"]((((env["open"]) + (env["close"])) - ((env["vwap"]) + (env["open"])))))
+    ) * (-(1))
+
 
 def alpha_087_program(env, const):
-    return ((env["max"](env["rank"](env["decay_linear"](env["delta"](((((env["close"]) * (const("alpha101.87.const.001", 0.369701)))) + (((env["vwap"]) * (((1) - (const("alpha101.87.const.002", 0.369701))))))), const("alpha101.87.const.003", 1.91233)), const("alpha101.87.const.004", 2.65461))), env["ts_rank"](env["decay_linear"](env["abs"](env["ts_corr"](env["indneutralize"](env["adv81"], env["industry"]), env["close"], const("alpha101.87.const.005", 13.4132))), const("alpha101.87.const.006", 4.89768)), const("alpha101.87.const.007", 14.4535)))) * ((-(1))))
+    return (
+        env["max"](
+            env["rank"](
+                env["decay_linear"](
+                    env["delta"](
+                        (
+                            ((env["close"]) * (const("alpha101.87.const.001", 0.369701)))
+                            + ((env["vwap"]) * ((1) - (const("alpha101.87.const.002", 0.369701))))
+                        ),
+                        const("alpha101.87.const.003", 1.91233),
+                    ),
+                    const("alpha101.87.const.004", 2.65461),
+                )
+            ),
+            env["ts_rank"](
+                env["decay_linear"](
+                    env["abs"](
+                        env["ts_corr"](
+                            env["indneutralize"](env["adv81"], env["industry"]),
+                            env["close"],
+                            const("alpha101.87.const.005", 13.4132),
+                        )
+                    ),
+                    const("alpha101.87.const.006", 4.89768),
+                ),
+                const("alpha101.87.const.007", 14.4535),
+            ),
+        )
+    ) * (-(1))
+
 
 def alpha_088_program(env, const):
-    return env["min"](env["rank"](env["decay_linear"](((((env["rank"](env["open"])) + (env["rank"](env["low"])))) - (((env["rank"](env["high"])) + (env["rank"](env["close"]))))), const("alpha101.88.const.001", 8.06882))), env["ts_rank"](env["decay_linear"](env["ts_corr"](env["ts_rank"](env["close"], const("alpha101.88.const.002", 8.44728)), env["ts_rank"](env["adv60"], const("alpha101.88.const.003", 20.6966)), const("alpha101.88.const.004", 8.01266)), const("alpha101.88.const.005", 6.65053)), const("alpha101.88.const.006", 2.61957)))
+    return env["min"](
+        env["rank"](
+            env["decay_linear"](
+                (
+                    ((env["rank"](env["open"])) + (env["rank"](env["low"])))
+                    - ((env["rank"](env["high"])) + (env["rank"](env["close"])))
+                ),
+                const("alpha101.88.const.001", 8.06882),
+            )
+        ),
+        env["ts_rank"](
+            env["decay_linear"](
+                env["ts_corr"](
+                    env["ts_rank"](env["close"], const("alpha101.88.const.002", 8.44728)),
+                    env["ts_rank"](env["adv60"], const("alpha101.88.const.003", 20.6966)),
+                    const("alpha101.88.const.004", 8.01266),
+                ),
+                const("alpha101.88.const.005", 6.65053),
+            ),
+            const("alpha101.88.const.006", 2.61957),
+        ),
+    )
+
 
 def alpha_089_program(env, const):
-    return ((env["ts_rank"](env["decay_linear"](env["ts_corr"](((((env["low"]) * (const("alpha101.89.const.001", 0.967285)))) + (((env["low"]) * (((1) - (const("alpha101.89.const.002", 0.967285))))))), env["adv10"], const("alpha101.89.const.003", 6.94279)), const("alpha101.89.const.004", 5.51607)), const("alpha101.89.const.005", 3.79744))) - (env["ts_rank"](env["decay_linear"](env["delta"](env["indneutralize"](env["vwap"], env["industry"]), const("alpha101.89.const.006", 3.48158)), const("alpha101.89.const.007", 10.1466)), const("alpha101.89.const.008", 15.3012))))
+    return (
+        env["ts_rank"](
+            env["decay_linear"](
+                env["ts_corr"](
+                    (
+                        ((env["low"]) * (const("alpha101.89.const.001", 0.967285)))
+                        + ((env["low"]) * ((1) - (const("alpha101.89.const.002", 0.967285))))
+                    ),
+                    env["adv10"],
+                    const("alpha101.89.const.003", 6.94279),
+                ),
+                const("alpha101.89.const.004", 5.51607),
+            ),
+            const("alpha101.89.const.005", 3.79744),
+        )
+    ) - (
+        env["ts_rank"](
+            env["decay_linear"](
+                env["delta"](
+                    env["indneutralize"](env["vwap"], env["industry"]),
+                    const("alpha101.89.const.006", 3.48158),
+                ),
+                const("alpha101.89.const.007", 10.1466),
+            ),
+            const("alpha101.89.const.008", 15.3012),
+        )
+    )
+
 
 def alpha_090_program(env, const):
-    return ((((env["rank"](((env["close"]) - (env["ts_max"](env["close"], const("alpha101.90.const.001", 4.66719)))))) ** (env["ts_rank"](env["ts_corr"](env["indneutralize"](env["adv40"], env["subindustry"]), env["low"], const("alpha101.90.const.002", 5.38375)), const("alpha101.90.const.003", 3.21856))))) * ((-(1))))
+    return (
+        (
+            env["rank"](
+                (
+                    (env["close"])
+                    - (env["ts_max"](env["close"], const("alpha101.90.const.001", 4.66719)))
+                )
+            )
+        )
+        ** (
+            env["ts_rank"](
+                env["ts_corr"](
+                    env["indneutralize"](env["adv40"], env["subindustry"]),
+                    env["low"],
+                    const("alpha101.90.const.002", 5.38375),
+                ),
+                const("alpha101.90.const.003", 3.21856),
+            )
+        )
+    ) * (-(1))
+
 
 def alpha_091_program(env, const):
-    return ((((env["ts_rank"](env["decay_linear"](env["decay_linear"](env["ts_corr"](env["indneutralize"](env["close"], env["industry"]), env["volume"], const("alpha101.91.const.001", 9.74928)), const("alpha101.91.const.002", 16.398)), const("alpha101.91.const.003", 3.83219)), const("alpha101.91.const.004", 4.8667))) - (env["rank"](env["decay_linear"](env["ts_corr"](env["vwap"], env["adv30"], const("alpha101.91.const.005", 4.01303)), const("alpha101.91.const.006", 2.6809)))))) * ((-(1))))
+    return (
+        (
+            env["ts_rank"](
+                env["decay_linear"](
+                    env["decay_linear"](
+                        env["ts_corr"](
+                            env["indneutralize"](env["close"], env["industry"]),
+                            env["volume"],
+                            const("alpha101.91.const.001", 9.74928),
+                        ),
+                        const("alpha101.91.const.002", 16.398),
+                    ),
+                    const("alpha101.91.const.003", 3.83219),
+                ),
+                const("alpha101.91.const.004", 4.8667),
+            )
+        )
+        - (
+            env["rank"](
+                env["decay_linear"](
+                    env["ts_corr"](
+                        env["vwap"], env["adv30"], const("alpha101.91.const.005", 4.01303)
+                    ),
+                    const("alpha101.91.const.006", 2.6809),
+                )
+            )
+        )
+    ) * (-(1))
+
 
 def alpha_092_program(env, const):
-    return env["min"](env["ts_rank"](env["decay_linear"](((((((((env["high"]) + (env["low"]))) / (2))) + (env["close"]))) < (((env["low"]) + (env["open"])))), const("alpha101.92.const.001", 14.7221)), const("alpha101.92.const.002", 18.8683)), env["ts_rank"](env["decay_linear"](env["ts_corr"](env["rank"](env["low"]), env["rank"](env["adv30"]), const("alpha101.92.const.003", 7.58555)), const("alpha101.92.const.004", 6.94024)), const("alpha101.92.const.005", 6.80584)))
+    return env["min"](
+        env["ts_rank"](
+            env["decay_linear"](
+                (
+                    ((((env["high"]) + (env["low"])) / (2)) + (env["close"]))
+                    < ((env["low"]) + (env["open"]))
+                ),
+                const("alpha101.92.const.001", 14.7221),
+            ),
+            const("alpha101.92.const.002", 18.8683),
+        ),
+        env["ts_rank"](
+            env["decay_linear"](
+                env["ts_corr"](
+                    env["rank"](env["low"]),
+                    env["rank"](env["adv30"]),
+                    const("alpha101.92.const.003", 7.58555),
+                ),
+                const("alpha101.92.const.004", 6.94024),
+            ),
+            const("alpha101.92.const.005", 6.80584),
+        ),
+    )
+
 
 def alpha_093_program(env, const):
-    return ((env["ts_rank"](env["decay_linear"](env["ts_corr"](env["indneutralize"](env["vwap"], env["industry"]), env["adv81"], const("alpha101.93.const.001", 17.4193)), const("alpha101.93.const.002", 19.848)), const("alpha101.93.const.003", 7.54455))) / (env["rank"](env["decay_linear"](env["delta"](((((env["close"]) * (const("alpha101.93.const.004", 0.524434)))) + (((env["vwap"]) * (((1) - (const("alpha101.93.const.005", 0.524434))))))), const("alpha101.93.const.006", 2.77377)), const("alpha101.93.const.007", 16.2664)))))
+    return (
+        env["ts_rank"](
+            env["decay_linear"](
+                env["ts_corr"](
+                    env["indneutralize"](env["vwap"], env["industry"]),
+                    env["adv81"],
+                    const("alpha101.93.const.001", 17.4193),
+                ),
+                const("alpha101.93.const.002", 19.848),
+            ),
+            const("alpha101.93.const.003", 7.54455),
+        )
+    ) / (
+        env["rank"](
+            env["decay_linear"](
+                env["delta"](
+                    (
+                        ((env["close"]) * (const("alpha101.93.const.004", 0.524434)))
+                        + ((env["vwap"]) * ((1) - (const("alpha101.93.const.005", 0.524434))))
+                    ),
+                    const("alpha101.93.const.006", 2.77377),
+                ),
+                const("alpha101.93.const.007", 16.2664),
+            )
+        )
+    )
+
 
 def alpha_094_program(env, const):
-    return ((((env["rank"](((env["vwap"]) - (env["ts_min"](env["vwap"], const("alpha101.94.const.001", 11.5783)))))) ** (env["ts_rank"](env["ts_corr"](env["ts_rank"](env["vwap"], const("alpha101.94.const.002", 19.6462)), env["ts_rank"](env["adv60"], const("alpha101.94.const.003", 4.02992)), const("alpha101.94.const.004", 18.0926)), const("alpha101.94.const.005", 2.70756))))) * ((-(1))))
+    return (
+        (
+            env["rank"](
+                (
+                    (env["vwap"])
+                    - (env["ts_min"](env["vwap"], const("alpha101.94.const.001", 11.5783)))
+                )
+            )
+        )
+        ** (
+            env["ts_rank"](
+                env["ts_corr"](
+                    env["ts_rank"](env["vwap"], const("alpha101.94.const.002", 19.6462)),
+                    env["ts_rank"](env["adv60"], const("alpha101.94.const.003", 4.02992)),
+                    const("alpha101.94.const.004", 18.0926),
+                ),
+                const("alpha101.94.const.005", 2.70756),
+            )
+        )
+    ) * (-(1))
+
 
 def alpha_095_program(env, const):
-    return ((env["rank"](((env["open"]) - (env["ts_min"](env["open"], const("alpha101.95.const.001", 12.4105)))))) < (env["ts_rank"](((env["rank"](env["ts_corr"](env["ts_sum"](((((env["high"]) + (env["low"]))) / (2)), const("alpha101.95.const.002", 19.1351)), env["ts_sum"](env["adv40"], const("alpha101.95.const.003", 19.1351)), const("alpha101.95.const.004", 12.8742)))) ** (const("alpha101.95.const.005", 5.0))), const("alpha101.95.const.006", 11.7584))))
+    return (
+        env["rank"](
+            ((env["open"]) - (env["ts_min"](env["open"], const("alpha101.95.const.001", 12.4105))))
+        )
+    ) < (
+        env["ts_rank"](
+            (
+                (
+                    env["rank"](
+                        env["ts_corr"](
+                            env["ts_sum"](
+                                (((env["high"]) + (env["low"])) / (2)),
+                                const("alpha101.95.const.002", 19.1351),
+                            ),
+                            env["ts_sum"](env["adv40"], const("alpha101.95.const.003", 19.1351)),
+                            const("alpha101.95.const.004", 12.8742),
+                        )
+                    )
+                )
+                ** (const("alpha101.95.const.005", 5.0))
+            ),
+            const("alpha101.95.const.006", 11.7584),
+        )
+    )
+
 
 def alpha_096_program(env, const):
-    return ((env["max"](env["ts_rank"](env["decay_linear"](env["ts_corr"](env["rank"](env["vwap"]), env["rank"](env["volume"]), const("alpha101.96.const.001", 3.83878)), const("alpha101.96.const.002", 4.16783)), const("alpha101.96.const.003", 8.38151)), env["ts_rank"](env["decay_linear"](env["ts_argmax"](env["ts_corr"](env["ts_rank"](env["close"], const("alpha101.96.const.004", 7.45404)), env["ts_rank"](env["adv60"], const("alpha101.96.const.005", 4.13242)), const("alpha101.96.const.006", 3.65459)), const("alpha101.96.const.007", 12.6556)), const("alpha101.96.const.008", 14.0365)), const("alpha101.96.const.009", 13.4143)))) * ((-(1))))
+    return (
+        env["max"](
+            env["ts_rank"](
+                env["decay_linear"](
+                    env["ts_corr"](
+                        env["rank"](env["vwap"]),
+                        env["rank"](env["volume"]),
+                        const("alpha101.96.const.001", 3.83878),
+                    ),
+                    const("alpha101.96.const.002", 4.16783),
+                ),
+                const("alpha101.96.const.003", 8.38151),
+            ),
+            env["ts_rank"](
+                env["decay_linear"](
+                    env["ts_argmax"](
+                        env["ts_corr"](
+                            env["ts_rank"](env["close"], const("alpha101.96.const.004", 7.45404)),
+                            env["ts_rank"](env["adv60"], const("alpha101.96.const.005", 4.13242)),
+                            const("alpha101.96.const.006", 3.65459),
+                        ),
+                        const("alpha101.96.const.007", 12.6556),
+                    ),
+                    const("alpha101.96.const.008", 14.0365),
+                ),
+                const("alpha101.96.const.009", 13.4143),
+            ),
+        )
+    ) * (-(1))
+
 
 def alpha_097_program(env, const):
-    return ((((env["rank"](env["decay_linear"](env["delta"](env["indneutralize"](((((env["low"]) * (const("alpha101.97.const.001", 0.721001)))) + (((env["vwap"]) * (((1) - (const("alpha101.97.const.002", 0.721001))))))), env["industry"]), const("alpha101.97.const.003", 3.3705)), const("alpha101.97.const.004", 20.4523)))) - (env["ts_rank"](env["decay_linear"](env["ts_rank"](env["ts_corr"](env["ts_rank"](env["low"], const("alpha101.97.const.005", 7.87871)), env["ts_rank"](env["adv60"], const("alpha101.97.const.006", 17.255)), const("alpha101.97.const.007", 4.97547)), const("alpha101.97.const.008", 18.5925)), const("alpha101.97.const.009", 15.7152)), const("alpha101.97.const.010", 6.71659))))) * ((-(1))))
+    return (
+        (
+            env["rank"](
+                env["decay_linear"](
+                    env["delta"](
+                        env["indneutralize"](
+                            (
+                                ((env["low"]) * (const("alpha101.97.const.001", 0.721001)))
+                                + (
+                                    (env["vwap"])
+                                    * ((1) - (const("alpha101.97.const.002", 0.721001)))
+                                )
+                            ),
+                            env["industry"],
+                        ),
+                        const("alpha101.97.const.003", 3.3705),
+                    ),
+                    const("alpha101.97.const.004", 20.4523),
+                )
+            )
+        )
+        - (
+            env["ts_rank"](
+                env["decay_linear"](
+                    env["ts_rank"](
+                        env["ts_corr"](
+                            env["ts_rank"](env["low"], const("alpha101.97.const.005", 7.87871)),
+                            env["ts_rank"](env["adv60"], const("alpha101.97.const.006", 17.255)),
+                            const("alpha101.97.const.007", 4.97547),
+                        ),
+                        const("alpha101.97.const.008", 18.5925),
+                    ),
+                    const("alpha101.97.const.009", 15.7152),
+                ),
+                const("alpha101.97.const.010", 6.71659),
+            )
+        )
+    ) * (-(1))
+
 
 def alpha_098_program(env, const):
-    return ((env["rank"](env["decay_linear"](env["ts_corr"](env["vwap"], env["ts_sum"](env["adv5"], const("alpha101.98.const.001", 26.4719)), const("alpha101.98.const.002", 4.58418)), const("alpha101.98.const.003", 7.18088)))) - (env["rank"](env["decay_linear"](env["ts_rank"](env["ts_argmin"](env["ts_corr"](env["rank"](env["open"]), env["rank"](env["adv15"]), const("alpha101.98.const.004", 20.8187)), const("alpha101.98.const.005", 8.62571)), const("alpha101.98.const.006", 6.95668)), const("alpha101.98.const.007", 8.07206)))))
+    return (
+        env["rank"](
+            env["decay_linear"](
+                env["ts_corr"](
+                    env["vwap"],
+                    env["ts_sum"](env["adv5"], const("alpha101.98.const.001", 26.4719)),
+                    const("alpha101.98.const.002", 4.58418),
+                ),
+                const("alpha101.98.const.003", 7.18088),
+            )
+        )
+    ) - (
+        env["rank"](
+            env["decay_linear"](
+                env["ts_rank"](
+                    env["ts_argmin"](
+                        env["ts_corr"](
+                            env["rank"](env["open"]),
+                            env["rank"](env["adv15"]),
+                            const("alpha101.98.const.004", 20.8187),
+                        ),
+                        const("alpha101.98.const.005", 8.62571),
+                    ),
+                    const("alpha101.98.const.006", 6.95668),
+                ),
+                const("alpha101.98.const.007", 8.07206),
+            )
+        )
+    )
+
 
 def alpha_099_program(env, const):
-    return ((((env["rank"](env["ts_corr"](env["ts_sum"](((((env["high"]) + (env["low"]))) / (2)), const("alpha101.99.const.001", 19.8975)), env["ts_sum"](env["adv60"], const("alpha101.99.const.002", 19.8975)), const("alpha101.99.const.003", 8.8136)))) < (env["rank"](env["ts_corr"](env["low"], env["volume"], const("alpha101.99.const.004", 6.28259)))))) * ((-(1))))
+    return (
+        (
+            env["rank"](
+                env["ts_corr"](
+                    env["ts_sum"](
+                        (((env["high"]) + (env["low"])) / (2)),
+                        const("alpha101.99.const.001", 19.8975),
+                    ),
+                    env["ts_sum"](env["adv60"], const("alpha101.99.const.002", 19.8975)),
+                    const("alpha101.99.const.003", 8.8136),
+                )
+            )
+        )
+        < (
+            env["rank"](
+                env["ts_corr"](env["low"], env["volume"], const("alpha101.99.const.004", 6.28259))
+            )
+        )
+    ) * (-(1))
+
 
 def alpha_100_program(env, const):
-    return ((0) - (((1) * (((((((const("alpha101.100.const.001", 1.5)) * (env["scale"](env["indneutralize"](env["indneutralize"](env["rank"](((((((((env["close"]) - (env["low"]))) - (((env["high"]) - (env["close"]))))) / (((env["high"]) - (env["low"]))))) * (env["volume"]))), env["subindustry"]), env["subindustry"]))))) - (env["scale"](env["indneutralize"](((env["ts_corr"](env["close"], env["rank"](env["adv20"]), const("alpha101.100.const.002", 5.0))) - (env["rank"](env["ts_argmin"](env["close"], const("alpha101.100.const.003", 30.0))))), env["subindustry"]))))) * (((env["volume"]) / (env["adv20"]))))))))
+    return (0) - (
+        (1)
+        * (
+            (
+                (
+                    (const("alpha101.100.const.001", 1.5))
+                    * (
+                        env["scale"](
+                            env["indneutralize"](
+                                env["indneutralize"](
+                                    env["rank"](
+                                        (
+                                            (
+                                                (
+                                                    ((env["close"]) - (env["low"]))
+                                                    - ((env["high"]) - (env["close"]))
+                                                )
+                                                / ((env["high"]) - (env["low"]))
+                                            )
+                                            * (env["volume"])
+                                        )
+                                    ),
+                                    env["subindustry"],
+                                ),
+                                env["subindustry"],
+                            )
+                        )
+                    )
+                )
+                - (
+                    env["scale"](
+                        env["indneutralize"](
+                            (
+                                (
+                                    env["ts_corr"](
+                                        env["close"],
+                                        env["rank"](env["adv20"]),
+                                        const("alpha101.100.const.002", 5.0),
+                                    )
+                                )
+                                - (
+                                    env["rank"](
+                                        env["ts_argmin"](
+                                            env["close"], const("alpha101.100.const.003", 30.0)
+                                        )
+                                    )
+                                )
+                            ),
+                            env["subindustry"],
+                        )
+                    )
+                )
+            )
+            * ((env["volume"]) / (env["adv20"]))
+        )
+    )
+
 
 def alpha_101_program(env, const):
-    return ((((env["close"]) - (env["open"]))) / (((((env["high"]) - (env["low"]))) + (const("alpha101.101.const.001", 0.001)))))
+    return ((env["close"]) - (env["open"])) / (
+        ((env["high"]) - (env["low"])) + (const("alpha101.101.const.001", 0.001))
+    )
+
 
 ALPHA_PROGRAM_DEFINITIONS: dict[int, AlphaProgramDefinition] = {
     1: AlphaProgramDefinition(

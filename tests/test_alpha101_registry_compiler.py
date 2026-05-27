@@ -18,8 +18,7 @@ def _sample_payload(size: int = 280) -> dict[str, list[float]]:
     lows = [value - 0.4 for value in closes]
     volumes = [1000.0 + (2.5 * idx) for idx in range(size)]
     vwaps = [
-        ((high + low + close) / 3.0)
-        for high, low, close in zip(highs, lows, closes, strict=False)
+        ((high + low + close) / 3.0) for high, low, close in zip(highs, lows, closes, strict=False)
     ]
     return {
         "opens": opens,

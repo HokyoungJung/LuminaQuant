@@ -51,7 +51,9 @@ def _build_from_switch(switch_payload: dict[str, Any], *, switch_path: Path) -> 
     selected_mode = str(recommended_mode.get("mode") or "").strip()
     if not selected_mode:
         raise ValueError("switch artifact is missing recommended_mode.mode")
-    rationale = [str(item) for item in list(switch_payload.get("rationale") or []) if str(item).strip()]
+    rationale = [
+        str(item) for item in list(switch_payload.get("rationale") or []) if str(item).strip()
+    ]
     current_market_state = dict(switch_payload.get("current_market_state") or {})
     return {
         "artifact_kind": "portfolio_live_readiness_decision",
@@ -61,7 +63,9 @@ def _build_from_switch(switch_payload: dict[str, Any], *, switch_path: Path) -> 
         "candidate_mode": selected_mode,
         "candidate_key": selected_mode,
         "selection_basis": "current_operating_switch",
-        "decision_reason": rationale[-1] if rationale else f"Use the current operating switch recommendation: {selected_mode}.",
+        "decision_reason": rationale[-1]
+        if rationale
+        else f"Use the current operating switch recommendation: {selected_mode}.",
         "source_artifacts": {
             "switch_path": str(switch_path.resolve()),
         },
@@ -69,7 +73,9 @@ def _build_from_switch(switch_payload: dict[str, Any], *, switch_path: Path) -> 
     }
 
 
-def _build_from_max_perf(max_perf_payload: dict[str, Any], *, max_perf_path: Path) -> dict[str, Any]:
+def _build_from_max_perf(
+    max_perf_payload: dict[str, Any], *, max_perf_path: Path
+) -> dict[str, Any]:
     winner = dict(max_perf_payload.get("winner") or {})
     winner_status = str(winner.get("status") or "").strip().lower()
     winner_key = str(winner.get("candidate_key") or "").strip()
@@ -90,8 +96,11 @@ def _build_from_max_perf(max_perf_payload: dict[str, Any], *, max_perf_path: Pat
         "candidate_key": candidate_reference,
         "candidate_mode": "",
         "selected_mode": "",
-        "selection_basis": str(max_perf_payload.get("selection_basis") or "portfolio_max_performance_decision"),
-        "decision_reason": reason or (
+        "selection_basis": str(
+            max_perf_payload.get("selection_basis") or "portfolio_max_performance_decision"
+        ),
+        "decision_reason": reason
+        or (
             "No challenger cleared the locked-OOS robustness gates; keep the incumbent."
             if decision == "keep_incumbent"
             else f"Promote challenger {candidate_reference}."
@@ -112,9 +121,7 @@ def _build_from_review(review_payload: dict[str, Any], *, review_path: Path) -> 
     if not candidate_key and review_target:
         candidate_key = Path(review_target).stem
     selected_mode = str(
-        review_payload.get("selected_mode")
-        or review_payload.get("candidate_mode")
-        or ""
+        review_payload.get("selected_mode") or review_payload.get("candidate_mode") or ""
     ).strip()
     if not selected_mode and candidate_key == "strict_autoresearch_1x_practical_shadow_latest":
         selected_mode = "strict_autoresearch_practical_mode"
@@ -156,18 +163,26 @@ def build_live_readiness_decision(
 ) -> dict[str, Any]:
     resolved_review_path = Path(review_path).resolve()
     if prefer_review and resolved_review_path.exists():
-        return _build_from_review(_read_json(resolved_review_path), review_path=resolved_review_path)
+        return _build_from_review(
+            _read_json(resolved_review_path), review_path=resolved_review_path
+        )
 
     resolved_switch_path = Path(switch_path).resolve()
     if resolved_switch_path.exists():
-        return _build_from_switch(_read_json(resolved_switch_path), switch_path=resolved_switch_path)
+        return _build_from_switch(
+            _read_json(resolved_switch_path), switch_path=resolved_switch_path
+        )
 
     resolved_max_perf_path = Path(max_perf_path).resolve()
     if resolved_max_perf_path.exists():
-        return _build_from_max_perf(_read_json(resolved_max_perf_path), max_perf_path=resolved_max_perf_path)
+        return _build_from_max_perf(
+            _read_json(resolved_max_perf_path), max_perf_path=resolved_max_perf_path
+        )
 
     if resolved_review_path.exists():
-        return _build_from_review(_read_json(resolved_review_path), review_path=resolved_review_path)
+        return _build_from_review(
+            _read_json(resolved_review_path), review_path=resolved_review_path
+        )
 
     raise FileNotFoundError(
         "No live-readiness source artifact found. "

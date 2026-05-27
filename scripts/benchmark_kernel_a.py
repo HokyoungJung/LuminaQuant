@@ -23,6 +23,7 @@ def _load_compute_alpha101():
 
         return compute_alpha101, False
     except Exception:
+
         def _compute_alpha101(*_args, **_kwargs):
             return 0.0
 

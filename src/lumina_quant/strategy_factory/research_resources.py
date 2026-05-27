@@ -166,8 +166,7 @@ class ResearchResourceLoader:
                         if hasattr(frame, "is_empty") and not frame.is_empty()
                     ),
                     "total_rows": sum(
-                        int(getattr(frame, "height", 0) or 0)
-                        for frame in feature_cache.values()
+                        int(getattr(frame, "height", 0) or 0) for frame in feature_cache.values()
                     ),
                     "elapsed_seconds": round(max(0.0, perf_counter() - feature_started_at), 6),
                 },
@@ -191,6 +190,7 @@ class ResearchResourceLoader:
                 raise
             benchmark = self.benchmark_cache(cache, normalized_timeframes)
         if progress_callback is not None:
+
             def _benchmark_return_count(payload: Any) -> int:
                 if isinstance(payload, Mapping):
                     values = payload.get("returns", [])
@@ -207,9 +207,7 @@ class ResearchResourceLoader:
                     "timeframe_count": len(normalized_timeframes),
                     "elapsed_seconds": round(max(0.0, perf_counter() - benchmark_started_at), 6),
                     "nonempty_timeframe_count": sum(
-                        1
-                        for payload in benchmark.values()
-                        if _benchmark_return_count(payload) > 0
+                        1 for payload in benchmark.values() if _benchmark_return_count(payload) > 0
                     ),
                 },
             )

@@ -43,7 +43,9 @@ def _corr(x: np.ndarray, y: np.ndarray) -> float:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Export factor diagnostics from candidate research report.")
+    parser = argparse.ArgumentParser(
+        description="Export factor diagnostics from candidate research report."
+    )
     parser.add_argument("--report", default="reports/candidate_research_latest.json")
     parser.add_argument("--output-dir", default="reports")
     return parser
@@ -56,7 +58,9 @@ def main() -> int:
         raise RuntimeError(f"Report file not found: {report_path}")
 
     payload = json.loads(report_path.read_text(encoding="utf-8"))
-    candidates = [dict(row) for row in list(payload.get("candidates") or []) if isinstance(row, dict)]
+    candidates = [
+        dict(row) for row in list(payload.get("candidates") or []) if isinstance(row, dict)
+    ]
     if not candidates:
         raise RuntimeError("No candidates found in report.")
 

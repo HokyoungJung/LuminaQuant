@@ -196,7 +196,9 @@ def _build_trader(monkeypatch, config_cls=_Config) -> LiveTrader:
     monkeypatch.setattr("lumina_quant.live.trader.setup_logging", lambda _name: _Logger())
     monkeypatch.setattr("lumina_quant.live.trader.LiveConfig", config_cls)
     monkeypatch.setattr("lumina_quant.live.trader.StateManager", _StateManager)
-    monkeypatch.setattr("lumina_quant.live.trader.RiskManager", lambda cfg: SimpleNamespace(config=cfg))
+    monkeypatch.setattr(
+        "lumina_quant.live.trader.RiskManager", lambda cfg: SimpleNamespace(config=cfg)
+    )
     monkeypatch.setattr("lumina_quant.live.trader.RuntimeCache", lambda: SimpleNamespace())
     monkeypatch.setattr("lumina_quant.live.trader.NotificationManager", _Notifier)
     monkeypatch.setattr("lumina_quant.live.trader.AuditStore", _AuditStore)
@@ -253,7 +255,9 @@ def test_constructor_failure_still_emits_failure_notification(monkeypatch):
     monkeypatch.setattr("lumina_quant.live.trader.setup_logging", lambda _name: _Logger())
     monkeypatch.setattr("lumina_quant.live.trader.LiveConfig", _Config)
     monkeypatch.setattr("lumina_quant.live.trader.StateManager", _StateManager)
-    monkeypatch.setattr("lumina_quant.live.trader.RiskManager", lambda cfg: SimpleNamespace(config=cfg))
+    monkeypatch.setattr(
+        "lumina_quant.live.trader.RiskManager", lambda cfg: SimpleNamespace(config=cfg)
+    )
     monkeypatch.setattr("lumina_quant.live.trader.RuntimeCache", lambda: SimpleNamespace())
 
     class _CapturingNotifier:
@@ -266,7 +270,10 @@ def test_constructor_failure_still_emits_failure_notification(monkeypatch):
 
     monkeypatch.setattr("lumina_quant.live.trader.NotificationManager", _CapturingNotifier)
     monkeypatch.setattr("lumina_quant.live.trader.AuditStore", _AuditStore)
-    monkeypatch.setattr("lumina_quant.live.trader.get_exchange", lambda _cfg: (_ for _ in ()).throw(RuntimeError("exchange exploded")))
+    monkeypatch.setattr(
+        "lumina_quant.live.trader.get_exchange",
+        lambda _cfg: (_ for _ in ()).throw(RuntimeError("exchange exploded")),
+    )
 
     with pytest.raises(RuntimeError, match="exchange exploded"):
         LiveTrader(
@@ -277,9 +284,7 @@ def test_constructor_failure_still_emits_failure_notification(monkeypatch):
             strategy_cls=_Strategy,
         )
 
-    assert sent_messages == [
-        "🛑 **LuminaQuant Failed During Startup**\nReason: exchange exploded"
-    ]
+    assert sent_messages == ["🛑 **LuminaQuant Failed During Startup**\nReason: exchange exploded"]
 
 
 def test_degraded_startup_sends_degraded_notification_after_gate(monkeypatch):
@@ -307,7 +312,9 @@ def test_constructor_failure_after_audit_start_sends_failed_init_and_closes_run(
     monkeypatch.setattr("lumina_quant.live.trader.setup_logging", lambda _name: _Logger())
     monkeypatch.setattr("lumina_quant.live.trader.LiveConfig", _Config)
     monkeypatch.setattr("lumina_quant.live.trader.StateManager", _StateManager)
-    monkeypatch.setattr("lumina_quant.live.trader.RiskManager", lambda cfg: SimpleNamespace(config=cfg))
+    monkeypatch.setattr(
+        "lumina_quant.live.trader.RiskManager", lambda cfg: SimpleNamespace(config=cfg)
+    )
     monkeypatch.setattr("lumina_quant.live.trader.RuntimeCache", lambda: SimpleNamespace())
     monkeypatch.setattr("lumina_quant.live.trader.NotificationManager", _Notifier)
     monkeypatch.setattr("lumina_quant.live.trader.AuditStore", _AuditStore)

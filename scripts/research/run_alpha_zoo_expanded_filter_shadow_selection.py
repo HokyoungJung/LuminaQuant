@@ -108,7 +108,9 @@ def _csv_value(value: Any) -> Any:
 def _write_csv(path: Path, rows: Sequence[Mapping[str, Any]], fieldnames: Sequence[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(fieldnames), extrasaction="ignore", lineterminator="\n")
+        writer = csv.DictWriter(
+            handle, fieldnames=list(fieldnames), extrasaction="ignore", lineterminator="\n"
+        )
         writer.writeheader()
         for row in rows:
             writer.writerow({field: _csv_value(row.get(field)) for field in fieldnames})
@@ -132,7 +134,11 @@ def _metrics_by_model(retune: Mapping[str, Any]) -> dict[str, dict[str, dict[str
         split = str(row.get("split") or "")
         if model_id and split in high.SPLIT_ORDER:
             by_model.setdefault(model_id, {})[split] = dict(row)
-    return {model_id: splits for model_id, splits in by_model.items() if all(split in splits for split in high.SPLIT_ORDER)}
+    return {
+        model_id: splits
+        for model_id, splits in by_model.items()
+        if all(split in splits for split in high.SPLIT_ORDER)
+    }
 
 
 def _live_gate_pass(splits: Mapping[str, Mapping[str, Any]]) -> bool:
@@ -143,7 +149,9 @@ def _live_gate_pass(splits: Mapping[str, Mapping[str, Any]]) -> bool:
     )
 
 
-def _summary(model_id: str, splits: Mapping[str, Mapping[str, Any]], *, rank: int, role: str) -> dict[str, Any]:
+def _summary(
+    model_id: str, splits: Mapping[str, Mapping[str, Any]], *, rank: int, role: str
+) -> dict[str, Any]:
     train = dict(splits["train"])
     validation = dict(splits["validation"])
     locked = dict(splits["locked_oos"])
@@ -238,7 +246,10 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     output_dir = Path(args.output_dir).expanduser().resolve()
     expanded_path = Path(args.expanded_retune_json).expanduser().resolve()
     retune = _load_json(expanded_path)
-    if _safe_float(retune.get("round_trip_slippage_fee_bps_primary")) != PRIMARY_ROUND_TRIP_COST_BPS:
+    if (
+        _safe_float(retune.get("round_trip_slippage_fee_bps_primary"))
+        != PRIMARY_ROUND_TRIP_COST_BPS
+    ):
         raise ValueError("expanded shadow selection requires a 10bps retune artifact")
     rows = _candidate_rows(retune)
     positive_oos = [
@@ -254,7 +265,8 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
         row
         for row in positive_oos
         if row.get("candidate_name") == "alpha_zoo_high_confidence_long_only"
-        and dict(row.get("trade_filter_params") or {}).get("dominant_factor_family") == "crypto_residual_reversal"
+        and dict(row.get("trade_filter_params") or {}).get("dominant_factor_family")
+        == "crypto_residual_reversal"
     ]
     conservative = [
         row
@@ -263,7 +275,9 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
         and _safe_float(row.get("locked_oos_return")) > 0.0
         and _safe_float(row.get("locked_oos_liquidation_count")) == 0.0
     ]
-    conservative = _rank(conservative, role="conservative_exit_positive_oos_candidate", limit=int(args.top_n))
+    conservative = _rank(
+        conservative, role="conservative_exit_positive_oos_candidate", limit=int(args.top_n)
+    )
     live_rows = [row for row in rows if bool(row.get("live_promotable_10bps"))]
     timestamp = _timestamp()
     latest_json = output_dir / "alpha_zoo_expanded_filter_shadow_selection_latest.json"
@@ -284,7 +298,9 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
             "model_count": len(rows),
             "live_promotable_count": len(live_rows),
             "positive_oos_shadow_candidate_count": len(positive_oos),
-            "positive_oos_shadow_family": "alpha_zoo_high_confidence_long_only / crypto_residual_reversal" if long_only_reversal else None,
+            "positive_oos_shadow_family": "alpha_zoo_high_confidence_long_only / crypto_residual_reversal"
+            if long_only_reversal
+            else None,
             "conservative_exit_positive_oos_count": len(conservative),
             "retune_memory_summary": dict(retune.get("memory_summary") or {}),
             "candidate_universe_summary": dict(retune.get("candidate_universe_summary") or {}),

@@ -7,8 +7,12 @@ from pathlib import Path
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
-MODULE_PATH = ROOT / "scripts" / "research" / "run_alpha_zoo_debounced_efficiency_repair_discovery.py"
-SPEC = importlib.util.spec_from_file_location("run_alpha_zoo_debounced_efficiency_repair_discovery", MODULE_PATH)
+MODULE_PATH = (
+    ROOT / "scripts" / "research" / "run_alpha_zoo_debounced_efficiency_repair_discovery.py"
+)
+SPEC = importlib.util.spec_from_file_location(
+    "run_alpha_zoo_debounced_efficiency_repair_discovery", MODULE_PATH
+)
 assert SPEC is not None and SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = MODULE
@@ -71,7 +75,9 @@ def test_gate_requires_all_split_return_per_turnover_above_10bps() -> None:
     assert row["train_dominant_sample_gate_pass"] is True
     assert row["execution_efficiency_proxy_gate_pass"] is False
     assert row["primary_10bps_promotion_gate_pass"] is False
-    assert any("locked_oos_return_per_turnover_proxy_bps_9.990" in r for r in row["rejection_reasons"])
+    assert any(
+        "locked_oos_return_per_turnover_proxy_bps_9.990" in r for r in row["rejection_reasons"]
+    )
 
 
 def test_gate_allows_paper_testnet_only_when_all_strict_gates_pass() -> None:
@@ -102,7 +108,9 @@ def test_debounced_state_signal_enforces_min_hold_and_cooldown() -> None:
 
 def test_handoff_and_no_promotion_artifacts_are_fail_closed() -> None:
     handoff = MODULE._paper_testnet_handoff([])
-    shortlist = MODULE._no_promotion_shortlist([MODULE._gate_candidate(_gate_row(model_id="shadow"))], limit=1)
+    shortlist = MODULE._no_promotion_shortlist(
+        [MODULE._gate_candidate(_gate_row(model_id="shadow"))], limit=1
+    )
 
     assert handoff["status"] == "no_paper_candidates"
     assert handoff["ready_for_real"] is False
@@ -129,5 +137,8 @@ def test_selected_output_rows_keeps_gate_pass_beyond_top_n() -> None:
 
     selected = MODULE._selected_output_rows(ranked, top_n=1)
 
-    assert [row["model_id"] for row in selected] == ["high-validation-reject", "lower-score-gate-pass"]
+    assert [row["model_id"] for row in selected] == [
+        "high-validation-reject",
+        "lower-score-gate-pass",
+    ]
     assert selected[1]["paper_candidate_gate_pass"] is True

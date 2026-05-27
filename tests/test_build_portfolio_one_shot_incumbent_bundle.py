@@ -134,7 +134,9 @@ def test_write_portfolio_one_shot_incumbent_bundle_writes_latest_files(tmp_path:
     current_portfolio.write_text(
         json.dumps(
             {
-                "weights": [{"candidate_id": "a", "name": "alpha", "weight": 0.7, "weight_share": 1.0}],
+                "weights": [
+                    {"candidate_id": "a", "name": "alpha", "weight": 0.7, "weight_share": 1.0}
+                ],
                 "gross_exposure": 0.7,
                 "cash_weight": 0.3,
                 "portfolio_metrics": {"oos": {"total_return": 0.01, "sharpe": 1.1}},

@@ -27,7 +27,9 @@ def test_resolve_followup_artifact_path_prefers_repo_artifact_over_worktree_copy
     assert resolved == repo_target
 
 
-def test_resolve_followup_artifact_path_falls_back_to_latest_worktree(monkeypatch, tmp_path: Path) -> None:
+def test_resolve_followup_artifact_path_falls_back_to_latest_worktree(
+    monkeypatch, tmp_path: Path
+) -> None:
     repo_root = tmp_path / "repo"
     target_rel = Path(
         "var/reports/exact_window_backtests/followup_status/portfolio_one_shot_current_opt/portfolio_optimization_latest.json"
@@ -66,7 +68,9 @@ def test_resolve_followup_artifact_path_uses_generic_worktree_fallback(
     assert resolved == generic.resolve()
 
 
-def test_resolve_current_optimization_path_uses_worktree_fallback(monkeypatch, tmp_path: Path) -> None:
+def test_resolve_current_optimization_path_uses_worktree_fallback(
+    monkeypatch, tmp_path: Path
+) -> None:
     repo_root = tmp_path / "repo"
     current_opt = (
         repo_root
@@ -84,7 +88,9 @@ def test_resolve_current_optimization_path_uses_worktree_fallback(monkeypatch, t
     monkeypatch.setattr(
         contract,
         "PORTFOLIO_CURRENT_OPTIMIZATION",
-        Path("var/reports/exact_window_backtests/followup_status/portfolio_one_shot_current_opt/portfolio_optimization_latest.json"),
+        Path(
+            "var/reports/exact_window_backtests/followup_status/portfolio_one_shot_current_opt/portfolio_optimization_latest.json"
+        ),
     )
 
     resolved = contract.resolve_current_optimization_path()

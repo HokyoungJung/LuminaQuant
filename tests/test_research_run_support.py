@@ -26,7 +26,12 @@ def test_adapt_candidate_inputs_round_robins_across_families_when_limited():
         _candidate("trend_a", "CompositeTrendStrategy", "trend"),
         _candidate("trend_b", "CompositeTrendStrategy", "trend"),
         _candidate("trend_c", "CompositeTrendStrategy", "trend"),
-        _candidate("carry_a", "PerpCrowdingCarryStrategy", "carry", symbols=["BTC/USDT", "ETH/USDT", "BNB/USDT"]),
+        _candidate(
+            "carry_a",
+            "PerpCrowdingCarryStrategy",
+            "carry",
+            symbols=["BTC/USDT", "ETH/USDT", "BNB/USDT"],
+        ),
         _candidate(
             "cross_a",
             "LastDayLiquidityRegimeStrategy",

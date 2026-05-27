@@ -91,9 +91,13 @@ def _candidate_symbol_basket(candidate: dict[str, Any]) -> tuple[str, ...]:
 def candidate_lineage_key(candidate: dict[str, Any]) -> str:
     """Collapse param variants that share the same structural basket lineage."""
     payload = {
-        "family": str(candidate.get("family") or strategy_family(str(candidate.get("name", "")))).strip().lower(),
+        "family": str(candidate.get("family") or strategy_family(str(candidate.get("name", ""))))
+        .strip()
+        .lower(),
         "strategy_class": str(candidate.get("strategy_class") or "").strip(),
-        "timeframe": str(candidate.get("strategy_timeframe") or candidate.get("timeframe") or "").strip().lower(),
+        "timeframe": str(candidate.get("strategy_timeframe") or candidate.get("timeframe") or "")
+        .strip()
+        .lower(),
         "symbols": list(_candidate_symbol_basket(candidate)),
     }
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"))
@@ -110,7 +114,9 @@ def candidate_symbol_basket_key(candidate: dict[str, Any]) -> str:
 
 def candidate_family_basket_key(candidate: dict[str, Any]) -> str:
     payload = {
-        "family": str(candidate.get("family") or strategy_family(str(candidate.get("name", "")))).strip().lower(),
+        "family": str(candidate.get("family") or strategy_family(str(candidate.get("name", ""))))
+        .strip()
+        .lower(),
         "symbols": list(_candidate_symbol_basket(candidate)),
     }
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"))
@@ -136,7 +142,10 @@ def robust_score_from_metrics(
     turnover_threshold = float(cfg["turnover_threshold"])
     active_fold_ratio = min(1.0, max(0.0, safe_float(metrics.get("active_fold_ratio"), 1.0)))
     inactive_fold_count = max(0.0, safe_float(metrics.get("inactive_fold_count"), 0.0))
-    failed_fold_ratio = min(1.0, max(0.0, safe_float(metrics.get("failed_fold_ratio"), safe_float(metrics.get("pbo"), 1.0))))
+    failed_fold_ratio = min(
+        1.0,
+        max(0.0, safe_float(metrics.get("failed_fold_ratio"), safe_float(metrics.get("pbo"), 1.0))),
+    )
     return float(
         (float(cfg["sharpe_weight"]) * safe_float(metrics.get("sharpe"), 0.0))
         + (float(cfg["deflated_sharpe_weight"]) * safe_float(metrics.get("deflated_sharpe"), 0.0))
@@ -199,7 +208,9 @@ def hurdle_score(
 
 def candidate_mix_type(candidate: dict[str, Any]) -> str:
     name_token = str(candidate.get("name", "")).strip().lower()
-    symbols = [str(item).strip() for item in list(candidate.get("symbols") or []) if str(item).strip()]
+    symbols = [
+        str(item).strip() for item in list(candidate.get("symbols") or []) if str(item).strip()
+    ]
     if name_token.startswith(("pair_", "lag_convergence")):
         return "pair"
     if len(symbols) >= 3:
@@ -220,7 +231,9 @@ def _allowlisted_portfolio_native_multi_asset_candidate(candidate: dict[str, Any
 
     strategy_class = str(candidate.get("strategy_class") or "").strip()
     family = str(candidate.get("family") or "").strip().lower()
-    tags = {str(item).strip().lower() for item in list(candidate.get("tags") or []) if str(item).strip()}
+    tags = {
+        str(item).strip().lower() for item in list(candidate.get("tags") or []) if str(item).strip()
+    }
 
     allowlisted_classes = {
         "CarryTrendFactorRotationStrategy",
@@ -363,7 +376,11 @@ def build_single_asset_portfolio_sets(
     for row in rows:
         if candidate_mix_type(row) != "single":
             continue
-        symbols = [str(item).strip().upper() for item in list(row.get("symbols") or []) if str(item).strip()]
+        symbols = [
+            str(item).strip().upper()
+            for item in list(row.get("symbols") or [])
+            if str(item).strip()
+        ]
         if len(symbols) != 1:
             continue
         symbol = symbols[0]
@@ -407,12 +424,17 @@ def build_single_asset_portfolio_sets(
             for item in items
         ]
         max_score = max(scores)
-        raw = [math.exp(max(weight_exp_clamp_floor, min(0.0, score - max_score))) for score in scores]
+        raw = [
+            math.exp(max(weight_exp_clamp_floor, min(0.0, score - max_score))) for score in scores
+        ]
         total = float(sum(raw))
         if total <= 0.0:
             equal = 1.0 / float(len(items))
             return [{**item, "portfolio_weight": equal} for item in items]
-        return [{**item, "portfolio_weight": float(weight / total)} for item, weight in zip(items, raw, strict=True)]
+        return [
+            {**item, "portfolio_weight": float(weight / total)}
+            for item, weight in zip(items, raw, strict=True)
+        ]
 
     out.append(
         {

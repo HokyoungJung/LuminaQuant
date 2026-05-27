@@ -89,7 +89,9 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(contract.to_dict(), indent=2, sort_keys=True))
         return 0
     if args.run:
-        return int(subprocess.call(command, env=_dashboard_env(contract), cwd=str(DASHBOARD_NEXT_APP_DIR)))
+        return int(
+            subprocess.call(command, env=_dashboard_env(contract), cwd=str(DASHBOARD_NEXT_APP_DIR))
+        )
     print(" ".join(command))
     return 0
 

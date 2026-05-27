@@ -6,10 +6,7 @@ import sys
 from pathlib import Path
 
 MODULE_PATH = (
-    Path(__file__).resolve().parents[2]
-    / "scripts"
-    / "research"
-    / "profit_moonshot_research.py"
+    Path(__file__).resolve().parents[2] / "scripts" / "research" / "profit_moonshot_research.py"
 )
 SPEC = importlib.util.spec_from_file_location("profit_moonshot_research", MODULE_PATH)
 assert SPEC is not None and SPEC.loader is not None
@@ -143,7 +140,10 @@ def test_main_writes_json_and_markdown_with_required_metric_columns(tmp_path: Pa
     markdown = markdown_path.read_text(encoding="utf-8")
     assert payload["promoted_candidate"]["candidate_id"] == "live-alpha"
     assert payload["best_return_candidate"]["candidate_id"] == "live-alpha"
-    assert "| rank | candidate | source | split | return | MDD | Sharpe | Sortino | trades | liq | final equity | blockers |" in markdown
+    assert (
+        "| rank | candidate | source | split | return | MDD | Sharpe | Sortino | trades | liq | final equity | blockers |"
+        in markdown
+    )
     assert "Promoted Candidate" in markdown
     assert "live-alpha" in markdown
 
@@ -170,7 +170,9 @@ def test_profit_moonshot_continuation_validator_requires_improvement(tmp_path: P
         / "research"
         / "validate_profit_moonshot_continuation.py"
     )
-    spec = importlib.util.spec_from_file_location("validate_profit_moonshot_continuation", module_path)
+    spec = importlib.util.spec_from_file_location(
+        "validate_profit_moonshot_continuation", module_path
+    )
     validator = importlib.util.module_from_spec(spec)
     assert spec is not None and spec.loader is not None
     sys.modules[spec.name] = validator
@@ -208,7 +210,9 @@ def test_profit_moonshot_continuation_validator_prefers_oos_operator_override(tm
         / "research"
         / "validate_profit_moonshot_continuation.py"
     )
-    spec = importlib.util.spec_from_file_location("validate_profit_moonshot_continuation", module_path)
+    spec = importlib.util.spec_from_file_location(
+        "validate_profit_moonshot_continuation", module_path
+    )
     validator = importlib.util.module_from_spec(spec)
     assert spec is not None and spec.loader is not None
     sys.modules[spec.name] = validator

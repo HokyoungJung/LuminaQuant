@@ -16,7 +16,9 @@ sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
 
 
-def test_build_report_flags_operational_gaps_even_when_structure_is_strong(monkeypatch, tmp_path: Path) -> None:
+def test_build_report_flags_operational_gaps_even_when_structure_is_strong(
+    monkeypatch, tmp_path: Path
+) -> None:
     config_path = tmp_path / "config.yaml"
     config_path.write_text("live: {}\n", encoding="utf-8")
 
@@ -47,7 +49,11 @@ def test_build_report_flags_operational_gaps_even_when_structure_is_strong(monke
                         "exchange": type(
                             "ExchangeStub",
                             (),
-                            {"driver": "binance_futures", "name": "binance", "market_type": "future"},
+                            {
+                                "driver": "binance_futures",
+                                "name": "binance",
+                                "market_type": "future",
+                            },
                         )(),
                     },
                 )()
@@ -68,7 +74,10 @@ def test_build_report_flags_operational_gaps_even_when_structure_is_strong(monke
     )
 
     switch_payload = {
-        "recommended_mode": {"mode": "hybrid_guarded_mode", "allocation": {"hybrid_online_portfolio": 1.0}},
+        "recommended_mode": {
+            "mode": "hybrid_guarded_mode",
+            "allocation": {"hybrid_online_portfolio": 1.0},
+        },
         "current_market_state": {
             "favored_group": "mixed",
             "confidence": 0.0,
@@ -102,10 +111,42 @@ def test_build_report_flags_operational_gaps_even_when_structure_is_strong(monke
         "scenarios": {
             "refreshed_latest_tail": {
                 "allocations": [
-                    {"date": "2026-02-28", "split": "val", "default_sleeve": "soft_three_way_regime", "cash_weight": 0.10, "weights": {"soft_three_way_regime": 0.90}},
-                    {"date": "2026-03-01", "split": "oos", "default_sleeve": "soft_three_way_regime", "cash_weight": 0.12, "weights": {"soft_three_way_regime": 0.88}},
-                    {"date": "2026-03-02", "split": "oos", "default_sleeve": "balanced_overlay_80_20", "cash_weight": 0.12, "weights": {"soft_three_way_regime": 0.70, "balanced_overlay_80_20": 0.05, "pair_tactical_mode": 0.13}},
-                    {"date": "2026-03-03", "split": "oos", "default_sleeve": "balanced_overlay_80_20", "cash_weight": 0.15, "weights": {"soft_three_way_regime": 0.65, "balanced_overlay_80_20": 0.05, "pair_tactical_mode": 0.15}},
+                    {
+                        "date": "2026-02-28",
+                        "split": "val",
+                        "default_sleeve": "soft_three_way_regime",
+                        "cash_weight": 0.10,
+                        "weights": {"soft_three_way_regime": 0.90},
+                    },
+                    {
+                        "date": "2026-03-01",
+                        "split": "oos",
+                        "default_sleeve": "soft_three_way_regime",
+                        "cash_weight": 0.12,
+                        "weights": {"soft_three_way_regime": 0.88},
+                    },
+                    {
+                        "date": "2026-03-02",
+                        "split": "oos",
+                        "default_sleeve": "balanced_overlay_80_20",
+                        "cash_weight": 0.12,
+                        "weights": {
+                            "soft_three_way_regime": 0.70,
+                            "balanced_overlay_80_20": 0.05,
+                            "pair_tactical_mode": 0.13,
+                        },
+                    },
+                    {
+                        "date": "2026-03-03",
+                        "split": "oos",
+                        "default_sleeve": "balanced_overlay_80_20",
+                        "cash_weight": 0.15,
+                        "weights": {
+                            "soft_three_way_regime": 0.65,
+                            "balanced_overlay_80_20": 0.05,
+                            "pair_tactical_mode": 0.15,
+                        },
+                    },
                 ],
                 "daily_returns": [0.001, 0.002, 0.003, -0.001],
                 "split_metrics": {
@@ -132,4 +173,7 @@ def test_build_report_flags_operational_gaps_even_when_structure_is_strong(monke
     assert "startup_reconciliation_hard_fail_disabled" in report["live_readiness"]["gaps"]
     assert report["hybrid_oos"]["allocation_summary"]["max_pair_weight"] == 0.15
     assert len(report["hybrid_oos"]["cost_stress"]) == 2
-    assert report["hybrid_oos"]["cost_stress"][1]["adjusted_total_return"] < report["hybrid_oos"]["cost_stress"][0]["adjusted_total_return"]
+    assert (
+        report["hybrid_oos"]["cost_stress"][1]["adjusted_total_return"]
+        < report["hybrid_oos"]["cost_stress"][0]["adjusted_total_return"]
+    )

@@ -44,8 +44,7 @@ ilp = grid_hybrid.ilp
 
 DEFAULT_INTEGER_PORTFOLIO_ARTIFACT = grid_hybrid.DEFAULT_INTEGER_PORTFOLIO_ARTIFACT
 DEFAULT_OUTPUT_DIR = (
-    REPO_ROOT
-    / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/"
+    REPO_ROOT / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/"
     "alpha_zoo_integer_leverage_optuna_hybrid_decision_20260524"
 )
 
@@ -135,7 +134,9 @@ def _json_safe(value: Any) -> Any:
 
 def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(_json_safe(payload), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(_json_safe(payload), indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
 
 def _csv_value(value: Any) -> Any:
@@ -151,7 +152,9 @@ def _csv_value(value: Any) -> Any:
 def _write_csv(path: Path, rows: Sequence[Mapping[str, Any]], fields: Sequence[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(fields), extrasaction="ignore", lineterminator="\n")
+        writer = csv.DictWriter(
+            handle, fieldnames=list(fields), extrasaction="ignore", lineterminator="\n"
+        )
         writer.writeheader()
         for row in rows:
             writer.writerow({field: _csv_value(row.get(field)) for field in fields})
@@ -175,10 +178,14 @@ def _split_metrics(values: np.ndarray) -> dict[str, Any]:
     return {
         "total_return": total,
         "max_drawdown": ilp.max_drawdown(arr),
-        "return_mdd": total / ilp.max_drawdown(arr) if ilp.max_drawdown(arr) > 1e-12 else (float("inf") if total > 0 else 0.0),
+        "return_mdd": total / ilp.max_drawdown(arr)
+        if ilp.max_drawdown(arr) > 1e-12
+        else (float("inf") if total > 0 else 0.0),
         "mean_return": float(np.nanmean(arr)) if arr.size else 0.0,
         "volatility": float(np.nanstd(arr, ddof=1)) if arr.size > 1 else 0.0,
-        "downside_volatility": float(np.sqrt(np.nanmean(np.square(np.where(arr < 0.0, arr, 0.0))))) if arr.size else 0.0,
+        "downside_volatility": float(np.sqrt(np.nanmean(np.square(np.where(arr < 0.0, arr, 0.0)))))
+        if arr.size
+        else 0.0,
         "active_return_bars": int(np.count_nonzero(np.abs(arr) > 1e-12)),
     }
 
@@ -189,13 +196,20 @@ def _source_profile_streams(
     data_root: Path,
     feature_root: Path,
 ) -> tuple[list[grid_hybrid.ProfileStream], list[Mapping[str, Any]]]:
-    if integer_payload.get("ready_for_real") is not False or integer_payload.get("real_money_execution") is not False:
+    if (
+        integer_payload.get("ready_for_real") is not False
+        or integer_payload.get("real_money_execution") is not False
+    ):
         raise ValueError("integer portfolio artifact violates real-money disabled guard")
     if _safe_float(integer_payload.get("research_primary_round_trip_cost_bps")) != 10.0:
-        raise ValueError("integer portfolio artifact is not using the primary 10bps round-trip cost")
+        raise ValueError(
+            "integer portfolio artifact is not using the primary 10bps round-trip cost"
+        )
     source_profile_rows = list(integer_payload.get("paper_testnet_candidate_profiles") or [])
     if len(source_profile_rows) != 3:
-        raise ValueError(f"expected exactly three paper/testnet source profiles, found {len(source_profile_rows)}")
+        raise ValueError(
+            f"expected exactly three paper/testnet source profiles, found {len(source_profile_rows)}"
+        )
 
     correlation_payload = ilp._load_json(ilp.DEFAULT_CORRELATION_ARTIFACT)
     monitoring_payload = ilp._load_json(ilp.DEFAULT_MONITORING_ARTIFACT)
@@ -210,9 +224,13 @@ def _source_profile_streams(
     bars_by_key = ilp._load_bars_for_rows(selected_rows, data_root=data_root)
     replays = ilp.build_candidate_replays(selected_rows, captures, bars_by_key=bars_by_key)
     replays_by_model_id = {replay.model_id: replay for replay in replays}
-    union_index = pd.DatetimeIndex(sorted(set().union(*(set(replay.datetimes) for replay in replays))))
+    union_index = pd.DatetimeIndex(
+        sorted(set().union(*(set(replay.datetimes) for replay in replays)))
+    )
     profile_streams = [
-        grid_hybrid._profile_stream_from_row(row, replays_by_model_id=replays_by_model_id, union_index=union_index)
+        grid_hybrid._profile_stream_from_row(
+            row, replays_by_model_id=replays_by_model_id, union_index=union_index
+        )
         for row in source_profile_rows
     ]
     return profile_streams, source_profile_rows
@@ -230,7 +248,9 @@ def _softmax(values: np.ndarray) -> np.ndarray:
     return exp / total
 
 
-def _rolling_feature(returns: np.ndarray, end: int, window: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def _rolling_feature(
+    returns: np.ndarray, end: int, window: int
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     start = max(0, int(end) - max(1, int(window)))
     hist = returns[start:end]
     k = returns.shape[1]
@@ -245,7 +265,9 @@ def _rolling_feature(returns: np.ndarray, end: int, window: int) -> tuple[np.nda
     return mean, std, downside
 
 
-def _candidate_scores(returns: np.ndarray, end: int, window: int, priors: np.ndarray, prior_ratio: float) -> np.ndarray:
+def _candidate_scores(
+    returns: np.ndarray, end: int, window: int, priors: np.ndarray, prior_ratio: float
+) -> np.ndarray:
     mean, std, downside = _rolling_feature(returns, end, window)
     score = mean / (std + downside + 1e-9)
     score = np.where(np.isfinite(score), score, 0.0)
@@ -258,11 +280,19 @@ def _metrics_for_cv(values: np.ndarray) -> dict[str, float]:
     mdd = ilp.max_drawdown(arr)
     mean = float(np.nanmean(arr)) if arr.size else 0.0
     vol = float(np.nanstd(arr, ddof=1)) if arr.size > 1 else 0.0
-    downside = float(np.sqrt(np.nanmean(np.square(np.where(arr < 0.0, arr, 0.0))))) if arr.size else 0.0
+    downside = (
+        float(np.sqrt(np.nanmean(np.square(np.where(arr < 0.0, arr, 0.0))))) if arr.size else 0.0
+    )
     sharpe = mean / vol * math.sqrt(24.0 * 365.0) if vol > 1e-12 else 0.0
     sortino = mean / downside * math.sqrt(24.0 * 365.0) if downside > 1e-12 else 0.0
     calmar = total / mdd if mdd > 1e-12 else (float("inf") if total > 0 else 0.0)
-    return {"total_return": total, "max_drawdown": mdd, "sharpe": sharpe, "sortino": sortino, "calmar": calmar}
+    return {
+        "total_return": total,
+        "max_drawdown": mdd,
+        "sharpe": sharpe,
+        "sortino": sortino,
+        "calmar": calmar,
+    }
 
 
 def _portfolio_returns_for_params(
@@ -280,7 +310,9 @@ def _portfolio_returns_for_params(
     weights_out = np.zeros((returns.shape[0], k), dtype=float)
     allocations: list[dict[str, Any]] = []
     portfolio_history = list(initial_portfolio_history or [])
-    prior_scores = _candidate_scores(returns, max(1, start_idx), max(2, params.mape_window), np.zeros(k), 0.0)
+    prior_scores = _candidate_scores(
+        returns, max(1, start_idx), max(2, params.mape_window), np.zeros(k), 0.0
+    )
     if not np.any(np.isfinite(prior_scores)):
         prior_scores = np.zeros(k)
     default_idx = int(learned.default_idx)
@@ -308,7 +340,7 @@ def _portfolio_returns_for_params(
         base = np.zeros(k, dtype=float)
         base[default_idx] = 1.0
         weights = adaptive_weight_ratio * base + (1.0 - adaptive_weight_ratio) * score_weights
-        recent = returns[max(0, t - max(2, params.short_vol_window)):t]
+        recent = returns[max(0, t - max(2, params.short_vol_window)) : t]
         vol_feature = 0.0
         if recent.size:
             vol_feature = float(np.nanstd(np.nanmean(recent, axis=1)))
@@ -333,14 +365,19 @@ def _portfolio_returns_for_params(
         weights /= max(1e-12, float(np.sum(weights)))
         exposure = 1.0
         if len(portfolio_history) >= max(2, params.bias_window):
-            ens = np.asarray(portfolio_history[-int(params.bias_window):], dtype=float)
-            model_hist = returns[max(0, t - int(params.bias_window)):t, default_idx]
+            ens = np.asarray(portfolio_history[-int(params.bias_window) :], dtype=float)
+            model_hist = returns[max(0, t - int(params.bias_window)) : t, default_idx]
             ens_bias = float(np.nanmean(ens)) if ens.size else 0.0
             model_bias = float(np.nanmean(model_hist)) if model_hist.size else 0.0
-            combined_bias = params.bias_combine_ratio * model_bias + (1.0 - params.bias_combine_ratio) * ens_bias
+            combined_bias = (
+                params.bias_combine_ratio * model_bias
+                + (1.0 - params.bias_combine_ratio) * ens_bias
+            )
             denom = float(np.nanmean(np.abs(ens))) + 1e-9
             if combined_bias < 0.0:
-                exposure = max(0.0, 1.0 - params.bias_correction_alpha * min(0.80, abs(combined_bias) / denom))
+                exposure = max(
+                    0.0, 1.0 - params.bias_correction_alpha * min(0.80, abs(combined_bias) / denom)
+                )
         ret = float(exposure * np.dot(weights, returns[t]))
         if not math.isfinite(ret):
             ret = 0.0
@@ -364,7 +401,9 @@ def _portfolio_returns_for_params(
     return out, weights_out, allocations
 
 
-def _learn_params(returns: np.ndarray, params: HybridParams, opt_indices: np.ndarray) -> LearnedParams:
+def _learn_params(
+    returns: np.ndarray, params: HybridParams, opt_indices: np.ndarray
+) -> LearnedParams:
     opt = returns[opt_indices]
     n = opt.shape[0]
     warmup_n = max(10, min(n, int(n * params.warmup_ratio))) if n else 0
@@ -377,12 +416,12 @@ def _learn_params(returns: np.ndarray, params: HybridParams, opt_indices: np.nda
     default_idx = int(np.nanargmax(scores))
     vol_series = []
     for t in range(max(2, params.short_vol_window), warmup_n):
-        recent = warmup[t - int(params.short_vol_window):t]
+        recent = warmup[t - int(params.short_vol_window) : t]
         vol_series.append(float(np.nanstd(np.nanmean(recent, axis=1))))
     threshold = float(np.nanpercentile(vol_series, 75)) if vol_series else 0.0
     hv_mask: list[int] = []
     for t in range(max(2, params.short_vol_window), warmup_n):
-        recent = warmup[t - int(params.short_vol_window):t]
+        recent = warmup[t - int(params.short_vol_window) : t]
         if float(np.nanstd(np.nanmean(recent, axis=1))) > threshold:
             hv_mask.append(t)
     if hv_mask:
@@ -394,7 +433,11 @@ def _learn_params(returns: np.ndarray, params: HybridParams, opt_indices: np.nda
     if hv_mask:
         hv_mean = np.nanmean(warmup[hv_mask], axis=0)
         best = float(hv_mean[high_vol_best])
-        others = [float(v) for i, v in enumerate(hv_mean) if i != high_vol_best and math.isfinite(float(v))]
+        others = [
+            float(v)
+            for i, v in enumerate(hv_mean)
+            if i != high_vol_best and math.isfinite(float(v))
+        ]
         if others:
             avg_other = float(np.nanmean(others))
             hv_gap = max(0.0, (best - avg_other) / (abs(avg_other) + abs(best) + 1e-9))
@@ -420,7 +463,11 @@ def _learn_params(returns: np.ndarray, params: HybridParams, opt_indices: np.nda
             start_idx=cv_start,
         )
         metrics = _metrics_for_cv(cv_returns[cv_start:])
-        score = _safe_float(metrics.get("calmar")) + _safe_float(metrics.get("sharpe")) + _safe_float(metrics.get("sortino"))
+        score = (
+            _safe_float(metrics.get("calmar"))
+            + _safe_float(metrics.get("sharpe"))
+            + _safe_float(metrics.get("sortino"))
+        )
         if score > best_score:
             best_score = score
             best_ratio = float(ratio)
@@ -475,13 +522,28 @@ def _turnover_and_events_from_dynamic_weights(
             avg_weights = pd.Series(0.0, index=weights_frame.columns)
         if split in {"train", "validation"}:
             for stream in profile_streams:
-                avg_weight_tv[stream.profile_id] = avg_weight_tv.get(stream.profile_id, 0.0) + float(avg_weights.get(stream.profile_id, 0.0)) / 2.0
+                avg_weight_tv[stream.profile_id] = (
+                    avg_weight_tv.get(stream.profile_id, 0.0)
+                    + float(avg_weights.get(stream.profile_id, 0.0)) / 2.0
+                )
         turnover_by_split[split] = float(
-            sum(stream.turnover_by_split[split] * max(0.0, float(avg_weights.get(stream.profile_id, 0.0))) for stream in profile_streams)
+            sum(
+                stream.turnover_by_split[split]
+                * max(0.0, float(avg_weights.get(stream.profile_id, 0.0)))
+                for stream in profile_streams
+            )
         )
-        active_streams = [stream for stream in profile_streams if float(avg_weights.get(stream.profile_id, 0.0)) > 1e-6]
-        trade_events_by_split[split] = int(sum(stream.trade_events_by_split[split] for stream in active_streams))
-        liquidation_by_split[split] = int(sum(stream.liquidation_count_by_split[split] for stream in active_streams))
+        active_streams = [
+            stream
+            for stream in profile_streams
+            if float(avg_weights.get(stream.profile_id, 0.0)) > 1e-6
+        ]
+        trade_events_by_split[split] = int(
+            sum(stream.trade_events_by_split[split] for stream in active_streams)
+        )
+        liquidation_by_split[split] = int(
+            sum(stream.liquidation_count_by_split[split] for stream in active_streams)
+        )
     return turnover_by_split, trade_events_by_split, liquidation_by_split, avg_weight_tv
 
 
@@ -510,7 +572,12 @@ def _run_model(
 ) -> OptunaModelResult:
     labels = [stream.profile_id for stream in profile_streams]
     index = profile_streams[0].returns.index
-    returns_matrix = np.column_stack([stream.returns.reindex(index, fill_value=0.0).to_numpy(dtype=float) for stream in profile_streams])
+    returns_matrix = np.column_stack(
+        [
+            stream.returns.reindex(index, fill_value=0.0).to_numpy(dtype=float)
+            for stream in profile_streams
+        ]
+    )
     opt_mask = _split_mask(index, "train") | _split_mask(index, "validation")
     opt_indices = np.flatnonzero(opt_mask)
     learned = _learn_params(returns_matrix, params, opt_indices)
@@ -531,10 +598,17 @@ def _run_model(
     train_val_weight_sum = sum(avg_weight_tv.values())
     if train_val_weight_sum > 0.0:
         avg_weight_tv = {k: float(v / train_val_weight_sum) for k, v in avg_weight_tv.items()}
-    gross_notional = float(sum(stream.gross_notional_fraction * avg_weight_tv.get(stream.profile_id, 0.0) for stream in profile_streams))
+    gross_notional = float(
+        sum(
+            stream.gross_notional_fraction * avg_weight_tv.get(stream.profile_id, 0.0)
+            for stream in profile_streams
+        )
+    )
     row = grid_hybrid._metric_row_from_stream(
         profile_id=profile_id,
-        profile_kind="optuna_v3_5_style_train_validation_selected" if version == "v3_5" else "optuna_v3_6_style_train_validation_selected",
+        profile_kind="optuna_v3_5_style_train_validation_selected"
+        if version == "v3_5"
+        else "optuna_v3_6_style_train_validation_selected",
         candidate_tier="optuna_hybrid_relaxed_paper_testnet_candidate",
         leverage_map={},
         weights=avg_weight_tv,
@@ -558,15 +632,21 @@ def _run_model(
             "learned_params": asdict(learned),
             "weights": avg_weight_tv,
             "average_weights_train_validation": avg_weight_tv,
-            "average_weights_train": _weights_summary(profile_streams=profile_streams, weights_frame=weights_frame, split="train"),
-            "average_weights_validation": _weights_summary(profile_streams=profile_streams, weights_frame=weights_frame, split="validation"),
+            "average_weights_train": _weights_summary(
+                profile_streams=profile_streams, weights_frame=weights_frame, split="train"
+            ),
+            "average_weights_validation": _weights_summary(
+                profile_streams=profile_streams, weights_frame=weights_frame, split="validation"
+            ),
             "average_weights_locked_oos_report_only": _weights_summary(
                 profile_streams=profile_streams,
                 weights_frame=weights_frame,
                 split="locked_oos",
             ),
             "final_weights": {label: float(weights_frame.iloc[-1][label]) for label in labels},
-            "asset_gross_notional_fraction": _dynamic_asset_gross(profile_streams=profile_streams, avg_weights=avg_weight_tv),
+            "asset_gross_notional_fraction": _dynamic_asset_gross(
+                profile_streams=profile_streams, avg_weights=avg_weight_tv
+            ),
             "selection_reasons": selection_reasons,
             "report_only_gate_reasons": report_only_reasons,
         }
@@ -636,8 +716,13 @@ def _run_optuna(
         trial.set_user_attr("validation_return", _safe_float(result.row.get("validation_return")))
         trial.set_user_attr("train_mdd", _safe_float(result.row.get("train_mdd")))
         trial.set_user_attr("validation_mdd", _safe_float(result.row.get("validation_mdd")))
-        trial.set_user_attr("train_rpt_bps", _safe_float(result.row.get("train_return_per_turnover_proxy_bps")))
-        trial.set_user_attr("validation_rpt_bps", _safe_float(result.row.get("validation_return_per_turnover_proxy_bps")))
+        trial.set_user_attr(
+            "train_rpt_bps", _safe_float(result.row.get("train_return_per_turnover_proxy_bps"))
+        )
+        trial.set_user_attr(
+            "validation_rpt_bps",
+            _safe_float(result.row.get("validation_return_per_turnover_proxy_bps")),
+        )
         trial.set_user_attr("selection_reasons", list(grid_hybrid._selection_reasons(result.row)))
         return _objective_score(result.row)
 
@@ -656,7 +741,9 @@ def _run_optuna(
             "short_vol_window": default.short_vol_window,
         }
     )
-    study.optimize(objective, n_trials=max(1, int(n_trials)), show_progress_bar=False, gc_after_trial=True)
+    study.optimize(
+        objective, n_trials=max(1, int(n_trials)), show_progress_bar=False, gc_after_trial=True
+    )
     best_params = HybridParams(
         bias_correction_alpha=float(study.best_params["bias_alpha"]),
         bias_combine_ratio=float(study.best_params["bias_combine_ratio"]),
@@ -666,7 +753,9 @@ def _run_optuna(
         short_vol_window=int(study.best_params["short_vol_window"]),
     )
     top_trials: list[dict[str, Any]] = []
-    for trial in sorted(study.trials, key=lambda t: float(t.value) if t.value is not None else -1e18, reverse=True)[:30]:
+    for trial in sorted(
+        study.trials, key=lambda t: float(t.value) if t.value is not None else -1e18, reverse=True
+    )[:30]:
         top_trials.append(
             {
                 "hybrid_version": version,
@@ -719,7 +808,10 @@ def _grid_baseline_row(profile_streams: Sequence[grid_hybrid.ProfileStream]) -> 
     row["optimizer"] = "coarse_5pct_grid_baseline_not_selected_by_this_runner"
     row["hybrid_version"] = "grid_baseline"
     row["best_value"] = None
-    row["best_params"] = {"weight_step": grid_hybrid.WEIGHT_STEP, "min_profile_weight": grid_hybrid.MIN_PROFILE_WEIGHT}
+    row["best_params"] = {
+        "weight_step": grid_hybrid.WEIGHT_STEP,
+        "min_profile_weight": grid_hybrid.MIN_PROFILE_WEIGHT,
+    }
     row["learned_params"] = {}
     row["average_weights_train_validation"] = row.get("weights", {})
     row["final_weights"] = row.get("weights", {})
@@ -745,7 +837,9 @@ def _base_rows(
 
 
 def _choose_selected_optuna(results: Sequence[OptunaModelResult]) -> dict[str, Any]:
-    train_val_pass = [result.row for result in results if not grid_hybrid._selection_reasons(result.row)]
+    train_val_pass = [
+        result.row for result in results if not grid_hybrid._selection_reasons(result.row)
+    ]
     pool = train_val_pass or [result.row for result in results]
     # locked-OOS is not in the sort key. Report-only gate may still reject the
     # candidate after the frozen train+validation selection.
@@ -850,7 +944,9 @@ def build_payload_from_inputs(
     timestamp = _timestamp()
     local_peak_mib = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
     latest_json = output_dir / "alpha_zoo_integer_leverage_optuna_hybrid_decision_latest.json"
-    timestamped_json = output_dir / f"alpha_zoo_integer_leverage_optuna_hybrid_decision_{timestamp}.json"
+    timestamped_json = (
+        output_dir / f"alpha_zoo_integer_leverage_optuna_hybrid_decision_{timestamp}.json"
+    )
     latest_md = output_dir / "alpha_zoo_integer_leverage_optuna_hybrid_decision_latest.md"
     comparison_csv = output_dir / "integer_leverage_optuna_hybrid_comparison_latest.csv"
     trial_csv = output_dir / "integer_leverage_optuna_hybrid_top_trials_latest.csv"
@@ -861,7 +957,10 @@ def build_payload_from_inputs(
         "artifact_kind": ARTIFACT_KIND,
         "generated_at_utc": _utc_now_iso(),
         "source_integer_portfolio_artifact": str(integer_artifact_path),
-        "source_grid_baseline_artifact": str(grid_hybrid.DEFAULT_OUTPUT_DIR / "alpha_zoo_integer_leverage_hybrid_decision_latest.json"),
+        "source_grid_baseline_artifact": str(
+            grid_hybrid.DEFAULT_OUTPUT_DIR
+            / "alpha_zoo_integer_leverage_hybrid_decision_latest.json"
+        ),
         "research_primary_round_trip_cost_bps": ilp.PRIMARY_ROUND_TRIP_COST_BPS,
         "avg_bbo_spread_bps_assumption": ilp.AVG_BBO_SPREAD_BPS_ASSUMPTION,
         "bbo_spread_multiplier": ilp.BBO_SPREAD_MULTIPLIER,
@@ -893,11 +992,27 @@ def build_payload_from_inputs(
         },
         "selected_optuna_hybrid_profile": selected,
         "comparison_rows": comparison_rows,
-        "hybrid_v3_5_optuna": {"row": v35.row, "optuna": v35.optuna, "top_trials": list(v35.top_trials), "allocation_samples": v35.allocations[:50]},
-        "hybrid_v3_6_optuna": {"row": v36.row, "optuna": v36.optuna, "top_trials": list(v36.top_trials), "allocation_samples": v36.allocations[:50]},
-        "profile_train_validation_corr_matrix": grid_hybrid._profile_corr_matrix(profile_streams, split="train_validation"),
-        "profile_validation_corr_matrix": grid_hybrid._profile_corr_matrix(profile_streams, split="validation"),
-        "profile_locked_oos_corr_matrix_report_only": grid_hybrid._profile_corr_matrix(profile_streams, split="locked_oos"),
+        "hybrid_v3_5_optuna": {
+            "row": v35.row,
+            "optuna": v35.optuna,
+            "top_trials": list(v35.top_trials),
+            "allocation_samples": v35.allocations[:50],
+        },
+        "hybrid_v3_6_optuna": {
+            "row": v36.row,
+            "optuna": v36.optuna,
+            "top_trials": list(v36.top_trials),
+            "allocation_samples": v36.allocations[:50],
+        },
+        "profile_train_validation_corr_matrix": grid_hybrid._profile_corr_matrix(
+            profile_streams, split="train_validation"
+        ),
+        "profile_validation_corr_matrix": grid_hybrid._profile_corr_matrix(
+            profile_streams, split="validation"
+        ),
+        "profile_locked_oos_corr_matrix_report_only": grid_hybrid._profile_corr_matrix(
+            profile_streams, split="locked_oos"
+        ),
         "runner_peak_rss_mib": local_peak_mib,
         "memory_summary": {"limit_mib": 8192.0, "pass_under_8gb": local_peak_mib < 8192.0},
         "output_paths": {
@@ -962,7 +1077,9 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--integer-portfolio-artifact", default=str(DEFAULT_INTEGER_PORTFOLIO_ARTIFACT))
+    parser.add_argument(
+        "--integer-portfolio-artifact", default=str(DEFAULT_INTEGER_PORTFOLIO_ARTIFACT)
+    )
     parser.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_DIR))
     parser.add_argument("--data-root", default=str(ilp.DEFAULT_DATA_ROOT))
     parser.add_argument("--feature-root", default=str(ilp.DEFAULT_FEATURE_ROOT))

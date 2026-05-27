@@ -90,6 +90,7 @@ def create_binance_futures_client(
         )
     )
 
+
 def _fetch_trades_with_retry(
     exchange: Any,
     symbol: str,
@@ -368,12 +369,13 @@ def _iter_archive_rows_to_raw_aggtrades(
                         "timestamp_ms": timestamp_ms,
                         "price": price,
                         "quantity": max(0.0, quantity),
-                        "is_buyer_maker": str(row[6]).strip().lower()
-                        in {"1", "true", "t", "yes"},
+                        "is_buyer_maker": str(row[6]).strip().lower() in {"1", "true", "t", "yes"},
                     }
                 )
                 if len(rows) >= max_rows:
-                    rows.sort(key=lambda item: (int(item["timestamp_ms"]), int(item["agg_trade_id"])))
+                    rows.sort(
+                        key=lambda item: (int(item["timestamp_ms"]), int(item["agg_trade_id"]))
+                    )
                     yield rows
                     rows = []
     rows.sort(key=lambda item: (int(item["timestamp_ms"]), int(item["agg_trade_id"])))
@@ -468,7 +470,9 @@ def sync_symbol_aggtrades_raw(
                 continue
             seen.add(key)
             normalized_rows.append(item)
-        normalized_rows.sort(key=lambda item: (int(item["timestamp_ms"]), int(item["agg_trade_id"])))
+        normalized_rows.sort(
+            key=lambda item: (int(item["timestamp_ms"]), int(item["agg_trade_id"]))
+        )
         return normalized_rows
 
     def _commit_batch(rows: list[dict[str, Any]], *, observed_until_ms: int) -> None:
@@ -639,7 +643,9 @@ def _http_get_json(
                 raise RuntimeError(f"HTTP {code} for {target}") from exc
             if attempt > max(0, int(retries)):
                 raise RuntimeError(f"HTTP {getattr(exc, 'code', '')} for {target}") from exc
-            retry_after_raw = exc.headers.get("Retry-After") if getattr(exc, "headers", None) else None
+            retry_after_raw = (
+                exc.headers.get("Retry-After") if getattr(exc, "headers", None) else None
+            )
             retry_after = 0.0
             if retry_after_raw is not None:
                 try:
@@ -944,7 +950,10 @@ def _fetch_liquidation_orders(
                 base_wait_sec=base_wait_sec,
             )
         except RuntimeError as exc:
-            if any(code in str(exc) for code in ("HTTP 400", "HTTP 401", "HTTP 403", "HTTP 404", "HTTP 429")):
+            if any(
+                code in str(exc)
+                for code in ("HTTP 400", "HTTP 401", "HTTP 403", "HTTP 404", "HTTP 429")
+            ):
                 break
             raise
         rows = list(data) if isinstance(data, list) else []
@@ -1311,7 +1320,9 @@ def ensure_market_data_coverage(
                 exchange=str(exchange_id).strip().lower(),
                 symbol=stream_symbol,
                 timeframe=timeframe_token,
-                start_date=datetime.fromtimestamp(int(effective_since) / 1000.0, tz=UTC).isoformat(),
+                start_date=datetime.fromtimestamp(
+                    int(effective_since) / 1000.0, tz=UTC
+                ).isoformat(),
                 end_date=datetime.fromtimestamp(int(effective_until) / 1000.0, tz=UTC).isoformat(),
                 chunk_days=7,
                 warmup_bars=0,
@@ -1461,11 +1472,15 @@ def sync_symbol_ohlcv(
     first_dt = output_frame["datetime"][0]
     last_dt = output_frame["datetime"][-1]
     first_ts = int(
-        (first_dt.replace(tzinfo=UTC) if first_dt.tzinfo is None else first_dt.astimezone(UTC)).timestamp()
+        (
+            first_dt.replace(tzinfo=UTC) if first_dt.tzinfo is None else first_dt.astimezone(UTC)
+        ).timestamp()
         * 1000
     )
     last_ts = int(
-        (last_dt.replace(tzinfo=UTC) if last_dt.tzinfo is None else last_dt.astimezone(UTC)).timestamp()
+        (
+            last_dt.replace(tzinfo=UTC) if last_dt.tzinfo is None else last_dt.astimezone(UTC)
+        ).timestamp()
         * 1000
     )
     row_count = int(output_frame.height)

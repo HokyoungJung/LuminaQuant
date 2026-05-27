@@ -387,7 +387,10 @@ def cluster_by_correlation(
     for cid in ids:
         added = False
         for cluster in clusters:
-            if any(abs(corr_streams(stream_map[cid], stream_map[member])) >= threshold for member in cluster):
+            if any(
+                abs(corr_streams(stream_map[cid], stream_map[member])) >= threshold
+                for member in cluster
+            ):
                 cluster.append(cid)
                 added = True
                 break
@@ -397,7 +400,9 @@ def cluster_by_correlation(
 
 
 def objective_policy_payload(profile: str, *, oos_is_objective_input: bool) -> dict[str, Any]:
-    policy = DIAGNOSTIC_OOS_OBJECTIVE_POLICY if oos_is_objective_input else LOCKED_OOS_OBJECTIVE_POLICY
+    policy = (
+        DIAGNOSTIC_OOS_OBJECTIVE_POLICY if oos_is_objective_input else LOCKED_OOS_OBJECTIVE_POLICY
+    )
     return {
         "objective_profile": str(profile),
         "objective_policy": policy,
@@ -411,11 +416,7 @@ def objective_policy_payload(profile: str, *, oos_is_objective_input: bool) -> d
 
 def normalized_symbols(record: dict[str, Any]) -> list[str]:
     return sorted(
-        {
-            str(symbol).strip()
-            for symbol in list(record.get("symbols") or [])
-            if str(symbol).strip()
-        }
+        {str(symbol).strip() for symbol in list(record.get("symbols") or []) if str(symbol).strip()}
     )
 
 
@@ -495,7 +496,9 @@ def project_simplex_with_upper_bounds(
     return out
 
 
-def asset_exposure(weights: dict[str, float], records: dict[str, dict[str, Any]], asset: str) -> float:
+def asset_exposure(
+    weights: dict[str, float], records: dict[str, dict[str, Any]], asset: str
+) -> float:
     exposure = 0.0
     token = str(asset)
     for key, weight in weights.items():
@@ -552,11 +555,7 @@ def portfolio_constraint_violations(
     }
 
     assets = sorted(
-        {
-            symbol
-            for key in weights
-            for symbol in normalized_symbols(records.get(key) or {})
-        }
+        {symbol for key in weights for symbol in normalized_symbols(records.get(key) or {})}
     )
     asset_violations = {}
     for asset in assets:
@@ -616,27 +615,19 @@ def apply_caps(
     asset_cap = max(0.0, float(max_asset))
     metals_cap = max(0.0, float(max_metals))
 
-    families = {
-        key: str((records.get(key) or {}).get("family", "other"))
-        for key in out
-    }
+    families = {key: str((records.get(key) or {}).get("family", "other")) for key in out}
     family_counts: dict[str, int] = defaultdict(int)
     for fam in families.values():
         family_counts[fam] += 1
 
     family_caps = dict.fromkeys(family_counts, family_cap)
     family_capacity = sum(
-        min(float(count) * strategy_cap, family_cap)
-        for count in family_counts.values()
+        min(float(count) * strategy_cap, family_cap) for count in family_counts.values()
     )
     target_active_weight = min(1.0, float(n) * strategy_cap, family_capacity)
 
     assets = sorted(
-        {
-            symbol
-            for key in out
-            for symbol in normalized_symbols(records.get(key) or {})
-        }
+        {symbol for key in out for symbol in normalized_symbols(records.get(key) or {})}
     )
     metal_ratios: dict[str, float] = {}
     for key in out:

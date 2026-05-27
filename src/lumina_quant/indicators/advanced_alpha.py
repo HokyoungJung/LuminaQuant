@@ -160,7 +160,9 @@ def pv_trend_score(
         if closes.size <= lag + 2:
             z_leg = 0.0
         else:
-            ret = np.log(np.clip(closes[lag:], 1e-12, np.inf) / np.clip(closes[:-lag], 1e-12, np.inf))
+            ret = np.log(
+                np.clip(closes[lag:], 1e-12, np.inf) / np.clip(closes[:-lag], 1e-12, np.inf)
+            )
             z_leg = _latest_zscore(ret, window=max(16, int(z_window)))
             if z_leg is None:
                 z_leg = 0.0
@@ -381,7 +383,9 @@ def cross_leadlag_spillover(
     leader_set = [item for item in leader_set if item and item in clean_prices]
     if not leader_set:
         # fallback: pick top-4 liquid names by history length.
-        leader_set = sorted(clean_prices.keys(), key=lambda token: clean_prices[token].size, reverse=True)[:4]
+        leader_set = sorted(
+            clean_prices.keys(), key=lambda token: clean_prices[token].size, reverse=True
+        )[:4]
 
     min_len = min(arr.size for arr in clean_prices.values())
     span = max(48, min(int(window), min_len))
@@ -497,7 +501,13 @@ def cross_leadlag_spillover(
             reg = float(max(1e-6, ridge_alpha)) * np.eye(gram.shape[0], dtype=float)
             beta = np.linalg.solve(gram + reg, Xn.T @ yn)
 
-            x_next = np.array([aligned_returns[name.split(":", 1)[0]][-(int(name.rsplit("lag", 1)[1]))] for name in feature_names], dtype=float)
+            x_next = np.array(
+                [
+                    aligned_returns[name.split(":", 1)[0]][-(int(name.rsplit("lag", 1)[1]))]
+                    for name in feature_names
+                ],
+                dtype=float,
+            )
             x_next_n = (x_next - x_mean) / x_std
             pred_n = float(np.dot(x_next_n, beta))
             pred = (pred_n * y_std) + y_mean
@@ -586,8 +596,12 @@ def perp_crowding_score(
 
     oi_delta = _log_returns(np.clip(oi, 1e-12, np.inf))
     funding_z = _latest_zscore(fr, window=max(16, int(window)))
-    oi_delta_z = _latest_zscore(oi_delta, window=max(16, int(window // 2))) if oi_delta.size else None
-    basis_z = _latest_zscore(basis_arr, window=max(12, int(window // 2))) if basis_arr.size else None
+    oi_delta_z = (
+        _latest_zscore(oi_delta, window=max(16, int(window // 2))) if oi_delta.size else None
+    )
+    basis_z = (
+        _latest_zscore(basis_arr, window=max(12, int(window // 2))) if basis_arr.size else None
+    )
 
     liq_imbalance_z = None
     if long_liq.size and short_liq.size:

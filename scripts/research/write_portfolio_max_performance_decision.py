@@ -231,7 +231,9 @@ def _grouped_allocator_weights(payload: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _strict_liquidation_total(strict_payload: dict[str, Any]) -> int:
-    validation = dict((strict_payload.get("strict_allocator") or {}).get("state_leverage_validation") or {})
+    validation = dict(
+        (strict_payload.get("strict_allocator") or {}).get("state_leverage_validation") or {}
+    )
     counts = dict(validation.get("liquidation_counts") or {})
     return int(sum(int(value) for value in counts.values()))
 
@@ -263,7 +265,9 @@ def _strict_grouped_allocator_entry(
     selection_basis = str(
         grouped_payload.get("selection_basis") or "grouped_three_way_market_regime_allocator"
     )
-    source_artifact_kind = "portfolio_incumbent_autoresearch_grouped.three_way_market_regime_allocator"
+    source_artifact_kind = (
+        "portfolio_incumbent_autoresearch_grouped.three_way_market_regime_allocator"
+    )
 
     if strict_validation_payload is not None:
         strict_allocator = dict(strict_validation_payload.get("strict_allocator") or {})
@@ -271,7 +275,9 @@ def _strict_grouped_allocator_entry(
             payload_for_entry = dict(strict_allocator)
             payload_for_entry["weights"] = _grouped_allocator_weights(strict_allocator)
             payload_for_entry["artifact_kind"] = str(
-                strict_validation_payload.get("artifact_kind") or payload_for_entry.get("artifact_kind") or "grouped_allocator_strict_validation"
+                strict_validation_payload.get("artifact_kind")
+                or payload_for_entry.get("artifact_kind")
+                or "grouped_allocator_strict_validation"
             )
             artifact_path = strict_validation_path or grouped_allocator_path
             selection_basis = "strict_grouped_allocator_state_leverage_validation"
@@ -299,9 +305,18 @@ def _strict_grouped_allocator_entry(
         entry["strict_validation"] = {
             "path": str((strict_validation_path or grouped_allocator_path).resolve()),
             "leverage_by_state": dict(strict_validation_payload.get("leverage_by_state") or {}),
-            "comparison_vs_promoted_challenger": dict(strict_validation_payload.get("comparison_vs_promoted_challenger") or {}),
-            "state_leverage_validation": dict((strict_validation_payload.get("strict_allocator") or {}).get("state_leverage_validation") or {}),
-            "split_metrics": dict((strict_validation_payload.get("strict_allocator") or {}).get("split_metrics") or {}),
+            "comparison_vs_promoted_challenger": dict(
+                strict_validation_payload.get("comparison_vs_promoted_challenger") or {}
+            ),
+            "state_leverage_validation": dict(
+                (strict_validation_payload.get("strict_allocator") or {}).get(
+                    "state_leverage_validation"
+                )
+                or {}
+            ),
+            "split_metrics": dict(
+                (strict_validation_payload.get("strict_allocator") or {}).get("split_metrics") or {}
+            ),
         }
     return entry
 
@@ -342,7 +357,9 @@ def _artifact_entry(
         "portfolio_return_streams": dict(payload.get("portfolio_return_streams") or {}),
         "portfolio_daily_return_streams": dict(payload.get("portfolio_daily_return_streams") or {}),
         "oos_monthly_returns": [
-            dict(row) for row in list(payload.get("oos_monthly_returns") or []) if isinstance(row, dict)
+            dict(row)
+            for row in list(payload.get("oos_monthly_returns") or [])
+            if isinstance(row, dict)
         ],
         "validation_objective": payload.get("validation_objective"),
         "notes": list(notes or []),
@@ -409,8 +426,7 @@ def _meta_search_entries(summary_paths: tuple[Path, ...]) -> list[dict[str, Any]
                 payload=winner_payload,
                 source_artifact_kind="portfolio_superiority_meta_search.winner",
                 selection_basis=str(
-                    summary_payload.get("selection_basis")
-                    or "validation_objective_then_locked_oos"
+                    summary_payload.get("selection_basis") or "validation_objective_then_locked_oos"
                 ),
                 notes=notes,
             )
@@ -431,10 +447,7 @@ def _extra_candidate_entries(extra_paths: tuple[Path, ...]) -> list[dict[str, An
             or payload.get("artifact_kind")
             or "portfolio_followup.custom_candidate"
         ).strip()
-        selection_basis = str(
-            payload.get("selection_basis")
-            or "manual_followup_candidate"
-        ).strip()
+        selection_basis = str(payload.get("selection_basis") or "manual_followup_candidate").strip()
         notes = _normalized_notes(payload.get("notes"))
         if not notes:
             notes = ["Manually supplied follow-up challenger artifact."]
@@ -482,7 +495,9 @@ def _strict_grouped_gate_failures(
     train = dict(metrics.get("train") or {})
     val = dict(metrics.get("val") or {})
     oos = dict(metrics.get("oos") or {})
-    liquidation_counts = dict((strict.get("state_leverage_validation") or {}).get("liquidation_counts") or {})
+    liquidation_counts = dict(
+        (strict.get("state_leverage_validation") or {}).get("liquidation_counts") or {}
+    )
     total_liquidations = int(sum(int(value) for value in liquidation_counts.values()))
 
     if _safe_float(train.get("total_return"), 0.0) <= 0.0:
@@ -677,8 +692,12 @@ def build_portfolio_max_performance_decision(
     regime_switch_path = Path(regime_switch_comparison_path)
     if regime_switch_path.exists():
         regime_switch_comparison = _load_json(regime_switch_path)
-        supporting_artifacts["portfolio_regime_switch_comparison"] = str(regime_switch_path.resolve())
-        regime_switch_section = dict(regime_switch_comparison.get("regime_switching_portfolio") or {})
+        supporting_artifacts["portfolio_regime_switch_comparison"] = str(
+            regime_switch_path.resolve()
+        )
+        regime_switch_section = dict(
+            regime_switch_comparison.get("regime_switching_portfolio") or {}
+        )
         if regime_switch_section:
             weights = list(regime_switch_section.get("weights") or [])
             nonzero_weights = [
@@ -691,7 +710,8 @@ def build_portfolio_max_performance_decision(
             ).strip()
             regime_selection_basis = (
                 raw_regime_selection_basis
-                if raw_regime_selection_basis and raw_regime_selection_basis != "locked_oos_promotion_score"
+                if raw_regime_selection_basis
+                and raw_regime_selection_basis != "locked_oos_promotion_score"
                 else "regime_switching_allocator"
             )
             notes = [
@@ -719,9 +739,7 @@ def build_portfolio_max_performance_decision(
 
     grouped_allocator = Path(grouped_allocator_path) if grouped_allocator_path is not None else None
     grouped_strict_validation = (
-        Path(grouped_strict_validation_path)
-        if grouped_strict_validation_path is not None
-        else None
+        Path(grouped_strict_validation_path) if grouped_strict_validation_path is not None else None
     )
     if grouped_allocator is not None and grouped_allocator.exists():
         grouped_payload = _load_json(grouped_allocator)
@@ -731,8 +749,8 @@ def build_portfolio_max_performance_decision(
         strict_validation_payload = None
         if grouped_strict_validation is not None and grouped_strict_validation.exists():
             strict_validation_payload = _load_json(grouped_strict_validation)
-            supporting_artifacts["portfolio_incumbent_autoresearch_grouped_strict_validation"] = str(
-                grouped_strict_validation.resolve()
+            supporting_artifacts["portfolio_incumbent_autoresearch_grouped_strict_validation"] = (
+                str(grouped_strict_validation.resolve())
             )
         elif grouped_strict_validation is not None:
             missing_artifacts.append(str(grouped_strict_validation.resolve()))
@@ -748,9 +766,7 @@ def build_portfolio_max_performance_decision(
         missing_artifacts.append(str(grouped_allocator.resolve()))
 
     grouped_static_blend = (
-        Path(grouped_static_blend_path)
-        if grouped_static_blend_path is not None
-        else None
+        Path(grouped_static_blend_path) if grouped_static_blend_path is not None else None
     )
     if grouped_static_blend is not None and grouped_static_blend.exists():
         grouped_static_blend_payload = _load_json(grouped_static_blend)
@@ -781,9 +797,7 @@ def build_portfolio_max_performance_decision(
         missing_artifacts.append(str(grouped_static_blend.resolve()))
 
     production_guarded = (
-        Path(production_guarded_path)
-        if production_guarded_path is not None
-        else None
+        Path(production_guarded_path) if production_guarded_path is not None else None
     )
     if production_guarded is not None and production_guarded.exists():
         production_guarded_payload = _load_json(production_guarded)
@@ -846,10 +860,7 @@ def build_portfolio_max_performance_decision(
                         "Weights="
                         f"{json.dumps({str((row or {}).get('candidate_id') or (row or {}).get('name')): _safe_float((row or {}).get('weight'), 0.0) for row in list(portfolio_superiority_meta_payload.get('weights') or []) if isinstance(row, dict)}, sort_keys=True)}"
                     ),
-                    (
-                        "Universe="
-                        f"{portfolio_superiority_meta_payload.get('universe')}"
-                    ),
+                    (f"Universe={portfolio_superiority_meta_payload.get('universe')}"),
                 ],
             )
         )
@@ -863,7 +874,11 @@ def build_portfolio_max_performance_decision(
         four_sleeve_comparison_path,
     ]
     anchored_path = next(
-        (Path(candidate) for candidate in anchored_candidates if candidate and Path(candidate).exists()),
+        (
+            Path(candidate)
+            for candidate in anchored_candidates
+            if candidate and Path(candidate).exists()
+        ),
         None,
     )
     if anchored_path is not None:
@@ -878,7 +893,13 @@ def build_portfolio_max_performance_decision(
         if anchored_section:
             rolling_gate = dict(anchored_comparison.get("rolling_gate") or {})
             metadata = dict(anchored_comparison.get("challenger_metadata") or {})
-            for key in ("candidate_key", "label", "source_artifact_kind", "selection_basis", "notes"):
+            for key in (
+                "candidate_key",
+                "label",
+                "source_artifact_kind",
+                "selection_basis",
+                "notes",
+            ):
                 if key not in metadata and anchored_section.get(key) is not None:
                     metadata[key] = anchored_section.get(key)
             candidate_key = str(metadata.get("candidate_key") or "anchored_four_sleeve_tuned")
@@ -951,12 +972,8 @@ def build_portfolio_max_performance_decision(
     else:
         winner = incumbent
         winner_status = "retained_incumbent"
-        winner_reason = (
-            "No challenger cleared the locked-OOS robustness gates; keep the current one-shot incumbent."
-        )
-        recommended_action = (
-            "Retain the incumbent and continue with cleanup, evidence collation, and reproducibility hardening."
-        )
+        winner_reason = "No challenger cleared the locked-OOS robustness gates; keep the current one-shot incumbent."
+        recommended_action = "Retain the incumbent and continue with cleanup, evidence collation, and reproducibility hardening."
 
     challenger_rankings = [
         {
@@ -1115,10 +1132,14 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--overlay-comparison", default=str(DEFAULT_OVERLAY_COMPARISON))
     parser.add_argument("--regime-switch-comparison", default=str(DEFAULT_REGIME_SWITCH_COMPARISON))
     parser.add_argument("--grouped-allocator", default=str(DEFAULT_GROUPED_ALLOCATOR))
-    parser.add_argument("--grouped-strict-validation", default=str(DEFAULT_GROUPED_STRICT_VALIDATION))
+    parser.add_argument(
+        "--grouped-strict-validation", default=str(DEFAULT_GROUPED_STRICT_VALIDATION)
+    )
     parser.add_argument("--grouped-static-blend", default=str(DEFAULT_GROUPED_STATIC_BLEND))
     parser.add_argument("--production-guarded", default=str(DEFAULT_PRODUCTION_GUARDED))
-    parser.add_argument("--portfolio-superiority-meta", default=str(DEFAULT_PORTFOLIO_SUPERIORITY_META))
+    parser.add_argument(
+        "--portfolio-superiority-meta", default=str(DEFAULT_PORTFOLIO_SUPERIORITY_META)
+    )
     parser.add_argument("--backbone-triplet", default=str(DEFAULT_BACKBONE_TRIPLET))
     parser.add_argument("--anchored-comparison", default=str(DEFAULT_ANCHORED_COMPARISON))
     parser.add_argument("--extra-candidate-artifact", action="append", default=[])
@@ -1144,7 +1165,9 @@ def main(argv: list[str] | None = None) -> int:
         backbone_triplet_path=Path(args.backbone_triplet).resolve(),
         anchored_comparison_path=Path(args.anchored_comparison).resolve(),
         meta_search_summary_paths=DEFAULT_META_SEARCH_SUMMARIES,
-        extra_candidate_artifact_paths=tuple(Path(path).resolve() for path in list(args.extra_candidate_artifact or [])),
+        extra_candidate_artifact_paths=tuple(
+            Path(path).resolve() for path in list(args.extra_candidate_artifact or [])
+        ),
         output_json_path=Path(args.output_json).resolve(),
         output_md_path=Path(args.output_md).resolve(),
     )

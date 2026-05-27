@@ -142,7 +142,12 @@ class TradingEngine(ABC):
                     should_process = True
             if should_process:
                 self._assert_strategy_requirements(
-                    available_inputs={"market_event", "data_handler", "execution_handler", "exchange"},
+                    available_inputs={
+                        "market_event",
+                        "data_handler",
+                        "execution_handler",
+                        "exchange",
+                    },
                     feature_lookup=getattr(self.data_handler, "_feature_lookup", None),
                 )
                 self.strategy.calculate_signals(market_event)
@@ -283,14 +288,22 @@ class TradingEngine(ABC):
         total_bars = sum(len(values or ()) for values in bars_1s.values())
         self.market_events += int(total_bars if total_bars > 0 else 1)
 
-        aggregator = self._ensure_timeframe_aggregator() if self._strategy_uses_timeframe_aggregator() else None
+        aggregator = (
+            self._ensure_timeframe_aggregator()
+            if self._strategy_uses_timeframe_aggregator()
+            else None
+        )
         if aggregator is not None:
             aggregator.update_from_1s_batch(bars_1s)
 
         if self._should_process_market_window_event(event):
-            preferred_contract = str(
-                getattr(self.strategy, "preferred_contract", "market_window") or "market_window"
-            ).strip().lower()
+            preferred_contract = (
+                str(
+                    getattr(self.strategy, "preferred_contract", "market_window") or "market_window"
+                )
+                .strip()
+                .lower()
+            )
             window_fn = getattr(self.strategy, "calculate_signals_window", None)
             context_fn = getattr(self.strategy, "calculate_signals_context", None)
             available_inputs = {"market_window", "data_handler", "execution_handler", "exchange"}

@@ -146,7 +146,14 @@ KNOWN_EXTERNAL_CLUSTERS: tuple[dict[str, Any], ...] = (
         "query_or_title": "Crypto momentum/reversal/common risk-factor literature",
         "source_type": "paper",
         "path_or_url": "cluster:crypto_momentum_reversal_risk_factor_papers",
-        "match_tokens": ("momentum", "reversal", "risk-factor", "risk factor", "paper", "literature"),
+        "match_tokens": (
+            "momentum",
+            "reversal",
+            "risk-factor",
+            "risk factor",
+            "paper",
+            "literature",
+        ),
         "content_summary": (
             "Crypto momentum, reversal, and common risk-factor literature supports dynamic/state "
             "hypotheses but does not validate fixed month/asset calendar-primary rules."
@@ -359,7 +366,9 @@ def _what_was_used_for_families(families: Sequence[str]) -> str:
     if "calendar_primary_invalid" in families:
         return "Used to reject fixed calendar/month/asset rules as live-primary alpha."
     if "liquidation_aware_replay" in families:
-        return "Used to require conservative liquidation, margin-buffer, and account-wipeout evidence."
+        return (
+            "Used to require conservative liquidation, margin-buffer, and account-wipeout evidence."
+        )
     if "source_history_ledger" in families:
         return "Used to seed durable source/history inventory and duplicate-search guards."
     if "raw_first_data_pipeline" in families or "live_equivalent_validation" in families:
@@ -368,12 +377,16 @@ def _what_was_used_for_families(families: Sequence[str]) -> str:
         return "Used to control split-window/timeframe evidence and prevent accidental validation drift."
     if "regime_switching_allocator" in families or "dynamic_portfolio_allocator" in families:
         return "Used as allocator and portfolio-selection history for later moonshot/live-promotion gates."
-    return "Used as historical context for dynamic restart candidate families and rejection decisions."
+    return (
+        "Used as historical context for dynamic restart candidate families and rejection decisions."
+    )
 
 
 def _decision_impact_for_families(families: Sequence[str]) -> str:
     if "calendar_primary_invalid" in families:
-        return "Blocks calendar-primary live promotion unless a separate robustness program proves it."
+        return (
+            "Blocks calendar-primary live promotion unless a separate robustness program proves it."
+        )
     if "integer_leverage" in families:
         return "Non-integer leverage rows are benchmark-only and cannot be live promoted."
     if "dynamic_hybrid_allocator" in families:
@@ -424,7 +437,9 @@ def parse_git_log_records(raw: str) -> list[dict[str, str]]:
     return records
 
 
-def discover_git_commit_history(*, start_date: str = START_DATE, end_date: str = END_DATE) -> list[dict[str, Any]]:
+def discover_git_commit_history(
+    *, start_date: str = START_DATE, end_date: str = END_DATE
+) -> list[dict[str, Any]]:
     """Return research-relevant semantic commits as durable source inventory.
 
     Git history is intentionally a first-class source because many March/April
@@ -504,7 +519,9 @@ def _external_inventory_items(local_items: Sequence[Mapping[str, Any]]) -> list[
     joined_by_date: dict[str, str] = defaultdict(str)
     for item in local_items:
         for date in item.get("all_research_dates") or [item.get("research_date")]:
-            joined_by_date[str(date)] += " " + str(item.get("path_or_url")) + " " + str(item.get("content_summary"))
+            joined_by_date[str(date)] += (
+                " " + str(item.get("path_or_url")) + " " + str(item.get("content_summary"))
+            )
 
     items: list[dict[str, Any]] = []
     for cluster in KNOWN_EXTERNAL_CLUSTERS:
@@ -582,7 +599,8 @@ def build_source_search_ledger(inventory: Sequence[Mapping[str, Any]]) -> list[d
                 "associated_strategy_families": set(),
                 "decision_impacts": [],
                 "inventory_refs": [],
-                "staleness_policy": item.get("staleness_policy") or "Recheck when data coverage, venue docs, or strategy family changes.",
+                "staleness_policy": item.get("staleness_policy")
+                or "Recheck when data coverage, venue docs, or strategy family changes.",
                 "recheck_before_use": bool(item.get("recheck_before_use", False)),
                 "do_not_repeat_note": item.get("do_not_repeat_note")
                 or "Check this normalized key before repeating the same local/source search.",
@@ -681,7 +699,12 @@ def build_strategy_chronology(
             )[:12],
             hypothesis="Research metrics should be rebuilt on raw-first/live-data foundations before promotion decisions.",
             primary_signal_type="research_infrastructure",
-            features=["raw-first ingestion", "live data decoupling", "Binance/live migration", "memory-safe refresh"],
+            features=[
+                "raw-first ingestion",
+                "live data decoupling",
+                "Binance/live migration",
+                "memory-safe refresh",
+            ],
             universe="live crypto universe and exact-window research inputs",
             timeframe="pre-profit-moonshot March data and refresh foundations",
             split_periods="foundation work for later exact-window train/validation/OOS splits",
@@ -697,10 +720,17 @@ def build_strategy_chronology(
             liquidation_status="liquidation/crowding features existed as strategy inputs but not final replay gates",
             source_ledger_refs=_ledger_keys_with(
                 ledger=ledger,
-                families=["raw_first_data_pipeline", "exact_window_validation", "live_equivalent_validation"],
+                families=[
+                    "raw_first_data_pipeline",
+                    "exact_window_validation",
+                    "live_equivalent_validation",
+                ],
             ),
             advantages=["made later exact replay possible", "reduced data-path ambiguity"],
-            disadvantages=["does not itself prove alpha", "requires later strategy/live-equivalent gates"],
+            disadvantages=[
+                "does not itself prove alpha",
+                "requires later strategy/live-equivalent gates",
+            ],
             final_decision="preserve_as_foundation",
             reason="March data/validation foundations are required context for later moonshot research claims.",
         ),
@@ -715,7 +745,12 @@ def build_strategy_chronology(
             )[:12],
             hypothesis="Memory-safe exact-window sweeps can identify stronger timeframe/strategy candidates without split drift.",
             primary_signal_type="dynamic_state_signal",
-            features=["timeframe sweep", "exact split validation", "strategy expansion", "candidate scoring"],
+            features=[
+                "timeframe sweep",
+                "exact split validation",
+                "strategy expansion",
+                "candidate scoring",
+            ],
             universe="candidate research universe before the May profit-moonshot naming",
             timeframe="multi-timeframe exact-window research windows",
             split_periods="exact train/validation/OOS windows where artifacts record them",
@@ -748,7 +783,12 @@ def build_strategy_chronology(
             )[:12],
             hypothesis="Dynamic causal and walk-forward portfolio allocation may improve robustness versus single-candidate ranking.",
             primary_signal_type="dynamic_portfolio_allocator",
-            features=["dynamic causal allocation", "walk-forward tuning", "portfolio weights", "candidate ensembles"],
+            features=[
+                "dynamic causal allocation",
+                "walk-forward tuning",
+                "portfolio weights",
+                "candidate ensembles",
+            ],
             universe="candidate portfolio universe before later live-equivalent narrowing",
             timeframe="walk-forward and latest-tail research windows",
             split_periods="train/validation/OOS where historical artifacts recorded them",
@@ -765,8 +805,14 @@ def build_strategy_chronology(
                 ledger=ledger,
                 families=["dynamic_portfolio_allocator", "walk_forward_validation"],
             ),
-            advantages=["introduced ensemble/portfolio thinking", "surfaced allocator robustness needs"],
-            disadvantages=["pre-source-ledger and pre-liquidation gate", "can overfit if OOS is used for selection"],
+            advantages=[
+                "introduced ensemble/portfolio thinking",
+                "surfaced allocator robustness needs",
+            ],
+            disadvantages=[
+                "pre-source-ledger and pre-liquidation gate",
+                "can overfit if OOS is used for selection",
+            ],
             final_decision="retain_as_allocator_predecessor",
             reason="Allocator ideas informed later candidate-hybrid rules but cannot bypass current train/validation-only gates.",
         ),
@@ -781,7 +827,12 @@ def build_strategy_chronology(
             )[:12],
             hypothesis="Strict portfolio validation and latest-tail checks can prevent fragile candidate promotion.",
             primary_signal_type="validation_control_plane",
-            features=["strict validation", "latest-tail checks", "OOS materialization", "memory guard"],
+            features=[
+                "strict validation",
+                "latest-tail checks",
+                "OOS materialization",
+                "memory guard",
+            ],
             universe="portfolio/candidate research universe with live-tail data concerns",
             timeframe="March latest-tail and exact-window validation slices",
             split_periods="strict train/validation/OOS split discipline",
@@ -814,7 +865,12 @@ def build_strategy_chronology(
             )[:12],
             hypothesis="Regime-switching/Kelly-sized allocators and archived pair blends might improve risk-adjusted OOS.",
             primary_signal_type="regime_switching_allocator",
-            features=["regime switch", "weekly Kelly sizing", "archived pair blend", "sparse-symbol live tails"],
+            features=[
+                "regime switch",
+                "weekly Kelly sizing",
+                "archived pair blend",
+                "sparse-symbol live tails",
+            ],
             universe="saved allocators and archived pair challengers",
             timeframe="late-March validation and live-tail continuity windows",
             split_periods="strict validation slices; OOS evidence preserved for later comparison only",
@@ -831,8 +887,14 @@ def build_strategy_chronology(
                 ledger=ledger,
                 families=["regime_switching_allocator", "residual_pair_reversion"],
             ),
-            advantages=["added allocator diversity", "made sparse-symbol/live-tail failure modes visible"],
-            disadvantages=["archived artifacts can be stale", "must not be promoted without current data refresh"],
+            advantages=[
+                "added allocator diversity",
+                "made sparse-symbol/live-tail failure modes visible",
+            ],
+            disadvantages=[
+                "archived artifacts can be stale",
+                "must not be promoted without current data refresh",
+            ],
             final_decision="retain_but_revalidate_before_use",
             reason="Regime and pair ideas remain useful hypotheses only after current train/validation/live gates rerun.",
         ),
@@ -847,7 +909,12 @@ def build_strategy_chronology(
             )[:12],
             hypothesis="Under-8GiB meta-search and leverage validation can find a superior live portfolio challenger.",
             primary_signal_type="portfolio_meta_search",
-            features=["meta-search winners", "basis leakage guard", "strict leverage validation", "8GiB cap"],
+            features=[
+                "meta-search winners",
+                "basis leakage guard",
+                "strict leverage validation",
+                "8GiB cap",
+            ],
             universe="portfolio-superiority candidate set",
             timeframe="April portfolio-superiority and saved-stream research windows",
             split_periods="robust gate evidence and strict validation paths",
@@ -862,10 +929,16 @@ def build_strategy_chronology(
             liquidation_status="not yet final Binance-style liquidation/margin replay",
             source_ledger_refs=_ledger_keys_with(
                 ledger=ledger,
-                families=["dynamic_portfolio_allocator", "integer_leverage", "live_equivalent_validation"],
+                families=[
+                    "dynamic_portfolio_allocator",
+                    "integer_leverage",
+                    "live_equivalent_validation",
+                ],
             ),
             advantages=["made 8GiB a hard research constraint", "surfaced leakage/basis risks"],
-            disadvantages=["portfolio-superiority artifacts are predecessors, not final live candidates"],
+            disadvantages=[
+                "portfolio-superiority artifacts are predecessors, not final live candidates"
+            ],
             final_decision="preserve_as_moonshot_predecessor",
             reason="April portfolio-superiority work explains the moonshot lineage but must be rerun under current gates.",
         ),
@@ -880,7 +953,12 @@ def build_strategy_chronology(
             )[:12],
             hypothesis="Profit-first hybrid switch thresholds and replayable policies may improve default portfolio routing.",
             primary_signal_type="dynamic_hybrid_allocator",
-            features=["hybrid warm-up", "profit-first switch", "reboot split replay", "market-state coverage"],
+            features=[
+                "hybrid warm-up",
+                "profit-first switch",
+                "reboot split replay",
+                "market-state coverage",
+            ],
             universe="hybrid/reboot portfolio mode universe",
             timeframe="April reboot split and switch-threshold replay windows",
             split_periods="reboot split with replayed switch performance",
@@ -898,7 +976,10 @@ def build_strategy_chronology(
                 families=["dynamic_hybrid_allocator", "walk_forward_validation"],
             ),
             advantages=["made hybrid policy replayable", "separated warm-up/lookback mechanics"],
-            disadvantages=["hybrid rows can inherit invalid source sleeves", "coverage limits can cap replay trust"],
+            disadvantages=[
+                "hybrid rows can inherit invalid source sleeves",
+                "coverage limits can cap replay trust",
+            ],
             final_decision="retain_hybrid_design_with_source_gates",
             reason="Hybrid mechanics are useful, but later candidate-derived hybrids must inherit source validity gates.",
         ),
@@ -913,7 +994,12 @@ def build_strategy_chronology(
             )[:12],
             hypothesis="A guarded production carry/trend sleeve and portfolio-superiority follow-up could become live-ready.",
             primary_signal_type="production_candidate_sleeve",
-            features=["carry/trend retune", "production mode", "portfolio overlays", "candidate diversity"],
+            features=[
+                "carry/trend retune",
+                "production mode",
+                "portfolio overlays",
+                "candidate diversity",
+            ],
             universe="production-safe carry/trend and portfolio-superiority candidate set",
             timeframe="April production retune and follow-up windows",
             split_periods="candidate research progress and portfolio optimization splits where recorded",
@@ -931,7 +1017,10 @@ def build_strategy_chronology(
                 families=["funding_oi_carry", "trend_momentum", "dynamic_portfolio_allocator"],
             ),
             advantages=["kept production-lane constraints explicit", "improved observability"],
-            disadvantages=["still predecessor evidence", "requires current source/liquidation gate replay"],
+            disadvantages=[
+                "still predecessor evidence",
+                "requires current source/liquidation gate replay",
+            ],
             final_decision="retain_as_production_predecessor",
             reason="Carry/trend production lane is historical context until refreshed under current live candidate rules.",
         ),
@@ -946,7 +1035,12 @@ def build_strategy_chronology(
             )[:12],
             hypothesis="Live-equivalent backtests and deployable-mode filters should separate research scores from live promotion.",
             primary_signal_type="live_equivalent_validation",
-            features=["live-equivalent revalidation", "deployable HYBRID modes", "full-universe selection", "candidate reset"],
+            features=[
+                "live-equivalent revalidation",
+                "deployable HYBRID modes",
+                "full-universe selection",
+                "candidate reset",
+            ],
             universe="full live-equivalent candidate universe before May profit search",
             timeframe="late-April live-equivalent validation and artifact-reset windows",
             split_periods="live-equivalent backtests and deployable portfolio modes",
@@ -963,7 +1057,10 @@ def build_strategy_chronology(
                 ledger=ledger,
                 families=["live_equivalent_validation", "dynamic_hybrid_allocator"],
             ),
-            advantages=["separated research HYBRID scores from live-deployable modes", "forced fail-closed posture"],
+            advantages=[
+                "separated research HYBRID scores from live-deployable modes",
+                "forced fail-closed posture",
+            ],
             disadvantages=["still needed refreshed May data and source-history metadata"],
             final_decision="bridge_to_may_profit_moonshot",
             reason="Late-April live-equivalent work is the direct predecessor to May profit-moonshot gates.",
@@ -988,7 +1085,9 @@ def build_strategy_chronology(
             oos_metrics="report-only; early rows were not final live promotions",
             leverage_status="live leverage not yet strict for every row",
             liquidation_status="not consistently replayed in early artifacts",
-            source_ledger_refs=_ledger_keys_with(ledger=ledger, families=["profit_moonshot_research_history"]),
+            source_ledger_refs=_ledger_keys_with(
+                ledger=ledger, families=["profit_moonshot_research_history"]
+            ),
             advantages=["broad search surface", "preserved early candidate context"],
             disadvantages=["incomplete live gates", "risk of repeated source searches"],
             final_decision="continue_dynamic_restart",
@@ -1074,7 +1173,10 @@ def build_strategy_chronology(
                 families=["calendar_primary_invalid", "integer_leverage"],
             ),
             advantages=["surfaced high-return failure mode", "hardened integer leverage policy"],
-            disadvantages=["calendar-primary edge is not live-defensible", "hybrids inherited defects"],
+            disadvantages=[
+                "calendar-primary edge is not live-defensible",
+                "hybrids inherited defects",
+            ],
             final_decision="reject_calendar_primary",
             reason="Calendar-primary month/asset rules are invalid for live promotion by default.",
         ),
@@ -1084,7 +1186,13 @@ def build_strategy_chronology(
             artifact_paths=_artifact_paths_with(inventory, "20260510"),
             hypothesis="A final candidate or hybrid can promote only if dynamic, traceable, integer, and liquidation safe.",
             primary_signal_type="fail_closed_dynamic_state_required",
-            features=["strategy validity", "source ledger", "integer leverage", "liquidation replay", "memory RSS"],
+            features=[
+                "strategy validity",
+                "source ledger",
+                "integer leverage",
+                "liquidation replay",
+                "memory RSS",
+            ],
             universe="candidate portfolio, direct candidate, and candidate-derived hybrid rows",
             timeframe="latest complete OOS cutoff with locked-OOS report-only",
             split_periods="train/validation selection; locked-OOS gate/report only",
@@ -1100,7 +1208,11 @@ def build_strategy_chronology(
             liquidation_status="split liquidation count, margin buffer, margin ratio, and no wipeout required",
             source_ledger_refs=_ledger_keys_with(
                 ledger=ledger,
-                families=["liquidation_aware_replay", "source_history_ledger", "dynamic_hybrid_allocator"],
+                families=[
+                    "liquidation_aware_replay",
+                    "source_history_ledger",
+                    "dynamic_hybrid_allocator",
+                ],
             ),
             advantages=["fail-closed live gate", "clear no-promotion terminal state"],
             disadvantages=["may reject all rows until metadata and replay are complete"],
@@ -1110,7 +1222,10 @@ def build_strategy_chronology(
         _chronology_entry(
             research_date="2026-05-10",
             strategy_family="dynamic_restart_research_history_ledger",
-            artifact_paths=[str(DEFAULT_DOCS_PATH), str(DEFAULT_REPORT_DIR / "profit_moonshot_research_history_latest.json")],
+            artifact_paths=[
+                str(DEFAULT_DOCS_PATH),
+                str(DEFAULT_REPORT_DIR / "profit_moonshot_research_history_latest.json"),
+            ],
             hypothesis="Future sessions should read a durable research history before new searches or tuning.",
             primary_signal_type="research_control_plane",
             features=["source_history_inventory", "source_search_ledger", "duplicate_search_guard"],
@@ -1188,7 +1303,9 @@ def build_research_history_payload(
     artifact_inventory = discover_source_history_inventory(roots)
     git_commit_history = discover_git_commit_history() if include_git_history else []
     local_inventory = artifact_inventory + git_commit_history
-    inventory = local_inventory + _external_inventory_items(local_inventory) + _not_reconstructable_items()
+    inventory = (
+        local_inventory + _external_inventory_items(local_inventory) + _not_reconstructable_items()
+    )
     ledger = build_source_search_ledger(inventory)
     chronology = build_strategy_chronology(inventory=inventory, ledger=ledger)
     return {
@@ -1346,7 +1463,9 @@ def ensure_notepad_pointer(notepad_path: Path, docs_path: Path) -> bool:
         "Profit moonshot dynamic restart: read "
         f"{docs_path} before new source searches, tuning, or live promotion decisions."
     )
-    existing = notepad_path.read_text(encoding="utf-8", errors="ignore") if notepad_path.exists() else ""
+    existing = (
+        notepad_path.read_text(encoding="utf-8", errors="ignore") if notepad_path.exists() else ""
+    )
     if pointer in existing:
         return False
     notepad_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1357,7 +1476,9 @@ def ensure_notepad_pointer(notepad_path: Path, docs_path: Path) -> bool:
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--root", action="append", default=[], help="Root/file to scan; repeatable.")
+    parser.add_argument(
+        "--root", action="append", default=[], help="Root/file to scan; repeatable."
+    )
     parser.add_argument("--docs-path", default=str(DEFAULT_DOCS_PATH))
     parser.add_argument("--report-dir", default=str(DEFAULT_REPORT_DIR))
     parser.add_argument("--notepad-path", default=str(DEFAULT_NOTEPAD_PATH))

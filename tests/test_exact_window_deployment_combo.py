@@ -141,7 +141,11 @@ def test_build_scenarios_carries_committee_and_final_decision_to_components(tmp_
                         "risk_flags": ["oos_positive_skew_warning"],
                         "final_decision": "promote",
                     },
-                    "return_streams": {"train": [{"t": 1, "v": 0.0}], "val": [{"t": 2, "v": 0.02}], "oos": [{"t": 3, "v": 0.03}]},
+                    "return_streams": {
+                        "train": [{"t": 1, "v": 0.0}],
+                        "val": [{"t": 2, "v": 0.02}],
+                        "oos": [{"t": 3, "v": 0.03}],
+                    },
                 }
             ]
         ),
@@ -163,4 +167,8 @@ def test_build_scenarios_carries_committee_and_final_decision_to_components(tmp_
     assert component["final_decision"] == "promote"
     assert component["committee"]["final_decision"] == "promote"
     assert component["committee"]["risk_flags"] == ["oos_positive_skew_warning"]
-    assert set(component["risk_flags"]) >= {"research_only", "no_strict_anchor", "oos_positive_skew_warning"}
+    assert set(component["risk_flags"]) >= {
+        "research_only",
+        "no_strict_anchor",
+        "oos_positive_skew_warning",
+    }

@@ -168,7 +168,10 @@ def _legacy_mode_weights(legacy_payload: dict[str, Any]) -> tuple[dict[str, floa
         or {}
     )
     return (
-        {str(k): _safe_float(v, 0.0) for k, v in dict(final_allocation.get("weights") or {}).items()},
+        {
+            str(k): _safe_float(v, 0.0)
+            for k, v in dict(final_allocation.get("weights") or {}).items()
+        },
         _safe_float(final_allocation.get("cash_weight"), 0.0),
     )
 
@@ -339,7 +342,9 @@ def _retune_static_final_allocation(
     replay["final_allocation"] = {
         "date": "static_validation_primary_retune",
         "split": "deployable_static",
-        "default_sleeve": max(dict(replay.get("weights") or {}), key=dict(replay.get("weights") or {}).get),
+        "default_sleeve": max(
+            dict(replay.get("weights") or {}), key=dict(replay.get("weights") or {}).get
+        ),
         "weights": dict(replay.get("weights") or {}),
         "cash_weight": _safe_float(replay.get("cash_weight"), 0.0),
     }
@@ -502,10 +507,7 @@ def _write_reports(
         f"- generated_at: `{payload['generated_at']}`",
         "- tuning universe: committed live portfolio modes only",
         "- selection: validation-primary; OOS report-only; cash efficiency not scored",
-        (
-            f"- best dynamic retune score: "
-            f"`{payload['dynamic_scores']['selection_score']:.2f}`"
-        ),
+        (f"- best dynamic retune score: `{payload['dynamic_scores']['selection_score']:.2f}`"),
         (
             f"- deployable validation-primary static mode: `retuned_live_portfolio_hybrid_mode`, "
             f"score `{final_replay['selection_score']:.2f}`"

@@ -118,7 +118,10 @@ def _module_declares_formula_specs(tree: ast.AST) -> bool:
     for node in ast.walk(tree):
         if isinstance(node, ast.Assign):
             for target in node.targets:
-                if isinstance(target, ast.Name) and target.id in {"ALPHA_FUNCTION_SPECS", "ALPHA_SPECS"}:
+                if isinstance(target, ast.Name) and target.id in {
+                    "ALPHA_FUNCTION_SPECS",
+                    "ALPHA_SPECS",
+                }:
                     return True
         if (
             isinstance(node, ast.AnnAssign)
@@ -161,7 +164,9 @@ def _iter_python_files(paths: Sequence[str]) -> list[Path]:
     return unique
 
 
-def _build_scan_plan(literal_paths: Sequence[str], formula_paths: Sequence[str]) -> list[FileScanConfig]:
+def _build_scan_plan(
+    literal_paths: Sequence[str], formula_paths: Sequence[str]
+) -> list[FileScanConfig]:
     literal_files = set(_iter_python_files(literal_paths))
     formula_files = set(_iter_python_files(formula_paths))
     plan: list[FileScanConfig] = []
@@ -197,7 +202,9 @@ def _sanitize_token(token: str) -> str:
     return "_".join(parts) or "param"
 
 
-def _find_enclosing_function(node: ast.AST, parent_map: dict[ast.AST, ast.AST]) -> ast.FunctionDef | ast.AsyncFunctionDef | None:
+def _find_enclosing_function(
+    node: ast.AST, parent_map: dict[ast.AST, ast.AST]
+) -> ast.FunctionDef | ast.AsyncFunctionDef | None:
     current = node
     while current in parent_map:
         current = parent_map[current]
@@ -213,7 +220,10 @@ def _is_function_default_literal(
 ) -> bool:
     if func is None:
         return False
-    defaults = [*list(func.args.defaults), *[item for item in func.args.kw_defaults if item is not None]]
+    defaults = [
+        *list(func.args.defaults),
+        *[item for item in func.args.kw_defaults if item is not None],
+    ]
     for default_node in defaults:
         for descendant in ast.walk(default_node):
             if descendant is node:
@@ -221,7 +231,9 @@ def _is_function_default_literal(
     return False
 
 
-def _find_default_arg_name(node: ast.AST, func: ast.FunctionDef | ast.AsyncFunctionDef) -> str | None:
+def _find_default_arg_name(
+    node: ast.AST, func: ast.FunctionDef | ast.AsyncFunctionDef
+) -> str | None:
     positional_args = list(func.args.args)
     defaults = list(func.args.defaults)
     default_start = len(positional_args) - len(defaults)
@@ -244,7 +256,9 @@ def _assignment_target_name(parent: ast.AST | None) -> str | None:
     return None
 
 
-def _context_label(node: ast.AST, parent_map: dict[ast.AST, ast.AST], *, alpha_id: int | None = None) -> str:
+def _context_label(
+    node: ast.AST, parent_map: dict[ast.AST, ast.AST], *, alpha_id: int | None = None
+) -> str:
     labels: list[str] = []
     func = _find_enclosing_function(node, parent_map)
     if func is not None:
@@ -327,9 +341,17 @@ def _parse_numeric_literal_from_node(
     parent_map: dict[ast.AST, ast.AST],
     source: str,
 ) -> tuple[float, str] | None:
-    if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)) and not isinstance(node.value, bool):
+    if (
+        isinstance(node, ast.Constant)
+        and isinstance(node.value, (int, float))
+        and not isinstance(node.value, bool)
+    ):
         parent = parent_map.get(node)
-        if isinstance(parent, ast.UnaryOp) and parent.operand is node and isinstance(parent.op, (ast.USub, ast.UAdd)):
+        if (
+            isinstance(parent, ast.UnaryOp)
+            and parent.operand is node
+            and isinstance(parent.op, (ast.USub, ast.UAdd))
+        ):
             return None
         value = float(node.value)
         literal = ast.get_source_segment(source, node) or str(node.value)
@@ -337,7 +359,11 @@ def _parse_numeric_literal_from_node(
 
     if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.USub, ast.UAdd)):
         operand = node.operand
-        if isinstance(operand, ast.Constant) and isinstance(operand.value, (int, float)) and not isinstance(operand.value, bool):
+        if (
+            isinstance(operand, ast.Constant)
+            and isinstance(operand.value, (int, float))
+            and not isinstance(operand.value, bool)
+        ):
             base = float(operand.value)
             value = -base if isinstance(node.op, ast.USub) else base
             literal = ast.get_source_segment(source, node) or str(value)
@@ -540,7 +566,13 @@ def _signature_aliases(signature: str) -> set[str]:
     return variants
 
 
-def _write_baseline(path: Path, signatures: Iterable[str], *, literal_paths: Sequence[str], formula_paths: Sequence[str]) -> None:
+def _write_baseline(
+    path: Path,
+    signatures: Iterable[str],
+    *,
+    literal_paths: Sequence[str],
+    formula_paths: Sequence[str],
+) -> None:
     payload = {
         "generated_at_utc": datetime.now(UTC).isoformat(),
         "literal_paths": list(literal_paths),
@@ -596,7 +628,9 @@ def _write_json_report(
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
-def _write_markdown_report(path: Path, *, violations: Sequence[Violation], baselined: set[str]) -> None:
+def _write_markdown_report(
+    path: Path, *, violations: Sequence[Violation], baselined: set[str]
+) -> None:
     lines: list[str] = []
     now = datetime.now(UTC).isoformat()
     total = len(violations)
@@ -697,7 +731,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             literal_paths=literal_paths,
             formula_paths=formula_paths,
         )
-        print(f"Baseline written: {baseline_path.relative_to(PROJECT_ROOT)} ({len(violations)} signatures)")
+        print(
+            f"Baseline written: {baseline_path.relative_to(PROJECT_ROOT)} ({len(violations)} signatures)"
+        )
         return 0
 
     json_out = (PROJECT_ROOT / str(args.json_out)).resolve()

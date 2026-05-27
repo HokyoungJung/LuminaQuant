@@ -173,7 +173,9 @@ class LiveTrader(TradingEngine):
             self.exchange = get_exchange(self.config)
             self.symbol_list = self._filter_unavailable_symbols(self.symbol_list)
             if not self.symbol_list:
-                raise RuntimeError("No tradable symbols are available on exchange after market sync.")
+                raise RuntimeError(
+                    "No tradable symbols are available on exchange after market sync."
+                )
             self.config = _snapshot_live_config(self._config_source, symbols=self.symbol_list)
             self.risk_manager.config = self.config
 
@@ -187,9 +189,7 @@ class LiveTrader(TradingEngine):
             if hasattr(self.execution_handler, "set_order_state_callback"):
                 self.execution_handler.set_order_state_callback(self._on_order_state)
 
-            self.portfolio = portfolio_cls(
-                self.data_handler, self.events, time.time(), self.config
-            )
+            self.portfolio = portfolio_cls(self.data_handler, self.events, time.time(), self.config)
             self.strategy = strategy_cls(self.data_handler, self.events, **self.strategy_params)
             try:
                 configured_cadence = max(
@@ -265,7 +265,9 @@ class LiveTrader(TradingEngine):
                 ),
                 cache_open_order_signature=self._cache_open_order_signature,
                 exchange_open_order_signature=lambda: tuple(
-                    getattr(self.execution_handler, "exchange_open_order_signature", lambda: tuple())()
+                    getattr(
+                        self.execution_handler, "exchange_open_order_signature", lambda: tuple()
+                    )()
                 ),
             )
 
@@ -378,7 +380,9 @@ class LiveTrader(TradingEngine):
             pass
         self._audit_closed = True
 
-    def _set_startup_state(self, state: str, *, reason: str = "", error: Exception | None = None) -> None:
+    def _set_startup_state(
+        self, state: str, *, reason: str = "", error: Exception | None = None
+    ) -> None:
         self._startup_state = str(state)
         self._startup_state_reason = str(reason or (str(error) if error is not None else ""))
         logger = getattr(self, "logger", None)
@@ -872,7 +876,9 @@ class LiveTrader(TradingEngine):
             market_spec=market_spec,
             config=self.config,
         )
-        mode = normalize_limit_price_mode(getattr(self.config, "LIMIT_PRICE_MODE", "one_tick_worse"))
+        mode = normalize_limit_price_mode(
+            getattr(self.config, "LIMIT_PRICE_MODE", "one_tick_worse")
+        )
         offset_ticks = int(getattr(self.config, "LIMIT_PRICE_OFFSET_TICKS", 1) or 0)
         price = limit_price_for_direction(
             reference_price=reference_price,
@@ -932,7 +938,9 @@ class LiveTrader(TradingEngine):
             except Exception as exc:
                 self.logger.error("Flatten could not fetch position legs: %s", exc)
 
-        effective_legs = self._best_available_position_legs(legs if isinstance(legs, dict) else None)
+        effective_legs = self._best_available_position_legs(
+            legs if isinstance(legs, dict) else None
+        )
 
         for symbol in self.symbol_list:
             payload = effective_legs.get(symbol) if isinstance(effective_legs, dict) else None
@@ -1230,7 +1238,9 @@ class LiveTrader(TradingEngine):
         now = time.monotonic()
         window = float(self.main_loop_error_window_seconds)
         self._main_loop_error_timestamps = [
-            stamp for stamp in list(self._main_loop_error_timestamps) if (now - float(stamp)) <= window
+            stamp
+            for stamp in list(self._main_loop_error_timestamps)
+            if (now - float(stamp)) <= window
         ]
         self._main_loop_error_timestamps.append(now)
         error_count = len(self._main_loop_error_timestamps)

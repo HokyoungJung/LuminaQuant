@@ -17,7 +17,9 @@ StrategySignalHandler = Callable[
 def _returns_from_close(closes: np.ndarray) -> np.ndarray:
     if closes.size < 2:
         return np.zeros(closes.shape, dtype=float)
-    return np.diff(closes, prepend=closes[0]) / np.clip(np.r_[closes[0], closes[:-1]], 1e-12, np.inf)
+    return np.diff(closes, prepend=closes[0]) / np.clip(
+        np.r_[closes[0], closes[:-1]], 1e-12, np.inf
+    )
 
 
 @dataclass(frozen=True, slots=True)

@@ -112,7 +112,9 @@ def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
 def _write_csv(path: Path, rows: Sequence[Mapping[str, Any]], fieldnames: Sequence[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(fieldnames), extrasaction="ignore", lineterminator="\n")
+        writer = csv.DictWriter(
+            handle, fieldnames=list(fieldnames), extrasaction="ignore", lineterminator="\n"
+        )
         writer.writeheader()
         for row in rows:
             writer.writerow({field: _csv_value(row.get(field)) for field in fieldnames})
@@ -170,7 +172,9 @@ def _lane_summary(row: Mapping[str, Any], *, lane_group: str) -> dict[str, Any]:
     status = dict(preflight.get("status") or {})
     sizing = dict(row.get("paper_equivalent_sizing") or {})
     leverage = _safe_float(row.get("leverage") or validation.get("leverage"))
-    allocation = _safe_float(row.get("allocation_fraction") or validation.get("allocation_fraction"))
+    allocation = _safe_float(
+        row.get("allocation_fraction") or validation.get("allocation_fraction")
+    )
     return {
         "lane_group": lane_group,
         "role": row.get("role"),
@@ -180,22 +184,29 @@ def _lane_summary(row: Mapping[str, Any], *, lane_group: str) -> dict[str, Any]:
         "leverage": leverage,
         "allocation_fraction": allocation,
         "target_notional_fraction_of_equity": leverage * allocation,
-        "sizing_mode": dict(sizing.get("fixture") or {}).get("sizing_mode") or paper_preflight.SIZING_MODE,
+        "sizing_mode": dict(sizing.get("fixture") or {}).get("sizing_mode")
+        or paper_preflight.SIZING_MODE,
         "expected_replay_notional_for_10000_equity": sizing.get("expected_replay_notional"),
         "live_notional_for_10000_equity": sizing.get("live_notional"),
         "notional_parity_passed": bool(sizing.get("notional_parity_passed")),
         "risk_check_passed": bool(sizing.get("risk_check_passed")),
-        "validation_return": _safe_float(validation.get("total_return") or row.get("validation_return")),
+        "validation_return": _safe_float(
+            validation.get("total_return") or row.get("validation_return")
+        ),
         "validation_mdd": _safe_float(validation.get("max_drawdown") or row.get("validation_mdd")),
         "validation_sharpe": _safe_float(validation.get("sharpe") or row.get("validation_sharpe")),
-        "validation_trade_event_count": validation.get("trade_event_count") or row.get("validation_trade_event_count"),
+        "validation_trade_event_count": validation.get("trade_event_count")
+        or row.get("validation_trade_event_count"),
         "train_return": _safe_float(train.get("total_return") or row.get("train_return")),
         "train_mdd": _safe_float(train.get("max_drawdown") or row.get("train_mdd")),
-        "locked_oos_return": _safe_float(locked.get("total_return") or row.get("locked_oos_return")),
+        "locked_oos_return": _safe_float(
+            locked.get("total_return") or row.get("locked_oos_return")
+        ),
         "locked_oos_mdd": _safe_float(locked.get("max_drawdown") or row.get("locked_oos_mdd")),
         "locked_oos_liquidation_count": _safe_float(locked.get("liquidation_count")),
         "locked_oos_account_wipeout_count": _safe_float(locked.get("account_wipeout_count")),
-        "locked_oos_trade_event_count": locked.get("trade_event_count") or row.get("locked_oos_trade_event_count"),
+        "locked_oos_trade_event_count": locked.get("trade_event_count")
+        or row.get("locked_oos_trade_event_count"),
         "primary_10bps_promotion_gate_pass": _all_split_gate_pass(row),
         "live_promotable_10bps": _all_split_gate_pass(row),
         "ready_for_paper": bool(status.get("ready_for_paper")),
@@ -215,7 +226,11 @@ def _metrics_by_model(retune: Mapping[str, Any]) -> dict[str, dict[str, dict[str
         split = str(row.get("split") or "")
         if model_id and split in high.SPLIT_ORDER:
             by_model.setdefault(model_id, {})[split] = dict(row)
-    return {model_id: splits for model_id, splits in by_model.items() if all(split in splits for split in high.SPLIT_ORDER)}
+    return {
+        model_id: splits
+        for model_id, splits in by_model.items()
+        if all(split in splits for split in high.SPLIT_ORDER)
+    }
 
 
 def _live_gate_pass(splits: Mapping[str, Mapping[str, Any]]) -> bool:
@@ -226,7 +241,9 @@ def _live_gate_pass(splits: Mapping[str, Mapping[str, Any]]) -> bool:
     )
 
 
-def _candidate_summary(model_id: str, splits: Mapping[str, Mapping[str, Any]], *, rank: int, shadow_group: str) -> dict[str, Any]:
+def _candidate_summary(
+    model_id: str, splits: Mapping[str, Mapping[str, Any]], *, rank: int, shadow_group: str
+) -> dict[str, Any]:
     train = dict(splits["train"])
     validation = dict(splits["validation"])
     locked = dict(splits["locked_oos"])
@@ -268,7 +285,9 @@ def _candidate_summary(model_id: str, splits: Mapping[str, Mapping[str, Any]], *
     }
 
 
-def _ranked_candidates(retune: Mapping[str, Any], predicate: Any, *, shadow_group: str, top_n: int) -> list[dict[str, Any]]:
+def _ranked_candidates(
+    retune: Mapping[str, Any], predicate: Any, *, shadow_group: str, top_n: int
+) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for model_id, splits in _metrics_by_model(retune).items():
         summary = _candidate_summary(model_id, splits, rank=0, shadow_group=shadow_group)
@@ -291,7 +310,10 @@ def _ranked_candidates(retune: Mapping[str, Any], predicate: Any, *, shadow_grou
 def _quality_surface(retune: Mapping[str, Any], *, top_n: int) -> dict[str, Any]:
     live_quality = _ranked_candidates(
         retune,
-        lambda row: row.get("candidate_name") == "alpha_zoo_quality_single_pair" and row.get("live_promotable_10bps"),
+        lambda row: (
+            row.get("candidate_name") == "alpha_zoo_quality_single_pair"
+            and row.get("live_promotable_10bps")
+        ),
         shadow_group="quality_single_pair_live_surface",
         top_n=top_n,
     )
@@ -318,9 +340,13 @@ def _monitoring_rows(lanes: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]
                 "leverage": lane.get("leverage"),
                 "allocation_fraction": lane.get("allocation_fraction"),
                 "sizing_mode": lane.get("sizing_mode"),
-                "target_notional_fraction_of_equity": lane.get("target_notional_fraction_of_equity"),
+                "target_notional_fraction_of_equity": lane.get(
+                    "target_notional_fraction_of_equity"
+                ),
                 "isolated_margin_fraction_of_equity": lane.get("allocation_fraction"),
-                "expected_replay_notional_for_10000_equity": lane.get("expected_replay_notional_for_10000_equity"),
+                "expected_replay_notional_for_10000_equity": lane.get(
+                    "expected_replay_notional_for_10000_equity"
+                ),
                 "live_notional_for_10000_equity": lane.get("live_notional_for_10000_equity"),
                 "notional_parity_passed": lane.get("notional_parity_passed"),
                 "research_round_trip_cost_bps": PRIMARY_ROUND_TRIP_COST_BPS,
@@ -335,7 +361,9 @@ def _monitoring_rows(lanes: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]
     return rows
 
 
-def _monitoring_contract(lanes: Sequence[Mapping[str, Any]], *, source_lineage: Mapping[str, Any]) -> dict[str, Any]:
+def _monitoring_contract(
+    lanes: Sequence[Mapping[str, Any]], *, source_lineage: Mapping[str, Any]
+) -> dict[str, Any]:
     return {
         "artifact_kind": "alpha_zoo_four_lane_paper_forward_monitoring_contract",
         "generated_at_utc": _utc_now_iso(),
@@ -416,18 +444,22 @@ def _markdown(payload: Mapping[str, Any]) -> str:
             f"{_safe_float(lane.get('target_notional_fraction_of_equity')):.1%} | "
             f"`{lane.get('ready_for_paper')}` | `{lane.get('ready_for_real')}` |"
         )
-    lines.extend([
-        "",
-        "## Shadow strategy findings",
-        "",
-        str(dict(payload.get("strategy_findings") or {}).get("summary") or ""),
-        "",
-        "### Top conservative-exit rescue hypotheses",
-        "",
-        "| Rank | Model | Val return | Train return | Locked-OOS | Status |",
-        "| ---: | --- | ---: | ---: | ---: | --- |",
-    ])
-    for row in dict(payload.get("shadow_discovery") or {}).get("conservative_exit_rescue_hypotheses") or []:
+    lines.extend(
+        [
+            "",
+            "## Shadow strategy findings",
+            "",
+            str(dict(payload.get("strategy_findings") or {}).get("summary") or ""),
+            "",
+            "### Top conservative-exit rescue hypotheses",
+            "",
+            "| Rank | Model | Val return | Train return | Locked-OOS | Status |",
+            "| ---: | --- | ---: | ---: | ---: | --- |",
+        ]
+    )
+    for row in (
+        dict(payload.get("shadow_discovery") or {}).get("conservative_exit_rescue_hypotheses") or []
+    ):
         lines.append(
             f"| {row.get('rank')} | `{row.get('model_id')}` | "
             f"{_safe_float(row.get('validation_return')):.4%} | "
@@ -446,7 +478,10 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     retune = _load_json(retune_path)
     active_balanced = _load_json(active_balanced_path)
     validation_first = _load_json(validation_first_path)
-    if _safe_float(retune.get("round_trip_slippage_fee_bps_primary")) != PRIMARY_ROUND_TRIP_COST_BPS:
+    if (
+        _safe_float(retune.get("round_trip_slippage_fee_bps_primary"))
+        != PRIMARY_ROUND_TRIP_COST_BPS
+    ):
         raise ValueError("four-lane discovery requires the frozen 10bps retune artifact")
 
     current_lanes = [
@@ -471,16 +506,22 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     )
     side_family = _ranked_candidates(
         retune,
-        lambda row: bool(row.get("trade_filter_params"))
-        and row.get("candidate_name") != "alpha_zoo_quality_single_pair"
-        and any(key in dict(row.get("trade_filter_params") or {}) for key in ("side", "symbol", "dominant_factor_family")),
+        lambda row: (
+            bool(row.get("trade_filter_params"))
+            and row.get("candidate_name") != "alpha_zoo_quality_single_pair"
+            and any(
+                key in dict(row.get("trade_filter_params") or {})
+                for key in ("side", "symbol", "dominant_factor_family")
+            )
+        ),
         shadow_group="side_family_threshold_hypothesis",
         top_n=int(args.shadow_top_n),
     )
     side_family_positive_oos = [
         row
         for row in side_family
-        if _safe_float(row.get("locked_oos_return")) > 0.0 and _safe_float(row.get("locked_oos_liquidation_count")) == 0.0
+        if _safe_float(row.get("locked_oos_return")) > 0.0
+        and _safe_float(row.get("locked_oos_liquidation_count")) == 0.0
     ]
     quality_surface = _quality_surface(retune, top_n=int(args.quality_top_n))
 

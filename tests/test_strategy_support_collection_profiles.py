@@ -201,7 +201,7 @@ def test_fetch_open_interest_history_chunks_long_ranges():
             until_ms=1_700_000_000_000 + (10 * 86_400_000),
             retries=0,
             base_wait_sec=0.0,
-    )
+        )
 
     assert len(rows) == 1
     assert len(calls) >= 2

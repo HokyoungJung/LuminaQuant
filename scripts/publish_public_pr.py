@@ -351,7 +351,9 @@ def _run(cmd: list[str], *, check: bool = True, capture: bool = True) -> CmdResu
         stderr=(proc.stderr or "").strip(),
     )
     if check and result.returncode != 0:
-        raise RuntimeError(f"Command failed ({result.returncode}): {' '.join(cmd)}\n{result.stderr}")
+        raise RuntimeError(
+            f"Command failed ({result.returncode}): {' '.join(cmd)}\n{result.stderr}"
+        )
     return result
 
 
@@ -400,8 +402,7 @@ def is_sensitive_path(path: str) -> bool:
     if _is_allowed_public_path(normalized):
         return False
     return bool(
-        SENSITIVE_PATH_RE.search(normalized)
-        or GENERIC_SENSITIVE_PATH_RE.search(normalized)
+        SENSITIVE_PATH_RE.search(normalized) or GENERIC_SENSITIVE_PATH_RE.search(normalized)
     )
 
 
@@ -427,17 +428,15 @@ def _content_sensitive_patterns() -> tuple[re.Pattern[str], ...]:
         is_exact_file = "." in normalized.rsplit("/", 1)[-1]
         if is_exact_file:
             patterns.append(
-                re.compile(
-                    rf"(?<![A-Za-z0-9_./-]){re.escape(normalized)}(?![A-Za-z0-9_./-])"
-                )
+                re.compile(rf"(?<![A-Za-z0-9_./-]){re.escape(normalized)}(?![A-Za-z0-9_./-])")
             )
         else:
-            patterns.append(
-                re.compile(rf"(?<![A-Za-z0-9_./-]){re.escape(normalized)}/[^\s'\"]+")
-            )
-        if normalized.startswith("src/lumina_quant/strategies") or normalized.startswith(
-            "lumina_quant/strategies"
-        ) or normalized == "strategies":
+            patterns.append(re.compile(rf"(?<![A-Za-z0-9_./-]){re.escape(normalized)}/[^\s'\"]+"))
+        if (
+            normalized.startswith("src/lumina_quant/strategies")
+            or normalized.startswith("lumina_quant/strategies")
+            or normalized == "strategies"
+        ):
             patterns.append(
                 re.compile(
                     r"\blumina_quant\.strategies\.(?!sample_public_strategy\b)[A-Za-z_][\w.]*"
@@ -544,7 +543,9 @@ def _detect_repo(remote: str) -> str | None:
     return value or None
 
 
-def _build_pr_create_cmd(*, repo: str | None, base_branch: str, head_branch: str, title: str) -> list[str]:
+def _build_pr_create_cmd(
+    *, repo: str | None, base_branch: str, head_branch: str, title: str
+) -> list[str]:
     cmd = ["gh", "pr", "create", "--base", base_branch, "--head", head_branch, "--title", title]
     if repo:
         cmd.extend(["--repo", repo])
@@ -589,7 +590,9 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--repo", default="")
     parser.add_argument("--no-pr", action="store_true", help="Skip gh pr create.")
-    parser.add_argument("--auto-merge", action="store_true", help="Enable PR auto-merge (merge method).")
+    parser.add_argument(
+        "--auto-merge", action="store_true", help="Enable PR auto-merge (merge method)."
+    )
     return parser.parse_args()
 
 
@@ -612,7 +615,10 @@ def main() -> int:
             check=False,
         )
         if merge_result.returncode != 0:
-            print("[WARN] Merge had conflicts; preferring source side before filtering.", file=sys.stderr)
+            print(
+                "[WARN] Merge had conflicts; preferring source side before filtering.",
+                file=sys.stderr,
+            )
             _git("checkout", "--theirs", "--", ".", check=False)
             _git("add", "-A", check=False)
 

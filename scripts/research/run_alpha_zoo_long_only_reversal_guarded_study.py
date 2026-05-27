@@ -140,7 +140,9 @@ def _csv_value(value: Any) -> Any:
 def _write_csv(path: Path, rows: Sequence[Mapping[str, Any]], fieldnames: Sequence[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(fieldnames), extrasaction="ignore", lineterminator="\n")
+        writer = csv.DictWriter(
+            handle, fieldnames=list(fieldnames), extrasaction="ignore", lineterminator="\n"
+        )
         writer.writeheader()
         for row in rows:
             writer.writerow({field: _csv_value(row.get(field)) for field in fieldnames})
@@ -164,7 +166,11 @@ def _metrics_by_model(retune: Mapping[str, Any]) -> dict[str, dict[str, dict[str
         split = str(row.get("split") or "")
         if model_id and split in high.SPLIT_ORDER:
             by_model.setdefault(model_id, {})[split] = dict(row)
-    return {model_id: splits for model_id, splits in by_model.items() if all(split in splits for split in high.SPLIT_ORDER)}
+    return {
+        model_id: splits
+        for model_id, splits in by_model.items()
+        if all(split in splits for split in high.SPLIT_ORDER)
+    }
 
 
 def _target_family_match(splits: Mapping[str, Mapping[str, Any]]) -> bool:
@@ -191,7 +197,9 @@ def _all_split_primary_gate_pass(splits: Mapping[str, Mapping[str, Any]]) -> boo
 def _fail_reasons(*, checks: Mapping[str, bool], values: Mapping[str, Any]) -> list[str]:
     reasons: list[str] = []
     if not checks["train_trade_count"]:
-        reasons.append(f"train_trade_event_count_{values['train_trades']}_below_{MIN_TRAIN_TRADE_EVENTS}")
+        reasons.append(
+            f"train_trade_event_count_{values['train_trades']}_below_{MIN_TRAIN_TRADE_EVENTS}"
+        )
     if not checks["validation_trade_count"]:
         reasons.append(
             f"validation_trade_event_count_{values['validation_trades']}_below_{MIN_VALIDATION_TRADE_EVENTS}"
@@ -208,13 +216,21 @@ def _fail_reasons(*, checks: Mapping[str, bool], values: Mapping[str, Any]) -> l
         reasons.append("locked_oos_return_not_positive")
     if not checks["train_validation_return_ratio"]:
         ratio = _safe_float(values.get("train_validation_return_ratio"))
-        reasons.append(f"train_validation_return_ratio_{ratio:.4f}_below_{MIN_TRAIN_VALIDATION_RETURN_RATIO:.2f}")
+        reasons.append(
+            f"train_validation_return_ratio_{ratio:.4f}_below_{MIN_TRAIN_VALIDATION_RETURN_RATIO:.2f}"
+        )
     if not checks["train_mdd"]:
-        reasons.append(f"train_mdd_{_safe_float(values['train_mdd']):.4f}_above_{MAX_TRAIN_MDD:.2f}")
+        reasons.append(
+            f"train_mdd_{_safe_float(values['train_mdd']):.4f}_above_{MAX_TRAIN_MDD:.2f}"
+        )
     if not checks["validation_mdd"]:
-        reasons.append(f"validation_mdd_{_safe_float(values['validation_mdd']):.4f}_above_{MAX_VALIDATION_MDD:.2f}")
+        reasons.append(
+            f"validation_mdd_{_safe_float(values['validation_mdd']):.4f}_above_{MAX_VALIDATION_MDD:.2f}"
+        )
     if not checks["locked_oos_mdd"]:
-        reasons.append(f"locked_oos_mdd_{_safe_float(values['locked_oos_mdd']):.4f}_above_{MAX_LOCKED_OOS_MDD:.2f}")
+        reasons.append(
+            f"locked_oos_mdd_{_safe_float(values['locked_oos_mdd']):.4f}_above_{MAX_LOCKED_OOS_MDD:.2f}"
+        )
     if not checks["locked_oos_no_liquidation"]:
         reasons.append("locked_oos_liquidation_count_nonzero")
     if not checks["locked_oos_no_account_wipeout"]:
@@ -364,7 +380,9 @@ def _reference_rows(ranked: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]
         references.append(dict(row, selection_role=role))
 
     add("validation_return_leader", ranked[0])
-    low_notional_pool = [row for row in ranked if _safe_float(row.get("target_notional_fraction_of_equity")) <= 1.0]
+    low_notional_pool = [
+        row for row in ranked if _safe_float(row.get("target_notional_fraction_of_equity")) <= 1.0
+    ]
     if low_notional_pool:
         add(
             "lower_notional_reference",
@@ -415,21 +433,37 @@ def _summary_stats(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     max_ratio = max(_safe_float(row.get("train_validation_return_ratio")) for row in rows)
     return {
         "target_family_model_count": len(rows),
-        "train_validation_guard_pass_count": sum(bool(row.get("train_validation_guard_pass")) for row in rows),
-        "locked_oos_report_gate_pass_count": sum(bool(row.get("locked_oos_report_gate_pass")) for row in rows),
+        "train_validation_guard_pass_count": sum(
+            bool(row.get("train_validation_guard_pass")) for row in rows
+        ),
+        "locked_oos_report_gate_pass_count": sum(
+            bool(row.get("locked_oos_report_gate_pass")) for row in rows
+        ),
         "primary_10bps_promotion_gate_pass_count": sum(
             bool(row.get("primary_10bps_promotion_gate_pass")) for row in rows
         ),
-        "strict_paper_guard_pass_count": sum(bool(row.get("paper_promotion_guard_pass")) for row in rows),
+        "strict_paper_guard_pass_count": sum(
+            bool(row.get("paper_promotion_guard_pass")) for row in rows
+        ),
         "positive_train_count": sum(_safe_float(row.get("train_return")) > 0.0 for row in rows),
-        "positive_validation_count": sum(_safe_float(row.get("validation_return")) > 0.0 for row in rows),
-        "positive_locked_oos_count": sum(_safe_float(row.get("locked_oos_return")) > 0.0 for row in rows),
+        "positive_validation_count": sum(
+            _safe_float(row.get("validation_return")) > 0.0 for row in rows
+        ),
+        "positive_locked_oos_count": sum(
+            _safe_float(row.get("locked_oos_return")) > 0.0 for row in rows
+        ),
         "max_validation_return": max(_safe_float(row.get("validation_return")) for row in rows),
         "max_train_return": max(_safe_float(row.get("train_return")) for row in rows),
         "max_locked_oos_return": max(_safe_float(row.get("locked_oos_return")) for row in rows),
-        "max_train_trade_event_count": max(_safe_int(row.get("train_trade_event_count")) for row in rows),
-        "max_validation_trade_event_count": max(_safe_int(row.get("validation_trade_event_count")) for row in rows),
-        "max_locked_oos_trade_event_count": max(_safe_int(row.get("locked_oos_trade_event_count")) for row in rows),
+        "max_train_trade_event_count": max(
+            _safe_int(row.get("train_trade_event_count")) for row in rows
+        ),
+        "max_validation_trade_event_count": max(
+            _safe_int(row.get("validation_trade_event_count")) for row in rows
+        ),
+        "max_locked_oos_trade_event_count": max(
+            _safe_int(row.get("locked_oos_trade_event_count")) for row in rows
+        ),
         "max_train_validation_return_ratio": max_ratio,
         "min_validation_mdd": min(_safe_float(row.get("validation_mdd")) for row in rows),
         "min_locked_oos_mdd": min(_safe_float(row.get("locked_oos_mdd")) for row in rows),
@@ -480,8 +514,13 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     expanded_path = Path(args.expanded_retune_json).expanduser().resolve()
     shadow_path = Path(args.shadow_selection_json).expanduser().resolve()
     retune = _load_json(expanded_path)
-    if _safe_float(retune.get("round_trip_slippage_fee_bps_primary")) != PRIMARY_ROUND_TRIP_COST_BPS:
-        raise ValueError("long-only reversal guarded study requires the expanded 10bps retune artifact")
+    if (
+        _safe_float(retune.get("round_trip_slippage_fee_bps_primary"))
+        != PRIMARY_ROUND_TRIP_COST_BPS
+    ):
+        raise ValueError(
+            "long-only reversal guarded study requires the expanded 10bps retune artifact"
+        )
     shadow_selection = _load_json(shadow_path) if shadow_path.exists() else {}
     family_rows = [
         _candidate_summary(model_id, splits)

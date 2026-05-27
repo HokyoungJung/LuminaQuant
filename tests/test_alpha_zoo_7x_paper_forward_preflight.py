@@ -8,7 +8,9 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT / "scripts" / "research" / "run_alpha_zoo_7x_paper_forward_preflight.py"
-SPEC = importlib.util.spec_from_file_location("run_alpha_zoo_7x_paper_forward_preflight", MODULE_PATH)
+SPEC = importlib.util.spec_from_file_location(
+    "run_alpha_zoo_7x_paper_forward_preflight", MODULE_PATH
+)
 assert SPEC is not None and SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = MODULE
@@ -41,7 +43,9 @@ def test_realized_bps_requires_positive_notional() -> None:
 
 def test_cost_summary_rejects_malformed_fill_costs() -> None:
     with pytest.raises(ValueError, match="realized_fee_bps"):
-        MODULE.summarize_round_trip_costs([{"realized_fee_bps": "bad", "realized_slippage_bps": 1.0}])
+        MODULE.summarize_round_trip_costs(
+            [{"realized_fee_bps": "bad", "realized_slippage_bps": 1.0}]
+        )
 
     with pytest.raises(ValueError, match="all_in_round_trip_bps"):
         MODULE.summarize_round_trip_costs([{"all_in_round_trip_bps": float("nan")}])
@@ -70,7 +74,9 @@ def test_build_paper_forward_bundle_from_frozen_10bps_sources(tmp_path: Path) ->
     assert balanced["model_id"] == MODULE.BALANCED_MODEL_ID
     assert active["paper_equivalent_sizing"]["expected_replay_notional"] == pytest.approx(14_000.0)
     assert active["paper_equivalent_sizing"]["live_notional"] == pytest.approx(14_000.0)
-    assert balanced["paper_equivalent_sizing"]["expected_replay_notional"] == pytest.approx(10_500.0)
+    assert balanced["paper_equivalent_sizing"]["expected_replay_notional"] == pytest.approx(
+        10_500.0
+    )
     assert balanced["paper_equivalent_sizing"]["live_notional"] == pytest.approx(10_500.0)
     assert active["preflight"]["status"] == {"ready_for_paper": True, "ready_for_real": False}
     assert balanced["preflight"]["status"] == {"ready_for_paper": True, "ready_for_real": False}

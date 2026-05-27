@@ -43,7 +43,9 @@ def _parse_timeframes(value: str) -> list[str]:
 
 
 def _normalize_timeframes(values: list[str]) -> list[str]:
-    normalized = [normalize_timeframe_token(str(value)) for value in list(values or []) if str(value).strip()]
+    normalized = [
+        normalize_timeframe_token(str(value)) for value in list(values or []) if str(value).strip()
+    ]
     deduped = list(dict.fromkeys(normalized))
     if "1s" in deduped and deduped[0] != "1s":
         deduped = ["1s", *[token for token in deduped if token != "1s"]]
@@ -59,7 +61,11 @@ def _coerce_positive_int(value: object) -> int | None:
 
 
 def _isoformat_utc_from_ms(timestamp_ms: int) -> str:
-    return datetime.fromtimestamp(int(timestamp_ms) / 1000.0, tz=UTC).isoformat().replace("+00:00", "Z")
+    return (
+        datetime.fromtimestamp(int(timestamp_ms) / 1000.0, tz=UTC)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
 
 
 def _resolve_symbol_materialization_window(

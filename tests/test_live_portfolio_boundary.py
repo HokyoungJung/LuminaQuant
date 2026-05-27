@@ -31,4 +31,3 @@ def test_live_portfolio_module_exports_lazy_boundary_aliases():
 
     assert "lumina_quant.backtesting.portfolio_backtest" in sys.modules
     assert live_portfolio_module.Portfolio is live_portfolio_cls
-

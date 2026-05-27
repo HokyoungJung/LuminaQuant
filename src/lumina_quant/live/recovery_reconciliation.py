@@ -102,8 +102,7 @@ class RecoveryReconciliationService:
                 else None
             )
             exchange_signature_match = (
-                _signature_ids(tracked_signature or tuple())
-                == _signature_ids(exchange_signature)
+                _signature_ids(tracked_signature or tuple()) == _signature_ids(exchange_signature)
                 if tracked_signature is not None and exchange_signature is not None
                 else None
             )
@@ -168,8 +167,7 @@ class RecoveryReconciliationService:
                 else None
             ),
             exchange_signature_match=(
-                _signature_ids(tracked_signature or tuple())
-                == _signature_ids(exchange_signature)
+                _signature_ids(tracked_signature or tuple()) == _signature_ids(exchange_signature)
                 if tracked_signature is not None and exchange_signature is not None
                 else None
             ),

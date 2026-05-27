@@ -21,6 +21,7 @@ _DEFAULT_PAIR_SET: tuple[tuple[str, str], ...] = (
     ("XPT/USDT", "XPD/USDT"),
 )
 
+
 def bounded_pair_retune_params(timeframe: str) -> dict[str, float | int]:
     """Return bounded turnover/correlation guardrails for pair-spread candidates."""
     payload = dict(PAIR_SPREAD_BOUNDED_RETUNE_DEFAULTS)

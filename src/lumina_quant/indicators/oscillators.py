@@ -307,7 +307,6 @@ def percentile_rank(values, *, window: int = 20) -> float | None:
     return (below + 0.5 * equal) / float(window_i)
 
 
-
 def awesome_oscillator(highs, lows, *, fast_period: int = 5, slow_period: int = 34) -> float | None:
     """Return Awesome Oscillator using median price SMAs."""
     fast_i = max(1, int(fast_period))

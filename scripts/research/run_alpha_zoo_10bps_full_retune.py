@@ -30,10 +30,10 @@ if str(REPO_ROOT) not in sys.path:
 from scripts.research import run_alpha_zoo_top_seed_hybrid_v35_v36_cost_validation as cost  # noqa: E402
 from scripts.research import run_alpha_zoo_validation_march_high_leverage as high  # noqa: E402
 
-DEFAULT_OUTPUT_DIR = (
-    high.DEFAULT_ALPHA_V2 / "alpha_zoo_10bps_full_retune_20260519"
+DEFAULT_OUTPUT_DIR = high.DEFAULT_ALPHA_V2 / "alpha_zoo_10bps_full_retune_20260519"
+DEFAULT_SOURCE_COST_DIR = (
+    high.DEFAULT_ALPHA_V2 / "alpha_zoo_top_seed_hybrid_cost_validation_20260518"
 )
-DEFAULT_SOURCE_COST_DIR = high.DEFAULT_ALPHA_V2 / "alpha_zoo_top_seed_hybrid_cost_validation_20260518"
 DEFAULT_SOURCE_COST_JSON = (
     DEFAULT_SOURCE_COST_DIR / "alpha_zoo_top_seed_hybrid_cost_validation_latest.json"
 )
@@ -308,8 +308,12 @@ def _split_metrics_from_prefixed_row(row: Mapping[str, Any]) -> dict[str, dict[s
     out: dict[str, dict[str, Any]] = {}
     for split in SPLIT_ORDER:
         out[split] = {
-            "total_return": _safe_float(row.get(f"{split}_total_return"), _safe_float(row.get(f"{split}_return"))),
-            "max_drawdown": _safe_float(row.get(f"{split}_max_drawdown"), _safe_float(row.get(f"{split}_mdd"))),
+            "total_return": _safe_float(
+                row.get(f"{split}_total_return"), _safe_float(row.get(f"{split}_return"))
+            ),
+            "max_drawdown": _safe_float(
+                row.get(f"{split}_max_drawdown"), _safe_float(row.get(f"{split}_mdd"))
+            ),
             "sharpe": _safe_float(row.get(f"{split}_sharpe")),
             "sortino": _safe_float(row.get(f"{split}_sortino")),
             "smart_sortino": _safe_float(row.get(f"{split}_smart_sortino")),
@@ -319,7 +323,9 @@ def _split_metrics_from_prefixed_row(row: Mapping[str, Any]) -> dict[str, dict[s
             "active_return_hours": _safe_int(row.get(f"{split}_active_return_hours")),
             "liquidation_count": _safe_int(row.get(f"{split}_liquidation_count")),
             "account_wipeout_count": _safe_int(row.get(f"{split}_account_wipeout_count")),
-            "minimum_margin_buffer": row.get(f"{split}_minimum_margin_buffer", row.get("minimum_margin_buffer")),
+            "minimum_margin_buffer": row.get(
+                f"{split}_minimum_margin_buffer", row.get("minimum_margin_buffer")
+            ),
         }
     return out
 
@@ -375,9 +381,10 @@ def _promotion_gate_reasons(
         if _safe_int(metrics.get("account_wipeout_count")) > 0:
             reasons.append(f"{split}_account_wipeout_count_positive")
         total_liquidations += _safe_int(metrics.get("liquidation_count"))
-        if metrics.get("minimum_margin_buffer") is not None and _safe_float(
-            metrics.get("minimum_margin_buffer"), -1.0
-        ) <= 0.0:
+        if (
+            metrics.get("minimum_margin_buffer") is not None
+            and _safe_float(metrics.get("minimum_margin_buffer"), -1.0) <= 0.0
+        ):
             reasons.append(f"{split}_minimum_margin_buffer_non_positive")
     if strict_zero_liquidation and total_liquidations > 0:
         reasons.append("liquidation_count_positive")
@@ -407,7 +414,9 @@ def _promotion_gate_result(
         "live_promotable_10bps": not reasons,
         "primary_10bps_promotion_gate_pass": not reasons,
         "primary_10bps_promotion_gate_reasons": reasons,
-        "candidate_universe_uses_locked_oos_bucket": bool(candidate_universe_uses_locked_oos_bucket),
+        "candidate_universe_uses_locked_oos_bucket": bool(
+            candidate_universe_uses_locked_oos_bucket
+        ),
         "regenerated_train_validation_only": bool(regenerated_train_validation_only),
         "promotability_scope": str(promotability_scope),
         "strict_zero_liquidation": bool(strict_zero_liquidation),
@@ -529,10 +538,18 @@ def _build_variant_inventory(source_live_payload: Mapping[str, Any]) -> list[dic
             continue
         variants: list[tuple[str, dict[str, Any]]] = [("base", params)]
         for spec in (
-            _scaled_param_variant(params, key="entry_threshold", factor=1.10, suffix="entry_10pct_stricter"),
-            _scaled_param_variant(params, key="entry_threshold", factor=1.25, suffix="entry_25pct_stricter"),
-            _scaled_param_variant(params, key="exit_threshold", factor=1.25, suffix="exit_hysteresis_25pct_wider"),
-            _scaled_param_variant(params, key="max_hold_bars", factor=1.50, suffix="max_hold_50pct_longer"),
+            _scaled_param_variant(
+                params, key="entry_threshold", factor=1.10, suffix="entry_10pct_stricter"
+            ),
+            _scaled_param_variant(
+                params, key="entry_threshold", factor=1.25, suffix="entry_25pct_stricter"
+            ),
+            _scaled_param_variant(
+                params, key="exit_threshold", factor=1.25, suffix="exit_hysteresis_25pct_wider"
+            ),
+            _scaled_param_variant(
+                params, key="max_hold_bars", factor=1.50, suffix="max_hold_50pct_longer"
+            ),
         ):
             if spec is not None:
                 variants.append(spec)
@@ -562,7 +579,9 @@ def _load_source_metric_rows(
     return _read_csv(source_cost_metrics_csv)
 
 
-def _group_metric_rows_by_model(rows: Sequence[Mapping[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+def _group_metric_rows_by_model(
+    rows: Sequence[Mapping[str, Any]],
+) -> dict[str, list[dict[str, Any]]]:
     grouped: dict[str, list[dict[str, Any]]] = {}
     for row in rows:
         if not math.isclose(_safe_float(row.get("round_trip_slippage_fee_bps")), PRIMARY_COST_BPS):
@@ -679,9 +698,7 @@ def _summary_from_split_metrics(
         "promotability_scope": gate["promotability_scope"],
         "shadow_only": gate["promotability_scope"] == "shadow_only",
         "primary_10bps_promotion_gate_pass": gate["primary_10bps_promotion_gate_pass"],
-        "primary_10bps_promotion_gate_reasons": gate[
-            "primary_10bps_promotion_gate_reasons"
-        ],
+        "primary_10bps_promotion_gate_reasons": gate["primary_10bps_promotion_gate_reasons"],
         "live_promotable_10bps": gate["live_promotable_10bps"],
         "train": dict(split_metrics.get("train") or {}),
         "validation": dict(split_metrics.get("validation") or {}),
@@ -722,15 +739,11 @@ def _metric_rows_from_split_metrics(
                 "candidate_universe_uses_locked_oos_bucket": gate[
                     "candidate_universe_uses_locked_oos_bucket"
                 ],
-                "regenerated_train_validation_only": gate[
-                    "regenerated_train_validation_only"
-                ],
+                "regenerated_train_validation_only": gate["regenerated_train_validation_only"],
                 "promotability_scope": gate["promotability_scope"],
                 "shadow_only": gate["promotability_scope"] == "shadow_only",
                 "calendar_primary": False,
-                "primary_10bps_promotion_gate_pass": gate[
-                    "primary_10bps_promotion_gate_pass"
-                ],
+                "primary_10bps_promotion_gate_pass": gate["primary_10bps_promotion_gate_pass"],
                 "primary_10bps_promotion_gate_reasons": ";".join(
                     gate["primary_10bps_promotion_gate_reasons"]
                 ),
@@ -779,7 +792,9 @@ def _trade_filter_variant_specs(
     train+validation metrics before locked-OOS gates are attached.
     """
     symbols = sorted({str(trade.get("symbol") or "") for trade in trades if trade.get("symbol")})
-    families = sorted({_trade_factor_family(trade) for trade in trades if _trade_factor_family(trade)})
+    families = sorted(
+        {_trade_factor_family(trade) for trade in trades if _trade_factor_family(trade)}
+    )
     specs: list[tuple[str, dict[str, Any], Any]] = []
     for side in ("LONG", "SHORT"):
         specs.append(
@@ -827,8 +842,10 @@ def _trade_filter_variant_specs(
                 (
                     f"side_{side.lower()}_abs_score_ge_{threshold:g}",
                     {"side": side, "abs_factor_score_min": threshold},
-                    lambda trade, side=side, threshold=threshold: str(trade.get("side") or "") == side
-                    and _trade_abs_factor_score(trade) >= threshold,
+                    lambda trade, side=side, threshold=threshold: (
+                        str(trade.get("side") or "") == side
+                        and _trade_abs_factor_score(trade) >= threshold
+                    ),
                 )
             )
     for family in families:
@@ -837,8 +854,10 @@ def _trade_filter_variant_specs(
                 (
                     f"family_{_slug(family)}_abs_score_ge_{threshold:g}",
                     {"dominant_factor_family": family, "abs_factor_score_min": threshold},
-                    lambda trade, family=family, threshold=threshold: _trade_factor_family(trade) == family
-                    and _trade_abs_factor_score(trade) >= threshold,
+                    lambda trade, family=family, threshold=threshold: (
+                        _trade_factor_family(trade) == family
+                        and _trade_abs_factor_score(trade) >= threshold
+                    ),
                 )
             )
     for side in ("LONG", "SHORT"):
@@ -847,8 +866,10 @@ def _trade_filter_variant_specs(
                 (
                     f"side_{side.lower()}_family_{_slug(family)}",
                     {"side": side, "dominant_factor_family": family},
-                    lambda trade, side=side, family=family: str(trade.get("side") or "") == side
-                    and _trade_factor_family(trade) == family,
+                    lambda trade, side=side, family=family: (
+                        str(trade.get("side") or "") == side
+                        and _trade_factor_family(trade) == family
+                    ),
                 )
             )
     for side in ("LONG", "SHORT"):
@@ -857,8 +878,10 @@ def _trade_filter_variant_specs(
                 (
                     f"side_{side.lower()}_symbol_{_slug(symbol)}",
                     {"side": side, "symbol": symbol},
-                    lambda trade, side=side, symbol=symbol: str(trade.get("side") or "") == side
-                    and str(trade.get("symbol") or "") == symbol,
+                    lambda trade, side=side, symbol=symbol: (
+                        str(trade.get("side") or "") == side
+                        and str(trade.get("symbol") or "") == symbol
+                    ),
                 )
             )
     return specs
@@ -878,7 +901,9 @@ def _sample_guarded_composite_trade_filter_variant_specs(
 ) -> list[tuple[str, dict[str, Any], Any]]:
     """Return an expanded non-calendar trade-filter grid for sample-guarded search."""
     symbols = sorted({str(trade.get("symbol") or "") for trade in trades if trade.get("symbol")})
-    families = sorted({_trade_factor_family(trade) for trade in trades if _trade_factor_family(trade)})
+    families = sorted(
+        {_trade_factor_family(trade) for trade in trades if _trade_factor_family(trade)}
+    )
     specs = list(_trade_filter_variant_specs(trades))
     for symbol in symbols:
         for threshold in (1.0, 1.5, 2.0, 2.5):
@@ -886,8 +911,10 @@ def _sample_guarded_composite_trade_filter_variant_specs(
                 (
                     f"symbol_{_slug(symbol)}_abs_score_ge_{threshold:g}",
                     {"symbol": symbol, "abs_factor_score_min": threshold},
-                    lambda trade, symbol=symbol, threshold=threshold: str(trade.get("symbol") or "") == symbol
-                    and _trade_abs_factor_score(trade) >= threshold,
+                    lambda trade, symbol=symbol, threshold=threshold: (
+                        str(trade.get("symbol") or "") == symbol
+                        and _trade_abs_factor_score(trade) >= threshold
+                    ),
                 )
             )
     for symbol in symbols:
@@ -896,8 +923,10 @@ def _sample_guarded_composite_trade_filter_variant_specs(
                 (
                     f"symbol_{_slug(symbol)}_family_{_slug(family)}",
                     {"symbol": symbol, "dominant_factor_family": family},
-                    lambda trade, symbol=symbol, family=family: str(trade.get("symbol") or "") == symbol
-                    and _trade_factor_family(trade) == family,
+                    lambda trade, symbol=symbol, family=family: (
+                        str(trade.get("symbol") or "") == symbol
+                        and _trade_factor_family(trade) == family
+                    ),
                 )
             )
     for side in ("LONG", "SHORT"):
@@ -911,9 +940,11 @@ def _sample_guarded_composite_trade_filter_variant_specs(
                             "dominant_factor_family": family,
                             "abs_factor_score_min": threshold,
                         },
-                        lambda trade, side=side, family=family, threshold=threshold: str(trade.get("side") or "") == side
-                        and _trade_factor_family(trade) == family
-                        and _trade_abs_factor_score(trade) >= threshold,
+                        lambda trade, side=side, family=family, threshold=threshold: (
+                            str(trade.get("side") or "") == side
+                            and _trade_factor_family(trade) == family
+                            and _trade_abs_factor_score(trade) >= threshold
+                        ),
                     )
                 )
     for side in ("LONG", "SHORT"):
@@ -923,9 +954,11 @@ def _sample_guarded_composite_trade_filter_variant_specs(
                     (
                         f"side_{side.lower()}_symbol_{_slug(symbol)}_abs_score_ge_{threshold:g}",
                         {"side": side, "symbol": symbol, "abs_factor_score_min": threshold},
-                        lambda trade, side=side, symbol=symbol, threshold=threshold: str(trade.get("side") or "") == side
-                        and str(trade.get("symbol") or "") == symbol
-                        and _trade_abs_factor_score(trade) >= threshold,
+                        lambda trade, side=side, symbol=symbol, threshold=threshold: (
+                            str(trade.get("side") or "") == side
+                            and str(trade.get("symbol") or "") == symbol
+                            and _trade_abs_factor_score(trade) >= threshold
+                        ),
                     )
                 )
     for family in families:
@@ -934,8 +967,10 @@ def _sample_guarded_composite_trade_filter_variant_specs(
                 (
                     f"family_{_slug(family)}_max_hold_le_{max_hold}h",
                     {"dominant_factor_family": family, "max_hold_hours": max_hold},
-                    lambda trade, family=family, max_hold=max_hold: _trade_factor_family(trade) == family
-                    and _trade_hold_hours(trade) <= max_hold,
+                    lambda trade, family=family, max_hold=max_hold: (
+                        _trade_factor_family(trade) == family
+                        and _trade_hold_hours(trade) <= max_hold
+                    ),
                 )
             )
     return _dedupe_trade_filter_specs(specs)
@@ -973,7 +1008,10 @@ def _maybe_keep_top_variant(
 
 def _selection_candidate_score(summary: Mapping[str, Any], *, profile: str) -> float:
     return _selection_score_for_profile(
-        {"train": dict(summary.get("train") or {}), "validation": dict(summary.get("validation") or {})},
+        {
+            "train": dict(summary.get("train") or {}),
+            "validation": dict(summary.get("validation") or {}),
+        },
         profile=profile,
     )
 
@@ -991,7 +1029,9 @@ def _profile_selected_model(
             continue
         candidates.append((_selection_candidate_score(item, profile=profile), dict(item)))
     if not candidates and require_live_promotable and fallback_to_fallback_profile:
-        candidates = [(_selection_candidate_score(item, profile=profile), dict(item)) for item in summaries]
+        candidates = [
+            (_selection_candidate_score(item, profile=profile), dict(item)) for item in summaries
+        ]
     if not candidates:
         return None
     candidates.sort(
@@ -1078,7 +1118,9 @@ def _selection_profiles_payload(
     )
 
 
-def _train_validation_series_from_stream(stream: Mapping[str, Any], *, split_masks: Mapping[str, Any]) -> np.ndarray:
+def _train_validation_series_from_stream(
+    stream: Mapping[str, Any], *, split_masks: Mapping[str, Any]
+) -> np.ndarray:
     raw_returns = stream.get("returns")
     returns = np.asarray([] if raw_returns is None else raw_returns, dtype=float)
     train_mask = np.asarray(split_masks.get("train"), dtype=bool)
@@ -1100,7 +1142,12 @@ def _pearson_correlation(left: np.ndarray, right: np.ndarray) -> float | None:
         return None
     left_std = float(np.std(left_safe))
     right_std = float(np.std(right_safe))
-    if not np.isfinite(left_std) or not np.isfinite(right_std) or left_std <= 0.0 or right_std <= 0.0:
+    if (
+        not np.isfinite(left_std)
+        or not np.isfinite(right_std)
+        or left_std <= 0.0
+        or right_std <= 0.0
+    ):
         return None
     corr = float(np.corrcoef(left_safe, right_safe)[0, 1])
     if not math.isfinite(corr):
@@ -1238,19 +1285,21 @@ def _discover_low_correlation_candidates(
                 "candidate_source": str(summary.get("source") or ""),
                 "correlation_train_validation": correlation,
                 "train_validation_correlation_to_reference": correlation,
-                "correlation_train_validation_abs": abs(correlation) if correlation is not None else None,
+                "correlation_train_validation_abs": abs(correlation)
+                if correlation is not None
+                else None,
                 "selection_correlation_split_inputs": list(TV_SPLITS),
                 "correlation_inputs": list(TV_SPLITS),
                 "selection_inputs": list(TV_SPLITS),
                 "uses_locked_oos_for_selection": False,
                 "uses_locked_oos_for_correlation": False,
-                "locked_oos_gate_pass": _as_bool(
-                    summary.get("primary_10bps_promotion_gate_pass")
-                ),
+                "locked_oos_gate_pass": _as_bool(summary.get("primary_10bps_promotion_gate_pass")),
                 "locked_oos_gate_reasons": ";".join(
                     summary.get("primary_10bps_promotion_gate_reasons") or []
                 ),
-                "primary_10bps_promotion_gate_pass": _safe_int(summary.get("primary_10bps_promotion_gate_pass"), 0),
+                "primary_10bps_promotion_gate_pass": _safe_int(
+                    summary.get("primary_10bps_promotion_gate_pass"), 0
+                ),
                 "primary_10bps_promotion_gate_reasons": ";".join(
                     summary.get("primary_10bps_promotion_gate_reasons") or []
                 ),
@@ -1484,7 +1533,9 @@ def _fresh_train_validation_retune(
             )
             if variant_gate["primary_10bps_promotion_gate_pass"]:
                 trade_filter_gate_pass_count += 1
-            variant_model_id = _fresh_model_id(f"fresh_tv10_filter_{_slug(variant_name)}", source_row)
+            variant_model_id = _fresh_model_id(
+                f"fresh_tv10_filter_{_slug(variant_name)}", source_row
+            )
             extra_fields = {
                 "variant_name": variant_name,
                 "trade_filter_params": dict(variant_params),
@@ -1796,7 +1847,9 @@ def _locked_oos_contamination_audit() -> dict[str, Any]:
     }
 
 
-def _validate_split_manifest(payload: Mapping[str, Any], *, allow_split_hash_drift: bool) -> dict[str, Any]:
+def _validate_split_manifest(
+    payload: Mapping[str, Any], *, allow_split_hash_drift: bool
+) -> dict[str, Any]:
     split_manifest = dict(payload.get("split_manifest") or {})
     observed_hash = str(split_manifest.get("timestamp_index_hash") or "")
     if observed_hash != EXPECTED_TIMESTAMP_INDEX_HASH and not allow_split_hash_drift:
@@ -1833,16 +1886,36 @@ def _best_model(
 
 
 def build_payload(args: argparse.Namespace) -> dict[str, Any]:
-    source_cost_json = Path(
-        getattr(args, "source_cost_json", getattr(args, "cost_validation_json", DEFAULT_SOURCE_COST_JSON))
-    ).expanduser().resolve()
-    source_cost_metrics_csv = Path(
-        getattr(args, "source_cost_metrics_csv", DEFAULT_SOURCE_COST_METRICS_CSV)
-    ).expanduser().resolve()
-    source_live_json = Path(getattr(args, "source_live_json", DEFAULT_SOURCE_LIVE_JSON)).expanduser().resolve()
-    source_candidate_csv = Path(
-        getattr(args, "source_candidate_csv", getattr(args, "candidate_csv", DEFAULT_SOURCE_CANDIDATE_CSV))
-    ).expanduser().resolve()
+    source_cost_json = (
+        Path(
+            getattr(
+                args,
+                "source_cost_json",
+                getattr(args, "cost_validation_json", DEFAULT_SOURCE_COST_JSON),
+            )
+        )
+        .expanduser()
+        .resolve()
+    )
+    source_cost_metrics_csv = (
+        Path(getattr(args, "source_cost_metrics_csv", DEFAULT_SOURCE_COST_METRICS_CSV))
+        .expanduser()
+        .resolve()
+    )
+    source_live_json = (
+        Path(getattr(args, "source_live_json", DEFAULT_SOURCE_LIVE_JSON)).expanduser().resolve()
+    )
+    source_candidate_csv = (
+        Path(
+            getattr(
+                args,
+                "source_candidate_csv",
+                getattr(args, "candidate_csv", DEFAULT_SOURCE_CANDIDATE_CSV),
+            )
+        )
+        .expanduser()
+        .resolve()
+    )
     source_payload = _load_json(source_cost_json)
     source_live_payload = _load_json(source_live_json)
     source_candidate_rows = _read_csv(source_candidate_csv) if source_candidate_csv.exists() else []
@@ -1876,7 +1949,9 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     profile_rows_10bps = dict(selection_profiles_10bps.get("selection_profiles") or {})
     balanced_profile_model = dict(fresh_retune.get("balanced_profile_model") or {})
     higher_risk_profile_model = dict(fresh_retune.get("higher_risk_profile_model") or {})
-    live_model = higher_risk_profile_model or _best_model(fresh_summaries, require_live_promotable=True)
+    live_model = higher_risk_profile_model or _best_model(
+        fresh_summaries, require_live_promotable=True
+    )
     best_fresh = _best_model(fresh_summaries, require_live_promotable=False)
     best_shadow = _best_model(shadow_summaries, require_live_promotable=False)
     execution_cost = _execution_cost_evidence()
@@ -1911,12 +1986,8 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
                 "balanced_reference_profile_id": SELECTION_PROFILE_BALANCED,
                 "candidate_rows_selected_before_oos_gate": fresh_retune["selected_source_rows"],
                 "evaluated_10bps_streams": fresh_retune["evaluated_streams"],
-                "evaluated_trade_filter_variants": fresh_retune[
-                    "evaluated_trade_filter_variants"
-                ],
-                "selected_trade_filter_variants": fresh_retune[
-                    "selected_trade_filter_variants"
-                ],
+                "evaluated_trade_filter_variants": fresh_retune["evaluated_trade_filter_variants"],
+                "selected_trade_filter_variants": fresh_retune["selected_trade_filter_variants"],
                 "trade_filter_gate_pass_count": fresh_retune["trade_filter_gate_pass_count"],
                 "trade_filter_grid_mode": fresh_retune["trade_filter_grid_mode"],
                 "sample_guarded_composite_grid_enabled": fresh_retune[
@@ -1925,9 +1996,7 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
                 "trade_filter_selection_inputs": list(TV_SPLITS),
                 "trade_filter_locked_oos_role": "gate_report_only_after_variant_freeze",
                 "skipped_candidate_names": fresh_retune["skipped_candidate_names"],
-                "low_correlation_discovery": fresh_retune[
-                    "low_correlation_discovery_summary"
-                ],
+                "low_correlation_discovery": fresh_retune["low_correlation_discovery_summary"],
             },
         },
         "selection_policy": {
@@ -1987,10 +2056,10 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
             "selection_profile": SELECTION_PROFILE_HIGHER_RISK,
             "reference_profile": SELECTION_PROFILE_HIGHER_RISK,
             "discovery_policy": dict(
-                dict(fresh_retune["low_correlation_discovery_summary"]).get(
-                    "discovery_policy"
+                dict(fresh_retune["low_correlation_discovery_summary"]).get("discovery_policy")
+                or _discovery_policy(
+                    "" if live_model is None else str(live_model.get("model_id") or "")
                 )
-                or _discovery_policy("" if live_model is None else str(live_model.get("model_id") or ""))
             ),
             "summary": dict(fresh_retune["low_correlation_discovery_summary"]),
         },
@@ -2016,12 +2085,17 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
             )[: int(getattr(args, "top_n", 50))],
         },
         "fresh_hybrid_results_10bps": fresh_retune["hybrid_results"],
-        "hybrid_weights_10bps": list(fresh_retune["hybrid_weights"]) or [
+        "hybrid_weights_10bps": list(fresh_retune["hybrid_weights"])
+        or [
             dict(row)
             for row in list(source_payload.get("hybrid_weights") or [])
-            if math.isclose(_safe_float(dict(row).get("round_trip_slippage_fee_bps")), PRIMARY_COST_BPS)
+            if math.isclose(
+                _safe_float(dict(row).get("round_trip_slippage_fee_bps")), PRIMARY_COST_BPS
+            )
         ],
-        "live_promotable_10bps_model_id": None if live_model is None else live_model.get("model_id"),
+        "live_promotable_10bps_model_id": None
+        if live_model is None
+        else live_model.get("model_id"),
         "balanced_live_promotable_10bps_model_id": balanced_profile_model.get("model_id"),
         "no_10bps_live_ready_model": live_model is None,
         "higher_risk_selected_10bps_model": live_model or {},

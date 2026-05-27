@@ -52,8 +52,8 @@ def test_build_replay_report_prefers_hybrid_profile_when_override_is_decisive(mo
                     "breadth_ma192": 1.0,
                     "breadth_delta": 0.05,
                     "basket_vol_ratio": 0.45,
-                    },
                 },
+            },
             "2026-03-03": {
                 "date": "2026-03-03T00:00:00+00:00",
                 "favored_group": "mixed",
@@ -143,24 +143,24 @@ def test_build_replay_report_prefers_hybrid_profile_when_override_is_decisive(mo
     balanced_payload = {
         "portfolio_metrics": {"val": {"total_return": 0.08, "sharpe": 4.1}},
         "portfolio_return_streams": {
-                "oos": [
-                    {"datetime": "2026-03-01T00:00:00+00:00", "v": 0.0020},
-                    {"datetime": "2026-03-02T00:00:00+00:00", "v": -0.0010},
-                    {"datetime": "2026-03-03T00:00:00+00:00", "v": 0.0020},
-                    {"datetime": "2026-03-04T00:00:00+00:00", "v": -0.0010},
-                ]
-            },
-        }
+            "oos": [
+                {"datetime": "2026-03-01T00:00:00+00:00", "v": 0.0020},
+                {"datetime": "2026-03-02T00:00:00+00:00", "v": -0.0010},
+                {"datetime": "2026-03-03T00:00:00+00:00", "v": 0.0020},
+                {"datetime": "2026-03-04T00:00:00+00:00", "v": -0.0010},
+            ]
+        },
+    }
     pair_payload = {
         "return_streams": {
-                "oos": [
-                    {"datetime": "2026-03-01T00:00:00+00:00", "v": 0.0010},
-                    {"datetime": "2026-03-02T00:00:00+00:00", "v": -0.0008},
-                    {"datetime": "2026-03-03T00:00:00+00:00", "v": 0.0009},
-                    {"datetime": "2026-03-04T00:00:00+00:00", "v": -0.0007},
-                ]
-            }
+            "oos": [
+                {"datetime": "2026-03-01T00:00:00+00:00", "v": 0.0010},
+                {"datetime": "2026-03-02T00:00:00+00:00", "v": -0.0008},
+                {"datetime": "2026-03-03T00:00:00+00:00", "v": 0.0009},
+                {"datetime": "2026-03-04T00:00:00+00:00", "v": -0.0007},
+            ]
         }
+    }
     hybrid_payload = {
         "readiness": {
             "beats_balanced_refreshed": True,
@@ -169,15 +169,15 @@ def test_build_replay_report_prefers_hybrid_profile_when_override_is_decisive(mo
             "recommended_stage": "pilot_candidate",
         },
         "scenarios": {
-                "refreshed_latest_tail": {
-                    "dates": ["2026-03-01", "2026-03-02", "2026-03-03", "2026-03-04"],
-                    "daily_returns": [0.004, 0.003, 0.004, 0.003],
-                    "allocations": [
-                        {"date": "2026-03-01", "split": "oos"},
-                        {"date": "2026-03-02", "split": "oos"},
-                        {"date": "2026-03-03", "split": "oos"},
-                        {"date": "2026-03-04", "split": "oos"},
-                    ],
+            "refreshed_latest_tail": {
+                "dates": ["2026-03-01", "2026-03-02", "2026-03-03", "2026-03-04"],
+                "daily_returns": [0.004, 0.003, 0.004, 0.003],
+                "allocations": [
+                    {"date": "2026-03-01", "split": "oos"},
+                    {"date": "2026-03-02", "split": "oos"},
+                    {"date": "2026-03-03", "split": "oos"},
+                    {"date": "2026-03-04", "split": "oos"},
+                ],
                 "split_metrics": {
                     "val": {"total_return": 0.065, "sharpe": 3.3},
                     "oos": {"total_return": 0.006, "sharpe": 3.2, "max_drawdown": 0.0025},

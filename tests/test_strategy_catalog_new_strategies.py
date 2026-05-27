@@ -133,8 +133,12 @@ def test_mean_reversion_std_residualize_btc_blocks_common_factor_signals():
         for idx, close_price in enumerate(rows):
             current_dt = start + timedelta(minutes=idx)
             for symbol in symbols:
-                bars.set_bar(symbol, current_dt, close_price, close_price, close_price, close_price, 10)
-                strategy.calculate_signals(_market_event(symbol, current_dt, close_price, volume=10))
+                bars.set_bar(
+                    symbol, current_dt, close_price, close_price, close_price, close_price, 10
+                )
+                strategy.calculate_signals(
+                    _market_event(symbol, current_dt, close_price, volume=10)
+                )
         signal_types: list[str] = []
         while not events.empty():
             signal_types.append(str(events.get_nowait().signal_type))

@@ -21,13 +21,20 @@ def _load(path: Path, name: str):
     return module
 
 
-PREFLIGHT = _load(ROOT / "scripts" / "ops" / "live_readiness_preflight.py", "live_readiness_preflight")
+PREFLIGHT = _load(
+    ROOT / "scripts" / "ops" / "live_readiness_preflight.py", "live_readiness_preflight"
+)
 STOP = _load(ROOT / "scripts" / "ops" / "request_live_stop.py", "request_live_stop")
 SLIPPAGE = _load(ROOT / "scripts" / "ops" / "summarize_fill_slippage.py", "summarize_fill_slippage")
 
 
 def test_live_readiness_preflight_reports_ready_for_paper(tmp_path: Path) -> None:
-    fresh_cutoff = (datetime.now(UTC) - timedelta(minutes=5)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    fresh_cutoff = (
+        (datetime.now(UTC) - timedelta(minutes=5))
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
     config_path = tmp_path / "config.yaml"
     config_path.write_text(
         "\n".join(
@@ -71,7 +78,12 @@ def test_live_readiness_preflight_reports_ready_for_paper(tmp_path: Path) -> Non
 
 
 def test_live_readiness_preflight_reports_ready_for_real(monkeypatch, tmp_path: Path) -> None:
-    fresh_cutoff = (datetime.now(UTC) - timedelta(minutes=5)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    fresh_cutoff = (
+        (datetime.now(UTC) - timedelta(minutes=5))
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
     config_path = tmp_path / "config.yaml"
     config_path.write_text(
         "\n".join(
@@ -116,7 +128,12 @@ def test_live_readiness_preflight_reports_ready_for_real(monkeypatch, tmp_path: 
 
 
 def test_live_readiness_preflight_accepts_explicit_promoted_candidate(tmp_path: Path) -> None:
-    fresh_cutoff = (datetime.now(UTC) - timedelta(minutes=5)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    fresh_cutoff = (
+        (datetime.now(UTC) - timedelta(minutes=5))
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
     config_path = tmp_path / "config.yaml"
     config_path.write_text(
         "\n".join(
@@ -170,7 +187,12 @@ def test_live_readiness_preflight_accepts_explicit_promoted_candidate(tmp_path: 
 def test_alpha_zoo_optuna_hybrid_real_mode_is_vetoed_by_artifact_flags(
     monkeypatch, tmp_path: Path
 ) -> None:
-    fresh_cutoff = (datetime.now(UTC) - timedelta(minutes=5)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    fresh_cutoff = (
+        (datetime.now(UTC) - timedelta(minutes=5))
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
     config_path = tmp_path / "config.yaml"
     config_path.write_text(
         "\n".join(
@@ -239,7 +261,12 @@ def test_alpha_zoo_optuna_hybrid_real_mode_is_vetoed_by_artifact_flags(
 
 
 def test_alpha_zoo_optuna_hybrid_paper_mode_can_pass_with_testnet(tmp_path: Path) -> None:
-    fresh_cutoff = (datetime.now(UTC) - timedelta(minutes=5)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    fresh_cutoff = (
+        (datetime.now(UTC) - timedelta(minutes=5))
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
     config_path = tmp_path / "config.yaml"
     config_path.write_text(
         "\n".join(
@@ -289,8 +316,15 @@ def test_alpha_zoo_optuna_hybrid_paper_mode_can_pass_with_testnet(tmp_path: Path
     assert payload["status"]["ready_for_real"] is False
 
 
-def test_live_readiness_preflight_honors_runtime_env_mode_override(monkeypatch, tmp_path: Path) -> None:
-    fresh_cutoff = (datetime.now(UTC) - timedelta(minutes=5)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+def test_live_readiness_preflight_honors_runtime_env_mode_override(
+    monkeypatch, tmp_path: Path
+) -> None:
+    fresh_cutoff = (
+        (datetime.now(UTC) - timedelta(minutes=5))
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
     config_path = tmp_path / "config.yaml"
     config_path.write_text(
         "\n".join(
@@ -336,7 +370,12 @@ def test_live_readiness_preflight_honors_runtime_env_mode_override(monkeypatch, 
 def test_live_readiness_preflight_falls_back_to_latest_worktree_decision_artifact(
     monkeypatch, tmp_path: Path
 ) -> None:
-    fresh_cutoff = (datetime.now(UTC) - timedelta(minutes=5)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    fresh_cutoff = (
+        (datetime.now(UTC) - timedelta(minutes=5))
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
     config_path = tmp_path / "config.yaml"
     config_path.write_text(
         "\n".join(
@@ -364,13 +403,7 @@ def test_live_readiness_preflight_falls_back_to_latest_worktree_decision_artifac
     )
     decision_rel = Path("var/reports/exact_window_backtests/followup_status/decision.json")
     worktree_decision = (
-        tmp_path
-        / ".omx"
-        / "team"
-        / "demo"
-        / "worktrees"
-        / "worker-1"
-        / decision_rel
+        tmp_path / ".omx" / "team" / "demo" / "worktrees" / "worker-1" / decision_rel
     )
     worktree_decision.parent.mkdir(parents=True, exist_ok=True)
     worktree_decision.write_text(json.dumps({"decision": "keep_incumbent"}), encoding="utf-8")

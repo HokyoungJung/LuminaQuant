@@ -32,11 +32,15 @@ from scripts.research import run_common_split_alpha_zoo_hybrid_v35_v36 as common
 DEFAULT_ALPHA_V2 = REPO_ROOT / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2"
 DEFAULT_OUTPUT_DIR = DEFAULT_ALPHA_V2 / "validation_to_20260331_latest_data_20260517"
 DEFAULT_CURRENT_TAIL_CACHE = (
-    REPO_ROOT / "var/cache/profit_moonshot_fresh_start/joined_panel_76f825ffea81c04f2fe41fbf.parquet"
+    REPO_ROOT
+    / "var/cache/profit_moonshot_fresh_start/joined_panel_76f825ffea81c04f2fe41fbf.parquet"
 )
-DEFAULT_EXTERNAL_STATE_CSV = DEFAULT_ALPHA_V2 / "external_market_state_20260512/external_market_state_lagged.csv"
+DEFAULT_EXTERNAL_STATE_CSV = (
+    DEFAULT_ALPHA_V2 / "external_market_state_20260512/external_market_state_lagged.csv"
+)
 DEFAULT_OLD_ALPHA_REPLAY = (
-    DEFAULT_ALPHA_V2 / "crypto_fx_alpha_zoo_real_data_20260514/crypto_fx_alpha_zoo_state_replay_latest.json"
+    DEFAULT_ALPHA_V2
+    / "crypto_fx_alpha_zoo_real_data_20260514/crypto_fx_alpha_zoo_state_replay_latest.json"
 )
 DEFAULT_TRAIN_START = "2025-01-01T00:00:00Z"
 DEFAULT_TRAIN_END = "2025-12-31T23:00:00Z"
@@ -160,7 +164,9 @@ def _build_screen_and_calibration(
             horizon=int(args.horizon),
             top_n=int(args.top_n),
             entry_quantile=float(args.entry_quantile),
-            max_ledger_records_per_factor_side_split=int(args.max_ledger_records_per_factor_side_split),
+            max_ledger_records_per_factor_side_split=int(
+                args.max_ledger_records_per_factor_side_split
+            ),
         )
     finally:
         common.COMMON_SPLIT_CONTRACT = old_contract
@@ -297,14 +303,18 @@ def _audit_from_trade_extrema(
         min_adverse = _safe_float(trade.get("_min_intratrade_adverse_return"))
         notional = float(starting_equity) * float(allocation_fraction) * float(leverage)
         margin_requirement = float(notional) * float(reserve_rate)
-        buffer = float(starting_equity) - margin_requirement + min(0.0, float(min_adverse) * notional)
+        buffer = (
+            float(starting_equity) - margin_requirement + min(0.0, float(min_adverse) * notional)
+        )
         split_status[split]["minimum_margin_buffer"] = min(
             float(split_status[split]["minimum_margin_buffer"]),
             float(buffer),
         )
         if min_adverse <= -adverse_threshold:
             split_status[split]["liquidation_count"] += 1
-            event_loss = min(1.0, abs(float(min_adverse)) * float(allocation_fraction) * float(leverage))
+            event_loss = min(
+                1.0, abs(float(min_adverse)) * float(allocation_fraction) * float(leverage)
+            )
             split_status[split]["maximum_liquidation_event_drawdown"] = max(
                 float(split_status[split]["maximum_liquidation_event_drawdown"]),
                 float(event_loss),
@@ -337,13 +347,17 @@ def _audit_from_trade_extrema(
 def _split_account_wipeout_count(audit: Mapping[str, Any], splits: tuple[str, ...]) -> int:
     status = dict(audit.get("split_status") or {})
     return int(
-        sum(int(dict(status.get(split) or {}).get("account_wipeout_count") or 0) for split in splits)
+        sum(
+            int(dict(status.get(split) or {}).get("account_wipeout_count") or 0) for split in splits
+        )
     )
 
 
 def _split_liquidation_count(audit: Mapping[str, Any], splits: tuple[str, ...]) -> int:
     status = dict(audit.get("split_status") or {})
-    return int(sum(int(dict(status.get(split) or {}).get("liquidation_count") or 0) for split in splits))
+    return int(
+        sum(int(dict(status.get(split) or {}).get("liquidation_count") or 0) for split in splits)
+    )
 
 
 def _tv_score(metrics: Mapping[str, Mapping[str, Any]], audit: Mapping[str, Any]) -> float:
@@ -426,7 +440,9 @@ def _build_rows(
     include_sample_guarded_new_alpha_grid: bool = False,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     specs = [common._old_selected_spec(old_replay, alpha), *alpha._default_grid_specs()]
-    if include_sample_guarded_new_alpha_grid and hasattr(alpha, "_sample_guarded_new_alpha_grid_specs"):
+    if include_sample_guarded_new_alpha_grid and hasattr(
+        alpha, "_sample_guarded_new_alpha_grid_specs"
+    ):
         specs.extend(alpha._sample_guarded_new_alpha_grid_specs())
     unique: dict[str, Any] = {}
     for spec in specs:
@@ -509,9 +525,15 @@ def _build_rows(
                         "cross_margin_liquidation_audit": audit,
                         "isolated_margin_audit": isolated_status,
                         "total_liquidation_count": int(audit.get("total_liquidation_count") or 0),
-                        "train_validation_liquidation_count": _split_liquidation_count(audit, TV_SPLITS),
-                        "locked_oos_liquidation_count": _split_liquidation_count(audit, ("locked_oos",)),
-                        "total_account_wipeout_count": _split_account_wipeout_count(audit, SPLIT_ORDER),
+                        "train_validation_liquidation_count": _split_liquidation_count(
+                            audit, TV_SPLITS
+                        ),
+                        "locked_oos_liquidation_count": _split_liquidation_count(
+                            audit, ("locked_oos",)
+                        ),
+                        "total_account_wipeout_count": _split_account_wipeout_count(
+                            audit, SPLIT_ORDER
+                        ),
                         "minimum_margin_buffer_cross_margin_diagnostic": _safe_float(
                             audit.get("minimum_margin_buffer")
                         ),
@@ -577,7 +599,12 @@ def _public_candidate(row: Mapping[str, Any] | None) -> dict[str, Any]:
     }
 
 
-def _strict_lane(alpha: Any, data: pd.DataFrame, promoted: Mapping[str, Any] | None, calibrated_edges: dict[str, float]) -> dict[str, Any]:
+def _strict_lane(
+    alpha: Any,
+    data: pd.DataFrame,
+    promoted: Mapping[str, Any] | None,
+    calibrated_edges: dict[str, float],
+) -> dict[str, Any]:
     if not promoted:
         return {"rows": [], "note": "no promoted candidate"}
     params = dict(promoted.get("params") or {})
@@ -657,7 +684,9 @@ def _rows_to_csv(rows: list[Mapping[str, Any]], path: Path) -> None:
                     "total_account_wipeout_count": row.get("total_account_wipeout_count"),
                     "locked_oos_gate_pass": row.get("locked_oos_gate_pass"),
                     "live_promotion_possible": row.get("live_promotion_possible"),
-                    "locked_oos_rejection_reasons": ";".join(row.get("locked_oos_rejection_reasons") or []),
+                    "locked_oos_rejection_reasons": ";".join(
+                        row.get("locked_oos_rejection_reasons") or []
+                    ),
                 }
             )
 
@@ -679,7 +708,10 @@ def _markdown(payload: Mapping[str, Any]) -> str:
     ]
     for name in SPLIT_ORDER:
         item = dict(split.get(name) or {})
-        period = dict(dict(payload.get("split_manifest") or {}).get("split_periods") or {}).get(name) or {}
+        period = (
+            dict(dict(payload.get("split_manifest") or {}).get("split_periods") or {}).get(name)
+            or {}
+        )
         lines.append(
             f"- {name}: `{item.get('start')}` .. `{item.get('end')}`; actual `{period.get('start_timestamp')}` .. `{period.get('end_timestamp')}`, rows `{period.get('record_count')}`"
         )
@@ -699,7 +731,9 @@ def _markdown(payload: Mapping[str, Any]) -> str:
             "",
             "## Live-promoted after locked-OOS gate",
             "",
-            _candidate_md(promoted) if promoted else "No candidate passed the post-freeze OOS gate.",
+            _candidate_md(promoted)
+            if promoted
+            else "No candidate passed the post-freeze OOS gate.",
             "",
             "## Artifacts",
             "",
@@ -743,7 +777,9 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
         strict_real_data=True,
     )
     common_frame = common.apply_common_split(bundle.frame, split_contract=split_contract)
-    common_frame = common.add_split_bounded_forward_return_label(common_frame, horizon=int(args.horizon))
+    common_frame = common.add_split_bounded_forward_return_label(
+        common_frame, horizon=int(args.horizon)
+    )
     _screen_payload, _calibration_payload, calibration_path = _build_screen_and_calibration(
         common_frame=common_frame,
         bundle_metadata=bundle.metadata,
@@ -777,7 +813,8 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
             for row in rows
             if row.get("candidate_name") == live_promoted.get("candidate_name")
             and _safe_float(row.get("leverage")) == _safe_float(live_promoted.get("leverage"))
-            and _safe_float(row.get("allocation_fraction")) == _safe_float(live_promoted.get("allocation_fraction"))
+            and _safe_float(row.get("allocation_fraction"))
+            == _safe_float(live_promoted.get("allocation_fraction"))
         ),
         None,
     )
@@ -819,7 +856,10 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
             ),
         },
         "candidate_rows_top50_path": str(csv_path),
-        "screen_payload_path": str(output_dir / "alpha_zoo_validation_march_high_leverage/crypto_fx_alpha_zoo_screen_validation_march_latest.json"),
+        "screen_payload_path": str(
+            output_dir
+            / "alpha_zoo_validation_march_high_leverage/crypto_fx_alpha_zoo_screen_validation_march_latest.json"
+        ),
         "calibration_payload_path": str(calibration_path),
         "locked_oos_contamination_audit": {
             "uses_locked_oos_for_objective": False,
@@ -897,7 +937,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     payload = build_payload(args)
     outputs = write_outputs(payload, Path(args.output_dir).expanduser().resolve())
-    print(json.dumps({**outputs, "peak_rss_mib": payload["memory_summary"]["peak_rss_mib"]}, sort_keys=True))
+    print(
+        json.dumps(
+            {**outputs, "peak_rss_mib": payload["memory_summary"]["peak_rss_mib"]}, sort_keys=True
+        )
+    )
     return 0
 
 

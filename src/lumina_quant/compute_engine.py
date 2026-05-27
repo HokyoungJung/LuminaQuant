@@ -75,8 +75,7 @@ def _normalize_gpu_mode(value: str | None) -> GPUMode:
     if token in {"forced-gpu", "force-gpu", "forcegpu", "forcedgpu"}:
         return "forced-gpu"
     raise ValueError(
-        "Invalid GPU mode. Expected one of auto|cpu|gpu|forced-gpu "
-        f"but received: {value!r}."
+        f"Invalid GPU mode. Expected one of auto|cpu|gpu|forced-gpu but received: {value!r}."
     )
 
 
@@ -171,7 +170,9 @@ def detect_nvidia_total_memory_gb(
         return [], f"nvidia-smi memory probe failed: {exc}"
 
     if proc.returncode != 0:
-        err = (proc.stderr or "").strip() or (proc.stdout or "").strip() or f"exit={proc.returncode}"
+        err = (
+            (proc.stderr or "").strip() or (proc.stdout or "").strip() or f"exit={proc.returncode}"
+        )
         return [], f"nvidia-smi memory probe failed: {err}"
 
     values: list[float] = []
@@ -235,7 +236,10 @@ def polars_gpu_available(
     if min_vram > 0.0:
         memory_gb, memory_reason = detect_nvidia_total_memory_gb()
         if not memory_gb:
-            return False, f"gpu compatibility check failed ({memory_reason}); requires >= {min_vram} GB"
+            return (
+                False,
+                f"gpu compatibility check failed ({memory_reason}); requires >= {min_vram} GB",
+            )
         target_idx = int(device or 0)
         if target_idx < 0 or target_idx >= len(memory_gb):
             return False, f"gpu device index {target_idx} is unavailable ({memory_reason})"
@@ -246,7 +250,10 @@ def polars_gpu_available(
     if not smoke_test:
         if nvidia_ok:
             return True, f"polars.GPUEngine available ({nvidia_reason})"
-        return True, f"polars.GPUEngine available ({nvidia_reason}; proceeding without strict check)"
+        return (
+            True,
+            f"polars.GPUEngine available ({nvidia_reason}; proceeding without strict check)",
+        )
 
     smoke_ok, smoke_reason = _run_polars_gpu_smoke(engine)
     if smoke_ok:
@@ -304,7 +311,9 @@ def select_engine(
     else:
         requested_mode = mode
     requested_mode = _normalize_gpu_mode(requested_mode)
-    resolved_device = _parse_gpu_device(device if device is not None else os.getenv("LQ_GPU_DEVICE"))
+    resolved_device = _parse_gpu_device(
+        device if device is not None else os.getenv("LQ_GPU_DEVICE")
+    )
     resolved_vram_gb = _parse_gpu_vram_gb(
         vram_gb if vram_gb is not None else os.getenv("LQ_GPU_VRAM_GB", "0")
     )

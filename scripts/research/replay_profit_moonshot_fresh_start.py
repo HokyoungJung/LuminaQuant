@@ -862,7 +862,9 @@ def _build_arrays(panel: pl.DataFrame, symbols: list[str]) -> dict[str, Any]:
     return arrays
 
 
-def _join_external_state(panel: pl.DataFrame, external_state_csv: str | Path) -> tuple[pl.DataFrame, dict[str, Any]]:
+def _join_external_state(
+    panel: pl.DataFrame, external_state_csv: str | Path
+) -> tuple[pl.DataFrame, dict[str, Any]]:
     """Join lagged daily external market-state features to the hourly crypto panel.
 
     The external CSV is expected to be pre-lagged by the fetch script so the
@@ -897,7 +899,9 @@ def _join_external_state(panel: pl.DataFrame, external_state_csv: str | Path) ->
         metadata["error"] = "external_state_csv_missing_external_columns"
         return panel, metadata
     external = (
-        external.select([pl.col(date_column).cast(pl.Date).alias("external_join_date"), *feature_columns])
+        external.select(
+            [pl.col(date_column).cast(pl.Date).alias("external_join_date"), *feature_columns]
+        )
         .unique(subset=["external_join_date"], keep="last")
         .sort("external_join_date")
     )

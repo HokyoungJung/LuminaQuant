@@ -58,7 +58,9 @@ def _load_json(path: Path) -> dict[str, Any]:
     return dict(json.loads(path.read_text(encoding="utf-8")))
 
 
-def _candidate_row_from_payload(payload: dict[str, Any], *, name: str, candidate_key: str, label: str) -> dict[str, Any]:
+def _candidate_row_from_payload(
+    payload: dict[str, Any], *, name: str, candidate_key: str, label: str
+) -> dict[str, Any]:
     metadata = dict(payload.get("metadata") or {})
     if candidate_key == "canonical_benchmark_static_blend":
         metadata["bypass_preblend_gate"] = True
@@ -81,7 +83,10 @@ def main() -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     benchmark_payload = _load_json(Path(args.benchmark_path).resolve())
-    report_paths = [Path(args.research_report).resolve(), *[Path(path).resolve() for path in list(args.extra_research_report or [])]]
+    report_paths = [
+        Path(args.research_report).resolve(),
+        *[Path(path).resolve() for path in list(args.extra_research_report or [])],
+    ]
     candidate_rows: list[dict[str, Any]] = []
     for report_path in report_paths:
         research_payload = _load_json(report_path)
@@ -99,19 +104,17 @@ def main() -> None:
         candidate_key="canonical_benchmark_static_blend",
         label="Canonical benchmark static blend",
     )
-    benchmark_only = evaluate_weighted_portfolio([
-        {**benchmark_row, "_saved_weight": 1.0}
-    ])
+    benchmark_only = evaluate_weighted_portfolio([{**benchmark_row, "_saved_weight": 1.0}])
 
     sorted_candidates = sorted(
         candidate_rows,
-        key=lambda row: float(row.get("selection_score", row.get("oos", {}).get("sharpe", float("-inf")))),
+        key=lambda row: float(
+            row.get("selection_score", row.get("oos", {}).get("sharpe", float("-inf")))
+        ),
         reverse=True,
     )
     best_new = dict(sorted_candidates[0])
-    new_only = evaluate_weighted_portfolio([
-        {**best_new, "_saved_weight": 1.0}
-    ])
+    new_only = evaluate_weighted_portfolio([{**best_new, "_saved_weight": 1.0}])
 
     combined = build_correlation_aware_sparse_fold_ensemble(
         [benchmark_row, *sorted_candidates],
@@ -150,7 +153,9 @@ def main() -> None:
 
     benchmark_oos = _oos_metrics(benchmark_only)
     new_oos = _oos_metrics(new_only)
-    combined_oos = dict(((combined.get("portfolio_payload") or {}).get("portfolio_metrics") or {}).get("oos") or {})
+    combined_oos = dict(
+        ((combined.get("portfolio_payload") or {}).get("portfolio_metrics") or {}).get("oos") or {}
+    )
     md_path.write_text(
         "\n".join(
             [

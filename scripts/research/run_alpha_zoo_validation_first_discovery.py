@@ -94,7 +94,9 @@ def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
 def _write_csv(path: Path, rows: Sequence[Mapping[str, Any]], fieldnames: Sequence[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(fieldnames), extrasaction="ignore", lineterminator="\n")
+        writer = csv.DictWriter(
+            handle, fieldnames=list(fieldnames), extrasaction="ignore", lineterminator="\n"
+        )
         writer.writeheader()
         for row in rows:
             writer.writerow({field: row.get(field) for field in fieldnames})
@@ -131,7 +133,9 @@ def _metrics_by_model(retune: Mapping[str, Any]) -> dict[str, dict[str, dict[str
     }
 
 
-def _validation_rank_key(splits: Mapping[str, Mapping[str, Any]]) -> tuple[float, float, float, float, str]:
+def _validation_rank_key(
+    splits: Mapping[str, Mapping[str, Any]],
+) -> tuple[float, float, float, float, str]:
     """Rank using train+validation evidence only; locked-OOS is intentionally unread."""
     train = dict(splits.get("train") or {})
     validation = dict(splits.get("validation") or {})
@@ -144,7 +148,9 @@ def _validation_rank_key(splits: Mapping[str, Mapping[str, Any]]) -> tuple[float
     )
 
 
-def _validation_efficiency_key(splits: Mapping[str, Mapping[str, Any]]) -> tuple[float, float, float, str]:
+def _validation_efficiency_key(
+    splits: Mapping[str, Mapping[str, Any]],
+) -> tuple[float, float, float, str]:
     """Prefer high validation return per drawdown using train+validation only."""
     train = dict(splits.get("train") or {})
     validation = dict(splits.get("validation") or {})
@@ -213,7 +219,9 @@ def _candidate_summary(
     }
 
 
-def _profile_payload(profile_id: str, selected: Mapping[str, Any], *, formula: str, consequence: str) -> dict[str, Any]:
+def _profile_payload(
+    profile_id: str, selected: Mapping[str, Any], *, formula: str, consequence: str
+) -> dict[str, Any]:
     return {
         "profile_id": profile_id,
         "selected_model_id": selected.get("model_id"),
@@ -318,15 +326,17 @@ def _discovery_markdown(payload: Mapping[str, Any]) -> str:
             f"{_safe_float(row.get('locked_oos_return')):.4%} | "
             f"`{status.get('ready_for_paper')}` | `{status.get('ready_for_real')}` |"
         )
-    lines.extend([
-        "",
-        "## High-validation quarantine",
-        "",
-        "These rows were found by validation ranking but are not paper candidates because locked-OOS/promotion gates fail.",
-        "",
-        "| Rank | Model | Val return | Locked-OOS return | Gate reasons |",
-        "| ---: | --- | ---: | ---: | --- |",
-    ])
+    lines.extend(
+        [
+            "",
+            "## High-validation quarantine",
+            "",
+            "These rows were found by validation ranking but are not paper candidates because locked-OOS/promotion gates fail.",
+            "",
+            "| Rank | Model | Val return | Locked-OOS return | Gate reasons |",
+            "| ---: | --- | ---: | ---: | --- |",
+        ]
+    )
     for row in payload.get("high_validation_quarantine") or []:
         reasons = ";".join(row.get("gate_reasons") or [])
         lines.append(
@@ -346,7 +356,10 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     retune = _load_json(retune_path)
     low_correlation = _load_json(low_correlation_path)
     live_aligned = _load_json(live_aligned_path)
-    if _safe_float(retune.get("round_trip_slippage_fee_bps_primary")) != PRIMARY_ROUND_TRIP_COST_BPS:
+    if (
+        _safe_float(retune.get("round_trip_slippage_fee_bps_primary"))
+        != PRIMARY_ROUND_TRIP_COST_BPS
+    ):
         raise ValueError("validation-first discovery requires the frozen 10bps retune artifact")
 
     source_lineage = paper_preflight._source_lineage(
@@ -371,7 +384,9 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
 
     live_pass_ranked = [summary for summary in ranked_summaries if summary["live_promotable_10bps"]]
     if not live_pass_ranked:
-        raise ValueError("no 10bps live-gate-passed candidate available for validation-first paper handoff")
+        raise ValueError(
+            "no 10bps live-gate-passed candidate available for validation-first paper handoff"
+        )
     validation_leader = dict(live_pass_ranked[0])
     validation_leader["role"] = "validation_return_leader"
     validation_leader["profile_id"] = VALIDATION_RETURN_LEADER_PROFILE
@@ -381,10 +396,13 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
         (model_id, splits)
         for model_id, splits in by_model.items()
         if _is_live_gate_pass(splits)
-        and _safe_float(splits["validation"].get("total_return")) >= leader_return * float(args.efficiency_min_return_ratio)
+        and _safe_float(splits["validation"].get("total_return"))
+        >= leader_return * float(args.efficiency_min_return_ratio)
         and _safe_float(splits["train"].get("total_return")) > 0.0
     ]
-    efficiency_model_id, efficiency_splits = max(efficiency_pool, key=lambda item: _validation_efficiency_key(item[1]))
+    efficiency_model_id, efficiency_splits = max(
+        efficiency_pool, key=lambda item: _validation_efficiency_key(item[1])
+    )
     validation_efficiency = _candidate_summary(
         role="validation_efficiency_reference",
         profile_id=VALIDATION_EFFICIENCY_PROFILE,

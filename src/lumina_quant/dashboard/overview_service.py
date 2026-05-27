@@ -22,7 +22,9 @@ from lumina_quant.utils.performance import (
 
 
 def resolve_dashboard_postgres_dsn(dsn: str | None = None) -> str:
-    return str(dsn or os.getenv("LQ_POSTGRES_DSN") or getattr(BaseConfig, "POSTGRES_DSN", "") or "").strip()
+    return str(
+        dsn or os.getenv("LQ_POSTGRES_DSN") or getattr(BaseConfig, "POSTGRES_DSN", "") or ""
+    ).strip()
 
 
 def coerce_datetime_series(frame: pd.DataFrame, column: str) -> pd.DataFrame:
@@ -119,15 +121,15 @@ def build_overview_payload_from_frames(
     prev = totals.to_numpy(dtype=float)[:-1]
     nxt = totals.to_numpy(dtype=float)[1:]
     returns = (
-        pd.Series(
-            (nxt - prev) / pd.Series(prev).replace(0.0, 1.0).to_numpy(dtype=float)
-        )
+        pd.Series((nxt - prev) / pd.Series(prev).replace(0.0, 1.0).to_numpy(dtype=float))
         .replace([float("inf"), float("-inf")], 0.0)
         .fillna(0.0)
         .to_numpy(dtype=float)
     )
     periods = 252
-    cagr = create_cagr(latest_equity, initial_equity, len(totals), periods) if len(totals) > 1 else 0.0
+    cagr = (
+        create_cagr(latest_equity, initial_equity, len(totals), periods) if len(totals) > 1 else 0.0
+    )
     annualized_vol = create_annualized_volatility(returns, periods) if returns.size else 0.0
     sharpe = create_sharpe_ratio(returns, periods=periods) if returns.size else 0.0
     sortino = create_sortino_ratio(returns, periods=periods) if returns.size else 0.0

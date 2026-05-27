@@ -73,7 +73,9 @@ def append_ohlcv_frame_native(
         ]
     )
 
-    timestamps = np.ascontiguousarray(prepared.get_column("timestamp_ms").to_numpy(), dtype=np.int64)
+    timestamps = np.ascontiguousarray(
+        prepared.get_column("timestamp_ms").to_numpy(), dtype=np.int64
+    )
     opens = np.ascontiguousarray(prepared.get_column("open").to_numpy(), dtype=np.float64)
     highs = np.ascontiguousarray(prepared.get_column("high").to_numpy(), dtype=np.float64)
     lows = np.ascontiguousarray(prepared.get_column("low").to_numpy(), dtype=np.float64)

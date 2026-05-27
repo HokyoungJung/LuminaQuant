@@ -24,7 +24,6 @@ def test_normalize_exchange_timestamp_ms_rejects_non_ms_units() -> None:
         normalize_exchange_timestamp_ms(1_700_000_000_000_000, source="rest")
 
 
-
 def test_coerce_raw_aggtrades_frame_polars_matches_iterable_path() -> None:
     rows = [
         {
@@ -265,7 +264,9 @@ def test_raw_aggtrades_auto_backend_logs_once_when_native_unavailable(monkeypatc
 
     assert first.height == 1
     assert second.height == 1
-    records = [record.message for record in caplog.records if "falling back to Python" in record.message]
+    records = [
+        record.message for record in caplog.records if "falling back to Python" in record.message
+    ]
     assert len(records) == 1
     assert "failed to load test library" in records[0]
 
@@ -298,7 +299,6 @@ def test_raw_aggtrades_auto_backend_logs_once_when_native_status_fails(monkeypat
     assert frame.height == 1
     records = [record.message for record in caplog.records if "status=7" in record.message]
     assert len(records) == 1
-
 
 
 def test_committed_loader_rebuilds_higher_timeframe_from_1s_and_truncates_incomplete_tail(

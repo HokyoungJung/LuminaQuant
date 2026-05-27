@@ -9,14 +9,18 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT / "scripts" / "research" / "write_profit_moonshot_live_final_selection.py"
-SPEC = importlib.util.spec_from_file_location("write_profit_moonshot_live_final_selection", MODULE_PATH)
+SPEC = importlib.util.spec_from_file_location(
+    "write_profit_moonshot_live_final_selection", MODULE_PATH
+)
 assert SPEC is not None and SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
 
 TUNER_PATH = ROOT / "scripts" / "research" / "tune_profit_moonshot_fresh_portfolio.py"
-TUNER_SPEC = importlib.util.spec_from_file_location("tune_profit_moonshot_fresh_portfolio_for_final_tests", TUNER_PATH)
+TUNER_SPEC = importlib.util.spec_from_file_location(
+    "tune_profit_moonshot_fresh_portfolio_for_final_tests", TUNER_PATH
+)
 assert TUNER_SPEC is not None and TUNER_SPEC.loader is not None
 TUNER = importlib.util.module_from_spec(TUNER_SPEC)
 sys.modules[TUNER_SPEC.name] = TUNER
@@ -81,7 +85,12 @@ def _split(
 
 
 def _candidate(
-    name: str, *, train_return: float, val_return: float, oos_return: float, sleeves: list[str] | None = None
+    name: str,
+    *,
+    train_return: float,
+    val_return: float,
+    oos_return: float,
+    sleeves: list[str] | None = None,
 ) -> dict:
     return {
         "name": name,
@@ -125,7 +134,9 @@ def _candidate(
     }
 
 
-def _candidate_with_sleeves(name: str, sleeve_names: list[str], *, oos_return: float = 0.10) -> dict:
+def _candidate_with_sleeves(
+    name: str, sleeve_names: list[str], *, oos_return: float = 0.10
+) -> dict:
     return {
         "name": name,
         "leverage": 3.0,
@@ -136,9 +147,20 @@ def _candidate_with_sleeves(name: str, sleeve_names: list[str], *, oos_return: f
         ],
         "source_search_ledger_refs": ["local_artifact:fixture_dynamic_candidate"],
         "splits": {
-            "train": _split(total_return=0.2, max_drawdown=0.04, sharpe=3.0, sortino=4.0, calmar=10.0),
-            "val": _split(total_return=0.2, max_drawdown=0.03, sharpe=6.0, sortino=7.0, calmar=30.0),
-            "oos": _split(total_return=oos_return, max_drawdown=0.02, sharpe=5.0, sortino=6.0, calmar=20.0, smart_sortino=4.5),
+            "train": _split(
+                total_return=0.2, max_drawdown=0.04, sharpe=3.0, sortino=4.0, calmar=10.0
+            ),
+            "val": _split(
+                total_return=0.2, max_drawdown=0.03, sharpe=6.0, sortino=7.0, calmar=30.0
+            ),
+            "oos": _split(
+                total_return=oos_return,
+                max_drawdown=0.02,
+                sharpe=5.0,
+                sortino=6.0,
+                calmar=20.0,
+                smart_sortino=4.5,
+            ),
         },
         "selection_policy": {
             "selection_inputs": ["train", "validation"],
@@ -157,7 +179,9 @@ def _liquidation_payload() -> dict:
         "artifact_kind": "profit_moonshot_liquidation_aware_validation",
         "oos_end_date": "2026-05-10",
         "current_base_reference_result": current_base,
-        "promoted_candidate": _candidate("train_val_winner", train_return=0.30, val_return=0.25, oos_return=0.09),
+        "promoted_candidate": _candidate(
+            "train_val_winner", train_return=0.30, val_return=0.25, oos_return=0.09
+        ),
         "selected_by_train_validation_retune": _candidate(
             "oos_poison_candidate", train_return=0.12, val_return=0.10, oos_return=0.30
         ),
@@ -172,7 +196,9 @@ def _candidate_portfolio_payload() -> dict:
         "selected_by_train_val_stability": _candidate(
             "candidate_portfolio_winner", train_return=0.25, val_return=0.20, oos_return=0.08
         ),
-        "diagnostic_best_oos": _candidate("diagnostic_oos_only", train_return=0.09, val_return=0.08, oos_return=0.50),
+        "diagnostic_best_oos": _candidate(
+            "diagnostic_oos_only", train_return=0.09, val_return=0.08, oos_return=0.50
+        ),
         "allocator_policy": {
             "selection_basis": "train_val_stability_only",
             "uses_locked_oos_for_selection": False,
@@ -182,7 +208,9 @@ def _candidate_portfolio_payload() -> dict:
 
 
 def _candidate_hybrid_payload() -> dict:
-    candidate_hybrid = _candidate("candidate_hybrid_train_val", train_return=0.28, val_return=0.24, oos_return=0.12)
+    candidate_hybrid = _candidate(
+        "candidate_hybrid_train_val", train_return=0.28, val_return=0.24, oos_return=0.12
+    )
     for split_payload in candidate_hybrid["splits"].values():
         split_payload.pop("minimum_margin_buffer", None)
         split_payload.pop("minimum_margin_ratio", None)
@@ -204,7 +232,9 @@ def _candidate_hybrid_payload() -> dict:
 
 
 def _candidate_hybrid_payload_with_dynamic_replay() -> dict:
-    candidate_hybrid = _candidate("candidate_hybrid_dynamic_replay", train_return=0.80, val_return=0.70, oos_return=0.60)
+    candidate_hybrid = _candidate(
+        "candidate_hybrid_dynamic_replay", train_return=0.80, val_return=0.70, oos_return=0.60
+    )
     candidate_hybrid["train_val_stability_score"] = 99.0
     for split_name, replay_return in (("train", 0.11), ("val", 0.10), ("oos", 0.07)):
         split_payload = candidate_hybrid["splits"][split_name]
@@ -375,14 +405,20 @@ def test_candidate_hybrid_uses_dynamic_replay_metrics_and_margin_evidence() -> N
 def test_calendar_sleeve_rejected_by_strategy_validity_gate() -> None:
     payload = MODULE.build_final_selection_payload(
         refresh_payload={"ohlcv_results": []},
-        candidate_portfolio_payload={"selected_by_train_val_stability": _candidate_with_sleeves(
-            "calendar_candidate",
-            [
-                "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
-            ],
-            oos_return=0.12,
-        )},
-        liquidation_payload={"current_base_reference_result": _candidate("current_base", train_return=0.10, val_return=0.08, oos_return=0.05)},
+        candidate_portfolio_payload={
+            "selected_by_train_val_stability": _candidate_with_sleeves(
+                "calendar_candidate",
+                [
+                    "fresh_calendar_trx_takeprofit_sethusdt_thr180_h168_ls620_ss120_tp600",
+                ],
+                oos_return=0.12,
+            )
+        },
+        liquidation_payload={
+            "current_base_reference_result": _candidate(
+                "current_base", train_return=0.10, val_return=0.08, oos_return=0.05
+            )
+        },
         candidate_hybrid_payload={},
         legacy_hybrid_payload={},
         source_artifacts={
@@ -395,7 +431,10 @@ def test_calendar_sleeve_rejected_by_strategy_validity_gate() -> None:
     row = next(row for row in payload["rows"] if row["name"] == "calendar_candidate")
     assert row["decision_gates"]["strategy_validity"]["pass"] is False
     assert row["strategy_validity"]["primary_signal_type"] == "calendar_primary"
-    assert "calendar_fixed_month_alpha" in row["decision_gates"]["strategy_validity"]["rejection_reasons"]
+    assert (
+        "calendar_fixed_month_alpha"
+        in row["decision_gates"]["strategy_validity"]["rejection_reasons"]
+    )
     assert row["decision_gates"]["deployable_candidate"] is False
     assert "strategy_validity_rejected" in row["rejection_reasons"]
 
@@ -410,7 +449,11 @@ def test_dynamic_sleeve_rows_keep_strategy_validity_metadata() -> None:
                 oos_return=0.11,
             )
         },
-        liquidation_payload={"current_base_reference_result": _candidate("current_base", train_return=0.10, val_return=0.08, oos_return=0.05)},
+        liquidation_payload={
+            "current_base_reference_result": _candidate(
+                "current_base", train_return=0.10, val_return=0.08, oos_return=0.05
+            )
+        },
         candidate_hybrid_payload={},
         legacy_hybrid_payload={},
         source_artifacts={
@@ -479,7 +522,10 @@ def test_strategy_validity_blocks_calendar_primary() -> None:
             train_return=0.60,
             val_return=0.45,
             oos_return=0.25,
-            sleeves=["fresh_calendar_rot_lbtcusdt_sethusdt_lb168_thr20_h336_sc80_st0", "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all"],
+            sleeves=[
+                "fresh_calendar_rot_lbtcusdt_sethusdt_lb168_thr20_h336_sc80_st0",
+                "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all",
+            ],
         )
     }
 
@@ -514,7 +560,9 @@ def test_fractional_leverage_blocks_live_candidate_promotion() -> None:
     }
     current_base = _candidate("current_base", train_return=0.10, val_return=0.08, oos_return=0.05)
     current_base["leverage"] = 2.3427334297703024
-    fractional_candidate = _candidate("fractional_live_impossible", train_return=0.90, val_return=0.80, oos_return=0.70)
+    fractional_candidate = _candidate(
+        "fractional_live_impossible", train_return=0.90, val_return=0.80, oos_return=0.70
+    )
     fractional_candidate["leverage"] = 2.3427334297703024
     liquidation_payload = {
         "artifact_kind": "profit_moonshot_liquidation_aware_validation",
@@ -580,7 +628,9 @@ def test_account_wipeout_blocks_candidate_even_with_positive_return() -> None:
         ]
     }
     liquidation = _liquidation_payload()
-    liquidation["promoted_candidate"]["splits"]["oos"]["liquidation_events"] = [{"account_wipeout": True}]
+    liquidation["promoted_candidate"]["splits"]["oos"]["liquidation_events"] = [
+        {"account_wipeout": True}
+    ]
 
     payload = MODULE.build_final_selection_payload(
         refresh_payload=refresh_payload,
@@ -635,7 +685,11 @@ def test_hybrid_split_window_oos_end_is_in_cutoff_gate() -> None:
         "split_windows": {"oos_end_inclusive": "2026-05-06"},
         "scenarios": {
             "refreshed_latest_tail": {
-                "split_metrics": {"oos": _metrics(total_return=0.01, max_drawdown=0.01, sharpe=1.0, sortino=1.0, calmar=1.0)}
+                "split_metrics": {
+                    "oos": _metrics(
+                        total_return=0.01, max_drawdown=0.01, sharpe=1.0, sortino=1.0, calmar=1.0
+                    )
+                }
             }
         },
     }
@@ -680,13 +734,17 @@ def test_missing_research_history_source_metadata_blocks_promotion() -> None:
             {"symbol": "ETH/USDT", "after_ohlcv_max_utc": "2026-05-10T23:59:30Z"},
         ]
     }
-    candidate = _candidate("source_untraceable", train_return=0.90, val_return=0.80, oos_return=0.70)
+    candidate = _candidate(
+        "source_untraceable", train_return=0.90, val_return=0.80, oos_return=0.70
+    )
     candidate.pop("research_history_refs")
     candidate.pop("source_search_ledger_refs")
     liquidation_payload = {
         "artifact_kind": "profit_moonshot_liquidation_aware_validation",
         "oos_end_date": "2026-05-10",
-        "current_base_reference_result": _candidate("current_base", train_return=0.10, val_return=0.08, oos_return=0.05),
+        "current_base_reference_result": _candidate(
+            "current_base", train_return=0.10, val_return=0.08, oos_return=0.05
+        ),
         "promoted_candidate": candidate,
         "memory_summary": {"peak_rss_bytes": 256 * 1024 * 1024, "under_8gib": True},
     }

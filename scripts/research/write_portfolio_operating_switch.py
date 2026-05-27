@@ -27,7 +27,9 @@ from lumina_quant.portfolio_split_contract import FOLLOWUP_ROOT, ROOT
 
 DEFAULT_GROUP_ROOT = FOLLOWUP_ROOT / "portfolio_incumbent_autoresearch_grouped"
 DEFAULT_MARKET_JUDGEMENT_PATH = (
-    DEFAULT_GROUP_ROOT / "market_regime_judgement_current" / "group_market_regime_judgement_latest.json"
+    DEFAULT_GROUP_ROOT
+    / "market_regime_judgement_current"
+    / "group_market_regime_judgement_latest.json"
 )
 DEFAULT_SOFT_ALLOCATOR_PATH = (
     DEFAULT_GROUP_ROOT
@@ -40,18 +42,30 @@ DEFAULT_THREE_WAY_ALLOCATOR_PATH = (
     / "three_way_market_regime_allocator_latest.json"
 )
 DEFAULT_OPERATING_PLAN_PATH = (
-    DEFAULT_GROUP_ROOT / "portfolio_candidate_overlay_review_current" / "portfolio_operating_plan_latest.json"
+    DEFAULT_GROUP_ROOT
+    / "portfolio_candidate_overlay_review_current"
+    / "portfolio_operating_plan_latest.json"
 )
-DEFAULT_BALANCED_STRATEGY_PATH = DEFAULT_GROUP_ROOT / "current_switch_validation_current" / "refreshed_balanced_overlay_strategy_latest.json"
+DEFAULT_BALANCED_STRATEGY_PATH = (
+    DEFAULT_GROUP_ROOT
+    / "current_switch_validation_current"
+    / "refreshed_balanced_overlay_strategy_latest.json"
+)
 DEFAULT_HYBRID_PORTFOLIO_PATH = (
     DEFAULT_GROUP_ROOT / "portfolio_hybrid_online_current" / "hybrid_online_portfolio_latest.json"
 )
 DEFAULT_PRODUCTION_GUARDED_PATH = (
-    DEFAULT_GROUP_ROOT / "portfolio_production_guarded_current" / "production_guarded_portfolio_latest.json"
+    DEFAULT_GROUP_ROOT
+    / "portfolio_production_guarded_current"
+    / "production_guarded_portfolio_latest.json"
 )
 DEFAULT_OUTPUT_DIR = DEFAULT_GROUP_ROOT / "portfolio_operating_switch_current"
-DEFAULT_MATERIALIZED_ROOT = ROOT / "data" / "market_parquet" / "market_data_materialized" / "binance"
-DEFAULT_RAW_AGGTRADES_ROOT = ROOT / "data" / "market_parquet" / "market_data_raw_aggtrades" / "binance"
+DEFAULT_MATERIALIZED_ROOT = (
+    ROOT / "data" / "market_parquet" / "market_data_materialized" / "binance"
+)
+DEFAULT_RAW_AGGTRADES_ROOT = (
+    ROOT / "data" / "market_parquet" / "market_data_raw_aggtrades" / "binance"
+)
 DEFAULT_PAIR_SYMBOLS = ("BNB/USDT", "TRX/USDT")
 DEFAULT_PAIR_TIMEFRAME = "30m"
 DEFAULT_VOLUME_LOOKBACK_DAYS = 7
@@ -169,7 +183,9 @@ def _profile_as_of_override(profile: str) -> str | None:
     if normalized != "reboot_validation" or not REBOOT_SWITCH_VALIDATION_PATH.exists():
         return None
     payload = _read_json(REBOOT_SWITCH_VALIDATION_PATH)
-    token = str(payload.get("latest_common_complete_utc") or payload.get("refresh_cutoff_utc") or "").strip()
+    token = str(
+        payload.get("latest_common_complete_utc") or payload.get("refresh_cutoff_utc") or ""
+    ).strip()
     return token or None
 
 
@@ -217,7 +233,8 @@ def _load_symbol_volume_signal(
         )
 
     eligible_days = [
-        path for path in sorted(symbol_root.glob("date=*"))
+        path
+        for path in sorted(symbol_root.glob("date=*"))
         if date.fromisoformat(path.name.split("=", 1)[1]) <= as_of_date
     ]
     if not eligible_days:
@@ -233,7 +250,7 @@ def _load_symbol_volume_signal(
             state="missing",
         )
 
-    selected_days = eligible_days[-max(1, int(lookback_days)):]
+    selected_days = eligible_days[-max(1, int(lookback_days)) :]
     files = [str(path) for day_dir in selected_days for path in sorted(day_dir.glob("*.parquet"))]
     if not files:
         return SymbolVolumeSignal(
@@ -252,19 +269,22 @@ def _load_symbol_volume_signal(
         pl.scan_parquet(files)
         .select(
             pl.col("timestamp_ms").cast(pl.Int64).alias("timestamp_ms"),
-            pl.from_epoch(pl.col("timestamp_ms"), time_unit="ms").dt.replace_time_zone("UTC").alias("datetime"),
+            pl.from_epoch(pl.col("timestamp_ms"), time_unit="ms")
+            .dt.replace_time_zone("UTC")
+            .alias("datetime"),
             pl.col("price").cast(pl.Float64).fill_null(0.0).alias("price"),
             pl.col("quantity").cast(pl.Float64).fill_null(0.0).alias("quantity"),
         )
         .with_columns(
-            (pl.col("price").clip(lower_bound=0.0) * pl.col("quantity").clip(lower_bound=0.0)).alias("dollar_volume"),
+            (
+                pl.col("price").clip(lower_bound=0.0) * pl.col("quantity").clip(lower_bound=0.0)
+            ).alias("dollar_volume"),
             pl.col("datetime").dt.date().alias("day"),
             (pl.col("timestamp_ms") % 86_400_000).alias("ms_of_day"),
         )
     )
     daily = (
-        base_scan
-        .group_by("day")
+        base_scan.group_by("day")
         .agg(
             pl.sum("dollar_volume").alias("full_dollar_volume"),
             pl.max("ms_of_day").alias("latest_ms_of_day"),
@@ -288,8 +308,7 @@ def _load_symbol_volume_signal(
     latest_day = daily["day"].to_list()[-1]
     latest_cutoff_ms = int(_safe_float(daily["latest_ms_of_day"].to_list()[-1], 0.0))
     partial = (
-        base_scan
-        .filter(pl.col("ms_of_day") <= latest_cutoff_ms)
+        base_scan.filter(pl.col("ms_of_day") <= latest_cutoff_ms)
         .group_by("day")
         .agg(pl.sum("dollar_volume").alias("partial_dollar_volume"))
         .sort("day")
@@ -301,8 +320,12 @@ def _load_symbol_volume_signal(
 
     latest_full_dollar_volume = _safe_float(daily["full_dollar_volume"].to_list()[-1], 0.0)
     latest_partial_dollar_volume = _safe_float(daily["partial_dollar_volume"].to_list()[-1], 0.0)
-    full_dollar_volumes = [_safe_float(value, 0.0) for value in daily["full_dollar_volume"].to_list()]
-    partial_dollar_volumes = [_safe_float(value, 0.0) for value in daily["partial_dollar_volume"].to_list()]
+    full_dollar_volumes = [
+        _safe_float(value, 0.0) for value in daily["full_dollar_volume"].to_list()
+    ]
+    partial_dollar_volumes = [
+        _safe_float(value, 0.0) for value in daily["partial_dollar_volume"].to_list()
+    ]
     previous_full = full_dollar_volumes[:-1]
     previous_partial = partial_dollar_volumes[:-1]
     if latest_day == as_of_date and previous_partial:
@@ -376,8 +399,7 @@ def _load_latest_market_judgement(
     for symbol in symbol_universe:
         symbol_root = feature_root / f"symbol={_symbol_token(symbol)}"
         days = sorted(
-            date.fromisoformat(path.name.split("=", 1)[1])
-            for path in symbol_root.glob("date=*")
+            date.fromisoformat(path.name.split("=", 1)[1]) for path in symbol_root.glob("date=*")
         )
         if days:
             latest_candidates.append(days[-1])
@@ -387,7 +409,9 @@ def _load_latest_market_judgement(
     latest_day = min(latest_candidates)
     if as_of_date is not None:
         latest_day = min(latest_day, as_of_date)
-    start_day = latest_day - _MARKET.pd.Timedelta(days=max(8, int(feature_lookback_days))).to_pytimedelta()
+    start_day = (
+        latest_day - _MARKET.pd.Timedelta(days=max(8, int(feature_lookback_days))).to_pytimedelta()
+    )
     symbol_frames = []
     for symbol in symbol_universe:
         frame, _summary = _MARKET._load_symbol_close_30m_from_feature_points(
@@ -468,7 +492,9 @@ def _volatility_state(snapshot: Mapping[str, Any]) -> str:
 
 
 def _overlay_candidate_health(operating_plan_payload: Mapping[str, Any]) -> dict[str, Any]:
-    balanced = dict((operating_plan_payload.get("deployment_modes") or {}).get("balanced_overlay_mode") or {})
+    balanced = dict(
+        (operating_plan_payload.get("deployment_modes") or {}).get("balanced_overlay_mode") or {}
+    )
     metrics = dict(balanced.get("metrics") or {})
     return {
         "oos_total_return": _safe_float(metrics.get("oos_total_return"), 0.0),
@@ -490,7 +516,9 @@ def _balanced_strategy_health(
 ) -> dict[str, Any]:
     hybrid_source_metrics = dict(hybrid_source_metrics or {})
     if "balanced_overlay_80_20" in hybrid_source_metrics:
-        return _allocator_health_from_split_metrics(dict(hybrid_source_metrics["balanced_overlay_80_20"]))
+        return _allocator_health_from_split_metrics(
+            dict(hybrid_source_metrics["balanced_overlay_80_20"])
+        )
     if isinstance(balanced_strategy_payload, Mapping):
         metrics = dict((balanced_strategy_payload.get("portfolio_metrics") or {}).get("oos") or {})
         val = dict((balanced_strategy_payload.get("portfolio_metrics") or {}).get("val") or {})
@@ -574,7 +602,9 @@ def _hybrid_portfolio_health(hybrid_payload: Mapping[str, Any] | None) -> dict[s
             "max_rss_under_8gib": False,
         }
     refreshed = dict(
-        dict((hybrid_payload.get("scenarios") or {}).get("refreshed_latest_tail") or {}).get("split_metrics")
+        dict((hybrid_payload.get("scenarios") or {}).get("refreshed_latest_tail") or {}).get(
+            "split_metrics"
+        )
         or {}
     )
     val = dict(refreshed.get("val") or {})
@@ -678,7 +708,8 @@ def _hybrid_balanced_promotion_signal(
         and str(hybrid.get("recommended_stage") or "").strip().lower() == "pilot_candidate"
         and oos_return_edge >= HYBRID_PROMOTION_STRONG_OOS_RETURN_EDGE
         and oos_sharpe_edge >= HYBRID_PROMOTION_STRONG_OOS_SHARPE_EDGE
-        and _safe_float(hybrid.get("val_total_return"), 0.0) >= HYBRID_PROMOTION_STRONG_VAL_TOTAL_RETURN
+        and _safe_float(hybrid.get("val_total_return"), 0.0)
+        >= HYBRID_PROMOTION_STRONG_VAL_TOTAL_RETURN
         and _safe_float(hybrid.get("val_sharpe"), 0.0) >= HYBRID_PROMOTION_STRONG_VAL_SHARPE
         and drawdown_ok
     )
@@ -686,11 +717,7 @@ def _hybrid_balanced_promotion_signal(
         hybrid.get("healthy")
         and drawdown_ok
         and (
-            (
-                (hybrid.get("beats_balanced_refreshed") or oos_ok)
-                and oos_ok
-                and val_ok
-            )
+            ((hybrid.get("beats_balanced_refreshed") or oos_ok) and oos_ok and val_ok)
             or profit_first_ok
         )
     )
@@ -752,21 +779,31 @@ def recommend_operating_mode(
     production_health: Mapping[str, Any] | None = None,
 ) -> OperatingModeDecision:
     snapshot = dict(current_judgement.get("feature_snapshot") or {})
-    favored_group = str(current_judgement.get("favored_group") or "mixed").strip().lower() or "mixed"
+    favored_group = (
+        str(current_judgement.get("favored_group") or "mixed").strip().lower() or "mixed"
+    )
     confidence = _safe_float(current_judgement.get("confidence"), 0.0)
     trend_state = _trend_state(snapshot)
     breadth_state = _breadth_state(snapshot)
     volatility_state = _volatility_state(snapshot)
     overlay_health = dict(balanced_health or _overlay_candidate_health(operating_plan_payload))
-    soft_health = _allocator_health(soft_current_state if "split_metrics" in soft_current_state else {})
-    hard_health = _allocator_health(hard_current_state if "split_metrics" in hard_current_state else {})
+    soft_health = _allocator_health(
+        soft_current_state if "split_metrics" in soft_current_state else {}
+    )
+    hard_health = _allocator_health(
+        hard_current_state if "split_metrics" in hard_current_state else {}
+    )
     hybrid = dict(hybrid_health or {})
     production = dict(production_health or {})
     # If raw current_state only was passed, re-read health from payloads is not possible here.
     # Accept optional preattached health blocks.
-    if not soft_health["healthy"] and isinstance(soft_current_state.get("_allocator_health"), Mapping):
+    if not soft_health["healthy"] and isinstance(
+        soft_current_state.get("_allocator_health"), Mapping
+    ):
         soft_health = dict(soft_current_state.get("_allocator_health") or {})
-    if not hard_health["healthy"] and isinstance(hard_current_state.get("_allocator_health"), Mapping):
+    if not hard_health["healthy"] and isinstance(
+        hard_current_state.get("_allocator_health"), Mapping
+    ):
         hard_health = dict(hard_current_state.get("_allocator_health") or {})
 
     risk_score = 0.0
@@ -790,9 +827,17 @@ def recommend_operating_mode(
     elif pair_liquidity_state == "strong":
         risk_score -= 0.5
 
-    soft_incumbent_exposure = _safe_float(soft_current_state.get("effective_incumbent_exposure"), 0.0)
-    soft_autoresearch_exposure = _safe_float(soft_current_state.get("effective_autoresearch_exposure"), 0.0)
-    hard_state = str(hard_current_state.get("state") or hard_current_state.get("selected_state") or "").strip().lower()
+    soft_incumbent_exposure = _safe_float(
+        soft_current_state.get("effective_incumbent_exposure"), 0.0
+    )
+    soft_autoresearch_exposure = _safe_float(
+        soft_current_state.get("effective_autoresearch_exposure"), 0.0
+    )
+    hard_state = (
+        str(hard_current_state.get("state") or hard_current_state.get("selected_state") or "")
+        .strip()
+        .lower()
+    )
     hard_raw_target = str(hard_current_state.get("raw_target_state") or "").strip().lower()
 
     deployment_modes = dict(operating_plan_payload.get("deployment_modes") or {})
@@ -832,10 +877,14 @@ def recommend_operating_mode(
         and pair_liquidity_state != "weak"
     ):
         mode = "hybrid_guarded_mode"
-        rationale.append("Legacy active sleeves are degraded, but the hybrid online governor is healthy and current conditions are acceptable -> use hybrid guarded mode.")
+        rationale.append(
+            "Legacy active sleeves are degraded, but the hybrid online governor is healthy and current conditions are acceptable -> use hybrid guarded mode."
+        )
     elif all_active_unhealthy:
         mode = "risk_off_mode"
-        rationale.append("All validated active sleeves are unhealthy -> move to risk-off mode until an active sleeve recovers.")
+        rationale.append(
+            "All validated active sleeves are unhealthy -> move to risk-off mode until an active sleeve recovers."
+        )
     elif (
         favored_group == "autoresearch"
         and confidence >= 0.65
@@ -845,7 +894,9 @@ def recommend_operating_mode(
         and bool(hard_health.get("healthy"))
     ):
         mode = "aggressive_realized_mode"
-        rationale.append("High-confidence autoresearch regime with non-stressed volatility -> use aggressive realized mode.")
+        rationale.append(
+            "High-confidence autoresearch regime with non-stressed volatility -> use aggressive realized mode."
+        )
     elif (
         favored_group == "autoresearch"
         and confidence >= 0.65
@@ -853,52 +904,84 @@ def recommend_operating_mode(
     ):
         if pair_liquidity_state != "weak" and overlay_health["healthy"]:
             mode = "balanced_overlay_mode"
-            rationale.append("Autoresearch regime fired, but hard allocator health is poor -> fall back to balanced overlay mode.")
+            rationale.append(
+                "Autoresearch regime fired, but hard allocator health is poor -> fall back to balanced overlay mode."
+            )
         elif bool(soft_health.get("healthy")):
             mode = "core_mode"
-            rationale.append("Autoresearch regime fired, but only the core sleeve remains healthy -> fall back to core mode.")
+            rationale.append(
+                "Autoresearch regime fired, but only the core sleeve remains healthy -> fall back to core mode."
+            )
         else:
             mode = "risk_off_mode"
-            rationale.append("Autoresearch regime fired, but no validated active sleeve is healthy -> stay risk-off.")
+            rationale.append(
+                "Autoresearch regime fired, but no validated active sleeve is healthy -> stay risk-off."
+            )
     elif favored_group == "incumbent" and confidence >= 0.60:
         if pair_liquidity_state == "weak" and bool(soft_health.get("healthy")):
             mode = "core_mode"
-            rationale.append("Incumbent-favored regime but pair liquidity is weak/stale -> remove overlay and stay core.")
+            rationale.append(
+                "Incumbent-favored regime but pair liquidity is weak/stale -> remove overlay and stay core."
+            )
         elif pair_liquidity_state == "weak":
             mode = "risk_off_mode"
-            rationale.append("Incumbent-favored regime but pair liquidity is weak/stale and core is unhealthy -> stay risk-off.")
+            rationale.append(
+                "Incumbent-favored regime but pair liquidity is weak/stale and core is unhealthy -> stay risk-off."
+            )
         elif volatility_state == "stressed" and overlay_health["healthy"]:
             mode = "defensive_overlay_mode"
-            rationale.append("Incumbent-favored but volatility is stressed -> use the drawdown-reducing defensive overlay.")
+            rationale.append(
+                "Incumbent-favored but volatility is stressed -> use the drawdown-reducing defensive overlay."
+            )
         elif volatility_state == "stressed" and bool(soft_health.get("healthy")):
             mode = "core_mode"
-            rationale.append("Incumbent-favored but volatility is stressed and only core is healthy -> use core mode.")
+            rationale.append(
+                "Incumbent-favored but volatility is stressed and only core is healthy -> use core mode."
+            )
         elif volatility_state == "stressed":
             mode = "risk_off_mode"
-            rationale.append("Incumbent-favored but volatility is stressed and no active sleeve is healthy -> stay risk-off.")
+            rationale.append(
+                "Incumbent-favored but volatility is stressed and no active sleeve is healthy -> stay risk-off."
+            )
         elif risk_score >= 3.0:
             if bool(soft_health.get("healthy")):
                 mode = "core_mode"
-                rationale.append("Risk score is high under incumbent-favored conditions -> stay in core mode.")
+                rationale.append(
+                    "Risk score is high under incumbent-favored conditions -> stay in core mode."
+                )
             else:
                 mode = "risk_off_mode"
-                rationale.append("Risk score is high and the core sleeve is unhealthy -> stay risk-off.")
+                rationale.append(
+                    "Risk score is high and the core sleeve is unhealthy -> stay risk-off."
+                )
         elif overlay_health["healthy"]:
             mode = "balanced_overlay_mode"
-            rationale.append("Incumbent-favored regime with acceptable volatility/liquidity -> keep balanced overlay mode.")
+            rationale.append(
+                "Incumbent-favored regime with acceptable volatility/liquidity -> keep balanced overlay mode."
+            )
         elif bool(soft_health.get("healthy")):
             mode = "core_mode"
-            rationale.append("Incumbent-favored regime confirmed, but overlay is unhealthy -> use core mode only.")
+            rationale.append(
+                "Incumbent-favored regime confirmed, but overlay is unhealthy -> use core mode only."
+            )
         else:
             mode = "risk_off_mode"
-            rationale.append("Incumbent-favored regime is not enough to override unhealthy active sleeves -> stay risk-off.")
+            rationale.append(
+                "Incumbent-favored regime is not enough to override unhealthy active sleeves -> stay risk-off."
+            )
     elif favored_group == "mixed":
-        if (volatility_state == "stressed" or pair_liquidity_state == "weak") and bool(soft_health.get("healthy")):
+        if (volatility_state == "stressed" or pair_liquidity_state == "weak") and bool(
+            soft_health.get("healthy")
+        ):
             mode = "core_mode"
-            rationale.append("Mixed regime with stressed volatility or weak pair liquidity -> prefer core mode.")
+            rationale.append(
+                "Mixed regime with stressed volatility or weak pair liquidity -> prefer core mode."
+            )
         elif volatility_state == "stressed" or pair_liquidity_state == "weak":
             mode = "risk_off_mode"
-            rationale.append("Mixed regime plus stressed volatility/weak liquidity with unhealthy core -> stay risk-off.")
+            rationale.append(
+                "Mixed regime plus stressed volatility/weak liquidity with unhealthy core -> stay risk-off."
+            )
         elif (
             bool(hybrid_promotion_signal.get("promoted"))
             and trend_state != "bearish"
@@ -940,7 +1023,9 @@ def recommend_operating_mode(
             )
         elif overlay_health["healthy"]:
             mode = "balanced_overlay_mode"
-            rationale.append("Mixed regime but calm enough for a small overlay -> balanced overlay mode.")
+            rationale.append(
+                "Mixed regime but calm enough for a small overlay -> balanced overlay mode."
+            )
         elif bool(soft_health.get("healthy")):
             mode = "core_mode"
             rationale.append("Mixed regime is calm, but the overlay is unhealthy -> use core mode.")
@@ -950,17 +1035,24 @@ def recommend_operating_mode(
     else:
         if bool(soft_health.get("healthy")):
             mode = "core_mode"
-            rationale.append("Fallback to core mode because aggressive conditions were not confirmed.")
+            rationale.append(
+                "Fallback to core mode because aggressive conditions were not confirmed."
+            )
         else:
             mode = "risk_off_mode"
-            rationale.append("Fallback to risk-off because aggressive conditions were not confirmed and core is unhealthy.")
+            rationale.append(
+                "Fallback to risk-off because aggressive conditions were not confirmed and core is unhealthy."
+            )
 
     default_mode_payloads = {
         "risk_off_mode": {"allocation": {"cash": 1.0}},
         "hybrid_guarded_mode": {"allocation": {"hybrid_online_portfolio": 1.0}},
         "production_guarded_mode": {"allocation": {"production_guarded_portfolio": 1.0}},
     }
-    allocation = dict((deployment_modes.get(mode) or default_mode_payloads.get(mode) or {}).get("allocation") or {})
+    allocation = dict(
+        (deployment_modes.get(mode) or default_mode_payloads.get(mode) or {}).get("allocation")
+        or {}
+    )
     return OperatingModeDecision(mode=mode, allocation=allocation, rationale=rationale)
 
 
@@ -979,7 +1071,9 @@ def build_operating_switch_payload(
     production_guarded_payload: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     saved_judgement = dict(market_judgement_payload.get("current_judgement") or {})
-    normalized_market_judgement_mode = str(market_judgement_mode or "latest").strip().lower() or "latest"
+    normalized_market_judgement_mode = (
+        str(market_judgement_mode or "latest").strip().lower() or "latest"
+    )
     if normalized_market_judgement_mode == "saved":
         current_judgement = dict(saved_judgement)
     else:
@@ -1030,7 +1124,9 @@ def build_operating_switch_payload(
             "hybrid_portfolio": str((hybrid_portfolio_payload or {}).get("_path") or ""),
             "production_guarded": str((production_guarded_payload or {}).get("_path") or ""),
             "market_judgement_mode": normalized_market_judgement_mode,
-            "as_of_date_override": as_of_date_override.isoformat() if as_of_date_override is not None else "",
+            "as_of_date_override": as_of_date_override.isoformat()
+            if as_of_date_override is not None
+            else "",
         },
         "current_market_state": {
             "favored_group": str(current_judgement.get("favored_group") or "mixed"),
@@ -1042,8 +1138,12 @@ def build_operating_switch_payload(
             "feature_snapshot": snapshot,
             "pair_volume_signals": [signal.as_payload() for signal in pair_volume_signals],
             "saved_market_judgement_as_of": str(saved_judgement.get("date") or ""),
-            "saved_market_judgement_favored_group": str(saved_judgement.get("favored_group") or "mixed"),
-            "saved_market_judgement_confidence": _safe_float(saved_judgement.get("confidence"), 0.0),
+            "saved_market_judgement_favored_group": str(
+                saved_judgement.get("favored_group") or "mixed"
+            ),
+            "saved_market_judgement_confidence": _safe_float(
+                saved_judgement.get("confidence"), 0.0
+            ),
         },
         "allocator_state": {
             "soft_current_state": soft_current,
@@ -1058,7 +1158,9 @@ def build_operating_switch_payload(
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--artifact-profile", choices=("live_current", "reboot_validation"), default="live_current")
+    parser.add_argument(
+        "--artifact-profile", choices=("live_current", "reboot_validation"), default="live_current"
+    )
     parser.add_argument("--market-judgement-mode", choices=("latest", "saved"), default=None)
     parser.add_argument("--as-of-date", default=None)
     parser.add_argument("--market-judgement-path", type=Path, default=None)
@@ -1072,7 +1174,9 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--raw-aggtrades-root", type=Path, default=None)
     parser.add_argument("--output-dir", type=Path, default=None)
     parser.add_argument("--pair-timeframe", default=DEFAULT_PAIR_TIMEFRAME)
-    parser.add_argument("--pair-volume-lookback-days", type=int, default=DEFAULT_VOLUME_LOOKBACK_DAYS)
+    parser.add_argument(
+        "--pair-volume-lookback-days", type=int, default=DEFAULT_VOLUME_LOOKBACK_DAYS
+    )
     parser.add_argument("--feature-lookback-days", type=int, default=DEFAULT_FEATURE_LOOKBACK_DAYS)
     parser.add_argument("--pair-symbol", dest="pair_symbols", action="append", default=[])
     return parser
@@ -1128,17 +1232,33 @@ def _build_markdown(payload: Mapping[str, Any]) -> str:
 def main() -> None:
     args = _build_parser().parse_args()
     defaults = _profile_defaults(args.artifact_profile)
-    market_judgement_path = Path(args.market_judgement_path or defaults["market_judgement_path"]).resolve()
-    soft_allocator_path = Path(args.soft_allocator_path or defaults["soft_allocator_path"]).resolve()
-    three_way_allocator_path = Path(args.three_way_allocator_path or defaults["three_way_allocator_path"]).resolve()
-    operating_plan_path = Path(args.operating_plan_path or defaults["operating_plan_path"]).resolve()
-    balanced_strategy_path = Path(args.balanced_strategy_path or defaults["balanced_strategy_path"]).resolve()
-    hybrid_portfolio_path = Path(args.hybrid_portfolio_path or defaults["hybrid_portfolio_path"]).resolve()
-    production_guarded_path = Path(args.production_guarded_path or DEFAULT_PRODUCTION_GUARDED_PATH).resolve()
+    market_judgement_path = Path(
+        args.market_judgement_path or defaults["market_judgement_path"]
+    ).resolve()
+    soft_allocator_path = Path(
+        args.soft_allocator_path or defaults["soft_allocator_path"]
+    ).resolve()
+    three_way_allocator_path = Path(
+        args.three_way_allocator_path or defaults["three_way_allocator_path"]
+    ).resolve()
+    operating_plan_path = Path(
+        args.operating_plan_path or defaults["operating_plan_path"]
+    ).resolve()
+    balanced_strategy_path = Path(
+        args.balanced_strategy_path or defaults["balanced_strategy_path"]
+    ).resolve()
+    hybrid_portfolio_path = Path(
+        args.hybrid_portfolio_path or defaults["hybrid_portfolio_path"]
+    ).resolve()
+    production_guarded_path = Path(
+        args.production_guarded_path or DEFAULT_PRODUCTION_GUARDED_PATH
+    ).resolve()
     raw_aggtrades_root = Path(args.raw_aggtrades_root or defaults["raw_aggtrades_root"]).resolve()
     output_dir = Path(args.output_dir or defaults["output_dir"]).resolve()
     market_judgement_mode = str(args.market_judgement_mode or defaults["market_judgement_mode"])
-    as_of_override_token = str(args.as_of_date or _profile_as_of_override(args.artifact_profile) or "").strip()
+    as_of_override_token = str(
+        args.as_of_date or _profile_as_of_override(args.artifact_profile) or ""
+    ).strip()
     as_of_override = _parse_as_of_date(as_of_override_token) if as_of_override_token else None
 
     market_judgement = _read_json(market_judgement_path)
@@ -1149,11 +1269,15 @@ def main() -> None:
     three_way_allocator["_path"] = str(three_way_allocator_path)
     operating_plan = _read_json(operating_plan_path)
     operating_plan["_path"] = str(operating_plan_path)
-    balanced_strategy = _read_json(balanced_strategy_path) if balanced_strategy_path.exists() else None
+    balanced_strategy = (
+        _read_json(balanced_strategy_path) if balanced_strategy_path.exists() else None
+    )
     hybrid_portfolio = _read_json(hybrid_portfolio_path) if hybrid_portfolio_path.exists() else None
     if hybrid_portfolio is not None:
         hybrid_portfolio["_path"] = str(hybrid_portfolio_path)
-    production_guarded = _read_json(production_guarded_path) if production_guarded_path.exists() else None
+    production_guarded = (
+        _read_json(production_guarded_path) if production_guarded_path.exists() else None
+    )
     if production_guarded is not None:
         production_guarded["_path"] = str(production_guarded_path)
 
@@ -1199,7 +1323,9 @@ def main() -> None:
     out_md = output_dir / f"portfolio_operating_switch_{timestamp}.md"
     latest_json = output_dir / "portfolio_operating_switch_latest.json"
     latest_md = output_dir / "portfolio_operating_switch_latest.md"
-    out_json.write_text(json.dumps(payload, indent=2, sort_keys=True, default=_json_default), encoding="utf-8")
+    out_json.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=_json_default), encoding="utf-8"
+    )
     markdown = _build_markdown(payload)
     out_md.write_text(markdown, encoding="utf-8")
     latest_json.write_text(out_json.read_text(encoding="utf-8"), encoding="utf-8")

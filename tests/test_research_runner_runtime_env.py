@@ -274,9 +274,19 @@ def test_load_bundle_cache_prefers_parquet_frames_and_records_their_source(monke
         }
     )
 
-    monkeypatch.setattr(research_runner, "load_data_dict_from_parquet", lambda *args, **kwargs: {"BTC/USDT": frame})
-    monkeypatch.setattr(research_runner, "_load_csv_bundle", lambda **kwargs: pytest.fail("csv fallback should not run"))
-    monkeypatch.setattr(research_runner, "_synthetic_bundle", lambda *args, **kwargs: pytest.fail("synthetic fallback should not run"))
+    monkeypatch.setattr(
+        research_runner, "load_data_dict_from_parquet", lambda *args, **kwargs: {"BTC/USDT": frame}
+    )
+    monkeypatch.setattr(
+        research_runner,
+        "_load_csv_bundle",
+        lambda **kwargs: pytest.fail("csv fallback should not run"),
+    )
+    monkeypatch.setattr(
+        research_runner,
+        "_synthetic_bundle",
+        lambda *args, **kwargs: pytest.fail("synthetic fallback should not run"),
+    )
 
     cache, source_map = research_runner._load_bundle_cache(
         symbols=["BTC/USDT"],
@@ -309,7 +319,9 @@ def test_load_bundle_cache_emits_symbol_timeframe_progress(monkeypatch):
     )
     events: list[tuple[str, dict[str, object]]] = []
 
-    monkeypatch.setattr(research_runner, "load_data_dict_from_parquet", lambda *args, **kwargs: {"BTC/USDT": frame})
+    monkeypatch.setattr(
+        research_runner, "load_data_dict_from_parquet", lambda *args, **kwargs: {"BTC/USDT": frame}
+    )
     counter = iter([10.0, 10.125, 10.5, 10.625])
     monkeypatch.setattr(research_runner, "perf_counter", lambda: next(counter))
 
@@ -370,7 +382,7 @@ def test_load_bundle_cache_emits_symbol_timeframe_progress(monkeypatch):
                 "bar_count": 1,
                 "elapsed_seconds": 0.125,
             },
-        )
+        ),
     ]
 
 
@@ -399,7 +411,9 @@ def test_load_feature_cache_uses_runtime_market_data_settings(
         captured.update({"db_path": db_path, "exchange": exchange, "symbol": symbol})
         raise RuntimeError("stop-after-capture")
 
-    monkeypatch.setattr(research_runner, "load_futures_feature_points_from_db", _stub_load_feature_points)
+    monkeypatch.setattr(
+        research_runner, "load_futures_feature_points_from_db", _stub_load_feature_points
+    )
 
     cache = research_runner._load_feature_cache(symbols=["ETH/USDT"])
     assert "ETH/USDT" in cache
@@ -491,7 +505,7 @@ def test_load_feature_cache_emits_symbol_progress(monkeypatch):
                 "row_count": 2,
                 "elapsed_seconds": 0.25,
             },
-        )
+        ),
     ]
 
 
@@ -541,15 +555,19 @@ def test_benchmark_cache_emits_timeframe_progress():
                 "return_count": 2,
                 "elapsed_seconds": 0.5,
             },
-        )
+        ),
     ]
 
 
 def test_synthetic_bundle_is_deterministic_for_symbol_and_timeframe():
     start = datetime(2024, 1, 1, 0, 0, 0)
     end = datetime(2024, 1, 1, 0, 31, 0)
-    first = research_runner._synthetic_bundle("BTC/USDT", "1m", bars=32, start_date=start, end_date=end)
-    second = research_runner._synthetic_bundle("BTC/USDT", "1m", bars=32, start_date=start, end_date=end)
+    first = research_runner._synthetic_bundle(
+        "BTC/USDT", "1m", bars=32, start_date=start, end_date=end
+    )
+    second = research_runner._synthetic_bundle(
+        "BTC/USDT", "1m", bars=32, start_date=start, end_date=end
+    )
 
     assert np.array_equal(first.datetime, second.datetime)
     assert np.array_equal(first.open, second.open)

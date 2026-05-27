@@ -169,7 +169,9 @@ def test_compute_metrics_assembles_resolved_payload(monkeypatch) -> None:
     )
 
     monkeypatch.setattr(rr, "resolve_risk_free_config", lambda *args, **kwargs: resolved_rf)
-    monkeypatch.setattr(rr, "_resolve_compute_metric_payload", lambda *args, **kwargs: metric_payload)
+    monkeypatch.setattr(
+        rr, "_resolve_compute_metric_payload", lambda *args, **kwargs: metric_payload
+    )
 
     metrics = rr._compute_metrics(
         np.asarray([0.01, -0.005], dtype=float),

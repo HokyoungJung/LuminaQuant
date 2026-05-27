@@ -163,10 +163,7 @@ def _aggregate_stream(stream: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
     bucket: dict[pd.Timestamp, float] = defaultdict(float)
     for ts, value in _normalize_stream(stream):
         bucket[ts] += value
-    return [
-        {"t": float(ts.timestamp() * 1000.0), "v": float(bucket[ts])}
-        for ts in sorted(bucket)
-    ]
+    return [{"t": float(ts.timestamp() * 1000.0), "v": float(bucket[ts])} for ts in sorted(bucket)]
 
 
 def _daily_aggregate_stream(stream: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -183,9 +180,13 @@ def _daily_aggregate_stream(stream: Sequence[dict[str, Any]]) -> list[dict[str, 
 def _extract_streams(payload: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
     for key in ("portfolio_return_streams", "combined_streams", "return_streams"):
         block = payload.get(key)
-        if isinstance(block, dict) and any(list(block.get(split) or []) for split in ("train", "val", "oos")):
+        if isinstance(block, dict) and any(
+            list(block.get(split) or []) for split in ("train", "val", "oos")
+        ):
             return {
-                split: [dict(point) for point in list(block.get(split) or []) if isinstance(point, dict)]
+                split: [
+                    dict(point) for point in list(block.get(split) or []) if isinstance(point, dict)
+                ]
                 for split in ("train", "val", "oos")
             }
 
@@ -234,7 +235,9 @@ def _extract_streams(payload: dict[str, Any]) -> dict[str, list[dict[str, Any]]]
             )
         if any(rebuilt.values()):
             return rebuilt
-    raise CandidatePayloadError("candidate payload is missing portfolio_return_streams/combined_streams")
+    raise CandidatePayloadError(
+        "candidate payload is missing portfolio_return_streams/combined_streams"
+    )
 
 
 def _extract_split_metrics(payload: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -260,7 +263,9 @@ def normalize_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
     if not payload:
         raw_path = candidate.get("artifact_path")
         if raw_path is None:
-            raise CandidatePayloadError(f"candidate {_candidate_key(candidate)!r} is missing payload/artifact_path")
+            raise CandidatePayloadError(
+                f"candidate {_candidate_key(candidate)!r} is missing payload/artifact_path"
+            )
         artifact_path = str(Path(str(raw_path)).resolve())
         payload = dict(_load_json(Path(artifact_path)))
     else:
@@ -269,11 +274,16 @@ def normalize_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
             artifact_path = str(Path(str(raw_path)).resolve())
 
     streams = _extract_streams(payload)
-    daily_streams = {split: _daily_aggregate_stream(streams.get(split) or []) for split in ("train", "val", "oos")}
+    daily_streams = {
+        split: _daily_aggregate_stream(streams.get(split) or [])
+        for split in ("train", "val", "oos")
+    }
     metrics = _extract_split_metrics(payload)
     for split in ("train", "val", "oos"):
         if split not in metrics:
-            returns = np.asarray([_safe_float(point.get("v"), 0.0) for point in daily_streams[split]], dtype=float)
+            returns = np.asarray(
+                [_safe_float(point.get("v"), 0.0) for point in daily_streams[split]], dtype=float
+            )
             generated = dict(_metrics_daily(returns))
             generated["return"] = float(generated.get("total_return", 0.0))
             metrics[split] = generated
@@ -281,9 +291,7 @@ def normalize_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
     def _split_participation(stream: Sequence[dict[str, Any]]) -> dict[str, float | int]:
         total_days = len(list(stream or []))
         active_days = sum(
-            1
-            for point in list(stream or [])
-            if abs(_safe_float(point.get("v"), 0.0)) > 1e-12
+            1 for point in list(stream or []) if abs(_safe_float(point.get("v"), 0.0)) > 1e-12
         )
         active_day_ratio = 0.0 if total_days <= 0 else float(active_days) / float(total_days)
         return {
@@ -297,22 +305,33 @@ def normalize_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
         "label": str(candidate.get("label") or _candidate_key(candidate)),
         "artifact_path": artifact_path,
         "lineage": infer_basis_lineage(candidate),
-        "selection_basis": str(candidate.get("selection_basis") or payload.get("selection_basis") or ""),
-        "source_artifact_kind": str(candidate.get("source_artifact_kind") or payload.get("artifact_kind") or ""),
-        "notes": [str(note) for note in list(candidate.get("notes") or payload.get("notes") or []) if str(note).strip()],
+        "selection_basis": str(
+            candidate.get("selection_basis") or payload.get("selection_basis") or ""
+        ),
+        "source_artifact_kind": str(
+            candidate.get("source_artifact_kind") or payload.get("artifact_kind") or ""
+        ),
+        "notes": [
+            str(note)
+            for note in list(candidate.get("notes") or payload.get("notes") or [])
+            if str(note).strip()
+        ],
         "portfolio_metrics": metrics,
-        "portfolio_return_streams": {split: list(streams.get(split) or []) for split in ("train", "val", "oos")},
+        "portfolio_return_streams": {
+            split: list(streams.get(split) or []) for split in ("train", "val", "oos")
+        },
         "portfolio_daily_return_streams": daily_streams,
         "participation": {
-            split: _split_participation(daily_streams[split])
-            for split in ("train", "val", "oos")
+            split: _split_participation(daily_streams[split]) for split in ("train", "val", "oos")
         },
     }
     normalized["lineage"] = infer_basis_lineage(normalized)
     return normalized
 
 
-def iter_weight_grid(count: int, *, step: float = DEFAULT_WEIGHT_STEP) -> Iterator[tuple[float, ...]]:
+def iter_weight_grid(
+    count: int, *, step: float = DEFAULT_WEIGHT_STEP
+) -> Iterator[tuple[float, ...]]:
     if count <= 0:
         return iter(())
     units = round(1.0 / float(step))
@@ -320,7 +339,9 @@ def iter_weight_grid(count: int, *, step: float = DEFAULT_WEIGHT_STEP) -> Iterat
         raise ValueError(f"weight step must evenly divide 1.0, got {step!r}")
     total_units = int(units)
 
-    def _walk(slots_left: int, remaining_units: int, prefix: list[int]) -> Iterator[tuple[int, ...]]:
+    def _walk(
+        slots_left: int, remaining_units: int, prefix: list[int]
+    ) -> Iterator[tuple[int, ...]]:
         if slots_left == 1:
             yield (*prefix, remaining_units)
             return
@@ -340,7 +361,9 @@ def _weighted_stream(
     for candidate, weight in zip(candidates, weights, strict=True):
         if weight <= 0.0:
             continue
-        for ts, value in _normalize_stream(list((candidate.get("portfolio_return_streams") or {}).get(split) or [])):
+        for ts, value in _normalize_stream(
+            list((candidate.get("portfolio_return_streams") or {}).get(split) or [])
+        ):
             bucket[ts] += float(weight) * value
     return [
         {"t": float(ts.timestamp() * 1000.0), "datetime": ts.isoformat(), "v": float(bucket[ts])}
@@ -382,7 +405,9 @@ def oos_monthly_mean(monthly_returns: Sequence[dict[str, Any]]) -> float:
         return 0.0
     return float(
         np.mean(
-            np.asarray([_safe_float(row.get("total_return"), 0.0) for row in monthly_returns], dtype=float)
+            np.asarray(
+                [_safe_float(row.get("total_return"), 0.0) for row in monthly_returns], dtype=float
+            )
         )
     )
 
@@ -408,23 +433,35 @@ def robustness_gate_failures(
     val = dict(candidate_metrics.get("val") or {})
     oos = dict(candidate_metrics.get("oos") or {})
     reasons: list[str] = []
-    if _safe_float(train.get("total_return", train.get("return")), 0.0) <= ROBUST_PROMOTION_GATES["train_total_return_gt"]:
+    if (
+        _safe_float(train.get("total_return", train.get("return")), 0.0)
+        <= ROBUST_PROMOTION_GATES["train_total_return_gt"]
+    ):
         reasons.append("train_total_return<=0")
-    if _safe_float(val.get("total_return", val.get("return")), 0.0) <= ROBUST_PROMOTION_GATES["val_total_return_gt"]:
+    if (
+        _safe_float(val.get("total_return", val.get("return")), 0.0)
+        <= ROBUST_PROMOTION_GATES["val_total_return_gt"]
+    ):
         reasons.append("val_total_return<=0")
     if _safe_float(train.get("sharpe"), 0.0) < ROBUST_PROMOTION_GATES["train_sharpe_gte"]:
         reasons.append("train_sharpe<-0.10")
-    incumbent_return = _safe_float(incumbent_oos.get("total_return", incumbent_oos.get("return")), 0.0)
+    incumbent_return = _safe_float(
+        incumbent_oos.get("total_return", incumbent_oos.get("return")), 0.0
+    )
     oos_return = _safe_float(oos.get("total_return", oos.get("return")), 0.0)
     if (oos_return - incumbent_return) <= ROBUST_PROMOTION_GATES["oos_total_return_delta_gt"]:
         reasons.append("oos_total_return_delta<=0")
     if oos_monthly_mean(monthly_returns) < ROBUST_PROMOTION_GATES["oos_monthly_mean_gte"]:
         reasons.append("oos_monthly_mean<0.02")
-    incumbent_drawdown = _safe_float(incumbent_oos.get("max_drawdown", incumbent_oos.get("mdd")), 0.0)
+    incumbent_drawdown = _safe_float(
+        incumbent_oos.get("max_drawdown", incumbent_oos.get("mdd")), 0.0
+    )
     oos_drawdown = _safe_float(oos.get("max_drawdown", oos.get("mdd")), 0.0)
     incumbent_sharpe = _safe_float(incumbent_oos.get("sharpe"), 0.0)
     oos_sharpe = _safe_float(oos.get("sharpe"), 0.0)
-    if oos_drawdown > incumbent_drawdown and oos_sharpe < (incumbent_sharpe + ROBUST_PROMOTION_GATES["oos_sharpe_relief_gte"]):
+    if oos_drawdown > incumbent_drawdown and oos_sharpe < (
+        incumbent_sharpe + ROBUST_PROMOTION_GATES["oos_sharpe_relief_gte"]
+    ):
         reasons.append("oos_drawdown_worse_without_sharpe_relief")
     return reasons
 
@@ -496,10 +533,12 @@ def evaluate_weight_combo(
     incumbent_oos: dict[str, Any],
 ) -> dict[str, Any]:
     split_streams = {
-        split: _weighted_stream(candidates, weights, split)
+        split: _weighted_stream(candidates, weights, split) for split in ("train", "val", "oos")
+    }
+    metrics = {
+        split: _portfolio_metrics_from_stream(split_streams[split])
         for split in ("train", "val", "oos")
     }
-    metrics = {split: _portfolio_metrics_from_stream(split_streams[split]) for split in ("train", "val", "oos")}
     monthly = monthly_oos_returns(split_streams["oos"])
     reasons = robustness_gate_failures(
         candidate_metrics=metrics,
@@ -570,11 +609,17 @@ def run_meta_search(
     normalized = [normalize_candidate(dict(candidate)) for candidate in candidates]
     ensure_basis_dedupe(normalized)
     incumbent = next(
-        (candidate for candidate in normalized if str(candidate.get("candidate_key")) == str(incumbent_key)),
+        (
+            candidate
+            for candidate in normalized
+            if str(candidate.get("candidate_key")) == str(incumbent_key)
+        ),
         None,
     )
     if incumbent is None:
-        raise CandidatePayloadError(f"incumbent_key={incumbent_key!r} not present in candidate universe")
+        raise CandidatePayloadError(
+            f"incumbent_key={incumbent_key!r} not present in candidate universe"
+        )
 
     resolved_output_dir = Path(output_dir).resolve()
     resolved_output_dir.mkdir(parents=True, exist_ok=True)
@@ -596,8 +641,12 @@ def run_meta_search(
     )
     results: list[dict[str, Any]] = []
     try:
-        guard.checkpoint("portfolio_superiority_meta_search_start", {"universe_name": universe_name})
-        for index, weights in enumerate(iter_weight_grid(len(normalized), step=weight_step), start=1):
+        guard.checkpoint(
+            "portfolio_superiority_meta_search_start", {"universe_name": universe_name}
+        )
+        for index, weights in enumerate(
+            iter_weight_grid(len(normalized), step=weight_step), start=1
+        ):
             result = evaluate_weight_combo(
                 candidates=normalized,
                 weights=weights,
@@ -628,7 +677,13 @@ def run_meta_search(
             "label": incumbent.get("label"),
             "rejection_reasons": ["no_promotable_candidate"],
             "promotable": False,
-            "weights": [{"candidate_key": incumbent.get("candidate_key"), "label": incumbent.get("label"), "weight": 1.0}],
+            "weights": [
+                {
+                    "candidate_key": incumbent.get("candidate_key"),
+                    "label": incumbent.get("label"),
+                    "weight": 1.0,
+                }
+            ],
             "oos": dict((incumbent.get("portfolio_metrics") or {}).get("oos") or {}),
         }
         guard_summary = guard.finalize(
@@ -697,8 +752,12 @@ def run_meta_search(
             ),
             encoding="utf-8",
         )
-        memory_ledger_path.write_text(json.dumps(ledger, indent=2, sort_keys=True), encoding="utf-8")
-        summary_json_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+        memory_ledger_path.write_text(
+            json.dumps(ledger, indent=2, sort_keys=True), encoding="utf-8"
+        )
+        summary_json_path.write_text(
+            json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8"
+        )
         summary_md_path.write_text(
             "\n".join(
                 [
@@ -753,7 +812,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     universe_payload = _load_universe_json(Path(args.universe_json).resolve())
     result = run_meta_search(
         universe_name=str(universe_payload.get("universe_name") or Path(args.universe_json).stem),
-        candidates=[dict(row) for row in list(universe_payload.get("candidates") or []) if isinstance(row, dict)],
+        candidates=[
+            dict(row)
+            for row in list(universe_payload.get("candidates") or [])
+            if isinstance(row, dict)
+        ],
         incumbent_key=str(universe_payload.get("incumbent_key") or ""),
         output_dir=Path(args.output_dir).resolve(),
         weight_step=float(args.weight_step),

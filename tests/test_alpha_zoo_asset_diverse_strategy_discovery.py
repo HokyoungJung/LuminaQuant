@@ -68,7 +68,9 @@ def test_defaults_are_multi_asset_group_paper_only_30m_plus() -> None:
     args = MODULE.parse_args([])
     symbols = MODULE._parse_csv_symbols(args.symbols)
     shadow_symbols = MODULE._parse_csv_symbols(args.shadow_symbols)
-    timeframes = MODULE.feedback._validate_timeframes(MODULE._parse_csv_symbols(args.timeframes.lower()))
+    timeframes = MODULE.feedback._validate_timeframes(
+        MODULE._parse_csv_symbols(args.timeframes.lower())
+    )
 
     assert {MODULE._asset_group(symbol) for symbol in (*symbols, *shadow_symbols)} >= {
         "crypto_major",
@@ -86,8 +88,14 @@ def test_selected_rows_keep_group_diversity_and_paper_rows() -> None:
     rows = MODULE._rank_rows(
         [
             _row(model_id="btc", asset_group="crypto_major", paper_candidate_gate_pass=False),
-            _row(model_id="metal", asset_group="precious_metal_proxy", paper_candidate_gate_pass=False),
-            _row(model_id="paper", asset_group="crypto_payment_alt", paper_candidate_gate_pass=True),
+            _row(
+                model_id="metal",
+                asset_group="precious_metal_proxy",
+                paper_candidate_gate_pass=False,
+            ),
+            _row(
+                model_id="paper", asset_group="crypto_payment_alt", paper_candidate_gate_pass=True
+            ),
         ]
     )
     selected = MODULE._selected_output_rows(rows, top_n=1)

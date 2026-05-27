@@ -38,11 +38,19 @@ class ExternalWindowDataHandler:
             "close": 4,
             "volume": 5,
         }
-        self._source_kind = str(getattr(config, "EXTERNAL_DATA_SOURCE_KIND", "jsonl") or "jsonl").strip().lower()
+        self._source_kind = (
+            str(getattr(config, "EXTERNAL_DATA_SOURCE_KIND", "jsonl") or "jsonl").strip().lower()
+        )
         self._path = Path(str(getattr(config, "EXTERNAL_DATA_PATH", "") or "")).expanduser()
-        self._schema = str(getattr(config, "EXTERNAL_DATA_SCHEMA", "market_window_v1") or "market_window_v1").strip().lower()
+        self._schema = (
+            str(getattr(config, "EXTERNAL_DATA_SCHEMA", "market_window_v1") or "market_window_v1")
+            .strip()
+            .lower()
+        )
         self._poll_seconds = max(1.0, float(getattr(config, "EXTERNAL_DATA_POLL_SECONDS", 2) or 2))
-        self._allow_stale_ms = max(1, int(getattr(config, "EXTERNAL_DATA_ALLOW_STALE_SECONDS", 45) or 45)) * 1000
+        self._allow_stale_ms = (
+            max(1, int(getattr(config, "EXTERNAL_DATA_ALLOW_STALE_SECONDS", 45) or 45)) * 1000
+        )
         self._symbol_map = dict(getattr(config, "EXTERNAL_DATA_SYMBOL_MAP", {}) or {})
         self._jsonl_offset = 0
         self._thread = threading.Thread(target=self._run_loop, daemon=False)
@@ -88,7 +96,9 @@ class ExternalWindowDataHandler:
         except Exception as exc:  # pragma: no cover - defensive
             self._publish_fatal(exc)
 
-    def _update_latest_rows(self, bars_1s: dict[str, tuple[tuple[int, float, float, float, float, float], ...]]) -> None:
+    def _update_latest_rows(
+        self, bars_1s: dict[str, tuple[tuple[int, float, float, float, float, float], ...]]
+    ) -> None:
         with self.lock:
             for symbol, rows in bars_1s.items():
                 key = str(symbol)

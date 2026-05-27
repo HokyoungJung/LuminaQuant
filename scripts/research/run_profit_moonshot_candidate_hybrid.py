@@ -37,7 +37,9 @@ from lumina_quant.portfolio_split_contract import (  # noqa: E402
 TUNER_PATH = REPO_ROOT / "scripts/research/tune_profit_moonshot_fresh_portfolio.py"
 FRESH_PATH = REPO_ROOT / "scripts/research/replay_profit_moonshot_fresh_start.py"
 HYBRID_PATH = REPO_ROOT / "scripts/research/run_hybrid_online_portfolio.py"
-LIQUIDATION_PATH = REPO_ROOT / "scripts/research/run_profit_moonshot_liquidation_aware_validation.py"
+LIQUIDATION_PATH = (
+    REPO_ROOT / "scripts/research/run_profit_moonshot_liquidation_aware_validation.py"
+)
 
 DEFAULT_ROOT = REPO_ROOT / "var/reports/profit_moonshot_20260501/live_final_selection_20260510"
 DEFAULT_CANDIDATE_PORTFOLIO_JSON = (
@@ -53,10 +55,12 @@ RUN_NAME = "profit_moonshot_candidate_hybrid"
 STARTING_EQUITY = 10_000.0
 LIVE_LEVERAGE_INTEGER_TOLERANCE = 1e-9
 _SOURCE_LEDGER_REF_FIELDS = ("source_ledger_refs", "source_search_ledger_refs", "source_ledger_ref")
-_RESEARCH_HISTORY_REF_FIELDS = ("research_history_refs", "research_history_ref", "source_history_refs")
-_NESTED_HYBRID_SOURCE_TOKENS = (
-    "hybrid",
+_RESEARCH_HISTORY_REF_FIELDS = (
+    "research_history_refs",
+    "research_history_ref",
+    "source_history_refs",
 )
+_NESTED_HYBRID_SOURCE_TOKENS = ("hybrid",)
 
 
 def _load_module(path: Path, name: str) -> Any:
@@ -182,11 +186,7 @@ def _nested_hybrid_source_invalid(row: Mapping[str, Any]) -> bool:
     )
     tokens = [str(value or "").lower() for value in text_fields]
     tokens.extend(str(sleeve or "").lower() for sleeve in list(row.get("sleeves") or []))
-    return any(
-        marker in token
-        for token in tokens
-        for marker in _NESTED_HYBRID_SOURCE_TOKENS
-    )
+    return any(marker in token for token in tokens for marker in _NESTED_HYBRID_SOURCE_TOKENS)
 
 
 def _split_like_sources(row: Mapping[str, Any]) -> list[Mapping[str, Any]]:
@@ -223,7 +223,9 @@ def _source_liquidation_unsafe(row: Mapping[str, Any]) -> bool:
         for event in list(source.get("liquidation_events") or []):
             if isinstance(event, Mapping):
                 account_wipeout = account_wipeout or bool(event.get("account_wipeout"))
-    return bool(account_wipeout) or liquidation_count > 0 or any(value <= 0.0 for value in min_buffers)
+    return (
+        bool(account_wipeout) or liquidation_count > 0 or any(value <= 0.0 for value in min_buffers)
+    )
 
 
 def _source_candidate_rejection_reasons(row: Mapping[str, Any]) -> list[str]:
@@ -395,7 +397,7 @@ def _iter_candidate_rows(
         "highest_zero_liquidation_integer",
     ):
         add("liquidation", key, liquidation_payload.get(key), "liquidation_json")
-    for idx, raw in enumerate(list(liquidation_payload.get("retune_results") or [])[: max_rows]):
+    for idx, raw in enumerate(list(liquidation_payload.get("retune_results") or [])[:max_rows]):
         add("liquidation", f"retune_results_{idx:02d}", raw, "liquidation_json")
 
     for key in (
@@ -406,14 +408,25 @@ def _iter_candidate_rows(
         "diagnostic_best_oos",
     ):
         add("candidate_portfolio", key, candidate_payload.get(key), "candidate_portfolio_json")
-    for idx, raw in enumerate(list(candidate_payload.get("diagnostic_quarantine") or [])[: max_rows]):
-        add("candidate_portfolio", f"diagnostic_quarantine_{idx:02d}", raw, "candidate_portfolio_json")
+    for idx, raw in enumerate(
+        list(candidate_payload.get("diagnostic_quarantine") or [])[:max_rows]
+    ):
+        add(
+            "candidate_portfolio",
+            f"diagnostic_quarantine_{idx:02d}",
+            raw,
+            "candidate_portfolio_json",
+        )
 
     deduped: list[dict[str, Any]] = []
     seen: set[tuple[tuple[str, ...], str, float]] = set()
     for item in rows:
         sleeves = tuple(str(name) for name in list(item.get("sleeves") or []))
-        key = (sleeves, str(item.get("mode") or "train_val_monthly_return_budget"), round(_safe_float(item.get("leverage"), 1.0), 8))
+        key = (
+            sleeves,
+            str(item.get("mode") or "train_val_monthly_return_budget"),
+            round(_safe_float(item.get("leverage"), 1.0), 8),
+        )
         if key in seen:
             continue
         seen.add(key)
@@ -424,7 +437,14 @@ def _iter_candidate_rows(
 def _split_indices(fresh: Any, arrays: Mapping[str, Any], split: Any) -> np.ndarray:
     timestamps = arrays["timestamp"]
     start_ts = int(datetime.combine(split.start, datetime.min.time(), tzinfo=UTC).timestamp())
-    end_ts = int(datetime.combine(split.end + timedelta(days=1), datetime.min.time(), tzinfo=UTC).timestamp()) - 1
+    end_ts = (
+        int(
+            datetime.combine(
+                split.end + timedelta(days=1), datetime.min.time(), tzinfo=UTC
+            ).timestamp()
+        )
+        - 1
+    )
     return np.flatnonzero((timestamps >= start_ts) & (timestamps <= end_ts))
 
 
@@ -458,7 +478,15 @@ def _group_equity(
     mode = str(row.get("mode") or "train_val_monthly_return_budget")
     weights = list(row.get("weights") or [])
     parsed_weights = [_safe_float(item) for item in weights] if weights else None
-    if mode in {"validation_return_risk_weight", "validation_drawdown_budget", "cluster_capped_validation_weight"} and not parsed_weights:
+    if (
+        mode
+        in {
+            "validation_return_risk_weight",
+            "validation_drawdown_budget",
+            "cluster_capped_validation_weight",
+        }
+        and not parsed_weights
+    ):
         mode = "equal_weight"
     return tuner._combine_equity(
         curves,
@@ -480,9 +508,15 @@ def _build_candidate_hybrid_rows(
     split_payloads: Mapping[str, Mapping[str, Mapping[str, Any]]],
 ) -> list[dict[str, Any]]:
     active_rows: list[dict[str, Any]] = []
-    split_index_by_name = {_display_split_name(split.name): _split_indices(fresh, arrays, split) for split in splits}
+    split_index_by_name = {
+        _display_split_name(split.name): _split_indices(fresh, arrays, split) for split in splits
+    }
     for source_idx, source_row in enumerate(candidate_rows, start=1):
-        sleeves = [str(name) for name in list(source_row.get("sleeves") or []) if str(name) in specs_by_name]
+        sleeves = [
+            str(name)
+            for name in list(source_row.get("sleeves") or [])
+            if str(name) in specs_by_name
+        ]
         if not sleeves:
             continue
         streams: dict[str, list[dict[str, Any]]] = {"train": [], "val": [], "oos": []}
@@ -511,7 +545,10 @@ def _build_candidate_hybrid_rows(
                 sum(int((split_payloads[name][raw_name]).get("fills") or 0) for name in sleeves)
             )
             trips_by_split[raw_name] = int(
-                sum(int((split_payloads[name][raw_name]).get("round_trips") or 0) for name in sleeves)
+                sum(
+                    int((split_payloads[name][raw_name]).get("round_trips") or 0)
+                    for name in sleeves
+                )
             )
         candidate_id = f"candidate_hybrid_input_{source_idx:02d}_{_slug(str(source_row.get('name') or source_idx), max_len=80)}"
         active_rows.append(
@@ -527,29 +564,51 @@ def _build_candidate_hybrid_rows(
                     "source_name": str(source_row.get("name") or ""),
                     "source_kind": str(source_row.get("_candidate_hybrid_source_kind") or ""),
                     "source_key": str(source_row.get("_candidate_hybrid_source_key") or ""),
-                    "source_artifact": str(source_row.get("_candidate_hybrid_source_artifact") or ""),
+                    "source_artifact": str(
+                        source_row.get("_candidate_hybrid_source_artifact") or ""
+                    ),
                     "source_ledger_refs": _row_refs(source_row, _SOURCE_LEDGER_REF_FIELDS),
                     "source_search_ledger_refs": _row_refs(source_row, _SOURCE_LEDGER_REF_FIELDS),
                     "research_history_refs": _row_refs(source_row, _RESEARCH_HISTORY_REF_FIELDS),
-                    "strategy_validity": dict(source_row.get("strategy_validity") or {"pass": True}),
+                    "strategy_validity": dict(
+                        source_row.get("strategy_validity") or {"pass": True}
+                    ),
                     "liquidation_gate": not _source_liquidation_unsafe(source_row),
                     "mode": str(source_row.get("mode") or "train_val_monthly_return_budget"),
                     "leverage": _safe_float(source_row.get("leverage"), 1.0),
-                    "weights": [_safe_float(item) for item in list(source_row.get("weights") or [])],
+                    "weights": [
+                        _safe_float(item) for item in list(source_row.get("weights") or [])
+                    ],
                     "sleeves": sleeves,
                     "source_train_val_score": _candidate_train_val_score(tuner, source_row),
                     "max_weight_cap": 0.65,
                 },
-                "train": {**split_metrics["train"], "fills": fills_by_split["train"], "round_trips": trips_by_split["train"]},
-                "val": {**split_metrics["val"], "fills": fills_by_split["val"], "round_trips": trips_by_split["val"]},
-                "oos": {**split_metrics["oos"], "fills": fills_by_split["oos"], "round_trips": trips_by_split["oos"]},
+                "train": {
+                    **split_metrics["train"],
+                    "fills": fills_by_split["train"],
+                    "round_trips": trips_by_split["train"],
+                },
+                "val": {
+                    **split_metrics["val"],
+                    "fills": fills_by_split["val"],
+                    "round_trips": trips_by_split["val"],
+                },
+                "oos": {
+                    **split_metrics["oos"],
+                    "fills": fills_by_split["oos"],
+                    "round_trips": trips_by_split["oos"],
+                },
             }
         )
     return active_rows
 
 
 def _cash_row_from_active(hybrid: Any, active_rows: list[dict[str, Any]]) -> dict[str, Any]:
-    all_days = sorted(set().union(*(hybrid._merged_daily_map(row["return_streams"]).keys() for row in active_rows)))
+    all_days = sorted(
+        set().union(
+            *(hybrid._merged_daily_map(row["return_streams"]).keys() for row in active_rows)
+        )
+    )
     return {
         "candidate_id": "risk_off_cash",
         "name": "risk_off_cash",
@@ -557,7 +616,9 @@ def _cash_row_from_active(hybrid: Any, active_rows: list[dict[str, Any]]) -> dic
         "strategy_timeframe": "1d",
         "family": "cash",
         "symbols": [],
-        "return_streams": hybrid._DYN._portfolio_return_streams_from_daily(all_days, [0.0] * len(all_days)),
+        "return_streams": hybrid._DYN._portfolio_return_streams_from_daily(
+            all_days, [0.0] * len(all_days)
+        ),
         "metadata": {"source_payload_path": ""},
         "train": {"total_return": 0.0, "sharpe": 0.0, "max_drawdown": 0.0},
         "val": {"total_return": 0.0, "sharpe": 0.0, "max_drawdown": 0.0},
@@ -585,7 +646,10 @@ def _allocation_weights_by_date(result: Mapping[str, Any]) -> dict[str, dict[str
         day = str(allocation.get("date") or "")
         if not day:
             continue
-        out[day] = {str(key): _safe_float(value) for key, value in dict(allocation.get("weights") or {}).items()}
+        out[day] = {
+            str(key): _safe_float(value)
+            for key, value in dict(allocation.get("weights") or {}).items()
+        }
     return out
 
 
@@ -602,7 +666,9 @@ def _weighted_report_leverage(state_entries: list[dict[str, Any]]) -> float:
     ]
     if open_leverages:
         return float(max(open_leverages))
-    return float(max((_safe_float(entry.get("leverage"), 1.0) for entry in state_entries), default=1.0))
+    return float(
+        max((_safe_float(entry.get("leverage"), 1.0) for entry in state_entries), default=1.0)
+    )
 
 
 def _dynamic_allocation_for_entry(
@@ -633,7 +699,14 @@ def _run_dynamic_liquidation_split(
     split_name = _display_split_name(split.name)
     timestamps = arrays["timestamp"]
     start_ts = int(datetime.combine(split.start, datetime.min.time(), tzinfo=UTC).timestamp())
-    end_ts = int(datetime.combine(split.end + timedelta(days=1), datetime.min.time(), tzinfo=UTC).timestamp()) - 1
+    end_ts = (
+        int(
+            datetime.combine(
+                split.end + timedelta(days=1), datetime.min.time(), tzinfo=UTC
+            ).timestamp()
+        )
+        - 1
+    )
     indices = np.flatnonzero((timestamps >= start_ts) & (timestamps <= end_ts))
     if indices.size == 0:
         return {
@@ -669,7 +742,9 @@ def _run_dynamic_liquidation_split(
 
     for raw_idx in indices:
         idx = int(raw_idx)
-        cash = liq._apply_funding_cost(cash=cash, states=states, arrays=arrays, idx=idx, model=model, fresh=fresh)
+        cash = liq._apply_funding_cost(
+            cash=cash, states=states, arrays=arrays, idx=idx, model=model, fresh=fresh
+        )
 
         for entry in state_entries:
             state = entry["state"]
@@ -696,7 +771,9 @@ def _run_dynamic_liquidation_split(
                     event["candidate_id"] = str(entry.get("candidate_id") or "")
                     event["source_sleeve"] = str(entry.get("sleeve_name") or "")
                     state_events.append(event)
-                    override_prices[leg.symbol] = _safe_float(event.get("liquidation_price"), leg.entry_price)
+                    override_prices[leg.symbol] = _safe_float(
+                        event.get("liquidation_price"), leg.entry_price
+                    )
             if state_events:
                 pre_equity = liq._portfolio_equity(cash, states, arrays, idx, fresh)
                 running_peak = max([STARTING_EQUITY, *equity_history, pre_equity])
@@ -733,7 +810,10 @@ def _run_dynamic_liquidation_split(
             model=model,
             fresh=fresh,
         )
-        if liq._open_legs(states) and _safe_float(pre_exit_snapshot.get("margin_buffer"), 1.0) <= 0.0:
+        if (
+            liq._open_legs(states)
+            and _safe_float(pre_exit_snapshot.get("margin_buffer"), 1.0) <= 0.0
+        ):
             cross_events = [
                 {
                     "split": split_name,
@@ -793,9 +873,13 @@ def _run_dynamic_liquidation_split(
                     spread_return = liq._state_unrealized_pnl(arrays, state, idx, fresh) / max(
                         1e-9, float(state.gross_entry_notional)
                     )
-                    if float(state.spec.stop_loss_pct) > 0.0 and spread_return <= -float(state.spec.stop_loss_pct):
+                    if float(state.spec.stop_loss_pct) > 0.0 and spread_return <= -float(
+                        state.spec.stop_loss_pct
+                    ):
                         exit_reason = "stop"
-                    elif float(state.spec.take_profit_pct) > 0.0 and spread_return >= float(state.spec.take_profit_pct):
+                    elif float(state.spec.take_profit_pct) > 0.0 and spread_return >= float(
+                        state.spec.take_profit_pct
+                    ):
                         exit_reason = "take_profit"
                     elif state.bars_held >= int(state.spec.hold_bars):
                         exit_reason = "max_hold"
@@ -808,10 +892,19 @@ def _run_dynamic_liquidation_split(
                     open_ = liq._array_value(arrays, f"{prefix}_open", idx, close)
                     side = str(leg.side).upper()
                     if side == "LONG":
-                        state.best_price = max(float(state.best_price or leg.entry_price), high if math.isfinite(high) else close)
+                        state.best_price = max(
+                            float(state.best_price or leg.entry_price),
+                            high if math.isfinite(high) else close,
+                        )
                         stop_pct = float(state.position_stop_loss_pct)
-                        base_stop = float(leg.entry_price) * (1.0 - stop_pct) if stop_pct > 0.0 else -math.inf
-                        trail_stop = state.best_price * (1.0 - stop_pct) if stop_pct > 0.0 else -math.inf
+                        base_stop = (
+                            float(leg.entry_price) * (1.0 - stop_pct)
+                            if stop_pct > 0.0
+                            else -math.inf
+                        )
+                        trail_stop = (
+                            state.best_price * (1.0 - stop_pct) if stop_pct > 0.0 else -math.inf
+                        )
                         stop = max(base_stop, trail_stop)
                         take = (
                             float(leg.entry_price) * (1.0 + float(state.position_take_profit_pct))
@@ -827,10 +920,19 @@ def _run_dynamic_liquidation_split(
                         elif state.bars_held >= int(state.spec.hold_bars):
                             exit_reason = "max_hold"
                     elif side == "SHORT":
-                        state.best_price = min(float(state.best_price or leg.entry_price), low if math.isfinite(low) else close)
+                        state.best_price = min(
+                            float(state.best_price or leg.entry_price),
+                            low if math.isfinite(low) else close,
+                        )
                         stop_pct = float(state.position_stop_loss_pct)
-                        base_stop = float(leg.entry_price) * (1.0 + stop_pct) if stop_pct > 0.0 else math.inf
-                        trail_stop = state.best_price * (1.0 + stop_pct) if stop_pct > 0.0 else math.inf
+                        base_stop = (
+                            float(leg.entry_price) * (1.0 + stop_pct)
+                            if stop_pct > 0.0
+                            else math.inf
+                        )
+                        trail_stop = (
+                            state.best_price * (1.0 + stop_pct) if stop_pct > 0.0 else math.inf
+                        )
                         stop = min(base_stop, trail_stop)
                         take = (
                             float(leg.entry_price) * (1.0 - float(state.position_take_profit_pct))
@@ -871,19 +973,41 @@ def _run_dynamic_liquidation_split(
             if allocation_scale <= 1e-12:
                 continue
             if liq._is_spread_state(state):
-                long_symbol, short_symbol, direction, _reason = liq._spread_signal_for_state(fresh, state, arrays, idx)
+                long_symbol, short_symbol, direction, _reason = liq._spread_signal_for_state(
+                    fresh, state, arrays, idx
+                )
                 if not long_symbol or not short_symbol or not direction:
                     continue
                 hedge = max(0.0, float(state.spec.spread_hedge_ratio))
                 if direction == "LONG_SPREAD":
                     plans = (
-                        (long_symbol, "BUY", max(0.0, float(state.spec.long_allocation_scale)) * allocation_scale),
-                        (short_symbol, "SELL", max(0.0, float(state.spec.short_allocation_scale)) * hedge * allocation_scale),
+                        (
+                            long_symbol,
+                            "BUY",
+                            max(0.0, float(state.spec.long_allocation_scale)) * allocation_scale,
+                        ),
+                        (
+                            short_symbol,
+                            "SELL",
+                            max(0.0, float(state.spec.short_allocation_scale))
+                            * hedge
+                            * allocation_scale,
+                        ),
                     )
                 else:
                     plans = (
-                        (long_symbol, "SELL", max(0.0, float(state.spec.long_allocation_scale)) * allocation_scale),
-                        (short_symbol, "BUY", max(0.0, float(state.spec.short_allocation_scale)) * hedge * allocation_scale),
+                        (
+                            long_symbol,
+                            "SELL",
+                            max(0.0, float(state.spec.long_allocation_scale)) * allocation_scale,
+                        ),
+                        (
+                            short_symbol,
+                            "BUY",
+                            max(0.0, float(state.spec.short_allocation_scale))
+                            * hedge
+                            * allocation_scale,
+                        ),
                     )
                 expected_orders = 2
             else:
@@ -891,7 +1015,10 @@ def _run_dynamic_liquidation_split(
                 if not symbol or not side:
                     continue
                 action = "BUY" if str(side).upper() == "LONG" else "SELL"
-                scale = max(0.0, float(fresh._side_allocation_scale(state.spec, side))) * allocation_scale
+                scale = (
+                    max(0.0, float(fresh._side_allocation_scale(state.spec, side)))
+                    * allocation_scale
+                )
                 plans = ((symbol, action, scale),)
                 expected_orders = 1
             equity = liq._portfolio_equity(cash, states, arrays, idx, fresh)
@@ -916,7 +1043,9 @@ def _run_dynamic_liquidation_split(
             ]
             if len(orders) != expected_orders:
                 continue
-            state.gross_entry_notional = sum(abs(float(order["qty"]) * float(order["fill"])) for order in orders)
+            state.gross_entry_notional = sum(
+                abs(float(order["qty"]) * float(order["fill"])) for order in orders
+            )
             for order in orders:
                 cash -= abs(float(order["qty"]) * float(order["fill"])) * float(order["fee_rate"])
                 state.legs.append(
@@ -933,7 +1062,9 @@ def _run_dynamic_liquidation_split(
             if not liq._is_spread_state(state) and state.legs:
                 leg = state.legs[0]
                 prefix = liq._symbol_prefix(fresh, leg.symbol)
-                state.position_stop_loss_pct = float(fresh._entry_stop_pct(state.spec, arrays, prefix, idx))
+                state.position_stop_loss_pct = float(
+                    fresh._entry_stop_pct(state.spec, arrays, prefix, idx)
+                )
                 state.position_take_profit_pct = float(state.spec.take_profit_pct)
                 state.best_price = float(leg.entry_price)
             state.bars_held = 0
@@ -965,7 +1096,9 @@ def _run_dynamic_liquidation_split(
         if equity_history:
             equity_history[-1] = float(cash)
 
-    metrics = fresh._metrics_from_equity_totals(equity_history, periods=int(fresh.HOURLY_PERIODS_PER_YEAR))
+    metrics = fresh._metrics_from_equity_totals(
+        equity_history, periods=int(fresh.HOURLY_PERIODS_PER_YEAR)
+    )
     summary = liq._split_margin_summary(
         split_name=split_name,
         snapshots=margin_snapshots,
@@ -1013,7 +1146,9 @@ def _dynamic_liquidation_replay(
     }
 
 
-def _attach_liquidation_evidence(record: dict[str, Any], replay: Mapping[str, Any], *, tuner: Any) -> dict[str, Any]:
+def _attach_liquidation_evidence(
+    record: dict[str, Any], replay: Mapping[str, Any], *, tuner: Any
+) -> dict[str, Any]:
     out = dict(record)
     splits = {key: dict(value) for key, value in dict(out.get("splits") or {}).items()}
     for split_name in ("train", "validation", "oos"):
@@ -1027,7 +1162,9 @@ def _attach_liquidation_evidence(record: dict[str, Any], replay: Mapping[str, An
                     _safe_float(evidence.get("liquidation_event_count_total"), 0.0)
                 ),
                 "liquidation_events": list(evidence.get("liquidation_events") or []),
-                "minimum_margin_buffer": _safe_optional_float(evidence.get("minimum_margin_buffer")),
+                "minimum_margin_buffer": _safe_optional_float(
+                    evidence.get("minimum_margin_buffer")
+                ),
                 "minimum_margin_ratio": _safe_optional_float(evidence.get("minimum_margin_ratio")),
                 "margin_buffer_positive": bool(evidence.get("margin_buffer_positive", False)),
                 "maximum_liquidation_event_drawdown": _safe_float(
@@ -1037,9 +1174,13 @@ def _attach_liquidation_evidence(record: dict[str, Any], replay: Mapping[str, An
                     evidence.get("maximum_liquidation_equity_loss_fraction"), 0.0
                 ),
                 "dynamic_liquidation_replay_metrics": _with_extra_metrics(tuner, metrics),
-                "dynamic_liquidation_replay_final_equity": _safe_optional_float(evidence.get("final_equity")),
+                "dynamic_liquidation_replay_final_equity": _safe_optional_float(
+                    evidence.get("final_equity")
+                ),
                 "dynamic_liquidation_replay_fills": int(_safe_float(evidence.get("fills"), 0.0)),
-                "dynamic_liquidation_replay_round_trips": int(_safe_float(evidence.get("round_trips"), 0.0)),
+                "dynamic_liquidation_replay_round_trips": int(
+                    _safe_float(evidence.get("round_trips"), 0.0)
+                ),
                 "dynamic_liquidation_replay_margin_snapshot_count": int(
                     _safe_float(evidence.get("margin_snapshot_count"), 0.0)
                 ),
@@ -1063,7 +1204,9 @@ def _attach_liquidation_evidence(record: dict[str, Any], replay: Mapping[str, An
     return out
 
 
-def _attach_source_metadata(record: dict[str, Any], active_rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+def _attach_source_metadata(
+    record: dict[str, Any], active_rows: Iterable[Mapping[str, Any]]
+) -> dict[str, Any]:
     out = dict(record)
     ledger_refs: list[str] = []
     history_refs: list[str] = []
@@ -1092,7 +1235,9 @@ def _attach_source_metadata(record: dict[str, Any], active_rows: Iterable[Mappin
 def _dynamic_train_val_components(tuner: Any, record: Mapping[str, Any]) -> dict[str, float]:
     splits = dict(record.get("splits") or {})
     train = dict(dict(splits.get("train") or {}).get("dynamic_liquidation_replay_metrics") or {})
-    validation = dict(dict(splits.get("validation") or {}).get("dynamic_liquidation_replay_metrics") or {})
+    validation = dict(
+        dict(splits.get("validation") or {}).get("dynamic_liquidation_replay_metrics") or {}
+    )
     return {
         "train_monthlyized_return": _monthlyized(tuner, train),
         "validation_monthlyized_return": _monthlyized(tuner, validation),
@@ -1105,7 +1250,9 @@ def _dynamic_train_val_components(tuner: Any, record: Mapping[str, Any]) -> dict
         "train_max_drawdown": _safe_float(train.get("max_drawdown"), 1.0),
         "validation_max_drawdown": _safe_float(validation.get("max_drawdown"), 1.0),
         "leverage": _safe_float(record.get("leverage"), 1.0),
-        "sleeve_count": float(len(list(record.get("sleeves") or [])) or _safe_float(record.get("sleeve_count"), 1.0)),
+        "sleeve_count": float(
+            len(list(record.get("sleeves") or [])) or _safe_float(record.get("sleeve_count"), 1.0)
+        ),
     }
 
 
@@ -1237,7 +1384,12 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
 
     candidate_payload = _load_json(args.candidate_portfolio_json)
     liquidation_payload = _load_json(args.liquidation_json)
-    oos_end_token = str(args.oos_end_date or candidate_payload.get("oos_end_date") or liquidation_payload.get("oos_end_date") or "")
+    oos_end_token = str(
+        args.oos_end_date
+        or candidate_payload.get("oos_end_date")
+        or liquidation_payload.get("oos_end_date")
+        or ""
+    )
     if not oos_end_token:
         raise RuntimeError("oos_end_date is required when source artifacts do not carry one")
     oos_end = datetime.fromisoformat(oos_end_token[:10]).date()
@@ -1261,7 +1413,9 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
         max_rows=int(args.max_candidate_rows),
     )
     raw_source_candidate_row_count = len(candidate_rows)
-    candidate_rows, discarded_source_candidate_rows = _partition_live_source_candidate_rows(candidate_rows)
+    candidate_rows, discarded_source_candidate_rows = _partition_live_source_candidate_rows(
+        candidate_rows
+    )
     discarded_non_integer_leverage_sources = [
         dict(row)
         for row in discarded_source_candidate_rows
@@ -1325,7 +1479,9 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
                 budget_bytes=PORTFOLIO_FOLLOWUP_EXPLICIT_BUDGET_BYTES
             ),
         }
-    required_sleeves = sorted({name for row in candidate_rows for name in list(row.get("sleeves") or [])})
+    required_sleeves = sorted(
+        {name for row in candidate_rows for name in list(row.get("sleeves") or [])}
+    )
     missing_sleeves = [name for name in required_sleeves if name not in specs_by_name]
     available_sleeves = [name for name in required_sleeves if name in specs_by_name]
     split_curves: dict[str, dict[str, list[float]]] = {}
@@ -1356,21 +1512,30 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     )
     if not active:
         raise RuntimeError("no candidate-hybrid active rows could be reconstructed")
-    exclude_active_ids = [str(item).strip() for item in list(args.exclude_active_id or []) if str(item).strip()]
-    exclude_source_sleeves = [str(item).strip() for item in list(args.exclude_source_sleeve or []) if str(item).strip()]
+    exclude_active_ids = [
+        str(item).strip() for item in list(args.exclude_active_id or []) if str(item).strip()
+    ]
+    exclude_source_sleeves = [
+        str(item).strip() for item in list(args.exclude_source_sleeve or []) if str(item).strip()
+    ]
     if exclude_active_ids or exclude_source_sleeves:
         filtered_active: list[dict[str, Any]] = []
         for row in active:
             candidate_id = str(row.get("candidate_id") or "")
             metadata = dict(row.get("metadata") or {})
             row_sleeves = {str(item) for item in list(metadata.get("sleeves") or [])}
-            excluded_id = any(candidate_id == token or candidate_id.startswith(token) for token in exclude_active_ids)
+            excluded_id = any(
+                candidate_id == token or candidate_id.startswith(token)
+                for token in exclude_active_ids
+            )
             excluded_sleeve = bool(row_sleeves.intersection(exclude_source_sleeves))
             if not excluded_id and not excluded_sleeve:
                 filtered_active.append(row)
         active = filtered_active
         if not active:
-            raise RuntimeError("all candidate-hybrid active rows were removed by risk-pruning filters")
+            raise RuntimeError(
+                "all candidate-hybrid active rows were removed by risk-pruning filters"
+            )
     active.sort(
         key=lambda row: (
             _safe_float(dict(row.get("metadata") or {}).get("source_train_val_score")),
@@ -1382,7 +1547,9 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     rows = [_cash_row_from_active(hybrid, active), *active]
     split_config = hybrid.HybridSplitConfig(oos_end=oos_end.isoformat())
 
-    default_candidates = [str(row.get("candidate_id")) for row in active[: max(1, int(args.default_candidate_count))]]
+    default_candidates = [
+        str(row.get("candidate_id")) for row in active[: max(1, int(args.default_candidate_count))]
+    ]
     tuning_results: list[dict[str, Any]] = []
     for default_name in default_candidates:
         for config in _config_grid(hybrid):
@@ -1419,11 +1586,17 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
                     },
                 }
             )
-    selection_pool = [item for item in tuning_results if bool(item["train_val_gate"])] or tuning_results
+    selection_pool = [
+        item for item in tuning_results if bool(item["train_val_gate"])
+    ] or tuning_results
     selection_pool.sort(
         key=lambda item: (
             _safe_float(item.get("score")),
-            _safe_float(dict(dict(item.get("result") or {}).get("split_metrics") or {}).get("val", {}).get("total_return")),
+            _safe_float(
+                dict(dict(item.get("result") or {}).get("split_metrics") or {})
+                .get("val", {})
+                .get("total_return")
+            ),
         ),
         reverse=True,
     )
@@ -1464,7 +1637,9 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
         result=best_result,
         model=margin_model,
     )
-    selected_record = _attach_liquidation_evidence(selected_record, dynamic_liquidation_replay, tuner=tuner)
+    selected_record = _attach_liquidation_evidence(
+        selected_record, dynamic_liquidation_replay, tuner=tuner
+    )
     selected_record = _use_dynamic_replay_score(tuner, selected_record)
     selected_record = _attach_source_metadata(selected_record, active)
     top_records = [
@@ -1482,7 +1657,10 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
         )
         for idx, item in enumerate(ranked[: int(args.report_top_n)], start=1)
     ]
-    top_records = [selected_record if item.get("name") == selected_record.get("name") else item for item in top_records]
+    top_records = [
+        selected_record if item.get("name") == selected_record.get("name") else item
+        for item in top_records
+    ]
     source_sleeve_metrics = {
         str(row.get("candidate_id")): {
             "source_name": dict(row.get("metadata") or {}).get("source_name"),
@@ -1491,9 +1669,15 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
             "leverage": dict(row.get("metadata") or {}).get("leverage"),
             "sleeves": dict(row.get("metadata") or {}).get("sleeves"),
             "source_ledger_refs": dict(row.get("metadata") or {}).get("source_ledger_refs", []),
-            "source_search_ledger_refs": dict(row.get("metadata") or {}).get("source_search_ledger_refs", []),
-            "research_history_refs": dict(row.get("metadata") or {}).get("research_history_refs", []),
-            "strategy_validity": dict(row.get("metadata") or {}).get("strategy_validity", {"pass": True}),
+            "source_search_ledger_refs": dict(row.get("metadata") or {}).get(
+                "source_search_ledger_refs", []
+            ),
+            "research_history_refs": dict(row.get("metadata") or {}).get(
+                "research_history_refs", []
+            ),
+            "strategy_validity": dict(row.get("metadata") or {}).get(
+                "strategy_validity", {"pass": True}
+            ),
             "liquidation_gate": dict(row.get("metadata") or {}).get("liquidation_gate", True),
             "train": dict(row.get("train") or {}),
             "validation": dict(row.get("val") or {}),
@@ -1527,7 +1711,9 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
                 "liquidation_unsafe_source_rejected": True,
             },
             "live_integer_leverage_required": True,
-            "discarded_non_integer_leverage_source_count": len(discarded_non_integer_leverage_sources),
+            "discarded_non_integer_leverage_source_count": len(
+                discarded_non_integer_leverage_sources
+            ),
             "discarded_non_integer_leverage_sources": discarded_non_integer_leverage_sources,
             "discarded_source_candidate_count": len(discarded_source_candidate_rows),
             "discarded_source_candidates": discarded_source_candidate_rows,
@@ -1544,7 +1730,9 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
             "split_summaries": {
                 name: {
                     "liquidation_count": int(_safe_float(split.get("liquidation_count"), 0.0)),
-                    "minimum_margin_buffer": _safe_optional_float(split.get("minimum_margin_buffer")),
+                    "minimum_margin_buffer": _safe_optional_float(
+                        split.get("minimum_margin_buffer")
+                    ),
                     "minimum_margin_ratio": _safe_optional_float(split.get("minimum_margin_ratio")),
                     "margin_buffer_positive": bool(split.get("margin_buffer_positive", False)),
                     "maximum_liquidation_event_drawdown": _safe_float(
@@ -1568,7 +1756,9 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
         "full_tuning_result_count": len(tuning_results),
         "final_allocation": final_allocation,
         "peak_rss_mib": _rss_mib(),
-        "memory_policy": memory_policy_payload(budget_bytes=PORTFOLIO_FOLLOWUP_EXPLICIT_BUDGET_BYTES),
+        "memory_policy": memory_policy_payload(
+            budget_bytes=PORTFOLIO_FOLLOWUP_EXPLICIT_BUDGET_BYTES
+        ),
     }
     return payload
 
@@ -1588,8 +1778,12 @@ def _markdown(payload: Mapping[str, Any]) -> str:
     oos = dict(dict(splits.get("oos") or {}).get("metrics") or {})
     train = dict(dict(splits.get("train") or {}).get("metrics") or {})
     val = dict(dict(splits.get("validation") or {}).get("metrics") or {})
-    replay_train = dict(dict(splits.get("train") or {}).get("dynamic_liquidation_replay_metrics") or {})
-    replay_val = dict(dict(splits.get("validation") or {}).get("dynamic_liquidation_replay_metrics") or {})
+    replay_train = dict(
+        dict(splits.get("train") or {}).get("dynamic_liquidation_replay_metrics") or {}
+    )
+    replay_val = dict(
+        dict(splits.get("validation") or {}).get("dynamic_liquidation_replay_metrics") or {}
+    )
     replay_oos = dict(dict(splits.get("oos") or {}).get("dynamic_liquidation_replay_metrics") or {})
     liquidation_replay = dict(payload.get("liquidation_replay") or {})
     replay_summaries = dict(liquidation_replay.get("split_summaries") or {})
@@ -1704,7 +1898,9 @@ def main(argv: list[str] | None = None) -> int:
         memory_summary = memory_guard.finalize(
             status="completed",
             context={
-                "selected": str(dict(payload.get("selected_by_train_validation") or {}).get("name") or ""),
+                "selected": str(
+                    dict(payload.get("selected_by_train_validation") or {}).get("name") or ""
+                ),
                 "full_tuning_result_count": int(payload.get("full_tuning_result_count") or 0),
             },
         )
@@ -1730,7 +1926,9 @@ def main(argv: list[str] | None = None) -> int:
         timestamped_md.write_text(markdown, encoding="utf-8")
     except Exception as exc:
         if not finalized:
-            memory_guard.finalize(status="failed", error=str(exc), context={"script": Path(__file__).name})
+            memory_guard.finalize(
+                status="failed", error=str(exc), context={"script": Path(__file__).name}
+            )
         raise
     finally:
         memory_guard.release()

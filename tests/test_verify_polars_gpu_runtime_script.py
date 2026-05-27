@@ -5,7 +5,9 @@ import json
 import sys
 from pathlib import Path
 
-_SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "ci" / "verify_polars_gpu_runtime.py"
+_SCRIPT_PATH = (
+    Path(__file__).resolve().parents[1] / "scripts" / "ci" / "verify_polars_gpu_runtime.py"
+)
 _SPEC = importlib.util.spec_from_file_location("verify_polars_gpu_runtime_script", _SCRIPT_PATH)
 if _SPEC is None or _SPEC.loader is None:
     raise RuntimeError(f"Failed to load module spec from {_SCRIPT_PATH}")
@@ -41,7 +43,9 @@ def test_run_check_skips_cleanly_without_gpu_when_not_required(monkeypatch):
 
 def test_run_check_fails_without_gpu_when_required(monkeypatch):
     monkeypatch.setattr(MODULE, "detect_nvidia_gpu", lambda: (True, "detected 1 GPU"))
-    monkeypatch.setattr(MODULE, "polars_gpu_available", lambda **kwargs: (False, "gpu smoke failed"))
+    monkeypatch.setattr(
+        MODULE, "polars_gpu_available", lambda **kwargs: (False, "gpu smoke failed")
+    )
     monkeypatch.setattr(MODULE.pl, "GPUEngine", object(), raising=False)
 
     rc, payload = MODULE.run_check(

@@ -129,14 +129,20 @@ def _resolve_feature_points_path() -> Path:
         seen.add(resolved)
         if resolved.exists():
             return resolved
-    return candidates[0].resolve() if candidates else (Path.cwd() / "data" / "market_parquet" / "feature_points").resolve()
+    return (
+        candidates[0].resolve()
+        if candidates
+        else (Path.cwd() / "data" / "market_parquet" / "feature_points").resolve()
+    )
 
 
 def _candidate_identity(candidate: dict[str, Any]) -> str:
     payload = {
         "name": str(candidate.get("name", "")),
         "strategy_class": str(candidate.get("strategy_class", "")),
-        "strategy_timeframe": str(candidate.get("strategy_timeframe") or candidate.get("timeframe") or ""),
+        "strategy_timeframe": str(
+            candidate.get("strategy_timeframe") or candidate.get("timeframe") or ""
+        ),
         "symbols": list(candidate.get("symbols") or []),
         "params": dict(candidate.get("params") or {}),
     }
@@ -388,7 +394,9 @@ def _resolve_split_stage_end(
     return None
 
 
-def _split_window_bounds(split: Mapping[str, Any] | None) -> tuple[datetime | None, datetime | None]:
+def _split_window_bounds(
+    split: Mapping[str, Any] | None,
+) -> tuple[datetime | None, datetime | None]:
     if not isinstance(split, Mapping):
         return None, None
     starts = [
@@ -433,7 +441,9 @@ def _resolve_split_config(
     *,
     strategy_timeframe: str,
 ) -> dict[str, Any]:
-    resolved = dict(split) if isinstance(split, Mapping) else _build_default_split(strategy_timeframe)
+    resolved = (
+        dict(split) if isinstance(split, Mapping) else _build_default_split(strategy_timeframe)
+    )
     train_start = _coerce_utc_datetime(resolved.get("train_start"))
     train_end = _resolve_split_stage_end(resolved, stage="train")
     val_start = _coerce_utc_datetime(resolved.get("val_start"))
@@ -451,7 +461,10 @@ def _resolve_split_config(
         "strategy_timeframe": str(
             resolved.get("strategy_timeframe") or resolved.get("timeframe") or strategy_timeframe
         ),
-        "mode": str(resolved.get("mode") or ("exact_dates" if isinstance(split, Mapping) else "rolling_default")),
+        "mode": str(
+            resolved.get("mode")
+            or ("exact_dates" if isinstance(split, Mapping) else "rolling_default")
+        ),
     }
 
 

@@ -7,10 +7,7 @@ from pathlib import Path
 
 
 MODULE_PATH = (
-    Path(__file__).resolve().parents[2]
-    / "src"
-    / "lumina_quant"
-    / "portfolio_split_contract.py"
+    Path(__file__).resolve().parents[2] / "src" / "lumina_quant" / "portfolio_split_contract.py"
 )
 
 

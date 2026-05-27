@@ -18,7 +18,9 @@ sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
 
 
-def _stream(start_ts_ms: float, values: list[float], *, step_ms: float = 86_400_000.0) -> list[dict[str, float]]:
+def _stream(
+    start_ts_ms: float, values: list[float], *, step_ms: float = 86_400_000.0
+) -> list[dict[str, float]]:
     return [{"t": start_ts_ms + (idx * step_ms), "v": value} for idx, value in enumerate(values)]
 
 
@@ -34,7 +36,9 @@ def _candidate(
         "candidate_id": name,
         "name": name,
         "selection_basis": "test_fixture",
-        "symbols": sorted({str(symbol) for row in components for symbol in list(row.get("symbols") or [])}),
+        "symbols": sorted(
+            {str(symbol) for row in components for symbol in list(row.get("symbols") or [])}
+        ),
         "components": components,
         "return_streams": {
             "train": _stream(1_735_689_600_000.0, train),
@@ -158,7 +162,9 @@ def test_run_regime_switch_allocator_uses_only_prior_history() -> None:
     assert first_val["weights"].get("pair55", 0.0) == 0.0
 
 
-def test_search_regime_switch_allocator_uses_weekly_rebalance_grid(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_search_regime_switch_allocator_uses_weekly_rebalance_grid(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     rows = [
         _candidate(
             "incumbent",
@@ -184,11 +190,34 @@ def test_search_regime_switch_allocator_uses_weekly_rebalance_grid(monkeypatch: 
         return {
             "dates": ["2025-01-01"],
             "daily_returns": [0.0],
-            "allocations": [{"date": "2025-01-01", "weights": {}, "cash_weight": 1.0, "sleeve_turnover": 0.0}],
+            "allocations": [
+                {"date": "2025-01-01", "weights": {}, "cash_weight": 1.0, "sleeve_turnover": 0.0}
+            ],
             "split_metrics": {
-                "train": {"total_return": 0.0, "sharpe": 0.0, "sortino": 0.0, "calmar": 0.0, "max_drawdown": 0.0, "volatility": 0.0},
-                "val": {"total_return": 0.0, "sharpe": 0.0, "sortino": 0.0, "calmar": 0.0, "max_drawdown": 0.0, "volatility": 0.0},
-                "oos": {"total_return": 0.0, "sharpe": 0.0, "sortino": 0.0, "calmar": 0.0, "max_drawdown": 0.0, "volatility": 0.0},
+                "train": {
+                    "total_return": 0.0,
+                    "sharpe": 0.0,
+                    "sortino": 0.0,
+                    "calmar": 0.0,
+                    "max_drawdown": 0.0,
+                    "volatility": 0.0,
+                },
+                "val": {
+                    "total_return": 0.0,
+                    "sharpe": 0.0,
+                    "sortino": 0.0,
+                    "calmar": 0.0,
+                    "max_drawdown": 0.0,
+                    "volatility": 0.0,
+                },
+                "oos": {
+                    "total_return": 0.0,
+                    "sharpe": 0.0,
+                    "sortino": 0.0,
+                    "calmar": 0.0,
+                    "max_drawdown": 0.0,
+                    "volatility": 0.0,
+                },
             },
             "all_metrics": {},
         }
@@ -365,7 +394,9 @@ def test_run_regime_switch_allocator_caps_turnover_and_respects_incumbent_floor(
         max_sleeve_turnover=0.25,
         incumbent_floor_weight=0.30,
     )
-    result = MODULE.run_regime_switch_allocator(rows, params, regime_features={"2026-01-01": {"btc_above_ma192": True}})
+    result = MODULE.run_regime_switch_allocator(
+        rows, params, regime_features={"2026-01-01": {"btc_above_ma192": True}}
+    )
     second_val = {row["date"]: row for row in result["allocations"]}["2026-01-02"]
     assert second_val["sleeve_turnover"] <= 0.2500001
     assert second_val["weights"].get("incumbent", 0.0) >= 0.30
@@ -429,7 +460,9 @@ def test_non_incumbent_rebuild_candidates_are_blocked_by_default(
         max_trailing_drawdown=1.0,
         max_portfolio_weight=1.0,
     )
-    result = MODULE.run_regime_switch_allocator(rows, params, regime_features={"2026-01-01": {"btc_above_ma192": True}})
+    result = MODULE.run_regime_switch_allocator(
+        rows, params, regime_features={"2026-01-01": {"btc_above_ma192": True}}
+    )
     first_val = {row["date"]: row for row in result["allocations"]}["2026-01-01"]
     assert first_val["weights"].get("incumbent", 0.0) > 0.99
     assert first_val["diagnostics"]["overlay"]["rebuild_blocked"] is True
@@ -495,7 +528,9 @@ def test_non_incumbent_candidates_blocked_when_continuity_fails(
         require_continuity_pass=True,
         allow_rebuilt_candidates=True,
     )
-    result = MODULE.run_regime_switch_allocator(rows, params, regime_features={"2026-01-01": {"btc_above_ma192": True}})
+    result = MODULE.run_regime_switch_allocator(
+        rows, params, regime_features={"2026-01-01": {"btc_above_ma192": True}}
+    )
     first_val = {row["date"]: row for row in result["allocations"]}["2026-01-01"]
     assert first_val["weights"].get("incumbent", 0.0) > 0.99
     assert first_val["diagnostics"]["pair55"]["continuity_blocked"] is True
@@ -605,7 +640,10 @@ def test_write_regime_switch_preflight_reports_blockers_without_rebuild(
     assert written["summary"]["blocked_candidate_count"] == 1
     status_by_id = {row["candidate_id"]: row for row in written["candidate_status"]}
     assert status_by_id["current_one_shot_incumbent"]["blocking_reasons"] == []
-    assert set(status_by_id["overlay"]["blocking_reasons"]) == {"rebuild_blocked", "continuity_blocked"}
+    assert set(status_by_id["overlay"]["blocking_reasons"]) == {
+        "rebuild_blocked",
+        "continuity_blocked",
+    }
 
 
 def test_extract_portfolio_return_streams_rebuilds_dynamic_payload(
@@ -613,7 +651,9 @@ def test_extract_portfolio_return_streams_rebuilds_dynamic_payload(
     tmp_path: Path,
 ) -> None:
     monkeypatch.setattr(MODULE, "_REBUILT_STREAM_CACHE_DIR", tmp_path / "cache")
-    monkeypatch.setattr(MODULE, "resolve_followup_artifact_path", lambda path: Path("/tmp/dynamic.json"))
+    monkeypatch.setattr(
+        MODULE, "resolve_followup_artifact_path", lambda path: Path("/tmp/dynamic.json")
+    )
     monkeypatch.setattr(
         MODULE._helper,
         "_load_candidates",
@@ -654,7 +694,9 @@ def test_extract_portfolio_return_streams_rebuilds_overlay_payload(
 ) -> None:
     monkeypatch.setattr(MODULE, "_REBUILT_STREAM_CACHE_DIR", tmp_path / "cache")
     monkeypatch.setattr(MODULE, "resolve_followup_artifact_path", lambda path: Path(str(path)))
-    monkeypatch.setattr(MODULE._helper, "_load_candidates", lambda _path: [{"candidate_id": "stub"}])
+    monkeypatch.setattr(
+        MODULE._helper, "_load_candidates", lambda _path: [{"candidate_id": "stub"}]
+    )
     monkeypatch.setattr(MODULE._overlay, "_load_backbone_weights", lambda _path: {"stub": 1.0})
     monkeypatch.setattr(
         MODULE._overlay,

@@ -72,7 +72,9 @@ def _derive_candidate(
     metadata = dict(candidate.get("metadata") or {})
     metadata["followup_origin"] = "pair_spread_robustness_tightening"
     candidate["metadata"] = metadata
-    tags = list(dict.fromkeys([*list(candidate.get("tags") or []), "followup", "pair_spread_robustness"]))
+    tags = list(
+        dict.fromkeys([*list(candidate.get("tags") or []), "followup", "pair_spread_robustness"])
+    )
     candidate["tags"] = tags
     return candidate
 
@@ -243,7 +245,9 @@ def main() -> None:
         "candidates": candidates,
     }
     manifest_path = output_dir / "pair_spread_robustness_candidate_manifest_latest.json"
-    manifest_path.write_text(json.dumps(manifest_payload, indent=2, sort_keys=True), encoding="utf-8")
+    manifest_path.write_text(
+        json.dumps(manifest_payload, indent=2, sort_keys=True), encoding="utf-8"
+    )
 
     batch_payload = {
         "artifact_kind": "article_pipeline_research_batches",
@@ -281,10 +285,7 @@ def main() -> None:
         f"- candidate_count: `{len(candidates)}`",
         "",
         "## candidates",
-        *[
-            f"- {candidate['name']}"
-            for candidate in candidates
-        ],
+        *[f"- {candidate['name']}" for candidate in candidates],
     ]
     md_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 

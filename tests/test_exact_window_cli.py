@@ -57,7 +57,9 @@ def test_exact_window_cli_generates_fail_analysis_and_memory_payloads(
             "evaluated_count": 1,
             "portfolio": {"weights": []},
         }
-        (out_dir / exact_window_cli.SUMMARY_LATEST).write_text(json.dumps(summary), encoding="utf-8")
+        (out_dir / exact_window_cli.SUMMARY_LATEST).write_text(
+            json.dumps(summary), encoding="utf-8"
+        )
         (out_dir / exact_window_cli.DETAILS_LATEST).write_text(
             json.dumps(
                 [
@@ -97,7 +99,9 @@ def test_exact_window_cli_generates_fail_analysis_and_memory_payloads(
     assert payload["eligible_symbols"] == ["BTC/USDT"]
     assert captured["allow_metals"] is False
     latest_pointer = json.loads((tmp_path / "latest.json").read_text(encoding="utf-8"))
-    assert latest_pointer["summary_path"] == str((tmp_path / exact_window_cli.SUMMARY_LATEST).resolve())
+    assert latest_pointer["summary_path"] == str(
+        (tmp_path / exact_window_cli.SUMMARY_LATEST).resolve()
+    )
 
 
 def test_exact_window_cli_passes_allow_metals_flag(tmp_path: Path, monkeypatch, capsys):
@@ -199,7 +203,9 @@ def test_exact_window_cli_passes_custom_window_overrides(tmp_path: Path, monkeyp
     assert captured["requested_oos_end_exclusive"] == "2026-03-09"
 
 
-def test_exact_window_cli_derives_adaptive_windows_for_metal_profile(tmp_path: Path, monkeypatch, capsys):
+def test_exact_window_cli_derives_adaptive_windows_for_metal_profile(
+    tmp_path: Path, monkeypatch, capsys
+):
     captured: dict[str, object] = {}
 
     monkeypatch.setattr(exact_window_cli, "RSSGuard", _FakeGuard)
@@ -299,17 +305,20 @@ def test_exact_window_cli_uses_runtime_config_defaults_when_symbols_are_omitted(
     monkeypatch.setattr(
         exact_window_cli,
         "resolve_coverage_adaptive_windows",
-        lambda **kwargs: adaptive_calls.update(kwargs) or {
-            "profile": "coverage_adaptive",
-            "train_start": "2026-01-01T00:00:00+00:00",
-            "val_start": "2026-02-01T00:00:00+00:00",
-            "oos_start": "2026-02-20T00:00:00+00:00",
-            "requested_oos_end_exclusive": "2026-03-09T00:00:00+00:00",
-            "common_start": "2026-01-01T00:00:00+00:00",
-            "common_end": "2026-03-08T23:59:00+00:00",
-            "total_days": 67,
-            "allocation_days": {"train": 31, "val": 19, "oos": 17},
-        },
+        lambda **kwargs: (
+            adaptive_calls.update(kwargs)
+            or {
+                "profile": "coverage_adaptive",
+                "train_start": "2026-01-01T00:00:00+00:00",
+                "val_start": "2026-02-01T00:00:00+00:00",
+                "oos_start": "2026-02-20T00:00:00+00:00",
+                "requested_oos_end_exclusive": "2026-03-09T00:00:00+00:00",
+                "common_start": "2026-01-01T00:00:00+00:00",
+                "common_end": "2026-03-08T23:59:00+00:00",
+                "total_days": 67,
+                "allocation_days": {"train": 31, "val": 19, "oos": 17},
+            }
+        ),
     )
 
     def _stub_suite(**kwargs):
@@ -354,7 +363,9 @@ def test_exact_window_cli_uses_runtime_config_defaults_when_symbols_are_omitted(
     assert suite_calls["symbols"] == ["ETH/USDT", "XRP/USDT"]
 
 
-def test_exact_window_cli_accepts_timeframe_specific_adaptive_profile(tmp_path: Path, monkeypatch, capsys):
+def test_exact_window_cli_accepts_timeframe_specific_adaptive_profile(
+    tmp_path: Path, monkeypatch, capsys
+):
     captured: dict[str, object] = {}
 
     monkeypatch.setattr(exact_window_cli, "RSSGuard", _FakeGuard)
@@ -501,16 +512,19 @@ def test_exact_window_cli_adopts_existing_run_artifacts(tmp_path: Path, monkeypa
     assert payload["existing_pid"] is None
 
     manifest = json.loads(
-        (output_root / next(output_root.glob("exact_window_*/manifest.json")).relative_to(output_root)).read_text(
-            encoding="utf-8"
-        )
+        (
+            output_root
+            / next(output_root.glob("exact_window_*/manifest.json")).relative_to(output_root)
+        ).read_text(encoding="utf-8")
     )
     assert manifest["adopted_existing_run"] is True
     assert manifest["status"] == "completed"
     assert manifest["artifacts"]["summary_path"] == str(summary_path)
 
 
-def test_exact_window_cli_blocks_when_another_heavy_run_is_active(tmp_path: Path, monkeypatch, capsys):
+def test_exact_window_cli_blocks_when_another_heavy_run_is_active(
+    tmp_path: Path, monkeypatch, capsys
+):
     class _BusyLock:
         @staticmethod
         def acquire(*, lock_path, label="exact_window", metadata=None):
@@ -549,13 +563,28 @@ def test_cli_main_dispatches_exact_window(monkeypatch):
     assert captured["argv"] == ["--emit-memory-baseline"]
 
 
-def test_exact_window_cli_skips_duplicate_signature_when_not_forced(tmp_path: Path, monkeypatch, capsys):
+def test_exact_window_cli_skips_duplicate_signature_when_not_forced(
+    tmp_path: Path, monkeypatch, capsys
+):
     score_config = tmp_path / "score_config.json"
     score_config.write_text("{}", encoding="utf-8")
 
     parser = exact_window_cli._build_parser()
-    args = parser.parse_args(["--output-dir", str(tmp_path), "--score-config", str(score_config), "--timeframes", "1m", "--symbols", "BTC/USDT"])
-    resolved_windows, _adaptive = exact_window_cli._build_resolved_windows(args=args, symbols=["BTC/USDT"] )
+    args = parser.parse_args(
+        [
+            "--output-dir",
+            str(tmp_path),
+            "--score-config",
+            str(score_config),
+            "--timeframes",
+            "1m",
+            "--symbols",
+            "BTC/USDT",
+        ]
+    )
+    resolved_windows, _adaptive = exact_window_cli._build_resolved_windows(
+        args=args, symbols=["BTC/USDT"]
+    )
     signature = exact_window_cli._candidate_run_signature(
         candidate_library_hash=exact_window_cli._candidate_library_hash(),
         batch_timeframes=exact_window_cli._resolve_batch_timeframes(args.timeframes),
@@ -605,16 +634,18 @@ def test_exact_window_cli_skips_duplicate_signature_when_not_forced(tmp_path: Pa
         lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("guard should not run")),
     )
 
-    rc = exact_window_cli.main([
-        "--output-dir",
-        str(tmp_path),
-        "--score-config",
-        str(score_config),
-        "--timeframes",
-        "1m",
-        "--symbols",
-        "BTC/USDT",
-    ])
+    rc = exact_window_cli.main(
+        [
+            "--output-dir",
+            str(tmp_path),
+            "--score-config",
+            str(score_config),
+            "--timeframes",
+            "1m",
+            "--symbols",
+            "BTC/USDT",
+        ]
+    )
     assert rc == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "skipped_duplicate"
@@ -627,8 +658,21 @@ def test_exact_window_cli_force_rerun_ignores_signature_cache(tmp_path: Path, mo
     score_config.write_text("{}", encoding="utf-8")
 
     parser = exact_window_cli._build_parser()
-    args = parser.parse_args(["--output-dir", str(tmp_path), "--score-config", str(score_config), "--timeframes", "1m", "--symbols", "BTC/USDT"])
-    resolved_windows, _adaptive = exact_window_cli._build_resolved_windows(args=args, symbols=["BTC/USDT"] )
+    args = parser.parse_args(
+        [
+            "--output-dir",
+            str(tmp_path),
+            "--score-config",
+            str(score_config),
+            "--timeframes",
+            "1m",
+            "--symbols",
+            "BTC/USDT",
+        ]
+    )
+    resolved_windows, _adaptive = exact_window_cli._build_resolved_windows(
+        args=args, symbols=["BTC/USDT"]
+    )
     signature = exact_window_cli._candidate_run_signature(
         candidate_library_hash=exact_window_cli._candidate_library_hash(),
         batch_timeframes=exact_window_cli._resolve_batch_timeframes(args.timeframes),
@@ -671,22 +715,37 @@ def test_exact_window_cli_force_rerun_ignores_signature_cache(tmp_path: Path, mo
     monkeypatch.setattr(
         exact_window_cli,
         "run_exact_window_suite",
-        lambda **kwargs: {"eligible_symbols": ["BTC/USDT"], "best_per_strategy": [], "promoted_count": 0, "portfolio": {"weights": []}},
+        lambda **kwargs: {
+            "eligible_symbols": ["BTC/USDT"],
+            "best_per_strategy": [],
+            "promoted_count": 0,
+            "portfolio": {"weights": []},
+        },
     )
-    monkeypatch.setattr(exact_window_cli, "write_fail_analysis_bundle", lambda **kwargs: {"json_latest": tmp_path / "exact_window_fail_analysis_latest.json"})
-    monkeypatch.setattr(exact_window_cli, "write_memory_evidence_bundle", lambda **kwargs: {"json_latest": tmp_path / "exact_window_memory_evidence_latest.json"})
+    monkeypatch.setattr(
+        exact_window_cli,
+        "write_fail_analysis_bundle",
+        lambda **kwargs: {"json_latest": tmp_path / "exact_window_fail_analysis_latest.json"},
+    )
+    monkeypatch.setattr(
+        exact_window_cli,
+        "write_memory_evidence_bundle",
+        lambda **kwargs: {"json_latest": tmp_path / "exact_window_memory_evidence_latest.json"},
+    )
 
-    rc = exact_window_cli.main([
-        "--output-dir",
-        str(tmp_path),
-        "--score-config",
-        str(score_config),
-        "--timeframes",
-        "1m",
-        "--symbols",
-        "BTC/USDT",
-        "--force-rerun",
-    ])
+    rc = exact_window_cli.main(
+        [
+            "--output-dir",
+            str(tmp_path),
+            "--score-config",
+            str(score_config),
+            "--timeframes",
+            "1m",
+            "--symbols",
+            "BTC/USDT",
+            "--force-rerun",
+        ]
+    )
     assert rc == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] != "skipped_duplicate"

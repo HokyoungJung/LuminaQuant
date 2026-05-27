@@ -69,11 +69,18 @@ def estimate_cost_bps(
     participation = (notional / safe_price) / volume_qty
 
     spread_bps = max(0.0, float(params.spread_bps))
-    impact_bps = max(0.0, float(params.impact_k) * max(0.0, float(sigma)) * ((notional / safe_adtv) ** 0.5) * 10_000.0)
+    impact_bps = max(
+        0.0,
+        float(params.impact_k)
+        * max(0.0, float(sigma))
+        * ((notional / safe_adtv) ** 0.5)
+        * 10_000.0,
+    )
     fees_bps = max(0.0, float(params.fees_bps) + float(params.tax_bps))
     participation_penalty = max(
         0.0,
-        float(params.participation_lambda) * (max(0.0, participation) ** max(0.1, float(params.participation_power))),
+        float(params.participation_lambda)
+        * (max(0.0, participation) ** max(0.1, float(params.participation_power))),
     )
     total_bps = spread_bps + impact_bps + fees_bps + participation_penalty
     return CostBreakdown(

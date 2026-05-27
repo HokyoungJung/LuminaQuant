@@ -18,7 +18,12 @@ from lumina_quant.market_data import load_data_dict_from_parquet
 from lumina_quant.strategy_factory.candidate_library import build_binance_futures_candidates
 from lumina_quant.strategy_factory import research_runner as rr
 from lumina_quant.strategy_factory.selection import robust_score_from_metrics
-from lumina_quant.symbols import CANONICAL_STRATEGY_TIMEFRAMES, canonical_symbol, canonicalize_symbol_list, normalize_strategy_timeframes
+from lumina_quant.symbols import (
+    CANONICAL_STRATEGY_TIMEFRAMES,
+    canonical_symbol,
+    canonicalize_symbol_list,
+    normalize_strategy_timeframes,
+)
 
 
 DEFAULT_TRAIN_START = "2025-01-01"
@@ -57,7 +62,10 @@ def _assert_low_ram_exclusions(rows: list[dict[str, Any]], *, row_kind: str) -> 
     for row in rows:
         strategy_class = str(row.get("strategy_class") or "")
         timeframe = str(row.get("strategy_timeframe") or row.get("timeframe") or "")
-        if strategy_class in LOW_RAM_EXCLUDED_STRATEGIES or timeframe in LOW_RAM_EXCLUDED_TIMEFRAMES:
+        if (
+            strategy_class in LOW_RAM_EXCLUDED_STRATEGIES
+            or timeframe in LOW_RAM_EXCLUDED_TIMEFRAMES
+        ):
             offenders.append(
                 f"{row_kind}: strategy={strategy_class or '<unknown>'} timeframe={timeframe or '<unknown>'}"
             )
@@ -98,7 +106,9 @@ def _committee_from_candidate_metrics(
     technical_score = _clamp_unit(
         0.45 + (0.25 * val_premium) + (0.30 * oos_premium) + (0.25 * (max(0.0, val_sharpe) / 4.0))
     )
-    support_score = _clamp_unit(0.6 * (min(1.0, val_trade / 25.0)) + 0.4 * (min(1.0, oos_trade / 12.0)))
+    support_score = _clamp_unit(
+        0.6 * (min(1.0, val_trade / 25.0)) + 0.4 * (min(1.0, oos_trade / 12.0))
+    )
     robustness_score_raw = robust_score_from_metrics(
         {
             **dict(oos),
@@ -109,18 +119,22 @@ def _committee_from_candidate_metrics(
         }
     )
     regime_score = _clamp_unit(
-        0.50 + (0.30 * (min(1.0, (oos_trade + val_trade) / 35.0)))
+        0.50
+        + (0.30 * (min(1.0, (oos_trade + val_trade) / 35.0)))
         + (0.10 * min(1.0, (val_stream_points / 8.0)))
         + (0.10 * min(1.0, (oos_stream_points / 8.0)))
     )
     robustness_score = min(
         1.0,
-        max(0.0, (
-            0.5
-            + (0.015 * robustness_score_raw)
-            + (0.10 * max(0.0, val_sharpe))
-            + (0.05 * max(0.0, oos_sharpe))
-        )),
+        max(
+            0.0,
+            (
+                0.5
+                + (0.015 * robustness_score_raw)
+                + (0.10 * max(0.0, val_sharpe))
+                + (0.05 * max(0.0, oos_sharpe))
+            ),
+        ),
     )
 
     risk_flags: list[str] = []
@@ -194,7 +208,10 @@ def _build_candidate_result_row(
         "candidate_id": str(candidate.get("candidate_id")),
         "name": str(candidate.get("name")),
         "strategy_class": str(candidate.get("strategy_class")),
-        "family": str(candidate.get("family") or rr._family_from_strategy(str(candidate.get("strategy_class")))),
+        "family": str(
+            candidate.get("family")
+            or rr._family_from_strategy(str(candidate.get("strategy_class")))
+        ),
         "strategy_timeframe": str(timeframe),
         "symbols": list(symbols_for_candidate),
         "params": dict(candidate.get("params") or {}),
@@ -295,12 +312,12 @@ def resolve_coverage_adaptive_windows(
         chunk_days=max(7, int(chunk_days)),
     )
     available_rows = [
-        row
-        for row in coverage_rows
-        if row.get("coverage_start") and row.get("coverage_end")
+        row for row in coverage_rows if row.get("coverage_start") and row.get("coverage_end")
     ]
     if not available_rows:
-        raise RuntimeError("Adaptive exact-window profile found no symbol coverage rows with valid bounds.")
+        raise RuntimeError(
+            "Adaptive exact-window profile found no symbol coverage rows with valid bounds."
+        )
     common_start = max(parse_utc_datetime(str(row["coverage_start"])) for row in available_rows)
     if common_end is None:
         common_end = min(parse_utc_datetime(str(row["coverage_end"])) for row in available_rows)
@@ -400,7 +417,9 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
     return out
 
 
-def _daily_stream_from_timestamps(timestamps: np.ndarray, returns: np.ndarray) -> list[dict[str, float]]:
+def _daily_stream_from_timestamps(
+    timestamps: np.ndarray, returns: np.ndarray
+) -> list[dict[str, float]]:
     days = np.asarray(timestamps, dtype="datetime64[D]")
     values = np.asarray(returns, dtype=float)
     compounded: dict[int, float] = {}
@@ -423,7 +442,9 @@ def compound_returns(values: list[float] | np.ndarray) -> float:
     return float(np.prod(1.0 + arr) - 1.0)
 
 
-def aggregate_stream_by_period(stream: list[dict[str, float]], *, period: str) -> list[dict[str, Any]]:
+def aggregate_stream_by_period(
+    stream: list[dict[str, float]], *, period: str
+) -> list[dict[str, Any]]:
     buckets: dict[str, list[float]] = defaultdict(list)
     for point in list(stream or []):
         epoch_ms = int(point.get("t", 0))
@@ -488,7 +509,9 @@ def _metrics_daily(returns: np.ndarray) -> dict[str, float]:
     }
 
 
-def _validation_score(row: dict[str, Any], *, scoring_config: dict[str, Any] | None = None) -> float:
+def _validation_score(
+    row: dict[str, Any], *, scoring_config: dict[str, Any] | None = None
+) -> float:
     cfg = rr._resolve_score_config(scoring_config)
     weights = dict(cfg["candidate_rank_score_weights"])
     metrics = dict(row.get("val") or {})
@@ -538,7 +561,9 @@ def _coerce_frame_datetime_bounds(frame: pl.DataFrame) -> tuple[datetime | None,
     end = dt.max()
     if start is None or end is None:
         return None, None
-    start_dt = parse_utc_datetime(start.to_pydatetime() if hasattr(start, "to_pydatetime") else start)
+    start_dt = parse_utc_datetime(
+        start.to_pydatetime() if hasattr(start, "to_pydatetime") else start
+    )
     end_dt = parse_utc_datetime(end.to_pydatetime() if hasattr(end, "to_pydatetime") else end)
     return start_dt, end_dt
 
@@ -624,8 +649,14 @@ def strict_align_bundles(
             return None
     assert merged is not None
     merged = merged.filter(
-        (pl.col("datetime") >= pl.lit(_to_naive_utc(window_start)).cast(pl.Datetime(time_unit="ms")))
-        & (pl.col("datetime") < pl.lit(_to_naive_utc(window_end_exclusive)).cast(pl.Datetime(time_unit="ms")))
+        (
+            pl.col("datetime")
+            >= pl.lit(_to_naive_utc(window_start)).cast(pl.Datetime(time_unit="ms"))
+        )
+        & (
+            pl.col("datetime")
+            < pl.lit(_to_naive_utc(window_end_exclusive)).cast(pl.Datetime(time_unit="ms"))
+        )
     ).sort("datetime")
     if merged.height < min_bars:
         return None
@@ -640,8 +671,14 @@ def strict_align_bundles(
         if feature_frame is None or feature_frame.is_empty():
             continue
         filtered = feature_frame.filter(
-            (pl.col("datetime") >= pl.lit(_to_naive_utc(window_start)).cast(pl.Datetime(time_unit="ms")))
-            & (pl.col("datetime") < pl.lit(_to_naive_utc(window_end_exclusive)).cast(pl.Datetime(time_unit="ms")))
+            (
+                pl.col("datetime")
+                >= pl.lit(_to_naive_utc(window_start)).cast(pl.Datetime(time_unit="ms"))
+            )
+            & (
+                pl.col("datetime")
+                < pl.lit(_to_naive_utc(window_end_exclusive)).cast(pl.Datetime(time_unit="ms"))
+            )
         ).sort("datetime")
         if filtered.is_empty():
             continue
@@ -657,13 +694,22 @@ def strict_align_bundles(
             open_interest=np.asarray(joined.get_column("open_interest").to_numpy(), dtype=float),
             mark_price=np.asarray(joined.get_column("mark_price").to_numpy(), dtype=float),
             index_price=np.asarray(joined.get_column("index_price").to_numpy(), dtype=float),
-            liquidation_long_notional=np.asarray(joined.get_column("liquidation_long_notional").to_numpy(), dtype=float),
-            liquidation_short_notional=np.asarray(joined.get_column("liquidation_short_notional").to_numpy(), dtype=float),
+            liquidation_long_notional=np.asarray(
+                joined.get_column("liquidation_long_notional").to_numpy(), dtype=float
+            ),
+            liquidation_short_notional=np.asarray(
+                joined.get_column("liquidation_short_notional").to_numpy(), dtype=float
+            ),
         )
         for key, values in support.items():
             aligned[f"{symbol}:{key}"] = values
     if "__bench_close" in merged.columns:
-        aligned["benchmark_close"] = merged.get_column("__bench_close").fill_null(strategy="forward").fill_null(strategy="backward").to_numpy()
+        aligned["benchmark_close"] = (
+            merged.get_column("__bench_close")
+            .fill_null(strategy="forward")
+            .fill_null(strategy="backward")
+            .to_numpy()
+        )
     return aligned
 
 
@@ -703,7 +749,9 @@ def _monthly_btc_thresholds(
     dts = frame.get_column("datetime").to_list()
     by_month: dict[str, list[float]] = defaultdict(list)
     for dt_raw, close in zip(dts, closes, strict=True):
-        dt = parse_utc_datetime(dt_raw.to_pydatetime() if hasattr(dt_raw, "to_pydatetime") else dt_raw)
+        dt = parse_utc_datetime(
+            dt_raw.to_pydatetime() if hasattr(dt_raw, "to_pydatetime") else dt_raw
+        )
         key = f"{dt.year:04d}-{dt.month:02d}"
         by_month[key].append(float(close))
     out: dict[str, dict[str, float]] = {}
@@ -718,8 +766,13 @@ def _monthly_btc_thresholds(
     return out
 
 
-def _monthly_hurdle_rows(stream: list[dict[str, float]], thresholds: dict[str, dict[str, float]]) -> list[dict[str, Any]]:
-    realized = {row["period"]: float(row["return"]) for row in aggregate_stream_by_period(stream, period="month")}
+def _monthly_hurdle_rows(
+    stream: list[dict[str, float]], thresholds: dict[str, dict[str, float]]
+) -> list[dict[str, Any]]:
+    realized = {
+        row["period"]: float(row["return"])
+        for row in aggregate_stream_by_period(stream, period="month")
+    }
     rows: list[dict[str, Any]] = []
     for month in sorted(realized):
         benchmark = dict(thresholds.get(month) or {})
@@ -766,7 +819,11 @@ def _portfolio_weights(best_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     pool = [row for row in best_rows if bool(row.get("promoted"))]
     basis = "promoted_only"
     if not pool:
-        pool = [row for row in best_rows if bool(row.get("candidate_pool_eligible") or row.get("btc_beating_candidate"))]
+        pool = [
+            row
+            for row in best_rows
+            if bool(row.get("candidate_pool_eligible") or row.get("btc_beating_candidate"))
+        ]
         basis = "candidate_pool_candidates"
     if not pool:
         pool = list(best_rows)
@@ -781,7 +838,9 @@ def _portfolio_weights(best_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         quality = max(0.05, float((row.get("val") or {}).get("deflated_sharpe", 0.0)) + 0.5)
         raw[cid] = quality * inv_vol
     total = float(sum(raw.values()))
-    weights = {cid: (value / total if total > 0 else 1.0 / max(1, len(raw))) for cid, value in raw.items()}
+    weights = {
+        cid: (value / total if total > 0 else 1.0 / max(1, len(raw))) for cid, value in raw.items()
+    }
 
     cap = max(0.35, 1.0 / max(1, len(weights)))
     capped = True
@@ -826,10 +885,16 @@ def _portfolio_weights(best_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return sorted(weight_rows, key=lambda item: item["weight"], reverse=True)
 
 
-def _portfolio_stream(best_rows: list[dict[str, Any]], weights: list[dict[str, Any]], split: str) -> list[dict[str, float]]:
+def _portfolio_stream(
+    best_rows: list[dict[str, Any]], weights: list[dict[str, Any]], split: str
+) -> list[dict[str, float]]:
     if not weights:
         return []
-    weight_map = {str(row["candidate_id"]): float(row["weight"]) for row in weights if float(row.get("weight", 0.0)) > 0.0}
+    weight_map = {
+        str(row["candidate_id"]): float(row["weight"])
+        for row in weights
+        if float(row.get("weight", 0.0)) > 0.0
+    }
     day_map: dict[str, float] = defaultdict(float)
     timestamp_lookup: dict[str, int] = {}
     for row in best_rows:
@@ -837,17 +902,16 @@ def _portfolio_stream(best_rows: list[dict[str, Any]], weights: list[dict[str, A
         weight = weight_map.get(cid, 0.0)
         if weight <= 0.0:
             continue
-        daily_rows = aggregate_stream_by_period(list((row.get("return_streams") or {}).get(split) or []), period="day")
+        daily_rows = aggregate_stream_by_period(
+            list((row.get("return_streams") or {}).get(split) or []), period="day"
+        )
         for item in daily_rows:
             day = str(item["period"])
             day_map[day] += weight * float(item["return"])
             if day not in timestamp_lookup:
                 day_dt = parse_utc_datetime(day)
                 timestamp_lookup[day] = int(day_dt.timestamp() * 1000)
-    return [
-        {"t": timestamp_lookup[day], "v": float(day_map[day])}
-        for day in sorted(day_map)
-    ]
+    return [{"t": timestamp_lookup[day], "v": float(day_map[day])} for day in sorted(day_map)]
 
 
 def _render_markdown(summary: dict[str, Any]) -> str:
@@ -874,30 +938,32 @@ def _render_markdown(summary: dict[str, Any]) -> str:
     ]
     for row in summary.get("best_per_strategy") or []:
         lines.append(
-            f"| {row.get('strategy_class','')} | {row.get('name','')} | {row.get('strategy_timeframe','')} | "
+            f"| {row.get('strategy_class', '')} | {row.get('name', '')} | {row.get('strategy_timeframe', '')} | "
             f"{float(row.get('validation_score', 0.0)):.3f} | {int(bool(row.get('promoted')))} | "
             f"{int(bool(row.get('validation_hurdle_pass')))} | {float((row.get('oos') or {}).get('return', 0.0)):.2%} | "
             f"{float((row.get('oos') or {}).get('sharpe', 0.0)):.3f} |"
         )
-    lines.extend([
-        "",
-        "## Portfolio",
-        "",
-        f"- Construction basis: `{summary.get('portfolio', {}).get('construction_basis', '')}`",
-        "",
-        "| Name | Strategy | Weight | OOS Return | OOS Sharpe |",
-        "|---|---|---:|---:|---:|",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Portfolio",
+            "",
+            f"- Construction basis: `{summary.get('portfolio', {}).get('construction_basis', '')}`",
+            "",
+            "| Name | Strategy | Weight | OOS Return | OOS Sharpe |",
+            "|---|---|---:|---:|---:|",
+        ]
+    )
     for row in summary.get("portfolio", {}).get("weights") or []:
         lines.append(
-            f"| {row.get('name','')} | {row.get('strategy_class','')} | {float(row.get('weight',0.0)):.2%} | "
-            f"{float(row.get('oos_return',0.0)):.2%} | {float(row.get('oos_sharpe',0.0)):.3f} |"
+            f"| {row.get('name', '')} | {row.get('strategy_class', '')} | {float(row.get('weight', 0.0)):.2%} | "
+            f"{float(row.get('oos_return', 0.0)):.2%} | {float(row.get('oos_sharpe', 0.0)):.3f} |"
         )
     lines.extend(["", "## Portfolio Monthly Hurdle", ""])
     for row in summary.get("portfolio", {}).get("monthly_hurdle") or []:
         lines.append(
-            f"- {row.get('month')}: return={float(row.get('strategy_return',0.0)):.2%}, "
-            f"btc={float(row.get('btc_buy_hold_return',0.0)):.2%}, threshold={float(row.get('threshold',0.0)):.2%}, "
+            f"- {row.get('month')}: return={float(row.get('strategy_return', 0.0)):.2%}, "
+            f"btc={float(row.get('btc_buy_hold_return', 0.0)):.2%}, threshold={float(row.get('threshold', 0.0)):.2%}, "
             f"pass={bool(row.get('pass'))}"
         )
     return "\n".join(lines) + "\n"
@@ -979,7 +1045,9 @@ def _resolve_exact_window_suite_plan(
         chunk_days=clamped_chunk_days,
     )
     if common_end is None:
-        raise RuntimeError("No symbol has full coverage from train start through the requested window.")
+        raise RuntimeError(
+            "No symbol has full coverage from train start through the requested window."
+        )
     actual_max_timestamp = min(
         common_end,
         resolved_windows["requested_oos_end_exclusive"] - timedelta(milliseconds=1),
@@ -1351,11 +1419,7 @@ def _build_exact_window_portfolio(best_by_strategy: list[dict[str, Any]]) -> dic
     for row in weights:
         cid = str(row.get("candidate_id"))
         source = next(
-            (
-                item
-                for item in best_by_strategy
-                if str(item.get("candidate_id")) == cid
-            ),
+            (item for item in best_by_strategy if str(item.get("candidate_id")) == cid),
             None,
         )
         if source is not None:
@@ -1389,7 +1453,9 @@ def _build_exact_window_suite_summary(
     portfolio: dict[str, Any],
     thresholds: dict[str, dict[str, float]],
 ) -> dict[str, Any]:
-    portfolio["monthly_hurdle"] = _monthly_hurdle_rows(portfolio["return_streams"]["oos"], thresholds)
+    portfolio["monthly_hurdle"] = _monthly_hurdle_rows(
+        portfolio["return_streams"]["oos"], thresholds
+    )
     return {
         "generated_at": datetime.now(UTC).isoformat(),
         "windows": {
@@ -1424,9 +1490,7 @@ def _build_exact_window_suite_summary(
             1 for row in best_by_strategy if bool(row.get("btc_beating_candidate"))
         ),
         "three_month_two_pct_candidate_count": sum(
-            1
-            for row in best_by_strategy
-            if bool(row.get("three_month_two_pct_candidate"))
+            1 for row in best_by_strategy if bool(row.get("three_month_two_pct_candidate"))
         ),
         "provisional_candidate_count": sum(
             1

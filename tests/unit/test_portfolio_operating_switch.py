@@ -27,7 +27,9 @@ def _base_operating_plan() -> dict:
                 "allocation": {"soft_three_way_regime": 0.8, "pair_fast_exit": 0.2},
                 "metrics": {"oos_total_return": 0.02, "oos_sharpe": 1.0, "oos_max_drawdown": 0.01},
             },
-            "defensive_overlay_mode": {"allocation": {"soft_three_way_regime": 0.7, "pair_fast_exit": 0.3}},
+            "defensive_overlay_mode": {
+                "allocation": {"soft_three_way_regime": 0.7, "pair_fast_exit": 0.3}
+            },
             "aggressive_realized_mode": {"allocation": {"three_way_regime": 1.0}},
             "hybrid_guarded_mode": {"allocation": {"hybrid_online_portfolio": 1.0}},
             "production_guarded_mode": {"allocation": {"production_guarded_portfolio": 1.0}},
@@ -72,7 +74,9 @@ def test_load_symbol_volume_signal_classifies_strong_volume(tmp_path: Path) -> N
     assert signal.state == "strong"
 
 
-def test_load_symbol_volume_signal_uses_same_time_baseline_for_partial_current_day(tmp_path: Path) -> None:
+def test_load_symbol_volume_signal_uses_same_time_baseline_for_partial_current_day(
+    tmp_path: Path,
+) -> None:
     symbol_root = tmp_path / "BNBUSDT"
     daily_payloads = {
         "2026-03-05": {
@@ -294,7 +298,12 @@ def test_balanced_strategy_health_prefers_hybrid_source_metrics() -> None:
         operating_plan_payload=_base_operating_plan(),
         balanced_strategy_payload={
             "portfolio_metrics": {
-                "val": {"total_return": -0.02, "sharpe": -1.0, "max_drawdown": 0.03, "volatility": 0.01},
+                "val": {
+                    "total_return": -0.02,
+                    "sharpe": -1.0,
+                    "max_drawdown": 0.03,
+                    "volatility": 0.01,
+                },
                 "oos": {"total_return": -0.01, "sharpe": -1.0, "max_drawdown": 0.02},
             }
         },
@@ -311,7 +320,9 @@ def test_balanced_strategy_health_prefers_hybrid_source_metrics() -> None:
     assert health["oos_sharpe"] == 1.5
 
 
-def test_recommend_operating_mode_uses_risk_off_even_in_bullish_state_when_all_active_sleeves_are_unhealthy() -> None:
+def test_recommend_operating_mode_uses_risk_off_even_in_bullish_state_when_all_active_sleeves_are_unhealthy() -> (
+    None
+):
     plan = _base_operating_plan()
     plan["deployment_modes"]["balanced_overlay_mode"]["metrics"] = {
         "oos_total_return": -0.01,
@@ -352,7 +363,9 @@ def test_recommend_operating_mode_uses_risk_off_even_in_bullish_state_when_all_a
     assert decision.allocation == {"cash": 1.0}
 
 
-def test_recommend_operating_mode_prefers_hybrid_guarded_when_legacy_sleeves_are_unhealthy_but_hybrid_is_healthy() -> None:
+def test_recommend_operating_mode_prefers_hybrid_guarded_when_legacy_sleeves_are_unhealthy_but_hybrid_is_healthy() -> (
+    None
+):
     plan = _base_operating_plan()
     plan["deployment_modes"]["balanced_overlay_mode"]["metrics"] = {
         "oos_total_return": -0.01,
@@ -402,7 +415,9 @@ def test_recommend_operating_mode_prefers_hybrid_guarded_when_legacy_sleeves_are
     assert decision.allocation == {"hybrid_online_portfolio": 1.0}
 
 
-def test_recommend_operating_mode_promotes_hybrid_guarded_in_mixed_calm_when_it_materially_beats_balanced() -> None:
+def test_recommend_operating_mode_promotes_hybrid_guarded_in_mixed_calm_when_it_materially_beats_balanced() -> (
+    None
+):
     decision = MODULE.recommend_operating_mode(
         current_judgement={
             "favored_group": "mixed",
@@ -518,7 +533,9 @@ def test_recommend_operating_mode_can_promote_production_guarded_in_mixed_calm()
     assert any("production-guarded candidate beats balanced" in item for item in decision.rationale)
 
 
-def test_recommend_operating_mode_uses_performance_first_override_when_hybrid_oos_edge_is_decisive() -> None:
+def test_recommend_operating_mode_uses_performance_first_override_when_hybrid_oos_edge_is_decisive() -> (
+    None
+):
     decision = MODULE.recommend_operating_mode(
         current_judgement={
             "favored_group": "mixed",
@@ -573,7 +590,9 @@ def test_recommend_operating_mode_uses_performance_first_override_when_hybrid_oo
     assert any("performance-first override" in item for item in decision.rationale)
 
 
-def test_recommend_operating_mode_requires_decisive_oos_edge_for_performance_first_override() -> None:
+def test_recommend_operating_mode_requires_decisive_oos_edge_for_performance_first_override() -> (
+    None
+):
     decision = MODULE.recommend_operating_mode(
         current_judgement={
             "favored_group": "mixed",
@@ -627,7 +646,9 @@ def test_recommend_operating_mode_requires_decisive_oos_edge_for_performance_fir
     assert decision.allocation == {"soft_three_way_regime": 0.8, "pair_fast_exit": 0.2}
 
 
-def test_recommend_operating_mode_keeps_balanced_overlay_when_incumbent_is_healthy_and_hybrid_is_only_a_challenger() -> None:
+def test_recommend_operating_mode_keeps_balanced_overlay_when_incumbent_is_healthy_and_hybrid_is_only_a_challenger() -> (
+    None
+):
     decision = MODULE.recommend_operating_mode(
         current_judgement={
             "favored_group": "incumbent",
@@ -701,8 +722,17 @@ def test_build_operating_switch_payload_includes_market_states() -> None:
                 },
             },
         },
-        soft_allocator_payload={"_path": "/tmp/soft.json", "current_state": {"effective_incumbent_exposure": 0.8, "effective_autoresearch_exposure": 0.2}},
-        three_way_allocator_payload={"_path": "/tmp/hard.json", "current_state": {"state": "autoresearch_55_45", "raw_target_state": "incumbent"}},
+        soft_allocator_payload={
+            "_path": "/tmp/soft.json",
+            "current_state": {
+                "effective_incumbent_exposure": 0.8,
+                "effective_autoresearch_exposure": 0.2,
+            },
+        },
+        three_way_allocator_payload={
+            "_path": "/tmp/hard.json",
+            "current_state": {"state": "autoresearch_55_45", "raw_target_state": "incumbent"},
+        },
         operating_plan_payload={"_path": "/tmp/plan.json", **_base_operating_plan()},
         pair_volume_signals=[
             MODULE.SymbolVolumeSignal(
@@ -723,7 +753,10 @@ def test_build_operating_switch_payload_includes_market_states() -> None:
     assert payload["current_market_state"]["trend_state"] == "bearish"
     assert payload["current_market_state"]["volatility_state"] == "calm"
     assert payload["recommended_mode"]["mode"] == "balanced_overlay_mode"
-    assert payload["recommended_mode"]["allocation"] == {"soft_three_way_regime": 0.8, "pair_fast_exit": 0.2}
+    assert payload["recommended_mode"]["allocation"] == {
+        "soft_three_way_regime": 0.8,
+        "pair_fast_exit": 0.2,
+    }
 
 
 def test_build_operating_switch_payload_can_freeze_saved_market_judgement() -> None:
@@ -770,7 +803,11 @@ def test_build_operating_switch_payload_can_freeze_saved_market_judgement() -> N
                 "current_state": {
                     "effective_incumbent_exposure": 0.95,
                     "effective_autoresearch_exposure": 0.05,
-                    "_allocator_health": {"healthy": True, "oos_total_return": 0.0009, "oos_sharpe": 0.74},
+                    "_allocator_health": {
+                        "healthy": True,
+                        "oos_total_return": 0.0009,
+                        "oos_sharpe": 0.74,
+                    },
                 },
             },
             three_way_allocator_payload={
@@ -778,7 +815,11 @@ def test_build_operating_switch_payload_can_freeze_saved_market_judgement() -> N
                 "current_state": {
                     "state": "blend_85_15",
                     "raw_target_state": "incumbent",
-                    "_allocator_health": {"healthy": True, "oos_total_return": 0.0020, "oos_sharpe": 1.31},
+                    "_allocator_health": {
+                        "healthy": True,
+                        "oos_total_return": 0.0020,
+                        "oos_sharpe": 1.31,
+                    },
                 },
             },
             operating_plan_payload={"_path": "/tmp/plan.json", **_base_operating_plan()},
@@ -816,7 +857,11 @@ def test_build_operating_switch_payload_can_freeze_saved_market_judgement() -> N
                     "refreshed_latest_tail": {
                         "split_metrics": {
                             "val": {"total_return": 0.07826, "sharpe": 3.99},
-                            "oos": {"total_return": 0.00482, "sharpe": 3.23, "max_drawdown": 0.00177},
+                            "oos": {
+                                "total_return": 0.00482,
+                                "sharpe": 3.23,
+                                "max_drawdown": 0.00177,
+                            },
                         }
                     }
                 },
@@ -866,10 +911,23 @@ def test_build_operating_switch_payload_passes_as_of_override_to_latest_loader()
         payload = MODULE.build_operating_switch_payload(
             market_judgement_payload={
                 "_path": "/tmp/market.json",
-                "current_judgement": {"date": "2026-03-07T00:00:00+00:00", "favored_group": "incumbent", "confidence": 1.0},
+                "current_judgement": {
+                    "date": "2026-03-07T00:00:00+00:00",
+                    "favored_group": "incumbent",
+                    "confidence": 1.0,
+                },
             },
-            soft_allocator_payload={"_path": "/tmp/soft.json", "current_state": {"effective_incumbent_exposure": 0.95, "effective_autoresearch_exposure": 0.05}},
-            three_way_allocator_payload={"_path": "/tmp/hard.json", "current_state": {"state": "blend_85_15", "raw_target_state": "incumbent"}},
+            soft_allocator_payload={
+                "_path": "/tmp/soft.json",
+                "current_state": {
+                    "effective_incumbent_exposure": 0.95,
+                    "effective_autoresearch_exposure": 0.05,
+                },
+            },
+            three_way_allocator_payload={
+                "_path": "/tmp/hard.json",
+                "current_state": {"state": "blend_85_15", "raw_target_state": "incumbent"},
+            },
             operating_plan_payload={"_path": "/tmp/plan.json", **_base_operating_plan()},
             pair_volume_signals=[
                 MODULE.SymbolVolumeSignal(

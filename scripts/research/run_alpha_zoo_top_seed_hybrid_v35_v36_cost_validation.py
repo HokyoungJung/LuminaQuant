@@ -39,10 +39,10 @@ from scripts.research import run_profit_moonshot_hybrid_v35_v36_fixed_inputs as 
 
 DEFAULT_SOURCE_DIR = high.DEFAULT_ALPHA_V2 / "live_notional_risk_aligned_alpha_zoo_20260518"
 DEFAULT_LIVE_JSON = DEFAULT_SOURCE_DIR / "live_notional_risk_aligned_alpha_zoo_latest.json"
-DEFAULT_CANDIDATE_CSV = DEFAULT_SOURCE_DIR / "alpha_zoo_validation_march_high_leverage_candidates_latest.csv"
-DEFAULT_OUTPUT_DIR = (
-    high.DEFAULT_ALPHA_V2 / "alpha_zoo_top_seed_hybrid_cost_validation_20260518"
+DEFAULT_CANDIDATE_CSV = (
+    DEFAULT_SOURCE_DIR / "alpha_zoo_validation_march_high_leverage_candidates_latest.csv"
 )
+DEFAULT_OUTPUT_DIR = high.DEFAULT_ALPHA_V2 / "alpha_zoo_top_seed_hybrid_cost_validation_20260518"
 REPORT_COST_BPS = (5.0, 10.0)
 STREAM_COST_BPS = (0.0, 5.0, 10.0)
 SPLIT_ORDER = ("train", "validation", "locked_oos")
@@ -101,7 +101,9 @@ def _as_bool(value: Any) -> bool:
     return str(value).strip().lower() in {"1", "true", "yes", "y"}
 
 
-def _candidate_key(candidate_name: Any, leverage: Any, allocation_fraction: Any) -> tuple[str, float, float]:
+def _candidate_key(
+    candidate_name: Any, leverage: Any, allocation_fraction: Any
+) -> tuple[str, float, float]:
     return (
         str(candidate_name),
         round(_safe_float(leverage), 10),
@@ -170,12 +172,9 @@ def _load_candidate_frame(path: Path) -> pd.DataFrame:
             frame[col] = pd.to_numeric(frame[col], errors="coerce")
     for col in ("locked_oos_gate_pass", "live_promotion_possible"):
         frame[col] = frame[col].map(_as_bool)
-    frame["full_compound_return"] = (
-        (1.0 + frame["train_return"])
-        * (1.0 + frame["validation_return"])
-        * (1.0 + frame["locked_oos_return"])
-        - 1.0
-    )
+    frame["full_compound_return"] = (1.0 + frame["train_return"]) * (
+        1.0 + frame["validation_return"]
+    ) * (1.0 + frame["locked_oos_return"]) - 1.0
     frame["filtered_balanced_score"] = (
         10.0 * frame["locked_oos_return"]
         + 2.0 * frame["validation_return"]
@@ -265,7 +264,9 @@ def select_seed_universe(
         )
         bucket_rows: list[dict[str, Any]] = []
         for row in rows:
-            key = _candidate_key(row.get("candidate_name"), row.get("leverage"), row.get("allocation_fraction"))
+            key = _candidate_key(
+                row.get("candidate_name"), row.get("leverage"), row.get("allocation_fraction")
+            )
             by_key.setdefault(key, row)
             bucket_membership[key].append(bucket_name)
             bucket_rows.append(_public_seed_row(row, source_bucket=bucket_name))
@@ -307,7 +308,9 @@ def _public_seed_row(row: Mapping[str, Any], *, source_bucket: str | None = None
         "leverage": _safe_float(row.get("leverage")),
         "allocation_fraction": _safe_float(row.get("allocation_fraction")),
         "label": _candidate_label(row),
-        "frozen_train_validation_rank": int(_safe_float(row.get("frozen_train_validation_rank"), 0.0)),
+        "frozen_train_validation_rank": int(
+            _safe_float(row.get("frozen_train_validation_rank"), 0.0)
+        ),
         "tv_selection_score": _safe_float(row.get("tv_selection_score")),
         "train_return": _safe_float(row.get("train_return")),
         "validation_return": _safe_float(row.get("validation_return")),
@@ -338,7 +341,9 @@ def _find_candidate_row(
         & frame["allocation_fraction"].sub(float(allocation_fraction)).abs().le(1e-12)
     ]
     if target.empty:
-        raise ValueError(f"missing candidate row: {candidate_name} {leverage:g}x/{allocation_fraction:g}")
+        raise ValueError(
+            f"missing candidate row: {candidate_name} {leverage:g}x/{allocation_fraction:g}"
+        )
     return dict(target.iloc[0].to_dict())
 
 
@@ -361,9 +366,13 @@ def _timestamp_seconds(value: Any) -> int:
     return int(ts.timestamp())
 
 
-def _timestamp_arrays(data: pd.DataFrame) -> tuple[np.ndarray, dict[str, np.ndarray], dict[int, int]]:
+def _timestamp_arrays(
+    data: pd.DataFrame,
+) -> tuple[np.ndarray, dict[str, np.ndarray], dict[int, int]]:
     per_ts = data[["timestamp", "split"]].drop_duplicates("timestamp").sort_values("timestamp")
-    timestamps = np.asarray([_timestamp_seconds(ts) for ts in per_ts["timestamp"].tolist()], dtype=np.int64)
+    timestamps = np.asarray(
+        [_timestamp_seconds(ts) for ts in per_ts["timestamp"].tolist()], dtype=np.int64
+    )
     split_values = per_ts["split"].astype(str).to_numpy(dtype=object)
     split_masks = {split: split_values == split for split in SPLIT_ORDER}
     return timestamps, split_masks, {int(ts): idx for idx, ts in enumerate(timestamps.tolist())}
@@ -468,7 +477,9 @@ def _stream_from_trades(
         status = dict(audit_status.get(split) or {})
         metrics["trade_count"] = int(trade_counts.get(split, 0))
         metrics["active_return_hours"] = int(np.count_nonzero(np.abs(full[mask]) > 1e-12))
-        metrics["liquidation_count"] = int(status.get("liquidation_count") or liquidated_by_split.get(split, 0))
+        metrics["liquidation_count"] = int(
+            status.get("liquidation_count") or liquidated_by_split.get(split, 0)
+        )
         metrics["account_wipeout_count"] = int(status.get("account_wipeout_count") or 0)
         metrics["minimum_margin_buffer"] = status.get("minimum_margin_buffer")
         metrics["margin_buffer_positive"] = bool(status.get("margin_buffer_positive", True))
@@ -528,7 +539,9 @@ def _build_trade_cache(
     return cache
 
 
-def _gate_reasons(metrics: Mapping[str, Any], *, strict_zero_liquidation: bool = False) -> list[str]:
+def _gate_reasons(
+    metrics: Mapping[str, Any], *, strict_zero_liquidation: bool = False
+) -> list[str]:
     reasons: list[str] = []
     if _safe_float(metrics.get("max_drawdown"), 1.0) > high.OOS_MDD_BUDGET:
         reasons.append("mdd_above_25pct")
@@ -539,9 +552,10 @@ def _gate_reasons(metrics: Mapping[str, Any], *, strict_zero_liquidation: bool =
             reasons.append(f"{key}_non_positive")
     if int(metrics.get("account_wipeout_count") or 0) > 0:
         reasons.append("account_wipeout_count_positive")
-    if metrics.get("minimum_margin_buffer") is not None and _safe_float(
-        metrics.get("minimum_margin_buffer"), -1.0
-    ) <= 0.0:
+    if (
+        metrics.get("minimum_margin_buffer") is not None
+        and _safe_float(metrics.get("minimum_margin_buffer"), -1.0) <= 0.0
+    ):
         reasons.append("minimum_margin_buffer_non_positive")
     if strict_zero_liquidation and int(metrics.get("liquidation_count") or 0) > 0:
         reasons.append("strict_zero_liquidation_count_positive")
@@ -576,7 +590,9 @@ def _metric_rows_for_model(
                 "role": role,
                 "candidate_name": candidate_name,
                 "leverage": "" if leverage is None else float(leverage),
-                "allocation_fraction": "" if allocation_fraction is None else float(allocation_fraction),
+                "allocation_fraction": ""
+                if allocation_fraction is None
+                else float(allocation_fraction),
                 "round_trip_slippage_fee_bps": float(cost_bps),
                 "split": split,
                 "total_return": _safe_float(metrics.get("total_return")),
@@ -626,7 +642,9 @@ def _public_hybrid_result(
     hybrid._attach_integrated_margin_to_splits(public, margin)
     for split, metrics in dict(public.get("splits") or {}).items():
         mask = np.asarray(split_masks[split], dtype=bool)
-        metrics["account_wipeout_count"] = _split_account_wipeout_count_from_returns(portfolio, mask)
+        metrics["account_wipeout_count"] = _split_account_wipeout_count_from_returns(
+            portfolio, mask
+        )
         metrics["active_return_hours"] = int(np.count_nonzero(np.abs(portfolio[mask]) > 1e-12))
         public["splits"][split] = metrics
     public["integrated_margin_replay"] = margin
@@ -645,7 +663,9 @@ def _public_hybrid_result(
 def _write_csv(path: Path, rows: Sequence[Mapping[str, Any]], fieldnames: Sequence[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="utf-8") as fh:
-        writer = csv.DictWriter(fh, fieldnames=list(fieldnames), extrasaction="ignore", lineterminator="\n")
+        writer = csv.DictWriter(
+            fh, fieldnames=list(fieldnames), extrasaction="ignore", lineterminator="\n"
+        )
         writer.writeheader()
         for row in rows:
             writer.writerow({key: _json_safe(row.get(key)) for key in fieldnames})
@@ -726,7 +746,9 @@ def _fmt_num(value: Any) -> str:
     return f"{parsed:.4f}"
 
 
-def _build_alpha_runtime(args: argparse.Namespace, live_payload: Mapping[str, Any]) -> dict[str, Any]:
+def _build_alpha_runtime(
+    args: argparse.Namespace, live_payload: Mapping[str, Any]
+) -> dict[str, Any]:
     split_contract = high._split_contract(args)
     bundle = common.load_real_data_bundle(
         input_path=args.input,
@@ -735,13 +757,17 @@ def _build_alpha_runtime(args: argparse.Namespace, live_payload: Mapping[str, An
         strict_real_data=True,
     )
     common_frame = common.apply_common_split(bundle.frame, split_contract=split_contract)
-    common_frame = common.add_split_bounded_forward_return_label(common_frame, horizon=int(args.horizon))
+    common_frame = common.add_split_bounded_forward_return_label(
+        common_frame, horizon=int(args.horizon)
+    )
     alpha = common._load_module(
         REPO_ROOT / "scripts/research/replay_crypto_fx_alpha_zoo_state.py",
         "alpha_zoo_top_seed_hybrid_cost_validation_alpha_replay",
     )
     old_replay = common._load_json(Path(args.old_alpha_replay_json))
-    calibration_path = Path(str(live_payload.get("calibration_payload_path") or args.alpha_calibration_json))
+    calibration_path = Path(
+        str(live_payload.get("calibration_payload_path") or args.alpha_calibration_json)
+    )
     calibrated_edges = alpha._load_calibrated_edges(calibration_path)
     data = alpha._ensure_replay_frame(common_frame)
     timestamps, split_masks, ts_to_idx = _timestamp_arrays(data)
@@ -839,7 +865,9 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     for cost_bps in REPORT_COST_BPS:
         cost_streams = streams_by_cost[float(cost_bps)]
         seed_streams = [cost_streams[key] for key in seed_keys]
-        returns = np.column_stack([np.asarray(stream["returns"], dtype=float) for stream in seed_streams])
+        returns = np.column_stack(
+            [np.asarray(stream["returns"], dtype=float) for stream in seed_streams]
+        )
         labels = [str(stream["label"]) for stream in seed_streams]
         v35 = hybrid._run_optuna(
             returns,

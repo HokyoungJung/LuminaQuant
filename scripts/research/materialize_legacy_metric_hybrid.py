@@ -34,7 +34,8 @@ DEFAULT_FULL_UNIVERSE_REPORT = (
 DEFAULT_OUTPUT_DIR = GROUP_ROOT / "legacy_metric_live_materialization_20260426"
 LIVE_IMPLEMENTABLE_OUTPUT_DIR = GROUP_ROOT / "live_implementable_selection_20260426"
 WAVE2_PAIR_RESEARCH_PATH = (
-    REPO_ROOT / "var/reports/portfolio_superiority_wave2/candidate_research_wave2_filtered_latest.json"
+    REPO_ROOT
+    / "var/reports/portfolio_superiority_wave2/candidate_research_wave2_filtered_latest.json"
 )
 WAVE2_PAIR_NAME = "pair_spread_1h_exec_tightstop_tp_bnbusdt_trxusdt_2.2_0.55"
 MDD_CAP = 0.25
@@ -161,7 +162,9 @@ def _score_from_metrics(metrics: dict[str, dict[str, Any]]) -> dict[str, float]:
     }
 
 
-def _split_metrics_from_streams(streams: dict[str, list[dict[str, Any]]]) -> dict[str, dict[str, float]]:
+def _split_metrics_from_streams(
+    streams: dict[str, list[dict[str, Any]]],
+) -> dict[str, dict[str, float]]:
     return _HYBRID._split_metrics_from_streams(streams)
 
 
@@ -221,11 +224,15 @@ def _make_payload_sleeve_row(
 
 def _load_wave2_pair_row() -> tuple[dict[str, Any], Path]:
     payload = _load_json(WAVE2_PAIR_RESEARCH_PATH)
-    candidates = [dict(row) for row in list(payload.get("candidates") or []) if isinstance(row, dict)]
+    candidates = [
+        dict(row) for row in list(payload.get("candidates") or []) if isinstance(row, dict)
+    ]
     for row in candidates:
         if str(row.get("name") or "") == WAVE2_PAIR_NAME:
             return row, WAVE2_PAIR_RESEARCH_PATH
-    raise RuntimeError(f"wave2 pair candidate {WAVE2_PAIR_NAME} not found in {WAVE2_PAIR_RESEARCH_PATH}")
+    raise RuntimeError(
+        f"wave2 pair candidate {WAVE2_PAIR_NAME} not found in {WAVE2_PAIR_RESEARCH_PATH}"
+    )
 
 
 def _make_wave2_sleeve_row(*, split_config: Any) -> dict[str, Any]:
@@ -298,7 +305,8 @@ def _build_sleeve_rows(*, split_config: Any) -> list[dict[str, Any]]:
             "portfolio",
         ),
         "state_vwap_pair": (
-            GROUP_ROOT / "portfolio_superiority_dense_pairs_current/state_vwap_pair_candidate_latest.json",
+            GROUP_ROOT
+            / "portfolio_superiority_dense_pairs_current/state_vwap_pair_candidate_latest.json",
             "PairSpreadZScoreStrategy",
             "market_neutral_pair",
         ),
@@ -331,7 +339,9 @@ def _source_sleeve_metrics(rows: list[dict[str, Any]]) -> dict[str, dict[str, An
             "family": str(row.get("family") or ""),
             "strategy_timeframe": str(row.get("strategy_timeframe") or ""),
             "symbols": list(row.get("symbols") or []),
-            "source_payload_path": str(dict(row.get("metadata") or {}).get("source_payload_path") or ""),
+            "source_payload_path": str(
+                dict(row.get("metadata") or {}).get("source_payload_path") or ""
+            ),
             "train": dict(row.get("train") or {}),
             "val": dict(row.get("val") or {}),
             "oos": dict(row.get("oos") or {}),
@@ -361,7 +371,11 @@ def _allocation_summary(allocations: list[dict[str, Any]]) -> dict[str, Any]:
             }
         )
         average_weights_by_split[split] = {
-            name: float(np.mean([_safe_float(dict(item.get("weights") or {}).get(name), 0.0) for item in items]))
+            name: float(
+                np.mean(
+                    [_safe_float(dict(item.get("weights") or {}).get(name), 0.0) for item in items]
+                )
+            )
             for name in names
         }
         average_cash_by_split[split] = float(
@@ -488,7 +502,9 @@ def _live_candidate_rows(
 ) -> list[dict[str, Any]]:
     candidates: list[dict[str, Any]] = []
 
-    def add_static(name: str, weights: dict[str, float], cash_weight: float = 0.0, caveat: str = "") -> None:
+    def add_static(
+        name: str, weights: dict[str, float], cash_weight: float = 0.0, caveat: str = ""
+    ) -> None:
         replay = _frozen_final_allocation_replay(
             name=name,
             weights=weights,
@@ -525,7 +541,9 @@ def _live_candidate_rows(
     )
     add_static("risk_off_mode", {}, cash_weight=1.0)
 
-    current_hybrid_path = GROUP_ROOT / "portfolio_hybrid_online_current/hybrid_online_portfolio_latest.json"
+    current_hybrid_path = (
+        GROUP_ROOT / "portfolio_hybrid_online_current/hybrid_online_portfolio_latest.json"
+    )
     if current_hybrid_path.exists():
         current_hybrid = _load_json(current_hybrid_path)
         current_final = dict(
@@ -536,7 +554,10 @@ def _live_candidate_rows(
         )
         add_static(
             "hybrid_guarded_mode",
-            {str(k): _safe_float(v, 0.0) for k, v in dict(current_final.get("weights") or {}).items()},
+            {
+                str(k): _safe_float(v, 0.0)
+                for k, v in dict(current_final.get("weights") or {}).items()
+            },
             cash_weight=_safe_float(current_final.get("cash_weight"), 0.0),
             caveat="current live HYBRID mode uses the latest saved final allocation, not the dynamic allocator path",
         )
@@ -703,7 +724,9 @@ def _write_wave2_live_candidate(output_dir: Path) -> Path:
         "source_path": _display_path(source_path),
     }
     path = output_dir / "wave2_pair_live_candidate_latest.json"
-    path.write_text(json.dumps(thin, indent=2, sort_keys=True, default=_json_default), encoding="utf-8")
+    path.write_text(
+        json.dumps(thin, indent=2, sort_keys=True, default=_json_default), encoding="utf-8"
+    )
     return path
 
 
@@ -879,7 +902,10 @@ def build_materialization_report(
     final_allocation = dict(materialized_result.get("final_allocation") or {})
     frozen_replay = _frozen_final_allocation_replay(
         name="legacy_no_highvol_hybrid_mode",
-        weights={str(k): _safe_float(v, 0.0) for k, v in dict(final_allocation.get("weights") or {}).items()},
+        weights={
+            str(k): _safe_float(v, 0.0)
+            for k, v in dict(final_allocation.get("weights") or {}).items()
+        },
         rows_by_name=rows_by_name,
         split_config=split_config,
         cash_weight=_safe_float(final_allocation.get("cash_weight"), 0.0),

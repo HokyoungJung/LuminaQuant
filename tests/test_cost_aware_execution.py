@@ -19,7 +19,9 @@ def test_no_close_fill_basis_enforced_to_next_open():
         sigma=0.01,
         bar_volume=1_000.0,
         params=CostModelParams(spread_bps=2.0, impact_k=1.0, fees_bps=1.0),
-        policy=ExecutionPolicy(fill_basis="next_open", max_participation=1.0, unfilled_policy="carry", carry_decay=1.0),
+        policy=ExecutionPolicy(
+            fill_basis="next_open", max_participation=1.0, unfilled_policy="carry", carry_decay=1.0
+        ),
     )
     assert abs(fill.basis_price - 101.0) < 1e-9
 
@@ -36,7 +38,9 @@ def test_participation_cap_and_carry_drop_policy():
         sigma=0.01,
         bar_volume=100.0,
         params=params,
-        policy=ExecutionPolicy(fill_basis="next_open", max_participation=0.1, unfilled_policy="carry", carry_decay=1.0),
+        policy=ExecutionPolicy(
+            fill_basis="next_open", max_participation=0.1, unfilled_policy="carry", carry_decay=1.0
+        ),
     )
     assert abs(carry_fill.executed_notional) <= 1000.0 + 1e-9
     assert carry_fill.next_pending_notional > 0.0
@@ -51,7 +55,9 @@ def test_participation_cap_and_carry_drop_policy():
         sigma=0.01,
         bar_volume=100.0,
         params=params,
-        policy=ExecutionPolicy(fill_basis="next_open", max_participation=0.1, unfilled_policy="drop", carry_decay=1.0),
+        policy=ExecutionPolicy(
+            fill_basis="next_open", max_participation=0.1, unfilled_policy="drop", carry_decay=1.0
+        ),
     )
     assert drop_fill.next_pending_notional == 0.0
 

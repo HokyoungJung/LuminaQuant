@@ -8,7 +8,9 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT / "scripts" / "research" / "run_alpha_zoo_four_lane_shadow_discovery.py"
-SPEC = importlib.util.spec_from_file_location("run_alpha_zoo_four_lane_shadow_discovery", MODULE_PATH)
+SPEC = importlib.util.spec_from_file_location(
+    "run_alpha_zoo_four_lane_shadow_discovery", MODULE_PATH
+)
 assert SPEC is not None and SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = MODULE
@@ -33,8 +35,12 @@ def test_four_lane_shadow_discovery_builds_paper_only_bundle(tmp_path: Path) -> 
     }
     assert lanes["active"]["target_notional_fraction_of_equity"] == pytest.approx(1.4)
     assert lanes["balanced"]["target_notional_fraction_of_equity"] == pytest.approx(1.05)
-    assert lanes["validation_return_leader"]["target_notional_fraction_of_equity"] == pytest.approx(1.0)
-    assert lanes["validation_efficiency_reference"]["target_notional_fraction_of_equity"] == pytest.approx(0.7)
+    assert lanes["validation_return_leader"]["target_notional_fraction_of_equity"] == pytest.approx(
+        1.0
+    )
+    assert lanes["validation_efficiency_reference"][
+        "target_notional_fraction_of_equity"
+    ] == pytest.approx(0.7)
     assert all(row["notional_parity_passed"] for row in lanes.values())
     assert all(row["ready_for_paper"] for row in lanes.values())
     assert not any(row["ready_for_real"] for row in lanes.values())
@@ -43,12 +49,17 @@ def test_four_lane_shadow_discovery_builds_paper_only_bundle(tmp_path: Path) -> 
     assert conservative[0]["validation_return"] > 0.20
     assert conservative[0]["locked_oos_return"] < 0.0
     assert conservative[0]["shadow_status"] == "shadow_only_locked_oos_negative"
-    assert payload["strategy_findings"]["conservative_exit_top_validation_locked_oos_positive_count"] == 0
+    assert (
+        payload["strategy_findings"]["conservative_exit_top_validation_locked_oos_positive_count"]
+        == 0
+    )
 
     side_family = payload["shadow_discovery"]["side_family_threshold_hypotheses"]
     assert side_family[0]["validation_return"] > 0.05
     assert side_family[0]["locked_oos_return"] < 0.0
-    assert payload["strategy_findings"]["side_family_positive_oos_zero_liq_in_top_shadow_count"] == 0
+    assert (
+        payload["strategy_findings"]["side_family_positive_oos_zero_liq_in_top_shadow_count"] == 0
+    )
 
     quality = payload["shadow_discovery"]["quality_single_pair_surface"]
     assert quality["top_live_quality_candidates"][0]["model_id"] == (

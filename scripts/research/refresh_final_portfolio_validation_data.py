@@ -17,7 +17,10 @@ from pathlib import Path
 from typing import Any
 
 import polars as pl
-from lumina_quant.data.native_raw_first_backend import RAW_FIRST_BACKEND_ENV, raw_first_backend_diagnostics
+from lumina_quant.data.native_raw_first_backend import (
+    RAW_FIRST_BACKEND_ENV,
+    raw_first_backend_diagnostics,
+)
 from lumina_quant.data.support_inventory import (
     INVENTORY_NOTES,
     build_strategy_support_inventory,
@@ -63,15 +66,24 @@ DEFAULT_EXCHANGE_ID = "binance"
 DEFAULT_OUTPUT_JSON = FOLLOWUP_ROOT / "final_portfolio_validation_data_refresh_latest.json"
 DEFAULT_OUTPUT_MD = FOLLOWUP_ROOT / "final_portfolio_validation_data_refresh_latest.md"
 DEFAULT_RSS_LOG = FOLLOWUP_ROOT / "final_portfolio_validation_data_refresh_rss_latest.jsonl"
-DEFAULT_SUPPORT_INVENTORY_JSON = FOLLOWUP_ROOT / "final_portfolio_validation_support_inventory_latest.json"
-DEFAULT_SUPPORT_INVENTORY_CSV = FOLLOWUP_ROOT / "final_portfolio_validation_support_inventory_latest.csv"
+DEFAULT_SUPPORT_INVENTORY_JSON = (
+    FOLLOWUP_ROOT / "final_portfolio_validation_support_inventory_latest.json"
+)
+DEFAULT_SUPPORT_INVENTORY_CSV = (
+    FOLLOWUP_ROOT / "final_portfolio_validation_support_inventory_latest.csv"
+)
 DEFAULT_MIN_START_UTC = "2025-01-01T00:00:00Z"
 DEFAULT_SAFE_SESSION_MEMORY_CAP_BYTES = DEFAULT_EXECUTION_MEMORY_POLICY.total_memory_cap_bytes
-DEFAULT_HEAVY_RUN_MEMORY_BUDGET_BYTES = gib_to_bytes(DEFAULT_EXECUTION_MEMORY_POLICY.heavy_run_cap_gib)
+DEFAULT_HEAVY_RUN_MEMORY_BUDGET_BYTES = gib_to_bytes(
+    DEFAULT_EXECUTION_MEMORY_POLICY.heavy_run_cap_gib
+)
 DEFAULT_SOFT_RSS_BYTES = int(DEFAULT_HEAVY_RUN_MEMORY_BUDGET_BYTES * 0.9)
 DEFAULT_PARALLEL_WORKER_MEMORY_BYTES = int(2.0 * 1024 * 1024 * 1024)
 DEFAULT_PARALLEL_MEMORY_RESERVE_BYTES = max(
-    gib_to_bytes(DEFAULT_EXECUTION_MEMORY_POLICY.total_memory_cap_gib - DEFAULT_EXECUTION_MEMORY_POLICY.heavy_run_cap_gib),
+    gib_to_bytes(
+        DEFAULT_EXECUTION_MEMORY_POLICY.total_memory_cap_gib
+        - DEFAULT_EXECUTION_MEMORY_POLICY.heavy_run_cap_gib
+    ),
     int(1.5 * 1024 * 1024 * 1024),
 )
 DEFAULT_RECENT_ARCHIVE_LIVE_CUTOVER_DAYS = 3
@@ -179,7 +191,12 @@ def _canonicalize_refresh_symbols(symbols: list[str] | tuple[str, ...] | None) -
 
 def _latest_feature_partition_day(symbol: str, *, db_path: str, exchange_id: str) -> date | None:
     compact = _canonical_refresh_symbol(symbol).replace("/", "")
-    root = Path(db_path) / "feature_points" / f"exchange={str(exchange_id).lower()}" / f"symbol={compact}"
+    root = (
+        Path(db_path)
+        / "feature_points"
+        / f"exchange={str(exchange_id).lower()}"
+        / f"symbol={compact}"
+    )
     latest: date | None = None
     for path in root.glob("date=*"):
         if not path.is_dir() or "=" not in path.name:
@@ -192,15 +209,21 @@ def _latest_feature_partition_day(symbol: str, *, db_path: str, exchange_id: str
     return latest
 
 
-def feature_resume_start(symbol: str, *, db_path: str, exchange_id: str, floor_dt: datetime) -> datetime:
+def feature_resume_start(
+    symbol: str, *, db_path: str, exchange_id: str, floor_dt: datetime
+) -> datetime:
     latest_day = _latest_feature_partition_day(symbol, db_path=db_path, exchange_id=exchange_id)
     if latest_day is None:
         return floor_dt
     return max(floor_dt, _day_start(latest_day))
 
 
-def load_portfolio_symbols(portfolio_path: Path | str = PORTFOLIO_CURRENT_OPTIMIZATION) -> list[str]:
-    payload = json.loads(resolve_current_optimization_path(portfolio_path).read_text(encoding="utf-8"))
+def load_portfolio_symbols(
+    portfolio_path: Path | str = PORTFOLIO_CURRENT_OPTIMIZATION,
+) -> list[str]:
+    payload = json.loads(
+        resolve_current_optimization_path(portfolio_path).read_text(encoding="utf-8")
+    )
     ordered: dict[str, None] = {}
     for row in list(payload.get("weights") or []):
         for symbol in list(row.get("symbols") or []):
@@ -241,9 +264,15 @@ def parse_symbol_tokens(value: str | None, *, default: list[str] | None = None) 
     return list(ordered)
 
 
-def prioritize_symbols(symbols: list[str], *, priority_symbols: list[str] | None = None) -> list[str]:
+def prioritize_symbols(
+    symbols: list[str], *, priority_symbols: list[str] | None = None
+) -> list[str]:
     ordered: dict[str, None] = {}
-    priorities = [_canonical_refresh_symbol(symbol) for symbol in list(priority_symbols or []) if str(symbol).strip()]
+    priorities = [
+        _canonical_refresh_symbol(symbol)
+        for symbol in list(priority_symbols or [])
+        if str(symbol).strip()
+    ]
     symbol_set = {_canonical_refresh_symbol(symbol) for symbol in list(symbols or [])}
     for symbol in priorities:
         if symbol in symbol_set:
@@ -321,13 +350,17 @@ def _build_source_skew_summary(results: list[OhlcvRefreshResult]) -> dict[str, A
     ]
     return {
         "symbols_with_live_tail": [
-            row.symbol for row in rows if str(row.live_tail_status or "").strip().lower() == "fetched"
+            row.symbol
+            for row in rows
+            if str(row.live_tail_status or "").strip().lower() == "fetched"
         ],
         "unsupported_live_tail_symbols": unsupported,
         "top_live_fetch_seconds": [
             {
                 "symbol": row.symbol,
-                "seconds": round(float((row.stage_timings_seconds or {}).get("live_fetch", 0.0) or 0.0), 6),
+                "seconds": round(
+                    float((row.stage_timings_seconds or {}).get("live_fetch", 0.0) or 0.0), 6
+                ),
             }
             for row in by_live_fetch[:5]
             if float((row.stage_timings_seconds or {}).get("live_fetch", 0.0) or 0.0) > 0.0
@@ -335,7 +368,9 @@ def _build_source_skew_summary(results: list[OhlcvRefreshResult]) -> dict[str, A
         "top_total_refresh_seconds": [
             {
                 "symbol": row.symbol,
-                "seconds": round(float((row.stage_timings_seconds or {}).get("total_refresh", 0.0) or 0.0), 6),
+                "seconds": round(
+                    float((row.stage_timings_seconds or {}).get("total_refresh", 0.0) or 0.0), 6
+                ),
             }
             for row in by_total[:5]
             if float((row.stage_timings_seconds or {}).get("total_refresh", 0.0) or 0.0) > 0.0
@@ -348,7 +383,9 @@ def resolve_effective_memory_budget_bytes(requested_budget_bytes: int) -> tuple[
     system_budget = resolve_memory_budget_bytes()
     effective = min(int(DEFAULT_HEAVY_RUN_MEMORY_BUDGET_BYTES), requested)
     if system_budget is not None and system_budget > 0:
-        effective = min(int(effective), int(system_budget), int(DEFAULT_SAFE_SESSION_MEMORY_CAP_BYTES))
+        effective = min(
+            int(effective), int(system_budget), int(DEFAULT_SAFE_SESSION_MEMORY_CAP_BYTES)
+        )
     else:
         effective = min(int(effective), int(DEFAULT_SAFE_SESSION_MEMORY_CAP_BYTES))
     return max(1, int(effective)), (None if system_budget is None else int(system_budget))
@@ -459,8 +496,12 @@ def estimate_parallel_workers(
     available = max(per_worker, budget - reserve)
     budget_limited = max(1, available // per_worker)
     cpu_limited = max(1, int(max_workers))
-    policy_limited = max(1, int(getattr(DEFAULT_EXECUTION_MEMORY_POLICY, 'light_worker_parallelism', 2) or 2))
-    return max(1, min(int(symbol_count), int(budget_limited), int(cpu_limited), int(policy_limited)))
+    policy_limited = max(
+        1, int(getattr(DEFAULT_EXECUTION_MEMORY_POLICY, "light_worker_parallelism", 2) or 2)
+    )
+    return max(
+        1, min(int(symbol_count), int(budget_limited), int(cpu_limited), int(policy_limited))
+    )
 
 
 def _process_peak_rss_bytes() -> int:
@@ -471,7 +512,9 @@ def _process_peak_rss_bytes() -> int:
     return peak * 1024
 
 
-def _last_close(repo: ParquetMarketDataRepository, *, symbol: str, max_dt: datetime | None) -> float | None:
+def _last_close(
+    repo: ParquetMarketDataRepository, *, symbol: str, max_dt: datetime | None
+) -> float | None:
     if max_dt is None:
         return None
     frame = repo.load_ohlcv(
@@ -506,15 +549,14 @@ def _raw_checkpoint_utc(
         latest = datetime.fromtimestamp(ts_ms / 1000.0, tz=UTC)
 
     compact = _canonical_refresh_symbol(symbol).replace("/", "")
-    root = (
-        Path(db_path)
-        / "market_data_raw_aggtrades"
-        / str(exchange_id).lower()
-        / compact
-    )
+    root = Path(db_path) / "market_data_raw_aggtrades" / str(exchange_id).lower() / compact
     for path in sorted(root.glob("date=*/part-*.parquet"), reverse=True):
         try:
-            frame = pl.scan_parquet(str(path)).select(pl.col("timestamp_ms").max().alias("ts")).collect()
+            frame = (
+                pl.scan_parquet(str(path))
+                .select(pl.col("timestamp_ms").max().alias("ts"))
+                .collect()
+            )
             file_ts = int(frame["ts"][0] or 0)
         except BaseException:
             continue
@@ -623,7 +665,9 @@ def _collect_live_raw_rows(
     cursor = max(0, int(start_ms))
     until = max(cursor, int(end_ms))
     current_limit = max(1, int(limit))
-    resolved_pause_sec = _live_raw_batch_pause_seconds() if pause_sec is None else max(0.0, float(pause_sec))
+    resolved_pause_sec = (
+        _live_raw_batch_pause_seconds() if pause_sec is None else max(0.0, float(pause_sec))
+    )
     last_trade_id = -1
     seen: set[tuple[int, int]] = set()
     out: list[dict[str, Any]] = []
@@ -648,7 +692,11 @@ def _collect_live_raw_rows(
                     raise LiveRawSymbolUnsupportedError(
                         f"Binance Futures live aggTrades do not support {symbol}."
                     ) from exc
-                if "429" in message or "Too Many Requests" in message or "DDoSProtection" in message:
+                if (
+                    "429" in message
+                    or "Too Many Requests" in message
+                    or "DDoSProtection" in message
+                ):
                     current_limit = max(100, current_limit // 2)
                     time.sleep(max(float(base_wait_sec), 5.0))
                     continue
@@ -701,7 +749,9 @@ def _collect_live_raw_rows(
 
 
 def _record_stage_duration(metrics: dict[str, float], key: str, started_at: float) -> None:
-    metrics[str(key)] = float(metrics.get(str(key), 0.0)) + max(0.0, time.perf_counter() - started_at)
+    metrics[str(key)] = float(metrics.get(str(key), 0.0)) + max(
+        0.0, time.perf_counter() - started_at
+    )
 
 
 def refresh_symbol_raw_first_ohlcv(
@@ -719,7 +769,11 @@ def refresh_symbol_raw_first_ohlcv(
     _, before_max = repo.get_symbol_time_range(exchange=exchange_id, symbol=symbol)
     before_max_utc = None
     if before_max is not None:
-        before_max_utc = before_max.replace(tzinfo=UTC) if before_max.tzinfo is None else before_max.astimezone(UTC)
+        before_max_utc = (
+            before_max.replace(tzinfo=UTC)
+            if before_max.tzinfo is None
+            else before_max.astimezone(UTC)
+        )
     before_raw_dt = _raw_checkpoint_utc(
         repo,
         db_path=db_path,
@@ -946,8 +1000,12 @@ def refresh_symbol_raw_first_ohlcv(
         live_raw_rows_upserted=live_raw_rows_upserted,
         live_tail_status=live_tail_status,
         derived_ohlcv_rows_upserted=derived_ohlcv_rows_upserted,
-        source_mix=source_mix if not archive_cutover_to_live else f"{source_mix}_recent_archive_cutover",
-        stage_timings_seconds={key: round(float(value), 6) for key, value in sorted(stage_timings_seconds.items())},
+        source_mix=source_mix
+        if not archive_cutover_to_live
+        else f"{source_mix}_recent_archive_cutover",
+        stage_timings_seconds={
+            key: round(float(value), 6) for key, value in sorted(stage_timings_seconds.items())
+        },
     )
 
 
@@ -998,8 +1056,8 @@ def refresh_ohlcv_symbols(
         return [], {"requested_workers": 0, "selected_workers": 0, "mode": "empty"}
 
     requested_workers = max(1, int(max_workers))
-    effective_memory_budget_bytes, system_memory_budget_bytes = resolve_effective_memory_budget_bytes(
-        int(memory_budget_bytes)
+    effective_memory_budget_bytes, system_memory_budget_bytes = (
+        resolve_effective_memory_budget_bytes(int(memory_budget_bytes))
     )
     selected_workers = estimate_parallel_workers(
         symbol_count=len(ordered_symbols),
@@ -1094,7 +1152,9 @@ def refresh_feature_tail(
     floor_dt: datetime,
 ) -> FeatureRefreshResult:
     latest_before = _latest_feature_partition_day(symbol, db_path=db_path, exchange_id=exchange_id)
-    resume_dt = feature_resume_start(symbol, db_path=db_path, exchange_id=exchange_id, floor_dt=floor_dt)
+    resume_dt = feature_resume_start(
+        symbol, db_path=db_path, exchange_id=exchange_id, floor_dt=floor_dt
+    )
     summaries = sync_futures_feature_points(
         db_path=db_path,
         exchange_id=exchange_id,
@@ -1115,8 +1175,12 @@ def refresh_feature_tail(
         resume_start_utc=iso_utc(resume_dt) or "",
         cutoff_utc=iso_utc(cutoff_dt) or "",
         upserted_rows=int(getattr(summary, "upserted_rows", 0) or 0),
-        first_timestamp_utc=iso_utc(datetime.fromtimestamp(first_ts / 1000.0, tz=UTC) if first_ts else None),
-        last_timestamp_utc=iso_utc(datetime.fromtimestamp(last_ts / 1000.0, tz=UTC) if last_ts else None),
+        first_timestamp_utc=iso_utc(
+            datetime.fromtimestamp(first_ts / 1000.0, tz=UTC) if first_ts else None
+        ),
+        last_timestamp_utc=iso_utc(
+            datetime.fromtimestamp(last_ts / 1000.0, tz=UTC) if last_ts else None
+        ),
     )
 
 
@@ -1291,8 +1355,8 @@ def main(argv: list[str] | None = None) -> int:
         priority_symbols=parse_symbol_tokens(args.priority_symbols),
     )
     feature_symbols = load_feature_symbols(bundle_override)
-    effective_memory_budget_bytes, system_memory_budget_bytes = resolve_effective_memory_budget_bytes(
-        int(args.memory_budget_bytes)
+    effective_memory_budget_bytes, system_memory_budget_bytes = (
+        resolve_effective_memory_budget_bytes(int(args.memory_budget_bytes))
     )
 
     guard = RSSGuard(
@@ -1400,7 +1464,9 @@ def main(argv: list[str] | None = None) -> int:
                 symbols=feature_symbols,
             )
             if feature_symbols
-            else _empty_inventory_payload(db_path=str(args.db_path), exchange_id=str(args.exchange_id))
+            else _empty_inventory_payload(
+                db_path=str(args.db_path), exchange_id=str(args.exchange_id)
+            )
         )
         inventory_outputs = write_strategy_support_inventory(
             payload=inventory_payload,

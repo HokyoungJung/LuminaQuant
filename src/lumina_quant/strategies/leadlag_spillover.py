@@ -47,9 +47,15 @@ class LeadLagSpilloverStrategy(Strategy):
             "entry_score": HyperParam.floating("entry_score", default=0.35, low=0.01, high=5.0),
             "exit_score": HyperParam.floating("exit_score", default=0.08, low=0.0, high=2.0),
             "max_hold_bars": HyperParam.integer("max_hold_bars", default=32, low=1, high=100_000),
-            "stop_loss_pct": HyperParam.floating("stop_loss_pct", default=0.02, low=0.001, high=0.5),
-            "max_realized_vol": HyperParam.floating("max_realized_vol", default=0.08, low=0.001, high=2.0),
-            "min_range_pct": HyperParam.floating("min_range_pct", default=0.0001, low=0.0, high=1.0),
+            "stop_loss_pct": HyperParam.floating(
+                "stop_loss_pct", default=0.02, low=0.001, high=0.5
+            ),
+            "max_realized_vol": HyperParam.floating(
+                "max_realized_vol", default=0.08, low=0.001, high=2.0
+            ),
+            "min_range_pct": HyperParam.floating(
+                "min_range_pct", default=0.0001, low=0.0, high=1.0
+            ),
             "allow_short": HyperParam.boolean("allow_short", default=True),
             # Backwards-compatible aliases.
             "entry_spillover": HyperParam.floating(
@@ -222,7 +228,9 @@ class LeadLagSpilloverStrategy(Strategy):
             return 0.0
         return max(0.0, float(high - low) / float(close))
 
-    def _emit(self, symbol, event_time, signal_type, *, stop_loss=None, strength=1.0, metadata=None):
+    def _emit(
+        self, symbol, event_time, signal_type, *, stop_loss=None, strength=1.0, metadata=None
+    ):
         self.events.put(
             SignalEvent(
                 strategy_id="leadlag_spillover",
@@ -263,7 +271,8 @@ class LeadLagSpilloverStrategy(Strategy):
         price_map = {
             sym: list(state.closes)
             for sym, state in self._state.items()
-            if sym not in _METALS and len(state.closes) >= max(32, self.window // LEADLAG_WINDOW_DIVISOR)
+            if sym not in _METALS
+            and len(state.closes) >= max(32, self.window // LEADLAG_WINDOW_DIVISOR)
         }
         if symbol in _METALS:
             return
@@ -323,7 +332,9 @@ class LeadLagSpilloverStrategy(Strategy):
                 or (float(close) >= float(item.entry_price or close) * (1.0 + self.stop_loss_pct))
             )
             if should_exit:
-                self._emit(symbol, event_time, "EXIT", metadata={**metadata, "reason": "short_exit"})
+                self._emit(
+                    symbol, event_time, "EXIT", metadata={**metadata, "reason": "short_exit"}
+                )
                 item.mode = "OUT"
                 item.entry_price = None
                 item.bars_held = 0

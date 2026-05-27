@@ -26,7 +26,9 @@ class _ConfigStub:
 
 
 def test_exit_signal_uses_component_scoped_position_not_total_symbol_position() -> None:
-    portfolio = Portfolio(_BarsStub(), SimpleNamespace(put=lambda event: None), "2026-04-17T00:00:00Z", _ConfigStub())
+    portfolio = Portfolio(
+        _BarsStub(), SimpleNamespace(put=lambda event: None), "2026-04-17T00:00:00Z", _ConfigStub()
+    )
 
     portfolio.update_fill(
         FillEvent(

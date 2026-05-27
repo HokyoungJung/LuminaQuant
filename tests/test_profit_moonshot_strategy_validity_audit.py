@@ -8,14 +8,18 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 FINAL_PATH = ROOT / "scripts" / "research" / "write_profit_moonshot_live_final_selection.py"
-FINAL_SPEC = importlib.util.spec_from_file_location("write_profit_moonshot_live_final_selection_for_validity_tests", FINAL_PATH)
+FINAL_SPEC = importlib.util.spec_from_file_location(
+    "write_profit_moonshot_live_final_selection_for_validity_tests", FINAL_PATH
+)
 assert FINAL_SPEC is not None and FINAL_SPEC.loader is not None
 FINAL = importlib.util.module_from_spec(FINAL_SPEC)
 sys.modules[FINAL_SPEC.name] = FINAL
 FINAL_SPEC.loader.exec_module(FINAL)
 
 AUDIT_PATH = ROOT / "scripts" / "research" / "audit_profit_moonshot_strategy_validity.py"
-AUDIT_SPEC = importlib.util.spec_from_file_location("audit_profit_moonshot_strategy_validity", AUDIT_PATH)
+AUDIT_SPEC = importlib.util.spec_from_file_location(
+    "audit_profit_moonshot_strategy_validity", AUDIT_PATH
+)
 assert AUDIT_SPEC is not None and AUDIT_SPEC.loader is not None
 AUDIT = importlib.util.module_from_spec(AUDIT_SPEC)
 sys.modules[AUDIT_SPEC.name] = AUDIT
@@ -70,7 +74,9 @@ def test_missing_candidate_sleeves_fail_closed() -> None:
     assert "strategy_source_row_missing_sleeves" in validity["rejection_reasons"]
 
 
-def test_closure_manifest_records_required_roles_and_missing_optional_sources(tmp_path: Path) -> None:
+def test_closure_manifest_records_required_roles_and_missing_optional_sources(
+    tmp_path: Path,
+) -> None:
     final_json = tmp_path / "final.json"
     final_md = tmp_path / "final.md"
     liquidation_json = tmp_path / "liquidation.json"
@@ -137,5 +143,9 @@ def test_closure_manifest_records_required_roles_and_missing_optional_sources(tm
     assert payload["summary"]["deployable_valid_count"] == 1
     assert payload["source_pool_summary"]["available"] is True
     assert payload["source_pool_summary"]["row_count"] == 1
-    assert {"source_role": "current_base", "reason": "not_provided"} in payload["missing_optional_sources"]
-    assert {"source_role": "passing_artifacts", "reason": "not_provided"} in payload["missing_optional_sources"]
+    assert {"source_role": "current_base", "reason": "not_provided"} in payload[
+        "missing_optional_sources"
+    ]
+    assert {"source_role": "passing_artifacts", "reason": "not_provided"} in payload[
+        "missing_optional_sources"
+    ]

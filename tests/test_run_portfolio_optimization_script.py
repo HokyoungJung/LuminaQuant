@@ -19,7 +19,13 @@ def test_run_portfolio_optimization_script_smoke(tmp_path: Path):
                 "family": "trend",
                 "strategy_timeframe": "1h",
                 "symbols": ["BTC/USDT"],
-                "oos": {"sharpe": 1.2, "return": 0.1, "deflated_sharpe": 0.6, "pbo": 0.2, "turnover": 0.4},
+                "oos": {
+                    "sharpe": 1.2,
+                    "return": 0.1,
+                    "deflated_sharpe": 0.6,
+                    "pbo": 0.2,
+                    "turnover": 0.4,
+                },
                 "pass": True,
                 "return_streams": {
                     "train": [{"t": float(i), "v": 0.0003} for i in range(80)],
@@ -35,7 +41,13 @@ def test_run_portfolio_optimization_script_smoke(tmp_path: Path):
                 "family": "market_neutral",
                 "strategy_timeframe": "15m",
                 "symbols": ["BTC/USDT", "ETH/USDT"],
-                "oos": {"sharpe": 1.0, "return": 0.08, "deflated_sharpe": 0.5, "pbo": 0.25, "turnover": 0.8},
+                "oos": {
+                    "sharpe": 1.0,
+                    "return": 0.08,
+                    "deflated_sharpe": 0.5,
+                    "pbo": 0.25,
+                    "turnover": 0.8,
+                },
                 "pass": True,
                 "return_streams": {
                     "train": [{"t": float(i), "v": 0.0002} for i in range(80)],
@@ -74,12 +86,18 @@ def test_run_portfolio_optimization_script_smoke(tmp_path: Path):
     result = subprocess.run(cmd, cwd=str(root), check=False, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     assert (out_dir / "portfolio_optimization_latest.json").exists()
-    payload = json.loads((out_dir / "portfolio_optimization_latest.json").read_text(encoding="utf-8"))
-    assert payload["status"] == "completed"
-    assert str((payload.get("memory") or {}).get("artifact_kind") or "") == "portfolio_followup_memory_summary"
-    assert str(((payload.get("memory") or {}).get("memory_policy") or {}).get("session_memory_lease_path") or "").endswith(
-        "session_memory_budget.lock"
+    payload = json.loads(
+        (out_dir / "portfolio_optimization_latest.json").read_text(encoding="utf-8")
     )
+    assert payload["status"] == "completed"
+    assert (
+        str((payload.get("memory") or {}).get("artifact_kind") or "")
+        == "portfolio_followup_memory_summary"
+    )
+    assert str(
+        ((payload.get("memory") or {}).get("memory_policy") or {}).get("session_memory_lease_path")
+        or ""
+    ).endswith("session_memory_budget.lock")
 
 
 def test_run_portfolio_optimization_uses_score_config_weights_and_caps(tmp_path: Path):
@@ -93,7 +111,13 @@ def test_run_portfolio_optimization_uses_score_config_weights_and_caps(tmp_path:
             "family": "trend",
             "strategy_timeframe": "1h",
             "symbols": ["BTC/USDT"],
-            "oos": {"sharpe": 0.6, "return": 0.03, "deflated_sharpe": 0.2, "pbo": 0.4, "turnover": 0.3},
+            "oos": {
+                "sharpe": 0.6,
+                "return": 0.03,
+                "deflated_sharpe": 0.2,
+                "pbo": 0.4,
+                "turnover": 0.3,
+            },
             "pass": True,
             "return_streams": {
                 "train": [{"t": float(i), "v": 0.0002} for i in range(60)],
@@ -109,7 +133,13 @@ def test_run_portfolio_optimization_uses_score_config_weights_and_caps(tmp_path:
             "family": "trend",
             "strategy_timeframe": "1h",
             "symbols": ["ETH/USDT"],
-            "oos": {"sharpe": 0.3, "return": 0.02, "deflated_sharpe": 0.1, "pbo": 0.3, "turnover": 0.2},
+            "oos": {
+                "sharpe": 0.3,
+                "return": 0.02,
+                "deflated_sharpe": 0.1,
+                "pbo": 0.3,
+                "turnover": 0.2,
+            },
             "pass": True,
             "return_streams": {
                 "train": [{"t": float(i), "v": 0.0001} for i in range(60)],
@@ -124,7 +154,9 @@ def test_run_portfolio_optimization_uses_score_config_weights_and_caps(tmp_path:
     team_path = tmp_path / "team_report.json"
     score_config_path = tmp_path / "score_config.json"
     out_dir = tmp_path / "reports"
-    research_path.write_text(json.dumps({"schema_version": "v2", "candidates": candidates}), encoding="utf-8")
+    research_path.write_text(
+        json.dumps({"schema_version": "v2", "candidates": candidates}), encoding="utf-8"
+    )
     team_path.write_text(json.dumps({"selected_team": candidates}), encoding="utf-8")
     score_config_path.write_text(
         json.dumps(
@@ -177,7 +209,9 @@ def test_run_portfolio_optimization_uses_score_config_weights_and_caps(tmp_path:
     result = subprocess.run(cmd, cwd=str(root), check=False, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
 
-    payload = json.loads((out_dir / "portfolio_optimization_latest.json").read_text(encoding="utf-8"))
+    payload = json.loads(
+        (out_dir / "portfolio_optimization_latest.json").read_text(encoding="utf-8")
+    )
     scoring = dict(payload.get("scoring") or {})
     weights = dict(scoring.get("candidate_rank_score_weights") or {})
     assert float(weights.get("return_weight", 0.0)) == 60.0
@@ -208,7 +242,13 @@ def test_run_portfolio_optimization_uses_score_config_weights_and_caps(tmp_path:
         dict(param_drift.get("plus_10pct_signal") or {}),
     )
     for section in sections:
-        assert abs(float(section.get("total_return", 0.0)) - float(portfolio_oos.get("total_return", 0.0))) < 1e-12
+        assert (
+            abs(
+                float(section.get("total_return", 0.0))
+                - float(portfolio_oos.get("total_return", 0.0))
+            )
+            < 1e-12
+        )
 
     constraints = dict(payload.get("constraints") or {})
     configured = dict(constraints.get("configured") or {})
@@ -226,7 +266,9 @@ def test_run_portfolio_optimization_enforces_strategy_cap_when_feasible(tmp_path
         return {
             "candidate_id": cid,
             "name": f"candidate_{cid}",
-            "strategy_class": "CompositeTrendStrategy" if family == "trend" else "PairSpreadZScoreStrategy",
+            "strategy_class": "CompositeTrendStrategy"
+            if family == "trend"
+            else "PairSpreadZScoreStrategy",
             "family": family,
             "strategy_timeframe": "1h",
             "symbols": [symbol],
@@ -250,7 +292,9 @@ def test_run_portfolio_optimization_enforces_strategy_cap_when_feasible(tmp_path
     research_path = tmp_path / "candidate_research.json"
     team_path = tmp_path / "team_report.json"
     out_dir = tmp_path / "reports"
-    research_path.write_text(json.dumps({"schema_version": "v2", "candidates": candidates}), encoding="utf-8")
+    research_path.write_text(
+        json.dumps({"schema_version": "v2", "candidates": candidates}), encoding="utf-8"
+    )
     team_path.write_text(json.dumps({"selected_team": candidates}), encoding="utf-8")
 
     script = root / "scripts" / "run_portfolio_optimization.py"
@@ -269,7 +313,9 @@ def test_run_portfolio_optimization_enforces_strategy_cap_when_feasible(tmp_path
     result = subprocess.run(cmd, cwd=str(root), check=False, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
 
-    payload = json.loads((out_dir / "portfolio_optimization_latest.json").read_text(encoding="utf-8"))
+    payload = json.loads(
+        (out_dir / "portfolio_optimization_latest.json").read_text(encoding="utf-8")
+    )
     weights = list(payload.get("weights") or [])
     assert len(weights) == 10
 
@@ -318,7 +364,9 @@ def test_run_portfolio_optimization_reserves_cash_when_asset_caps_bind(tmp_path:
     team_path = tmp_path / "team_report.json"
     score_config_path = tmp_path / "score_config.json"
     out_dir = tmp_path / "reports"
-    research_path.write_text(json.dumps({"schema_version": "v2", "candidates": candidates}), encoding="utf-8")
+    research_path.write_text(
+        json.dumps({"schema_version": "v2", "candidates": candidates}), encoding="utf-8"
+    )
     team_path.write_text(json.dumps({"selected_team": candidates}), encoding="utf-8")
     score_config_path.write_text(
         json.dumps(
@@ -354,7 +402,9 @@ def test_run_portfolio_optimization_reserves_cash_when_asset_caps_bind(tmp_path:
     result = subprocess.run(cmd, cwd=str(root), check=False, capture_output=True, text=True)
 
     assert result.returncode == 0, result.stderr
-    payload = json.loads((out_dir / "portfolio_optimization_latest.json").read_text(encoding="utf-8"))
+    payload = json.loads(
+        (out_dir / "portfolio_optimization_latest.json").read_text(encoding="utf-8")
+    )
     assert payload["status"] == "completed"
     constraints = dict(payload.get("constraints") or {})
     assert float(constraints.get("max_asset", 0.0)) == 0.2
@@ -375,9 +425,27 @@ def test_run_portfolio_optimization_fits_on_validation_and_reports_oos(tmp_path:
             "family": "trend",
             "strategy_timeframe": "1h",
             "symbols": ["BTC/USDT"],
-            "train": {"sharpe": 0.5, "return": 0.03, "deflated_sharpe": 0.2, "pbo": 0.2, "turnover": 0.2},
-            "val": {"sharpe": 3.0, "return": 0.12, "deflated_sharpe": 1.0, "pbo": 0.1, "turnover": 0.1},
-            "oos": {"sharpe": -0.2, "return": -0.03, "deflated_sharpe": 0.0, "pbo": 0.4, "turnover": 0.2},
+            "train": {
+                "sharpe": 0.5,
+                "return": 0.03,
+                "deflated_sharpe": 0.2,
+                "pbo": 0.2,
+                "turnover": 0.2,
+            },
+            "val": {
+                "sharpe": 3.0,
+                "return": 0.12,
+                "deflated_sharpe": 1.0,
+                "pbo": 0.1,
+                "turnover": 0.1,
+            },
+            "oos": {
+                "sharpe": -0.2,
+                "return": -0.03,
+                "deflated_sharpe": 0.0,
+                "pbo": 0.4,
+                "turnover": 0.2,
+            },
             "pass": True,
             "return_streams": {
                 "train": [
@@ -402,9 +470,27 @@ def test_run_portfolio_optimization_fits_on_validation_and_reports_oos(tmp_path:
             "family": "market_neutral",
             "strategy_timeframe": "1h",
             "symbols": ["ETH/USDT", "SOL/USDT"],
-            "train": {"sharpe": 0.5, "return": 0.03, "deflated_sharpe": 0.2, "pbo": 0.2, "turnover": 0.2},
-            "val": {"sharpe": 0.1, "return": 0.01, "deflated_sharpe": 0.05, "pbo": 0.2, "turnover": 0.2},
-            "oos": {"sharpe": 4.0, "return": 0.20, "deflated_sharpe": 1.2, "pbo": 0.05, "turnover": 0.1},
+            "train": {
+                "sharpe": 0.5,
+                "return": 0.03,
+                "deflated_sharpe": 0.2,
+                "pbo": 0.2,
+                "turnover": 0.2,
+            },
+            "val": {
+                "sharpe": 0.1,
+                "return": 0.01,
+                "deflated_sharpe": 0.05,
+                "pbo": 0.2,
+                "turnover": 0.2,
+            },
+            "oos": {
+                "sharpe": 4.0,
+                "return": 0.20,
+                "deflated_sharpe": 1.2,
+                "pbo": 0.05,
+                "turnover": 0.1,
+            },
             "pass": True,
             "return_streams": {
                 "train": [
@@ -427,7 +513,9 @@ def test_run_portfolio_optimization_fits_on_validation_and_reports_oos(tmp_path:
     research_path = tmp_path / "candidate_research.json"
     team_path = tmp_path / "team_report.json"
     out_dir = tmp_path / "reports"
-    research_path.write_text(json.dumps({"schema_version": "v2", "candidates": candidates}), encoding="utf-8")
+    research_path.write_text(
+        json.dumps({"schema_version": "v2", "candidates": candidates}), encoding="utf-8"
+    )
     team_path.write_text(json.dumps({"selected_team": candidates}), encoding="utf-8")
 
     script = root / "scripts" / "run_portfolio_optimization.py"
@@ -451,7 +539,9 @@ def test_run_portfolio_optimization_fits_on_validation_and_reports_oos(tmp_path:
     result = subprocess.run(cmd, cwd=str(root), check=False, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
 
-    payload = json.loads((out_dir / "portfolio_optimization_latest.json").read_text(encoding="utf-8"))
+    payload = json.loads(
+        (out_dir / "portfolio_optimization_latest.json").read_text(encoding="utf-8")
+    )
     selection = dict(payload.get("selection") or {})
     assert selection.get("fit_split") == "val"
     assert selection.get("report_split") == "oos"
@@ -481,9 +571,21 @@ def test_run_portfolio_optimization_prefers_research_candidates_over_team_shortl
         "family": "trend",
         "strategy_timeframe": "1h",
         "symbols": ["BTC/USDT"],
-        "train": {"sharpe": 0.4, "return": 0.02, "deflated_sharpe": 0.1, "pbo": 0.2, "turnover": 0.2},
+        "train": {
+            "sharpe": 0.4,
+            "return": 0.02,
+            "deflated_sharpe": 0.1,
+            "pbo": 0.2,
+            "turnover": 0.2,
+        },
         "val": {"sharpe": 2.5, "return": 0.10, "deflated_sharpe": 0.9, "pbo": 0.1, "turnover": 0.1},
-        "oos": {"sharpe": -0.1, "return": -0.01, "deflated_sharpe": 0.0, "pbo": 0.4, "turnover": 0.2},
+        "oos": {
+            "sharpe": -0.1,
+            "return": -0.01,
+            "deflated_sharpe": 0.0,
+            "pbo": 0.4,
+            "turnover": 0.2,
+        },
         "pass": True,
         "return_streams": {
             "train": [{"t": "2025-12-31T00:00:00Z", "v": 0.001}],
@@ -499,9 +601,27 @@ def test_run_portfolio_optimization_prefers_research_candidates_over_team_shortl
         "family": "market_neutral",
         "strategy_timeframe": "1h",
         "symbols": ["ETH/USDT", "SOL/USDT"],
-        "train": {"sharpe": 0.4, "return": 0.02, "deflated_sharpe": 0.1, "pbo": 0.2, "turnover": 0.2},
-        "val": {"sharpe": 0.1, "return": 0.01, "deflated_sharpe": 0.05, "pbo": 0.2, "turnover": 0.2},
-        "oos": {"sharpe": 3.0, "return": 0.18, "deflated_sharpe": 1.1, "pbo": 0.05, "turnover": 0.1},
+        "train": {
+            "sharpe": 0.4,
+            "return": 0.02,
+            "deflated_sharpe": 0.1,
+            "pbo": 0.2,
+            "turnover": 0.2,
+        },
+        "val": {
+            "sharpe": 0.1,
+            "return": 0.01,
+            "deflated_sharpe": 0.05,
+            "pbo": 0.2,
+            "turnover": 0.2,
+        },
+        "oos": {
+            "sharpe": 3.0,
+            "return": 0.18,
+            "deflated_sharpe": 1.1,
+            "pbo": 0.05,
+            "turnover": 0.1,
+        },
         "pass": True,
         "return_streams": {
             "train": [{"t": "2025-12-31T00:00:00Z", "v": 0.001}],
@@ -541,7 +661,9 @@ def test_run_portfolio_optimization_prefers_research_candidates_over_team_shortl
     result = subprocess.run(cmd, cwd=str(root), check=False, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
 
-    payload = json.loads((out_dir / "portfolio_optimization_latest.json").read_text(encoding="utf-8"))
+    payload = json.loads(
+        (out_dir / "portfolio_optimization_latest.json").read_text(encoding="utf-8")
+    )
     assert payload.get("source_report") == str(research_path.resolve())
     weights = list(payload.get("weights") or [])
     assert [row.get("candidate_id") for row in weights] == ["fit_winner"]
@@ -560,16 +682,27 @@ def test_run_portfolio_optimization_preserves_vol_target_gross_exposure(tmp_path
         "oos": {"sharpe": 1.0, "return": 0.08, "deflated_sharpe": 0.5, "pbo": 0.1, "turnover": 0.2},
         "pass": True,
         "return_streams": {
-            "train": [{"t": float(i), "v": value} for i, value in enumerate([0.10, -0.10, 0.10, -0.10, 0.10, -0.10])],
-            "val": [{"t": float(i), "v": value} for i, value in enumerate([0.10, -0.10, 0.10, -0.10, 0.10, -0.10])],
-            "oos": [{"t": float(i), "v": value} for i, value in enumerate([0.10, -0.10, 0.10, -0.10, 0.10, -0.10])],
+            "train": [
+                {"t": float(i), "v": value}
+                for i, value in enumerate([0.10, -0.10, 0.10, -0.10, 0.10, -0.10])
+            ],
+            "val": [
+                {"t": float(i), "v": value}
+                for i, value in enumerate([0.10, -0.10, 0.10, -0.10, 0.10, -0.10])
+            ],
+            "oos": [
+                {"t": float(i), "v": value}
+                for i, value in enumerate([0.10, -0.10, 0.10, -0.10, 0.10, -0.10])
+            ],
         },
         "metadata": {"cost_rate": 0.0005},
     }
 
     research_path = tmp_path / "candidate_research.json"
     team_path = tmp_path / "team_report.json"
-    research_path.write_text(json.dumps({"schema_version": "v2", "candidates": [candidate]}), encoding="utf-8")
+    research_path.write_text(
+        json.dumps({"schema_version": "v2", "candidates": [candidate]}), encoding="utf-8"
+    )
     team_path.write_text(json.dumps({"selected_team": [candidate]}), encoding="utf-8")
 
     script = root / "scripts" / "run_portfolio_optimization.py"
@@ -607,11 +740,17 @@ def test_run_portfolio_optimization_preserves_vol_target_gross_exposure(tmp_path
 
     low_result = subprocess.run(low_cmd, cwd=str(root), check=False, capture_output=True, text=True)
     assert low_result.returncode == 0, low_result.stderr
-    high_result = subprocess.run(high_cmd, cwd=str(root), check=False, capture_output=True, text=True)
+    high_result = subprocess.run(
+        high_cmd, cwd=str(root), check=False, capture_output=True, text=True
+    )
     assert high_result.returncode == 0, high_result.stderr
 
-    low_payload = json.loads((low_dir / "portfolio_optimization_latest.json").read_text(encoding="utf-8"))
-    high_payload = json.loads((high_dir / "portfolio_optimization_latest.json").read_text(encoding="utf-8"))
+    low_payload = json.loads(
+        (low_dir / "portfolio_optimization_latest.json").read_text(encoding="utf-8")
+    )
+    high_payload = json.loads(
+        (high_dir / "portfolio_optimization_latest.json").read_text(encoding="utf-8")
+    )
 
     low_weight = float((low_payload.get("weights") or [{}])[0].get("weight", 0.0))
     high_weight = float((high_payload.get("weights") or [{}])[0].get("weight", 0.0))
@@ -625,7 +764,11 @@ def test_run_portfolio_optimization_preserves_vol_target_gross_exposure(tmp_path
     assert abs(low_weight - float(low_payload.get("gross_exposure", 0.0))) < 1e-9
     assert abs(high_weight - float(high_payload.get("gross_exposure", 0.0))) < 1e-9
     assert float(low_payload.get("cash_weight", 0.0)) > float(high_payload.get("cash_weight", 0.0))
-    low_scale = float((low_payload.get("scoring") or {}).get("vol_targeting", {}).get("vol_scale", 0.0))
-    high_scale = float((high_payload.get("scoring") or {}).get("vol_targeting", {}).get("vol_scale", 0.0))
+    low_scale = float(
+        (low_payload.get("scoring") or {}).get("vol_targeting", {}).get("vol_scale", 0.0)
+    )
+    high_scale = float(
+        (high_payload.get("scoring") or {}).get("vol_targeting", {}).get("vol_scale", 0.0)
+    )
     assert low_scale > 0.0
     assert high_scale > low_scale

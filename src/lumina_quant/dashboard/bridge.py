@@ -168,7 +168,13 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--retired-stub-path",
-        default=str(Path(__file__).resolve().parents[3] / "src" / "lumina_quant" / "dashboard" / "retired_stub.py"),
+        default=str(
+            Path(__file__).resolve().parents[3]
+            / "src"
+            / "lumina_quant"
+            / "dashboard"
+            / "retired_stub.py"
+        ),
     )
     parser.add_argument("--compat-path", default=DEFAULT_DASHBOARD_COMPAT_PATH)
     parser.add_argument("--overview-json", action="store_true", help="Print overview payload JSON.")

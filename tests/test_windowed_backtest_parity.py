@@ -138,8 +138,12 @@ def test_timeframe_aggregator_batched_update_matches_incremental_rows():
     frame = _build_1s_frame(start, seconds=125)
     rows = list(frame.iter_rows(named=False))
 
-    batched = TimeframeAggregator(timeframes=["20s", "1m", "5m"], lookbacks={"20s": 16, "1m": 16, "5m": 16})
-    incremental = TimeframeAggregator(timeframes=["20s", "1m", "5m"], lookbacks={"20s": 16, "1m": 16, "5m": 16})
+    batched = TimeframeAggregator(
+        timeframes=["20s", "1m", "5m"], lookbacks={"20s": 16, "1m": 16, "5m": 16}
+    )
+    incremental = TimeframeAggregator(
+        timeframes=["20s", "1m", "5m"], lookbacks={"20s": 16, "1m": 16, "5m": 16}
+    )
 
     batched.update_from_1s_batch({"BTC/USDT": tuple(rows[:80])})
     batched.update_from_1s_batch({"BTC/USDT": tuple(rows[60:])})
@@ -188,7 +192,9 @@ def test_timeframe_aggregator_canonical_epoch_rows_match_datetime_rows():
     canonical_aggregator.update_from_1s_batch({"BTC/USDT": tuple(canonical_rows[60:])})
 
     for timeframe in ("1s", "20s", "1m", "5m"):
-        assert canonical_aggregator.get_bars("BTC/USDT", timeframe, n=16) == datetime_aggregator.get_bars(
+        assert canonical_aggregator.get_bars(
+            "BTC/USDT", timeframe, n=16
+        ) == datetime_aggregator.get_bars(
             "BTC/USDT",
             timeframe,
             n=16,

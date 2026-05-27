@@ -65,4 +65,3 @@ def test_full_gate_rejects_equity_breach_even_after_capping() -> None:
 
     assert pass_gate is False
     assert "train_equity_breach_observed" in reasons
-

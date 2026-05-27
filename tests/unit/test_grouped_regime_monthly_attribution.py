@@ -31,7 +31,13 @@ def test_monthly_return_table_compounds_by_month() -> None:
     )
     monthly = MODULE._monthly_return_table(
         frame,
-        value_columns=["incumbent", "blend_85_15", "autoresearch_55_45", "hard_allocator", "soft_allocator"],
+        value_columns=[
+            "incumbent",
+            "blend_85_15",
+            "autoresearch_55_45",
+            "hard_allocator",
+            "soft_allocator",
+        ],
     )
     jan = monthly.loc[monthly["month"].eq("2025-01")].iloc[0]
     assert abs(float(jan["incumbent"]) - 0.21) < 1e-12

@@ -42,7 +42,10 @@ def _start_ms(day: date) -> int:
 
 def _end_ms(day: date) -> int:
     return int(
-        (datetime.combine(day + timedelta(days=1), datetime.min.time(), tzinfo=UTC) - timedelta(milliseconds=1)).timestamp()
+        (
+            datetime.combine(day + timedelta(days=1), datetime.min.time(), tzinfo=UTC)
+            - timedelta(milliseconds=1)
+        ).timestamp()
         * 1000
     )
 
@@ -196,7 +199,9 @@ def collect_hyperliquid(
     client = HyperliquidInfoClient()
     generated_ms = int(datetime.now(UTC).timestamp() * 1000)
     context_payload = client.meta_and_asset_contexts()
-    context_rows = parse_meta_asset_context_rows(context_payload, symbols=symbols, timestamp_ms=generated_ms)
+    context_rows = parse_meta_asset_context_rows(
+        context_payload, symbols=symbols, timestamp_ms=generated_ms
+    )
     context_by_symbol = {str(row["symbol"]): row for row in context_rows}
     symbol_payloads: list[dict[str, Any]] = []
     upserted_total = 0
@@ -210,7 +215,10 @@ def collect_hyperliquid(
             throttle_seconds=throttle_seconds,
         )
         current_context = context_by_symbol.get(symbol)
-        feature_rows = [{key: value for key, value in row.items() if key in {"timestamp_ms", "funding_rate"}} for row in funding_rows]
+        feature_rows = [
+            {key: value for key, value in row.items() if key in {"timestamp_ms", "funding_rate"}}
+            for row in funding_rows
+        ]
         if current_context:
             feature_rows.append(
                 {
@@ -231,7 +239,9 @@ def collect_hyperliquid(
                 source="hyperliquid_info_readonly",
             )
         split_counts = {
-            split_name: _split_count(funding_rows, start=_parse_day(start_raw), end=_parse_day(end_raw))
+            split_name: _split_count(
+                funding_rows, start=_parse_day(start_raw), end=_parse_day(end_raw)
+            )
             for split_name, (start_raw, end_raw) in SPLITS.items()
         }
         candle_summary = _candle_split_summary(
@@ -246,14 +256,28 @@ def collect_hyperliquid(
                 "coin": coin,
                 "funding_rows": len(funding_rows),
                 "funding_pages": pages,
-                "first_funding_timestamp_ms": int(funding_rows[0]["timestamp_ms"]) if funding_rows else None,
-                "last_funding_timestamp_ms": int(funding_rows[-1]["timestamp_ms"]) if funding_rows else None,
-                "first_funding_utc": _iso(int(funding_rows[0]["timestamp_ms"])) if funding_rows else None,
-                "last_funding_utc": _iso(int(funding_rows[-1]["timestamp_ms"])) if funding_rows else None,
+                "first_funding_timestamp_ms": int(funding_rows[0]["timestamp_ms"])
+                if funding_rows
+                else None,
+                "last_funding_timestamp_ms": int(funding_rows[-1]["timestamp_ms"])
+                if funding_rows
+                else None,
+                "first_funding_utc": _iso(int(funding_rows[0]["timestamp_ms"]))
+                if funding_rows
+                else None,
+                "last_funding_utc": _iso(int(funding_rows[-1]["timestamp_ms"]))
+                if funding_rows
+                else None,
                 "funding_split_counts": split_counts,
                 "current_context": {
                     key: current_context.get(key)
-                    for key in ("timestamp_ms", "funding_rate", "mark_price", "index_price", "open_interest")
+                    for key in (
+                        "timestamp_ms",
+                        "funding_rate",
+                        "mark_price",
+                        "index_price",
+                        "open_interest",
+                    )
                 }
                 if current_context
                 else None,
@@ -280,7 +304,9 @@ def collect_hyperliquid(
     output_dir.mkdir(parents=True, exist_ok=True)
     json_path = output_dir / "hyperliquid_readonly_collection_latest.json"
     md_path = output_dir / "hyperliquid_readonly_collection_latest.md"
-    json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    json_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     md_path.write_text(_markdown(payload), encoding="utf-8")
     return {"payload": payload, "paths": {"json": str(json_path), "markdown": str(md_path)}}
 

@@ -94,7 +94,9 @@ def _resolve_portfolio_score_config(overrides: dict[str, Any] | None) -> dict[st
     return resolved
 
 
-def _resolved_cli_or_config_float(cli_value: float | None, config_value: Any, *, default: float) -> float:
+def _resolved_cli_or_config_float(
+    cli_value: float | None, config_value: Any, *, default: float
+) -> float:
     if cli_value is not None:
         return max(0.0, _safe_float(cli_value, default))
     return max(0.0, _safe_float(config_value, default))
@@ -162,7 +164,9 @@ def main() -> int:
         output_dir=output_dir,
         input_path=args.research_report,
         metadata={
-            "team_report": str(Path(args.team_report).resolve()) if str(args.team_report).strip() else None,
+            "team_report": str(Path(args.team_report).resolve())
+            if str(args.team_report).strip()
+            else None,
             "soft_rss_bytes": memory_budget_bytes,
             "max_strategies": int(args.max_strategies),
         },
@@ -228,13 +232,22 @@ def main() -> int:
         def _score(row: dict[str, Any]) -> float:
             fit_metrics = _split_metrics(row, fit_split)
             return float(
-                (_safe_float(rank_weights.get("sharpe_weight"), 2.8) * _safe_float(fit_metrics.get("sharpe"), 0.0))
+                (
+                    _safe_float(rank_weights.get("sharpe_weight"), 2.8)
+                    * _safe_float(fit_metrics.get("sharpe"), 0.0)
+                )
                 + (
                     _safe_float(rank_weights.get("deflated_sharpe_weight"), 1.5)
                     * _safe_float(fit_metrics.get("deflated_sharpe"), 0.0)
                 )
-                - (_safe_float(rank_weights.get("pbo_penalty"), 2.0) * _safe_float(fit_metrics.get("pbo"), 1.0))
-                + (_safe_float(rank_weights.get("return_weight"), 25.0) * _safe_float(fit_metrics.get("return"), 0.0))
+                - (
+                    _safe_float(rank_weights.get("pbo_penalty"), 2.0)
+                    * _safe_float(fit_metrics.get("pbo"), 1.0)
+                )
+                + (
+                    _safe_float(rank_weights.get("return_weight"), 25.0)
+                    * _safe_float(fit_metrics.get("return"), 0.0)
+                )
             )
 
         filtered.sort(key=_score, reverse=True)
@@ -245,7 +258,9 @@ def main() -> int:
         stream_cache = StreamCache()
         fit_streams = {cid: stream_cache.aggregate_for_row(rows[cid], fit_split) for cid in ids}
         fit_map = {cid: stream_cache.array_for_row(rows[cid], fit_split) for cid in ids}
-        clusters = _cluster_by_correlation(ids, fit_streams, threshold=float(args.correlation_threshold))
+        clusters = _cluster_by_correlation(
+            ids, fit_streams, threshold=float(args.correlation_threshold)
+        )
 
         cluster_weight_raw: dict[int, float] = {}
         member_weight_raw: dict[str, float] = {}
@@ -259,7 +274,9 @@ def main() -> int:
                 continue
 
             cluster_port = np.zeros(min_len, dtype=float)
-            invs = np.asarray([_inverse_vol_weight(arr[-min_len:]) for arr in cluster_rets], dtype=float)
+            invs = np.asarray(
+                [_inverse_vol_weight(arr[-min_len:]) for arr in cluster_rets], dtype=float
+            )
             inv_sum = float(np.sum(invs))
             invs = invs / inv_sum if inv_sum > 0 else np.ones_like(invs) / len(invs)
 
@@ -283,7 +300,11 @@ def main() -> int:
 
         cluster_total = float(sum(cluster_weight_raw.values()))
         cluster_weights = {
-            key: (value / cluster_total if cluster_total > 0 else 1.0 / max(1, len(cluster_weight_raw)))
+            key: (
+                value / cluster_total
+                if cluster_total > 0
+                else 1.0 / max(1, len(cluster_weight_raw))
+            )
             for key, value in cluster_weight_raw.items()
         }
 
@@ -355,7 +376,9 @@ def main() -> int:
 
         target_vol_floor = max(0.0, _safe_float(vol_targeting_params.get("target_vol_floor"), 0.01))
         vol_scale_cap = max(0.0, _safe_float(vol_targeting_params.get("vol_scale_cap"), 2.0))
-        vol_scale_epsilon = max(0.0, _safe_float(vol_targeting_params.get("vol_scale_epsilon"), 1e-12))
+        vol_scale_epsilon = max(
+            0.0, _safe_float(vol_targeting_params.get("vol_scale_epsilon"), 1e-12)
+        )
         portfolio_fit = _build_portfolio_returns(
             pre_vol_weights,
             rows,
@@ -364,17 +387,27 @@ def main() -> int:
         )
         fit_vol = _safe_float(np.std(portfolio_fit, ddof=1), 0.0)
         target_vol = max(target_vol_floor, float(args.target_vol))
-        vol_scale = 1.0 if fit_vol <= vol_scale_epsilon else min(
-            vol_scale_cap,
-            target_vol / max(vol_scale_epsilon, fit_vol),
+        vol_scale = (
+            1.0
+            if fit_vol <= vol_scale_epsilon
+            else min(
+                vol_scale_cap,
+                target_vol / max(vol_scale_epsilon, fit_vol),
+            )
         )
         weights = {key: float(pre_vol_weights[key] * vol_scale) for key in pre_vol_weights}
         gross_exposure = float(sum(weights.values()))
         cash_weight = max(0.0, 1.0 - gross_exposure)
 
-        portfolio_train_stream = _build_portfolio_stream(weights, rows, split="train", cache=stream_cache)
-        portfolio_val_stream = _build_portfolio_stream(weights, rows, split="val", cache=stream_cache)
-        portfolio_oos_stream = _build_portfolio_stream(weights, rows, split="oos", cache=stream_cache)
+        portfolio_train_stream = _build_portfolio_stream(
+            weights, rows, split="train", cache=stream_cache
+        )
+        portfolio_val_stream = _build_portfolio_stream(
+            weights, rows, split="val", cache=stream_cache
+        )
+        portfolio_oos_stream = _build_portfolio_stream(
+            weights, rows, split="oos", cache=stream_cache
+        )
         portfolio_fit_stream = _build_portfolio_stream(
             weights,
             rows,
@@ -409,10 +442,18 @@ def main() -> int:
             weighted_turnover += weight * _safe_float(report_row_metrics.get("turnover"), 0.0)
             weighted_cost += weight * cost
 
-        cost_stress_x2_multiplier = _safe_float(sensitivity_params.get("cost_stress_x2_multiplier"), 2.0)
-        cost_stress_x3_multiplier = _safe_float(sensitivity_params.get("cost_stress_x3_multiplier"), 3.0)
-        signal_drift_down_multiplier = _safe_float(sensitivity_params.get("signal_drift_down_multiplier"), 0.9)
-        signal_drift_up_multiplier = _safe_float(sensitivity_params.get("signal_drift_up_multiplier"), 1.1)
+        cost_stress_x2_multiplier = _safe_float(
+            sensitivity_params.get("cost_stress_x2_multiplier"), 2.0
+        )
+        cost_stress_x3_multiplier = _safe_float(
+            sensitivity_params.get("cost_stress_x3_multiplier"), 3.0
+        )
+        signal_drift_down_multiplier = _safe_float(
+            sensitivity_params.get("signal_drift_down_multiplier"), 0.9
+        )
+        signal_drift_up_multiplier = _safe_float(
+            sensitivity_params.get("signal_drift_up_multiplier"), 1.1
+        )
 
         report_x2 = portfolio_report - (
             max(0.0, cost_stress_x2_multiplier - 1.0) * weighted_turnover * weighted_cost
@@ -473,7 +514,9 @@ def main() -> int:
             "selection": {
                 "fit_split": fit_split,
                 "report_split": report_split,
-                "selection_basis": "validation_only" if fit_split == "val" and report_split == "oos" else f"{fit_split}_fit",
+                "selection_basis": "validation_only"
+                if fit_split == "val" and report_split == "oos"
+                else f"{fit_split}_fit",
             },
             "objective_policy": _objective_policy_payload(
                 f"{fit_split}_fit",
@@ -484,20 +527,32 @@ def main() -> int:
             "gross_exposure": gross_exposure,
             "cash_weight": cash_weight,
             "constraints": {
-                "max_strategy": float(effective_caps.get("max_strategy", configured_caps["max_strategy"])),
-                "max_family": float(effective_caps.get("max_family", configured_caps["max_family"])),
+                "max_strategy": float(
+                    effective_caps.get("max_strategy", configured_caps["max_strategy"])
+                ),
+                "max_family": float(
+                    effective_caps.get("max_family", configured_caps["max_family"])
+                ),
                 "max_asset": float(effective_caps.get("max_asset", configured_caps["max_asset"])),
-                "max_metals": float(effective_caps.get("max_metals", configured_caps["max_metals"])),
-                "target_active_weight": float(effective_caps.get("target_active_weight", active_budget)),
+                "max_metals": float(
+                    effective_caps.get("max_metals", configured_caps["max_metals"])
+                ),
+                "target_active_weight": float(
+                    effective_caps.get("target_active_weight", active_budget)
+                ),
                 "active_weight": float(effective_caps.get("active_weight", active_budget)),
-                "cash_reserve_weight": float(effective_caps.get("cash_reserve_weight", max(0.0, 1.0 - active_budget))),
+                "cash_reserve_weight": float(
+                    effective_caps.get("cash_reserve_weight", max(0.0, 1.0 - active_budget))
+                ),
                 "family_caps": dict(effective_caps.get("family_caps") or {}),
                 "configured": configured_caps,
             },
             "scoring": {
                 "candidate_rank_score_weights": {
                     "sharpe_weight": _safe_float(rank_weights.get("sharpe_weight"), 2.8),
-                    "deflated_sharpe_weight": _safe_float(rank_weights.get("deflated_sharpe_weight"), 1.5),
+                    "deflated_sharpe_weight": _safe_float(
+                        rank_weights.get("deflated_sharpe_weight"), 1.5
+                    ),
                     "pbo_penalty": _safe_float(rank_weights.get("pbo_penalty"), 2.0),
                     "return_weight": _safe_float(rank_weights.get("return_weight"), 25.0),
                 },

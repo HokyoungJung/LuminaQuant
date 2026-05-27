@@ -16,8 +16,7 @@ RUNNER_PATH = ROOT / "scripts" / "research" / "run_common_split_alpha_zoo_hybrid
 HYBRID_PATH = ROOT / "scripts" / "research" / "run_profit_moonshot_hybrid_v35_v36_fixed_inputs.py"
 CALIBRATOR_PATH = ROOT / "scripts" / "research" / "calibrate_crypto_fx_edges.py"
 REPORT_DIR = (
-    ROOT
-    / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/"
+    ROOT / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/"
     "common_split_alpha_zoo_hybrid_v35_v36_20260517"
 )
 
@@ -77,7 +76,14 @@ def test_apply_common_split_uses_exact_calendar_boundaries() -> None:
         "2026-03-01 00:00:00",
         "2026-05-06 23:00:00",
     ]
-    assert out["split"].tolist() == ["train", "train", "validation", "validation", "locked_oos", "locked_oos"]
+    assert out["split"].tolist() == [
+        "train",
+        "train",
+        "validation",
+        "validation",
+        "locked_oos",
+        "locked_oos",
+    ]
 
 
 def test_split_bounded_forward_labels_do_not_cross_into_future_split() -> None:
@@ -96,15 +102,22 @@ def test_split_bounded_forward_labels_do_not_cross_into_future_split() -> None:
     poisoned = base.copy()
     poisoned.loc[poisoned.index[-1], "close"] = 1.0
 
-    labeled = RUNNER.add_split_bounded_forward_return_label(RUNNER.apply_common_split(base), horizon=1)
-    labeled_poisoned = RUNNER.add_split_bounded_forward_return_label(RUNNER.apply_common_split(poisoned), horizon=1)
+    labeled = RUNNER.add_split_bounded_forward_return_label(
+        RUNNER.apply_common_split(base), horizon=1
+    )
+    labeled_poisoned = RUNNER.add_split_bounded_forward_return_label(
+        RUNNER.apply_common_split(poisoned), horizon=1
+    )
 
     train = labeled[labeled["split"].eq("train")].reset_index(drop=True)
     train_poisoned = labeled_poisoned[labeled_poisoned["split"].eq("train")].reset_index(drop=True)
     # The last train row would otherwise look into validation and is masked.
     assert pd.isna(train.loc[2, "forward_return"])
     # Earlier train labels remain same-split and are invariant to validation/OOS poisoning.
-    assert train.loc[:1, "forward_return"].tolist() == train_poisoned.loc[:1, "forward_return"].tolist()
+    assert (
+        train.loc[:1, "forward_return"].tolist()
+        == train_poisoned.loc[:1, "forward_return"].tolist()
+    )
 
 
 def test_factor_screen_selection_ignores_locked_oos_poison() -> None:
@@ -128,7 +141,9 @@ def test_factor_screen_selection_ignores_locked_oos_poison() -> None:
     poisoned.loc[locked, "forward_return"] = -poisoned.loc[locked, "forward_return"]
 
     clean_screen = RUNNER.screen_factor_frame(clean, factors=["factor_good", "factor_bad"], top_n=2)
-    poisoned_screen = RUNNER.screen_factor_frame(poisoned, factors=["factor_good", "factor_bad"], top_n=2)
+    poisoned_screen = RUNNER.screen_factor_frame(
+        poisoned, factors=["factor_good", "factor_bad"], top_n=2
+    )
 
     assert [row["factor"] for row in clean_screen["selected_factors"]] == [
         row["factor"] for row in poisoned_screen["selected_factors"]
@@ -144,7 +159,14 @@ def test_edge_calibration_signature_ignores_locked_oos_poison() -> None:
     poisoned = [*train_val, *[_calibration_record("locked_oos", 5000.0) for _ in range(8)]]
     kwargs = {
         "ledger_summary": {"record_count": len(clean)},
-        "bucket_fields": ("candidate_id", "side", "symbol", "regime_bucket", "volatility_bucket", "factor_bucket"),
+        "bucket_fields": (
+            "candidate_id",
+            "side",
+            "symbol",
+            "regime_bucket",
+            "volatility_bucket",
+            "factor_bucket",
+        ),
         "parent_fields": ("candidate_id", "side"),
         "min_bucket_n": 1,
         "confidence_z": 0.0,
@@ -155,7 +177,10 @@ def test_edge_calibration_signature_ignores_locked_oos_poison() -> None:
     clean_payload = CALIBRATOR.build_calibration_payload(clean, **kwargs)
     poisoned_payload = CALIBRATOR.build_calibration_payload(poisoned, **kwargs)
 
-    assert clean_payload["calibrated_edges_for_strategy"] == poisoned_payload["calibrated_edges_for_strategy"]
+    assert (
+        clean_payload["calibrated_edges_for_strategy"]
+        == poisoned_payload["calibrated_edges_for_strategy"]
+    )
     assert clean_payload["locked_oos_calibration_record_count"] == 0
     assert poisoned_payload["locked_oos_calibration_record_count"] == 0
 
@@ -170,9 +195,9 @@ def test_timestamp_hash_uses_unique_split_timestamp_index() -> None:
     )
     single_symbol = frame[frame["symbol"].eq("BTC/USDT")].copy()
 
-    assert RUNNER._timestamp_index_hash(RUNNER.apply_common_split(frame)) == RUNNER._timestamp_index_hash(
-        RUNNER.apply_common_split(single_symbol)
-    )
+    assert RUNNER._timestamp_index_hash(
+        RUNNER.apply_common_split(frame)
+    ) == RUNNER._timestamp_index_hash(RUNNER.apply_common_split(single_symbol))
 
 
 def test_hybrid_alpha_stream_applies_common_replay_manifest_instead_of_fractional_split() -> None:
@@ -202,7 +227,9 @@ def test_alpha_rows_use_top_level_integer_grid_results() -> None:
                 "leverage": 6,
                 "deployable_success": True,
                 "liquidation_audit": {
-                    "split_status": {"locked_oos": {"liquidation_count": 0, "minimum_margin_buffer": 123.0}}
+                    "split_status": {
+                        "locked_oos": {"liquidation_count": 0, "minimum_margin_buffer": 123.0}
+                    }
                 },
                 "split_metrics": {
                     "locked_oos": {
@@ -237,9 +264,18 @@ def test_alpha_rows_use_top_level_integer_grid_results() -> None:
 def test_hybrid_rows_use_split_periods_as_effective_active_window() -> None:
     hybrid_payload = {
         "split_periods": {
-            "train": {"start_timestamp": "2025-01-01T00:00:00Z", "end_timestamp": "2025-12-31T23:00:00Z"},
-            "validation": {"start_timestamp": "2026-01-01T00:00:00Z", "end_timestamp": "2026-02-28T23:00:00Z"},
-            "locked_oos": {"start_timestamp": "2026-03-01T00:00:00Z", "end_timestamp": "2026-05-06T23:00:00Z"},
+            "train": {
+                "start_timestamp": "2025-01-01T00:00:00Z",
+                "end_timestamp": "2025-12-31T23:00:00Z",
+            },
+            "validation": {
+                "start_timestamp": "2026-01-01T00:00:00Z",
+                "end_timestamp": "2026-02-28T23:00:00Z",
+            },
+            "locked_oos": {
+                "start_timestamp": "2026-03-01T00:00:00Z",
+                "end_timestamp": "2026-05-06T23:00:00Z",
+            },
         }
     }
     item = {"splits": {"locked_oos": {"total_return": 0.1}}, "selection_provenance": {}}
@@ -272,7 +308,10 @@ def test_live_alpha_zoo_strict_6x_decision_artifact_maps_to_live_runtime() -> No
     assert config["strategy_params"]["calibrated_edges"]["default:SHORT"] > 0.0
     assert config["strategy_params"]["decision_cadence_seconds"] == 3600
     assert payload["live_equivalent_contract"]["live_cli_params_supported"] is True
-    assert payload["live_equivalent_contract"]["market_window_hourly_parity_test"] == "required_and_covered"
+    assert (
+        payload["live_equivalent_contract"]["market_window_hourly_parity_test"]
+        == "required_and_covered"
+    )
     assert locked_oos["total_return"] == pytest.approx(0.20512682089993306)
     assert locked_oos["liquidation_count"] == 0
     assert locked_oos["minimum_margin_buffer"] > 0.0

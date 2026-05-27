@@ -98,7 +98,9 @@ def _daily_map_from_payload(payload: dict[str, Any]) -> dict[str, float]:
                 raw_ts = point.get("datetime", point.get("t", point.get("timestamp", "")))
                 if raw_ts in (None, ""):
                     continue
-                if isinstance(raw_ts, (int, float)) or (isinstance(raw_ts, str) and raw_ts.strip().isdigit()):
+                if isinstance(raw_ts, (int, float)) or (
+                    isinstance(raw_ts, str) and raw_ts.strip().isdigit()
+                ):
                     ts = float(raw_ts)
                     if abs(ts) >= 1e12:
                         dt = datetime.fromtimestamp(ts / 1000.0, tz=UTC)
@@ -117,7 +119,16 @@ def _daily_map_from_payload(payload: dict[str, Any]) -> dict[str, float]:
     raise RuntimeError("payload has no usable daily return stream")
 
 
-def _split_for_day_key(day_key: str, *, train_start: date, train_end: date, val_start: date, val_end: date, oos_start: date, oos_end: date | None) -> str | None:
+def _split_for_day_key(
+    day_key: str,
+    *,
+    train_start: date,
+    train_end: date,
+    val_start: date,
+    val_end: date,
+    oos_start: date,
+    oos_end: date | None,
+) -> str | None:
     day_value = _parse_day(day_key)
     if day_value < train_start:
         return None
@@ -175,8 +186,16 @@ def _resplit_payload(
         split = _split_for_day_key(day_key, **split_bounds)
         if split is None:
             continue
-        streams[split].append({"datetime": f"{day_key}T00:00:00Z", "t": f"{day_key}T00:00:00Z", "v": float(daily_map[day_key])})
-    return _evaluate_single_stream(name=name, streams=streams, evaluate_weighted_portfolio=evaluate_weighted_portfolio)
+        streams[split].append(
+            {
+                "datetime": f"{day_key}T00:00:00Z",
+                "t": f"{day_key}T00:00:00Z",
+                "v": float(daily_map[day_key]),
+            }
+        )
+    return _evaluate_single_stream(
+        name=name, streams=streams, evaluate_weighted_portfolio=evaluate_weighted_portfolio
+    )
 
 
 def _row_from_allocator_payload(
@@ -230,7 +249,9 @@ def _best_weighted_blend(
         if float(oos.get("total_return", oos.get("return", 0.0))) <= 0.0:
             score -= 3.0
         normalized_streams = {}
-        for split_name, points in dict(evaluation.get("portfolio_daily_return_streams") or {}).items():
+        for split_name, points in dict(
+            evaluation.get("portfolio_daily_return_streams") or {}
+        ).items():
             normalized_streams[split_name] = [
                 {
                     "datetime": str(point.get("datetime") or point.get("t")),
@@ -249,8 +270,16 @@ def _best_weighted_blend(
             "portfolio_intraday_return_streams": normalized_streams,
             "weighted_component_summaries": evaluation.get("weighted_component_summaries"),
             "weights": [
-                {"candidate_id": str(left_row.get("candidate_key") or left_row.get("name")), "name": str(left_row.get("name")), "weight": float(left_weight)},
-                {"candidate_id": str(right_row.get("candidate_key") or right_row.get("name")), "name": str(right_row.get("name")), "weight": float(right_weight)},
+                {
+                    "candidate_id": str(left_row.get("candidate_key") or left_row.get("name")),
+                    "name": str(left_row.get("name")),
+                    "weight": float(left_weight),
+                },
+                {
+                    "candidate_id": str(right_row.get("candidate_key") or right_row.get("name")),
+                    "name": str(right_row.get("name")),
+                    "weight": float(right_weight),
+                },
             ],
             "source_components": source_paths,
             "validation_objective": score,
@@ -259,7 +288,9 @@ def _best_weighted_blend(
     leaderboard.sort(
         key=lambda item: (
             float(item["validation_objective"]),
-            float(((item.get("portfolio_metrics") or {}).get("oos") or {}).get("total_return", 0.0)),
+            float(
+                ((item.get("portfolio_metrics") or {}).get("oos") or {}).get("total_return", 0.0)
+            ),
             float(((item.get("portfolio_metrics") or {}).get("oos") or {}).get("sharpe", 0.0)),
         ),
         reverse=True,
@@ -285,7 +316,9 @@ def _load_pair_reports(group_root: Path, *, pattern: str) -> list[dict[str, Any]
     return rows
 
 
-def _select_best_pair_candidate(candidates: list[dict[str, Any]], validation_objective) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+def _select_best_pair_candidate(
+    candidates: list[dict[str, Any]], validation_objective
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     ranked: list[dict[str, Any]] = []
     for row in list(candidates or []):
         val = dict(row.get("val") or {})
@@ -351,11 +384,26 @@ def main() -> None:
     os.environ["LQ_PORTFOLIO_VAL_END"] = str(args.val_end)
     os.environ["LQ_PORTFOLIO_OOS_START"] = str(args.oos_start)
 
-    M = _load_module("group_market_regime_judgement_reboot_fast", "scripts/research/run_group_market_regime_judgement.py")
-    S = _load_module("soft_three_way_market_regime_allocator_reboot_fast", "scripts/research/run_soft_three_way_market_regime_allocator.py")
-    T = _load_module("three_way_market_regime_allocator_reboot_fast", "scripts/research/run_three_way_market_regime_allocator.py")
-    SW = _load_module("write_portfolio_operating_switch_reboot_fast", "scripts/research/write_portfolio_operating_switch.py")
-    from lumina_quant.portfolio_followup_rules import evaluate_weighted_portfolio, validation_objective
+    M = _load_module(
+        "group_market_regime_judgement_reboot_fast",
+        "scripts/research/run_group_market_regime_judgement.py",
+    )
+    S = _load_module(
+        "soft_three_way_market_regime_allocator_reboot_fast",
+        "scripts/research/run_soft_three_way_market_regime_allocator.py",
+    )
+    T = _load_module(
+        "three_way_market_regime_allocator_reboot_fast",
+        "scripts/research/run_three_way_market_regime_allocator.py",
+    )
+    SW = _load_module(
+        "write_portfolio_operating_switch_reboot_fast",
+        "scripts/research/write_portfolio_operating_switch.py",
+    )
+    from lumina_quant.portfolio_followup_rules import (
+        evaluate_weighted_portfolio,
+        validation_objective,
+    )
 
     split_bounds = {
         "train_start": _parse_day(args.train_start),
@@ -374,13 +422,25 @@ def main() -> None:
         "oos_end": _utc_now_iso() if not str(args.oos_end).strip() else _day_end_iso(args.oos_end),
     }
 
-    refresh_payload = json.loads((FOLLOWUP / "final_portfolio_validation_data_refresh_latest.json").read_text(encoding="utf-8"))
+    refresh_payload = json.loads(
+        (FOLLOWUP / "final_portfolio_validation_data_refresh_latest.json").read_text(
+            encoding="utf-8"
+        )
+    )
 
-    inc_source_artifact_path = FOLLOWUP / "portfolio_one_shot_current_opt" / "portfolio_optimization_latest.json"
-    auto_source_artifact_path = FOLLOWUP / "autoresearch_candidate_portfolio_opt" / "portfolio_optimization_latest.json"
+    inc_source_artifact_path = (
+        FOLLOWUP / "portfolio_one_shot_current_opt" / "portfolio_optimization_latest.json"
+    )
+    auto_source_artifact_path = (
+        FOLLOWUP / "autoresearch_candidate_portfolio_opt" / "portfolio_optimization_latest.json"
+    )
     inc_output_path = output_dir / "refreshed_current_one_shot_incumbent_portfolio_latest.json"
     auto_output_path = output_dir / "refreshed_autoresearch_pair_55_45_portfolio_latest.json"
-    operating_plan_path = GROUP_ROOT / "portfolio_candidate_overlay_review_current" / "portfolio_operating_plan_latest.json"
+    operating_plan_path = (
+        GROUP_ROOT
+        / "portfolio_candidate_overlay_review_current"
+        / "portfolio_operating_plan_latest.json"
+    )
     operating_plan_payload = json.loads(operating_plan_path.read_text(encoding="utf-8"))
 
     inc_source = json.loads(inc_source_artifact_path.read_text(encoding="utf-8"))
@@ -402,7 +462,9 @@ def main() -> None:
         "portfolio_metrics": inc_resplit["portfolio_metrics"],
         "weights": list(inc_source.get("weights") or []),
     }
-    inc_output_path.write_text(json.dumps(inc_payload, indent=2, sort_keys=True, default=_json_default), encoding="utf-8")
+    inc_output_path.write_text(
+        json.dumps(inc_payload, indent=2, sort_keys=True, default=_json_default), encoding="utf-8"
+    )
 
     auto_resplit = _resplit_payload(
         payload=auto_source,
@@ -421,7 +483,9 @@ def main() -> None:
         "weights": list(auto_source.get("weights") or []),
         "source_components": list(auto_source.get("source_components") or []),
     }
-    auto_output_path.write_text(json.dumps(auto_payload, indent=2, sort_keys=True, default=_json_default), encoding="utf-8")
+    auto_output_path.write_text(
+        json.dumps(auto_payload, indent=2, sort_keys=True, default=_json_default), encoding="utf-8"
+    )
 
     inc_row = {**inc_resplit, "candidate_key": "incumbent_only", "name": "incumbent_only"}
     auto_row = {**auto_resplit, "candidate_key": "autoresearch_55_45", "name": "autoresearch_55_45"}
@@ -433,12 +497,17 @@ def main() -> None:
         validation_objective=validation_objective,
         artifact_kind="refreshed_grouped_static_blend",
         selection_basis="reboot_split_blend_weight_search_from_resplit_sources",
-        source_paths={"incumbent": str(inc_output_path.resolve()), "autoresearch": str(auto_output_path.resolve())},
+        source_paths={
+            "incumbent": str(inc_output_path.resolve()),
+            "autoresearch": str(auto_output_path.resolve()),
+        },
     )
     static_best = _plain(static_best)
     static_best["leaderboard"] = [_plain(row) for row in static_board]
     blend_path = output_dir / "refreshed_grouped_static_blend_latest.json"
-    blend_path.write_text(json.dumps(static_best, indent=2, sort_keys=True, default=_json_default), encoding="utf-8")
+    blend_path.write_text(
+        json.dumps(static_best, indent=2, sort_keys=True, default=_json_default), encoding="utf-8"
+    )
 
     market_out = output_dir / "refreshed_market_regime_judgement_current"
     market_judgement_mode = "retuned"
@@ -490,11 +559,15 @@ def main() -> None:
         merged["oos"] = resplit["oos"]
         merged["return_streams"] = resplit["return_streams"]
         pair_resplit.append(merged)
-    pair_best, pair_ranked = _select_best_pair_candidate(pair_resplit, validation_objective=validation_objective)
+    pair_best, pair_ranked = _select_best_pair_candidate(
+        pair_resplit, validation_objective=validation_objective
+    )
     pair_best = _plain(pair_best)
     pair_best["reboot_pair_leaderboard"] = [_plain(row) for row in pair_ranked[:10]]
     pair_path = output_dir / "refreshed_pair_fast_exit_candidate_latest.json"
-    pair_path.write_text(json.dumps(pair_best, indent=2, sort_keys=True, default=_json_default), encoding="utf-8")
+    pair_path.write_text(
+        json.dumps(pair_best, indent=2, sort_keys=True, default=_json_default), encoding="utf-8"
+    )
 
     soft_row = _row_from_allocator_payload(
         dict(soft_report["payload"]),
@@ -503,7 +576,9 @@ def main() -> None:
         evaluate_weighted_portfolio=evaluate_weighted_portfolio,
     )
     pair_row = dict(pair_best)
-    pair_row["candidate_key"] = str(pair_row.get("candidate_id") or pair_row.get("name") or "pair_tactical_mode")
+    pair_row["candidate_key"] = str(
+        pair_row.get("candidate_id") or pair_row.get("name") or "pair_tactical_mode"
+    )
     balanced_best, balanced_board = _best_weighted_blend(
         left_row=soft_row,
         right_row=pair_row,
@@ -512,12 +587,17 @@ def main() -> None:
         validation_objective=validation_objective,
         artifact_kind="refreshed_balanced_overlay_strategy",
         selection_basis="reboot_split_soft_pair_overlay_weight_search",
-        source_paths={"soft_allocator": str(soft_report["latest_json_path"].resolve()), "pair_candidate": str(pair_path.resolve())},
+        source_paths={
+            "soft_allocator": str(soft_report["latest_json_path"].resolve()),
+            "pair_candidate": str(pair_path.resolve()),
+        },
     )
     balanced_best = _plain(balanced_best)
     balanced_best["leaderboard"] = [_plain(row) for row in balanced_board]
     balanced_path = output_dir / "refreshed_balanced_overlay_strategy_latest.json"
-    balanced_path.write_text(json.dumps(balanced_best, indent=2, sort_keys=True, default=_json_default), encoding="utf-8")
+    balanced_path.write_text(
+        json.dumps(balanced_best, indent=2, sort_keys=True, default=_json_default), encoding="utf-8"
+    )
 
     market_payload = json.loads(market_report["latest_json_path"].read_text(encoding="utf-8"))
     market_payload["_path"] = str(market_report["latest_json_path"].resolve())
@@ -528,8 +608,18 @@ def main() -> None:
     operating_plan_payload["_path"] = str(operating_plan_path.resolve())
     as_of = SW._parse_as_of_date(market_payload["current_judgement"]["date"])
     volume_signals = [
-        SW._load_symbol_volume_signal(raw_aggtrades_root=SW.DEFAULT_RAW_AGGTRADES_ROOT, symbol="BNB/USDT", as_of_date=as_of, lookback_days=SW.DEFAULT_VOLUME_LOOKBACK_DAYS),
-        SW._load_symbol_volume_signal(raw_aggtrades_root=SW.DEFAULT_RAW_AGGTRADES_ROOT, symbol="TRX/USDT", as_of_date=as_of, lookback_days=SW.DEFAULT_VOLUME_LOOKBACK_DAYS),
+        SW._load_symbol_volume_signal(
+            raw_aggtrades_root=SW.DEFAULT_RAW_AGGTRADES_ROOT,
+            symbol="BNB/USDT",
+            as_of_date=as_of,
+            lookback_days=SW.DEFAULT_VOLUME_LOOKBACK_DAYS,
+        ),
+        SW._load_symbol_volume_signal(
+            raw_aggtrades_root=SW.DEFAULT_RAW_AGGTRADES_ROOT,
+            symbol="TRX/USDT",
+            as_of_date=as_of,
+            lookback_days=SW.DEFAULT_VOLUME_LOOKBACK_DAYS,
+        ),
     ]
     switch_payload = SW.build_operating_switch_payload(
         market_judgement_payload=market_payload,
@@ -544,7 +634,10 @@ def main() -> None:
     switch_dir.mkdir(parents=True, exist_ok=True)
     switch_json = switch_dir / "portfolio_operating_switch_latest.json"
     switch_md = switch_dir / "portfolio_operating_switch_latest.md"
-    switch_json.write_text(json.dumps(switch_payload, indent=2, sort_keys=True, default=_json_default), encoding="utf-8")
+    switch_json.write_text(
+        json.dumps(switch_payload, indent=2, sort_keys=True, default=_json_default),
+        encoding="utf-8",
+    )
     switch_md.write_text(SW._build_markdown(switch_payload), encoding="utf-8")
 
     soft_oos = dict((soft_report["payload"].get("split_metrics") or {}).get("oos") or {})
@@ -561,16 +654,30 @@ def main() -> None:
             "risk_off_cash": {"total_return": 0.0, "sharpe": 0.0, "max_drawdown": 0.0},
             "switch_strategy_core_soft100": dict(soft_oos),
             "strategy1_balanced_overlay_80_20": dict(balanced_oos),
-            "three_way_regime": dict((hard_report["payload"].get("split_metrics") or {}).get("oos") or {}),
+            "three_way_regime": dict(
+                (hard_report["payload"].get("split_metrics") or {}).get("oos") or {}
+            ),
             "soft_three_way_regime": dict(soft_oos),
             "pair_tactical_mode": dict(pair_best.get("oos") or {}),
             "balanced_overlay_80_20": dict(balanced_oos),
         },
         "comparison_switch_vs_strategy1": {
-            "oos_return_delta": float(soft_oos.get("total_return", 0.0)) - float(balanced_oos.get("total_return", 0.0)),
-            "oos_sharpe_delta": float(soft_oos.get("sharpe", 0.0)) - float(balanced_oos.get("sharpe", 0.0)),
-            "oos_max_drawdown_delta": float(soft_oos.get("max_drawdown", 0.0)) - float(balanced_oos.get("max_drawdown", 0.0)),
-            "validation_objective_delta": float(validation_objective(dict((soft_report["payload"].get("split_metrics") or {}).get("val") or {}))) - float(validation_objective(dict((balanced_best.get("portfolio_metrics") or {}).get("val") or {}))),
+            "oos_return_delta": float(soft_oos.get("total_return", 0.0))
+            - float(balanced_oos.get("total_return", 0.0)),
+            "oos_sharpe_delta": float(soft_oos.get("sharpe", 0.0))
+            - float(balanced_oos.get("sharpe", 0.0)),
+            "oos_max_drawdown_delta": float(soft_oos.get("max_drawdown", 0.0))
+            - float(balanced_oos.get("max_drawdown", 0.0)),
+            "validation_objective_delta": float(
+                validation_objective(
+                    dict((soft_report["payload"].get("split_metrics") or {}).get("val") or {})
+                )
+            )
+            - float(
+                validation_objective(
+                    dict((balanced_best.get("portfolio_metrics") or {}).get("val") or {})
+                )
+            ),
         },
         "artifact_paths": {
             "refreshed_incumbent": str(inc_output_path.resolve()),
@@ -588,11 +695,15 @@ def main() -> None:
         "selected_balanced_overlay": balanced_best,
         "selected_static_blend": static_best,
         "selected_pair_candidate_count": len(pair_resplit),
-        "pair_report_sources": sorted({str(path) for path in GROUP_ROOT.glob(str(args.pair_report_glob))}),
+        "pair_report_sources": sorted(
+            {str(path) for path in GROUP_ROOT.glob(str(args.pair_report_glob))}
+        ),
     }
     summary_json = output_dir / "refreshed_switch_vs_strategy1_validation_latest.json"
     summary_md = output_dir / "refreshed_switch_vs_strategy1_validation_latest.md"
-    summary_json.write_text(json.dumps(summary, indent=2, sort_keys=True, default=_json_default), encoding="utf-8")
+    summary_json.write_text(
+        json.dumps(summary, indent=2, sort_keys=True, default=_json_default), encoding="utf-8"
+    )
     summary_md.write_text(_build_markdown(summary), encoding="utf-8")
 
     print(str(summary_json.resolve()))

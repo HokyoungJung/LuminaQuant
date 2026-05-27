@@ -11,7 +11,9 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT / "scripts" / "research" / "build_portfolio_exact_window_freeze.py"
 if not MODULE_PATH.exists():
-    pytest.skip("build_portfolio_exact_window_freeze script not yet present", allow_module_level=True)
+    pytest.skip(
+        "build_portfolio_exact_window_freeze script not yet present", allow_module_level=True
+    )
 
 SPEC = importlib.util.spec_from_file_location("build_portfolio_exact_window_freeze", MODULE_PATH)
 if SPEC is None or SPEC.loader is None:
@@ -177,7 +179,11 @@ def _call_write(
     if extra_kwargs:
         candidate_kwargs.update(extra_kwargs)
     accepts_kwargs = any(param.kind is inspect.Parameter.VAR_KEYWORD for param in params.values())
-    call_kwargs = dict(candidate_kwargs) if accepts_kwargs else {name: value for name, value in candidate_kwargs.items() if name in params}
+    call_kwargs = (
+        dict(candidate_kwargs)
+        if accepts_kwargs
+        else {name: value for name, value in candidate_kwargs.items() if name in params}
+    )
     try:
         return write_portfolio_exact_window_freeze(**call_kwargs)
     except TypeError as exc:  # pragma: no cover - assertion payload is the point.
@@ -221,7 +227,9 @@ def _selected_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _selected_ids(payload: dict[str, Any]) -> set[str]:
-    return {str(row.get("candidate_id") or row.get("name") or "") for row in _selected_rows(payload)}
+    return {
+        str(row.get("candidate_id") or row.get("name") or "") for row in _selected_rows(payload)
+    }
 
 
 def _rolling_admission_blocked(payload: dict[str, Any]) -> bool:
@@ -302,7 +310,9 @@ def _base_incumbent_grouped_rows() -> dict[str, list[dict[str, Any]]]:
     }
 
 
-def _write_incumbent_bundle(tmp_path: Path, rows: list[dict[str, Any]]) -> tuple[Path, dict[str, Any]]:
+def _write_incumbent_bundle(
+    tmp_path: Path, rows: list[dict[str, Any]]
+) -> tuple[Path, dict[str, Any]]:
     bundle_path = tmp_path / "portfolio_one_shot_incumbent_bundle_latest.json"
     weighted_rows = []
     total = max(1, len(rows))
@@ -320,7 +330,9 @@ def _write_incumbent_bundle(tmp_path: Path, rows: list[dict[str, Any]]) -> tuple
     return bundle_path, payload
 
 
-def test_build_portfolio_exact_window_freeze_prefers_validation_only_and_excludes_pair_spread(tmp_path: Path):
+def test_build_portfolio_exact_window_freeze_prefers_validation_only_and_excludes_pair_spread(
+    tmp_path: Path,
+):
     grouped_rows = {
         "composite_trend_30m": [
             _row(
@@ -443,17 +455,26 @@ def test_build_portfolio_exact_window_freeze_prefers_validation_only_and_exclude
     assert "topcap-val-winner" in selected_ids
     assert "topcap-oos-lure" not in selected_ids
     assert "pair-spread-should-be-excluded" not in selected_ids
-    assert all(str(row.get("strategy_class") or "") != "PairSpreadZScoreStrategy" for row in selected)
+    assert all(
+        str(row.get("strategy_class") or "") != "PairSpreadZScoreStrategy" for row in selected
+    )
     assert len(selected) == 2
     optimizer_bundle = dict(_unwrap_payload(payload).get("optimizer_bundle") or {})
     assert len(list(optimizer_bundle.get("candidates") or [])) == 2
     assert len(list(optimizer_bundle.get("selected_team") or [])) == 2
 
-    composite_row = next(row for row in selected if str(row.get("candidate_id")) == "composite-val-winner")
-    assert composite_row["return_streams"]["oos"][0]["t"] == grouped_rows["composite_trend_30m"][0]["return_streams"]["oos"][0]["t"]
+    composite_row = next(
+        row for row in selected if str(row.get("candidate_id")) == "composite-val-winner"
+    )
+    assert (
+        composite_row["return_streams"]["oos"][0]["t"]
+        == grouped_rows["composite_trend_30m"][0]["return_streams"]["oos"][0]["t"]
+    )
 
 
-def test_build_portfolio_exact_window_freeze_keeps_rollingbreakout_base_row_before_gate_supplement(tmp_path: Path):
+def test_build_portfolio_exact_window_freeze_keeps_rollingbreakout_base_row_before_gate_supplement(
+    tmp_path: Path,
+):
     grouped_rows = {
         "rolling_breakout_30m": [
             _row(
@@ -534,7 +555,9 @@ def test_build_portfolio_exact_window_freeze_keeps_rollingbreakout_base_row_befo
         assert metadata_dict.get("activation_rule_id") == "basket_vol_ratio_moderate"
 
 
-def test_write_portfolio_exact_window_freeze_writes_files(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_write_portfolio_exact_window_freeze_writes_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     grouped_rows = {
         "topcap_tsmom_1h": [
             _row(
@@ -897,7 +920,9 @@ def test_incumbent_anchor_mode_admits_fourth_sleeve_only_when_gate_passes(tmp_pa
     assert "rolling-train-val-survivor" in selected_ids
     selection_basis = _selection_basis(payload).lower()
     assert "incumbent" in selection_basis and "anchor" in selection_basis
-    rolling_row = next(row for row in selected if str(row.get("candidate_id")) == "rolling-train-val-survivor")
+    rolling_row = next(
+        row for row in selected if str(row.get("candidate_id")) == "rolling-train-val-survivor"
+    )
     metadata = dict(rolling_row.get("metadata") or {})
     assert metadata.get("activation_rule_survives") is True
     assert _rolling_admission_blocked(payload) is False

@@ -224,7 +224,9 @@ class RawFirstChunkCache:
         while len(self._cache) > self.max_entries:
             self._cache.popitem(last=False)
 
-    def load(self, *, symbols: list[str], chunk_start: datetime, chunk_end: datetime) -> dict[str, FrozenRows]:
+    def load(
+        self, *, symbols: list[str], chunk_start: datetime, chunk_end: datetime
+    ) -> dict[str, FrozenRows]:
         out: dict[str, FrozenRows] = {}
         missing: list[str] = []
         for symbol in list(symbols or []):
@@ -487,7 +489,9 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
     )
 
 
-def _checkpoint_get(checkpoint: dict[str, Any], *, candidate_id: str, split: str) -> dict[str, Any] | None:
+def _checkpoint_get(
+    checkpoint: dict[str, Any], *, candidate_id: str, split: str
+) -> dict[str, Any] | None:
     runs = checkpoint.get("runs")
     if not isinstance(runs, dict):
         return None
@@ -550,12 +554,18 @@ def _normalize_metrics_payload(
     """
     source = dict(metrics or {})
     out: dict[str, Any] = {key: _safe_float(source.get(key), 0.0) for key in _empty_metrics()}
-    raw_total_return = _safe_float(source.get("raw_total_return", out["total_return"]), out["total_return"])
-    raw_max_drawdown = _safe_float(source.get("raw_max_drawdown", out["max_drawdown"]), out["max_drawdown"])
+    raw_total_return = _safe_float(
+        source.get("raw_total_return", out["total_return"]), out["total_return"]
+    )
+    raw_max_drawdown = _safe_float(
+        source.get("raw_max_drawdown", out["max_drawdown"]), out["max_drawdown"]
+    )
     min_equity = _safe_float(source.get("min_equity"), 0.0)
     raw_final_equity = _safe_float(source.get("raw_final_equity", final_equity or 0.0), 0.0)
     breach_count = _safe_float(source.get("equity_breach_count"), 0.0)
-    final_value = _safe_float(final_equity, float("nan")) if final_equity is not None else float("nan")
+    final_value = (
+        _safe_float(final_equity, float("nan")) if final_equity is not None else float("nan")
+    )
     final_breach = bool(
         math.isfinite(final_value)
         and final_value <= 0.0
@@ -809,7 +819,9 @@ def _run_split_batch(
 def _screen_pass(result: dict[str, Any]) -> bool:
     metrics = _normalize_metrics_payload(
         dict(result.get("metrics") or {}),
-        final_equity=result.get("final_equity") if str(result.get("status") or "") == "completed" else None,
+        final_equity=result.get("final_equity")
+        if str(result.get("status") or "") == "completed"
+        else None,
     )
     return bool(
         str(result.get("status") or "") == "completed"
@@ -880,7 +892,9 @@ def _candidate_row(
         result = dict(split_results.get(split_name) or {})
         metrics = _normalize_metrics_payload(
             dict(result.get("metrics") or {}),
-            final_equity=result.get("final_equity") if str(result.get("status") or "") == "completed" else None,
+            final_equity=result.get("final_equity")
+            if str(result.get("status") or "") == "completed"
+            else None,
         )
         row[f"{split_name}_status"] = str(result.get("status") or "")
         row[f"{split_name}_trade_count"] = int(result.get("trade_count") or 0)
@@ -1038,7 +1052,9 @@ def _build_parser() -> argparse.ArgumentParser:
         default="2026-02-14",
         help="Validation sub-window end for broad cadence screening.",
     )
-    parser.add_argument("--cadence-grid", default=",".join(str(item) for item in DEFAULT_CADENCE_GRID))
+    parser.add_argument(
+        "--cadence-grid", default=",".join(str(item) for item in DEFAULT_CADENCE_GRID)
+    )
     parser.add_argument(
         "--mode-contains",
         default="profit_moonshot_,profit_reboot_,derivatives_flow_squeeze_mode",
@@ -1071,14 +1087,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     cadence_grid = _parse_int_grid(args.cadence_grid)
     requested_modes = [
-        item.strip()
-        for item in str(args.portfolio_modes or "").split(",")
-        if item.strip()
+        item.strip() for item in str(args.portfolio_modes or "").split(",") if item.strip()
     ]
     include_tokens = tuple(
-        item.strip()
-        for item in str(args.mode_contains or "").split(",")
-        if item.strip()
+        item.strip() for item in str(args.mode_contains or "").split(",") if item.strip()
     )
     modes = requested_modes or [
         mode
@@ -1195,7 +1207,9 @@ def main(argv: list[str] | None = None) -> int:
                     full_results_by_candidate[candidate.candidate_id][split_name] = cached
                     all_runs.append(cached)
                     continue
-                pending_by_symbols.setdefault(tuple(_candidate_symbols(candidate)), []).append(candidate)
+                pending_by_symbols.setdefault(tuple(_candidate_symbols(candidate)), []).append(
+                    candidate
+                )
 
             for group_idx, group in enumerate(pending_by_symbols.values(), start=1):
                 print(
@@ -1306,8 +1320,12 @@ def main(argv: list[str] | None = None) -> int:
         "paths": {
             "json": str((output_dir / "profit_moonshot_cadence_sweep_latest.json").resolve()),
             "markdown": str((output_dir / "profit_moonshot_cadence_sweep_latest.md").resolve()),
-            "screen_csv": str((output_dir / "profit_moonshot_cadence_sweep_screen_latest.csv").resolve()),
-            "full_csv": str((output_dir / "profit_moonshot_cadence_sweep_full_latest.csv").resolve()),
+            "screen_csv": str(
+                (output_dir / "profit_moonshot_cadence_sweep_screen_latest.csv").resolve()
+            ),
+            "full_csv": str(
+                (output_dir / "profit_moonshot_cadence_sweep_full_latest.csv").resolve()
+            ),
             "checkpoint": str(checkpoint_path.resolve()),
         },
     }

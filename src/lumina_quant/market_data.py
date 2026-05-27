@@ -528,15 +528,9 @@ def _partition_parquet_paths(
     start_ms = _coerce_timestamp_ms(start_date)
     end_ms = _coerce_timestamp_ms(end_date)
     start_token = (
-        _timestamp_ms_to_datetime(start_ms).date().isoformat()
-        if start_ms is not None
-        else None
+        _timestamp_ms_to_datetime(start_ms).date().isoformat() if start_ms is not None else None
     )
-    end_token = (
-        _timestamp_ms_to_datetime(end_ms).date().isoformat()
-        if end_ms is not None
-        else None
-    )
+    end_token = _timestamp_ms_to_datetime(end_ms).date().isoformat() if end_ms is not None else None
 
     try:
         partition_dirs = sorted(path for path in base.glob("date=*") if path.is_dir())
@@ -653,7 +647,9 @@ def _ensure_ohlcv_frame(rows: Any) -> pl.DataFrame:
         frame.select(required)
         .with_columns(
             [
-                pl.col("datetime").cast(pl.Datetime(time_unit="ms"), strict=False).alias("datetime"),
+                pl.col("datetime")
+                .cast(pl.Datetime(time_unit="ms"), strict=False)
+                .alias("datetime"),
                 pl.col("open").cast(pl.Float64),
                 pl.col("high").cast(pl.Float64),
                 pl.col("low").cast(pl.Float64),
@@ -804,8 +800,8 @@ def _load_feature_points(
 
     if frame.is_empty():
         return frame
-    return frame.sort("timestamp_ms").unique(subset=["timestamp_ms"], keep="last").sort(
-        "timestamp_ms"
+    return (
+        frame.sort("timestamp_ms").unique(subset=["timestamp_ms"], keep="last").sort("timestamp_ms")
     )
 
 
@@ -853,7 +849,14 @@ def _upsert_feature_points(
         },
         strict=False,
     )
-    canonical_columns = ["exchange", "symbol", "timestamp_ms", "datetime", "source", *_FEATURE_COLUMNS]
+    canonical_columns = [
+        "exchange",
+        "symbol",
+        "timestamp_ms",
+        "datetime",
+        "source",
+        *_FEATURE_COLUMNS,
+    ]
 
     def _align_columns(frame: pl.DataFrame) -> pl.DataFrame:
         out = frame
@@ -874,9 +877,7 @@ def _upsert_feature_points(
         pl.col("datetime").drop_nulls().last().alias("datetime"),
         pl.col("source").drop_nulls().last().alias("source"),
     ]
-    grouped_expr.extend(
-        [pl.col(col).drop_nulls().last().alias(col) for col in _FEATURE_COLUMNS]
-    )
+    grouped_expr.extend([pl.col(col).drop_nulls().last().alias(col) for col in _FEATURE_COLUMNS])
 
     compacted = merged.group_by("timestamp_ms").agg(grouped_expr).sort("timestamp_ms")
     compacted = compacted.with_columns(

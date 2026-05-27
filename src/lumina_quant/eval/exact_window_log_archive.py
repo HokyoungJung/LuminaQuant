@@ -277,14 +277,18 @@ def _merge_registry_entry(primary: dict[str, Any], secondary: dict[str, Any]) ->
         merged[key] = _prefer_string(primary.get(key), secondary.get(key))
     for key in ("requested_timeframes", "requested_symbols"):
         merged[key] = _prefer_list(primary.get(key), secondary.get(key))
-    merged["allow_metals"] = _prefer_bool(primary.get("allow_metals"), secondary.get("allow_metals"))
+    merged["allow_metals"] = _prefer_bool(
+        primary.get("allow_metals"), secondary.get("allow_metals")
+    )
     for key in ("chunk_days", "promoted_count", "evaluated_count"):
         merged[key] = _prefer_int(primary.get(key), secondary.get(key))
     merged["peak_rss_mib"] = max(
         _prefer_float(primary.get("peak_rss_mib"), 0.0),
         _prefer_float(secondary.get("peak_rss_mib"), 0.0),
     )
-    merged["updated_at_utc"] = _prefer_string(primary.get("updated_at_utc"), secondary.get("updated_at_utc")) or _now_iso()
+    merged["updated_at_utc"] = (
+        _prefer_string(primary.get("updated_at_utc"), secondary.get("updated_at_utc")) or _now_iso()
+    )
     if not merged["batch_id"] and merged["requested_timeframes"]:
         merged["batch_id"] = "-".join(merged["requested_timeframes"])
     if not merged["window_profile"]:
@@ -337,13 +341,25 @@ def _canonical_signature_entries(
         entry = {
             "run_id": run_id,
             "batch_id": batch_id or _string_or_none(manifest.get("batch_id")) or "",
-            "run_signature": _string_or_none(record.get("signature")) or _string_or_none(manifest.get("run_signature")) or "",
-            "status": _string_or_none(record.get("status")) or _string_or_none(manifest.get("status")) or "",
+            "run_signature": _string_or_none(record.get("signature"))
+            or _string_or_none(manifest.get("run_signature"))
+            or "",
+            "status": _string_or_none(record.get("status"))
+            or _string_or_none(manifest.get("status"))
+            or "",
             "manifest_path": manifest_path,
-            "summary_path": _prefer_string(record.get("summary_path"), manifest.get("summary_path")),
-            "details_path": _prefer_string(record.get("details_path"), manifest.get("details_path")),
-            "fail_analysis_path": _prefer_string(record.get("fail_analysis_path"), manifest.get("fail_analysis_path")),
-            "memory_evidence_path": _prefer_string(record.get("memory_evidence_path"), manifest.get("memory_evidence_path")),
+            "summary_path": _prefer_string(
+                record.get("summary_path"), manifest.get("summary_path")
+            ),
+            "details_path": _prefer_string(
+                record.get("details_path"), manifest.get("details_path")
+            ),
+            "fail_analysis_path": _prefer_string(
+                record.get("fail_analysis_path"), manifest.get("fail_analysis_path")
+            ),
+            "memory_evidence_path": _prefer_string(
+                record.get("memory_evidence_path"), manifest.get("memory_evidence_path")
+            ),
             "requested_timeframes": _prefer_list(
                 manifest.get("requested_timeframes"),
                 batch_id.split("-") if batch_id else [],
@@ -357,21 +373,36 @@ def _canonical_signature_entries(
             "train_start": _prefer_string(manifest.get("train_start"), record.get("train_start")),
             "val_start": _prefer_string(manifest.get("val_start"), record.get("val_start")),
             "oos_start": _prefer_string(manifest.get("oos_start"), record.get("oos_start")),
-            "window_profile": _prefer_string(manifest.get("window_profile"), record.get("window_profile")),
+            "window_profile": _prefer_string(
+                manifest.get("window_profile"), record.get("window_profile")
+            ),
             "chunk_days": _prefer_int(manifest.get("chunk_days"), record.get("chunk_days")),
-            "promoted_count": _prefer_int(manifest.get("promoted_count"), record.get("promoted_count")),
-            "evaluated_count": _prefer_int(manifest.get("evaluated_count"), record.get("evaluated_count")),
+            "promoted_count": _prefer_int(
+                manifest.get("promoted_count"), record.get("promoted_count")
+            ),
+            "evaluated_count": _prefer_int(
+                manifest.get("evaluated_count"), record.get("evaluated_count")
+            ),
             "peak_rss_mib": _memory_peak_rss_mib(
-                _prefer_string(record.get("memory_evidence_path"), manifest.get("memory_evidence_path"))
+                _prefer_string(
+                    record.get("memory_evidence_path"), manifest.get("memory_evidence_path")
+                )
             ),
             "error": record.get("error") or manifest.get("error"),
-            "updated_at_utc": _prefer_string(record.get("completed_at_utc"), record.get("started_at_utc")) or _now_iso(),
+            "updated_at_utc": _prefer_string(
+                record.get("completed_at_utc"), record.get("started_at_utc")
+            )
+            or _now_iso(),
         }
         entries_by_run_id[run_id] = _merge_registry_entry(
             _enrich_registry_entry(entry),
             entries_by_run_id.get(run_id, {}),
         )
-    return sorted(entries_by_run_id.values(), key=lambda item: str(item.get("updated_at_utc") or ""), reverse=True)
+    return sorted(
+        entries_by_run_id.values(),
+        key=lambda item: str(item.get("updated_at_utc") or ""),
+        reverse=True,
+    )
 
 
 def scan_exact_window_logs(log_dir: Path) -> list[dict[str, Any]]:
@@ -388,12 +419,20 @@ def scan_exact_window_logs(log_dir: Path) -> list[dict[str, Any]]:
             for payload in blocks:
                 if "run_id" not in payload or "status" not in payload:
                     continue
-                if "manifest_path" not in payload and "snapshot" not in payload and "active_run" in payload:
+                if (
+                    "manifest_path" not in payload
+                    and "snapshot" not in payload
+                    and "active_run" in payload
+                ):
                     continue
                 requested_timeframes = list(cli_meta.get("requested_timeframes") or [])
                 if not requested_timeframes and payload.get("timeframe"):
                     requested_timeframes = [str(payload.get("timeframe"))]
-                batch_id = "-".join(requested_timeframes) if requested_timeframes else str(payload.get("batch_id") or "")
+                batch_id = (
+                    "-".join(requested_timeframes)
+                    if requested_timeframes
+                    else str(payload.get("batch_id") or "")
+                )
                 entry = {
                     "run_id": str(payload.get("run_id") or ""),
                     "batch_id": batch_id,
@@ -402,10 +441,14 @@ def scan_exact_window_logs(log_dir: Path) -> list[dict[str, Any]]:
                     "manifest_path": payload.get("manifest_path"),
                     "summary_path": payload.get("summary_latest") or payload.get("summary_path"),
                     "details_path": payload.get("details_latest") or payload.get("details_path"),
-                    "fail_analysis_path": payload.get("fail_analysis_latest") or payload.get("fail_analysis_path"),
-                    "memory_evidence_path": payload.get("memory_evidence_latest") or payload.get("memory_evidence_path"),
+                    "fail_analysis_path": payload.get("fail_analysis_latest")
+                    or payload.get("fail_analysis_path"),
+                    "memory_evidence_path": payload.get("memory_evidence_latest")
+                    or payload.get("memory_evidence_path"),
                     "requested_timeframes": requested_timeframes,
-                    "requested_symbols": list(cli_meta.get("requested_symbols") or payload.get("eligible_symbols") or []),
+                    "requested_symbols": list(
+                        cli_meta.get("requested_symbols") or payload.get("eligible_symbols") or []
+                    ),
                     "allow_metals": bool(payload.get("allow_metals")),
                     "requested_oos_end_exclusive": None,
                     "train_start": None,
@@ -428,7 +471,9 @@ def scan_exact_window_logs(log_dir: Path) -> list[dict[str, Any]]:
             continue
         existing = deduped.get(run_id)
         deduped[run_id] = _merge_registry_entry(entry, existing or {})
-    return sorted(deduped.values(), key=lambda item: (str(item.get("run_id")), str(item.get("log_path"))))
+    return sorted(
+        deduped.values(), key=lambda item: (str(item.get("run_id")), str(item.get("log_path")))
+    )
 
 
 def write_exact_window_canonical_registry(*, report_root: Path) -> dict[str, Any]:
@@ -440,7 +485,9 @@ def write_exact_window_canonical_registry(*, report_root: Path) -> dict[str, Any
         for row in list((existing_payload or {}).get("entries") or [])
         if isinstance(row, dict)
     ]
-    entries = _canonical_signature_entries(report_root=report_root, existing_entries=existing_entries)
+    entries = _canonical_signature_entries(
+        report_root=report_root, existing_entries=existing_entries
+    )
     payload = {
         "schema_version": "1.0",
         "artifact_kind": "exact_window_canonical_registry",
@@ -463,7 +510,9 @@ def write_exact_window_log_archive(*, log_dir: Path, report_root: Path) -> dict[
     followup_root.mkdir(parents=True, exist_ok=True)
     log_entries = scan_exact_window_logs(log_dir)
     recovered_registry_path = report_root / RECOVERED_REGISTRY_LATEST
-    existing_payload = _json_load(recovered_registry_path) if recovered_registry_path.exists() else None
+    existing_payload = (
+        _json_load(recovered_registry_path) if recovered_registry_path.exists() else None
+    )
     existing_entries = [
         dict(row)
         for row in list((existing_payload or {}).get("entries") or [])
@@ -491,7 +540,9 @@ def write_exact_window_log_archive(*, log_dir: Path, report_root: Path) -> dict[
         "entry_count": len(entries),
         "entries": entries,
     }
-    recovered_registry_path.write_text(json.dumps(registry_payload, indent=2, sort_keys=True), encoding="utf-8")
+    recovered_registry_path.write_text(
+        json.dumps(registry_payload, indent=2, sort_keys=True), encoding="utf-8"
+    )
 
     archive_payload = {
         "schema_version": "1.0",

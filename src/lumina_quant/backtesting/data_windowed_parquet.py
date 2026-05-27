@@ -164,7 +164,9 @@ class HistoricParquetWindowedDataHandler(HistoricCSVDataHandler):
             scoped = []
             timestamp_rows = self._window_row_timestamps_ms.get(symbol)
             if timestamp_rows is None or len(timestamp_rows) != len(rows):
-                timestamp_rows = deque((self._bar_time_ms(row[0]) for row in rows), maxlen=rows.maxlen)
+                timestamp_rows = deque(
+                    (self._bar_time_ms(row[0]) for row in rows), maxlen=rows.maxlen
+                )
                 self._window_row_timestamps_ms[symbol] = timestamp_rows
             for ts_ms, row in zip(timestamp_rows, rows, strict=False):
                 if ts_ms is None or int(ts_ms) < cutoff_ms:
@@ -246,7 +248,9 @@ class HistoricParquetWindowedDataHandler(HistoricCSVDataHandler):
             kept_timestamps = []
             timestamp_rows = self._window_row_timestamps_ms.get(symbol)
             if timestamp_rows is None or len(timestamp_rows) != len(rows):
-                timestamp_rows = deque((self._bar_time_ms(row[0]) for row in rows), maxlen=rows.maxlen)
+                timestamp_rows = deque(
+                    (self._bar_time_ms(row[0]) for row in rows), maxlen=rows.maxlen
+                )
                 self._window_row_timestamps_ms[symbol] = timestamp_rows
             for ts_ms, row in zip(timestamp_rows, rows, strict=False):
                 if ts_ms is None:

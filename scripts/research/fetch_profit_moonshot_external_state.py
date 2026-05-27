@@ -39,7 +39,9 @@ def _fred_csv_url(series_id: str, start: date, end: date) -> str:
     )
 
 
-def _fetch_fred_series(series_id: str, start: date, end: date, *, timeout: float = 30.0) -> pl.DataFrame:
+def _fetch_fred_series(
+    series_id: str, start: date, end: date, *, timeout: float = 30.0
+) -> pl.DataFrame:
     url = _fred_csv_url(series_id, start, end)
     with urlopen(url, timeout=timeout) as response:
         raw = response.read().decode("utf-8")
@@ -92,7 +94,9 @@ def _build_external_state_panel(series_frames: list[pl.DataFrame]) -> pl.DataFra
         ).alias("external_risk_off_score")
     )
     lag_columns = [column for column in panel.columns if column.startswith("external_")]
-    panel = panel.with_columns([pl.col(column).shift(1).alias(f"{column}_lag1") for column in lag_columns])
+    panel = panel.with_columns(
+        [pl.col(column).shift(1).alias(f"{column}_lag1") for column in lag_columns]
+    )
     keep_columns = ["date", *lag_columns, *(f"{column}_lag1" for column in lag_columns)]
     return panel.select(keep_columns).rename({"date": "effective_date"})
 
@@ -104,7 +108,9 @@ def build_payload(args: argparse.Namespace) -> tuple[dict[str, object], pl.DataF
     series_metadata: dict[str, object] = {}
     for series_id in [item.strip().upper() for item in str(args.series).split(",") if item.strip()]:
         if series_id not in FRED_SERIES:
-            raise ValueError(f"unsupported FRED series {series_id}; supported={sorted(FRED_SERIES)}")
+            raise ValueError(
+                f"unsupported FRED series {series_id}; supported={sorted(FRED_SERIES)}"
+            )
         frame = _fetch_fred_series(series_id, start, end)
         frames.append(frame)
         series_metadata[series_id] = {
@@ -148,7 +154,11 @@ def main(argv: list[str] | None = None) -> int:
     panel.write_csv(csv_path)
     payload["csv_path"] = str(csv_path)
     json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
-    print(json.dumps({"csv": str(csv_path), "json": str(json_path), "rows": panel.height}, sort_keys=True))
+    print(
+        json.dumps(
+            {"csv": str(csv_path), "json": str(json_path), "rows": panel.height}, sort_keys=True
+        )
+    )
     return 0
 
 

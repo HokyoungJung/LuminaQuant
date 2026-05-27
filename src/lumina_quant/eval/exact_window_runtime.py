@@ -115,7 +115,11 @@ def resolve_memory_budget_bytes() -> int | None:
     env_budget = _read_env_budget_bytes()
     cgroup_limit = _read_cgroup_limit_bytes()
     memavailable = _read_memavailable_bytes()
-    candidates = [value for value in (cgroup_limit, memavailable, env_budget) if value is not None and value > 0]
+    candidates = [
+        value
+        for value in (cgroup_limit, memavailable, env_budget)
+        if value is not None and value > 0
+    ]
     if not candidates:
         return None
     return min(candidates)
@@ -138,7 +142,9 @@ def _process_running(pid: int | None) -> bool:
 class HeavyRunActiveError(RuntimeError):
     """Raised when another heavy exact-window backtest already owns the lock."""
 
-    def __init__(self, *, lock_path: str | Path, active_payload: dict[str, Any] | None = None) -> None:
+    def __init__(
+        self, *, lock_path: str | Path, active_payload: dict[str, Any] | None = None
+    ) -> None:
         self.lock_path = Path(lock_path).resolve()
         self.active_payload = dict(active_payload or {})
         pid = self.active_payload.get("pid")
@@ -192,7 +198,9 @@ class HeavyRunLock:
                 try:
                     resolved.unlink()
                 except OSError:
-                    raise HeavyRunActiveError(lock_path=resolved, active_payload=active_payload) from None
+                    raise HeavyRunActiveError(
+                        lock_path=resolved, active_payload=active_payload
+                    ) from None
                 continue
             with os.fdopen(fd, "w", encoding="utf-8") as handle:
                 handle.write(json.dumps(payload, indent=2, sort_keys=True))
@@ -247,7 +255,9 @@ class RSSGuard:
         self.log_path = Path(log_path).resolve()
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
         self.label = str(label)
-        self.budget_bytes = int(budget_bytes) if budget_bytes is not None else resolve_memory_budget_bytes()
+        self.budget_bytes = (
+            int(budget_bytes) if budget_bytes is not None else resolve_memory_budget_bytes()
+        )
         self.soft_limit_bytes = (
             int(soft_limit_bytes)
             if soft_limit_bytes is not None
@@ -282,12 +292,20 @@ class RSSGuard:
             "hard_limit_mib": bytes_to_mib(self.hard_limit_bytes),
             "context": dict(context or {}),
         }
-        if rss_bytes is not None and self.soft_limit_bytes is not None and rss_bytes >= self.soft_limit_bytes:
+        if (
+            rss_bytes is not None
+            and self.soft_limit_bytes is not None
+            and rss_bytes >= self.soft_limit_bytes
+        ):
             self.soft_trigger_count += 1
             record["soft_limit_exceeded"] = True
         else:
             record["soft_limit_exceeded"] = False
-        if rss_bytes is not None and self.hard_limit_bytes is not None and rss_bytes >= self.hard_limit_bytes:
+        if (
+            rss_bytes is not None
+            and self.hard_limit_bytes is not None
+            and rss_bytes >= self.hard_limit_bytes
+        ):
             self.hard_trigger_count += 1
             record["hard_limit_exceeded"] = True
         else:

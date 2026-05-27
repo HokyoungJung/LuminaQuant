@@ -39,10 +39,15 @@ def test_build_alpha_research_pipeline_manifest_contains_expected_sections(tmp_p
     assert len(payload["families"]) >= 5
     assert set(DEFAULT_METRICS).issubset(set(payload["metric_checklist"]))
     assert any(
-        "global across all active sessions/services/workers" in rule for rule in payload["operating_rules"]
+        "global across all active sessions/services/workers" in rule
+        for rule in payload["operating_rules"]
     )
-    assert payload["recommended_outputs"]["signature_registry"].endswith("exact_window_run_registry.jsonl")
-    assert payload["recommended_outputs"]["recovered_run_archive"].endswith("backtest_log_archive_latest.json")
+    assert payload["recommended_outputs"]["signature_registry"].endswith(
+        "exact_window_run_registry.jsonl"
+    )
+    assert payload["recommended_outputs"]["recovered_run_archive"].endswith(
+        "backtest_log_archive_latest.json"
+    )
 
 
 def test_build_alpha_research_pipeline_manifest_uses_8gb_defaults(tmp_path: Path):

@@ -37,10 +37,7 @@ def _rewrite_file(path: Path) -> dict[str, int | str]:
         ]
     )
 
-    changed = (
-        original.columns != updated.columns
-        or not original.equals(updated, null_equal=True)
-    )
+    changed = original.columns != updated.columns or not original.equals(updated, null_equal=True)
     if not changed:
         return {"file": str(path), "updated": 0, "rows": int(updated.height)}
 

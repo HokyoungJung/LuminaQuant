@@ -450,4 +450,5 @@ class HistoricCSVDataHandler(DataHandler):
         _ = symbol
         return {}
 
+
 __all__ = ["DataHandler", "HistoricCSVDataHandler"]

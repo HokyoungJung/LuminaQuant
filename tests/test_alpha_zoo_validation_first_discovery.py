@@ -8,7 +8,9 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT / "scripts" / "research" / "run_alpha_zoo_validation_first_discovery.py"
-SPEC = importlib.util.spec_from_file_location("run_alpha_zoo_validation_first_discovery", MODULE_PATH)
+SPEC = importlib.util.spec_from_file_location(
+    "run_alpha_zoo_validation_first_discovery", MODULE_PATH
+)
 assert SPEC is not None and SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = MODULE
@@ -93,9 +95,10 @@ def test_build_validation_first_discovery_from_frozen_10bps_sources(tmp_path: Pa
     assert "locked_oos_return_non_positive" in quarantine[0]["gate_reasons"]
     ceiling = payload["new_strategy_findings"]["validation_ceiling_audit"]
     assert ceiling["max_live_gate_validation_return"] == leader["validation_return"]
-    assert ceiling[
-        "candidate_count_with_validation_gt_1pct_and_positive_locked_oos_zero_liquidation"
-    ] == 0
+    assert (
+        ceiling["candidate_count_with_validation_gt_1pct_and_positive_locked_oos_zero_liquidation"]
+        == 0
+    )
 
     for profile in payload["selection_profiles"].values():
         assert profile["uses_locked_oos_for_selection"] is False

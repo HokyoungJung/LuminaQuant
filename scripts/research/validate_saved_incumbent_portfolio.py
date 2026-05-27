@@ -39,7 +39,9 @@ from lumina_quant.utils.risk_free import resolve_risk_free_config, sharpe_ratio,
 
 FEATURE_REQUIRED_STRATEGIES = {"CompositeTrendStrategy", "PerpCrowdingCarryStrategy"}
 DEFAULT_REFRESH_REPORT = FOLLOWUP_ROOT / "final_portfolio_validation_data_refresh_latest.json"
-DEFAULT_SUPPORT_INVENTORY_JSON = FOLLOWUP_ROOT / "final_portfolio_validation_support_inventory_latest.json"
+DEFAULT_SUPPORT_INVENTORY_JSON = (
+    FOLLOWUP_ROOT / "final_portfolio_validation_support_inventory_latest.json"
+)
 DEFAULT_OUTPUT_JSON = FOLLOWUP_ROOT / "final_portfolio_validation_latest.json"
 DEFAULT_OUTPUT_MD = FOLLOWUP_ROOT / "final_portfolio_validation_latest.md"
 DEFAULT_RSS_LOG = FOLLOWUP_ROOT / "final_portfolio_validation_rss_latest.jsonl"
@@ -139,7 +141,9 @@ def _stream_from_aggregate(aggregated: dict[str, dict[str, Any]]) -> list[dict[s
     return out
 
 
-def _concat_streams(lhs_stream: list[dict[str, Any]], rhs_stream: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _concat_streams(
+    lhs_stream: list[dict[str, Any]], rhs_stream: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
     aggregated = _aggregate_stream(lhs_stream)
     for token, row in _aggregate_stream(rhs_stream).items():
         if token not in aggregated:
@@ -319,7 +323,9 @@ def _load_support_inventory_rows(refresh_payload: dict[str, Any]) -> list[dict[s
     return []
 
 
-def _normalized_refresh_rows(refresh_payload: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+def _normalized_refresh_rows(
+    refresh_payload: dict[str, Any],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     ohlcv_rows = list(refresh_payload.get("ohlcv_results") or refresh_payload.get("results") or [])
     feature_rows = list(refresh_payload.get("feature_results") or [])
     if feature_rows:
@@ -406,7 +412,9 @@ def _latest_common_complete_time(
             (
                 dt,
                 {
-                    "source": feature_source_by_symbol.get(_research_symbol(symbol), "feature_points"),
+                    "source": feature_source_by_symbol.get(
+                        _research_symbol(symbol), "feature_points"
+                    ),
                     "symbol": _research_symbol(symbol),
                     "timeframe": "feature",
                     "last_complete_utc": iso_utc(dt) or "",
@@ -437,7 +445,11 @@ def _group_candidates_for_strict_research(
             }
         ) or list(symbol_universe)
         candidate_timeframes = (
-            (str(candidate.get("strategy_timeframe") or candidate.get("timeframe") or "").strip().lower(),)
+            (
+                str(candidate.get("strategy_timeframe") or candidate.get("timeframe") or "")
+                .strip()
+                .lower(),
+            )
             if str(candidate.get("strategy_timeframe") or candidate.get("timeframe") or "").strip()
             else tuple(strategy_timeframes)
         )
@@ -495,7 +507,9 @@ def _saved_weight_rows(
         row["_saved_weight"] = safe_float(weight_row.get("weight"), 0.0)
         resolved.append(row)
     if missing:
-        raise RuntimeError("saved incumbent weights missing refreshed candidates: " + ", ".join(missing))
+        raise RuntimeError(
+            "saved incumbent weights missing refreshed candidates: " + ", ".join(missing)
+        )
     return resolved
 
 
@@ -568,7 +582,11 @@ def _extend_saved_rows(
         saved_oos = dict(saved.get("oos") or {})
         combined["oos"] = {
             **saved_oos,
-            **_metrics(oos_returns, periods_per_year=365, timestamps=_stream_timestamps(combined_oos_stream)),
+            **_metrics(
+                oos_returns,
+                periods_per_year=365,
+                timestamps=_stream_timestamps(combined_oos_stream),
+            ),
             "return": _metrics(
                 oos_returns,
                 periods_per_year=365,
@@ -586,7 +604,9 @@ def _extend_saved_rows(
     return combined_rows
 
 
-def _component_summaries(rows: list[dict[str, Any]], oos_stream: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _component_summaries(
+    rows: list[dict[str, Any]], oos_stream: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for row in rows:
         component_oos = dict(row.get("oos") or {})
@@ -654,7 +674,9 @@ def _stream_end_utc(stream: list[dict[str, Any]]) -> datetime | None:
         raw_datetime = point.get("datetime")
         raw_t = point.get("t")
         dt = parse_utc(
-            raw_datetime if isinstance(raw_datetime, str) else (raw_t if isinstance(raw_t, str) else None)
+            raw_datetime
+            if isinstance(raw_datetime, str)
+            else (raw_t if isinstance(raw_t, str) else None)
         )
         if dt is None:
             try:
@@ -682,13 +704,20 @@ def _strict_validation_cache_key(
             "strategy_class": str(candidate.get("strategy_class") or "").strip(),
             "strategy_timeframe": str(
                 candidate.get("strategy_timeframe") or candidate.get("timeframe") or ""
-            ).strip().lower(),
+            )
+            .strip()
+            .lower(),
             "symbols": sorted(
                 str(symbol).strip()
                 for symbol in list(candidate.get("symbols") or [])
                 if str(symbol).strip()
             ),
-            "leverage": int(safe_float(candidate.get("leverage"), safe_float((candidate.get("params") or {}).get("leverage"), 0.0))),
+            "leverage": int(
+                safe_float(
+                    candidate.get("leverage"),
+                    safe_float((candidate.get("params") or {}).get("leverage"), 0.0),
+                )
+            ),
             "params": _normalize_cache_value(dict(candidate.get("params") or {})),
         }
         for candidate in list(candidates or [])
@@ -733,7 +762,9 @@ def _run_strict_research(
     combined_data_sources: dict[str, list[Any]] = {}
     report_generated_at: str | None = None
 
-    for group in _group_candidates_for_strict_research(candidates, strategy_timeframes, symbol_universe):
+    for group in _group_candidates_for_strict_research(
+        candidates, strategy_timeframes, symbol_universe
+    ):
         cache_key = _strict_validation_cache_key(
             candidates=list(group["candidates"]),
             strategy_timeframes=list(group["timeframes"]),
@@ -769,18 +800,16 @@ def _run_strict_research(
             matched_candidates = [
                 row
                 for row in report_candidates
-                if (
-                    candidate_id
-                    and str(row.get("candidate_id") or "").strip() == candidate_id
-                )
-                or (
-                    candidate_name
-                    and str(row.get("name") or "").strip() == candidate_name
-                )
+                if (candidate_id and str(row.get("candidate_id") or "").strip() == candidate_id)
+                or (candidate_name and str(row.get("name") or "").strip() == candidate_name)
             ] or report_candidates
             if not matched_candidates:
-                candidate_label = str(candidate.get("name") or candidate.get("candidate_id") or "unknown")
-                raise RuntimeError(f"Strict validation returned no candidate rows for {candidate_label}.")
+                candidate_label = str(
+                    candidate.get("name") or candidate.get("candidate_id") or "unknown"
+                )
+                raise RuntimeError(
+                    f"Strict validation returned no candidate rows for {candidate_label}."
+                )
             combined_candidates.extend(matched_candidates)
         for key, values in data_sources.items():
             target = combined_data_sources.setdefault(str(key), [])
@@ -800,9 +829,13 @@ def _run_strict_research(
     }
 
 
-def evaluate_saved_weight_portfolio(rows: list[dict[str, Any]], *, metric_config: Any | None = None) -> dict[str, Any]:
+def evaluate_saved_weight_portfolio(
+    rows: list[dict[str, Any]], *, metric_config: Any | None = None
+) -> dict[str, Any]:
     raw_streams = {split: _weighted_stream(rows, split) for split in ("train", "val", "oos")}
-    daily_streams = {split: _daily_aggregate_stream(stream) for split, stream in raw_streams.items()}
+    daily_streams = {
+        split: _daily_aggregate_stream(stream) for split, stream in raw_streams.items()
+    }
     metrics: dict[str, dict[str, Any]] = {}
     weighted_component_summaries: dict[str, dict[str, float]] = {}
     for split, stream in daily_streams.items():
@@ -853,8 +886,18 @@ def evaluate_saved_weight_portfolio(rows: list[dict[str, Any]], *, metric_config
     cost_x3 = oos_returns - (max(0.0, 3.0 - 1.0) * weighted_turnover * weighted_cost)
     sensitivity = {
         "cost_stress": {
-            "x2": _metrics(cost_x2, periods_per_year=365, timestamps=oos_timestamps, metric_config=metric_config),
-            "x3": _metrics(cost_x3, periods_per_year=365, timestamps=oos_timestamps, metric_config=metric_config),
+            "x2": _metrics(
+                cost_x2,
+                periods_per_year=365,
+                timestamps=oos_timestamps,
+                metric_config=metric_config,
+            ),
+            "x3": _metrics(
+                cost_x3,
+                periods_per_year=365,
+                timestamps=oos_timestamps,
+                metric_config=metric_config,
+            ),
         },
         "param_drift": {
             "minus_10pct_signal": _metrics(
@@ -939,7 +982,9 @@ def build_markdown(payload: dict[str, Any]) -> str:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Validate the saved incumbent portfolio on strict real data.")
+    parser = argparse.ArgumentParser(
+        description="Validate the saved incumbent portfolio on strict real data."
+    )
     parser.add_argument("--bundle-path", default="")
     parser.add_argument("--portfolio-path", default=str(PORTFOLIO_CURRENT_OPTIMIZATION))
     parser.add_argument("--refresh-report", default=str(DEFAULT_REFRESH_REPORT))
@@ -973,7 +1018,9 @@ def main(argv: list[str] | None = None) -> int:
         else {}
     )
 
-    selected_team = list(bundle_payload.get("selected_team") or bundle_payload.get("candidates") or [])
+    selected_team = list(
+        bundle_payload.get("selected_team") or bundle_payload.get("candidates") or []
+    )
     if not selected_team:
         raise RuntimeError(f"no incumbent candidate rows found in {bundle_path}")
     saved_weights = list(portfolio_payload.get("weights") or [])
@@ -1025,7 +1072,9 @@ def main(argv: list[str] | None = None) -> int:
         "error": None,
         "bundle_path": str(bundle_path),
         "portfolio_path": str(portfolio_path.resolve()),
-        "refresh_report_path": str(refresh_report_path.resolve()) if refresh_report_path.exists() else None,
+        "refresh_report_path": str(refresh_report_path.resolve())
+        if refresh_report_path.exists()
+        else None,
         "symbols": symbols,
         "timeframes": timeframes,
         "coverage_evidence": [],
@@ -1103,7 +1152,9 @@ def main(argv: list[str] | None = None) -> int:
                         "candidate_count": len(list(continuity_report.get("candidates") or [])),
                     },
                     "portfolio_metrics": continuity_eval.get("portfolio_metrics"),
-                    "weighted_component_summaries": continuity_eval.get("weighted_component_summaries"),
+                    "weighted_component_summaries": continuity_eval.get(
+                        "weighted_component_summaries"
+                    ),
                 }
             else:
                 continuity_validation = {
@@ -1139,7 +1190,10 @@ def main(argv: list[str] | None = None) -> int:
         ).as_dict()
         guard.checkpoint(
             "exact_validation_start",
-            {"candidate_count": len(selected_team), "latest_common_complete_utc": iso_utc(latest_common_complete)},
+            {
+                "candidate_count": len(selected_team),
+                "latest_common_complete_utc": iso_utc(latest_common_complete),
+            },
         )
         exact_report = _run_strict_research(
             candidates=selected_team,
@@ -1158,7 +1212,9 @@ def main(argv: list[str] | None = None) -> int:
             "exact_validation_evaluated",
             {
                 "oos_total_return": safe_float(
-                    ((exact_eval.get("portfolio_metrics") or {}).get("oos") or {}).get("total_return"),
+                    ((exact_eval.get("portfolio_metrics") or {}).get("oos") or {}).get(
+                        "total_return"
+                    ),
                     0.0,
                 )
             },
@@ -1203,18 +1259,26 @@ def main(argv: list[str] | None = None) -> int:
                     },
                     "portfolio_metrics": exact_eval.get("portfolio_metrics"),
                     "weighted_component_summaries": exact_eval.get("weighted_component_summaries"),
-                    "portfolio_daily_return_streams": exact_eval.get("portfolio_daily_return_streams"),
+                    "portfolio_daily_return_streams": exact_eval.get(
+                        "portfolio_daily_return_streams"
+                    ),
                     "comparison_vs_saved_artifact": exact_comparison,
                     "component_rows": exact_eval.get("component_rows"),
                     "oos_monthly_returns": exact_eval.get("oos_monthly_returns"),
                     "sensitivity": exact_eval.get("sensitivity"),
-                    "saved_weight_total": float(sum(safe_float(row.get("weight"), 0.0) for row in saved_weights)),
+                    "saved_weight_total": float(
+                        sum(safe_float(row.get("weight"), 0.0) for row in saved_weights)
+                    ),
                     "risk_free_reference": {
                         "mode": getattr(BacktestConfig, "RISK_FREE_MODE", "us_treasury_constant"),
                         "tenor": getattr(BacktestConfig, "RISK_FREE_TENOR", "3m"),
                         "annual_rate": float(getattr(BacktestConfig, "RISK_FREE_ANNUAL", 0.0)),
-                        "sortino_target_mode": getattr(BacktestConfig, "SORTINO_TARGET_MODE", "same_as_rf"),
-                        "sortino_target_annual": float(getattr(BacktestConfig, "SORTINO_TARGET_ANNUAL", 0.0)),
+                        "sortino_target_mode": getattr(
+                            BacktestConfig, "SORTINO_TARGET_MODE", "same_as_rf"
+                        ),
+                        "sortino_target_annual": float(
+                            getattr(BacktestConfig, "SORTINO_TARGET_ANNUAL", 0.0)
+                        ),
                     },
                 },
             }

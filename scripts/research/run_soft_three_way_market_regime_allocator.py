@@ -40,7 +40,9 @@ _hard_spec.loader.exec_module(_hard)
 
 SCHEMA_VERSION = "1.0"
 DEFAULT_OUTPUT_DIR = (
-    FOLLOWUP_ROOT / "portfolio_incumbent_autoresearch_grouped" / "soft_three_way_market_regime_allocator_current"
+    FOLLOWUP_ROOT
+    / "portfolio_incumbent_autoresearch_grouped"
+    / "soft_three_way_market_regime_allocator_current"
 )
 DEFAULT_BLEND_PATH = _hard.DEFAULT_BLEND_PATH
 DEFAULT_MARKET_JUDGEMENT_PATH = _hard.DEFAULT_MARKET_JUDGEMENT_PATH
@@ -94,13 +96,21 @@ def _base_blend_weights() -> dict[str, float]:
     return {"incumbent": 0.0, "blend_85_15": 1.0, "autoresearch_55_45": 0.0}
 
 
-def _signal_strength(*, confidence: float, max_signal_score: float, params: SoftAllocatorParams) -> float:
+def _signal_strength(
+    *, confidence: float, max_signal_score: float, params: SoftAllocatorParams
+) -> float:
     if max_signal_score < params.min_signal_score or confidence < params.min_confidence:
         return 0.0
-    conf_component = 1.0 if params.confidence_scale <= 0.0 else min(1.0, confidence / params.confidence_scale)
-    score_component = 1.0 if params.score_scale <= 0.0 else min(
-        1.0,
-        max(0.0, max_signal_score - params.min_signal_score) / params.score_scale,
+    conf_component = (
+        1.0 if params.confidence_scale <= 0.0 else min(1.0, confidence / params.confidence_scale)
+    )
+    score_component = (
+        1.0
+        if params.score_scale <= 0.0
+        else min(
+            1.0,
+            max(0.0, max_signal_score - params.min_signal_score) / params.score_scale,
+        )
     )
     return max(0.0, min(1.0, conf_component * score_component))
 
@@ -149,7 +159,9 @@ def _apply_smoothing(
         }
         turnover = max_turnover
     normalized = _normalize(blended)
-    actual_turnover = 0.5 * sum(abs(float(normalized[key]) - float(previous[key])) for key in previous)
+    actual_turnover = 0.5 * sum(
+        abs(float(normalized[key]) - float(previous[key])) for key in previous
+    )
     return normalized, float(actual_turnover)
 
 
@@ -173,7 +185,9 @@ def _run_soft_allocator(*, panel: pd.DataFrame, params: SoftAllocatorParams) -> 
             "active_rules": list(item.active_rules),
         }
         target = _target_weights(signal, params=params)
-        weights, turnover = _apply_smoothing(previous=previous_weights, target=target, params=params)
+        weights, turnover = _apply_smoothing(
+            previous=previous_weights, target=target, params=params
+        )
         portfolio_return = (
             float(weights["incumbent"]) * float(item.incumbent)
             + float(weights["blend_85_15"]) * float(item.blend_85_15)
@@ -194,8 +208,12 @@ def _run_soft_allocator(*, panel: pd.DataFrame, params: SoftAllocatorParams) -> 
                 "return": float(portfolio_return),
                 "weights": weights,
                 "target_weights": target,
-                "effective_incumbent_exposure": float(weights["incumbent"] + 0.85 * weights["blend_85_15"]),
-                "effective_autoresearch_exposure": float(weights["autoresearch_55_45"] + 0.15 * weights["blend_85_15"]),
+                "effective_incumbent_exposure": float(
+                    weights["incumbent"] + 0.85 * weights["blend_85_15"]
+                ),
+                "effective_autoresearch_exposure": float(
+                    weights["autoresearch_55_45"] + 0.15 * weights["blend_85_15"]
+                ),
             }
         )
         previous_weights = weights
@@ -203,8 +221,12 @@ def _run_soft_allocator(*, panel: pd.DataFrame, params: SoftAllocatorParams) -> 
     state_frame = pd.DataFrame(output_rows)
     split_metrics = _hard._metrics_by_split(state_frame, "return")
     train_val_mask = state_frame["split_group"].isin(["train", "val"])
-    train_val_metrics = _hard._compute_metrics_from_returns(state_frame.loc[train_val_mask, "return"].astype(float).tolist())
-    turnover_fraction = float(state_frame.loc[train_val_mask, "turnover"].mean()) if train_val_mask.any() else 0.0
+    train_val_metrics = _hard._compute_metrics_from_returns(
+        state_frame.loc[train_val_mask, "return"].astype(float).tolist()
+    )
+    turnover_fraction = (
+        float(state_frame.loc[train_val_mask, "turnover"].mean()) if train_val_mask.any() else 0.0
+    )
     objective = _hard._objective(train_val_metrics, turnover_fraction=turnover_fraction)
     return {
         "state_frame": state_frame,
@@ -217,7 +239,11 @@ def _run_soft_allocator(*, panel: pd.DataFrame, params: SoftAllocatorParams) -> 
 def _weight_summary(state_frame: pd.DataFrame) -> dict[str, Any]:
     out: dict[str, Any] = {}
     for split_name in ("train", "val", "oos", "all"):
-        sample = state_frame if split_name == "all" else state_frame.loc[state_frame["split_group"].eq(split_name)]
+        sample = (
+            state_frame
+            if split_name == "all"
+            else state_frame.loc[state_frame["split_group"].eq(split_name)]
+        )
         if sample.empty:
             out[split_name] = {
                 "days": 0,
@@ -295,7 +321,9 @@ def _build_markdown(payload: dict[str, Any]) -> str:
         ("autoresearch_55_45", "55/45"),
         ("allocator", "soft_allocator"),
     ):
-        lines.append(metric_line(title, dict((benchmark_metrics.get(label) or {}).get("oos") or {})))
+        lines.append(
+            metric_line(title, dict((benchmark_metrics.get(label) or {}).get("oos") or {}))
+        )
 
     lines.extend(["", "## Weight Summary"])
     for split_name in ("train", "val", "oos", "all"):
@@ -332,8 +360,12 @@ def run_soft_three_way_market_regime_allocator(
         run_name="soft_three_way_market_regime_allocator",
         output_dir=output_dir,
         input_path=str(incumbent_path),
-        rss_log_path=output_dir / MEMORY_GUARD_DIRNAME / "soft_three_way_market_regime_allocator_rss_latest.jsonl",
-        summary_path=output_dir / MEMORY_GUARD_DIRNAME / "soft_three_way_market_regime_allocator_memory_latest.json",
+        rss_log_path=output_dir
+        / MEMORY_GUARD_DIRNAME
+        / "soft_three_way_market_regime_allocator_rss_latest.jsonl",
+        summary_path=output_dir
+        / MEMORY_GUARD_DIRNAME
+        / "soft_three_way_market_regime_allocator_memory_latest.json",
         budget_bytes=hard_rss_bytes,
         soft_limit_bytes=soft_rss_bytes,
         hard_limit_bytes=hard_rss_bytes,
@@ -343,9 +375,15 @@ def run_soft_three_way_market_regime_allocator(
     error: str | None = None
     try:
         memory_guard.sample(event="soft_three_way_market_regime_allocator_start", context={})
-        incumbent_frame = _hard._load_candidate_frame(label="incumbent", path=incumbent_path).rename(columns={"return": "incumbent"})
-        blend_frame = _hard._load_candidate_frame(label="blend_85_15", path=blend_path).rename(columns={"return": "blend_85_15"})
-        autoresearch_frame = _hard._load_candidate_frame(label="autoresearch_55_45", path=autoresearch_path).rename(columns={"return": "autoresearch_55_45"})
+        incumbent_frame = _hard._load_candidate_frame(
+            label="incumbent", path=incumbent_path
+        ).rename(columns={"return": "incumbent"})
+        blend_frame = _hard._load_candidate_frame(label="blend_85_15", path=blend_path).rename(
+            columns={"return": "blend_85_15"}
+        )
+        autoresearch_frame = _hard._load_candidate_frame(
+            label="autoresearch_55_45", path=autoresearch_path
+        ).rename(columns={"return": "autoresearch_55_45"})
         panel = (
             incumbent_frame[["date", "split_group", "incumbent"]]
             .merge(blend_frame[["date", "blend_85_15"]], on="date", how="inner")
@@ -361,7 +399,10 @@ def run_soft_three_way_market_regime_allocator(
             incumbent_path=incumbent_path,
             autoresearch_path=autoresearch_path,
         )
-        signal_rows = [_hard._signal_from_row(row, selected_rules=selected_rules) for _, row in feature_frame.iterrows()]
+        signal_rows = [
+            _hard._signal_from_row(row, selected_rules=selected_rules)
+            for _, row in feature_frame.iterrows()
+        ]
         signal_frame = pd.DataFrame(signal_rows)
         merged = panel.merge(signal_frame, on=["date", "split_group"], how="inner")
         memory_guard.checkpoint(
@@ -373,7 +414,9 @@ def run_soft_three_way_market_regime_allocator(
         for params in PARAM_GRID:
             result = _run_soft_allocator(panel=merged, params=params)
             candidate = {"params": params, **result}
-            if best is None or float(candidate["validation_objective"]) > float(best["validation_objective"]):
+            if best is None or float(candidate["validation_objective"]) > float(
+                best["validation_objective"]
+            ):
                 best = candidate
             memory_guard.checkpoint(
                 "soft_three_way_param_evaluated",
@@ -425,9 +468,13 @@ def run_soft_three_way_market_regime_allocator(
                     "turnover": float(row["turnover"]),
                     "return": float(row["return"]),
                     "weights": {key: float(val) for key, val in dict(row["weights"]).items()},
-                    "target_weights": {key: float(val) for key, val in dict(row["target_weights"]).items()},
+                    "target_weights": {
+                        key: float(val) for key, val in dict(row["target_weights"]).items()
+                    },
                     "effective_incumbent_exposure": float(row["effective_incumbent_exposure"]),
-                    "effective_autoresearch_exposure": float(row["effective_autoresearch_exposure"]),
+                    "effective_autoresearch_exposure": float(
+                        row["effective_autoresearch_exposure"]
+                    ),
                 }
                 for row in state_frame.to_dict(orient="records")
             ],
@@ -438,7 +485,10 @@ def run_soft_three_way_market_regime_allocator(
         error = str(exc)
         raise
     finally:
-        memory_guard.sample(event="soft_three_way_market_regime_allocator_finish", context={"status": status, "error": error})
+        memory_guard.sample(
+            event="soft_three_way_market_regime_allocator_finish",
+            context={"status": status, "error": error},
+        )
         memory_summary = memory_guard.finalize(status=status, error=error, context={})
         memory_guard.release()
         if payload is not None:
@@ -452,7 +502,9 @@ def run_soft_three_way_market_regime_allocator(
     out_md = output_dir / f"soft_three_way_market_regime_allocator_{timestamp}.md"
     latest_json = output_dir / "soft_three_way_market_regime_allocator_latest.json"
     latest_md = output_dir / "soft_three_way_market_regime_allocator_latest.md"
-    out_json.write_text(json.dumps(payload, indent=2, sort_keys=True, default=_json_default), encoding="utf-8")
+    out_json.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=_json_default), encoding="utf-8"
+    )
     markdown = _build_markdown(payload)
     out_md.write_text(markdown, encoding="utf-8")
     latest_json.write_text(out_json.read_text(encoding="utf-8"), encoding="utf-8")
@@ -464,7 +516,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--incumbent-path", type=Path, default=resolve_current_optimization_path())
     parser.add_argument("--blend-path", type=Path, default=DEFAULT_BLEND_PATH)
-    parser.add_argument("--autoresearch-path", type=Path, default=_hard._resolve_autoresearch_default_path())
+    parser.add_argument(
+        "--autoresearch-path", type=Path, default=_hard._resolve_autoresearch_default_path()
+    )
     parser.add_argument("--market-judgement-path", type=Path, default=DEFAULT_MARKET_JUDGEMENT_PATH)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--soft-rss-bytes", type=int, default=DEFAULT_SOFT_RSS_BYTES)

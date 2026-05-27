@@ -118,13 +118,16 @@ def test_recent_three_month_two_pct_pass_requires_three_recent_months():
     ]
     assert _recent_three_month_two_pct_pass(recent_rows) is True
     assert _recent_three_month_two_pct_pass(recent_rows[:2]) is False
-    assert _recent_three_month_two_pct_pass(
-        [
-            {"month": "2026-01", "strategy_return": 0.021},
-            {"month": "2026-02", "strategy_return": 0.019},
-            {"month": "2026-03", "strategy_return": 0.025},
-        ]
-    ) is False
+    assert (
+        _recent_three_month_two_pct_pass(
+            [
+                {"month": "2026-01", "strategy_return": 0.021},
+                {"month": "2026-02", "strategy_return": 0.019},
+                {"month": "2026-03", "strategy_return": 0.025},
+            ]
+        )
+        is False
+    )
 
 
 def test_min_bars_for_timeframe_relaxes_short_daily_adaptive_windows():
@@ -133,9 +136,17 @@ def test_min_bars_for_timeframe_relaxes_short_daily_adaptive_windows():
     long_start = datetime(2026, 1, 1, tzinfo=UTC)
     long_end = datetime(2026, 3, 15, tzinfo=UTC)
 
-    assert _min_bars_for_timeframe("1d", window_start=short_start, window_end_exclusive=short_end) == 28
-    assert _min_bars_for_timeframe("1d", window_start=long_start, window_end_exclusive=long_end) == 45
-    assert _min_bars_for_timeframe("4h", window_start=short_start, window_end_exclusive=short_end) == 180
+    assert (
+        _min_bars_for_timeframe("1d", window_start=short_start, window_end_exclusive=short_end)
+        == 28
+    )
+    assert (
+        _min_bars_for_timeframe("1d", window_start=long_start, window_end_exclusive=long_end) == 45
+    )
+    assert (
+        _min_bars_for_timeframe("4h", window_start=short_start, window_end_exclusive=short_end)
+        == 180
+    )
 
 
 def test_min_bars_for_high_timeframes_is_relaxed_for_adaptive_windows():
@@ -178,7 +189,12 @@ def test_resolve_coverage_adaptive_windows_allocates_from_common_coverage(monkey
     )
 
     assert resolved["common_start"] == datetime(2026, 1, 1, tzinfo=UTC)
-    assert resolved["train_start"] < resolved["val_start"] < resolved["oos_start"] < resolved["requested_oos_end_exclusive"]
+    assert (
+        resolved["train_start"]
+        < resolved["val_start"]
+        < resolved["oos_start"]
+        < resolved["requested_oos_end_exclusive"]
+    )
     assert resolved["allocation_days"]["train"] >= 24
     assert resolved["allocation_days"]["val"] >= 14
     assert resolved["allocation_days"]["oos"] >= 14
@@ -218,7 +234,12 @@ def test_resolve_coverage_adaptive_windows_supports_shorter_metals_4h_history(mo
     )
 
     assert resolved["common_start"] == datetime(2026, 1, 30, tzinfo=UTC)
-    assert resolved["train_start"] < resolved["val_start"] < resolved["oos_start"] < resolved["requested_oos_end_exclusive"]
+    assert (
+        resolved["train_start"]
+        < resolved["val_start"]
+        < resolved["oos_start"]
+        < resolved["requested_oos_end_exclusive"]
+    )
     assert resolved["allocation_days"]["train"] >= 16
     assert resolved["allocation_days"]["val"] >= 8
     assert resolved["allocation_days"]["oos"] >= 10

@@ -258,7 +258,9 @@ def _extract_split_metrics(row: Mapping[str, Any], split: str) -> dict[str, floa
     }
 
 
-def _primary_metrics(split_metrics: Mapping[str, Mapping[str, float]]) -> tuple[str, dict[str, float]]:
+def _primary_metrics(
+    split_metrics: Mapping[str, Mapping[str, float]],
+) -> tuple[str, dict[str, float]]:
     for split in ("val", "oos", "train"):
         metrics = dict(split_metrics.get(split) or {})
         if any(abs(float(metrics.get(key, 0.0))) > 1e-12 for key in _METRIC_KEYS):
@@ -273,7 +275,9 @@ def _blockers(row: Mapping[str, Any]) -> list[str]:
         if value in (None, "", [], {}):
             continue
         if isinstance(value, str):
-            blockers.extend([item.strip() for item in value.replace("|", ";").split(";") if item.strip()])
+            blockers.extend(
+                [item.strip() for item in value.replace("|", ";").split(";") if item.strip()]
+            )
         elif isinstance(value, Mapping):
             blockers.extend(f"{k}={v}" for k, v in value.items())
         elif isinstance(value, Iterable):
@@ -294,7 +298,13 @@ def _blockers(row: Mapping[str, Any]) -> list[str]:
 
 
 def _explicit_selection_eligible(row: Mapping[str, Any]) -> bool | None:
-    for key in ("selection_eligible", "promotion_eligible", "eligible_for_promotion", "promoted", "pass"):
+    for key in (
+        "selection_eligible",
+        "promotion_eligible",
+        "eligible_for_promotion",
+        "promoted",
+        "pass",
+    ):
         if key in row:
             return _is_truthy(row.get(key))
     return None
@@ -400,13 +410,18 @@ def _normalize_row(row: Mapping[str, Any], *, artifact_kind: str, path: Path) ->
 
 def _looks_like_candidate(row: Mapping[str, Any]) -> bool:
     return any(key in row for key in _ID_KEYS) or any(
-        key in row for key in ("metrics", "val_total_return", "total_return", "sharpe", "max_drawdown")
+        key in row
+        for key in ("metrics", "val_total_return", "total_return", "sharpe", "max_drawdown")
     )
 
 
 def _extract_candidate_rows(payload: Any) -> list[dict[str, Any]]:
     if isinstance(payload, list):
-        return [dict(item) for item in payload if isinstance(item, Mapping) and _looks_like_candidate(item)]
+        return [
+            dict(item)
+            for item in payload
+            if isinstance(item, Mapping) and _looks_like_candidate(item)
+        ]
     if not isinstance(payload, Mapping):
         return []
 
@@ -415,7 +430,11 @@ def _extract_candidate_rows(payload: Any) -> list[dict[str, Any]]:
         value = payload.get(key)
         if not isinstance(value, list):
             continue
-        rows.extend(dict(item) for item in value if isinstance(item, Mapping) and _looks_like_candidate(item))
+        rows.extend(
+            dict(item)
+            for item in value
+            if isinstance(item, Mapping) and _looks_like_candidate(item)
+        )
     if rows:
         return rows
     if _looks_like_candidate(payload):
@@ -446,7 +465,9 @@ def _load_json_bounded(path: Path, *, max_bytes: int) -> tuple[Any | None, ScanI
     try:
         return json.loads(path.read_text(encoding="utf-8")), None
     except Exception as exc:
-        return None, ScanIssue(_compact_path(path), f"json_parse_failed:{exc.__class__.__name__}", bytes=int(size))
+        return None, ScanIssue(
+            _compact_path(path), f"json_parse_failed:{exc.__class__.__name__}", bytes=int(size)
+        )
 
 
 def _candidate_sort_key(row: Mapping[str, Any]) -> tuple[float, float, float, float, str]:
@@ -481,7 +502,14 @@ def _source_counts(rows: Sequence[Mapping[str, Any]]) -> dict[str, int]:
 
 def _round_candidate(row: Mapping[str, Any]) -> dict[str, Any]:
     rounded = dict(row)
-    for key in ("ranking_score", "total_return", "max_drawdown", "sharpe", "sortino", "final_equity"):
+    for key in (
+        "ranking_score",
+        "total_return",
+        "max_drawdown",
+        "sharpe",
+        "sortino",
+        "final_equity",
+    ):
         if key in rounded:
             rounded[key] = round(_safe_float(rounded[key]), 10)
     return rounded
@@ -535,17 +563,25 @@ def build_summary(
         "generated_at": generated_at or _utc_now_iso(),
         "input_dir": _compact_path(input_dir),
         "output_dir": _compact_path(output_dir),
-        "scan_limits": {"max_files": int(max_files), "max_bytes": int(max_bytes), "top_n": int(top_n)},
+        "scan_limits": {
+            "max_files": int(max_files),
+            "max_bytes": int(max_bytes),
+            "top_n": int(top_n),
+        },
         "decision": decision,
         "candidate_count": len(candidates),
-        "promotion_eligible_count": sum(1 for row in candidates if bool(row.get("promotion_eligible"))),
+        "promotion_eligible_count": sum(
+            1 for row in candidates if bool(row.get("promotion_eligible"))
+        ),
         "source_counts": _source_counts(candidates),
         "scanned_artifacts": artifacts,
         "skipped_artifacts": [issue.as_payload() for issue in issues],
         "blocker_summary": _summarize_blockers(candidates),
         "promoted_candidate": _round_candidate(promoted) if promoted else None,
         "best_return_candidate": _round_candidate(best_return) if best_return else None,
-        "best_report_only_candidate": _round_candidate(best_report_only) if best_report_only else None,
+        "best_report_only_candidate": _round_candidate(best_report_only)
+        if best_report_only
+        else None,
         "ranked_candidates": [_round_candidate(row) for row in ranked[: max(1, int(top_n))]],
     }
     return summary
@@ -674,20 +710,30 @@ def write_summary(summary: Mapping[str, Any], *, output_dir: Path) -> dict[str, 
     output_dir.mkdir(parents=True, exist_ok=True)
     json_path = output_dir / SUMMARY_JSON_NAME
     md_path = output_dir / SUMMARY_MD_NAME
-    json_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    json_path.write_text(
+        json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     md_path.write_text(render_markdown(summary), encoding="utf-8")
     return {"json": str(json_path), "markdown": str(md_path)}
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Summarize bounded profit moonshot research artifacts.")
+    parser = argparse.ArgumentParser(
+        description="Summarize bounded profit moonshot research artifacts."
+    )
     parser.add_argument("--input-dir", type=Path, default=DEFAULT_REPORT_ROOT)
     parser.add_argument("--output-dir", type=Path, default=None)
     parser.add_argument("--max-files", type=int, default=DEFAULT_MAX_FILES)
     parser.add_argument("--max-bytes", type=int, default=DEFAULT_MAX_BYTES)
     parser.add_argument("--top-n", type=int, default=DEFAULT_TOP_N)
-    parser.add_argument("--generated-at", default="", help="Deterministic timestamp override for tests/replays.")
-    parser.add_argument("--print-json", action="store_true", help="Print the summary payload after writing artifacts.")
+    parser.add_argument(
+        "--generated-at", default="", help="Deterministic timestamp override for tests/replays."
+    )
+    parser.add_argument(
+        "--print-json",
+        action="store_true",
+        help="Print the summary payload after writing artifacts.",
+    )
     return parser.parse_args(argv)
 
 

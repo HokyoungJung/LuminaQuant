@@ -7,13 +7,17 @@ from lumina_quant.live_selection import (
     resolve_portfolio_mode_runtime_config,
     supports_live_portfolio_mode,
 )
-from lumina_quant.strategies.artifact_portfolio_mode import PortfolioModeDefinition, resolve_portfolio_mode_definition
+from lumina_quant.strategies.artifact_portfolio_mode import (
+    PortfolioModeDefinition,
+    resolve_portfolio_mode_definition,
+)
 
 
 def test_live_selection_accepts_bare_and_wrapped_portfolio_modes() -> None:
-    assert normalize_portfolio_mode_reference(
-        "ArtifactPortfolioModeStrategy[static_blend_76_24]"
-    ) == "static_blend_76_24"
+    assert (
+        normalize_portfolio_mode_reference("ArtifactPortfolioModeStrategy[static_blend_76_24]")
+        == "static_blend_76_24"
+    )
     assert supports_live_portfolio_mode("static_blend_76_24")
     assert supports_live_portfolio_mode("ArtifactPortfolioModeStrategy[state_vwap_pair]")
 

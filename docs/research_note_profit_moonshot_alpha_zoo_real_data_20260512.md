@@ -1014,3 +1014,17 @@ Follow-up cleanup refactored the selected `hybrid_v3_5_optuna_three_profile_blen
 Behavior was locked before the split. `tests/test_alpha_zoo_optuna_hybrid_live_strategy.py` now asserts the selected artifact metrics and live decision contract directly: selected profile `hybrid_v3_5_optuna_three_profile_blend`, Optuna TPE v3.5, train `+611.5025%`, validation `+138.3170%`, locked-OOS report-only `+20.8319%`, validation MDD `18.9796%`, locked-OOS MDD `10.5735%`, RPT proxy `83.39/79.17/25.29bps`, trades `3363/789/362`, gross notional fraction `4.3645889x`, final profile weights aggressive `57.2699%`, balanced `7.9831%`, growth `8.0672%`, and train+validation average weights aggressive `78.1094%`, balanced `10.9140%`, growth `10.9767%`. The same tests lock the latest `paper_testnet_live_decision_latest.json` limit-first contract: `default_order_type=LMT`, `allow_market_orders=false`, `limit_price_mode=one_tick_worse`, one-tick offset, and side-aware limit entry/exit policies.
 
 Governance is unchanged. The live adapter remains paper/testnet-only: `ready_for_paper=true`, `ready_for_real=false`, `real_money_execution=false`, `real_execution_allowed=false`; locked-OOS is still gate/report-only and the 10bps round-trip cost/RPT threshold remains the primary assumption. This cleanup is a structure/reproducibility pass, not a new discovery or performance rerun.
+
+## 2026-05-27 KST — Repo-wide format/Rust hygiene baseline
+
+Follow-up cleanup normalized the whole tracked Python/Rust/code-hygiene surface after the live adapter split. This is a behavior-preserving cleanup pass: the selected `hybrid_v3_5_optuna_three_profile_blend` artifacts, paper/testnet-only live contract, limit-first order defaults, 10bps replay assumption, and hard real-money veto remain unchanged.
+
+Changes made:
+
+- Applied repo-wide `ruff format` to remove the previously known formatting drift outside the live-adapter patch.
+- Applied `cargo fmt` to native Rust crates and added CI checks for `cargo fmt --check`, `cargo check`, and `cargo test` on `native/rust_metrics` and `native/rust_rawfirst`.
+- Added `.gitattributes` to lock repository text hygiene to LF by default while preserving CRLF for Windows launchers (`*.bat`, `*.cmd`, `*.ps1`).
+- Updated the hardcoded-parameter audit baseline after formatting moved source coordinates; audit result remains `total=567 new=0 baselined=567`.
+- Added CI `ruff format --check .` so future pushes fail on format drift instead of relying on local-only checks.
+
+Validation evidence for this pass: full pytest `1480 passed` with max RSS `2,746,164 KiB` (<8 GiB); Ruff format/check pass; compileall pass; docs verification pass; architecture check pass; hardcoded-parameter audit `new=0`; `uv lock --check` pass; `git diff --check` pass; native Rust format/check/tests pass; GPU auto and forced runtime smokes pass with CPU/GPU row parity.

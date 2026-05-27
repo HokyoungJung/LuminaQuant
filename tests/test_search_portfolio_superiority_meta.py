@@ -262,7 +262,9 @@ def test_evaluate_weight_combo_carries_sparse_component_rejection_reason() -> No
         reason.startswith("sparse_component_weight_above_cap:sparse_pair")
         for reason in result["rejection_reasons"]
     )
-    sparse_diag = next(row for row in result["component_participation"] if row["candidate_key"] == "sparse_pair")
+    sparse_diag = next(
+        row for row in result["component_participation"] if row["candidate_key"] == "sparse_pair"
+    )
     assert sparse_diag["is_sparse"] is True
 
 
@@ -313,7 +315,9 @@ def test_run_meta_search_writes_artifacts_and_memory_ledger(
         incumbent=_candidate("incumbent", oos=[0.01, 0.01, 0.01]),
         raw_55_45=_candidate("autoresearch_pair_55_45", oos=[0.04, 0.03, 0.02]),
         derived_80_20=_candidate("incumbent_autoresearch_static_blend", oos=[0.03, 0.03, 0.02]),
-        soft_allocator=_candidate("soft_allocator", train=[-0.01, -0.01], val=[-0.01, -0.01], oos=[0.0, 0.0, 0.0]),
+        soft_allocator=_candidate(
+            "soft_allocator", train=[-0.01, -0.01], val=[-0.01, -0.01], oos=[0.0, 0.0, 0.0]
+        ),
         regime_switch=_candidate("regime_switching_portfolio", oos=[0.015, 0.01, 0.01]),
         grouped_base=_candidate("grouped_base", oos=[0.012, 0.011, 0.01]),
     )[MODULE.RAW_UNIVERSE_NAME]

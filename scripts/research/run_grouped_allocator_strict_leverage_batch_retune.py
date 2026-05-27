@@ -34,7 +34,11 @@ _VALIDATION_CORE = _validation._validation
 
 _runner_spec = importlib.util.spec_from_file_location(
     "lumina_quant.strategy_factory.research_runner",
-    Path(__file__).resolve().parents[2] / "src" / "lumina_quant" / "strategy_factory" / "research_runner.py",
+    Path(__file__).resolve().parents[2]
+    / "src"
+    / "lumina_quant"
+    / "strategy_factory"
+    / "research_runner.py",
 )
 if _runner_spec is None or _runner_spec.loader is None:
     raise RuntimeError("Failed to load research runner helpers")
@@ -83,7 +87,10 @@ def _json_ready(value: Any) -> Any:
     if isinstance(value, Path):
         return str(value)
     if isinstance(value, dict):
-        return {str(key): _json_ready(item) for key, item in sorted(value.items(), key=lambda item: str(item[0]))}
+        return {
+            str(key): _json_ready(item)
+            for key, item in sorted(value.items(), key=lambda item: str(item[0]))
+        }
     if isinstance(value, (list, tuple)):
         return [_json_ready(item) for item in value]
     if isinstance(value, set):
@@ -152,7 +159,9 @@ def _shared_resource_cache_key_payload(
 
 
 def _shared_resource_cache_key(payload: dict[str, Any]) -> str:
-    encoded = json.dumps(_json_ready(payload), sort_keys=True, separators=(",", ":")).encode("utf-8")
+    encoded = json.dumps(_json_ready(payload), sort_keys=True, separators=(",", ":")).encode(
+        "utf-8"
+    )
     return hashlib.sha256(encoded).hexdigest()
 
 
@@ -181,7 +190,12 @@ def _load_shared_resource_cache(
     data_sources = payload.get("data_sources")
     feature_cache = payload.get("feature_cache")
     benchmark = payload.get("benchmark")
-    if not isinstance(cache, dict) or not isinstance(data_sources, dict) or not isinstance(feature_cache, dict) or not isinstance(benchmark, dict):
+    if (
+        not isinstance(cache, dict)
+        or not isinstance(data_sources, dict)
+        or not isinstance(feature_cache, dict)
+        or not isinstance(benchmark, dict)
+    ):
         return None
     return SharedStrictResources(
         data_sources=_copy_data_sources(data_sources),
@@ -262,10 +276,15 @@ def _load_legacy_shared_resources_fast(
         data_mode="legacy",
     )
 
-    missing_symbols = [symbol for symbol in universe if symbol not in one_second_frames or one_second_frames[symbol].is_empty()]
+    missing_symbols = [
+        symbol
+        for symbol in universe
+        if symbol not in one_second_frames or one_second_frames[symbol].is_empty()
+    ]
     if missing_symbols:
         raise RuntimeError(
-            "Missing legacy 1s parquet rows for strict shared preload: " + ", ".join(missing_symbols)
+            "Missing legacy 1s parquet rows for strict shared preload: "
+            + ", ".join(missing_symbols)
         )
 
     cache: dict[tuple[str, str], Any] = {}
@@ -273,7 +292,9 @@ def _load_legacy_shared_resources_fast(
     for symbol in universe:
         frame_1s = one_second_frames[symbol]
         for timeframe in normalized_timeframes:
-            frame = frame_1s if timeframe == "1s" else resample_1s_frame(frame_1s, timeframe=timeframe)
+            frame = (
+                frame_1s if timeframe == "1s" else resample_1s_frame(frame_1s, timeframe=timeframe)
+            )
             if frame.is_empty():
                 raise RuntimeError(
                     f"Legacy resample produced no rows for strict shared preload: {symbol}@{timeframe}"
@@ -325,7 +346,9 @@ def _build_markdown(rows: list[dict[str, Any]]) -> str:
         val = dict(strict_allocator.get("val") or {})
         oos = dict(strict_allocator.get("oos") or {})
         delta = dict((row.get("comparison_vs_promoted_challenger") or {}).get("oos") or {})
-        liquidation_counts = dict((row.get("state_leverage_validation") or {}).get("liquidation_counts") or {})
+        liquidation_counts = dict(
+            (row.get("state_leverage_validation") or {}).get("liquidation_counts") or {}
+        )
         total_liquidations = int(sum(int(value) for value in liquidation_counts.values()))
         lines.append(
             f"- inc {row['incumbent_leverage']}x / auto {row['autoresearch_leverage']}x | "
@@ -473,7 +496,9 @@ def _run_report_from_context(
         resolved_split=context.resolved_split,
         scoring=context.scoring,
     )
-    report_candidates = _runner._sorted_report_candidates(report_candidates, scoring=context.scoring)
+    report_candidates = _runner._sorted_report_candidates(
+        report_candidates, scoring=context.scoring
+    )
     return _runner._candidate_research_report_payload(
         base_tf=context.base_tf,
         normalized_timeframes=context.normalized_timeframes,
@@ -508,16 +533,27 @@ def _strict_group_payloads_for_combo(
         leverage=auto,
     )
 
-    incumbent_report = _run_report_from_context(context=incumbent_context, candidates=incumbent_candidates)
+    incumbent_report = _run_report_from_context(
+        context=incumbent_context, candidates=incumbent_candidates
+    )
     incumbent_rows = _VALIDATION_CORE._saved_weight_rows(
         list(incumbent_report.get("candidates") or []),
-        [dict(row) for row in list(incumbent_portfolio_payload.get("weights") or []) if isinstance(row, dict)],
+        [
+            dict(row)
+            for row in list(incumbent_portfolio_payload.get("weights") or [])
+            if isinstance(row, dict)
+        ],
     )
     incumbent_eval = _VALIDATION_CORE.evaluate_saved_weight_portfolio(incumbent_rows)
     incumbent_payload = _validation._build_group_portfolio_payload(
         label="incumbent",
         source_payload=incumbent_portfolio_payload,
-        source_path=Path(str(incumbent_portfolio_payload.get("source_portfolio_path") or _validation.resolve_current_optimization_path())),
+        source_path=Path(
+            str(
+                incumbent_portfolio_payload.get("source_portfolio_path")
+                or _validation.resolve_current_optimization_path()
+            )
+        ),
         leverage=inc,
         strict_report=incumbent_report,
         refreshed_rows=incumbent_rows,
@@ -530,16 +566,27 @@ def _strict_group_payloads_for_combo(
         markdown=f"# strict incumbent portfolio\n\n- leverage: `{inc}x`\n",
     )
 
-    autoresearch_report = _run_report_from_context(context=autoresearch_context, candidates=autoresearch_candidates)
+    autoresearch_report = _run_report_from_context(
+        context=autoresearch_context, candidates=autoresearch_candidates
+    )
     autoresearch_rows = _VALIDATION_CORE._saved_weight_rows(
         list(autoresearch_report.get("candidates") or []),
-        [dict(row) for row in list(autoresearch_portfolio_payload.get("weights") or []) if isinstance(row, dict)],
+        [
+            dict(row)
+            for row in list(autoresearch_portfolio_payload.get("weights") or [])
+            if isinstance(row, dict)
+        ],
     )
     autoresearch_eval = _VALIDATION_CORE.evaluate_saved_weight_portfolio(autoresearch_rows)
     autoresearch_payload = _validation._build_group_portfolio_payload(
         label="autoresearch_55_45",
         source_payload=autoresearch_portfolio_payload,
-        source_path=Path(str(autoresearch_portfolio_payload.get("source_portfolio_path") or _validation._market._resolve_autoresearch_default_path())),
+        source_path=Path(
+            str(
+                autoresearch_portfolio_payload.get("source_portfolio_path")
+                or _validation._market._resolve_autoresearch_default_path()
+            )
+        ),
         leverage=auto,
         strict_report=autoresearch_report,
         refreshed_rows=autoresearch_rows,
@@ -591,9 +638,13 @@ def run_batch_retune(
 
     incumbent_bundle = _validation._path_payload(incumbent_bundle_path)
     incumbent_portfolio_payload = _validation._path_payload(incumbent_portfolio_path)
-    incumbent_portfolio_payload["source_portfolio_path"] = str(Path(incumbent_portfolio_path).resolve())
+    incumbent_portfolio_payload["source_portfolio_path"] = str(
+        Path(incumbent_portfolio_path).resolve()
+    )
     autoresearch_portfolio_payload = _validation._path_payload(autoresearch_portfolio_path)
-    autoresearch_portfolio_payload["source_portfolio_path"] = str(Path(autoresearch_portfolio_path).resolve())
+    autoresearch_portfolio_payload["source_portfolio_path"] = str(
+        Path(autoresearch_portfolio_path).resolve()
+    )
     leverage_payload = _validation._path_payload(leverage_tuning_path)
     decision_payload = _validation._path_payload(decision_path)
 
@@ -641,7 +692,9 @@ def run_batch_retune(
                 combo_resources, _, _ = _prepare_shared_resources(
                     candidates=[*incumbent_source_candidates, *autoresearch_source_candidates],
                     split=validation_split,
-                    cache_dir=None if shared_cache_dir is None else Path(shared_cache_dir).resolve(),
+                    cache_dir=None
+                    if shared_cache_dir is None
+                    else Path(shared_cache_dir).resolve(),
                     refresh_cache=False,
                 )
                 incumbent_context = _prepare_shared_context(
@@ -654,15 +707,17 @@ def run_batch_retune(
                     split=validation_split,
                     resources=combo_resources,
                 )
-                incumbent_written, autoresearch_written, blend_payload = _strict_group_payloads_for_combo(
-                    inc=inc,
-                    auto=auto,
-                    combo_dir=combo_dir,
-                    validation_split=validation_split,
-                    incumbent_context=incumbent_context,
-                    autoresearch_context=autoresearch_context,
-                    incumbent_portfolio_payload=incumbent_portfolio_payload,
-                    autoresearch_portfolio_payload=autoresearch_portfolio_payload,
+                incumbent_written, autoresearch_written, blend_payload = (
+                    _strict_group_payloads_for_combo(
+                        inc=inc,
+                        auto=auto,
+                        combo_dir=combo_dir,
+                        validation_split=validation_split,
+                        incumbent_context=incumbent_context,
+                        autoresearch_context=autoresearch_context,
+                        incumbent_portfolio_payload=incumbent_portfolio_payload,
+                        autoresearch_portfolio_payload=autoresearch_portfolio_payload,
+                    )
                 )
                 incumbent_context = None
                 autoresearch_context = None
@@ -678,23 +733,36 @@ def run_batch_retune(
                 )
                 strict_allocator = _validation._three_way.run_three_way_market_regime_allocator(
                     incumbent_path=incumbent_written["json"],
-                    blend_path=(combo_dir / "strict_blend_portfolio_current" / "strict_grouped_blend_portfolio_latest.json"),
+                    blend_path=(
+                        combo_dir
+                        / "strict_blend_portfolio_current"
+                        / "strict_grouped_blend_portfolio_latest.json"
+                    ),
                     autoresearch_path=autoresearch_written["json"],
                     market_judgement_path=strict_market["latest_json_path"],
                     output_dir=combo_dir / "strict_three_way_market_regime_allocator_current",
                     soft_rss_bytes=max(1, int(soft_rss_bytes)),
                     hard_rss_bytes=max(1, int(hard_rss_bytes)),
                 )
-                promoted_candidate = _validation._resolve_current_promoted_candidate(decision_payload)
+                promoted_candidate = _validation._resolve_current_promoted_candidate(
+                    decision_payload
+                )
                 strict_allocator_payload = _validation._apply_allocator_state_leverage_to_payload(
                     allocator_payload=dict(strict_allocator["payload"]),
                     leverage_by_state={
                         "incumbent": int(inc),
-                        "blend_85_15": int((leverage_payload.get("best_result") or {}).get("leverage_by_state", {}).get("blend_85_15") or 1),
+                        "blend_85_15": int(
+                            (leverage_payload.get("best_result") or {})
+                            .get("leverage_by_state", {})
+                            .get("blend_85_15")
+                            or 1
+                        ),
                         "autoresearch_55_45": int(auto),
                     },
                 )
-                strict_allocator_payload["artifact_path"] = str(Path(strict_allocator["latest_json_path"]).resolve())
+                strict_allocator_payload["artifact_path"] = str(
+                    Path(strict_allocator["latest_json_path"]).resolve()
+                )
                 comparison = _validation._comparison_block(
                     dict(strict_allocator_payload.get("split_metrics") or {}),
                     {
@@ -717,19 +785,40 @@ def run_batch_retune(
                     },
                     "leverage_by_state": {
                         "incumbent": int(inc),
-                        "blend_85_15": int((leverage_payload.get("best_result") or {}).get("leverage_by_state", {}).get("blend_85_15") or 1),
+                        "blend_85_15": int(
+                            (leverage_payload.get("best_result") or {})
+                            .get("leverage_by_state", {})
+                            .get("blend_85_15")
+                            or 1
+                        ),
                         "autoresearch_55_45": int(auto),
                     },
                     "strict_artifact_paths": {
                         "incumbent": str(Path(incumbent_written["json"]).resolve()),
                         "autoresearch_55_45": str(Path(autoresearch_written["json"]).resolve()),
-                        "blend_85_15": str((combo_dir / "strict_blend_portfolio_current" / "strict_grouped_blend_portfolio_latest.json").resolve()),
+                        "blend_85_15": str(
+                            (
+                                combo_dir
+                                / "strict_blend_portfolio_current"
+                                / "strict_grouped_blend_portfolio_latest.json"
+                            ).resolve()
+                        ),
                         "market_judgement": str(Path(strict_market["latest_json_path"]).resolve()),
                         "allocator": str(Path(strict_allocator["latest_json_path"]).resolve()),
                     },
                     "strict_group_metrics": {
-                        "incumbent": dict(_validation._path_payload(incumbent_written["json"]).get("portfolio_metrics") or {}),
-                        "autoresearch_55_45": dict(_validation._path_payload(autoresearch_written["json"]).get("portfolio_metrics") or {}),
+                        "incumbent": dict(
+                            _validation._path_payload(incumbent_written["json"]).get(
+                                "portfolio_metrics"
+                            )
+                            or {}
+                        ),
+                        "autoresearch_55_45": dict(
+                            _validation._path_payload(autoresearch_written["json"]).get(
+                                "portfolio_metrics"
+                            )
+                            or {}
+                        ),
                         "blend_85_15": dict(blend_payload.get("portfolio_metrics") or {}),
                         "allocator": dict(strict_allocator_payload.get("split_metrics") or {}),
                     },
@@ -754,9 +843,15 @@ def run_batch_retune(
                         "autoresearch_leverage": int(auto),
                         "status": "ok",
                         "elapsed_seconds": perf_counter() - started,
-                        "strict_allocator": final_payload.get("strict_allocator", {}).get("split_metrics"),
-                        "state_leverage_validation": final_payload.get("strict_allocator", {}).get("state_leverage_validation"),
-                        "comparison_vs_promoted_challenger": final_payload.get("comparison_vs_promoted_challenger"),
+                        "strict_allocator": final_payload.get("strict_allocator", {}).get(
+                            "split_metrics"
+                        ),
+                        "state_leverage_validation": final_payload.get("strict_allocator", {}).get(
+                            "state_leverage_validation"
+                        ),
+                        "comparison_vs_promoted_challenger": final_payload.get(
+                            "comparison_vs_promoted_challenger"
+                        ),
                         "report_path": str(Path(written["json"]).resolve()),
                     }
                 )
@@ -779,7 +874,9 @@ def run_batch_retune(
     rows.sort(
         key=lambda row: (
             row.get("status") == "ok",
-            float(((row.get("strict_allocator") or {}).get("oos") or {}).get("total_return") or 0.0),
+            float(
+                ((row.get("strict_allocator") or {}).get("oos") or {}).get("total_return") or 0.0
+            ),
             float(((row.get("strict_allocator") or {}).get("oos") or {}).get("sharpe") or 0.0),
         ),
         reverse=True,
@@ -790,7 +887,9 @@ def run_batch_retune(
         "incumbent_leverages": list(incumbent_leverages),
         "autoresearch_leverages": list(autoresearch_leverages),
         "shared_resource_cache": {
-            "cache_dir": str(Path(shared_cache_dir).resolve()) if shared_cache_dir is not None else None,
+            "cache_dir": str(Path(shared_cache_dir).resolve())
+            if shared_cache_dir is not None
+            else None,
             "refresh_requested": bool(refresh_shared_cache),
             "resource_source": shared_resource_source,
             "cache_key": shared_resource_cache_key,
@@ -810,8 +909,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--incumbent-leverages", default="1,3,5,7,9")
     parser.add_argument("--autoresearch-leverages", default="1,2")
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
-    parser.add_argument("--soft-rss-bytes", type=int, default=int(_validation.DEFAULT_SOFT_RSS_BYTES))
-    parser.add_argument("--hard-rss-bytes", type=int, default=int(_validation.DEFAULT_HARD_RSS_BYTES))
+    parser.add_argument(
+        "--soft-rss-bytes", type=int, default=int(_validation.DEFAULT_SOFT_RSS_BYTES)
+    )
+    parser.add_argument(
+        "--hard-rss-bytes", type=int, default=int(_validation.DEFAULT_HARD_RSS_BYTES)
+    )
     parser.add_argument("--shared-cache-dir", type=Path, default=DEFAULT_SHARED_RESOURCE_CACHE_DIR)
     parser.add_argument("--refresh-shared-cache", action="store_true")
     return parser
@@ -825,7 +928,9 @@ def main() -> None:
         output_dir=Path(args.output_dir).resolve(),
         soft_rss_bytes=max(1, int(args.soft_rss_bytes)),
         hard_rss_bytes=max(1, int(args.hard_rss_bytes)),
-        shared_cache_dir=None if args.shared_cache_dir is None else Path(args.shared_cache_dir).resolve(),
+        shared_cache_dir=None
+        if args.shared_cache_dir is None
+        else Path(args.shared_cache_dir).resolve(),
         refresh_shared_cache=bool(args.refresh_shared_cache),
     )
     print(Path(report["summary_json"]).resolve())

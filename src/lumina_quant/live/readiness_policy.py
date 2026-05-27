@@ -117,7 +117,9 @@ def effective_startup_reconciliation_hard_fail(*, mode: str, configured: bool) -
     return bool(configured) or resolved_mode == "real"
 
 
-def real_mode_explicitly_enabled(*, mode: str, require_real_enable_flag: bool, env: Mapping[str, str] | None = None) -> bool:
+def real_mode_explicitly_enabled(
+    *, mode: str, require_real_enable_flag: bool, env: Mapping[str, str] | None = None
+) -> bool:
     resolved_mode = str(mode or "").strip().lower()
     if resolved_mode != "real":
         return True
@@ -136,7 +138,9 @@ def _decision_allows_live_start(decision: Mapping[str, Any]) -> tuple[bool, bool
         or decision.get("candidate_key")
         or ""
     ).strip()
-    decision_promote = decision_value in {"promote_candidate", "selected_live_mode"} and bool(selected_reference)
+    decision_promote = decision_value in {"promote_candidate", "selected_live_mode"} and bool(
+        selected_reference
+    )
     decision_allowed = bool(decision_keep or decision_promote)
     return decision_allowed, decision_keep, decision_promote, selected_reference
 
@@ -151,7 +155,10 @@ def _decision_runtime_compatible(
         return False
     if decision_keep:
         return True
-    return bool(infer_strategy_class_name(selected_reference) or supports_live_portfolio_mode(selected_reference))
+    return bool(
+        infer_strategy_class_name(selected_reference)
+        or supports_live_portfolio_mode(selected_reference)
+    )
 
 
 def _decision_strategy_params(decision: Mapping[str, Any]) -> dict[str, Any]:
@@ -288,7 +295,9 @@ def _build_live_readiness_verdict(
         require_real_enable_flag=require_real_flag,
         env=env,
     )
-    decision_allowed, decision_keep, decision_promote, decision_reference = _decision_allows_live_start(decision)
+    decision_allowed, decision_keep, decision_promote, decision_reference = (
+        _decision_allows_live_start(decision)
+    )
     decision_runtime_compatible = _decision_runtime_compatible(
         decision_allowed=decision_allowed,
         decision_keep=decision_keep,
@@ -300,11 +309,14 @@ def _build_live_readiness_verdict(
     )
     artifact_real_money_veto = bool(artifact_veto_checks.get("artifact_real_money_veto"))
 
-    postgres_dsn_env_name = str(
-        runtime_storage.get("postgres_dsn_env", "")
-        or raw_storage.get("postgres_dsn_env", "")
+    postgres_dsn_env_name = (
+        str(
+            runtime_storage.get("postgres_dsn_env", "")
+            or raw_storage.get("postgres_dsn_env", "")
+            or "LQ_POSTGRES_DSN"
+        ).strip()
         or "LQ_POSTGRES_DSN"
-    ).strip() or "LQ_POSTGRES_DSN"
+    )
     postgres_dsn = (
         str(runtime_storage.get("postgres_dsn", "") or "").strip()
         or str(raw_storage.get("postgres_dsn", "") or "").strip()
@@ -455,7 +467,9 @@ def enforce_live_readiness_from_files(
     if not allowed:
         raise LiveReadinessBlockedError(
             mode=resolved_mode,
-            recommended_action=str(payload.get("recommended_action") or "block_until_preflight_gaps_closed"),
+            recommended_action=str(
+                payload.get("recommended_action") or "block_until_preflight_gaps_closed"
+            ),
             payload=payload,
         )
     return payload

@@ -32,14 +32,18 @@ class MicroRangeExpansion1sStrategy(Strategy):
     @classmethod
     def get_param_schema(cls) -> dict[str, HyperParam]:
         return {
-            "lookback": HyperParam.integer("lookback", default=30, low=6, high=1024, grid=[20, 30, 45]),
+            "lookback": HyperParam.integer(
+                "lookback", default=30, low=6, high=1024, grid=[20, 30, 45]
+            ),
             "range_z_threshold": HyperParam.floating(
                 "range_z_threshold", default=1.5, low=0.1, high=6.0, grid=[1.2, 1.5, 2.0]
             ),
             "volume_z_threshold": HyperParam.floating(
                 "volume_z_threshold", default=1.0, low=0.0, high=6.0, grid=[0.8, 1.0, 1.5]
             ),
-            "max_hold_bars": HyperParam.integer("max_hold_bars", default=20, low=1, high=2000, grid=[10, 20, 30]),
+            "max_hold_bars": HyperParam.integer(
+                "max_hold_bars", default=20, low=1, high=2000, grid=[10, 20, 30]
+            ),
             "allow_short": HyperParam.boolean("allow_short", default=True, grid=[True, False]),
         }
 
@@ -203,7 +207,9 @@ class MicroRangeExpansion1sStrategy(Strategy):
         if item.mode != "OUT":
             item.bars_held += 1
             if item.bars_held >= self.max_hold_bars:
-                self._emit(symbol, getattr(event, "time", None), "EXIT", range_z=range_z, volume_z=volume_z)
+                self._emit(
+                    symbol, getattr(event, "time", None), "EXIT", range_z=range_z, volume_z=volume_z
+                )
                 item.mode = "OUT"
                 item.bars_held = 0
             return
@@ -213,10 +219,14 @@ class MicroRangeExpansion1sStrategy(Strategy):
 
         prev_close = item.closes[-2]
         if close >= prev_close:
-            self._emit(symbol, getattr(event, "time", None), "LONG", range_z=range_z, volume_z=volume_z)
+            self._emit(
+                symbol, getattr(event, "time", None), "LONG", range_z=range_z, volume_z=volume_z
+            )
             item.mode = "LONG"
             item.bars_held = 0
         elif self.allow_short:
-            self._emit(symbol, getattr(event, "time", None), "SHORT", range_z=range_z, volume_z=volume_z)
+            self._emit(
+                symbol, getattr(event, "time", None), "SHORT", range_z=range_z, volume_z=volume_z
+            )
             item.mode = "SHORT"
             item.bars_held = 0

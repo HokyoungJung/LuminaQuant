@@ -75,7 +75,9 @@ def test_build_latest_anchored_split_trims_from_left() -> None:
     assert split.oos_start == datetime(2026, 2, 4, 0, 0, 0, tzinfo=UTC)
 
 
-def test_load_real_ohlcv_frame_rebuilds_from_lower_timeframe_and_drops_incomplete_tail(tmp_path: Path) -> None:
+def test_load_real_ohlcv_frame_rebuilds_from_lower_timeframe_and_drops_incomplete_tail(
+    tmp_path: Path,
+) -> None:
     frame_30m = pl.DataFrame(
         {
             "datetime": [

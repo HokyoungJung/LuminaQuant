@@ -85,7 +85,9 @@ def _sample_details() -> list[dict[str, object]]:
 def test_build_fail_analysis_groups_reasons_and_next_steps():
     payload = build_fail_analysis(_sample_summary(), _sample_details())
 
-    reason_counts = {row["rejection_reason"]: row["count"] for row in payload["counts_by_rejection_reason"]}
+    reason_counts = {
+        row["rejection_reason"]: row["count"] for row in payload["counts_by_rejection_reason"]
+    }
     assert reason_counts["oos_sharpe"] == 1
     assert reason_counts["trade_count"] == 1
     assert reason_counts["pbo"] == 1
@@ -155,18 +157,28 @@ def test_sync_exact_window_latest_aliases_materializes_root_level_latest_files(t
     synced = sync_exact_window_latest_aliases(tmp_path)
     assert synced["summary"] == (tmp_path / "exact_window_suite_summary_latest.json").resolve()
     assert synced["details"] == (tmp_path / "exact_window_candidate_details_latest.json").resolve()
-    assert synced["fail_analysis"] == (tmp_path / "exact_window_fail_analysis_latest.json").resolve()
-    assert synced["memory_evidence"] == (tmp_path / "exact_window_memory_evidence_latest.json").resolve()
+    assert (
+        synced["fail_analysis"] == (tmp_path / "exact_window_fail_analysis_latest.json").resolve()
+    )
+    assert (
+        synced["memory_evidence"]
+        == (tmp_path / "exact_window_memory_evidence_latest.json").resolve()
+    )
     assert synced["rss_log"] == (tmp_path / "exact_window_rss_latest.jsonl").resolve()
 
     resolved = resolve_exact_window_artifact_paths(tmp_path)
     assert resolved["summary"] == (tmp_path / "exact_window_suite_summary_latest.json").resolve()
-    assert json.loads(Path(resolved["summary"]).read_text(encoding="utf-8"))["generated_at"] == "2026-03-09T09:00:00Z"
+    assert (
+        json.loads(Path(resolved["summary"]).read_text(encoding="utf-8"))["generated_at"]
+        == "2026-03-09T09:00:00Z"
+    )
 
 
 def test_backtest_registry_upsert_and_resolve_dedupes(tmp_path: Path):
     output_root = tmp_path
-    (output_root / "latest.json").write_text(json.dumps({"run_dir": str(output_root / "run-1" / "5m")}))
+    (output_root / "latest.json").write_text(
+        json.dumps({"run_dir": str(output_root / "run-1" / "5m")})
+    )
     (output_root / "run-1" / "5m").mkdir(parents=True)
     first = upsert_backtest_registry(
         output_root,
@@ -176,7 +188,9 @@ def test_backtest_registry_upsert_and_resolve_dedupes(tmp_path: Path):
         run_signature="sig",
         manifest_path=str(output_root / "manifest-1.json"),
         summary_path=str(output_root / "run-1" / "5m" / "exact_window_suite_summary_latest.json"),
-        details_path=str(output_root / "run-1" / "5m" / "exact_window_candidate_details_latest.json"),
+        details_path=str(
+            output_root / "run-1" / "5m" / "exact_window_candidate_details_latest.json"
+        ),
         fail_analysis_path=None,
         memory_evidence_path=None,
         requested_timeframes=["5m"],
@@ -193,7 +207,9 @@ def test_backtest_registry_upsert_and_resolve_dedupes(tmp_path: Path):
         run_signature="sig",
         manifest_path=str(output_root / "manifest-1.json"),
         summary_path=str(output_root / "run-1" / "5m" / "exact_window_suite_summary_latest.json"),
-        details_path=str(output_root / "run-1" / "5m" / "exact_window_candidate_details_latest.json"),
+        details_path=str(
+            output_root / "run-1" / "5m" / "exact_window_candidate_details_latest.json"
+        ),
         fail_analysis_path=None,
         memory_evidence_path=None,
         requested_timeframes=["5m"],

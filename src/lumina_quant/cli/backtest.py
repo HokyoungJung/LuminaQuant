@@ -59,6 +59,7 @@ def _get_strategy_registry():
         _strategy_registry = load_strategy_registry(import_private_strategy_registry)
     return _strategy_registry
 
+
 # ==========================================
 # CONFIGURATION FROM YAML
 # ==========================================
@@ -216,6 +217,7 @@ def _env_int(name, default):
     except Exception:
         return int(default)
 
+
 def _normalize_backtest_mode(value: str | None, default: str = "windowed") -> str:
     token = str(value or default).strip().lower()
     if token in {"windowed", "legacy_batch", "legacy_1s"}:
@@ -228,6 +230,7 @@ def _normalize_data_mode(value: str | None, default: str = "raw-first") -> str:
         return normalize_data_mode(value, default=default)
     except RawFirstDataMissingError:
         return str(default)
+
 
 def _parse_config_date(value, default):
     try:
@@ -262,7 +265,9 @@ def _current_backtest_runtime_settings() -> dict[str, Any]:
         else _parse_config_date(getattr(BacktestConfig, "END_DATE", None), None)
     )
     settings = {
-        "symbol_list": list(symbol_list_override) if symbol_list_override is not None else list(BaseConfig.SYMBOLS),
+        "symbol_list": list(symbol_list_override)
+        if symbol_list_override is not None
+        else list(BaseConfig.SYMBOLS),
         "start_date": start_date,
         "end_date": end_date,
         "market_db_path": (
@@ -280,7 +285,9 @@ def _current_backtest_runtime_settings() -> dict[str, Any]:
             if market_db_backend_override is not None
             else str(BaseConfig.STORAGE_BACKEND)
         ),
-        "base_timeframe": _normalize_timeframe_or_default(os.getenv("LQ_BASE_TIMEFRAME", "1s"), "1s"),
+        "base_timeframe": _normalize_timeframe_or_default(
+            os.getenv("LQ_BASE_TIMEFRAME", "1s"), "1s"
+        ),
         "auto_collect_db": _env_bool("LQ_AUTO_COLLECT_DB", False),
         "bt_chunk_days": (
             max(1, int(bt_chunk_days_override))
@@ -560,7 +567,10 @@ def _persist_backtest_audit_rows(audit_store, run_id, backtest, *, low_memory=Fa
                 total = _safe_float(total_value)
                 if total is None:
                     continue
-                if last_snapshot_ts is not None and (float(ts_seconds) - float(last_snapshot_ts)) < snapshot_interval:
+                if (
+                    last_snapshot_ts is not None
+                    and (float(ts_seconds) - float(last_snapshot_ts)) < snapshot_interval
+                ):
                     continue
                 last_snapshot_ts = float(ts_seconds)
                 try:
@@ -647,7 +657,9 @@ def _is_year_scale_window(start_date, end_date, *, threshold_days=30) -> bool:
     return (end - start).days >= int(threshold_days)
 
 
-def _resolve_execution_profile(*, low_memory=None, persist_output=None, start_date=None, end_date=None):
+def _resolve_execution_profile(
+    *, low_memory=None, persist_output=None, start_date=None, end_date=None
+):
     env_low_memory = _env_optional_bool("LQ_BACKTEST_LOW_MEMORY")
     if low_memory is not None:
         resolved_low_memory = bool(low_memory)
@@ -660,9 +672,7 @@ def _resolve_execution_profile(*, low_memory=None, persist_output=None, start_da
         resolved_persist_output = _env_optional_bool("LQ_BACKTEST_PERSIST_OUTPUT")
     if resolved_persist_output is None:
         resolved_persist_output = (
-            False
-            if resolved_low_memory
-            else bool(getattr(BacktestConfig, "PERSIST_OUTPUT", True))
+            False if resolved_low_memory else bool(getattr(BacktestConfig, "PERSIST_OUTPUT", True))
         )
     return {
         "low_memory": bool(resolved_low_memory),
@@ -734,9 +744,7 @@ def run(
         bool(settings["auto_collect_db"]) if auto_collect_db is None else bool(auto_collect_db)
     )
     data_mode = str(settings["data_mode"]) if data_mode is None else str(data_mode)
-    backtest_mode = (
-        str(settings["backtest_mode"]) if backtest_mode is None else str(backtest_mode)
-    )
+    backtest_mode = str(settings["backtest_mode"]) if backtest_mode is None else str(backtest_mode)
     bt_chunk_days = int(settings["bt_chunk_days"])
     bt_chunk_warmup_bars = int(settings["bt_chunk_warmup_bars"])
     backtest_poll_seconds = int(settings["backtest_poll_seconds"])
@@ -1050,14 +1058,20 @@ def main(argv: list[str] | None = None) -> int:
             market_exchange=args.market_exchange,
             base_timeframe=_normalize_timeframe_or_default(args.base_timeframe, "1s"),
             external_data_root=args.external_data_root,
-            auto_collect_db=(not bool(args.no_auto_collect_db) and bool(settings["auto_collect_db"])),
+            auto_collect_db=(
+                not bool(args.no_auto_collect_db) and bool(settings["auto_collect_db"])
+            ),
             run_id=args.run_id,
             low_memory=args.low_memory,
             persist_output=args.persist_output,
             backtest_mode=args.backtest_mode,
             portfolio_mode=args.portfolio_mode,
         )
-    except (RawFirstDataMissingError, RawFirstManifestInvalidError, RawFirstStaleWindowError) as exc:
+    except (
+        RawFirstDataMissingError,
+        RawFirstManifestInvalidError,
+        RawFirstStaleWindowError,
+    ) as exc:
         code = raw_first_exit_code(exc)
         if code is None:
             raise

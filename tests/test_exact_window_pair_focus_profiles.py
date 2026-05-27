@@ -8,11 +8,7 @@ def test_4h_pair_focus_includes_metal_and_mixed_pairs_when_symbols_present():
         timeframes=["4h"],
         symbols=["BTC/USDT", "ETH/USDT", "XAU/USDT", "XAG/USDT", "XPT/USDT", "XPD/USDT"],
     )
-    pair_rows = [
-        row
-        for row in rows
-        if row.strategy_class == "PairSpreadZScoreStrategy"
-    ]
+    pair_rows = [row for row in rows if row.strategy_class == "PairSpreadZScoreStrategy"]
     pair_set = {tuple(row.symbols) for row in pair_rows}
 
     assert ("XAU/USDT", "XAG/USDT") in pair_set

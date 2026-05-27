@@ -175,7 +175,9 @@ def test_run_strict_research_rejects_synthetic_fallback(monkeypatch) -> None:
 
     with pytest.raises(RuntimeError, match="synthetic fallback"):
         MODULE._run_strict_research(
-            candidates=[{"candidate_id": "c1", "symbols": ["BTC/USDT"], "strategy_timeframe": "1h"}],
+            candidates=[
+                {"candidate_id": "c1", "symbols": ["BTC/USDT"], "strategy_timeframe": "1h"}
+            ],
             strategy_timeframes=["1h"],
             symbol_universe=["BTC/USDT"],
             split={
@@ -248,7 +250,6 @@ def test_run_strict_research_executes_candidates_sequentially_with_candidate_spe
     assert calls[1]["strategy_timeframes"] == ["30m"]
     assert calls[1]["symbol_universe"] == ["BTC/USDT", "ETH/USDT"]
     assert [row["candidate_id"] for row in report["candidates"]] == ["pair", "trend"]
-
 
 
 def test_build_latest_anchored_split_trims_from_left_when_latest_anchor_moves_forward() -> None:

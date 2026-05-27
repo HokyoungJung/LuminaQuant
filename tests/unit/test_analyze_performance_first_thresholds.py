@@ -42,7 +42,11 @@ def test_build_report_captures_frontier_maxima_for_current_hybrid_case() -> None
                 "source_sleeve_metrics": {
                     "balanced_overlay_80_20": {
                         "val": {"total_return": 0.08308, "sharpe": 4.1120},
-                        "oos": {"total_return": 0.001091, "sharpe": 0.4828, "max_drawdown": 0.005162},
+                        "oos": {
+                            "total_return": 0.001091,
+                            "sharpe": 0.4828,
+                            "max_drawdown": 0.005162,
+                        },
                     }
                 },
             }
@@ -64,7 +68,13 @@ def test_build_report_captures_frontier_maxima_for_current_hybrid_case() -> None
     assert report["current_thresholds"]["min_val_return"] == 0.06
     assert report["current_thresholds"]["min_val_sharpe"] == 3.0
     assert report["frontier"]["passing_count"] == 300
-    assert report["frontier"]["frontier_maxima"]["max_return_edge_threshold_that_still_promotes"] == 0.005
-    assert report["frontier"]["frontier_maxima"]["max_sharpe_edge_threshold_that_still_promotes"] == 2.5
+    assert (
+        report["frontier"]["frontier_maxima"]["max_return_edge_threshold_that_still_promotes"]
+        == 0.005
+    )
+    assert (
+        report["frontier"]["frontier_maxima"]["max_sharpe_edge_threshold_that_still_promotes"]
+        == 2.5
+    )
     assert report["frontier"]["frontier_maxima"]["max_min_val_return_that_still_promotes"] == 0.06
     assert report["frontier"]["frontier_maxima"]["max_min_val_sharpe_that_still_promotes"] == 3.0

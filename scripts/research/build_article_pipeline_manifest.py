@@ -75,10 +75,7 @@ def main() -> None:
         f"- max_total: `{payload['max_total']}`",
         "",
         "## families",
-        *[
-            f"- {family}: {count}"
-            for family, count in sorted(payload["family_counts"].items())
-        ],
+        *[f"- {family}: {count}" for family, count in sorted(payload["family_counts"].items())],
         "",
         "## article families",
         *[

@@ -145,7 +145,9 @@ def test_build_master_scoreboard_promotes_hybrid_when_switch_does() -> None:
     onepager = MODULE.build_onepager_payload(scoreboard)
 
     assert scoreboard["current_default"]["mode"] == "hybrid_guarded_mode"
-    assert scoreboard["hybrid_challenger"]["why_not_default"].startswith("Promoted to the live default")
+    assert scoreboard["hybrid_challenger"]["why_not_default"].startswith(
+        "Promoted to the live default"
+    )
     assert scoreboard["refreshed_live_scoreboard"][1]["status"] == "switch_default"
     assert {row["name"] for row in scoreboard["refreshed_live_scoreboard"]} >= {
         "production_guarded_mode",

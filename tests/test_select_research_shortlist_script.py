@@ -75,7 +75,9 @@ def test_apply_portfolio_weights_honors_risk_penalty_override():
         weighted_steep,
         key=lambda item: float((item.get("oos") or {}).get("mdd", 0.0)),
     )
-    assert float(by_mdd[0].get("portfolio_weight", 0.0)) > float(by_mdd[1].get("portfolio_weight", 0.0))
+    assert float(by_mdd[0].get("portfolio_weight", 0.0)) > float(
+        by_mdd[1].get("portfolio_weight", 0.0)
+    )
 
 
 def test_select_diversified_keeps_allowlisted_multi_asset_factor_rotation_by_default():

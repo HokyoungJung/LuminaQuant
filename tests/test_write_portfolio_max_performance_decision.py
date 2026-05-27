@@ -144,7 +144,9 @@ def _anchored_candidate_entries(payload: dict[str, object]) -> list[dict[str, ob
             continue
         key = str(entry.get("candidate_key") or "").lower()
         label = str(entry.get("label") or "").lower()
-        if any(token in key or token in label for token in ("anchored", "four_sleeve", "four-sleeve")):
+        if any(
+            token in key or token in label for token in ("anchored", "four_sleeve", "four-sleeve")
+        ):
             out.append(entry)
     return out
 
@@ -190,8 +192,16 @@ def _regime_switch_section(
         },
         "oos_monthly_returns": _monthly_rows(*(oos_monthly_returns or [max(total_return, 0.03)])),
         "weights": [
-            {"candidate_id": "autoresearch_pair_55_45", "name": "autoresearch_pair_55_45", "weight": 0.35},
-            {"candidate_id": "current_one_shot_incumbent", "name": "current_one_shot_incumbent", "weight": 0.2},
+            {
+                "candidate_id": "autoresearch_pair_55_45",
+                "name": "autoresearch_pair_55_45",
+                "weight": 0.35,
+            },
+            {
+                "candidate_id": "current_one_shot_incumbent",
+                "name": "current_one_shot_incumbent",
+                "weight": 0.2,
+            },
         ],
     }
 
@@ -220,7 +230,9 @@ def _grouped_allocator_payload(
                 "volatility": volatility,
             },
         },
-        "oos_monthly_returns": _monthly_rows(max(total_return, 0.03), max(total_return, 0.03), max(total_return, 0.03)),
+        "oos_monthly_returns": _monthly_rows(
+            max(total_return, 0.03), max(total_return, 0.03), max(total_return, 0.03)
+        ),
         "current_state": {
             "state": "autoresearch_55_45",
             "raw_target_state": "incumbent",
@@ -269,7 +281,11 @@ def _grouped_strict_validation_payload(
                     "volatility": 0.12,
                 },
             },
-            "oos_monthly_returns": _monthly_rows(max(oos_total_return, 0.03), max(oos_total_return, 0.03), max(oos_total_return, 0.03)),
+            "oos_monthly_returns": _monthly_rows(
+                max(oos_total_return, 0.03),
+                max(oos_total_return, 0.03),
+                max(oos_total_return, 0.03),
+            ),
             "state_leverage_validation": {
                 "liquidation_counts": {
                     "incumbent": 0,
@@ -323,7 +339,9 @@ def _static_blend_payload(
                 "volatility": volatility,
             },
         },
-        "oos_monthly_returns": _monthly_rows(max(total_return, 0.03), max(total_return, 0.03), max(total_return, 0.03)),
+        "oos_monthly_returns": _monthly_rows(
+            max(total_return, 0.03), max(total_return, 0.03), max(total_return, 0.03)
+        ),
     }
 
 
@@ -372,7 +390,9 @@ def _production_guarded_payload(
             {"candidate_id": "static_blend_76_24", "weight": 0.35},
             {"candidate_id": "incumbent_only", "weight": 0.2},
         ],
-        "oos_monthly_returns": _monthly_rows(max(total_return, 0.03), max(total_return, 0.03), max(total_return, 0.03)),
+        "oos_monthly_returns": _monthly_rows(
+            max(total_return, 0.03), max(total_return, 0.03), max(total_return, 0.03)
+        ),
     }
 
 
@@ -629,7 +649,9 @@ def test_build_portfolio_max_performance_decision_includes_extra_candidate_artif
     tuned.write_text(json.dumps({"selection_basis": "validation_only"}), encoding="utf-8")
     dynamic.write_text(json.dumps({"selection_basis": "validation_only"}), encoding="utf-8")
     overlay.write_text(json.dumps({"selection_basis": "validation_only"}), encoding="utf-8")
-    triplet.write_text(json.dumps({"artifact_kind": "portfolio_backbone_triplet_search"}), encoding="utf-8")
+    triplet.write_text(
+        json.dumps({"artifact_kind": "portfolio_backbone_triplet_search"}), encoding="utf-8"
+    )
     extra.write_text(
         json.dumps(
             {
@@ -736,7 +758,9 @@ def test_build_portfolio_max_performance_decision_requires_positive_return_even_
         ),
         encoding="utf-8",
     )
-    triplet.write_text(json.dumps({"artifact_kind": "portfolio_backbone_triplet_search"}), encoding="utf-8")
+    triplet.write_text(
+        json.dumps({"artifact_kind": "portfolio_backbone_triplet_search"}), encoding="utf-8"
+    )
 
     payload = MODULE.build_portfolio_max_performance_decision(
         incumbent_bundle_path=incumbent_bundle,
@@ -786,7 +810,9 @@ def test_build_portfolio_max_performance_decision_includes_anchored_four_sleeve_
     tuned.write_text(json.dumps({"selection_basis": "validation_only"}), encoding="utf-8")
     dynamic.write_text(json.dumps({"selection_basis": "validation_only"}), encoding="utf-8")
     overlay.write_text(json.dumps({"selection_basis": "validation_only"}), encoding="utf-8")
-    triplet.write_text(json.dumps({"artifact_kind": "portfolio_backbone_triplet_search"}), encoding="utf-8")
+    triplet.write_text(
+        json.dumps({"artifact_kind": "portfolio_backbone_triplet_search"}), encoding="utf-8"
+    )
 
     anchored_section = _comparison_section(
         path=tmp_path / "anchored_tuned.json",
@@ -862,7 +888,9 @@ def test_build_portfolio_max_performance_decision_includes_grouped_allocator_can
     tuned.write_text(json.dumps({"selection_basis": "validation_only"}), encoding="utf-8")
     dynamic.write_text(json.dumps({"selection_basis": "validation_only"}), encoding="utf-8")
     overlay.write_text(json.dumps({"selection_basis": "validation_only"}), encoding="utf-8")
-    triplet.write_text(json.dumps({"artifact_kind": "portfolio_backbone_triplet_search"}), encoding="utf-8")
+    triplet.write_text(
+        json.dumps({"artifact_kind": "portfolio_backbone_triplet_search"}), encoding="utf-8"
+    )
     grouped_allocator.write_text(
         json.dumps(
             _grouped_allocator_payload(
@@ -941,7 +969,9 @@ def test_grouped_allocator_strict_liquidation_evidence_blocks_promotion(
     tuned.write_text(json.dumps({"selection_basis": "validation_only"}), encoding="utf-8")
     dynamic.write_text(json.dumps({"selection_basis": "validation_only"}), encoding="utf-8")
     overlay.write_text(json.dumps({"selection_basis": "validation_only"}), encoding="utf-8")
-    triplet.write_text(json.dumps({"artifact_kind": "portfolio_backbone_triplet_search"}), encoding="utf-8")
+    triplet.write_text(
+        json.dumps({"artifact_kind": "portfolio_backbone_triplet_search"}), encoding="utf-8"
+    )
     grouped_allocator.write_text(
         json.dumps(
             _grouped_allocator_payload(
@@ -1021,7 +1051,9 @@ def test_build_portfolio_max_performance_decision_includes_static_blend_candidat
     tuned.write_text(json.dumps({"selection_basis": "validation_only"}), encoding="utf-8")
     dynamic.write_text(json.dumps({"selection_basis": "validation_only"}), encoding="utf-8")
     overlay.write_text(json.dumps({"selection_basis": "validation_only"}), encoding="utf-8")
-    triplet.write_text(json.dumps({"artifact_kind": "portfolio_backbone_triplet_search"}), encoding="utf-8")
+    triplet.write_text(
+        json.dumps({"artifact_kind": "portfolio_backbone_triplet_search"}), encoding="utf-8"
+    )
     static_blend.write_text(
         json.dumps(
             _static_blend_payload(
@@ -1083,7 +1115,9 @@ def test_build_portfolio_max_performance_decision_can_promote_static_blend(
     tuned.write_text(json.dumps({"selection_basis": "validation_only"}), encoding="utf-8")
     dynamic.write_text(json.dumps({"selection_basis": "validation_only"}), encoding="utf-8")
     overlay.write_text(json.dumps({"selection_basis": "validation_only"}), encoding="utf-8")
-    triplet.write_text(json.dumps({"artifact_kind": "portfolio_backbone_triplet_search"}), encoding="utf-8")
+    triplet.write_text(
+        json.dumps({"artifact_kind": "portfolio_backbone_triplet_search"}), encoding="utf-8"
+    )
     static_blend.write_text(
         json.dumps(
             _static_blend_payload(
@@ -1248,7 +1282,9 @@ def test_grouped_allocator_strict_gate_blocks_promotion_when_train_is_negative(
     tuned.write_text(json.dumps({"selection_basis": "validation_only"}), encoding="utf-8")
     dynamic.write_text(json.dumps({"selection_basis": "validation_only"}), encoding="utf-8")
     overlay.write_text(json.dumps({"selection_basis": "validation_only"}), encoding="utf-8")
-    triplet.write_text(json.dumps({"artifact_kind": "portfolio_backbone_triplet_search"}), encoding="utf-8")
+    triplet.write_text(
+        json.dumps({"artifact_kind": "portfolio_backbone_triplet_search"}), encoding="utf-8"
+    )
     grouped_allocator.write_text(
         json.dumps(
             _grouped_allocator_payload(
@@ -1327,7 +1363,9 @@ def test_build_portfolio_max_performance_decision_includes_regime_switch_candida
     tuned.write_text(json.dumps({"selection_basis": "validation_only"}), encoding="utf-8")
     dynamic.write_text(json.dumps({"selection_basis": "validation_only"}), encoding="utf-8")
     overlay.write_text(json.dumps({"selection_basis": "validation_only"}), encoding="utf-8")
-    triplet.write_text(json.dumps({"artifact_kind": "portfolio_backbone_triplet_search"}), encoding="utf-8")
+    triplet.write_text(
+        json.dumps({"artifact_kind": "portfolio_backbone_triplet_search"}), encoding="utf-8"
+    )
     regime_switch.write_text(
         json.dumps(
             {
@@ -1395,7 +1433,9 @@ def test_build_portfolio_max_performance_decision_can_promote_regime_switch_cand
     tuned.write_text(json.dumps({"selection_basis": "validation_only"}), encoding="utf-8")
     dynamic.write_text(json.dumps({"selection_basis": "validation_only"}), encoding="utf-8")
     overlay.write_text(json.dumps({"selection_basis": "validation_only"}), encoding="utf-8")
-    triplet.write_text(json.dumps({"artifact_kind": "portfolio_backbone_triplet_search"}), encoding="utf-8")
+    triplet.write_text(
+        json.dumps({"artifact_kind": "portfolio_backbone_triplet_search"}), encoding="utf-8"
+    )
     regime_switch.write_text(
         json.dumps(
             {
@@ -1604,7 +1644,9 @@ def test_build_portfolio_max_performance_decision_allows_custom_anchored_metadat
     tuned.write_text(json.dumps({"selection_basis": "validation_only"}), encoding="utf-8")
     dynamic.write_text(json.dumps({"selection_basis": "validation_only"}), encoding="utf-8")
     overlay.write_text(json.dumps({"selection_basis": "validation_only"}), encoding="utf-8")
-    triplet.write_text(json.dumps({"artifact_kind": "portfolio_backbone_triplet_search"}), encoding="utf-8")
+    triplet.write_text(
+        json.dumps({"artifact_kind": "portfolio_backbone_triplet_search"}), encoding="utf-8"
+    )
 
     anchored_section = _comparison_section(
         path=tmp_path / "tradecount_probe.json",

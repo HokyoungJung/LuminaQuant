@@ -21,7 +21,9 @@ ROOT = Path(__file__).resolve().parents[1]
     ("value", "expected"),
     [(None, "next"), ("auto", "next"), ("next", "next")],
 )
-def test_normalize_dashboard_launch_mode_accepts_supported_values(value: str | None, expected: str) -> None:
+def test_normalize_dashboard_launch_mode_accepts_supported_values(
+    value: str | None, expected: str
+) -> None:
     assert normalize_dashboard_launch_mode(value) == expected
 
 
@@ -96,7 +98,7 @@ def test_build_overview_payload_from_frames_uses_real_run_and_equity_data() -> N
                 "metadata": {"strategy": "MomentumStrategy"},
                 "strategy": "MomentumStrategy",
                 "started_at": "2026-02-28T00:00:00Z",
-            }
+            },
         ]
     )
     equity = pd.DataFrame(

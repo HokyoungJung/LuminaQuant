@@ -47,7 +47,9 @@ def optimization_search_policy_payload(
     }
     if objective_policy is not None:
         payload["objective_policy"] = (
-            dict(objective_policy) if isinstance(objective_policy, Mapping) else str(objective_policy)
+            dict(objective_policy)
+            if isinstance(objective_policy, Mapping)
+            else str(objective_policy)
         )
     if bounded_grid_justification:
         payload["bounded_grid_justification"] = str(bounded_grid_justification)
@@ -99,7 +101,9 @@ def build_bounded_grid_combinations(
     return BoundedGridResult(combinations=combinations, metadata=metadata)
 
 
-def suggest_params_from_optuna_config(trial: Any, optuna_config: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
+def suggest_params_from_optuna_config(
+    trial: Any, optuna_config: Mapping[str, Mapping[str, Any]]
+) -> dict[str, Any]:
     """Suggest a parameter dictionary from the canonical Optuna config schema."""
     params: dict[str, Any] = {}
     for key, conf in optuna_config.items():

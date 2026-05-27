@@ -95,7 +95,9 @@ def _trend_efficiency_latest_python(closes: np.ndarray, window: int) -> float:
 if NUMBA_AVAILABLE:
 
     @njit(cache=True)
-    def _rolling_log_return_volatility_latest_numba(closes: np.ndarray, window: int) -> float:  # pragma: no cover
+    def _rolling_log_return_volatility_latest_numba(
+        closes: np.ndarray, window: int
+    ) -> float:  # pragma: no cover
         n = closes.shape[0]
         if n < window + 1:
             return np.nan
@@ -152,7 +154,9 @@ if NUMBA_AVAILABLE:
         return accum / window
 
     @njit(cache=True)
-    def _volume_shock_zscore_latest_numba(volumes: np.ndarray, window: int) -> float:  # pragma: no cover
+    def _volume_shock_zscore_latest_numba(
+        volumes: np.ndarray, window: int
+    ) -> float:  # pragma: no cover
         n = volumes.shape[0]
         if n < window + 1:
             return np.nan
@@ -180,7 +184,9 @@ if NUMBA_AVAILABLE:
         return (current - mean) / std
 
     @njit(cache=True)
-    def _trend_efficiency_latest_numba(closes: np.ndarray, window: int) -> float:  # pragma: no cover
+    def _trend_efficiency_latest_numba(
+        closes: np.ndarray, window: int
+    ) -> float:  # pragma: no cover
         n = closes.shape[0]
         if n < window + 1:
             return np.nan

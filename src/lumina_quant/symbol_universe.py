@@ -64,10 +64,7 @@ def normalize_research_timeframes(
         required_set = set(REQUIRED_RESEARCH_TIMEFRAMES)
         if out_set != required_set:
             required = ", ".join(REQUIRED_RESEARCH_TIMEFRAMES)
-            raise ValueError(
-                "Strategy timeframes must match canonical set exactly: "
-                f"{required}."
-            )
+            raise ValueError(f"Strategy timeframes must match canonical set exactly: {required}.")
         return tuple(token for token in REQUIRED_RESEARCH_TIMEFRAMES if token in out_set)
 
     if not out:

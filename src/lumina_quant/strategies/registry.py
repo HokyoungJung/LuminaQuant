@@ -67,16 +67,16 @@ VolCompressionVWAPReversionStrategy = _optional_strategy_class(
 VolCompressionVwapReversionStrategy = _optional_strategy_class(
     "vol_compression_vwap_reversion", "VolCompressionVwapReversionStrategy"
 )
-LeadLagSpilloverStrategy = _optional_strategy_class(
-    "leadlag_spillover", "LeadLagSpilloverStrategy"
-)
+LeadLagSpilloverStrategy = _optional_strategy_class("leadlag_spillover", "LeadLagSpilloverStrategy")
 AbnormalReturnContinuationStrategy = _optional_strategy_class(
     "abnormal_return_continuation", "AbnormalReturnContinuationStrategy"
 )
 LastDayLiquidityRegimeStrategy = _optional_strategy_class(
     "last_day_liquidity_regime", "LastDayLiquidityRegimeStrategy"
 )
-PairSpreadZScoreStrategy = _optional_strategy_class("pair_spread_zscore", "PairSpreadZScoreStrategy")
+PairSpreadZScoreStrategy = _optional_strategy_class(
+    "pair_spread_zscore", "PairSpreadZScoreStrategy"
+)
 MicroRangeExpansion1sStrategy = _optional_strategy_class(
     "micro_range_expansion_1s", "MicroRangeExpansion1sStrategy"
 )
@@ -285,19 +285,13 @@ def get_strategy_map() -> dict[str, StrategyClass]:
 
 def get_live_strategy_map(*, include_opt_in: bool = True) -> dict[str, StrategyClass]:
     allowed = {"live_default", "live_opt_in"} if include_opt_in else {"live_default"}
-    return {
-        name: cls
-        for name, cls in _STRATEGY_MAP.items()
-        if get_strategy_tier(name) in allowed
-    }
+    return {name: cls for name, cls in _STRATEGY_MAP.items() if get_strategy_tier(name) in allowed}
 
 
 def get_strategy_names(*, include_research_only: bool = True) -> list[str]:
     if include_research_only:
         return sorted(_STRATEGY_MAP.keys())
-    return sorted(
-        name for name in _STRATEGY_MAP if get_strategy_tier(name) != "research_only"
-    )
+    return sorted(name for name in _STRATEGY_MAP if get_strategy_tier(name) != "research_only")
 
 
 def get_live_strategy_names(*, include_opt_in: bool = True) -> list[str]:
@@ -329,7 +323,9 @@ def get_strategy_canonical_param_names(strategy_name: str) -> dict[str, str]:
     return _PARAM_REGISTRY.get_canonical_names(str(strategy_name))
 
 
-def resolve_strategy_params(strategy_name: str, overrides: dict[str, Any] | None = None) -> dict[str, Any]:
+def resolve_strategy_params(
+    strategy_name: str, overrides: dict[str, Any] | None = None
+) -> dict[str, Any]:
     return _PARAM_REGISTRY.resolve_params(str(strategy_name), overrides or {}, keep_unknown=True)
 
 
@@ -337,7 +333,9 @@ def get_default_strategy_params(strategy_name: str) -> dict[str, Any]:
     return _PARAM_REGISTRY.default_params(str(strategy_name))
 
 
-def resolve_optuna_config(strategy_name: str, override: dict[str, Any] | None = None) -> dict[str, Any]:
+def resolve_optuna_config(
+    strategy_name: str, override: dict[str, Any] | None = None
+) -> dict[str, Any]:
     return _PARAM_REGISTRY.resolve_optuna_config(str(strategy_name), override or {})
 
 
@@ -345,7 +343,9 @@ def get_default_optuna_config(strategy_name: str) -> dict[str, Any]:
     return _PARAM_REGISTRY.default_optuna_config(str(strategy_name))
 
 
-def resolve_grid_config(strategy_name: str, override: dict[str, Any] | None = None) -> dict[str, Any]:
+def resolve_grid_config(
+    strategy_name: str, override: dict[str, Any] | None = None
+) -> dict[str, Any]:
     return _PARAM_REGISTRY.resolve_grid_config(str(strategy_name), override or {})
 
 

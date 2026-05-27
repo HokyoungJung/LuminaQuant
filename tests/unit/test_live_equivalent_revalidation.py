@@ -42,7 +42,9 @@ def _fake_risk_off_definition(mode: str):
     )
 
 
-def test_mode_preflight_marks_pair_modes_ready_on_complete_stubbed_days(monkeypatch, tmp_path: Path) -> None:
+def test_mode_preflight_marks_pair_modes_ready_on_complete_stubbed_days(
+    monkeypatch, tmp_path: Path
+) -> None:
     monkeypatch.setattr(
         reval,
         "_has_committed_materialized_day",
@@ -115,7 +117,10 @@ def test_revalidation_defaults_to_preflight_not_full_backtest(monkeypatch, tmp_p
     )
 
     assert calls["backtests"] == 0
-    assert result["payload"]["final_recommendations"]["best_full_universe_live_equivalent_candidate"] is None
+    assert (
+        result["payload"]["final_recommendations"]["best_full_universe_live_equivalent_candidate"]
+        is None
+    )
 
 
 def test_split_windows_default_uses_latest_complete_utc_day(monkeypatch) -> None:
@@ -141,7 +146,11 @@ def test_metrics_cap_negative_equity_as_breach_not_investment_drawdown() -> None
 def test_revalidation_runtime_config_allows_research_only_defined_modes(monkeypatch) -> None:
     monkeypatch.setattr(reval, "supported_portfolio_modes", lambda: {"shadow_mode"})
     monkeypatch.setattr(reval, "resolve_portfolio_mode_definition", _fake_pair_definition)
-    monkeypatch.setattr(reval, "resolve_portfolio_mode_runtime_config", lambda _mode: (_ for _ in ()).throw(ValueError("unsupported")))
+    monkeypatch.setattr(
+        reval,
+        "resolve_portfolio_mode_runtime_config",
+        lambda _mode: (_ for _ in ()).throw(ValueError("unsupported")),
+    )
 
     config = reval._resolve_revalidation_runtime_config("shadow_mode")
 
@@ -150,7 +159,9 @@ def test_revalidation_runtime_config_allows_research_only_defined_modes(monkeypa
     assert config["strategy_params"] == {"portfolio_mode": "shadow_mode"}
 
 
-def test_fail_fast_alpha_gate_skips_val_after_train_floor_failure(monkeypatch, tmp_path: Path) -> None:
+def test_fail_fast_alpha_gate_skips_val_after_train_floor_failure(
+    monkeypatch, tmp_path: Path
+) -> None:
     calls: list[str] = []
     splits = [
         reval.SplitWindow("train", date(2025, 1, 1), date(2025, 1, 1), "sanity_filter"),

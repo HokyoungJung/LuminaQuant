@@ -18,12 +18,28 @@ sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
 
 
-def _portfolio_payload(*, oos_return: float, oos_sharpe: float, oos_max_dd: float) -> dict[str, object]:
+def _portfolio_payload(
+    *, oos_return: float, oos_sharpe: float, oos_max_dd: float
+) -> dict[str, object]:
     return {
         "artifact_kind": "portfolio_optimization",
         "portfolio_metrics": {
-            "train": {"total_return": 0.02, "sharpe": 0.20, "sortino": 0.30, "calmar": 1.0, "max_drawdown": 0.05, "volatility": 0.10},
-            "val": {"total_return": 0.03, "sharpe": 0.60, "sortino": 0.80, "calmar": 2.0, "max_drawdown": 0.02, "volatility": 0.10},
+            "train": {
+                "total_return": 0.02,
+                "sharpe": 0.20,
+                "sortino": 0.30,
+                "calmar": 1.0,
+                "max_drawdown": 0.05,
+                "volatility": 0.10,
+            },
+            "val": {
+                "total_return": 0.03,
+                "sharpe": 0.60,
+                "sortino": 0.80,
+                "calmar": 2.0,
+                "max_drawdown": 0.02,
+                "volatility": 0.10,
+            },
             "oos": {
                 "total_return": oos_return,
                 "sharpe": oos_sharpe,
@@ -67,7 +83,9 @@ def test_build_portfolio_max_performance_decision_includes_meta_candidate(
     regime = tmp_path / "regime.json"
     meta = tmp_path / "meta.json"
 
-    incumbent_bundle.write_text(json.dumps({"selection_basis": "bundle", "candidates": []}), encoding="utf-8")
+    incumbent_bundle.write_text(
+        json.dumps({"selection_basis": "bundle", "candidates": []}), encoding="utf-8"
+    )
     incumbent_portfolio.write_text(
         json.dumps(_portfolio_payload(oos_return=0.05, oos_sharpe=3.0, oos_max_dd=0.02)),
         encoding="utf-8",
@@ -96,7 +114,9 @@ def test_build_portfolio_max_performance_decision_includes_meta_candidate(
     )
 
     meta_entry = next(
-        entry for entry in payload["candidates"] if entry["candidate_key"] == "portfolio_superiority_meta_portfolio"
+        entry
+        for entry in payload["candidates"]
+        if entry["candidate_key"] == "portfolio_superiority_meta_portfolio"
     )
     assert meta_entry["label"] == "Robust meta-portfolio challenger"
 
@@ -111,7 +131,9 @@ def test_build_portfolio_max_performance_decision_can_promote_meta_candidate(
     regime = tmp_path / "regime.json"
     meta = tmp_path / "meta.json"
 
-    incumbent_bundle.write_text(json.dumps({"selection_basis": "bundle", "candidates": []}), encoding="utf-8")
+    incumbent_bundle.write_text(
+        json.dumps({"selection_basis": "bundle", "candidates": []}), encoding="utf-8"
+    )
     incumbent_portfolio.write_text(
         json.dumps(_portfolio_payload(oos_return=0.05, oos_sharpe=3.0, oos_max_dd=0.02)),
         encoding="utf-8",

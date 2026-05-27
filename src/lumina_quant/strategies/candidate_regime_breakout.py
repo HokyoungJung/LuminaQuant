@@ -329,7 +329,9 @@ class RegimeBreakoutCandidateStrategy(Strategy):
                 or slope > 0.0
                 or range_pos > 0.50
             ):
-                self._emit(symbol, event_time, "EXIT", metadata={**metadata, "reason": "short_exit"})
+                self._emit(
+                    symbol, event_time, "EXIT", metadata={**metadata, "reason": "short_exit"}
+                )
                 item.mode = "OUT"
                 item.entry_price = None
             return

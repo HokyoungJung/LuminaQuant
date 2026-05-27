@@ -88,9 +88,7 @@ def _runtime_env_defaults(runtime) -> dict[str, str]:
         ),
         "LQ__EXECUTION__GPU_VRAM_GB": str(float(getattr(execution, "gpu_vram_gb", 0.0))),
         "LQ__BACKTEST__CHUNK_DAYS": str(int(getattr(backtest, "chunk_days", 2))),
-        "LQ__BACKTEST__CHUNK_WARMUP_BARS": str(
-            int(getattr(backtest, "chunk_warmup_bars", 0))
-        ),
+        "LQ__BACKTEST__CHUNK_WARMUP_BARS": str(int(getattr(backtest, "chunk_warmup_bars", 0))),
         "LQ__BACKTEST__SKIP_AHEAD_ENABLED": _bool_to_env(
             bool(getattr(backtest, "skip_ahead_enabled", True))
         ),
@@ -113,9 +111,7 @@ def _runtime_env_defaults(runtime) -> dict[str, str]:
         "LQ__LIVE__ALLOW_MARKET_ORDERS": _bool_to_env(
             bool(getattr(live, "allow_market_orders", False))
         ),
-        "LQ__LIVE__LIMIT_PRICE_MODE": str(
-            getattr(live, "limit_price_mode", "one_tick_worse")
-        ),
+        "LQ__LIVE__LIMIT_PRICE_MODE": str(getattr(live, "limit_price_mode", "one_tick_worse")),
         "LQ__LIVE__LIMIT_PRICE_OFFSET_TICKS": str(
             int(getattr(live, "limit_price_offset_ticks", 1))
         ),
@@ -123,9 +119,7 @@ def _runtime_env_defaults(runtime) -> dict[str, str]:
             float(getattr(live, "limit_price_tick_fallback", 0.0))
         ),
         "LQ__LIVE__LIMIT_TIME_IN_FORCE": str(getattr(live, "limit_time_in_force", "GTC")),
-        "LQ__LIVE__PROTECTIVE_ORDER_STYLE": str(
-            getattr(live, "protective_order_style", "limit")
-        ),
+        "LQ__LIVE__PROTECTIVE_ORDER_STYLE": str(getattr(live, "protective_order_style", "limit")),
         "LQ__LIVE__STARTUP_RECONCILIATION_HARD_FAIL": _bool_to_env(
             bool(getattr(live, "startup_reconciliation_hard_fail", False))
         ),
@@ -154,9 +148,9 @@ def _runtime_env_defaults(runtime) -> dict[str, str]:
     }
     postgres_dsn = str(getattr(storage, "postgres_dsn", "") or "").strip()
     if postgres_dsn:
-        defaults[str(getattr(storage, "postgres_dsn_env", "LQ_POSTGRES_DSN") or "LQ_POSTGRES_DSN")] = (
-            postgres_dsn
-        )
+        defaults[
+            str(getattr(storage, "postgres_dsn_env", "LQ_POSTGRES_DSN") or "LQ_POSTGRES_DSN")
+        ] = postgres_dsn
     return defaults
 
 
@@ -195,9 +189,7 @@ def _strip_auto_seeded_runtime_env_defaults(
     env_before_seed: MutableMapping[str, str] | dict[str, str] | set[str],
 ) -> None:
     preexisting_keys = (
-        set(env_before_seed)
-        if isinstance(env_before_seed, set)
-        else set(env_before_seed.keys())
+        set(env_before_seed) if isinstance(env_before_seed, set) else set(env_before_seed.keys())
     )
     for key, value in seeded_defaults.items():
         if key in preexisting_keys:
@@ -319,7 +311,9 @@ def current_market_data_runtime_settings() -> dict[str, object]:
             or "data/market_parquet"
         ),
         "market_data_exchange": str(
-            storage_raw.get("market_data_exchange") or runtime.storage.market_data_exchange or "binance"
+            storage_raw.get("market_data_exchange")
+            or runtime.storage.market_data_exchange
+            or "binance"
         ),
     }
 
@@ -401,8 +395,7 @@ def _base_config_values(runtime) -> dict[str, object]:
     timeframes = list(getattr(trading, "timeframes", [])) or [timeframe]
     gpu_mode = str(getattr(execution, "gpu_mode", execution.compute_backend) or "gpu").lower()
     risk_free_annual = float(
-        getattr(backtest, "risk_free_annual", getattr(backtest, "risk_free_rate", 0.0))
-        or 0.0
+        getattr(backtest, "risk_free_annual", getattr(backtest, "risk_free_rate", 0.0)) or 0.0
     )
     return {
         "LOG_LEVEL": runtime.system.log_level,
@@ -451,9 +444,7 @@ def _base_config_values(runtime) -> dict[str, object]:
         "WAL_COMPACTION_INTERVAL_SECONDS": int(
             getattr(storage, "wal_compaction_interval_seconds", 3600)
         ),
-        "COLLECTOR_PERIODIC_ENABLED": bool(
-            getattr(storage, "collector_periodic_enabled", True)
-        ),
+        "COLLECTOR_PERIODIC_ENABLED": bool(getattr(storage, "collector_periodic_enabled", True)),
         "COLLECTOR_POLL_SECONDS": int(getattr(storage, "collector_poll_seconds", 2)),
         "COLLECTOR_BOOTSTRAP_LOOKBACK_HOURS": int(
             getattr(storage, "collector_bootstrap_lookback_hours", 24)
@@ -469,9 +460,7 @@ def _base_config_values(runtime) -> dict[str, object]:
             getattr(storage, "materializer_required_timeframes", ["1s"])
         )
         or ["1s"],
-        "MARKET_WINDOW_PARITY_V2_ENABLED": bool(
-            getattr(market_window, "parity_v2_enabled", False)
-        ),
+        "MARKET_WINDOW_PARITY_V2_ENABLED": bool(getattr(market_window, "parity_v2_enabled", False)),
         "MARKET_WINDOW_METRICS_LOG_PATH": str(
             getattr(
                 market_window,
@@ -481,20 +470,19 @@ def _base_config_values(runtime) -> dict[str, object]:
             or "logs/live/market_window_metrics.ndjson"
         ),
         "RISK_FREE_MODE": str(
-            getattr(backtest, "risk_free_mode", "us_treasury_constant")
-            or "us_treasury_constant"
-        ).strip().lower(),
-        "RISK_FREE_TENOR": str(getattr(backtest, "risk_free_tenor", "3m") or "3m")
+            getattr(backtest, "risk_free_mode", "us_treasury_constant") or "us_treasury_constant"
+        )
         .strip()
         .lower(),
+        "RISK_FREE_TENOR": str(getattr(backtest, "risk_free_tenor", "3m") or "3m").strip().lower(),
         "RISK_FREE_ANNUAL": risk_free_annual,
         "RISK_FREE_SERIES_PATH": str(getattr(backtest, "risk_free_series_path", "") or ""),
         "SORTINO_TARGET_MODE": str(
             getattr(backtest, "sortino_target_mode", "same_as_rf") or "same_as_rf"
-        ).strip().lower(),
-        "SORTINO_TARGET_ANNUAL": float(
-            getattr(backtest, "sortino_target_annual", 0.0) or 0.0
-        ),
+        )
+        .strip()
+        .lower(),
+        "SORTINO_TARGET_ANNUAL": float(getattr(backtest, "sortino_target_annual", 0.0) or 0.0),
     }
 
 
@@ -509,9 +497,7 @@ def _backtest_config_values(runtime) -> dict[str, object]:
         "START_DATE": backtest.start_date,
         "END_DATE": backtest.end_date,
         "MODE": str(getattr(backtest, "mode", "windowed") or "windowed"),
-        "DATA_SOURCE": str(getattr(backtest, "data_source", "auto") or "auto")
-        .strip()
-        .lower(),
+        "DATA_SOURCE": str(getattr(backtest, "data_source", "auto") or "auto").strip().lower(),
         "EXTERNAL_SOURCE_KIND": str(getattr(external, "source_kind", "csv") or "csv")
         .strip()
         .lower(),
@@ -522,17 +508,18 @@ def _backtest_config_values(runtime) -> dict[str, object]:
         "ANNUAL_PERIODS": int(backtest.annual_periods),
         "RISK_FREE_RATE": float(backtest.risk_free_rate),
         "RISK_FREE_MODE": str(
-            getattr(backtest, "risk_free_mode", "us_treasury_constant")
-            or "us_treasury_constant"
-        ).strip().lower(),
-        "RISK_FREE_TENOR": str(getattr(backtest, "risk_free_tenor", "3m") or "3m")
+            getattr(backtest, "risk_free_mode", "us_treasury_constant") or "us_treasury_constant"
+        )
         .strip()
         .lower(),
+        "RISK_FREE_TENOR": str(getattr(backtest, "risk_free_tenor", "3m") or "3m").strip().lower(),
         "RISK_FREE_ANNUAL": risk_free_annual,
         "RISK_FREE_SERIES_PATH": str(getattr(backtest, "risk_free_series_path", "") or ""),
         "SORTINO_TARGET_MODE": str(
             getattr(backtest, "sortino_target_mode", "same_as_rf") or "same_as_rf"
-        ).strip().lower(),
+        )
+        .strip()
+        .lower(),
         "SORTINO_TARGET_ANNUAL": float(
             getattr(backtest, "sortino_target_annual", risk_free_annual)
         ),
@@ -593,9 +580,7 @@ def _live_polymarket_values(runtime) -> dict[str, object]:
         ),
         "POLYMARKET_FUNDER": str(getattr(polymarket, "funder", "") or ""),
         "POLYMARKET_SIGNATURE_TYPE": int(getattr(polymarket, "signature_type", 0) or 0),
-        "POLYMARKET_ALLOW_REAL_EXECUTION": bool(
-            getattr(polymarket, "allow_real_execution", False)
-        ),
+        "POLYMARKET_ALLOW_REAL_EXECUTION": bool(getattr(polymarket, "allow_real_execution", False)),
     }
 
 
@@ -611,12 +596,8 @@ def _live_config_values(runtime) -> dict[str, object]:
         "TELEGRAM_BOT_TOKEN": live.telegram_bot_token,
         "TELEGRAM_CHAT_ID": live.telegram_chat_id,
         "MODE": str(live.mode).strip().lower(),
-        "MARKET_DATA_SOURCE": str(getattr(live, "market_data_source", "committed"))
-        .strip()
-        .lower(),
-        "ORDER_STATE_SOURCE": str(getattr(live, "order_state_source", "polling"))
-        .strip()
-        .lower(),
+        "MARKET_DATA_SOURCE": str(getattr(live, "market_data_source", "committed")).strip().lower(),
+        "ORDER_STATE_SOURCE": str(getattr(live, "order_state_source", "polling")).strip().lower(),
         "EXTERNAL_DATA_SOURCE_KIND": str(getattr(external, "source_kind", "jsonl") or "jsonl")
         .strip()
         .lower(),
@@ -645,27 +626,19 @@ def _live_config_values(runtime) -> dict[str, object]:
         )
         .strip()
         .lower(),
-        "LIMIT_PRICE_OFFSET_TICKS": int(
-            getattr(live, "limit_price_offset_ticks", 1) or 1
-        ),
-        "LIMIT_PRICE_TICK_FALLBACK": float(
-            getattr(live, "limit_price_tick_fallback", 0.0) or 0.0
-        ),
+        "LIMIT_PRICE_OFFSET_TICKS": int(getattr(live, "limit_price_offset_ticks", 1) or 1),
+        "LIMIT_PRICE_TICK_FALLBACK": float(getattr(live, "limit_price_tick_fallback", 0.0) or 0.0),
         "LIMIT_TIME_IN_FORCE": str(getattr(live, "limit_time_in_force", "GTC") or "GTC")
         .strip()
         .upper(),
-        "PROTECTIVE_ORDER_STYLE": str(
-            getattr(live, "protective_order_style", "limit") or "limit"
-        )
+        "PROTECTIVE_ORDER_STYLE": str(getattr(live, "protective_order_style", "limit") or "limit")
         .strip()
         .lower(),
         "STARTUP_RECONCILIATION_HARD_FAIL": effective_startup_reconciliation_hard_fail(
             mode=str(live.mode),
             configured=bool(getattr(live, "startup_reconciliation_hard_fail", False)),
         ),
-        "MAIN_LOOP_ERROR_RETRY_LIMIT": int(
-            getattr(live, "main_loop_error_retry_limit", 3) or 3
-        ),
+        "MAIN_LOOP_ERROR_RETRY_LIMIT": int(getattr(live, "main_loop_error_retry_limit", 3) or 3),
         "MAIN_LOOP_ERROR_WINDOW_SECONDS": int(
             getattr(live, "main_loop_error_window_seconds", 60) or 60
         ),
@@ -812,20 +785,15 @@ class LiveConfig(BaseConfig):
         runtime.trading.timeframes = list(getattr(cls, "TIMEFRAMES", [cls.TIMEFRAME]))
         runtime.trading.target_allocation = float(cls.TARGET_ALLOCATION)
         runtime.trading.target_allocation_mode = str(
-            getattr(cls, "TARGET_ALLOCATION_MODE", "legacy_notional_cap")
-            or "legacy_notional_cap"
+            getattr(cls, "TARGET_ALLOCATION_MODE", "legacy_notional_cap") or "legacy_notional_cap"
         )
         runtime.risk.max_daily_loss_pct = cls.MAX_DAILY_LOSS_PCT
         runtime.risk.risk_per_trade = float(cls.RISK_PER_TRADE)
         runtime.risk.max_total_margin_pct = float(cls.MAX_TOTAL_MARGIN_PCT)
         runtime.risk.max_symbol_exposure_pct = float(cls.MAX_SYMBOL_EXPOSURE_PCT)
         runtime.risk.max_order_value = float(cls.MAX_ORDER_VALUE)
-        runtime.risk.max_order_notional_pct = float(
-            getattr(cls, "MAX_ORDER_NOTIONAL_PCT", 0.0)
-        )
-        runtime.risk.max_total_notional_pct = float(
-            getattr(cls, "MAX_TOTAL_NOTIONAL_PCT", 0.0)
-        )
+        runtime.risk.max_order_notional_pct = float(getattr(cls, "MAX_ORDER_NOTIONAL_PCT", 0.0))
+        runtime.risk.max_total_notional_pct = float(getattr(cls, "MAX_TOTAL_NOTIONAL_PCT", 0.0))
         return runtime
 
     @classmethod

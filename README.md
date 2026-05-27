@@ -393,9 +393,16 @@ When installed, `lumina_quant.strategies.registry` and `lumina_quant.indicators`
 bash scripts/ci/architecture_gate_live_data.sh
 bash scripts/ci/architecture_gate_market_window_contract.sh
 uv run python scripts/check_architecture.py
-uv run ruff format . --check
+uv run ruff format --check .
 uv run ruff check .
+for crate in native/rust_metrics native/rust_rawfirst; do
+  (cd "$crate" && cargo fmt --check && cargo check --quiet && cargo test --quiet)
+done
 ```
+
+Repository text files are normalized with `.gitattributes` (`LF` by default;
+Windows launchers stay `CRLF`) so `git diff --check`, Ruff formatting, and CI
+all enforce the same hygiene baseline.
 
 **8GB Baseline Gate (RSS/OOM/Disk/Benchmark):**
 ```bash

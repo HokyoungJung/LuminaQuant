@@ -6,7 +6,9 @@ import sys
 from pathlib import Path
 
 MODULE_PATH = Path("scripts/research/run_state_distilled_regime_boost_portfolio.py")
-SPEC = importlib.util.spec_from_file_location("run_state_distilled_regime_boost_portfolio", MODULE_PATH)
+SPEC = importlib.util.spec_from_file_location(
+    "run_state_distilled_regime_boost_portfolio", MODULE_PATH
+)
 assert SPEC and SPEC.loader
 regime_boost = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = regime_boost
@@ -29,7 +31,9 @@ def test_strategy_validity_fails_closed_on_calendar_and_oos_selection() -> None:
 
 
 def test_dynamic_leverage_is_asset_vol_targeted_and_capped_at_25x() -> None:
-    cfg = regime_boost.VolTargetLeverageConfig(max_effective_leverage=25.0, target_annual_volatility=2.5)
+    cfg = regime_boost.VolTargetLeverageConfig(
+        max_effective_leverage=25.0, target_annual_volatility=2.5
+    )
 
     low_vol = regime_boost.effective_dynamic_leverage(
         confidence=0.95,
@@ -62,7 +66,9 @@ def test_dynamic_leverage_is_asset_vol_targeted_and_capped_at_25x() -> None:
 
 
 def test_grid_cap_is_deterministic_and_hard_limited() -> None:
-    cfg = regime_boost.RegimeBoostConfig(selection=regime_boost.SelectionConfig(grid_limit=10_000, hard_grid_cap=256))
+    cfg = regime_boost.RegimeBoostConfig(
+        selection=regime_boost.SelectionConfig(grid_limit=10_000, hard_grid_cap=256)
+    )
     configs, meta = regime_boost.enforce_grid_cap(regime_boost.grid_product(cfg), cfg.selection)
 
     assert meta["evaluated_count"] == min(meta["product_space_size"], 256)
@@ -119,11 +125,33 @@ def test_neutral_pair_fit_uses_train_validation_only_even_with_oos_poison() -> N
 
 
 def test_strict_promotion_fails_on_liquidation_buffer_or_oos_mdd_but_not_return_mdd_ratio() -> None:
-    positive_metrics = {"total_return": 0.01, "sharpe": 1.0, "sortino": 1.0, "smart_sortino": 1.0, "calmar": 1.0}
+    positive_metrics = {
+        "total_return": 0.01,
+        "sharpe": 1.0,
+        "sortino": 1.0,
+        "smart_sortino": 1.0,
+        "calmar": 1.0,
+    }
     metrics = {
-        "train": {"liquidation_count": 0, "minimum_margin_buffer": 1.0, "return_mdd": -100.0, **positive_metrics},
-        "validation": {"liquidation_count": 0, "minimum_margin_buffer": 1.0, "return_mdd": -100.0, **positive_metrics},
-        "locked_oos": {"liquidation_count": 0, "minimum_margin_buffer": 1.0, "max_drawdown": 0.10, "return_mdd": -100.0, **positive_metrics},
+        "train": {
+            "liquidation_count": 0,
+            "minimum_margin_buffer": 1.0,
+            "return_mdd": -100.0,
+            **positive_metrics,
+        },
+        "validation": {
+            "liquidation_count": 0,
+            "minimum_margin_buffer": 1.0,
+            "return_mdd": -100.0,
+            **positive_metrics,
+        },
+        "locked_oos": {
+            "liquidation_count": 0,
+            "minimum_margin_buffer": 1.0,
+            "max_drawdown": 0.10,
+            "return_mdd": -100.0,
+            **positive_metrics,
+        },
     }
     promoted, reasons = regime_boost.strict_lane_promoted(metrics, regime_boost.SelectionConfig())
     assert promoted is True
@@ -159,7 +187,9 @@ def test_freeze_hash_sidecar_and_locked_oos_gate_reference_identical_params(tmp_
         pair_fit={"uses_locked_oos_for_pair_fit": False},
     )
 
-    freeze_path, sidecar_path, freeze_hash = regime_boost.write_freeze_artifacts(tmp_path, freeze_payload)
+    freeze_path, sidecar_path, freeze_hash = regime_boost.write_freeze_artifacts(
+        tmp_path, freeze_payload
+    )
     sidecar = json.loads(sidecar_path.read_text())
     frozen = json.loads(freeze_path.read_text())
 

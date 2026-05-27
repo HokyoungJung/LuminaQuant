@@ -84,7 +84,9 @@ class ResearchReportBuilder:
             "name": str(row.get("name")),
             "strategy_class": str(row.get("strategy_class")),
             "strategy": str(row.get("strategy") or row.get("strategy_class") or ""),
-            "family": str(row.get("family") or self.family_from_strategy(str(row.get("strategy_class")))),
+            "family": str(
+                row.get("family") or self.family_from_strategy(str(row.get("strategy_class")))
+            ),
             "strategy_timeframe": timeframe,
             "timeframe": timeframe,
             "symbols": self.canonicalize_symbol_list(list(row.get("symbols") or [])),
@@ -154,16 +156,16 @@ class ResearchReportBuilder:
             "name": str(row.get("name")),
             "strategy_class": str(row.get("strategy_class")),
             "strategy": str(row.get("strategy") or row.get("strategy_class") or ""),
-            "family": str(row.get("family") or self.family_from_strategy(str(row.get("strategy_class")))),
+            "family": str(
+                row.get("family") or self.family_from_strategy(str(row.get("strategy_class")))
+            ),
             "strategy_timeframe": timeframe,
             "timeframe": timeframe,
             "symbols": self.canonicalize_symbol_list(list(row.get("symbols") or [])),
             "params": dict(row.get("params") or {}),
             "notes": str(row.get("notes") or result.get("notes") or ""),
             "tags": [
-                str(tag)
-                for tag in list(row.get("tags") or result.get("tags") or [])
-                if str(tag)
+                str(tag) for tag in list(row.get("tags") or result.get("tags") or []) if str(tag)
             ],
             "train": train,
             "val": val,

@@ -54,7 +54,17 @@ def test_parse_funding_history_page_sorts_and_skips_invalid_rows() -> None:
 def test_parse_candle_snapshot_keeps_candles_as_non_rawfirst_context() -> None:
     rows = parse_candle_snapshot(
         [
-            {"t": 10, "T": 19, "s": "ETH", "i": "1h", "o": "1", "h": "2", "l": "0.5", "c": "1.5", "v": "7"},
+            {
+                "t": 10,
+                "T": 19,
+                "s": "ETH",
+                "i": "1h",
+                "o": "1",
+                "h": "2",
+                "l": "0.5",
+                "c": "1.5",
+                "v": "7",
+            },
         ]
     )
 

@@ -292,9 +292,7 @@ def materialize_raw_aggtrades_bundle(
         )
 
     if require_complete and len(commits_by_timeframe) != len(normalized_timeframes):
-        missing_remaining = [
-            tf for tf in normalized_timeframes if tf not in commits_by_timeframe
-        ]
+        missing_remaining = [tf for tf in normalized_timeframes if tf not in commits_by_timeframe]
         joined = ", ".join(missing_remaining)
         raise RawFirstDataMissingError(
             "Materializer required timeframe set is incomplete for "

@@ -71,9 +71,15 @@ class DerivativesFlowSqueezeStrategy(Strategy):
             "momentum_lookback_bars": HyperParam.integer(
                 "momentum_lookback_bars", default=48, low=2, high=2_880
             ),
-            "short_reclaim_bars": HyperParam.integer("short_reclaim_bars", default=6, low=1, high=360),
-            "flow_lookback_bars": HyperParam.integer("flow_lookback_bars", default=96, low=4, high=2_880),
-            "oi_lookback_bars": HyperParam.integer("oi_lookback_bars", default=96, low=2, high=2_880),
+            "short_reclaim_bars": HyperParam.integer(
+                "short_reclaim_bars", default=6, low=1, high=360
+            ),
+            "flow_lookback_bars": HyperParam.integer(
+                "flow_lookback_bars", default=96, low=4, high=2_880
+            ),
+            "oi_lookback_bars": HyperParam.integer(
+                "oi_lookback_bars", default=96, low=2, high=2_880
+            ),
             "liquidation_window_bars": HyperParam.integer(
                 "liquidation_window_bars", default=192, low=8, high=4_320
             ),
@@ -86,17 +92,27 @@ class DerivativesFlowSqueezeStrategy(Strategy):
             "continuation_momentum_min": HyperParam.floating(
                 "continuation_momentum_min", default=0.0015, low=0.0, high=0.20
             ),
-            "flow_imbalance_min": HyperParam.floating("flow_imbalance_min", default=0.08, low=0.0, high=1.0),
-            "oi_delta_min": HyperParam.floating("oi_delta_min", default=0.0002, low=-0.20, high=0.20),
-            "oi_delta_z_min": HyperParam.floating("oi_delta_z_min", default=-0.25, low=-5.0, high=5.0),
+            "flow_imbalance_min": HyperParam.floating(
+                "flow_imbalance_min", default=0.08, low=0.0, high=1.0
+            ),
+            "oi_delta_min": HyperParam.floating(
+                "oi_delta_min", default=0.0002, low=-0.20, high=0.20
+            ),
+            "oi_delta_z_min": HyperParam.floating(
+                "oi_delta_z_min", default=-0.25, low=-5.0, high=5.0
+            ),
             "max_abs_continuation_funding": HyperParam.floating(
                 "max_abs_continuation_funding", default=0.0015, low=0.0, high=0.05
             ),
-            "liquidation_z_min": HyperParam.floating("liquidation_z_min", default=2.0, low=0.0, high=20.0),
+            "liquidation_z_min": HyperParam.floating(
+                "liquidation_z_min", default=2.0, low=0.0, high=20.0
+            ),
             "liquidation_notional_min": HyperParam.floating(
                 "liquidation_notional_min", default=1.0, low=0.0, high=1_000_000_000.0
             ),
-            "price_shock_min": HyperParam.floating("price_shock_min", default=0.003, low=0.0, high=0.5),
+            "price_shock_min": HyperParam.floating(
+                "price_shock_min", default=0.003, low=0.0, high=0.5
+            ),
             "reclaim_min": HyperParam.floating("reclaim_min", default=0.0006, low=0.0, high=0.20),
             "target_allocation": HyperParam.floating(
                 "target_allocation", default=0.012, low=0.0, high=2.0, tunable=False
@@ -113,16 +129,28 @@ class DerivativesFlowSqueezeStrategy(Strategy):
             "max_volatility_multiplier": HyperParam.floating(
                 "max_volatility_multiplier", default=1.0, low=0.0, high=5.0
             ),
-            "volatility_hard_cap": HyperParam.floating("volatility_hard_cap", default=0.020, low=0.0, high=1.0),
-            "funding_overheat_abs": HyperParam.floating("funding_overheat_abs", default=0.004, low=0.0, high=0.10),
+            "volatility_hard_cap": HyperParam.floating(
+                "volatility_hard_cap", default=0.020, low=0.0, high=1.0
+            ),
+            "funding_overheat_abs": HyperParam.floating(
+                "funding_overheat_abs", default=0.004, low=0.0, high=0.10
+            ),
             "stop_loss_pct": HyperParam.floating("stop_loss_pct", default=0.018, low=0.0, high=0.5),
-            "take_profit_pct": HyperParam.floating("take_profit_pct", default=0.040, low=0.0, high=1.0),
-            "trailing_exit_pct": HyperParam.floating("trailing_exit_pct", default=0.018, low=0.0, high=0.5),
+            "take_profit_pct": HyperParam.floating(
+                "take_profit_pct", default=0.040, low=0.0, high=1.0
+            ),
+            "trailing_exit_pct": HyperParam.floating(
+                "trailing_exit_pct", default=0.018, low=0.0, high=0.5
+            ),
             "max_hold_bars": HyperParam.integer("max_hold_bars", default=288, low=1, high=100_000),
             "min_price": HyperParam.floating("min_price", default=0.10, low=0.0, high=1_000_000.0),
             "allow_short": HyperParam.boolean("allow_short", default=True, grid=[True, False]),
-            "enable_continuation": HyperParam.boolean("enable_continuation", default=True, grid=[True, False]),
-            "enable_exhaustion": HyperParam.boolean("enable_exhaustion", default=True, grid=[True, False]),
+            "enable_continuation": HyperParam.boolean(
+                "enable_continuation", default=True, grid=[True, False]
+            ),
+            "enable_exhaustion": HyperParam.boolean(
+                "enable_exhaustion", default=True, grid=[True, False]
+            ),
             "allow_ohlcv_flow_proxy": HyperParam.boolean(
                 "allow_ohlcv_flow_proxy", default=True, grid=[True, False], tunable=False
             ),
@@ -226,7 +254,9 @@ class DerivativesFlowSqueezeStrategy(Strategy):
         self.flow_imbalance_min = max(0.0, float(resolved["flow_imbalance_min"]))
         self.oi_delta_min = float(resolved["oi_delta_min"])
         self.oi_delta_z_min = float(resolved["oi_delta_z_min"])
-        self.max_abs_continuation_funding = max(0.0, float(resolved["max_abs_continuation_funding"]))
+        self.max_abs_continuation_funding = max(
+            0.0, float(resolved["max_abs_continuation_funding"])
+        )
         self.liquidation_z_min = max(0.0, float(resolved["liquidation_z_min"]))
         self.liquidation_notional_min = max(0.0, float(resolved["liquidation_notional_min"]))
         self.price_shock_min = max(0.0, float(resolved["price_shock_min"]))
@@ -251,14 +281,17 @@ class DerivativesFlowSqueezeStrategy(Strategy):
         self.allow_ohlcv_flow_proxy = bool(resolved["allow_ohlcv_flow_proxy"])
         self.allow_volume_oi_proxy = bool(resolved["allow_volume_oi_proxy"])
 
-        size = max(
-            self.lookback_bars,
-            self.momentum_lookback_bars,
-            self.flow_lookback_bars,
-            self.oi_lookback_bars,
-            self.liquidation_window_bars,
-            self.volatility_lookback_bars,
-        ) + 8
+        size = (
+            max(
+                self.lookback_bars,
+                self.momentum_lookback_bars,
+                self.flow_lookback_bars,
+                self.oi_lookback_bars,
+                self.liquidation_window_bars,
+                self.volatility_lookback_bars,
+            )
+            + 8
+        )
         self._state = {
             symbol: _SymbolState(
                 opens=deque(maxlen=size),
@@ -351,7 +384,9 @@ class DerivativesFlowSqueezeStrategy(Strategy):
             item.has_open_interest = bool(payload.get("has_open_interest", False))
             item.has_liquidation = bool(payload.get("has_liquidation", False))
             item.has_taker_flow = bool(payload.get("has_taker_flow", False))
-            item.last_open_interest_source = str(payload.get("last_open_interest_source") or "missing")
+            item.last_open_interest_source = str(
+                payload.get("last_open_interest_source") or "missing"
+            )
 
     @staticmethod
     def _safe_non_negative_int(value: Any) -> int:
@@ -441,7 +476,11 @@ class DerivativesFlowSqueezeStrategy(Strategy):
             buy_quote = snapshot.get("taker_buy_quote_volume")
         if sell_quote is None:
             sell_quote = snapshot.get("taker_sell_quote_volume")
-        if buy_quote is not None and sell_quote is not None and (float(buy_quote) + float(sell_quote)) > 0.0:
+        if (
+            buy_quote is not None
+            and sell_quote is not None
+            and (float(buy_quote) + float(sell_quote)) > 0.0
+        ):
             return max(0.0, float(buy_quote)), max(0.0, float(sell_quote)), source
 
         buy_base = self._extract_feature(event, symbol, "taker_buy_base_volume")
@@ -451,7 +490,11 @@ class DerivativesFlowSqueezeStrategy(Strategy):
             buy_base = snapshot.get("taker_buy_base_volume")
         if sell_base is None:
             sell_base = snapshot.get("taker_sell_base_volume")
-        if buy_base is not None and sell_base is not None and (float(buy_base) + float(sell_base)) > 0.0:
+        if (
+            buy_base is not None
+            and sell_base is not None
+            and (float(buy_base) + float(sell_base)) > 0.0
+        ):
             return max(0.0, float(buy_base) * close), max(0.0, float(sell_base) * close), source
 
         if not self.allow_ohlcv_flow_proxy:
@@ -652,41 +695,57 @@ class DerivativesFlowSqueezeStrategy(Strategy):
         item.bars_held += 1
         if item.mode == "LONG":
             item.high_watermark = max(float(item.high_watermark or close), close)
-            stop_hit = item.entry_price is not None and self.stop_loss_pct > 0.0 and close <= item.entry_price * (
-                1.0 - self.stop_loss_pct
+            stop_hit = (
+                item.entry_price is not None
+                and self.stop_loss_pct > 0.0
+                and close <= item.entry_price * (1.0 - self.stop_loss_pct)
             )
-            take_hit = item.entry_price is not None and self.take_profit_pct > 0.0 and close >= item.entry_price * (
-                1.0 + self.take_profit_pct
+            take_hit = (
+                item.entry_price is not None
+                and self.take_profit_pct > 0.0
+                and close >= item.entry_price * (1.0 + self.take_profit_pct)
             )
             trail_hit = (
                 self.trailing_exit_pct > 0.0
                 and item.high_watermark is not None
                 and close <= item.high_watermark * (1.0 - self.trailing_exit_pct)
             )
-            opposing_flow = metrics["price_momentum"] < -self.continuation_momentum_min and metrics[
-                "flow_imbalance"
-            ] < -self.flow_imbalance_min
-            funding_overheat = self.funding_overheat_abs > 0.0 and metrics["funding"] > self.funding_overheat_abs
+            opposing_flow = (
+                metrics["price_momentum"] < -self.continuation_momentum_min
+                and metrics["flow_imbalance"] < -self.flow_imbalance_min
+            )
+            funding_overheat = (
+                self.funding_overheat_abs > 0.0 and metrics["funding"] > self.funding_overheat_abs
+            )
         else:
             item.low_watermark = min(float(item.low_watermark or close), close)
-            stop_hit = item.entry_price is not None and self.stop_loss_pct > 0.0 and close >= item.entry_price * (
-                1.0 + self.stop_loss_pct
+            stop_hit = (
+                item.entry_price is not None
+                and self.stop_loss_pct > 0.0
+                and close >= item.entry_price * (1.0 + self.stop_loss_pct)
             )
-            take_hit = item.entry_price is not None and self.take_profit_pct > 0.0 and close <= item.entry_price * (
-                1.0 - self.take_profit_pct
+            take_hit = (
+                item.entry_price is not None
+                and self.take_profit_pct > 0.0
+                and close <= item.entry_price * (1.0 - self.take_profit_pct)
             )
             trail_hit = (
                 self.trailing_exit_pct > 0.0
                 and item.low_watermark is not None
                 and close >= item.low_watermark * (1.0 + self.trailing_exit_pct)
             )
-            opposing_flow = metrics["price_momentum"] > self.continuation_momentum_min and metrics[
-                "flow_imbalance"
-            ] > self.flow_imbalance_min
-            funding_overheat = self.funding_overheat_abs > 0.0 and metrics["funding"] < -self.funding_overheat_abs
+            opposing_flow = (
+                metrics["price_momentum"] > self.continuation_momentum_min
+                and metrics["flow_imbalance"] > self.flow_imbalance_min
+            )
+            funding_overheat = (
+                self.funding_overheat_abs > 0.0 and metrics["funding"] < -self.funding_overheat_abs
+            )
 
         max_hold = item.bars_held >= self.max_hold_bars
-        hard_vol = self.volatility_hard_cap > 0.0 and metrics["realized_vol"] > self.volatility_hard_cap
+        hard_vol = (
+            self.volatility_hard_cap > 0.0 and metrics["realized_vol"] > self.volatility_hard_cap
+        )
         reasons = [
             name
             for name, flag in (
@@ -764,13 +823,17 @@ class DerivativesFlowSqueezeStrategy(Strategy):
         )
         if signal_type == "LONG":
             stop_loss = close * (1.0 - self.stop_loss_pct) if self.stop_loss_pct > 0.0 else None
-            take_profit = close * (1.0 + self.take_profit_pct) if self.take_profit_pct > 0.0 else None
+            take_profit = (
+                close * (1.0 + self.take_profit_pct) if self.take_profit_pct > 0.0 else None
+            )
             item.mode = "LONG"
             item.high_watermark = close
             item.low_watermark = None
         else:
             stop_loss = close * (1.0 + self.stop_loss_pct) if self.stop_loss_pct > 0.0 else None
-            take_profit = close * (1.0 - self.take_profit_pct) if self.take_profit_pct > 0.0 else None
+            take_profit = (
+                close * (1.0 - self.take_profit_pct) if self.take_profit_pct > 0.0 else None
+            )
             item.mode = "SHORT"
             item.low_watermark = close
             item.high_watermark = None
@@ -788,7 +851,9 @@ class DerivativesFlowSqueezeStrategy(Strategy):
         item.entry_price = close
         item.bars_held = 0
 
-    def _process_symbol(self, event: Any, symbol: str, *, snapshot: dict[str, float | None] | None = None) -> None:
+    def _process_symbol(
+        self, event: Any, symbol: str, *, snapshot: dict[str, float | None] | None = None
+    ) -> None:
         item = self._state[symbol]
         key = time_key(getattr(event, "time", getattr(event, "datetime", None)))
         if key and key == item.last_time_key:
@@ -828,7 +893,9 @@ class DerivativesFlowSqueezeStrategy(Strategy):
             (liq_long is not None and liq_long > 0.0) or (liq_short is not None and liq_short > 0.0)
         )
 
-        buy_quote, sell_quote, flow_source = self._resolve_flow_values(event, symbol, snapshot, close)
+        buy_quote, sell_quote, flow_source = self._resolve_flow_values(
+            event, symbol, snapshot, close
+        )
         item.last_flow_source = flow_source
         item.has_taker_flow = item.has_taker_flow or flow_source.startswith("feature")
         quote_value = max(0.0, float(volume) * close)
@@ -868,8 +935,12 @@ class DerivativesFlowSqueezeStrategy(Strategy):
         oi_delta = self._pct_change(item.open_interest, self.oi_lookback_bars) or 0.0
         oi_delta_z = self._oi_delta_z(item.open_interest, self.oi_lookback_bars, self.lookback_bars)
         funding_value = float(item.funding_rate[-1]) if item.funding_rate else 0.0
-        long_liq_z = self._zscore_latest(item.liquidation_long_notional, self.liquidation_window_bars)
-        short_liq_z = self._zscore_latest(item.liquidation_short_notional, self.liquidation_window_bars)
+        long_liq_z = self._zscore_latest(
+            item.liquidation_long_notional, self.liquidation_window_bars
+        )
+        short_liq_z = self._zscore_latest(
+            item.liquidation_short_notional, self.liquidation_window_bars
+        )
         realized_vol = self._realized_vol(item.closes, self.volatility_lookback_bars)
         vol_multiplier = self._volatility_multiplier(realized_vol)
         metrics = {
@@ -904,20 +975,47 @@ class DerivativesFlowSqueezeStrategy(Strategy):
                 and flow_imbalance <= -self.flow_imbalance_min
             )
             if long_continuation:
-                strength = 0.35 + min(1.0, abs(price_momentum) / max(self.continuation_momentum_min, 1e-9)) * 0.35
-                strength += min(1.0, abs(flow_imbalance)) * 0.45 + max(0.0, min(1.0, oi_delta_z)) * 0.15
-                self._enter(event, symbol, item, "LONG", close, "flow_continuation_long", metrics, strength)
+                strength = (
+                    0.35
+                    + min(1.0, abs(price_momentum) / max(self.continuation_momentum_min, 1e-9))
+                    * 0.35
+                )
+                strength += (
+                    min(1.0, abs(flow_imbalance)) * 0.45 + max(0.0, min(1.0, oi_delta_z)) * 0.15
+                )
+                self._enter(
+                    event, symbol, item, "LONG", close, "flow_continuation_long", metrics, strength
+                )
                 return
             if short_continuation:
-                strength = 0.35 + min(1.0, abs(price_momentum) / max(self.continuation_momentum_min, 1e-9)) * 0.35
-                strength += min(1.0, abs(flow_imbalance)) * 0.45 + max(0.0, min(1.0, oi_delta_z)) * 0.15
-                self._enter(event, symbol, item, "SHORT", close, "flow_continuation_short", metrics, strength)
+                strength = (
+                    0.35
+                    + min(1.0, abs(price_momentum) / max(self.continuation_momentum_min, 1e-9))
+                    * 0.35
+                )
+                strength += (
+                    min(1.0, abs(flow_imbalance)) * 0.45 + max(0.0, min(1.0, oi_delta_z)) * 0.15
+                )
+                self._enter(
+                    event,
+                    symbol,
+                    item,
+                    "SHORT",
+                    close,
+                    "flow_continuation_short",
+                    metrics,
+                    strength,
+                )
                 return
 
         if not self.enable_exhaustion or not item.has_liquidation:
             return
-        long_liq_latest = float(item.liquidation_long_notional[-1]) if item.liquidation_long_notional else 0.0
-        short_liq_latest = float(item.liquidation_short_notional[-1]) if item.liquidation_short_notional else 0.0
+        long_liq_latest = (
+            float(item.liquidation_long_notional[-1]) if item.liquidation_long_notional else 0.0
+        )
+        short_liq_latest = (
+            float(item.liquidation_short_notional[-1]) if item.liquidation_short_notional else 0.0
+        )
         long_exhaustion = (
             long_liq_latest >= self.liquidation_notional_min
             and long_liq_z >= self.liquidation_z_min
@@ -936,12 +1034,23 @@ class DerivativesFlowSqueezeStrategy(Strategy):
         if long_exhaustion:
             strength = 0.55 + min(1.0, long_liq_z / max(self.liquidation_z_min, 1e-9)) * 0.65
             strength += min(1.0, max(0.0, short_momentum) / max(self.reclaim_min, 1e-9)) * 0.25
-            self._enter(event, symbol, item, "LONG", close, "liquidation_exhaustion_long", metrics, strength)
+            self._enter(
+                event, symbol, item, "LONG", close, "liquidation_exhaustion_long", metrics, strength
+            )
             return
         if short_exhaustion:
             strength = 0.55 + min(1.0, short_liq_z / max(self.liquidation_z_min, 1e-9)) * 0.65
             strength += min(1.0, max(0.0, -short_momentum) / max(self.reclaim_min, 1e-9)) * 0.25
-            self._enter(event, symbol, item, "SHORT", close, "liquidation_exhaustion_short", metrics, strength)
+            self._enter(
+                event,
+                symbol,
+                item,
+                "SHORT",
+                close,
+                "liquidation_exhaustion_short",
+                metrics,
+                strength,
+            )
 
     def calculate_signals_window(self, event: Any, aggregator: Any) -> None:
         _ = aggregator

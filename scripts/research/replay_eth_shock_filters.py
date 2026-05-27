@@ -38,8 +38,7 @@ from scripts.research.revalidate_live_equivalent_candidates import (  # noqa: E4
 )
 
 DEFAULT_OUTPUT_DIR = (
-    REPO_ROOT
-    / "var/reports/profit_moonshot_20260501/current_tail_20260506/eth_shock_filter_replay"
+    REPO_ROOT / "var/reports/profit_moonshot_20260501/current_tail_20260506/eth_shock_filter_replay"
 )
 FEATURE_COLUMNS = (
     "funding_rate",
@@ -387,7 +386,9 @@ def _build_arrays(panel: pl.DataFrame) -> dict[str, Any]:
     datetimes = panel["datetime"].to_list()
     arrays: dict[str, Any] = {
         "datetime": datetimes,
-        "timestamp": np.asarray([int(dt.replace(tzinfo=UTC).timestamp()) for dt in datetimes], dtype=np.int64),
+        "timestamp": np.asarray(
+            [int(dt.replace(tzinfo=UTC).timestamp()) for dt in datetimes], dtype=np.int64
+        ),
     }
     for column in panel.columns:
         if column == "datetime":
@@ -530,7 +531,14 @@ def _run_split(
 ) -> dict[str, Any]:
     timestamps = arrays["timestamp"]
     start_ts = int(datetime.combine(split.start, datetime.min.time(), tzinfo=UTC).timestamp())
-    end_ts = int(datetime.combine(split.end + timedelta(days=1), datetime.min.time(), tzinfo=UTC).timestamp()) - 1
+    end_ts = (
+        int(
+            datetime.combine(
+                split.end + timedelta(days=1), datetime.min.time(), tzinfo=UTC
+            ).timestamp()
+        )
+        - 1
+    )
     indices = np.flatnonzero((timestamps >= start_ts) & (timestamps <= end_ts))
     if indices.size == 0:
         return {"metrics": {}, "round_trips": 0, "fills": 0, "reject_counts": {"split_empty": 1}}
@@ -670,7 +678,9 @@ def _run_split(
         round_trips += 1
         fills += 1
 
-    metrics = _metrics_from_equity_totals(equity_history, periods=int(getattr(BacktestConfig, "ANNUAL_PERIODS", 252)))
+    metrics = _metrics_from_equity_totals(
+        equity_history, periods=int(getattr(BacktestConfig, "ANNUAL_PERIODS", 252))
+    )
     return {
         "metrics": metrics,
         "round_trips": int(round_trips),
@@ -687,7 +697,9 @@ def _vol_caps(arrays: dict[str, Any]) -> list[tuple[int, float, str]]:
         finite = values[np.isfinite(values)]
         if finite.size:
             for quantile in (0.55, 0.70, 0.85):
-                caps.append((lookback, float(np.quantile(finite, quantile)), f"q{int(quantile * 100)}"))
+                caps.append(
+                    (lookback, float(np.quantile(finite, quantile)), f"q{int(quantile * 100)}")
+                )
     return caps
 
 
@@ -838,19 +850,23 @@ def _evaluate_specs(
     results: list[dict[str, Any]] = []
     for spec in specs:
         split_results = {
-            split.name: _run_split(spec=spec, arrays=arrays, split=split)
-            for split in splits
+            split.name: _run_split(spec=spec, arrays=arrays, split=split) for split in splits
         }
-        metrics = {name: dict(result.get("metrics") or {}) for name, result in split_results.items()}
+        metrics = {
+            name: dict(result.get("metrics") or {}) for name, result in split_results.items()
+        }
         oos = metrics.get("oos", {})
         train = metrics.get("train", {})
         val = metrics.get("val", {})
         absolute_gates = {
             "train_positive": _safe_float(train.get("total_return"), 0.0) > 0.0,
             "val_positive": _safe_float(val.get("total_return"), 0.0) > 0.0,
-            "oos_return_beats_baseline": _safe_float(oos.get("total_return"), 0.0) > BASELINE_OOS_RETURN,
-            "oos_sharpe_beats_funding_guard": _safe_float(oos.get("sharpe"), 0.0) > FUNDING_GUARD_OOS_SHARPE,
-            "oos_mdd_beats_funding_guard": _safe_float(oos.get("max_drawdown"), 1.0) < FUNDING_GUARD_OOS_MDD,
+            "oos_return_beats_baseline": _safe_float(oos.get("total_return"), 0.0)
+            > BASELINE_OOS_RETURN,
+            "oos_sharpe_beats_funding_guard": _safe_float(oos.get("sharpe"), 0.0)
+            > FUNDING_GUARD_OOS_SHARPE,
+            "oos_mdd_beats_funding_guard": _safe_float(oos.get("max_drawdown"), 1.0)
+            < FUNDING_GUARD_OOS_MDD,
             "oos_sharpe_gt_1": _safe_float(oos.get("sharpe"), 0.0) > 1.0,
             "oos_trades_not_starved": int(split_results["oos"].get("round_trips") or 0) >= 5,
         }
@@ -871,7 +887,9 @@ def _evaluate_specs(
             "absolute_gate_shape": bool(absolute_shape),
             "success_candidate": bool(absolute_shape and absolute_gates["oos_sharpe_gt_1"]),
             "filters": json.dumps(spec.filters_payload(), sort_keys=True),
-            "reject_top": json.dumps(split_results["oos"].get("reject_counts") or {}, sort_keys=True),
+            "reject_top": json.dumps(
+                split_results["oos"].get("reject_counts") or {}, sort_keys=True
+            ),
         }
         for split_name, result in split_results.items():
             split_metrics = dict(result.get("metrics") or {})
@@ -1065,7 +1083,9 @@ def build_replay(
     json_path = output_dir / "eth_shock_filter_replay_latest.json"
     csv_path = output_dir / "eth_shock_filter_replay_candidates.csv"
     md_path = output_dir / "eth_shock_filter_replay_latest.md"
-    json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    json_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     _write_csv(csv_path, rows)
     md_path.write_text(_markdown(payload, rows), encoding="utf-8")
     return {

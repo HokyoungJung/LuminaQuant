@@ -78,7 +78,9 @@ def test_regime_breakout_candidate_emits_long_signal():
         dt = start + timedelta(minutes=idx)
         close = 100.0 + idx * 0.4
         bars.set_bar("BTC/USDT", dt, close - 0.1, close + 0.5, close - 0.5, close, 20.0)
-        strategy.calculate_signals(_market_event("BTC/USDT", dt, close, close + 0.5, close - 0.5, 20))
+        strategy.calculate_signals(
+            _market_event("BTC/USDT", dt, close, close + 0.5, close - 0.5, 20)
+        )
 
     assert not events.empty()
     signal = events.get_nowait()
@@ -105,7 +107,9 @@ def test_volatility_compression_reversion_emits_long_signal():
     for idx, close in enumerate(closes):
         dt = start + timedelta(minutes=idx)
         bars.set_bar("BTC/USDT", dt, close, close + 0.2, close - 0.2, close, 10.0)
-        strategy.calculate_signals(_market_event("BTC/USDT", dt, close, close + 0.2, close - 0.2, 10))
+        strategy.calculate_signals(
+            _market_event("BTC/USDT", dt, close, close + 0.2, close - 0.2, 10)
+        )
 
     assert not events.empty()
     signal = events.get_nowait()

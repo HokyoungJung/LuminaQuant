@@ -209,7 +209,11 @@ def main() -> None:
     if build_rust_rawfirst:
         print(f"rust_rawfirst_ok={rust_rawfirst_ok} rust_rawfirst_lib={rust_rawfirst_lib}")
 
-    if (build_c and not c_ok) or (build_rust and not rust_ok) or (build_rust_rawfirst and not rust_rawfirst_ok):
+    if (
+        (build_c and not c_ok)
+        or (build_rust and not rust_ok)
+        or (build_rust_rawfirst and not rust_rawfirst_ok)
+    ):
         sys.exit(1)
 
 

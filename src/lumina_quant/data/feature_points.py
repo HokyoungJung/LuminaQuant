@@ -164,21 +164,34 @@ class FeaturePointLookup:
             if field not in cleaned.columns:
                 cleaned = cleaned.with_columns(pl.lit(None, dtype=pl.Float64).alias(field))
 
-        cleaned = cleaned.select(["timestamp_ms", *FEATURE_COLUMNS]).sort("timestamp_ms").unique(
-            subset=["timestamp_ms"],
-            keep="last",
+        cleaned = (
+            cleaned.select(["timestamp_ms", *FEATURE_COLUMNS])
+            .sort("timestamp_ms")
+            .unique(
+                subset=["timestamp_ms"],
+                keep="last",
+            )
         )
         raw_columns = {
-            field: [float(value) if value is not None else None for value in cleaned.get_column(field).to_list()]
+            field: [
+                float(value) if value is not None else None
+                for value in cleaned.get_column(field).to_list()
+            ]
             for field in FEATURE_COLUMNS
         }
         cleaned = cleaned.with_columns(
-            [pl.col(field).cast(pl.Float64).fill_null(strategy="forward").alias(field) for field in FEATURE_COLUMNS]
+            [
+                pl.col(field).cast(pl.Float64).fill_null(strategy="forward").alias(field)
+                for field in FEATURE_COLUMNS
+            ]
         )
 
         timestamps_ms = [int(value) for value in cleaned.get_column("timestamp_ms").to_list()]
         columns = {
-            field: [float(value) if value is not None else None for value in cleaned.get_column(field).to_list()]
+            field: [
+                float(value) if value is not None else None
+                for value in cleaned.get_column(field).to_list()
+            ]
             for field in FEATURE_COLUMNS
         }
         return _FeatureCache(timestamps_ms=timestamps_ms, columns=columns, raw_columns=raw_columns)

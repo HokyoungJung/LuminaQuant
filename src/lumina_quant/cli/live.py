@@ -21,7 +21,10 @@ from lumina_quant.live_selection import (
     supports_live_portfolio_mode,
 )
 from lumina_quant.system_assembly import build_live_runtime_contract
-from lumina_quant.strategies.artifact_portfolio_mode import ArtifactPortfolioModeStrategy, resolve_portfolio_mode_definition
+from lumina_quant.strategies.artifact_portfolio_mode import (
+    ArtifactPortfolioModeStrategy,
+    resolve_portfolio_mode_definition,
+)
 
 DEFAULT_LIVE_STRATEGY_NAME = "MovingAverageCrossStrategy"
 DEFAULT_WS_STRATEGY_NAME = "RsiStrategy"
@@ -31,9 +34,7 @@ resolve_strategy_class = None
 
 def _strategy_helpers():
     global STRATEGY_MAP, resolve_strategy_class
-    registry = load_strategy_registry(
-        import_private_strategy_registry
-    )
+    registry = load_strategy_registry(import_private_strategy_registry)
     default_name = getattr(registry, "DEFAULT_STRATEGY_NAME", "PublicStubStrategy")
 
     def _get_live_strategy_map(include_opt_in=True):
@@ -46,11 +47,7 @@ def _strategy_helpers():
         default_name: str | None = None,
         default_name_override: str | None = None,
     ):
-        fallback_name = (
-            default_name_override
-            if default_name_override is not None
-            else default_name
-        )
+        fallback_name = default_name_override if default_name_override is not None else default_name
         return registry.resolve_strategy_class(
             name,
             default_name=fallback_name or default_name,
@@ -140,8 +137,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    default_strategy_registry_name, get_live_strategy_map, resolve_strategy_class = _strategy_helpers()
-    strategy_map = STRATEGY_MAP if isinstance(STRATEGY_MAP, dict) else get_live_strategy_map(include_opt_in=True)
+    default_strategy_registry_name, get_live_strategy_map, resolve_strategy_class = (
+        _strategy_helpers()
+    )
+    strategy_map = (
+        STRATEGY_MAP
+        if isinstance(STRATEGY_MAP, dict)
+        else get_live_strategy_map(include_opt_in=True)
+    )
 
     transport = _resolve_transport(args.transport)
     if args.enable_live_real:
@@ -197,7 +200,9 @@ def main(argv: list[str] | None = None) -> int:
                 if isinstance(decision_params, dict):
                     strategy_params = dict(decision_params)
             elif target_kind == "portfolio_mode":
-                reference = str(decision_cfg.get("reference") or "").strip() or "unknown_portfolio_mode"
+                reference = (
+                    str(decision_cfg.get("reference") or "").strip() or "unknown_portfolio_mode"
+                )
                 if not supports_live_portfolio_mode(reference):
                     raise ValueError(
                         "Live decision points to unsupported portfolio mode "
@@ -255,7 +260,8 @@ def main(argv: list[str] | None = None) -> int:
                 LiveConfig.DECISION_CADENCE_SECONDS = int(decision_cfg["decision_cadence_seconds"])
 
         if not bool(args.no_selection) and (
-            decision_cfg is None or str(decision_cfg.get("target_kind") or "") == "incumbent_fallback"
+            decision_cfg is None
+            or str(decision_cfg.get("target_kind") or "") == "incumbent_fallback"
         ):
             selection_path = resolve_selection_file(args.selection_file)
             if selection_path is not None:
@@ -324,7 +330,9 @@ def main(argv: list[str] | None = None) -> int:
     if decision_path is not None:
         print(f"Decision File: {decision_path}")
         if decision_cfg is not None:
-            print(f"Decision Target: {decision_cfg.get('reference') or decision_cfg.get('decision')}")
+            print(
+                f"Decision Target: {decision_cfg.get('reference') or decision_cfg.get('decision')}"
+            )
 
     print(f"Trading Symbols: {symbol_list}")
     print(f"Strategy Timeframe: {LiveConfig.TIMEFRAME}")

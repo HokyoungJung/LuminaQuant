@@ -18,8 +18,18 @@ class _DummyClient:
         return [
             {"universe": [{"name": "BTC"}, {"name": "ETH"}]},
             [
-                {"funding": "0.0001", "openInterest": "100", "oraclePx": "50000", "markPx": "50100"},
-                {"funding": "0.0002", "openInterest": "200", "oraclePx": "50000", "markPx": "49000"},
+                {
+                    "funding": "0.0001",
+                    "openInterest": "100",
+                    "oraclePx": "50000",
+                    "markPx": "50100",
+                },
+                {
+                    "funding": "0.0002",
+                    "openInterest": "200",
+                    "oraclePx": "50000",
+                    "markPx": "49000",
+                },
             ],
         ]
 
@@ -28,7 +38,11 @@ class _DummyClient:
         if coin == "BTC":
             return [
                 {"coin": "BTC", "time": OOS_START_MS, "fundingRate": "0.001"},
-                {"coin": "BTC", "time": OOS_START_MS, "fundingRate": "0.001"},  # duplicated timestamp
+                {
+                    "coin": "BTC",
+                    "time": OOS_START_MS,
+                    "fundingRate": "0.001",
+                },  # duplicated timestamp
                 {"coin": "BTC", "time": OOS_START_MS + 3600_000, "fundingRate": "0.0015"},
             ]
         return [
@@ -53,7 +67,9 @@ class _DummyClient:
         ]
 
 
-def test_collect_hyperliquid_builds_lightweight_artifacts_with_deterministic_payload(monkeypatch, tmp_path: Path) -> None:
+def test_collect_hyperliquid_builds_lightweight_artifacts_with_deterministic_payload(
+    monkeypatch, tmp_path: Path
+) -> None:
     """Tiny deterministic smoke for collect_hyperliquid() with fully mocked I/O."""
     monkeypatch.setattr(mod, "HyperliquidInfoClient", _DummyClient)
 

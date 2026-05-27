@@ -146,10 +146,16 @@ def _candidate_progress_snapshot(
     def _split_summary(name: str) -> dict[str, Any]:
         split_block = dict(result.get(name) or {})
         return {
-            "total_return": float(split_block.get("total_return", split_block.get("return", 0.0)) or 0.0),
+            "total_return": float(
+                split_block.get("total_return", split_block.get("return", 0.0)) or 0.0
+            ),
             "sharpe": float(split_block.get("sharpe", 0.0) or 0.0),
-            "max_drawdown": float(split_block.get("max_drawdown", split_block.get("mdd", 0.0)) or 0.0),
-            "trade_count": float(split_block.get("trade_count", split_block.get("trades", 0.0)) or 0.0),
+            "max_drawdown": float(
+                split_block.get("max_drawdown", split_block.get("mdd", 0.0)) or 0.0
+            ),
+            "trade_count": float(
+                split_block.get("trade_count", split_block.get("trades", 0.0)) or 0.0
+            ),
         }
 
     return {
@@ -157,7 +163,9 @@ def _candidate_progress_snapshot(
         "name": str(result.get("name") or ""),
         "strategy_class": str(result.get("strategy_class") or ""),
         "family": str(result.get("family") or ""),
-        "strategy_timeframe": str(result.get("strategy_timeframe") or result.get("timeframe") or ""),
+        "strategy_timeframe": str(
+            result.get("strategy_timeframe") or result.get("timeframe") or ""
+        ),
         "stage1_prefilter_score": float(stage1_prefilter_score),
         "pass": bool(result.get("pass", False)),
         "hard_reject": bool(result.get("hard_reject", False)),
@@ -179,7 +187,9 @@ def _stage_result_with_candidate_identity(
         "name": str(candidate.get("name") or candidate.get("candidate_id") or ""),
         "strategy_class": str(candidate.get("strategy_class") or candidate.get("strategy") or ""),
         "family": str(candidate.get("family") or ""),
-        "strategy_timeframe": str(candidate.get("strategy_timeframe") or candidate.get("timeframe") or ""),
+        "strategy_timeframe": str(
+            candidate.get("strategy_timeframe") or candidate.get("timeframe") or ""
+        ),
         "timeframe": str(candidate.get("timeframe") or candidate.get("strategy_timeframe") or ""),
     }
     for key, value in identity_defaults.items():

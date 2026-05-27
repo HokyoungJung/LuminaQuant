@@ -49,9 +49,7 @@ class RiskManager:
         return None
 
     @staticmethod
-    def _project_hedge_legs(
-        order_event, current_legs: dict[str, float]
-    ) -> dict[str, float] | None:
+    def _project_hedge_legs(order_event, current_legs: dict[str, float]) -> dict[str, float] | None:
         position_side = str(getattr(order_event, "position_side", "") or "").upper()
         if position_side not in {"LONG", "SHORT"}:
             return None
@@ -127,7 +125,9 @@ class RiskManager:
             else:
                 cur_qty = float(portfolio.current_positions.get(order_event.symbol, 0.0))
                 signed_order_qty = (
-                    order_event.quantity if order_event.direction == "BUY" else -order_event.quantity
+                    order_event.quantity
+                    if order_event.direction == "BUY"
+                    else -order_event.quantity
                 )
                 projected_qty = cur_qty + signed_order_qty
                 projected_symbol_notional = abs(projected_qty * current_price)

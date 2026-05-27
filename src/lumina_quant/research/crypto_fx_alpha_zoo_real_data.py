@@ -121,9 +121,11 @@ def discover_latest_current_tail_cache(
 
 def _is_wide_current_tail_frame(frame: pd.DataFrame) -> bool:
     columns = {str(column).lower() for column in frame.columns}
-    return ("datetime" in columns or "timestamp" in columns) and any(
-        column.endswith("_close") for column in columns
-    ) and "symbol" not in columns
+    return (
+        ("datetime" in columns or "timestamp" in columns)
+        and any(column.endswith("_close") for column in columns)
+        and "symbol" not in columns
+    )
 
 
 def _wide_prefixes(columns: list[str]) -> list[str]:
@@ -175,7 +177,9 @@ def _wide_current_tail_to_long(frame: pd.DataFrame) -> tuple[pd.DataFrame, dict[
                 source_columns[field] = source
         rows.append(output)
         coverage = {
-            field: float(output[field].notna().mean()) if field in output.columns and len(output) else 0.0
+            field: float(output[field].notna().mean())
+            if field in output.columns and len(output)
+            else 0.0
             for field in (*REQUIRED_OHLCV, *OPTIONAL_REAL_FIELDS)
             if field in output.columns
         }
@@ -203,7 +207,11 @@ def _long_frame_source_metadata(frame: pd.DataFrame) -> dict[str, Any]:
     out["symbol"] = out["symbol"].astype(str)
     symbol_meta: dict[str, Any] = {}
     for symbol, group in out.groupby("symbol", sort=True):
-        observed = [field for field in (*REQUIRED_OHLCV, *OPTIONAL_REAL_FIELDS, "vwap") if field in group.columns]
+        observed = [
+            field
+            for field in (*REQUIRED_OHLCV, *OPTIONAL_REAL_FIELDS, "vwap")
+            if field in group.columns
+        ]
         imputed = []
         for field in ("vwap",):
             if field not in group.columns:
@@ -227,7 +235,9 @@ def _long_frame_source_metadata(frame: pd.DataFrame) -> dict[str, Any]:
     }
 
 
-def _join_external_state(frame: pd.DataFrame, external_state_csv: str | Path | None) -> tuple[pd.DataFrame, dict[str, Any]]:
+def _join_external_state(
+    frame: pd.DataFrame, external_state_csv: str | Path | None
+) -> tuple[pd.DataFrame, dict[str, Any]]:
     raw = str(external_state_csv or "").strip()
     metadata: dict[str, Any] = {
         "enabled": bool(raw),
@@ -268,7 +278,8 @@ def _join_external_state(frame: pd.DataFrame, external_state_csv: str | Path | N
             "rows": len(external),
             "feature_columns": features,
             "coverage_ratio_by_feature": {
-                feature: float(out[feature].notna().mean()) if len(out) else 0.0 for feature in features
+                feature: float(out[feature].notna().mean()) if len(out) else 0.0
+                for feature in features
             },
         }
     )
@@ -300,7 +311,9 @@ def normalize_real_data_frame(
 
     symbol_coverage = dict(coverage.get("symbol_coverage") or {})
     required_failures = [
-        symbol for symbol, item in symbol_coverage.items() if not bool(item.get("required_ohlcv_observed"))
+        symbol
+        for symbol, item in symbol_coverage.items()
+        if not bool(item.get("required_ohlcv_observed"))
     ]
     validity_reasons: list[str] = []
     if required_failures:
@@ -310,15 +323,21 @@ def normalize_real_data_frame(
     if strict_real_data and validity_reasons:
         raise ValueError("real-data coverage failed closed: " + ",".join(validity_reasons))
 
-    split_counts = Counter(str(item) for item in normalized.get("split", pd.Series(dtype=str)).dropna())
+    split_counts = Counter(
+        str(item) for item in normalized.get("split", pd.Series(dtype=str)).dropna()
+    )
     metadata = {
         "artifact_kind": "crypto_fx_alpha_zoo_real_data_source_coverage",
         "generated_at_utc": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "source_path": str(source_path),
         "strict_real_data": bool(strict_real_data),
         "row_count": len(normalized),
-        "timestamp_min": str(pd.to_datetime(normalized["timestamp"]).min()) if len(normalized) else None,
-        "timestamp_max": str(pd.to_datetime(normalized["timestamp"]).max()) if len(normalized) else None,
+        "timestamp_min": str(pd.to_datetime(normalized["timestamp"]).min())
+        if len(normalized)
+        else None,
+        "timestamp_max": str(pd.to_datetime(normalized["timestamp"]).max())
+        if len(normalized)
+        else None,
         "input": coverage,
         "external_state": external_meta,
         "split_counts_pre_factor": dict(split_counts),
@@ -343,7 +362,11 @@ def load_real_data_bundle(
     """Load either explicit input or the latest current-tail cached panel."""
     source = Path(input_path).expanduser().resolve() if input_path else None
     if source is None:
-        source = Path(current_tail_cache).expanduser().resolve() if current_tail_cache else discover_latest_current_tail_cache()
+        source = (
+            Path(current_tail_cache).expanduser().resolve()
+            if current_tail_cache
+            else discover_latest_current_tail_cache()
+        )
     frame = read_tabular_frame(source)
     return normalize_real_data_frame(
         frame,
@@ -401,7 +424,9 @@ def build_candidate_outcome_records(
     data = labeled.sort_values(["symbol", "timestamp"]).copy().reset_index(drop=True)
     if "split" not in data.columns:
         raise ValueError("labeled frame must include split column before ledger generation")
-    selected_names = [str(row.get("factor")) for row in selected_factors if str(row.get("factor")) in data.columns]
+    selected_names = [
+        str(row.get("factor")) for row in selected_factors if str(row.get("factor")) in data.columns
+    ]
     for factor in selected_names:
         factor_values = pd.to_numeric(data[factor], errors="coerce")
         if factor_values.dropna().empty:
@@ -418,10 +443,16 @@ def build_candidate_outcome_records(
                 if len(group) <= max_hold_bars + 1:
                     continue
                 closes = pd.to_numeric(group["close"], errors="coerce").to_numpy(dtype=float)
-                highs = pd.to_numeric(group.get("high", group["close"]), errors="coerce").to_numpy(dtype=float)
-                lows = pd.to_numeric(group.get("low", group["close"]), errors="coerce").to_numpy(dtype=float)
+                highs = pd.to_numeric(group.get("high", group["close"]), errors="coerce").to_numpy(
+                    dtype=float
+                )
+                lows = pd.to_numeric(group.get("low", group["close"]), errors="coerce").to_numpy(
+                    dtype=float
+                )
                 values = pd.to_numeric(group[factor], errors="coerce")
-                vol_bucket_values = group["realized_vol_24"] if "realized_vol_24" in group.columns else values.abs()
+                vol_bucket_values = (
+                    group["realized_vol_24"] if "realized_vol_24" in group.columns else values.abs()
+                )
                 side_entries = {
                     "LONG": group.index[values >= high_threshold].tolist(),
                     "SHORT": group.index[values <= low_threshold].tolist(),
@@ -466,7 +497,10 @@ def build_candidate_outcome_records(
                                 "mfe_bps": float(outcome.max_favorable_excursion * 10_000.0),
                                 "factor_bucket": "top" if side == "LONG" else "bottom",
                                 "regime_bucket": _regime_bucket(entry_row),
-                                "volatility_bucket": _volatility_bucket(vol_bucket_values, entry_row.get("realized_vol_24", entry_row.get(factor))),
+                                "volatility_bucket": _volatility_bucket(
+                                    vol_bucket_values,
+                                    entry_row.get("realized_vol_24", entry_row.get(factor)),
+                                ),
                                 "feature_snapshot": {
                                     "factor": factor,
                                     "factor_value": _safe_float(entry_row.get(factor)),
@@ -490,7 +524,9 @@ def build_candidate_outcome_records(
     return out
 
 
-def write_candidate_outcome_ledger(path: str | Path, records: list[dict[str, Any]]) -> dict[str, Any]:
+def write_candidate_outcome_ledger(
+    path: str | Path, records: list[dict[str, Any]]
+) -> dict[str, Any]:
     ledger_path = Path(path)
     ledger_path.parent.mkdir(parents=True, exist_ok=True)
     ledger_path.write_text("", encoding="utf-8")
@@ -502,8 +538,12 @@ def write_candidate_outcome_ledger(path: str | Path, records: list[dict[str, Any
     summary.update(
         {
             "split_counts": dict(split_counts),
-            "train_validation_record_count": sum(split_counts.get(split, 0) for split in TRAIN_VALIDATION_SPLITS),
-            "locked_oos_record_count": sum(split_counts.get(split, 0) for split in LOCKED_OOS_SPLITS),
+            "train_validation_record_count": sum(
+                split_counts.get(split, 0) for split in TRAIN_VALIDATION_SPLITS
+            ),
+            "locked_oos_record_count": sum(
+                split_counts.get(split, 0) for split in LOCKED_OOS_SPLITS
+            ),
             "strategy": "CryptoFxAlphaZooStateStrategy",
             "calendar_primary": False,
             "uses_locked_oos_for_selection": False,

@@ -17,4 +17,3 @@ class StrategyInputContext:
     execution_handler: Any = None
     exchange: Any = None
     provider_metadata: dict[str, Any] = field(default_factory=dict)
-

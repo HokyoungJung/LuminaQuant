@@ -45,8 +45,12 @@ def test_align_bundles_augments_feature_series_from_feature_cache():
             "open_interest": np.linspace(1_000_000.0, 1_600_000.0, datetimes.len(), dtype=float),
             "liquidation_long_qty": np.linspace(10.0, 20.0, datetimes.len(), dtype=float),
             "liquidation_short_qty": np.linspace(5.0, 8.0, datetimes.len(), dtype=float),
-            "liquidation_long_notional": np.linspace(100_000.0, 140_000.0, datetimes.len(), dtype=float),
-            "liquidation_short_notional": np.linspace(30_000.0, 40_000.0, datetimes.len(), dtype=float),
+            "liquidation_long_notional": np.linspace(
+                100_000.0, 140_000.0, datetimes.len(), dtype=float
+            ),
+            "liquidation_short_notional": np.linspace(
+                30_000.0, 40_000.0, datetimes.len(), dtype=float
+            ),
         }
     )
 
@@ -165,7 +169,9 @@ def test_rolling_z_matches_reference_loop():
         hist = tail[:-1]
         latest = tail[-1]
         std = research_runner._safe_std(hist)
-        expected[idx - 1] = 0.0 if std <= 1e-12 else (float(latest) - research_runner._safe_mean(hist)) / std
+        expected[idx - 1] = (
+            0.0 if std <= 1e-12 else (float(latest) - research_runner._safe_mean(hist)) / std
+        )
 
     actual = research_runner._rolling_z(values, window)
     np.testing.assert_allclose(actual[window - 1 :], expected[window - 1 :], rtol=1e-9, atol=1e-9)
@@ -2804,7 +2810,9 @@ def test_carry_trend_factor_rotation_strategy_prefers_uncrowded_trend_leaders(mo
         aligned[f"{symbol}:close"] = close
         aligned[f"{symbol}:volume"] = np.full(length, 120.0, dtype=float)
         aligned[f"{symbol}:funding_rate"] = np.full(length, funding_map[symbol], dtype=float)
-        aligned[f"{symbol}:open_interest"] = np.linspace(1_000_000.0, 1_100_000.0, length, dtype=float)
+        aligned[f"{symbol}:open_interest"] = np.linspace(
+            1_000_000.0, 1_100_000.0, length, dtype=float
+        )
         aligned[f"{symbol}:liquidation_long_notional"] = np.full(length, 100_000.0, dtype=float)
         aligned[f"{symbol}:liquidation_short_notional"] = np.full(length, 40_000.0, dtype=float)
         aligned[f"{symbol}:mark_price"] = close * 1.001

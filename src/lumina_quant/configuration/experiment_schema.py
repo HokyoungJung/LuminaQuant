@@ -115,11 +115,15 @@ class ExperimentConfig:
         run_controls_raw = dict(data.get("run_controls") or {})
 
         run_required = ("start_date", "end_date")
-        run_missing = [key for key in run_required if not str(run_controls_raw.get(key) or "").strip()]
+        run_missing = [
+            key for key in run_required if not str(run_controls_raw.get(key) or "").strip()
+        ]
         if run_missing:
             raise ValueError(f"run_controls missing required keys: {run_missing}")
 
-        ranking_objective = str(run_controls_raw.get("ranking_objective", "composite")).strip().lower()
+        ranking_objective = (
+            str(run_controls_raw.get("ranking_objective", "composite")).strip().lower()
+        )
         if ranking_objective not in {"composite", "sharpe", "total_return", "drawdown"}:
             ranking_objective = "composite"
         ranking_weights_raw = run_controls_raw.get("ranking_weights") or {}
@@ -153,7 +157,9 @@ class ExperimentConfig:
                 seed=int(run_controls_raw.get("seed", 42)),
                 parallelism=max(1, int(run_controls_raw.get("parallelism", 1))),
                 exchange=str(run_controls_raw.get("exchange", "binance")),
-                market_data_root=str(run_controls_raw.get("market_data_root", "data/market_parquet")),
+                market_data_root=str(
+                    run_controls_raw.get("market_data_root", "data/market_parquet")
+                ),
                 use_synthetic_data=bool(run_controls_raw.get("use_synthetic_data", True)),
                 synthetic_bars=max(32, int(run_controls_raw.get("synthetic_bars", 480))),
                 initial_capital=float(run_controls_raw.get("initial_capital", 100000.0)),

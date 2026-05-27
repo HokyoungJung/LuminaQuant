@@ -78,9 +78,9 @@ def infer_basis_lineage(candidate: Mapping[str, Any]) -> dict[str, str]:
 
     family = str(lineage.get("family") or metadata.get("basis_family") or "").strip().lower()
     variant = str(lineage.get("variant") or metadata.get("basis_variant") or "").strip().lower()
-    basis_universe = str(
-        lineage.get("basis_universe") or metadata.get("basis_universe") or ""
-    ).strip().lower()
+    basis_universe = (
+        str(lineage.get("basis_universe") or metadata.get("basis_universe") or "").strip().lower()
+    )
 
     tokens = _candidate_tokens(candidate)
     if not family or not variant or not basis_universe:
@@ -92,7 +92,10 @@ def infer_basis_lineage(candidate: Mapping[str, Any]) -> dict[str, str]:
             family = family or "static_blend"
             variant = variant or "derived_80_20"
             basis_universe = basis_universe or "derived_basis"
-        elif "incumbent_autoresearch_static_blend" in tokens or "current_one_shot_incumbent" in tokens:
+        elif (
+            "incumbent_autoresearch_static_blend" in tokens
+            or "current_one_shot_incumbent" in tokens
+        ):
             family = family or "incumbent"
             variant = variant or "incumbent_autoresearch_static_blend"
             basis_universe = basis_universe or "shared"
@@ -199,7 +202,9 @@ def build_basis_search_universes(rows: list[Mapping[str, Any]]) -> dict[str, lis
 def _point_datetime(point: Mapping[str, Any]) -> datetime | None:
     raw_datetime = point.get("datetime")
     if isinstance(raw_datetime, str) and raw_datetime.strip():
-        normalized = raw_datetime.replace("Z", "+00:00") if raw_datetime.endswith("Z") else raw_datetime
+        normalized = (
+            raw_datetime.replace("Z", "+00:00") if raw_datetime.endswith("Z") else raw_datetime
+        )
         try:
             parsed = datetime.fromisoformat(normalized)
         except ValueError:
@@ -323,7 +328,11 @@ def extract_portfolio_streams(payload: Mapping[str, Any]) -> dict[str, list[dict
         if not isinstance(stream_block, Mapping):
             continue
         return {
-            split: [dict(item) for item in list(stream_block.get(split) or []) if isinstance(item, Mapping)]
+            split: [
+                dict(item)
+                for item in list(stream_block.get(split) or [])
+                if isinstance(item, Mapping)
+            ]
             for split in ("train", "val", "oos")
         }
     return {split: [] for split in ("train", "val", "oos")}
@@ -538,7 +547,9 @@ def build_sparse_fold_aware_ensemble(
         raw_scores.append(_sparse_fold_component_score(row))
 
     max_score = max(raw_scores)
-    weights = np.asarray([math.exp(max(-60.0, min(0.0, score - max_score))) for score in raw_scores], dtype=float)
+    weights = np.asarray(
+        [math.exp(max(-60.0, min(0.0, score - max_score))) for score in raw_scores], dtype=float
+    )
     if float(np.sum(weights)) <= 0.0:
         weights = np.full(len(selected), 1.0 / float(len(selected)), dtype=float)
     else:
@@ -559,7 +570,9 @@ def build_sparse_fold_aware_ensemble(
                 "name": str(row.get("name") or ""),
                 "weight": float(row["_saved_weight"]),
                 "oos_pbo": safe_float((row.get("oos") or {}).get("pbo"), 1.0),
-                "oos_active_fold_ratio": safe_float((row.get("oos") or {}).get("active_fold_ratio"), 0.0),
+                "oos_active_fold_ratio": safe_float(
+                    (row.get("oos") or {}).get("active_fold_ratio"), 0.0
+                ),
             }
             for row in weighted_rows
         ],
@@ -727,7 +740,9 @@ def build_correlation_aware_sparse_fold_ensemble(
                 "avg_abs_oos_corr": float(item["avg_abs_corr"]),
                 "preblend_reasons": list(item["preblend_reasons"]),
                 "oos_pbo": safe_float((row.get("oos") or {}).get("pbo"), 1.0),
-                "oos_active_fold_ratio": safe_float((row.get("oos") or {}).get("active_fold_ratio"), 0.0),
+                "oos_active_fold_ratio": safe_float(
+                    (row.get("oos") or {}).get("active_fold_ratio"), 0.0
+                ),
             }
             for item, row in zip(selected, weighted_rows, strict=True)
         ],
@@ -884,9 +899,7 @@ def evaluate_robustness_gates(
     oos_sharpe_delta = safe_float(candidate_oos.get("sharpe"), 0.0) - safe_float(
         incumbent_oos.get("sharpe"), 0.0
     )
-    max_drawdown_cap = float(
-        ROBUST_PROMOTION_GATES["candidate_split_max_drawdown_max_inclusive"]
-    )
+    max_drawdown_cap = float(ROBUST_PROMOTION_GATES["candidate_split_max_drawdown_max_inclusive"])
     strict_liquidation_count = _strict_liquidation_evidence_count(candidate_payload)
     strict_leverage = _strict_leverage_evidence(candidate_payload)
     strict_max_leverage = strict_leverage["max_leverage"]
@@ -898,17 +911,18 @@ def evaluate_robustness_gates(
     checks = {
         "train_total_return": safe_float(
             candidate_train.get("total_return", candidate_train.get("return")), 0.0
-        ) > ROBUST_PROMOTION_GATES["train_total_return_min_exclusive"],
+        )
+        > ROBUST_PROMOTION_GATES["train_total_return_min_exclusive"],
         "train_real_participation": not (
-            abs(
-                safe_float(candidate_train.get("total_return", candidate_train.get("return")), 0.0)
-            )
+            abs(safe_float(candidate_train.get("total_return", candidate_train.get("return")), 0.0))
             <= 1e-12
-            and safe_float(candidate_train.get("trade_count", candidate_train.get("trades")), 0.0) <= 0.0
+            and safe_float(candidate_train.get("trade_count", candidate_train.get("trades")), 0.0)
+            <= 0.0
         ),
         "val_total_return": safe_float(
             candidate_val.get("total_return", candidate_val.get("return")), 0.0
-        ) > ROBUST_PROMOTION_GATES["val_total_return_min_exclusive"],
+        )
+        > ROBUST_PROMOTION_GATES["val_total_return_min_exclusive"],
         "train_sharpe": safe_float(candidate_train.get("sharpe"), 0.0)
         >= ROBUST_PROMOTION_GATES["train_sharpe_min"],
         "train_max_drawdown": safe_float(
@@ -940,7 +954,8 @@ def evaluate_robustness_gates(
         "strict_max_leverage": strict_max_leverage is None
         or strict_max_leverage <= ROBUST_PROMOTION_GATES["strict_max_leverage_max_inclusive"],
         "strict_average_leverage": strict_average_leverage is None
-        or strict_average_leverage < ROBUST_PROMOTION_GATES["strict_average_leverage_max_exclusive"],
+        or strict_average_leverage
+        < ROBUST_PROMOTION_GATES["strict_average_leverage_max_exclusive"],
     }
 
     rejection_reasons: list[str] = []

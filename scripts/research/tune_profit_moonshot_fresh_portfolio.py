@@ -140,7 +140,6 @@ def _load_fresh_module() -> Any:
     return module
 
 
-
 def _read_rows(path: Path) -> list[dict[str, str]]:
     with path.open(encoding="utf-8") as handle:
         return list(csv.DictReader(handle))
@@ -165,7 +164,12 @@ def _load_json_mapping(path: Path) -> dict[str, Any]:
 
 
 def _candidate_by_name(payload: dict[str, Any], name: str) -> dict[str, Any]:
-    for key in ("best_success_candidate", "selected_by_validation", "diagnostic_best_oos", "candidate"):
+    for key in (
+        "best_success_candidate",
+        "selected_by_validation",
+        "diagnostic_best_oos",
+        "candidate",
+    ):
         candidate = payload.get(key)
         if not isinstance(candidate, dict):
             continue
@@ -206,7 +210,10 @@ def _load_current_base_candidate(path_value: Any) -> tuple[dict[str, Any], dict[
             candidate = source_candidate
             candidate.setdefault("source_artifact", str(source_path))
             candidate.setdefault("candidate_artifact", str(path))
-    elif any(isinstance(payload.get(key), dict) for key in ("best_success_candidate", "selected_by_validation")):
+    elif any(
+        isinstance(payload.get(key), dict)
+        for key in ("best_success_candidate", "selected_by_validation")
+    ):
         candidate = _candidate_by_name(payload, "")
 
     if candidate:
@@ -387,7 +394,9 @@ def _current_base_comparison(
     item_components = _train_val_stability_component_payload(item)
     base_components = _train_val_stability_component_payload(current_base_candidate)
     item_score = _train_val_stability_score(item, base_candidate=current_base_candidate)
-    base_score = _train_val_stability_score(current_base_candidate, base_candidate=current_base_candidate)
+    base_score = _train_val_stability_score(
+        current_base_candidate, base_candidate=current_base_candidate
+    )
     oos_return = _split_metric(item, "oos", "total_return")
     oos_mdd = _split_metric(item, "oos", "max_drawdown")
     base_oos_return = _split_metric(current_base_candidate, "oos", "total_return")
@@ -425,7 +434,9 @@ def _compact_current_base_candidate(candidate: dict[str, Any]) -> dict[str, Any]
         "source_artifact": candidate.get("source_artifact"),
         "candidate_artifact": candidate.get("candidate_artifact"),
         "train_val_stability": _train_val_stability_component_payload(candidate),
-        "train_val_stability_score": _train_val_stability_score(candidate, base_candidate=candidate),
+        "train_val_stability_score": _train_val_stability_score(
+            candidate, base_candidate=candidate
+        ),
         "locked_oos": {
             "total_return": _split_metric(candidate, "oos", "total_return"),
             "max_drawdown": _split_metric(candidate, "oos", "max_drawdown"),
@@ -455,7 +466,9 @@ def _no_improvement_lifecycle(
         "no_improvement": bool(current_base_candidate) and success_candidate_count == 0,
         "current_base_retained": bool(current_base_candidate) and success_candidate_count == 0,
         "current_base_name": current_base_candidate.get("name") if current_base_candidate else "",
-        "selected_by_train_val_name": selected_by_validation.get("name") if selected_by_validation else "",
+        "selected_by_train_val_name": selected_by_validation.get("name")
+        if selected_by_validation
+        else "",
         "best_improvement_candidate_name": (
             best_success_candidate.get("name") if best_success_candidate else ""
         ),
@@ -470,7 +483,13 @@ def _validation_score(row: dict[str, str]) -> float:
     val_sharpe = _safe_float(row.get("val_sharpe"))
     val_mdd = _safe_float(row.get("val_max_drawdown"), 1.0)
     trips = max(1.0, _safe_float(row.get("val_round_trips"), 0.0))
-    return val_ret * 100.0 + train_ret * 25.0 + val_sharpe * 0.15 - val_mdd * 50.0 + math.log1p(trips) * 0.01
+    return (
+        val_ret * 100.0
+        + train_ret * 25.0
+        + val_sharpe * 0.15
+        - val_mdd * 50.0
+        + math.log1p(trips) * 0.01
+    )
 
 
 def _row_filters(row: dict[str, Any]) -> dict[str, Any]:
@@ -495,7 +514,9 @@ def _calendar_neighborhood_key(row: dict[str, Any]) -> tuple[Any, ...] | None:
     hold_bars = round(_safe_float(filters.get("hold_bars"), _safe_float(row.get("hold_bars"), 0.0)))
     hold_bucket = int(round(hold_bars / 24.0) * 24) if hold_bars > 0 else 0
     threshold = _safe_float(filters.get("threshold"), _safe_float(row.get("threshold"), 0.0))
-    take_profit = _safe_float(filters.get("take_profit_pct"), _safe_float(row.get("take_profit_pct"), 0.0))
+    take_profit = _safe_float(
+        filters.get("take_profit_pct"), _safe_float(row.get("take_profit_pct"), 0.0)
+    )
     threshold_bucket = round(threshold / 0.003) if threshold > 0.0 else 0
     take_profit_bucket = round(take_profit / 0.012) if take_profit > 0.0 else 0
     return (
@@ -532,7 +553,9 @@ def _calendar_neighborhood_score(group_rows: list[dict[str, str]]) -> float:
     val_median = _quantile(val_returns, 0.50)
     val_lq = _quantile(val_returns, 0.25)
     val_mdd_median = _quantile(val_mdds, 0.50)
-    dispersion = float(np.std(np.asarray(val_returns, dtype=float))) if len(val_returns) > 1 else 0.0
+    dispersion = (
+        float(np.std(np.asarray(val_returns, dtype=float))) if len(val_returns) > 1 else 0.0
+    )
     return (
         val_median * 100.0
         + train_median * 25.0
@@ -632,14 +655,20 @@ def _candidate_pool_with_metadata(
         families = sorted(
             {row.get("family") or "unknown" for row in eligible},
             key=lambda family: max(
-                (_validation_score(row) for row in eligible if (row.get("family") or "unknown") == family),
+                (
+                    _validation_score(row)
+                    for row in eligible
+                    if (row.get("family") or "unknown") == family
+                ),
                 default=float("-inf"),
             ),
             reverse=True,
         )
         for family in families:
             family_rows = [row for row in eligible if (row.get("family") or "unknown") == family]
-            _append_unique(selected, selected_names, family_rows[: max(0, int(family_quota))], limit=limit)
+            _append_unique(
+                selected, selected_names, family_rows[: max(0, int(family_quota))], limit=limit
+            )
             if len(selected) >= limit:
                 metadata["selected_names"] = [row.get("name") for row in selected]
                 return selected, metadata
@@ -831,7 +860,11 @@ def _cap_cluster_weights(
                 excess += weight - sleeve_cap
                 weights[idx] = sleeve_cap
         cluster_sums = {
-            cluster_id: sum(weight for weight, cid in zip(weights, cluster_ids, strict=True) if cid == cluster_id)
+            cluster_id: sum(
+                weight
+                for weight, cid in zip(weights, cluster_ids, strict=True)
+                if cid == cluster_id
+            )
             for cluster_id in set(cluster_ids)
         }
         for cluster_id, total in cluster_sums.items():
@@ -846,7 +879,11 @@ def _cap_cluster_weights(
         if excess <= 1e-12:
             break
         cluster_sums = {
-            cluster_id: sum(weight for weight, cid in zip(weights, cluster_ids, strict=True) if cid == cluster_id)
+            cluster_id: sum(
+                weight
+                for weight, cid in zip(weights, cluster_ids, strict=True)
+                if cid == cluster_id
+            )
             for cluster_id in set(cluster_ids)
         }
         capacities = [
@@ -864,7 +901,9 @@ def _cap_cluster_weights(
         if missing > 0.0:
             cluster_sums = {
                 cluster_id: sum(
-                    weight for weight, cid in zip(weights, cluster_ids, strict=True) if cid == cluster_id
+                    weight
+                    for weight, cid in zip(weights, cluster_ids, strict=True)
+                    if cid == cluster_id
                 )
                 for cluster_id in set(cluster_ids)
             }
@@ -891,7 +930,9 @@ def _cluster_capped_validation_weights(
     sleeve_cap: float,
     correlation_threshold: float,
 ) -> tuple[list[float], dict[str, Any]]:
-    raw_weights = _train_val_mdd_budget_weights(combo_names=combo_names, split_payloads=split_payloads)
+    raw_weights = _train_val_mdd_budget_weights(
+        combo_names=combo_names, split_payloads=split_payloads
+    )
     assignments = _cluster_assignments(
         combo_names=combo_names,
         split_curves=split_curves,
@@ -899,9 +940,13 @@ def _cluster_capped_validation_weights(
         correlation_threshold=correlation_threshold,
     )
     cluster_ids = [assignments[name] for name in combo_names]
-    weights = _cap_cluster_weights(raw_weights, cluster_ids=cluster_ids, cluster_cap=cluster_cap, sleeve_cap=sleeve_cap)
+    weights = _cap_cluster_weights(
+        raw_weights, cluster_ids=cluster_ids, cluster_cap=cluster_cap, sleeve_cap=sleeve_cap
+    )
     cluster_weights = {
-        cluster_id: sum(weight for weight, cid in zip(weights, cluster_ids, strict=True) if cid == cluster_id)
+        cluster_id: sum(
+            weight for weight, cid in zip(weights, cluster_ids, strict=True) if cid == cluster_id
+        )
         for cluster_id in sorted(set(cluster_ids))
     }
     diagnostics = {
@@ -1225,7 +1270,9 @@ def _train_val_monthly_return_leverage(
                 "leverage": int(item["leverage"]),
                 "score": float(item["score"]),
                 "train_monthlyized_return": float(item["components"]["train_monthlyized_return"]),
-                "val_monthlyized_return": float(item["components"]["validation_monthlyized_return"]),
+                "val_monthlyized_return": float(
+                    item["components"]["validation_monthlyized_return"]
+                ),
                 "train_max_drawdown": float(item["components"]["train_max_drawdown"]),
                 "val_max_drawdown": float(item["components"]["validation_max_drawdown"]),
                 "train_val_gate_pass": bool(item["train_val_gate_pass"]),
@@ -1264,7 +1311,9 @@ def _mode_weights_and_leverage(
             split_curves=split_curves,
         )
         return None, leverage, diagnostics
-    weights = _validation_return_risk_weights(combo_names=combo_names, split_payloads=split_payloads)
+    weights = _validation_return_risk_weights(
+        combo_names=combo_names, split_payloads=split_payloads
+    )
     if mode == "validation_return_risk_weight":
         return weights, 1.0, {"selection_basis": "train_val_validation_return_risk"}
     if mode == "validation_drawdown_budget":
@@ -1281,10 +1330,14 @@ def _mode_weights_and_leverage(
         val_mdd = _safe_float(validation_metrics.get("max_drawdown"), 1.0)
         target_val_mdd = SHADOW_OOS_MDD * 0.75
         leverage = 1.0 if val_mdd <= 0.0 else target_val_mdd / val_mdd
-        return weights, max(0.20, min(6.0, float(leverage))), {
-            "selection_basis": "train_val_validation_drawdown_budget",
-            "target_val_mdd": target_val_mdd,
-        }
+        return (
+            weights,
+            max(0.20, min(6.0, float(leverage))),
+            {
+                "selection_basis": "train_val_validation_drawdown_budget",
+                "target_val_mdd": target_val_mdd,
+            },
+        )
     if mode == "cluster_capped_validation_weight":
         capped_weights, diagnostics = _cluster_capped_validation_weights(
             combo_names=combo_names,
@@ -1320,7 +1373,9 @@ def _smart_sortino(metrics: dict[str, Any]) -> float:
     monthly_return = _monthlyized_return(metrics)
     return_floor_factor = max(0.0, min(1.0, monthly_return / MIN_STABLE_MONTHLY_RETURN))
     mdd = max(0.0, _safe_float(metrics.get("max_drawdown"), 1.0))
-    drawdown_budget_factor = max(0.0, 1.0 - min(mdd, MAX_ACCEPTABLE_OOS_MDD) / MAX_ACCEPTABLE_OOS_MDD)
+    drawdown_budget_factor = max(
+        0.0, 1.0 - min(mdd, MAX_ACCEPTABLE_OOS_MDD) / MAX_ACCEPTABLE_OOS_MDD
+    )
     return _safe_float(metrics.get("sortino")) * return_floor_factor * drawdown_budget_factor
 
 
@@ -1395,7 +1450,9 @@ def _with_promotion_labels(item: dict[str, Any]) -> dict[str, Any]:
     item["success_candidate"] = improved
     item["diagnostic_not_promoted"] = not improved
     item["promotion_status"] = (
-        "improved_success_candidate" if improved else LOCKBOX_POLICY["diagnostic_not_promoted_label"]
+        "improved_success_candidate"
+        if improved
+        else LOCKBOX_POLICY["diagnostic_not_promoted_label"]
     )
     item["locked_oos_policy"] = {
         "selection_basis": "train_val_only",
@@ -1449,7 +1506,9 @@ def _combo_metrics(
             equity,
             periods=int(getattr(fresh, "HOURLY_PERIODS_PER_YEAR", 365 * 24)),
         )
-        round_trips = sum(int(split_payloads[name][split_name].get("round_trips") or 0) for name in combo_names)
+        round_trips = sum(
+            int(split_payloads[name][split_name].get("round_trips") or 0) for name in combo_names
+        )
         fills = sum(int(split_payloads[name][split_name].get("fills") or 0) for name in combo_names)
         out["splits"][split_name] = {
             "metrics": metrics,
@@ -1484,7 +1543,9 @@ def _combo_metrics(
         allocator_diagnostics.get("raw_val_total_return"),
         val_return if leverage == 1.0 else -1.0,
     )
-    integer_leverage = math.isclose(float(leverage), float(round(leverage)), rel_tol=0.0, abs_tol=1e-9)
+    integer_leverage = math.isclose(
+        float(leverage), float(round(leverage)), rel_tol=0.0, abs_tol=1e-9
+    )
     gates = {
         "train_positive": train_return > 0.0,
         "val_positive": val_return > 0.0,
@@ -1495,7 +1556,8 @@ def _combo_metrics(
             train_monthly_return >= MIN_BUFFERED_TRAIN_MONTHLY_RETURN
         ),
         "val_monthly_return_gte_2pct": val_monthly_return >= MIN_STABLE_MONTHLY_RETURN,
-        "raw_train_monthly_return_gte_1pct": raw_train_monthly_return >= MIN_RAW_TRAIN_MONTHLY_RETURN,
+        "raw_train_monthly_return_gte_1pct": raw_train_monthly_return
+        >= MIN_RAW_TRAIN_MONTHLY_RETURN,
         "raw_val_monthly_return_gte_2pct": raw_val_monthly_return >= MIN_RAW_VAL_MONTHLY_RETURN,
         "integer_leverage": integer_leverage,
         "train_sharpe_high": _safe_float(train.get("sharpe")) >= SUCCESS_TRAIN_SHARPE,
@@ -1609,21 +1671,35 @@ def _flatten_row(item: dict[str, Any]) -> dict[str, Any]:
         row["current_base_train_val_stability_score"] = _safe_float(
             current_base.get("current_base_train_val_stability_score"), 0.0
         )
-        row["current_base_oos_return"] = _safe_float(current_base.get("current_base_oos_return"), 0.0)
+        row["current_base_oos_return"] = _safe_float(
+            current_base.get("current_base_oos_return"), 0.0
+        )
         row["current_base_oos_return_risk"] = _safe_float(
             current_base.get("current_base_oos_return_risk"), 0.0
         )
-        row["candidate_oos_return_risk"] = _safe_float(current_base.get("candidate_oos_return_risk"), 0.0)
+        row["candidate_oos_return_risk"] = _safe_float(
+            current_base.get("candidate_oos_return_risk"), 0.0
+        )
         for key in CURRENT_BASE_GATE_KEYS:
             row[key] = bool(dict(current_base.get("gates") or {}).get(key))
     if item.get("allocator_diagnostics"):
         diagnostics = dict(item["allocator_diagnostics"])
         row["allocator_selection_basis"] = diagnostics.get("selection_basis", "")
         row["allocator_integer_leverage_only"] = bool(diagnostics.get("integer_leverage_only"))
-        row["allocator_selected_grid_score"] = _safe_float(diagnostics.get("selected_grid_score"), 0.0)
+        row["allocator_selected_grid_score"] = _safe_float(
+            diagnostics.get("selected_grid_score"), 0.0
+        )
     for split_name, split in item["splits"].items():
         metrics = split["metrics"]
-        for key in ("total_return", "cagr", "max_drawdown", "sharpe", "sortino", "calmar", "volatility"):
+        for key in (
+            "total_return",
+            "cagr",
+            "max_drawdown",
+            "sharpe",
+            "sortino",
+            "calmar",
+            "volatility",
+        ):
             row[f"{split_name}_{key}"] = _safe_float(metrics.get(key), 0.0)
         row[f"{split_name}_round_trips"] = int(split.get("round_trips") or 0)
     return row
@@ -1819,8 +1895,10 @@ def _portfolio_report_sort_key(item: dict[str, Any]) -> tuple[bool, float, bool,
 def build_payload(args: argparse.Namespace) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     fresh = _load_fresh_module()
     rows = _read_rows(Path(args.candidate_csv))
-    current_base_path = "" if bool(getattr(args, "no_current_base", False)) else getattr(
-        args, "current_base_artifact", str(DEFAULT_CURRENT_BASE_ARTIFACT)
+    current_base_path = (
+        ""
+        if bool(getattr(args, "no_current_base", False))
+        else getattr(args, "current_base_artifact", str(DEFAULT_CURRENT_BASE_ARTIFACT))
     )
     current_base_candidate, base_policy = _load_current_base_candidate(current_base_path)
     pool, pool_policy = _candidate_pool_with_metadata(
@@ -1829,7 +1907,9 @@ def build_payload(args: argparse.Namespace) -> tuple[dict[str, Any], list[dict[s
         family_quota=int(args.family_quota),
         calendar_neighborhood_reps=int(args.calendar_neighborhood_reps),
     )
-    current_base_sleeves = [str(name) for name in current_base_candidate.get("sleeves") or [] if str(name)]
+    current_base_sleeves = [
+        str(name) for name in current_base_candidate.get("sleeves") or [] if str(name)
+    ]
     if current_base_sleeves:
         rows_by_name = {str(row.get("name") or ""): row for row in rows}
         pool_names = {str(row.get("name") or "") for row in pool}
@@ -1838,14 +1918,19 @@ def build_payload(args: argparse.Namespace) -> tuple[dict[str, Any], list[dict[s
             row = rows_by_name.get(name)
             if not row or name in pool_names:
                 continue
-            if _safe_float(row.get("train_total_return")) <= 0.0 or _safe_float(row.get("val_total_return")) <= 0.0:
+            if (
+                _safe_float(row.get("train_total_return")) <= 0.0
+                or _safe_float(row.get("val_total_return")) <= 0.0
+            ):
                 continue
             anchored_rows.append(row)
             pool_names.add(name)
         if anchored_rows:
             pool.extend(anchored_rows)
         pool_policy["current_base_anchor_names"] = current_base_sleeves
-        pool_policy["current_base_anchor_added"] = [str(row.get("name") or "") for row in anchored_rows]
+        pool_policy["current_base_anchor_added"] = [
+            str(row.get("name") or "") for row in anchored_rows
+        ]
         pool_policy["current_base_anchor_selection_basis"] = "current_base_train_val_recheck_only"
     oos_end = datetime.fromisoformat(str(args.oos_end_date)).date()
     splits = fresh._split_windows(oos_end=oos_end)
@@ -1853,7 +1938,11 @@ def build_payload(args: argparse.Namespace) -> tuple[dict[str, Any], list[dict[s
     end = max(split.end for split in splits)
     symbols = [item.strip() for item in str(args.symbols).split(",") if item.strip()]
     panel, data_metadata = fresh._joined_panel(
-        market_root=Path(args.market_root), exchange=str(args.exchange), symbols=symbols, start=start, end=end
+        market_root=Path(args.market_root),
+        exchange=str(args.exchange),
+        symbols=symbols,
+        start=start,
+        end=end,
     )
     arrays = fresh._build_arrays(panel, symbols)
     specs_by_name = {spec.name: spec for spec in fresh._candidate_specs(arrays, symbols)}
@@ -1880,7 +1969,9 @@ def build_payload(args: argparse.Namespace) -> tuple[dict[str, Any], list[dict[s
     combo_limit_hits: dict[str, int] = {}
     evaluated_combos: set[frozenset[str]] = set()
     forced_combo_names: list[tuple[str, ...]] = []
-    if 2 <= len(current_base_sleeves) <= max_k and all(name in names for name in current_base_sleeves):
+    if 2 <= len(current_base_sleeves) <= max_k and all(
+        name in names for name in current_base_sleeves
+    ):
         forced_combo_names.append(tuple(current_base_sleeves))
 
     def _append_combo(combo: tuple[str, ...]) -> None:
@@ -1934,7 +2025,9 @@ def build_payload(args: argparse.Namespace) -> tuple[dict[str, Any], list[dict[s
     selection_outcome = (
         "improved_success_candidate"
         if best_success_candidate
-        else "no_improvement_current_base_retained" if retained_base_candidate else "no_improvement_no_base"
+        else "no_improvement_current_base_retained"
+        if retained_base_candidate
+        else "no_improvement_no_base"
     )
     diagnostic_best_oos = max(
         portfolio_items,
@@ -1949,7 +2042,8 @@ def build_payload(args: argparse.Namespace) -> tuple[dict[str, Any], list[dict[s
             item
             for item in portfolio_items
             if bool(item.get("diagnostic_not_promoted"))
-            and _safe_float(item["splits"]["oos"]["metrics"].get("total_return")) > CURRENT_CHAMPION_OOS_RETURN
+            and _safe_float(item["splits"]["oos"]["metrics"].get("total_return"))
+            > CURRENT_CHAMPION_OOS_RETURN
         ],
         key=lambda item: (
             _safe_float(item["splits"]["oos"]["metrics"].get("total_return")),
@@ -1990,7 +2084,9 @@ def build_payload(args: argparse.Namespace) -> tuple[dict[str, Any], list[dict[s
             "train_val_stability_formula": "frozen_weighted_train_validation_score_v1",
             "train_val_stability_components": list(TRAIN_VAL_STABILITY_COMPONENTS),
             "integer_leverage_only": True,
-            "integer_leverage_grid": list(range(MIN_INTEGER_LEVERAGE, int(MAX_TRAIN_VAL_MONTHLY_BUDGET_LEVERAGE) + 1)),
+            "integer_leverage_grid": list(
+                range(MIN_INTEGER_LEVERAGE, int(MAX_TRAIN_VAL_MONTHLY_BUDGET_LEVERAGE) + 1)
+            ),
             "minimum_buffered_train_monthly_return": MIN_BUFFERED_TRAIN_MONTHLY_RETURN,
             "minimum_raw_train_monthly_return": MIN_RAW_TRAIN_MONTHLY_RETURN,
             "minimum_raw_val_monthly_return": MIN_RAW_VAL_MONTHLY_RETURN,
@@ -2014,7 +2110,9 @@ def build_payload(args: argparse.Namespace) -> tuple[dict[str, Any], list[dict[s
             best_success_candidate=best_success_candidate,
             success_candidate_count=len(success_candidates),
         ),
-        "memory_policy": memory_policy_payload(budget_bytes=PORTFOLIO_FOLLOWUP_EXPLICIT_BUDGET_BYTES),
+        "memory_policy": memory_policy_payload(
+            budget_bytes=PORTFOLIO_FOLLOWUP_EXPLICIT_BUDGET_BYTES
+        ),
     }
     return payload, csv_rows
 
@@ -2121,7 +2219,9 @@ def main(argv: list[str] | None = None) -> int:
         md_path.write_text(_markdown(payload, rows) + "\n", encoding="utf-8")
     except Exception as exc:
         if not finalized:
-            memory_guard.finalize(status="failed", error=str(exc), context={"script": Path(__file__).name})
+            memory_guard.finalize(
+                status="failed", error=str(exc), context={"script": Path(__file__).name}
+            )
         raise
     finally:
         memory_guard.release()

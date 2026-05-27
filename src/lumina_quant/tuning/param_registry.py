@@ -452,7 +452,9 @@ class ParamRegistry:
         prefix_s = str(prefix)
         if not prefix_s:
             return dict(self._runtime_values)
-        return {key: value for key, value in self._runtime_values.items() if key.startswith(prefix_s)}
+        return {
+            key: value for key, value in self._runtime_values.items() if key.startswith(prefix_s)
+        }
 
     def register(
         self,
@@ -493,9 +495,7 @@ class ParamRegistry:
         bundle = self._bundles.get(name)
         if bundle is None:
             return {}
-        return {
-            param_name: canonical_param_name(name, param_name) for param_name in bundle.schema
-        }
+        return {param_name: canonical_param_name(name, param_name) for param_name in bundle.schema}
 
     def resolve_params(
         self,

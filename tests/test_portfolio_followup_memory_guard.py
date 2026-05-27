@@ -94,7 +94,9 @@ class _CrashGuard:
     ) -> dict[str, Any]:
         payload = {"status": status, "error": error, "context": context or {}}
         self.finalize_calls.append(payload)
-        summary_path = self.output_dir / "_memory_guard" / "portfolio_four_sleeve_search_memory_latest.json"
+        summary_path = (
+            self.output_dir / "_memory_guard" / "portfolio_four_sleeve_search_memory_latest.json"
+        )
         summary_path.parent.mkdir(parents=True, exist_ok=True)
         summary_path.write_text(json.dumps(payload), encoding="utf-8")
         return payload
@@ -282,7 +284,10 @@ def test_portfolio_memory_guard_acquires_session_memory_lease(
 
     assert captured["requested_budget_bytes"] == budget_bytes
     assert captured["effective_budget_bytes"] == budget_bytes
-    assert Path(captured["lock_path"]).resolve() == contract.PORTFOLIO_FOLLOWUP_SESSION_MEMORY_LEASE_PATH.resolve()
+    assert (
+        Path(captured["lock_path"]).resolve()
+        == contract.PORTFOLIO_FOLLOWUP_SESSION_MEMORY_LEASE_PATH.resolve()
+    )
     assert session_lock.released is True
     assert heavy_lock.released is True
 
@@ -388,7 +393,9 @@ def test_anchored_search_finalizes_failed_guard_when_optimizer_crashes(
         {"status": "failed", "error": "optimizer crashed", "context": {}}
     ]
     assert crash_guard.released is True
-    summary_path = tmp_path / "search" / "_memory_guard" / "portfolio_four_sleeve_search_memory_latest.json"
+    summary_path = (
+        tmp_path / "search" / "_memory_guard" / "portfolio_four_sleeve_search_memory_latest.json"
+    )
     assert summary_path.exists()
     assert json.loads(summary_path.read_text(encoding="utf-8"))["status"] == "failed"
 
@@ -431,7 +438,9 @@ def test_dynamic_report_passes_explicit_8gib_budget_and_emits_it(
     )
 
     expected_budget = contract.PORTFOLIO_FOLLOWUP_EXPLICIT_BUDGET_BYTES
-    summary_path = tmp_path / "dynamic" / "_memory_guard" / "causal_dynamic_portfolio_memory_latest.json"
+    summary_path = (
+        tmp_path / "dynamic" / "_memory_guard" / "causal_dynamic_portfolio_memory_latest.json"
+    )
     assert _observed_budget_evidence(
         captured=captured,
         result=result,
@@ -467,7 +476,9 @@ def test_overlay_report_passes_explicit_8gib_budget_and_emits_it(
 
     monkeypatch.setattr(OVERLAY_MODULE, "acquire_portfolio_memory_guard", _fake_acquire)
     monkeypatch.setattr(OVERLAY_MODULE, "resolve_incumbent_bundle_path", lambda path: Path(path))
-    monkeypatch.setattr(OVERLAY_MODULE._helper, "_load_candidates", lambda path: [{"candidate_id": "c1"}])
+    monkeypatch.setattr(
+        OVERLAY_MODULE._helper, "_load_candidates", lambda path: [{"candidate_id": "c1"}]
+    )
     monkeypatch.setattr(OVERLAY_MODULE, "_load_backbone_weights", lambda path: {"c1": 1.0})
     monkeypatch.setattr(
         OVERLAY_MODULE,
@@ -486,7 +497,9 @@ def test_overlay_report_passes_explicit_8gib_budget_and_emits_it(
     )
 
     expected_budget = contract.PORTFOLIO_FOLLOWUP_EXPLICIT_BUDGET_BYTES
-    summary_path = tmp_path / "overlay" / "_memory_guard" / "causal_overlay_portfolio_memory_latest.json"
+    summary_path = (
+        tmp_path / "overlay" / "_memory_guard" / "causal_overlay_portfolio_memory_latest.json"
+    )
     assert _observed_budget_evidence(
         captured=captured,
         result=result,

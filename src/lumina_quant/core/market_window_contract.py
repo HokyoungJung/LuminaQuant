@@ -31,7 +31,9 @@ def _to_epoch_ms(value: Any, *, field_name: str) -> int:
         try:
             ts = ts_fn()
         except Exception as exc:  # pragma: no cover - defensive
-            raise MarketWindowContractError(f"{field_name} timestamp conversion failed: {exc}") from exc
+            raise MarketWindowContractError(
+                f"{field_name} timestamp conversion failed: {exc}"
+            ) from exc
         if isinstance(ts, (int, float)):
             return _to_epoch_ms(float(ts), field_name=field_name)
 
@@ -68,7 +70,9 @@ def normalize_bars_1s(
             normalized[symbol_key] = tuple()
             continue
         if not isinstance(rows, (tuple, list)):
-            raise MarketWindowContractError(f"bars_1s[{symbol_key}] must be tuple/list of OHLCV rows.")
+            raise MarketWindowContractError(
+                f"bars_1s[{symbol_key}] must be tuple/list of OHLCV rows."
+            )
         fast_rows = _normalized_sorted_rows_fast_path(rows)
         if fast_rows is not None:
             normalized[symbol_key] = fast_rows

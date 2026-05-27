@@ -385,8 +385,16 @@ uv run python scripts/run_research_pipeline.py \
 bash scripts/ci/architecture_gate_live_data.sh
 bash scripts/ci/architecture_gate_market_window_contract.sh
 uv run python scripts/check_architecture.py
+uv run ruff format --check .
 uv run ruff check .
+for crate in native/rust_metrics native/rust_rawfirst; do
+  (cd "$crate" && cargo fmt --check && cargo check --quiet && cargo test --quiet)
+done
 ```
+
+저장소 텍스트 파일은 `.gitattributes`로 기본 `LF`를 강제하고, Windows 실행
+스크립트만 `CRLF` 예외를 둡니다. 따라서 `git diff --check`, Ruff format, CI가
+동일한 hygiene baseline을 검증합니다.
 
 **8GB 기준 게이트 (RSS/OOM/디스크/벤치마크):**
 ```bash

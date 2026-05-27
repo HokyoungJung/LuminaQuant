@@ -29,7 +29,9 @@ MIN_OOS_SMART_SORTINO = 3.0
 MIN_OOS_CALMAR = 1.0
 LIVE_LEVERAGE_INTEGER_TOLERANCE = 1e-9
 DEFAULT_REQUIRED_SYMBOLS = "BTC/USDT,ETH/USDT,SOL/USDT,BNB/USDT,TRX/USDT"
-DEFAULT_OUTPUT_DIR = Path("var/reports/profit_moonshot_20260501/live_final_selection_20260510/final_decision")
+DEFAULT_OUTPUT_DIR = Path(
+    "var/reports/profit_moonshot_20260501/live_final_selection_20260510/final_decision"
+)
 _TIME_RSS_RE = re.compile(r"Maximum resident set size \(kbytes\):\s*(\d+)")
 
 METRICS_EXPLANATION = {
@@ -91,7 +93,11 @@ _REQUIRED_STRATEGY_VALIDITY_KEYS = {
     "audit_sources",
 }
 _SOURCE_LEDGER_REF_FIELDS = ("source_ledger_refs", "source_search_ledger_refs", "source_ledger_ref")
-_RESEARCH_HISTORY_REF_FIELDS = ("research_history_refs", "research_history_ref", "source_history_refs")
+_RESEARCH_HISTORY_REF_FIELDS = (
+    "research_history_refs",
+    "research_history_ref",
+    "source_history_refs",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -332,11 +338,17 @@ def _metric_from_quality(raw: Mapping[str, Any], split_name: str, metric: str) -
 
 def _normalize_split(raw: Mapping[str, Any], split_name: str) -> dict[str, Any]:
     source = _raw_split(raw, split_name)
-    metrics = _as_dict(source.get("dynamic_liquidation_replay_metrics")) or _as_dict(source.get("metrics"))
-    total_return = _safe_optional_float(metrics.get("total_return", metrics.get("raw_total_return")))
+    metrics = _as_dict(source.get("dynamic_liquidation_replay_metrics")) or _as_dict(
+        source.get("metrics")
+    )
+    total_return = _safe_optional_float(
+        metrics.get("total_return", metrics.get("raw_total_return"))
+    )
     if total_return is None:
         total_return = _metric_from_quality(raw, split_name, "total_return")
-    max_drawdown = _safe_optional_float(metrics.get("max_drawdown", metrics.get("raw_max_drawdown")))
+    max_drawdown = _safe_optional_float(
+        metrics.get("max_drawdown", metrics.get("raw_max_drawdown"))
+    )
     if max_drawdown is None:
         max_drawdown = _metric_from_quality(raw, split_name, "max_drawdown")
     monthlyized = _metric_from_quality(raw, split_name, "monthlyized_return")
@@ -373,7 +385,10 @@ def _normalize_split(raw: Mapping[str, Any], split_name: str) -> dict[str, Any]:
         "round_trips": int(_safe_float(source.get("round_trips"), 0.0)),
         "liquidation_count": int(_safe_float(source.get("liquidation_count"), 0.0)),
         "liquidation_event_count": int(
-            _safe_float(source.get("liquidation_event_count_total", source.get("liquidation_event_count")), 0.0)
+            _safe_float(
+                source.get("liquidation_event_count_total", source.get("liquidation_event_count")),
+                0.0,
+            )
         ),
         "minimum_margin_buffer": _safe_optional_float(source.get("minimum_margin_buffer")),
         "minimum_margin_ratio": _safe_optional_float(source.get("minimum_margin_ratio")),
@@ -383,7 +398,11 @@ def _normalize_split(raw: Mapping[str, Any], split_name: str) -> dict[str, Any]:
         "maximum_liquidation_equity_loss_fraction": _safe_float(
             source.get("maximum_liquidation_equity_loss_fraction"), 0.0
         ),
-        "account_wipeout": any(_truthy(event.get("account_wipeout")) for event in _as_list(source.get("liquidation_events")) if isinstance(event, Mapping)),
+        "account_wipeout": any(
+            _truthy(event.get("account_wipeout"))
+            for event in _as_list(source.get("liquidation_events"))
+            if isinstance(event, Mapping)
+        ),
     }
 
 
@@ -405,7 +424,9 @@ def _candidate_sleeve_count(raw: Mapping[str, Any]) -> int:
     return int(_safe_float(raw.get("sleeve_count"), CURRENT_BASE_SLEEVE_COUNT))
 
 
-def _components_from_splits(raw: Mapping[str, Any], splits: Mapping[str, Mapping[str, Any]]) -> dict[str, float]:
+def _components_from_splits(
+    raw: Mapping[str, Any], splits: Mapping[str, Mapping[str, Any]]
+) -> dict[str, float]:
     existing = _as_dict(raw.get("train_val_stability"))
     if existing:
         return {key: _safe_float(value) for key, value in existing.items()}
@@ -434,7 +455,9 @@ def _selection_policy(raw: Mapping[str, Any], *, benchmark_only: bool = False) -
     locked_policy = _as_dict(raw.get("locked_oos_policy"))
     if locked_policy:
         uses_oos = bool(locked_policy.get("uses_locked_oos_for_selection", uses_oos))
-        if _truthy(locked_policy.get("oos_is_gate_only")) and _truthy(locked_policy.get("oos_is_report_only")):
+        if _truthy(locked_policy.get("oos_is_gate_only")) and _truthy(
+            locked_policy.get("oos_is_report_only")
+        ):
             locked = "report_only_gate_only"
     return {
         "selection_inputs": list(policy.get("selection_inputs") or ["train", "validation"]),
@@ -478,11 +501,26 @@ def _sleeve_family_from_name(sleeve_name: Any) -> str:
 
 def _liquidation_summary(splits: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
     split_values = [_as_dict(splits.get(name)) for name in ("train", "validation", "oos")]
-    total_liquidations = sum(int(_safe_float(split.get("liquidation_count"), 0.0)) for split in split_values)
-    buffers = [split.get("minimum_margin_buffer") for split in split_values if split.get("minimum_margin_buffer") is not None]
-    ratios = [split.get("minimum_margin_ratio") for split in split_values if split.get("minimum_margin_ratio") is not None]
-    max_drawdown = max(_safe_float(split.get("maximum_liquidation_event_drawdown"), 0.0) for split in split_values)
-    max_loss = max(_safe_float(split.get("maximum_liquidation_equity_loss_fraction"), 0.0) for split in split_values)
+    total_liquidations = sum(
+        int(_safe_float(split.get("liquidation_count"), 0.0)) for split in split_values
+    )
+    buffers = [
+        split.get("minimum_margin_buffer")
+        for split in split_values
+        if split.get("minimum_margin_buffer") is not None
+    ]
+    ratios = [
+        split.get("minimum_margin_ratio")
+        for split in split_values
+        if split.get("minimum_margin_ratio") is not None
+    ]
+    max_drawdown = max(
+        _safe_float(split.get("maximum_liquidation_event_drawdown"), 0.0) for split in split_values
+    )
+    max_loss = max(
+        _safe_float(split.get("maximum_liquidation_equity_loss_fraction"), 0.0)
+        for split in split_values
+    )
     account_wipeout = any(bool(split.get("account_wipeout")) for split in split_values)
     return {
         "liquidation_count": total_liquidations,
@@ -578,7 +616,9 @@ def _strategy_validity(
 
     sleeves = [str(s) for s in _as_list(raw.get("sleeves")) if str(s)]
     audit_sources = [str(source_artifact)] if source_artifact else ["inline_final_selection_audit"]
-    if not sleeves and (not candidate_derived or benchmark_only or kind in {"cash", "legacy_hybrid_benchmark"}):
+    if not sleeves and (
+        not candidate_derived or benchmark_only or kind in {"cash", "legacy_hybrid_benchmark"}
+    ):
         return {
             "pass": True,
             "primary_signal_type": "non_candidate_row",
@@ -610,7 +650,8 @@ def _strategy_validity(
     )
     if rejected_sleeves:
         primary_signal_evidence = "; ".join(
-            f"{item.get('sleeve')}={item.get('primary_signal_evidence')}" for item in rejected_sleeves[:5]
+            f"{item.get('sleeve')}={item.get('primary_signal_evidence')}"
+            for item in rejected_sleeves[:5]
         )
         return {
             "pass": False,
@@ -698,7 +739,10 @@ def _decision_gates(
     strategy_validity_pass = _strategy_validity_passes(strategy_validity)
     source_metadata_present = bool(_as_dict(source_metadata).get("present"))
     live_integer_leverage = _live_integer_leverage_supported(leverage)
-    evidence_available = bool(liquidation.get("evidence_available")) or kind in {"current_base", "direct_candidate"}
+    evidence_available = bool(liquidation.get("evidence_available")) or kind in {
+        "current_base",
+        "direct_candidate",
+    }
     margin_buffer_positive = margin_buffer is None or _safe_float(margin_buffer) > 0.0
     no_account_wipeout = not bool(liquidation.get("account_wipeout"))
     tiny_liq_ok = (
@@ -706,7 +750,9 @@ def _decision_gates(
         and _safe_float(liquidation.get("maximum_liquidation_event_drawdown")) <= 0.005
         and _safe_float(liquidation.get("maximum_liquidation_equity_loss_fraction")) <= 0.005
     )
-    liquidation_gate = evidence_available and margin_buffer_positive and no_account_wipeout and tiny_liq_ok
+    liquidation_gate = (
+        evidence_available and margin_buffer_positive and no_account_wipeout and tiny_liq_ok
+    )
     performance_gate = (
         oos_mdd <= MAX_ACCEPTABLE_OOS_MDD
         and oos_return > base_return
@@ -837,7 +883,9 @@ def _comparison_row(
     }
 
 
-def _rejection_reasons(gates: Mapping[str, Any], strategy_validity: Mapping[str, Any] | None = None) -> list[str]:
+def _rejection_reasons(
+    gates: Mapping[str, Any], strategy_validity: Mapping[str, Any] | None = None
+) -> list[str]:
     if bool(gates.get("deployable_candidate")):
         return []
     reasons = []
@@ -874,7 +922,11 @@ def _rejection_reasons(gates: Mapping[str, Any], strategy_validity: Mapping[str,
         reasons.append("diagnostic_not_promoted")
     if strategy_validity is not None and not bool(strategy_validity.get("pass")):
         reasons.extend(
-            [str(item) for item in strategy_validity.get("rejection_reasons", []) if str(item) not in reasons]
+            [
+                str(item)
+                for item in strategy_validity.get("rejection_reasons", [])
+                if str(item) not in reasons
+            ]
         )
     return reasons or ["not_candidate_live_promotion_row"]
 
@@ -886,7 +938,9 @@ def _add_unique(rows: list[dict[str, Any]], row: dict[str, Any]) -> None:
     rows.append(row)
 
 
-def _liquidation_rows(liquidation_payload: Mapping[str, Any], source_artifact: str) -> list[tuple[str, str, Mapping[str, Any]]]:
+def _liquidation_rows(
+    liquidation_payload: Mapping[str, Any], source_artifact: str
+) -> list[tuple[str, str, Mapping[str, Any]]]:
     keys = [
         ("current_base", "current_base_reference_result"),
         ("direct_candidate", "promoted_candidate"),
@@ -901,14 +955,20 @@ def _liquidation_rows(liquidation_payload: Mapping[str, Any], source_artifact: s
         raw = liquidation_payload.get(key)
         if isinstance(raw, Mapping) and raw:
             out.append((kind, key, raw))
-    retune_results = [item for item in _as_list(liquidation_payload.get("retune_results")) if isinstance(item, Mapping)]
+    retune_results = [
+        item
+        for item in _as_list(liquidation_payload.get("retune_results"))
+        if isinstance(item, Mapping)
+    ]
     retune_results.sort(key=lambda item: _safe_float(item.get("train_val_score")), reverse=True)
     for index, raw in enumerate(retune_results[:20], start=1):
         out.append(("direct_candidate", f"retune_results_top_{index:02d}", raw))
     return out
 
 
-def _candidate_portfolio_rows(candidate_payload: Mapping[str, Any]) -> list[tuple[str, str, Mapping[str, Any]]]:
+def _candidate_portfolio_rows(
+    candidate_payload: Mapping[str, Any],
+) -> list[tuple[str, str, Mapping[str, Any]]]:
     keys = [
         ("candidate_portfolio", "selected_by_train_val_stability"),
         ("candidate_portfolio", "best_success_candidate"),
@@ -921,7 +981,9 @@ def _candidate_portfolio_rows(candidate_payload: Mapping[str, Any]) -> list[tupl
         raw = candidate_payload.get(key)
         if isinstance(raw, Mapping) and raw:
             out.append((kind, key, raw))
-    for index, raw in enumerate(_as_list(candidate_payload.get("diagnostic_quarantine"))[:10], start=1):
+    for index, raw in enumerate(
+        _as_list(candidate_payload.get("diagnostic_quarantine"))[:10], start=1
+    ):
         if isinstance(raw, Mapping) and raw:
             out.append(("candidate_portfolio", f"diagnostic_quarantine_{index:02d}", raw))
     return out
@@ -965,7 +1027,9 @@ def _hybrid_source_candidate_failures(
     return failures
 
 
-def _candidate_hybrid_rows(candidate_hybrid_payload: Mapping[str, Any]) -> list[tuple[str, str, Mapping[str, Any]]]:
+def _candidate_hybrid_rows(
+    candidate_hybrid_payload: Mapping[str, Any],
+) -> list[tuple[str, str, Mapping[str, Any]]]:
     def with_source_leverage_gate(raw: Mapping[str, Any]) -> dict[str, Any]:
         out = dict(raw)
         source_metrics = _as_dict(candidate_hybrid_payload.get("source_sleeve_metrics"))
@@ -977,9 +1041,13 @@ def _candidate_hybrid_rows(candidate_hybrid_payload: Mapping[str, Any]) -> list[
                 non_integer.append({"source_id": source_id, "leverage": leverage})
         source_failures = _hybrid_source_candidate_failures(source_metrics, source_ids)
         out["_non_integer_source_leverages"] = non_integer
-        out["_live_integer_source_leverage"] = bool(source_metrics) and bool(source_ids) and not non_integer
+        out["_live_integer_source_leverage"] = (
+            bool(source_metrics) and bool(source_ids) and not non_integer
+        )
         out["_source_candidate_gate_failures"] = source_failures
-        out["_live_source_candidate_metadata"] = bool(source_metrics) and bool(source_ids) and not source_failures
+        out["_live_source_candidate_metadata"] = (
+            bool(source_metrics) and bool(source_ids) and not source_failures
+        )
         return out
 
     keys = [
@@ -991,16 +1059,26 @@ def _candidate_hybrid_rows(candidate_hybrid_payload: Mapping[str, Any]) -> list[
         raw = candidate_hybrid_payload.get(key)
         if isinstance(raw, Mapping) and raw:
             out.append((kind, key, with_source_leverage_gate(raw)))
-    for index, raw in enumerate(_as_list(candidate_hybrid_payload.get("tuning_results"))[:10], start=1):
+    for index, raw in enumerate(
+        _as_list(candidate_hybrid_payload.get("tuning_results"))[:10], start=1
+    ):
         if isinstance(raw, Mapping) and raw:
-            out.append(("candidate_hybrid", f"tuning_results_top_{index:02d}", with_source_leverage_gate(raw)))
+            out.append(
+                (
+                    "candidate_hybrid",
+                    f"tuning_results_top_{index:02d}",
+                    with_source_leverage_gate(raw),
+                )
+            )
     return out
 
 
 def _legacy_hybrid_raw(legacy_hybrid_payload: Mapping[str, Any]) -> dict[str, Any]:
     if not legacy_hybrid_payload:
         return {}
-    scenario = _as_dict(_as_dict(legacy_hybrid_payload.get("scenarios")).get("refreshed_latest_tail"))
+    scenario = _as_dict(
+        _as_dict(legacy_hybrid_payload.get("scenarios")).get("refreshed_latest_tail")
+    )
     split_metrics = _as_dict(scenario.get("split_metrics"))
     oos_metrics = _as_dict(split_metrics.get("oos")) or _as_dict(legacy_hybrid_payload.get("oos"))
     if not oos_metrics:
@@ -1010,7 +1088,9 @@ def _legacy_hybrid_raw(legacy_hybrid_payload: Mapping[str, Any]) -> dict[str, An
         "splits": {
             "oos": {"metrics": oos_metrics},
             "train": {"metrics": _as_dict(split_metrics.get("train"))},
-            "validation": {"metrics": _as_dict(split_metrics.get("validation", split_metrics.get("val")))},
+            "validation": {
+                "metrics": _as_dict(split_metrics.get("validation", split_metrics.get("val")))
+            },
         },
         "selection_policy": {
             "selection_inputs": ["train", "validation"],
@@ -1118,7 +1198,12 @@ def _artifact_memory_entry(index: int, artifact: Mapping[str, Any]) -> dict[str,
             return None
         peak = int(peak_mib * 1024 * 1024)
     else:
-        peak = int(_safe_float(summary.get("peak_rss_bytes"), _safe_float(summary.get("peak_rss_mib")) * 1024 * 1024))
+        peak = int(
+            _safe_float(
+                summary.get("peak_rss_bytes"),
+                _safe_float(summary.get("peak_rss_mib")) * 1024 * 1024,
+            )
+        )
     return {
         "kind": "artifact_memory_summary",
         "artifact_index": index,
@@ -1180,7 +1265,9 @@ def build_final_selection_payload(
         artifacts_for_memory.append(candidate_hybrid_payload)
     if legacy_hybrid_payload:
         artifacts_for_memory.append(legacy_hybrid_payload)
-    memory_ledger = build_memory_ledger(artifacts=artifacts_for_memory, time_logs=list(time_logs or []))
+    memory_ledger = build_memory_ledger(
+        artifacts=artifacts_for_memory, time_logs=list(time_logs or [])
+    )
 
     rows: list[dict[str, Any]] = []
     current_base_raw = _as_dict(liquidation_payload.get("current_base_reference_result"))
@@ -1208,7 +1295,9 @@ def build_final_selection_payload(
         )
         _add_unique(rows, current_base_row)
 
-    for kind, source_key, raw in _liquidation_rows(liquidation_payload, sources.get("liquidation_json", "")):
+    for kind, source_key, raw in _liquidation_rows(
+        liquidation_payload, sources.get("liquidation_json", "")
+    ):
         if source_key == "current_base_reference_result":
             continue
         name = str(raw.get("name") or raw.get("candidate_name") or source_key)
@@ -1278,13 +1367,17 @@ def build_final_selection_payload(
         for row in rows:
             row["decision_gates"]["artifact_cutoff_current"] = False
             row["decision_gates"]["deployable_candidate"] = False
-            row["rejection_reasons"] = sorted(set(row["rejection_reasons"] + ["artifact_cutoff_stale"]))
+            row["rejection_reasons"] = sorted(
+                set(row["rejection_reasons"] + ["artifact_cutoff_stale"])
+            )
 
     if not memory_ledger["under_8gib"]:
         for row in rows:
             row["decision_gates"]["memory_under_8gib"] = False
             row["decision_gates"]["deployable_candidate"] = False
-            row["rejection_reasons"] = sorted(set(row["rejection_reasons"] + ["memory_over_8gib_or_missing"]))
+            row["rejection_reasons"] = sorted(
+                set(row["rejection_reasons"] + ["memory_over_8gib_or_missing"])
+            )
 
     contenders = [row for row in rows if bool(row["decision_gates"].get("deployable_candidate"))]
     contenders.sort(
@@ -1364,7 +1457,9 @@ def _winner_summary(row: Mapping[str, Any] | None) -> dict[str, Any] | None:
     }
 
 
-def _rejected_alternatives(rows: Iterable[Mapping[str, Any]], winner: Mapping[str, Any] | None) -> list[dict[str, Any]]:
+def _rejected_alternatives(
+    rows: Iterable[Mapping[str, Any]], winner: Mapping[str, Any] | None
+) -> list[dict[str, Any]]:
     winner_key = (winner or {}).get("kind"), (winner or {}).get("name")
     out: list[dict[str, Any]] = []
     for row in rows:
@@ -1378,7 +1473,9 @@ def _rejected_alternatives(rows: Iterable[Mapping[str, Any]], winner: Mapping[st
                 "candidate_derived": row.get("candidate_derived"),
                 "benchmark_only": row.get("benchmark_only"),
                 "strategy_validity_pass": _as_dict(row.get("strategy_validity")).get("pass"),
-                "primary_signal_type": _as_dict(row.get("strategy_validity")).get("primary_signal_type"),
+                "primary_signal_type": _as_dict(row.get("strategy_validity")).get(
+                    "primary_signal_type"
+                ),
                 "reasons": list(row.get("rejection_reasons") or []),
             }
         )
@@ -1460,7 +1557,9 @@ def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     refresh_path = Path(args.refresh_json)
     candidate_path = Path(args.candidate_portfolio_json)
-    candidate_hybrid_path = Path(args.candidate_hybrid_json) if str(args.candidate_hybrid_json).strip() else None
+    candidate_hybrid_path = (
+        Path(args.candidate_hybrid_json) if str(args.candidate_hybrid_json).strip() else None
+    )
     liquidation_path = Path(args.liquidation_json)
     hybrid_path = Path(args.legacy_hybrid_json) if str(args.legacy_hybrid_json).strip() else None
     payload = build_final_selection_payload(
@@ -1485,7 +1584,15 @@ def main(argv: list[str] | None = None) -> int:
     md_path = output_dir / "profit_moonshot_live_final_selection_latest.md"
     _write_json(json_path, payload)
     md_path.write_text(build_markdown(payload), encoding="utf-8")
-    print(json.dumps({"json_path": str(json_path), "markdown_path": str(md_path), "status": payload["status"]}))
+    print(
+        json.dumps(
+            {
+                "json_path": str(json_path),
+                "markdown_path": str(md_path),
+                "status": payload["status"],
+            }
+        )
+    )
     return 2 if str(payload.get("status") or "").startswith("failed_") else 0
 
 

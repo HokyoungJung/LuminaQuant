@@ -46,7 +46,12 @@ def test_load_research_run_resources_delegates_to_loader() -> None:
     class _Loader:
         def load(self, **kwargs):
             captured.update(kwargs)
-            return {"cache": 1}, {"parquet": ["BTC/USDT@1m"]}, {"features": 1}, {"1m": {"close": []}}
+            return (
+                {"cache": 1},
+                {"parquet": ["BTC/USDT@1m"]},
+                {"features": 1},
+                {"1m": {"close": []}},
+            )
 
     result = research_stage_support.load_research_run_resources(
         loader=_Loader(),

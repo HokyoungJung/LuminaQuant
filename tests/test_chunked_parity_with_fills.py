@@ -132,10 +132,13 @@ def test_chunked_runner_matches_full_run_with_fills(monkeypatch):
     )
 
     assert int(chunked.portfolio.trade_count) == int(baseline.portfolio.trade_count)
-    assert abs(
-        float(chunked.portfolio.current_holdings["total"])
-        - float(baseline.portfolio.current_holdings["total"])
-    ) <= 1e-9
+    assert (
+        abs(
+            float(chunked.portfolio.current_holdings["total"])
+            - float(baseline.portfolio.current_holdings["total"])
+        )
+        <= 1e-9
+    )
 
 
 def test_latency_model_state_restores_random_sequence():

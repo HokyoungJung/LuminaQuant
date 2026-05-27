@@ -36,8 +36,18 @@ def _stub_exchange_bootstrap(monkeypatch) -> None:
                     "baseAsset": "BTC",
                     "quoteAsset": "USDT",
                     "filters": [
-                        {"filterType": "LOT_SIZE", "stepSize": "0.001", "minQty": "0.001", "maxQty": "1000"},
-                        {"filterType": "MARKET_LOT_SIZE", "stepSize": "0.001", "minQty": "0.001", "maxQty": "1000"},
+                        {
+                            "filterType": "LOT_SIZE",
+                            "stepSize": "0.001",
+                            "minQty": "0.001",
+                            "maxQty": "1000",
+                        },
+                        {
+                            "filterType": "MARKET_LOT_SIZE",
+                            "stepSize": "0.001",
+                            "minQty": "0.001",
+                            "maxQty": "1000",
+                        },
                         {"filterType": "PRICE_FILTER", "tickSize": "0.1"},
                         {"filterType": "MIN_NOTIONAL", "minNotional": "5"},
                     ],
@@ -45,9 +55,15 @@ def _stub_exchange_bootstrap(monkeypatch) -> None:
             ]
         },
     )
-    monkeypatch.setattr(BinanceFuturesRESTClient, "change_position_mode", lambda self, **kwargs: {}, raising=True)
-    monkeypatch.setattr(BinanceFuturesRESTClient, "change_margin_type", lambda self, **kwargs: {}, raising=True)
-    monkeypatch.setattr(BinanceFuturesRESTClient, "change_initial_leverage", lambda self, **kwargs: {}, raising=True)
+    monkeypatch.setattr(
+        BinanceFuturesRESTClient, "change_position_mode", lambda self, **kwargs: {}, raising=True
+    )
+    monkeypatch.setattr(
+        BinanceFuturesRESTClient, "change_margin_type", lambda self, **kwargs: {}, raising=True
+    )
+    monkeypatch.setattr(
+        BinanceFuturesRESTClient, "change_initial_leverage", lambda self, **kwargs: {}, raising=True
+    )
 
 
 def test_exchange_uses_native_rest_client(monkeypatch) -> None:
@@ -224,11 +240,15 @@ def test_exchange_bootstrap_does_not_silently_swallow_setup_failures(monkeypatch
         raise AssertionError("Expected BinanceFuturesAPIError to propagate during bootstrap")
 
 
-def test_exchange_bootstrap_surfaces_credential_guidance_for_invalid_testnet_keys(monkeypatch) -> None:
+def test_exchange_bootstrap_surfaces_credential_guidance_for_invalid_testnet_keys(
+    monkeypatch,
+) -> None:
     _stub_exchange_bootstrap(monkeypatch)
 
     def _raise_invalid_key(self, **_kwargs):
-        raise BinanceFuturesAPIError("Invalid API-key, IP, or permissions for action", error_code=-2015)
+        raise BinanceFuturesAPIError(
+            "Invalid API-key, IP, or permissions for action", error_code=-2015
+        )
 
     monkeypatch.setattr(
         BinanceFuturesRESTClient,

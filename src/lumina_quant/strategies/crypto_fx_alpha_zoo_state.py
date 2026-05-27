@@ -133,28 +133,66 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
     @classmethod
     def get_param_schema(cls) -> dict[str, HyperParam]:
         return {
-            "fast_lookback_bars": HyperParam.integer("fast_lookback_bars", default=4, low=1, high=2880, tunable=False),
-            "slow_lookback_bars": HyperParam.integer("slow_lookback_bars", default=24, low=2, high=10080, tunable=False),
-            "history_window": HyperParam.integer("history_window", default=96, low=16, high=20000, tunable=False),
-            "entry_threshold": HyperParam.floating("entry_threshold", default=0.75, low=0.0, high=10.0, tunable=False),
-            "abs_factor_score_min": HyperParam.floating("abs_factor_score_min", default=0.0, low=0.0, high=10.0, tunable=False),
-            "exit_threshold": HyperParam.floating("exit_threshold", default=0.20, low=0.0, high=10.0, tunable=False),
-            "stop_loss_pct": HyperParam.floating("stop_loss_pct", default=0.035, low=0.0, high=1.0, tunable=False),
-            "take_profit_pct": HyperParam.floating("take_profit_pct", default=0.075, low=0.0, high=2.0, tunable=False),
-            "max_hold_bars": HyperParam.integer("max_hold_bars", default=96, low=1, high=10080, tunable=False),
+            "fast_lookback_bars": HyperParam.integer(
+                "fast_lookback_bars", default=4, low=1, high=2880, tunable=False
+            ),
+            "slow_lookback_bars": HyperParam.integer(
+                "slow_lookback_bars", default=24, low=2, high=10080, tunable=False
+            ),
+            "history_window": HyperParam.integer(
+                "history_window", default=96, low=16, high=20000, tunable=False
+            ),
+            "entry_threshold": HyperParam.floating(
+                "entry_threshold", default=0.75, low=0.0, high=10.0, tunable=False
+            ),
+            "abs_factor_score_min": HyperParam.floating(
+                "abs_factor_score_min", default=0.0, low=0.0, high=10.0, tunable=False
+            ),
+            "exit_threshold": HyperParam.floating(
+                "exit_threshold", default=0.20, low=0.0, high=10.0, tunable=False
+            ),
+            "stop_loss_pct": HyperParam.floating(
+                "stop_loss_pct", default=0.035, low=0.0, high=1.0, tunable=False
+            ),
+            "take_profit_pct": HyperParam.floating(
+                "take_profit_pct", default=0.075, low=0.0, high=2.0, tunable=False
+            ),
+            "max_hold_bars": HyperParam.integer(
+                "max_hold_bars", default=96, low=1, high=10080, tunable=False
+            ),
             "max_longs": HyperParam.integer("max_longs", default=2, low=0, high=16, tunable=False),
-            "max_shorts": HyperParam.integer("max_shorts", default=2, low=0, high=16, tunable=False),
+            "max_shorts": HyperParam.integer(
+                "max_shorts", default=2, low=0, high=16, tunable=False
+            ),
             "allow_shorts": HyperParam.boolean("allow_shorts", default=True, tunable=False),
             "use_fx_filter": HyperParam.boolean("use_fx_filter", default=True, tunable=False),
-            "require_calibrated_edge": HyperParam.boolean("require_calibrated_edge", default=True, tunable=False),
-            "min_calibrated_edge_bps": HyperParam.floating("min_calibrated_edge_bps", default=0.0, low=-10000.0, high=10000.0, tunable=False),
-            "risk_off_threshold": HyperParam.floating("risk_off_threshold", default=0.015, low=0.0, high=1.0, tunable=False),
-            "risk_on_threshold": HyperParam.floating("risk_on_threshold", default=-0.010, low=-1.0, high=0.0, tunable=False),
-            "residual_momentum_weight": HyperParam.floating("residual_momentum_weight", default=0.35, low=0.0, high=1.0, tunable=False),
-            "residual_reversal_weight": HyperParam.floating("residual_reversal_weight", default=0.25, low=0.0, high=1.0, tunable=False),
-            "vwap_pressure_weight": HyperParam.floating("vwap_pressure_weight", default=0.15, low=0.0, high=1.0, tunable=False),
-            "breakout_failure_weight": HyperParam.floating("breakout_failure_weight", default=0.15, low=0.0, high=1.0, tunable=False),
-            "trend_efficiency_weight": HyperParam.floating("trend_efficiency_weight", default=0.10, low=0.0, high=1.0, tunable=False),
+            "require_calibrated_edge": HyperParam.boolean(
+                "require_calibrated_edge", default=True, tunable=False
+            ),
+            "min_calibrated_edge_bps": HyperParam.floating(
+                "min_calibrated_edge_bps", default=0.0, low=-10000.0, high=10000.0, tunable=False
+            ),
+            "risk_off_threshold": HyperParam.floating(
+                "risk_off_threshold", default=0.015, low=0.0, high=1.0, tunable=False
+            ),
+            "risk_on_threshold": HyperParam.floating(
+                "risk_on_threshold", default=-0.010, low=-1.0, high=0.0, tunable=False
+            ),
+            "residual_momentum_weight": HyperParam.floating(
+                "residual_momentum_weight", default=0.35, low=0.0, high=1.0, tunable=False
+            ),
+            "residual_reversal_weight": HyperParam.floating(
+                "residual_reversal_weight", default=0.25, low=0.0, high=1.0, tunable=False
+            ),
+            "vwap_pressure_weight": HyperParam.floating(
+                "vwap_pressure_weight", default=0.15, low=0.0, high=1.0, tunable=False
+            ),
+            "breakout_failure_weight": HyperParam.floating(
+                "breakout_failure_weight", default=0.15, low=0.0, high=1.0, tunable=False
+            ),
+            "trend_efficiency_weight": HyperParam.floating(
+                "trend_efficiency_weight", default=0.10, low=0.0, high=1.0, tunable=False
+            ),
             "liquidity_sweep_reversal_weight": HyperParam.floating(
                 "liquidity_sweep_reversal_weight", default=0.0, low=0.0, high=1.0, tunable=False
             ),
@@ -170,14 +208,30 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
             "liquidity_sweep_min_wick_fraction": HyperParam.floating(
                 "liquidity_sweep_min_wick_fraction", default=0.30, low=0.0, high=1.0, tunable=False
             ),
-            "event_volume_z_cap": HyperParam.floating("event_volume_z_cap", default=3.0, low=0.0, high=10.0, tunable=False),
-            "risk_off_long_multiplier": HyperParam.floating("risk_off_long_multiplier", default=0.25, low=0.0, high=2.0, tunable=False),
-            "risk_off_short_multiplier": HyperParam.floating("risk_off_short_multiplier", default=1.15, low=0.0, high=2.0, tunable=False),
-            "risk_on_long_multiplier": HyperParam.floating("risk_on_long_multiplier", default=1.10, low=0.0, high=2.0, tunable=False),
-            "risk_on_short_multiplier": HyperParam.floating("risk_on_short_multiplier", default=0.50, low=0.0, high=2.0, tunable=False),
-            "min_signal_strength": HyperParam.floating("min_signal_strength", default=0.10, low=0.0, high=1.0, tunable=False),
+            "event_volume_z_cap": HyperParam.floating(
+                "event_volume_z_cap", default=3.0, low=0.0, high=10.0, tunable=False
+            ),
+            "risk_off_long_multiplier": HyperParam.floating(
+                "risk_off_long_multiplier", default=0.25, low=0.0, high=2.0, tunable=False
+            ),
+            "risk_off_short_multiplier": HyperParam.floating(
+                "risk_off_short_multiplier", default=1.15, low=0.0, high=2.0, tunable=False
+            ),
+            "risk_on_long_multiplier": HyperParam.floating(
+                "risk_on_long_multiplier", default=1.10, low=0.0, high=2.0, tunable=False
+            ),
+            "risk_on_short_multiplier": HyperParam.floating(
+                "risk_on_short_multiplier", default=0.50, low=0.0, high=2.0, tunable=False
+            ),
+            "min_signal_strength": HyperParam.floating(
+                "min_signal_strength", default=0.10, low=0.0, high=1.0, tunable=False
+            ),
             "decision_cadence_seconds": HyperParam.integer(
-                "decision_cadence_seconds", default=cls.decision_cadence_seconds, low=1, high=86400, tunable=False
+                "decision_cadence_seconds",
+                default=cls.decision_cadence_seconds,
+                low=1,
+                high=86400,
+                tunable=False,
             ),
         }
 
@@ -198,7 +252,9 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
             raise ValueError("CryptoFxAlphaZooStateStrategy requires at least one symbol")
         resolved = resolve_params_from_schema(self.get_param_schema(), params, keep_unknown=True)
         self.fast_lookback_bars = max(1, int(resolved["fast_lookback_bars"]))
-        self.slow_lookback_bars = max(self.fast_lookback_bars + 1, int(resolved["slow_lookback_bars"]))
+        self.slow_lookback_bars = max(
+            self.fast_lookback_bars + 1, int(resolved["slow_lookback_bars"])
+        )
         self.history_window = max(self.slow_lookback_bars + 8, int(resolved["history_window"]))
         self.entry_threshold = max(0.0, float(resolved["entry_threshold"]))
         self.abs_factor_score_min = max(0.0, float(resolved["abs_factor_score_min"]))
@@ -207,7 +263,9 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
         self.take_profit_pct = max(0.0, float(resolved["take_profit_pct"]))
         self.max_hold_bars = max(1, int(resolved["max_hold_bars"]))
         self.max_longs = max(0, int(resolved["max_longs"]))
-        self.max_shorts = max(0, int(resolved["max_shorts"])) if bool(resolved["allow_shorts"]) else 0
+        self.max_shorts = (
+            max(0, int(resolved["max_shorts"])) if bool(resolved["allow_shorts"]) else 0
+        )
         self.allow_shorts = bool(resolved["allow_shorts"])
         self.use_fx_filter = bool(resolved["use_fx_filter"])
         self.require_calibrated_edge = bool(resolved["require_calibrated_edge"])
@@ -220,10 +278,14 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
         self.breakout_failure_weight = float(resolved["breakout_failure_weight"])
         self.trend_efficiency_weight = float(resolved["trend_efficiency_weight"])
         self.liquidity_sweep_reversal_weight = float(resolved["liquidity_sweep_reversal_weight"])
-        self.liquidity_sweep_continuation_weight = float(resolved["liquidity_sweep_continuation_weight"])
+        self.liquidity_sweep_continuation_weight = float(
+            resolved["liquidity_sweep_continuation_weight"]
+        )
         self.range_expansion_breakout_weight = float(resolved["range_expansion_breakout_weight"])
         self.range_expansion_fade_weight = float(resolved["range_expansion_fade_weight"])
-        self.liquidity_sweep_min_wick_fraction = float(resolved["liquidity_sweep_min_wick_fraction"])
+        self.liquidity_sweep_min_wick_fraction = float(
+            resolved["liquidity_sweep_min_wick_fraction"]
+        )
         self.event_volume_z_cap = max(1e-12, float(resolved["event_volume_z_cap"]))
         self.risk_off_long_multiplier = float(resolved["risk_off_long_multiplier"])
         self.risk_off_short_multiplier = float(resolved["risk_off_short_multiplier"])
@@ -231,12 +293,22 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
         self.risk_on_short_multiplier = float(resolved["risk_on_short_multiplier"])
         self.min_signal_strength = float(resolved["min_signal_strength"])
         self.decision_cadence_seconds = max(1, int(resolved["decision_cadence_seconds"]))
-        self.calibrated_edges = {str(key): float(value) for key, value in dict(calibrated_edges or {}).items()}
+        self.calibrated_edges = {
+            str(key): float(value) for key, value in dict(calibrated_edges or {}).items()
+        }
 
         requested_crypto = {normalize_symbol(item) for item in (crypto_symbols or CRYPTO_DEFAULTS)}
         requested_fx = {normalize_symbol(item) for item in (fx_symbols or FX_DEFAULTS)}
-        self.crypto_symbols = [symbol for symbol in self.symbol_list if normalize_symbol(symbol) in requested_crypto or infer_market(symbol) == "crypto"]
-        self.fx_symbols = [symbol for symbol in self.symbol_list if normalize_symbol(symbol) in requested_fx or infer_market(symbol) == "fx"]
+        self.crypto_symbols = [
+            symbol
+            for symbol in self.symbol_list
+            if normalize_symbol(symbol) in requested_crypto or infer_market(symbol) == "crypto"
+        ]
+        self.fx_symbols = [
+            symbol
+            for symbol in self.symbol_list
+            if normalize_symbol(symbol) in requested_fx or infer_market(symbol) == "fx"
+        ]
         if not self.crypto_symbols:
             raise ValueError("CryptoFxAlphaZooStateStrategy requires at least one crypto symbol")
         maxlen = self.history_window + self.slow_lookback_bars + 8
@@ -291,7 +363,9 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
             item.bars_held = max(0, safe_int(raw.get("bars_held"), 0))
             item.last_time_key = str(raw.get("last_time_key", ""))
 
-    def _append_bar(self, event_time: Any, symbol: str, open_: Any, high: Any, low: Any, close: Any, volume: Any) -> bool:
+    def _append_bar(
+        self, event_time: Any, symbol: str, open_: Any, high: Any, low: Any, close: Any, volume: Any
+    ) -> bool:
         if symbol not in self._state:
             return False
         close_f = safe_float(close)
@@ -315,7 +389,9 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
             item.bars_held += 1
         return True
 
-    def _resolve_market_event(self, event: Any) -> tuple[Any, str, float, float, float, float, float] | None:
+    def _resolve_market_event(
+        self, event: Any
+    ) -> tuple[Any, str, float, float, float, float, float] | None:
         symbol = str(getattr(event, "symbol", ""))
         if symbol not in self._state:
             return None
@@ -326,7 +402,15 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
         close_f = safe_float(getattr(event, "close", None))
         volume_f = safe_float(getattr(event, "volume", None))
         if close_f is not None:
-            return event_time, symbol, open_f or close_f, high_f or close_f, low_f or close_f, close_f, volume_f or 0.0
+            return (
+                event_time,
+                symbol,
+                open_f or close_f,
+                high_f or close_f,
+                low_f or close_f,
+                close_f,
+                volume_f or 0.0,
+            )
         return None
 
     def _fx_risk_score(self) -> float:
@@ -342,7 +426,9 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
                 continue
             score += weights[name] * value
             count += 1
-        jpy = next((symbol for symbol in self.fx_symbols if normalize_symbol(symbol) == "USDJPY"), None)
+        jpy = next(
+            (symbol for symbol in self.fx_symbols if normalize_symbol(symbol) == "USDJPY"), None
+        )
         if jpy is not None:
             jpy_ret = _ret(self._state[jpy].closes, self.fast_lookback_bars)
             if jpy_ret is not None:
@@ -382,7 +468,14 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
     def _score_symbol(self, symbol: str) -> float | None:
         self._last_score_components.pop(symbol, None)
         item = self._state[symbol]
-        btc_symbol = next((candidate for candidate in self.crypto_symbols if normalize_symbol(candidate) == "BTC"), None)
+        btc_symbol = next(
+            (
+                candidate
+                for candidate in self.crypto_symbols
+                if normalize_symbol(candidate) == "BTC"
+            ),
+            None,
+        )
         if btc_symbol is None or len(item.closes) <= self.slow_lookback_bars:
             return None
         btc = self._state[btc_symbol]
@@ -394,17 +487,42 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
             return None
         residual_fast = fast_ret - btc_fast
         residual_slow = slow_ret - btc_slow
-        residual_hist = [ret - (btc_ret or 0.0) for ret, btc_ret in zip(_returns(item.closes, self.fast_lookback_bars), _returns(btc.closes, self.fast_lookback_bars), strict=False)]
+        residual_hist = [
+            ret - (btc_ret or 0.0)
+            for ret, btc_ret in zip(
+                _returns(item.closes, self.fast_lookback_bars),
+                _returns(btc.closes, self.fast_lookback_bars),
+                strict=False,
+            )
+        ]
         residual_mom = _zscore(residual_fast, residual_hist[-self.history_window :])
-        residual_reversal = -_zscore(residual_slow, residual_hist[-self.history_window :]) if residual_fast * residual_slow < 0.0 else 0.0
+        residual_reversal = (
+            -_zscore(residual_slow, residual_hist[-self.history_window :])
+            if residual_fast * residual_slow < 0.0
+            else 0.0
+        )
         vwap_components = (float(item.highs[-1]), float(item.lows[-1]), float(item.closes[-1]))
         vwap_proxy = sum(vwap_components) / len(vwap_components)
-        vwap_pressure = _volume_z(item.volumes, self.slow_lookback_bars) * (1.0 if item.closes[-1] >= vwap_proxy else -1.0)
-        prior_high = max(list(item.highs)[-self.slow_lookback_bars - 1 : -1]) if len(item.highs) > self.slow_lookback_bars else item.highs[-1]
-        prior_low = min(list(item.lows)[-self.slow_lookback_bars - 1 : -1]) if len(item.lows) > self.slow_lookback_bars else item.lows[-1]
+        vwap_pressure = _volume_z(item.volumes, self.slow_lookback_bars) * (
+            1.0 if item.closes[-1] >= vwap_proxy else -1.0
+        )
+        prior_high = (
+            max(list(item.highs)[-self.slow_lookback_bars - 1 : -1])
+            if len(item.highs) > self.slow_lookback_bars
+            else item.highs[-1]
+        )
+        prior_low = (
+            min(list(item.lows)[-self.slow_lookback_bars - 1 : -1])
+            if len(item.lows) > self.slow_lookback_bars
+            else item.lows[-1]
+        )
         bar_range = max(1e-12, float(item.highs[-1]) - float(item.lows[-1]))
-        upper_wick = (float(item.highs[-1]) - max(float(item.opens[-1]), float(item.closes[-1]))) / bar_range
-        lower_wick = (min(float(item.opens[-1]), float(item.closes[-1])) - float(item.lows[-1])) / bar_range
+        upper_wick = (
+            float(item.highs[-1]) - max(float(item.opens[-1]), float(item.closes[-1]))
+        ) / bar_range
+        lower_wick = (
+            min(float(item.opens[-1]), float(item.closes[-1])) - float(item.lows[-1])
+        ) / bar_range
         volume_shock = max(0.0, _volume_z(item.volumes, self.slow_lookback_bars))
         breakout_failure = 0.0
         if item.highs[-1] > prior_high and item.closes[-1] < prior_high:
@@ -412,7 +530,9 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
         elif item.lows[-1] < prior_low and item.closes[-1] > prior_low:
             breakout_failure = 1.0
         liquidity_sweep_reversal = 0.0
-        event_volume_boost = 1.0 + min(volume_shock, self.event_volume_z_cap) / self.event_volume_z_cap
+        event_volume_boost = (
+            1.0 + min(volume_shock, self.event_volume_z_cap) / self.event_volume_z_cap
+        )
         if (
             item.highs[-1] > prior_high
             and item.closes[-1] < prior_high
@@ -435,27 +555,40 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
         ]
         avg_prior_range = mean(prior_ranges) if prior_ranges else bar_range
         range_expansion = max(0.0, (bar_range / max(avg_prior_range, 1e-12)) - 1.0)
-        range_expansion_breakout = (1.0 if residual_fast >= 0.0 else -1.0) * range_expansion * event_volume_boost
+        range_expansion_breakout = (
+            (1.0 if residual_fast >= 0.0 else -1.0) * range_expansion * event_volume_boost
+        )
         trend_eff = _trend_efficiency(item.closes, self.fast_lookback_bars)
         components = {
             "crypto_residual_momentum": self.residual_momentum_weight * residual_mom,
             "crypto_residual_reversal": self.residual_reversal_weight * residual_reversal,
             "volume_vwap_pressure": self.vwap_pressure_weight * vwap_pressure,
             "breakout_failure": self.breakout_failure_weight * breakout_failure,
-            "trend_efficiency": self.trend_efficiency_weight * trend_eff * (1.0 if residual_fast >= 0.0 else -1.0),
-            "liquidity_sweep_reversal": self.liquidity_sweep_reversal_weight * liquidity_sweep_reversal,
-            "liquidity_sweep_continuation": self.liquidity_sweep_continuation_weight * (-liquidity_sweep_reversal),
-            "range_expansion_breakout": self.range_expansion_breakout_weight * range_expansion_breakout,
+            "trend_efficiency": self.trend_efficiency_weight
+            * trend_eff
+            * (1.0 if residual_fast >= 0.0 else -1.0),
+            "liquidity_sweep_reversal": self.liquidity_sweep_reversal_weight
+            * liquidity_sweep_reversal,
+            "liquidity_sweep_continuation": self.liquidity_sweep_continuation_weight
+            * (-liquidity_sweep_reversal),
+            "range_expansion_breakout": self.range_expansion_breakout_weight
+            * range_expansion_breakout,
             "range_expansion_fade": self.range_expansion_fade_weight * (-range_expansion_breakout),
         }
-        self._last_score_components[symbol] = {key: float(value) for key, value in components.items()}
+        self._last_score_components[symbol] = {
+            key: float(value) for key, value in components.items()
+        }
         return sum(components.values())
 
     def _adjust_for_fx(self, score: float, risk_state: str) -> float:
         if risk_state == "risk_off":
-            return score * (self.risk_off_long_multiplier if score > 0.0 else self.risk_off_short_multiplier)
+            return score * (
+                self.risk_off_long_multiplier if score > 0.0 else self.risk_off_short_multiplier
+            )
         if risk_state == "risk_on":
-            return score * (self.risk_on_long_multiplier if score > 0.0 else self.risk_on_short_multiplier)
+            return score * (
+                self.risk_on_long_multiplier if score > 0.0 else self.risk_on_short_multiplier
+            )
         return score
 
     def _emit(
@@ -479,7 +612,9 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
         elif signal_type == "SHORT":
             stop = close * (1.0 + self.stop_loss_pct)
             take = close * (1.0 - self.take_profit_pct)
-        components = {key: float(value) for key, value in self._last_score_components.get(symbol, {}).items()}
+        components = {
+            key: float(value) for key, value in self._last_score_components.get(symbol, {}).items()
+        }
         dominant = (
             max(components, key=lambda key: abs(components[key]))
             if any(abs(value) > 1e-12 for value in components.values())
@@ -504,7 +639,9 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
                 symbol=symbol,
                 datetime=event_time,
                 signal_type=signal_type,
-                strength=min(1.0, max(self.min_signal_strength, abs(score) / max(self.entry_threshold, 1e-9))),
+                strength=min(
+                    1.0, max(self.min_signal_strength, abs(score) / max(self.entry_threshold, 1e-9))
+                ),
                 price=close,
                 stop_loss=stop,
                 take_profit=take,
@@ -516,12 +653,24 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
     def _evaluate(self, event_time: Any) -> None:
         risk_state = self._fx_risk_state()
         raw_scores = {symbol: self._score_symbol(symbol) for symbol in self.crypto_symbols}
-        scores = {symbol: self._adjust_for_fx(score, risk_state) for symbol, score in raw_scores.items() if score is not None}
+        scores = {
+            symbol: self._adjust_for_fx(score, risk_state)
+            for symbol, score in raw_scores.items()
+            if score is not None
+        }
         if not scores:
             return
         entry_threshold = max(self.entry_threshold, self.abs_factor_score_min)
-        longs = [symbol for symbol, score in sorted(scores.items(), key=lambda item: item[1], reverse=True) if score > entry_threshold][: self.max_longs]
-        shorts = [symbol for symbol, score in sorted(scores.items(), key=lambda item: item[1]) if score < -entry_threshold][: self.max_shorts]
+        longs = [
+            symbol
+            for symbol, score in sorted(scores.items(), key=lambda item: item[1], reverse=True)
+            if score > entry_threshold
+        ][: self.max_longs]
+        shorts = [
+            symbol
+            for symbol, score in sorted(scores.items(), key=lambda item: item[1])
+            if score < -entry_threshold
+        ][: self.max_shorts]
         for symbol, score in scores.items():
             item = self._state[symbol]
             close = float(item.closes[-1])
@@ -529,7 +678,13 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
                 stop_hit = close <= item.entry_price * (1.0 - self.stop_loss_pct)
                 take_hit = close >= item.entry_price * (1.0 + self.take_profit_pct)
                 stale = item.bars_held >= self.max_hold_bars
-                if stop_hit or take_hit or stale or score <= self.exit_threshold or risk_state == "risk_off":
+                if (
+                    stop_hit
+                    or take_hit
+                    or stale
+                    or score <= self.exit_threshold
+                    or risk_state == "risk_off"
+                ):
                     exit_reason = (
                         "stop_loss"
                         if stop_hit
@@ -558,7 +713,13 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
                 stop_hit = close >= item.entry_price * (1.0 + self.stop_loss_pct)
                 take_hit = close <= item.entry_price * (1.0 - self.take_profit_pct)
                 stale = item.bars_held >= self.max_hold_bars
-                if stop_hit or take_hit or stale or score >= -self.exit_threshold or risk_state == "risk_on":
+                if (
+                    stop_hit
+                    or take_hit
+                    or stale
+                    or score >= -self.exit_threshold
+                    or risk_state == "risk_on"
+                ):
                     exit_reason = (
                         "stop_loss"
                         if stop_hit
@@ -586,14 +747,28 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
             if symbol in longs:
                 allowed, edge = self._edge_gate(symbol, "LONG")
                 if allowed:
-                    self._emit(symbol, event_time, "LONG", score=score, edge_bps=edge, risk_state=risk_state)
+                    self._emit(
+                        symbol,
+                        event_time,
+                        "LONG",
+                        score=score,
+                        edge_bps=edge,
+                        risk_state=risk_state,
+                    )
                     item.mode = "LONG"
                     item.entry_price = close
                     item.bars_held = 0
             elif self.allow_shorts and symbol in shorts:
                 allowed, edge = self._edge_gate(symbol, "SHORT")
                 if allowed:
-                    self._emit(symbol, event_time, "SHORT", score=score, edge_bps=edge, risk_state=risk_state)
+                    self._emit(
+                        symbol,
+                        event_time,
+                        "SHORT",
+                        score=score,
+                        edge_bps=edge,
+                        risk_state=risk_state,
+                    )
                     item.mode = "SHORT"
                     item.entry_price = close
                     item.bars_held = 0
@@ -659,7 +834,10 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
 
     def calculate_signals_window(self, event: Any, aggregator: Any) -> None:
         _ = aggregator
-        if not isinstance(event, MarketWindowEvent) and getattr(event, "type", None) != "MARKET_WINDOW":
+        if (
+            not isinstance(event, MarketWindowEvent)
+            and getattr(event, "type", None) != "MARKET_WINDOW"
+        ):
             self.calculate_signals(event)
             return
         event_time = getattr(event, "time", None)

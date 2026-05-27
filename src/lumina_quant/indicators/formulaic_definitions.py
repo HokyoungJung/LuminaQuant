@@ -42,7 +42,9 @@ def _resolve_constant(
     return float(param_registry.get(key, default))
 
 
-def _build_env(context: dict[str, pd.Series], *, index: pd.Index, rank_window: int) -> dict[str, object]:
+def _build_env(
+    context: dict[str, pd.Series], *, index: pd.Index, rank_window: int
+) -> dict[str, object]:
     return {
         **context,
         "abs": np.abs,

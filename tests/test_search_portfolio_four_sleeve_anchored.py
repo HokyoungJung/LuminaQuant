@@ -12,7 +12,9 @@ ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT / "scripts" / "research" / "search_portfolio_four_sleeve_anchored.py"
 MODULE = None
 if MODULE_PATH.exists():
-    SPEC = importlib.util.spec_from_file_location("search_portfolio_four_sleeve_anchored", MODULE_PATH)
+    SPEC = importlib.util.spec_from_file_location(
+        "search_portfolio_four_sleeve_anchored", MODULE_PATH
+    )
     if SPEC is None or SPEC.loader is None:
         raise RuntimeError("Failed to load search_portfolio_four_sleeve_anchored module")
     MODULE = importlib.util.module_from_spec(SPEC)
@@ -32,7 +34,12 @@ def _grid_size() -> int:
                 size *= len(list(values or []))
             return int(size)
 
-    for attr_name in ("iter_search_grid", "_iter_search_grid", "build_search_grid", "_build_search_grid"):
+    for attr_name in (
+        "iter_search_grid",
+        "_iter_search_grid",
+        "build_search_grid",
+        "_build_search_grid",
+    ):
         attr = getattr(MODULE, attr_name, None)
         if callable(attr):
             built = attr()
@@ -80,7 +87,9 @@ def test_search_grid_has_expected_axis_cardinalities() -> None:
     assert math.prod(normalized[name] for name in expected) == 384
 
 
-def test_run_search_writes_summary_and_best_outputs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_search_writes_summary_and_best_outputs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     if MODULE is None:
         pytest.skip("search wrapper module missing")
 
@@ -153,7 +162,9 @@ def test_run_search_writes_summary_and_best_outputs(tmp_path: Path, monkeypatch:
         output_dir: Path,
         params: dict[str, float],
     ) -> dict[str, Any]:
-        val_sharpe = params["correlation_threshold"] + params["target_vol"] + params["max_strategy_cap"]
+        val_sharpe = (
+            params["correlation_threshold"] + params["target_vol"] + params["max_strategy_cap"]
+        )
         val_return = params["max_family_cap"] / 10.0
         max_drawdown = params["cost_penalty"] / 10.0
         report = {
@@ -288,8 +299,7 @@ def _optimizer_payload(
             },
         },
         "weights": [
-            {"candidate_id": f"c{idx}", "weight": weight}
-            for idx, weight in enumerate(weights)
+            {"candidate_id": f"c{idx}", "weight": weight} for idx, weight in enumerate(weights)
         ],
     }
 
@@ -381,14 +391,17 @@ def test_search_wrapper_selects_best_objective_and_writes_summary(
             self.output_dir = Path(output_dir)
             self.output_dir.mkdir(parents=True, exist_ok=True)
             self.guard = type("Guard", (), {"budget_bytes": budget_bytes})()
-            self.rss_log_path = self.output_dir / "_memory_guard" / "portfolio_four_sleeve_search_rss_latest.jsonl"
+            self.rss_log_path = (
+                self.output_dir / "_memory_guard" / "portfolio_four_sleeve_search_rss_latest.jsonl"
+            )
             self.rss_log_path.parent.mkdir(parents=True, exist_ok=True)
             self.rss_log_path.write_text("", encoding="utf-8")
 
         def sample(self, *, event: str, context: dict[str, Any] | None = None) -> dict[str, Any]:
             self.rss_log_path.write_text(
                 self.rss_log_path.read_text(encoding="utf-8")
-                + json.dumps({"event": event, "context": context or {}}) + "\n",
+                + json.dumps({"event": event, "context": context or {}})
+                + "\n",
                 encoding="utf-8",
             )
             return {"event": event}
@@ -403,7 +416,11 @@ def test_search_wrapper_selects_best_objective_and_writes_summary(
             error: str | None = None,
             context: dict[str, Any] | None = None,
         ) -> dict[str, Any]:
-            summary_path = self.output_dir / "_memory_guard" / "portfolio_four_sleeve_search_memory_latest.json"
+            summary_path = (
+                self.output_dir
+                / "_memory_guard"
+                / "portfolio_four_sleeve_search_memory_latest.json"
+            )
             payload = {
                 "status": status,
                 "error": error,
@@ -421,7 +438,9 @@ def test_search_wrapper_selects_best_objective_and_writes_summary(
         captured.update(kwargs)
         return DummyMemoryGuard(Path(kwargs["output_dir"]), int(kwargs["budget_bytes"]))
 
-    monkeypatch.setattr(MODULE, "acquire_portfolio_memory_guard", fake_acquire_portfolio_memory_guard)
+    monkeypatch.setattr(
+        MODULE, "acquire_portfolio_memory_guard", fake_acquire_portfolio_memory_guard
+    )
 
     fixed_budget_bytes = MODULE.PORTFOLIO_FOLLOWUP_EXPLICIT_BUDGET_BYTES
     comparison_json_path = tmp_path / "comparison.json"
@@ -449,7 +468,9 @@ def test_search_wrapper_selects_best_objective_and_writes_summary(
         )[1]
     )
     assert captured["budget_bytes"] == fixed_budget_bytes
-    assert Path(search_output_dir / "_memory_guard" / "portfolio_four_sleeve_search_rss_latest.jsonl").exists()
+    assert Path(
+        search_output_dir / "_memory_guard" / "portfolio_four_sleeve_search_rss_latest.jsonl"
+    ).exists()
     assert Path(result["tuned_json_path"]).exists()
     assert Path(result["summary_json_path"]).exists()
     assert Path(result["summary_md_path"]).exists()
@@ -489,7 +510,9 @@ def test_search_wrapper_blocks_when_rolling_gate_is_blocked(
         def release(self) -> None:
             return None
 
-    monkeypatch.setattr(MODULE, "acquire_portfolio_memory_guard", lambda **kwargs: DummyMemoryGuard())
+    monkeypatch.setattr(
+        MODULE, "acquire_portfolio_memory_guard", lambda **kwargs: DummyMemoryGuard()
+    )
 
     with pytest.raises(RuntimeError, match="rolling admission is blocked"):
         MODULE.run_search(

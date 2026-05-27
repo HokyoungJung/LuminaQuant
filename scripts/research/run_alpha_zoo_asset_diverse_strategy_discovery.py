@@ -29,8 +29,7 @@ if str(REPO_ROOT) not in sys.path:
 from scripts.research import run_alpha_zoo_30m_plus_alpha_feedback_discovery as feedback  # noqa: E402
 
 DEFAULT_OUTPUT_DIR = (
-    REPO_ROOT
-    / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/"
+    REPO_ROOT / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/"
     "alpha_zoo_asset_diverse_strategy_discovery_20260523"
 )
 DEFAULT_SYMBOLS = ("BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "TRXUSDT")
@@ -350,7 +349,9 @@ def _candidate_base(
         "allocation_fraction": allocation,
         "notional_fraction": leverage * allocation,
         "asset_group": _asset_group(symbol),
-        "universe_role": "promotion_eligible" if symbol in promotion_symbols else "shadow_probe_only",
+        "universe_role": "promotion_eligible"
+        if symbol in promotion_symbols
+        else "shadow_probe_only",
         "cross_asset_inputs": dict(cross_asset_inputs),
     }
 
@@ -369,7 +370,9 @@ def discover_asset_diverse_candidates(
 
     for timeframe in timeframes:
         panel = _build_close_panel(bars_by_symbol_tf, symbols=symbols, timeframe=timeframe)
-        panel_by_lookback = {lookback: _panel_state(panel, lookback) for lookback in (12, 24, 36, 48, 72)}
+        panel_by_lookback = {
+            lookback: _panel_state(panel, lookback) for lookback in (12, 24, 36, 48, 72)
+        }
         base_closes = {
             base: bars_by_symbol_tf[(base, timeframe)][["datetime", "close"]].rename(
                 columns={"close": f"{base.lower()}_close"}
@@ -556,7 +559,9 @@ def discover_asset_diverse_candidates(
                                     allocation_fraction=allocation,
                                 )
                                 rows.append(
-                                    _finalize_asset_candidate(base, sim, frame["datetime"], timeframe=timeframe)
+                                    _finalize_asset_candidate(
+                                        base, sim, frame["datetime"], timeframe=timeframe
+                                    )
                                 )
 
             for fast, slow in ((6, 30), (8, 40), (12, 48)):
@@ -636,7 +641,9 @@ def discover_asset_diverse_candidates(
                                 allocation_fraction=allocation,
                             )
                             rows.append(
-                                _finalize_asset_candidate(base, sim, frame["datetime"], timeframe=timeframe)
+                                _finalize_asset_candidate(
+                                    base, sim, frame["datetime"], timeframe=timeframe
+                                )
                             )
     return rows
 
@@ -652,7 +659,9 @@ def _rank_rows(rows: Sequence[dict[str, Any]], *, limit: int | None = None) -> l
     return [dict(row, rank=rank) for rank, row in enumerate(ranked, start=1)]
 
 
-def _selected_output_rows(ranked_rows: Sequence[dict[str, Any]], *, top_n: int) -> list[dict[str, Any]]:
+def _selected_output_rows(
+    ranked_rows: Sequence[dict[str, Any]], *, top_n: int
+) -> list[dict[str, Any]]:
     selected_ids = {str(row["model_id"]) for row in ranked_rows[:top_n]}
     for row in ranked_rows:
         if row.get("paper_candidate_gate_pass") or row.get("train_dominant_sample_gate_pass"):
@@ -662,7 +671,9 @@ def _selected_output_rows(ranked_rows: Sequence[dict[str, Any]], *, top_n: int) 
         if group_rows:
             selected_ids.add(str(group_rows[0]["model_id"]))
     if ranked_rows:
-        best_validation = max(ranked_rows, key=lambda row: float(row.get("validation_return") or -1e9))
+        best_validation = max(
+            ranked_rows, key=lambda row: float(row.get("validation_return") or -1e9)
+        )
         selected_ids.add(str(best_validation["model_id"]))
     return [dict(row) for row in ranked_rows if str(row["model_id"]) in selected_ids]
 
@@ -703,9 +714,15 @@ def _summary(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         decisions[str(row.get("decision"))] = decisions.get(str(row.get("decision")), 0) + 1
         families[str(row.get("family"))] = families.get(str(row.get("family")), 0) + 1
         symbols[str(row.get("symbol"))] = symbols.get(str(row.get("symbol")), 0) + 1
-        asset_groups[str(row.get("asset_group"))] = asset_groups.get(str(row.get("asset_group")), 0) + 1
-        universe_roles[str(row.get("universe_role"))] = universe_roles.get(str(row.get("universe_role")), 0) + 1
-    best_validation = max(rows, key=lambda row: float(row.get("validation_return") or -1e9)) if rows else {}
+        asset_groups[str(row.get("asset_group"))] = (
+            asset_groups.get(str(row.get("asset_group")), 0) + 1
+        )
+        universe_roles[str(row.get("universe_role"))] = (
+            universe_roles.get(str(row.get("universe_role")), 0) + 1
+        )
+    best_validation = (
+        max(rows, key=lambda row: float(row.get("validation_return") or -1e9)) if rows else {}
+    )
     return {
         "candidate_count": len(rows),
         "decision_counts": dict(sorted(decisions.items())),
@@ -750,7 +767,9 @@ def _coverage_manifest(
     for symbol in symbols:
         symbol_payload: dict[str, Any] = {
             "asset_group": _asset_group(symbol),
-            "universe_role": "promotion_eligible" if symbol in promotion_symbols else "shadow_probe_only",
+            "universe_role": "promotion_eligible"
+            if symbol in promotion_symbols
+            else "shadow_probe_only",
             "timeframes": {},
         }
         for timeframe in timeframes:
@@ -772,7 +791,9 @@ def _coverage_manifest(
 def _markdown(payload: Mapping[str, Any]) -> str:
     summary = dict(payload.get("discovery_summary") or {})
     top = list(payload.get("top_candidates") or [])[:15]
-    paper = [row for row in payload.get("top_candidates", []) if row.get("paper_candidate_gate_pass")][:15]
+    paper = [
+        row for row in payload.get("top_candidates", []) if row.get("paper_candidate_gate_pass")
+    ][:15]
     lines = [
         "# Alpha Zoo asset-diverse strategy discovery",
         "",
@@ -838,7 +859,9 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     all_symbols = tuple(dict.fromkeys([*symbols, *shadow_symbols]))
     promotion_symbols = set(symbols)
 
-    bars_by_symbol_tf = feedback.load_requested_bars(all_symbols, timeframes=timeframes, data_root=data_root)
+    bars_by_symbol_tf = feedback.load_requested_bars(
+        all_symbols, timeframes=timeframes, data_root=data_root
+    )
     rows = discover_asset_diverse_candidates(
         bars_by_symbol_tf,
         symbols=symbols,
@@ -857,7 +880,9 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     )
 
     latest_json = output_dir / "alpha_zoo_asset_diverse_strategy_discovery_latest.json"
-    timestamped_json = output_dir / f"alpha_zoo_asset_diverse_strategy_discovery_{_timestamp()}.json"
+    timestamped_json = (
+        output_dir / f"alpha_zoo_asset_diverse_strategy_discovery_{_timestamp()}.json"
+    )
     latest_md = output_dir / "alpha_zoo_asset_diverse_strategy_discovery_latest.md"
     candidates_csv = output_dir / "asset_diverse_strategy_candidates_latest.csv"
     decisions_csv = output_dir / "asset_diverse_strategy_decisions_latest.csv"

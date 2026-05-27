@@ -95,7 +95,9 @@ def test_write_exact_window_log_archive_does_not_overwrite_canonical_registry(tm
 
     write_exact_window_log_archive(log_dir=log_dir, report_root=report_root)
     assert json.loads(canonical_registry_path.read_text(encoding="utf-8")) == canonical_payload
-    recovered_payload = json.loads((report_root / RECOVERED_REGISTRY_LATEST).read_text(encoding="utf-8"))
+    recovered_payload = json.loads(
+        (report_root / RECOVERED_REGISTRY_LATEST).read_text(encoding="utf-8")
+    )
     assert recovered_payload["entries"][0]["run_id"] == "recovered_run"
 
 

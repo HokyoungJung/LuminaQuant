@@ -7,15 +7,23 @@ from pathlib import Path
 
 import pytest
 
-_EXPORT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "ci" / "export_market_window_gate_metrics.py"
-_EXPORT_SPEC = importlib.util.spec_from_file_location("export_market_window_gate_metrics", _EXPORT_PATH)
+_EXPORT_PATH = (
+    Path(__file__).resolve().parents[1] / "scripts" / "ci" / "export_market_window_gate_metrics.py"
+)
+_EXPORT_SPEC = importlib.util.spec_from_file_location(
+    "export_market_window_gate_metrics", _EXPORT_PATH
+)
 if _EXPORT_SPEC is None or _EXPORT_SPEC.loader is None:
     raise RuntimeError(f"Failed to load module from {_EXPORT_PATH}")
 export_script = importlib.util.module_from_spec(_EXPORT_SPEC)
 _EXPORT_SPEC.loader.exec_module(export_script)
 
-_CHECK_PATH = Path(__file__).resolve().parents[1] / "scripts" / "ci" / "check_market_window_rollout_gates.py"
-_CHECK_SPEC = importlib.util.spec_from_file_location("check_market_window_rollout_gates", _CHECK_PATH)
+_CHECK_PATH = (
+    Path(__file__).resolve().parents[1] / "scripts" / "ci" / "check_market_window_rollout_gates.py"
+)
+_CHECK_SPEC = importlib.util.spec_from_file_location(
+    "check_market_window_rollout_gates", _CHECK_PATH
+)
 if _CHECK_SPEC is None or _CHECK_SPEC.loader is None:
     raise RuntimeError(f"Failed to load module from {_CHECK_PATH}")
 check_script = importlib.util.module_from_spec(_CHECK_SPEC)
