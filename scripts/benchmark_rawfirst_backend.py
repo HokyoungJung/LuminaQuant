@@ -17,7 +17,10 @@ from typing import Any
 import numpy as np
 import polars as pl
 
-from lumina_quant.data.native_raw_first_backend import raw_first_backend_diagnostics
+from lumina_quant.data.native_raw_first_backend import (
+    native_backend_available,
+    raw_first_backend_diagnostics,
+)
 from lumina_quant.data.raw_first_lineage import raw_aggtrades_to_1s_frame
 
 DEFAULT_START_MS = 1_710_000_000_000
@@ -166,8 +169,8 @@ def run_benchmark(
     if evals <= 0:
         raise ValueError("evals must be positive")
     auto_backend = raw_first_backend_diagnostics("auto")
+    rust_available = native_backend_available()
     rust_diag = raw_first_backend_diagnostics("rust")
-    rust_available = rust_diag.get("resolved_backend") == "rust"
     if require_rust and not rust_available:
         return RawFirstBenchmarkResult(
             status="rust_unavailable",

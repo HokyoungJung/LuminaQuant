@@ -58,3 +58,34 @@ def test_rawfirst_benchmark_result_has_rust_parity_when_available() -> None:
     else:
         assert result.status == "rust_unavailable"
         assert result.rust is None
+
+
+def test_rawfirst_benchmark_skips_missing_rust_without_calling_backend(monkeypatch) -> None:
+    monkeypatch.setattr(benchmark_rawfirst_backend, "native_backend_available", lambda: False)
+    monkeypatch.setattr(
+        benchmark_rawfirst_backend,
+        "raw_first_backend_diagnostics",
+        lambda requested: {
+            "requested_backend": requested or "auto",
+            "resolved_backend": "python",
+            "description": "rust:unavailable" if requested == "rust" else "python",
+            "native_library_path": None,
+            "native_load_error": "missing in test",
+            "auto_fallback_warning_count": 0,
+            "auto_fallback_warning_reasons": [],
+        },
+    )
+
+    result = benchmark_rawfirst_backend.run_benchmark(
+        trades=500,
+        seconds=120,
+        evals=1,
+        backend="both",
+    )
+
+    assert result.status == "rust_unavailable"
+    assert result.rust_available is False
+    assert result.python is not None
+    assert result.rust is None
+    assert result.parity.checked is False
+    assert result.parity.passed is False
