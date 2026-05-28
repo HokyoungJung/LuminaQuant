@@ -4,9 +4,9 @@ leader workspace에 cache/build/runtime log가 쌓였지만 연구 증거는 보
 
 ## 연구노트와 증거 위치
 
-- Alpha Zoo 기본 연구노트: `docs/research_note_profit_moonshot_alpha_zoo_real_data_20260512.md`
-- State-distilled 연구노트: `docs/research_note_profit_moonshot_state_distilled_20260511.md`
-- 전체 연구 이력/source ledger: `docs/profit_moonshot_research_history_20260510.md`
+- Alpha Zoo 기본 연구노트: `docs/research_note/research_note.md`
+- State-distilled 연구노트: `docs/research_note/state_distilled.md`
+- 전체 연구 이력/source ledger: `docs/research_note/research_history.md`
 - 세션 handoff: `docs/session_handoff_*.md`
 - live/paper 운영 런북: `docs/live-readiness/`
 - 세션 checkpoint memory: `.omx/notepad.md`

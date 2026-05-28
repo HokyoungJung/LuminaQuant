@@ -24,7 +24,7 @@ Next session should not assume the current 7x/0.15 live decision will reproduce 
 
 - PRD: `.omx/plans/prd-live-alpha-zoo-notional-risk-alignment-20260517.md`
 - Test spec: `.omx/plans/test-spec-live-alpha-zoo-notional-risk-alignment-20260517.md`
-- Research note: `docs/research_note_profit_moonshot_alpha_zoo_real_data_20260512.md`
+- Research note: `docs/research_note/research_note.md`
 - Current decision artifact: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/validation_to_20260331_latest_data_20260517/live_alpha_zoo_fast_residual_7x_isolated_decision_latest.json`
 - Current replay artifact: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/validation_to_20260331_latest_data_20260517/alpha_zoo_validation_march_high_leverage_latest.json`
 
@@ -45,7 +45,7 @@ $ralplan $team $ralph 이어서 진행해. 작업 디렉터리는 /home/hoky/Qua
 - .omx/plans/prd-live-alpha-zoo-notional-risk-alignment-20260517.md
 - .omx/plans/test-spec-live-alpha-zoo-notional-risk-alignment-20260517.md
 - docs/session_handoff_20260517_live_notional_risk_alignment.md
-- docs/research_note_profit_moonshot_alpha_zoo_real_data_20260512.md
+- docs/research_note/research_note.md
 - var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/validation_to_20260331_latest_data_20260517/alpha_zoo_validation_march_high_leverage_latest.json
 - var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/validation_to_20260331_latest_data_20260517/live_alpha_zoo_fast_residual_7x_isolated_decision_latest.json
 
@@ -75,7 +75,7 @@ git diff --cached --check
 
 ## Research history/source ledger note
 
-No global research inventory/source ledger regeneration is required for this handoff alone. It adds a plan and documentation for the next implementation session and does not introduce a new data-source family. If the next session refreshes market data beyond the current tail or adds new source families, it must revisit `docs/profit_moonshot_research_history_20260510.md` and matching `var/reports/.../research_history/` artifacts.
+No global research inventory/source ledger regeneration is required for this handoff alone. It adds a plan and documentation for the next implementation session and does not introduce a new data-source family. If the next session refreshes market data beyond the current tail or adds new source families, it must revisit `docs/research_note/research_history.md` and matching `var/reports/.../research_history/` artifacts.
 
 ## 2026-05-18 KST completion addendum
 

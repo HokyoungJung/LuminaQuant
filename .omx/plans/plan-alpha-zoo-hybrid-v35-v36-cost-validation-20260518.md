@@ -142,9 +142,9 @@ Create a **new research runner** rather than changing the existing fixed-input h
      - liquidation/account wipeout events are included in split MDD/gates.
 
 7. **Documentation and handoff**
-   - Update `docs/research_note_profit_moonshot_alpha_zoo_real_data_20260512.md` with run result summary and artifact paths.
+   - Update `docs/research_note/research_note.md` with run result summary and artifact paths.
    - Update `.omx/notepad.md` with final artifact paths, selected/failed models, and verification evidence.
-   - If the execution session refreshes market data or adds a new source family, update/regenerate `docs/profit_moonshot_research_history_20260510.md` and matching `var/reports/.../research_history/` artifacts; otherwise explicitly state why not regenerated.
+   - If the execution session refreshes market data or adds a new source family, update/regenerate `docs/research_note/research_history.md` and matching `var/reports/.../research_history/` artifacts; otherwise explicitly state why not regenerated.
 
 ## Acceptance criteria
 
@@ -193,7 +193,7 @@ $ralplan $team $ralph 이어서 진행해. 작업 디렉터리는 /home/hoky/Qua
 
 이번 목표는 Alpha Zoo 최신 live-aligned 후보들로 seed-union hybrid v3.5/v3.6 cost validation을 새 artifact 디렉터리에 만드는 것이다. 반드시 먼저 읽어:
 - .omx/plans/plan-alpha-zoo-hybrid-v35-v36-cost-validation-20260518.md
-- docs/research_note_profit_moonshot_alpha_zoo_real_data_20260512.md
+- docs/research_note/research_note.md
 - var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/live_notional_risk_aligned_alpha_zoo_20260518/live_notional_risk_aligned_alpha_zoo_latest.json
 - var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/live_notional_risk_aligned_alpha_zoo_20260518/alpha_zoo_validation_march_high_leverage_candidates_latest.csv
 - scripts/research/run_alpha_zoo_validation_march_high_leverage.py

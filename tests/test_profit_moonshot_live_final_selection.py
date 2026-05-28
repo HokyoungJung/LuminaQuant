@@ -98,7 +98,7 @@ def _candidate(
         "sleeves": sleeves if sleeves is not None else ["a", "b", "c"],
         "research_history_refs": [
             "strategy_chronology:fixture_dynamic_candidate",
-            "docs/profit_moonshot_research_history_20260510.md#unit",
+            "docs/research_note/research_history.md#unit",
         ],
         "source_search_ledger_refs": ["local_artifact:fixture_dynamic_candidate"],
         "splits": {
@@ -143,7 +143,7 @@ def _candidate_with_sleeves(
         "sleeves": sleeve_names,
         "research_history_refs": [
             "strategy_chronology:fixture_dynamic_candidate",
-            "docs/profit_moonshot_research_history_20260510.md#unit",
+            "docs/research_note/research_history.md#unit",
         ],
         "source_search_ledger_refs": ["local_artifact:fixture_dynamic_candidate"],
         "splits": {

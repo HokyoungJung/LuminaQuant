@@ -55,7 +55,7 @@ Restart profit-moonshot strategy research from first principles after the calend
 
 ### Phase 1 — Research-history/source-ledger scaffolding (tests first)
 Deliverables:
-- `docs/profit_moonshot_research_history_20260510.md`
+- `docs/research_note/research_history.md`
 - `var/reports/profit_moonshot_20260501/research_history/profit_moonshot_research_history_latest.md`
 - `var/reports/profit_moonshot_20260501/research_history/profit_moonshot_research_history_latest.json`
 - `.omx/notepad.md` pointer requiring future sessions to read the history first.
@@ -125,7 +125,7 @@ Rules:
 - `explore`: fast repo-local mapping only.
 
 Recommended `$team` staffing after plan approval:
-- Worker 1 (`executor`/writer responsibility): research-history generator/artifacts and source-ledger content; owns `docs/profit_moonshot_research_history_20260510.md`, `var/reports/.../research_history/*`, and relevant tests.
+- Worker 1 (`executor`/writer responsibility): research-history generator/artifacts and source-ledger content; owns `docs/research_note/research_history.md`, `var/reports/.../research_history/*`, and relevant tests.
 - Worker 2 (`executor` responsibility): strategy-validity/live-gate hardening for history/source metadata and hybrid source filtering; owns final-selection/hybrid code and tests.
 - Worker 3 (`executor` or `test-engineer` responsibility): dynamic-candidate replay/tuning orchestration and memory-safe evidence; owns bounded run commands and metrics artifacts.
 
@@ -146,4 +146,4 @@ Ralph follow-up:
 
 **Consequences**: More tests/artifacts up front, heavier but bounded backtesting, and a stricter final-selection gate. The live recommendation may still be no promotion.
 
-**Follow-ups**: Keep `docs/profit_moonshot_research_history_20260510.md` updated on every future profit-moonshot research pass; add `.omx/notepad.md` pointer; treat missing source-ledger links as a promotion blocker.
+**Follow-ups**: Keep `docs/research_note/research_history.md` updated on every future profit-moonshot research pass; add `.omx/notepad.md` pointer; treat missing source-ledger links as a promotion blocker.

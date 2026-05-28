@@ -7,7 +7,7 @@ Implement a research-only `StateDistilledRegimeBoostPortfolio` path that consume
 - Context: `.omx/context/state-distilled-regime-boost-20260513T133805Z.md`.
 - Likely reusable engines: `scripts/research/replay_profit_moonshot_fresh_start.py`, `scripts/research/run_profit_moonshot_liquidation_aware_validation.py`, `scripts/research/replay_crypto_fx_alpha_zoo_state.py`.
 - Existing invariants/tests: `tests/test_profit_moonshot_liquidation_aware_validation.py`, `tests/test_crypto_fx_alpha_zoo_state_strategy.py`, `tests/test_profit_moonshot_pass_under_8gb_validator.py`.
-- Research docs to update/supersede: `docs/research_note_profit_moonshot_state_distilled_20260511.md`, `docs/research_note_profit_moonshot_alpha_zoo_real_data_20260512.md`, new handoff doc.
+- Research docs to update/supersede: `docs/research_note/state_distilled.md`, `docs/research_note/research_note.md`, new handoff doc.
 
 ## RALPLAN-DR summary
 ### Principles
@@ -74,7 +74,7 @@ Implement a research-only `StateDistilledRegimeBoostPortfolio` path that consume
    - Add focused regression tests if helper extraction touches existing validator/replay scripts.
 
 8. **Docs and handoff**
-   - Update/supersede `docs/research_note_profit_moonshot_state_distilled_20260511.md` and, if Alpha Zoo/current-tail chronology changes, `docs/research_note_profit_moonshot_alpha_zoo_real_data_20260512.md`.
+   - Update/supersede `docs/research_note/state_distilled.md` and, if Alpha Zoo/current-tail chronology changes, `docs/research_note/research_note.md`.
    - Add `docs/session_handoff_20260513_state_distilled_regime_boost.md` with commands, artifacts, selected config, strict/diagnostic lane decision, CI status.
    - Update research history only if global chronology/source ledger changed; otherwise document why not.
 
@@ -87,7 +87,7 @@ Implement a research-only `StateDistilledRegimeBoostPortfolio` path that consume
 - Add: `tests/test_profit_moonshot_regime_boost_portfolio.py`
 - Maybe edit: `scripts/research/run_profit_moonshot_liquidation_aware_validation.py` only for safe helper reuse/extraction if needed.
 - Maybe edit: `scripts/research/replay_profit_moonshot_fresh_start.py` only if candidate artifact parsing must expose reusable state-distilled helpers.
-- Edit docs: `docs/research_note_profit_moonshot_state_distilled_20260511.md`, maybe `docs/research_note_profit_moonshot_alpha_zoo_real_data_20260512.md`, add `docs/session_handoff_20260513_state_distilled_regime_boost.md`.
+- Edit docs: `docs/research_note/state_distilled.md`, maybe `docs/research_note/research_note.md`, add `docs/session_handoff_20260513_state_distilled_regime_boost.md`.
 - New artifacts: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/state_distilled_regime_boost_20260513/`.
 
 ## Acceptance criteria

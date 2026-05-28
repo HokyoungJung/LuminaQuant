@@ -24,7 +24,7 @@ Previous high-return candidates were later rejected because their apparent edge 
 
 ## Functional requirements
 1. **Research-history artifact**
-   - Write `docs/profit_moonshot_research_history_20260510.md`.
+   - Write `docs/research_note/research_history.md`.
    - Write `var/reports/profit_moonshot_20260501/research_history/profit_moonshot_research_history_latest.md` and `.json`.
    - Add `.omx/notepad.md` pointer stating future profit-moonshot sessions must read the research history first.
    - The Markdown must be human-readable and grouped by chronology, strategy family, source/search ledger, invalidity lessons, and future-use instructions.

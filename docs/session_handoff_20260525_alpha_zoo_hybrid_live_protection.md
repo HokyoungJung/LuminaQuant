@@ -38,7 +38,7 @@ Hard safety flags remain:
 - Readiness checklist update: `docs/live-readiness/01-live-trading-checklist.md`
 - Paper readiness update: `docs/live-readiness/02-paper-trading-readiness.md`
 - Deployment safety note: `docs/DEPLOYMENT.md`
-- Research history: `docs/research_note_profit_moonshot_alpha_zoo_real_data_20260512.md`
+- Research history: `docs/research_note/research_note.md`
 - README summaries: `README.md`, `README_KR.md`
 
 ## Verification evidence

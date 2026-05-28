@@ -84,9 +84,9 @@ graph TD
 - 선택된 frozen source asset `ETHUSDT`, `SOLUSDT`, `TRXUSDT`에 대해 asset-generic 동작을 regression test로 확인했습니다. 더 넓은 asset은 동일한 paper/testnet evidence가 필요합니다.
 - 실제 paper/testnet fill, BBO spread, slippage, reject/timeout, reconciliation, protective-order telemetry가 10bps/replay-live parity 가정을 증명하기 전까지 real-money는 계속 차단됩니다.
 
-현재 operator handoff는 `docs/live-readiness/04-paper-trading-runbook.md`와 `docs/research_note_profit_moonshot_alpha_zoo_real_data_20260512.md`를 기준으로 합니다.
+현재 operator handoff는 `docs/live-readiness/04-paper-trading-runbook.md`와 `docs/research_note/research_note.md`를 기준으로 합니다.
 
-연구노트는 cache가 아니라 `docs/`에 둡니다. 현재 기본 노트는 `docs/research_note_profit_moonshot_alpha_zoo_real_data_20260512.md`, 전체 이력은 `docs/profit_moonshot_research_history_20260510.md`, 세션 checkpoint는 `.omx/notepad.md`, 큰 생성 증거는 `var/reports/`에 보존합니다. 삭제 전 `docs/kr/LOCAL_ARTIFACT_CLEANUP.md`를 기준으로 확인하세요.
+연구노트는 cache가 아니라 `docs/`에 둡니다. 현재 표준 연구노트 디렉터리는 `docs/research_note/`입니다 (`research_note.md`가 현재 노트, `research_history.md`가 전체 ledger), 세션 checkpoint는 `.omx/notepad.md`, 큰 생성 증거는 `var/reports/`에 보존합니다. 삭제 전 `docs/kr/LOCAL_ARTIFACT_CLEANUP.md`를 기준으로 확인하세요.
 
 ---
 

@@ -4,9 +4,9 @@ Use this when the leader workspace accumulates local caches, build outputs, and 
 
 ## Research-note and evidence locations
 
-- Primary Alpha Zoo research note: `docs/research_note_profit_moonshot_alpha_zoo_real_data_20260512.md`
-- State-distilled research note: `docs/research_note_profit_moonshot_state_distilled_20260511.md`
-- Global research history/source ledger: `docs/profit_moonshot_research_history_20260510.md`
+- Primary Alpha Zoo research note: `docs/research_note/research_note.md`
+- State-distilled research note: `docs/research_note/state_distilled.md`
+- Global research history/source ledger: `docs/research_note/research_history.md`
 - Session handoffs: `docs/session_handoff_*.md`
 - Operator live/paper runbooks: `docs/live-readiness/`
 - Session checkpoint memory: `.omx/notepad.md`

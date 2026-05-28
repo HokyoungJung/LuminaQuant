@@ -67,7 +67,7 @@ Max observed peak RSS: `1239.703125 MiB`; pass under 8 GiB: `true`.
 
 ## Research history/source ledger
 
-`docs/profit_moonshot_research_history_20260510.md` and `var/reports/.../research_history/` were **not regenerated**: this session reused existing repo-local artifacts and did not add a new global source family or source-ledger chronology.
+`docs/research_note/research_history.md` and `var/reports/.../research_history/` were **not regenerated**: this session reused existing repo-local artifacts and did not add a new global source family or source-ledger chronology.
 
 ## Verification status
 

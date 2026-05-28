@@ -84,9 +84,9 @@ The current private Alpha Zoo live handoff is **paper/testnet-only**. It is not 
 - Asset applicability is regression-tested across the selected frozen source assets `ETHUSDT`, `SOLUSDT`, and `TRXUSDT`; broader assets still need the same paper/testnet evidence before promotion.
 - Real-money remains blocked until actual paper/testnet fill, BBO spread, slippage, reject/timeout, reconciliation, and protective-order telemetry prove the 10bps/replay-live parity assumptions.
 
-See `docs/live-readiness/04-paper-trading-runbook.md` and `docs/research_note_profit_moonshot_alpha_zoo_real_data_20260512.md` for the current operator handoff.
+See `docs/live-readiness/04-paper-trading-runbook.md` and `docs/research_note/research_note.md` for the current operator handoff.
 
-Research notes are intentionally kept under `docs/` rather than local caches: the primary current note is `docs/research_note_profit_moonshot_alpha_zoo_real_data_20260512.md`, global history is `docs/profit_moonshot_research_history_20260510.md`, session checkpoints live in `.omx/notepad.md`, and large generated evidence remains under `var/reports/`. See `docs/LOCAL_ARTIFACT_CLEANUP.md` before deleting local artifacts.
+Research notes are intentionally kept under `docs/` rather than local caches: the canonical research-note directory is `docs/research_note/` (`research_note.md` for the current note and `research_history.md` for the global ledger), session checkpoints live in `.omx/notepad.md`, and large generated evidence remains under `var/reports/`. See `docs/LOCAL_ARTIFACT_CLEANUP.md` before deleting local artifacts.
 
 ---
 

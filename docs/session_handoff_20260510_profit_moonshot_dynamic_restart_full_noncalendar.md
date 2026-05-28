@@ -74,7 +74,7 @@ Final decision artifact: `var/reports/profit_moonshot_20260501/dynamic_restart_f
 
 Research history was regenerated after this run:
 
-- `docs/profit_moonshot_research_history_20260510.md`
+- `docs/research_note/research_history.md`
 - `var/reports/profit_moonshot_20260501/research_history/profit_moonshot_research_history_latest.json`
 - `var/reports/profit_moonshot_20260501/research_history/profit_moonshot_research_history_latest.md`
 

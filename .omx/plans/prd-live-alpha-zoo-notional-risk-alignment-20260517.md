@@ -113,7 +113,7 @@ For the current 7x/0.15 candidate, the intended high-performance interpretation 
    - Do not place real orders.
 
 6. **Docs and handoff**
-   - Update `docs/research_note_profit_moonshot_alpha_zoo_real_data_20260512.md`.
+   - Update `docs/research_note/research_note.md`.
    - Update `.omx/notepad.md`.
    - Add a session handoff with final artifact paths and exact next command/prompt.
    - State explicitly whether global research history/source ledger changed; likely no if only same-source latest-tail artifacts are reused.

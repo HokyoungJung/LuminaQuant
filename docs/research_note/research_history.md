@@ -191,7 +191,7 @@ Future profit-moonshot sessions must read this file before repeating searches or
 - Leverage/liquidation: records integer-leverage policy as a gate / records liquidation/margin evidence as a gate
 - Decision: `require_future_sessions_to_read_first` — Research memory is part of the live-promotion contract.
 - Source ledger refs: agent_log:var_reports_exact_window_backtests_followup_status_portfolio_incumbent_autoresearch_grouped_carry_trend_production_retune_current_research_run_1h_guarded_candidate_research_progress_20260418t134826z_log, agent_log:var_reports_exact_window_backtests_followup_status_portfolio_incumbent_autoresearch_grouped_carry_trend_production_retune_current_research_run_1h_guarded_full_features_candidate_research_progress_20260418t151350z_log, agent_log:var_reports_exact_window_backtests_followup_status_portfolio_incumbent_autoresearch_grouped_carry_trend_production_retune_current_research_run_1h_guarded_top5_candidate_research_progress_20260418t135820z_log, agent_log:var_reports_exact_window_backtests_followup_status_portfolio_incumbent_autoresearch_grouped_carry_trend_production_retune_current_research_run_1h_guarded_top5_candidate_research_progress_20260418t140840z_log, agent_log:var_reports_exact_window_backtests_followup_status_portfolio_incumbent_autoresearch_grouped_carry_trend_production_retune_current_research_run_1h_guarded_top5_candidate_research_progress_20260418t141637z_log, agent_log:var_reports_exact_window_backtests_followup_status_portfolio_incumbent_autoresearch_grouped_carry_trend_production_retune_current_research_run_1h_guarded_top5_features_candidate_research_progress_20260418t143713z_log, agent_log:var_reports_exact_window_backtests_followup_status_portfolio_incumbent_autoresearch_grouped_carry_trend_production_retune_current_research_run_4h_trendcarry_full_features_candidate_research_progress_20260418t153452z_log, agent_log:var_reports_exact_window_backtests_followup_status_portfolio_incumbent_autoresearch_grouped_carry_trend_production_retune_current_research_run_4h_trendcarry_top5_candidate_research_progress_20260418t142447z_log
-- Artifacts: docs/profit_moonshot_research_history_20260510.md, var/reports/profit_moonshot_20260501/research_history/profit_moonshot_research_history_latest.json
+- Artifacts: docs/research_note/research_history.md, var/reports/profit_moonshot_20260501/research_history/profit_moonshot_research_history_latest.json
 
 ## Git commit research ledger
 - 2026-03-01 `eac4adc` — feat: add advanced quant research pipeline and optimizer (profit_moonshot_research_history)
@@ -2851,7 +2851,7 @@ Future profit-moonshot sessions must read this file before repeating searches or
 - `local_artifact:omx_plans_test_spec_profit_moonshot_live_final_selection_20260510_md` (mapped) — 2026-05-10 — .omx/plans/test-spec-profit-moonshot-live-final-selection-20260510.md
 - `local_artifact:omx_plans_test_spec_profit_moonshot_strategy_validity_audit_20260510_md` (mapped) — 2026-05-10 — .omx/plans/test-spec-profit-moonshot-strategy-validity-audit-20260510.md
 - `local_artifact:docs_next_session_prompt_profit_moonshot_liquidation_aware_20260510_md` (mapped) — 2026-05-10 — docs/next_session_prompt_profit_moonshot_liquidation_aware_20260510.md
-- `local_artifact:docs_profit_moonshot_research_history_20260510_md` (mapped) — 2026-05-10 — docs/profit_moonshot_research_history_20260510.md
+- `local_artifact:docs_research_note_research_history_md` (mapped) — 2026-05-10 — docs/research_note/research_history.md
 - `local_artifact:docs_session_handoff_20260510_profit_moonshot_dynamic_restart_full_noncalendar_md` (mapped) — 2026-05-10 — docs/session_handoff_20260510_profit_moonshot_dynamic_restart_full_noncalendar.md
 - `local_artifact:docs_session_handoff_20260510_profit_moonshot_liquidation_aware_5x_md` (mapped) — 2026-05-10 — docs/session_handoff_20260510_profit_moonshot_liquidation_aware_5x.md
 - `local_artifact:docs_session_handoff_20260510_profit_moonshot_liquidation_next_md` (mapped) — 2026-05-10 — docs/session_handoff_20260510_profit_moonshot_liquidation_next.md
@@ -8325,10 +8325,10 @@ Future profit-moonshot sessions must read this file before repeating searches or
 - Staleness/recheck: Recheck when data coverage, venue docs, or strategy family changes. / `False`
 - Do-not-repeat note: Check this normalized key before repeating the same local/source search.
 
-### `local_artifact:docs_profit_moonshot_research_history_20260510_md`
+### `local_artifact:docs_research_note_research_history_md`
 - Research dates: 2026-05-10
 - Source type: `local_artifact`
-- Title/path: profit moonshot research history 20260510 — docs/profit_moonshot_research_history_20260510.md
+- Title/path: research note history — docs/research_note/research_history.md
 - Content summary: # Profit Moonshot Research History — March-to-May Dynamic Restart Ledger Future profit-moonshot sessions must read this file before repeating searches or promoting candidates. ## Generation metadata - schema_version: `profit_moonshot_research_history.v1` - gen...
 - What was used: Used to require conservative liquidation, margin-buffer, and account-wipeout evidence.
 - Families: dynamic_hybrid_allocator, dynamic_portfolio_allocator, exact_window_validation, integer_leverage, liquidation_aware_replay, liquidity_taker_flow, live_equivalent_validation, raw_first_data_pipeline, residual_pair_reversion, source_history_ledger, timeframe_sweep, trend_momentum, walk_forward_validation
@@ -32477,7 +32477,7 @@ Future profit-moonshot sessions must read this file before repeating searches or
 - Missing strategy-validity, source-ledger, split, liquidation, or memory evidence fails closed.
 
 ## Future-use instructions
-- Read docs/profit_moonshot_research_history_20260510.md before new profit-moonshot searches.
+- Read docs/research_note/research_history.md before new profit-moonshot searches.
 - Check source_search_ledger.normalized_key before repeating funding/OI/taker/liquidation/external-venue/literature searches.
 - Use train+validation only for ranking/tuning; keep locked-OOS gate/report-only.
 - Update this history after every material profit-moonshot research pass.

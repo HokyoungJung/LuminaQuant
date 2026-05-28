@@ -28,7 +28,7 @@
 - 최신 paper/testnet handoff: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_integer_leverage_optuna_hybrid_decision_20260524/paper_testnet_live_decision_latest.json`
 - 요약 문서: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_integer_leverage_optuna_hybrid_decision_20260524/paper_testnet_live_decision_latest.md`
 - 운영 런북: `docs/live-readiness/04-paper-trading-runbook.md`
-- 연구 노트: `docs/research_note_profit_moonshot_alpha_zoo_real_data_20260512.md`
+- 연구 노트: `docs/research_note/research_note.md`
 
 현재 판정:
 

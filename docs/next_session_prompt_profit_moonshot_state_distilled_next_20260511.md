@@ -8,7 +8,7 @@ $ralplan $team $ralph 이어서 진행해. 작업 디렉터리는 /home/hoky/Qua
 먼저 아래 파일들을 읽어:
 - .omx/plans/profit_moonshot_state_distilled_next_plan_20260511.md
 - docs/session_handoff_20260511_profit_moonshot_state_distilled_leadership_unwind.md
-- docs/research_note_profit_moonshot_state_distilled_20260511.md
+- docs/research_note/state_distilled.md
 - docs/next_session_prompt_profit_moonshot_state_distilled_next_20260511.md
 - var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/state_distilled_leadership_unwind_20260511/fresh_start_overhaul_replay_latest.json
 - var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/state_distilled_leadership_unwind_20260511/fresh_start_overhaul_replay_candidates.csv

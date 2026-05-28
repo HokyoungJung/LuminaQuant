@@ -120,7 +120,7 @@ $ralplan $team $ralph 이어서 진행해. 작업 디렉터리는 /home/hoky/Qua
 
 반드시 먼저 읽어:
 - .omx/plans/plan-alpha-zoo-7x-paper-forward-live-preflight-20260519.md
-- docs/research_note_profit_moonshot_alpha_zoo_real_data_20260512.md
+- docs/research_note/research_note.md
 - .omx/notepad.md
 - var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_10bps_full_retune_20260519/alpha_zoo_10bps_full_retune_latest.json
 - var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_10bps_full_retune_20260519/low_correlation_discovery_latest.json

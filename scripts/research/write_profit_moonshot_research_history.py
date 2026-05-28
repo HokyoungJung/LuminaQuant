@@ -24,7 +24,7 @@ DEFAULT_ROOTS = (
     Path(".omx/plans"),
     Path("var/reports"),
 )
-DEFAULT_DOCS_PATH = Path("docs/profit_moonshot_research_history_20260510.md")
+DEFAULT_DOCS_PATH = Path("docs/research_note/research_history.md")
 DEFAULT_REPORT_DIR = Path("var/reports/profit_moonshot_20260501/research_history")
 DEFAULT_NOTEPAD_PATH = Path(".omx/notepad.md")
 DATE_RE = re.compile(r"20(26)[-_]?(0[1-9]|1[0-2])[-_]?(0[1-9]|[12]\d|3[01])")
@@ -1337,7 +1337,7 @@ def build_research_history_payload(
             "Missing strategy-validity, source-ledger, split, liquidation, or memory evidence fails closed.",
         ],
         "future_session_instructions": [
-            "Read docs/profit_moonshot_research_history_20260510.md before new profit-moonshot searches.",
+            "Read docs/research_note/research_history.md before new profit-moonshot searches.",
             "Check source_search_ledger.normalized_key before repeating funding/OI/taker/liquidation/external-venue/literature searches.",
             "Use train+validation only for ranking/tuning; keep locked-OOS gate/report-only.",
             "Update this history after every material profit-moonshot research pass.",

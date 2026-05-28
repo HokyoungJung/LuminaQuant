@@ -120,7 +120,7 @@ def test_research_history_writer_emits_markdown_and_json(tmp_path: Path) -> None
     (source_root / "profit_moonshot_next_hypotheses_20260508.md").write_text(
         "dynamic momentum residual funding OI research handoff\n", encoding="utf-8"
     )
-    output_doc = tmp_path / "docs" / "profit_moonshot_research_history_20260510.md"
+    output_doc = tmp_path / "docs" / "research_note" / "research_history.md"
     report_dir = tmp_path / "var" / "reports" / "profit_moonshot_20260501" / "research_history"
 
     payload = MODULE.build_research_history_payload(

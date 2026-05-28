@@ -31,4 +31,4 @@ New common-split artifacts under `var/reports/profit_moonshot_20260501/current_t
 - New/updated common-split runner under `scripts/research/`.
 - Existing hybrid runner `scripts/research/run_profit_moonshot_hybrid_v35_v36_fixed_inputs.py` may be reused with common Alpha Zoo replay/calibration paths.
 - Tests under `tests/test_profit_moonshot_hybrid_v35_v36_fixed_inputs.py` and Alpha Zoo state/validation tests may need additions for common-split invariants.
-- Docs: `docs/research_note_profit_moonshot_alpha_zoo_real_data_20260512.md`, new `docs/session_handoff_20260517_common_split_alpha_zoo_hybrid_v35_v36.md`, `.omx/notepad.md`, maybe `.omx/plans/*`.
+- Docs: `docs/research_note/research_note.md`, new `docs/session_handoff_20260517_common_split_alpha_zoo_hybrid_v35_v36.md`, `.omx/notepad.md`, maybe `.omx/plans/*`.

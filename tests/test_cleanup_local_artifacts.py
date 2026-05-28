@@ -28,7 +28,7 @@ def test_discovery_preserves_research_notes_data_and_evidence_roots(tmp_path: Pa
         "data/market_parquet/BTCUSDT.parquet",
         "var/reports/profit_moonshot_20260501/result.json",
         "var/logs/reboot_validation_20260416/01_run.log",
-        "docs/research_note_profit_moonshot_alpha_zoo_real_data_20260512.md",
+        "docs/research_note/research_note.md",
         ".omx/notepad.md",
         ".omx/context/profit-moonshot.md",
         ".omx/plans/ralplan-profit-moonshot.md",
@@ -98,7 +98,7 @@ def test_apply_removes_only_generated_local_artifacts(tmp_path: Path) -> None:
         "data/market_parquet/BTCUSDT.parquet",
         "var/reports/profit_moonshot_20260501/result.json",
         "var/logs/reboot_validation_20260416/01_run.log",
-        "docs/research_note_profit_moonshot_alpha_zoo_real_data_20260512.md",
+        "docs/research_note/research_note.md",
         ".omx/notepad.md",
         ".env",
     ]
