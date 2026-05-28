@@ -32,7 +32,8 @@ Scope: refreshed-data Alpha Zoo Optuna hybrid standard live refit with latest 8 
 - `uv run ruff check <changed files>` → passed.
 - `uv run pytest tests/test_alpha_zoo_live_training_policy.py tests/test_alpha_zoo_integer_leverage_optuna_hybrid_decision.py tests/test_native_hybrid_optuna_backend.py -q` → `12 passed`, max RSS `176,400 KiB`.
 - `uv run python -m compileall -q src scripts tests` → passed, max RSS `38,696 KiB`.
-- `uv run ruff check .` → passed, max RSS `69,572 KiB`.
+- `uv run ruff format --check .` → passed after formatting three files, max RSS `76,176 KiB`.
+- `uv run ruff check .` → passed, max RSS `38,056 KiB`.
 - `uv run python scripts/check_architecture.py` → passed.
 - `uv run python scripts/verify_docs.py` → passed (`117 markdown files checked`).
 - `uv run python scripts/audit_hardcoded_params.py` → `total=567 new=0 baselined=567`.

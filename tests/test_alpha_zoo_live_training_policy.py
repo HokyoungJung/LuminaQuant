@@ -12,15 +12,9 @@ from lumina_quant.alpha_zoo.live_training_policy import (
 
 
 def test_latest_complete_bar_does_not_include_incomplete_boundary_bar() -> None:
-    assert format_utc(latest_complete_bar_start("2026-05-28T11:00:00Z")) == (
-        "2026-05-28T10:00:00Z"
-    )
-    assert format_utc(latest_complete_bar_start("2026-05-28T11:42:00Z")) == (
-        "2026-05-28T10:00:00Z"
-    )
-    assert format_utc(latest_complete_bar_start("2026-05-28T10:59:58Z")) == (
-        "2026-05-28T10:00:00Z"
-    )
+    assert format_utc(latest_complete_bar_start("2026-05-28T11:00:00Z")) == ("2026-05-28T10:00:00Z")
+    assert format_utc(latest_complete_bar_start("2026-05-28T11:42:00Z")) == ("2026-05-28T10:00:00Z")
+    assert format_utc(latest_complete_bar_start("2026-05-28T10:59:58Z")) == ("2026-05-28T10:00:00Z")
 
 
 def test_standard_live_training_plan_uses_latest_8_weeks_and_empty_oos() -> None:

@@ -615,7 +615,9 @@ def _learn_params(
         )
     )
     ratio_floor = float(min(params.default_weight_ratio_floor, params.default_weight_ratio_ceiling))
-    ratio_ceiling = float(max(params.default_weight_ratio_floor, params.default_weight_ratio_ceiling))
+    ratio_ceiling = float(
+        max(params.default_weight_ratio_floor, params.default_weight_ratio_ceiling)
+    )
     ratio_steps = max(2, int(params.default_weight_ratio_steps))
     ratios = tuple(float(x) for x in np.linspace(ratio_floor, ratio_ceiling, ratio_steps))
     cv_start = max(2, warmup_n // 2)
@@ -1056,7 +1058,9 @@ def _base_rows(
 
 
 def _choose_selected_optuna_result(results: Sequence[OptunaModelResult]) -> OptunaModelResult:
-    train_val_pass = [result for result in results if not grid_hybrid._selection_reasons(result.row)]
+    train_val_pass = [
+        result for result in results if not grid_hybrid._selection_reasons(result.row)
+    ]
     pool = train_val_pass or list(results)
     # locked-OOS is not in the sort key. Report-only gate may still reject the
     # candidate after the frozen train+validation selection.
@@ -1118,10 +1122,10 @@ def _render_markdown(payload: Mapping[str, Any]) -> str:
         )
     lines.extend(
         [
-        "## Comparison",
-        "",
-        "| Profile | Version | Optimizer | Weights/avg TV weights | Gross | Train | Val | OOS report-only | Val MDD | OOS MDD | RPT T/V/OOS bps | Paper candidate |",
-        "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
+            "## Comparison",
+            "",
+            "| Profile | Version | Optimizer | Weights/avg TV weights | Gross | Train | Val | OOS report-only | Val MDD | OOS MDD | RPT T/V/OOS bps | Paper candidate |",
+            "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
         ]
     )
     for row in payload["comparison_rows"]:
@@ -1262,7 +1266,9 @@ def build_payload_from_inputs(
             selected = selected_final_result.row
             selected["selection_evidence_metrics"] = _selected_metric_summary(selection_evidence)
         comparison_rows = [*base_rows, grid_row, v35.row, v36.row]
-        corr_train_validation = grid_hybrid._profile_corr_matrix(profile_streams, split="train_validation")
+        corr_train_validation = grid_hybrid._profile_corr_matrix(
+            profile_streams, split="train_validation"
+        )
         corr_validation = grid_hybrid._profile_corr_matrix(profile_streams, split="validation")
         corr_oos = grid_hybrid._profile_corr_matrix(profile_streams, split="locked_oos")
 
@@ -1441,7 +1447,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=20260524)
     parser.add_argument("--standard-live-refit", action="store_true")
     parser.add_argument("--final-refit", action="store_true")
-    parser.add_argument("--prior-artifact", default=str(DEFAULT_OUTPUT_DIR / "alpha_zoo_integer_leverage_optuna_hybrid_decision_latest.json"))
+    parser.add_argument(
+        "--prior-artifact",
+        default=str(
+            DEFAULT_OUTPUT_DIR / "alpha_zoo_integer_leverage_optuna_hybrid_decision_latest.json"
+        ),
+    )
     return parser.parse_args(argv)
 
 

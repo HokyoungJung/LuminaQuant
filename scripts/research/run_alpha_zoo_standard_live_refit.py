@@ -37,7 +37,8 @@ from scripts.research import run_alpha_zoo_integer_leverage_optuna_hybrid_decisi
 
 DEFAULT_OUTPUT_DIR = optuna_hybrid.DEFAULT_STANDARD_LIVE_REFIT_OUTPUT_DIR
 DEFAULT_PRIOR_ARTIFACT = (
-    optuna_hybrid.DEFAULT_OUTPUT_DIR / "alpha_zoo_integer_leverage_optuna_hybrid_decision_latest.json"
+    optuna_hybrid.DEFAULT_OUTPUT_DIR
+    / "alpha_zoo_integer_leverage_optuna_hybrid_decision_latest.json"
 )
 
 
@@ -92,7 +93,9 @@ def _data_coverage(data_root: Path, symbols: Sequence[str]) -> dict[str, Any]:
     latest_values = [row.get("latest") for row in rows if row.get("latest")]
     if not latest_values:
         raise ValueError(f"no local 1s OHLCV coverage found under {data_root}")
-    latest_datetimes = [datetime.fromisoformat(str(value).replace("Z", "+00:00")) for value in latest_values]
+    latest_datetimes = [
+        datetime.fromisoformat(str(value).replace("Z", "+00:00")) for value in latest_values
+    ]
     common_end = min(latest_datetimes)
     return {
         "data_root": str(data_root),
@@ -104,7 +107,9 @@ def _data_coverage(data_root: Path, symbols: Sequence[str]) -> dict[str, Any]:
     }
 
 
-def _comparison_delta(new_row: Mapping[str, Any], old_row: Mapping[str, Any] | None) -> dict[str, Any]:
+def _comparison_delta(
+    new_row: Mapping[str, Any], old_row: Mapping[str, Any] | None
+) -> dict[str, Any]:
     if not old_row:
         return {}
     keys = [
@@ -161,7 +166,9 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     )
     # Re-write after adding the small comparison delta.
     latest = Path(payload["output_paths"]["latest_json"])
-    latest.write_text(json.dumps(_json_safe(payload), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    latest.write_text(
+        json.dumps(_json_safe(payload), indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     timestamped = Path(payload["output_paths"]["timestamped_json"])
     timestamped.write_text(
         json.dumps(_json_safe(payload), indent=2, sort_keys=True) + "\n", encoding="utf-8"
@@ -171,7 +178,10 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--integer-portfolio-artifact", default=str(optuna_hybrid.DEFAULT_INTEGER_PORTFOLIO_ARTIFACT))
+    parser.add_argument(
+        "--integer-portfolio-artifact",
+        default=str(optuna_hybrid.DEFAULT_INTEGER_PORTFOLIO_ARTIFACT),
+    )
     parser.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_DIR))
     parser.add_argument("--data-root", default=str(optuna_hybrid.ilp.DEFAULT_DATA_ROOT))
     parser.add_argument("--feature-root", default=str(optuna_hybrid.ilp.DEFAULT_FEATURE_ROOT))
