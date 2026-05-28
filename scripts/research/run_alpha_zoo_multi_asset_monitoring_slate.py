@@ -26,6 +26,13 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from lumina_quant.research_universe import (  # noqa: E402
+    BINANCE_TRADFI_ENERGY_INDUSTRIAL_COMMODITY_SYMBOLS,
+    BINANCE_TRADFI_EQUITY_SYMBOLS,
+    BINANCE_TRADFI_ETF_INDEX_SYMBOLS,
+    BINANCE_TRADFI_PRECIOUS_METAL_SYMBOLS,
+    BINANCE_TRADFI_PREMARKET_SYMBOLS,
+)
 from scripts.research import run_alpha_zoo_30m_plus_alpha_feedback_discovery as feedback  # noqa: E402
 
 ALPHA_V2_ROOT = REPO_ROOT / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2"
@@ -59,7 +66,11 @@ ASSET_GROUPS: dict[str, tuple[str, ...]] = {
     "crypto_high_beta_alt": ("SOLUSDT", "AVAXUSDT", "DOGEUSDT", "TONUSDT", "ADAUSDT"),
     "crypto_payment_alt": ("TRXUSDT", "XRPUSDT"),
     "crypto_exchange_beta": ("BNBUSDT",),
-    "precious_metal_proxy": ("XAUUSDT", "XAGUSDT", "XPTUSDT", "XPDUSDT"),
+    "precious_metal_proxy": BINANCE_TRADFI_PRECIOUS_METAL_SYMBOLS,
+    "tradfi_energy_industrial_commodity": BINANCE_TRADFI_ENERGY_INDUSTRIAL_COMMODITY_SYMBOLS,
+    "tradfi_etf_index": BINANCE_TRADFI_ETF_INDEX_SYMBOLS,
+    "tradfi_equity": BINANCE_TRADFI_EQUITY_SYMBOLS,
+    "tradfi_premarket": BINANCE_TRADFI_PREMARKET_SYMBOLS,
 }
 
 BLOCKED_REAL_MONEY_FLAG_KEYS = frozenset(

@@ -217,6 +217,8 @@ uv run python scripts/sync_binance_ohlcv.py \
 
 Public 저장소에는 DB 동기화/구축 헬퍼를 의도적으로 포함하지 않습니다. 사전 구축된 DB 파일 또는 CSV 데이터를 사용하세요.
 
+확장 Binance research universe(private 저장소): `src/lumina_quant/research_universe.py`에 2026-05-28 기준 10개 core crypto + 58개 Binance USD-M `TRADIFI_PERPETUAL` 심볼 snapshot을 side-effect-free 상수로 기록했습니다. 이후 staged refresh/coverage inventory 작업에는 `BINANCE_EXTENDED_RESEARCH_SYMBOLS_SLASHED`를 사용합니다. 목록 추가는 데이터 수집을 실행하지 않으며 real-money 승인이 아닙니다. `docs/kr/RUNBOOK_1Y_1S_LOCAL.md` 및 `docs/research_note/research_note.md`를 참고하세요.
+
 **Raw aggTrades → 커밋된 materialized 파이프라인 (Private 저장소):**
 ```bash
 # 0) 최초 부트스트랩(권장): 처음 1회는 --since를 명시하세요.

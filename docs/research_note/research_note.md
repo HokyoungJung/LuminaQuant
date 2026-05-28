@@ -15,6 +15,27 @@ Current live/paper-testnet identity:
 
 Prepend new research diary entries below this heading. The legacy historical entries were reordered newest-first during the 2026-05-28 naming cleanup.
 
+## 2026-05-28 KST — Binance TradFi perpetual universe added for future monitoring/refits
+
+Recorded the current Binance USD-M `TRADIFI_PERPETUAL` research universe without running any data collection. Source check: `Binance USD-M Futures /fapi/v1/exchangeInfo` at `2026-05-28T13:40:47Z`. The standard expanded research universe is now `68` compact USDT symbols: `10` core crypto plus `58` TradFi perpetual symbols. Future refresh/monitoring jobs should keep these symbols current and make them available to strategy discovery, but every new asset remains shadow/research-only until it passes the standard latest-8-week validation, final-refit, paper/testnet handoff, and live telemetry gates. Real-money flags remain hard-false.
+
+Core crypto watch set (`10`): `BTCUSDT`, `ETHUSDT`, `SOLUSDT`, `BNBUSDT`, `TRXUSDT`, `XRPUSDT`, `DOGEUSDT`, `ADAUSDT`, `AVAXUSDT`, `TONUSDT`.
+
+TradFi groups (`58` total):
+
+- Commodity / metal / energy proxies (`8`): `XAUUSDT`, `XAGUSDT`, `XPTUSDT`, `XPDUSDT`, `COPPERUSDT`, `CLUSDT`, `BZUSDT`, `NATGASUSDT`.
+- ETF / index-linked proxies (`5`): `QQQUSDT`, `SPYUSDT`, `EWYUSDT`, `EWJUSDT`, `SOXLUSDT`.
+- Equity-linked proxies (`43`): `TSLAUSDT`, `INTCUSDT`, `HOODUSDT`, `MSTRUSDT`, `AMZNUSDT`, `CRCLUSDT`, `COINUSDT`, `PLTRUSDT`, `PAYPUSDT`, `METAUSDT`, `NVDAUSDT`, `GOOGLUSDT`, `AAPLUSDT`, `TSMUSDT`, `MUUSDT`, `SNDKUSDT`, `MSFTUSDT`, `AVGOUSDT`, `BABAUSDT`, `AMDUSDT`, `QCOMUSDT`, `USARUSDT`, `LITEUSDT`, `ORCLUSDT`, `DISUSDT`, `UBERUSDT`, `CSCOUSDT`, `HDUSDT`, `MRVLUSDT`, `CRWVUSDT`, `WMTUSDT`, `JPMUSDT`, `VUSDT`, `BRKBUSDT`, `FLNCUSDT`, `DRAMUSDT`, `RKLBUSDT`, `CBRSUSDT`, `NBISUSDT`, `WDCUSDT`, `ARMUSDT`, `BEUSDT`, `COHRUSDT`.
+- Premarket / not-yet-standardized equity proxies (`2`): `SPCXUSDT`, `OPENAIUSDT`.
+
+Implementation notes: added the side-effect-free canonical list in `src/lumina_quant/research_universe.py`; wired `scripts/research/build_multiasset_exchange_coverage_inventory.py` defaults to that expanded slashed universe; and expanded `scripts/research/run_alpha_zoo_multi_asset_monitoring_slate.py` asset-group fallbacks so future artifacts can classify all TradFi candidates. This did **not** modify the frozen selected live strategy universe or execute a backfill. `AlphaZooOptunaHybridLiveStrategy` remains the current paper/testnet strategy identity; the `profit_moonshot_alpha_zoo` path remains only a historical artifact namespace.
+
+Estimated data-refresh effort if all 2025-to-current data is refreshed later under the 8GB memory budget: existing local storage already has `14` symbols with roughly `429M` 1s rows. A naive full-calendar `68`-symbol upper bound would be about `3.0B` 1s rows, but current Binance `onboardDate` evidence means the 58 TradFi perps only have about `241M` possible 1s rows from launch through `2026-05-28T13:40:47Z`. The practical full available universe is therefore roughly `684M` rows, with incremental missing coverage from the current local store around `250-300M` rows before retries and compaction overhead. For an update from the current repo data state, expect about `8-18h` staged under 8GB (`~2-6h` existing crypto/metals tails plus `~6-12h` TradFi batches if archives/API are cooperative). A cold full rebuild of all available 2025-to-current coverage should be scheduled as `18-36h`; `2-3d` is the realistic worst-case if missing archives, API backfill, retries, or low-parallelism constraints dominate.
+
+No data collection was run for this documentation/code universe update.
+
+---
+
 ## 2026-05-28 KST — Standard live-refit rule: latest 8-week validation + Optuna full-parameter final refit
 
 Established the new system standard for live-facing Alpha Zoo refits: update local raw-first/committed market data first, reserve the latest **8 complete weeks** as validation, tune all exposed strategy-internal hybrid parameters with Optuna, select using train+validation evidence while fitting/learning on train only, then run a final refit on train+validation for the frozen paper/testnet runtime artifact. There is intentionally no locked-OOS/test set in this live final-refit mode; the final live artifact is frozen after refit and does not self-train online. Warmup remains a ratio inside the train window and is now part of the Optuna search space. Real-money flags remain hard-false.

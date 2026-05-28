@@ -11,20 +11,13 @@ from typing import Any
 
 from lumina_quant.config import BaseConfig
 from lumina_quant.data.support_inventory import build_strategy_support_inventory
+from lumina_quant.research_universe import BINANCE_EXTENDED_RESEARCH_SYMBOLS_SLASHED
 
 DEFAULT_OUTPUT_DIR = (
     Path(__file__).resolve().parents[2]
     / "var/reports/profit_moonshot_20260501/current_tail_20260506/multiasset_exchange_expansion"
 )
-DEFAULT_SYMBOLS = (
-    "BTC/USDT",
-    "ETH/USDT",
-    "SOL/USDT",
-    "XAU/USDT",
-    "XAG/USDT",
-    "XPT/USDT",
-    "XPD/USDT",
-)
+DEFAULT_SYMBOLS = BINANCE_EXTENDED_RESEARCH_SYMBOLS_SLASHED
 SPLITS = {
     "train": ("2025-01-01", "2025-12-31"),
     "val": ("2026-01-01", "2026-02-28"),

@@ -21,10 +21,20 @@ uv run python scripts/init_postgres_schema.py --dsn "$LQ_POSTGRES_DSN"
 - `Quants-agent` (private source-of-truth)
 - `LuminaQuant` (public mirror)
 
-Use the default 12-symbol universe via env override:
+Use the standard extended research universe via env override. The canonical list is
+`lumina_quant.research_universe.BINANCE_EXTENDED_RESEARCH_SYMBOLS_SLASHED`: 10 core crypto
+symbols plus the Binance USD-M `TRADIFI_PERPETUAL` snapshot recorded on 2026-05-28
+(58 commodity / ETF-index / equity / premarket symbols). These symbols are research and
+shadow-monitoring inputs until the standard 8-week validation, final-refit, and
+paper/testnet gates pass; they are **not** real-money approvals.
 
 ```bash
-export LQ__TRADING__SYMBOLS='["BTC/USDT","ETH/USDT","XRP/USDT","BNB/USDT","SOL/USDT","TRX/USDT","DOGE/USDT","ADA/USDT","TON/USDT","AVAX/USDT","XAU/USDT","XAG/USDT"]'
+export LQ__TRADING__SYMBOLS="$(uv run python - <<'PY'
+import json
+from lumina_quant.research_universe import BINANCE_EXTENDED_RESEARCH_SYMBOLS_SLASHED
+print(json.dumps(list(BINANCE_EXTENDED_RESEARCH_SYMBOLS_SLASHED)))
+PY
+)"
 ```
 
 ---
@@ -33,7 +43,11 @@ export LQ__TRADING__SYMBOLS='["BTC/USDT","ETH/USDT","XRP/USDT","BNB/USDT","SOL/U
 
 ```bash
 uv run python scripts/sync_binance_ohlcv.py \
-  --symbols BTC/USDT ETH/USDT XRP/USDT BNB/USDT SOL/USDT TRX/USDT DOGE/USDT ADA/USDT TON/USDT AVAX/USDT XAU/USDT XAG/USDT \
+  --symbols $(uv run python - <<'PY'
+from lumina_quant.research_universe import BINANCE_EXTENDED_RESEARCH_SYMBOLS_SLASHED
+print(" ".join(BINANCE_EXTENDED_RESEARCH_SYMBOLS_SLASHED))
+PY
+) \
   --timeframe 1s \
   --db-path data/market_parquet \
   --exchange-id binance \
@@ -45,6 +59,11 @@ uv run python scripts/sync_binance_ohlcv.py \
   --retries 3 \
   --no-export-csv
 ```
+
+
+> 2026-05-28 note: do not run the extended refresh automatically during documentation
+> updates. A full 2025-to-current refresh for all 68 symbols should be scheduled as a
+> staged data job under the 8GB memory budget, not as an incidental docs/code change.
 
 Compact WAL into bounded monthly parquet files:
 
