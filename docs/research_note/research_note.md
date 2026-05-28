@@ -15,6 +15,39 @@ Current live/paper-testnet identity:
 
 Prepend new research diary entries below this heading. The legacy historical entries were reordered newest-first during the 2026-05-28 naming cleanup.
 
+## 2026-05-28 KST — Standard live-refit rule: latest 8-week validation + Optuna full-parameter final refit
+
+Established the new system standard for live-facing Alpha Zoo refits: update local raw-first/committed market data first, reserve the latest **8 complete weeks** as validation, tune all exposed strategy-internal hybrid parameters with Optuna, select using train+validation evidence while fitting/learning on train only, then run a final refit on train+validation for the frozen paper/testnet runtime artifact. There is intentionally no locked-OOS/test set in this live final-refit mode; the final live artifact is frozen after refit and does not self-train online. Warmup remains a ratio inside the train window and is now part of the Optuna search space. Real-money flags remain hard-false.
+
+Data refresh and split:
+
+- Watch universe refreshed/compacted for `BTCUSDT`, `ETHUSDT`, `SOLUSDT`, `BNBUSDT`, and `TRXUSDT` through `2026-05-28T10:59:59Z` in `data/market_parquet/market_ohlcv_1s/binance`.
+- Standard split from latest complete 1h bars: train `2025-01-01T00:00:00Z` → `2026-04-02T10:00:00Z`; validation `2026-04-02T11:00:00Z` → `2026-05-28T10:00:00Z`; locked-OOS disabled for live final refit.
+- Refresh/compaction evidence: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/standard_live_refit_20260528/`. Peak RSS stayed below the 8 GiB session budget: data refresh about `5.82 GiB` artifact peak / `6,045,100 KiB` `/usr/bin/time`; WAL compaction `1,565,284 KiB`.
+
+Implementation/artifact updates:
+
+- Added `src/lumina_quant/alpha_zoo/live_training_policy.py` to make the latest-8-week validation/final-refit split deterministic and reusable.
+- Added `scripts/research/run_alpha_zoo_standard_live_refit.py` as the standard wrapper around the Optuna hybrid decision runner.
+- Updated `scripts/research/run_alpha_zoo_integer_leverage_optuna_hybrid_decision.py` so Optuna covers every exposed `HybridParams` field: bias alpha/combine ratio/window, MAPE/short-vol windows, warmup ratio, max single weight, volatility-regime threshold/boost shape, min/max boost, and default-weight-ratio range/steps. Grid remains comparison-only.
+- Removed the old hard-coded data end from the 30m+/HTF alpha source loaders so refreshed committed data can be used without editing dates.
+- New standard-refit outputs: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_standard_live_refit_20260528/alpha_zoo_integer_leverage_optuna_hybrid_decision_latest.json|md`.
+
+Result after embedded `10bps` round-trip friction proxy:
+
+| Profile / run | Train | Validation | Validation MDD | RPT bps T/V | Trades T/V | Gross | Notes |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| Prior selected 2026-05-24 Optuna v3.5 | `+611.5025%` | `+138.3170%` | `18.9796%` | `83.39 / 79.17` | `3363 / 789` | `4.3646x` | Old split with locked-OOS report-only. |
+| Standard live refit Optuna v3.5 selection/final-refit | `+3447.4699%` | `+38.0717%` | `7.4789%` | `368.22 / 36.77` | `4167 / 447` | `4.6902x` | Latest-8-week validation; no live test set. |
+
+The selected profile remains `hybrid_v3_5_optuna_three_profile_blend`, now final-refit on train+validation. Final refit active weights are aggressive `91.4204%`, balanced `4.1881%`, growth `4.3915%`; asset gross notional fractions are approximately ETH `0.9573x`, SOL `2.0035x`, and TRX `1.7295x`. The recent validation is much lower than the old validation split but remains positive, above the 2% gate, below the 12% validation-MDD cap, and above the 10bps return-per-turnover threshold. The lower validation drawdown is an improvement; the very large train-vs-validation gap and aggressive sleeve concentration remain the main overfit/concentration risks to monitor in paper/testnet.
+
+Verification for the standard-refit patch passed locally: changed-file Ruff pass; targeted live-training/hybrid tests `12 passed`; `compileall` over `src scripts tests`; repo-wide `ruff check .`; architecture check; docs verification; hardcoded-parameter audit `total=567 new=0 baselined=567`; `git diff --check`; and full `pytest -q` `1506 passed in 89.76s` with max RSS `2,736,260 KiB` (<8 GiB). The standard-refit runner itself completed with `/usr/bin/time` max RSS `6,324,184 KiB` and artifact peak `6175.96 MiB` (<8 GiB).
+
+Safety conclusion: paper/testnet-only candidate evidence was refreshed, but real-money remains blocked. The latest artifacts still keep `ready_for_real=false`, `real_money_execution=false`, and `real_execution_allowed=false`; live execution must use the frozen artifact and collect realized BBO/fill/fee/slippage/reconciliation telemetry before any future real-money discussion.
+
+---
+
 ## 2026-05-28 KST — Research-note path canonicalization
 
 Renamed the confusing strategy/date-specific research-note paths into the stable `docs/research_note/` directory:

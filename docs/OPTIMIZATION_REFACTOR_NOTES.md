@@ -29,6 +29,19 @@ existing behavior while reducing runtime and temporary allocations.
   - keep locked-OOS flags false for selection/objective/pruning/parameter fitting
     unless a diagnostic artifact explicitly labels otherwise.
 
+### Standard live refit policy
+
+- Live-facing Alpha Zoo refits must refresh committed data first, reserve the
+  latest 8 complete weeks as validation, tune every exposed strategy-internal
+  parameter with Optuna, and then final-refit the selected frozen profile on
+  train+validation.
+- The selection fit/learn phase uses train only; selection/reporting may inspect
+  train+validation. Live final-refit mode intentionally does not reserve or use a
+  locked-OOS/test set.
+- Warmup remains a train-window ratio and is part of the Optuna search space.
+- Grid rows are comparison baselines only, not the default optimizer.
+- Real-money flags remain hard-false in research and live handoff artifacts.
+
 ### New compute loader module
 
 - Added `lumina_quant/compute/ohlcv_loader.py`.

@@ -64,11 +64,17 @@ Current local-first stack defaults:
 - **Backtest/optimization compute**: Polars Lazy with GPU-first execution (`gpu` by default; CI/non-GPU environments can override to `cpu` or `auto`)
 - **Native/fast-path acceleration**: Python APIs stay stable; proven hot kernels use Rust underneath when built. Raw-first aggTrades→1s OHLCV, the Alpha Zoo Optuna hybrid portfolio loop, and Alpha Zoo live state-signal machines auto-load Rust backends when available; live `MARKET_WINDOW` construction uses a trusted Python fast path where Rust would still pay Python tuple conversion costs; metrics evaluation still auto-selects Numba/Python because local Rust metrics is not faster yet.
 
-## Current Private Paper/Testnet Status (2026-05-27)
+## Current Private Paper/Testnet Status (2026-05-28)
 
 The current private Alpha Zoo live handoff is **paper/testnet-only**. It is not a real-money approval.
 
 - Selected runtime: `AlphaZooOptunaHybridLiveStrategy` for the frozen Optuna v3.5 hybrid artifact.
+- Standard live refits now use refreshed committed data, the latest 8 complete weeks as validation,
+  Optuna tuning for every exposed hybrid parameter, and a final refit on train+validation before
+  freezing the runtime artifact. Live final-refit mode intentionally has no locked-OOS/test set.
+- Latest standard-refit evidence is under
+  `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_standard_live_refit_20260528/`;
+  data coverage for the watch universe reaches `2026-05-28T10:59:59Z`.
 - Live implementation is split into reproducibility-safe modules: frozen artifact/config loading in
   `lumina_quant.alpha_zoo.optuna_hybrid_config`, signal/bar math in
   `lumina_quant.alpha_zoo.optuna_hybrid_signals` with optional Rust state-machine acceleration, and orchestration/event emission in

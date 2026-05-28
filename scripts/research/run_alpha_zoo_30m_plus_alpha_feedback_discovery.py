@@ -38,6 +38,8 @@ from scripts.research.run_alpha_zoo_htf_momentum_crowding_discovery import (  # 
     DEFAULT_FEATURE_ROOT,
     PRIMARY_ROUND_TRIP_COST_BPS,
     RETURN_PER_TURNOVER_THRESHOLD_BPS,
+    DATA_END,
+    DATA_START,
     SPLIT_ORDER,
     SPLITS,
     SimResult,
@@ -308,10 +310,10 @@ def _aggregate_file_to_30m(path: Path) -> pl.DataFrame:
     construction while retaining only tiny monthly 30m partials in memory.
     """
     target_ms = 30 * 60 * 1000
-    lf = pl.scan_parquet(str(path)).filter(
-        (pl.col("datetime") >= pl.datetime(2025, 1, 1, 0, 0, 0))
-        & (pl.col("datetime") <= pl.datetime(2026, 5, 17, 10, 0, 0))
-    )
+    time_filter = pl.col("datetime") >= pl.lit(DATA_START.to_pydatetime())
+    if DATA_END is not None:
+        time_filter = time_filter & (pl.col("datetime") <= pl.lit(DATA_END.to_pydatetime()))
+    lf = pl.scan_parquet(str(path)).filter(time_filter)
     return (
         lf.with_columns(pl.col("datetime").dt.epoch("ms").alias("ts_ms"))
         .with_columns(((pl.col("ts_ms") // target_ms) * target_ms).alias("bucket_ms"))

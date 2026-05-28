@@ -41,6 +41,19 @@
 - search space는 `lumina_quant.tuning.param_registry` 또는 strategy registry 기본값을
   원천으로 삼고, script마다 더 나쁜 중복 domain을 만들지 않습니다.
 
+## 표준 live refit 정책
+
+- live-facing Alpha Zoo refit은 먼저 committed data를 최신화하고, 최신 8개 완성 주를
+  validation으로 예약한 뒤, 전략 내부에 노출된 모든 parameter를 Optuna로 튜닝합니다.
+- 선택/학습 단계는 train만 fit/learn 입력으로 쓰고, train+validation 성적으로 선택/보고합니다.
+  선택 후에는 train+validation 전체로 final refit한 frozen artifact를 live runtime에 사용합니다.
+- live final-refit 모드에서는 locked-OOS/test set을 의도적으로 두지 않습니다. live runtime은
+  artifact를 freeze해서 사용하고 온라인 재학습을 하지 않습니다.
+- warmup은 기존처럼 train window 내부 비율이며 Optuna search space에 포함됩니다.
+- grid는 비교 baseline 전용입니다. 기본 optimizer는 Optuna입니다.
+- `ready_for_real=false`, `real_money_execution=false`, `real_execution_allowed=false` 안전 플래그는
+  연구/라이브 handoff artifact에서 계속 hard-false입니다.
+
 ## 검증
 
 - `uv run pytest -q tests/test_optimization_search_policy.py tests/test_param_registry.py tests/test_portfolio_optimizer_core.py tests/test_strategy_alias_compat.py`

@@ -100,6 +100,66 @@ def test_v35_v36_run_model_keeps_real_money_disabled_and_cost_contract() -> None
         assert sum(result.row["average_weights_train_validation"].values()) == pytest.approx(1.0)
 
 
+def test_standard_live_refit_fits_train_only_and_disables_oos_gate() -> None:
+    streams = [
+        _stream("balanced", 0.004, 0.003, -0.01),
+        _stream("growth", 0.006, 0.004, -0.02),
+        _stream("aggressive", 0.007, 0.005, -0.03),
+    ]
+    split_windows = {
+        "train": ("2025-01-01 00:00:00", "2025-01-02 15:00:00"),
+        "validation": ("2026-01-01 00:00:00", "2026-01-02 05:00:00"),
+        "locked_oos": ("2026-04-02 00:00:00", "2026-04-01 23:00:00"),
+    }
+
+    with MODULE._split_window_context(split_windows):
+        result = MODULE._run_model(
+            streams,
+            MODULE.HybridParams(),
+            version="v3_5",
+            profile_id=MODULE.V35_PROFILE_ID,
+            fit_splits=("train",),
+            require_locked_oos_gate=False,
+        )
+
+    assert result.row["fit_splits"] == ["train"]
+    assert result.row["final_refit"] is False
+    assert result.row["locked_oos_gate_required"] is False
+    assert result.row["test_set_policy"] == "disabled_for_live_final_refit_no_test_set_reserved"
+    assert result.row["report_only_gate_reasons"] == []
+    assert result.row["ready_for_real"] is False
+    assert result.row["real_money_execution"] is False
+    assert result.row["locked_oos_trade_event_count_report_only"] == 0
+
+
+def test_final_refit_records_train_validation_fit_inputs() -> None:
+    streams = [
+        _stream("balanced", 0.004, 0.003, 0.001),
+        _stream("growth", 0.006, 0.004, 0.0015),
+        _stream("aggressive", 0.007, 0.005, 0.0012),
+    ]
+
+    result = MODULE._run_model(
+        streams,
+        MODULE.HybridParams(),
+        version="v3_5",
+        profile_id=MODULE.V35_PROFILE_ID,
+        fit_splits=("train", "validation"),
+        final_refit=True,
+        require_locked_oos_gate=False,
+    )
+
+    assert result.row["fit_splits"] == ["train", "validation"]
+    assert result.row["final_refit"] is True
+    assert result.row["test_set_policy"] == "disabled_for_live_final_refit_no_test_set_reserved"
+
+
+def test_all_exposed_hybrid_params_are_in_optuna_config() -> None:
+    assert set(MODULE._trial_params_from_hybrid(MODULE.HybridParams())) == set(
+        MODULE.HYBRID_OPTUNA_CONFIG
+    )
+
+
 def test_selected_optuna_sort_key_does_not_prefer_oos_spike() -> None:
     row_a = {
         "profile_id": "a",

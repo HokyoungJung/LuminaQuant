@@ -38,6 +38,8 @@ SPLITS = {
     "locked_oos": (pd.Timestamp("2026-04-01 00:00:00"), pd.Timestamp("2026-05-17 10:00:00")),
 }
 SPLIT_ORDER = ("train", "validation", "locked_oos")
+DATA_START = pd.Timestamp("2025-01-01 00:00:00")
+DATA_END: pd.Timestamp | None = None
 PRIMARY_ROUND_TRIP_COST_BPS = 10.0
 AVG_BBO_SPREAD_BPS_ASSUMPTION = 2.0
 BBO_SPREAD_MULTIPLIER = 5.0
@@ -234,10 +236,10 @@ def _load_symbol_hourly(symbol: str, *, data_root: Path) -> pd.DataFrame:
     files = sorted(symbol_root.glob("2025-*.parquet")) + sorted(symbol_root.glob("2026-*.parquet"))
     if not files:
         raise FileNotFoundError(f"missing OHLCV 1s parquet files for {symbol}: {symbol_root}")
-    lf = pl.scan_parquet([str(path) for path in files]).filter(
-        (pl.col("datetime") >= pl.datetime(2025, 1, 1, 0, 0, 0))
-        & (pl.col("datetime") <= pl.datetime(2026, 5, 17, 10, 0, 0))
-    )
+    time_filter = pl.col("datetime") >= pl.lit(DATA_START.to_pydatetime())
+    if DATA_END is not None:
+        time_filter = time_filter & (pl.col("datetime") <= pl.lit(DATA_END.to_pydatetime()))
+    lf = pl.scan_parquet([str(path) for path in files]).filter(time_filter)
     frame = (
         lf.group_by_dynamic("datetime", every="1h", period="1h")
         .agg(
