@@ -100,6 +100,7 @@ BINANCE_TRADFI_EQUITY_SYMBOLS: tuple[str, ...] = (
 BINANCE_TRADFI_PREMARKET_SYMBOLS: tuple[str, ...] = (
     "SPCXUSDT",
     "OPENAIUSDT",
+    "QNTXUSDT",
 )
 
 BINANCE_TRADFI_PERP_RESEARCH_SYMBOLS: tuple[str, ...] = (

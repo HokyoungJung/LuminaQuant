@@ -23,8 +23,8 @@ uv run python scripts/init_postgres_schema.py --dsn "$LQ_POSTGRES_DSN"
 
 Use the standard extended research universe via env override. The canonical list is
 `lumina_quant.research_universe.BINANCE_EXTENDED_RESEARCH_SYMBOLS_SLASHED`: 10 core crypto
-symbols plus the Binance USD-M `TRADIFI_PERPETUAL` snapshot recorded on 2026-05-28
-(58 commodity / ETF-index / equity / premarket symbols). These symbols are research and
+symbols plus the Binance USD-M `TRADIFI_PERPETUAL` snapshot updated on 2026-05-30
+(59 commodity / ETF-index / equity / premarket symbols). These symbols are research and
 shadow-monitoring inputs until the standard 8-week validation, final-refit, and
 paper/testnet gates pass; they are **not** real-money approvals.
 
@@ -62,7 +62,7 @@ PY
 
 
 > 2026-05-28 note: do not run the extended refresh automatically during documentation
-> updates. A full 2025-to-current refresh for all 68 symbols should be scheduled as a
+> updates. A full 2025-to-current refresh for all 69 symbols should be scheduled as a
 > staged data job under the 8GB memory budget, not as an incidental docs/code change.
 
 Compact WAL into bounded monthly parquet files:

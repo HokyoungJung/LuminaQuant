@@ -24,8 +24,8 @@ uv run python scripts/init_postgres_schema.py --dsn "$LQ_POSTGRES_DSN"
 
 표준 확장 research universe override. 정본 목록은
 `lumina_quant.research_universe.BINANCE_EXTENDED_RESEARCH_SYMBOLS_SLASHED`이며,
-10개 core crypto와 2026-05-28에 기록한 Binance USD-M `TRADIFI_PERPETUAL` snapshot
-58개(commodity / ETF-index / equity / premarket)를 포함합니다. 이 심볼들은
+10개 core crypto와 2026-05-30에 갱신한 Binance USD-M `TRADIFI_PERPETUAL` snapshot
+59개(commodity / ETF-index / equity / premarket)를 포함합니다. 이 심볼들은
 표준 8주 validation, final-refit, paper/testnet gate를 통과하기 전까지 research 및
 shadow-monitoring 입력일 뿐이며 **real-money 승인 목록이 아닙니다**.
 
@@ -63,7 +63,7 @@ PY
 
 
 > 2026-05-28 메모: 문서/목록 갱신 중에는 확장 universe 데이터 refresh를 자동 실행하지
-> 않습니다. 68개 전체의 2025년 이후 refresh는 8GB 메모리 예산 아래 staged data job으로
+> 않습니다. 69개 전체의 2025년 이후 refresh는 8GB 메모리 예산 아래 staged data job으로
 > 따로 예약해야 합니다.
 
 WAL → monthly parquet compact:

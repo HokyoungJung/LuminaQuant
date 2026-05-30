@@ -42,13 +42,14 @@ def test_binance_extended_research_universe_is_unique_and_complete() -> None:
     assert len(BINANCE_TRADFI_COMMODITY_SYMBOLS) == 8
     assert len(BINANCE_TRADFI_ETF_INDEX_SYMBOLS) == 5
     assert len(BINANCE_TRADFI_EQUITY_SYMBOLS) == 43
-    assert len(BINANCE_TRADFI_PREMARKET_SYMBOLS) == 2
-    assert len(BINANCE_TRADFI_PERP_RESEARCH_SYMBOLS) == 58
-    assert len(BINANCE_EXTENDED_RESEARCH_SYMBOLS) == 68
+    assert len(BINANCE_TRADFI_PREMARKET_SYMBOLS) == 3
+    assert len(BINANCE_TRADFI_PERP_RESEARCH_SYMBOLS) == 59
+    assert len(BINANCE_EXTENDED_RESEARCH_SYMBOLS) == 69
 
     counts = Counter(BINANCE_EXTENDED_RESEARCH_SYMBOLS)
     assert [symbol for symbol, count in counts.items() if count > 1] == []
     assert "OPENAIUSDT" in BINANCE_TRADFI_PREMARKET_SYMBOLS
+    assert "QNTXUSDT" in BINANCE_TRADFI_PREMARKET_SYMBOLS
     assert "NATGASUSDT" in BINANCE_TRADFI_COMMODITY_SYMBOLS
     assert "SOXLUSDT" in BINANCE_TRADFI_ETF_INDEX_SYMBOLS
     assert "NVDAUSDT" in BINANCE_TRADFI_EQUITY_SYMBOLS

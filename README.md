@@ -217,7 +217,7 @@ uv run python scripts/sync_binance_ohlcv.py \
 
 In the public repository, sync/build helpers are intentionally removed. Use prebuilt market parquet files or CSV data.
 
-Extended Binance research universe (private repo): `src/lumina_quant/research_universe.py` now records the side-effect-free 2026-05-28 snapshot of 10 core crypto + 58 Binance USD-M `TRADIFI_PERPETUAL` symbols. Use `BINANCE_EXTENDED_RESEARCH_SYMBOLS_SLASHED` for future staged refresh/coverage inventory jobs; adding the symbols does not collect data and does not approve real-money trading. See `docs/RUNBOOK_1Y_1S_LOCAL.md` and `docs/research_note/research_note.md`.
+Extended Binance research universe (private repo): `src/lumina_quant/research_universe.py` now records the current side-effect-free snapshot of 10 core crypto + 59 Binance USD-M `TRADIFI_PERPETUAL` symbols. Use `BINANCE_EXTENDED_RESEARCH_SYMBOLS_SLASHED` for future staged refresh/coverage inventory jobs; adding or collecting research bars for the symbols does not approve real-money trading. See `docs/RUNBOOK_1Y_1S_LOCAL.md` and `docs/research_note/research_note.md`.
 
 **Raw aggTrades → committed materialized pipeline (private repo):**
 ```bash
