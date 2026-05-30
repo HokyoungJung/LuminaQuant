@@ -227,7 +227,7 @@ uv run python scripts/sync_binance_ohlcv.py \
 
 In the public repository, sync/build helpers are intentionally removed. Use prebuilt market parquet files or CSV data.
 
-Extended Binance research universe (private repo): `src/lumina_quant/research_universe.py` now records the current side-effect-free snapshot of 10 core crypto + 59 Binance USD-M `TRADIFI_PERPETUAL` symbols. Direct 1m research bars for all 69 symbols are stored under `data/market_parquet/exchange=binance` and are used by the OOM-capped 69-asset Optuna refit runner. Use `BINANCE_EXTENDED_RESEARCH_SYMBOLS_SLASHED` for future staged refresh/coverage inventory jobs; adding or collecting research bars for the symbols does not approve real-money trading. See `docs/RUNBOOK_1Y_1S_LOCAL.md` and `docs/research_note/research_note.md`.
+Extended Binance research universe (private repo): `src/lumina_quant/research_universe.py` now records the current side-effect-free snapshot of 10 core crypto + 59 Binance USD-M `TRADIFI_PERPETUAL` symbols. Direct 1m research bars for all 69 symbols are stored under `data/market_parquet/exchange=binance` and are used by the OOM-capped 69-asset Optuna refit and live-efficiency repair runners. The current paper/testnet-only efficiency-repaired v3.5 hybrid is train `+295.99%`, validation `+172.79%`, validation MDD `6.10%`, RPT `76.65/125.01bps`, and remains `ready_for_real=false` / `real_money_execution=false`. Use `BINANCE_EXTENDED_RESEARCH_SYMBOLS_SLASHED` for future staged refresh/coverage inventory jobs; adding or collecting research bars for the symbols does not approve real-money trading. See `docs/RUNBOOK_1Y_1S_LOCAL.md` and `docs/research_note/research_note.md`.
 
 **Raw aggTrades → committed materialized pipeline (private repo):**
 ```bash

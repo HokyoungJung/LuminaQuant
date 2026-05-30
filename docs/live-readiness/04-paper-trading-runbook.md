@@ -370,3 +370,21 @@ baseline vs candidate divergence를 보는 shadow 경로를 운영 가능하게 
 
 즉, 이 runbook의 목적은 “바로 실거래”가 아니라
 **paper evidence를 쌓아 real gate를 닫는 것**이다.
+
+---
+
+## 8. 2026-05-30 69-asset efficiency-repaired paper candidate
+
+Current broad-universe paper candidate artifact:
+`var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_efficiency_repair_optuna_20260530/alpha_zoo_69_asset_efficiency_repair_optuna_latest.json`.
+
+Summary:
+- candidate: `hybrid_v3_5_optuna_three_profile_blend`
+- train / validation: `+295.9880%` / `+172.7926%`
+- train / validation MDD: `17.7072%` / `6.0984%`
+- RPT bps train / validation: `76.65` / `125.01`
+- 20bps stress proxy train / validation: `+251.9612%` / `+157.7868%`
+- gross notional: `7.3257x`
+- `ready_for_paper=true`, `ready_for_real=false`, `real_money_execution=false`
+
+This remains paper/testnet-only. The paper run must specifically monitor high-turnover assets and sleeves where validation PnL contribution is small relative to event count, realized all-in cost, BBO depth/latency, partial/cancel/timeout behavior, protective-order reconciliation, intended-vs-actual notional parity, and liquidation-inclusive MDD before any real-money review.

@@ -1,5 +1,34 @@
 # Research Note
 
+## 2026-05-30 KST — 69-asset live-efficiency repair Optuna pass
+
+Follow-up to the corrected 69-asset per-profile rebuild after the operator clarified that the three profiles are risk/strategy templates to expand across all assets, not a limit of three final selections. Added `scripts/research/run_alpha_zoo_69_asset_efficiency_repair_optuna.py` and `tests/test_alpha_zoo_69_asset_efficiency_repair_optuna.py`. The pass preserves the per-symbol/per-profile Optuna-tuned parameters from `alpha_zoo_69_asset_profile_optuna_hybrid_refit_20260530`, then retunes source-profile sleeve weights and v3.5/v3.6 hybrid weights for live/paper efficiency: stronger train-dominance, 10bps RPT, 15/20bps cost-stress, low-sample diagnostics, high-turnover/low-efficiency penalties, concentration penalties, integer leverage maps, and no locked test set. All real-money flags remain false.
+
+Artifact: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_efficiency_repair_optuna_20260530/alpha_zoo_69_asset_efficiency_repair_optuna_latest.json`. Contribution proxy CSV: `alpha_zoo_69_asset_efficiency_repair_contribution_proxy_latest.csv`.
+
+Run evidence: `/usr/bin/time -v uv run python scripts/research/run_alpha_zoo_69_asset_efficiency_repair_optuna.py --profile-trials 192 --hybrid-trials 192` completed in `5:37.38` wall time with max RSS `933,212 KiB`; payload `runner_peak_rss_mib=911.34`, below the 8GB memory budget.
+
+Selected train/validation-legal paper candidate is the repaired v3.5 hybrid over all three repaired multi-asset profiles:
+
+| portfolio | train | validation | train MDD | validation MDD | RPT bps train/val | 20bps stress train/val | gross | paper | real |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |
+| `hybrid_v3_5_optuna_three_profile_blend` | `+295.9880%` | `+172.7926%` | `17.7072%` | `6.0984%` | `76.65 / 125.01` | `+251.9612% / +157.7868%` | `7.3257x` | `true` | `false` |
+
+Hybrid average weights are balanced `39.57%`, growth `24.13%`, aggressive `36.30%`; final weights are balanced `40.47%`, growth `23.29%`, aggressive `25.09%`. This improves the prior train/validation-legal guarded static baseline (`+160.33%/+150.07%`, validation MDD `7.56%`, gross `5.00x`) while keeping train return above validation, validation MDD lower, 10bps cost embedded, and 20bps stress proxy positive. The tradeoff is higher train MDD and more gross exposure; paper/testnet telemetry must therefore emphasize realized cost, fill quality, asset concentration, and margin/liquidation distance before any real review.
+
+Source-profile audit after repair:
+
+| profile | sleeves | gross | train | validation | validation MDD | RPT bps train/val | 20bps stress train/val | diagnostic |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| balanced repair | `45` | `5.00x` | `+130.52%` | `+107.54%` | `6.31%` | `41.65 / 99.50` | `+99.18% / +96.73%` | low-eff/low-sample sleeves remain diagnostic, not aggregate gate failures |
+| growth repair | `44` | `7.12x` | `+155.85%` | `+149.45%` | `11.80%` | `31.65 / 106.15` | `+106.60% / +135.37%` | train-dominant after repair |
+| aggressive repair | `57` | `10.00x` | `+285.99%` | `+278.95%` | `10.86%` | `52.59 / 138.11` | `+231.60% / +258.75%` | standalone gross > 8x, used only through capped hybrid weights |
+
+Contribution proxy using v3.5 average weights shows validation return is now primarily from TradFi equity (`~0.716 proxy`) plus crypto core (`~0.271`), with commodities (`~0.064`), ETF/index (`~0.053`), and premarket proxies (`~0.010`) smaller. Top validation contributors are `TONUSDT`, `CRCLUSDT`, `MUUSDT`, `EWYUSDT`, `SNDKUSDT`, `XAGUSDT`, `MSTRUSDT`, and `COINUSDT`. High-turnover assets that still need paper/live cost scrutiny include `ETHUSDT`, `DOGEUSDT`, `SOLUSDT`, `TRXUSDT`, `XRPUSDT`, `ADAUSDT`, `TONUSDT`, and `AVAXUSDT`; many of those contribute little validation PnL relative to event count, so live monitoring should downweight or quarantine them if realized cost exceeds the replay proxy.
+
+Real-money remains blocked (`ready_for_real=false`, `real_money_execution=false`, `real_execution_allowed=false`). This candidate is paper/testnet-only until exchange-connected limit-first fill telemetry confirms realized all-in cost, BBO depth/latency, partial/cancel/timeout behavior, protective-order reconciliation, intended-vs-actual notional parity, concentration, and liquidation-inclusive MDD.
+
+
 ## 2026-05-30 KST — 69-asset per-profile Optuna rebuild after broad-blend audit
 
 Follow-up to the first broad 69-symbol blend: the earlier pass optimized a diversified stream blend and did **not** fully rebuild the original hybrid source-profile logic per asset. Added `scripts/research/run_alpha_zoo_69_asset_profile_optuna_hybrid_refit.py` and `tests/test_alpha_zoo_69_asset_profile_optuna_hybrid_refit.py` to run the corrected expansion:
