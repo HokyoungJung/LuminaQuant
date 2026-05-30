@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from lumina_quant.live.binance_market_stream import BinanceMarketStreamClient
 from lumina_quant.live.market_window_rolling import NormalizedTradeTick, RollingWindowAggregator
 
@@ -71,3 +73,28 @@ def test_binance_market_stream_parser_normalizes_aggtrade_message():
     assert tick.price == 102.5
     assert tick.quantity == 0.75
     assert tick.event_id == "mkt:agg:BTC/USDT:42"
+
+
+def test_binance_market_stream_parser_normalizes_book_ticker_message():
+    payload = {
+        "stream": "btcusdt@bookTicker",
+        "data": {
+            "e": "bookTicker",
+            "E": 1_700_000_004_000,
+            "s": "BTCUSDT",
+            "b": "100.0",
+            "B": "2.5",
+            "a": "100.1",
+            "A": "3.0",
+        },
+    }
+
+    book = BinanceMarketStreamClient.parse_book_ticker_message(
+        payload, receive_ts_ms=1_700_000_004_050
+    )
+
+    assert book is not None
+    assert book.symbol == "BTC/USDT"
+    assert book.bid_price == 100.0
+    assert book.ask_price == 100.1
+    assert book.spread_bps == pytest.approx((0.1 / 100.05) * 10_000.0)

@@ -33,6 +33,21 @@ class MockBars:
         return {"price_tick_size": 0.1}
 
 
+class MockBboBars(MockBars):
+    snapshot = {
+        "bid_price": 99.99,
+        "ask_price": 100.01,
+        "bid_quantity": 10.0,
+        "ask_quantity": 10.0,
+        "exchange_ts_ms": 1_700_000_000_000,
+    }
+
+    @classmethod
+    def get_latest_book_ticker(cls, symbol):
+        _ = symbol
+        return dict(cls.snapshot)
+
+
 class MockConfig:
     """Minimal config for live execution tests."""
 
@@ -253,6 +268,100 @@ class TestLiveExecutionStateMachine(unittest.TestCase):
 
         with self.assertRaisesRegex(RuntimeError, "Market orders are disabled"):
             handler.execute_order(OrderEvent("BTC/USDT", "MKT", 1.0, "BUY"))
+
+    def test_limit_slippage_guard_rejects_high_spread_without_market_fallback(self):
+        events = queue.Queue()
+        exchange = MockExchange()
+
+        class _WideBboBars(MockBboBars):
+            snapshot = {
+                "bid_price": 99.0,
+                "ask_price": 101.0,
+                "bid_quantity": 10.0,
+                "ask_quantity": 10.0,
+                "exchange_ts_ms": 1_700_000_000_000,
+            }
+
+        handler = LiveExecutionHandler(events, _WideBboBars(), MockConfig, exchange)
+        states = []
+        handler.set_order_state_callback(states.append)
+        order = OrderEvent(
+            "BTC/USDT",
+            "LMT",
+            1.0,
+            "BUY",
+            price=100.1,
+            metadata={
+                "live_slippage_guard_policy": {
+                    "require_bbo_snapshot": True,
+                    "max_bbo_spread_bps_at_submit": 4.0,
+                    "max_estimated_one_way_slippage_bps": 5.0,
+                    "market_fallback_allowed": False,
+                }
+            },
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "slippage guard breached"):
+            handler.execute_order(order)
+
+        self.assertEqual(exchange.orders, [])
+        self.assertTrue(any(item["message"] == "slippage_guard_breach" for item in states))
+        self.assertEqual(order.metadata["slippage_guard_check"]["status"], "breach")
+        self.assertFalse(order.metadata["slippage_guard_check"]["market_fallback_allowed"])
+
+    def test_limit_slippage_guard_requires_bbo_when_policy_says_fail_closed(self):
+        events = queue.Queue()
+        exchange = MockExchange()
+        handler = LiveExecutionHandler(events, MockBars(), MockConfig, exchange)
+        order = OrderEvent(
+            "BTC/USDT",
+            "LMT",
+            1.0,
+            "BUY",
+            price=100.1,
+            metadata={
+                "live_slippage_guard_policy": {
+                    "require_bbo_snapshot": True,
+                    "max_bbo_spread_bps_at_submit": 4.0,
+                    "max_estimated_one_way_slippage_bps": 5.0,
+                    "market_fallback_allowed": False,
+                }
+            },
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "requires a fresh BBO"):
+            handler.execute_order(order)
+
+        self.assertEqual(exchange.orders, [])
+        self.assertEqual(order.metadata["slippage_guard_check"]["status"], "missing_bbo")
+
+    def test_limit_slippage_guard_allows_tight_bbo_and_records_check(self):
+        events = queue.Queue()
+        exchange = MockExchange()
+        handler = LiveExecutionHandler(events, MockBboBars(), MockConfig, exchange)
+        order = OrderEvent(
+            "BTC/USDT",
+            "LMT",
+            1.0,
+            "BUY",
+            price=100.02,
+            metadata={
+                "live_slippage_guard_policy": {
+                    "require_bbo_snapshot": True,
+                    "max_bbo_spread_bps_at_submit": 4.0,
+                    "max_estimated_one_way_slippage_bps": 5.0,
+                    "market_fallback_allowed": False,
+                }
+            },
+        )
+
+        handler.execute_order(order)
+
+        self.assertEqual(len(exchange.orders), 1)
+        self.assertEqual(order.metadata["slippage_guard_check"]["status"], "passed")
+        self.assertLessEqual(
+            order.metadata["slippage_guard_check"]["bbo_spread_bps_at_submit"], 4.0
+        )
 
     def test_live_protective_orders_fail_fast_without_exchange_params(self):
         events = queue.Queue()

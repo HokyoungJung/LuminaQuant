@@ -27,7 +27,21 @@ DEFAULT_INTEGER_PORTFOLIO_ARTIFACT = (
     / "alpha_zoo_corr_integer_leverage_portfolio_20260524"
     / "alpha_zoo_corr_integer_leverage_portfolio_latest.json"
 )
+DEFAULT_69_ASSET_EFFICIENCY_REPAIR_ARTIFACT = (
+    ALPHA_V2_ROOT
+    / "alpha_zoo_69_asset_efficiency_repair_optuna_20260530"
+    / "alpha_zoo_69_asset_efficiency_repair_optuna_latest.json"
+)
 DEFAULT_SELECTED_PROFILE_ID = "hybrid_v3_5_optuna_three_profile_blend"
+EFFICIENCY_REPAIR_ARTIFACT_KIND = "alpha_zoo_69_asset_efficiency_repair_optuna"
+EFFICIENCY_REPAIR_FILTER_LABEL = "artifact_69_asset_efficiency_repair"
+EFFICIENCY_REPAIR_SUPPORTED_FAMILIES = frozenset(
+    {
+        "cross_sectional_momentum_rank",
+        "trend_pullback_reclaim",
+        "volatility_adjusted_trend_persistence",
+    }
+)
 PROFILE_IDS = (
     "balanced_mdd12_gross5",
     "growth_mdd20_gross8",
@@ -42,6 +56,47 @@ INTRABAR_ATR_LOOKBACK = 14
 INTRABAR_STOP_ATR_MULT = 2.0
 INTRABAR_MIN_STOP_COST_MULT = 12.0
 INTRABAR_MAX_STOP_COST_MULT = 80.0
+MAX_BBO_SPREAD_BPS_AT_SUBMIT = 4.0
+MAX_ESTIMATED_ONE_WAY_SLIPPAGE_BPS = 5.0
+MAX_REALIZED_ONE_WAY_SLIPPAGE_BPS = 5.0
+MAX_REALIZED_ROUND_TRIP_COST_BPS = ROUND_TRIP_COST_BPS
+
+
+def live_unfilled_order_policy() -> dict[str, Any]:
+    """Fail-closed live/paper policy for unfilled or partially filled limit orders."""
+    return {
+        "market_fallback_allowed": False,
+        "max_chase_attempts": 0,
+        "timeout_action": "cancel_reconcile_revalidate_signal",
+        "partial_fill_action": "keep_filled_cancel_remainder_on_timeout",
+        "after_cancel_action": "skip_until_next_completed_bar_unless_signal_revalidates",
+        "resubmit_requires": [
+            "same_component_signal_still_active",
+            "fresh_completed_bar_or_same_bar_revalidation",
+            "spread_within_slippage_guard",
+            "notional_and_position_caps_unchanged",
+        ],
+        "repeated_timeout_action": "freeze_symbol_and_require_operator_review",
+    }
+
+
+def live_slippage_guard_policy() -> dict[str, Any]:
+    """Strict bounded-cost policy for limit-first live/paper submission."""
+    return {
+        "max_bbo_spread_bps_at_submit": MAX_BBO_SPREAD_BPS_AT_SUBMIT,
+        "max_estimated_one_way_slippage_bps": MAX_ESTIMATED_ONE_WAY_SLIPPAGE_BPS,
+        "max_realized_one_way_slippage_bps": MAX_REALIZED_ONE_WAY_SLIPPAGE_BPS,
+        "max_realized_round_trip_cost_bps": MAX_REALIZED_ROUND_TRIP_COST_BPS,
+        "limit_price_mode": "one_tick_worse",
+        "limit_price_offset_ticks": 1,
+        "require_bbo_snapshot": True,
+        "on_missing_bbo_snapshot": "do_not_submit_no_market_fallback",
+        "on_pre_submit_breach": "do_not_submit",
+        "on_open_order_breach": "cancel_open_order_no_market_fallback",
+        "on_realized_breach": "freeze_symbol_and_review",
+        "market_fallback_allowed": False,
+        "paper_testnet_measurement_required": True,
+    }
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,6 +120,16 @@ class SourceSleeve:
     trail_atr_mult: float = 0.0
     base_symbol: str = "BTCUSDT"
     z_entry: float = 0.0
+    market_guard: float = 0.0
+    breadth_guard: float = 0.0
+    adx_min: float = 0.0
+    market_abs_max: float = 0.0
+    fast_divisor: int = 0
+    trend_slope_min: float = 0.0
+    source_profile_id: str = ""
+    source_model_id: str = ""
+    weighted_notional_fraction: float = 0.0
+    sleeve_multiplier: float = 1.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -501,6 +566,238 @@ def _validate_source_model_id(sleeve: SourceSleeve) -> None:
         raise ValueError(f"source model id parity failed: {sleeve.model_id} != {expected}")
 
 
+def _is_69_asset_efficiency_repair_payload(payload: dict[str, Any]) -> bool:
+    return str(payload.get("artifact_kind") or "") == EFFICIENCY_REPAIR_ARTIFACT_KIND
+
+
+def _extract_69_asset_selected_profile(
+    payload: dict[str, Any], selected_profile_id: str
+) -> dict[str, Any]:
+    for key in ("selected_train_validation_legal_portfolio", "selected_optuna_hybrid_profile"):
+        selected = dict(payload.get(key) or {})
+        if selected.get("profile_id") == selected_profile_id:
+            return selected
+    for row in [
+        dict(payload.get("static_efficiency_guarded_hybrid") or {}),
+        dict((payload.get("hybrid_v3_5_optuna") or {}).get("row") or {}),
+        dict((payload.get("hybrid_v3_6_optuna") or {}).get("row") or {}),
+    ]:
+        if row.get("profile_id") == selected_profile_id:
+            return row
+    raise ValueError(f"selected 69-asset efficiency profile not found: {selected_profile_id}")
+
+
+def _float_from_row_or_params(
+    row: dict[str, Any], params: dict[str, Any], key: str, default: float = 0.0
+) -> float:
+    value = row.get(key, params.get(key, default))
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return float(default)
+
+
+def _int_from_row_or_params(
+    row: dict[str, Any], params: dict[str, Any], key: str, default: int = 0
+) -> int:
+    value = row.get(key, params.get(key, default))
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return int(default)
+
+
+def _source_sleeve_from_69_row(row: dict[str, Any], optuna_path: Path) -> SourceSleeve:
+    params = dict(row.get("optuna_params") or {})
+    family = str(row.get("family") or params.get("family") or "")
+    if family not in EFFICIENCY_REPAIR_SUPPORTED_FAMILIES:
+        raise ValueError(f"unsupported 69-asset efficiency source family: {family}")
+    return SourceSleeve(
+        model_id=str(row["model_id"]),
+        family=family,
+        symbol=_compact_symbol(str(row.get("symbol") or params.get("symbol") or "")),
+        timeframe=normalize_timeframe_token(str(row.get("timeframe") or params.get("timeframe"))),
+        side=str(row.get("side") or params.get("side") or "long_short"),
+        lookback=_int_from_row_or_params(row, params, "lookback_bars", 0),
+        allocation_fraction=_float_from_row_or_params(row, params, "allocation_fraction", 0.0),
+        source_leverage=_float_from_row_or_params(row, params, "integer_leverage", 0.0),
+        source_artifact_path=str(optuna_path),
+        entry_threshold=_float_from_row_or_params(row, params, "threshold", 0.0),
+        exit_threshold=_float_from_row_or_params(row, params, "exit_threshold", 0.0),
+        min_hold_bars=_int_from_row_or_params(row, params, "min_hold_bars", 0),
+        cooldown_bars=_int_from_row_or_params(row, params, "cooldown_bars", 0),
+        filter_label=EFFICIENCY_REPAIR_FILTER_LABEL,
+        market_guard=_float_from_row_or_params(row, params, "market_guard", 0.0),
+        breadth_guard=_float_from_row_or_params(row, params, "breadth_guard", 0.0),
+        adx_min=_float_from_row_or_params(row, params, "adx_min", 0.0),
+        market_abs_max=_float_from_row_or_params(row, params, "market_abs_max", 0.0),
+        fast_divisor=_int_from_row_or_params(row, params, "fast_divisor", 0),
+        trend_slope_min=_float_from_row_or_params(row, params, "trend_slope_min", 0.0),
+        source_profile_id=str(row.get("source_profile_id") or ""),
+        source_model_id=str(row.get("source_model_id") or ""),
+        weighted_notional_fraction=_float_from_row_or_params(
+            row,
+            params,
+            "weighted_notional_fraction",
+            _float_from_row_or_params(row, params, "notional_fraction", 0.0),
+        ),
+        sleeve_multiplier=_float_from_row_or_params(row, params, "sleeve_multiplier", 1.0),
+    )
+
+
+def _load_69_asset_efficiency_repair_live_config(
+    *,
+    payload: dict[str, Any],
+    optuna_path: Path,
+    integer_path: Path,
+    selected_profile_id: str,
+) -> AlphaZooOptunaHybridLiveConfig:
+    _validate_paper_only_governance(payload, label="69-asset efficiency repair artifact")
+    selected_profile = _extract_69_asset_selected_profile(payload, selected_profile_id)
+    for key in ("ready_for_real", "real_money_execution", "real_execution_allowed"):
+        if selected_profile.get(key) is not False:
+            raise ValueError(f"selected 69-asset efficiency profile must keep {key}=false")
+    if selected_profile.get("paper_testnet_candidate") is not True:
+        raise ValueError("selected 69-asset efficiency profile must be paper/testnet only")
+    if selected_profile.get("ready_for_paper") is not True:
+        raise ValueError("selected 69-asset efficiency profile must be ready_for_paper=true")
+    if list(selected_profile.get("selection_reasons") or []):
+        raise ValueError("selected 69-asset efficiency profile has selection rejection reasons")
+
+    source_rows = [
+        dict(row)
+        for row in list(payload.get("selected_sleeve_rows") or [])
+        if isinstance(row, dict)
+    ]
+    if not source_rows:
+        raise ValueError("69-asset efficiency artifact has no selected_sleeve_rows")
+    profile_ids = tuple(dict.fromkeys(str(row.get("profile_id") or "") for row in source_rows))
+    if not all(profile_ids):
+        raise ValueError("69-asset efficiency sleeve row missing profile_id")
+    profile_rows = {
+        str(row.get("profile_id")): dict(row)
+        for row in list(payload.get("profile_rows") or [])
+        if isinstance(row, dict) and row.get("profile_id")
+    }
+
+    source_sleeves: list[SourceSleeve] = []
+    seen_model_ids: set[str] = set()
+    for row in source_rows:
+        sleeve = _source_sleeve_from_69_row(row, optuna_path)
+        if not sleeve.model_id or sleeve.model_id in seen_model_ids:
+            raise ValueError(f"duplicate or empty 69-asset source model id: {sleeve.model_id}")
+        seen_model_ids.add(sleeve.model_id)
+        if sleeve.source_leverage <= 0.0 or not float(sleeve.source_leverage).is_integer():
+            raise ValueError(
+                f"69-asset source leverage must be a positive integer: {sleeve.model_id}"
+            )
+        for key in ("ready_for_real", "real_money_execution", "real_execution_allowed"):
+            if row.get(key) is not False:
+                raise ValueError(f"69-asset sleeve must keep {key}=false: {sleeve.model_id}")
+        source_sleeves.append(sleeve)
+
+    source_profiles: list[SourceProfile] = []
+    for profile_id in profile_ids:
+        rows_for_profile = [row for row in source_rows if str(row.get("profile_id")) == profile_id]
+        profile_row = dict(profile_rows.get(profile_id) or {})
+        leverage_map = {
+            _compact_symbol(symbol): int(float(leverage))
+            for symbol, leverage in dict(profile_row.get("leverage_map") or {}).items()
+            if float(leverage) > 0.0 and float(leverage).is_integer()
+        }
+        for row in rows_for_profile:
+            symbol = _compact_symbol(str(row.get("symbol") or ""))
+            leverage = float(row.get("integer_leverage") or 0.0)
+            if leverage <= 0.0 or not leverage.is_integer():
+                raise ValueError(
+                    f"69-asset profile leverage must be integer: {profile_id}:{symbol}"
+                )
+            leverage_map.setdefault(symbol, int(leverage))
+        models = tuple(str(row["model_id"]) for row in rows_for_profile)
+        if not models:
+            raise ValueError(f"69-asset source profile has no selected models: {profile_id}")
+        source_profiles.append(
+            SourceProfile(
+                profile_id=profile_id,
+                selected_model_ids=models,
+                leverage_map=leverage_map,
+            )
+        )
+
+    weights = {
+        str(key): float(value)
+        for key, value in dict(selected_profile.get("final_weights") or {}).items()
+    }
+    if not weights:
+        weights = {
+            str(key): float(value)
+            for key, value in dict(selected_profile.get("weights") or {}).items()
+        }
+    average_weights = {
+        str(key): float(value)
+        for key, value in dict(
+            selected_profile.get("average_weights_train_validation")
+            or selected_profile.get("weights")
+            or {}
+        ).items()
+    }
+    for profile_id in profile_ids:
+        if profile_id not in weights:
+            raise ValueError(f"missing 69-asset final profile weight: {profile_id}")
+        if profile_id not in average_weights:
+            raise ValueError(f"missing 69-asset average profile weight: {profile_id}")
+
+    universe_symbols = list(dict(payload.get("universe") or {}).get("symbols") or [])
+    watch_source = universe_symbols or [sleeve.symbol for sleeve in source_sleeves]
+    watch_symbols = tuple(dict.fromkeys(_live_symbol(symbol) for symbol in watch_source))
+    if len(watch_symbols) < 60:
+        raise ValueError("69-asset efficiency live config requires the broad watch universe")
+
+    split_policy = dict(payload.get("split_policy") or {})
+    locked_oos = dict(split_policy.get("locked_oos") or {})
+    governance = {
+        "artifact_kind": EFFICIENCY_REPAIR_ARTIFACT_KIND,
+        "paper_testnet_only": True,
+        "ready_for_paper": True,
+        "ready_for_real": False,
+        "real_money_execution": False,
+        "real_execution_allowed": False,
+        "research_primary_round_trip_cost_bps": ROUND_TRIP_COST_BPS,
+        "return_per_turnover_threshold_bps": RETURN_PER_TURNOVER_THRESHOLD_BPS,
+        "locked_oos_role": str(
+            locked_oos.get("role") or "disabled_for_live_efficiency_repair_no_test_set_reserved"
+        ),
+        "replay_live_notional_parity": True,
+        "live_unfilled_order_policy": live_unfilled_order_policy(),
+        "live_slippage_guard_policy": live_slippage_guard_policy(),
+        "historical_train_validation_gross_notional_fraction": float(
+            selected_profile.get("gross_notional_fraction") or 0.0
+        ),
+    }
+    governance["live_final_weight_gross_notional_fraction"] = float(
+        sum(
+            sleeve.weighted_notional_fraction * weights.get(profile.profile_id, 0.0)
+            for profile in source_profiles
+            for sleeve in source_sleeves
+            if sleeve.model_id in profile.selected_model_ids
+        )
+    )
+    return AlphaZooOptunaHybridLiveConfig(
+        selected_profile_id=selected_profile_id,
+        optuna_artifact_path=optuna_path,
+        integer_artifact_path=integer_path,
+        selected_profile=selected_profile,
+        final_profile_weights=weights,
+        average_profile_weights=average_weights,
+        best_params=dict(selected_profile.get("best_params") or {}),
+        learned_params=dict(selected_profile.get("learned_params") or {}),
+        source_profiles=tuple(source_profiles),
+        source_sleeves=tuple(source_sleeves),
+        watch_symbols=watch_symbols,
+        governance=governance,
+    )
+
+
 def load_alpha_zoo_optuna_hybrid_live_config(
     *,
     optuna_hybrid_artifact_path: str | Path = DEFAULT_OPTUNA_HYBRID_ARTIFACT,
@@ -510,6 +807,14 @@ def load_alpha_zoo_optuna_hybrid_live_config(
     optuna_path = _resolve_path(optuna_hybrid_artifact_path)
     integer_path = _resolve_path(integer_portfolio_artifact_path)
     optuna_payload = _read_json(optuna_path)
+    if _is_69_asset_efficiency_repair_payload(optuna_payload):
+        return _load_69_asset_efficiency_repair_live_config(
+            payload=optuna_payload,
+            optuna_path=optuna_path,
+            integer_path=integer_path,
+            selected_profile_id=selected_profile_id,
+        )
+
     integer_payload = _read_json(integer_path)
 
     _validate_paper_only_governance(optuna_payload, label="optuna hybrid artifact")
@@ -613,6 +918,8 @@ def load_alpha_zoo_optuna_hybrid_live_config(
         "return_per_turnover_threshold_bps": RETURN_PER_TURNOVER_THRESHOLD_BPS,
         "locked_oos_role": "gate_report_only",
         "replay_live_notional_parity": bool(integer_payload.get("replay_live_notional_parity")),
+        "live_unfilled_order_policy": live_unfilled_order_policy(),
+        "live_slippage_guard_policy": live_slippage_guard_policy(),
     }
     return AlphaZooOptunaHybridLiveConfig(
         selected_profile_id=selected_profile_id,
@@ -632,14 +939,21 @@ def load_alpha_zoo_optuna_hybrid_live_config(
 
 __all__ = [
     "ALPHA_V2_ROOT",
+    "DEFAULT_69_ASSET_EFFICIENCY_REPAIR_ARTIFACT",
     "DEFAULT_INTEGER_PORTFOLIO_ARTIFACT",
     "DEFAULT_OPTUNA_HYBRID_ARTIFACT",
     "DEFAULT_SELECTED_PROFILE_ID",
+    "EFFICIENCY_REPAIR_ARTIFACT_KIND",
+    "EFFICIENCY_REPAIR_FILTER_LABEL",
     "INTRABAR_ATR_LOOKBACK",
     "INTRABAR_MAX_STOP_COST_MULT",
     "INTRABAR_MIN_STOP_COST_MULT",
     "INTRABAR_RISK_TIMEFRAMES",
     "INTRABAR_STOP_ATR_MULT",
+    "MAX_BBO_SPREAD_BPS_AT_SUBMIT",
+    "MAX_ESTIMATED_ONE_WAY_SLIPPAGE_BPS",
+    "MAX_REALIZED_ONE_WAY_SLIPPAGE_BPS",
+    "MAX_REALIZED_ROUND_TRIP_COST_BPS",
     "PROFILE_IDS",
     "REPO_ROOT",
     "RETURN_PER_TURNOVER_THRESHOLD_BPS",
@@ -652,5 +966,7 @@ __all__ = [
     "SleeveDecision",
     "SourceProfile",
     "SourceSleeve",
+    "live_slippage_guard_policy",
+    "live_unfilled_order_policy",
     "load_alpha_zoo_optuna_hybrid_live_config",
 ]

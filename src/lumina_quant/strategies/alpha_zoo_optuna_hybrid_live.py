@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from lumina_quant.alpha_zoo.optuna_hybrid_config import (
+    DEFAULT_69_ASSET_EFFICIENCY_REPAIR_ARTIFACT,
     DEFAULT_INTEGER_PORTFOLIO_ARTIFACT,
     DEFAULT_OPTUNA_HYBRID_ARTIFACT,
     DEFAULT_SELECTED_PROFILE_ID,
@@ -23,6 +24,7 @@ from lumina_quant.alpha_zoo.optuna_hybrid_signals import (
 )
 
 __all__ = [
+    "DEFAULT_69_ASSET_EFFICIENCY_REPAIR_ARTIFACT",
     "DEFAULT_INTEGER_PORTFOLIO_ARTIFACT",
     "DEFAULT_OPTUNA_HYBRID_ARTIFACT",
     "DEFAULT_SELECTED_PROFILE_ID",

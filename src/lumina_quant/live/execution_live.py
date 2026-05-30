@@ -861,6 +861,195 @@ class LiveExecutionHandler(ExecutionHandler):
             metadata=metadata,
         )
 
+    def _slippage_guard_policy_for_event(self, event) -> dict[str, Any]:
+        metadata = dict(getattr(event, "metadata", None) or {})
+        for key in ("live_slippage_guard_policy", "slippage_guard_policy"):
+            value = metadata.get(key)
+            if isinstance(value, dict):
+                return dict(value)
+        nested = metadata.get("signal_metadata")
+        if isinstance(nested, dict):
+            for key in ("live_slippage_guard_policy", "slippage_guard_policy"):
+                value = nested.get(key)
+                if isinstance(value, dict):
+                    return dict(value)
+
+        policy: dict[str, Any] = {}
+        max_spread = getattr(self.config, "MAX_BBO_SPREAD_BPS_AT_SUBMIT", None)
+        max_slippage = getattr(self.config, "MAX_ESTIMATED_ONE_WAY_SLIPPAGE_BPS", None)
+        if max_spread is not None:
+            policy["max_bbo_spread_bps_at_submit"] = float(max_spread)
+        if max_slippage is not None:
+            policy["max_estimated_one_way_slippage_bps"] = float(max_slippage)
+        if bool(getattr(self.config, "REQUIRE_BBO_FOR_LIMIT_ORDERS", False)):
+            policy["require_bbo_snapshot"] = True
+        if bool(getattr(self.config, "ALLOW_MARKET_ORDERS", False)) is False:
+            policy.setdefault("market_fallback_allowed", False)
+        return policy
+
+    def _latest_bbo_snapshot(self, symbol: str) -> dict[str, Any] | None:
+        getter = getattr(self.bars, "get_latest_book_ticker", None)
+        if callable(getter):
+            try:
+                snapshot = getter(symbol)
+            except Exception:
+                snapshot = None
+            if isinstance(snapshot, dict):
+                return dict(snapshot)
+        return None
+
+    @staticmethod
+    def _bbo_spread_bps(snapshot: dict[str, Any]) -> float | None:
+        try:
+            bid = float(snapshot.get("bid_price") or snapshot.get("bid") or 0.0)
+            ask = float(snapshot.get("ask_price") or snapshot.get("ask") or 0.0)
+        except Exception:
+            return None
+        if bid <= 0.0 or ask <= 0.0 or ask < bid:
+            return None
+        mid = (bid + ask) / 2.0
+        if mid <= 0.0:
+            return None
+        return ((ask - bid) / mid) * 10_000.0
+
+    @staticmethod
+    def _estimated_one_way_slippage_bps(event, snapshot: dict[str, Any]) -> float | None:
+        try:
+            bid = float(snapshot.get("bid_price") or snapshot.get("bid") or 0.0)
+            ask = float(snapshot.get("ask_price") or snapshot.get("ask") or 0.0)
+            limit_price = float(getattr(event, "price", 0.0) or 0.0)
+        except Exception:
+            return None
+        if bid <= 0.0 or ask <= 0.0 or ask < bid or limit_price <= 0.0:
+            return None
+        mid = (bid + ask) / 2.0
+        if mid <= 0.0:
+            return None
+        direction = str(getattr(event, "direction", "") or "").strip().upper()
+        if direction == "BUY":
+            return max(0.0, ((limit_price - mid) / mid) * 10_000.0)
+        if direction == "SELL":
+            return max(0.0, ((mid - limit_price) / mid) * 10_000.0)
+        return None
+
+    def _record_slippage_guard_check(
+        self,
+        event,
+        *,
+        snapshot: dict[str, Any] | None,
+        spread_bps: float | None,
+        estimated_bps: float | None,
+        status: str,
+        reason: str | None = None,
+    ) -> None:
+        metadata = dict(getattr(event, "metadata", None) or {})
+        metadata["slippage_guard_check"] = {
+            "status": str(status),
+            "reason": reason,
+            "bbo_spread_bps_at_submit": spread_bps,
+            "estimated_one_way_slippage_bps_at_submit": estimated_bps,
+            "bbo_snapshot": dict(snapshot or {}),
+            "market_fallback_allowed": False,
+        }
+        event.metadata = metadata
+
+    def _validate_limit_slippage_guard(self, event) -> None:
+        if canonical_order_type(getattr(event, "order_type", "LMT"), default="LMT") != "LMT":
+            return
+        policy = self._slippage_guard_policy_for_event(event)
+        if not policy:
+            return
+
+        require_bbo = bool(
+            policy.get("require_bbo_snapshot")
+            or getattr(self.config, "REQUIRE_BBO_FOR_LIMIT_ORDERS", False)
+        )
+        snapshot = self._latest_bbo_snapshot(str(getattr(event, "symbol", "")))
+        if not snapshot:
+            self._record_slippage_guard_check(
+                event,
+                snapshot=None,
+                spread_bps=None,
+                estimated_bps=None,
+                status="missing_bbo",
+                reason="missing_bbo_snapshot",
+            )
+            if require_bbo:
+                self._notify_state(
+                    order_id=None,
+                    entry={
+                        "event": event,
+                        "symbol": getattr(event, "symbol", None),
+                        "last_filled": 0.0,
+                        "created_at": time.time(),
+                    },
+                    state=STATE_REJECTED,
+                    message="slippage_guard_missing_bbo",
+                    metadata={"market_fallback_allowed": False},
+                )
+                raise RuntimeError(
+                    "Limit slippage guard requires a fresh BBO snapshot; order skipped with no market fallback."
+                )
+            return
+
+        spread_bps = self._bbo_spread_bps(snapshot)
+        estimated_bps = self._estimated_one_way_slippage_bps(event, snapshot)
+        max_spread = policy.get("max_bbo_spread_bps_at_submit")
+        max_estimated = policy.get("max_estimated_one_way_slippage_bps")
+        breach_reasons: list[str] = []
+        if max_spread is not None and spread_bps is not None and spread_bps > float(max_spread):
+            breach_reasons.append(
+                f"bbo_spread_bps_at_submit={spread_bps:.6g}>{float(max_spread):.6g}"
+            )
+        if (
+            max_estimated is not None
+            and estimated_bps is not None
+            and estimated_bps > float(max_estimated)
+        ):
+            breach_reasons.append(
+                "estimated_one_way_slippage_bps_at_submit="
+                f"{estimated_bps:.6g}>{float(max_estimated):.6g}"
+            )
+
+        if breach_reasons:
+            reason = ";".join(breach_reasons)
+            self._record_slippage_guard_check(
+                event,
+                snapshot=snapshot,
+                spread_bps=spread_bps,
+                estimated_bps=estimated_bps,
+                status="breach",
+                reason=reason,
+            )
+            self._notify_state(
+                order_id=None,
+                entry={
+                    "event": event,
+                    "symbol": getattr(event, "symbol", None),
+                    "last_filled": 0.0,
+                    "created_at": time.time(),
+                },
+                state=STATE_REJECTED,
+                message="slippage_guard_breach",
+                metadata={
+                    "reason": reason,
+                    "bbo_spread_bps_at_submit": spread_bps,
+                    "estimated_one_way_slippage_bps_at_submit": estimated_bps,
+                    "market_fallback_allowed": False,
+                },
+            )
+            raise RuntimeError(
+                "Limit slippage guard breached; order skipped with no market fallback: " + reason
+            )
+
+        self._record_slippage_guard_check(
+            event,
+            snapshot=snapshot,
+            spread_bps=spread_bps,
+            estimated_bps=estimated_bps,
+            status="passed",
+        )
+
     def _estimate_commission(self, fill_price, quantity):
         fee_rate = getattr(
             self.config,
@@ -976,6 +1165,7 @@ class LiveExecutionHandler(ExecutionHandler):
                 "LIMIT orders require a positive limit price before live submission."
             )
         event.order_type = requested_order_type
+        self._validate_limit_slippage_guard(event)
         order_type = "limit" if requested_order_type == "LMT" else "market"
         event.client_order_id = event.client_order_id or self._make_client_order_id(event)
 

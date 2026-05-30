@@ -75,15 +75,9 @@ graph TD
 - 최신 표준 refit evidence는
   `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_standard_live_refit_20260528/`에 있으며,
   watch universe 데이터 coverage는 `2026-05-28T10:59:59Z`까지 갱신되었습니다.
-- 전체 69개 Binance research universe용 challenger evidence가 있습니다. 첫 broad blend는
-  `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_optuna_hybrid_refit_20260530/`에 있는
-  저MDD 분산형 shadow 후보입니다. 수정된 per-profile 확장은
-  `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_profile_optuna_hybrid_refit_20260530/`에 있으며,
-  balanced/growth/aggressive를 “최종 3개 자산”이 아니라 69개 전체에 적용하는 risk template으로 취급합니다.
-  각 symbol/profile pair를 Optuna로 개별 튜닝하고 BTC/ETH/SOL/SPY/QQQ/XAU/XAG/원유 proxy domain-anchor concentration filter를 적용했습니다.
-  train/validation-legal paper 후보는 train `+160.3316%`, validation `+150.0726%`, validation MDD `7.5634%`,
-  train/validation RPT proxy `69.40/152.18bps`입니다. real-money 승인이 아니며, 실제 실행 전에는 별도 live/paper adapter와
-  forward fill/BBO/slippage/protection/reconciliation telemetry가 필요합니다.
+- 전체 69개 Binance research universe용 challenger evidence가 있습니다. 현재 efficiency-repaired paper/testnet 후보는
+  `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_efficiency_repair_optuna_20260530/`에 있으며,
+  per-symbol/profile Optuna parameter를 보존한 뒤 repaired sleeve/hybrid weight를 재튜닝했습니다. 선택 후보 `hybrid_v3_5_optuna_three_profile_blend`는 train `+295.9880%`, validation `+172.7926%`, validation MDD `6.0984%`, train/validation RPT proxy `76.65/125.01bps`이고 20bps stress도 양수입니다. 이제 paper/testnet live decision artifact와 live adapter 지원이 있지만, real-money 승인은 아닙니다.
 - live 구현은 재현성 기준으로 모듈을 분리했습니다:
   `lumina_quant.alpha_zoo.optuna_hybrid_config`는 frozen artifact/config 로딩,
   `lumina_quant.alpha_zoo.optuna_hybrid_signals`는 optional Rust state-machine 가속을 포함한 signal/bar 연산,
@@ -96,8 +90,9 @@ graph TD
 - 기본 limit 가격은 빠른 bounded execution을 위해 `one_tick_worse`입니다. BUY는 기준가보다 1 tick 위, SELL은 기준가보다 1 tick 아래이며, `same_price`와 `one_tick_better`도 설정 가능합니다.
 - paper/testnet 보호 경로는 local intrabar component exit와 entry fill 이후 Binance USDⓈ-M conditional algo limit 보호 주문을 모두 포함합니다: `POST /fapi/v1/algoOrder`의 `STOP` / `TAKE_PROFIT`.
 - Binance algo request payload는 문서화된 거래소 field allowlist만 통과하고, parent/protection telemetry는 reconciliation용 local record에만 남깁니다.
-- 선택된 frozen source asset `ETHUSDT`, `SOLUSDT`, `TRXUSDT`에 대해 asset-generic 동작을 regression test로 확인했습니다. 더 넓은 asset은 동일한 paper/testnet evidence가 필요합니다.
-- 실제 paper/testnet fill, BBO spread, slippage, reject/timeout, reconciliation, protective-order telemetry가 10bps/replay-live parity 가정을 증명하기 전까지 real-money는 계속 차단됩니다.
+- legacy ETH/SOL/TRX adapter와 69-symbol efficiency-repair adapter 재구성/signal math를 regression test로 고정했습니다. 거래소 fill 검증은 아직 필요합니다.
+- limit 주문이 체결되지 않으면 paper/testnet 정책은 cancel → partial fill reconcile → 다음 completed-bar signal까지 revalidate/skip입니다. 가격 추격과 market fallback은 기본 금지입니다.
+- 실제 paper/testnet fill, BBO spread, slippage, reject/timeout, reconciliation, protective-order telemetry가 10bps/replay-live parity 가정을 증명하기 전까지 real-money는 계속 차단됩니다. live 경로는 이제 Binance `bookTicker` snapshot을 파싱하고, strategy slippage policy가 붙은 주문은 BBO 누락/고스프레드/고슬리피지 상태에서 market 전환 없이 skip합니다.
 
 현재 operator handoff는 `docs/live-readiness/04-paper-trading-runbook.md`와 `docs/research_note/research_note.md`를 기준으로 합니다.
 

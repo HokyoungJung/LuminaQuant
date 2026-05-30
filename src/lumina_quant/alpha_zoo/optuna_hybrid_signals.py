@@ -290,12 +290,14 @@ def _panel_state(panel: pd.DataFrame, lookback: int) -> dict[str, pd.Series | pd
     momentum = panel / panel.shift(lookback) - 1.0
     ranks = momentum.rank(axis=1, ascending=False, method="first")
     reverse_ranks = momentum.rank(axis=1, ascending=True, method="first")
+    valid_count = momentum.notna().sum(axis=1).replace(0, np.nan)
     return {
         "market_momentum": market_index / market_index.shift(lookback) - 1.0,
-        "breadth": (momentum > 0.0).sum(axis=1) / float(len(panel.columns)),
+        "breadth": (momentum > 0.0).sum(axis=1) / valid_count,
         "dispersion": momentum.std(axis=1, ddof=1),
         "momentum": momentum,
         "ranks": ranks,
+        "rank_pct": momentum.rank(axis=1, ascending=False, pct=True),
         "reverse_ranks": reverse_ranks,
     }
 
@@ -459,13 +461,18 @@ def _evaluate_booster(
     )
 
 
-def _build_panel(aggregator: Any, timeframe: str, lookback: int) -> pd.DataFrame:
+def _build_panel(
+    aggregator: Any,
+    timeframe: str,
+    lookback: int,
+    symbols: tuple[str, ...] = WATCH_SYMBOLS,
+) -> pd.DataFrame:
     frames: list[pd.DataFrame] = []
-    for symbol in WATCH_SYMBOLS:
+    for symbol in tuple(dict.fromkeys(symbols)):
         frame = _frame_for(aggregator, symbol, timeframe, lookback)
         if frame.empty:
             return pd.DataFrame()
-        frames.append(frame[["datetime", "close"]].assign(symbol=symbol))
+        frames.append(frame[["datetime", "close"]].assign(symbol=str(symbol).replace("/", "")))
     panel = pd.concat(frames).pivot(index="datetime", columns="symbol", values="close")
     return panel.sort_index().dropna(how="any")
 
@@ -517,6 +524,186 @@ def _evaluate_residual(
             "market_momentum": float(market_mom.iloc[-1])
             if pd.notna(market_mom.iloc[-1])
             else None,
+        },
+    )
+
+
+def _latest_float(series: pd.Series) -> float | None:
+    value = series.iloc[-1] if len(series) else np.nan
+    return float(value) if pd.notna(value) and np.isfinite(float(value)) else None
+
+
+def _evaluate_cross_sectional_momentum_rank(
+    sleeve: SourceSleeve,
+    frame: pd.DataFrame,
+    panel: pd.DataFrame,
+) -> SleeveDecision | None:
+    symbol = sleeve.symbol.replace("/", "")
+    if panel.empty or symbol not in panel.columns:
+        return None
+    state = _panel_state(panel, sleeve.lookback)
+    momentum_panel = state["momentum"]
+    rank_panel = state["rank_pct"]
+    if not isinstance(momentum_panel, pd.DataFrame) or not isinstance(rank_panel, pd.DataFrame):
+        return None
+    symbol_momentum = _align_to_frame(momentum_panel[symbol], frame["datetime"])
+    symbol_rank = _align_to_frame(rank_panel[symbol], frame["datetime"])
+    market_mom = _align_to_frame(state["market_momentum"], frame["datetime"])
+    breadth = _align_to_frame(state["breadth"], frame["datetime"])
+    top_pct = float(sleeve.entry_threshold)
+    exit_rank = float(sleeve.exit_threshold)
+    market_guard = float(sleeve.market_guard)
+    breadth_guard = float(sleeve.breadth_guard)
+    long_entry = (
+        (symbol_rank <= top_pct)
+        & (symbol_momentum > 0.0)
+        & (market_mom > -market_guard)
+        & (breadth >= breadth_guard)
+    )
+    short_entry = (
+        (symbol_rank >= 1.0 - top_pct)
+        & (symbol_momentum < 0.0)
+        & (market_mom < market_guard)
+        & (breadth <= 1.0 - breadth_guard)
+    )
+    long_exit = (symbol_rank > exit_rank) | (symbol_momentum < 0.0)
+    short_exit = (symbol_rank < 1.0 - exit_rank) | (symbol_momentum > 0.0)
+    signal = debounced_state_signal(
+        long_entry,
+        long_exit,
+        short_entry,
+        short_exit,
+        side=sleeve.side,
+        min_hold_bars=sleeve.min_hold_bars,
+        cooldown_bars=sleeve.cooldown_bars,
+    )
+    if len(signal) == 0:
+        return None
+    latest = frame.iloc[-1]
+    return SleeveDecision(
+        signal=int(signal[-1]),
+        completed_key=_time_key(latest["datetime"]),
+        event_time=latest["datetime"],
+        price=float(latest["close"]),
+        diagnostics={
+            "symbol_momentum": _latest_float(symbol_momentum),
+            "rank_pct": _latest_float(symbol_rank),
+            "market_momentum": _latest_float(market_mom),
+            "breadth": _latest_float(breadth),
+        },
+    )
+
+
+def _evaluate_voladj_efficiency_repair(
+    sleeve: SourceSleeve,
+    frame: pd.DataFrame,
+    panel: pd.DataFrame,
+) -> SleeveDecision | None:
+    if panel.empty:
+        return None
+    close = frame["close"].astype(float)
+    high = frame["high"].astype(float)
+    low = frame["low"].astype(float)
+    lookback = sleeve.lookback
+    momentum = close / close.shift(lookback) - 1.0
+    realized = close.pct_change().rolling(max(6, lookback // 2)).std(ddof=1)
+    vol_adjusted = momentum / (realized * np.sqrt(float(lookback))).replace(0.0, np.nan)
+    adx = _adx_proxy(high, low, close, max(6, lookback // 2))
+    market_mom = _align_to_frame(
+        _panel_state(panel, lookback)["market_momentum"], frame["datetime"]
+    )
+    market_abs_max = float(sleeve.market_abs_max) if sleeve.market_abs_max > 0.0 else 1.0
+    common = (adx >= float(sleeve.adx_min)) & (market_mom.abs() < market_abs_max)
+    entry = float(sleeve.entry_threshold)
+    exit_z = float(sleeve.exit_threshold)
+    long_entry = (vol_adjusted > entry) & common
+    short_entry = (vol_adjusted < -entry) & common
+    long_exit = (vol_adjusted < exit_z) | (~common)
+    short_exit = (vol_adjusted > -exit_z) | (~common)
+    signal = debounced_state_signal(
+        long_entry,
+        long_exit,
+        short_entry,
+        short_exit,
+        side=sleeve.side,
+        min_hold_bars=sleeve.min_hold_bars,
+        cooldown_bars=sleeve.cooldown_bars,
+    )
+    if len(signal) == 0:
+        return None
+    latest = frame.iloc[-1]
+    return SleeveDecision(
+        signal=int(signal[-1]),
+        completed_key=_time_key(latest["datetime"]),
+        event_time=latest["datetime"],
+        price=float(latest["close"]),
+        diagnostics={
+            "vol_adjusted_momentum": _latest_float(vol_adjusted),
+            "market_momentum": _latest_float(market_mom),
+            "adx_proxy": _latest_float(adx),
+        },
+    )
+
+
+def _evaluate_trend_pullback_reclaim(
+    sleeve: SourceSleeve,
+    frame: pd.DataFrame,
+    panel: pd.DataFrame,
+) -> SleeveDecision | None:
+    if panel.empty:
+        return None
+    close = frame["close"].astype(float)
+    slow = sleeve.lookback
+    fast = max(4, round(slow / max(1, int(sleeve.fast_divisor or 4))))
+    ema_fast = close.ewm(span=fast, adjust=False).mean()
+    ema_slow = close.ewm(span=slow, adjust=False).mean()
+    trend_slope = ema_slow / ema_slow.shift(max(2, slow // 6)) - 1.0
+    distance = (close - ema_fast) / ema_fast.replace(0.0, np.nan)
+    dist_z = _rolling_zscore(distance, max(24, slow))
+    market_lookback = min(72, max(6, slow // 2))
+    market_mom = _align_to_frame(
+        _panel_state(panel, market_lookback)["market_momentum"], frame["datetime"]
+    )
+    pullback_z = float(sleeve.entry_threshold)
+    trend_min = float(sleeve.trend_slope_min)
+    market_guard = float(sleeve.market_guard)
+    long_entry = (
+        (ema_fast > ema_slow)
+        & (trend_slope > trend_min)
+        & (dist_z.shift(1) <= pullback_z)
+        & (close > ema_fast)
+        & (market_mom > -market_guard)
+    )
+    short_entry = (
+        (ema_fast < ema_slow)
+        & (trend_slope < -trend_min)
+        & (dist_z.shift(1) >= -pullback_z)
+        & (close < ema_fast)
+        & (market_mom < market_guard)
+    )
+    long_exit = (close < ema_slow) | (trend_slope < 0.0)
+    short_exit = (close > ema_slow) | (trend_slope > 0.0)
+    signal = debounced_state_signal(
+        long_entry,
+        long_exit,
+        short_entry,
+        short_exit,
+        side=sleeve.side,
+        min_hold_bars=sleeve.min_hold_bars,
+        cooldown_bars=sleeve.cooldown_bars,
+    )
+    if len(signal) == 0:
+        return None
+    latest = frame.iloc[-1]
+    return SleeveDecision(
+        signal=int(signal[-1]),
+        completed_key=_time_key(latest["datetime"]),
+        event_time=latest["datetime"],
+        price=float(latest["close"]),
+        diagnostics={
+            "pullback_z": _latest_float(dist_z),
+            "trend_slope": _latest_float(trend_slope),
+            "market_momentum": _latest_float(market_mom),
         },
     )
 
@@ -584,6 +771,9 @@ def _timeframe_hours(timeframe: str) -> float:
 
 
 __all__ = [
+    "_evaluate_cross_sectional_momentum_rank",
+    "_evaluate_trend_pullback_reclaim",
+    "_evaluate_voladj_efficiency_repair",
     "completed_bars_only",
     "debounced_state_signal",
     "trailing_state_signal",

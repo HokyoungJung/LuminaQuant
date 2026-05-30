@@ -75,16 +75,9 @@ The current private Alpha Zoo live handoff is **paper/testnet-only**. It is not 
 - Latest standard-refit evidence is under
   `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_standard_live_refit_20260528/`;
   data coverage for the watch universe reaches `2026-05-28T10:59:59Z`.
-- Broad challenger evidence now exists for the full 69-symbol Binance research universe. The first
-  broad blend lives under
-  `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_optuna_hybrid_refit_20260530/`
-  and is a low-MDD diversified shadow candidate. The corrected per-profile expansion lives under
-  `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_profile_optuna_hybrid_refit_20260530/`: it treats
-  balanced/growth/aggressive as risk templates expanded across all 69 assets, Optuna-tunes each
-  symbol/profile pair, applies BTC/ETH/SOL/SPY/QQQ/XAU/XAG/crude domain-anchor concentration filters,
-  and selects a train/validation-legal paper candidate with train `+160.3316%`, validation `+150.0726%`,
-  validation MDD `7.5634%`, and train/validation RPT proxy `69.40/152.18bps`. It is not a real-money
-  approval and still needs a live/paper adapter plus forward fill/BBO/slippage/protection/reconciliation telemetry.
+- Broad challenger evidence now exists for the full 69-symbol Binance research universe. The current
+  efficiency-repaired paper/testnet candidate lives under
+  `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_efficiency_repair_optuna_20260530/`: it preserves the per-symbol/profile Optuna parameters, retunes the repaired sleeve/hybrid weights, and selects `hybrid_v3_5_optuna_three_profile_blend` with train `+295.9880%`, validation `+172.7926%`, validation MDD `6.0984%`, train/validation RPT proxy `76.65/125.01bps`, and 20bps stress still positive. It now has a paper/testnet live decision artifact and live adapter support, but it is not a real-money approval.
 - Live implementation is split into reproducibility-safe modules: frozen artifact/config loading in
   `lumina_quant.alpha_zoo.optuna_hybrid_config`, signal/bar math in
   `lumina_quant.alpha_zoo.optuna_hybrid_signals` with optional Rust state-machine acceleration, and orchestration/event emission in
@@ -97,8 +90,9 @@ The current private Alpha Zoo live handoff is **paper/testnet-only**. It is not 
 - Default limit pricing is `one_tick_worse` for fast bounded execution: BUY one tick above the reference, SELL one tick below it; `same_price` and `one_tick_better` remain config options.
 - Paper/testnet protection now covers both local intrabar component exits and exchange-side Binance USDⓈ-M conditional algo limit protection after an entry fill: `STOP` / `TAKE_PROFIT` through `POST /fapi/v1/algoOrder`.
 - The Binance algo request path is allowlisted to documented exchange fields; internal parent/protection telemetry stays local for reconciliation.
-- Asset applicability is regression-tested across the selected frozen source assets `ETHUSDT`, `SOLUSDT`, and `TRXUSDT`; broader assets still need the same paper/testnet evidence before promotion.
-- Real-money remains blocked until actual paper/testnet fill, BBO spread, slippage, reject/timeout, reconciliation, and protective-order telemetry prove the 10bps/replay-live parity assumptions.
+- Asset applicability is now regression-tested for the legacy ETH/SOL/TRX adapter and the 69-symbol efficiency-repair adapter reconstruction/signal math. Exchange fill verification is still pending.
+- If a limit order does not fill, the paper/testnet policy is cancel → reconcile partial fill → revalidate/skip until the next completed-bar signal; no price chasing and no market fallback by default.
+- Real-money remains blocked until actual paper/testnet fill, BBO spread, slippage, reject/timeout, reconciliation, and protective-order telemetry prove the 10bps/replay-live parity assumptions. The live path now parses Binance `bookTicker` snapshots and, when the strategy slippage policy is attached, skips missing-BBO/high-spread/high-slippage submissions instead of converting to market orders.
 
 See `docs/live-readiness/04-paper-trading-runbook.md` and `docs/research_note/research_note.md` for the current operator handoff.
 

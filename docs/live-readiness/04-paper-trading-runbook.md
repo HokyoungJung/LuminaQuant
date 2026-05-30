@@ -264,6 +264,12 @@ intrabar / microstructure 추가 계약:
 - real-money exchange-side protective order는 아직 별도 승인된 경로가 아니다. 실제 real
   mode는 paper/testnet fill telemetry와 별도 real-readiness review가 쌓일 때까지 계속
   veto한다.
+- limit order가 미체결이면 timeout 후 cancel을 먼저 수행하고, query로 partial fill을
+  reconcile한 뒤 다음 completed-bar signal에서만 재검증한다. 가격 추격(`chase`)과
+  market fallback은 기본 금지다.
+- BBO snapshot이 없거나 high spread / high slippage 환경이면 submit하지 않거나 open order를 cancel한다.
+  paper/testnet decision contract의 guard는 BBO submit spread `4bps`, estimated one-way
+  slippage `5bps`, realized round-trip cost `10bps`를 기준으로 하며, strategy policy가 attached된 live order는 missing-BBO도 fail-closed로 skip한다.
 - queue priority는 거래소가 정확한 내 대기열 위치를 주지 않으므로 BBO/depth/fill-latency
   proxy로만 판단한다.
 
@@ -387,4 +393,16 @@ Summary:
 - gross notional: `7.3257x`
 - `ready_for_paper=true`, `ready_for_real=false`, `real_money_execution=false`
 
-This remains paper/testnet-only. The paper run must specifically monitor high-turnover assets and sleeves where validation PnL contribution is small relative to event count, realized all-in cost, BBO depth/latency, partial/cancel/timeout behavior, protective-order reconciliation, intended-vs-actual notional parity, and liquidation-inclusive MDD before any real-money review.
+Live/paper handoff artifacts:
+- `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_efficiency_repair_optuna_20260530/paper_testnet_live_decision_latest.json`
+- `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_efficiency_repair_optuna_20260530/paper_testnet_live_decision_latest.md`
+
+This remains paper/testnet-only. The adapter reconstructs 146 selected sleeves, watches all 69 symbols, and supports `30m/1h/2h/4h` state-rule families. Real-money is still blocked.
+
+Execution contingency:
+- default parent/protective orders are `LMT` / conditional limit, `one_tick_worse`, `GTC`;
+- no market fallback unless explicitly reviewed and configured;
+- no-fill path is timeout cancel → post-cancel query/reconcile → no chase → revalidate/skip until next completed-bar signal;
+- missing-BBO/high spread/high slippage path is skip/cancel/freeze-symbol review, not “pay any price”.
+
+The paper run must specifically monitor high-turnover assets and sleeves where validation PnL contribution is small relative to event count, realized all-in cost, BBO depth/latency, partial/cancel/timeout behavior, protective-order reconciliation, intended-vs-actual notional parity, and liquidation-inclusive MDD before any real-money review.

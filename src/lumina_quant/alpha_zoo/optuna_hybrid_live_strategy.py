@@ -10,9 +10,11 @@ from lumina_quant.core.events import SignalEvent
 from lumina_quant.strategy import Strategy
 
 from .optuna_hybrid_config import (
+    DEFAULT_69_ASSET_EFFICIENCY_REPAIR_ARTIFACT,
     DEFAULT_INTEGER_PORTFOLIO_ARTIFACT,
     DEFAULT_OPTUNA_HYBRID_ARTIFACT,
     DEFAULT_SELECTED_PROFILE_ID,
+    EFFICIENCY_REPAIR_FILTER_LABEL,
     INTRABAR_ATR_LOOKBACK,
     RETURN_PER_TURNOVER_THRESHOLD_BPS,
     ROUND_TRIP_COST_BPS,
@@ -30,9 +32,12 @@ from .optuna_hybrid_signals import (
     _build_panel,
     _clamp_stop_distance_pct,
     _evaluate_booster,
+    _evaluate_cross_sectional_momentum_rank,
     _evaluate_debounced,
     _evaluate_residual,
+    _evaluate_trend_pullback_reclaim,
     _evaluate_voladj,
+    _evaluate_voladj_efficiency_repair,
     _frame_for,
     _intrabar_risk_frame_for,
     _latest_atr_pct,
@@ -49,8 +54,8 @@ class AlphaZooOptunaHybridLiveStrategy(Strategy):
     decision_cadence_seconds = 3600
     preferred_contract = "market_window"
     uses_timeframe_aggregator = True
-    required_timeframes = ("1m", "5m", "1h", "2h", "4h")
-    required_lookbacks = {"1m": 96, "5m": 96, "1h": 96, "2h": 128, "4h": 64}
+    required_timeframes = ("1m", "5m", "30m", "1h", "2h", "4h")
+    required_lookbacks = {"1m": 96, "5m": 96, "30m": 256, "1h": 256, "2h": 256, "4h": 256}
     required_inputs = ("OHLCV",)
     strategy_validity = {
         "pass": True,
@@ -140,8 +145,9 @@ class AlphaZooOptunaHybridLiveStrategy(Strategy):
     def calculate_signals_window(self, event: Any, aggregator: Any) -> None:
         if aggregator is None:
             return
+        eval_cache: dict[tuple[Any, ...], Any] = {}
         for sleeve in self.config.source_sleeves:
-            decision = self._evaluate_sleeve(aggregator, sleeve)
+            decision = self._evaluate_sleeve(aggregator, sleeve, eval_cache)
             if decision is None:
                 continue
             if decision.completed_key == self._last_completed_key_by_sleeve.get(sleeve.model_id):
@@ -154,17 +160,69 @@ class AlphaZooOptunaHybridLiveStrategy(Strategy):
             self._emit_transition(sleeve, decision, previous_signal, aggregator)
         _ = event
 
-    def _evaluate_sleeve(self, aggregator: Any, sleeve: SourceSleeve) -> SleeveDecision | None:
+    def _panel_for(
+        self,
+        aggregator: Any,
+        *,
+        timeframe: str,
+        lookback: int,
+        eval_cache: dict[tuple[Any, ...], Any],
+    ) -> Any:
+        symbols = tuple(self.config.watch_symbols)
+        key = ("panel", timeframe, int(lookback), symbols)
+        if key not in eval_cache:
+            eval_cache[key] = _build_panel(aggregator, timeframe, int(lookback), symbols=symbols)
+        return eval_cache[key]
+
+    def _evaluate_sleeve(
+        self,
+        aggregator: Any,
+        sleeve: SourceSleeve,
+        eval_cache: dict[tuple[Any, ...], Any] | None = None,
+    ) -> SleeveDecision | None:
+        eval_cache = {} if eval_cache is None else eval_cache
         lookback = max(96, sleeve.lookback + sleeve.min_hold_bars + 8, self.min_completed_bars)
         frame = _frame_for(aggregator, sleeve.symbol, sleeve.timeframe, lookback)
         if len(frame) < max(8, sleeve.lookback + 2):
             return None
+        if sleeve.family == "cross_sectional_momentum_rank":
+            panel = self._panel_for(
+                aggregator,
+                timeframe=sleeve.timeframe,
+                lookback=max(96, lookback),
+                eval_cache=eval_cache,
+            )
+            return _evaluate_cross_sectional_momentum_rank(sleeve, frame, panel)
+        if sleeve.family == "trend_pullback_reclaim":
+            panel = self._panel_for(
+                aggregator,
+                timeframe=sleeve.timeframe,
+                lookback=max(256, lookback),
+                eval_cache=eval_cache,
+            )
+            return _evaluate_trend_pullback_reclaim(sleeve, frame, panel)
         if sleeve.family == "relative_residual_reclaim":
             base = _frame_for(aggregator, sleeve.base_symbol, sleeve.timeframe, lookback)
-            panel = _build_panel(aggregator, sleeve.timeframe, max(96, lookback))
+            panel = self._panel_for(
+                aggregator,
+                timeframe=sleeve.timeframe,
+                lookback=max(96, lookback),
+                eval_cache=eval_cache,
+            )
             if len(base) < max(8, sleeve.lookback + 2):
                 return None
             return _evaluate_residual(sleeve, frame, base, panel)
+        if (
+            sleeve.family == "volatility_adjusted_trend_persistence"
+            and sleeve.filter_label == EFFICIENCY_REPAIR_FILTER_LABEL
+        ):
+            panel = self._panel_for(
+                aggregator,
+                timeframe=sleeve.timeframe,
+                lookback=max(96, lookback),
+                eval_cache=eval_cache,
+            )
+            return _evaluate_voladj_efficiency_repair(sleeve, frame, panel)
         btc = _frame_for(aggregator, "BTCUSDT", sleeve.timeframe, lookback)
         if len(btc) < max(8, sleeve.lookback + 2):
             return None
@@ -179,13 +237,22 @@ class AlphaZooOptunaHybridLiveStrategy(Strategy):
     def target_notional_fraction_for_sleeve(self, sleeve: SourceSleeve) -> float:
         profile_weights = self.allocator.profile_weights_for_live()
         total = 0.0
+        uses_weighted_notional = False
         for profile in self.config.source_profiles:
             if sleeve.model_id not in profile.selected_model_ids:
+                continue
+            if sleeve.weighted_notional_fraction > 0.0:
+                uses_weighted_notional = True
+                total += float(profile_weights.get(profile.profile_id, 0.0)) * float(
+                    sleeve.weighted_notional_fraction
+                )
                 continue
             leverage = int(profile.leverage_map.get(sleeve.symbol, 0))
             if leverage <= 0:
                 continue
             total += float(profile_weights.get(profile.profile_id, 0.0)) * float(leverage)
+        if uses_weighted_notional:
+            return float(total)
         return float(sleeve.allocation_fraction) * total
 
     def max_symbol_notional_fraction(self, symbol: str) -> float:
@@ -207,12 +274,19 @@ class AlphaZooOptunaHybridLiveStrategy(Strategy):
                 continue
             leverage = int(profile.leverage_map.get(sleeve.symbol, 0))
             weight = float(weights.get(profile.profile_id, 0.0))
+            source_notional = (
+                float(sleeve.weighted_notional_fraction)
+                if sleeve.weighted_notional_fraction > 0.0
+                else float(sleeve.allocation_fraction) * float(leverage)
+            )
             out.append(
                 {
                     "profile_id": profile.profile_id,
                     "profile_weight": weight,
                     "integer_leverage": leverage,
                     "weighted_integer_leverage": weight * float(leverage),
+                    "source_notional_fraction": source_notional,
+                    "weighted_notional_fraction": weight * source_notional,
                 }
             )
         return out
@@ -344,6 +418,7 @@ class AlphaZooOptunaHybridLiveStrategy(Strategy):
             client_hash = hashlib.sha1(
                 f"{model_id}|{getattr(event, 'time', '')}|{reason}".encode()
             ).hexdigest()[:18]
+            locked_oos_role = str(self.config.governance.get("locked_oos_role", "gate_report_only"))
             self.events.put(
                 SignalEvent(
                     strategy_id=self.strategy_id,
@@ -371,7 +446,13 @@ class AlphaZooOptunaHybridLiveStrategy(Strategy):
                         "target_allocation": 0.0,
                         "target_allocation_mode": "notional_fraction",
                         "sizing_mode": "notional_fraction",
-                        "locked_oos_role": "gate_report_only",
+                        "locked_oos_role": locked_oos_role,
+                        "live_unfilled_order_policy": dict(
+                            self.config.governance.get("live_unfilled_order_policy") or {}
+                        ),
+                        "live_slippage_guard_policy": dict(
+                            self.config.governance.get("live_slippage_guard_policy") or {}
+                        ),
                     },
                 )
             )
@@ -398,6 +479,12 @@ class AlphaZooOptunaHybridLiveStrategy(Strategy):
         if signal_type == "EXIT":
             self._intrabar_guards.pop(sleeve.model_id, None)
         target_notional = self.target_notional_fraction_for_sleeve(sleeve)
+        locked_oos_role = str(self.config.governance.get("locked_oos_role", "gate_report_only"))
+        target_formula = (
+            "sum(profile_weight*source_notional_fraction_after_sleeve_multiplier)"
+            if sleeve.weighted_notional_fraction > 0.0
+            else "allocation_fraction*sum(profile_weight*integer_leverage)"
+        )
         symbol_notional_cap = max(
             target_notional + 0.05,
             self.max_symbol_notional_fraction(sleeve.symbol) * 1.05,
@@ -416,8 +503,10 @@ class AlphaZooOptunaHybridLiveStrategy(Strategy):
             "component_id": sleeve.model_id,
             "source_allocation_fraction": float(sleeve.allocation_fraction),
             "source_research_leverage": float(sleeve.source_leverage),
+            "source_weighted_notional_fraction": float(sleeve.weighted_notional_fraction),
+            "source_sleeve_multiplier": float(sleeve.sleeve_multiplier),
             "target_notional_fraction": target_notional,
-            "target_notional_formula": "allocation_fraction*sum(profile_weight*integer_leverage)",
+            "target_notional_formula": target_formula,
             "target_allocation": target_notional,
             "target_allocation_mode": "notional_fraction",
             "sizing_mode": "notional_fraction",
@@ -428,7 +517,7 @@ class AlphaZooOptunaHybridLiveStrategy(Strategy):
             "allocator": self.allocator.allocation_metadata(),
             "round_trip_cost_bps": ROUND_TRIP_COST_BPS,
             "return_per_turnover_threshold_bps": RETURN_PER_TURNOVER_THRESHOLD_BPS,
-            "locked_oos_role": "gate_report_only",
+            "locked_oos_role": locked_oos_role,
             "replay_live_notional_parity": True,
             "completed_bar_key": decision.completed_key,
             "previous_source_signal": int(previous_signal),
@@ -456,6 +545,12 @@ class AlphaZooOptunaHybridLiveStrategy(Strategy):
                 "cancel_timeout_reject_flags",
             ],
             "queue_priority_model": "proxy_only_exchange_exact_queue_position_unavailable",
+            "live_unfilled_order_policy": dict(
+                self.config.governance.get("live_unfilled_order_policy") or {}
+            ),
+            "live_slippage_guard_policy": dict(
+                self.config.governance.get("live_slippage_guard_policy") or {}
+            ),
         }
         if signal_type in {"LONG", "SHORT"}:
             self._activate_intrabar_guard(sleeve, decision, signal_type, protection)
@@ -481,6 +576,7 @@ class AlphaZooOptunaHybridLiveStrategy(Strategy):
 
 
 __all__ = [
+    "DEFAULT_69_ASSET_EFFICIENCY_REPAIR_ARTIFACT",
     "DEFAULT_INTEGER_PORTFOLIO_ARTIFACT",
     "DEFAULT_OPTUNA_HYBRID_ARTIFACT",
     "DEFAULT_SELECTED_PROFILE_ID",

@@ -13,6 +13,7 @@ from lumina_quant.data.feature_points import FeaturePointLookup
 from lumina_quant.live.binance_market_stream import (
     BinanceMarketStreamClient,
     BinanceMarketStreamConfig,
+    NormalizedBookTicker,
     build_trade_event_id,
     normalize_stream_symbol,
 )
@@ -47,6 +48,7 @@ class BinanceLiveDataHandler:
         self._shutdown = threading.Event()
         self.lock = threading.Lock()
         self.latest_symbol_data = {symbol: deque(maxlen=500) for symbol in self.symbol_list}
+        self.latest_book_ticker: dict[str, dict[str, Any]] = {}
         self.col_idx = {
             "datetime": 0,
             "open": 1,
@@ -156,6 +158,10 @@ class BinanceLiveDataHandler:
             self._ws_consecutive_errors = 0
             self._emit_from_tick(tick)
 
+        def _on_book_ticker(book: NormalizedBookTicker) -> None:
+            self._ws_consecutive_errors = 0
+            self._store_book_ticker(book)
+
         def _on_error(exc: Exception) -> None:
             if self._shutdown.is_set() or not self.continue_backtest:
                 return
@@ -175,6 +181,7 @@ class BinanceLiveDataHandler:
         client.run_ws_loop(
             stop_event=self._shutdown,
             on_trade=_on_trade,
+            on_book_ticker=_on_book_ticker,
             on_error=_on_error,
         )
 
@@ -198,6 +205,25 @@ class BinanceLiveDataHandler:
                 self._push_market_window(event)
             if self.continue_backtest and not self._shutdown.is_set():
                 time.sleep(self._poll_seconds)
+
+    def _store_book_ticker(self, book: NormalizedBookTicker) -> None:
+        snapshot = book.as_dict()
+        compact = str(book.symbol).replace("/", "").upper()
+        with self.lock:
+            self.latest_book_ticker[str(book.symbol)] = dict(snapshot)
+            self.latest_book_ticker[compact] = dict(snapshot)
+
+    def get_latest_book_ticker(self, symbol: str) -> dict[str, Any] | None:
+        key = str(symbol)
+        compact = normalize_stream_symbol(key).replace("/", "").upper()
+        normalized = normalize_stream_symbol(key)
+        with self.lock:
+            snapshot = (
+                self.latest_book_ticker.get(key)
+                or self.latest_book_ticker.get(normalized)
+                or self.latest_book_ticker.get(compact)
+            )
+            return dict(snapshot) if isinstance(snapshot, dict) else None
 
     def _push_market_window(self, event: MarketWindowEvent) -> None:
         with self.lock:
