@@ -1,5 +1,35 @@
 # Research Note
 
+## 2026-05-30 KST — 69-asset per-profile Optuna rebuild after broad-blend audit
+
+Follow-up to the first broad 69-symbol blend: the earlier pass optimized a diversified stream blend and did **not** fully rebuild the original hybrid source-profile logic per asset. Added `scripts/research/run_alpha_zoo_69_asset_profile_optuna_hybrid_refit.py` and `tests/test_alpha_zoo_69_asset_profile_optuna_hybrid_refit.py` to run the corrected expansion:
+
+- Treat the three source profiles as risk/selection templates, not as three final assets: balanced/growth/aggressive each tunes all 69 symbols independently.
+- Each symbol/profile pair is Optuna-tuned over family, timeframe, side, entry/exit, min-hold, cooldown, and integer leverage; no grid selection is used for the tunable search.
+- Domain anchors are tracked beyond BTC: BTC, ETH, SOL, SPY, QQQ, XAU, XAG, and crude proxy anchors. Candidate/profile objectives penalize single-anchor clones, top-symbol concentration, top-asset-group concentration, and top-anchor concentration.
+- Each rebuilt source profile performs an Optuna sleeve-allocation pass, then the three rebuilt multi-asset profile streams are passed to the v3.5/v3.6 Optuna hybrid engine plus a train-dominance guarded static Optuna blend.
+- Locked test/OOS remains disabled for live-final-refit style research; latest 8 complete weeks are validation/report evidence. Real-money flags remain false.
+
+Final artifact: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_profile_optuna_hybrid_refit_20260530/alpha_zoo_69_asset_profile_optuna_hybrid_refit_latest.json`.
+
+OOM evidence: full 69-symbol per-profile run completed in `7:05.78` wall time with max RSS `1,043,232 KiB` / artifact `runner_peak_rss_mib=1018.78125`, safely below 8GB.
+
+Selected train/validation-legal portfolio is the guarded static blend selecting the rebuilt balanced multi-asset profile:
+
+| portfolio | train | validation | train MDD | validation MDD | RPT bps train/val | gross | paper | real |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |
+| `hybrid_static_train_dominance_guarded_three_profile_blend` | `+160.3316%` | `+150.0726%` | `15.3371%` | `7.5634%` | `69.40 / 152.18` | `5.00x` | `true` | `false` |
+
+Rebuilt source profile audit:
+
+| profile | sleeves | train | validation | validation MDD | RPT bps train/val | top symbol | top anchor | decision |
+| --- | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |
+| balanced | `22` | `+160.3316%` | `+150.0726%` | `7.5634%` | `69.40 / 152.18` | `XPTUSDT 10.73%` | `energy_crude_beta 21.77%` | train/validation legal |
+| growth | `30` | `+174.8699%` | `+1433.8154%` | `17.630%` | `38.3 / 594.9` | `AAPLUSDT 9.56%` | `crypto_beta_btc 20.60%` | rejected as validation spike |
+| aggressive | `45` | `+218.5251%` | `+1497.3979%` | `18.2%` | `43.7 / 642.9` | `MUUSDT 7.93%` | `crypto_beta_btc 29.81%` | rejected as validation spike + gross > 8x |
+
+The adaptive v3.5/v3.6 hybrid result is deliberately not promoted despite high validation because it violates the train-dominance rule (`train +301.56% < validation +715.70%`). This is recorded as a validation-spike rejection, not a live candidate. The legal candidate is therefore the balanced multi-asset profile/guarded static blend. It is still paper/testnet-only and requires exchange-connected paper telemetry before any real review.
+
 Canonical path: `docs/research_note/research_note.md`.
 
 This file is the current cumulative research note / research journal. Keep the filename stable as `research_note.md`; strategy, project, and date labels belong inside entries, not in the path.

@@ -75,12 +75,15 @@ graph TD
 - 최신 표준 refit evidence는
   `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_standard_live_refit_20260528/`에 있으며,
   watch universe 데이터 coverage는 `2026-05-28T10:59:59Z`까지 갱신되었습니다.
-- 전체 69개 Binance research universe용 broad challenger evidence도
-  `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_optuna_hybrid_refit_20260530/`에 있습니다.
-  이는 direct 1m→30m+ 데이터에서 Optuna로 선택한 paper/testnet backtest gate 후보이며 train `+9.0960%`,
-  validation `+8.5640%`, validation MDD `0.6934%`, train/validation RPT proxy `10.96/31.84bps`,
-  top symbol `16.27%`로 asset concentration이 크게 낮습니다. real-money 승인이 아니며,
-  실제 실행 전에는 별도 live/paper adapter와 forward fill/BBO/slippage/protection/reconciliation telemetry가 필요합니다.
+- 전체 69개 Binance research universe용 challenger evidence가 있습니다. 첫 broad blend는
+  `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_optuna_hybrid_refit_20260530/`에 있는
+  저MDD 분산형 shadow 후보입니다. 수정된 per-profile 확장은
+  `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_profile_optuna_hybrid_refit_20260530/`에 있으며,
+  balanced/growth/aggressive를 “최종 3개 자산”이 아니라 69개 전체에 적용하는 risk template으로 취급합니다.
+  각 symbol/profile pair를 Optuna로 개별 튜닝하고 BTC/ETH/SOL/SPY/QQQ/XAU/XAG/원유 proxy domain-anchor concentration filter를 적용했습니다.
+  train/validation-legal paper 후보는 train `+160.3316%`, validation `+150.0726%`, validation MDD `7.5634%`,
+  train/validation RPT proxy `69.40/152.18bps`입니다. real-money 승인이 아니며, 실제 실행 전에는 별도 live/paper adapter와
+  forward fill/BBO/slippage/protection/reconciliation telemetry가 필요합니다.
 - live 구현은 재현성 기준으로 모듈을 분리했습니다:
   `lumina_quant.alpha_zoo.optuna_hybrid_config`는 frozen artifact/config 로딩,
   `lumina_quant.alpha_zoo.optuna_hybrid_signals`는 optional Rust state-machine 가속을 포함한 signal/bar 연산,

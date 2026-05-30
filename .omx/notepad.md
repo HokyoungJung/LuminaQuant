@@ -1,4 +1,12 @@
 
+## 2026-05-30 KST — corrected 69-asset per-profile Optuna rebuild
+
+- Added corrected runner `scripts/research/run_alpha_zoo_69_asset_profile_optuna_hybrid_refit.py`: three profiles are risk templates expanded across all 69 assets, not exactly three final assets.
+- Full run: `--asset-trials 24 --profile-trials 96 --hybrid-trials 160`, max RSS `1018.78125 MiB`, wall `7:05.78`.
+- Legal paper/testnet candidate: `hybrid_static_train_dominance_guarded_three_profile_blend` / balanced rebuilt multi-asset profile, train `+160.3316%`, validation `+150.0726%`, train MDD `15.3371%`, validation MDD `7.5634%`, RPT `69.40/152.18bps`, gross `5.00x`, `ready_for_real=false`.
+- v3.5 adaptive hybrid and growth/aggressive profiles rejected as validation spikes where validation return exceeded train return.
+
+
 
 ## WORKING MEMORY
 [2026-02-21T06:27:57.777Z] $ralph 완료: uv sync/verify_install/full pytest(141 passed), C/Rust native backend 빌드 성공, TA-Lib/Numba import 확인, C/Rust native parity 벤치 성공. Influx 설정 미완성 시 inferred backend는 SQLite fallback, explicit influx는 strict ValueError 유지하도록 market_data.py 수정 + 테스트 추가. architect 승인 후 state_clear(mode=ralph) 수행.

@@ -75,12 +75,16 @@ The current private Alpha Zoo live handoff is **paper/testnet-only**. It is not 
 - Latest standard-refit evidence is under
   `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_standard_live_refit_20260528/`;
   data coverage for the watch universe reaches `2026-05-28T10:59:59Z`.
-- Broad challenger evidence now also exists for the full 69-symbol Binance research universe under
-  `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_optuna_hybrid_refit_20260530/`.
-  It is an Optuna-selected, direct-1m→30m+ paper/testnet backtest gate candidate with train `+9.0960%`,
-  validation `+8.5640%`, validation MDD `0.6934%`, train/validation RPT proxy `10.96/31.84bps`,
-  and materially lower asset concentration (top symbol `16.27%`). It is not a real-money approval and
-  still needs a live/paper adapter plus forward fill/BBO/slippage/protection/reconciliation telemetry.
+- Broad challenger evidence now exists for the full 69-symbol Binance research universe. The first
+  broad blend lives under
+  `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_optuna_hybrid_refit_20260530/`
+  and is a low-MDD diversified shadow candidate. The corrected per-profile expansion lives under
+  `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_profile_optuna_hybrid_refit_20260530/`: it treats
+  balanced/growth/aggressive as risk templates expanded across all 69 assets, Optuna-tunes each
+  symbol/profile pair, applies BTC/ETH/SOL/SPY/QQQ/XAU/XAG/crude domain-anchor concentration filters,
+  and selects a train/validation-legal paper candidate with train `+160.3316%`, validation `+150.0726%`,
+  validation MDD `7.5634%`, and train/validation RPT proxy `69.40/152.18bps`. It is not a real-money
+  approval and still needs a live/paper adapter plus forward fill/BBO/slippage/protection/reconciliation telemetry.
 - Live implementation is split into reproducibility-safe modules: frozen artifact/config loading in
   `lumina_quant.alpha_zoo.optuna_hybrid_config`, signal/bar math in
   `lumina_quant.alpha_zoo.optuna_hybrid_signals` with optional Rust state-machine acceleration, and orchestration/event emission in

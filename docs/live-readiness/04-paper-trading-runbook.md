@@ -283,10 +283,16 @@ baseline vs candidate divergence를 보는 shadow 경로를 운영 가능하게 
   성적은 train `+9.0960%`, validation `+8.5640%`, validation MDD `0.6934%`,
   train/validation RPT proxy `10.96/31.84bps`, top symbol share `16.27%`,
   validation long/short exposure share 약 `52.06%/47.94%`다.
-- 이 69-symbol challenger는 현 incumbent보다 훨씬 분산되어 있지만 아직 live adapter와
-  exchange paper/testnet fill telemetry가 없으므로 **shadow/paper challenger**로만 취급한다.
-  real 전환 판단에는 최소 2~4주 forward fill/BBO/slippage/protective-order/reconciliation
-  evidence가 필요하다.
+- 2026-05-30 추가 corrected per-profile expansion artifact:
+  `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_profile_optuna_hybrid_refit_20260530/alpha_zoo_69_asset_profile_optuna_hybrid_refit_latest.json`.
+  이 artifact는 balanced/growth/aggressive를 69개 전체 자산에 적용하는 risk template으로 재해석하고,
+  각 자산/profile pair를 Optuna로 개별 튜닝한 뒤 domain-anchor concentration filter(BTC/ETH/SOL/SPY/QQQ/XAU/XAG/원유 proxy)를 적용한다.
+  train/validation-legal selected portfolio는 train `+160.3316%`, validation `+150.0726%`, validation MDD `7.5634%`,
+  train/validation RPT proxy `69.40/152.18bps`, gross `5.00x`, `ready_for_paper=true`, `ready_for_real=false`다.
+  v3.5 adaptive result와 growth/aggressive source profiles는 validation spike로 reject되어 promotion 후보가 아니다.
+- 두 69-symbol challenger 모두 아직 live adapter와 exchange paper/testnet fill telemetry가 없으므로
+  **shadow/paper challenger**로만 취급한다. real 전환 판단에는 최소 2~4주
+  forward fill/BBO/slippage/protective-order/reconciliation evidence가 필요하다.
 
 따라서 paper 단계에서는:
 - incumbent 단독 paper 실행
