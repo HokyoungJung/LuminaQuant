@@ -564,9 +564,15 @@ def _portfolio_returns_for_params(
 
 
 def _learn_params(
-    returns: np.ndarray, params: HybridParams, opt_indices: np.ndarray
+    returns: np.ndarray,
+    params: HybridParams,
+    opt_indices: np.ndarray,
+    *,
+    warmup_indices: np.ndarray | None = None,
 ) -> LearnedParams:
-    opt = returns[opt_indices]
+    # The objective fit window may include validation for scoring/final-refit
+    # evidence, but warmup state learning is train-only by default.
+    opt = returns[warmup_indices] if warmup_indices is not None else returns[opt_indices]
     n = opt.shape[0]
     warmup_n = max(10, min(n, int(n * params.warmup_ratio))) if n else 0
     warmup = opt[:warmup_n]
@@ -781,6 +787,7 @@ def _run_model(
     optuna: Mapping[str, Any] | None = None,
     top_trials: Sequence[Mapping[str, Any]] = (),
     fit_splits: Sequence[str] = ("train", "validation"),
+    warmup_splits: Sequence[str] = ("train",),
     final_refit: bool = False,
     require_locked_oos_gate: bool = True,
 ) -> OptunaModelResult:
@@ -796,7 +803,16 @@ def _run_model(
     for split in fit_splits:
         fit_mask |= _split_mask(index, str(split))
     opt_indices = np.flatnonzero(fit_mask)
-    learned = _learn_params(returns_matrix, params, opt_indices)
+    warmup_mask = np.zeros(len(index), dtype=bool)
+    for split in warmup_splits:
+        warmup_mask |= _split_mask(index, str(split))
+    warmup_indices = np.flatnonzero(warmup_mask)
+    learned = _learn_params(
+        returns_matrix,
+        params,
+        opt_indices,
+        warmup_indices=warmup_indices,
+    )
     start_idx = int(opt_indices[0]) if opt_indices.size else 0
     portfolio, weights, allocations = _portfolio_returns_for_params(
         returns_matrix,
@@ -849,6 +865,10 @@ def _run_model(
             "best_params": asdict(params),
             "learned_params": asdict(learned),
             "fit_splits": [str(split) for split in fit_splits],
+            "fit_bar_count": int(opt_indices.size),
+            "warmup_splits": [str(split) for split in warmup_splits],
+            "warmup_bar_count": int(warmup_indices.size),
+            "warmup_policy": "warmup_ratio_applies_to_train_split_only",
             "final_refit": bool(final_refit),
             "locked_oos_gate_required": bool(require_locked_oos_gate),
             "test_set_policy": "locked_oos_gate_report_only"
@@ -924,6 +944,7 @@ def _run_optuna(
     n_trials: int,
     seed: int,
     fit_splits: Sequence[str] = ("train", "validation"),
+    warmup_splits: Sequence[str] = ("train",),
     require_locked_oos_gate: bool = True,
 ) -> OptunaModelResult:
     import optuna
@@ -938,6 +959,7 @@ def _run_optuna(
             version=version,
             profile_id=profile_id,
             fit_splits=fit_splits,
+            warmup_splits=warmup_splits,
             require_locked_oos_gate=require_locked_oos_gate,
         )
         trial.set_user_attr("train_return", _safe_float(result.row.get("train_return")))
@@ -1000,6 +1022,8 @@ def _run_optuna(
                 "sampler": "TPESampler",
                 "seed": int(seed),
                 "fit_splits": [str(split) for split in fit_splits],
+                "warmup_splits": [str(split) for split in warmup_splits],
+                "warmup_policy": "warmup_ratio_applies_to_train_split_only",
                 "search_space": HYBRID_OPTUNA_CONFIG,
             },
         ),
@@ -1017,6 +1041,7 @@ def _run_optuna(
         optuna=optuna_payload,
         top_trials=top_trials,
         fit_splits=fit_splits,
+        warmup_splits=warmup_splits,
         require_locked_oos_gate=require_locked_oos_gate,
     )
     final.row["optuna"] = optuna_payload
@@ -1259,6 +1284,7 @@ def build_payload_from_inputs(
                 optuna=selected_result.optuna,
                 top_trials=selected_result.top_trials,
                 fit_splits=("train", "validation"),
+                warmup_splits=("train",),
                 final_refit=True,
                 require_locked_oos_gate=require_locked_oos_gate,
             )
@@ -1327,6 +1353,8 @@ def build_payload_from_inputs(
             "selection_fit_inputs": ["train"] if standard_live_refit else ["train", "validation"],
             "selection_score_inputs": ["train", "validation"],
             "final_refit_inputs": ["train", "validation"] if final_refit else [],
+            "warmup_fit_inputs": ["train"],
+            "warmup_ratio_scope": "train_split_only",
             "locked_oos_role": "disabled_for_live_final_refit_no_test_set_reserved"
             if standard_live_refit
             else "gate/report-only after train+validation Optuna params freeze",
@@ -1337,6 +1365,7 @@ def build_payload_from_inputs(
             "uses_locked_oos_for_objective": False,
             "uses_locked_oos_for_pruning": False,
             "uses_locked_oos_for_parameter_fitting": False,
+            "uses_validation_for_warmup_or_initial_state_learning": False,
             "uses_validation_for_parameter_fitting_before_selection": not bool(standard_live_refit),
             "final_refit_after_selection": bool(final_refit),
             "no_calendar_date_hack": True,

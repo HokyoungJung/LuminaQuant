@@ -459,6 +459,92 @@ def _split_mask(
     return ((values >= start) & (values <= end)).to_numpy()
 
 
+def _frame_bounds(frame: pd.DataFrame) -> dict[str, str | None]:
+    if frame.empty:
+        return {"earliest": None, "latest": None}
+    datetimes = pd.to_datetime(frame["datetime"])
+    return {"earliest": datetimes.min().isoformat(), "latest": datetimes.max().isoformat()}
+
+
+def build_train_eligibility_report(
+    bars_by_symbol_tf: Mapping[tuple[str, str], pd.DataFrame],
+    *,
+    symbols: Sequence[str],
+    timeframes: Sequence[str],
+    windows: SplitWindows,
+) -> dict[str, Any]:
+    """Report which symbol/timeframe pairs have physical train-window data.
+
+    Validation-only listings are unsafe for live parameter fitting because they
+    can look attractive only inside the holdout.  The standard policy is to
+    exclude every symbol/timeframe with zero train bars from candidate fitting,
+    portfolio allocation, and live promotion, while still recording it as
+    data-only coverage for a future refit.
+    """
+    by_symbol: dict[str, Any] = {}
+    train_ineligible_symbols: list[str] = []
+    train_eligible_symbols: list[str] = []
+    ineligible_symbol_timeframes: list[dict[str, Any]] = []
+    for symbol in symbols:
+        timeframe_payload: dict[str, Any] = {}
+        eligible_timeframes: list[str] = []
+        total_train_rows = 0
+        total_validation_rows = 0
+        for timeframe in timeframes:
+            frame = bars_by_symbol_tf.get((symbol, timeframe), pd.DataFrame())
+            if frame.empty:
+                train_rows = 0
+                validation_rows = 0
+            else:
+                datetimes = pd.Series(pd.to_datetime(frame["datetime"]))
+                train_rows = int(_split_mask(datetimes, "train", windows).sum())
+                validation_rows = int(_split_mask(datetimes, "validation", windows).sum())
+            total_train_rows += train_rows
+            total_validation_rows += validation_rows
+            train_eligible = train_rows > 0
+            if train_eligible:
+                eligible_timeframes.append(str(timeframe))
+            else:
+                ineligible_symbol_timeframes.append(
+                    {
+                        "symbol": str(symbol),
+                        "timeframe": str(timeframe),
+                        "reason": "no_train_bars",
+                    }
+                )
+            timeframe_payload[str(timeframe)] = {
+                **_frame_bounds(frame),
+                "train_rows": train_rows,
+                "validation_rows": validation_rows,
+                "train_eligible": train_eligible,
+            }
+        if eligible_timeframes:
+            train_eligible_symbols.append(str(symbol))
+        else:
+            train_ineligible_symbols.append(str(symbol))
+        by_symbol[str(symbol)] = {
+            "train_eligible": bool(eligible_timeframes),
+            "eligible_timeframes": eligible_timeframes,
+            "train_rows_total": total_train_rows,
+            "validation_rows_total": total_validation_rows,
+            "timeframes": timeframe_payload,
+        }
+    return {
+        "policy": (
+            "exclude_symbol_timeframes_without_train_rows_from_parameter_fit_"
+            "allocation_selection_and_live_promotion"
+        ),
+        "warmup_scope": "train_split_only",
+        "symbol_count": len(symbols),
+        "train_eligible_symbol_count": len(train_eligible_symbols),
+        "train_ineligible_symbol_count": len(train_ineligible_symbols),
+        "train_eligible_symbols": train_eligible_symbols,
+        "train_ineligible_symbols": train_ineligible_symbols,
+        "train_ineligible_symbol_timeframes": ineligible_symbol_timeframes,
+        "symbols": by_symbol,
+    }
+
+
 def max_drawdown(returns: np.ndarray) -> float:
     if returns.size == 0:
         return 0.0

@@ -248,17 +248,40 @@ def _candidate_live_efficiency_score(row: Mapping[str, Any], spec: Mapping[str, 
     )
 
 
+def _source_row_train_eligible(
+    row: Mapping[str, Any], train_eligibility: Mapping[str, Any]
+) -> bool:
+    symbol = str(row.get("symbol") or "")
+    timeframe = str(row.get("timeframe") or "")
+    symbol_payload = dict(dict(train_eligibility.get("symbols") or {}).get(symbol) or {})
+    timeframe_payload = dict(dict(symbol_payload.get("timeframes") or {}).get(timeframe) or {})
+    return bool(timeframe_payload.get("train_eligible"))
+
+
+def _allocatable_efficiency_streams(
+    candidate_streams: Sequence[broad69.CandidateStream],
+) -> list[broad69.CandidateStream]:
+    return [
+        stream
+        for stream in candidate_streams
+        if not list(stream.row.get("efficiency_repair_reasons") or [])
+    ]
+
+
 def _build_candidate_streams(
     *,
     source_payload: Mapping[str, Any],
     spec: Mapping[str, Any],
     cache: profile69.FeatureCache,
     windows: broad69.SplitWindows,
+    train_eligibility: Mapping[str, Any],
 ) -> list[broad69.CandidateStream]:
     out: list[broad69.CandidateStream] = []
     source_profile_id = str(spec["source_profile_id"])
     for raw in source_payload.get("asset_tuning_rows", []):
         if str(raw.get("profile_id")) != source_profile_id:
+            continue
+        if not _source_row_train_eligible(raw, train_eligibility):
             continue
         params = raw.get("optuna_params") or {}
         if not isinstance(params, Mapping) or not params:
@@ -402,7 +425,7 @@ def tune_efficiency_profile_allocations(
         raise RuntimeError("Optuna is required for efficiency repair tuning")
     profile_id = str(spec["profile_id"])
     ranked = sorted(
-        candidate_streams,
+        _allocatable_efficiency_streams(candidate_streams),
         key=lambda stream: _safe_float(stream.row.get("live_efficiency_score"), -1e18),
         reverse=True,
     )[: int(spec["candidate_pool_size"])]
@@ -816,6 +839,10 @@ def _render_pct(value: Any) -> str:
 
 def _render_markdown(payload: Mapping[str, Any]) -> str:
     selected = dict(payload.get("selected_train_validation_legal_portfolio") or {})
+    selected_hybrid = dict(payload.get("selected_optuna_hybrid_profile") or {})
+    train_eligibility = dict(payload.get("train_eligibility") or {})
+    eligible_symbols = list(train_eligibility.get("train_eligible_symbols") or [])
+    ineligible_symbols = list(train_eligibility.get("train_ineligible_symbols") or [])
     lines = [
         "# 69-asset live-efficiency repair Optuna",
         "",
@@ -826,7 +853,16 @@ def _render_markdown(payload: Mapping[str, Any]) -> str:
         "- Repairs the 69-asset per-profile artifact for live/paper efficiency rather than selecting only three assets.",
         "- Every source asset/profile remains individually tuned; this pass retunes portfolio sleeves and hybrid weights with stronger 10bps RPT, sample, turnover, concentration, and 15/20bps stress constraints.",
         "- No locked test set is used; train and latest 8-week validation remain the only selection inputs.",
+        "- Symbol/timeframe rows without train-split bars are excluded from parameter fitting, sleeve allocation, hybrid selection, and live promotion; they remain watch/research coverage only until a future refit has train data.",
         "- Real-money execution remains disabled.",
+        "",
+        "## Train eligibility",
+        "",
+        f"- train-eligible symbols: `{len(eligible_symbols)}`",
+        f"- train-ineligible symbols: `{len(ineligible_symbols)}`",
+        f"- exclusion policy: `{train_eligibility.get('policy')}`",
+        f"- warmup scope: `{train_eligibility.get('warmup_scope')}`",
+        f"- train-ineligible symbol list: `{', '.join(ineligible_symbols)}`",
         "",
         "## Selected legal portfolio",
         "",
@@ -838,6 +874,16 @@ def _render_markdown(payload: Mapping[str, Any]) -> str:
         f"- gross notional: `{_safe_float(selected.get('gross_notional_fraction')):.4f}x`",
         f"- final weights: `{json.dumps(_json_safe(selected.get('final_weights') or selected.get('weights') or {}), sort_keys=True)}`",
         f"- selection reasons: `{selected.get('selection_reasons')}`",
+        "",
+        "## Selected Optuna hybrid for paper/testnet live handoff",
+        "",
+        f"- profile: `{selected_hybrid.get('profile_id')}`",
+        f"- train / validation: `{_render_pct(selected_hybrid.get('train_return'))}` / `{_render_pct(selected_hybrid.get('validation_return'))}`",
+        f"- train / validation MDD: `{_render_pct(selected_hybrid.get('train_mdd'))}` / `{_render_pct(selected_hybrid.get('validation_mdd'))}`",
+        f"- RPT bps train / validation: `{_safe_float(selected_hybrid.get('train_return_per_turnover_proxy_bps')):.2f}` / `{_safe_float(selected_hybrid.get('validation_return_per_turnover_proxy_bps')):.2f}`",
+        f"- gross notional: `{_safe_float(selected_hybrid.get('gross_notional_fraction')):.4f}x`",
+        f"- final weights: `{json.dumps(_json_safe(selected_hybrid.get('final_weights') or {}), sort_keys=True)}`",
+        f"- selection reasons: `{selected_hybrid.get('selection_reasons')}`",
         "",
         "## Repaired profiles",
         "",
@@ -881,6 +927,12 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     data_root = Path(source_payload["data_coverage"]["data_root"])
     bars, coverage = broad69.load_all_bars(symbols, data_root=data_root, timeframes=timeframes)
     windows = _split_windows_from_payload(source_payload)
+    train_eligibility = broad69.build_train_eligibility_report(
+        bars,
+        symbols=symbols,
+        timeframes=timeframes,
+        windows=windows,
+    )
     cache = profile69.FeatureCache(
         bars_by_symbol_tf=bars,
         symbols=symbols,
@@ -895,7 +947,11 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     profile_streams: list[grid_hybrid.ProfileStream] = []
     for idx, spec in enumerate(EFFICIENCY_PROFILE_SPECS):
         candidates = _build_candidate_streams(
-            source_payload=source_payload, spec=spec, cache=cache, windows=windows
+            source_payload=source_payload,
+            spec=spec,
+            cache=cache,
+            windows=windows,
+            train_eligibility=train_eligibility,
         )
         asset_rows.extend(dict(stream.row) for stream in candidates)
         profile_stream, profile_row, selected = tune_efficiency_profile_allocations(
@@ -916,7 +972,8 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
             version="v3_5",
             n_trials=int(args.hybrid_trials),
             seed=int(args.seed) + 700_000,
-            fit_splits=("train", "validation"),
+            fit_splits=("train",),
+            warmup_splits=("train",),
             require_locked_oos_gate=False,
         )
         v36 = optuna_hybrid._run_optuna(
@@ -924,7 +981,8 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
             version="v3_6",
             n_trials=int(args.hybrid_trials),
             seed=int(args.seed) + 700_001,
-            fit_splits=("train", "validation"),
+            fit_splits=("train",),
+            warmup_splits=("train",),
             require_locked_oos_gate=False,
         )
         static_guarded = optimize_efficiency_blend(
@@ -996,6 +1054,7 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
             },
         },
         "data_coverage": coverage,
+        "train_eligibility": train_eligibility,
         "research_primary_round_trip_cost_bps": PRIMARY_COST_BPS,
         "avg_bbo_spread_bps_assumption": broad69.AVG_BBO_SPREAD_BPS_ASSUMPTION,
         "return_per_turnover_threshold_bps": broad69.RETURN_PER_TURNOVER_THRESHOLD_BPS,
@@ -1013,8 +1072,19 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
                 "profile_trials": int(args.profile_trials),
                 "hybrid_trials_per_version": int(args.hybrid_trials),
                 "cost_stress_bps": list(STRESS_COST_BPS),
+                "train_eligible_symbol_count": train_eligibility["train_eligible_symbol_count"],
+                "train_ineligible_symbol_count": train_eligibility["train_ineligible_symbol_count"],
+                "train_ineligible_symbols": train_eligibility["train_ineligible_symbols"],
                 "all_source_asset_profile_params_preserved": True,
                 "repairs_portfolio_weights_not_asset_signal_params": True,
+                "candidate_filtering": (
+                    "source rows without train bars or with efficiency_repair_reasons "
+                    "are excluded from allocation and live promotion"
+                ),
+                "hybrid_fit_inputs": ["train"],
+                "hybrid_score_inputs": ["train", "validation"],
+                "hybrid_warmup_inputs": ["train"],
+                "warmup_ratio_scope": "train_split_only",
                 "uses_test_set": False,
                 "profile_specs": list(EFFICIENCY_PROFILE_SPECS),
             },

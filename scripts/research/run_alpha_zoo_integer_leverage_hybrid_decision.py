@@ -477,16 +477,14 @@ def _base_comparison_row(stream: ProfileStream, source_row: Mapping[str, Any]) -
 def _profile_corr_matrix(
     profile_streams: Sequence[ProfileStream], *, split: str
 ) -> dict[str, dict[str, float | None]]:
+    frame = pd.DataFrame(
+        {stream.profile_id: stream.returns for stream in profile_streams}
+    ).sort_index()
     if split == "train_validation":
-        mask = ilp._split_mask(profile_streams[0].returns.index, "train") | ilp._split_mask(
-            profile_streams[0].returns.index,
-            "validation",
-        )
+        mask = ilp._split_mask(frame.index, "train") | ilp._split_mask(frame.index, "validation")
     else:
-        mask = ilp._split_mask(profile_streams[0].returns.index, split)
-    frame = pd.DataFrame({stream.profile_id: stream.returns for stream in profile_streams}).loc[
-        mask
-    ]
+        mask = ilp._split_mask(frame.index, split)
+    frame = frame.loc[mask]
     corr = frame.corr()
     out: dict[str, dict[str, float | None]] = {}
     for left in corr.index:

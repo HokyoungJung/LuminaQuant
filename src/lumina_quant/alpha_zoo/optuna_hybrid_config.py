@@ -570,6 +570,17 @@ def _is_69_asset_efficiency_repair_payload(payload: dict[str, Any]) -> bool:
     return str(payload.get("artifact_kind") or "") == EFFICIENCY_REPAIR_ARTIFACT_KIND
 
 
+def _resolve_selected_profile_id(payload: dict[str, Any], selected_profile_id: str | None) -> str:
+    explicit = str(selected_profile_id or "").strip()
+    if explicit:
+        return explicit
+    for key in ("selected_optuna_hybrid_profile", "selected_train_validation_legal_portfolio"):
+        profile_id = str(dict(payload.get(key) or {}).get("profile_id") or "").strip()
+        if profile_id:
+            return profile_id
+    return DEFAULT_SELECTED_PROFILE_ID
+
+
 def _extract_69_asset_selected_profile(
     payload: dict[str, Any], selected_profile_id: str
 ) -> dict[str, Any]:
@@ -802,17 +813,18 @@ def load_alpha_zoo_optuna_hybrid_live_config(
     *,
     optuna_hybrid_artifact_path: str | Path = DEFAULT_OPTUNA_HYBRID_ARTIFACT,
     integer_portfolio_artifact_path: str | Path = DEFAULT_INTEGER_PORTFOLIO_ARTIFACT,
-    selected_profile_id: str = DEFAULT_SELECTED_PROFILE_ID,
+    selected_profile_id: str | None = None,
 ) -> AlphaZooOptunaHybridLiveConfig:
     optuna_path = _resolve_path(optuna_hybrid_artifact_path)
     integer_path = _resolve_path(integer_portfolio_artifact_path)
     optuna_payload = _read_json(optuna_path)
+    resolved_selected_profile_id = _resolve_selected_profile_id(optuna_payload, selected_profile_id)
     if _is_69_asset_efficiency_repair_payload(optuna_payload):
         return _load_69_asset_efficiency_repair_live_config(
             payload=optuna_payload,
             optuna_path=optuna_path,
             integer_path=integer_path,
-            selected_profile_id=selected_profile_id,
+            selected_profile_id=resolved_selected_profile_id,
         )
 
     integer_payload = _read_json(integer_path)
@@ -822,7 +834,7 @@ def load_alpha_zoo_optuna_hybrid_live_config(
     _validate_locked_oos_policy(optuna_payload)
     _validate_integer_artifact(integer_payload)
 
-    selected_profile = _extract_selected_profile(optuna_payload, selected_profile_id)
+    selected_profile = _extract_selected_profile(optuna_payload, resolved_selected_profile_id)
     for key in ("ready_for_real", "real_money_execution"):
         if selected_profile.get(key) is not False:
             raise ValueError(f"selected Optuna profile must keep {key}=false")
@@ -922,7 +934,7 @@ def load_alpha_zoo_optuna_hybrid_live_config(
         "live_slippage_guard_policy": live_slippage_guard_policy(),
     }
     return AlphaZooOptunaHybridLiveConfig(
-        selected_profile_id=selected_profile_id,
+        selected_profile_id=resolved_selected_profile_id,
         optuna_artifact_path=optuna_path,
         integer_artifact_path=integer_path,
         selected_profile=selected_profile,

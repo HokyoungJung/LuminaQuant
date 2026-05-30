@@ -2,11 +2,15 @@
 
 - strategy_name: `AlphaZooOptunaHybridLiveStrategy`
 - selected_mode: `alpha_zoo_69_asset_efficiency_repair_optuna_hybrid`
-- selected_profile_id: `hybrid_v3_5_optuna_three_profile_blend`
+- selected_profile_id: `hybrid_v3_6_optuna_three_profile_blend`
 - symbol_count: `69`
+- selected_source_symbol_count: `13`
+- selected_source_symbols: `ADAUSDT, AVAXUSDT, BNBUSDT, BTCUSDT, COPPERUSDT, CRCLUSDT, DOGEUSDT, SOLUSDT, TONUSDT, XAGUSDT, XAUUSDT, XPTUSDT, XRPUSDT`
+- live_final_gross_notional: `2.338904x`
+- historical_train_validation_gross_notional: `2.504196x`
 - target_allocation_mode: `notional_fraction`
 - target_allocation source: `SignalEvent.metadata.target_allocation`
-- risk_caps: `{"max_order_notional_pct": 0.275556, "max_order_value": 0.0, "max_symbol_exposure_pct": 0.515101, "max_total_margin_pct": 6.808695, "max_total_notional_pct": 6.808695}`
+- risk_caps: `{"max_order_notional_pct": 0.419745, "max_order_value": 0.0, "max_symbol_exposure_pct": 0.485734, "max_total_margin_pct": 2.588904, "max_total_notional_pct": 2.588904}`
 - limit order contract: `LMT one_tick_worse by default; market optional only by explicit opt-in`
 - unfilled-order policy: `cancel, reconcile, do not chase, no market fallback`
 - slippage guard: `missing-BBO/guard breach skip or cancel; no high-slippage fallback`

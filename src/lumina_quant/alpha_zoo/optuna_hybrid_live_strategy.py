@@ -76,7 +76,7 @@ class AlphaZooOptunaHybridLiveStrategy(Strategy):
         *,
         optuna_hybrid_artifact_path: str | Path = DEFAULT_OPTUNA_HYBRID_ARTIFACT,
         integer_portfolio_artifact_path: str | Path = DEFAULT_INTEGER_PORTFOLIO_ARTIFACT,
-        selected_profile_id: str = DEFAULT_SELECTED_PROFILE_ID,
+        selected_profile_id: str | None = None,
         paper_testnet_only: bool = True,
         allow_real_money: bool = False,
         min_completed_bars: int = 0,

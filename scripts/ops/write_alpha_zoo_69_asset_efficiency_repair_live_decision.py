@@ -41,21 +41,35 @@ DEFAULT_OUTPUT_DIR = (
 DEFAULT_OUTPUT_PATH = DEFAULT_OUTPUT_DIR / "paper_testnet_live_decision_latest.json"
 
 
+def _artifact_default_selected_profile_id(path: str | Path) -> str:
+    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    selected = dict(payload.get("selected_optuna_hybrid_profile") or {})
+    profile_id = str(selected.get("profile_id") or "").strip()
+    return profile_id or DEFAULT_SELECTED_PROFILE_ID
+
+
 def build_69_asset_efficiency_repair_decision_payload(
     *,
     optuna_hybrid_artifact_path: str | Path = DEFAULT_69_ASSET_EFFICIENCY_REPAIR_ARTIFACT,
     integer_portfolio_artifact_path: str | Path = DEFAULT_INTEGER_PORTFOLIO_ARTIFACT,
-    selected_profile_id: str = DEFAULT_SELECTED_PROFILE_ID,
+    selected_profile_id: str | None = None,
 ) -> dict[str, Any]:
+    resolved_selected_profile_id = (
+        str(selected_profile_id).strip()
+        if selected_profile_id is not None and str(selected_profile_id).strip()
+        else _artifact_default_selected_profile_id(optuna_hybrid_artifact_path)
+    )
     build_decision_payload = _load_base_decision_builder()
     return build_decision_payload(
         optuna_hybrid_artifact_path=optuna_hybrid_artifact_path,
         integer_portfolio_artifact_path=integer_portfolio_artifact_path,
-        selected_profile_id=selected_profile_id,
+        selected_profile_id=resolved_selected_profile_id,
     )
 
 
 def _write_markdown(output: Path, payload: dict[str, Any]) -> None:
+    applicability = dict(payload.get("asset_applicability_contract") or {})
+    selected_source_symbols = list(applicability.get("selected_source_symbols") or [])
     output.with_suffix(".md").write_text(
         "\n".join(
             [
@@ -65,6 +79,10 @@ def _write_markdown(output: Path, payload: dict[str, Any]) -> None:
                 f"- selected_mode: `{payload['selected_mode']}`",
                 f"- selected_profile_id: `{payload['strategy_params']['selected_profile_id']}`",
                 f"- symbol_count: `{len(payload['symbols'])}`",
+                f"- selected_source_symbol_count: `{len(selected_source_symbols)}`",
+                f"- selected_source_symbols: `{', '.join(selected_source_symbols)}`",
+                f"- live_final_gross_notional: `{payload['live_final_weight_gross_notional_fraction']:.6f}x`",
+                f"- historical_train_validation_gross_notional: `{payload['historical_train_validation_gross_notional_fraction']:.6f}x`",
                 f"- target_allocation_mode: `{payload['target_allocation_mode']}`",
                 "- target_allocation source: `SignalEvent.metadata.target_allocation`",
                 f"- risk_caps: `{json.dumps(payload['risk_caps'], sort_keys=True)}`",
@@ -111,7 +129,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--integer-portfolio-artifact", default=str(DEFAULT_INTEGER_PORTFOLIO_ARTIFACT)
     )
-    parser.add_argument("--selected-profile-id", default=DEFAULT_SELECTED_PROFILE_ID)
+    parser.add_argument(
+        "--selected-profile-id",
+        default="",
+        help="Override selected profile id; default uses artifact selected_optuna_hybrid_profile.",
+    )
     parser.add_argument("--check-only", action="store_true")
     args = parser.parse_args(argv)
 

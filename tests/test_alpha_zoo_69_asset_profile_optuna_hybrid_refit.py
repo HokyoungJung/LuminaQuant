@@ -87,3 +87,33 @@ def test_split_windows_for_hybrid_preserves_empty_locked_oos() -> None:
     split_windows = module._split_windows_for_hybrid(windows.as_payload())
 
     assert split_windows["locked_oos"][0] > split_windows["locked_oos"][1]
+
+
+def test_train_eligibility_excludes_validation_only_symbols() -> None:
+    windows = broad69.SplitWindows(
+        train=(pd.Timestamp("2026-01-01"), pd.Timestamp("2026-01-03")),
+        validation=(pd.Timestamp("2026-01-04"), pd.Timestamp("2026-01-05")),
+    )
+    train_frame = pd.DataFrame(
+        {
+            "datetime": pd.date_range("2026-01-01", periods=5, freq="h"),
+            "close": np.linspace(1.0, 1.1, 5),
+        }
+    )
+    validation_only_frame = pd.DataFrame(
+        {
+            "datetime": pd.date_range("2026-01-04", periods=5, freq="h"),
+            "close": np.linspace(1.0, 1.1, 5),
+        }
+    )
+
+    report = broad69.build_train_eligibility_report(
+        {("BTCUSDT", "1h"): train_frame, ("NEWUSDT", "1h"): validation_only_frame},
+        symbols=("BTCUSDT", "NEWUSDT"),
+        timeframes=("1h",),
+        windows=windows,
+    )
+
+    assert report["train_eligible_symbols"] == ["BTCUSDT"]
+    assert report["train_ineligible_symbols"] == ["NEWUSDT"]
+    assert module._eligible_timeframes_for_symbol(report, "NEWUSDT", ("1h",)) == ()

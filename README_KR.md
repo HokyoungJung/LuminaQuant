@@ -68,16 +68,16 @@ graph TD
 
 현재 private Alpha Zoo live handoff는 **paper/testnet 전용**이며 real-money 승인이 아닙니다.
 
-- 선택 runtime: frozen Optuna v3.5 hybrid artifact용 `AlphaZooOptunaHybridLiveStrategy`.
+- 선택 runtime: `AlphaZooOptunaHybridLiveStrategy`입니다. 현재 69-symbol efficiency-repair handoff는 artifact가 선택한 v3.6 hybrid를 사용하고, 기존 standard/live-refit v3.5 artifact는 historical baseline으로 남깁니다.
 - 표준 live refit은 이제 committed data를 최신화한 뒤, 최신 8개 완성 주를 validation으로 두고,
   노출된 모든 hybrid parameter를 Optuna로 튜닝한 다음 train+validation으로 final refit해서
   runtime artifact를 freeze합니다. live final-refit 모드에서는 locked-OOS/test set을 의도적으로 두지 않습니다.
 - 최신 표준 refit evidence는
   `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_standard_live_refit_20260528/`에 있으며,
   watch universe 데이터 coverage는 `2026-05-28T10:59:59Z`까지 갱신되었습니다.
-- 전체 69개 Binance research universe용 challenger evidence가 있습니다. 현재 efficiency-repaired paper/testnet 후보는
+- 전체 69개 Binance research universe용 challenger evidence가 있습니다. 수정된 efficiency-repaired paper/testnet 후보는
   `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_efficiency_repair_optuna_20260530/`에 있으며,
-  per-symbol/profile Optuna parameter를 보존한 뒤 repaired sleeve/hybrid weight를 재튜닝했습니다. 선택 후보 `hybrid_v3_5_optuna_three_profile_blend`는 train `+295.9880%`, validation `+172.7926%`, validation MDD `6.0984%`, train/validation RPT proxy `76.65/125.01bps`이고 20bps stress도 양수입니다. 이제 paper/testnet live decision artifact와 live adapter 지원이 있지만, real-money 승인은 아닙니다.
+  train split에 없는 symbol/timeframe은 parameter fitting, sleeve allocation, hybrid selection, live promotion에서 제외합니다. 현재 paper/testnet live handoff는 `hybrid_v3_6_optuna_three_profile_blend`이고 train `+96.5913%`, validation `+68.1871%`, validation MDD `7.8678%`, train/validation RPT proxy `42.30/149.64bps`, live final gross `2.3389x`입니다. 이전 `+295.9880%/+172.7926%` headline은 validation-only asset이 allocation에 들어간 결과라 supersede했습니다. eligibility fix 이후 v3.5는 비교 후보(`+153.0941%/+57.2165%`)로만 남고 선택 live handoff는 아닙니다. paper/testnet live decision artifact와 live adapter 지원은 있지만, real-money 승인은 아닙니다.
 - live 구현은 재현성 기준으로 모듈을 분리했습니다:
   `lumina_quant.alpha_zoo.optuna_hybrid_config`는 frozen artifact/config 로딩,
   `lumina_quant.alpha_zoo.optuna_hybrid_signals`는 optional Rust state-machine 가속을 포함한 signal/bar 연산,
@@ -221,7 +221,7 @@ uv run python scripts/sync_binance_ohlcv.py \
 
 Public 저장소에는 DB 동기화/구축 헬퍼를 의도적으로 포함하지 않습니다. 사전 구축된 DB 파일 또는 CSV 데이터를 사용하세요.
 
-확장 Binance research universe(private 저장소): `src/lumina_quant/research_universe.py`에 현재 기준 10개 core crypto + 59개 Binance USD-M `TRADIFI_PERPETUAL` 심볼 snapshot을 side-effect-free 상수로 기록했습니다. 69개 전체 direct 1m research bar는 `data/market_parquet/exchange=binance` 아래에 저장되어 있고 OOM-capped 69-asset Optuna refit 및 live-efficiency repair runner가 사용합니다. 현재 paper/testnet-only efficiency-repaired v3.5 hybrid는 train `+295.99%`, validation `+172.79%`, validation MDD `6.10%`, RPT `76.65/125.01bps`이며 `ready_for_real=false` / `real_money_execution=false`를 유지합니다. 이후 staged refresh/coverage inventory 작업에는 `BINANCE_EXTENDED_RESEARCH_SYMBOLS_SLASHED`를 사용합니다. 목록 추가 또는 research bar 수집은 real-money 승인이 아닙니다. `docs/kr/RUNBOOK_1Y_1S_LOCAL.md` 및 `docs/research_note/research_note.md`를 참고하세요.
+확장 Binance research universe(private 저장소): `src/lumina_quant/research_universe.py`에 현재 기준 10개 core crypto + 59개 Binance USD-M `TRADIFI_PERPETUAL` 심볼 snapshot을 side-effect-free 상수로 기록했습니다. 69개 전체 direct 1m research bar는 `data/market_parquet/exchange=binance` 아래에 저장되어 있고 OOM-capped 69-asset Optuna refit 및 live-efficiency repair runner가 사용합니다. 현재 corrected efficiency-repair 정책은 train split에 없는 asset/timeframe을 tuning/allocation/live promotion에서 제외합니다. 선택된 paper/testnet-only v3.6 hybrid는 train `+96.59%`, validation `+68.19%`, validation MDD `7.87%`, RPT `42.30/149.64bps`이며 `ready_for_real=false` / `real_money_execution=false`를 유지합니다. 이후 staged refresh/coverage inventory 작업에는 `BINANCE_EXTENDED_RESEARCH_SYMBOLS_SLASHED`를 사용합니다. 목록 추가 또는 research bar 수집은 real-money 승인이 아닙니다. `docs/kr/RUNBOOK_1Y_1S_LOCAL.md` 및 `docs/research_note/research_note.md`를 참고하세요.
 
 **Raw aggTrades → 커밋된 materialized 파이프라인 (Private 저장소):**
 ```bash

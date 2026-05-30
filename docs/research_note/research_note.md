@@ -1,44 +1,40 @@
 # Research Note
 
-## 2026-05-30 KST — 69-asset efficiency repair live adapter and no-fill/slippage policy
+## 2026-05-31 KST — 69-asset train-eligibility correction and live handoff refresh
 
-Implemented the paper/testnet live handoff for the 69-asset efficiency-repaired Optuna candidate without relaxing real-money gates. The existing `AlphaZooOptunaHybridLiveStrategy` now loads `alpha_zoo_69_asset_efficiency_repair_optuna_latest.json`, reconstructs `146` selected sleeves across the three repaired profiles, watches all `69` symbols, and evaluates the `cross_sectional_momentum_rank`, `volatility_adjusted_trend_persistence`, and `trend_pullback_reclaim` families on completed `30m/1h/2h/4h` bars. Target notional for the new artifact uses the repaired source notional after sleeve multipliers plus frozen final profile weights; the historical train+validation gross remains recorded separately.
+Corrected the 69-symbol efficiency-repair pipeline after finding that several newly listed TradFi/premarket symbols had no train-split rows before `2026-04-04T03:00:00`, yet the earlier allocation layer could still admit validation-only sleeves. The superseded headline `+295.9880%` train / `+172.7926%` validation was therefore contaminated by validation-only assets and is no longer the live handoff evidence.
 
-Generated the new handoff artifact: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_efficiency_repair_optuna_20260530/paper_testnet_live_decision_latest.json` plus `.md`. It keeps `paper_testnet_only=true`, `ready_for_real=false`, `real_money_execution=false`, and `real_execution_allowed=false`. The selected model remains `hybrid_v3_5_optuna_three_profile_blend` with the research artifact's train `+295.9880%`, validation `+172.7926%`, validation MDD `6.0984%`, and train/validation RPT `76.65/125.01bps` under the embedded 10bps round-trip cost proxy.
+Implemented train-eligibility gating in the shared 69-asset refit utilities and repair runner:
 
-Execution policy was hardened for the operator's no-high-slippage requirement: default orders remain limit-first (`LMT`, `one_tick_worse`, `GTC`), market fallback is false, max chase attempts are `0`, unfilled orders cancel on timeout and reconcile any partial fill before waiting for a fresh/revalidated completed-bar signal. The live Binance stream now parses `bookTicker` BBO snapshots, and strategy-attached slippage policy requires BBO before submission; missing-BBO, BBO spread above `4bps`, or estimated one-way slippage above `5bps` skips the order with no market conversion. Realized one-way slippage `5bps` and round-trip cost `10bps` remain paper/testnet telemetry gates.
+- Build a symbol/timeframe train-eligibility report from the actual train/validation windows.
+- Exclude any symbol/timeframe with zero train rows from per-asset parameter fitting, repair source rows, sleeve allocation, hybrid selection, and live promotion.
+- Keep those symbols in the watch/data universe only; they become eligible only after a future refit has real train-split history.
+- Apply `warmup_ratio` to train-split bars only, even when final refit fits train+validation parameters.
+- Filter rejected/diagnostic repair streams out of allocation so rows with `efficiency_repair_reasons` cannot re-enter through portfolio weights.
 
-Verification passed locally: `uv run ruff format --check .`; `uv run ruff check .`; `uv run python -m compileall -q src scripts tests`; `uv run python scripts/verify_docs.py`; `uv run python scripts/check_architecture.py`; `uv run python scripts/audit_hardcoded_params.py` (`new=0`); `git diff --check`; targeted live/order suite `43 passed`; and full `/usr/bin/time -v uv run pytest -q` (`1535 passed`, max RSS `2,708,672 KiB`, below 8GB). CI follows after push.
+Train eligibility in the corrected artifact: `32` eligible symbols and `37` train-ineligible symbols. The train-ineligible list is `QQQUSDT`, `SPYUSDT`, `SOXLUSDT`, `AAPLUSDT`, `TSMUSDT`, `MUUSDT`, `SNDKUSDT`, `MSFTUSDT`, `AVGOUSDT`, `BABAUSDT`, `AMDUSDT`, `QCOMUSDT`, `USARUSDT`, `LITEUSDT`, `ORCLUSDT`, `DISUSDT`, `UBERUSDT`, `CSCOUSDT`, `HDUSDT`, `MRVLUSDT`, `CRWVUSDT`, `WMTUSDT`, `JPMUSDT`, `VUSDT`, `BRKBUSDT`, `FLNCUSDT`, `DRAMUSDT`, `RKLBUSDT`, `CBRSUSDT`, `NBISUSDT`, `WDCUSDT`, `ARMUSDT`, `BEUSDT`, `COHRUSDT`, `SPCXUSDT`, `OPENAIUSDT`, and `QNTXUSDT`.
 
+Corrected artifact: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_efficiency_repair_optuna_20260530/alpha_zoo_69_asset_efficiency_repair_optuna_latest.json` generated at `2026-05-30T16:17:37Z`. Rerun evidence: wall `1:55.26`, max RSS `891,500 KiB` / artifact `870.61 MiB`, below the 8GB budget. No locked test set is used in this final-refit style pass; train and latest 8-week validation are the only selection inputs.
 
-## 2026-05-30 KST — 69-asset live-efficiency repair Optuna pass
-
-Follow-up to the corrected 69-asset per-profile rebuild after the operator clarified that the three profiles are risk/strategy templates to expand across all assets, not a limit of three final selections. Added `scripts/research/run_alpha_zoo_69_asset_efficiency_repair_optuna.py` and `tests/test_alpha_zoo_69_asset_efficiency_repair_optuna.py`. The pass preserves the per-symbol/per-profile Optuna-tuned parameters from `alpha_zoo_69_asset_profile_optuna_hybrid_refit_20260530`, then retunes source-profile sleeve weights and v3.5/v3.6 hybrid weights for live/paper efficiency: stronger train-dominance, 10bps RPT, 15/20bps cost-stress, low-sample diagnostics, high-turnover/low-efficiency penalties, concentration penalties, integer leverage maps, and no locked test set. All real-money flags remain false.
-
-Artifact: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_efficiency_repair_optuna_20260530/alpha_zoo_69_asset_efficiency_repair_optuna_latest.json`. Contribution proxy CSV: `alpha_zoo_69_asset_efficiency_repair_contribution_proxy_latest.csv`.
-
-Run evidence: `/usr/bin/time -v uv run python scripts/research/run_alpha_zoo_69_asset_efficiency_repair_optuna.py --profile-trials 192 --hybrid-trials 192` completed in `5:37.38` wall time with max RSS `933,212 KiB`; payload `runner_peak_rss_mib=911.34`, below the 8GB memory budget.
-
-Selected train/validation-legal paper candidate is the repaired v3.5 hybrid over all three repaired multi-asset profiles:
+Corrected selected train/validation-legal portfolio:
 
 | portfolio | train | validation | train MDD | validation MDD | RPT bps train/val | 20bps stress train/val | gross | paper | real |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |
-| `hybrid_v3_5_optuna_three_profile_blend` | `+295.9880%` | `+172.7926%` | `17.7072%` | `6.0984%` | `76.65 / 125.01` | `+251.9612% / +157.7868%` | `7.3257x` | `true` | `false` |
+| `balanced_mdd12_gross5_69_asset_efficiency_repair_optuna` | `+119.3799%` | `+79.7120%` | `16.6872%` | `7.4789%` | `108.53 / 157.53` | `+108.3799% / +74.6520%` | `2.2000x` | `true` | `false` |
 
-Hybrid average weights are balanced `39.57%`, growth `24.13%`, aggressive `36.30%`; final weights are balanced `40.47%`, growth `23.29%`, aggressive `25.09%`. This improves the prior train/validation-legal guarded static baseline (`+160.33%/+150.07%`, validation MDD `7.56%`, gross `5.00x`) while keeping train return above validation, validation MDD lower, 10bps cost embedded, and 20bps stress proxy positive. The tradeoff is higher train MDD and more gross exposure; paper/testnet telemetry must therefore emphasize realized cost, fill quality, asset concentration, and margin/liquidation distance before any real review.
+Corrected paper/testnet live handoff now uses artifact-selected `hybrid_v3_6_optuna_three_profile_blend`:
 
-Source-profile audit after repair:
+| hybrid | train | validation | train MDD | validation MDD | RPT bps train/val | historical gross | live final gross | paper | real |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |
+| `hybrid_v3_6_optuna_three_profile_blend` | `+96.5913%` | `+68.1871%` | `12.5785%` | `7.8678%` | `42.30 / 149.64` | `2.5042x` | `2.3389x` | `true` | `false` |
 
-| profile | sleeves | gross | train | validation | validation MDD | RPT bps train/val | 20bps stress train/val | diagnostic |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| balanced repair | `45` | `5.00x` | `+130.52%` | `+107.54%` | `6.31%` | `41.65 / 99.50` | `+99.18% / +96.73%` | low-eff/low-sample sleeves remain diagnostic, not aggregate gate failures |
-| growth repair | `44` | `7.12x` | `+155.85%` | `+149.45%` | `11.80%` | `31.65 / 106.15` | `+106.60% / +135.37%` | train-dominant after repair |
-| aggressive repair | `57` | `10.00x` | `+285.99%` | `+278.95%` | `10.86%` | `52.59 / 138.11` | `+231.60% / +258.75%` | standalone gross > 8x, used only through capped hybrid weights |
+The corrected v3.5 comparison remains paper-eligible but is not the selected live handoff: train `+153.0941%`, validation `+57.2165%`, train/validation MDD `14.0862%/8.4343%`, RPT `49.29/91.23bps`, gross `3.0697x`.
 
-Contribution proxy using v3.5 average weights shows validation return is now primarily from TradFi equity (`~0.716 proxy`) plus crypto core (`~0.271`), with commodities (`~0.064`), ETF/index (`~0.053`), and premarket proxies (`~0.010`) smaller. Top validation contributors are `TONUSDT`, `CRCLUSDT`, `MUUSDT`, `EWYUSDT`, `SNDKUSDT`, `XAGUSDT`, `MSTRUSDT`, and `COINUSDT`. High-turnover assets that still need paper/live cost scrutiny include `ETHUSDT`, `DOGEUSDT`, `SOLUSDT`, `TRXUSDT`, `XRPUSDT`, `ADAUSDT`, `TONUSDT`, and `AVAXUSDT`; many of those contribute little validation PnL relative to event count, so live monitoring should downweight or quarantine them if realized cost exceeds the replay proxy.
+The live adapter now reconstructs `18` selected source sleeves, watches all `69` symbols, and has nonzero selected source exposure only in `13` train-eligible symbols: `ADAUSDT`, `AVAXUSDT`, `BNBUSDT`, `BTCUSDT`, `COPPERUSDT`, `CRCLUSDT`, `DOGEUSDT`, `SOLUSDT`, `TONUSDT`, `XAGUSDT`, `XAUUSDT`, `XPTUSDT`, and `XRPUSDT`. No train-ineligible asset has nonzero selected live gross after the fix.
 
-Real-money remains blocked (`ready_for_real=false`, `real_money_execution=false`, `real_execution_allowed=false`). This candidate is paper/testnet-only until exchange-connected limit-first fill telemetry confirms realized all-in cost, BBO depth/latency, partial/cancel/timeout behavior, protective-order reconciliation, intended-vs-actual notional parity, concentration, and liquidation-inclusive MDD.
+Limit/no-fill/slippage policy is unchanged and remains paper/testnet only: `LMT` default, `one_tick_worse`, market fallback disabled, max chase attempts `0`, missing/high-spread/high-slippage BBO guard skips without market conversion, and realized all-in round-trip cost must stay within the `10bps` replay/gate assumption before any real-money review. Safety flags remain `paper_testnet_only=true`, `ready_for_real=false`, `real_money_execution=false`, and `real_execution_allowed=false`.
 
+Verification after the correction passed: targeted eligibility/live adapter suites `23 passed`; `ruff format --check .`; `ruff check .`; `compileall`; docs verification `117` markdown files; architecture check; hardcoded-parameter audit `new=0`; `git diff --check`; artifact invariant script confirmed no train-ineligible selected live gross; and full `pytest -q` `1539 passed` with max RSS `2,756,628 KiB` (<8GB). GitNexus was refreshed and reported high impact because the research/live artifacts and default live profile changed; the change is intentional and covered by the verification above.
 
 ## 2026-05-30 KST — 69-asset per-profile Optuna rebuild after broad-blend audit
 
@@ -77,7 +73,7 @@ This file is the current cumulative research note / research journal. Keep the f
 Current live/paper-testnet identity:
 
 - Runtime strategy name: `AlphaZooOptunaHybridLiveStrategy`.
-- Selected frozen profile/artifact family: `hybrid_v3_5_optuna_three_profile_blend`.
+- Selected frozen profile/artifact family for the corrected 69-asset efficiency-repair handoff: `hybrid_v3_6_optuna_three_profile_blend`. Older standard/integer-leverage artifacts using `hybrid_v3_5_optuna_three_profile_blend` remain historical baselines.
 - `profit_moonshot_alpha_zoo` is retained only as a historical artifact namespace, not as the strategy name.
 - Real-money execution remains prohibited until separate paper/testnet fill telemetry gates pass.
 

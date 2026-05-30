@@ -113,3 +113,34 @@ def test_weighted_turnover_events_use_selected_positive_multipliers() -> None:
     assert turnover["validation"] == pytest.approx(0.5)
     assert events["train"] == 10
     assert events["validation"] == 5
+
+
+def test_source_rows_without_train_data_are_not_eligible_for_repair() -> None:
+    report = {
+        "symbols": {
+            "OLDUSDT": {"timeframes": {"1h": {"train_eligible": True}}},
+            "NEWUSDT": {"timeframes": {"1h": {"train_eligible": False}}},
+        }
+    }
+
+    assert module._source_row_train_eligible({"symbol": "OLDUSDT", "timeframe": "1h"}, report)
+    assert not module._source_row_train_eligible({"symbol": "NEWUSDT", "timeframe": "1h"}, report)
+
+
+def test_efficiency_allocation_filters_rejected_sleeves() -> None:
+    idx = pd.date_range("2026-01-01", periods=2, freq="h")
+
+    def stream(model_id: str, reasons: list[str]) -> broad69.CandidateStream:
+        row = {
+            "model_id": model_id,
+            "efficiency_repair_reasons": reasons,
+            "live_efficiency_score": 1.0,
+        }
+        returns = pd.Series([0.0, 0.0], index=idx)
+        return broad69.CandidateStream(row=row, returns=returns, position=returns)
+
+    allocatable = module._allocatable_efficiency_streams(
+        [stream("valid", []), stream("validation_only", ["train_events_0_below_20"])]
+    )
+
+    assert [item.row["model_id"] for item in allocatable] == ["valid"]

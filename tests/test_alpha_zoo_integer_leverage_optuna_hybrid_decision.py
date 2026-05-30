@@ -123,6 +123,8 @@ def test_standard_live_refit_fits_train_only_and_disables_oos_gate() -> None:
         )
 
     assert result.row["fit_splits"] == ["train"]
+    assert result.row["warmup_splits"] == ["train"]
+    assert result.row["warmup_policy"] == "warmup_ratio_applies_to_train_split_only"
     assert result.row["final_refit"] is False
     assert result.row["locked_oos_gate_required"] is False
     assert result.row["test_set_policy"] == "disabled_for_live_final_refit_no_test_set_reserved"
@@ -150,8 +152,25 @@ def test_final_refit_records_train_validation_fit_inputs() -> None:
     )
 
     assert result.row["fit_splits"] == ["train", "validation"]
+    assert result.row["warmup_splits"] == ["train"]
     assert result.row["final_refit"] is True
     assert result.row["test_set_policy"] == "disabled_for_live_final_refit_no_test_set_reserved"
+
+
+def test_learn_params_uses_train_warmup_even_when_fit_includes_validation() -> None:
+    train = [[0.02, -0.01, -0.01]] * 30
+    validation = [[-0.01, 0.05, -0.01]] * 30
+    returns = pd.DataFrame([*train, *validation]).to_numpy(dtype=float)
+    params = MODULE.HybridParams(warmup_ratio=0.5)
+
+    learned = MODULE._learn_params(
+        returns,
+        params,
+        opt_indices=pd.Index(range(60)).to_numpy(dtype=int),
+        warmup_indices=pd.Index(range(30)).to_numpy(dtype=int),
+    )
+
+    assert learned.default_idx == 0
 
 
 def test_all_exposed_hybrid_params_are_in_optuna_config() -> None:

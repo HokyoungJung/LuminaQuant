@@ -551,6 +551,14 @@ def _candidate_objective(row: Mapping[str, Any], spec: Mapping[str, Any]) -> flo
     )
 
 
+def _eligible_timeframes_for_symbol(
+    train_eligibility: Mapping[str, Any], symbol: str, requested: Sequence[str]
+) -> tuple[str, ...]:
+    symbol_payload = dict(dict(train_eligibility.get("symbols") or {}).get(str(symbol)) or {})
+    eligible = set(symbol_payload.get("eligible_timeframes") or ())
+    return tuple(timeframe for timeframe in requested if timeframe in eligible)
+
+
 def tune_symbol_profile(
     *,
     symbol: str,
@@ -564,6 +572,8 @@ def tune_symbol_profile(
     if optuna is None:
         raise RuntimeError("Optuna is required for per-asset profile tuning")
     profile_id = str(spec["profile_id"])
+    if not tuple(spec.get("_timeframes") or ()):
+        return None
 
     def objective(trial: Any) -> float:
         params = _params_from_trial(trial, spec)
@@ -1249,6 +1259,12 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
         validation_weeks=int(args.validation_weeks),
         bar_minutes=60,
     )
+    train_eligibility = broad69.build_train_eligibility_report(
+        bars,
+        symbols=symbols,
+        timeframes=timeframes,
+        windows=windows,
+    )
     cache = FeatureCache(
         bars_by_symbol_tf=bars,
         symbols=symbols,
@@ -1262,12 +1278,18 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     sleeve_rows: list[dict[str, Any]] = []
     profile_streams: list[grid_hybrid.ProfileStream] = []
     for profile_idx, base_spec in enumerate(PROFILE_SPECS):
-        spec = {**base_spec, "_timeframes": timeframes}
+        profile_spec = {**base_spec, "_timeframes": timeframes}
         streams: list[broad69.CandidateStream] = []
         for symbol_idx, symbol in enumerate(symbols):
+            eligible_timeframes = _eligible_timeframes_for_symbol(
+                train_eligibility, symbol, timeframes
+            )
+            if not eligible_timeframes:
+                continue
+            symbol_spec = {**base_spec, "_timeframes": eligible_timeframes}
             stream = tune_symbol_profile(
                 symbol=symbol,
-                spec=spec,
+                spec=symbol_spec,
                 cache=cache,
                 windows=windows,
                 n_trials=int(args.asset_trials),
@@ -1280,7 +1302,7 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
             if _safe_float(stream.row.get("profile_objective_score"), -1e18) > -1e8:
                 streams.append(stream)
         profile_stream, profile_row, selected_sleeves = tune_profile_allocations(
-            spec=spec,
+            spec=profile_spec,
             candidate_streams=streams,
             windows=windows,
             n_trials=int(args.profile_trials),
@@ -1298,7 +1320,8 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
             version="v3_5",
             n_trials=int(args.hybrid_trials),
             seed=int(args.seed) + 700_000,
-            fit_splits=("train", "validation"),
+            fit_splits=("train",),
+            warmup_splits=("train",),
             require_locked_oos_gate=False,
         )
         v36 = optuna_hybrid._run_optuna(
@@ -1306,7 +1329,8 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
             version="v3_6",
             n_trials=int(args.hybrid_trials),
             seed=int(args.seed) + 700_001,
-            fit_splits=("train", "validation"),
+            fit_splits=("train",),
+            warmup_splits=("train",),
             require_locked_oos_gate=False,
         )
         static_guarded = optimize_static_profile_blend(
@@ -1344,6 +1368,7 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
         "timeframes": list(timeframes),
         "split_policy": plan_payload,
         "data_coverage": coverage,
+        "train_eligibility": train_eligibility,
         "research_primary_round_trip_cost_bps": broad69.PRIMARY_ROUND_TRIP_COST_BPS,
         "avg_bbo_spread_bps_assumption": broad69.AVG_BBO_SPREAD_BPS_ASSUMPTION,
         "return_per_turnover_threshold_bps": broad69.RETURN_PER_TURNOVER_THRESHOLD_BPS,
@@ -1361,11 +1386,18 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
                 "profile_allocation_trials": int(args.profile_trials),
                 "hybrid_trials_per_version": int(args.hybrid_trials),
                 "symbol_profile_tune_count": len(asset_rows),
+                "train_eligible_symbol_count": train_eligibility["train_eligible_symbol_count"],
+                "train_ineligible_symbol_count": train_eligibility["train_ineligible_symbol_count"],
+                "train_ineligible_symbols": train_eligibility["train_ineligible_symbols"],
                 "profile_specs": list(PROFILE_SPECS),
                 "domain_anchors": dict(DOMAIN_ANCHORS),
                 "domain_filtering": "candidate single-anchor clone penalty plus profile top-anchor/top-symbol/top-group concentration penalty",
                 "all_internal_params_tuned_per_asset_profile": True,
                 "final_hybrid_engine": "run_alpha_zoo_integer_leverage_optuna_hybrid_decision::_run_optuna",
+                "hybrid_fit_inputs": ["train"],
+                "hybrid_score_inputs": ["train", "validation"],
+                "hybrid_warmup_inputs": ["train"],
+                "warmup_ratio_scope": "train_split_only",
                 "uses_test_set": False,
             },
         ),

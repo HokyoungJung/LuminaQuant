@@ -68,16 +68,16 @@ Current local-first stack defaults:
 
 The current private Alpha Zoo live handoff is **paper/testnet-only**. It is not a real-money approval.
 
-- Selected runtime: `AlphaZooOptunaHybridLiveStrategy` for the frozen Optuna v3.5 hybrid artifact.
+- Selected runtime: `AlphaZooOptunaHybridLiveStrategy`. The current 69-symbol efficiency-repair handoff now uses the artifact-selected v3.6 hybrid; the older standard/live-refit v3.5 artifacts remain historical baselines.
 - Standard live refits now use refreshed committed data, the latest 8 complete weeks as validation,
   Optuna tuning for every exposed hybrid parameter, and a final refit on train+validation before
   freezing the runtime artifact. Live final-refit mode intentionally has no locked-OOS/test set.
 - Latest standard-refit evidence is under
   `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_standard_live_refit_20260528/`;
   data coverage for the watch universe reaches `2026-05-28T10:59:59Z`.
-- Broad challenger evidence now exists for the full 69-symbol Binance research universe. The current
+- Broad challenger evidence now exists for the full 69-symbol Binance research universe. The corrected
   efficiency-repaired paper/testnet candidate lives under
-  `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_efficiency_repair_optuna_20260530/`: it preserves the per-symbol/profile Optuna parameters, retunes the repaired sleeve/hybrid weights, and selects `hybrid_v3_5_optuna_three_profile_blend` with train `+295.9880%`, validation `+172.7926%`, validation MDD `6.0984%`, train/validation RPT proxy `76.65/125.01bps`, and 20bps stress still positive. It now has a paper/testnet live decision artifact and live adapter support, but it is not a real-money approval.
+  `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_efficiency_repair_optuna_20260530/`: train-split-ineligible symbols/timeframes are excluded from parameter fitting, sleeve allocation, hybrid selection, and live promotion. The selected paper/testnet live handoff is `hybrid_v3_6_optuna_three_profile_blend` with train `+96.5913%`, validation `+68.1871%`, validation MDD `7.8678%`, train/validation RPT proxy `42.30/149.64bps`, and live final gross `2.3389x`. The previous `+295.9880%/+172.7926%` headline is superseded because it let validation-only assets into allocation; after the eligibility fix v3.5 remains a comparison (`+153.0941%/+57.2165%`) but is not the selected live handoff. It has a paper/testnet live decision artifact and live adapter support, but it is not a real-money approval.
 - Live implementation is split into reproducibility-safe modules: frozen artifact/config loading in
   `lumina_quant.alpha_zoo.optuna_hybrid_config`, signal/bar math in
   `lumina_quant.alpha_zoo.optuna_hybrid_signals` with optional Rust state-machine acceleration, and orchestration/event emission in
@@ -221,7 +221,7 @@ uv run python scripts/sync_binance_ohlcv.py \
 
 In the public repository, sync/build helpers are intentionally removed. Use prebuilt market parquet files or CSV data.
 
-Extended Binance research universe (private repo): `src/lumina_quant/research_universe.py` now records the current side-effect-free snapshot of 10 core crypto + 59 Binance USD-M `TRADIFI_PERPETUAL` symbols. Direct 1m research bars for all 69 symbols are stored under `data/market_parquet/exchange=binance` and are used by the OOM-capped 69-asset Optuna refit and live-efficiency repair runners. The current paper/testnet-only efficiency-repaired v3.5 hybrid is train `+295.99%`, validation `+172.79%`, validation MDD `6.10%`, RPT `76.65/125.01bps`, and remains `ready_for_real=false` / `real_money_execution=false`. Use `BINANCE_EXTENDED_RESEARCH_SYMBOLS_SLASHED` for future staged refresh/coverage inventory jobs; adding or collecting research bars for the symbols does not approve real-money trading. See `docs/RUNBOOK_1Y_1S_LOCAL.md` and `docs/research_note/research_note.md`.
+Extended Binance research universe (private repo): `src/lumina_quant/research_universe.py` now records the current side-effect-free snapshot of 10 core crypto + 59 Binance USD-M `TRADIFI_PERPETUAL` symbols. Direct 1m research bars for all 69 symbols are stored under `data/market_parquet/exchange=binance` and are used by the OOM-capped 69-asset Optuna refit and live-efficiency repair runners. Current corrected efficiency-repair policy excludes assets/timeframes with no train-split bars from tuning/allocation/live promotion; the selected paper/testnet-only v3.6 hybrid is train `+96.59%`, validation `+68.19%`, validation MDD `7.87%`, RPT `42.30/149.64bps`, and remains `ready_for_real=false` / `real_money_execution=false`. Use `BINANCE_EXTENDED_RESEARCH_SYMBOLS_SLASHED` for future staged refresh/coverage inventory jobs; adding or collecting research bars for the symbols does not approve real-money trading. See `docs/RUNBOOK_1Y_1S_LOCAL.md` and `docs/research_note/research_note.md`.
 
 **Raw aggTrades → committed materialized pipeline (private repo):**
 ```bash
