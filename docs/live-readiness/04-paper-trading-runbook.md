@@ -277,6 +277,16 @@ baseline vs candidate divergence를 보는 shadow 경로를 운영 가능하게 
 현재 문서 기준:
 - shadow 비교는 **강력 권장**
 - 다만 별도 운영 스크립트/entrypoint가 아직 고정된 것은 아님
+- 2026-05-30 기준 69-symbol broad Optuna hybrid challenger artifact:
+  `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_optuna_hybrid_refit_20260530/alpha_zoo_69_asset_optuna_hybrid_refit_latest.json`.
+  이 artifact는 backtest gate상 `ready_for_paper=true`이지만 real flags는 모두 false다.
+  성적은 train `+9.0960%`, validation `+8.5640%`, validation MDD `0.6934%`,
+  train/validation RPT proxy `10.96/31.84bps`, top symbol share `16.27%`,
+  validation long/short exposure share 약 `52.06%/47.94%`다.
+- 이 69-symbol challenger는 현 incumbent보다 훨씬 분산되어 있지만 아직 live adapter와
+  exchange paper/testnet fill telemetry가 없으므로 **shadow/paper challenger**로만 취급한다.
+  real 전환 판단에는 최소 2~4주 forward fill/BBO/slippage/protective-order/reconciliation
+  evidence가 필요하다.
 
 따라서 paper 단계에서는:
 - incumbent 단독 paper 실행

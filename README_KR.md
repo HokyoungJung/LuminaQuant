@@ -64,7 +64,7 @@ graph TD
 - **백테스트/최적화 계산**: Polars Lazy + GPU 우선 실행(`gpu` 기본, CI/비GPU 환경은 `cpu` 또는 `auto` override 가능)
 - **Native/fast-path 가속**: Python API는 안정적으로 유지하고, 효과가 검증된 hot kernel만 Rust를 내부에서 사용합니다. raw-first aggTrades→1초 OHLCV, Alpha Zoo Optuna hybrid portfolio loop, Alpha Zoo live state-signal state machine은 Rust backend가 빌드되어 있으면 자동 로드합니다. live `MARKET_WINDOW` 생성은 Rust로 넘겨도 Python tuple 변환 비용이 남는 경계라 trusted Python fast path로 최적화했고, metrics evaluator는 현재 로컬 Rust metrics가 Numba보다 빠르지 않아 Numba/Python auto-selection을 유지합니다.
 
-## 현재 Private Paper/Testnet 상태 (2026-05-28)
+## 현재 Private Paper/Testnet 상태 (2026-05-30)
 
 현재 private Alpha Zoo live handoff는 **paper/testnet 전용**이며 real-money 승인이 아닙니다.
 
@@ -75,6 +75,12 @@ graph TD
 - 최신 표준 refit evidence는
   `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_standard_live_refit_20260528/`에 있으며,
   watch universe 데이터 coverage는 `2026-05-28T10:59:59Z`까지 갱신되었습니다.
+- 전체 69개 Binance research universe용 broad challenger evidence도
+  `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_optuna_hybrid_refit_20260530/`에 있습니다.
+  이는 direct 1m→30m+ 데이터에서 Optuna로 선택한 paper/testnet backtest gate 후보이며 train `+9.0960%`,
+  validation `+8.5640%`, validation MDD `0.6934%`, train/validation RPT proxy `10.96/31.84bps`,
+  top symbol `16.27%`로 asset concentration이 크게 낮습니다. real-money 승인이 아니며,
+  실제 실행 전에는 별도 live/paper adapter와 forward fill/BBO/slippage/protection/reconciliation telemetry가 필요합니다.
 - live 구현은 재현성 기준으로 모듈을 분리했습니다:
   `lumina_quant.alpha_zoo.optuna_hybrid_config`는 frozen artifact/config 로딩,
   `lumina_quant.alpha_zoo.optuna_hybrid_signals`는 optional Rust state-machine 가속을 포함한 signal/bar 연산,
@@ -217,7 +223,7 @@ uv run python scripts/sync_binance_ohlcv.py \
 
 Public 저장소에는 DB 동기화/구축 헬퍼를 의도적으로 포함하지 않습니다. 사전 구축된 DB 파일 또는 CSV 데이터를 사용하세요.
 
-확장 Binance research universe(private 저장소): `src/lumina_quant/research_universe.py`에 현재 기준 10개 core crypto + 59개 Binance USD-M `TRADIFI_PERPETUAL` 심볼 snapshot을 side-effect-free 상수로 기록했습니다. 이후 staged refresh/coverage inventory 작업에는 `BINANCE_EXTENDED_RESEARCH_SYMBOLS_SLASHED`를 사용합니다. 목록 추가 또는 research bar 수집은 real-money 승인이 아닙니다. `docs/kr/RUNBOOK_1Y_1S_LOCAL.md` 및 `docs/research_note/research_note.md`를 참고하세요.
+확장 Binance research universe(private 저장소): `src/lumina_quant/research_universe.py`에 현재 기준 10개 core crypto + 59개 Binance USD-M `TRADIFI_PERPETUAL` 심볼 snapshot을 side-effect-free 상수로 기록했습니다. 69개 전체 direct 1m research bar는 `data/market_parquet/exchange=binance` 아래에 저장되어 있고 OOM-capped 69-asset Optuna refit runner가 사용합니다. 이후 staged refresh/coverage inventory 작업에는 `BINANCE_EXTENDED_RESEARCH_SYMBOLS_SLASHED`를 사용합니다. 목록 추가 또는 research bar 수집은 real-money 승인이 아닙니다. `docs/kr/RUNBOOK_1Y_1S_LOCAL.md` 및 `docs/research_note/research_note.md`를 참고하세요.
 
 **Raw aggTrades → 커밋된 materialized 파이프라인 (Private 저장소):**
 ```bash

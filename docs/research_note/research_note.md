@@ -15,6 +15,26 @@ Current live/paper-testnet identity:
 
 Prepend new research diary entries below this heading. The legacy historical entries were reordered newest-first during the 2026-05-28 naming cleanup.
 
+## 2026-05-30 KST — 69-asset Optuna hybrid refit and concentration audit
+
+Expanded the Alpha Zoo broad research pass from the prior ETH/SOL/TRX-heavy incumbent universe to the full `69`-symbol Binance research universe (`10` core crypto + `59` Binance USD-M `TRADIFI_PERPETUAL` proxies) using direct stored `1m` OHLCV resampled into `30m`, `1h`, `2h`, and `4h` bars. The new runner is `scripts/research/run_alpha_zoo_69_asset_optuna_hybrid_refit.py`; outputs are under `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_optuna_hybrid_refit_20260530/`. The standard live-facing split rule is preserved: latest `8` complete weeks are validation, no locked-OOS/test set is used in this final-refit mode, and every real-money flag remains hard false. Candidate and hybrid search uses Optuna TPE through the shared `lumina_quant.optimization.search_policy` path, not grid search.
+
+OOM-safe implementation choices: direct 1m reads are symbol/timeframe chunked, in-memory hybrid streams are capped (`MAX_CACHED_STREAMS_PER_SYMBOL=8`, run cap `--max-hybrid-streams 48`, `--max-streams-per-symbol 2`), and the selected-stream matrix is built only after ranking/freeze. Full run evidence: `/usr/bin/time` wall `1:00.25`, max RSS `838,416 KiB` and payload `runner_peak_rss_mib=818.77`, well below the 8 GiB session budget.
+
+Discovery result after embedded `10bps` round-trip friction proxy:
+
+- `45,120` candidates evaluated; no single component passed full paper promotion by itself. `17` rows passed the sample gate but failed execution-efficiency proxy, so they remain shadow rows (`AVAXUSDT` 10, `HOODUSDT` 4, `COINUSDT` 2, `XAGUSDT` 1).
+- The Optuna-selected aggregate hybrid passed the strict backtest paper gate only as a diversified hybrid: train `+9.0960%`, validation `+8.5640%`, train MDD `2.5726%`, validation MDD `0.6934%`, train RPT proxy `10.9603bps`, validation RPT proxy `31.8371bps`, component trade events train/validation `9,613 / 3,789`, liquidation/account wipeout `0 / 0`. Backtest gate says `ready_for_paper=true`, but `ready_for_real=false`, `real_money_execution=false`, `real_execution_allowed=false`.
+- Concentration audit improved materially versus the incumbent: top symbol `TONUSDT` share `16.27%`, effective symbol count `11.59`, top asset group `crypto_core` `49.91%`, TradFi equity `32.64%`, ETF/index `10.21%`, commodities `7.24%`; no concentration flags. Validation long/short exposure when active is approximately `52.06% / 47.94%`, so the hybrid is not only one direction despite every rule being long/short-capable. Timeframe mix: `30m` `41.94%`, `1h` `23.93%`, `2h` `15.29%`, `4h` `18.84%`. Family mix: volatility-adjusted trend persistence `55.45%`, cross-sectional momentum rank `29.20%`, pullback reclaim `15.34%`.
+
+Interpretation: the broad 69-asset hybrid is a lower-return, lower-MDD, much more diversified challenger/shadow paper candidate. It is not a replacement for the current high-return standard live refit yet: the prior `hybrid_v3_5_optuna_three_profile_blend` standard refit remains far higher returning (`validation +38.0717%`, validation MDD `7.4789%`, gross `4.6902x`) but is more concentrated and train-dominant. The 69-asset result is therefore best treated as a paper/testnet challenger whose value is diversification and concentration reduction, not immediate performance superiority.
+
+Real-transition decision: do **not** enable real-money. The path from this artifact to real requires a separate live adapter/handoff if this 69-asset rule set is to be executed, then at least `2-4` weeks of paper/testnet forward telemetry for limit-first fills, realized fee/spread/slippage/all-in round-trip cost against the `10bps` replay assumption, intended-vs-actual notional parity, partial/cancel/timeout rates, BBO/depth/fill-latency quality, protective-order attach/reconciliation, liquidation-distance/margin buffers, and continued asset/position concentration monitoring.
+
+Local verification for this pass: repo-wide `ruff format --check .` and `ruff check .`; targeted tests `23 passed`; `compileall`; docs verification `117` markdown files; architecture check; hardcoded-parameter audit `new=0`; `git diff --check`; and full `pytest -q` `1519 passed in 104.14s` with max RSS `2,728,592 KiB` (<8 GiB). Commit, push, and CI follow in the same work session.
+
+---
+
 ## 2026-05-30 KST — Binance 69-symbol direct 1m research-bar backfill
 
 Updated the expanded Binance research universe to `69` compact USDT symbols after the 2026-05-29 addition of `QNTXUSDT`: `10` core crypto plus `59` active Binance USD-M `TRADIFI_PERPETUAL` symbols. `QNTXUSDT` is classified under the premarket/not-yet-standardized equity proxy group. This universe is a research/shadow-monitoring input only; it does not expand the selected paper/testnet live strategy universe and does not approve real-money trading. Hard safety flags remain `ready_for_real=false`, `real_money_execution=false`, and `real_execution_allowed=false`.

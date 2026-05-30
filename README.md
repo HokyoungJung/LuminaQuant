@@ -64,7 +64,7 @@ Current local-first stack defaults:
 - **Backtest/optimization compute**: Polars Lazy with GPU-first execution (`gpu` by default; CI/non-GPU environments can override to `cpu` or `auto`)
 - **Native/fast-path acceleration**: Python APIs stay stable; proven hot kernels use Rust underneath when built. Raw-first aggTrades→1s OHLCV, the Alpha Zoo Optuna hybrid portfolio loop, and Alpha Zoo live state-signal machines auto-load Rust backends when available; live `MARKET_WINDOW` construction uses a trusted Python fast path where Rust would still pay Python tuple conversion costs; metrics evaluation still auto-selects Numba/Python because local Rust metrics is not faster yet.
 
-## Current Private Paper/Testnet Status (2026-05-28)
+## Current Private Paper/Testnet Status (2026-05-30)
 
 The current private Alpha Zoo live handoff is **paper/testnet-only**. It is not a real-money approval.
 
@@ -75,6 +75,12 @@ The current private Alpha Zoo live handoff is **paper/testnet-only**. It is not 
 - Latest standard-refit evidence is under
   `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_standard_live_refit_20260528/`;
   data coverage for the watch universe reaches `2026-05-28T10:59:59Z`.
+- Broad challenger evidence now also exists for the full 69-symbol Binance research universe under
+  `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_optuna_hybrid_refit_20260530/`.
+  It is an Optuna-selected, direct-1m→30m+ paper/testnet backtest gate candidate with train `+9.0960%`,
+  validation `+8.5640%`, validation MDD `0.6934%`, train/validation RPT proxy `10.96/31.84bps`,
+  and materially lower asset concentration (top symbol `16.27%`). It is not a real-money approval and
+  still needs a live/paper adapter plus forward fill/BBO/slippage/protection/reconciliation telemetry.
 - Live implementation is split into reproducibility-safe modules: frozen artifact/config loading in
   `lumina_quant.alpha_zoo.optuna_hybrid_config`, signal/bar math in
   `lumina_quant.alpha_zoo.optuna_hybrid_signals` with optional Rust state-machine acceleration, and orchestration/event emission in
@@ -217,7 +223,7 @@ uv run python scripts/sync_binance_ohlcv.py \
 
 In the public repository, sync/build helpers are intentionally removed. Use prebuilt market parquet files or CSV data.
 
-Extended Binance research universe (private repo): `src/lumina_quant/research_universe.py` now records the current side-effect-free snapshot of 10 core crypto + 59 Binance USD-M `TRADIFI_PERPETUAL` symbols. Use `BINANCE_EXTENDED_RESEARCH_SYMBOLS_SLASHED` for future staged refresh/coverage inventory jobs; adding or collecting research bars for the symbols does not approve real-money trading. See `docs/RUNBOOK_1Y_1S_LOCAL.md` and `docs/research_note/research_note.md`.
+Extended Binance research universe (private repo): `src/lumina_quant/research_universe.py` now records the current side-effect-free snapshot of 10 core crypto + 59 Binance USD-M `TRADIFI_PERPETUAL` symbols. Direct 1m research bars for all 69 symbols are stored under `data/market_parquet/exchange=binance` and are used by the OOM-capped 69-asset Optuna refit runner. Use `BINANCE_EXTENDED_RESEARCH_SYMBOLS_SLASHED` for future staged refresh/coverage inventory jobs; adding or collecting research bars for the symbols does not approve real-money trading. See `docs/RUNBOOK_1Y_1S_LOCAL.md` and `docs/research_note/research_note.md`.
 
 **Raw aggTrades → committed materialized pipeline (private repo):**
 ```bash
