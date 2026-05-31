@@ -1,5 +1,33 @@
 # Research Note
 
+
+## 2026-05-31 KST — MDD-guarded relaxed 69-asset efficiency repair
+
+Applied the operator's relaxed gate interpretation to the corrected 69-asset efficiency-repair artifact without changing the 10bps execution-efficiency requirement. New runner/test: `scripts/research/run_alpha_zoo_69_asset_relaxed_efficiency_repair_optuna.py` and `tests/test_alpha_zoo_69_asset_relaxed_efficiency_repair_optuna.py`. Artifact: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_relaxed_efficiency_repair_optuna_20260531/alpha_zoo_69_asset_relaxed_efficiency_repair_optuna_latest.json` plus Markdown/CSV siblings.
+
+Relaxed policy `material_positive_tradfi_low_sample_mdd_guard_20260531`:
+
+- `train < validation` is no longer a hard rejection when both train and validation returns are at least `2%` and the MDD guard passes.
+- TradFi low-sample rows can be admitted as warnings when MDD and the strict `>10bps` train/validation RPT gates pass.
+- Material-positive non-TradFi low-sample rows are also reportable/admissible under the same MDD/RPT guard, but the optimizer still penalizes relaxed/low-sample notional share.
+- Gross/concentration pressure is optimized and penalized rather than hard rejected while validation MDD remains under the relaxed guard; a `12x` hard gross cap remains.
+- Train-ineligible symbol/timeframe rows are still excluded from parameter fitting, repair source rows, sleeve allocation, hybrid selection, and live promotion.
+- No locked test/OOS is used for selection. All artifacts remain `paper_testnet_only=true`, `ready_for_real=false`, `real_money_execution=false`, and `real_execution_allowed=false`.
+
+Candidate pool impact versus the strict corrected pass: strict gate-ok rows `18`; relaxed gate-ok rows `30`; newly admitted rows `16`; relaxed unique gate-ok symbols `19`. Newly admitted symbols: `COINUSDT`, `COPPERUSDT`, `CRCLUSDT`, `ETHUSDT`, `GOOGLUSDT`, `INTCUSDT`, `METAUSDT`, `MSTRUSDT`, `PLTRUSDT`, `TONUSDT`, and `XPDUSDT`.
+
+Best train/validation-legal relaxed portfolio is the aggressive profile:
+
+| portfolio | train | validation | train MDD | validation MDD | RPT bps train/val | 20bps stress train/val | gross | paper | real |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |
+| `aggressive_mdd30_gross10_69_asset_relaxed_efficiency_repair_optuna` | `+555.8771%` | `+518.4857%` | `27.7065%` | `21.2478%` | `96.70 / 286.89` | `+498.3937% / +500.4133%` | `7.2541x` | `true` | `false` |
+
+Selected relaxed Optuna hybrid comparison is `hybrid_v3_5_optuna_three_profile_blend`: train `+284.5998%`, validation `+373.8607%`, train/validation MDD `23.9019%/16.3433%`, RPT `58.07/250.46bps`, gross `6.8713x`, `selection_reasons=[]`, paper/testnet only. This hybrid uses the relaxed dominance rule because both train and validation are materially positive and MDD remains below the relaxed hybrid guard.
+
+Strict corrected reference remains available and safer/lower-MDD: selected balanced profile train/validation `+119.3799%/+79.7120%`, MDD `16.6872%/7.4789%`, RPT `108.53/157.53bps`, gross `2.2x`; strict live handoff v3.6 train/validation `+96.5913%/+68.1871%`, MDD `12.5785%/7.8678%`, RPT `42.30/149.64bps`, gross `2.5042x`. The relaxed artifact is a higher-return, higher-MDD paper/testnet challenger, not a real-money enablement.
+
+Selected relaxed sleeve set has `30` sleeves across `19` train-eligible symbols. Concentration for the aggressive selected profile: top symbol `PLTRUSDT` `13.78%`, top group `tradfi_equity` `53.59%`, effective symbol count `9.95`; group mix `crypto_core 38.05%`, `tradfi_equity 53.59%`, `tradfi_commodity 8.36%`. All sleeve integer leverages remain integers (`2x` to `12x`). Runner evidence: wall `1:49.86`, max RSS `914,748 KiB` / artifact `893.31 MiB`, below the 8GB cap.
+
 ## 2026-05-31 KST — Cold-start donor transfer shadow for validation-only assets
 
 Added the report-only cold-start transfer pass for the `37` train-ineligible 69-asset symbols. The new runner `scripts/research/run_alpha_zoo_69_asset_cold_start_transfer_shadow.py` and tests `tests/test_alpha_zoo_69_asset_cold_start_transfer_shadow.py` evaluate whether recently listed TradFi/premarket symbols can be initialized from similar train-eligible donor profiles without leaking target validation PnL into donor choice.
