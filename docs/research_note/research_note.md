@@ -1,6 +1,47 @@
 # Research Note
 
 
+## 2026-05-31 KST — Relaxed repair interpretation: trust, liquidation, 69→19 selection, and future refit of train-ineligible assets
+
+Follow-up interpretation for the MDD-guarded relaxed 69-asset efficiency-repair artifact. The relaxed artifact is **not** a real-money/live-ready result. It is a high-return, high-MDD **paper/testnet challenger** that should be compared against the stricter lower-MDD v3.6 live-handoff baseline before any promotion decision.
+
+Trust assessment:
+
+- Trustworthy parts: the corrected train-eligibility guard is preserved; train-ineligible symbol/timeframe rows are not used for parameter fitting, repair source rows, sleeve allocation, hybrid selection, or live promotion. The primary `10bps` round-trip RPT gate remains strict. Train and validation are both strongly positive and selected aggressive profile train return remains above validation return.
+- Discounted parts: no locked test/OOS is active in this final-refit-style pass; paper/testnet fill telemetry is not yet measured; relaxed policy admits material-positive train<validation and low-sample TradFi rows under MDD/RPT guards; selected gross is high at `7.2541x`; MDD is material. Therefore these numbers must not be read as live expected returns.
+- Current operating conclusion: keep the strict corrected v3.6 result as the safer baseline while running the relaxed artifact as paper/testnet challenger evidence.
+
+Liquidation / wipeout interpretation:
+
+| candidate | train liquidation / wipeout | validation liquidation / wipeout | train MDD | validation MDD | note |
+| --- | ---: | ---: | ---: | ---: | --- |
+| `aggressive_mdd30_gross10_69_asset_relaxed_efficiency_repair_optuna` | `0 / 0` | `0 / 0` | `27.7065%` | `21.2478%` | liquidation-free in replay, but high drawdown |
+| relaxed selected `hybrid_v3_5_optuna_three_profile_blend` | `0 / 0` | `0 / 0` | `23.9019%` | `16.3433%` | lower MDD than aggressive, but validation exceeds train under relaxed rule |
+
+The liquidation fields are clean in train/validation replay, but locked-OOS/test-set liquidation evidence is not available for this final-refit artifact. The correct reading is: no simulated liquidation/wipeout occurred under the replay assumptions, but MDD and live fill/slippage risk remain the binding safety concerns.
+
+Why 19 symbols instead of all 69:
+
+1. Research/monitoring universe is `69` symbols.
+2. `37` symbols had no train-split rows and remain watch/shadow-only under the corrected no-validation-only-leakage policy.
+3. `32` symbols are train-eligible.
+4. `32 × 3` profile rows produce `96` candidate rows.
+5. Relaxed gate passes `30` rows across `19` unique symbols; all `30` relaxed gate-ok rows are selected as sleeves in the profile set.
+
+Selected relaxed symbols are `ADAUSDT`, `AVAXUSDT`, `BNBUSDT`, `BTCUSDT`, `COINUSDT`, `COPPERUSDT`, `CRCLUSDT`, `DOGEUSDT`, `ETHUSDT`, `GOOGLUSDT`, `INTCUSDT`, `METAUSDT`, `MSTRUSDT`, `PLTRUSDT`, `SOLUSDT`, `TONUSDT`, `XAGUSDT`, `XPDUSDT`, and `XPTUSDT`. Eligible symbols that still have no relaxed gate-ok row are `AMZNUSDT`, `BZUSDT`, `CLUSDT`, `EWJUSDT`, `EWYUSDT`, `HOODUSDT`, `NATGASUSDT`, `NVDAUSDT`, `PAYPUSDT`, `TRXUSDT`, `TSLAUSDT`, `XAUUSDT`, and `XRPUSDT`. Main rejection causes remain insufficient validation return, train/validation RPT not above `10bps`, train<validation without the material-positive/MDD exception, and profile trade-count minima.
+
+Forced inclusion of all 69 assets is intentionally rejected. The standard rule is: monitor all 69; allocate only to symbols with train evidence and passing RPT/MDD/sample/concentration gates; keep the rest as shadow/watchlist until they earn train+validation evidence.
+
+Future refit expectation for the 37 train-ineligible assets:
+
+- Re-running the same split does not make the 37 assets eligible; they still have no train rows in that split.
+- A train+validation final refit can technically fit them, but it would leave no independent validation for those assets and should not promote them by itself.
+- A later rolling refit, after enough new bars make today’s validation/cold-start period part of train and reserve a fresh latest validation window, can admit a meaningful subset.
+- Based on the cold-start donor-frozen shadow artifact, roughly `15–20` of the 37 could plausibly enter the candidate pool when real train history exists, but optimizer selection will likely keep fewer nonzero exposures.
+
+Cold-start shadow evidence for the 37 symbols remains report-only: donor-frozen primary shadow selected `18` sleeves with validation `+31.6832%`, validation MDD `10.2407%`, validation RPT `83.87bps`, gross `2.0x`, and no promotion because target train rows are absent. Stronger watchlist names include `MUUSDT`, `SNDKUSDT`, `AMDUSDT`, `DRAMUSDT`, `QCOMUSDT`, `SOXLUSDT`, `QQQUSDT`, `SPYUSDT`, `MRVLUSDT`, `ARMUSDT`, `AVGOUSDT`, and `TSMUSDT`. Weak/negative cold-start names such as `OPENAIUSDT`, `SPCXUSDT`, `BABAUSDT`, `WDCUSDT`, and `COHRUSDT` need fresh train evidence before any inclusion.
+
+
 ## 2026-05-31 KST — MDD-guarded relaxed 69-asset efficiency repair
 
 Applied the operator's relaxed gate interpretation to the corrected 69-asset efficiency-repair artifact without changing the 10bps execution-efficiency requirement. New runner/test: `scripts/research/run_alpha_zoo_69_asset_relaxed_efficiency_repair_optuna.py` and `tests/test_alpha_zoo_69_asset_relaxed_efficiency_repair_optuna.py`. Artifact: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_relaxed_efficiency_repair_optuna_20260531/alpha_zoo_69_asset_relaxed_efficiency_repair_optuna_latest.json` plus Markdown/CSV siblings.
