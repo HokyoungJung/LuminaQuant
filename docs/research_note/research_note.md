@@ -1,5 +1,29 @@
 # Research Note
 
+## 2026-05-31 KST — Cold-start donor transfer shadow for validation-only assets
+
+Added the report-only cold-start transfer pass for the `37` train-ineligible 69-asset symbols. The new runner `scripts/research/run_alpha_zoo_69_asset_cold_start_transfer_shadow.py` and tests `tests/test_alpha_zoo_69_asset_cold_start_transfer_shadow.py` evaluate whether recently listed TradFi/premarket symbols can be initialized from similar train-eligible donor profiles without leaking target validation PnL into donor choice.
+
+Artifact: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_cold_start_transfer_shadow_20260531/alpha_zoo_69_asset_cold_start_transfer_shadow_latest.json` plus Markdown/CSV siblings. Source remains the corrected 69-asset profile artifact and the strict live reference remains `alpha_zoo_69_asset_efficiency_repair_optuna_20260530`; the live handoff was not changed.
+
+Safety contract in the artifact:
+
+- Donor selection uses donor train/validation quality, static domain similarity, and target bar coverage only. Target validation PnL is not used in the primary donor-frozen lane.
+- No donor OHLCV, donor PnL, donor trade counts, or synthetic target train metrics are substituted into target train performance.
+- Validation-oracle selection is emitted only as a diagnostic upper bound and is explicitly non-promotable.
+- `paper_testnet_only=true`, `shadow_report_only=true`, `ready_for_paper=false`, `ready_for_real=false`, `real_money_execution=false`, and `real_execution_allowed=false` throughout. The primary cost/RPT assumption remains `10bps` round trip.
+
+Results under the latest 8-week validation window (`2026-04-04T04:00:00` through `2026-05-30T03:00:00`):
+
+| lane | sleeves | gross | train | validation | validation MDD | validation RPT | status |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| donor-frozen primary cold-start shadow | `18` | `2.00x` | `0.00%` | `+31.6832%` | `10.2407%` | `83.87bps` | report-only, not promotable |
+| validation-oracle diagnostic upper bound | `16` | `1.7778x` | `0.00%` | `+44.4677%` | `8.1768%` | `178.67bps` | leakage diagnostic, not promotable |
+
+Primary donor-frozen selected symbols were `TSMUSDT`, `MUUSDT`, `SNDKUSDT`, `AVGOUSDT`, `AMDUSDT`, `QCOMUSDT`, `MRVLUSDT`, `DRAMUSDT`, `WDCUSDT`, `ARMUSDT`, `COHRUSDT`, `BABAUSDT`, `SPYUSDT`, `SOXLUSDT`, `QQQUSDT`, `SPCXUSDT`, `OPENAIUSDT`, and `QNTXUSDT`. Positive contributors included `MUUSDT`, `SNDKUSDT`, `AMDUSDT`, `DRAMUSDT`, `QCOMUSDT`, `SOXLUSDT`, `QQQUSDT`, and `SPYUSDT`; negative contributors included `COHRUSDT`, `SPCXUSDT`, `OPENAIUSDT`, `BABAUSDT`, and `WDCUSDT`. The primary lane stays useful as a monitored cold-start watchlist but cannot enter live/paper allocation until those symbols have physical train-window data.
+
+Runner evidence: wall `0:14.80`, max RSS `852,388 KiB`; artifact `runner_peak_rss_mib=832.41`, below the 8GB cap. Local targeted verification passed: new cold-start tests `5 passed`; related Alpha Zoo targeted suite `16 passed`; Ruff check and compileall passed for the new runner/tests.
+
 ## 2026-05-31 KST — 69-asset train-eligibility correction and live handoff refresh
 
 Corrected the 69-symbol efficiency-repair pipeline after finding that several newly listed TradFi/premarket symbols had no train-split rows before `2026-04-04T03:00:00`, yet the earlier allocation layer could still admit validation-only sleeves. The superseded headline `+295.9880%` train / `+172.7926%` validation was therefore contaminated by validation-only assets and is no longer the live handoff evidence.

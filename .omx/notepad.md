@@ -1,3 +1,11 @@
+## 2026-05-31 KST — cold-start donor transfer shadow results
+
+- Added `scripts/research/run_alpha_zoo_69_asset_cold_start_transfer_shadow.py` and `tests/test_alpha_zoo_69_asset_cold_start_transfer_shadow.py`.
+- Artifact: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_cold_start_transfer_shadow_20260531/alpha_zoo_69_asset_cold_start_transfer_shadow_latest.json`.
+- Donor-frozen primary shadow selected donors without target validation PnL: validation `+31.6832%`, validation MDD `10.2407%`, validation RPT `83.87bps`, gross `2.00x`, 18 sleeves, train `0.00%` because targets have no train rows.
+- Validation-oracle diagnostic upper bound: validation `+44.4677%`, MDD `8.1768%`, RPT `178.67bps`, gross `1.7778x`, 16 sleeves; explicitly leakage diagnostic only.
+- No promotion: `ready_for_paper=false`, `ready_for_real=false`, `real_money_execution=false`, `real_execution_allowed=false`; strict live reference unchanged. Runner max RSS `832.41 MiB`.
+
 
 ## 2026-05-30 KST — corrected 69-asset per-profile Optuna rebuild
 
