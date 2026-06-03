@@ -164,3 +164,77 @@ def test_69_asset_efficiency_decision_payload_is_limit_only_and_no_chase() -> No
         "hybrid_v3_6_optuna_three_profile_blend"
     )
     assert len(payload["asset_applicability_contract"]["selected_source_symbols"]) == 13
+
+
+def test_69_asset_efficiency_decision_payload_blocks_on_failed_clean_oos_gate(
+    tmp_path: Path,
+) -> None:
+    module = _load_69_ops_module()
+    gate_path = tmp_path / "clean_oos_gate_failed.json"
+    gate_path.write_text(
+        """
+        {
+          "clean_oos_gate_pass": false,
+          "clean_oos_gate_reasons": [
+            "locked_oos_return_not_positive",
+            "locked_oos_rpt_-7.516_not_above_10bps"
+          ],
+          "selected_hybrid_version": "v3_5",
+          "selected_primary_weight_set": "final_weights",
+          "selected_profile_id": "hybrid_v3_5_optuna_three_profile_blend",
+          "source_artifact": "/tmp/clean_artifact.json",
+          "split_manifest": {
+            "locked_oos": {"start": "2026-03-01T00:00:00", "end": "2026-05-06T23:00:00"}
+          }
+        }
+        """,
+        encoding="utf-8",
+    )
+
+    payload = module.build_69_asset_efficiency_repair_decision_payload(
+        clean_oos_gate_path=gate_path
+    )
+
+    assert payload["decision"] == "blocked_by_clean_oos_gate"
+    assert payload["ready_for_paper"] is False
+    assert payload["clean_oos_gate"]["pass"] is False
+    assert payload["clean_oos_gate"]["selected_hybrid_version"] == "v3_5"
+    assert payload["paper_testnet_blockers"] == [
+        "clean_oos_gate_failed: locked_oos_return_not_positive, "
+        "locked_oos_rpt_-7.516_not_above_10bps"
+    ]
+    assert payload["operator_warning"] == (
+        "paper/testnet startup blocked by clean locked-OOS gate; do not deploy this handoff"
+    )
+
+
+def test_69_asset_efficiency_decision_payload_attaches_passing_clean_oos_gate(
+    tmp_path: Path,
+) -> None:
+    module = _load_69_ops_module()
+    gate_path = tmp_path / "clean_oos_gate_pass.json"
+    gate_path.write_text(
+        """
+        {
+          "clean_oos_gate_pass": true,
+          "clean_oos_gate_reasons": [],
+          "selected_hybrid_version": "v3_5",
+          "selected_primary_weight_set": "final_weights",
+          "selected_profile_id": "hybrid_v3_5_optuna_three_profile_blend",
+          "source_artifact": "/tmp/clean_artifact.json",
+          "split_manifest": {
+            "locked_oos": {"start": "2026-03-01T00:00:00", "end": "2026-05-06T23:00:00"}
+          }
+        }
+        """,
+        encoding="utf-8",
+    )
+
+    payload = module.build_69_asset_efficiency_repair_decision_payload(
+        clean_oos_gate_path=gate_path
+    )
+
+    assert payload["decision"] == "selected_live_mode"
+    assert payload["ready_for_paper"] is True
+    assert payload["clean_oos_gate"]["pass"] is True
+    assert payload["paper_testnet_only"] is True

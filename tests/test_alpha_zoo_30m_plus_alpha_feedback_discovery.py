@@ -48,16 +48,22 @@ def _gate_row(**overrides: object) -> dict[str, object]:
 
 
 def test_validate_timeframes_enforces_30m_floor() -> None:
-    assert MODULE._validate_timeframes(["30m", "1h", "2h", "4h", "6h"]) == (
+    assert MODULE._validate_timeframes(["30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d"]) == (
         "30m",
         "1h",
         "2h",
         "4h",
         "6h",
+        "8h",
+        "12h",
+        "1d",
     )
 
     with pytest.raises(ValueError, match="below 30m"):
         MODULE._validate_timeframes(["15m"])
+
+    assert MODULE._timeframe_hours("1d") == 24.0
+    assert MODULE._pandas_rule("1d") == "1D"
 
 
 def test_native_30m_loader_builds_base_before_resampling(tmp_path: Path) -> None:

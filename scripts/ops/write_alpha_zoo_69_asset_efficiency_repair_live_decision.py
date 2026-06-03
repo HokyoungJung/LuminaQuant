@@ -48,11 +48,68 @@ def _artifact_default_selected_profile_id(path: str | Path) -> str:
     return profile_id or DEFAULT_SELECTED_PROFILE_ID
 
 
+def _load_clean_oos_gate(path: str | Path) -> dict[str, Any]:
+    gate_path = Path(path).expanduser().resolve()
+    return {
+        "path": str(gate_path),
+        **json.loads(gate_path.read_text(encoding="utf-8")),
+    }
+
+
+def _clean_oos_gate_summary(gate_payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "path": gate_payload["path"],
+        "pass": bool(gate_payload.get("clean_oos_gate_pass")),
+        "reasons": list(gate_payload.get("clean_oos_gate_reasons") or []),
+        "selected_profile_id": gate_payload.get("selected_profile_id"),
+        "selected_hybrid_version": gate_payload.get("selected_hybrid_version"),
+        "selected_primary_weight_set": gate_payload.get("selected_primary_weight_set"),
+        "split_manifest": gate_payload.get("split_manifest"),
+        "source_artifact": gate_payload.get("source_artifact"),
+    }
+
+
+def _apply_clean_oos_gate(payload: dict[str, Any], gate_path: str | Path | None) -> dict[str, Any]:
+    if gate_path is None or not str(gate_path).strip():
+        return payload
+
+    gate_payload = _load_clean_oos_gate(gate_path)
+    summary = _clean_oos_gate_summary(gate_payload)
+    payload["clean_oos_gate"] = summary
+    if summary["pass"]:
+        payload["paper_testnet_validation_requirements"].append(
+            "continue monitoring paper/testnet drift against the clean locked-OOS gate artifact"
+        )
+        return payload
+
+    reasons = ", ".join(str(item) for item in summary["reasons"]) or "unknown_reason"
+    blocker = f"clean_oos_gate_failed: {reasons}"
+    payload["decision"] = "blocked_by_clean_oos_gate"
+    payload["ready_for_paper"] = False
+    payload.setdefault("paper_testnet_blockers", []).append(blocker)
+    if blocker not in payload["real_money_blockers"]:
+        payload["real_money_blockers"].append(blocker)
+    payload["known_limitations"].append(
+        "Clean locked-OOS gate failed on the previous train/validation/OOS split; "
+        "paper/testnet promotion is blocked until a regenerated artifact passes without "
+        "using locked-OOS for fitting, selection, pruning, or final-weight freeze."
+    )
+    payload["paper_testnet_validation_requirements"].insert(
+        0,
+        "regenerate the 69-asset artifact with locked-OOS excluded and pass the clean-OOS gate",
+    )
+    payload["operator_warning"] = (
+        "paper/testnet startup blocked by clean locked-OOS gate; do not deploy this handoff"
+    )
+    return payload
+
+
 def build_69_asset_efficiency_repair_decision_payload(
     *,
     optuna_hybrid_artifact_path: str | Path = DEFAULT_69_ASSET_EFFICIENCY_REPAIR_ARTIFACT,
     integer_portfolio_artifact_path: str | Path = DEFAULT_INTEGER_PORTFOLIO_ARTIFACT,
     selected_profile_id: str | None = None,
+    clean_oos_gate_path: str | Path | None = None,
 ) -> dict[str, Any]:
     resolved_selected_profile_id = (
         str(selected_profile_id).strip()
@@ -60,11 +117,12 @@ def build_69_asset_efficiency_repair_decision_payload(
         else _artifact_default_selected_profile_id(optuna_hybrid_artifact_path)
     )
     build_decision_payload = _load_base_decision_builder()
-    return build_decision_payload(
+    payload = build_decision_payload(
         optuna_hybrid_artifact_path=optuna_hybrid_artifact_path,
         integer_portfolio_artifact_path=integer_portfolio_artifact_path,
         selected_profile_id=resolved_selected_profile_id,
     )
+    return _apply_clean_oos_gate(payload, clean_oos_gate_path)
 
 
 def _write_markdown(output: Path, payload: dict[str, Any]) -> None:
@@ -95,6 +153,16 @@ def _write_markdown(output: Path, payload: dict[str, Any]) -> None:
                 "- primary round-trip cost: `10bps`",
                 "",
                 "This is a paper/testnet handoff artifact only; it is not a real-money approval.",
+                "",
+                "## Clean locked-OOS gate",
+                "",
+                f"```json\n{json.dumps(payload.get('clean_oos_gate'), indent=2, sort_keys=True)}\n```"
+                if payload.get("clean_oos_gate")
+                else "- not provided",
+                "",
+                "## Paper/testnet blockers",
+                "",
+                *[f"- {item}" for item in payload.get("paper_testnet_blockers", [])],
                 "",
                 "## No-fill / slippage policy",
                 "",
@@ -134,6 +202,14 @@ def main(argv: list[str] | None = None) -> int:
         default="",
         help="Override selected profile id; default uses artifact selected_optuna_hybrid_profile.",
     )
+    parser.add_argument(
+        "--clean-oos-gate",
+        default="",
+        help=(
+            "Optional clean locked-OOS gate JSON. If provided and failing, the live decision is "
+            "blocked for paper/testnet as well as real-money."
+        ),
+    )
     parser.add_argument("--check-only", action="store_true")
     args = parser.parse_args(argv)
 
@@ -141,6 +217,7 @@ def main(argv: list[str] | None = None) -> int:
         optuna_hybrid_artifact_path=args.optuna_hybrid_artifact,
         integer_portfolio_artifact_path=args.integer_portfolio_artifact,
         selected_profile_id=args.selected_profile_id,
+        clean_oos_gate_path=args.clean_oos_gate,
     )
     if args.check_only:
         print(
@@ -149,9 +226,11 @@ def main(argv: list[str] | None = None) -> int:
                     "selected_mode": payload["selected_mode"],
                     "strategy_name": payload["strategy_name"],
                     "paper_testnet_only": payload["paper_testnet_only"],
+                    "ready_for_paper": payload["ready_for_paper"],
                     "ready_for_real": payload["ready_for_real"],
                     "real_money_execution": payload["real_money_execution"],
                     "real_execution_allowed": payload["real_execution_allowed"],
+                    "clean_oos_gate": payload.get("clean_oos_gate"),
                     "symbol_count": len(payload["symbols"]),
                     "unfilled_market_fallback_allowed": payload["unfilled_order_policy"][
                         "market_fallback_allowed"

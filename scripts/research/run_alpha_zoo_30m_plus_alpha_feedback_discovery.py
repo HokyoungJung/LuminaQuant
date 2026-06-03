@@ -60,7 +60,7 @@ DEFAULT_PRIOR_ARTIFACT = (
     "alpha_zoo_debounced_efficiency_repair_discovery_latest.json"
 )
 DEFAULT_SYMBOLS = ("BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "TRXUSDT")
-DEFAULT_TIMEFRAMES = ("30m", "1h", "2h", "4h", "6h")
+DEFAULT_TIMEFRAMES = ("30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d")
 BTC_REGIME_SYMBOL = "BTCUSDT"
 BAR_CONSTRUCTION = "native_1s_to_30m_base_then_requested_timeframe"
 STRATEGY_SCOPE = "single_symbol_only"
@@ -275,17 +275,23 @@ def _write_csv(path: Path, rows: Sequence[Mapping[str, Any]], fields: Sequence[s
 
 
 def _timeframe_hours(timeframe: str) -> float:
-    if timeframe.endswith("m"):
-        return float(timeframe[:-1]) / 60.0
-    if timeframe.endswith("h"):
-        return float(timeframe[:-1])
+    token = str(timeframe).strip().lower()
+    if token.endswith("m"):
+        return float(token[:-1]) / 60.0
+    if token.endswith("h"):
+        return float(token[:-1])
+    if token.endswith("d"):
+        return float(token[:-1]) * 24.0
     raise ValueError(f"unsupported timeframe {timeframe!r}")
 
 
 def _pandas_rule(timeframe: str) -> str:
-    if timeframe.endswith("m"):
-        return f"{int(timeframe[:-1])}min"
-    return f"{int(timeframe[:-1])}h"
+    token = str(timeframe).strip().lower()
+    if token.endswith("m"):
+        return f"{int(token[:-1])}min"
+    if token.endswith("d"):
+        return f"{int(token[:-1])}D"
+    return f"{int(token[:-1])}h"
 
 
 def _validate_timeframes(timeframes: Sequence[str]) -> tuple[str, ...]:

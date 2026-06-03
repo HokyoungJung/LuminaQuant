@@ -1,5 +1,50 @@
 # Research Note
 
+## 2026-06-03 KST — 69-asset monthly clean-OOS walk-forward final selection
+
+최종 69-asset 월별 refit walk-forward 연구를 최신 데이터까지 재평가했다. 기준은 `30m, 1h, 2h, 4h, 6h, 8h, 12h, 1d`, round-trip slippage `10bps`, train expanding from `2025-01-01T00:00:00`, 매월 1일 refit, 직전 2개월 validation, 다음 1개월 locked OOS이다. 평가 OOS는 `2025-09-01T00:00:00`부터 최신 보유 데이터 `2026-06-01T06:30:00`까지이며, `2026-06` fold는 부분 월이다. 총 10개 OOS fold를 사용했다.
+
+Clean/no-leakage contract:
+
+- 각 fold의 현재 OOS는 해당 fold의 파라미터, bridge/dynamic weight, selector label, portfolio weighting에 사용하지 않았다.
+- dynamic-aware lane은 same-month dynamic self-feeding 금지 검사를 통과했다.
+- bridge/online metric reconciliation은 `metrics_reconciled=true`, mismatches `[]`로 확인했다.
+- 단, `fixed_relaxed_dynamic_blend:*` 후보는 OOS 리뷰 후 추가한 exact bar-level 조합이므로 동일 창에서는 clean promotion이 아니라 `fresh_forward_shadow_required_before_promotion`이다.
+
+최종 후보 성과 요약:
+
+| 후보 | Clean | OOS Comp | Ann approx | Max OOS MDD | Monthly Eq MDD | Sharpe | Sortino | PF | Hit | Worst | Latest | 판단 |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| `relaxed_efficiency:hybrid_v3_5` | Y | `156.03%` | `209.00%` | `19.75%` | `15.66%` | `1.69` | `10.48` | `7.04` | `5/10` | `-8.41%` | `-0.09%` | clean-only 최고 comp, paper/testnet 후보 |
+| `fixed_relaxed_dynamic_blend:relaxed70_dynamic30` | N | `122.36%` | `160.90%` | `16.66%` | `14.66%` | `1.74` | `8.97` | `6.33` | `6/10` | `-8.42%` | `-0.17%` | shadow 고수익형 |
+| `fixed_relaxed_dynamic_blend:relaxed60_dynamic40` | N | `111.75%` | `146.03%` | `16.19%` | `14.35%` | `1.75` | `8.43` | `6.00` | `6/10` | `-8.61%` | `-0.20%` | 최종 균형 shadow 후보 |
+| `dynamic_aware_hybrid:hybrid_v3_5_train_validation_fit` | Y | `54.76%` | `68.89%` | `16.75%` | `12.76%` | `1.53` | `4.43` | `3.87` | `5/10` | `-9.97%` | `-0.38%` | clean 방어 sleeve |
+| `cross_candidate_hybrid:hybrid_v3_6` | Y | `61.61%` | `77.89%` | `27.57%` | `14.83%` | `1.55` | `4.28` | `4.47` | `7/10` | `-9.48%` | `-0.57%` | 별도 leverage run 내 clean 비교 상위, MDD 큼 |
+| `asset_timeframe_leverage:hybrid_v3_6` | Y | `21.78%` | `26.67%` | `21.97%` | `21.19%` | `0.72` | `1.67` | `1.79` | `4/10` | `-15.87%` | `-0.57%` | leverage 진단/monitor only |
+
+월별 OOS 분포에서 최종 균형 shadow 후보 `fixed_relaxed_dynamic_blend:relaxed60_dynamic40`은 `2025-09 +0.59%`, `2025-10 +0.07%`, `2025-11 +45.85%`, `2025-12 -2.90%`, `2026-01 +19.80%`, `2026-02 +30.64%`, `2026-03 -6.28%`, `2026-04 -8.61%`, `2026-05 +11.04%`, `2026-06 -0.20%`였다. `dynamic_aware_hybrid:hybrid_v3_5_train_validation_fit`은 같은 기간 `+2.65%, -0.47%, +22.76%, -3.48%, +24.60%, +7.43%, -3.10%, -9.97%, +9.88%, -0.38%`로 수익이 더 낮지만 smoother 방어 sleeve 역할을 한다.
+
+Exposure/rebalancing/leverage 결론:
+
+- 최종 exact blend 60/40은 fold 전체에서 unique assets `29`, 평균 active assets/fold `13.7`, active range `10~29`, 평균 gross `1.92x`, gross range `1.35~2.58x`였다. 후보풀은 69개 전체를 계속 모니터링하며, allocation은 train/validation evidence와 fold별 gate를 통과한 자산만 사용한다.
+- 기존 source sleeve 단계에서 `symbol x timeframe x integer_leverage`는 이미 train/validation 기반으로 튜닝된다. 이번에는 그 위에 asset/timeframe post-allocation multiplier와 gross cap을 추가로 clean 검증했다. 하지만 최고 `asset_timeframe_leverage:hybrid_v3_6`도 OOS comp `21.78%`, MDD `21.97%`, Sharpe `0.72`로 final core를 대체하지 못했다.
+- 따라서 portfolio-level rebalance/leverage 확장은 즉시 실전 코어 편입이 아니라 monitor/diagnostic 보조축으로 유지한다. 리밸런싱 cadence 자체는 monthly day-1 refit protocol로 고정했고, intramonth에는 signal-level position update로 해석한다.
+
+최종 선택:
+
+1. **실전 균형 shadow/paper 후보:** `fixed_relaxed_dynamic_blend:relaxed60_dynamic40`. OOS comp `111.75%`, max OOS MDD `16.19%`, Sharpe `1.75`, Hit `6/10`로 risk/return 균형이 가장 낫다. 다만 post-OOS research variant라 fresh-forward shadow가 쌓이기 전에는 clean promotion 금지.
+2. **고수익 shadow 후보:** `fixed_relaxed_dynamic_blend:relaxed70_dynamic30`. OOS comp `122.36%`로 더 높지만 relaxed sleeve 의존도가 더 크다.
+3. **clean-only 기준 최고:** `relaxed_efficiency:hybrid_v3_5`. 같은 OOS 창에서는 clean comp `156.03%`로 최고이나 max OOS MDD `19.75%`, hit `5/10`이고 relaxed repair risk가 있으므로 paper/testnet challenger로 다룬다.
+4. **real-money 상태:** 모든 후보는 아직 `ready_for_real=false`로 유지한다. 실전 전환은 fresh-forward shadow, paper/testnet fill/BBO/slippage/reconciliation telemetry, 월별 hard-stop review를 통과해야 한다.
+
+Artifacts:
+
+- Exact blend full-tuning walk-forward: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_exact_blend_full_tuning_20260603/exact_blend_full_tuning_walkforward_latest.json` and `.md`. Selection report: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_exact_blend_full_tuning_20260603/exact_blend_selection_report_ko.md`. Runtime `2:35:12`, peak RSS `1121.3 MiB`.
+- Asset/timeframe leverage clean test: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_asset_tf_leverage_20260603/asset_tf_leverage_walkforward_latest.json` and `.md`. Selection report: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_asset_tf_leverage_20260603/asset_tf_leverage_selection_report_ko.md`. Runtime `1:40:52`, peak RSS `1085.0 MiB`.
+- Supporting earlier OOS/selector artifacts: `alpha_zoo_69_asset_best_strategy_factory_20260601`, `alpha_zoo_69_asset_monthly_refit_diagnostics_20260601`, `alpha_zoo_69_asset_clean_full_tuning_20260602`, `alpha_zoo_69_asset_dynamic_aware_hybrid_20260602`, `alpha_zoo_69_asset_oos_oracle_bridge_20260602`, `alpha_zoo_69_asset_risk_enhanced_20260602`, and `alpha_zoo_69_asset_mdd30_high_vol_20260602`.
+
+Verification after final patches and report generation: `py_compile` and `ruff check` passed for all changed/untracked Python research files; targeted Alpha Zoo 69-asset pytest passed `66 passed in 1.31s`; docs verification passed (`118 markdown files checked`); `git diff --check` passed.
+
 
 ## 2026-05-31 KST — Relaxed repair interpretation: trust, liquidation, 69→19 selection, and future refit of train-ineligible assets
 

@@ -75,7 +75,7 @@ AVG_BBO_SPREAD_BPS_ASSUMPTION = 2.0
 BBO_SPREAD_MULTIPLIER = 5.0
 RETURN_PER_TURNOVER_THRESHOLD_BPS = AVG_BBO_SPREAD_BPS_ASSUMPTION * BBO_SPREAD_MULTIPLIER
 
-DEFAULT_TIMEFRAMES = ("30m", "1h", "2h", "4h")
+DEFAULT_TIMEFRAMES = ("30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d")
 DEFAULT_LEVERAGES = (1, 2, 3, 4)
 DEFAULT_ALLOCATION_FRACTION = 0.10
 MAX_CACHED_STREAMS_PER_SYMBOL = 8
@@ -287,10 +287,13 @@ def _parse_ints(value: str) -> tuple[int, ...]:
 
 
 def _timeframe_minutes(timeframe: str) -> int:
-    if timeframe.endswith("m"):
-        minutes = int(timeframe[:-1])
-    elif timeframe.endswith("h"):
-        minutes = int(timeframe[:-1]) * 60
+    token = str(timeframe).strip().lower()
+    if token.endswith("m"):
+        minutes = int(token[:-1])
+    elif token.endswith("h"):
+        minutes = int(token[:-1]) * 60
+    elif token.endswith("d"):
+        minutes = int(token[:-1]) * 24 * 60
     else:
         raise ValueError(f"unsupported timeframe {timeframe!r}")
     if minutes < 30:
@@ -300,6 +303,8 @@ def _timeframe_minutes(timeframe: str) -> int:
 
 def _polars_every(timeframe: str) -> str:
     minutes = _timeframe_minutes(timeframe)
+    if minutes % (24 * 60) == 0:
+        return f"{minutes // (24 * 60)}d"
     return f"{minutes}m" if minutes < 60 else f"{minutes // 60}h"
 
 
@@ -332,6 +337,7 @@ def load_symbol_bars(
     timeframe: str,
     start: pd.Timestamp | None = None,
     end: pd.Timestamp | None = None,
+    require_complete_buckets: bool = True,
 ) -> pd.DataFrame:
     """Load one symbol from direct 1m parquet and aggregate to ``timeframe``."""
     files = _symbol_1m_files(data_root, symbol)
@@ -359,6 +365,9 @@ def load_symbol_bars(
         .sort("datetime")
         .collect()
     )
+    if require_complete_buckets and not frame.is_empty():
+        expected_1m_rows = _timeframe_minutes(timeframe)
+        frame = frame.filter(pl.col("source_1m_rows") >= expected_1m_rows)
     pdf = pd.DataFrame(frame.to_dicts())
     if pdf.empty:
         return pd.DataFrame(

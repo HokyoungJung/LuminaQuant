@@ -78,6 +78,14 @@ def test_params_from_trial_uses_requested_timeframe_and_integer_leverage_cap() -
     assert params["family"] == "trend_pullback_reclaim"
 
 
+def test_broad69_timeframe_support_includes_one_day_complete_bucket_policy() -> None:
+    assert "1d" in broad69.DEFAULT_TIMEFRAMES
+    assert broad69._timeframe_minutes("1d") == 24 * 60
+    assert broad69._polars_every("1d") == "1d"
+    with pytest.raises(ValueError, match="minimum research timeframe"):
+        broad69._timeframe_minutes("15m")
+
+
 def test_split_windows_for_hybrid_preserves_empty_locked_oos() -> None:
     windows = broad69.SplitWindows(
         train=(pd.Timestamp("2026-01-01"), pd.Timestamp("2026-01-02")),
