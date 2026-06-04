@@ -51,7 +51,11 @@ def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
 
 
 def _rows_for(payload: Mapping[str, Any], label: str) -> list[dict[str, Any]]:
-    return [dict(row) for row in payload.get("fold_candidate_rows", []) if row["candidate_label"] == label]
+    return [
+        dict(row)
+        for row in payload.get("fold_candidate_rows", [])
+        if row["candidate_label"] == label
+    ]
 
 
 def _aggregate_for(payload: Mapping[str, Any], label: str) -> dict[str, Any]:
@@ -126,9 +130,7 @@ def _monthly_metrics(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     }
 
 
-def _audit_aggregate_match(
-    payload: Mapping[str, Any], candidate_label: str
-) -> dict[str, Any]:
+def _audit_aggregate_match(payload: Mapping[str, Any], candidate_label: str) -> dict[str, Any]:
     rows = _rows_for(payload, candidate_label)
     aggregate = _aggregate_for(payload, candidate_label)
     metrics = _monthly_metrics(rows)
@@ -207,8 +209,16 @@ def _audit_latest_detail_match(
     full = full_rows[0]
     det = detail_rows[0]
     fields = [
-        ("validation_return", full["validation"]["total_return"], det["validation"]["total_return"]),
-        ("locked_oos_return", full["locked_oos"]["total_return"], det["locked_oos"]["total_return"]),
+        (
+            "validation_return",
+            full["validation"]["total_return"],
+            det["validation"]["total_return"],
+        ),
+        (
+            "locked_oos_return",
+            full["locked_oos"]["total_return"],
+            det["locked_oos"]["total_return"],
+        ),
         ("locked_oos_mdd", full["locked_oos"]["mdd"], det["locked_oos"]["mdd"]),
     ]
     deltas = {name: _safe_float(a) - _safe_float(b) for name, a, b in fields}
@@ -402,9 +412,7 @@ def build_diagnostics(
             "protocol_oos_used_for_selection": bool(
                 walkforward.get("protocol", {}).get("oos_used_for_selection")
             ),
-            "latest_detail_match": _audit_latest_detail_match(
-                walkforward, detail, candidate_label
-            ),
+            "latest_detail_match": _audit_latest_detail_match(walkforward, detail, candidate_label),
             "existing_unit_tests_executed": [
                 "tests/test_alpha_zoo_integer_leverage_optuna_hybrid_decision.py",
                 "tests/test_alpha_zoo_69_asset_individual_robust_paper_decision.py",

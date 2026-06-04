@@ -241,7 +241,9 @@ def evaluate_candidate(
     min_oos_return = min(oos_returns) if oos_returns else 0.0
     max_validation_mdd = max(validation_mdds) if validation_mdds else 0.0
     max_fold_oos_mdd = max(oos_mdds) if oos_mdds else 0.0
-    all_validation_positive = bool(validation_returns) and all(value > 0.0 for value in validation_returns)
+    all_validation_positive = bool(validation_returns) and all(
+        value > 0.0 for value in validation_returns
+    )
     all_oos_positive = bool(oos_returns) and all(value > 0.0 for value in oos_returns)
     return {
         "candidate_id": candidate.candidate_id,
@@ -264,7 +266,9 @@ def evaluate_candidate(
             "all_oos_positive": all_oos_positive,
             "all_validation_and_oos_positive": all_validation_positive and all_oos_positive,
             "oos_mdd_within_limit": max_fold_oos_mdd <= max_oos_mdd,
-            "return_shape_pass": all_validation_positive and all_oos_positive and max_fold_oos_mdd <= max_oos_mdd,
+            "return_shape_pass": all_validation_positive
+            and all_oos_positive
+            and max_fold_oos_mdd <= max_oos_mdd,
         },
     }
 
@@ -281,7 +285,8 @@ def weights_for_target_gross(
     allow_upscale: bool,
 ) -> tuple[dict[str, float], float] | None:
     source_gross = sum(
-        max(0.0, float(profile_mix.get(profile_id, 0.0))) * float(profile_gross.get(profile_id, 0.0))
+        max(0.0, float(profile_mix.get(profile_id, 0.0)))
+        * float(profile_gross.get(profile_id, 0.0))
         for profile_id in profile_mix
     )
     if source_gross <= 0.0:
@@ -299,8 +304,12 @@ def candidate_score(evaluation: Mapping[str, Any]) -> float:
     mdd_ok = bool(summary.get("oos_mdd_within_limit"))
     if not (all_val_oos and mdd_ok):
         return -1e9
-    validation_returns = [float(dict(row.get("validation") or {}).get("total_return") or 0.0) for row in folds]
-    oos_returns = [float(dict(row.get("locked_oos") or {}).get("total_return") or 0.0) for row in folds]
+    validation_returns = [
+        float(dict(row.get("validation") or {}).get("total_return") or 0.0) for row in folds
+    ]
+    oos_returns = [
+        float(dict(row.get("locked_oos") or {}).get("total_return") or 0.0) for row in folds
+    ]
     avg_return = float(np.mean(validation_returns + oos_returns)) if folds else 0.0
     return (
         7.0 * float(summary.get("min_oos_return") or 0.0)
@@ -322,9 +331,7 @@ def _grid_matrix_context(
     )
     matrix = np.vstack(
         [
-            profile_returns[profile_id]
-            .reindex(index, fill_value=0.0)
-            .to_numpy(dtype=float)
+            profile_returns[profile_id].reindex(index, fill_value=0.0).to_numpy(dtype=float)
             for profile_id in profile_ids
         ]
     )
@@ -366,7 +373,9 @@ def _fast_grid_summary(
     min_oos_return = min(oos_returns) if oos_returns else 0.0
     max_validation_mdd = max(validation_mdds) if validation_mdds else 0.0
     max_fold_oos_mdd = max(oos_mdds) if oos_mdds else 0.0
-    all_validation_positive = bool(validation_returns) and all(value > 0.0 for value in validation_returns)
+    all_validation_positive = bool(validation_returns) and all(
+        value > 0.0 for value in validation_returns
+    )
     all_oos_positive = bool(oos_returns) and all(value > 0.0 for value in oos_returns)
     return {
         "fold_count": len(oos_returns),
@@ -380,7 +389,9 @@ def _fast_grid_summary(
         "all_oos_positive": all_oos_positive,
         "all_validation_and_oos_positive": all_validation_positive and all_oos_positive,
         "oos_mdd_within_limit": max_fold_oos_mdd <= max_oos_mdd,
-        "return_shape_pass": all_validation_positive and all_oos_positive and max_fold_oos_mdd <= max_oos_mdd,
+        "return_shape_pass": all_validation_positive
+        and all_oos_positive
+        and max_fold_oos_mdd <= max_oos_mdd,
     }
 
 
@@ -421,7 +432,12 @@ def _profile_mix_grid(step: float, profile_ids: Sequence[str]) -> list[dict[str,
         for second_units in range(scale - first_units + 1):
             third_units = scale - first_units - second_units
             weights = [first_units / scale, second_units / scale, third_units / scale]
-            mixes.append({profile_id: weight for profile_id, weight in zip(profile_ids, weights, strict=True)})
+            mixes.append(
+                {
+                    profile_id: weight
+                    for profile_id, weight in zip(profile_ids, weights, strict=True)
+                }
+            )
     return mixes
 
 
@@ -523,14 +539,18 @@ def build_monitor_manifest(
     source_payload: Mapping[str, Any],
     diverse_payload: Mapping[str, Any],
 ) -> list[dict[str, Any]]:
-    universe_symbols = [str(symbol) for symbol in dict(source_payload.get("universe") or {}).get("symbols") or []]
+    universe_symbols = [
+        str(symbol) for symbol in dict(source_payload.get("universe") or {}).get("symbols") or []
+    ]
     source_train_eligible = set(salvage._train_eligible_symbols(source_payload))
     source_train_ineligible = set(salvage._train_ineligible_symbols(source_payload))
     diverse_by_symbol = {
-        str(row.get("symbol")): dict(row) for row in diverse_payload.get("asset_inclusion_manifest") or []
+        str(row.get("symbol")): dict(row)
+        for row in diverse_payload.get("asset_inclusion_manifest") or []
     }
     selected_by_symbol = {
-        str(row.get("symbol")): dict(row) for row in diverse_payload.get("selected_sleeve_rows") or []
+        str(row.get("symbol")): dict(row)
+        for row in diverse_payload.get("selected_sleeve_rows") or []
     }
     manifest: list[dict[str, Any]] = []
     for symbol in universe_symbols:
@@ -558,7 +578,9 @@ def build_monitor_manifest(
                 "core_gross_notional_fraction": _safe_float(
                     selected_row.get("weighted_notional_fraction") if selected_row else 0.0
                 ),
-                "source_profile_id": selected_row.get("source_profile_id") if selected_row else None,
+                "source_profile_id": selected_row.get("source_profile_id")
+                if selected_row
+                else None,
                 "timeframe": selected_row.get("timeframe") if selected_row else None,
                 "side": selected_row.get("side") if selected_row else None,
                 "family": selected_row.get("family") if selected_row else None,
@@ -591,7 +613,9 @@ def _core_candidate_from_diverse(
     )
 
 
-def _selection_recommendation(core_eval: Mapping[str, Any], shadow_search: Mapping[str, Any]) -> dict[str, Any]:
+def _selection_recommendation(
+    core_eval: Mapping[str, Any], shadow_search: Mapping[str, Any]
+) -> dict[str, Any]:
     core_summary = dict(core_eval.get("summary") or {})
     shadow = dict(shadow_search.get("best_candidate") or {})
     shadow_summary = dict(shadow.get("summary") or {})
@@ -605,7 +629,9 @@ def _selection_recommendation(core_eval: Mapping[str, Any], shadow_search: Mappi
         "shadow_reason": (
             "all walk-forward validation/OOS folds positive in frozen-return-shape diagnostics, "
             "but it used OOS folds for ranking so it is not live-promotable without refit"
-        ) if shadow else None,
+        )
+        if shadow
+        else None,
         "can_claim_all_val_and_oos_very_good_now": False,
         "why_not": (
             "the grid found all-positive fold shapes, but no candidate met stricter 'very good' feasibility "
@@ -647,12 +673,17 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     diverse_path = Path(args.diverse_artifact).expanduser().resolve()
     source_payload = json.loads(source_path.read_text(encoding="utf-8"))
     diverse_payload = json.loads(diverse_path.read_text(encoding="utf-8"))
-    context = clean_gate._build_profile_context(source_payload, _source_windows_from_payload(source_payload))
+    context = clean_gate._build_profile_context(
+        source_payload, _source_windows_from_payload(source_payload)
+    )
     profile_returns: Mapping[str, pd.Series] = context["profile_returns"]
     profile_gross = {
-        profile_id: _safe_float(gross) for profile_id, gross in dict(context["profile_gross"]).items()
+        profile_id: _safe_float(gross)
+        for profile_id, gross in dict(context["profile_gross"]).items()
     }
-    profile_ids = [profile_id for profile_id in DEFAULT_PROFILE_ORDER if profile_id in profile_returns]
+    profile_ids = [
+        profile_id for profile_id in DEFAULT_PROFILE_ORDER if profile_id in profile_returns
+    ]
     core_candidate = _core_candidate_from_diverse(diverse_payload, profile_gross)
     core_eval = evaluate_candidate(
         core_candidate,

@@ -106,7 +106,6 @@ def test_timeframe_coverage_summary_reports_one_day() -> None:
     assert "complete_bucket_policy" in summary["1d"]
 
 
-
 def test_leaf_strategy_material_filter_rejects_nested_hybrid_inputs() -> None:
     leaf = _candidate("profile_optuna:growth_mdd20_gross8_69_asset_profile_optuna")
     hybrid = _candidate("cross_candidate_hybrid:hybrid_v3_5", family="cross_candidate_hybrid")
@@ -120,6 +119,58 @@ def test_leaf_strategy_material_filter_rejects_nested_hybrid_inputs() -> None:
     assert module._leaf_strategy_material_candidate(hybrid) is False
     assert module._leaf_strategy_material_candidate(selector) is False
     assert module._leaf_strategy_material_candidate(selected_optuna) is False
+
+
+def test_leaf_strategy_material_filter_rejects_calendar_primary_inputs() -> None:
+    def candidate_with_row(label: str, row: dict[str, object], family: str = "profile_optuna"):
+        candidate = _candidate(label, family=family)
+        candidate.row.update(row)
+        return candidate
+
+    clean_monthly_refit = _candidate("profile_optuna:monthly_refit_validation_cadence")
+    clean_monthly_refit.row.update(
+        {
+            "profile_id": "monthly_refit_validation_cadence",
+            "profile_kind": "leaf_momentum_profile",
+            "protocol_note": "monthly_refit is a cadence, not calendar alpha",
+        }
+    )
+    calendar_family = candidate_with_row(
+        "calendar_rotation:btc_may_short",
+        {"profile_id": "calendar_rotation_btc_may_short"},
+        family="calendar_rotation",
+    )
+    calendar_flag = candidate_with_row(
+        "profile_optuna:flagged_calendar_primary",
+        {"calendar_primary": "true"},
+    )
+    calendar_params = candidate_with_row(
+        "profile_optuna:fixed_month_entry",
+        {"params_json": '{"entry_months": [5], "lookback": 20}'},
+    )
+    rejected_calendar = candidate_with_row(
+        "profile_optuna:rejected_calendar_rule",
+        {"rejection_reasons": ["calendar_fixed_month_alpha"]},
+    )
+
+    assert module._leaf_strategy_material_candidate(clean_monthly_refit) is True
+    assert module._leaf_strategy_material_candidate(calendar_family) is False
+    assert module._leaf_strategy_material_candidate(calendar_flag) is False
+    assert module._leaf_strategy_material_candidate(calendar_params) is False
+    assert module._leaf_strategy_material_candidate(rejected_calendar) is False
+
+
+def test_clean_material_filters_reject_disguised_nested_row_references() -> None:
+    disguised_leaf = _candidate(
+        "profile_optuna:growth_mdd20_gross8_69_asset_profile_optuna",
+        family="profile_optuna",
+    )
+    disguised_leaf.row["final_weights"] = {"cross_candidate_hybrid:hybrid_v3_5": 1.0}
+
+    assert module._leaf_strategy_material_candidate(disguised_leaf) is False
+    assert module._clean_source_candidate(disguised_leaf) is False
+    assert module._clean_downstream_candidate(disguised_leaf) is False
+
 
 def test_dynamic_conviction_switch_uses_train_validation_only() -> None:
     index = pd.date_range("2025-01-01", "2025-03-31", freq="1D")
@@ -167,6 +218,7 @@ def test_dynamic_conviction_switch_uses_train_validation_only() -> None:
     # though its locked OOS is deliberately worse than fallback in this fixture.
     assert module._period_metrics(switched[0].returns, fold.locked_oos)["total_return"] < 0.0
 
+
 def test_dynamic_aware_hybrid_is_disabled_for_nested_hybrid_materials(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -204,6 +256,32 @@ def test_dynamic_aware_hybrid_is_disabled_for_nested_hybrid_materials(
 
     assert out == []
 
+
+def test_meta_portfolio_candidates_use_leaf_materials_only() -> None:
+    fold = module.MonthlyFold(
+        fold_id="2025-03",
+        refit_at=pd.Timestamp("2025-03-01"),
+        train=(pd.Timestamp("2025-01-01"), pd.Timestamp("2025-01-31")),
+        validation=(pd.Timestamp("2025-02-01"), pd.Timestamp("2025-02-28")),
+        locked_oos=(pd.Timestamp("2025-03-01"), pd.Timestamp("2025-03-31")),
+    )
+    nested_label = "validation_selector:top_clean"
+    candidates = [
+        _candidate(
+            "profile_optuna:growth_mdd20_gross8_69_asset_profile_optuna", daily_return=0.010
+        ),
+        _candidate(
+            "profile_optuna:balanced_mdd12_gross5_69_asset_profile_optuna", daily_return=0.008
+        ),
+        _candidate(nested_label, family="validation_selector", daily_return=0.050),
+    ]
+
+    out = module._meta_portfolio_candidates(candidates, fold)
+
+    assert out
+    assert all(nested_label not in candidate.row.get("final_weights", {}) for candidate in out)
+
+
 def test_fixed_risk_enhanced_blend_is_disabled_for_nested_materials() -> None:
     candidates = [
         _candidate(
@@ -219,6 +297,7 @@ def test_fixed_risk_enhanced_blend_is_disabled_for_nested_materials() -> None:
     ]
 
     assert module._fixed_risk_enhanced_blend_candidates(candidates) == []
+
 
 def test_fixed_relaxed_dynamic_blend_is_disabled_for_nested_hybrids() -> None:
     index = pd.date_range("2025-01-01", "2025-01-05", freq="1D")
@@ -241,6 +320,7 @@ def test_fixed_relaxed_dynamic_blend_is_disabled_for_nested_hybrids() -> None:
 
     assert module._fixed_relaxed_dynamic_blend_candidates(candidates) == []
 
+
 def test_asset_timeframe_leverage_family_marks_clean_train_validation_policy(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -253,7 +333,9 @@ def test_asset_timeframe_leverage_family_marks_clean_train_validation_policy(
         locked_oos=(pd.Timestamp("2025-03-01"), pd.Timestamp("2025-03-31")),
     )
 
-    def make_profile_stream(profile_id: str, daily_return: float) -> module.grid_hybrid.ProfileStream:
+    def make_profile_stream(
+        profile_id: str, daily_return: float
+    ) -> module.grid_hybrid.ProfileStream:
         return module.grid_hybrid.ProfileStream(
             profile_id=profile_id,
             candidate_tier="paper_testnet_individual_sleeve_first_candidate",
@@ -332,7 +414,9 @@ def test_asset_timeframe_leverage_family_marks_clean_train_validation_policy(
 
     monkeypatch.setattr(module, "tune_individual_robust_profile", fake_tune)
     monkeypatch.setattr(module.optuna_hybrid, "_run_optuna", fake_run_optuna)
-    monkeypatch.setattr(module.optuna_hybrid, "_choose_selected_optuna_result", lambda items: items[0])
+    monkeypatch.setattr(
+        module.optuna_hybrid, "_choose_selected_optuna_result", lambda items: items[0]
+    )
     monkeypatch.setattr(module.profile69, "optimize_static_profile_blend", fake_static)
 
     candidates, aux = module._run_asset_timeframe_leverage_family(
@@ -454,13 +538,16 @@ def test_mdd30_risk_scaled_candidates_use_leaf_sources_only() -> None:
     labels = {item.candidate_label for item in out}
     assert "mdd30_risk_scaled:profile_growth_x1_50" in labels
     assert all(nested_label not in candidate.row.get("final_weights", {}) for candidate in out)
-    scaled = next(item for item in out if item.candidate_label == "mdd30_risk_scaled:profile_growth_x1_50")
+    scaled = next(
+        item for item in out if item.candidate_label == "mdd30_risk_scaled:profile_growth_x1_50"
+    )
     assert scaled.row["source_candidate_label"] == source_label
     assert scaled.row["uses_locked_oos_for_selection"] is False
     assert scaled.row["current_fold_oos_used_for_weighting"] is False
     assert scaled.row["post_oos_research_variant"] is True
     assert scaled.row["requires_fresh_forward_shadow"] is True
     assert scaled.row["risk_scale"] == pytest.approx(1.50)
+
 
 def test_mdd30_high_vol_gate_can_pick_bad_oos_from_validation_only() -> None:
     index = pd.date_range("2025-01-01", "2025-03-31", freq="1D")
@@ -513,6 +600,7 @@ def test_mdd30_high_vol_gate_can_pick_bad_oos_from_validation_only() -> None:
     # OOS is deliberately worse, proving the gate did not peek at locked OOS.
     assert module._period_metrics(selected.returns, fold.locked_oos)["total_return"] < 0.0
 
+
 def test_bridge_protocol_manifest_hash_matches_frozen_file() -> None:
     manifest_path = module.DEFAULT_BRIDGE_PROTOCOL_MANIFEST
     loaded = module._load_bridge_protocol_manifest(manifest_path)
@@ -556,7 +644,9 @@ def test_hybrid_bridge_refuses_nested_dynamic_and_hybrid_inputs() -> None:
                 daily_return=0.010,
             ),
             _candidate("cross_candidate_hybrid:hybrid_v3_5", family="cross_candidate_hybrid"),
-            _candidate("profile_optuna:growth_mdd20_gross8_69_asset_profile_optuna", daily_return=0.008),
+            _candidate(
+                "profile_optuna:growth_mdd20_gross8_69_asset_profile_optuna", daily_return=0.008
+            ),
         ],
         fold,
         prior_completed_utilities={"2025-02": [0.02]},
@@ -576,6 +666,7 @@ def test_hybrid_bridge_refuses_nested_dynamic_and_hybrid_inputs() -> None:
         ]
         is False
     )
+
 
 def test_hybrid_bridge_eligible_pool_excludes_nested_and_post_oos_research_variants() -> None:
     fold = module.MonthlyFold(
@@ -609,6 +700,7 @@ def test_hybrid_bridge_eligible_pool_excludes_nested_and_post_oos_research_varia
     )
 
     assert [candidate.candidate_label for candidate, _ in eligible] == [clean_leaf.candidate_label]
+
 
 def test_dynamic_switch_rows_do_not_self_feed_same_month_oos_or_oracle_inputs() -> None:
     clean_rows = [

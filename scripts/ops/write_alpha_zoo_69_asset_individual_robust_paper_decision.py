@@ -88,7 +88,10 @@ def _find_fold_candidate(
     payload: Mapping[str, Any], *, fold_id: str, candidate_label: str
 ) -> dict[str, Any]:
     for row in list(payload.get("fold_candidate_rows") or []):
-        if str(row.get("fold_id")) == fold_id and str(row.get("candidate_label")) == candidate_label:
+        if (
+            str(row.get("fold_id")) == fold_id
+            and str(row.get("candidate_label")) == candidate_label
+        ):
             return dict(row)
     raise ValueError(f"candidate row not found for {fold_id}: {candidate_label}")
 
@@ -449,9 +452,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "candidate": payload["selected_candidate_label"],
                     "ready_for_paper_shadow": payload["ready_for_paper_shadow"],
                     "ready_for_real": payload["ready_for_real"],
-                    "selected_symbol_count": payload["selected_symbol_exposure"][
-                        "symbol_count"
-                    ],
+                    "selected_symbol_count": payload["selected_symbol_exposure"]["symbol_count"],
                     "gate_pass": payload["walkforward_gate"]["pass"],
                 },
                 indent=2,

@@ -13,7 +13,7 @@ import argparse
 import json
 import math
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -83,6 +83,34 @@ _STATEFUL_DYNAMIC_PREFIXES = (
     "fresh_compression_",
     "fresh_oi_",
     "fresh_basis_",
+)
+NON_LEAF_SOURCE_MARKERS = (
+    "cross_candidate_hybrid",
+    "dynamic_aware_hybrid",
+    "hybrid_oracle_bridge",
+    "meta_portfolio",
+    "validation_selector",
+    "risk_enhanced_blend",
+    "fixed_relaxed_dynamic_blend",
+    "mdd30_barbell_blend",
+    "mdd30_risk_scaled",
+    "mdd30_high_vol_gate",
+    "dynamic_conviction_switch",
+    "nested_hybrid",
+    "nested_portfolio",
+    "nested_",
+    ":hybrid_",
+    "hybrid_v3_",
+    "selected_optuna",
+    "selected_train_validation_legal",
+    "static_guarded",
+)
+FIXED_CALENDAR_SOURCE_MARKERS = (
+    "fresh_calendar_",
+    "calendar_primary",
+    "calendar_month",
+    "fixed_month",
+    "month_alpha",
 )
 _REQUIRED_STRATEGY_VALIDITY_KEYS = {
     "pass",
@@ -549,6 +577,18 @@ CALENDAR_PRIMARY_REASONS = (
     "calendar_fixed_month_alpha",
     "fixed_asset_calendar_target",
 )
+CALENDAR_RULE_PARAM_KEYS = {
+    "calendar_long_months",
+    "calendar_short_months",
+    "calendar_months",
+    "entry_days_of_month",
+    "entry_hours",
+    "entry_months",
+    "month_filter",
+    "day_filter",
+    "hour_filter",
+    "date_filter",
+}
 CALENDAR_PRIMARY_TOKEN_RE = re.compile(
     r"\bfresh_calendar_(?:(?:rot|takeprofit|dynamic|spread|seasonal)_)?[a-z]+_?(?:seth(?:usdt)?|tr[xu]usdt|btcusdt|ethusdt|usdt)?\b",
     re.IGNORECASE,
@@ -601,6 +641,69 @@ def _strategy_validity_passes(strategy_validity: Mapping[str, Any] | None) -> bo
     )
 
 
+def _calendar_rule_param_refs(value: Any, *, prefix: str = "") -> list[str]:
+    refs: list[str] = []
+    if isinstance(value, Mapping):
+        for key, child in value.items():
+            key_text = str(key)
+            key_path = f"{prefix}.{key_text}" if prefix else key_text
+            if key_text.lower() in CALENDAR_RULE_PARAM_KEYS and child not in (None, "", (), [], {}):
+                refs.append(key_path)
+            refs.extend(_calendar_rule_param_refs(child, prefix=key_path))
+    elif isinstance(value, list | tuple):
+        for index, child in enumerate(value):
+            if isinstance(child, Mapping | list | tuple):
+                refs.extend(_calendar_rule_param_refs(child, prefix=f"{prefix}[{index}]"))
+    return sorted(set(refs))
+
+
+def _calendar_rule_reasons_from_refs(refs: Sequence[str]) -> list[str]:
+    reasons = {"calendar_entry_rule_unsupported", "calendar_fixed_month_alpha"}
+    for ref in refs:
+        token = ref.lower()
+        if "month" in token:
+            reasons.add("calendar_month_entry_rule")
+        if "day" in token or "date" in token:
+            reasons.add("calendar_day_entry_rule")
+        if "hour" in token:
+            reasons.add("calendar_hour_entry_rule")
+    return sorted(reasons)
+
+
+def _source_reference_tokens(source_id: str, metrics: Mapping[str, Any]) -> list[str]:
+    tokens = [
+        source_id,
+        metrics.get("name"),
+        metrics.get("family"),
+        metrics.get("mode"),
+        metrics.get("strategy_name"),
+        metrics.get("candidate_family"),
+        metrics.get("candidate_source"),
+        _as_dict(metrics.get("strategy_validity")).get("primary_signal_type"),
+        _as_dict(metrics.get("strategy_validity")).get("primary_signal_evidence"),
+    ]
+    tokens.extend(str(item) for item in _as_list(metrics.get("sleeves")))
+    for key in ("final_weights", "weights"):
+        tokens.extend(str(item) for item in _as_dict(metrics.get(key)))
+    return [str(token or "").strip().lower() for token in tokens if str(token or "").strip()]
+
+
+def _non_leaf_source_reference_invalid(source_id: str, metrics: Mapping[str, Any]) -> bool:
+    return any(
+        marker in token
+        for token in _source_reference_tokens(source_id, metrics)
+        for marker in NON_LEAF_SOURCE_MARKERS
+    )
+
+
+def _fixed_calendar_source_reference_invalid(source_id: str, metrics: Mapping[str, Any]) -> bool:
+    return any(
+        marker in token
+        for token in _source_reference_tokens(source_id, metrics)
+        for marker in FIXED_CALENDAR_SOURCE_MARKERS
+    )
+
+
 def _strategy_validity(
     *,
     kind: str,
@@ -610,6 +713,20 @@ def _strategy_validity(
     candidate_derived: bool,
     benchmark_only: bool,
 ) -> dict[str, Any]:
+    calendar_rule_refs = _calendar_rule_param_refs(raw)
+    if calendar_rule_refs:
+        return {
+            "pass": False,
+            "primary_signal_type": "calendar_timed_state_signal",
+            "primary_signal_evidence": f"calendar/date parameter fields:{','.join(calendar_rule_refs[:8])}",
+            "audited_sleeves": [],
+            "audit_sources": [str(source_artifact)]
+            if source_artifact
+            else ["inline_final_selection_audit"],
+            "rejection_reasons": _calendar_rule_reasons_from_refs(calendar_rule_refs),
+            "calendar_rule_param_refs": calendar_rule_refs,
+        }
+
     existing = _as_dict(raw.get("strategy_validity"))
     if _strategy_validity_metadata_present(existing):
         return dict(existing)
@@ -998,6 +1115,10 @@ def _hybrid_source_candidate_failures(
         reasons: list[str] = []
         if not metrics:
             reasons.append("source_metric_missing")
+        if _non_leaf_source_reference_invalid(source_id, metrics):
+            reasons.append("nested_hybrid_or_same_family_source_invalid")
+        if _fixed_calendar_source_reference_invalid(source_id, metrics):
+            reasons.append("calendar_primary_source_invalid")
         validity = _as_dict(metrics.get("strategy_validity"))
         if validity and not bool(validity.get("pass")):
             reasons.append("strategy_validity_rejected")

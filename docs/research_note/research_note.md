@@ -1,5 +1,54 @@
 # Research Note
 
+## 2026-06-04 KST — Fresh full clean non-nested monthly-refit rerun and TradFi auto-expansion monitor
+
+현재 코드 기준으로 69-asset monthly-refit walk-forward를 다시 full rerun했다. 기준은 `30m, 1h, 2h, 4h, 6h, 8h, 12h, 1d`, round-trip slippage `10bps`, 매월 1일 refit, 직전 2개월 validation, 다음 1개월 locked OOS다. 평가 OOS는 `2025-09-01T00:00:00`부터 최신 보유 데이터 `2026-06-01T06:30:00`까지이며, `2026-06`은 부분 월이다. 총 10개 OOS fold를 사용했다.
+
+이번 rerun은 기존 row recompute가 아니라 현행 no-nested/material guard가 들어간 runner로 새로 실행한 결과다. 검증상 `fold_candidate_rows=625`, `aggregate_rankings=70`, `clean_promotion_rankings=54`, `demoted_nested_or_historical_rankings=16`, 모든 timeframe coverage `69/69`, metric reconciliation `true`, clean contamination violation `0`이었다. Runtime은 `31:54.04`, peak RSS는 `1158.04 MiB`였다.
+
+Artifacts:
+
+- JSON: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_clean_non_nested_full_eval_20260604_final/clean_non_nested_monthly_refit_full_20260604_final.json`
+- Markdown: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_clean_non_nested_full_eval_20260604_final/clean_non_nested_monthly_refit_full_20260604_final.md`
+- SHA256: `83094ae79f946d81b95f1a1a3422f5b2934b82550d9862fc7241e6dc3a93909a`
+
+Clean-promotion ranking 상위:
+
+| Rank | Candidate | OOS Comp | Max OOS MDD | Sharpe | Sortino | Hit | Min OOS | Latest OOS | 판단 |
+| ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 1 | `profile_optuna:selected_optuna` | `10.05%` | `19.20%` | `0.50` | `1.16` | `5/10` | `-9.30%` | `-0.73%` | clean ranker 1위지만 hard-stop promotion 실패 |
+| 2 | `profile_optuna:hybrid_v3_5` | `9.06%` | `19.20%` | `0.47` | `1.04` | `5/10` | `-9.30%` | `-0.23%` | non-nested top-level hybrid output, paper/shadow only |
+| 3 | `dynamic_conviction_switch:t0.85_risk_capped_fallback` | `8.61%` | `10.08%` | `0.80` | `2.65` | `5/9` | `-2.65%` | `0.00%` | return은 낮지만 drawdown/tail이 더 안정적 |
+| 4 | `dynamic_conviction_switch:t0.90_risk_capped_fallback` | `8.61%` | `10.08%` | `0.80` | `2.65` | `5/9` | `-2.65%` | `0.00%` | 위와 동일 family/threshold |
+| 5 | `dynamic_conviction_switch:t0.95_risk_capped_fallback` | `8.61%` | `10.08%` | `0.80` | `2.65` | `5/9` | `-2.65%` | `0.00%` | 위와 동일 family/threshold |
+| 6 | `dynamic_conviction_switch:t1.00_risk_capped_fallback` | `8.61%` | `10.08%` | `0.80` | `2.65` | `5/9` | `-2.65%` | `0.00%` | 위와 동일 family/threshold |
+
+참고로 comp만 보면 `dynamic_conviction_switch:*_strict_fallback`은 `10.47%` / MDD `10.62%`로 높지만 hit가 `4/9`라 conservative ranker에서 11~12위권으로 내려간다. 어떤 후보도 challenger/robust hard-stop 기준은 통과하지 못했으므로 **real-money 승격은 계속 금지**한다. 실전 후보 해석은 `profile_optuna:selected_optuna`/`hybrid_v3_5`를 수익형 shadow, `dynamic_conviction_switch:*_risk_capped_fallback`을 방어형 shadow로 나누고, fresh-forward paper telemetry가 쌓이기 전까지 capital allocation은 하지 않는 쪽이 맞다.
+
+Nested-hybrid 정책은 유지한다: top-level hybrid output은 분석/후보로 남을 수 있지만, hybrid/blend/selector/gate/portfolio row를 다른 hybrid/portfolio의 **재료**로 다시 넣는 것은 금지한다. 이번 패치로 hidden `final_weights`/`weights` 참조까지 검사해 disguised nested material도 downstream source에서 제외한다. Calendar/month-fixed primary-alpha material도 raw params와 validity/rejection metadata 기준으로 clean material에서 제외한다.
+
+TradFi 확장 모니터링도 추가했다. `lumina_quant.research_universe`는 side-effect 없는 static 69 snapshot을 유지하되, `binance_tradfi_perp_symbols_from_exchange_info()`와 `binance_extended_research_symbols_from_exchange_info()` helper로 Binance `/fapi/v1/exchangeInfo`의 현재 `TRADIFI_PERPETUAL`/USDT trading 심볼을 합칠 수 있게 했다. `scripts/collect_binance_1m_research_universe.py`의 기본 `--universe-source`는 `static-plus-fapi-tradfi`로 바뀌었다. 따라서 명시 `--symbols`가 없으면 기존 69개를 유지하면서, 새 TradFi 지원 심볼은 자동으로 1m data-vision/FAPI fetch plan과 report의 `universe_discovery`에 들어간다. 완전 고정 재현이 필요할 때만 `--universe-source static`을 사용한다.
+
+Verification:
+
+```text
+uv run ruff format src/lumina_quant/research_universe.py scripts/collect_binance_1m_research_universe.py tests/test_research_universe.py tests/test_collect_binance_1m_research_universe.py
+uv run ruff check src/lumina_quant/research_universe.py scripts/collect_binance_1m_research_universe.py tests/test_research_universe.py tests/test_collect_binance_1m_research_universe.py
+uv run pytest -q tests/test_research_universe.py tests/test_collect_binance_1m_research_universe.py
+# 9 passed
+
+uv run --extra optimize python scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py ... --output-json ...20260604_final.json
+# Exit status 0; elapsed 31:54.04; peak RSS 1185828 KB
+
+uv run ruff format --check .
+uv run ruff check .
+uv run pytest -q tests/test_alpha_zoo_69_asset_monthly_refit_walkforward.py tests/test_profit_moonshot_candidate_hybrid.py tests/test_profit_moonshot_live_final_selection.py tests/test_profit_moonshot_strategy_validity_audit.py tests/test_research_universe.py tests/test_collect_binance_1m_research_universe.py
+# 64 passed
+
+uv run python scripts/verify_docs.py
+# 119 markdown files checked
+```
+
 ## 2026-06-04 KST — No-nested clean recompute, stale deep-report reconciliation, and report checkpoint optimization
 
 `C:\Users\hoky1\Desktop\deep-research-report.md`를 확인했다. 해당 보고서는 2026-06-03 당시의 `fixed_relaxed_dynamic_blend:*` / `dynamic_aware_hybrid:*` 후보를 중심으로 평가했기 때문에, **전략 랭킹 부분은 현재 no-nested 정책하에서 stale**이다. 다만 selection-bias, execution realism, slippage telemetry, governance/PBO/DSR 같은 주의사항은 여전히 유효하다.

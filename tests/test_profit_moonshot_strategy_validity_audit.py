@@ -50,6 +50,30 @@ def test_calendar_primary_sleeves_fail_even_inside_hybrid_aliases() -> None:
     assert "calendar_primary_alpha_unsupported" in validity["rejection_reasons"]
 
 
+def test_calendar_parameter_fields_fail_even_when_sleeves_are_stateful() -> None:
+    validity = FINAL._strategy_validity(
+        kind="candidate_portfolio",
+        name="stateful_with_fixed_calendar_params",
+        raw={
+            "sleeves": ["fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all"],
+            "params": {"month_filter": [1, 2], "risk": {"entry_hours": [2]}},
+        },
+        source_artifact="candidate.json",
+        candidate_derived=True,
+        benchmark_only=False,
+    )
+
+    assert validity["pass"] is False
+    assert validity["primary_signal_type"] == "calendar_timed_state_signal"
+    assert "calendar_entry_rule_unsupported" in validity["rejection_reasons"]
+    assert "calendar_month_entry_rule" in validity["rejection_reasons"]
+    assert "calendar_hour_entry_rule" in validity["rejection_reasons"]
+    assert validity["calendar_rule_param_refs"] == [
+        "params.month_filter",
+        "params.risk.entry_hours",
+    ]
+
+
 def test_dynamic_state_signal_families_are_not_overblocked_by_secondary_time_filters() -> None:
     dynamic_sleeves = [
         "fresh_pair_resid_revert_spread_lb24_z150_h120_sc10_st100_tp400_all",

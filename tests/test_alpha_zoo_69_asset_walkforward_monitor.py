@@ -11,7 +11,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def _load_module():
     path = ROOT / "scripts" / "research" / "run_alpha_zoo_69_asset_walkforward_monitor.py"
-    spec = importlib.util.spec_from_file_location("run_alpha_zoo_69_asset_walkforward_monitor", path)
+    spec = importlib.util.spec_from_file_location(
+        "run_alpha_zoo_69_asset_walkforward_monitor", path
+    )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module

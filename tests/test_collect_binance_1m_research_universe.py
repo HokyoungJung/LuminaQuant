@@ -72,3 +72,34 @@ def test_binance_ban_until_regex_extracts_epoch_milliseconds() -> None:
 
     assert match is not None
     assert match.group("until_ms") == "1780116708940"
+
+
+def test_default_universe_appends_new_tradfi_discovery() -> None:
+    exchange_info = {
+        "NEWEQUSDT": {
+            "symbol": "NEWEQUSDT",
+            "contractType": "TRADIFI_PERPETUAL",
+            "quoteAsset": "USDT",
+            "status": "TRADING",
+        }
+    }
+
+    static_symbols = MODULE.resolve_default_symbols(
+        exchange_info=exchange_info,
+        universe_source="static",
+    )
+    expanded_symbols = MODULE.resolve_default_symbols(
+        exchange_info=exchange_info,
+        universe_source="static-plus-fapi-tradfi",
+    )
+    discovery = MODULE.universe_discovery_payload(
+        exchange_info=exchange_info,
+        universe_source="static-plus-fapi-tradfi",
+        symbols=expanded_symbols,
+        explicit_symbols=False,
+    )
+
+    assert "NEWEQUSDT" not in static_symbols
+    assert "NEWEQUSDT" in expanded_symbols
+    assert discovery["new_tradfi_since_static_snapshot_symbols"] == ["NEWEQUSDT"]
+    assert discovery["selected_new_tradfi_symbols"] == ["NEWEQUSDT"]

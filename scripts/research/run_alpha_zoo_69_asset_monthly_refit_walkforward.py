@@ -258,7 +258,9 @@ def _timeframe_coverage_summary(coverage: Mapping[str, Any]) -> dict[str, Any]:
     out: dict[str, Any] = {}
     for timeframe, tf_cov_raw in dict(coverage.get("timeframes") or {}).items():
         tf_cov = dict(tf_cov_raw or {})
-        rows = [_safe_float(item.get("rows")) for item in tf_cov.values() if isinstance(item, Mapping)]
+        rows = [
+            _safe_float(item.get("rows")) for item in tf_cov.values() if isinstance(item, Mapping)
+        ]
         zero_symbols = [
             symbol
             for symbol, item in tf_cov.items()
@@ -393,23 +395,30 @@ def _dynamic_self_feed_audit(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any
     }
 
 
-def _metric_reconciliation_report(payload: Mapping[str, Any], *, tolerance: float = 1e-12) -> dict[str, Any]:
+def _metric_reconciliation_report(
+    payload: Mapping[str, Any], *, tolerance: float = 1e-12
+) -> dict[str, Any]:
     expected = {
         row["candidate_label"]: row
         for row in _aggregate_rows(list(payload.get("fold_candidate_rows") or []))
     }
-    actual = {
-        row["candidate_label"]: row
-        for row in list(payload.get("aggregate_rankings") or [])
-    }
+    actual = {row["candidate_label"]: row for row in list(payload.get("aggregate_rankings") or [])}
     mismatches: list[dict[str, Any]] = []
     for label, expected_row in expected.items():
         actual_row = actual.get(label)
         if actual_row is None:
             mismatches.append({"candidate_label": label, "field": "missing_aggregate"})
             continue
-        for field in ("compounded_oos_return", "positive_oos_folds", "max_oos_mdd", "min_oos_return"):
-            if abs(_safe_float(actual_row.get(field)) - _safe_float(expected_row.get(field))) > tolerance:
+        for field in (
+            "compounded_oos_return",
+            "positive_oos_folds",
+            "max_oos_mdd",
+            "min_oos_return",
+        ):
+            if (
+                abs(_safe_float(actual_row.get(field)) - _safe_float(expected_row.get(field)))
+                > tolerance
+            ):
                 mismatches.append({"candidate_label": label, "field": field})
     return {
         "metrics_reconciled": not mismatches,
@@ -446,9 +455,7 @@ def _promotability_decision(best: Mapping[str, Any]) -> dict[str, Any]:
         "promotion_hard_stop_pass": bool(reasons),
         "promotion_hard_stop_reasons": reasons,
         "if_false_recommendation": (
-            None
-            if reasons
-            else "paper_shadow_only_further_uplift_would_be_oos_mining_risk"
+            None if reasons else "paper_shadow_only_further_uplift_would_be_oos_mining_risk"
         ),
     }
 
@@ -464,7 +471,9 @@ _PREPARED_RETURNS_CACHE: OrderedDict[tuple[Any, ...], _PreparedReturns] = Ordere
 _PERIOD_METRICS_CACHE: OrderedDict[tuple[Any, ...], dict[str, Any]] = OrderedDict()
 
 
-def _bounded_cache_get(cache: OrderedDict[tuple[Any, ...], Any], key: tuple[Any, ...]) -> Any | None:
+def _bounded_cache_get(
+    cache: OrderedDict[tuple[Any, ...], Any], key: tuple[Any, ...]
+) -> Any | None:
     value = cache.get(key)
     if value is not None:
         cache.move_to_end(key)
@@ -513,7 +522,9 @@ def _returns_signature(returns: pd.Series) -> tuple[Any, ...]:
     )
 
 
-def _prepared_returns(returns: pd.Series, signature: tuple[Any, ...] | None = None) -> _PreparedReturns:
+def _prepared_returns(
+    returns: pd.Series, signature: tuple[Any, ...] | None = None
+) -> _PreparedReturns:
     signature = _returns_signature(returns) if signature is None else signature
     cached = _bounded_cache_get(_PREPARED_RETURNS_CACHE, signature)
     if cached is not None:
@@ -569,7 +580,9 @@ def _periods_per_year(index: pd.DatetimeIndex) -> float:
     return 365.0 * 24.0 * 60.0 * 60.0 / seconds
 
 
-def _period_metrics(returns: pd.Series, window: tuple[pd.Timestamp, pd.Timestamp]) -> dict[str, Any]:
+def _period_metrics(
+    returns: pd.Series, window: tuple[pd.Timestamp, pd.Timestamp]
+) -> dict[str, Any]:
     start_ns = _timestamp_ns(window[0])
     end_ns = _timestamp_ns(window[1])
     signature = _returns_signature(returns)
@@ -650,7 +663,11 @@ def _combine_profile_returns(
     index = pd.DatetimeIndex(
         sorted(
             set().union(
-                *(set(stream.returns.index) for stream in profile_streams if stream.profile_id in active)
+                *(
+                    set(stream.returns.index)
+                    for stream in profile_streams
+                    if stream.profile_id in active
+                )
             )
         )
     )
@@ -692,7 +709,9 @@ def _candidate_eval(
     )
 
 
-def _candidate_validation_snapshot(candidate: CandidateResult, fold: MonthlyFold) -> dict[str, float]:
+def _candidate_validation_snapshot(
+    candidate: CandidateResult, fold: MonthlyFold
+) -> dict[str, float]:
     train = _period_metrics(candidate.returns, fold.train)
     validation = _period_metrics(candidate.returns, fold.validation)
     val_return = _safe_float(validation["total_return"])
@@ -768,6 +787,113 @@ _NON_LEAF_PROFILE_KIND_TOKENS = (
     "assimilation",
 )
 
+_CALENDAR_PRIMARY_FAMILIES = {"calendar_rotation", "calendar_spread"}
+
+_CALENDAR_PRIMARY_PARAM_KEYS = {
+    "calendar_long_months",
+    "calendar_short_months",
+    "calendar_months",
+    "entry_days_of_month",
+    "entry_hours",
+    "entry_months",
+    "month_filter",
+    "day_filter",
+    "hour_filter",
+    "date_filter",
+    "fixed_month",
+    "fixed_months",
+    "month",
+    "months",
+}
+
+_CALENDAR_PRIMARY_REJECTION_TOKENS = (
+    "calendar_primary",
+    "calendar_fixed_month_alpha",
+    "calendar_or_date_rule_forbidden",
+    "calendar_primary_alpha_unsupported",
+    "fixed_month_asset_calendar_rule",
+)
+
+_CALENDAR_PRIMARY_LABEL_TOKENS = (
+    "fresh_calendar_",
+    "calendar_rotation",
+    "calendar_spread",
+    "calendar_primary",
+)
+
+
+def _truthy_flag(value: Any) -> bool:
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+    return bool(value)
+
+
+def _iter_mappings(value: Any) -> list[Mapping[str, Any]]:
+    if isinstance(value, Mapping):
+        return [value]
+    if isinstance(value, str) and value.strip():
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            return []
+        return [parsed] if isinstance(parsed, Mapping) else []
+    return []
+
+
+def _calendar_param_key_paths(value: Mapping[str, Any], *, prefix: str = "") -> list[str]:
+    reasons: list[str] = []
+    for key, raw in value.items():
+        key_text = str(key)
+        path = f"{prefix}.{key_text}" if prefix else key_text
+        if isinstance(raw, Mapping):
+            reasons.extend(_calendar_param_key_paths(raw, prefix=path))
+            continue
+        if key_text.lower() not in _CALENDAR_PRIMARY_PARAM_KEYS:
+            continue
+        if raw not in (None, "", (), [], {}):
+            reasons.append(path)
+    return sorted(set(reasons))
+
+
+def _row_calendar_primary_reasons(row: Mapping[str, Any]) -> list[str]:
+    """Return reasons a row is calendar/month-fixed primary-alpha material.
+
+    Monthly refit is a validation cadence, not a calendar alpha. This detector
+    therefore keys off explicit validity flags, known calendar-primary
+    families, and fixed date/month entry parameters rather than broad words
+    such as ``monthly_refit`` in protocol descriptions.
+    """
+    reasons: list[str] = []
+    if _truthy_flag(row.get("calendar_primary")):
+        reasons.append("calendar_primary=true")
+    primary_signal_type = str(row.get("primary_signal_type") or "").lower()
+    if primary_signal_type == "calendar_primary":
+        reasons.append("primary_signal_type=calendar_primary")
+    family = str(row.get("family") or "").lower()
+    if family in _CALENDAR_PRIMARY_FAMILIES:
+        reasons.append(f"family={family}")
+    for key in ("candidate_label", "source_profile_id", "profile_id"):
+        value = str(row.get(key) or "").lower()
+        if value and any(token in value for token in _CALENDAR_PRIMARY_LABEL_TOKENS):
+            reasons.append(f"{key}_calendar_primary_token")
+
+    validity = row.get("strategy_validity")
+    if isinstance(validity, Mapping):
+        reasons.extend(
+            f"strategy_validity:{item}" for item in _row_calendar_primary_reasons(validity)
+        )
+
+    for key in ("rejection_reasons", "calendar_rule_rejection_reasons"):
+        for reason in row.get(key) or []:
+            reason_text = str(reason).lower()
+            if any(token in reason_text for token in _CALENDAR_PRIMARY_REJECTION_TOKENS):
+                reasons.append(f"{key}:{reason}")
+
+    for key in ("params", "params_json", "variant_params_json", "strategy_params_json"):
+        for mapping in _iter_mappings(row.get(key)):
+            reasons.extend(f"{key}:{path}" for path in _calendar_param_key_paths(mapping))
+    return sorted(set(reasons))
+
 
 def _leaf_strategy_material_candidate(candidate: CandidateResult) -> bool:
     """Return whether a candidate may be used as a hybrid/portfolio ingredient.
@@ -787,6 +913,10 @@ def _leaf_strategy_material_candidate(candidate: CandidateResult) -> bool:
     if any(token in label for token in _NON_LEAF_LABEL_TOKENS):
         return False
     if any(token in profile_id for token in _NON_LEAF_LABEL_TOKENS):
+        return False
+    if _row_calendar_primary_reasons(row):
+        return False
+    if _row_references_non_leaf_material(row):
         return False
     return not any(token in profile_kind for token in _NON_LEAF_PROFILE_KIND_TOKENS)
 
@@ -870,7 +1000,9 @@ def _meta_portfolio_candidates(
                     "ready_for_real": False,
                     "real_money_execution": False,
                 },
-                returns=_blend_candidate_returns([item[0] for item in calmar_ranked], calmar_weights),
+                returns=_blend_candidate_returns(
+                    [item[0] for item in calmar_ranked], calmar_weights
+                ),
             )
         )
 
@@ -884,8 +1016,7 @@ def _meta_portfolio_candidates(
         reverse=True,
     )[:8]
     stability_weights = {
-        candidate.candidate_label: 1.0 / len(stability_ranked)
-        for candidate, _ in stability_ranked
+        candidate.candidate_label: 1.0 / len(stability_ranked) for candidate, _ in stability_ranked
     }
     if stability_weights:
         out.append(
@@ -943,7 +1074,9 @@ def _meta_portfolio_candidates(
                     "ready_for_real": False,
                     "real_money_execution": False,
                 },
-                returns=_blend_candidate_returns([item[0] for item in inv_mdd_ranked], inv_mdd_weights),
+                returns=_blend_candidate_returns(
+                    [item[0] for item in inv_mdd_ranked], inv_mdd_weights
+                ),
             )
         )
     return out
@@ -1021,8 +1154,12 @@ def _cross_candidate_hybrid_candidates(
     )[:6]
     if len(ranked) < 2:
         return []
-    union_index = pd.DatetimeIndex(sorted(set().union(*(set(item[0].returns.index) for item in ranked))))
-    streams = [_stream_from_candidate(candidate, union_index=union_index) for candidate, _ in ranked]
+    union_index = pd.DatetimeIndex(
+        sorted(set().union(*(set(item[0].returns.index) for item in ranked)))
+    )
+    streams = [
+        _stream_from_candidate(candidate, union_index=union_index) for candidate, _ in ranked
+    ]
     split_windows = profile69._split_windows_for_hybrid(fold.windows().as_payload())
     with optuna_hybrid._split_window_context(split_windows):
         v35 = optuna_hybrid._run_optuna(
@@ -1443,7 +1580,9 @@ def _scale_candidate_row(
         "ready_for_paper": True,
         "ready_for_real": False,
         "real_money_execution": False,
-        "source_post_oos_research_variant": bool(source_row.get("post_oos_research_variant", False)),
+        "source_post_oos_research_variant": bool(
+            source_row.get("post_oos_research_variant", False)
+        ),
     }
 
 
@@ -1452,6 +1591,7 @@ def _clean_source_candidate(candidate: CandidateResult) -> bool:
     return bool(
         candidate.returns.size
         and _leaf_strategy_material_candidate(candidate)
+        and not _row_references_non_leaf_material(row)
         and not row.get("uses_locked_oos_for_selection")
         and not row.get("same_month_self_feeding")
         and not row.get("current_fold_oos_used_for_weighting")
@@ -1474,6 +1614,7 @@ def _clean_downstream_candidate(candidate: CandidateResult) -> bool:
     return bool(
         candidate.returns.size
         and _leaf_strategy_material_candidate(candidate)
+        and not _row_references_non_leaf_material(row)
         and not row.get("uses_locked_oos_for_selection")
         and not row.get("same_month_self_feeding")
         and not row.get("current_fold_oos_used_for_weighting")
@@ -1545,13 +1686,17 @@ def _mdd30_high_volatility_candidates(
 
     profile_growth = "profile_optuna:growth_mdd20_gross8_69_asset_profile_optuna"
     profile_aggressive = "profile_optuna:aggressive_mdd30_gross10_69_asset_profile_optuna"
-    relaxed_growth = "relaxed_efficiency:growth_mdd20_gross8_69_asset_relaxed_efficiency_repair_optuna"
+    relaxed_growth = (
+        "relaxed_efficiency:growth_mdd20_gross8_69_asset_relaxed_efficiency_repair_optuna"
+    )
     relaxed_aggressive = (
         "relaxed_efficiency:aggressive_mdd30_gross10_69_asset_relaxed_efficiency_repair_optuna"
     )
     strict_balanced = "strict_efficiency:balanced_mdd12_gross5_69_asset_efficiency_repair_optuna"
     strict_growth = "strict_efficiency:growth_mdd20_gross8_69_asset_efficiency_repair_optuna"
-    strict_aggressive = "strict_efficiency:aggressive_mdd30_gross10_69_asset_efficiency_repair_optuna"
+    strict_aggressive = (
+        "strict_efficiency:aggressive_mdd30_gross10_69_asset_efficiency_repair_optuna"
+    )
 
     fixed_scale_specs: tuple[tuple[str, str, float], ...] = (
         ("mdd30_risk_scaled:profile_growth_x1_50", profile_growth, 1.50),
@@ -1786,7 +1931,9 @@ def _mdd30_high_volatility_candidates(
             "ready_for_paper": True,
             "ready_for_real": False,
             "real_money_execution": False,
-            "selected_candidate_label": aggressive.candidate_label if breakout else defensive.candidate_label,
+            "selected_candidate_label": aggressive.candidate_label
+            if breakout
+            else defensive.candidate_label,
             "aggressive_candidate_label": aggressive.candidate_label,
             "fallback_candidate_label": defensive.candidate_label,
             "high_vol_breakout": breakout,
@@ -1803,7 +1950,9 @@ def _mdd30_high_volatility_candidates(
     return out
 
 
-def _bridge_utility(candidate: CandidateResult, fold: MonthlyFold, *, drawdown_penalty: float = 1.0) -> float:
+def _bridge_utility(
+    candidate: CandidateResult, fold: MonthlyFold, *, drawdown_penalty: float = 1.0
+) -> float:
     snap = _candidate_validation_snapshot(candidate, fold)
     return float(
         snap["validation_return"]
@@ -1845,7 +1994,9 @@ def _preferred_dynamic_expert(
     return max(dynamic, key=lambda item: _bridge_utility(item[0], fold, drawdown_penalty=1.0))
 
 
-def _softmax_weights(raw_scores: Mapping[str, float], *, learning_rate: float, cap: float) -> dict[str, float]:
+def _softmax_weights(
+    raw_scores: Mapping[str, float], *, learning_rate: float, cap: float
+) -> dict[str, float]:
     if not raw_scores:
         return {}
     values = np.asarray(list(raw_scores.values()), dtype=float)
@@ -1925,7 +2076,9 @@ def _hybrid_assimilated_dynamic_candidates(
     # v1: fixed manifest blend. Dynamic contributes, but cannot dominate.
     score_weights = _softmax_weights(
         {
-            candidate.candidate_label: max(0.0, _bridge_utility(candidate, fold, drawdown_penalty=1.0))
+            candidate.candidate_label: max(
+                0.0, _bridge_utility(candidate, fold, drawdown_penalty=1.0)
+            )
             for candidate, _ in non_dynamic_ranked[:5]
         },
         learning_rate=0.30,
@@ -1971,9 +2124,9 @@ def _hybrid_assimilated_dynamic_candidates(
     for candidate, _ in pool:
         history = list(prior_completed_utilities.get(candidate.candidate_label, ()))
         lagged = float(np.mean(history)) if history else 0.0
-        hedge_scores[candidate.candidate_label] = _bridge_utility(
-            candidate, fold, drawdown_penalty=1.0
-        ) + 0.75 * lagged
+        hedge_scores[candidate.candidate_label] = (
+            _bridge_utility(candidate, fold, drawdown_penalty=1.0) + 0.75 * lagged
+        )
     hedge_weights = _softmax_weights(hedge_scores, learning_rate=0.30, cap=0.30)
     # Keep an entropy floor from the manifest so the bridge stays diversified.
     if hedge_weights:
@@ -2030,7 +2183,9 @@ def _append_profile_family_candidates(
             family=family,
             label=f"{family}:static_guarded",
             row=static_row,
-            returns=_combine_profile_returns(profile_streams, dict(static_row.get("final_weights") or {})),
+            returns=_combine_profile_returns(
+                profile_streams, dict(static_row.get("final_weights") or {})
+            ),
         )
     )
     out.append(
@@ -2078,9 +2233,7 @@ def _append_profile_family_candidates(
     )
 
 
-def _individual_candidate_score(
-    stream: broad69.CandidateStream, spec: Mapping[str, Any]
-) -> float:
+def _individual_candidate_score(stream: broad69.CandidateStream, spec: Mapping[str, Any]) -> float:
     row = stream.row
     train = _safe_float(row.get("train_return"))
     validation = _safe_float(row.get("validation_return"))
@@ -2137,7 +2290,8 @@ def _allocatable_individual_streams(
         and _safe_float(stream.row.get("validation_return"))
         <= _safe_float(spec["max_validation_return"]) * 1.8
         and _safe_float(stream.row.get("validation_return"))
-        <= _safe_float(stream.row.get("train_return")) + _safe_float(spec["validation_spike_cap"]) * 2.5
+        <= _safe_float(stream.row.get("train_return"))
+        + _safe_float(spec["validation_spike_cap"]) * 2.5
         and _safe_float(stream.row.get("validation_mdd"))
         <= _safe_float(spec["max_validation_mdd"]) * 1.35
         and _safe_float(stream.row.get("train_mdd")) <= _safe_float(spec["max_train_mdd"]) * 1.35
@@ -2161,7 +2315,9 @@ def _individual_profile_reasons(row: Mapping[str, Any], spec: Mapping[str, Any])
     if int(row.get("selected_sleeve_count") or 0) < int(spec["min_sleeves"]):
         reasons.append("selected_sleeves_below_core_target")
     concentration = dict(row.get("concentration") or {})
-    if _safe_float(concentration.get("top_symbol_share")) > _safe_float(spec["top_symbol_share_cap"]):
+    if _safe_float(concentration.get("top_symbol_share")) > _safe_float(
+        spec["top_symbol_share_cap"]
+    ):
         reasons.append("top_symbol_share_above_cap")
     if _safe_float(concentration.get("top_asset_group_share")) > _safe_float(
         spec["top_asset_group_share_cap"]
@@ -2266,12 +2422,17 @@ def _individual_portfolio_guard_score(row: Mapping[str, Any]) -> float:
     reasons = _individual_portfolio_reasons(row)
     penalty = 18.0 * len(reasons)
     penalty += max(0.0, validation - validation_cap) * 35.0
-    penalty += max(
-        0.0,
-        validation - train - _safe_float(INDIVIDUAL_PORTFOLIO_GUARD["validation_spike_cap"]),
-    ) * 20.0
+    penalty += (
+        max(
+            0.0,
+            validation - train - _safe_float(INDIVIDUAL_PORTFOLIO_GUARD["validation_spike_cap"]),
+        )
+        * 20.0
+    )
     penalty += max(0.0, train - _safe_float(INDIVIDUAL_PORTFOLIO_GUARD["max_train_return"])) * 6.0
-    penalty += max(0.0, val_mdd - _safe_float(INDIVIDUAL_PORTFOLIO_GUARD["max_validation_mdd"])) * 20.0
+    penalty += (
+        max(0.0, val_mdd - _safe_float(INDIVIDUAL_PORTFOLIO_GUARD["max_validation_mdd"])) * 20.0
+    )
     penalty += max(0.0, train_mdd - _safe_float(INDIVIDUAL_PORTFOLIO_GUARD["max_train_mdd"])) * 8.0
     return float(
         8.0 * stable_validation
@@ -2362,23 +2523,28 @@ def tune_individual_robust_profile(
         penalty += max(0.0, _safe_float(spec["min_validation_return"]) - validation) * 30.0
         penalty += max(0.0, _safe_float(spec["min_train_return"]) - train) * 10.0
         penalty += max(0.0, validation - validation_cap) * 36.0
-        penalty += max(
-            0.0, spike - _safe_float(spec["validation_spike_cap"]) * 1.5
-        ) * 16.0
+        penalty += max(0.0, spike - _safe_float(spec["validation_spike_cap"]) * 1.5) * 16.0
         penalty += max(0.0, val_mdd - _safe_float(spec["max_validation_mdd"])) * 26.0
         penalty += max(0.0, train_mdd - _safe_float(spec["max_train_mdd"])) * 6.0
         penalty += max(0.0, 10.0 - train_rpt) / 4.0
         penalty += max(0.0, 10.0 - val_rpt) / 3.0
         penalty += max(0, int(spec["min_sleeves"]) - active_count) / 2.0
-        penalty += max(
-            0.0,
-            _safe_float(conc.get("top_symbol_share")) - _safe_float(spec["top_symbol_share_cap"]),
-        ) * 6.0
-        penalty += max(
-            0.0,
-            _safe_float(conc.get("top_asset_group_share"))
-            - _safe_float(spec["top_asset_group_share_cap"]),
-        ) * 3.0
+        penalty += (
+            max(
+                0.0,
+                _safe_float(conc.get("top_symbol_share"))
+                - _safe_float(spec["top_symbol_share_cap"]),
+            )
+            * 6.0
+        )
+        penalty += (
+            max(
+                0.0,
+                _safe_float(conc.get("top_asset_group_share"))
+                - _safe_float(spec["top_asset_group_share_cap"]),
+            )
+            * 3.0
+        )
         penalty += spike * 5.0
         metrics["concentration"] = conc
         for split in grid_hybrid.ilp.SPLIT_ORDER:
@@ -2566,7 +2732,9 @@ def _run_individual_robust_family(
         _apply_individual_portfolio_guard(row)
     v35.row.update(_apply_individual_portfolio_guard(dict(v35.row)))
     v36.row.update(_apply_individual_portfolio_guard(dict(v36.row)))
-    selected_optuna = max([v35, v36], key=lambda result: _individual_portfolio_guard_score(result.row))
+    selected_optuna = max(
+        [v35, v36], key=lambda result: _individual_portfolio_guard_score(result.row)
+    )
 
     legal_pool = [dict(static_guarded), *profile_rows, dict(v35.row), dict(v36.row)]
     legal_pass = [row for row in legal_pool if not row.get("selection_reasons")]
@@ -2598,7 +2766,9 @@ def _mark_asset_timeframe_leverage_row(row: dict[str, Any]) -> dict[str, Any]:
     row["leverage_tuning_policy"] = (
         "train_validation_only_source_integer_leverage_plus_post_allocation_multiplier"
     )
-    row["candidate_tier"] = row.get("candidate_tier") or "clean_train_validation_selected_paper_shadow"
+    row["candidate_tier"] = (
+        row.get("candidate_tier") or "clean_train_validation_selected_paper_shadow"
+    )
     row["ready_for_real"] = False
     row["real_money_execution"] = False
     row["real_execution_allowed"] = False
@@ -2678,9 +2848,15 @@ def _run_asset_timeframe_leverage_family(
     )
     for row in profile_rows:
         _apply_individual_portfolio_guard(row)
-    v35.row.update(_mark_asset_timeframe_leverage_row(_apply_individual_portfolio_guard(dict(v35.row))))
-    v36.row.update(_mark_asset_timeframe_leverage_row(_apply_individual_portfolio_guard(dict(v36.row))))
-    selected_optuna = max([v35, v36], key=lambda result: _individual_portfolio_guard_score(result.row))
+    v35.row.update(
+        _mark_asset_timeframe_leverage_row(_apply_individual_portfolio_guard(dict(v35.row)))
+    )
+    v36.row.update(
+        _mark_asset_timeframe_leverage_row(_apply_individual_portfolio_guard(dict(v36.row)))
+    )
+    selected_optuna = max(
+        [v35, v36], key=lambda result: _individual_portfolio_guard_score(result.row)
+    )
 
     legal_pool = [dict(static_guarded), *profile_rows, dict(v35.row), dict(v36.row)]
     legal_pass = [row for row in legal_pool if not row.get("selection_reasons")]
@@ -2796,7 +2972,9 @@ def _run_source_profile_family(
         selected_optuna = optuna_hybrid._choose_selected_optuna_result([v35, v36])
     legal_pool = [dict(static_guarded), *profile_rows, dict(v35.row), dict(v36.row)]
     legal_pass = [row for row in legal_pool if not row.get("selection_reasons")]
-    selected_legal = max(legal_pass or legal_pool, key=lambda row: grid_hybrid._train_validation_score(row))
+    selected_legal = max(
+        legal_pass or legal_pool, key=lambda row: grid_hybrid._train_validation_score(row)
+    )
 
     source_payload = {
         "artifact_kind": "alpha_zoo_69_asset_profile_optuna_hybrid_refit_monthly_fold_source",
@@ -2878,12 +3056,14 @@ def _run_efficiency_family(
             if not candidate_streams:
                 continue
             try:
-                profile_stream, profile_row, selected = relaxed_eff.tune_relaxed_profile_allocations(
-                    spec=spec,
-                    candidate_streams=candidate_streams,
-                    windows=windows,
-                    n_trials=int(profile_trials),
-                    seed=int(seed) + idx * 10_000,
+                profile_stream, profile_row, selected = (
+                    relaxed_eff.tune_relaxed_profile_allocations(
+                        spec=spec,
+                        candidate_streams=candidate_streams,
+                        windows=windows,
+                        n_trials=int(profile_trials),
+                        seed=int(seed) + idx * 10_000,
+                    )
                 )
             except ValueError:
                 continue
@@ -2898,12 +3078,14 @@ def _run_efficiency_family(
             if not candidate_streams:
                 continue
             try:
-                profile_stream, profile_row, selected = strict_eff.tune_efficiency_profile_allocations(
-                    spec=spec,
-                    candidate_streams=candidate_streams,
-                    windows=windows,
-                    n_trials=int(profile_trials),
-                    seed=int(seed) + idx * 10_000,
+                profile_stream, profile_row, selected = (
+                    strict_eff.tune_efficiency_profile_allocations(
+                        spec=spec,
+                        candidate_streams=candidate_streams,
+                        windows=windows,
+                        n_trials=int(profile_trials),
+                        seed=int(seed) + idx * 10_000,
+                    )
                 )
             except ValueError:
                 continue
@@ -2978,7 +3160,9 @@ def _run_efficiency_family(
 
     if relaxed:
         selected_legal = relaxed_eff._select_legal([*profile_rows, *hybrid_rows])
-        selected_optuna = max([v35, v36], key=lambda result: relaxed_eff._relaxed_hybrid_objective_score(result.row))
+        selected_optuna = max(
+            [v35, v36], key=lambda result: relaxed_eff._relaxed_hybrid_objective_score(result.row)
+        )
         selected_optuna_row = dict(selected_optuna.row)
         selected_optuna_row.update(
             strict_eff._stress_metrics(
@@ -3138,7 +3322,9 @@ def _aggregate_rows(fold_rows: Sequence[Mapping[str, Any]]) -> list[dict[str, An
         monthly_equity_mdd = 0.0
         if monthly_equity.size:
             running_peak = np.maximum.accumulate(monthly_equity)
-            monthly_equity_mdd = float(np.max(1.0 - monthly_equity / np.maximum(running_peak, 1e-12)))
+            monthly_equity_mdd = float(
+                np.max(1.0 - monthly_equity / np.maximum(running_peak, 1e-12))
+            )
         centered = oos_array - float(np.mean(oos_array)) if oos_array.size else oos_array
         population_std = float(np.std(oos_array, ddof=0)) if oos_array.size else 0.0
         monthly_skew = (
@@ -3168,7 +3354,8 @@ def _aggregate_rows(fold_rows: Sequence[Mapping[str, Any]]) -> list[dict[str, An
         )
         clean_candidate = all(bool(row.get("clean_promotion_eligible", True)) for row in rows)
         beats_challenger = (
-            compounded > CURRENT_CHALLENGER_OOS_COMP and max(oos_mdds, default=0.0) <= CURRENT_CHALLENGER_MAX_OOS_MDD
+            compounded > CURRENT_CHALLENGER_OOS_COMP
+            and max(oos_mdds, default=0.0) <= CURRENT_CHALLENGER_MAX_OOS_MDD
         )
         material_risk_improvement = (
             compounded >= CURRENT_CHALLENGER_OOS_COMP * 0.85
@@ -3247,9 +3434,7 @@ def _aggregate_rows(fold_rows: Sequence[Mapping[str, Any]]) -> list[dict[str, An
                 "monthly_var_05": var_05,
                 "monthly_quantile_95": q95,
                 "monthly_cvar_25": cvar_25,
-                "tail_ratio_95_05": (
-                    float(q95 / abs(var_05)) if abs(var_05) > 0.0 else 0.0
-                ),
+                "tail_ratio_95_05": (float(q95 / abs(var_05)) if abs(var_05) > 0.0 else 0.0),
                 "monthly_skew": monthly_skew,
                 "monthly_excess_kurtosis": monthly_excess_kurtosis,
                 "avg_gain": float(np.mean(positive)) if positive.size else 0.0,
@@ -3273,9 +3458,7 @@ def _aggregate_rows(fold_rows: Sequence[Mapping[str, Any]]) -> list[dict[str, An
                     float(compounded / max(oos_mdds)) if oos_mdds and max(oos_mdds) > 0.0 else 0.0
                 ),
                 "annualized_return_to_monthly_equity_mdd": (
-                    float(annualized_comp / monthly_equity_mdd)
-                    if monthly_equity_mdd > 0.0
-                    else 0.0
+                    float(annualized_comp / monthly_equity_mdd) if monthly_equity_mdd > 0.0 else 0.0
                 ),
                 "max_loss_streak": int(max_loss_streak),
                 "ready_for_paper_folds": sum(bool(row.get("ready_for_paper")) for row in rows),
@@ -3341,11 +3524,7 @@ def _refresh_payload_derived_reports(payload: dict[str, Any]) -> None:
     payload["promotability"] = (
         _promotability_decision(clean[0])
         if clean
-        else (
-            _promotability_decision(aggregate[0])
-            if aggregate
-            else _promotability_decision({})
-        )
+        else (_promotability_decision(aggregate[0]) if aggregate else _promotability_decision({}))
     )
 
 
@@ -3426,8 +3605,12 @@ def _recompute_payload_from_existing(
             "fresh_optuna_rerun": False,
             "generated_at_utc": _utc_now_iso(),
             "output_paths": {
-                "json": str(output_json.expanduser().resolve()) if output_json is not None else None,
-                "markdown": str(output_md.expanduser().resolve()) if output_md is not None else None,
+                "json": str(output_json.expanduser().resolve())
+                if output_json is not None
+                else None,
+                "markdown": str(output_md.expanduser().resolve())
+                if output_md is not None
+                else None,
             },
             "interpretation": (
                 "governance/ranking repair only; not a fresh no-nested Optuna search"
@@ -3443,9 +3626,9 @@ def _fmt_pct(value: Any) -> str:
 
 def _render_markdown(payload: Mapping[str, Any]) -> str:
     aggregates = list(payload.get("aggregate_rankings") or [])
-    clean_rankings = list(payload.get("clean_promotion_rankings") or []) or _clean_promotion_rankings(
-        aggregates
-    )
+    clean_rankings = list(
+        payload.get("clean_promotion_rankings") or []
+    ) or _clean_promotion_rankings(aggregates)
     demoted_rankings = list(
         payload.get("demoted_nested_or_historical_rankings") or []
     ) or _demoted_nested_or_historical_rankings(aggregates)
@@ -3618,19 +3801,25 @@ def _checkpoint_due(fold_idx: int, fold_count: int, interval: int) -> bool:
 
 
 def run_walkforward(args: argparse.Namespace) -> dict[str, Any]:
-    symbols = tuple(str(item).strip().upper() for item in str(args.symbols).split(",") if item.strip())
+    symbols = tuple(
+        str(item).strip().upper() for item in str(args.symbols).split(",") if item.strip()
+    )
     timeframes = _validate_timeframes_30m_to_1d(
         str(item).strip() for item in str(args.timeframes).split(",") if item.strip()
     )
     slippage_bps = float(args.slippage_bps)
-    if not math.isclose(slippage_bps, broad69.PRIMARY_ROUND_TRIP_COST_BPS, rel_tol=0.0, abs_tol=1e-9):
+    if not math.isclose(
+        slippage_bps, broad69.PRIMARY_ROUND_TRIP_COST_BPS, rel_tol=0.0, abs_tol=1e-9
+    ):
         raise ValueError(
             f"this runner is pinned to {broad69.PRIMARY_ROUND_TRIP_COST_BPS:g} bps; "
             f"got --slippage-bps={slippage_bps:g}"
         )
     bridge_manifest = _load_bridge_protocol_manifest(Path(args.bridge_protocol_manifest))
     data_root = Path(args.data_root).expanduser().resolve()
-    print(f"[load] symbols={len(symbols)} timeframes={timeframes} data_root={data_root}", flush=True)
+    print(
+        f"[load] symbols={len(symbols)} timeframes={timeframes} data_root={data_root}", flush=True
+    )
     bars, coverage = broad69.load_all_bars(symbols, data_root=data_root, timeframes=timeframes)
     timeframe_coverage = _timeframe_coverage_summary(coverage)
     latest_data = _coerce_ts(coverage["global_latest_utc"])
@@ -3682,7 +3871,11 @@ def run_walkforward(args: argparse.Namespace) -> dict[str, Any]:
         "protocol_freeze_report": _protocol_freeze_report(bridge_manifest),
         "online_weight_audit": _online_weight_audit([]),
         "dynamic_self_feed_audit": _dynamic_self_feed_audit([]),
-        "metric_reconciliation": {"metrics_reconciled": True, "mismatches": [], "candidate_count": 0},
+        "metric_reconciliation": {
+            "metrics_reconciled": True,
+            "mismatches": [],
+            "candidate_count": 0,
+        },
         "promotability": _promotability_decision({}),
         "trial_policy": {
             "asset_trials": int(args.asset_trials),
@@ -3890,7 +4083,9 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--first-oos-start", default=DEFAULT_FIRST_OOS_START)
     parser.add_argument("--bar-minutes", type=int, default=30)
     parser.add_argument("--max-folds", type=int, default=None)
-    parser.add_argument("--allocation-fraction", type=float, default=profile69.DEFAULT_ALLOCATION_FRACTION)
+    parser.add_argument(
+        "--allocation-fraction", type=float, default=profile69.DEFAULT_ALLOCATION_FRACTION
+    )
     parser.add_argument("--asset-trials", type=int, default=DEFAULT_ASSET_TRIALS)
     parser.add_argument("--profile-trials", type=int, default=DEFAULT_PROFILE_TRIALS)
     parser.add_argument("--hybrid-trials", type=int, default=DEFAULT_HYBRID_TRIALS)

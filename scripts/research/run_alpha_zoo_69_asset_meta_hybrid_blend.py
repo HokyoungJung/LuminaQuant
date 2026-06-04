@@ -167,7 +167,9 @@ def _dynamic_return_sleeve(
         "avg_active_signal_count": float(np.mean(active_signal_count))
         if active_signal_count.size
         else 0.0,
-        "max_active_signal_count": int(np.max(active_signal_count)) if active_signal_count.size else 0,
+        "max_active_signal_count": int(np.max(active_signal_count))
+        if active_signal_count.size
+        else 0,
         "selection_log_tail": selection_log[-20:],
     }
     sleeve = SleeveReturn(
@@ -186,7 +188,9 @@ def _dynamic_return_sleeve(
     return sleeve, activity
 
 
-def _selection_surface_from_artifact(label: str, payload: Mapping[str, Any], path: Path) -> tuple[str, bool, tuple[str, ...]]:
+def _selection_surface_from_artifact(
+    label: str, payload: Mapping[str, Any], path: Path
+) -> tuple[str, bool, tuple[str, ...]]:
     raw = json.dumps(
         {
             "label": label,
@@ -239,14 +243,18 @@ def build_core_sleeve_from_artifact(
         artifact_path=str(artifact_path),
         profile_id=profile_id,
         returns=profile_returns[profile_id].sort_index(),
-        gross_notional_fraction=_safe_float(dict(context.get("profile_gross") or {}).get(profile_id)),
+        gross_notional_fraction=_safe_float(
+            dict(context.get("profile_gross") or {}).get(profile_id)
+        ),
         selection_surface=surface,
         deployable_without_refit=deployable,
         notes=notes,
     )
 
 
-def blend_return_series(dynamic_returns: pd.Series, core_returns: pd.Series, dynamic_weight: float) -> pd.Series:
+def blend_return_series(
+    dynamic_returns: pd.Series, core_returns: pd.Series, dynamic_weight: float
+) -> pd.Series:
     weight = float(dynamic_weight)
     if weight < -1e-12 or weight > 1.0 + 1e-12:
         raise ValueError("dynamic_weight must be between 0 and 1")
@@ -340,7 +348,9 @@ def _candidate_payload(
     summary = dict(evaluation.get("walkforward_summary") or {})
     clean = dict(evaluation.get("clean_metrics") or {})
     clean_oos = dict(clean.get("locked_oos") or {})
-    blend_deployable = bool(dynamic_sleeve.deployable_without_refit and core_sleeve.deployable_without_refit)
+    blend_deployable = bool(
+        dynamic_sleeve.deployable_without_refit and core_sleeve.deployable_without_refit
+    )
     blockers: list[str] = []
     if not blend_deployable:
         blockers.append("one_or_more_sleeves_selected_with_oos_or_diagnostic_surface")
@@ -517,7 +527,8 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
         **search,
         "recommended_shadow_candidate": best_positive or best,
         "recommended_deployable_candidate": best_deployable or None,
-        "ready_for_paper": bool(best_deployable) and not list(best_deployable.get("promotion_blockers") or []),
+        "ready_for_paper": bool(best_deployable)
+        and not list(best_deployable.get("promotion_blockers") or []),
         "ready_for_real": False,
         "real_execution_allowed": False,
         "runner_peak_rss_mib": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0,

@@ -162,7 +162,11 @@ def select_source_profile(
     if not candidates:
         raise ValueError("source artifact has no selected_sleeve_rows to salvage")
     _, selected_profile_id = max(candidates, key=lambda item: item[0])
-    return selected_profile_id, grouped[selected_profile_id], dict(profile_rows.get(selected_profile_id) or {})
+    return (
+        selected_profile_id,
+        grouped[selected_profile_id],
+        dict(profile_rows.get(selected_profile_id) or {}),
+    )
 
 
 def build_asset_inclusion_manifest(

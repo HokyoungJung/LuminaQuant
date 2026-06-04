@@ -800,3 +800,35 @@ def test_candidate_hybrid_inherits_invalid_source_metadata_gate() -> None:
         }
     ]
     assert "live_source_candidate_metadata" in row["rejection_reasons"]
+
+
+def test_candidate_hybrid_source_gate_rejects_nested_and_fixed_month_sources() -> None:
+    refresh_payload = {
+        "ohlcv_results": [
+            {"symbol": "BTC/USDT", "after_ohlcv_max_utc": "2026-05-10T23:59:30Z"},
+            {"symbol": "ETH/USDT", "after_ohlcv_max_utc": "2026-05-10T23:59:30Z"},
+        ]
+    }
+    candidate_hybrid_payload = _candidate_hybrid_payload_with_dynamic_replay()
+    candidate_hybrid_payload["source_sleeve_metrics"]["b"]["family"] = "meta_portfolio"
+    candidate_hybrid_payload["source_sleeve_metrics"]["c"]["name"] = "fixed_month_alpha_proxy"
+
+    payload = MODULE.build_final_selection_payload(
+        refresh_payload=refresh_payload,
+        candidate_portfolio_payload={},
+        liquidation_payload=_liquidation_payload(),
+        candidate_hybrid_payload=candidate_hybrid_payload,
+        legacy_hybrid_payload={},
+        source_artifacts={"candidate_hybrid_json": "candidate_hybrid.json"},
+        time_logs=[],
+        required_symbols=["BTC/USDT", "ETH/USDT"],
+    )
+
+    row = next(row for row in payload["rows"] if row["name"] == "candidate_hybrid_dynamic_replay")
+    assert row["decision_gates"]["live_source_candidate_metadata"] is False
+    assert row["decision_gates"]["deployable_candidate"] is False
+    assert row["source_candidate_gate_failures"] == [
+        {"source_id": "b", "reasons": ["nested_hybrid_or_same_family_source_invalid"]},
+        {"source_id": "c", "reasons": ["calendar_primary_source_invalid"]},
+    ]
+    assert "live_source_candidate_metadata" in row["rejection_reasons"]

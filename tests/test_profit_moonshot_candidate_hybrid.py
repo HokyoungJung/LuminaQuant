@@ -96,7 +96,7 @@ def test_candidate_hybrid_live_source_gate_discards_untraceable_or_invalid_rows(
     assert reasons["liquidation_unsafe"] == ["liquidation_source_unsafe"]
 
 
-def test_candidate_hybrid_rejects_nested_hybrid_sources_only() -> None:
+def test_candidate_hybrid_rejects_nested_portfolio_sources_only() -> None:
     rows = [
         {
             "name": "atomic_state_signal",
@@ -128,6 +128,19 @@ def test_candidate_hybrid_rejects_nested_hybrid_sources_only() -> None:
             },
         },
         {
+            "name": "stateful_monthly_return_budget",
+            "leverage": 3.0,
+            "strategy_validity": {"pass": True, "primary_signal_type": "state_signal"},
+            "research_history_refs": ["strategy_chronology:stateful_monthly_return_budget"],
+            "source_search_ledger_refs": ["local_artifact:stateful_monthly_return_budget"],
+            "sleeves": ["fresh_pair_monthly_return_budget_state_signal"],
+            "splits": {
+                "train": {"liquidation_count": 0, "minimum_margin_buffer": 1.0},
+                "validation": {"liquidation_count": 0, "minimum_margin_buffer": 1.0},
+                "oos": {"liquidation_count": 0, "minimum_margin_buffer": 1.0},
+            },
+        },
+        {
             "name": "nested_hybrid_online_allocator",
             "leverage": 3.0,
             "strategy_validity": {"pass": True, "primary_signal_type": "state_signal"},
@@ -140,13 +153,32 @@ def test_candidate_hybrid_rejects_nested_hybrid_sources_only() -> None:
                 "oos": {"liquidation_count": 0, "minimum_margin_buffer": 1.0},
             },
         },
+        {
+            "name": "selector_disguised_as_source",
+            "leverage": 3.0,
+            "strategy_validity": {"pass": True, "primary_signal_type": "state_signal"},
+            "research_history_refs": ["strategy_chronology:selector_disguised_as_source"],
+            "source_search_ledger_refs": ["local_artifact:selector_disguised_as_source"],
+            "final_weights": {"validation_selector:top_clean": 1.0},
+            "splits": {
+                "train": {"liquidation_count": 0, "minimum_margin_buffer": 1.0},
+                "validation": {"liquidation_count": 0, "minimum_margin_buffer": 1.0},
+                "oos": {"liquidation_count": 0, "minimum_margin_buffer": 1.0},
+            },
+        },
     ]
 
     accepted, discarded = MODULE._partition_live_source_candidate_rows(rows)
 
     assert [row["name"] for row in accepted] == [
         "atomic_state_signal",
-        "portfolio_allocator_static_blend_plain",
+        "stateful_monthly_return_budget",
     ]
-    assert [row["name"] for row in discarded] == ["nested_hybrid_online_allocator"]
-    assert discarded[0]["reasons"] == ["nested_hybrid_or_same_family_source_invalid"]
+    assert [row["name"] for row in discarded] == [
+        "portfolio_allocator_static_blend_plain",
+        "nested_hybrid_online_allocator",
+        "selector_disguised_as_source",
+    ]
+    assert {row["reasons"][0] for row in discarded} == {
+        "nested_hybrid_or_same_family_source_invalid"
+    }

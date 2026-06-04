@@ -104,7 +104,9 @@ def _coerce_windows(args: argparse.Namespace) -> GateWindows:
     )
 
 
-def _split_mask(index: pd.DatetimeIndex | pd.Series, window: tuple[pd.Timestamp, pd.Timestamp]) -> np.ndarray:
+def _split_mask(
+    index: pd.DatetimeIndex | pd.Series, window: tuple[pd.Timestamp, pd.Timestamp]
+) -> np.ndarray:
     values = pd.Series(index) if not isinstance(index, pd.Series) else index
     values = pd.to_datetime(values)
     return ((values >= window[0]) & (values <= window[1])).to_numpy()
@@ -190,9 +192,7 @@ def _split_metrics(
             if turnover > 0.0
             else None,
             "liquidation_count": int(liquidation_by_split.get(split, 0)),
-            "account_wipeout_bar_count": int(
-                ((equity <= 0.0).to_numpy(dtype=bool) & mask).sum()
-            ),
+            "account_wipeout_bar_count": int(((equity <= 0.0).to_numpy(dtype=bool) & mask).sum()),
         }
     return out
 
@@ -267,9 +267,7 @@ def _hybrid_rows(payload: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
     return rows
 
 
-def _build_profile_context(
-    payload: Mapping[str, Any], windows: GateWindows
-) -> dict[str, Any]:
+def _build_profile_context(payload: Mapping[str, Any], windows: GateWindows) -> dict[str, Any]:
     symbols = tuple(payload["universe"]["symbols"])
     timeframes = tuple(payload["timeframes"])
     data_root = Path(payload["data_coverage"]["data_root"])
@@ -286,7 +284,9 @@ def _build_profile_context(
     profile_events: dict[str, dict[str, int]] = {}
     profile_liquidation: dict[str, dict[str, int]] = {}
     profile_gross: dict[str, float] = {}
-    sleeve_streams: dict[str, list[tuple[dict[str, Any], broad69.CandidateStream]]] = defaultdict(list)
+    sleeve_streams: dict[str, list[tuple[dict[str, Any], broad69.CandidateStream]]] = defaultdict(
+        list
+    )
     for raw in payload.get("selected_sleeve_rows") or []:
         row = dict(raw)
         params = dict(row.get("optuna_params") or {})
@@ -314,7 +314,9 @@ def _build_profile_context(
         sleeve_streams[str(row["profile_id"])].append((row, stream))
 
     for profile_id, items in sleeve_streams.items():
-        index = pd.DatetimeIndex(sorted(set().union(*(set(stream.returns.index) for _, stream in items))))
+        index = pd.DatetimeIndex(
+            sorted(set().union(*(set(stream.returns.index) for _, stream in items)))
+        )
         returns = pd.Series(0.0, index=index)
         turnover = dict.fromkeys(SPLIT_NAMES, 0.0)
         events = dict.fromkeys(SPLIT_NAMES, 0)
@@ -334,7 +336,9 @@ def _build_profile_context(
                 event_count = _stream_events_in_mask(stream.position, mask)
                 events[split] += event_count
                 turnover[split] += event_count * abs(notional) * multiplier
-                liquidation[split] += int(liq_flags.to_numpy(dtype=bool)[mask].sum()) if mask.any() else 0
+                liquidation[split] += (
+                    int(liq_flags.to_numpy(dtype=bool)[mask].sum()) if mask.any() else 0
+                )
         profile_returns[profile_id] = returns.sort_index()
         profile_turnover[profile_id] = turnover
         profile_events[profile_id] = events
@@ -354,7 +358,9 @@ def _evaluate_weights(
     context: Mapping[str, Any], weights: Mapping[str, float], windows: GateWindows
 ) -> dict[str, Any]:
     profile_returns: Mapping[str, pd.Series] = context["profile_returns"]
-    index = pd.DatetimeIndex(sorted(set().union(*(set(series.index) for series in profile_returns.values()))))
+    index = pd.DatetimeIndex(
+        sorted(set().union(*(set(series.index) for series in profile_returns.values())))
+    )
     returns = pd.Series(0.0, index=index)
     turnover = dict.fromkeys(SPLIT_NAMES, 0.0)
     events = dict.fromkeys(SPLIT_NAMES, 0)
@@ -419,7 +425,9 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     selected = dict(payload.get("selected_optuna_hybrid_profile") or {})
     selected_eval = rows.get("selected_optuna_hybrid_profile", {})
     selected_weights = dict(selected_eval.get("weight_sets") or {})
-    primary_gate = dict(selected_weights.get("final_weights") or selected_weights.get("weights") or {})
+    primary_gate = dict(
+        selected_weights.get("final_weights") or selected_weights.get("weights") or {}
+    )
     primary_reasons = list(primary_gate.get("locked_oos_gate_reasons") or [])
     primary_pass = bool(primary_gate.get("locked_oos_gate_pass"))
     return {
@@ -445,7 +453,9 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
         "data_coverage": context["coverage"],
         "selected_profile_id": selected.get("profile_id"),
         "selected_hybrid_version": selected.get("hybrid_version"),
-        "selected_primary_weight_set": "final_weights" if "final_weights" in selected_weights else "weights",
+        "selected_primary_weight_set": "final_weights"
+        if "final_weights" in selected_weights
+        else "weights",
         "clean_oos_gate_pass": primary_pass,
         "clean_oos_gate_reasons": primary_reasons,
         "ready_for_paper_after_clean_oos_gate": primary_pass,

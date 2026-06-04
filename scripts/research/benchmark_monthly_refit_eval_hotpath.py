@@ -75,7 +75,10 @@ def _make_workload(
         series.append(pd.Series(values, index=index, dtype=float))
     windows = (
         (index[0], index[min(len(index) - 1, int(bars * 0.35))]),
-        (index[min(len(index) - 1, int(bars * 0.35) + 1)], index[min(len(index) - 1, int(bars * 0.55))]),
+        (
+            index[min(len(index) - 1, int(bars * 0.35) + 1)],
+            index[min(len(index) - 1, int(bars * 0.55))],
+        ),
         (index[min(len(index) - 1, int(bars * 0.55) + 1)], index[-1]),
     )
     return series, windows
@@ -118,8 +121,12 @@ def main() -> None:
             legacy = _legacy_period_metrics(returns, window)
             optimized = runner._period_metrics(returns, window)
             for field in ("bar_count", "total_return", "mdd", "sharpe", "sortino", "calmar"):
-                if not math.isclose(float(legacy[field]), float(optimized[field]), rel_tol=1e-12, abs_tol=1e-12):
-                    raise SystemExit(f"metric mismatch field={field}: legacy={legacy[field]} optimized={optimized[field]}")
+                if not math.isclose(
+                    float(legacy[field]), float(optimized[field]), rel_tol=1e-12, abs_tol=1e-12
+                ):
+                    raise SystemExit(
+                        f"metric mismatch field={field}: legacy={legacy[field]} optimized={optimized[field]}"
+                    )
 
     runner._clear_period_metric_caches()
     legacy_elapsed, legacy_checksum = _run_metrics_loop(

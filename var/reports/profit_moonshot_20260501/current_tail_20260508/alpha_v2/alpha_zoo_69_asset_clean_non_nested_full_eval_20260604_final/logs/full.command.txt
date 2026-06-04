@@ -1,0 +1,10 @@
+uv run --extra optimize python scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py \
+  --data-root /home/hoky/Quants-agent/LuminaQuant/data/market_parquet/exchange=binance \
+  --bridge-protocol-manifest /home/hoky/Quants-agent/LuminaQuant/.omx/plans/bridge-protocol-manifest-oos-oracle-hybrid-v1-20260602.json \
+  --timeframes 30m,1h,2h,4h,6h,8h,12h,1d \
+  --slippage-bps 10 \
+  --families individual_robust,asset_timeframe_leverage,strict_efficiency,relaxed_efficiency \
+  --checkpoint-interval 1 \
+  --checkpoint-markdown-interval 0 \
+  --output-json var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_clean_non_nested_full_eval_20260604_final/clean_non_nested_monthly_refit_full_20260604_final.json \
+  --output-md var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_clean_non_nested_full_eval_20260604_final/clean_non_nested_monthly_refit_full_20260604_final.md

@@ -65,6 +65,37 @@ PY
 > updates. A full 2025-to-current refresh for all 69 symbols should be scheduled as a
 > staged data job under the 8GB memory budget, not as an incidental docs/code change.
 
+TradFi support can expand after the static 69-symbol snapshot. The 1m collector now
+defaults to `--universe-source static-plus-fapi-tradfi`, which keeps the frozen 69
+symbols and appends any currently trading Binance USD-M `TRADIFI_PERPETUAL`/USDT
+contracts discovered from `/fapi/v1/exchangeInfo`. Use this as the periodic TradFi
+watchlist/backfill job; pass `--universe-source static` only when a strictly frozen
+reproducibility run is required.
+
+```bash
+uv run python scripts/collect_binance_1m_research_universe.py \
+  --source data-vision \
+  --universe-source static-plus-fapi-tradfi \
+  --db-path data/market_parquet \
+  --exchange binance \
+  --since 2025-01-01T00:00:00Z \
+  --workers 4 \
+  --global-request-interval-sec 1.0
+```
+
+For a current-tail refresh of newly listed TradFi contracts that are not yet fully
+mirrored on data.binance.vision, use the same dynamic universe with the FAPI tail:
+
+```bash
+uv run python scripts/collect_binance_1m_research_universe.py \
+  --source fapi \
+  --universe-source static-plus-fapi-tradfi \
+  --db-path data/market_parquet \
+  --exchange binance \
+  --workers 2 \
+  --global-request-interval-sec 1.0
+```
+
 Compact WAL into bounded monthly parquet files:
 
 ```bash

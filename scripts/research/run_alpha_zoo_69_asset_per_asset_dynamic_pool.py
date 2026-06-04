@@ -186,10 +186,14 @@ def row_fit_score(row: Mapping[str, Any]) -> float:
 def _candidate_pool_policy(
     *, source: Mapping[str, Any], stream_rows: Sequence[Mapping[str, Any]]
 ) -> dict[str, Any]:
-    universe_symbols = tuple(str(symbol) for symbol in dict(source.get("universe") or {}).get("symbols") or ())
+    universe_symbols = tuple(
+        str(symbol) for symbol in dict(source.get("universe") or {}).get("symbols") or ()
+    )
     stream_symbols = sorted({str(row.get("symbol")) for row in stream_rows})
     train_eligibility = dict(source.get("train_eligibility") or {})
-    train_ineligible = tuple(str(symbol) for symbol in train_eligibility.get("train_ineligible_symbols") or ())
+    train_ineligible = tuple(
+        str(symbol) for symbol in train_eligibility.get("train_ineligible_symbols") or ()
+    )
     return {
         "candidate_pool_symbol_count": len(universe_symbols),
         "candidate_pool_symbols": list(universe_symbols),
@@ -209,13 +213,22 @@ def _candidate_pool_policy(
 
 def build_dynamic_context(source_artifact: Path, windows: clean_gate.GateWindows) -> DynamicContext:
     source = json.loads(source_artifact.read_text(encoding="utf-8"))
-    raw_rows = [dict(row) for row in source.get("asset_tuning_rows") or source.get("selected_sleeve_rows") or []]
+    raw_rows = [
+        dict(row)
+        for row in source.get("asset_tuning_rows") or source.get("selected_sleeve_rows") or []
+    ]
     if not raw_rows:
         raise ValueError("source artifact has no per-asset tuned rows")
-    universe_symbols = tuple(str(symbol) for symbol in dict(source.get("universe") or {}).get("symbols") or ())
+    universe_symbols = tuple(
+        str(symbol) for symbol in dict(source.get("universe") or {}).get("symbols") or ()
+    )
     timeframes = tuple(str(timeframe) for timeframe in source.get("timeframes") or ())
-    data_root = Path(dict(source.get("data_coverage") or {}).get("data_root") or broad69.DEFAULT_DATA_ROOT)
-    bars, _coverage = broad69.load_all_bars(universe_symbols, data_root=data_root, timeframes=timeframes)
+    data_root = Path(
+        dict(source.get("data_coverage") or {}).get("data_root") or broad69.DEFAULT_DATA_ROOT
+    )
+    bars, _coverage = broad69.load_all_bars(
+        universe_symbols, data_root=data_root, timeframes=timeframes
+    )
     split_windows = broad69.SplitWindows(train=windows.train, validation=windows.validation)
     cache = profile69.FeatureCache(
         bars_by_symbol_tf=bars,
@@ -260,12 +273,17 @@ def build_dynamic_context(source_artifact: Path, windows: clean_gate.GateWindows
         returns.append(stream.returns.sort_index())
         positions.append(stream.position.sort_index())
 
-    aligned_index = pd.DatetimeIndex(sorted(set().union(*(set(series.index) for series in returns))))
+    aligned_index = pd.DatetimeIndex(
+        sorted(set().union(*(set(series.index) for series in returns)))
+    )
     returns_matrix = np.vstack(
         [series.reindex(aligned_index, fill_value=0.0).to_numpy(dtype=float) for series in returns]
     )
     position_matrix = np.vstack(
-        [series.reindex(aligned_index, fill_value=0.0).to_numpy(dtype=float) for series in positions]
+        [
+            series.reindex(aligned_index, fill_value=0.0).to_numpy(dtype=float)
+            for series in positions
+        ]
     )
     notionals = np.asarray([_safe_float(row.get("notional_fraction")) for row in rebuilt_rows])
     return DynamicContext(
@@ -324,7 +342,9 @@ def dynamic_weights(
     weights = np.zeros_like(returns, dtype=np.float32)
     selection_log: list[dict[str, Any]] = []
     start = index[0].normalize() + pd.Timedelta(days=params.lookback_days)
-    for rebalance_time in pd.date_range(start=start, end=index[-1], freq=f"{params.rebalance_days}D"):
+    for rebalance_time in pd.date_range(
+        start=start, end=index[-1], freq=f"{params.rebalance_days}D"
+    ):
         loc = int(np.searchsorted(index.values, np.datetime64(rebalance_time), side="left"))
         if loc >= len(index):
             break
@@ -345,7 +365,11 @@ def dynamic_weights(
         trailing_return = _window_return_from_cumprod(cumprod, lookback_start, loc)
         trailing_std = _window_std_from_cumsums(cumsum, cumsum_square, lookback_start, loc)
         scaled_vol = trailing_std * math.sqrt(max(loc - lookback_start, 1))
-        score = trailing_return + params.fit_weight * context.fit_scores - params.vol_penalty * scaled_vol
+        score = (
+            trailing_return
+            + params.fit_weight * context.fit_scores
+            - params.vol_penalty * scaled_vol
+        )
 
         candidates: list[tuple[float, int]] = []
         for symbol, row_indices in by_symbol.items():
@@ -360,7 +384,9 @@ def dynamic_weights(
             if score[selected] <= 0.0 and trailing_return[selected] <= 0.0:
                 continue
             candidates.append((float(score[selected]), selected))
-        active = [row_index for _score, row_index in sorted(candidates, reverse=True)[: params.top_n]]
+        active = [
+            row_index for _score, row_index in sorted(candidates, reverse=True)[: params.top_n]
+        ]
         if not active:
             continue
         current = np.zeros(returns.shape[0], dtype=float)
@@ -378,7 +404,8 @@ def dynamic_weights(
                 "active_row_count": len(active),
                 "active_symbols": [context.row_symbols[row_index] for row_index in active],
                 "active_source_row_indices": [
-                    int(context.rows[row_index].get("source_row_index") or 0) for row_index in active
+                    int(context.rows[row_index].get("source_row_index") or 0)
+                    for row_index in active
                 ],
             }
         )
@@ -395,7 +422,9 @@ def evaluate_dynamic_selector(
     portfolio_returns = np.sum(context.returns * weights, axis=0)
     gross = np.sum(np.abs(weights) * context.notionals[:, None], axis=0)
     ready_count = np.sum(np.abs(weights) > 1e-12, axis=0)
-    active_signal_count = np.sum((np.abs(weights) > 1e-12) & (np.abs(context.positions) > 1e-12), axis=0)
+    active_signal_count = np.sum(
+        (np.abs(weights) > 1e-12) & (np.abs(context.positions) > 1e-12), axis=0
+    )
 
     clean_metrics = {
         "train": _period_metric(
@@ -492,7 +521,9 @@ def evaluate_dynamic_selector(
         key=lambda item: float(item.get("avg_gross_notional_fraction") or 0.0), reverse=True
     )
 
-    all_validation_positive = bool(validation_returns) and all(value > 0.0 for value in validation_returns)
+    all_validation_positive = bool(validation_returns) and all(
+        value > 0.0 for value in validation_returns
+    )
     all_oos_positive = bool(oos_returns) and all(value > 0.0 for value in oos_returns)
     return {
         "selector_params": asdict(params),
@@ -516,7 +547,9 @@ def evaluate_dynamic_selector(
             "avg_active_signal_count": float(np.mean(active_signal_count))
             if active_signal_count.size
             else 0.0,
-            "max_active_signal_count": int(np.max(active_signal_count)) if active_signal_count.size else 0,
+            "max_active_signal_count": int(np.max(active_signal_count))
+            if active_signal_count.size
+            else 0,
         },
         "row_attribution": row_attribution,
         "selection_log_tail": selection_log[-20:],
@@ -548,9 +581,10 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     evaluation = evaluate_dynamic_selector(context, params, windows)
     wf_summary = dict(evaluation.get("walkforward_summary") or {})
     clean = dict(evaluation.get("clean_metrics") or {})
-    clean_oos_pass = (
-        float(dict(clean.get("locked_oos") or {}).get("total_return") or 0.0) > 0.0
-        and float(dict(clean.get("locked_oos") or {}).get("mdd") or 0.0) <= float(args.max_oos_mdd)
+    clean_oos_pass = float(
+        dict(clean.get("locked_oos") or {}).get("total_return") or 0.0
+    ) > 0.0 and float(dict(clean.get("locked_oos") or {}).get("mdd") or 0.0) <= float(
+        args.max_oos_mdd
     )
     promotion_reasons: list[str] = []
     if not clean_oos_pass:

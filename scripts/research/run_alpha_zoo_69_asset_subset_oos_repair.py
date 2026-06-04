@@ -66,7 +66,9 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
     return number if math.isfinite(number) else default
 
 
-def tv_quality_score(row: Mapping[str, Any], *, selection_mode: str = DEFAULT_SELECTION_MODE) -> float:
+def tv_quality_score(
+    row: Mapping[str, Any], *, selection_mode: str = DEFAULT_SELECTION_MODE
+) -> float:
     train_return = _safe_float(row.get("train_return"))
     validation_return = _safe_float(row.get("validation_return"))
     validation_mdd = _safe_float(row.get("validation_mdd"))
@@ -171,9 +173,7 @@ def select_explicit_index_rows(
             raise ValueError(f"selected row index not found: {index}")
         row = dict(by_index[int(index)])
         row["source_row_index"] = int(index)
-        row["tv_quality_score"] = tv_quality_score(
-            row, selection_mode="diversified_watch_core"
-        )
+        row["tv_quality_score"] = tv_quality_score(row, selection_mode="diversified_watch_core")
         selected.append(row)
     return selected
 
@@ -188,7 +188,9 @@ def _scale_selected_rows(
     source_gross = diverse.profile_gross_notional(rows)
     if source_gross <= 0.0:
         raise ValueError("selected TV-quality source gross is zero")
-    effective_target = float(target_gross) if allow_upscale else min(float(target_gross), source_gross)
+    effective_target = (
+        float(target_gross) if allow_upscale else min(float(target_gross), source_gross)
+    )
     scale = effective_target / source_gross
     scaled: list[dict[str, Any]] = []
     for raw in rows:
@@ -470,7 +472,9 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT_PATH))
     parser.add_argument("--output-profile-id", default=DEFAULT_OUTPUT_PROFILE_ID)
     parser.add_argument("--target-gross", type=float, default=DEFAULT_TARGET_GROSS)
-    parser.add_argument("--min-validation-return", type=float, default=DEFAULT_MIN_VALIDATION_RETURN)
+    parser.add_argument(
+        "--min-validation-return", type=float, default=DEFAULT_MIN_VALIDATION_RETURN
+    )
     parser.add_argument("--max-validation-mdd", type=float, default=DEFAULT_MAX_VALIDATION_MDD)
     parser.add_argument("--min-rpt-bps", type=float, default=DEFAULT_MIN_RPT_BPS)
     parser.add_argument("--max-sleeves", type=int, default=DEFAULT_MAX_SLEEVES)

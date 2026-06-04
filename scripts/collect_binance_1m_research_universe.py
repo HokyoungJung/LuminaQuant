@@ -35,6 +35,9 @@ from lumina_quant.market_data import MarketDataRepository, normalize_timeframe_t
 from lumina_quant.research_universe import (  # noqa: E402
     BINANCE_CORE_CRYPTO_RESEARCH_SYMBOLS,
     BINANCE_EXTENDED_RESEARCH_SYMBOLS,
+    BINANCE_TRADFI_PERP_RESEARCH_SYMBOLS,
+    binance_extended_research_symbols_from_exchange_info,
+    binance_tradfi_perp_symbols_from_exchange_info,
 )
 from lumina_quant.symbols import canonical_symbol  # noqa: E402
 
@@ -165,19 +168,83 @@ def load_exchange_info() -> dict[str, dict[str, Any]]:
 
 
 def default_symbols_from_exchange_info(exchange_info: dict[str, dict[str, Any]]) -> list[str]:
-    tradfi = [
-        symbol
-        for symbol, row in exchange_info.items()
-        if row.get("contractType") == "TRADIFI_PERPETUAL"
-        and row.get("quoteAsset") == "USDT"
-        and row.get("status") == "TRADING"
-    ]
     ordered: list[str] = []
-    for symbol in (*BINANCE_CORE_CRYPTO_RESEARCH_SYMBOLS, *sorted(tradfi)):
+    for symbol in binance_extended_research_symbols_from_exchange_info(
+        exchange_info,
+        include_static_tradfi_snapshot=False,
+    ):
         token = compact_symbol(symbol)
         if token and token not in ordered:
             ordered.append(token)
     return ordered
+
+
+def resolve_default_symbols(
+    *,
+    exchange_info: dict[str, dict[str, Any]],
+    universe_source: str,
+) -> list[str]:
+    """Resolve the default collector universe without current-fold performance data.
+
+    ``static`` preserves the frozen 69-symbol research snapshot.  The default
+    ``static-plus-fapi-tradfi`` keeps those 69 symbols and appends any newly
+    listed Binance TRADIFI_PERPETUAL/USDT contracts discovered from exchangeInfo,
+    so TradFi support growth automatically enters the monitor/backfill queue.
+    """
+    if universe_source == "static":
+        raw_symbols = BINANCE_EXTENDED_RESEARCH_SYMBOLS
+    elif universe_source == "fapi-tradfi":
+        raw_symbols = default_symbols_from_exchange_info(exchange_info)
+    elif universe_source == "static-plus-fapi-tradfi":
+        raw_symbols = binance_extended_research_symbols_from_exchange_info(
+            exchange_info,
+            include_static_tradfi_snapshot=True,
+        )
+    else:
+        raise ValueError(f"unsupported universe_source: {universe_source}")
+    ordered: list[str] = []
+    for item in raw_symbols:
+        symbol = compact_symbol(item)
+        if symbol and symbol not in ordered:
+            ordered.append(symbol)
+    return ordered
+
+
+def universe_discovery_payload(
+    *,
+    exchange_info: dict[str, dict[str, Any]],
+    universe_source: str,
+    symbols: list[str],
+    explicit_symbols: bool,
+) -> dict[str, Any]:
+    discovered_tradfi = list(binance_tradfi_perp_symbols_from_exchange_info(exchange_info))
+    static_tradfi = {compact_symbol(symbol) for symbol in BINANCE_TRADFI_PERP_RESEARCH_SYMBOLS}
+    selected = {compact_symbol(symbol) for symbol in symbols}
+    new_tradfi = [symbol for symbol in discovered_tradfi if symbol not in static_tradfi]
+    selected_new_tradfi = [symbol for symbol in new_tradfi if symbol in selected]
+    return {
+        "universe_source": str(universe_source),
+        "explicit_symbols": bool(explicit_symbols),
+        "core_crypto_snapshot_count": len(BINANCE_CORE_CRYPTO_RESEARCH_SYMBOLS),
+        "static_tradfi_snapshot_count": len(BINANCE_TRADFI_PERP_RESEARCH_SYMBOLS),
+        "discovered_tradfi_trading_count": len(discovered_tradfi),
+        "new_tradfi_since_static_snapshot_count": len(new_tradfi),
+        "new_tradfi_since_static_snapshot_symbols": new_tradfi,
+        "selected_new_tradfi_symbols": selected_new_tradfi,
+        "monitoring_policy": (
+            "explicit_symbols_only"
+            if explicit_symbols
+            else (
+                "core crypto plus current Binance TRADIFI_PERPETUAL/USDT discovery"
+                if universe_source == "fapi-tradfi"
+                else (
+                    "frozen 69-symbol snapshot only"
+                    if universe_source == "static"
+                    else "frozen 69-symbol snapshot plus current Binance TRADIFI_PERPETUAL/USDT discovery"
+                )
+            )
+        ),
+    }
 
 
 def make_symbol_plans(
@@ -643,6 +710,16 @@ def parser() -> argparse.ArgumentParser:
         ),
     )
     out.add_argument("--symbols", nargs="*", default=None)
+    out.add_argument(
+        "--universe-source",
+        choices=("static", "fapi-tradfi", "static-plus-fapi-tradfi"),
+        default="static-plus-fapi-tradfi",
+        help=(
+            "Default symbol discovery when --symbols is omitted. static preserves the "
+            "frozen 69-symbol snapshot; fapi-tradfi uses current exchangeInfo core+TradFi; "
+            "static-plus-fapi-tradfi keeps the snapshot and appends newly listed TradFi perps."
+        ),
+    )
     out.add_argument("--workers", type=int, default=4)
     out.add_argument("--limit", type=int, default=1500)
     out.add_argument("--retries", type=int, default=4)
@@ -675,34 +752,34 @@ def main(argv: list[str] | None = None) -> int:
         until_ms = (
             int(datetime.now(UTC).timestamp() * 1000) // KLINE_INTERVAL_MS
         ) * KLINE_INTERVAL_MS - 1
-    if args.source == "fapi":
-        exchange_info = {} if args.symbols else load_exchange_info()
-        symbols = [
-            compact_symbol(item)
-            for item in (args.symbols or default_symbols_from_exchange_info(exchange_info))
-        ]
-        plans = make_symbol_plans(
-            symbols,
-            exchange_info=exchange_info,
-            since_ms=since_ms,
-            until_ms=until_ms,
-            db_path=db_path,
-            exchange=str(args.exchange),
-            resume=not bool(args.no_resume),
+    explicit_symbols = bool(args.symbols)
+    needs_exchange_info = not explicit_symbols and str(args.universe_source) != "static"
+    exchange_info = load_exchange_info() if needs_exchange_info else {}
+    symbols = [
+        compact_symbol(item)
+        for item in (
+            args.symbols
+            or resolve_default_symbols(
+                exchange_info=exchange_info,
+                universe_source=str(args.universe_source),
+            )
         )
-    else:
-        symbols = [
-            compact_symbol(item) for item in (args.symbols or BINANCE_EXTENDED_RESEARCH_SYMBOLS)
-        ]
-        plans = make_symbol_plans(
-            symbols,
-            exchange_info={},
-            since_ms=since_ms,
-            until_ms=until_ms,
-            db_path=db_path,
-            exchange=str(args.exchange),
-            resume=not bool(args.no_resume),
-        )
+    ]
+    plans = make_symbol_plans(
+        symbols,
+        exchange_info=exchange_info,
+        since_ms=since_ms,
+        until_ms=until_ms,
+        db_path=db_path,
+        exchange=str(args.exchange),
+        resume=not bool(args.no_resume),
+    )
+    discovery = universe_discovery_payload(
+        exchange_info=exchange_info,
+        universe_source=str(args.universe_source),
+        symbols=symbols,
+        explicit_symbols=explicit_symbols,
+    )
 
     run_started = utc_now_iso()
     throttle = GlobalRequestThrottle(min_interval_sec=float(args.global_request_interval_sec))
@@ -712,6 +789,10 @@ def main(argv: list[str] | None = None) -> int:
                 "event": "start",
                 "source": str(args.source),
                 "symbol_count": len(plans),
+                "universe_source": str(args.universe_source),
+                "new_tradfi_since_static_snapshot_count": discovery[
+                    "new_tradfi_since_static_snapshot_count"
+                ],
                 "since_utc": ms_to_iso(since_ms),
                 "until_utc": ms_to_iso(until_ms),
                 "workers": int(args.workers),
@@ -780,6 +861,7 @@ def main(argv: list[str] | None = None) -> int:
             else "Binance USD-M Futures /fapi/v1/klines"
         ),
         "source_mode": str(args.source),
+        "universe_discovery": discovery,
         "since_utc": ms_to_iso(since_ms),
         "until_utc": ms_to_iso(until_ms),
         "symbol_count": len(plans),

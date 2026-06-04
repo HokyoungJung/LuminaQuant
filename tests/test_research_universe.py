@@ -18,6 +18,8 @@ from lumina_quant.research_universe import (
     BINANCE_TRADFI_PERP_RESEARCH_SYMBOLS_SLASHED,
     BINANCE_TRADFI_PRECIOUS_METAL_SYMBOLS,
     BINANCE_TRADFI_PREMARKET_SYMBOLS,
+    binance_extended_research_symbols_from_exchange_info,
+    binance_tradfi_perp_symbols_from_exchange_info,
     compact_to_slashed_usdt,
 )
 
@@ -89,3 +91,39 @@ def test_research_universe_feeds_inventory_and_monitoring_defaults() -> None:
         "tradfi_premarket",
     ):
         assert group in monitoring.ASSET_GROUPS
+
+
+def test_tradfi_exchange_info_discovery_extends_static_snapshot() -> None:
+    exchange_info = {
+        "symbols": [
+            {
+                "symbol": "NEWEQUSDT",
+                "contractType": "TRADIFI_PERPETUAL",
+                "quoteAsset": "USDT",
+                "status": "TRADING",
+            },
+            {
+                "symbol": "OLDHALTUSDT",
+                "contractType": "TRADIFI_PERPETUAL",
+                "quoteAsset": "USDT",
+                "status": "BREAK",
+            },
+            {
+                "symbol": "BTCUSDT",
+                "contractType": "PERPETUAL",
+                "quoteAsset": "USDT",
+                "status": "TRADING",
+            },
+        ]
+    }
+
+    assert binance_tradfi_perp_symbols_from_exchange_info(exchange_info) == ("NEWEQUSDT",)
+
+    expanded = binance_extended_research_symbols_from_exchange_info(exchange_info)
+
+    assert expanded[: len(BINANCE_CORE_CRYPTO_RESEARCH_SYMBOLS)] == (
+        BINANCE_CORE_CRYPTO_RESEARCH_SYMBOLS
+    )
+    assert "NEWEQUSDT" in expanded
+    assert "OLDHALTUSDT" not in expanded
+    assert len(expanded) == len(BINANCE_EXTENDED_RESEARCH_SYMBOLS) + 1

@@ -21,7 +21,17 @@ def _load_module():
 repair = _load_module()
 
 
-def _row(symbol: str, *, train: float, val: float, val_mdd: float, train_rpt: float = 50.0, val_rpt: float = 50.0, gross: float = 0.5, score_boost: float = 0.0) -> dict:
+def _row(
+    symbol: str,
+    *,
+    train: float,
+    val: float,
+    val_mdd: float,
+    train_rpt: float = 50.0,
+    val_rpt: float = 50.0,
+    gross: float = 0.5,
+    score_boost: float = 0.0,
+) -> dict:
     return {
         "symbol": symbol,
         "profile_id": f"profile_{symbol}_{score_boost}",
@@ -107,7 +117,9 @@ def test_build_payload_preserves_69_monitor_manifest(tmp_path: Path) -> None:
     assert payload["subset_selection_policy"]["locked_oos_used_for_selection"] is False
     assert payload["candidate_pool_policy"]["candidate_pool_symbol_count"] == 3
     assert payload["candidate_pool_policy"]["all_universe_symbols_remain_candidates"] is True
-    assert payload["candidate_pool_policy"]["candidate_pool_is_not_equal_to_current_positions"] is True
+    assert (
+        payload["candidate_pool_policy"]["candidate_pool_is_not_equal_to_current_positions"] is True
+    )
     assert payload["subset_selection_policy"]["current_tradable_symbol_count"] == 2
     assert len(payload["asset_inclusion_manifest"]) == 3
     status = {row["symbol"]: row["status"] for row in payload["asset_inclusion_manifest"]}

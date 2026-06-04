@@ -60,7 +60,27 @@ _RESEARCH_HISTORY_REF_FIELDS = (
     "research_history_ref",
     "source_history_refs",
 )
-_NESTED_HYBRID_SOURCE_TOKENS = ("hybrid",)
+NON_LEAF_SOURCE_MARKERS = (
+    "cross_candidate_hybrid",
+    "dynamic_aware_hybrid",
+    "hybrid_oracle_bridge",
+    "meta_portfolio",
+    "validation_selector",
+    "risk_enhanced_blend",
+    "fixed_relaxed_dynamic_blend",
+    "mdd30_barbell_blend",
+    "mdd30_risk_scaled",
+    "mdd30_high_vol_gate",
+    "dynamic_conviction_switch",
+    "nested_hybrid",
+    "nested_portfolio",
+    "nested_",
+    ":hybrid_",
+    "hybrid_v3_",
+    "selected_optuna",
+    "selected_train_validation_legal",
+    "static_guarded",
+)
 
 
 def _load_module(path: Path, name: str) -> Any:
@@ -161,19 +181,21 @@ def _calendar_primary_source_invalid(row: Mapping[str, Any]) -> bool:
 
 
 def _nested_hybrid_source_invalid(row: Mapping[str, Any]) -> bool:
-    """Reject already-hybrid sources as sleeves of a new hybrid.
+    """Reject already-portfolio/meta/selector sources as sleeves of a new hybrid.
 
     Candidate-hybrid construction must be a first-order blend of atomic,
-    traceable strategy rows. Feeding an already-hybrid source back into another
-    hybrid double-counts prior selection and hides the true strategy provenance.
-    Generic portfolio/allocator/meta/static-blend/leverage-sweep names are not
-    invalid by themselves; they are rejected here only when their own provenance
-    explicitly identifies them as hybrid.
+    traceable strategy rows. Feeding an already-hybrid, meta, selector, switch,
+    gate, or nested source back into another hybrid double-counts prior
+    selection and hides the true strategy provenance.
     """
     validity = row.get("strategy_validity")
     if isinstance(validity, Mapping):
         primary_signal = str(validity.get("primary_signal_type") or "").lower()
-        if any(token in primary_signal for token in _NESTED_HYBRID_SOURCE_TOKENS):
+        primary_evidence = str(validity.get("primary_signal_evidence") or "").lower()
+        if any(
+            marker in primary_signal or marker in primary_evidence
+            for marker in NON_LEAF_SOURCE_MARKERS
+        ):
             return True
 
     text_fields = (
@@ -186,7 +208,9 @@ def _nested_hybrid_source_invalid(row: Mapping[str, Any]) -> bool:
     )
     tokens = [str(value or "").lower() for value in text_fields]
     tokens.extend(str(sleeve or "").lower() for sleeve in list(row.get("sleeves") or []))
-    return any(marker in token for token in tokens for marker in _NESTED_HYBRID_SOURCE_TOKENS)
+    for key in ("final_weights", "weights"):
+        tokens.extend(str(item).lower() for item in dict(row.get(key) or {}))
+    return any(marker in token for token in tokens for marker in NON_LEAF_SOURCE_MARKERS)
 
 
 def _split_like_sources(row: Mapping[str, Any]) -> list[Mapping[str, Any]]:
