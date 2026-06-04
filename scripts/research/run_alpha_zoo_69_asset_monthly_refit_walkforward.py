@@ -312,6 +312,14 @@ def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
     path.write_text(json.dumps(_json_safe(payload), indent=2, sort_keys=True) + "\n", "utf-8")
 
 
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def _load_bridge_protocol_manifest(path: Path = DEFAULT_BRIDGE_PROTOCOL_MANIFEST) -> dict[str, Any]:
     """Load the pre-registered no-OOS bridge protocol and its content hash."""
     manifest_path = path.expanduser().resolve()
@@ -3171,6 +3179,26 @@ def _aggregate_rows(fold_rows: Sequence[Mapping[str, Any]]) -> list[dict[str, An
             compounded > ROBUST_DEFAULT_OOS_COMP
             and max(oos_mdds, default=0.0) <= ROBUST_DEFAULT_MAX_OOS_MDD_LIMIT
         )
+        nested_hybrid_dependency = any(bool(row.get("nested_hybrid_dependency")) for row in rows)
+        post_oos_research_variant = any(bool(row.get("post_oos_research_variant")) for row in rows)
+        requires_fresh_forward_shadow = any(
+            bool(row.get("requires_fresh_forward_shadow")) for row in rows
+        )
+        uses_locked_oos_for_selection = any(
+            bool(row.get("uses_locked_oos_for_selection")) for row in rows
+        )
+        non_clean_reasons = [
+            reason
+            for reason, active in (
+                ("nested_hybrid_dependency", nested_hybrid_dependency),
+                ("post_oos_research_variant", post_oos_research_variant),
+                ("requires_fresh_forward_shadow", requires_fresh_forward_shadow),
+                ("uses_locked_oos_for_selection", uses_locked_oos_for_selection),
+            )
+            if active
+        ]
+        if not clean_candidate and not non_clean_reasons:
+            non_clean_reasons.append("non_clean_fold_flag")
         hard_stop_promotable = clean_candidate and (
             beats_challenger or material_risk_improvement or robust_default_improvement
         )
@@ -3180,6 +3208,11 @@ def _aggregate_rows(fold_rows: Sequence[Mapping[str, Any]]) -> list[dict[str, An
                 "family": rows[0].get("family"),
                 "fold_count": len(rows),
                 "clean_promotion_eligible": clean_candidate,
+                "nested_hybrid_dependency": nested_hybrid_dependency,
+                "post_oos_research_variant": post_oos_research_variant,
+                "requires_fresh_forward_shadow": requires_fresh_forward_shadow,
+                "uses_locked_oos_for_selection": uses_locked_oos_for_selection,
+                "non_clean_reasons": non_clean_reasons,
                 "compounded_oos_return": compounded,
                 "annualized_oos_return_approx": annualized_comp,
                 "mean_oos_return": float(np.mean(oos_returns)) if oos_returns else 0.0,
@@ -3271,6 +3304,51 @@ def _aggregate_rows(fold_rows: Sequence[Mapping[str, Any]]) -> list[dict[str, An
     )
 
 
+def _clean_promotion_rankings(
+    aggregate_rows: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    return [dict(row) for row in aggregate_rows if bool(row.get("clean_promotion_eligible"))]
+
+
+def _demoted_nested_or_historical_rankings(
+    aggregate_rows: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    return [
+        dict(row)
+        for row in aggregate_rows
+        if not bool(row.get("clean_promotion_eligible"))
+        and (
+            bool(row.get("nested_hybrid_dependency"))
+            or bool(row.get("post_oos_research_variant"))
+            or bool(row.get("requires_fresh_forward_shadow"))
+            or bool(row.get("uses_locked_oos_for_selection"))
+            or bool(row.get("non_clean_reasons"))
+        )
+    ]
+
+
+def _refresh_payload_derived_reports(payload: dict[str, Any]) -> None:
+    """Refresh aggregate reports that depend on fold candidate rows."""
+    rows = list(payload.get("fold_candidate_rows") or [])
+    aggregate = _aggregate_rows(rows)
+    clean = _clean_promotion_rankings(aggregate)
+    demoted = _demoted_nested_or_historical_rankings(aggregate)
+    payload["aggregate_rankings"] = aggregate
+    payload["clean_promotion_rankings"] = clean
+    payload["demoted_nested_or_historical_rankings"] = demoted
+    payload["dynamic_self_feed_audit"] = _dynamic_self_feed_audit(rows)
+    payload["metric_reconciliation"] = _metric_reconciliation_report(payload)
+    payload["promotability"] = (
+        _promotability_decision(clean[0])
+        if clean
+        else (
+            _promotability_decision(aggregate[0])
+            if aggregate
+            else _promotability_decision({})
+        )
+    )
+
+
 def _sanitize_research_dependency_flags(
     rows: Sequence[Mapping[str, Any]],
 ) -> list[dict[str, Any]]:
@@ -3323,23 +3401,38 @@ def _sanitize_research_dependency_flags(
     return mutable_rows
 
 
-def _recompute_payload_from_existing(payload: Mapping[str, Any]) -> dict[str, Any]:
+def _recompute_payload_from_existing(
+    payload: Mapping[str, Any],
+    *,
+    source_path: Path | None = None,
+    output_json: Path | None = None,
+    output_md: Path | None = None,
+) -> dict[str, Any]:
     """Fast path: recompute clean flags, rankings, audits, and markdown inputs."""
     out = dict(payload)
     rows = _sanitize_research_dependency_flags(list(payload.get("fold_candidate_rows") or []))
     out["fold_candidate_rows"] = rows
-    out["aggregate_rankings"] = _aggregate_rows(rows)
-    out["dynamic_self_feed_audit"] = _dynamic_self_feed_audit(rows)
-    out["metric_reconciliation"] = _metric_reconciliation_report(out)
-    out["promotability"] = (
-        _promotability_decision(out["aggregate_rankings"][0])
-        if out["aggregate_rankings"]
-        else _promotability_decision({})
-    )
+    _refresh_payload_derived_reports(out)
     out["recomputed_from_existing_rows"] = True
     out["recompute_note"] = (
         "no strategy optimization rerun; clean/research dependency flags and aggregates recomputed"
     )
+    if source_path is not None:
+        resolved_source = source_path.expanduser().resolve()
+        out["recompute_provenance"] = {
+            "source_json_path": str(resolved_source),
+            "source_json_sha256": _file_sha256(resolved_source),
+            "recomputed_from_existing_rows": True,
+            "fresh_optuna_rerun": False,
+            "generated_at_utc": _utc_now_iso(),
+            "output_paths": {
+                "json": str(output_json.expanduser().resolve()) if output_json is not None else None,
+                "markdown": str(output_md.expanduser().resolve()) if output_md is not None else None,
+            },
+            "interpretation": (
+                "governance/ranking repair only; not a fresh no-nested Optuna search"
+            ),
+        }
     out["generated_at_utc"] = _utc_now_iso()
     return out
 
@@ -3350,9 +3443,42 @@ def _fmt_pct(value: Any) -> str:
 
 def _render_markdown(payload: Mapping[str, Any]) -> str:
     aggregates = list(payload.get("aggregate_rankings") or [])
+    clean_rankings = list(payload.get("clean_promotion_rankings") or []) or _clean_promotion_rankings(
+        aggregates
+    )
+    demoted_rankings = list(
+        payload.get("demoted_nested_or_historical_rankings") or []
+    ) or _demoted_nested_or_historical_rankings(aggregates)
     fold_rows = list(payload.get("fold_candidate_rows") or [])
     folds = list(payload.get("folds") or [])
     top = aggregates[:12]
+    clean_top = clean_rankings[:12]
+    demoted_top = demoted_rankings[:12]
+    provenance = dict(payload.get("recompute_provenance") or {})
+
+    def append_ranking_table(rows: Sequence[Mapping[str, Any]]) -> None:
+        lines.extend(
+            [
+                "| Rank | Candidate | Family | Clean | Reasons | Hard-stop | OOS comp | OOS pos | Min OOS | Latest OOS | Sharpe | Sortino | Max OOS MDD |",
+                "| ---: | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+            ]
+        )
+        for idx, row in enumerate(rows, start=1):
+            reasons = ",".join(str(item) for item in (row.get("non_clean_reasons") or []))
+            lines.append(
+                f"| {idx} | `{row['candidate_label']}` | `{row['family']}` | "
+                f"`{bool(row.get('clean_promotion_eligible'))}` | "
+                f"`{reasons}` | "
+                f"`{bool(row.get('hard_stop_promotable'))}` | "
+                f"{_fmt_pct(row['compounded_oos_return'])} | "
+                f"{row['positive_oos_folds']}/{row['fold_count']} | "
+                f"{_fmt_pct(row['min_oos_return'])} | "
+                f"{_fmt_pct(row['latest_oos_return'])} | "
+                f"{_safe_float(row.get('monthly_sharpe_approx')):.2f} | "
+                f"{_safe_float(row.get('monthly_sortino_approx')):.2f} | "
+                f"{_fmt_pct(row['max_oos_mdd'])} |"
+            )
+
     lines = [
         "# 69-asset monthly-refit walk-forward: 2M validation / 1M OOS",
         "",
@@ -3363,12 +3489,25 @@ def _render_markdown(payload: Mapping[str, Any]) -> str:
         f"- folds: `{len(folds)}` (`{folds[0]['fold_id'] if folds else ''}` → `{folds[-1]['fold_id'] if folds else ''}`)",
         f"- trials: asset/profile/hybrid = `{payload.get('trial_policy', {}).get('asset_trials')}` / `{payload.get('trial_policy', {}).get('profile_trials')}` / `{payload.get('trial_policy', {}).get('hybrid_trials')}`",
         "- selection/refit input: train + 2M validation only; OOS month is evaluated after frozen fold params.",
-        "",
-        "## Fold schedule",
-        "",
-        "| Fold | Refit | Train | Validation | OOS |",
-        "| --- | --- | --- | --- | --- |",
     ]
+    if provenance:
+        lines.extend(
+            [
+                f"- recomputed from existing rows: `{bool(provenance.get('recomputed_from_existing_rows'))}`",
+                f"- source JSON: `{provenance.get('source_json_path')}`",
+                f"- source sha256: `{provenance.get('source_json_sha256')}`",
+                f"- recompute interpretation: `{provenance.get('interpretation')}`",
+            ]
+        )
+    lines.extend(
+        [
+            "",
+            "## Fold schedule",
+            "",
+            "| Fold | Refit | Train | Validation | OOS |",
+            "| --- | --- | --- | --- | --- |",
+        ]
+    )
     for fold in folds:
         lines.append(
             f"| `{fold['fold_id']}` | `{fold['refit_at']}` | "
@@ -3379,32 +3518,36 @@ def _render_markdown(payload: Mapping[str, Any]) -> str:
     lines.extend(
         [
             "",
-            "## Aggregate ranking",
+            "## Raw aggregate ranking (diagnostic only)",
             "",
-            "| Rank | Candidate | Family | Clean | Hard-stop | OOS comp | OOS pos | Min OOS | Latest OOS | Sharpe | Sortino | Max OOS MDD |",
-            "| ---: | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
         ]
     )
-    for idx, row in enumerate(top, start=1):
-        lines.append(
-            f"| {idx} | `{row['candidate_label']}` | `{row['family']}` | "
-            f"`{bool(row.get('clean_promotion_eligible'))}` | "
-            f"`{bool(row.get('hard_stop_promotable'))}` | "
-            f"{_fmt_pct(row['compounded_oos_return'])} | "
-            f"{row['positive_oos_folds']}/{row['fold_count']} | "
-            f"{_fmt_pct(row['min_oos_return'])} | "
-            f"{_fmt_pct(row['latest_oos_return'])} | "
-            f"{_safe_float(row.get('monthly_sharpe_approx')):.2f} | "
-            f"{_safe_float(row.get('monthly_sortino_approx')):.2f} | "
-            f"{_fmt_pct(row['max_oos_mdd'])} |"
-        )
-    if top:
-        best_label = str(top[0]["candidate_label"])
+    append_ranking_table(top)
+    lines.extend(
+        [
+            "",
+            "## Clean-promotion ranking (current recommendation set)",
+            "",
+        ]
+    )
+    append_ranking_table(clean_top)
+    lines.extend(
+        [
+            "",
+            "## Demoted nested/historical ranking",
+            "",
+            "These rows may remain useful diagnostics, but they are not current clean-promotion evidence.",
+            "",
+        ]
+    )
+    append_ranking_table(demoted_top)
+    if clean_top or top:
+        best_label = str((clean_top or top)[0]["candidate_label"])
         best_rows = [row for row in fold_rows if row.get("candidate_label") == best_label]
         lines.extend(
             [
                 "",
-                f"## Best candidate monthly OOS detail: `{best_label}`",
+                f"## Best clean candidate monthly OOS detail: `{best_label}`",
                 "",
                 "| Fold | Val | OOS | OOS MDD | Weights/source |",
                 "| --- | ---: | ---: | ---: | --- |",
@@ -3466,6 +3609,12 @@ def _render_markdown(payload: Mapping[str, Any]) -> str:
         ]
     )
     return "\n".join(lines) + "\n"
+
+
+def _checkpoint_due(fold_idx: int, fold_count: int, interval: int) -> bool:
+    if fold_idx >= fold_count:
+        return False
+    return int(interval) > 0 and fold_idx % int(interval) == 0
 
 
 def run_walkforward(args: argparse.Namespace) -> dict[str, Any]:
@@ -3554,6 +3703,9 @@ def run_walkforward(args: argparse.Namespace) -> dict[str, Any]:
         "fold_summaries": fold_summaries,
         "fold_candidate_rows": fold_candidate_rows,
         "aggregate_rankings": [],
+        "clean_promotion_rankings": [],
+        "demoted_nested_or_historical_rankings": [],
+        "recomputed_from_existing_rows": False,
         "output_paths": {"json": str(output_json), "markdown": str(output_md)},
     }
     _write_json(output_json, payload)
@@ -3707,13 +3859,12 @@ def run_walkforward(args: argparse.Namespace) -> dict[str, Any]:
             "runner_peak_rss_mib": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0,
         }
         fold_summaries.append(fold_summary)
-        payload["aggregate_rankings"] = _aggregate_rows(fold_candidate_rows)
-        payload["dynamic_self_feed_audit"] = _dynamic_self_feed_audit(fold_candidate_rows)
-        payload["metric_reconciliation"] = _metric_reconciliation_report(payload)
-        payload["promotability"] = _promotability_decision(payload["aggregate_rankings"][0])
+        _refresh_payload_derived_reports(payload)
         payload["generated_at_utc"] = _utc_now_iso()
-        _write_json(output_json, payload)
-        output_md.write_text(_render_markdown(payload), "utf-8")
+        if _checkpoint_due(fold_idx, len(folds), int(args.checkpoint_interval)):
+            _write_json(output_json, payload)
+        if _checkpoint_due(fold_idx, len(folds), int(args.checkpoint_markdown_interval)):
+            output_md.write_text(_render_markdown(payload), "utf-8")
         print(
             f"[fold {fold.fold_id}] best={best_fold['candidate_label']} "
             f"oos={_fmt_pct(best_fold['locked_oos']['total_return'])} "
@@ -3723,14 +3874,7 @@ def run_walkforward(args: argparse.Namespace) -> dict[str, Any]:
 
     payload["completed_at_utc"] = _utc_now_iso()
     payload["runner_peak_rss_mib"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
-    payload["aggregate_rankings"] = _aggregate_rows(fold_candidate_rows)
-    payload["dynamic_self_feed_audit"] = _dynamic_self_feed_audit(fold_candidate_rows)
-    payload["metric_reconciliation"] = _metric_reconciliation_report(payload)
-    payload["promotability"] = (
-        _promotability_decision(payload["aggregate_rankings"][0])
-        if payload["aggregate_rankings"]
-        else _promotability_decision({})
-    )
+    _refresh_payload_derived_reports(payload)
     _write_json(output_json, payload)
     output_md.write_text(_render_markdown(payload), "utf-8")
     return payload
@@ -3771,6 +3915,24 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             "dependency flags plus aggregate reports without rerunning Optuna."
         ),
     )
+    parser.add_argument(
+        "--checkpoint-interval",
+        type=int,
+        default=1,
+        help=(
+            "Write JSON checkpoint every N folds during full reruns. Use 0 to write only "
+            "initial/final artifacts; default preserves fold-level recovery."
+        ),
+    )
+    parser.add_argument(
+        "--checkpoint-markdown-interval",
+        type=int,
+        default=0,
+        help=(
+            "Render markdown checkpoint every N folds during full reruns. Default 0 skips "
+            "expensive growing markdown renders until final output."
+        ),
+    )
     parser.add_argument("--output-json", default=str(DEFAULT_OUTPUT_JSON))
     parser.add_argument("--output-md", default=str(DEFAULT_OUTPUT_MD))
     args = parser.parse_args(argv)
@@ -3782,20 +3944,30 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
+    output_json = Path(args.output_json).expanduser().resolve()
+    output_md = Path(args.output_md).expanduser().resolve()
     if args.recompute_from_json:
+        source_path = Path(args.recompute_from_json).expanduser().resolve()
         payload = _recompute_payload_from_existing(
-            json.loads(Path(args.recompute_from_json).read_text("utf-8"))
+            json.loads(source_path.read_text("utf-8")),
+            source_path=source_path,
+            output_json=output_json,
+            output_md=output_md,
         )
         payload["output_paths"] = {
-            "json": str(Path(args.output_json)),
-            "markdown": str(Path(args.output_md)),
+            "json": str(output_json),
+            "markdown": str(output_md),
         }
-        _write_json(Path(args.output_json), payload)
-        Path(args.output_md).parent.mkdir(parents=True, exist_ok=True)
-        Path(args.output_md).write_text(_render_markdown(payload), "utf-8")
+        if "recompute_provenance" in payload:
+            payload["recompute_provenance"]["output_paths"] = dict(payload["output_paths"])
+        _write_json(output_json, payload)
+        output_md.parent.mkdir(parents=True, exist_ok=True)
+        output_md.write_text(_render_markdown(payload), "utf-8")
     else:
         payload = run_walkforward(args)
     top = list(payload.get("aggregate_rankings") or [])[:5]
+    clean_top = list(payload.get("clean_promotion_rankings") or [])[:5]
+    demoted_top = list(payload.get("demoted_nested_or_historical_rankings") or [])[:5]
     print(
         json.dumps(
             _json_safe(
@@ -3804,6 +3976,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "fold_count": len(payload["folds"]),
                     "latest_available_data": payload["data_coverage"]["global_latest_utc"],
                     "top_5": top,
+                    "clean_top_5": clean_top,
+                    "demoted_top_5": demoted_top,
                     "runner_peak_rss_mib": payload.get("runner_peak_rss_mib"),
                 }
             ),

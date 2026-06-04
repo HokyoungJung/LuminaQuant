@@ -1,5 +1,55 @@
 # Research Note
 
+## 2026-06-04 KST — No-nested clean recompute, stale deep-report reconciliation, and report checkpoint optimization
+
+`C:\Users\hoky1\Desktop\deep-research-report.md`를 확인했다. 해당 보고서는 2026-06-03 당시의 `fixed_relaxed_dynamic_blend:*` / `dynamic_aware_hybrid:*` 후보를 중심으로 평가했기 때문에, **전략 랭킹 부분은 현재 no-nested 정책하에서 stale**이다. 다만 selection-bias, execution realism, slippage telemetry, governance/PBO/DSR 같은 주의사항은 여전히 유효하다.
+
+Ralplan consensus 후 실행한 추가 정리:
+
+- 월별 refit runner가 `raw aggregate`, `clean_promotion_rankings`, `demoted_nested_or_historical_rankings`를 분리해 출력하도록 변경했다. 최종 추천/해석은 clean-only ranking에서만 한다.
+- recompute artifact에 `recompute_provenance`를 추가했다: source JSON path, source sha256, output paths, `recomputed_from_existing_rows=true`, `fresh_optuna_rerun=false`를 명시한다.
+- nested/material detector acceptance를 넓혔다: `cross_candidate_hybrid`, `meta_portfolio`, `dynamic_conviction_switch`, `validation_selector`, `mdd30_*`, `*:selected_optuna`, `*:selected_train_validation_legal`, `*:static_guarded`, `*:hybrid_*` 등은 downstream hybrid/portfolio 재료로 금지된다.
+- full rerun 중 매 fold마다 커지는 Markdown을 렌더링하던 비용을 줄이기 위해 `--checkpoint-markdown-interval`을 추가했다. 기본값 `0`은 최종 Markdown만 렌더링한다. JSON checkpoint는 `--checkpoint-interval` 기본값 `1`로 fold-level recovery를 유지한다.
+
+새 no-nested clean recompute artifact:
+
+- Source: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_exact_blend_full_tuning_20260603/exact_blend_full_tuning_walkforward_latest.json`
+- Source sha256: `563aff7f59174a7ebb6b53f9164eb1feb0cf67881e7f203aecb06987024fa58f`
+- Output JSON: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_no_nested_clean_recompute_20260604/no_nested_clean_recompute_latest.json`
+- Output Markdown: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_no_nested_clean_recompute_20260604/no_nested_clean_recompute_latest.md`
+- 해석: 기존 row의 governance/ranking repair이며, fresh no-nested Optuna rerun은 아니다.
+
+Clean-only 상위 결과:
+
+| Rank | Candidate | OOS Comp | Max OOS MDD | Sharpe | Sortino | Hit | Min OOS | Latest OOS | 판단 |
+| ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 1 | `relaxed_efficiency:hybrid_v3_5` | `156.03%` | `19.75%` | `1.69` | `10.48` | `5/10` | `-8.41%` | `-0.09%` | clean recompute 기준 1위, 하지만 hit 5/10과 MDD 19.75%라 shadow 우선 |
+| 2 | `relaxed_efficiency:selected_optuna` | `60.18%` | `24.27%` | `1.12` | `2.32` | `5/10` | `-22.55%` | `-0.09%` | MDD/left-tail이 커서 보조 후보 |
+| 3 | `strict_efficiency:static_guarded` | `40.37%` | `29.16%` | `0.84` | `1.57` | `5/10` | `-26.40%` | `-0.53%` | drawdown 관점에서 실전 후보 약함 |
+| 4 | `relaxed_efficiency:selected_train_validation_legal` | `33.82%` | `25.79%` | `0.81` | `1.57` | `5/10` | `-22.55%` | `-0.09%` | 보조/진단 후보 |
+| 5 | `strict_efficiency:hybrid_v3_6` | `32.13%` | `15.89%` | `1.03` | `5.48` | `5/10` | `-5.89%` | `-0.17%` | return은 낮지만 MDD가 상대적으로 안정적 |
+
+Demoted raw 상위 후보:
+
+- `fixed_relaxed_dynamic_blend:relaxed70_dynamic30`: raw OOS comp `122.36%`, but `nested_hybrid_dependency`, `post_oos_research_variant`, `requires_fresh_forward_shadow`.
+- `fixed_relaxed_dynamic_blend:relaxed60_dynamic40`: raw OOS comp `111.75%`, same demotion reasons.
+- `cross_candidate_hybrid:*`, `dynamic_aware_hybrid:*`, `mdd30_high_vol_gate:*`는 non-leaf/nested material 또는 historical research layer로 demoted.
+
+검증:
+
+```text
+uv run python -m py_compile scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py scripts/research/benchmark_monthly_refit_eval_hotpath.py tests/test_alpha_zoo_69_asset_monthly_refit_walkforward.py
+
+uv run python -m pytest -q tests/test_alpha_zoo_69_asset_monthly_refit_walkforward.py
+# 27 passed in 0.25s
+
+uv run python -m ruff check scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py scripts/research/benchmark_monthly_refit_eval_hotpath.py tests/test_alpha_zoo_69_asset_monthly_refit_walkforward.py
+# All checks passed
+
+uv run python scripts/research/benchmark_monthly_refit_eval_hotpath.py --min-speedup 1.5
+# speedup=6.375x, checksum identical, PASS
+```
+
 ## 2026-06-04 KST — No-nested-hybrid cleanup and monthly-refit evaluation hotpath optimization
 
 정책을 변경했다: **hybrid/blend/selector/gate/bridge 등 포트폴리오 레이어 후보는 다른 hybrid/portfolio의 재료로 사용할 수 없다.** hybrid는 이미 내부 sleeve를 합친 portfolio이므로, hybrid를 다시 hybrid 재료로 넣으면 분산처럼 보이지만 실제로는 동일 sleeve/asset/factor exposure를 중복 매수할 수 있다.
@@ -18,10 +68,10 @@
 
 ```text
 uv run python scripts/research/benchmark_monthly_refit_eval_hotpath.py --min-speedup 1.5
-# legacy_elapsed_sec=0.626140, optimized_elapsed_sec=0.083269, speedup=7.519x, PASS
+# latest rerun speedup=6.375x, checksum identical, PASS
 
 uv run python -m pytest -q tests/test_alpha_zoo_69_asset_monthly_refit_walkforward.py
-# 23 passed in 0.16s
+# 27 passed in 0.25s
 
 uv run python -m ruff check scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py scripts/research/benchmark_monthly_refit_eval_hotpath.py tests/test_alpha_zoo_69_asset_monthly_refit_walkforward.py
 # All checks passed

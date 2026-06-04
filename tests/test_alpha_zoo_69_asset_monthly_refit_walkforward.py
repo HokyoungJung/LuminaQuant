@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -729,3 +730,138 @@ def test_recompute_payload_marks_downstream_post_oos_dependencies_non_clean() ->
     assert bridge["requires_fresh_forward_shadow"] is True
     assert bridge["clean_promotion_eligible"] is False
     assert recomputed["metric_reconciliation"]["metrics_reconciled"] is True
+
+
+def test_recompute_payload_separates_raw_clean_and_demoted_rankings() -> None:
+    clean_row = {
+        "fold_id": "2025-03",
+        "family": "relaxed_efficiency",
+        "candidate_label": "relaxed_efficiency:growth_leaf",
+        "clean_promotion_eligible": True,
+        "train": {"total_return": 0.10, "mdd": 0.05},
+        "validation": {"total_return": 0.08, "mdd": 0.04},
+        "locked_oos": {"total_return": 0.05, "mdd": 0.03},
+    }
+    raw_winner_nested = {
+        "fold_id": "2025-03",
+        "family": "meta_portfolio",
+        "candidate_label": "meta_portfolio:raw_winner",
+        "clean_promotion_eligible": True,
+        "final_weights": {"cross_candidate_hybrid:hybrid_v3_5": 1.0},
+        "train": {"total_return": 0.20, "mdd": 0.05},
+        "validation": {"total_return": 0.18, "mdd": 0.04},
+        "locked_oos": {"total_return": 0.30, "mdd": 0.03},
+    }
+
+    recomputed = module._recompute_payload_from_existing(
+        {"fold_candidate_rows": [clean_row, raw_winner_nested]}
+    )
+
+    assert recomputed["aggregate_rankings"][0]["candidate_label"] == "meta_portfolio:raw_winner"
+    assert recomputed["aggregate_rankings"][0]["clean_promotion_eligible"] is False
+    assert recomputed["clean_promotion_rankings"][0]["candidate_label"] == (
+        "relaxed_efficiency:growth_leaf"
+    )
+    assert recomputed["demoted_nested_or_historical_rankings"][0]["candidate_label"] == (
+        "meta_portfolio:raw_winner"
+    )
+    assert recomputed["demoted_nested_or_historical_rankings"][0]["non_clean_reasons"] == [
+        "nested_hybrid_dependency"
+    ]
+
+
+def test_non_leaf_reference_detector_covers_portfolio_families_and_selected_tokens() -> None:
+    forbidden = [
+        "cross_candidate_hybrid:hybrid_v3_5",
+        "meta_portfolio:validation_balanced",
+        "dynamic_conviction_switch:t0.90_risk_capped_fallback",
+        "validation_selector:top_clean",
+        "mdd30_high_vol_gate:breakout_x1_50",
+        "profile_optuna:selected_optuna",
+        "individual_robust:selected_train_validation_legal",
+        "relaxed_efficiency:hybrid_v3_5",
+    ]
+    allowed_leaf = "profile_optuna:growth_mdd20_gross8_69_asset_profile_optuna"
+
+    assert all(module._candidate_label_is_non_leaf_reference(label) for label in forbidden)
+    assert module._candidate_label_is_non_leaf_reference(allowed_leaf) is False
+
+
+def test_recompute_payload_records_provenance(tmp_path: Path) -> None:
+    source = tmp_path / "walkforward.json"
+    source.write_text(json.dumps({"fold_candidate_rows": []}), "utf-8")
+    output_json = tmp_path / "out.json"
+    output_md = tmp_path / "out.md"
+
+    recomputed = module._recompute_payload_from_existing(
+        json.loads(source.read_text("utf-8")),
+        source_path=source,
+        output_json=output_json,
+        output_md=output_md,
+    )
+
+    provenance = recomputed["recompute_provenance"]
+    assert provenance["source_json_path"] == str(source.resolve())
+    assert provenance["source_json_sha256"] == module._file_sha256(source)
+    assert provenance["recomputed_from_existing_rows"] is True
+    assert provenance["fresh_optuna_rerun"] is False
+    assert provenance["output_paths"] == {
+        "json": str(output_json.resolve()),
+        "markdown": str(output_md.resolve()),
+    }
+
+
+def test_markdown_renders_clean_and_demoted_sections() -> None:
+    payload = module._recompute_payload_from_existing(
+        {
+            "generated_at_utc": "2026-06-04T00:00:00Z",
+            "data_coverage": {"global_latest_utc": "2026-06-04T00:00:00"},
+            "timeframes": ["30m"],
+            "cost_model": {"slippage_bps": 10.0},
+            "trial_policy": {"asset_trials": 1, "profile_trials": 1, "hybrid_trials": 1},
+            "folds": [
+                {
+                    "fold_id": "2025-03",
+                    "refit_at": "2025-03-01T00:00:00",
+                    "train": {"start": "2025-01-01T00:00:00", "end": "2025-01-31T00:00:00"},
+                    "validation": {
+                        "start": "2025-02-01T00:00:00",
+                        "end": "2025-02-28T00:00:00",
+                    },
+                    "locked_oos": {
+                        "start": "2025-03-01T00:00:00",
+                        "end": "2025-03-31T00:00:00",
+                    },
+                }
+            ],
+            "fold_candidate_rows": [
+                {
+                    "fold_id": "2025-03",
+                    "family": "relaxed_efficiency",
+                    "candidate_label": "relaxed_efficiency:growth_leaf",
+                    "source_profile_id": "growth_leaf",
+                    "clean_promotion_eligible": True,
+                    "train": {"total_return": 0.10, "mdd": 0.05},
+                    "validation": {"total_return": 0.08, "mdd": 0.04},
+                    "locked_oos": {"total_return": 0.05, "mdd": 0.03},
+                },
+                {
+                    "fold_id": "2025-03",
+                    "family": "fixed_relaxed_dynamic_blend",
+                    "candidate_label": "fixed_relaxed_dynamic_blend:relaxed60_dynamic40",
+                    "source_profile_id": "nested",
+                    "final_weights": {"dynamic_aware_hybrid:hybrid_v3_5_train_validation_fit": 1.0},
+                    "train": {"total_return": 0.20, "mdd": 0.05},
+                    "validation": {"total_return": 0.18, "mdd": 0.04},
+                    "locked_oos": {"total_return": 0.30, "mdd": 0.03},
+                },
+            ],
+        }
+    )
+
+    markdown = module._render_markdown(payload)
+
+    assert "## Raw aggregate ranking (diagnostic only)" in markdown
+    assert "## Clean-promotion ranking (current recommendation set)" in markdown
+    assert "## Demoted nested/historical ranking" in markdown
+    assert "Best clean candidate monthly OOS detail" in markdown
