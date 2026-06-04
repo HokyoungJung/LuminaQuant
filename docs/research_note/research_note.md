@@ -1,5 +1,34 @@
 # Research Note
 
+## 2026-06-04 KST — No-nested-hybrid cleanup and monthly-refit evaluation hotpath optimization
+
+정책을 변경했다: **hybrid/blend/selector/gate/bridge 등 포트폴리오 레이어 후보는 다른 hybrid/portfolio의 재료로 사용할 수 없다.** hybrid는 이미 내부 sleeve를 합친 portfolio이므로, hybrid를 다시 hybrid 재료로 넣으면 분산처럼 보이지만 실제로는 동일 sleeve/asset/factor exposure를 중복 매수할 수 있다.
+
+이번 코드 정리 결과:
+
+- 새 leaf-only 필터 `_leaf_strategy_material_candidate`를 추가해 `cross_candidate_hybrid`, `dynamic_aware_hybrid`, `hybrid_oracle_bridge`, `meta_portfolio`, `validation_selector`, `risk_enhanced_blend`, `fixed_relaxed_dynamic_blend`, `mdd30_*`, `dynamic_conviction_switch` 계열을 downstream hybrid/portfolio 재료에서 제외한다.
+- `dynamic_conviction_switch`는 더 이상 `cross_candidate_hybrid:*`, `profile_optuna:hybrid_*`, `selected_optuna` 같은 non-leaf 후보를 고르지 않고, profile/strict/relaxed/individual leaf 후보만 선택한다.
+- `dynamic_aware_hybrid`, `risk_enhanced_blend`, `fixed_relaxed_dynamic_blend`는 기존 구현이 non-leaf를 다시 섞는 구조라 명시적으로 no-op 처리했다. 특히 이전 최종 shadow 후보였던 `fixed_relaxed_dynamic_blend:relaxed60_dynamic40` 및 `relaxed70_dynamic30`은 새 정책하에서 promotion/selection 후보가 아니라 historical deprecated artifact로만 본다.
+- `validation_selector`, bridge eligible pool, MDD30 risk/gate family도 leaf-only 입력만 받도록 정리했다. MDD30 연구 family는 기존 dynamic/hybrid source 대신 profile/strict/relaxed leaf source만 scale/blend한다.
+- 기존 artifact를 재계산하는 fast repair path는 non-leaf reference를 `nested_hybrid_dependency=true`로 표시하고 clean promotion에서 제외한다.
+
+평가 성능도 개선했다. 월별 refit runner의 반복 병목은 같은 candidate return stream에 대해 train/validation/OOS `_period_metrics`를 여러 selector/hybrid/report 단계에서 반복 계산하는 부분이었다. `_period_metrics`에 bounded LRU-style 캐시를 추가해 return series 정렬/Datetime mask 생성은 1회만 수행하고, 이후 window는 int64 timestamp `searchsorted`와 metric-result cache를 사용한다. 캐시는 `LQ_MONTHLY_REFIT_PERIOD_METRICS_CACHE_SIZE`와 `LQ_MONTHLY_REFIT_PREPARED_RETURNS_CACHE_SIZE`로 조정 가능하다.
+
+성능/회귀 검증:
+
+```text
+uv run python scripts/research/benchmark_monthly_refit_eval_hotpath.py --min-speedup 1.5
+# legacy_elapsed_sec=0.626140, optimized_elapsed_sec=0.083269, speedup=7.519x, PASS
+
+uv run python -m pytest -q tests/test_alpha_zoo_69_asset_monthly_refit_walkforward.py
+# 23 passed in 0.16s
+
+uv run python -m ruff check scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py scripts/research/benchmark_monthly_refit_eval_hotpath.py tests/test_alpha_zoo_69_asset_monthly_refit_walkforward.py
+# All checks passed
+```
+
+운용 해석: 2026-06-03 note의 `fixed_relaxed_dynamic_blend:*`, `dynamic_aware_hybrid:*`, `risk_enhanced_blend:*`, `hybrid_oracle_bridge:*` 계열 성과는 nested-hybrid exposure risk 때문에 더 이상 최종 선택 근거로 쓰면 안 된다. 새 기준의 최종 후보는 leaf-only 재료로 walk-forward를 다시 돌린 결과에서만 선정해야 한다.
+
 ## 2026-06-03 KST — 69-asset monthly clean-OOS walk-forward final selection
 
 최종 69-asset 월별 refit walk-forward 연구를 최신 데이터까지 재평가했다. 기준은 `30m, 1h, 2h, 4h, 6h, 8h, 12h, 1d`, round-trip slippage `10bps`, train expanding from `2025-01-01T00:00:00`, 매월 1일 refit, 직전 2개월 validation, 다음 1개월 locked OOS이다. 평가 OOS는 `2025-09-01T00:00:00`부터 최신 보유 데이터 `2026-06-01T06:30:00`까지이며, `2026-06` fold는 부분 월이다. 총 10개 OOS fold를 사용했다.

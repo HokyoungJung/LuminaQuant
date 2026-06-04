@@ -23,9 +23,10 @@ import argparse
 import hashlib
 import json
 import math
+import os
 import resource
 import sys
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -63,6 +64,12 @@ CURRENT_CHALLENGER_OOS_COMP = 0.5338
 CURRENT_CHALLENGER_MAX_OOS_MDD = 0.1880
 ROBUST_DEFAULT_OOS_COMP = 0.2701
 ROBUST_DEFAULT_MAX_OOS_MDD_LIMIT = 0.15
+PERIOD_METRICS_CACHE_SIZE = max(
+    0, int(os.getenv("LQ_MONTHLY_REFIT_PERIOD_METRICS_CACHE_SIZE", "200000"))
+)
+PREPARED_RETURNS_CACHE_SIZE = max(
+    0, int(os.getenv("LQ_MONTHLY_REFIT_PREPARED_RETURNS_CACHE_SIZE", "50000"))
+)
 REQUIRED_BRIDGE_MANIFEST_KEYS = (
     "deployable_expert_roster",
     "allowed_pre_oos_features",
@@ -438,6 +445,111 @@ def _promotability_decision(best: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+@dataclass(frozen=True, slots=True)
+class _PreparedReturns:
+    source: pd.Series
+    index_ns: np.ndarray
+    values: np.ndarray
+
+
+_PREPARED_RETURNS_CACHE: OrderedDict[tuple[Any, ...], _PreparedReturns] = OrderedDict()
+_PERIOD_METRICS_CACHE: OrderedDict[tuple[Any, ...], dict[str, Any]] = OrderedDict()
+
+
+def _bounded_cache_get(cache: OrderedDict[tuple[Any, ...], Any], key: tuple[Any, ...]) -> Any | None:
+    value = cache.get(key)
+    if value is not None:
+        cache.move_to_end(key)
+    return value
+
+
+def _bounded_cache_set(
+    cache: OrderedDict[tuple[Any, ...], Any],
+    key: tuple[Any, ...],
+    value: Any,
+    *,
+    limit: int,
+) -> None:
+    if limit <= 0:
+        return
+    cache[key] = value
+    cache.move_to_end(key)
+    while len(cache) > limit:
+        cache.popitem(last=False)
+
+
+def _clear_period_metric_caches() -> None:
+    """Clear hot-path metric caches used by benchmarks and isolated tests."""
+    _PREPARED_RETURNS_CACHE.clear()
+    _PERIOD_METRICS_CACHE.clear()
+
+
+def _timestamp_ns(value: str | pd.Timestamp) -> int:
+    return int(pd.Timestamp(value).value)
+
+
+def _returns_signature(returns: pd.Series) -> tuple[Any, ...]:
+    size = int(returns.size)
+    if size == 0:
+        return (id(returns), 0, 0, 0, 0.0, 0.0, True)
+    index = pd.DatetimeIndex(returns.index)
+    values = returns.to_numpy(dtype=float, copy=False)
+    return (
+        id(returns),
+        size,
+        int(index[0].value),
+        int(index[-1].value),
+        float(values[0]),
+        float(values[-1]),
+        bool(index.is_monotonic_increasing),
+    )
+
+
+def _prepared_returns(returns: pd.Series, signature: tuple[Any, ...] | None = None) -> _PreparedReturns:
+    signature = _returns_signature(returns) if signature is None else signature
+    cached = _bounded_cache_get(_PREPARED_RETURNS_CACHE, signature)
+    if cached is not None:
+        return cached
+
+    if returns.size == 0:
+        prepared = _PreparedReturns(
+            source=returns,
+            index_ns=np.asarray([], dtype=np.int64),
+            values=np.asarray([], dtype=np.float64),
+        )
+    else:
+        index = pd.DatetimeIndex(returns.index)
+        index_ns = index.view("int64")
+        values = returns.to_numpy(dtype=float, copy=False)
+        if not index.is_monotonic_increasing:
+            order = np.argsort(index_ns, kind="mergesort")
+            index_ns = index_ns[order]
+            values = values[order]
+        prepared = _PreparedReturns(
+            source=returns,
+            index_ns=np.asarray(index_ns, dtype=np.int64),
+            values=np.asarray(values, dtype=np.float64),
+        )
+    _bounded_cache_set(
+        _PREPARED_RETURNS_CACHE,
+        signature,
+        prepared,
+        limit=PREPARED_RETURNS_CACHE_SIZE,
+    )
+    return prepared
+
+
+def _periods_per_year_ns(index_ns: np.ndarray) -> float:
+    if index_ns.size < 2:
+        return 365.0 * 24.0 * 2.0
+    diffs = np.diff(index_ns) / 1_000_000_000.0
+    positive = diffs[diffs > 0]
+    if positive.size == 0:
+        return 365.0 * 24.0 * 2.0
+    seconds = float(np.median(positive))
+    return 365.0 * 24.0 * 60.0 * 60.0 / seconds
+
+
 def _periods_per_year(index: pd.DatetimeIndex) -> float:
     if len(index) < 2:
         return 365.0 * 24.0 * 2.0
@@ -450,19 +562,27 @@ def _periods_per_year(index: pd.DatetimeIndex) -> float:
 
 
 def _period_metrics(returns: pd.Series, window: tuple[pd.Timestamp, pd.Timestamp]) -> dict[str, Any]:
-    sorted_returns = returns.sort_index()
-    idx = pd.DatetimeIndex(sorted_returns.index)
-    mask = (idx >= window[0]) & (idx <= window[1])
-    values = sorted_returns.to_numpy(dtype=float)[mask]
-    period_index = idx[mask]
+    start_ns = _timestamp_ns(window[0])
+    end_ns = _timestamp_ns(window[1])
+    signature = _returns_signature(returns)
+    cache_key = (*signature, start_ns, end_ns)
+    cached = _bounded_cache_get(_PERIOD_METRICS_CACHE, cache_key)
+    if cached is not None:
+        return dict(cached)
+
+    prepared = _prepared_returns(returns, signature)
+    lo = int(np.searchsorted(prepared.index_ns, start_ns, side="left"))
+    hi = int(np.searchsorted(prepared.index_ns, end_ns, side="right"))
+    values = prepared.values[lo:hi]
+    period_index_ns = prepared.index_ns[lo:hi]
     mean = float(np.mean(values)) if values.size else 0.0
     std = float(np.std(values, ddof=1)) if values.size > 1 else 0.0
     downside = values[values < 0.0]
     down_std = float(np.std(downside, ddof=1)) if downside.size > 1 else 0.0
-    annual = _periods_per_year(period_index)
+    annual = _periods_per_year_ns(period_index_ns)
     total = float(np.prod(1.0 + values) - 1.0) if values.size else 0.0
     mdd = float(broad69.max_drawdown(values)) if values.size else 0.0
-    return {
+    out = {
         "start": window[0].isoformat(),
         "end": window[1].isoformat(),
         "bar_count": int(values.size),
@@ -472,6 +592,8 @@ def _period_metrics(returns: pd.Series, window: tuple[pd.Timestamp, pd.Timestamp
         "sortino": mean / down_std * math.sqrt(annual) if down_std > 0.0 else 0.0,
         "calmar": total / mdd if mdd > 0.0 else 0.0,
     }
+    _bounded_cache_set(_PERIOD_METRICS_CACHE, cache_key, out, limit=PERIOD_METRICS_CACHE_SIZE)
+    return dict(out)
 
 
 def _add_month(ts: pd.Timestamp, months: int) -> pd.Timestamp:
@@ -601,6 +723,66 @@ def _blend_candidate_returns(
     return blended.sort_index()
 
 
+_NON_LEAF_PORTFOLIO_FAMILIES = {
+    "cross_candidate_hybrid",
+    "dynamic_aware_hybrid",
+    "hybrid_oracle_bridge",
+    "meta_portfolio",
+    "validation_selector",
+    "risk_enhanced_blend",
+    "fixed_relaxed_dynamic_blend",
+    "mdd30_barbell_blend",
+    "mdd30_risk_scaled",
+    "mdd30_high_vol_gate",
+    "dynamic_conviction_switch",
+}
+
+_NON_LEAF_LABEL_TOKENS = (
+    ":hybrid_",
+    ":selected_optuna",
+    ":selected_train_validation_legal",
+    ":static_guarded",
+    "hybrid_",
+    "blend:",
+    "meta_portfolio:",
+    "validation_selector:",
+    "dynamic_conviction_switch:",
+)
+
+_NON_LEAF_PROFILE_KIND_TOKENS = (
+    "hybrid",
+    "blend",
+    "portfolio",
+    "selector",
+    "switch",
+    "gate",
+    "scaled",
+    "assimilation",
+)
+
+
+def _leaf_strategy_material_candidate(candidate: CandidateResult) -> bool:
+    """Return whether a candidate may be used as a hybrid/portfolio ingredient.
+
+    Hybrid rows are already portfolios over lower-level strategies. Feeding a
+    hybrid/blend/selector/gate row into another hybrid makes exposure look more
+    diversified than it is and can double-count the same sleeve. Downstream
+    portfolio builders therefore accept only leaf-like strategy/profile rows.
+    """
+    label = candidate.candidate_label.lower()
+    family = candidate.family.lower()
+    row = dict(candidate.row)
+    profile_kind = str(row.get("profile_kind") or "").lower()
+    profile_id = str(row.get("profile_id") or row.get("source_profile_id") or "").lower()
+    if family in _NON_LEAF_PORTFOLIO_FAMILIES:
+        return False
+    if any(token in label for token in _NON_LEAF_LABEL_TOKENS):
+        return False
+    if any(token in profile_id for token in _NON_LEAF_LABEL_TOKENS):
+        return False
+    return not any(token in profile_kind for token in _NON_LEAF_PROFILE_KIND_TOKENS)
+
+
 def _normalize_capped_weights(raw: Mapping[str, float], *, cap: float) -> dict[str, float]:
     weights = {key: max(0.0, float(value)) for key, value in raw.items()}
     total = sum(weights.values())
@@ -640,6 +822,7 @@ def _meta_portfolio_candidates(
         and snap["validation_return"] > 0.0
         and snap["validation_mdd"] <= 0.20
         and not dict(candidate.row).get("selection_reasons")
+        and _leaf_strategy_material_candidate(candidate)
     ]
     if len(eligible) < 2:
         return []
@@ -817,6 +1000,7 @@ def _cross_candidate_hybrid_candidates(
         and snap["validation_return"] > 0.0
         and snap["validation_mdd"] <= 0.18
         and _clean_downstream_candidate(candidate)
+        and _leaf_strategy_material_candidate(candidate)
     ]
     ranked = sorted(
         eligible,
@@ -922,7 +1106,7 @@ def _dynamic_conviction_switch_candidates(
     """Fold-local train/validation selector over existing clean candidates.
 
     The switch is deliberately simple and auditable: every fold scores only
-    train+validation evidence, then chooses either an aggressive hybrid sleeve
+    train+validation evidence, then chooses either an aggressive leaf sleeve
     or a strict-efficiency fallback.  Locked OOS is never read by the selector.
     Multiple fixed thresholds are emitted as separate candidates so the report
     can show whether the higher-comp path is coming from a stable rule or from
@@ -930,16 +1114,16 @@ def _dynamic_conviction_switch_candidates(
     """
     by_label = {candidate.candidate_label: candidate for candidate in candidates}
     aggressive_labels = [
-        "cross_candidate_hybrid:hybrid_v3_5",
-        "cross_candidate_hybrid:hybrid_v3_6",
-        "cross_candidate_hybrid:hybrid_v3_5_train_validation_fit",
-        "cross_candidate_hybrid:hybrid_v3_6_train_validation_fit",
-        "profile_optuna:selected_optuna",
-        "profile_optuna:hybrid_v3_5",
-        "profile_optuna:hybrid_v3_6",
-        "individual_robust:selected_optuna",
-        "individual_robust:hybrid_v3_5",
-        "individual_robust:hybrid_v3_6",
+        "profile_optuna:balanced_mdd12_gross5_69_asset_profile_optuna",
+        "profile_optuna:growth_mdd20_gross8_69_asset_profile_optuna",
+        "profile_optuna:aggressive_mdd30_gross10_69_asset_profile_optuna",
+        "individual_robust:individual_robust_balanced_mdd10_gross3_core10",
+        "individual_robust:individual_robust_growth_mdd14_gross5_core14",
+        "individual_robust:individual_robust_opportunity_mdd18_gross7_core18",
+        "relaxed_efficiency:balanced_mdd12_gross5_69_asset_relaxed_efficiency_repair_optuna",
+        "relaxed_efficiency:growth_mdd20_gross8_69_asset_relaxed_efficiency_repair_optuna",
+        "relaxed_efficiency:aggressive_mdd30_gross10_69_asset_relaxed_efficiency_repair_optuna",
+        "strict_efficiency:aggressive_mdd30_gross10_69_asset_efficiency_repair_optuna",
     ]
     fallback_labels = [
         "strict_efficiency:balanced_mdd12_gross5_69_asset_efficiency_repair_optuna",
@@ -951,6 +1135,8 @@ def _dynamic_conviction_switch_candidates(
         if candidate is None:
             return None
         if not _clean_downstream_candidate(candidate):
+            return None
+        if not _leaf_strategy_material_candidate(candidate):
             return None
         snap = _candidate_validation_snapshot(candidate, fold)
         if snap["train_return"] <= 0.0 or snap["validation_return"] <= 0.0:
@@ -964,6 +1150,8 @@ def _dynamic_conviction_switch_candidates(
         if candidate is None:
             return None
         if not _clean_downstream_candidate(candidate):
+            return None
+        if not _leaf_strategy_material_candidate(candidate):
             return None
         snap = _candidate_validation_snapshot(candidate, fold)
         # Fallback sleeves are allowed to be tiny/cash-like and can carry
@@ -1024,25 +1212,25 @@ def _dynamic_conviction_switch_candidates(
             selected = best_aggressive if best_score >= threshold else fallback_candidate
             selected_snap = _candidate_validation_snapshot(selected, fold)
             row = {
-            "profile_id": f"dynamic_conviction_switch_t{threshold:.2f}_{fallback_name}",
-            "profile_kind": "train_validation_dynamic_conviction_switch",
-            "candidate_tier": "clean_train_validation_selected_paper_shadow",
-            "selected_candidate_label": selected.candidate_label,
-            "aggressive_candidate_label": best_aggressive.candidate_label,
-            "fallback_candidate_label": fallback_candidate.candidate_label,
-            "fallback_policy": fallback_name,
-            "conviction_threshold": float(threshold),
-            "aggressive_conviction_score": best_score,
-            "selected_validation_return": selected_snap["validation_return"],
-            "selected_validation_mdd": selected_snap["validation_mdd"],
-            "selection_inputs": ["train", "validation"],
-            "uses_locked_oos_for_selection": False,
-            "ready_for_paper": True,
-            "ready_for_real": False,
-            "real_money_execution": False,
-            "weights": {selected.candidate_label: 1.0},
-            "final_weights": {selected.candidate_label: 1.0},
-        }
+                "profile_id": f"dynamic_conviction_switch_t{threshold:.2f}_{fallback_name}",
+                "profile_kind": "train_validation_dynamic_conviction_switch",
+                "candidate_tier": "clean_train_validation_selected_paper_shadow",
+                "selected_candidate_label": selected.candidate_label,
+                "aggressive_candidate_label": best_aggressive.candidate_label,
+                "fallback_candidate_label": fallback_candidate.candidate_label,
+                "fallback_policy": fallback_name,
+                "conviction_threshold": float(threshold),
+                "aggressive_conviction_score": best_score,
+                "selected_validation_return": selected_snap["validation_return"],
+                "selected_validation_mdd": selected_snap["validation_mdd"],
+                "selection_inputs": ["train", "validation"],
+                "uses_locked_oos_for_selection": False,
+                "ready_for_paper": True,
+                "ready_for_real": False,
+                "real_money_execution": False,
+                "weights": {selected.candidate_label: 1.0},
+                "final_weights": {selected.candidate_label: 1.0},
+            }
             out.append(
                 _candidate_eval(
                     family="dynamic_conviction_switch",
@@ -1080,342 +1268,44 @@ def _dynamic_aware_hybrid_candidates(
     hybrid_trials: int,
     seed: int,
 ) -> list[CandidateResult]:
-    """Run v3.5/v3.6 again after dynamic challengers exist.
+    """Deprecated nested-hybrid pass.
 
-    The earlier cross-candidate hybrid is built before the dynamic switch rows
-    are generated, so it cannot actually absorb those high-comp challengers.
-    This pass treats dynamic/challenger/robust/strict rows as ordinary expert
-    streams under the same no-current-OOS contract: inputs are screened and
-    optimized from train+validation only, while locked OOS remains report-only.
+    The old dynamic-aware pass fed ``dynamic_conviction_switch`` and existing
+    hybrid rows into another v3.5/v3.6 optimizer.  Under the no-nested-hybrid
+    policy a hybrid/selector/gate is already a portfolio-level object, so it
+    cannot be a material input to another hybrid.  Keep the function as an
+    explicit no-op so historical callers do not silently resurrect the nested
+    family.
     """
-    snapshots = [
-        (candidate, _candidate_validation_snapshot(candidate, fold))
-        for candidate in candidates
-        if candidate.returns.size
-    ]
-
-    def eligible(candidate: CandidateResult, snap: Mapping[str, float]) -> bool:
-        if not _clean_downstream_candidate(candidate):
-            return False
-        if snap["train_return"] <= -0.02 or snap["validation_return"] <= -0.01:
-            return False
-        return not snap["validation_mdd"] > 0.22
-
-    eligible_items = [
-        (candidate, snap)
-        for candidate, snap in snapshots
-        if eligible(candidate, snap)
-    ]
-    by_label = {candidate.candidate_label: (candidate, snap) for candidate, snap in eligible_items}
-    selected: list[tuple[CandidateResult, dict[str, float]]] = []
-    seen: set[str] = set()
-
-    def add(item: tuple[CandidateResult, dict[str, float]] | None) -> None:
-        if item is None:
-            return
-        candidate, _ = item
-        if candidate.candidate_label in seen:
-            return
-        selected.append(item)
-        seen.add(candidate.candidate_label)
-
-    for label in DYNAMIC_AWARE_PRIORITY_LABELS:
-        add(by_label.get(label))
-
-    ranked_backfill = sorted(
-        eligible_items,
-        key=lambda item: (
-            item[1]["stability_score"],
-            item[1]["validation_calmar"],
-            item[1]["validation_return"],
-        ),
-        reverse=True,
-    )
-    for item in ranked_backfill:
-        if len(selected) >= 12:
-            break
-        add(item)
-
-    dynamic_labels = [
-        candidate.candidate_label
-        for candidate, _ in selected
-        if candidate.family == "dynamic_conviction_switch"
-    ]
-    robust_core_labels = [
-        candidate.candidate_label
-        for candidate, _ in selected
-        if candidate.family in {"cross_candidate_hybrid", "strict_efficiency", "individual_robust"}
-    ]
-    if not dynamic_labels or len(selected) < 3:
-        return []
-
-    union_index = pd.DatetimeIndex(sorted(set().union(*(set(item[0].returns.index) for item in selected))))
-    streams = [_stream_from_candidate(candidate, union_index=union_index) for candidate, _ in selected]
-    split_windows = profile69._split_windows_for_hybrid(fold.windows().as_payload())
-    with optuna_hybrid._split_window_context(split_windows):
-        v35 = optuna_hybrid._run_optuna(
-            streams,
-            version="v3_5",
-            n_trials=max(4, int(hybrid_trials) // 2),
-            seed=int(seed) + 910_000,
-            fit_splits=("train",),
-            warmup_splits=("train",),
-            require_locked_oos_gate=False,
-        )
-        v36 = optuna_hybrid._run_optuna(
-            streams,
-            version="v3_6",
-            n_trials=max(4, int(hybrid_trials) // 2),
-            seed=int(seed) + 910_001,
-            fit_splits=("train",),
-            warmup_splits=("train",),
-            require_locked_oos_gate=False,
-        )
-        v35_train_validation = optuna_hybrid._run_optuna(
-            streams,
-            version="v3_5",
-            n_trials=max(4, int(hybrid_trials) // 2),
-            seed=int(seed) + 910_010,
-            fit_splits=("train", "validation"),
-            warmup_splits=("train",),
-            require_locked_oos_gate=False,
-        )
-        v36_train_validation = optuna_hybrid._run_optuna(
-            streams,
-            version="v3_6",
-            n_trials=max(4, int(hybrid_trials) // 2),
-            seed=int(seed) + 910_011,
-            fit_splits=("train", "validation"),
-            warmup_splits=("train",),
-            require_locked_oos_gate=False,
-        )
-
-    input_labels = [candidate.candidate_label for candidate, _ in selected]
-    for result, fit_policy in (
-        (v35, "train_only_after_dynamic_aware_input_screen"),
-        (v36, "train_only_after_dynamic_aware_input_screen"),
-        (v35_train_validation, "train_validation_dynamic_aware_final_refit"),
-        (v36_train_validation, "train_validation_dynamic_aware_final_refit"),
-    ):
-        result.row.update(
-            {
-                "profile_kind": "dynamic_aware_v35_v36_oracle_proxy_hybrid",
-                "candidate_tier": "clean_train_validation_selected_paper_shadow",
-                "selection_inputs": ["train", "validation"],
-                "uses_locked_oos_for_selection": False,
-                "dynamic_aware_fit_policy": fit_policy,
-                "dynamic_aware_inputs": input_labels,
-                "dynamic_input_labels": dynamic_labels,
-                "robust_core_input_labels": robust_core_labels,
-                "dynamic_expert_used_as": "return_stream_only_no_same_fold_label_feature",
-                "same_month_self_feeding": False,
-                "current_fold_oos_used_for_weighting": False,
-                "ready_for_real": False,
-                "real_money_execution": False,
-            }
-        )
-    return [
-        _candidate_eval(
-            family="dynamic_aware_hybrid",
-            label="dynamic_aware_hybrid:hybrid_v3_5",
-            row=v35.row,
-            returns=v35.returns,
-        ),
-        _candidate_eval(
-            family="dynamic_aware_hybrid",
-            label="dynamic_aware_hybrid:hybrid_v3_6",
-            row=v36.row,
-            returns=v36.returns,
-        ),
-        _candidate_eval(
-            family="dynamic_aware_hybrid",
-            label="dynamic_aware_hybrid:hybrid_v3_5_train_validation_fit",
-            row=v35_train_validation.row,
-            returns=v35_train_validation.returns,
-        ),
-        _candidate_eval(
-            family="dynamic_aware_hybrid",
-            label="dynamic_aware_hybrid:hybrid_v3_6_train_validation_fit",
-            row=v36_train_validation.row,
-            returns=v36_train_validation.returns,
-        ),
-    ]
+    _ = (candidates, fold, hybrid_trials, seed)
+    return []
 
 
 def _fixed_risk_enhanced_blend_candidates(
     candidates: Sequence[CandidateResult],
 ) -> list[CandidateResult]:
-    """Fixed-weight challenger overlays for research-only forward shadowing.
+    """Deprecated fixed overlay over non-leaf dynamic/hybrid candidates.
 
-    These are deliberately *not* adaptive to the current locked OOS month: the
-    weights are fixed constants over clean candidate streams.  Because these
-    overlays were added after reviewing earlier OOS artifacts, they are flagged
-    as post-OOS research variants and must not be promoted from the same
-    historical window.  Their purpose is to create fresh forward-shadow
-    candidates that trade some dynamic-switch upside for lower drawdown.
+    These research overlays were useful for shadow analysis, but they combine
+    selector/hybrid rows rather than leaf strategy material.  The no-nested
+    policy disables this family until it is rebuilt directly from leaf sleeves.
     """
-    by_label = {candidate.candidate_label: candidate for candidate in candidates}
-
-    def available(weights: Mapping[str, float]) -> list[CandidateResult] | None:
-        active: list[CandidateResult] = []
-        for label in weights:
-            candidate = by_label.get(label)
-            if candidate is None or not _clean_downstream_candidate(candidate):
-                return None
-            active.append(candidate)
-        return active
-
-    dyn085 = "dynamic_conviction_switch:t0.85_risk_capped_fallback"
-    dyn100 = "dynamic_conviction_switch:t1.00_risk_capped_fallback"
-    aware_v36_tv = "dynamic_aware_hybrid:hybrid_v3_6_train_validation_fit"
-    aware_v36 = "dynamic_aware_hybrid:hybrid_v3_6"
-    aware_v35 = "dynamic_aware_hybrid:hybrid_v3_5"
-    strict_growth = "strict_efficiency:growth_mdd20_gross8_69_asset_efficiency_repair_optuna"
-    specs: tuple[tuple[str, dict[str, float]], ...] = (
-        (
-            "risk_enhanced_blend:dyn085_70_aware_v36tv_30",
-            {dyn085: 0.70, aware_v36_tv: 0.30},
-        ),
-        (
-            "risk_enhanced_blend:dyn085_60_aware_v36tv_40",
-            {dyn085: 0.60, aware_v36_tv: 0.40},
-        ),
-        (
-            "risk_enhanced_blend:dyn085_50_aware_v36tv_50",
-            {dyn085: 0.50, aware_v36_tv: 0.50},
-        ),
-        (
-            "risk_enhanced_blend:dyn085_60_aware_v36_40",
-            {dyn085: 0.60, aware_v36: 0.40},
-        ),
-        (
-            "risk_enhanced_blend:dyn085_50_aware_v35_50",
-            {dyn085: 0.50, aware_v35: 0.50},
-        ),
-        (
-            "risk_enhanced_blend:dyn100_60_aware_v36tv_40",
-            {dyn100: 0.60, aware_v36_tv: 0.40},
-        ),
-        (
-            "risk_enhanced_blend:dyn085_60_aware_v36tv_30_strict_growth_10",
-            {dyn085: 0.60, aware_v36_tv: 0.30, strict_growth: 0.10},
-        ),
-    )
-
-    out: list[CandidateResult] = []
-    for label, weights in specs:
-        active = available(weights)
-        if active is None:
-            continue
-        row = {
-            "profile_id": label,
-            "profile_kind": "fixed_weight_dynamic_challenger_risk_overlay",
-            "candidate_tier": "post_oos_research_forward_shadow_only",
-            "weights": weights,
-            "final_weights": weights,
-            "selection_inputs": ["fixed_prior", "train", "validation"],
-            "uses_locked_oos_for_selection": False,
-            "same_month_self_feeding": False,
-            "current_fold_oos_used_for_weighting": False,
-            "post_oos_research_variant": True,
-            "requires_fresh_forward_shadow": True,
-            "ready_for_paper": True,
-            "ready_for_real": False,
-            "real_money_execution": False,
-        }
-        out.append(
-            _candidate_eval(
-                family="risk_enhanced_blend",
-                label=label,
-                row=row,
-                returns=_blend_candidate_returns(active, weights),
-            )
-        )
-    return out
+    _ = candidates
+    return []
 
 
 def _fixed_relaxed_dynamic_blend_candidates(
     candidates: Sequence[CandidateResult],
 ) -> list[CandidateResult]:
-    """Exact bar-return fixed blends of the top relaxed sleeve and dynamic candidate.
+    """Deprecated exact blend of two lower-level hybrid portfolios.
 
-    These rows answer the user's follow-up research question with intrabar
-    MDD/Sharpe computed from actual candidate return streams rather than from
-    monthly-return approximations.  The weights are fixed constants and the
-    current locked OOS month is never read for weighting.  Because this blend
-    family was introduced after reviewing the same historical OOS window, rows
-    are explicitly marked fresh-forward-shadow only.
+    ``relaxed_efficiency:hybrid_v3_5`` and
+    ``dynamic_aware_hybrid:hybrid_v3_5_train_validation_fit`` are already
+    portfolio-level hybrids.  Blending them again creates hidden duplicate
+    sleeve exposure, so this family is intentionally disabled by policy.
     """
-    by_label = {candidate.candidate_label: candidate for candidate in candidates}
-    relaxed_label = "relaxed_efficiency:hybrid_v3_5"
-    dynamic_label = "dynamic_aware_hybrid:hybrid_v3_5_train_validation_fit"
-    relaxed = by_label.get(relaxed_label)
-    dynamic = by_label.get(dynamic_label)
-
-    def clean_component_stream(candidate: CandidateResult | None) -> bool:
-        if candidate is None or not candidate.returns.size:
-            return False
-        row = dict(candidate.row)
-        return bool(
-            not row.get("uses_locked_oos_for_selection")
-            and not row.get("same_month_self_feeding")
-            and not row.get("current_fold_oos_used_for_weighting")
-            and not row.get("post_oos_research_variant")
-            and not row.get("requires_fresh_forward_shadow")
-            and not row.get("source_post_oos_research_variant")
-        )
-
-    if (
-        relaxed is None
-        or dynamic is None
-        or not clean_component_stream(relaxed)
-        or not clean_component_stream(dynamic)
-    ):
-        return []
-
-    specs: tuple[tuple[str, float, float], ...] = (
-        ("fixed_relaxed_dynamic_blend:relaxed30_dynamic70", 0.30, 0.70),
-        ("fixed_relaxed_dynamic_blend:relaxed40_dynamic60", 0.40, 0.60),
-        ("fixed_relaxed_dynamic_blend:relaxed50_dynamic50", 0.50, 0.50),
-        ("fixed_relaxed_dynamic_blend:relaxed60_dynamic40", 0.60, 0.40),
-        ("fixed_relaxed_dynamic_blend:relaxed70_dynamic30", 0.70, 0.30),
-    )
-    out: list[CandidateResult] = []
-    for label, relaxed_weight, dynamic_weight in specs:
-        weights = {
-            relaxed_label: float(relaxed_weight),
-            dynamic_label: float(dynamic_weight),
-        }
-        row = {
-            "profile_id": label,
-            "profile_kind": "fixed_weight_relaxed_dynamic_exact_bar_blend",
-            "candidate_tier": "post_oos_research_forward_shadow_only",
-            "weights": weights,
-            "final_weights": weights,
-            "selection_inputs": ["fixed_prior", "train", "validation"],
-            "uses_locked_oos_for_selection": False,
-            "same_month_self_feeding": False,
-            "current_fold_oos_used_for_weighting": False,
-            "post_oos_research_variant": True,
-            "requires_fresh_forward_shadow": True,
-            "ready_for_paper": True,
-            "ready_for_real": False,
-            "real_money_execution": False,
-            "blend_components": [relaxed_label, dynamic_label],
-            "blend_rationale": (
-                "fixed exact-bar blend of highest-comp relaxed sleeve and lower-risk "
-                "dynamic-aware candidate; historical-window promotion requires fresh-forward shadow"
-            ),
-        }
-        out.append(
-            _candidate_eval(
-                family="fixed_relaxed_dynamic_blend",
-                label=label,
-                row=row,
-                returns=_blend_candidate_returns([relaxed, dynamic], weights),
-            )
-        )
-    return out
+    _ = candidates
+    return []
 
 
 def _validation_selector_candidates(
@@ -1431,6 +1321,8 @@ def _validation_selector_candidates(
 
     def eligible(candidate: CandidateResult, snap: Mapping[str, float], *, mdd_cap: float) -> bool:
         if not _clean_downstream_candidate(candidate):
+            return False
+        if not _leaf_strategy_material_candidate(candidate):
             return False
         return (
             snap["train_return"] > 0.0
@@ -1551,6 +1443,7 @@ def _clean_source_candidate(candidate: CandidateResult) -> bool:
     row = dict(candidate.row)
     return bool(
         candidate.returns.size
+        and _leaf_strategy_material_candidate(candidate)
         and not row.get("uses_locked_oos_for_selection")
         and not row.get("same_month_self_feeding")
         and not row.get("current_fold_oos_used_for_weighting")
@@ -1572,6 +1465,7 @@ def _clean_downstream_candidate(candidate: CandidateResult) -> bool:
     row = dict(candidate.row)
     return bool(
         candidate.returns.size
+        and _leaf_strategy_material_candidate(candidate)
         and not row.get("uses_locked_oos_for_selection")
         and not row.get("same_month_self_feeding")
         and not row.get("current_fold_oos_used_for_weighting")
@@ -1580,6 +1474,44 @@ def _clean_downstream_candidate(candidate: CandidateResult) -> bool:
         and not row.get("source_post_oos_research_variant")
         and not row.get("selection_reasons")
     )
+
+
+def _candidate_label_is_non_leaf_reference(label: str) -> bool:
+    lower = str(label).lower()
+    family = lower.split(":", 1)[0]
+    return family in _NON_LEAF_PORTFOLIO_FAMILIES or any(
+        token in lower for token in _NON_LEAF_LABEL_TOKENS
+    )
+
+
+def _row_reference_labels(row: Mapping[str, Any]) -> set[str]:
+    refs: set[str] = set()
+    for key in (
+        "selected_candidate_label",
+        "aggressive_candidate_label",
+        "fallback_candidate_label",
+        "dynamic_expert_label",
+        "source_candidate_label",
+    ):
+        value = row.get(key)
+        if value:
+            refs.add(str(value))
+    for key in (
+        "bridge_inputs",
+        "dynamic_aware_inputs",
+        "dynamic_input_labels",
+        "robust_core_input_labels",
+        "cross_candidate_inputs",
+        "blend_components",
+    ):
+        refs.update(str(item) for item in (row.get(key) or []))
+    for key in ("final_weights", "weights"):
+        refs.update(str(item) for item in dict(row.get(key) or {}))
+    return refs
+
+
+def _row_references_non_leaf_material(row: Mapping[str, Any]) -> bool:
+    return any(_candidate_label_is_non_leaf_reference(ref) for ref in _row_reference_labels(row))
 
 
 def _mdd30_high_volatility_candidates(
@@ -1603,20 +1535,22 @@ def _mdd30_high_volatility_candidates(
             return None
         return candidate
 
-    dyn085 = "dynamic_conviction_switch:t0.85_risk_capped_fallback"
-    dyn100 = "dynamic_conviction_switch:t1.00_risk_capped_fallback"
-    aware_v36_tv = "dynamic_aware_hybrid:hybrid_v3_6_train_validation_fit"
-    aware_v35 = "dynamic_aware_hybrid:hybrid_v3_5"
-    cross_v35 = "cross_candidate_hybrid:hybrid_v3_5"
+    profile_growth = "profile_optuna:growth_mdd20_gross8_69_asset_profile_optuna"
+    profile_aggressive = "profile_optuna:aggressive_mdd30_gross10_69_asset_profile_optuna"
+    relaxed_growth = "relaxed_efficiency:growth_mdd20_gross8_69_asset_relaxed_efficiency_repair_optuna"
+    relaxed_aggressive = (
+        "relaxed_efficiency:aggressive_mdd30_gross10_69_asset_relaxed_efficiency_repair_optuna"
+    )
     strict_balanced = "strict_efficiency:balanced_mdd12_gross5_69_asset_efficiency_repair_optuna"
     strict_growth = "strict_efficiency:growth_mdd20_gross8_69_asset_efficiency_repair_optuna"
+    strict_aggressive = "strict_efficiency:aggressive_mdd30_gross10_69_asset_efficiency_repair_optuna"
 
     fixed_scale_specs: tuple[tuple[str, str, float], ...] = (
-        ("mdd30_risk_scaled:dyn085_x1_25", dyn085, 1.25),
-        ("mdd30_risk_scaled:dyn085_x1_50", dyn085, 1.50),
-        ("mdd30_risk_scaled:dyn100_x1_50", dyn100, 1.50),
-        ("mdd30_risk_scaled:aware_v36tv_x1_50", aware_v36_tv, 1.50),
-        ("mdd30_risk_scaled:cross_v35_x1_50", cross_v35, 1.50),
+        ("mdd30_risk_scaled:profile_growth_x1_50", profile_growth, 1.50),
+        ("mdd30_risk_scaled:profile_aggressive_x1_50", profile_aggressive, 1.50),
+        ("mdd30_risk_scaled:relaxed_growth_x1_50", relaxed_growth, 1.50),
+        ("mdd30_risk_scaled:relaxed_aggressive_x1_50", relaxed_aggressive, 1.50),
+        ("mdd30_risk_scaled:strict_aggressive_x1_25", strict_aggressive, 1.25),
     )
     for label, source_label, scale in fixed_scale_specs:
         candidate = source(source_label)
@@ -1639,8 +1573,8 @@ def _mdd30_high_volatility_candidates(
         )
 
     validation_scaled_specs: tuple[tuple[str, str, float, float], ...] = (
-        ("mdd30_risk_scaled:dyn085_val_mdd30_cap1_50", dyn085, 0.30, 1.50),
-        ("mdd30_risk_scaled:aware_v36tv_val_mdd30_cap1_75", aware_v36_tv, 0.30, 1.75),
+        ("mdd30_risk_scaled:profile_aggressive_val_mdd30_cap1_50", profile_aggressive, 0.30, 1.50),
+        ("mdd30_risk_scaled:relaxed_aggressive_val_mdd30_cap1_75", relaxed_aggressive, 0.30, 1.75),
     )
     for label, source_label, target_mdd, max_scale in validation_scaled_specs:
         candidate = source(source_label)
@@ -1671,19 +1605,24 @@ def _mdd30_high_volatility_candidates(
 
     fixed_blend_specs: tuple[tuple[str, dict[str, float], float], ...] = (
         (
-            "mdd30_barbell_blend:dyn085_85_aware_v36tv_15_x1_50",
-            {dyn085: 0.85, aware_v36_tv: 0.15},
+            "mdd30_barbell_blend:profile_aggressive_70_strict_balanced_30_x1_50",
+            {profile_aggressive: 0.70, strict_balanced: 0.30},
             1.50,
         ),
         (
-            "mdd30_barbell_blend:dyn085_75_aware_v35_25_x1_50",
-            {dyn085: 0.75, aware_v35: 0.25},
+            "mdd30_barbell_blend:relaxed_aggressive_70_strict_growth_30_x1_50",
+            {relaxed_aggressive: 0.70, strict_growth: 0.30},
             1.50,
         ),
         (
-            "mdd30_barbell_blend:dyn085_70_strict_growth_30_x1_50",
-            {dyn085: 0.70, strict_growth: 0.30},
-            1.50,
+            "mdd30_barbell_blend:profile_growth_60_strict_growth_40_x1_25",
+            {profile_growth: 0.60, strict_growth: 0.40},
+            1.25,
+        ),
+        (
+            "mdd30_barbell_blend:strict_aggressive_70_strict_balanced_30_x1_25",
+            {strict_aggressive: 0.70, strict_balanced: 0.30},
+            1.25,
         ),
     )
     for label, weights, scale in fixed_blend_specs:
@@ -1725,25 +1664,17 @@ def _mdd30_high_volatility_candidates(
         if _clean_source_candidate(candidate)
     ]
     aggressive_labels = {
-        dyn085,
-        dyn100,
-        "profile_optuna:selected_optuna",
-        "profile_optuna:hybrid_v3_5",
-        "profile_optuna:hybrid_v3_6",
-        "profile_optuna:growth_mdd20_gross8_69_asset_profile_optuna",
-        "relaxed_efficiency:aggressive_mdd30_gross10_69_asset_relaxed_efficiency_repair_optuna",
-        "relaxed_efficiency:growth_mdd20_gross8_69_asset_relaxed_efficiency_repair_optuna",
-        cross_v35,
-        "cross_candidate_hybrid:hybrid_v3_6",
-        aware_v35,
-        aware_v36_tv,
+        profile_growth,
+        profile_aggressive,
+        relaxed_growth,
+        relaxed_aggressive,
+        strict_aggressive,
     }
     defensive_labels = {
-        aware_v36_tv,
-        "dynamic_aware_hybrid:hybrid_v3_6",
         strict_balanced,
         strict_growth,
-        "cross_candidate_hybrid:hybrid_v3_6_train_validation_fit",
+        "profile_optuna:balanced_mdd12_gross5_69_asset_profile_optuna",
+        "relaxed_efficiency:balanced_mdd12_gross5_69_asset_relaxed_efficiency_repair_optuna",
     }
 
     def high_vol_score(item: tuple[CandidateResult, Mapping[str, float]]) -> tuple[float, ...]:
@@ -3120,6 +3051,7 @@ def _evaluate_candidate(candidate: CandidateResult, fold: MonthlyFold) -> dict[s
     requires_fresh_forward_shadow = bool(row.get("requires_fresh_forward_shadow", False))
     source_post_oos_research_variant = bool(row.get("source_post_oos_research_variant", False))
     uses_locked_oos_for_selection = bool(row.get("uses_locked_oos_for_selection", False))
+    nested_hybrid_dependency = _row_references_non_leaf_material(row)
     return {
         "fold_id": fold.fold_id,
         "family": candidate.family,
@@ -3143,10 +3075,12 @@ def _evaluate_candidate(candidate: CandidateResult, fold: MonthlyFold) -> dict[s
         "uses_locked_oos_for_selection": uses_locked_oos_for_selection,
         "post_oos_research_variant": post_oos_research_variant,
         "requires_fresh_forward_shadow": requires_fresh_forward_shadow,
+        "nested_hybrid_dependency": nested_hybrid_dependency,
         "clean_promotion_eligible": not uses_locked_oos_for_selection
         and not post_oos_research_variant
         and not requires_fresh_forward_shadow
-        and not source_post_oos_research_variant,
+        and not source_post_oos_research_variant
+        and not nested_hybrid_dependency,
         "ready_for_paper": bool(row.get("ready_for_paper") or row.get("paper_testnet_candidate")),
         "selected_candidate_label": row.get("selected_candidate_label"),
         "aggressive_candidate_label": row.get("aggressive_candidate_label"),
@@ -3356,35 +3290,12 @@ def _sanitize_research_dependency_flags(
     }
     post_oos_prefixes = ("mdd30_", "risk_enhanced_blend:")
 
-    def references(row: Mapping[str, Any]) -> set[str]:
-        refs: set[str] = set()
-        for key in (
-            "selected_candidate_label",
-            "aggressive_candidate_label",
-            "fallback_candidate_label",
-            "dynamic_expert_label",
-            "source_candidate_label",
-        ):
-            value = row.get(key)
-            if value:
-                refs.add(str(value))
-        for key in (
-            "bridge_inputs",
-            "dynamic_aware_inputs",
-            "dynamic_input_labels",
-            "robust_core_input_labels",
-        ):
-            refs.update(str(item) for item in (row.get(key) or []))
-        for key in ("final_weights", "weights"):
-            refs.update(str(item) for item in dict(row.get(key) or {}))
-        return refs
-
     changed = True
     while changed:
         changed = False
         for row in mutable_rows:
             label = str(row.get("candidate_label"))
-            refs = references(row)
+            refs = _row_reference_labels(row)
             contaminated = any(ref in post_oos_labels for ref in refs) or any(
                 ref.startswith(post_oos_prefixes) for ref in refs
             )
@@ -3394,6 +3305,7 @@ def _sanitize_research_dependency_flags(
 
     for row in mutable_rows:
         label = str(row.get("candidate_label"))
+        nested_hybrid_dependency = _row_references_non_leaf_material(row)
         contaminated = label in post_oos_labels or any(
             label.startswith(prefix) for prefix in post_oos_prefixes
         )
@@ -3401,10 +3313,12 @@ def _sanitize_research_dependency_flags(
             row["post_oos_research_variant"] = True
             row["requires_fresh_forward_shadow"] = True
         uses_oos = bool(row.get("uses_locked_oos_for_selection", False))
+        row["nested_hybrid_dependency"] = nested_hybrid_dependency
         row["clean_promotion_eligible"] = (
             not uses_oos
             and not bool(row.get("post_oos_research_variant", False))
             and not bool(row.get("requires_fresh_forward_shadow", False))
+            and not nested_hybrid_dependency
         )
     return mutable_rows
 

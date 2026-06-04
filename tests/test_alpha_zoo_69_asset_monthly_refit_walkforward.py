@@ -105,6 +105,21 @@ def test_timeframe_coverage_summary_reports_one_day() -> None:
     assert "complete_bucket_policy" in summary["1d"]
 
 
+
+def test_leaf_strategy_material_filter_rejects_nested_hybrid_inputs() -> None:
+    leaf = _candidate("profile_optuna:growth_mdd20_gross8_69_asset_profile_optuna")
+    hybrid = _candidate("cross_candidate_hybrid:hybrid_v3_5", family="cross_candidate_hybrid")
+    selector = _candidate(
+        "dynamic_conviction_switch:t0.90_risk_capped_fallback",
+        family="dynamic_conviction_switch",
+    )
+    selected_optuna = _candidate("profile_optuna:selected_optuna")
+
+    assert module._leaf_strategy_material_candidate(leaf) is True
+    assert module._leaf_strategy_material_candidate(hybrid) is False
+    assert module._leaf_strategy_material_candidate(selector) is False
+    assert module._leaf_strategy_material_candidate(selected_optuna) is False
+
 def test_dynamic_conviction_switch_uses_train_validation_only() -> None:
     index = pd.date_range("2025-01-01", "2025-03-31", freq="1D")
     fold = module.MonthlyFold(
@@ -114,13 +129,14 @@ def test_dynamic_conviction_switch_uses_train_validation_only() -> None:
         validation=(pd.Timestamp("2025-02-01"), pd.Timestamp("2025-02-28")),
         locked_oos=(pd.Timestamp("2025-03-01"), pd.Timestamp("2025-03-31")),
     )
+    aggressive_label = "profile_optuna:growth_mdd20_gross8_69_asset_profile_optuna"
     aggressive_returns = pd.Series(0.04, index=index, dtype=float)
     aggressive_returns.loc["2025-03-01":"2025-03-31"] = -0.03
     fallback_returns = pd.Series(0.001, index=index, dtype=float)
     candidates = [
         module.CandidateResult(
-            family="cross_candidate_hybrid",
-            candidate_label="cross_candidate_hybrid:hybrid_v3_5",
+            family="profile_optuna",
+            candidate_label=aggressive_label,
             source_profile_id="aggressive",
             row={"selection_reasons": [], "uses_locked_oos_for_selection": False},
             returns=aggressive_returns,
@@ -145,13 +161,12 @@ def test_dynamic_conviction_switch_uses_train_validation_only() -> None:
 
     assert switched
     assert all(candidate.row["uses_locked_oos_for_selection"] is False for candidate in switched)
-    assert switched[0].row["selected_candidate_label"] == "cross_candidate_hybrid:hybrid_v3_5"
-    # The selector still picks the high train/validation candidate even though
-    # its locked OOS is deliberately worse than fallback in this fixture.
+    assert switched[0].row["selected_candidate_label"] == aggressive_label
+    # The selector still picks the high train/validation leaf candidate even
+    # though its locked OOS is deliberately worse than fallback in this fixture.
     assert module._period_metrics(switched[0].returns, fold.locked_oos)["total_return"] < 0.0
 
-
-def test_dynamic_aware_hybrid_absorbs_dynamic_as_clean_expert(
+def test_dynamic_aware_hybrid_is_disabled_for_nested_hybrid_materials(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     fold = module.MonthlyFold(
@@ -161,33 +176,11 @@ def test_dynamic_aware_hybrid_absorbs_dynamic_as_clean_expert(
         validation=(pd.Timestamp("2025-02-01"), pd.Timestamp("2025-02-28")),
         locked_oos=(pd.Timestamp("2025-03-01"), pd.Timestamp("2025-03-31")),
     )
-    calls: list[dict[str, object]] = []
 
-    def fake_run_optuna(
-        streams, *, version, n_trials, seed, fit_splits, warmup_splits, require_locked_oos_gate
-    ):
-        labels = [stream.profile_id for stream in streams]
-        calls.append(
-            {
-                "labels": labels,
-                "version": version,
-                "fit_splits": tuple(fit_splits),
-                "require_locked_oos_gate": require_locked_oos_gate,
-            }
-        )
-        returns = sum(stream.returns for stream in streams) / float(len(streams))
-        weights = {label: 1.0 / float(len(labels)) for label in labels}
-        return SimpleNamespace(
-            row={
-                "profile_id": f"fake_{version}_{'_'.join(fit_splits)}",
-                "selection_reasons": [],
-                "weights": weights,
-                "final_weights": weights,
-            },
-            returns=returns,
-        )
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("dynamic-aware nested hybrid optimizer should not run")
 
-    monkeypatch.setattr(module.optuna_hybrid, "_run_optuna", fake_run_optuna)
+    monkeypatch.setattr(module.optuna_hybrid, "_run_optuna", fail_if_called)
     candidates = [
         _candidate(
             "dynamic_conviction_switch:t0.90_risk_capped_fallback",
@@ -204,37 +197,13 @@ def test_dynamic_aware_hybrid_absorbs_dynamic_as_clean_expert(
             family="strict_efficiency",
             daily_return=0.002,
         ),
-        _candidate(
-            "strict_efficiency:growth_mdd20_gross8_69_asset_efficiency_repair_optuna",
-            family="strict_efficiency",
-            daily_return=0.001,
-        ),
     ]
 
     out = module._dynamic_aware_hybrid_candidates(candidates, fold, hybrid_trials=8, seed=7)
 
-    assert len(out) == 4
-    assert {item.candidate_label for item in out} == {
-        "dynamic_aware_hybrid:hybrid_v3_5",
-        "dynamic_aware_hybrid:hybrid_v3_6",
-        "dynamic_aware_hybrid:hybrid_v3_5_train_validation_fit",
-        "dynamic_aware_hybrid:hybrid_v3_6_train_validation_fit",
-    }
-    assert all(candidate.row["uses_locked_oos_for_selection"] is False for candidate in out)
-    assert all(candidate.row["same_month_self_feeding"] is False for candidate in out)
-    assert all(candidate.row["current_fold_oos_used_for_weighting"] is False for candidate in out)
-    assert all(
-        "dynamic_conviction_switch:t0.90_risk_capped_fallback"
-        in candidate.row["dynamic_input_labels"]
-        for candidate in out
-    )
-    assert all(call["require_locked_oos_gate"] is False for call in calls)
-    assert all(
-        "dynamic_conviction_switch:t0.90_risk_capped_fallback" in call["labels"] for call in calls
-    )
+    assert out == []
 
-
-def test_fixed_risk_enhanced_blend_is_research_only_without_oos_selection() -> None:
+def test_fixed_risk_enhanced_blend_is_disabled_for_nested_materials() -> None:
     candidates = [
         _candidate(
             "dynamic_conviction_switch:t0.85_risk_capped_fallback",
@@ -248,77 +217,28 @@ def test_fixed_risk_enhanced_blend_is_research_only_without_oos_selection() -> N
         ),
     ]
 
-    out = module._fixed_risk_enhanced_blend_candidates(candidates)
+    assert module._fixed_risk_enhanced_blend_candidates(candidates) == []
 
-    assert {
-        "risk_enhanced_blend:dyn085_70_aware_v36tv_30",
-        "risk_enhanced_blend:dyn085_60_aware_v36tv_40",
-        "risk_enhanced_blend:dyn085_50_aware_v36tv_50",
-    }.issubset({candidate.candidate_label for candidate in out})
-    candidate = next(
-        item
-        for item in out
-        if item.candidate_label == "risk_enhanced_blend:dyn085_70_aware_v36tv_30"
-    )
-    assert candidate.row["uses_locked_oos_for_selection"] is False
-    assert candidate.row["current_fold_oos_used_for_weighting"] is False
-    assert candidate.row["post_oos_research_variant"] is True
-    assert candidate.row["requires_fresh_forward_shadow"] is True
-    assert candidate.row["ready_for_real"] is False
-    assert (
-        module._period_metrics(
-            candidate.returns,
-            (pd.Timestamp("2025-01-01"), pd.Timestamp("2025-01-31")),
-        )["total_return"]
-        > module._period_metrics(
-            candidates[1].returns,
-            (pd.Timestamp("2025-01-01"), pd.Timestamp("2025-01-31")),
-        )["total_return"]
-    )
-
-
-def test_fixed_relaxed_dynamic_blend_uses_exact_streams_and_is_shadow_only() -> None:
+def test_fixed_relaxed_dynamic_blend_is_disabled_for_nested_hybrids() -> None:
     index = pd.date_range("2025-01-01", "2025-01-05", freq="1D")
-    relaxed_returns = pd.Series([0.10, -0.04, 0.03, -0.02, 0.01], index=index, dtype=float)
-    dynamic_returns = pd.Series([0.02, -0.01, 0.01, 0.00, 0.01], index=index, dtype=float)
     candidates = [
         module.CandidateResult(
             family="relaxed_efficiency",
             candidate_label="relaxed_efficiency:hybrid_v3_5",
             source_profile_id="relaxed",
             row={"selection_reasons": [], "uses_locked_oos_for_selection": False},
-            returns=relaxed_returns,
+            returns=pd.Series(0.01, index=index, dtype=float),
         ),
         module.CandidateResult(
             family="dynamic_aware_hybrid",
             candidate_label="dynamic_aware_hybrid:hybrid_v3_5_train_validation_fit",
             source_profile_id="dynamic",
             row={"selection_reasons": [], "uses_locked_oos_for_selection": False},
-            returns=dynamic_returns,
+            returns=pd.Series(0.01, index=index, dtype=float),
         ),
     ]
 
-    out = module._fixed_relaxed_dynamic_blend_candidates(candidates)
-
-    assert {
-        "fixed_relaxed_dynamic_blend:relaxed40_dynamic60",
-        "fixed_relaxed_dynamic_blend:relaxed50_dynamic50",
-        "fixed_relaxed_dynamic_blend:relaxed60_dynamic40",
-    }.issubset({candidate.candidate_label for candidate in out})
-    blend = next(
-        candidate
-        for candidate in out
-        if candidate.candidate_label == "fixed_relaxed_dynamic_blend:relaxed50_dynamic50"
-    )
-    pd.testing.assert_series_equal(
-        blend.returns, relaxed_returns * 0.5 + dynamic_returns * 0.5, check_freq=False
-    )
-    assert blend.row["uses_locked_oos_for_selection"] is False
-    assert blend.row["current_fold_oos_used_for_weighting"] is False
-    assert blend.row["post_oos_research_variant"] is True
-    assert blend.row["requires_fresh_forward_shadow"] is True
-    assert blend.row["ready_for_real"] is False
-
+    assert module._fixed_relaxed_dynamic_blend_candidates(candidates) == []
 
 def test_asset_timeframe_leverage_family_marks_clean_train_validation_policy(
     monkeypatch: pytest.MonkeyPatch,
@@ -513,18 +433,12 @@ def test_validation_selector_excludes_post_oos_research_variants() -> None:
     )
 
 
-def test_mdd30_risk_scaled_candidates_use_no_locked_oos_selection() -> None:
+def test_mdd30_risk_scaled_candidates_use_leaf_sources_only() -> None:
+    source_label = "profile_optuna:growth_mdd20_gross8_69_asset_profile_optuna"
+    nested_label = "dynamic_conviction_switch:t0.85_risk_capped_fallback"
     candidates = [
-        _candidate(
-            "dynamic_conviction_switch:t0.85_risk_capped_fallback",
-            family="dynamic_conviction_switch",
-            daily_return=0.010,
-        ),
-        _candidate(
-            "dynamic_aware_hybrid:hybrid_v3_6_train_validation_fit",
-            family="dynamic_aware_hybrid",
-            daily_return=0.004,
-        ),
+        _candidate(source_label, family="profile_optuna", daily_return=0.010),
+        _candidate(nested_label, family="dynamic_conviction_switch", daily_return=0.020),
     ]
     fold = module.MonthlyFold(
         fold_id="2025-03",
@@ -536,20 +450,16 @@ def test_mdd30_risk_scaled_candidates_use_no_locked_oos_selection() -> None:
 
     out = module._mdd30_high_volatility_candidates(candidates, fold)
 
-    scaled = next(item for item in out if item.candidate_label == "mdd30_risk_scaled:dyn085_x1_50")
+    labels = {item.candidate_label for item in out}
+    assert "mdd30_risk_scaled:profile_growth_x1_50" in labels
+    assert all(nested_label not in candidate.row.get("final_weights", {}) for candidate in out)
+    scaled = next(item for item in out if item.candidate_label == "mdd30_risk_scaled:profile_growth_x1_50")
+    assert scaled.row["source_candidate_label"] == source_label
     assert scaled.row["uses_locked_oos_for_selection"] is False
     assert scaled.row["current_fold_oos_used_for_weighting"] is False
     assert scaled.row["post_oos_research_variant"] is True
     assert scaled.row["requires_fresh_forward_shadow"] is True
     assert scaled.row["risk_scale"] == pytest.approx(1.50)
-    assert (
-        module._period_metrics(scaled.returns, fold.validation)["total_return"]
-        > module._period_metrics(
-            candidates[0].returns,
-            fold.validation,
-        )["total_return"]
-    )
-
 
 def test_mdd30_high_vol_gate_can_pick_bad_oos_from_validation_only() -> None:
     index = pd.date_range("2025-01-01", "2025-03-31", freq="1D")
@@ -560,6 +470,7 @@ def test_mdd30_high_vol_gate_can_pick_bad_oos_from_validation_only() -> None:
         validation=(pd.Timestamp("2025-02-01"), pd.Timestamp("2025-02-28")),
         locked_oos=(pd.Timestamp("2025-03-01"), pd.Timestamp("2025-03-31")),
     )
+    aggressive_label = "profile_optuna:aggressive_mdd30_gross10_69_asset_profile_optuna"
     breakout_bad_oos = pd.Series(0.010, index=index, dtype=float)
     breakout_bad_oos.loc["2025-03-01":"2025-03-31"] = -0.020
     defensive_good_oos = pd.Series(0.001, index=index, dtype=float)
@@ -567,7 +478,7 @@ def test_mdd30_high_vol_gate_can_pick_bad_oos_from_validation_only() -> None:
     candidates = [
         module.CandidateResult(
             family="profile_optuna",
-            candidate_label="profile_optuna:selected_optuna",
+            candidate_label=aggressive_label,
             source_profile_id="breakout_bad_oos",
             row={"selection_reasons": [], "uses_locked_oos_for_selection": False},
             returns=breakout_bad_oos,
@@ -595,12 +506,11 @@ def test_mdd30_high_vol_gate_can_pick_bad_oos_from_validation_only() -> None:
         if item.candidate_label == "mdd30_high_vol_gate:validation_breakout_or_defensive_scaled"
     )
 
-    assert selected.row["selected_candidate_label"] == "profile_optuna:selected_optuna"
+    assert selected.row["selected_candidate_label"] == aggressive_label
     assert selected.row["uses_locked_oos_for_selection"] is False
     assert selected.row["high_vol_breakout"] is True
     # OOS is deliberately worse, proving the gate did not peek at locked OOS.
     assert module._period_metrics(selected.returns, fold.locked_oos)["total_return"] < 0.0
-
 
 def test_bridge_protocol_manifest_hash_matches_frozen_file() -> None:
     manifest_path = module.DEFAULT_BRIDGE_PROTOCOL_MANIFEST
@@ -628,7 +538,7 @@ def test_protocol_freeze_report_forbids_post_oos_expansion() -> None:
     assert freeze_report["oos_used_for_protocol_expansion"] is False
 
 
-def test_hybrid_bridge_hedge_weights_use_only_prior_completed_month_utility() -> None:
+def test_hybrid_bridge_refuses_nested_dynamic_and_hybrid_inputs() -> None:
     fold = module.MonthlyFold(
         fold_id="2025-03",
         refit_at=pd.Timestamp("2025-03-01"),
@@ -645,22 +555,14 @@ def test_hybrid_bridge_hedge_weights_use_only_prior_completed_month_utility() ->
                 daily_return=0.010,
             ),
             _candidate("cross_candidate_hybrid:hybrid_v3_5", family="cross_candidate_hybrid"),
-            _candidate("profile_optuna:selected_optuna", daily_return=0.008),
+            _candidate("profile_optuna:growth_mdd20_gross8_69_asset_profile_optuna", daily_return=0.008),
         ],
         fold,
         prior_completed_utilities={"2025-02": [0.02]},
         bridge_manifest=manifest,
     )
 
-    hedge = next(
-        item
-        for item in bridge_candidates
-        if item.candidate_label == "hybrid_oracle_bridge:hybrid_assimilated_dynamic_v1_hedge"
-    )
-    assert hedge.row["bridge_assimilation_mode"] == "fully_lagged_hedge_validation_blend"
-    assert hedge.row["online_update_cutoff_fold"] == "2025-02"
-    assert hedge.row["current_fold_oos_used_for_weighting"] is False
-    assert hedge.row["uses_locked_oos_for_selection"] is False
+    assert bridge_candidates == []
     assert (
         module._online_weight_audit(
             [{"month": "2025-03", "utility_months_used": ["2025-01", "2025-02"]}]
@@ -674,8 +576,7 @@ def test_hybrid_bridge_hedge_weights_use_only_prior_completed_month_utility() ->
         is False
     )
 
-
-def test_hybrid_bridge_excludes_post_oos_research_variants_from_clean_pool() -> None:
+def test_hybrid_bridge_eligible_pool_excludes_nested_and_post_oos_research_variants() -> None:
     fold = module.MonthlyFold(
         fold_id="2025-03",
         refit_at=pd.Timestamp("2025-03-01"),
@@ -683,13 +584,16 @@ def test_hybrid_bridge_excludes_post_oos_research_variants_from_clean_pool() -> 
         validation=(pd.Timestamp("2025-02-01"), pd.Timestamp("2025-02-28")),
         locked_oos=(pd.Timestamp("2025-03-01"), pd.Timestamp("2025-03-31")),
     )
-    manifest = module._load_bridge_protocol_manifest(module.DEFAULT_BRIDGE_PROTOCOL_MANIFEST)
     post_oos = _candidate(
-        "mdd30_risk_scaled:dyn085_x1_50", family="mdd30_risk_scaled", daily_return=0.05
+        "mdd30_risk_scaled:profile_growth_x1_50", family="mdd30_risk_scaled", daily_return=0.05
     )
     post_oos.row["post_oos_research_variant"] = True
     post_oos.row["requires_fresh_forward_shadow"] = True
-    bridge_candidates = module._hybrid_assimilated_dynamic_candidates(
+    clean_leaf = _candidate(
+        "profile_optuna:growth_mdd20_gross8_69_asset_profile_optuna", daily_return=0.008
+    )
+
+    eligible = module._bridge_eligible_candidates(
         [
             _candidate(
                 "dynamic_conviction_switch:t0.90_risk_capped_fallback",
@@ -697,24 +601,13 @@ def test_hybrid_bridge_excludes_post_oos_research_variants_from_clean_pool() -> 
                 daily_return=0.010,
             ),
             _candidate("cross_candidate_hybrid:hybrid_v3_5", family="cross_candidate_hybrid"),
-            _candidate("profile_optuna:selected_optuna", daily_return=0.008),
+            clean_leaf,
             post_oos,
         ],
         fold,
-        prior_completed_utilities={},
-        bridge_manifest=manifest,
     )
 
-    assert bridge_candidates
-    assert all(
-        "mdd30_risk_scaled:dyn085_x1_50" not in candidate.row["bridge_inputs"]
-        for candidate in bridge_candidates
-    )
-    assert all(
-        "mdd30_risk_scaled:dyn085_x1_50" not in candidate.row["final_weights"]
-        for candidate in bridge_candidates
-    )
-
+    assert [candidate.candidate_label for candidate, _ in eligible] == [clean_leaf.candidate_label]
 
 def test_dynamic_switch_rows_do_not_self_feed_same_month_oos_or_oracle_inputs() -> None:
     clean_rows = [
