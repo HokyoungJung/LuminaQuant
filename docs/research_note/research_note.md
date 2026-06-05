@@ -1657,3 +1657,92 @@ For live/paper continuation:
 - `uv run pytest -q tests/test_alpha_zoo_69_asset_monthly_refit_walkforward.py` — `33 passed`.
 - Full rerun: `25:52.79`, max RSS `1293384 KB`, exit status `0`.
 - Audits in final artifact: metric reconciliation passed, dynamic self-feed audit passed, online weight audit passed.
+
+---
+
+## 2026-06-05 — 85-symbol expanded-universe clean dynamic risk-scaled rerun
+
+### Objective
+
+Address the weak clean OOS return after nested-hybrid removal while reflecting the expanded Binance TradFi universe.  The rerun keeps the same live discipline:
+
+- Universe/timeframes: 85 Binance research symbols = 10 core crypto + 75 `TRADIFI_PERPETUAL`, `30m,1h,2h,4h,6h,8h,12h,1d`.
+- Cost: 10 bps slippage/cost proxy.
+- Refit: monthly, calendar day 1 UTC.
+- Selection inputs: expanding train + prior 2 calendar months validation only.
+- Locked OOS: next calendar month, report-only after fold params/candidate selection are frozen.
+- OOS span: `2025-09-01T00:00:00` → `2026-06-05T12:00:00`; 2026-06 is partial because that is the latest local Binance bar.
+
+### Implementation / hygiene changes
+
+- Expanded the static Binance research universe snapshot to 85 symbols and backfilled the 16 newly listed/added TradFi symbols locally.  New symbols are monitored/backfilled now, but most are not train-eligible yet because they listed around 2026-06.
+- Made the OHLCV loader missing-symbol safe and records requested/loaded/missing symbol counts.  The 2026-06-05 run requested and loaded all 85 symbols.
+- Fold-local feature support now excludes symbols without train-window data, preventing newly listed OOS-only symbols from diluting cross-sectional ranks.
+- Removed nested-hybrid material from the final path: the new dynamic candidates reference only leaf strategy labels in `final_weights`.
+- Added validation-only dynamic position sizing:
+  - base dynamic switch still picks a clean leaf from train/validation only;
+  - `val_mdd12/15/20_scaled` variants increase exposure only on a coarse grid that remains within the fold's validation MDD budget;
+  - `val_ret02_calmar80_gate` can cash-guard weak validation months;
+  - cash/no-eligible folds are explicitly emitted for every dynamic label, so aggregate metrics use all 10 folds.
+- Removed pandas `pct_change` default-fill behavior in the alpha-zoo loaders to avoid warning-driven implicit forward-fill distortion.
+
+### Main artifacts
+
+- JSON: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_85_asset_dynamic_scaled_20260605/alpha_zoo_85_asset_dynamic_scaled_full_v2_20260605.json`
+- Markdown: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_85_asset_dynamic_scaled_20260605/alpha_zoo_85_asset_dynamic_scaled_full_v2_20260605.md`
+- Symbol expansion/backfill report: `var/reports/data_collection/binance_1m_research_universe_20260605_symbol_expansion/binance_1m_research_universe_collection_20260605T123257Z.json`
+- ExchangeInfo snapshot: `var/reports/symbol_universe_20260605/binance_fapi_exchangeInfo_20260605.json`
+
+### Final clean-OOS result table
+
+| Candidate | Clean | Nested material | OOS comp | Ann approx | Max bar MDD | Monthly eq MDD | Sharpe | Sortino | Hit | Min OOS | Tail ratio | Profit factor | Max validation MDD |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `dynamic_conviction_switch:t0.85_risk_capped_fallback_val_mdd20_scaled` | True | False | 23.41% | 28.72% | 23.59% | 5.75% | 0.91 | 5.24 | 5/10 | -3.18% | 5.52 | 5.12 | 18.36% |
+| `dynamic_conviction_switch:t0.85_risk_capped_fallback_val_mdd15_scaled` | True | False | 18.46% | 22.55% | 19.29% | 5.75% | 0.87 | 4.14 | 5/10 | -3.18% | 4.55 | 4.26 | 14.84% |
+| `dynamic_conviction_switch:t0.85_risk_capped_fallback_val_mdd12_scaled` | True | False | 13.17% | — | 14.79% | — | 0.80 | 2.96 | 5/10 | -3.18% | — | — | ≤12% target |
+| `dynamic_conviction_switch:t0.85_risk_capped_fallback_val_ret02_calmar80_gate` | True | False | 12.97% | 15.76% | 10.08% | 0.00% | 1.16 | 0.00* | 3/10 | 0.00% | n/a | n/a | 7.58% |
+| `dynamic_conviction_switch:t0.85_risk_capped_fallback` | True | False | 8.02% | 9.70% | 10.08% | 5.13% | 0.71 | 2.06 | 5/10 | -2.65% | 2.71 | 2.59 | 7.58% |
+| `strict_calm_leaf_selector:val_mdd8_train_val_spike_penalty` | True | False | 3.31% | 3.98% | 10.08% | 5.22% | 0.32 | 0.63 | 3/10 | -5.22% | 1.73 | 1.47 | 7.58% |
+
+`*` Sortino/profit factor are not meaningful for the cash-gated candidate because its monthly loss observations are zero in this sample.
+
+### Fold details for the selected top candidate
+
+Top candidate: `dynamic_conviction_switch:t0.85_risk_capped_fallback_val_mdd20_scaled`.
+
+| Fold | OOS return | OOS MDD | Selected leaf | Leaf weight |
+| --- | ---: | ---: | --- | ---: |
+| 2025-09 | 0.14% | 0.07% | `strict_efficiency:growth_mdd20_gross8_69_asset_efficiency_repair_optuna` | 1.00 |
+| 2025-10 | 0.00% | 0.00% | cash/no eligible signal | 0.00 |
+| 2025-11 | 28.71% | 23.59% | `strict_efficiency:balanced_mdd12_gross5_69_asset_efficiency_repair_optuna` | 2.50 |
+| 2025-12 | -0.13% | 1.63% | `strict_efficiency:balanced_mdd12_gross5_69_asset_efficiency_repair_optuna` | 1.00 |
+| 2026-01 | 0.99% | 2.15% | `strict_efficiency:balanced_mdd12_gross5_69_asset_efficiency_repair_optuna` | 1.25 |
+| 2026-02 | 0.26% | 8.44% | `strict_efficiency:balanced_mdd12_gross5_69_asset_efficiency_repair_optuna` | 2.50 |
+| 2026-03 | -2.65% | 2.80% | `strict_efficiency:balanced_mdd12_gross5_69_asset_efficiency_repair_optuna` | 1.00 |
+| 2026-04 | -3.18% | 3.45% | `strict_efficiency:balanced_mdd12_gross5_69_asset_efficiency_repair_optuna` | 1.25 |
+| 2026-05 | 0.47% | 2.28% | `strict_efficiency:balanced_mdd12_gross5_69_asset_efficiency_repair_optuna` | 1.00 |
+| 2026-06 | 0.00% | 0.00% | `strict_efficiency:balanced_mdd12_gross5_69_asset_efficiency_repair_optuna` | 1.00 |
+
+### Interpretation
+
+- The 85-symbol expansion is reflected in the monitor/backfill layer, but not yet a direct performance source: the newest TradFi symbols mostly lack train-window data and are intentionally excluded from fold-local feature support until they have enough history.
+- The improvement comes from clean validation-only position sizing, not from OOS oracle selection or nested hybrid reuse.  `final_weights` point only to strict-efficiency leaf candidates or cash.
+- The best clean candidate improves from the prior unscaled dynamic baseline (+8.02% comp, max bar MDD 10.08%) to +23.41% comp, but it spends a 23.59% bar-MDD budget.  The more conservative `val_mdd15_scaled` variant gives +18.46% comp with 19.29% max bar MDD; `val_mdd12_scaled` gives +13.17% comp with 14.79% max bar MDD.
+- Hard-stop promotability is still false: the candidate does not beat the historical challenger (+53.38% comp) or robust-default hurdle (+27.01% comp / 15% MDD limit).  Treat this as paper/shadow, not real-money approval.
+- The clean candidate is still concentrated in one strict-efficiency leaf in most folds.  That is preferable to hidden nested duplication, but live risk should treat it as one alpha family, not a diversified portfolio.
+
+### Recommendation
+
+1. Primary paper/shadow return candidate: `dynamic_conviction_switch:t0.85_risk_capped_fallback_val_mdd20_scaled` if a ~24% bar-MDD budget is acceptable.
+2. More balanced paper candidate: `dynamic_conviction_switch:t0.85_risk_capped_fallback_val_mdd15_scaled`.
+3. Conservative risk candidate: `dynamic_conviction_switch:t0.85_risk_capped_fallback_val_mdd12_scaled` or the unscaled `dynamic_conviction_switch:t0.85_risk_capped_fallback`.
+4. Do not revive nested hybrid-on-hybrid blends; the current improvement already avoids nested material.
+5. Keep collecting/monitoring all 85 symbols.  Refit should automatically start admitting newly listed TradFi names once they have train+validation coverage.
+6. Before any real-money promotion, require fresh-forward shadow evidence after 2026-06-05 and an execution-layer risk cap that enforces total gross, per-asset concentration, and TradFi session/liquidity guards.
+
+### Validation evidence
+
+- Full rerun: `alpha_zoo_85_asset_dynamic_scaled_full_v2_20260605`, 10 folds, 85/85 symbols loaded, latest data `2026-06-05T12:00:00`, peak RSS `1191.1 MiB`, exit status `0`.
+- Audits in final artifact: metric reconciliation passed, dynamic self-feed audit passed, online weight audit passed.
+- `uv run ruff check scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py tests/test_alpha_zoo_69_asset_monthly_refit_walkforward.py` — passed during implementation.
+- `uv run pytest tests/test_alpha_zoo_69_asset_monthly_refit_walkforward.py::test_dynamic_conviction_switch_emits_fallback_when_aggressive_pool_missing -q` — passed during implementation.

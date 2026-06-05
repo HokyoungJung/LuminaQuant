@@ -935,3 +935,12 @@ Verification passed: runner max RSS `6,492,344 KiB` (<8 GiB); artifact invariant
 - Return shadow: `profile_optuna:selected_optuna`: comp +10.05%, max bar MDD 19.20%, monthly equity MDD 13.58%, Sharpe .50, Sortino 1.16, min OOS -9.30%.
 - Fixed dynamic missing-fold issue by emitting cash/no-position guard instead of omitting candidate rows.
 - Validation: ruff targeted pass, pytest targeted 33 passed, full rerun exit 0.
+
+## 2026-06-05 — 85-symbol dynamic scaled clean rerun
+
+- Universe updated to 85 symbols (10 core crypto + 75 Binance TRADIFI_PERPETUAL). All 85 local bars loaded through 2026-06-05T12:00:00 UTC; new symbols mostly not train-eligible yet.
+- Implemented dynamic validation-MDD risk scaling and validation-strength cash guards without nested hybrid materials. Final weights reference only strict-efficiency leaf labels or cash.
+- Full clean walk-forward artifact: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_85_asset_dynamic_scaled_20260605/alpha_zoo_85_asset_dynamic_scaled_full_v2_20260605.json`.
+- Best clean candidate: `dynamic_conviction_switch:t0.85_risk_capped_fallback_val_mdd20_scaled`, OOS comp +23.41%, max bar MDD 23.59%, monthly eq MDD 5.75%, Sharpe 0.91, Sortino 5.24, 5/10 positive folds from 2025-09-01 to 2026-06-05T12:00 UTC.
+- Conservative variants: `val_mdd15_scaled` +18.46% / max MDD 19.29%; `val_mdd12_scaled` +13.17% / max MDD 14.79%.
+- Hard-stop remains false vs historical challenger/robust hurdle; treat as paper/shadow, not real-money approval.

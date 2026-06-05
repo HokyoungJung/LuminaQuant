@@ -207,7 +207,7 @@ class FeatureCache:
             symbol: self.bars_by_symbol_tf[(symbol, timeframe)] for symbol in self.symbols
         }
         panel = broad69._close_panel(bars_by_symbol, self.symbols)
-        panel_returns = panel.pct_change().mean(axis=1).fillna(0.0)
+        panel_returns = panel.pct_change(fill_method=None).mean(axis=1).fillna(0.0)
         market_index = (1.0 + panel_returns).cumprod()
         momentum = panel / panel.shift(int(lookback)) - 1.0
         rank_pct = momentum.rank(axis=1, ascending=False, pct=True)
@@ -236,7 +236,7 @@ class FeatureCache:
                 .assign(datetime=lambda pdf: pd.to_datetime(pdf["datetime"]))
                 .set_index("datetime")["close"]
                 .astype(float)
-                .pct_change()
+                .pct_change(fill_method=None)
                 .rename(anchor_name)
             )
             frames.append(series)
@@ -410,7 +410,7 @@ def _candidate_from_params(
         short_exit = (symbol_rank < 1.0 - exit_rank) | (symbol_momentum > 0.0)
     elif family == "volatility_adjusted_trend_persistence":
         momentum = close / close.shift(lookback) - 1.0
-        realized = close.pct_change().rolling(max(6, lookback // 2)).std(ddof=1)
+        realized = close.pct_change(fill_method=None).rolling(max(6, lookback // 2)).std(ddof=1)
         vol_adjusted = momentum / (realized * math.sqrt(float(lookback))).replace(0.0, np.nan)
         adx = broad69._adx_proxy(high, low, close, max(6, lookback // 2))
         market_mom = cache.xsmom(timeframe, lookback)["market_momentum"].reindex(datetimes).ffill()

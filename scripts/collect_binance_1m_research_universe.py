@@ -186,8 +186,8 @@ def resolve_default_symbols(
 ) -> list[str]:
     """Resolve the default collector universe without current-fold performance data.
 
-    ``static`` preserves the frozen 69-symbol research snapshot.  The default
-    ``static-plus-fapi-tradfi`` keeps those 69 symbols and appends any newly
+    ``static`` preserves the frozen research snapshot.  The default
+    ``static-plus-fapi-tradfi`` keeps that snapshot and appends any newly
     listed Binance TRADIFI_PERPETUAL/USDT contracts discovered from exchangeInfo,
     so TradFi support growth automatically enters the monitor/backfill queue.
     """
@@ -238,9 +238,12 @@ def universe_discovery_payload(
                 "core crypto plus current Binance TRADIFI_PERPETUAL/USDT discovery"
                 if universe_source == "fapi-tradfi"
                 else (
-                    "frozen 69-symbol snapshot only"
+                    "frozen static research snapshot only"
                     if universe_source == "static"
-                    else "frozen 69-symbol snapshot plus current Binance TRADIFI_PERPETUAL/USDT discovery"
+                    else (
+                        "frozen static research snapshot plus current Binance "
+                        "TRADIFI_PERPETUAL/USDT discovery"
+                    )
                 )
             )
         ),
@@ -716,8 +719,9 @@ def parser() -> argparse.ArgumentParser:
         default="static-plus-fapi-tradfi",
         help=(
             "Default symbol discovery when --symbols is omitted. static preserves the "
-            "frozen 69-symbol snapshot; fapi-tradfi uses current exchangeInfo core+TradFi; "
-            "static-plus-fapi-tradfi keeps the snapshot and appends newly listed TradFi perps."
+            "frozen static snapshot; fapi-tradfi uses current exchangeInfo core+TradFi; "
+            "static-plus-fapi-tradfi keeps the snapshot and appends newly listed TradFi "
+            "perps."
         ),
     )
     out.add_argument("--workers", type=int, default=4)

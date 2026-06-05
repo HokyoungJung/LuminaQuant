@@ -42,19 +42,23 @@ def test_binance_extended_research_universe_is_unique_and_complete() -> None:
     assert len(BINANCE_TRADFI_PRECIOUS_METAL_SYMBOLS) == 4
     assert len(BINANCE_TRADFI_ENERGY_INDUSTRIAL_COMMODITY_SYMBOLS) == 4
     assert len(BINANCE_TRADFI_COMMODITY_SYMBOLS) == 8
-    assert len(BINANCE_TRADFI_ETF_INDEX_SYMBOLS) == 5
-    assert len(BINANCE_TRADFI_EQUITY_SYMBOLS) == 43
-    assert len(BINANCE_TRADFI_PREMARKET_SYMBOLS) == 3
-    assert len(BINANCE_TRADFI_PERP_RESEARCH_SYMBOLS) == 59
-    assert len(BINANCE_EXTENDED_RESEARCH_SYMBOLS) == 69
+    assert len(BINANCE_TRADFI_ETF_INDEX_SYMBOLS) == 6
+    assert len(BINANCE_TRADFI_EQUITY_SYMBOLS) == 57
+    assert len(BINANCE_TRADFI_PREMARKET_SYMBOLS) == 4
+    assert len(BINANCE_TRADFI_PERP_RESEARCH_SYMBOLS) == 75
+    assert len(BINANCE_EXTENDED_RESEARCH_SYMBOLS) == 85
 
     counts = Counter(BINANCE_EXTENDED_RESEARCH_SYMBOLS)
     assert [symbol for symbol, count in counts.items() if count > 1] == []
+    assert "ANTHROPICUSDT" in BINANCE_TRADFI_PREMARKET_SYMBOLS
     assert "OPENAIUSDT" in BINANCE_TRADFI_PREMARKET_SYMBOLS
     assert "QNTXUSDT" in BINANCE_TRADFI_PREMARKET_SYMBOLS
     assert "NATGASUSDT" in BINANCE_TRADFI_COMMODITY_SYMBOLS
     assert "SOXLUSDT" in BINANCE_TRADFI_ETF_INDEX_SYMBOLS
+    assert "EWTUSDT" in BINANCE_TRADFI_ETF_INDEX_SYMBOLS
     assert "NVDAUSDT" in BINANCE_TRADFI_EQUITY_SYMBOLS
+    assert "SAMSUNGUSDT" in BINANCE_TRADFI_EQUITY_SYMBOLS
+    assert "SKHYNIXUSDT" in BINANCE_TRADFI_EQUITY_SYMBOLS
 
 
 def test_compact_to_slashed_usdt_handles_short_and_long_bases() -> None:

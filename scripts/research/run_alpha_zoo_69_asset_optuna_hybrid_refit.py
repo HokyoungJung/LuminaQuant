@@ -335,6 +335,21 @@ def _symbol_1m_files(data_root: Path, symbol: str) -> list[Path]:
     return sorted((data_root / f"symbol={symbol}" / "timeframe=1m").rglob("*.parquet"))
 
 
+def _empty_ohlcv_frame(symbol: str) -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "datetime": pd.Series(dtype="datetime64[ns]"),
+            "open": pd.Series(dtype=float),
+            "high": pd.Series(dtype=float),
+            "low": pd.Series(dtype=float),
+            "close": pd.Series(dtype=float),
+            "volume": pd.Series(dtype=float),
+            "source_1m_rows": pd.Series(dtype=int),
+            "symbol": pd.Series(dtype=str),
+        }
+    ).assign(symbol=str(symbol))
+
+
 def load_symbol_bars(
     symbol: str,
     *,
@@ -375,18 +390,7 @@ def load_symbol_bars(
         frame = frame.filter(pl.col("source_1m_rows") >= expected_1m_rows)
     pdf = pd.DataFrame(frame.to_dicts())
     if pdf.empty:
-        return pd.DataFrame(
-            columns=[
-                "datetime",
-                "open",
-                "high",
-                "low",
-                "close",
-                "volume",
-                "source_1m_rows",
-                "symbol",
-            ]
-        )
+        return _empty_ohlcv_frame(symbol)
     pdf["datetime"] = pd.to_datetime(pdf["datetime"])
     pdf["symbol"] = symbol
     return pdf
@@ -398,10 +402,20 @@ def _load_timeframe_panel(
     bars: dict[str, pd.DataFrame] = {}
     coverage: dict[str, Any] = {}
     for symbol in symbols:
-        frame = load_symbol_bars(symbol, data_root=data_root, timeframe=timeframe)
+        try:
+            frame = load_symbol_bars(symbol, data_root=data_root, timeframe=timeframe)
+            missing_reason = None
+        except FileNotFoundError:
+            frame = _empty_ohlcv_frame(symbol)
+            missing_reason = "missing_direct_1m_parquet"
         bars[symbol] = frame
         if frame.empty:
-            coverage[symbol] = {"rows": 0, "earliest": None, "latest": None}
+            coverage[symbol] = {
+                "rows": 0,
+                "earliest": None,
+                "latest": None,
+                "missing_reason": missing_reason or "empty_after_resample",
+            }
         else:
             coverage[symbol] = {
                 "rows": len(frame),
@@ -415,14 +429,31 @@ def load_all_bars(
     symbols: Sequence[str], *, data_root: Path, timeframes: Sequence[str]
 ) -> tuple[dict[tuple[str, str], pd.DataFrame], dict[str, Any]]:
     bars: dict[tuple[str, str], pd.DataFrame] = {}
-    coverage: dict[str, Any] = {"timeframes": {}, "missing_symbols": []}
+    coverage: dict[str, Any] = {
+        "timeframes": {},
+        "missing_symbols": [],
+        "missing_symbol_timeframes": [],
+        "symbols_with_any_rows": [],
+    }
+    symbols_with_any_rows: set[str] = set()
     for timeframe in timeframes:
         loaded, tf_cov = _load_timeframe_panel(symbols, data_root=data_root, timeframe=timeframe)
         coverage["timeframes"][timeframe] = tf_cov
         for symbol, frame in loaded.items():
             bars[(symbol, timeframe)] = frame
+            if not frame.empty:
+                symbols_with_any_rows.add(symbol)
             if frame.empty and symbol not in coverage["missing_symbols"]:
                 coverage["missing_symbols"].append(symbol)
+            if frame.empty:
+                coverage["missing_symbol_timeframes"].append(
+                    {
+                        "symbol": symbol,
+                        "timeframe": timeframe,
+                        "reason": tf_cov.get(symbol, {}).get("missing_reason")
+                        or "empty_after_resample",
+                    }
+                )
     latest_values = [
         pd.Timestamp(item["latest"])
         for tf_cov in coverage["timeframes"].values()
@@ -438,6 +469,12 @@ def load_all_bars(
     if not latest_values:
         raise ValueError("no direct 1m-derived bars loaded for any symbol/timeframe")
     coverage["symbol_count"] = len(symbols)
+    coverage["requested_symbol_count"] = len(symbols)
+    coverage["loaded_symbol_count"] = len(symbols_with_any_rows)
+    coverage["symbols_with_any_rows"] = sorted(symbols_with_any_rows)
+    coverage["missing_symbols"] = sorted(
+        symbol for symbol in symbols if symbol not in symbols_with_any_rows
+    )
     coverage["global_latest_utc"] = max(latest_values).isoformat()
     coverage["global_earliest_utc"] = min(earliest_values).isoformat() if earliest_values else None
     coverage["data_root"] = str(data_root)
@@ -1000,7 +1037,7 @@ def discover_candidates(
         panel = _close_panel(bars_by_symbol, symbols)
         if panel.empty:
             continue
-        panel_returns = panel.pct_change().mean(axis=1).fillna(0.0)
+        panel_returns = panel.pct_change(fill_method=None).mean(axis=1).fillna(0.0)
         market_index = (1.0 + panel_returns).cumprod()
         for lookback in (12, 24, 48):
             momentum_panel = panel / panel.shift(lookback) - 1.0
@@ -1035,7 +1072,9 @@ def discover_candidates(
                 breadth_aligned = pd.Series(
                     breadth.reindex(datetimes).ffill().to_numpy(), index=frame.index
                 )
-                realized = close.pct_change().rolling(max(6, lookback // 2)).std(ddof=1)
+                realized = close.pct_change(fill_method=None).rolling(
+                    max(6, lookback // 2)
+                ).std(ddof=1)
                 vol_adjusted = symbol_momentum / (realized * math.sqrt(float(lookback))).replace(
                     0.0, np.nan
                 )

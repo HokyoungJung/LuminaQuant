@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-BINANCE_RESEARCH_UNIVERSE_SNAPSHOT_UTC = "2026-05-28T13:40:47Z"
+BINANCE_RESEARCH_UNIVERSE_SNAPSHOT_UTC = "2026-06-05T12:28:39Z"
 BINANCE_RESEARCH_UNIVERSE_SOURCE = "Binance USD-M Futures /fapi/v1/exchangeInfo"
 
 BINANCE_CORE_CRYPTO_RESEARCH_SYMBOLS: tuple[str, ...] = (
@@ -52,6 +52,7 @@ BINANCE_TRADFI_ETF_INDEX_SYMBOLS: tuple[str, ...] = (
     "EWYUSDT",
     "EWJUSDT",
     "SOXLUSDT",
+    "EWTUSDT",
 )
 
 BINANCE_TRADFI_EQUITY_SYMBOLS: tuple[str, ...] = (
@@ -98,12 +99,27 @@ BINANCE_TRADFI_EQUITY_SYMBOLS: tuple[str, ...] = (
     "ARMUSDT",
     "BEUSDT",
     "COHRUSDT",
+    "ASTSUSDT",
+    "BBXUSDT",
+    "CRMUSDT",
+    "DELLUSDT",
+    "HYUNDAIUSDT",
+    "IBMUSDT",
+    "IRENUSDT",
+    "LLYUSDT",
+    "NOKUSDT",
+    "NOWUSDT",
+    "NVOUSDT",
+    "ONDSUSDT",
+    "SAMSUNGUSDT",
+    "SKHYNIXUSDT",
 )
 
 BINANCE_TRADFI_PREMARKET_SYMBOLS: tuple[str, ...] = (
     "SPCXUSDT",
     "OPENAIUSDT",
     "QNTXUSDT",
+    "ANTHROPICUSDT",
 )
 
 BINANCE_TRADFI_PERP_RESEARCH_SYMBOLS: tuple[str, ...] = (

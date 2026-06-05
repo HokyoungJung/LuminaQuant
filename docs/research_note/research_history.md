@@ -32514,3 +32514,17 @@ Can the rejected calendar-primary TRX/ETH winners be converted into live-causal 
 
 ### Do-not-repeat note
 Before repeating calendar-salvage research, read `var/reports/profit_moonshot_20260501/calendar_salvage_state_proxy_20260510/calendar_salvage_state_proxy_latest.md` and use the existing state-proxy families as the starting point. Do not re-test calendar month buckets as alpha.
+
+---
+
+## 2026-06-05 85-symbol dynamic risk-scaled clean rerun
+
+- Research dates: 2026-06-05
+- Source type: `local_artifact`
+- Title/path: 85-symbol expanded-universe clean dynamic risk-scaled walk-forward — `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_85_asset_dynamic_scaled_20260605/alpha_zoo_85_asset_dynamic_scaled_full_v2_20260605.json`
+- Content summary: Latest Binance research universe expanded to 85 symbols (10 core crypto + 75 TradFi perpetuals).  Clean non-nested dynamic switch added validation-MDD-budget risk scaling and validation-strength cash guards.  Best clean candidate `dynamic_conviction_switch:t0.85_risk_capped_fallback_val_mdd20_scaled` produced OOS comp +23.41%, max bar MDD 23.59%, monthly equity MDD 5.75%, monthly Sharpe 0.91, Sortino 5.24, 5/10 positive folds over 2025-09-01→2026-06-05T12:00.  More conservative variants: val_mdd15 +18.46% / max MDD 19.29%, val_mdd12 +13.17% / max MDD 14.79%.
+- What was used: Updates the live/paper candidate hierarchy after nested-hybrid removal.  Uses train+validation only for selection/sizing and references only leaf strategies in final weights.
+- Families: dynamic_conviction_switch, strict_efficiency, profile_optuna, relaxed_efficiency, strict_calm_leaf_selector
+- Decision impact: Primary paper/shadow candidate becomes `dynamic_conviction_switch:t0.85_risk_capped_fallback_val_mdd20_scaled`; use `val_mdd15` or `val_mdd12` if lower MDD budget is required.  Hard-stop promotability remains false because the result does not beat the historical challenger or robust-default hurdle.
+- Staleness/recheck: Recheck after newly listed TradFi symbols accumulate train/validation data or after fresh-forward shadow evidence beyond 2026-06-05. / `False`
+- Do-not-repeat note: Do not reintroduce hybrid-as-hybrid material; use leaf-only final weights and fold-local train/validation risk sizing.

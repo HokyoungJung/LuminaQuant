@@ -221,7 +221,7 @@ uv run python scripts/sync_binance_ohlcv.py \
 
 Public 저장소에는 DB 동기화/구축 헬퍼를 의도적으로 포함하지 않습니다. 사전 구축된 DB 파일 또는 CSV 데이터를 사용하세요.
 
-확장 Binance research universe(private 저장소): `src/lumina_quant/research_universe.py`에 현재 기준 10개 core crypto + 59개 Binance USD-M `TRADIFI_PERPETUAL` 심볼 snapshot을 side-effect-free 상수로 기록했습니다. 69개 전체 direct 1m research bar는 `data/market_parquet/exchange=binance` 아래에 저장되어 있고 OOM-capped 69-asset Optuna refit 및 live-efficiency repair runner가 사용합니다. 현재 corrected efficiency-repair 정책은 train split에 없는 asset/timeframe을 tuning/allocation/live promotion에서 제외합니다. 선택된 paper/testnet-only v3.6 hybrid는 train `+96.59%`, validation `+68.19%`, validation MDD `7.87%`, RPT `42.30/149.64bps`이며 `ready_for_real=false` / `real_money_execution=false`를 유지합니다. 이후 staged refresh/coverage inventory 작업에는 `BINANCE_EXTENDED_RESEARCH_SYMBOLS_SLASHED`를 사용합니다. 목록 추가 또는 research bar 수집은 real-money 승인이 아닙니다. `docs/kr/RUNBOOK_1Y_1S_LOCAL.md` 및 `docs/research_note/research_note.md`를 참고하세요.
+확장 Binance research universe(private 저장소): `src/lumina_quant/research_universe.py`에 현재 기준 10개 core crypto + 75개 Binance USD-M `TRADIFI_PERPETUAL` 심볼 snapshot(요청 universe 85개)을 side-effect-free 상수로 기록했습니다. Research bar coverage는 local/private입니다. 2026-06-05 backfill report 기준 85/85개 심볼이 `2026-06-05T12:00:00`까지 로드되었지만, 신규 TradFi 상장 심볼은 train-split bar가 생기기 전까지 tuning/allocation/live promotion에서 제외합니다. monthly-refit runner는 requested/loaded/missing symbol을 기록하고 missing symbol 때문에 실패하지 않으므로 staged backfill 이후 자동 편입될 수 있습니다. 목록 추가 또는 research bar 수집은 real-money 승인이 아닙니다. `docs/kr/RUNBOOK_1Y_1S_LOCAL.md` 및 `docs/research_note/research_note.md`를 참고하세요.
 
 **Raw aggTrades → 커밋된 materialized 파이프라인 (Private 저장소):**
 ```bash

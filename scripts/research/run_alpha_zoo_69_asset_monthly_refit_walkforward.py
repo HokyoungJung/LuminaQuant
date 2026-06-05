@@ -762,6 +762,7 @@ _NON_LEAF_PORTFOLIO_FAMILIES = {
     "risk_enhanced_blend",
     "fixed_relaxed_dynamic_blend",
     "teacher_leaf_blend",
+    "strict_calm_leaf_selector",
     "mdd30_barbell_blend",
     "mdd30_risk_scaled",
     "mdd30_high_vol_gate",
@@ -777,6 +778,7 @@ _NON_LEAF_LABEL_TOKENS = (
     "blend:",
     "meta_portfolio:",
     "validation_selector:",
+    "strict_calm_leaf_selector:",
     "dynamic_conviction_switch:",
 )
 
@@ -1337,40 +1339,76 @@ def _dynamic_conviction_switch_candidates(
         if reference is None:
             return []
         cash_returns = pd.Series(0.0, index=reference.returns.index, dtype=float)
+        suffix_specs: tuple[tuple[str, dict[str, Any]], ...] = (
+            ("", {}),
+            ("_val_mdd12_scaled", {"target_validation_mdd": 0.12, "max_risk_scale": 2.0}),
+            ("_val_mdd15_scaled", {"target_validation_mdd": 0.15, "max_risk_scale": 2.25}),
+            ("_val_mdd20_scaled", {"target_validation_mdd": 0.20, "max_risk_scale": 2.50}),
+            (
+                "_val_ret02_calmar80_gate",
+                {"min_validation_return": 0.02, "min_validation_calmar": 0.80},
+            ),
+            (
+                "_val_ret02_calmar80_gate_val_mdd15_scaled",
+                {
+                    "min_validation_return": 0.02,
+                    "min_validation_calmar": 0.80,
+                    "target_validation_mdd": 0.15,
+                    "max_risk_scale": 2.25,
+                },
+            ),
+            (
+                "_val_ret02_calmar80_gate_val_mdd20_scaled",
+                {
+                    "min_validation_return": 0.02,
+                    "min_validation_calmar": 0.80,
+                    "target_validation_mdd": 0.20,
+                    "max_risk_scale": 2.50,
+                },
+            ),
+        )
         out: list[CandidateResult] = []
         for threshold in (0.85, 0.90, 0.95, 1.00):
             for fallback_name in ("strict_fallback", "risk_capped_fallback"):
-                row = {
-                    "profile_id": (
-                        f"dynamic_conviction_switch_t{threshold:.2f}_{fallback_name}_cash"
-                    ),
-                    "profile_kind": "train_validation_dynamic_conviction_switch_cash_guard",
-                    "candidate_tier": "clean_train_validation_selected_paper_shadow",
-                    "selected_candidate_label": "cash_no_eligible_signal",
-                    "aggressive_candidate_label": None,
-                    "fallback_candidate_label": None,
-                    "fallback_policy": fallback_name,
-                    "conviction_threshold": float(threshold),
-                    "aggressive_conviction_score": None,
-                    "selected_validation_return": 0.0,
-                    "selected_validation_mdd": 0.0,
-                    "selection_inputs": ["train", "validation"],
-                    "selection_notes": [reason, "no_position_cash_guard_for_missing_fold"],
-                    "uses_locked_oos_for_selection": False,
-                    "ready_for_paper": True,
-                    "ready_for_real": False,
-                    "real_money_execution": False,
-                    "weights": {},
-                    "final_weights": {},
-                }
-                out.append(
-                    _candidate_eval(
-                        family="dynamic_conviction_switch",
-                        label=f"dynamic_conviction_switch:t{threshold:.2f}_{fallback_name}",
-                        row=row,
-                        returns=cash_returns,
+                for label_suffix, extra in suffix_specs:
+                    row = {
+                        "profile_id": (
+                            f"dynamic_conviction_switch_t{threshold:.2f}_{fallback_name}"
+                            f"{label_suffix}_cash"
+                        ),
+                        "profile_kind": "train_validation_dynamic_conviction_switch_cash_guard",
+                        "candidate_tier": "clean_train_validation_selected_paper_shadow",
+                        "selected_candidate_label": "cash_no_eligible_signal",
+                        "aggressive_candidate_label": None,
+                        "fallback_candidate_label": None,
+                        "fallback_policy": fallback_name,
+                        "conviction_threshold": float(threshold),
+                        "aggressive_conviction_score": None,
+                        "selected_validation_return": 0.0,
+                        "selected_validation_mdd": 0.0,
+                        "selection_inputs": ["train", "validation"],
+                        "selection_notes": [reason, "no_position_cash_guard_for_missing_fold"],
+                        "uses_locked_oos_for_selection": False,
+                        "ready_for_paper": True,
+                        "ready_for_real": False,
+                        "real_money_execution": False,
+                        "risk_scale": 0.0,
+                        "risk_scale_mode": "train_validation_cash_guard",
+                        "weights": {},
+                        "final_weights": {},
+                        **extra,
+                    }
+                    out.append(
+                        _candidate_eval(
+                            family="dynamic_conviction_switch",
+                            label=(
+                                f"dynamic_conviction_switch:t{threshold:.2f}_{fallback_name}"
+                                f"{label_suffix}"
+                            ),
+                            row=row,
+                            returns=cash_returns,
+                        )
                     )
-                )
         return out
 
     if not fallback_pool:
@@ -1394,6 +1432,156 @@ def _dynamic_conviction_switch_candidates(
         )
     best_aggressive = max(aggressive_pool, key=conviction_score) if aggressive_pool else None
     best_score = conviction_score(best_aggressive) if best_aggressive is not None else -float("inf")
+    def _scaled_candidate_snapshot(
+        candidate: CandidateResult, scale: float
+    ) -> dict[str, dict[str, Any]]:
+        scaled_returns = candidate.returns * float(scale)
+        return {
+            "train": _period_metrics(scaled_returns, fold.train),
+            "validation": _period_metrics(scaled_returns, fold.validation),
+        }
+
+    def _validation_budget_scale(
+        candidate: CandidateResult,
+        *,
+        target_validation_mdd: float,
+        max_scale: float,
+    ) -> tuple[float, dict[str, dict[str, Any]]]:
+        """Pick a fold-local leverage scale using train+validation only.
+
+        The grid is intentionally coarse: it is a position-sizing guard, not a
+        hidden optimizer.  A scale is admissible only if the scaled sleeve still
+        has non-negative validation return and stays inside the requested
+        validation MDD budget.  Locked OOS is never read here.
+        """
+        best_scale = 1.0
+        best_snapshot = _scaled_candidate_snapshot(candidate, 1.0)
+        best_score = -float("inf")
+        for scale in (1.0, 1.10, 1.25, 1.50, 1.75, 2.00, 2.25, 2.50):
+            if scale > max_scale + 1e-12:
+                continue
+            snapshot = _scaled_candidate_snapshot(candidate, scale)
+            train = snapshot["train"]
+            validation = snapshot["validation"]
+            train_return = _safe_float(train["total_return"])
+            validation_return = _safe_float(validation["total_return"])
+            validation_mdd = _safe_float(validation["mdd"])
+            if train_return <= -0.02 or validation_return < 0.0:
+                continue
+            if validation_mdd > target_validation_mdd + 1e-12:
+                continue
+            # Prefer high validation efficiency, but penalize gratuitous size
+            # so equal-quality fits choose the lower operational exposure.
+            score = (
+                validation_return / max(validation_mdd, 0.02)
+                + 0.10 * min(train_return, 2.0)
+                - 0.03 * scale
+            )
+            if score > best_score:
+                best_score = score
+                best_scale = float(scale)
+                best_snapshot = snapshot
+        return best_scale, best_snapshot
+
+    def _emit_dynamic_candidate(
+        *,
+        label_suffix: str,
+        profile_kind: str,
+        selected: CandidateResult,
+        fallback_name: str,
+        fallback_candidate: CandidateResult,
+        threshold: float,
+        selected_snap: Mapping[str, float],
+        returns: pd.Series,
+        scale: float,
+        extra_row: Mapping[str, Any] | None = None,
+    ) -> CandidateResult:
+        selected_weight = float(scale)
+        row = {
+            "profile_id": (
+                f"dynamic_conviction_switch_t{threshold:.2f}_{fallback_name}{label_suffix}"
+            ),
+            "profile_kind": profile_kind,
+            "candidate_tier": "clean_train_validation_selected_paper_shadow",
+            "selected_candidate_label": selected.candidate_label,
+            "aggressive_candidate_label": (
+                best_aggressive.candidate_label if best_aggressive is not None else None
+            ),
+            "fallback_candidate_label": fallback_candidate.candidate_label,
+            "fallback_policy": fallback_name,
+            "conviction_threshold": float(threshold),
+            "aggressive_conviction_score": best_score,
+            "selected_validation_return": selected_snap["validation_return"],
+            "selected_validation_mdd": selected_snap["validation_mdd"],
+            "selection_inputs": ["train", "validation"],
+            "uses_locked_oos_for_selection": False,
+            "ready_for_paper": True,
+            "ready_for_real": False,
+            "real_money_execution": False,
+            "risk_scale": selected_weight,
+            "risk_scale_mode": "train_validation_validation_mdd_budget",
+            "weights": {selected.candidate_label: selected_weight},
+            "final_weights": {selected.candidate_label: selected_weight},
+        }
+        if extra_row:
+            row.update(dict(extra_row))
+        return _candidate_eval(
+            family="dynamic_conviction_switch",
+            label=f"dynamic_conviction_switch:t{threshold:.2f}_{fallback_name}{label_suffix}",
+            row=row,
+            returns=returns,
+        )
+
+    def _emit_cash_guard_candidate(
+        *,
+        label_suffix: str,
+        profile_kind: str,
+        selected: CandidateResult,
+        fallback_name: str,
+        fallback_candidate: CandidateResult,
+        threshold: float,
+        selected_snap: Mapping[str, float],
+        reason: str,
+        extra_row: Mapping[str, Any] | None = None,
+    ) -> CandidateResult:
+        cash_returns = pd.Series(0.0, index=selected.returns.index, dtype=float)
+        row = {
+            "profile_id": (
+                f"dynamic_conviction_switch_t{threshold:.2f}_{fallback_name}{label_suffix}_cash"
+            ),
+            "profile_kind": profile_kind,
+            "candidate_tier": "clean_train_validation_selected_paper_shadow",
+            "selected_candidate_label": "cash_validation_strength_guard",
+            "cash_guard_source_candidate_label": selected.candidate_label,
+            "aggressive_candidate_label": (
+                best_aggressive.candidate_label if best_aggressive is not None else None
+            ),
+            "fallback_candidate_label": fallback_candidate.candidate_label,
+            "fallback_policy": fallback_name,
+            "conviction_threshold": float(threshold),
+            "aggressive_conviction_score": best_score,
+            "selected_validation_return": selected_snap["validation_return"],
+            "selected_validation_mdd": selected_snap["validation_mdd"],
+            "selection_inputs": ["train", "validation"],
+            "selection_notes": [reason],
+            "uses_locked_oos_for_selection": False,
+            "ready_for_paper": True,
+            "ready_for_real": False,
+            "real_money_execution": False,
+            "risk_scale": 0.0,
+            "risk_scale_mode": "train_validation_cash_guard",
+            "weights": {},
+            "final_weights": {},
+        }
+        if extra_row:
+            row.update(dict(extra_row))
+        return _candidate_eval(
+            family="dynamic_conviction_switch",
+            label=f"dynamic_conviction_switch:t{threshold:.2f}_{fallback_name}{label_suffix}",
+            row=row,
+            returns=cash_returns,
+        )
+
     out: list[CandidateResult] = []
     for threshold in (0.85, 0.90, 0.95, 1.00):
         for fallback_name, fallback_candidate in (
@@ -1406,36 +1594,155 @@ def _dynamic_conviction_switch_candidates(
                 else fallback_candidate
             )
             selected_snap = _candidate_validation_snapshot(selected, fold)
-            row = {
-                "profile_id": f"dynamic_conviction_switch_t{threshold:.2f}_{fallback_name}",
-                "profile_kind": "train_validation_dynamic_conviction_switch",
-                "candidate_tier": "clean_train_validation_selected_paper_shadow",
-                "selected_candidate_label": selected.candidate_label,
-                "aggressive_candidate_label": (
-                    best_aggressive.candidate_label if best_aggressive is not None else None
-                ),
-                "fallback_candidate_label": fallback_candidate.candidate_label,
-                "fallback_policy": fallback_name,
-                "conviction_threshold": float(threshold),
-                "aggressive_conviction_score": best_score,
-                "selected_validation_return": selected_snap["validation_return"],
-                "selected_validation_mdd": selected_snap["validation_mdd"],
-                "selection_inputs": ["train", "validation"],
-                "uses_locked_oos_for_selection": False,
-                "ready_for_paper": True,
-                "ready_for_real": False,
-                "real_money_execution": False,
-                "weights": {selected.candidate_label: 1.0},
-                "final_weights": {selected.candidate_label: 1.0},
-            }
             out.append(
-                _candidate_eval(
-                    family="dynamic_conviction_switch",
-                    label=f"dynamic_conviction_switch:t{threshold:.2f}_{fallback_name}",
-                    row=row,
+                _emit_dynamic_candidate(
+                    label_suffix="",
+                    profile_kind="train_validation_dynamic_conviction_switch",
+                    selected=selected,
+                    fallback_name=fallback_name,
+                    fallback_candidate=fallback_candidate,
+                    threshold=threshold,
+                    selected_snap=selected_snap,
                     returns=selected.returns,
+                    scale=1.0,
                 )
             )
+
+            for target_mdd, max_scale in ((0.12, 2.0), (0.15, 2.25), (0.20, 2.50)):
+                scale, scale_snapshot = _validation_budget_scale(
+                    selected,
+                    target_validation_mdd=target_mdd,
+                    max_scale=max_scale,
+                )
+                scaled_snap = {
+                    "train_return": _safe_float(scale_snapshot["train"]["total_return"]),
+                    "validation_return": _safe_float(
+                        scale_snapshot["validation"]["total_return"]
+                    ),
+                    "train_mdd": _safe_float(scale_snapshot["train"]["mdd"]),
+                    "validation_mdd": _safe_float(scale_snapshot["validation"]["mdd"]),
+                }
+                out.append(
+                    _emit_dynamic_candidate(
+                        label_suffix=f"_val_mdd{int(target_mdd * 100):02d}_scaled",
+                        profile_kind="train_validation_dynamic_conviction_switch_risk_scaled",
+                        selected=selected,
+                        fallback_name=fallback_name,
+                        fallback_candidate=fallback_candidate,
+                        threshold=threshold,
+                        selected_snap=scaled_snap,
+                        returns=selected.returns * scale,
+                        scale=scale,
+                        extra_row={
+                            "target_validation_mdd": float(target_mdd),
+                            "max_risk_scale": float(max_scale),
+                            "unscaled_selected_validation_return": selected_snap[
+                                "validation_return"
+                            ],
+                            "unscaled_selected_validation_mdd": selected_snap[
+                                "validation_mdd"
+                            ],
+                        },
+                    )
+                )
+
+            for min_validation_return, min_validation_calmar in ((0.02, 0.80),):
+                validation_calmar = selected_snap["validation_return"] / max(
+                    selected_snap["validation_mdd"], 0.01
+                )
+                gate_extra = {
+                    "min_validation_return": float(min_validation_return),
+                    "min_validation_calmar": float(min_validation_calmar),
+                    "validation_strength_calmar": float(validation_calmar),
+                }
+                gate_pass = (
+                    selected_snap["validation_return"] >= min_validation_return
+                    and validation_calmar >= min_validation_calmar
+                )
+                gate_suffix = (
+                    f"_val_ret{int(min_validation_return * 100):02d}_calmar"
+                    f"{int(min_validation_calmar * 100):02d}_gate"
+                )
+                if not gate_pass:
+                    out.append(
+                        _emit_cash_guard_candidate(
+                            label_suffix=gate_suffix,
+                            profile_kind=(
+                                "train_validation_dynamic_conviction_switch_"
+                                "validation_strength_cash_guard"
+                            ),
+                            selected=selected,
+                            fallback_name=fallback_name,
+                            fallback_candidate=fallback_candidate,
+                            threshold=threshold,
+                            selected_snap=selected_snap,
+                            reason="validation_strength_below_trade_threshold",
+                            extra_row=gate_extra,
+                        )
+                    )
+                    continue
+
+                out.append(
+                    _emit_dynamic_candidate(
+                        label_suffix=gate_suffix,
+                        profile_kind=(
+                            "train_validation_dynamic_conviction_switch_"
+                            "validation_strength_gate"
+                        ),
+                        selected=selected,
+                        fallback_name=fallback_name,
+                        fallback_candidate=fallback_candidate,
+                        threshold=threshold,
+                        selected_snap=selected_snap,
+                        returns=selected.returns,
+                        scale=1.0,
+                        extra_row=gate_extra,
+                    )
+                )
+                for target_mdd, max_scale in ((0.15, 2.25), (0.20, 2.50)):
+                    scale, scale_snapshot = _validation_budget_scale(
+                        selected,
+                        target_validation_mdd=target_mdd,
+                        max_scale=max_scale,
+                    )
+                    scaled_snap = {
+                        "train_return": _safe_float(scale_snapshot["train"]["total_return"]),
+                        "validation_return": _safe_float(
+                            scale_snapshot["validation"]["total_return"]
+                        ),
+                        "train_mdd": _safe_float(scale_snapshot["train"]["mdd"]),
+                        "validation_mdd": _safe_float(scale_snapshot["validation"]["mdd"]),
+                    }
+                    out.append(
+                        _emit_dynamic_candidate(
+                            label_suffix=(
+                                f"{gate_suffix}_val_mdd{int(target_mdd * 100):02d}"
+                                "_scaled"
+                            ),
+                            profile_kind=(
+                                "train_validation_dynamic_conviction_switch_"
+                                "validation_strength_risk_scaled"
+                            ),
+                            selected=selected,
+                            fallback_name=fallback_name,
+                            fallback_candidate=fallback_candidate,
+                            threshold=threshold,
+                            selected_snap=scaled_snap,
+                            returns=selected.returns * scale,
+                            scale=scale,
+                            extra_row={
+                                **gate_extra,
+                                "target_validation_mdd": float(target_mdd),
+                                "max_risk_scale": float(max_scale),
+                                "unscaled_selected_validation_return": selected_snap[
+                                    "validation_return"
+                                ],
+                                "unscaled_selected_validation_mdd": selected_snap[
+                                    "validation_mdd"
+                                ],
+                            },
+                        )
+                    )
     return out
 
 
@@ -1931,6 +2238,146 @@ def _validation_selector_candidates(
             )
         )
     return out
+
+
+STRICT_CALM_LEAF_SELECTOR_LABELS: tuple[str, ...] = (
+    "strict_efficiency:balanced_mdd12_gross5_69_asset_efficiency_repair_optuna",
+    "strict_efficiency:growth_mdd20_gross8_69_asset_efficiency_repair_optuna",
+    "profile_optuna:balanced_mdd12_gross5_69_asset_profile_optuna",
+    "profile_optuna:growth_mdd20_gross8_69_asset_profile_optuna",
+)
+
+
+def _strict_calm_leaf_score(snap: Mapping[str, float]) -> float:
+    """Validation-dominant utility for a low-drawdown monthly leaf selector."""
+    train_return = float(snap["train_return"])
+    validation_return = float(snap["validation_return"])
+    train_mdd = float(snap["train_mdd"])
+    validation_mdd = float(snap["validation_mdd"])
+    validation_spike = max(0.0, validation_return - max(train_return, 0.0))
+    return float(
+        validation_return
+        + 0.05 * min(max(train_return, -0.20), 1.50)
+        - 3.00 * validation_mdd
+        - 0.20 * train_mdd
+        - 0.75 * validation_spike
+    )
+
+
+def _strict_calm_leaf_selector_candidates(
+    candidates: Sequence[CandidateResult],
+    fold: MonthlyFold,
+) -> list[CandidateResult]:
+    """Pick one calm leaf sleeve from train+validation evidence only.
+
+    This is intentionally not a hybrid.  Each fold selects exactly one
+    low-validation-drawdown source leaf from a fixed, pre-OOS family roster.
+    If no leaf passes the train/validation gate, the row goes to cash for that
+    fold so the aggregate remains auditable instead of silently dropping a
+    difficult month.
+    """
+    reference = next((candidate for candidate in candidates if candidate.returns.size), None)
+    if reference is None:
+        return []
+
+    by_label = {candidate.candidate_label: candidate for candidate in candidates}
+    pool: list[tuple[CandidateResult, dict[str, float], float]] = []
+    for label in STRICT_CALM_LEAF_SELECTOR_LABELS:
+        candidate = by_label.get(label)
+        if candidate is None:
+            continue
+        if not _clean_downstream_candidate(candidate):
+            continue
+        snap = _candidate_validation_snapshot(candidate, fold)
+        if snap["train_return"] <= 0.0:
+            continue
+        if snap["validation_return"] < 0.0:
+            continue
+        if snap["validation_mdd"] > 0.08:
+            continue
+        if snap["train_mdd"] > 0.45:
+            continue
+        pool.append((candidate, snap, _strict_calm_leaf_score(snap)))
+
+    label = "strict_calm_leaf_selector:val_mdd8_train_val_spike_penalty"
+    if not pool:
+        cash_returns = pd.Series(0.0, index=reference.returns.index, dtype=float)
+        row = {
+            "profile_id": label,
+            "profile_kind": "strict_calm_leaf_train_validation_selector",
+            "candidate_tier": "clean_train_validation_selected_paper_shadow",
+            "selected_candidate_label": "cash_no_eligible_signal",
+            "selected_validation_return": 0.0,
+            "selected_validation_mdd": 0.0,
+            "selected_train_return": 0.0,
+            "selected_train_mdd": 0.0,
+            "strict_calm_score": 0.0,
+            "selection_inputs": ["train", "validation"],
+            "selection_policy": (
+                "fixed_leaf_roster_validation_mdd8_positive_train_validation_no_oos"
+            ),
+            "selection_notes": ["no_train_validation_eligible_leaf", "cash_guard"],
+            "uses_locked_oos_for_selection": False,
+            "same_month_self_feeding": False,
+            "current_fold_oos_used_for_weighting": False,
+            "post_oos_research_variant": False,
+            "requires_fresh_forward_shadow": False,
+            "ready_for_paper": True,
+            "ready_for_real": False,
+            "real_money_execution": False,
+            "weights": {},
+            "final_weights": {},
+        }
+        return [
+            _candidate_eval(
+                family="strict_calm_leaf_selector",
+                label=label,
+                row=row,
+                returns=cash_returns,
+            )
+        ]
+
+    selected, snap, score = max(
+        pool,
+        key=lambda item: (
+            item[2],
+            item[1]["validation_calmar"],
+            item[1]["validation_return"],
+            -item[1]["validation_mdd"],
+        ),
+    )
+    row = {
+        "profile_id": label,
+        "profile_kind": "strict_calm_leaf_train_validation_selector",
+        "candidate_tier": "clean_train_validation_selected_paper_shadow",
+        "selected_candidate_label": selected.candidate_label,
+        "selected_validation_return": snap["validation_return"],
+        "selected_validation_mdd": snap["validation_mdd"],
+        "selected_train_return": snap["train_return"],
+        "selected_train_mdd": snap["train_mdd"],
+        "strict_calm_score": float(score),
+        "candidate_pool_labels": [candidate.candidate_label for candidate, _, _ in pool],
+        "selection_inputs": ["train", "validation"],
+        "selection_policy": "fixed_leaf_roster_validation_mdd8_positive_train_validation_no_oos",
+        "uses_locked_oos_for_selection": False,
+        "same_month_self_feeding": False,
+        "current_fold_oos_used_for_weighting": False,
+        "post_oos_research_variant": False,
+        "requires_fresh_forward_shadow": False,
+        "ready_for_paper": True,
+        "ready_for_real": False,
+        "real_money_execution": False,
+        "weights": {selected.candidate_label: 1.0},
+        "final_weights": {selected.candidate_label: 1.0},
+    }
+    return [
+        _candidate_eval(
+            family="strict_calm_leaf_selector",
+            label=label,
+            row=row,
+            returns=selected.returns.copy(),
+        )
+    ]
 
 
 def _scaled_candidate_returns(candidate: CandidateResult, scale: float) -> pd.Series:
@@ -3291,6 +3738,8 @@ def _run_source_profile_family(
         timeframes=timeframes,
         windows=windows,
     )
+    feature_support_symbols = tuple(train_eligibility["train_eligible_symbols"])
+    fold_cache = _fold_feature_cache(cache, symbols=feature_support_symbols)
     asset_rows: list[dict[str, Any]] = []
     profile_rows: list[dict[str, Any]] = []
     sleeve_rows: list[dict[str, Any]] = []
@@ -3298,7 +3747,7 @@ def _run_source_profile_family(
     profile_streams: list[grid_hybrid.ProfileStream] = []
     workers = max(1, int(source_symbol_workers))
     if workers > 1:
-        _prewarm_source_feature_cache(cache, timeframes=timeframes)
+        _prewarm_source_feature_cache(fold_cache, timeframes=timeframes)
 
     for profile_idx, base_spec in enumerate(profile69.PROFILE_SPECS):
         profile_spec = {**base_spec, "_timeframes": timeframes}
@@ -3320,7 +3769,7 @@ def _run_source_profile_family(
             return profile69.tune_symbol_profile(
                 symbol=symbol,
                 spec=symbol_spec,
-                cache=cache,
+                cache=fold_cache,
                 windows=windows,
                 n_trials=int(asset_trials),
                 seed=int(seed) + profile_idx * 100_000 + symbol_idx,
@@ -3395,7 +3844,13 @@ def _run_source_profile_family(
     source_payload = {
         "artifact_kind": "alpha_zoo_69_asset_profile_optuna_hybrid_refit_monthly_fold_source",
         "generated_at_utc": _utc_now_iso(),
-        "universe": {"symbol_count": len(symbols), "symbols": list(symbols)},
+        "universe": {
+            "symbol_count": len(symbols),
+            "symbols": list(symbols),
+            "feature_support_symbol_count": len(feature_support_symbols),
+            "feature_support_symbols": list(feature_support_symbols),
+            "feature_support_policy": "train_eligible_symbols_only",
+        },
         "timeframes": list(timeframes),
         "split_policy": windows.as_payload(),
         "data_coverage": dict(data_coverage),
@@ -3430,6 +3885,8 @@ def _run_source_profile_family(
         "selected_sleeve_row_count": len(sleeve_rows),
         "train_eligible_symbol_count": train_eligibility["train_eligible_symbol_count"],
         "train_ineligible_symbols": train_eligibility["train_ineligible_symbols"],
+        "feature_support_symbol_count": len(feature_support_symbols),
+        "feature_support_policy": "train_eligible_symbols_only",
         "source_symbol_workers": workers,
     }
     return candidates, aux
@@ -3456,6 +3913,8 @@ def _run_efficiency_family(
         timeframes=timeframes,
         windows=windows,
     )
+    feature_support_symbols = tuple(train_eligibility["train_eligible_symbols"])
+    fold_cache = _fold_feature_cache(cache, symbols=feature_support_symbols)
     candidates: list[CandidateResult] = []
     profile_rows: list[dict[str, Any]] = []
     sleeve_rows: list[dict[str, Any]] = []
@@ -3466,7 +3925,7 @@ def _run_efficiency_family(
             candidate_streams = relaxed_eff._build_candidate_streams(
                 source_payload=source_payload,
                 spec=spec,
-                cache=cache,
+                cache=fold_cache,
                 windows=windows,
                 train_eligibility=train_eligibility,
             )
@@ -3488,7 +3947,7 @@ def _run_efficiency_family(
             candidate_streams = strict_eff._build_candidate_streams(
                 source_payload=source_payload,
                 spec=spec,
-                cache=cache,
+                cache=fold_cache,
                 windows=windows,
                 train_eligibility=train_eligibility,
             )
@@ -3515,6 +3974,8 @@ def _run_efficiency_family(
             "profile_row_count": 0,
             "selected_sleeve_row_count": 0,
             "train_eligible_symbol_count": train_eligibility["train_eligible_symbol_count"],
+            "feature_support_symbol_count": len(feature_support_symbols),
+            "feature_support_policy": "train_eligible_symbols_only",
             "skip_reason": "no_allocatable_efficiency_profile_streams",
         }
 
@@ -3647,6 +4108,8 @@ def _run_efficiency_family(
         "profile_row_count": len(profile_rows),
         "selected_sleeve_row_count": len(sleeve_rows),
         "train_eligible_symbol_count": train_eligibility["train_eligible_symbol_count"],
+        "feature_support_symbol_count": len(feature_support_symbols),
+        "feature_support_policy": "train_eligible_symbols_only",
     }
     return candidates, aux
 
@@ -3662,6 +4125,28 @@ def _prewarm_source_feature_cache(
         for lookback in xsmom_lookbacks:
             cache.xsmom(str(timeframe), int(lookback))
         cache.anchor_returns(str(timeframe))
+
+
+def _fold_feature_cache(
+    base: profile69.FeatureCache,
+    *,
+    symbols: Sequence[str],
+) -> profile69.FeatureCache:
+    """Return a fold-local feature cache scoped to train-eligible symbols.
+
+    Newly listed symbols can be present in local parquet for monitoring/backfill
+    while still having no train-window data.  They must not become hidden
+    cross-sectional rank/support features inside a fold until they are train
+    eligible, otherwise they can alter OOS-only rankings without having been
+    available to the fold's parameter fit.
+    """
+    return profile69.FeatureCache(
+        bars_by_symbol_tf=base.bars_by_symbol_tf,
+        symbols=tuple(symbols),
+        timeframes=base.timeframes,
+        _xsmom={},
+        _anchor_returns={},
+    )
 
 
 def _evaluate_candidate(candidate: CandidateResult, fold: MonthlyFold) -> dict[str, Any]:
@@ -4092,11 +4577,17 @@ def _render_markdown(payload: Mapping[str, Any]) -> str:
                 f"{_fmt_pct(row['max_oos_mdd'])} |"
             )
 
+    universe = dict(payload.get("universe") or {})
+    data_coverage = dict(payload.get("data_coverage") or {})
+    missing_symbols = list(data_coverage.get("missing_symbols") or [])
     lines = [
-        "# 69-asset monthly-refit walk-forward: 2M validation / 1M OOS",
+        "# Expanded-universe monthly-refit walk-forward: 2M validation / 1M OOS",
         "",
         f"- generated: `{payload.get('generated_at_utc')}`",
-        f"- latest available data: `{payload.get('data_coverage', {}).get('global_latest_utc')}`",
+        f"- requested symbols: `{universe.get('requested_symbol_count', universe.get('symbol_count'))}`",
+        f"- loaded symbols with bars: `{universe.get('loaded_symbol_count', data_coverage.get('loaded_symbol_count'))}`",
+        f"- missing symbols held for future monitoring/backfill: `{len(missing_symbols)}`",
+        f"- latest available data: `{data_coverage.get('global_latest_utc')}`",
         f"- allowed timeframes: `{', '.join(payload.get('timeframes') or [])}`",
         f"- slippage/cost proxy: `{payload.get('cost_model', {}).get('slippage_bps')}` bps",
         f"- folds: `{len(folds)}` (`{folds[0]['fold_id'] if folds else ''}` → `{folds[-1]['fold_id'] if folds else ''}`)",
@@ -4252,6 +4743,14 @@ def run_walkforward(args: argparse.Namespace) -> dict[str, Any]:
         f"[load] symbols={len(symbols)} timeframes={timeframes} data_root={data_root}", flush=True
     )
     bars, coverage = broad69.load_all_bars(symbols, data_root=data_root, timeframes=timeframes)
+    loaded_symbols = tuple(str(item) for item in coverage.get("symbols_with_any_rows", []))
+    missing_symbols = tuple(str(item) for item in coverage.get("missing_symbols", []))
+    if missing_symbols:
+        print(
+            f"[load] requested={len(symbols)} loaded={len(loaded_symbols)} "
+            f"missing={len(missing_symbols)} (held for future backfill/monitoring)",
+            flush=True,
+        )
     timeframe_coverage = _timeframe_coverage_summary(coverage)
     latest_data = _coerce_ts(coverage["global_latest_utc"])
     folds = build_monthly_folds(
@@ -4320,7 +4819,15 @@ def run_walkforward(args: argparse.Namespace) -> dict[str, Any]:
             "research_primary_round_trip_cost_bps": broad69.PRIMARY_ROUND_TRIP_COST_BPS,
             "return_per_turnover_threshold_bps": broad69.RETURN_PER_TURNOVER_THRESHOLD_BPS,
         },
-        "universe": {"symbol_count": len(symbols), "symbols": list(symbols)},
+        "universe": {
+            "symbol_count": len(symbols),
+            "requested_symbol_count": len(symbols),
+            "loaded_symbol_count": len(loaded_symbols),
+            "missing_symbol_count": len(missing_symbols),
+            "symbols": list(symbols),
+            "loaded_symbols": list(loaded_symbols),
+            "missing_symbols": list(missing_symbols),
+        },
         "timeframes": list(timeframes),
         "data_coverage": coverage,
         "timeframe_coverage": timeframe_coverage,
@@ -4425,6 +4932,14 @@ def run_walkforward(args: argparse.Namespace) -> dict[str, Any]:
             all_candidates.extend(teacher_leaf_blend_candidates)
         else:
             teacher_leaf_blend_candidates = []
+        if "strict_calm_leaf_selector" in args.families:
+            strict_calm_leaf_selector_candidates = _strict_calm_leaf_selector_candidates(
+                all_candidates,
+                fold,
+            )
+            all_candidates.extend(strict_calm_leaf_selector_candidates)
+        else:
+            strict_calm_leaf_selector_candidates = []
         meta_candidates = _meta_portfolio_candidates(all_candidates, fold)
         all_candidates.extend(meta_candidates)
         cross_hybrid_candidates = _cross_candidate_hybrid_candidates(
@@ -4481,6 +4996,7 @@ def run_walkforward(args: argparse.Namespace) -> dict[str, Any]:
             "relaxed_efficiency_aux": relaxed_aux,
             "asset_timeframe_leverage_count": len(asset_tf_leverage_candidates),
             "teacher_leaf_blend_count": len(teacher_leaf_blend_candidates),
+            "strict_calm_leaf_selector_count": len(strict_calm_leaf_selector_candidates),
             "meta_portfolio_candidate_count": len(meta_candidates),
             "cross_candidate_hybrid_count": len(cross_hybrid_candidates),
             "dynamic_conviction_switch_count": len(dynamic_switch_candidates),
@@ -4546,12 +5062,13 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--families",
         default=(
             "profile_optuna,individual_robust,asset_timeframe_leverage,"
-            "strict_efficiency,relaxed_efficiency,teacher_leaf_blend"
+            "strict_efficiency,relaxed_efficiency,teacher_leaf_blend,"
+            "strict_calm_leaf_selector"
         ),
         help=(
             "Comma-separated families. profile_optuna is always included; optional: "
             "individual_robust, asset_timeframe_leverage, strict_efficiency, "
-            "relaxed_efficiency, teacher_leaf_blend."
+            "relaxed_efficiency, teacher_leaf_blend, strict_calm_leaf_selector."
         ),
     )
     parser.add_argument("--bridge-protocol-manifest", default=str(DEFAULT_BRIDGE_PROTOCOL_MANIFEST))

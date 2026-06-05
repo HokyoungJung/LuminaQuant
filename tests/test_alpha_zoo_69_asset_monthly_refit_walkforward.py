@@ -7,6 +7,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pandas as pd
+import polars as pl
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -106,6 +107,38 @@ def test_timeframe_coverage_summary_reports_one_day() -> None:
     assert "complete_bucket_policy" in summary["1d"]
 
 
+def test_load_all_bars_marks_missing_new_symbols_without_failing(tmp_path: Path) -> None:
+    data_root = tmp_path / "exchange=binance"
+    btc_dir = data_root / "symbol=BTCUSDT" / "timeframe=1m" / "date=2025-01-01"
+    btc_dir.mkdir(parents=True)
+    datetimes = pd.date_range("2025-01-01", periods=30, freq="1min")
+    pl.DataFrame(
+        {
+            "datetime": datetimes.to_pydatetime().tolist(),
+            "open": [100.0] * len(datetimes),
+            "high": [101.0] * len(datetimes),
+            "low": [99.0] * len(datetimes),
+            "close": [100.5] * len(datetimes),
+            "volume": [10.0] * len(datetimes),
+        }
+    ).write_parquet(btc_dir / "part.parquet")
+
+    bars, coverage = module.broad69.load_all_bars(
+        ("BTCUSDT", "ANTHROPICUSDT"),
+        data_root=data_root,
+        timeframes=("30m",),
+    )
+
+    assert not bars[("BTCUSDT", "30m")].empty
+    assert bars[("ANTHROPICUSDT", "30m")].empty
+    assert coverage["requested_symbol_count"] == 2
+    assert coverage["loaded_symbol_count"] == 1
+    assert coverage["missing_symbols"] == ["ANTHROPICUSDT"]
+    assert coverage["timeframes"]["30m"]["ANTHROPICUSDT"]["missing_reason"] == (
+        "missing_direct_1m_parquet"
+    )
+
+
 def test_leaf_strategy_material_filter_rejects_nested_hybrid_inputs() -> None:
     leaf = _candidate("profile_optuna:growth_mdd20_gross8_69_asset_profile_optuna")
     hybrid = _candidate("cross_candidate_hybrid:hybrid_v3_5", family="cross_candidate_hybrid")
@@ -119,6 +152,60 @@ def test_leaf_strategy_material_filter_rejects_nested_hybrid_inputs() -> None:
     assert module._leaf_strategy_material_candidate(hybrid) is False
     assert module._leaf_strategy_material_candidate(selector) is False
     assert module._leaf_strategy_material_candidate(selected_optuna) is False
+
+
+def test_strict_calm_leaf_selector_is_clean_and_does_not_peek_oos() -> None:
+    index = pd.date_range("2025-01-01", "2025-03-31", freq="1D")
+    fold = module.MonthlyFold(
+        fold_id="2025-03",
+        refit_at=pd.Timestamp("2025-03-01"),
+        train=(pd.Timestamp("2025-01-01"), pd.Timestamp("2025-01-31")),
+        validation=(pd.Timestamp("2025-02-01"), pd.Timestamp("2025-02-28")),
+        locked_oos=(pd.Timestamp("2025-03-01"), pd.Timestamp("2025-03-31")),
+    )
+    calm_bad_oos = pd.Series(0.003, index=index, dtype=float)
+    calm_bad_oos.loc["2025-03-01":"2025-03-31"] = -0.020
+    lower_validation_good_oos = pd.Series(0.001, index=index, dtype=float)
+    lower_validation_good_oos.loc["2025-03-01":"2025-03-31"] = 0.050
+    nested = pd.Series(0.020, index=index, dtype=float)
+    candidates = [
+        module.CandidateResult(
+            family="strict_efficiency",
+            candidate_label=(
+                "strict_efficiency:balanced_mdd12_gross5_69_asset_efficiency_repair_optuna"
+            ),
+            source_profile_id="strict_balanced",
+            row={"selection_reasons": [], "uses_locked_oos_for_selection": False},
+            returns=calm_bad_oos,
+        ),
+        module.CandidateResult(
+            family="profile_optuna",
+            candidate_label="profile_optuna:growth_mdd20_gross8_69_asset_profile_optuna",
+            source_profile_id="profile_growth",
+            row={"selection_reasons": [], "uses_locked_oos_for_selection": False},
+            returns=lower_validation_good_oos,
+        ),
+        module.CandidateResult(
+            family="dynamic_conviction_switch",
+            candidate_label="dynamic_conviction_switch:t0.90_risk_capped_fallback",
+            source_profile_id="nested_selector",
+            row={"selection_reasons": [], "uses_locked_oos_for_selection": False},
+            returns=nested,
+        ),
+    ]
+
+    selected = module._strict_calm_leaf_selector_candidates(candidates, fold)
+    row = module._evaluate_candidate(selected[0], fold)
+
+    assert row["family"] == "strict_calm_leaf_selector"
+    assert row["selected_candidate_label"] == (
+        "strict_efficiency:balanced_mdd12_gross5_69_asset_efficiency_repair_optuna"
+    )
+    assert row["uses_locked_oos_for_selection"] is False
+    assert row["clean_promotion_eligible"] is True
+    assert row["nested_hybrid_dependency"] is False
+    assert "dynamic_conviction_switch:t0.90_risk_capped_fallback" not in row["final_weights"]
+    assert row["locked_oos"]["total_return"] < 0.0
 
 
 def test_leaf_strategy_material_filter_rejects_calendar_primary_inputs() -> None:
@@ -251,12 +338,15 @@ def test_dynamic_conviction_switch_emits_fallback_when_aggressive_pool_missing()
 
     switched = module._dynamic_conviction_switch_candidates(candidates, fold)
 
-    assert len(switched) == 8
+    assert len(switched) == 56
     assert all(candidate.row["aggressive_candidate_label"] is None for candidate in switched)
     assert all(
         candidate.row["selected_candidate_label"] == fallback_label for candidate in switched
     )
     assert all(set(candidate.row["final_weights"]) == {fallback_label} for candidate in switched)
+    assert any(candidate.row.get("risk_scale", 1.0) > 1.0 for candidate in switched)
+    assert any("_val_ret02_calmar80_gate" in candidate.candidate_label for candidate in switched)
+    assert all(candidate.row["uses_locked_oos_for_selection"] is False for candidate in switched)
 
 
 def test_dynamic_aware_hybrid_is_disabled_for_nested_hybrid_materials(
