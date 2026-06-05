@@ -1592,3 +1592,68 @@ Every future profit-moonshot session must update research notes before final han
 Do not repeat the earlier loop of finding a good-looking single rule and then discovering it is calendar-primary or OOS-selected. The next path must be evidence-first:
 
 `real factors → train/validation labels → calibrated edge → stateful replay → locked-OOS gate/report → strict liquidation validation`.
+
+---
+
+## 2026-06-05 — 69-asset clean OOS non-nested teacher-leaf rerun
+
+### Objective
+
+Re-check whether the previously high-performing nested hybrid/teacher structure can be made live-usable without nested hybrid material.  The rerun keeps the current live discipline:
+
+- Universe/timeframes: 69 Binance research symbols, `30m,1h,2h,4h,6h,8h,12h,1d`.
+- Cost: 10 bps slippage/cost proxy.
+- Refit: monthly, calendar day 1 UTC.
+- Selection inputs: expanding train + prior 2 calendar months validation only.
+- Locked OOS: next calendar month, report-only after fold params/candidate selection are frozen.
+- OOS span: `2025-09-01T00:00:00` → `2026-06-01T06:30:00`; 2026-06 is a partial fold because latest available data is `2026-06-01T06:30:00`.
+
+### Implementation / hygiene changes
+
+- Added `teacher_leaf_blend` as a non-leaf portfolio family that **does not use hybrid rows as material**. It rebuilds the old nested-teacher idea from clean leaf candidates only, with train/validation scoring and train/validation risk scaling.
+- Kept `teacher_leaf_blend` out of downstream material by adding it to `_NON_LEAF_PORTFOLIO_FAMILIES`.
+- Fixed `dynamic_conviction_switch` fold accounting: when the train/validation pool has no eligible aggressive/fallback branch, it now emits an explicit clean cash/no-position guard instead of silently omitting the fold. This avoids 9/10 fold aggregate distortion.
+- Added an optional numba JIT speed path for `_debounced_state_signal`; sample verification matched the Python loop exactly. The full core-family run still took `25:52.79`, so the dominant cost remains per-symbol Optuna + pandas feature work, not just the signal loop.
+- Added `--source-symbol-workers` as an experimental per-symbol threaded option. Tiny smoke passed, but `workers=4` did not materially improve the full 69-symbol path, so default remains sequential (`1`).
+
+### Main artifact
+
+- JSON: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_teacher_leaf_blend_20260605/teacher_leaf_blend_corefamilies_full_v2_20260605.json`
+- Markdown: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_teacher_leaf_blend_20260605/teacher_leaf_blend_corefamilies_full_v2_20260605.md`
+
+### Final clean-OOS result table
+
+| Candidate | Clean | OOS comp | Ann approx | Max bar MDD | Monthly eq MDD | Sharpe | Sortino | Hit | Min OOS | Latest OOS | Val min/mean |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `profile_optuna:selected_optuna` | True | 10.05% | 12.18% | 19.20% | 13.58% | 0.50 | 1.16 | 5/10 | -9.30% | -0.73% | 25.71%/59.74% |
+| `profile_optuna:hybrid_v3_5` | True | 9.06% | 10.97% | 19.20% | 13.58% | 0.47 | 1.04 | 5/10 | -9.30% | -0.23% | 25.71%/59.51% |
+| `dynamic_conviction_switch:t0.85_risk_capped_fallback` | True | 8.61% | 10.42% | 10.08% | 4.62% | 0.76 | 2.38 | 5/10 | -2.65% | 0.00% | 0.00%/4.62% |
+| `dynamic_conviction_switch:t0.85_strict_fallback` | True | 10.47% | 12.69% | 10.62% | 2.11% | 0.67 | 1.13 | 4/10 | -8.56% | -0.17% | 0.00%/9.22% |
+| `strict_efficiency:growth_mdd20_gross8_69_asset_efficiency_repair_optuna` | True | 6.97% | 8.42% | 7.32% | 3.70% | 0.66 | 1.84 | 4/10 | -3.58% | -0.17% | 0.01%/6.18% |
+| `teacher_leaf_blend:val_balanced_top12_cap20_mdd20` | True | -28.11% | -32.70% | 26.40% | 22.44% | -1.10 | -1.70 | 4/10 | -15.80% | -0.88% | 29.89%/51.65% |
+| `teacher_leaf_blend:val_return_top8_cap35_mdd30` | True | -42.49% | -48.52% | 37.72% | 35.31% | -1.33 | -2.10 | 4/10 | -22.86% | -1.07% | 40.46%/85.50% |
+
+### Interpretation
+
+- The de-nested teacher idea **does not survive** full clean OOS.  It looked good in the latest 2-fold smoke (`val_return_top8` about +90.22% OOS comp), but across all 10 folds it is negative.  The failure pattern is classic validation-overfit/high-volatility-chasing: very high validation returns (`val_return_top8` mean validation about +85.50%) paired with large negative next-month OOS tails.
+- Therefore, do **not** promote `teacher_leaf_blend` to live.  Keep it as a negative control / lesson: leaf-only plus validation-only mechanics are necessary but not sufficient; validation return must be regularized heavily for tail risk and regime turnover.
+- Best practical live/paper shadow candidate is `dynamic_conviction_switch:t0.85_risk_capped_fallback`: lower comp than profile selected, but much better realized risk profile: max bar MDD 10.08%, monthly equity MDD 4.62%, min OOS -2.65%, Sortino 2.38.
+- If pure return is prioritized, `profile_optuna:selected_optuna` remains the highest 10-fold clean full candidate in this core-family rerun (+10.05% comp), but its min OOS (-9.30%) and bar MDD (19.20%) make it less attractive for live without an external risk throttle.
+- `dynamic_conviction_switch:t0.85_strict_fallback` has slightly higher comp (+10.47%) and low monthly equity MDD (2.11%) but only 4/10 positive OOS folds and a -8.56% worst month, so it is a shadow/challenger rather than the primary risk candidate.
+
+### Recommendation
+
+For live/paper continuation:
+
+1. Primary paper candidate: `dynamic_conviction_switch:t0.85_risk_capped_fallback`.
+2. Return-seeking shadow: `profile_optuna:selected_optuna`.
+3. Additional challenger/shadow: `dynamic_conviction_switch:t0.85_strict_fallback`.
+4. Do not use `teacher_leaf_blend` except as a monitored research negative-control family.
+5. Next improvement should not chase current OOS.  Use train/validation-only rules to add a risk throttle around `profile_optuna:selected_optuna`, preferably from realized validation drawdown/volatility, external lagged risk-state, and cash/no-position guards.  Then require a fresh-forward shadow window before promotion.
+
+### Validation evidence
+
+- `uv run ruff check scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py scripts/research/run_alpha_zoo_69_asset_optuna_hybrid_refit.py tests/test_alpha_zoo_69_asset_monthly_refit_walkforward.py` — passed.
+- `uv run pytest -q tests/test_alpha_zoo_69_asset_monthly_refit_walkforward.py` — `33 passed`.
+- Full rerun: `25:52.79`, max RSS `1293384 KB`, exit status `0`.
+- Audits in final artifact: metric reconciliation passed, dynamic self-feed audit passed, online weight audit passed.

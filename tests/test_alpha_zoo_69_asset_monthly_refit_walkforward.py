@@ -219,6 +219,46 @@ def test_dynamic_conviction_switch_uses_train_validation_only() -> None:
     assert module._period_metrics(switched[0].returns, fold.locked_oos)["total_return"] < 0.0
 
 
+def test_dynamic_conviction_switch_emits_fallback_when_aggressive_pool_missing() -> None:
+    index = pd.date_range("2025-01-01", "2025-03-31", freq="1D")
+    fold = module.MonthlyFold(
+        fold_id="2025-03",
+        refit_at=pd.Timestamp("2025-03-01"),
+        train=(pd.Timestamp("2025-01-01"), pd.Timestamp("2025-01-31")),
+        validation=(pd.Timestamp("2025-02-01"), pd.Timestamp("2025-02-28")),
+        locked_oos=(pd.Timestamp("2025-03-01"), pd.Timestamp("2025-03-31")),
+    )
+    fallback_label = "strict_efficiency:balanced_mdd12_gross5_69_asset_efficiency_repair_optuna"
+    fallback_returns = pd.Series(0.001, index=index, dtype=float)
+    candidates = [
+        module.CandidateResult(
+            family="strict_efficiency",
+            candidate_label=fallback_label,
+            source_profile_id="fallback",
+            row={"selection_reasons": [], "uses_locked_oos_for_selection": False},
+            returns=fallback_returns,
+        ),
+        module.CandidateResult(
+            family="strict_efficiency",
+            candidate_label=(
+                "strict_efficiency:growth_mdd20_gross8_69_asset_efficiency_repair_optuna"
+            ),
+            source_profile_id="fallback_growth",
+            row={"selection_reasons": [], "uses_locked_oos_for_selection": False},
+            returns=fallback_returns,
+        ),
+    ]
+
+    switched = module._dynamic_conviction_switch_candidates(candidates, fold)
+
+    assert len(switched) == 8
+    assert all(candidate.row["aggressive_candidate_label"] is None for candidate in switched)
+    assert all(
+        candidate.row["selected_candidate_label"] == fallback_label for candidate in switched
+    )
+    assert all(set(candidate.row["final_weights"]) == {fallback_label} for candidate in switched)
+
+
 def test_dynamic_aware_hybrid_is_disabled_for_nested_hybrid_materials(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -319,6 +359,114 @@ def test_fixed_relaxed_dynamic_blend_is_disabled_for_nested_hybrids() -> None:
     ]
 
     assert module._fixed_relaxed_dynamic_blend_candidates(candidates) == []
+
+
+def test_teacher_leaf_blend_uses_validation_only_leaf_material() -> None:
+    index = pd.date_range("2025-01-01", "2025-03-31", freq="1D")
+    fold = module.MonthlyFold(
+        fold_id="2025-03",
+        refit_at=pd.Timestamp("2025-03-01"),
+        train=(pd.Timestamp("2025-01-01"), pd.Timestamp("2025-01-31")),
+        validation=(pd.Timestamp("2025-02-01"), pd.Timestamp("2025-02-28")),
+        locked_oos=(pd.Timestamp("2025-03-01"), pd.Timestamp("2025-03-31")),
+    )
+    high_validation_bad_oos = pd.Series(0.004, index=index, dtype=float)
+    high_validation_bad_oos.loc["2025-02-01":"2025-02-28"] = 0.012
+    high_validation_bad_oos.loc["2025-03-01":"2025-03-31"] = -0.020
+    lower_validation_good_oos = pd.Series(0.003, index=index, dtype=float)
+    lower_validation_good_oos.loc["2025-02-01":"2025-02-28"] = 0.004
+    lower_validation_good_oos.loc["2025-03-01":"2025-03-31"] = 0.010
+    nested = pd.Series(0.050, index=index, dtype=float)
+    candidates = [
+        module.CandidateResult(
+            family="relaxed_efficiency",
+            candidate_label=(
+                "relaxed_efficiency:growth_mdd20_gross8_69_asset_relaxed_efficiency_repair_optuna"
+            ),
+            source_profile_id="relaxed_growth",
+            row={"selection_reasons": [], "uses_locked_oos_for_selection": False},
+            returns=high_validation_bad_oos,
+        ),
+        module.CandidateResult(
+            family="strict_efficiency",
+            candidate_label=(
+                "strict_efficiency:balanced_mdd12_gross5_69_asset_efficiency_repair_optuna"
+            ),
+            source_profile_id="strict_balanced",
+            row={"selection_reasons": [], "uses_locked_oos_for_selection": False},
+            returns=lower_validation_good_oos,
+        ),
+        module.CandidateResult(
+            family="dynamic_conviction_switch",
+            candidate_label="dynamic_conviction_switch:t0.90_risk_capped_fallback",
+            source_profile_id="nested_selector",
+            row={"selection_reasons": [], "uses_locked_oos_for_selection": False},
+            returns=nested,
+        ),
+    ]
+
+    blended = module._teacher_leaf_blend_candidates(candidates, fold)
+
+    assert blended
+    assert all(
+        "dynamic_conviction_switch:t0.90_risk_capped_fallback" not in candidate.row["final_weights"]
+        for candidate in blended
+    )
+    assert any(
+        "relaxed_efficiency:growth_mdd20_gross8_69_asset_relaxed_efficiency_repair_optuna"
+        in candidate.row["final_weights"]
+        for candidate in blended
+    )
+    assert all(candidate.row["uses_locked_oos_for_selection"] is False for candidate in blended)
+    # The validation-led blend can still lose in the locked OOS fixture,
+    # proving the construction did not choose by current OOS.
+    assert any(
+        module._period_metrics(candidate.returns, fold.locked_oos)["total_return"] < 0.0
+        for candidate in blended
+    )
+
+
+def test_teacher_leaf_blend_evaluates_as_clean_non_nested_candidate() -> None:
+    index = pd.date_range("2025-01-01", "2025-03-31", freq="1D")
+    fold = module.MonthlyFold(
+        fold_id="2025-03",
+        refit_at=pd.Timestamp("2025-03-01"),
+        train=(pd.Timestamp("2025-01-01"), pd.Timestamp("2025-01-31")),
+        validation=(pd.Timestamp("2025-02-01"), pd.Timestamp("2025-02-28")),
+        locked_oos=(pd.Timestamp("2025-03-01"), pd.Timestamp("2025-03-31")),
+    )
+    candidates = [
+        module.CandidateResult(
+            family="relaxed_efficiency",
+            candidate_label=(
+                "relaxed_efficiency:growth_mdd20_gross8_69_asset_relaxed_efficiency_repair_optuna"
+            ),
+            source_profile_id="relaxed_growth",
+            row={"selection_reasons": [], "uses_locked_oos_for_selection": False},
+            returns=pd.Series(0.004, index=index, dtype=float),
+        ),
+        module.CandidateResult(
+            family="profile_optuna",
+            candidate_label="profile_optuna:growth_mdd20_gross8_69_asset_profile_optuna",
+            source_profile_id="profile_growth",
+            row={"selection_reasons": [], "uses_locked_oos_for_selection": False},
+            returns=pd.Series(0.003, index=index, dtype=float),
+        ),
+    ]
+
+    row = module._evaluate_candidate(
+        module._teacher_leaf_blend_candidates(candidates, fold)[0], fold
+    )
+
+    assert row["family"] == "teacher_leaf_blend"
+    assert row["clean_promotion_eligible"] is True
+    assert row["nested_hybrid_dependency"] is False
+    assert row["uses_locked_oos_for_selection"] is False
+    assert row["current_fold_oos_used_for_weighting"] is False
+    assert set(row["final_weights"]) == {
+        "relaxed_efficiency:growth_mdd20_gross8_69_asset_relaxed_efficiency_repair_optuna",
+        "profile_optuna:growth_mdd20_gross8_69_asset_profile_optuna",
+    }
 
 
 def test_asset_timeframe_leverage_family_marks_clean_train_validation_policy(

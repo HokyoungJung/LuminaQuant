@@ -62,6 +62,11 @@ try:  # pragma: no cover - import availability is environment dependent.
 except Exception:  # pragma: no cover
     optuna = None
 
+try:  # pragma: no cover - optional speed path depends on the optimize extra.
+    import numba as nb  # type: ignore
+except Exception:  # pragma: no cover
+    nb = None
+
 ALPHA_V2_ROOT = REPO_ROOT / "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2"
 DEFAULT_OUTPUT_DIR = ALPHA_V2_ROOT / "alpha_zoo_69_asset_optuna_hybrid_refit_20260530"
 DEFAULT_DATA_ROOT = REPO_ROOT / "data/market_parquet/exchange=binance"
@@ -673,6 +678,52 @@ def _adx_proxy(high: pd.Series, low: pd.Series, close: pd.Series, lookback: int)
     return dx.rolling(lookback).mean()
 
 
+if nb is not None:  # pragma: no cover - exercised by optimize runtime, not base CI.
+
+    @nb.njit(cache=True)
+    def _debounced_state_signal_jit(
+        long_entry_values: np.ndarray,
+        long_exit_values: np.ndarray,
+        short_entry_values: np.ndarray,
+        short_exit_values: np.ndarray,
+        allow_long: bool,
+        allow_short: bool,
+        min_hold_bars: int,
+        cooldown_bars: int,
+    ) -> np.ndarray:
+        out = np.zeros(long_entry_values.size, dtype=np.float64)
+        state = 0.0
+        bars_held = 10**9
+        cooldown_remaining = 0
+        for idx in range(out.size):
+            can_exit = bars_held >= min_hold_bars
+            exited = False
+            if can_exit and (
+                (state > 0.0 and long_exit_values[idx]) or (state < 0.0 and short_exit_values[idx])
+            ):
+                state = 0.0
+                bars_held = 0
+                cooldown_remaining = cooldown_bars
+                exited = True
+            if state == 0.0:
+                if cooldown_remaining > 0:
+                    cooldown_remaining -= 1
+                elif not exited:
+                    if allow_long and long_entry_values[idx]:
+                        state = 1.0
+                        bars_held = 0
+                    elif allow_short and short_entry_values[idx]:
+                        state = -1.0
+                        bars_held = 0
+            out[idx] = state
+            if state != 0.0:
+                bars_held += 1
+        return out
+
+else:  # pragma: no cover - base fallback path.
+    _debounced_state_signal_jit = None
+
+
 def _debounced_state_signal(
     long_entry: pd.Series,
     long_exit: pd.Series,
@@ -687,6 +738,17 @@ def _debounced_state_signal(
     long_exit_values = long_exit.fillna(False).astype(bool).to_numpy()
     short_entry_values = short_entry.fillna(False).astype(bool).to_numpy()
     short_exit_values = short_exit.fillna(False).astype(bool).to_numpy()
+    if _debounced_state_signal_jit is not None:
+        return _debounced_state_signal_jit(
+            long_entry_values,
+            long_exit_values,
+            short_entry_values,
+            short_exit_values,
+            side in {"long_only", "long_short"},
+            side in {"short_only", "long_short"},
+            int(min_hold_bars),
+            int(cooldown_bars),
+        )
     out = np.zeros(len(long_entry_values), dtype=float)
     state = 0.0
     bars_held = 10**9

@@ -26,6 +26,7 @@ import math
 import os
 import resource
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections import OrderedDict, defaultdict
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
@@ -174,6 +175,8 @@ ASSET_TIMEFRAME_LEVERAGE_PROFILE_SPECS: tuple[dict[str, Any], ...] = (
         ),
     },
 )
+
+TEACHER_LEAF_BLEND_SCALE_GRID: tuple[float, ...] = (0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5)
 
 INDIVIDUAL_PORTFOLIO_GUARD: dict[str, float] = {
     "max_validation_return": 0.35,
@@ -758,6 +761,7 @@ _NON_LEAF_PORTFOLIO_FAMILIES = {
     "validation_selector",
     "risk_enhanced_blend",
     "fixed_relaxed_dynamic_blend",
+    "teacher_leaf_blend",
     "mdd30_barbell_blend",
     "mdd30_risk_scaled",
     "mdd30_high_vol_gate",
@@ -1327,10 +1331,51 @@ def _dynamic_conviction_switch_candidates(
     fallback_pool = [
         candidate for label in fallback_labels if (candidate := fallback_eligible(label))
     ]
-    if not aggressive_pool or not fallback_pool:
-        return []
 
-    best_aggressive = max(aggressive_pool, key=conviction_score)
+    def zero_signal_candidates(reason: str) -> list[CandidateResult]:
+        reference = next((candidate for candidate in candidates if candidate.returns.size), None)
+        if reference is None:
+            return []
+        cash_returns = pd.Series(0.0, index=reference.returns.index, dtype=float)
+        out: list[CandidateResult] = []
+        for threshold in (0.85, 0.90, 0.95, 1.00):
+            for fallback_name in ("strict_fallback", "risk_capped_fallback"):
+                row = {
+                    "profile_id": (
+                        f"dynamic_conviction_switch_t{threshold:.2f}_{fallback_name}_cash"
+                    ),
+                    "profile_kind": "train_validation_dynamic_conviction_switch_cash_guard",
+                    "candidate_tier": "clean_train_validation_selected_paper_shadow",
+                    "selected_candidate_label": "cash_no_eligible_signal",
+                    "aggressive_candidate_label": None,
+                    "fallback_candidate_label": None,
+                    "fallback_policy": fallback_name,
+                    "conviction_threshold": float(threshold),
+                    "aggressive_conviction_score": None,
+                    "selected_validation_return": 0.0,
+                    "selected_validation_mdd": 0.0,
+                    "selection_inputs": ["train", "validation"],
+                    "selection_notes": [reason, "no_position_cash_guard_for_missing_fold"],
+                    "uses_locked_oos_for_selection": False,
+                    "ready_for_paper": True,
+                    "ready_for_real": False,
+                    "real_money_execution": False,
+                    "weights": {},
+                    "final_weights": {},
+                }
+                out.append(
+                    _candidate_eval(
+                        family="dynamic_conviction_switch",
+                        label=f"dynamic_conviction_switch:t{threshold:.2f}_{fallback_name}",
+                        row=row,
+                        returns=cash_returns,
+                    )
+                )
+        return out
+
+    if not fallback_pool:
+        return zero_signal_candidates("no_train_validation_eligible_fallback_leaf")
+
     best_fallback = max(fallback_pool, key=fallback_score)
     balanced_fallback = by_label.get(
         "strict_efficiency:balanced_mdd12_gross5_69_asset_efficiency_repair_optuna"
@@ -1347,21 +1392,28 @@ def _dynamic_conviction_switch_candidates(
         risk_capped_fallback = (
             growth_fallback if balanced_snap["validation_mdd"] > 0.10 else balanced_fallback
         )
-    best_score = conviction_score(best_aggressive)
+    best_aggressive = max(aggressive_pool, key=conviction_score) if aggressive_pool else None
+    best_score = conviction_score(best_aggressive) if best_aggressive is not None else -float("inf")
     out: list[CandidateResult] = []
     for threshold in (0.85, 0.90, 0.95, 1.00):
         for fallback_name, fallback_candidate in (
             ("strict_fallback", best_fallback),
             ("risk_capped_fallback", risk_capped_fallback),
         ):
-            selected = best_aggressive if best_score >= threshold else fallback_candidate
+            selected = (
+                best_aggressive
+                if best_aggressive is not None and best_score >= threshold
+                else fallback_candidate
+            )
             selected_snap = _candidate_validation_snapshot(selected, fold)
             row = {
                 "profile_id": f"dynamic_conviction_switch_t{threshold:.2f}_{fallback_name}",
                 "profile_kind": "train_validation_dynamic_conviction_switch",
                 "candidate_tier": "clean_train_validation_selected_paper_shadow",
                 "selected_candidate_label": selected.candidate_label,
-                "aggressive_candidate_label": best_aggressive.candidate_label,
+                "aggressive_candidate_label": (
+                    best_aggressive.candidate_label if best_aggressive is not None else None
+                ),
                 "fallback_candidate_label": fallback_candidate.candidate_label,
                 "fallback_policy": fallback_name,
                 "conviction_threshold": float(threshold),
@@ -1451,6 +1503,339 @@ def _fixed_relaxed_dynamic_blend_candidates(
     """
     _ = candidates
     return []
+
+
+def _teacher_leaf_prior(candidate: CandidateResult) -> float:
+    """Fixed no-OOS prior distilled from the old nested teacher structure.
+
+    The prior is deliberately coarse and family/name based: it does not read
+    any OOS metric or historical exact-blend row.  Its role is to bias the
+    validation optimizer toward the same *kind* of material that made the old
+    nested artifact useful, while keeping every material input leaf-level.
+    """
+    label = candidate.candidate_label.lower()
+    family = candidate.family.lower()
+    prior = 1.0
+    if family == "relaxed_efficiency":
+        prior *= 1.35
+        if "growth_mdd20" in label:
+            prior *= 1.20
+        elif "balanced_mdd12" in label:
+            prior *= 1.05
+        elif "aggressive_mdd30" in label:
+            prior *= 0.95
+    elif family == "strict_efficiency":
+        prior *= 0.85
+    elif family == "individual_robust":
+        prior *= 0.95
+    elif family == "profile_optuna":
+        prior *= 1.00
+        if "growth_mdd20" in label:
+            prior *= 1.10
+        elif "aggressive_mdd30" in label:
+            prior *= 0.95
+    return float(prior)
+
+
+def _teacher_leaf_snapshot(candidate: CandidateResult, fold: MonthlyFold) -> dict[str, float]:
+    snap = _candidate_validation_snapshot(candidate, fold)
+    validation = _period_metrics(candidate.returns, fold.validation)
+    train_return = snap["train_return"]
+    val_return = snap["validation_return"]
+    train_mdd = snap["train_mdd"]
+    val_mdd = snap["validation_mdd"]
+    val_sharpe = _safe_float(validation.get("sharpe"))
+    val_sortino = _safe_float(validation.get("sortino"))
+    train_val_gap = abs(max(0.0, train_return) - max(0.0, val_return))
+    val_spike = max(0.0, val_return - max(train_return, 0.0))
+    teacher_prior = _teacher_leaf_prior(candidate)
+    return {
+        **snap,
+        "validation_sharpe": val_sharpe,
+        "validation_sortino": val_sortino,
+        "teacher_prior": teacher_prior,
+        "return_score": (
+            val_return * teacher_prior
+            + 0.18 * min(max(train_return, -0.10), 1.50)
+            - 1.25 * val_mdd
+            - 0.35 * train_mdd
+            - 0.45 * val_spike
+        ),
+        "calmar_score": (
+            val_return / max(val_mdd, 0.025)
+            + 0.20 * min(val_sharpe, 5.0)
+            + 0.10 * min(val_sortino, 8.0)
+            - 0.60 * train_val_gap
+        )
+        * teacher_prior,
+        "balanced_score": (
+            0.65 * val_return
+            + 0.20 * min(train_return, val_return)
+            + 0.025 * min(max(val_sharpe, -3.0), 5.0)
+            + 0.015 * min(max(val_sortino, -3.0), 8.0)
+            - 1.15 * val_mdd
+            - 0.30 * train_mdd
+            - 0.30 * val_spike
+        )
+        * teacher_prior,
+    }
+
+
+def _teacher_leaf_eligible_pool(
+    candidates: Sequence[CandidateResult],
+    fold: MonthlyFold,
+) -> list[tuple[CandidateResult, dict[str, float]]]:
+    pool: list[tuple[CandidateResult, dict[str, float]]] = []
+    for candidate in candidates:
+        if not _clean_downstream_candidate(candidate):
+            continue
+        snap = _teacher_leaf_snapshot(candidate, fold)
+        if snap["train_return"] <= -0.05:
+            continue
+        if snap["validation_return"] <= 0.0:
+            continue
+        if snap["validation_mdd"] > 0.30 or snap["train_mdd"] > 0.60:
+            continue
+        pool.append((candidate, snap))
+    return pool
+
+
+def _teacher_leaf_scale(
+    returns: pd.Series,
+    fold: MonthlyFold,
+    *,
+    target_validation_mdd: float,
+    max_scale: float,
+) -> tuple[float, dict[str, Any]]:
+    best_scale = 1.0
+    best_metrics: dict[str, Any] = {}
+    best_score = -float("inf")
+    for scale in TEACHER_LEAF_BLEND_SCALE_GRID:
+        if scale > max_scale:
+            continue
+        scaled = returns.astype(float) * float(scale)
+        train = _period_metrics(scaled, fold.train)
+        validation = _period_metrics(scaled, fold.validation)
+        train_return = _safe_float(train.get("total_return"))
+        val_return = _safe_float(validation.get("total_return"))
+        train_mdd = _safe_float(train.get("mdd"))
+        val_mdd = _safe_float(validation.get("mdd"))
+        if train_return <= -0.05 or val_return <= 0.0:
+            continue
+        if val_mdd > target_validation_mdd or train_mdd > 0.60:
+            continue
+        score = (
+            val_return / max(val_mdd, 0.025)
+            + 0.08 * min(_safe_float(validation.get("sharpe")), 5.0)
+            + 0.04 * min(_safe_float(validation.get("sortino")), 8.0)
+            + 0.10 * min(train_return, val_return)
+            - 0.08 * float(scale)
+        )
+        if score > best_score:
+            best_score = float(score)
+            best_scale = float(scale)
+            best_metrics = {
+                "train": train,
+                "validation": validation,
+                "scale_score": float(score),
+            }
+    if not best_metrics:
+        best_metrics = {
+            "train": _period_metrics(returns, fold.train),
+            "validation": _period_metrics(returns, fold.validation),
+            "scale_score": 0.0,
+        }
+    return best_scale, best_metrics
+
+
+def _teacher_leaf_build_candidate(
+    *,
+    label: str,
+    fold: MonthlyFold,
+    candidates: Sequence[CandidateResult],
+    weights: Mapping[str, float],
+    target_validation_mdd: float,
+    max_scale: float,
+    score_name: str,
+    selection_notes: Sequence[str],
+) -> CandidateResult | None:
+    normalized = _normalize_capped_weights(weights, cap=1.0)
+    if len(normalized) < 2:
+        return None
+    base_returns = _blend_candidate_returns(candidates, normalized)
+    if base_returns.empty:
+        return None
+    scale, scale_metrics = _teacher_leaf_scale(
+        base_returns,
+        fold,
+        target_validation_mdd=target_validation_mdd,
+        max_scale=max_scale,
+    )
+    scaled_weights = {key: float(value) * float(scale) for key, value in normalized.items()}
+    row = {
+        "profile_id": label,
+        "profile_kind": "validation_only_denested_teacher_leaf_portfolio",
+        "candidate_tier": "clean_train_validation_selected_paper_shadow",
+        "selection_inputs": ["train", "validation", "fixed_teacher_family_prior"],
+        "selection_policy": (
+            "leaf_only_validation_weighting_train_validation_scale_locked_oos_report_only"
+        ),
+        "teacher_prior_source": "coarse_family_structure_only_no_oos_metrics_or_nested_rows",
+        "score_name": score_name,
+        "selection_notes": list(selection_notes),
+        "target_validation_mdd": float(target_validation_mdd),
+        "max_scale": float(max_scale),
+        "risk_scale": float(scale),
+        "risk_scale_mode": "train_validation_grid_target_validation_mdd",
+        "weights": dict(normalized),
+        "final_weights": dict(scaled_weights),
+        "leaf_source_labels": list(normalized),
+        "leaf_source_count": len(normalized),
+        "uses_locked_oos_for_selection": False,
+        "same_month_self_feeding": False,
+        "current_fold_oos_used_for_weighting": False,
+        "post_oos_research_variant": False,
+        "requires_fresh_forward_shadow": False,
+        "ready_for_paper": True,
+        "ready_for_real": False,
+        "real_money_execution": False,
+        "train_validation_scale_metrics": scale_metrics,
+    }
+    return _candidate_eval(
+        family="teacher_leaf_blend",
+        label=label,
+        row=row,
+        returns=base_returns.astype(float) * float(scale),
+    )
+
+
+def _teacher_leaf_blend_candidates(
+    candidates: Sequence[CandidateResult],
+    fold: MonthlyFold,
+) -> list[CandidateResult]:
+    """De-nest the old high-return teacher into leaf-only validation blends.
+
+    The old ``fixed_relaxed_dynamic_blend`` combined lower-level hybrid rows.
+    This family keeps the useful idea (relaxed/high-conviction sleeve material
+    plus defensive validation gates) but rebuilds it directly from leaf
+    strategy/profile rows.  All weighting, caps, and exposure scale choices are
+    made from train+validation evidence only; locked OOS is report-only.
+    """
+    pool = _teacher_leaf_eligible_pool(candidates, fold)
+    if len(pool) < 2:
+        return []
+
+    by_label = {candidate.candidate_label: candidate for candidate, _ in pool}
+
+    def top_weights(
+        score_key: str,
+        *,
+        top_n: int,
+        cap: float,
+        learning_rate: float,
+    ) -> dict[str, float]:
+        ranked = sorted(pool, key=lambda item: item[1][score_key], reverse=True)[:top_n]
+        scores = {candidate.candidate_label: snap[score_key] for candidate, snap in ranked}
+        return _softmax_weights(scores, learning_rate=learning_rate, cap=cap)
+
+    out: list[CandidateResult] = []
+    specs: tuple[tuple[str, str, int, float, float, float, float], ...] = (
+        (
+            "teacher_leaf_blend:val_return_top8_cap35_mdd30",
+            "return_score",
+            8,
+            0.35,
+            0.75,
+            0.30,
+            2.50,
+        ),
+        (
+            "teacher_leaf_blend:val_calmar_top10_cap25_mdd24",
+            "calmar_score",
+            10,
+            0.25,
+            0.65,
+            0.24,
+            2.25,
+        ),
+        (
+            "teacher_leaf_blend:val_balanced_top12_cap20_mdd20",
+            "balanced_score",
+            12,
+            0.20,
+            0.55,
+            0.20,
+            2.00,
+        ),
+    )
+    for label, score_key, top_n, cap, learning_rate, target_mdd, max_scale in specs:
+        weights = top_weights(score_key, top_n=top_n, cap=cap, learning_rate=learning_rate)
+        candidate = _teacher_leaf_build_candidate(
+            label=label,
+            fold=fold,
+            candidates=list(by_label.values()),
+            weights=weights,
+            target_validation_mdd=target_mdd,
+            max_scale=max_scale,
+            score_name=score_key,
+            selection_notes=[
+                "weights_from_train_validation_only",
+                "hybrid_rows_excluded_from_material_pool",
+            ],
+        )
+        if candidate is not None:
+            out.append(candidate)
+
+    relaxed = [
+        (candidate, snap) for candidate, snap in pool if candidate.family == "relaxed_efficiency"
+    ]
+    defensive = [
+        (candidate, snap)
+        for candidate, snap in pool
+        if candidate.family in {"strict_efficiency", "individual_robust", "profile_optuna"}
+    ]
+    if relaxed and defensive:
+        relaxed_weights = _softmax_weights(
+            {
+                candidate.candidate_label: snap["balanced_score"]
+                for candidate, snap in sorted(
+                    relaxed, key=lambda item: item[1]["balanced_score"], reverse=True
+                )[:5]
+            },
+            learning_rate=0.60,
+            cap=0.45,
+        )
+        defensive_weights = _softmax_weights(
+            {
+                candidate.candidate_label: snap["calmar_score"]
+                for candidate, snap in sorted(
+                    defensive, key=lambda item: item[1]["calmar_score"], reverse=True
+                )[:7]
+            },
+            learning_rate=0.55,
+            cap=0.30,
+        )
+        barbell_weights = {
+            **{label: weight * 0.65 for label, weight in relaxed_weights.items()},
+            **{label: weight * 0.35 for label, weight in defensive_weights.items()},
+        }
+        candidate = _teacher_leaf_build_candidate(
+            label="teacher_leaf_blend:relaxed65_defensive35_mdd24",
+            fold=fold,
+            candidates=list(by_label.values()),
+            weights=barbell_weights,
+            target_validation_mdd=0.24,
+            max_scale=2.25,
+            score_name="relaxed_balanced_plus_defensive_calmar",
+            selection_notes=[
+                "fixed_family_barbell_65_35_from_nested_teacher_shape",
+                "sub_weights_from_train_validation_only",
+            ],
+        )
+        if candidate is not None:
+            out.append(candidate)
+
+    return out
 
 
 def _validation_selector_candidates(
@@ -2897,6 +3282,7 @@ def _run_source_profile_family(
     hybrid_trials: int,
     seed: int,
     allocation_fraction: float,
+    source_symbol_workers: int = 1,
 ) -> tuple[list[CandidateResult], dict[str, Any]]:
     windows = fold.windows()
     train_eligibility = broad69.build_train_eligibility_report(
@@ -2910,17 +3296,28 @@ def _run_source_profile_family(
     sleeve_rows: list[dict[str, Any]] = []
     individual_streams: list[broad69.CandidateStream] = []
     profile_streams: list[grid_hybrid.ProfileStream] = []
+    workers = max(1, int(source_symbol_workers))
+    if workers > 1:
+        _prewarm_source_feature_cache(cache, timeframes=timeframes)
+
     for profile_idx, base_spec in enumerate(profile69.PROFILE_SPECS):
         profile_spec = {**base_spec, "_timeframes": timeframes}
         streams: list[broad69.CandidateStream] = []
-        for symbol_idx, symbol in enumerate(symbols):
+
+        def tune_symbol(
+            symbol_idx: int,
+            symbol: str,
+            *,
+            profile_idx: int = profile_idx,
+            base_spec: Mapping[str, Any] = base_spec,
+        ) -> broad69.CandidateStream | None:
             eligible_timeframes = profile69._eligible_timeframes_for_symbol(
                 train_eligibility, symbol, timeframes
             )
             if not eligible_timeframes:
-                continue
+                return None
             symbol_spec = {**base_spec, "_timeframes": eligible_timeframes}
-            stream = profile69.tune_symbol_profile(
+            return profile69.tune_symbol_profile(
                 symbol=symbol,
                 spec=symbol_spec,
                 cache=cache,
@@ -2929,8 +3326,27 @@ def _run_source_profile_family(
                 seed=int(seed) + profile_idx * 100_000 + symbol_idx,
                 allocation_fraction=float(allocation_fraction),
             )
-            if stream is None:
-                continue
+
+        tuned_streams: list[tuple[int, broad69.CandidateStream]] = []
+        if workers > 1:
+            with ThreadPoolExecutor(max_workers=workers) as executor:
+                future_by_symbol_idx = {
+                    executor.submit(tune_symbol, symbol_idx, symbol): symbol_idx
+                    for symbol_idx, symbol in enumerate(symbols)
+                }
+                for future in as_completed(future_by_symbol_idx):
+                    symbol_idx = future_by_symbol_idx[future]
+                    stream = future.result()
+                    if stream is not None:
+                        tuned_streams.append((symbol_idx, stream))
+            tuned_streams.sort(key=lambda item: item[0])
+        else:
+            for symbol_idx, symbol in enumerate(symbols):
+                stream = tune_symbol(symbol_idx, symbol)
+                if stream is not None:
+                    tuned_streams.append((symbol_idx, stream))
+
+        for _, stream in tuned_streams:
             asset_rows.append(dict(stream.row))
             individual_streams.append(stream)
             if _safe_float(stream.row.get("profile_objective_score"), -1e18) > -1e8:
@@ -3014,6 +3430,7 @@ def _run_source_profile_family(
         "selected_sleeve_row_count": len(sleeve_rows),
         "train_eligible_symbol_count": train_eligibility["train_eligible_symbol_count"],
         "train_ineligible_symbols": train_eligibility["train_ineligible_symbols"],
+        "source_symbol_workers": workers,
     }
     return candidates, aux
 
@@ -3232,6 +3649,19 @@ def _run_efficiency_family(
         "train_eligible_symbol_count": train_eligibility["train_eligible_symbol_count"],
     }
     return candidates, aux
+
+
+def _prewarm_source_feature_cache(
+    cache: profile69.FeatureCache,
+    *,
+    timeframes: Sequence[str],
+) -> None:
+    """Precompute shared read-mostly panels before threaded symbol tuning."""
+    xsmom_lookbacks = (6, 12, 18, 24, 36, 48, 72)
+    for timeframe in timeframes:
+        for lookback in xsmom_lookbacks:
+            cache.xsmom(str(timeframe), int(lookback))
+        cache.anchor_returns(str(timeframe))
 
 
 def _evaluate_candidate(candidate: CandidateResult, fold: MonthlyFold) -> dict[str, Any]:
@@ -3671,6 +4101,7 @@ def _render_markdown(payload: Mapping[str, Any]) -> str:
         f"- slippage/cost proxy: `{payload.get('cost_model', {}).get('slippage_bps')}` bps",
         f"- folds: `{len(folds)}` (`{folds[0]['fold_id'] if folds else ''}` → `{folds[-1]['fold_id'] if folds else ''}`)",
         f"- trials: asset/profile/hybrid = `{payload.get('trial_policy', {}).get('asset_trials')}` / `{payload.get('trial_policy', {}).get('profile_trials')}` / `{payload.get('trial_policy', {}).get('hybrid_trials')}`",
+        f"- source symbol workers: `{payload.get('trial_policy', {}).get('source_symbol_workers', 1)}`",
         "- selection/refit input: train + 2M validation only; OOS month is evaluated after frozen fold params.",
     ]
     if provenance:
@@ -3882,6 +4313,7 @@ def run_walkforward(args: argparse.Namespace) -> dict[str, Any]:
             "profile_trials": int(args.profile_trials),
             "hybrid_trials": int(args.hybrid_trials),
             "seed": int(args.seed),
+            "source_symbol_workers": int(args.source_symbol_workers),
         },
         "cost_model": {
             "slippage_bps": slippage_bps,
@@ -3924,6 +4356,7 @@ def run_walkforward(args: argparse.Namespace) -> dict[str, Any]:
             hybrid_trials=int(args.hybrid_trials),
             seed=fold_seed,
             allocation_fraction=float(args.allocation_fraction),
+            source_symbol_workers=int(args.source_symbol_workers),
         )
         all_candidates = list(source_candidates)
         source_payload = source_aux["source_payload"]
@@ -3984,6 +4417,14 @@ def run_walkforward(args: argparse.Namespace) -> dict[str, Any]:
             all_candidates.extend(relaxed_candidates)
         else:
             relaxed_aux = {}
+        if "teacher_leaf_blend" in args.families:
+            teacher_leaf_blend_candidates = _teacher_leaf_blend_candidates(
+                all_candidates,
+                fold,
+            )
+            all_candidates.extend(teacher_leaf_blend_candidates)
+        else:
+            teacher_leaf_blend_candidates = []
         meta_candidates = _meta_portfolio_candidates(all_candidates, fold)
         all_candidates.extend(meta_candidates)
         cross_hybrid_candidates = _cross_candidate_hybrid_candidates(
@@ -4039,6 +4480,7 @@ def run_walkforward(args: argparse.Namespace) -> dict[str, Any]:
             "strict_efficiency_aux": strict_aux,
             "relaxed_efficiency_aux": relaxed_aux,
             "asset_timeframe_leverage_count": len(asset_tf_leverage_candidates),
+            "teacher_leaf_blend_count": len(teacher_leaf_blend_candidates),
             "meta_portfolio_candidate_count": len(meta_candidates),
             "cross_candidate_hybrid_count": len(cross_hybrid_candidates),
             "dynamic_conviction_switch_count": len(dynamic_switch_candidates),
@@ -4089,16 +4531,27 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--asset-trials", type=int, default=DEFAULT_ASSET_TRIALS)
     parser.add_argument("--profile-trials", type=int, default=DEFAULT_PROFILE_TRIALS)
     parser.add_argument("--hybrid-trials", type=int, default=DEFAULT_HYBRID_TRIALS)
+    parser.add_argument(
+        "--source-symbol-workers",
+        type=int,
+        default=1,
+        help=(
+            "Parallel workers for per-symbol source Optuna tuning. Default 1 preserves "
+            "the historical sequential path; >1 prewarms shared features and tunes "
+            "symbols concurrently with deterministic per-symbol seeds."
+        ),
+    )
     parser.add_argument("--seed", type=int, default=20260601)
     parser.add_argument(
         "--families",
         default=(
             "profile_optuna,individual_robust,asset_timeframe_leverage,"
-            "strict_efficiency,relaxed_efficiency"
+            "strict_efficiency,relaxed_efficiency,teacher_leaf_blend"
         ),
         help=(
             "Comma-separated families. profile_optuna is always included; optional: "
-            "individual_robust, asset_timeframe_leverage, strict_efficiency, relaxed_efficiency."
+            "individual_robust, asset_timeframe_leverage, strict_efficiency, "
+            "relaxed_efficiency, teacher_leaf_blend."
         ),
     )
     parser.add_argument("--bridge-protocol-manifest", default=str(DEFAULT_BRIDGE_PROTOCOL_MANIFEST))
@@ -4134,6 +4587,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     families = {item.strip() for item in str(args.families).split(",") if item.strip()}
     families.add("profile_optuna")
     args.families = tuple(sorted(families))
+    args.source_symbol_workers = max(1, int(args.source_symbol_workers))
     return args
 
 
