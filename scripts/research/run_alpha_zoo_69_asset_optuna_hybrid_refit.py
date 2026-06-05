@@ -1072,9 +1072,9 @@ def discover_candidates(
                 breadth_aligned = pd.Series(
                     breadth.reindex(datetimes).ffill().to_numpy(), index=frame.index
                 )
-                realized = close.pct_change(fill_method=None).rolling(
-                    max(6, lookback // 2)
-                ).std(ddof=1)
+                realized = (
+                    close.pct_change(fill_method=None).rolling(max(6, lookback // 2)).std(ddof=1)
+                )
                 vol_adjusted = symbol_momentum / (realized * math.sqrt(float(lookback))).replace(
                     0.0, np.nan
                 )

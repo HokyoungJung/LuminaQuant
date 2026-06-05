@@ -1344,6 +1344,7 @@ def _dynamic_conviction_switch_candidates(
             ("_val_mdd12_scaled", {"target_validation_mdd": 0.12, "max_risk_scale": 2.0}),
             ("_val_mdd15_scaled", {"target_validation_mdd": 0.15, "max_risk_scale": 2.25}),
             ("_val_mdd20_scaled", {"target_validation_mdd": 0.20, "max_risk_scale": 2.50}),
+            ("_val_mdd30_scaled", {"target_validation_mdd": 0.30, "max_risk_scale": 3.00}),
             (
                 "_val_ret02_calmar80_gate",
                 {"min_validation_return": 0.02, "min_validation_calmar": 0.80},
@@ -1364,6 +1365,15 @@ def _dynamic_conviction_switch_candidates(
                     "min_validation_calmar": 0.80,
                     "target_validation_mdd": 0.20,
                     "max_risk_scale": 2.50,
+                },
+            ),
+            (
+                "_val_ret02_calmar80_gate_val_mdd30_scaled",
+                {
+                    "min_validation_return": 0.02,
+                    "min_validation_calmar": 0.80,
+                    "target_validation_mdd": 0.30,
+                    "max_risk_scale": 3.00,
                 },
             ),
         )
@@ -1432,6 +1442,7 @@ def _dynamic_conviction_switch_candidates(
         )
     best_aggressive = max(aggressive_pool, key=conviction_score) if aggressive_pool else None
     best_score = conviction_score(best_aggressive) if best_aggressive is not None else -float("inf")
+
     def _scaled_candidate_snapshot(
         candidate: CandidateResult, scale: float
     ) -> dict[str, dict[str, Any]]:
@@ -1457,7 +1468,7 @@ def _dynamic_conviction_switch_candidates(
         best_scale = 1.0
         best_snapshot = _scaled_candidate_snapshot(candidate, 1.0)
         best_score = -float("inf")
-        for scale in (1.0, 1.10, 1.25, 1.50, 1.75, 2.00, 2.25, 2.50):
+        for scale in (1.0, 1.10, 1.25, 1.50, 1.75, 2.00, 2.25, 2.50, 2.75, 3.00):
             if scale > max_scale + 1e-12:
                 continue
             snapshot = _scaled_candidate_snapshot(candidate, scale)
@@ -1608,7 +1619,12 @@ def _dynamic_conviction_switch_candidates(
                 )
             )
 
-            for target_mdd, max_scale in ((0.12, 2.0), (0.15, 2.25), (0.20, 2.50)):
+            for target_mdd, max_scale in (
+                (0.12, 2.0),
+                (0.15, 2.25),
+                (0.20, 2.50),
+                (0.30, 3.00),
+            ):
                 scale, scale_snapshot = _validation_budget_scale(
                     selected,
                     target_validation_mdd=target_mdd,
@@ -1616,9 +1632,7 @@ def _dynamic_conviction_switch_candidates(
                 )
                 scaled_snap = {
                     "train_return": _safe_float(scale_snapshot["train"]["total_return"]),
-                    "validation_return": _safe_float(
-                        scale_snapshot["validation"]["total_return"]
-                    ),
+                    "validation_return": _safe_float(scale_snapshot["validation"]["total_return"]),
                     "train_mdd": _safe_float(scale_snapshot["train"]["mdd"]),
                     "validation_mdd": _safe_float(scale_snapshot["validation"]["mdd"]),
                 }
@@ -1639,9 +1653,7 @@ def _dynamic_conviction_switch_candidates(
                             "unscaled_selected_validation_return": selected_snap[
                                 "validation_return"
                             ],
-                            "unscaled_selected_validation_mdd": selected_snap[
-                                "validation_mdd"
-                            ],
+                            "unscaled_selected_validation_mdd": selected_snap["validation_mdd"],
                         },
                     )
                 )
@@ -1680,14 +1692,40 @@ def _dynamic_conviction_switch_candidates(
                             extra_row=gate_extra,
                         )
                     )
+                    for target_mdd, max_scale in (
+                        (0.15, 2.25),
+                        (0.20, 2.50),
+                        (0.30, 3.00),
+                    ):
+                        out.append(
+                            _emit_cash_guard_candidate(
+                                label_suffix=(
+                                    f"{gate_suffix}_val_mdd{int(target_mdd * 100):02d}_scaled"
+                                ),
+                                profile_kind=(
+                                    "train_validation_dynamic_conviction_switch_"
+                                    "validation_strength_scaled_cash_guard"
+                                ),
+                                selected=selected,
+                                fallback_name=fallback_name,
+                                fallback_candidate=fallback_candidate,
+                                threshold=threshold,
+                                selected_snap=selected_snap,
+                                reason="validation_strength_below_scaled_trade_threshold",
+                                extra_row={
+                                    **gate_extra,
+                                    "target_validation_mdd": float(target_mdd),
+                                    "max_risk_scale": float(max_scale),
+                                },
+                            )
+                        )
                     continue
 
                 out.append(
                     _emit_dynamic_candidate(
                         label_suffix=gate_suffix,
                         profile_kind=(
-                            "train_validation_dynamic_conviction_switch_"
-                            "validation_strength_gate"
+                            "train_validation_dynamic_conviction_switch_validation_strength_gate"
                         ),
                         selected=selected,
                         fallback_name=fallback_name,
@@ -1699,7 +1737,11 @@ def _dynamic_conviction_switch_candidates(
                         extra_row=gate_extra,
                     )
                 )
-                for target_mdd, max_scale in ((0.15, 2.25), (0.20, 2.50)):
+                for target_mdd, max_scale in (
+                    (0.15, 2.25),
+                    (0.20, 2.50),
+                    (0.30, 3.00),
+                ):
                     scale, scale_snapshot = _validation_budget_scale(
                         selected,
                         target_validation_mdd=target_mdd,
@@ -1716,8 +1758,7 @@ def _dynamic_conviction_switch_candidates(
                     out.append(
                         _emit_dynamic_candidate(
                             label_suffix=(
-                                f"{gate_suffix}_val_mdd{int(target_mdd * 100):02d}"
-                                "_scaled"
+                                f"{gate_suffix}_val_mdd{int(target_mdd * 100):02d}_scaled"
                             ),
                             profile_kind=(
                                 "train_validation_dynamic_conviction_switch_"
@@ -1737,9 +1778,7 @@ def _dynamic_conviction_switch_candidates(
                                 "unscaled_selected_validation_return": selected_snap[
                                     "validation_return"
                                 ],
-                                "unscaled_selected_validation_mdd": selected_snap[
-                                    "validation_mdd"
-                                ],
+                                "unscaled_selected_validation_mdd": selected_snap["validation_mdd"],
                             },
                         )
                     )
@@ -4227,6 +4266,7 @@ def _aggregate_rows(fold_rows: Sequence[Mapping[str, Any]]) -> list[dict[str, An
         negative = oos_array[oos_array < 0.0]
         monthly_std = float(np.std(oos_array, ddof=1)) if oos_array.size > 1 else 0.0
         downside_std = float(np.std(negative, ddof=1)) if negative.size > 1 else 0.0
+        no_negative_oos_folds = bool(oos_array.size and negative.size == 0)
         fold_count = int(oos_array.size)
         annualized_comp = (
             float((1.0 + compounded) ** (12.0 / fold_count) - 1.0)
@@ -4341,6 +4381,9 @@ def _aggregate_rows(fold_rows: Sequence[Mapping[str, Any]]) -> list[dict[str, An
                     if monthly_std > 0.0
                     else 0.0
                 ),
+                "sortino_unbounded": bool(
+                    no_negative_oos_folds and oos_array.size and float(np.mean(oos_array)) > 0.0
+                ),
                 "monthly_sortino_approx": (
                     float(np.mean(oos_array) / downside_std * math.sqrt(12.0))
                     if downside_std > 0.0
@@ -4359,16 +4402,20 @@ def _aggregate_rows(fold_rows: Sequence[Mapping[str, Any]]) -> list[dict[str, An
                     if positive.size and negative.size and abs(float(np.mean(negative))) > 0.0
                     else 0.0
                 ),
+                "gain_loss_ratio_unbounded": bool(no_negative_oos_folds and positive.size),
                 "profit_factor": (
                     float(np.sum(positive) / abs(np.sum(negative)))
                     if positive.size and negative.size and abs(float(np.sum(negative))) > 0.0
                     else 0.0
                 ),
+                "profit_factor_unbounded": bool(no_negative_oos_folds and positive.size),
                 "omega_0": (
                     float(np.sum(np.maximum(oos_array, 0.0)) / np.sum(np.maximum(-oos_array, 0.0)))
                     if oos_array.size and np.sum(np.maximum(-oos_array, 0.0)) > 0.0
                     else 0.0
                 ),
+                "omega_0_unbounded": bool(no_negative_oos_folds and positive.size),
+                "no_negative_oos_folds": no_negative_oos_folds,
                 "oos_return_to_max_mdd": (
                     float(compounded / max(oos_mdds)) if oos_mdds and max(oos_mdds) > 0.0 else 0.0
                 ),
@@ -4393,8 +4440,8 @@ def _aggregate_rows(fold_rows: Sequence[Mapping[str, Any]]) -> list[dict[str, An
     return sorted(
         aggregate,
         key=lambda row: (
-            int(row["positive_oos_folds"]),
             _safe_float(row["compounded_oos_return"]),
+            int(row["positive_oos_folds"]),
             _safe_float(row["min_oos_return"]),
             -_safe_float(row["max_oos_mdd"]),
         ),
@@ -4554,11 +4601,16 @@ def _render_markdown(payload: Mapping[str, Any]) -> str:
     demoted_top = demoted_rankings[:12]
     provenance = dict(payload.get("recompute_provenance") or {})
 
+    def fmt_ratio(row: Mapping[str, Any], key: str, unbounded_key: str) -> str:
+        if bool(row.get(unbounded_key)):
+            return "∞"
+        return f"{_safe_float(row.get(key)):.2f}"
+
     def append_ranking_table(rows: Sequence[Mapping[str, Any]]) -> None:
         lines.extend(
             [
-                "| Rank | Candidate | Family | Clean | Reasons | Hard-stop | OOS comp | OOS pos | Min OOS | Latest OOS | Sharpe | Sortino | Max OOS MDD |",
-                "| ---: | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+                "| Rank | Candidate | Family | Clean | Reasons | Hard-stop | OOS comp | OOS pos | Min OOS | Latest OOS | Sharpe | Sortino | PF | Max OOS MDD |",
+                "| ---: | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
             ]
         )
         for idx, row in enumerate(rows, start=1):
@@ -4573,7 +4625,8 @@ def _render_markdown(payload: Mapping[str, Any]) -> str:
                 f"{_fmt_pct(row['min_oos_return'])} | "
                 f"{_fmt_pct(row['latest_oos_return'])} | "
                 f"{_safe_float(row.get('monthly_sharpe_approx')):.2f} | "
-                f"{_safe_float(row.get('monthly_sortino_approx')):.2f} | "
+                f"{fmt_ratio(row, 'monthly_sortino_approx', 'sortino_unbounded')} | "
+                f"{fmt_ratio(row, 'profit_factor', 'profit_factor_unbounded')} | "
                 f"{_fmt_pct(row['max_oos_mdd'])} |"
             )
 
@@ -4677,10 +4730,11 @@ def _render_markdown(payload: Mapping[str, Any]) -> str:
                 "",
                 f"- OOS comp: `{_fmt_pct(best_agg.get('compounded_oos_return'))}`",
                 f"- hit rate: `{_safe_float(best_agg.get('positive_oos_folds')):.0f}/{_safe_float(best_agg.get('fold_count')):.0f}`",
-                f"- monthly Sharpe / Sortino approx: `{_safe_float(best_agg.get('monthly_sharpe_approx')):.2f}` / `{_safe_float(best_agg.get('monthly_sortino_approx')):.2f}`",
+                f"- monthly Sharpe / Sortino approx: `{_safe_float(best_agg.get('monthly_sharpe_approx')):.2f}` / `{fmt_ratio(best_agg, 'monthly_sortino_approx', 'sortino_unbounded')}`",
+                f"- profit factor / omega(0): `{fmt_ratio(best_agg, 'profit_factor', 'profit_factor_unbounded')}` / `{fmt_ratio(best_agg, 'omega_0', 'omega_0_unbounded')}`",
                 f"- 5% monthly VaR / 25% CVaR: `{_fmt_pct(best_agg.get('monthly_var_05'))}` / `{_fmt_pct(best_agg.get('monthly_cvar_25'))}`",
                 f"- avg gain / avg loss: `{_fmt_pct(best_agg.get('avg_gain'))}` / `{_fmt_pct(best_agg.get('avg_loss'))}`",
-                f"- gain/loss ratio: `{_safe_float(best_agg.get('gain_loss_ratio')):.2f}`",
+                f"- gain/loss ratio: `{fmt_ratio(best_agg, 'gain_loss_ratio', 'gain_loss_ratio_unbounded')}`",
                 f"- max loss streak: `{int(_safe_float(best_agg.get('max_loss_streak'))):d}`",
                 f"- mean/min validation: `{_fmt_pct(best_agg.get('mean_validation_return'))}` / `{_fmt_pct(best_agg.get('min_validation_return'))}`",
             ]

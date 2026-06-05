@@ -1,5 +1,49 @@
 # Research Note
 
+## 2026-06-05 KST — 85-symbol clean dynamic v5, CI 실제 경로 검증, ranking/reporting repair
+
+사용자 피드백에 따라 “CI 툴 검증”을 실제 GitHub Actions 기준으로 재확인했다. 직전 push `cf25437e`에서 private-ci는 성공했지만 public `ci` run `27019925528`이 `uv run ruff format --check .` 단계에서 실패했다. 실패 파일은 `scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py`와 `scripts/research/run_alpha_zoo_69_asset_optuna_hybrid_refit.py`였고, repo-wide ruff format으로 수정했다.
+
+전략 쪽에서는 두 가지 문제가 있었다.
+
+1. `dynamic_conviction_switch:*_val_ret02_calmar80_gate_*_scaled` 후보가 validation-strength gate 실패 fold에서 cash row를 내지 않아 일부 월이 누락될 수 있었다. 이제 scaled gate 후보도 gate 실패 시 `cash_validation_strength_guard` row를 명시적으로 내므로 `fold_count=10`으로 평가된다.
+2. aggregate/clean ranking이 comp보다 positive-fold 수를 먼저 정렬해서, 실제 최고 comp 후보가 clean top 표 밖으로 밀리는 리포팅/선정 문제가 있었다. 정렬을 `compounded_oos_return` 우선으로 바꿨고, no-loss 후보의 Sortino/PF/Omega는 0이 아니라 `unbounded` 플래그와 `∞` 표시로 보고한다.
+
+Clean OOS 재평가 artifacts:
+
+- v5 JSON: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_85_asset_dynamic_scaled_20260605/alpha_zoo_85_asset_dynamic_scaled_full_v5_20260605.json`
+- v5 Markdown: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_85_asset_dynamic_scaled_20260605/alpha_zoo_85_asset_dynamic_scaled_full_v5_20260605.md`
+- OOS schedule: 10 folds, `2025-09-01T00:00:00` → `2026-06-05T12:00:00` UTC, monthly day-1 refit, 2M validation, 10bps, 85/85 loaded symbols, 30m~1D.
+- Selection discipline: train + validation only; OOS month is report-only; `nested_hybrid_dependency=false`; `uses_locked_oos_for_selection=false`; final weights are strict-efficiency leaf or cash, not hybrid-as-hybrid material.
+
+Final clean comp ranking after repair:
+
+| Rank | Candidate | OOS comp | Max bar MDD | Monthly eq MDD | Sharpe | Sortino/PF | Hit | Min OOS | Notes |
+| ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 1 | `dynamic_conviction_switch:t0.85_risk_capped_fallback_val_ret02_calmar80_gate_val_mdd30_scaled` | `34.39%` | `27.69%` | `0.00%` | `1.12` | `∞/∞` | `3/10` | `0.00%` | highest clean comp, trades only strong validation months |
+| 5 | `dynamic_conviction_switch:t0.85_risk_capped_fallback_val_ret02_calmar80_gate_val_mdd20_scaled` | `29.65%` | `23.59%` | `0.00%` | `1.13` | `∞/∞` | `3/10` | `0.00%` | lower MDD, still selective/no losing OOS month |
+| 9 | `dynamic_conviction_switch:t0.85_risk_capped_fallback_val_mdd30_scaled` | `27.92%` | `27.69%` | `5.75%` | `0.94` | `6.24/5.92` | `5/10` | `-3.18%` | more active but accepts small losing months |
+| 13 | `dynamic_conviction_switch:t0.85_risk_capped_fallback_val_mdd20_scaled` | `23.41%` | `23.59%` | `5.75%` | `0.91` | `5.24/5.12` | `5/10` | `-3.18%` | safer active variant |
+
+Full-family/higher-trial v4 was intentionally tested and **not selected**: best clean only `12.45%` comp with `16.97%` max MDD, because the larger candidate pool chased validation strength into OOS tail losses. The correct conclusion is not “add every family”; the better clean result is the stable v3/v5 family set plus validation-only MDD30 sizing and validation-strength cash gate.
+
+Hard-stop status remains false versus the historical challenger (`+53.38%` comp / `18.8%` MDD) and robust-default 15% MDD hurdle. Therefore this is paper/shadow research evidence, not real-money approval. If using it for paper, rank 1 is the return-seeking selective candidate; rank 5 is the lower-MDD selective candidate; rank 9/13 are more active but accept losses.
+
+CI/local verification recorded for this pass:
+
+- `uv run ruff format --check .` — passed.
+- `uv run ruff check .` — passed.
+- Raw-first periodic preload CI subset — `78 passed`.
+- Rust native checks for `rust_metrics`, `rust_rawfirst`, `rust_hybrid_optuna`, `rust_live_signals` — passed.
+- Architecture gates: live data, market-window parity, native Binance — passed.
+- `scripts/check_architecture.py`, `scripts/audit_hardcoded_params.py`, `scripts/verify_docs.py` — passed (`119 markdown files checked`, hardcoded audit `new=0`).
+- Dashboard CI path: `npm install`, `npm run lint`, `npm run test`, `npm run typecheck`, `npm run build` — passed.
+- GPU contract tests and auto runtime smoke — `24 passed`, strict Polars GPU smoke passed on detected NVIDIA GPU.
+- Full pytest — `1619 passed in 87.51s`.
+- Benchmark smoke + 8GB baseline — passed, peak RSS `186.61 MiB` < `7.2 GiB` budget.
+
+Remote CI must still be watched after the new commit/push; previous public CI failure root cause was the ruff format drift fixed above.
+
 ## 2026-06-04 KST — Fresh full clean non-nested monthly-refit rerun and TradFi auto-expansion monitor
 
 현재 코드 기준으로 69-asset monthly-refit walk-forward를 다시 full rerun했다. 기준은 `30m, 1h, 2h, 4h, 6h, 8h, 12h, 1d`, round-trip slippage `10bps`, 매월 1일 refit, 직전 2개월 validation, 다음 1개월 locked OOS다. 평가 OOS는 `2025-09-01T00:00:00`부터 최신 보유 데이터 `2026-06-01T06:30:00`까지이며, `2026-06`은 부분 월이다. 총 10개 OOS fold를 사용했다.

@@ -87,6 +87,33 @@ def test_aggregate_rows_recomputes_extended_metrics() -> None:
     assert agg["clean_promotion_eligible"] is True
 
 
+def test_aggregate_rows_rank_by_compounded_return_before_hit_count() -> None:
+    def row(label: str, value: float) -> dict[str, object]:
+        return {
+            "candidate_label": label,
+            "family": "f",
+            "clean_promotion_eligible": True,
+            "train": {"total_return": 0.2, "mdd": 0.05},
+            "validation": {"total_return": 0.1, "mdd": 0.04},
+            "locked_oos": {"total_return": value, "mdd": 0.03},
+            "ready_for_paper": True,
+        }
+
+    ranked = module._aggregate_rows(
+        [
+            row("steady", 0.02),
+            row("steady", 0.02),
+            row("steady", 0.02),
+            row("selective_high_comp", 0.20),
+            row("selective_high_comp", 0.0),
+            row("selective_high_comp", 0.0),
+        ]
+    )
+
+    assert ranked[0]["candidate_label"] == "selective_high_comp"
+    assert ranked[0]["positive_oos_folds"] < ranked[1]["positive_oos_folds"]
+
+
 def test_timeframe_coverage_summary_reports_one_day() -> None:
     summary = module._timeframe_coverage_summary(
         {
@@ -338,7 +365,7 @@ def test_dynamic_conviction_switch_emits_fallback_when_aggressive_pool_missing()
 
     switched = module._dynamic_conviction_switch_candidates(candidates, fold)
 
-    assert len(switched) == 56
+    assert len(switched) == 72
     assert all(candidate.row["aggressive_candidate_label"] is None for candidate in switched)
     assert all(
         candidate.row["selected_candidate_label"] == fallback_label for candidate in switched
@@ -347,6 +374,63 @@ def test_dynamic_conviction_switch_emits_fallback_when_aggressive_pool_missing()
     assert any(candidate.row.get("risk_scale", 1.0) > 1.0 for candidate in switched)
     assert any("_val_ret02_calmar80_gate" in candidate.candidate_label for candidate in switched)
     assert all(candidate.row["uses_locked_oos_for_selection"] is False for candidate in switched)
+
+
+def test_dynamic_conviction_switch_keeps_scaled_gate_cash_folds_when_gate_fails() -> None:
+    index = pd.date_range("2025-01-01", "2025-03-31", freq="1D")
+    fold = module.MonthlyFold(
+        fold_id="2025-03",
+        refit_at=pd.Timestamp("2025-03-01"),
+        train=(pd.Timestamp("2025-01-01"), pd.Timestamp("2025-01-31")),
+        validation=(pd.Timestamp("2025-02-01"), pd.Timestamp("2025-02-28")),
+        locked_oos=(pd.Timestamp("2025-03-01"), pd.Timestamp("2025-03-31")),
+    )
+    fallback_label = "strict_efficiency:balanced_mdd12_gross5_69_asset_efficiency_repair_optuna"
+    fallback_returns = pd.Series(0.001, index=index, dtype=float)
+    fallback_returns.loc["2025-02-01":"2025-02-28"] = 0.0
+    candidates = [
+        module.CandidateResult(
+            family="strict_efficiency",
+            candidate_label=fallback_label,
+            source_profile_id="fallback",
+            row={"selection_reasons": [], "uses_locked_oos_for_selection": False},
+            returns=fallback_returns,
+        ),
+        module.CandidateResult(
+            family="strict_efficiency",
+            candidate_label=(
+                "strict_efficiency:growth_mdd20_gross8_69_asset_efficiency_repair_optuna"
+            ),
+            source_profile_id="fallback_growth",
+            row={"selection_reasons": [], "uses_locked_oos_for_selection": False},
+            returns=fallback_returns,
+        ),
+    ]
+
+    switched = module._dynamic_conviction_switch_candidates(candidates, fold)
+    scaled_cash = [
+        candidate
+        for candidate in switched
+        if candidate.candidate_label.endswith("_val_ret02_calmar80_gate_val_mdd20_scaled")
+    ]
+
+    assert len(scaled_cash) == 8
+    assert all(
+        candidate.row["selected_candidate_label"] == "cash_validation_strength_guard"
+        for candidate in scaled_cash
+    )
+    assert all(candidate.row["final_weights"] == {} for candidate in scaled_cash)
+    assert all(
+        module._period_metrics(candidate.returns, fold.locked_oos)["total_return"] == 0.0
+        for candidate in scaled_cash
+    )
+    mdd30_scaled_cash = [
+        candidate
+        for candidate in switched
+        if candidate.candidate_label.endswith("_val_ret02_calmar80_gate_val_mdd30_scaled")
+    ]
+    assert len(mdd30_scaled_cash) == 8
+    assert all(candidate.row["target_validation_mdd"] == 0.30 for candidate in mdd30_scaled_cash)
 
 
 def test_dynamic_aware_hybrid_is_disabled_for_nested_hybrid_materials(
