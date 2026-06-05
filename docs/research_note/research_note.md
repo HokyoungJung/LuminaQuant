@@ -42,7 +42,7 @@ CI/local verification recorded for this pass:
 - Full pytest — `1619 passed in 87.51s`.
 - Benchmark smoke + 8GB baseline — passed, peak RSS `186.61 MiB` < `7.2 GiB` budget.
 
-Remote CI must still be watched after the new commit/push; previous public CI failure root cause was the ruff format drift fixed above.
+Remote CI follow-up: after the first repair push, public `ci` passed ruff/dashboard/GPU but failed full pytest because `DEFAULT_BRIDGE_PROTOCOL_MANIFEST` pointed at ignored runtime state under `.omx/plans/`. The frozen bridge protocol manifest is now tracked at `configs/research/bridge-protocol-manifest-oos-oracle-hybrid-v1-20260602.json`, so clean checkouts and CI can reproduce the bridge tests without local OMX state. Previous public CI format failure root cause was the ruff format drift fixed above.
 
 ## 2026-06-04 KST — Fresh full clean non-nested monthly-refit rerun and TradFi auto-expansion monitor
 

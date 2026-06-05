@@ -59,7 +59,10 @@ DEFAULT_HYBRID_TRIALS = 48
 ALLOWED_TIMEFRAMES_30M_TO_1D = ("30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d")
 DEFAULT_SLIPPAGE_BPS = 10.0
 DEFAULT_BRIDGE_PROTOCOL_MANIFEST = (
-    REPO_ROOT / ".omx" / "plans" / "bridge-protocol-manifest-oos-oracle-hybrid-v1-20260602.json"
+    REPO_ROOT
+    / "configs"
+    / "research"
+    / "bridge-protocol-manifest-oos-oracle-hybrid-v1-20260602.json"
 )
 CURRENT_CHALLENGER_OOS_COMP = 0.5338
 CURRENT_CHALLENGER_MAX_OOS_MDD = 0.1880
