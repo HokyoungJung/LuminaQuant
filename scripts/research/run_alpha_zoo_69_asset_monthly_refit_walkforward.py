@@ -2707,6 +2707,33 @@ LAGGED_SHADOW_LEAF_AVG_WINDOW = 2
 LAGGED_SHADOW_LEAF_MIN_VALIDATION_RETURN = 0.05
 LAGGED_SHADOW_LEAF_MAX_VALIDATION_MDD = 0.12
 LAGGED_SHADOW_LEAF_MAX_TRAIN_MDD = 0.50
+LAGGED_SHADOW_LEAF_ROUTER_SPECS: tuple[dict[str, float | str], ...] = (
+    {
+        "label": LAGGED_SHADOW_LEAF_ROUTER_LABEL,
+        "lagged_target_validation_mdd": 0.0,
+        "lagged_max_scale": 1.0,
+    },
+    {
+        "label": ("lagged_shadow_leaf_router:core_warmup4_avg2_val05_mdd12_lag_val_mdd15_cap125"),
+        "lagged_target_validation_mdd": 0.15,
+        "lagged_max_scale": 1.25,
+    },
+    {
+        "label": ("lagged_shadow_leaf_router:core_warmup4_avg2_val05_mdd12_lag_val_mdd20_cap140"),
+        "lagged_target_validation_mdd": 0.20,
+        "lagged_max_scale": 1.40,
+    },
+    {
+        "label": ("lagged_shadow_leaf_router:core_warmup4_avg2_val05_mdd12_lag_val_mdd20_cap150"),
+        "lagged_target_validation_mdd": 0.20,
+        "lagged_max_scale": 1.50,
+    },
+    {
+        "label": ("lagged_shadow_leaf_router:core_warmup4_avg2_val05_mdd12_lag_val_mdd25_cap150"),
+        "lagged_target_validation_mdd": 0.25,
+        "lagged_max_scale": 1.50,
+    },
+)
 
 
 def _lagged_shadow_leaf_source(candidate: CandidateResult) -> bool:
@@ -2932,8 +2959,7 @@ def _lagged_shadow_leaf_router_candidates(
         selected, returns, row_extra, branch = strict_core_branch()
 
     update_cutoff_fold = prior_completed_fold_ids[-1] if prior_completed_fold_ids else None
-    row = {
-        "profile_id": LAGGED_SHADOW_LEAF_ROUTER_LABEL,
+    common_row = {
         "profile_kind": "lagged_shadow_leaf_router",
         "candidate_tier": "post_oos_research_forward_shadow_only",
         "selection_inputs": ["train", "validation", "lagged_completed_shadow_oos"],
@@ -2958,16 +2984,62 @@ def _lagged_shadow_leaf_router_candidates(
         "ready_for_paper": True,
         "ready_for_real": False,
         "real_money_execution": False,
-        **row_extra,
     }
-    return [
-        _candidate_eval(
-            family="lagged_shadow_leaf_router",
-            label=LAGGED_SHADOW_LEAF_ROUTER_LABEL,
-            row=row,
-            returns=returns,
+
+    out: list[CandidateResult] = []
+    for spec in LAGGED_SHADOW_LEAF_ROUTER_SPECS:
+        label = str(spec["label"])
+        row = {
+            **common_row,
+            **row_extra,
+            "profile_id": label,
+            "lagged_shadow_scale_target_validation_mdd": float(
+                spec["lagged_target_validation_mdd"]
+            ),
+            "lagged_shadow_scale_max": float(spec["lagged_max_scale"]),
+            "lagged_shadow_scale_applied": False,
+        }
+        spec_returns = returns
+        if (
+            branch == "lagged_shadow_leaf"
+            and selected is not None
+            and float(spec["lagged_target_validation_mdd"]) > 0.0
+        ):
+            scale, scaled_snapshot = _validation_budget_scale_for_candidate(
+                selected,
+                fold,
+                target_validation_mdd=float(spec["lagged_target_validation_mdd"]),
+                max_scale=float(spec["lagged_max_scale"]),
+            )
+            spec_returns = _scaled_candidate_returns(selected, scale)
+            row.update(
+                {
+                    "risk_scale": float(scale),
+                    "risk_scale_mode": (
+                        "lagged_leaf_train_validation_mdd_budget_"
+                        f"target{float(spec['lagged_target_validation_mdd']):.2f}_"
+                        f"cap{float(spec['lagged_max_scale']):.2f}"
+                    ),
+                    "scaled_train_return": _safe_float(scaled_snapshot["train"]["total_return"]),
+                    "scaled_train_mdd": _safe_float(scaled_snapshot["train"]["mdd"]),
+                    "scaled_validation_return": _safe_float(
+                        scaled_snapshot["validation"]["total_return"]
+                    ),
+                    "scaled_validation_mdd": _safe_float(scaled_snapshot["validation"]["mdd"]),
+                    "weights": {selected.candidate_label: float(scale)},
+                    "final_weights": {selected.candidate_label: float(scale)},
+                    "lagged_shadow_scale_applied": True,
+                }
+            )
+        out.append(
+            _candidate_eval(
+                family="lagged_shadow_leaf_router",
+                label=label,
+                row=row,
+                returns=spec_returns,
+            )
         )
-    ]
+    return out
 
 
 def _scale_candidate_row(
@@ -4807,6 +4879,11 @@ def _evaluate_candidate(candidate: CandidateResult, fold: MonthlyFold) -> dict[s
         "lagged_shadow_max_train_mdd": row.get("lagged_shadow_max_train_mdd"),
         "lagged_shadow_completed_fold_count": row.get("lagged_shadow_completed_fold_count"),
         "lagged_shadow_completed_fold_tail": row.get("lagged_shadow_completed_fold_tail") or [],
+        "lagged_shadow_scale_target_validation_mdd": row.get(
+            "lagged_shadow_scale_target_validation_mdd"
+        ),
+        "lagged_shadow_scale_max": row.get("lagged_shadow_scale_max"),
+        "lagged_shadow_scale_applied": bool(row.get("lagged_shadow_scale_applied", False)),
         "dynamic_expert_label": row.get("dynamic_expert_label"),
         "dynamic_expert_used_as": row.get("dynamic_expert_used_as"),
         "same_month_self_feeding": bool(row.get("same_month_self_feeding", False)),
@@ -5154,6 +5231,200 @@ def _recompute_payload_from_existing(
                 "governance/ranking repair only; not a fresh no-nested Optuna search"
             ),
         }
+    out["generated_at_utc"] = _utc_now_iso()
+    return out
+
+
+ROW_LEVEL_LEAF_SELECTOR_SPECS: tuple[
+    tuple[str, float, Callable[[Mapping[str, Any]], tuple[float, ...]]],
+    ...,
+] = (
+    (
+        "row_level_leaf_selector:validation_calmar_mdd20",
+        0.20,
+        lambda row: (
+            _row_metric(row, "validation", "calmar"),
+            _row_metric(row, "validation", "total_return"),
+            -_row_metric(row, "validation", "mdd"),
+            _row_metric(row, "train", "total_return"),
+        ),
+    ),
+    (
+        "row_level_leaf_selector:validation_return_mdd25",
+        0.25,
+        lambda row: (
+            _row_metric(row, "validation", "total_return"),
+            _row_metric(row, "validation", "calmar"),
+            -_row_metric(row, "validation", "mdd"),
+            -_row_metric(row, "train", "mdd"),
+        ),
+    ),
+    (
+        "row_level_leaf_selector:stability_utility_mdd25",
+        0.25,
+        lambda row: (
+            min(_row_metric(row, "validation", "total_return"), 1.0)
+            + 0.15 * min(_row_metric(row, "train", "total_return"), 2.0)
+            - 1.75 * _row_metric(row, "validation", "mdd")
+            - 0.35 * _row_metric(row, "train", "mdd")
+            - 0.50
+            * max(
+                0.0,
+                _row_metric(row, "validation", "total_return")
+                - max(_row_metric(row, "train", "total_return"), 0.0),
+            ),
+            _row_metric(row, "validation", "calmar"),
+            _row_metric(row, "validation", "total_return"),
+        ),
+    ),
+    (
+        "row_level_leaf_selector:high_conviction_mdd30",
+        0.30,
+        lambda row: (
+            min(_row_metric(row, "validation", "total_return"), 1.5)
+            + 0.10 * min(_row_metric(row, "train", "total_return"), 2.5)
+            - 1.00 * _row_metric(row, "validation", "mdd")
+            - 0.20 * _row_metric(row, "train", "mdd"),
+            _row_metric(row, "validation", "calmar"),
+            _row_metric(row, "validation", "total_return"),
+        ),
+    ),
+)
+
+
+def _row_metric(row: Mapping[str, Any], split: str, field: str) -> float:
+    metrics = row.get(split)
+    if not isinstance(metrics, Mapping):
+        return 0.0
+    return _safe_float(metrics.get(field))
+
+
+def _row_is_clean_leaf_material(row: Mapping[str, Any]) -> bool:
+    """Return whether an evaluated row is leaf-like enough for row-level selectors."""
+    label = str(row.get("candidate_label") or "").lower()
+    family = str(row.get("family") or "").lower()
+    profile_kind = str(row.get("profile_kind") or "").lower()
+    source_profile_id = str(row.get("source_profile_id") or "").lower()
+    return bool(
+        label
+        and family not in _NON_LEAF_PORTFOLIO_FAMILIES
+        and not any(token in label for token in _NON_LEAF_LABEL_TOKENS)
+        and not any(token in source_profile_id for token in _NON_LEAF_LABEL_TOKENS)
+        and not any(token in profile_kind for token in _NON_LEAF_PROFILE_KIND_TOKENS)
+        and not _row_calendar_primary_reasons(row)
+        and not _row_references_non_leaf_material(row)
+        and not row.get("selection_reasons")
+        and not row.get("uses_locked_oos_for_selection")
+        and not row.get("same_month_self_feeding")
+        and not row.get("current_fold_oos_used_for_weighting")
+        and not row.get("post_oos_research_variant")
+        and not row.get("requires_fresh_forward_shadow")
+        and bool(row.get("clean_promotion_eligible", True))
+    )
+
+
+def _row_level_leaf_selector_rows(
+    rows: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Append fast single-leaf selectors from already evaluated fold rows.
+
+    These selectors are useful for rapid research because they require no
+    Optuna rerun: each fold chooses one already evaluated leaf row using only
+    train/validation fields, then copies that source row's exact OOS metrics.
+    They are deliberately marked as post-OOS shadow variants because the
+    selector family is introduced after historical OOS review.
+    """
+    base_rows = [
+        dict(row) for row in rows if str(row.get("family") or "") != "row_level_leaf_selector"
+    ]
+    by_fold: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in base_rows:
+        fold_id = str(row.get("fold_id") or "")
+        if fold_id:
+            by_fold[fold_id].append(row)
+
+    out: list[dict[str, Any]] = []
+    for fold_id, fold_rows in sorted(by_fold.items()):
+        eligible_base = [
+            row
+            for row in fold_rows
+            if _row_is_clean_leaf_material(row)
+            and _row_metric(row, "train", "total_return") > 0.0
+            and _row_metric(row, "validation", "total_return") > 0.0
+        ]
+        for label, validation_mdd_cap, score_fn in ROW_LEVEL_LEAF_SELECTOR_SPECS:
+            eligible = [
+                row
+                for row in eligible_base
+                if _row_metric(row, "validation", "mdd") <= validation_mdd_cap
+            ]
+            if not eligible:
+                continue
+            selected = max(eligible, key=score_fn)
+            selected_label = str(selected.get("candidate_label"))
+            new_row = dict(selected)
+            new_row.update(
+                {
+                    "family": "row_level_leaf_selector",
+                    "candidate_label": label,
+                    "source_profile_id": label,
+                    "profile_kind": "post_hoc_train_validation_row_level_leaf_selector",
+                    "candidate_tier": "post_oos_research_forward_shadow_only",
+                    "selected_candidate_label": selected_label,
+                    "selection_inputs": ["train", "validation"],
+                    "selection_policy": (
+                        "single_clean_leaf_row_selected_by_train_validation_metrics_no_oos"
+                    ),
+                    "selected_train_return": _row_metric(selected, "train", "total_return"),
+                    "selected_train_mdd": _row_metric(selected, "train", "mdd"),
+                    "selected_validation_return": _row_metric(
+                        selected, "validation", "total_return"
+                    ),
+                    "selected_validation_mdd": _row_metric(selected, "validation", "mdd"),
+                    "selected_validation_calmar": _row_metric(selected, "validation", "calmar"),
+                    "row_level_selector_source_family": selected.get("family"),
+                    "row_level_selector_source_label": selected_label,
+                    "row_level_selector_validation_mdd_cap": float(validation_mdd_cap),
+                    "mechanically_oos_clean": True,
+                    "uses_locked_oos_for_selection": False,
+                    "same_month_self_feeding": False,
+                    "current_fold_oos_used_for_weighting": False,
+                    "post_oos_research_variant": True,
+                    "requires_fresh_forward_shadow": True,
+                    "nested_hybrid_dependency": False,
+                    "clean_promotion_eligible": False,
+                    "ready_for_paper": True,
+                    "ready_for_real": False,
+                    "real_money_execution": False,
+                    "weights": {selected_label: 1.0},
+                    "final_weights": {selected_label: 1.0},
+                    "selection_reasons": [],
+                }
+            )
+            out.append(new_row)
+    return out
+
+
+def _augment_payload_with_row_level_leaf_selectors(payload: Mapping[str, Any]) -> dict[str, Any]:
+    out = dict(payload)
+    base_rows = [
+        dict(row)
+        for row in out.get("fold_candidate_rows") or []
+        if str(row.get("family") or "") != "row_level_leaf_selector"
+    ]
+    selector_rows = _row_level_leaf_selector_rows(base_rows)
+    out["fold_candidate_rows"] = [*base_rows, *selector_rows]
+    out["row_level_leaf_selector_report"] = {
+        "enabled": True,
+        "selector_row_count": len(selector_rows),
+        "selector_labels": [spec[0] for spec in ROW_LEVEL_LEAF_SELECTOR_SPECS],
+        "interpretation": (
+            "fast exact row-level replay: source OOS metrics are copied from one selected "
+            "clean leaf row per fold; no current-fold OOS is used for selection, but the "
+            "new selector family is post-OOS research and needs fresh-forward shadowing"
+        ),
+    }
+    _refresh_payload_derived_reports(out)
     out["generated_at_utc"] = _utc_now_iso()
     return out
 
@@ -5737,6 +6008,15 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--augment-row-level-selectors",
+        action="store_true",
+        help=(
+            "Append post-OOS shadow single-leaf selectors from existing fold rows. "
+            "Selection uses train/validation row metrics only and copies exact source "
+            "OOS metrics; use with --recompute-from-json for fast strategy diagnostics."
+        ),
+    )
+    parser.add_argument(
         "--checkpoint-interval",
         type=int,
         default=1,
@@ -5787,6 +6067,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         output_md.write_text(_render_markdown(payload), "utf-8")
     else:
         payload = run_walkforward(args)
+    if args.augment_row_level_selectors:
+        payload = _augment_payload_with_row_level_leaf_selectors(payload)
+        payload["output_paths"] = {
+            "json": str(output_json),
+            "markdown": str(output_md),
+        }
+        if "recompute_provenance" in payload:
+            payload["recompute_provenance"]["output_paths"] = dict(payload["output_paths"])
+        _write_json(output_json, payload)
+        output_md.parent.mkdir(parents=True, exist_ok=True)
+        output_md.write_text(_render_markdown(payload), "utf-8")
     top = list(payload.get("aggregate_rankings") or [])[:5]
     clean_top = list(payload.get("clean_promotion_rankings") or [])[:5]
     demoted_top = list(payload.get("demoted_nested_or_historical_rankings") or [])[:5]

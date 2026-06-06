@@ -1854,3 +1854,68 @@ Top candidate: `dynamic_conviction_switch:t0.85_risk_capped_fallback_val_mdd20_s
 - Artifact audits: `metric_reconciliation.metrics_reconciled=true`, `nested_hybrid_dependency=false`, `uses_locked_oos_for_selection=false` for both top router and current clean dynamic.
 - `uv run ruff check scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py tests/test_alpha_zoo_69_asset_monthly_refit_walkforward.py` — passed.
 - `uv run pytest tests/test_alpha_zoo_69_asset_monthly_refit_walkforward.py -q` — `38 passed`.
+
+## 2026-06-06 — 최신 데이터 85-symbol non-nested clean/shadow 재평가
+
+- Data refresh: `scripts/collect_binance_1m_research_universe.py --source fapi --universe-source static-plus-fapi-tradfi`로 85/85 symbols 최신화. 최신 30m 기준 `2026-06-06T08:30:00` UTC, 수집 report `var/reports/data_collection/binance_1m_research_universe_refresh_20260606/binance_1m_research_universe_collection_latest.json`, error 0.
+- Full WF artifact: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_85_asset_lagged_shadow_router_scaled_latest_20260606/alpha_zoo_85_asset_lagged_shadow_router_scaled_latest_20260606.json`.
+- Augmented/report artifact: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_85_asset_non_nested_augmented_selectors_latest_20260606/alpha_zoo_85_asset_non_nested_augmented_selectors_latest_20260606.json` and `.md`.
+- Protocol: monthly day-1 refit, expanding train from 2025-01-01, 2M validation, 1M locked OOS, allowed TF `30m,1h,2h,4h,6h,8h,12h,1d`, 10bps round-trip cost. OOS range `2025-09-01T00:00:00` → `2026-06-06T08:30:00` UTC; June is partial.
+- Runtime: full exact rerun exit 0, `31:37.96`, peak RSS `1,520.3 MiB`. Augmented row-level replay exit 0, `0:08.45`, peak RSS `209,948 KiB`.
+- Evaluation audit: `metric_reconciliation.metrics_reconciled=true`, `candidate_count=152`, `uses_locked_oos_for_selection=0`, `nested_hybrid_dependency=0`, clean+nested rows 0, dynamic self-feed violations 0.
+- Slippage audit: runner refuses `--slippage-bps` unless it equals `broad69.PRIMARY_ROUND_TRIP_COST_BPS`; both are `10.0`. `simulate_symbol` charges half cost on entry and half on exit, so 0→1→0 costs one full 10bps round trip.
+
+### Latest aggregate comparison
+
+| Candidate | Clean promotion | Why non-clean if any | OOS comp | Ann approx | Max bar MDD | Monthly eq MDD | Sharpe | Sortino | PF/Omega | Hit | Min OOS | Latest OOS | Nested | Current OOS used |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |
+| `lagged_shadow_leaf_router:core_warmup4_avg2_val05_mdd12_lag_val_mdd20_cap150` | False | `post_oos_research_variant`, `requires_fresh_forward_shadow` | `61.40%` | `77.62%` | `29.13%` | `3.86%` | `1.61` | `50.87` | `8.55/8.55` | `4/10` | `-3.86%` | `-3.34%` | False | False |
+| `lagged_shadow_leaf_router:core_warmup4_avg2_val05_mdd12_lag_val_mdd20_cap140` | False | `post_oos_research_variant`, `requires_fresh_forward_shadow` | `59.99%` | `75.76%` | `27.69%` | `3.59%` | `1.60` | `105.04` | `8.70/8.70` | `4/10` | `-3.59%` | `-3.34%` | False | False |
+| `lagged_shadow_leaf_router:core_warmup4_avg2_val05_mdd12` | False | `post_oos_research_variant`, `requires_fresh_forward_shadow` | `56.15%` | `70.71%` | `27.69%` | `6.59%` | `1.53` | `6.09` | `6.58/6.58` | `4/10` | `-6.59%` | `-6.59%` | False | False |
+| `dynamic_conviction_switch:t0.85_risk_capped_fallback_val_ret02_calmar80_gate_val_mdd30_scaled` | True | — | `34.39%` | `42.57%` | `27.69%` | `0.00%` | `1.12` | `∞` | `∞/∞` | `3/10` | `0.00%` | `0.00%` | False | False |
+| `strict_efficiency:aggressive_mdd30_gross10_69_asset_efficiency_repair_optuna` | True | — | `32.74%` | `45.88%` | `14.77%` | `14.40%` | `0.84` | `2.58` | `2.95/2.95` | `4/9` | `-14.22%` | `49.10%` | False | False |
+| `relaxed_efficiency:aggressive_mdd30_gross10_69_asset_relaxed_efficiency_repair_optuna` | True | — | `31.62%` | `39.05%` | `26.47%` | `22.01%` | `0.70` | `2.89` | `2.13/2.13` | `4/10` | `-13.99%` | `40.86%` | False | False |
+| `row_level_leaf_selector:validation_return_mdd25` | False | post-OOS row-level diagnostic | `22.11%` | — | `26.62%` | — | `0.59` | — | — | `5/10` | `-15.35%` | — | False | False |
+
+### Best clean candidate fold detail
+
+Best clean/promotable-mechanics candidate remains `dynamic_conviction_switch:t0.85_risk_capped_fallback_val_ret02_calmar80_gate_val_mdd30_scaled`.
+
+| Fold | Validation return | OOS return | OOS MDD | Selected leaf/cash | Risk scale |
+| --- | ---: | ---: | ---: | --- | ---: |
+| `2025-09` | `0.00%` | `0.00%` | `0.00%` | cash guard | `0.0` |
+| `2025-10` | `0.00%` | `0.00%` | `0.00%` | cash/no eligible | `0.0` |
+| `2025-11` | `85.56%` | `33.48%` | `27.69%` | strict balanced leaf | `3.0` |
+| `2025-12` | `0.00%` | `0.00%` | `0.00%` | cash guard | `0.0` |
+| `2026-01` | `0.00%` | `0.00%` | `0.00%` | cash guard | `0.0` |
+| `2026-02` | `15.01%` | `0.21%` | `10.08%` | strict balanced leaf | `3.0` |
+| `2026-03` | `0.00%` | `0.00%` | `0.00%` | cash guard | `0.0` |
+| `2026-04` | `0.00%` | `0.00%` | `0.00%` | cash guard | `0.0` |
+| `2026-05` | `2.86%` | `0.47%` | `2.28%` | strict balanced leaf | `1.0` |
+| `2026-06` | `0.00%` | `0.00%` | `0.00%` | cash guard | `0.0` |
+
+### Best shadow candidate fold detail
+
+Best raw/shadow candidate is `lagged_shadow_leaf_router:core_warmup4_avg2_val05_mdd12_lag_val_mdd20_cap150`. It is mechanically current-fold OOS-clean and non-nested, but not promotion-clean because the router/scale variant was introduced after historical OOS review.
+
+| Fold | Branch | Selected leaf/cash | Validation return | OOS return | OOS MDD | Risk scale |
+| --- | --- | --- | ---: | ---: | ---: | ---: |
+| `2025-09` | strict-core cash | cash guard | `0.00%` | `0.00%` | `0.00%` | `0.0` |
+| `2025-10` | strict-core cash | cash guard | `0.00%` | `0.00%` | `0.00%` | `0.0` |
+| `2025-11` | strict-core scaled | strict balanced leaf | `85.56%` | `33.48%` | `27.69%` | `3.0` |
+| `2025-12` | strict-core cash | cash guard | `0.00%` | `0.00%` | `0.00%` | `0.0` |
+| `2026-01` | lagged shadow leaf | strict growth leaf | `5.77%` | `5.28%` | `2.38%` | `0.5` |
+| `2026-02` | lagged shadow leaf | relaxed growth leaf | `23.28%` | `4.39%` | `11.61%` | `1.5` |
+| `2026-03` | lagged shadow leaf | relaxed growth leaf | `16.16%` | `-3.86%` | `7.69%` | `1.5` |
+| `2026-04` | strict-core cash | cash guard | `0.00%` | `0.00%` | `0.00%` | `0.0` |
+| `2026-05` | lagged shadow leaf | relaxed balanced leaf | `72.66%` | `18.40%` | `29.13%` | `1.5` |
+| `2026-06` | lagged shadow leaf | relaxed balanced leaf | `2.63%` | `-3.34%` | `3.13%` | `0.5` |
+
+### Conclusion
+
+- Nested hybrid 문제는 이번 latest artifact 기준 제거됐다. Hybrid/selector/gate를 hybrid 재료로 넣지 않고, leaf-only source/reference rule과 row-reference audit이 모두 통과한다.
+- Clean-promotion 기준으로 성능 상단은 여전히 dynamic cash-gated sleeve다. +34.39% comp는 이전보다 높지만 historical challenger +53.38%에는 못 미치므로 real 승격은 불가하다.
+- Return을 더 올린 후보는 lagged-shadow leaf router scale variants다. 다만 이것은 same-month OOS를 보지 않는 온라인형 아이디어일 뿐, 같은 historical window에서 이미 OOS를 본 뒤 만든 family라 fresh-forward shadow 없이는 clean promotion으로 부르면 안 된다.
+- Row-level selector diagnostic은 빠른 재평가 도구로는 유용하지만 성능 개선에는 실패했다. 가장 나은 변형도 +22.11% comp라 dynamic clean보다 낮다.
+- 이론적으로 타당한 방향은 “cross-sectional/trend leaf → train+validation gate → cash/no-position guard → coarse validation-MDD position sizing”이다. 반대로 OOS oracle, calendar-primary alpha, nested hybrid-on-hybrid, same-month dynamic self-feed는 계속 금지한다.
+- 다음 실전 조건은 2026-06-06 이후 fresh-forward shadow. 최소 다음 1~2개 refit month에서 lagged router가 같은 rule로 positive/controlled-DD를 보여야 하며, 동시에 live/paper fill cost가 replay 10bps 이내인지 별도 검증해야 한다.

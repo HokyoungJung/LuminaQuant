@@ -166,6 +166,30 @@ def test_load_all_bars_marks_missing_new_symbols_without_failing(tmp_path: Path)
     )
 
 
+def test_cost_model_is_pinned_to_10bps_round_trip() -> None:
+    assert module.DEFAULT_SLIPPAGE_BPS == 10.0
+    assert module.broad69.PRIMARY_ROUND_TRIP_COST_BPS == 10.0
+
+    bars = pd.DataFrame(
+        {
+            "close": [100.0, 100.0, 100.0, 100.0],
+            "high": [101.0, 101.0, 101.0, 101.0],
+            "low": [99.0, 99.0, 99.0, 99.0],
+        }
+    )
+    signal = pd.Series([0.0, 1.0, 1.0, 0.0], dtype=float).to_numpy()
+    result = module.broad69.simulate_symbol(
+        bars,
+        signal,
+        integer_leverage=1,
+        allocation_fraction=1.0,
+        round_trip_cost_bps=module.DEFAULT_SLIPPAGE_BPS,
+    )
+
+    # Two half-turnover transitions, 0->1 and 1->0, equal one full 10bps round trip.
+    assert result.returns.sum() == pytest.approx(-0.001)
+
+
 def test_leaf_strategy_material_filter_rejects_nested_hybrid_inputs() -> None:
     leaf = _candidate("profile_optuna:growth_mdd20_gross8_69_asset_profile_optuna")
     hybrid = _candidate("cross_candidate_hybrid:hybrid_v3_5", family="cross_candidate_hybrid")
@@ -499,6 +523,16 @@ def test_lagged_shadow_leaf_router_uses_only_prior_completed_oos_and_leaf_source
     # Current OOS is deliberately worse than the strict leaf, proving the
     # router did not choose by same-month locked OOS.
     assert row["locked_oos"]["total_return"] < 0.0
+    scaled = [
+        module._evaluate_candidate(candidate, fold)
+        for candidate in routed
+        if candidate.candidate_label.endswith("_lag_val_mdd20_cap150")
+    ]
+    assert len(scaled) == 1
+    assert scaled[0]["risk_scale"] > 1.0
+    assert scaled[0]["lagged_shadow_scale_applied"] is True
+    assert scaled[0]["uses_locked_oos_for_selection"] is False
+    assert scaled[0]["nested_hybrid_dependency"] is False
 
 
 def test_dynamic_aware_hybrid_is_disabled_for_nested_hybrid_materials(
@@ -1250,6 +1284,60 @@ def test_recompute_payload_separates_raw_clean_and_demoted_rankings() -> None:
     assert recomputed["demoted_nested_or_historical_rankings"][0]["non_clean_reasons"] == [
         "nested_hybrid_dependency"
     ]
+
+
+def test_row_level_leaf_selectors_are_oos_clean_non_nested_shadow_rows() -> None:
+    leaf = {
+        "fold_id": "2025-03",
+        "family": "profile_optuna",
+        "candidate_label": "profile_optuna:growth_leaf",
+        "source_profile_id": "profile_optuna:growth_leaf",
+        "profile_kind": "leaf_momentum_profile",
+        "selection_reasons": [],
+        "clean_promotion_eligible": True,
+        "uses_locked_oos_for_selection": False,
+        "train": {"total_return": 0.40, "mdd": 0.10, "calmar": 4.0},
+        "validation": {"total_return": 0.12, "mdd": 0.05, "calmar": 2.4},
+        "locked_oos": {"total_return": 0.07, "mdd": 0.03},
+    }
+    nested = {
+        **leaf,
+        "family": "cross_candidate_hybrid",
+        "candidate_label": "cross_candidate_hybrid:hybrid_v3_5",
+        "source_profile_id": "cross_candidate_hybrid:hybrid_v3_5",
+        "profile_kind": "hybrid",
+        "validation": {"total_return": 0.50, "mdd": 0.02, "calmar": 25.0},
+        "locked_oos": {"total_return": 0.50, "mdd": 0.02},
+    }
+
+    augmented = module._augment_payload_with_row_level_leaf_selectors(
+        {"fold_candidate_rows": [leaf, nested]}
+    )
+    selector_rows = [
+        row
+        for row in augmented["fold_candidate_rows"]
+        if row["family"] == "row_level_leaf_selector"
+    ]
+
+    assert len(selector_rows) == len(module.ROW_LEVEL_LEAF_SELECTOR_SPECS)
+    assert {row["selected_candidate_label"] for row in selector_rows} == {
+        "profile_optuna:growth_leaf"
+    }
+    assert all(row["uses_locked_oos_for_selection"] is False for row in selector_rows)
+    assert all(row["mechanically_oos_clean"] is True for row in selector_rows)
+    assert all(row["nested_hybrid_dependency"] is False for row in selector_rows)
+    assert all(row["clean_promotion_eligible"] is False for row in selector_rows)
+    assert all(row["locked_oos"]["total_return"] == pytest.approx(0.07) for row in selector_rows)
+    assert augmented["metric_reconciliation"]["metrics_reconciled"] is True
+    assert any(
+        row["candidate_label"] == "row_level_leaf_selector:validation_calmar_mdd20"
+        and row["non_clean_reasons"]
+        == [
+            "post_oos_research_variant",
+            "requires_fresh_forward_shadow",
+        ]
+        for row in augmented["demoted_nested_or_historical_rankings"]
+    )
 
 
 def test_non_leaf_reference_detector_covers_portfolio_families_and_selected_tokens() -> None:
