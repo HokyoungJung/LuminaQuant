@@ -948,3 +948,11 @@ Verification passed: runner max RSS `6,492,344 KiB` (<8 GiB); artifact invariant
 [2026-06-06T00:55:00+09:00] 85-symbol clean dynamic v5: fixed scaled-gate cash fold accounting, comp-first aggregate ranking, unbounded Sortino/PF reporting, and actual CI failure triage. Best clean candidate `dynamic_conviction_switch:t0.85_risk_capped_fallback_val_ret02_calmar80_gate_val_mdd30_scaled` OOS 2025-09-01..2026-06-05T12:00 UTC: comp +34.39%, max bar MDD 27.69%, monthly equity MDD 0%, Sharpe 1.12, Sortino/PF unbounded, hit 3/10, clean=true, nested=false, OOS selection=false. Full-family v4 underperformed (+12.45%) and is not selected. Previous public CI failure root cause was ruff format drift; final local CI-equivalent checks passed (`pytest 1619`, ruff, Rust, dashboard, GPU, benchmark); remote CI to watch after push.
 
 [2026-06-06T01:05:00+09:00] Remote CI follow-up: public ci run 27025487259 passed ruff format but failed full pytest because the bridge protocol manifest lived only under ignored `.omx/plans`. Moved the frozen manifest to tracked `configs/research/bridge-protocol-manifest-oos-oracle-hybrid-v1-20260602.json`, updated default runner path, and re-ran targeted bridge tests plus full pytest 1619 passed locally. Next push must be watched again.
+
+## 2026-06-06 — Lagged shadow leaf router result
+- Added non-nested `lagged_shadow_leaf_router:core_warmup4_avg2_val05_mdd12` to monthly-refit runner.
+- Full exact v2 artifact: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_85_asset_lagged_shadow_router_v2_20260606/alpha_zoo_85_asset_lagged_shadow_router_v2_full_20260606.json`.
+- OOS `2025-09-01`→`2026-06-05T12:00:00`, 85/85 symbols, 30m~1d, 10bps, monthly day-1 refit, 2M validation.
+- Best raw/shadow: lagged router `+67.16%` comp, annualized approx `+85.25%`, max bar MDD `27.69%`, monthly equity MDD `2.51%`, Sharpe `1.81`, PF/Omega `23.83`, min OOS `-2.51%`, 4/10 positive folds, no nested material/current OOS selection.
+- Best clean-promotable remains dynamic gate `+34.39%`, max bar MDD `27.69%`, no negative OOS folds; hard-stop still false.
+- Lagged router is post-OOS research/fresh-forward shadow only, not immediate real-money promotion.

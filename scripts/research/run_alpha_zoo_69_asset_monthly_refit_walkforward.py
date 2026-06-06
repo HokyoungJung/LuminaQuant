@@ -770,6 +770,8 @@ _NON_LEAF_PORTFOLIO_FAMILIES = {
     "mdd30_risk_scaled",
     "mdd30_high_vol_gate",
     "dynamic_conviction_switch",
+    "regime_opportunity_leaf_switch",
+    "lagged_shadow_leaf_router",
 }
 
 _NON_LEAF_LABEL_TOKENS = (
@@ -783,6 +785,8 @@ _NON_LEAF_LABEL_TOKENS = (
     "validation_selector:",
     "strict_calm_leaf_selector:",
     "dynamic_conviction_switch:",
+    "regime_opportunity_leaf_switch:",
+    "lagged_shadow_leaf_router:",
 )
 
 _NON_LEAF_PROFILE_KIND_TOKENS = (
@@ -2424,6 +2428,546 @@ def _strict_calm_leaf_selector_candidates(
 
 def _scaled_candidate_returns(candidate: CandidateResult, scale: float) -> pd.Series:
     return candidate.returns.astype(float) * float(scale)
+
+
+def _validation_budget_scale_for_candidate(
+    candidate: CandidateResult,
+    fold: MonthlyFold,
+    *,
+    target_validation_mdd: float,
+    max_scale: float,
+) -> tuple[float, dict[str, dict[str, Any]]]:
+    """Choose a coarse leverage scale from train+validation only.
+
+    This is intentionally a small grid search over risk budgets, not another
+    optimizer.  It never reads the locked OOS month; admissible scales must keep
+    train and validation non-destructive and fit inside the requested validation
+    MDD budget.
+    """
+    best_scale = 0.0
+    best_snapshot = {
+        "train": _period_metrics(candidate.returns * 0.0, fold.train),
+        "validation": _period_metrics(candidate.returns * 0.0, fold.validation),
+    }
+    best_score = -float("inf")
+    for scale in (0.50, 0.75, 1.00, 1.10, 1.25, 1.40, 1.50, 1.75, 2.00, 2.25, 2.50, 2.75, 3.00):
+        if scale > max_scale + 1e-12:
+            continue
+        scaled_returns = candidate.returns * float(scale)
+        train = _period_metrics(scaled_returns, fold.train)
+        validation = _period_metrics(scaled_returns, fold.validation)
+        train_return = _safe_float(train["total_return"])
+        validation_return = _safe_float(validation["total_return"])
+        validation_mdd = _safe_float(validation["mdd"])
+        if train_return <= -0.02 or validation_return < 0.0:
+            continue
+        if validation_mdd > target_validation_mdd + 1e-12:
+            continue
+        score = (
+            validation_return / max(validation_mdd, 0.02)
+            + 0.10 * min(train_return, 2.0)
+            - 0.03 * scale
+        )
+        if score > best_score:
+            best_score = score
+            best_scale = float(scale)
+            best_snapshot = {"train": train, "validation": validation}
+    return best_scale, best_snapshot
+
+
+REGIME_OPPORTUNITY_STRICT_CORE_LABELS: tuple[str, ...] = (
+    "strict_efficiency:balanced_mdd12_gross5_69_asset_efficiency_repair_optuna",
+    "strict_efficiency:growth_mdd20_gross8_69_asset_efficiency_repair_optuna",
+)
+
+REGIME_OPPORTUNITY_RELAXED_LABELS: tuple[str, ...] = (
+    "relaxed_efficiency:balanced_mdd12_gross5_69_asset_relaxed_efficiency_repair_optuna",
+    "relaxed_efficiency:growth_mdd20_gross8_69_asset_relaxed_efficiency_repair_optuna",
+    "relaxed_efficiency:aggressive_mdd30_gross10_69_asset_relaxed_efficiency_repair_optuna",
+)
+
+
+def _regime_opportunity_leaf_switch_candidates(
+    candidates: Sequence[CandidateResult],
+    fold: MonthlyFold,
+) -> list[CandidateResult]:
+    """Strict-core plus relaxed-opportunity switch over leaf strategies only.
+
+    The existing strict dynamic switch avoids bad validation regimes, but it
+    also misses months where relaxed-efficiency leaves have stable train and
+    validation evidence.  This selector keeps the non-nested rule: it can only
+    consume fixed leaf rows, never another hybrid/portfolio/switch.  Because the
+    rule was introduced after reviewing historical OOS behavior, emitted rows
+    are forward-shadow research candidates even though current-fold OOS is not
+    read by the selector.
+    """
+    reference = next((candidate for candidate in candidates if candidate.returns.size), None)
+    if reference is None:
+        return []
+
+    by_label = {candidate.candidate_label: candidate for candidate in candidates}
+
+    def source(label: str) -> CandidateResult | None:
+        candidate = by_label.get(label)
+        if candidate is None or not _clean_source_candidate(candidate):
+            return None
+        return candidate
+
+    strict_pool: list[tuple[CandidateResult, dict[str, float], float]] = []
+    for label in REGIME_OPPORTUNITY_STRICT_CORE_LABELS:
+        candidate = source(label)
+        if candidate is None:
+            continue
+        snap = _candidate_validation_snapshot(candidate, fold)
+        if snap["train_return"] < 0.20:
+            continue
+        if snap["validation_return"] < 0.20:
+            continue
+        if snap["validation_mdd"] > 0.10:
+            continue
+        if snap["train_mdd"] > 0.45:
+            continue
+        if snap["validation_calmar"] < 2.0:
+            continue
+        score = (
+            snap["validation_calmar"]
+            + 0.50 * snap["validation_return"]
+            + 0.10 * min(snap["train_return"], 1.50)
+            - snap["validation_mdd"]
+        )
+        strict_pool.append((candidate, snap, float(score)))
+
+    opportunity_pool: list[tuple[CandidateResult, dict[str, float], float]] = []
+    for label in REGIME_OPPORTUNITY_RELAXED_LABELS:
+        candidate = source(label)
+        if candidate is None:
+            continue
+        snap = _candidate_validation_snapshot(candidate, fold)
+        if snap["train_return"] < 0.20:
+            continue
+        if snap["validation_return"] < 0.08:
+            continue
+        if snap["validation_mdd"] > 0.18:
+            continue
+        if snap["train_mdd"] > 0.45:
+            continue
+        if snap["validation_calmar"] < 0.80:
+            continue
+        validation_to_train = snap["validation_return"] / max(snap["train_return"], 0.01)
+        # The lower bound avoids exhausted train-dominant trends; the upper
+        # bound avoids pure validation spikes that did not exist in train.
+        if validation_to_train < 0.25 or validation_to_train > 1.20:
+            continue
+        label_lower = label.lower()
+        risk_bonus = (
+            0.04 if "balanced" in label_lower else (0.03 if "growth" in label_lower else 0.0)
+        )
+        score = (
+            snap["validation_return"]
+            + 0.20 * min(snap["train_return"], 1.50)
+            + 0.05 * snap["validation_calmar"]
+            - 1.20 * snap["validation_mdd"]
+            - 0.10 * snap["train_mdd"]
+            - 0.30 * abs(validation_to_train - 0.65)
+            + risk_bonus
+        )
+        opportunity_pool.append((candidate, snap, float(score)))
+
+    selected: CandidateResult | None
+    selected_snap: dict[str, float]
+    branch: str
+    branch_score: float
+    if strict_pool:
+        selected, selected_snap, branch_score = max(
+            strict_pool,
+            key=lambda item: (
+                item[2],
+                item[1]["validation_calmar"],
+                item[1]["validation_return"],
+            ),
+        )
+        branch = "strict_core"
+    elif opportunity_pool:
+        selected, selected_snap, branch_score = max(
+            opportunity_pool,
+            key=lambda item: (
+                item[2],
+                item[1]["validation_return"],
+                -item[1]["validation_mdd"],
+            ),
+        )
+        branch = "relaxed_opportunity"
+    else:
+        selected = None
+        selected_snap = {
+            "train_return": 0.0,
+            "validation_return": 0.0,
+            "train_mdd": 0.0,
+            "validation_mdd": 0.0,
+            "validation_calmar": 0.0,
+        }
+        branch = "cash_guard"
+        branch_score = 0.0
+
+    scale_specs: tuple[tuple[str, float, float, float, float], ...] = (
+        ("unscaled", 1.00, 1.00, 1.00, 1.00),
+        ("strict30_relaxed15_cap125", 0.30, 3.00, 0.15, 1.25),
+        ("strict30_relaxed15_cap150", 0.30, 3.00, 0.15, 1.50),
+        ("strict30_relaxed20_cap150", 0.30, 3.00, 0.20, 1.50),
+    )
+
+    out: list[CandidateResult] = []
+    for suffix, strict_target, strict_cap, opportunity_target, opportunity_cap in scale_specs:
+        label = f"regime_opportunity_leaf_switch:{suffix}"
+        if selected is None:
+            returns = pd.Series(0.0, index=reference.returns.index, dtype=float)
+            scale = 0.0
+            scaled_snapshot = {
+                "train": _period_metrics(returns, fold.train),
+                "validation": _period_metrics(returns, fold.validation),
+            }
+            weights: dict[str, float] = {}
+            selected_label = "cash_no_eligible_signal"
+        else:
+            if suffix == "unscaled":
+                scale = 1.0
+                returns = selected.returns.copy()
+                scaled_snapshot = {
+                    "train": _period_metrics(returns, fold.train),
+                    "validation": _period_metrics(returns, fold.validation),
+                }
+            else:
+                target_mdd = strict_target if branch == "strict_core" else opportunity_target
+                max_scale = strict_cap if branch == "strict_core" else opportunity_cap
+                scale, scaled_snapshot = _validation_budget_scale_for_candidate(
+                    selected,
+                    fold,
+                    target_validation_mdd=target_mdd,
+                    max_scale=max_scale,
+                )
+                returns = _scaled_candidate_returns(selected, scale)
+            weights = {selected.candidate_label: float(scale)}
+            selected_label = selected.candidate_label
+
+        row = {
+            "profile_id": label,
+            "profile_kind": "train_validation_regime_opportunity_leaf_switch",
+            "candidate_tier": "post_oos_research_forward_shadow_only",
+            "selected_candidate_label": selected_label,
+            "switch_branch": branch,
+            "switch_score": float(branch_score),
+            "strict_core_pool_labels": [
+                candidate.candidate_label for candidate, _, _ in strict_pool
+            ],
+            "relaxed_opportunity_pool_labels": [
+                candidate.candidate_label for candidate, _, _ in opportunity_pool
+            ],
+            "selection_inputs": ["train", "validation"],
+            "selection_policy": (
+                "strict_core_trigger_else_relaxed_opportunity_ratio_band_no_oos_leaf_only"
+            ),
+            "uses_locked_oos_for_selection": False,
+            "same_month_self_feeding": False,
+            "current_fold_oos_used_for_weighting": False,
+            "post_oos_research_variant": True,
+            "requires_fresh_forward_shadow": True,
+            "ready_for_paper": True,
+            "ready_for_real": False,
+            "real_money_execution": False,
+            "risk_scale": float(scale),
+            "risk_scale_mode": "fixed_branch_validation_mdd_budget"
+            if suffix != "unscaled"
+            else "unscaled",
+            "selected_train_return": selected_snap["train_return"],
+            "selected_validation_return": selected_snap["validation_return"],
+            "selected_train_mdd": selected_snap["train_mdd"],
+            "selected_validation_mdd": selected_snap["validation_mdd"],
+            "selected_validation_calmar": selected_snap["validation_calmar"],
+            "scaled_train_return": _safe_float(scaled_snapshot["train"]["total_return"]),
+            "scaled_validation_return": _safe_float(scaled_snapshot["validation"]["total_return"]),
+            "scaled_train_mdd": _safe_float(scaled_snapshot["train"]["mdd"]),
+            "scaled_validation_mdd": _safe_float(scaled_snapshot["validation"]["mdd"]),
+            "weights": weights,
+            "final_weights": weights,
+        }
+        out.append(
+            _candidate_eval(
+                family="regime_opportunity_leaf_switch",
+                label=label,
+                row=row,
+                returns=returns,
+            )
+        )
+    return out
+
+
+LAGGED_SHADOW_LEAF_ROUTER_LABEL = "lagged_shadow_leaf_router:core_warmup4_avg2_val05_mdd12"
+LAGGED_SHADOW_LEAF_MIN_HISTORY = 4
+LAGGED_SHADOW_LEAF_AVG_WINDOW = 2
+LAGGED_SHADOW_LEAF_MIN_VALIDATION_RETURN = 0.05
+LAGGED_SHADOW_LEAF_MAX_VALIDATION_MDD = 0.12
+LAGGED_SHADOW_LEAF_MAX_TRAIN_MDD = 0.50
+
+
+def _lagged_shadow_leaf_source(candidate: CandidateResult) -> bool:
+    row = dict(candidate.row)
+    return bool(
+        candidate.family in {"strict_efficiency", "relaxed_efficiency"}
+        and candidate.returns.size
+        and _leaf_strategy_material_candidate(candidate)
+        and not row.get("uses_locked_oos_for_selection")
+        and not row.get("same_month_self_feeding")
+        and not row.get("current_fold_oos_used_for_weighting")
+        and not row.get("post_oos_research_variant")
+        and not row.get("requires_fresh_forward_shadow")
+    )
+
+
+def _lagged_shadow_leaf_row_source(row: Mapping[str, Any]) -> bool:
+    label = str(row.get("candidate_label") or "")
+    return bool(
+        row.get("family") in {"strict_efficiency", "relaxed_efficiency"}
+        and bool(row.get("clean_promotion_eligible"))
+        and not _candidate_label_is_non_leaf_reference(label)
+    )
+
+
+def _update_lagged_shadow_leaf_prior_returns(
+    prior_completed_returns: dict[str, list[float]],
+    rows: Sequence[Mapping[str, Any]],
+) -> None:
+    """Record completed fold paper/live returns for future router decisions."""
+    for row in rows:
+        if not _lagged_shadow_leaf_row_source(row):
+            continue
+        label = str(row.get("candidate_label"))
+        prior_completed_returns.setdefault(label, []).append(
+            _safe_float((row.get("locked_oos") or {}).get("total_return"))
+        )
+
+
+def _lagged_shadow_leaf_router_candidates(
+    candidates: Sequence[CandidateResult],
+    fold: MonthlyFold,
+    *,
+    prior_completed_returns: Mapping[str, Sequence[float]],
+    prior_completed_fold_ids: Sequence[str] = (),
+) -> list[CandidateResult]:
+    """Route among strict/relaxed leaves using only lagged shadow returns.
+
+    The router is a live-feasible monitoring layer: it waits for four completed
+    paper/live OOS months, then uses the average of the last two completed
+    returns for each monitored leaf as a lagged confidence score.  Current fold
+    OOS is not read.  Until enough history exists, or when no monitored leaf
+    passes the current train/validation guard, the router falls back to a direct
+    strict-core cash/scale rule equivalent to the existing conservative core.
+    """
+    reference = next((candidate for candidate in candidates if candidate.returns.size), None)
+    if reference is None:
+        return []
+
+    by_label = {candidate.candidate_label: candidate for candidate in candidates}
+
+    def strict_core_branch() -> tuple[CandidateResult | None, pd.Series, dict[str, Any], str]:
+        balanced = by_label.get(
+            "strict_efficiency:balanced_mdd12_gross5_69_asset_efficiency_repair_optuna"
+        )
+        growth = by_label.get(
+            "strict_efficiency:growth_mdd20_gross8_69_asset_efficiency_repair_optuna"
+        )
+        fallback_pool: list[tuple[CandidateResult, dict[str, float]]] = []
+        for candidate in (balanced, growth):
+            if candidate is None or not _lagged_shadow_leaf_source(candidate):
+                continue
+            snap = _candidate_validation_snapshot(candidate, fold)
+            if snap["train_return"] < -0.02 or snap["validation_return"] < -0.02:
+                continue
+            if snap["validation_mdd"] > 0.20:
+                continue
+            fallback_pool.append((candidate, snap))
+
+        selected: CandidateResult | None = None
+        snap: dict[str, float] | None = None
+        if balanced is not None and growth is not None and _lagged_shadow_leaf_source(balanced):
+            balanced_snap = _candidate_validation_snapshot(balanced, fold)
+            if (
+                balanced_snap["train_return"] >= -0.02
+                and balanced_snap["validation_return"] >= -0.02
+                and balanced_snap["validation_mdd"] <= 0.20
+            ):
+                selected = growth if balanced_snap["validation_mdd"] > 0.10 else balanced
+                if selected is not None and _lagged_shadow_leaf_source(selected):
+                    snap = _candidate_validation_snapshot(selected, fold)
+        if selected is None and fallback_pool:
+            selected, snap = max(
+                fallback_pool,
+                key=lambda item: (
+                    item[1]["validation_return"] / max(item[1]["validation_mdd"], 0.02),
+                    item[1]["validation_return"],
+                ),
+            )
+
+        if selected is None or snap is None:
+            cash_returns = pd.Series(0.0, index=reference.returns.index, dtype=float)
+            return (
+                None,
+                cash_returns,
+                {
+                    "selected_candidate_label": "cash_no_strict_core_leaf",
+                    "router_branch": "strict_core_cash",
+                    "risk_scale": 0.0,
+                    "risk_scale_mode": "strict_core_cash_guard",
+                    "weights": {},
+                    "final_weights": {},
+                },
+                "strict_core_cash",
+            )
+
+        validation_calmar = snap["validation_return"] / max(snap["validation_mdd"], 0.01)
+        gate_pass = snap["validation_return"] >= 0.02 and validation_calmar >= 0.80
+        if not gate_pass:
+            cash_returns = pd.Series(0.0, index=selected.returns.index, dtype=float)
+            return (
+                None,
+                cash_returns,
+                {
+                    "selected_candidate_label": "cash_strict_core_validation_strength_guard",
+                    "cash_guard_source_candidate_label": selected.candidate_label,
+                    "router_branch": "strict_core_cash",
+                    "selected_validation_return": snap["validation_return"],
+                    "selected_validation_mdd": snap["validation_mdd"],
+                    "selected_validation_calmar": validation_calmar,
+                    "risk_scale": 0.0,
+                    "risk_scale_mode": "strict_core_cash_guard",
+                    "weights": {},
+                    "final_weights": {},
+                },
+                "strict_core_cash",
+            )
+
+        scale, scaled_snapshot = _validation_budget_scale_for_candidate(
+            selected,
+            fold,
+            target_validation_mdd=0.30,
+            max_scale=3.00,
+        )
+        returns = _scaled_candidate_returns(selected, scale)
+        return (
+            selected,
+            returns,
+            {
+                "selected_candidate_label": selected.candidate_label,
+                "router_branch": "strict_core_scaled",
+                "selected_validation_return": snap["validation_return"],
+                "selected_validation_mdd": snap["validation_mdd"],
+                "selected_validation_calmar": validation_calmar,
+                "risk_scale": float(scale),
+                "risk_scale_mode": "strict_core_validation_mdd30_cap3",
+                "scaled_validation_return": _safe_float(
+                    scaled_snapshot["validation"]["total_return"]
+                ),
+                "scaled_validation_mdd": _safe_float(scaled_snapshot["validation"]["mdd"]),
+                "weights": {selected.candidate_label: float(scale)},
+                "final_weights": {selected.candidate_label: float(scale)},
+            },
+            "strict_core_scaled",
+        )
+
+    online_pool: list[tuple[float, float, CandidateResult, dict[str, float], list[float]]] = []
+    for candidate in candidates:
+        if not _lagged_shadow_leaf_source(candidate):
+            continue
+        history = list(prior_completed_returns.get(candidate.candidate_label) or [])
+        if len(history) < LAGGED_SHADOW_LEAF_MIN_HISTORY:
+            continue
+        snap = _candidate_validation_snapshot(candidate, fold)
+        if snap["train_return"] < -0.02:
+            continue
+        if snap["train_mdd"] > LAGGED_SHADOW_LEAF_MAX_TRAIN_MDD:
+            continue
+        if snap["validation_return"] < LAGGED_SHADOW_LEAF_MIN_VALIDATION_RETURN:
+            continue
+        if snap["validation_mdd"] > LAGGED_SHADOW_LEAF_MAX_VALIDATION_MDD:
+            continue
+        lagged_window = history[-LAGGED_SHADOW_LEAF_AVG_WINDOW:]
+        lagged_score = float(sum(lagged_window) / len(lagged_window))
+        validation_score = (
+            snap["validation_return"] / max(snap["validation_mdd"], 0.02)
+            + 0.03 * min(snap["train_return"], 1.50)
+            - 0.10 * snap["train_mdd"]
+        )
+        online_pool.append((lagged_score, float(validation_score), candidate, snap, history))
+
+    selected: CandidateResult | None
+    returns: pd.Series
+    row_extra: dict[str, Any]
+    branch: str
+    if online_pool:
+        lagged_score, validation_score, selected, snap, history = max(
+            online_pool,
+            key=lambda item: (item[0], item[1], item[3]["validation_return"]),
+        )
+        returns = selected.returns.copy()
+        branch = "lagged_shadow_leaf"
+        row_extra = {
+            "selected_candidate_label": selected.candidate_label,
+            "router_branch": branch,
+            "lagged_shadow_score": float(lagged_score),
+            "lagged_shadow_validation_score": float(validation_score),
+            "lagged_shadow_history_count": len(history),
+            "lagged_shadow_history_tail": [
+                float(item) for item in history[-LAGGED_SHADOW_LEAF_AVG_WINDOW:]
+            ],
+            "selected_train_return": snap["train_return"],
+            "selected_train_mdd": snap["train_mdd"],
+            "selected_validation_return": snap["validation_return"],
+            "selected_validation_mdd": snap["validation_mdd"],
+            "selected_validation_calmar": snap["validation_calmar"],
+            "risk_scale": 1.0,
+            "risk_scale_mode": "unscaled_lagged_shadow_leaf",
+            "weights": {selected.candidate_label: 1.0},
+            "final_weights": {selected.candidate_label: 1.0},
+        }
+    else:
+        selected, returns, row_extra, branch = strict_core_branch()
+
+    update_cutoff_fold = prior_completed_fold_ids[-1] if prior_completed_fold_ids else None
+    row = {
+        "profile_id": LAGGED_SHADOW_LEAF_ROUTER_LABEL,
+        "profile_kind": "lagged_shadow_leaf_router",
+        "candidate_tier": "post_oos_research_forward_shadow_only",
+        "selection_inputs": ["train", "validation", "lagged_completed_shadow_oos"],
+        "selection_policy": (
+            "warmup4_then_avg2_lagged_shadow_return_leaf_router_"
+            "val_return05_val_mdd12_no_current_oos"
+        ),
+        "lagged_shadow_min_history": LAGGED_SHADOW_LEAF_MIN_HISTORY,
+        "lagged_shadow_avg_window": LAGGED_SHADOW_LEAF_AVG_WINDOW,
+        "lagged_shadow_min_validation_return": LAGGED_SHADOW_LEAF_MIN_VALIDATION_RETURN,
+        "lagged_shadow_max_validation_mdd": LAGGED_SHADOW_LEAF_MAX_VALIDATION_MDD,
+        "lagged_shadow_max_train_mdd": LAGGED_SHADOW_LEAF_MAX_TRAIN_MDD,
+        "lagged_shadow_completed_fold_count": len(prior_completed_fold_ids),
+        "lagged_shadow_completed_fold_tail": list(prior_completed_fold_ids[-4:]),
+        "router_branch": branch,
+        "online_update_cutoff_fold": update_cutoff_fold,
+        "uses_locked_oos_for_selection": False,
+        "same_month_self_feeding": False,
+        "current_fold_oos_used_for_weighting": False,
+        "post_oos_research_variant": True,
+        "requires_fresh_forward_shadow": True,
+        "ready_for_paper": True,
+        "ready_for_real": False,
+        "real_money_execution": False,
+        **row_extra,
+    }
+    return [
+        _candidate_eval(
+            family="lagged_shadow_leaf_router",
+            label=LAGGED_SHADOW_LEAF_ROUTER_LABEL,
+            row=row,
+            returns=returns,
+        )
+    ]
 
 
 def _scale_candidate_row(
@@ -4221,6 +4765,7 @@ def _evaluate_candidate(candidate: CandidateResult, fold: MonthlyFold) -> dict[s
         "candidate_tier": row.get("candidate_tier"),
         "selection_reasons": row.get("selection_reasons") or [],
         "selection_inputs": row.get("selection_inputs") or ["train", "validation"],
+        "selection_policy": row.get("selection_policy"),
         "uses_locked_oos_for_selection": uses_locked_oos_for_selection,
         "post_oos_research_variant": post_oos_research_variant,
         "requires_fresh_forward_shadow": requires_fresh_forward_shadow,
@@ -4231,9 +4776,37 @@ def _evaluate_candidate(candidate: CandidateResult, fold: MonthlyFold) -> dict[s
         and not source_post_oos_research_variant
         and not nested_hybrid_dependency,
         "ready_for_paper": bool(row.get("ready_for_paper") or row.get("paper_testnet_candidate")),
+        "ready_for_real": bool(row.get("ready_for_real", False)),
+        "real_money_execution": bool(row.get("real_money_execution", False)),
         "selected_candidate_label": row.get("selected_candidate_label"),
         "aggressive_candidate_label": row.get("aggressive_candidate_label"),
         "fallback_candidate_label": row.get("fallback_candidate_label"),
+        "cash_guard_source_candidate_label": row.get("cash_guard_source_candidate_label"),
+        "switch_branch": row.get("switch_branch"),
+        "switch_score": row.get("switch_score"),
+        "router_branch": row.get("router_branch"),
+        "risk_scale": row.get("risk_scale"),
+        "risk_scale_mode": row.get("risk_scale_mode"),
+        "selected_train_return": row.get("selected_train_return"),
+        "selected_train_mdd": row.get("selected_train_mdd"),
+        "selected_validation_return": row.get("selected_validation_return"),
+        "selected_validation_mdd": row.get("selected_validation_mdd"),
+        "selected_validation_calmar": row.get("selected_validation_calmar"),
+        "scaled_train_return": row.get("scaled_train_return"),
+        "scaled_train_mdd": row.get("scaled_train_mdd"),
+        "scaled_validation_return": row.get("scaled_validation_return"),
+        "scaled_validation_mdd": row.get("scaled_validation_mdd"),
+        "lagged_shadow_score": row.get("lagged_shadow_score"),
+        "lagged_shadow_validation_score": row.get("lagged_shadow_validation_score"),
+        "lagged_shadow_history_count": row.get("lagged_shadow_history_count"),
+        "lagged_shadow_history_tail": row.get("lagged_shadow_history_tail") or [],
+        "lagged_shadow_min_history": row.get("lagged_shadow_min_history"),
+        "lagged_shadow_avg_window": row.get("lagged_shadow_avg_window"),
+        "lagged_shadow_min_validation_return": row.get("lagged_shadow_min_validation_return"),
+        "lagged_shadow_max_validation_mdd": row.get("lagged_shadow_max_validation_mdd"),
+        "lagged_shadow_max_train_mdd": row.get("lagged_shadow_max_train_mdd"),
+        "lagged_shadow_completed_fold_count": row.get("lagged_shadow_completed_fold_count"),
+        "lagged_shadow_completed_fold_tail": row.get("lagged_shadow_completed_fold_tail") or [],
         "dynamic_expert_label": row.get("dynamic_expert_label"),
         "dynamic_expert_used_as": row.get("dynamic_expert_used_as"),
         "same_month_self_feeding": bool(row.get("same_month_self_feeding", False)),
@@ -4900,6 +5473,8 @@ def run_walkforward(args: argparse.Namespace) -> dict[str, Any]:
     _write_json(output_json, payload)
     output_md.write_text(_render_markdown(payload), "utf-8")
     bridge_prior_completed_utilities: dict[str, list[float]] = {}
+    lagged_shadow_leaf_prior_returns: dict[str, list[float]] = {}
+    lagged_shadow_leaf_completed_folds: list[str] = []
 
     for fold_idx, fold in enumerate(folds, start=1):
         fold_seed = int(args.seed) + fold_idx * 1_000_000
@@ -4997,6 +5572,24 @@ def run_walkforward(args: argparse.Namespace) -> dict[str, Any]:
             all_candidates.extend(strict_calm_leaf_selector_candidates)
         else:
             strict_calm_leaf_selector_candidates = []
+        if "regime_opportunity_leaf_switch" in args.families:
+            regime_opportunity_leaf_switch_candidates = _regime_opportunity_leaf_switch_candidates(
+                all_candidates,
+                fold,
+            )
+            all_candidates.extend(regime_opportunity_leaf_switch_candidates)
+        else:
+            regime_opportunity_leaf_switch_candidates = []
+        if "lagged_shadow_leaf_router" in args.families:
+            lagged_shadow_leaf_router_candidates = _lagged_shadow_leaf_router_candidates(
+                all_candidates,
+                fold,
+                prior_completed_returns=lagged_shadow_leaf_prior_returns,
+                prior_completed_fold_ids=lagged_shadow_leaf_completed_folds,
+            )
+            all_candidates.extend(lagged_shadow_leaf_router_candidates)
+        else:
+            lagged_shadow_leaf_router_candidates = []
         meta_candidates = _meta_portfolio_candidates(all_candidates, fold)
         all_candidates.extend(meta_candidates)
         cross_hybrid_candidates = _cross_candidate_hybrid_candidates(
@@ -5034,6 +5627,8 @@ def run_walkforward(args: argparse.Namespace) -> dict[str, Any]:
         all_candidates.extend(bridge_candidates)
         rows = [_evaluate_candidate(candidate, fold) for candidate in all_candidates]
         fold_candidate_rows.extend(rows)
+        _update_lagged_shadow_leaf_prior_returns(lagged_shadow_leaf_prior_returns, rows)
+        lagged_shadow_leaf_completed_folds.append(fold.fold_id)
         _update_bridge_prior_utilities(bridge_prior_completed_utilities, rows)
         best_fold = max(rows, key=lambda row: _safe_float(row["locked_oos"]["total_return"]))
         fold_summary = {
@@ -5054,6 +5649,8 @@ def run_walkforward(args: argparse.Namespace) -> dict[str, Any]:
             "asset_timeframe_leverage_count": len(asset_tf_leverage_candidates),
             "teacher_leaf_blend_count": len(teacher_leaf_blend_candidates),
             "strict_calm_leaf_selector_count": len(strict_calm_leaf_selector_candidates),
+            "regime_opportunity_leaf_switch_count": len(regime_opportunity_leaf_switch_candidates),
+            "lagged_shadow_leaf_router_count": len(lagged_shadow_leaf_router_candidates),
             "meta_portfolio_candidate_count": len(meta_candidates),
             "cross_candidate_hybrid_count": len(cross_hybrid_candidates),
             "dynamic_conviction_switch_count": len(dynamic_switch_candidates),
@@ -5120,12 +5717,14 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=(
             "profile_optuna,individual_robust,asset_timeframe_leverage,"
             "strict_efficiency,relaxed_efficiency,teacher_leaf_blend,"
-            "strict_calm_leaf_selector"
+            "strict_calm_leaf_selector,regime_opportunity_leaf_switch,"
+            "lagged_shadow_leaf_router"
         ),
         help=(
             "Comma-separated families. profile_optuna is always included; optional: "
             "individual_robust, asset_timeframe_leverage, strict_efficiency, "
-            "relaxed_efficiency, teacher_leaf_blend, strict_calm_leaf_selector."
+            "relaxed_efficiency, teacher_leaf_blend, strict_calm_leaf_selector, "
+            "regime_opportunity_leaf_switch, lagged_shadow_leaf_router."
         ),
     )
     parser.add_argument("--bridge-protocol-manifest", default=str(DEFAULT_BRIDGE_PROTOCOL_MANIFEST))

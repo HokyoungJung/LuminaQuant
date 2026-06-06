@@ -433,6 +433,74 @@ def test_dynamic_conviction_switch_keeps_scaled_gate_cash_folds_when_gate_fails(
     assert all(candidate.row["target_validation_mdd"] == 0.30 for candidate in mdd30_scaled_cash)
 
 
+def test_lagged_shadow_leaf_router_uses_only_prior_completed_oos_and_leaf_sources() -> None:
+    index = pd.date_range("2025-01-01", "2025-03-31", freq="1D")
+    fold = module.MonthlyFold(
+        fold_id="2025-03",
+        refit_at=pd.Timestamp("2025-03-01"),
+        train=(pd.Timestamp("2025-01-01"), pd.Timestamp("2025-01-31")),
+        validation=(pd.Timestamp("2025-02-01"), pd.Timestamp("2025-02-28")),
+        locked_oos=(pd.Timestamp("2025-03-01"), pd.Timestamp("2025-03-31")),
+    )
+    relaxed_label = (
+        "relaxed_efficiency:growth_mdd20_gross8_69_asset_relaxed_efficiency_repair_optuna"
+    )
+    strict_label = "strict_efficiency:balanced_mdd12_gross5_69_asset_efficiency_repair_optuna"
+    relaxed_prior_winner_bad_current_oos = pd.Series(0.003, index=index, dtype=float)
+    relaxed_prior_winner_bad_current_oos.loc["2025-03-01":"2025-03-31"] = -0.020
+    strict_current_oos_winner = pd.Series(0.002, index=index, dtype=float)
+    strict_current_oos_winner.loc["2025-03-01":"2025-03-31"] = 0.020
+    nested = pd.Series(0.050, index=index, dtype=float)
+    candidates = [
+        module.CandidateResult(
+            family="relaxed_efficiency",
+            candidate_label=relaxed_label,
+            source_profile_id=relaxed_label,
+            row={"selection_reasons": [], "uses_locked_oos_for_selection": False},
+            returns=relaxed_prior_winner_bad_current_oos,
+        ),
+        module.CandidateResult(
+            family="strict_efficiency",
+            candidate_label=strict_label,
+            source_profile_id=strict_label,
+            row={"selection_reasons": [], "uses_locked_oos_for_selection": False},
+            returns=strict_current_oos_winner,
+        ),
+        module.CandidateResult(
+            family="dynamic_conviction_switch",
+            candidate_label="dynamic_conviction_switch:t0.90_risk_capped_fallback",
+            source_profile_id="nested_selector",
+            row={"selection_reasons": [], "uses_locked_oos_for_selection": False},
+            returns=nested,
+        ),
+    ]
+
+    routed = module._lagged_shadow_leaf_router_candidates(
+        candidates,
+        fold,
+        prior_completed_returns={
+            relaxed_label: [0.00, -0.01, 0.12, 0.10],
+            strict_label: [0.03, 0.02, 0.01, 0.00],
+        },
+        prior_completed_fold_ids=("2024-11", "2024-12", "2025-01", "2025-02"),
+    )
+    row = module._evaluate_candidate(routed[0], fold)
+
+    assert row["candidate_label"] == module.LAGGED_SHADOW_LEAF_ROUTER_LABEL
+    assert row["selected_candidate_label"] == relaxed_label
+    assert row["router_branch"] == "lagged_shadow_leaf"
+    assert row["online_update_cutoff_fold"] == "2025-02"
+    assert row["lagged_shadow_history_tail"] == [0.12, 0.10]
+    assert row["uses_locked_oos_for_selection"] is False
+    assert row["current_fold_oos_used_for_weighting"] is False
+    assert row["clean_promotion_eligible"] is False
+    assert row["nested_hybrid_dependency"] is False
+    assert "dynamic_conviction_switch:t0.90_risk_capped_fallback" not in row["final_weights"]
+    # Current OOS is deliberately worse than the strict leaf, proving the
+    # router did not choose by same-month locked OOS.
+    assert row["locked_oos"]["total_return"] < 0.0
+
+
 def test_dynamic_aware_hybrid_is_disabled_for_nested_hybrid_materials(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

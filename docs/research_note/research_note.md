@@ -1790,3 +1790,67 @@ Top candidate: `dynamic_conviction_switch:t0.85_risk_capped_fallback_val_mdd20_s
 - Audits in final artifact: metric reconciliation passed, dynamic self-feed audit passed, online weight audit passed.
 - `uv run ruff check scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py tests/test_alpha_zoo_69_asset_monthly_refit_walkforward.py` — passed during implementation.
 - `uv run pytest tests/test_alpha_zoo_69_asset_monthly_refit_walkforward.py::test_dynamic_conviction_switch_emits_fallback_when_aggressive_pool_missing -q` — passed during implementation.
+
+---
+
+## 2026-06-06 KST — Non-nested lagged shadow leaf router, 성능 상향 재평가
+
+사용자 피드백은 “nested를 제거한 뒤 OOS comp가 너무 낮다. 그러나 OOS는 clean해야 하고, hybrid 안에 hybrid를 넣지 말라”였다. 이번 패스의 결론은 다음과 같다.
+
+1. 단순히 relaxed leaf를 validation 성과로 더 공격적으로 여는 `regime_opportunity_leaf_switch`는 실패했다. 최고 변형도 `+33.94%` comp에 그쳤고, `2025-09`와 `2025-12`에서 validation trap을 밟아 각각 큰 손실을 냈다. 따라서 이 family는 diagnostic/shadow negative control로만 둔다.
+2. 성능을 실제로 끌어올린 후보는 `lagged_shadow_leaf_router:core_warmup4_avg2_val05_mdd12`다. 이 후보는 hybrid를 재료로 쓰지 않는다. 후보 pool은 `strict_efficiency`/`relaxed_efficiency` leaf만 사용하고, 현재 fold OOS를 선택/weighting에 쓰지 않는다.
+3. 다만 이 router 자체는 과거 OOS 리뷰 후 설계된 `post_oos_research_variant`이므로, 같은 historical window에서는 clean promotion 대상이 아니다. “기계적으로 current-fold OOS-free”이지만 “즉시 real 승격 가능한 clean protocol”은 아니다. fresh-forward shadow가 필요하다.
+
+### Final rerun artifact
+
+- JSON: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_85_asset_lagged_shadow_router_v2_20260606/alpha_zoo_85_asset_lagged_shadow_router_v2_full_20260606.json`
+- Markdown: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_85_asset_lagged_shadow_router_v2_20260606/alpha_zoo_85_asset_lagged_shadow_router_v2_full_20260606.md`
+- Universe/timeframes: `85/85` symbols loaded, `30m,1h,2h,4h,6h,8h,12h,1d`.
+- Data end: `2026-06-05T12:00:00` UTC.
+- OOS schedule: 10 folds, `2025-09-01T00:00:00` → `2026-06-05T12:00:00`, monthly day-1 refit, 2M validation, 10bps.
+- Full rerun: `34:42.20`, peak RSS `1474.02 MiB`; metric reconciliation passed with `candidate_count=144` and no mismatches.
+
+### Aggregate comparison
+
+| Candidate | Clean promotion | Why non-clean if any | OOS comp | Ann approx | Max bar MDD | Monthly eq MDD | Sharpe | PF/Omega | Hit | Min OOS | Latest OOS | Nested material | Current OOS used |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |
+| `lagged_shadow_leaf_router:core_warmup4_avg2_val05_mdd12` | False | `post_oos_research_variant`, `requires_fresh_forward_shadow` | `67.16%` | `85.25%` | `27.69%` | `2.51%` | `1.81` | `23.83/23.83` | `4/10` | `-2.51%` | `0.00%` | False | False |
+| `dynamic_conviction_switch:t0.85_risk_capped_fallback_val_ret02_calmar80_gate_val_mdd30_scaled` | True | — | `34.39%` | `42.57%` | `27.69%` | `0.00%` | `1.12` | `∞/∞` sample | `3/10` | `0.00%` | `0.00%` | False | False |
+| `regime_opportunity_leaf_switch:strict30_relaxed15_cap150` | False | `post_oos_research_variant`, `requires_fresh_forward_shadow` | `33.94%` | `42.00%` | `29.13%` | `14.02%` | `0.90` | `2.25/2.25` | `4/10` | `-17.00%` | `-0.18%` | False | False |
+
+### Lagged router mechanics
+
+- Warmup: at least 4 completed paper/OOS months per leaf.
+- Source universe: strict/relaxed leaf rows only; no `hybrid_v3_5`, `hybrid_v3_6`, `dynamic_conviction_switch`, `validation_selector`, `meta_portfolio`, `bridge`, or nested portfolio material.
+- Monthly rule after warmup: among leaves that pass current train/validation guards (`validation_return >= 5%`, `validation_mdd <= 12%`, `train_mdd <= 50%`), rank by the average of the last 2 completed shadow/OOS returns. The current month OOS is not available at selection time.
+- Fallback before warmup or with no eligible lagged leaf: direct strict-core/cash guard, using train/validation only.
+- The runner now records `router_branch`, lagged history tail, completed-fold cutoff, and scale metadata in fold rows so future audit can confirm no same-month self-feed.
+
+### Fold-level result
+
+| Fold | OOS window | Router cutoff | Branch | Selected leaf / cash | Val return | OOS return | OOS MDD |
+| --- | --- | --- | --- | --- | ---: | ---: | ---: |
+| `2025-09` | `2025-09-01` → `2025-09-30` | — | strict-core cash | cash guard | `0.00%` | `0.00%` | `0.00%` |
+| `2025-10` | `2025-10-01` → `2025-10-31` | `2025-09` | strict-core cash | cash guard | `0.00%` | `0.00%` | `0.00%` |
+| `2025-11` | `2025-11-01` → `2025-11-30` | `2025-10` | strict-core scaled | strict balanced leaf | `85.56%` | `33.48%` | `27.69%` |
+| `2025-12` | `2025-12-01` → `2025-12-31` | `2025-11` | strict-core cash | cash guard | `0.00%` | `0.00%` | `0.00%` |
+| `2026-01` | `2026-01-01` → `2026-01-31` | `2025-12` | lagged shadow leaf | strict growth leaf | `11.19%` | `10.55%` | `4.73%` |
+| `2026-02` | `2026-02-01` → `2026-02-28` | `2026-01` | lagged shadow leaf | relaxed growth leaf | `15.45%` | `3.28%` | `7.87%` |
+| `2026-03` | `2026-03-01` → `2026-03-31` | `2026-02` | lagged shadow leaf | relaxed growth leaf | `10.74%` | `-2.51%` | `5.16%` |
+| `2026-04` | `2026-04-01` → `2026-04-30` | `2026-03` | strict-core cash | cash guard | `0.00%` | `0.00%` | `0.00%` |
+| `2026-05` | `2026-05-01` → `2026-05-31` | `2026-04` | lagged shadow leaf | relaxed balanced leaf | `45.43%` | `12.51%` | `20.26%` |
+| `2026-06` | `2026-06-01` → `2026-06-05` | `2026-05` | lagged shadow leaf | relaxed balanced leaf | `5.64%` | `0.00%` | `0.00%` |
+
+### Recommendation
+
+- 현 시점 real-money 승격 후보는 여전히 없다. Hard-stop은 historical challenger `+53.38%` comp / `18.8%` MDD 대비 `lagged_shadow_leaf_router`가 return은 이기지만 MDD와 fresh-forward 조건을 통과하지 못해 false다.
+- 그래도 “성능이 너무 낮다”는 문제에 대한 가장 합리적인 개선 경로는 이 router다. 기존 clean-promotable dynamic은 baseline/paper-safe conservative track으로 유지하고, lagged router는 85-symbol monitor에서 fresh-forward shadow로 굴린다.
+- 실제 운용 후보가 되려면 2026-06-05 이후 새 월간 forward에서 최소 1~2개월 이상 같은 선택 규칙으로 관찰하고, 가능하면 4개월 이상 lagged telemetry가 쌓인 뒤에만 소액/테스트넷 승격을 검토한다.
+- nested hybrid 재도입은 금지한다. 겉으로 comp가 높아 보여도 같은 sleeve/factor를 두 번 사는 노출 중복과 OOS-review contamination 리스크가 더 크다.
+
+### Validation evidence
+
+- Full exact rerun: exit `0`, `34:42.20`, peak RSS `1474.02 MiB`.
+- Artifact audits: `metric_reconciliation.metrics_reconciled=true`, `nested_hybrid_dependency=false`, `uses_locked_oos_for_selection=false` for both top router and current clean dynamic.
+- `uv run ruff check scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py tests/test_alpha_zoo_69_asset_monthly_refit_walkforward.py` — passed.
+- `uv run pytest tests/test_alpha_zoo_69_asset_monthly_refit_walkforward.py -q` — `38 passed`.
