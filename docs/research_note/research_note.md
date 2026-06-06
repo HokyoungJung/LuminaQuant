@@ -1,5 +1,49 @@
 # Research Note
 
+## 2026-06-06 KST — 최신 85-symbol non-nested 결과 문제점/리스크 분석
+
+이번 업데이트는 새 전략 rerun이 아니라, 직전 최신 artifact를 기준으로 “왜 아직 실전 승격이 어렵고 어디가 취약한가”를 명시한 리스크 리뷰다. 근거 artifact는 `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_85_asset_non_nested_augmented_selectors_latest_20260606/alpha_zoo_85_asset_non_nested_augmented_selectors_latest_20260606.json|md`이며, source full rerun은 `alpha_zoo_85_asset_lagged_shadow_router_scaled_latest_20260606`다.
+
+### Evidence snapshot
+
+- Protocol: 월 1일 refit, expanding train + 직전 2개월 validation, 다음 1개월 locked OOS, `30m,1h,2h,4h,6h,8h,12h,1d`, 10bps round-trip cost proxy.
+- OOS window: `2025-09-01T00:00:00` → `2026-06-06T08:30:00` UTC. `2026-06` fold는 부분 월이다.
+- Universe/data: 85/85 symbols loaded, missing 0, 하지만 fold-local train-eligible feature support는 29 symbols이고 신규/짧은 TradFi 56 symbols는 대부분 monitor/backfill 상태다.
+- Audit: `metric_reconciliation.metrics_reconciled=true`, candidate 152, clean 123, demoted 29, locked-OOS selection row 0, nested row 0, dynamic self-feed violation 0, online lagged-weight violation 0.
+- Runtime: full exact rerun `31:37.96`, peak RSS 약 `1.52 GiB`; row-level selector 재집계는 `0:08.45`, peak RSS 약 `205 MiB`.
+
+### 최신 성과와 판단
+
+| Track | Candidate | Status | OOS comp | Ann approx | Max bar MDD | Sharpe | PF/Omega | Hit | 핵심 판단 |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| Best raw/shadow | `lagged_shadow_leaf_router:core_warmup4_avg2_val05_mdd12_lag_val_mdd20_cap150` | non-clean shadow | `61.40%` | `77.62%` | `29.13%` | `1.61` | `8.55/8.55` | `4/10` | 현재-fold OOS를 선택에 쓰지는 않았지만 post-OOS 설계라 fresh-forward 필요 |
+| Lower-MDD shadow | `lagged_shadow_leaf_router:core_warmup4_avg2_val05_mdd12_lag_val_mdd20_cap140` | non-clean shadow | `59.99%` | `75.76%` | `27.69%` | `1.60` | `8.70/8.70` | `4/10` | cap150보다 MDD가 낮지만 같은 fresh-forward 제약 |
+| Best clean mechanics | `dynamic_conviction_switch:t0.85_risk_capped_fallback_val_ret02_calmar80_gate_val_mdd30_scaled` | clean, hard-stop false | `34.39%` | `42.57%` | `27.69%` | `1.12` | `∞/∞` sample | `3/10` | 기계적으로 clean이나 실전 승격 성능/안정성 부족 |
+| Lower-MDD clean leaf | `strict_efficiency:aggressive_mdd30_gross10_69_asset_efficiency_repair_optuna` | clean, partial fold count | `32.74%` | `45.88%` | `14.77%` | `0.84` | `2.95/2.95` | `4/9` | MDD는 낮지만 9 folds, min month `-14.22%`, 단독 robust 부족 |
+
+### Ranked problem synthesis
+
+1. **Clean 후보의 절대 성능이 아직 실전 기준에 못 미친다.** Best clean은 `+34.39%` comp지만 max bar MDD가 `27.69%`이고 hard-stop은 false다. 현재 hard-stop 비교 기준은 historical challenger `+53.38%` comp / `18.8%` MDD, robust-default `+27.01%` comp / `15%` MDD limit이므로, return은 challenger보다 낮고 risk는 robust-default보다 높다.
+2. **가장 좋아 보이는 `+61.40%` 성과는 clean promotion 성과가 아니다.** Lagged shadow router는 source leaf만 쓰고 current-fold OOS를 선택에 쓰지 않는 구조지만, 이 family 자체가 기존 OOS 리뷰 이후 설계된 `post_oos_research_variant` / `requires_fresh_forward_shadow`다. 같은 historical OOS window에서 바로 real 후보로 승격하면 OOS-mining 리스크가 크다.
+3. **월별 분포가 넓게 안정적이지 않다.** Shadow router는 `4/10` positive folds이고 median OOS가 `0%`다. Best clean dynamic은 `3/10` positive folds이며 7개 fold는 cash/no-position에 가깝다. 즉 headline comp는 일부 강한 월에 크게 의존하고, “항상 골고루 이기는” 형태는 아니다. `∞` Sortino/PF도 손실 월이 없는 작은 표본/cash-gate의 산물이지 무한 edge라는 뜻이 아니다.
+4. **85-symbol 확장은 아직 성과 원천이라기보다 모니터링 레이어다.** 모든 symbol bar는 loaded됐지만 train-eligible은 29개뿐이다. 새 TradFi/프리마켓 symbol 다수는 2026년 4~6월 상장/지원 시작이라 train+validation history가 부족하며, 지금 강제로 넣으면 look-ahead 또는 validation-only sleeve 문제가 재발할 수 있다.
+5. **June 2026 성과는 부분 월이다.** 최신 OOS는 `2026-06-06T08:30:00`까지만 반영된다. 특히 shadow top의 latest OOS `-3.34%`는 월말 확정치가 아니므로, 좋은 쪽/나쁜 쪽 모두 과해석하면 안 된다.
+6. **실전 비용/체결 리스크는 아직 proxy 수준이다.** Backtest는 10bps fixed round-trip cost를 강제하고, symbol simulation은 진입/청산 transition에 각각 half cost를 부과한다. 그러나 실제 Binance futures/TradFi perp의 funding, spread, partial fill, latency, reject/reconcile, session-liquidity 차이는 아직 이 artifact가 증명하지 않는다. Paper fill telemetry와 BBO/slippage guard 통과 전 real-money는 계속 blocked다.
+7. **MDD 30% 허용만으로는 clean하지 않다.** Shadow top은 max bar MDD `29.13%`로 한계에 가까우며, bar-level MDD가 live liquidation/margin/portfolio-level intraday gap risk를 완전히 대변하지 않는다. Gross/leverage, per-symbol concentration, stop/fail-closed execution guard가 별도로 필요하다.
+8. **평가 속도는 개선됐지만 full search는 여전히 무겁다.** Full exact rerun은 약 31분이 걸렸고, row-level replay는 8초다. 병목은 새 후보를 전부 다시 만드는 full evaluation이며, 향후 월간 운영에서는 per-symbol/timeframe candidate return cache, fold-level immutable row store, incremental latest-fold replay, family별 Optuna stage cache가 필요하다.
+9. **Nested/calendar 문제는 현재 통과했지만 유지보수 리스크가 있다.** 최신 artifact에서는 nested row와 locked-OOS selection row가 0이고 calendar-primary 계열도 promotion path에서 제외됐다. 다만 hybrid-as-hybrid를 다시 넣거나 post-hoc selector를 clean으로 오표기하면 같은 문제가 재발하므로, 관련 tests와 demotion flag를 절대 완화하면 안 된다.
+
+### Operating recommendation
+
+- **Real-money 승격:** 아직 금지. 현재 증거는 paper/shadow까지만 충분하다.
+- **Paper baseline:** clean mechanics 후보 `dynamic_conviction_switch:t0.85_risk_capped_fallback_val_ret02_calmar80_gate_val_mdd30_scaled`를 conservative baseline으로 유지하되, “cash가 많은 방어형 selector”로 해석한다.
+- **Return shadow:** `lagged_shadow_leaf_router` cap140/cap150은 non-nested이고 current-fold OOS-free이므로 shadow monitoring에는 가치가 있다. 하지만 2026-06-06 이후 fresh-forward 월별 결과가 쌓이기 전에는 deployable clean으로 부르지 않는다.
+- **Fresh-forward gate:** 최소 1~2개 신규 월, 가능하면 4개 월간 refit을 같은 frozen rule로 관찰한다. 새 월에서 OOS comp/MDD/Sharpe가 현 historical shadow와 크게 괴리되면 router를 demote한다.
+- **TradFi 확장:** 85 symbols는 계속 수집/모니터링한다. 신규 symbol은 train+2M validation이 충분해질 때까지 feature support에는 자동 편입하되, validation-only 편입은 금지한다.
+- **Execution gate:** paper/testnet에서 realized all-in round-trip cost mean ≤10bps, p95 ≤15bps, BBO spread/slippage guard pass, no unexplained reconciliation gap을 먼저 확인한다.
+- **Optimization gate:** 앞으로 성능 개선은 같은 OOS window에서 무제한 튜닝하지 말고, train/validation objective 또는 fresh-forward shadow objective로만 판단한다.
+
+
 ## 2026-06-05 KST — 85-symbol clean dynamic v5, CI 실제 경로 검증, ranking/reporting repair
 
 사용자 피드백에 따라 “CI 툴 검증”을 실제 GitHub Actions 기준으로 재확인했다. 직전 push `cf25437e`에서 private-ci는 성공했지만 public `ci` run `27019925528`이 `uv run ruff format --check .` 단계에서 실패했다. 실패 파일은 `scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py`와 `scripts/research/run_alpha_zoo_69_asset_optuna_hybrid_refit.py`였고, repo-wide ruff format으로 수정했다.
