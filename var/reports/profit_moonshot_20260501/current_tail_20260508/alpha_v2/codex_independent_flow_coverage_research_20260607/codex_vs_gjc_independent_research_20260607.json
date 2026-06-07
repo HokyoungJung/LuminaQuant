@@ -3,7 +3,7 @@
   "generated_at_utc": "2026-06-07T11:52:25.235258+00:00",
   "headline": "GJC와 별개인 Codex 독립 라인: sparse feature asof bug fixed; clean OOS improved but no live/small-sleeve promotion.",
   "decision": {
-    "beats_gjc_claim": "No fake victory claim; methodologically ahead by finding/fixing feature alignment, but performance still below 100% annualized and live gate fails.",
+    "beats_gjc_claim": "No. Performance is worse than existing 85-symbol/router and historical/control leaders; the contribution is a feature-alignment bug fix, not a strategy-performance win.",
     "real_money_execution": false,
     "small_sleeve_execution": false,
     "allowed_label": "research_shadow_only_after_data_pipeline_recovery",
@@ -12,7 +12,8 @@
       "execution_cost_gate",
       "theory_plausibility_gate",
       "live_feature_coverage_gate"
-    ]
+    ],
+    "performance_rank_correction": "core10 sparse-asof +19.45% annualized is below clean dynamic +42.57%, lagged shadow +77.62%, clean-input shadow +110.46%, and relaxed historical/control +209.00%."
   },
   "experiments": {
     "btc_eth_sol_pre_sparse_asof_fix": {
@@ -294,6 +295,7 @@
     }
   },
   "key_findings": [
+    "Performance correction: the Codex core10 sparse-asof rematch is weaker than the existing 85-symbol/router leaders; it should not be presented as a win.",
     "feature_points are sparse by source; joining on the latest whole row suppressed feature-backed families because funding/OI/taker rarely coexist in one row.",
     "Per-column last-observation asof with age gates restores flow-only train/validation coverage without look-ahead.",
     "BTC/ETH/SOL clean result improved from -4.06% comp / -9.46% annualized to +3.75% comp / +9.23% annualized.",

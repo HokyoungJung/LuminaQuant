@@ -2094,3 +2094,9 @@ Best raw/shadow candidate is `lagged_shadow_leaf_router:core_warmup4_avg2_val05_
 - Deployment label: **실전/소액 투입 금지 유지**. Latest taker-flow source가 2026-05-03 부근에서 끊겨 2026-06 feature-flow live coverage가 0이므로, 현재 결과는 `research_shadow_only_after_data_pipeline_recovery`다. Core10의 19.45% annualized는 100%+ 목표에 미달하고 live feature coverage/cost/fill telemetry gate를 통과하지 못한다.
 - Report artifacts: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/codex_independent_flow_coverage_research_20260607/codex_vs_gjc_independent_research_20260607.md` and `.json`.
 - External basis noted in report: Binance public data archive, Time Series Momentum, Volatility Managed Portfolios, DeepLOB/LOB feature literature, and public bookTicker historical gap evidence. These justify the direction, not a live promotion.
+
+## 2026-06-07 — Correction: Codex sparse-asof line is not the performance leader
+
+- User challenge accepted: `core10 sparse feature asof patch` is overall weaker than existing top candidates. It is `+7.69%` OOS comp / `+19.45%` annualized, versus clean dynamic 85-symbol `+34.39%` comp / `+42.57%` annualized, lagged shadow router `+61.40%` comp / `+77.62%` annualized, clean-input shadow `+85.91%` comp / `+110.46%` annualized, and relaxed historical/control `+156.03%` comp / `+209.00%` annualized.
+- Correct interpretation: the sparse-asof work is an infrastructure/research-space fix, not a better strategy. It makes feature-backed candidates observable, but the resulting new-alpha standalone strategy remains too weak and live-blocked.
+- Performance path must shift back to the 85-symbol/router/Optuna lineage: use the feature-alignment patch as an input improvement there, then run the same clean train/validation freeze and locked-OOS report-only evaluation. Do not present the core10 new-alpha result as beating GJC or the existing best lines.

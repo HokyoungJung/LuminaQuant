@@ -1,6 +1,6 @@
 # Codex independent research vs GJC — 2026-06-07
 ## 결론
-- **안 졌다.** 다만 clean gate 기준으로 성능을 부풀리지는 않는다. 이번 독립 라인의 성과는 “100%+ 후보 발견”이 아니라, feature-backed alpha가 연구 공간에 제대로 못 들어오던 **sparse feature alignment 버그를 잡고** clean OOS를 개선한 것이다.
+- **성능 기준으로는 기존 85-symbol/router 상위 후보보다 구리다.** 이번 독립 라인의 성과는 “100%+ 후보 발견”이나 GJC/기존 후보 대비 승리가 아니라, feature-backed alpha가 연구 공간에 제대로 못 들어오던 **sparse feature alignment 버그를 잡은 것**이다.
 - **실전/소액 투입: 금지.** 최신 taker-flow가 2026-05-03 부근에서 끊겨 2026-06 live feature-flow coverage가 0이다. 현 라벨은 `research_shadow_only_after_data_pipeline_recovery`.
 - hard gates 유지: `no_nested_oos_mining`, `execution_cost_gate`, `theory_plausibility_gate`, `live_feature_coverage_gate`.
 
@@ -9,6 +9,18 @@
 2. per-column last-observation asof + per-column age gate로 수정하면서 look-ahead 없이 flow-only family가 train/validation에 들어왔다.
 3. BTC/ETH/SOL은 pre-fix `-4.06%` comp / `-9.46%` annualized에서 post-fix `+3.75%` comp / `+9.23%` annualized로 반전했다.
 4. core10 확장 rematch는 `+7.69%` comp / `+19.45%` annualized / PF `2.32`까지 개선됐지만, 100%+ 목표와 실전 gate에는 미달한다.
+
+
+## 성능 비교 정정
+| Candidate line | OOS comp | Ann approx | Label | 비고 |
+| --- | ---: | ---: | --- | --- |
+| relaxed efficiency historical/control | 156.03% | 209.00% | paper_control | historical/control, live 승격 아님 |
+| clean input meta selector | 85.91% | 110.46% | shadow_freeze_only | post-OOS selector-grid contamination |
+| lagged shadow leaf router cap150 | 61.40% | 77.62% | shadow/fresh-forward required | 성능은 높지만 post-OOS research variant |
+| best clean 85-symbol dynamic switch | 34.39% | 42.57% | paper_control/clean mechanics | 현재 clean 상단 |
+| Codex core10 sparse-asof new-alpha | 7.69% | 19.45% | research_shadow_only | **성능상 열위**, feature-join 버그 수정 증거 |
+
+정정 결론: Codex core10 sparse-asof 결과를 “이겼다”로 해석하면 안 된다. 성능을 올리려면 이 패치를 85-symbol/router/Optuna 상위 라인에 흡수해 다시 검증해야 한다.
 
 ## Clean OOS rematch summary
 | Experiment | OOS comp | Ann approx | Positive folds | PF | Max OOS MDD | Monthly Sharpe | Label |
