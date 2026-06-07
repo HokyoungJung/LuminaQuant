@@ -63,6 +63,7 @@
 - Result: OOS comp `-0.24%`, annualized `-0.57%`, monthly equity MDD `8.72%`, Sharpe `0.04`, hit `3/5`.
 - BBO rows now observed: BNBUSDT 716, BTCUSDT 741, ETHUSDT 755, SOLUSDT 746, TRXUSDT 700.
 - Impact: no promotion flag changed; `clean_new_alpha_discovery_feature_bounded` remains `rejected` and `real_money_execution=false`.
+- Follow-up implementation: `scripts/import_binance_book_ticker_history.py` can now ingest explicitly approved external Binance BBO history files into feature points (`csv`, `jsonl`/`ndjson`, `parquet`) and is covered by `tests/test_import_binance_book_ticker_history.py`. This is plumbing only: it does not approve a data vendor, does not change the cap=500 OOS result above, and cannot unlock real-money without a new clean walk-forward rerun on approved history.
 
 ## Verification
 
@@ -76,3 +77,4 @@
 - Latest BBO post-update verification: JSON/artifact assertions pass; Ruff/format/git diff check pass; `PYTHONPATH=. uv run pytest -q tests/test_alpha_zoo_clean_new_alpha_discovery.py tests/test_strategy_support_inventory.py tests/test_collect_binance_book_ticker_feature_points.py` -> `12 passed in 0.53s` after no-PYTHONPATH collection retry.
 - Code-reviewer re-review after latest BBO accumulation: no no-live/no-small-sleeve blocker; one LOW stale dirty-workspace caveat in `final_quality_gate_20260607.json` was fixed and de-hashed so the caveat no longer goes stale when follow-up commits are added.
 - Latest cap=500 BBO freeze verification: JSON/artifact assertions pass; `git diff --check` pass; `PYTHONPATH=. uv run pytest -q tests/test_alpha_zoo_clean_new_alpha_discovery.py tests/test_strategy_support_inventory.py tests/test_collect_binance_book_ticker_feature_points.py` -> `12 passed in 0.54s`.
+- Historical BBO ingest adapter verification: `PYTHONPATH=. uv run pytest -q tests/test_import_binance_book_ticker_history.py` -> `3 passed in 0.08s`; existing BBO/alpha focused suite stayed `12 passed in 0.48s`.

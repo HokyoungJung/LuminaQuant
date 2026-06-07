@@ -109,6 +109,14 @@
     {
       "title": "Pseudo-Mathematics and Financial Charlatanism",
       "url": "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2308659"
+    },
+    {
+      "title": "Binance USD\u24c8-M Futures Individual Symbol Book Ticker Streams",
+      "url": "https://developers.binance.com/docs/derivatives/usds-margined-futures/websocket-market-streams/Individual-Symbol-Book-Ticker-Streams"
+    },
+    {
+      "title": "Binance USD\u24c8-M Futures All Book Tickers Stream",
+      "url": "https://developers.binance.com/docs/derivatives/usds-margined-futures/websocket-market-streams/All-Book-Tickers-Stream"
     }
   ],
   "final_conclusion": {
@@ -148,7 +156,7 @@
       "Historical incumbent metrics must be read with source lineage: source artifact reports 209.00% annualized / 156.03% compounded; locked-OOS/cost verifier fixed-blend aggregation reports 160.90% / 122.36% under the same candidate id. Both are paper/control only and cannot be used as live expected return."
     ]
   },
-  "last_reverified_at_utc": "2026-06-07T10:40:29+00:00",
+  "last_reverified_at_utc": "2026-06-07T10:47:52Z",
   "last_reviewed_at_utc": "2026-06-07T10:08:34+00:00",
   "latest_bbo_accumulation_recheck": {
     "aggregate": {
@@ -167,6 +175,18 @@
     "clean_promotion_eligible": false,
     "decision_impact": "unchanged_rejected; latest current-day BBO accumulation did not improve clean train/validation-first OOS result",
     "fold_count": 5,
+    "historical_bbo_ingest_adapter": {
+      "decision_impact": "no_change_to_cap500_clean_oos_result; no vendor/source approved; no real_money_unlock_without_new_clean_walk_forward",
+      "script": "scripts/import_binance_book_ticker_history.py",
+      "status": "plumbing_ready_for_explicitly_approved_external_history_only",
+      "supported_formats": [
+        "csv",
+        "jsonl",
+        "ndjson",
+        "parquet"
+      ],
+      "test": "tests/test_import_binance_book_ticker_history.py"
+    },
     "real_money_execution": false,
     "source_generated_at_utc": "2026-06-07T10:32:06.564484Z",
     "source_json": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607_feature_bounded/clean_new_alpha_discovery_latest.json",
@@ -231,6 +251,10 @@
     "compileall_targeted": "pass: python3 -m compileall -q modified Python/test/BBO surfaces",
     "formal_ultragoal_checkpoint": "blocked/watch: G008 independent review evidence attached and ledger goal_blocked event recorded, but goals.json still shows G008 in_progress and fresh get_goal is a completed legacy latency objective.",
     "git_diff_check": "pass: git diff --check -> no output",
+    "historical_bbo_ingest_adapter": {
+      "evidence": "PYTHONPATH=. uv run pytest -q tests/test_import_binance_book_ticker_history.py -> 3 passed in 0.08s; existing alpha/BBO focused suite -> 12 passed in 0.48s.",
+      "status": "pass"
+    },
     "json_manifest_report": "pass",
     "latest_bbo_accumulation_recheck": {
       "evidence": "Latest BBO accumulation recheck (2026-06-07T10:32:06.564484Z) used inferred candidate_cap=500 and left feature-bounded OOS unchanged at -0.24% comp / -0.57% annualized; no promotion flags changed.",

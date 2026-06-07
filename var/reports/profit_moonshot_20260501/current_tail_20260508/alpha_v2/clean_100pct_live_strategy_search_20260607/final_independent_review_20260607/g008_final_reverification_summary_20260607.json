@@ -61,12 +61,17 @@
       "evidence": "PYTHONPATH=. uv run pytest -q tests/test_alpha_zoo_clean_new_alpha_discovery.py tests/test_strategy_support_inventory.py tests/test_collect_binance_book_ticker_feature_points.py -> 12 passed in 0.54s.",
       "name": "latest_bbo_pytest",
       "status": "pass"
+    },
+    {
+      "evidence": "PYTHONPATH=. uv run pytest -q tests/test_import_binance_book_ticker_history.py -> 3 passed in 0.08s; adapter supports approved csv/jsonl/ndjson/parquet BBO history ingest without changing no-deploy decision.",
+      "name": "historical_bbo_ingest_adapter",
+      "status": "pass_plumbing_only"
     }
   ],
   "code_reviewer": "APPROVE",
   "code_reviewer_rereview_after_bbo": {
     "low_findings_fixed": [
-      "[LOW] final_quality_gate_20260607.json:5 — Caveat says repository remains dirty with pre-existing changes, but post-review worktree status was clean. Why it matters: stale provenance wording can confuse final audit readers even though it is conservative and does not overstate promotion readiness. Fix: if regenerating final artifacts, update/remove this stale caveat or qualify it as historical generation context."
+      "[LOW] final_quality_gate_20260607.json:5 \u2014 Caveat says repository remains dirty with pre-existing changes, but post-review worktree status was clean. Why it matters: stale provenance wording can confuse final audit readers even though it is conservative and does not overstate promotion readiness. Fix: if regenerating final artifacts, update/remove this stale caveat or qualify it as historical generation context."
     ],
     "no_live_blockers": false,
     "note": "Historical re-review artifact; stale dirty-workspace and commit-hash wording fixed in final quality gate.",
@@ -74,7 +79,7 @@
     "team": "read-only-final-re-re-4a549153"
   },
   "deployment_conclusion": "no_real_money; no_small_sleeve; 0pct_allocation_or_paper_control_only",
-  "generated_at_utc": "2026-06-07T10:40:29+00:00",
+  "generated_at_utc": "2026-06-07T10:48:09Z",
   "hidden_goal_snapshot": "wrong completed legacy latency objective; saved in fresh_get_goal_after_g008_review.json",
   "latest_bbo_accumulation_recheck": {
     "aggregate": {
@@ -93,6 +98,12 @@
     "clean_promotion_eligible": false,
     "decision_impact": "unchanged_rejected; latest current-day BBO accumulation did not improve clean train/validation-first OOS result",
     "fold_count": 5,
+    "historical_bbo_ingest_adapter": {
+      "decision_impact": "no_change_to_no_real_money_no_small_sleeve_conclusion",
+      "script": "scripts/import_binance_book_ticker_history.py",
+      "status": "plumbing_ready_for_explicitly_approved_external_history_only",
+      "test": "tests/test_import_binance_book_ticker_history.py"
+    },
     "real_money_execution": false,
     "source_generated_at_utc": "2026-06-07T10:32:06.564484Z",
     "source_json": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607_feature_bounded/clean_new_alpha_discovery_latest.json",

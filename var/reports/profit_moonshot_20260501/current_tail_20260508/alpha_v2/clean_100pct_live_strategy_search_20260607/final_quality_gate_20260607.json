@@ -7,7 +7,8 @@
     "Historical incumbent metric lineage is annotated: final report table uses the source 209.00% annualized / 156.03% compounded record, while locked-OOS/cost fixed-blend aggregation reports 160.90% / 122.36%; both remain paper/control only.",
     "G008 blocked checkpoint is intentionally non-terminal: .omx/ultragoal ledger records goal_blocked while goals.json remains in_progress; this strict completion blocker is recorded in final_independent_review_20260607.",
     "Final verification passed locally after G008 reconciliation, but formal ultragoal completion remains blocked by the stale hidden Codex goal snapshot.",
-    "Latest BBO accumulation recheck (2026-06-07T10:32:06.564484Z) used inferred candidate_cap=500 and left feature-bounded OOS unchanged at -0.24% comp / -0.57% annualized; no promotion flags changed."
+    "Latest BBO accumulation recheck (2026-06-07T10:32:06.564484Z) used inferred candidate_cap=500 and left feature-bounded OOS unchanged at -0.24% comp / -0.57% annualized; no promotion flags changed.",
+    "Historical BBO ingest adapter is now plumbing-ready for explicitly approved external Binance BBO history files, but it does not approve any source/vendor and does not change the no-real-money decision without a new clean walk-forward rerun."
   ],
   "final_reviews": {
     "ai_slop_cleaner": "not invoked because no cleanup/refactor/code-structure change was made; only report/provenance artifacts are being reconciled.",
@@ -18,7 +19,7 @@
     "g008_reverification": "PASS_WITH_G008_WATCH_AND_HIDDEN_GOAL_BLOCKER; see final_independent_review_20260607/g008_final_reverification_summary_20260607.json"
   },
   "generated_at_utc": "2026-06-07T07:13:46.900714+00:00",
-  "last_reverified_at_utc": "2026-06-07T10:40:29+00:00",
+  "last_reverified_at_utc": "2026-06-07T10:47:52Z",
   "last_reviewed_at_utc": "2026-06-07T10:08:34+00:00",
   "outputs": [
     "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/final_report_clean_100pct_live_strategy_search_20260607.md",
@@ -136,6 +137,11 @@
     {
       "evidence": "PYTHONPATH=. uv run pytest -q tests/test_alpha_zoo_clean_new_alpha_discovery.py tests/test_strategy_support_inventory.py tests/test_collect_binance_book_ticker_feature_points.py -> 12 passed in 0.54s.",
       "name": "latest_bbo_pytest",
+      "status": "pass"
+    },
+    {
+      "evidence": "PYTHONPATH=. uv run pytest -q tests/test_import_binance_book_ticker_history.py -> 3 passed in 0.08s; alias handling preserves Binance bookTicker b/B/a/A fields; CSV/JSONL paths persist feature points.",
+      "name": "historical_bbo_ingest_adapter",
       "status": "pass"
     }
   ]

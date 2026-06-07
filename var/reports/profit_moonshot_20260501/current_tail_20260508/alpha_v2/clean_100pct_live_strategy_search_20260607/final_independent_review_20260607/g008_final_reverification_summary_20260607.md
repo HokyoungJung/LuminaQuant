@@ -16,6 +16,7 @@
 - `git diff --check`: pass
 - Artifact assertions: pass; all final candidates remain `real_money_allowed=false` and `small_sleeve_allowed=false`.
 - Latest BBO post-update verification: JSON/artifact assertions pass; Ruff/format/git diff check pass; `PYTHONPATH=. ...` subset `12 passed in 0.53s` after no-PYTHONPATH collection retry.
+- Historical BBO ingest adapter: `scripts/import_binance_book_ticker_history.py` added for explicitly approved external BBO history files only; `PYTHONPATH=. uv run pytest -q tests/test_import_binance_book_ticker_history.py` -> `3 passed in 0.08s`; no deployment decision changed.
 
 
 
