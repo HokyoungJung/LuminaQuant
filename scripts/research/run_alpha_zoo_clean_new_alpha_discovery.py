@@ -91,6 +91,11 @@ FAMILY_DESCRIPTIONS: dict[str, str] = {
         "Use Binance BBO spread expansion together with taker-flow exhaustion to fade "
         "microstructure dislocations. Requires historical BBO feature coverage."
     ),
+    "feature_book_depth_imbalance_reversal": (
+        "Use official Binance public-data bookDepth nearest-bucket notional imbalance "
+        "as a post-2024 orderbook pressure source. This is a separate depth feature, "
+        "not a synthetic BBO quote."
+    ),
 }
 
 
@@ -187,6 +192,12 @@ def _search_space() -> dict[str, Any]:
             "spread_z_min": [1.0, 1.5],
             "flow_imbalance_min": [0.10, 0.15],
             "price_extension_min": [0.004, 0.008],
+            "min_hold": [4, 8],
+        },
+        "feature_book_depth_imbalance_reversal": {
+            "lookback": [6, 12],
+            "depth_imbalance_min": [0.10, 0.20],
+            "price_extension_min": [0.003, 0.006],
             "min_hold": [4, 8],
         },
     }
@@ -288,10 +299,11 @@ def _split_feature_coverage(
     train: tuple[pd.Timestamp, pd.Timestamp],
     validation: tuple[pd.Timestamp, pd.Timestamp],
     locked_oos: tuple[pd.Timestamp, pd.Timestamp],
+    column: str = "feature_valid",
 ) -> dict[str, float]:
-    if "feature_valid" not in frame.columns:
+    if column not in frame.columns:
         return {"train": 0.0, "validation": 0.0, "locked_oos": 0.0}
-    valid = frame["feature_valid"].fillna(False).astype(bool).to_numpy()
+    valid = frame[column].fillna(False).astype(bool).to_numpy()
     return {
         "train": float(np.mean(valid[_window_mask(frame["datetime"], train)])),
         "validation": float(np.mean(valid[_window_mask(frame["datetime"], validation)])),
@@ -309,25 +321,57 @@ def _attach_feature_points(
         out["taker_buy_sell_imbalance"] = np.nan
         out["liquidation_imbalance"] = np.nan
         out["bbo_spread_bps"] = np.nan
+        out["book_depth_imbalance_1pct"] = np.nan
+        out["funding_rate_age_hours"] = np.inf
+        out["open_interest_age_hours"] = np.inf
+        out["taker_buy_sell_imbalance_age_hours"] = np.inf
+        out["liquidation_imbalance_age_hours"] = np.inf
+        out["bbo_spread_bps_age_hours"] = np.inf
+        out["book_depth_imbalance_1pct_age_hours"] = np.inf
+        out["feature_depth_valid"] = False
         out["feature_age_hours"] = np.inf
         out["feature_valid"] = False
+        out["feature_oi_flow_valid"] = False
+        out["feature_liquidation_valid"] = False
+        out["feature_bbo_valid"] = False
         return out
     feats = features.copy().sort_values("datetime")
-    buy = pd.to_numeric(feats.get("taker_buy_quote_volume"), errors="coerce")
-    sell = pd.to_numeric(feats.get("taker_sell_quote_volume"), errors="coerce")
+
+    def numeric_feature(column: str) -> pd.Series:
+        if column not in feats.columns:
+            return pd.Series(np.nan, index=feats.index)
+        return pd.to_numeric(feats[column], errors="coerce")
+
+    buy = numeric_feature("taker_buy_quote_volume")
+    sell = numeric_feature("taker_sell_quote_volume")
     denom = buy.fillna(0.0) + sell.fillna(0.0)
     feats["taker_buy_sell_imbalance"] = np.where(
         denom > 0.0, (buy.fillna(0.0) - sell.fillna(0.0)) / denom, np.nan
     )
-    feats["funding_rate"] = pd.to_numeric(feats.get("funding_rate"), errors="coerce")
-    feats["open_interest"] = pd.to_numeric(feats.get("open_interest"), errors="coerce")
-    long_liq = pd.to_numeric(feats.get("liquidation_long_notional"), errors="coerce")
-    short_liq = pd.to_numeric(feats.get("liquidation_short_notional"), errors="coerce")
+    feats["funding_rate"] = numeric_feature("funding_rate")
+    feats["open_interest"] = numeric_feature("open_interest")
+    long_liq = numeric_feature("liquidation_long_notional")
+    short_liq = numeric_feature("liquidation_short_notional")
     liq_denom = long_liq.abs().fillna(0.0) + short_liq.abs().fillna(0.0)
     feats["liquidation_imbalance"] = np.where(
         liq_denom > 0.0, (long_liq.fillna(0.0) - short_liq.fillna(0.0)) / liq_denom, np.nan
     )
-    feats["bbo_spread_bps"] = pd.to_numeric(feats.get("bbo_spread_bps"), errors="coerce")
+    feats["bbo_spread_bps"] = numeric_feature("bbo_spread_bps")
+    feats["book_depth_imbalance_1pct"] = numeric_feature("book_depth_imbalance_1pct")
+    feature_columns = [
+        "funding_rate",
+        "open_interest",
+        "taker_buy_sell_imbalance",
+        "liquidation_imbalance",
+        "bbo_spread_bps",
+        "book_depth_imbalance_1pct",
+    ]
+    for column in feature_columns:
+        observed_column = f"{column}_observed_datetime"
+        observed = pd.Series(pd.NaT, index=feats.index, dtype="datetime64[ns]")
+        observed.loc[feats[column].notna()] = feats.loc[feats[column].notna(), "datetime"]
+        feats[observed_column] = observed.ffill()
+        feats[column] = feats[column].ffill()
     feats = feats.rename(columns={"datetime": "feature_datetime"})
     merged = pd.merge_asof(
         out,
@@ -335,10 +379,17 @@ def _attach_feature_points(
             [
                 "feature_datetime",
                 "funding_rate",
+                "funding_rate_observed_datetime",
                 "open_interest",
+                "open_interest_observed_datetime",
                 "taker_buy_sell_imbalance",
+                "taker_buy_sell_imbalance_observed_datetime",
                 "liquidation_imbalance",
+                "liquidation_imbalance_observed_datetime",
                 "bbo_spread_bps",
+                "bbo_spread_bps_observed_datetime",
+                "book_depth_imbalance_1pct",
+                "book_depth_imbalance_1pct_observed_datetime",
             ]
         ],
         left_on="datetime",
@@ -348,19 +399,57 @@ def _attach_feature_points(
     age = (merged["datetime"] - merged["feature_datetime"]).dt.total_seconds() / 3600.0
     max_age = 24.0 if timeframe == "1h" else 48.0
     merged["feature_age_hours"] = age.fillna(np.inf)
-    merged["feature_valid"] = (
-        (merged["feature_age_hours"] <= max_age)
+    for column in feature_columns:
+        observed_column = f"{column}_observed_datetime"
+        age_column = f"{column}_age_hours"
+        observed_age = (
+            merged["datetime"] - pd.to_datetime(merged[observed_column])
+        ).dt.total_seconds() / 3600.0
+        merged[age_column] = observed_age.fillna(np.inf)
+    flow_valid = (
+        (merged["funding_rate_age_hours"] <= max_age)
+        & (merged["taker_buy_sell_imbalance_age_hours"] <= max_age)
         & merged["funding_rate"].notna()
-        & merged["open_interest"].notna()
         & merged["taker_buy_sell_imbalance"].notna()
+    )
+    oi_flow_valid = (
+        flow_valid
+        & (merged["open_interest_age_hours"] <= max_age)
+        & merged["open_interest"].notna()
+    )
+    merged["feature_valid"] = flow_valid
+    merged["feature_oi_flow_valid"] = oi_flow_valid
+    merged["feature_liquidation_valid"] = (
+        oi_flow_valid
+        & (merged["liquidation_imbalance_age_hours"] <= max_age)
         & merged["liquidation_imbalance"].notna()
     )
-    return merged.drop(columns=["feature_datetime"])
+    merged["feature_bbo_valid"] = (
+        flow_valid
+        & (merged["bbo_spread_bps_age_hours"] <= max_age)
+        & merged["bbo_spread_bps"].notna()
+    )
+    merged["feature_depth_valid"] = (
+        merged["book_depth_imbalance_1pct_age_hours"] <= max_age
+    ) & merged["book_depth_imbalance_1pct"].notna()
+    return merged.drop(
+        columns=[
+            "feature_datetime",
+            "funding_rate_observed_datetime",
+            "open_interest_observed_datetime",
+            "taker_buy_sell_imbalance_observed_datetime",
+            "liquidation_imbalance_observed_datetime",
+            "bbo_spread_bps_observed_datetime",
+            "book_depth_imbalance_1pct_observed_datetime",
+        ]
+    )
 
 
 def _load_feature_points_safe(symbol: str, *, feature_root: Path) -> pd.DataFrame:
     symbol_root = feature_root / f"symbol={symbol}"
-    files = sorted(symbol_root.rglob("*.parquet"))
+    files = sorted(
+        path for path in symbol_root.rglob("*.parquet") if not path.name.endswith(".tmp.parquet")
+    )
     if not files:
         return pd.DataFrame(
             columns=[
@@ -372,6 +461,7 @@ def _load_feature_points_safe(symbol: str, *, feature_root: Path) -> pd.DataFram
                 "liquidation_long_notional",
                 "liquidation_short_notional",
                 "bbo_spread_bps",
+                "book_depth_imbalance_1pct",
             ]
         )
     lf = pl.scan_parquet([str(path) for path in files])
@@ -385,6 +475,7 @@ def _load_feature_points_safe(symbol: str, *, feature_root: Path) -> pd.DataFram
         "liquidation_long_notional",
         "liquidation_short_notional",
         "bbo_spread_bps",
+        "book_depth_imbalance_1pct",
     ]
     existing = [column for column in wanted if column in schema]
     frame = lf.select(existing).collect()
@@ -845,10 +936,14 @@ def _feature_flow_rows(
     allocation_fraction: float,
 ) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
-    if frame.empty or "feature_valid" not in frame.columns:
+    if frame.empty or "feature_oi_flow_valid" not in frame.columns:
         return out
     coverage = _split_feature_coverage(
-        frame, train=fold.train, validation=fold.validation, locked_oos=fold.locked_oos
+        frame,
+        train=fold.train,
+        validation=fold.validation,
+        locked_oos=fold.locked_oos,
+        column="feature_oi_flow_valid",
     )
     if coverage["train"] < 0.60 or coverage["validation"] < 0.60:
         return out
@@ -856,7 +951,7 @@ def _feature_flow_rows(
     funding = pd.to_numeric(frame["funding_rate"], errors="coerce").reset_index(drop=True)
     open_interest = pd.to_numeric(frame["open_interest"], errors="coerce").reset_index(drop=True)
     flow = pd.to_numeric(frame["taker_buy_sell_imbalance"], errors="coerce").reset_index(drop=True)
-    feature_valid = frame["feature_valid"].fillna(False).astype(bool).reset_index(drop=True)
+    feature_valid = frame["feature_oi_flow_valid"].fillna(False).astype(bool).reset_index(drop=True)
     datetimes = frame["datetime"]
     returns = close.pct_change(fill_method=None)
     for lookback in (12, 24):
@@ -950,7 +1045,11 @@ def _feature_liquidation_rows(
     if frame.empty or "feature_valid" not in frame.columns:
         return out
     coverage = _split_feature_coverage(
-        frame, train=fold.train, validation=fold.validation, locked_oos=fold.locked_oos
+        frame,
+        train=fold.train,
+        validation=fold.validation,
+        locked_oos=fold.locked_oos,
+        column="feature_liquidation_valid",
     )
     if coverage["train"] < 0.60 or coverage["validation"] < 0.60:
         return out
@@ -960,7 +1059,9 @@ def _feature_liquidation_rows(
     liq_imbalance = pd.to_numeric(frame["liquidation_imbalance"], errors="coerce").reset_index(
         drop=True
     )
-    feature_valid = frame["feature_valid"].fillna(False).astype(bool).reset_index(drop=True)
+    feature_valid = (
+        frame["feature_liquidation_valid"].fillna(False).astype(bool).reset_index(drop=True)
+    )
     datetimes = frame["datetime"]
     returns = close.pct_change(fill_method=None)
     for lookback in (12, 24):
@@ -1054,17 +1155,21 @@ def _feature_flow_trend_rows(
     allocation_fraction: float,
 ) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
-    if frame.empty or "feature_valid" not in frame.columns:
+    if frame.empty or "feature_oi_flow_valid" not in frame.columns:
         return out
     coverage = _split_feature_coverage(
-        frame, train=fold.train, validation=fold.validation, locked_oos=fold.locked_oos
+        frame,
+        train=fold.train,
+        validation=fold.validation,
+        locked_oos=fold.locked_oos,
+        column="feature_oi_flow_valid",
     )
     if coverage["train"] < 0.60 or coverage["validation"] < 0.60:
         return out
     funding = pd.to_numeric(frame["funding_rate"], errors="coerce").reset_index(drop=True)
     open_interest = pd.to_numeric(frame["open_interest"], errors="coerce").reset_index(drop=True)
     flow = pd.to_numeric(frame["taker_buy_sell_imbalance"], errors="coerce").reset_index(drop=True)
-    feature_valid = frame["feature_valid"].fillna(False).astype(bool).reset_index(drop=True)
+    feature_valid = frame["feature_oi_flow_valid"].fillna(False).astype(bool).reset_index(drop=True)
     datetimes = frame["datetime"]
     for lookback in (12, 24):
         oi_z = broad69._rolling_zscore(open_interest.pct_change(fill_method=None), lookback)
@@ -1160,10 +1265,14 @@ def _feature_crowding_continuation_rows(
     allocation_fraction: float,
 ) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
-    if frame.empty or "feature_valid" not in frame.columns:
+    if frame.empty or "feature_oi_flow_valid" not in frame.columns:
         return out
     coverage = _split_feature_coverage(
-        frame, train=fold.train, validation=fold.validation, locked_oos=fold.locked_oos
+        frame,
+        train=fold.train,
+        validation=fold.validation,
+        locked_oos=fold.locked_oos,
+        column="feature_oi_flow_valid",
     )
     if coverage["train"] < 0.60 or coverage["validation"] < 0.60:
         return out
@@ -1171,7 +1280,7 @@ def _feature_crowding_continuation_rows(
     funding = pd.to_numeric(frame["funding_rate"], errors="coerce").reset_index(drop=True)
     open_interest = pd.to_numeric(frame["open_interest"], errors="coerce").reset_index(drop=True)
     flow = pd.to_numeric(frame["taker_buy_sell_imbalance"], errors="coerce").reset_index(drop=True)
-    feature_valid = frame["feature_valid"].fillna(False).astype(bool).reset_index(drop=True)
+    feature_valid = frame["feature_oi_flow_valid"].fillna(False).astype(bool).reset_index(drop=True)
     datetimes = frame["datetime"]
     for lookback in (6, 12):
         momentum = close / close.shift(lookback) - 1.0
@@ -1261,7 +1370,11 @@ def _perp_crowding_rows(
     if frame.empty or "feature_valid" not in frame.columns:
         return out
     coverage = _split_feature_coverage(
-        frame, train=fold.train, validation=fold.validation, locked_oos=fold.locked_oos
+        frame,
+        train=fold.train,
+        validation=fold.validation,
+        locked_oos=fold.locked_oos,
+        column="feature_liquidation_valid",
     )
     if coverage["train"] < 0.60 or coverage["validation"] < 0.60:
         return out
@@ -1271,7 +1384,9 @@ def _perp_crowding_rows(
     liq_imbalance = pd.to_numeric(frame["liquidation_imbalance"], errors="coerce").reset_index(
         drop=True
     )
-    feature_valid = frame["feature_valid"].fillna(False).astype(bool).reset_index(drop=True)
+    feature_valid = (
+        frame["feature_liquidation_valid"].fillna(False).astype(bool).reset_index(drop=True)
+    )
     datetimes = frame["datetime"]
     returns = close.pct_change(fill_method=None)
     for lookback in (24, 48):
@@ -1459,23 +1574,25 @@ def _feature_bbo_flow_rows(
     allocation_fraction: float,
 ) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
-    if frame.empty or "feature_valid" not in frame.columns or "bbo_spread_bps" not in frame.columns:
+    if (
+        frame.empty
+        or "feature_bbo_valid" not in frame.columns
+        or "bbo_spread_bps" not in frame.columns
+    ):
         return out
     coverage = _split_feature_coverage(
-        frame, train=fold.train, validation=fold.validation, locked_oos=fold.locked_oos
+        frame,
+        train=fold.train,
+        validation=fold.validation,
+        locked_oos=fold.locked_oos,
+        column="feature_bbo_valid",
     )
-    bbo_valid = frame["bbo_spread_bps"].notna().to_numpy()
-    if (
-        coverage["train"] < 0.60
-        or coverage["validation"] < 0.60
-        or float(np.mean(bbo_valid[_window_mask(frame["datetime"], fold.train)])) < 0.60
-        or float(np.mean(bbo_valid[_window_mask(frame["datetime"], fold.validation)])) < 0.60
-    ):
+    if coverage["train"] < 0.60 or coverage["validation"] < 0.60:
         return out
     close = frame["close"].astype(float).reset_index(drop=True)
     flow = pd.to_numeric(frame["taker_buy_sell_imbalance"], errors="coerce").reset_index(drop=True)
     spread = pd.to_numeric(frame["bbo_spread_bps"], errors="coerce").reset_index(drop=True)
-    feature_valid = frame["feature_valid"].fillna(False).astype(bool).reset_index(drop=True)
+    feature_valid = frame["feature_bbo_valid"].fillna(False).astype(bool).reset_index(drop=True)
     datetimes = frame["datetime"]
     for lookback in (6, 12):
         spread_z = broad69._rolling_zscore(spread, max(6, lookback))
@@ -1553,6 +1670,109 @@ def _feature_bbo_flow_rows(
     return out
 
 
+def _feature_book_depth_rows(
+    *,
+    frame: pd.DataFrame,
+    symbol: str,
+    timeframe: str,
+    fold: monthly.MonthlyFold,
+    leverages: Sequence[int],
+    allocation_fraction: float,
+) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    if (
+        frame.empty
+        or "feature_depth_valid" not in frame.columns
+        or "book_depth_imbalance_1pct" not in frame.columns
+    ):
+        return out
+    coverage = _split_feature_coverage(
+        frame,
+        train=fold.train,
+        validation=fold.validation,
+        locked_oos=fold.locked_oos,
+        column="feature_depth_valid",
+    )
+    if coverage["train"] < 0.60 or coverage["validation"] < 0.60:
+        return out
+    close = frame["close"].astype(float).reset_index(drop=True)
+    depth = pd.to_numeric(frame["book_depth_imbalance_1pct"], errors="coerce").reset_index(
+        drop=True
+    )
+    feature_valid = frame["feature_depth_valid"].fillna(False).astype(bool).reset_index(drop=True)
+    datetimes = frame["datetime"]
+    for lookback in (6, 12):
+        extension = close / close.shift(lookback) - 1.0
+        depth_smooth = depth.rolling(max(2, lookback // 2), min_periods=2).mean()
+        for imbalance_min in (0.10, 0.20):
+            for price_extension_min in (0.003, 0.006):
+                long_entry = (
+                    feature_valid
+                    & (depth_smooth.shift(1) >= imbalance_min)
+                    & (extension.shift(1) <= -price_extension_min)
+                )
+                short_entry = (
+                    feature_valid
+                    & (depth_smooth.shift(1) <= -imbalance_min)
+                    & (extension.shift(1) >= price_extension_min)
+                )
+                long_exit = (~feature_valid) | (depth_smooth < 0.0) | (extension > 0.0)
+                short_exit = (~feature_valid) | (depth_smooth > 0.0) | (extension < 0.0)
+                for min_hold in (4, 8):
+                    signal = broad69._debounced_state_signal(
+                        long_entry,
+                        long_exit,
+                        short_entry,
+                        short_exit,
+                        side="long_short",
+                        min_hold_bars=min_hold,
+                        cooldown_bars=2,
+                    )
+                    for leverage in leverages:
+                        sim = broad69.simulate_symbol(
+                            frame,
+                            signal,
+                            integer_leverage=int(leverage),
+                            allocation_fraction=allocation_fraction,
+                        )
+                        base = _candidate_base(
+                            family="feature_book_depth_imbalance_reversal",
+                            model_parts=(
+                                "bookdepth",
+                                timeframe,
+                                symbol,
+                                f"lb{lookback}",
+                                f"imb{imbalance_min}",
+                                f"ret{price_extension_min}",
+                                f"hold{min_hold}",
+                                f"lev{leverage}",
+                            ),
+                            symbol=symbol,
+                            timeframe=timeframe,
+                            side="long_short",
+                            lookback=lookback,
+                            threshold=imbalance_min,
+                            exit_threshold=price_extension_min,
+                            min_hold=min_hold,
+                            leverage=int(leverage),
+                            allocation_fraction=allocation_fraction,
+                        )
+                        base["feature_backed"] = True
+                        base["feature_coverage"] = dict(coverage)
+                        out.append(
+                            _finalize_row(
+                                base=base,
+                                sim=sim,
+                                datetimes=datetimes,
+                                timeframe=timeframe,
+                                train=fold.train,
+                                validation=fold.validation,
+                                locked_oos=fold.locked_oos,
+                            )
+                        )
+    return out
+
+
 def _rows_for_fold(
     *,
     bars: Mapping[tuple[str, str], pd.DataFrame],
@@ -1599,6 +1819,7 @@ def _rows_for_fold(
                     _feature_taker_flow_exhaustion_rows(**{**kwargs, "frame": feature_frame})
                 )
                 rows.extend(_feature_bbo_flow_rows(**{**kwargs, "frame": feature_frame}))
+                rows.extend(_feature_book_depth_rows(**{**kwargs, "frame": feature_frame}))
             if not panel.empty:
                 rows.extend(
                     _lead_lag_rows(

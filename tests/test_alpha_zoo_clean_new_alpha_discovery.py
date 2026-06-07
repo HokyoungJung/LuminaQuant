@@ -68,9 +68,10 @@ def test_search_space_hash_is_stable_and_excludes_oos_results() -> None:
         "perp_crowding_score_reversion",
         "feature_taker_flow_exhaustion_reversal",
         "feature_bbo_flow_exhaustion_reversal",
+        "feature_book_depth_imbalance_reversal",
     ]
     assert first == second
-    assert first == "1d421663b0f9f785a18d69e5068c81f1816005598f5a378bfeb697239f2488f6"
+    assert first == "1ad1e7560baf9c68152b31351efb8e5bf42e5c4d54a94439b5f4754a5794cf7f"
 
 
 def test_lead_lag_family_is_covered_and_flat_split_labeled() -> None:
@@ -141,6 +142,7 @@ def test_load_feature_points_safe_tolerates_missing_taker_columns(tmp_path: Path
         "liquidation_long_notional",
         "liquidation_short_notional",
         "bbo_spread_bps",
+        "book_depth_imbalance_1pct",
         "datetime",
     ]
     assert loaded["taker_buy_quote_volume"].isna().all()
@@ -148,6 +150,24 @@ def test_load_feature_points_safe_tolerates_missing_taker_columns(tmp_path: Path
     assert loaded["liquidation_long_notional"].isna().all()
     assert loaded["liquidation_short_notional"].isna().all()
     assert loaded["bbo_spread_bps"].isna().all()
+
+
+def test_load_feature_points_safe_ignores_tmp_parquet(tmp_path: Path) -> None:
+    day_dir = tmp_path / "symbol=BTCUSDT" / "date=2025-01-01"
+    day_dir.mkdir(parents=True)
+    pl.DataFrame(
+        {
+            "timestamp_ms": [1735689600000],
+            "funding_rate": [0.0001],
+            "open_interest": [1234.0],
+            "taker_buy_quote_volume": [200.0],
+            "taker_sell_quote_volume": [100.0],
+        }
+    ).write_parquet(day_dir / "compact.tmp.parquet")
+
+    loaded = module._load_feature_points_safe("BTCUSDT", feature_root=tmp_path)
+
+    assert loaded.empty
 
 
 def test_attach_feature_points_builds_liquidation_imbalance() -> None:
@@ -170,6 +190,96 @@ def test_attach_feature_points_builds_liquidation_imbalance() -> None:
 
     assert attached["liquidation_imbalance"].tolist() == pytest.approx([0.5, -0.5])
     assert attached["feature_valid"].tolist() == [True, True]
+    assert attached["feature_liquidation_valid"].tolist() == [True, True]
+
+
+def test_attach_feature_points_keeps_taker_flow_valid_without_liquidations() -> None:
+    bars = pd.DataFrame(
+        {"datetime": pd.date_range("2025-01-01", periods=2, freq="h"), "close": [1.0, 1.0]}
+    )
+    features = pd.DataFrame(
+        {
+            "datetime": pd.date_range("2025-01-01", periods=2, freq="h"),
+            "funding_rate": [0.0001, -0.0001],
+            "open_interest": [1000.0, 1001.0],
+            "taker_buy_quote_volume": [200.0, 100.0],
+            "taker_sell_quote_volume": [100.0, 200.0],
+        }
+    )
+
+    attached = module._attach_feature_points(bars, features, timeframe="1h")
+
+    assert attached["feature_valid"].tolist() == [True, True]
+    assert attached["feature_liquidation_valid"].tolist() == [False, False]
+    assert attached["feature_bbo_valid"].tolist() == [False, False]
+
+
+def test_attach_feature_points_aligns_sparse_feature_sources_independently() -> None:
+    bars = pd.DataFrame(
+        {
+            "datetime": pd.to_datetime(["2025-01-01 00:30", "2025-01-01 01:00"]),
+            "close": [1.0, 1.0],
+        }
+    )
+    features = pd.DataFrame(
+        {
+            "datetime": pd.to_datetime(
+                [
+                    "2025-01-01 00:00",
+                    "2025-01-01 00:10",
+                    "2025-01-01 00:20",
+                ]
+            ),
+            "funding_rate": [0.0001, np.nan, np.nan],
+            "open_interest": [np.nan, 1000.0, np.nan],
+            "taker_buy_quote_volume": [np.nan, np.nan, 200.0],
+            "taker_sell_quote_volume": [np.nan, np.nan, 100.0],
+        }
+    )
+
+    attached = module._attach_feature_points(bars, features, timeframe="1h")
+
+    assert attached["funding_rate"].tolist() == pytest.approx([0.0001, 0.0001])
+    assert attached["open_interest"].tolist() == pytest.approx([1000.0, 1000.0])
+    assert attached["taker_buy_sell_imbalance"].tolist() == pytest.approx([1.0 / 3.0, 1.0 / 3.0])
+    assert attached["feature_valid"].tolist() == [True, True]
+    assert attached["feature_oi_flow_valid"].tolist() == [True, True]
+    assert attached["feature_liquidation_valid"].tolist() == [False, False]
+
+
+def test_attach_feature_points_keeps_flow_valid_without_open_interest() -> None:
+    bars = pd.DataFrame(
+        {"datetime": pd.date_range("2025-01-01", periods=2, freq="h"), "close": [1.0, 1.0]}
+    )
+    features = pd.DataFrame(
+        {
+            "datetime": pd.date_range("2025-01-01", periods=2, freq="h"),
+            "funding_rate": [0.0001, -0.0001],
+            "taker_buy_quote_volume": [200.0, 100.0],
+            "taker_sell_quote_volume": [100.0, 200.0],
+        }
+    )
+
+    attached = module._attach_feature_points(bars, features, timeframe="1h")
+
+    assert attached["feature_valid"].tolist() == [True, True]
+    assert attached["feature_oi_flow_valid"].tolist() == [False, False]
+    assert attached["feature_liquidation_valid"].tolist() == [False, False]
+    assert attached["feature_bbo_valid"].tolist() == [False, False]
+
+
+def test_attach_feature_points_empty_features_sets_all_validity_flags() -> None:
+    bars = pd.DataFrame(
+        {"datetime": pd.date_range("2025-01-01", periods=2, freq="h"), "close": [1.0, 1.0]}
+    )
+
+    attached = module._attach_feature_points(bars, pd.DataFrame(), timeframe="1h")
+
+    assert attached["feature_valid"].tolist() == [False, False]
+    assert attached["feature_oi_flow_valid"].tolist() == [False, False]
+    assert attached["feature_liquidation_valid"].tolist() == [False, False]
+    assert attached["feature_bbo_valid"].tolist() == [False, False]
+    assert attached["feature_depth_valid"].tolist() == [False, False]
 
 
 def test_run_writes_policy_flags_with_synthetic_loader(monkeypatch, tmp_path: Path) -> None:
