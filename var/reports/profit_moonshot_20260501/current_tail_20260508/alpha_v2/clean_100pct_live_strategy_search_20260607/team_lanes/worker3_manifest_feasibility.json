@@ -63,7 +63,7 @@
     ],
     "runner_backtest_feasible": true
   },
-  "generated_at_utc": "2026-06-07T06:58:38Z",
+  "generated_at_utc": "2026-06-07T07:02:00Z",
   "goal_reference": ".omx/ultragoal G002-contamination-and-eligibility-audit",
   "hard_search_constraints": {
     "allowed_optimization_input_splits": [
@@ -243,7 +243,7 @@
     "dirty_before_lane_outputs": false,
     "dirty_status_before_lane_outputs": [],
     "git_commit": "f9da35e126234f05f5fc223a99b1f1b5fa4c5845",
-    "manifest_payload_sha256": "41f8bff5e8ce41f0aa1686a9fe31ae20c6bc3ec7dd897ce61e135eddbdbb0f43",
+    "manifest_payload_sha256": "bcd9d6d9b0a0c916f37c3be843583fa6e0b425e66f2c2bfcafcacce98577dfc9",
     "source_hashes_sha256": {
       "scripts/research/run_alpha_zoo_69_asset_clean_oos_gate.py": "b2c51ae3b7af6f4e6871b3645297728049b4b39590b069f56bd33e706bbd1da7",
       "scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py": "73c6211004d93082d96c1504e599fb959197fb4129f841c855f3d3022a11936b",
@@ -273,11 +273,19 @@
   "scope": {
     "core_code_changes_made": false,
     "deliverables": [
-      "team_lanes/worker3_manifest_feasibility.md",
-      "team_lanes/worker3_manifest_feasibility.json"
+      "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/team_lanes/worker3_manifest_feasibility.md",
+      "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/team_lanes/worker3_manifest_feasibility.json"
     ],
     "lane": "Lane 3 immutable manifest and runner feasibility",
-    "reason_core_code_not_changed": "Task scope asks for manifest/runner feasibility artifacts. Core runner changes would touch shared scripts outside the lane output scope and should be scheduled only after leader review."
+    "leader_clarification_applied": {
+      "instruction": "Write artifacts only under var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/team_lanes/.",
+      "message_id": "587f766f-d0a5-45a3-ab3d-e192c2ccb6e0"
+    },
+    "reason_core_code_not_changed": "Task scope asks for manifest/runner feasibility artifacts. Core runner changes would touch shared scripts outside the lane output scope and should be scheduled only after leader review.",
+    "supersedes_wrong_initial_paths": [
+      "team_lanes/worker3_manifest_feasibility.md",
+      "team_lanes/worker3_manifest_feasibility.json"
+    ]
   },
   "subagent_delegation": {
     "serial_searches_before_skip": 2,
