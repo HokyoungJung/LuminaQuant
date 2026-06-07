@@ -2113,3 +2113,17 @@ Best raw/shadow candidate is `lagged_shadow_leaf_router:core_warmup4_avg2_val05_
 - Interpretation: this is theoretically plausible (trend/cross-sectional momentum + validation/risk gating), not a date/asset hard-code. The large 2026-06 contribution from relaxed aggressive (`+64.80%`) also makes overfit risk obvious.
 - Deployment label: **research_shadow_only_requires_fresh_forward_shadow_and_bar_exact_rerun**. It is not live-clean because the grid was selected after reviewing the historical OOS set. Real-money allocation remains `0%` until the rule is pre-registered, bar-exact rerun reproduces it, and fresh-forward shadow/paper fill telemetry passes 10/15/20bps cost, turnover/RPT, spread/slippage, partial/reject/cancel checks.
 - Row-metric scaled stress variants reached `377.94%` comp / `553.50%` ann, but those are fold-metric linear sizing approximations, not bar-exact production metrics; use only to prioritize the next bar-exact rerun.
+
+## 2026-06-07 — Pre-registered lagged router replay pass
+
+- Follow-up to the Codex performance re-research: the high-return lagged leaf router hypothesis has now been moved from ad-hoc diagnostic into the monthly walk-forward runner as `PREREGISTERED_LAGGED_LEAF_ROUTER_LABEL`.
+- Runner label: `codex_lagged_leaf_router_grid:h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_exact_unscaled`.
+- Code path: `scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py` now emits the pre-registered spec during full lagged-router candidate generation and replays it from existing exact fold rows during `--recompute-from-json`.
+- Replay artifact: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/codex_preregistered_lagged_router_pass_20260607/preregistered_lagged_router_pass_20260607.md` and `.json`.
+- Official replay rank: aggregate rank `1` among the recomputed rows.
+- Official metrics: OOS compounded `197.37%`, annualized approx `269.80%`, max fold OOS MDD `27.69%`, monthly equity MDD `4.50%`, positive folds `5/10`, profit factor `30.04`, latest fold `+64.80%`.
+- Governance flags passed for the internal replay gate: `uses_locked_oos_for_selection=false`, `nested_hybrid_dependency=false`, current-fold OOS is report-only, and selection uses train/validation + prior completed leaf OOS history.
+- Governance flags still blocking live: `post_oos_research_variant=true`, `requires_fresh_forward_shadow=true`, `clean_promotion_eligible=false`. This is now a **pre-registered shadow/paper candidate**, not a real-money approval.
+- Tests added: lagged-router full candidate path now checks the pre-registered label, prior-only history tail, validation weight, no locked-OOS selection, and no nested dependency; replay path checks exact source-row selection and copied OOS metrics.
+- Verification for this pass: Ruff format/check passed; `PYTHONPATH=. uv run pytest -q tests/test_alpha_zoo_69_asset_monthly_refit_walkforward.py -k 'lagged_shadow or preregistered'` -> `2 passed`; `--recompute-from-json` generated the pass artifact and aggregate rank 1.
+- Next gate that cannot be faked: freeze this exact spec before the next unseen month, then require fresh-forward shadow/paper with 10/15/20bps costs, turnover/RPT, BBO spread/slippage, partial/reject/cancel telemetry before any small-sleeve review.

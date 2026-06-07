@@ -533,6 +533,130 @@ def test_lagged_shadow_leaf_router_uses_only_prior_completed_oos_and_leaf_source
     assert scaled[0]["lagged_shadow_scale_applied"] is True
     assert scaled[0]["uses_locked_oos_for_selection"] is False
     assert scaled[0]["nested_hybrid_dependency"] is False
+    preregistered = [
+        module._evaluate_candidate(candidate, fold)
+        for candidate in routed
+        if candidate.candidate_label == module.PREREGISTERED_LAGGED_LEAF_ROUTER_LABEL
+    ]
+    assert len(preregistered) == 1
+    assert preregistered[0]["selected_candidate_label"] == relaxed_label
+    assert preregistered[0]["router_branch"] == "pre_registered_lagged_plus_validation_leaf"
+    assert preregistered[0]["lagged_shadow_avg_window"] == 1
+    assert preregistered[0]["lagged_shadow_history_tail"] == [0.10]
+    assert preregistered[0]["lagged_shadow_validation_weight"] == pytest.approx(0.25)
+    assert preregistered[0]["uses_locked_oos_for_selection"] is False
+    assert preregistered[0]["current_fold_oos_used_for_weighting"] is False
+    assert preregistered[0]["nested_hybrid_dependency"] is False
+    assert preregistered[0]["clean_promotion_eligible"] is False
+
+
+def test_preregistered_lagged_leaf_router_replay_uses_prior_leaf_history() -> None:
+    strict_label = "strict_efficiency:balanced_mdd12_gross5_69_asset_efficiency_repair_optuna"
+    relaxed_label = (
+        "relaxed_efficiency:growth_mdd20_gross8_69_asset_relaxed_efficiency_repair_optuna"
+    )
+
+    def row(
+        fold_id: str,
+        label: str,
+        family: str,
+        *,
+        train_return: float,
+        train_mdd: float,
+        validation_return: float,
+        validation_mdd: float,
+        oos_return: float,
+    ) -> dict[str, object]:
+        return {
+            "fold_id": fold_id,
+            "candidate_label": label,
+            "source_profile_id": label,
+            "profile_kind": "leaf",
+            "family": family,
+            "clean_promotion_eligible": True,
+            "selection_reasons": [],
+            "uses_locked_oos_for_selection": False,
+            "same_month_self_feeding": False,
+            "current_fold_oos_used_for_weighting": False,
+            "post_oos_research_variant": False,
+            "requires_fresh_forward_shadow": False,
+            "train": {"total_return": train_return, "mdd": train_mdd},
+            "validation": {
+                "total_return": validation_return,
+                "mdd": validation_mdd,
+                "calmar": validation_return / max(validation_mdd, 0.01),
+            },
+            "locked_oos": {"total_return": oos_return, "mdd": 0.03},
+        }
+
+    rows: list[dict[str, object]] = []
+    for idx, fold_id in enumerate(["2025-01", "2025-02", "2025-03", "2025-04"], start=1):
+        rows.extend(
+            [
+                row(
+                    fold_id,
+                    strict_label,
+                    "strict_efficiency",
+                    train_return=0.10,
+                    train_mdd=0.10,
+                    validation_return=0.05,
+                    validation_mdd=0.08,
+                    oos_return=0.01 * idx,
+                ),
+                row(
+                    fold_id,
+                    relaxed_label,
+                    "relaxed_efficiency",
+                    train_return=0.10,
+                    train_mdd=0.10,
+                    validation_return=0.05,
+                    validation_mdd=0.08,
+                    oos_return=0.00 if idx < 4 else 0.10,
+                ),
+            ]
+        )
+    rows.extend(
+        [
+            row(
+                "2025-05",
+                strict_label,
+                "strict_efficiency",
+                train_return=0.10,
+                train_mdd=0.10,
+                validation_return=0.05,
+                validation_mdd=0.08,
+                oos_return=-0.25,
+            ),
+            row(
+                "2025-05",
+                relaxed_label,
+                "relaxed_efficiency",
+                train_return=0.20,
+                train_mdd=0.15,
+                validation_return=0.30,
+                validation_mdd=0.12,
+                oos_return=0.42,
+            ),
+        ]
+    )
+
+    replayed = module._append_preregistered_lagged_leaf_router_rows(rows)
+    router_rows = [
+        item
+        for item in replayed
+        if item["candidate_label"] == module.PREREGISTERED_LAGGED_LEAF_ROUTER_LABEL
+    ]
+
+    assert len(router_rows) == 5
+    assert router_rows[-1]["selected_candidate_label"] == relaxed_label
+    assert router_rows[-1]["router_branch"] == "pre_registered_lagged_plus_validation_leaf"
+    assert router_rows[-1]["lagged_shadow_history_count"] == 4
+    assert router_rows[-1]["lagged_shadow_history_tail"] == [0.10]
+    assert router_rows[-1]["locked_oos"]["total_return"] == pytest.approx(0.42)
+    assert router_rows[-1]["uses_locked_oos_for_selection"] is False
+    assert router_rows[-1]["post_oos_research_variant"] is True
+    assert router_rows[-1]["requires_fresh_forward_shadow"] is True
+    assert router_rows[-1]["nested_hybrid_dependency"] is False
 
 
 def test_dynamic_aware_hybrid_is_disabled_for_nested_hybrid_materials(

@@ -2707,6 +2707,17 @@ LAGGED_SHADOW_LEAF_AVG_WINDOW = 2
 LAGGED_SHADOW_LEAF_MIN_VALIDATION_RETURN = 0.05
 LAGGED_SHADOW_LEAF_MAX_VALIDATION_MDD = 0.12
 LAGGED_SHADOW_LEAF_MAX_TRAIN_MDD = 0.50
+PREREGISTERED_LAGGED_LEAF_ROUTER_LABEL = (
+    "codex_lagged_leaf_router_grid:"
+    "h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_exact_unscaled"
+)
+PREREGISTERED_LAGGED_LEAF_MIN_HISTORY = 4
+PREREGISTERED_LAGGED_LEAF_AVG_WINDOW = 1
+PREREGISTERED_LAGGED_LEAF_MIN_TRAIN_RETURN = -0.02
+PREREGISTERED_LAGGED_LEAF_MAX_TRAIN_MDD = 0.50
+PREREGISTERED_LAGGED_LEAF_MIN_VALIDATION_RETURN = 0.0
+PREREGISTERED_LAGGED_LEAF_MAX_VALIDATION_MDD = 0.25
+PREREGISTERED_LAGGED_LEAF_VALIDATION_WEIGHT = 0.25
 LAGGED_SHADOW_LEAF_ROUTER_SPECS: tuple[dict[str, float | str], ...] = (
     {
         "label": LAGGED_SHADOW_LEAF_ROUTER_LABEL,
@@ -2900,30 +2911,60 @@ def _lagged_shadow_leaf_router_candidates(
             "strict_core_scaled",
         )
 
-    online_pool: list[tuple[float, float, CandidateResult, dict[str, float], list[float]]] = []
-    for candidate in candidates:
-        if not _lagged_shadow_leaf_source(candidate):
-            continue
-        history = list(prior_completed_returns.get(candidate.candidate_label) or [])
-        if len(history) < LAGGED_SHADOW_LEAF_MIN_HISTORY:
-            continue
-        snap = _candidate_validation_snapshot(candidate, fold)
-        if snap["train_return"] < -0.02:
-            continue
-        if snap["train_mdd"] > LAGGED_SHADOW_LEAF_MAX_TRAIN_MDD:
-            continue
-        if snap["validation_return"] < LAGGED_SHADOW_LEAF_MIN_VALIDATION_RETURN:
-            continue
-        if snap["validation_mdd"] > LAGGED_SHADOW_LEAF_MAX_VALIDATION_MDD:
-            continue
-        lagged_window = history[-LAGGED_SHADOW_LEAF_AVG_WINDOW:]
-        lagged_score = float(sum(lagged_window) / len(lagged_window))
-        validation_score = (
+    def validation_score(snap: Mapping[str, float]) -> float:
+        return (
             snap["validation_return"] / max(snap["validation_mdd"], 0.02)
             + 0.03 * min(snap["train_return"], 1.50)
             - 0.10 * snap["train_mdd"]
         )
-        online_pool.append((lagged_score, float(validation_score), candidate, snap, history))
+
+    online_pool: list[tuple[float, float, CandidateResult, dict[str, float], list[float]]] = []
+    preregistered_pool: list[
+        tuple[float, float, float, CandidateResult, dict[str, float], list[float]]
+    ] = []
+    for candidate in candidates:
+        if not _lagged_shadow_leaf_source(candidate):
+            continue
+        history = list(prior_completed_returns.get(candidate.candidate_label) or [])
+        snap = _candidate_validation_snapshot(candidate, fold)
+        if (
+            len(history) >= LAGGED_SHADOW_LEAF_MIN_HISTORY
+            and snap["train_return"] >= -0.02
+            and snap["train_mdd"] <= LAGGED_SHADOW_LEAF_MAX_TRAIN_MDD
+            and snap["validation_return"] >= LAGGED_SHADOW_LEAF_MIN_VALIDATION_RETURN
+            and snap["validation_mdd"] <= LAGGED_SHADOW_LEAF_MAX_VALIDATION_MDD
+        ):
+            lagged_window = history[-LAGGED_SHADOW_LEAF_AVG_WINDOW:]
+            lagged_score = float(sum(lagged_window) / len(lagged_window))
+            online_pool.append(
+                (lagged_score, float(validation_score(snap)), candidate, snap, history)
+            )
+        if (
+            len(history) >= PREREGISTERED_LAGGED_LEAF_MIN_HISTORY
+            and snap["train_return"] >= PREREGISTERED_LAGGED_LEAF_MIN_TRAIN_RETURN
+            and snap["train_mdd"] <= PREREGISTERED_LAGGED_LEAF_MAX_TRAIN_MDD
+            and snap["validation_return"] >= PREREGISTERED_LAGGED_LEAF_MIN_VALIDATION_RETURN
+            and snap["validation_mdd"] <= PREREGISTERED_LAGGED_LEAF_MAX_VALIDATION_MDD
+        ):
+            preregistered_lagged_window = history[-PREREGISTERED_LAGGED_LEAF_AVG_WINDOW:]
+            preregistered_lagged_score = float(
+                sum(preregistered_lagged_window) / len(preregistered_lagged_window)
+            )
+            preregistered_validation_score = float(validation_score(snap))
+            preregistered_combined_score = (
+                preregistered_lagged_score
+                + PREREGISTERED_LAGGED_LEAF_VALIDATION_WEIGHT * preregistered_validation_score
+            )
+            preregistered_pool.append(
+                (
+                    preregistered_combined_score,
+                    preregistered_lagged_score,
+                    preregistered_validation_score,
+                    candidate,
+                    snap,
+                    history,
+                )
+            )
 
     selected: CandidateResult | None
     returns: pd.Series
@@ -3039,6 +3080,83 @@ def _lagged_shadow_leaf_router_candidates(
                 returns=spec_returns,
             )
         )
+    if preregistered_pool:
+        (
+            preregistered_combined_score,
+            preregistered_lagged_score,
+            preregistered_validation_score,
+            preregistered_selected,
+            preregistered_snap,
+            preregistered_history,
+        ) = max(
+            preregistered_pool,
+            key=lambda item: (
+                item[0],
+                item[1],
+                item[2],
+                item[4]["validation_return"],
+            ),
+        )
+        preregistered_returns = preregistered_selected.returns.copy()
+        preregistered_branch = "pre_registered_lagged_plus_validation_leaf"
+        preregistered_row_extra = {
+            "selected_candidate_label": preregistered_selected.candidate_label,
+            "router_branch": preregistered_branch,
+            "lagged_shadow_score": float(preregistered_lagged_score),
+            "lagged_shadow_validation_score": float(preregistered_validation_score),
+            "lagged_shadow_combined_score": float(preregistered_combined_score),
+            "lagged_shadow_score_mode": "lagged_plus_val025",
+            "lagged_shadow_history_count": len(preregistered_history),
+            "lagged_shadow_history_tail": [
+                float(item)
+                for item in preregistered_history[-PREREGISTERED_LAGGED_LEAF_AVG_WINDOW:]
+            ],
+            "selected_train_return": preregistered_snap["train_return"],
+            "selected_train_mdd": preregistered_snap["train_mdd"],
+            "selected_validation_return": preregistered_snap["validation_return"],
+            "selected_validation_mdd": preregistered_snap["validation_mdd"],
+            "selected_validation_calmar": preregistered_snap["validation_calmar"],
+            "risk_scale": 1.0,
+            "risk_scale_mode": "unscaled_pre_registered_lagged_plus_validation_leaf",
+            "weights": {preregistered_selected.candidate_label: 1.0},
+            "final_weights": {preregistered_selected.candidate_label: 1.0},
+        }
+    else:
+        (
+            _preregistered_selected,
+            preregistered_returns,
+            preregistered_row_extra,
+            preregistered_branch,
+        ) = strict_core_branch()
+    preregistered_row = {
+        **common_row,
+        **preregistered_row_extra,
+        "profile_id": PREREGISTERED_LAGGED_LEAF_ROUTER_LABEL,
+        "router_branch": preregistered_branch,
+        "selection_policy": (
+            "pre_registered_warmup4_last1_lagged_shadow_return_plus_"
+            "0.25_validation_score_leaf_router_val_return00_val_mdd25_no_current_oos"
+        ),
+        "lagged_shadow_min_history": PREREGISTERED_LAGGED_LEAF_MIN_HISTORY,
+        "lagged_shadow_avg_window": PREREGISTERED_LAGGED_LEAF_AVG_WINDOW,
+        "lagged_shadow_min_train_return": PREREGISTERED_LAGGED_LEAF_MIN_TRAIN_RETURN,
+        "lagged_shadow_max_train_mdd": PREREGISTERED_LAGGED_LEAF_MAX_TRAIN_MDD,
+        "lagged_shadow_min_validation_return": (PREREGISTERED_LAGGED_LEAF_MIN_VALIDATION_RETURN),
+        "lagged_shadow_max_validation_mdd": PREREGISTERED_LAGGED_LEAF_MAX_VALIDATION_MDD,
+        "lagged_shadow_validation_weight": PREREGISTERED_LAGGED_LEAF_VALIDATION_WEIGHT,
+        "lagged_shadow_scale_target_validation_mdd": 0.0,
+        "lagged_shadow_scale_max": 1.0,
+        "lagged_shadow_scale_applied": False,
+        "pre_registered_after_diagnostic_commit": True,
+    }
+    out.append(
+        _candidate_eval(
+            family="lagged_shadow_leaf_router",
+            label=PREREGISTERED_LAGGED_LEAF_ROUTER_LABEL,
+            row=preregistered_row,
+            returns=preregistered_returns,
+        )
+    )
     return out
 
 
@@ -4870,13 +4988,17 @@ def _evaluate_candidate(candidate: CandidateResult, fold: MonthlyFold) -> dict[s
         "scaled_validation_mdd": row.get("scaled_validation_mdd"),
         "lagged_shadow_score": row.get("lagged_shadow_score"),
         "lagged_shadow_validation_score": row.get("lagged_shadow_validation_score"),
+        "lagged_shadow_combined_score": row.get("lagged_shadow_combined_score"),
+        "lagged_shadow_score_mode": row.get("lagged_shadow_score_mode"),
         "lagged_shadow_history_count": row.get("lagged_shadow_history_count"),
         "lagged_shadow_history_tail": row.get("lagged_shadow_history_tail") or [],
         "lagged_shadow_min_history": row.get("lagged_shadow_min_history"),
         "lagged_shadow_avg_window": row.get("lagged_shadow_avg_window"),
+        "lagged_shadow_min_train_return": row.get("lagged_shadow_min_train_return"),
         "lagged_shadow_min_validation_return": row.get("lagged_shadow_min_validation_return"),
         "lagged_shadow_max_validation_mdd": row.get("lagged_shadow_max_validation_mdd"),
         "lagged_shadow_max_train_mdd": row.get("lagged_shadow_max_train_mdd"),
+        "lagged_shadow_validation_weight": row.get("lagged_shadow_validation_weight"),
         "lagged_shadow_completed_fold_count": row.get("lagged_shadow_completed_fold_count"),
         "lagged_shadow_completed_fold_tail": row.get("lagged_shadow_completed_fold_tail") or [],
         "lagged_shadow_scale_target_validation_mdd": row.get(
@@ -5205,6 +5327,7 @@ def _recompute_payload_from_existing(
     """Fast path: recompute clean flags, rankings, audits, and markdown inputs."""
     out = dict(payload)
     rows = _sanitize_research_dependency_flags(list(payload.get("fold_candidate_rows") or []))
+    rows = _append_preregistered_lagged_leaf_router_rows(rows)
     out["fold_candidate_rows"] = rows
     _refresh_payload_derived_reports(out)
     out["recomputed_from_existing_rows"] = True
@@ -5321,6 +5444,215 @@ def _row_is_clean_leaf_material(row: Mapping[str, Any]) -> bool:
         and not row.get("requires_fresh_forward_shadow")
         and bool(row.get("clean_promotion_eligible", True))
     )
+
+
+def _row_is_preregistered_lagged_leaf_source(row: Mapping[str, Any]) -> bool:
+    """Return whether a row is a fixed strict/relaxed leaf source for lagged replay."""
+    return bool(
+        _lagged_shadow_leaf_row_source(row)
+        and not row.get("uses_locked_oos_for_selection")
+        and not row.get("same_month_self_feeding")
+        and not row.get("current_fold_oos_used_for_weighting")
+        and not row.get("post_oos_research_variant")
+        and not row.get("requires_fresh_forward_shadow")
+    )
+
+
+def _preregistered_lagged_validation_score(row: Mapping[str, Any]) -> float:
+    return (
+        _row_metric(row, "validation", "total_return")
+        / max(_row_metric(row, "validation", "mdd"), 0.02)
+        + 0.03 * min(_row_metric(row, "train", "total_return"), 1.50)
+        - 0.10 * _row_metric(row, "train", "mdd")
+    )
+
+
+def _row_passes_preregistered_lagged_leaf_gate(row: Mapping[str, Any]) -> bool:
+    return bool(
+        _row_metric(row, "train", "total_return") >= PREREGISTERED_LAGGED_LEAF_MIN_TRAIN_RETURN
+        and _row_metric(row, "train", "mdd") <= PREREGISTERED_LAGGED_LEAF_MAX_TRAIN_MDD
+        and _row_metric(row, "validation", "total_return")
+        >= PREREGISTERED_LAGGED_LEAF_MIN_VALIDATION_RETURN
+        and _row_metric(row, "validation", "mdd") <= PREREGISTERED_LAGGED_LEAF_MAX_VALIDATION_MDD
+    )
+
+
+def _append_preregistered_lagged_leaf_router_rows(
+    rows: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Replay the pre-registered lagged leaf router from existing exact fold rows.
+
+    This is the fast-path counterpart of ``_lagged_shadow_leaf_router_candidates``.
+    It copies exact source-row fold metrics after selecting with only train,
+    validation, and prior completed leaf OOS returns.  The family remains
+    post-OOS shadow because the rule was registered after a diagnostic sweep.
+    """
+    base_rows = [
+        dict(row)
+        for row in rows
+        if str(row.get("candidate_label") or "") != PREREGISTERED_LAGGED_LEAF_ROUTER_LABEL
+    ]
+    by_fold: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in base_rows:
+        fold_id = str(row.get("fold_id") or "")
+        if fold_id:
+            by_fold[fold_id].append(row)
+
+    prior_completed_returns: dict[str, list[float]] = {}
+    completed_fold_ids: list[str] = []
+    replay_rows: list[dict[str, Any]] = []
+    for fold_id in sorted(by_fold):
+        fold_rows = by_fold[fold_id]
+        eligible: list[tuple[float, float, float, dict[str, Any], list[float]]] = []
+        for row in fold_rows:
+            if not _row_is_preregistered_lagged_leaf_source(row):
+                continue
+            history = list(prior_completed_returns.get(str(row.get("candidate_label"))) or [])
+            if len(history) < PREREGISTERED_LAGGED_LEAF_MIN_HISTORY:
+                continue
+            if not _row_passes_preregistered_lagged_leaf_gate(row):
+                continue
+            lagged_window = history[-PREREGISTERED_LAGGED_LEAF_AVG_WINDOW:]
+            lagged_score = float(sum(lagged_window) / len(lagged_window))
+            validation_score = float(_preregistered_lagged_validation_score(row))
+            combined_score = (
+                lagged_score + PREREGISTERED_LAGGED_LEAF_VALIDATION_WEIGHT * validation_score
+            )
+            eligible.append((combined_score, lagged_score, validation_score, row, history))
+
+        if eligible:
+            combined_score, lagged_score, validation_score, selected, history = max(
+                eligible,
+                key=lambda item: (
+                    item[0],
+                    item[1],
+                    item[2],
+                    _row_metric(item[3], "validation", "total_return"),
+                ),
+            )
+            selected_label = str(selected.get("candidate_label"))
+            new_row = dict(selected)
+            new_row.update(
+                {
+                    "selected_candidate_label": selected_label,
+                    "router_branch": "pre_registered_lagged_plus_validation_leaf",
+                    "lagged_shadow_score": float(lagged_score),
+                    "lagged_shadow_validation_score": float(validation_score),
+                    "lagged_shadow_combined_score": float(combined_score),
+                    "lagged_shadow_score_mode": "lagged_plus_val025",
+                    "lagged_shadow_history_count": len(history),
+                    "lagged_shadow_history_tail": [
+                        float(item) for item in history[-PREREGISTERED_LAGGED_LEAF_AVG_WINDOW:]
+                    ],
+                    "selected_train_return": _row_metric(selected, "train", "total_return"),
+                    "selected_train_mdd": _row_metric(selected, "train", "mdd"),
+                    "selected_validation_return": _row_metric(
+                        selected, "validation", "total_return"
+                    ),
+                    "selected_validation_mdd": _row_metric(selected, "validation", "mdd"),
+                    "selected_validation_calmar": _row_metric(selected, "validation", "calmar"),
+                    "risk_scale": 1.0,
+                    "risk_scale_mode": "unscaled_pre_registered_lagged_plus_validation_leaf",
+                    "weights": {selected_label: 1.0},
+                    "final_weights": {selected_label: 1.0},
+                }
+            )
+        else:
+            fallback = next(
+                (
+                    row
+                    for row in fold_rows
+                    if str(row.get("candidate_label") or "") == LAGGED_SHADOW_LEAF_ROUTER_LABEL
+                    and str(row.get("router_branch") or "").startswith("strict_core")
+                ),
+                None,
+            )
+            if fallback is None:
+                reference = fold_rows[0] if fold_rows else {}
+                new_row = {
+                    "fold_id": fold_id,
+                    "train": {
+                        **dict(reference.get("train") or {}),
+                        "total_return": 0.0,
+                        "mdd": 0.0,
+                    },
+                    "validation": {
+                        **dict(reference.get("validation") or {}),
+                        "total_return": 0.0,
+                        "mdd": 0.0,
+                    },
+                    "locked_oos": {
+                        **dict(reference.get("locked_oos") or {}),
+                        "total_return": 0.0,
+                        "mdd": 0.0,
+                    },
+                    "selected_candidate_label": "cash_no_strict_core_leaf",
+                    "router_branch": "strict_core_cash",
+                    "risk_scale": 0.0,
+                    "risk_scale_mode": "strict_core_cash_guard",
+                    "weights": {},
+                    "final_weights": {},
+                }
+            else:
+                new_row = dict(fallback)
+
+        new_row.update(
+            {
+                "family": "lagged_shadow_leaf_router",
+                "candidate_label": PREREGISTERED_LAGGED_LEAF_ROUTER_LABEL,
+                "source_profile_id": PREREGISTERED_LAGGED_LEAF_ROUTER_LABEL,
+                "profile_id": PREREGISTERED_LAGGED_LEAF_ROUTER_LABEL,
+                "profile_kind": "lagged_shadow_leaf_router",
+                "candidate_tier": "post_oos_research_forward_shadow_only",
+                "selection_inputs": ["train", "validation", "lagged_completed_shadow_oos"],
+                "selection_policy": (
+                    "pre_registered_warmup4_last1_lagged_shadow_return_plus_"
+                    "0.25_validation_score_leaf_router_val_return00_val_mdd25_no_current_oos"
+                ),
+                "lagged_shadow_min_history": PREREGISTERED_LAGGED_LEAF_MIN_HISTORY,
+                "lagged_shadow_avg_window": PREREGISTERED_LAGGED_LEAF_AVG_WINDOW,
+                "lagged_shadow_min_train_return": PREREGISTERED_LAGGED_LEAF_MIN_TRAIN_RETURN,
+                "lagged_shadow_max_train_mdd": PREREGISTERED_LAGGED_LEAF_MAX_TRAIN_MDD,
+                "lagged_shadow_min_validation_return": (
+                    PREREGISTERED_LAGGED_LEAF_MIN_VALIDATION_RETURN
+                ),
+                "lagged_shadow_max_validation_mdd": (PREREGISTERED_LAGGED_LEAF_MAX_VALIDATION_MDD),
+                "lagged_shadow_validation_weight": (PREREGISTERED_LAGGED_LEAF_VALIDATION_WEIGHT),
+                "lagged_shadow_completed_fold_count": len(completed_fold_ids),
+                "lagged_shadow_completed_fold_tail": list(completed_fold_ids[-4:]),
+                "lagged_shadow_scale_target_validation_mdd": 0.0,
+                "lagged_shadow_scale_max": 1.0,
+                "lagged_shadow_scale_applied": False,
+                "online_update_cutoff_fold": (
+                    completed_fold_ids[-1] if completed_fold_ids else None
+                ),
+                "pre_registered_after_diagnostic_commit": True,
+                "mechanically_oos_clean": True,
+                "uses_locked_oos_for_selection": False,
+                "same_month_self_feeding": False,
+                "current_fold_oos_used_for_weighting": False,
+                "post_oos_research_variant": True,
+                "requires_fresh_forward_shadow": True,
+                "nested_hybrid_dependency": False,
+                "clean_promotion_eligible": False,
+                "ready_for_paper": True,
+                "ready_for_real": False,
+                "real_money_execution": False,
+                "selection_reasons": [],
+            }
+        )
+        replay_rows.append(new_row)
+
+        for row in fold_rows:
+            if not _row_is_preregistered_lagged_leaf_source(row):
+                continue
+            label = str(row.get("candidate_label"))
+            prior_completed_returns.setdefault(label, []).append(
+                _row_metric(row, "locked_oos", "total_return")
+            )
+        completed_fold_ids.append(fold_id)
+
+    return [*base_rows, *replay_rows]
 
 
 def _row_level_leaf_selector_rows(
