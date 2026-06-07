@@ -195207,7 +195207,7 @@
   },
   "fold_count": 5,
   "fresh_forward_required": true,
-  "generated_at_utc": "2026-06-07T10:32:06.564484Z",
+  "generated_at_utc": "2026-06-07T11:08:08.338686Z",
   "label_blockers": [
     "continuous_position_state_across_split_boundaries",
     "fresh_forward_required_before_promotion"

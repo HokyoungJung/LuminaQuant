@@ -9,7 +9,8 @@
     "Final verification passed locally after G008 reconciliation, but formal ultragoal completion remains blocked by the stale hidden Codex goal snapshot.",
     "Latest BBO accumulation recheck (2026-06-07T10:32:06.564484Z) used inferred candidate_cap=500 and left feature-bounded OOS unchanged at -0.24% comp / -0.57% annualized; no promotion flags changed.",
     "Historical BBO ingest adapter is now plumbing-ready for explicitly approved external Binance BBO history files, but it does not approve any source/vendor and does not change the no-real-money decision without a new clean walk-forward rerun.",
-    "Official Binance public bookTicker archive backfill is now implemented and locally verified, but it is data plumbing only: approved symbol/date manifest, new clean walk-forward, and paper fill/cost telemetry are still required before any deployment review."
+    "Official Binance public bookTicker archive backfill is now implemented and locally verified, but it is data plumbing only: approved symbol/date manifest, new clean walk-forward, and paper fill/cost telemetry are still required before any deployment review.",
+    "Actual official Binance bookTicker smoke backfill imported 2024-03-30 core5 five-minute BBO rows and the post-backfill cap=500 rerun remained unchanged/rejected; broader train/validation historical BBO coverage is still the next blocker."
   ],
   "final_reviews": {
     "ai_slop_cleaner": "not invoked because no cleanup/refactor/code-structure change was made; only report/provenance artifacts are being reconciled.",
@@ -20,7 +21,7 @@
     "g008_reverification": "PASS_WITH_G008_WATCH_AND_HIDDEN_GOAL_BLOCKER; see final_independent_review_20260607/g008_final_reverification_summary_20260607.json"
   },
   "generated_at_utc": "2026-06-07T07:13:46.900714+00:00",
-  "last_reverified_at_utc": "2026-06-07T11:04:26Z",
+  "last_reverified_at_utc": "2026-06-07T11:09:51Z",
   "last_reviewed_at_utc": "2026-06-07T10:08:34+00:00",
   "outputs": [
     "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/final_report_clean_100pct_live_strategy_search_20260607.md",
@@ -151,6 +152,11 @@
       "name": "public_book_ticker_archive_backfill",
       "status": "pass",
       "evidence": "uv run ruff check import/backfill BBO scripts and tests -> All checks passed; uv run ruff format --check import/backfill BBO scripts and tests -> 4 files already formatted; PYTHONPATH=. uv run pytest -q tests/test_import_binance_book_ticker_history.py tests/test_backfill_binance_public_book_ticker_history.py -> 8 passed in 0.16s; curl -I official BTCUSDT 2024-03-30 archive URL -> HTTP/2 200 application/zip"
+    },
+    {
+      "name": "official_bbo_smoke_backfill_and_post_rerun",
+      "status": "pass_no_promotion",
+      "evidence": "Backfilled BTC/ETH/SOL/BNB/TRX 2024-03-30 official bookTicker archives with cadence_seconds=300 -> 1,440 persisted rows; support inventory BBO rows now BTC 1029, ETH 1043, SOL 1034, BNB 1004, TRX 988; post-backfill cap=500 clean discovery generated 2026-06-07T11:08:08.338686Z and remained -0.24% OOS comp / -0.57% annualized / promotion false; final focused verification: Ruff/pytest/docs pass (22 tests, 119 markdown files)."
     }
   ]
 }

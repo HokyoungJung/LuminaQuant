@@ -10,9 +10,10 @@ train/validation coverage instead of only forward sidecar data.
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 from datetime import date, datetime, timedelta
-from io import BytesIO
+from io import BytesIO, TextIOWrapper
 from zipfile import ZipFile
 
 import polars as pl
@@ -53,6 +54,114 @@ def _read_first_csv_from_zip(blob: bytes) -> pl.DataFrame:
             raise ValueError("zip archive did not contain a CSV member")
         with archive.open(names[0]) as member:
             return pl.read_csv(member)
+
+
+def _first_csv_name(blob: bytes) -> str:
+    with ZipFile(BytesIO(blob)) as archive:
+        names = [name for name in archive.namelist() if name.lower().endswith(".csv")]
+        if not names:
+            raise ValueError("zip archive did not contain a CSV member")
+        return names[0]
+
+
+def _float_or_none(value: object) -> float | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        return float(text)
+    except ValueError:
+        return None
+
+
+def _int_or_none(value: object) -> int | None:
+    parsed = _float_or_none(value)
+    if parsed is None or parsed != parsed:
+        return None
+    return int(parsed)
+
+
+def _row_value(row: dict[str, str], names: tuple[str, ...]) -> str | None:
+    for name in names:
+        value = row.get(name)
+        if value not in (None, ""):
+            return value
+    lower = {key.lower(): value for key, value in row.items()}
+    for name in names:
+        value = lower.get(name.lower())
+        if value not in (None, ""):
+            return value
+    return None
+
+
+def _read_cadence_sampled_csv_from_zip(
+    blob: bytes,
+    *,
+    symbol: str,
+    cadence_seconds: int,
+) -> tuple[pl.DataFrame, int]:
+    cadence_ms = int(cadence_seconds) * 1000
+    if cadence_ms <= 0:
+        raise ValueError("cadence_seconds must be positive")
+    normalized_symbol = normalize_symbol(symbol)
+    rows: list[dict[str, object]] = []
+    seen_buckets: set[int] = set()
+    archive_rows = 0
+    with ZipFile(BytesIO(blob)) as archive:
+        name = _first_csv_name(blob)
+        with archive.open(name) as member:
+            reader = csv.DictReader(TextIOWrapper(member, encoding="utf-8"))
+            for raw in reader:
+                archive_rows += 1
+                timestamp_ms = _int_or_none(
+                    _row_value(
+                        raw,
+                        ("transaction_time", "timestamp_ms", "time", "timestamp", "event_time"),
+                    )
+                )
+                if timestamp_ms is None:
+                    continue
+                bucket_ms = timestamp_ms // cadence_ms * cadence_ms
+                if bucket_ms in seen_buckets:
+                    continue
+                bid = _float_or_none(
+                    _row_value(raw, ("best_bid_price", "bid_price", "best_bid", "bid", "b"))
+                )
+                ask = _float_or_none(
+                    _row_value(raw, ("best_ask_price", "ask_price", "best_ask", "ask", "a"))
+                )
+                if bid is None or ask is None:
+                    continue
+                bid_qty = _float_or_none(
+                    _row_value(
+                        raw,
+                        ("best_bid_qty", "best_bid_quantity", "bid_quantity", "bid_qty", "B"),
+                    )
+                )
+                ask_qty = _float_or_none(
+                    _row_value(
+                        raw,
+                        ("best_ask_qty", "best_ask_quantity", "ask_quantity", "ask_qty", "A"),
+                    )
+                )
+                mid = (bid + ask) / 2.0
+                rows.append(
+                    {
+                        "timestamp_ms": timestamp_ms,
+                        "symbol": normalized_symbol,
+                        "best_bid_price": bid,
+                        "best_bid_quantity": bid_qty,
+                        "best_ask_price": ask,
+                        "best_ask_quantity": ask_qty,
+                        "bbo_mid_price": mid,
+                        "bbo_spread_bps": ((ask - bid) / mid * 10000.0) if mid > 0.0 else None,
+                    }
+                )
+                seen_buckets.add(bucket_ms)
+    frame = pl.DataFrame(rows).sort(["symbol", "timestamp_ms"]) if rows else pl.DataFrame()
+    return frame, archive_rows
 
 
 def _sample_by_cadence(frame: pl.DataFrame, *, cadence_seconds: int | None) -> pl.DataFrame:
@@ -99,10 +208,16 @@ def backfill_public_book_ticker_history(
                     {"symbol": normalized_symbol, "date": day_value.isoformat(), "url": url}
                 )
                 continue
-            frame = _read_first_csv_from_zip(blob)
-            normalized = normalize_bbo_frame(frame, symbol_override=normalized_symbol)
-            archive_rows = int(normalized.height)
-            normalized = _sample_by_cadence(normalized, cadence_seconds=cadence_seconds)
+            if cadence_seconds is None:
+                frame = _read_first_csv_from_zip(blob)
+                normalized = normalize_bbo_frame(frame, symbol_override=normalized_symbol)
+                archive_rows = int(normalized.height)
+            else:
+                normalized, archive_rows = _read_cadence_sampled_csv_from_zip(
+                    blob,
+                    symbol=normalized_symbol,
+                    cadence_seconds=int(cadence_seconds),
+                )
             if max_rows_per_archive is not None:
                 normalized = normalized.head(int(max_rows_per_archive))
             rows = normalized.drop("symbol").to_dicts()

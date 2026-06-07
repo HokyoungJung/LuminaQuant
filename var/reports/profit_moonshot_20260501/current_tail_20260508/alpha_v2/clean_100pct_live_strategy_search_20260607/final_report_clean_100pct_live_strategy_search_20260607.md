@@ -58,13 +58,14 @@
 
 ## Latest BBO accumulation recheck
 
-- Source: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607_feature_bounded/clean_new_alpha_discovery_latest.json` generated `2026-06-07T10:32:06.564484Z`.
+- Source: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607_feature_bounded/clean_new_alpha_discovery_latest.json` generated `2026-06-07T11:08:08.338686Z` after the official one-day BBO smoke backfill.
 - Inferred candidate cap: `500`; folds: `5`; candidate rows: `2500`.
 - Result: OOS comp `-0.24%`, annualized `-0.57%`, monthly equity MDD `8.72%`, Sharpe `0.04`, hit `3/5`.
-- BBO rows now observed: BNBUSDT 716, BTCUSDT 741, ETHUSDT 755, SOLUSDT 746, TRXUSDT 700.
+- BBO rows now observed after official one-day smoke backfill plus forward sidecar: BTCUSDT 1029, ETHUSDT 1043, SOLUSDT 1034, BNBUSDT 1004, TRXUSDT 988.
 - Impact: no promotion flag changed; `clean_new_alpha_discovery_feature_bounded` remains `rejected` and `real_money_execution=false`.
 - Follow-up implementation: `scripts/import_binance_book_ticker_history.py` can now ingest explicitly approved external Binance BBO history files into feature points (`csv`, `jsonl`/`ndjson`, `parquet`) and is covered by `tests/test_import_binance_book_ticker_history.py`. This is plumbing only: it does not approve a data vendor, does not change the cap=500 OOS result above, and cannot unlock real-money without a new clean walk-forward rerun on approved history.
 - Public archive follow-up: `scripts/backfill_binance_public_book_ticker_history.py` can now pull official Binance USD-M daily `bookTicker` ZIPs from `data.binance.vision`, normalize the official `transaction_time`/`best_*` column shape, optionally cadence-sample rows, and persist feature points. This is still data plumbing only: symbol/date scope must be pre-manifested, and it does not change the no-real-money/no-small-sleeve conclusion without a fresh clean walk-forward plus paper fill/cost telemetry.
+- Actual smoke run: imported official `2024-03-30` BTC/ETH/SOL/BNB/TRX `bookTicker` archives, cadence-sampled each symbol-day to `288` five-minute rows (`1,440` persisted rows total), then reran the cap=500 BBO-aware clean discovery. The aggregate stayed OOS comp `-0.24%`, annualized `-0.57%`, monthly equity MDD `8.72%`, Sharpe `0.04`, hit `3/5`; promotion remains `false`.
 
 ## Verification
 
@@ -80,3 +81,4 @@
 - Latest cap=500 BBO freeze verification: JSON/artifact assertions pass; `git diff --check` pass; `PYTHONPATH=. uv run pytest -q tests/test_alpha_zoo_clean_new_alpha_discovery.py tests/test_strategy_support_inventory.py tests/test_collect_binance_book_ticker_feature_points.py` -> `12 passed in 0.54s`.
 - Historical BBO ingest adapter verification: `PYTHONPATH=. uv run pytest -q tests/test_import_binance_book_ticker_history.py` -> `3 passed in 0.08s`; existing BBO/alpha focused suite stayed `12 passed in 0.48s`.
 - Public Binance bookTicker archive backfill verification: Ruff check pass; Ruff format `4 files already formatted`; `PYTHONPATH=. uv run pytest -q tests/test_import_binance_book_ticker_history.py tests/test_backfill_binance_public_book_ticker_history.py` -> `8 passed in 0.16s`; `curl -I` on the official BTCUSDT 2024-03-30 archive returned `HTTP/2 200` / `application/zip`.
+- Post-smoke rerun verification: final focused check passed (`4 files already formatted`, Ruff all checks passed, `22 passed in 0.66s`, docs verification `119 markdown files checked`); clean result remained rejected/no-promotion.
