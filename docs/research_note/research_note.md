@@ -1,5 +1,61 @@
 # Research Note
 
+## 2026-06-07 KST — Deep-research 최종 결론: 최고 수익 후보는 freeze/shadow, real-money는 아직 금지
+
+최종 리포트: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_best_strategy_clean_oos_20260607/deep_research_best_strategy_clean_oos_20260607.md|json`.
+
+Hard gates는 사용자 답변 기준 `no_nested_oos_mining`, `execution_cost_gate`, `theory_plausibility_gate`다. 이 기준을 동시에 적용하면 **현재 real-money 실전 투입 승인 후보는 없다**. 수익 극대화 관점에서 가장 좋은 운영안은 `clean_input_meta_selector`를 freeze/shadow로 고정하고, `strict_no_leak_best_single`을 paper-control로 관찰하는 2-track이다.
+
+| Track | Evidence class | 주요 성과 | 결론 |
+| --- | --- | --- | --- |
+| `clean_input_meta_selector` | `shadow-freeze-only` | OOS comp `85.91%`, ann `110.46%`, max OOS MDD `19.29%`, monthly MDD `6.32%`, Sharpe `1.28`, PF `6.26`, hit `5/10`, latest partial month `64.80%` | 최고 수익 후보지만 selector-grid ranking이 historical locked-OOS를 사용했으므로 fresh-forward 전 paper/real 금지 |
+| `strict_no_leak_best_single_10bps` | paper-only / no-real-sleeve | 10bps total return `54.56%`, MDD `30.63%`, Sharpe `1.26`, PF `1.21`, hit `6/10`; 20bps stress return `27.10%`, MDD `43.63%` | clean/theory plausible control. Drawdown·cost stress·10-symbol concentration 때문에 real-sleeve 차단 |
+| `dynamic_conviction_switch:t0.85_risk_capped_fallback_val_ret02_calmar80_gate_val_mdd30_scaled` | paper baseline / monitor | OOS comp `34.39%`, ann `42.57%`, max bar MDD `27.69%`, hit `3/10`, train mean `12.68%`, val mean `10.34%` | 85-symbol clean mechanics baseline이나 sparse hit-rate와 MDD 때문에 실전 아님 |
+| `lagged_shadow_leaf_router cap150` | shadow-only | OOS comp `61.40%`, ann `77.62%`, max bar MDD `29.13%`, Sharpe `1.61`, hit `4/10` | current-fold OOS-free/non-nested이나 post-OOS family라 fresh-forward 전 승격 금지 |
+| `clean_new_alpha_discovery_full` | reject / diagnostic-only | 5-family diagnostic OOS comp `+2.51%`, ann `+3.01%`, max OOS MDD `8.77%`, monthly MDD `10.28%`, Sharpe `0.24`, PF `1.20`, hit `5/10`; search hash `4a6fee0f540f5d9ce15158beaf6b7c91ad89600cb5d76e1c4bfa0e33008b81b7` | 새 정보-flow/feature-flow family가 손실은 줄였지만 수익이 너무 낮고 `continuous_position_state_across_split_boundaries` blocker가 있어 `clean_promotion_eligible=false`. 같은 OOS에서 selector 튜닝 금지 |
+
+운영 규칙:
+- Freeze manifest: `alpha_zoo_clean_meta_selector_research_20260607/clean_meta_selector_freeze_manifest_latest.json`, sha256 `bd26dcd5116337647d9c6f1ce20ed4710a387184f0f64d0cffce02cb6c21c43a`.
+- 같은 historical OOS window에서 selector/grid를 다시 돌려 수치를 키우면 OOS mining으로 간주한다.
+- Optuna/hybrid는 train+validation 내부 objective와 fold-local material에만 허용한다. Nested hybrid material, post-hoc selector, OOS tie-breaker는 demote한다.
+- Paper fill telemetry는 mean all-in round-trip `<=10bps`, p95 `<=15bps`, reject/reconcile gap 0을 요구한다. 15bps stress 양수와 20bps diagnostic tail 안정성이 없으면 real sleeve 논의 금지.
+- TradFi/commodity/stock perps는 계속 85-symbol monitor/backfill로 유지하되, train + 2M validation history가 충분해질 때만 fold-local feature support에 편입한다. 최신/validation-only 편입은 금지한다.
+
+## 2026-06-07 KST — Post-OOS 불신 반영: pre-registered clean new-alpha 1차 결과
+
+사용자 지적대로 post-OOS selector/meta-grid 결과는 clean evidence로 믿지 않는다. Ralplan consensus `2026-06-07-0457-b89b`에서 확정한 원칙에 따라 `+85.91%` meta-selector와 `+61.40%` lagged-shadow는 모두 fresh-forward shadow/hypothesis로만 격리했다.
+
+실행 변경:
+- 새 runner `scripts/research/run_alpha_zoo_clean_new_alpha_discovery.py` 추가.
+- 새 test `tests/test_alpha_zoo_clean_new_alpha_discovery.py` 추가.
+- search space는 실행 전 고정/해시화: latest `4a6fee0f540f5d9ce15158beaf6b7c91ad89600cb5d76e1c4bfa0e33008b81b7` after adding pre-registered cross-asset lead-lag and feature-flow crowding reversal diagnostics.
+- families: `volatility_squeeze_breakout`, `volume_absorption_reversal`, `range_reclaim_continuation`, `cross_asset_lead_lag_momentum`, `feature_flow_crowding_reversal`.
+- fold 선택은 train+validation score only; locked-OOS는 freeze 이후 report/gate only; post-OOS selector trusted false; real-money false.
+- split metric policy는 `continuous_full_period_signal_slice_report_only`다. 포지션 state가 split boundary를 넘어갈 수 있으므로 이 artifact는 `clean_promotion_eligible=false`이고, promotion evidence가 아니라 future fresh-forward hypothesis source로만 사용한다.
+
+Core-crypto full 10-fold artifact:
+`var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607/clean_new_alpha_discovery_latest.json|md`
+
+결과:
+- Latest full OOS comp `+2.51%`, annualized approx `+3.01%`; earlier OHLCV-only diagnostic before lead-lag/feature-flow was `-13.17%`.
+- monthly equity MDD `10.28%`, max bar OOS MDD `8.77%`.
+- positive folds `5/10`, Sharpe approx `0.24`.
+- 결론: cross-asset lead-lag/feature-flow가 손실은 크게 줄였지만 절대 성과가 낮고 continuous carry-state blocker가 있다. 이 1차 genuinely-new alpha set은 diagnostic-only reject다.
+- Smoke run(5 core symbols, 3 latest folds)은 `+1.92%`, hit `1/3`였지만 full 10-fold 기준으로만 판단한다.
+
+Performance/verification:
+- Optuna hybrid warmup hot path는 이전 병목 `42.650s → 0.934s`로 개선했고, small monthly profile 전체는 `80.633s → 38.525s`.
+- Focused verification: `ruff format --check`, `ruff check`, report/artifact assertions, docs verification, py_compile passed; focused pytest `18 passed`.
+- 기존 post-OOS meta-selector artifact는 계속 `clean_promotion_eligible=false`, `requires_fresh_forward_shadow=true`로만 유지한다.
+- Feature-point extension follow-up: added `feature_flow_crowding_reversal` using local `funding_rate`, `open_interest`, and `taker_buy_sell_imbalance` with train/validation coverage requirements (`>=60%` each) and fail-closed handling for legacy parquet days missing taker-flow columns.
+- Bounded feature-backed run (`max-folds 5`) artifact: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607_feature_bounded/clean_new_alpha_discovery_latest.json|md`.
+- Feature-backed bounded result still failed to beat even the weak clean baseline: OOS comp `-0.24%`, monthly equity MDD `8.72%`, Sharpe `0.04`, hit `3/5`; selected rows still resolved to `cross_asset_lead_lag_momentum`, so current Binance feature coverage did not create a superior family yet.
+
+다음 연구 방향:
+- 이번 failed families를 그대로 튜닝하지 말고 새 pre-registered family를 추가한다.
+- 특히 OHLCV만으로 약한 absorption/squeeze를 반복하지 말고, funding/open-interest/BBO/fill telemetry 또는 cross-exchange/cross-asset lead-lag처럼 OOS 리뷰 후 selector가 아닌 새 정보원을 붙여야 한다.
+- fresh-forward 데이터가 생기기 전까지 historical OOS window에서 selector/grid를 더 돌려 숫자를 키우는 작업은 금지한다.
+
 ## 2026-06-06 KST — 최신 85-symbol non-nested 결과 문제점/리스크 분석
 
 이번 업데이트는 새 전략 rerun이 아니라, 직전 최신 artifact를 기준으로 “왜 아직 실전 승격이 어렵고 어디가 취약한가”를 명시한 리스크 리뷰다. 근거 artifact는 `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_85_asset_non_nested_augmented_selectors_latest_20260606/alpha_zoo_85_asset_non_nested_augmented_selectors_latest_20260606.json|md`이며, source full rerun은 `alpha_zoo_85_asset_lagged_shadow_router_scaled_latest_20260606`다.

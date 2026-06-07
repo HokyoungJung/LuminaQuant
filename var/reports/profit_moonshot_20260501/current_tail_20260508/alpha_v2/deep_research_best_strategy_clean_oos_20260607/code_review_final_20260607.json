@@ -1,0 +1,36 @@
+{
+  "aiSlopCleaner": {
+    "evidence": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_best_strategy_clean_oos_20260607/ai_slop_cleaner_report_20260607.json",
+    "status": "passed"
+  },
+  "codeReview": {
+    "architectStatus": "CLEAR",
+    "evidence": "post-fix independent CLI review lanes resolved prior REQUEST CHANGES blockers",
+    "independentReview": {
+      "architect": {
+        "agentRole": "architect",
+        "artifact": "/tmp/lumina_architect_fix_20260607.md",
+        "evidence": "Architectural Status CLEAR; remaining risks explicitly demoted and no real-money deployment allowed."
+      },
+      "codeReviewer": {
+        "agentRole": "code-reviewer",
+        "artifact": "/tmp/lumina_code_reviewer_fix_20260607.md",
+        "evidence": "No unresolved blockers; prior HIGH/MEDIUM/LOW findings verified resolved; Recommendation APPROVE."
+      }
+    },
+    "recommendation": "APPROVE"
+  },
+  "generated_at_utc": "2026-06-07T06:14:15.189182Z",
+  "verification": {
+    "commands": [
+      "uv run ruff format --check scripts/research/run_alpha_zoo_clean_meta_selector_research.py tests/test_alpha_zoo_clean_meta_selector_research.py scripts/research/run_alpha_zoo_clean_new_alpha_discovery.py tests/test_alpha_zoo_clean_new_alpha_discovery.py scripts/research/run_alpha_zoo_integer_leverage_optuna_hybrid_decision.py tests/test_alpha_zoo_integer_leverage_optuna_hybrid_decision.py",
+      "uv run ruff check scripts/research/run_alpha_zoo_clean_meta_selector_research.py tests/test_alpha_zoo_clean_meta_selector_research.py scripts/research/run_alpha_zoo_clean_new_alpha_discovery.py tests/test_alpha_zoo_clean_new_alpha_discovery.py scripts/research/run_alpha_zoo_integer_leverage_optuna_hybrid_decision.py tests/test_alpha_zoo_integer_leverage_optuna_hybrid_decision.py",
+      "PYTHONPATH=. uv run pytest -q tests/test_alpha_zoo_clean_meta_selector_research.py tests/test_alpha_zoo_clean_new_alpha_discovery.py tests/test_alpha_zoo_integer_leverage_optuna_hybrid_decision.py",
+      "PYTHONPATH=. uv run python report/artifact assertions",
+      "uv run python scripts/verify_docs.py",
+      "python3 -m py_compile scripts/research/run_alpha_zoo_clean_meta_selector_research.py scripts/research/run_alpha_zoo_clean_new_alpha_discovery.py scripts/research/run_alpha_zoo_integer_leverage_optuna_hybrid_decision.py"
+    ],
+    "evidence": "format passed; ruff passed; focused pytest 18 passed; report/artifact assertions passed; docs verification 119 markdown files passed; py_compile passed",
+    "status": "passed"
+  }
+}
