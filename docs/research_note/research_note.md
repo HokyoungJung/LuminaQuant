@@ -2100,3 +2100,16 @@ Best raw/shadow candidate is `lagged_shadow_leaf_router:core_warmup4_avg2_val05_
 - User challenge accepted: `core10 sparse feature asof patch` is overall weaker than existing top candidates. It is `+7.69%` OOS comp / `+19.45%` annualized, versus clean dynamic 85-symbol `+34.39%` comp / `+42.57%` annualized, lagged shadow router `+61.40%` comp / `+77.62%` annualized, clean-input shadow `+85.91%` comp / `+110.46%` annualized, and relaxed historical/control `+156.03%` comp / `+209.00%` annualized.
 - Correct interpretation: the sparse-asof work is an infrastructure/research-space fix, not a better strategy. It makes feature-backed candidates observable, but the resulting new-alpha standalone strategy remains too weak and live-blocked.
 - Performance path must shift back to the 85-symbol/router/Optuna lineage: use the feature-alignment patch as an input improvement there, then run the same clean train/validation freeze and locked-OOS report-only evaluation. Do not present the core10 new-alpha result as beating GJC or the existing best lines.
+
+## 2026-06-07 — Codex performance re-research: lagged leaf router grid diagnostic
+
+- User challenge accepted: 기존 Codex sparse-asof line은 약했고, 성능 개선은 85-symbol/router/Optuna lineage에서 다시 찾았다. GJC/backfill 프로세스는 별도 유지했고 건드리지 않았다.
+- New artifact: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/codex_performance_research_20260607/lagged_leaf_router_grid_diagnostic_20260607.md` and `.json`.
+- Grid size: 54,540 variants over 10 locked OOS folds, using only strict/relaxed efficiency leaf rows (`balanced`, `growth`, `aggressive`). Hybrid/selector/router/meta/static-guarded labels were excluded to preserve the no-nested rule.
+- Best exact source-metric diagnostic: `codex_lagged_leaf_router_grid:h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_exact_unscaled`.
+  - OOS compounded `197.37%`, annualized approx `269.80%`, max fold OOS MDD `27.69%`, monthly equity MDD `4.50%`, positive folds `5/10`, profit factor `30.04`.
+  - This improves the previous canonical lagged best exact line from `61.40%` comp / `77.62%` ann to `197.37%` comp / `269.80%` ann on the same fold set.
+- Mechanism: after a 4-month warmup, select a leaf using last-1 completed leaf OOS return plus `0.25 * validation_score`, with train return >= `-2%`, train MDD <= `50%`, validation return >= `0%`, validation MDD <= `25%`; strict-core cash/scaled fallback remains for warmup/no-pool months.
+- Interpretation: this is theoretically plausible (trend/cross-sectional momentum + validation/risk gating), not a date/asset hard-code. The large 2026-06 contribution from relaxed aggressive (`+64.80%`) also makes overfit risk obvious.
+- Deployment label: **research_shadow_only_requires_fresh_forward_shadow_and_bar_exact_rerun**. It is not live-clean because the grid was selected after reviewing the historical OOS set. Real-money allocation remains `0%` until the rule is pre-registered, bar-exact rerun reproduces it, and fresh-forward shadow/paper fill telemetry passes 10/15/20bps cost, turnover/RPT, spread/slippage, partial/reject/cancel checks.
+- Row-metric scaled stress variants reached `377.94%` comp / `553.50%` ann, but those are fold-metric linear sizing approximations, not bar-exact production metrics; use only to prioritize the next bar-exact rerun.
