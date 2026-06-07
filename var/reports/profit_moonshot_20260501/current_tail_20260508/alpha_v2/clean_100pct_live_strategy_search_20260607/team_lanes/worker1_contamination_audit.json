@@ -1,0 +1,980 @@
+{
+  "artifact_inventory": [
+    {
+      "artifact_kind": null,
+      "bytes": 2156,
+      "exists": true,
+      "generated_at_utc": "2026-06-07T06:49:00Z",
+      "path": "/home/hoky/Quants-agent/LuminaQuant-clean-100pct-20260607/.omx/plans/ralplan-handoff-clean-100pct-live-strategy-search-20260607.json",
+      "relative_path": ".omx/plans/ralplan-handoff-clean-100pct-live-strategy-search-20260607.json",
+      "role": "planning_or_handoff",
+      "sha256": "032e5917cd234fae5d5ca484f65d80e978c0cc550bda11c0e7ebf1c01c27956c",
+      "top_keys": [
+        "task_slug",
+        "created_at",
+        "objective",
+        "planning_artifacts",
+        "ralplan_architect_review",
+        "ralplan_critic_review",
+        "ralplan_consensus_gate",
+        "hard_gates",
+        "execution_handoff"
+      ]
+    },
+    {
+      "bytes": 12606,
+      "exists": true,
+      "path": "/home/hoky/Quants-agent/LuminaQuant-clean-100pct-20260607/.omx/plans/prd-clean-100pct-live-strategy-search-20260607.md",
+      "relative_path": ".omx/plans/prd-clean-100pct-live-strategy-search-20260607.md",
+      "role": "planning_or_handoff",
+      "sha256": "babc17edcd67440ce74ea9139b21858d69d9fa78d9487ef3c0b3f612a78bb36c"
+    },
+    {
+      "bytes": 6162,
+      "exists": true,
+      "path": "/home/hoky/Quants-agent/LuminaQuant-clean-100pct-20260607/.omx/plans/test-spec-clean-100pct-live-strategy-search-20260607.md",
+      "relative_path": ".omx/plans/test-spec-clean-100pct-live-strategy-search-20260607.md",
+      "role": "planning_or_handoff",
+      "sha256": "07171613f65c7687b6745c393b63fc7bfab0852f1e683a61f658e2c948a737f8"
+    },
+    {
+      "bytes": 3152,
+      "exists": true,
+      "path": "/home/hoky/Quants-agent/LuminaQuant-clean-100pct-20260607/.omx/context/clean-100pct-live-strategy-search-20260607T064554Z.md",
+      "relative_path": ".omx/context/clean-100pct-live-strategy-search-20260607T064554Z.md",
+      "role": "planning_or_handoff",
+      "sha256": "0a0b1d7e930eb13be68f1e8281dc3c7735df1ab5049246bb16c43a0560ecea92"
+    },
+    {
+      "artifact_kind": null,
+      "bytes": 3779,
+      "exists": true,
+      "generated_at_utc": "2026-06-07T06:52:20Z",
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/execution_context_g001.json",
+      "relative_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/execution_context_g001.json",
+      "role": "existing_evidence_readonly",
+      "sha256": "de39c58cf861317cb20437a54f33f121d2a7a291af768d553c6302abc58fe81c",
+      "top_keys": [
+        "created_at",
+        "ultragoal_id",
+        "git_status_before_execution",
+        "stale_ultragoal_archive",
+        "archive_files",
+        "ledger_annotation",
+        "output_dir",
+        "ownership_plan",
+        "overwrite_policy"
+      ]
+    },
+    {
+      "bytes": 3527,
+      "exists": true,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/execution_context_g001.md",
+      "relative_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/execution_context_g001.md",
+      "role": "existing_evidence_readonly",
+      "sha256": "fdb0e578ed7d8bd54a93628f26548341820b6b11a7e5537fa7f260c15eeae530"
+    },
+    {
+      "artifact_kind": "alpha_zoo_clean_meta_selector_research",
+      "bytes": 154256,
+      "exists": true,
+      "generated_at_utc": "2026-06-07T05:21:54.412161Z",
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_meta_selector_research_20260607/clean_meta_selector_research_latest.json",
+      "relative_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_meta_selector_research_20260607/clean_meta_selector_research_latest.json",
+      "role": "existing_evidence_readonly",
+      "sha256": "0371c1d0578fa1481e41a8f05a06aa948c21a646e286ea23f45d8b28626a2a18",
+      "top_keys": [
+        "artifact_kind",
+        "best_selector",
+        "degrees_of_freedom",
+        "evidence_classes",
+        "freeze_manifest_path",
+        "freeze_manifest_sha256",
+        "generated_at_utc",
+        "grid_candidate_count",
+        "hard_gate_summary",
+        "output_paths",
+        "protocol",
+        "ready_for_real",
+        "real_money_execution",
+        "selector_policy",
+        "source_artifact_kind",
+        "source_json",
+        "top_selectors"
+      ]
+    },
+    {
+      "bytes": 2856,
+      "exists": true,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_meta_selector_research_20260607/clean_meta_selector_research_latest.md",
+      "relative_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_meta_selector_research_20260607/clean_meta_selector_research_latest.md",
+      "role": "existing_evidence_readonly",
+      "sha256": "2d79fe35dacf52259591cbb593a63688818ec4d1a779b5e2b2e1e9c25b3bd3c2"
+    },
+    {
+      "artifact_kind": "alpha_zoo_clean_meta_selector_freeze_manifest",
+      "bytes": 4003,
+      "exists": true,
+      "generated_at_utc": "2026-06-07T05:21:50.231232Z",
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_meta_selector_research_20260607/clean_meta_selector_freeze_manifest_latest.json",
+      "relative_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_meta_selector_research_20260607/clean_meta_selector_freeze_manifest_latest.json",
+      "role": "existing_evidence_readonly",
+      "sha256": "bd26dcd5116337647d9c6f1ce20ed4710a387184f0f64d0cffce02cb6c21c43a",
+      "top_keys": [
+        "allowed_family_groups",
+        "allowed_feature_inputs",
+        "artifact_kind",
+        "banned_selection_fields",
+        "command_ledger",
+        "environment",
+        "evidence_class_cap",
+        "fold_schedule",
+        "generated_at_utc",
+        "hard_gates",
+        "objective_function",
+        "promotion_labels",
+        "report_destination",
+        "selector_family",
+        "selector_origin",
+        "source_artifacts",
+        "trial_budget",
+        "universe"
+      ]
+    },
+    {
+      "artifact_kind": null,
+      "bytes": 604007,
+      "exists": true,
+      "generated_at_utc": "2026-06-06T14:24:50.381592+00:00",
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_strict_no_leak_20260606/strict_no_leak_selector_latest.json",
+      "relative_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_strict_no_leak_20260606/strict_no_leak_selector_latest.json",
+      "role": "existing_evidence_readonly",
+      "sha256": "03cbea6ea0ff5a20fef5a8b57556483996411437bd35e9f0f1423ff11060b74b",
+      "top_keys": [
+        "coverage",
+        "eligible_symbols",
+        "generated_at_utc",
+        "monitor_only_symbols",
+        "protocol",
+        "results"
+      ]
+    },
+    {
+      "bytes": 2508,
+      "exists": true,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_strict_no_leak_20260606/strict_no_leak_selector_latest.md",
+      "relative_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_strict_no_leak_20260606/strict_no_leak_selector_latest.md",
+      "role": "existing_evidence_readonly",
+      "sha256": "fef9b2f8cbdd41b143c9205fa4b2b8de5d6b382b006040048cd2e1b552d8f7ca"
+    },
+    {
+      "artifact_kind": "alpha_zoo_69_asset_monthly_refit_walkforward",
+      "bytes": 7889319,
+      "exists": true,
+      "generated_at_utc": "2026-06-06T09:46:44.506177Z",
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_85_asset_non_nested_augmented_selectors_latest_20260606/alpha_zoo_85_asset_non_nested_augmented_selectors_latest_20260606.json",
+      "relative_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_85_asset_non_nested_augmented_selectors_latest_20260606/alpha_zoo_85_asset_non_nested_augmented_selectors_latest_20260606.json",
+      "role": "existing_evidence_readonly",
+      "sha256": "cd7f4ced043cf4067685d6b324c2e9ba1e20c484591eb799fef8399a04acab6d",
+      "top_keys": [
+        "aggregate_rankings",
+        "artifact_kind",
+        "bridge_protocol_audit",
+        "bridge_protocol_manifest",
+        "clean_promotion_rankings",
+        "completed_at_utc",
+        "cost_model",
+        "data_coverage",
+        "demoted_nested_or_historical_rankings",
+        "dynamic_self_feed_audit",
+        "fold_candidate_rows",
+        "fold_summaries",
+        "folds",
+        "generated_at_utc",
+        "metric_reconciliation",
+        "online_weight_audit",
+        "output_paths",
+        "promotability",
+        "protocol",
+        "protocol_freeze_report",
+        "recompute_note",
+        "recompute_provenance",
+        "recomputed_from_existing_rows",
+        "row_level_leaf_selector_report"
+      ]
+    },
+    {
+      "bytes": 15452,
+      "exists": true,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_85_asset_non_nested_augmented_selectors_latest_20260606/alpha_zoo_85_asset_non_nested_augmented_selectors_latest_20260606.md",
+      "relative_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_85_asset_non_nested_augmented_selectors_latest_20260606/alpha_zoo_85_asset_non_nested_augmented_selectors_latest_20260606.md",
+      "role": "existing_evidence_readonly",
+      "sha256": "e627bb859c3fdfd694193d0c923cfed4ef6413a733c5e288d10452813d8ef409"
+    },
+    {
+      "artifact_kind": "alpha_zoo_69_asset_monthly_refit_walkforward",
+      "bytes": 4125944,
+      "exists": true,
+      "generated_at_utc": "2026-06-05T15:49:24.230615Z",
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_85_asset_dynamic_scaled_20260605/alpha_zoo_85_asset_dynamic_scaled_full_v5_20260605.json",
+      "relative_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_85_asset_dynamic_scaled_20260605/alpha_zoo_85_asset_dynamic_scaled_full_v5_20260605.json",
+      "role": "existing_evidence_readonly",
+      "sha256": "5338aa0cc6ef66aac26e4a07bad6176f07047661c76347ee17b4d80d4c2f444d",
+      "top_keys": [
+        "aggregate_rankings",
+        "artifact_kind",
+        "bridge_protocol_audit",
+        "bridge_protocol_manifest",
+        "clean_promotion_rankings",
+        "completed_at_utc",
+        "cost_model",
+        "data_coverage",
+        "demoted_nested_or_historical_rankings",
+        "dynamic_self_feed_audit",
+        "fold_candidate_rows",
+        "fold_summaries",
+        "folds",
+        "generated_at_utc",
+        "metric_reconciliation",
+        "online_weight_audit",
+        "output_paths",
+        "promotability",
+        "protocol",
+        "protocol_freeze_report",
+        "recompute_note",
+        "recompute_provenance",
+        "recomputed_from_existing_rows",
+        "runner_peak_rss_mib"
+      ]
+    },
+    {
+      "bytes": 14863,
+      "exists": true,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_85_asset_dynamic_scaled_20260605/alpha_zoo_85_asset_dynamic_scaled_full_v5_20260605.md",
+      "relative_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_85_asset_dynamic_scaled_20260605/alpha_zoo_85_asset_dynamic_scaled_full_v5_20260605.md",
+      "role": "existing_evidence_readonly",
+      "sha256": "5e2f34500096de4fffb3139ac6ab06e7573b50668aa013e4abe30d11367c073c"
+    },
+    {
+      "artifact_kind": "alpha_zoo_69_asset_monthly_refit_walkforward",
+      "bytes": 3410912,
+      "exists": true,
+      "generated_at_utc": "2026-06-04T11:48:17.720249Z",
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_no_nested_clean_recompute_20260604/no_nested_clean_recompute_latest.json",
+      "relative_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_no_nested_clean_recompute_20260604/no_nested_clean_recompute_latest.json",
+      "role": "existing_evidence_readonly",
+      "sha256": "39687d7a210098d6042ec3a9e6f177ba8e6c4ee1808794c381930ebcdd8ceb3e",
+      "top_keys": [
+        "aggregate_rankings",
+        "artifact_kind",
+        "bridge_protocol_audit",
+        "bridge_protocol_manifest",
+        "clean_promotion_rankings",
+        "completed_at_utc",
+        "cost_model",
+        "data_coverage",
+        "demoted_nested_or_historical_rankings",
+        "dynamic_self_feed_audit",
+        "fold_candidate_rows",
+        "fold_summaries",
+        "folds",
+        "generated_at_utc",
+        "metric_reconciliation",
+        "online_weight_audit",
+        "output_paths",
+        "promotability",
+        "protocol",
+        "protocol_freeze_report",
+        "recompute_note",
+        "recompute_provenance",
+        "recomputed_from_existing_rows",
+        "runner_peak_rss_mib"
+      ]
+    },
+    {
+      "bytes": 14395,
+      "exists": true,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_no_nested_clean_recompute_20260604/no_nested_clean_recompute_latest.md",
+      "relative_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_no_nested_clean_recompute_20260604/no_nested_clean_recompute_latest.md",
+      "role": "existing_evidence_readonly",
+      "sha256": "13c2786d0047cc5f52812c5a1f6f97fd23db9d8e93475bfb81dca35f82c6cce7"
+    },
+    {
+      "artifact_kind": "alpha_zoo_69_asset_monthly_refit_walkforward",
+      "bytes": 3219291,
+      "exists": true,
+      "generated_at_utc": "2026-06-04T13:18:51.185028Z",
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_clean_non_nested_full_eval_20260604_final/clean_non_nested_monthly_refit_full_20260604_final.json",
+      "relative_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_clean_non_nested_full_eval_20260604_final/clean_non_nested_monthly_refit_full_20260604_final.json",
+      "role": "existing_evidence_readonly",
+      "sha256": "83094ae79f946d81b95f1a1a3422f5b2934b82550d9862fc7241e6dc3a93909a",
+      "top_keys": [
+        "aggregate_rankings",
+        "artifact_kind",
+        "bridge_protocol_audit",
+        "bridge_protocol_manifest",
+        "clean_promotion_rankings",
+        "completed_at_utc",
+        "cost_model",
+        "data_coverage",
+        "demoted_nested_or_historical_rankings",
+        "dynamic_self_feed_audit",
+        "fold_candidate_rows",
+        "fold_summaries",
+        "folds",
+        "generated_at_utc",
+        "metric_reconciliation",
+        "online_weight_audit",
+        "output_paths",
+        "promotability",
+        "protocol",
+        "protocol_freeze_report",
+        "recomputed_from_existing_rows",
+        "runner_peak_rss_mib",
+        "timeframe_coverage",
+        "timeframes"
+      ]
+    },
+    {
+      "bytes": 13429,
+      "exists": true,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_clean_non_nested_full_eval_20260604_final/clean_non_nested_monthly_refit_full_20260604_final.md",
+      "relative_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_clean_non_nested_full_eval_20260604_final/clean_non_nested_monthly_refit_full_20260604_final.md",
+      "role": "existing_evidence_readonly",
+      "sha256": "5c31d19ad39e749c0bd553bbfb3fceec645c2efe166b7dd90f78da95beee4eb4"
+    },
+    {
+      "artifact_kind": "alpha_zoo_clean_new_alpha_discovery",
+      "bytes": 4810510,
+      "exists": true,
+      "generated_at_utc": "2026-06-07T06:23:20.853360Z",
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607/clean_new_alpha_discovery_latest.json",
+      "relative_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607/clean_new_alpha_discovery_latest.json",
+      "role": "existing_evidence_readonly",
+      "sha256": "99cb2b44152146d78d0ecfa70c83cc1a82cda473553900950da499a24276104b",
+      "top_keys": [
+        "aggregate",
+        "artifact_kind",
+        "candidate_rows",
+        "clean_promotion_eligible",
+        "data_coverage",
+        "fold_count",
+        "fresh_forward_required",
+        "generated_at_utc",
+        "label_blockers",
+        "optimization_policy",
+        "output_paths",
+        "pre_registered_search_space_sha256",
+        "ready_for_real",
+        "real_money_execution",
+        "search_space",
+        "selected_fold_rows",
+        "split_simulation_policy",
+        "universe"
+      ]
+    },
+    {
+      "bytes": 2364,
+      "exists": true,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607/clean_new_alpha_discovery_latest.md",
+      "relative_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607/clean_new_alpha_discovery_latest.md",
+      "role": "existing_evidence_readonly",
+      "sha256": "8bd4bd119b2f3fc7df5db31e62d9223aa95d950ecfd678e48e4a2e330958fdcb"
+    },
+    {
+      "artifact_kind": "alpha_zoo_clean_new_alpha_discovery",
+      "bytes": 3770959,
+      "exists": true,
+      "generated_at_utc": "2026-06-07T07:01:16.421941Z",
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607_feature_bounded/clean_new_alpha_discovery_latest.json",
+      "relative_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607_feature_bounded/clean_new_alpha_discovery_latest.json",
+      "role": "existing_evidence_readonly",
+      "sha256": "2a9e639401c5822ed9a185e264a41fcd1ea813e567b890c0a57afc7b93fe78cd",
+      "top_keys": [
+        "aggregate",
+        "artifact_kind",
+        "candidate_rows",
+        "clean_promotion_eligible",
+        "data_coverage",
+        "fold_count",
+        "fresh_forward_required",
+        "generated_at_utc",
+        "label_blockers",
+        "optimization_policy",
+        "output_paths",
+        "pre_registered_search_space_sha256",
+        "ready_for_real",
+        "real_money_execution",
+        "search_space",
+        "selected_fold_rows",
+        "split_simulation_policy",
+        "universe"
+      ]
+    },
+    {
+      "bytes": 1564,
+      "exists": true,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607_feature_bounded/clean_new_alpha_discovery_latest.md",
+      "relative_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607_feature_bounded/clean_new_alpha_discovery_latest.md",
+      "role": "existing_evidence_readonly",
+      "sha256": "e389a45a1f72860fb07c6495631faa591a7ebd30a1825e300d9ec0873ae7fcbb"
+    },
+    {
+      "artifact_kind": "alpha_zoo_clean_new_alpha_discovery",
+      "bytes": 628268,
+      "exists": true,
+      "generated_at_utc": "2026-06-07T05:58:15.162556Z",
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607_smoke/clean_new_alpha_discovery_latest.json",
+      "relative_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607_smoke/clean_new_alpha_discovery_latest.json",
+      "role": "existing_evidence_readonly",
+      "sha256": "c44a38af8618954cffa2115d8d563cd41599ec7c241cba96d1f14c4a3816dc67",
+      "top_keys": [
+        "aggregate",
+        "artifact_kind",
+        "candidate_rows",
+        "clean_promotion_eligible",
+        "data_coverage",
+        "fold_count",
+        "fresh_forward_required",
+        "generated_at_utc",
+        "label_blockers",
+        "optimization_policy",
+        "output_paths",
+        "pre_registered_search_space_sha256",
+        "ready_for_real",
+        "real_money_execution",
+        "search_space",
+        "selected_fold_rows",
+        "split_simulation_policy",
+        "universe"
+      ]
+    },
+    {
+      "bytes": 1227,
+      "exists": true,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607_smoke/clean_new_alpha_discovery_latest.md",
+      "relative_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607_smoke/clean_new_alpha_discovery_latest.md",
+      "role": "existing_evidence_readonly",
+      "sha256": "2e02394b28a14abc214b262d2b7bac8131f8aebac5699ffad459df1390546ab9"
+    },
+    {
+      "bytes": 2849,
+      "exists": true,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_live_status_20260606/current_verdict_latest.md",
+      "relative_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_live_status_20260606/current_verdict_latest.md",
+      "role": "existing_evidence_readonly",
+      "sha256": "d6318f44a128f11adc2818826858bd3104d3cedaf4255a0c19ec7064c9967585"
+    },
+    {
+      "bytes": 1103,
+      "exists": true,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_live_status_20260606/live_search_status_latest.md",
+      "relative_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_live_status_20260606/live_search_status_latest.md",
+      "role": "existing_evidence_readonly",
+      "sha256": "ae821a833b91af938f5855c000c61ab68181b7d57402c7d3269e2dfd0073ac2c"
+    },
+    {
+      "artifact_kind": null,
+      "bytes": 7104,
+      "exists": true,
+      "generated_at_utc": "2026-06-07T06:09:27.791466Z",
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_best_strategy_clean_oos_20260607/deep_research_best_strategy_clean_oos_20260607.json",
+      "relative_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_best_strategy_clean_oos_20260607/deep_research_best_strategy_clean_oos_20260607.json",
+      "role": "existing_evidence_readonly",
+      "sha256": "34e7848ceab8a24f7558ab8c0de70a7fca2cca49ac2d01b86bca6d50d703c5fa",
+      "top_keys": [
+        "artifacts",
+        "best_clean_now_paper_control",
+        "best_returning_freeze_candidate",
+        "current_clean_85_baseline",
+        "decision",
+        "generated_at_utc",
+        "new_alpha_diagnostic",
+        "sources"
+      ]
+    },
+    {
+      "bytes": 11186,
+      "exists": true,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_best_strategy_clean_oos_20260607/deep_research_best_strategy_clean_oos_20260607.md",
+      "relative_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_best_strategy_clean_oos_20260607/deep_research_best_strategy_clean_oos_20260607.md",
+      "role": "existing_evidence_readonly",
+      "sha256": "ab3d165ca565b0b55f13a981f2977f8ef47d91ce9f0664998ed3fc939dcfebcb"
+    },
+    {
+      "bytes": 21602,
+      "exists": true,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/scripts/research/run_alpha_zoo_clean_meta_selector_research.py",
+      "relative_path": "scripts/research/run_alpha_zoo_clean_meta_selector_research.py",
+      "role": "source_or_test_readonly",
+      "sha256": "01b6d0d876c0864da135f979c6ba26c8ca157a2c60a8959b4f94302da5b72ef2"
+    },
+    {
+      "bytes": 3901,
+      "exists": true,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/tests/test_alpha_zoo_clean_meta_selector_research.py",
+      "relative_path": "tests/test_alpha_zoo_clean_meta_selector_research.py",
+      "role": "source_or_test_readonly",
+      "sha256": "30a5b5c5e7a4d275d2b122e17cc7592b0e631d244619be8d01df09abea83d35a"
+    },
+    {
+      "exists": false,
+      "path": "/home/hoky/Quants-agent/LuminaQuant-clean-100pct-20260607/.omx/plans/ralplan-architect-review-clean-100pct-live-strategy-search-20260607.md",
+      "relative_path": ".omx/plans/ralplan-architect-review-clean-100pct-live-strategy-search-20260607.md",
+      "role": "planning_or_handoff"
+    },
+    {
+      "exists": false,
+      "path": "/home/hoky/Quants-agent/LuminaQuant-clean-100pct-20260607/.omx/plans/ralplan-critic-review-clean-100pct-live-strategy-search-20260607.md",
+      "relative_path": ".omx/plans/ralplan-critic-review-clean-100pct-live-strategy-search-20260607.md",
+      "role": "planning_or_handoff"
+    },
+    {
+      "bytes": 2174,
+      "exists": true,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/.omx/plans/ralplan-architect-review-clean-100pct-live-strategy-search-20260607.md",
+      "relative_path": ".omx/plans/ralplan-architect-review-clean-100pct-live-strategy-search-20260607.md",
+      "role": "planning_or_handoff_main_readonly",
+      "sha256": "dd3ce2bce492aca27ef5eba810c888655ca6254b5ca3acd6ab9b928f8f58db4f"
+    },
+    {
+      "bytes": 1945,
+      "exists": true,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/.omx/plans/ralplan-critic-review-clean-100pct-live-strategy-search-20260607.md",
+      "relative_path": ".omx/plans/ralplan-critic-review-clean-100pct-live-strategy-search-20260607.md",
+      "role": "planning_or_handoff_main_readonly",
+      "sha256": "dcbcaf976b1569bf1aad83bc81cf1c7c1099c98f9d2aced17c1aaa0f313eff42"
+    }
+  ],
+  "artifact_kind": "worker1_contamination_eligibility_audit",
+  "classification_schema": [
+    "diagnostic_only",
+    "shadow_freeze_only",
+    "eligible_control",
+    "rejected"
+  ],
+  "classifications": [
+    {
+      "allowed_use": "freeze/shadow benchmark only; not current promotion evidence",
+      "artifact_or_candidate_id": "clean_input_meta_selector",
+      "blockers": [
+        "post_oos_selector_grid_ranking_uses_historical_locked_oos",
+        "fresh_forward_required_before_promotion",
+        "paper_fill_telemetry_absent",
+        "15bps_stress_artifact_absent"
+      ],
+      "contamination_evidence": [
+        "uses_locked_oos_for_selector_grid_ranking=true",
+        "selector_origin=post_oos_research_freeze_candidate",
+        "grid_candidate_count=2048"
+      ],
+      "contamination_flags": [
+        "uses_locked_oos_for_selector_grid_ranking=true",
+        "selector_origin=post_oos_research_freeze_candidate",
+        "grid_candidate_count=2048"
+      ],
+      "cost_gate_summary": "see metrics_summary/blockers",
+      "evidence_paths": [
+        "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_meta_selector_research_20260607/clean_meta_selector_research_latest.json",
+        "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_meta_selector_research_20260607/clean_meta_selector_research_latest.md",
+        "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_meta_selector_research_20260607/clean_meta_selector_freeze_manifest_latest.json"
+      ],
+      "fresh_forward_status": "absent_or_required_before_promotion",
+      "label": "shadow_freeze_only",
+      "metrics_summary": {
+        "annualized_oos_return_approx_pct": 110.46,
+        "hit_rate": "5/10",
+        "max_bar_oos_mdd_pct": 19.29,
+        "monthly_equity_mdd_pct": 6.32,
+        "oos_compounded_return_pct": 85.91
+      },
+      "normalized_classification": "shadow_freeze_only",
+      "paper_fill_telemetry_status": "absent",
+      "promotion_decision": "rejected",
+      "source_label": "shadow-freeze-only"
+    },
+    {
+      "allowed_use": "manifest/provenance evidence for contamination map only",
+      "artifact_or_candidate_id": "clean_meta_selector_freeze_manifest",
+      "blockers": [
+        "not a promotion candidate",
+        "supports shadow-freeze-only cap"
+      ],
+      "contamination_evidence": [
+        "selector_origin=post_oos_research_freeze_candidate",
+        "selection_metric_rule states grid ranking is historical-OOS diagnostic"
+      ],
+      "contamination_flags": [
+        "post_oos_research_freeze_candidate",
+        "historical_oos_grid_ranking_diagnostic"
+      ],
+      "cost_gate_summary": "not applicable to manifest",
+      "evidence_paths": [
+        "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_meta_selector_research_20260607/clean_meta_selector_freeze_manifest_latest.json"
+      ],
+      "fresh_forward_status": "required for candidate before promotion",
+      "label": "diagnostic_only",
+      "metrics_summary": {
+        "grid_candidate_count": 2048,
+        "selector_family": "clean_input_meta_selector"
+      },
+      "normalized_classification": "diagnostic_only",
+      "paper_fill_telemetry_status": "absent",
+      "promotion_decision": "not a candidate; diagnostic support for frozen shadow candidate only",
+      "source_label": "shadow-freeze-only freeze manifest / contamination map support"
+    },
+    {
+      "allowed_use": "clean paper/control and stress benchmark",
+      "artifact_or_candidate_id": "strict_no_leak_best_single_10bps",
+      "blockers": [
+        "drawdown too high for real sleeve",
+        "20bps stress MDD tail risk",
+        "15bps/paper-fill telemetry missing",
+        "eligible universe only 10/85 symbols"
+      ],
+      "contamination_evidence": [
+        "train+previous-2M-validation selection; next month OOS report-only",
+        "nested hybrids forbidden; raw leaf rules only"
+      ],
+      "contamination_flags": [
+        "train+previous-2M-validation selection; next month OOS report-only",
+        "nested hybrids forbidden; raw leaf rules only"
+      ],
+      "cost_gate_summary": "see metrics_summary/blockers",
+      "evidence_paths": [
+        "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_strict_no_leak_20260606/strict_no_leak_selector_latest.md",
+        "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_strict_no_leak_20260606/strict_no_leak_selector_latest.json"
+      ],
+      "fresh_forward_status": "absent_or_required_before_promotion",
+      "label": "eligible_control",
+      "metrics_summary": {
+        "10bps_mdd_pct": 30.63,
+        "10bps_pf": 1.2096,
+        "10bps_positive_months": "6/10",
+        "10bps_sharpe": 1.26,
+        "10bps_total_return_pct": 54.56,
+        "20bps_mdd_pct": 43.63,
+        "20bps_total_return_pct": 27.1
+      },
+      "normalized_classification": "eligible_control",
+      "paper_fill_telemetry_status": "absent",
+      "promotion_decision": "no_real_money; paper/control only",
+      "source_label": "eligible-control"
+    },
+    {
+      "allowed_use": "broad-universe clean monitor/control baseline",
+      "artifact_or_candidate_id": "dynamic_conviction_switch_85_symbol_baseline",
+      "blockers": [
+        "below 100pct reporting label",
+        "sparse positive folds",
+        "high MDD",
+        "no 15bps/20bps/paper fill telemetry in this artifact"
+      ],
+      "contamination_evidence": [
+        "uses_locked_oos_for_selection=false",
+        "dynamic_self_feed violations=[]",
+        "online lag violations=[]"
+      ],
+      "contamination_flags": [
+        "uses_locked_oos_for_selection=false",
+        "dynamic_self_feed violations=[]",
+        "online lag violations=[]"
+      ],
+      "cost_gate_summary": "see metrics_summary/blockers",
+      "evidence_paths": [
+        "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_85_asset_non_nested_augmented_selectors_latest_20260606/alpha_zoo_85_asset_non_nested_augmented_selectors_latest_20260606.json",
+        "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_85_asset_non_nested_augmented_selectors_latest_20260606/alpha_zoo_85_asset_non_nested_augmented_selectors_latest_20260606.md"
+      ],
+      "fresh_forward_status": "absent_or_required_before_promotion",
+      "label": "eligible_control",
+      "metrics_summary": {
+        "annualized_oos_return_approx_pct": 42.57,
+        "cost_bps": 10.0,
+        "hit_rate": "3/10",
+        "max_oos_mdd_pct": 27.69,
+        "oos_compounded_return_pct": 34.39
+      },
+      "normalized_classification": "eligible_control",
+      "paper_fill_telemetry_status": "absent",
+      "promotion_decision": "paper baseline/monitor only",
+      "source_label": "eligible-control"
+    },
+    {
+      "allowed_use": "comparison incumbent/control only",
+      "artifact_or_candidate_id": "relaxed_efficiency_hybrid_v3_5_69_asset_incumbent",
+      "blockers": [
+        "existing historical locked-OOS artifact cannot be current promotion evidence",
+        "no fresh-forward/paper fill telemetry for real money",
+        "15bps/20bps hard-gate proof incomplete here"
+      ],
+      "contamination_evidence": [
+        "uses_locked_oos_for_selection=false in artifact",
+        "governance/ranking repair only; not fresh clean-100pct run"
+      ],
+      "contamination_flags": [
+        "uses_locked_oos_for_selection=false in artifact",
+        "governance/ranking repair only; not fresh clean-100pct run"
+      ],
+      "cost_gate_summary": "see metrics_summary/blockers",
+      "evidence_paths": [
+        "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_no_nested_clean_recompute_20260604/no_nested_clean_recompute_latest.json",
+        "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_no_nested_clean_recompute_20260604/no_nested_clean_recompute_latest.md"
+      ],
+      "fresh_forward_status": "absent_or_required_before_promotion",
+      "label": "eligible_control",
+      "metrics_summary": {
+        "annualized_oos_return_approx_pct": 209.0,
+        "cost_bps": 10.0,
+        "hit_rate": "5/10",
+        "max_oos_mdd_pct": 19.75,
+        "oos_compounded_return_pct": 156.03
+      },
+      "normalized_classification": "eligible_control",
+      "paper_fill_telemetry_status": "absent",
+      "promotion_decision": "historical incumbent/control only; no new promotion from this audit",
+      "source_label": "eligible-control"
+    },
+    {
+      "allowed_use": "clean lower-return comparison/control",
+      "artifact_or_candidate_id": "profile_optuna_69_asset_clean_non_nested_full_eval",
+      "blockers": [
+        "below 100pct reporting label",
+        "promotability=false",
+        "no fresh-forward/paper fill telemetry"
+      ],
+      "contamination_evidence": [
+        "uses_locked_oos_for_selection=false",
+        "bridge/self-feed/online-lag audits pass"
+      ],
+      "contamination_flags": [
+        "uses_locked_oos_for_selection=false",
+        "bridge/self-feed/online-lag audits pass"
+      ],
+      "cost_gate_summary": "see metrics_summary/blockers",
+      "evidence_paths": [
+        "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_clean_non_nested_full_eval_20260604_final/clean_non_nested_monthly_refit_full_20260604_final.json",
+        "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_clean_non_nested_full_eval_20260604_final/clean_non_nested_monthly_refit_full_20260604_final.md"
+      ],
+      "fresh_forward_status": "absent_or_required_before_promotion",
+      "label": "eligible_control",
+      "metrics_summary": {
+        "cost_bps": 10.0,
+        "hit_rate": "5/10",
+        "max_oos_mdd_pct": 19.2,
+        "top_annualized_return_approx_pct": 12.18,
+        "top_oos_compounded_return_pct": 10.05
+      },
+      "normalized_classification": "eligible_control",
+      "paper_fill_telemetry_status": "absent",
+      "promotion_decision": "paper/control only",
+      "source_label": "eligible-control"
+    },
+    {
+      "allowed_use": "shadow/freeze hypothesis source only",
+      "artifact_or_candidate_id": "lagged_shadow_leaf_router_and_demoted_post_oos_variants",
+      "blockers": [
+        "post-OOS family/variant status",
+        "fresh-forward required",
+        "10bps proxy only"
+      ],
+      "contamination_evidence": [
+        "post_oos_research_variant",
+        "requires_fresh_forward_shadow"
+      ],
+      "contamination_flags": [
+        "post_oos_research_variant",
+        "requires_fresh_forward_shadow"
+      ],
+      "cost_gate_summary": "see metrics_summary/blockers",
+      "evidence_paths": [
+        "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_85_asset_non_nested_augmented_selectors_latest_20260606/alpha_zoo_85_asset_non_nested_augmented_selectors_latest_20260606.md",
+        "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_85_asset_lagged_shadow_router_scaled_latest_20260606/alpha_zoo_85_asset_lagged_shadow_router_scaled_latest_20260606.json"
+      ],
+      "fresh_forward_status": "absent_or_required_before_promotion",
+      "label": "shadow_freeze_only",
+      "metrics_summary": {
+        "example_annualized_return_approx_pct": 77.62,
+        "example_hit_rate": "4/10",
+        "example_max_bar_mdd_pct": 29.13,
+        "example_oos_compounded_return_pct": 61.4
+      },
+      "normalized_classification": "shadow_freeze_only",
+      "paper_fill_telemetry_status": "absent",
+      "promotion_decision": "rejected for current promotion",
+      "source_label": "shadow-freeze-only"
+    },
+    {
+      "allowed_use": "diagnostic/future hypothesis source only after new freeze; not current promotion",
+      "artifact_or_candidate_id": "clean_new_alpha_discovery_full_feature_bounded_smoke",
+      "blockers": [
+        "low/negative returns",
+        "explicit clean_promotion_eligible=false",
+        "same-window promotion blocked; future hypothesis source only"
+      ],
+      "contamination_evidence": [
+        "uses_locked_oos_for_selection=false, but post_oos_selector_trusted=false and clean_promotion_eligible=false in artifacts"
+      ],
+      "contamination_flags": [
+        "uses_locked_oos_for_selection=false, but post_oos_selector_trusted=false and clean_promotion_eligible=false in artifacts"
+      ],
+      "cost_gate_summary": "see metrics_summary/blockers",
+      "evidence_paths": [
+        "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607/clean_new_alpha_discovery_latest.json",
+        "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607_feature_bounded/clean_new_alpha_discovery_latest.json",
+        "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607_smoke/clean_new_alpha_discovery_latest.json"
+      ],
+      "fresh_forward_status": "absent_or_required_before_promotion",
+      "label": "diagnostic_only",
+      "metrics_summary": {
+        "feature_bounded_annualized_pct": -0.57,
+        "full_annualized_pct": 3.01,
+        "smoke_annualized_pct": 7.89
+      },
+      "normalized_classification": "diagnostic_only",
+      "paper_fill_telemetry_status": "absent",
+      "promotion_decision": "rejected as current alpha/promotion source",
+      "source_label": "reject / diagnostic-only"
+    },
+    {
+      "allowed_use": "summary/context for leader G002 only",
+      "artifact_or_candidate_id": "deep_research_live_status_and_best_strategy_conclusion",
+      "blockers": [
+        "not primary manifest-bound run evidence",
+        "real-money blocked by fresh-forward and telemetry gaps"
+      ],
+      "contamination_evidence": [
+        "aggregate conclusion references multiple prior locked-OOS artifacts; not a selector input for current promotion"
+      ],
+      "contamination_flags": [
+        "aggregate conclusion references multiple prior locked-OOS artifacts; not a selector input for current promotion"
+      ],
+      "cost_gate_summary": "see metrics_summary/blockers",
+      "evidence_paths": [
+        "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_live_status_20260606/current_verdict_latest.md",
+        "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_best_strategy_clean_oos_20260607/deep_research_best_strategy_clean_oos_20260607.md"
+      ],
+      "fresh_forward_status": "absent_or_required_before_promotion",
+      "label": "diagnostic_only",
+      "metrics_summary": {
+        "decision": "no_real_money_deployment_now",
+        "fresh_search_status": "no fresh clean candidate beats incumbent"
+      },
+      "normalized_classification": "diagnostic_only",
+      "paper_fill_telemetry_status": "absent",
+      "promotion_decision": "diagnostic summary only",
+      "source_label": "diagnostic-only"
+    }
+  ],
+  "clean_input_meta_selector_decision": "shadow_freeze_only and explicitly rejected for current promotion due post-OOS selector-grid ranking over historical locked OOS; freeze/shadow only until fresh-forward evidence.",
+  "coordination_boundary_checked": {
+    "coordination_protocol": "coordinated - handoff, dirty repo read-only boundary, lane output ownership, and Ultragoal non-mutation checked",
+    "dirty_repo_preservation_checked": true,
+    "handoff_checked": true,
+    "team_lane_ownership_checked": true,
+    "ultragoal_non_mutation_checked": true
+  },
+  "generated_at_utc": "2026-06-07T07:02:35Z",
+  "hard_gate_summary": {
+    "execution_cost_gate": "10bps evidence exists for controls; strict no-leak has 20bps diagnostic; 15bps and paper fill telemetry are missing/blocking for real money.",
+    "fresh_forward_paper_telemetry": "Absent in inspected artifacts; real-money approval remains blocked.",
+    "hundred_pct_threshold": "Reporting label only; not selector objective or promotion filter in this audit.",
+    "no_nested_oos_mining": "No existing artifact is promotion evidence for this lane; prior locked-OOS/history is contamination/control context only.",
+    "theory_plausibility_gate": "Existing strategy families are only plausibility candidates; worker-4/theory lane must supply external source evidence before promotion."
+  },
+  "read_only_probe": {
+    "leader_clean_repo_inspected_readonly": true,
+    "main_dirty_repo_inspected_readonly": true,
+    "worktree_write_scope_only": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/team_lanes"
+  },
+  "real_money_approval_blocked": true,
+  "repo_context": {
+    "clean_worktree": "/home/hoky/Quants-agent/LuminaQuant-clean-100pct-20260607/.omx/team/clean-100pct-live-tar-4a549153/worktrees/worker-1",
+    "leader_clean_repo_readonly_source": "/home/hoky/Quants-agent/LuminaQuant-clean-100pct-20260607",
+    "main_dirty_repo_readonly": "/home/hoky/Quants-agent/LuminaQuant",
+    "main_git_status_readonly_snapshot": [
+      "## private-main...private/main [ahead 1]",
+      " M docs/research_note/research_note.md",
+      " M scripts/research/run_alpha_zoo_clean_new_alpha_discovery.py",
+      " M tests/test_alpha_zoo_clean_new_alpha_discovery.py",
+      " M var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607/clean_new_alpha_discovery_latest.json",
+      " M var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607/clean_new_alpha_discovery_latest.md",
+      " M var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607_feature_bounded/clean_new_alpha_discovery_latest.json",
+      " M var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607_feature_bounded/clean_new_alpha_discovery_latest.md",
+      "?? .gjc/",
+      "?? var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/",
+      "?? var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_bestlane_rerun_20260606/",
+      "?? var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_efficiency_specialist_20260606/",
+      "?? var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_fresh_69_relaxed_seed_20260606/",
+      "?? var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_fresh_69_rematch_20260606/",
+      "?? var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_fresh_69_teacher_20260606/",
+      "?? var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_fresh_85_clean_focus_20260606/",
+      "?? var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_fresh_85_full_20260606/",
+      "?? var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_fresh_85_teacher_20260606/",
+      "?? var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_leaf_optuna_20260606/",
+      "?? var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_live_status_20260606/",
+      "?? var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_probe_69_teacher_1fold_20260606/",
+      "?? var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_probe_69_teacher_3fold_20260606/",
+      "?? var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_relaxed_specialist_20260606/"
+    ],
+    "worktree_git_status_before_artifact_write_snapshot": [
+      "## HEAD (no branch)"
+    ],
+    "write_boundary": "only this worktree lane artifacts under var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/team_lanes"
+  },
+  "scope": "Task 1 lane 1A contamination/eligibility audit context",
+  "source_handoff_location_note": {
+    "leader_clean_copy_exists": true,
+    "main_dirty_copy_exists_readonly": true,
+    "worktree_relative_missing": true
+  },
+  "source_handoff_path": "/home/hoky/Quants-agent/LuminaQuant-clean-100pct-20260607/.omx/plans/ralplan-handoff-clean-100pct-live-strategy-search-20260607.json",
+  "source_handoff_sha256": "032e5917cd234fae5d5ca484f65d80e978c0cc550bda11c0e7ebf1c01c27956c",
+  "source_hash_boundary_note": "Artifact hashes are for the read-only source root listed in each path. Worktree report copies under the same report root were absent before this lane wrote worker1_contamination_audit.{json,md}.",
+  "source_roots": {
+    "leader_clean_readonly": "/home/hoky/Quants-agent/LuminaQuant-clean-100pct-20260607",
+    "main_dirty_readonly": "/home/hoky/Quants-agent/LuminaQuant",
+    "worktree": "/home/hoky/Quants-agent/LuminaQuant-clean-100pct-20260607/.omx/team/clean-100pct-live-tar-4a549153/worktrees/worker-1"
+  },
+  "subagent_evidence": {
+    "children": [
+      {
+        "agent_id": "019ea0df-0f47-70f3-ad19-798a4471baee",
+        "findings_integrated": [
+          "handoff present in leader/main but missing at worktree relative path",
+          "required lane paths and key artifacts",
+          "boundary risks and minimum fields"
+        ],
+        "name": "Repository map probe",
+        "nickname": "Helmholtz",
+        "status": "completed"
+      },
+      {
+        "agent_id": "019ea0e0-16b6-71c1-8ee1-3e420230e12d",
+        "findings_integrated": [
+          "clean_input rejection confirmation",
+          "normalization/source_label fields",
+          "freeze manifest diagnostic classification",
+          "dirty-root/hash boundary note",
+          "real-money blockers"
+        ],
+        "name": "Review probe",
+        "nickname": "Hegel",
+        "status": "completed"
+      }
+    ],
+    "findings_integrated_summary": [
+      "repository map probe: paths, artifact types, boundary risks, minimum fields",
+      "review probe: normalized classifications, freeze manifest diagnostic class, source root/hash boundary, hard blockers"
+    ],
+    "serial_searches_before_spawn": 2,
+    "subagent_model_requested": "gpt-5.4-mini per task contract; spawn surface did not expose model/agent_type fields, so agent_type: explore was passed in prompt",
+    "subagents_spawned": 2
+  },
+  "task_id": "1",
+  "task_ids": [
+    "1"
+  ],
+  "ultragoal_id": "G002-contamination-and-eligibility-audit",
+  "updated_at_utc": "2026-06-07T07:03:12Z",
+  "worker": "worker-1"
+}
