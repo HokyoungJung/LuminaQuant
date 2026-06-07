@@ -61,6 +61,7 @@ Performance/verification:
 - Re-ran the BBO-aware bounded clean search at candidate cap `500`; result still remained unchanged (`-0.24%` OOS comp / `8.72%` monthly equity MDD / Sharpe `0.04` / hit `3/5`). Current-day BBO buildup still does not change fold winners.
 - After additional healthy `bg_3` BBO monitor cycles (`rows=60`, `buckets=60`, `errors=0` per cycle), Binance support-inventory now shows `BTCUSDT 705`, `ETHUSDT 719`, `SOLUSDT 710`, `BNBUSDT 680`, `TRXUSDT 664` BBO rows through `2026-06-07T10:26:45Z`.
 - Re-ran the bounded BBO-aware clean discovery again at candidate cap `500`; the aggregate remained unchanged at OOS comp `-0.24%`, monthly equity MDD `8.72%`, Sharpe `0.04`, and hit `3/5`.
+- Structural blocker confirmed: official Binance USDⓈ-M `bookTicker` documentation describes real-time WebSocket best-bid/ask streams (`<symbol>@bookTicker` and `!bookTicker`; source: https://developers.binance.com/docs/derivatives/usds-margined-futures/websocket-market-streams/Individual-Symbol-Book-Ticker-Streams and https://developers.binance.com/docs/derivatives/usds-margined-futures/websocket-market-streams/All-Book-Tickers-Stream), not a historical archive endpoint. So the in-house BBO sidecar can validate wiring and accumulate forward history, but it cannot instantly provide historical train/validation coverage for old folds unless we either wait for enough local accumulation or approve an external historical BBO source.
 
 다음 연구 방향:
 - 이번 failed families를 그대로 튜닝하지 말고 새 pre-registered family를 추가한다.
