@@ -148,7 +148,7 @@
       "Historical incumbent metrics must be read with source lineage: source artifact reports 209.00% annualized / 156.03% compounded; locked-OOS/cost verifier fixed-blend aggregation reports 160.90% / 122.36% under the same candidate id. Both are paper/control only and cannot be used as live expected return."
     ]
   },
-  "last_reverified_at_utc": "2026-06-07T10:20:57+00:00",
+  "last_reverified_at_utc": "2026-06-07T10:30:42+00:00",
   "last_reviewed_at_utc": "2026-06-07T10:08:34+00:00",
   "latest_bbo_accumulation_recheck": {
     "aggregate": {
@@ -223,6 +223,11 @@
     "architect_lane": "watch_no_safety_fail: OMX team architect task completed; artifact final_independent_review_20260607/architect_final_report.md",
     "artifact_assertions": "pass: 25 target/review JSON files parsed; all candidates real_money_allowed=false/small_sleeve_allowed=false; manifest sha matched; no true locked-OOS/live-promotion flags found",
     "code_reviewer_lane": "pass: OMX team code-reviewer task completed; artifact final_independent_review_20260607/code_reviewer_final_report.md",
+    "code_reviewer_rereview_after_bbo": {
+      "artifact": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/final_independent_review_20260607/code_reviewer_rereview_after_bbo_20260607.md",
+      "evidence": "read-only-final-re-re-4a549153 found no no-live blockers; one LOW stale dirty caveat was fixed in final_quality_gate.",
+      "status": "comment_low_fixed_pending_clean_rereview"
+    },
     "compileall_targeted": "pass: python3 -m compileall -q modified Python/test/BBO surfaces",
     "formal_ultragoal_checkpoint": "blocked/watch: G008 independent review evidence attached and ledger goal_blocked event recorded, but goals.json still shows G008 in_progress and fresh get_goal is a completed legacy latency objective.",
     "git_diff_check": "pass: git diff --check -> no output",

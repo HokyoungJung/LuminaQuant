@@ -25,6 +25,8 @@
 - Result unchanged: OOS comp `-0.24%`, annualized `-0.57%`, monthly equity MDD `8.72%`, hit `3/5`.
 - Decision impact: no promotion; real-money and small-sleeve remain disallowed.
 
+- Code-reviewer re-review after latest BBO accumulation: 5/5 tasks complete; no no-live blocker; one LOW stale dirty caveat was fixed in final_quality_gate; clean recheck pending for formal APPROVE.
+
 ## Remaining blockers
 
 1. `.omx/ultragoal` blocked checkpoint is intentionally non-terminal: ledger has G008 `goal_blocked`, while `goals.json` keeps G008 `in_progress`.

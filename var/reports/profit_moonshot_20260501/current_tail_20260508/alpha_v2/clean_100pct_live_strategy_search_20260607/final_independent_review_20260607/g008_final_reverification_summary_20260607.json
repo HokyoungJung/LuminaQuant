@@ -61,11 +61,24 @@
       "evidence": "uv run pytest without PYTHONPATH failed to collect scripts imports; rerun with PYTHONPATH=. passed.",
       "name": "latest_bbo_pytest_first_attempt",
       "status": "environment_retry"
+    },
+    {
+      "evidence": "5/5 code-reviewer tasks completed; no no-live blocker; LOW stale dirty caveat fixed.",
+      "name": "code_reviewer_rereview_after_bbo",
+      "status": "comment_low_fixed_pending_clean_rereview"
     }
   ],
   "code_reviewer": "APPROVE",
+  "code_reviewer_rereview_after_bbo": {
+    "low_findings_fixed": [
+      "[LOW] final_quality_gate_20260607.json:5 — Caveat says repository remains dirty with pre-existing changes, but current post-0364e354 worktree `git status --short` is clean. Why it matters: stale provenance wording can confuse final audit readers even though it is conservative and does not overstate promotion readiness. Fix: if regenerating final artifacts, update/remove this stale caveat or qualify it as historical generation context."
+    ],
+    "no_live_blockers": false,
+    "status": "COMMENT_LOW_FIXED_PENDING_CLEAN_REREVIEW",
+    "team": "read-only-final-re-re-4a549153"
+  },
   "deployment_conclusion": "no_real_money; no_small_sleeve; 0pct_allocation_or_paper_control_only",
-  "generated_at_utc": "2026-06-07T10:20:57+00:00",
+  "generated_at_utc": "2026-06-07T10:30:42+00:00",
   "hidden_goal_snapshot": "wrong completed legacy latency objective; saved in fresh_get_goal_after_g008_review.json",
   "latest_bbo_accumulation_recheck": {
     "aggregate": {
