@@ -4,6 +4,7 @@ import importlib.util
 import sys
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -171,6 +172,19 @@ def test_learn_params_uses_train_warmup_even_when_fit_includes_validation() -> N
     )
 
     assert learned.default_idx == 0
+
+
+def test_rolling_nanstd_matches_legacy_warmup_volatility_loop() -> None:
+    values = np.asarray([0.01, np.nan, -0.02, 0.03, 0.00, 0.04, -0.01], dtype=float)
+    window = 3
+
+    optimized = MODULE._rolling_nanstd(values, window)
+    legacy = np.asarray(
+        [float(np.nanstd(values[idx : idx + window])) for idx in range(values.size - window + 1)],
+        dtype=float,
+    )
+
+    assert optimized == pytest.approx(legacy)
 
 
 def test_all_exposed_hybrid_params_are_in_optuna_config() -> None:

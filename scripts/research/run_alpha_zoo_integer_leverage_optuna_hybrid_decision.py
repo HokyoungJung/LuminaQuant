@@ -563,6 +563,44 @@ def _portfolio_returns_for_params(
     return out, weights_out, allocations
 
 
+def _rolling_nanstd(values: np.ndarray, window: int) -> np.ndarray:
+    """Return nan-aware population std for fixed-width trailing windows.
+
+    Window ``i`` covers ``values[i : i + window]``.  This replaces repeated
+    ``np.nanstd`` calls in Optuna warmup learning without changing the ddof=0
+    semantics used by the original loop.
+    """
+    width = max(1, int(window))
+    arr = np.asarray(values, dtype=float)
+    if arr.size < width:
+        return np.asarray([], dtype=float)
+    finite = np.isfinite(arr)
+    clean = np.where(finite, arr, 0.0)
+    counts = np.concatenate(([0], np.cumsum(finite.astype(np.int64))))
+    sums = np.concatenate(([0.0], np.cumsum(clean)))
+    sq_sums = np.concatenate(([0.0], np.cumsum(clean * clean)))
+
+    window_counts = counts[width:] - counts[:-width]
+    window_sums = sums[width:] - sums[:-width]
+    window_sq_sums = sq_sums[width:] - sq_sums[:-width]
+    mean = np.divide(
+        window_sums,
+        window_counts,
+        out=np.zeros_like(window_sums, dtype=float),
+        where=window_counts > 0,
+    )
+    variance = (
+        np.divide(
+            window_sq_sums,
+            window_counts,
+            out=np.zeros_like(window_sq_sums, dtype=float),
+            where=window_counts > 0,
+        )
+        - mean * mean
+    )
+    return np.sqrt(np.maximum(variance, 0.0))
+
+
 def _learn_params(
     returns: np.ndarray,
     params: HybridParams,
@@ -582,36 +620,33 @@ def _learn_params(
     std = np.nanstd(warmup, axis=0, ddof=1) if warmup.shape[0] > 1 else np.zeros(warmup.shape[1])
     scores = np.where(np.isfinite(mean / (std + 1e-9)), mean / (std + 1e-9), 0.0)
     default_idx = int(np.nanargmax(scores))
-    vol_series = []
-    for t in range(max(2, params.short_vol_window), warmup_n):
-        recent = warmup[t - int(params.short_vol_window) : t]
-        vol_series.append(float(np.nanstd(np.nanmean(recent, axis=1))))
+    start_t = max(2, params.short_vol_window)
+    row_mean = np.nanmean(warmup, axis=1)
+    rolling_vol = _rolling_nanstd(row_mean, int(params.short_vol_window))
+    if start_t < int(params.short_vol_window):
+        vol_series = rolling_vol[: max(0, warmup_n - start_t)]
+    else:
+        offset = start_t - int(params.short_vol_window)
+        vol_series = rolling_vol[offset : offset + max(0, warmup_n - start_t)]
     threshold = (
         float(np.nanpercentile(vol_series, np.clip(params.high_vol_threshold_quantile, 1.0, 99.0)))
-        if vol_series
+        if vol_series.size
         else 0.0
     )
-    hv_mask: list[int] = []
-    for t in range(max(2, params.short_vol_window), warmup_n):
-        recent = warmup[t - int(params.short_vol_window) : t]
-        if float(np.nanstd(np.nanmean(recent, axis=1))) > threshold:
-            hv_mask.append(t)
-    if hv_mask:
-        hv_mean = np.nanmean(warmup[hv_mask], axis=0)
+    hv_positions = np.flatnonzero(vol_series > threshold) + start_t
+    if hv_positions.size:
+        hv_mean = np.nanmean(warmup[hv_positions], axis=0)
         high_vol_best = int(np.nanargmax(np.where(np.isfinite(hv_mean), hv_mean, -1e9)))
     else:
+        hv_mean = np.asarray([], dtype=float)
         high_vol_best = default_idx
     hv_gap = 0.0
-    if hv_mask:
-        hv_mean = np.nanmean(warmup[hv_mask], axis=0)
+    if hv_positions.size:
         best = float(hv_mean[high_vol_best])
-        others = [
-            float(v)
-            for i, v in enumerate(hv_mean)
-            if i != high_vol_best and math.isfinite(float(v))
-        ]
-        if others:
-            avg_other = float(np.nanmean(others))
+        finite_others = np.delete(hv_mean, high_vol_best)
+        finite_others = finite_others[np.isfinite(finite_others)]
+        if finite_others.size:
+            avg_other = float(np.nanmean(finite_others))
             hv_gap = max(0.0, (best - avg_other) / (abs(avg_other) + abs(best) + 1e-9))
     boost = float(
         np.clip(

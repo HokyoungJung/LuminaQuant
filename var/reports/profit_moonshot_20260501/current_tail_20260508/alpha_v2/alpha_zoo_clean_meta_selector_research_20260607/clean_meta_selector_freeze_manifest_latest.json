@@ -1,0 +1,113 @@
+{
+  "allowed_family_groups": {
+    "dynamic_only": [
+      "dynamic_conviction_switch"
+    ],
+    "dynamic_strict_relaxed": [
+      "dynamic_conviction_switch",
+      "strict_efficiency",
+      "relaxed_efficiency"
+    ],
+    "profile_strict_relaxed": [
+      "profile_optuna",
+      "strict_efficiency",
+      "relaxed_efficiency"
+    ],
+    "strict_relaxed": [
+      "strict_efficiency",
+      "relaxed_efficiency"
+    ]
+  },
+  "allowed_feature_inputs": [
+    "family",
+    "clean_promotion_eligible",
+    "nested_hybrid_dependency",
+    "post_oos_research_variant",
+    "selection_reasons",
+    "train.total_return",
+    "train.mdd",
+    "validation.total_return",
+    "validation.mdd"
+  ],
+  "artifact_kind": "alpha_zoo_clean_meta_selector_freeze_manifest",
+  "banned_selection_fields": [
+    "locked_oos",
+    "oos_return",
+    "oos_mdd",
+    "compounded_oos_return",
+    "latest_oos_return",
+    "positive_oos_folds",
+    "monthly_sharpe_approx",
+    "profit_factor"
+  ],
+  "command_ledger": [
+    {
+      "command": "python scripts/research/run_alpha_zoo_clean_meta_selector_research.py --source-json /home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_85_asset_lagged_shadow_router_scaled_latest_20260606/alpha_zoo_85_asset_lagged_shadow_router_scaled_latest_20260606.json --output-dir var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_meta_selector_research_20260607",
+      "cwd": "/home/hoky/Quants-agent/LuminaQuant"
+    }
+  ],
+  "environment": {
+    "python_version": "3.13.5"
+  },
+  "evidence_class_cap": "shadow-freeze-only",
+  "fold_schedule": {
+    "locked_oos_window": "next_one_calendar_month",
+    "oos_used_for_selection": false,
+    "refit_day": "calendar_month_day_1_utc",
+    "refit_frequency": "monthly",
+    "train_window": "expanding_from_train_start_to_validation_start_minus_one_bar",
+    "validation_window": "previous_two_calendar_months"
+  },
+  "generated_at_utc": "2026-06-07T05:21:50.231232Z",
+  "hard_gates": [
+    "no_nested_oos_mining",
+    "execution_cost_gate",
+    "theory_plausibility_gate"
+  ],
+  "objective_function": {
+    "name": "train_validation_deployable_utility",
+    "score_terms": [
+      "return_weight * min(train_return, validation_return)",
+      "calmar_weight * (validation_calmar + train_calmar)",
+      "-mdd_weight * (validation_mdd + 0.5 * train_mdd)",
+      "-spike_penalty_weight * max(0, validation_return - train_return)"
+    ],
+    "selection_metric_rule": "Fold choice uses only train/validation score. Locked OOS is attached only after choice. Grid ranking is historical-OOS diagnostic and therefore caps the label at shadow-freeze-only."
+  },
+  "promotion_labels": [
+    "deployable-paper",
+    "small-real-sleeve candidate",
+    "shadow-freeze-only",
+    "reject"
+  ],
+  "report_destination": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_meta_selector_research_20260607",
+  "selector_family": "clean_input_meta_selector",
+  "selector_origin": "post_oos_research_freeze_candidate",
+  "source_artifacts": {
+    "source_artifact_kind": "alpha_zoo_69_asset_monthly_refit_walkforward",
+    "source_json": "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_85_asset_lagged_shadow_router_scaled_latest_20260606/alpha_zoo_85_asset_lagged_shadow_router_scaled_latest_20260606.json",
+    "source_sha256": "340f955250f345df2c8cf621d95990874b32a4ccc5d6fc74fefa129e2c591757"
+  },
+  "trial_budget": {
+    "grid_candidate_count": 2048,
+    "optuna_trials": 0,
+    "random_seeds": [],
+    "search_method": "bounded_deterministic_grid"
+  },
+  "universe": {
+    "global_earliest_utc": "2025-01-01T00:00:00",
+    "global_latest_utc": "2026-06-06T08:30:00",
+    "loaded_symbol_count": 85,
+    "requested_symbol_count": 85,
+    "timeframes": [
+      "30m",
+      "1h",
+      "2h",
+      "4h",
+      "6h",
+      "8h",
+      "12h",
+      "1d"
+    ]
+  }
+}
