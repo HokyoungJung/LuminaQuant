@@ -15,6 +15,15 @@
 - Pytest stream/BBO: `6 passed in 0.04s`
 - `git diff --check`: pass
 - Artifact assertions: pass; all final candidates remain `real_money_allowed=false` and `small_sleeve_allowed=false`.
+- Latest BBO post-update verification: JSON/artifact assertions pass; Ruff/format/git diff check pass; `PYTHONPATH=. ...` subset `12 passed in 0.53s` after no-PYTHONPATH collection retry.
+
+
+## Latest BBO accumulation recheck
+
+- Source generated: `2026-06-07T10:14:05.285023Z`.
+- Inferred candidate cap `450`, folds `5`, candidate rows `2250`.
+- Result unchanged: OOS comp `-0.24%`, annualized `-0.57%`, monthly equity MDD `8.72%`, hit `3/5`.
+- Decision impact: no promotion; real-money and small-sleeve remain disallowed.
 
 ## Remaining blockers
 

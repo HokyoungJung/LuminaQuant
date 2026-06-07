@@ -56,6 +56,14 @@
 - Trading Costs — https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3229719
 - Backtest overfitting / Pseudo-Mathematics — https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2308659
 
+## Latest BBO accumulation recheck
+
+- Source: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607_feature_bounded/clean_new_alpha_discovery_latest.json` generated `2026-06-07T10:14:05.285023Z`.
+- Inferred candidate cap: `450`; folds: `5`; candidate rows: `2250`.
+- Result: OOS comp `-0.24%`, annualized `-0.57%`, monthly equity MDD `8.72%`, Sharpe `0.04`, hit `3/5`.
+- BBO rows now observed: BNBUSDT 603, BTCUSDT 628, ETHUSDT 642, SOLUSDT 638, TRXUSDT 587.
+- Impact: no promotion flag changed; `clean_new_alpha_discovery_feature_bounded` remains `rejected` and `real_money_execution=false`.
+
 ## Verification
 
 - JSON/manifest/report assertions: pass.
@@ -63,4 +71,6 @@
 - Pytest targeted: core suite `34 passed in 0.76s`; stream/BBO suite `6 passed in 0.04s`.
 - Quality gate artifact: `final_quality_gate_20260607.json`.
 - G008 code-reviewer lane: APPROVE; architect lane: WATCH/no safety FAIL; both reports are stored in `final_independent_review_20260607/`.
+- Latest BBO accumulation recheck: pass/no promotion; feature-bounded result remains -0.24% OOS comp / -0.57% annualized.
 - Formal ultragoal checkpoint is still not fully closed: G008 blocked checkpoint is intentionally non-terminal: ledger records `goal_blocked` while `.omx/ultragoal/goals.json` keeps G008 `in_progress`, and hidden Codex `get_goal` points to an older completed latency objective. This blocks merge-ready/final-checkpoint approval, but not the research conclusion above.
+- Latest BBO post-update verification: JSON/artifact assertions pass; Ruff/format/git diff check pass; `PYTHONPATH=. uv run pytest -q tests/test_alpha_zoo_clean_new_alpha_discovery.py tests/test_strategy_support_inventory.py tests/test_collect_binance_book_ticker_feature_points.py` -> `12 passed in 0.53s` after no-PYTHONPATH collection retry.

@@ -36,12 +36,86 @@
       "evidence": "25 target/review JSON files parsed; all six candidates real_money_allowed=false and small_sleeve_allowed=false; manifest sha matched; no true locked-OOS/live-promotion flags found",
       "name": "artifact_assertions",
       "status": "pass"
+    },
+    {
+      "evidence": "Latest BBO accumulation recheck (2026-06-07T10:14:05.285023Z) used inferred candidate_cap=450 and left feature-bounded OOS unchanged at -0.24% comp / -0.57% annualized; no promotion flags changed.",
+      "name": "latest_bbo_accumulation_recheck",
+      "status": "pass_no_promotion"
+    },
+    {
+      "evidence": "PYTHONPATH=src uv run python custom parser/assertions -> final report, quality gate, G008 summary, and feature-bounded JSON parsed; all final candidates real_money_allowed=false/small_sleeve_allowed=false; latest BBO rows all >0; feature-bounded real_money_execution=false and clean_promotion_eligible=false.",
+      "name": "latest_bbo_json_artifact_assertions",
+      "status": "pass"
+    },
+    {
+      "evidence": "uv run ruff check ... -> All checks passed; uv run ruff format --check ... -> 6 files already formatted; git diff --check -> no output.",
+      "name": "latest_bbo_ruff_and_diff_check",
+      "status": "pass"
+    },
+    {
+      "evidence": "PYTHONPATH=. uv run pytest -q tests/test_alpha_zoo_clean_new_alpha_discovery.py tests/test_strategy_support_inventory.py tests/test_collect_binance_book_ticker_feature_points.py -> 12 passed in 0.53s.",
+      "name": "latest_bbo_pytest",
+      "status": "pass"
+    },
+    {
+      "evidence": "uv run pytest without PYTHONPATH failed to collect scripts imports; rerun with PYTHONPATH=. passed.",
+      "name": "latest_bbo_pytest_first_attempt",
+      "status": "environment_retry"
     }
   ],
   "code_reviewer": "APPROVE",
   "deployment_conclusion": "no_real_money; no_small_sleeve; 0pct_allocation_or_paper_control_only",
-  "generated_at_utc": "2026-06-07T10:10:37+00:00",
+  "generated_at_utc": "2026-06-07T10:20:57+00:00",
   "hidden_goal_snapshot": "wrong completed legacy latency objective; saved in fresh_get_goal_after_g008_review.json",
+  "latest_bbo_accumulation_recheck": {
+    "aggregate": {
+      "annualized_oos_return_approx": -0.005715372151040787,
+      "compounded_oos_return": -0.0023853868449449367,
+      "max_oos_mdd": 0.08315392481708694,
+      "monthly_equity_mdd": 0.08716671516123264,
+      "monthly_sharpe_approx": 0.0386242684900772,
+      "positive_oos_folds": 3,
+      "profit_factor": 1.032455916541698
+    },
+    "artifact_kind": "latest_bbo_accumulation_recheck",
+    "candidate_cap_inferred": 450,
+    "candidate_rows": 2250,
+    "checked_at_utc": "2026-06-07T10:19:34+00:00",
+    "clean_promotion_eligible": false,
+    "decision_impact": "unchanged_rejected; latest current-day BBO accumulation did not improve clean train/validation-first OOS result",
+    "fold_count": 5,
+    "real_money_execution": false,
+    "source_generated_at_utc": "2026-06-07T10:14:05.285023Z",
+    "source_json": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607_feature_bounded/clean_new_alpha_discovery_latest.json",
+    "source_markdown": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607_feature_bounded/clean_new_alpha_discovery_latest.md",
+    "support_inventory_bbo_rows": {
+      "BNBUSDT": {
+        "bbo_first_timestamp_utc": "2026-06-07T07:38:30+00:00",
+        "bbo_last_timestamp_utc": "2026-06-07T10:18:25+00:00",
+        "bbo_rows": 603
+      },
+      "BTCUSDT": {
+        "bbo_first_timestamp_utc": "2026-06-07T07:29:05+00:00",
+        "bbo_last_timestamp_utc": "2026-06-07T10:18:25+00:00",
+        "bbo_rows": 628
+      },
+      "ETHUSDT": {
+        "bbo_first_timestamp_utc": "2026-06-07T07:29:05+00:00",
+        "bbo_last_timestamp_utc": "2026-06-07T10:18:25+00:00",
+        "bbo_rows": 642
+      },
+      "SOLUSDT": {
+        "bbo_first_timestamp_utc": "2026-06-07T07:29:05+00:00",
+        "bbo_last_timestamp_utc": "2026-06-07T10:18:25+00:00",
+        "bbo_rows": 638
+      },
+      "TRXUSDT": {
+        "bbo_first_timestamp_utc": "2026-06-07T07:38:30+00:00",
+        "bbo_last_timestamp_utc": "2026-06-07T10:18:25+00:00",
+        "bbo_rows": 587
+      }
+    }
+  },
   "remaining_blockers": [
     "Formal .omx/ultragoal aggregate cannot be marked complete because fresh Codex get_goal points to a completed legacy latency objective.",
     "G008 blocked checkpoint is intentionally non-terminal: ledger records goal_blocked while goals.json remains in_progress.",

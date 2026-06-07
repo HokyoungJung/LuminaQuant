@@ -55,6 +55,8 @@ Performance/verification:
 - Collector hardening: fixed websocket import compatibility (`websockets.sync.client`) and added `--summary` mode so long-running monitors no longer fail on missing shell `python` or broken pipe parsing.
 - Smoke capture succeeded for `BTCUSDT`, `ETHUSDT`, `SOLUSDT`, then expanded to `BNBUSDT` and `TRXUSDT`; rows persist under `data/market_parquet/feature_points/exchange=binance`. Current support-inventory snapshot shows `BTC/ETH/SOL` each with `16` BBO rows, `BNBUSDT` with `19`, and `TRXUSDT` with `10`.
 - BBO-aware bounded re-evaluation (`max-folds 5`, candidate cap `360`) still stayed at OOS comp `-0.24%`, monthly equity MDD `8.72%`, Sharpe `0.04`, hit `3/5`. The new `feature_bbo_flow_exhaustion_reversal` family is wired, but current BBO history is still only fresh-forward/current-day sidecar data and cannot satisfy historical train/validation coverage strongly enough to beat `cross_asset_lead_lag_momentum`.
+- Continued BBO accumulation check: latest support-inventory snapshot now shows `BTCUSDT 628`, `ETHUSDT 642`, `SOLUSDT 638`, `BNBUSDT 603`, `TRXUSDT 587` BBO rows through roughly `2026-06-07T10:18Z`.
+- Re-ran the BBO-aware bounded clean search at candidate cap `450`; result was unchanged (`-0.24%` OOS comp / `8.72%` monthly equity MDD / Sharpe `0.04` / hit `3/5`). Current-day BBO buildup still does not change fold winners.
 
 다음 연구 방향:
 - 이번 failed families를 그대로 튜닝하지 말고 새 pre-registered family를 추가한다.

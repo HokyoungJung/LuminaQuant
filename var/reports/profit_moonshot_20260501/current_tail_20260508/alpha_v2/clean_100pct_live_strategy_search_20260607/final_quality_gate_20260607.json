@@ -6,7 +6,8 @@
     "G008 independent review evidence is now attached: code-reviewer APPROVE; architect WATCH/no safety FAIL. This resolves the earlier missing-independent-review evidence but not the hidden Codex get_goal mismatch.",
     "Historical incumbent metric lineage is annotated: final report table uses the source 209.00% annualized / 156.03% compounded record, while locked-OOS/cost fixed-blend aggregation reports 160.90% / 122.36%; both remain paper/control only.",
     "G008 blocked checkpoint is intentionally non-terminal: .omx/ultragoal ledger records goal_blocked while goals.json remains in_progress; this strict completion blocker is recorded in final_independent_review_20260607.",
-    "Final verification passed locally after G008 reconciliation, but formal ultragoal completion remains blocked by the stale hidden Codex goal snapshot."
+    "Final verification passed locally after G008 reconciliation, but formal ultragoal completion remains blocked by the stale hidden Codex goal snapshot.",
+    "Latest BBO accumulation recheck (2026-06-07T10:14:05.285023Z) used inferred candidate_cap=450 and left feature-bounded OOS unchanged at -0.24% comp / -0.57% annualized; no promotion flags changed."
   ],
   "final_reviews": {
     "ai_slop_cleaner": "not invoked because no cleanup/refactor/code-structure change was made; only report/provenance artifacts are being reconciled.",
@@ -16,7 +17,7 @@
     "g008_reverification": "PASS_WITH_G008_WATCH_AND_HIDDEN_GOAL_BLOCKER; see final_independent_review_20260607/g008_final_reverification_summary_20260607.json"
   },
   "generated_at_utc": "2026-06-07T07:13:46.900714+00:00",
-  "last_reverified_at_utc": "2026-06-07T10:10:37+00:00",
+  "last_reverified_at_utc": "2026-06-07T10:20:57+00:00",
   "last_reviewed_at_utc": "2026-06-07T10:08:34+00:00",
   "outputs": [
     "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/final_report_clean_100pct_live_strategy_search_20260607.md",
@@ -31,7 +32,9 @@
     "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/final_independent_review_20260607/g008_final_reverification_summary_20260607.md",
     "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/final_independent_review_20260607/fresh_get_goal_after_g008_review.json",
     "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/final_independent_review_20260607/ultragoal_g008_blocked_checkpoint.json",
-    "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/final_independent_review_20260607/ultragoal_status_after_g008_checkpoint.json"
+    "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/final_independent_review_20260607/ultragoal_status_after_g008_checkpoint.json",
+    "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607_feature_bounded/clean_new_alpha_discovery_latest.json",
+    "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607_feature_bounded/clean_new_alpha_discovery_latest.md"
   ],
   "schema_version": 1,
   "status": "pass_with_g008_review_watch_and_hidden_goal_blocker",
@@ -106,6 +109,31 @@
       "evidence": "omx ultragoal checkpoint --status blocked recorded the intended non-terminal ledger goal_blocked for G008; goals.json remains in_progress by design; fresh get_goal is wrong legacy completed objective.",
       "name": "g008_blocker_checkpoint",
       "status": "blocked_watch"
+    },
+    {
+      "evidence": "Latest BBO accumulation recheck (2026-06-07T10:14:05.285023Z) used inferred candidate_cap=450 and left feature-bounded OOS unchanged at -0.24% comp / -0.57% annualized; no promotion flags changed.",
+      "name": "latest_bbo_accumulation_recheck",
+      "status": "pass_no_promotion"
+    },
+    {
+      "evidence": "PYTHONPATH=src uv run python custom parser/assertions -> final report, quality gate, G008 summary, and feature-bounded JSON parsed; all final candidates real_money_allowed=false/small_sleeve_allowed=false; latest BBO rows all >0; feature-bounded real_money_execution=false and clean_promotion_eligible=false.",
+      "name": "latest_bbo_json_artifact_assertions",
+      "status": "pass"
+    },
+    {
+      "evidence": "uv run ruff check ... -> All checks passed; uv run ruff format --check ... -> 6 files already formatted; git diff --check -> no output.",
+      "name": "latest_bbo_ruff_and_diff_check",
+      "status": "pass"
+    },
+    {
+      "evidence": "PYTHONPATH=. uv run pytest -q tests/test_alpha_zoo_clean_new_alpha_discovery.py tests/test_strategy_support_inventory.py tests/test_collect_binance_book_ticker_feature_points.py -> 12 passed in 0.53s.",
+      "name": "latest_bbo_pytest",
+      "status": "pass"
+    },
+    {
+      "evidence": "uv run pytest without PYTHONPATH failed to collect scripts imports; rerun with PYTHONPATH=. passed.",
+      "name": "latest_bbo_pytest_first_attempt",
+      "status": "environment_retry"
     }
   ]
 }
