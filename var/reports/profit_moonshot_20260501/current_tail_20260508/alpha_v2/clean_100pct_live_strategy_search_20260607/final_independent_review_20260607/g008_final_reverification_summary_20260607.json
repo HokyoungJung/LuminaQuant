@@ -38,9 +38,9 @@
       "status": "pass"
     },
     {
-      "evidence": "5/5 code-reviewer tasks completed; no no-live blocker; LOW stale dirty caveat fixed.",
+      "evidence": "5/5 code-reviewer tasks completed; no no-live blocker; LOW stale dirty caveat fixed and de-hashed.",
       "name": "code_reviewer_rereview_after_bbo",
-      "status": "comment_low_fixed_pending_clean_rereview"
+      "status": "comment_low_fixed_historical"
     },
     {
       "evidence": "Latest BBO accumulation recheck (2026-06-07T10:32:06.564484Z) used inferred candidate_cap=500 and left feature-bounded OOS unchanged at -0.24% comp / -0.57% annualized; no promotion flags changed.",
@@ -66,14 +66,15 @@
   "code_reviewer": "APPROVE",
   "code_reviewer_rereview_after_bbo": {
     "low_findings_fixed": [
-      "[LOW] final_quality_gate_20260607.json:5 — Caveat says repository remains dirty with pre-existing changes, but current post-0364e354 worktree `git status --short` is clean. Why it matters: stale provenance wording can confuse final audit readers even though it is conservative and does not overstate promotion readiness. Fix: if regenerating final artifacts, update/remove this stale caveat or qualify it as historical generation context."
+      "[LOW] final_quality_gate_20260607.json:5 — Caveat says repository remains dirty with pre-existing changes, but post-review worktree status was clean. Why it matters: stale provenance wording can confuse final audit readers even though it is conservative and does not overstate promotion readiness. Fix: if regenerating final artifacts, update/remove this stale caveat or qualify it as historical generation context."
     ],
     "no_live_blockers": false,
-    "status": "COMMENT_LOW_FIXED_PENDING_CLEAN_REREVIEW",
+    "note": "Historical re-review artifact; stale dirty-workspace and commit-hash wording fixed in final quality gate.",
+    "status": "COMMENT_LOW_FIXED_HISTORICAL",
     "team": "read-only-final-re-re-4a549153"
   },
   "deployment_conclusion": "no_real_money; no_small_sleeve; 0pct_allocation_or_paper_control_only",
-  "generated_at_utc": "2026-06-07T10:33:33+00:00",
+  "generated_at_utc": "2026-06-07T10:40:29+00:00",
   "hidden_goal_snapshot": "wrong completed legacy latency objective; saved in fresh_get_goal_after_g008_review.json",
   "latest_bbo_accumulation_recheck": {
     "aggregate": {

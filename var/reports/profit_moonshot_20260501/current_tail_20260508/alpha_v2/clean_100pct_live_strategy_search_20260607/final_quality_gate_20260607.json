@@ -2,7 +2,7 @@
   "artifact_kind": "final_quality_gate",
   "caveats": [
     "Current get_goal reports an old completed latency objective, not the active ultragoal aggregate; .omx/ultragoal checkpointing uses prior active aggregate snapshot if continued.",
-    "Tracked report/code changes are committed through 0364e354; the original leader workspace still has untracked legacy .gjc and deep_research_* artifacts outside the final clean-100pct commit scope; no external push/CI was performed.",
+    "Tracked final clean-search report/code changes are committed locally; the original leader workspace still has untracked legacy .gjc and deep_research_* artifacts outside the final clean-100pct commit scope; no external push/CI was performed.",
     "G008 independent review evidence is now attached: code-reviewer APPROVE; architect WATCH/no safety FAIL. This resolves the earlier missing-independent-review evidence but not the hidden Codex get_goal mismatch.",
     "Historical incumbent metric lineage is annotated: final report table uses the source 209.00% annualized / 156.03% compounded record, while locked-OOS/cost fixed-blend aggregation reports 160.90% / 122.36%; both remain paper/control only.",
     "G008 blocked checkpoint is intentionally non-terminal: .omx/ultragoal ledger records goal_blocked while goals.json remains in_progress; this strict completion blocker is recorded in final_independent_review_20260607.",
@@ -13,12 +13,12 @@
     "ai_slop_cleaner": "not invoked because no cleanup/refactor/code-structure change was made; only report/provenance artifacts are being reconciled.",
     "architect_clear": "WATCH, not CLEAR: architect lane found no safety FAIL and supports no-real-money/no-small-sleeve conclusion, but requires G008 checkpoint/provenance and metric-lineage annotation.",
     "code_reviewer_approve": "APPROVE via OMX team code-reviewer lane for .omx/ultragoal G008; report artifact final_independent_review_20260607/code_reviewer_final_report.md; 0 CRITICAL/HIGH/MEDIUM, 1 LOW provenance note.",
-    "code_reviewer_rereview_after_bbo": "COMMENT before leader fix: 0 CRITICAL/HIGH/MEDIUM; 1 LOW stale dirty-workspace caveat in final_quality_gate; no no-live blocker. Caveat wording fixed in this revision; clean recheck still required for formal APPROVE.",
+    "code_reviewer_rereview_after_bbo": "Historical COMMENT re-review found 0 CRITICAL/HIGH/MEDIUM and no no-live blocker; the stale dirty-workspace caveat it reported has been fixed. This historical entry is not a live-promotion approval.",
     "g008_reconciliation": "G007 remains construction/provenance reference for the final report; G008 is the independent review/checkpoint reconciliation story. Formal checkpoint still depends on fresh matching Codex get_goal state.",
     "g008_reverification": "PASS_WITH_G008_WATCH_AND_HIDDEN_GOAL_BLOCKER; see final_independent_review_20260607/g008_final_reverification_summary_20260607.json"
   },
   "generated_at_utc": "2026-06-07T07:13:46.900714+00:00",
-  "last_reverified_at_utc": "2026-06-07T10:33:33+00:00",
+  "last_reverified_at_utc": "2026-06-07T10:40:29+00:00",
   "last_reviewed_at_utc": "2026-06-07T10:08:34+00:00",
   "outputs": [
     "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/final_report_clean_100pct_live_strategy_search_20260607.md",
@@ -114,9 +114,9 @@
       "status": "blocked_watch"
     },
     {
-      "evidence": "OMX team read-only-final-re-re-4a549153 completed 5/5: tasks 1-3 APPROVE, task4 COMMENT with LOW stale dirty caveat, task5 COMMENT formal blockers only; no no-live blocker. Leader updated dirty caveat wording in final_quality_gate.",
+      "evidence": "OMX team read-only-final-re-re-4a549153 completed 5/5: tasks 1-3 APPROVE, task4 COMMENT with LOW stale dirty caveat, task5 COMMENT formal blockers only; no no-live blocker. Dirty caveat wording was fixed and later de-hashed to avoid stale commit references.",
       "name": "code_reviewer_rereview_after_bbo",
-      "status": "comment_low_fixed_pending_clean_rereview"
+      "status": "comment_low_fixed_historical"
     },
     {
       "evidence": "Latest BBO accumulation recheck (2026-06-07T10:32:06.564484Z) used inferred candidate_cap=500 and left feature-bounded OOS unchanged at -0.24% comp / -0.57% annualized; no promotion flags changed.",
