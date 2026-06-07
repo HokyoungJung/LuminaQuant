@@ -20,12 +20,21 @@ import polars as pl
 from lumina_quant.market_data import normalize_symbol, upsert_futures_feature_points_rows
 
 _REQUIRED_ALIASES: dict[str, tuple[str, ...]] = {
-    "timestamp_ms": ("timestamp_ms", "exchange_ts_ms", "ts_ms", "ts", "time", "timestamp"),
+    "timestamp_ms": (
+        "timestamp_ms",
+        "exchange_ts_ms",
+        "ts_ms",
+        "ts",
+        "time",
+        "timestamp",
+        "transaction_time",
+        "event_time",
+    ),
     "symbol": ("symbol", "s"),
-    "best_bid_price": ("best_bid_price", "bid_price", "bid", "b"),
-    "best_bid_quantity": ("best_bid_quantity", "bid_quantity", "bid_qty", "B"),
-    "best_ask_price": ("best_ask_price", "ask_price", "ask", "a"),
-    "best_ask_quantity": ("best_ask_quantity", "ask_quantity", "ask_qty", "A"),
+    "best_bid_price": ("best_bid_price", "bid_price", "best_bid", "bid", "b"),
+    "best_bid_quantity": ("best_bid_quantity", "best_bid_qty", "bid_quantity", "bid_qty", "B"),
+    "best_ask_price": ("best_ask_price", "ask_price", "best_ask", "ask", "a"),
+    "best_ask_quantity": ("best_ask_quantity", "best_ask_qty", "ask_quantity", "ask_qty", "A"),
 }
 
 

@@ -66,12 +66,17 @@
       "evidence": "PYTHONPATH=. uv run pytest -q tests/test_import_binance_book_ticker_history.py -> 3 passed in 0.08s; adapter supports approved csv/jsonl/ndjson/parquet BBO history ingest without changing no-deploy decision.",
       "name": "historical_bbo_ingest_adapter",
       "status": "pass_plumbing_only"
+    },
+    {
+      "name": "public_book_ticker_archive_backfill",
+      "status": "pass",
+      "evidence": "uv run ruff check import/backfill BBO scripts and tests -> All checks passed; uv run ruff format --check import/backfill BBO scripts and tests -> 4 files already formatted; PYTHONPATH=. uv run pytest -q tests/test_import_binance_book_ticker_history.py tests/test_backfill_binance_public_book_ticker_history.py -> 8 passed in 0.16s; curl -I official BTCUSDT 2024-03-30 archive URL -> HTTP/2 200 application/zip"
     }
   ],
   "code_reviewer": "APPROVE",
   "code_reviewer_rereview_after_bbo": {
     "low_findings_fixed": [
-      "[LOW] final_quality_gate_20260607.json:5 \u2014 Caveat says repository remains dirty with pre-existing changes, but post-review worktree status was clean. Why it matters: stale provenance wording can confuse final audit readers even though it is conservative and does not overstate promotion readiness. Fix: if regenerating final artifacts, update/remove this stale caveat or qualify it as historical generation context."
+      "[LOW] final_quality_gate_20260607.json:5 — Caveat says repository remains dirty with pre-existing changes, but post-review worktree status was clean. Why it matters: stale provenance wording can confuse final audit readers even though it is conservative and does not overstate promotion readiness. Fix: if regenerating final artifacts, update/remove this stale caveat or qualify it as historical generation context."
     ],
     "no_live_blockers": false,
     "note": "Historical re-review artifact; stale dirty-workspace and commit-hash wording fixed in final quality gate.",
@@ -79,7 +84,7 @@
     "team": "read-only-final-re-re-4a549153"
   },
   "deployment_conclusion": "no_real_money; no_small_sleeve; 0pct_allocation_or_paper_control_only",
-  "generated_at_utc": "2026-06-07T10:48:09Z",
+  "generated_at_utc": "2026-06-07T11:04:26Z",
   "hidden_goal_snapshot": "wrong completed legacy latency objective; saved in fresh_get_goal_after_g008_review.json",
   "latest_bbo_accumulation_recheck": {
     "aggregate": {
@@ -142,5 +147,25 @@
     "Architect verdict is WATCH, not CLEAR, due provenance/metric-lineage caveats now annotated."
   ],
   "status": "PASS_WITH_G008_WATCH_AND_HIDDEN_GOAL_BLOCKER",
-  "ultragoal_checkpoint": "ledger goal_blocked event recorded for G008, but goals.json status remains in_progress; treat as OMX state-transition caveat, not strategy approval."
+  "ultragoal_checkpoint": "ledger goal_blocked event recorded for G008, but goals.json status remains in_progress; treat as OMX state-transition caveat, not strategy approval.",
+  "public_book_ticker_archive_backfill": {
+    "script": "scripts/backfill_binance_public_book_ticker_history.py",
+    "test": "tests/test_backfill_binance_public_book_ticker_history.py",
+    "source": "https://data.binance.vision/data/futures/um/daily/bookTicker/{SYMBOL}/{SYMBOL}-bookTicker-{YYYY-MM-DD}.zip",
+    "status": "official_public_archive_backfill_ready_for_explicitly_manifested_symbols_dates_only",
+    "column_shape": "update_id,best_bid_price,best_bid_qty,best_ask_price,best_ask_qty,transaction_time,event_time",
+    "controls": [
+      "requires explicit symbol/date manifest before research use",
+      "optional cadence sampling before persistence",
+      "missing archives recorded fail-closed instead of fabricated",
+      "does not change cap=500 feature-bounded OOS result",
+      "does not unlock real-money without new clean walk-forward and cost/fill telemetry"
+    ],
+    "verification": [
+      "uv run ruff check import/backfill BBO scripts and tests -> All checks passed",
+      "uv run ruff format --check import/backfill BBO scripts and tests -> 4 files already formatted",
+      "PYTHONPATH=. uv run pytest -q tests/test_import_binance_book_ticker_history.py tests/test_backfill_binance_public_book_ticker_history.py -> 8 passed in 0.16s",
+      "curl -I official BTCUSDT 2024-03-30 archive URL -> HTTP/2 200 application/zip"
+    ]
+  }
 }

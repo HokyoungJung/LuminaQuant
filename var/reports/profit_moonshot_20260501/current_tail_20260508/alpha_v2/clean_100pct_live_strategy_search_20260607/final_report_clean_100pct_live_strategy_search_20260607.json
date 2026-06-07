@@ -111,12 +111,16 @@
       "url": "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2308659"
     },
     {
-      "title": "Binance USD\u24c8-M Futures Individual Symbol Book Ticker Streams",
+      "title": "Binance USDⓈ-M Futures Individual Symbol Book Ticker Streams",
       "url": "https://developers.binance.com/docs/derivatives/usds-margined-futures/websocket-market-streams/Individual-Symbol-Book-Ticker-Streams"
     },
     {
-      "title": "Binance USD\u24c8-M Futures All Book Tickers Stream",
+      "title": "Binance USDⓈ-M Futures All Book Tickers Stream",
       "url": "https://developers.binance.com/docs/derivatives/usds-margined-futures/websocket-market-streams/All-Book-Tickers-Stream"
+    },
+    {
+      "title": "Binance Public Data — USD-M daily bookTicker archive",
+      "url": "https://data.binance.vision/data/futures/um/daily/bookTicker/"
     }
   ],
   "final_conclusion": {
@@ -156,7 +160,7 @@
       "Historical incumbent metrics must be read with source lineage: source artifact reports 209.00% annualized / 156.03% compounded; locked-OOS/cost verifier fixed-blend aggregation reports 160.90% / 122.36% under the same candidate id. Both are paper/control only and cannot be used as live expected return."
     ]
   },
-  "last_reverified_at_utc": "2026-06-07T10:47:52Z",
+  "last_reverified_at_utc": "2026-06-07T11:04:26Z",
   "last_reviewed_at_utc": "2026-06-07T10:08:34+00:00",
   "latest_bbo_accumulation_recheck": {
     "aggregate": {
@@ -185,7 +189,12 @@
         "ndjson",
         "parquet"
       ],
-      "test": "tests/test_import_binance_book_ticker_history.py"
+      "test": "tests/test_import_binance_book_ticker_history.py",
+      "public_archive_followup": {
+        "script": "scripts/backfill_binance_public_book_ticker_history.py",
+        "status": "ready_for_explicit_public_binance_bookTicker_backfill_after manifest approval",
+        "decision_impact": "no_change_to_no_real_money/no_small_sleeve; use only to create fresh train/validation coverage before a new clean walk-forward"
+      }
     },
     "real_money_execution": false,
     "source_generated_at_utc": "2026-06-07T10:32:06.564484Z",
@@ -217,6 +226,26 @@
         "bbo_last_timestamp_utc": "2026-06-07T10:31:00+00:00",
         "bbo_rows": 700
       }
+    },
+    "public_book_ticker_archive_backfill": {
+      "script": "scripts/backfill_binance_public_book_ticker_history.py",
+      "test": "tests/test_backfill_binance_public_book_ticker_history.py",
+      "source": "https://data.binance.vision/data/futures/um/daily/bookTicker/{SYMBOL}/{SYMBOL}-bookTicker-{YYYY-MM-DD}.zip",
+      "status": "official_public_archive_backfill_ready_for_explicitly_manifested_symbols_dates_only",
+      "column_shape": "update_id,best_bid_price,best_bid_qty,best_ask_price,best_ask_qty,transaction_time,event_time",
+      "controls": [
+        "requires explicit symbol/date manifest before research use",
+        "optional cadence sampling before persistence",
+        "missing archives recorded fail-closed instead of fabricated",
+        "does not change cap=500 feature-bounded OOS result",
+        "does not unlock real-money without new clean walk-forward and cost/fill telemetry"
+      ],
+      "verification": [
+        "uv run ruff check import/backfill BBO scripts and tests -> All checks passed",
+        "uv run ruff format --check import/backfill BBO scripts and tests -> 4 files already formatted",
+        "PYTHONPATH=. uv run pytest -q tests/test_import_binance_book_ticker_history.py tests/test_backfill_binance_public_book_ticker_history.py -> 8 passed in 0.16s",
+        "curl -I official BTCUSDT 2024-03-30 archive URL -> HTTP/2 200 application/zip"
+      ]
     }
   },
   "manifest_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/immutable_manifest_clean_100pct_live_strategy_search_20260607.json",
@@ -269,6 +298,10 @@
     "quality_gate_artifact": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/final_quality_gate_20260607.json",
     "ruff_format_targeted": "pass: uv run ruff format --check modified Python/test/BBO surfaces -> 9 files already formatted",
     "ruff_targeted": "pass: uv run ruff check modified Python/test/BBO surfaces -> All checks passed",
-    "status": "pass_with_g008_review_watch_and_hidden_goal_blocker"
+    "status": "pass_with_g008_review_watch_and_hidden_goal_blocker",
+    "public_book_ticker_archive_backfill": {
+      "status": "pass",
+      "evidence": "uv run ruff check import/backfill BBO scripts and tests -> All checks passed; uv run ruff format --check import/backfill BBO scripts and tests -> 4 files already formatted; PYTHONPATH=. uv run pytest -q tests/test_import_binance_book_ticker_history.py tests/test_backfill_binance_public_book_ticker_history.py -> 8 passed in 0.16s; curl -I official BTCUSDT 2024-03-30 archive URL -> HTTP/2 200 application/zip"
+    }
   }
 }

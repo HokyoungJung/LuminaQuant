@@ -73,3 +73,21 @@ def test_import_bbo_history_jsonl_with_aliases(tmp_path: Path) -> None:
     row = loaded.to_dicts()[0]
     assert row["best_bid_price"] == 50.0
     assert row["best_ask_price"] == 50.1
+
+
+def test_normalize_bbo_frame_accepts_official_binance_archive_columns() -> None:
+    frame = pl.DataFrame(
+        {
+            "transaction_time": [1_711_756_800_007],
+            "best_bid_price": [0.12004],
+            "best_bid_qty": [108662.0],
+            "best_ask_price": [0.12005],
+            "best_ask_qty": [31803.0],
+        }
+    )
+    normalized = module.normalize_bbo_frame(frame, symbol_override="TRXUSDT")
+    row = normalized.to_dicts()[0]
+    assert row["timestamp_ms"] == 1_711_756_800_007
+    assert row["symbol"] == "TRX/USDT"
+    assert row["best_bid_price"] == 0.12004
+    assert row["best_ask_price"] == 0.12005
