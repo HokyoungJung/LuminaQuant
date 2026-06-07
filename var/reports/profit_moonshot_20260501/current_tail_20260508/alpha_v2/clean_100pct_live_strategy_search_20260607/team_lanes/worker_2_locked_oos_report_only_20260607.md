@@ -52,18 +52,3 @@ worker: `worker-2`
 - Final integrated report should still state `found`/`not_found` only after contamination, manifest/search, cost, theory, and label lanes are integrated.
 - This lane does not approve real money and does not mutate `.omx/ultragoal`.
 
-## Subagent probe integrated
-- Subagents spawned: `1` (`019ea0dd-b8f9-73c2-bed9-8ab99b7117be`, change-slice probe).
-- Subagent model requested: `gpt-5.4-mini` (tool schema inherited current model; no explicit model field exposed).
-- Findings integrated: safest slice is report-only; code edits unnecessary/risky; worker-2 should only write worker-owned lane files; source code, `.omx/ultragoal`, docs, and peer lane files are shared-file hazards.
-- Additional anchors integrated: `src/lumina_quant/optimization/search_policy.py`, `tests/test_optimization_search_policy.py`, `src/lumina_quant/alpha_zoo/factor_card.py`, and `scripts/research/run_alpha_zoo_clean_meta_selector_research.py`.
-
-## Additional policy anchors
-- `src/lumina_quant/optimization/search_policy.py` — `LOCKED_OOS_SEARCH_FLAGS` centralizes `uses_locked_oos_for_selection/objective/pruning/parameter_fitting=false`.
-- `tests/test_optimization_search_policy.py` — Optuna policy payload defaults are asserted to keep all locked-OOS search flags false.
-- `src/lumina_quant/alpha_zoo/factor_card.py` — factor cards fail closed with `locked_oos_used_for_selection` if selected splits include `locked_oos`/`oos`; provenance records `locked_oos_role=gate_report_only`.
-- `scripts/research/run_alpha_zoo_clean_meta_selector_research.py` — the 110%+ shadow example explicitly records `uses_locked_oos_for_selector_grid_ranking=true`, `post_oos_research_variant=true`, `ready_for_real=false`, and `deployment_label=shadow-freeze-only`.
-
-## Scan/caveat
-- Focused scan found no current clean-process `100pct`/`100%` annualized selector or Optuna objective; annualized fields in clean discovery/meta-selector are aggregate/report rendering.
-- Caveat: historical/control config `configs/research/bridge-protocol-manifest-oos-oracle-hybrid-v1-20260602.json` contains OOS promotion thresholds; this lane does not claim those historical configs are current clean promotion inputs.

@@ -1,22 +1,4 @@
 {
-  "additional_policy_evidence": [
-    {
-      "evidence": "LOCKED_OOS_SEARCH_FLAGS centralize uses_locked_oos_for_selection/objective/pruning/parameter_fitting=false and optimization_search_policy_payload injects them into search metadata.",
-      "path": "src/lumina_quant/optimization/search_policy.py"
-    },
-    {
-      "evidence": "test_optuna_policy_payload_defaults_to_locked_oos_report_only_flags asserts all locked-OOS search flags are false for Optuna policy payloads.",
-      "path": "tests/test_optimization_search_policy.py"
-    },
-    {
-      "evidence": "build_factor_card rejects any factor card selected with locked_oos/oos splits and records locked_oos_role=gate_report_only.",
-      "path": "src/lumina_quant/alpha_zoo/factor_card.py"
-    },
-    {
-      "evidence": "The meta-selector explicitly marks uses_locked_oos_for_selector_grid_ranking=true and caps deployment_label/evidence_class at shadow-freeze-only.",
-      "path": "scripts/research/run_alpha_zoo_clean_meta_selector_research.py"
-    }
-  ],
   "artifact_kind": "clean_100pct_live_strategy_search_task3_locked_oos_report_only",
   "code_policy_evidence": [
     {
@@ -46,20 +28,6 @@
     "may_select_or_promote_from_locked_oos": false,
     "real_money_approval": "blocked_absent_fresh_forward_and_paper_fill_telemetry",
     "task3_result": "complete_report_only_no_code_change"
-  },
-  "delegation": {
-    "findings_integrated": [
-      "Confirmed safest slice is report-only with no code/model/artifact mutation.",
-      "Identified shared-file hazard: only create worker-2-owned files under team_lanes and avoid .omx/ultragoal, docs/research_note/research_note.md, source code, and peer lane filenames.",
-      "Added policy anchors for shared search policy, factor-card fail-closed locked-OOS rejection, and optimization policy tests.",
-      "Added caveat that historical/control configs may contain OOS thresholds, but Task 3 claim is limited to current clean process/100pct annualized absence from selector objective."
-    ],
-    "serial_searches_before_spawn": 1,
-    "subagent_model_requested": "gpt-5.4-mini",
-    "subagent_task_name": "Change-slice probe: isolate safe implementation slices and migration hazards",
-    "subagent_thread_id": "019ea0dd-b8f9-73c2-bed9-8ab99b7117be",
-    "subagents_spawned": 1,
-    "tooling_note": "Current native spawn tool schema did not expose an agent_type field; role/model were included in the child prompt instead."
   },
   "feature_bounded_discovery_summary": {
     "aggregate": {
@@ -133,11 +101,6 @@
     },
     "pre_registered_search_space_sha256": "4a6fee0f540f5d9ce15158beaf6b7c91ad89600cb5d76e1c4bfa0e33008b81b7",
     "ready_for_real": false
-  },
-  "scan_evidence": {
-    "annualized_100pct_scan": "No current clean process evidence showed 100pct/100% as selector or Optuna objective; annualized fields in clean discovery/meta-selector are report rendering/aggregate fields.",
-    "known_historical_config_caveat": "configs/research/bridge-protocol-manifest-oos-oracle-hybrid-v1-20260602.json contains historical/control OOS promotion thresholds, so Task 3 does not generalize those configs into current clean-process eligibility.",
-    "locked_oos_policy_scan": "rg scan found current clean/policy/test surfaces use false locked-OOS selection/objective/fitting/pruning flags or reject locked-OOS-selected factor cards."
   },
   "shadow_meta_selector_demonstration": {
     "best_selector": {
