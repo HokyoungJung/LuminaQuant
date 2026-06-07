@@ -1,0 +1,44 @@
+{
+  "created_at": "2026-06-07T06:52:20Z",
+  "ultragoal_id": "G001-preserve-execution-context-and-stale",
+  "git_status_before_execution": [
+    "## private-main...private/main [ahead 1]",
+    " M docs/research_note/research_note.md",
+    " M scripts/research/run_alpha_zoo_clean_new_alpha_discovery.py",
+    " M tests/test_alpha_zoo_clean_new_alpha_discovery.py",
+    " M var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607/clean_new_alpha_discovery_latest.json",
+    " M var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607/clean_new_alpha_discovery_latest.md",
+    " M var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607_feature_bounded/clean_new_alpha_discovery_latest.json",
+    " M var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607_feature_bounded/clean_new_alpha_discovery_latest.md",
+    "?? .gjc/",
+    "?? var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/",
+    "?? var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_bestlane_rerun_20260606/",
+    "?? var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_efficiency_specialist_20260606/",
+    "?? var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_fresh_69_relaxed_seed_20260606/",
+    "?? var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_fresh_69_rematch_20260606/",
+    "?? var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_fresh_69_teacher_20260606/",
+    "?? var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_fresh_85_clean_focus_20260606/",
+    "?? var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_fresh_85_full_20260606/",
+    "?? var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_fresh_85_teacher_20260606/",
+    "?? var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_leaf_optuna_20260606/",
+    "?? var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_live_status_20260606/",
+    "?? var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_probe_69_teacher_1fold_20260606/",
+    "?? var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_probe_69_teacher_3fold_20260606/",
+    "?? var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_relaxed_specialist_20260606/"
+  ],
+  "stale_ultragoal_archive": ".omx/ultragoal/archive/stale-before-clean-100pct-live-strategy-search-20260607T065200Z",
+  "archive_files": [
+    ".omx/ultragoal/archive/stale-before-clean-100pct-live-strategy-search-20260607T065200Z/brief.md",
+    ".omx/ultragoal/archive/stale-before-clean-100pct-live-strategy-search-20260607T065200Z/goals.json",
+    ".omx/ultragoal/archive/stale-before-clean-100pct-live-strategy-search-20260607T065200Z/ledger.jsonl"
+  ],
+  "ledger_annotation": "accepted via omx ultragoal steer --kind annotate_ledger before create-goals --force",
+  "output_dir": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607",
+  "ownership_plan": {
+    "lane1": "artifact_contamination_eligibility_audit",
+    "lane2": "pre_registration_runner_backtest",
+    "lane3": "execution_cost_turnover_verifier",
+    "lane4": "external_theory_source_lane"
+  },
+  "overwrite_policy": "do not overwrite modified/untracked prior research artifacts; write versioned outputs only"
+}

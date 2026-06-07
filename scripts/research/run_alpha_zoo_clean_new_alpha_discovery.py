@@ -63,6 +63,34 @@ FAMILY_DESCRIPTIONS: dict[str, str] = {
         "directional flow after funding/flow extremes. Feature coverage must exist "
         "in train and validation; locked-OOS features are report-only."
     ),
+    "feature_liquidation_imbalance_reversal": (
+        "Use local liquidation imbalance with funding/open-interest context to fade "
+        "one-sided squeeze cascades after crowding extremes. Feature coverage must "
+        "exist in train and validation; locked-OOS features are report-only."
+    ),
+    "feature_flow_oi_trend_continuation": (
+        "Use Binance taker-flow plus open-interest expansion with neutral funding "
+        "to continue internal Binance orderflow leadership without cross-venue or "
+        "post-OOS selector inputs."
+    ),
+    "funding_oi_taker_crowding_continuation": (
+        "Use Binance taker-flow and open-interest expansion with neutral funding "
+        "to continue internal Binance perp crowding when feature-backed state is "
+        "present. No post-OOS selector inputs."
+    ),
+    "perp_crowding_score_reversion": (
+        "Compute a Binance-only perp crowding score from funding, open-interest, "
+        "and liquidation imbalance z-scores, then fade one-sided crowding after "
+        "extreme buildup. No post-OOS selector inputs."
+    ),
+    "feature_taker_flow_exhaustion_reversal": (
+        "Fade short-horizon Binance taker-flow and price-extension exhaustion when "
+        "funding remains contained. Uses only Binance feature points and prior bars."
+    ),
+    "feature_bbo_flow_exhaustion_reversal": (
+        "Use Binance BBO spread expansion together with taker-flow exhaustion to fade "
+        "microstructure dislocations. Requires historical BBO feature coverage."
+    ),
 }
 
 
@@ -119,6 +147,46 @@ def _search_space() -> dict[str, Any]:
             "funding_abs_min": [0.00005, 0.00010],
             "flow_abs_min": [0.15, 0.30],
             "oi_z_min": [0.5, 1.0],
+            "min_hold": [4, 8],
+        },
+        "feature_liquidation_imbalance_reversal": {
+            "lookback": [12, 24],
+            "liq_z_min": [1.0, 1.5],
+            "funding_abs_min": [0.00005, 0.00010],
+            "oi_z_min": [0.5, 1.0],
+            "min_hold": [4, 8],
+        },
+        "feature_flow_oi_trend_continuation": {
+            "lookback": [12, 24],
+            "flow_abs_min": [0.15, 0.30],
+            "oi_z_min": [0.5, 1.0],
+            "funding_abs_max": [0.00010, 0.00020],
+            "min_hold": [4, 8],
+        },
+        "funding_oi_taker_crowding_continuation": {
+            "lookback": [6, 12],
+            "funding_abs_max": [0.00010, 0.00025],
+            "imbalance_threshold": [0.0, 0.05],
+            "min_hold": [8],
+        },
+        "perp_crowding_score_reversion": {
+            "lookback": [24, 48],
+            "crowding_threshold": [0.55, 0.75],
+            "min_hold": [4, 8],
+        },
+        "feature_taker_flow_exhaustion_reversal": {
+            "lookback": [6, 12],
+            "flow_imbalance_min": [0.10, 0.15],
+            "price_extension_min": [0.004, 0.008],
+            "funding_abs_cap": [0.00015, 0.00030],
+            "max_realized_vol": [0.008, 0.012],
+            "min_hold": [4, 8],
+        },
+        "feature_bbo_flow_exhaustion_reversal": {
+            "lookback": [6, 12],
+            "spread_z_min": [1.0, 1.5],
+            "flow_imbalance_min": [0.10, 0.15],
+            "price_extension_min": [0.004, 0.008],
             "min_hold": [4, 8],
         },
     }
@@ -239,6 +307,8 @@ def _attach_feature_points(
         out["funding_rate"] = np.nan
         out["open_interest"] = np.nan
         out["taker_buy_sell_imbalance"] = np.nan
+        out["liquidation_imbalance"] = np.nan
+        out["bbo_spread_bps"] = np.nan
         out["feature_age_hours"] = np.inf
         out["feature_valid"] = False
         return out
@@ -251,10 +321,26 @@ def _attach_feature_points(
     )
     feats["funding_rate"] = pd.to_numeric(feats.get("funding_rate"), errors="coerce")
     feats["open_interest"] = pd.to_numeric(feats.get("open_interest"), errors="coerce")
+    long_liq = pd.to_numeric(feats.get("liquidation_long_notional"), errors="coerce")
+    short_liq = pd.to_numeric(feats.get("liquidation_short_notional"), errors="coerce")
+    liq_denom = long_liq.abs().fillna(0.0) + short_liq.abs().fillna(0.0)
+    feats["liquidation_imbalance"] = np.where(
+        liq_denom > 0.0, (long_liq.fillna(0.0) - short_liq.fillna(0.0)) / liq_denom, np.nan
+    )
+    feats["bbo_spread_bps"] = pd.to_numeric(feats.get("bbo_spread_bps"), errors="coerce")
     feats = feats.rename(columns={"datetime": "feature_datetime"})
     merged = pd.merge_asof(
         out,
-        feats[["feature_datetime", "funding_rate", "open_interest", "taker_buy_sell_imbalance"]],
+        feats[
+            [
+                "feature_datetime",
+                "funding_rate",
+                "open_interest",
+                "taker_buy_sell_imbalance",
+                "liquidation_imbalance",
+                "bbo_spread_bps",
+            ]
+        ],
         left_on="datetime",
         right_on="feature_datetime",
         direction="backward",
@@ -267,6 +353,7 @@ def _attach_feature_points(
         & merged["funding_rate"].notna()
         & merged["open_interest"].notna()
         & merged["taker_buy_sell_imbalance"].notna()
+        & merged["liquidation_imbalance"].notna()
     )
     return merged.drop(columns=["feature_datetime"])
 
@@ -282,6 +369,9 @@ def _load_feature_points_safe(symbol: str, *, feature_root: Path) -> pd.DataFram
                 "open_interest",
                 "taker_buy_quote_volume",
                 "taker_sell_quote_volume",
+                "liquidation_long_notional",
+                "liquidation_short_notional",
+                "bbo_spread_bps",
             ]
         )
     lf = pl.scan_parquet([str(path) for path in files])
@@ -292,6 +382,9 @@ def _load_feature_points_safe(symbol: str, *, feature_root: Path) -> pd.DataFram
         "open_interest",
         "taker_buy_quote_volume",
         "taker_sell_quote_volume",
+        "liquidation_long_notional",
+        "liquidation_short_notional",
+        "bbo_spread_bps",
     ]
     existing = [column for column in wanted if column in schema]
     frame = lf.select(existing).collect()
@@ -844,6 +937,622 @@ def _feature_flow_rows(
     return out
 
 
+def _feature_liquidation_rows(
+    *,
+    frame: pd.DataFrame,
+    symbol: str,
+    timeframe: str,
+    fold: monthly.MonthlyFold,
+    leverages: Sequence[int],
+    allocation_fraction: float,
+) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    if frame.empty or "feature_valid" not in frame.columns:
+        return out
+    coverage = _split_feature_coverage(
+        frame, train=fold.train, validation=fold.validation, locked_oos=fold.locked_oos
+    )
+    if coverage["train"] < 0.60 or coverage["validation"] < 0.60:
+        return out
+    close = frame["close"].astype(float).reset_index(drop=True)
+    funding = pd.to_numeric(frame["funding_rate"], errors="coerce").reset_index(drop=True)
+    open_interest = pd.to_numeric(frame["open_interest"], errors="coerce").reset_index(drop=True)
+    liq_imbalance = pd.to_numeric(frame["liquidation_imbalance"], errors="coerce").reset_index(
+        drop=True
+    )
+    feature_valid = frame["feature_valid"].fillna(False).astype(bool).reset_index(drop=True)
+    datetimes = frame["datetime"]
+    returns = close.pct_change(fill_method=None)
+    for lookback in (12, 24):
+        oi_z = broad69._rolling_zscore(open_interest.pct_change(fill_method=None), lookback)
+        liq_z = broad69._rolling_zscore(liq_imbalance.abs(), lookback)
+        ret_z = broad69._rolling_zscore(returns, lookback)
+        for liq_z_min in (1.0, 1.5):
+            for funding_abs_min in (0.00005, 0.00010):
+                for oi_z_min in (0.5, 1.0):
+                    long_entry = (
+                        feature_valid
+                        & (liq_imbalance.shift(1) < -0.20)
+                        & (liq_z.shift(1) > liq_z_min)
+                        & (funding.shift(1) < -funding_abs_min)
+                        & (oi_z.shift(1) > oi_z_min)
+                        & (ret_z.shift(1) > -1.0)
+                    )
+                    short_entry = (
+                        feature_valid
+                        & (liq_imbalance.shift(1) > 0.20)
+                        & (liq_z.shift(1) > liq_z_min)
+                        & (funding.shift(1) > funding_abs_min)
+                        & (oi_z.shift(1) > oi_z_min)
+                        & (ret_z.shift(1) < 1.0)
+                    )
+                    long_exit = (~feature_valid) | (liq_imbalance > 0.0) | (ret_z > 0.75)
+                    short_exit = (~feature_valid) | (liq_imbalance < 0.0) | (ret_z < -0.75)
+                    for min_hold in (4, 8):
+                        signal = broad69._debounced_state_signal(
+                            long_entry,
+                            long_exit,
+                            short_entry,
+                            short_exit,
+                            side="long_short",
+                            min_hold_bars=min_hold,
+                            cooldown_bars=2,
+                        )
+                        for leverage in leverages:
+                            sim = broad69.simulate_symbol(
+                                frame,
+                                signal,
+                                integer_leverage=int(leverage),
+                                allocation_fraction=allocation_fraction,
+                            )
+                            base = _candidate_base(
+                                family="feature_liquidation_imbalance_reversal",
+                                model_parts=(
+                                    "featureliq",
+                                    timeframe,
+                                    symbol,
+                                    f"lb{lookback}",
+                                    f"liq{liq_z_min}",
+                                    f"fund{funding_abs_min}",
+                                    f"oi{oi_z_min}",
+                                    f"hold{min_hold}",
+                                    f"lev{leverage}",
+                                ),
+                                symbol=symbol,
+                                timeframe=timeframe,
+                                side="long_short",
+                                lookback=lookback,
+                                threshold=liq_z_min,
+                                exit_threshold=funding_abs_min,
+                                min_hold=min_hold,
+                                leverage=int(leverage),
+                                allocation_fraction=allocation_fraction,
+                            )
+                            base["feature_backed"] = True
+                            base["feature_coverage"] = dict(coverage)
+                            out.append(
+                                _finalize_row(
+                                    base=base,
+                                    sim=sim,
+                                    datetimes=datetimes,
+                                    timeframe=timeframe,
+                                    train=fold.train,
+                                    validation=fold.validation,
+                                    locked_oos=fold.locked_oos,
+                                )
+                            )
+    return out
+
+
+def _feature_flow_trend_rows(
+    *,
+    frame: pd.DataFrame,
+    symbol: str,
+    timeframe: str,
+    fold: monthly.MonthlyFold,
+    leverages: Sequence[int],
+    allocation_fraction: float,
+) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    if frame.empty or "feature_valid" not in frame.columns:
+        return out
+    coverage = _split_feature_coverage(
+        frame, train=fold.train, validation=fold.validation, locked_oos=fold.locked_oos
+    )
+    if coverage["train"] < 0.60 or coverage["validation"] < 0.60:
+        return out
+    funding = pd.to_numeric(frame["funding_rate"], errors="coerce").reset_index(drop=True)
+    open_interest = pd.to_numeric(frame["open_interest"], errors="coerce").reset_index(drop=True)
+    flow = pd.to_numeric(frame["taker_buy_sell_imbalance"], errors="coerce").reset_index(drop=True)
+    feature_valid = frame["feature_valid"].fillna(False).astype(bool).reset_index(drop=True)
+    datetimes = frame["datetime"]
+    for lookback in (12, 24):
+        oi_z = broad69._rolling_zscore(open_interest.pct_change(fill_method=None), lookback)
+        flow_smooth = flow.rolling(lookback).mean()
+        for flow_abs_min in (0.15, 0.30):
+            for oi_z_min in (0.5, 1.0):
+                for funding_abs_max in (0.00010, 0.00020):
+                    long_entry = (
+                        feature_valid
+                        & (flow_smooth.shift(1) > flow_abs_min)
+                        & (oi_z.shift(1) > oi_z_min)
+                        & (funding.shift(1).abs() <= funding_abs_max)
+                    )
+                    short_entry = (
+                        feature_valid
+                        & (flow_smooth.shift(1) < -flow_abs_min)
+                        & (oi_z.shift(1) > oi_z_min)
+                        & (funding.shift(1).abs() <= funding_abs_max)
+                    )
+                    long_exit = (
+                        (~feature_valid)
+                        | (flow_smooth < 0.0)
+                        | (funding.abs() > funding_abs_max * 1.5)
+                    )
+                    short_exit = (
+                        (~feature_valid)
+                        | (flow_smooth > 0.0)
+                        | (funding.abs() > funding_abs_max * 1.5)
+                    )
+                    for min_hold in (4, 8):
+                        signal = broad69._debounced_state_signal(
+                            long_entry,
+                            long_exit,
+                            short_entry,
+                            short_exit,
+                            side="long_short",
+                            min_hold_bars=min_hold,
+                            cooldown_bars=2,
+                        )
+                        for leverage in leverages:
+                            sim = broad69.simulate_symbol(
+                                frame,
+                                signal,
+                                integer_leverage=int(leverage),
+                                allocation_fraction=allocation_fraction,
+                            )
+                            base = _candidate_base(
+                                family="feature_flow_oi_trend_continuation",
+                                model_parts=(
+                                    "featuretrend",
+                                    timeframe,
+                                    symbol,
+                                    f"lb{lookback}",
+                                    f"flow{flow_abs_min}",
+                                    f"oi{oi_z_min}",
+                                    f"fundcap{funding_abs_max}",
+                                    f"hold{min_hold}",
+                                    f"lev{leverage}",
+                                ),
+                                symbol=symbol,
+                                timeframe=timeframe,
+                                side="long_short",
+                                lookback=lookback,
+                                threshold=flow_abs_min,
+                                exit_threshold=funding_abs_max,
+                                min_hold=min_hold,
+                                leverage=int(leverage),
+                                allocation_fraction=allocation_fraction,
+                            )
+                            base["feature_backed"] = True
+                            base["feature_coverage"] = dict(coverage)
+                            out.append(
+                                _finalize_row(
+                                    base=base,
+                                    sim=sim,
+                                    datetimes=datetimes,
+                                    timeframe=timeframe,
+                                    train=fold.train,
+                                    validation=fold.validation,
+                                    locked_oos=fold.locked_oos,
+                                )
+                            )
+    return out
+
+
+def _feature_crowding_continuation_rows(
+    *,
+    frame: pd.DataFrame,
+    symbol: str,
+    timeframe: str,
+    fold: monthly.MonthlyFold,
+    leverages: Sequence[int],
+    allocation_fraction: float,
+) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    if frame.empty or "feature_valid" not in frame.columns:
+        return out
+    coverage = _split_feature_coverage(
+        frame, train=fold.train, validation=fold.validation, locked_oos=fold.locked_oos
+    )
+    if coverage["train"] < 0.60 or coverage["validation"] < 0.60:
+        return out
+    close = frame["close"].astype(float).reset_index(drop=True)
+    funding = pd.to_numeric(frame["funding_rate"], errors="coerce").reset_index(drop=True)
+    open_interest = pd.to_numeric(frame["open_interest"], errors="coerce").reset_index(drop=True)
+    flow = pd.to_numeric(frame["taker_buy_sell_imbalance"], errors="coerce").reset_index(drop=True)
+    feature_valid = frame["feature_valid"].fillna(False).astype(bool).reset_index(drop=True)
+    datetimes = frame["datetime"]
+    for lookback in (6, 12):
+        momentum = close / close.shift(lookback) - 1.0
+        oi_change = open_interest / open_interest.shift(lookback) - 1.0
+        for funding_abs_max in (0.00010, 0.00025):
+            for imbalance_threshold in (0.0, 0.05):
+                long_entry = (
+                    (momentum > 0.01)
+                    & (oi_change > 0.0)
+                    & (flow > imbalance_threshold)
+                    & (funding.abs() <= funding_abs_max)
+                    & feature_valid
+                )
+                short_entry = (
+                    (momentum < -0.01)
+                    & (oi_change > 0.0)
+                    & (flow < -imbalance_threshold)
+                    & (funding.abs() <= funding_abs_max)
+                    & feature_valid
+                )
+                long_exit = (momentum < 0.0) | (~feature_valid)
+                short_exit = (momentum > 0.0) | (~feature_valid)
+                signal = broad69._debounced_state_signal(
+                    long_entry,
+                    long_exit,
+                    short_entry,
+                    short_exit,
+                    side="long_short",
+                    min_hold_bars=8,
+                    cooldown_bars=2,
+                )
+                for leverage in leverages:
+                    sim = broad69.simulate_symbol(
+                        frame,
+                        signal,
+                        integer_leverage=int(leverage),
+                        allocation_fraction=allocation_fraction,
+                    )
+                    base = _candidate_base(
+                        family="funding_oi_taker_crowding_continuation",
+                        model_parts=(
+                            "featurecrowding",
+                            timeframe,
+                            symbol,
+                            f"lb{lookback}",
+                            f"fund{funding_abs_max}",
+                            f"imb{imbalance_threshold}",
+                            "hold8",
+                            f"lev{leverage}",
+                        ),
+                        symbol=symbol,
+                        timeframe=timeframe,
+                        side="long_short",
+                        lookback=lookback,
+                        threshold=imbalance_threshold,
+                        exit_threshold=funding_abs_max,
+                        min_hold=8,
+                        leverage=int(leverage),
+                        allocation_fraction=allocation_fraction,
+                    )
+                    base["feature_backed"] = True
+                    base["feature_coverage"] = dict(coverage)
+                    out.append(
+                        _finalize_row(
+                            base=base,
+                            sim=sim,
+                            datetimes=datetimes,
+                            timeframe=timeframe,
+                            train=fold.train,
+                            validation=fold.validation,
+                            locked_oos=fold.locked_oos,
+                        )
+                    )
+    return out
+
+
+def _perp_crowding_rows(
+    *,
+    frame: pd.DataFrame,
+    symbol: str,
+    timeframe: str,
+    fold: monthly.MonthlyFold,
+    leverages: Sequence[int],
+    allocation_fraction: float,
+) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    if frame.empty or "feature_valid" not in frame.columns:
+        return out
+    coverage = _split_feature_coverage(
+        frame, train=fold.train, validation=fold.validation, locked_oos=fold.locked_oos
+    )
+    if coverage["train"] < 0.60 or coverage["validation"] < 0.60:
+        return out
+    close = frame["close"].astype(float).reset_index(drop=True)
+    funding = pd.to_numeric(frame["funding_rate"], errors="coerce").reset_index(drop=True)
+    open_interest = pd.to_numeric(frame["open_interest"], errors="coerce").reset_index(drop=True)
+    liq_imbalance = pd.to_numeric(frame["liquidation_imbalance"], errors="coerce").reset_index(
+        drop=True
+    )
+    feature_valid = frame["feature_valid"].fillna(False).astype(bool).reset_index(drop=True)
+    datetimes = frame["datetime"]
+    returns = close.pct_change(fill_method=None)
+    for lookback in (24, 48):
+        funding_z = broad69._rolling_zscore(funding, max(16, lookback))
+        oi_delta = open_interest.pct_change(fill_method=None)
+        oi_delta_z = broad69._rolling_zscore(oi_delta, max(12, lookback // 2))
+        liq_z = broad69._rolling_zscore(liq_imbalance, max(12, lookback // 2))
+        crowding = np.tanh(
+            0.45 * funding_z.fillna(0.0) + 0.35 * oi_delta_z.fillna(0.0) + 0.05 * liq_z.fillna(0.0)
+        )
+        ret_z = broad69._rolling_zscore(returns, max(12, lookback // 2))
+        for crowding_threshold in (0.55, 0.75):
+            long_entry = (
+                feature_valid & (crowding.shift(1) <= -crowding_threshold) & (ret_z.shift(1) > -1.0)
+            )
+            short_entry = (
+                feature_valid & (crowding.shift(1) >= crowding_threshold) & (ret_z.shift(1) < 1.0)
+            )
+            long_exit = (~feature_valid) | (crowding > -0.10) | (ret_z > 0.75)
+            short_exit = (~feature_valid) | (crowding < 0.10) | (ret_z < -0.75)
+            for min_hold in (4, 8):
+                signal = broad69._debounced_state_signal(
+                    long_entry,
+                    long_exit,
+                    short_entry,
+                    short_exit,
+                    side="long_short",
+                    min_hold_bars=min_hold,
+                    cooldown_bars=2,
+                )
+                for leverage in leverages:
+                    sim = broad69.simulate_symbol(
+                        frame,
+                        signal,
+                        integer_leverage=int(leverage),
+                        allocation_fraction=allocation_fraction,
+                    )
+                    base = _candidate_base(
+                        family="perp_crowding_score_reversion",
+                        model_parts=(
+                            "crowdscore",
+                            timeframe,
+                            symbol,
+                            f"lb{lookback}",
+                            f"thr{crowding_threshold}",
+                            f"hold{min_hold}",
+                            f"lev{leverage}",
+                        ),
+                        symbol=symbol,
+                        timeframe=timeframe,
+                        side="long_short",
+                        lookback=lookback,
+                        threshold=crowding_threshold,
+                        exit_threshold=0.10,
+                        min_hold=min_hold,
+                        leverage=int(leverage),
+                        allocation_fraction=allocation_fraction,
+                    )
+                    base["feature_backed"] = True
+                    base["feature_coverage"] = dict(coverage)
+                    out.append(
+                        _finalize_row(
+                            base=base,
+                            sim=sim,
+                            datetimes=datetimes,
+                            timeframe=timeframe,
+                            train=fold.train,
+                            validation=fold.validation,
+                            locked_oos=fold.locked_oos,
+                        )
+                    )
+    return out
+
+
+def _feature_taker_flow_exhaustion_rows(
+    *,
+    frame: pd.DataFrame,
+    symbol: str,
+    timeframe: str,
+    fold: monthly.MonthlyFold,
+    leverages: Sequence[int],
+    allocation_fraction: float,
+) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    if frame.empty or "feature_valid" not in frame.columns:
+        return out
+    coverage = _split_feature_coverage(
+        frame, train=fold.train, validation=fold.validation, locked_oos=fold.locked_oos
+    )
+    if coverage["train"] < 0.60 or coverage["validation"] < 0.60:
+        return out
+    close = frame["close"].astype(float).reset_index(drop=True)
+    funding = pd.to_numeric(frame["funding_rate"], errors="coerce").reset_index(drop=True)
+    flow = pd.to_numeric(frame["taker_buy_sell_imbalance"], errors="coerce").reset_index(drop=True)
+    feature_valid = frame["feature_valid"].fillna(False).astype(bool).reset_index(drop=True)
+    datetimes = frame["datetime"]
+    returns = close.pct_change(fill_method=None)
+    for lookback in (6, 12):
+        extension = close / close.shift(lookback) - 1.0
+        realized_vol = returns.rolling(max(6, lookback)).std(ddof=1)
+        for flow_imbalance_min in (0.10, 0.15):
+            for price_extension_min in (0.004, 0.008):
+                for funding_abs_cap in (0.00015, 0.00030):
+                    for max_realized_vol in (0.008, 0.012):
+                        long_entry = (
+                            feature_valid
+                            & (extension.shift(1) <= -price_extension_min)
+                            & (flow.shift(1) <= -flow_imbalance_min)
+                            & (funding.shift(1).abs() <= funding_abs_cap)
+                            & (realized_vol.shift(1) <= max_realized_vol)
+                        )
+                        short_entry = (
+                            feature_valid
+                            & (extension.shift(1) >= price_extension_min)
+                            & (flow.shift(1) >= flow_imbalance_min)
+                            & (funding.shift(1).abs() <= funding_abs_cap)
+                            & (realized_vol.shift(1) <= max_realized_vol)
+                        )
+                        long_exit = (~feature_valid) | (extension > 0.0) | (flow > 0.0)
+                        short_exit = (~feature_valid) | (extension < 0.0) | (flow < 0.0)
+                        for min_hold in (4, 8):
+                            signal = broad69._debounced_state_signal(
+                                long_entry,
+                                long_exit,
+                                short_entry,
+                                short_exit,
+                                side="long_short",
+                                min_hold_bars=min_hold,
+                                cooldown_bars=2,
+                            )
+                            for leverage in leverages:
+                                sim = broad69.simulate_symbol(
+                                    frame,
+                                    signal,
+                                    integer_leverage=int(leverage),
+                                    allocation_fraction=allocation_fraction,
+                                )
+                                base = _candidate_base(
+                                    family="feature_taker_flow_exhaustion_reversal",
+                                    model_parts=(
+                                        "flowexhaust",
+                                        timeframe,
+                                        symbol,
+                                        f"lb{lookback}",
+                                        f"flow{flow_imbalance_min}",
+                                        f"ret{price_extension_min}",
+                                        f"fundcap{funding_abs_cap}",
+                                        f"vol{max_realized_vol}",
+                                        f"hold{min_hold}",
+                                        f"lev{leverage}",
+                                    ),
+                                    symbol=symbol,
+                                    timeframe=timeframe,
+                                    side="long_short",
+                                    lookback=lookback,
+                                    threshold=flow_imbalance_min,
+                                    exit_threshold=price_extension_min,
+                                    min_hold=min_hold,
+                                    leverage=int(leverage),
+                                    allocation_fraction=allocation_fraction,
+                                )
+                                base["feature_backed"] = True
+                                base["feature_coverage"] = dict(coverage)
+                                out.append(
+                                    _finalize_row(
+                                        base=base,
+                                        sim=sim,
+                                        datetimes=datetimes,
+                                        timeframe=timeframe,
+                                        train=fold.train,
+                                        validation=fold.validation,
+                                        locked_oos=fold.locked_oos,
+                                    )
+                                )
+    return out
+
+
+def _feature_bbo_flow_rows(
+    *,
+    frame: pd.DataFrame,
+    symbol: str,
+    timeframe: str,
+    fold: monthly.MonthlyFold,
+    leverages: Sequence[int],
+    allocation_fraction: float,
+) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    if frame.empty or "feature_valid" not in frame.columns or "bbo_spread_bps" not in frame.columns:
+        return out
+    coverage = _split_feature_coverage(
+        frame, train=fold.train, validation=fold.validation, locked_oos=fold.locked_oos
+    )
+    bbo_valid = frame["bbo_spread_bps"].notna().to_numpy()
+    if (
+        coverage["train"] < 0.60
+        or coverage["validation"] < 0.60
+        or float(np.mean(bbo_valid[_window_mask(frame["datetime"], fold.train)])) < 0.60
+        or float(np.mean(bbo_valid[_window_mask(frame["datetime"], fold.validation)])) < 0.60
+    ):
+        return out
+    close = frame["close"].astype(float).reset_index(drop=True)
+    flow = pd.to_numeric(frame["taker_buy_sell_imbalance"], errors="coerce").reset_index(drop=True)
+    spread = pd.to_numeric(frame["bbo_spread_bps"], errors="coerce").reset_index(drop=True)
+    feature_valid = frame["feature_valid"].fillna(False).astype(bool).reset_index(drop=True)
+    datetimes = frame["datetime"]
+    for lookback in (6, 12):
+        spread_z = broad69._rolling_zscore(spread, max(6, lookback))
+        extension = close / close.shift(lookback) - 1.0
+        for spread_z_min in (1.0, 1.5):
+            for flow_imbalance_min in (0.10, 0.15):
+                for price_extension_min in (0.004, 0.008):
+                    long_entry = (
+                        feature_valid
+                        & (spread_z.shift(1) >= spread_z_min)
+                        & (extension.shift(1) <= -price_extension_min)
+                        & (flow.shift(1) <= -flow_imbalance_min)
+                    )
+                    short_entry = (
+                        feature_valid
+                        & (spread_z.shift(1) >= spread_z_min)
+                        & (extension.shift(1) >= price_extension_min)
+                        & (flow.shift(1) >= flow_imbalance_min)
+                    )
+                    long_exit = (~feature_valid) | (spread_z < 0.25) | (flow > 0.0)
+                    short_exit = (~feature_valid) | (spread_z < 0.25) | (flow < 0.0)
+                    for min_hold in (4, 8):
+                        signal = broad69._debounced_state_signal(
+                            long_entry,
+                            long_exit,
+                            short_entry,
+                            short_exit,
+                            side="long_short",
+                            min_hold_bars=min_hold,
+                            cooldown_bars=2,
+                        )
+                        for leverage in leverages:
+                            sim = broad69.simulate_symbol(
+                                frame,
+                                signal,
+                                integer_leverage=int(leverage),
+                                allocation_fraction=allocation_fraction,
+                            )
+                            base = _candidate_base(
+                                family="feature_bbo_flow_exhaustion_reversal",
+                                model_parts=(
+                                    "bboflow",
+                                    timeframe,
+                                    symbol,
+                                    f"lb{lookback}",
+                                    f"spr{spread_z_min}",
+                                    f"flow{flow_imbalance_min}",
+                                    f"ret{price_extension_min}",
+                                    f"hold{min_hold}",
+                                    f"lev{leverage}",
+                                ),
+                                symbol=symbol,
+                                timeframe=timeframe,
+                                side="long_short",
+                                lookback=lookback,
+                                threshold=spread_z_min,
+                                exit_threshold=price_extension_min,
+                                min_hold=min_hold,
+                                leverage=int(leverage),
+                                allocation_fraction=allocation_fraction,
+                            )
+                            base["feature_backed"] = True
+                            base["feature_coverage"] = dict(coverage)
+                            out.append(
+                                _finalize_row(
+                                    base=base,
+                                    sim=sim,
+                                    datetimes=datetimes,
+                                    timeframe=timeframe,
+                                    train=fold.train,
+                                    validation=fold.validation,
+                                    locked_oos=fold.locked_oos,
+                                )
+                            )
+    return out
+
+
 def _rows_for_fold(
     *,
     bars: Mapping[tuple[str, str], pd.DataFrame],
@@ -880,6 +1589,16 @@ def _rows_for_fold(
             if not features.empty:
                 feature_frame = _attach_feature_points(frame, features, timeframe=timeframe)
                 rows.extend(_feature_flow_rows(**{**kwargs, "frame": feature_frame}))
+                rows.extend(_feature_liquidation_rows(**{**kwargs, "frame": feature_frame}))
+                rows.extend(_feature_flow_trend_rows(**{**kwargs, "frame": feature_frame}))
+                rows.extend(
+                    _feature_crowding_continuation_rows(**{**kwargs, "frame": feature_frame})
+                )
+                rows.extend(_perp_crowding_rows(**{**kwargs, "frame": feature_frame}))
+                rows.extend(
+                    _feature_taker_flow_exhaustion_rows(**{**kwargs, "frame": feature_frame})
+                )
+                rows.extend(_feature_bbo_flow_rows(**{**kwargs, "frame": feature_frame}))
             if not panel.empty:
                 rows.extend(
                     _lead_lag_rows(

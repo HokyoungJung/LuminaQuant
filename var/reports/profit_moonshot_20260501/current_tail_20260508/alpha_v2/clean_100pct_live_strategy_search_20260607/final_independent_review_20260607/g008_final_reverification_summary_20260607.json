@@ -1,0 +1,52 @@
+{
+  "architect": "WATCH/no_safety_FAIL",
+  "artifact_kind": "g008_final_reverification_summary",
+  "checks": [
+    {
+      "evidence": "python3 -m compileall -q modified Python/test/BBO surfaces",
+      "name": "compileall",
+      "status": "pass"
+    },
+    {
+      "evidence": "uv run ruff check modified Python/test/BBO surfaces -> All checks passed",
+      "name": "ruff_check",
+      "status": "pass"
+    },
+    {
+      "evidence": "uv run ruff format --check modified Python/test/BBO surfaces -> 9 files already formatted",
+      "name": "ruff_format_check",
+      "status": "pass"
+    },
+    {
+      "evidence": "uv run pytest -q tests/test_alpha_zoo_clean_new_alpha_discovery.py tests/test_strategy_support_inventory.py tests/test_collect_binance_book_ticker_feature_points.py tests/test_optimization_search_policy.py tests/test_alpha_zoo_10bps_full_retune_artifact_assertions.py -> 34 passed in 0.76s",
+      "name": "pytest_core",
+      "status": "pass"
+    },
+    {
+      "evidence": "uv run pytest -q tests/test_live_binance_market_window_aggregation.py tests/test_collect_binance_book_ticker_feature_points.py -> 6 passed in 0.04s",
+      "name": "pytest_stream_bbo",
+      "status": "pass"
+    },
+    {
+      "evidence": "git diff --check -> no output",
+      "name": "git_diff_check",
+      "status": "pass"
+    },
+    {
+      "evidence": "25 target/review JSON files parsed; all six candidates real_money_allowed=false and small_sleeve_allowed=false; manifest sha matched; no true locked-OOS/live-promotion flags found",
+      "name": "artifact_assertions",
+      "status": "pass"
+    }
+  ],
+  "code_reviewer": "APPROVE",
+  "deployment_conclusion": "no_real_money; no_small_sleeve; 0pct_allocation_or_paper_control_only",
+  "generated_at_utc": "2026-06-07T10:10:37+00:00",
+  "hidden_goal_snapshot": "wrong completed legacy latency objective; saved in fresh_get_goal_after_g008_review.json",
+  "remaining_blockers": [
+    "Formal .omx/ultragoal aggregate cannot be marked complete because fresh Codex get_goal points to a completed legacy latency objective.",
+    "G008 blocked checkpoint is intentionally non-terminal: ledger records goal_blocked while goals.json remains in_progress.",
+    "Architect verdict is WATCH, not CLEAR, due provenance/metric-lineage caveats now annotated."
+  ],
+  "status": "PASS_WITH_G008_WATCH_AND_HIDDEN_GOAL_BLOCKER",
+  "ultragoal_checkpoint": "ledger goal_blocked event recorded for G008, but goals.json status remains in_progress; treat as OMX state-transition caveat, not strategy approval."
+}

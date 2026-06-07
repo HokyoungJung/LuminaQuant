@@ -62,9 +62,15 @@ def test_search_space_hash_is_stable_and_excludes_oos_results() -> None:
         "range_reclaim_continuation",
         "cross_asset_lead_lag_momentum",
         "feature_flow_crowding_reversal",
+        "feature_liquidation_imbalance_reversal",
+        "feature_flow_oi_trend_continuation",
+        "funding_oi_taker_crowding_continuation",
+        "perp_crowding_score_reversion",
+        "feature_taker_flow_exhaustion_reversal",
+        "feature_bbo_flow_exhaustion_reversal",
     ]
     assert first == second
-    assert first == "4a6fee0f540f5d9ce15158beaf6b7c91ad89600cb5d76e1c4bfa0e33008b81b7"
+    assert first == "1d421663b0f9f785a18d69e5068c81f1816005598f5a378bfeb697239f2488f6"
 
 
 def test_lead_lag_family_is_covered_and_flat_split_labeled() -> None:
@@ -132,10 +138,38 @@ def test_load_feature_points_safe_tolerates_missing_taker_columns(tmp_path: Path
         "open_interest",
         "taker_buy_quote_volume",
         "taker_sell_quote_volume",
+        "liquidation_long_notional",
+        "liquidation_short_notional",
+        "bbo_spread_bps",
         "datetime",
     ]
     assert loaded["taker_buy_quote_volume"].isna().all()
     assert loaded["taker_sell_quote_volume"].isna().all()
+    assert loaded["liquidation_long_notional"].isna().all()
+    assert loaded["liquidation_short_notional"].isna().all()
+    assert loaded["bbo_spread_bps"].isna().all()
+
+
+def test_attach_feature_points_builds_liquidation_imbalance() -> None:
+    bars = pd.DataFrame(
+        {"datetime": pd.date_range("2025-01-01", periods=2, freq="h"), "close": [1.0, 1.0]}
+    )
+    features = pd.DataFrame(
+        {
+            "datetime": pd.date_range("2025-01-01", periods=2, freq="h"),
+            "funding_rate": [0.0001, 0.0001],
+            "open_interest": [1000.0, 1001.0],
+            "taker_buy_quote_volume": [200.0, 100.0],
+            "taker_sell_quote_volume": [100.0, 200.0],
+            "liquidation_long_notional": [300.0, 50.0],
+            "liquidation_short_notional": [100.0, 150.0],
+        }
+    )
+
+    attached = module._attach_feature_points(bars, features, timeframe="1h")
+
+    assert attached["liquidation_imbalance"].tolist() == pytest.approx([0.5, -0.5])
+    assert attached["feature_valid"].tolist() == [True, True]
 
 
 def test_run_writes_policy_flags_with_synthetic_loader(monkeypatch, tmp_path: Path) -> None:

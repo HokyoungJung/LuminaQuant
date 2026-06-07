@@ -1,6 +1,6 @@
 # Alpha Zoo clean new-alpha discovery
 
-- generated: `2026-06-07T06:09:00.709499Z`
+- generated: `2026-06-07T06:23:20.853360Z`
 - pre-registered search hash: `4a6fee0f540f5d9ce15158beaf6b7c91ad89600cb5d76e1c4bfa0e33008b81b7`
 - selection input: `train + validation only`
 - locked-OOS: `report/gate only after freeze`

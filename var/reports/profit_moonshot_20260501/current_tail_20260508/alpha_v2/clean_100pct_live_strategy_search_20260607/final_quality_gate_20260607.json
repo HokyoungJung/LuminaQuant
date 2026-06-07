@@ -1,0 +1,111 @@
+{
+  "artifact_kind": "final_quality_gate",
+  "caveats": [
+    "Current get_goal reports an old completed latency objective, not the active ultragoal aggregate; .omx/ultragoal checkpointing uses prior active aggregate snapshot if continued.",
+    "Repository remains dirty with pre-existing research-note/code/artifact changes and team-runtime scaffold commits; no push performed.",
+    "G008 independent review evidence is now attached: code-reviewer APPROVE; architect WATCH/no safety FAIL. This resolves the earlier missing-independent-review evidence but not the hidden Codex get_goal mismatch.",
+    "Historical incumbent metric lineage is annotated: final report table uses the source 209.00% annualized / 156.03% compounded record, while locked-OOS/cost fixed-blend aggregation reports 160.90% / 122.36%; both remain paper/control only.",
+    "G008 blocked checkpoint is intentionally non-terminal: .omx/ultragoal ledger records goal_blocked while goals.json remains in_progress; this strict completion blocker is recorded in final_independent_review_20260607.",
+    "Final verification passed locally after G008 reconciliation, but formal ultragoal completion remains blocked by the stale hidden Codex goal snapshot."
+  ],
+  "final_reviews": {
+    "ai_slop_cleaner": "not invoked because no cleanup/refactor/code-structure change was made; only report/provenance artifacts are being reconciled.",
+    "architect_clear": "WATCH, not CLEAR: architect lane found no safety FAIL and supports no-real-money/no-small-sleeve conclusion, but requires G008 checkpoint/provenance and metric-lineage annotation.",
+    "code_reviewer_approve": "APPROVE via OMX team code-reviewer lane for .omx/ultragoal G008; report artifact final_independent_review_20260607/code_reviewer_final_report.md; 0 CRITICAL/HIGH/MEDIUM, 1 LOW provenance note.",
+    "g008_reconciliation": "G007 remains construction/provenance reference for the final report; G008 is the independent review/checkpoint reconciliation story. Formal checkpoint still depends on fresh matching Codex get_goal state.",
+    "g008_reverification": "PASS_WITH_G008_WATCH_AND_HIDDEN_GOAL_BLOCKER; see final_independent_review_20260607/g008_final_reverification_summary_20260607.json"
+  },
+  "generated_at_utc": "2026-06-07T07:13:46.900714+00:00",
+  "last_reverified_at_utc": "2026-06-07T10:10:37+00:00",
+  "last_reviewed_at_utc": "2026-06-07T10:08:34+00:00",
+  "outputs": [
+    "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/final_report_clean_100pct_live_strategy_search_20260607.md",
+    "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/final_report_clean_100pct_live_strategy_search_20260607.json",
+    "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/immutable_manifest_clean_100pct_live_strategy_search_20260607.json",
+    "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/final_quality_gate_20260607.json",
+    "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/final_independent_review_20260607/code_reviewer_final_report.md",
+    "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/final_independent_review_20260607/architect_final_report.md",
+    "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/final_independent_review_20260607/code_reviewer_completion_summary.json",
+    "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/final_independent_review_20260607/architect_completion_summary.json",
+    "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/final_independent_review_20260607/g008_final_reverification_summary_20260607.json",
+    "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/final_independent_review_20260607/g008_final_reverification_summary_20260607.md",
+    "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/final_independent_review_20260607/fresh_get_goal_after_g008_review.json",
+    "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/final_independent_review_20260607/ultragoal_g008_blocked_checkpoint.json",
+    "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/final_independent_review_20260607/ultragoal_status_after_g008_checkpoint.json"
+  ],
+  "schema_version": 1,
+  "status": "pass_with_g008_review_watch_and_hidden_goal_blocker",
+  "target": "clean_100pct_live_strategy_search_20260607 final report",
+  "validations": [
+    {
+      "evidence": "python3 -m json.tool final_label_report_20260607.json immutable_manifest_g003_20260607.json worker4_cost_verifier.json; custom assertions ok",
+      "name": "json_final_report_and_manifest",
+      "status": "pass"
+    },
+    {
+      "evidence": "uv run ruff check scripts/research/run_alpha_zoo_clean_new_alpha_discovery.py tests/test_alpha_zoo_clean_new_alpha_discovery.py src/lumina_quant/optimization/search_policy.py tests/test_optimization_search_policy.py -> All checks passed",
+      "name": "ruff_targeted",
+      "status": "pass"
+    },
+    {
+      "evidence": "PYTHONPATH=. uv run pytest -q tests/test_alpha_zoo_clean_new_alpha_discovery.py tests/test_optimization_search_policy.py tests/test_alpha_zoo_10bps_full_retune_artifact_assertions.py -> 29 passed in 0.55s",
+      "name": "pytest_targeted",
+      "status": "pass"
+    },
+    {
+      "evidence": "without PYTHONPATH, pytest collection could not import scripts; rerun with PYTHONPATH=. passed",
+      "name": "first_pytest_attempt",
+      "status": "environment_retry"
+    },
+    {
+      "evidence": "OMX team code-reviewer task completed with Recommendation: APPROVE; compileall/Ruff/format/targeted pytest/artifact assertions/git diff --check passed.",
+      "name": "g008_code_reviewer_lane",
+      "status": "pass"
+    },
+    {
+      "evidence": "OMX team architect task completed with Overall: WATCH; no safety FAIL; final no-real-money/no-small-sleeve conclusion internally supported; provenance and metric-lineage watch items annotated.",
+      "name": "g008_architect_lane",
+      "status": "watch_no_safety_fail"
+    },
+    {
+      "evidence": "python3 -m compileall -q modified Python/test/BBO surfaces",
+      "name": "final_compileall",
+      "status": "pass"
+    },
+    {
+      "evidence": "uv run ruff check modified Python/test/BBO surfaces -> All checks passed",
+      "name": "final_ruff_check",
+      "status": "pass"
+    },
+    {
+      "evidence": "uv run ruff format --check modified Python/test/BBO surfaces -> 9 files already formatted",
+      "name": "final_ruff_format_check",
+      "status": "pass"
+    },
+    {
+      "evidence": "uv run pytest -q tests/test_alpha_zoo_clean_new_alpha_discovery.py tests/test_strategy_support_inventory.py tests/test_collect_binance_book_ticker_feature_points.py tests/test_optimization_search_policy.py tests/test_alpha_zoo_10bps_full_retune_artifact_assertions.py -> 34 passed in 0.76s",
+      "name": "final_pytest_core",
+      "status": "pass"
+    },
+    {
+      "evidence": "uv run pytest -q tests/test_live_binance_market_window_aggregation.py tests/test_collect_binance_book_ticker_feature_points.py -> 6 passed in 0.04s",
+      "name": "final_pytest_stream_bbo",
+      "status": "pass"
+    },
+    {
+      "evidence": "git diff --check -> no output",
+      "name": "final_git_diff_check",
+      "status": "pass"
+    },
+    {
+      "evidence": "25 target/review JSON files parsed; all six candidates real_money_allowed=false and small_sleeve_allowed=false; manifest sha matched; no true locked-OOS/live-promotion flags found",
+      "name": "final_artifact_assertions",
+      "status": "pass"
+    },
+    {
+      "evidence": "omx ultragoal checkpoint --status blocked recorded the intended non-terminal ledger goal_blocked for G008; goals.json remains in_progress by design; fresh get_goal is wrong legacy completed objective.",
+      "name": "g008_blocker_checkpoint",
+      "status": "blocked_watch"
+    }
+  ]
+}

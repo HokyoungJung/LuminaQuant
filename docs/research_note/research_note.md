@@ -47,9 +47,14 @@ Performance/verification:
 - Optuna hybrid warmup hot path는 이전 병목 `42.650s → 0.934s`로 개선했고, small monthly profile 전체는 `80.633s → 38.525s`.
 - Focused verification: `ruff format --check`, `ruff check`, report/artifact assertions, docs verification, py_compile passed; focused pytest `18 passed`.
 - 기존 post-OOS meta-selector artifact는 계속 `clean_promotion_eligible=false`, `requires_fresh_forward_shadow=true`로만 유지한다.
-- Feature-point extension follow-up: added `feature_flow_crowding_reversal` using local `funding_rate`, `open_interest`, and `taker_buy_sell_imbalance` with train/validation coverage requirements (`>=60%` each) and fail-closed handling for legacy parquet days missing taker-flow columns.
-- Bounded feature-backed run (`max-folds 5`) artifact: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607_feature_bounded/clean_new_alpha_discovery_latest.json|md`.
-- Feature-backed bounded result still failed to beat even the weak clean baseline: OOS comp `-0.24%`, monthly equity MDD `8.72%`, Sharpe `0.04`, hit `3/5`; selected rows still resolved to `cross_asset_lead_lag_momentum`, so current Binance feature coverage did not create a superior family yet.
+- Feature-point extension follow-up: added six Binance feature-backed families — `feature_flow_crowding_reversal`, `feature_liquidation_imbalance_reversal`, `feature_flow_oi_trend_continuation`, `funding_oi_taker_crowding_continuation`, `perp_crowding_score_reversion`, and `feature_taker_flow_exhaustion_reversal` — using local `funding_rate`, `open_interest`, `taker_buy_sell_imbalance`, liquidation notional imbalance, Binance-only crowding score, and price-extension exhaustion with train/validation coverage requirements (`>=60%`) plus fail-closed handling for legacy parquet days missing taker-flow/liquidation columns.
+- Full feature-backed 10-fold rerun completed with `--feature-root data/market_parquet/feature_points/exchange=binance`: aggregate still remained `+2.51%` OOS comp / `10.28%` monthly-equity MDD / Sharpe `0.24` / hit `5/10`, identical to the lead-lag-led full rerun.
+- Bounded feature-backed reruns up to candidate cap `320` kept the same result: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607_feature_bounded/clean_new_alpha_discovery_latest.json|md` stayed at OOS comp `-0.24%`, monthly equity MDD `8.72%`, Sharpe `0.04`, hit `3/5`.
+- 중요: full과 bounded 둘 다 selected rows는 끝까지 `cross_asset_lead_lag_momentum`이었다. 새 feature-backed 여섯 family 모두 우승 family가 되지 못했다. 즉 현재 Binance feature coverage만으로는 funding/OI/taker-flow/liquidation/crowding-score/price-exhaustion 기반 continuation/reversal family가 우세한 clean alpha를 만들지 못했다.
+- Binance BBO groundwork landed: added BBO feature columns (`best_bid_price`, `best_bid_quantity`, `best_ask_price`, `best_ask_quantity`, `bbo_mid_price`, `bbo_spread_bps`) to parquet feature-point schema, support inventory, and the forward-only collector `scripts/collect_binance_book_ticker_feature_points.py`.
+- Collector hardening: fixed websocket import compatibility (`websockets.sync.client`) and added `--summary` mode so long-running monitors no longer fail on missing shell `python` or broken pipe parsing.
+- Smoke capture succeeded for `BTCUSDT`, `ETHUSDT`, `SOLUSDT`, then expanded to `BNBUSDT` and `TRXUSDT`; rows persist under `data/market_parquet/feature_points/exchange=binance`. Current support-inventory snapshot shows `BTC/ETH/SOL` each with `16` BBO rows, `BNBUSDT` with `19`, and `TRXUSDT` with `10`.
+- BBO-aware bounded re-evaluation (`max-folds 5`, candidate cap `360`) still stayed at OOS comp `-0.24%`, monthly equity MDD `8.72%`, Sharpe `0.04`, hit `3/5`. The new `feature_bbo_flow_exhaustion_reversal` family is wired, but current BBO history is still only fresh-forward/current-day sidecar data and cannot satisfy historical train/validation coverage strongly enough to beat `cross_asset_lead_lag_momentum`.
 
 다음 연구 방향:
 - 이번 failed families를 그대로 튜닝하지 말고 새 pre-registered family를 추가한다.
@@ -2019,3 +2024,36 @@ Best raw/shadow candidate is `lagged_shadow_leaf_router:core_warmup4_avg2_val05_
 - Row-level selector diagnostic은 빠른 재평가 도구로는 유용하지만 성능 개선에는 실패했다. 가장 나은 변형도 +22.11% comp라 dynamic clean보다 낮다.
 - 이론적으로 타당한 방향은 “cross-sectional/trend leaf → train+validation gate → cash/no-position guard → coarse validation-MDD position sizing”이다. 반대로 OOS oracle, calendar-primary alpha, nested hybrid-on-hybrid, same-month dynamic self-feed는 계속 금지한다.
 - 다음 실전 조건은 2026-06-06 이후 fresh-forward shadow. 최소 다음 1~2개 refit month에서 lagged router가 같은 rule로 positive/controlled-DD를 보여야 하며, 동시에 live/paper fill cost가 replay 10bps 이내인지 별도 검증해야 한다.
+
+## 2026-06-07 — Clean 100%+ live strategy search ultragoal final
+
+- Workflow: `$ralplan` → `$team` → `$ultragoal`; durable evidence under `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/` and `.omx/ultragoal/ledger.jsonl`.
+- Objective was reframed cleanly: not “mine until 100%+”, but “verify whether a pre-registered clean process yields any 100%+ annualized reporting-label candidate.” The 100% threshold was not used as selector/Optuna objective/promotion gate.
+- Result: **no real-money candidate and no small-sleeve candidate**. Historical 100%+ labels exist only as `shadow_freeze_only`/control context.
+- `clean_input_meta_selector`: annualized OOS approx `110.46%`, OOS comp `85.91%`, but **not promotable** because post-OOS selector-grid ranking used historical locked-OOS context. Label: `shadow_freeze_only`.
+- `strict_no_leak_best_single_10bps`: `54.56%` total return at 10bps and `27.10%` at 20bps stress, but high MDD/tail and missing 15bps/paper-fill telemetry block live. Label: `paper_control`.
+- 85-symbol clean baseline: annualized approx around `42.57%`, below 100% and high/sparse OOS profile. Label: `paper_control`.
+- Clean new-alpha discovery: full `3.01%` annualized, feature-bounded `-0.57%`; rejected for current promotion.
+- Cost gate: requires 10/15/20bps, turnover/RPT, capacity/liquidity proxy, all-in fill telemetry, BBO/spread/slippage/cancel/partial/reject evidence. Current evidence fails real-money and small-sleeve gates.
+- TradFi expansion: monitor SPY/QQQ/IWM/TLT/IEF/GLD/USO/DXY proxy/VIX/US10Y as report-only context until a separate data/cost/session manifest exists; do not include TradFi signals in selection before that manifest.
+- Final report: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/final_report_clean_100pct_live_strategy_search_20260607.json` and `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/final_report_clean_100pct_live_strategy_search_20260607.md`.
+
+## 2026-06-07 — Clean 100%+ live-target audit final label
+
+- Final report: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/final_report_clean_100pct_live_strategy_search_20260607.md`; manifest: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/immutable_manifest_clean_100pct_live_strategy_search_20260607.json`.
+- 결론: 현재 **실전 투입 가능한 연 100%+ clean 후보 없음**. 100%+ headline은 `clean_input_meta_selector`/historical incumbent에 존재하지만 각각 `shadow_freeze_only`/`paper_control`로 제한한다.
+- Hard gates: `no_nested_oos_mining`, `execution_cost_gate`, `theory_plausibility_gate` 유지. Locked OOS는 post-freeze report/gate only; 100% annualized threshold는 post-evaluation reporting label only.
+- 실제 투입 금지 사유: fresh-forward shadow와 paper/testnet fill telemetry 부재, 후보 단위 10/15/20bps cost grid·RPT·turnover·tail/CVaR·capacity/liquidity 출력 미완비.
+- 허용 다음 단계: 동일 rule로 fresh-forward shadow/paper 관찰 후, manifest-first runner와 fail-closed execution verifier를 통과할 때만 small sleeve 검토.
+- Formal ultragoal G007 approval은 원래 독립 code-reviewer/architect evidence와 hidden Codex goal snapshot mismatch 때문에 `review_blocked`로 남겼다. 이후 G008(`resolve-final-independent-review-and`)에서 독립 리뷰를 회수했다: code-reviewer는 `APPROVE`, architect는 `WATCH/no safety FAIL`.
+- G008 WATCH 항목은 두 가지다: (1) G007은 final-report construction/provenance, G008은 independent-review/checkpoint reconciliation으로 명시할 것, (2) relaxed-efficiency incumbent는 source artifact 209.00% ann / 156.03% comp와 locked-OOS/cost fixed-blend 160.90% ann / 122.36% comp가 같은 candidate id에 공존하므로 둘 다 paper/control lineage로만 해석할 것. 연구 결론(실전 0% allocation / no small-sleeve)은 변하지 않는다.
+
+
+## 2026-06-07 — G008 independent review reconciliation
+
+- Recheck result: 작업은 “완료 직전”이 아니었다. `G008-resolve-final-independent-review-and`를 열어 최종 독립 리뷰를 회수했다.
+- Code-reviewer lane: `APPROVE`; compileall/Ruff/format/targeted pytest/artifact assertions/git diff --check 통과, CRITICAL/HIGH/MEDIUM 0.
+- Architect lane: `WATCH/no safety FAIL`; no nested OOS / locked-OOS report-only / execution-cost gate / theory plausibility / TradFi monitoring-only expansion 구조는 유지되지만, G007/G008 provenance와 relaxed-efficiency metric lineage는 명시 주석이 필요했다.
+- 최종 리스크 라벨: 실전 투입 금지 유지. 100%+ headline은 historical/shadow/control일 뿐, current clean real-money 기대수익으로 제시하면 안 된다.
+
+- Reverification after G008 annotation: compileall/Ruff/format/targeted pytest/core+BBO/git diff check/artifact assertions passed. G008 checkpoint is still a formal-state blocker because blocked checkpoint is intentionally non-terminal: ledger records `goal_blocked` while `goals.json` remains `in_progress`, and hidden `get_goal` is the old completed latency objective.

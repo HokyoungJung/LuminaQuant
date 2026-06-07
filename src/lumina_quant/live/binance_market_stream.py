@@ -211,7 +211,7 @@ class BinanceMarketStreamClient:
     ) -> None:
         """Run websocket loop until stopped. Best-effort reconnect on transient errors."""
         try:
-            import websockets
+            from websockets.sync.client import connect as ws_connect
         except Exception as exc:  # pragma: no cover - optional dependency path
             if on_error is not None:
                 on_error(exc)
@@ -221,7 +221,7 @@ class BinanceMarketStreamClient:
             try:
                 url = self.stream_url()
                 connected_at = time.monotonic()
-                with websockets.sync.client.connect(url, open_timeout=10, close_timeout=5) as ws:
+                with ws_connect(url, open_timeout=10, close_timeout=5) as ws:
                     while not stop_event.is_set():
                         if time.monotonic() - connected_at >= max(
                             60.0, float(self.config.max_connection_age_sec)

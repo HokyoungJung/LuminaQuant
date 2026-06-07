@@ -28,6 +28,12 @@ FEATURE_COLUMNS: Final[tuple[str, ...]] = (
     "liquidation_short_qty",
     "liquidation_long_notional",
     "liquidation_short_notional",
+    "best_bid_price",
+    "best_bid_quantity",
+    "best_ask_price",
+    "best_ask_quantity",
+    "bbo_mid_price",
+    "bbo_spread_bps",
 )
 
 

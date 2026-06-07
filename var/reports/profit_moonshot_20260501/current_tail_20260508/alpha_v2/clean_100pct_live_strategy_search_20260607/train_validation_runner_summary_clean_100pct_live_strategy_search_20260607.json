@@ -1,0 +1,66 @@
+{
+  "artifact_kind": "train_validation_only_runner_policy_summary",
+  "feature_bounded_assessment": {
+    "aggregate": {
+      "annualized_oos_return_approx": -0.005715372151040787,
+      "compounded_oos_return": -0.0023853868449449367,
+      "fold_count": 5,
+      "latest_oos_return": 0.08114093334768158,
+      "max_oos_mdd": 0.08315392481708694,
+      "min_oos_return": -0.052816115068317626,
+      "monthly_equity_mdd": 0.08716671516123264,
+      "monthly_sharpe_approx": 0.0386242684900772,
+      "positive_oos_folds": 3,
+      "profit_factor": 1.032455916541698,
+      "profit_factor_unbounded": false
+    },
+    "artifact": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607_feature_bounded/clean_new_alpha_discovery_latest.json",
+    "clean_promotion_eligible": false,
+    "label_blockers": [
+      "continuous_position_state_across_split_boundaries",
+      "fresh_forward_required_before_promotion"
+    ]
+  },
+  "generated_at_utc": "2026-06-07T07:11:42Z",
+  "goal_reference": ".omx/ultragoal G004-train-validation-only-search-or-runn",
+  "manifest_path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/immutable_manifest_clean_100pct_live_strategy_search_20260607.json",
+  "new_runner_executed": false,
+  "policy_decision": "No manifest-bound fresh train/validation search produced a 100%+ candidate in this ultragoal run; existing train/validation-first artifacts are report-only/diagnostic and below target.",
+  "required_before_future_eligible_claim": [
+    "Add a small immutable manifest writer/validator to the selected runner entrypoint or wrapper.",
+    "Write the manifest before optimization starts and freeze its canonical JSON sha256 in the result payload.",
+    "Fail closed if locked_oos/test fields enter discovery, objective, pruning, warmup, fitting, selection, or tie-break inputs.",
+    "Fail closed if a 100pct annualized-return threshold appears in objective, pruning, Optuna sampler/search constraints, promotion gates, or tie-breaks."
+  ],
+  "reuse_assessment": {
+    "aggregate": {
+      "annualized_oos_return_approx": 0.030140209223393777,
+      "compounded_oos_return": 0.025054483041021536,
+      "fold_count": 10,
+      "latest_oos_return": 0.08114093334768158,
+      "max_oos_mdd": 0.08773789287262324,
+      "min_oos_return": -0.06472773330948511,
+      "monthly_equity_mdd": 0.10284237335219204,
+      "monthly_sharpe_approx": 0.24022334168607748,
+      "positive_oos_folds": 5,
+      "profit_factor": 1.1953329837223945,
+      "profit_factor_unbounded": false
+    },
+    "clean_promotion_eligible": false,
+    "existing_clean_new_alpha_artifact": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607/clean_new_alpha_discovery_latest.json",
+    "label_blockers": [
+      "continuous_position_state_across_split_boundaries",
+      "fresh_forward_required_before_promotion"
+    ],
+    "pre_registered_search_space_sha256": "4a6fee0f540f5d9ce15158beaf6b7c91ad89600cb5d76e1c4bfa0e33008b81b7",
+    "selection_inputs": [
+      "train",
+      "validation"
+    ],
+    "uses_locked_oos_for_objective": false,
+    "uses_locked_oos_for_parameter_fitting": false,
+    "uses_locked_oos_for_pruning": false,
+    "uses_locked_oos_for_selection": false
+  },
+  "schema_version": "1.0"
+}

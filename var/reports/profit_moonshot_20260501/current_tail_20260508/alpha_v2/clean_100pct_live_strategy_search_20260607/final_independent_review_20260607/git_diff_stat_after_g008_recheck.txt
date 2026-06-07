@@ -1,0 +1,17 @@
+ docs/research_note/research_note.md                |     44 +-
+ .../run_alpha_zoo_clean_new_alpha_discovery.py     |    721 +-
+ src/lumina_quant/data/feature_points.py            |      6 +
+ src/lumina_quant/data/support_inventory.py         |     27 +
+ src/lumina_quant/live/binance_market_stream.py     |      4 +-
+ src/lumina_quant/market_data.py                    |      6 +
+ tests/test_alpha_zoo_clean_new_alpha_discovery.py  |     36 +-
+ tests/test_strategy_support_inventory.py           |     10 +-
+ .../clean_new_alpha_discovery_latest.json          |  98839 +++++++++---
+ .../clean_new_alpha_discovery_latest.md            |      2 +-
+ .../clean_new_alpha_discovery_latest.json          | 147909 ++++++++++++++++--
+ .../clean_new_alpha_discovery_latest.md            |      4 +-
+ .../team_lanes/worker1_contamination_audit.json    |    214 +-
+ .../team_lanes/worker1_contamination_audit.md      |     44 +-
+ .../worker_2_locked_oos_report_only_20260607.json  |     37 +
+ .../worker_2_locked_oos_report_only_20260607.md    |     15 +
+ 16 files changed, 206157 insertions(+), 41761 deletions(-)

@@ -1,7 +1,7 @@
 # Alpha Zoo clean new-alpha discovery
 
-- generated: `2026-06-07T06:13:13.852816Z`
-- pre-registered search hash: `4a6fee0f540f5d9ce15158beaf6b7c91ad89600cb5d76e1c4bfa0e33008b81b7`
+- generated: `2026-06-07T10:08:12.317565Z`
+- pre-registered search hash: `1d421663b0f9f785a18d69e5068c81f1816005598f5a378bfeb697239f2488f6`
 - selection input: `train + validation only`
 - locked-OOS: `report/gate only after freeze`
 - split simulation policy: `continuous_full_period_signal_slice_report_only`

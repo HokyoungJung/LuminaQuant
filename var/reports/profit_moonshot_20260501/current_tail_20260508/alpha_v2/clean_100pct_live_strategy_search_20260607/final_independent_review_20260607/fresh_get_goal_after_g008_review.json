@@ -1,0 +1,15 @@
+{
+  "goal": {
+    "threadId": "019e7c86-f6da-7153-8f72-d562cb038e0e",
+    "objective": "LuminaQuant monthly refit walk-forward evaluation latency optimization without changing clean-OOS semantics",
+    "status": "complete",
+    "tokensUsed": 126875,
+    "timeUsedSeconds": 431,
+    "createdAt": 1780571282,
+    "updatedAt": 1780571680
+  },
+  "remainingTokens": null,
+  "completionBudgetReport": null,
+  "captured_by": "functions.get_goal",
+  "interpretation": "wrong completed legacy Codex goal; does not match active .omx/ultragoal G008 aggregate story"
+}

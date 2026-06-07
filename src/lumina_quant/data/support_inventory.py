@@ -23,6 +23,14 @@ _TAKER_FLOW_COLUMNS: tuple[str, ...] = (
     "taker_buy_quote_volume",
     "taker_sell_quote_volume",
 )
+_BBO_COLUMNS: tuple[str, ...] = (
+    "best_bid_price",
+    "best_bid_quantity",
+    "best_ask_price",
+    "best_ask_quantity",
+    "bbo_mid_price",
+    "bbo_spread_bps",
+)
 
 INVENTORY_NOTES: dict[str, str | bool] = {
     "canonical_inventory": True,
@@ -97,6 +105,7 @@ def _select_feature_columns(frame: pl.DataFrame) -> pl.DataFrame:
         "open_interest",
         *_TAKER_FLOW_COLUMNS,
         *_LIQUIDATION_COLUMNS,
+        *_BBO_COLUMNS,
     ]
     aligned = frame
     for column in columns:
@@ -138,22 +147,28 @@ def build_strategy_support_inventory(
                     "open_interest_rows": 0,
                     "taker_flow_rows": 0,
                     "liquidation_rows": 0,
+                    "bbo_rows": 0,
                     "oi_first_timestamp_ms": None,
                     "oi_last_timestamp_ms": None,
                     "taker_flow_first_timestamp_ms": None,
                     "taker_flow_last_timestamp_ms": None,
+                    "bbo_first_timestamp_ms": None,
+                    "bbo_last_timestamp_ms": None,
                     "first_timestamp_utc": None,
                     "last_timestamp_utc": None,
                     "oi_first_timestamp_utc": None,
                     "oi_last_timestamp_utc": None,
                     "taker_flow_first_timestamp_utc": None,
                     "taker_flow_last_timestamp_utc": None,
+                    "bbo_first_timestamp_utc": None,
+                    "bbo_last_timestamp_utc": None,
                     "has_funding_fee": False,
                     "has_mark": False,
                     "has_index": False,
                     "has_open_interest": False,
                     "has_taker_flow": False,
                     "has_liquidation": False,
+                    "has_bbo": False,
                 }
             )
             continue
@@ -183,10 +198,16 @@ def build_strategy_support_inventory(
         liquidation_rows = int(cleaned.select(liquidation_expr.sum().alias("count")).item())
         oi_present = pl.col("open_interest").is_not_null()
         taker_flow_present = taker_flow_expr
+        bbo_expr = pl.lit(False)
+        for column in _BBO_COLUMNS:
+            bbo_expr = bbo_expr | pl.col(column).is_not_null()
+        bbo_rows = int(cleaned.select(bbo_expr.sum().alias("count")).item())
         oi_first_timestamp_ms = _min_timestamp_for(cleaned, oi_present)
         oi_last_timestamp_ms = _max_timestamp_for(cleaned, oi_present)
         taker_flow_first_timestamp_ms = _min_timestamp_for(cleaned, taker_flow_present)
         taker_flow_last_timestamp_ms = _max_timestamp_for(cleaned, taker_flow_present)
+        bbo_first_timestamp_ms = _min_timestamp_for(cleaned, bbo_expr)
+        bbo_last_timestamp_ms = _max_timestamp_for(cleaned, bbo_expr)
 
         inventory_rows.append(
             {
@@ -205,22 +226,28 @@ def build_strategy_support_inventory(
                 "open_interest_rows": open_interest_rows,
                 "taker_flow_rows": taker_flow_rows,
                 "liquidation_rows": liquidation_rows,
+                "bbo_rows": bbo_rows,
                 "oi_first_timestamp_ms": oi_first_timestamp_ms,
                 "oi_last_timestamp_ms": oi_last_timestamp_ms,
                 "taker_flow_first_timestamp_ms": taker_flow_first_timestamp_ms,
                 "taker_flow_last_timestamp_ms": taker_flow_last_timestamp_ms,
+                "bbo_first_timestamp_ms": bbo_first_timestamp_ms,
+                "bbo_last_timestamp_ms": bbo_last_timestamp_ms,
                 "first_timestamp_utc": _iso_utc(first_timestamp_ms),
                 "last_timestamp_utc": _iso_utc(last_timestamp_ms),
                 "oi_first_timestamp_utc": _iso_utc(oi_first_timestamp_ms),
                 "oi_last_timestamp_utc": _iso_utc(oi_last_timestamp_ms),
                 "taker_flow_first_timestamp_utc": _iso_utc(taker_flow_first_timestamp_ms),
                 "taker_flow_last_timestamp_utc": _iso_utc(taker_flow_last_timestamp_ms),
+                "bbo_first_timestamp_utc": _iso_utc(bbo_first_timestamp_ms),
+                "bbo_last_timestamp_utc": _iso_utc(bbo_last_timestamp_ms),
                 "has_funding_fee": funding_fee_rows > 0,
                 "has_mark": mark_rows > 0,
                 "has_index": index_rows > 0,
                 "has_open_interest": open_interest_rows > 0,
                 "has_taker_flow": taker_flow_rows > 0,
                 "has_liquidation": liquidation_rows > 0,
+                "has_bbo": bbo_rows > 0,
             }
         )
 

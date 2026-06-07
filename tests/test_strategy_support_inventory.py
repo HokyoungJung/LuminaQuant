@@ -26,6 +26,9 @@ def test_build_strategy_support_inventory_counts_feature_groups(tmp_path):
                 "taker_sell_quote_volume": 30_000.0,
                 "liquidation_long_qty": 2.0,
                 "liquidation_long_notional": 4_100.0,
+                "best_bid_price": 2_049.9,
+                "best_ask_price": 2_050.1,
+                "bbo_spread_bps": 0.9756,
             },
         ],
     )
@@ -49,15 +52,18 @@ def test_build_strategy_support_inventory_counts_feature_groups(tmp_path):
     assert xau_row["open_interest_rows"] == 1
     assert xau_row["taker_flow_rows"] == 1
     assert xau_row["liquidation_rows"] == 1
+    assert xau_row["bbo_rows"] == 1
     assert xau_row["has_funding_fee"] is True
     assert xau_row["has_mark"] is True
     assert xau_row["has_index"] is True
     assert xau_row["has_open_interest"] is True
     assert xau_row["has_taker_flow"] is True
     assert xau_row["has_liquidation"] is True
+    assert xau_row["has_bbo"] is True
     assert xau_row["oi_first_timestamp_ms"] == 1_700_000_120_000
     assert xau_row["oi_last_timestamp_ms"] == 1_700_000_120_000
-
+    assert xau_row["bbo_first_timestamp_ms"] == 1_700_000_120_000
+    assert xau_row["bbo_last_timestamp_ms"] == 1_700_000_120_000
     assert btc_row["symbol"] == "BTCUSDT"
     assert btc_row["rows"] == 0
     assert btc_row["has_funding_fee"] is False
@@ -106,4 +112,6 @@ def test_build_strategy_support_inventory_tolerates_sparse_legacy_columns(tmp_pa
     assert row["symbol"] == "ETHUSDT"
     assert row["open_interest_rows"] == 1
     assert row["taker_flow_rows"] == 0
+    assert row["bbo_rows"] == 0
+    assert row["has_bbo"] is False
     assert row["has_taker_flow"] is False
