@@ -1,0 +1,115 @@
+{
+  "artifact_kind": "worker1_clean_input_meta_selector_promotion_rejection",
+  "clean_input_meta_selector": {
+    "allowed_use": "freeze/shadow benchmark only",
+    "blockers": [
+      "post_oos_selector_grid_ranking_uses_historical_locked_oos",
+      "fresh_forward_required_before_promotion",
+      "paper_fill_telemetry_absent",
+      "15bps_stress_artifact_absent"
+    ],
+    "classification": "shadow_freeze_only",
+    "current_promotion_decision": "rejected",
+    "evidence_paths": [
+      "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_meta_selector_research_20260607/clean_meta_selector_research_latest.json",
+      "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_meta_selector_research_20260607/clean_meta_selector_research_latest.md",
+      "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_meta_selector_research_20260607/clean_meta_selector_freeze_manifest_latest.json"
+    ],
+    "historical_oos_annualized_pct": 110.46,
+    "historical_oos_compounded_pct": 85.91,
+    "rejection_reason": "post-OOS selector-grid ranking used historical locked-OOS context; fresh-forward/paper telemetry absent"
+  },
+  "controls": [
+    {
+      "allowed_use": "clean paper/control and stress benchmark",
+      "artifact_or_candidate_id": "strict_no_leak_best_single_10bps",
+      "blockers": [
+        "drawdown too high for real sleeve",
+        "20bps stress MDD tail risk",
+        "15bps/paper-fill telemetry missing",
+        "eligible universe only 10/85 symbols"
+      ],
+      "contamination_evidence": [
+        "train+previous-2M-validation selection; next month OOS report-only",
+        "nested hybrids forbidden; raw leaf rules only"
+      ],
+      "contamination_flags": [
+        "train+previous-2M-validation selection; next month OOS report-only",
+        "nested hybrids forbidden; raw leaf rules only"
+      ],
+      "cost_gate_summary": "see metrics_summary/blockers",
+      "evidence_paths": [
+        "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_strict_no_leak_20260606/strict_no_leak_selector_latest.md",
+        "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_strict_no_leak_20260606/strict_no_leak_selector_latest.json"
+      ],
+      "fresh_forward_status": "absent_or_required_before_promotion",
+      "label": "eligible_control",
+      "metrics_summary": {
+        "10bps_mdd_pct": 30.63,
+        "10bps_pf": 1.2096,
+        "10bps_positive_months": "6/10",
+        "10bps_sharpe": 1.26,
+        "10bps_total_return_pct": 54.56,
+        "20bps_mdd_pct": 43.63,
+        "20bps_total_return_pct": 27.1
+      },
+      "normalized_classification": "eligible_control",
+      "paper_fill_telemetry_status": "absent",
+      "promotion_decision": "no_real_money; paper/control only",
+      "source_label": "eligible-control"
+    },
+    {
+      "allowed_use": "broad-universe clean monitor/control baseline",
+      "artifact_or_candidate_id": "dynamic_conviction_switch_85_symbol_baseline",
+      "blockers": [
+        "below 100pct reporting label",
+        "sparse positive folds",
+        "high MDD",
+        "no 15bps/20bps/paper fill telemetry in this artifact"
+      ],
+      "contamination_evidence": [
+        "uses_locked_oos_for_selection=false",
+        "dynamic_self_feed violations=[]",
+        "online lag violations=[]"
+      ],
+      "contamination_flags": [
+        "uses_locked_oos_for_selection=false",
+        "dynamic_self_feed violations=[]",
+        "online lag violations=[]"
+      ],
+      "cost_gate_summary": "see metrics_summary/blockers",
+      "evidence_paths": [
+        "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_85_asset_non_nested_augmented_selectors_latest_20260606/alpha_zoo_85_asset_non_nested_augmented_selectors_latest_20260606.json",
+        "/home/hoky/Quants-agent/LuminaQuant/var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_85_asset_non_nested_augmented_selectors_latest_20260606/alpha_zoo_85_asset_non_nested_augmented_selectors_latest_20260606.md"
+      ],
+      "fresh_forward_status": "absent_or_required_before_promotion",
+      "label": "eligible_control",
+      "metrics_summary": {
+        "annualized_oos_return_approx_pct": 42.57,
+        "cost_bps": 10.0,
+        "hit_rate": "3/10",
+        "max_oos_mdd_pct": 27.69,
+        "oos_compounded_return_pct": 34.39
+      },
+      "normalized_classification": "eligible_control",
+      "paper_fill_telemetry_status": "absent",
+      "promotion_decision": "paper baseline/monitor only",
+      "source_label": "eligible-control"
+    }
+  ],
+  "generated_at_utc": "2026-06-07T07:05:57Z",
+  "hundred_pct_threshold_selector_policy": {
+    "allowed_use": "post-evaluation reporting label only",
+    "must_not_be_optuna_objective": true,
+    "must_not_be_promotion_filter": true,
+    "must_not_be_rerun_trigger": true,
+    "must_not_be_selector_objective": true
+  },
+  "real_money_approval_blocked": true,
+  "source_audit_artifact": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/team_lanes/worker1_contamination_audit.json",
+  "source_audit_sha256": "21d376fb2e0215ddca2772d876ebe8ff0f77f1f29d24212a31789e2d7940dc02",
+  "subagent_skip_reason": "Task 4 reuses the completed Task 1 parallel repository-map and review probes covering the same clean_input_meta_selector risk surface; no additional serial repo-search/read loop was performed, so spawning new required probes would duplicate evidence.",
+  "task_id": "4",
+  "ultragoal_id": "G002-contamination-and-eligibility-audit",
+  "worker": "worker-1"
+}
