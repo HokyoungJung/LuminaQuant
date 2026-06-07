@@ -148,7 +148,7 @@
       "Historical incumbent metrics must be read with source lineage: source artifact reports 209.00% annualized / 156.03% compounded; locked-OOS/cost verifier fixed-blend aggregation reports 160.90% / 122.36% under the same candidate id. Both are paper/control only and cannot be used as live expected return."
     ]
   },
-  "last_reverified_at_utc": "2026-06-07T10:30:42+00:00",
+  "last_reverified_at_utc": "2026-06-07T10:33:33+00:00",
   "last_reviewed_at_utc": "2026-06-07T10:08:34+00:00",
   "latest_bbo_accumulation_recheck": {
     "aggregate": {
@@ -161,41 +161,41 @@
       "profit_factor": 1.032455916541698
     },
     "artifact_kind": "latest_bbo_accumulation_recheck",
-    "candidate_cap_inferred": 450,
-    "candidate_rows": 2250,
-    "checked_at_utc": "2026-06-07T10:19:34+00:00",
+    "candidate_cap_inferred": 500,
+    "candidate_rows": 2500,
+    "checked_at_utc": "2026-06-07T10:33:06+00:00",
     "clean_promotion_eligible": false,
     "decision_impact": "unchanged_rejected; latest current-day BBO accumulation did not improve clean train/validation-first OOS result",
     "fold_count": 5,
     "real_money_execution": false,
-    "source_generated_at_utc": "2026-06-07T10:14:05.285023Z",
+    "source_generated_at_utc": "2026-06-07T10:32:06.564484Z",
     "source_json": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607_feature_bounded/clean_new_alpha_discovery_latest.json",
     "source_markdown": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_clean_new_alpha_discovery_20260607_feature_bounded/clean_new_alpha_discovery_latest.md",
     "support_inventory_bbo_rows": {
       "BNBUSDT": {
         "bbo_first_timestamp_utc": "2026-06-07T07:38:30+00:00",
-        "bbo_last_timestamp_utc": "2026-06-07T10:18:25+00:00",
-        "bbo_rows": 603
+        "bbo_last_timestamp_utc": "2026-06-07T10:31:00+00:00",
+        "bbo_rows": 716
       },
       "BTCUSDT": {
         "bbo_first_timestamp_utc": "2026-06-07T07:29:05+00:00",
-        "bbo_last_timestamp_utc": "2026-06-07T10:18:25+00:00",
-        "bbo_rows": 628
+        "bbo_last_timestamp_utc": "2026-06-07T10:31:00+00:00",
+        "bbo_rows": 741
       },
       "ETHUSDT": {
         "bbo_first_timestamp_utc": "2026-06-07T07:29:05+00:00",
-        "bbo_last_timestamp_utc": "2026-06-07T10:18:25+00:00",
-        "bbo_rows": 642
+        "bbo_last_timestamp_utc": "2026-06-07T10:31:00+00:00",
+        "bbo_rows": 755
       },
       "SOLUSDT": {
         "bbo_first_timestamp_utc": "2026-06-07T07:29:05+00:00",
-        "bbo_last_timestamp_utc": "2026-06-07T10:18:25+00:00",
-        "bbo_rows": 638
+        "bbo_last_timestamp_utc": "2026-06-07T10:31:00+00:00",
+        "bbo_rows": 746
       },
       "TRXUSDT": {
         "bbo_first_timestamp_utc": "2026-06-07T07:38:30+00:00",
-        "bbo_last_timestamp_utc": "2026-06-07T10:18:25+00:00",
-        "bbo_rows": 587
+        "bbo_last_timestamp_utc": "2026-06-07T10:31:00+00:00",
+        "bbo_rows": 700
       }
     }
   },
@@ -233,12 +233,12 @@
     "git_diff_check": "pass: git diff --check -> no output",
     "json_manifest_report": "pass",
     "latest_bbo_accumulation_recheck": {
-      "evidence": "Latest BBO accumulation recheck (2026-06-07T10:14:05.285023Z) used inferred candidate_cap=450 and left feature-bounded OOS unchanged at -0.24% comp / -0.57% annualized; no promotion flags changed.",
+      "evidence": "Latest BBO accumulation recheck (2026-06-07T10:32:06.564484Z) used inferred candidate_cap=500 and left feature-bounded OOS unchanged at -0.24% comp / -0.57% annualized; no promotion flags changed.",
       "status": "pass_no_promotion"
     },
     "latest_bbo_post_update_verification": {
-      "evidence": "JSON/artifact assertions pass; Ruff/format/git diff check pass; PYTHONPATH=. pytest subset 12 passed in 0.53s after no-PYTHONPATH collection retry.",
-      "status": "pass_with_environment_retry"
+      "evidence": "cap=500 JSON/artifact assertions pass; git diff --check pass; PYTHONPATH=. pytest subset 12 passed in 0.54s.",
+      "status": "pass"
     },
     "metric_lineage_watch": "relaxed-efficiency source artifact reports 209.00%/156.03%, while locked-OOS/cost fixed-blend aggregation reports 160.90%/122.36%; non-promotable in both lineages.",
     "pytest_targeted": "pass: core targeted suite -> 34 passed in 0.76s; stream/BBO suite -> 6 passed in 0.04s",
