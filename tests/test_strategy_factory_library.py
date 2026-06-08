@@ -277,7 +277,24 @@ def test_candidate_library_includes_deep_research_report_leaf_candidates(monkeyp
     assert all(row.metadata["source_report"] == "desktop-deep-research-report-20260608" for row in report_rows)
     assert all(row.metadata["leaf_only"] is True for row in report_rows)
     assert all(row.metadata["research_only"] is True for row in report_rows)
+    assert all(row.metadata["no_nested_oos_mining"] is True for row in report_rows)
     assert all(row.metadata["requires_fresh_forward_shadow"] is True for row in report_rows)
+    assert all(
+        row.metadata["deployment_gate"]
+        == "blocked_until_fresh_forward_cost_telemetry_pbo_dsr_psr"
+        for row in report_rows
+    )
+
+    expected_article_families = {
+        "FundingDislocationTrendCarryStrategy": "deep-research-funding-dislocation-trend-carry",
+        "VolManagedMomentumCrashGateStrategy": "deep-research-vol-managed-momentum-crash-gate",
+        "FlowImbalanceLiquidationSweepStrategy": "deep-research-flow-imbalance-liquidation-sweep",
+    }
+    for strategy_class, article_family in expected_article_families.items():
+        strategy_rows = [row for row in report_rows if row.strategy_class == strategy_class]
+        assert strategy_rows
+        assert all(article_family in row.metadata["article_pipeline_family_ids"] for row in strategy_rows)
+        assert all(f"article_family:{article_family}" in row.tags for row in strategy_rows)
 
     flow_rows = [
         row for row in rows if row.strategy_class == "FlowImbalanceLiquidationSweepStrategy"

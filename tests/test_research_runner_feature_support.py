@@ -1378,7 +1378,7 @@ def test_deep_research_vol_managed_momentum_crash_gate_signal_produces_exposure(
         },
     }
 
-    _, turnover, exposure, _ = research_runner._strategy_signal(
+    _, turnover, exposure, meta = research_runner._strategy_signal(
         candidate,
         aligned=aligned,
         symbols=symbols,
@@ -1388,6 +1388,8 @@ def test_deep_research_vol_managed_momentum_crash_gate_signal_produces_exposure(
     assert np.any(np.abs(exposure) > 0.0)
     assert np.any(turnover > 0.0)
     assert float(np.nanmax(np.abs(exposure))) <= 1.0
+    assert meta.get("deep_research_leaf") == "vol_managed_momentum_crash_gate"
+    assert set(meta.get("support_data_symbols") or []) == set(symbols)
 
 
 def test_deep_research_flow_imbalance_liquidation_sweep_signal_produces_exposure():

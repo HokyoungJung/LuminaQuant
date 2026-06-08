@@ -5776,6 +5776,7 @@ def _apply_vol_managed_momentum_crash_gate_strategy(
     aligned: Mapping[str, np.ndarray],
     symbols: Sequence[str],
     exposures: np.ndarray,
+    meta: dict[str, Any],
 ) -> None:
     close_matrix = np.vstack(
         [np.asarray(aligned[f"{symbol}:close"], dtype=float) for symbol in symbols]
@@ -5845,6 +5846,8 @@ def _apply_vol_managed_momentum_crash_gate_strategy(
         long_scale=long_scale,
         short_scale=short_scale,
     )
+    meta["deep_research_leaf"] = "vol_managed_momentum_crash_gate"
+    meta["support_data_symbols"] = list(symbols)
 
 
 @dataclass(frozen=True, slots=True)
@@ -6185,6 +6188,7 @@ _STRATEGY_SIGNAL_DISPATCHER = StrategySignalDispatcher(
         ),
         "VolManagedMomentumCrashGateStrategy": _wrap_strategy_handler(
             _apply_vol_managed_momentum_crash_gate_strategy,
+            include_meta=True,
         ),
         "FlowImbalanceLiquidationSweepStrategy": _wrap_strategy_handler(
             _apply_flow_imbalance_liquidation_sweep_strategy,
