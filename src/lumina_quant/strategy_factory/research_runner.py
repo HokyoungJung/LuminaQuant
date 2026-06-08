@@ -57,10 +57,23 @@ _FEATURE_POINT_COLUMNS: tuple[str, ...] = (
     "mark_price",
     "index_price",
     "open_interest",
+    "taker_buy_base_volume",
+    "taker_sell_base_volume",
+    "taker_buy_quote_volume",
+    "taker_sell_quote_volume",
     "liquidation_long_qty",
     "liquidation_short_qty",
     "liquidation_long_notional",
     "liquidation_short_notional",
+    "best_bid_price",
+    "best_bid_quantity",
+    "best_ask_price",
+    "best_ask_quantity",
+    "bbo_mid_price",
+    "bbo_spread_bps",
+    "book_depth_bid_notional_1pct",
+    "book_depth_ask_notional_1pct",
+    "book_depth_imbalance_1pct",
 )
 
 
@@ -3198,6 +3211,9 @@ def _aligned_feature_points(
         return None
 
     target = pl.DataFrame({"datetime": pl.Series("datetime", common_datetime)})
+    for field in _FEATURE_POINT_COLUMNS:
+        if field not in feature_frame.columns:
+            feature_frame = feature_frame.with_columns(pl.lit(None, dtype=pl.Float64).alias(field))
     feature_points = feature_frame.select(["datetime", *_FEATURE_POINT_COLUMNS])
     target_dtype = target.schema.get("datetime")
     feature_dtype = feature_points.schema.get("datetime")
@@ -5525,6 +5541,507 @@ def _apply_pair_spread_strategy(
         meta["event_driven_proxy_error"] = str(exc)
 
 
+def _lagged_return_matrix(close_matrix: np.ndarray, lookback: int) -> np.ndarray:
+    lookback_i = max(1, int(lookback))
+    out = np.full(close_matrix.shape, np.nan, dtype=float)
+    if close_matrix.shape[1] <= lookback_i:
+        return out
+    latest = close_matrix[:, lookback_i:]
+    base = close_matrix[:, : close_matrix.shape[1] - lookback_i]
+    valid = np.isfinite(latest) & np.isfinite(base) & (base > 0.0)
+    out[:, lookback_i:] = np.where(
+        valid,
+        np.divide(
+            latest,
+            base,
+            out=np.full_like(latest, np.nan, dtype=float),
+            where=valid,
+        )
+        - 1.0,
+        np.nan,
+    )
+    return out
+
+
+def _target_indices_from_score(
+    *,
+    score_column: np.ndarray,
+    valid_indices: np.ndarray,
+    signal_threshold: float,
+    max_longs: int,
+    max_shorts: int,
+    allow_short: bool,
+) -> tuple[np.ndarray, np.ndarray]:
+    if valid_indices.size == 0:
+        empty = np.empty(0, dtype=np.int64)
+        return empty, empty
+    ordered = valid_indices[np.argsort(score_column[valid_indices], kind="stable")]
+    long_indices = ordered[score_column[ordered] >= signal_threshold]
+    short_indices = ordered[score_column[ordered] <= -signal_threshold]
+    if long_indices.size > 0 and max_longs > 0:
+        long_indices = long_indices[::-1][:max_longs]
+    else:
+        long_indices = np.empty(0, dtype=np.int64)
+    if not allow_short or short_indices.size == 0 or max_shorts <= 0:
+        return long_indices, np.empty(0, dtype=np.int64)
+    short_indices = short_indices[:max_shorts]
+    if long_indices.size == 0:
+        return long_indices, short_indices
+    return long_indices, short_indices[~np.isin(short_indices, long_indices, assume_unique=False)]
+
+
+def _apply_rebalanced_cross_sectional_targets(
+    *,
+    score_matrix: np.ndarray,
+    valid_mask: np.ndarray,
+    close_matrix: np.ndarray,
+    exposures: np.ndarray,
+    rebalance_bars: int,
+    signal_threshold: float,
+    max_longs: int,
+    max_shorts: int,
+    allow_short: bool,
+    max_abs_exposure: float,
+    stop_loss_pct: float = 0.0,
+    long_scale: np.ndarray | None = None,
+    short_scale: np.ndarray | None = None,
+) -> None:
+    symbol_count, bar_count = score_matrix.shape
+    position_state = np.zeros(symbol_count, dtype=float)
+    entry_price = np.full(symbol_count, np.nan, dtype=float)
+    rebalance_due = (np.arange(bar_count, dtype=np.int64) + 1) % max(1, int(rebalance_bars)) == 0
+    gross = max(0.0, float(max_abs_exposure))
+
+    for idx in range(bar_count):
+        close_column = close_matrix[:, idx]
+        if stop_loss_pct > 0.0:
+            active = (
+                (position_state != 0.0)
+                & np.isfinite(entry_price)
+                & np.isfinite(close_column)
+                & (close_column > 0.0)
+            )
+            exit_mask = np.zeros(symbol_count, dtype=bool)
+            exit_mask |= (
+                (position_state > 0.0)
+                & active
+                & (close_column <= (entry_price * (1.0 - stop_loss_pct)))
+            )
+            exit_mask |= (
+                (position_state < 0.0)
+                & active
+                & (close_column >= (entry_price * (1.0 + stop_loss_pct)))
+            )
+            if np.any(exit_mask):
+                position_state[exit_mask] = 0.0
+                entry_price[exit_mask] = np.nan
+
+        if rebalance_due[idx]:
+            valid_indices = np.flatnonzero(valid_mask[:, idx])
+            long_indices, short_indices = _target_indices_from_score(
+                score_column=score_matrix[:, idx],
+                valid_indices=valid_indices,
+                signal_threshold=float(signal_threshold),
+                max_longs=int(max_longs),
+                max_shorts=int(max_shorts),
+                allow_short=bool(allow_short),
+            )
+            next_state = np.zeros(symbol_count, dtype=float)
+            if long_indices.size > 0:
+                scale = (
+                    np.ones(long_indices.size, dtype=float)
+                    if long_scale is None
+                    else np.asarray(long_scale[long_indices, idx], dtype=float)
+                )
+                next_state[long_indices] = np.clip(scale, 0.0, gross)
+            if short_indices.size > 0:
+                scale = (
+                    np.ones(short_indices.size, dtype=float)
+                    if short_scale is None
+                    else np.asarray(short_scale[short_indices, idx], dtype=float)
+                )
+                next_state[short_indices] = -np.clip(scale, 0.0, gross)
+            changed = next_state != position_state
+            position_state = next_state
+            fresh = changed & (position_state != 0.0) & np.isfinite(close_column)
+            entry_price[fresh] = close_column[fresh]
+            entry_price[position_state == 0.0] = np.nan
+
+        exposures[:, idx] = position_state
+
+
+def _apply_funding_dislocation_trend_carry_strategy(
+    *,
+    params: Mapping[str, Any],
+    aligned: Mapping[str, np.ndarray],
+    symbols: Sequence[str],
+    exposures: np.ndarray,
+    meta: dict[str, Any],
+) -> None:
+    close_matrix = np.vstack(
+        [np.asarray(aligned[f"{symbol}:close"], dtype=float) for symbol in symbols]
+    )
+    symbol_count, bar_count = close_matrix.shape
+    fast = _lagged_return_matrix(close_matrix, int(params.get("fast_lookback_bars", 24)))
+    mid = _lagged_return_matrix(close_matrix, int(params.get("mid_lookback_bars", 72)))
+    slow = _lagged_return_matrix(close_matrix, int(params.get("slow_lookback_bars", 168)))
+    trend_stack = np.stack([fast, mid, slow])
+    trend_finite = np.isfinite(trend_stack)
+    trend_counts = trend_finite.sum(axis=0)
+    trend_raw = np.divide(
+        np.where(trend_finite, trend_stack, 0.0).sum(axis=0),
+        np.clip(trend_counts, 1, np.inf),
+        out=np.full(close_matrix.shape, np.nan, dtype=float),
+        where=trend_counts > 0,
+    )
+    valid_mask = np.isfinite(trend_raw)
+
+    funding_z = np.zeros((symbol_count, bar_count), dtype=float)
+    basis_z = np.zeros((symbol_count, bar_count), dtype=float)
+    crowding_penalty = np.zeros((symbol_count, bar_count), dtype=float)
+    missing_symbols: list[str] = []
+    for s_idx, symbol in enumerate(symbols):
+        support_inputs = _resolve_crowding_support_inputs(aligned=aligned, symbol=symbol)
+        if support_inputs is None:
+            missing_symbols.append(symbol)
+            valid_mask[s_idx] = False
+            continue
+        support = _crowding_support_series(
+            funding_rate=support_inputs.funding_rate,
+            open_interest=support_inputs.open_interest,
+            mark_price=support_inputs.mark_price,
+            index_price=support_inputs.index_price,
+            liquidation_long_notional=support_inputs.liquidation_long_notional,
+            liquidation_short_notional=support_inputs.liquidation_short_notional,
+            window=max(12, int(params.get("crowding_window", 72))),
+        )
+        funding_z[s_idx] = np.asarray(support["funding_z"], dtype=float)
+        basis_z[s_idx] = np.asarray(support["basis_z"], dtype=float)
+        crowding = np.asarray(support["crowding_score"], dtype=float)
+        crowding_penalty[s_idx] = np.abs(np.nan_to_num(crowding, nan=0.0))
+        valid_mask[s_idx] &= np.isfinite(funding_z[s_idx]) & np.isfinite(basis_z[s_idx])
+        _note_support_data_symbol(meta, symbol=symbol, values=np.asarray(crowding, dtype=float))
+    _finalize_missing_support_symbols(meta, missing_symbols=missing_symbols)
+
+    trend_score = _cross_sectional_score_matrix(np.nan_to_num(trend_raw, nan=0.0), valid_mask)
+    carry_score = _cross_sectional_score_matrix(-np.nan_to_num(funding_z, nan=0.0), valid_mask)
+    basis_score = _cross_sectional_score_matrix(-np.nan_to_num(basis_z, nan=0.0), valid_mask)
+    penalty_score = _cross_sectional_score_matrix(
+        -np.nan_to_num(crowding_penalty, nan=0.0),
+        valid_mask,
+    )
+    score_matrix = (
+        float(params.get("trend_weight", 0.55)) * trend_score
+        + float(params.get("carry_weight", 0.25)) * carry_score
+        + float(params.get("basis_weight", 0.10)) * basis_score
+        + float(params.get("crowding_penalty_weight", 0.10)) * penalty_score
+    )
+    _apply_rebalanced_cross_sectional_targets(
+        score_matrix=score_matrix,
+        valid_mask=valid_mask,
+        close_matrix=close_matrix,
+        exposures=exposures,
+        rebalance_bars=int(params.get("rebalance_bars", 4)),
+        signal_threshold=float(params.get("signal_threshold", 0.45)),
+        max_longs=int(params.get("max_longs", 3)),
+        max_shorts=int(params.get("max_shorts", 2)),
+        allow_short=bool(params.get("allow_short", True)),
+        max_abs_exposure=float(params.get("max_abs_exposure", 1.0)),
+        stop_loss_pct=float(params.get("stop_loss_pct", 0.045)),
+    )
+    meta["deep_research_leaf"] = "funding_dislocation_trend_carry"
+
+
+def _rolling_realized_vol_for_deep_research(values: np.ndarray, window: int) -> np.ndarray:
+    arr = np.asarray(values, dtype=float)
+    out = np.full(arr.shape, np.nan, dtype=float)
+    if arr.size < 3:
+        return out
+    returns = np.full(arr.shape, np.nan, dtype=float)
+    valid = np.isfinite(arr[1:]) & np.isfinite(arr[:-1]) & (arr[1:] > 0.0) & (arr[:-1] > 0.0)
+    returns[1:] = np.where(valid, np.log(arr[1:] / arr[:-1]), np.nan)
+    win = max(4, int(window))
+    for idx in range(win, arr.size + 1):
+        tail = returns[idx - win + 1 : idx]
+        finite = tail[np.isfinite(tail)]
+        if finite.size < max(2, win // 2):
+            continue
+        out[idx - 1] = float(np.std(finite, ddof=1))
+    return out
+
+
+def _apply_vol_managed_momentum_crash_gate_strategy(
+    *,
+    params: Mapping[str, Any],
+    aligned: Mapping[str, np.ndarray],
+    symbols: Sequence[str],
+    exposures: np.ndarray,
+) -> None:
+    close_matrix = np.vstack(
+        [np.asarray(aligned[f"{symbol}:close"], dtype=float) for symbol in symbols]
+    )
+    momentum = _lagged_return_matrix(close_matrix, int(params.get("momentum_lookback_bars", 96)))
+    valid_mask = np.isfinite(momentum)
+    score_matrix = _cross_sectional_score_matrix(np.nan_to_num(momentum, nan=0.0), valid_mask)
+    realized_vol = np.vstack(
+        [
+            _rolling_realized_vol_for_deep_research(
+                close_matrix[s_idx],
+                int(params.get("vol_window", 48)),
+            )
+            for s_idx in range(len(symbols))
+        ]
+    )
+    target_vol = max(0.0, float(params.get("target_vol", 0.018)))
+    max_leverage = max(0.0, float(params.get("max_leverage", 1.0)))
+    vol_scale = np.divide(
+        target_vol,
+        np.clip(realized_vol, 1e-8, np.inf),
+        out=np.zeros_like(realized_vol, dtype=float),
+        where=np.isfinite(realized_vol),
+    )
+    vol_scale = np.clip(np.nan_to_num(vol_scale, nan=0.0, posinf=max_leverage), 0.0, max_leverage)
+
+    benchmark_symbol = "BTC/USDT" if "BTC/USDT" in symbols else symbols[0]
+    benchmark = close_matrix[symbols.index(benchmark_symbol)]
+    crash_window = max(1, int(params.get("crash_window_bars", 24)))
+    benchmark_ret = np.full(benchmark.shape, np.nan, dtype=float)
+    if benchmark.size > crash_window:
+        benchmark_ret[crash_window:] = (
+            benchmark[crash_window:] / np.clip(benchmark[:-crash_window], 1e-12, np.inf)
+        ) - 1.0
+    fast_vol = _rolling_realized_vol_for_deep_research(
+        benchmark,
+        int(params.get("vol_window", 48)),
+    )
+    slow_vol = _rolling_realized_vol_for_deep_research(
+        benchmark,
+        int(params.get("vol_ratio_window", 192)),
+    )
+    vol_ratio = np.divide(
+        fast_vol,
+        np.clip(slow_vol, 1e-8, np.inf),
+        out=np.zeros_like(fast_vol, dtype=float),
+        where=np.isfinite(fast_vol) & np.isfinite(slow_vol),
+    )
+    stress = (
+        (benchmark_ret <= -float(params.get("crash_return_pct", 0.055)))
+        | (vol_ratio >= float(params.get("vol_ratio_max", 2.4)))
+    )
+    stress_reduce = np.clip(float(params.get("stress_reduce", 0.25)), 0.0, 1.0)
+    long_scale = vol_scale * np.where(stress[np.newaxis, :], stress_reduce, 1.0)
+    short_scale = vol_scale
+    _apply_rebalanced_cross_sectional_targets(
+        score_matrix=score_matrix,
+        valid_mask=valid_mask,
+        close_matrix=close_matrix,
+        exposures=exposures,
+        rebalance_bars=int(params.get("rebalance_bars", 4)),
+        signal_threshold=float(params.get("signal_threshold", 0.35)),
+        max_longs=int(params.get("max_longs", 3)),
+        max_shorts=int(params.get("max_shorts", 2)),
+        allow_short=bool(params.get("allow_short", True)),
+        max_abs_exposure=max_leverage,
+        long_scale=long_scale,
+        short_scale=short_scale,
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class _FlowImbalanceLiquidationSweepConfig:
+    window: int
+    entry_score: float
+    exit_score: float
+    liquidation_z_min: float
+    return_shock_pct: float
+    max_spread_bps: float
+    max_hold_bars: int
+    stop_loss_pct: float
+    allow_short: bool
+
+
+def _resolve_flow_imbalance_liquidation_sweep_config(
+    params: Mapping[str, Any],
+) -> _FlowImbalanceLiquidationSweepConfig:
+    return _FlowImbalanceLiquidationSweepConfig(
+        window=max(8, int(params.get("window", 72))),
+        entry_score=float(params.get("entry_score", 0.35)),
+        exit_score=float(params.get("exit_score", 0.08)),
+        liquidation_z_min=float(params.get("liquidation_z_min", 1.2)),
+        return_shock_pct=float(params.get("return_shock_pct", 0.006)),
+        max_spread_bps=float(params.get("max_spread_bps", 12.0)),
+        max_hold_bars=max(1, int(params.get("max_hold_bars", 18))),
+        stop_loss_pct=float(params.get("stop_loss_pct", 0.016)),
+        allow_short=bool(params.get("allow_short", True)),
+    )
+
+
+def _flow_imbalance_series(
+    *,
+    aligned: Mapping[str, np.ndarray],
+    symbol: str,
+    close: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray] | None:
+    buy_quote = aligned.get(f"{symbol}:taker_buy_quote_volume")
+    sell_quote = aligned.get(f"{symbol}:taker_sell_quote_volume")
+    if buy_quote is None or sell_quote is None:
+        return None
+    buy_arr = np.nan_to_num(np.asarray(buy_quote, dtype=float), nan=0.0)
+    sell_arr = np.nan_to_num(np.asarray(sell_quote, dtype=float), nan=0.0)
+    taker_imbalance = np.divide(
+        buy_arr - sell_arr,
+        np.abs(buy_arr) + np.abs(sell_arr) + 1e-12,
+        out=np.zeros(close.shape, dtype=float),
+    )
+
+    depth = aligned.get(f"{symbol}:book_depth_imbalance_1pct")
+    if depth is not None:
+        book_imbalance = np.nan_to_num(np.asarray(depth, dtype=float), nan=0.0)
+    else:
+        bid_qty = aligned.get(f"{symbol}:best_bid_quantity")
+        ask_qty = aligned.get(f"{symbol}:best_ask_quantity")
+        if bid_qty is None or ask_qty is None:
+            return None
+        bid_arr = np.nan_to_num(np.asarray(bid_qty, dtype=float), nan=0.0)
+        ask_arr = np.nan_to_num(np.asarray(ask_qty, dtype=float), nan=0.0)
+        book_imbalance = np.divide(
+            bid_arr - ask_arr,
+            np.abs(bid_arr) + np.abs(ask_arr) + 1e-12,
+            out=np.zeros(close.shape, dtype=float),
+        )
+
+    spread = aligned.get(f"{symbol}:bbo_spread_bps")
+    if spread is not None:
+        spread_bps = np.asarray(spread, dtype=float)
+    else:
+        bid = aligned.get(f"{symbol}:best_bid_price")
+        ask = aligned.get(f"{symbol}:best_ask_price")
+        if bid is None or ask is None:
+            spread_bps = np.zeros(close.shape, dtype=float)
+        else:
+            bid_arr = np.asarray(bid, dtype=float)
+            ask_arr = np.asarray(ask, dtype=float)
+            mid = (bid_arr + ask_arr) * 0.5
+            spread_bps = np.divide(
+                ask_arr - bid_arr,
+                np.clip(mid, 1e-12, np.inf),
+                out=np.zeros(close.shape, dtype=float),
+                where=np.isfinite(mid),
+            ) * 10_000.0
+
+    flow_score = (0.60 * taker_imbalance) + (0.40 * book_imbalance)
+    return np.nan_to_num(flow_score, nan=0.0), np.nan_to_num(spread_bps, nan=np.inf)
+
+
+def _flow_imbalance_liquidation_position_series(
+    *,
+    close: np.ndarray,
+    flow_score: np.ndarray,
+    spread_bps: np.ndarray,
+    liquidation_long_z: np.ndarray,
+    liquidation_short_z: np.ndarray,
+    config: _FlowImbalanceLiquidationSweepConfig,
+) -> np.ndarray:
+    returns = _returns_from_close(close)
+    position = np.zeros(close.shape, dtype=float)
+    mode = 0
+    entry_price: float | None = None
+    bars_held = 0
+    for idx in range(close.size):
+        close_i = float(close[idx])
+        if not np.isfinite(close_i):
+            position[idx] = float(mode)
+            continue
+        if mode != 0:
+            bars_held += 1
+            exit_long = mode == 1 and (
+                float(flow_score[idx]) <= config.exit_score
+                or bars_held >= config.max_hold_bars
+                or (
+                    entry_price is not None
+                    and close_i <= float(entry_price) * (1.0 - config.stop_loss_pct)
+                )
+            )
+            exit_short = mode == -1 and (
+                float(flow_score[idx]) >= -config.exit_score
+                or bars_held >= config.max_hold_bars
+                or (
+                    entry_price is not None
+                    and close_i >= float(entry_price) * (1.0 + config.stop_loss_pct)
+                )
+            )
+            if exit_long or exit_short:
+                mode = 0
+                entry_price = None
+                bars_held = 0
+            position[idx] = float(mode)
+            continue
+
+        spread_ok = np.isfinite(spread_bps[idx]) and float(spread_bps[idx]) <= config.max_spread_bps
+        if not spread_ok:
+            position[idx] = 0.0
+            continue
+        long_signal = (
+            float(liquidation_long_z[idx]) >= config.liquidation_z_min
+            and float(returns[idx]) <= -config.return_shock_pct
+            and float(flow_score[idx]) >= config.entry_score
+        )
+        short_signal = (
+            config.allow_short
+            and float(liquidation_short_z[idx]) >= config.liquidation_z_min
+            and float(returns[idx]) >= config.return_shock_pct
+            and float(flow_score[idx]) <= -config.entry_score
+        )
+        if long_signal:
+            mode = 1
+            entry_price = close_i
+        elif short_signal:
+            mode = -1
+            entry_price = close_i
+        position[idx] = float(mode)
+    return position
+
+
+def _apply_flow_imbalance_liquidation_sweep_strategy(
+    *,
+    params: Mapping[str, Any],
+    aligned: Mapping[str, np.ndarray],
+    symbols: Sequence[str],
+    exposures: np.ndarray,
+    meta: dict[str, Any],
+) -> None:
+    config = _resolve_flow_imbalance_liquidation_sweep_config(params)
+    missing_symbols: list[str] = []
+    for s_idx, symbol in enumerate(symbols):
+        close = np.asarray(aligned[f"{symbol}:close"], dtype=float)
+        long_liq = aligned.get(f"{symbol}:liquidation_long_notional")
+        short_liq = aligned.get(f"{symbol}:liquidation_short_notional")
+        flow_payload = _flow_imbalance_series(aligned=aligned, symbol=symbol, close=close)
+        if long_liq is None or short_liq is None or flow_payload is None:
+            missing_symbols.append(symbol)
+            continue
+        flow_score, spread_bps = flow_payload
+        liquidation_long_z = _rolling_z(
+            np.nan_to_num(np.asarray(long_liq, dtype=float), nan=0.0),
+            config.window,
+        )
+        liquidation_short_z = _rolling_z(
+            np.nan_to_num(np.asarray(short_liq, dtype=float), nan=0.0),
+            config.window,
+        )
+        exposures[s_idx] = _flow_imbalance_liquidation_position_series(
+            close=close,
+            flow_score=flow_score,
+            spread_bps=spread_bps,
+            liquidation_long_z=np.nan_to_num(liquidation_long_z, nan=0.0),
+            liquidation_short_z=np.nan_to_num(liquidation_short_z, nan=0.0),
+            config=config,
+        )
+        _note_support_data_symbol(meta, symbol=symbol, values=flow_score)
+    _finalize_missing_support_symbols(meta, missing_symbols=missing_symbols)
+    meta["deep_research_leaf"] = "flow_imbalance_liquidation_sweep"
+
+
 def _apply_micro_range_expansion_strategy(
     *,
     params: Mapping[str, Any],
@@ -5660,6 +6177,17 @@ _STRATEGY_SIGNAL_DISPATCHER = StrategySignalDispatcher(
         ),
         "FundingLiquidationCrowdingFadeStrategy": _wrap_strategy_handler(
             _apply_funding_liquidation_crowding_fade_strategy,
+            include_meta=True,
+        ),
+        "FundingDislocationTrendCarryStrategy": _wrap_strategy_handler(
+            _apply_funding_dislocation_trend_carry_strategy,
+            include_meta=True,
+        ),
+        "VolManagedMomentumCrashGateStrategy": _wrap_strategy_handler(
+            _apply_vol_managed_momentum_crash_gate_strategy,
+        ),
+        "FlowImbalanceLiquidationSweepStrategy": _wrap_strategy_handler(
+            _apply_flow_imbalance_liquidation_sweep_strategy,
             include_meta=True,
         ),
         "BasisSnapbackReversionStrategy": _wrap_strategy_handler(

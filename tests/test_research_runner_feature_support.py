@@ -1275,6 +1275,171 @@ def test_funding_liquidation_crowding_position_series_resumes_after_nonfinite_cl
     assert np.array_equal(position, np.asarray([0.0, 1.0, 1.0, 1.0], dtype=float))
 
 
+def _deep_research_base_aligned(
+    symbols: list[str],
+    *,
+    length: int = 240,
+) -> dict[str, np.ndarray]:
+    aligned: dict[str, np.ndarray] = {"datetime": _minute_datetimes(length)}
+    for idx, symbol in enumerate(symbols):
+        drift = 0.02 * (idx + 1)
+        close = 100.0 + np.linspace(0.0, drift * length, length, dtype=float)
+        if idx % 2:
+            close = 120.0 - np.linspace(0.0, drift * length * 0.6, length, dtype=float)
+        close = close + (0.35 * (idx + 1) * np.sin(np.linspace(0.0, 10.0, length)))
+        aligned[f"{symbol}:open"] = close - 0.1
+        aligned[f"{symbol}:high"] = close + 0.3
+        aligned[f"{symbol}:low"] = close - 0.3
+        aligned[f"{symbol}:close"] = close
+        aligned[f"{symbol}:volume"] = np.linspace(1_000.0, 1_800.0, length, dtype=float)
+        aligned[f"{symbol}:funding_rate"] = np.linspace(
+            -0.0002 + (idx * 0.0001),
+            0.0002 + (idx * 0.0001),
+            length,
+            dtype=float,
+        )
+        aligned[f"{symbol}:open_interest"] = 1_000_000.0 * np.exp(
+            np.linspace(0.0, 0.10 + (idx * 0.03), length, dtype=float)
+        )
+        aligned[f"{symbol}:liquidation_long_notional"] = np.linspace(
+            10_000.0,
+            20_000.0 + (idx * 1_000.0),
+            length,
+            dtype=float,
+        )
+        aligned[f"{symbol}:liquidation_short_notional"] = np.linspace(
+            8_000.0,
+            14_000.0 + (idx * 1_000.0),
+            length,
+            dtype=float,
+        )
+        aligned[f"{symbol}:mark_price"] = close * (1.0 + (idx * 0.0002))
+        aligned[f"{symbol}:index_price"] = close
+    return aligned
+
+
+def test_deep_research_funding_dislocation_trend_carry_signal_produces_exposure():
+    symbols = ["BTC/USDT", "ETH/USDT", "BNB/USDT", "SOL/USDT"]
+    aligned = _deep_research_base_aligned(symbols, length=260)
+    candidate = {
+        "strategy_class": "FundingDislocationTrendCarryStrategy",
+        "params": {
+            "fast_lookback_bars": 8,
+            "mid_lookback_bars": 16,
+            "slow_lookback_bars": 32,
+            "rebalance_bars": 4,
+            "signal_threshold": 0.0,
+            "max_longs": 1,
+            "max_shorts": 0,
+            "crowding_window": 24,
+            "trend_weight": 0.55,
+            "carry_weight": 0.25,
+            "basis_weight": 0.10,
+            "crowding_penalty_weight": 0.10,
+            "stop_loss_pct": 0.05,
+            "max_abs_exposure": 1.0,
+            "allow_short": False,
+        },
+    }
+
+    _, turnover, exposure, meta = research_runner._strategy_signal(
+        candidate,
+        aligned=aligned,
+        symbols=symbols,
+    )
+
+    assert exposure.shape == (260,)
+    assert np.any(np.abs(exposure) > 0.0)
+    assert np.any(turnover > 0.0)
+    assert meta.get("deep_research_leaf") == "funding_dislocation_trend_carry"
+    assert set(meta.get("support_data_symbols") or []) == set(symbols)
+
+
+def test_deep_research_vol_managed_momentum_crash_gate_signal_produces_exposure():
+    symbols = ["BTC/USDT", "ETH/USDT", "BNB/USDT", "SOL/USDT"]
+    aligned = _deep_research_base_aligned(symbols, length=220)
+    candidate = {
+        "strategy_class": "VolManagedMomentumCrashGateStrategy",
+        "params": {
+            "momentum_lookback_bars": 24,
+            "rebalance_bars": 4,
+            "vol_window": 12,
+            "target_vol": 0.02,
+            "max_leverage": 1.0,
+            "signal_threshold": 0.0,
+            "max_longs": 1,
+            "max_shorts": 0,
+            "crash_window_bars": 12,
+            "crash_return_pct": 0.20,
+            "vol_ratio_window": 48,
+            "vol_ratio_max": 10.0,
+            "stress_reduce": 0.25,
+            "allow_short": False,
+        },
+    }
+
+    _, turnover, exposure, _ = research_runner._strategy_signal(
+        candidate,
+        aligned=aligned,
+        symbols=symbols,
+    )
+
+    assert exposure.shape == (220,)
+    assert np.any(np.abs(exposure) > 0.0)
+    assert np.any(turnover > 0.0)
+    assert float(np.nanmax(np.abs(exposure))) <= 1.0
+
+
+def test_deep_research_flow_imbalance_liquidation_sweep_signal_produces_exposure():
+    length = 180
+    close = np.linspace(100.0, 104.0, length, dtype=float)
+    close[90] = 98.0
+    close[91:100] = np.linspace(98.5, 101.0, 9, dtype=float)
+    aligned = {
+        "datetime": _minute_datetimes(length),
+        "BTC/USDT:open": close - 0.1,
+        "BTC/USDT:high": close + 0.2,
+        "BTC/USDT:low": close - 0.2,
+        "BTC/USDT:close": close,
+        "BTC/USDT:volume": np.full(length, 1_000.0, dtype=float),
+        "BTC/USDT:taker_buy_quote_volume": np.full(length, 100_000.0, dtype=float),
+        "BTC/USDT:taker_sell_quote_volume": np.full(length, 100_000.0, dtype=float),
+        "BTC/USDT:book_depth_imbalance_1pct": np.zeros(length, dtype=float),
+        "BTC/USDT:bbo_spread_bps": np.full(length, 4.0, dtype=float),
+        "BTC/USDT:liquidation_long_notional": np.full(length, 10_000.0, dtype=float),
+        "BTC/USDT:liquidation_short_notional": np.full(length, 10_000.0, dtype=float),
+    }
+    aligned["BTC/USDT:taker_buy_quote_volume"][90] = 500_000.0
+    aligned["BTC/USDT:book_depth_imbalance_1pct"][90] = 0.75
+    aligned["BTC/USDT:liquidation_long_notional"][90] = 250_000.0
+    candidate = {
+        "strategy_class": "FlowImbalanceLiquidationSweepStrategy",
+        "params": {
+            "window": 16,
+            "entry_score": 0.25,
+            "exit_score": 0.05,
+            "liquidation_z_min": 0.0,
+            "return_shock_pct": 0.006,
+            "max_spread_bps": 10.0,
+            "max_hold_bars": 12,
+            "stop_loss_pct": 0.02,
+            "allow_short": True,
+        },
+    }
+
+    _, turnover, exposure, meta = research_runner._strategy_signal(
+        candidate,
+        aligned=aligned,
+        symbols=["BTC/USDT"],
+    )
+
+    assert exposure.shape == (length,)
+    assert np.any(exposure > 0.0)
+    assert np.any(turnover > 0.0)
+    assert meta.get("deep_research_leaf") == "flow_imbalance_liquidation_sweep"
+    assert "BTC/USDT" in list(meta.get("support_data_symbols") or [])
+
+
 def test_liquidity_shock_reversion_strategy_signal_produces_exposure():
     length = 240
     close = np.linspace(100.0, 108.0, length, dtype=float)

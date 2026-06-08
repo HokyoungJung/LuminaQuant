@@ -18,6 +18,7 @@ from lumina_quant.strategy_factory import (
     build_article_pipeline_manifest,
     build_binance_futures_candidates,
     build_single_asset_portfolio_sets,
+    candidate_library,
     candidate_identity,
     select_diversified_shortlist,
 )
@@ -251,6 +252,39 @@ def test_candidate_library_includes_article_inspired_carry_trend_factor_rotation
     production_ready = [row for row in factor_rows if row.metadata.get("production_ready") is True]
     assert {row.timeframe for row in production_ready} == {"1h", "4h"}
     assert all(bool(row.params["allow_short"]) is False for row in production_ready)
+
+
+def test_candidate_library_includes_deep_research_report_leaf_candidates(monkeypatch):
+    monkeypatch.setattr(candidate_library, "_has_perp_support_data", lambda: True)
+
+    rows = build_binance_futures_candidates(
+        timeframes=["5m", "15m", "1h", "4h"],
+        symbols=["BTC/USDT", "ETH/USDT", "BNB/USDT", "SOL/USDT", "TRX/USDT"],
+    )
+    by_class = {row.strategy_class: row for row in rows}
+
+    expected = {
+        "FundingDislocationTrendCarryStrategy",
+        "VolManagedMomentumCrashGateStrategy",
+        "FlowImbalanceLiquidationSweepStrategy",
+    }
+    assert expected.issubset(by_class)
+
+    report_rows = [row for row in rows if row.strategy_class in expected]
+    assert report_rows
+    assert all(row.family == "deep_research_leaf" for row in report_rows)
+    assert all("deep_research_report_20260608" in row.tags for row in report_rows)
+    assert all(row.metadata["source_report"] == "desktop-deep-research-report-20260608" for row in report_rows)
+    assert all(row.metadata["leaf_only"] is True for row in report_rows)
+    assert all(row.metadata["research_only"] is True for row in report_rows)
+    assert all(row.metadata["requires_fresh_forward_shadow"] is True for row in report_rows)
+
+    flow_rows = [
+        row for row in rows if row.strategy_class == "FlowImbalanceLiquidationSweepStrategy"
+    ]
+    assert flow_rows
+    assert all(row.metadata["symbol_scope"] == "major_crypto_only" for row in flow_rows)
+    assert all(row.metadata["initial_gross_cap_hint"] == 0.15 for row in flow_rows)
 
 
 def test_candidate_library_includes_last_day_liquidity_regime_family():

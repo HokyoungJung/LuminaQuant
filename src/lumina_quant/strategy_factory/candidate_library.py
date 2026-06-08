@@ -809,6 +809,179 @@ _FUNDING_LIQUIDATION_CROWDING_FADE_SLICE: dict[str, tuple[dict[str, Any], ...]] 
     ),
 }
 
+_DEEP_RESEARCH_FUNDING_DISLOCATION_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "1h": (
+        {
+            "variant": "balanced_ls",
+            "fast_lookback_bars": 24,
+            "mid_lookback_bars": 72,
+            "slow_lookback_bars": 168,
+            "rebalance_bars": 4,
+            "signal_threshold": 0.45,
+            "max_longs": 3,
+            "max_shorts": 2,
+            "vol_window": 48,
+            "crowding_window": 72,
+            "trend_weight": 0.55,
+            "carry_weight": 0.25,
+            "basis_weight": 0.10,
+            "crowding_penalty_weight": 0.10,
+            "stop_loss_pct": 0.045,
+            "max_abs_exposure": 1.0,
+            "allow_short": True,
+        },
+        {
+            "variant": "guarded_lo",
+            "fast_lookback_bars": 24,
+            "mid_lookback_bars": 96,
+            "slow_lookback_bars": 240,
+            "rebalance_bars": 6,
+            "signal_threshold": 0.55,
+            "max_longs": 3,
+            "max_shorts": 0,
+            "vol_window": 72,
+            "crowding_window": 96,
+            "trend_weight": 0.60,
+            "carry_weight": 0.25,
+            "basis_weight": 0.10,
+            "crowding_penalty_weight": 0.05,
+            "stop_loss_pct": 0.040,
+            "max_abs_exposure": 1.0,
+            "allow_short": False,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "swing_ls",
+            "fast_lookback_bars": 12,
+            "mid_lookback_bars": 36,
+            "slow_lookback_bars": 90,
+            "rebalance_bars": 3,
+            "signal_threshold": 0.40,
+            "max_longs": 3,
+            "max_shorts": 2,
+            "vol_window": 36,
+            "crowding_window": 54,
+            "trend_weight": 0.58,
+            "carry_weight": 0.24,
+            "basis_weight": 0.08,
+            "crowding_penalty_weight": 0.10,
+            "stop_loss_pct": 0.060,
+            "max_abs_exposure": 1.0,
+            "allow_short": True,
+        },
+    ),
+}
+
+_DEEP_RESEARCH_VOL_MANAGED_MOMENTUM_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "1h": (
+        {
+            "variant": "balanced_ls",
+            "momentum_lookback_bars": 96,
+            "rebalance_bars": 4,
+            "vol_window": 48,
+            "target_vol": 0.018,
+            "max_leverage": 1.0,
+            "signal_threshold": 0.35,
+            "max_longs": 3,
+            "max_shorts": 2,
+            "crash_window_bars": 24,
+            "crash_return_pct": 0.055,
+            "vol_ratio_window": 192,
+            "vol_ratio_max": 2.4,
+            "stress_reduce": 0.25,
+            "allow_short": True,
+        },
+        {
+            "variant": "guarded_lo",
+            "momentum_lookback_bars": 120,
+            "rebalance_bars": 6,
+            "vol_window": 72,
+            "target_vol": 0.016,
+            "max_leverage": 0.8,
+            "signal_threshold": 0.45,
+            "max_longs": 3,
+            "max_shorts": 0,
+            "crash_window_bars": 36,
+            "crash_return_pct": 0.070,
+            "vol_ratio_window": 240,
+            "vol_ratio_max": 2.2,
+            "stress_reduce": 0.15,
+            "allow_short": False,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "swing_ls",
+            "momentum_lookback_bars": 60,
+            "rebalance_bars": 3,
+            "vol_window": 36,
+            "target_vol": 0.026,
+            "max_leverage": 1.0,
+            "signal_threshold": 0.35,
+            "max_longs": 3,
+            "max_shorts": 2,
+            "crash_window_bars": 12,
+            "crash_return_pct": 0.085,
+            "vol_ratio_window": 120,
+            "vol_ratio_max": 2.3,
+            "stress_reduce": 0.30,
+            "allow_short": True,
+        },
+    ),
+}
+
+_DEEP_RESEARCH_FLOW_IMBALANCE_LIQUIDATION_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "5m": (
+        {
+            "variant": "majors_sweep_ls",
+            "window": 72,
+            "entry_score": 0.35,
+            "exit_score": 0.08,
+            "liquidation_z_min": 1.2,
+            "return_shock_pct": 0.006,
+            "max_spread_bps": 12.0,
+            "max_hold_bars": 18,
+            "stop_loss_pct": 0.016,
+            "allow_short": True,
+        },
+        {
+            "variant": "majors_guarded_lo",
+            "window": 96,
+            "entry_score": 0.45,
+            "exit_score": 0.10,
+            "liquidation_z_min": 1.5,
+            "return_shock_pct": 0.008,
+            "max_spread_bps": 10.0,
+            "max_hold_bars": 14,
+            "stop_loss_pct": 0.014,
+            "allow_short": False,
+        },
+    ),
+    "15m": (
+        {
+            "variant": "majors_sweep_ls",
+            "window": 64,
+            "entry_score": 0.35,
+            "exit_score": 0.08,
+            "liquidation_z_min": 1.1,
+            "return_shock_pct": 0.010,
+            "max_spread_bps": 14.0,
+            "max_hold_bars": 12,
+            "stop_loss_pct": 0.020,
+            "allow_short": True,
+        },
+    ),
+}
+
+_DEEP_RESEARCH_FLOW_MAJOR_SYMBOLS: tuple[str, ...] = (
+    "BTC/USDT",
+    "ETH/USDT",
+    "SOL/USDT",
+    "BNB/USDT",
+    "TRX/USDT",
+)
+
 _BASIS_SNAPBACK_REVERSION_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
     "30m": (
         {
@@ -2117,6 +2290,12 @@ def _article_pipeline_family_ids(
         return ("session-transition-liquidity-vacuum-fade",)
     if strategy_token == "FundingLiquidationCrowdingFadeStrategy":
         return ("funding-liquidation-crowding-fade",)
+    if strategy_token == "FundingDislocationTrendCarryStrategy":
+        return ("deep-research-funding-dislocation-trend-carry",)
+    if strategy_token == "VolManagedMomentumCrashGateStrategy":
+        return ("deep-research-vol-managed-momentum-crash-gate",)
+    if strategy_token == "FlowImbalanceLiquidationSweepStrategy":
+        return ("deep-research-flow-imbalance-liquidation-sweep",)
     if strategy_token == "BasisSnapbackReversionStrategy":
         return ("basis-snapback-reversion",)
     if strategy_token == "VolOfVolExhaustionFadeStrategy":
@@ -2407,6 +2586,7 @@ class _CandidateBuildContext:
         _build_formula_and_breadth_candidates(self)
         _build_breakout_candidates(self)
         _build_pair_and_intermarket_candidates(self)
+        _build_deep_research_report_candidates(self)
         _build_optional_carry_and_micro_candidates(self)
         return self.candidates
 
@@ -3912,6 +4092,181 @@ def _build_pair_and_intermarket_candidates(ctx: _CandidateBuildContext) -> None:
                         "timeframe": timeframe,
                         "pair": f"{symbol_x}_{symbol_y}",
                         "pair_variant": str(spec["variant"]),
+                    },
+                )
+
+
+def _build_deep_research_report_candidates(ctx: _CandidateBuildContext) -> None:
+    candidates = ctx.candidates
+    crypto_symbols = tuple(ctx.crypto_symbols)
+    if len(crypto_symbols) < 3:
+        return
+
+    shared_metadata = {
+        "source_report": "desktop-deep-research-report-20260608",
+        "leaf_only": True,
+        "research_only": True,
+        "no_nested_oos_mining": True,
+        "requires_fresh_forward_shadow": True,
+        "deployment_gate": "blocked_until_fresh_forward_cost_telemetry_pbo_dsr_psr",
+    }
+
+    if ctx.perp_support_data_available:
+        for timeframe in ctx._present("1h", "4h"):
+            tf_tag = timeframe.replace("/", "-")
+            for spec in _DEEP_RESEARCH_FUNDING_DISLOCATION_SLICE.get(timeframe, ()):
+                params = {
+                    "fast_lookback_bars": int(spec["fast_lookback_bars"]),
+                    "mid_lookback_bars": int(spec["mid_lookback_bars"]),
+                    "slow_lookback_bars": int(spec["slow_lookback_bars"]),
+                    "rebalance_bars": int(spec["rebalance_bars"]),
+                    "signal_threshold": float(spec["signal_threshold"]),
+                    "max_longs": int(spec["max_longs"]),
+                    "max_shorts": int(spec["max_shorts"]),
+                    "vol_window": int(spec["vol_window"]),
+                    "crowding_window": int(spec["crowding_window"]),
+                    "trend_weight": float(spec["trend_weight"]),
+                    "carry_weight": float(spec["carry_weight"]),
+                    "basis_weight": float(spec["basis_weight"]),
+                    "crowding_penalty_weight": float(spec["crowding_penalty_weight"]),
+                    "stop_loss_pct": float(spec["stop_loss_pct"]),
+                    "max_abs_exposure": float(spec["max_abs_exposure"]),
+                    "allow_short": bool(spec["allow_short"]),
+                }
+                _add_candidate(
+                    candidates,
+                    name=(
+                        f"deep_research_funding_dislocation_trend_carry_{tf_tag}_"
+                        f"{spec['variant']}_{int(spec['mid_lookback_bars'])}_"
+                        f"{float(spec['signal_threshold']):.2f}"
+                    ),
+                    family="deep_research_leaf",
+                    strategy_class="FundingDislocationTrendCarryStrategy",
+                    timeframe=timeframe,
+                    symbols=crypto_symbols,
+                    params=params,
+                    notes=(
+                        "Desktop deep-research leaf: cross-sectional trend-carry score using "
+                        "multi-horizon momentum, funding/basis dislocation, and OI/crowding "
+                        f"penalty for {timeframe} ({spec['variant']})."
+                    ),
+                    tags=(
+                        "deep_research_report_20260608",
+                        "leaf_alpha",
+                        "trend",
+                        "carry",
+                        "funding",
+                        "derivatives",
+                    ),
+                    metadata={
+                        **shared_metadata,
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": "crypto_excluding_metals",
+                        "requires_perp_feature_points": True,
+                        "data_dependent": True,
+                    },
+                )
+
+    for timeframe in ctx._present("1h", "4h"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _DEEP_RESEARCH_VOL_MANAGED_MOMENTUM_SLICE.get(timeframe, ()):
+            params = {
+                "momentum_lookback_bars": int(spec["momentum_lookback_bars"]),
+                "rebalance_bars": int(spec["rebalance_bars"]),
+                "vol_window": int(spec["vol_window"]),
+                "target_vol": float(spec["target_vol"]),
+                "max_leverage": float(spec["max_leverage"]),
+                "signal_threshold": float(spec["signal_threshold"]),
+                "max_longs": int(spec["max_longs"]),
+                "max_shorts": int(spec["max_shorts"]),
+                "crash_window_bars": int(spec["crash_window_bars"]),
+                "crash_return_pct": float(spec["crash_return_pct"]),
+                "vol_ratio_window": int(spec["vol_ratio_window"]),
+                "vol_ratio_max": float(spec["vol_ratio_max"]),
+                "stress_reduce": float(spec["stress_reduce"]),
+                "allow_short": bool(spec["allow_short"]),
+            }
+            _add_candidate(
+                candidates,
+                name=(
+                    f"deep_research_vol_managed_momentum_crash_gate_{tf_tag}_"
+                    f"{spec['variant']}_{int(spec['momentum_lookback_bars'])}_"
+                    f"{float(spec['target_vol']):.3f}"
+                ),
+                family="deep_research_leaf",
+                strategy_class="VolManagedMomentumCrashGateStrategy",
+                timeframe=timeframe,
+                symbols=crypto_symbols,
+                params=params,
+                notes=(
+                    "Desktop deep-research leaf: volatility-managed cross-sectional momentum "
+                    "with benchmark crash/volatility gate and bounded leverage."
+                ),
+                tags=(
+                    "deep_research_report_20260608",
+                    "leaf_alpha",
+                    "momentum",
+                    "volatility_targeting",
+                    "crash_gate",
+                ),
+                metadata={
+                    **shared_metadata,
+                    "timeframe": timeframe,
+                    "retune_profile": str(spec["variant"]),
+                    "symbol_scope": "crypto_excluding_metals",
+                },
+            )
+
+    flow_symbols = tuple(
+        symbol for symbol in _DEEP_RESEARCH_FLOW_MAJOR_SYMBOLS if symbol in ctx.normalized_symbols
+    )
+    if ctx.perp_support_data_available and flow_symbols:
+        for timeframe in ctx._present("5m", "15m"):
+            tf_tag = timeframe.replace("/", "-")
+            for spec in _DEEP_RESEARCH_FLOW_IMBALANCE_LIQUIDATION_SLICE.get(timeframe, ()):
+                params = {
+                    "window": int(spec["window"]),
+                    "entry_score": float(spec["entry_score"]),
+                    "exit_score": float(spec["exit_score"]),
+                    "liquidation_z_min": float(spec["liquidation_z_min"]),
+                    "return_shock_pct": float(spec["return_shock_pct"]),
+                    "max_spread_bps": float(spec["max_spread_bps"]),
+                    "max_hold_bars": int(spec["max_hold_bars"]),
+                    "stop_loss_pct": float(spec["stop_loss_pct"]),
+                    "allow_short": bool(spec["allow_short"]),
+                }
+                _add_candidate(
+                    candidates,
+                    name=(
+                        f"deep_research_flow_imbalance_liquidation_sweep_{tf_tag}_"
+                        f"{spec['variant']}_{int(spec['window'])}_"
+                        f"{float(spec['entry_score']):.2f}"
+                    ),
+                    family="deep_research_leaf",
+                    strategy_class="FlowImbalanceLiquidationSweepStrategy",
+                    timeframe=timeframe,
+                    symbols=flow_symbols,
+                    params=params,
+                    notes=(
+                        "Desktop deep-research leaf: major-asset order-flow/liquidation sweep "
+                        "sleeve using taker imbalance, depth/BBO quality, and liquidation flush "
+                        f"confirmation for {timeframe} ({spec['variant']})."
+                    ),
+                    tags=(
+                        "deep_research_report_20260608",
+                        "leaf_alpha",
+                        "order_flow",
+                        "liquidation",
+                        "microstructure",
+                    ),
+                    metadata={
+                        **shared_metadata,
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": "major_crypto_only",
+                        "requires_perp_feature_points": True,
+                        "initial_gross_cap_hint": 0.15,
                     },
                 )
 
