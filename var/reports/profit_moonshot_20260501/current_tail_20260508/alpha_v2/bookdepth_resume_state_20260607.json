@@ -1,0 +1,192 @@
+{
+  "abort_audit": {
+    "note": "After the latest aborted BNB backfill attempt, no *.tmp.parquet files were found. BNB partial progress advanced and is included below.",
+    "tmp_parquet_files_present": false
+  },
+  "active_goal": "Complete the durable ultragoal plan in .gjc/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .gjc/ultragoal/ledger.jsonl as the audit trail.",
+  "backfill_optimization_plan": [
+    "Add resume manifest/skip logic so already-complete symbol-days are not re-downloaded or re-upserted.",
+    "Stream hourly samples from ZIP CSV directly (already added) and avoid loading raw daily files into Polars unless cadence_seconds is absent.",
+    "Batch sampled rows per symbol-month and write/merge fewer parquet partitions instead of one upsert per symbol-day.",
+    "Optionally parallelize by symbol with bounded concurrency after manifest locking is added.",
+    "Keep checksum/source metadata per archive so reruns can audit provenance without repeating downloads."
+  ],
+  "book_depth_coverage_2025_01_01_to_2026_05_31": {
+    "BNBUSDT": {
+      "first": "2025-01-01T00:00:00+00:00",
+      "first_missing": "2025-03-12",
+      "last": "2026-05-31T23:00:00+00:00",
+      "last_missing": "2026-04-30",
+      "missing_days": 0,
+      "resume_command": "uv run python scripts/backfill_binance_public_book_depth_history.py --db-path data/market_parquet --symbols BNBUSDT --start-date 2025-03-12 --end-date 2026-04-30 --cadence-seconds 3600 --retries 1 --base-wait-sec 0.1",
+      "rows": 12384,
+      "status": "complete"
+    },
+    "BTCUSDT": {
+      "first": "2025-01-01T00:00:00+00:00",
+      "last": "2026-05-31T23:00:00+00:00",
+      "missing_days": 0,
+      "rows": 12384,
+      "status": "complete"
+    },
+    "ETHUSDT": {
+      "first": "2025-01-01T00:00:00+00:00",
+      "last": "2026-05-31T23:00:00+00:00",
+      "missing_days": 0,
+      "rows": 12384,
+      "status": "complete"
+    },
+    "SOLUSDT": {
+      "first": "2025-01-01T00:00:00+00:00",
+      "first_missing": "2026-01-14",
+      "last": "2026-05-31T23:00:00+00:00",
+      "last_missing": "2026-01-14",
+      "missing_days": 1,
+      "rows": 12360,
+      "source_gap_note": "Official Binance public bookDepth archive missing for 2026-01-14; targeted retry returned missing archive.",
+      "status": "partial_source_gap"
+    },
+    "TRXUSDT": {
+      "first": "2026-05-01T00:00:00+00:00",
+      "first_missing": "2026-01-14",
+      "last": "2026-05-31T23:00:00+00:00",
+      "last_missing": "2026-01-14",
+      "missing_days": 1,
+      "resume_command": "uv run python scripts/backfill_binance_public_book_depth_history.py --db-path data/market_parquet --symbols TRXUSDT --start-date 2025-01-01 --end-date 2026-04-30 --cadence-seconds 3600 --retries 1 --base-wait-sec 0.1",
+      "rows": 12360,
+      "source_gap_note": "Official Binance public bookDepth archive missing for 2026-01-14; targeted retry returned missing archive.",
+      "status": "partial_source_gap"
+    }
+  },
+  "corrected_feature_root_discovery": {
+    "aggregate": {
+      "annualized_oos_return_approx": 0.19447238595258676,
+      "compounded_oos_return": 0.07685372382286593,
+      "monthly_equity_mdd": 0.052816115068317626,
+      "monthly_sharpe_approx": 1.0620437135488816,
+      "positive_oos_folds": "3/5"
+    },
+    "command": "uv run python scripts/research/run_alpha_zoo_clean_new_alpha_discovery.py --feature-root data/market_parquet/feature_points/exchange=binance --max-folds 5 --max-candidates-per-fold 500",
+    "correction": "Previous explicit --feature-root data/market_parquet did not load feature parquet rows; clean runner expects feature_root/symbol=..., so the correct Binance feature root is data/market_parquet/feature_points/exchange=binance.",
+    "feature_backed_candidate_rows": 442,
+    "feature_candidate_families": {
+      "feature_book_depth_imbalance_reversal": 148,
+      "feature_taker_flow_exhaustion_reversal": 294
+    },
+    "promotion": "no_promotion",
+    "remaining_blockers": [
+      "selected rows have validation sample/spike rejection reasons",
+      "fresh-forward still required before paper/testnet",
+      "real_money_execution remains false"
+    ],
+    "selected_feature_rows": [
+      "2026-04 ETHUSDT feature_taker_flow_exhaustion_reversal",
+      "2026-05 ETHUSDT feature_taker_flow_exhaustion_reversal"
+    ]
+  },
+  "coverage_rationale": {
+    "current_fold_need": "Bounded five-fold research uses train/validation windows spanning 2025-01-01 through 2026-05-31. Depth features must cover those historical bars before feature_book_depth_imbalance_reversal can be fairly selected.",
+    "why_not_optional": "Without coverage, the family is skipped/fail-closed; using partial May-2026-only data would be a lookback/availability artifact rather than a clean train-validation signal.",
+    "why_required": "The clean runner allows feature-backed families only when feature_valid coverage is >=60% in both train and validation. This prevents sparse post-hoc features from entering selection and creating biased OOS-looking signals."
+  },
+  "created_at_utc": "2026-06-07T10:31:00Z",
+  "current_blockers": [
+    "Backfill sufficient bookDepth train/validation coverage for all core symbols.",
+    "Rerun depth-aware clean discovery after coverage.",
+    "No real-money or paper promotion; current research remains no-promotion."
+  ],
+  "do_not_complete_goal": true,
+  "implemented_files": [
+    "scripts/backfill_binance_public_book_depth_history.py",
+    "tests/test_backfill_binance_public_book_depth_history.py",
+    "scripts/backfill_binance_public_book_ticker_history.py",
+    "tests/test_backfill_binance_public_book_ticker_history.py",
+    "scripts/import_binance_book_ticker_history.py",
+    "tests/test_import_binance_book_ticker_history.py",
+    "scripts/research/run_alpha_zoo_clean_new_alpha_discovery.py",
+    "src/lumina_quant/market_data.py",
+    "src/lumina_quant/data/feature_points.py",
+    "docs/research_note/research_note.md"
+  ],
+  "latest_coverage_audit_after_resume": {
+    "BNBUSDT": {
+      "days": 516,
+      "missing_days": 0,
+      "rows": 12384
+    },
+    "BTCUSDT": {
+      "days": 516,
+      "missing_days": 0,
+      "rows": 12384
+    },
+    "ETHUSDT": {
+      "days": 516,
+      "missing_days": 0,
+      "rows": 12384
+    },
+    "SOLUSDT": {
+      "days": 515,
+      "first_missing": "2026-01-14",
+      "missing_days": 1,
+      "rows": 12360
+    },
+    "TRXUSDT": {
+      "days": 515,
+      "first_missing": "2026-01-14",
+      "missing_days": 1,
+      "rows": 12360
+    }
+  },
+  "latest_depth_aware_clean_discovery_after_resume": {
+    "command": "uv run python scripts/research/run_alpha_zoo_clean_new_alpha_discovery.py --feature-root data/market_parquet --max-folds 5 --max-candidates-per-fold 500",
+    "compounded_oos_return": -0.0023853868449449367,
+    "monthly_equity_mdd": 0.08716671516123264,
+    "monthly_sharpe_approx": 0.0386242684900772,
+    "positive_oos_folds": "3/5",
+    "promotion": "no_promotion"
+  },
+  "latest_depth_aware_clean_discovery_after_source_gap_audit": {
+    "command": "uv run python scripts/research/run_alpha_zoo_clean_new_alpha_discovery.py --feature-root data/market_parquet --max-folds 5 --max-candidates-per-fold 500",
+    "compounded_oos_return": -0.0023853868449449367,
+    "monthly_equity_mdd": 0.08716671516123264,
+    "monthly_sharpe_approx": 0.0386242684900772,
+    "positive_oos_folds": "3/5",
+    "promotion": "no_promotion"
+  },
+  "latest_good_verification": {
+    "command": "uv run ruff format --check ... && uv run ruff check ... && uv run python -m pytest -q ... && uv run python scripts/verify_docs.py",
+    "note": "This was before the last aborted BNB import; after abort, temp parquet audit found no *.tmp.parquet files.",
+    "result": "29 passed; docs verify 119 markdown files checked"
+  },
+  "next_steps": [
+    "Treat SOLUSDT/TRXUSDT 2026-01-14 as an official archive source gap unless another approved source is added.",
+    "Do not promote; depth-aware clean discovery remains -0.24% OOS comp / 8.72% monthly-equity MDD / Sharpe 0.04 / hit 3/5.",
+    "Continue only with new pre-registered clean information sources or source-gap resolution; do not tune historical OOS selector/grid to improve this lineage."
+  ],
+  "official_source_gap_audit_2026_01_14": {
+    "daily_listing": "Official Binance public-data daily bookDepth listings omit 2026-01-14; SOLUSDT listing jumps 2026-01-13 to 2026-01-15, TRXUSDT targeted daily URL also returns missing.",
+    "decision": "No synthetic/interpolated feature rows were inserted; remaining gaps stay audited source gaps.",
+    "monthly_fallback": "https://data.binance.vision/data/futures/um/monthly/bookDepth/{SYMBOL}/{SYMBOL}-bookDepth-2026-01.zip returns HTTP 404 for SOLUSDT and TRXUSDT.",
+    "symbols": [
+      "SOLUSDT",
+      "TRXUSDT"
+    ]
+  },
+  "optuna_hybrid_performance_followup": {
+    "artifact": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_optuna_hybrid_refit_20260530/alpha_zoo_69_asset_optuna_hybrid_refit_latest.json",
+    "command": "uv run python scripts/research/run_alpha_zoo_69_asset_optuna_hybrid_refit.py --symbols BTCUSDT,ETHUSDT,SOLUSDT,BNBUSDT,TRXUSDT,XRPUSDT,DOGEUSDT,ADAUSDT,AVAXUSDT,TONUSDT --timeframes 1h,4h --max-hybrid-streams 32 --max-streams-per-symbol 2 --n-trials 160 --seed 20260608",
+    "decision": "Use Optuna hybrid as the performance lane; clean locked-OOS discovery remains research/no-promotion diagnostic until fresh-forward and fill telemetry.",
+    "ready_for_paper": true,
+    "ready_for_real": false,
+    "real_money_execution": false,
+    "selected_hybrid_status": "optimized",
+    "train_max_drawdown": 0.04895698851867436,
+    "train_total_return": 0.19496225723721383,
+    "validation_max_drawdown": 0.015112782866078311,
+    "validation_sharpe": 9.073815381044689,
+    "validation_total_return": 0.1855025027749766,
+    "validation_trade_event_count": 359
+  },
+  "purpose": "Resume state for Binance bookDepth-backed clean new-alpha research after aborted BNB import attempts.",
+  "updated_at_utc": "2026-06-08Tpost-optuna-performance-followup"
+}

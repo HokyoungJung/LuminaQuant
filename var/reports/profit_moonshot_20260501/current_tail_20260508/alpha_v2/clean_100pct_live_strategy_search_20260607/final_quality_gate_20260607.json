@@ -10,7 +10,8 @@
     "Latest BBO accumulation recheck (2026-06-07T10:32:06.564484Z) used inferred candidate_cap=500 and left feature-bounded OOS unchanged at -0.24% comp / -0.57% annualized; no promotion flags changed.",
     "Historical BBO ingest adapter is now plumbing-ready for explicitly approved external Binance BBO history files, but it does not approve any source/vendor and does not change the no-real-money decision without a new clean walk-forward rerun.",
     "Official Binance public bookTicker archive backfill is now implemented and locally verified, but it is data plumbing only: approved symbol/date manifest, new clean walk-forward, and paper fill/cost telemetry are still required before any deployment review.",
-    "Actual official Binance bookTicker smoke backfill imported 2024-03-30 core5 five-minute BBO rows and the post-backfill cap=500 rerun remained unchanged/rejected; broader train/validation historical BBO coverage is still the next blocker."
+    "Actual official Binance bookTicker smoke backfill imported 2024-03-30 core5 five-minute BBO rows and the post-backfill cap=500 rerun remained unchanged/rejected; broader train/validation historical BBO coverage is still the next blocker.",
+    "Official Binance public-data bookTicker coverage currently appears to stop at 2024-03-30 for BTCUSDT daily archives; a 2025-12 core5 probe returned all missing, so current 2025-2026 fold BBO research needs a post-2024 source decision or earlier-window manifest."
   ],
   "final_reviews": {
     "ai_slop_cleaner": "not invoked because no cleanup/refactor/code-structure change was made; only report/provenance artifacts are being reconciled.",
@@ -21,7 +22,7 @@
     "g008_reverification": "PASS_WITH_G008_WATCH_AND_HIDDEN_GOAL_BLOCKER; see final_independent_review_20260607/g008_final_reverification_summary_20260607.json"
   },
   "generated_at_utc": "2026-06-07T07:13:46.900714+00:00",
-  "last_reverified_at_utc": "2026-06-07T11:09:51Z",
+  "last_reverified_at_utc": "2026-06-07T11:12:24Z",
   "last_reviewed_at_utc": "2026-06-07T10:08:34+00:00",
   "outputs": [
     "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/clean_100pct_live_strategy_search_20260607/final_report_clean_100pct_live_strategy_search_20260607.md",
@@ -157,6 +158,11 @@
       "name": "official_bbo_smoke_backfill_and_post_rerun",
       "status": "pass_no_promotion",
       "evidence": "Backfilled BTC/ETH/SOL/BNB/TRX 2024-03-30 official bookTicker archives with cadence_seconds=300 -> 1,440 persisted rows; support inventory BBO rows now BTC 1029, ETH 1043, SOL 1034, BNB 1004, TRX 988; post-backfill cap=500 clean discovery generated 2026-06-07T11:08:08.338686Z and remained -0.24% OOS comp / -0.57% annualized / promotion false; final focused verification: Ruff/pytest/docs pass (22 tests, 119 markdown files)."
+    },
+    {
+      "name": "official_bbo_coverage_window_audit",
+      "status": "blocked_for_current_window",
+      "evidence": "Official BTCUSDT daily bookTicker listing currently shows latest 2024-03-30 archive; 2025-12-01..2025-12-07 core5 probe returned 35 missing archives; current bounded folds need 2025-01-01..2026-05-31 train/validation BBO coverage."
     }
   ]
 }

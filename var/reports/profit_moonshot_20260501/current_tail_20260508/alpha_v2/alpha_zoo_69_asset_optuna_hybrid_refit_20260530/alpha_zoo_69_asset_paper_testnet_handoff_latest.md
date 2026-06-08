@@ -12,21 +12,21 @@ Status: backtest-gated paper/testnet challenger only. Real-money remains blocked
 
 ## Backtest evidence
 
-- train return: `9.0960%`
-- validation return: `8.5640%`
-- validation MDD: `0.6934%`
-- train/validation RPT proxy: `10.960323416727334` / `31.837053294540155` bps
-- component trade events train/validation: `9613` / `3789`
+- train return: `19.4962%`
+- validation return: `18.5503%`
+- validation MDD: `1.5113%`
+- train/validation RPT proxy: `30.47952168166796` / `237.95139403615903` bps
+- component trade events train/validation: `3121` / `359`
 - liquidation/account wipeout train/validation: `0`/`0` and `0`/`0`
 
 ## Concentration evidence
 
-- total weighted notional fraction: `0.26098143962555787`
-- top symbol: `TONUSDT` at `16.27%`
-- top asset group: `crypto_core` at `49.91%`
-- effective symbol count: `11.59`
-- validation long/short exposure share: `0.5206173221349235` / `0.4793826778650765`
-- concentration flags: `[]`
+- total weighted notional fraction: `0.32501398462185427`
+- top symbol: `TONUSDT` at `33.18%`
+- top asset group: `crypto_core` at `100.00%`
+- effective symbol count: `4.99`
+- validation long/short exposure share: `0.38775553391611917` / `0.612244466083881`
+- concentration flags: `['top_asset_group_share_above_70pct']`
 
 ## Required before any live/real transition
 

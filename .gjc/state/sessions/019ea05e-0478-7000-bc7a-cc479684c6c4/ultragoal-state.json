@@ -1,0 +1,62 @@
+{
+  "skill": "ultragoal",
+  "status": "active",
+  "current_phase": "active",
+  "active": true,
+  "goals": [
+    {
+      "id": "G001",
+      "title": "# Pending Approval Plan — Clean New-Alpha Discovery Without Post-OOS Trust",
+      "status": "active"
+    },
+    {
+      "id": "G002",
+      "title": "Accumulate Binance BBO history",
+      "status": "pending"
+    },
+    {
+      "id": "G003",
+      "title": "Resolve historical Binance BBO source gap",
+      "status": "pending"
+    }
+  ],
+  "counts": {
+    "pending": 2,
+    "active": 1,
+    "complete": 0,
+    "failed": 0,
+    "blocked": 0,
+    "review_blocked": 0,
+    "superseded": 0
+  },
+  "ledger_path": "/home/hoky/Quants-agent/LuminaQuant/.gjc/ultragoal/ledger.jsonl",
+  "brief_path": "/home/hoky/Quants-agent/LuminaQuant/.gjc/ultragoal/brief.md",
+  "goals_path": "/home/hoky/Quants-agent/LuminaQuant/.gjc/ultragoal/goals.json",
+  "version": 2,
+  "updated_at": "2026-06-07T10:49:58.156Z",
+  "receipt": {
+    "version": 1,
+    "skill": "ultragoal",
+    "owner": "gjc-runtime",
+    "command": "gjc ultragoal (reconcile)",
+    "state_path": "/home/hoky/Quants-agent/LuminaQuant/.gjc/state/sessions/019ea05e-0478-7000-bc7a-cc479684c6c4/skill-active-state.json",
+    "storage_path": "/home/hoky/Quants-agent/LuminaQuant/.gjc/state/sessions/019ea05e-0478-7000-bc7a-cc479684c6c4/ultragoal-state.json",
+    "mutated_at": "2026-06-07T10:49:58.156Z",
+    "fresh_until": "2026-06-07T11:19:58.156Z",
+    "status": "fresh",
+    "mutation_id": "ultragoal:reconcile:2026-06-07T10:49:58.156Z",
+    "verb": "reconcile",
+    "forced": true,
+    "from_phase": "active",
+    "to_phase": "active",
+    "content_sha256": {
+      "algorithm": "sha256",
+      "value": "4414fa427e37cb9c80256724b7a175ce7530d23ad78222fb681c8e81101c3316",
+      "covered_path": "/home/hoky/Quants-agent/LuminaQuant/.gjc/state/sessions/019ea05e-0478-7000-bc7a-cc479684c6c4/ultragoal-state.json",
+      "computed_at": "2026-06-07T10:49:58.157Z"
+    }
+  },
+  "session_id": "019ea05e-0478-7000-bc7a-cc479684c6c4",
+  "active_goal_id": "G001",
+  "gjc_objective": "Complete the durable ultragoal plan in .gjc/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .gjc/ultragoal/ledger.jsonl as the audit trail."
+}

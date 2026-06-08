@@ -57,6 +57,9 @@ _FEATURE_COLUMNS = (
     "best_ask_quantity",
     "bbo_mid_price",
     "bbo_spread_bps",
+    "book_depth_bid_notional_1pct",
+    "book_depth_ask_notional_1pct",
+    "book_depth_imbalance_1pct",
 )
 
 

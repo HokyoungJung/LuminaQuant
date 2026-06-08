@@ -76,6 +76,11 @@
       "name": "official_bbo_smoke_backfill_and_post_rerun",
       "status": "pass_no_promotion",
       "evidence": "Backfilled BTC/ETH/SOL/BNB/TRX 2024-03-30 official bookTicker archives with cadence_seconds=300 -> 1,440 persisted rows; support inventory BBO rows now BTC 1029, ETH 1043, SOL 1034, BNB 1004, TRX 988; post-backfill cap=500 clean discovery generated 2026-06-07T11:08:08.338686Z and remained -0.24% OOS comp / -0.57% annualized / promotion false; final focused verification: Ruff/pytest/docs pass (22 tests, 119 markdown files)."
+    },
+    {
+      "name": "official_bbo_coverage_window_audit",
+      "status": "blocked_for_current_window",
+      "evidence": "Official BTCUSDT daily bookTicker listing currently shows latest 2024-03-30 archive; 2025-12-01..2025-12-07 core5 probe returned 35 missing archives; current bounded folds need 2025-01-01..2026-05-31 train/validation BBO coverage."
     }
   ],
   "code_reviewer": "APPROVE",
@@ -89,7 +94,7 @@
     "team": "read-only-final-re-re-4a549153"
   },
   "deployment_conclusion": "no_real_money; no_small_sleeve; 0pct_allocation_or_paper_control_only",
-  "generated_at_utc": "2026-06-07T11:09:51Z",
+  "generated_at_utc": "2026-06-07T11:12:24Z",
   "hidden_goal_snapshot": "wrong completed legacy latency objective; saved in fresh_get_goal_after_g008_review.json",
   "latest_bbo_accumulation_recheck": {
     "aggregate": {
@@ -329,5 +334,26 @@
       "fold_count": 5,
       "decision_impact": "unchanged_no_promotion; one historical day validates ingestion path but does not provide enough train/validation coverage to alter selection"
     }
+  },
+  "official_bbo_coverage_window_audit": {
+    "status": "coverage_mismatch_for_current_folds",
+    "checked_at_utc": "2026-06-07T11:12:24Z",
+    "official_prefix": "https://data.binance.vision/?prefix=data/futures/um/daily/bookTicker/BTCUSDT/",
+    "observed_latest_daily_btcusdt_listing": "BTCUSDT-bookTicker-2024-03-30.zip",
+    "failed_current_window_probe": {
+      "date_range": "2025-12-01..2025-12-07",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT"
+      ],
+      "requested_symbol_days": 35,
+      "imported_archive_count": 0,
+      "missing_archive_count": 35
+    },
+    "current_fold_window_requirement": "2025-01-01 through 2026-05-31 train/validation coverage for the bounded clean discovery windows",
+    "decision_impact": "official public archive proves ingestion path but cannot satisfy current fold BBO coverage; resolve post-2024 BBO source or define an earlier BBO-specific manifest before rerunning for promotion evidence"
   }
 }

@@ -1,0 +1,26 @@
+{
+  "run_id": "2026-06-07-0457-b89b",
+  "skill": "ralplan",
+  "active": true,
+  "current_phase": "planner",
+  "version": 2,
+  "updated_at": "2026-06-07T04:57:35.392Z",
+  "receipt": {
+    "version": 1,
+    "skill": "ralplan",
+    "owner": "gjc-runtime",
+    "command": "gjc ralplan persist-run-id",
+    "state_path": "/home/hoky/Quants-agent/LuminaQuant/.gjc/state/skill-active-state.json",
+    "storage_path": "/home/hoky/Quants-agent/LuminaQuant/.gjc/state/ralplan-state.json",
+    "mutated_at": "2026-06-07T04:57:35.392Z",
+    "fresh_until": "2026-06-07T05:27:35.392Z",
+    "status": "fresh",
+    "mutation_id": "ralplan:2026-06-07T04:57:35.392Z",
+    "content_sha256": {
+      "algorithm": "sha256",
+      "value": "01d545af26d8cda250254999100bf9eabeebf47ad8132e5755fde5c878e11637",
+      "covered_path": "/home/hoky/Quants-agent/LuminaQuant/.gjc/state/ralplan-state.json",
+      "computed_at": "2026-06-07T04:57:35.393Z"
+    }
+  }
+}

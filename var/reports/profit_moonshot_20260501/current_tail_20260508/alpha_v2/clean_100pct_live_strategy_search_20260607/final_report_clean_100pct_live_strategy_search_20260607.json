@@ -160,7 +160,7 @@
       "Historical incumbent metrics must be read with source lineage: source artifact reports 209.00% annualized / 156.03% compounded; locked-OOS/cost verifier fixed-blend aggregation reports 160.90% / 122.36% under the same candidate id. Both are paper/control only and cannot be used as live expected return."
     ]
   },
-  "last_reverified_at_utc": "2026-06-07T11:09:51Z",
+  "last_reverified_at_utc": "2026-06-07T11:12:24Z",
   "last_reviewed_at_utc": "2026-06-07T10:08:34+00:00",
   "latest_bbo_accumulation_recheck": {
     "aggregate": {
@@ -177,7 +177,7 @@
     "candidate_rows": 2500,
     "checked_at_utc": "2026-06-07T11:09:51Z",
     "clean_promotion_eligible": false,
-    "decision_impact": "unchanged_rejected; official one-day BBO archive smoke backfill plus rerun did not improve clean train/validation-first OOS result",
+    "decision_impact": "unchanged_rejected; official one-day BBO smoke backfill plus rerun did not improve clean OOS, and official public-data coverage currently does not reach the 2025-2026 fold windows",
     "fold_count": 5,
     "historical_bbo_ingest_adapter": {
       "decision_impact": "no_change_to_cap500_clean_oos_result; no vendor/source approved; no real_money_unlock_without_new_clean_walk_forward",
@@ -308,6 +308,27 @@
           "fold_count": 5,
           "decision_impact": "unchanged_no_promotion; one historical day validates ingestion path but does not provide enough train/validation coverage to alter selection"
         }
+      },
+      "current_window_coverage_audit": {
+        "status": "coverage_mismatch_for_current_folds",
+        "checked_at_utc": "2026-06-07T11:12:24Z",
+        "official_prefix": "https://data.binance.vision/?prefix=data/futures/um/daily/bookTicker/BTCUSDT/",
+        "observed_latest_daily_btcusdt_listing": "BTCUSDT-bookTicker-2024-03-30.zip",
+        "failed_current_window_probe": {
+          "date_range": "2025-12-01..2025-12-07",
+          "symbols": [
+            "BTC/USDT",
+            "ETH/USDT",
+            "SOL/USDT",
+            "BNB/USDT",
+            "TRX/USDT"
+          ],
+          "requested_symbol_days": 35,
+          "imported_archive_count": 0,
+          "missing_archive_count": 35
+        },
+        "current_fold_window_requirement": "2025-01-01 through 2026-05-31 train/validation coverage for the bounded clean discovery windows",
+        "decision_impact": "official public archive proves ingestion path but cannot satisfy current fold BBO coverage; resolve post-2024 BBO source or define an earlier BBO-specific manifest before rerunning for promotion evidence"
       }
     }
   },
@@ -365,6 +386,10 @@
     "public_book_ticker_archive_backfill": {
       "status": "pass",
       "evidence": "uv run ruff check import/backfill BBO scripts and tests -> All checks passed; uv run ruff format --check import/backfill BBO scripts and tests -> 4 files already formatted; PYTHONPATH=. uv run pytest -q tests/test_import_binance_book_ticker_history.py tests/test_backfill_binance_public_book_ticker_history.py -> 8 passed in 0.16s; curl -I official BTCUSDT 2024-03-30 archive URL -> HTTP/2 200 application/zip; actual 2024-03-30 core5 smoke backfill persisted 1,440 five-minute BBO rows; post-backfill cap=500 rerun generated 2026-06-07T11:08:08.338686Z and stayed -0.24% comp / -0.57% annualized / no promotion; final focused verification -> 22 passed; docs verification -> 119 markdown files checked."
+    },
+    "official_bbo_coverage_window_audit": {
+      "status": "blocked_for_current_window",
+      "evidence": "Official BTCUSDT daily bookTicker listing currently shows latest 2024-03-30 archive; 2025-12-01..2025-12-07 core5 probe returned 35 missing archives; current bounded folds need 2025-01-01..2026-05-31 train/validation BBO coverage."
     }
   }
 }

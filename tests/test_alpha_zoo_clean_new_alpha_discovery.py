@@ -72,9 +72,12 @@ def test_search_space_hash_is_stable_and_excludes_oos_results() -> None:
         "deep_research_funding_dislocation_trend_carry",
         "deep_research_vol_managed_momentum_crash_gate",
         "deep_research_flow_imbalance_liquidation_sweep",
+        "indicator_vwap_atr_bollinger_reversion",
+        "indicator_kalman_volatility_trend",
+        "standardized_indicator_ridge_directional",
     ]
     assert first == second
-    assert first == "d92dce2b046441bcf1a7a7ebfa5499844b418a52d6d2416fefad491458967312"
+    assert first == "ee6ecd539a6b5a8c078bd0e39f22ef0bb483d10e1ecbf97236c51b9a6fb087e8"
 
 
 def test_lead_lag_family_is_covered_and_flat_split_labeled() -> None:
@@ -344,6 +347,58 @@ def test_deep_research_report_rows_are_gated_and_report_only() -> None:
     assert {row["uses_locked_oos_for_selection"] for row in rows} == {False}
     assert {row["real_money_execution"] for row in rows} == {False}
     assert {row["clean_promotion_eligible"] for row in rows} == {False}
+
+
+def test_indicator_and_train_only_ml_rows_are_report_only() -> None:
+    datetimes = pd.date_range("2025-01-01", periods=520, freq="h")
+    base = np.linspace(100.0, 140.0, len(datetimes))
+    wave = 3.0 * np.sin(np.linspace(0.0, 18.0, len(datetimes)))
+    close = base + wave
+    high_spread = 1.005 + 0.002 * np.sin(np.linspace(0.0, 13.0, len(datetimes)))
+    low_spread = 0.995 - 0.002 * np.cos(np.linspace(0.0, 11.0, len(datetimes)))
+    frame = pd.DataFrame(
+        {
+            "datetime": datetimes,
+            "open": close,
+            "high": close * high_spread,
+            "low": close * low_spread,
+            "close": close,
+            "volume": 1000.0 + 50.0 * np.cos(np.linspace(0.0, 21.0, len(datetimes))),
+        }
+    )
+
+    class Fold:
+        train = (datetimes[0], datetimes[359])
+        validation = (datetimes[360], datetimes[459])
+        locked_oos = (datetimes[460], datetimes[-1])
+
+    kwargs = {
+        "frame": frame,
+        "symbol": "BTCUSDT",
+        "timeframe": "1h",
+        "fold": Fold(),
+        "leverages": (2,),
+        "allocation_fraction": 0.1,
+    }
+    rows = (
+        module._indicator_vwap_atr_bollinger_reversion_rows(**kwargs)
+        + module._indicator_kalman_volatility_trend_rows(**kwargs)
+        + module._standardized_indicator_ridge_directional_rows(**kwargs)
+    )
+
+    families = {row["family"] for row in rows}
+    assert "indicator_vwap_atr_bollinger_reversion" in families
+    assert "indicator_kalman_volatility_trend" in families
+    assert "standardized_indicator_ridge_directional" in families
+    assert {row["uses_locked_oos_for_selection"] for row in rows} == {False}
+    assert {row["real_money_execution"] for row in rows} == {False}
+    assert {row["clean_promotion_eligible"] for row in rows} == {False}
+    ml_rows = [row for row in rows if row["family"] == "standardized_indicator_ridge_directional"]
+    assert ml_rows
+    assert {row["uses_ml"] for row in ml_rows} == {True}
+    assert {row["ml_fit_scope"] for row in ml_rows} == {"train_only"}
+    assert {row["standardization_scope"] for row in ml_rows} == {"train_only"}
+    assert {row["no_nested_oos_mining"] for row in ml_rows} == {True}
 
 
 def test_run_writes_policy_flags_with_synthetic_loader(monkeypatch, tmp_path: Path) -> None:

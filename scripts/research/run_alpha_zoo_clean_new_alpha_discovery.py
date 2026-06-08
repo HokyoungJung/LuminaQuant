@@ -111,6 +111,20 @@ FAMILY_DESCRIPTIONS: dict[str, str] = {
         "liquidation imbalance, taker-flow/depth confirmation, and spread-quality "
         "filters. Requires train/validation feature coverage."
     ),
+    "indicator_vwap_atr_bollinger_reversion": (
+        "Indicator leaf alpha: fade standardized VWAP/Bollinger dislocations only when "
+        "ATR and realized-volatility gates keep the setup inside a tradable 30m+ "
+        "mean-reversion regime."
+    ),
+    "indicator_kalman_volatility_trend": (
+        "Indicator leaf alpha: use a scalar Kalman price filter as an adaptive moving "
+        "average, then trade standardized filter slope with ATR/volatility gates."
+    ),
+    "standardized_indicator_ridge_directional": (
+        "Small ML-style leaf alpha: train-only standardized OHLCV indicator features "
+        "feed a bounded ridge directional score; train/validation select thresholds "
+        "and locked OOS remains report-only."
+    ),
 }
 
 
@@ -238,6 +252,29 @@ def _search_space() -> dict[str, Any]:
             "max_spread_bps": [8.0, 12.0],
             "min_hold": [4, 8],
         },
+        "indicator_vwap_atr_bollinger_reversion": {
+            "lookback": [24, 48],
+            "vwap_deviation_z": [1.25, 1.75],
+            "bollinger_z": [1.5, 2.0],
+            "max_atr_pct": [0.018, 0.028],
+            "min_hold": [4, 8],
+        },
+        "indicator_kalman_volatility_trend": {
+            "lookback": [24, 48],
+            "process_noise": [0.0005, 0.002],
+            "measurement_noise": [0.02, 0.08],
+            "slope_z_min": [0.25, 0.50],
+            "max_realized_vol": [0.018, 0.028],
+            "min_hold": [4, 8],
+        },
+        "standardized_indicator_ridge_directional": {
+            "feature_set": ["returns", "vwap", "bollinger", "atr", "kalman", "volume"],
+            "ridge_alpha": [1.0, 10.0],
+            "score_threshold": [0.0005, 0.0010],
+            "standardization_scope": "train_only",
+            "min_train_observations": 240,
+            "min_hold": [4, 8],
+        },
     }
 
 
@@ -347,6 +384,104 @@ def _split_feature_coverage(
         "validation": float(np.mean(valid[_window_mask(frame["datetime"], validation)])),
         "locked_oos": float(np.mean(valid[_window_mask(frame["datetime"], locked_oos)])),
     }
+
+
+def _true_range_pct(frame: pd.DataFrame) -> pd.Series:
+    high = frame["high"].astype(float).reset_index(drop=True)
+    low = frame["low"].astype(float).reset_index(drop=True)
+    close = frame["close"].astype(float).reset_index(drop=True)
+    prev_close = close.shift(1)
+    true_range = pd.concat(
+        [
+            high - low,
+            (high - prev_close).abs(),
+            (low - prev_close).abs(),
+        ],
+        axis=1,
+    ).max(axis=1, skipna=True)
+    return true_range / close.replace(0.0, np.nan)
+
+
+def _rolling_vwap(close: pd.Series, volume: pd.Series, lookback: int) -> pd.Series:
+    volume_clean = volume.astype(float).clip(lower=0.0)
+    notional = close.astype(float) * volume_clean
+    denom = volume_clean.rolling(lookback).sum().replace(0.0, np.nan)
+    return notional.rolling(lookback).sum() / denom
+
+
+def _kalman_log_price_filter(
+    close: pd.Series,
+    *,
+    process_noise: float,
+    measurement_noise: float,
+) -> pd.Series:
+    observations = np.log(close.astype(float).replace(0.0, np.nan)).to_numpy(dtype=float)
+    filtered = np.full(observations.shape, np.nan, dtype=float)
+    finite = np.flatnonzero(np.isfinite(observations))
+    if finite.size == 0:
+        return pd.Series(filtered, index=close.index)
+    state = float(observations[finite[0]])
+    covariance = 1.0
+    process_var = max(1e-12, float(process_noise) ** 2)
+    measurement_var = max(1e-12, float(measurement_noise) ** 2)
+    for idx, observation in enumerate(observations):
+        covariance += process_var
+        if math.isfinite(float(observation)):
+            gain = covariance / (covariance + measurement_var)
+            state = state + gain * (float(observation) - state)
+            covariance = (1.0 - gain) * covariance
+        filtered[idx] = state
+    return pd.Series(filtered, index=close.index)
+
+
+def _train_standardized_frame(
+    raw_features: pd.DataFrame,
+    train_mask: np.ndarray,
+) -> pd.DataFrame:
+    out = pd.DataFrame(index=raw_features.index)
+    train_mask = np.asarray(train_mask, dtype=bool)
+    for column in raw_features.columns:
+        values = pd.to_numeric(raw_features[column], errors="coerce")
+        train_values = values[train_mask & np.isfinite(values.to_numpy(dtype=float))]
+        mean = float(train_values.mean()) if len(train_values) else 0.0
+        std = float(train_values.std(ddof=1)) if len(train_values) > 1 else 0.0
+        if not math.isfinite(std) or std <= 1e-12:
+            out[column] = np.nan
+        else:
+            out[column] = (values - mean) / std
+    return out
+
+
+def _ridge_directional_score(
+    features: pd.DataFrame,
+    target: pd.Series,
+    train_mask: np.ndarray,
+    *,
+    ridge_alpha: float,
+    min_train_observations: int = 240,
+) -> pd.Series | None:
+    train_mask = np.asarray(train_mask, dtype=bool)
+    x_all = features.to_numpy(dtype=float)
+    y_all = target.to_numpy(dtype=float)
+    finite_rows = np.isfinite(x_all).all(axis=1) & np.isfinite(y_all)
+    train_rows = finite_rows & train_mask
+    if int(np.count_nonzero(train_rows)) < int(min_train_observations):
+        return None
+    x_train = x_all[train_rows]
+    y_train = y_all[train_rows]
+    x_train_design = np.column_stack([np.ones(x_train.shape[0]), x_train])
+    penalty = np.eye(x_train_design.shape[1], dtype=float) * max(0.0, float(ridge_alpha))
+    penalty[0, 0] = 0.0
+    lhs = x_train_design.T @ x_train_design + penalty
+    rhs = x_train_design.T @ y_train
+    try:
+        beta = np.linalg.solve(lhs, rhs)
+    except np.linalg.LinAlgError:
+        beta = np.linalg.lstsq(lhs, rhs, rcond=None)[0]
+    x_full = np.where(np.isfinite(x_all), x_all, 0.0)
+    score = np.column_stack([np.ones(x_full.shape[0]), x_full]) @ beta
+    score[~finite_rows] = np.nan
+    return pd.Series(score, index=features.index)
 
 
 def _attach_feature_points(
@@ -2164,6 +2299,357 @@ def _deep_research_flow_imbalance_liquidation_sweep_rows(
     return out
 
 
+def _indicator_vwap_atr_bollinger_reversion_rows(
+    *,
+    frame: pd.DataFrame,
+    symbol: str,
+    timeframe: str,
+    fold: monthly.MonthlyFold,
+    leverages: Sequence[int],
+    allocation_fraction: float,
+) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    if frame.empty:
+        return out
+    close = frame["close"].astype(float).reset_index(drop=True)
+    volume = frame["volume"].astype(float).reset_index(drop=True)
+    datetimes = frame["datetime"]
+    returns = close.pct_change(fill_method=None)
+    true_range_pct = _true_range_pct(frame)
+    for lookback in (24, 48):
+        vwap = _rolling_vwap(close, volume, lookback)
+        atr_pct = true_range_pct.rolling(lookback).mean()
+        realized_vol = returns.rolling(lookback).std(ddof=1)
+        middle = close.rolling(lookback).mean()
+        sigma = close.rolling(lookback).std(ddof=1).replace(0.0, np.nan)
+        bollinger_z = (close - middle) / sigma
+        vwap_deviation = close / vwap.replace(0.0, np.nan) - 1.0
+        vwap_deviation_z = broad69._rolling_zscore(vwap_deviation, lookback * 2)
+        for vwap_z_min in (1.25, 1.75):
+            for bollinger_z_min in (1.5, 2.0):
+                for max_atr_pct in (0.018, 0.028):
+                    volatility_ok = (atr_pct.shift(1) <= max_atr_pct) & (
+                        realized_vol.shift(1) <= max_atr_pct
+                    )
+                    long_entry = (
+                        (vwap_deviation_z.shift(1) <= -vwap_z_min)
+                        & (bollinger_z.shift(1) <= -bollinger_z_min)
+                        & volatility_ok
+                    )
+                    short_entry = (
+                        (vwap_deviation_z.shift(1) >= vwap_z_min)
+                        & (bollinger_z.shift(1) >= bollinger_z_min)
+                        & volatility_ok
+                    )
+                    long_exit = (
+                        (close >= vwap)
+                        | (bollinger_z > -0.25)
+                        | (atr_pct > max_atr_pct * 1.5)
+                    )
+                    short_exit = (
+                        (close <= vwap)
+                        | (bollinger_z < 0.25)
+                        | (atr_pct > max_atr_pct * 1.5)
+                    )
+                    for min_hold in (4, 8):
+                        signal = broad69._debounced_state_signal(
+                            long_entry,
+                            long_exit,
+                            short_entry,
+                            short_exit,
+                            side="long_short",
+                            min_hold_bars=min_hold,
+                            cooldown_bars=2,
+                        )
+                        for leverage in leverages:
+                            sim = broad69.simulate_symbol(
+                                frame,
+                                signal,
+                                integer_leverage=int(leverage),
+                                allocation_fraction=allocation_fraction,
+                            )
+                            base = _candidate_base(
+                                family="indicator_vwap_atr_bollinger_reversion",
+                                model_parts=(
+                                    "vwapatrbbrev",
+                                    timeframe,
+                                    symbol,
+                                    f"lb{lookback}",
+                                    f"vz{vwap_z_min}",
+                                    f"bb{bollinger_z_min}",
+                                    f"atr{max_atr_pct}",
+                                    f"hold{min_hold}",
+                                    f"lev{leverage}",
+                                ),
+                                symbol=symbol,
+                                timeframe=timeframe,
+                                side="long_short",
+                                lookback=lookback,
+                                threshold=vwap_z_min,
+                                exit_threshold=bollinger_z_min,
+                                min_hold=min_hold,
+                                leverage=int(leverage),
+                                allocation_fraction=allocation_fraction,
+                            )
+                            base["indicator_set"] = [
+                                "rolling_vwap",
+                                "atr_pct",
+                                "bollinger_z",
+                                "realized_volatility",
+                                "rolling_standardization",
+                            ]
+                            base["theory_plausibility_gate"] = "vwap_atr_bollinger_reversion"
+                            out.append(
+                                _finalize_row(
+                                    base=base,
+                                    sim=sim,
+                                    datetimes=datetimes,
+                                    timeframe=timeframe,
+                                    train=fold.train,
+                                    validation=fold.validation,
+                                    locked_oos=fold.locked_oos,
+                                )
+                            )
+    return out
+
+
+def _indicator_kalman_volatility_trend_rows(
+    *,
+    frame: pd.DataFrame,
+    symbol: str,
+    timeframe: str,
+    fold: monthly.MonthlyFold,
+    leverages: Sequence[int],
+    allocation_fraction: float,
+) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    if frame.empty:
+        return out
+    close = frame["close"].astype(float).reset_index(drop=True)
+    datetimes = frame["datetime"]
+    log_close = np.log(close.replace(0.0, np.nan))
+    returns = close.pct_change(fill_method=None)
+    atr_pct = _true_range_pct(frame)
+    for lookback in (24, 48):
+        realized_vol = returns.rolling(lookback).std(ddof=1)
+        for process_noise in (0.0005, 0.002):
+            for measurement_noise in (0.02, 0.08):
+                filtered = _kalman_log_price_filter(
+                    close,
+                    process_noise=process_noise,
+                    measurement_noise=measurement_noise,
+                )
+                slope_window = max(3, lookback // 6)
+                kalman_slope = filtered - filtered.shift(slope_window)
+                slope_z = broad69._rolling_zscore(kalman_slope, lookback * 2)
+                deviation_z = broad69._rolling_zscore(log_close - filtered, lookback * 2)
+                for slope_z_min in (0.25, 0.50):
+                    for max_realized_vol in (0.018, 0.028):
+                        volatility_ok = (realized_vol.shift(1) <= max_realized_vol) & (
+                            atr_pct.rolling(lookback).mean().shift(1)
+                            <= max_realized_vol * 1.5
+                        )
+                        long_entry = (
+                            (slope_z.shift(1) >= slope_z_min)
+                            & (deviation_z.shift(1) >= -0.75)
+                            & (log_close.shift(1) >= filtered.shift(1))
+                            & volatility_ok
+                        )
+                        short_entry = (
+                            (slope_z.shift(1) <= -slope_z_min)
+                            & (deviation_z.shift(1) <= 0.75)
+                            & (log_close.shift(1) <= filtered.shift(1))
+                            & volatility_ok
+                        )
+                        long_exit = (slope_z < 0.0) | (realized_vol > max_realized_vol * 1.5)
+                        short_exit = (slope_z > 0.0) | (realized_vol > max_realized_vol * 1.5)
+                        for min_hold in (4, 8):
+                            signal = broad69._debounced_state_signal(
+                                long_entry,
+                                long_exit,
+                                short_entry,
+                                short_exit,
+                                side="long_short",
+                                min_hold_bars=min_hold,
+                                cooldown_bars=2,
+                            )
+                            for leverage in leverages:
+                                sim = broad69.simulate_symbol(
+                                    frame,
+                                    signal,
+                                    integer_leverage=int(leverage),
+                                    allocation_fraction=allocation_fraction,
+                                )
+                                base = _candidate_base(
+                                    family="indicator_kalman_volatility_trend",
+                                    model_parts=(
+                                        "kalmanvoltrend",
+                                        timeframe,
+                                        symbol,
+                                        f"lb{lookback}",
+                                        f"q{process_noise}",
+                                        f"r{measurement_noise}",
+                                        f"sz{slope_z_min}",
+                                        f"vol{max_realized_vol}",
+                                        f"hold{min_hold}",
+                                        f"lev{leverage}",
+                                    ),
+                                    symbol=symbol,
+                                    timeframe=timeframe,
+                                    side="long_short",
+                                    lookback=lookback,
+                                    threshold=slope_z_min,
+                                    exit_threshold=max_realized_vol,
+                                    min_hold=min_hold,
+                                    leverage=int(leverage),
+                                    allocation_fraction=allocation_fraction,
+                                )
+                                base["indicator_set"] = [
+                                    "kalman_log_price_filter",
+                                    "kalman_slope_z",
+                                    "atr_pct",
+                                    "realized_volatility",
+                                    "rolling_standardization",
+                                ]
+                                base["theory_plausibility_gate"] = "kalman_adaptive_trend_filter"
+                                out.append(
+                                    _finalize_row(
+                                        base=base,
+                                        sim=sim,
+                                        datetimes=datetimes,
+                                        timeframe=timeframe,
+                                        train=fold.train,
+                                        validation=fold.validation,
+                                        locked_oos=fold.locked_oos,
+                                    )
+                                )
+    return out
+
+
+def _standardized_indicator_ridge_directional_rows(
+    *,
+    frame: pd.DataFrame,
+    symbol: str,
+    timeframe: str,
+    fold: monthly.MonthlyFold,
+    leverages: Sequence[int],
+    allocation_fraction: float,
+) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    if frame.empty:
+        return out
+    close = frame["close"].astype(float).reset_index(drop=True)
+    volume = frame["volume"].astype(float).reset_index(drop=True)
+    datetimes = frame["datetime"]
+    train_mask = _window_mask(datetimes, fold.train)
+    returns = close.pct_change(fill_method=None)
+    next_return = close.shift(-1) / close.replace(0.0, np.nan) - 1.0
+    true_range_pct = _true_range_pct(frame)
+    for lookback in (24, 48):
+        vwap = _rolling_vwap(close, volume, lookback)
+        middle = close.rolling(lookback).mean()
+        sigma = close.rolling(lookback).std(ddof=1).replace(0.0, np.nan)
+        filtered = _kalman_log_price_filter(
+            close,
+            process_noise=0.001,
+            measurement_noise=0.04,
+        )
+        raw_features = pd.DataFrame(
+            {
+                "return_1": returns,
+                "momentum": close / close.shift(lookback) - 1.0,
+                "realized_vol": returns.rolling(lookback).std(ddof=1),
+                "atr_pct": true_range_pct.rolling(lookback).mean(),
+                "bollinger_z": (close - middle) / sigma,
+                "vwap_deviation": close / vwap.replace(0.0, np.nan) - 1.0,
+                "kalman_slope": filtered - filtered.shift(max(3, lookback // 6)),
+                "volume_z": broad69._rolling_zscore(volume, lookback * 2),
+            }
+        ).shift(1)
+        standardized = _train_standardized_frame(raw_features, train_mask)
+        for ridge_alpha in (1.0, 10.0):
+            score = _ridge_directional_score(
+                standardized,
+                next_return,
+                train_mask,
+                ridge_alpha=ridge_alpha,
+                min_train_observations=240,
+            )
+            if score is None:
+                continue
+            for score_threshold in (0.0005, 0.0010):
+                long_entry = score >= score_threshold
+                short_entry = score <= -score_threshold
+                long_exit = score <= 0.0
+                short_exit = score >= 0.0
+                for min_hold in (4, 8):
+                    signal = broad69._debounced_state_signal(
+                        long_entry,
+                        long_exit,
+                        short_entry,
+                        short_exit,
+                        side="long_short",
+                        min_hold_bars=min_hold,
+                        cooldown_bars=2,
+                    )
+                    for leverage in leverages:
+                        sim = broad69.simulate_symbol(
+                            frame,
+                            signal,
+                            integer_leverage=int(leverage),
+                            allocation_fraction=allocation_fraction,
+                        )
+                        base = _candidate_base(
+                            family="standardized_indicator_ridge_directional",
+                            model_parts=(
+                                "stdridge",
+                                timeframe,
+                                symbol,
+                                f"lb{lookback}",
+                                f"alpha{ridge_alpha}",
+                                f"thr{score_threshold}",
+                                f"hold{min_hold}",
+                                f"lev{leverage}",
+                            ),
+                            symbol=symbol,
+                            timeframe=timeframe,
+                            side="long_short",
+                            lookback=lookback,
+                            threshold=score_threshold,
+                            exit_threshold=0.0,
+                            min_hold=min_hold,
+                            leverage=int(leverage),
+                            allocation_fraction=allocation_fraction,
+                        )
+                        base["uses_ml"] = True
+                        base["ml_model"] = "bounded_ridge_directional_score"
+                        base["ml_fit_scope"] = "train_only"
+                        base["standardization_scope"] = "train_only"
+                        base["indicator_set"] = [
+                            "returns",
+                            "vwap_deviation",
+                            "bollinger_z",
+                            "atr_pct",
+                            "realized_volatility",
+                            "kalman_slope",
+                            "volume_z",
+                        ]
+                        base["no_nested_oos_mining"] = True
+                        base["theory_plausibility_gate"] = "standardized_indicator_ml_leaf"
+                        out.append(
+                            _finalize_row(
+                                base=base,
+                                sim=sim,
+                                datetimes=datetimes,
+                                timeframe=timeframe,
+                                train=fold.train,
+                                validation=fold.validation,
+                                locked_oos=fold.locked_oos,
+                            )
+                        )
+    return out
+
+
 def _rows_for_fold(
     *,
     bars: Mapping[tuple[str, str], pd.DataFrame],
@@ -2196,6 +2682,9 @@ def _rows_for_fold(
             rows.extend(_squeeze_rows(**kwargs))
             rows.extend(_absorption_rows(**kwargs))
             rows.extend(_reclaim_rows(**kwargs))
+            rows.extend(_indicator_vwap_atr_bollinger_reversion_rows(**kwargs))
+            rows.extend(_indicator_kalman_volatility_trend_rows(**kwargs))
+            rows.extend(_standardized_indicator_ridge_directional_rows(**kwargs))
             rows.extend(
                 _deep_research_vol_managed_momentum_crash_gate_rows(
                     **kwargs,
@@ -2442,7 +2931,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--symbols", default=",".join(BINANCE_CORE_CRYPTO_RESEARCH_SYMBOLS))
     parser.add_argument("--timeframes", default=",".join(DEFAULT_TIMEFRAMES))
     parser.add_argument("--max-folds", type=int, default=None)
-    parser.add_argument("--max-candidates-per-fold", type=int, default=80)
+    parser.add_argument("--max-candidates-per-fold", type=int, default=10000)
     return parser.parse_args(argv)
 
 
