@@ -96,6 +96,21 @@ FAMILY_DESCRIPTIONS: dict[str, str] = {
         "as a post-2024 orderbook pressure source. This is a separate depth feature, "
         "not a synthetic BBO quote."
     ),
+    "deep_research_funding_dislocation_trend_carry": (
+        "Report-inspired leaf alpha: align medium-horizon momentum with perp funding "
+        "carry and open-interest crowding caps. Requires train/validation feature "
+        "coverage and remains blocked from promotion until fresh-forward/cost gates."
+    ),
+    "deep_research_vol_managed_momentum_crash_gate": (
+        "Report-inspired leaf alpha: momentum entries only when realized volatility and "
+        "BTC benchmark stress gates are acceptable. This is a leaf search input, not "
+        "a post-OOS router or live promotion rule."
+    ),
+    "deep_research_flow_imbalance_liquidation_sweep": (
+        "Report-inspired leaf alpha: contrarian sweep entries after return shocks, "
+        "liquidation imbalance, taker-flow/depth confirmation, and spread-quality "
+        "filters. Requires train/validation feature coverage."
+    ),
 }
 
 
@@ -198,6 +213,29 @@ def _search_space() -> dict[str, Any]:
             "lookback": [6, 12],
             "depth_imbalance_min": [0.10, 0.20],
             "price_extension_min": [0.003, 0.006],
+            "min_hold": [4, 8],
+        },
+        "deep_research_funding_dislocation_trend_carry": {
+            "lookback": [12, 24, 48],
+            "momentum_min": [0.004, 0.008],
+            "funding_carry_min": [0.0, 0.00005],
+            "oi_z_cap": [1.5, 2.5],
+            "min_hold": [4, 8],
+        },
+        "deep_research_vol_managed_momentum_crash_gate": {
+            "lookback": [12, 24, 48],
+            "momentum_min": [0.006, 0.012],
+            "realized_vol_max": [0.018, 0.028],
+            "benchmark_crash_window": [12, 24],
+            "benchmark_crash_return": [0.035, 0.055],
+            "min_hold": [4, 8],
+        },
+        "deep_research_flow_imbalance_liquidation_sweep": {
+            "lookback": [12, 24],
+            "return_shock_min": [0.004, 0.008],
+            "flow_or_depth_min": [0.10, 0.20],
+            "liquidation_z_min": [1.0, 1.5],
+            "max_spread_bps": [8.0, 12.0],
             "min_hold": [4, 8],
         },
     }
@@ -1773,6 +1811,359 @@ def _feature_book_depth_rows(
     return out
 
 
+def _deep_research_funding_dislocation_trend_carry_rows(
+    *,
+    frame: pd.DataFrame,
+    symbol: str,
+    timeframe: str,
+    fold: monthly.MonthlyFold,
+    leverages: Sequence[int],
+    allocation_fraction: float,
+) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    if frame.empty or "feature_oi_flow_valid" not in frame.columns:
+        return out
+    coverage = _split_feature_coverage(
+        frame,
+        train=fold.train,
+        validation=fold.validation,
+        locked_oos=fold.locked_oos,
+        column="feature_oi_flow_valid",
+    )
+    if coverage["train"] < 0.60 or coverage["validation"] < 0.60:
+        return out
+    close = frame["close"].astype(float).reset_index(drop=True)
+    funding = pd.to_numeric(frame["funding_rate"], errors="coerce").reset_index(drop=True)
+    open_interest = pd.to_numeric(frame["open_interest"], errors="coerce").reset_index(drop=True)
+    feature_valid = frame["feature_oi_flow_valid"].fillna(False).astype(bool).reset_index(
+        drop=True
+    )
+    datetimes = frame["datetime"]
+    for lookback in (12, 24, 48):
+        momentum = close / close.shift(lookback) - 1.0
+        funding_carry = funding.rolling(max(4, lookback // 2)).mean()
+        oi_change = open_interest.pct_change(fill_method=None)
+        oi_z = broad69._rolling_zscore(oi_change, max(8, lookback))
+        for momentum_min in (0.004, 0.008):
+            for funding_carry_min in (0.0, 0.00005):
+                for oi_z_cap in (1.5, 2.5):
+                    long_entry = (
+                        feature_valid
+                        & (momentum.shift(1) >= momentum_min)
+                        & (funding_carry.shift(1) <= -funding_carry_min)
+                        & (oi_z.shift(1).abs() <= oi_z_cap)
+                    )
+                    short_entry = (
+                        feature_valid
+                        & (momentum.shift(1) <= -momentum_min)
+                        & (funding_carry.shift(1) >= funding_carry_min)
+                        & (oi_z.shift(1).abs() <= oi_z_cap)
+                    )
+                    long_exit = (
+                        (~feature_valid)
+                        | (momentum <= 0.0)
+                        | (funding_carry > max(0.00010, funding_carry_min * 2.0))
+                    )
+                    short_exit = (
+                        (~feature_valid)
+                        | (momentum >= 0.0)
+                        | (funding_carry < -max(0.00010, funding_carry_min * 2.0))
+                    )
+                    for min_hold in (4, 8):
+                        signal = broad69._debounced_state_signal(
+                            long_entry,
+                            long_exit,
+                            short_entry,
+                            short_exit,
+                            side="long_short",
+                            min_hold_bars=min_hold,
+                            cooldown_bars=2,
+                        )
+                        for leverage in leverages:
+                            sim = broad69.simulate_symbol(
+                                frame,
+                                signal,
+                                integer_leverage=int(leverage),
+                                allocation_fraction=allocation_fraction,
+                            )
+                            base = _candidate_base(
+                                family="deep_research_funding_dislocation_trend_carry",
+                                model_parts=(
+                                    "drfundingcarry",
+                                    timeframe,
+                                    symbol,
+                                    f"lb{lookback}",
+                                    f"mom{momentum_min}",
+                                    f"fund{funding_carry_min}",
+                                    f"oicap{oi_z_cap}",
+                                    f"hold{min_hold}",
+                                    f"lev{leverage}",
+                                ),
+                                symbol=symbol,
+                                timeframe=timeframe,
+                                side="long_short",
+                                lookback=lookback,
+                                threshold=momentum_min,
+                                exit_threshold=funding_carry_min,
+                                min_hold=min_hold,
+                                leverage=int(leverage),
+                                allocation_fraction=allocation_fraction,
+                            )
+                            base["feature_backed"] = True
+                            base["feature_coverage"] = dict(coverage)
+                            base["source_report"] = "desktop-deep-research-report-20260608"
+                            base["no_nested_oos_mining"] = True
+                            out.append(
+                                _finalize_row(
+                                    base=base,
+                                    sim=sim,
+                                    datetimes=datetimes,
+                                    timeframe=timeframe,
+                                    train=fold.train,
+                                    validation=fold.validation,
+                                    locked_oos=fold.locked_oos,
+                                )
+                            )
+    return out
+
+
+def _deep_research_vol_managed_momentum_crash_gate_rows(
+    *,
+    frame: pd.DataFrame,
+    bars_by_symbol: Mapping[str, pd.DataFrame],
+    symbol: str,
+    timeframe: str,
+    fold: monthly.MonthlyFold,
+    leverages: Sequence[int],
+    allocation_fraction: float,
+) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    if frame.empty:
+        return out
+    close = frame["close"].astype(float).reset_index(drop=True)
+    datetimes = frame["datetime"]
+    benchmark_frame = bars_by_symbol.get("BTCUSDT", frame)
+    benchmark_close = benchmark_frame["close"].astype(float).reset_index(drop=True)
+    if len(benchmark_close) != len(close):
+        benchmark_close = close
+    returns = close.pct_change(fill_method=None)
+    benchmark_returns = benchmark_close.pct_change(fill_method=None)
+    for lookback in (12, 24, 48):
+        momentum = close / close.shift(lookback) - 1.0
+        realized_vol = returns.rolling(max(6, lookback)).std(ddof=1)
+        for momentum_min in (0.006, 0.012):
+            for realized_vol_max in (0.018, 0.028):
+                for crash_window in (12, 24):
+                    benchmark_crash = benchmark_close / benchmark_close.shift(crash_window) - 1.0
+                    benchmark_vol = benchmark_returns.rolling(max(6, crash_window)).std(ddof=1)
+                    for benchmark_crash_return in (0.035, 0.055):
+                        stress = (benchmark_crash <= -benchmark_crash_return) | (
+                            benchmark_vol > realized_vol_max
+                        )
+                        stress_prev = stress.shift(1)
+                        stress_prev = stress_prev.where(stress_prev.notna(), False).astype(bool)
+                        stress_now = stress.where(stress.notna(), False).astype(bool)
+                        long_entry = (
+                            (momentum.shift(1) >= momentum_min)
+                            & (realized_vol.shift(1) <= realized_vol_max)
+                            & (~stress_prev)
+                        )
+                        short_entry = (
+                            (momentum.shift(1) <= -momentum_min)
+                            & (realized_vol.shift(1) <= realized_vol_max)
+                            & (~stress_prev)
+                        )
+                        long_exit = (momentum <= 0.0) | stress_now
+                        short_exit = (momentum >= 0.0) | stress_now
+                        for min_hold in (4, 8):
+                            signal = broad69._debounced_state_signal(
+                                long_entry,
+                                long_exit,
+                                short_entry,
+                                short_exit,
+                                side="long_short",
+                                min_hold_bars=min_hold,
+                                cooldown_bars=2,
+                            )
+                            for leverage in leverages:
+                                sim = broad69.simulate_symbol(
+                                    frame,
+                                    signal,
+                                    integer_leverage=int(leverage),
+                                    allocation_fraction=allocation_fraction,
+                                )
+                                base = _candidate_base(
+                                    family="deep_research_vol_managed_momentum_crash_gate",
+                                    model_parts=(
+                                        "drvolmom",
+                                        timeframe,
+                                        symbol,
+                                        f"lb{lookback}",
+                                        f"mom{momentum_min}",
+                                        f"vol{realized_vol_max}",
+                                        f"cr{crash_window}",
+                                        f"crret{benchmark_crash_return}",
+                                        f"hold{min_hold}",
+                                        f"lev{leverage}",
+                                    ),
+                                    symbol=symbol,
+                                    timeframe=timeframe,
+                                    side="long_short",
+                                    lookback=lookback,
+                                    threshold=momentum_min,
+                                    exit_threshold=realized_vol_max,
+                                    min_hold=min_hold,
+                                    leverage=int(leverage),
+                                    allocation_fraction=allocation_fraction,
+                                )
+                                base["source_report"] = "desktop-deep-research-report-20260608"
+                                base["no_nested_oos_mining"] = True
+                                out.append(
+                                    _finalize_row(
+                                        base=base,
+                                        sim=sim,
+                                        datetimes=datetimes,
+                                        timeframe=timeframe,
+                                        train=fold.train,
+                                        validation=fold.validation,
+                                        locked_oos=fold.locked_oos,
+                                    )
+                                )
+    return out
+
+
+def _deep_research_flow_imbalance_liquidation_sweep_rows(
+    *,
+    frame: pd.DataFrame,
+    symbol: str,
+    timeframe: str,
+    fold: monthly.MonthlyFold,
+    leverages: Sequence[int],
+    allocation_fraction: float,
+) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    if frame.empty or "feature_liquidation_valid" not in frame.columns:
+        return out
+    coverage = _split_feature_coverage(
+        frame,
+        train=fold.train,
+        validation=fold.validation,
+        locked_oos=fold.locked_oos,
+        column="feature_liquidation_valid",
+    )
+    if coverage["train"] < 0.60 or coverage["validation"] < 0.60:
+        return out
+    close = frame["close"].astype(float).reset_index(drop=True)
+    flow = pd.to_numeric(frame["taker_buy_sell_imbalance"], errors="coerce").reset_index(drop=True)
+    liquidation = pd.to_numeric(frame["liquidation_imbalance"], errors="coerce").reset_index(
+        drop=True
+    )
+    spread = pd.to_numeric(frame.get("bbo_spread_bps", pd.Series(np.nan, index=frame.index)))
+    spread = spread.reset_index(drop=True)
+    depth = pd.to_numeric(
+        frame.get("book_depth_imbalance_1pct", pd.Series(np.nan, index=frame.index)),
+        errors="coerce",
+    ).reset_index(drop=True)
+    feature_valid = (
+        frame["feature_liquidation_valid"].fillna(False).astype(bool).reset_index(drop=True)
+    )
+    datetimes = frame["datetime"]
+    returns = close.pct_change(fill_method=None)
+    for lookback in (12, 24):
+        liquidation_z = broad69._rolling_zscore(liquidation, max(8, lookback))
+        flow_smooth = flow.rolling(max(4, lookback // 2)).mean()
+        depth_smooth = depth.rolling(max(4, lookback // 2)).mean()
+        micro_pressure = pd.concat([flow_smooth, depth_smooth], axis=1).mean(
+            axis=1, skipna=True
+        )
+        for return_shock_min in (0.004, 0.008):
+            for flow_or_depth_min in (0.10, 0.20):
+                for liquidation_z_min in (1.0, 1.5):
+                    for max_spread_bps in (8.0, 12.0):
+                        spread_ok = spread.isna() | (spread <= max_spread_bps)
+                        long_entry = (
+                            feature_valid
+                            & spread_ok
+                            & (returns.shift(1) <= -return_shock_min)
+                            & (liquidation_z.shift(1) >= liquidation_z_min)
+                            & (micro_pressure.shift(1) >= flow_or_depth_min)
+                        )
+                        short_entry = (
+                            feature_valid
+                            & spread_ok
+                            & (returns.shift(1) >= return_shock_min)
+                            & (liquidation_z.shift(1) <= -liquidation_z_min)
+                            & (micro_pressure.shift(1) <= -flow_or_depth_min)
+                        )
+                        long_exit = (
+                            (~feature_valid)
+                            | (micro_pressure < 0.0)
+                            | (returns > return_shock_min)
+                        )
+                        short_exit = (
+                            (~feature_valid)
+                            | (micro_pressure > 0.0)
+                            | (returns < -return_shock_min)
+                        )
+                        for min_hold in (4, 8):
+                            signal = broad69._debounced_state_signal(
+                                long_entry,
+                                long_exit,
+                                short_entry,
+                                short_exit,
+                                side="long_short",
+                                min_hold_bars=min_hold,
+                                cooldown_bars=2,
+                            )
+                            for leverage in leverages:
+                                sim = broad69.simulate_symbol(
+                                    frame,
+                                    signal,
+                                    integer_leverage=int(leverage),
+                                    allocation_fraction=allocation_fraction,
+                                )
+                                base = _candidate_base(
+                                    family="deep_research_flow_imbalance_liquidation_sweep",
+                                    model_parts=(
+                                        "drflowsweep",
+                                        timeframe,
+                                        symbol,
+                                        f"lb{lookback}",
+                                        f"shock{return_shock_min}",
+                                        f"flow{flow_or_depth_min}",
+                                        f"liq{liquidation_z_min}",
+                                        f"spr{max_spread_bps}",
+                                        f"hold{min_hold}",
+                                        f"lev{leverage}",
+                                    ),
+                                    symbol=symbol,
+                                    timeframe=timeframe,
+                                    side="long_short",
+                                    lookback=lookback,
+                                    threshold=flow_or_depth_min,
+                                    exit_threshold=return_shock_min,
+                                    min_hold=min_hold,
+                                    leverage=int(leverage),
+                                    allocation_fraction=allocation_fraction,
+                                )
+                                base["feature_backed"] = True
+                                base["feature_coverage"] = dict(coverage)
+                                base["source_report"] = "desktop-deep-research-report-20260608"
+                                base["no_nested_oos_mining"] = True
+                                out.append(
+                                    _finalize_row(
+                                        base=base,
+                                        sim=sim,
+                                        datetimes=datetimes,
+                                        timeframe=timeframe,
+                                        train=fold.train,
+                                        validation=fold.validation,
+                                        locked_oos=fold.locked_oos,
+                                    )
+                                )
+    return out
+
+
 def _rows_for_fold(
     *,
     bars: Mapping[tuple[str, str], pd.DataFrame],
@@ -1805,6 +2196,12 @@ def _rows_for_fold(
             rows.extend(_squeeze_rows(**kwargs))
             rows.extend(_absorption_rows(**kwargs))
             rows.extend(_reclaim_rows(**kwargs))
+            rows.extend(
+                _deep_research_vol_managed_momentum_crash_gate_rows(
+                    **kwargs,
+                    bars_by_symbol=bars_by_symbol,
+                )
+            )
             features = (features_by_symbol or {}).get(symbol, pd.DataFrame())
             if not features.empty:
                 feature_frame = _attach_feature_points(frame, features, timeframe=timeframe)
@@ -1820,6 +2217,16 @@ def _rows_for_fold(
                 )
                 rows.extend(_feature_bbo_flow_rows(**{**kwargs, "frame": feature_frame}))
                 rows.extend(_feature_book_depth_rows(**{**kwargs, "frame": feature_frame}))
+                rows.extend(
+                    _deep_research_funding_dislocation_trend_carry_rows(
+                        **{**kwargs, "frame": feature_frame}
+                    )
+                )
+                rows.extend(
+                    _deep_research_flow_imbalance_liquidation_sweep_rows(
+                        **{**kwargs, "frame": feature_frame}
+                    )
+                )
             if not panel.empty:
                 rows.extend(
                     _lead_lag_rows(

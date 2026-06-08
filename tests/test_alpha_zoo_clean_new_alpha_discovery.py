@@ -69,9 +69,12 @@ def test_search_space_hash_is_stable_and_excludes_oos_results() -> None:
         "feature_taker_flow_exhaustion_reversal",
         "feature_bbo_flow_exhaustion_reversal",
         "feature_book_depth_imbalance_reversal",
+        "deep_research_funding_dislocation_trend_carry",
+        "deep_research_vol_managed_momentum_crash_gate",
+        "deep_research_flow_imbalance_liquidation_sweep",
     ]
     assert first == second
-    assert first == "1ad1e7560baf9c68152b31351efb8e5bf42e5c4d54a94439b5f4754a5794cf7f"
+    assert first == "d92dce2b046441bcf1a7a7ebfa5499844b418a52d6d2416fefad491458967312"
 
 
 def test_lead_lag_family_is_covered_and_flat_split_labeled() -> None:
@@ -280,6 +283,67 @@ def test_attach_feature_points_empty_features_sets_all_validity_flags() -> None:
     assert attached["feature_liquidation_valid"].tolist() == [False, False]
     assert attached["feature_bbo_valid"].tolist() == [False, False]
     assert attached["feature_depth_valid"].tolist() == [False, False]
+
+
+def test_deep_research_report_rows_are_gated_and_report_only() -> None:
+    datetimes = pd.date_range("2025-01-01", periods=180, freq="h")
+    close = np.linspace(100.0, 130.0, len(datetimes))
+    frame = pd.DataFrame(
+        {
+            "datetime": datetimes,
+            "open": close,
+            "high": close * 1.01,
+            "low": close * 0.99,
+            "close": close,
+            "volume": np.full(len(datetimes), 1000.0),
+            "funding_rate": np.full(len(datetimes), -0.00008),
+            "open_interest": np.linspace(1000.0, 1120.0, len(datetimes)),
+            "taker_buy_sell_imbalance": np.full(len(datetimes), 0.30),
+            "liquidation_imbalance": np.full(len(datetimes), 0.0),
+            "bbo_spread_bps": np.full(len(datetimes), 4.0),
+            "book_depth_imbalance_1pct": np.full(len(datetimes), 0.20),
+            "feature_valid": np.full(len(datetimes), True),
+            "feature_oi_flow_valid": np.full(len(datetimes), True),
+            "feature_liquidation_valid": np.full(len(datetimes), True),
+            "feature_bbo_valid": np.full(len(datetimes), True),
+            "feature_depth_valid": np.full(len(datetimes), True),
+        }
+    )
+    frame.loc[90, "close"] = 115.0
+    frame.loc[91, "close"] = 108.0
+    frame.loc[91, "liquidation_imbalance"] = 1.0
+
+    class Fold:
+        train = (datetimes[0], datetimes[59])
+        validation = (datetimes[60], datetimes[119])
+        locked_oos = (datetimes[120], datetimes[-1])
+
+    kwargs = {
+        "frame": frame,
+        "symbol": "BTCUSDT",
+        "timeframe": "1h",
+        "fold": Fold(),
+        "leverages": (2,),
+        "allocation_fraction": 0.1,
+    }
+    rows = (
+        module._deep_research_funding_dislocation_trend_carry_rows(**kwargs)
+        + module._deep_research_vol_managed_momentum_crash_gate_rows(
+            **kwargs,
+            bars_by_symbol={"BTCUSDT": frame},
+        )
+        + module._deep_research_flow_imbalance_liquidation_sweep_rows(**kwargs)
+    )
+
+    families = {row["family"] for row in rows}
+    assert "deep_research_funding_dislocation_trend_carry" in families
+    assert "deep_research_vol_managed_momentum_crash_gate" in families
+    assert "deep_research_flow_imbalance_liquidation_sweep" in families
+    assert {row["source_report"] for row in rows} == {"desktop-deep-research-report-20260608"}
+    assert {row["no_nested_oos_mining"] for row in rows} == {True}
+    assert {row["uses_locked_oos_for_selection"] for row in rows} == {False}
+    assert {row["real_money_execution"] for row in rows} == {False}
+    assert {row["clean_promotion_eligible"] for row in rows} == {False}
 
 
 def test_run_writes_policy_flags_with_synthetic_loader(monkeypatch, tmp_path: Path) -> None:
