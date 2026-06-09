@@ -38,7 +38,12 @@ DEFAULT_OUTPUT_DIR = REPO_ROOT / (
     "existing_candidate_reuse_selector_20260609"
 )
 
-VARIANTS = ("robust_top1", "robust_top2_equal", "robust_diverse3_equal")
+VARIANTS = (
+    "robust_top1",
+    "robust_top2_equal",
+    "robust_diverse3_equal",
+    "robust_quality_v1_top1",
+)
 
 
 def _utc_now_iso() -> str:
@@ -86,12 +91,45 @@ def _eligible_sorted(rows: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any
     )
 
 
+def _train_validation_return_ratio(row: Mapping[str, Any]) -> float:
+    validation = _safe_float(row.get("validation_return"))
+    return _safe_float(row.get("train_return")) / max(abs(validation), 0.02)
+
+
+def _quality_v1_allowed(row: Mapping[str, Any]) -> bool:
+    if not clean._eligible_for_policy(row, selection_policy=clean.ROBUST_SELECTION_POLICY):
+        return False
+    if _train_validation_return_ratio(row) > 2.5:
+        return False
+    if _safe_float(row.get("train_return")) - _safe_float(row.get("validation_return")) > 0.25:
+        return False
+    if _safe_float(row.get("validation_mdd")) > 0.06:
+        return False
+    if _safe_float(row.get("train_mdd")) > 0.25:
+        return False
+    return _safe_float(row.get("validation_return_per_turnover_proxy_bps"), -100.0) > 0.0
+
+
+def _quality_v1_sorted(rows: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    eligible = [row for row in rows if _quality_v1_allowed(row)]
+    return sorted(
+        eligible,
+        key=lambda row: (
+            clean._selection_score(row, selection_policy=clean.ROBUST_SELECTION_POLICY),
+            str(row.get("model_id")),
+        ),
+        reverse=True,
+    )
+
+
 def _pick_variant(rows: Sequence[Mapping[str, Any]], variant: str) -> list[Mapping[str, Any]]:
     ranked = _eligible_sorted(rows)
     if variant == "robust_top1":
         return ranked[:1]
     if variant == "robust_top2_equal":
         return ranked[:2]
+    if variant == "robust_quality_v1_top1":
+        return _quality_v1_sorted(rows)[:1]
     if variant == "robust_diverse3_equal":
         picked: list[Mapping[str, Any]] = []
         families: set[str] = set()

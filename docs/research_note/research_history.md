@@ -32542,3 +32542,17 @@ Before repeating calendar-salvage research, read `var/reports/profit_moonshot_20
 - Decision impact: No live/shadow promotion. Real allocation remains 0%. Use accelerated backend for future smaller pre-registered family sweeps; do not mine locked OOS.
 - Staleness/recheck: Recheck only on fresh-forward/current data and 10/15/20bps cost/fill telemetry. / `True`
 - Do-not-repeat note: Do not rerun full 8-family/6-symbol/2-timeframe overlays as a first probe; one such run was terminated after 4:54 and ~5GB RSS. Start with family/symbol/timeframe/leverage subsets.
+
+---
+
+## 2026-06-09 residual/dispersion alpha current-search smoke
+
+- Research dates: 2026-06-09
+- Source type: `local_artifact + implementation + external_literature_check`
+- Title/path: Residual and dispersion-gated current alpha smoke — `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/current_search_residual_dispersion_summary_20260609/current_search_residual_dispersion_summary_20260609.md`
+- Content summary: Implemented `cross_sectional_residual_reversal` and `cross_sectional_dispersion_gated_momentum` as clean train/validation-only candidate families. Standalone smokes were weak (`-0.25%` comp for residual reversal; `+0.69%` comp for dispersion momentum). Dispersion-gated overlay degraded the prior current overlay to `+0.75%` comp, while excluding dispersion preserved `+4.16%` comp / `+17.73%` annualized / `3/3` positive. Existing-candidate reuse quality variant reached `+24.55%` comp but remains post-failure diagnostic.
+- What was used: External literature only shaped theory-plausible features; locked-OOS remained report/gate-only after train/validation freeze.
+- Families: cross_sectional_residual_reversal, cross_sectional_dispersion_gated_momentum, cross_asset_lead_lag_momentum, cross_sectional_vol_adjusted_momentum, indicator_kalman_residual_reversion, indicator_vwap_kalman_pullback_continuation, standardized_indicator_ridge_directional
+- Decision impact: No promotion. Current live/shadow allocation remains 0%. Do not use dispersion-gated momentum to improve current overlay; it is a research input requiring fresh-forward before any family-subset decision can be trusted.
+- Staleness/recheck: Recheck only on a fresh unseen slice with pre-frozen family subset and exact 10/15/20bps or paper fill cost telemetry. / `True`
+- Do-not-repeat note: Do not keep adding train/validation-high families into the current overlay and selecting by locked-OOS aftermath. Use small family smokes, quarantine degraders, then freeze before fresh-forward.

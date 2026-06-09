@@ -1,6 +1,6 @@
 {
   "artifact_kind": "alpha_zoo_existing_candidate_reuse_selector_research",
-  "best_variant_by_report_oos": "robust_top1",
+  "best_variant_by_report_oos": "robust_quality_v1_top1",
   "candidate_family_counts": {
     "cross_asset_lead_lag_momentum": 23375,
     "deep_research_vol_managed_momentum_crash_gate": 27686,
@@ -21,7 +21,7 @@
     "shadow_execution": false
   },
   "fold_count": 10,
-  "generated_at_utc": "2026-06-09T12:20:35.380056Z",
+  "generated_at_utc": "2026-06-09T13:29:18.656970Z",
   "locked_oos_role": "report_only_after_reuse_selector_freeze",
   "output_paths": {
     "json": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/existing_candidate_reuse_selector_20260609/existing_candidate_reuse_selector_latest.json",
@@ -471,6 +471,224 @@
           ],
           "selected_count": 3,
           "variant": "robust_diverse3_equal"
+        }
+      ]
+    },
+    "robust_quality_v1_top1": {
+      "aggregate": {
+        "annualized_oos_return_approx": 0.301379249930841,
+        "compounded_oos_return": 0.24547944595998406,
+        "fold_count": 10,
+        "latest_oos_return": -0.0037428423110466014,
+        "max_oos_mdd": 0.09174438302643706,
+        "mean_selected_count": 1.0,
+        "min_oos_return": -0.031035464274063562,
+        "monthly_equity_mdd": 0.031035464274063673,
+        "monthly_sharpe_approx": 1.9100262693212133,
+        "positive_oos_folds": 7,
+        "profit_factor": 6.301677628027914,
+        "profit_factor_unbounded": false
+      },
+      "selected_fold_rows": [
+        {
+          "fold_id": "2025-09",
+          "locked_oos_mdd_report_only": 0.008256596826498597,
+          "locked_oos_return_report_only": 0.005558219477208359,
+          "selected_candidates": [
+            {
+              "family": "cross_asset_lead_lag_momentum",
+              "locked_oos_mdd_report_only": 0.008256596826498597,
+              "locked_oos_return_report_only": 0.005558219477208359,
+              "model_id": "az69_leadlag_1h_btcusdt_adausdt_lb6_thr0p01_lag0p5_hold8_lev4_602fd75f",
+              "selection_score_robust_v1_train_validation_only": 12.801257744600262,
+              "symbol": "ADAUSDT",
+              "timeframe": "1h",
+              "train_return": 0.06371580531269339,
+              "validation_return": 0.15722092403959942
+            }
+          ],
+          "selected_count": 1,
+          "variant": "robust_quality_v1_top1"
+        },
+        {
+          "fold_id": "2025-10",
+          "locked_oos_mdd_report_only": 0.04722941081823673,
+          "locked_oos_return_report_only": 0.0844469972032047,
+          "selected_candidates": [
+            {
+              "family": "standardized_indicator_ridge_directional",
+              "locked_oos_mdd_report_only": 0.04722941081823673,
+              "locked_oos_return_report_only": 0.0844469972032047,
+              "model_id": "az69_stdridge_4h_xrpusdt_lb48_alpha10p0_thr0p0005_hold4_lev4_c1f89a28",
+              "selection_score_robust_v1_train_validation_only": 16.62905405679304,
+              "symbol": "XRPUSDT",
+              "timeframe": "4h",
+              "train_return": 0.34531843218907543,
+              "validation_return": 0.23438820333437627
+            }
+          ],
+          "selected_count": 1,
+          "variant": "robust_quality_v1_top1"
+        },
+        {
+          "fold_id": "2025-11",
+          "locked_oos_mdd_report_only": 0.03978415849200756,
+          "locked_oos_return_report_only": 0.020891458962180698,
+          "selected_candidates": [
+            {
+              "family": "standardized_indicator_ridge_directional",
+              "locked_oos_mdd_report_only": 0.03978415849200756,
+              "locked_oos_return_report_only": 0.020891458962180698,
+              "model_id": "az69_stdridge_1h_tonusdt_lb48_alpha1p0_thr0p0005_hold4_lev4_3b0bf205",
+              "selection_score_robust_v1_train_validation_only": 13.957112412236425,
+              "symbol": "TONUSDT",
+              "timeframe": "1h",
+              "train_return": 0.03554950922059197,
+              "validation_return": 0.13450352799153564
+            }
+          ],
+          "selected_count": 1,
+          "variant": "robust_quality_v1_top1"
+        },
+        {
+          "fold_id": "2025-12",
+          "locked_oos_mdd_report_only": 0.04289551380566048,
+          "locked_oos_return_report_only": -0.031035464274063562,
+          "selected_candidates": [
+            {
+              "family": "indicator_kalman_volatility_trend",
+              "locked_oos_mdd_report_only": 0.04289551380566048,
+              "locked_oos_return_report_only": -0.031035464274063562,
+              "model_id": "az69_kalmanvoltrend_4h_xrpusdt_lb24_q0p002_r0p02_sz0p5_vol0p018_hold8_lev4_436cdd1e",
+              "selection_score_robust_v1_train_validation_only": 15.329901519122902,
+              "symbol": "XRPUSDT",
+              "timeframe": "4h",
+              "train_return": 0.14978826890301544,
+              "validation_return": 0.2437671428840782
+            }
+          ],
+          "selected_count": 1,
+          "variant": "robust_quality_v1_top1"
+        },
+        {
+          "fold_id": "2026-01",
+          "locked_oos_mdd_report_only": 0.01972125906819011,
+          "locked_oos_return_report_only": 0.09710524698100276,
+          "selected_candidates": [
+            {
+              "family": "cross_asset_lead_lag_momentum",
+              "locked_oos_mdd_report_only": 0.01972125906819011,
+              "locked_oos_return_report_only": 0.09710524698100276,
+              "model_id": "az69_leadlag_4h_solusdt_avaxusdt_lb12_thr0p01_lag0p25_hold4_lev4_9f73c134",
+              "selection_score_robust_v1_train_validation_only": 17.982504765259275,
+              "symbol": "AVAXUSDT",
+              "timeframe": "4h",
+              "train_return": 0.4353076325762466,
+              "validation_return": 0.2321120314224201
+            }
+          ],
+          "selected_count": 1,
+          "variant": "robust_quality_v1_top1"
+        },
+        {
+          "fold_id": "2026-02",
+          "locked_oos_mdd_report_only": 0.09174438302643706,
+          "locked_oos_return_report_only": 0.009714590932634826,
+          "selected_candidates": [
+            {
+              "family": "cross_asset_lead_lag_momentum",
+              "locked_oos_mdd_report_only": 0.09174438302643706,
+              "locked_oos_return_report_only": 0.009714590932634826,
+              "model_id": "az69_leadlag_4h_solusdt_avaxusdt_lb12_thr0p01_lag0p5_hold4_lev4_ae4a4fa6",
+              "selection_score_robust_v1_train_validation_only": 15.093034198657458,
+              "symbol": "AVAXUSDT",
+              "timeframe": "4h",
+              "train_return": 0.40493422776116184,
+              "validation_return": 0.1752699057721423
+            }
+          ],
+          "selected_count": 1,
+          "variant": "robust_quality_v1_top1"
+        },
+        {
+          "fold_id": "2026-03",
+          "locked_oos_mdd_report_only": 0.027481385648932877,
+          "locked_oos_return_report_only": 0.0033788156079688214,
+          "selected_candidates": [
+            {
+              "family": "volatility_squeeze_breakout",
+              "locked_oos_mdd_report_only": 0.027481385648932877,
+              "locked_oos_return_report_only": 0.0033788156079688214,
+              "model_id": "az69_squeeze_30m_ethusdt_lb24_q0p15_br12_hold8_lev4_a2d3018a",
+              "selection_score_robust_v1_train_validation_only": 12.539816301286267,
+              "symbol": "ETHUSDT",
+              "timeframe": "30m",
+              "train_return": 0.04533096051701491,
+              "validation_return": 0.13879156905786427
+            }
+          ],
+          "selected_count": 1,
+          "variant": "robust_quality_v1_top1"
+        },
+        {
+          "fold_id": "2026-04",
+          "locked_oos_mdd_report_only": 0.03833157201398951,
+          "locked_oos_return_report_only": 0.05161406713498096,
+          "selected_candidates": [
+            {
+              "family": "feature_taker_flow_exhaustion_reversal",
+              "locked_oos_mdd_report_only": 0.03833157201398951,
+              "locked_oos_return_report_only": 0.05161406713498096,
+              "model_id": "az69_flowexhaust_4h_ethusdt_lb6_flow0p15_ret0p008_fundcap0p0003_vol0p008_hold8_lev4_f90ccd3e",
+              "selection_score_robust_v1_train_validation_only": 13.871283885358219,
+              "symbol": "ETHUSDT",
+              "timeframe": "4h",
+              "train_return": 0.06735781188500267,
+              "validation_return": 0.13131500067922852
+            }
+          ],
+          "selected_count": 1,
+          "variant": "robust_quality_v1_top1"
+        },
+        {
+          "fold_id": "2026-05",
+          "locked_oos_mdd_report_only": 0.038523627953795714,
+          "locked_oos_return_report_only": -0.008497375288277653,
+          "selected_candidates": [
+            {
+              "family": "indicator_vwap_atr_bollinger_reversion",
+              "locked_oos_mdd_report_only": 0.038523627953795714,
+              "locked_oos_return_report_only": -0.008497375288277653,
+              "model_id": "az69_vwapatrbbrev_4h_adausdt_lb24_vz1p75_bb2p0_atr0p028_hold8_lev4_2bfd771d",
+              "selection_score_robust_v1_train_validation_only": 13.1710685263743,
+              "symbol": "ADAUSDT",
+              "timeframe": "4h",
+              "train_return": 0.08648732135545156,
+              "validation_return": 0.12415074954261929
+            }
+          ],
+          "selected_count": 1,
+          "variant": "robust_quality_v1_top1"
+        },
+        {
+          "fold_id": "2026-06",
+          "locked_oos_mdd_report_only": 0.04351584400377839,
+          "locked_oos_return_report_only": -0.0037428423110466014,
+          "selected_candidates": [
+            {
+              "family": "deep_research_vol_managed_momentum_crash_gate",
+              "locked_oos_mdd_report_only": 0.04351584400377839,
+              "locked_oos_return_report_only": -0.0037428423110466014,
+              "model_id": "az69_drvolmom_4h_tonusdt_lb12_mom0p006_vol0p028_cr24_crret0p055_hold4_lev4_8c8c4a30",
+              "selection_score_robust_v1_train_validation_only": 17.058942156861693,
+              "symbol": "TONUSDT",
+              "timeframe": "4h",
+              "train_return": 0.1848152202812341,
+              "validation_return": 0.4280258524237339
+            }
+          ],
+          "selected_count": 1,
+          "variant": "robust_quality_v1_top1"
         }
       ]
     },

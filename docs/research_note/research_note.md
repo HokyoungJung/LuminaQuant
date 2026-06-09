@@ -2199,3 +2199,18 @@ Best raw/shadow candidate is `lagged_shadow_leaf_router:core_warmup4_avg2_val05_
 - New VWAP/Kalman pullback standalone smoke: `current_search_vwap_kalman_pullback_smoke_20260609` produced OOS comp `+0.61%`, annualized approx `+2.46%`, `2/3` positive folds. It is retained as a search input only; no promotion.
 - Existing-candidate reuse selector script added for post-failure research over already-evaluated candidate rows. `robust_top1` reproduces the robust diagnostic at `+22.14%` comp / `+27.12%` annualized / `6/10` positive, but the selector design is still OOS-informed and fresh-forward-required. `robust_top2_equal` is `+20.02%` comp / `+24.48%` annualized / `7/10`; diverse3 is weak.
 - Decision: **NO PROMOTION; allocation remains 0%**. The backend/finalize speedups are kept because they preserve semantics and make iteration faster. The latest alpha overlay does not approach the requested 100%+ annualized clean/live target. Continue with smaller pre-registered family sweeps and escalate to expensive 10-fold/full-universe only after current 3-fold smoke survives 10/15/20bps cost, RPT/turnover, and paper/live fill telemetry gates.
+
+## 2026-06-09 — Residual/dispersion alpha search: 후보 추가, 승격 없음
+
+- Added two theory-plausible clean-discovery families under search hash `4dd982a04779707f11d4530059f314ebe965cdee32fbd5a92a87a946ca3c7be7`:
+  - `cross_sectional_residual_reversal`: panel-median residual shock mean-reversion with own-trend, realized-vol, and market-stress gates.
+  - `cross_sectional_dispersion_gated_momentum`: residual relative-strength momentum gated by lagged cross-sectional return dispersion vs rolling history.
+- External theory anchors checked for hypothesis shape: Zhang & Makgolo 2026 dispersion/state-dependent crypto momentum, Dobrynskaya crypto momentum/reversal, Avellaneda-Lee residual/stat-arb mean reversion, and Moskowitz-Ooi-Pedersen time-series momentum.
+- Smoke evidence at embedded 10bps round-trip cost, BTC/ETH/SOL/BNB, 1h, 3 recent folds, lev2, Rust backend, robust train/validation selector:
+  - `current_search_xs_residual_reversal_smoke_20260609`: OOS comp `-0.25%`, annualized `-1.49%`, `0/2` positive. **Reject standalone**.
+  - `current_search_xs_dispersion_gated_momentum_smoke_20260609`: OOS comp `+0.69%`, annualized `+2.79%`, `2/3` positive. Weak standalone only.
+  - `current_search_dispersion_residual_overlay_20260609`: adding dispersion-gated momentum to the current overlay degraded OOS to `+0.75%` comp / `+3.04%` annualized / `2/3` positive because it displaced better train/validation winners.
+  - `current_search_residual_only_overlay_v2_20260609`: excluding dispersion-gated momentum preserved the prior best current overlay at `+4.16%` comp / `+17.73%` annualized / `3/3` positive, selected lead-lag + XS vol-adjusted momentum.
+- Existing-candidate reuse diagnostic added/recorded `robust_quality_v1_top1`: `+24.55%` comp / `+30.14%` annualized / `7/10` positive, improving prior `robust_top1` (`+22.14%` comp). This is still **post-failure research**, not clean/fresh-forward promotion.
+- Summary artifact: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/current_search_residual_dispersion_summary_20260609/current_search_residual_dispersion_summary_20260609.md` and `.json`.
+- Decision: **NO LIVE/SHADOW PROMOTION; real allocation remains `0%`**. Do not tune thresholds or family inclusion against these locked-OOS smoke results. If using this branch next, freeze family subset before a genuinely unseen/fresh-forward slice, then run 10/15/20bps cost or paper fill telemetry, turnover/RPT, BBO spread/slippage, partial/cancel/reject, and reconciliation gates.

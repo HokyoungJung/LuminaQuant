@@ -76,6 +76,18 @@ FAMILY_DESCRIPTIONS: dict[str, str] = {
         "median move and scaling by realized volatility. Uses prior bars only, "
         "with market-stress and volatility gates to avoid raw beta chasing."
     ),
+    "cross_sectional_dispersion_gated_momentum": (
+        "Enter residual relative-strength momentum only when lagged cross-sectional "
+        "return dispersion is not elevated versus its own rolling history. This "
+        "keeps the leaf aligned with crypto momentum state-dependence research "
+        "without using locked-OOS feedback."
+    ),
+    "cross_sectional_residual_reversal": (
+        "Fade short-horizon panel-median residual shocks when the target is not "
+        "in a strong own-trend regime. This is a cross-sectional stat-arb style "
+        "mean-reversion leaf using prior bars only, with market-stress and "
+        "volatility gates."
+    ),
     "feature_flow_crowding_reversal": (
         "Use local funding/open-interest/taker-flow feature points to fade crowded "
         "directional flow after funding/flow extremes. Feature coverage must exist "
@@ -217,6 +229,25 @@ def _search_space() -> dict[str, Any]:
             "lookback": [12, 24, 48],
             "vol_window": [24, 48],
             "score_threshold": [0.50, 1.00],
+            "market_stress_gate": [0.025, 0.050],
+            "max_realized_vol": [0.012, 0.020],
+            "min_hold": [4, 8],
+        },
+        "cross_sectional_dispersion_gated_momentum": {
+            "lookback": [12, 24, 48],
+            "vol_window": [24, 48],
+            "score_threshold": [0.50, 1.00],
+            "dispersion_window": [48, 96],
+            "max_dispersion_quantile": [0.60, 0.80],
+            "market_stress_gate": [0.025, 0.050],
+            "max_realized_vol": [0.012, 0.020],
+            "min_hold": [4, 8],
+        },
+        "cross_sectional_residual_reversal": {
+            "lookback": [12, 24, 48],
+            "vol_window": [24, 48],
+            "residual_z_min": [1.25, 1.75],
+            "max_trend_z": [0.75, 1.25],
             "market_stress_gate": [0.025, 0.050],
             "max_realized_vol": [0.012, 0.020],
             "min_hold": [4, 8],
@@ -1629,6 +1660,264 @@ def _cross_sectional_vol_adjusted_momentum_rows(
                                         locked_oos=fold.locked_oos,
                                     )
                                 )
+    return out
+
+
+def _cross_sectional_dispersion_gated_momentum_rows(
+    *,
+    bars_by_symbol: Mapping[str, pd.DataFrame],
+    panel: pd.DataFrame,
+    symbol: str,
+    timeframe: str,
+    fold: monthly.MonthlyFold,
+    leverages: Sequence[int],
+    allocation_fraction: float,
+    simulation_backend: str | None = None,
+) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    frame = bars_by_symbol.get(symbol, pd.DataFrame())
+    if frame.empty or symbol not in panel or len(panel.columns) < 3:
+        return out
+    datetimes = pd.DatetimeIndex(pd.to_datetime(frame["datetime"]))
+    close_panel = panel.reindex(datetimes).ffill()
+    target_close = close_panel[symbol]
+    target_returns = target_close.pct_change(fill_method=None)
+    panel_returns = close_panel.pct_change(fill_method=None)
+    for lookback in (12, 24, 48):
+        target_momentum = target_close / target_close.shift(lookback) - 1.0
+        panel_momentum = close_panel / close_panel.shift(lookback) - 1.0
+        market_median_momentum = panel_momentum.median(axis=1, skipna=True)
+        residual_momentum = target_momentum - market_median_momentum
+        market_stress = panel_returns.median(axis=1, skipna=True).rolling(lookback).sum()
+        cross_sectional_dispersion = (
+            panel_returns.std(axis=1, skipna=True, ddof=1).rolling(lookback).mean()
+        )
+        for vol_window in (24, 48):
+            realized_vol = target_returns.rolling(vol_window).std(ddof=1).replace(0.0, np.nan)
+            score = residual_momentum / realized_vol
+            for score_threshold in (0.50, 1.00):
+                for dispersion_window in (48, 96):
+                    rolling_dispersion_cap = cross_sectional_dispersion.rolling(
+                        dispersion_window,
+                        min_periods=max(12, dispersion_window // 2),
+                    )
+                    for max_dispersion_quantile in (0.60, 0.80):
+                        dispersion_cap = rolling_dispersion_cap.quantile(
+                            max_dispersion_quantile
+                        )
+                        dispersion_ok = (
+                            cross_sectional_dispersion.shift(1) <= dispersion_cap.shift(1)
+                        )
+                        for market_stress_gate in (0.025, 0.050):
+                            stress_ok = market_stress.shift(1) > -market_stress_gate
+                            inverse_stress_ok = market_stress.shift(1) < market_stress_gate
+                            for max_realized_vol in (0.012, 0.020):
+                                volatility_ok = realized_vol.shift(1) <= max_realized_vol
+                                long_entry = (
+                                    (score.shift(1) >= score_threshold)
+                                    & stress_ok
+                                    & volatility_ok
+                                    & dispersion_ok
+                                )
+                                short_entry = (
+                                    (score.shift(1) <= -score_threshold)
+                                    & inverse_stress_ok
+                                    & volatility_ok
+                                    & dispersion_ok
+                                )
+                                long_exit = (score < 0.0) | (
+                                    realized_vol > max_realized_vol * 1.5
+                                )
+                                short_exit = (score > 0.0) | (
+                                    realized_vol > max_realized_vol * 1.5
+                                )
+                                for min_hold in (4, 8):
+                                    signal = broad69._debounced_state_signal(
+                                        long_entry,
+                                        long_exit,
+                                        short_entry,
+                                        short_exit,
+                                        side="long_short",
+                                        min_hold_bars=min_hold,
+                                        cooldown_bars=2,
+                                    )
+                                    for leverage in leverages:
+                                        sim = _simulate_symbol(
+                                            frame,
+                                            signal,
+                                            integer_leverage=int(leverage),
+                                            allocation_fraction=allocation_fraction,
+                                            simulation_backend=simulation_backend,
+                                        )
+                                        base = _candidate_base(
+                                            family="cross_sectional_dispersion_gated_momentum",
+                                            model_parts=(
+                                                "xsdispmom",
+                                                timeframe,
+                                                symbol,
+                                                f"lb{lookback}",
+                                                f"vw{vol_window}",
+                                                f"thr{score_threshold}",
+                                                f"dw{dispersion_window}",
+                                                f"dq{max_dispersion_quantile}",
+                                                f"stress{market_stress_gate}",
+                                                f"vol{max_realized_vol}",
+                                                f"hold{min_hold}",
+                                                f"lev{leverage}",
+                                            ),
+                                            symbol=symbol,
+                                            timeframe=timeframe,
+                                            side="long_short",
+                                            lookback=lookback,
+                                            threshold=score_threshold,
+                                            exit_threshold=max_dispersion_quantile,
+                                            min_hold=min_hold,
+                                            leverage=int(leverage),
+                                            allocation_fraction=allocation_fraction,
+                                        )
+                                        base["vol_window"] = vol_window
+                                        base["dispersion_window"] = dispersion_window
+                                        base["max_dispersion_quantile"] = (
+                                            max_dispersion_quantile
+                                        )
+                                        base["max_realized_vol"] = max_realized_vol
+                                        base["market_stress_gate"] = market_stress_gate
+                                        base["indicator_set"] = [
+                                            "panel_median_residual_momentum",
+                                            "realized_volatility",
+                                            "rolling_cross_sectional_return_dispersion",
+                                            "market_stress_gate",
+                                        ]
+                                        base["no_nested_oos_mining"] = True
+                                        base["theory_plausibility_gate"] = (
+                                            "cross_sectional_dispersion_state_dependent_momentum"
+                                        )
+                                        out.append(
+                                            _finalize_row(
+                                                base=base,
+                                                sim=sim,
+                                                datetimes=frame["datetime"],
+                                                timeframe=timeframe,
+                                                train=fold.train,
+                                                validation=fold.validation,
+                                                locked_oos=fold.locked_oos,
+                                            )
+                                        )
+    return out
+
+
+def _cross_sectional_residual_reversal_rows(
+    *,
+    bars_by_symbol: Mapping[str, pd.DataFrame],
+    panel: pd.DataFrame,
+    symbol: str,
+    timeframe: str,
+    fold: monthly.MonthlyFold,
+    leverages: Sequence[int],
+    allocation_fraction: float,
+    simulation_backend: str | None = None,
+) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    frame = bars_by_symbol.get(symbol, pd.DataFrame())
+    if frame.empty or symbol not in panel or len(panel.columns) < 3:
+        return out
+    datetimes = pd.DatetimeIndex(pd.to_datetime(frame["datetime"]))
+    close_panel = panel.reindex(datetimes).ffill()
+    target_close = close_panel[symbol]
+    target_returns = target_close.pct_change(fill_method=None)
+    panel_returns = close_panel.pct_change(fill_method=None)
+    for lookback in (12, 24, 48):
+        target_momentum = target_close / target_close.shift(lookback) - 1.0
+        panel_momentum = close_panel / close_panel.shift(lookback) - 1.0
+        market_median_momentum = panel_momentum.median(axis=1, skipna=True)
+        residual_momentum = target_momentum - market_median_momentum
+        residual_z = broad69._rolling_zscore(residual_momentum, lookback * 2)
+        trend_z = broad69._rolling_zscore(target_momentum, lookback * 2).abs()
+        market_stress = panel_returns.abs().median(axis=1, skipna=True).rolling(lookback).sum()
+        for vol_window in (24, 48):
+            realized_vol = target_returns.rolling(vol_window).std(ddof=1).replace(0.0, np.nan)
+            for residual_z_min in (1.25, 1.75):
+                for max_trend_z in (0.75, 1.25):
+                    trend_ok = trend_z.shift(1) <= max_trend_z
+                    for market_stress_gate in (0.025, 0.050):
+                        stress_ok = market_stress.shift(1) <= market_stress_gate
+                        for max_realized_vol in (0.012, 0.020):
+                            volatility_ok = realized_vol.shift(1) <= max_realized_vol
+                            setup_ok = trend_ok & stress_ok & volatility_ok
+                            long_entry = (residual_z.shift(1) <= -residual_z_min) & setup_ok
+                            short_entry = (residual_z.shift(1) >= residual_z_min) & setup_ok
+                            vol_stop = realized_vol > max_realized_vol * 1.5
+                            long_exit = (residual_z > -0.20) | vol_stop
+                            short_exit = (residual_z < 0.20) | vol_stop
+                            for min_hold in (4, 8):
+                                signal = broad69._debounced_state_signal(
+                                    long_entry,
+                                    long_exit,
+                                    short_entry,
+                                    short_exit,
+                                    side="long_short",
+                                    min_hold_bars=min_hold,
+                                    cooldown_bars=2,
+                                )
+                                for leverage in leverages:
+                                    sim = _simulate_symbol(
+                                        frame,
+                                        signal,
+                                        integer_leverage=int(leverage),
+                                        allocation_fraction=allocation_fraction,
+                                        simulation_backend=simulation_backend,
+                                    )
+                                    base = _candidate_base(
+                                        family="cross_sectional_residual_reversal",
+                                        model_parts=(
+                                            "xsresrev",
+                                            timeframe,
+                                            symbol,
+                                            f"lb{lookback}",
+                                            f"vw{vol_window}",
+                                            f"z{residual_z_min}",
+                                            f"tz{max_trend_z}",
+                                            f"stress{market_stress_gate}",
+                                            f"vol{max_realized_vol}",
+                                            f"hold{min_hold}",
+                                            f"lev{leverage}",
+                                        ),
+                                        symbol=symbol,
+                                        timeframe=timeframe,
+                                        side="long_short",
+                                        lookback=lookback,
+                                        threshold=residual_z_min,
+                                        exit_threshold=0.20,
+                                        min_hold=min_hold,
+                                        leverage=int(leverage),
+                                        allocation_fraction=allocation_fraction,
+                                    )
+                                    base["vol_window"] = vol_window
+                                    base["max_trend_z"] = max_trend_z
+                                    base["market_stress_gate"] = market_stress_gate
+                                    base["max_realized_vol"] = max_realized_vol
+                                    base["indicator_set"] = [
+                                        "panel_median_residual_momentum",
+                                        "residual_z",
+                                        "own_trend_z_gate",
+                                        "realized_volatility",
+                                        "market_stress_gate",
+                                    ]
+                                    base["no_nested_oos_mining"] = True
+                                    base["theory_plausibility_gate"] = (
+                                        "cross_sectional_residual_stat_arb_reversal"
+                                    )
+                                    out.append(
+                                        _finalize_row(
+                                            base=base,
+                                            sim=sim,
+                                            datetimes=frame["datetime"],
+                                            timeframe=timeframe,
+                                            train=fold.train,
+                                            validation=fold.validation,
+                                            locked_oos=fold.locked_oos,
+                                        )
+                                    )
     return out
 
 
@@ -3592,6 +3881,32 @@ def _rows_for_fold(
                 if "cross_sectional_vol_adjusted_momentum" in enabled:
                     rows.extend(
                         _cross_sectional_vol_adjusted_momentum_rows(
+                            bars_by_symbol=bars_by_symbol,
+                            panel=panel,
+                            symbol=symbol,
+                            timeframe=timeframe,
+                            fold=fold,
+                            leverages=actual_leverages,
+                            allocation_fraction=DEFAULT_ALLOCATION_FRACTION,
+                            simulation_backend=simulation_backend,
+                        )
+                    )
+                if "cross_sectional_dispersion_gated_momentum" in enabled:
+                    rows.extend(
+                        _cross_sectional_dispersion_gated_momentum_rows(
+                            bars_by_symbol=bars_by_symbol,
+                            panel=panel,
+                            symbol=symbol,
+                            timeframe=timeframe,
+                            fold=fold,
+                            leverages=actual_leverages,
+                            allocation_fraction=DEFAULT_ALLOCATION_FRACTION,
+                            simulation_backend=simulation_backend,
+                        )
+                    )
+                if "cross_sectional_residual_reversal" in enabled:
+                    rows.extend(
+                        _cross_sectional_residual_reversal_rows(
                             bars_by_symbol=bars_by_symbol,
                             panel=panel,
                             symbol=symbol,

@@ -274,6 +274,8 @@ def test_search_space_hash_is_stable_and_excludes_oos_results() -> None:
         "cross_asset_lead_lag_momentum",
         "btc_beta_residual_momentum",
         "cross_sectional_vol_adjusted_momentum",
+        "cross_sectional_dispersion_gated_momentum",
+        "cross_sectional_residual_reversal",
         "feature_flow_crowding_reversal",
         "feature_liquidation_imbalance_reversal",
         "feature_flow_oi_trend_continuation",
@@ -292,7 +294,7 @@ def test_search_space_hash_is_stable_and_excludes_oos_results() -> None:
         "standardized_indicator_ridge_directional",
     ]
     assert first == second
-    assert first == "c1e3482dfefb4c0591eb80c5c343650693f7e6f2a54db285c0f4e418d1e4db05"
+    assert first == "4dd982a04779707f11d4530059f314ebe965cdee32fbd5a92a87a946ca3c7be7"
 
 
 def test_lead_lag_family_is_covered_and_flat_split_labeled() -> None:
@@ -508,6 +510,118 @@ def test_cross_sectional_vol_adjusted_momentum_family_is_pre_registered() -> Non
 
     assert rows
     assert {row["family"] for row in rows} == {"cross_sectional_vol_adjusted_momentum"}
+    assert all(row["uses_locked_oos_for_selection"] is False for row in rows)
+
+
+def test_cross_sectional_dispersion_gated_momentum_family_is_pre_registered() -> None:
+    datetimes = pd.date_range("2025-01-01", periods=260, freq="h")
+    base = np.linspace(100.0, 115.0, len(datetimes))
+    eth_close = base + np.r_[np.zeros(120), np.linspace(0.0, 10.0, 140)]
+    sol_close = base * 0.97
+    xrp_close = base * 1.03 - np.r_[np.zeros(120), np.linspace(0.0, 2.0, 140)]
+
+    def frame(close: np.ndarray) -> pd.DataFrame:
+        return pd.DataFrame(
+            {
+                "datetime": datetimes,
+                "open": close,
+                "high": close * 1.01,
+                "low": close * 0.99,
+                "close": close,
+                "volume": np.full(len(close), 1000.0),
+            }
+        )
+
+    class Fold:
+        train = (datetimes[0], datetimes[99])
+        validation = (datetimes[100], datetimes[189])
+        locked_oos = (datetimes[190], datetimes[-1])
+
+    bars_by_symbol = {
+        "ETHUSDT": frame(eth_close),
+        "SOLUSDT": frame(sol_close),
+        "XRPUSDT": frame(xrp_close),
+    }
+    panel = module.broad69._close_panel(
+        bars_by_symbol,
+        ("ETHUSDT", "SOLUSDT", "XRPUSDT"),
+    )
+
+    rows = module._cross_sectional_dispersion_gated_momentum_rows(
+        bars_by_symbol=bars_by_symbol,
+        panel=panel,
+        symbol="ETHUSDT",
+        timeframe="1h",
+        fold=Fold(),
+        leverages=(2,),
+        allocation_fraction=0.1,
+        simulation_backend="python",
+    )
+
+    assert rows
+    assert {row["family"] for row in rows} == {
+        "cross_sectional_dispersion_gated_momentum"
+    }
+    assert all(row["no_nested_oos_mining"] is True for row in rows)
+    assert all("rolling_cross_sectional_return_dispersion" in row["indicator_set"] for row in rows)
+    assert all(row["uses_locked_oos_for_selection"] is False for row in rows)
+
+
+def test_cross_sectional_residual_reversal_family_is_pre_registered() -> None:
+    datetimes = pd.date_range("2025-01-01", periods=260, freq="h")
+    market = np.linspace(100.0, 112.0, len(datetimes))
+    shock = np.zeros(len(datetimes))
+    shock[90:130] = np.linspace(0.0, 10.0, 40)
+    shock[130:180] = np.linspace(10.0, -4.0, 50)
+    shock[180:] = np.linspace(-4.0, 0.0, len(datetimes) - 180)
+    eth_close = market + shock
+    sol_close = market * 0.98
+    xrp_close = market * 1.03
+
+    def frame(close: np.ndarray) -> pd.DataFrame:
+        return pd.DataFrame(
+            {
+                "datetime": datetimes,
+                "open": close,
+                "high": close * 1.01,
+                "low": close * 0.99,
+                "close": close,
+                "volume": np.full(len(close), 1000.0),
+            }
+        )
+
+    class Fold:
+        train = (datetimes[0], datetimes[99])
+        validation = (datetimes[100], datetimes[189])
+        locked_oos = (datetimes[190], datetimes[-1])
+
+    bars_by_symbol = {
+        "ETHUSDT": frame(eth_close),
+        "SOLUSDT": frame(sol_close),
+        "XRPUSDT": frame(xrp_close),
+    }
+    panel = module.broad69._close_panel(
+        bars_by_symbol,
+        ("ETHUSDT", "SOLUSDT", "XRPUSDT"),
+    )
+
+    rows = module._cross_sectional_residual_reversal_rows(
+        bars_by_symbol=bars_by_symbol,
+        panel=panel,
+        symbol="ETHUSDT",
+        timeframe="1h",
+        fold=Fold(),
+        leverages=(2,),
+        allocation_fraction=0.1,
+        simulation_backend="python",
+    )
+
+    assert rows
+    assert {row["family"] for row in rows} == {"cross_sectional_residual_reversal"}
+    assert all(row["no_nested_oos_mining"] is True for row in rows)
+    assert {row["theory_plausibility_gate"] for row in rows} == {
+        "cross_sectional_residual_stat_arb_reversal"
+    }
     assert all(row["uses_locked_oos_for_selection"] is False for row in rows)
 
 
