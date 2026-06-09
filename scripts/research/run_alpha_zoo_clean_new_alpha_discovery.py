@@ -30,6 +30,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from lumina_quant.alpha_zoo import native_alpha_fold_backend  # noqa: E402
 from lumina_quant.optimization.search_policy import optimization_search_policy_payload  # noqa: E402
 from lumina_quant.research_universe import BINANCE_CORE_CRYPTO_RESEARCH_SYMBOLS  # noqa: E402
 from scripts.research import run_alpha_zoo_69_asset_monthly_refit_walkforward as monthly  # noqa: E402
@@ -41,6 +42,7 @@ DEFAULT_TIMEFRAMES = ("1h", "4h")
 DEFAULT_LEVERAGES = (2, 3, 4)
 DEFAULT_ALLOCATION_FRACTION = 0.10
 DEFAULT_FOLD_WORKERS = 1
+DEFAULT_SIMULATION_BACKEND = native_alpha_fold_backend.ALPHA_FOLD_BACKEND_AUTO
 DEFAULT_SELECTION_POLICY = "default_train_validation"
 ROBUST_SELECTION_POLICY = "robust_train_validation_v1"
 SELECTION_POLICIES = (DEFAULT_SELECTION_POLICY, ROBUST_SELECTION_POLICY)
@@ -140,6 +142,12 @@ FAMILY_DESCRIPTIONS: dict[str, str] = {
         "Indicator leaf alpha: use scalar Kalman filter residual z-score as an "
         "adaptive mean-reversion setup, gated by weak filter slope and realized "
         "volatility so it does not fight strong trends."
+    ),
+    "indicator_vwap_kalman_pullback_continuation": (
+        "Indicator leaf alpha: trade pullback continuation when an adaptive Kalman "
+        "trend, rolling VWAP, Bollinger location, ATR distance, and train/validation "
+        "volatility gates agree. Uses prior bars only and is a theory-plausible "
+        "30m+ trend-reentry setup, not a hard-coded post-OOS rescue rule."
     ),
     "standardized_indicator_ridge_directional": (
         "Small ML-style leaf alpha: train-only standardized OHLCV indicator features "
@@ -310,6 +318,16 @@ def _search_space() -> dict[str, Any]:
             "measurement_noise": [0.02, 0.08],
             "residual_z_min": [1.25, 1.75],
             "max_slope_z": [0.25, 0.50],
+            "max_realized_vol": [0.018, 0.028],
+            "min_hold": [4, 8],
+        },
+        "indicator_vwap_kalman_pullback_continuation": {
+            "lookback": [48, 96],
+            "process_noise": [0.0005, 0.002],
+            "measurement_noise": [0.02, 0.08],
+            "trend_slope_z": [0.25, 0.50],
+            "pullback_z": [0.25, 0.75],
+            "max_atr_distance": [1.5, 2.5],
             "max_realized_vol": [0.018, 0.028],
             "min_hold": [4, 8],
         },
@@ -833,6 +851,91 @@ def _load_feature_points_safe(symbol: str, *, feature_root: Path) -> pd.DataFram
     return pdf.sort_values("datetime")
 
 
+_FRAME_ARRAY_CACHE: dict[int, tuple[int, np.ndarray, np.ndarray, np.ndarray]] = {}
+_SPLIT_MASK_CACHE: dict[
+    tuple[int, int, pd.Timestamp, pd.Timestamp, pd.Timestamp, pd.Timestamp, pd.Timestamp, pd.Timestamp],
+    tuple[np.ndarray, np.ndarray, np.ndarray],
+] = {}
+
+
+def _frame_arrays(frame: pd.DataFrame) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    cache_key = id(frame)
+    cached = _FRAME_ARRAY_CACHE.get(cache_key)
+    if cached is not None and cached[0] == len(frame):
+        return cached[1], cached[2], cached[3]
+    close = frame["close"].to_numpy(dtype=float, copy=False)
+    high = frame["high"].to_numpy(dtype=float, copy=False)
+    low = frame["low"].to_numpy(dtype=float, copy=False)
+    arrays = (
+        np.ascontiguousarray(close, dtype=np.float64),
+        np.ascontiguousarray(high, dtype=np.float64),
+        np.ascontiguousarray(low, dtype=np.float64),
+    )
+    _FRAME_ARRAY_CACHE[cache_key] = (len(frame), arrays[0], arrays[1], arrays[2])
+    return arrays
+
+
+def _simulate_symbol(
+    frame: pd.DataFrame,
+    signal: np.ndarray,
+    *,
+    integer_leverage: int,
+    allocation_fraction: float,
+    round_trip_cost_bps: float = broad69.PRIMARY_ROUND_TRIP_COST_BPS,
+    simulation_backend: str | None = None,
+) -> broad69.SimResult:
+    close, high, low = _frame_arrays(frame)
+    signal_arr = np.ascontiguousarray(np.asarray(signal, dtype=np.float64), dtype=np.float64)
+    if signal_arr.size != close.size:
+        raise ValueError("signal length must equal bars length")
+    returns, liquidation, account_wipeout = native_alpha_fold_backend.simulate_symbol_arrays(
+        close,
+        high,
+        low,
+        signal_arr,
+        integer_leverage=int(integer_leverage),
+        allocation_fraction=float(allocation_fraction),
+        round_trip_cost_bps=float(round_trip_cost_bps),
+        backend=simulation_backend,
+    )
+    return broad69.SimResult(
+        returns=returns,
+        position=signal_arr,
+        liquidation_flags=liquidation,
+        account_wipeout_flags=account_wipeout,
+    )
+
+
+def _split_masks(
+    datetimes: pd.Series | pd.DatetimeIndex,
+    *,
+    train: tuple[pd.Timestamp, pd.Timestamp],
+    validation: tuple[pd.Timestamp, pd.Timestamp],
+    locked_oos: tuple[pd.Timestamp, pd.Timestamp],
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    key = (
+        id(datetimes),
+        len(datetimes),
+        pd.Timestamp(train[0]),
+        pd.Timestamp(train[1]),
+        pd.Timestamp(validation[0]),
+        pd.Timestamp(validation[1]),
+        pd.Timestamp(locked_oos[0]),
+        pd.Timestamp(locked_oos[1]),
+    )
+    cached = _SPLIT_MASK_CACHE.get(key)
+    if cached is not None:
+        return cached
+    idx = pd.DatetimeIndex(pd.to_datetime(datetimes))
+    masks = (
+        np.asarray((idx >= train[0]) & (idx <= train[1]), dtype=bool),
+        np.asarray((idx >= validation[0]) & (idx <= validation[1]), dtype=bool),
+        np.asarray((idx >= locked_oos[0]) & (idx <= locked_oos[1]), dtype=bool),
+    )
+    _SPLIT_MASK_CACHE[key] = masks
+    return masks
+
+
 def _finalize_row(
     *,
     base: Mapping[str, Any],
@@ -844,14 +947,47 @@ def _finalize_row(
     locked_oos: tuple[pd.Timestamp, pd.Timestamp],
 ) -> dict[str, Any]:
     row = dict(base)
-    windows = broad69.SplitWindows(train=train, validation=validation)
-    row = broad69.finalize_candidate(row, sim, datetimes, timeframe=timeframe, windows=windows)
-    mask = _window_mask(pd.DatetimeIndex(pd.to_datetime(datetimes)), locked_oos)
+    train_mask, validation_mask, locked_mask = _split_masks(
+        datetimes,
+        train=train,
+        validation=validation,
+        locked_oos=locked_oos,
+    )
+    for split, mask in (("train", train_mask), ("validation", validation_mask)):
+        metrics = broad69.split_metrics(
+            sim.returns[mask],
+            sim.position[mask],
+            sim.liquidation_flags[mask],
+            sim.account_wipeout_flags[mask],
+            timeframe=timeframe,
+        )
+        row[f"{split}_return"] = metrics["total_return"]
+        row[f"{split}_mdd"] = metrics["max_drawdown"]
+        row[f"{split}_sharpe"] = metrics["sharpe"]
+        row[f"{split}_sortino"] = metrics["sortino"]
+        row[f"{split}_calmar"] = metrics["calmar"]
+        row[f"{split}_trade_event_count"] = metrics["trade_event_count"]
+        row[f"{split}_exposure_bar_count"] = metrics["exposure_bar_count"]
+    validation_return = float(row.get("validation_return") or 0.0)
+    train_return = float(row.get("train_return") or 0.0)
+    row["train_validation_return_ratio"] = (
+        train_return / validation_return if validation_return > 0.0 else 0.0
+    )
+    row["train_minus_validation_return"] = train_return - validation_return
+    notional = float(row["notional_fraction"])
+    for split in broad69.SPLIT_ORDER:
+        row[f"{split}_return_per_turnover_proxy_bps"] = broad69._return_per_turnover(
+            float(row[f"{split}_return"]),
+            int(row[f"{split}_trade_event_count"]),
+            notional,
+        )
+    row["train_validation_score"] = broad69._candidate_score(row)
+    row = broad69.gate_candidate(row)
     locked = broad69.split_metrics(
-        sim.returns[mask],
-        sim.position[mask],
-        sim.liquidation_flags[mask],
-        sim.account_wipeout_flags[mask],
+        sim.returns[locked_mask],
+        sim.position[locked_mask],
+        sim.liquidation_flags[locked_mask],
+        sim.account_wipeout_flags[locked_mask],
         timeframe=timeframe,
     )
     row.update(
@@ -924,6 +1060,7 @@ def _squeeze_rows(
     fold: monthly.MonthlyFold,
     leverages: Sequence[int],
     allocation_fraction: float,
+    simulation_backend: str | None = None,
 ) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     close = frame["close"].astype(float).reset_index(drop=True)
@@ -954,11 +1091,12 @@ def _squeeze_rows(
                         cooldown_bars=2,
                     )
                     for leverage in leverages:
-                        sim = broad69.simulate_symbol(
+                        sim = _simulate_symbol(
                             frame,
                             signal,
                             integer_leverage=int(leverage),
                             allocation_fraction=allocation_fraction,
+                            simulation_backend=simulation_backend,
                         )
                         base = _candidate_base(
                             family="volatility_squeeze_breakout",
@@ -1004,6 +1142,7 @@ def _absorption_rows(
     fold: monthly.MonthlyFold,
     leverages: Sequence[int],
     allocation_fraction: float,
+    simulation_backend: str | None = None,
 ) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     close = frame["close"].astype(float).reset_index(drop=True)
@@ -1039,11 +1178,12 @@ def _absorption_rows(
                         cooldown_bars=2,
                     )
                     for leverage in leverages:
-                        sim = broad69.simulate_symbol(
+                        sim = _simulate_symbol(
                             frame,
                             signal,
                             integer_leverage=int(leverage),
                             allocation_fraction=allocation_fraction,
+                            simulation_backend=simulation_backend,
                         )
                         base = _candidate_base(
                             family="volume_absorption_reversal",
@@ -1089,6 +1229,7 @@ def _reclaim_rows(
     fold: monthly.MonthlyFold,
     leverages: Sequence[int],
     allocation_fraction: float,
+    simulation_backend: str | None = None,
 ) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     close = frame["close"].astype(float).reset_index(drop=True)
@@ -1121,11 +1262,12 @@ def _reclaim_rows(
                     cooldown_bars=2,
                 )
                 for leverage in leverages:
-                    sim = broad69.simulate_symbol(
+                    sim = _simulate_symbol(
                         frame,
                         signal,
                         integer_leverage=int(leverage),
                         allocation_fraction=allocation_fraction,
+                        simulation_backend=simulation_backend,
                     )
                     base = _candidate_base(
                         family="range_reclaim_continuation",
@@ -1171,6 +1313,7 @@ def _lead_lag_rows(
     fold: monthly.MonthlyFold,
     leverages: Sequence[int],
     allocation_fraction: float,
+    simulation_backend: str | None = None,
 ) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     frame = bars_by_symbol.get(symbol, pd.DataFrame())
@@ -1226,11 +1369,12 @@ def _lead_lag_rows(
                             cooldown_bars=2,
                         )
                         for leverage in leverages:
-                            sim = broad69.simulate_symbol(
+                            sim = _simulate_symbol(
                                 frame,
                                 signal,
                                 integer_leverage=int(leverage),
                                 allocation_fraction=allocation_fraction,
+                                simulation_backend=simulation_backend,
                             )
                             base = _candidate_base(
                                 family="cross_asset_lead_lag_momentum",
@@ -1279,6 +1423,7 @@ def _btc_beta_residual_momentum_rows(
     fold: monthly.MonthlyFold,
     leverages: Sequence[int],
     allocation_fraction: float,
+    simulation_backend: str | None = None,
 ) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     frame = bars_by_symbol.get(symbol, pd.DataFrame())
@@ -1331,11 +1476,12 @@ def _btc_beta_residual_momentum_rows(
                                 cooldown_bars=2,
                             )
                             for leverage in leverages:
-                                sim = broad69.simulate_symbol(
+                                sim = _simulate_symbol(
                                     frame,
                                     signal,
                                     integer_leverage=int(leverage),
                                     allocation_fraction=allocation_fraction,
+                                    simulation_backend=simulation_backend,
                                 )
                                 base = _candidate_base(
                                     family="btc_beta_residual_momentum",
@@ -1388,6 +1534,7 @@ def _cross_sectional_vol_adjusted_momentum_rows(
     fold: monthly.MonthlyFold,
     leverages: Sequence[int],
     allocation_fraction: float,
+    simulation_backend: str | None = None,
 ) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     frame = bars_by_symbol.get(symbol, pd.DataFrame())
@@ -1434,11 +1581,12 @@ def _cross_sectional_vol_adjusted_momentum_rows(
                                 cooldown_bars=2,
                             )
                             for leverage in leverages:
-                                sim = broad69.simulate_symbol(
+                                sim = _simulate_symbol(
                                     frame,
                                     signal,
                                     integer_leverage=int(leverage),
                                     allocation_fraction=allocation_fraction,
+                                    simulation_backend=simulation_backend,
                                 )
                                 base = _candidate_base(
                                     family="cross_sectional_vol_adjusted_momentum",
@@ -1492,6 +1640,7 @@ def _feature_flow_rows(
     fold: monthly.MonthlyFold,
     leverages: Sequence[int],
     allocation_fraction: float,
+    simulation_backend: str | None = None,
 ) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     if frame.empty or "feature_oi_flow_valid" not in frame.columns:
@@ -1545,11 +1694,12 @@ def _feature_flow_rows(
                             cooldown_bars=2,
                         )
                         for leverage in leverages:
-                            sim = broad69.simulate_symbol(
+                            sim = _simulate_symbol(
                                 frame,
                                 signal,
                                 integer_leverage=int(leverage),
                                 allocation_fraction=allocation_fraction,
+                                simulation_backend=simulation_backend,
                             )
                             base = _candidate_base(
                                 family="feature_flow_crowding_reversal",
@@ -1598,6 +1748,7 @@ def _feature_liquidation_rows(
     fold: monthly.MonthlyFold,
     leverages: Sequence[int],
     allocation_fraction: float,
+    simulation_backend: str | None = None,
 ) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     if frame.empty or "feature_valid" not in frame.columns:
@@ -1658,11 +1809,12 @@ def _feature_liquidation_rows(
                             cooldown_bars=2,
                         )
                         for leverage in leverages:
-                            sim = broad69.simulate_symbol(
+                            sim = _simulate_symbol(
                                 frame,
                                 signal,
                                 integer_leverage=int(leverage),
                                 allocation_fraction=allocation_fraction,
+                                simulation_backend=simulation_backend,
                             )
                             base = _candidate_base(
                                 family="feature_liquidation_imbalance_reversal",
@@ -1711,6 +1863,7 @@ def _feature_flow_trend_rows(
     fold: monthly.MonthlyFold,
     leverages: Sequence[int],
     allocation_fraction: float,
+    simulation_backend: str | None = None,
 ) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     if frame.empty or "feature_oi_flow_valid" not in frame.columns:
@@ -1768,11 +1921,12 @@ def _feature_flow_trend_rows(
                             cooldown_bars=2,
                         )
                         for leverage in leverages:
-                            sim = broad69.simulate_symbol(
+                            sim = _simulate_symbol(
                                 frame,
                                 signal,
                                 integer_leverage=int(leverage),
                                 allocation_fraction=allocation_fraction,
+                                simulation_backend=simulation_backend,
                             )
                             base = _candidate_base(
                                 family="feature_flow_oi_trend_continuation",
@@ -1821,6 +1975,7 @@ def _feature_crowding_continuation_rows(
     fold: monthly.MonthlyFold,
     leverages: Sequence[int],
     allocation_fraction: float,
+    simulation_backend: str | None = None,
 ) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     if frame.empty or "feature_oi_flow_valid" not in frame.columns:
@@ -1871,11 +2026,12 @@ def _feature_crowding_continuation_rows(
                     cooldown_bars=2,
                 )
                 for leverage in leverages:
-                    sim = broad69.simulate_symbol(
+                    sim = _simulate_symbol(
                         frame,
                         signal,
                         integer_leverage=int(leverage),
                         allocation_fraction=allocation_fraction,
+                        simulation_backend=simulation_backend,
                     )
                     base = _candidate_base(
                         family="funding_oi_taker_crowding_continuation",
@@ -1923,6 +2079,7 @@ def _perp_crowding_rows(
     fold: monthly.MonthlyFold,
     leverages: Sequence[int],
     allocation_fraction: float,
+    simulation_backend: str | None = None,
 ) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     if frame.empty or "feature_valid" not in frame.columns:
@@ -1976,11 +2133,12 @@ def _perp_crowding_rows(
                     cooldown_bars=2,
                 )
                 for leverage in leverages:
-                    sim = broad69.simulate_symbol(
+                    sim = _simulate_symbol(
                         frame,
                         signal,
                         integer_leverage=int(leverage),
                         allocation_fraction=allocation_fraction,
+                        simulation_backend=simulation_backend,
                     )
                     base = _candidate_base(
                         family="perp_crowding_score_reversion",
@@ -2027,6 +2185,7 @@ def _feature_taker_flow_exhaustion_rows(
     fold: monthly.MonthlyFold,
     leverages: Sequence[int],
     allocation_fraction: float,
+    simulation_backend: str | None = None,
 ) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     if frame.empty or "feature_valid" not in frame.columns:
@@ -2076,11 +2235,12 @@ def _feature_taker_flow_exhaustion_rows(
                                 cooldown_bars=2,
                             )
                             for leverage in leverages:
-                                sim = broad69.simulate_symbol(
+                                sim = _simulate_symbol(
                                     frame,
                                     signal,
                                     integer_leverage=int(leverage),
                                     allocation_fraction=allocation_fraction,
+                                    simulation_backend=simulation_backend,
                                 )
                                 base = _candidate_base(
                                     family="feature_taker_flow_exhaustion_reversal",
@@ -2130,6 +2290,7 @@ def _feature_bbo_flow_rows(
     fold: monthly.MonthlyFold,
     leverages: Sequence[int],
     allocation_fraction: float,
+    simulation_backend: str | None = None,
 ) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     if (
@@ -2183,11 +2344,12 @@ def _feature_bbo_flow_rows(
                             cooldown_bars=2,
                         )
                         for leverage in leverages:
-                            sim = broad69.simulate_symbol(
+                            sim = _simulate_symbol(
                                 frame,
                                 signal,
                                 integer_leverage=int(leverage),
                                 allocation_fraction=allocation_fraction,
+                                simulation_backend=simulation_backend,
                             )
                             base = _candidate_base(
                                 family="feature_bbo_flow_exhaustion_reversal",
@@ -2236,6 +2398,7 @@ def _feature_book_depth_rows(
     fold: monthly.MonthlyFold,
     leverages: Sequence[int],
     allocation_fraction: float,
+    simulation_backend: str | None = None,
 ) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     if (
@@ -2287,11 +2450,12 @@ def _feature_book_depth_rows(
                         cooldown_bars=2,
                     )
                     for leverage in leverages:
-                        sim = broad69.simulate_symbol(
+                        sim = _simulate_symbol(
                             frame,
                             signal,
                             integer_leverage=int(leverage),
                             allocation_fraction=allocation_fraction,
+                            simulation_backend=simulation_backend,
                         )
                         base = _candidate_base(
                             family="feature_book_depth_imbalance_reversal",
@@ -2339,6 +2503,7 @@ def _deep_research_funding_dislocation_trend_carry_rows(
     fold: monthly.MonthlyFold,
     leverages: Sequence[int],
     allocation_fraction: float,
+    simulation_backend: str | None = None,
 ) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     if frame.empty or "feature_oi_flow_valid" not in frame.columns:
@@ -2398,11 +2563,12 @@ def _deep_research_funding_dislocation_trend_carry_rows(
                             cooldown_bars=2,
                         )
                         for leverage in leverages:
-                            sim = broad69.simulate_symbol(
+                            sim = _simulate_symbol(
                                 frame,
                                 signal,
                                 integer_leverage=int(leverage),
                                 allocation_fraction=allocation_fraction,
+                                simulation_backend=simulation_backend,
                             )
                             base = _candidate_base(
                                 family="deep_research_funding_dislocation_trend_carry",
@@ -2454,6 +2620,7 @@ def _deep_research_vol_managed_momentum_crash_gate_rows(
     fold: monthly.MonthlyFold,
     leverages: Sequence[int],
     allocation_fraction: float,
+    simulation_backend: str | None = None,
 ) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     if frame.empty:
@@ -2504,11 +2671,12 @@ def _deep_research_vol_managed_momentum_crash_gate_rows(
                                 cooldown_bars=2,
                             )
                             for leverage in leverages:
-                                sim = broad69.simulate_symbol(
+                                sim = _simulate_symbol(
                                     frame,
                                     signal,
                                     integer_leverage=int(leverage),
                                     allocation_fraction=allocation_fraction,
+                                    simulation_backend=simulation_backend,
                                 )
                                 base = _candidate_base(
                                     family="deep_research_vol_managed_momentum_crash_gate",
@@ -2558,6 +2726,7 @@ def _deep_research_flow_imbalance_liquidation_sweep_rows(
     fold: monthly.MonthlyFold,
     leverages: Sequence[int],
     allocation_fraction: float,
+    simulation_backend: str | None = None,
 ) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     if frame.empty or "feature_liquidation_valid" not in frame.columns:
@@ -2630,11 +2799,12 @@ def _deep_research_flow_imbalance_liquidation_sweep_rows(
                                 cooldown_bars=2,
                             )
                             for leverage in leverages:
-                                sim = broad69.simulate_symbol(
+                                sim = _simulate_symbol(
                                     frame,
                                     signal,
                                     integer_leverage=int(leverage),
                                     allocation_fraction=allocation_fraction,
+                                    simulation_backend=simulation_backend,
                                 )
                                 base = _candidate_base(
                                     family="deep_research_flow_imbalance_liquidation_sweep",
@@ -2686,6 +2856,7 @@ def _indicator_vwap_atr_bollinger_reversion_rows(
     fold: monthly.MonthlyFold,
     leverages: Sequence[int],
     allocation_fraction: float,
+    simulation_backend: str | None = None,
 ) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     if frame.empty:
@@ -2737,11 +2908,12 @@ def _indicator_vwap_atr_bollinger_reversion_rows(
                             cooldown_bars=2,
                         )
                         for leverage in leverages:
-                            sim = broad69.simulate_symbol(
+                            sim = _simulate_symbol(
                                 frame,
                                 signal,
                                 integer_leverage=int(leverage),
                                 allocation_fraction=allocation_fraction,
+                                simulation_backend=simulation_backend,
                             )
                             base = _candidate_base(
                                 family="indicator_vwap_atr_bollinger_reversion",
@@ -2796,6 +2968,7 @@ def _indicator_kalman_volatility_trend_rows(
     fold: monthly.MonthlyFold,
     leverages: Sequence[int],
     allocation_fraction: float,
+    simulation_backend: str | None = None,
 ) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     if frame.empty:
@@ -2848,11 +3021,12 @@ def _indicator_kalman_volatility_trend_rows(
                                 cooldown_bars=2,
                             )
                             for leverage in leverages:
-                                sim = broad69.simulate_symbol(
+                                sim = _simulate_symbol(
                                     frame,
                                     signal,
                                     integer_leverage=int(leverage),
                                     allocation_fraction=allocation_fraction,
+                                    simulation_backend=simulation_backend,
                                 )
                                 base = _candidate_base(
                                     family="indicator_kalman_volatility_trend",
@@ -2908,6 +3082,7 @@ def _indicator_kalman_residual_reversion_rows(
     fold: monthly.MonthlyFold,
     leverages: Sequence[int],
     allocation_fraction: float,
+    simulation_backend: str | None = None,
 ) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     if frame.empty:
@@ -2967,11 +3142,12 @@ def _indicator_kalman_residual_reversion_rows(
                                     cooldown_bars=2,
                                 )
                                 for leverage in leverages:
-                                    sim = broad69.simulate_symbol(
+                                    sim = _simulate_symbol(
                                         frame,
                                         signal,
                                         integer_leverage=int(leverage),
                                         allocation_fraction=allocation_fraction,
+                                        simulation_backend=simulation_backend,
                                     )
                                     base = _candidate_base(
                                         family="indicator_kalman_residual_reversion",
@@ -3018,8 +3194,158 @@ def _indicator_kalman_residual_reversion_rows(
                                             train=fold.train,
                                             validation=fold.validation,
                                             locked_oos=fold.locked_oos,
-                                        )
+                                )
+                            )
+    return out
+
+
+def _indicator_vwap_kalman_pullback_continuation_rows(
+    *,
+    frame: pd.DataFrame,
+    symbol: str,
+    timeframe: str,
+    fold: monthly.MonthlyFold,
+    leverages: Sequence[int],
+    allocation_fraction: float,
+    simulation_backend: str | None = None,
+) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    if frame.empty:
+        return out
+    close = frame["close"].astype(float).reset_index(drop=True)
+    volume = frame["volume"].astype(float).reset_index(drop=True)
+    datetimes = frame["datetime"]
+    log_close = np.log(close.replace(0.0, np.nan))
+    returns = close.pct_change(fill_method=None)
+    true_range_pct = _true_range_pct(frame)
+    for lookback in (48, 96):
+        vwap = _rolling_vwap(close, volume, lookback)
+        atr_pct = true_range_pct.rolling(lookback).mean()
+        realized_vol = returns.rolling(lookback).std(ddof=1)
+        middle = close.rolling(lookback).mean()
+        sigma = close.rolling(lookback).std(ddof=1).replace(0.0, np.nan)
+        bollinger_z = (close - middle) / sigma
+        vwap_deviation = close / vwap.replace(0.0, np.nan) - 1.0
+        vwap_deviation_z = broad69._rolling_zscore(vwap_deviation, lookback * 2)
+        atr_distance = (close - vwap).abs() / (
+            close.replace(0.0, np.nan) * atr_pct.replace(0.0, np.nan)
+        )
+        for process_noise in (0.0005, 0.002):
+            for measurement_noise in (0.02, 0.08):
+                filtered = _kalman_log_price_filter(
+                    close,
+                    process_noise=process_noise,
+                    measurement_noise=measurement_noise,
+                )
+                slope_window = max(6, lookback // 8)
+                kalman_slope = filtered - filtered.shift(slope_window)
+                slope_z = broad69._rolling_zscore(kalman_slope, lookback * 2)
+                for trend_slope_z in (0.25, 0.50):
+                    for pullback_z in (0.25, 0.75):
+                        for max_atr_distance in (1.5, 2.5):
+                            for max_realized_vol in (0.018, 0.028):
+                                volatility_ok = (
+                                    (realized_vol.shift(1) <= max_realized_vol)
+                                    & (atr_pct.shift(1) <= max_realized_vol * 1.5)
+                                    & (atr_distance.shift(1) <= max_atr_distance)
+                                )
+                                long_entry = (
+                                    (slope_z.shift(1) >= trend_slope_z)
+                                    & (log_close.shift(1) >= filtered.shift(1))
+                                    & (
+                                        (vwap_deviation_z.shift(1) <= -pullback_z)
+                                        | (bollinger_z.shift(1) <= -pullback_z)
                                     )
+                                    & volatility_ok
+                                )
+                                short_entry = (
+                                    (slope_z.shift(1) <= -trend_slope_z)
+                                    & (log_close.shift(1) <= filtered.shift(1))
+                                    & (
+                                        (vwap_deviation_z.shift(1) >= pullback_z)
+                                        | (bollinger_z.shift(1) >= pullback_z)
+                                    )
+                                    & volatility_ok
+                                )
+                                long_exit = (
+                                    (slope_z < 0.0)
+                                    | ((close >= vwap) & (bollinger_z >= 0.25))
+                                    | (realized_vol > max_realized_vol * 1.5)
+                                )
+                                short_exit = (
+                                    (slope_z > 0.0)
+                                    | ((close <= vwap) & (bollinger_z <= -0.25))
+                                    | (realized_vol > max_realized_vol * 1.5)
+                                )
+                                for min_hold in (4, 8):
+                                    signal = broad69._debounced_state_signal(
+                                        long_entry,
+                                        long_exit,
+                                        short_entry,
+                                        short_exit,
+                                        side="long_short",
+                                        min_hold_bars=min_hold,
+                                        cooldown_bars=2,
+                                    )
+                                    for leverage in leverages:
+                                        sim = _simulate_symbol(
+                                            frame,
+                                            signal,
+                                            integer_leverage=int(leverage),
+                                            allocation_fraction=allocation_fraction,
+                                            simulation_backend=simulation_backend,
+                                        )
+                                        base = _candidate_base(
+                                            family="indicator_vwap_kalman_pullback_continuation",
+                                            model_parts=(
+                                                "vwapkalmanpullback",
+                                                timeframe,
+                                                symbol,
+                                                f"lb{lookback}",
+                                                f"q{process_noise}",
+                                                f"r{measurement_noise}",
+                                                f"trend{trend_slope_z}",
+                                                f"pb{pullback_z}",
+                                                f"atrx{max_atr_distance}",
+                                                f"vol{max_realized_vol}",
+                                                f"hold{min_hold}",
+                                                f"lev{leverage}",
+                                            ),
+                                            symbol=symbol,
+                                            timeframe=timeframe,
+                                            side="long_short",
+                                            lookback=lookback,
+                                            threshold=trend_slope_z,
+                                            exit_threshold=pullback_z,
+                                            min_hold=min_hold,
+                                            leverage=int(leverage),
+                                            allocation_fraction=allocation_fraction,
+                                        )
+                                        base["indicator_set"] = [
+                                            "rolling_vwap",
+                                            "kalman_log_price_filter",
+                                            "kalman_slope_z",
+                                            "bollinger_z",
+                                            "atr_pct",
+                                            "atr_distance_to_vwap",
+                                            "realized_volatility",
+                                            "rolling_standardization",
+                                        ]
+                                        base["no_nested_oos_mining"] = True
+                                        base["theory_plausibility_gate"] = (
+                                            "vwap_kalman_pullback_continuation"
+                                        )
+                                        out.append(
+                                            _finalize_row(
+                                                base=base,
+                                                sim=sim,
+                                                datetimes=datetimes,
+                                                timeframe=timeframe,
+                                                train=fold.train,
+                                                validation=fold.validation,
+                                                locked_oos=fold.locked_oos,
+                                            )
+                                        )
     return out
 
 
@@ -3031,6 +3357,7 @@ def _standardized_indicator_ridge_directional_rows(
     fold: monthly.MonthlyFold,
     leverages: Sequence[int],
     allocation_fraction: float,
+    simulation_backend: str | None = None,
 ) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     if frame.empty:
@@ -3090,11 +3417,12 @@ def _standardized_indicator_ridge_directional_rows(
                         cooldown_bars=2,
                     )
                     for leverage in leverages:
-                        sim = broad69.simulate_symbol(
+                        sim = _simulate_symbol(
                             frame,
                             signal,
                             integer_leverage=int(leverage),
                             allocation_fraction=allocation_fraction,
+                            simulation_backend=simulation_backend,
                         )
                         base = _candidate_base(
                             family="standardized_indicator_ridge_directional",
@@ -3158,6 +3486,7 @@ def _rows_for_fold(
     selection_policy: str = DEFAULT_SELECTION_POLICY,
     enabled_families: Sequence[str] | None = None,
     leverages: Sequence[int] | None = DEFAULT_LEVERAGES,
+    simulation_backend: str | None = DEFAULT_SIMULATION_BACKEND,
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     enabled = set(_normalize_enabled_families(enabled_families))
@@ -3180,6 +3509,7 @@ def _rows_for_fold(
                 "fold": fold,
                 "leverages": actual_leverages,
                 "allocation_fraction": DEFAULT_ALLOCATION_FRACTION,
+                "simulation_backend": simulation_backend,
             }
             if "volatility_squeeze_breakout" in enabled:
                 rows.extend(_squeeze_rows(**kwargs))
@@ -3193,6 +3523,8 @@ def _rows_for_fold(
                 rows.extend(_indicator_kalman_volatility_trend_rows(**kwargs))
             if "indicator_kalman_residual_reversion" in enabled:
                 rows.extend(_indicator_kalman_residual_reversion_rows(**kwargs))
+            if "indicator_vwap_kalman_pullback_continuation" in enabled:
+                rows.extend(_indicator_vwap_kalman_pullback_continuation_rows(**kwargs))
             if "standardized_indicator_ridge_directional" in enabled:
                 rows.extend(_standardized_indicator_ridge_directional_rows(**kwargs))
             if "deep_research_vol_managed_momentum_crash_gate" in enabled:
@@ -3241,6 +3573,7 @@ def _rows_for_fold(
                             fold=fold,
                             leverages=actual_leverages,
                             allocation_fraction=DEFAULT_ALLOCATION_FRACTION,
+                            simulation_backend=simulation_backend,
                         )
                     )
                 if "btc_beta_residual_momentum" in enabled:
@@ -3253,6 +3586,7 @@ def _rows_for_fold(
                             fold=fold,
                             leverages=actual_leverages,
                             allocation_fraction=DEFAULT_ALLOCATION_FRACTION,
+                            simulation_backend=simulation_backend,
                         )
                     )
                 if "cross_sectional_vol_adjusted_momentum" in enabled:
@@ -3265,6 +3599,7 @@ def _rows_for_fold(
                             fold=fold,
                             leverages=actual_leverages,
                             allocation_fraction=DEFAULT_ALLOCATION_FRACTION,
+                            simulation_backend=simulation_backend,
                         )
                     )
     return _cap_rows_for_selection(
@@ -3415,12 +3750,16 @@ def run(
     fold_workers: int = DEFAULT_FOLD_WORKERS,
     leverages: Sequence[int] | None = DEFAULT_LEVERAGES,
     max_candidate_rows_output: int | None = None,
+    simulation_backend: str | None = DEFAULT_SIMULATION_BACKEND,
 ) -> dict[str, Any]:
     if selection_policy not in SELECTION_POLICIES:
         raise ValueError(f"unknown selection policy: {selection_policy}")
     enabled_families_normalized = _normalize_enabled_families(enabled_families)
     actual_leverages = _normalize_leverages(leverages)
     fold_workers = max(1, int(fold_workers))
+    normalized_simulation_backend = native_alpha_fold_backend.normalize_alpha_fold_backend(
+        simulation_backend
+    )
     search_space = _search_space()
     search_hash = _search_space_hash(search_space)
     bars, coverage = broad69.load_all_bars(symbols, data_root=data_root, timeframes=timeframes)
@@ -3454,6 +3793,7 @@ def run(
             selection_policy=selection_policy,
             enabled_families=enabled_families_normalized,
             leverages=actual_leverages,
+            simulation_backend=normalized_simulation_backend,
         )
 
     if fold_workers == 1 or len(folds) <= 1:
@@ -3536,6 +3876,9 @@ def run(
         "enabled_families": list(enabled_families_normalized),
         "integer_leverages": list(actual_leverages),
         "fold_workers": fold_workers,
+        "simulation_backend": native_alpha_fold_backend.alpha_fold_backend_diagnostics(
+            normalized_simulation_backend
+        ),
         "candidate_cap_sort_policy": "eligible_first_active_train_validation_selection_score",
         "candidate_row_count_total": candidate_row_count_total,
         "candidate_rows_truncated": len(candidate_rows_for_output) < candidate_row_count_total,
@@ -3553,6 +3896,9 @@ def run(
                 "enabled_families": list(enabled_families_normalized),
                 "integer_leverages": list(actual_leverages),
                 "fold_workers": fold_workers,
+                "simulation_backend": native_alpha_fold_backend.alpha_fold_backend_diagnostics(
+                    normalized_simulation_backend
+                ),
                 "candidate_row_count_total": candidate_row_count_total,
                 "max_candidate_rows_output": max_candidate_rows_output,
                 "candidate_cap_sort_policy": (
@@ -3619,6 +3965,8 @@ def _render_markdown(payload: Mapping[str, Any]) -> str:
         f"- enabled families: `{len(payload.get('enabled_families') or [])}`",
         f"- integer leverages: `{payload.get('integer_leverages', list(DEFAULT_LEVERAGES))}`",
         f"- fold workers: `{int(payload.get('fold_workers') or 1)}`",
+        "- simulation backend: "
+        f"`{(payload.get('simulation_backend') or {}).get('resolved_backend', 'unknown')}`",
         f"- candidate cap sort: `{payload.get('candidate_cap_sort_policy', 'legacy_score')}`",
         f"- candidate rows retained/written: `{payload.get('candidate_row_count_total', 0)}`/"
         f"`{len(payload.get('candidate_rows') or [])}`",
@@ -3708,6 +4056,16 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Parallel fold workers for candidate generation. 1 preserves serial execution.",
     )
     parser.add_argument(
+        "--simulation-backend",
+        choices=(
+            native_alpha_fold_backend.ALPHA_FOLD_BACKEND_AUTO,
+            native_alpha_fold_backend.ALPHA_FOLD_BACKEND_PYTHON,
+            native_alpha_fold_backend.ALPHA_FOLD_BACKEND_RUST,
+        ),
+        default=DEFAULT_SIMULATION_BACKEND,
+        help="Symbol simulation backend for fold candidate loops. auto uses Rust when built.",
+    )
+    parser.add_argument(
         "--max-candidate-rows-output",
         type=int,
         default=-1,
@@ -3748,6 +4106,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             int(item.strip()) for item in str(args.leverages).split(",") if item.strip()
         ),
         max_candidate_rows_output=int(args.max_candidate_rows_output),
+        simulation_backend=str(args.simulation_backend),
     )
     print(json.dumps(payload["aggregate"], indent=2, sort_keys=True))
     return 0

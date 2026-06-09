@@ -28,6 +28,93 @@ def _row(**overrides):
     return row
 
 
+def test_fast_finalize_row_matches_reference_finalize_metrics() -> None:
+    datetimes = pd.date_range("2025-01-01", periods=12, freq="h")
+    close = np.linspace(100.0, 105.0, len(datetimes))
+    frame = pd.DataFrame(
+        {
+            "datetime": datetimes,
+            "open": close,
+            "high": close * 1.01,
+            "low": close * 0.99,
+            "close": close,
+            "volume": np.full(len(close), 1000.0),
+        }
+    )
+    signal = np.array([0.0, 1.0, 1.0, 0.0, -1.0, -1.0, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0])
+    sim = module._simulate_symbol(
+        frame,
+        signal,
+        integer_leverage=2,
+        allocation_fraction=0.1,
+        round_trip_cost_bps=10.0,
+        simulation_backend="python",
+    )
+    base = module._candidate_base(
+        family="unit",
+        model_parts=("unit", "1h", "BTCUSDT", "lev2"),
+        symbol="BTCUSDT",
+        timeframe="1h",
+        side="long_short",
+        lookback=4,
+        threshold=0.1,
+        exit_threshold=0.0,
+        min_hold=1,
+        leverage=2,
+        allocation_fraction=0.1,
+    )
+    train = (datetimes[0], datetimes[3])
+    validation = (datetimes[4], datetimes[7])
+    locked_oos = (datetimes[8], datetimes[-1])
+
+    fast = module._finalize_row(
+        base=base,
+        sim=sim,
+        datetimes=frame["datetime"],
+        timeframe="1h",
+        train=train,
+        validation=validation,
+        locked_oos=locked_oos,
+    )
+    reference = module.broad69.finalize_candidate(
+        base,
+        sim,
+        frame["datetime"],
+        timeframe="1h",
+        windows=module.broad69.SplitWindows(train=train, validation=validation),
+    )
+
+    for key in (
+        "train_return",
+        "train_mdd",
+        "train_sharpe",
+        "train_trade_event_count",
+        "validation_return",
+        "validation_mdd",
+        "validation_sharpe",
+        "validation_trade_event_count",
+        "train_return_per_turnover_proxy_bps",
+        "validation_return_per_turnover_proxy_bps",
+        "train_validation_score",
+        "gate_pass",
+    ):
+        fast_value = fast.get(key)
+        reference_value = reference.get(key)
+        if isinstance(fast_value, float):
+            assert fast_value == pytest.approx(reference_value)
+        else:
+            assert fast_value == reference_value
+    assert fast["locked_oos_return_report_only"] == pytest.approx(
+        module.broad69.split_metrics(
+            sim.returns[module._window_mask(frame["datetime"], locked_oos)],
+            sim.position[module._window_mask(frame["datetime"], locked_oos)],
+            sim.liquidation_flags[module._window_mask(frame["datetime"], locked_oos)],
+            sim.account_wipeout_flags[module._window_mask(frame["datetime"], locked_oos)],
+            timeframe="1h",
+        )["total_return"]
+    )
+
+
 def test_score_row_ignores_locked_oos_report_fields() -> None:
     base = _row(locked_oos_return_report_only=-0.90, locked_oos_mdd_report_only=0.90)
     changed = _row(locked_oos_return_report_only=2.50, locked_oos_mdd_report_only=0.01)
@@ -201,10 +288,11 @@ def test_search_space_hash_is_stable_and_excludes_oos_results() -> None:
         "indicator_vwap_atr_bollinger_reversion",
         "indicator_kalman_volatility_trend",
         "indicator_kalman_residual_reversion",
+        "indicator_vwap_kalman_pullback_continuation",
         "standardized_indicator_ridge_directional",
     ]
     assert first == second
-    assert first == "bf59ed6fb259fc1094d84616b814e94beb4bef0761572c96665727db633056d2"
+    assert first == "c1e3482dfefb4c0591eb80c5c343650693f7e6f2a54db285c0f4e418d1e4db05"
 
 
 def test_lead_lag_family_is_covered_and_flat_split_labeled() -> None:
@@ -329,6 +417,48 @@ def test_kalman_residual_reversion_family_is_pre_registered() -> None:
     assert rows
     assert {row["family"] for row in rows} == {"indicator_kalman_residual_reversion"}
     assert all("kalman_residual_z" in row["indicator_set"] for row in rows)
+    assert all(row["uses_locked_oos_for_selection"] is False for row in rows)
+
+
+def test_vwap_kalman_pullback_continuation_family_is_pre_registered() -> None:
+    datetimes = pd.date_range("2025-01-01", periods=520, freq="h")
+    trend = np.linspace(100.0, 135.0, len(datetimes))
+    pullback_wave = 2.0 * np.sin(np.linspace(0.0, 16.0 * np.pi, len(datetimes)))
+    close = trend + pullback_wave
+    frame = pd.DataFrame(
+        {
+            "datetime": datetimes,
+            "open": close,
+            "high": close * 1.01,
+            "low": close * 0.99,
+            "close": close,
+            "volume": np.full(len(close), 1000.0),
+        }
+    )
+
+    class Fold:
+        train = (datetimes[0], datetimes[299])
+        validation = (datetimes[300], datetimes[419])
+        locked_oos = (datetimes[420], datetimes[-1])
+
+    rows = module._indicator_vwap_kalman_pullback_continuation_rows(
+        frame=frame,
+        symbol="ETHUSDT",
+        timeframe="1h",
+        fold=Fold(),
+        leverages=(2,),
+        allocation_fraction=0.1,
+        simulation_backend="python",
+    )
+
+    assert rows
+    assert {row["family"] for row in rows} == {
+        "indicator_vwap_kalman_pullback_continuation"
+    }
+    assert all("kalman_slope_z" in row["indicator_set"] for row in rows)
+    assert {row["theory_plausibility_gate"] for row in rows} == {
+        "vwap_kalman_pullback_continuation"
+    }
     assert all(row["uses_locked_oos_for_selection"] is False for row in rows)
 
 
@@ -727,6 +857,7 @@ def test_run_writes_policy_flags_with_synthetic_loader(monkeypatch, tmp_path: Pa
     assert robust_payload["selection_policy"] == module.ROBUST_SELECTION_POLICY
     assert robust_payload["enabled_families"] == ["indicator_kalman_residual_reversion"]
     assert robust_payload["fold_workers"] == 2
+    assert robust_payload["simulation_backend"]["requested_backend"] == "auto"
     assert (
         robust_payload["optimization_policy"]["selection_policy"] == module.ROBUST_SELECTION_POLICY
     )

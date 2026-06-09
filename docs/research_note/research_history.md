@@ -32528,3 +32528,17 @@ Before repeating calendar-salvage research, read `var/reports/profit_moonshot_20
 - Decision impact: Primary paper/shadow candidate becomes `dynamic_conviction_switch:t0.85_risk_capped_fallback_val_mdd20_scaled`; use `val_mdd15` or `val_mdd12` if lower MDD budget is required.  Hard-stop promotability remains false because the result does not beat the historical challenger or robust-default hurdle.
 - Staleness/recheck: Recheck after newly listed TradFi symbols accumulate train/validation data or after fresh-forward shadow evidence beyond 2026-06-05. / `False`
 - Do-not-repeat note: Do not reintroduce hybrid-as-hybrid material; use leaf-only final weights and fold-local train/validation risk sizing.
+
+---
+
+## 2026-06-09 alpha-fold backend acceleration and candidate overlay smoke
+
+- Research dates: 2026-06-09
+- Source type: `local_artifact + implementation`
+- Title/path: Current-search alpha overlay plus Rust fold backend — `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/current_search_alpha_fold_backend_summary_20260609/current_search_alpha_fold_backend_summary_20260609.md`
+- Content summary: Added Rust alpha-fold simulation backend, cached OHLCV arrays, cached split masks, and fast finalize path. Added `indicator_vwap_kalman_pullback_continuation` to default clean new-alpha search space. Fast overlay over BTC/ETH/SOL/BNB 1h 3-fold selected existing cross-asset/XS-vol momentum, not the new alpha; OOS comp +4.16%, annualized +17.73%, 3/3 positive. New alpha standalone smoke was +0.61%, annualized +2.46%, 2/3 positive. Existing-candidate reuse selector remains post-failure research only.
+- What was used: Improves iteration speed and preserves clean-OOS semantics; candidate overlay confirms new alpha is integrated but not a winner.
+- Families: cross_asset_lead_lag_momentum, cross_sectional_vol_adjusted_momentum, indicator_vwap_kalman_pullback_continuation, indicator_kalman_residual_reversion, indicator_kalman_volatility_trend, indicator_vwap_atr_bollinger_reversion, standardized_indicator_ridge_directional, btc_beta_residual_momentum
+- Decision impact: No live/shadow promotion. Real allocation remains 0%. Use accelerated backend for future smaller pre-registered family sweeps; do not mine locked OOS.
+- Staleness/recheck: Recheck only on fresh-forward/current data and 10/15/20bps cost/fill telemetry. / `True`
+- Do-not-repeat note: Do not rerun full 8-family/6-symbol/2-timeframe overlays as a first probe; one such run was terminated after 4:54 and ~5GB RSS. Start with family/symbol/timeframe/leverage subsets.
