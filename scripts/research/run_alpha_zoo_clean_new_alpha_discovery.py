@@ -12,9 +12,11 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import heapq
 import json
 import math
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
@@ -38,6 +40,7 @@ DEFAULT_OUTPUT_DIR = broad69.ALPHA_V2_ROOT / "alpha_zoo_clean_new_alpha_discover
 DEFAULT_TIMEFRAMES = ("1h", "4h")
 DEFAULT_LEVERAGES = (2, 3, 4)
 DEFAULT_ALLOCATION_FRACTION = 0.10
+DEFAULT_FOLD_WORKERS = 1
 DEFAULT_SELECTION_POLICY = "default_train_validation"
 ROBUST_SELECTION_POLICY = "robust_train_validation_v1"
 SELECTION_POLICIES = (DEFAULT_SELECTION_POLICY, ROBUST_SELECTION_POLICY)
@@ -65,6 +68,11 @@ FAMILY_DESCRIPTIONS: dict[str, str] = {
         "Enter residual target momentum after rolling BTC/ETH beta adjustment, "
         "with benchmark crash and realized-volatility gates. Uses only prior "
         "bars and is designed to avoid paying for plain market beta."
+    ),
+    "cross_sectional_vol_adjusted_momentum": (
+        "Enter residual relative-strength momentum after subtracting the panel "
+        "median move and scaling by realized volatility. Uses prior bars only, "
+        "with market-stress and volatility gates to avoid raw beta chasing."
     ),
     "feature_flow_crowding_reversal": (
         "Use local funding/open-interest/taker-flow feature points to fade crowded "
@@ -128,6 +136,11 @@ FAMILY_DESCRIPTIONS: dict[str, str] = {
         "Indicator leaf alpha: use a scalar Kalman price filter as an adaptive moving "
         "average, then trade standardized filter slope with ATR/volatility gates."
     ),
+    "indicator_kalman_residual_reversion": (
+        "Indicator leaf alpha: use scalar Kalman filter residual z-score as an "
+        "adaptive mean-reversion setup, gated by weak filter slope and realized "
+        "volatility so it does not fight strong trends."
+    ),
     "standardized_indicator_ridge_directional": (
         "Small ML-style leaf alpha: train-only standardized OHLCV indicator features "
         "feed a bounded ridge directional score; train/validation select thresholds "
@@ -189,6 +202,14 @@ def _search_space() -> dict[str, Any]:
             "beta_window": [48, 96],
             "residual_threshold": [0.003, 0.006],
             "benchmark_crash_gate": [0.025, 0.050],
+            "max_realized_vol": [0.012, 0.020],
+            "min_hold": [4, 8],
+        },
+        "cross_sectional_vol_adjusted_momentum": {
+            "lookback": [12, 24, 48],
+            "vol_window": [24, 48],
+            "score_threshold": [0.50, 1.00],
+            "market_stress_gate": [0.025, 0.050],
             "max_realized_vol": [0.012, 0.020],
             "min_hold": [4, 8],
         },
@@ -283,6 +304,15 @@ def _search_space() -> dict[str, Any]:
             "max_realized_vol": [0.018, 0.028],
             "min_hold": [4, 8],
         },
+        "indicator_kalman_residual_reversion": {
+            "lookback": [24, 48],
+            "process_noise": [0.0005, 0.002],
+            "measurement_noise": [0.02, 0.08],
+            "residual_z_min": [1.25, 1.75],
+            "max_slope_z": [0.25, 0.50],
+            "max_realized_vol": [0.018, 0.028],
+            "min_hold": [4, 8],
+        },
         "standardized_indicator_ridge_directional": {
             "feature_set": ["returns", "vwap", "bollinger", "atr", "kalman", "volume"],
             "ridge_alpha": [1.0, 10.0],
@@ -297,6 +327,29 @@ def _search_space() -> dict[str, Any]:
 def _search_space_hash(space: Mapping[str, Any]) -> str:
     encoded = json.dumps(space, sort_keys=True, separators=(",", ":")).encode()
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _normalize_enabled_families(enabled_families: Sequence[str] | None) -> tuple[str, ...]:
+    if enabled_families is None:
+        return tuple(FAMILY_DESCRIPTIONS)
+    requested = tuple(str(item).strip() for item in enabled_families if str(item).strip())
+    if not requested:
+        return tuple(FAMILY_DESCRIPTIONS)
+    unknown = sorted(set(requested) - set(FAMILY_DESCRIPTIONS))
+    if unknown:
+        raise ValueError(f"unknown alpha families: {', '.join(unknown)}")
+    return requested
+
+
+def _normalize_leverages(leverages: Sequence[int] | None) -> tuple[int, ...]:
+    if leverages is None:
+        return tuple(DEFAULT_LEVERAGES)
+    normalized = tuple(int(item) for item in leverages)
+    if not normalized:
+        return tuple(DEFAULT_LEVERAGES)
+    if any(value <= 0 for value in normalized):
+        raise ValueError(f"leverages must be positive integers: {normalized}")
+    return normalized
 
 
 def _compound(returns: Sequence[float]) -> float:
@@ -432,6 +485,33 @@ def _eligible_for_policy(row: Mapping[str, Any], *, selection_policy: str) -> bo
     if selection_policy == ROBUST_SELECTION_POLICY:
         return _eligible_for_freeze(row) and _robust_v1_eligible(row)
     raise ValueError(f"unknown selection policy: {selection_policy}")
+
+
+def _candidate_cap_key(row: Mapping[str, Any], *, selection_policy: str) -> tuple[bool, float, str]:
+    return (
+        _eligible_for_policy(row, selection_policy=selection_policy),
+        _selection_score(row, selection_policy=selection_policy),
+        str(row.get("model_id")),
+    )
+
+
+def _cap_rows_for_selection(
+    rows: Sequence[dict[str, Any]],
+    *,
+    max_candidates_per_fold: int,
+    selection_policy: str,
+) -> list[dict[str, Any]]:
+    if len(rows) <= max_candidates_per_fold or max_candidates_per_fold <= 0:
+        return sorted(
+            rows,
+            key=lambda row: _candidate_cap_key(row, selection_policy=selection_policy),
+            reverse=True,
+        )
+    return heapq.nlargest(
+        max_candidates_per_fold,
+        rows,
+        key=lambda row: _candidate_cap_key(row, selection_policy=selection_policy),
+    )
 
 
 def _eligible_for_freeze(row: Mapping[str, Any]) -> bool:
@@ -1285,6 +1365,111 @@ def _btc_beta_residual_momentum_rows(
                                 base["benchmark_symbol"] = benchmark_symbol
                                 base["beta_window"] = beta_window
                                 base["max_realized_vol"] = max_realized_vol
+                                out.append(
+                                    _finalize_row(
+                                        base=base,
+                                        sim=sim,
+                                        datetimes=frame["datetime"],
+                                        timeframe=timeframe,
+                                        train=fold.train,
+                                        validation=fold.validation,
+                                        locked_oos=fold.locked_oos,
+                                    )
+                                )
+    return out
+
+
+def _cross_sectional_vol_adjusted_momentum_rows(
+    *,
+    bars_by_symbol: Mapping[str, pd.DataFrame],
+    panel: pd.DataFrame,
+    symbol: str,
+    timeframe: str,
+    fold: monthly.MonthlyFold,
+    leverages: Sequence[int],
+    allocation_fraction: float,
+) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    frame = bars_by_symbol.get(symbol, pd.DataFrame())
+    if frame.empty or symbol not in panel or len(panel.columns) < 3:
+        return out
+    datetimes = pd.DatetimeIndex(pd.to_datetime(frame["datetime"]))
+    close_panel = panel.reindex(datetimes).ffill()
+    target_close = close_panel[symbol]
+    target_returns = target_close.pct_change(fill_method=None)
+    panel_returns = close_panel.pct_change(fill_method=None)
+    for lookback in (12, 24, 48):
+        target_momentum = target_close / target_close.shift(lookback) - 1.0
+        panel_momentum = close_panel / close_panel.shift(lookback) - 1.0
+        market_median_momentum = panel_momentum.median(axis=1, skipna=True)
+        residual_momentum = target_momentum - market_median_momentum
+        market_stress = panel_returns.median(axis=1, skipna=True).rolling(lookback).sum()
+        for vol_window in (24, 48):
+            realized_vol = target_returns.rolling(vol_window).std(ddof=1).replace(0.0, np.nan)
+            score = residual_momentum / realized_vol
+            for score_threshold in (0.50, 1.00):
+                for market_stress_gate in (0.025, 0.050):
+                    for max_realized_vol in (0.012, 0.020):
+                        volatility_ok = realized_vol.shift(1) <= max_realized_vol
+                        long_entry = (
+                            (score.shift(1) >= score_threshold)
+                            & (market_stress.shift(1) > -market_stress_gate)
+                            & volatility_ok
+                        )
+                        short_entry = (
+                            (score.shift(1) <= -score_threshold)
+                            & (market_stress.shift(1) < market_stress_gate)
+                            & volatility_ok
+                        )
+                        long_exit = (score < 0.0) | (realized_vol > max_realized_vol * 1.5)
+                        short_exit = (score > 0.0) | (realized_vol > max_realized_vol * 1.5)
+                        for min_hold in (4, 8):
+                            signal = broad69._debounced_state_signal(
+                                long_entry,
+                                long_exit,
+                                short_entry,
+                                short_exit,
+                                side="long_short",
+                                min_hold_bars=min_hold,
+                                cooldown_bars=2,
+                            )
+                            for leverage in leverages:
+                                sim = broad69.simulate_symbol(
+                                    frame,
+                                    signal,
+                                    integer_leverage=int(leverage),
+                                    allocation_fraction=allocation_fraction,
+                                )
+                                base = _candidate_base(
+                                    family="cross_sectional_vol_adjusted_momentum",
+                                    model_parts=(
+                                        "xsvamom",
+                                        timeframe,
+                                        symbol,
+                                        f"lb{lookback}",
+                                        f"vw{vol_window}",
+                                        f"thr{score_threshold}",
+                                        f"stress{market_stress_gate}",
+                                        f"vol{max_realized_vol}",
+                                        f"hold{min_hold}",
+                                        f"lev{leverage}",
+                                    ),
+                                    symbol=symbol,
+                                    timeframe=timeframe,
+                                    side="long_short",
+                                    lookback=lookback,
+                                    threshold=score_threshold,
+                                    exit_threshold=market_stress_gate,
+                                    min_hold=min_hold,
+                                    leverage=int(leverage),
+                                    allocation_fraction=allocation_fraction,
+                                )
+                                base["vol_window"] = vol_window
+                                base["max_realized_vol"] = max_realized_vol
+                                base["market_stress_gate"] = market_stress_gate
+                                base["theory_plausibility_gate"] = (
+                                    "cross_sectional_residual_momentum_vol_adjusted"
+                                )
                                 out.append(
                                     _finalize_row(
                                         base=base,
@@ -2715,6 +2900,129 @@ def _indicator_kalman_volatility_trend_rows(
     return out
 
 
+def _indicator_kalman_residual_reversion_rows(
+    *,
+    frame: pd.DataFrame,
+    symbol: str,
+    timeframe: str,
+    fold: monthly.MonthlyFold,
+    leverages: Sequence[int],
+    allocation_fraction: float,
+) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    if frame.empty:
+        return out
+    close = frame["close"].astype(float).reset_index(drop=True)
+    datetimes = frame["datetime"]
+    log_close = np.log(close.replace(0.0, np.nan))
+    returns = close.pct_change(fill_method=None)
+    atr_pct = _true_range_pct(frame)
+    for lookback in (24, 48):
+        realized_vol = returns.rolling(lookback).std(ddof=1)
+        for process_noise in (0.0005, 0.002):
+            for measurement_noise in (0.02, 0.08):
+                filtered = _kalman_log_price_filter(
+                    close,
+                    process_noise=process_noise,
+                    measurement_noise=measurement_noise,
+                )
+                slope_window = max(3, lookback // 6)
+                kalman_slope = filtered - filtered.shift(slope_window)
+                slope_z = broad69._rolling_zscore(kalman_slope, lookback * 2)
+                residual_z = broad69._rolling_zscore(log_close - filtered, lookback * 2)
+                for residual_z_min in (1.25, 1.75):
+                    for max_slope_z in (0.25, 0.50):
+                        for max_realized_vol in (0.018, 0.028):
+                            volatility_ok = (realized_vol.shift(1) <= max_realized_vol) & (
+                                atr_pct.rolling(lookback).mean().shift(1) <= max_realized_vol * 1.5
+                            )
+                            long_entry = (
+                                (residual_z.shift(1) <= -residual_z_min)
+                                & (slope_z.shift(1).abs() <= max_slope_z)
+                                & volatility_ok
+                            )
+                            short_entry = (
+                                (residual_z.shift(1) >= residual_z_min)
+                                & (slope_z.shift(1).abs() <= max_slope_z)
+                                & volatility_ok
+                            )
+                            long_exit = (
+                                (residual_z >= -0.15)
+                                | (slope_z < -max_slope_z)
+                                | (realized_vol > max_realized_vol * 1.5)
+                            )
+                            short_exit = (
+                                (residual_z <= 0.15)
+                                | (slope_z > max_slope_z)
+                                | (realized_vol > max_realized_vol * 1.5)
+                            )
+                            for min_hold in (4, 8):
+                                signal = broad69._debounced_state_signal(
+                                    long_entry,
+                                    long_exit,
+                                    short_entry,
+                                    short_exit,
+                                    side="long_short",
+                                    min_hold_bars=min_hold,
+                                    cooldown_bars=2,
+                                )
+                                for leverage in leverages:
+                                    sim = broad69.simulate_symbol(
+                                        frame,
+                                        signal,
+                                        integer_leverage=int(leverage),
+                                        allocation_fraction=allocation_fraction,
+                                    )
+                                    base = _candidate_base(
+                                        family="indicator_kalman_residual_reversion",
+                                        model_parts=(
+                                            "kalmanresrev",
+                                            timeframe,
+                                            symbol,
+                                            f"lb{lookback}",
+                                            f"q{process_noise}",
+                                            f"r{measurement_noise}",
+                                            f"rz{residual_z_min}",
+                                            f"szcap{max_slope_z}",
+                                            f"vol{max_realized_vol}",
+                                            f"hold{min_hold}",
+                                            f"lev{leverage}",
+                                        ),
+                                        symbol=symbol,
+                                        timeframe=timeframe,
+                                        side="long_short",
+                                        lookback=lookback,
+                                        threshold=residual_z_min,
+                                        exit_threshold=max_slope_z,
+                                        min_hold=min_hold,
+                                        leverage=int(leverage),
+                                        allocation_fraction=allocation_fraction,
+                                    )
+                                    base["indicator_set"] = [
+                                        "kalman_log_price_filter",
+                                        "kalman_residual_z",
+                                        "kalman_slope_z",
+                                        "atr_pct",
+                                        "realized_volatility",
+                                        "rolling_standardization",
+                                    ]
+                                    base["theory_plausibility_gate"] = (
+                                        "kalman_adaptive_residual_reversion"
+                                    )
+                                    out.append(
+                                        _finalize_row(
+                                            base=base,
+                                            sim=sim,
+                                            datetimes=datetimes,
+                                            timeframe=timeframe,
+                                            train=fold.train,
+                                            validation=fold.validation,
+                                            locked_oos=fold.locked_oos,
+                                        )
+                                    )
+    return out
+
+
 def _standardized_indicator_ridge_directional_rows(
     *,
     frame: pd.DataFrame,
@@ -2848,8 +3156,12 @@ def _rows_for_fold(
     fold: monthly.MonthlyFold,
     max_candidates_per_fold: int,
     selection_policy: str = DEFAULT_SELECTION_POLICY,
+    enabled_families: Sequence[str] | None = None,
+    leverages: Sequence[int] | None = DEFAULT_LEVERAGES,
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
+    enabled = set(_normalize_enabled_families(enabled_families))
+    actual_leverages = _normalize_leverages(leverages)
     for timeframe in timeframes:
         bars_by_symbol = {
             symbol: bars.get((symbol, timeframe), pd.DataFrame()) for symbol in symbols
@@ -2866,77 +3178,100 @@ def _rows_for_fold(
                 "symbol": symbol,
                 "timeframe": timeframe,
                 "fold": fold,
-                "leverages": DEFAULT_LEVERAGES,
+                "leverages": actual_leverages,
                 "allocation_fraction": DEFAULT_ALLOCATION_FRACTION,
             }
-            rows.extend(_squeeze_rows(**kwargs))
-            rows.extend(_absorption_rows(**kwargs))
-            rows.extend(_reclaim_rows(**kwargs))
-            rows.extend(_indicator_vwap_atr_bollinger_reversion_rows(**kwargs))
-            rows.extend(_indicator_kalman_volatility_trend_rows(**kwargs))
-            rows.extend(_standardized_indicator_ridge_directional_rows(**kwargs))
-            rows.extend(
-                _deep_research_vol_managed_momentum_crash_gate_rows(
-                    **kwargs,
-                    bars_by_symbol=bars_by_symbol,
+            if "volatility_squeeze_breakout" in enabled:
+                rows.extend(_squeeze_rows(**kwargs))
+            if "volume_absorption_reversal" in enabled:
+                rows.extend(_absorption_rows(**kwargs))
+            if "range_reclaim_continuation" in enabled:
+                rows.extend(_reclaim_rows(**kwargs))
+            if "indicator_vwap_atr_bollinger_reversion" in enabled:
+                rows.extend(_indicator_vwap_atr_bollinger_reversion_rows(**kwargs))
+            if "indicator_kalman_volatility_trend" in enabled:
+                rows.extend(_indicator_kalman_volatility_trend_rows(**kwargs))
+            if "indicator_kalman_residual_reversion" in enabled:
+                rows.extend(_indicator_kalman_residual_reversion_rows(**kwargs))
+            if "standardized_indicator_ridge_directional" in enabled:
+                rows.extend(_standardized_indicator_ridge_directional_rows(**kwargs))
+            if "deep_research_vol_managed_momentum_crash_gate" in enabled:
+                rows.extend(
+                    _deep_research_vol_managed_momentum_crash_gate_rows(
+                        **kwargs,
+                        bars_by_symbol=bars_by_symbol,
+                    )
                 )
-            )
             features = (features_by_symbol or {}).get(symbol, pd.DataFrame())
             if not features.empty:
                 feature_frame = _attach_feature_points(frame, features, timeframe=timeframe)
-                rows.extend(_feature_flow_rows(**{**kwargs, "frame": feature_frame}))
-                rows.extend(_feature_liquidation_rows(**{**kwargs, "frame": feature_frame}))
-                rows.extend(_feature_flow_trend_rows(**{**kwargs, "frame": feature_frame}))
-                rows.extend(
-                    _feature_crowding_continuation_rows(**{**kwargs, "frame": feature_frame})
-                )
-                rows.extend(_perp_crowding_rows(**{**kwargs, "frame": feature_frame}))
-                rows.extend(
-                    _feature_taker_flow_exhaustion_rows(**{**kwargs, "frame": feature_frame})
-                )
-                rows.extend(_feature_bbo_flow_rows(**{**kwargs, "frame": feature_frame}))
-                rows.extend(_feature_book_depth_rows(**{**kwargs, "frame": feature_frame}))
-                rows.extend(
-                    _deep_research_funding_dislocation_trend_carry_rows(
-                        **{**kwargs, "frame": feature_frame}
+                feature_kwargs = {**kwargs, "frame": feature_frame}
+                if "feature_flow_crowding_reversal" in enabled:
+                    rows.extend(_feature_flow_rows(**feature_kwargs))
+                if "feature_liquidation_imbalance_reversal" in enabled:
+                    rows.extend(_feature_liquidation_rows(**feature_kwargs))
+                if "feature_flow_oi_trend_continuation" in enabled:
+                    rows.extend(_feature_flow_trend_rows(**feature_kwargs))
+                if "funding_oi_taker_crowding_continuation" in enabled:
+                    rows.extend(_feature_crowding_continuation_rows(**feature_kwargs))
+                if "perp_crowding_score_reversion" in enabled:
+                    rows.extend(_perp_crowding_rows(**feature_kwargs))
+                if "feature_taker_flow_exhaustion_reversal" in enabled:
+                    rows.extend(_feature_taker_flow_exhaustion_rows(**feature_kwargs))
+                if "feature_bbo_flow_exhaustion_reversal" in enabled:
+                    rows.extend(_feature_bbo_flow_rows(**feature_kwargs))
+                if "feature_book_depth_imbalance_reversal" in enabled:
+                    rows.extend(_feature_book_depth_rows(**feature_kwargs))
+                if "deep_research_funding_dislocation_trend_carry" in enabled:
+                    rows.extend(
+                        _deep_research_funding_dislocation_trend_carry_rows(**feature_kwargs)
                     )
-                )
-                rows.extend(
-                    _deep_research_flow_imbalance_liquidation_sweep_rows(
-                        **{**kwargs, "frame": feature_frame}
+                if "deep_research_flow_imbalance_liquidation_sweep" in enabled:
+                    rows.extend(
+                        _deep_research_flow_imbalance_liquidation_sweep_rows(**feature_kwargs)
                     )
-                )
             if not panel.empty:
-                rows.extend(
-                    _lead_lag_rows(
-                        bars_by_symbol=bars_by_symbol,
-                        panel=panel,
-                        symbol=symbol,
-                        timeframe=timeframe,
-                        fold=fold,
-                        leverages=DEFAULT_LEVERAGES,
-                        allocation_fraction=DEFAULT_ALLOCATION_FRACTION,
+                if "cross_asset_lead_lag_momentum" in enabled:
+                    rows.extend(
+                        _lead_lag_rows(
+                            bars_by_symbol=bars_by_symbol,
+                            panel=panel,
+                            symbol=symbol,
+                            timeframe=timeframe,
+                            fold=fold,
+                            leverages=actual_leverages,
+                            allocation_fraction=DEFAULT_ALLOCATION_FRACTION,
+                        )
                     )
-                )
-                rows.extend(
-                    _btc_beta_residual_momentum_rows(
-                        bars_by_symbol=bars_by_symbol,
-                        panel=panel,
-                        symbol=symbol,
-                        timeframe=timeframe,
-                        fold=fold,
-                        leverages=DEFAULT_LEVERAGES,
-                        allocation_fraction=DEFAULT_ALLOCATION_FRACTION,
+                if "btc_beta_residual_momentum" in enabled:
+                    rows.extend(
+                        _btc_beta_residual_momentum_rows(
+                            bars_by_symbol=bars_by_symbol,
+                            panel=panel,
+                            symbol=symbol,
+                            timeframe=timeframe,
+                            fold=fold,
+                            leverages=actual_leverages,
+                            allocation_fraction=DEFAULT_ALLOCATION_FRACTION,
+                        )
                     )
-                )
-    return sorted(
+                if "cross_sectional_vol_adjusted_momentum" in enabled:
+                    rows.extend(
+                        _cross_sectional_vol_adjusted_momentum_rows(
+                            bars_by_symbol=bars_by_symbol,
+                            panel=panel,
+                            symbol=symbol,
+                            timeframe=timeframe,
+                            fold=fold,
+                            leverages=actual_leverages,
+                            allocation_fraction=DEFAULT_ALLOCATION_FRACTION,
+                        )
+                    )
+    return _cap_rows_for_selection(
         rows,
-        key=lambda row: (
-            _selection_score(row, selection_policy=selection_policy),
-            str(row.get("model_id")),
-        ),
-        reverse=True,
-    )[:max_candidates_per_fold]
+        max_candidates_per_fold=max_candidates_per_fold,
+        selection_policy=selection_policy,
+    )
 
 
 def _select_fold_candidate(
@@ -3057,6 +3392,8 @@ def _realism_diagnostics(
             "volatility_managed_momentum_and_crash_gates",
             "lead_lag_information_flow",
             "btc_eth_beta_residual_momentum",
+            "kalman_filter_residual_reversion",
+            "cross_sectional_vol_adjusted_residual_momentum",
             "perp_funding_open_interest_taker_flow_crowding",
             "order_book_spread_depth_imbalance_microstructure",
             "train_only_standardized_indicator_ridge_leaf",
@@ -3074,9 +3411,16 @@ def run(
     max_folds: int | None,
     max_candidates_per_fold: int,
     selection_policy: str = DEFAULT_SELECTION_POLICY,
+    enabled_families: Sequence[str] | None = None,
+    fold_workers: int = DEFAULT_FOLD_WORKERS,
+    leverages: Sequence[int] | None = DEFAULT_LEVERAGES,
+    max_candidate_rows_output: int | None = None,
 ) -> dict[str, Any]:
     if selection_policy not in SELECTION_POLICIES:
         raise ValueError(f"unknown selection policy: {selection_policy}")
+    enabled_families_normalized = _normalize_enabled_families(enabled_families)
+    actual_leverages = _normalize_leverages(leverages)
+    fold_workers = max(1, int(fold_workers))
     search_space = _search_space()
     search_hash = _search_space_hash(search_space)
     bars, coverage = broad69.load_all_bars(symbols, data_root=data_root, timeframes=timeframes)
@@ -3097,8 +3441,10 @@ def run(
 
     fold_rows: list[dict[str, Any]] = []
     selected_rows: list[dict[str, Any]] = []
-    for fold in folds:
-        rows = _rows_for_fold(
+    fold_batches: list[tuple[monthly.MonthlyFold, list[dict[str, Any]]]] = []
+
+    def rows_for(fold: monthly.MonthlyFold) -> list[dict[str, Any]]:
+        return _rows_for_fold(
             bars=bars,
             symbols=symbols,
             timeframes=timeframes,
@@ -3106,7 +3452,26 @@ def run(
             fold=fold,
             max_candidates_per_fold=max_candidates_per_fold,
             selection_policy=selection_policy,
+            enabled_families=enabled_families_normalized,
+            leverages=actual_leverages,
         )
+
+    if fold_workers == 1 or len(folds) <= 1:
+        fold_batches = [(fold, rows_for(fold)) for fold in folds]
+    else:
+        fold_batches_buffer: list[tuple[monthly.MonthlyFold, list[dict[str, Any]]] | None] = [
+            None
+        ] * len(folds)
+        with ThreadPoolExecutor(max_workers=min(fold_workers, len(folds))) as executor:
+            future_to_index = {
+                executor.submit(rows_for, fold): index for index, fold in enumerate(folds)
+            }
+            for future in as_completed(future_to_index):
+                index = future_to_index[future]
+                fold_batches_buffer[index] = (folds[index], future.result())
+        fold_batches = [batch for batch in fold_batches_buffer if batch is not None]
+
+    for fold, rows in fold_batches:
         selected = _select_fold_candidate(rows, selection_policy=selection_policy)
         for row in rows:
             row["selection_policy"] = selection_policy
@@ -3128,6 +3493,8 @@ def run(
                         "model_id": row.get("model_id"),
                         "score": row.get("selection_score_active_train_validation_only"),
                         "selection_policy": selection_policy,
+                        "enabled_families": enabled_families_normalized,
+                        "leverages": actual_leverages,
                         "train": row.get("train_return"),
                         "validation": row.get("validation_return"),
                     },
@@ -3155,12 +3522,24 @@ def run(
             selected_rows.append(selected_payload)
 
     aggregate = _aggregate(selected_rows)
+    candidate_row_count_total = len(fold_rows)
+    if max_candidate_rows_output is None or int(max_candidate_rows_output) < 0:
+        candidate_rows_for_output = fold_rows
+    else:
+        candidate_rows_for_output = fold_rows[: int(max_candidate_rows_output)]
     payload = {
         "artifact_kind": "alpha_zoo_clean_new_alpha_discovery",
         "generated_at_utc": _utc_now_iso(),
         "search_space": search_space,
         "pre_registered_search_space_sha256": search_hash,
         "selection_policy": selection_policy,
+        "enabled_families": list(enabled_families_normalized),
+        "integer_leverages": list(actual_leverages),
+        "fold_workers": fold_workers,
+        "candidate_cap_sort_policy": "eligible_first_active_train_validation_selection_score",
+        "candidate_row_count_total": candidate_row_count_total,
+        "candidate_rows_truncated": len(candidate_rows_for_output) < candidate_row_count_total,
+        "max_candidate_rows_output": max_candidate_rows_output,
         "optimization_policy": optimization_search_policy_payload(
             search_method="bounded_grid_pre_registered_new_alpha",
             objective_policy="rank_train_validation_only_then_attach_locked_oos_report_gate",
@@ -3171,6 +3550,14 @@ def run(
             ),
             extra={
                 "selection_policy": selection_policy,
+                "enabled_families": list(enabled_families_normalized),
+                "integer_leverages": list(actual_leverages),
+                "fold_workers": fold_workers,
+                "candidate_row_count_total": candidate_row_count_total,
+                "max_candidate_rows_output": max_candidate_rows_output,
+                "candidate_cap_sort_policy": (
+                    "eligible_first_active_train_validation_selection_score"
+                ),
                 "selection_policy_status": (
                     "post_failure_research_variant_requires_fresh_forward"
                     if selection_policy == ROBUST_SELECTION_POLICY
@@ -3191,7 +3578,7 @@ def run(
         "data_coverage": coverage,
         "fold_count": len(folds),
         "selected_fold_rows": selected_rows,
-        "candidate_rows": fold_rows,
+        "candidate_rows": candidate_rows_for_output,
         "aggregate": aggregate,
         "realism_diagnostics": _realism_diagnostics(
             selected_rows,
@@ -3229,6 +3616,12 @@ def _render_markdown(payload: Mapping[str, Any]) -> str:
         f"- generated: `{payload.get('generated_at_utc')}`",
         f"- pre-registered search hash: `{payload.get('pre_registered_search_space_sha256')}`",
         f"- selection policy: `{payload.get('selection_policy', DEFAULT_SELECTION_POLICY)}`",
+        f"- enabled families: `{len(payload.get('enabled_families') or [])}`",
+        f"- integer leverages: `{payload.get('integer_leverages', list(DEFAULT_LEVERAGES))}`",
+        f"- fold workers: `{int(payload.get('fold_workers') or 1)}`",
+        f"- candidate cap sort: `{payload.get('candidate_cap_sort_policy', 'legacy_score')}`",
+        f"- candidate rows retained/written: `{payload.get('candidate_row_count_total', 0)}`/"
+        f"`{len(payload.get('candidate_rows') or [])}`",
         "- selection input: `train + validation only`",
         "- locked-OOS: `report/gate only after freeze`",
         "- split simulation policy: `continuous_full_period_signal_slice_report_only`",
@@ -3296,6 +3689,34 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--max-folds", type=int, default=None)
     parser.add_argument("--max-candidates-per-fold", type=int, default=10000)
     parser.add_argument(
+        "--leverages",
+        default=",".join(str(value) for value in DEFAULT_LEVERAGES),
+        help="Comma-separated positive integer leverages. Use one value for faster probes.",
+    )
+    parser.add_argument(
+        "--families",
+        default="",
+        help=(
+            "Comma-separated alpha families to run for faster fold probes. "
+            "Default empty value runs every registered family."
+        ),
+    )
+    parser.add_argument(
+        "--fold-workers",
+        type=int,
+        default=DEFAULT_FOLD_WORKERS,
+        help="Parallel fold workers for candidate generation. 1 preserves serial execution.",
+    )
+    parser.add_argument(
+        "--max-candidate-rows-output",
+        type=int,
+        default=-1,
+        help=(
+            "Limit candidate_rows serialized into JSON. Use 0 for fast probe artifacts; "
+            "-1 keeps all retained rows."
+        ),
+    )
+    parser.add_argument(
         "--selection-policy",
         choices=SELECTION_POLICIES,
         default=DEFAULT_SELECTION_POLICY,
@@ -3318,6 +3739,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         max_folds=args.max_folds,
         max_candidates_per_fold=int(args.max_candidates_per_fold),
         selection_policy=str(args.selection_policy),
+        enabled_families=tuple(
+            item.strip() for item in str(args.families).split(",") if item.strip()
+        )
+        or None,
+        fold_workers=int(args.fold_workers),
+        leverages=tuple(
+            int(item.strip()) for item in str(args.leverages).split(",") if item.strip()
+        ),
+        max_candidate_rows_output=int(args.max_candidate_rows_output),
     )
     print(json.dumps(payload["aggregate"], indent=2, sort_keys=True))
     return 0

@@ -82,6 +82,67 @@ def test_robust_select_fold_candidate_uses_train_validation_robustness_not_oos()
     assert selected["model_id"] == "stable_train_validation"
 
 
+def test_candidate_cap_keeps_robust_eligible_rows_first() -> None:
+    capped = module._cap_rows_for_selection(
+        [
+            _row(
+                model_id="ineligible_oos_looking_winner",
+                train_return=0.95,
+                validation_return=0.10,
+                locked_oos_return_report_only=3.0,
+            ),
+            _row(
+                model_id="eligible_stable",
+                train_return=0.12,
+                validation_return=0.10,
+                locked_oos_return_report_only=-0.5,
+            ),
+        ],
+        max_candidates_per_fold=1,
+        selection_policy=module.ROBUST_SELECTION_POLICY,
+    )
+
+    assert [row["model_id"] for row in capped] == ["eligible_stable"]
+
+
+def test_rows_for_fold_family_subset_skips_unrequested_generators(monkeypatch) -> None:
+    datetimes = pd.date_range("2025-01-01", periods=8, freq="h")
+    frame = pd.DataFrame(
+        {
+            "datetime": datetimes,
+            "open": np.linspace(100.0, 101.0, len(datetimes)),
+            "high": np.linspace(101.0, 102.0, len(datetimes)),
+            "low": np.linspace(99.0, 100.0, len(datetimes)),
+            "close": np.linspace(100.0, 101.0, len(datetimes)),
+            "volume": np.full(len(datetimes), 1000.0),
+        }
+    )
+
+    class Fold:
+        train = (datetimes[0], datetimes[2])
+        validation = (datetimes[3], datetimes[5])
+        locked_oos = (datetimes[6], datetimes[-1])
+
+    def fake_squeeze_rows(**_kwargs):
+        return [_row(model_id="squeeze", family="volatility_squeeze_breakout")]
+
+    def fail_unrequested(**_kwargs):
+        raise AssertionError("unrequested family generator should not run")
+
+    monkeypatch.setattr(module, "_squeeze_rows", fake_squeeze_rows)
+    monkeypatch.setattr(module, "_absorption_rows", fail_unrequested)
+    rows = module._rows_for_fold(
+        bars={("BTCUSDT", "1h"): frame},
+        symbols=("BTCUSDT",),
+        timeframes=("1h",),
+        fold=Fold(),
+        max_candidates_per_fold=10,
+        enabled_families=("volatility_squeeze_breakout",),
+    )
+
+    assert [row["family"] for row in rows] == ["volatility_squeeze_breakout"]
+
+
 def test_realism_diagnostics_blocks_live_assumption_for_suspicious_validation() -> None:
     diagnostics = module._realism_diagnostics(
         [
@@ -125,6 +186,7 @@ def test_search_space_hash_is_stable_and_excludes_oos_results() -> None:
         "range_reclaim_continuation",
         "cross_asset_lead_lag_momentum",
         "btc_beta_residual_momentum",
+        "cross_sectional_vol_adjusted_momentum",
         "feature_flow_crowding_reversal",
         "feature_liquidation_imbalance_reversal",
         "feature_flow_oi_trend_continuation",
@@ -138,10 +200,11 @@ def test_search_space_hash_is_stable_and_excludes_oos_results() -> None:
         "deep_research_flow_imbalance_liquidation_sweep",
         "indicator_vwap_atr_bollinger_reversion",
         "indicator_kalman_volatility_trend",
+        "indicator_kalman_residual_reversion",
         "standardized_indicator_ridge_directional",
     ]
     assert first == second
-    assert first == "57121f6a8ade6faeaf1a83b06276728a8f3590d320d5af501ce3115e9b260a82"
+    assert first == "bf59ed6fb259fc1094d84616b814e94beb4bef0761572c96665727db633056d2"
 
 
 def test_lead_lag_family_is_covered_and_flat_split_labeled() -> None:
@@ -229,6 +292,92 @@ def test_btc_beta_residual_momentum_family_is_pre_registered() -> None:
     assert rows
     assert {row["family"] for row in rows} == {"btc_beta_residual_momentum"}
     assert {row["benchmark_symbol"] for row in rows} == {"BTCUSDT"}
+    assert all(row["uses_locked_oos_for_selection"] is False for row in rows)
+
+
+def test_kalman_residual_reversion_family_is_pre_registered() -> None:
+    datetimes = pd.date_range("2025-01-01", periods=260, freq="h")
+    trend = np.linspace(100.0, 104.0, len(datetimes))
+    wave = np.sin(np.linspace(0.0, 18.0 * np.pi, len(datetimes))) * 2.0
+    close = trend + wave
+
+    frame = pd.DataFrame(
+        {
+            "datetime": datetimes,
+            "open": close,
+            "high": close * 1.01,
+            "low": close * 0.99,
+            "close": close,
+            "volume": np.full(len(close), 1000.0),
+        }
+    )
+
+    class Fold:
+        train = (datetimes[0], datetimes[99])
+        validation = (datetimes[100], datetimes[189])
+        locked_oos = (datetimes[190], datetimes[-1])
+
+    rows = module._indicator_kalman_residual_reversion_rows(
+        frame=frame,
+        symbol="ETHUSDT",
+        timeframe="1h",
+        fold=Fold(),
+        leverages=(2,),
+        allocation_fraction=0.1,
+    )
+
+    assert rows
+    assert {row["family"] for row in rows} == {"indicator_kalman_residual_reversion"}
+    assert all("kalman_residual_z" in row["indicator_set"] for row in rows)
+    assert all(row["uses_locked_oos_for_selection"] is False for row in rows)
+
+
+def test_cross_sectional_vol_adjusted_momentum_family_is_pre_registered() -> None:
+    datetimes = pd.date_range("2025-01-01", periods=220, freq="h")
+    base = np.linspace(100.0, 115.0, len(datetimes))
+    eth_close = base + np.r_[np.zeros(110), np.linspace(0.0, 12.0, 110)]
+    sol_close = base * 0.95
+    xrp_close = base * 1.03 - np.r_[np.zeros(110), np.linspace(0.0, 4.0, 110)]
+
+    def frame(close: np.ndarray) -> pd.DataFrame:
+        return pd.DataFrame(
+            {
+                "datetime": datetimes,
+                "open": close,
+                "high": close * 1.01,
+                "low": close * 0.99,
+                "close": close,
+                "volume": np.full(len(close), 1000.0),
+            }
+        )
+
+    class Fold:
+        train = (datetimes[0], datetimes[89])
+        validation = (datetimes[90], datetimes[159])
+        locked_oos = (datetimes[160], datetimes[-1])
+
+    bars_by_symbol = {
+        "ETHUSDT": frame(eth_close),
+        "SOLUSDT": frame(sol_close),
+        "XRPUSDT": frame(xrp_close),
+    }
+    panel = module.broad69._close_panel(
+        bars_by_symbol,
+        ("ETHUSDT", "SOLUSDT", "XRPUSDT"),
+    )
+
+    rows = module._cross_sectional_vol_adjusted_momentum_rows(
+        bars_by_symbol=bars_by_symbol,
+        panel=panel,
+        symbol="ETHUSDT",
+        timeframe="1h",
+        fold=Fold(),
+        leverages=(2,),
+        allocation_fraction=0.1,
+    )
+
+    assert rows
+    assert {row["family"] for row in rows} == {"cross_sectional_vol_adjusted_momentum"}
     assert all(row["uses_locked_oos_for_selection"] is False for row in rows)
 
 
@@ -489,12 +638,14 @@ def test_indicator_and_train_only_ml_rows_are_report_only() -> None:
     rows = (
         module._indicator_vwap_atr_bollinger_reversion_rows(**kwargs)
         + module._indicator_kalman_volatility_trend_rows(**kwargs)
+        + module._indicator_kalman_residual_reversion_rows(**kwargs)
         + module._standardized_indicator_ridge_directional_rows(**kwargs)
     )
 
     families = {row["family"] for row in rows}
     assert "indicator_vwap_atr_bollinger_reversion" in families
     assert "indicator_kalman_volatility_trend" in families
+    assert "indicator_kalman_residual_reversion" in families
     assert "standardized_indicator_ridge_directional" in families
     assert {row["uses_locked_oos_for_selection"] for row in rows} == {False}
     assert {row["real_money_execution"] for row in rows} == {False}
@@ -548,6 +699,8 @@ def test_run_writes_policy_flags_with_synthetic_loader(monkeypatch, tmp_path: Pa
     assert payload["optimization_policy"]["post_oos_selector_trusted"] is False
     assert payload["fresh_forward_required"] is True
     assert payload["real_money_execution"] is False
+    assert payload["fold_workers"] == 1
+    assert len(payload["enabled_families"]) == len(module.FAMILY_DESCRIPTIONS)
     assert Path(payload["output_paths"]["json"]).exists()
     assert Path(payload["output_paths"]["markdown"]).exists()
     assert payload["realism_diagnostics"]["live_performance_plausibility"] == "not_supported"
@@ -567,9 +720,13 @@ def test_run_writes_policy_flags_with_synthetic_loader(monkeypatch, tmp_path: Pa
         max_folds=None,
         max_candidates_per_fold=5,
         selection_policy=module.ROBUST_SELECTION_POLICY,
+        enabled_families=("indicator_kalman_residual_reversion",),
+        fold_workers=2,
     )
 
     assert robust_payload["selection_policy"] == module.ROBUST_SELECTION_POLICY
+    assert robust_payload["enabled_families"] == ["indicator_kalman_residual_reversion"]
+    assert robust_payload["fold_workers"] == 2
     assert (
         robust_payload["optimization_policy"]["selection_policy"] == module.ROBUST_SELECTION_POLICY
     )
