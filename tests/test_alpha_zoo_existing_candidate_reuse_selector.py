@@ -101,6 +101,39 @@ def test_quality_variant_applies_stricter_train_validation_filters() -> None:
     assert picked[0]["model_id"] == "strict_quality"
 
 
+def test_balanced_variant_requires_validation_quality_and_scores_stability() -> None:
+    picked = module._pick_variant(
+        [
+            _row(
+                "2026-01",
+                "high_validation_drawdown",
+                train_return=0.30,
+                validation_return=0.20,
+                validation_mdd=0.05,
+            ),
+            _row(
+                "2026-01",
+                "low_validation_return",
+                train_return=0.20,
+                validation_return=0.08,
+                validation_mdd=0.02,
+            ),
+            _row(
+                "2026-01",
+                "balanced_quality",
+                train_return=0.18,
+                validation_return=0.14,
+                validation_mdd=0.02,
+                validation_trade_event_count=15,
+            ),
+        ],
+        "robust_balanced_v1_top1",
+    )
+
+    assert len(picked) == 1
+    assert picked[0]["model_id"] == "balanced_quality"
+
+
 def test_run_writes_non_promotable_reuse_artifact(tmp_path: Path) -> None:
     source_json = tmp_path / "source.json"
     source_json.write_text(
@@ -130,5 +163,6 @@ def test_run_writes_non_promotable_reuse_artifact(tmp_path: Path) -> None:
     assert payload["decision"]["real_money_execution"] is False
     assert payload["best_variant_by_report_oos"] in module.VARIANTS
     assert "robust_quality_v1_top1" in payload["variants"]
+    assert "robust_balanced_v1_top1" in payload["variants"]
     assert Path(payload["output_paths"]["json"]).exists()
     assert Path(payload["output_paths"]["markdown"]).exists()

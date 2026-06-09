@@ -284,6 +284,7 @@ def test_search_space_hash_is_stable_and_excludes_oos_results() -> None:
         "feature_taker_flow_exhaustion_reversal",
         "feature_bbo_flow_exhaustion_reversal",
         "feature_book_depth_imbalance_reversal",
+        "feature_microstructure_squeeze_reversal",
         "deep_research_funding_dislocation_trend_carry",
         "deep_research_vol_managed_momentum_crash_gate",
         "deep_research_flow_imbalance_liquidation_sweep",
@@ -294,7 +295,7 @@ def test_search_space_hash_is_stable_and_excludes_oos_results() -> None:
         "standardized_indicator_ridge_directional",
     ]
     assert first == second
-    assert first == "4dd982a04779707f11d4530059f314ebe965cdee32fbd5a92a87a946ca3c7be7"
+    assert first == "b4bdb079ba4d9ad5e7202b053858c6d219359126dddaa2a546e38c863ccccca4"
 
 
 def test_lead_lag_family_is_covered_and_flat_split_labeled() -> None:
@@ -454,9 +455,7 @@ def test_vwap_kalman_pullback_continuation_family_is_pre_registered() -> None:
     )
 
     assert rows
-    assert {row["family"] for row in rows} == {
-        "indicator_vwap_kalman_pullback_continuation"
-    }
+    assert {row["family"] for row in rows} == {"indicator_vwap_kalman_pullback_continuation"}
     assert all("kalman_slope_z" in row["indicator_set"] for row in rows)
     assert {row["theory_plausibility_gate"] for row in rows} == {
         "vwap_kalman_pullback_continuation"
@@ -559,9 +558,7 @@ def test_cross_sectional_dispersion_gated_momentum_family_is_pre_registered() ->
     )
 
     assert rows
-    assert {row["family"] for row in rows} == {
-        "cross_sectional_dispersion_gated_momentum"
-    }
+    assert {row["family"] for row in rows} == {"cross_sectional_dispersion_gated_momentum"}
     assert all(row["no_nested_oos_mining"] is True for row in rows)
     assert all("rolling_cross_sectional_return_dispersion" in row["indicator_set"] for row in rows)
     assert all(row["uses_locked_oos_for_selection"] is False for row in rows)
@@ -846,6 +843,55 @@ def test_deep_research_report_rows_are_gated_and_report_only() -> None:
     assert {row["uses_locked_oos_for_selection"] for row in rows} == {False}
     assert {row["real_money_execution"] for row in rows} == {False}
     assert {row["clean_promotion_eligible"] for row in rows} == {False}
+
+
+def test_microstructure_squeeze_reversal_rows_are_feature_backed() -> None:
+    datetimes = pd.date_range("2025-01-01", periods=240, freq="h")
+    phase = np.linspace(0.0, 16.0 * np.pi, len(datetimes))
+    close = 100.0 + np.sin(phase) * 3.0
+    extension = pd.Series(close).pct_change(6).fillna(0.0).to_numpy()
+    pressure_sign = np.where(extension < 0.0, -1.0, 1.0)
+    frame = pd.DataFrame(
+        {
+            "datetime": datetimes,
+            "open": close,
+            "high": close * 1.01,
+            "low": close * 0.99,
+            "close": close,
+            "volume": np.full(len(datetimes), 1000.0),
+            "funding_rate": np.zeros(len(datetimes)),
+            "open_interest": np.linspace(1000.0, 1100.0, len(datetimes)),
+            "taker_buy_sell_imbalance": 0.25 * pressure_sign,
+            "liquidation_imbalance": np.zeros(len(datetimes)),
+            "bbo_spread_bps": 3.0 + np.abs(np.sin(phase)) * 20.0,
+            "book_depth_imbalance_1pct": -0.25 * pressure_sign,
+            "feature_valid": np.full(len(datetimes), True),
+            "feature_oi_flow_valid": np.full(len(datetimes), True),
+            "feature_liquidation_valid": np.full(len(datetimes), True),
+            "feature_bbo_valid": np.full(len(datetimes), True),
+            "feature_depth_valid": np.full(len(datetimes), True),
+        }
+    )
+
+    class Fold:
+        train = (datetimes[0], datetimes[79])
+        validation = (datetimes[80], datetimes[159])
+        locked_oos = (datetimes[160], datetimes[-1])
+
+    rows = module._feature_microstructure_squeeze_reversal_rows(
+        frame=frame,
+        symbol="ETHUSDT",
+        timeframe="1h",
+        fold=Fold(),
+        leverages=(2,),
+        allocation_fraction=0.1,
+    )
+
+    assert rows
+    assert {row["family"] for row in rows} == {"feature_microstructure_squeeze_reversal"}
+    assert {row["feature_backed"] for row in rows} == {True}
+    assert all("bbo_spread_bps" in row["microstructure_inputs"] for row in rows)
+    assert all(row["uses_locked_oos_for_selection"] is False for row in rows)
 
 
 def test_indicator_and_train_only_ml_rows_are_report_only() -> None:

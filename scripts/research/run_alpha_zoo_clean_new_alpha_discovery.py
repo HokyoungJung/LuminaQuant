@@ -126,6 +126,12 @@ FAMILY_DESCRIPTIONS: dict[str, str] = {
         "as a post-2024 orderbook pressure source. This is a separate depth feature, "
         "not a synthetic BBO quote."
     ),
+    "feature_microstructure_squeeze_reversal": (
+        "Combine Binance taker-flow, liquidation imbalance, BBO spread, and 1pct "
+        "book-depth imbalance to fade short-horizon squeeze dislocations only "
+        "when microstructure stress confirms one-sided pressure. Requires train/"
+        "validation feature coverage and remains fresh-forward gated."
+    ),
     "deep_research_funding_dislocation_trend_carry": (
         "Report-inspired leaf alpha: align medium-horizon momentum with perp funding "
         "carry and open-interest crowding caps. Requires train/validation feature "
@@ -303,6 +309,14 @@ def _search_space() -> dict[str, Any]:
             "lookback": [6, 12],
             "depth_imbalance_min": [0.10, 0.20],
             "price_extension_min": [0.003, 0.006],
+            "min_hold": [4, 8],
+        },
+        "feature_microstructure_squeeze_reversal": {
+            "lookback": [6, 12],
+            "spread_z_min": [1.0, 1.5],
+            "flow_abs_min": [0.10, 0.20],
+            "depth_imbalance_min": [0.10, 0.20],
+            "return_shock_min": [0.003, 0.006],
             "min_hold": [4, 8],
         },
         "deep_research_funding_dislocation_trend_carry": {
@@ -884,7 +898,9 @@ def _load_feature_points_safe(symbol: str, *, feature_root: Path) -> pd.DataFram
 
 _FRAME_ARRAY_CACHE: dict[int, tuple[int, np.ndarray, np.ndarray, np.ndarray]] = {}
 _SPLIT_MASK_CACHE: dict[
-    tuple[int, int, pd.Timestamp, pd.Timestamp, pd.Timestamp, pd.Timestamp, pd.Timestamp, pd.Timestamp],
+    tuple[
+        int, int, pd.Timestamp, pd.Timestamp, pd.Timestamp, pd.Timestamp, pd.Timestamp, pd.Timestamp
+    ],
     tuple[np.ndarray, np.ndarray, np.ndarray],
 ] = {}
 
@@ -1702,11 +1718,9 @@ def _cross_sectional_dispersion_gated_momentum_rows(
                         min_periods=max(12, dispersion_window // 2),
                     )
                     for max_dispersion_quantile in (0.60, 0.80):
-                        dispersion_cap = rolling_dispersion_cap.quantile(
-                            max_dispersion_quantile
-                        )
-                        dispersion_ok = (
-                            cross_sectional_dispersion.shift(1) <= dispersion_cap.shift(1)
+                        dispersion_cap = rolling_dispersion_cap.quantile(max_dispersion_quantile)
+                        dispersion_ok = cross_sectional_dispersion.shift(1) <= dispersion_cap.shift(
+                            1
                         )
                         for market_stress_gate in (0.025, 0.050):
                             stress_ok = market_stress.shift(1) > -market_stress_gate
@@ -1725,12 +1739,8 @@ def _cross_sectional_dispersion_gated_momentum_rows(
                                     & volatility_ok
                                     & dispersion_ok
                                 )
-                                long_exit = (score < 0.0) | (
-                                    realized_vol > max_realized_vol * 1.5
-                                )
-                                short_exit = (score > 0.0) | (
-                                    realized_vol > max_realized_vol * 1.5
-                                )
+                                long_exit = (score < 0.0) | (realized_vol > max_realized_vol * 1.5)
+                                short_exit = (score > 0.0) | (realized_vol > max_realized_vol * 1.5)
                                 for min_hold in (4, 8):
                                     signal = broad69._debounced_state_signal(
                                         long_entry,
@@ -1777,9 +1787,7 @@ def _cross_sectional_dispersion_gated_momentum_rows(
                                         )
                                         base["vol_window"] = vol_window
                                         base["dispersion_window"] = dispersion_window
-                                        base["max_dispersion_quantile"] = (
-                                            max_dispersion_quantile
-                                        )
+                                        base["max_dispersion_quantile"] = max_dispersion_quantile
                                         base["max_realized_vol"] = max_realized_vol
                                         base["market_stress_gate"] = market_stress_gate
                                         base["indicator_set"] = [
@@ -2784,6 +2792,157 @@ def _feature_book_depth_rows(
     return out
 
 
+def _feature_microstructure_squeeze_reversal_rows(
+    *,
+    frame: pd.DataFrame,
+    symbol: str,
+    timeframe: str,
+    fold: monthly.MonthlyFold,
+    leverages: Sequence[int],
+    allocation_fraction: float,
+    simulation_backend: str | None = None,
+) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    required = {
+        "feature_valid",
+        "feature_liquidation_valid",
+        "feature_bbo_valid",
+        "feature_depth_valid",
+        "taker_buy_sell_imbalance",
+        "liquidation_imbalance",
+        "bbo_spread_bps",
+        "book_depth_imbalance_1pct",
+    }
+    if frame.empty or any(column not in frame.columns for column in required):
+        return out
+    work = frame.copy()
+    work["feature_microstructure_valid"] = (
+        work["feature_valid"].fillna(False).astype(bool)
+        & work["feature_liquidation_valid"].fillna(False).astype(bool)
+        & work["feature_bbo_valid"].fillna(False).astype(bool)
+        & work["feature_depth_valid"].fillna(False).astype(bool)
+    )
+    coverage = _split_feature_coverage(
+        work,
+        train=fold.train,
+        validation=fold.validation,
+        locked_oos=fold.locked_oos,
+        column="feature_microstructure_valid",
+    )
+    if coverage["train"] < 0.60 or coverage["validation"] < 0.60:
+        return out
+    close = work["close"].astype(float).reset_index(drop=True)
+    flow = pd.to_numeric(work["taker_buy_sell_imbalance"], errors="coerce").reset_index(drop=True)
+    liquidation = pd.to_numeric(work["liquidation_imbalance"], errors="coerce").reset_index(
+        drop=True
+    )
+    spread = pd.to_numeric(work["bbo_spread_bps"], errors="coerce").reset_index(drop=True)
+    depth = pd.to_numeric(work["book_depth_imbalance_1pct"], errors="coerce").reset_index(drop=True)
+    feature_valid = work["feature_microstructure_valid"].reset_index(drop=True)
+    datetimes = work["datetime"]
+    returns = close.pct_change(fill_method=None)
+    for lookback in (6, 12):
+        extension = close / close.shift(lookback) - 1.0
+        spread_z = broad69._rolling_zscore(spread, max(12, lookback * 2))
+        flow_smooth = flow.rolling(max(2, lookback // 2), min_periods=2).mean()
+        depth_smooth = depth.rolling(max(2, lookback // 2), min_periods=2).mean()
+        liquidation_smooth = liquidation.rolling(max(2, lookback // 2), min_periods=2).mean()
+        for spread_z_min in (1.0, 1.5):
+            for flow_abs_min in (0.10, 0.20):
+                for depth_imbalance_min in (0.10, 0.20):
+                    for return_shock_min in (0.003, 0.006):
+                        long_entry = (
+                            feature_valid
+                            & (spread_z.shift(1) >= spread_z_min)
+                            & (extension.shift(1) <= -return_shock_min)
+                            & (flow_smooth.shift(1) <= -flow_abs_min)
+                            & (depth_smooth.shift(1) >= depth_imbalance_min)
+                            & (liquidation_smooth.shift(1) <= 0.20)
+                        )
+                        short_entry = (
+                            feature_valid
+                            & (spread_z.shift(1) >= spread_z_min)
+                            & (extension.shift(1) >= return_shock_min)
+                            & (flow_smooth.shift(1) >= flow_abs_min)
+                            & (depth_smooth.shift(1) <= -depth_imbalance_min)
+                            & (liquidation_smooth.shift(1) >= -0.20)
+                        )
+                        long_exit = (
+                            (~feature_valid)
+                            | (spread_z < 0.0)
+                            | (flow_smooth > 0.0)
+                            | (returns > return_shock_min)
+                        )
+                        short_exit = (
+                            (~feature_valid)
+                            | (spread_z < 0.0)
+                            | (flow_smooth < 0.0)
+                            | (returns < -return_shock_min)
+                        )
+                        for min_hold in (4, 8):
+                            signal = broad69._debounced_state_signal(
+                                long_entry,
+                                long_exit,
+                                short_entry,
+                                short_exit,
+                                side="long_short",
+                                min_hold_bars=min_hold,
+                                cooldown_bars=2,
+                            )
+                            for leverage in leverages:
+                                sim = _simulate_symbol(
+                                    work,
+                                    signal,
+                                    integer_leverage=int(leverage),
+                                    allocation_fraction=allocation_fraction,
+                                    simulation_backend=simulation_backend,
+                                )
+                                base = _candidate_base(
+                                    family="feature_microstructure_squeeze_reversal",
+                                    model_parts=(
+                                        "microrev",
+                                        timeframe,
+                                        symbol,
+                                        f"lb{lookback}",
+                                        f"spz{spread_z_min}",
+                                        f"flow{flow_abs_min}",
+                                        f"depth{depth_imbalance_min}",
+                                        f"ret{return_shock_min}",
+                                        f"hold{min_hold}",
+                                        f"lev{leverage}",
+                                    ),
+                                    symbol=symbol,
+                                    timeframe=timeframe,
+                                    side="long_short",
+                                    lookback=lookback,
+                                    threshold=flow_abs_min,
+                                    exit_threshold=return_shock_min,
+                                    min_hold=min_hold,
+                                    leverage=int(leverage),
+                                    allocation_fraction=allocation_fraction,
+                                )
+                                base["feature_backed"] = True
+                                base["feature_coverage"] = dict(coverage)
+                                base["microstructure_inputs"] = [
+                                    "taker_buy_sell_imbalance",
+                                    "liquidation_imbalance",
+                                    "bbo_spread_bps",
+                                    "book_depth_imbalance_1pct",
+                                ]
+                                out.append(
+                                    _finalize_row(
+                                        base=base,
+                                        sim=sim,
+                                        datetimes=datetimes,
+                                        timeframe=timeframe,
+                                        train=fold.train,
+                                        validation=fold.validation,
+                                        locked_oos=fold.locked_oos,
+                                    )
+                                )
+    return out
+
+
 def _deep_research_funding_dislocation_trend_carry_rows(
     *,
     frame: pd.DataFrame,
@@ -3483,8 +3642,8 @@ def _indicator_kalman_residual_reversion_rows(
                                             train=fold.train,
                                             validation=fold.validation,
                                             locked_oos=fold.locked_oos,
-                                )
-                            )
+                                        )
+                                    )
     return out
 
 
@@ -3843,6 +4002,8 @@ def _rows_for_fold(
                     rows.extend(_feature_bbo_flow_rows(**feature_kwargs))
                 if "feature_book_depth_imbalance_reversal" in enabled:
                     rows.extend(_feature_book_depth_rows(**feature_kwargs))
+                if "feature_microstructure_squeeze_reversal" in enabled:
+                    rows.extend(_feature_microstructure_squeeze_reversal_rows(**feature_kwargs))
                 if "deep_research_funding_dislocation_trend_carry" in enabled:
                     rows.extend(
                         _deep_research_funding_dislocation_trend_carry_rows(**feature_kwargs)

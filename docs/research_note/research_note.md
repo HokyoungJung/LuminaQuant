@@ -1,5 +1,31 @@
 # Research Note
 
+## 2026-06-09 KST — 기존 후보 재활용 selector 한계 및 microstructure alpha 전환
+
+이번 세션 결론은 기존 후보 pool 안에서 selector를 계속 깎는 방식은 한계가 있다는 것이다. 기존 full candidate artifact `indicator_kalman_ml_robust_selector_full_universe_20260609/clean_new_alpha_discovery_latest.json`는 10 folds / 100,000 rows이고, 이를 train+validation-only 방식으로 재활용하면 기존 clean default 대비 수치는 개선되지만 fresh-forward 전 실전 승격 근거는 아니다.
+
+기존 후보 재활용 결과:
+- 새 reuse runner: `scripts/research/run_alpha_zoo_existing_candidate_reuse_selector.py`.
+- Report artifact: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/existing_candidate_reuse_selector_20260609/existing_candidate_reuse_selector_latest.json|md`.
+- `robust_top1`: OOS comp `22.14%`, ann `27.12%`, monthly MDD `3.10%`, hit `6/10`, PF `4.95`.
+- `robust_quality_v1_top1`: OOS comp `24.55%`, ann `30.14%`, monthly MDD `3.10%`, hit `7/10`, PF `6.30`.
+- `robust_balanced_v1_top1`: OOS comp `27.03%`, ann `33.26%`, monthly MDD `2.72%`, hit `7/10`, PF `7.92`.
+- 판단: 개선은 됐지만 selector variants 자체가 historical locked-OOS 리뷰 후 설계된 post-failure research이므로 `real_money_execution=false`, `fresh_forward_required=true`.
+
+새 후보 확장:
+- Clean new-alpha runner에 추가/정리된 family:
+  - `btc_beta_residual_momentum`
+  - `indicator_kalman_residual_reversion`
+  - `feature_microstructure_squeeze_reversal`
+- 특히 `feature_microstructure_squeeze_reversal`는 taker-flow, liquidation imbalance, BBO spread, 1pct book-depth imbalance를 동시에 요구하는 microstructure squeeze mean-reversion leaf다. 이 방향이 OHLCV/Kalman/후보줍기보다 ceiling을 깰 가능성이 높다.
+- Isolated real-data smoke (`ETHUSDT`, `1h`, last 2 folds, microstructure family only)는 candidate rows `0`이었다. 원인은 alpha 공식보다 feature coverage gate다: BBO+depth+liquidation+flow를 동시에 요구하면 current WF train/validation coverage가 충분하지 않아 fail-closed된다.
+
+운영 결론:
+- 같은 locked-OOS window에서 selector mining으로 headline 수치를 더 키우는 작업은 중단한다. 그건 점점 OOS-fitting이다.
+- 다음 수익 개선 경로는 microstructure feature coverage를 train/validation 전체로 채운 뒤, frozen selector/family로 fresh-forward 평가하는 것이다.
+- 현 단계 real-money/paper promotion은 여전히 blocked. 필요한 gate는 fresh-forward slice, 10/15/20bps cost stress, paper fill/slippage/reject/reconcile telemetry다.
+- Verification: `uv run ruff check scripts/research/run_alpha_zoo_clean_new_alpha_discovery.py tests/test_alpha_zoo_clean_new_alpha_discovery.py`, `PYTHONPATH=. uv run pytest -q tests/test_alpha_zoo_clean_new_alpha_discovery.py` (`27 passed`), `uv run ruff check scripts/research/run_alpha_zoo_existing_candidate_reuse_selector.py tests/test_alpha_zoo_existing_candidate_reuse_selector.py`, `PYTHONPATH=. uv run pytest -q tests/test_alpha_zoo_existing_candidate_reuse_selector.py` (`5 passed`).
+
 ## 2026-06-07 KST — Deep-research 최종 결론: 최고 수익 후보는 freeze/shadow, real-money는 아직 금지
 
 최종 리포트: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/deep_research_best_strategy_clean_oos_20260607/deep_research_best_strategy_clean_oos_20260607.md|json`.

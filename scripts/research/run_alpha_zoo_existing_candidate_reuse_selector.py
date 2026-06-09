@@ -43,6 +43,7 @@ VARIANTS = (
     "robust_top2_equal",
     "robust_diverse3_equal",
     "robust_quality_v1_top1",
+    "robust_balanced_v1_top1",
 )
 
 
@@ -122,6 +123,53 @@ def _quality_v1_sorted(rows: Sequence[Mapping[str, Any]]) -> list[Mapping[str, A
     )
 
 
+def _validation_calmar(row: Mapping[str, Any]) -> float:
+    return _safe_float(row.get("validation_return")) / max(
+        _safe_float(row.get("validation_mdd")), 0.02
+    )
+
+
+def _train_calmar(row: Mapping[str, Any]) -> float:
+    return _safe_float(row.get("train_return")) / max(_safe_float(row.get("train_mdd")), 0.02)
+
+
+def _balanced_v1_allowed(row: Mapping[str, Any]) -> bool:
+    if not clean._eligible_for_policy(row, selection_policy=clean.ROBUST_SELECTION_POLICY):
+        return False
+    if _train_validation_return_ratio(row) > 2.5:
+        return False
+    if _safe_float(row.get("train_return")) - _safe_float(row.get("validation_return")) > 0.45:
+        return False
+    if _safe_float(row.get("validation_return")) < 0.12:
+        return False
+    if _safe_float(row.get("validation_mdd")) > 0.03:
+        return False
+    if int(row.get("validation_trade_event_count") or 0) < 10:
+        return False
+    return _safe_float(row.get("validation_return_per_turnover_proxy_bps"), -100.0) > 0.0
+
+
+def _balanced_v1_score(row: Mapping[str, Any]) -> float:
+    train = _safe_float(row.get("train_return"))
+    validation = _safe_float(row.get("validation_return"))
+    gap = abs(train - validation) / max(abs(validation), 0.05)
+    return float(
+        5.0 * min(train, validation)
+        + min(_train_calmar(row), _validation_calmar(row))
+        - gap
+        + 0.0002 * _safe_float(row.get("validation_return_per_turnover_proxy_bps"))
+    )
+
+
+def _balanced_v1_sorted(rows: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    eligible = [row for row in rows if _balanced_v1_allowed(row)]
+    return sorted(
+        eligible,
+        key=lambda row: (_balanced_v1_score(row), str(row.get("model_id"))),
+        reverse=True,
+    )
+
+
 def _pick_variant(rows: Sequence[Mapping[str, Any]], variant: str) -> list[Mapping[str, Any]]:
     ranked = _eligible_sorted(rows)
     if variant == "robust_top1":
@@ -130,6 +178,8 @@ def _pick_variant(rows: Sequence[Mapping[str, Any]], variant: str) -> list[Mappi
         return ranked[:2]
     if variant == "robust_quality_v1_top1":
         return _quality_v1_sorted(rows)[:1]
+    if variant == "robust_balanced_v1_top1":
+        return _balanced_v1_sorted(rows)[:1]
     if variant == "robust_diverse3_equal":
         picked: list[Mapping[str, Any]] = []
         families: set[str] = set()
