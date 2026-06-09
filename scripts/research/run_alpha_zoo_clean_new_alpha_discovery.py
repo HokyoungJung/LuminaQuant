@@ -38,6 +38,9 @@ DEFAULT_OUTPUT_DIR = broad69.ALPHA_V2_ROOT / "alpha_zoo_clean_new_alpha_discover
 DEFAULT_TIMEFRAMES = ("1h", "4h")
 DEFAULT_LEVERAGES = (2, 3, 4)
 DEFAULT_ALLOCATION_FRACTION = 0.10
+DEFAULT_SELECTION_POLICY = "default_train_validation"
+ROBUST_SELECTION_POLICY = "robust_train_validation_v1"
+SELECTION_POLICIES = (DEFAULT_SELECTION_POLICY, ROBUST_SELECTION_POLICY)
 
 FAMILY_DESCRIPTIONS: dict[str, str] = {
     "volatility_squeeze_breakout": (
@@ -57,6 +60,11 @@ FAMILY_DESCRIPTIONS: dict[str, str] = {
         "Enter target symbols from lagged leader-symbol momentum when the target "
         "has not yet fully moved with the leader. This is a pre-registered "
         "cross-asset information-flow alpha using only prior bars."
+    ),
+    "btc_beta_residual_momentum": (
+        "Enter residual target momentum after rolling BTC/ETH beta adjustment, "
+        "with benchmark crash and realized-volatility gates. Uses only prior "
+        "bars and is designed to avoid paying for plain market beta."
     ),
     "feature_flow_crowding_reversal": (
         "Use local funding/open-interest/taker-flow feature points to fade crowded "
@@ -174,6 +182,14 @@ def _search_space() -> dict[str, Any]:
             "lookback": [6, 12, 24],
             "leader_threshold": [0.01, 0.02],
             "target_lag_fraction": [0.25, 0.50],
+            "min_hold": [4, 8],
+        },
+        "btc_beta_residual_momentum": {
+            "lookback": [12, 24, 48],
+            "beta_window": [48, 96],
+            "residual_threshold": [0.003, 0.006],
+            "benchmark_crash_gate": [0.025, 0.050],
+            "max_realized_vol": [0.012, 0.020],
             "min_hold": [4, 8],
         },
         "feature_flow_crowding_reversal": {
@@ -341,6 +357,81 @@ def _score_row(row: Mapping[str, Any]) -> float:
         - 5.0 * spike
         - active_penalty
     )
+
+
+def _train_validation_return_ratio(row: Mapping[str, Any]) -> float:
+    explicit = row.get("train_validation_return_ratio")
+    if explicit is not None:
+        return _safe_float(explicit, 999.0)
+    validation = _safe_float(row.get("validation_return"))
+    return _safe_float(row.get("train_return")) / max(abs(validation), 0.02)
+
+
+def _robust_v1_eligible(row: Mapping[str, Any]) -> bool:
+    if row.get("uses_locked_oos_for_selection"):
+        return False
+    if row.get("uses_locked_oos_for_objective"):
+        return False
+    if row.get("uses_locked_oos_for_pruning"):
+        return False
+    if row.get("uses_locked_oos_for_parameter_fitting"):
+        return False
+    train = _safe_float(row.get("train_return"))
+    validation = _safe_float(row.get("validation_return"))
+    train_mdd = _safe_float(row.get("train_mdd"))
+    validation_mdd = _safe_float(row.get("validation_mdd"))
+    ratio = _train_validation_return_ratio(row)
+    if train <= 0.0 or validation <= 0.0:
+        return False
+    if train_mdd > 0.35 or validation_mdd > 0.12:
+        return False
+    if ratio < 0.25 or ratio > 3.0:
+        return False
+    if train - validation > 0.45:
+        return False
+    if int(row.get("validation_trade_event_count") or 0) < 2:
+        return False
+    train_rpt = _safe_float(row.get("train_return_per_turnover_proxy_bps"), -100.0)
+    validation_rpt = _safe_float(row.get("validation_return_per_turnover_proxy_bps"), -100.0)
+    return train_rpt > 0.0 and validation_rpt > 0.0
+
+
+def _robust_v1_score_row(row: Mapping[str, Any]) -> float:
+    validation = _safe_float(row.get("validation_return"))
+    train = _safe_float(row.get("train_return"))
+    validation_mdd = _safe_float(row.get("validation_mdd"))
+    train_mdd = _safe_float(row.get("train_mdd"))
+    validation_calmar = validation / max(validation_mdd, 0.02)
+    train_calmar = train / max(train_mdd, 0.02)
+    gap_penalty = abs(train - validation) / max(abs(validation), 0.05)
+    validation_rpt = _safe_float(row.get("validation_return_per_turnover_proxy_bps"), -100.0)
+    rpt_bonus = min(max(validation_rpt, -50.0), 200.0) / 100.0
+    trade_count_bonus = min(float(row.get("validation_trade_event_count") or 0.0), 20.0) / 100.0
+    return float(
+        2.0 * validation_calmar
+        + 0.5 * min(train_calmar, validation_calmar * 1.5)
+        + 0.25 * rpt_bonus
+        + trade_count_bonus
+        - 0.3 * gap_penalty
+        - 0.5 * validation_mdd
+        - 0.25 * train_mdd
+    )
+
+
+def _selection_score(row: Mapping[str, Any], *, selection_policy: str) -> float:
+    if selection_policy == DEFAULT_SELECTION_POLICY:
+        return _score_row(row)
+    if selection_policy == ROBUST_SELECTION_POLICY:
+        return _robust_v1_score_row(row)
+    raise ValueError(f"unknown selection policy: {selection_policy}")
+
+
+def _eligible_for_policy(row: Mapping[str, Any], *, selection_policy: str) -> bool:
+    if selection_policy == DEFAULT_SELECTION_POLICY:
+        return _eligible_for_freeze(row)
+    if selection_policy == ROBUST_SELECTION_POLICY:
+        return _eligible_for_freeze(row) and _robust_v1_eligible(row)
+    raise ValueError(f"unknown selection policy: {selection_policy}")
 
 
 def _eligible_for_freeze(row: Mapping[str, Any]) -> bool:
@@ -1096,6 +1187,115 @@ def _lead_lag_rows(
                                     locked_oos=fold.locked_oos,
                                 )
                             )
+    return out
+
+
+def _btc_beta_residual_momentum_rows(
+    *,
+    bars_by_symbol: Mapping[str, pd.DataFrame],
+    panel: pd.DataFrame,
+    symbol: str,
+    timeframe: str,
+    fold: monthly.MonthlyFold,
+    leverages: Sequence[int],
+    allocation_fraction: float,
+) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    frame = bars_by_symbol.get(symbol, pd.DataFrame())
+    if frame.empty or symbol not in panel:
+        return out
+    benchmark_symbol = "BTCUSDT" if symbol != "BTCUSDT" else "ETHUSDT"
+    if benchmark_symbol not in panel:
+        return out
+    datetimes = pd.DatetimeIndex(pd.to_datetime(frame["datetime"]))
+    target_close = panel[symbol].reindex(datetimes).ffill()
+    benchmark_close = panel[benchmark_symbol].reindex(datetimes).ffill()
+    target_returns = target_close.pct_change(fill_method=None)
+    benchmark_returns = benchmark_close.pct_change(fill_method=None)
+    for lookback in (12, 24, 48):
+        benchmark_momentum = benchmark_close / benchmark_close.shift(lookback) - 1.0
+        realized_vol = target_returns.rolling(max(lookback, 24)).std(ddof=1)
+        for beta_window in (48, 96):
+            beta_local = target_returns.rolling(beta_window).cov(benchmark_returns) / (
+                benchmark_returns.rolling(beta_window).var(ddof=1).replace(0.0, np.nan)
+            )
+            residual_local = target_returns - beta_local.clip(-3.0, 3.0) * benchmark_returns
+            residual_signal = residual_local.rolling(lookback).sum()
+            for residual_threshold in (0.003, 0.006):
+                for benchmark_crash_gate in (0.025, 0.050):
+                    for max_realized_vol in (0.012, 0.020):
+                        long_entry = (
+                            (residual_signal.shift(1) > residual_threshold)
+                            & (benchmark_momentum.shift(1) > -benchmark_crash_gate)
+                            & (realized_vol.shift(1) <= max_realized_vol)
+                        )
+                        short_entry = (
+                            (residual_signal.shift(1) < -residual_threshold)
+                            & (benchmark_momentum.shift(1) < benchmark_crash_gate)
+                            & (realized_vol.shift(1) <= max_realized_vol)
+                        )
+                        long_exit = (residual_signal < 0.0) | (
+                            realized_vol > max_realized_vol * 1.5
+                        )
+                        short_exit = (residual_signal > 0.0) | (
+                            realized_vol > max_realized_vol * 1.5
+                        )
+                        for min_hold in (4, 8):
+                            signal = broad69._debounced_state_signal(
+                                long_entry,
+                                long_exit,
+                                short_entry,
+                                short_exit,
+                                side="long_short",
+                                min_hold_bars=min_hold,
+                                cooldown_bars=2,
+                            )
+                            for leverage in leverages:
+                                sim = broad69.simulate_symbol(
+                                    frame,
+                                    signal,
+                                    integer_leverage=int(leverage),
+                                    allocation_fraction=allocation_fraction,
+                                )
+                                base = _candidate_base(
+                                    family="btc_beta_residual_momentum",
+                                    model_parts=(
+                                        "betaresmom",
+                                        timeframe,
+                                        benchmark_symbol,
+                                        symbol,
+                                        f"lb{lookback}",
+                                        f"bw{beta_window}",
+                                        f"thr{residual_threshold}",
+                                        f"crash{benchmark_crash_gate}",
+                                        f"vol{max_realized_vol}",
+                                        f"hold{min_hold}",
+                                        f"lev{leverage}",
+                                    ),
+                                    symbol=symbol,
+                                    timeframe=timeframe,
+                                    side="long_short",
+                                    lookback=lookback,
+                                    threshold=residual_threshold,
+                                    exit_threshold=benchmark_crash_gate,
+                                    min_hold=min_hold,
+                                    leverage=int(leverage),
+                                    allocation_fraction=allocation_fraction,
+                                )
+                                base["benchmark_symbol"] = benchmark_symbol
+                                base["beta_window"] = beta_window
+                                base["max_realized_vol"] = max_realized_vol
+                                out.append(
+                                    _finalize_row(
+                                        base=base,
+                                        sim=sim,
+                                        datetimes=frame["datetime"],
+                                        timeframe=timeframe,
+                                        train=fold.train,
+                                        validation=fold.validation,
+                                        locked_oos=fold.locked_oos,
+                                    )
+                                )
     return out
 
 
@@ -1970,9 +2170,7 @@ def _deep_research_funding_dislocation_trend_carry_rows(
     close = frame["close"].astype(float).reset_index(drop=True)
     funding = pd.to_numeric(frame["funding_rate"], errors="coerce").reset_index(drop=True)
     open_interest = pd.to_numeric(frame["open_interest"], errors="coerce").reset_index(drop=True)
-    feature_valid = frame["feature_oi_flow_valid"].fillna(False).astype(bool).reset_index(
-        drop=True
-    )
+    feature_valid = frame["feature_oi_flow_valid"].fillna(False).astype(bool).reset_index(drop=True)
     datetimes = frame["datetime"]
     for lookback in (12, 24, 48):
         momentum = close / close.shift(lookback) - 1.0
@@ -2208,9 +2406,7 @@ def _deep_research_flow_imbalance_liquidation_sweep_rows(
         liquidation_z = broad69._rolling_zscore(liquidation, max(8, lookback))
         flow_smooth = flow.rolling(max(4, lookback // 2)).mean()
         depth_smooth = depth.rolling(max(4, lookback // 2)).mean()
-        micro_pressure = pd.concat([flow_smooth, depth_smooth], axis=1).mean(
-            axis=1, skipna=True
-        )
+        micro_pressure = pd.concat([flow_smooth, depth_smooth], axis=1).mean(axis=1, skipna=True)
         for return_shock_min in (0.004, 0.008):
             for flow_or_depth_min in (0.10, 0.20):
                 for liquidation_z_min in (1.0, 1.5):
@@ -2231,9 +2427,7 @@ def _deep_research_flow_imbalance_liquidation_sweep_rows(
                             & (micro_pressure.shift(1) <= -flow_or_depth_min)
                         )
                         long_exit = (
-                            (~feature_valid)
-                            | (micro_pressure < 0.0)
-                            | (returns > return_shock_min)
+                            (~feature_valid) | (micro_pressure < 0.0) | (returns > return_shock_min)
                         )
                         short_exit = (
                             (~feature_valid)
@@ -2342,14 +2536,10 @@ def _indicator_vwap_atr_bollinger_reversion_rows(
                         & volatility_ok
                     )
                     long_exit = (
-                        (close >= vwap)
-                        | (bollinger_z > -0.25)
-                        | (atr_pct > max_atr_pct * 1.5)
+                        (close >= vwap) | (bollinger_z > -0.25) | (atr_pct > max_atr_pct * 1.5)
                     )
                     short_exit = (
-                        (close <= vwap)
-                        | (bollinger_z < 0.25)
-                        | (atr_pct > max_atr_pct * 1.5)
+                        (close <= vwap) | (bollinger_z < 0.25) | (atr_pct > max_atr_pct * 1.5)
                     )
                     for min_hold in (4, 8):
                         signal = broad69._debounced_state_signal(
@@ -2446,8 +2636,7 @@ def _indicator_kalman_volatility_trend_rows(
                 for slope_z_min in (0.25, 0.50):
                     for max_realized_vol in (0.018, 0.028):
                         volatility_ok = (realized_vol.shift(1) <= max_realized_vol) & (
-                            atr_pct.rolling(lookback).mean().shift(1)
-                            <= max_realized_vol * 1.5
+                            atr_pct.rolling(lookback).mean().shift(1) <= max_realized_vol * 1.5
                         )
                         long_entry = (
                             (slope_z.shift(1) >= slope_z_min)
@@ -2658,6 +2847,7 @@ def _rows_for_fold(
     features_by_symbol: Mapping[str, pd.DataFrame] | None = None,
     fold: monthly.MonthlyFold,
     max_candidates_per_fold: int,
+    selection_policy: str = DEFAULT_SELECTION_POLICY,
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for timeframe in timeframes:
@@ -2728,14 +2918,42 @@ def _rows_for_fold(
                         allocation_fraction=DEFAULT_ALLOCATION_FRACTION,
                     )
                 )
-    return sorted(rows, key=lambda row: _score_row(row), reverse=True)[:max_candidates_per_fold]
+                rows.extend(
+                    _btc_beta_residual_momentum_rows(
+                        bars_by_symbol=bars_by_symbol,
+                        panel=panel,
+                        symbol=symbol,
+                        timeframe=timeframe,
+                        fold=fold,
+                        leverages=DEFAULT_LEVERAGES,
+                        allocation_fraction=DEFAULT_ALLOCATION_FRACTION,
+                    )
+                )
+    return sorted(
+        rows,
+        key=lambda row: (
+            _selection_score(row, selection_policy=selection_policy),
+            str(row.get("model_id")),
+        ),
+        reverse=True,
+    )[:max_candidates_per_fold]
 
 
-def _select_fold_candidate(rows: Sequence[Mapping[str, Any]]) -> Mapping[str, Any] | None:
-    eligible = [row for row in rows if _eligible_for_freeze(row)]
+def _select_fold_candidate(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    selection_policy: str = DEFAULT_SELECTION_POLICY,
+) -> Mapping[str, Any] | None:
+    eligible = [row for row in rows if _eligible_for_policy(row, selection_policy=selection_policy)]
     if not eligible:
         return None
-    return max(eligible, key=lambda row: (_score_row(row), str(row.get("model_id"))))
+    return max(
+        eligible,
+        key=lambda row: (
+            _selection_score(row, selection_policy=selection_policy),
+            str(row.get("model_id")),
+        ),
+    )
 
 
 def _aggregate(selected_rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
@@ -2758,6 +2976,94 @@ def _aggregate(selected_rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _realism_diagnostics(
+    selected_rows: Sequence[Mapping[str, Any]],
+    aggregate: Mapping[str, Any],
+    *,
+    selection_policy: str,
+) -> dict[str, Any]:
+    validation_returns = [_safe_float(row.get("validation_return")) for row in selected_rows]
+    locked_oos_returns = [
+        _safe_float(row.get("locked_oos_return_report_only")) for row in selected_rows
+    ]
+    validation_trade_counts = [
+        int(row.get("validation_trade_event_count") or 0) for row in selected_rows
+    ]
+    validation_sharpes = [_safe_float(row.get("validation_sharpe")) for row in selected_rows]
+    row_blockers = sorted(
+        {
+            str(blocker)
+            for row in selected_rows
+            for blocker in (row.get("label_blockers") or [])
+            if str(blocker)
+        }
+    )
+    reasons: list[str] = []
+    if not selected_rows:
+        reasons.append("no_selected_fold_rows")
+    if selection_policy == ROBUST_SELECTION_POLICY:
+        reasons.append("robust_selector_is_post_failure_diagnostic_requires_fresh_forward")
+    if row_blockers:
+        reasons.extend(row_blockers)
+    if selected_rows and not all(bool(row.get("ready_for_real")) for row in selected_rows):
+        reasons.append("selected_rows_not_ready_for_real_money")
+    if selected_rows and any(
+        bool(row.get("uses_continuous_position_state_across_split_boundaries"))
+        for row in selected_rows
+    ):
+        reasons.append("continuous_position_state_split_simulation_not_live_equivalent")
+    if validation_trade_counts and min(validation_trade_counts) < 30:
+        reasons.append("some_validation_samples_below_30_trade_events")
+    mean_validation_return = float(np.mean(validation_returns)) if validation_returns else 0.0
+    mean_locked_oos_return = float(np.mean(locked_oos_returns)) if locked_oos_returns else 0.0
+    if mean_validation_return > 0.10 and mean_locked_oos_return < mean_validation_return * 0.50:
+        reasons.append("validation_to_locked_oos_decay_large")
+    if validation_sharpes and max(validation_sharpes) > 5.0:
+        reasons.append(
+            "validation_sharpe_too_high_for_live_assumption_without_forward_fill_telemetry"
+        )
+    if _safe_float(aggregate.get("annualized_oos_return_approx")) > 1.0:
+        reasons.append("hundred_pct_plus_oos_label_needs_independent_pre_registered_retest")
+    live_plausibility = "not_supported" if reasons else "needs_shadow_confirmation"
+    return {
+        "live_performance_plausibility": live_plausibility,
+        "real_money_execution": False,
+        "ready_for_real": False,
+        "selection_policy": selection_policy,
+        "selected_fold_count": len(selected_rows),
+        "mean_validation_return": mean_validation_return,
+        "mean_locked_oos_return_report_only": mean_locked_oos_return,
+        "locked_oos_compounded_return_report_only": _safe_float(
+            aggregate.get("compounded_oos_return")
+        ),
+        "locked_oos_annualized_return_report_only": _safe_float(
+            aggregate.get("annualized_oos_return_approx")
+        ),
+        "locked_oos_monthly_equity_mdd_report_only": _safe_float(
+            aggregate.get("monthly_equity_mdd")
+        ),
+        "positive_locked_oos_fold_share": (
+            sum(1 for value in locked_oos_returns if value > 0.0) / len(locked_oos_returns)
+            if locked_oos_returns
+            else 0.0
+        ),
+        "min_validation_trade_event_count": min(validation_trade_counts)
+        if validation_trade_counts
+        else 0,
+        "max_validation_sharpe": max(validation_sharpes) if validation_sharpes else 0.0,
+        "blockers": sorted(set(reasons)),
+        "external_priors_reflected": [
+            "time_series_and_cross_sectional_momentum",
+            "volatility_managed_momentum_and_crash_gates",
+            "lead_lag_information_flow",
+            "btc_eth_beta_residual_momentum",
+            "perp_funding_open_interest_taker_flow_crowding",
+            "order_book_spread_depth_imbalance_microstructure",
+            "train_only_standardized_indicator_ridge_leaf",
+        ],
+    }
+
+
 def run(
     *,
     data_root: Path,
@@ -2767,7 +3073,10 @@ def run(
     feature_root: Path | None = None,
     max_folds: int | None,
     max_candidates_per_fold: int,
+    selection_policy: str = DEFAULT_SELECTION_POLICY,
 ) -> dict[str, Any]:
+    if selection_policy not in SELECTION_POLICIES:
+        raise ValueError(f"unknown selection policy: {selection_policy}")
     search_space = _search_space()
     search_hash = _search_space_hash(search_space)
     bars, coverage = broad69.load_all_bars(symbols, data_root=data_root, timeframes=timeframes)
@@ -2796,9 +3105,17 @@ def run(
             features_by_symbol=features_by_symbol,
             fold=fold,
             max_candidates_per_fold=max_candidates_per_fold,
+            selection_policy=selection_policy,
         )
-        selected = _select_fold_candidate(rows)
+        selected = _select_fold_candidate(rows, selection_policy=selection_policy)
         for row in rows:
+            row["selection_policy"] = selection_policy
+            row["selection_score_active_train_validation_only"] = _selection_score(
+                row,
+                selection_policy=selection_policy,
+            )
+            row["robust_train_validation_v1_eligible"] = _robust_v1_eligible(row)
+            row["selection_score_robust_v1_train_validation_only"] = _robust_v1_score_row(row)
             row["fold_id"] = fold.fold_id
             row["selected_by_train_validation_freeze"] = bool(
                 selected is not None and row.get("model_id") == selected.get("model_id")
@@ -2809,7 +3126,8 @@ def run(
                     {
                         "fold_id": fold.fold_id,
                         "model_id": row.get("model_id"),
-                        "score": row.get("selection_score_train_validation_only"),
+                        "score": row.get("selection_score_active_train_validation_only"),
+                        "selection_policy": selection_policy,
                         "train": row.get("train_return"),
                         "validation": row.get("validation_return"),
                     },
@@ -2823,6 +3141,17 @@ def run(
             selected_payload["fold_id"] = fold.fold_id
             selected_payload["selected_by_train_validation_freeze"] = True
             selected_payload["pre_registered_search_space_sha256"] = search_hash
+            selected_payload["selection_policy"] = selection_policy
+            selected_payload["selection_score_active_train_validation_only"] = _selection_score(
+                selected_payload,
+                selection_policy=selection_policy,
+            )
+            selected_payload["robust_train_validation_v1_eligible"] = _robust_v1_eligible(
+                selected_payload
+            )
+            selected_payload["selection_score_robust_v1_train_validation_only"] = (
+                _robust_v1_score_row(selected_payload)
+            )
             selected_rows.append(selected_payload)
 
     aggregate = _aggregate(selected_rows)
@@ -2831,6 +3160,7 @@ def run(
         "generated_at_utc": _utc_now_iso(),
         "search_space": search_space,
         "pre_registered_search_space_sha256": search_hash,
+        "selection_policy": selection_policy,
         "optimization_policy": optimization_search_policy_payload(
             search_method="bounded_grid_pre_registered_new_alpha",
             objective_policy="rank_train_validation_only_then_attach_locked_oos_report_gate",
@@ -2840,6 +3170,12 @@ def run(
                 "lagged-shadow, nested, or locked-OOS objective inputs"
             ),
             extra={
+                "selection_policy": selection_policy,
+                "selection_policy_status": (
+                    "post_failure_research_variant_requires_fresh_forward"
+                    if selection_policy == ROBUST_SELECTION_POLICY
+                    else "pre_existing_default_policy"
+                ),
                 "post_oos_selector_trusted": False,
                 "fresh_forward_required": True,
                 "real_money_execution": False,
@@ -2857,6 +3193,11 @@ def run(
         "selected_fold_rows": selected_rows,
         "candidate_rows": fold_rows,
         "aggregate": aggregate,
+        "realism_diagnostics": _realism_diagnostics(
+            selected_rows,
+            aggregate,
+            selection_policy=selection_policy,
+        ),
         "ready_for_real": False,
         "real_money_execution": False,
         "fresh_forward_required": True,
@@ -2887,6 +3228,7 @@ def _render_markdown(payload: Mapping[str, Any]) -> str:
         "",
         f"- generated: `{payload.get('generated_at_utc')}`",
         f"- pre-registered search hash: `{payload.get('pre_registered_search_space_sha256')}`",
+        f"- selection policy: `{payload.get('selection_policy', DEFAULT_SELECTION_POLICY)}`",
         "- selection input: `train + validation only`",
         "- locked-OOS: `report/gate only after freeze`",
         "- split simulation policy: `continuous_full_period_signal_slice_report_only`",
@@ -2903,11 +3245,32 @@ def _render_markdown(payload: Mapping[str, Any]) -> str:
         f"- positive folds: `{agg.get('positive_oos_folds')}/{agg.get('fold_count')}`",
         f"- Sharpe approx: `{_safe_float(agg.get('monthly_sharpe_approx')):.2f}`",
         "",
-        "## Fold selections",
+        "## Live realism diagnostics",
         "",
-        "| Fold | Model | Family | Train | Validation | Locked OOS | OOS MDD |",
-        "| --- | --- | --- | ---: | ---: | ---: | ---: |",
     ]
+    realism = payload.get("realism_diagnostics") or {}
+    blockers = realism.get("blockers") or []
+    lines.extend(
+        [
+            f"- live plausibility: `{realism.get('live_performance_plausibility', 'unknown')}`",
+            f"- mean validation return: `{_fmt_pct(realism.get('mean_validation_return'))}`",
+            f"- mean locked-OOS return: `{_fmt_pct(realism.get('mean_locked_oos_return_report_only'))}`",
+            f"- positive locked-OOS fold share: `{_safe_float(realism.get('positive_locked_oos_fold_share')):.2f}`",
+            f"- min validation trade events: `{int(realism.get('min_validation_trade_event_count') or 0)}`",
+            f"- max validation Sharpe: `{_safe_float(realism.get('max_validation_sharpe')):.2f}`",
+            "- blockers: "
+            + (", ".join(f"`{blocker}`" for blocker in blockers) if blockers else "`none`"),
+            "",
+        ]
+    )
+    lines.extend(
+        [
+            "## Fold selections",
+            "",
+            "| Fold | Model | Family | Train | Validation | Locked OOS | OOS MDD |",
+            "| --- | --- | --- | ---: | ---: | ---: | ---: |",
+        ]
+    )
     for row in payload.get("selected_fold_rows", []):
         lines.append(
             "| `{fold}` | `{model}` | `{family}` | {train} | {validation} | {oos} | {mdd} |".format(
@@ -2932,6 +3295,15 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--timeframes", default=",".join(DEFAULT_TIMEFRAMES))
     parser.add_argument("--max-folds", type=int, default=None)
     parser.add_argument("--max-candidates-per-fold", type=int, default=10000)
+    parser.add_argument(
+        "--selection-policy",
+        choices=SELECTION_POLICIES,
+        default=DEFAULT_SELECTION_POLICY,
+        help=(
+            "Train/validation-only fold selector. robust_train_validation_v1 is a "
+            "post-failure research policy and must require fresh-forward before promotion."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -2945,6 +3317,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         feature_root=Path(args.feature_root) if str(args.feature_root).strip() else None,
         max_folds=args.max_folds,
         max_candidates_per_fold=int(args.max_candidates_per_fold),
+        selection_policy=str(args.selection_policy),
     )
     print(json.dumps(payload["aggregate"], indent=2, sort_keys=True))
     return 0

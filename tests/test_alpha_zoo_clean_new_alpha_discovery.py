@@ -35,6 +35,14 @@ def test_score_row_ignores_locked_oos_report_fields() -> None:
     assert module._score_row(base) == pytest.approx(module._score_row(changed))
 
 
+def test_robust_selector_score_ignores_locked_oos_report_fields() -> None:
+    base = _row(locked_oos_return_report_only=-0.90, locked_oos_mdd_report_only=0.90)
+    changed = _row(locked_oos_return_report_only=2.50, locked_oos_mdd_report_only=0.01)
+
+    assert module._robust_v1_score_row(base) == pytest.approx(module._robust_v1_score_row(changed))
+    assert module._robust_v1_eligible(base) == module._robust_v1_eligible(changed)
+
+
 def test_select_fold_candidate_uses_train_validation_score_not_oos() -> None:
     selected = module._select_fold_candidate(
         [
@@ -51,6 +59,61 @@ def test_select_fold_candidate_uses_train_validation_score_not_oos() -> None:
     assert selected["model_id"] == "validation_winner"
 
 
+def test_robust_select_fold_candidate_uses_train_validation_robustness_not_oos() -> None:
+    selected = module._select_fold_candidate(
+        [
+            _row(
+                model_id="oos_winner_overfit",
+                train_return=0.80,
+                validation_return=0.10,
+                locked_oos_return_report_only=2.0,
+            ),
+            _row(
+                model_id="stable_train_validation",
+                train_return=0.12,
+                validation_return=0.10,
+                locked_oos_return_report_only=-0.5,
+            ),
+        ],
+        selection_policy=module.ROBUST_SELECTION_POLICY,
+    )
+
+    assert selected is not None
+    assert selected["model_id"] == "stable_train_validation"
+
+
+def test_realism_diagnostics_blocks_live_assumption_for_suspicious_validation() -> None:
+    diagnostics = module._realism_diagnostics(
+        [
+            _row(
+                ready_for_real=False,
+                uses_continuous_position_state_across_split_boundaries=True,
+                label_blockers=["fresh_forward_required_before_promotion"],
+                validation_return=0.30,
+                locked_oos_return_report_only=0.01,
+                validation_trade_event_count=10,
+                validation_sharpe=6.5,
+            )
+        ],
+        {
+            "compounded_oos_return": 0.01,
+            "annualized_oos_return_approx": 0.012,
+            "monthly_equity_mdd": 0.02,
+        },
+        selection_policy=module.DEFAULT_SELECTION_POLICY,
+    )
+
+    assert diagnostics["live_performance_plausibility"] == "not_supported"
+    assert diagnostics["ready_for_real"] is False
+    assert diagnostics["real_money_execution"] is False
+    assert "validation_to_locked_oos_decay_large" in diagnostics["blockers"]
+    assert "selected_rows_not_ready_for_real_money" in diagnostics["blockers"]
+    assert (
+        "order_book_spread_depth_imbalance_microstructure"
+        in diagnostics["external_priors_reflected"]
+    )
+
+
 def test_search_space_hash_is_stable_and_excludes_oos_results() -> None:
     search_space = module._search_space()
     first = module._search_space_hash(search_space)
@@ -61,6 +124,7 @@ def test_search_space_hash_is_stable_and_excludes_oos_results() -> None:
         "volume_absorption_reversal",
         "range_reclaim_continuation",
         "cross_asset_lead_lag_momentum",
+        "btc_beta_residual_momentum",
         "feature_flow_crowding_reversal",
         "feature_liquidation_imbalance_reversal",
         "feature_flow_oi_trend_continuation",
@@ -77,7 +141,7 @@ def test_search_space_hash_is_stable_and_excludes_oos_results() -> None:
         "standardized_indicator_ridge_directional",
     ]
     assert first == second
-    assert first == "ee6ecd539a6b5a8c078bd0e39f22ef0bb483d10e1ecbf97236c51b9a6fb087e8"
+    assert first == "57121f6a8ade6faeaf1a83b06276728a8f3590d320d5af501ce3115e9b260a82"
 
 
 def test_lead_lag_family_is_covered_and_flat_split_labeled() -> None:
@@ -124,6 +188,48 @@ def test_lead_lag_family_is_covered_and_flat_split_labeled() -> None:
     assert all(
         "continuous_position_state_across_split_boundaries" in row["label_blockers"] for row in rows
     )
+
+
+def test_btc_beta_residual_momentum_family_is_pre_registered() -> None:
+    datetimes = pd.date_range("2025-01-01", periods=220, freq="h")
+    btc_close = np.linspace(100.0, 130.0, len(datetimes))
+    residual_lift = np.r_[np.zeros(110), np.linspace(0.0, 8.0, 110)]
+    eth_close = btc_close * 1.02 + residual_lift
+
+    def frame(close: np.ndarray) -> pd.DataFrame:
+        return pd.DataFrame(
+            {
+                "datetime": datetimes,
+                "open": close,
+                "high": close * 1.01,
+                "low": close * 0.99,
+                "close": close,
+                "volume": np.full(len(close), 1000.0),
+            }
+        )
+
+    class Fold:
+        train = (datetimes[0], datetimes[89])
+        validation = (datetimes[90], datetimes[159])
+        locked_oos = (datetimes[160], datetimes[-1])
+
+    bars_by_symbol = {"BTCUSDT": frame(btc_close), "ETHUSDT": frame(eth_close)}
+    panel = module.broad69._close_panel(bars_by_symbol, ("BTCUSDT", "ETHUSDT"))
+
+    rows = module._btc_beta_residual_momentum_rows(
+        bars_by_symbol=bars_by_symbol,
+        panel=panel,
+        symbol="ETHUSDT",
+        timeframe="1h",
+        fold=Fold(),
+        leverages=(2,),
+        allocation_fraction=0.1,
+    )
+
+    assert rows
+    assert {row["family"] for row in rows} == {"btc_beta_residual_momentum"}
+    assert {row["benchmark_symbol"] for row in rows} == {"BTCUSDT"}
+    assert all(row["uses_locked_oos_for_selection"] is False for row in rows)
 
 
 def test_load_feature_points_safe_tolerates_missing_taker_columns(tmp_path: Path) -> None:
@@ -444,8 +550,39 @@ def test_run_writes_policy_flags_with_synthetic_loader(monkeypatch, tmp_path: Pa
     assert payload["real_money_execution"] is False
     assert Path(payload["output_paths"]["json"]).exists()
     assert Path(payload["output_paths"]["markdown"]).exists()
+    assert payload["realism_diagnostics"]["live_performance_plausibility"] == "not_supported"
+    assert payload["realism_diagnostics"]["real_money_execution"] is False
+    assert "Live realism diagnostics" in Path(payload["output_paths"]["markdown"]).read_text()
     loaded = json.loads(Path(payload["output_paths"]["json"]).read_text())
     assert (
         loaded["pre_registered_search_space_sha256"]
         == payload["pre_registered_search_space_sha256"]
+    )
+
+    robust_payload = module.run(
+        data_root=tmp_path,
+        output_dir=tmp_path / "out_robust",
+        symbols=("BTCUSDT",),
+        timeframes=("1h",),
+        max_folds=None,
+        max_candidates_per_fold=5,
+        selection_policy=module.ROBUST_SELECTION_POLICY,
+    )
+
+    assert robust_payload["selection_policy"] == module.ROBUST_SELECTION_POLICY
+    assert (
+        robust_payload["optimization_policy"]["selection_policy"] == module.ROBUST_SELECTION_POLICY
+    )
+    robust_loaded = json.loads(Path(robust_payload["output_paths"]["json"]).read_text())
+    assert robust_loaded["selection_policy"] == module.ROBUST_SELECTION_POLICY
+    assert all(
+        "selection_score_robust_v1_train_validation_only" in row
+        for row in robust_loaded["candidate_rows"]
+    )
+    assert (
+        robust_loaded["realism_diagnostics"]["selection_policy"] == module.ROBUST_SELECTION_POLICY
+    )
+    assert (
+        "robust_selector_is_post_failure_diagnostic_requires_fresh_forward"
+        in robust_loaded["realism_diagnostics"]["blockers"]
     )
