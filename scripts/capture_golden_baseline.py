@@ -31,6 +31,8 @@ import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import time
+
 import numpy as np
 import polars as pl
 
@@ -61,14 +63,16 @@ OHLCV_DAYS = 1000
 OHLCV_START = datetime(2022, 1, 1)
 ANNUAL_PERIODS = 252
 
-# ── Walk-forward grid ─────────────────────────────────────────────────────────
-WF_SHORT_WINDOWS = [10, 20]
-WF_LONG_WINDOWS = [40, 80]
+# ── Walk-forward grid (canonical spec — shared with worker-3 E2E timing axis) ─
+# short_window=[10,20,30] x long_window=[40,80,120] = 9 combos
+# 3 folds; train=6mo, val=3mo, test=3mo, step=3mo, start=2022-01-01
+WF_SHORT_WINDOWS = [10, 20, 30]
+WF_LONG_WINDOWS = [40, 80, 120]
 WF_FOLDS = 3
-WF_TRAIN_MONTHS = 8
-WF_VAL_MONTHS = 4
-WF_TEST_MONTHS = 4
-WF_STEP_MONTHS = 4
+WF_TRAIN_MONTHS = 6
+WF_VAL_MONTHS = 3
+WF_TEST_MONTHS = 3
+WF_STEP_MONTHS = 3
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -508,13 +512,16 @@ def _ma_cross_equity(close: np.ndarray, short_w: int, long_w: int) -> np.ndarray
 
 
 def step_walk_forward(fixtures: dict[str, dict], dry_run: bool) -> dict:
-    print("\n[5/7] Running walk-forward grid (3 folds × 4 param combos)...")
+    n_combos = len(WF_SHORT_WINDOWS) * len(WF_LONG_WINDOWS)
+    print(f"\n[5/7] Running walk-forward grid ({WF_FOLDS} folds × {n_combos} param combos)...")
     from lumina_quant.optimization.walkers import build_walk_forward_splits
     from lumina_quant.optimization.native_backend import evaluate_metrics_backend
 
     btc_df = fixtures["BTCUSDT"]["df"]
     close_full = btc_df["close"].to_numpy()
     dates_full = btc_df["datetime"].to_list()
+
+    wf_start_t = time.perf_counter()
 
     splits = build_walk_forward_splits(
         base_start=OHLCV_START,
@@ -582,7 +589,13 @@ def step_walk_forward(fixtures: dict[str, dict], dry_run: bool) -> dict:
         })
         print(f"  fold {fold}: best={best_params}, val_sharpe={val_metrics[0]:.4f}, test_sharpe={test_metrics[0]:.4f}")
 
-    payload = {"splits": fold_results, "grid_params": {"short_windows": WF_SHORT_WINDOWS, "long_windows": WF_LONG_WINDOWS}}
+    elapsed_s = round(time.perf_counter() - wf_start_t, 4)
+    print(f"  walk-forward elapsed: {elapsed_s}s")
+    payload = {
+        "splits": fold_results,
+        "grid_params": {"short_windows": WF_SHORT_WINDOWS, "long_windows": WF_LONG_WINDOWS},
+        "elapsed_s": elapsed_s,
+    }
     if not dry_run:
         _write_json(GOLDEN_DIR / "walk_forward_results.json", payload)
     return payload
@@ -744,10 +757,13 @@ def step_write_provenance(
             "val_months": WF_VAL_MONTHS,
             "test_months": WF_TEST_MONTHS,
             "step_months": WF_STEP_MONTHS,
+            "start_date": OHLCV_START.isoformat(),
             "param_grid": {
                 "short_window": WF_SHORT_WINDOWS,
                 "long_window": WF_LONG_WINDOWS,
             },
+            "n_combos": len(WF_SHORT_WINDOWS) * len(WF_LONG_WINDOWS),
+            "elapsed_s": wf_result.get("elapsed_s"),
         },
     }
 

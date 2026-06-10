@@ -1,6 +1,6 @@
 {
   "schema_version": "1",
-  "generated_at_utc": "2026-06-10T00:49:04.065355+00:00",
+  "generated_at_utc": "2026-06-10T00:54:57.947190+00:00",
   "numpy_seed": 42,
   "environment": {
     "python_version": "3.11.15 (main, Apr 14 2026, 14:28:36) [Clang 22.1.3 ]",
@@ -205,19 +205,24 @@
   },
   "walk_forward": {
     "folds": 3,
-    "train_months": 8,
-    "val_months": 4,
-    "test_months": 4,
-    "step_months": 4,
+    "train_months": 6,
+    "val_months": 3,
+    "test_months": 3,
+    "step_months": 3,
+    "start_date": "2022-01-01T00:00:00",
     "param_grid": {
       "short_window": [
         10,
-        20
+        20,
+        30
       ],
       "long_window": [
         40,
-        80
+        80,
+        120
       ]
-    }
+    },
+    "n_combos": 9,
+    "elapsed_s": 0.0042
   }
 }
