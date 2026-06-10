@@ -447,8 +447,11 @@ docs/
 
 ### Phase 7 architecture notes (2026-06-10)
 
-- **Deleted dead code**: `team_lanes/` (orphan artifacts), `FillModel` + `LiquidityModel` in `execution_sim.py` (Phase 4 deletion gates closed), `runUvPythonSnippetJson` in `python-runtime.ts`, `retired_stub.py` (Phase 6 gate). The `alpha_zoo/` package was **kept by analysis** — it has active consumers in research and backtest paths.
-- **Retained pending team-lead call**: `data/hyperliquid_readonly.py` and `data/support_inventory.py` have extensive consumers in `scripts/research/` and `tests/` — not deleted in Phase 7; disposition recorded here for the next cut decision.
+- **Deleted dead code**: `team_lanes/` (orphan artifacts), `FillModel` + `LiquidityModel` in `execution_sim.py` (Phase 4 deletion gates closed), `runUvPythonSnippetJson` in `python-runtime.ts`, `retired_stub.py` (Phase 6 gate).
+- **Kept by analysis — do not delete without a full consumer audit**:
+  - `alpha_zoo/` — active consumers in research and backtest paths
+  - `data/hyperliquid_readonly.py` — consumers: `scripts/research/collect_hyperliquid_readonly.py`, `tests/test_hyperliquid_readonly.py`, `tests/test_collect_hyperliquid_readonly_smoke.py`
+  - `data/support_inventory.py` — consumers: `scripts/build_strategy_support_inventory.py`, `scripts/collect_all_strategy_support_data.py`, `scripts/research/build_multiasset_exchange_coverage_inventory.py`, `scripts/research/refresh_final_portfolio_validation_data.py`, `scripts/research/validate_saved_incumbent_portfolio.py`, `scripts/research/validate_saved_incumbent_portfolio_continuity.py`, plus `tests/test_strategy_support_inventory.py`, `tests/test_validate_saved_incumbent_portfolio_script.py`, `tests/test_validate_saved_incumbent_portfolio_continuity_script.py`
 - **Python 3.14 target**: `pyproject.toml` `target-version = "py314"`; CI PYTHON_VERSION `"3.14"` in both `ci.yml` and `private-ci.yml`. All code must be ruff-clean at py314. The 5 deprecated crate `target/` dirs (`rust_metrics`, `rust_rawfirst`, `rust_hybrid_optuna`, `rust_live_signals`, plus `c_metrics`) are gitignored / untracked — no git action needed; use `native/lumina_compute/` exclusively.
 - **CI native build**: the old per-crate cargo loop was replaced by `maturin develop --release -C native/lumina_compute/`. Do not re-add cargo loops for the deprecated crates.
 - **Deletion gate protocol (Phase 7)**: before deleting any module, run the trio: (1) `grep -r "ModuleName" src/ tests/ scripts/` → zero hits; (2) verify import graph; (3) run full suite green. Document the grep evidence in the commit message. If consumers exist, record in AGENTS.md and defer to team-lead.
