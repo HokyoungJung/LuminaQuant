@@ -209,7 +209,16 @@ class LiveRuntimeConfig:
     go_live_stage: str = "testnet"  # testnet | shadow | canary | full
     kill_switch_enabled: bool = True  # always-on; validate.py REJECTS False
     canary_position_fraction: float = 0.10  # position sizing fraction during canary stage (0, 1]
-    shadow_parity_min_ratio: float = 0.99  # minimum signal agreement ratio before stage advance
+    # shadow_parity_min_ratio / shadow_parity_window_bars govern the shadow-stage entry
+    # check.  The caller must pass an explicit measured parity_ratio (from
+    # ShadowLiveRunner.evaluate_signal_parity) to readiness_policy; an unmeasured ratio
+    # (None) blocks shadow entry by design — the default=1.0 in the runner is a
+    # "no comparison made" sentinel for the runner itself, not a bypass of the gate.
+    # canary/full entry NEVER depends on parity — it gates on artifact flags
+    # (canary_execution_allowed, real_money_execution) + LUMINA_ENABLE_LIVE_REAL.
+    # Shadow is the measuring stage (testnet-routed, no money at risk);
+    # canary is the deploying stage with its own artifact gate.
+    shadow_parity_min_ratio: float = 0.99  # minimum signal agreement ratio for shadow entry
     shadow_parity_window_bars: int = 1000  # bars to evaluate parity over
     reconciliation_poll_fallback_enabled: bool = True
     book_ticker_enabled: bool = False

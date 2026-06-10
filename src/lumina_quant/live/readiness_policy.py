@@ -362,6 +362,20 @@ def _build_live_readiness_verdict(
 
     # Phase 5 go-live stage pipeline — per-stage entry checks (spec R7: free composition).
     # Each stage's checks must pass for that stage; no sequential traversal required.
+    #
+    # Parity-default semantics (shadow stage):
+    #   shadow entry with unmeasured parity (shadow_parity_ratio=None) is BLOCKED by
+    #   design (_shadow_parity_ok requires an explicit measured ratio).  The default
+    #   parity_ratio=1.0 in ShadowLiveRunner.evaluate_signal_parity (when no strategy
+    #   fns are configured) is a "no comparison made" sentinel for the runner itself —
+    #   it does NOT flow here as shadow_parity_ratio; the caller must pass an explicit
+    #   float from a real measurement to satisfy _shadow_parity_ok.
+    #
+    #   canary/full entry NEVER depends on shadow_parity_ratio — ready_for_canary and
+    #   ready_for_real hinge exclusively on artifact flags (canary_execution_allowed,
+    #   real_money_execution) and the LUMINA_ENABLE_LIVE_REAL env gate.  This is
+    #   intentional: shadow is the MEASURING stage (testnet-routed, no money at risk);
+    #   canary is the DEPLOYING stage (prod endpoint) with its own artifact gate.
     go_live_stage = str(runtime_live.get("go_live_stage", "testnet") or "testnet").strip().lower()
     shadow_parity_min = float(runtime_live.get("shadow_parity_min_ratio", 0.99) or 0.99)
     _shadow_parity_ok = (
@@ -372,7 +386,8 @@ def _build_live_readiness_verdict(
     )
     ready_for_shadow = bool(ready_for_paper and _shadow_parity_ok)
     # canary: prod endpoint (testnet=False), real_enable_env, canary artifact flag,
-    # no real-money veto (artifact must be promoted to allow canary)
+    # no real-money veto (artifact must be promoted to allow canary).
+    # Does NOT gate on shadow_parity_ratio — see parity-default semantics note above.
     ready_for_canary = bool(
         real_mode
         and not testnet

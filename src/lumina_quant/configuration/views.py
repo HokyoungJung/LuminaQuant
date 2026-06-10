@@ -26,7 +26,7 @@ from __future__ import annotations
 from lumina_quant.configuration.schema import RuntimeConfig
 
 
-# DELETION-GATE: Phase 5
+# DELETION-GATE: Phase 6 (re-gated from Phase 5)
 class BacktestConfigView:
     """Typed config bag for backtest engine — uppercase attrs from RuntimeConfig.
 
@@ -36,7 +36,8 @@ class BacktestConfigView:
     Stores ``._rt`` (the originating ``RuntimeConfig``) so engine components can call
     ``ExecutionModelConfig.from_runtime(config._rt)`` directly.
 
-    DELETION-GATE: Phase 5 — migrate consumers to typed RuntimeConfig attrs directly.
+    DELETION-GATE: Phase 6 (re-gated from Phase 5) — migrate consumers to typed
+    RuntimeConfig attrs directly.
     """
 
     def __init__(self, runtime: RuntimeConfig) -> None:
@@ -151,7 +152,7 @@ class BacktestConfigView:
         self.MARKET_WINDOW_METRICS_LOG_PATH = str(mw.metrics_log_path)
 
 
-# DELETION-GATE: Phase 5
+# DELETION-GATE: Phase 6 (re-gated from Phase 5)
 class LiveConfigView:
     """Typed config bag for live engine — uppercase attrs from RuntimeConfig.
 
@@ -159,7 +160,8 @@ class LiveConfigView:
     and related components need.  Constructed once per run in cli/live.py and
     passed to LiveTrader; LiveTrader snapshots it via _snapshot_live_config.
 
-    DELETION-GATE: Phase 5 — migrate consumers to typed RuntimeConfig attrs directly.
+    DELETION-GATE: Phase 6 (re-gated from Phase 5) — migrate consumers to typed
+    RuntimeConfig attrs directly.
     """
 
     def __init__(self, runtime: RuntimeConfig) -> None:
