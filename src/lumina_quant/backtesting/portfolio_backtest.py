@@ -678,10 +678,14 @@ class Portfolio:
             direction = "SELL" if qty > 0 else "BUY"
             position_side = "LONG" if qty > 0 else "SHORT"
             abs_qty = abs(qty)
-            fee_rate = self.execution_model.cfg.taker_fee_rate
             leverage = self.execution_model.cfg.leverage
             fill_cost = trigger_price * abs_qty
-            commission = fill_cost * fee_rate
+            # Single cost path: a forced liquidation is an aggressive (taker) fill
+            # at the computed trigger price — route the fee through ExecutionModel
+            # rather than re-deriving fill_cost * taker_fee_rate here.
+            commission = self.execution_model.commission_for(
+                fill_price=trigger_price, qty=abs_qty, is_maker=False
+            )
             fill_event = FillEvent(
                 timeindex=latest_datetime,
                 symbol=symbol,

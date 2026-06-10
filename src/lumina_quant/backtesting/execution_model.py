@@ -214,6 +214,29 @@ class ExecutionModel:
             unfilled_qty=unfilled,
         )
 
+    def commission_for(
+        self,
+        *,
+        fill_price: float,
+        qty: float,
+        is_maker: bool = False,
+    ) -> float:
+        """Commission for an already-known fill price/quantity — the single fee path.
+
+        This is the one place fees are computed as ``fill_price * qty * fee_rate``.
+        Use it whenever the executed price is already known (an exchange-reported
+        real fill, or a forced liquidation at a computed trigger) and only the
+        fee is needed — i.e. ``compute_fill`` would be wrong because it would
+        re-apply slippage and move the price.
+
+        ``is_maker`` selects ``maker_fee_rate`` (passive/LMT) vs ``taker_fee_rate``
+        (aggressive/MKT/STOP/liquidation). Callers (live real-mode fills,
+        liquidation accounting) must route through here rather than re-deriving
+        the formula, so there is exactly one cost path (Phase 4 Principle 4).
+        """
+        fee_rate = self.cfg.maker_fee_rate if bool(is_maker) else self.cfg.taker_fee_rate
+        return float(fill_price) * float(qty) * float(fee_rate)
+
     # ── Funding ───────────────────────────────────────────────────────────────
 
     def compute_funding_payment(
