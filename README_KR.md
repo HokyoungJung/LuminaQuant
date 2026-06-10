@@ -27,8 +27,13 @@
 ### 설치
 
 ```bash
+# 비공개 저장소 (이 repo)
 git clone https://github.com/hoky1227/Quants-agent.git
 cd Quants-agent
+
+# 공개 미러 (LuminaQuant)
+git clone https://github.com/HokyoungJung/LuminaQuant.git
+cd LuminaQuant
 
 # 코어 + 주요 extras
 uv sync --extra optimize --extra live-binance --extra dashboard --extra dev

@@ -27,8 +27,13 @@
 ### Install
 
 ```bash
+# Private repository (this repo)
 git clone https://github.com/hoky1227/Quants-agent.git
 cd Quants-agent
+
+# Public mirror (LuminaQuant)
+git clone https://github.com/HokyoungJung/LuminaQuant.git
+cd LuminaQuant
 
 # Core + most extras
 uv sync --extra optimize --extra live-binance --extra dashboard --extra dev
