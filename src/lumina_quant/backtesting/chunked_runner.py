@@ -1,4 +1,10 @@
-"""Chunked backtest runner to avoid full-range in-memory datasets."""
+"""Chunked backtest runner to avoid full-range in-memory datasets (Phase 4).
+
+Phase 4 consolidation: ``run_backtest_chunked`` now accepts an optional ``config``
+parameter (``RuntimeConfig`` or ``BacktestConfigView``).  Pass it explicitly so the
+optimizer (Phase 4.3) can supply per-fold config without touching global state.
+``Backtest`` auto-wraps a bare ``RuntimeConfig`` in ``BacktestConfigView``.
+"""
 
 from __future__ import annotations
 
@@ -143,8 +149,17 @@ def run_backtest_chunked(
     record_history: bool = True,
     track_metrics: bool = True,
     record_trades: bool = True,
+    config: Any = None,
 ) -> Backtest:
-    """Execute one logical backtest by loading bounded chunks sequentially."""
+    """Execute one logical backtest by loading bounded chunks sequentially.
+
+    Parameters
+    ----------
+    config:
+        Optional ``RuntimeConfig`` or ``BacktestConfigView``.  When ``None`` the
+        default runtime config is used.  Pass an explicit config to avoid global
+        state — required for the Phase 4.3 per-fold optimizer path.
+    """
     mode_token = str(backtest_mode or "windowed").strip().lower()
     if mode_token not in {"windowed", "legacy_batch", "legacy_1s"}:
         mode_token = "windowed"
@@ -189,6 +204,7 @@ def run_backtest_chunked(
             track_metrics=track_metrics,
             record_trades=record_trades,
             strategy_timeframe=str(strategy_timeframe),
+            config=config,
         )
 
         if carry:
@@ -222,6 +238,7 @@ def run_backtest_chunked(
         track_metrics=track_metrics,
         record_trades=record_trades,
         strategy_timeframe=str(strategy_timeframe),
+        config=config,
     )
     empty.simulate_trading(output=False)
     return empty

@@ -1,3 +1,23 @@
+"""Event-driven backtest engine (Phase 4).
+
+Bar engine pipeline:
+    data_handler  →  events queue  →  strategy / portfolio / execution_handler
+    BacktestConfigView (Phase 1 bridge, DELETION-GATE: Phase 4) carries uppercase-attr
+    config to Portfolio and ExecutionHandler.  Pass a plain ``RuntimeConfig`` and this
+    module wraps it automatically.
+
+Compute backends (Phase 2):
+    Metric evaluation routes through ``optimization.native_backend`` →
+    ``lumina_quant._compute.evaluate_metrics`` (pyo3).  The bar engine itself
+    processes OHLCV tuples in Python; heavy numerical work stays in pyo3 kernels.
+
+Phase 4 execution model:
+    ``SimulatedExecutionHandler`` delegates all fill / funding / liquidation logic to
+    ``backtesting.execution_model.ExecutionModel``.
+"""
+
+from __future__ import annotations
+
 import collections
 import logging
 import os
@@ -148,9 +168,18 @@ class Backtest(TradingEngine):
     ):
         self.csv_dir = csv_dir
         self.symbol_list = symbol_list
-        self.config = config if config is not None else BacktestConfigView(
-            get_default_runtime_config()
-        )
+        # Accept RuntimeConfig directly — wrap in BacktestConfigView so all
+        # downstream getattr(config, "UPPER_ATTR") consumers work unchanged.
+        if config is None:
+            self.config: Any = BacktestConfigView(get_default_runtime_config())
+        elif isinstance(config, BacktestConfigView):
+            self.config = config
+        elif hasattr(config, "execution") and hasattr(config, "backtest"):
+            # Looks like a RuntimeConfig — wrap it.
+            self.config = BacktestConfigView(config)
+        else:
+            # Duck-typed config bag (legacy or test-stub) — pass through.
+            self.config = config
         self.heartbeat = 0.0
         self.start_date = start_date
         self.end_date = end_date  # Override config if specific

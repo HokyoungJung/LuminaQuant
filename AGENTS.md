@@ -409,6 +409,15 @@ docs/
 - **Phase 1 config knobs**: `RuntimeConfig.memory.cap_gb` (default 8.0 GiB) and `RuntimeConfig.validation.golden_rtol` (default 1e-8). Golden comparisons must use `rtol=rt.validation.golden_rtol`; no hardcoded tolerances.
 - **No os.environ hidden bus**: config must flow through explicit `RuntimeConfig` objects. `os.environ` access is only allowed inside `get_default_runtime_config()` and `load_runtime_config()`.
 
+### Phase 4 architecture notes (2026-06-10)
+
+- **Unified ExecutionModel**: `backtesting/execution_model.py` is the single source of truth for fees, slippage, spread, partial-fill liquidity cap, funding-rate payments, and leverage-based liquidation. Both `SimulatedExecutionHandler` (backtest) and `live/execution_live.py` (Phase 5) MUST import `ExecutionModel` from this module — not their own copies. The Phase 5 CI grep gate enforces this: `grep -r "ExecutionModel" live/execution_live.py` must be non-empty.
+- **ExecutionModelConfig construction**: use `ExecutionModelConfig.from_runtime(rt, mode="backtest"|"live")` when you have a typed `RuntimeConfig`; use `ExecutionModelConfig.from_config_obj(config)` for legacy `BacktestConfigView` consumers (DELETION-GATE: Phase 4).
+- **LMT order fill rule (ratified 2026-06-10 — BINDING)**: BUY LMT fills IFF `bar_low < limit_price` (strict, not ≤). SELL LMT fills IFF `bar_high > limit_price` (strict, not ≥). Fill price = `limit_price` exactly; fee = `maker_fee_rate`; no slippage. The partial-fill liquidity cap (`max_bar_volume_ratio × bar_volume`) applies. The RNG is NOT consumed for LMT fills (consumed unconditionally for MKT to preserve legacy golden sequence). These rules are validated by `TickReplayValidator` (Phase 4.4).
+- **Chunked-run RNG parity**: `SimulatedExecutionHandler.get_state()` / `set_state()` saves and restores `execution_model._rng` state under key `"execution_model_rng_state"`. Without this checkpoint each chunk re-seeds the RNG causing fill-price divergence. Any new fill-RNG-bearing handler MUST include a matching state key.
+- **BacktestConfigView (DELETION-GATE: Phase 4)**: still in use as a backward-compat uppercase-attr bridge. `Backtest()` auto-wraps a bare `RuntimeConfig` in `BacktestConfigView`. New code should pass `RuntimeConfig` directly; do NOT create `BacktestConfigView` manually in new code.
+- **`run_backtest_chunked` config parameter**: pass `config=` explicitly in all optimizer / walk-forward call sites (Phase 4.3+) to avoid relying on `get_default_runtime_config()` global state.
+
 ### Phase 3 architecture notes (2026-06-10)
 
 - **DataCollector entry-point**: `lumina_quant.data.collector.DataCollector.from_runtime_config(rt)` is the single factory for all data-collection paths. Never call `data_collector.py` functions or `data_sync.py` sync functions directly from new code; go through `DataCollector`.
