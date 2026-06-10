@@ -206,6 +206,16 @@ uv run python scripts/measure_walkforward_e2e.py \
 | ms/run | 6322.6 |
 | total backtest runs | 27 (9 combos × 3 folds) |
 
+> **Timing denominator note — Variant A workload:** The 170.71s wall-clock is measured
+> against the **variant A** golden (fold geometry: train=6mo/val=3mo/test=3mo/step=3mo).
+> With `long_window=120` and only ~90 val/test bars, the optimizer kernel emits `-999`
+> sentinels for windows shorter than the MA warmup — this is correct sentinel behaviour,
+> not a data defect, and the event-driven backtest machinery still runs the full bar loop.
+> Worker-2 is separately producing a **variant B** golden (warmup-context fed to val/test
+> so all windows yield real metrics) as a richer Phase 4 oracle.  Variant B does **not**
+> replace this timing denominator; the Phase 1–6 perf gates reference the variant A
+> wall-clock recorded here.
+
 ---
 
 ## Axis 2 — Single-Backtest Throughput (bars/sec)
