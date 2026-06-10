@@ -1,0 +1,56 @@
+{
+  "strategy": "MovingAverageCrossStrategy",
+  "symbols": [
+    "BTC/USDT",
+    "ETH/USDT"
+  ],
+  "iterations": 5,
+  "warmup": 1,
+  "seed": 42,
+  "generated_at_utc": "2026-06-10T00:48:44.023156+00:00",
+  "python": "3.11.15",
+  "samples": [
+    {
+      "seconds": 53.28552765096538,
+      "peak_tracemalloc_mb": 2.8188114166259766,
+      "peak_rss_mb": null,
+      "bars_processed": 1268,
+      "bars_per_sec": 23.796329996124708
+    },
+    {
+      "seconds": 57.829797154990956,
+      "peak_tracemalloc_mb": 0.9814786911010742,
+      "peak_rss_mb": null,
+      "bars_processed": 1268,
+      "bars_per_sec": 21.926412721137588
+    },
+    {
+      "seconds": 56.49866643996211,
+      "peak_tracemalloc_mb": 0.977421760559082,
+      "peak_rss_mb": null,
+      "bars_processed": 1268,
+      "bars_per_sec": 22.4430075946559
+    },
+    {
+      "seconds": 56.22986563196173,
+      "peak_tracemalloc_mb": 0.9758720397949219,
+      "peak_rss_mb": null,
+      "bars_processed": 1268,
+      "bars_per_sec": 22.550293971879128
+    },
+    {
+      "seconds": 61.14443215896608,
+      "peak_tracemalloc_mb": 0.9736776351928711,
+      "peak_rss_mb": null,
+      "bars_processed": 1268,
+      "bars_per_sec": 20.737783559807962
+    }
+  ],
+  "median_seconds": 56.49866643996211,
+  "mean_seconds": 56.99765780736925,
+  "median_bars_per_sec": 22.4430075946559,
+  "mean_bars_per_sec": 22.290765568721056,
+  "median_peak_tracemalloc_mb": 0.977421760559082,
+  "max_peak_rss_mb": null,
+  "comparison": null
+}

@@ -1,0 +1,78 @@
+{
+  "generated_at_utc": "2026-06-10T00:44:00.812794+00:00",
+  "iters": 10000,
+  "live_signal_per_tick": {
+    "backend": "rust",
+    "native_library": "/home/hoky/Quants-agent/native/rust_live_signals/target/release/liblumina_live_signals.so",
+    "iters": 10000,
+    "debounced": {
+      "median_ms": 0.013228971511125565,
+      "mean_ms": 0.015952579362783582,
+      "p95_ms": 0.022558573982678347,
+      "p99_ms": 0.04774283268488952,
+      "min_ms": 0.01057301415130496,
+      "max_ms": 0.308605027385056,
+      "n": 10000
+    },
+    "trailing": {
+      "median_ms": 0.016665493603795767,
+      "mean_ms": 0.022129671671427785,
+      "p95_ms": 0.03878004790749391,
+      "p99_ms": 0.09790913143660876,
+      "min_ms": 0.0136379967443645,
+      "max_ms": 1.7379199853166938,
+      "n": 10000
+    },
+    "combined_debounced_plus_trailing": {
+      "median_ms": 0.030498486012220383,
+      "mean_ms": 0.03808225103421137,
+      "p95_ms": 0.0730808213120326,
+      "p99_ms": 0.1268380356486887,
+      "min_ms": 0.024777953512966633,
+      "max_ms": 1.7566900351084769,
+      "n": 10000
+    }
+  },
+  "paper_order_path": {
+    "note": "OrderStateMachine.transition() only \u2014 pure Python dict lookup, no network, no exchange. Full tick\u2192order latency includes I/O and is measured in Phase 5 against testnet.",
+    "iters": 10000,
+    "submit_to_ack": {
+      "median_ms": 0.0004289904609322548,
+      "mean_ms": 0.00046908283256925644,
+      "p95_ms": 0.0007609516615048051,
+      "p99_ms": 0.0009710498852655298,
+      "min_ms": 0.00038300640881061554,
+      "max_ms": 0.014112971257418394,
+      "n": 10000
+    },
+    "ack_to_fill": {
+      "median_ms": 0.0004270114004611969,
+      "mean_ms": 0.0004702077188994735,
+      "p95_ms": 0.0007519847713410854,
+      "p99_ms": 0.0009219616185873749,
+      "min_ms": 0.0003789900802075863,
+      "max_ms": 0.03552500857040286,
+      "n": 10000
+    },
+    "full_transition_chain": {
+      "median_ms": 0.0008539645932614803,
+      "mean_ms": 0.00093929055146873,
+      "p95_ms": 0.0015040277503430843,
+      "p99_ms": 0.00187907076906413,
+      "min_ms": 0.0007810303941369057,
+      "max_ms": 0.03593700239434838,
+      "n": 10000
+    }
+  },
+  "replay_path_proxy": {
+    "note": "ShadowLiveRunner.run() parity-checker overhead on a single synthetic event \u2014 stable_event_sort + timestamp/sequence comparison only. NOT signal or order latency. Proxy for minimum replay-path overhead.",
+    "iters": 10000,
+    "median_ms": 0.0012849923223257065,
+    "mean_ms": 0.0015700697782449423,
+    "p95_ms": 0.0023929751478135586,
+    "p99_ms": 0.002734043519012631,
+    "min_ms": 0.0011209631338715553,
+    "max_ms": 0.043947016820311546,
+    "n": 10000
+  }
+}

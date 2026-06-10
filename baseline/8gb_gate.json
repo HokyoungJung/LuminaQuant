@@ -1,0 +1,47 @@
+{
+  "overall_status": "PASS",
+  "benchmark_json": "/tmp/rss_bench_single.json",
+  "rss_limit_gib": 8.0,
+  "disk_budget_gib": 30.0,
+  "checks": {
+    "benchmark_parse": {
+      "status": "PASS",
+      "detail": "Loaded /tmp/rss_bench_single.json (iterations=1, median_seconds=58.2112945500412, median_bars_per_sec=21.78271433063504)"
+    },
+    "rss_budget": {
+      "status": "PASS",
+      "detail": "peak_rss=129.59MiB < limit=8192.00MiB (source=rss_log:/home/hoky/Quants-agent/baseline/bench_rss_time.log)"
+    },
+    "oom_evidence": {
+      "status": "PASS",
+      "detail": "No OOM signatures detected."
+    },
+    "disk_budget_snapshot": {
+      "status": "PASS",
+      "detail": "disk_total=0.000GiB <= budget=30.000GiB",
+      "snapshot": [
+        {
+          "path": "data",
+          "resolved": "/home/hoky/Quants-agent/data",
+          "exists": true,
+          "size_bytes": 211122,
+          "size_gib": 0.000197
+        },
+        {
+          "path": "logs",
+          "resolved": "/home/hoky/Quants-agent/logs",
+          "exists": false,
+          "size_bytes": 0,
+          "size_gib": 0.0
+        },
+        {
+          "path": "reports",
+          "resolved": "/home/hoky/Quants-agent/reports",
+          "exists": false,
+          "size_bytes": 0,
+          "size_gib": 0.0
+        }
+      ]
+    }
+  }
+}

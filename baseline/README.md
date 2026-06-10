@@ -185,16 +185,26 @@ before the timed loop (JIT compilation amortised).
 **Canonical spec (shared with task #2 golden run):**
 - Strategy: `MovingAverageCrossStrategy`, `allow_short=True`
 - Symbols: BTCUSDT + ETHUSDT (1000 daily bars from 2022-01-01, seed=42)
-- Fixtures: `baseline/golden/BTCUSDT_1000d_seed42.parquet` + `ETHUSDT_1000d_seed42.parquet`
-  — verify SHA-256 against `baseline/golden/PROVENANCE.json` before use
+- Fixtures: `tests/fixtures/ohlcv/BTCUSDT_seed42_1000d.parquet` + `ETHUSDT_seed42_1000d.parquet`
+  — SHA-256 verified against `baseline/golden/PROVENANCE.json` (keyed by symbol name) before use
 - Grid: `short_window=[10,20,30]` × `long_window=[40,80,120]` → 9 combinations
 - Folds: 3; train=6mo, val=3mo, test=3mo, step=3mo, start=2022-01-01
 - Seed: 42
 
-**Status:** Pending worker-2 fixture delivery (task #2). Will be filled in and committed
-together with `baseline/perf-baseline.json` when fixtures are available.
+**Command:**
+```bash
+uv run python scripts/measure_walkforward_e2e.py \
+  --output baseline/bench_walkforward_e2e.json
+```
 
-**Result:** `walk_forward_e2e_elapsed_s` — TBD (see `baseline/bench_walkforward_e2e.json`).
+**Result:** See `baseline/bench_walkforward_e2e.json`
+
+| Metric | Value |
+|---|---|
+| `walk_forward_e2e_elapsed_s` | 170.71 |
+| runs/sec | 0.158 |
+| ms/run | 6322.6 |
+| total backtest runs | 27 (9 combos × 3 folds) |
 
 ---
 
@@ -225,8 +235,10 @@ benchmark JSON is `null`.  Peak RSS is measured separately via
 
 | Metric | Value |
 |---|---|
-| `backtest_median_bars_per_sec` | TBD |
-| `backtest_median_s` | TBD |
+| `backtest_median_bars_per_sec` | 22.44 |
+| `backtest_median_s` | 56.50 |
+| bars_processed | 1,268 |
+| iterations | 5 (1 warmup) |
 
 ---
 
