@@ -23,7 +23,6 @@ Regeneration procedure (for baseline/README.md):
 from __future__ import annotations
 
 import argparse
-import ctypes
 import hashlib
 import json
 import os
@@ -277,42 +276,12 @@ def step_backtest_goldens(fixtures: dict[str, dict], dry_run: bool) -> dict:
 
 # ── Step 4: Native backend goldens ────────────────────────────────────────────
 
-def _call_rust_metrics(close_arr: np.ndarray) -> dict:
-    """Call rust_metrics cdylib directly via ctypes."""
-    so = REPO_ROOT / "native" / "rust_metrics" / "target" / "release" / "liblumina_metrics.so"
-    lib = ctypes.CDLL(str(so))
-    fn = lib.evaluate_metrics
-    fn.argtypes = [
-        ctypes.POINTER(ctypes.c_double), ctypes.c_int, ctypes.c_int,
-        ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double),
-        ctypes.POINTER(ctypes.c_double),
-    ]
-    fn.restype = ctypes.c_int
+def _call_pyo3_metrics(close_arr: np.ndarray) -> dict:
+    """Call lumina_compute.evaluate_metrics via pyo3 binding."""
+    from lumina_quant._compute import evaluate_metrics  # type: ignore[attr-defined]
     arr = np.ascontiguousarray(close_arr, dtype=np.float64)
-    sharpe, cagr, mdd = ctypes.c_double(), ctypes.c_double(), ctypes.c_double()
-    status = fn(arr.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
-                len(arr), ANNUAL_PERIODS,
-                ctypes.byref(sharpe), ctypes.byref(cagr), ctypes.byref(mdd))
-    return {"status": status, "sharpe": sharpe.value, "cagr": cagr.value, "max_dd": mdd.value}
-
-
-def _call_c_metrics(close_arr: np.ndarray) -> dict:
-    """Call c_metrics cdylib directly via ctypes."""
-    so = REPO_ROOT / "native" / "c_metrics" / "build" / "liblumina_metrics.so"
-    lib = ctypes.CDLL(str(so))
-    fn = lib.evaluate_metrics
-    fn.argtypes = [
-        ctypes.POINTER(ctypes.c_double), ctypes.c_int, ctypes.c_int,
-        ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double),
-        ctypes.POINTER(ctypes.c_double),
-    ]
-    fn.restype = ctypes.c_int
-    arr = np.ascontiguousarray(close_arr, dtype=np.float64)
-    sharpe, cagr, mdd = ctypes.c_double(), ctypes.c_double(), ctypes.c_double()
-    status = fn(arr.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
-                len(arr), ANNUAL_PERIODS,
-                ctypes.byref(sharpe), ctypes.byref(cagr), ctypes.byref(mdd))
-    return {"status": status, "sharpe": sharpe.value, "cagr": cagr.value, "max_dd": mdd.value}
+    sharpe, cagr, mdd = evaluate_metrics(arr, ANNUAL_PERIODS)
+    return {"sharpe": float(sharpe), "cagr": float(cagr), "max_dd": float(mdd)}
 
 
 def _call_alpha_fold(close: np.ndarray, high: np.ndarray, low: np.ndarray) -> dict:
@@ -450,7 +419,7 @@ def step_native_backend_goldens(
     aggtrades_df: pl.DataFrame,
     dry_run: bool,
 ) -> dict:
-    print("\n[4/7] Exercising all 6 native backends...")
+    print("\n[4/7] Exercising all 5 native kernels (pyo3)...")
     btc_df = fixtures["BTCUSDT"]["df"]
     close = btc_df["close"].to_numpy()
     high = btc_df["high"].to_numpy()
@@ -458,11 +427,11 @@ def step_native_backend_goldens(
 
     results: dict[str, dict] = {}
 
-    print("  rust_metrics...")
-    results["rust_metrics"] = _call_rust_metrics(close)
+    print("  rust_metrics (pyo3)...")
+    results["rust_metrics"] = _call_pyo3_metrics(close)
 
-    print("  c_metrics...")
-    results["c_metrics"] = _call_c_metrics(close)
+    print("  c_metrics (pyo3 — consolidated into lumina_compute)...")
+    results["c_metrics"] = _call_pyo3_metrics(close)
 
     print("  rust_alpha_fold...")
     results["rust_alpha_fold"] = _call_alpha_fold(close, high, low)
