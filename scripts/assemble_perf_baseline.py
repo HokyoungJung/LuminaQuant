@@ -26,9 +26,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 BASELINE = PROJECT_ROOT / "baseline"
 
-RSS_PATTERN = re.compile(
-    r"Maximum resident set size \(kbytes\):\s*(\d+)", re.IGNORECASE
-)
+RSS_PATTERN = re.compile(r"Maximum resident set size \(kbytes\):\s*(\d+)", re.IGNORECASE)
 OPTIMIZER_ELAPSED_PATTERN = re.compile(r"elapsed_sec=([0-9.]+)")
 OPTIMIZER_EPS_PATTERN = re.compile(r"evals_per_sec=([0-9.]+)")
 
@@ -38,7 +36,7 @@ def _load_json(path: Path) -> dict:
         return {}
     try:
         return json.loads(path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+    except json.JSONDecodeError, OSError:
         return {}
 
 
@@ -149,9 +147,7 @@ def assemble() -> dict:
     # ------------------------------------------------------------------ #
     # Axis 1 MICRO — optimizer kernel
     # ------------------------------------------------------------------ #
-    kernel_elapsed, kernel_eps = _parse_optimizer_txt(
-        BASELINE / "bench_optimizer_kernel.txt"
-    )
+    kernel_elapsed, kernel_eps = _parse_optimizer_txt(BASELINE / "bench_optimizer_kernel.txt")
 
     # ------------------------------------------------------------------ #
     # Axis 1 E2E — walk-forward (optional: pending worker-2 fixtures)
@@ -213,19 +209,11 @@ def assemble() -> dict:
         "live_signal_batch_rust_debounced_s_per_eval": rust_timing.get(
             "debounced_seconds_per_eval"
         ),
-        "live_signal_batch_rust_trailing_s_per_eval": rust_timing.get(
-            "trailing_seconds_per_eval"
-        ),
-        "live_signal_batch_rust_total_s_per_eval": rust_timing.get(
-            "total_seconds_per_eval"
-        ),
-        "live_signal_batch_python_total_s_per_eval": python_timing.get(
-            "total_seconds_per_eval"
-        ),
+        "live_signal_batch_rust_trailing_s_per_eval": rust_timing.get("trailing_seconds_per_eval"),
+        "live_signal_batch_rust_total_s_per_eval": rust_timing.get("total_seconds_per_eval"),
+        "live_signal_batch_python_total_s_per_eval": python_timing.get("total_seconds_per_eval"),
         "live_signal_batch_speedup_rust_vs_python": live_signal.get("speedup_total"),
-        "live_signal_batch_parity_exact": (live_signal.get("parity") or {}).get(
-            "passed"
-        ),
+        "live_signal_batch_parity_exact": (live_signal.get("parity") or {}).get("passed"),
         # Axis 3b: per-single-tick signal latency (10k iters)
         "live_signal_kernel_latency_median_ms": combined_tick.get("median_ms"),
         "live_signal_kernel_latency_p95_ms": combined_tick.get("p95_ms"),
@@ -241,9 +229,7 @@ def assemble() -> dict:
         # Axis 4
         "peak_rss_mb": peak_rss_mb,
         "peak_rss_source": "bench_rss_time.log (/usr/bin/time -v)",
-        "peak_rss_gate_status": (gate.get("checks") or {})
-        .get("rss_budget", {})
-        .get("status"),
+        "peak_rss_gate_status": (gate.get("checks") or {}).get("rss_budget", {}).get("status"),
     }
 
     source_files = {
@@ -277,8 +263,10 @@ def main() -> None:
     print("\n=== Axis Summary ===")
     print(f"  Axis 1 MICRO  elapsed_s      : {axes.get('walk_forward_kernel_elapsed_s')}")
     print(f"  Axis 1 MICRO  evals/sec       : {axes.get('walk_forward_kernel_evals_per_sec')}")
-    print(f"  Axis 1 E2E    elapsed_s       : {axes.get('walk_forward_e2e_elapsed_s')} "
-          f"[{axes.get('walk_forward_e2e_status')}]")
+    print(
+        f"  Axis 1 E2E    elapsed_s       : {axes.get('walk_forward_e2e_elapsed_s')} "
+        f"[{axes.get('walk_forward_e2e_status')}]"
+    )
     print(f"  Axis 2        bars/sec        : {axes.get('backtest_median_bars_per_sec')}")
     print(f"  Axis 3b       sig median_ms   : {axes.get('live_signal_kernel_latency_median_ms')}")
     print(f"  Axis 3c       order median_ms : {axes.get('paper_order_path_latency_median_ms')}")

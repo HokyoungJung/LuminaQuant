@@ -98,7 +98,7 @@ def _timestamp() -> str:
 def _safe_float(value: Any, default: float = 0.0) -> float:
     try:
         parsed = float(value)
-    except (TypeError, ValueError, OverflowError):
+    except TypeError, ValueError, OverflowError:
         return default
     return parsed if math.isfinite(parsed) else default
 
@@ -106,7 +106,7 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
 def _safe_int(value: Any, default: int = 0) -> int:
     try:
         parsed = int(value)
-    except (TypeError, ValueError, OverflowError):
+    except TypeError, ValueError, OverflowError:
         return default
     return parsed
 

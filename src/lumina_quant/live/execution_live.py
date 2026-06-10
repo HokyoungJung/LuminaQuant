@@ -4,7 +4,10 @@ import time
 from types import SimpleNamespace
 from typing import Any
 
-from lumina_quant.backtesting.execution_model import ExecutionModel, ExecutionModelConfig
+from lumina_quant.backtesting.execution_model import (  # noqa: F401  # Phase 5 structural gate: live/ must share unified cost model
+    ExecutionModel,
+    ExecutionModelConfig,
+)
 from lumina_quant.backtesting.execution_sim import ExecutionHandler
 from lumina_quant.core.events import FillEvent
 from lumina_quant.core.order_policy import (

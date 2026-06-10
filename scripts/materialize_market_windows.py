@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 
 from lumina_quant.backtesting.cli_contract import RawFirstDataMissingError
 from lumina_quant.configuration import BacktestConfigView, get_default_runtime_config
+
 BaseConfig = BacktestConfigView(get_default_runtime_config())
 from lumina_quant.market_data import normalize_timeframe_token, timeframe_to_milliseconds
 from lumina_quant.services.materialize_from_raw import materialize_raw_aggtrades_bundle

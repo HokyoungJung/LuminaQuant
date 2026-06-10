@@ -7,6 +7,7 @@ The new invariants:
   - current_market_data_runtime_settings() reads fresh config on every call
   - No os.environ hidden-bus: env vars are NOT silently seeded from config values
 """
+
 from __future__ import annotations
 
 import textwrap
@@ -112,9 +113,7 @@ def test_get_default_runtime_config_uses_LQ_CONFIG_PATH(tmp_path, monkeypatch):
     assert rt.live.exchange.leverage == 2
 
 
-def test_current_market_data_runtime_settings_reads_fresh_config_per_call(
-    tmp_path, monkeypatch
-):
+def test_current_market_data_runtime_settings_reads_fresh_config_per_call(tmp_path, monkeypatch):
     first_dir = tmp_path / "first"
     second_dir = tmp_path / "second"
     first_dir.mkdir()
@@ -174,4 +173,4 @@ def test_get_default_runtime_config_missing_file_returns_default(tmp_path, monke
     # Must be a valid RuntimeConfig with defaults
     assert isinstance(rt, RuntimeConfig)
     assert rt.trading.timeframe == "1m"  # schema default
-    assert rt.backtest.chunk_days == 2   # schema default
+    assert rt.backtest.chunk_days == 2  # schema default

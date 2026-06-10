@@ -106,7 +106,7 @@ def _load_json(path: Path | str | None) -> dict[str, Any]:
 def _safe_float(value: Any, default: float = 0.0) -> float:
     try:
         parsed = float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return float(default)
     return float(parsed) if math.isfinite(parsed) else float(default)
 
@@ -114,7 +114,7 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
 def _safe_optional_float(value: Any) -> float | None:
     try:
         parsed = float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     return float(parsed) if math.isfinite(parsed) else None
 

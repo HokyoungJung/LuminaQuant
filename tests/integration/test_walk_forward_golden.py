@@ -58,6 +58,7 @@ WARMUP_BARS = max(WF_LONG_WINDOWS)  # 120
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture(scope="module")
 def btc_close_and_dates():
     """Load BTCUSDT synthetic fixture once per module."""
@@ -70,6 +71,7 @@ def btc_close_and_dates():
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
 
 def _slice_close(close_full, dates_full, start: datetime, end: datetime) -> np.ndarray:
     idxs = [i for i, d in enumerate(dates_full) if start <= d < end]
@@ -89,6 +91,7 @@ def _best_train_params(train_grid: list[dict]) -> tuple[int, int]:
 
 
 # ── Main walk-forward computation ─────────────────────────────────────────────
+
 
 def _run_walk_forward_b(close_full, dates_full) -> dict:
     """Reproduce Variant B: walk-forward WITH warmup context."""
@@ -179,6 +182,7 @@ def _run_walk_forward_b(close_full, dates_full) -> dict:
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
 
+
 def test_walk_forward_variant_b_matches_golden(btc_close_and_dates):
     """Phase 4.5 gate: all folds match Variant B golden within rtol 1e-8."""
     close_full, dates_full = btc_close_and_dates
@@ -192,9 +196,7 @@ def test_walk_forward_variant_b_matches_golden(btc_close_and_dates):
             f"Fold {fold_n}: val_metrics.sharpe == -999 — warmup context was not provided. "
             f"This is the Phase 4.3 InsufficientWarmupError bug."
         )
-        assert val_sharpe > -10.0, (
-            f"Fold {fold_n}: val_sharpe={val_sharpe!r} looks degenerate."
-        )
+        assert val_sharpe > -10.0, f"Fold {fold_n}: val_sharpe={val_sharpe!r} looks degenerate."
 
     # Phase 4.5: compare against Variant B golden at rtol 1e-8
     if not _GOLDEN_B.exists():
@@ -230,7 +232,7 @@ def test_ma_cross_equity_context_mode_differs_from_no_context():
     close = 10_000.0 * np.cumprod(1.0 + rng.normal(0.0, 0.01, size=90))
     ctx = 10_000.0 * np.cumprod(1.0 + rng.normal(0.0, 0.01, size=120))
 
-    eq_no_ctx = ma_cross_equity(close, 10, 40)   # flat (MA can't warm up in 90 bars)
+    eq_no_ctx = ma_cross_equity(close, 10, 40)  # flat (MA can't warm up in 90 bars)
     eq_with_ctx = ma_cross_equity(close, 10, 40, context=ctx)
 
     # Without context (90 < 40+1 is False but signal will be zeroed initially) —

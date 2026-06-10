@@ -67,7 +67,7 @@ def _read_json(path: Path) -> dict[str, Any]:
 def _safe_float(value: Any, default: float = 0.0) -> float:
     try:
         numeric = float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return float(default)
     return float(numeric)
 

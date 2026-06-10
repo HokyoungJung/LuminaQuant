@@ -24,6 +24,7 @@ import numpy as np
 import polars as pl
 
 from lumina_quant.configuration import BacktestConfigView, get_default_runtime_config
+
 _lq_rt = get_default_runtime_config()
 BacktestConfig = BacktestConfigView(_lq_rt)
 BaseConfig = BacktestConfigView(_lq_rt)

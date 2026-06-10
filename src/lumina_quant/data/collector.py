@@ -93,7 +93,7 @@ class DataCollectorConfig:
     """Market type passed to the exchange adapter (``live.exchange.market_type``)."""
 
     @classmethod
-    def from_runtime_config(cls, rt: RuntimeConfig) -> "DataCollectorConfig":
+    def from_runtime_config(cls, rt: RuntimeConfig) -> DataCollectorConfig:
         """Derive DataCollectorConfig from a fully-loaded RuntimeConfig."""
         is_testnet: bool
         if rt.live.testnet is not None:
@@ -105,9 +105,7 @@ class DataCollectorConfig:
         return cls(
             exchange=str(rt.storage.market_data_exchange or "binance"),
             driver=str(rt.live.exchange.driver or "binance_futures"),
-            parquet_root=Path(
-                rt.storage.market_data_parquet_path or "data/market_parquet"
-            ),
+            parquet_root=Path(rt.storage.market_data_parquet_path or "data/market_parquet"),
             symbols=list(rt.trading.symbols),
             is_testnet=is_testnet,
             kinds=list(rt.data.kinds),
@@ -149,7 +147,7 @@ class DataCollector:
         self._exchange_client = _exchange_client
 
     @classmethod
-    def from_runtime_config(cls, rt: RuntimeConfig) -> "DataCollector":
+    def from_runtime_config(cls, rt: RuntimeConfig) -> DataCollector:
         """Build DataCollector from RuntimeConfig.
 
         Driver-keyed adapter selection::
@@ -289,7 +287,7 @@ class DataCollector:
             if callable(close_fn):
                 close_fn()
 
-    def __enter__(self) -> "DataCollector":
+    def __enter__(self) -> DataCollector:
         return self
 
     def __exit__(self, *_: object) -> None:
@@ -320,8 +318,7 @@ def _build_exchange_client(cfg: DataCollectorConfig, *, rt: RuntimeConfig) -> An
         return _build_polymarket_client(rt)
 
     raise ValueError(
-        f"Unknown exchange driver: {driver!r}. "
-        f"Supported: binance_futures, mt5, polymarket."
+        f"Unknown exchange driver: {driver!r}. Supported: binance_futures, mt5, polymarket."
     )
 
 

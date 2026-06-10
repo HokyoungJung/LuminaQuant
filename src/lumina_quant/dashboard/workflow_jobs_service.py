@@ -17,7 +17,10 @@ from lumina_quant.postgres_state import _connect_postgres
 
 def resolve_dashboard_postgres_dsn(dsn: str | None = None) -> str:
     return str(
-        dsn or os.getenv("LQ_POSTGRES_DSN") or get_default_runtime_config().storage.postgres_dsn or ""
+        dsn
+        or os.getenv("LQ_POSTGRES_DSN")
+        or get_default_runtime_config().storage.postgres_dsn
+        or ""
     ).strip()
 
 
@@ -35,7 +38,7 @@ def request_job_stop(stop_file: str | None, *, timestamp: str) -> bool:
 def terminate_process(pid: object) -> tuple[bool, str]:
     try:
         resolved_pid = int(pid)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return False, "invalid pid"
     if resolved_pid <= 0:
         return False, "invalid pid"
@@ -213,16 +216,25 @@ def main(argv: list[str] | None = None) -> int:
         prog="lumina_quant.dashboard.workflow_jobs_service",
         description="Emit workflow-jobs payload or control a job.",
     )
-    parser.add_argument("--json", action="store_true", default=True,
-                        help="Output as JSON (default and only output mode).")
-    parser.add_argument("--fn", choices=["load", "control"], default="load",
-                        help="Function to invoke (default: load).")
-    parser.add_argument("--limit", type=int, default=10,
-                        help="Max jobs to return (load only, default: 10).")
-    parser.add_argument("--job-id", default="", dest="job_id",
-                        help="Job ID for control action.")
-    parser.add_argument("--action", default="stop",
-                        help="Control action: stop | kill (default: stop).")
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        default=True,
+        help="Output as JSON (default and only output mode).",
+    )
+    parser.add_argument(
+        "--fn",
+        choices=["load", "control"],
+        default="load",
+        help="Function to invoke (default: load).",
+    )
+    parser.add_argument(
+        "--limit", type=int, default=10, help="Max jobs to return (load only, default: 10)."
+    )
+    parser.add_argument("--job-id", default="", dest="job_id", help="Job ID for control action.")
+    parser.add_argument(
+        "--action", default="stop", help="Control action: stop | kill (default: stop)."
+    )
     args = parser.parse_args(argv)
 
     if args.fn == "control":

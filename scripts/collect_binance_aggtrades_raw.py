@@ -10,6 +10,7 @@ from pathlib import Path
 
 from lumina_quant.configuration import BacktestConfigView, get_default_runtime_config
 from lumina_quant.live.trader import _build_live_config_namespace
+
 _lq_rt = get_default_runtime_config()
 BaseConfig = BacktestConfigView(_lq_rt)
 LiveConfig = _build_live_config_namespace(_lq_rt, symbols=[])

@@ -48,11 +48,13 @@ _LOGGER = logging.getLogger(__name__)
 
 # ── Order definitions ─────────────────────────────────────────────────────────
 
+
 @dataclass
 class MktOrderCase:
     """Single MKT order test case for tick-replay validation."""
+
     symbol: str
-    direction: str   # "BUY" | "SELL"
+    direction: str  # "BUY" | "SELL"
     qty: float
     description: str = ""
 
@@ -65,8 +67,9 @@ class LmtOrderCase:
     - ``True``:  a fill MUST occur within the bar window.
     - ``False``: NO fill should occur within the bar window.
     """
+
     symbol: str
-    direction: str   # "BUY" | "SELL"
+    direction: str  # "BUY" | "SELL"
     qty: float
     limit_price: float
     expect_fill: bool = True
@@ -76,9 +79,10 @@ class LmtOrderCase:
 @dataclass
 class TickReplayVerdict:
     """Return value of :meth:`TickReplayValidator.validate`."""
+
     bars_count: int
-    lmt_verdict: str           # "PASS" | "FAIL" | "SKIP"
-    mkt_verdict: str           # "PASS" | "FAIL" | "SKIP"
+    lmt_verdict: str  # "PASS" | "FAIL" | "SKIP"
+    mkt_verdict: str  # "PASS" | "FAIL" | "SKIP"
     lmt_cases: list[dict] = field(default_factory=list)
     mkt_cases: list[dict] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
@@ -95,6 +99,7 @@ class TickReplayVerdict:
 
 
 # ── Validator ─────────────────────────────────────────────────────────────────
+
 
 class TickReplayValidator:
     """Validate bar-level order execution against real aggTrades tick data.
@@ -132,6 +137,7 @@ class TickReplayValidator:
         # Build a default ExecutionModelConfig if none provided.
         if execution_cfg is None:
             from lumina_quant.backtesting.execution_model import ExecutionModelConfig
+
             execution_cfg = ExecutionModelConfig(
                 taker_fee_rate=0.0004,
                 maker_fee_rate=0.0002,
@@ -147,6 +153,7 @@ class TickReplayValidator:
                 max_bar_volume_ratio=0.1,
             )
         from lumina_quant.backtesting.execution_model import ExecutionModel
+
         self._execution_model = ExecutionModel(execution_cfg)
         self._lmt_cases = lmt_cases
         self._mkt_cases = mkt_cases
@@ -247,7 +254,7 @@ class TickReplayValidator:
                 direction="BUY",
                 qty=0.01,
                 limit_price=mid_price_round,
-                expect_fill=True,   # at least one bar should have low < mid
+                expect_fill=True,  # at least one bar should have low < mid
                 description=f"BUY LMT at {mid_price_round} — expect fill (price range covers limit)",
             ),
             LmtOrderCase(
@@ -255,7 +262,7 @@ class TickReplayValidator:
                 direction="SELL",
                 qty=0.01,
                 limit_price=mid_price_round,
-                expect_fill=True,   # at least one bar should have high > mid
+                expect_fill=True,  # at least one bar should have high > mid
                 description=f"SELL LMT at {mid_price_round} — expect fill (price range covers limit)",
             ),
             LmtOrderCase(
@@ -315,7 +322,6 @@ class TickReplayValidator:
 
         filled_any = False
         wrong_price = False
-        wrong_no_fill_bar = False
         fill_price_seen: float | None = None
         n_should_fill = 0
         n_did_fill = 0
@@ -415,7 +421,7 @@ class TickReplayValidator:
         fp = fill_result.fill_price
         cfg = self._execution_model.cfg
         # Allow fill_price within bar range extended by max possible slippage.
-        max_slip = cfg.slippage_rate * 1.5 * 2.0 + cfg.spread_rate  # 3× slip + spread headroom
+        max_slip = cfg.slippage_rate * 1.5 * 2.0 + cfg.spread_rate  # 3x slip + spread headroom
         direction = str(case.direction).upper()
         if direction == "BUY":
             price_ok = fp <= bar_high * (1.0 + max_slip)
@@ -443,7 +449,7 @@ class TickReplayValidator:
     def validate(self) -> TickReplayVerdict:
         """Run validation and return a :class:`TickReplayVerdict`.
 
-        Returns
+        Returns:
         -------
         TickReplayVerdict
             Always returns a verdict (never raises).  Check
@@ -469,7 +475,9 @@ class TickReplayValidator:
         bars_count = len(bars)
 
         # ── LMT validation ────────────────────────────────────────────────────
-        lmt_cases = self._lmt_cases if self._lmt_cases is not None else self._default_lmt_cases(bars)
+        lmt_cases = (
+            self._lmt_cases if self._lmt_cases is not None else self._default_lmt_cases(bars)
+        )
         lmt_results = []
         lmt_all_pass = True
 

@@ -208,13 +208,11 @@ def import_private_strategy_registry() -> Any:
 
 
 __all__ = [
-    # Decorator + accessor
-    "register",
-    "PluginRegistry",
     "GLOBAL_REGISTRY",
-    # Backward-compat CLI helpers
-    "PublicStubStrategy",
+    "PluginRegistry",
     "PublicStrategyRegistry",
-    "load_strategy_registry",
+    "PublicStubStrategy",
     "import_private_strategy_registry",
+    "load_strategy_registry",
+    "register",
 ]

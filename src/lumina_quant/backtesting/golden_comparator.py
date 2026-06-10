@@ -33,7 +33,7 @@ _GOLDEN_DIR = _REPO_ROOT / "baseline" / "golden"
 class GoldenMismatch(AssertionError):
     """Raised when a numeric value exceeds ``rtol`` vs the golden baseline.
 
-    Attributes
+    Attributes:
     ----------
     key:
         Dot-separated path to the failing field.
@@ -114,7 +114,7 @@ def compare_to_golden(
         represent degenerate ``-999`` entries from Variant A that Phase 4
         replaces with real metrics (documented improvement).
 
-    Raises
+    Raises:
     ------
     GoldenMismatch
         On the first field that exceeds *rtol*.
@@ -124,6 +124,7 @@ def compare_to_golden(
     if rtol is None:
         try:
             from lumina_quant.configuration import get_default_runtime_config
+
             rt = get_default_runtime_config()
             rtol = float(rt.validation.golden_rtol)
         except Exception:
@@ -162,8 +163,7 @@ def compare_to_golden(
 
     if mismatches:
         raise AssertionError(
-            f"Golden comparator found {len(mismatches)} missing key(s):\n"
-            + "\n".join(mismatches)
+            f"Golden comparator found {len(mismatches)} missing key(s):\n" + "\n".join(mismatches)
         )
 
 

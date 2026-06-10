@@ -13,7 +13,7 @@ def _safe_float(value: Any) -> float | None:
         if value is None or value == "":
             return None
         return float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 
@@ -22,7 +22,7 @@ def _safe_int(value: Any) -> int:
         if value is None or value == "":
             return 0
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return 0
 
 
@@ -234,10 +234,13 @@ def main(argv: list[str] | None = None) -> int:
         prog="lumina_quant.dashboard.exact_window_service",
         description="Emit exact-window summary payload as JSON.",
     )
-    parser.add_argument("--json", action="store_true", default=True,
-                        help="Output as JSON (default and only output mode).")
-    parser.add_argument("--root", default=None,
-                        help="Override exact-window bundle root path.")
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        default=True,
+        help="Output as JSON (default and only output mode).",
+    )
+    parser.add_argument("--root", default=None, help="Override exact-window bundle root path.")
     args = parser.parse_args(argv)
     payload = load_exact_window_summary_payload(root=args.root)
     print(json.dumps(payload, indent=2, sort_keys=True, default=str))

@@ -28,7 +28,7 @@ def _call_with_supported_kwargs(
     """
     try:
         params = signature(func).parameters
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return func(**kwargs)
 
     if any(param.kind == Parameter.VAR_KEYWORD for param in params.values()):

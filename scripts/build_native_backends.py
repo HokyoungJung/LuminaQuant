@@ -33,9 +33,7 @@ def _find_maturin(venv_bin: Path) -> str:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Build lumina_compute pyo3 island (maturin)"
-    )
+    parser = argparse.ArgumentParser(description="Build lumina_compute pyo3 island (maturin)")
     parser.add_argument(
         "--wheel",
         action="store_true",

@@ -3,10 +3,12 @@ import logging
 import os
 from logging.handlers import RotatingFileHandler
 
+
 def _get_log_level() -> str:
     """Resolve log level: config.yaml system.log_level → LQ_LOG_LEVEL env → INFO."""
     try:
-        from lumina_quant.configuration import get_default_runtime_config  # noqa: PLC0415
+        from lumina_quant.configuration import get_default_runtime_config
+
         return get_default_runtime_config().system.log_level
     except Exception:
         return os.getenv("LQ_LOG_LEVEL", "INFO")

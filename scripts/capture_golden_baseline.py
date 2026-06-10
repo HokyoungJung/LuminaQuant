@@ -52,9 +52,7 @@ AGGTRADES_FIXTURE_DIR = REPO_ROOT / "tests" / "fixtures" / "aggtrades"
 AGGTRADES_SYMBOL = "BTCUSDT"
 AGGTRADES_START_MS = 1781046000000
 AGGTRADES_END_MS = 1781049600000
-AGGTRADES_FIXTURE_NAME = (
-    f"{AGGTRADES_SYMBOL}_1h_{AGGTRADES_START_MS}_{AGGTRADES_END_MS}.parquet"
-)
+AGGTRADES_FIXTURE_NAME = f"{AGGTRADES_SYMBOL}_1h_{AGGTRADES_START_MS}_{AGGTRADES_END_MS}.parquet"
 
 # ── Backtest parameters ───────────────────────────────────────────────────────
 OHLCV_SYMBOLS = ["BTCUSDT", "ETHUSDT"]
@@ -75,6 +73,7 @@ WF_STEP_MONTHS = 3
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
 
 def sha256_file(path: Path) -> str:
     h = hashlib.sha256()
@@ -98,6 +97,7 @@ def _write_parquet(path: Path, df: pl.DataFrame) -> None:
 
 # ── Step 1: Generate synthetic OHLCV fixtures ─────────────────────────────────
 
+
 def generate_ohlcv(symbol: str) -> pl.DataFrame:
     """Deterministic OHLCV generation — caller must have set np.random.seed."""
     dates = [OHLCV_START + timedelta(days=i) for i in range(OHLCV_DAYS)]
@@ -109,14 +109,16 @@ def generate_ohlcv(symbol: str) -> pl.DataFrame:
     lows = opens * (1.0 - np.abs(np.random.randn(n) * 0.01))
     closes = lows + (highs - lows) * np.random.rand(n)
     volumes = np.random.randint(100, 1000, size=n).astype(np.float64)
-    return pl.DataFrame({
-        "datetime": dates,
-        "open": opens,
-        "high": highs,
-        "low": lows,
-        "close": closes,
-        "volume": volumes,
-    }).with_columns(pl.col("datetime").cast(pl.Datetime))
+    return pl.DataFrame(
+        {
+            "datetime": dates,
+            "open": opens,
+            "high": highs,
+            "low": lows,
+            "close": closes,
+            "volume": volumes,
+        }
+    ).with_columns(pl.col("datetime").cast(pl.Datetime))
 
 
 def step_generate_fixtures(dry_run: bool) -> dict[str, dict]:
@@ -138,10 +140,12 @@ def step_generate_fixtures(dry_run: bool) -> dict[str, dict]:
 
 # ── Step 2: Freeze configs ────────────────────────────────────────────────────
 
+
 def step_freeze_configs(dry_run: bool) -> dict[str, str]:
     """Copy config files to baseline/golden/configs/ and return SHA-256 map."""
     print("\n[2/7] Freezing configs...")
     import shutil
+
     srcs = {
         "config_frozen.yaml": REPO_ROOT / "config.yaml",
         "research_frozen.yaml": REPO_ROOT / "configs" / "profiles" / "research.yaml",
@@ -160,6 +164,7 @@ def step_freeze_configs(dry_run: bool) -> dict[str, str]:
 
 
 # ── Step 3: Backtest goldens ──────────────────────────────────────────────────
+
 
 def _run_ma_cross_backtest(data_dict: dict[str, pl.DataFrame]) -> dict:
     """Run MovingAverageCrossStrategy on both symbols; return captured artefacts."""
@@ -276,9 +281,11 @@ def step_backtest_goldens(fixtures: dict[str, dict], dry_run: bool) -> dict:
 
 # ── Step 4: Native backend goldens ────────────────────────────────────────────
 
+
 def _call_pyo3_metrics(close_arr: np.ndarray) -> dict:
     """Call lumina_compute.evaluate_metrics via pyo3 binding."""
     from lumina_quant._compute import evaluate_metrics  # type: ignore[attr-defined]
+
     arr = np.ascontiguousarray(close_arr, dtype=np.float64)
     sharpe, cagr, mdd = evaluate_metrics(arr, ANNUAL_PERIODS)
     return {"sharpe": float(sharpe), "cagr": float(cagr), "max_dd": float(mdd)}
@@ -288,10 +295,14 @@ def _call_alpha_fold(close: np.ndarray, high: np.ndarray, low: np.ndarray) -> di
     """Exercise rust_alpha_fold via its Python wrapper."""
     os.environ["LQ_ALPHA_FOLD_BACKEND"] = "rust"
     from lumina_quant.alpha_zoo.native_alpha_fold_backend import simulate_symbol_arrays
+
     signal = np.where(close > np.roll(close, 5), 1.0, -1.0)
     signal[:5] = 0.0
     returns, liquidation, wipeout = simulate_symbol_arrays(
-        close, high, low, signal,
+        close,
+        high,
+        low,
+        signal,
         integer_leverage=2,
         allocation_fraction=0.5,
         round_trip_cost_bps=10.0,
@@ -339,7 +350,10 @@ def _call_hybrid_optuna(close: np.ndarray) -> dict:
         high_vol_weight_boost=0.2,
     )
     if result is None:
-        return {"backend": "unavailable", "note": "hybrid_optuna returned None (fallback to Python)"}
+        return {
+            "backend": "unavailable",
+            "note": "hybrid_optuna returned None (fallback to Python)",
+        }
     portfolio, weights_exp, weights_raw, d0, d1, d2 = result
     return {
         "backend": "rust",
@@ -356,6 +370,7 @@ def _call_live_signals(close: np.ndarray) -> dict:
         evaluate_debounced_state_native,
         evaluate_trailing_state_native,
     )
+
     n = len(close)
     sma5 = np.convolve(close, np.ones(5) / 5, mode="same")
     long_entry = (close > sma5).astype(np.uint8)
@@ -364,14 +379,27 @@ def _call_live_signals(close: np.ndarray) -> dict:
     short_exit = long_entry.copy()
 
     deb = evaluate_debounced_state_native(
-        long_entry, long_exit, short_entry, short_exit,
-        side="both", min_hold_bars=3, cooldown_bars=2,
+        long_entry,
+        long_exit,
+        short_entry,
+        short_exit,
+        side="both",
+        min_hold_bars=3,
+        cooldown_bars=2,
     )
 
     atr = np.abs(np.diff(close, prepend=close[0])) * 2.0
     trail = evaluate_trailing_state_native(
-        close, long_entry, short_entry, long_exit, short_exit, atr,
-        side="both", min_hold_bars=3, cooldown_bars=2, trail_atr_mult=2.0,
+        close,
+        long_entry,
+        short_entry,
+        long_exit,
+        short_exit,
+        atr,
+        side="both",
+        min_hold_bars=3,
+        cooldown_bars=2,
+        trail_atr_mult=2.0,
     )
 
     return {
@@ -455,6 +483,7 @@ def step_native_backend_goldens(
 
 
 # ── Step 5: Walk-forward golden ───────────────────────────────────────────────
+
 
 def _add_months(dt: datetime, months: int) -> datetime:
     year = dt.year + (dt.month - 1 + months) // 12
@@ -564,14 +593,14 @@ def step_walk_forward(fixtures: dict[str, dict], dry_run: bool) -> dict:
     for split in splits:
         fold = split["fold"]
         train_start, train_end = split["train_start"], split["train_end"]
-        val_start,   val_end   = split["val_start"],   split["val_end"]
-        test_start,  test_end  = split["test_start"],  split["test_end"]
+        val_start, val_end = split["val_start"], split["val_end"]
+        test_start, test_end = split["test_start"], split["test_end"]
 
         train_close = _slice(train_start, train_end)
-        val_close   = _slice(val_start,   val_end)
-        test_close  = _slice(test_start,  test_end)
-        val_ctx     = _context_before(val_start)
-        test_ctx    = _context_before(test_start)
+        val_close = _slice(val_start, val_end)
+        test_close = _slice(test_start, test_end)
+        val_ctx = _context_before(val_start)
+        test_ctx = _context_before(test_start)
 
         # ── Grid search on train (identical for both variants) ────────────────
         best_sharpe = -999.0
@@ -584,12 +613,15 @@ def step_walk_forward(fixtures: dict[str, dict], dry_run: bool) -> dict:
                     continue
                 eq = _ma_cross_equity(train_close, sw, lw)
                 sharpe, cagr, mdd = evaluate_metrics_backend(eq, ANNUAL_PERIODS)
-                grid_rows.append({
-                    "short_window": sw, "long_window": lw,
-                    "train_sharpe": sharpe,
-                    "train_cagr":   cagr,
-                    "train_max_dd": mdd,
-                })
+                grid_rows.append(
+                    {
+                        "short_window": sw,
+                        "long_window": lw,
+                        "train_sharpe": sharpe,
+                        "train_cagr": cagr,
+                        "train_max_dd": mdd,
+                    }
+                )
                 if sharpe > best_sharpe:
                     best_sharpe = sharpe
                     best_params = {"short_window": sw, "long_window": lw}
@@ -597,31 +629,42 @@ def step_walk_forward(fixtures: dict[str, dict], dry_run: bool) -> dict:
         sw_b, lw_b = best_params["short_window"], best_params["long_window"]
 
         # ── Variant A: no context (legacy behaviour, may emit -999) ──────────
-        vm_a = evaluate_metrics_backend(_ma_cross_equity(val_close,  sw_b, lw_b), ANNUAL_PERIODS)
+        vm_a = evaluate_metrics_backend(_ma_cross_equity(val_close, sw_b, lw_b), ANNUAL_PERIODS)
         tm_a = evaluate_metrics_backend(_ma_cross_equity(test_close, sw_b, lw_b), ANNUAL_PERIODS)
 
         # ── Variant B: with warmup context (real metrics for every fold) ──────
         vm_b = evaluate_metrics_backend(
-            _ma_cross_equity(val_close,  sw_b, lw_b, context=val_ctx),  ANNUAL_PERIODS)
+            _ma_cross_equity(val_close, sw_b, lw_b, context=val_ctx), ANNUAL_PERIODS
+        )
         tm_b = evaluate_metrics_backend(
-            _ma_cross_equity(test_close, sw_b, lw_b, context=test_ctx), ANNUAL_PERIODS)
+            _ma_cross_equity(test_close, sw_b, lw_b, context=test_ctx), ANNUAL_PERIODS
+        )
 
         base = {
             "fold": fold,
-            "train_start": train_start.isoformat(), "train_end": train_end.isoformat(),
-            "val_start":   val_start.isoformat(),   "val_end":   val_end.isoformat(),
-            "test_start":  test_start.isoformat(),  "test_end":  test_end.isoformat(),
+            "train_start": train_start.isoformat(),
+            "train_end": train_end.isoformat(),
+            "val_start": val_start.isoformat(),
+            "val_end": val_end.isoformat(),
+            "test_start": test_start.isoformat(),
+            "test_end": test_end.isoformat(),
             "best_params": best_params,
-            "train_grid":  grid_rows,
+            "train_grid": grid_rows,
         }
-        folds_a.append({**base,
-            "val_metrics":  {"sharpe": vm_a[0], "cagr": vm_a[1], "max_dd": vm_a[2]},
-            "test_metrics": {"sharpe": tm_a[0], "cagr": tm_a[1], "max_dd": tm_a[2]},
-        })
-        folds_b.append({**base,
-            "val_metrics":  {"sharpe": vm_b[0], "cagr": vm_b[1], "max_dd": vm_b[2]},
-            "test_metrics": {"sharpe": tm_b[0], "cagr": tm_b[1], "max_dd": tm_b[2]},
-        })
+        folds_a.append(
+            {
+                **base,
+                "val_metrics": {"sharpe": vm_a[0], "cagr": vm_a[1], "max_dd": vm_a[2]},
+                "test_metrics": {"sharpe": tm_a[0], "cagr": tm_a[1], "max_dd": tm_a[2]},
+            }
+        )
+        folds_b.append(
+            {
+                **base,
+                "val_metrics": {"sharpe": vm_b[0], "cagr": vm_b[1], "max_dd": vm_b[2]},
+                "test_metrics": {"sharpe": tm_b[0], "cagr": tm_b[1], "max_dd": tm_b[2]},
+            }
+        )
 
         print(
             f"  fold {fold}: best={best_params} | "
@@ -633,7 +676,9 @@ def step_walk_forward(fixtures: dict[str, dict], dry_run: bool) -> dict:
     # E2E framework time.  Authoritative E2E timing lives in worker-3's
     # perf-baseline.json (170.71 s for the identical 27-eval workload).
     split_build_elapsed_s = round(time.perf_counter() - wf_start_t, 6)
-    print(f"  numpy-path elapsed: {split_build_elapsed_s}s (authoritative E2E: worker-3 perf-baseline.json)")
+    print(
+        f"  numpy-path elapsed: {split_build_elapsed_s}s (authoritative E2E: worker-3 perf-baseline.json)"
+    )
 
     grid_params = {"short_windows": WF_SHORT_WINDOWS, "long_windows": WF_LONG_WINDOWS}
 
@@ -654,13 +699,14 @@ def step_walk_forward(fixtures: dict[str, dict], dry_run: bool) -> dict:
     }
 
     if not dry_run:
-        _write_json(GOLDEN_DIR / "walk_forward_results.json",         payload_a)
-        _write_json(GOLDEN_DIR / "walk_forward_results_warmup.json",  payload_b)
+        _write_json(GOLDEN_DIR / "walk_forward_results.json", payload_a)
+        _write_json(GOLDEN_DIR / "walk_forward_results_warmup.json", payload_b)
 
     return {"variant_a": payload_a, "variant_b": payload_b}
 
 
 # ── Step 6: Verify aggTrades fixture ─────────────────────────────────────────
+
 
 def step_verify_aggtrades(dry_run: bool) -> tuple[pl.DataFrame, dict]:
     print("\n[6/7] Verifying aggTrades fixture...")
@@ -704,6 +750,7 @@ def step_verify_aggtrades(dry_run: bool) -> tuple[pl.DataFrame, dict]:
 
 
 # ── Step 7: Write PROVENANCE.json ─────────────────────────────────────────────
+
 
 def step_write_provenance(
     fixtures: dict[str, dict],
@@ -847,10 +894,12 @@ def step_write_provenance(
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Capture golden baselines.")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Verify and print without writing any files.")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Verify and print without writing any files."
+    )
     args = parser.parse_args()
     dry_run: bool = args.dry_run
 
@@ -869,8 +918,13 @@ def main() -> None:
     native_goldens = step_native_backend_goldens(fixtures, aggtrades_df, dry_run)
     wf_result = step_walk_forward(fixtures, dry_run)
     step_write_provenance(
-        fixtures, config_shas, backtest_goldens, native_goldens,
-        wf_result, aggtrades_meta, dry_run,
+        fixtures,
+        config_shas,
+        backtest_goldens,
+        native_goldens,
+        wf_result,
+        aggtrades_meta,
+        dry_run,
     )
 
     print("\n✓ Golden baseline capture complete.")

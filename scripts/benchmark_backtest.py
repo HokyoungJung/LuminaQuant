@@ -89,11 +89,11 @@ def _load_best_params(strategy_name: str) -> dict[str, Any]:
                         "[WARN] best_params metadata indicates non validation-only selection basis "
                         f"for {strategy_name}."
                     )
-            except (OSError, ValueError, TypeError):
+            except OSError, ValueError, TypeError:
                 print(f"[WARN] Failed to parse best_params metadata for {strategy_name}.")
         else:
             print(f"[WARN] best_params metadata missing for {strategy_name}.")
-    except (OSError, ValueError, TypeError):
+    except OSError, ValueError, TypeError:
         pass
     return params
 
@@ -152,7 +152,7 @@ def _load_snapshot(path: str) -> dict[str, Any] | None:
             data = json.load(file)
         if isinstance(data, dict):
             return data
-    except (OSError, ValueError, TypeError):
+    except OSError, ValueError, TypeError:
         return None
     return None
 

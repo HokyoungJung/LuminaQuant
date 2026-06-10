@@ -29,6 +29,7 @@ try:
     from lumina_quant._compute import (  # type: ignore[attr-defined]
         evaluate_hybrid_optuna_portfolio as _pyo3_evaluate_hybrid,
     )
+
     _PYO3_FN = _pyo3_evaluate_hybrid
 except Exception as _exc:
     _PYO3_LOAD_ERROR = str(_exc)

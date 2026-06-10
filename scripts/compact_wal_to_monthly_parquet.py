@@ -6,6 +6,7 @@ import argparse
 from pathlib import Path
 
 from lumina_quant.configuration import BacktestConfigView, get_default_runtime_config
+
 BaseConfig = BacktestConfigView(get_default_runtime_config())
 from lumina_quant.storage.parquet import ParquetMarketDataRepository, normalize_symbol
 

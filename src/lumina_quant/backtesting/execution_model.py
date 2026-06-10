@@ -9,7 +9,7 @@ LMT fill assumptions (Phase 4, approved 2026-06-10 — see AGENTS.md §Execution
     SELL LMT fills when ``bar_high > limit_price`` (strict, not ≥)
     Fill price = ``limit_price`` exactly; commission uses ``maker_fee_rate``.
     No slippage applied to limit fills.
-    The partial-fill liquidity cap (``max_bar_volume_ratio × bar_volume``) applies
+    The partial-fill liquidity cap (``max_bar_volume_ratio * bar_volume``) applies
     to both LMT and MKT fills.  Realism validated by TickReplayValidator (Phase 4.4).
 
 Phase 5 import gate: ``live/execution_live.py`` MUST import ``ExecutionModel`` from
@@ -97,9 +97,7 @@ def _config_from_attrs(config: Any) -> ExecutionModelConfig:
         slippage_rate=float(getattr(config, "SLIPPAGE_RATE", 0.0005)),
         spread_rate=float(getattr(config, "SPREAD_RATE", 0.0002)),
         leverage=max(1, int(getattr(config, "LEVERAGE", 1))),
-        margin_mode=str(
-            getattr(config, "MARGIN_MODE", "isolated") or "isolated"
-        ).strip().lower(),
+        margin_mode=str(getattr(config, "MARGIN_MODE", "isolated") or "isolated").strip().lower(),
         maintenance_margin_rate=float(getattr(config, "MAINTENANCE_MARGIN_RATE", 0.005)),
         liquidation_buffer_rate=float(getattr(config, "LIQUIDATION_BUFFER_RATE", 0.0)),
         funding_rate_per_8h=float(getattr(config, "FUNDING_RATE_PER_8H", 0.0)),
@@ -127,7 +125,7 @@ class ExecutionModel:
         SELL LMT fills when ``bar_high > limit_price`` (strict — not ≥).
         Fill price = ``limit_price`` exactly; fee = ``maker_fee_rate``.
         No slippage applied to limit fills.
-        Partial-fill cap (``max_bar_volume_ratio × bar_volume``) applies to both LMT and MKT.
+        Partial-fill cap (``max_bar_volume_ratio * bar_volume``) applies to both LMT and MKT.
         These rules are intentionally conservative: we only fill when the market clearly
         crosses the limit and give no price improvement.
 
@@ -156,8 +154,8 @@ class ExecutionModel:
         """Simulate a single fill: (optional liquidity cap) → price → fee.
 
         For aggressive fills (``is_maker=False``, MKT/STOP/TP/TRAIL_STOP):
-            slip = Uniform(slippage_rate×0.5, slippage_rate×1.5); doubled when vol > 0.01.
-            fill_price = raw_price × (1 ± (slip + spread/2)); fee = taker_fee_rate.
+            slip = Uniform(slippage_rate*0.5, slippage_rate*1.5); doubled when vol > 0.01.
+            fill_price = raw_price * (1 +/- (slip + spread/2)); fee = taker_fee_rate.
             The RNG is consumed once per call regardless of cap outcome, matching the
             legacy ``FillModel`` sequence (deterministic golden preservation).
 
@@ -175,7 +173,7 @@ class ExecutionModel:
         bar_volume:
             Current bar's volume for the liquidity cap computation.
         volatility:
-            Normalised bar range (high − low) / open; doubles slippage when > 0.01.
+            Normalised bar range (high - low) / open; doubles slippage when > 0.01.
             Ignored for maker (LMT) fills.
         is_maker:
             ``True`` for LMT fills — exact price, maker fee, no slippage.
@@ -198,9 +196,7 @@ class ExecutionModel:
             # Aggressive fill: adaptive slippage + half-spread + taker fee.
             # rng consumed unconditionally to preserve the same sequence as the
             # legacy FillModel (which always called rng.uniform even for qty=0).
-            slip = self._rng.uniform(
-                self.cfg.slippage_rate * 0.5, self.cfg.slippage_rate * 1.5
-            )
+            slip = self._rng.uniform(self.cfg.slippage_rate * 0.5, self.cfg.slippage_rate * 1.5)
             if float(volatility) > 0.01:
                 slip *= 2.0
             penalty = slip + self.cfg.spread_rate / 2.0
@@ -266,8 +262,8 @@ class ExecutionModel:
     ) -> float | None:
         """Approximate isolated USDT-M liquidation price. Returns ``None`` when leverage ≤ 1.
 
-        Long  : ``entry × (1 − 1/L + MMR + fee + buffer)``
-        Short : ``entry × (1 + 1/L − MMR − fee − buffer)``
+        Long  : ``entry * (1 - 1/L + MMR + fee + buffer)``
+        Short : ``entry * (1 + 1/L - MMR - fee - buffer)``
         """
         lev = max(1, int(self.cfg.leverage))
         if lev <= 1:
@@ -303,9 +299,9 @@ class ExecutionModel:
             return False, 0.0
 
         if float(qty) > 0:  # long
-            breached = (
-                float(bar_low) > 0 and float(bar_low) <= liq_price
-            ) or float(close_price) <= liq_price
+            breached = (float(bar_low) > 0 and float(bar_low) <= liq_price) or float(
+                close_price
+            ) <= liq_price
             if not breached:
                 return False, 0.0
             trigger = (
@@ -314,9 +310,9 @@ class ExecutionModel:
                 else float(close_price)
             )
         else:  # short
-            breached = (
-                float(bar_high) > 0 and float(bar_high) >= liq_price
-            ) or float(close_price) >= liq_price
+            breached = (float(bar_high) > 0 and float(bar_high) >= liq_price) or float(
+                close_price
+            ) >= liq_price
             if not breached:
                 return False, 0.0
             trigger = (

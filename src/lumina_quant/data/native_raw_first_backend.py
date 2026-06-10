@@ -33,6 +33,7 @@ try:
     from lumina_quant._compute import (  # type: ignore[attr-defined]
         aggregate_raw_aggtrades_to_1s as _pyo3_aggregate,
     )
+
     _PYO3_FN = _pyo3_aggregate
 except Exception as _exc:
     _PYO3_LOAD_ERROR = str(_exc)

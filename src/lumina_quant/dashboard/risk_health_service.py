@@ -133,10 +133,13 @@ def main(argv: list[str] | None = None) -> int:
         prog="lumina_quant.dashboard.risk_health_service",
         description="Emit risk-health dashboard payload as JSON.",
     )
-    parser.add_argument("--json", action="store_true", default=True,
-                        help="Output payload as JSON (default and only output mode).")
-    parser.add_argument("--limit", type=int, default=25,
-                        help="Max rows per table (default: 25).")
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        default=True,
+        help="Output payload as JSON (default and only output mode).",
+    )
+    parser.add_argument("--limit", type=int, default=25, help="Max rows per table (default: 25).")
     args = parser.parse_args(argv)
     payload = load_risk_health_payload(limit=args.limit)
     print(json.dumps(payload, indent=2, sort_keys=True, default=str))

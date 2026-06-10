@@ -186,11 +186,7 @@ def _initialize_optimize_runtime_state(*, log: bool = False) -> None:
         BASE_START = datetime(2023, 1, 1)
 
     try:
-        BASE_END = (
-            datetime.strptime(str(_bt.end_date), "%Y-%m-%d")
-            if _bt.end_date
-            else None
-        )
+        BASE_END = datetime.strptime(str(_bt.end_date), "%Y-%m-%d") if _bt.end_date else None
     except Exception:
         BASE_END = None
 
@@ -806,7 +802,7 @@ def _execute_backtest(
             "num_trades": int(getattr(backtest.portfolio, "trade_count", 0)),
             "no_data": no_data,
         }
-    except (RawFirstDataMissingError, RawFirstManifestInvalidError, RawFirstStaleWindowError):
+    except RawFirstDataMissingError, RawFirstManifestInvalidError, RawFirstStaleWindowError:
         raise
     except Exception as e:
         # print(f"Backtest Error: {e}")
@@ -1331,7 +1327,9 @@ def main(argv: list[str] | None = None) -> int:
     OPTUNA_TRIALS = args.n_trials
     MAX_WORKERS = min(2, max(1, int(args.max_workers)))
     configured_numba_threads = configure_numba_threads(MAX_WORKERS)
-    persist_best_params = bool(args.save_best_params or get_default_runtime_config().optimization.persist_best_params)
+    persist_best_params = bool(
+        args.save_best_params or get_default_runtime_config().optimization.persist_best_params
+    )
 
     try:
         if int(args.oos_days) <= 0:
@@ -1384,7 +1382,9 @@ def main(argv: list[str] | None = None) -> int:
                 data_source=contract.data_source,
                 market_db_path=args.market_db_path,
                 external_data_root=args.external_data_root,
-                external_symbol_map=dict(get_default_runtime_config().backtest.external.symbol_map or {}),
+                external_symbol_map=dict(
+                    get_default_runtime_config().backtest.external.symbol_map or {}
+                ),
                 market_exchange=args.market_exchange,
                 timeframe=str(args.base_timeframe),
                 start_date=BASE_START,

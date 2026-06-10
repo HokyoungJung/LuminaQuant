@@ -105,6 +105,7 @@ def resolve_postgres_dsn(dsn: str | None = None, *, base_config: Any = None) -> 
     # Last resort: load from default RuntimeConfig
     try:
         from lumina_quant.configuration import get_default_runtime_config
+
         rt = get_default_runtime_config()
         rt_dsn = str(rt.storage.postgres_dsn or "").strip()
         if rt_dsn:

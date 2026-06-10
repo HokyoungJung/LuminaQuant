@@ -604,7 +604,7 @@ def _float_from_row_or_params(
     value = row.get(key, params.get(key, default))
     try:
         return float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return float(default)
 
 
@@ -614,7 +614,7 @@ def _int_from_row_or_params(
     value = row.get(key, params.get(key, default))
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return int(default)
 
 

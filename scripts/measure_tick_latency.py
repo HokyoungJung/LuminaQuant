@@ -40,6 +40,7 @@ if str(PROJECT_ROOT) not in sys.path:
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _percentile(samples: list[float], pct: float) -> float:
     """Return the p-th percentile (0–100) of sorted samples."""
     if not samples:
@@ -68,6 +69,7 @@ def _stats(samples_s: list[float]) -> dict[str, float]:
 # Measurement 1: live signal per-tick latency
 # ---------------------------------------------------------------------------
 
+
 def _measure_live_signal_per_tick(iters: int) -> dict:
     """Time a single-tick call through debounced + trailing signal kernels."""
     from lumina_quant.alpha_zoo import native_live_signal_backend as nb
@@ -87,15 +89,28 @@ def _measure_live_signal_per_tick(iters: int) -> dict:
     for _ in range(iters):
         t0 = perf_counter()
         nb.evaluate_debounced_state_native(
-            true_arr, false_arr, false_arr, false_arr,
-            side="long_only", min_hold_bars=1, cooldown_bars=0,
+            true_arr,
+            false_arr,
+            false_arr,
+            false_arr,
+            side="long_only",
+            min_hold_bars=1,
+            cooldown_bars=0,
         )
         debounced_samples.append(perf_counter() - t0)
 
         t0 = perf_counter()
         nb.evaluate_trailing_state_native(
-            close, true_arr, false_arr, false_arr, false_arr, atr,
-            side="long_only", min_hold_bars=1, cooldown_bars=0, trail_atr_mult=2.0,
+            close,
+            true_arr,
+            false_arr,
+            false_arr,
+            false_arr,
+            atr,
+            side="long_only",
+            min_hold_bars=1,
+            cooldown_bars=0,
+            trail_atr_mult=2.0,
         )
         trailing_samples.append(perf_counter() - t0)
 
@@ -113,6 +128,7 @@ def _measure_live_signal_per_tick(iters: int) -> dict:
 # ---------------------------------------------------------------------------
 # Measurement 2: paper order path (OrderStateMachine transitions)
 # ---------------------------------------------------------------------------
+
 
 def _measure_paper_order_path(iters: int) -> dict:
     """Time OrderStateMachine.transition() — the innermost paper-mode order step."""
@@ -153,6 +169,7 @@ def _measure_paper_order_path(iters: int) -> dict:
 # Measurement 3: replay path proxy (ShadowLiveRunner)
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class _SyntheticEvent:
     timestamp_ns: int
@@ -187,12 +204,14 @@ def _measure_replay_path_proxy(iters: int) -> dict:
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Measure per-tick latency proxies (no live exchange required)."
     )
-    parser.add_argument("--iters", type=int, default=10_000,
-                        help="Iterations per measurement (default: 10000).")
+    parser.add_argument(
+        "--iters", type=int, default=10_000, help="Iterations per measurement (default: 10000)."
+    )
     parser.add_argument(
         "--output",
         default="baseline/bench_tick_latency.json",
@@ -207,8 +226,10 @@ def main() -> None:
 
     print(f"Measuring live signal per-tick latency ({iters} iters)...")
     live_signal = _measure_live_signal_per_tick(iters)
-    print(f"  backend={live_signal['backend']}  "
-          f"combined_median={live_signal['combined_debounced_plus_trailing']['median_ms']:.4f}ms")
+    print(
+        f"  backend={live_signal['backend']}  "
+        f"combined_median={live_signal['combined_debounced_plus_trailing']['median_ms']:.4f}ms"
+    )
 
     print(f"Measuring paper order path latency ({iters} iters)...")
     paper_order = _measure_paper_order_path(iters)

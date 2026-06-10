@@ -23,7 +23,10 @@ from lumina_quant.utils.performance import (
 
 def resolve_dashboard_postgres_dsn(dsn: str | None = None) -> str:
     return str(
-        dsn or os.getenv("LQ_POSTGRES_DSN") or get_default_runtime_config().storage.postgres_dsn or ""
+        dsn
+        or os.getenv("LQ_POSTGRES_DSN")
+        or get_default_runtime_config().storage.postgres_dsn
+        or ""
     ).strip()
 
 

@@ -159,17 +159,45 @@ def load_overview_payload(
 
 _V2_ROUTES: tuple[tuple[str, str, str], ...] = (
     # (api_path, python_module, status)
-    ("/api/python/dashboard/overview",              "lumina_quant.dashboard.bridge",                   "active"),
-    ("/api/python/dashboard/risk-health",           "lumina_quant.dashboard.risk_health_service",      "active"),
-    ("/api/python/dashboard/workflow-jobs",         "lumina_quant.dashboard.workflow_jobs_service",    "active"),
-    ("/api/python/dashboard/workflow-jobs/control", "lumina_quant.dashboard.workflow_jobs_service",    "active"),
-    ("/api/python/dashboard/exact-window",          "lumina_quant.dashboard.exact_window_service",     "active"),
-    ("/api/python/dashboard/performance-price",     "lumina_quant.dashboard.cutover_surfaces_service", "active"),
-    ("/api/python/dashboard/execution-analytics",   "lumina_quant.dashboard.cutover_surfaces_service", "active"),
-    ("/api/python/dashboard/market-data",           "lumina_quant.dashboard.cutover_surfaces_service", "active"),
-    ("/api/python/dashboard/optimization-insights", "lumina_quant.dashboard.cutover_surfaces_service", "active"),
-    ("/api/python/dashboard/raw-data",              "lumina_quant.dashboard.cutover_surfaces_service", "active"),
-    ("/api/python/dashboard/report-export",         "lumina_quant.dashboard.cutover_surfaces_service", "active"),
+    ("/api/python/dashboard/overview", "lumina_quant.dashboard.bridge", "active"),
+    ("/api/python/dashboard/risk-health", "lumina_quant.dashboard.risk_health_service", "active"),
+    (
+        "/api/python/dashboard/workflow-jobs",
+        "lumina_quant.dashboard.workflow_jobs_service",
+        "active",
+    ),
+    (
+        "/api/python/dashboard/workflow-jobs/control",
+        "lumina_quant.dashboard.workflow_jobs_service",
+        "active",
+    ),
+    ("/api/python/dashboard/exact-window", "lumina_quant.dashboard.exact_window_service", "active"),
+    (
+        "/api/python/dashboard/performance-price",
+        "lumina_quant.dashboard.cutover_surfaces_service",
+        "active",
+    ),
+    (
+        "/api/python/dashboard/execution-analytics",
+        "lumina_quant.dashboard.cutover_surfaces_service",
+        "active",
+    ),
+    (
+        "/api/python/dashboard/market-data",
+        "lumina_quant.dashboard.cutover_surfaces_service",
+        "active",
+    ),
+    (
+        "/api/python/dashboard/optimization-insights",
+        "lumina_quant.dashboard.cutover_surfaces_service",
+        "active",
+    ),
+    ("/api/python/dashboard/raw-data", "lumina_quant.dashboard.cutover_surfaces_service", "active"),
+    (
+        "/api/python/dashboard/report-export",
+        "lumina_quant.dashboard.cutover_surfaces_service",
+        "active",
+    ),
 )
 
 
@@ -177,9 +205,9 @@ _V2_ROUTES: tuple[tuple[str, str, str], ...] = (
 class DashboardRouteDescriptor:
     """Descriptor for a single dashboard API route — drives module-mode invocation."""
 
-    route: str       # e.g. "/api/python/dashboard/overview"
-    python_fn: str   # module name for `uv run python -m <python_fn> --json`
-    status: str      # "active" | "guarded" | "deprecated"
+    route: str  # e.g. "/api/python/dashboard/overview"
+    python_fn: str  # module name for `uv run python -m <python_fn> --json`
+    status: str  # "active" | "guarded" | "deprecated"
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -227,16 +255,11 @@ def build_dashboard_bridge_contract_v2(
     from lumina_quant.configuration import get_default_runtime_config
 
     rt = get_default_runtime_config()
-    resolved_dsn = str(
-        dsn or os.getenv("LQ_POSTGRES_DSN") or rt.storage.postgres_dsn or ""
-    ).strip()
+    resolved_dsn = str(dsn or os.getenv("LQ_POSTGRES_DSN") or rt.storage.postgres_dsn or "").strip()
     repo_root = Path(__file__).resolve().parents[3]
-    resolved_target = str(
-        frontend_target or (repo_root / "apps" / "dashboard_web")
-    )
+    resolved_target = str(frontend_target or (repo_root / "apps" / "dashboard_web"))
     routes = tuple(
-        DashboardRouteDescriptor(route=r, python_fn=m, status=s)
-        for r, m, s in _V2_ROUTES
+        DashboardRouteDescriptor(route=r, python_fn=m, status=s) for r, m, s in _V2_ROUTES
     )
     return DashboardBridgeContractV2(
         launch_mode="next",
@@ -249,19 +272,16 @@ def build_dashboard_bridge_contract_v2(
 
 __all__ = [
     "DEFAULT_DASHBOARD_COMPAT_PATH",
-    # v1 (kept for compat)
     "DashboardBridgeContract",
-    "DashboardCompatibilityError",
-    "DashboardSliceContract",
-    "normalize_dashboard_launch_mode",
-    "resolve_dashboard_bridge_contract",
-    # v2 (canonical)
     "DashboardBridgeContractV2",
+    "DashboardCompatibilityError",
     "DashboardRouteDescriptor",
+    "DashboardSliceContract",
     "build_dashboard_bridge_contract_v2",
-    # shared helpers
     "build_overview_payload_from_frames",
     "load_overview_payload",
+    "normalize_dashboard_launch_mode",
+    "resolve_dashboard_bridge_contract",
     "resolve_dashboard_postgres_dsn",
 ]
 
@@ -279,12 +299,24 @@ def main(argv: list[str] | None = None) -> int:
         prog="lumina_quant.dashboard.bridge",
         description="Emit dashboard overview payload or print the v2 bridge contract.",
     )
-    parser.add_argument("--json", action="store_true", default=False,
-                        help="Emit overview payload as JSON (module-mode default).")
-    parser.add_argument("--overview-json", action="store_true", dest="overview_json",
-                        help="Alias for --json (legacy compat).")
-    parser.add_argument("--print-contract", action="store_true", dest="print_contract",
-                        help="Print DashboardBridgeContractV2 as JSON and exit.")
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        default=False,
+        help="Emit overview payload as JSON (module-mode default).",
+    )
+    parser.add_argument(
+        "--overview-json",
+        action="store_true",
+        dest="overview_json",
+        help="Alias for --json (legacy compat).",
+    )
+    parser.add_argument(
+        "--print-contract",
+        action="store_true",
+        dest="print_contract",
+        help="Print DashboardBridgeContractV2 as JSON and exit.",
+    )
     args = parser.parse_args(argv)
 
     if args.print_contract:

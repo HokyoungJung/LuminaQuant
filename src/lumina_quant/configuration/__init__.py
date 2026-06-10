@@ -86,9 +86,7 @@ def current_market_data_runtime_settings() -> dict[str, object]:
     trading_raw = raw.get("trading", {}) if isinstance(raw.get("trading"), dict) else {}
     storage_raw = raw.get("storage", {}) if isinstance(raw.get("storage"), dict) else {}
     return {
-        "symbols": list(
-            trading_raw.get("symbols") or runtime.trading.symbols
-        ),
+        "symbols": list(trading_raw.get("symbols") or runtime.trading.symbols),
         "market_data_parquet_path": str(
             storage_raw.get("market_data_parquet_path")
             or runtime.storage.market_data_parquet_path
@@ -114,14 +112,6 @@ except ImportError:
 
 
 __all__ = [
-    # Core loader functions
-    "build_runtime_config",
-    "get_default_runtime_config",
-    "current_market_data_runtime_settings",
-    "load_runtime_config",
-    "load_yaml_config",
-    "validate_runtime_config",
-    # Schema types
     "BacktestExternalConfig",
     "BacktestRuntimeConfig",
     "DataConfig",
@@ -140,4 +130,10 @@ __all__ = [
     "SystemConfig",
     "TradingConfig",
     "ValidationConfig",
+    "build_runtime_config",
+    "current_market_data_runtime_settings",
+    "get_default_runtime_config",
+    "load_runtime_config",
+    "load_yaml_config",
+    "validate_runtime_config",
 ]

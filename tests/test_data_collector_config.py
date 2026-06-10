@@ -121,8 +121,10 @@ def test_config_only_switch_data_kinds():
 
     assert cfg_ohlcv_only.kinds == [DATA_KIND_OHLCV]
     assert set(cfg_all.kinds) == {
-        DATA_KIND_OHLCV, DATA_KIND_FUNDING,
-        DATA_KIND_FEATURE_POINTS, DATA_KIND_AGGTRADES_TICK,
+        DATA_KIND_OHLCV,
+        DATA_KIND_FUNDING,
+        DATA_KIND_FEATURE_POINTS,
+        DATA_KIND_AGGTRADES_TICK,
     }
     assert cfg_tick.kinds == [DATA_KIND_AGGTRADES_TICK]
     assert cfg_tick.tick_path == Path("data/raw_ticks")

@@ -188,7 +188,9 @@ def ma_cross_equity(
     long_ma = np.convolve(close_arr, np.ones(long_w) / long_w, mode="full")[:n]
     signal = np.where(short_ma > long_ma, 1.0, -1.0)
     signal[:long_w] = 0.0
-    daily_ret = np.diff(close_arr, prepend=close_arr[0]) / np.where(close_arr == 0.0, 1.0, close_arr)
+    daily_ret = np.diff(close_arr, prepend=close_arr[0]) / np.where(
+        close_arr == 0.0, 1.0, close_arr
+    )
     equity = 10_000.0 * np.cumprod(1.0 + signal * daily_ret)
     return equity
 

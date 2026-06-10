@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
-from typing import Any, Callable
+from dataclasses import dataclass
+from typing import Any
+from collections.abc import Callable
 
 from lumina_quant.replay import stable_event_sort
 

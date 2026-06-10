@@ -63,7 +63,9 @@ class RiskConfig:
     auto_flatten_on_breach: bool = False
     # Phase 5 kill-switch envelope: non-bypassable risk caps
     max_position_size_pct: float = 1.0  # (0, 1] — per-symbol position size as fraction of capital
-    consecutive_loss_halt_count: int = 5  # > 0 — freeze new entries after N consecutive realized losses
+    consecutive_loss_halt_count: int = (
+        5  # > 0 — freeze new entries after N consecutive realized losses
+    )
 
 
 @dataclass(slots=True)
@@ -326,9 +328,7 @@ class DataConfig:
     ``tick_path`` overrides the parquet root for raw aggTrades archives.
     """
 
-    kinds: list[str] = field(
-        default_factory=lambda: ["ohlcv", "funding", "feature_points"]
-    )
+    kinds: list[str] = field(default_factory=lambda: ["ohlcv", "funding", "feature_points"])
     tick_path: str = ""
 
 

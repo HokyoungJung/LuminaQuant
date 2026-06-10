@@ -424,9 +424,7 @@ def _validate_live_and_optimization_runtime_invariants(runtime: RuntimeConfig) -
     # Phase 5 go-live stage pipeline fields
     go_live_stage = str(getattr(runtime.live, "go_live_stage", "testnet")).strip().lower()
     if go_live_stage not in {"testnet", "shadow", "canary", "full"}:
-        raise ValueError(
-            "live.go_live_stage must be one of: testnet, shadow, canary, full."
-        )
+        raise ValueError("live.go_live_stage must be one of: testnet, shadow, canary, full.")
     canary_frac = float(getattr(runtime.live, "canary_position_fraction", 0.10))
     if canary_frac <= 0 or canary_frac > 1.0:
         raise ValueError("live.canary_position_fraction must be in (0, 1.0].")

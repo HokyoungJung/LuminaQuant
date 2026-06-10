@@ -215,7 +215,7 @@ def _as_float(value: Any, default: float | None = None) -> float | None:
         return default
     try:
         return float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
 
 
@@ -224,7 +224,7 @@ def _as_int(value: Any, default: int | None = None) -> int | None:
         return default
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
 
 

@@ -224,7 +224,7 @@ def _write_csv(path: Path, rows: Sequence[Mapping[str, Any]], fields: Sequence[s
 def _safe_float(value: Any, default: float = 0.0) -> float:
     try:
         parsed = float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
     return parsed if math.isfinite(parsed) else default
 
@@ -232,7 +232,7 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
 def _safe_int(value: Any, default: int = 0) -> int:
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
 
 

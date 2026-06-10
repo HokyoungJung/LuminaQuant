@@ -99,7 +99,9 @@ def test_validator_and_research_runner_metrics_share_sharpe_sortino_semantics() 
         dtype="datetime64[ms]",
     )
 
-    validator_metrics = MODULE._metrics(returns, periods_per_year=365, timestamps=timestamps, metric_config=cfg)
+    validator_metrics = MODULE._metrics(
+        returns, periods_per_year=365, timestamps=timestamps, metric_config=cfg
+    )
     research_metrics = rr._compute_metrics(
         returns,
         turnover=np.zeros_like(returns),

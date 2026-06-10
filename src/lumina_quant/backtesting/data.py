@@ -109,7 +109,8 @@ class HistoricCSVDataHandler(DataHandler):
         resolved_exchange = exchange
         if resolved_db_path is None or resolved_exchange is None:
             try:
-                from lumina_quant.configuration import get_default_runtime_config  # noqa: PLC0415
+                from lumina_quant.configuration import get_default_runtime_config
+
                 _rt = get_default_runtime_config()
                 _rt_storage = _rt.storage
             except Exception:

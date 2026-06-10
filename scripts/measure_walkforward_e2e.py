@@ -74,16 +74,13 @@ def _verify_provenance() -> dict:
         (FIXTURE_ETHUSDT, "ETHUSDT"),
     ]:
         if not path.exists():
-            raise FileNotFoundError(
-                f"Fixture missing: {path}. Run task #2 (worker-2) first."
-            )
+            raise FileNotFoundError(f"Fixture missing: {path}. Run task #2 (worker-2) first.")
         expected = (fixtures.get(symbol) or {}).get("sha256")
         if expected:
             actual = _sha256_file(path)
             if actual != expected:
                 raise ValueError(
-                    f"SHA-256 mismatch for {symbol}: "
-                    f"expected={expected} actual={actual}"
+                    f"SHA-256 mismatch for {symbol}: expected={expected} actual={actual}"
                 )
             print(f"  [OK] SHA-256 verified: {symbol} ({path.name})")
         else:
@@ -111,6 +108,7 @@ def _run_e2e_walkforward() -> float:
 
     # Build walk-forward splits
     from datetime import datetime
+
     base_start = datetime.strptime(START_DATE_STR, "%Y-%m-%d")
     splits = build_walk_forward_splits(
         base_start=base_start,
@@ -131,6 +129,7 @@ def _run_e2e_walkforward() -> float:
 
     # Write fixtures to temp CSV for HistoricCSVDataHandler compatibility
     import tempfile, os
+
     tmp_dir = tempfile.mkdtemp(prefix="lq_wf_bench_")
     try:
         btc_csv = os.path.join(tmp_dir, "BTCUSDT.csv")
@@ -163,6 +162,7 @@ def _run_e2e_walkforward() -> float:
         elapsed = perf_counter() - t0
     finally:
         import shutil
+
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
     return elapsed
@@ -238,8 +238,10 @@ def main() -> None:
     out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     print(json.dumps(payload, indent=2))
     print(f"Saved: {out}")
-    print(f"walk_forward_e2e_elapsed_s = {elapsed:.3f}s  "
-          f"({total_runs} runs, {elapsed/total_runs*1000:.1f}ms/run)")
+    print(
+        f"walk_forward_e2e_elapsed_s = {elapsed:.3f}s  "
+        f"({total_runs} runs, {elapsed / total_runs * 1000:.1f}ms/run)"
+    )
 
 
 if __name__ == "__main__":

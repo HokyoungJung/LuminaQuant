@@ -80,7 +80,7 @@ where = ["src"]
 include = ["lumina_quant*"]
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py314"
 line-length = 100
 src = ["src", "apps", "scripts", "tests"]
 extend-exclude = [

@@ -27,6 +27,7 @@ from lumina_quant.backtesting.data_windowed_parquet import HistoricParquetWindow
 from lumina_quant.backtesting.execution_sim import SimulatedExecutionHandler
 from lumina_quant.backtesting.portfolio_backtest import Portfolio
 from lumina_quant.configuration import BacktestConfigView, get_default_runtime_config
+
 _lq_rt = get_default_runtime_config()
 BacktestConfig = BacktestConfigView(_lq_rt)
 BaseConfig = BacktestConfigView(_lq_rt)

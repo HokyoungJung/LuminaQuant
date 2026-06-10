@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import math
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -39,6 +38,7 @@ from lumina_quant.postgres_state import _connect_postgres
 
 def _dashboard_contract() -> Any:
     from lumina_quant.dashboard.bridge import build_dashboard_bridge_contract_v2
+
     return build_dashboard_bridge_contract_v2()
 
 
@@ -57,7 +57,7 @@ def _parse_json_dict(value: Any) -> dict[str, Any]:
 def _safe_float(value: Any, default: float = 0.0) -> float:
     try:
         parsed = float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return float(default)
     return parsed if pd.notna(parsed) else float(default)
 
@@ -159,7 +159,9 @@ def _resolve_market_context(
     timeframe, clamped = _normalize_market_timeframe(
         metadata.get("timeframe") or get_default_runtime_config().trading.timeframe
     )
-    market_db_path = str(get_default_runtime_config().storage.market_data_parquet_path or "").strip()
+    market_db_path = str(
+        get_default_runtime_config().storage.market_data_parquet_path or ""
+    ).strip()
     return {
         "symbol": symbol or "n/a",
         "timeframe": timeframe,
@@ -1253,7 +1255,7 @@ def _get_fn_map():
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Module-mode entry for all cutover-surface routes.
+    r"""Module-mode entry for all cutover-surface routes.
 
     Each of the 6 routes that share this module passes ``--fn <function_name>``
     so the correct payload builder is invoked.
@@ -1277,21 +1279,42 @@ def main(argv: list[str] | None = None) -> int:
         default="load_performance_price_payload",
         help="Payload builder to invoke (default: load_performance_price_payload).",
     )
-    parser.add_argument("--json", action="store_true", default=True,
-                        help="Output as JSON (default and only output mode).")
-    parser.add_argument("--point-limit", type=int, default=240, dest="point_limit",
-                        help="Max metric/equity points (default: 240).")
-    parser.add_argument("--fill-limit", type=int, default=80, dest="fill_limit",
-                        help="Max fill rows (default: 80).")
-    parser.add_argument("--order-limit", type=int, default=200, dest="order_limit",
-                        help="Max order rows (default: 200).")
-    parser.add_argument("--event-limit", type=int, default=50, dest="event_limit",
-                        help="Max risk/heartbeat event rows (default: 50).")
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        default=True,
+        help="Output as JSON (default and only output mode).",
+    )
+    parser.add_argument(
+        "--point-limit",
+        type=int,
+        default=240,
+        dest="point_limit",
+        help="Max metric/equity points (default: 240).",
+    )
+    parser.add_argument(
+        "--fill-limit", type=int, default=80, dest="fill_limit", help="Max fill rows (default: 80)."
+    )
+    parser.add_argument(
+        "--order-limit",
+        type=int,
+        default=200,
+        dest="order_limit",
+        help="Max order rows (default: 200).",
+    )
+    parser.add_argument(
+        "--event-limit",
+        type=int,
+        default=50,
+        dest="event_limit",
+        help="Max risk/heartbeat event rows (default: 50).",
+    )
     args = parser.parse_args(argv)
 
     fn = fn_map[args.fn]
     # Pass only the kwargs each function accepts; unused kwargs are silently dropped.
     import inspect
+
     sig = inspect.signature(fn)
     kwargs: dict[str, Any] = {}
     if "point_limit" in sig.parameters:

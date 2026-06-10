@@ -101,9 +101,8 @@ class RiskManager:
                 return False, "Trade freeze active: new entries blocked."
 
             # Phase 5 kill-switch: consecutive-loss auto-halt (reduce-only exempt)
-            if (
-                self._consecutive_loss_count >= self.consecutive_loss_halt_count
-                and not bool(getattr(order_event, "reduce_only", False))
+            if self._consecutive_loss_count >= self.consecutive_loss_halt_count and not bool(
+                getattr(order_event, "reduce_only", False)
             ):
                 return (
                     False,

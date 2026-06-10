@@ -12,6 +12,7 @@ from typing import Any
 
 from lumina_quant.configuration import get_default_runtime_config
 from lumina_quant.backtesting._config_view import BacktestConfigView
+
 BaseConfig = BacktestConfigView(get_default_runtime_config())
 from lumina_quant.data.hyperliquid_readonly import (
     DEFAULT_INFO_URL,

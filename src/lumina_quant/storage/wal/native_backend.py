@@ -21,6 +21,7 @@ try:
     from lumina_quant._compute import (  # type: ignore[attr-defined]
         append_ohlcv_1s_wal as _pyo3_append_wal,
     )
+
     _PYO3_WAL_FN = _pyo3_append_wal
 except Exception as _exc:
     _PYO3_LOAD_ERROR = str(_exc)

@@ -13,11 +13,7 @@ from pathlib import Path
 
 
 _EXECUTION_LIVE_PATH = (
-    Path(__file__).resolve().parents[1]
-    / "src"
-    / "lumina_quant"
-    / "live"
-    / "execution_live.py"
+    Path(__file__).resolve().parents[1] / "src" / "lumina_quant" / "live" / "execution_live.py"
 )
 
 

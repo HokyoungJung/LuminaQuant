@@ -43,6 +43,7 @@ _PYO3_LOAD_ERROR: str = ""
 
 try:
     from lumina_quant._compute import evaluate_metrics as _pyo3_evaluate_metrics  # type: ignore[attr-defined]
+
     _PYO3_FN = _pyo3_evaluate_metrics
 except Exception as _exc:
     _PYO3_LOAD_ERROR = str(_exc)

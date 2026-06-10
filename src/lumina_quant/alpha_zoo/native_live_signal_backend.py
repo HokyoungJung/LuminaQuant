@@ -41,6 +41,7 @@ try:
         debounced_state_signal as _pyo3_debounced,
         trailing_state_signal as _pyo3_trailing,
     )
+
     _PYO3_DEBOUNCED_FN = _pyo3_debounced
     _PYO3_TRAILING_FN = _pyo3_trailing
 except Exception as _exc:

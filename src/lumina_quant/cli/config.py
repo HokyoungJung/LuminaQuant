@@ -36,7 +36,7 @@ def _rt_to_dict(rt) -> dict:
             try:
                 json.dumps(value)
                 result[attr] = value
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 result[attr] = str(value)
         return result
 
@@ -50,6 +50,7 @@ def cmd_show(args: argparse.Namespace) -> int:
         rt = load_runtime_config(path)
     except FileNotFoundError:
         from lumina_quant.configuration.schema import RuntimeConfig
+
         rt = RuntimeConfig()
         print(
             f"[warn] config file not found at '{path}'; showing schema defaults",

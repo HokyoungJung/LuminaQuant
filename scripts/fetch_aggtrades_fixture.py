@@ -119,15 +119,20 @@ def main() -> None:
     print(f"T_first: {df['timestamp_ms'][0]}, T_last: {df['timestamp_ms'][-1]}")
     print(f"SHA-256: {sha}")
     print("\nAdd to PROVENANCE.json aggtrades_fixture:")
-    print(json.dumps({
-        "status": "captured",
-        "path": f"tests/fixtures/aggtrades/{FIXTURE_NAME}",
-        "symbol": SYMBOL,
-        "start_ms": START_MS,
-        "end_ms": END_MS,
-        "record_count": len(df),
-        "sha256": sha,
-    }, indent=2))
+    print(
+        json.dumps(
+            {
+                "status": "captured",
+                "path": f"tests/fixtures/aggtrades/{FIXTURE_NAME}",
+                "symbol": SYMBOL,
+                "start_ms": START_MS,
+                "end_ms": END_MS,
+                "record_count": len(df),
+                "sha256": sha,
+            },
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":

@@ -18,6 +18,7 @@ from lumina_quant.live.shadow_live_runner import ShadowLiveResult, ShadowLiveRun
 
 # ── ShadowLiveResult backward compat ────────────────────────────────────────
 
+
 def test_shadow_result_has_parity_ratio_field():
     r = ShadowLiveResult(events_processed=10, divergence_count=0)
     assert hasattr(r, "parity_ratio")
@@ -31,6 +32,7 @@ def test_shadow_result_has_signal_fields():
 
 
 # ── run() backward compat ────────────────────────────────────────────────────
+
 
 def test_run_zero_divergence_identical_events():
     events = [
@@ -72,6 +74,7 @@ def test_run_empty_events_returns_perfect_parity():
 
 
 # ── evaluate_signal_parity ───────────────────────────────────────────────────
+
 
 def test_evaluate_parity_identical_strategy_fns():
     """Identical strategy functions → parity_ratio == 1.0."""
@@ -179,6 +182,7 @@ def test_evaluate_parity_empty_windows_returns_perfect_parity():
 
 
 # ── parity gate threshold check ──────────────────────────────────────────────
+
 
 def test_parity_ratio_meets_threshold():
     """Confirms caller logic: parity_ratio >= threshold → gate passes."""

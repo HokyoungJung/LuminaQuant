@@ -21,6 +21,7 @@ from lumina_quant.risk_manager import RiskManager
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
+
 def _base_raw(*, stage: str = "testnet") -> dict:
     return {
         "trading": {"symbols": ["BTC/USDT"], "timeframe": "1m", "timeframes": ["1s", "1m"]},
@@ -97,6 +98,7 @@ def _risk_cfg(
 
 # ── IS_TESTNET routing ────────────────────────────────────────────────────────
 
+
 def test_testnet_stage_is_testnet_true():
     assert _view(stage="testnet").IS_TESTNET is True
 
@@ -120,6 +122,7 @@ def test_go_live_stage_attribute_exposed():
 
 # ── Spec R7: free composition (no sequential traversal required) ─────────────
 
+
 def test_full_stage_accessible_without_prior_stages():
     """Operator may select 'full' directly — no sequential traversal required."""
     view = _view(stage="full")
@@ -129,6 +132,7 @@ def test_full_stage_accessible_without_prior_stages():
 
 
 # ── Canary sizing ─────────────────────────────────────────────────────────────
+
 
 def test_canary_stage_effective_fraction_uses_canary_value():
     view = _view(stage="canary", canary_fraction=0.10)
@@ -153,6 +157,7 @@ def test_canary_position_fraction_exposed():
 
 
 # ── Consecutive-loss auto-halt ────────────────────────────────────────────────
+
 
 def test_consecutive_loss_halt_blocks_new_entry_after_n_losses():
     """N consecutive losses → new entries blocked."""
@@ -232,6 +237,7 @@ def test_record_profit_resets_to_zero():
 
 # ── Daily-loss / intraday-drawdown auto-halt ──────────────────────────────────
 
+
 def test_daily_loss_breach_triggers_freeze():
     """Simulated intraday drawdown breach → evaluate_portfolio_risk returns FREEZE."""
     manager = RiskManager(_risk_cfg(max_daily_loss=0.05))
@@ -264,6 +270,7 @@ def test_consecutive_loss_halt_without_portfolio_has_no_check():
 
 
 # ── Phase 5 schema field defaults ────────────────────────────────────────────
+
 
 def test_kill_switch_enabled_default_true():
     view = _view(stage="testnet")

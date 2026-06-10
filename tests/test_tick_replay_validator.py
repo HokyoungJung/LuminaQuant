@@ -42,6 +42,7 @@ def btcusdt_aggtrades():
 @pytest.fixture(scope="module")
 def validator(btcusdt_aggtrades):
     from lumina_quant.backtesting.tick_replay_validator import TickReplayValidator
+
     return TickReplayValidator(btcusdt_aggtrades)
 
 
@@ -52,6 +53,7 @@ def verdict(validator):
 
 # ── Smoke tests ───────────────────────────────────────────────────────────────
 
+
 def test_validator_produces_verdict(verdict):
     """validate() returns a TickReplayVerdict with bars from the fixture."""
     assert verdict.bars_count > 0, "Expected at least one 1s bar from fixture"
@@ -61,38 +63,31 @@ def test_validator_produces_verdict(verdict):
 
 def test_bars_count_matches_fixture_duration(verdict):
     """Fixture spans ~1 hour → expect ~3 600 1s bars (±60 for boundary gaps)."""
-    assert 3_400 <= verdict.bars_count <= 3_700, (
-        f"Expected ~3 600 bars, got {verdict.bars_count}"
-    )
+    assert 3_400 <= verdict.bars_count <= 3_700, f"Expected ~3 600 bars, got {verdict.bars_count}"
 
 
 # ── MKT verdict ───────────────────────────────────────────────────────────────
 
+
 def test_mkt_verdict_pass(verdict):
     """MKT orders fill within the bar price range."""
-    assert verdict.mkt_verdict == "PASS", (
-        f"MKT verdict FAIL — details: {verdict.mkt_cases}"
-    )
+    assert verdict.mkt_verdict == "PASS", f"MKT verdict FAIL — details: {verdict.mkt_cases}"
 
 
 def test_mkt_fill_price_in_bar_range(verdict):
     """Every MKT case: fill_price is between bar_open and bar_high/low."""
     for case in verdict.mkt_cases:
-        assert case.get("passed"), (
-            f"MKT case '{case['description']}' failed: {case}"
-        )
-        assert case["executed_qty"] > 0, (
-            f"MKT case '{case['description']}': executed_qty == 0"
-        )
+        assert case.get("passed"), f"MKT case '{case['description']}' failed: {case}"
+        assert case["executed_qty"] > 0, f"MKT case '{case['description']}': executed_qty == 0"
 
 
 # ── LMT verdict ───────────────────────────────────────────────────────────────
 
+
 def test_lmt_verdict_pass(verdict):
     """LMT orders pass all fill-rule assertions."""
-    assert verdict.lmt_verdict == "PASS", (
-        f"LMT verdict FAIL — details:\n" +
-        "\n".join(f"  {c}" for c in verdict.lmt_cases if not c.get("passed"))
+    assert verdict.lmt_verdict == "PASS", f"LMT verdict FAIL — details:\n" + "\n".join(
+        f"  {c}" for c in verdict.lmt_cases if not c.get("passed")
     )
 
 
@@ -171,12 +166,10 @@ def test_lmt_buy_no_fill_below_market(btcusdt_aggtrades):
     assert result.lmt_verdict == "PASS", result.lmt_cases
     case_r = result.lmt_cases[0]
     assert not case_r["filled_any"], (
-        f"BUY LMT at {floor_price:.1f} should not fill; "
-        f"market floor {bars['low'].min():.1f}"
+        f"BUY LMT at {floor_price:.1f} should not fill; market floor {bars['low'].min():.1f}"
     )
     assert case_r["n_bars_should_fill"] == 0, (
-        f"Expected 0 bars with bar_low < {floor_price:.1f}, "
-        f"got {case_r['n_bars_should_fill']}"
+        f"Expected 0 bars with bar_low < {floor_price:.1f}, got {case_r['n_bars_should_fill']}"
     )
 
 
@@ -292,9 +285,11 @@ def test_lmt_sell_no_fill_above_market(btcusdt_aggtrades):
 
 # ── Verdict serialisation ─────────────────────────────────────────────────────
 
+
 def test_verdict_to_dict_is_json_serialisable(verdict):
     """to_dict() produces a JSON-serialisable structure."""
     import json
+
     d = verdict.to_dict()
     json.dumps(d)  # should not raise
     assert "lmt_verdict" in d
@@ -303,6 +298,7 @@ def test_verdict_to_dict_is_json_serialisable(verdict):
 
 
 # ── No-fixture fallback ───────────────────────────────────────────────────────
+
 
 def test_validator_graceful_on_empty_df():
     """Empty aggTrades DataFrame produces SKIP verdict without crashing."""

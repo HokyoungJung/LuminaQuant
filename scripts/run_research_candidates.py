@@ -12,6 +12,7 @@ from typing import Any
 from collections.abc import Mapping
 
 from lumina_quant.configuration import BacktestConfigView, get_default_runtime_config
+
 BaseConfig = BacktestConfigView(get_default_runtime_config())
 from lumina_quant.storage.parquet import load_data_dict_from_parquet
 from lumina_quant.strategy_factory import (

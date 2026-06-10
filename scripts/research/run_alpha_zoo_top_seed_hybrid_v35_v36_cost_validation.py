@@ -66,7 +66,7 @@ def _rss_mib() -> float:
 def _safe_float(value: Any, default: float = 0.0) -> float:
     try:
         parsed = float(value)
-    except (TypeError, ValueError, OverflowError):
+    except TypeError, ValueError, OverflowError:
         return default
     return parsed if math.isfinite(parsed) else default
 
@@ -443,7 +443,7 @@ def _stream_from_trades(
     for trade in trades:
         try:
             exit_ts = _timestamp_seconds(trade.get("exit_time"))
-        except (TypeError, ValueError, OverflowError):
+        except TypeError, ValueError, OverflowError:
             continue
         idx = ts_to_idx.get(exit_ts)
         if idx is None:

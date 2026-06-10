@@ -55,13 +55,10 @@ class SimulatedExecutionHandler(ExecutionHandler):
         # Plain mock configs (unit tests) fall back to _config_from_attrs.
         _rt = getattr(config, "_rt", None)
         self.execution_model = ExecutionModel(
-            ExecutionModelConfig.from_runtime(_rt) if _rt is not None
+            ExecutionModelConfig.from_runtime(_rt)
+            if _rt is not None
             else _config_from_attrs(config)
         )
-        # Keep FillModel and LiquidityModel instances for any external callers that
-        # reference them directly (deprecated — DELETION-GATE: Phase 4).
-        self.fill_model = FillModel(config)
-        self.liquidity_model = LiquidityModel(config)
         self.latency_model = LatencyModel(config)
 
         # Store conditional orders: { order_id: { 'symbol':..., 'type':..., 'trigger_price':..., 'parent_id':...} }
@@ -455,10 +452,9 @@ class SimulatedExecutionHandler(ExecutionHandler):
                 direction = str(order["direction"]).upper()
                 # Strict cross: BUY fills when bar_low < limit (not ≤).
                 #               SELL fills when bar_high > limit (not ≥).
-                if direction == "BUY" and bar_low < limit_price:
-                    exec_price = limit_price
-                    triggered = True
-                elif direction == "SELL" and bar_high > limit_price:
+                if (direction == "BUY" and bar_low < limit_price) or (
+                    direction == "SELL" and bar_high > limit_price
+                ):
                     exec_price = limit_price
                     triggered = True
 
@@ -642,48 +638,6 @@ class SimulatedExecutionHandler(ExecutionHandler):
         self.active_orders = next_active_orders
 
 
-class FillModel:
-    """Encapsulates slippage/spread/fee assumptions for simulated fills.
-
-    Deprecated: SimulatedExecutionHandler now delegates to ExecutionModel.
-    Kept for any external code that instantiates FillModel directly.
-    DELETION-GATE: Phase 4.
-    """
-
-    def __init__(self, config: Any):
-        self.config = config
-
-    def apply(
-        self,
-        *,
-        raw_price: float,
-        quantity: float,
-        direction: str,
-        volatility: float,
-        rng: random.Random,
-    ) -> tuple[float, float]:
-        base_slippage = float(getattr(self.config, "SLIPPAGE_RATE", 0.0005))
-        spread = float(getattr(self.config, "SPREAD_RATE", 0.0002))
-        commission_rate = float(
-            getattr(
-                self.config,
-                "TAKER_FEE_RATE",
-                getattr(self.config, "COMMISSION_RATE", 0.001),
-            )
-        )
-
-        slip = rng.uniform(base_slippage * 0.5, base_slippage * 1.5)
-        if volatility > 0.01:
-            slip *= 2.0
-        penalty = slip + (spread / 2.0)
-        if direction == "BUY":
-            fill_price = raw_price * (1.0 + penalty)
-        else:
-            fill_price = raw_price * (1.0 - penalty)
-        fill_cost = fill_price * quantity
-        return fill_price, fill_cost * commission_rate
-
-
 class LatencyModel:
     """Simple latency model releasing queued orders on next check cycle."""
 
@@ -717,26 +671,8 @@ class LatencyModel:
         return int(waited) >= int(target)
 
 
-class LiquidityModel:
-    """Caps executable size as a function of bar volume.
-
-    Deprecated: SimulatedExecutionHandler now delegates to ExecutionModel.
-    Kept for any external code that instantiates LiquidityModel directly.
-    DELETION-GATE: Phase 4.
-    """
-
-    def __init__(self, config: Any):
-        self.config = config
-
-    def max_fill_quantity(self, bar_volume: float) -> float:
-        max_ratio = float(getattr(self.config, "SIM_MAX_BAR_VOLUME_RATIO", 0.1))
-        return max(0.0, bar_volume * max_ratio)
-
-
 __all__ = [
     "ExecutionHandler",
-    "FillModel",
     "LatencyModel",
-    "LiquidityModel",
     "SimulatedExecutionHandler",
 ]

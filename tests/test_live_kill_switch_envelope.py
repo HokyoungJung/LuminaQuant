@@ -37,6 +37,7 @@ def _base_raw() -> dict:
 
 # ── kill_switch_enabled ─────────────────────────────────────────────────────
 
+
 def test_kill_switch_false_is_rejected():
     raw = _base_raw()
     raw["live"]["kill_switch_enabled"] = False
@@ -60,6 +61,7 @@ def test_kill_switch_default_is_accepted():
 
 
 # ── max_daily_loss_pct ──────────────────────────────────────────────────────
+
 
 def test_daily_loss_zero_is_rejected():
     raw = _base_raw()
@@ -93,6 +95,7 @@ def test_daily_loss_small_positive_is_accepted():
 
 # ── max_position_size_pct ───────────────────────────────────────────────────
 
+
 def test_position_size_zero_is_rejected():
     raw = _base_raw()
     raw["risk"] = {"max_position_size_pct": 0.0}
@@ -118,6 +121,7 @@ def test_position_size_exactly_one_is_accepted():
 
 # ── consecutive_loss_halt_count ─────────────────────────────────────────────
 
+
 def test_consecutive_loss_halt_zero_is_rejected():
     raw = _base_raw()
     raw["risk"] = {"consecutive_loss_halt_count": 0}
@@ -142,6 +146,7 @@ def test_consecutive_loss_halt_positive_is_accepted():
 
 
 # ── freeze_new_entries_on_breach in canary/full ─────────────────────────────
+
 
 def test_freeze_false_in_canary_stage_is_rejected():
     raw = _base_raw()
@@ -180,6 +185,7 @@ def test_freeze_false_in_shadow_stage_is_accepted():
 
 # ── go_live_stage validation ────────────────────────────────────────────────
 
+
 def test_invalid_go_live_stage_is_rejected():
     raw = _base_raw()
     raw["live"]["go_live_stage"] = "staging"
@@ -198,6 +204,7 @@ def test_all_valid_go_live_stages_are_accepted():
 
 # ── canary_position_fraction ────────────────────────────────────────────────
 
+
 def test_canary_position_fraction_zero_is_rejected():
     raw = _base_raw()
     raw["live"]["canary_position_fraction"] = 0.0
@@ -215,6 +222,7 @@ def test_canary_position_fraction_above_one_is_rejected():
 
 
 # ── shadow_parity_min_ratio ─────────────────────────────────────────────────
+
 
 def test_shadow_parity_ratio_zero_is_rejected():
     raw = _base_raw()

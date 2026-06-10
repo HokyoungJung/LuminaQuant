@@ -30,11 +30,13 @@ def _resolve_config_path() -> str:
 
 def _load_rt():
     from lumina_quant.configuration import load_runtime_config
+
     path = _resolve_config_path()
     try:
         return load_runtime_config(path)
     except FileNotFoundError:
         from lumina_quant.configuration.schema import RuntimeConfig
+
         return RuntimeConfig()
 
 
@@ -47,8 +49,10 @@ def cmd_collect(args: argparse.Namespace) -> int:
     from lumina_quant.data.collector import DataCollector
 
     rt = _load_rt()
-    print(f"[lq data collect] exchange={rt.storage.market_data_exchange} "
-          f"symbols={list(rt.trading.symbols)} kinds={list(rt.data.kinds)}")
+    print(
+        f"[lq data collect] exchange={rt.storage.market_data_exchange} "
+        f"symbols={list(rt.trading.symbols)} kinds={list(rt.data.kinds)}"
+    )
 
     with DataCollector.from_runtime_config(rt) as collector:
         results: dict = {}
@@ -84,8 +88,10 @@ def cmd_fast(args: argparse.Namespace) -> int:
     from lumina_quant.data.collector import DataCollector
 
     rt = _load_rt()
-    print(f"[lq data fast] quick refresh: exchange={rt.storage.market_data_exchange} "
-          f"symbols={list(rt.trading.symbols)}")
+    print(
+        f"[lq data fast] quick refresh: exchange={rt.storage.market_data_exchange} "
+        f"symbols={list(rt.trading.symbols)}"
+    )
 
     with DataCollector.from_runtime_config(rt) as collector:
         # Quick OHLCV top-up (last 7 days)
@@ -147,16 +153,33 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="subcommand")
 
     _collect = sub.add_parser("collect", help="Ensure OHLCV + feature-point coverage.")
-    _collect.add_argument("--since-ms", type=int, default=None, dest="since_ms",
-                          help="Start timestamp in milliseconds (UTC).")
-    _collect.add_argument("--until-ms", type=int, default=None, dest="until_ms",
-                          help="End timestamp in milliseconds (UTC).")
-    _collect.add_argument("--force-full", action="store_true", dest="force_full",
-                          help="Force full re-fetch even if data exists.")
-    _collect.add_argument("--feature-profile", default="full", dest="feature_profile",
-                          help="Feature profile name (default: full).")
-    _collect.add_argument("--json", action="store_true",
-                          help="Output stats as JSON.")
+    _collect.add_argument(
+        "--since-ms",
+        type=int,
+        default=None,
+        dest="since_ms",
+        help="Start timestamp in milliseconds (UTC).",
+    )
+    _collect.add_argument(
+        "--until-ms",
+        type=int,
+        default=None,
+        dest="until_ms",
+        help="End timestamp in milliseconds (UTC).",
+    )
+    _collect.add_argument(
+        "--force-full",
+        action="store_true",
+        dest="force_full",
+        help="Force full re-fetch even if data exists.",
+    )
+    _collect.add_argument(
+        "--feature-profile",
+        default="full",
+        dest="feature_profile",
+        help="Feature profile name (default: full).",
+    )
+    _collect.add_argument("--json", action="store_true", help="Output stats as JSON.")
 
     sub.add_parser("fast", help="Fast incremental refresh (replaces lq refresh-data-fast).")
 

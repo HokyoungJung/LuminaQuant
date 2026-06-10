@@ -27,7 +27,6 @@ from lumina_quant.core.plugin_registry import (
 )
 from lumina_quant.configuration import (
     get_default_runtime_config,
-    load_runtime_config,
 )
 from lumina_quant.live_selection import (
     normalize_portfolio_mode_reference,
@@ -670,7 +669,9 @@ def _resolve_execution_profile(
         resolved_persist_output = _env_optional_bool("LQ_BACKTEST_PERSIST_OUTPUT")
     if resolved_persist_output is None:
         resolved_persist_output = (
-            False if resolved_low_memory else bool(get_default_runtime_config().backtest.persist_output)
+            False
+            if resolved_low_memory
+            else bool(get_default_runtime_config().backtest.persist_output)
         )
     return {
         "low_memory": bool(resolved_low_memory),
@@ -838,7 +839,9 @@ def run(
                 market_exchange,
                 base_timeframe=str(timeframe_token),
                 external_data_root=str(external_data_root or ""),
-                external_symbol_map=dict(get_default_runtime_config().backtest.external.symbol_map or {}),
+                external_symbol_map=dict(
+                    get_default_runtime_config().backtest.external.symbol_map or {}
+                ),
                 data_mode=resolved_data_mode,
                 backtest_mode=resolved_backtest_mode,
                 auto_collect_db=bool(auto_collect_db),

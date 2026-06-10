@@ -16,6 +16,7 @@ from lumina_quant.core.plugin_registry import GLOBAL_REGISTRY, register
 # Helpers — isolated registry per test to avoid cross-test pollution
 # ---------------------------------------------------------------------------
 
+
 def _register_and_lookup(kind: str, name: str, interface: str | None = None):
     """Register a fresh class, return (cls, retrieved_cls, interface_tag)."""
 
@@ -31,6 +32,7 @@ def _register_and_lookup(kind: str, name: str, interface: str | None = None):
 # ---------------------------------------------------------------------------
 # 1. Strategy kind
 # ---------------------------------------------------------------------------
+
 
 class TestStrategyRegistration:
     def test_event_driven_strategy_registers_and_retrieves(self):
@@ -64,11 +66,10 @@ class TestStrategyRegistration:
 # 2. Indicator kind
 # ---------------------------------------------------------------------------
 
+
 class TestIndicatorRegistration:
     def test_indicator_registers_and_retrieves(self):
-        cls, retrieved, tag = _register_and_lookup(
-            "indicator", "_IntegTestRSIIndicator"
-        )
+        cls, retrieved, tag = _register_and_lookup("indicator", "_IntegTestRSIIndicator")
         assert retrieved is cls
         assert tag is None
         assert "indicator" in GLOBAL_REGISTRY.list_kinds()
@@ -95,11 +96,10 @@ class TestIndicatorRegistration:
 # 3. Portfolio kind
 # ---------------------------------------------------------------------------
 
+
 class TestPortfolioRegistration:
     def test_portfolio_registers_and_retrieves(self):
-        cls, retrieved, tag = _register_and_lookup(
-            "portfolio", "_IntegTestEqualWeightPortfolio"
-        )
+        cls, retrieved, tag = _register_and_lookup("portfolio", "_IntegTestEqualWeightPortfolio")
         assert retrieved is cls
         assert "portfolio" in GLOBAL_REGISTRY.list_kinds()
         assert "_IntegTestEqualWeightPortfolio" in GLOBAL_REGISTRY.list_names("portfolio")
@@ -114,12 +114,16 @@ class TestPortfolioRegistration:
             pass
 
         assert GLOBAL_REGISTRY.get("portfolio", "_IntegTestMomentumPortfolio") is _MP
-        assert GLOBAL_REGISTRY.get_interface("portfolio", "_IntegTestMomentumPortfolio") == "risk_parity"
+        assert (
+            GLOBAL_REGISTRY.get_interface("portfolio", "_IntegTestMomentumPortfolio")
+            == "risk_parity"
+        )
 
 
 # ---------------------------------------------------------------------------
 # 4. Cross-kind isolation
 # ---------------------------------------------------------------------------
+
 
 class TestCrossKindIsolation:
     def test_same_name_different_kinds_do_not_collide(self):

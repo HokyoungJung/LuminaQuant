@@ -91,7 +91,8 @@ class Portfolio:
         # Plain class configs (unit tests) use _config_from_attrs.
         _rt = getattr(config, "_rt", None)
         self.execution_model = ExecutionModel(
-            ExecutionModelConfig.from_runtime(_rt) if _rt is not None
+            ExecutionModelConfig.from_runtime(_rt)
+            if _rt is not None
             else _config_from_attrs(config)
         )
         self._current_day = None

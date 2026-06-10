@@ -17,6 +17,7 @@ def test_optimize_import_does_not_materialize_runtime_config_snapshots(monkeypat
     original_fn = None
     try:
         import lumina_quant.configuration as _cfg_mod
+
         original_fn = _cfg_mod.get_default_runtime_config
 
         def _spy():
