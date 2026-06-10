@@ -74,5 +74,13 @@ optimization workloads.
 
 ```bash
 uv run python scripts/benchmark_backtest.py --iters 3 --seed 42
-uv run python scripts/measure_walkforward_e2e.py
+uv run python scripts/measure_walkforward_e2e.py --output docs/perf/data/bench_walkforward_e2e.json
 ```
+
+> **Frozen-baseline rule**: `baseline/` is a frozen Phase 0 artifact set — the numbers
+> in `baseline/perf-baseline.json` are the permanent denominators.  Re-measurements
+> MUST write outside `baseline/` (e.g. `docs/perf/data/` or `/tmp/`).  Never pass
+> `--output baseline/...` or allow a script's default to target that directory.
+> `benchmark_backtest.py` already defaults to `reports/benchmarks/`; the
+> `measure_walkforward_e2e.py` default was corrected from `baseline/` to
+> `docs/perf/data/` in the same commit as this doc.

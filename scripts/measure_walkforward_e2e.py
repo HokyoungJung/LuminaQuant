@@ -174,8 +174,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--output",
-        default="baseline/bench_walkforward_e2e.json",
-        help="Output JSON path.",
+        default="docs/perf/data/bench_walkforward_e2e.json",
+        help=(
+            "Output JSON path.  Defaults to docs/perf/data/ — NOT baseline/, which "
+            "is a frozen Phase 0 artifact set.  Pass an explicit path or use "
+            "--output /tmp/... for ad-hoc runs."
+        ),
     )
     parser.add_argument(
         "--skip-sha256",
