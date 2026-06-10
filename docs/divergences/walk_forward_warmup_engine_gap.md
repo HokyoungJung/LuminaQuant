@@ -50,6 +50,10 @@ of the Variant B golden must not assume the live optimizer reproduces it.
 
 ## Remediation (future work — cross-cutting, multiple owners)
 
+> **Tracked:** full implementation plan + acceptance criteria live in
+> [`docs/TODO.md`](../TODO.md) item 1 (priority HIGH before relying on
+> walk-forward parameter selection for real money).
+
 To make warmup context real in the engine (so Variant B becomes an engine
 guarantee), all of the following are required and span files owned by different
 workers:

@@ -563,6 +563,9 @@ editing the file for another reason, and add a unit test for the extracted helpe
 
 ### Guardrails for future agents
 
+0. Check `docs/TODO.md` for tracked follow-ups before starting optimizer/engine
+   work — item 1 (engine warmup context, priority HIGH before live walk-forward
+   parameter selection) has a full implementation plan + acceptance criteria.
 1. Before broad optimizer edits, read `.omx/plans/ralplan-portfolio-optimizer-integration-cleanup-20260507.md` and the latest `docs/session_handoff_*portfolio_optimizer*` file.
 2. Add/extend regression tests before moving optimizer/tuner behavior.
 3. Keep the outer portfolio memory guard in CLI paths and preserve RSS evidence fields.
