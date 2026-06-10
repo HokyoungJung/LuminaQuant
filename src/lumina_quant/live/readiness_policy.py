@@ -238,6 +238,11 @@ def _artifact_real_money_veto_checks(
             and integer.get("real_money_execution") is True
             and selected.get("real_money_execution") is True
         )
+        # Phase 5: canary_execution_allowed — separate artifact flag for canary stage
+        canary_execution_allowed = bool(
+            optuna.get("canary_execution_allowed") is True
+            and integer.get("canary_execution_allowed") is True
+        )
         return {
             "artifact_real_money_veto": bool(
                 paper_only
@@ -249,6 +254,7 @@ def _artifact_real_money_veto_checks(
             "artifact_ready_for_real": ready_for_real,
             "artifact_real_execution_allowed": real_execution_allowed,
             "artifact_real_money_execution": real_money_execution,
+            "artifact_canary_execution_allowed": canary_execution_allowed,
             "artifact_validation_error": "",
             "artifact_optuna_hybrid_path": str(optuna_path),
             "artifact_integer_portfolio_path": str(integer_path),
@@ -279,6 +285,7 @@ def _build_live_readiness_verdict(
     decision: Mapping[str, Any],
     env: Mapping[str, str] | None = None,
     now: datetime | None = None,
+    shadow_parity_ratio: float | None = None,
 ) -> LiveReadinessVerdict:
     current_time = (now or datetime.now(UTC)).astimezone(UTC)
     cutoff = _parse_utc(str(refresh.get("collection_cutoff_utc") or ""))
@@ -353,6 +360,34 @@ def _build_live_readiness_verdict(
         and postgres_dsn_present
     )
 
+    # Phase 5 go-live stage pipeline — per-stage entry checks (spec R7: free composition).
+    # Each stage's checks must pass for that stage; no sequential traversal required.
+    go_live_stage = str(runtime_live.get("go_live_stage", "testnet") or "testnet").strip().lower()
+    shadow_parity_min = float(runtime_live.get("shadow_parity_min_ratio", 0.99) or 0.99)
+    _shadow_parity_ok = (
+        shadow_parity_ratio is not None and float(shadow_parity_ratio) >= shadow_parity_min
+    )
+    artifact_canary_allowed = bool(
+        artifact_veto_checks.get("artifact_canary_execution_allowed", False)
+    )
+    ready_for_shadow = bool(ready_for_paper and _shadow_parity_ok)
+    # canary: prod endpoint (testnet=False), real_enable_env, canary artifact flag,
+    # no real-money veto (artifact must be promoted to allow canary)
+    ready_for_canary = bool(
+        real_mode
+        and not testnet
+        and require_real_flag
+        and real_enable_env
+        and refresh_completed
+        and decision_completed
+        and not refresh_is_stale
+        and decision_allowed
+        and decision_runtime_compatible
+        and artifact_canary_allowed
+        and not artifact_real_money_veto
+        and postgres_dsn_present
+    )
+
     feature_common_tail = min(
         (
             row.get("last_timestamp_utc")
@@ -364,6 +399,10 @@ def _build_live_readiness_verdict(
     recommended_action = (
         "paper_run_allowed"
         if ready_for_paper
+        else "shadow_run_allowed"
+        if ready_for_shadow
+        else "canary_run_allowed"
+        if ready_for_canary
         else "real_run_allowed"
         if ready_for_real
         else "block_until_preflight_gaps_closed"
@@ -396,6 +435,12 @@ def _build_live_readiness_verdict(
                 mode=mode,
                 configured=bool(runtime_live.get("startup_reconciliation_hard_fail", False)),
             ),
+            # Phase 5 stage pipeline checks
+            "go_live_stage": go_live_stage,
+            "shadow_parity_min_ratio": shadow_parity_min,
+            "shadow_parity_ratio": shadow_parity_ratio,
+            "shadow_parity_satisfied": _shadow_parity_ok,
+            "artifact_canary_execution_allowed": artifact_canary_allowed,
         },
         latest={
             "refresh_cutoff_utc": refresh.get("collection_cutoff_utc"),
@@ -405,7 +450,12 @@ def _build_live_readiness_verdict(
         },
         status={
             "ready_for_paper": ready_for_paper,
+            "ready_for_shadow": ready_for_shadow,
+            "ready_for_canary": ready_for_canary,
             "ready_for_real": ready_for_real,
+            # Stage-keyed alias for enforce_live_readiness_from_files stage dispatch
+            "ready_for_testnet": ready_for_paper,
+            "ready_for_full": ready_for_real,
         },
         recommended_action=recommended_action,
     )
@@ -419,6 +469,7 @@ def build_live_readiness_payload(
     stale_minutes: int = DEFAULT_PREFLIGHT_STALE_MINUTES,
     env: Mapping[str, str] | None = None,
     now: datetime | None = None,
+    shadow_parity_ratio: float | None = None,
 ) -> dict[str, Any]:
     effective_env = env or os.environ
     runtime = load_runtime_config(config_path=str(config_path), env=effective_env)
@@ -439,6 +490,7 @@ def build_live_readiness_payload(
         decision=decision,
         env=effective_env,
         now=now,
+        shadow_parity_ratio=shadow_parity_ratio,
     )
     return verdict.as_payload()
 
@@ -452,7 +504,20 @@ def enforce_live_readiness_from_files(
     stale_minutes: int = DEFAULT_PREFLIGHT_STALE_MINUTES,
     env: Mapping[str, str] | None = None,
     now: datetime | None = None,
+    shadow_parity_ratio: float | None = None,
+    go_live_stage: str | None = None,
 ) -> dict[str, Any]:
+    """Enforce live readiness for the given mode and stage.
+
+    ``go_live_stage`` selects which status key to check.  When None, the stage
+    is inferred from ``mode``: "real" → "ready_for_real", else "ready_for_paper".
+    Explicit stage values map directly: "testnet"→paper, "shadow"→shadow,
+    "canary"→canary, "full"→real.
+
+    Per-stage entry checks (spec R7): stage selection is free composition —
+    operators may set any stage directly.  What is mandatory is that the
+    selected stage's entry checks pass at startup.
+    """
     payload = build_live_readiness_payload(
         config_path=config_path,
         refresh_json=refresh_json,
@@ -460,10 +525,23 @@ def enforce_live_readiness_from_files(
         stale_minutes=stale_minutes,
         env=env,
         now=now,
+        shadow_parity_ratio=shadow_parity_ratio,
     )
     status = dict(payload.get("status") or {})
     resolved_mode = str(mode or "").strip().lower() or "paper"
-    allowed = bool(status.get("ready_for_real" if resolved_mode == "real" else "ready_for_paper"))
+    # Stage-aware status key dispatch
+    _stage_key_map = {
+        "testnet": "ready_for_paper",
+        "shadow": "ready_for_shadow",
+        "canary": "ready_for_canary",
+        "full": "ready_for_real",
+    }
+    if go_live_stage is not None:
+        resolved_stage = str(go_live_stage or "testnet").strip().lower()
+        status_key = _stage_key_map.get(resolved_stage, "ready_for_paper")
+    else:
+        status_key = "ready_for_real" if resolved_mode == "real" else "ready_for_paper"
+    allowed = bool(status.get(status_key, False))
     if not allowed:
         raise LiveReadinessBlockedError(
             mode=resolved_mode,
