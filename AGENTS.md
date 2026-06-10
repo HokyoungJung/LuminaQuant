@@ -490,11 +490,23 @@ Profile YAML (configs/profiles/<name>.yaml)
 
 ### How to add a strategy (Phase 1+)
 
+> **One template file + a config name — no framework edits.** Dropping a
+> conforming module into `src/lumina_quant/strategies/` is sufficient:
+> `strategies/registry._discover_plugin_strategies()` auto-imports sibling
+> modules so the `@register` decorator fires, and `get_strategy_map()` /
+> `resolve_strategy_class()` consult `GLOBAL_REGISTRY`. Select it by setting
+> `optimization.strategy: ClassName` in config — `cli/backtest`, `cli/live`,
+> and `cli/optimize` all resolve through the registry. The drop-in flow is
+> gated by `tests/integration/test_registry_dropfile_e2e.py`.
+
 1. Create `src/lumina_quant/strategies/<name>.py` with a class that subclasses `Strategy` (event-driven) or `StrategyPlugin` (polars-batch).
-2. Decorate with `@register("strategy", "ClassName", interface="event_driven"|"polars_batch")` from `lumina_quant.core.plugin_registry`.
-3. Import the module in `src/lumina_quant/strategies/registry.py` (add to the explicit import block and `_STRATEGY_MAP`).
-4. Add param schema entry in `src/lumina_quant/tuning/param_registry.py`.
+2. Decorate with `@register("strategy", "ClassName", interface="event_driven"|"polars_batch")` from `lumina_quant.core.plugin_registry`. This is the ONLY registration step — do **not** edit `registry.py` / `_STRATEGY_MAP` (the curated map remains for the shipped strategies but is no longer required for new ones).
+3. Reference it by name in config: `optimization.strategy: ClassName`.
+4. (Optional) Add a param schema entry in `src/lumina_quant/tuning/param_registry.py` if the strategy exposes tunable hyperparameters (otherwise it runs with `get_param_schema()` defaults).
 5. Write at least one unit test under `tests/` verifying signals output shape and `GLOBAL_REGISTRY.get("strategy", "ClassName")` returns the class.
+
+`MovingAverageCrossStrategy` (`strategies/moving_average.py`) is the canonical
+decorator-registered example.
 
 ### How to add an indicator (Phase 1+)
 
