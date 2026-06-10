@@ -536,6 +536,31 @@ The single native extension is `native/lumina_compute/` (Rust via pyo3, built wi
 - **Do NOT** call `ctypes.CDLL` or `cffi` directly from strategy code; go through `lumina_quant.compute` only.
 - **Do NOT** add new native crates outside `native/lumina_compute/`; extend the existing pyo3 module.
 
+### Monolithic module disposition (honest scope statement)
+
+The Phase 1–7 refactor reshaped the engine seams (configuration, execution model,
+plugin registry, compute kernels) but **deliberately left several large modules
+monolithic**. This is an explicit, documented decision — not an oversight — so the
+docs do not imply a completed full-scale decomposition. These modules carry heavy
+behaviour with broad import fan-out; splitting them now would be churn with real
+regression risk and little correctness benefit. They stay as-is until a dedicated,
+test-backed decomposition pass.
+
+| Module | Lines | Why it stays monolithic | Future decomposition seam |
+|--------|-------|-------------------------|---------------------------|
+| `strategy_factory/research_runner.py` | ~7,750 | Single research orchestration flow; ~8% of the package, 2 re-wiring commits only | Split per stage: candidate-gen / eval / reporting behind a `ResearchStage` protocol |
+| `strategy_factory/candidate_library.py` | ~4,490 | Large static candidate catalog + builders; no new seams introduced | Separate the static catalog data from the builder logic |
+| `live/trader.py` | ~1,770 | Live event loop + reconciliation + state; live-safety critical, owned by the live lane | Extract `_build_live_config_namespace()` + reconciliation into `live/reconciliation.py` (keep the loop) |
+| `data_sync.py` (package root) | ~1,574 | Collector/materializer glue with ~root-level importers; Phase 3.1 consolidation did not land | Move under `data/`/`storage/` behind `DataCollector` (already the single factory) |
+| `market_data.py` (package root) | ~1,390 | 20 importers; loaders + timeframe parsing + CSV resolution intermixed | Extract timeframe parsing into one shared util (also duplicated in `storage/parquet/ohlcv_repo.py`, `data/raw_first_lineage.py`) |
+| `dashboard/cutover_surfaces_service.py` | ~1,335 | 6 routes share one `--fn` dispatch module by design (see route note above) | Per-surface modules only if routes diverge; otherwise keep the single dispatch |
+| `postgres_state.py` (package root) | ~1,000 | State persistence with 7 importers | Split read vs write paths once a state-store interface is introduced |
+
+**Rule for future agents:** do NOT opportunistically decompose these mid-task.
+Decomposition is its own change with its own regression-test gate. Extract only
+trivially-safe *pure* helpers (no I/O, no shared state) when you are already
+editing the file for another reason, and add a unit test for the extracted helper.
+
 ### Guardrails for future agents
 
 1. Before broad optimizer edits, read `.omx/plans/ralplan-portfolio-optimizer-integration-cleanup-20260507.md` and the latest `docs/session_handoff_*portfolio_optimizer*` file.
