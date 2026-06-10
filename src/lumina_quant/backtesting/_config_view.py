@@ -17,7 +17,10 @@ configuration/__init__.py re-exports this class so research scripts can continue
 
 from __future__ import annotations
 
-from lumina_quant.configuration.schema import RuntimeConfig
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lumina_quant.configuration.schema import RuntimeConfig
 
 
 class BacktestConfigView:

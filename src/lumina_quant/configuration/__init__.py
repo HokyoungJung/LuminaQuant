@@ -20,9 +20,6 @@ from __future__ import annotations
 
 import os
 
-# BacktestConfigView moved to backtesting._config_view in Phase 6 (views.py deleted).
-# Re-exported here so existing scripts continue to import from this module.
-from lumina_quant.backtesting._config_view import BacktestConfigView  # noqa: F401
 from lumina_quant.configuration.loader import (
     build_runtime_config,
     load_runtime_config,
@@ -51,6 +48,17 @@ from lumina_quant.configuration.schema import (
 from lumina_quant.configuration.validate import validate_runtime_config
 
 _DEFAULT_CONFIG_PATH = "config.yaml"
+
+
+def __getattr__(name: str):
+    # BacktestConfigView lives in backtesting._config_view (moved in Phase 6).
+    # Lazy re-export: an eager import here creates a circular import for entry
+    # points that import lumina_quant.backtesting before this package.
+    if name == "BacktestConfigView":
+        from lumina_quant.backtesting._config_view import BacktestConfigView
+
+        return BacktestConfigView
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def get_default_runtime_config() -> RuntimeConfig:

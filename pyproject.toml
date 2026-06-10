@@ -155,4 +155,8 @@ indent-style = "space"
 [dependency-groups]
 dev = [
     "maturin>=1.13.3",
+    # Optimizer deps in the default dev sync so optuna/numba test paths never
+    # skip in local runs (also published to users via the "optimize" extra).
+    "optuna>=4.0",
+    "numba>=0.62",
 ]
