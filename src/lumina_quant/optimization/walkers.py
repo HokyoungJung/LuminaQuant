@@ -132,6 +132,31 @@ def check_warmup_sufficient(
         )
 
 
+def _lagged_strategy_returns(prices: np.ndarray, signal: np.ndarray) -> np.ndarray:
+    """Strategy returns with a one-bar signal lag and a causal return denominator.
+
+    Two correctness requirements (no lookahead):
+
+    * Simple return ``ret[i] = (price[i] - price[i-1]) / price[i-1]`` — the
+      denominator is the *prior* close, not ``price[i]``.
+    * The position earning ``ret[i]`` is the signal decided at the *prior* bar's
+      close (``signal[i-1]``).  The signal at bar ``i`` includes ``price[i]`` in
+      its moving averages, so applying it to ``ret[i]`` (which ends at
+      ``price[i]``) would let the position be chosen using the very close that
+      defines the return it earns — a classic 1-bar lookahead.
+
+    ``ret[0]`` and the lagged position at index 0 are both 0.0 (no prior bar).
+    """
+    n = len(prices)
+    out = np.zeros(n, dtype=np.float64)
+    if n < 2:
+        return out
+    prev = prices[:-1]
+    ret = (prices[1:] - prev) / np.where(prev == 0.0, 1.0, prev)
+    out[1:] = signal[:-1] * ret
+    return out
+
+
 def ma_cross_equity(
     close: Any,
     short_w: int,
@@ -140,6 +165,11 @@ def ma_cross_equity(
     context: Any = None,
 ) -> np.ndarray:
     """Vectorised MA-cross equity curve — shared reference implementation.
+
+    The signal is lagged one bar and returns use a causal denominator
+    (``close[i-1]``) so the oracle is free of the 1-bar lookahead the
+    pre-correction implementation carried — see
+    ``docs/divergences/walk_forward_oracle_lookahead.md``.
 
     Used by ``scripts/capture_golden_baseline.py`` *and* the Phase 4.3
     walk-forward golden integration test to guarantee identical computation.
@@ -171,8 +201,7 @@ def ma_cross_equity(
         long_ma = np.convolve(full, np.ones(long_w) / long_w, mode="full")[:n_full]
         signal_full = np.where(short_ma > long_ma, 1.0, -1.0)
         signal_full[:long_w] = 0.0
-        daily_ret_full = np.diff(full, prepend=full[0]) / np.where(full == 0.0, 1.0, full)
-        equity_full = 10_000.0 * np.cumprod(1.0 + signal_full * daily_ret_full)
+        equity_full = 10_000.0 * np.cumprod(1.0 + _lagged_strategy_returns(full, signal_full))
         window_eq = equity_full[n_ctx:]
         if len(window_eq) == 0:
             return np.full(len(close_arr), 10_000.0)
@@ -188,10 +217,7 @@ def ma_cross_equity(
     long_ma = np.convolve(close_arr, np.ones(long_w) / long_w, mode="full")[:n]
     signal = np.where(short_ma > long_ma, 1.0, -1.0)
     signal[:long_w] = 0.0
-    daily_ret = np.diff(close_arr, prepend=close_arr[0]) / np.where(
-        close_arr == 0.0, 1.0, close_arr
-    )
-    equity = 10_000.0 * np.cumprod(1.0 + signal * daily_ret)
+    equity = 10_000.0 * np.cumprod(1.0 + _lagged_strategy_returns(close_arr, signal))
     return equity
 
 
