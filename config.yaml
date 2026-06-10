@@ -151,6 +151,18 @@ live:
   market_data_source: "committed" # committed|binance_futures|external|polymarket_live
   order_state_source: "polling" # polling|user_stream
   shadow_live_enabled: false
+  # --- Go-live stage pipeline (R7) --------------------------------------------
+  # Free stage composition with per-stage entry checks. Promotion is gated; you
+  # cannot skip ahead. testnet -> shadow -> canary -> full.
+  go_live_stage: "testnet" # testnet|shadow|canary|full
+  # Kill switch is always-on by contract; validate.py REJECTS kill_switch_enabled: false.
+  kill_switch_enabled: true
+  # Position sizing fraction applied during the canary stage. Range (0, 1].
+  canary_position_fraction: 0.10
+  # Shadow-stage entry check: minimum measured signal-agreement ratio between the
+  # shadow (testnet-routed) run and the reference over shadow_parity_window_bars.
+  shadow_parity_min_ratio: 0.99
+  shadow_parity_window_bars: 1000
   reconciliation_poll_fallback_enabled: true
   book_ticker_enabled: false
   # Limit-first live execution. Market orders are disabled unless both
@@ -269,3 +281,32 @@ promotion_gate:
       max_critical_errors: 0
       require_alpha_card: true
       alpha_card_path: "reports/alpha_card_rsi_strategy.md"
+
+# ------------------------------------------
+# Memory Budget (8GB-baseline enforcement)
+# ------------------------------------------
+memory:
+  # Hard RSS cap (GiB) for execution paths. Enforced at engine start:
+  # if the process RSS already exceeds this cap the run errors clearly
+  # (MemoryCapExceededError) instead of risking an OOM kill. Lower this on
+  # constrained hosts; raise it on big-memory boxes.
+  cap_gb: 8.0
+
+# ------------------------------------------
+# Validation / Golden Contracts
+# ------------------------------------------
+validation:
+  # Relative tolerance for golden-record comparisons (np.testing.assert_allclose
+  # rtol=). Tightening this makes regression gates stricter.
+  golden_rtol: 1.0e-8
+
+# ------------------------------------------
+# Data Collection
+# ------------------------------------------
+data:
+  # Explicit list of data kinds the collector fetches.
+  # Valid: ohlcv | funding | feature_points | aggtrades_tick
+  # aggtrades_tick is validation-only (testnet/paper/replay; never live orders).
+  kinds: [ohlcv, funding, feature_points]
+  # Optional override for the raw aggTrades parquet root ("" = storage default).
+  tick_path: ""
