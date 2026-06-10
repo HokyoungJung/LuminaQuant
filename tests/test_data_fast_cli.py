@@ -8,15 +8,13 @@ suite denominator is preserved without coupling to DataCollector I/O.
 from __future__ import annotations
 
 import argparse
+import importlib
 
 import pytest
 
 
 def _parse(argv: list[str]) -> argparse.Namespace:
-    from lumina_quant.cli.data import main as data_main  # noqa: F401 — verify import
-    import importlib, sys
-
-    mod = importlib.import_module("lumina_quant.cli.data")
+    importlib.import_module("lumina_quant.cli.data")
     parser = argparse.ArgumentParser(prog="lq data")
     sub = parser.add_subparsers(dest="subcommand")
     collect = sub.add_parser("collect")
@@ -66,4 +64,4 @@ def test_data_main_no_subcommand_returns_zero() -> None:
 
 def test_data_module_importable() -> None:
     """Regression guard: module must import without side effects."""
-    from lumina_quant.cli.data import cmd_collect, cmd_fast, cmd_tick, main  # noqa: F401
+    from lumina_quant.cli.data import cmd_collect, cmd_fast, cmd_tick, main

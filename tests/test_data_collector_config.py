@@ -140,7 +140,7 @@ def test_invalid_data_kinds_raises_value_error():
     from lumina_quant.configuration import build_runtime_config
 
     raw = yaml.safe_load("data:\n  kinds: [ohlcv, fundig, funding]") or {}
-    with pytest.raises(ValueError, match="Invalid data.kinds token.*fundig"):
+    with pytest.raises(ValueError, match=r"Invalid data\.kinds token.*fundig"):
         build_runtime_config(raw, {})
 
 
@@ -325,10 +325,12 @@ def test_collector_context_manager():
     """DataCollector works as a context manager; close() is called on exit."""
     rt = _rt_from_yaml("")
     mock_client = MagicMock()
-    with patch(
-        "lumina_quant.data.collector._build_exchange_client",
-        return_value=mock_client,
+    with (
+        patch(
+            "lumina_quant.data.collector._build_exchange_client",
+            return_value=mock_client,
+        ),
+        DataCollector.from_runtime_config(rt) as collector,
     ):
-        with DataCollector.from_runtime_config(rt) as collector:
-            assert collector.config.driver == "binance_futures"
+        assert collector.config.driver == "binance_futures"
     mock_client.close.assert_called_once()

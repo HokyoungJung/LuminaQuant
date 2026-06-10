@@ -42,7 +42,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 
 def _percentile(samples: list[float], pct: float) -> float:
-    """Return the p-th percentile (0–100) of sorted samples."""
+    """Return the p-th percentile (0-100) of sorted samples."""
     if not samples:
         return float("nan")
     sorted_s = sorted(samples)

@@ -86,7 +86,7 @@ def test_mkt_fill_price_in_bar_range(verdict):
 
 def test_lmt_verdict_pass(verdict):
     """LMT orders pass all fill-rule assertions."""
-    assert verdict.lmt_verdict == "PASS", f"LMT verdict FAIL — details:\n" + "\n".join(
+    assert verdict.lmt_verdict == "PASS", "LMT verdict FAIL — details:\n" + "\n".join(
         f"  {c}" for c in verdict.lmt_cases if not c.get("passed")
     )
 
@@ -131,7 +131,7 @@ def test_lmt_buy_fills_when_bar_low_below_limit(btcusdt_aggtrades):
     case_r = result.lmt_cases[0]
     assert case_r["filled_any"], (
         f"Expected at least one fill for BUY LMT at {limit}; "
-        f"price range {lows.min():.1f}–{highs.max():.1f}"
+        f"price range {lows.min():.1f}-{highs.max():.1f}"
     )
 
 

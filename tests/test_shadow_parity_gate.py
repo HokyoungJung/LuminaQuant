@@ -170,8 +170,6 @@ def test_live_paper_lmt_fill_commission_matches_execution_model():
     """
     import queue
 
-    import pytest
-
     from lumina_quant.backtesting.execution_model import ExecutionModel, ExecutionModelConfig
     from lumina_quant.live.execution_live import LiveExecutionHandler
 
@@ -269,8 +267,6 @@ def test_live_paper_lmt_fill_commission_matches_execution_model():
 def test_live_paper_mkt_fill_commission_uses_taker_fee():
     """MKT fill in paper mode must apply taker fee (not maker fee)."""
     import queue
-
-    import pytest
 
     from lumina_quant.live.execution_live import LiveExecutionHandler
 

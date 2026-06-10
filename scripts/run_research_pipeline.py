@@ -8,8 +8,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from lumina_quant.configuration import BacktestConfigView, get_default_runtime_config
-
-BaseConfig = BacktestConfigView(get_default_runtime_config())
 from lumina_quant.strategy_factory import run_candidate_research
 from lumina_quant.strategy_factory.candidate_library import build_candidate_manifest
 from lumina_quant.strategy_factory.pipeline import (
@@ -17,6 +15,8 @@ from lumina_quant.strategy_factory.pipeline import (
     render_shortlist_markdown,
     write_candidate_manifest,
 )
+
+BaseConfig = BacktestConfigView(get_default_runtime_config())
 
 
 def _build_parser() -> argparse.ArgumentParser:

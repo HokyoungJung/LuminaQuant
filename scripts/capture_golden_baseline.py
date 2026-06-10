@@ -354,7 +354,7 @@ def _call_hybrid_optuna(close: np.ndarray) -> dict:
             "backend": "unavailable",
             "note": "hybrid_optuna returned None (fallback to Python)",
         }
-    portfolio, weights_exp, weights_raw, d0, d1, d2 = result
+    portfolio, weights_exp, _weights_raw, _d0, _d1, _d2 = result
     return {
         "backend": "rust",
         "n": len(portfolio),
@@ -371,7 +371,6 @@ def _call_live_signals(close: np.ndarray) -> dict:
         evaluate_trailing_state_native,
     )
 
-    n = len(close)
     sma5 = np.convolve(close, np.ones(5) / 5, mode="same")
     long_entry = (close > sma5).astype(np.uint8)
     long_exit = (close < sma5).astype(np.uint8)
@@ -557,7 +556,7 @@ def step_walk_forward(fixtures: dict[str, dict], dry_run: bool) -> dict:
     warmup_bars = max(WF_LONG_WINDOWS)  # = 120
     print(
         f"\n[5/7] Running walk-forward grid "
-        f"({WF_FOLDS} folds × {n_combos} combos) — variants A (no-ctx) + B ({warmup_bars}-bar ctx)..."
+        f"({WF_FOLDS} folds x {n_combos} combos) — variants A (no-ctx) + B ({warmup_bars}-bar ctx)..."
     )
     from lumina_quant.optimization.walkers import build_walk_forward_splits
     from lumina_quant.optimization.native_backend import evaluate_metrics_backend
@@ -726,7 +725,7 @@ def step_verify_aggtrades(dry_run: bool) -> tuple[pl.DataFrame, dict]:
             prov = json.loads(prov_path.read_text())
             expected = prov.get("aggtrades_fixture", {}).get("sha256", "")
             if expected and expected != actual_sha:
-                print(f"  FATAL: aggTrades fixture SHA-256 mismatch!")
+                print("  FATAL: aggTrades fixture SHA-256 mismatch!")
                 print(f"    expected: {expected}")
                 print(f"    actual  : {actual_sha}")
                 print("  Fixture has changed. Re-fetch and get new baseline approval.")
@@ -762,7 +761,8 @@ def step_write_provenance(
     dry_run: bool,
 ) -> None:
     print("\n[7/7] Writing PROVENANCE.json...")
-    import platform, subprocess
+    import platform
+    import subprocess
 
     env_lock_path = REPO_ROOT / "baseline" / "env.lock"
     env_lock_sha = sha256_file(env_lock_path) if env_lock_path.exists() else "MISSING"

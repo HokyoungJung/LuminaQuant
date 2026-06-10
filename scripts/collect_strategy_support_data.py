@@ -9,9 +9,9 @@ import argparse
 import json
 
 from lumina_quant.configuration import BacktestConfigView, get_default_runtime_config
+from lumina_quant.data_collector import collect_strategy_support_data
 
 BaseConfig = BacktestConfigView(get_default_runtime_config())
-from lumina_quant.data_collector import collect_strategy_support_data
 
 
 def _build_parser() -> argparse.ArgumentParser:

@@ -14,8 +14,6 @@ import numpy as np
 
 from lumina_quant.backtesting.cli_contract import RawFirstDataMissingError
 from lumina_quant.configuration import BacktestConfigView, get_default_runtime_config
-
-BacktestConfig = BacktestConfigView(get_default_runtime_config())
 from lumina_quant.eval.final_validation import (
     build_latest_anchored_split,
     discover_latest_common_complete_timestamp,
@@ -38,6 +36,8 @@ from lumina_quant.storage.parquet import normalize_symbol, timeframe_to_millisec
 from lumina_quant.symbol_universe import canonicalize_research_symbol
 from lumina_quant.strategy_factory import run_candidate_research
 from lumina_quant.utils.risk_free import resolve_risk_free_config, sharpe_ratio, sortino_ratio
+
+BacktestConfig = BacktestConfigView(get_default_runtime_config())
 
 FEATURE_REQUIRED_STRATEGIES = {"CompositeTrendStrategy", "PerpCrowdingCarryStrategy"}
 DEFAULT_REFRESH_REPORT = FOLLOWUP_ROOT / "final_portfolio_validation_data_refresh_latest.json"

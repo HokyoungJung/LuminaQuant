@@ -99,7 +99,7 @@ class TestIndicatorRegistration:
 
 class TestPortfolioRegistration:
     def test_portfolio_registers_and_retrieves(self):
-        cls, retrieved, tag = _register_and_lookup("portfolio", "_IntegTestEqualWeightPortfolio")
+        cls, retrieved, _tag = _register_and_lookup("portfolio", "_IntegTestEqualWeightPortfolio")
         assert retrieved is cls
         assert "portfolio" in GLOBAL_REGISTRY.list_kinds()
         assert "_IntegTestEqualWeightPortfolio" in GLOBAL_REGISTRY.list_names("portfolio")

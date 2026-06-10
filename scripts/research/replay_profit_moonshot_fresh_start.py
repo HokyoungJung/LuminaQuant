@@ -27,14 +27,14 @@ import numpy as np
 import polars as pl
 
 from lumina_quant.configuration import BacktestConfigView, get_default_runtime_config
-
-BaseConfig = BacktestConfigView(get_default_runtime_config())
 from lumina_quant.market_data import load_futures_feature_points_from_db
 from lumina_quant.portfolio_split_contract import (
     PORTFOLIO_FOLLOWUP_EXPLICIT_BUDGET_BYTES,
     acquire_portfolio_memory_guard,
     memory_policy_payload,
 )
+
+BaseConfig = BacktestConfigView(get_default_runtime_config())
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:

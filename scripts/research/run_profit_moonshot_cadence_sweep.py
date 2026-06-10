@@ -40,10 +40,6 @@ from lumina_quant.backtesting.execution_sim import SimulatedExecutionHandler
 from lumina_quant.backtesting.portfolio_backtest import Portfolio
 from lumina_quant.compute.ohlcv_loader import normalize_ohlcv_frame
 from lumina_quant.configuration import BacktestConfigView, get_default_runtime_config
-
-_lq_rt = get_default_runtime_config()
-BacktestConfig = BacktestConfigView(_lq_rt)
-BaseConfig = BacktestConfigView(_lq_rt)
 from lumina_quant.data.native_raw_first_backend import raw_first_backend_diagnostics
 from lumina_quant.market_data import load_data_dict_from_parquet
 from lumina_quant.strategies.artifact_portfolio_mode import (
@@ -52,6 +48,10 @@ from lumina_quant.strategies.artifact_portfolio_mode import (
     resolve_portfolio_mode_definition,
     supported_portfolio_modes,
 )
+
+_lq_rt = get_default_runtime_config()
+BacktestConfig = BacktestConfigView(_lq_rt)
+BaseConfig = BacktestConfigView(_lq_rt)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT_DIR = (

@@ -1,4 +1,4 @@
-"""End-to-end walk-forward timing on the canonical 9-combo × 3-fold spec.
+"""End-to-end walk-forward timing on the canonical 9-combo x 3-fold spec.
 
 Canonical spec (shared with task #2 golden run):
   Strategy : MovingAverageCrossStrategy, allow_short=True
@@ -6,12 +6,12 @@ Canonical spec (shared with task #2 golden run):
   Fixtures : baseline/golden/BTCUSDT_1000d_seed42.parquet
              baseline/golden/ETHUSDT_1000d_seed42.parquet
              (SHA-256 verified against baseline/golden/PROVENANCE.json)
-  Grid     : short_window=[10,20,30] × long_window=[40,80,120] → 9 combos
+  Grid     : short_window=[10,20,30] x long_window=[40,80,120] -> 9 combos
              allow_short=True fixed
   Folds    : 3; train=6mo, val=3mo, test=3mo, step=3mo, start=2022-01-01
   Seed     : 42
 
-Output key: walk_forward_e2e_elapsed_s (wall-clock for full 9-combo × 3-fold run)
+Output key: walk_forward_e2e_elapsed_s (wall-clock for full 9-combo x 3-fold run)
 """
 
 from __future__ import annotations
@@ -90,7 +90,7 @@ def _verify_provenance() -> dict:
 
 
 def _run_e2e_walkforward() -> float:
-    """Run canonical 9-combo × 3-fold walk-forward; return wall-clock seconds."""
+    """Run canonical 9-combo x 3-fold walk-forward; return wall-clock seconds."""
     import numpy as np
     import polars as pl
 
@@ -98,7 +98,6 @@ def _run_e2e_walkforward() -> float:
     from lumina_quant.backtesting.data import HistoricCSVDataHandler
     from lumina_quant.backtesting.execution_sim import SimulatedExecutionHandler
     from lumina_quant.backtesting.portfolio_backtest import Portfolio
-    from lumina_quant.optimization.fast_eval import evaluate_metrics_numba
     from lumina_quant.optimization.walkers import build_walk_forward_splits
     from lumina_quant.strategies.moving_average import MovingAverageCrossStrategy
 
@@ -128,7 +127,8 @@ def _run_e2e_walkforward() -> float:
     np.random.seed(SEED)
 
     # Write fixtures to temp CSV for HistoricCSVDataHandler compatibility
-    import tempfile, os
+    import tempfile
+    import os
 
     tmp_dir = tempfile.mkdtemp(prefix="lq_wf_bench_")
     try:
@@ -141,7 +141,7 @@ def _run_e2e_walkforward() -> float:
 
         for fold in splits:
             train_start = fold["train_start"]
-            test_end = fold["test_end"]
+            _test_end = fold["test_end"]
 
             for params in param_grid:
                 backtest = Backtest(
@@ -170,7 +170,7 @@ def _run_e2e_walkforward() -> float:
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Time canonical 9-combo × 3-fold walk-forward run (Axis 1 E2E)."
+        description="Time canonical 9-combo x 3-fold walk-forward run (Axis 1 E2E)."
     )
     parser.add_argument(
         "--output",
@@ -195,14 +195,13 @@ def main() -> None:
     print("Verifying fixtures against PROVENANCE.json...")
     if args.skip_sha256:
         print("  [SKIP] SHA-256 verification skipped (--skip-sha256).")
-        provenance: dict = {}
     else:
-        provenance = _verify_provenance()
+        _verify_provenance()
 
     n_combos = len(SHORT_WINDOWS) * len(LONG_WINDOWS)
     total_runs = N_FOLDS * n_combos
     print(
-        f"Running canonical walk-forward: {N_FOLDS} folds × {n_combos} combos "
+        f"Running canonical walk-forward: {N_FOLDS} folds x {n_combos} combos "
         f"= {total_runs} backtests..."
     )
 

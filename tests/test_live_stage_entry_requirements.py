@@ -117,7 +117,7 @@ def test_full_stage_is_testnet_false():
 
 def test_go_live_stage_attribute_exposed():
     for stage in ("testnet", "shadow", "canary", "full"):
-        assert _view(stage=stage).GO_LIVE_STAGE == stage
+        assert stage == _view(stage=stage).GO_LIVE_STAGE
 
 
 # ── Spec R7: free composition (no sequential traversal required) ─────────────
@@ -136,24 +136,24 @@ def test_full_stage_accessible_without_prior_stages():
 
 def test_canary_stage_effective_fraction_uses_canary_value():
     view = _view(stage="canary", canary_fraction=0.10)
-    assert view.EFFECTIVE_POSITION_FRACTION == pytest.approx(0.10)
+    assert pytest.approx(0.10) == view.EFFECTIVE_POSITION_FRACTION
 
 
 def test_testnet_stage_effective_fraction_is_one():
-    assert _view(stage="testnet").EFFECTIVE_POSITION_FRACTION == pytest.approx(1.0)
+    assert pytest.approx(1.0) == _view(stage="testnet").EFFECTIVE_POSITION_FRACTION
 
 
 def test_shadow_stage_effective_fraction_is_one():
-    assert _view(stage="shadow").EFFECTIVE_POSITION_FRACTION == pytest.approx(1.0)
+    assert pytest.approx(1.0) == _view(stage="shadow").EFFECTIVE_POSITION_FRACTION
 
 
 def test_full_stage_effective_fraction_is_one():
-    assert _view(stage="full").EFFECTIVE_POSITION_FRACTION == pytest.approx(1.0)
+    assert pytest.approx(1.0) == _view(stage="full").EFFECTIVE_POSITION_FRACTION
 
 
 def test_canary_position_fraction_exposed():
     view = _view(stage="canary", canary_fraction=0.05)
-    assert view.CANARY_POSITION_FRACTION == pytest.approx(0.05)
+    assert pytest.approx(0.05) == view.CANARY_POSITION_FRACTION
 
 
 # ── Consecutive-loss auto-halt ────────────────────────────────────────────────
@@ -184,7 +184,7 @@ def test_consecutive_loss_halt_allows_reduce_only():
     for _ in range(5):
         manager.record_loss(realized_pnl=-50.0)
 
-    passed, reason = manager.check_order(reduce_order, current_price=100.0, portfolio=portfolio)
+    passed, _reason = manager.check_order(reduce_order, current_price=100.0, portfolio=portfolio)
     assert passed is True
 
 
@@ -253,7 +253,7 @@ def test_daily_loss_breach_triggers_freeze():
 def test_daily_loss_below_threshold_passes():
     manager = RiskManager(_risk_cfg(max_daily_loss=0.10))
     portfolio = _portfolio(equity=9500.0, day_start=10000.0)  # 5% loss < 10% threshold
-    passed, reason, action, _ = manager.evaluate_portfolio_risk(portfolio)
+    passed, _reason, action, _ = manager.evaluate_portfolio_risk(portfolio)
     assert passed is True
     assert action == "NONE"
 
@@ -281,7 +281,7 @@ def test_shadow_parity_min_ratio_exposed():
     raw = _base_raw()
     raw["live"]["shadow_parity_min_ratio"] = 0.95
     view = _build_live_config_namespace(build_runtime_config(raw, env={}), symbols=["BTC/USDT"])
-    assert view.SHADOW_PARITY_MIN_RATIO == pytest.approx(0.95)
+    assert pytest.approx(0.95) == view.SHADOW_PARITY_MIN_RATIO
 
 
 def test_shadow_parity_window_bars_exposed():

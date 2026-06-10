@@ -56,7 +56,7 @@ def test_execution_live_import_is_from_backtesting():
 
 def test_execution_model_importable_from_backtesting():
     """The shared ExecutionModel must be importable (build gate: pyo3 present)."""
-    from lumina_quant.backtesting.execution_model import ExecutionModel, ExecutionModelConfig  # noqa: F401
+    from lumina_quant.backtesting.execution_model import ExecutionModel, ExecutionModelConfig
 
 
 def test_execution_model_config_from_runtime_live_mode():

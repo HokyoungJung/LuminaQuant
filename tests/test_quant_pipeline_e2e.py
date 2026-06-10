@@ -18,7 +18,7 @@ def test_quant_pipeline_end_to_end(tmp_path: Path, monkeypatch):
     # Write a minimal config so get_default_runtime_config() picks up the right parquet path.
     cfg_file = tmp_path / "config.yaml"
     cfg_file.write_text(
-        f"storage:\n  market_data_parquet_path: {str(tmp_path / 'market_parquet')}\n",
+        f"storage:\n  market_data_parquet_path: {tmp_path / 'market_parquet'!s}\n",
         encoding="utf-8",
     )
     monkeypatch.setenv("LQ_CONFIG_PATH", str(cfg_file))
