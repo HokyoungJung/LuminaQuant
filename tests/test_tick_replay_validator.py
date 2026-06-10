@@ -283,6 +283,80 @@ def test_lmt_sell_no_fill_above_market(btcusdt_aggtrades):
     assert not result.lmt_cases[0]["filled_any"]
 
 
+# ── Independence (non-circularity) ────────────────────────────────────────────
+
+
+def test_lmt_verdict_uses_independent_tape_ground_truth(verdict):
+    """LMT cases carry raw-tape fields and the model rule agrees with the tape.
+
+    Regression for the circularity finding: the cross decision and fill-quantity
+    feasibility now come from the raw aggTrades tape, not from the model checking
+    itself. Each case must expose the tape-derived fields and, for crossing
+    cases, the model's bar rule must MATCH the tape ground truth.
+    """
+    assert verdict.lmt_cases, "expected default LMT cases"
+    for case in verdict.lmt_cases:
+        for field in ("tape_crossed", "tape_volume_through_limit", "model_rule_matches_tape"):
+            assert field in case, f"LMT case missing independent field {field!r}: {case}"
+        # The bar-rule cross decision must agree with the raw-tape cross decision.
+        assert case["model_rule_matches_tape"], f"model rule disagrees with tape: {case}"
+        if case.get("filled_any"):
+            # A fill is only allowed when the tape actually traded through the limit.
+            assert case["tape_crossed"], f"fill claimed but tape never crossed: {case}"
+            assert case["tape_volume_through_limit"] > 0.0, case
+            # Executed quantity cannot exceed realised tape liquidity.
+            assert case["qty_feasible"], f"fill exceeds realised tape volume: {case}"
+
+
+def test_lmt_fill_quantity_bounded_by_real_tape_liquidity(btcusdt_aggtrades):
+    """A BUY LMT only fills up to the tape liquidity at-or-through the limit."""
+    from lumina_quant.backtesting.tick_replay_validator import (
+        LmtOrderCase,
+        TickReplayValidator,
+    )
+
+    df = btcusdt_aggtrades
+    v_tmp = TickReplayValidator(df)
+    bars = v_tmp._aggregate_to_1s()
+    if bars is None or bars.is_empty():
+        bars = v_tmp._fallback_1s()
+    lows = bars["low"].to_numpy()
+    highs = bars["high"].to_numpy()
+    limit = round(float((lows.min() + highs.max()) / 2.0) / 10.0) * 10.0
+
+    result = TickReplayValidator(
+        df,
+        lmt_cases=[
+            LmtOrderCase(
+                symbol="BTCUSDT",
+                direction="BUY",
+                qty=1e9,  # absurd size — must be bounded by realised tape volume
+                limit_price=limit,
+                expect_fill=True,
+                description="BUY LMT oversized — bounded by tape liquidity",
+            )
+        ],
+    ).validate()
+
+    case_r = result.lmt_cases[0]
+    assert case_r["tape_crossed"], case_r
+    # The model must never report filling more than the realised tape volume.
+    assert case_r["executed_qty"] <= case_r["tape_volume_through_limit"] + 1e-9, case_r
+    assert case_r["qty_feasible"], case_r
+
+
+def test_mkt_fill_price_bounded_by_realised_tick_range(verdict):
+    """MKT fill price is validated against the realised tape range, not slippage params."""
+    assert verdict.mkt_cases, "expected default MKT cases"
+    for case in verdict.mkt_cases:
+        assert "tape_low" in case and "tape_high" in case, case
+        assert case["price_in_tape_range"], f"fill price outside realised tick range: {case}"
+        fp = case["fill_price"]
+        # Fill price must sit inside the realised tape range (with tiny tolerance).
+        tol = 1e-6 * max(1.0, case["tape_high"])
+        assert case["tape_low"] - tol <= fp <= case["tape_high"] + tol, case
+
+
 # ── Verdict serialisation ─────────────────────────────────────────────────────
 
 

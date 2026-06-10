@@ -299,6 +299,21 @@ class TickReplayValidator:
             ),
         ]
 
+    # ── Raw tick tape (independent ground truth) ───────────────────────────────
+
+    def _raw_tick_arrays(self) -> tuple[np.ndarray, np.ndarray]:
+        """Return (prices, quantities) from the RAW aggTrades tape.
+
+        This is the independent reference: it is computed directly from the
+        committed tick stream, NOT from the 1s bars the ExecutionModel consumes
+        nor from the model's own fill output. Validating model fills against
+        these arrays is what makes the validator non-circular.
+        """
+        df = self._df
+        prices = np.asarray(df["price"].to_numpy(), dtype=np.float64)
+        qtys = np.asarray(df["quantity"].to_numpy(), dtype=np.float64)
+        return prices, qtys
+
     # ── LMT validation ────────────────────────────────────────────────────────
 
     def _validate_lmt_case(
@@ -306,78 +321,95 @@ class TickReplayValidator:
         case: LmtOrderCase,
         bars,
     ) -> dict:
-        """Check LMT fill rule against all 1s bars.
+        """Validate the LMT fill rule against the RAW tick tape (independent).
 
-        BUY fills IFF bar_low < limit (strict).
-        SELL fills IFF bar_high > limit (strict).
-        Fill price must equal limit_price exactly.
+        The previous implementation re-derived ``should_cross`` with the same
+        expression the engine uses and then asked ``compute_fill(is_maker=True)``
+        — whose price IS ``limit`` by construction — so ``wrong_price`` could
+        never trip and the non-crossing branch was discarded. That validated the
+        model against itself.
+
+        Here the ground truth comes from the tick tape:
+
+        * **Cross feasibility** — a passive BUY limit at ``L`` can only fill if a
+          real trade printed strictly below ``L`` (``price < L``); SELL needs a
+          print strictly above ``L``. This is computed from raw ticks.
+        * **Fill-quantity feasibility** — the liquidity that could have filled a
+          resting limit is the tape volume at-or-through ``L`` (BUY:
+          ``price <= L``; SELL: ``price >= L``). The model's executed quantity
+          must not exceed that realised volume — otherwise the model claims a
+          fill the tape never supported.
+        * **Fill price** — a passive limit fills at ``L`` exactly (maker, no
+          slippage), and that price must be one the tape actually traded through.
+
+        The model's bar-rule decision is then asserted to AGREE with the
+        tape-derived cross feasibility.
         """
         lows = bars["low"].to_numpy()
         highs = bars["high"].to_numpy()
-        volumes = bars["volume"].to_numpy()
 
         direction = str(case.direction).upper()
         limit = float(case.limit_price)
         qty = float(case.qty)
 
+        prices, qtys = self._raw_tick_arrays()
+
+        # ── Independent tape ground truth ─────────────────────────────────────
+        if direction == "BUY":
+            cross_mask = prices < limit  # strict cross (matches engine rule)
+            avail_mask = prices <= limit  # liquidity that fills a resting bid
+        else:
+            cross_mask = prices > limit
+            avail_mask = prices >= limit
+        tape_crossed = bool(cross_mask.any())
+        tape_volume_through_limit = float(qtys[avail_mask].sum()) if qtys.size else 0.0
+
+        # ── Model bar-rule decision (must agree with the tape) ────────────────
+        if direction == "BUY":
+            n_should_fill = int((lows < limit).sum())
+        else:
+            n_should_fill = int((highs > limit).sum())
+        model_rule_crossed = n_should_fill > 0
+        model_rule_matches_tape = model_rule_crossed == tape_crossed
+
+        # ── Model fill (only meaningful when the tape says a fill is possible) ─
         filled_any = False
         wrong_price = False
         fill_price_seen: float | None = None
-        n_should_fill = 0
-        n_did_fill = 0
+        executed_qty = 0.0
+        if tape_crossed:
+            fill_result = self._execution_model.compute_fill(
+                raw_price=limit,
+                qty=qty,
+                direction=direction,
+                bar_volume=tape_volume_through_limit,
+                is_maker=True,
+                apply_liquidity_cap=True,
+            )
+            executed_qty = float(fill_result.executed_qty)
+            if executed_qty > 0:
+                filled_any = True
+                fill_price_seen = float(fill_result.fill_price)
+                # Passive limit must fill at the limit price exactly.
+                if abs(fill_result.fill_price - limit) > 1e-8:
+                    wrong_price = True
 
-        for i in range(len(lows)):
-            bar_low = float(lows[i])
-            bar_high = float(highs[i])
-            bar_vol = float(volumes[i])
+        # Fill quantity must be supported by the realised tape volume.
+        qty_feasible = executed_qty <= tape_volume_through_limit + 1e-12
 
-            if direction == "BUY":
-                should_cross = bar_low < limit
-            else:
-                should_cross = bar_high > limit
-
-            # Simulate the fill.
-            if should_cross:
-                n_should_fill += 1
-                fill_result = self._execution_model.compute_fill(
-                    raw_price=limit,
-                    qty=qty,
-                    direction=direction,
-                    bar_volume=bar_vol,
-                    is_maker=True,
-                    apply_liquidity_cap=True,
-                )
-                if fill_result.executed_qty > 0:
-                    filled_any = True
-                    n_did_fill += 1
-                    # LMT fill price must equal limit_price exactly.
-                    if abs(fill_result.fill_price - limit) > 1e-8:
-                        wrong_price = True
-                    fill_price_seen = fill_result.fill_price
-            else:
-                # Bar doesn't cross limit — must NOT fill.
-                fill_result = self._execution_model.compute_fill(
-                    raw_price=limit,
-                    qty=qty,
-                    direction=direction,
-                    bar_volume=bar_vol,
-                    is_maker=True,
-                    apply_liquidity_cap=True,
-                )
-                # Executor should check the cross condition before calling compute_fill.
-                # Here we validate the RULE by checking: if we incorrectly called
-                # compute_fill without the cross guard, would price still be exact?
-                # (ExecutionModel itself is stateless — the guard is in execution_sim.)
-                # What we validate: on a non-crossing bar the rule says no-fill.
-                _ = fill_result  # Suppress unused; rule enforcement is in execution_sim
-
-        # Determine pass/fail.
+        # ── Pass/fail ─────────────────────────────────────────────────────────
         if case.expect_fill:
-            passed = filled_any and not wrong_price
+            passed = (
+                tape_crossed
+                and model_rule_matches_tape
+                and filled_any
+                and not wrong_price
+                and qty_feasible
+                and tape_volume_through_limit > 0.0
+            )
         else:
-            # For expect_fill=False: the price range should never cross the limit,
-            # meaning n_should_fill == 0 (no bar crossed the limit).
-            passed = n_should_fill == 0
+            # No tape trade should cross the limit, and the model must agree.
+            passed = (not tape_crossed) and model_rule_matches_tape
 
         return {
             "description": case.description,
@@ -386,8 +418,12 @@ class TickReplayValidator:
             "expect_fill": case.expect_fill,
             "filled_any": filled_any,
             "n_bars_should_fill": n_should_fill,
-            "n_bars_did_fill": n_did_fill,
+            "tape_crossed": tape_crossed,
+            "tape_volume_through_limit": tape_volume_through_limit,
+            "model_rule_matches_tape": model_rule_matches_tape,
             "fill_price_seen": fill_price_seen,
+            "executed_qty": executed_qty,
+            "qty_feasible": qty_feasible,
             "wrong_price": wrong_price,
             "passed": passed,
         }
@@ -395,18 +431,31 @@ class TickReplayValidator:
     # ── MKT validation ────────────────────────────────────────────────────────
 
     def _validate_mkt_case(self, case: MktOrderCase, bars) -> dict:
-        """Check MKT fill rule: fill price within bar range + slippage bound."""
+        """Validate the MKT fill price against the RAW tick price range (independent).
+
+        The previous implementation bounded the model's fill price by a tolerance
+        derived from the model's OWN slippage parameters — i.e. it checked the
+        model against itself. Here the bound is the price range the tape actually
+        traded: a market BUY cannot realistically fill above the highest print
+        (nor below the bar open it crossed from), and a market SELL cannot fill
+        below the lowest print. Fill quantity must not exceed the realised tape
+        volume.
+        """
         opens = bars["open"].to_numpy()
         lows = bars["low"].to_numpy()
         highs = bars["high"].to_numpy()
         volumes = bars["volume"].to_numpy()
 
-        # Use the first bar for the MKT test.
         bar_idx = 0
         bar_open = float(opens[bar_idx])
         bar_low = float(lows[bar_idx])
         bar_high = float(highs[bar_idx])
         bar_vol = float(volumes[bar_idx])
+
+        prices, qtys = self._raw_tick_arrays()
+        tape_low = float(prices.min()) if prices.size else bar_low
+        tape_high = float(prices.max()) if prices.size else bar_high
+        tape_volume = float(qtys.sum()) if qtys.size else 0.0
 
         fill_result = self._execution_model.compute_fill(
             raw_price=bar_open,
@@ -418,30 +467,31 @@ class TickReplayValidator:
             apply_liquidity_cap=True,
         )
 
-        fp = fill_result.fill_price
-        cfg = self._execution_model.cfg
-        # Allow fill_price within bar range extended by max possible slippage.
-        max_slip = cfg.slippage_rate * 1.5 * 2.0 + cfg.spread_rate  # 3x slip + spread headroom
+        fp = float(fill_result.fill_price)
         direction = str(case.direction).upper()
+        # Independent bound: realised tape price range (small tolerance for the
+        # half-spread crossing on the boundary print).
+        tol = 1e-6 * max(1.0, tape_high)
         if direction == "BUY":
-            price_ok = fp <= bar_high * (1.0 + max_slip)
-            price_ok = price_ok and fp >= bar_open  # BUY: should be above open
+            price_in_tape_range = bar_open - tol <= fp <= tape_high + tol
         else:
-            price_ok = fp >= bar_low * (1.0 - max_slip)
-            price_ok = price_ok and fp <= bar_open  # SELL: should be below open
+            price_in_tape_range = tape_low - tol <= fp <= bar_open + tol
+        qty_feasible = float(fill_result.executed_qty) <= tape_volume + 1e-12
 
         return {
             "description": case.description,
             "direction": direction,
             "qty": float(case.qty),
             "bar_open": bar_open,
-            "bar_low": bar_low,
-            "bar_high": bar_high,
+            "tape_low": tape_low,
+            "tape_high": tape_high,
             "fill_price": fp,
             "commission": fill_result.commission,
             "executed_qty": fill_result.executed_qty,
-            "price_ok": price_ok,
-            "passed": price_ok and fill_result.executed_qty > 0,
+            "price_in_tape_range": price_in_tape_range,
+            "qty_feasible": qty_feasible,
+            "price_ok": price_in_tape_range,
+            "passed": price_in_tape_range and qty_feasible and fill_result.executed_qty > 0,
         }
 
     # ── Main validate ─────────────────────────────────────────────────────────

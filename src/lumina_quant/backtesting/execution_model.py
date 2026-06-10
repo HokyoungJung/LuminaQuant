@@ -10,7 +10,10 @@ LMT fill assumptions (Phase 4, approved 2026-06-10 — see AGENTS.md §Execution
     Fill price = ``limit_price`` exactly; commission uses ``maker_fee_rate``.
     No slippage applied to limit fills.
     The partial-fill liquidity cap (``max_bar_volume_ratio * bar_volume``) applies
-    to both LMT and MKT fills.  Realism validated by TickReplayValidator (Phase 4.4).
+    to both LMT and MKT fills.  ``TickReplayValidator`` (Phase 4.4) checks these
+    rules against the raw aggTrades tape — LMT cross + fill-quantity feasibility
+    (volume traded at-or-through the limit) and MKT fill price within the realised
+    tick range — an independent reference, not the model re-checking its own params.
 
 Phase 5 import gate: ``live/execution_live.py`` MUST import ``ExecutionModel`` from
 this module (enforced by CI grep gate after Phase 5 completes).
