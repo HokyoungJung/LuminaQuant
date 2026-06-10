@@ -3,9 +3,9 @@
 Three measurements (none require a live exchange connection):
 
 1. live_signal_per_tick — per-SINGLE-tick call latency for
-   evaluate_debounced_state_native + evaluate_trailing_state_native via their
-   existing ctypes loaders.  Falls back to Python if Rust library is missing.
-   Reports median/p95/p99 across --iters calls.
+   evaluate_debounced_state_native + evaluate_trailing_state_native via the
+   pyo3 backend (lumina_quant._compute).  Falls back to Python if the native
+   extension is unavailable.  Reports median/p95/p99 across --iters calls.
 
 2. paper_order_path — per-transition latency through OrderStateMachine.transition()
    (SUBMITTED→ACKED then ACKED→FILLED), the innermost hot path of the paper-mode
@@ -117,7 +117,9 @@ def _measure_live_signal_per_tick(iters: int) -> dict:
     combined = [d + t for d, t in zip(debounced_samples, trailing_samples)]
     return {
         "backend": resolved,
-        "native_library": nb._NATIVE_DLL or None,
+        "backend_description": backend,
+        "native_available": nb.native_backend_available(),
+        "native_load_error": nb._PYO3_LOAD_ERROR or None,
         "iters": iters,
         "debounced": _stats(debounced_samples),
         "trailing": _stats(trailing_samples),
@@ -214,8 +216,8 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--output",
-        default="baseline/bench_tick_latency.json",
-        help="Output JSON path.",
+        default="docs/perf/data/bench_tick_latency.json",
+        help="Output JSON path (must stay outside the frozen baseline/ dir).",
     )
     return parser
 
