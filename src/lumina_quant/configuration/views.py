@@ -9,10 +9,16 @@ no global state, no os.environ mutation.
 Consumers and deletion schedule
 ---------------------------------
 BacktestConfigView  — consumed by backtesting/backtest.py, cli/backtest.py
-                      DELETION-GATE: Phase 5 (Live trading path rewrite — uppercase attrs
-                      not needed once engine migrates to typed RuntimeConfig attrs directly)
+                      DELETION-GATE: Phase 6 (re-gated from Phase 5)
+                      Phase 5 focused on the live gate pipeline; full migration of
+                      trader.py/execution_live.py off uppercase attrs is scoped to
+                      Phase 6 CLI rewrite where the whole call layer is rewritten.
+
 LiveConfigView      — consumed by live/trader.py
-                      DELETION-GATE: Phase 5 (Live trading path rewrite)
+                      DELETION-GATE: Phase 6 (re-gated from Phase 5)
+                      All Phase 5 go-live gate fields are exposed here so existing
+                      uppercase-attr consumers work unchanged; the full migration to
+                      typed RuntimeConfig direct access is deferred to Phase 6.
 """
 
 from __future__ import annotations
@@ -72,6 +78,8 @@ class BacktestConfigView:
         self.MAX_ROLLING_LOSS_PCT_1H = float(rk.max_rolling_loss_pct_1h)
         self.FREEZE_NEW_ENTRIES_ON_BREACH = bool(rk.freeze_new_entries_on_breach)
         self.AUTO_FLATTEN_ON_BREACH = bool(rk.auto_flatten_on_breach)
+        self.MAX_POSITION_SIZE_PCT = float(rk.max_position_size_pct)
+        self.CONSECUTIVE_LOSS_HALT_COUNT = int(rk.consecutive_loss_halt_count)
 
         # Execution
         self.MAKER_FEE_RATE = float(ex.maker_fee_rate)
@@ -192,6 +200,8 @@ class LiveConfigView:
         self.MAX_ROLLING_LOSS_PCT_1H = float(rk.max_rolling_loss_pct_1h)
         self.FREEZE_NEW_ENTRIES_ON_BREACH = bool(rk.freeze_new_entries_on_breach)
         self.AUTO_FLATTEN_ON_BREACH = bool(rk.auto_flatten_on_breach)
+        self.MAX_POSITION_SIZE_PCT = float(rk.max_position_size_pct)
+        self.CONSECUTIVE_LOSS_HALT_COUNT = int(rk.consecutive_loss_halt_count)
 
         # Execution
         self.MAKER_FEE_RATE = float(run_ex.maker_fee_rate)
@@ -244,7 +254,11 @@ class LiveConfigView:
 
         # Live mode and sources
         self.MODE = str(lv.mode)
-        self.IS_TESTNET = str(lv.mode).strip().lower() != "real"
+        # IS_TESTNET: Phase 5 routing — go_live_stage drives the exchange endpoint.
+        # testnet/shadow stages → testnet REST; canary/full stages → prod REST.
+        # Defaults gracefully: go_live_stage="testnet" when not set → IS_TESTNET=True.
+        _stage = str(getattr(lv, "go_live_stage", "testnet") or "testnet").strip().lower()
+        self.IS_TESTNET = _stage in {"testnet", "shadow"}
         self.REQUIRE_REAL_ENABLE_FLAG = bool(lv.require_real_enable_flag)
         self.MARKET_DATA_SOURCE = str(lv.market_data_source)
         self.ORDER_STATE_SOURCE = str(lv.order_state_source)
@@ -330,3 +344,14 @@ class LiveConfigView:
 
         # Symbol limits
         self.SYMBOL_LIMITS: dict = dict(lv.symbol_limits)
+
+        # Phase 5 go-live gate pipeline
+        self.GO_LIVE_STAGE = _stage  # already computed above for IS_TESTNET
+        self.KILL_SWITCH_ENABLED = bool(lv.kill_switch_enabled)
+        self.CANARY_POSITION_FRACTION = float(lv.canary_position_fraction)
+        self.SHADOW_PARITY_MIN_RATIO = float(lv.shadow_parity_min_ratio)
+        self.SHADOW_PARITY_WINDOW_BARS = int(lv.shadow_parity_window_bars)
+        # Effective position fraction: reduced sizing in canary stage, full otherwise
+        self.EFFECTIVE_POSITION_FRACTION = (
+            float(lv.canary_position_fraction) if _stage == "canary" else 1.0
+        )

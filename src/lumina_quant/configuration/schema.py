@@ -61,6 +61,9 @@ class RiskConfig:
     max_rolling_loss_pct_1h: float = 0.05
     freeze_new_entries_on_breach: bool = True
     auto_flatten_on_breach: bool = False
+    # Phase 5 kill-switch envelope: non-bypassable risk caps
+    max_position_size_pct: float = 1.0  # (0, 1] — per-symbol position size as fraction of capital
+    consecutive_loss_halt_count: int = 5  # > 0 — freeze new entries after N consecutive realized losses
 
 
 @dataclass(slots=True)
@@ -202,6 +205,12 @@ class LiveRuntimeConfig:
     market_data_source: str = "committed"
     order_state_source: str = "polling"
     shadow_live_enabled: bool = False
+    # Phase 5 go-live gate pipeline (R7: free stage composition, per-stage entry checks)
+    go_live_stage: str = "testnet"  # testnet | shadow | canary | full
+    kill_switch_enabled: bool = True  # always-on; validate.py REJECTS False
+    canary_position_fraction: float = 0.10  # position sizing fraction during canary stage (0, 1]
+    shadow_parity_min_ratio: float = 0.99  # minimum signal agreement ratio before stage advance
+    shadow_parity_window_bars: int = 1000  # bars to evaluate parity over
     reconciliation_poll_fallback_enabled: bool = True
     book_ticker_enabled: bool = False
     default_order_type: str = "LMT"
