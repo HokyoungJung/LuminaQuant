@@ -77,6 +77,28 @@ def _resolve_effective_transport(*, transport: str, market_data_source: str) -> 
     return selected_transport
 
 
+def _resolve_live_banner(live_cfg) -> dict[str, object]:
+    """Resolve the operator-facing live banner (stage / endpoint / mode / real-money).
+
+    Stage drives the exchange endpoint: ``canary``/``full`` route to the PRODUCTION
+    endpoint (validate.py prod-routing gate, which also requires ``mode='real'``).
+    An explicit ``live.testnet=False`` with ``mode='real'`` is likewise a production
+    endpoint. The banner must reflect the resolved endpoint, never just the mode
+    string — a banner that says PAPER while orders route to prod is a dangerous lie.
+    """
+    stage = str(getattr(live_cfg, "go_live_stage", "testnet")).strip().lower()
+    mode = str(getattr(live_cfg, "mode", "paper")).strip().lower()
+    endpoint_is_prod = stage in {"canary", "full"} or (
+        getattr(live_cfg, "testnet", None) is False and mode == "real"
+    )
+    return {
+        "stage": stage,
+        "mode": "REAL" if mode == "real" else "PAPER",
+        "endpoint": "PRODUCTION (live exchange)" if endpoint_is_prod else "TESTNET",
+        "endpoint_is_prod": endpoint_is_prod,
+    }
+
+
 def _shutdown_on_fatal(trader, exc: Exception) -> None:
     print(f"\nCritical live-data contract breach: {exc}")
     ordered_shutdown = getattr(trader, "_ordered_shutdown", None)
@@ -301,8 +323,15 @@ def main(argv: list[str] | None = None) -> int:
     rt.trading.timeframe = str(resolved_timeframe)
     validate_runtime_config(rt, for_live=True)
 
-    is_testnet = str(rt.live.mode).strip().lower() != "real"
-    print(f"Mode: {'TESTNET/PAPER' if is_testnet else 'REAL TRADING'}")
+    # Operator-facing banner must reflect the ACTUAL resolved endpoint, not just
+    # the mode string — a banner that says PAPER while orders route to prod is a
+    # dangerous lie on a real-money tool.
+    banner = _resolve_live_banner(rt.live)
+    print(f"Go-Live Stage: {banner['stage']}")
+    print(f"Endpoint: {banner['endpoint']}")
+    print(f"Mode: {banner['mode']}")
+    if banner["endpoint_is_prod"]:
+        print("⚠  REAL MONEY — orders route to the PRODUCTION exchange endpoint")
     print(f"Exchange: {rt.live.exchange.name} ({rt.live.exchange.market_type})")
     market_data_source = str(rt.live.market_data_source)
     order_state_source = str(rt.live.order_state_source)
