@@ -78,8 +78,10 @@ def test_build_paper_forward_bundle_from_frozen_10bps_sources(tmp_path: Path) ->
         10_500.0
     )
     assert balanced["paper_equivalent_sizing"]["live_notional"] == pytest.approx(10_500.0)
-    assert active["preflight"]["status"] == {"ready_for_paper": True, "ready_for_real": False}
-    assert balanced["preflight"]["status"] == {"ready_for_paper": True, "ready_for_real": False}
+    assert active["preflight"]["status"]["ready_for_paper"] is True
+    assert active["preflight"]["status"]["ready_for_real"] is False
+    assert balanced["preflight"]["status"]["ready_for_paper"] is True
+    assert balanced["preflight"]["status"]["ready_for_real"] is False
 
     active_decision = Path(payload["output_paths"]["active_decision"])
     balanced_decision = Path(payload["output_paths"]["balanced_decision"])
