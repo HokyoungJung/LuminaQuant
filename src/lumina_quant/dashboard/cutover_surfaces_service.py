@@ -1285,6 +1285,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="Max fill rows (default: 80).")
     parser.add_argument("--order-limit", type=int, default=200, dest="order_limit",
                         help="Max order rows (default: 200).")
+    parser.add_argument("--event-limit", type=int, default=50, dest="event_limit",
+                        help="Max risk/heartbeat event rows (default: 50).")
     args = parser.parse_args(argv)
 
     fn = fn_map[args.fn]
@@ -1298,6 +1300,8 @@ def main(argv: list[str] | None = None) -> int:
         kwargs["fill_limit"] = args.fill_limit
     if "order_limit" in sig.parameters:
         kwargs["order_limit"] = args.order_limit
+    if "event_limit" in sig.parameters:
+        kwargs["event_limit"] = args.event_limit
 
     payload = fn(**kwargs)
     print(json.dumps(payload, indent=2, sort_keys=True, default=str))
