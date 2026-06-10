@@ -17,14 +17,38 @@ from __future__ import annotations
 
 import sys
 import textwrap
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 STRATEGIES_DIR = PROJECT_ROOT / "src" / "lumina_quant" / "strategies"
-DATA_DIR = PROJECT_ROOT / "data"
+
+
+def _write_synthetic_csv(path: Path, *, bars: int = 200) -> None:
+    """Write a deterministic OHLCV CSV the HistoricCSVDataHandler can read.
+
+    Self-contained so the e2e gate runs in a clean checkout (CI) with no
+    dependency on a committed/local data/ file — the prior version relied on
+    PROJECT_ROOT/data/BTCUSDT.csv existing, which passed locally on a dev box
+    with leftover data but failed in CI (0 market bars).
+    """
+    start = datetime(2024, 1, 1)
+    price = 100.0
+    lines = ["datetime,open,high,low,close,volume"]
+    for i in range(bars):
+        ts = (start + timedelta(days=i)).isoformat()
+        # deterministic gentle drift (no RNG — reproducible everywhere)
+        o = price
+        c = price * (1.0 + (0.002 if i % 2 == 0 else -0.0015))
+        hi = max(o, c) * 1.001
+        lo = min(o, c) * 0.999
+        vol = 1000.0 + i
+        lines.append(f"{ts},{o},{hi},{lo},{c},{vol}")
+        price = c
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
 
 # A user touches exactly these two surfaces: ONE new file + a config name.
 PROBE_MODULE = "e2e_dropin_probe"
@@ -105,8 +129,13 @@ def dropped_strategy_file(monkeypatch, tmp_path):
     )
     monkeypatch.setenv("LQ_CONFIG_PATH", str(config_path))
 
+    # Self-contained market data so the gate runs in a clean checkout (CI).
+    data_dir = tmp_path / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    _write_synthetic_csv(data_dir / "BTCUSDT.csv")
+
     try:
-        yield config_path
+        yield config_path, data_dir
     finally:
         probe_path.unlink(missing_ok=True)
         # Restore global registry + discovery cache so no state leaks.
@@ -125,6 +154,7 @@ def dropped_strategy_file(monkeypatch, tmp_path):
 
 def test_dropfile_strategy_registers_resolves_and_runs(dropped_strategy_file):
     """One dropped file + a config name → discoverable, config-resolvable, runnable."""
+    _config_path, data_dir = dropped_strategy_file
     from lumina_quant.backtesting.backtest import Backtest
     from lumina_quant.backtesting.data import HistoricCSVDataHandler
     from lumina_quant.backtesting.execution_sim import SimulatedExecutionHandler
@@ -155,7 +185,7 @@ def test_dropfile_strategy_registers_resolves_and_runs(dropped_strategy_file):
 
     # 5) A real backtest selecting the dropped strategy actually RUNS and trades.
     backtest = Backtest(
-        csv_dir=str(DATA_DIR),
+        csv_dir=str(data_dir),
         symbol_list=["BTCUSDT"],
         start_date=datetime(2024, 1, 1),
         data_handler_cls=HistoricCSVDataHandler,
