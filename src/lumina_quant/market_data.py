@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -19,14 +18,6 @@ MARKET_OHLCV_1S_TABLE = "market_ohlcv_1s"
 FUTURES_FEATURE_POINTS_TABLE = "futures_feature_points"
 DEFAULT_MARKET_DATA_DB_PATH = "data/market_parquet"
 KNOWN_QUOTES = ("USDT", "USDC", "BUSD", "USD", "BTC", "ETH")
-TIMEFRAME_UNIT_MS = {
-    "s": 1_000,
-    "m": 60_000,
-    "h": 3_600_000,
-    "d": 86_400_000,
-    "w": 604_800_000,
-    "M": 2_592_000_000,
-}
 EMPTY_OHLCV_SCHEMA = {
     "datetime": pl.Datetime(time_unit="ms"),
     "open": pl.Float64,
@@ -380,44 +371,24 @@ def load_data_dict_from_external_root(
 
 
 def timeframe_to_milliseconds(timeframe: str) -> int:
-    """Convert timeframe token like 1m/1h/1d into milliseconds."""
-    token = normalize_timeframe_token(timeframe)
-    if len(token) < 2:
-        raise ValueError(f"Invalid timeframe: {timeframe}")
-    unit = token[-1]
-    value = int(token[:-1])
-    if value <= 0:
-        raise ValueError(f"Invalid timeframe value: {timeframe}")
-    unit_ms = TIMEFRAME_UNIT_MS.get(unit)
-    if unit_ms is None:
-        raise ValueError(f"Unsupported timeframe unit in: {timeframe}")
-    return value * unit_ms
+    """Convert timeframe token like 1m/1h/1d into milliseconds.
 
+    Thin delegate to the single canonical leaf util
+    ``lumina_quant.data.timeframe``. The import is function-local so that
+    importing ``market_data`` does not eagerly pull the ``data`` package (whose
+    ``__init__`` re-imports back into ``market_data``) — that eager edge is the
+    ``market_data <-> data.*`` import cycle this delegation breaks.
+    """
+    from lumina_quant.data.timeframe import timeframe_to_milliseconds as _impl
 
-_TIMEFRAME_PATTERN = re.compile(r"^([1-9][0-9]*)([smhdwM])$")
+    return _impl(timeframe)
 
 
 def normalize_timeframe_token(timeframe: str) -> str:
-    """Normalize timeframe token while preserving month/minute semantics."""
-    raw = str(timeframe or "").strip()
-    if not raw:
-        raise ValueError("Timeframe cannot be empty")
-    if len(raw) < 2:
-        raise ValueError(f"Invalid timeframe: {timeframe}")
+    """Normalize timeframe token — thin delegate to ``lumina_quant.data.timeframe``."""
+    from lumina_quant.data.timeframe import normalize_timeframe_token as _impl
 
-    value = raw[:-1].strip()
-    unit_raw = raw[-1]
-    if not value.isdigit() or int(value) <= 0:
-        raise ValueError(f"Invalid timeframe value: {timeframe}")
-
-    if unit_raw == "M":
-        unit = "M"
-    else:
-        unit = unit_raw.lower()
-    token = f"{int(value)}{unit}"
-    if _TIMEFRAME_PATTERN.fullmatch(token) is None:
-        raise ValueError(f"Unsupported timeframe unit in: {timeframe}")
-    return token
+    return _impl(timeframe)
 
 
 def connect_market_data_db(db_path: str) -> ParquetMarketDataConnection:

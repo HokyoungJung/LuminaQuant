@@ -600,8 +600,10 @@ class Portfolio:
             if isinstance(row, (tuple, list)) and len(row) >= 6:
                 return float(row[2]), float(row[3]), float(row[4])
             if isinstance(row, dict):
-                return float(row.get("high", 0.0)), float(row.get("low", 0.0)), float(
-                    row.get("close", 0.0)
+                return (
+                    float(row.get("high", 0.0)),
+                    float(row.get("low", 0.0)),
+                    float(row.get("close", 0.0)),
                 )
             high = getattr(row, "high", None)
             low = getattr(row, "low", None)
@@ -832,9 +834,7 @@ class Portfolio:
         )
         # Apply canary position fraction: EFFECTIVE_POSITION_FRACTION == canary_position_fraction
         # when stage=canary, 1.0 otherwise.  Clamped to (0, 1] to prevent zero/negative qty.
-        effective_fraction = float(
-            getattr(self.config, "EFFECTIVE_POSITION_FRACTION", 1.0) or 1.0
-        )
+        effective_fraction = float(getattr(self.config, "EFFECTIVE_POSITION_FRACTION", 1.0) or 1.0)
         if 0.0 < effective_fraction < 1.0:
             qty = qty * effective_fraction
         return qty
