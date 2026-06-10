@@ -45,6 +45,7 @@ python scripts/build_native_backends.py
 cd apps/dashboard_web && npm install && cd ../..
 
 # 선택 사항: GPU 런타임 (Linux x86_64 + CUDA 12 전용)
+# 핵심 pin: polars>=1.35.2, GPU 엔진 cudf-polars-cu12>=26.6
 uv sync --extra gpu
 ```
 

@@ -45,6 +45,7 @@ python scripts/build_native_backends.py
 cd apps/dashboard_web && npm install && cd ../..
 
 # Optional: GPU runtime (Linux x86_64 + CUDA 12 only)
+# Key pins: polars>=1.35.2, GPU engine cudf-polars-cu12>=26.6
 uv sync --extra gpu
 ```
 
