@@ -617,9 +617,9 @@ def step_walk_forward(fixtures: dict[str, dict], dry_run: bool) -> dict:
                 sharpe, cagr, mdd = evaluate_metrics_backend(eq, ANNUAL_PERIODS)
                 grid_rows.append({
                     "short_window": sw, "long_window": lw,
-                    "train_sharpe": round(sharpe, 6),
-                    "train_cagr":   round(cagr,   6),
-                    "train_max_dd": round(mdd,    6),
+                    "train_sharpe": sharpe,
+                    "train_cagr":   cagr,
+                    "train_max_dd": mdd,
                 })
                 if sharpe > best_sharpe:
                     best_sharpe = sharpe
@@ -646,12 +646,12 @@ def step_walk_forward(fixtures: dict[str, dict], dry_run: bool) -> dict:
             "train_grid":  grid_rows,
         }
         folds_a.append({**base,
-            "val_metrics":  {"sharpe": round(vm_a[0], 6), "cagr": round(vm_a[1], 6), "max_dd": round(vm_a[2], 6)},
-            "test_metrics": {"sharpe": round(tm_a[0], 6), "cagr": round(tm_a[1], 6), "max_dd": round(tm_a[2], 6)},
+            "val_metrics":  {"sharpe": vm_a[0], "cagr": vm_a[1], "max_dd": vm_a[2]},
+            "test_metrics": {"sharpe": tm_a[0], "cagr": tm_a[1], "max_dd": tm_a[2]},
         })
         folds_b.append({**base,
-            "val_metrics":  {"sharpe": round(vm_b[0], 6), "cagr": round(vm_b[1], 6), "max_dd": round(vm_b[2], 6)},
-            "test_metrics": {"sharpe": round(tm_b[0], 6), "cagr": round(tm_b[1], 6), "max_dd": round(tm_b[2], 6)},
+            "val_metrics":  {"sharpe": vm_b[0], "cagr": vm_b[1], "max_dd": vm_b[2]},
+            "test_metrics": {"sharpe": tm_b[0], "cagr": tm_b[1], "max_dd": tm_b[2]},
         })
 
         print(
@@ -668,12 +668,13 @@ def step_walk_forward(fixtures: dict[str, dict], dry_run: bool) -> dict:
 
     grid_params = {"short_windows": WF_SHORT_WINDOWS, "long_windows": WF_LONG_WINDOWS}
 
+    # split_build_elapsed_s is wall-clock only — excluded from the golden artifact
+    # so byte-level determinism holds across runs.  Timing is recorded to stdout.
     payload_a = {
         "variant": "A",
         "description": "preservation oracle — current behaviour incl. -999 sentinels",
         "splits": folds_a,
         "grid_params": grid_params,
-        "split_build_elapsed_s": split_build_elapsed_s,
     }
     payload_b = {
         "variant": "B",
