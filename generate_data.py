@@ -5,21 +5,33 @@ import numpy as np
 import polars as pl
 
 
-def generate_random_data(symbol, days=100):
-    start_date = datetime(2022, 1, 1)
+def generate_random_data(symbol, days=100, seed=None):
+    """Generate a deterministic synthetic OHLCV CSV for ``symbol``.
+
+    A ``seed`` makes the output reproducible — required so the CI perf/8GB smoke
+    gate and any local benchmark exercise the SAME data every run (an unseeded
+    random walk was flaky: some draws produced zero RSI signals and tripped the
+    benchmark's signals>0 honesty assertion).
+    """
+    rng = np.random.default_rng(seed)
+    # Start at the conventional backtest window start (config backtest.start_date
+    # default = 2024-01-01) so the full generated series lies inside the benchmark
+    # window — otherwise only the tail bars are in-window and may miss every RSI
+    # threshold crossing, producing zero signals.
+    start_date = datetime(2024, 1, 1)
     dates = [start_date + timedelta(days=i) for i in range(days)]
 
     # Generate random walk
     n = len(dates)
-    returns = np.random.randn(n) * 0.02  # 2% daily vol
+    returns = rng.standard_normal(n) * 0.02  # 2% daily vol
     price_path = 100 * np.cumprod(1 + returns)
 
     # Create OHLCV
     opens = price_path
-    highs = opens * (1 + np.abs(np.random.randn(n) * 0.01))
-    lows = opens * (1 - np.abs(np.random.randn(n) * 0.01))
-    closes = lows + (highs - lows) * np.random.rand(n)
-    volumes = np.random.randint(100, 1000, size=n)
+    highs = opens * (1 + np.abs(rng.standard_normal(n) * 0.01))
+    lows = opens * (1 - np.abs(rng.standard_normal(n) * 0.01))
+    closes = lows + (highs - lows) * rng.random(n)
+    volumes = rng.integers(100, 1000, size=n)
 
     # Create Polars DataFrame
     df = pl.DataFrame(
@@ -44,5 +56,6 @@ def generate_random_data(symbol, days=100):
 
 
 if __name__ == "__main__":
-    generate_random_data("BTCUSDT", 1000)
-    generate_random_data("ETHUSDT", 1000)
+    # Fixed per-symbol seeds → reproducible data across machines and CI runs.
+    generate_random_data("BTCUSDT", 1000, seed=42)
+    generate_random_data("ETHUSDT", 1000, seed=43)

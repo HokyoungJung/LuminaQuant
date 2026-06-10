@@ -26,7 +26,7 @@ from lumina_quant.backtesting.chunked_runner import run_backtest_chunked
 from lumina_quant.backtesting.data_windowed_parquet import HistoricParquetWindowedDataHandler
 from lumina_quant.backtesting.execution_sim import SimulatedExecutionHandler
 from lumina_quant.backtesting.portfolio_backtest import Portfolio
-from lumina_quant.config import BacktestConfig, BaseConfig
+from lumina_quant.configuration import BacktestConfigView, get_default_runtime_config
 from lumina_quant.live_selection import (
     resolve_portfolio_mode_runtime_config,
     supports_live_portfolio_mode,
@@ -38,6 +38,10 @@ from lumina_quant.strategies.artifact_portfolio_mode import (
     supported_portfolio_modes,
 )
 from lumina_quant.symbols import canonical_symbol
+
+_lq_rt = get_default_runtime_config()
+BacktestConfig = BacktestConfigView(_lq_rt)
+BaseConfig = BacktestConfigView(_lq_rt)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FOLLOWUP_ROOT = REPO_ROOT / "var/reports/exact_window_backtests/followup_status"

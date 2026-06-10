@@ -80,11 +80,39 @@ class StateConnection:
 
 
 def resolve_postgres_dsn(dsn: str | None = None, *, base_config: Any = None) -> str:
-    """Resolve dashboard Postgres DSN from explicit value, env, or config."""
-    token = str(
-        dsn or os.getenv("LQ_POSTGRES_DSN") or getattr(base_config, "POSTGRES_DSN", "") or ""
-    ).strip()
-    return token
+    """Resolve dashboard Postgres DSN from explicit value, env, or RuntimeConfig.
+
+    Resolution order:
+    1. Explicit ``dsn`` argument
+    2. ``LQ_POSTGRES_DSN`` environment variable
+    3. ``RuntimeConfig.storage.postgres_dsn`` (dotpath, Phase 6+)
+    4. Legacy: ``base_config.POSTGRES_DSN`` uppercase attr (kept for compat)
+    """
+    if dsn:
+        return str(dsn).strip()
+    env_dsn = str(os.getenv("LQ_POSTGRES_DSN") or "").strip()
+    if env_dsn:
+        return env_dsn
+    # RuntimeConfig dotpath — preferred post-Phase 6
+    if base_config is not None:
+        rt_dsn = getattr(getattr(base_config, "storage", None), "postgres_dsn", None)
+        if rt_dsn:
+            return str(rt_dsn).strip()
+        # Legacy uppercase attr fallback (views-era)
+        legacy = getattr(base_config, "POSTGRES_DSN", "")
+        if legacy:
+            return str(legacy).strip()
+    # Last resort: load from default RuntimeConfig
+    try:
+        from lumina_quant.configuration import get_default_runtime_config
+
+        rt = get_default_runtime_config()
+        rt_dsn = str(rt.storage.postgres_dsn or "").strip()
+        if rt_dsn:
+            return rt_dsn
+    except Exception:
+        pass
+    return ""
 
 
 def connect_state_store(

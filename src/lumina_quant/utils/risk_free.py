@@ -36,10 +36,18 @@ class ResolvedRiskFree:
     periodic_sortino_targets: np.ndarray
 
 
+_MISSING = object()
+
+
 def _read_attr(config: Any, name: str, default: Any) -> Any:
     if config is None:
         return default
-    return getattr(config, name, default)
+    # Try the canonical uppercase name first (BacktestConfigView / old metaclass classes).
+    val = getattr(config, name, _MISSING)
+    if val is not _MISSING:
+        return val
+    # Typed dataclass fields are lowercase — BacktestRuntimeConfig uses risk_free_annual etc.
+    return getattr(config, name.lower(), default)
 
 
 def risk_free_policy_from_config(config: Any | None = None) -> RiskFreePolicy:

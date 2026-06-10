@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  PYTHON_VERSION: "3.13"
+  PYTHON_VERSION: "3.14"
 
 jobs:
   gpu-ci-config:
@@ -105,16 +105,8 @@ jobs:
       - name: Ruff format check
         run: uv run ruff format --check .
 
-      - name: Native Rust checks
-        run: |
-          for crate in native/rust_metrics native/rust_rawfirst native/rust_hybrid_optuna native/rust_live_signals; do
-            (
-              cd "$crate"
-              cargo fmt --check
-              cargo check --quiet
-              cargo test --quiet
-            )
-          done
+      - name: Build native extensions (maturin)
+        run: uv run python scripts/build_native_backends.py
 
       - name: Architecture gate (live data decoupling)
         run: bash scripts/ci/architecture_gate_live_data.sh
@@ -174,6 +166,13 @@ jobs:
 
       - name: Run full pytest suite
         run: uv run pytest -q
+
+      - name: Generate benchmark smoke data
+        # The perf/8GB smoke gate needs OHLCV CSVs; the repo ships none (data/ is
+        # gitignored). Generate BTCUSDT/ETHUSDT via the repo's own generator so the
+        # benchmark has real symbols to run — benchmark_backtest now fails loudly
+        # (rather than silently skipping) when no symbol data is present.
+        run: uv run python generate_data.py
 
       - name: Benchmark smoke + 8GB baseline gate
         env:

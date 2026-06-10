@@ -1,0 +1,282 @@
+{
+  "variant": "A",
+  "description": "preservation oracle \u2014 current behaviour incl. -999 sentinels",
+  "splits": [
+    {
+      "fold": 1,
+      "train_start": "2022-01-01T00:00:00",
+      "train_end": "2022-07-01T00:00:00",
+      "val_start": "2022-07-01T00:00:00",
+      "val_end": "2022-10-01T00:00:00",
+      "test_start": "2022-10-01T00:00:00",
+      "test_end": "2023-01-01T00:00:00",
+      "best_params": {
+        "short_window": 20,
+        "long_window": 120
+      },
+      "train_grid": [
+        {
+          "short_window": 10,
+          "long_window": 40,
+          "train_sharpe": -0.4860109515558259,
+          "train_cagr": -0.1701444407120154,
+          "train_max_dd": 0.28725134138965847
+        },
+        {
+          "short_window": 10,
+          "long_window": 80,
+          "train_sharpe": -0.7214767103596409,
+          "train_cagr": -0.18952952362463182,
+          "train_max_dd": 0.28682480335391003
+        },
+        {
+          "short_window": 10,
+          "long_window": 120,
+          "train_sharpe": 0.14773605871139542,
+          "train_cagr": 0.009698130529242288,
+          "train_max_dd": 0.18037796384845953
+        },
+        {
+          "short_window": 20,
+          "long_window": 40,
+          "train_sharpe": -0.9957881240816407,
+          "train_cagr": -0.28545651874086364,
+          "train_max_dd": 0.3571512168126238
+        },
+        {
+          "short_window": 20,
+          "long_window": 80,
+          "train_sharpe": 0.27137413420435885,
+          "train_cagr": 0.037336601618884746,
+          "train_max_dd": 0.17202084577995133
+        },
+        {
+          "short_window": 20,
+          "long_window": 120,
+          "train_sharpe": 0.7955787763811616,
+          "train_cagr": 0.1487575144073805,
+          "train_max_dd": 0.13065451296068076
+        },
+        {
+          "short_window": 30,
+          "long_window": 40,
+          "train_sharpe": -0.2518875865575715,
+          "train_cagr": -0.11083864192909576,
+          "train_max_dd": 0.26861283771713046
+        },
+        {
+          "short_window": 30,
+          "long_window": 80,
+          "train_sharpe": 0.4145997536562006,
+          "train_cagr": 0.07492606123620882,
+          "train_max_dd": 0.1476051765514677
+        },
+        {
+          "short_window": 30,
+          "long_window": 120,
+          "train_sharpe": -0.6983542792573697,
+          "train_cagr": -0.14717649428776058,
+          "train_max_dd": 0.18453218055958545
+        }
+      ],
+      "val_metrics": {
+        "sharpe": -999.0,
+        "cagr": 0.0,
+        "max_dd": 0.0
+      },
+      "test_metrics": {
+        "sharpe": -999.0,
+        "cagr": 0.0,
+        "max_dd": 0.0
+      }
+    },
+    {
+      "fold": 2,
+      "train_start": "2022-04-01T00:00:00",
+      "train_end": "2022-10-01T00:00:00",
+      "val_start": "2022-10-01T00:00:00",
+      "val_end": "2023-01-01T00:00:00",
+      "test_start": "2023-01-01T00:00:00",
+      "test_end": "2023-04-01T00:00:00",
+      "best_params": {
+        "short_window": 20,
+        "long_window": 80
+      },
+      "train_grid": [
+        {
+          "short_window": 10,
+          "long_window": 40,
+          "train_sharpe": -1.6037584519560801,
+          "train_cagr": -0.4279585746434317,
+          "train_max_dd": 0.37194710775811896
+        },
+        {
+          "short_window": 10,
+          "long_window": 80,
+          "train_sharpe": 0.38501559308201727,
+          "train_cagr": 0.07170044636377848,
+          "train_max_dd": 0.16245864281221475
+        },
+        {
+          "short_window": 10,
+          "long_window": 120,
+          "train_sharpe": -0.19463346582473506,
+          "train_cagr": -0.06660011557303036,
+          "train_max_dd": 0.15893806176211922
+        },
+        {
+          "short_window": 20,
+          "long_window": 40,
+          "train_sharpe": -2.238312193922341,
+          "train_cagr": -0.5304797657894564,
+          "train_max_dd": 0.44401526643189604
+        },
+        {
+          "short_window": 20,
+          "long_window": 80,
+          "train_sharpe": 0.5372895781736379,
+          "train_cagr": 0.11880953034568109,
+          "train_max_dd": 0.15893806176212005
+        },
+        {
+          "short_window": 20,
+          "long_window": 120,
+          "train_sharpe": -0.25631989442318326,
+          "train_cagr": -0.07945061581779322,
+          "train_max_dd": 0.15893806176211922
+        },
+        {
+          "short_window": 30,
+          "long_window": 40,
+          "train_sharpe": 0.010675171031759046,
+          "train_cagr": -0.04588135944873872,
+          "train_max_dd": 0.21629575051970615
+        },
+        {
+          "short_window": 30,
+          "long_window": 80,
+          "train_sharpe": 0.5202480732962415,
+          "train_cagr": 0.11343740858596485,
+          "train_max_dd": 0.1589380617621192
+        },
+        {
+          "short_window": 30,
+          "long_window": 120,
+          "train_sharpe": -0.25631989442318326,
+          "train_cagr": -0.07945061581779322,
+          "train_max_dd": 0.15893806176211922
+        }
+      ],
+      "val_metrics": {
+        "sharpe": 1.2837946238310145,
+        "cagr": 0.09936585728708747,
+        "max_dd": 0.04058589602509661
+      },
+      "test_metrics": {
+        "sharpe": -1.0166299560930026,
+        "cagr": -0.10380723728277119,
+        "max_dd": 0.05735883204351216
+      }
+    },
+    {
+      "fold": 3,
+      "train_start": "2022-07-01T00:00:00",
+      "train_end": "2023-01-01T00:00:00",
+      "val_start": "2023-01-01T00:00:00",
+      "val_end": "2023-04-01T00:00:00",
+      "test_start": "2023-04-01T00:00:00",
+      "test_end": "2023-07-01T00:00:00",
+      "best_params": {
+        "short_window": 10,
+        "long_window": 120
+      },
+      "train_grid": [
+        {
+          "short_window": 10,
+          "long_window": 40,
+          "train_sharpe": -1.2207557102918225,
+          "train_cagr": -0.3293144079743626,
+          "train_max_dd": 0.2886804764394221
+        },
+        {
+          "short_window": 10,
+          "long_window": 80,
+          "train_sharpe": -0.5334619351125749,
+          "train_cagr": -0.14306246130092792,
+          "train_max_dd": 0.18130324392034536
+        },
+        {
+          "short_window": 10,
+          "long_window": 120,
+          "train_sharpe": 0.07663064810605694,
+          "train_cagr": -0.0013886840033844328,
+          "train_max_dd": 0.1407059224355909
+        },
+        {
+          "short_window": 20,
+          "long_window": 40,
+          "train_sharpe": -1.2818414678990229,
+          "train_cagr": -0.34110978734816766,
+          "train_max_dd": 0.2804358324146464
+        },
+        {
+          "short_window": 20,
+          "long_window": 80,
+          "train_sharpe": -0.9494449421001918,
+          "train_cagr": -0.22320269635125645,
+          "train_max_dd": 0.22782215346848897
+        },
+        {
+          "short_window": 20,
+          "long_window": 120,
+          "train_sharpe": -1.0372017252335828,
+          "train_cagr": -0.17263191614618822,
+          "train_max_dd": 0.19143087259555358
+        },
+        {
+          "short_window": 30,
+          "long_window": 40,
+          "train_sharpe": -0.26973261180456937,
+          "train_cagr": -0.11475701885287704,
+          "train_max_dd": 0.19292459839060666
+        },
+        {
+          "short_window": 30,
+          "long_window": 80,
+          "train_sharpe": -1.6684970737772804,
+          "train_cagr": -0.3436237100798476,
+          "train_max_dd": 0.31718554903691276
+        },
+        {
+          "short_window": 30,
+          "long_window": 120,
+          "train_sharpe": -1.2416519635364658,
+          "train_cagr": -0.20054296397138072,
+          "train_max_dd": 0.21143928698928985
+        }
+      ],
+      "val_metrics": {
+        "sharpe": -999.0,
+        "cagr": 0.0,
+        "max_dd": 0.0
+      },
+      "test_metrics": {
+        "sharpe": -999.0,
+        "cagr": 0.0,
+        "max_dd": 0.0
+      }
+    }
+  ],
+  "grid_params": {
+    "short_windows": [
+      10,
+      20,
+      30
+    ],
+    "long_windows": [
+      40,
+      80,
+      120
+    ]
+  }
+}

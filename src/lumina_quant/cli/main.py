@@ -16,7 +16,8 @@ COMMAND_MODULES = {
     "data": "data",
     "exact_window": "exact_window",
     "autonomous_research": "autonomous_research",
-    "refresh_data_fast": "refresh_data_fast",
+    "config": "config",
+    "registry": "registry",
 }
 
 
@@ -56,8 +57,8 @@ def main(argv: list[str] | None = None) -> int:
         "exact-window": COMMAND_MODULES["exact_window"],
         "autonomous-research": COMMAND_MODULES["autonomous_research"],
         "autonomous_research": COMMAND_MODULES["autonomous_research"],
-        "refresh-data-fast": COMMAND_MODULES["refresh_data_fast"],
-        "refresh_data_fast": COMMAND_MODULES["refresh_data_fast"],
+        "config": COMMAND_MODULES["config"],
+        "registry": COMMAND_MODULES["registry"],
     }
 
     parser = argparse.ArgumentParser(

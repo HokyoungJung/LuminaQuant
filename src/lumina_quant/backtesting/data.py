@@ -109,15 +109,21 @@ class HistoricCSVDataHandler(DataHandler):
         resolved_exchange = exchange
         if resolved_db_path is None or resolved_exchange is None:
             try:
-                from lumina_quant.config import BaseConfig
+                from lumina_quant.configuration import get_default_runtime_config
+
+                _rt = get_default_runtime_config()
+                _rt_storage = _rt.storage
             except Exception:
-                BaseConfig = None
+                _rt_storage = None
             if resolved_db_path is None:
                 resolved_db_path = str(
-                    getattr(BaseConfig, "MARKET_DATA_PARQUET_PATH", "data/market_parquet")
+                    getattr(_rt_storage, "market_data_parquet_path", "data/market_parquet")
+                    or "data/market_parquet"
                 )
             if resolved_exchange is None:
-                resolved_exchange = str(getattr(BaseConfig, "MARKET_DATA_EXCHANGE", "binance"))
+                resolved_exchange = str(
+                    getattr(_rt_storage, "market_data_exchange", "binance") or "binance"
+                )
         return FeaturePointLookup(
             db_path=resolved_db_path,
             exchange=str(resolved_exchange or "binance"),

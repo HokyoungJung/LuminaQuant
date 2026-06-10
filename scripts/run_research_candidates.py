@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 from collections.abc import Mapping
 
-from lumina_quant.config import BaseConfig
+from lumina_quant.configuration import BacktestConfigView, get_default_runtime_config
 from lumina_quant.storage.parquet import load_data_dict_from_parquet
 from lumina_quant.strategy_factory import (
     build_default_candidate_rows,
@@ -19,6 +19,8 @@ from lumina_quant.strategy_factory import (
 )
 from lumina_quant.strategy_factory.selection import select_diversified_shortlist
 from lumina_quant.symbols import CANONICAL_STRATEGY_TIMEFRAMES, canonicalize_symbol_list
+
+BaseConfig = BacktestConfigView(get_default_runtime_config())
 
 _METALS = {"XAU/USDT", "XAG/USDT", "XPT/USDT", "XPD/USDT"}
 _RESEARCH_PROMOTION_MAX_SPLIT_DRAWDOWN = 0.15

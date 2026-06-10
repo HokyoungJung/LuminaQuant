@@ -61,10 +61,7 @@ DEFAULT_TARGETS: tuple[tuple[str, str], ...] = (
 )
 
 OPTIONAL_NATIVE_TARGETS: tuple[tuple[str, str], ...] = (
-    ("native/rust_metrics/target", "optional Rust metrics build target"),
-    ("native/rust_rawfirst/target", "optional Rust raw-first build target"),
-    ("native/rust_hybrid_optuna/target", "optional Rust Optuna hybrid build target"),
-    ("native/rust_live_signals/target", "optional Rust live-signal build target"),
+    ("native/lumina_compute/target", "optional lumina_compute pyo3 build target"),
 )
 
 DEFAULT_PATTERNS: tuple[tuple[str, str], ...] = (
@@ -89,10 +86,7 @@ PRESERVED_ROOTS: tuple[Path, ...] = (
     Path(".omx/goals"),
     Path(".omx/interviews"),
     Path(".omx/manual-worktrees"),
-    Path("native/rust_metrics/target"),
-    Path("native/rust_rawfirst/target"),
-    Path("native/rust_hybrid_optuna/target"),
-    Path("native/rust_live_signals/target"),
+    Path("native/lumina_compute/target"),
 )
 
 WALK_PRUNE_DIRS: tuple[Path, ...] = (

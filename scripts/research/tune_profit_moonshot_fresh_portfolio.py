@@ -1050,7 +1050,7 @@ def _leverage_for_monthly_return(
     if raw_total_return > -1.0 and raw_cagr > -1.0:
         try:
             annualization = math.log1p(raw_cagr) / math.log1p(raw_total_return)
-        except (ValueError, ZeroDivisionError):
+        except ValueError, ZeroDivisionError:
             annualization = 1.0
     if not math.isfinite(annualization) or annualization <= 0.0:
         annualization = 1.0

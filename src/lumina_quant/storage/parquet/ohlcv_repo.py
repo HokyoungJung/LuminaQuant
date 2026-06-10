@@ -21,6 +21,7 @@ from lumina_quant.backtesting.cli_contract import (
     normalize_data_mode,
 )
 from lumina_quant.data.raw_first_lineage import resample_1s_frame
+from lumina_quant.data.timeframe import normalize_timeframe_token, timeframe_to_milliseconds
 from lumina_quant.eval.exact_window_runtime import HeavyRunActiveError, HeavyRunLock
 from lumina_quant.storage.wal.binary import BinaryWAL, WALRecord
 from lumina_quant.storage.wal.native_backend import append_ohlcv_frame_native
@@ -35,15 +36,6 @@ _DEFAULT_SCHEMA: dict[str, pl.DataType] = {
     "volume": pl.Float64,
 }
 _KNOWN_QUOTES = ("USDT", "USDC", "BUSD", "USD", "BTC", "ETH")
-_TIMEFRAME_UNIT_MS = {
-    "s": 1_000,
-    "m": 60_000,
-    "h": 3_600_000,
-    "d": 86_400_000,
-    "w": 604_800_000,
-    "M": 2_592_000_000,
-}
-_TIMEFRAME_PATTERN = re.compile(r"^([1-9][0-9]*)([smhdwM])$")
 _OHLCV_COLUMNS = ["datetime", "open", "high", "low", "close", "volume"]
 _MANIFEST_REQUIRED_FIELDS = (
     "manifest_version",
@@ -102,42 +94,10 @@ def normalize_symbol(symbol: str) -> str:
     return canonical_symbol(symbol)
 
 
-def normalize_timeframe_token(timeframe: str) -> str:
-    """Normalize timeframe token while preserving month/minute semantics."""
-    raw = str(timeframe or "").strip()
-    if not raw:
-        raise ValueError("Timeframe cannot be empty")
-    if len(raw) < 2:
-        raise ValueError(f"Invalid timeframe: {timeframe}")
-
-    value = raw[:-1].strip()
-    unit_raw = raw[-1]
-    if not value.isdigit() or int(value) <= 0:
-        raise ValueError(f"Invalid timeframe value: {timeframe}")
-
-    if unit_raw == "M":
-        unit = "M"
-    else:
-        unit = unit_raw.lower()
-    token = f"{int(value)}{unit}"
-    if _TIMEFRAME_PATTERN.fullmatch(token) is None:
-        raise ValueError(f"Unsupported timeframe unit in: {timeframe}")
-    return token
-
-
-def timeframe_to_milliseconds(timeframe: str) -> int:
-    """Convert timeframe token like 1m/1h/1d into milliseconds."""
-    token = normalize_timeframe_token(timeframe)
-    if len(token) < 2:
-        raise ValueError(f"Invalid timeframe: {timeframe}")
-    unit = token[-1]
-    value = int(token[:-1])
-    if value <= 0:
-        raise ValueError(f"Invalid timeframe value: {timeframe}")
-    unit_ms = _TIMEFRAME_UNIT_MS.get(unit)
-    if unit_ms is None:
-        raise ValueError(f"Unsupported timeframe unit in: {timeframe}")
-    return value * unit_ms
+# ``normalize_timeframe_token`` / ``timeframe_to_milliseconds`` are imported from
+# ``lumina_quant.data.timeframe`` (the single canonical timeframe util) and
+# re-exported here for the existing in-module callers and ``storage.parquet``
+# package re-exports.
 
 
 @dataclass(slots=True)

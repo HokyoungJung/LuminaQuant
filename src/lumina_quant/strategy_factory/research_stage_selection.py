@@ -120,7 +120,7 @@ class ResearchStageSelector:
 def _supported_kwargs(func: Callable[..., Any], kwargs: Mapping[str, Any]) -> dict[str, Any]:
     try:
         params = signature(func).parameters
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return dict(kwargs)
 
     if any(param.kind == Parameter.VAR_KEYWORD for param in params.values()):

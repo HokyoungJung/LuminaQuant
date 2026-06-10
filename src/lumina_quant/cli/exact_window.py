@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from lumina_quant.config import current_market_data_runtime_settings
+from lumina_quant.configuration import current_market_data_runtime_settings
 from lumina_quant.eval.exact_window_reporting import (
     DETAILS_LATEST,
     MEMORY_EVIDENCE_LATEST,

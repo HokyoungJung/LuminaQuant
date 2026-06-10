@@ -8,7 +8,7 @@ from typing import Any
 
 import numpy as np
 
-from lumina_quant.config import BacktestConfig
+from lumina_quant.configuration import get_default_runtime_config
 from lumina_quant.utils.risk_free import (
     resolve_risk_free_config,
     sharpe_ratio as compute_sharpe_ratio,
@@ -403,7 +403,7 @@ def compute_metrics(
         )
 
     resolved_rf = resolve_risk_free_config(
-        metric_config or BacktestConfig,
+        metric_config or get_default_runtime_config().backtest,
         periods_per_year=periods_per_year,
         timestamps=timestamps,
         size=int(returns.size),

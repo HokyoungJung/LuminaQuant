@@ -1,16 +1,12 @@
-"""Optional Rust backend for live Alpha Zoo state-signal kernels.
+"""Optional pyo3 backend for live Alpha Zoo state-signal kernels.
 
-The public API remains Python.  Rust is an internal acceleration path for
-pure deterministic state machines used by the paper/testnet live strategy.
+Phase 2: pyo3 migration — lumina_quant._compute (pyo3).
 """
 
 from __future__ import annotations
 
-import ctypes
 import logging
 import os
-import platform
-from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -19,7 +15,7 @@ LIVE_SIGNAL_BACKEND_AUTO = "auto"
 LIVE_SIGNAL_BACKEND_PYTHON = "python"
 LIVE_SIGNAL_BACKEND_RUST = "rust"
 LIVE_SIGNAL_BACKEND_ENV = "LQ_LIVE_SIGNAL_BACKEND"
-LIVE_SIGNAL_BACKEND_DLL_ENV = "LQ_LIVE_SIGNAL_BACKEND_DLL"
+LIVE_SIGNAL_BACKEND_DLL_ENV = "LQ_LIVE_SIGNAL_BACKEND_DLL"  # kept for env-var compat
 _VALID_BACKENDS = {
     LIVE_SIGNAL_BACKEND_AUTO,
     LIVE_SIGNAL_BACKEND_PYTHON,
@@ -32,26 +28,24 @@ _SIDE_MODES = {
 }
 _SIDE_MODE_NONE = 3
 
-_NATIVE_HANDLE: Any = None
-_DEBOUNCED_FN: Any = None
-_TRAILING_FN: Any = None
-_NATIVE_DLL = ""
-_NATIVE_LOAD_ERROR = ""
 _AUTO_FALLBACK_WARNED: set[str] = set()
 _LOGGER = logging.getLogger(__name__)
 
+# ── pyo3 bindings ─────────────────────────────────────────────────────────────
+_PYO3_DEBOUNCED_FN: Any = None
+_PYO3_TRAILING_FN: Any = None
+_PYO3_LOAD_ERROR: str = ""
 
-def _project_root() -> Path:
-    return Path(__file__).resolve().parents[3]
+try:
+    from lumina_quant._compute import (  # type: ignore[attr-defined]
+        debounced_state_signal as _pyo3_debounced,
+        trailing_state_signal as _pyo3_trailing,
+    )
 
-
-def _native_lib_filename(stem: str) -> str:
-    system_name = platform.system().lower()
-    if system_name == "windows":
-        return f"{stem}.dll"
-    if system_name == "darwin":
-        return f"lib{stem}.dylib"
-    return f"lib{stem}.so"
+    _PYO3_DEBOUNCED_FN = _pyo3_debounced
+    _PYO3_TRAILING_FN = _pyo3_trailing
+except Exception as _exc:
+    _PYO3_LOAD_ERROR = str(_exc)
 
 
 def normalize_live_signal_backend(value: str | None = None) -> str:
@@ -64,23 +58,6 @@ def normalize_live_signal_backend(value: str | None = None) -> str:
     return normalized
 
 
-def _discover_dll_candidates() -> list[str]:
-    explicit = str(os.getenv(LIVE_SIGNAL_BACKEND_DLL_ENV, "")).strip()
-    if explicit:
-        return [explicit]
-    root = _project_root()
-    return [
-        str(
-            root
-            / "native"
-            / "rust_live_signals"
-            / "target"
-            / "release"
-            / _native_lib_filename("lumina_live_signals")
-        )
-    ]
-
-
 def _warn_auto_fallback_once(reason: str) -> None:
     message = str(reason or "").strip()
     if not message or message in _AUTO_FALLBACK_WARNED:
@@ -90,90 +67,12 @@ def _warn_auto_fallback_once(reason: str) -> None:
 
 
 def load_live_signal_native_library() -> Any | None:
-    global _NATIVE_HANDLE, _NATIVE_DLL, _NATIVE_LOAD_ERROR
-    if _NATIVE_HANDLE is not None:
-        return _NATIVE_HANDLE
-    last_error = ""
-    for dll_path in _discover_dll_candidates():
-        if not dll_path or not os.path.exists(dll_path):
-            last_error = (
-                f"native library missing at {dll_path}"
-                if dll_path
-                else "native library path missing"
-            )
-            continue
-        try:
-            handle = ctypes.CDLL(dll_path)
-        except Exception as exc:  # pragma: no cover - platform loader detail
-            last_error = f"failed to load native library {dll_path}: {exc}"
-            continue
-        _NATIVE_HANDLE = handle
-        _NATIVE_DLL = dll_path
-        _NATIVE_LOAD_ERROR = ""
-        return handle
-    _NATIVE_LOAD_ERROR = last_error or "native library unavailable"
-    return None
-
-
-def _load_debounced_function() -> Any | None:
-    global _DEBOUNCED_FN
-    if _DEBOUNCED_FN is not None:
-        return _DEBOUNCED_FN
-    handle = load_live_signal_native_library()
-    if handle is None:
-        return None
-    try:
-        fn = handle.debounced_state_signal_native
-        fn.argtypes = [
-            ctypes.POINTER(ctypes.c_uint8),
-            ctypes.POINTER(ctypes.c_uint8),
-            ctypes.POINTER(ctypes.c_uint8),
-            ctypes.POINTER(ctypes.c_uint8),
-            ctypes.c_int32,
-            ctypes.c_int32,
-            ctypes.c_int32,
-            ctypes.c_int32,
-            ctypes.POINTER(ctypes.c_double),
-        ]
-        fn.restype = ctypes.c_int32
-    except Exception:  # pragma: no cover - corrupt/wrong library
-        return None
-    _DEBOUNCED_FN = fn
-    return fn
-
-
-def _load_trailing_function() -> Any | None:
-    global _TRAILING_FN
-    if _TRAILING_FN is not None:
-        return _TRAILING_FN
-    handle = load_live_signal_native_library()
-    if handle is None:
-        return None
-    try:
-        fn = handle.trailing_state_signal_native
-        fn.argtypes = [
-            ctypes.POINTER(ctypes.c_double),
-            ctypes.POINTER(ctypes.c_uint8),
-            ctypes.POINTER(ctypes.c_uint8),
-            ctypes.POINTER(ctypes.c_uint8),
-            ctypes.POINTER(ctypes.c_uint8),
-            ctypes.POINTER(ctypes.c_double),
-            ctypes.c_int32,
-            ctypes.c_int32,
-            ctypes.c_int32,
-            ctypes.c_int32,
-            ctypes.c_double,
-            ctypes.POINTER(ctypes.c_double),
-        ]
-        fn.restype = ctypes.c_int32
-    except Exception:  # pragma: no cover - corrupt/wrong library
-        return None
-    _TRAILING_FN = fn
-    return fn
+    """Return pyo3 debounced function if available (API preserved for callers)."""
+    return _PYO3_DEBOUNCED_FN
 
 
 def native_backend_available() -> bool:
-    return _load_debounced_function() is not None and _load_trailing_function() is not None
+    return _PYO3_DEBOUNCED_FN is not None and _PYO3_TRAILING_FN is not None
 
 
 def live_signal_backend_diagnostics(requested: str | None = None) -> dict[str, Any]:
@@ -187,8 +86,8 @@ def live_signal_backend_diagnostics(requested: str | None = None) -> dict[str, A
         "resolved_backend": resolved_backend,
         "description": description,
         "native_available": resolved_backend == LIVE_SIGNAL_BACKEND_RUST,
-        "native_library_path": _NATIVE_DLL or None,
-        "native_load_error": _NATIVE_LOAD_ERROR or None,
+        "native_library_path": None,
+        "native_load_error": _PYO3_LOAD_ERROR or None,
         "auto_fallback_warning_count": len(_AUTO_FALLBACK_WARNED),
         "auto_fallback_warning_reasons": sorted(_AUTO_FALLBACK_WARNED),
     }
@@ -204,7 +103,7 @@ def describe_live_signal_backend(requested: str | None = None) -> str:
             if mode == LIVE_SIGNAL_BACKEND_AUTO
             else f"{LIVE_SIGNAL_BACKEND_RUST}:unavailable"
         )
-    return f"{LIVE_SIGNAL_BACKEND_RUST}:{_NATIVE_DLL}"
+    return f"{LIVE_SIGNAL_BACKEND_RUST}:pyo3"
 
 
 def _side_mode(side: str) -> int:
@@ -245,15 +144,14 @@ def evaluate_debounced_state_native(
     if mode == LIVE_SIGNAL_BACKEND_PYTHON:
         return None
 
-    fn = _load_debounced_function()
-    if fn is None:
+    if _PYO3_DEBOUNCED_FN is None:
         if mode == LIVE_SIGNAL_BACKEND_RUST:
             raise RuntimeError(
                 "Rust live-signal backend requested but native library is unavailable"
             )
         _warn_auto_fallback_once(
             "Rust live-signal backend unavailable in auto mode; falling back to Python"
-            + (f" ({_NATIVE_LOAD_ERROR})" if _NATIVE_LOAD_ERROR else "")
+            + (f" ({_PYO3_LOAD_ERROR})" if _PYO3_LOAD_ERROR else "")
         )
         return None
 
@@ -263,31 +161,27 @@ def evaluate_debounced_state_native(
     long_exit_values = _as_bool_u8(long_exit, name="long_exit", expected_len=length)
     short_entry_values = _as_bool_u8(short_entry, name="short_entry", expected_len=length)
     short_exit_values = _as_bool_u8(short_exit, name="short_exit", expected_len=length)
-    out = np.zeros(length, dtype=np.float64)
     if length == 0:
-        return out
+        return np.zeros(0, dtype=np.float64)
 
-    status = int(
-        fn(
-            long_entry_values.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),
-            long_exit_values.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),
-            short_entry_values.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),
-            short_exit_values.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),
+    try:
+        return _PYO3_DEBOUNCED_FN(
+            long_entry_values,
+            long_exit_values,
+            short_entry_values,
+            short_exit_values,
             int(length),
             int(_side_mode(side)),
             int(min_hold_bars),
             int(cooldown_bars),
-            out.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
         )
-    )
-    if status != 0:
+    except Exception as exc:
         if mode == LIVE_SIGNAL_BACKEND_AUTO:
             _warn_auto_fallback_once(
-                f"Rust live-signal debounced kernel returned status={status}; falling back to Python"
+                f"Rust live-signal debounced kernel error; falling back to Python ({exc})"
             )
             return None
-        raise RuntimeError(f"Rust live-signal debounced kernel failed with status={status}")
-    return out
+        raise RuntimeError(f"Rust live-signal debounced kernel failed: {exc}") from exc
 
 
 def evaluate_trailing_state_native(
@@ -308,15 +202,14 @@ def evaluate_trailing_state_native(
     if mode == LIVE_SIGNAL_BACKEND_PYTHON:
         return None
 
-    fn = _load_trailing_function()
-    if fn is None:
+    if _PYO3_TRAILING_FN is None:
         if mode == LIVE_SIGNAL_BACKEND_RUST:
             raise RuntimeError(
                 "Rust live-signal backend requested but native library is unavailable"
             )
         _warn_auto_fallback_once(
             "Rust live-signal backend unavailable in auto mode; falling back to Python"
-            + (f" ({_NATIVE_LOAD_ERROR})" if _NATIVE_LOAD_ERROR else "")
+            + (f" ({_PYO3_LOAD_ERROR})" if _PYO3_LOAD_ERROR else "")
         )
         return None
 
@@ -328,34 +221,30 @@ def evaluate_trailing_state_native(
     long_exit_values = _as_bool_u8(long_exit, name="long_exit", expected_len=length)
     short_exit_values = _as_bool_u8(short_exit, name="short_exit", expected_len=length)
     atr_values = _as_float64(atr, name="atr", expected_len=length)
-    out = np.zeros(length, dtype=np.float64)
     if length == 0:
-        return out
+        return np.zeros(0, dtype=np.float64)
 
-    status = int(
-        fn(
-            close_values.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
-            long_entry_values.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),
-            short_entry_values.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),
-            long_exit_values.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),
-            short_exit_values.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),
-            atr_values.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
+    try:
+        return _PYO3_TRAILING_FN(
+            close_values,
+            long_entry_values,
+            short_entry_values,
+            long_exit_values,
+            short_exit_values,
+            atr_values,
             int(length),
             int(_side_mode(side)),
             int(min_hold_bars),
             int(cooldown_bars),
             float(trail_atr_mult),
-            out.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
         )
-    )
-    if status != 0:
+    except Exception as exc:
         if mode == LIVE_SIGNAL_BACKEND_AUTO:
             _warn_auto_fallback_once(
-                f"Rust live-signal trailing kernel returned status={status}; falling back to Python"
+                f"Rust live-signal trailing kernel error; falling back to Python ({exc})"
             )
             return None
-        raise RuntimeError(f"Rust live-signal trailing kernel failed with status={status}")
-    return out
+        raise RuntimeError(f"Rust live-signal trailing kernel failed: {exc}") from exc
 
 
 __all__ = [

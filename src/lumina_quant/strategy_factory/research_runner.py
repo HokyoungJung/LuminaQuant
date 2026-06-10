@@ -16,7 +16,7 @@ from typing import Any
 import numpy as np
 import polars as pl
 from lumina_quant.backtesting.cli_contract import RawFirstDataMissingError
-from lumina_quant.config import BacktestConfig
+from lumina_quant.configuration import get_default_runtime_config
 from lumina_quant.market_data import load_futures_feature_points_from_db
 from lumina_quant.storage.parquet import load_data_dict_from_parquet
 from lumina_quant.symbols import (
@@ -366,7 +366,7 @@ def _load_feature_frame(
         if "unexpected keyword argument" not in str(exc):
             raise
         return pl.DataFrame()
-    except (FileNotFoundError, OSError, RuntimeError, ValueError):
+    except FileNotFoundError, OSError, RuntimeError, ValueError:
         return pl.DataFrame()
 
 
@@ -601,7 +601,7 @@ def _compute_metrics(
         )
 
     resolved_rf = resolve_risk_free_config(
-        metric_config or BacktestConfig,
+        metric_config or get_default_runtime_config().backtest,
         periods_per_year=periods_per_year,
         timestamps=timestamps,
         size=int(returns.size),
@@ -5825,9 +5825,8 @@ def _apply_vol_managed_momentum_crash_gate_strategy(
         out=np.zeros_like(fast_vol, dtype=float),
         where=np.isfinite(fast_vol) & np.isfinite(slow_vol),
     )
-    stress = (
-        (benchmark_ret <= -float(params.get("crash_return_pct", 0.055)))
-        | (vol_ratio >= float(params.get("vol_ratio_max", 2.4)))
+    stress = (benchmark_ret <= -float(params.get("crash_return_pct", 0.055))) | (
+        vol_ratio >= float(params.get("vol_ratio_max", 2.4))
     )
     stress_reduce = np.clip(float(params.get("stress_reduce", 0.25)), 0.0, 1.0)
     long_scale = vol_scale * np.where(stress[np.newaxis, :], stress_reduce, 1.0)
@@ -5925,12 +5924,15 @@ def _flow_imbalance_series(
             bid_arr = np.asarray(bid, dtype=float)
             ask_arr = np.asarray(ask, dtype=float)
             mid = (bid_arr + ask_arr) * 0.5
-            spread_bps = np.divide(
-                ask_arr - bid_arr,
-                np.clip(mid, 1e-12, np.inf),
-                out=np.zeros(close.shape, dtype=float),
-                where=np.isfinite(mid),
-            ) * 10_000.0
+            spread_bps = (
+                np.divide(
+                    ask_arr - bid_arr,
+                    np.clip(mid, 1e-12, np.inf),
+                    out=np.zeros(close.shape, dtype=float),
+                    where=np.isfinite(mid),
+                )
+                * 10_000.0
+            )
 
     flow_score = (0.60 * taker_imbalance) + (0.40 * book_imbalance)
     return np.nan_to_num(flow_score, nan=0.0), np.nan_to_num(spread_bps, nan=np.inf)
@@ -6372,7 +6374,7 @@ def _metrics_for_mask(
         benchmark_returns=benchmark_returns[mask],
         periods_per_year=periods_per_year,
         num_trials=candidate_count,
-        metric_config=BacktestConfig,
+        metric_config=get_default_runtime_config().backtest,
         timestamps=timestamps[mask],
     )
 
@@ -6444,7 +6446,7 @@ def _candidate_oos_cost_stress_metrics(
         benchmark_returns=benchmark[oos_mask],
         periods_per_year=periods_per_year,
         num_trials=candidate_count,
-        metric_config=BacktestConfig,
+        metric_config=get_default_runtime_config().backtest,
         timestamps=timestamps[oos_mask],
     )
     oos_stress_x3 = _compute_metrics(
@@ -6454,7 +6456,7 @@ def _candidate_oos_cost_stress_metrics(
         benchmark_returns=benchmark[oos_mask],
         periods_per_year=periods_per_year,
         num_trials=candidate_count,
-        metric_config=BacktestConfig,
+        metric_config=get_default_runtime_config().backtest,
         timestamps=timestamps[oos_mask],
     )
     return oos_stress_x2, oos_stress_x3
@@ -7000,7 +7002,7 @@ def _load_timeframe_parquet_frames(
         if "unexpected keyword argument" not in str(exc):
             raise
         return {}
-    except (FileNotFoundError, OSError, RuntimeError, ValueError):
+    except FileNotFoundError, OSError, RuntimeError, ValueError:
         return {}
 
 
@@ -7044,7 +7046,7 @@ def _load_csv_bundle(
             continue
         try:
             frame_csv = _read_csv_ohlcv(csv_path)
-        except (FileNotFoundError, OSError, RuntimeError, ValueError):
+        except FileNotFoundError, OSError, RuntimeError, ValueError:
             frame_csv = pl.DataFrame()
         frame_csv = _filter_csv_frame_date_bounds(
             frame_csv,
@@ -7437,7 +7439,7 @@ def _research_report_builder() -> ResearchReportBuilder:
         candidate_rank_score=_candidate_rank_score,
         correlation=_correlation,
         periods_per_year=_PERIODS_PER_YEAR,
-        metric_config=BacktestConfig,
+        metric_config=get_default_runtime_config().backtest,
     )
 
 

@@ -312,7 +312,7 @@ def _load_module(path: Path, name: str) -> Any:
 def _safe_float(value: Any, default: float = 0.0) -> float:
     try:
         parsed = float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return float(default)
     return float(parsed) if math.isfinite(parsed) else float(default)
 
@@ -759,7 +759,7 @@ def _array_value(arrays: Mapping[str, Any], key: str, idx: int, default: float =
         return float(default)
     try:
         value = float(values[idx])
-    except (IndexError, TypeError, ValueError):
+    except IndexError, TypeError, ValueError:
         return float(default)
     return float(value) if math.isfinite(value) else float(default)
 

@@ -1,0 +1,52 @@
+{
+  "generated_at_utc": "2026-06-10T00:56:40.097449+00:00",
+  "hardware": {
+    "cpu_model": "12th Gen Intel(R) Core(TM) i5-12400F",
+    "ram_mb": 15871,
+    "gpu_present": true,
+    "gpu_model": "NVIDIA GeForce RTX 3050 OEM",
+    "nvidia_driver_version": "610.47",
+    "gpu_memory_mib": 8192,
+    "gpu_compute_cap": "8.6",
+    "cuda_umd_version": "13.3",
+    "python_version": "3.11.15",
+    "python_full": "3.11.15 (main, Apr 14 2026, 14:28:36) [Clang 22.1.3 ]",
+    "platform_kernel": "Linux-6.6.114.1-microsoft-standard-WSL2-x86_64-with-glibc2.39"
+  },
+  "axes": {
+    "walk_forward_kernel_elapsed_s": 178.076144,
+    "walk_forward_kernel_evals_per_sec": 28.08,
+    "walk_forward_e2e_elapsed_s": 170.70920570002636,
+    "walk_forward_e2e_status": "complete",
+    "backtest_median_bars_per_sec": 22.4430075946559,
+    "backtest_median_s": 56.49866643996211,
+    "live_signal_backend": "rust",
+    "live_signal_batch_rust_debounced_s_per_eval": 0.000502191599807702,
+    "live_signal_batch_rust_trailing_s_per_eval": 0.0007727951998822391,
+    "live_signal_batch_rust_total_s_per_eval": 0.0013637771602952853,
+    "live_signal_batch_python_total_s_per_eval": 0.2626461362600094,
+    "live_signal_batch_speedup_rust_vs_python": 192.5872817837345,
+    "live_signal_batch_parity_exact": true,
+    "live_signal_kernel_latency_median_ms": 0.030498486012220383,
+    "live_signal_kernel_latency_p95_ms": 0.0730808213120326,
+    "live_signal_kernel_latency_p99_ms": 0.1268380356486887,
+    "paper_order_path_latency_median_ms": 0.0008539645932614803,
+    "paper_order_path_latency_p95_ms": 0.0015040277503430843,
+    "paper_order_path_latency_p99_ms": 0.00187907076906413,
+    "paper_order_path_note": "OrderStateMachine.transition() only \u2014 pure Python dict lookup, no network, no exchange. Full tick\u2192order latency includes I/O and is measured in Phase 5 against testnet.",
+    "replay_path_proxy_latency_median_ms": 0.0012849923223257065,
+    "replay_path_proxy_note": "ShadowLiveRunner.run() parity-checker overhead on a single synthetic event \u2014 stable_event_sort + timestamp/sequence comparison only. NOT signal or order latency. Proxy for minimum replay-path overhead.",
+    "peak_rss_mb": 129.59,
+    "peak_rss_source": "bench_rss_time.log (/usr/bin/time -v)",
+    "peak_rss_gate_status": "PASS"
+  },
+  "source_files": {
+    "walk_forward_kernel": "baseline/bench_optimizer_kernel.txt",
+    "walk_forward_e2e": "baseline/bench_walkforward_e2e.json",
+    "backtest": "baseline/bench_backtest.json",
+    "live_signal_batch": "baseline/bench_live_signal.json",
+    "tick_latency": "baseline/bench_tick_latency.json",
+    "rss_time_log": "baseline/bench_rss_time.log",
+    "memory_gate": "baseline/8gb_gate.json"
+  }
+}

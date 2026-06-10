@@ -61,6 +61,11 @@ class RiskConfig:
     max_rolling_loss_pct_1h: float = 0.05
     freeze_new_entries_on_breach: bool = True
     auto_flatten_on_breach: bool = False
+    # Phase 5 kill-switch envelope: non-bypassable risk caps
+    max_position_size_pct: float = 1.0  # (0, 1] — per-symbol position size as fraction of capital
+    consecutive_loss_halt_count: int = (
+        5  # > 0 — freeze new entries after N consecutive realized losses
+    )
 
 
 @dataclass(slots=True)
@@ -75,6 +80,7 @@ class ExecutionConfig:
     funding_interval_hours: int = 8
     maintenance_margin_rate: float = 0.005
     liquidation_buffer_rate: float = 0.0005
+    max_bar_volume_ratio: float = 0.1
     compute_backend: str = "gpu"
     gpu_mode: str = "gpu"
     gpu_vram_gb: float = 8.0
@@ -201,6 +207,21 @@ class LiveRuntimeConfig:
     market_data_source: str = "committed"
     order_state_source: str = "polling"
     shadow_live_enabled: bool = False
+    # Phase 5 go-live gate pipeline (R7: free stage composition, per-stage entry checks)
+    go_live_stage: str = "testnet"  # testnet | shadow | canary | full
+    kill_switch_enabled: bool = True  # always-on; validate.py REJECTS False
+    canary_position_fraction: float = 0.10  # position sizing fraction during canary stage (0, 1]
+    # shadow_parity_min_ratio / shadow_parity_window_bars govern the shadow-stage entry
+    # check.  The caller must pass an explicit measured parity_ratio (from
+    # ShadowLiveRunner.evaluate_signal_parity) to readiness_policy; an unmeasured ratio
+    # (None) blocks shadow entry by design — the default=1.0 in the runner is a
+    # "no comparison made" sentinel for the runner itself, not a bypass of the gate.
+    # canary/full entry NEVER depends on parity — it gates on artifact flags
+    # (canary_execution_allowed, real_money_execution) + LUMINA_ENABLE_LIVE_REAL.
+    # Shadow is the measuring stage (testnet-routed, no money at risk);
+    # canary is the deploying stage with its own artifact gate.
+    shadow_parity_min_ratio: float = 0.99  # minimum signal agreement ratio for shadow entry
+    shadow_parity_window_bars: int = 1000  # bars to evaluate parity over
     reconciliation_poll_fallback_enabled: bool = True
     book_ticker_enabled: bool = False
     default_order_type: str = "LMT"
@@ -279,6 +300,39 @@ class PromotionGateConfig:
 
 
 @dataclass(slots=True)
+class MemoryConfig:
+    """Memory usage limits."""
+
+    cap_gb: float = 8.0
+
+
+@dataclass(slots=True)
+class ValidationConfig:
+    """Validation and testing contracts."""
+
+    golden_rtol: float = 1e-8
+
+
+_VALID_DATA_KINDS: frozenset[str] = frozenset(
+    {"ohlcv", "funding", "feature_points", "aggtrades_tick"}
+)
+
+
+@dataclass(slots=True)
+class DataConfig:
+    """Data-collection settings.
+
+    ``kinds`` is the explicit list of data kinds the collector will fetch.
+    Valid values: ohlcv, funding, feature_points, aggtrades_tick.
+    ``aggtrades_tick`` is validation-only (testnet/paper/replay; no live orders).
+    ``tick_path`` overrides the parquet root for raw aggTrades archives.
+    """
+
+    kinds: list[str] = field(default_factory=lambda: ["ohlcv", "funding", "feature_points"])
+    tick_path: str = ""
+
+
+@dataclass(slots=True)
 class RuntimeConfig:
     """Full runtime configuration bundle."""
 
@@ -287,8 +341,11 @@ class RuntimeConfig:
     risk: RiskConfig = field(default_factory=RiskConfig)
     execution: ExecutionConfig = field(default_factory=ExecutionConfig)
     storage: StorageConfig = field(default_factory=StorageConfig)
+    data: DataConfig = field(default_factory=DataConfig)
     backtest: BacktestRuntimeConfig = field(default_factory=BacktestRuntimeConfig)
     live: LiveRuntimeConfig = field(default_factory=LiveRuntimeConfig)
     optimization: OptimizationRuntimeConfig = field(default_factory=OptimizationRuntimeConfig)
     market_window: MarketWindowConfig = field(default_factory=MarketWindowConfig)
     promotion_gate: PromotionGateConfig = field(default_factory=PromotionGateConfig)
+    memory: MemoryConfig = field(default_factory=MemoryConfig)
+    validation: ValidationConfig = field(default_factory=ValidationConfig)

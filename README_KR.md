@@ -1,8 +1,8 @@
-# LuminaQuant 문서
-
-**LuminaQuant**는 전문적인 백테스팅 및 실거래를 위해 설계된 고급 이벤트 기반 퀀트 트레이딩 시스템입니다. 다중 거래소 지원, 강력한 상태 관리, 정교한 전략 최적화 기능을 갖춘 모듈식 아키텍처를 특징으로 합니다.
-
 [English Version](README.md)
+
+# LuminaQuant
+
+**LuminaQuant**는 전문적인 백테스팅, 워크포워드 최적화, 실거래를 위한 고성능 config 기반 퀀트 트레이딩 엔진입니다. 아키텍처 전면 개편(Phase 4–7)을 통해 레거시 이벤트 루프를 Rust 가속 커널과 통합 ExecutionModel로 교체했으며, Next.js 15 대시보드와 단일 `config.yaml` 기반 사용자 제어 인터페이스를 갖추고 있습니다.
 
 ## 저장소 역할 (Source of Truth)
 
@@ -12,551 +12,293 @@
 
 ---
 
-## 📚 문서 목차 (Documentation Index)
+## 빠른 시작
 
-| 섹션 | 설명 |
+### 필수 요구사항
+
+| 항목 | 비고 |
 | :--- | :--- |
-| **[설치 및 설정](#설치-installation)** | LuminaQuant 시작하기. |
-| **[운영 워크플로우](docs/kr/WORKFLOW.md)** | Private/Public 브랜치 운영 및 공개 배포 체크리스트. |
-| **[로컬 산출물 정리](docs/kr/LOCAL_ARTIFACT_CLEANUP.md)** | 연구노트/결과/data를 보존하면서 cache/log/build 산출물을 안전하게 정리. |
-| **[Live Readiness 런북](docs/live-readiness/04-paper-trading-runbook.md)** | paper/testnet 전용 live handoff, protective-order 계약, real-money blocker. |
-| **[8GB 기준 Quickstart](docs/kr/QUICKSTART_8GB_BASELINE.md)** | 설치/스모크/섀도우라이브/대시보드/안전종료/정리 최소 절차. |
-| **[마이그레이션 가이드](docs/kr/MIGRATION_GUIDE_POSTGRES_PARQUET.md)** | 레거시 저장소 제거 후 Parquet + PostgreSQL 전환 가이드. |
-| **[GPU 자동 실행 설계](docs/kr/DESIGN_NOTES_GPU_AUTO.md)** | Polars GPU/CPU 선택, GPU-first 기본값, CI 검증 전략 설명. |
-| **[Rust Native 가속](docs/kr/RUST_NATIVE_ACCELERATION.md)** | hotspot만 Rust로 전환하는 정책, 빌드 명령, 벤치마크 근거. |
-| **[최적화 리팩터링 노트](docs/kr/OPTIMIZATION_REFACTOR_NOTES.md)** | 공용 Optuna/search policy, bounded-grid 예외, cleanup 규칙. |
-| **[1년+ 1초 로컬 런북](docs/kr/RUNBOOK_1Y_1S_LOCAL.md)** | 8GB RAM / 8GB VRAM 기준 장기 로컬 실행/튜닝 절차. |
-| **[선물 전략 팩토리](docs/kr/FUTURES_STRATEGY_FACTORY.md)** | 후보 생성, 가중치 기반 숏리스트, 단일-자산 조합 정책. |
-| **[스코어 설정 가이드](docs/kr/SCORING_CONFIG_GUIDE.md)** | 리서치/숏리스트/최적화 스크립트 공용 score-config 템플릿 사용법. |
-| **[거래소 가이드](docs/kr/EXCHANGES.md)** | **바이낸스 USDⓈ-M 선물**, **MetaTrader 5 (MT5)**, **Polymarket** 상세 설정법. |
-| **[외부 데이터 가이드](docs/kr/EXTERNAL_DATA.md)** | 사용자 보유 데이터를 백테스트/라이브에 연결하는 canonical contract 설명. |
-| **[최소 설치 프로필](docs/kr/MINIMAL_INSTALLS.md)** | 백테스트 전용 / 라이브 전용 설치를 위한 persona-oriented extras. |
-| **[거래 매뉴얼](docs/kr/TRADING_MANUAL.md)** | **실전 운용법**: 매수/매도, 레버리지, TP/SL, 트레일링 스탑. |
-| **[성과 지표](docs/kr/METRICS.md)** | Sharpe, Sortino, Alpha, Beta 등 지표에 대한 설명. |
-| **[개발자 API](docs/kr/API.md)** | 전략 작성법 및 시스템 확장 가이드. |
-| **[기여 가이드](CONTRIBUTING.md)** | 로컬 체크/CI parity 명령/PR 기준. |
-| **[보안 정책](SECURITY.md)** | 취약점 제보 및 자격증명 관리 정책. |
-| **[구성 (Configuration)](#구성-configuration)** | `config.yaml` 빠른 참조. |
+| Python >=3.14 | `uv`로 관리 |
+| [uv](https://docs.astral.sh/uv/) | 의존성 및 런타임 관리 |
+| ta-lib 시스템 라이브러리 | `apt install libta-lib-dev` 또는 동등한 패키지 |
+| Rust + maturin | `native/lumina_compute` pyo3 확장 빌드에 필요 |
+| Node 20+ | 대시보드 프런트엔드 전용 |
 
----
-
-## 🏗 아키텍처 (Architecture)
-
-LuminaQuant는 모듈식 **이벤트 기반 아키텍처(Event-Driven Architecture)**를 따릅니다:
-
-```mermaid
-graph TD
-    Data[Data Handler] -->|MarketEvent| Engine[Trading Engine]
-    Engine -->|MarketEvent| Strategy[Strategy]
-    Strategy -->|SignalEvent| Portfolio[Portfolio]
-    Portfolio -->|OrderEvent| Execution[Execution Handler]
-    Execution -->|FillEvent| Portfolio
-```
-
-- **DataHandler**: 과거(CSV) 또는 실시간(WebSocket) 데이터 피드를 관리합니다.
-- **Strategy**: 시장 데이터를 기반으로 `SignalEvent`를 생성합니다 (예: RSI < 30).
-- **Portfolio**: 상태, 포지션, 리스크를 관리하며, 신호를 `OrderEvent`로 변환합니다.
-- **ExecutionHandler**: 체결을 시뮬레이션(백테스트)하거나 API를 통해 실행(실거래)합니다.
-
-현재 기본 로컬 스택:
-- **1초 캔들 저장소**: Parquet(ZSTD, exchange/symbol/date 파티션)
-- **상태/감사/잡 관리**: PostgreSQL(local)
-- **백테스트/최적화 계산**: Polars Lazy + GPU 우선 실행(`gpu` 기본, CI/비GPU 환경은 `cpu` 또는 `auto` override 가능)
-- **Native/fast-path 가속**: Python API는 안정적으로 유지하고, 효과가 검증된 hot kernel만 Rust를 내부에서 사용합니다. raw-first aggTrades→1초 OHLCV, Alpha Zoo Optuna hybrid portfolio loop, Alpha Zoo live state-signal state machine은 Rust backend가 빌드되어 있으면 자동 로드합니다. live `MARKET_WINDOW` 생성은 Rust로 넘겨도 Python tuple 변환 비용이 남는 경계라 trusted Python fast path로 최적화했고, metrics evaluator는 현재 로컬 Rust metrics가 Numba보다 빠르지 않아 Numba/Python auto-selection을 유지합니다.
-
-## 현재 Private Paper/Testnet 상태 (2026-05-30)
-
-현재 private Alpha Zoo live handoff는 **paper/testnet 전용**이며 real-money 승인이 아닙니다.
-
-- 선택 runtime: `AlphaZooOptunaHybridLiveStrategy`입니다. 현재 69-symbol efficiency-repair handoff는 artifact가 선택한 v3.6 hybrid를 사용하고, 기존 standard/live-refit v3.5 artifact는 historical baseline으로 남깁니다.
-- 표준 live refit은 이제 committed data를 최신화한 뒤, 최신 8개 완성 주를 validation으로 두고,
-  노출된 모든 hybrid parameter를 Optuna로 튜닝한 다음 train+validation으로 final refit해서
-  runtime artifact를 freeze합니다. live final-refit 모드에서는 locked-OOS/test set을 의도적으로 두지 않습니다.
-- 최신 표준 refit evidence는
-  `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_standard_live_refit_20260528/`에 있으며,
-  watch universe 데이터 coverage는 `2026-05-28T10:59:59Z`까지 갱신되었습니다.
-- 전체 69개 Binance research universe용 challenger evidence가 있습니다. 수정된 efficiency-repaired paper/testnet 후보는
-  `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_69_asset_efficiency_repair_optuna_20260530/`에 있으며,
-  train split에 없는 symbol/timeframe은 parameter fitting, sleeve allocation, hybrid selection, live promotion에서 제외합니다. 현재 paper/testnet live handoff는 `hybrid_v3_6_optuna_three_profile_blend`이고 train `+96.5913%`, validation `+68.1871%`, validation MDD `7.8678%`, train/validation RPT proxy `42.30/149.64bps`, live final gross `2.3389x`입니다. 이전 `+295.9880%/+172.7926%` headline은 validation-only asset이 allocation에 들어간 결과라 supersede했습니다. eligibility fix 이후 v3.5는 비교 후보(`+153.0941%/+57.2165%`)로만 남고 선택 live handoff는 아닙니다. paper/testnet live decision artifact와 live adapter 지원은 있지만, real-money 승인은 아닙니다.
-- live 구현은 재현성 기준으로 모듈을 분리했습니다:
-  `lumina_quant.alpha_zoo.optuna_hybrid_config`는 frozen artifact/config 로딩,
-  `lumina_quant.alpha_zoo.optuna_hybrid_signals`는 optional Rust state-machine 가속을 포함한 signal/bar 연산,
-  `lumina_quant.alpha_zoo.optuna_hybrid_live_strategy`는 orchestration/event emission을 담당합니다.
-- regression test가 선택 artifact 성적, live limit-first decision contract, sleeve/weight 재구성을
-  먼저 고정하므로 이후 refactor에서 결과 drift를 잡습니다.
-- live rolling `MARKET_WINDOW` 경로는 내부 canonical producer(`RollingWindowAggregator`, committed materialized snapshot)에 한해서만 중복 row normalization을 건너뜁니다. 외부 payload는 계속 전체 schema normalization을 탑니다.
-- 최신 handoff artifact의 안전 플래그는 계속 hard-false입니다: `ready_for_real=false`, `real_money_execution=false`, `real_execution_allowed=false`.
-- live 주문 생성은 기본적으로 limit-first입니다. 진입, 숏 진입, reduce-only exit, risk-flatten 주문은 `LMT`를 쓰며, 시장가는 `live.default_order_type: "MKT"`와 `live.allow_market_orders: true`를 명시해야만 옵션으로 켤 수 있습니다.
-- 기본 limit 가격은 빠른 bounded execution을 위해 `one_tick_worse`입니다. BUY는 기준가보다 1 tick 위, SELL은 기준가보다 1 tick 아래이며, `same_price`와 `one_tick_better`도 설정 가능합니다.
-- paper/testnet 보호 경로는 local intrabar component exit와 entry fill 이후 Binance USDⓈ-M conditional algo limit 보호 주문을 모두 포함합니다: `POST /fapi/v1/algoOrder`의 `STOP` / `TAKE_PROFIT`.
-- Binance algo request payload는 문서화된 거래소 field allowlist만 통과하고, parent/protection telemetry는 reconciliation용 local record에만 남깁니다.
-- legacy ETH/SOL/TRX adapter와 69-symbol efficiency-repair adapter 재구성/signal math를 regression test로 고정했습니다. 거래소 fill 검증은 아직 필요합니다.
-- limit 주문이 체결되지 않으면 paper/testnet 정책은 cancel → partial fill reconcile → 다음 completed-bar signal까지 revalidate/skip입니다. 가격 추격과 market fallback은 기본 금지입니다.
-- 실제 paper/testnet fill, BBO spread, slippage, reject/timeout, reconciliation, protective-order telemetry가 10bps/replay-live parity 가정을 증명하기 전까지 real-money는 계속 차단됩니다. live 경로는 이제 Binance `bookTicker` snapshot을 파싱하고, strategy slippage policy가 붙은 주문은 BBO 누락/고스프레드/고슬리피지 상태에서 market 전환 없이 skip합니다.
-
-현재 operator handoff는 `docs/live-readiness/04-paper-trading-runbook.md`와 `docs/research_note/research_note.md`를 기준으로 합니다.
-
-연구노트는 cache가 아니라 `docs/`에 둡니다. 현재 표준 연구노트 디렉터리는 `docs/research_note/`입니다 (`research_note.md`가 현재 노트, `research_history.md`가 전체 ledger), 세션 checkpoint는 `.omx/notepad.md`, 큰 생성 증거는 `var/reports/`에 보존합니다. 삭제 전 `docs/kr/LOCAL_ARTIFACT_CLEANUP.md`를 기준으로 확인하세요.
-
----
-
-## ⚙️ 설정 및 구성 (Setup & Configuration)
-
-### 필수 요구사항 (Prerequisites)
-- Python 3.11 이상 3.14 미만
-- [uv](https://docs.astral.sh/uv/) (의존성/실행 환경 관리)
-- [Polars](https://pola.rs/) `polars>=1.35.2,<1.36` 고정 + GPU extra는 `cudf-polars-cu12>=26.2,<26.3`로 고정 (현재 CI/runtime 계약에서 검증된 RAPIDS 라인); pandas는 별도 pandas-3 호환성 검증 전까지 검증된 2.x 라인(`pandas>=2.2.0,<3`) 유지
-- [Talib](https://github.com/TA-Lib/ta-lib-python) (기술적 지표 계산을 위해 사용)
-
-### 환경 변수 (Environment Variables)
-보안을 위해 **API 키를 절대 커밋하지 마세요**. 루트 디렉토리에 `.env` 파일을 생성하여 관리합니다:
-
-```ini
-# .env 파일 예시
-BINANCE_API_KEY=your_api_key
-BINANCE_SECRET_KEY=your_secret_key
-LQ_POSTGRES_DSN=postgresql://localhost:5432/luminaquant
-LQ_GPU_MODE=gpu
-LQ_GPU_DEVICE=0
-LOG_LEVEL=INFO
-```
-
-*템플릿은 `.env.example` 파일을 참고하세요.*
-
----
-
-## 🚀 빠른 시작 (Quick Start)
-
-### 1. 설치 (Installation)
+### 설치
 
 ```bash
-# Private 원본 저장소 복제 (유지보수 권장)
+# 비공개 저장소 (이 repo)
 git clone https://github.com/hoky1227/Quants-agent.git
 cd Quants-agent
 
-# Public 미러 대안 (외부/읽기 중심)
-# git clone https://github.com/HokyoungJung/LuminaQuant.git
-# cd LuminaQuant
+# 공개 미러 (LuminaQuant)
+git clone https://github.com/HokyoungJung/LuminaQuant.git
+cd LuminaQuant
 
-# 프로젝트 Python 버전 고정 (< 3.14)
-uv python pin 3.13
+# 코어 + 주요 extras
+uv sync --extra optimize --extra live-binance --extra dashboard --extra dev
 
-# 예시: 전체 로컬 개발 설치
-uv sync --extra backtest --extra optimize --extra live-binance --extra live-mt5 --extra live-polymarket --extra dashboard --extra dev
+# Rust pyo3 확장 빌드 (백테스트/최적화/실거래에 필수)
+python scripts/build_native_backends.py
 
-# 대시보드 프런트엔드(Next.js)는 Node 20+ 의존성도 1회 설치 필요
+# 대시보드 프런트엔드 (최초 1회)
 cd apps/dashboard_web && npm install && cd ../..
 
-# (선택 사항) Linux x86_64 + CUDA 12 GPU 런타임
+# 선택 사항: GPU 런타임 (Linux x86_64 + CUDA 12 전용)
+# 핵심 pin: polars>=1.35.2, GPU 엔진 cudf-polars-cu12>=26.6
 uv sync --extra gpu
-
-# 설치/테스트 기본 검증
-uv run python scripts/verify_install.py
-
-# 예시: 최소 설치 프로필
-uv sync --extra backtest --extra dev
-uv sync --extra live-binance --extra dev
-uv sync --extra live-mt5 --extra dev
-uv sync --extra live-polymarket --extra dev
 ```
 
-### 1분 최소 실행 (DB/API 키 불필요)
+**제공 extras:** `backtest` · `optimize` · `gpu` · `live-binance` · `live-mt5` · `live-polymarket` · `dashboard` · `dev`
+
+### 스모크 테스트 (DB·API 키 불필요)
 
 ```bash
 uv run python scripts/minimum_viable_run.py
 ```
 
-이 명령은 (필요 시) 작은 synthetic CSV 데이터를 생성하고, 로컬 CSV 전용 백테스트 프로필로 스모크 백테스트를 실행합니다. PostgreSQL/거래소 키가 필요 없습니다.
+### 백테스트 실행
 
-### 2. 구성 (Configuration)
+```bash
+uv run lq backtest
+```
 
-LuminaQuant는 `config.yaml` 파일로 모든 설정을 관리합니다.
+### 워크포워드 최적화
 
-**일반 설정:**
+```bash
+uv run lq optimize
+```
+
+### 대시보드 실행
+
+```bash
+uv run lq dashboard --run
+```
+
+---
+
+## CLI 참조
+
+`uv run lq <command>`가 유일하게 지원되는 진입점입니다. 루트 호환 shim은 제거되었습니다.
+
+| 명령 | 기능 |
+| :--- | :--- |
+| `lq backtest` | 설정된 전략으로 백테스트 실행 |
+| `lq optimize` | Optuna 기반 워크포워드 최적화 |
+| `lq live` | 실거래 시작 (기본값: paper/testnet) |
+| `lq data` | 데이터 수집 및 materialization 헬퍼 |
+| `lq exact-window` | 틱 재현 윈도우 기준 exact-window 평가 |
+| `lq autonomous-research` | 자율 전략 리서치 파이프라인 |
+| `lq dashboard` | Next.js 대시보드 관리 (`--run`, `--print-contract`) |
+| `lq config show` | 해석된 `RuntimeConfig`를 JSON으로 출력 |
+| `lq config validate` | config YAML을 전체 정규화 파이프라인으로 검증 |
+| `lq registry list` | 등록된 전략·지표·포트폴리오 최적화기 목록 출력 |
+
+---
+
+## 구성 (Configuration)
+
+모든 사용자 설정은 **`config.yaml`**(루트)과 활성 프로필 **`configs/profiles/{paper,real,research}.yaml`**에 집중되어 있습니다. 소스 코드를 수정할 필요가 거의 없습니다.
+
+주요 설정 섹션과 주요 항목:
+
 ```yaml
+# 거래소 / 드라이버 선택
+live:
+  exchange:
+    driver: "binance_futures"   # binance_futures | mt5 | polymarket
+
+# 심볼 및 데이터 종류
 trading:
   symbols: ["BTC/USDT", "ETH/USDT"]
-  timeframe: "1h"
-  initial_capital: 10000.0
+data:
+  kinds: [ohlcv, funding, feature_points]  # ohlcv | funding | feature_points | aggtrades_tick
+
+# 전략 선택
+optimization:
+  strategy: "RsiStrategy"       # 플러그인 레지스트리의 클래스명
+
+# 메모리 한도 및 황금 회귀 허용 오차
+memory:
+  cap_gb: 8.0
+validation:
+  golden_rtol: 1.0e-8
+
+# 실거래 안전 파이프라인
+live:
+  go_live_stage: "testnet"      # testnet | shadow | canary | full
+  kill_switch_enabled: true     # 항상 활성 — false로 설정하면 로드 시 거부됨
+  canary_position_fraction: 0.10
 ```
 
-**거래소 선택:**
-
-*   **바이낸스 USDⓈ-M 선물**: `driver: "binance_futures"` 설정
-*   **MetaTrader 5 (FX/주식)**: `driver: "mt5"` 설정
-
-*👉 상세한 인증/제공자 설정은 [거래소 가이드](docs/kr/EXCHANGES.md), [외부 데이터 가이드](docs/kr/EXTERNAL_DATA.md), [최소 설치 프로필](docs/kr/MINIMAL_INSTALLS.md)을 참고하세요.*
-
-### Public / Private 저장소 범위
-
-- Public 저장소에서는 아래 연구 IP를 의도적으로 제외합니다.
-  - `src/lumina_quant/indicators/`
-  - `strategies/`
-  - 전략/지표 전용 테스트 파일
-- Public 저장소에서는 DB 구축/동기화 코드도 제외합니다.
-  - `src/lumina_quant/data_sync.py`
-  - `src/lumina_quant/data_collector.py`
-  - `scripts/sync_binance_ohlcv.py`
-  - `scripts/collect_market_data.py`
-  - `tests/test_data_sync.py`
-- Public 저장소에서는 아래 연구/배포 메타데이터 surface도 제외합니다.
-  - 튜닝된 candidate library / research runner / article-pipeline workflow
-  - exact-window 평가/리포팅/대시보드 surface와 deployment scenario 생성기
-  - follow-up watchlist 로직과 research candidate/optimization orchestration
-  - 튜닝 상수, family ID, shortlist 메타데이터를 드러내는 전략 전용 테스트
-- 전략/지표 전체 구현 및 AGENTS 가이드는 Private 저장소에서 관리합니다.
-- DB/런타임 산출물은 게시하지 않습니다 (`data/`, `logs/`, `.omx/`, `.sisyphus/`).
-- 정상적인 운영/검토용 report 산출물은 Private 저장소에 둘 수 있지만, Public 저장소에는 push 하지 않습니다.
-
-### 3. 시스템 실행 (Running the System)
-
-**(Private 저장소 전용) 바이낸스 OHLCV 전체 수집 + Parquet 업데이트 (+CSV 미러):**
-```bash
-uv run python scripts/sync_binance_ohlcv.py \
-  --symbols BTC/USDT ETH/USDT \
-  --timeframe 1m \
-  --db-path data/market_parquet \
-  --force-full
-```
-
-Public 저장소에는 DB 동기화/구축 헬퍼를 의도적으로 포함하지 않습니다. 사전 구축된 DB 파일 또는 CSV 데이터를 사용하세요.
-
-확장 Binance research universe(private 저장소): `src/lumina_quant/research_universe.py`에 현재 기준 10개 core crypto + 75개 Binance USD-M `TRADIFI_PERPETUAL` 심볼 snapshot(요청 universe 85개)을 side-effect-free 상수로 기록했습니다. Research bar coverage는 local/private입니다. 2026-06-05 backfill report 기준 85/85개 심볼이 `2026-06-05T12:00:00`까지 로드되었지만, 신규 TradFi 상장 심볼은 train-split bar가 생기기 전까지 tuning/allocation/live promotion에서 제외합니다. monthly-refit runner는 requested/loaded/missing symbol을 기록하고 missing symbol 때문에 실패하지 않으므로 staged backfill 이후 자동 편입될 수 있습니다. 목록 추가 또는 research bar 수집은 real-money 승인이 아닙니다. `docs/kr/RUNBOOK_1Y_1S_LOCAL.md` 및 `docs/research_note/research_note.md`를 참고하세요.
-
-**Raw aggTrades → 커밋된 materialized 파이프라인 (Private 저장소):**
-```bash
-# 0) 최초 부트스트랩(권장): 처음 1회는 --since를 명시하세요.
-uv run python scripts/collect_binance_aggtrades_raw.py \
-  --symbols BTC/USDT,ETH/USDT \
-  --db-path data/market_parquet \
-  --since 2026-03-01T00:00:00Z \
-  --no-periodic
-
-# 1) Raw 수집기 (체크포인트 재개 + 주기 루프)
-uv run python scripts/collect_binance_aggtrades_raw.py \
-  --symbols BTC/USDT,ETH/USDT \
-  --db-path data/market_parquet \
-  --periodic --poll-seconds 2 --cycles 2
-
-# 2) Materializer (raw -> 커밋된 1s + trading.timeframes 번들)
-uv run python scripts/materialize_market_windows.py \
-  --symbols BTC/USDT,ETH/USDT \
-  --timeframes 1s,1m,5m,15m,30m,1h,4h,1d \
-  --db-path data/market_parquet \
-  --periodic --poll-seconds 5 --cycles 2
-
-# 3) Live 트레이더 (기본=committed 소스, 설정으로 Binance 실시간 소스 가능)
-uv run lq live
-```
-
-Collector 부트스트랩 동작:
-- `--since`가 비어 있고 raw 체크포인트도 없으면
-  `now - storage.collector_bootstrap_lookback_hours`(기본 24시간)부터 시작합니다.
-- 초기 커버리지를 정확히 맞추려면 최초 1회는 `--since`를 명시하는 것을 권장합니다.
-
-Materializer 윈도우 동작:
-- `--start-date/--end-date`를 비우면, 주기적 materializer는 최신 `1s` 커밋
-  manifest를 기준으로 아직 변경될 수 있는 UTC 날짜 파티션만 다시 읽습니다
-  (기본 timeframe 세트에서는 보통 "당일 UTC 구간"만 재계산하며, 실제 재생 범위는
-  가장 큰 required timeframe과 마지막 커밋 anchor 이후의 날짜 경계 차이에 따라 달라집니다).
-- 과거 전체를 의도적으로 다시 만들거나, 마지막 materializer anchor보다 더 과거에
-  raw 백필/수정이 들어왔으면 `--full-rebuild`를 사용하세요.
-
-라이브 시작 전 커밋 데이터 확인:
-```bash
-uv run python - <<'PY'
-from lumina_quant.storage.parquet import ParquetMarketDataRepository
-repo = ParquetMarketDataRepository("data/market_parquet")
-for symbol in ("BTC/USDT", "ETH/USDT"):
-    frame = repo.load_committed_ohlcv_chunked(exchange="binance", symbol=symbol, timeframe="1s")
-    print(symbol, frame.height, frame["datetime"].max())
-PY
-```
-
-롤아웃 게이트 메트릭(베이스라인/카나리):
-```bash
-uv run python scripts/ci/export_market_window_gate_metrics.py \
-  --input logs/live/market_window_metrics.ndjson \
-  --output reports/live_rollout/baseline_gate_metrics.json \
-  --window-hours 24 --require-flag false
-
-uv run python scripts/ci/export_market_window_gate_metrics.py \
-  --input logs/live/market_window_metrics.ndjson \
-  --output reports/live_rollout/canary_gate_metrics.json \
-  --window-hours 24 --require-flag true
-
-uv run python scripts/ci/check_market_window_rollout_gates.py \
-  --baseline reports/live_rollout/baseline_gate_metrics.json \
-  --canary reports/live_rollout/canary_gate_metrics.json \
-  --max-p95-payload-bytes 131072 \
-  --max-queue-lag-increase-pct 5 \
-  --max-fail-fast-incidents 0
-```
-
-**전략 백테스트:**
-```bash
-uv run lq backtest --data-mode raw-first
-
-# DB 데이터만 사용
-uv run lq backtest \
-  --data-mode raw-first \
-  --data-source db \
-  --backtest-mode windowed \
-  --market-db-path data/market_parquet
-```
-
-`LQ_POSTGRES_DSN`이 없으면 백테스트는 계속 실행되지만 PostgreSQL 감사(audit) 저장은 건너뜁니다.
-
-**워크포워드 최적화:**
-```bash
-uv run lq optimize --data-mode raw-first
-
-# DB 우선, 부족하면 CSV fallback
-uv run lq optimize \
-  --data-mode raw-first \
-  --data-source auto \
-  --market-db-path data/market_parquet
-```
-
-**권장 통합 CLI (`lq`):**
-```bash
-uv run lq backtest --data-mode raw-first
-uv run lq optimize --data-mode raw-first
-uv run lq live --transport poll
-uv run lq live --transport ws
-uv run lq dashboard --run
-uv run lq dashboard --print-contract
-```
-
-**간단한 로컬 시작/중지 래퍼 (Linux/macOS 셸):**
-```bash
-# 제어된 paper 1회 실행 (env 로드 + 선택적 refresh/validate/preflight)
-bash scripts/ops/start_live_session.sh --dsn 'postgresql:///luminaquant'
-
-# 런타임 크래시 시 자동 재시작하는 paper 러너
-bash run_bot.sh --dsn 'postgresql:///luminaquant'
-
-# paper 정상 종료
-bash scripts/ops/stop_live_session.sh
-
-# ~/.bashrc 에 쉬운 셸 함수 설치
-bash scripts/ops/install_shell_aliases.sh
-source ~/.bashrc
-
-# 이후 사용:
-lq-paper-on
-lq-paper-off
-lq-real-on
-lq-real-off
-```
-
-루트 호환 shim은 제거되었습니다. `uv run lq ...`를 단일 공식 엔트리포인트로 사용하세요.
-
-### 선택적 private 확장 패키지
-
-public/main과 private/main은 동일한 저장소 레이아웃을 유지할 수 있습니다.
-비공개 전략/지표 구현은 별도 확장 패키지로 배포하면 됩니다.
-
-- 패키지/모듈: `lumina_quant_private`
-- 선택적 전략 레지스트리: `lumina_quant_private.strategy_registry`
-- 선택적 지표 모듈: `lumina_quant_private.indicators`
-
-해당 패키지가 설치되면 `lumina_quant.strategies.registry`와 `lumina_quant.indicators`가 런타임에 자동으로 private export를 병합합니다.
-
-
-**전략 팩토리 파이프라인 (후보 + 숏리스트):**
-```bash
-# dry-run (후보 수만 출력하고 파일은 쓰지 않음)
-uv run python scripts/run_research_pipeline.py --dry-run
-
-# 후보/숏리스트 생성
-uv run python scripts/run_research_pipeline.py \
-  --db-path data/market_parquet \
-  --mode standard \
-  --timeframes 1m 5m 15m \
-  --seeds 20260221 \
-  --single-min-score 0.0 \
-  --single-min-return 0.0 \
-  --single-min-sharpe 0.7 \
-  --single-min-trades 20 \
-  --drop-single-without-metrics
-```
-
-포트폴리오 숏리스트 기본 정책:
-- **단일 전략**은 score/return/sharpe/trades 기준을 통과하지 못하면 제외
-- `--allow-multi-asset`을 명시하지 않으면 **직접 multi-asset 전략은 포트폴리오 숏리스트에서 제외**
-- 최종 포트폴리오 후보는 성과가 검증된 단일 전략을 자산별로 묶은 **`portfolio_sets`**(가중치 `portfolio_weight`)로 생성
-
-### 최적화 search policy
-
-- 공통 search-loop 메커니즘은 `lumina_quant.optimization.search_policy`에 둡니다.
-- 튜닝 가능하거나 차원이 큰 최적화는 Optuna를 기본으로 사용합니다. 동일한
-  workflow를 `run_optuna_study(...)`로 표현할 수 있다면 research script 안에서
-  새 `optuna.create_study(...)` 루프를 직접 만들지 않습니다.
-- 직접 cartesian grid를 쓰는 경우는 작은 deterministic policy enumeration에 한정하며,
-  `build_bounded_grid_combinations(...)`를 통해 justification/cap metadata를 남겨야 합니다.
-- 전략 search space는 `lumina_quant.tuning.param_registry` 또는 strategy registry 기본값을
-  원천으로 삼고, ad-hoc parameter domain 중복 구현을 피합니다.
-
-**아키텍처/린트 검증:**
-```bash
-bash scripts/ci/architecture_gate_live_data.sh
-bash scripts/ci/architecture_gate_market_window_contract.sh
-uv run python scripts/check_architecture.py
-uv run ruff format --check .
-uv run ruff check .
-for crate in native/rust_metrics native/rust_rawfirst native/rust_hybrid_optuna native/rust_live_signals; do
-  (cd "$crate" && cargo fmt --check && cargo check --quiet && cargo test --quiet)
-done
-```
-
-저장소 텍스트 파일은 `.gitattributes`로 기본 `LF`를 강제하고, Windows 실행
-스크립트만 `CRLF` 예외를 둡니다. 따라서 `git diff --check`, Ruff format, CI가
-동일한 hygiene baseline을 검증합니다.
-
-**8GB 기준 게이트 (RSS/OOM/디스크/벤치마크):**
-```bash
-mkdir -p logs reports/benchmarks
-/usr/bin/time -v \
-  uv run python scripts/benchmark_backtest.py --iters 1 --warmup 0 --output reports/benchmarks/ci_smoke.json \
-  2>&1 | tee logs/ci_smoke.time.log
-uv run python scripts/verify_8gb_baseline.py \
-  --benchmark reports/benchmarks/ci_smoke.json \
-  --time-log logs/ci_smoke.time.log \
-  --oom-log logs/ci_smoke.time.log \
-  --skip-dmesg \
-  --output reports/benchmarks/ci_8gb_gate.json
-```
-
-전체 8GB 절차: [docs/kr/QUICKSTART_8GB_BASELINE.md](docs/kr/QUICKSTART_8GB_BASELINE.md)
-
-**PostgreSQL 스키마 초기화:**
-```bash
-uv run python scripts/init_postgres_schema.py --dsn "$LQ_POSTGRES_DSN"
-```
-
-**백테스트 성능 벤치마크/회귀 비교:**
-```bash
-uv run python scripts/benchmark_backtest.py --output reports/benchmarks/baseline_snapshot.json
-
-# 이전 스냅샷과 비교
-uv run python scripts/benchmark_backtest.py \
-  --output reports/benchmarks/current_snapshot.json \
-  --compare-to reports/benchmarks/baseline_snapshot.json
-```
-
-**전략 팩토리 파이프라인 (manifest + shortlist):**
-```bash
-# Dry run
-uv run python scripts/run_research_pipeline.py --dry-run
-
-# 단일 전략 성과 필터 + 가중치 + portfolio_sets 생성
-uv run python scripts/run_research_pipeline.py \
-  --db-path data/market_parquet \
-  --mode standard \
-  --timeframes 1m 5m 15m \
-  --seeds 20260221 \
-  --single-min-score 0.0 \
-  --single-min-return 0.0 \
-  --single-min-sharpe 0.7 \
-  --single-min-trades 20 \
-  --drop-single-without-metrics
-```
-
-기본 shortlist 정책:
-- 단일 전략은 score/return/sharpe/trades 기준을 통과해야 포함
-- direct multi-asset 행은 기본 제외 (`--allow-multi-asset`으로 허용)
-- 성공한 단일-자산 전략 조합으로 `portfolio_sets`가 생성되고 각 멤버에 `portfolio_weight`가 부여됨
-
-스코어 설정 템플릿:
-- `configs/score_config.example.json` 사용
-- 공용 섹션:
-  - `candidate_research` → `scripts/run_research_candidates.py --score-config ...`
-  - `portfolio_optimization` → `scripts/run_portfolio_optimization.py --score-config ...`
-  - `strategy_shortlist` → `scripts/select_research_shortlist.py --score-config ...`
-  - `research_hurdle` → `scripts/run_research_hurdle.py --score-config ...`
-
-**결과 시각화 (대시보드):**
-```bash
-uv run lq dashboard --run
-```
-
-대시보드 개선 사항:
-- 전략별 Run 필터(`Filter Run IDs By Strategy`) 및 전략 변경 시 Run 자동 재선택
-- 감사 상태(PostgreSQL)와 시장 OHLCV(Parquet) 소스를 분리하여 표시
-- 런타임 데이터가 없을 때 CSV fallback 상태를 명시적으로 경고
-
-**대시보드 스모크 체크 (런처 + 빌드 경로):**
-```bash
-uv run lq dashboard --print-contract
-cd apps/dashboard_web && npm install && npm run build
-```
-
-**Ghost RUNNING 정리 (PostgreSQL):**
-```bash
-# dry-run
-uv run python scripts/cleanup_ghost_runs.py \
-  --dsn "$LQ_POSTGRES_DSN" \
-  --stale-sec 300 \
-  --startup-grace-sec 90
-
-# apply
-uv run python scripts/cleanup_ghost_runs.py \
-  --dsn "$LQ_POSTGRES_DSN" \
-  --stale-sec 300 \
-  --startup-grace-sec 90 \
-  --apply
-```
-
-**실거래 실행:**
-```bash
-# 기본 엔트리포인트 (폴링 기반 시장데이터 핸들러)
-uv run lq live
-
-# 더 쉬운 래퍼
-bash scripts/ops/start_live_session.sh --dsn 'postgresql:///luminaquant'
-bash run_bot.sh --dsn 'postgresql:///luminaquant'
-bash scripts/ops/stop_live_session.sh
-
-# WebSocket 엔트리포인트 (더 낮은 지연)
-uv run lq live --transport ws
-
-# real 모드는 명시적 안전 플래그와 artifact 승인이 모두 필요합니다.
-# 현재 Alpha Zoo handoff artifact는 여전히 real money를 veto합니다.
-# LUMINA_ENABLE_LIVE_REAL=true uv run lq live --enable-live-real
-
-# 쉬운 real 모드 래퍼
-bash scripts/ops/start_live_session.sh --real --allow-real --dsn 'postgresql:///luminaquant'
-bash run_bot.sh --real --allow-real --dsn 'postgresql:///luminaquant'
-bash scripts/ops/stop_live_session.sh --real
-
-# 운영 권장: stop-file 기반 정상 종료
-touch /tmp/lq.stop
-uv run lq live --stop-file /tmp/lq.stop
-```
+전체 스키마는 [`AGENTS.md`](AGENTS.md)와 [`docs/CONFIG_SPEC.md`](docs/CONFIG_SPEC.md)를 참고하세요.
 
 ---
 
-## 🌟 주요 기능 (Key Features)
+## 아키텍처
 
-- **이벤트 기반 코어**: 이벤트(`Market`, `Signal`, `Order`, `Fill`)를 순차적으로 처리하여 현실적인 체결을 시뮬레이션합니다.
-- **다중 자산 & 다중 거래소**:
-    - native Binance USDⓈ-M Futures API를 통한 **암호화폐 선물** 거래.
-    - MetaTrader 5를 통한 **FX, CFD, 주식** 거래.
-- **고급 백테스팅**: 슬리피지, 수수료 모델, 트레일링 스탑 로직 포함.
-- **최적화**: **Optuna**(베이지안 최적화)를 내장하여 최적의 전략 파라미터를 탐색.
-- **실거래 안정성**:
-    - **상태 복구**: 재시작 시 포지션 동기화.
-    - **서킷 브레이커**: 일일 손실 한도 초과 시 거래 중단.
+### 기술 스택
+
+| 계층 | 기술 |
+| :--- | :--- |
+| 언어 | Python >=3.14 |
+| 패키지/런타임 | uv |
+| 네이티브 가속 | Rust pyo3 확장 `native/lumina_compute` (maturin) |
+| 연산 | Polars Lazy + 선택적 GPU (cudf-polars) |
+| 저장소 | Parquet (ZSTD, exchange/symbol/date 파티션) + PostgreSQL 감사 |
+| 대시보드 | Next.js 15 (`apps/dashboard_web`) |
+
+### Rust 네이티브 확장 — `native/lumina_compute`
+
+단일 pyo3 cdylib(`lumina_quant._compute`)으로 maturin을 통해 빌드합니다. 기존 5개의 ctypes 로더를 대체하는 7개의 커널을 제공합니다:
+
+| 커널 | 기능 |
+| :--- | :--- |
+| `evaluate_metrics` | Sharpe, Sortino, MDD 등 성과 지표 계산 |
+| `simulate_symbol_fold` | 폴드 전체를 벡터화한 백테스트 (내부 루프) |
+| `debounced_state_signal` | 실거래 신호 상태 머신 |
+| `trailing_state_signal` | 실거래 트레일링 스탑 상태 머신 |
+| `evaluate_hybrid_optuna_portfolio` | Optuna 하이브리드 포트폴리오 평가기 |
+| `aggregate_raw_aggtrades_to_1s` | 원시 aggTrades → 1초 OHLCV 집계 |
+| `append_ohlcv_1s_wal` | 1초 시장 데이터 WAL 추가 |
+
+빌드: `python scripts/build_native_backends.py` (`maturin develop --release` 실행).
+
+### 저장소 구조
+
+```
+LuminaQuant/
+├── config.yaml                  ← 단일 사용자 설정 파일
+├── configs/profiles/            ← paper.yaml / real.yaml / research.yaml
+├── pyproject.toml
+├── src/lumina_quant/
+│   ├── cli/                     ← lq 진입점
+│   ├── configuration/           ← RuntimeConfig 스키마 + 유효성 검사
+│   ├── core/                    ← 엔진, 이벤트, plugin_registry
+│   ├── compute/                 ← _compute 커널용 Python 래퍼
+│   ├── data/                    ← DataCollector, 로더
+│   ├── storage/                 ← Parquet, PostgreSQL, WAL
+│   ├── exchanges/               ← Binance futures, MT5, Polymarket 어댑터
+│   ├── backtesting/             ← ExecutionModel, 백테스트 엔진
+│   ├── optimization/            ← 워크포워드, Optuna, search_policy
+│   ├── live/                    ← LiveTrader, 준비 상태 점검, paper exchange
+│   ├── strategies/              ← 전략 레지스트리 + 내장 전략
+│   ├── indicators/              ← 지표 레지스트리 (alpha101 등)
+│   ├── portfolio/               ← 포트폴리오 최적화기
+│   ├── dashboard/               ← bridge contract, 백엔드 서비스
+│   └── workflows/               ← 리서치 / 자율 파이프라인
+├── native/lumina_compute/       ← Rust pyo3 cdylib (maturin)
+├── apps/dashboard_web/          ← Next.js 15 대시보드
+├── baseline/                    ← 동결된 성능 기준 산출물
+├── docs/perf/                   ← 단계별 벤치마크 결과
+├── docs/divergences/            ← 설계 결정 기록
+└── scripts/                     ← ci/, ops/, dev/, research/
+```
+
+### 백테스트 정밀도
+
+백테스트 엔진은 시뮬레이션 백테스트와 실거래 모두에서 공유하는 **통합 `ExecutionModel`**(`backtesting/execution_model.py`)을 사용합니다:
+
+- 수수료(maker/taker), 펀딩 비용, 레버리지, 청산 임계값
+- 슬리피지 모델, 바 내 거래량 상한을 적용한 부분 체결
+- LMT strict-cross 체결 규칙 (BUY는 `bar_low < limit_price`일 때만 체결; SELL은 `bar_high > limit_price`일 때만 체결)
+- CI에서 `rtol=1e-8`(`validation.golden_rtol`) 기준 황금 회귀 검증
+- 체결 가격 동등성 검증용 틱 재현 검증기(`TickReplayValidator`)
+- 설정 가능한 폴드 수와 워밍업 구간이 있는 워크포워드
+
+### 성능
+
+Phase 4 리팩터 트리를 Phase 0 순수 Python 기준선과 비교한 측정 결과 (출처: [`docs/perf/phase4-results.md`](docs/perf/phase4-results.md)):
+
+| 축 | 기준선 | Phase 4 | 속도 향상 |
+| :--- | :--- | :--- | :--- |
+| 백테스트 bars/sec (RsiStrategy, 1,268 bars, 14 심볼) | 22.44 | 6,632 | **295×** |
+| 워크포워드 E2E (27회 실행: 3폴드 × 9 조합) | 170.71초 | 1.768초 | **97×** |
+
+주요 동인: `simulate_symbol_fold` Rust 커널이 순수 Python 바별 이벤트 루프를 대체합니다.
 
 ---
 
-## 📊 대시보드 미리보기
+## 대시보드
 
-내장된 Next.js 대시보드는 전문가 수준의 분석을 제공합니다:
+`uv run lq dashboard --run`으로 Next.js 15 프런트엔드를 시작합니다. Python 백엔드는 10개의 Next.js 라우트가 소비하는 `DashboardBridgeContractV2` JSON 계약을 노출합니다:
 
-- **자산 곡선 & 낙폭**: 포트폴리오 성장과 리스크 시각화.
-- **매매 분석**: 차트상에서 매수/매도 타점 확인.
-- **포괄적 지표**: Sharpe Ratio, Sortino, Calmar, Alpha, Beta 등.
+`/`(홈) · `/performance-price` · `/risk-health` · `/optimization-insights` · `/market-data` · `/execution-analytics` · `/exact-window` · `/raw-data` · `/report-export` · `/workflows`
 
-*👉 모든 통계의 정의는 [성과 지표](docs/kr/METRICS.md)를 참고하세요.*
+workflows 라우트는 비동기 잡 관리와 로그 스트리밍을 갖춘 백테스트·최적화·실거래 세션의 코드 없는 실행 컨트롤을 제공합니다.
+
+---
+
+## 실거래 안전 모델
+
+실거래는 `live.go_live_stage`로 제어되는 4단계 프로모션 파이프라인을 따릅니다:
+
+1. **testnet** — 거래소 테스트넷, 실제 자금 없음
+2. **shadow** — 실시간 시장 데이터, 시뮬레이션 주문
+3. **canary** — 소규모 실제 포지션 비율 (`canary_position_fraction`, 기본 10%)
+4. **full** — 전체 포지션 사이징
+
+**킬 스위치는 항상 활성화됩니다.** config에서 `kill_switch_enabled: false`를 설정하면 로드 시 구조적으로 거부됩니다. 실거래 모드는 추가로 `LUMINA_ENABLE_LIVE_REAL` 환경 변수와 체결/슬리피지/BBO 패리티를 증명하는 준비 산출물이 필요합니다.
+
+```bash
+# Paper/testnet (기본값)
+uv run lq live
+
+# 실거래 모드 (환경 변수 + 준비 산출물 필요)
+LUMINA_ENABLE_LIVE_REAL=true uv run lq live --enable-live-real
+```
+
+운영자 체크리스트는 [`docs/live-readiness/04-paper-trading-runbook.md`](docs/live-readiness/04-paper-trading-runbook.md)를 참고하세요.
+
+---
+
+## 전략·지표·포트폴리오 최적화기 추가
+
+플러그인 시스템은 `lumina_quant.core.plugin_registry`의 `@register` 데코레이터를 사용합니다. 단계별 가이드는 [`AGENTS.md`](AGENTS.md)에 있습니다. 요약:
+
+1. `src/lumina_quant/strategies/<name>.py`에 전략 인터페이스를 구현하는 클래스를 생성합니다.
+2. `@register("strategy", "ClassName", interface="event_driven"|"polars_batch")`로 장식합니다.
+3. `src/lumina_quant/strategies/registry.py`에 임포트 항목을 추가합니다.
+4. `src/lumina_quant/tuning/param_registry.py`에 파라미터 스키마 항목을 추가합니다.
+5. `config.yaml`에서 `optimization.strategy: "ClassName"`으로 활성화합니다.
+
+지표(`"indicator"`)와 포트폴리오 최적화기(`"portfolio"`)에도 동일한 `@register` 패턴이 적용됩니다. 자세한 내용은 [`AGENTS.md`](AGENTS.md)를 참고하세요.
+
+---
+
+## 문서 목차
+
+| 문서 | 설명 |
+| :--- | :--- |
+| [`AGENTS.md`](AGENTS.md) | 아키텍처 노트, 소유권 맵, 방법 가이드 |
+| [`docs/CONFIG_SPEC.md`](docs/CONFIG_SPEC.md) | RuntimeConfig 전체 스키마 참조 |
+| [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | 배포 노트 및 운영 체크리스트 |
+| [`docs/live-readiness/04-paper-trading-runbook.md`](docs/live-readiness/04-paper-trading-runbook.md) | Paper/testnet 실거래 핸드오프 런북 |
+| [`docs/perf/phase4-results.md`](docs/perf/phase4-results.md) | Phase 4 벤치마크 결과 |
+| [`docs/EXCHANGES.md`](docs/EXCHANGES.md) | Binance USDⓈ-M 선물, MetaTrader 5, Polymarket 설정 |
+| [`docs/EXTERNAL_DATA.md`](docs/EXTERNAL_DATA.md) | 사용자 보유 데이터 연결 canonical contract |
+| [`docs/METRICS.md`](docs/METRICS.md) | Sharpe, Sortino, Alpha, Beta, Calmar 정의 |
+| [`docs/RUST_NATIVE_ACCELERATION.md`](docs/RUST_NATIVE_ACCELERATION.md) | hotspot 전용 Rust 정책, 빌드 명령, 벤치마크 |
+| [`docs/QUICKSTART_8GB_BASELINE.md`](docs/QUICKSTART_8GB_BASELINE.md) | 8 GB RAM 최소 설치 및 스모크 절차 |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | 로컬 검사, CI parity 명령, PR 기준 |
+| [`SECURITY.md`](SECURITY.md) | 취약점 제보 및 자격증명 관리 정책 |
+
+---
+
+## 환경 변수
+
+API 키는 절대 커밋하지 마세요. 저장소 루트에 `.env` 파일을 생성하세요 (`.env.example` 참고):
+
+```ini
+BINANCE_API_KEY=your_api_key
+BINANCE_SECRET_KEY=your_secret_key
+LQ_POSTGRES_DSN=postgresql://localhost:5432/luminaquant
+```
+
+PostgreSQL은 백테스팅에서 선택 사항입니다. `LQ_POSTGRES_DSN`이 없으면 감사 저장이 건너뜁니다.
+
+---
+
+## 라이선스 및 면책 조항
+
+이 소프트웨어는 연구 및 교육 목적으로 제공됩니다. 과거 백테스트 성과가 미래 수익을 보장하지 않습니다. 실거래는 상당한 손실 위험을 수반합니다. 킬 스위치와 go_live_stage 파이프라인은 프로모션 속도를 늦추기 위한 것이며 리스크를 제거하지 않습니다. 유지보수팀은 어떠한 종류의 보증도 제공하지 않습니다.

@@ -351,16 +351,24 @@ class TradingEngine(ABC):
         self.portfolio.update_timeindex(event)
 
         if hasattr(self.execution_handler, "check_open_orders"):
+            fallback_time = getattr(event, "time", None)
             for symbol, rows in bars_1s.items():
                 if not rows:
                     continue
-                market_event = self._coerce_market_event(
-                    symbol=str(symbol),
-                    row=rows[-1],
-                    fallback_time=getattr(event, "time", None),
-                )
-                if market_event is not None:
-                    self.execution_handler.check_open_orders(market_event)
+                # Evaluate open orders (STOP / LMT / TAKE_PROFIT / TRAIL_STOP)
+                # against EVERY 1s bar in the window, not just the last one.
+                # Checking only rows[-1] silently skips any stop/limit level
+                # touched in the other ~19s of a ~20s window, understating tail
+                # risk and biasing optimizer parameter selection. This mirrors
+                # handle_market_batch_event, which already checks every bar.
+                for row in rows:
+                    market_event = self._coerce_market_event(
+                        symbol=str(symbol),
+                        row=row,
+                        fallback_time=fallback_time,
+                    )
+                    if market_event is not None:
+                        self.execution_handler.check_open_orders(market_event)
 
     def handle_signal_event(self, event):
         self.signals += 1

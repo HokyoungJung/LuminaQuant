@@ -1,0 +1,1862 @@
+[
+  {
+    "datetime": "2022-01-31 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 11.168000000000001,
+    "fill_cost": 979.5047820769934,
+    "commission": 0.39180191283079735,
+    "price": 87.70637375331243,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-01-31 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 9.58,
+    "fill_cost": 997.1558131846516,
+    "commission": 0.3988623252738607,
+    "price": 104.08724563514109,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-02-17 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 9.58,
+    "fill_cost": 873.653361108054,
+    "commission": 0.34946134444322163,
+    "price": 91.19554917620606,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-02-17 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 10.888,
+    "fill_cost": 992.9628782750021,
+    "commission": 0.3971851513100009,
+    "price": 91.19791314061372,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-03-12 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 10.888,
+    "fill_cost": 968.0294504724685,
+    "commission": 0.38721178018898744,
+    "price": 88.90792160841923,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-03-12 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 10.914,
+    "fill_cost": 970.2831348843008,
+    "commission": 0.3881132539537203,
+    "price": 88.90261452119304,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-03-13 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 10.888,
+    "fill_cost": 952.1716031705989,
+    "commission": 0.3808686412682396,
+    "price": 87.45146979891614,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-03-13 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 11.216000000000001,
+    "fill_cost": 979.6898274876663,
+    "commission": 0.39187593099506657,
+    "price": 87.34752384875769,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-03-14 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 11.168000000000001,
+    "fill_cost": 949.0722284923089,
+    "commission": 0.3796288913969236,
+    "price": 84.98139581772107,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-03-14 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 11.641,
+    "fill_cost": 989.0745792125102,
+    "commission": 0.3956298316850041,
+    "price": 84.9647435110824,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-03-30 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 11.641,
+    "fill_cost": 948.93243389594,
+    "commission": 0.379572973558376,
+    "price": 81.5164018465716,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-03-30 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 11.861,
+    "fill_cost": 966.7273699903752,
+    "commission": 0.3866909479961501,
+    "price": 81.50471039460207,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-04-03 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 11.861,
+    "fill_cost": 984.7083159282556,
+    "commission": 0.39388332637130224,
+    "price": 83.02068256709009,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-04-03 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 11.586,
+    "fill_cost": 962.0432575818162,
+    "commission": 0.3848173030327265,
+    "price": 83.0349782135177,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-04-04 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 11.861,
+    "fill_cost": 978.8646952303892,
+    "commission": 0.3915458780921557,
+    "price": 82.52800735438741,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-04-04 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 11.689,
+    "fill_cost": 962.3625454380185,
+    "commission": 0.38494501817520743,
+    "price": 82.33061386243635,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-04-15 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 10.585999999999999,
+    "fill_cost": 852.9979054685537,
+    "commission": 0.34119916218742147,
+    "price": 80.57792418935894,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-04-15 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 12.301,
+    "fill_cost": 992.284668023111,
+    "commission": 0.3969138672092444,
+    "price": 80.66699195375261,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-04-28 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 12.301,
+    "fill_cost": 986.7897385103902,
+    "commission": 0.3947158954041561,
+    "price": 80.22028603450046,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-04-28 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 12.118,
+    "fill_cost": 972.8910653033038,
+    "commission": 0.3891564261213215,
+    "price": 80.28478835643702,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-05-02 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 11.758000000000003,
+    "fill_cost": 948.6330991374396,
+    "commission": 0.37945323965497585,
+    "price": 80.67980091320287,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-05-02 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 11.885,
+    "fill_cost": 961.4758542876752,
+    "commission": 0.3845903417150701,
+    "price": 80.89826287653977,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-05-18 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 11.885,
+    "fill_cost": 923.355704156723,
+    "commission": 0.36934228166268923,
+    "price": 77.69084595344746,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-05-18 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 12.504,
+    "fill_cost": 971.6260018586403,
+    "commission": 0.38865040074345614,
+    "price": 77.7052144800576,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-05-26 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 12.118,
+    "fill_cost": 852.259208387428,
+    "commission": 0.34090368335497123,
+    "price": 70.33002214783198,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-05-26 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 14.113,
+    "fill_cost": 991.952554489717,
+    "commission": 0.3967810217958868,
+    "price": 70.28644189681266,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-05-27 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 12.118,
+    "fill_cost": 868.2023022806789,
+    "commission": 0.34728092091227153,
+    "price": 71.64567604230722,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-05-27 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 14.07,
+    "fill_cost": 1007.2538469361233,
+    "commission": 0.40290153877444934,
+    "price": 71.5887595548062,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-05-28 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 14.113,
+    "fill_cost": 1022.3116812494109,
+    "commission": 0.4089246724997644,
+    "price": 72.43758812792538,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-05-28 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 13.728,
+    "fill_cost": 997.0634666749185,
+    "commission": 0.3988253866699674,
+    "price": 72.62991453051562,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-05-29 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 12.161000000000001,
+    "fill_cost": 839.1628952779307,
+    "commission": 0.3356651581111723,
+    "price": 69.0044318130031,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-05-29 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 13.652000000000001,
+    "fill_cost": 942.1215170954894,
+    "commission": 0.37684860683819577,
+    "price": 69.00978003922424,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-06-12 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 12.504,
+    "fill_cost": 999.0045967463833,
+    "commission": 0.3996018386985533,
+    "price": 79.89480140326162,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-06-12 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 12.416,
+    "fill_cost": 992.4067435103044,
+    "commission": 0.39696269740412177,
+    "price": 79.9296668420026,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-06-30 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 14.037,
+    "fill_cost": 997.7448063325355,
+    "commission": 0.39909792253301424,
+    "price": 71.07963285121717,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-06-30 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 14.065,
+    "fill_cost": 999.82171944744,
+    "commission": 0.39992868777897606,
+    "price": 71.08579590810096,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-07-10 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 14.065,
+    "fill_cost": 906.9473401943817,
+    "commission": 0.3627789360777527,
+    "price": 64.48256951257602,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-07-10 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 14.691,
+    "fill_cost": 947.5134887850041,
+    "commission": 0.3790053955140017,
+    "price": 64.49618737900784,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-07-18 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 12.416,
+    "fill_cost": 1041.934708068229,
+    "commission": 0.4167738832272916,
+    "price": 83.91871037920659,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-07-18 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 11.6,
+    "fill_cost": 973.5955521252952,
+    "commission": 0.3894382208501181,
+    "price": 83.93065104528407,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-07-31 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 11.6,
+    "fill_cost": 1110.1711282596514,
+    "commission": 0.4440684513038606,
+    "price": 95.70440760859064,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-07-31 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 10.329,
+    "fill_cost": 987.8804824457358,
+    "commission": 0.39515219297829435,
+    "price": 95.64144471349944,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-08-23 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 14.691,
+    "fill_cost": 856.0439330618893,
+    "commission": 0.34241757322475574,
+    "price": 58.26995664433254,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-08-23 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 16.914,
+    "fill_cost": 985.6385994372605,
+    "commission": 0.39425543977490424,
+    "price": 58.27353668187658,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-08-25 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 10.329,
+    "fill_cost": 968.4516600655056,
+    "commission": 0.38738066402620225,
+    "price": 93.76044729068695,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-08-25 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 9.824,
+    "fill_cost": 920.9616106185103,
+    "commission": 0.36838464424740414,
+    "price": 93.74609228608615,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-09-14 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 9.824,
+    "fill_cost": 964.2427072801537,
+    "commission": 0.3856970829120615,
+    "price": 98.15174137623714,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-09-14 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 10.182,
+    "fill_cost": 999.5577694320942,
+    "commission": 0.3998231077728377,
+    "price": 98.16909933530684,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-09-24 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 10.182,
+    "fill_cost": 906.253705987336,
+    "commission": 0.36250148239493446,
+    "price": 89.00547102605933,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-09-24 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 10.894,
+    "fill_cost": 969.8885515719948,
+    "commission": 0.3879554206287979,
+    "price": 89.02960818542269,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-09-24 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 16.914,
+    "fill_cost": 1042.1113758964743,
+    "commission": 0.41684455035858975,
+    "price": 61.61235520258214,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-09-24 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 15.585,
+    "fill_cost": 960.382989362571,
+    "commission": 0.38415319574502843,
+    "price": 61.62226431585313,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-10-19 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 10.894,
+    "fill_cost": 946.1108243223413,
+    "commission": 0.37844432972893655,
+    "price": 86.84696386289161,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-10-19 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 11.114,
+    "fill_cost": 965.8629799608913,
+    "commission": 0.3863451919843565,
+    "price": 86.90507287753205,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-10-27 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 11.114,
+    "fill_cost": 1013.3218655751543,
+    "commission": 0.40532874623006176,
+    "price": 91.17526233355716,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-10-27 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 10.715,
+    "fill_cost": 976.9809907566736,
+    "commission": 0.39079239630266943,
+    "price": 91.17881388303067,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-10-28 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 11.114,
+    "fill_cost": 996.9969216656111,
+    "commission": 0.3987987686662445,
+    "price": 89.70639928609062,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-10-28 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 10.652000000000001,
+    "fill_cost": 957.5610280334135,
+    "commission": 0.38302441121336545,
+    "price": 89.89495193704595,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-10-28 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 15.585,
+    "fill_cost": 922.1471878347911,
+    "commission": 0.36885887513391646,
+    "price": 59.16889238593462,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-10-28 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 16.309,
+    "fill_cost": 965.0896649167147,
+    "commission": 0.3860358659666859,
+    "price": 59.17528143458916,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-12-12 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 11.177,
+    "fill_cost": 1132.8535212888971,
+    "commission": 0.4531414085155589,
+    "price": 101.35577715745703,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-12-12 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 9.714,
+    "fill_cost": 981.7885768517424,
+    "commission": 0.392715430740697,
+    "price": 101.06944377720222,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-12-18 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 15.4,
+    "fill_cost": 939.7079735966,
+    "commission": 0.37588318943864,
+    "price": 61.01999828549351,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-12-18 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 15.4,
+    "fill_cost": 939.5878672842573,
+    "commission": 0.37583514691370296,
+    "price": 61.012199174302424,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-12-19 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 0.9090000000000007,
+    "fill_cost": 55.68360966299009,
+    "commission": 0.022273443865196037,
+    "price": 61.25809643893294,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-12-19 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 0.6190000000000015,
+    "fill_cost": 37.92130030391996,
+    "commission": 0.015168520121567986,
+    "price": 61.26219758306925,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-12-26 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 16.019000000000002,
+    "fill_cost": 1037.8866405585836,
+    "commission": 0.41515465622343345,
+    "price": 64.79097575120691,
+    "component_id": null
+  },
+  {
+    "datetime": "2022-12-26 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 15.085,
+    "fill_cost": 977.1795373924289,
+    "commission": 0.39087181495697154,
+    "price": 64.77822587951135,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-01-06 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 9.714,
+    "fill_cost": 963.0040753270004,
+    "commission": 0.38520163013080017,
+    "price": 99.13568821566814,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-01-06 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 9.481,
+    "fill_cost": 939.8830488859287,
+    "commission": 0.3759532195543715,
+    "price": 99.13332442631882,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-01-29 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 15.085,
+    "fill_cost": 964.6983681953593,
+    "commission": 0.3858793472781437,
+    "price": 63.95083647301023,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-01-29 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 15.575000000000001,
+    "fill_cost": 995.3046621088056,
+    "commission": 0.39812186484352224,
+    "price": 63.90399114663278,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-02-10 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 9.481,
+    "fill_cost": 1012.147446544531,
+    "commission": 0.40485897861781245,
+    "price": 106.75534717271712,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-02-10 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 9.077,
+    "fill_cost": 969.5633786782917,
+    "commission": 0.3878253514713167,
+    "price": 106.81539921541166,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-02-27 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 9.077,
+    "fill_cost": 1065.3522568810183,
+    "commission": 0.42614090275240735,
+    "price": 117.36832178924956,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-02-27 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 8.103,
+    "fill_cost": 950.9120523994283,
+    "commission": 0.3803648209597713,
+    "price": 117.35308557317393,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-03-12 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 15.575000000000001,
+    "fill_cost": 893.1379415973613,
+    "commission": 0.3572551766389445,
+    "price": 57.34433011861067,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-03-12 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 16.67,
+    "fill_cost": 955.4950286181625,
+    "commission": 0.382198011447265,
+    "price": 57.318238069475846,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-03-22 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 8.103,
+    "fill_cost": 886.456957611824,
+    "commission": 0.3545827830447296,
+    "price": 109.39861256470739,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-03-22 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 8.83,
+    "fill_cost": 965.9985691422302,
+    "commission": 0.38639942765689206,
+    "price": 109.3996114543862,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-04-09 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 16.67,
+    "fill_cost": 913.1776532478938,
+    "commission": 0.36527106129915754,
+    "price": 54.779703254222774,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-04-09 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 17.542,
+    "fill_cost": 961.2328519759918,
+    "commission": 0.38449314079039676,
+    "price": 54.796080947211934,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-04-29 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 8.83,
+    "fill_cost": 899.5406394744078,
+    "commission": 0.3598162557897632,
+    "price": 101.87323210355694,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-04-29 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 9.368,
+    "fill_cost": 954.6470217883875,
+    "commission": 0.38185880871535505,
+    "price": 101.90510480234708,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-04-29 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 17.542,
+    "fill_cost": 1032.7194361721834,
+    "commission": 0.41308777446887335,
+    "price": 58.871248214125146,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-04-29 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 16.436,
+    "fill_cost": 967.4337630423557,
+    "commission": 0.3869735052169423,
+    "price": 58.86065727928667,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-05-07 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 9.368,
+    "fill_cost": 952.3541199967868,
+    "commission": 0.38094164799871477,
+    "price": 101.66034585789782,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-05-07 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 9.629,
+    "fill_cost": 979.3659428030363,
+    "commission": 0.3917463771212146,
+    "price": 101.71003663963405,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-05-12 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 9.629,
+    "fill_cost": 985.0000550602933,
+    "commission": 0.3940000220241174,
+    "price": 102.29515578567799,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-05-12 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 9.192,
+    "fill_cost": 940.2559219486689,
+    "commission": 0.37610236877946757,
+    "price": 102.29067906317111,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-05-22 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 9.192,
+    "fill_cost": 897.0563681594908,
+    "commission": 0.35882254726379637,
+    "price": 97.5909887031648,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-05-22 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 9.591000000000001,
+    "fill_cost": 935.510173063077,
+    "commission": 0.3742040692252308,
+    "price": 97.54042050496058,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-05-27 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 16.436,
+    "fill_cost": 1010.1934419829154,
+    "commission": 0.4040773767931662,
+    "price": 61.46224397559719,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-05-27 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 16.014,
+    "fill_cost": 984.6209781069368,
+    "commission": 0.39384839124277476,
+    "price": 61.48501174640545,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-06-07 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 16.014,
+    "fill_cost": 1027.7145328256504,
+    "commission": 0.41108581313026016,
+    "price": 64.17600429784254,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-06-07 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 15.171000000000001,
+    "fill_cost": 973.7689513428852,
+    "commission": 0.3895075805371541,
+    "price": 64.18620732600917,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-06-15 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 15.171000000000001,
+    "fill_cost": 932.2693107104991,
+    "commission": 0.37290772428419966,
+    "price": 61.45074884387971,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-06-15 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 15.309000000000001,
+    "fill_cost": 941.1895530479732,
+    "commission": 0.37647582121918927,
+    "price": 61.47949265451519,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-07-19 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 9.591000000000001,
+    "fill_cost": 780.3434663615876,
+    "commission": 0.3121373865446351,
+    "price": 81.36205467225393,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-07-19 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 12.113,
+    "fill_cost": 985.430035160382,
+    "commission": 0.3941720140641528,
+    "price": 81.35309462233815,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-07-29 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 12.113,
+    "fill_cost": 922.9392639488242,
+    "commission": 0.36917570557952967,
+    "price": 76.1941107858354,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-07-29 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 12.783,
+    "fill_cost": 973.2981025493981,
+    "commission": 0.38931924101975923,
+    "price": 76.14003774930752,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-08-13 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 11.200000000000001,
+    "fill_cost": 858.0622643963683,
+    "commission": 0.3432249057585473,
+    "price": 76.61270217824716,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-08-13 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 11.200000000000001,
+    "fill_cost": 858.0002092848214,
+    "commission": 0.34320008371392857,
+    "price": 76.60716154328762,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-08-14 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 1.5829999999999984,
+    "fill_cost": 121.47285268389136,
+    "commission": 0.048589141073556545,
+    "price": 76.73585134800473,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-08-14 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 1.298,
+    "fill_cost": 99.64036795444656,
+    "commission": 0.03985614718177863,
+    "price": 76.76453617445806,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-08-30 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 15.309000000000001,
+    "fill_cost": 687.2572174124213,
+    "commission": 0.2749028869649685,
+    "price": 44.892365106304865,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-08-30 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 20.921,
+    "fill_cost": 939.344888582673,
+    "commission": 0.3757379554330692,
+    "price": 44.89961706336566,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-09-03 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 20.921,
+    "fill_cost": 941.4035189951745,
+    "commission": 0.37656140759806983,
+    "price": 44.99801725515867,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-09-03 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 21.200000000000003,
+    "fill_cost": 953.4803956242932,
+    "commission": 0.38139215824971734,
+    "price": 44.97549035963647,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-09-04 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 1.1539999999999964,
+    "fill_cost": 51.26246683678826,
+    "commission": 0.020504986734715305,
+    "price": 44.42154838543191,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-09-24 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 22.354,
+    "fill_cost": 1085.1062380941917,
+    "commission": 0.4340424952376767,
+    "price": 48.541927086615,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-09-24 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 20.244,
+    "fill_cost": 982.9156603348217,
+    "commission": 0.3931662641339287,
+    "price": 48.5534311566302,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-10-05 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 12.498000000000001,
+    "fill_cost": 1056.7877119696188,
+    "commission": 0.4227150847878476,
+    "price": 84.55654600493028,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-10-05 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 11.289,
+    "fill_cost": 954.2083822582347,
+    "commission": 0.3816833529032939,
+    "price": 84.52550113014746,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-10-06 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 20.244,
+    "fill_cost": 960.5280952392461,
+    "commission": 0.38421123809569846,
+    "price": 47.44754471642196,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-10-06 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 20.941,
+    "fill_cost": 993.8834632341272,
+    "commission": 0.3975533852936509,
+    "price": 47.46112713022909,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-10-12 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 20.941,
+    "fill_cost": 926.5845436821064,
+    "commission": 0.3706338174728426,
+    "price": 44.247387597636525,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-10-12 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 22.374,
+    "fill_cost": 989.9614076127938,
+    "commission": 0.39598456304511753,
+    "price": 44.246062734101805,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-10-14 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 22.374,
+    "fill_cost": 993.4213064891268,
+    "commission": 0.39736852259565075,
+    "price": 44.40070199736868,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-10-14 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 22.391000000000002,
+    "fill_cost": 993.5695408909714,
+    "commission": 0.3974278163563886,
+    "price": 44.373611758785735,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-10-23 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 22.391000000000002,
+    "fill_cost": 1060.5787522582061,
+    "commission": 0.4242315009032825,
+    "price": 47.36629682721656,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-10-23 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 20.629,
+    "fill_cost": 977.3528445037083,
+    "commission": 0.3909411378014833,
+    "price": 47.37761619582666,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-10-26 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 11.289,
+    "fill_cost": 919.1904544598704,
+    "commission": 0.3676761817839482,
+    "price": 81.42354986800163,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-10-26 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 11.671,
+    "fill_cost": 949.7913703660424,
+    "commission": 0.379916548146417,
+    "price": 81.38046185982714,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-11-02 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 11.671,
+    "fill_cost": 952.5619445733682,
+    "commission": 0.3810247778293473,
+    "price": 81.61785147574058,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-11-02 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 12.014000000000001,
+    "fill_cost": 980.7063218589616,
+    "commission": 0.39228252874358466,
+    "price": 81.63029148151836,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-11-02 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 20.629,
+    "fill_cost": 875.4159089342072,
+    "commission": 0.3501663635736829,
+    "price": 42.4361776593246,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-11-02 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 22.821,
+    "fill_cost": 968.4604235730055,
+    "commission": 0.38738416942920223,
+    "price": 42.4372474288158,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-11-26 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 12.200000000000001,
+    "fill_cost": 557.5466802209593,
+    "commission": 0.22301867208838372,
+    "price": 45.70054755909502,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-11-26 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 12.200000000000001,
+    "fill_cost": 557.2548591359373,
+    "commission": 0.22290194365437493,
+    "price": 45.676627798027646,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-11-27 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 10.621,
+    "fill_cost": 498.58936848020505,
+    "commission": 0.19943574739208203,
+    "price": 46.943731143979385,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-11-27 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 9.19,
+    "fill_cost": 431.5897196982901,
+    "commission": 0.17263588787931605,
+    "price": 46.962972763687716,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-11-29 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 12.014000000000001,
+    "fill_cost": 923.731213367295,
+    "commission": 0.36949248534691803,
+    "price": 76.88789856561469,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-11-29 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 12.26,
+    "fill_cost": 941.8349935283195,
+    "commission": 0.3767339974113278,
+    "price": 76.8217776124241,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-12-08 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 12.26,
+    "fill_cost": 882.8268695931728,
+    "commission": 0.3531307478372691,
+    "price": 72.00871693255895,
+    "component_id": null
+  },
+  {
+    "datetime": "2023-12-08 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 13.102,
+    "fill_cost": 943.654932192905,
+    "commission": 0.377461972877162,
+    "price": 72.02373165874714,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-01-18 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 21.39,
+    "fill_cost": 984.4683862491654,
+    "commission": 0.3937873544996662,
+    "price": 46.02470248944205,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-01-18 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 20.467,
+    "fill_cost": 941.985119686477,
+    "commission": 0.3767940478745908,
+    "price": 46.02458199474652,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-02-07 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 20.467,
+    "fill_cost": 985.831192534599,
+    "commission": 0.3943324770138396,
+    "price": 48.166863367107986,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-02-07 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 19.734,
+    "fill_cost": 950.6896776510272,
+    "commission": 0.3802758710604109,
+    "price": 48.17521423183476,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-02-08 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 13.102,
+    "fill_cost": 926.5482819943098,
+    "commission": 0.370619312797724,
+    "price": 70.71807983470538,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-02-08 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 13.275,
+    "fill_cost": 938.6489355414894,
+    "commission": 0.3754595742165958,
+    "price": 70.70801774323837,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-03-08 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 19.734,
+    "fill_cost": 970.7645069405482,
+    "commission": 0.3883058027762193,
+    "price": 49.19248540288579,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-03-08 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 19.141000000000002,
+    "fill_cost": 941.8050561757655,
+    "commission": 0.37672202247030623,
+    "price": 49.20354506952434,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-03-20 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 13.600000000000001,
+    "fill_cost": 748.6992052301161,
+    "commission": 0.29947968209204645,
+    "price": 55.05141214927324,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-03-20 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 13.600000000000001,
+    "fill_cost": 748.94420374573,
+    "commission": 0.299577681498292,
+    "price": 55.06942674600955,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-03-21 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 5.541,
+    "fill_cost": 315.109920171869,
+    "commission": 0.12604396806874762,
+    "price": 56.868781839355535,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-03-21 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 3.4719999999999978,
+    "fill_cost": 197.34414244397686,
+    "commission": 0.07893765697759075,
+    "price": 56.83875070391042,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-03-22 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 13.275,
+    "fill_cost": 977.0865400278531,
+    "commission": 0.3908346160111412,
+    "price": 73.60350584013959,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-03-22 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 12.75,
+    "fill_cost": 938.1238550912294,
+    "commission": 0.3752495420364918,
+    "price": 73.5783415757827,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-03-29 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 12.75,
+    "fill_cost": 985.0863874435978,
+    "commission": 0.39403455497743917,
+    "price": 77.26167744655669,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-03-29 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 12.156,
+    "fill_cost": 939.0935679278306,
+    "commission": 0.37563742717113224,
+    "price": 77.25350180386891,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-04-15 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 17.072,
+    "fill_cost": 908.4341584616194,
+    "commission": 0.36337366338464777,
+    "price": 53.2119352425972,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-04-15 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 17.231,
+    "fill_cost": 917.2588774881834,
+    "commission": 0.3669035509952734,
+    "price": 53.23306119715532,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-04-21 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 11.8,
+    "fill_cost": 969.2874956218809,
+    "commission": 0.3877149982487524,
+    "price": 82.14300810354922,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-04-21 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 11.542,
+    "fill_cost": 947.9870080368635,
+    "commission": 0.3791948032147454,
+    "price": 82.13368636604258,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-04-22 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 0.35599999999999987,
+    "fill_cost": 28.575874809221055,
+    "commission": 0.011430349923688422,
+    "price": 80.26931126185693,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-04-29 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 11.542,
+    "fill_cost": 976.4942469012906,
+    "commission": 0.39059769876051625,
+    "price": 84.60355630751089,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-04-29 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 11.035,
+    "fill_cost": 933.5956259176669,
+    "commission": 0.3734382503670668,
+    "price": 84.60313782670293,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-05-05 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 17.231,
+    "fill_cost": 942.8681280515075,
+    "commission": 0.377147251220603,
+    "price": 54.719292441036934,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-05-05 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 16.582,
+    "fill_cost": 907.6093186689214,
+    "commission": 0.3630437274675686,
+    "price": 54.73461094372943,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-05-21 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 16.582,
+    "fill_cost": 894.5281848999299,
+    "commission": 0.357811273959972,
+    "price": 53.94573542998009,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-05-21 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 17.483,
+    "fill_cost": 942.4947540715192,
+    "commission": 0.3769979016286077,
+    "price": 53.90921203863863,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-06-04 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 17.483,
+    "fill_cost": 963.8866922035153,
+    "commission": 0.38555467688140616,
+    "price": 55.132797128840316,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-06-04 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 16.561,
+    "fill_cost": 912.3351057900592,
+    "commission": 0.36493404231602367,
+    "price": 55.08937297204633,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-06-05 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 17.483,
+    "fill_cost": 960.7032991269376,
+    "commission": 0.38428131965077506,
+    "price": 54.95071207040769,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-06-05 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 17.395,
+    "fill_cost": 953.8553264909584,
+    "commission": 0.38154213059638337,
+    "price": 54.83502882960382,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-06-10 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 16.648999999999997,
+    "fill_cost": 927.5744419807771,
+    "commission": 0.37102977679231086,
+    "price": 55.71352285307089,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-06-10 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 17.513,
+    "fill_cost": 977.2211398186511,
+    "commission": 0.39088845592746047,
+    "price": 55.79975674177188,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-06-14 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 12.3,
+    "fill_cost": 656.2209455334286,
+    "commission": 0.26248837821337145,
+    "price": 53.351296384831585,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-06-14 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 12.3,
+    "fill_cost": 656.3406302068581,
+    "commission": 0.2625362520827433,
+    "price": 53.36102684608602,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-06-15 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 5.213000000000001,
+    "fill_cost": 281.88178792838494,
+    "commission": 0.11275271517135398,
+    "price": 54.072854005061366,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-06-15 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 5.626999999999999,
+    "fill_cost": 304.1729316642166,
+    "commission": 0.12166917266568665,
+    "price": 54.05596795170013,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-07-07 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 17.927,
+    "fill_cost": 993.4392562377684,
+    "commission": 0.3973757024951074,
+    "price": 55.41581169396823,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-07-07 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 17.718,
+    "fill_cost": 981.5546340219373,
+    "commission": 0.39262185360877494,
+    "price": 55.39872638119073,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-07-27 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 11.035,
+    "fill_cost": 1395.0961593213613,
+    "commission": 0.5580384637285445,
+    "price": 126.424663282407,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-07-27 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 7.757000000000001,
+    "fill_cost": 980.3482206993604,
+    "commission": 0.39213928827974415,
+    "price": 126.38239276774014,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-08-02 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 17.718,
+    "fill_cost": 957.7642626565431,
+    "commission": 0.38310570506261726,
+    "price": 54.0560030848032,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-08-02 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "SELL",
+    "quantity": 17.855,
+    "fill_cost": 965.1489568856122,
+    "commission": 0.3860595827542449,
+    "price": 54.054828164974076,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-08-19 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 7.757000000000001,
+    "fill_cost": 1048.5756185915568,
+    "commission": 0.4194302474366227,
+    "price": 135.1779835750363,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-08-19 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "BUY",
+    "quantity": 7.416,
+    "fill_cost": 1002.4520214004594,
+    "commission": 0.4009808085601838,
+    "price": 135.1742207929422,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-09-08 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 7.416,
+    "fill_cost": 932.1985815037604,
+    "commission": 0.37287943260150413,
+    "price": 125.7009953484035,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-09-08 00:00:00",
+    "symbol": "BTCUSDT",
+    "direction": "SELL",
+    "quantity": 7.663,
+    "fill_cost": 964.1012743251222,
+    "commission": 0.3856405097300489,
+    "price": 125.81251133043483,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-09-08 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 17.855,
+    "fill_cost": 932.0124261616583,
+    "commission": 0.3728049704646633,
+    "price": 52.19895974022169,
+    "component_id": null
+  },
+  {
+    "datetime": "2024-09-08 00:00:00",
+    "symbol": "ETHUSDT",
+    "direction": "BUY",
+    "quantity": 18.653,
+    "fill_cost": 973.6056064669599,
+    "commission": 0.389442242586784,
+    "price": 52.19565788167908,
+    "component_id": null
+  }
+]

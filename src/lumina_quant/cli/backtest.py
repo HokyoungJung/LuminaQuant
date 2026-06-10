@@ -21,11 +21,10 @@ from lumina_quant.backtesting.data import HistoricCSVDataHandler
 from lumina_quant.backtesting.data_windowed_parquet import HistoricParquetWindowedDataHandler
 from lumina_quant.backtesting.execution_sim import SimulatedExecutionHandler
 from lumina_quant.backtesting.portfolio_backtest import Portfolio
-from lumina_quant.cli._strategy_registry_fallback import (
-    import_private_strategy_registry,
-    load_strategy_registry,
+from lumina_quant.configuration import (
+    get_default_runtime_config,
 )
-from lumina_quant.config import BacktestConfig, BaseConfig, LiveConfig, OptimizationConfig
+from lumina_quant.core.memory_budget import enforce_runtime_memory_cap
 from lumina_quant.live_selection import (
     normalize_portfolio_mode_reference,
     resolve_portfolio_mode_runtime_config,
@@ -56,7 +55,9 @@ class BacktestStrategySetup:
 def _get_strategy_registry():
     global _strategy_registry
     if _strategy_registry is None:
-        _strategy_registry = load_strategy_registry(import_private_strategy_registry)
+        from lumina_quant.strategies import registry
+
+        _strategy_registry = registry
     return _strategy_registry
 
 
@@ -98,7 +99,7 @@ def _resolve_strategy_setup_detail(
     requested_portfolio_mode = str(
         portfolio_mode or os.getenv("LQ_BACKTEST_PORTFOLIO_MODE", "") or ""
     ).strip()
-    requested_strategy_name = str(OptimizationConfig.STRATEGY_NAME or "").strip()
+    requested_strategy_name = str(get_default_runtime_config().optimization.strategy or "").strip()
     if not requested_portfolio_mode:
         requested_portfolio_mode = _portfolio_mode_from_requested_strategy(requested_strategy_name)
     if requested_portfolio_mode:
@@ -254,36 +255,39 @@ def _current_backtest_runtime_settings() -> dict[str, Any]:
     backtest_window_override = globals().get("BACKTEST_WINDOW_SECONDS")
     backtest_decision_override = globals().get("BACKTEST_DECISION_CADENCE_SECONDS")
     backtest_audit_snapshot_override = globals().get("BACKTEST_AUDIT_SNAPSHOT_SECONDS")
+    # Load typed runtime config once — tests may override globals above for monkeypatching.
+    _rt = get_default_runtime_config()
+    _bt = _rt.backtest
     start_date = (
         start_date_override
         if start_date_override is not None
-        else _parse_config_date(getattr(BacktestConfig, "START_DATE", None), datetime(2024, 1, 1))
+        else _parse_config_date(_bt.start_date, datetime(2024, 1, 1))
     )
     end_date = (
         end_date_override
         if end_date_override is not None
-        else _parse_config_date(getattr(BacktestConfig, "END_DATE", None), None)
+        else _parse_config_date(_bt.end_date, None)
     )
     settings = {
         "symbol_list": list(symbol_list_override)
         if symbol_list_override is not None
-        else list(BaseConfig.SYMBOLS),
+        else list(_rt.trading.symbols),
         "start_date": start_date,
         "end_date": end_date,
         "market_db_path": (
             str(market_db_path_override)
             if market_db_path_override is not None
-            else str(BaseConfig.MARKET_DATA_PARQUET_PATH)
+            else str(_rt.storage.market_data_parquet_path)
         ),
         "market_db_exchange": (
             str(market_db_exchange_override)
             if market_db_exchange_override is not None
-            else str(BaseConfig.MARKET_DATA_EXCHANGE)
+            else str(_rt.storage.market_data_exchange)
         ),
         "market_db_backend": (
             str(market_db_backend_override)
             if market_db_backend_override is not None
-            else str(BaseConfig.STORAGE_BACKEND)
+            else str(_rt.storage.backend)
         ),
         "base_timeframe": _normalize_timeframe_or_default(
             os.getenv("LQ_BASE_TIMEFRAME", "1s"), "1s"
@@ -294,7 +298,7 @@ def _current_backtest_runtime_settings() -> dict[str, Any]:
             if bt_chunk_days_override is not None
             else max(
                 1,
-                _env_int("LQ__BACKTEST__CHUNK_DAYS", int(getattr(BacktestConfig, "CHUNK_DAYS", 2))),
+                _env_int("LQ__BACKTEST__CHUNK_DAYS", int(_bt.chunk_days)),
             )
         ),
         "bt_chunk_warmup_bars": (
@@ -302,10 +306,7 @@ def _current_backtest_runtime_settings() -> dict[str, Any]:
             if bt_chunk_warmup_override is not None
             else max(
                 0,
-                _env_int(
-                    "LQ__BACKTEST__CHUNK_WARMUP_BARS",
-                    int(getattr(BacktestConfig, "CHUNK_WARMUP_BARS", 0)),
-                ),
+                _env_int("LQ__BACKTEST__CHUNK_WARMUP_BARS", int(_bt.chunk_warmup_bars)),
             )
         ),
         "backtest_poll_seconds": (
@@ -313,10 +314,7 @@ def _current_backtest_runtime_settings() -> dict[str, Any]:
             if backtest_poll_override is not None
             else max(
                 1,
-                _env_int(
-                    "LQ__BACKTEST__POLL_SECONDS",
-                    int(getattr(BacktestConfig, "POLL_SECONDS", 20)),
-                ),
+                _env_int("LQ__BACKTEST__POLL_SECONDS", int(_bt.poll_seconds)),
             )
         ),
         "backtest_window_seconds": (
@@ -324,10 +322,7 @@ def _current_backtest_runtime_settings() -> dict[str, Any]:
             if backtest_window_override is not None
             else max(
                 1,
-                _env_int(
-                    "LQ__BACKTEST__WINDOW_SECONDS",
-                    int(getattr(BacktestConfig, "WINDOW_SECONDS", 20)),
-                ),
+                _env_int("LQ__BACKTEST__WINDOW_SECONDS", int(_bt.window_seconds)),
             )
         ),
         "backtest_decision_cadence_seconds": (
@@ -337,7 +332,7 @@ def _current_backtest_runtime_settings() -> dict[str, Any]:
                 1,
                 _env_int(
                     "LQ__BACKTEST__DECISION_CADENCE_SECONDS",
-                    int(getattr(BacktestConfig, "DECISION_CADENCE_SECONDS", 20)),
+                    int(_bt.decision_cadence_seconds),
                 ),
             )
         ),
@@ -353,7 +348,7 @@ def _current_backtest_runtime_settings() -> dict[str, Any]:
             )
         ),
         "backtest_mode": _normalize_backtest_mode(
-            os.getenv("LQ_BACKTEST_MODE", str(getattr(BacktestConfig, "MODE", "windowed"))),
+            os.getenv("LQ_BACKTEST_MODE", str(_bt.mode)),
             default="windowed",
         ),
         "data_mode": _normalize_data_mode(
@@ -379,7 +374,7 @@ def _enforce_1s_base_timeframe(value: str) -> str:
 
 def _create_audit_store():
     try:
-        return AuditStore(BaseConfig.POSTGRES_DSN), True
+        return AuditStore(get_default_runtime_config().storage.postgres_dsn), True
     except Exception as exc:
         message = str(exc).strip()
         if not message:
@@ -451,18 +446,19 @@ def _load_data_dict(
         )
 
     if source in {"auto", "db"} and auto_collect_db and not use_parquet:
+        _lv_rt = get_default_runtime_config().live
         try:
             sync_rows = _auto_collect_market_data(
                 symbol_list=symbol_list,
                 timeframe=str(base_timeframe),
                 db_path=str(market_db_path),
                 exchange_id=str(market_exchange),
-                market_type=str(LiveConfig.MARKET_TYPE),
+                market_type=str(_lv_rt.exchange.market_type),
                 since_dt=start_date,
                 until_dt=end_date,
-                api_key=str(LiveConfig.BINANCE_API_KEY or ""),
-                secret_key=str(LiveConfig.BINANCE_SECRET_KEY or ""),
-                testnet=bool(LiveConfig.IS_TESTNET),
+                api_key=str(_lv_rt.api_key or ""),
+                secret_key=str(_lv_rt.secret_key or ""),
+                testnet=bool(str(_lv_rt.mode).strip().lower() != "real"),
                 limit=1000,
                 max_batches=100000,
                 retries=3,
@@ -672,7 +668,9 @@ def _resolve_execution_profile(
         resolved_persist_output = _env_optional_bool("LQ_BACKTEST_PERSIST_OUTPUT")
     if resolved_persist_output is None:
         resolved_persist_output = (
-            False if resolved_low_memory else bool(getattr(BacktestConfig, "PERSIST_OUTPUT", True))
+            False
+            if resolved_low_memory
+            else bool(get_default_runtime_config().backtest.persist_output)
         )
     return {
         "low_memory": bool(resolved_low_memory),
@@ -727,6 +725,10 @@ def run(
     portfolio_mode=None,
 ):
     settings = _current_backtest_runtime_settings()
+    # Engine-start memory guard: errors clearly (MemoryCapExceededError) if the
+    # process already exceeds the config-driven RSS cap, instead of risking an
+    # OOM kill mid-run. Lowering memory.cap_gb in config genuinely lowers the cap.
+    enforce_runtime_memory_cap(get_default_runtime_config(), label="backtest engine start")
     symbol_list = list(settings["symbol_list"])
     start_date = settings["start_date"]
     end_date = settings["end_date"]
@@ -809,7 +811,7 @@ def run(
                 "external_data_root": str(external_data_root or ""),
                 "market_exchange": str(market_exchange),
                 "base_timeframe": str(timeframe_token),
-                "strategy_timeframe": str(BaseConfig.TIMEFRAME),
+                "strategy_timeframe": str(get_default_runtime_config().trading.timeframe),
                 "auto_collect_db": bool(auto_collect_db),
                 "backtest_poll_seconds": backtest_poll_seconds,
                 "backtest_window_seconds": backtest_window_seconds,
@@ -840,7 +842,9 @@ def run(
                 market_exchange,
                 base_timeframe=str(timeframe_token),
                 external_data_root=str(external_data_root or ""),
-                external_symbol_map=dict(getattr(BacktestConfig, "EXTERNAL_SYMBOL_MAP", {}) or {}),
+                external_symbol_map=dict(
+                    get_default_runtime_config().backtest.external.symbol_map or {}
+                ),
                 data_mode=resolved_data_mode,
                 backtest_mode=resolved_backtest_mode,
                 auto_collect_db=bool(auto_collect_db),
@@ -875,7 +879,7 @@ def run(
                 strategy_params=strategy_params,
                 data_loader=_chunk_loader,
                 chunk_days=bt_chunk_days,
-                strategy_timeframe=str(BaseConfig.TIMEFRAME),
+                strategy_timeframe=str(get_default_runtime_config().trading.timeframe),
                 data_handler_cls=selected_data_handler_cls,
                 execution_handler_cls=SimulatedExecutionHandler,
                 portfolio_cls=Portfolio,
@@ -909,7 +913,7 @@ def run(
                 record_history=bool(execution_profile["record_history"]),
                 track_metrics=bool(execution_profile["track_metrics"]),
                 record_trades=bool(execution_profile["record_trades"]),
-                strategy_timeframe=str(BaseConfig.TIMEFRAME),
+                strategy_timeframe=str(get_default_runtime_config().trading.timeframe),
             )
             if bool(execution_profile["low_memory"]):
                 backtest.simulate_trading(output=False)
@@ -971,7 +975,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--data-source",
         choices=["auto", "csv", "db", "external"],
-        default=str(getattr(BacktestConfig, "DATA_SOURCE", "auto") or "auto"),
+        default=str(get_default_runtime_config().backtest.data_source or "auto"),
         help="Market data source (auto: DB first then CSV fallback; external: user-managed CSV/parquet root).",
     )
     parser.add_argument(
@@ -981,7 +985,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--external-data-root",
-        default=str(getattr(BacktestConfig, "EXTERNAL_DATA_ROOT", "") or ""),
+        default=str(get_default_runtime_config().backtest.external.root_path or ""),
         help="External market-data root for --data-source external (canonical CSV/parquet OHLCV).",
     )
     parser.add_argument(

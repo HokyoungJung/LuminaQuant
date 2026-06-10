@@ -14,12 +14,14 @@ from dotenv import load_dotenv
 from lumina_quant.configuration.schema import (
     BacktestExternalConfig,
     BacktestRuntimeConfig,
+    DataConfig,
     ExecutionConfig,
     LiveExchangeConfig,
     LiveExternalConfig,
     LivePolymarketConfig,
     LiveRuntimeConfig,
     MarketWindowConfig,
+    MemoryConfig,
     OptimizationRuntimeConfig,
     PromotionGateConfig,
     RiskConfig,
@@ -27,6 +29,8 @@ from lumina_quant.configuration.schema import (
     StorageConfig,
     SystemConfig,
     TradingConfig,
+    ValidationConfig,
+    _VALID_DATA_KINDS,
 )
 from lumina_quant.core.order_policy import canonical_order_type, normalize_limit_price_mode
 
@@ -48,14 +52,14 @@ def _as_bool(value: Any, default: bool = False) -> bool:
 def _as_float(value: Any, default: float) -> float:
     try:
         return float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return float(default)
 
 
 def _as_int(value: Any, default: int) -> int:
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return int(default)
 
 
@@ -118,7 +122,7 @@ def _normalize_timeframe_list(value: Any) -> list[str]:
         if token.startswith("[") and token.endswith("]"):
             try:
                 parsed = json.loads(token)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 parsed = [part for part in token.split(",")]
             items = list(parsed) if isinstance(parsed, list) else [token]
         else:
@@ -189,7 +193,7 @@ def _parse_env_scalar(raw: str) -> Any:
     if raw.strip().startswith(("[", "{")):
         try:
             return json.loads(raw)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return raw
     try:
         if "." in raw:
@@ -251,6 +255,7 @@ def _extract_runtime_sections(mapped: dict[str, Any]) -> dict[str, dict[str, Any
         "risk": _raw_section(mapped, "risk"),
         "execution": _raw_section(mapped, "execution"),
         "storage": _raw_section(mapped, "storage"),
+        "data": _raw_section(mapped, "data"),
         "backtest": backtest_raw,
         "backtest_external": _raw_section(backtest_raw, "external"),
         "live": live_raw,
@@ -260,6 +265,8 @@ def _extract_runtime_sections(mapped: dict[str, Any]) -> dict[str, dict[str, Any
         "optimization": _raw_section(mapped, "optimization"),
         "promotion_gate": _raw_section(mapped, "promotion_gate"),
         "market_window": _raw_section(mapped, "market_window"),
+        "memory": _raw_section(mapped, "memory"),
+        "validation": _raw_section(mapped, "validation"),
     }
 
 
@@ -766,6 +773,26 @@ def _normalize_market_window_runtime_section(
     )
 
 
+def _normalize_data_runtime_section(runtime: RuntimeConfig) -> None:
+    raw_kinds = getattr(runtime.data, "kinds", None)
+    if isinstance(raw_kinds, (list, tuple)):
+        normalized: list[str] = []
+        for item in raw_kinds:
+            token = str(item or "").strip().lower()
+            if not token:
+                continue  # skip blank entries
+            if token not in _VALID_DATA_KINDS:
+                raise ValueError(
+                    f"Invalid data.kinds token: {token!r}. "
+                    f"Valid values: {sorted(_VALID_DATA_KINDS)}"
+                )
+            normalized.append(token)
+        runtime.data.kinds = list(dict.fromkeys(normalized)) or list(DataConfig().kinds)
+    else:
+        runtime.data.kinds = list(DataConfig().kinds)
+    runtime.data.tick_path = str(getattr(runtime.data, "tick_path", "") or "").strip()
+
+
 def _normalize_promotion_gate_runtime_section(runtime: RuntimeConfig) -> None:
     runtime.promotion_gate.days = _as_int(runtime.promotion_gate.days, 14)
     runtime.promotion_gate.max_order_rejects = _as_int(runtime.promotion_gate.max_order_rejects, 0)
@@ -806,6 +833,7 @@ def _normalize_runtime_config(
     market_window_raw = sections["market_window"]
 
     _normalize_storage_runtime_section(runtime, storage_raw=storage_raw)
+    _normalize_data_runtime_section(runtime)
     _normalize_trading_and_risk_runtime_section(runtime)
     _normalize_execution_runtime_section(runtime, exec_raw=exec_raw)
     _normalize_live_exchange_runtime_section(runtime)
@@ -838,6 +866,7 @@ def _build_runtime_config_tree(
             **_coerce_dataclass_kwargs(sections["execution"], ExecutionConfig)
         ),
         storage=StorageConfig(**_coerce_dataclass_kwargs(sections["storage"], StorageConfig)),
+        data=DataConfig(**_coerce_dataclass_kwargs(sections["data"], DataConfig)),
         backtest=BacktestRuntimeConfig(
             **{
                 **_coerce_dataclass_kwargs(sections["backtest"], BacktestRuntimeConfig),
@@ -864,6 +893,10 @@ def _build_runtime_config_tree(
         ),
         market_window=MarketWindowConfig(
             **_coerce_dataclass_kwargs(sections["market_window"], MarketWindowConfig)
+        ),
+        memory=MemoryConfig(**_coerce_dataclass_kwargs(sections["memory"], MemoryConfig)),
+        validation=ValidationConfig(
+            **_coerce_dataclass_kwargs(sections["validation"], ValidationConfig)
         ),
         promotion_gate=PromotionGateConfig(
             **promotion_kwargs,

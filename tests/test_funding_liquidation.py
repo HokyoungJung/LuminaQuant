@@ -3,7 +3,7 @@ import unittest
 from datetime import datetime, timedelta
 
 from lumina_quant.backtesting.portfolio_backtest import Portfolio
-from lumina_quant.core.events import FillEvent
+from lumina_quant.core.events import FillEvent, MarketWindowEvent
 
 
 class MockBars:
@@ -100,6 +100,75 @@ class TestFundingAndLiquidation(unittest.TestCase):
         self.assertLess(p.current_holdings["cash"], cash_before)
         self.assertGreater(p.total_funding_paid, 0.0)
 
+    def test_no_funding_charged_across_flat_gap_after_reopen(self):
+        """Regression: closing a position resets the funding anchor.
+
+        open -> close -> flat gap (10 days) -> reopen must NOT back-charge
+        funding for the flat interval. Before the fix, _last_funding_ts kept
+        its pre-close value, so the first _apply_funding after the reopen
+        charged ~30 intervals of phantom funding.
+        """
+        events = queue.Queue()
+        bars = MockBars(datetime(2026, 1, 1, 0, 0), 100.0)
+        p = Portfolio(bars, events, bars.current_dt, FundingConfig)
+
+        # Open a long; first update anchors the funding timestamp.
+        p.update_positions_from_fill(
+            FillEvent(
+                timeindex=bars.current_dt,
+                symbol="BTC/USDT",
+                exchange="TEST",
+                quantity=1.0,
+                direction="BUY",
+                fill_cost=100.0,
+                commission=0.0,
+            )
+        )
+        p.update_timeindex(None)
+        self.assertIsNotNone(p._last_funding_ts["BTC/USDT"])
+
+        # Close the position flat -> anchor must be cleared.
+        p.update_positions_from_fill(
+            FillEvent(
+                timeindex=bars.current_dt,
+                symbol="BTC/USDT",
+                exchange="TEST",
+                quantity=1.0,
+                direction="SELL",
+                fill_cost=100.0,
+                commission=0.0,
+            )
+        )
+        self.assertEqual(p.current_positions["BTC/USDT"], 0.0)
+        self.assertIsNone(p._last_funding_ts["BTC/USDT"])
+
+        # Stay flat for a long gap (10 days = 30 funding intervals).
+        bars.current_dt += timedelta(days=10)
+        p.update_timeindex(None)
+        funding_before_reopen = p.total_funding_paid
+
+        # Reopen the long; the first bar re-anchors (no payment yet).
+        p.update_positions_from_fill(
+            FillEvent(
+                timeindex=bars.current_dt,
+                symbol="BTC/USDT",
+                exchange="TEST",
+                quantity=1.0,
+                direction="BUY",
+                fill_cost=100.0,
+                commission=0.0,
+            )
+        )
+        p.update_timeindex(None)
+
+        # No funding may have been booked for the flat gap.
+        self.assertEqual(p.total_funding_paid, funding_before_reopen)
+
+        # One genuine interval after the reopen DOES charge funding.
+        bars.current_dt += timedelta(hours=8)
+        p.update_timeindex(None)
+        self.assertGreater(p.total_funding_paid, funding_before_reopen)
+
     def test_liquidation_event_emitted(self):
         events = queue.Queue()
         bars = MockBars(datetime(2026, 1, 1, 0, 0), 100.0)
@@ -120,6 +189,41 @@ class TestFundingAndLiquidation(unittest.TestCase):
         self.assertIsInstance(evt, FillEvent)
         self.assertEqual(evt.status, "LIQUIDATED")
         self.assertEqual(evt.symbol, "BTC/USDT")
+
+    def test_windowed_liquidation_uses_full_window_extremes(self):
+        """Regression: a liquidation breach in any 1s bar of a window triggers.
+
+        The windowed handler advances get_latest_bar_value to only the LAST 1s
+        bar. Before the fix, an intra-window maintenance-margin breach (a dip in
+        an earlier second) was silently skipped. _check_liquidations now reads
+        the window's full low/high extremes from the event's bars_1s rows.
+        """
+        events = queue.Queue()
+        # Latest 1s bar stays benign (low 99.5) so single-bar checks would miss.
+        bars = MockBars(datetime(2026, 1, 1, 0, 0), 100.0)
+        bars.low = 99.5
+        bars.high = 101.0
+        bars.close = 100.0
+        p = Portfolio(bars, events, bars.current_dt, LiquidationConfig)
+        p.current_positions["BTC/USDT"] = 1.0
+        p.entry_prices["BTC/USDT"] = 100.0
+
+        ts = int(bars.current_dt.timestamp() * 1000)
+        # Middle 1s bar dips to 60.0 — breaches the long liquidation level.
+        bars_1s = {
+            "BTC/USDT": [
+                (ts, 100.0, 101.0, 99.5, 100.0, 10.0),
+                (ts + 1000, 100.0, 102.0, 60.0, 80.0, 10.0),
+                (ts + 2000, 100.0, 101.0, 99.5, 100.0, 10.0),
+            ]
+        }
+        evt = MarketWindowEvent(time=bars.current_dt, window_seconds=20, bars_1s=bars_1s)
+        p.update_timeindex(evt)
+
+        self.assertFalse(events.empty())
+        fill = events.get()
+        self.assertEqual(fill.status, "LIQUIDATED")
+        self.assertEqual(fill.symbol, "BTC/USDT")
 
 
 if __name__ == "__main__":

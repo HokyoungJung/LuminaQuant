@@ -1,14 +1,15 @@
-"""Native metric backend selection with automatic fastest-path defaulting."""
+"""Native metric backend selection with automatic fastest-path defaulting.
+
+Phase 2: pyo3 migration — lumina_quant._compute (pyo3).
+Fallback chain: pyo3 → numba → python.
+"""
 
 from __future__ import annotations
 
-import ctypes
 import os
-import platform
 import time
 from collections.abc import Callable
-from pathlib import Path
-from typing import Any, cast
+from typing import cast
 
 import numpy as np
 from lumina_quant.optimization.constants import (
@@ -16,7 +17,6 @@ from lumina_quant.optimization.constants import (
     METRIC_FALLBACK_SHARPE,
     METRIC_FALLBACK_TRIPLE,
     NATIVE_AUTO_SELECT_ENV,
-    NATIVE_BACKEND_DLL_ENV,
     NATIVE_BACKEND_ENV,
     NATIVE_BENCH_DEFAULT_LOOPS,
     NATIVE_BENCH_DEFAULT_TOL,
@@ -37,8 +37,18 @@ from lumina_quant.optimization.constants import (
 )
 from lumina_quant.optimization.fast_eval import NUMBA_AVAILABLE, evaluate_metrics_numba
 
-_NATIVE_FN: Any = None
-_NATIVE_DLL: str = ""
+# ── pyo3 binding ──────────────────────────────────────────────────────────────
+_PYO3_FN: Callable[..., tuple[float, float, float]] | None = None
+_PYO3_LOAD_ERROR: str = ""
+
+try:
+    from lumina_quant._compute import evaluate_metrics as _pyo3_evaluate_metrics  # type: ignore[attr-defined]
+
+    _PYO3_FN = _pyo3_evaluate_metrics
+except Exception as _exc:
+    _PYO3_LOAD_ERROR = str(_exc)
+
+# ── module state ──────────────────────────────────────────────────────────────
 _BACKEND_MODE = NATIVE_MODE_NUMBA if NUMBA_AVAILABLE else NATIVE_MODE_PYTHON
 NATIVE_BACKEND_NAME = _BACKEND_MODE
 
@@ -64,59 +74,18 @@ def _env_float(name: str, default: float) -> float:
         return float(default)
 
 
-def _project_root() -> Path:
-    return Path(__file__).resolve().parents[2]
-
-
-def _load_native_function(dll_path: str) -> Any | None:
-    if not dll_path:
-        return None
-    if not os.path.exists(dll_path):
-        return None
-    try:
-        lib = ctypes.CDLL(dll_path)
-        fn = lib.evaluate_metrics
-        fn.argtypes = [
-            ctypes.POINTER(ctypes.c_double),
-            ctypes.c_int,
-            ctypes.c_int,
-            ctypes.POINTER(ctypes.c_double),
-            ctypes.POINTER(ctypes.c_double),
-            ctypes.POINTER(ctypes.c_double),
-        ]
-        fn.restype = ctypes.c_int
-        return fn
-    except Exception:
-        return None
-
-
-def _evaluate_native_fn(
-    native_fn: Any,
+def _evaluate_pyo3(
     total_series: np.ndarray,
     annual_periods: int,
 ) -> tuple[float, float, float] | None:
-    if native_fn is None:
+    if _PYO3_FN is None:
         return None
     arr = np.ascontiguousarray(total_series, dtype=np.float64)
-    out_sharpe = ctypes.c_double(0.0)
-    out_cagr = ctypes.c_double(0.0)
-    out_mdd = ctypes.c_double(0.0)
     try:
-        status = int(
-            native_fn(
-                arr.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
-                int(arr.shape[0]),
-                int(annual_periods),
-                ctypes.byref(out_sharpe),
-                ctypes.byref(out_cagr),
-                ctypes.byref(out_mdd),
-            )
-        )
+        result = _PYO3_FN(arr, int(annual_periods))
+        return float(result[0]), float(result[1]), float(result[2])
     except Exception:
         return None
-    if status != 0:
-        return None
-    return float(out_sharpe.value), float(out_cagr.value), float(out_mdd.value)
 
 
 def _evaluate_python(total_series: np.ndarray, annual_periods: int) -> tuple[float, float, float]:
@@ -184,38 +153,6 @@ def _bench(
     )
 
 
-def _discover_dll_candidates() -> list[tuple[str, str]]:
-    out: list[tuple[str, str]] = []
-    explicit = str(os.getenv(NATIVE_BACKEND_DLL_ENV, "")).strip()
-    if explicit:
-        return [("explicit", explicit)]
-
-    root = _project_root()
-    system_name = platform.system().lower()
-    if system_name == "windows":
-        c_names = ["lumina_metrics.dll"]
-        rust_names = ["lumina_metrics.dll"]
-    elif system_name == "darwin":
-        c_names = ["liblumina_metrics.dylib", "lumina_metrics.dylib"]
-        rust_names = ["liblumina_metrics.dylib", "lumina_metrics.dylib"]
-    else:
-        c_names = ["liblumina_metrics.so", "lumina_metrics.so"]
-        rust_names = ["liblumina_metrics.so", "lumina_metrics.so"]
-
-    builtins: list[tuple[str, Path]] = []
-    for filename in c_names:
-        builtins.append(("c", root / "native" / "c_metrics" / "build" / filename))
-    for filename in rust_names:
-        builtins.append(
-            ("rust", root / "native" / "rust_metrics" / "target" / "release" / filename)
-        )
-
-    for name, path in builtins:
-        if path.exists():
-            out.append((name, str(path)))
-    return out
-
-
 def _outputs_close(
     lhs: tuple[float, float, float], rhs: tuple[float, float, float], tol: float
 ) -> bool:
@@ -227,7 +164,7 @@ def _outputs_close(
 
 
 def _select_fastest_backend() -> None:
-    global _NATIVE_FN, _NATIVE_DLL, _BACKEND_MODE, NATIVE_BACKEND_NAME
+    global _BACKEND_MODE, NATIVE_BACKEND_NAME
 
     fallback_name = NATIVE_MODE_NUMBA if NUMBA_AVAILABLE else NATIVE_MODE_PYTHON
     fallback_fn = _evaluate_numba_or_python
@@ -244,20 +181,12 @@ def _select_fastest_backend() -> None:
         NATIVE_BACKEND_NAME = NATIVE_MODE_NUMBA
         return
 
-    candidates = _discover_dll_candidates()
-    if not candidates:
+    if _PYO3_FN is None:
         return
 
     if mode_override == NATIVE_MODE_NATIVE:
-        for candidate_name, dll_path in candidates:
-            fn = _load_native_function(dll_path)
-            if fn is None:
-                continue
-            _NATIVE_FN = fn
-            _NATIVE_DLL = dll_path
-            _BACKEND_MODE = NATIVE_MODE_NATIVE
-            NATIVE_BACKEND_NAME = f"{NATIVE_MODE_NATIVE}:{candidate_name}"
-            return
+        _BACKEND_MODE = NATIVE_MODE_NATIVE
+        NATIVE_BACKEND_NAME = f"{NATIVE_MODE_NATIVE}:pyo3"
         return
 
     auto_select = _env_bool(NATIVE_AUTO_SELECT_ENV, True)
@@ -274,50 +203,24 @@ def _select_fastest_backend() -> None:
     series = (1.0 + returns).cumprod() * NATIVE_BENCH_STARTING_CAPITAL
 
     fallback_speed, fallback_out = _bench(fallback_fn, series, DEFAULT_ANNUAL_PERIODS, loops)
-    best_speed = fallback_speed
-    best_name = fallback_name
-    best_fn = None
-    best_dll = ""
 
-    for candidate_name, dll_path in candidates:
-        fn = _load_native_function(dll_path)
-        if fn is None:
-            continue
+    def _call_pyo3(arr: np.ndarray, periods: int) -> tuple[float, float, float]:
+        out = _evaluate_pyo3(arr, periods)
+        return out if out is not None else METRIC_FALLBACK_TRIPLE
 
-        def _call_native(
-            arr: np.ndarray,
-            periods: int,
-            _fn: Any = fn,
-        ) -> tuple[float, float, float]:
-            out = _evaluate_native_fn(_fn, arr, periods)
-            if out is None:
-                return METRIC_FALLBACK_TRIPLE
-            return out
-
-        native_speed, native_out = _bench(_call_native, series, DEFAULT_ANNUAL_PERIODS, loops)
-        if not _outputs_close(native_out, fallback_out, tol):
-            continue
-
-        if not auto_select:
-            _NATIVE_FN = fn
-            _NATIVE_DLL = dll_path
-            _BACKEND_MODE = NATIVE_MODE_NATIVE
-            NATIVE_BACKEND_NAME = f"{NATIVE_MODE_NATIVE}:{candidate_name}"
-            return
-
-        threshold = best_speed * (1.0 + min_gain)
-        if native_speed > threshold:
-            best_speed = native_speed
-            best_name = candidate_name
-            best_fn = fn
-            best_dll = dll_path
-
-    if best_fn is None:
+    pyo3_speed, pyo3_out = _bench(_call_pyo3, series, DEFAULT_ANNUAL_PERIODS, loops)
+    if not _outputs_close(pyo3_out, fallback_out, tol):
         return
-    _NATIVE_FN = best_fn
-    _NATIVE_DLL = best_dll
-    _BACKEND_MODE = NATIVE_MODE_NATIVE
-    NATIVE_BACKEND_NAME = f"{NATIVE_MODE_NATIVE}:{best_name}"
+
+    if not auto_select:
+        _BACKEND_MODE = NATIVE_MODE_NATIVE
+        NATIVE_BACKEND_NAME = f"{NATIVE_MODE_NATIVE}:pyo3"
+        return
+
+    threshold = fallback_speed * (1.0 + min_gain)
+    if pyo3_speed > threshold:
+        _BACKEND_MODE = NATIVE_MODE_NATIVE
+        NATIVE_BACKEND_NAME = f"{NATIVE_MODE_NATIVE}:pyo3"
 
 
 _select_fastest_backend()
@@ -328,8 +231,8 @@ def evaluate_metrics_backend(
     annual_periods: int,
 ) -> tuple[float, float, float]:
     """Evaluate metrics via selected fastest backend with safe fallback."""
-    if _BACKEND_MODE == NATIVE_MODE_NATIVE and _NATIVE_FN is not None:
-        native_out = _evaluate_native_fn(_NATIVE_FN, total_series, annual_periods)
+    if _BACKEND_MODE == NATIVE_MODE_NATIVE and _PYO3_FN is not None:
+        native_out = _evaluate_pyo3(total_series, annual_periods)
         if native_out is not None:
             return native_out
     return _evaluate_numba_or_python(total_series, annual_periods)
@@ -340,5 +243,6 @@ def backend_selection_details() -> dict[str, str]:
     return {
         "backend": str(NATIVE_BACKEND_NAME),
         "mode": str(_BACKEND_MODE),
-        "dll": str(_NATIVE_DLL),
+        "pyo3_available": str(_PYO3_FN is not None),
+        "pyo3_load_error": str(_PYO3_LOAD_ERROR) if _PYO3_LOAD_ERROR else "",
     }

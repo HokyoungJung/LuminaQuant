@@ -225,7 +225,7 @@ def _timestamp() -> str:
 def _safe_float(value: Any, default: float = 0.0) -> float:
     try:
         parsed = float(value)
-    except (TypeError, ValueError, OverflowError):
+    except TypeError, ValueError, OverflowError:
         return default
     return parsed if math.isfinite(parsed) else default
 
@@ -233,7 +233,7 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
 def _safe_int(value: Any, default: int = 0) -> int:
     try:
         parsed = int(float(value))
-    except (TypeError, ValueError, OverflowError):
+    except TypeError, ValueError, OverflowError:
         return default
     return parsed
 
@@ -361,7 +361,7 @@ def _variant_inventory_summary(retune: Mapping[str, Any]) -> dict[str, Any]:
             params = (
                 json.loads(raw_params) if isinstance(raw_params, str) else dict(raw_params or {})
             )
-        except (TypeError, ValueError, json.JSONDecodeError):
+        except TypeError, ValueError, json.JSONDecodeError:
             params = {}
         if params.get("side"):
             side_values.add(str(params["side"]))

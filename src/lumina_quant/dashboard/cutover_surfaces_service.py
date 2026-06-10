@@ -5,12 +5,11 @@ from __future__ import annotations
 import json
 import math
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any
 
 import pandas as pd
 
-from lumina_quant.config import BaseConfig
+from lumina_quant.configuration import get_default_runtime_config
 from lumina_quant.dashboard.state_store_service import (
     load_fills_state_frame,
     load_heartbeats_state_frame,
@@ -23,7 +22,6 @@ from lumina_quant.dashboard.state_store_service import (
     load_runs_frame,
 )
 from lumina_quant.dashboard.workflow_jobs_service import load_recent_workflow_jobs
-from lumina_quant.dashboard.bridge import resolve_dashboard_bridge_contract
 from lumina_quant.dashboard.overview_service import (
     build_overview_payload_from_frames,
     coerce_datetime_series,
@@ -39,12 +37,9 @@ from lumina_quant.postgres_state import _connect_postgres
 
 
 def _dashboard_contract() -> Any:
-    repo_root = Path(__file__).resolve().parents[3]
-    return resolve_dashboard_bridge_contract(
-        launch_mode="next",
-        retired_stub_path=repo_root / "src" / "lumina_quant" / "dashboard" / "retired_stub.py",
-        next_app_dir=repo_root / "apps" / "dashboard_web",
-    )
+    from lumina_quant.dashboard.bridge import build_dashboard_bridge_contract_v2
+
+    return build_dashboard_bridge_contract_v2()
 
 
 def _parse_json_dict(value: Any) -> dict[str, Any]:
@@ -62,7 +57,7 @@ def _parse_json_dict(value: Any) -> dict[str, Any]:
 def _safe_float(value: Any, default: float = 0.0) -> float:
     try:
         parsed = float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return float(default)
     return parsed if pd.notna(parsed) else float(default)
 
@@ -148,7 +143,7 @@ def _resolve_market_context(
     fills_frame: pd.DataFrame,
 ) -> dict[str, Any]:
     metadata = _parse_json_dict(run_row.get("metadata"))
-    configured_symbols = getattr(BaseConfig, "SYMBOLS", [])
+    configured_symbols = get_default_runtime_config().trading.symbols
     symbol = ""
     if "symbol" in fills_frame.columns:
         symbol_values = fills_frame["symbol"].dropna().astype(str)
@@ -162,14 +157,16 @@ def _resolve_market_context(
         symbol = str(configured_symbols[0])
 
     timeframe, clamped = _normalize_market_timeframe(
-        metadata.get("timeframe") or getattr(BaseConfig, "TIMEFRAME", "1m")
+        metadata.get("timeframe") or get_default_runtime_config().trading.timeframe
     )
-    market_db_path = str(getattr(BaseConfig, "MARKET_DATA_PARQUET_PATH", "") or "").strip()
+    market_db_path = str(
+        get_default_runtime_config().storage.market_data_parquet_path or ""
+    ).strip()
     return {
         "symbol": symbol or "n/a",
         "timeframe": timeframe,
         "timeframe_clamped": clamped,
-        "exchange": str(getattr(BaseConfig, "MARKET_DATA_EXCHANGE", "binance") or "binance"),
+        "exchange": str(get_default_runtime_config().storage.market_data_exchange or "binance"),
         "strategy": str(run_row.get("strategy") or metadata.get("strategy") or "unknown"),
         "market_db_path": market_db_path,
         "source": "parquet" if market_db_path else "unconfigured",
@@ -1242,3 +1239,97 @@ __all__ = [
     "load_raw_data_payload",
     "load_report_export_payload",
 ]
+
+_FN_MAP: dict[str, Any] = {}  # populated lazily below
+
+
+def _get_fn_map():
+    return {
+        "load_performance_price_payload": load_performance_price_payload,
+        "load_execution_analytics_payload": load_execution_analytics_payload,
+        "load_market_data_payload": load_market_data_payload,
+        "load_optimization_insights_payload": load_optimization_insights_payload,
+        "load_raw_data_payload": load_raw_data_payload,
+        "load_report_export_payload": load_report_export_payload,
+    }
+
+
+def main(argv: list[str] | None = None) -> int:
+    r"""Module-mode entry for all cutover-surface routes.
+
+    Each of the 6 routes that share this module passes ``--fn <function_name>``
+    so the correct payload builder is invoked.
+
+    Example::
+
+        uv run python -m lumina_quant.dashboard.cutover_surfaces_service \\
+            --fn load_performance_price_payload --json
+    """
+    import argparse
+    import json
+
+    fn_map = _get_fn_map()
+    parser = argparse.ArgumentParser(
+        prog="lumina_quant.dashboard.cutover_surfaces_service",
+        description="Emit a cutover-surface dashboard payload as JSON.",
+    )
+    parser.add_argument(
+        "--fn",
+        choices=list(fn_map.keys()),
+        default="load_performance_price_payload",
+        help="Payload builder to invoke (default: load_performance_price_payload).",
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        default=True,
+        help="Output as JSON (default and only output mode).",
+    )
+    parser.add_argument(
+        "--point-limit",
+        type=int,
+        default=240,
+        dest="point_limit",
+        help="Max metric/equity points (default: 240).",
+    )
+    parser.add_argument(
+        "--fill-limit", type=int, default=80, dest="fill_limit", help="Max fill rows (default: 80)."
+    )
+    parser.add_argument(
+        "--order-limit",
+        type=int,
+        default=200,
+        dest="order_limit",
+        help="Max order rows (default: 200).",
+    )
+    parser.add_argument(
+        "--event-limit",
+        type=int,
+        default=50,
+        dest="event_limit",
+        help="Max risk/heartbeat event rows (default: 50).",
+    )
+    args = parser.parse_args(argv)
+
+    fn = fn_map[args.fn]
+    # Pass only the kwargs each function accepts; unused kwargs are silently dropped.
+    import inspect
+
+    sig = inspect.signature(fn)
+    kwargs: dict[str, Any] = {}
+    if "point_limit" in sig.parameters:
+        kwargs["point_limit"] = args.point_limit
+    if "fill_limit" in sig.parameters:
+        kwargs["fill_limit"] = args.fill_limit
+    if "order_limit" in sig.parameters:
+        kwargs["order_limit"] = args.order_limit
+    if "event_limit" in sig.parameters:
+        kwargs["event_limit"] = args.event_limit
+
+    payload = fn(**kwargs)
+    print(json.dumps(payload, indent=2, sort_keys=True, default=str))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

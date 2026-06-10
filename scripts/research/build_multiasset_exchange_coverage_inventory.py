@@ -9,9 +9,11 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from lumina_quant.config import BaseConfig
+from lumina_quant.configuration import BacktestConfigView, get_default_runtime_config
 from lumina_quant.data.support_inventory import build_strategy_support_inventory
 from lumina_quant.research_universe import BINANCE_EXTENDED_RESEARCH_SYMBOLS_SLASHED
+
+BaseConfig = BacktestConfigView(get_default_runtime_config())
 
 DEFAULT_OUTPUT_DIR = (
     Path(__file__).resolve().parents[2]

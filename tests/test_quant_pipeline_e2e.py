@@ -5,7 +5,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-from lumina_quant.config import BaseConfig
 from lumina_quant.strategy_factory import (
     build_default_candidate_rows,
     run_candidate_research,
@@ -16,7 +15,13 @@ from lumina_quant.strategy_factory.selection import select_diversified_shortlist
 def test_quant_pipeline_end_to_end(tmp_path: Path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("LQ_GPU_MODE", "cpu")
-    monkeypatch.setattr(BaseConfig, "MARKET_DATA_PARQUET_PATH", str(tmp_path / "market_parquet"))
+    # Write a minimal config so get_default_runtime_config() picks up the right parquet path.
+    cfg_file = tmp_path / "config.yaml"
+    cfg_file.write_text(
+        f"storage:\n  market_data_parquet_path: {tmp_path / 'market_parquet'!s}\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("LQ_CONFIG_PATH", str(cfg_file))
     symbols = ["BTC/USDT", "ETH/USDT", "SOL/USDT"]
     timeframes = ["1m", "5m"]
 

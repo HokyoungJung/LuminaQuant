@@ -153,7 +153,7 @@ def _utc_now_iso() -> str:
 def _safe_float(value: Any, default: float = 0.0) -> float:
     try:
         numeric = float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return float(default)
     if not math.isfinite(numeric):
         return float(default)

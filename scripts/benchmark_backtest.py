@@ -89,13 +89,29 @@ def _load_best_params(strategy_name: str) -> dict[str, Any]:
                         "[WARN] best_params metadata indicates non validation-only selection basis "
                         f"for {strategy_name}."
                     )
-            except (OSError, ValueError, TypeError):
+            except OSError, ValueError, TypeError:
                 print(f"[WARN] Failed to parse best_params metadata for {strategy_name}.")
         else:
             print(f"[WARN] best_params metadata missing for {strategy_name}.")
-    except (OSError, ValueError, TypeError):
+    except OSError, ValueError, TypeError:
         pass
     return params
+
+
+def _filter_symbols_with_data(symbols: list[str], csv_dir: str) -> tuple[list[str], list[str]]:
+    """Split symbols into (has CSV data, missing). Avoids benchmarking phantom
+    symbols whose data files do not exist (12/14 configured symbols ship no CSV).
+    """
+    from lumina_quant.market_data import resolve_symbol_csv_path
+
+    available: list[str] = []
+    missing: list[str] = []
+    for symbol in symbols:
+        if os.path.exists(resolve_symbol_csv_path(csv_dir, symbol)):
+            available.append(symbol)
+        else:
+            missing.append(symbol)
+    return available, missing
 
 
 def _get_rss_mb() -> float | None:
@@ -118,6 +134,9 @@ class BenchmarkSample:
     peak_rss_mb: float | None
     bars_processed: int
     bars_per_sec: float
+    signals: int
+    orders: int
+    fills: int
 
 
 @dataclass(slots=True)
@@ -138,6 +157,9 @@ class BenchmarkSummary:
     mean_bars_per_sec: float
     median_peak_tracemalloc_mb: float
     max_peak_rss_mb: float | None
+    signals: int = 0
+    orders: int = 0
+    fills: int = 0
     comparison: dict[str, Any] | None = None
 
 
@@ -152,7 +174,7 @@ def _load_snapshot(path: str) -> dict[str, Any] | None:
             data = json.load(file)
         if isinstance(data, dict):
             return data
-    except (OSError, ValueError, TypeError):
+    except OSError, ValueError, TypeError:
         return None
     return None
 
@@ -235,6 +257,9 @@ def _run_once(
         peak_rss_mb=peak_rss_mb,
         bars_processed=bars_processed,
         bars_per_sec=bars_per_sec,
+        signals=int(backtest.signals),
+        orders=int(backtest.orders),
+        fills=int(backtest.fills),
     )
 
 
@@ -255,6 +280,18 @@ def build_benchmark_summary(args: argparse.Namespace) -> BenchmarkSummary:
     )
     if not symbols:
         raise ValueError("No symbols specified for benchmark.")
+
+    # Only benchmark symbols that actually have data files. Most configured
+    # symbols ship no committed CSV, so silently passing all 14 would crash or
+    # benchmark empty series. Trim + report (never silently).
+    symbols, missing_symbols = _filter_symbols_with_data(symbols, "data")
+    if missing_symbols:
+        print(
+            f"[INFO] Skipping {len(missing_symbols)} symbol(s) with no data file under data/: "
+            f"{', '.join(missing_symbols)}"
+        )
+    if not symbols:
+        raise ValueError("None of the requested symbols have committed data files under data/.")
 
     start_date_raw = (config_data.get("backtest", {}) or {}).get("start_date", "2024-01-01")
     start_date = datetime.strptime(str(start_date_raw), "%Y-%m-%d")
@@ -288,6 +325,20 @@ def build_benchmark_summary(args: argparse.Namespace) -> BenchmarkSummary:
     rss_candidates = [sample.peak_rss_mb for sample in samples if sample.peak_rss_mb is not None]
     max_peak_rss_mb = max(rss_candidates) if rss_candidates else None
 
+    # The benchmark must exercise a real signal→order→fill path, not a no-op
+    # event loop. Counts are deterministic across iters (fixed seed, same data).
+    representative = samples[0]
+    if representative.signals <= 0:
+        raise ValueError(
+            f"Benchmark produced 0 signals for {strategy_name} on {symbols} — "
+            "the workload is not exercising the strategy (check data window/params)."
+        )
+    if representative.fills <= 0:
+        raise ValueError(
+            f"Benchmark produced 0 fills for {strategy_name} on {symbols} — "
+            "signals never converted to fills (check execution/portfolio wiring)."
+        )
+
     return BenchmarkSummary(
         strategy=strategy_name,
         symbols=symbols,
@@ -303,6 +354,9 @@ def build_benchmark_summary(args: argparse.Namespace) -> BenchmarkSummary:
         mean_bars_per_sec=statistics.fmean(bps_list),
         median_peak_tracemalloc_mb=statistics.median(tracemalloc_list),
         max_peak_rss_mb=max_peak_rss_mb,
+        signals=representative.signals,
+        orders=representative.orders,
+        fills=representative.fills,
     )
 
 

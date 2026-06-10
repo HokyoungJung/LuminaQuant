@@ -1,3 +1,23 @@
+"""Event-driven backtest engine (Phase 4).
+
+Bar engine pipeline:
+    data_handler  →  events queue  →  strategy / portfolio / execution_handler
+    BacktestConfigView (permanent engine-private adapter, backtesting/_config_view.py)
+    carries uppercase-attr config to Portfolio and ExecutionHandler.  Pass a plain
+    ``RuntimeConfig`` and this module wraps it automatically.
+
+Compute backends (Phase 2):
+    Metric evaluation routes through ``optimization.native_backend`` →
+    ``lumina_quant._compute.evaluate_metrics`` (pyo3).  The bar engine itself
+    processes OHLCV tuples in Python; heavy numerical work stays in pyo3 kernels.
+
+Phase 4 execution model:
+    ``SimulatedExecutionHandler`` delegates all fill / funding / liquidation logic to
+    ``backtesting.execution_model.ExecutionModel``.
+"""
+
+from __future__ import annotations
+
 import collections
 import logging
 import os
@@ -5,7 +25,8 @@ import queue
 from pprint import pprint
 from typing import Any
 
-from lumina_quant.config import BacktestConfig
+from lumina_quant.backtesting._config_view import BacktestConfigView
+from lumina_quant.configuration import get_default_runtime_config
 from lumina_quant.core.engine import TradingEngine
 from lumina_quant.market_data import normalize_timeframe_token, timeframe_to_milliseconds
 
@@ -144,10 +165,22 @@ class Backtest(TradingEngine):
         record_trades=True,
         strategy_timeframe=None,
         data_handler_kwargs=None,
+        config=None,
     ):
         self.csv_dir = csv_dir
         self.symbol_list = symbol_list
-        self.config = BacktestConfig
+        # Accept RuntimeConfig directly — wrap in BacktestConfigView so all
+        # downstream getattr(config, "UPPER_ATTR") consumers work unchanged.
+        if config is None:
+            self.config: Any = BacktestConfigView(get_default_runtime_config())
+        elif isinstance(config, BacktestConfigView):
+            self.config = config
+        elif hasattr(config, "execution") and hasattr(config, "backtest"):
+            # Looks like a RuntimeConfig — wrap it.
+            self.config = BacktestConfigView(config)
+        else:
+            # Duck-typed config bag (legacy or test-stub) — pass through.
+            self.config = config
         self.heartbeat = 0.0
         self.start_date = start_date
         self.end_date = end_date  # Override config if specific

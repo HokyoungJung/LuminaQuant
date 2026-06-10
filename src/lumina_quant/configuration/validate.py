@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import platform
 import re
 from collections.abc import Iterable
@@ -104,6 +105,92 @@ def _validate_trading_runtime_invariants(runtime: RuntimeConfig) -> None:
     configured_timeframes = {str(token).strip() for token in runtime.trading.timeframes}
     if str(runtime.trading.timeframe).strip() not in configured_timeframes:
         raise ValueError("trading.timeframe must be included in trading.timeframes.")
+
+
+def _validate_kill_switch_and_risk_envelope(runtime: RuntimeConfig) -> None:
+    """Always-on kill-switch: reject any config that disables the risk envelope.
+
+    Called first in validate_runtime_config so the full risk envelope is
+    non-bypassable before any other check runs.  kill_switch_enabled=False is
+    structurally rejected; all envelope bounds are enforced here so disabling
+    any single component is equally rejected.
+
+    Per-stage composition note (spec R7): stage selection is free — an operator
+    may set go_live_stage='full' directly without traversing prior stages, provided
+    each stage's own entry checks pass at startup.  What is mandatory is that
+    the kill-switch envelope is intact for *any* selected stage.
+    """
+    # 1. kill_switch_enabled — structurally rejected when False
+    if not getattr(runtime.live, "kill_switch_enabled", True):
+        raise ValueError(
+            "live.kill_switch_enabled cannot be set to false. "
+            "The kill-switch is always-on and config-disable is rejected."
+        )
+    # 2. Daily loss cap — (0, 0.5]; zero disables the cap, >0.5 provides no protection
+    max_daily = float(getattr(runtime.risk, "max_daily_loss_pct", 0.03))
+    if max_daily <= 0 or max_daily > 0.5:
+        raise ValueError(
+            f"risk.max_daily_loss_pct={max_daily!r} must be in (0, 0.5]. "
+            "Zero disables the cap; values above 0.5 provide no meaningful protection."
+        )
+    # 3. Per-symbol position size cap — (0, 1.0]
+    max_pos = float(getattr(runtime.risk, "max_position_size_pct", 1.0))
+    if max_pos <= 0 or max_pos > 1.0:
+        raise ValueError(
+            f"risk.max_position_size_pct={max_pos!r} must be in (0, 1.0]. "
+            "Zero disables the cap; values above 1.0 exceed total capital."
+        )
+    # 4. Consecutive-loss halt — must be a positive integer (zero disables the trigger)
+    halt = int(getattr(runtime.risk, "consecutive_loss_halt_count", 5))
+    if halt <= 0:
+        raise ValueError(
+            f"risk.consecutive_loss_halt_count={halt!r} must be > 0. "
+            "Zero disables the automatic consecutive-loss halt trigger."
+        )
+    # 5. freeze_new_entries_on_breach required in canary/full stages
+    stage = str(getattr(runtime.live, "go_live_stage", "testnet")).strip().lower()
+    if stage in {"canary", "full"} and not bool(
+        getattr(runtime.risk, "freeze_new_entries_on_breach", True)
+    ):
+        raise ValueError(
+            f"risk.freeze_new_entries_on_breach must be true when "
+            f"live.go_live_stage='{stage}'. "
+            "Canary and full stages require entry freeze on breach to contain runaway positions."
+        )
+    # 6. Structural prod-routing gate: canary/full stage MUST use mode='real'.
+    # Stage determines the exchange endpoint (testnet=False for canary/full).
+    # Combining stage=canary/full with mode=paper is an operator error that would
+    # route paper-commission-simulated orders to the production REST endpoint.
+    mode = str(getattr(runtime.live, "mode", "paper")).strip().lower()
+    if stage in {"canary", "full"} and mode != "real":
+        raise ValueError(
+            f"live.go_live_stage='{stage}' requires live.mode='real'. "
+            "Canary and full stages route orders to the production exchange endpoint; "
+            "combining them with mode='paper' would place real orders while simulating paper commissions. "
+            "Set live.mode='real' and set LUMINA_ENABLE_LIVE_REAL=true in the environment."
+        )
+    # 7. Per-order absolute value cap — must be positive (zero silently disables the cap
+    # in RiskManager.check_order, bypassing all per-order notional limits)
+    max_order_val = float(getattr(runtime.risk, "max_order_value", 5000.0))
+    if max_order_val <= 0:
+        raise ValueError(
+            f"risk.max_order_value={max_order_val!r} must be > 0. "
+            "Zero disables the per-order absolute value cap in the risk engine."
+        )
+    # 8. Per-symbol exposure cap — (0, 1.0]; zero silently disables symbol-level cap
+    max_sym_exp = float(getattr(runtime.risk, "max_symbol_exposure_pct", 0.25))
+    if max_sym_exp <= 0 or max_sym_exp > 1.0:
+        raise ValueError(
+            f"risk.max_symbol_exposure_pct={max_sym_exp!r} must be in (0, 1.0]. "
+            "Zero disables the per-symbol exposure cap."
+        )
+    # 9. Total margin/notional cap — (0, 5.0]; zero silently disables portfolio-level cap
+    max_total_margin = float(getattr(runtime.risk, "max_total_margin_pct", 0.5))
+    if max_total_margin <= 0 or max_total_margin > 5.0:
+        raise ValueError(
+            f"risk.max_total_margin_pct={max_total_margin!r} must be in (0, 5.0]. "
+            "Zero disables the total margin/notional cap."
+        )
 
 
 def _validate_live_mode_and_sources(runtime: RuntimeConfig) -> tuple[str, str]:
@@ -225,8 +312,8 @@ def _validate_risk_and_execution_runtime_invariants(runtime: RuntimeConfig) -> N
         )
     if runtime.risk.risk_per_trade <= 0 or runtime.risk.risk_per_trade > 0.05:
         raise ValueError("risk.risk_per_trade must be in (0, 0.05].")
-    if runtime.risk.max_daily_loss_pct <= 0 or runtime.risk.max_daily_loss_pct > 1:
-        raise ValueError("risk.max_daily_loss_pct must be in (0, 1].")
+    if runtime.risk.max_daily_loss_pct <= 0 or runtime.risk.max_daily_loss_pct > 0.5:
+        raise ValueError("risk.max_daily_loss_pct must be in (0, 0.5].")
     if runtime.risk.max_intraday_drawdown_pct <= 0 or runtime.risk.max_intraday_drawdown_pct > 1:
         raise ValueError("risk.max_intraday_drawdown_pct must be in (0, 1].")
     if runtime.risk.max_rolling_loss_pct_1h <= 0 or runtime.risk.max_rolling_loss_pct_1h > 1:
@@ -368,6 +455,19 @@ def _validate_live_and_optimization_runtime_invariants(runtime: RuntimeConfig) -
             "live.protective_order_style=market requires live.allow_market_orders=true; "
             "protective orders default to STOP/TAKE_PROFIT limit."
         )
+    # Phase 5 go-live stage pipeline fields
+    go_live_stage = str(getattr(runtime.live, "go_live_stage", "testnet")).strip().lower()
+    if go_live_stage not in {"testnet", "shadow", "canary", "full"}:
+        raise ValueError("live.go_live_stage must be one of: testnet, shadow, canary, full.")
+    canary_frac = float(getattr(runtime.live, "canary_position_fraction", 0.10))
+    if canary_frac <= 0 or canary_frac > 1.0:
+        raise ValueError("live.canary_position_fraction must be in (0, 1.0].")
+    parity_ratio = float(getattr(runtime.live, "shadow_parity_min_ratio", 0.99))
+    if parity_ratio <= 0 or parity_ratio > 1.0:
+        raise ValueError("live.shadow_parity_min_ratio must be in (0, 1.0].")
+    window_bars = int(getattr(runtime.live, "shadow_parity_window_bars", 1000))
+    if window_bars < 1:
+        raise ValueError("live.shadow_parity_window_bars must be >= 1.")
     if runtime.optimization.max_workers < 1:
         raise ValueError("optimization.max_workers must be >= 1.")
     if int(getattr(runtime.optimization, "validation_days", 0)) < 0:
@@ -446,6 +546,7 @@ def _validate_strategy_profile_invariants(runtime: RuntimeConfig) -> None:
 
 def validate_runtime_config(runtime: RuntimeConfig, *, for_live: bool = False) -> None:
     """Validate runtime configuration invariants."""
+    _validate_kill_switch_and_risk_envelope(runtime)
     _validate_storage_runtime_invariants(runtime)
     _validate_trading_runtime_invariants(runtime)
     market_data_source, order_state_source = _validate_live_mode_and_sources(runtime)
@@ -460,6 +561,17 @@ def validate_runtime_config(runtime: RuntimeConfig, *, for_live: bool = False) -
     _validate_promotion_gate_runtime_invariants(runtime)
     _validate_market_window_parity_invariants(runtime)
     _validate_strategy_profile_invariants(runtime)
+
+    if (
+        for_live
+        and str(runtime.live.mode).strip().lower() == "real"
+        and getattr(runtime.live, "require_real_enable_flag", True)
+        and os.environ.get("LUMINA_ENABLE_LIVE_REAL", "").strip().lower() != "true"
+    ):
+        raise ValueError(
+            "Live real mode requires LUMINA_ENABLE_LIVE_REAL=true in the environment. "
+            "Set this explicitly to confirm intent to place real orders."
+        )
 
     if for_live and (not runtime.live.api_key or not runtime.live.secret_key):
         raise ValueError(

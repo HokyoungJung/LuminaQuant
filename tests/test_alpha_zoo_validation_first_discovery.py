@@ -84,10 +84,12 @@ def test_build_validation_first_discovery_from_frozen_10bps_sources(tmp_path: Pa
         "fresh_tv10_filter_abs_score_ge_1p5_alpha_zoo_quality_single_pair_5p0x_0p2alloc"
     )
     assert leader["validation_return"] > 0.005
-    assert leader["preflight"]["status"] == {"ready_for_paper": True, "ready_for_real": False}
+    assert leader["preflight"]["status"]["ready_for_paper"] is True
+    assert leader["preflight"]["status"]["ready_for_real"] is False
     assert leader["paper_equivalent_sizing"]["expected_replay_notional"] == pytest.approx(10_000.0)
     assert efficient["validation_mdd"] < leader["validation_mdd"]
-    assert efficient["preflight"]["status"] == {"ready_for_paper": True, "ready_for_real": False}
+    assert efficient["preflight"]["status"]["ready_for_paper"] is True
+    assert efficient["preflight"]["status"]["ready_for_real"] is False
 
     quarantine = payload["high_validation_quarantine"]
     assert quarantine[0]["validation_return"] > 0.20

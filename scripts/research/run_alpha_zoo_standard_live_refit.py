@@ -124,7 +124,7 @@ def _comparison_delta(
     for key in keys:
         try:
             out[f"delta_{key}"] = float(new_row.get(key) or 0.0) - float(old_row.get(key) or 0.0)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             out[f"delta_{key}"] = None
     return out
 

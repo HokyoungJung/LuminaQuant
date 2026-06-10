@@ -14,17 +14,37 @@ TARGETS = [ROOT / "README.md", ROOT / "README_KR.md", *sorted(DOCS_ROOT.rglob("*
 LINK_RE = re.compile(r"!\[[^\]]*]\(([^)]+)\)|\[[^\]]+]\(([^)]+)\)")
 SKIP_PREFIXES = ("http://", "https://", "mailto:", "tel:", "data:", "#")
 
+
+def _pyproject_pin(package: str) -> str:
+    """Return the current requirement string for ``package`` from pyproject.toml.
+
+    Derived dynamically so this verifier can never drift from the real pins
+    (hardcoded snippets here went stale after the Stack Lift version bumps).
+    Environment markers (the part after ';') are stripped — READMEs document
+    the version constraint, not the platform gate.
+    """
+    import tomllib
+
+    data = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    pools: list[list[str]] = [data["project"].get("dependencies", [])]
+    pools.extend(data["project"].get("optional-dependencies", {}).values())
+    for pool in pools:
+        for req in pool:
+            name = re.split(r"[><=!~;\[ ]", req.strip(), maxsplit=1)[0]
+            if name == package:
+                return req.split(";", 1)[0].strip()
+    raise SystemExit(f"verify_docs: package {package!r} not found in pyproject.toml")
+
+
+_README_SNIPPETS = [
+    _pyproject_pin("polars"),
+    _pyproject_pin("cudf-polars-cu12"),
+    "uv sync --extra gpu",
+]
+
 REQUIRED_SNIPPETS = {
-    ROOT / "README.md": [
-        "polars>=1.35.2,<1.36",
-        "cudf-polars-cu12>=26.2,<26.3",
-        "uv sync --extra gpu",
-    ],
-    ROOT / "README_KR.md": [
-        "polars>=1.35.2,<1.36",
-        "cudf-polars-cu12>=26.2,<26.3",
-        "uv sync --extra gpu",
-    ],
+    ROOT / "README.md": _README_SNIPPETS,
+    ROOT / "README_KR.md": _README_SNIPPETS,
 }
 
 

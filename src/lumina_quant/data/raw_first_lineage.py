@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-import re
 from typing import Any
 
 import polars as pl
@@ -16,15 +15,8 @@ from lumina_quant.data.native_raw_first_backend import (
     normalize_raw_first_backend,
 )
 
-_TIMEFRAME_UNIT_MS = {
-    "s": 1_000,
-    "m": 60_000,
-    "h": 3_600_000,
-    "d": 86_400_000,
-    "w": 604_800_000,
-    "M": 2_592_000_000,
-}
-_TIMEFRAME_PATTERN = re.compile(r"^([1-9][0-9]*)([smhdwM])$")
+# Single canonical timeframe util — re-exported for this module's callers.
+from lumina_quant.data.timeframe import normalize_timeframe_token, timeframe_to_milliseconds
 
 _RAW_COLUMNS = (
     "agg_trade_id",
@@ -48,31 +40,6 @@ def _empty_ohlcv_frame() -> pl.DataFrame:
             "volume": pl.Float64,
         },
     )
-
-
-def normalize_timeframe_token(timeframe: str) -> str:
-    raw = str(timeframe or "").strip()
-    if not raw:
-        raise ValueError("Timeframe cannot be empty")
-    value = raw[:-1].strip()
-    unit_raw = raw[-1]
-    if not value.isdigit() or int(value) <= 0:
-        raise ValueError(f"Invalid timeframe value: {timeframe}")
-    unit = "M" if unit_raw == "M" else unit_raw.lower()
-    token = f"{int(value)}{unit}"
-    if _TIMEFRAME_PATTERN.fullmatch(token) is None:
-        raise ValueError(f"Unsupported timeframe unit in: {timeframe}")
-    return token
-
-
-def timeframe_to_milliseconds(timeframe: str) -> int:
-    token = normalize_timeframe_token(timeframe)
-    unit = token[-1]
-    value = int(token[:-1])
-    unit_ms = _TIMEFRAME_UNIT_MS.get(unit)
-    if unit_ms is None:
-        raise ValueError(f"Unsupported timeframe unit in: {timeframe}")
-    return int(value * unit_ms)
 
 
 def normalize_exchange_timestamp_ms(value: Any, *, source: str) -> int:

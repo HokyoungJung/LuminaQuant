@@ -1,0 +1,35 @@
+{
+  "generated_at_utc": "2026-06-10T00:56:18.914075+00:00",
+  "spec": {
+    "strategy": "MovingAverageCrossStrategy",
+    "allow_short": true,
+    "symbols": [
+      "BTC/USDT",
+      "ETH/USDT"
+    ],
+    "fixture_btcusdt": "/home/hoky/Quants-agent/tests/fixtures/ohlcv/BTCUSDT_seed42_1000d.parquet",
+    "fixture_ethusdt": "/home/hoky/Quants-agent/tests/fixtures/ohlcv/ETHUSDT_seed42_1000d.parquet",
+    "short_windows": [
+      10,
+      20,
+      30
+    ],
+    "long_windows": [
+      40,
+      80,
+      120
+    ],
+    "n_combos": 9,
+    "n_folds": 3,
+    "train_months": 6,
+    "val_months": 3,
+    "test_months": 3,
+    "step_months": 3,
+    "start_date": "2022-01-01",
+    "seed": 42,
+    "total_backtest_runs": 27
+  },
+  "walk_forward_e2e_elapsed_s": 170.70920570002636,
+  "walk_forward_e2e_runs_per_sec": 0.15816370235735816,
+  "provenance_path": "/home/hoky/Quants-agent/baseline/golden/PROVENANCE.json"
+}

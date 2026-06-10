@@ -3,6 +3,11 @@ from collections import deque
 from datetime import UTC, date, datetime
 
 import polars as pl
+from lumina_quant.backtesting.execution_model import (
+    ExecutionModel,
+    ExecutionModelConfig,
+    _config_from_attrs,
+)
 from lumina_quant.core.events import FillEvent, OrderEvent
 from lumina_quant.core.order_policy import (
     canonical_order_type,
@@ -81,6 +86,15 @@ class Portfolio:
         )
         self.leverage = getattr(config, "LEVERAGE", 1.0)
         self.default_stop_loss_pct = getattr(config, "DEFAULT_STOP_LOSS_PCT", 0.01)
+        # Phase 4 unified cost model — funding and liquidation delegate to this.
+        # BacktestConfigView carries ._rt (RuntimeConfig); use from_runtime for production.
+        # Plain class configs (unit tests) use _config_from_attrs.
+        _rt = getattr(config, "_rt", None)
+        self.execution_model = ExecutionModel(
+            ExecutionModelConfig.from_runtime(_rt)
+            if _rt is not None
+            else _config_from_attrs(config)
+        )
         self._current_day = None
         self._last_funding_ts = dict.fromkeys(self.symbol_list)
         self.total_funding_paid = 0.0
@@ -212,7 +226,7 @@ class Portfolio:
         should_sample = self._should_sample(latest_datetime)
         self._update_day_boundary(latest_datetime)
         self._apply_funding(latest_datetime)
-        self._check_liquidations(latest_datetime)
+        self._check_liquidations(latest_datetime, event)
 
         current_positions = self.current_positions
         current_holdings = self.current_holdings
@@ -357,6 +371,13 @@ class Portfolio:
         if abs(new_qty) < 1e-12:
             self.entry_prices[fill.symbol] = None
             self._pending_liquidation.discard(fill.symbol)
+            # CRITICAL: clear the funding anchor when the position goes flat.
+            # Otherwise _last_funding_ts retains its pre-close value through the
+            # entire flat gap, and the first _apply_funding after a reopen
+            # back-charges funding for that gap (sign flips for shorts → phantom
+            # funding income). Re-anchoring happens lazily in _apply_funding when
+            # last_ts is None on the next bar the position is held.
+            self._last_funding_ts[fill.symbol] = None
             return
 
         # Position flip or fresh position: entry resets to current fill price.
@@ -484,9 +505,8 @@ class Portfolio:
             return None
 
     def _apply_funding(self, latest_datetime):
-        interval_hours = max(1, int(getattr(self.config, "FUNDING_INTERVAL_HOURS", 8)))
-        interval_seconds = interval_hours * 3600
-        default_rate_per_8h = float(getattr(self.config, "FUNDING_RATE_PER_8H", 0.0))
+        interval_seconds = self.execution_model.cfg.funding_interval_hours * 3600
+        default_rate_per_8h = self.execution_model.cfg.funding_rate_per_8h
 
         now_ts = self._to_unix_seconds(latest_datetime)
         if now_ts is None:
@@ -519,14 +539,14 @@ class Portfolio:
                 self._last_funding_ts[symbol] = now_ts
                 continue
 
-            interval_rate = float(rate_per_8h) * (interval_hours / 8.0)
-            if abs(interval_rate) <= 1e-12:
-                self._last_funding_ts[symbol] = last_ts + periods * interval_seconds
-                continue
-
-            # Positive funding rate: longs pay, shorts receive.
-            signed = 1.0 if qty > 0 else -1.0
-            funding_payment = signed * notional * interval_rate * periods
+            # Delegate payment computation to the unified ExecutionModel.
+            # Returns 0.0 when abs(rate) <= 1e-12 — timestamp still advances below.
+            funding_payment = self.execution_model.compute_funding_payment(
+                signed_qty=qty,
+                price=price,
+                periods=periods,
+                rate=rate_per_8h,
+            )
             self.current_holdings["cash"] -= funding_payment
             self.current_holdings["total"] -= funding_payment
             self.current_holdings["funding"] += funding_payment
@@ -560,37 +580,65 @@ class Portfolio:
             return None
         return float(default)
 
-    def _check_liquidations(self, latest_datetime):
-        leverage = max(1, int(getattr(self.config, "LEVERAGE", 1)))
+    @staticmethod
+    def _window_extremes_from_event(event) -> dict[str, tuple[float, float, float]]:
+        """Map symbol -> (max_high, min_low, last_close) from a MARKET_WINDOW event.
+
+        The windowed data handler advances ``get_latest_bar_value`` to only the
+        LAST 1s bar of each ~20s window, so liquidation checks would miss a
+        maintenance-margin breach touched anywhere else in the window. When the
+        event carries per-second ``bars_1s`` rows, evaluate against the window's
+        full extremes instead (long liquidates on the lowest low, short on the
+        highest high). Returns an empty dict for non-window events (batch/single
+        bar), so those paths keep using ``get_latest_bar_value`` unchanged.
+        """
+        bars_1s = getattr(event, "bars_1s", None)
+        if not isinstance(bars_1s, dict) or not bars_1s:
+            return {}
+
+        def _hlc(row):
+            if isinstance(row, (tuple, list)) and len(row) >= 6:
+                return float(row[2]), float(row[3]), float(row[4])
+            if isinstance(row, dict):
+                return (
+                    float(row.get("high", 0.0)),
+                    float(row.get("low", 0.0)),
+                    float(row.get("close", 0.0)),
+                )
+            high = getattr(row, "high", None)
+            low = getattr(row, "low", None)
+            close = getattr(row, "close", None)
+            if high is None or low is None or close is None:
+                return None
+            return float(high), float(low), float(close)
+
+        extremes: dict[str, tuple[float, float, float]] = {}
+        for symbol, rows in bars_1s.items():
+            if not rows:
+                continue
+            highs: list[float] = []
+            lows: list[float] = []
+            last_close = None
+            for row in rows:
+                hlc = _hlc(row)
+                if hlc is None:
+                    continue
+                highs.append(hlc[0])
+                lows.append(hlc[1])
+                last_close = hlc[2]
+            if not highs or last_close is None:
+                continue
+            extremes[str(symbol)] = (max(highs), min(lows), last_close)
+        return extremes
+
+    def _check_liquidations(self, latest_datetime, event=None):
+        # leverage <= 1 guard is implicit: execution_model.liquidation_price() returns None.
         configured_margin_mode = (
             str(getattr(self.config, "MARGIN_MODE", "isolated") or "isolated").strip().lower()
         )
         modeled_margin_mode = "isolated"
-        mmr = float(getattr(self.config, "MAINTENANCE_MARGIN_RATE", 0.005))
-        liq_buffer = float(getattr(self.config, "LIQUIDATION_BUFFER_RATE", 0.0))
-        if leverage <= 1:
-            return
 
-        fee_rate = float(
-            getattr(
-                self.config,
-                "TAKER_FEE_RATE",
-                getattr(self.config, "COMMISSION_RATE", 0.001),
-            )
-        )
-
-        def calc_liq_price(entry_price, qty):
-            """Approximate isolated USDT-M liquidation price with maintenance margin and fee/buffer safety.
-            Long  : entry * (1 - 1/L + MMR + fee + buffer)
-            Short : entry * (1 + 1/L - MMR - fee - buffer)
-            """
-            if qty > 0:
-                factor = 1.0 - (1.0 / leverage) + mmr + fee_rate + liq_buffer
-                factor = max(0.0, min(factor, 1.0))
-                return entry_price * factor
-            factor = 1.0 + (1.0 / leverage) - mmr - fee_rate - liq_buffer
-            factor = max(1.0, factor)
-            return entry_price * factor
+        window_extremes = self._window_extremes_from_event(event)
 
         for symbol in self.symbol_list:
             qty = float(self.current_positions.get(symbol, 0.0))
@@ -603,33 +651,43 @@ class Portfolio:
             if not entry_price or entry_price <= 0:
                 continue
 
-            close_price = self.bars.get_latest_bar_value(symbol, "close")
-            bar_high = self.bars.get_latest_bar_value(symbol, "high")
-            bar_low = self.bars.get_latest_bar_value(symbol, "low")
+            symbol_extremes = window_extremes.get(symbol)
+            if symbol_extremes is not None:
+                bar_high, bar_low, close_price = symbol_extremes
+            else:
+                close_price = self.bars.get_latest_bar_value(symbol, "close")
+                bar_high = self.bars.get_latest_bar_value(symbol, "high")
+                bar_low = self.bars.get_latest_bar_value(symbol, "low")
             if close_price <= 0:
                 continue
 
-            liq_price = calc_liq_price(entry_price, qty)
+            # Delegate liquidation price and breach detection to ExecutionModel.
+            liq_price = self.execution_model.liquidation_price(qty=qty, entry_price=entry_price)
+            if liq_price is None:
+                # leverage <= 1 — no liquidation possible for this symbol.
+                continue
 
-            if qty > 0:
-                breached = (bar_low > 0 and bar_low <= liq_price) or close_price <= liq_price
-                direction = "SELL"
-                position_side = "LONG"
-                trigger_price = bar_low if (bar_low > 0 and bar_low <= liq_price) else close_price
-            else:
-                breached = (bar_high > 0 and bar_high >= liq_price) or close_price >= liq_price
-                direction = "BUY"
-                position_side = "SHORT"
-                trigger_price = (
-                    bar_high if (bar_high > 0 and bar_high >= liq_price) else close_price
-                )
-
+            breached, trigger_price = self.execution_model.check_liquidation(
+                qty=qty,
+                entry_price=entry_price,
+                bar_low=bar_low,
+                bar_high=bar_high,
+                close_price=close_price,
+            )
             if not breached:
                 continue
 
+            direction = "SELL" if qty > 0 else "BUY"
+            position_side = "LONG" if qty > 0 else "SHORT"
             abs_qty = abs(qty)
+            leverage = self.execution_model.cfg.leverage
             fill_cost = trigger_price * abs_qty
-            commission = fill_cost * fee_rate
+            # Single cost path: a forced liquidation is an aggressive (taker) fill
+            # at the computed trigger price — route the fee through ExecutionModel
+            # rather than re-deriving fill_cost * taker_fee_rate here.
+            commission = self.execution_model.commission_for(
+                fill_price=trigger_price, qty=abs_qty, is_maker=False
+            )
             fill_event = FillEvent(
                 timeindex=latest_datetime,
                 symbol=symbol,
@@ -754,9 +812,14 @@ class Portfolio:
         """Futures-oriented position sizing:
         risk_amount = equity * risk_per_trade
         qty = risk_amount / stop_distance
+
+        When live.go_live_stage='canary', EFFECTIVE_POSITION_FRACTION is set to
+        canary_position_fraction (< 1.0) in _build_live_config_namespace.  Multiplying
+        here is the single choke point for canary sizing — backtesting and live both
+        route through this method via LivePortfolio re-export.
         """
         target_alloc = getattr(self.config, "TARGET_ALLOCATION", self.max_symbol_exposure_pct)
-        return PortfolioSizingService.risk_based_quantity(
+        qty = PortfolioSizingService.risk_based_quantity(
             signal=signal,
             current_price=float(current_price),
             equity=float(self.current_holdings["total"]),
@@ -769,6 +832,12 @@ class Portfolio:
             leverage=float(self.leverage),
             max_order_notional_pct=float(self.max_order_notional_pct),
         )
+        # Apply canary position fraction: EFFECTIVE_POSITION_FRACTION == canary_position_fraction
+        # when stage=canary, 1.0 otherwise.  Clamped to (0, 1] to prevent zero/negative qty.
+        effective_fraction = float(getattr(self.config, "EFFECTIVE_POSITION_FRACTION", 1.0) or 1.0)
+        if 0.0 < effective_fraction < 1.0:
+            qty = qty * effective_fraction
+        return qty
 
     def _validate_and_round_quantity(self, symbol, quantity, price):
         limits = self._get_symbol_limits(symbol)

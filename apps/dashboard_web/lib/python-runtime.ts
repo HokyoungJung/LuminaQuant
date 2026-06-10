@@ -1,4 +1,4 @@
-import { execFile, execFileSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
@@ -17,10 +17,3 @@ export async function runUvPythonModuleJson<T>(moduleName: string, ...args: stri
   return JSON.parse(stdout.trim()) as T;
 }
 
-export async function runUvPythonSnippetJson<T>(snippet: string): Promise<T> {
-  const stdout = execFileSync('uv', ['run', 'python', '-c', snippet], {
-    cwd: REPO_ROOT,
-    encoding: 'utf-8',
-  });
-  return JSON.parse(stdout.trim()) as T;
-}

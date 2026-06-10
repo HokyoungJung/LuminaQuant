@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from lumina_quant.core.events import SignalEvent
+from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.common import safe_float
 from lumina_quant.indicators.moving_average import RollingMeanWindow
 from lumina_quant.strategy import Strategy
@@ -17,6 +18,10 @@ class _SymbolState:
     last_time_key: str = ""
 
 
+# Canonical decorator-registration example (AC8): this shipped strategy is
+# resolvable purely via ``@register`` + package auto-discovery — no entry in
+# ``registry._STRATEGY_MAP`` is required to make it config-selectable.
+@register("strategy", "MovingAverageCrossStrategy", interface="event_driven")
 class MovingAverageCrossStrategy(Strategy):
     @classmethod
     def get_param_schema(cls) -> dict[str, HyperParam]:

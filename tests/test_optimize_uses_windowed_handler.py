@@ -51,6 +51,6 @@ def test_optimize_uses_windowed_handler_in_parquet_mode(monkeypatch):
     assert captured["data_handler_cls"] is optimize.HistoricParquetWindowedDataHandler
     assert captured["backtest_mode"] == "windowed"
     assert dict(captured["data_handler_kwargs"]) == {
-        "backtest_poll_seconds": int(optimize.BacktestConfig.POLL_SECONDS),
-        "backtest_window_seconds": int(optimize.BacktestConfig.WINDOW_SECONDS),
+        "backtest_poll_seconds": int(optimize.BACKTEST_POLL_SECONDS),
+        "backtest_window_seconds": int(optimize.BACKTEST_WINDOW_SECONDS),
     }

@@ -1,12 +1,19 @@
-"""Shared dashboard migration compatibility contract helpers."""
+"""Shared dashboard migration compatibility contract helpers.
+
+v1 — DashboardBridgeContract / DashboardSliceContract (compat, kept for legacy callers)
+v2 — DashboardBridgeContractV2 / DashboardRouteDescriptor (Phase 6, canonical)
+     All 11 routes use module-mode invocation (runUvPythonModuleJson).
+     Zero snippet-bridge invocations.
+"""
 
 from __future__ import annotations
 
 import argparse
 import json
-from dataclasses import asdict, dataclass
+import os
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from lumina_quant.dashboard.overview_service import (
     build_overview_payload_from_frames,
@@ -146,11 +153,131 @@ def load_overview_payload(
     )
 
 
+# ---------------------------------------------------------------------------
+# v2 contract — canonical for Phase 6 and beyond
+# ---------------------------------------------------------------------------
+
+_V2_ROUTES: tuple[tuple[str, str, str], ...] = (
+    # (api_path, python_module, status)
+    ("/api/python/dashboard/overview", "lumina_quant.dashboard.bridge", "active"),
+    ("/api/python/dashboard/risk-health", "lumina_quant.dashboard.risk_health_service", "active"),
+    (
+        "/api/python/dashboard/workflow-jobs",
+        "lumina_quant.dashboard.workflow_jobs_service",
+        "active",
+    ),
+    (
+        "/api/python/dashboard/workflow-jobs/control",
+        "lumina_quant.dashboard.workflow_jobs_service",
+        "active",
+    ),
+    ("/api/python/dashboard/exact-window", "lumina_quant.dashboard.exact_window_service", "active"),
+    (
+        "/api/python/dashboard/performance-price",
+        "lumina_quant.dashboard.cutover_surfaces_service",
+        "active",
+    ),
+    (
+        "/api/python/dashboard/execution-analytics",
+        "lumina_quant.dashboard.cutover_surfaces_service",
+        "active",
+    ),
+    (
+        "/api/python/dashboard/market-data",
+        "lumina_quant.dashboard.cutover_surfaces_service",
+        "active",
+    ),
+    (
+        "/api/python/dashboard/optimization-insights",
+        "lumina_quant.dashboard.cutover_surfaces_service",
+        "active",
+    ),
+    ("/api/python/dashboard/raw-data", "lumina_quant.dashboard.cutover_surfaces_service", "active"),
+    (
+        "/api/python/dashboard/report-export",
+        "lumina_quant.dashboard.cutover_surfaces_service",
+        "active",
+    ),
+)
+
+
+@dataclass(slots=True, frozen=True)
+class DashboardRouteDescriptor:
+    """Descriptor for a single dashboard API route — drives module-mode invocation."""
+
+    route: str  # e.g. "/api/python/dashboard/overview"
+    python_fn: str  # module name for `uv run python -m <python_fn> --json`
+    status: str  # "active" | "guarded" | "deprecated"
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(slots=True, frozen=True)
+class DashboardBridgeContractV2:
+    """v2 contract — all routes use module-mode invocation (runUvPythonModuleJson).
+
+    The ``dsn_config_key`` is a dot-path into RuntimeConfig that resolves to the
+    Postgres DSN (e.g. ``storage.postgres_dsn``).  Frontend and bridge server
+    read this via ``RuntimeConfig.storage.postgres_dsn`` — they never call
+    ``get_default_runtime_config()`` independently.
+    """
+
+    CONTRACT_VERSION: ClassVar[int] = 2
+
+    launch_mode: str = "next"
+    frontend_target: str = ""
+    dsn_config_key: str = "storage.postgres_dsn"
+    postgres_dsn: str = ""
+    routes: tuple[DashboardRouteDescriptor, ...] = field(default_factory=tuple)
+
+    def to_dict(self) -> dict[str, Any]:
+        payload = {
+            "contract_version": self.CONTRACT_VERSION,
+            "launch_mode": self.launch_mode,
+            "frontend_target": self.frontend_target,
+            "dsn_config_key": self.dsn_config_key,
+            "routes": [r.to_dict() for r in self.routes],
+        }
+        return payload
+
+
+def build_dashboard_bridge_contract_v2(
+    *,
+    dsn: str | None = None,
+    frontend_target: str | None = None,
+) -> DashboardBridgeContractV2:
+    """Build the canonical v2 contract from RuntimeConfig.
+
+    DSN resolution order: explicit ``dsn`` arg → ``LQ_POSTGRES_DSN`` env →
+    ``RuntimeConfig.storage.postgres_dsn``.
+    """
+    from lumina_quant.configuration import get_default_runtime_config
+
+    rt = get_default_runtime_config()
+    resolved_dsn = str(dsn or os.getenv("LQ_POSTGRES_DSN") or rt.storage.postgres_dsn or "").strip()
+    repo_root = Path(__file__).resolve().parents[3]
+    resolved_target = str(frontend_target or (repo_root / "apps" / "dashboard_web"))
+    routes = tuple(
+        DashboardRouteDescriptor(route=r, python_fn=m, status=s) for r, m, s in _V2_ROUTES
+    )
+    return DashboardBridgeContractV2(
+        launch_mode="next",
+        frontend_target=resolved_target,
+        dsn_config_key="storage.postgres_dsn",
+        postgres_dsn=resolved_dsn,
+        routes=routes,
+    )
+
+
 __all__ = [
     "DEFAULT_DASHBOARD_COMPAT_PATH",
     "DashboardBridgeContract",
+    "DashboardBridgeContractV2",
     "DashboardCompatibilityError",
+    "DashboardRouteDescriptor",
     "DashboardSliceContract",
+    "build_dashboard_bridge_contract_v2",
     "build_overview_payload_from_frames",
     "load_overview_payload",
     "normalize_dashboard_launch_mode",
@@ -160,49 +287,52 @@ __all__ = [
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Print the dashboard migration bridge contract.")
-    parser.add_argument("--json", action="store_true", help="Print the contract as JSON.")
-    parser.add_argument(
-        "--next-app-dir",
-        default=str(Path(__file__).resolve().parents[3] / "apps" / "dashboard_web"),
+    """Module-mode entry for the dashboard overview route.
+
+    Default (``--json``) emits the overview payload — this is what the frontend
+    calls via ``runUvPythonModuleJson("lumina_quant.dashboard.bridge", "--json")``.
+
+    ``--print-contract`` emits the v2 bridge contract (diagnostic).
+    ``--overview-json`` is a legacy alias for ``--json``.
+    """
+    parser = argparse.ArgumentParser(
+        prog="lumina_quant.dashboard.bridge",
+        description="Emit dashboard overview payload or print the v2 bridge contract.",
     )
     parser.add_argument(
-        "--retired-stub-path",
-        default=str(
-            Path(__file__).resolve().parents[3]
-            / "src"
-            / "lumina_quant"
-            / "dashboard"
-            / "retired_stub.py"
-        ),
+        "--json",
+        action="store_true",
+        default=False,
+        help="Emit overview payload as JSON (module-mode default).",
     )
-    parser.add_argument("--compat-path", default=DEFAULT_DASHBOARD_COMPAT_PATH)
-    parser.add_argument("--overview-json", action="store_true", help="Print overview payload JSON.")
+    parser.add_argument(
+        "--overview-json",
+        action="store_true",
+        dest="overview_json",
+        help="Alias for --json (legacy compat).",
+    )
+    parser.add_argument(
+        "--print-contract",
+        action="store_true",
+        dest="print_contract",
+        help="Print DashboardBridgeContractV2 as JSON and exit.",
+    )
     args = parser.parse_args(argv)
 
-    if args.overview_json:
-        print(
-            json.dumps(
-                load_overview_payload(
-                    launch_mode="next",
-                    compatibility_path=args.compat_path,
-                ),
-                indent=2,
-                sort_keys=True,
-            )
-        )
+    if args.print_contract:
+        contract = build_dashboard_bridge_contract_v2()
+        print(json.dumps(contract.to_dict(), indent=2, sort_keys=True))
         return 0
 
-    contract = resolve_dashboard_bridge_contract(
-        launch_mode="next",
-        retired_stub_path=args.retired_stub_path,
-        next_app_dir=args.next_app_dir,
-        compatibility_path=args.compat_path,
+    # Default: emit overview payload (--json or --overview-json or bare invocation)
+    print(
+        json.dumps(
+            load_overview_payload(launch_mode="next"),
+            indent=2,
+            sort_keys=True,
+            default=str,
+        )
     )
-    if args.json:
-        print(json.dumps(contract.to_dict(), indent=2, sort_keys=True))
-    else:
-        print(contract.compatibility_path)
     return 0
 
 

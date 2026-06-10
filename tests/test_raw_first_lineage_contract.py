@@ -198,16 +198,13 @@ def test_resolve_raw_aggtrades_backend_name_reports_python_without_native(monkey
 
 def test_raw_first_backend_diagnostics_reports_load_error(monkeypatch) -> None:
     native_raw_first_backend._AUTO_FALLBACK_WARNED.clear()
-    native_raw_first_backend._NATIVE_HANDLE = None
-    native_raw_first_backend._NATIVE_FN = None
-    native_raw_first_backend._NATIVE_DLL = ""
     monkeypatch.setattr(
         "lumina_quant.data.native_raw_first_backend._load_native_function",
         lambda: None,
     )
     monkeypatch.setattr(
         native_raw_first_backend,
-        "_NATIVE_LOAD_ERROR",
+        "_PYO3_LOAD_ERROR",
         "failed to load test library",
     )
     native_raw_first_backend._AUTO_FALLBACK_WARNED.add("failed to load test library")
@@ -230,7 +227,7 @@ def test_raw_aggtrades_auto_backend_logs_once_when_native_unavailable(monkeypatc
     )
     monkeypatch.setattr(
         native_raw_first_backend,
-        "_NATIVE_LOAD_ERROR",
+        "_PYO3_LOAD_ERROR",
         "failed to load test library",
     )
     caplog.set_level("WARNING")
@@ -271,11 +268,15 @@ def test_raw_aggtrades_auto_backend_logs_once_when_native_unavailable(monkeypatc
     assert "failed to load test library" in records[0]
 
 
-def test_raw_aggtrades_auto_backend_logs_once_when_native_status_fails(monkeypatch, caplog) -> None:
+def test_raw_aggtrades_auto_backend_logs_once_when_native_errors(monkeypatch, caplog) -> None:
     native_raw_first_backend._AUTO_FALLBACK_WARNED.clear()
+
+    def _raise(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("simulated pyo3 error")
+
     monkeypatch.setattr(
         "lumina_quant.data.native_raw_first_backend._load_native_function",
-        lambda: lambda *args, **kwargs: 7,
+        lambda: _raise,
     )
     caplog.set_level("WARNING")
 
@@ -297,7 +298,9 @@ def test_raw_aggtrades_auto_backend_logs_once_when_native_status_fails(monkeypat
     )
 
     assert frame.height == 1
-    records = [record.message for record in caplog.records if "status=7" in record.message]
+    records = [
+        record.message for record in caplog.records if "falling back to Python" in record.message
+    ]
     assert len(records) == 1
 
 

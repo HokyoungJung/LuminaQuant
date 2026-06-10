@@ -256,12 +256,13 @@ def corr_streams(
 
 
 def max_drawdown(returns: np.ndarray) -> float:
-    if returns.size == 0:
-        return 0.0
-    equity = np.cumprod(1.0 + returns)
-    peaks = np.maximum.accumulate(equity)
-    dd = 1.0 - np.divide(equity, np.maximum(peaks, 1e-12))
-    return float(np.max(dd)) if dd.size else 0.0
+    # Single canonical returns-based max-drawdown primitive lives in
+    # strategy_factory.research_metrics; delegate rather than carry an
+    # algorithm-identical copy (finding 8 dedupe). Imported lazily to keep
+    # this allocation-hot-path module free of import-time research/config deps.
+    from lumina_quant.strategy_factory.research_metrics import max_drawdown as _canonical
+
+    return _canonical(returns)
 
 
 def metrics(returns: np.ndarray, periods_per_year: int = 365) -> dict[str, float]:

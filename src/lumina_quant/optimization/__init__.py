@@ -15,20 +15,29 @@ from lumina_quant.optimization.search_policy import (
 )
 from lumina_quant.optimization.storage import save_optimization_rows
 from lumina_quant.optimization.threading_control import configure_numba_threads
-from lumina_quant.optimization.walkers import add_months, build_walk_forward_splits
+from lumina_quant.optimization.walkers import (
+    InsufficientWarmupError,
+    add_months,
+    build_walk_forward_splits,
+    check_warmup_sufficient,
+    ma_cross_equity,
+)
 
 __all__ = [
     "NATIVE_BACKEND_NAME",
     "NUMBA_AVAILABLE",
     "BoundedGridResult",
     "FrozenDataset",
+    "InsufficientWarmupError",
     "add_months",
     "build_bounded_grid_combinations",
     "build_frozen_dataset",
     "build_walk_forward_splits",
+    "check_warmup_sufficient",
     "configure_numba_threads",
     "evaluate_metrics_backend",
     "evaluate_metrics_numba",
+    "ma_cross_equity",
     "optimization_search_policy_payload",
     "run_optuna_study",
     "save_optimization_rows",

@@ -17,10 +17,12 @@ from typing import Any
 
 import polars as pl
 
-from lumina_quant.config import BaseConfig
+from lumina_quant.configuration import BacktestConfigView, get_default_runtime_config
 from lumina_quant.data.feature_points import FEATURE_COLUMNS
 from lumina_quant.market_data import normalize_symbol
 from lumina_quant.storage.parquet import ParquetMarketDataRepository
+
+BaseConfig = BacktestConfigView(get_default_runtime_config())
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT_JSON = (

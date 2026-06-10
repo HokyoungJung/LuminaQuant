@@ -10,7 +10,7 @@ from typing import Any
 
 import polars as pl
 
-from lumina_quant.config import BaseConfig
+from lumina_quant.configuration import BacktestConfigView, get_default_runtime_config
 from lumina_quant.data.support_inventory import (
     build_strategy_support_inventory,
     write_strategy_support_inventory,
@@ -18,6 +18,8 @@ from lumina_quant.data.support_inventory import (
 from lumina_quant.data_sync import parse_timestamp_input, sync_futures_feature_points
 from lumina_quant.market_data import load_futures_feature_points_from_db
 from lumina_quant.symbols import canonical_symbol
+
+BaseConfig = BacktestConfigView(get_default_runtime_config())
 
 
 def _build_parser() -> argparse.ArgumentParser:

@@ -90,6 +90,8 @@ def _patch_entrypoint_env(monkeypatch, module, *, strategy_name: str):
             raise RawFirstDataMissingError("fatal committed data breach")
 
     monkeypatch.setattr(module, "LiveConfig", _LiveConfig)
+    # validate_runtime_config requires api_keys not available in unit tests — bypass.
+    monkeypatch.setattr(module, "validate_runtime_config", lambda *_a, **_kw: None)
     monkeypatch.setattr(module, "STRATEGY_MAP", {strategy_name: _Strategy})
     monkeypatch.setattr(module, "resolve_strategy_class", lambda *_args, **_kwargs: _Strategy)
     monkeypatch.setattr(
@@ -150,6 +152,7 @@ def test_committed_market_data_forces_poll_transport_even_when_ws_requested(monk
             return None
 
     monkeypatch.setattr(live_cli, "LiveConfig", _LiveConfig)
+    monkeypatch.setattr(live_cli, "validate_runtime_config", lambda *_a, **_kw: None)
     monkeypatch.setattr(
         live_cli,
         "_strategy_helpers",
@@ -196,7 +199,6 @@ def test_selection_overrides_are_applied_before_live_config_validation(monkeypat
 
         @classmethod
         def validate(cls):
-            validate_calls.append((list(cls.SYMBOLS), str(cls.TIMEFRAME)))
             return None
 
     class _Strategy:
@@ -213,6 +215,13 @@ def test_selection_overrides_are_applied_before_live_config_validation(monkeypat
             return None
 
     monkeypatch.setattr(live_cli, "LiveConfig", _LiveConfig)
+    monkeypatch.setattr(
+        live_cli,
+        "validate_runtime_config",
+        lambda rt, **_kw: validate_calls.append(
+            (list(rt.trading.symbols), str(rt.trading.timeframe))
+        ),
+    )
     monkeypatch.setattr(
         live_cli,
         "_strategy_helpers",
@@ -344,6 +353,7 @@ def test_live_cli_uses_supported_portfolio_mode_strategy(monkeypatch):
             return None
 
     monkeypatch.setattr(live_cli, "LiveConfig", _LiveConfig)
+    monkeypatch.setattr(live_cli, "validate_runtime_config", lambda *_a, **_kw: None)
     monkeypatch.setattr(
         live_cli,
         "_strategy_helpers",
@@ -430,6 +440,7 @@ def test_live_cli_uses_decision_strategy_target_without_falling_back_to_stale_se
             return None
 
     monkeypatch.setattr(live_cli, "LiveConfig", _LiveConfig)
+    monkeypatch.setattr(live_cli, "validate_runtime_config", lambda *_a, **_kw: None)
     monkeypatch.setattr(
         live_cli,
         "_strategy_helpers",
@@ -581,23 +592,6 @@ def test_live_cli_applies_alpha_zoo_decision_params_and_6x_runtime_overrides(mon
 
         @classmethod
         def validate(cls):
-            validate_snapshot["symbols"] = list(cls.SYMBOLS)
-            validate_snapshot["timeframe"] = str(cls.TIMEFRAME)
-            validate_snapshot["exchange"] = dict(cls.EXCHANGE)
-            validate_snapshot["exchange_id"] = str(cls.EXCHANGE_ID)
-            validate_snapshot["market_type"] = str(cls.MARKET_TYPE)
-            validate_snapshot["position_mode"] = str(cls.POSITION_MODE)
-            validate_snapshot["margin_mode"] = str(cls.MARGIN_MODE)
-            validate_snapshot["leverage"] = int(cls.LEVERAGE)
-            validate_snapshot["target_allocation"] = float(cls.TARGET_ALLOCATION)
-            validate_snapshot["target_allocation_mode"] = str(cls.TARGET_ALLOCATION_MODE)
-            validate_snapshot["max_order_value"] = float(cls.MAX_ORDER_VALUE)
-            validate_snapshot["max_order_notional_pct"] = float(cls.MAX_ORDER_NOTIONAL_PCT)
-            validate_snapshot["max_symbol_exposure_pct"] = float(cls.MAX_SYMBOL_EXPOSURE_PCT)
-            validate_snapshot["max_total_notional_pct"] = float(cls.MAX_TOTAL_NOTIONAL_PCT)
-            validate_snapshot["window_seconds"] = int(cls.WINDOW_SECONDS)
-            validate_snapshot["ingest_window_seconds"] = int(cls.INGEST_WINDOW_SECONDS)
-            validate_snapshot["decision_cadence_seconds"] = int(cls.DECISION_CADENCE_SECONDS)
             return None
 
     class _Fallback:
@@ -617,6 +611,32 @@ def test_live_cli_applies_alpha_zoo_decision_params_and_6x_runtime_overrides(mon
             return None
 
     monkeypatch.setattr(live_cli, "LiveConfig", _LiveConfig)
+
+    def _spy_validate(rt, **_kw):
+        validate_snapshot["timeframe"] = str(rt.trading.timeframe)
+        validate_snapshot["exchange"] = {
+            "name": rt.live.exchange.name,
+            "market_type": rt.live.exchange.market_type,
+            "position_mode": rt.live.exchange.position_mode,
+            "margin_mode": rt.live.exchange.margin_mode,
+            "leverage": rt.live.exchange.leverage,
+        }
+        validate_snapshot["exchange_id"] = str(rt.live.exchange.name)
+        validate_snapshot["market_type"] = str(rt.live.exchange.market_type)
+        validate_snapshot["position_mode"] = str(rt.live.exchange.position_mode)
+        validate_snapshot["margin_mode"] = str(rt.live.exchange.margin_mode)
+        validate_snapshot["leverage"] = int(rt.live.exchange.leverage)
+        validate_snapshot["target_allocation"] = float(rt.trading.target_allocation)
+        validate_snapshot["target_allocation_mode"] = str(rt.trading.target_allocation_mode)
+        validate_snapshot["max_order_value"] = float(rt.risk.max_order_value)
+        validate_snapshot["max_order_notional_pct"] = float(rt.risk.max_order_notional_pct)
+        validate_snapshot["max_symbol_exposure_pct"] = float(rt.risk.max_symbol_exposure_pct)
+        validate_snapshot["max_total_notional_pct"] = float(rt.risk.max_total_notional_pct)
+        validate_snapshot["window_seconds"] = int(rt.live.window_seconds)
+        validate_snapshot["ingest_window_seconds"] = int(rt.live.ingest_window_seconds)
+        validate_snapshot["decision_cadence_seconds"] = int(rt.live.decision_cadence_seconds)
+
+    monkeypatch.setattr(live_cli, "validate_runtime_config", _spy_validate)
     monkeypatch.setattr(
         live_cli,
         "_strategy_helpers",

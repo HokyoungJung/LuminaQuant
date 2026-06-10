@@ -4,6 +4,11 @@ from abc import ABC, abstractmethod
 from copy import deepcopy
 from typing import Any
 
+from lumina_quant.backtesting.execution_model import (
+    ExecutionModel,
+    ExecutionModelConfig,
+    _config_from_attrs,
+)
 from lumina_quant.core.events import FillEvent
 
 
@@ -35,6 +40,7 @@ class SimulatedExecutionHandler(ExecutionHandler):
     without latency, slippage or fill-ratio issues.
 
     It allows a "Trailing Stop" which is simulated by tracking data updates.
+    LMT orders are supported with strict-cross fill rules (see ExecutionModel docstring).
     """
 
     def __init__(self, events: Any, bars: Any, config: Any):
@@ -43,9 +49,17 @@ class SimulatedExecutionHandler(ExecutionHandler):
         self.config = config
         self.rng = random.Random(getattr(config, "RANDOM_SEED", 42))
         self._order_seq = 0
-        self.fill_model = FillModel(config)
+
+        # Phase 4 unified cost model — replaces FillModel + LiquidityModel for fills.
+        # BacktestConfigView carries ._rt (RuntimeConfig); production path uses from_runtime.
+        # Plain mock configs (unit tests) fall back to _config_from_attrs.
+        _rt = getattr(config, "_rt", None)
+        self.execution_model = ExecutionModel(
+            ExecutionModelConfig.from_runtime(_rt)
+            if _rt is not None
+            else _config_from_attrs(config)
+        )
         self.latency_model = LatencyModel(config)
-        self.liquidity_model = LiquidityModel(config)
 
         # Store conditional orders: { order_id: { 'symbol':..., 'type':..., 'trigger_price':..., 'parent_id':...} }
         # For simplicity, just list of order dicts
@@ -56,6 +70,9 @@ class SimulatedExecutionHandler(ExecutionHandler):
             "active_orders": deepcopy(self.active_orders),
             "order_seq": int(self._order_seq),
             "rng_state": self.rng.getstate(),
+            # Phase 4: execution_model._rng drives all fill randomness — must be
+            # checkpointed so chunked runs produce the same sequence as a full run.
+            "execution_model_rng_state": self.execution_model._rng.getstate(),
         }
         latency_get_state = getattr(self.latency_model, "get_state", None)
         if callable(latency_get_state):
@@ -79,6 +96,13 @@ class SimulatedExecutionHandler(ExecutionHandler):
                 self.rng.setstate(rng_state)
             except Exception:
                 pass
+        # Restore execution_model rng; gracefully skip if absent (old state dicts).
+        em_rng_state = state.get("execution_model_rng_state")
+        if em_rng_state is not None:
+            try:
+                self.execution_model._rng.setstate(em_rng_state)
+            except Exception:
+                pass
         latency_state = state.get("latency_model")
         latency_set_state = getattr(self.latency_model, "set_state", None)
         if isinstance(latency_state, dict) and callable(latency_set_state):
@@ -91,21 +115,25 @@ class SimulatedExecutionHandler(ExecutionHandler):
     def _apply_slippage_and_comm(
         self, price: float, quantity: float, direction: str, symbol: str
     ) -> tuple[float, float]:
-        """Helper to apply physics (Slippage/Fees/Spread) to a raw price."""
-        # Volatility scale for adaptive slippage
+        """Helper to apply physics (Slippage/Fees/Spread) to a raw price.
+
+        Delegates to ExecutionModel.compute_fill with no liquidity cap.
+        Kept for backward compat — internal code now calls compute_fill directly.
+        """
         high = self.bars.get_latest_bar_value(symbol, "high")
         low = self.bars.get_latest_bar_value(symbol, "low")
         open_p = self.bars.get_latest_bar_value(symbol, "open")
-        volatility = 0.0
-        if open_p > 0:
-            volatility = (high - low) / open_p
-        return self.fill_model.apply(
+        volatility = (high - low) / open_p if open_p > 0 else 0.0
+        result = self.execution_model.compute_fill(
             raw_price=float(price),
-            quantity=float(quantity),
+            qty=float(quantity),
             direction=str(direction),
+            bar_volume=0.0,  # apply_liquidity_cap=False, bar_volume ignored
             volatility=float(volatility),
-            rng=self.rng,
+            is_maker=False,
+            apply_liquidity_cap=False,
         )
+        return result.fill_price, result.commission
 
     def _cancel_protective_orders(self, symbol: str, position_side: str | None = None) -> None:
         protected_types = {"STOP", "TAKE_PROFIT"}
@@ -234,6 +262,7 @@ class SimulatedExecutionHandler(ExecutionHandler):
     def execute_order(self, event: Any) -> None:
         """Receives OrderEvent.
         - MKT: Queues for Next Open execution (realism).
+        - LMT: Queues for strict-cross fill on next bar.
         - STOP/TRAIL: triggers active monitoring.
         """
         if event.type == "ORDER":
@@ -264,8 +293,33 @@ class SimulatedExecutionHandler(ExecutionHandler):
                     }
                 )
 
-                # Check for attached TP/SL or Trailing Stop requests here if the simulated order was more complex
-                # For now, we assume strategy or portfolio sends separate stop orders or manages them
+            elif event.order_type == "LMT":
+                # LMT order: fills when bar strictly crosses limit_price.
+                # BUY fills when bar_low  < limit_price (strict — not ≤).
+                # SELL fills when bar_high > limit_price (strict — not ≥).
+                limit_price = getattr(event, "price", None)
+                if bool(getattr(event, "reduce_only", False)):
+                    self._cancel_protective_orders(
+                        event.symbol,
+                        getattr(event, "position_side", None),
+                    )
+                self.active_orders.append(
+                    {
+                        "order_id": order_id,
+                        "symbol": event.symbol,
+                        "type": "LMT",
+                        "quantity": event.quantity,
+                        "direction": event.direction,
+                        "limit_price": float(limit_price) if limit_price is not None else None,
+                        "status": "PENDING",
+                        "position_side": event.position_side,
+                        "reduce_only": event.reduce_only,
+                        "client_order_id": event.client_order_id,
+                        "stop_loss": event.stop_loss,
+                        "take_profit": event.take_profit,
+                        "trailing_percent": event.trailing_percent,
+                    }
+                )
 
             elif event.order_type == "STOP":
                 # Add to active orders
@@ -312,7 +366,7 @@ class SimulatedExecutionHandler(ExecutionHandler):
 
     def check_open_orders(self, event: Any) -> None:
         """Check active orders against the new MarketEvent.
-        Handles MKT (Next Open), STOP/TP, TRAIL_STOP.
+        Handles MKT (Next Open), LMT (strict-cross), STOP/TP, TRAIL_STOP.
         """
         if event.type != "MARKET" or not self.active_orders:
             return
@@ -321,6 +375,8 @@ class SimulatedExecutionHandler(ExecutionHandler):
         bar_high = event.high
         bar_low = event.low
         bar_volume = event.volume
+        # Normalised bar range — used to scale slippage on volatile bars.
+        volatility = (bar_high - bar_low) / bar_open if bar_open > 0 else 0.0
 
         next_active_orders: list[dict[str, Any]] = []
         remainder_orders: list[dict[str, Any]] = []
@@ -338,8 +394,11 @@ class SimulatedExecutionHandler(ExecutionHandler):
 
             triggered = False
             exec_price = None
+            # Pre-computed fill result for MKT and LMT (computed inside their branches
+            # so we don't double-consume the rng in the unified triggered block).
+            _fill_result = None
 
-            # MKT ORDER (Next Open)
+            # ── MKT ORDER (Next Open) ─────────────────────────────────────────
             if order["type"] == "MKT" and order["status"] == "PENDING":
                 if not self.latency_model.should_release(order):
                     next_active_orders.append(order)
@@ -347,33 +406,90 @@ class SimulatedExecutionHandler(ExecutionHandler):
                 exec_price = bar_open
                 triggered = True
 
-                max_trade_vol = self.liquidity_model.max_fill_quantity(float(bar_volume))
                 original_qty = order["quantity"]
+                _fill_result = self.execution_model.compute_fill(
+                    raw_price=float(exec_price),
+                    qty=float(original_qty),
+                    direction=str(order["direction"]),
+                    bar_volume=float(bar_volume),
+                    volatility=float(volatility),
+                    is_maker=False,
+                    apply_liquidity_cap=True,
+                )
 
-                if original_qty > max_trade_vol:
+                if _fill_result.unfilled_qty > 0.0:
                     if not _env_flag("LQ_BACKTEST_SUPPRESS_PARTIAL_FILL_LOGS", False):
                         print(
-                            f"[Realism] Partial Fill: Req {original_qty} > Limit {max_trade_vol:.4f}. Filling {max_trade_vol} and keeping remainder."
+                            f"[Realism] Partial Fill: Req {original_qty} > Limit "
+                            f"{_fill_result.executed_qty:.4f}. Filling "
+                            f"{_fill_result.executed_qty} and keeping remainder."
                         )
-                    order["quantity"] = max_trade_vol
-                    remainder = original_qty - max_trade_vol
-                    remainder_order = {
-                        "order_id": f"{order['order_id']}-R",
-                        "symbol": order["symbol"],
-                        "type": "MKT",
-                        "quantity": remainder,
-                        "direction": order["direction"],
-                        "status": "PENDING",
-                        "position_side": order.get("position_side"),
-                        "reduce_only": order.get("reduce_only", False),
-                        "client_order_id": order.get("client_order_id"),
-                        "stop_loss": order.get("stop_loss"),
-                        "take_profit": order.get("take_profit"),
-                        "trailing_percent": order.get("trailing_percent"),
-                    }
-                    remainder_orders.append(remainder_order)
+                    remainder_orders.append(
+                        {
+                            "order_id": f"{order['order_id']}-R",
+                            "symbol": order["symbol"],
+                            "type": "MKT",
+                            "quantity": _fill_result.unfilled_qty,
+                            "direction": order["direction"],
+                            "status": "PENDING",
+                            "position_side": order.get("position_side"),
+                            "reduce_only": order.get("reduce_only", False),
+                            "client_order_id": order.get("client_order_id"),
+                            "stop_loss": order.get("stop_loss"),
+                            "take_profit": order.get("take_profit"),
+                            "trailing_percent": order.get("trailing_percent"),
+                        }
+                    )
+                order["quantity"] = _fill_result.executed_qty
 
-            # STOP ORDER
+            # ── LMT ORDER (strict-cross fill) ─────────────────────────────────
+            elif order["type"] == "LMT" and order.get("status") == "PENDING":
+                limit_price = order.get("limit_price")
+                if limit_price is None or float(limit_price) <= 0.0:
+                    next_active_orders.append(order)
+                    continue
+                limit_price = float(limit_price)
+                direction = str(order["direction"]).upper()
+                # Strict cross: BUY fills when bar_low < limit (not ≤).
+                #               SELL fills when bar_high > limit (not ≥).
+                if (direction == "BUY" and bar_low < limit_price) or (
+                    direction == "SELL" and bar_high > limit_price
+                ):
+                    exec_price = limit_price
+                    triggered = True
+
+                if triggered:
+                    original_qty = order["quantity"]
+                    _fill_result = self.execution_model.compute_fill(
+                        raw_price=float(exec_price),
+                        qty=float(original_qty),
+                        direction=str(order["direction"]),
+                        bar_volume=float(bar_volume),
+                        volatility=0.0,  # LMT fills at exact price — no slippage
+                        is_maker=True,
+                        apply_liquidity_cap=True,
+                    )
+                    if _fill_result.unfilled_qty > 0.0:
+                        remainder_orders.append(
+                            {
+                                "order_id": f"{order['order_id']}-R",
+                                "symbol": order["symbol"],
+                                "type": "LMT",
+                                "quantity": _fill_result.unfilled_qty,
+                                "direction": order["direction"],
+                                "limit_price": limit_price,
+                                "status": "PENDING",
+                                "position_side": order.get("position_side"),
+                                "reduce_only": order.get("reduce_only", False),
+                                "client_order_id": order.get("client_order_id"),
+                                "stop_loss": order.get("stop_loss"),
+                                "take_profit": order.get("take_profit"),
+                                "trailing_percent": order.get("trailing_percent"),
+                            }
+                        )
+                    order["quantity"] = _fill_result.executed_qty
+
+            # ── STOP ORDER ────────────────────────────────────────────────────
             elif order["type"] == "STOP":
                 if order["direction"] == "SELL" and bar_low <= order["stop_price"]:
                     exec_price = order["stop_price"]
@@ -386,7 +502,7 @@ class SimulatedExecutionHandler(ExecutionHandler):
                         exec_price = bar_open
                     triggered = True
 
-            # TAKE PROFIT ORDER
+            # ── TAKE PROFIT ORDER ─────────────────────────────────────────────
             elif order["type"] == "TAKE_PROFIT":
                 target = float(order["stop_price"])
                 if order["direction"] == "SELL" and bar_high >= target:
@@ -400,40 +516,59 @@ class SimulatedExecutionHandler(ExecutionHandler):
                         exec_price = bar_open
                     triggered = True
 
-            # TRAILING STOP
+            # ── TRAILING STOP ─────────────────────────────────────────────────
+            # Conservative intra-bar sequencing: test the trigger against the
+            # stop level as it stood BEFORE this bar, THEN ratchet using this
+            # bar's favorable extreme. Ratcheting first (the old behaviour)
+            # assumes the favorable extreme always precedes the adverse one
+            # within the bar — best-case optimism that overstates trailing-stop
+            # exits by up to the bar range. Only a non-triggering bar advances
+            # the trail for future bars.
             elif order["type"] == "TRAIL_STOP":
                 if order["direction"] == "SELL":
-                    if order["highest_price"] is None or bar_high > order["highest_price"]:
+                    prev_stop = order["stop_price"]
+                    if prev_stop is not None and bar_low <= prev_stop:
+                        exec_price = prev_stop
+                        if bar_open < exec_price:
+                            exec_price = bar_open
+                        triggered = True
+                    elif order["highest_price"] is None or bar_high > order["highest_price"]:
                         order["highest_price"] = bar_high
                         order["stop_price"] = order["highest_price"] * (
                             1.0 - order["trailing_percent"]
                         )
-
-                    if bar_low <= order["stop_price"]:
-                        exec_price = order["stop_price"]
-                        if bar_open < exec_price:
+                elif order["direction"] == "BUY":
+                    prev_stop = order["stop_price"]
+                    if prev_stop is not None and bar_high >= prev_stop:
+                        exec_price = prev_stop
+                        if bar_open > exec_price:
                             exec_price = bar_open
                         triggered = True
-                elif order["direction"] == "BUY":
-                    if order["lowest_price"] is None or bar_low < order["lowest_price"]:
+                    elif order["lowest_price"] is None or bar_low < order["lowest_price"]:
                         order["lowest_price"] = bar_low
                         order["stop_price"] = order["lowest_price"] * (
                             1.0 + order["trailing_percent"]
                         )
 
-                    if bar_high >= order["stop_price"]:
-                        exec_price = order["stop_price"]
-                        if bar_open > exec_price:
-                            exec_price = bar_open
-                        triggered = True
-
+            # ── Unified fill emission ──────────────────────────────────────────
             if triggered and exec_price is not None:
-                fill_price, comm = self._apply_slippage_and_comm(
-                    exec_price,
-                    order["quantity"],
-                    order["direction"],
-                    order["symbol"],
-                )
+                if _fill_result is not None:
+                    # MKT or LMT — fill already computed in the branch above.
+                    fill_price = _fill_result.fill_price
+                    comm = _fill_result.commission
+                else:
+                    # STOP, TAKE_PROFIT, TRAIL_STOP — no liquidity cap; aggressive fill.
+                    cond_result = self.execution_model.compute_fill(
+                        raw_price=float(exec_price),
+                        qty=float(order["quantity"]),
+                        direction=str(order["direction"]),
+                        bar_volume=float(bar_volume),
+                        volatility=float(volatility),
+                        is_maker=False,
+                        apply_liquidity_cap=False,
+                    )
+                    fill_price = cond_result.fill_price
+                    comm = cond_result.commission
 
                 fill_event = FillEvent(
                     timeindex=event.time,
@@ -458,7 +593,7 @@ class SimulatedExecutionHandler(ExecutionHandler):
                 )
                 self.events.put(fill_event)
 
-                if order.get("type") == "MKT":
+                if order.get("type") in {"MKT", "LMT"}:
                     remainder_orders.extend(
                         self._build_protective_orders(order, fill_price=fill_price)
                     )
@@ -510,43 +645,6 @@ class SimulatedExecutionHandler(ExecutionHandler):
         self.active_orders = next_active_orders
 
 
-class FillModel:
-    """Encapsulates slippage/spread/fee assumptions for simulated fills."""
-
-    def __init__(self, config: Any):
-        self.config = config
-
-    def apply(
-        self,
-        *,
-        raw_price: float,
-        quantity: float,
-        direction: str,
-        volatility: float,
-        rng: random.Random,
-    ) -> tuple[float, float]:
-        base_slippage = float(getattr(self.config, "SLIPPAGE_RATE", 0.0005))
-        spread = float(getattr(self.config, "SPREAD_RATE", 0.0002))
-        commission_rate = float(
-            getattr(
-                self.config,
-                "TAKER_FEE_RATE",
-                getattr(self.config, "COMMISSION_RATE", 0.001),
-            )
-        )
-
-        slip = rng.uniform(base_slippage * 0.5, base_slippage * 1.5)
-        if volatility > 0.01:
-            slip *= 2.0
-        penalty = slip + (spread / 2.0)
-        if direction == "BUY":
-            fill_price = raw_price * (1.0 + penalty)
-        else:
-            fill_price = raw_price * (1.0 - penalty)
-        fill_cost = fill_price * quantity
-        return fill_price, fill_cost * commission_rate
-
-
 class LatencyModel:
     """Simple latency model releasing queued orders on next check cycle."""
 
@@ -580,21 +678,8 @@ class LatencyModel:
         return int(waited) >= int(target)
 
 
-class LiquidityModel:
-    """Caps executable size as a function of bar volume."""
-
-    def __init__(self, config: Any):
-        self.config = config
-
-    def max_fill_quantity(self, bar_volume: float) -> float:
-        max_ratio = float(getattr(self.config, "SIM_MAX_BAR_VOLUME_RATIO", 0.1))
-        return max(0.0, bar_volume * max_ratio)
-
-
 __all__ = [
     "ExecutionHandler",
-    "FillModel",
     "LatencyModel",
-    "LiquidityModel",
     "SimulatedExecutionHandler",
 ]
