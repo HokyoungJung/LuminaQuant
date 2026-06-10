@@ -1,0 +1,173 @@
+{
+  "splits": [
+    {
+      "fold": 1,
+      "train_start": "2022-01-01T00:00:00",
+      "train_end": "2022-09-01T00:00:00",
+      "val_start": "2022-09-01T00:00:00",
+      "val_end": "2023-01-01T00:00:00",
+      "test_start": "2023-01-01T00:00:00",
+      "test_end": "2023-05-01T00:00:00",
+      "best_params": {
+        "short_window": 20,
+        "long_window": 80
+      },
+      "train_grid": [
+        {
+          "short_window": 10,
+          "long_window": 40,
+          "train_sharpe": -0.267931,
+          "train_cagr": -0.123577,
+          "train_max_dd": 0.220153
+        },
+        {
+          "short_window": 10,
+          "long_window": 80,
+          "train_sharpe": 0.18855,
+          "train_cagr": 0.014161,
+          "train_max_dd": 0.163464
+        },
+        {
+          "short_window": 20,
+          "long_window": 40,
+          "train_sharpe": -1.809869,
+          "train_cagr": -0.456138,
+          "train_max_dd": 0.473042
+        },
+        {
+          "short_window": 20,
+          "long_window": 80,
+          "train_sharpe": 0.263328,
+          "train_cagr": 0.03537,
+          "train_max_dd": 0.146601
+        }
+      ],
+      "val_metrics": {
+        "sharpe": -0.192254,
+        "cagr": -0.042438,
+        "max_dd": 0.146192
+      },
+      "test_metrics": {
+        "sharpe": 0.284692,
+        "cagr": 0.037728,
+        "max_dd": 0.145822
+      }
+    },
+    {
+      "fold": 2,
+      "train_start": "2022-05-01T00:00:00",
+      "train_end": "2023-01-01T00:00:00",
+      "val_start": "2023-01-01T00:00:00",
+      "val_end": "2023-05-01T00:00:00",
+      "test_start": "2023-05-01T00:00:00",
+      "test_end": "2023-09-01T00:00:00",
+      "best_params": {
+        "short_window": 10,
+        "long_window": 40
+      },
+      "train_grid": [
+        {
+          "short_window": 10,
+          "long_window": 40,
+          "train_sharpe": 0.211041,
+          "train_cagr": 0.017532,
+          "train_max_dd": 0.207601
+        },
+        {
+          "short_window": 10,
+          "long_window": 80,
+          "train_sharpe": 0.210636,
+          "train_cagr": 0.019826,
+          "train_max_dd": 0.217084
+        },
+        {
+          "short_window": 20,
+          "long_window": 40,
+          "train_sharpe": -1.558922,
+          "train_cagr": -0.412253,
+          "train_max_dd": 0.419811
+        },
+        {
+          "short_window": 20,
+          "long_window": 80,
+          "train_sharpe": -0.246009,
+          "train_cagr": -0.103856,
+          "train_max_dd": 0.309559
+        }
+      ],
+      "val_metrics": {
+        "sharpe": -0.483492,
+        "cagr": -0.178468,
+        "max_dd": 0.185055
+      },
+      "test_metrics": {
+        "sharpe": 0.67454,
+        "cagr": 0.150028,
+        "max_dd": 0.162907
+      }
+    },
+    {
+      "fold": 3,
+      "train_start": "2022-09-01T00:00:00",
+      "train_end": "2023-05-01T00:00:00",
+      "val_start": "2023-05-01T00:00:00",
+      "val_end": "2023-09-01T00:00:00",
+      "test_start": "2023-09-01T00:00:00",
+      "test_end": "2024-01-01T00:00:00",
+      "best_params": {
+        "short_window": 10,
+        "long_window": 80
+      },
+      "train_grid": [
+        {
+          "short_window": 10,
+          "long_window": 40,
+          "train_sharpe": 0.137607,
+          "train_cagr": -0.005452,
+          "train_max_dd": 0.252032
+        },
+        {
+          "short_window": 10,
+          "long_window": 80,
+          "train_sharpe": 0.369539,
+          "train_cagr": 0.066367,
+          "train_max_dd": 0.16259
+        },
+        {
+          "short_window": 20,
+          "long_window": 40,
+          "train_sharpe": -1.471061,
+          "train_cagr": -0.39492,
+          "train_max_dd": 0.504712
+        },
+        {
+          "short_window": 20,
+          "long_window": 80,
+          "train_sharpe": 0.282334,
+          "train_cagr": 0.040582,
+          "train_max_dd": 0.195496
+        }
+      ],
+      "val_metrics": {
+        "sharpe": 0.047919,
+        "cagr": -0.008023,
+        "max_dd": 0.110527
+      },
+      "test_metrics": {
+        "sharpe": 0.785317,
+        "cagr": 0.133253,
+        "max_dd": 0.059923
+      }
+    }
+  ],
+  "grid_params": {
+    "short_windows": [
+      10,
+      20
+    ],
+    "long_windows": [
+      40,
+      80
+    ]
+  }
+}

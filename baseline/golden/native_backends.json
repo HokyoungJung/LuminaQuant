@@ -1,0 +1,99 @@
+{
+  "rust_metrics": {
+    "status": 0,
+    "sharpe": 0.2993542540374392,
+    "cagr": 0.04491008636884075,
+    "max_dd": 0.5085791489826454
+  },
+  "c_metrics": {
+    "status": 0,
+    "sharpe": 0.2993542540374392,
+    "cagr": 0.04491008636884075,
+    "max_dd": 0.5085791489826454
+  },
+  "rust_alpha_fold": {
+    "backend": "rust",
+    "n": 1000,
+    "total_return": -1.335412446167978,
+    "liquidation_count": 0,
+    "wipeout_count": 0,
+    "returns_first5": [
+      -0.0,
+      -0.0,
+      0.0,
+      -0.0,
+      0.0
+    ],
+    "returns_last5": [
+      -0.025224121067528724,
+      -0.01616133372035935,
+      -0.016167722285499665,
+      0.013285655258999773,
+      0.0
+    ]
+  },
+  "rust_hybrid_optuna": {
+    "backend": "rust",
+    "n": 1000,
+    "portfolio_final": 9824.906231479908,
+    "weights_exp_final": [
+      0.5555555555555556,
+      0.3055555555555556,
+      0.1388888888888889
+    ]
+  },
+  "rust_live_signals": {
+    "debounced": {
+      "available": true,
+      "n": 1000,
+      "signal_changes": 0,
+      "first5": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "trailing": {
+      "available": true,
+      "n": 1000,
+      "signal_changes": 0,
+      "first5": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
+  },
+  "rust_rawfirst": {
+    "backend": "rust",
+    "n": 3598,
+    "columns": [
+      "datetime",
+      "open",
+      "high",
+      "low",
+      "close",
+      "volume"
+    ],
+    "first_row": {
+      "datetime": "2026-06-09 23:00:00",
+      "open": 61687.9,
+      "high": 61687.9,
+      "low": 61687.9,
+      "close": 61687.9,
+      "volume": 0.019
+    },
+    "last_row": {
+      "datetime": "2026-06-09 23:59:57",
+      "open": 61695.0,
+      "high": 61695.0,
+      "low": 61694.9,
+      "close": 61694.9,
+      "volume": 0.013000000000000001
+    }
+  }
+}
