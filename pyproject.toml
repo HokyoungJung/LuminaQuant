@@ -151,3 +151,8 @@ convention = "google"
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+[dependency-groups]
+dev = [
+    "maturin>=1.13.3",
+]
