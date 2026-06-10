@@ -17,7 +17,10 @@ from typing import Any
 import numpy as np
 import polars as pl
 
-from lumina_quant.config import BacktestConfig, BaseConfig
+from lumina_quant.configuration import BacktestConfigView, get_default_runtime_config
+_lq_rt = get_default_runtime_config()
+BacktestConfig = BacktestConfigView(_lq_rt)
+BaseConfig = BacktestConfigView(_lq_rt)
 from lumina_quant.market_data import load_futures_feature_points_from_db
 
 REPO_ROOT = Path(__file__).resolve().parents[2]

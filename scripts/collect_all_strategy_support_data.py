@@ -10,7 +10,8 @@ from typing import Any
 
 import polars as pl
 
-from lumina_quant.config import BaseConfig
+from lumina_quant.configuration import BacktestConfigView, get_default_runtime_config
+BaseConfig = BacktestConfigView(get_default_runtime_config())
 from lumina_quant.data.support_inventory import (
     build_strategy_support_inventory,
     write_strategy_support_inventory,

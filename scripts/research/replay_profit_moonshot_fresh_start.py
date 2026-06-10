@@ -26,7 +26,8 @@ from typing import Any
 import numpy as np
 import polars as pl
 
-from lumina_quant.config import BaseConfig
+from lumina_quant.configuration import BacktestConfigView, get_default_runtime_config
+BaseConfig = BacktestConfigView(get_default_runtime_config())
 from lumina_quant.market_data import load_futures_feature_points_from_db
 from lumina_quant.portfolio_split_contract import (
     PORTFOLIO_FOLLOWUP_EXPLICIT_BUDGET_BYTES,

@@ -13,7 +13,8 @@ from typing import Any
 import numpy as np
 
 from lumina_quant.backtesting.cli_contract import RawFirstDataMissingError
-from lumina_quant.config import BacktestConfig
+from lumina_quant.configuration import BacktestConfigView, get_default_runtime_config
+BacktestConfig = BacktestConfigView(get_default_runtime_config())
 from lumina_quant.eval.final_validation import (
     build_latest_anchored_split,
     discover_latest_common_complete_timestamp,

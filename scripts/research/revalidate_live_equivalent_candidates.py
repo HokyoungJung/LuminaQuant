@@ -26,7 +26,10 @@ from lumina_quant.backtesting.chunked_runner import run_backtest_chunked
 from lumina_quant.backtesting.data_windowed_parquet import HistoricParquetWindowedDataHandler
 from lumina_quant.backtesting.execution_sim import SimulatedExecutionHandler
 from lumina_quant.backtesting.portfolio_backtest import Portfolio
-from lumina_quant.config import BacktestConfig, BaseConfig
+from lumina_quant.configuration import BacktestConfigView, get_default_runtime_config
+_lq_rt = get_default_runtime_config()
+BacktestConfig = BacktestConfigView(_lq_rt)
+BaseConfig = BacktestConfigView(_lq_rt)
 from lumina_quant.live_selection import (
     resolve_portfolio_mode_runtime_config,
     supports_live_portfolio_mode,

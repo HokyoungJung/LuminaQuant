@@ -401,7 +401,7 @@ docs/
 
 ### Phase 1 architecture notes (2026-06-10)
 
-- **Unified config entry-point**: `lumina_quant.configuration` is the ONLY config entry-point. `runtime_access.py` has been deleted. `config.py` is a thin backward-compat shim (Phase 7 removal). Never add a second global config loader.
+- **Unified config entry-point**: `lumina_quant.configuration` is the ONLY config entry-point. `runtime_access.py` and `config.py` have been deleted. All 18 operational scripts migrated to `lumina_quant.configuration` directly. Never add a second global config loader.
 - **Config engine views**: `configuration/compat.py` was renamed to `configuration/views.py` (canonical). A thin `compat.py` re-exporter is kept for existing code that imports `lumina_quant.configuration.compat`; deletion gate is Phase 3 (backtest engine) / Phase 5 (live trader). New code must import from `lumina_quant.configuration` or `lumina_quant.configuration.views`.
 - **Plugin registry**: `lumina_quant.core.plugin_registry` owns the `@register(kind, name, *, interface=None)` decorator and the `GLOBAL_REGISTRY` accessor. Kinds: `"strategy"`, `"indicator"`, `"portfolio"`. `cli/_strategy_registry_fallback.py` has been deleted; `PublicStubStrategy` / `PublicStrategyRegistry` / `load_strategy_registry` now live in `core/plugin_registry`.
 - **Strategies package — eager imports**: `lumina_quant.strategies.__init__` no longer uses lazy `__getattr__`. All `strategies.registry` exports are imported eagerly; `register` and `GLOBAL_REGISTRY` from `core.plugin_registry` are re-exported so callers can do `from lumina_quant.strategies import register`.

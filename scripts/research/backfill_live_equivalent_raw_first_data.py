@@ -20,7 +20,8 @@ from datetime import UTC, date, datetime, time as datetime_time, timedelta
 from pathlib import Path
 from typing import Any
 
-from lumina_quant.config import BaseConfig
+from lumina_quant.configuration import BacktestConfigView, get_default_runtime_config
+BaseConfig = BacktestConfigView(get_default_runtime_config())
 from lumina_quant.data_sync import create_binance_futures_client, sync_symbol_aggtrades_raw
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
