@@ -24,24 +24,12 @@ Retrieve via the global registry accessor::
 
     cls = GLOBAL_REGISTRY.get("strategy", "MySMA")
     names = GLOBAL_REGISTRY.list_names("indicator")
-
-Backward-compat helpers (CLI entrypoints)
------------------------------------------
-``load_strategy_registry`` / ``import_private_strategy_registry`` /
-``PublicStubStrategy`` / ``PublicStrategyRegistry`` are preserved here for
-the CLI ``backtest``, ``optimize``, and ``live`` entrypoints.
-``cli/_strategy_registry_fallback.py`` has been deleted; this module is its
-sole successor.
 """
 
 from __future__ import annotations
 
-import sys
 from collections.abc import Callable
-from importlib import import_module
 from typing import Any
-
-from lumina_quant.strategy import Strategy
 
 # ---------------------------------------------------------------------------
 # Core registry internals
@@ -110,109 +98,9 @@ class PluginRegistry:
 #: Singleton accessor — use this in application code.
 GLOBAL_REGISTRY = PluginRegistry()
 
-# ---------------------------------------------------------------------------
-# Backward-compat CLI helpers (formerly cli/_strategy_registry_fallback.py)
-# ---------------------------------------------------------------------------
-
-
-class PublicStubStrategy(Strategy):
-    """Fallback strategy used when private strategy modules are unavailable."""
-
-    def __init__(self, *args, **kwargs):
-        raise RuntimeError("Strategy modules are unavailable in this distribution.")
-
-    def calculate_signals(self, event):
-        _ = event
-        return None
-
-
-class PublicStrategyRegistry:
-    """Minimal registry fallback used by public/lightweight installs."""
-
-    DEFAULT_STRATEGY_NAME = "PublicStubStrategy"
-
-    @staticmethod
-    def get_strategy_map() -> dict[str, type[Strategy]]:
-        return {"PublicStubStrategy": PublicStubStrategy}
-
-    @staticmethod
-    def resolve_strategy_class(
-        name: str,
-        default_name: str | None = None,
-    ) -> type[Strategy]:
-        _ = (name, default_name)
-        return PublicStubStrategy
-
-    @staticmethod
-    def get_default_strategy_params(strategy_name: str) -> dict[str, Any]:
-        _ = strategy_name
-        return {}
-
-    @staticmethod
-    def resolve_strategy_params(
-        strategy_name: str,
-        overrides: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        _ = strategy_name
-        return dict(overrides or {})
-
-    @staticmethod
-    def get_default_optuna_config(strategy_name: str) -> dict[str, Any]:
-        _ = strategy_name
-        return {"n_trials": 20, "params": {}}
-
-    @staticmethod
-    def get_default_grid_config(strategy_name: str) -> dict[str, Any]:
-        _ = strategy_name
-        return {"params": {}}
-
-    @staticmethod
-    def resolve_optuna_config(
-        strategy_name: str,
-        override: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        _ = strategy_name
-        cfg: dict[str, Any] = {"n_trials": 20, "params": {}}
-        if isinstance(override, dict):
-            cfg.update(override)
-        return cfg
-
-    @staticmethod
-    def resolve_grid_config(
-        strategy_name: str,
-        override: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        _ = strategy_name
-        cfg: dict[str, Any] = {"params": {}}
-        if isinstance(override, dict):
-            cfg.update(override)
-        return cfg
-
-
-def load_strategy_registry(importer: Callable[[], Any]) -> Any:
-    """Load private strategy registry with a stable public fallback."""
-    try:
-        return importer()
-    except Exception as exc:
-        print(
-            f"[WARN] Strategy registry import failed; using public fallback: "
-            f"{type(exc).__name__}: {exc}",
-            file=sys.stderr,
-        )
-        return PublicStrategyRegistry()
-
-
-def import_private_strategy_registry() -> Any:
-    """Import the private/public strategy registry module when available."""
-    return import_module("lumina_quant.strategies.registry")
-
 
 __all__ = [
     "GLOBAL_REGISTRY",
     "PluginRegistry",
-    "PublicStrategyRegistry",
-    "PublicStubStrategy",
-    "import_private_strategy_registry",
-    "load_strategy_registry",
     "register",
 ]

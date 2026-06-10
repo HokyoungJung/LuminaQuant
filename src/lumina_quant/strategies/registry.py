@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 from typing import Any, cast
 
+from lumina_quant.core.plugin_registry import GLOBAL_REGISTRY
 from lumina_quant.strategy import Strategy
 from lumina_quant.tuning import ParamRegistry
 
@@ -279,19 +280,92 @@ def get_strategy_tier(strategy_name: str) -> str:
     return str(get_strategy_metadata(strategy_name).get("tier", "live_default"))
 
 
+# ---------------------------------------------------------------------------
+# Plugin auto-discovery (AC8: add ONE template file + reference it by name)
+# ---------------------------------------------------------------------------
+# A user registers a new strategy by dropping ONE conforming module into this
+# package decorated with ``@register("strategy", "ClassName", ...)`` from
+# ``lumina_quant.core.plugin_registry`` — no edit to this file is required.
+# Discovery imports any not-yet-imported sibling module so its ``@register``
+# decorators execute and populate GLOBAL_REGISTRY; resolution then consults the
+# registry alongside the curated ``_STRATEGY_MAP``.  Discovery is LAZY (runs on
+# the first map/resolve call, never at module import) to avoid the
+# strategies-package circular import while ``strategies/__init__`` is still
+# initialising.
+_PLUGIN_DISCOVERY_DONE: set[str] = set()
+_PLUGIN_DISCOVERY_SKIP: frozenset[str] = frozenset({"registry", "plugin_interface"})
+
+
+def _discover_plugin_strategies() -> None:
+    """Import sibling strategy modules so their ``@register`` decorators fire.
+
+    Idempotent and resilient: a malformed dropped module is skipped without
+    breaking resolution of the others.  Newly-dropped files are picked up on the
+    next call because their module name is not yet in the discovered set.
+
+    The directory is scanned with ``glob`` (a fresh ``scandir`` every call) rather
+    than ``pkgutil.iter_modules`` so a file dropped at runtime is seen even after
+    the import system's ``FileFinder`` cached an earlier listing; when a genuinely
+    new module appears we call ``invalidate_caches`` before importing it.
+    """
+    package = __package__ or "lumina_quant.strategies"
+    pkg_dir = Path(__file__).resolve().parent
+    try:
+        candidates = {entry.stem for entry in pkg_dir.glob("*.py") if entry.name != "__init__.py"}
+    except OSError:
+        return
+    new_names = candidates - _PLUGIN_DISCOVERY_DONE - _PLUGIN_DISCOVERY_SKIP
+    if not new_names:
+        return
+    # A new module file appeared since the last scan — make the import system
+    # aware of it before importing (FileFinder caches directory listings).
+    importlib.invalidate_caches()
+    for name in sorted(new_names):
+        _PLUGIN_DISCOVERY_DONE.add(name)
+        if name.startswith("_"):
+            continue
+        try:
+            importlib.import_module(f"{package}.{name}")
+        except Exception:
+            # A bad drop-in module must not break resolution of the others.
+            continue
+
+
+def _registry_strategy_classes() -> dict[str, StrategyClass]:
+    """Operational ``@register``-discovered strategy classes from GLOBAL_REGISTRY.
+
+    Private/test names (leading underscore) are excluded so transient test-only
+    registrations never leak into the operational strategy map.
+    """
+    out: dict[str, StrategyClass] = {}
+    for name, cls in GLOBAL_REGISTRY.get_all("strategy").items():
+        token = str(name)
+        if token.startswith("_"):
+            continue
+        if isinstance(cls, type) and issubclass(cls, Strategy):
+            out[token] = cast(StrategyClass, cls)
+    return out
+
+
 def get_strategy_map() -> dict[str, StrategyClass]:
-    return dict(_STRATEGY_MAP)
+    _discover_plugin_strategies()
+    combined: dict[str, StrategyClass] = dict(_STRATEGY_MAP)
+    combined.update(_registry_strategy_classes())
+    return combined
 
 
 def get_live_strategy_map(*, include_opt_in: bool = True) -> dict[str, StrategyClass]:
     allowed = {"live_default", "live_opt_in"} if include_opt_in else {"live_default"}
-    return {name: cls for name, cls in _STRATEGY_MAP.items() if get_strategy_tier(name) in allowed}
+    return {
+        name: cls for name, cls in get_strategy_map().items() if get_strategy_tier(name) in allowed
+    }
 
 
 def get_strategy_names(*, include_research_only: bool = True) -> list[str]:
+    names = get_strategy_map().keys()
     if include_research_only:
-        return sorted(_STRATEGY_MAP.keys())
-    return sorted(name for name in _STRATEGY_MAP if get_strategy_tier(name) != "research_only")
+        return sorted(names)
+    return sorted(name for name in names if get_strategy_tier(name) != "research_only")
 
 
 def get_live_strategy_names(*, include_opt_in: bool = True) -> list[str]:
@@ -301,17 +375,18 @@ def get_live_strategy_names(*, include_opt_in: bool = True) -> list[str]:
 def resolve_strategy_class(
     name: str | None, default_name: str = DEFAULT_STRATEGY_NAME
 ) -> StrategyClass:
+    strategy_map = get_strategy_map()
     requested = str(name or "").strip()
-    if requested in _STRATEGY_MAP:
-        return _STRATEGY_MAP[requested]
+    if requested in strategy_map:
+        return strategy_map[requested]
 
     fallback = str(default_name).strip()
-    if fallback in _STRATEGY_MAP:
-        return _STRATEGY_MAP[fallback]
-    if DEFAULT_STRATEGY_NAME in _STRATEGY_MAP:
-        return _STRATEGY_MAP[DEFAULT_STRATEGY_NAME]
-    if _STRATEGY_MAP:
-        return next(iter(_STRATEGY_MAP.values()))
+    if fallback in strategy_map:
+        return strategy_map[fallback]
+    if DEFAULT_STRATEGY_NAME in strategy_map:
+        return strategy_map[DEFAULT_STRATEGY_NAME]
+    if strategy_map:
+        return next(iter(strategy_map.values()))
     raise ValueError("No strategy classes are available in registry")
 
 

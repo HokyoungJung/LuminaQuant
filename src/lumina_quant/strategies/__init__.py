@@ -1,9 +1,10 @@
 """Public strategy registry exports for CLI and dashboard modules.
 
-Phase 1: replaced lazy ``__getattr__`` delegation with eager imports.
-Single-source registry: ``lumina_quant.core.plugin_registry`` (decorator-based).
-Operational strategy look-up functions are still re-exported from
-``lumina_quant.strategies.registry`` for backward compat with CLI entry points.
+These eager re-exports from ``lumina_quant.strategies.registry`` are the public
+strategy-lookup API — CLI and dashboard modules import them directly. The
+decorator + ``GLOBAL_REGISTRY`` accessor live in
+``lumina_quant.core.plugin_registry``; ``registry`` consults that registry so
+drop-in strategy modules are resolvable without editing framework internals.
 """
 
 from __future__ import annotations

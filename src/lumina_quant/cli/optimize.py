@@ -26,10 +26,6 @@ from lumina_quant.backtesting.data import HistoricCSVDataHandler
 from lumina_quant.backtesting.data_windowed_parquet import HistoricParquetWindowedDataHandler
 from lumina_quant.backtesting.execution_sim import SimulatedExecutionHandler
 from lumina_quant.backtesting.portfolio_backtest import Portfolio
-from lumina_quant.core.plugin_registry import (
-    import_private_strategy_registry,
-    load_strategy_registry,
-)
 from lumina_quant.compute.ohlcv_loader import OHLCVFrameLoader
 from lumina_quant.configuration import get_default_runtime_config
 from lumina_quant.market_data import (
@@ -139,7 +135,9 @@ PROFILE_TOTALS = {
 def _get_strategy_registry():
     global _strategy_registry
     if _strategy_registry is None:
-        _strategy_registry = load_strategy_registry(import_private_strategy_registry)
+        from lumina_quant.strategies import registry
+
+        _strategy_registry = registry
     return _strategy_registry
 
 

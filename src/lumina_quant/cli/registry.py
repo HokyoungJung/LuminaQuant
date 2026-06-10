@@ -15,13 +15,8 @@ import sys
 
 def cmd_list(args: argparse.Namespace) -> int:
     """Print all registered plugin registry entries as JSON."""
-    from lumina_quant.core.plugin_registry import (
-        import_private_strategy_registry,
-        load_strategy_registry,
-    )
-
     try:
-        registry = load_strategy_registry(import_private_strategy_registry)
+        from lumina_quant.strategies import registry
     except Exception as exc:
         print(f"[error] failed to load strategy registry: {exc}", file=sys.stderr)
         return 1
@@ -46,6 +41,22 @@ def cmd_list(args: argparse.Namespace) -> int:
     except Exception:
         entries["live_strategies"] = []
 
+    # Decorator-registered indicator / portfolio plugins (GLOBAL_REGISTRY).
+    # Triggering get_strategy_map above already ran strategy package
+    # auto-discovery, so any dropped @register modules are now reflected here.
+    try:
+        from lumina_quant.core.plugin_registry import GLOBAL_REGISTRY
+
+        entries["indicators"] = sorted(
+            n for n in GLOBAL_REGISTRY.list_names("indicator") if not n.startswith("_")
+        )
+        entries["portfolios"] = sorted(
+            n for n in GLOBAL_REGISTRY.list_names("portfolio") if not n.startswith("_")
+        )
+    except Exception:
+        entries["indicators"] = []
+        entries["portfolios"] = []
+
     # Default strategy name
     try:
         entries["default_strategy"] = getattr(registry, "DEFAULT_STRATEGY_NAME", None)
@@ -66,6 +77,14 @@ def cmd_list(args: argparse.Namespace) -> int:
         for name in entries["strategies"]:
             marker = " [live]" if name in entries.get("live_strategies", []) else ""
             print(f"  {name}{marker}")
+        if entries.get("indicators"):
+            print(f"Indicators ({len(entries['indicators'])}):")
+            for name in entries["indicators"]:
+                print(f"  {name}")
+        if entries.get("portfolios"):
+            print(f"Portfolios ({len(entries['portfolios'])}):")
+            for name in entries["portfolios"]:
+                print(f"  {name}")
         if entries.get("default_strategy"):
             print(f"Default: {entries['default_strategy']}")
 
