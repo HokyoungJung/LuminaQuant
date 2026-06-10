@@ -1,63 +1,42 @@
-"""Optional native helpers for WAL append acceleration."""
+"""Optional pyo3 helpers for WAL append acceleration.
+
+Phase 2: pyo3 migration — lumina_quant._compute (pyo3).
+The import of load_rawfirst_native_library is removed; this module calls
+the pyo3 append_ohlcv_1s_wal binding directly.
+"""
 
 from __future__ import annotations
 
-import ctypes
 import os
-from pathlib import Path
 from typing import Any
 
 import numpy as np
 import polars as pl
 
-from lumina_quant.data.native_raw_first_backend import load_rawfirst_native_library
+# ── pyo3 binding ──────────────────────────────────────────────────────────────
+_PYO3_WAL_FN: Any = None
+_PYO3_LOAD_ERROR: str = ""
 
-_NATIVE_WAL_FN: Any = None
-
-
-def _load_native_wal_function() -> Any | None:
-    global _NATIVE_WAL_FN
-    if _NATIVE_WAL_FN is not None:
-        return _NATIVE_WAL_FN
-
-    handle = load_rawfirst_native_library()
-    if handle is None:
-        return None
-
-    try:
-        fn = handle.append_ohlcv_1s_wal
-        fn.argtypes = [
-            ctypes.c_char_p,
-            ctypes.POINTER(ctypes.c_longlong),
-            ctypes.POINTER(ctypes.c_double),
-            ctypes.POINTER(ctypes.c_double),
-            ctypes.POINTER(ctypes.c_double),
-            ctypes.POINTER(ctypes.c_double),
-            ctypes.POINTER(ctypes.c_double),
-            ctypes.c_int32,
-            ctypes.c_int32,
-            ctypes.POINTER(ctypes.c_int32),
-        ]
-        fn.restype = ctypes.c_int32
-    except Exception:
-        return None
-
-    _NATIVE_WAL_FN = fn
-    return fn
+try:
+    from lumina_quant._compute import (  # type: ignore[attr-defined]
+        append_ohlcv_1s_wal as _pyo3_append_wal,
+    )
+    _PYO3_WAL_FN = _pyo3_append_wal
+except Exception as _exc:
+    _PYO3_LOAD_ERROR = str(_exc)
 
 
 def native_wal_append_available() -> bool:
-    return _load_native_wal_function() is not None
+    return _PYO3_WAL_FN is not None
 
 
 def append_ohlcv_frame_native(
-    wal_path: str | os.PathLike[str] | Path,
+    wal_path: str | os.PathLike[str],
     frame: pl.DataFrame,
     *,
     fsync_after_write: bool,
 ) -> int | None:
-    fn = _load_native_wal_function()
-    if fn is None:
+    if _PYO3_WAL_FN is None:
         return None
     if frame.is_empty():
         return 0
@@ -82,24 +61,22 @@ def append_ohlcv_frame_native(
     closes = np.ascontiguousarray(prepared.get_column("close").to_numpy(), dtype=np.float64)
     volumes = np.ascontiguousarray(prepared.get_column("volume").to_numpy(), dtype=np.float64)
 
-    output_len = ctypes.c_int32(0)
-    status = int(
-        fn(
-            ctypes.c_char_p(os.fsencode(os.fspath(wal_path))),
-            timestamps.ctypes.data_as(ctypes.POINTER(ctypes.c_longlong)),
-            opens.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
-            highs.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
-            lows.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
-            closes.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
-            volumes.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
-            int(prepared.height),
-            1 if fsync_after_write else 0,
-            ctypes.byref(output_len),
+    try:
+        written = int(
+            _PYO3_WAL_FN(
+                os.fspath(wal_path),
+                timestamps,
+                opens,
+                highs,
+                lows,
+                closes,
+                volumes,
+                bool(fsync_after_write),
+            )
         )
-    )
-    if status != 0:
-        raise RuntimeError(f"Native WAL append failed with status={status}")
-    return int(output_len.value)
+        return written
+    except Exception as exc:
+        raise RuntimeError(f"Native WAL append failed: {exc}") from exc
 
 
 __all__ = [
