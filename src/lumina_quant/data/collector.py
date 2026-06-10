@@ -165,6 +165,17 @@ class DataCollector:
         """Resolved configuration (read-only)."""
         return self._cfg
 
+    @property
+    def repo(self) -> Any:
+        """``ParquetMarketDataRepository`` for this collector's storage root.
+
+        The repository root comes from ``storage.market_data_parquet_path`` via
+        ``DataCollectorConfig.parquet_root`` — no manual path threading required.
+        """
+        from lumina_quant.storage.parquet import ParquetMarketDataRepository
+
+        return ParquetMarketDataRepository(str(self._cfg.parquet_root))
+
     # ------------------------------------------------------------------
     # Data-collection methods (one per data kind)
     # ------------------------------------------------------------------

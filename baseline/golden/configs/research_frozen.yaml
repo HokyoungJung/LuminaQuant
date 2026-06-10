@@ -2,3 +2,6 @@ profile: research
 optimization:
   method: OPTUNA
   walk_forward_folds: 3
+data:
+  # research profile: ohlcv + feature_points for strategy development
+  kinds: [ohlcv, feature_points]
