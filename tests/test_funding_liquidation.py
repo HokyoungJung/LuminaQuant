@@ -3,7 +3,7 @@ import unittest
 from datetime import datetime, timedelta
 
 from lumina_quant.backtesting.portfolio_backtest import Portfolio
-from lumina_quant.core.events import FillEvent
+from lumina_quant.core.events import FillEvent, MarketWindowEvent
 
 
 class MockBars:
@@ -189,6 +189,41 @@ class TestFundingAndLiquidation(unittest.TestCase):
         self.assertIsInstance(evt, FillEvent)
         self.assertEqual(evt.status, "LIQUIDATED")
         self.assertEqual(evt.symbol, "BTC/USDT")
+
+    def test_windowed_liquidation_uses_full_window_extremes(self):
+        """Regression: a liquidation breach in any 1s bar of a window triggers.
+
+        The windowed handler advances get_latest_bar_value to only the LAST 1s
+        bar. Before the fix, an intra-window maintenance-margin breach (a dip in
+        an earlier second) was silently skipped. _check_liquidations now reads
+        the window's full low/high extremes from the event's bars_1s rows.
+        """
+        events = queue.Queue()
+        # Latest 1s bar stays benign (low 99.5) so single-bar checks would miss.
+        bars = MockBars(datetime(2026, 1, 1, 0, 0), 100.0)
+        bars.low = 99.5
+        bars.high = 101.0
+        bars.close = 100.0
+        p = Portfolio(bars, events, bars.current_dt, LiquidationConfig)
+        p.current_positions["BTC/USDT"] = 1.0
+        p.entry_prices["BTC/USDT"] = 100.0
+
+        ts = int(bars.current_dt.timestamp() * 1000)
+        # Middle 1s bar dips to 60.0 — breaches the long liquidation level.
+        bars_1s = {
+            "BTC/USDT": [
+                (ts, 100.0, 101.0, 99.5, 100.0, 10.0),
+                (ts + 1000, 100.0, 102.0, 60.0, 80.0, 10.0),
+                (ts + 2000, 100.0, 101.0, 99.5, 100.0, 10.0),
+            ]
+        }
+        evt = MarketWindowEvent(time=bars.current_dt, window_seconds=20, bars_1s=bars_1s)
+        p.update_timeindex(evt)
+
+        self.assertFalse(events.empty())
+        fill = events.get()
+        self.assertEqual(fill.status, "LIQUIDATED")
+        self.assertEqual(fill.symbol, "BTC/USDT")
 
 
 if __name__ == "__main__":

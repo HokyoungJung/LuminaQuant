@@ -226,7 +226,7 @@ class Portfolio:
         should_sample = self._should_sample(latest_datetime)
         self._update_day_boundary(latest_datetime)
         self._apply_funding(latest_datetime)
-        self._check_liquidations(latest_datetime)
+        self._check_liquidations(latest_datetime, event)
 
         current_positions = self.current_positions
         current_holdings = self.current_holdings
@@ -580,12 +580,63 @@ class Portfolio:
             return None
         return float(default)
 
-    def _check_liquidations(self, latest_datetime):
+    @staticmethod
+    def _window_extremes_from_event(event) -> dict[str, tuple[float, float, float]]:
+        """Map symbol -> (max_high, min_low, last_close) from a MARKET_WINDOW event.
+
+        The windowed data handler advances ``get_latest_bar_value`` to only the
+        LAST 1s bar of each ~20s window, so liquidation checks would miss a
+        maintenance-margin breach touched anywhere else in the window. When the
+        event carries per-second ``bars_1s`` rows, evaluate against the window's
+        full extremes instead (long liquidates on the lowest low, short on the
+        highest high). Returns an empty dict for non-window events (batch/single
+        bar), so those paths keep using ``get_latest_bar_value`` unchanged.
+        """
+        bars_1s = getattr(event, "bars_1s", None)
+        if not isinstance(bars_1s, dict) or not bars_1s:
+            return {}
+
+        def _hlc(row):
+            if isinstance(row, (tuple, list)) and len(row) >= 6:
+                return float(row[2]), float(row[3]), float(row[4])
+            if isinstance(row, dict):
+                return float(row.get("high", 0.0)), float(row.get("low", 0.0)), float(
+                    row.get("close", 0.0)
+                )
+            high = getattr(row, "high", None)
+            low = getattr(row, "low", None)
+            close = getattr(row, "close", None)
+            if high is None or low is None or close is None:
+                return None
+            return float(high), float(low), float(close)
+
+        extremes: dict[str, tuple[float, float, float]] = {}
+        for symbol, rows in bars_1s.items():
+            if not rows:
+                continue
+            highs: list[float] = []
+            lows: list[float] = []
+            last_close = None
+            for row in rows:
+                hlc = _hlc(row)
+                if hlc is None:
+                    continue
+                highs.append(hlc[0])
+                lows.append(hlc[1])
+                last_close = hlc[2]
+            if not highs or last_close is None:
+                continue
+            extremes[str(symbol)] = (max(highs), min(lows), last_close)
+        return extremes
+
+    def _check_liquidations(self, latest_datetime, event=None):
         # leverage <= 1 guard is implicit: execution_model.liquidation_price() returns None.
         configured_margin_mode = (
             str(getattr(self.config, "MARGIN_MODE", "isolated") or "isolated").strip().lower()
         )
         modeled_margin_mode = "isolated"
+
+        window_extremes = self._window_extremes_from_event(event)
 
         for symbol in self.symbol_list:
             qty = float(self.current_positions.get(symbol, 0.0))
@@ -598,9 +649,13 @@ class Portfolio:
             if not entry_price or entry_price <= 0:
                 continue
 
-            close_price = self.bars.get_latest_bar_value(symbol, "close")
-            bar_high = self.bars.get_latest_bar_value(symbol, "high")
-            bar_low = self.bars.get_latest_bar_value(symbol, "low")
+            symbol_extremes = window_extremes.get(symbol)
+            if symbol_extremes is not None:
+                bar_high, bar_low, close_price = symbol_extremes
+            else:
+                close_price = self.bars.get_latest_bar_value(symbol, "close")
+                bar_high = self.bars.get_latest_bar_value(symbol, "high")
+                bar_low = self.bars.get_latest_bar_value(symbol, "low")
             if close_price <= 0:
                 continue
 

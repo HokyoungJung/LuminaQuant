@@ -517,31 +517,38 @@ class SimulatedExecutionHandler(ExecutionHandler):
                     triggered = True
 
             # ── TRAILING STOP ─────────────────────────────────────────────────
+            # Conservative intra-bar sequencing: test the trigger against the
+            # stop level as it stood BEFORE this bar, THEN ratchet using this
+            # bar's favorable extreme. Ratcheting first (the old behaviour)
+            # assumes the favorable extreme always precedes the adverse one
+            # within the bar — best-case optimism that overstates trailing-stop
+            # exits by up to the bar range. Only a non-triggering bar advances
+            # the trail for future bars.
             elif order["type"] == "TRAIL_STOP":
                 if order["direction"] == "SELL":
-                    if order["highest_price"] is None or bar_high > order["highest_price"]:
+                    prev_stop = order["stop_price"]
+                    if prev_stop is not None and bar_low <= prev_stop:
+                        exec_price = prev_stop
+                        if bar_open < exec_price:
+                            exec_price = bar_open
+                        triggered = True
+                    elif order["highest_price"] is None or bar_high > order["highest_price"]:
                         order["highest_price"] = bar_high
                         order["stop_price"] = order["highest_price"] * (
                             1.0 - order["trailing_percent"]
                         )
-
-                    if bar_low <= order["stop_price"]:
-                        exec_price = order["stop_price"]
-                        if bar_open < exec_price:
+                elif order["direction"] == "BUY":
+                    prev_stop = order["stop_price"]
+                    if prev_stop is not None and bar_high >= prev_stop:
+                        exec_price = prev_stop
+                        if bar_open > exec_price:
                             exec_price = bar_open
                         triggered = True
-                elif order["direction"] == "BUY":
-                    if order["lowest_price"] is None or bar_low < order["lowest_price"]:
+                    elif order["lowest_price"] is None or bar_low < order["lowest_price"]:
                         order["lowest_price"] = bar_low
                         order["stop_price"] = order["lowest_price"] * (
                             1.0 + order["trailing_percent"]
                         )
-
-                    if bar_high >= order["stop_price"]:
-                        exec_price = order["stop_price"]
-                        if bar_open > exec_price:
-                            exec_price = bar_open
-                        triggered = True
 
             # ── Unified fill emission ──────────────────────────────────────────
             if triggered and exec_price is not None:
