@@ -98,7 +98,7 @@ def enforce_memory_cap(
     """
     try:
         cap = float(cap_gb) if cap_gb is not None else None
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     if cap is None or not math.isfinite(cap) or cap <= 0.0:
         return None
