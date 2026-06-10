@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-import types
+import textwrap
 
 from lumina_quant.strategy_factory import runtime_settings
 
@@ -43,22 +43,22 @@ def test_default_research_symbol_universe_falls_back_when_config_import_is_unava
     )
 
 
-def test_runtime_settings_fall_back_when_base_config_lookup_raises_file_not_found(
+def test_current_research_market_data_settings_reads_from_typed_config(
+    tmp_path,
     monkeypatch,
 ) -> None:
-    class _MissingSymbolsMeta(type):
-        MARKET_DATA_PARQUET_PATH = "tmp/parquet"
-        MARKET_DATA_EXCHANGE = "bybit"
-
-        def __getattr__(cls, _name: str):
-            raise FileNotFoundError("config missing")
-
-    class _BaseConfig(metaclass=_MissingSymbolsMeta):
-        pass
-
-    config_module = types.ModuleType("lumina_quant.config")
-    config_module.BaseConfig = _BaseConfig
-    monkeypatch.setitem(sys.modules, "lumina_quant.config", config_module)
+    """current_research_market_data_settings() reads parquet_root and exchange from
+    LQ_CONFIG_PATH YAML, replacing the old BaseConfig attribute-lookup approach."""
+    cfg = textwrap.dedent(
+        """
+        storage:
+          market_data_parquet_path: tmp/parquet
+          market_data_exchange: bybit
+        """
+    ).strip()
+    cfg_path = tmp_path / "config.yaml"
+    cfg_path.write_text(cfg, encoding="utf-8")
+    monkeypatch.setenv("LQ_CONFIG_PATH", str(cfg_path))
 
     assert runtime_settings.default_research_symbol_universe()[0] == "BTC/USDT"
     assert runtime_settings.current_research_market_data_settings() == {

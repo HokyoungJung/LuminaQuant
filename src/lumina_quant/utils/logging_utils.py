@@ -3,7 +3,13 @@ import logging
 import os
 from logging.handlers import RotatingFileHandler
 
-from lumina_quant.config import BaseConfig
+def _get_log_level() -> str:
+    """Resolve log level: config.yaml system.log_level → LQ_LOG_LEVEL env → INFO."""
+    try:
+        from lumina_quant.configuration import get_default_runtime_config  # noqa: PLC0415
+        return get_default_runtime_config().system.log_level
+    except Exception:
+        return os.getenv("LQ_LOG_LEVEL", "INFO")
 
 
 class JsonLogFormatter(logging.Formatter):
@@ -26,7 +32,7 @@ def _resolve_logs_dir() -> str:
 
 def _ensure_root_log_handler(formatter: logging.Formatter) -> None:
     root = logging.getLogger()
-    root.setLevel(BaseConfig.LOG_LEVEL)
+    root.setLevel(_get_log_level())
     for handler in list(root.handlers):
         if bool(getattr(handler, "_lumina_root_file_handler", False)):
             return
@@ -46,7 +52,7 @@ def _ensure_root_log_handler(formatter: logging.Formatter) -> None:
 def setup_logging(name="lumina_quant"):
     """Sets up a logger with a StreamHandler and FileHandler."""
     logger = logging.getLogger(name)
-    logger.setLevel(BaseConfig.LOG_LEVEL)
+    logger.setLevel(_get_log_level())
     logger.propagate = False
 
     # Prevent duplicate handlers when setup_logging is called multiple times.

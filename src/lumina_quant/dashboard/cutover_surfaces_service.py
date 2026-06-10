@@ -10,7 +10,7 @@ from typing import Any
 
 import pandas as pd
 
-from lumina_quant.config import BaseConfig
+from lumina_quant.configuration import get_default_runtime_config
 from lumina_quant.dashboard.state_store_service import (
     load_fills_state_frame,
     load_heartbeats_state_frame,
@@ -148,7 +148,7 @@ def _resolve_market_context(
     fills_frame: pd.DataFrame,
 ) -> dict[str, Any]:
     metadata = _parse_json_dict(run_row.get("metadata"))
-    configured_symbols = getattr(BaseConfig, "SYMBOLS", [])
+    configured_symbols = get_default_runtime_config().trading.symbols
     symbol = ""
     if "symbol" in fills_frame.columns:
         symbol_values = fills_frame["symbol"].dropna().astype(str)
@@ -162,14 +162,14 @@ def _resolve_market_context(
         symbol = str(configured_symbols[0])
 
     timeframe, clamped = _normalize_market_timeframe(
-        metadata.get("timeframe") or getattr(BaseConfig, "TIMEFRAME", "1m")
+        metadata.get("timeframe") or get_default_runtime_config().trading.timeframe
     )
-    market_db_path = str(getattr(BaseConfig, "MARKET_DATA_PARQUET_PATH", "") or "").strip()
+    market_db_path = str(get_default_runtime_config().storage.market_data_parquet_path or "").strip()
     return {
         "symbol": symbol or "n/a",
         "timeframe": timeframe,
         "timeframe_clamped": clamped,
-        "exchange": str(getattr(BaseConfig, "MARKET_DATA_EXCHANGE", "binance") or "binance"),
+        "exchange": str(get_default_runtime_config().storage.market_data_exchange or "binance"),
         "strategy": str(run_row.get("strategy") or metadata.get("strategy") or "unknown"),
         "market_db_path": market_db_path,
         "source": "parquet" if market_db_path else "unconfigured",

@@ -1,31 +1,55 @@
-"""Compatibility facade for runtime config access."""
+"""Backward-compat shim for operational scripts (Phase 1 bridge).
+
+The metaclass-backed runtime_access.py has been deleted.  This module now
+exposes the four XxxConfig names as view objects constructed from the typed
+RuntimeConfig.  No global state, no os.environ hidden bus.
+
+Operational scripts should migrate to ``lumina_quant.configuration`` directly.
+This shim will be removed in Phase 7.
+"""
 
 from __future__ import annotations
 
-import importlib
-import os
-
+from lumina_quant.configuration import (
+    BacktestConfigView,
+    LiveConfigView,
+    current_market_data_runtime_settings,
+    get_default_runtime_config,
+)
 from lumina_quant.configuration.loader import load_yaml_config
 
-_runtime_access = importlib.import_module("lumina_quant.configuration.runtime_access")
+# Load once at import time — consistent with old per-process behaviour.
+# Scripts that need fresh values for a different LQ_CONFIG_PATH should
+# call get_default_runtime_config() directly.
+_rt = get_default_runtime_config()
 
-_runtime_access.clear_runtime_config_views()
+BacktestConfig = BacktestConfigView(_rt)
+LiveConfig = LiveConfigView(_rt)
+# BaseConfig covers the same attribute set (SYMBOLS, TIMEFRAME, POSTGRES_DSN, …)
+BaseConfig = BacktestConfigView(_rt)
 
-BaseConfig = _runtime_access.BaseConfig
-BacktestConfig = _runtime_access.BacktestConfig
-LiveConfig = _runtime_access.LiveConfig
-OptimizationConfig = _runtime_access.OptimizationConfig
-clear_runtime_config_views = _runtime_access.clear_runtime_config_views
-current_market_data_runtime_settings = _runtime_access.current_market_data_runtime_settings
-export_runtime_dict = _runtime_access.export_runtime_dict
-load_current_runtime_config = _runtime_access.load_current_runtime_config
-reload_runtime_config = _runtime_access.reload_runtime_config
-reset_runtime_config_cache = _runtime_access.reset_runtime_config_cache
-seed_runtime_env_defaults = _runtime_access.seed_runtime_env_defaults
+
+class _OptimizationConfigShim:
+    """Minimal shim for operational scripts that read OptimizationConfig attrs."""
+
+    def __init__(self, opt) -> None:
+        self.METHOD = str(opt.method)
+        self.STRATEGY_NAME = str(opt.strategy)
+        self.OPTUNA_CONFIG: dict = dict(opt.optuna)
+        self.GRID_CONFIG: dict = dict(opt.grid)
+        self.MAX_WORKERS = int(opt.max_workers)
+        self.WALK_FORWARD_FOLDS = int(opt.walk_forward_folds)
+        self.OVERFIT_PENALTY = float(opt.overfit_penalty)
+        self.PERSIST_BEST_PARAMS = bool(opt.persist_best_params)
+        self.VALIDATION_DAYS = int(opt.validation_days)
+        self.OOS_DAYS = int(opt.oos_days)
+
+
+OptimizationConfig = _OptimizationConfigShim(_rt.optimization)
 
 
 def load_config(config_path: str = "config.yaml") -> dict:
-    """Load raw YAML config."""
+    """Load raw YAML config dict (backward compat)."""
     return load_yaml_config(config_path=config_path)
 
 
@@ -34,13 +58,7 @@ __all__ = [
     "BaseConfig",
     "LiveConfig",
     "OptimizationConfig",
-    "clear_runtime_config_views",
     "current_market_data_runtime_settings",
-    "export_runtime_dict",
+    "get_default_runtime_config",
     "load_config",
-    "load_current_runtime_config",
-    "os",
-    "reload_runtime_config",
-    "reset_runtime_config_cache",
-    "seed_runtime_env_defaults",
 ]

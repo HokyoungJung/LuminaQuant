@@ -13,7 +13,7 @@ from typing import Any
 import numpy as np
 import polars as pl
 
-from lumina_quant.config import current_market_data_runtime_settings
+from lumina_quant.configuration import current_market_data_runtime_settings
 from lumina_quant.market_data import load_data_dict_from_parquet
 from lumina_quant.strategy_factory.candidate_library import build_binance_futures_candidates
 from lumina_quant.strategy_factory import research_runner as rr

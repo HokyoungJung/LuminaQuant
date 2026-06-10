@@ -1,42 +1,34 @@
 import os
 import unittest
 
-from lumina_quant.config import LiveConfig
+from lumina_quant.configuration import validate_runtime_config
+from lumina_quant.configuration.schema import RuntimeConfig
 
 
 class TestConfigSchema(unittest.TestCase):
     def test_exchange_schema_exists(self):
-        self.assertIsInstance(LiveConfig.EXCHANGE, dict)
-        self.assertIn("driver", LiveConfig.EXCHANGE)
-        self.assertIn("name", LiveConfig.EXCHANGE)
-        self.assertIn("market_type", LiveConfig.EXCHANGE)
+        rt = RuntimeConfig()
+        # LiveExchangeConfig dataclass has these typed fields
+        self.assertTrue(hasattr(rt.live.exchange, "driver"))
+        self.assertTrue(hasattr(rt.live.exchange, "name"))
+        self.assertTrue(hasattr(rt.live.exchange, "market_type"))
 
     def test_real_mode_requires_explicit_flag(self):
-        original = {
-            "MODE": LiveConfig.MODE,
-            "REQUIRE_REAL_ENABLE_FLAG": LiveConfig.REQUIRE_REAL_ENABLE_FLAG,
-            "BINANCE_API_KEY": LiveConfig.BINANCE_API_KEY,
-            "BINANCE_SECRET_KEY": LiveConfig.BINANCE_SECRET_KEY,
-        }
+        rt = RuntimeConfig()
+        rt.live.mode = "real"
+        rt.live.require_real_enable_flag = True
+        rt.live.api_key = "test_key"
+        rt.live.secret_key = "test_secret"
+
         old_env = os.environ.get("LUMINA_ENABLE_LIVE_REAL")
         try:
-            LiveConfig.MODE = "real"
-            LiveConfig.REQUIRE_REAL_ENABLE_FLAG = True
-            LiveConfig.BINANCE_API_KEY = "test_key"
-            LiveConfig.BINANCE_SECRET_KEY = "test_secret"
-
-            if "LUMINA_ENABLE_LIVE_REAL" in os.environ:
-                del os.environ["LUMINA_ENABLE_LIVE_REAL"]
+            os.environ.pop("LUMINA_ENABLE_LIVE_REAL", None)
             with self.assertRaises(ValueError):
-                LiveConfig.validate()
+                validate_runtime_config(rt, for_live=True)
 
             os.environ["LUMINA_ENABLE_LIVE_REAL"] = "true"
-            LiveConfig.validate()
+            validate_runtime_config(rt, for_live=True)
         finally:
-            LiveConfig.MODE = original["MODE"]
-            LiveConfig.REQUIRE_REAL_ENABLE_FLAG = original["REQUIRE_REAL_ENABLE_FLAG"]
-            LiveConfig.BINANCE_API_KEY = original["BINANCE_API_KEY"]
-            LiveConfig.BINANCE_SECRET_KEY = original["BINANCE_SECRET_KEY"]
             if old_env is None:
                 os.environ.pop("LUMINA_ENABLE_LIVE_REAL", None)
             else:

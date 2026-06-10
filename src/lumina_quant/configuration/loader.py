@@ -20,6 +20,7 @@ from lumina_quant.configuration.schema import (
     LivePolymarketConfig,
     LiveRuntimeConfig,
     MarketWindowConfig,
+    MemoryConfig,
     OptimizationRuntimeConfig,
     PromotionGateConfig,
     RiskConfig,
@@ -27,6 +28,7 @@ from lumina_quant.configuration.schema import (
     StorageConfig,
     SystemConfig,
     TradingConfig,
+    ValidationConfig,
 )
 from lumina_quant.core.order_policy import canonical_order_type, normalize_limit_price_mode
 
@@ -260,6 +262,8 @@ def _extract_runtime_sections(mapped: dict[str, Any]) -> dict[str, dict[str, Any
         "optimization": _raw_section(mapped, "optimization"),
         "promotion_gate": _raw_section(mapped, "promotion_gate"),
         "market_window": _raw_section(mapped, "market_window"),
+        "memory": _raw_section(mapped, "memory"),
+        "validation": _raw_section(mapped, "validation"),
     }
 
 
@@ -864,6 +868,10 @@ def _build_runtime_config_tree(
         ),
         market_window=MarketWindowConfig(
             **_coerce_dataclass_kwargs(sections["market_window"], MarketWindowConfig)
+        ),
+        memory=MemoryConfig(**_coerce_dataclass_kwargs(sections["memory"], MemoryConfig)),
+        validation=ValidationConfig(
+            **_coerce_dataclass_kwargs(sections["validation"], ValidationConfig)
         ),
         promotion_gate=PromotionGateConfig(
             **promotion_kwargs,

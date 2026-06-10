@@ -8,7 +8,7 @@ from typing import Any
 
 import pandas as pd
 
-from lumina_quant.config import BaseConfig
+from lumina_quant.configuration import get_default_runtime_config
 from lumina_quant.postgres_state import _connect_postgres
 from lumina_quant.dashboard.workflow_jobs_service import load_recent_workflow_jobs
 from lumina_quant.utils.performance import (
@@ -23,7 +23,7 @@ from lumina_quant.utils.performance import (
 
 def resolve_dashboard_postgres_dsn(dsn: str | None = None) -> str:
     return str(
-        dsn or os.getenv("LQ_POSTGRES_DSN") or getattr(BaseConfig, "POSTGRES_DSN", "") or ""
+        dsn or os.getenv("LQ_POSTGRES_DSN") or get_default_runtime_config().storage.postgres_dsn or ""
     ).strip()
 
 

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import importlib
 import queue
 import textwrap
 from types import SimpleNamespace
@@ -28,16 +27,17 @@ def test_live_staleness_keys_are_runtime_loaded_via_config_module(tmp_path, monk
     cfg_path.write_text(cfg, encoding="utf-8")
 
     monkeypatch.setenv("LQ_CONFIG_PATH", str(cfg_path))
-    monkeypatch.delenv("LQ__LIVE__MATERIALIZED_STALENESS_THRESHOLD_SECONDS", raising=False)
-    monkeypatch.delenv("LQ__LIVE__MATERIALIZED_STALENESS_ALERT_COOLDOWN_SECONDS", raising=False)
-    monkeypatch.delenv("LQ__LIVE__MARKET_DATA_SOURCE", raising=False)
-    monkeypatch.delenv("LQ__RUNTIME_AUTOSEEDED_DEFAULTS_JSON", raising=False)
-    monkeypatch.delenv("LQ__RUNTIME_AUTOSEEDED_PREEXISTING_KEYS_JSON", raising=False)
-    import lumina_quant.config as config_module
 
-    config_module = importlib.reload(config_module)
-    assert int(config_module.LiveConfig.MATERIALIZED_STALENESS_THRESHOLD_SECONDS) == 12
-    assert int(config_module.LiveConfig.MATERIALIZED_STALENESS_ALERT_COOLDOWN_SECONDS) == 34
+    from lumina_quant.configuration import get_default_runtime_config
+    from lumina_quant.configuration.compat import LiveConfigView
+
+    rt = get_default_runtime_config()
+    assert int(rt.live.materialized_staleness_threshold_seconds) == 12
+    assert int(rt.live.materialized_staleness_alert_cooldown_seconds) == 34
+
+    live_cfg = LiveConfigView(rt)
+    assert int(live_cfg.MATERIALIZED_STALENESS_THRESHOLD_SECONDS) == 12
+    assert int(live_cfg.MATERIALIZED_STALENESS_ALERT_COOLDOWN_SECONDS) == 34
 
     class _ReaderStub:
         def __init__(self, *args, **kwargs):
@@ -70,7 +70,7 @@ def test_live_staleness_keys_are_runtime_loaded_via_config_module(tmp_path, monk
     handler = LiveDataHandler(
         queue.Queue(),
         ["BTC/USDT"],
-        config_module.LiveConfig,
+        live_cfg,
         exchange=SimpleNamespace(),
     )
     assert int(handler._staleness_threshold_seconds) == 12

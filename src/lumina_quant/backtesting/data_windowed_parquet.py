@@ -7,7 +7,7 @@ from collections import deque
 from typing import Any
 
 from lumina_quant.backtesting.data import HistoricCSVDataHandler
-from lumina_quant.config import BaseConfig
+from lumina_quant.configuration import get_default_runtime_config
 from lumina_quant.core.market_window_contract import build_market_window_event
 
 
@@ -54,12 +54,17 @@ class HistoricParquetWindowedDataHandler(HistoricCSVDataHandler):
         }
         self._next_emit_ts_ms: int | None = None
         self._last_window_event_ms: int | None = None
-        self._parity_v2_enabled = (
-            bool(BaseConfig.MARKET_WINDOW_PARITY_V2_ENABLED)
-            if market_window_parity_v2_enabled is None
-            else bool(market_window_parity_v2_enabled)
-        )
-        self._metrics_log_path = str(BaseConfig.MARKET_WINDOW_METRICS_LOG_PATH)
+        if market_window_parity_v2_enabled is None:
+            try:
+                _mw = get_default_runtime_config().market_window
+                self._parity_v2_enabled = bool(_mw.parity_v2_enabled)
+                self._metrics_log_path = str(_mw.metrics_log_path)
+            except Exception:
+                self._parity_v2_enabled = False
+                self._metrics_log_path = "logs/live/market_window_metrics.ndjson"
+        else:
+            self._parity_v2_enabled = bool(market_window_parity_v2_enabled)
+            self._metrics_log_path = "logs/live/market_window_metrics.ndjson"
 
     def _freeze_rows_as_epoch_ms(self) -> None:
         """Convert loaded 1s rows once into the canonical MARKET_WINDOW shape.

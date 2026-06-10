@@ -26,12 +26,12 @@ from lumina_quant.backtesting.data import HistoricCSVDataHandler
 from lumina_quant.backtesting.data_windowed_parquet import HistoricParquetWindowedDataHandler
 from lumina_quant.backtesting.execution_sim import SimulatedExecutionHandler
 from lumina_quant.backtesting.portfolio_backtest import Portfolio
-from lumina_quant.cli._strategy_registry_fallback import (
+from lumina_quant.core.plugin_registry import (
     import_private_strategy_registry,
     load_strategy_registry,
 )
 from lumina_quant.compute.ohlcv_loader import OHLCVFrameLoader
-from lumina_quant.config import BacktestConfig, BaseConfig, LiveConfig, OptimizationConfig
+from lumina_quant.configuration import get_default_runtime_config
 from lumina_quant.market_data import (
     load_data_dict_from_db,
     load_data_dict_from_external_root,
@@ -145,7 +145,7 @@ def _get_strategy_registry():
 
 def _resolve_strategy_class():
     strategy_registry = _get_strategy_registry()
-    requested_strategy_name = str(OptimizationConfig.STRATEGY_NAME or "").strip()
+    requested_strategy_name = str(get_default_runtime_config().optimization.strategy or "").strip()
     return strategy_registry.resolve_strategy_class(
         requested_strategy_name,
         default_name=strategy_registry.DEFAULT_STRATEGY_NAME,
@@ -157,26 +157,29 @@ def _initialize_optimize_runtime_state(*, log: bool = False) -> None:
     global GRID_PARAMS, OPTUNA_CONFIG, OPTUNA_TRIALS, MAX_WORKERS
     global BASE_START, BASE_END
 
+    _rt = get_default_runtime_config()
+    _opt = _rt.optimization
+    _bt = _rt.backtest
     strategy_registry = _get_strategy_registry()
     STRATEGY_CLASS = _resolve_strategy_class()
     ACTIVE_STRATEGY_NAME = STRATEGY_CLASS.__name__
-    OPTIMIZATION_METHOD = str(OptimizationConfig.METHOD)
+    OPTIMIZATION_METHOD = str(_opt.method)
 
     resolved_optuna_config = strategy_registry.resolve_optuna_config(
         ACTIVE_STRATEGY_NAME,
-        OptimizationConfig.OPTUNA_CONFIG,
+        dict(_opt.optuna),
     )
     resolved_grid_config = strategy_registry.resolve_grid_config(
         ACTIVE_STRATEGY_NAME,
-        OptimizationConfig.GRID_CONFIG,
+        dict(_opt.grid),
     )
     GRID_PARAMS = dict(resolved_grid_config.get("params", {}))
     OPTUNA_CONFIG = dict(resolved_optuna_config.get("params", {}))
     OPTUNA_TRIALS = int(resolved_optuna_config.get("n_trials", 20))
-    MAX_WORKERS = min(2, max(1, int(OptimizationConfig.MAX_WORKERS)))
+    MAX_WORKERS = min(2, max(1, int(_opt.max_workers)))
 
     try:
-        BASE_START = datetime.strptime(BacktestConfig.START_DATE, "%Y-%m-%d")
+        BASE_START = datetime.strptime(str(_bt.start_date), "%Y-%m-%d")
     except Exception as exc:
         if log:
             print(f"Error parsing dates from config: {exc}. Using defaults.")
@@ -184,8 +187,8 @@ def _initialize_optimize_runtime_state(*, log: bool = False) -> None:
 
     try:
         BASE_END = (
-            datetime.strptime(BacktestConfig.END_DATE, "%Y-%m-%d")
-            if BacktestConfig.END_DATE
+            datetime.strptime(str(_bt.end_date), "%Y-%m-%d")
+            if _bt.end_date
             else None
         )
     except Exception:
@@ -262,56 +265,44 @@ class OptimizeRuntimeSettings:
 
 
 def _current_optimize_runtime_settings() -> OptimizeRuntimeSettings:
+    _rt = get_default_runtime_config()
+    _bt = _rt.backtest
+    _opt = _rt.optimization
     data_mode = str(os.getenv("LQ_DATA_MODE", "raw-first") or "raw-first").strip().lower()
     if data_mode not in {"raw-first", "legacy"}:
         data_mode = "raw-first"
     return OptimizeRuntimeSettings(
-        symbol_list=list(BaseConfig.SYMBOLS),
-        market_db_path=str(BaseConfig.MARKET_DATA_PARQUET_PATH),
-        market_db_exchange=str(BaseConfig.MARKET_DATA_EXCHANGE),
-        market_db_backend=str(BaseConfig.STORAGE_BACKEND),
+        symbol_list=list(_rt.trading.symbols),
+        market_db_path=str(_rt.storage.market_data_parquet_path),
+        market_db_exchange=str(_rt.storage.market_data_exchange),
+        market_db_backend=str(_rt.storage.backend),
         base_timeframe=str(os.getenv("LQ_BASE_TIMEFRAME", "1s") or "1s").strip().lower(),
-        strategy_timeframe=str(BaseConfig.TIMEFRAME),
+        strategy_timeframe=str(_rt.trading.timeframe),
         data_mode=data_mode,
         auto_collect_db=str(os.getenv("LQ_AUTO_COLLECT_DB", "0")).strip().lower()
         not in {"0", "false", "no", "off"},
         backtest_mode=_normalize_backtest_mode(
-            os.getenv("LQ_BACKTEST_MODE", str(getattr(BacktestConfig, "MODE", "windowed"))),
+            os.getenv("LQ_BACKTEST_MODE", str(_bt.mode)),
             default="windowed",
         ),
-        bt_chunk_days=max(
-            1,
-            _env_int("LQ__BACKTEST__CHUNK_DAYS", int(getattr(BacktestConfig, "CHUNK_DAYS", 2))),
-        ),
+        bt_chunk_days=max(1, _env_int("LQ__BACKTEST__CHUNK_DAYS", int(_bt.chunk_days))),
         bt_chunk_warmup_bars=max(
             0,
-            _env_int(
-                "LQ__BACKTEST__CHUNK_WARMUP_BARS",
-                int(getattr(BacktestConfig, "CHUNK_WARMUP_BARS", 0)),
-            ),
+            _env_int("LQ__BACKTEST__CHUNK_WARMUP_BARS", int(_bt.chunk_warmup_bars)),
         ),
         backtest_poll_seconds=max(
             1,
-            _env_int(
-                "LQ__BACKTEST__POLL_SECONDS",
-                int(getattr(BacktestConfig, "POLL_SECONDS", 20)),
-            ),
+            _env_int("LQ__BACKTEST__POLL_SECONDS", int(_bt.poll_seconds)),
         ),
         backtest_window_seconds=max(
             1,
-            _env_int(
-                "LQ__BACKTEST__WINDOW_SECONDS",
-                int(getattr(BacktestConfig, "WINDOW_SECONDS", 20)),
-            ),
+            _env_int("LQ__BACKTEST__WINDOW_SECONDS", int(_bt.window_seconds)),
         ),
         backtest_decision_cadence_seconds=max(
             1,
-            _env_int(
-                "LQ__BACKTEST__DECISION_CADENCE_SECONDS",
-                int(getattr(BacktestConfig, "DECISION_CADENCE_SECONDS", 20)),
-            ),
+            _env_int("LQ__BACKTEST__DECISION_CADENCE_SECONDS", int(_bt.decision_cadence_seconds)),
         ),
-        max_workers=min(2, max(1, int(OptimizationConfig.MAX_WORKERS))),
+        max_workers=min(2, max(1, int(_opt.max_workers))),
     )
 
 
@@ -679,17 +670,18 @@ def _auto_collect_db_if_enabled(
         print("[INFO] Auto collector skipped for parquet market-data backend.")
         return []
 
+    _lv = get_default_runtime_config().live
     sync_rows = _auto_collect_market_data(
         symbol_list=list(symbol_list),
         timeframe=str(base_timeframe),
         db_path=str(market_db_path),
         exchange_id=str(market_exchange),
-        market_type=str(LiveConfig.MARKET_TYPE),
+        market_type=str(_lv.exchange.market_type),
         since_dt=start_date,
         until_dt=None,
-        api_key=str(LiveConfig.BINANCE_API_KEY or ""),
-        secret_key=str(LiveConfig.BINANCE_SECRET_KEY or ""),
-        testnet=bool(LiveConfig.IS_TESTNET),
+        api_key=str(_lv.api_key or ""),
+        secret_key=str(_lv.secret_key or ""),
+        testnet=bool(str(_lv.mode).strip().lower() != "real"),
         limit=1000,
         max_batches=100000,
         retries=3,
@@ -1152,7 +1144,7 @@ def run_walk_forward_fold(split):
         )
         res["train_sharpe"] = cand["sharpe"]
         divergence = abs(float(cand["sharpe"]) - float(res["sharpe"]))
-        penalty_factor = OptimizationConfig.OVERFIT_PENALTY
+        penalty_factor = get_default_runtime_config().optimization.overfit_penalty
         res["robustness_score"] = float(res["sharpe"]) - (divergence * penalty_factor)
         if res.get("no_data"):
             res["robustness_score"] = -999.0
@@ -1205,7 +1197,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--folds",
         type=int,
-        default=OptimizationConfig.WALK_FORWARD_FOLDS,
+        default=get_default_runtime_config().optimization.walk_forward_folds,
         help="Number of walk-forward folds.",
     )
     parser.add_argument(
@@ -1234,12 +1226,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--data-source",
         choices=["auto", "csv", "db", "external"],
-        default=str(getattr(BacktestConfig, "DATA_SOURCE", "auto") or "auto"),
+        default=str(get_default_runtime_config().backtest.data_source or "auto"),
         help="Market data source for optimization (auto: DB then CSV fallback; external: user-managed CSV/parquet root).",
     )
     parser.add_argument(
         "--external-data-root",
-        default=str(getattr(BacktestConfig, "EXTERNAL_DATA_ROOT", "") or ""),
+        default=str(get_default_runtime_config().backtest.external.root_path or ""),
         help="External market-data root for --data-source external (canonical CSV/parquet OHLCV).",
     )
     parser.add_argument(
@@ -1265,13 +1257,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--oos-days",
         type=int,
-        default=OptimizationConfig.OOS_DAYS,
+        default=get_default_runtime_config().optimization.oos_days,
         help="Final holdout window length in days excluded from optimization and used only for final evaluation.",
     )
     parser.add_argument(
         "--validation-days",
         type=int,
-        default=OptimizationConfig.VALIDATION_DAYS,
+        default=get_default_runtime_config().optimization.validation_days,
         help=(
             "If > 0, enforce a strict recent validation window immediately before OOS "
             "(e.g. 30 = previous month). Set 0 to keep legacy walk-forward windows."
@@ -1305,7 +1297,7 @@ def main(argv: list[str] | None = None) -> int:
         return int(raw_first_exit_code(exc) or 1)
 
     run_id = str(args.run_id or "").strip() or str(uuid.uuid4())
-    db_path = BaseConfig.POSTGRES_DSN
+    db_path = get_default_runtime_config().storage.postgres_dsn
     audit_store = AuditStore(db_path)
     audit_store.start_run(
         mode="optimize",
@@ -1339,7 +1331,7 @@ def main(argv: list[str] | None = None) -> int:
     OPTUNA_TRIALS = args.n_trials
     MAX_WORKERS = min(2, max(1, int(args.max_workers)))
     configured_numba_threads = configure_numba_threads(MAX_WORKERS)
-    persist_best_params = bool(args.save_best_params or OptimizationConfig.PERSIST_BEST_PARAMS)
+    persist_best_params = bool(args.save_best_params or get_default_runtime_config().optimization.persist_best_params)
 
     try:
         if int(args.oos_days) <= 0:
@@ -1392,7 +1384,7 @@ def main(argv: list[str] | None = None) -> int:
                 data_source=contract.data_source,
                 market_db_path=args.market_db_path,
                 external_data_root=args.external_data_root,
-                external_symbol_map=dict(getattr(BacktestConfig, "EXTERNAL_SYMBOL_MAP", {}) or {}),
+                external_symbol_map=dict(get_default_runtime_config().backtest.external.symbol_map or {}),
                 market_exchange=args.market_exchange,
                 timeframe=str(args.base_timeframe),
                 start_date=BASE_START,

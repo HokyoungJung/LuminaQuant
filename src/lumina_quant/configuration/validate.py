@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import platform
 import re
 from collections.abc import Iterable
@@ -460,6 +461,17 @@ def validate_runtime_config(runtime: RuntimeConfig, *, for_live: bool = False) -
     _validate_promotion_gate_runtime_invariants(runtime)
     _validate_market_window_parity_invariants(runtime)
     _validate_strategy_profile_invariants(runtime)
+
+    if (
+        for_live
+        and str(runtime.live.mode).strip().lower() == "real"
+        and getattr(runtime.live, "require_real_enable_flag", True)
+        and os.environ.get("LUMINA_ENABLE_LIVE_REAL", "").strip().lower() != "true"
+    ):
+        raise ValueError(
+            "Live real mode requires LUMINA_ENABLE_LIVE_REAL=true in the environment. "
+            "Set this explicitly to confirm intent to place real orders."
+        )
 
     if for_live and (not runtime.live.api_key or not runtime.live.secret_key):
         raise ValueError(

@@ -16,7 +16,7 @@ from typing import Any
 import numpy as np
 import polars as pl
 from lumina_quant.backtesting.cli_contract import RawFirstDataMissingError
-from lumina_quant.config import BacktestConfig
+from lumina_quant.configuration import get_default_runtime_config
 from lumina_quant.market_data import load_futures_feature_points_from_db
 from lumina_quant.storage.parquet import load_data_dict_from_parquet
 from lumina_quant.symbols import (
@@ -601,7 +601,7 @@ def _compute_metrics(
         )
 
     resolved_rf = resolve_risk_free_config(
-        metric_config or BacktestConfig,
+        metric_config or get_default_runtime_config().backtest,
         periods_per_year=periods_per_year,
         timestamps=timestamps,
         size=int(returns.size),
@@ -6372,7 +6372,7 @@ def _metrics_for_mask(
         benchmark_returns=benchmark_returns[mask],
         periods_per_year=periods_per_year,
         num_trials=candidate_count,
-        metric_config=BacktestConfig,
+        metric_config=get_default_runtime_config().backtest,
         timestamps=timestamps[mask],
     )
 
@@ -6444,7 +6444,7 @@ def _candidate_oos_cost_stress_metrics(
         benchmark_returns=benchmark[oos_mask],
         periods_per_year=periods_per_year,
         num_trials=candidate_count,
-        metric_config=BacktestConfig,
+        metric_config=get_default_runtime_config().backtest,
         timestamps=timestamps[oos_mask],
     )
     oos_stress_x3 = _compute_metrics(
@@ -6454,7 +6454,7 @@ def _candidate_oos_cost_stress_metrics(
         benchmark_returns=benchmark[oos_mask],
         periods_per_year=periods_per_year,
         num_trials=candidate_count,
-        metric_config=BacktestConfig,
+        metric_config=get_default_runtime_config().backtest,
         timestamps=timestamps[oos_mask],
     )
     return oos_stress_x2, oos_stress_x3
@@ -7437,7 +7437,7 @@ def _research_report_builder() -> ResearchReportBuilder:
         candidate_rank_score=_candidate_rank_score,
         correlation=_correlation,
         periods_per_year=_PERIODS_PER_YEAR,
-        metric_config=BacktestConfig,
+        metric_config=get_default_runtime_config().backtest,
     )
 
 

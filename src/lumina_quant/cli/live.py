@@ -4,11 +4,11 @@ import argparse
 import os
 
 from lumina_quant.backtesting.cli_contract import RawFirstDataMissingError
-from lumina_quant.cli._strategy_registry_fallback import (
+from lumina_quant.core.plugin_registry import (
     import_private_strategy_registry,
     load_strategy_registry,
 )
-from lumina_quant.config import LiveConfig
+from lumina_quant.configuration import get_default_runtime_config, validate_runtime_config
 from lumina_quant.core.market_window_contract import MarketWindowContractError
 from lumina_quant.live_selection import (
     extract_live_decision_config,
@@ -28,6 +28,11 @@ from lumina_quant.strategies.artifact_portfolio_mode import (
 
 DEFAULT_LIVE_STRATEGY_NAME = "MovingAverageCrossStrategy"
 DEFAULT_WS_STRATEGY_NAME = "RsiStrategy"
+
+# Module-level compatibility attribute — not used by main() which reads from
+# get_default_runtime_config().  Present so tests can monkeypatch it without
+# raising AttributeError (monkeypatch.setattr raising=True default).
+LiveConfig = None
 STRATEGY_MAP = None
 resolve_strategy_class = None
 
@@ -153,9 +158,10 @@ def main(argv: list[str] | None = None) -> int:
     # 1. Check Configuration
     print("=== LuminaQuant Live Trader ===")
 
-    # 2. Setup
-    symbol_list = list(LiveConfig.SYMBOLS)  # e.g. ['BTC/USDT'] from config.yaml
-    resolved_timeframe = str(LiveConfig.TIMEFRAME)
+    # 2. Setup — load typed RuntimeConfig once; mutate fields in-place from decision artifacts
+    rt = get_default_runtime_config()
+    symbol_list = list(rt.trading.symbols)
+    resolved_timeframe = str(rt.trading.timeframe)
     strategy_params = {}
     default_strategy_name = (
         DEFAULT_WS_STRATEGY_NAME if transport == "ws" else DEFAULT_LIVE_STRATEGY_NAME
@@ -216,48 +222,41 @@ def main(argv: list[str] | None = None) -> int:
 
             exchange_override = decision_cfg.get("exchange")
             if isinstance(exchange_override, dict) and exchange_override:
-                live_exchange = dict(getattr(LiveConfig, "EXCHANGE", {}) or {})
-                live_exchange.update(exchange_override)
-                LiveConfig.EXCHANGE = live_exchange
-                if "name" in live_exchange:
-                    LiveConfig.EXCHANGE_ID = str(live_exchange["name"])
-                if "market_type" in live_exchange:
-                    LiveConfig.MARKET_TYPE = str(live_exchange["market_type"])
-                if "position_mode" in live_exchange:
-                    LiveConfig.POSITION_MODE = str(live_exchange["position_mode"])
-                if "margin_mode" in live_exchange:
-                    LiveConfig.MARGIN_MODE = str(live_exchange["margin_mode"])
+                if "name" in exchange_override:
+                    rt.live.exchange.name = str(exchange_override["name"])
+                if "market_type" in exchange_override:
+                    rt.live.exchange.market_type = str(exchange_override["market_type"])
+                if "position_mode" in exchange_override:
+                    rt.live.exchange.position_mode = str(exchange_override["position_mode"])
+                if "margin_mode" in exchange_override:
+                    rt.live.exchange.margin_mode = str(exchange_override["margin_mode"])
                 if "leverage" in exchange_override:
-                    LiveConfig.LEVERAGE = int(exchange_override["leverage"])
+                    rt.live.exchange.leverage = int(exchange_override["leverage"])
             elif decision_cfg.get("leverage") is not None:
-                leverage = int(decision_cfg["leverage"])
-                live_exchange = dict(getattr(LiveConfig, "EXCHANGE", {}) or {})
-                live_exchange["leverage"] = leverage
-                LiveConfig.EXCHANGE = live_exchange
-                LiveConfig.LEVERAGE = leverage
+                rt.live.exchange.leverage = int(decision_cfg["leverage"])
 
             if decision_cfg.get("target_allocation") is not None:
-                LiveConfig.TARGET_ALLOCATION = float(decision_cfg["target_allocation"])
+                rt.trading.target_allocation = float(decision_cfg["target_allocation"])
             if decision_cfg.get("target_allocation_mode") is not None:
-                LiveConfig.TARGET_ALLOCATION_MODE = str(decision_cfg["target_allocation_mode"])
-            for cfg_key, attr_name in (
-                ("max_order_value", "MAX_ORDER_VALUE"),
-                ("max_order_notional_pct", "MAX_ORDER_NOTIONAL_PCT"),
-                ("max_symbol_exposure_pct", "MAX_SYMBOL_EXPOSURE_PCT"),
-                ("max_total_margin_pct", "MAX_TOTAL_MARGIN_PCT"),
-                ("max_total_notional_pct", "MAX_TOTAL_NOTIONAL_PCT"),
+                rt.trading.target_allocation_mode = str(decision_cfg["target_allocation_mode"])
+            for cfg_key in (
+                "max_order_value",
+                "max_order_notional_pct",
+                "max_symbol_exposure_pct",
+                "max_total_margin_pct",
+                "max_total_notional_pct",
             ):
                 if decision_cfg.get(cfg_key) is not None:
-                    setattr(LiveConfig, attr_name, float(decision_cfg[cfg_key]))
+                    setattr(rt.risk, cfg_key, float(decision_cfg[cfg_key]))
             if decision_cfg.get("window_seconds") is not None:
                 window_seconds = int(decision_cfg["window_seconds"])
-                LiveConfig.WINDOW_SECONDS = window_seconds
+                rt.live.window_seconds = window_seconds
                 if decision_cfg.get("ingest_window_seconds") is None:
-                    LiveConfig.INGEST_WINDOW_SECONDS = window_seconds
+                    rt.live.ingest_window_seconds = window_seconds
             if decision_cfg.get("ingest_window_seconds") is not None:
-                LiveConfig.INGEST_WINDOW_SECONDS = int(decision_cfg["ingest_window_seconds"])
+                rt.live.ingest_window_seconds = int(decision_cfg["ingest_window_seconds"])
             if decision_cfg.get("decision_cadence_seconds") is not None:
-                LiveConfig.DECISION_CADENCE_SECONDS = int(decision_cfg["decision_cadence_seconds"])
+                rt.live.decision_cadence_seconds = int(decision_cfg["decision_cadence_seconds"])
 
         if not bool(args.no_selection) and (
             decision_cfg is None
@@ -301,14 +300,15 @@ def main(argv: list[str] | None = None) -> int:
         print(f"\nCritical Error: {exc}")
         return 1
 
-    LiveConfig.SYMBOLS = list(symbol_list)
-    LiveConfig.TIMEFRAME = str(resolved_timeframe)
-    LiveConfig.validate()
+    rt.trading.symbols = list(symbol_list)
+    rt.trading.timeframe = str(resolved_timeframe)
+    validate_runtime_config(rt, for_live=True)
 
-    print(f"Mode: {'TESTNET/PAPER' if LiveConfig.IS_TESTNET else 'REAL TRADING'}")
-    print(f"Exchange: {LiveConfig.EXCHANGE}")
-    market_data_source = str(getattr(LiveConfig, "MARKET_DATA_SOURCE", "committed"))
-    order_state_source = str(getattr(LiveConfig, "ORDER_STATE_SOURCE", "polling"))
+    is_testnet = str(rt.live.mode).strip().lower() != "real"
+    print(f"Mode: {'TESTNET/PAPER' if is_testnet else 'REAL TRADING'}")
+    print(f"Exchange: {rt.live.exchange.name} ({rt.live.exchange.market_type})")
+    market_data_source = str(rt.live.market_data_source)
+    order_state_source = str(rt.live.order_state_source)
     effective_transport = _resolve_effective_transport(
         transport=transport,
         market_data_source=market_data_source,
@@ -335,11 +335,11 @@ def main(argv: list[str] | None = None) -> int:
             )
 
     print(f"Trading Symbols: {symbol_list}")
-    print(f"Strategy Timeframe: {LiveConfig.TIMEFRAME}")
+    print(f"Strategy Timeframe: {rt.trading.timeframe}")
     print(
         "Materialized Staleness Gate: "
-        f"threshold={LiveConfig.MATERIALIZED_STALENESS_THRESHOLD_SECONDS}s, "
-        f"alert_cooldown={LiveConfig.MATERIALIZED_STALENESS_ALERT_COOLDOWN_SECONDS}s"
+        f"threshold={rt.live.materialized_staleness_threshold_seconds}s, "
+        f"alert_cooldown={rt.live.materialized_staleness_alert_cooldown_seconds}s"
     )
     print(f"Strategy Params: {strategy_params}")
 
@@ -361,6 +361,7 @@ def main(argv: list[str] | None = None) -> int:
             strategy_name=strategy_name,
             stop_file=args.stop_file,
             external_run_id=args.run_id,
+            runtime_config=rt,
         )
 
         print("Starting engine... Press Ctrl+C to stop.")

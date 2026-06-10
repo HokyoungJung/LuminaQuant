@@ -29,14 +29,22 @@ _DEFAULT_EXCHANGE = "binance"
 
 def _safe_base_config_value(name: str, default: Any) -> Any:
     try:
-        from lumina_quant.config import BaseConfig
-    except (AttributeError, ImportError, ModuleNotFoundError):
+        from lumina_quant.configuration import get_default_runtime_config  # noqa: PLC0415
+        rt = get_default_runtime_config()
+    except (AttributeError, ImportError, ModuleNotFoundError, FileNotFoundError, RuntimeError):
         return default
-
-    try:
-        return getattr(BaseConfig, name, default)
-    except (FileNotFoundError, RuntimeError):
-        return default
+    # Map known uppercase names to typed RuntimeConfig fields.
+    _MAP = {
+        "SYMBOLS": lambda r: list(r.trading.symbols),
+        "MARKET_DATA_PARQUET_PATH": lambda r: r.storage.market_data_parquet_path,
+        "MARKET_DATA_EXCHANGE": lambda r: r.storage.market_data_exchange,
+    }
+    if name in _MAP:
+        try:
+            return _MAP[name](rt)
+        except Exception:
+            return default
+    return default
 
 
 def _default_market_data_settings() -> dict[str, Any]:
@@ -69,7 +77,7 @@ def current_research_market_data_settings(
         defaults = dict(runtime_settings)
     else:
         try:
-            from lumina_quant.config import current_market_data_runtime_settings
+            from lumina_quant.configuration import current_market_data_runtime_settings  # noqa: PLC0415
         except (AttributeError, ImportError, ModuleNotFoundError):
             defaults = _default_market_data_settings()
         else:

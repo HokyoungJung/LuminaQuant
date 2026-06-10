@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 from contextlib import redirect_stderr
 
-from lumina_quant.cli._strategy_registry_fallback import (
+from lumina_quant.core.plugin_registry import (
     PublicStrategyRegistry,
     PublicStubStrategy,
     import_private_strategy_registry,

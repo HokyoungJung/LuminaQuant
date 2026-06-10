@@ -6,7 +6,7 @@ from copy import deepcopy
 from types import SimpleNamespace
 
 from lumina_quant.backtesting.cli_contract import RawFirstDataMissingError
-from lumina_quant.config import LiveConfig
+from lumina_quant.configuration import LiveConfigView, get_default_runtime_config, validate_runtime_config
 from lumina_quant.core.engine import TradingEngine
 from lumina_quant.core.events import OrderEvent
 from lumina_quant.core.market_window_contract import MarketWindowContractError
@@ -61,6 +61,13 @@ def _snapshot_live_config(base_config, *, symbols) -> SimpleNamespace:
     return SimpleNamespace(**attrs)
 
 
+# Module-level injection hook.  Production code keeps this as None (typed config
+# path via get_default_runtime_config + validate_runtime_config is used instead).
+# Tests may monkeypatch this to a fake config object to bypass validation:
+#   monkeypatch.setattr("lumina_quant.live.trader.LiveConfig", fake_cfg)
+LiveConfig = None
+
+
 class LiveTrader(TradingEngine):
     """The LiveTrader engine."""
 
@@ -75,6 +82,7 @@ class LiveTrader(TradingEngine):
         strategy_name=None,
         stop_file="",
         external_run_id="",
+        runtime_config=None,
     ):
         self.logger = setup_logging("LiveTrader")
         self._audit_closed = True
@@ -82,9 +90,16 @@ class LiveTrader(TradingEngine):
         self.run_id = None
         self.symbol_list = list(symbol_list or [])
         self.events = queue.Queue()
-        self._config_source = LiveConfig
-        self._config_source.validate()
-        self.config = _snapshot_live_config(self._config_source, symbols=self.symbol_list)
+        if LiveConfig is not None:
+            # Test-injection path: tests monkeypatch LiveConfig at module level to bypass
+            # validate_runtime_config and supply a fake config object directly.
+            self._config_source = LiveConfig
+            self.config = LiveConfig
+        else:
+            _rt = runtime_config if runtime_config is not None else get_default_runtime_config()
+            validate_runtime_config(_rt, for_live=True)
+            self._config_source = LiveConfigView(_rt)
+            self.config = _snapshot_live_config(self._config_source, symbols=self.symbol_list)
         default_strategy_name = getattr(strategy_cls, "__name__", strategy_cls.__class__.__name__)
         self.strategy_name = str(strategy_name or default_strategy_name)
         self.strategy_params = dict(strategy_params or {})

@@ -279,6 +279,20 @@ class PromotionGateConfig:
 
 
 @dataclass(slots=True)
+class MemoryConfig:
+    """Memory usage limits."""
+
+    cap_gb: float = 8.0
+
+
+@dataclass(slots=True)
+class ValidationConfig:
+    """Validation and testing contracts."""
+
+    golden_rtol: float = 1e-8
+
+
+@dataclass(slots=True)
 class RuntimeConfig:
     """Full runtime configuration bundle."""
 
@@ -292,3 +306,5 @@ class RuntimeConfig:
     optimization: OptimizationRuntimeConfig = field(default_factory=OptimizationRuntimeConfig)
     market_window: MarketWindowConfig = field(default_factory=MarketWindowConfig)
     promotion_gate: PromotionGateConfig = field(default_factory=PromotionGateConfig)
+    memory: MemoryConfig = field(default_factory=MemoryConfig)
+    validation: ValidationConfig = field(default_factory=ValidationConfig)

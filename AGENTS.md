@@ -1,4 +1,4 @@
-# LuminaQuant Repository Layout (2026-03-03)
+# LuminaQuant Repository Layout (2026-06-10, Phase 1)
 
 Preferred structure (high level):
 
@@ -115,6 +115,7 @@ src/lumina_quant/
     src/lumina_quant/core/events.py
     src/lumina_quant/core/market_window_contract.py
     src/lumina_quant/core/memory_budget.py
+    src/lumina_quant/core/plugin_registry.py
     src/lumina_quant/core/protocols.py
     src/lumina_quant/core/session_memory.py
     src/lumina_quant/core/strategy_input.py
@@ -124,7 +125,6 @@ src/lumina_quant/
     src/lumina_quant/dashboard/exact_window_bundle.py
     src/lumina_quant/dashboard/exact_window_service.py
     src/lumina_quant/dashboard/overview_service.py
-    src/lumina_quant/dashboard/retired_stub.py
     src/lumina_quant/dashboard/risk_health_service.py
     src/lumina_quant/dashboard/state_store_service.py
     src/lumina_quant/dashboard/workflow_jobs_service.py
@@ -398,6 +398,14 @@ docs/
 - **Tests**: `tests/test_run_portfolio_optimization_script.py`, `tests/test_profit_moonshot_fresh_portfolio_tuning.py`, `tests/test_optuna_tune_profit_moonshot_calendar.py`, `tests/test_profit_moonshot_pass_under_8gb_validator.py`, and new `tests/test_portfolio_optimizer_core.py` lock behavior before cleanup.
 - **Docs / handoff**: `docs/session_handoff_*`, `.omx/plans/*`, and `.omx/notepad.md` hold reboot-safe state. Commit concise handoffs; avoid raw report payloads.
 - **Artifacts**: `var/reports/` contains generated evidence; commit only intentional concise PASS/readiness artifacts. `var/cache/` remains ignored.
+
+### Phase 1 architecture notes (2026-06-10)
+
+- **Unified config entry-point**: `lumina_quant.configuration` is the ONLY config entry-point. `runtime_access.py` has been deleted. `config.py` is a thin backward-compat shim (Phase 7 removal). Never add a second global config loader.
+- **Plugin registry**: `lumina_quant.core.plugin_registry` owns the `@register(kind, name, *, interface=None)` decorator and the `GLOBAL_REGISTRY` accessor. Kinds: `"strategy"`, `"indicator"`, `"portfolio"`. `cli/_strategy_registry_fallback.py` has been deleted; `PublicStubStrategy` / `PublicStrategyRegistry` / `load_strategy_registry` now live in `core/plugin_registry`.
+- **Dual ABC (Strategy vs StrategyPlugin)**: Phase 4 owns unification. Do NOT merge the two ABCs now. Register both with explicit `interface` tags (`"event_driven"` / `"polars_batch"`).
+- **Phase 1 config knobs**: `RuntimeConfig.memory.cap_gb` (default 8.0 GiB) and `RuntimeConfig.validation.golden_rtol` (default 1e-8). Golden comparisons must use `rtol=rt.validation.golden_rtol`; no hardcoded tolerances.
+- **No os.environ hidden bus**: config must flow through explicit `RuntimeConfig` objects. `os.environ` access is only allowed inside `get_default_runtime_config()` and `load_runtime_config()`.
 
 ### Guardrails for future agents
 

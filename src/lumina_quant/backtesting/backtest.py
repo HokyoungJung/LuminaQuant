@@ -5,7 +5,7 @@ import queue
 from pprint import pprint
 from typing import Any
 
-from lumina_quant.config import BacktestConfig
+from lumina_quant.configuration import BacktestConfigView, get_default_runtime_config
 from lumina_quant.core.engine import TradingEngine
 from lumina_quant.market_data import normalize_timeframe_token, timeframe_to_milliseconds
 
@@ -144,10 +144,13 @@ class Backtest(TradingEngine):
         record_trades=True,
         strategy_timeframe=None,
         data_handler_kwargs=None,
+        config=None,
     ):
         self.csv_dir = csv_dir
         self.symbol_list = symbol_list
-        self.config = BacktestConfig
+        self.config = config if config is not None else BacktestConfigView(
+            get_default_runtime_config()
+        )
         self.heartbeat = 0.0
         self.start_date = start_date
         self.end_date = end_date  # Override config if specific
