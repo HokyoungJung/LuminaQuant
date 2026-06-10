@@ -96,9 +96,12 @@ def enforce_memory_cap(
     positive finite number or RSS cannot be measured (guard becomes a no-op
     rather than failing the run on an unmeasurable host).
     """
+    # float() only raises TypeError/ValueError; a single broad guard avoids the
+    # multi-exception `except` tuple that different ruff versions format
+    # differently (parens vs PEP-758 parens-free), which was bouncing the CI gate.
     try:
         cap = float(cap_gb) if cap_gb is not None else None
-    except TypeError, ValueError:
+    except Exception:
         return None
     if cap is None or not math.isfinite(cap) or cap <= 0.0:
         return None
