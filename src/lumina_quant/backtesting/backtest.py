@@ -25,7 +25,8 @@ import queue
 from pprint import pprint
 from typing import Any
 
-from lumina_quant.configuration import BacktestConfigView, get_default_runtime_config
+from lumina_quant.backtesting._config_view import BacktestConfigView
+from lumina_quant.configuration import get_default_runtime_config
 from lumina_quant.core.engine import TradingEngine
 from lumina_quant.market_data import normalize_timeframe_token, timeframe_to_milliseconds
 

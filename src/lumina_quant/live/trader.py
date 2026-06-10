@@ -6,7 +6,7 @@ from copy import deepcopy
 from types import SimpleNamespace
 
 from lumina_quant.backtesting.cli_contract import RawFirstDataMissingError
-from lumina_quant.configuration import LiveConfigView, get_default_runtime_config, validate_runtime_config
+from lumina_quant.configuration import get_default_runtime_config, validate_runtime_config
 from lumina_quant.core.engine import TradingEngine
 from lumina_quant.core.events import OrderEvent
 from lumina_quant.core.market_window_contract import MarketWindowContractError
@@ -61,6 +61,170 @@ def _snapshot_live_config(base_config, *, symbols) -> SimpleNamespace:
     return SimpleNamespace(**attrs)
 
 
+def _build_live_config_namespace(rt, *, symbols) -> SimpleNamespace:
+    """Build the live config snapshot directly from RuntimeConfig.
+
+    Replaces the two-step ``LiveConfigView(rt)`` → ``_snapshot_live_config(view, …)``
+    pattern used prior to Phase 6 (views.py deletion gate).  All values are copies
+    (primitive constructors or list/dict) so downstream deepcopy is not required.
+    """
+    lv = rt.live
+    ex = lv.exchange
+    pm = lv.polymarket
+    ext = lv.external
+    tr = rt.trading
+    rk = rt.risk
+    run_ex = rt.execution
+    st = rt.storage
+    mw = rt.market_window
+    bt = rt.backtest
+    sys_ = rt.system
+
+    _stage = str(getattr(lv, "go_live_stage", "testnet") or "testnet").strip().lower()
+
+    return SimpleNamespace(
+        LOG_LEVEL=str(sys_.log_level),
+        SYMBOLS=list(symbols or []),
+        TIMEFRAME=str(tr.timeframe),
+        TIMEFRAMES=list(tr.timeframes),
+        INITIAL_CAPITAL=float(tr.initial_capital),
+        TARGET_ALLOCATION=float(tr.target_allocation),
+        TARGET_ALLOCATION_MODE=str(tr.target_allocation_mode),
+        MIN_TRADE_QTY=float(tr.min_trade_qty),
+        RISK_PER_TRADE=float(rk.risk_per_trade),
+        MAX_DAILY_LOSS_PCT=float(rk.max_daily_loss_pct),
+        MAX_TOTAL_MARGIN_PCT=float(rk.max_total_margin_pct),
+        MAX_SYMBOL_EXPOSURE_PCT=float(rk.max_symbol_exposure_pct),
+        MAX_ORDER_VALUE=float(rk.max_order_value),
+        MAX_ORDER_NOTIONAL_PCT=float(rk.max_order_notional_pct),
+        MAX_TOTAL_NOTIONAL_PCT=float(rk.max_total_notional_pct),
+        DEFAULT_STOP_LOSS_PCT=float(rk.default_stop_loss_pct),
+        MAX_INTRADAY_DRAWDOWN_PCT=float(rk.max_intraday_drawdown_pct),
+        MAX_ROLLING_LOSS_PCT_1H=float(rk.max_rolling_loss_pct_1h),
+        FREEZE_NEW_ENTRIES_ON_BREACH=bool(rk.freeze_new_entries_on_breach),
+        AUTO_FLATTEN_ON_BREACH=bool(rk.auto_flatten_on_breach),
+        MAX_POSITION_SIZE_PCT=float(rk.max_position_size_pct),
+        CONSECUTIVE_LOSS_HALT_COUNT=int(rk.consecutive_loss_halt_count),
+        MAKER_FEE_RATE=float(run_ex.maker_fee_rate),
+        TAKER_FEE_RATE=float(run_ex.taker_fee_rate),
+        SPREAD_RATE=float(run_ex.spread_rate),
+        SLIPPAGE_RATE=float(run_ex.slippage_rate),
+        FUNDING_RATE_PER_8H=float(run_ex.funding_rate_per_8h),
+        FUNDING_INTERVAL_HOURS=int(run_ex.funding_interval_hours),
+        MAINTENANCE_MARGIN_RATE=float(run_ex.maintenance_margin_rate),
+        LIQUIDATION_BUFFER_RATE=float(run_ex.liquidation_buffer_rate),
+        GPU_MODE=str(run_ex.gpu_mode),
+        COMPUTE_BACKEND=str(run_ex.compute_backend),
+        GPU_VRAM_GB=float(run_ex.gpu_vram_gb),
+        STORAGE_BACKEND=str(st.backend),
+        MARKET_DATA_PARQUET_PATH=str(st.market_data_parquet_path),
+        STORAGE_MARKET_DATA_PARQUET_PATH=str(st.market_data_parquet_path),
+        MARKET_DATA_EXCHANGE=str(st.market_data_exchange),
+        POSTGRES_DSN=str(st.postgres_dsn),
+        POSTGRES_DSN_ENV=str(st.postgres_dsn_env),
+        WAL_MAX_BYTES=int(st.wal_max_bytes),
+        WAL_COMPACT_ON_THRESHOLD=bool(st.wal_compact_on_threshold),
+        WAL_COMPACTION_INTERVAL_SECONDS=int(st.wal_compaction_interval_seconds),
+        COLLECTOR_PERIODIC_ENABLED=bool(st.collector_periodic_enabled),
+        COLLECTOR_POLL_SECONDS=int(st.collector_poll_seconds),
+        COLLECTOR_BOOTSTRAP_LOOKBACK_HOURS=int(st.collector_bootstrap_lookback_hours),
+        MATERIALIZER_PERIODIC_ENABLED=bool(st.materializer_periodic_enabled),
+        MATERIALIZER_POLL_SECONDS=int(st.materializer_poll_seconds),
+        MATERIALIZER_BASE_TIMEFRAME=str(st.materializer_base_timeframe),
+        MATERIALIZER_REQUIRED_TIMEFRAMES=list(st.materializer_required_timeframes),
+        RISK_FREE_MODE=str(bt.risk_free_mode),
+        RISK_FREE_TENOR=str(bt.risk_free_tenor),
+        RISK_FREE_ANNUAL=float(bt.risk_free_annual),
+        RISK_FREE_SERIES_PATH=str(bt.risk_free_series_path),
+        SORTINO_TARGET_MODE=str(bt.sortino_target_mode),
+        SORTINO_TARGET_ANNUAL=float(bt.sortino_target_annual),
+        MARKET_WINDOW_PARITY_V2_ENABLED=bool(mw.parity_v2_enabled),
+        MARKET_WINDOW_METRICS_LOG_PATH=str(mw.metrics_log_path),
+        BINANCE_API_KEY=str(lv.api_key),
+        BINANCE_SECRET_KEY=str(lv.secret_key),
+        TELEGRAM_BOT_TOKEN=lv.telegram_bot_token,
+        TELEGRAM_CHAT_ID=lv.telegram_chat_id,
+        MODE=str(lv.mode),
+        IS_TESTNET=_stage in {"testnet", "shadow"},
+        REQUIRE_REAL_ENABLE_FLAG=bool(lv.require_real_enable_flag),
+        MARKET_DATA_SOURCE=str(lv.market_data_source),
+        ORDER_STATE_SOURCE=str(lv.order_state_source),
+        SHADOW_LIVE_ENABLED=bool(lv.shadow_live_enabled),
+        RECONCILIATION_POLL_FALLBACK_ENABLED=bool(lv.reconciliation_poll_fallback_enabled),
+        BOOK_TICKER_ENABLED=bool(lv.book_ticker_enabled),
+        DEFAULT_ORDER_TYPE=str(lv.default_order_type),
+        ALLOW_MARKET_ORDERS=bool(lv.allow_market_orders),
+        LIMIT_PRICE_MODE=str(lv.limit_price_mode),
+        LIMIT_PRICE_OFFSET_TICKS=int(lv.limit_price_offset_ticks),
+        LIMIT_PRICE_TICK_FALLBACK=float(lv.limit_price_tick_fallback),
+        LIMIT_TIME_IN_FORCE=str(lv.limit_time_in_force),
+        PROTECTIVE_ORDER_STYLE=str(lv.protective_order_style),
+        STARTUP_RECONCILIATION_HARD_FAIL=bool(lv.startup_reconciliation_hard_fail),
+        MAIN_LOOP_ERROR_RETRY_LIMIT=int(lv.main_loop_error_retry_limit),
+        MAIN_LOOP_ERROR_WINDOW_SECONDS=int(lv.main_loop_error_window_seconds),
+        POLL_SECONDS=int(lv.poll_seconds),
+        POLL_INTERVAL=int(lv.poll_seconds),
+        LIVE_POLL_SECONDS=int(lv.poll_seconds),
+        WINDOW_SECONDS=int(lv.window_seconds),
+        INGEST_WINDOW_SECONDS=int(lv.window_seconds),
+        DECISION_CADENCE_SECONDS=int(lv.decision_cadence_seconds),
+        MATERIALIZED_STALENESS_THRESHOLD_SECONDS=int(lv.materialized_staleness_threshold_seconds),
+        MATERIALIZED_STALENESS_ALERT_COOLDOWN_SECONDS=int(
+            lv.materialized_staleness_alert_cooldown_seconds
+        ),
+        ORDER_TIMEOUT=int(lv.order_timeout),
+        HEARTBEAT_INTERVAL_SEC=int(lv.heartbeat_interval_sec),
+        RECONCILIATION_INTERVAL_SEC=int(lv.reconciliation_interval_sec),
+        EXCHANGE={
+            "driver": str(ex.driver),
+            "name": str(ex.name),
+            "market_type": str(ex.market_type),
+            "position_mode": str(ex.position_mode),
+            "margin_mode": str(ex.margin_mode),
+            "leverage": int(ex.leverage),
+        },
+        EXCHANGE_ID=str(ex.name),
+        MARKET_TYPE=str(ex.market_type),
+        POSITION_MODE=str(ex.position_mode),
+        MARGIN_MODE=str(ex.margin_mode),
+        LEVERAGE=int(ex.leverage),
+        EXTERNAL_DATA_SOURCE_KIND=str(ext.source_kind),
+        EXTERNAL_DATA_PATH=str(ext.path),
+        EXTERNAL_DATA_SCHEMA=str(ext.schema),
+        EXTERNAL_DATA_SYMBOL_MAP=dict(ext.symbol_map),
+        EXTERNAL_DATA_POLL_SECONDS=int(ext.poll_seconds),
+        EXTERNAL_DATA_ALLOW_STALE_SECONDS=int(ext.allow_stale_seconds),
+        MT5_MAGIC=int(lv.mt5_magic),
+        MT5_DEVIATION=int(lv.mt5_deviation),
+        MT5_BRIDGE_PYTHON=str(lv.mt5_bridge_python),
+        MT5_BRIDGE_SCRIPT=str(lv.mt5_bridge_script),
+        MT5_BRIDGE_USE_WSLPATH=bool(lv.mt5_bridge_use_wslpath),
+        POLYMARKET_HOST=str(pm.host),
+        POLYMARKET_GAMMA_HOST=str(pm.gamma_host),
+        POLYMARKET_DATA_HOST=str(pm.data_host),
+        POLYMARKET_MARKET_WS_URL=str(pm.market_ws_url),
+        POLYMARKET_USER_WS_URL=str(pm.user_ws_url),
+        POLYMARKET_CHAIN_ID=int(pm.chain_id),
+        POLYMARKET_ASSET_IDS=list(pm.asset_ids),
+        POLYMARKET_PRIVATE_KEY_ENV=str(pm.private_key_env),
+        POLYMARKET_API_KEY_ENV=str(pm.api_key_env),
+        POLYMARKET_API_SECRET_ENV=str(pm.api_secret_env),
+        POLYMARKET_API_PASSPHRASE_ENV=str(pm.api_passphrase_env),
+        POLYMARKET_FUNDER=str(pm.funder),
+        POLYMARKET_SIGNATURE_TYPE=int(pm.signature_type),
+        POLYMARKET_ALLOW_REAL_EXECUTION=bool(pm.allow_real_execution),
+        SYMBOL_LIMITS=dict(lv.symbol_limits),
+        GO_LIVE_STAGE=_stage,
+        KILL_SWITCH_ENABLED=bool(lv.kill_switch_enabled),
+        CANARY_POSITION_FRACTION=float(lv.canary_position_fraction),
+        SHADOW_PARITY_MIN_RATIO=float(lv.shadow_parity_min_ratio),
+        SHADOW_PARITY_WINDOW_BARS=int(lv.shadow_parity_window_bars),
+        EFFECTIVE_POSITION_FRACTION=(
+            float(lv.canary_position_fraction) if _stage == "canary" else 1.0
+        ),
+    )
+
+
 # Module-level injection hook.  Production code keeps this as None (typed config
 # path via get_default_runtime_config + validate_runtime_config is used instead).
 # Tests may monkeypatch this to a fake config object to bypass validation:
@@ -98,8 +262,8 @@ class LiveTrader(TradingEngine):
         else:
             _rt = runtime_config if runtime_config is not None else get_default_runtime_config()
             validate_runtime_config(_rt, for_live=True)
-            self._config_source = LiveConfigView(_rt)
-            self.config = _snapshot_live_config(self._config_source, symbols=self.symbol_list)
+            self._config_source = _build_live_config_namespace(_rt, symbols=self.symbol_list)
+            self.config = self._config_source
         default_strategy_name = getattr(strategy_cls, "__name__", strategy_cls.__class__.__name__)
         self.strategy_name = str(strategy_name or default_strategy_name)
         self.strategy_params = dict(strategy_params or {})

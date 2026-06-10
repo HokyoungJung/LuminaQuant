@@ -8,10 +8,11 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
-from lumina_quant.configuration import BacktestConfigView, LiveConfigView, get_default_runtime_config
+from lumina_quant.configuration import BacktestConfigView, get_default_runtime_config
+from lumina_quant.live.trader import _build_live_config_namespace
 _lq_rt = get_default_runtime_config()
 BaseConfig = BacktestConfigView(_lq_rt)
-LiveConfig = LiveConfigView(_lq_rt)
+LiveConfig = _build_live_config_namespace(_lq_rt, symbols=[])
 from lumina_quant.data_collector import collect_binance_aggtrades_raw
 from lumina_quant.data_sync import parse_timestamp_input
 from lumina_quant.storage.parquet import ParquetMarketDataRepository

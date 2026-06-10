@@ -29,13 +29,13 @@ def test_live_staleness_keys_are_runtime_loaded_via_config_module(tmp_path, monk
     monkeypatch.setenv("LQ_CONFIG_PATH", str(cfg_path))
 
     from lumina_quant.configuration import get_default_runtime_config
-    from lumina_quant.configuration.views import LiveConfigView
+    from lumina_quant.live.trader import _build_live_config_namespace
 
     rt = get_default_runtime_config()
     assert int(rt.live.materialized_staleness_threshold_seconds) == 12
     assert int(rt.live.materialized_staleness_alert_cooldown_seconds) == 34
 
-    live_cfg = LiveConfigView(rt)
+    live_cfg = _build_live_config_namespace(rt, symbols=["BTC/USDT"])
     assert int(live_cfg.MATERIALIZED_STALENESS_THRESHOLD_SECONDS) == 12
     assert int(live_cfg.MATERIALIZED_STALENESS_ALERT_COOLDOWN_SECONDS) == 34
 

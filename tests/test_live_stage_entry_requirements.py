@@ -15,7 +15,7 @@ from types import SimpleNamespace
 
 import pytest
 from lumina_quant.configuration.loader import build_runtime_config
-from lumina_quant.configuration.views import LiveConfigView
+from lumina_quant.live.trader import _build_live_config_namespace
 from lumina_quant.risk_manager import RiskManager
 
 
@@ -45,10 +45,10 @@ def _base_raw(*, stage: str = "testnet") -> dict:
     }
 
 
-def _view(*, stage: str = "testnet", canary_fraction: float = 0.10) -> LiveConfigView:
+def _view(*, stage: str = "testnet", canary_fraction: float = 0.10):
     raw = _base_raw(stage=stage)
     raw["live"]["canary_position_fraction"] = canary_fraction
-    return LiveConfigView(build_runtime_config(raw, env={}))
+    return _build_live_config_namespace(build_runtime_config(raw, env={}), symbols=["BTC/USDT"])
 
 
 def _portfolio(*, equity: float, day_start: float, rolling_loss: float = 0.0, frozen: bool = False):
@@ -273,12 +273,12 @@ def test_kill_switch_enabled_default_true():
 def test_shadow_parity_min_ratio_exposed():
     raw = _base_raw()
     raw["live"]["shadow_parity_min_ratio"] = 0.95
-    view = LiveConfigView(build_runtime_config(raw, env={}))
+    view = _build_live_config_namespace(build_runtime_config(raw, env={}), symbols=["BTC/USDT"])
     assert view.SHADOW_PARITY_MIN_RATIO == pytest.approx(0.95)
 
 
 def test_shadow_parity_window_bars_exposed():
     raw = _base_raw()
     raw["live"]["shadow_parity_window_bars"] = 500
-    view = LiveConfigView(build_runtime_config(raw, env={}))
+    view = _build_live_config_namespace(build_runtime_config(raw, env={}), symbols=["BTC/USDT"])
     assert view.SHADOW_PARITY_WINDOW_BARS == 500

@@ -14,19 +14,15 @@ Schema types re-exported so callers never need to import from sub-modules:
   StorageConfig, TradingConfig, RiskConfig, ExecutionConfig, SystemConfig,
   MarketWindowConfig, MemoryConfig, ValidationConfig, PromotionGateConfig,
   BacktestExternalConfig, LiveExchangeConfig, LiveExternalConfig, LivePolymarketConfig
-
-Engine views (Phase 1 bridge — deletion-gated):
-  BacktestConfigView — uppercase-attr bag for Backtest / Portfolio / ExecutionSim
-                       DELETION-GATE: Phase 4
-  LiveConfigView     — uppercase-attr bag for LiveTrader / RiskManager
-                       DELETION-GATE: Phase 5
 """
 
 from __future__ import annotations
 
 import os
 
-from lumina_quant.configuration.views import BacktestConfigView, LiveConfigView
+# BacktestConfigView moved to backtesting._config_view in Phase 6 (views.py deleted).
+# Re-exported here so existing scripts continue to import from this module.
+from lumina_quant.backtesting._config_view import BacktestConfigView  # noqa: F401
 from lumina_quant.configuration.loader import (
     build_runtime_config,
     load_runtime_config,
@@ -125,9 +121,6 @@ __all__ = [
     "load_runtime_config",
     "load_yaml_config",
     "validate_runtime_config",
-    # Engine compat views
-    "BacktestConfigView",
-    "LiveConfigView",
     # Schema types
     "BacktestExternalConfig",
     "BacktestRuntimeConfig",
