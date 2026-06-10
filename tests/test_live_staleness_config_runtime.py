@@ -29,7 +29,7 @@ def test_live_staleness_keys_are_runtime_loaded_via_config_module(tmp_path, monk
     monkeypatch.setenv("LQ_CONFIG_PATH", str(cfg_path))
 
     from lumina_quant.configuration import get_default_runtime_config
-    from lumina_quant.configuration.compat import LiveConfigView
+    from lumina_quant.configuration.views import LiveConfigView
 
     rt = get_default_runtime_config()
     assert int(rt.live.materialized_staleness_threshold_seconds) == 12

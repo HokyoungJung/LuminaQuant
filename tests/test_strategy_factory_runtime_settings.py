@@ -23,7 +23,7 @@ def test_current_research_market_data_settings_uses_explicit_runtime_mapping() -
 def test_default_research_symbol_universe_falls_back_when_config_import_is_unavailable(
     monkeypatch,
 ) -> None:
-    monkeypatch.setitem(sys.modules, "lumina_quant.config", None)
+    monkeypatch.setitem(sys.modules, "lumina_quant.configuration", None)
 
     assert runtime_settings.default_research_symbol_universe() == (
         "BTC/USDT",
