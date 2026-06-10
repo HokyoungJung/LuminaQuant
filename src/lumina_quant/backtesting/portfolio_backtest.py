@@ -371,6 +371,13 @@ class Portfolio:
         if abs(new_qty) < 1e-12:
             self.entry_prices[fill.symbol] = None
             self._pending_liquidation.discard(fill.symbol)
+            # CRITICAL: clear the funding anchor when the position goes flat.
+            # Otherwise _last_funding_ts retains its pre-close value through the
+            # entire flat gap, and the first _apply_funding after a reopen
+            # back-charges funding for that gap (sign flips for shorts → phantom
+            # funding income). Re-anchoring happens lazily in _apply_funding when
+            # last_ts is None on the next bar the position is held.
+            self._last_funding_ts[fill.symbol] = None
             return
 
         # Position flip or fresh position: entry resets to current fill price.
@@ -744,9 +751,14 @@ class Portfolio:
         """Futures-oriented position sizing:
         risk_amount = equity * risk_per_trade
         qty = risk_amount / stop_distance
+
+        When live.go_live_stage='canary', EFFECTIVE_POSITION_FRACTION is set to
+        canary_position_fraction (< 1.0) in _build_live_config_namespace.  Multiplying
+        here is the single choke point for canary sizing — backtesting and live both
+        route through this method via LivePortfolio re-export.
         """
         target_alloc = getattr(self.config, "TARGET_ALLOCATION", self.max_symbol_exposure_pct)
-        return PortfolioSizingService.risk_based_quantity(
+        qty = PortfolioSizingService.risk_based_quantity(
             signal=signal,
             current_price=float(current_price),
             equity=float(self.current_holdings["total"]),
@@ -759,6 +771,14 @@ class Portfolio:
             leverage=float(self.leverage),
             max_order_notional_pct=float(self.max_order_notional_pct),
         )
+        # Apply canary position fraction: EFFECTIVE_POSITION_FRACTION == canary_position_fraction
+        # when stage=canary, 1.0 otherwise.  Clamped to (0, 1] to prevent zero/negative qty.
+        effective_fraction = float(
+            getattr(self.config, "EFFECTIVE_POSITION_FRACTION", 1.0) or 1.0
+        )
+        if 0.0 < effective_fraction < 1.0:
+            qty = qty * effective_fraction
+        return qty
 
     def _validate_and_round_quantity(self, symbol, quantity, price):
         limits = self._get_symbol_limits(symbol)

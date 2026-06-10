@@ -100,6 +100,75 @@ class TestFundingAndLiquidation(unittest.TestCase):
         self.assertLess(p.current_holdings["cash"], cash_before)
         self.assertGreater(p.total_funding_paid, 0.0)
 
+    def test_no_funding_charged_across_flat_gap_after_reopen(self):
+        """Regression: closing a position resets the funding anchor.
+
+        open -> close -> flat gap (10 days) -> reopen must NOT back-charge
+        funding for the flat interval. Before the fix, _last_funding_ts kept
+        its pre-close value, so the first _apply_funding after the reopen
+        charged ~30 intervals of phantom funding.
+        """
+        events = queue.Queue()
+        bars = MockBars(datetime(2026, 1, 1, 0, 0), 100.0)
+        p = Portfolio(bars, events, bars.current_dt, FundingConfig)
+
+        # Open a long; first update anchors the funding timestamp.
+        p.update_positions_from_fill(
+            FillEvent(
+                timeindex=bars.current_dt,
+                symbol="BTC/USDT",
+                exchange="TEST",
+                quantity=1.0,
+                direction="BUY",
+                fill_cost=100.0,
+                commission=0.0,
+            )
+        )
+        p.update_timeindex(None)
+        self.assertIsNotNone(p._last_funding_ts["BTC/USDT"])
+
+        # Close the position flat -> anchor must be cleared.
+        p.update_positions_from_fill(
+            FillEvent(
+                timeindex=bars.current_dt,
+                symbol="BTC/USDT",
+                exchange="TEST",
+                quantity=1.0,
+                direction="SELL",
+                fill_cost=100.0,
+                commission=0.0,
+            )
+        )
+        self.assertEqual(p.current_positions["BTC/USDT"], 0.0)
+        self.assertIsNone(p._last_funding_ts["BTC/USDT"])
+
+        # Stay flat for a long gap (10 days = 30 funding intervals).
+        bars.current_dt += timedelta(days=10)
+        p.update_timeindex(None)
+        funding_before_reopen = p.total_funding_paid
+
+        # Reopen the long; the first bar re-anchors (no payment yet).
+        p.update_positions_from_fill(
+            FillEvent(
+                timeindex=bars.current_dt,
+                symbol="BTC/USDT",
+                exchange="TEST",
+                quantity=1.0,
+                direction="BUY",
+                fill_cost=100.0,
+                commission=0.0,
+            )
+        )
+        p.update_timeindex(None)
+
+        # No funding may have been booked for the flat gap.
+        self.assertEqual(p.total_funding_paid, funding_before_reopen)
+
+        # One genuine interval after the reopen DOES charge funding.
+        bars.current_dt += timedelta(hours=8)
+        p.update_timeindex(None)
+        self.assertGreater(p.total_funding_paid, funding_before_reopen)
+
     def test_liquidation_event_emitted(self):
         events = queue.Queue()
         bars = MockBars(datetime(2026, 1, 1, 0, 0), 100.0)
