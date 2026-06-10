@@ -1,12 +1,12 @@
 {
   "schema_version": "1",
-  "generated_at_utc": "2026-06-10T00:54:57.947190+00:00",
+  "generated_at_utc": "2026-06-10T01:05:11.774512+00:00",
   "numpy_seed": 42,
   "environment": {
-    "python_version": "3.11.15 (main, Apr 14 2026, 14:28:36) [Clang 22.1.3 ]",
+    "python_version": "3.14.4 (main, Apr 14 2026, 14:26:14) [Clang 22.1.3 ]",
     "platform": "Linux-6.6.114.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
-    "rustc": "rustc 1.94.0 (4a4ef493e 2026-03-02)",
-    "cargo": "cargo 1.94.0 (85eff7c80 2026-01-15)",
+    "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+    "cargo": "cargo 1.96.0 (30a34c682 2026-05-25)",
     "env_lock_path": "baseline/env.lock",
     "env_lock_sha256": "fa7712a0ea928a4e61a45a93a679e6027ea80d9d59c13315b1c98ef335c7cfa9"
   },
@@ -54,7 +54,8 @@
     "buyholdstrategy_equity_curve": "baseline/golden/buyholdstrategy_equity_curve.parquet",
     "buyholdstrategy_stats": "baseline/golden/buyholdstrategy_stats.json",
     "native_backends": "baseline/golden/native_backends.json",
-    "walk_forward_results": "baseline/golden/walk_forward_results.json"
+    "walk_forward_variant_a": "baseline/golden/walk_forward_results.json",
+    "walk_forward_variant_b": "baseline/golden/walk_forward_results_warmup.json"
   },
   "backends": {
     "rust_metrics": {
@@ -223,6 +224,17 @@
       ]
     },
     "n_combos": 9,
-    "elapsed_s": 0.0042
+    "variant_a": {
+      "file": "baseline/golden/walk_forward_results.json",
+      "description": "preservation oracle \u2014 current behaviour incl. -999 sentinels",
+      "note": "Phase 4 improvement will NOT reproduce -999; divergence documented per procedure"
+    },
+    "variant_b": {
+      "file": "baseline/golden/walk_forward_results_warmup.json",
+      "description": "warmup-context oracle \u2014 real metrics for all folds",
+      "warmup_context_bars": 120
+    },
+    "split_build_elapsed_s": 0.003542,
+    "authoritative_e2e_timing": "baseline/perf-baseline.json (worker-3, 170.71s)"
   }
 }

@@ -1,6 +1,6 @@
 {
-  "variant": "A",
-  "description": "preservation oracle \u2014 current behaviour incl. -999 sentinels",
+  "variant": "B",
+  "description": "warmup-context oracle \u2014 real metrics for all folds",
   "splits": [
     {
       "fold": 1,
@@ -80,14 +80,14 @@
         }
       ],
       "val_metrics": {
-        "sharpe": -999.0,
-        "cagr": 0.0,
-        "max_dd": 0.0
+        "sharpe": -0.234991,
+        "cagr": -0.146092,
+        "max_dd": 0.183107
       },
       "test_metrics": {
-        "sharpe": -999.0,
-        "cagr": 0.0,
-        "max_dd": 0.0
+        "sharpe": -0.559743,
+        "cagr": -0.190874,
+        "max_dd": 0.175198
       }
     },
     {
@@ -168,14 +168,14 @@
         }
       ],
       "val_metrics": {
-        "sharpe": 0.714103,
-        "cagr": 0.054488,
-        "max_dd": 0.041319
+        "sharpe": -1.245836,
+        "cagr": -0.340091,
+        "max_dd": 0.223305
       },
       "test_metrics": {
-        "sharpe": -0.703903,
-        "cagr": -0.076987,
-        "max_dd": 0.058574
+        "sharpe": -0.968682,
+        "cagr": -0.342503,
+        "max_dd": 0.185181
       }
     },
     {
@@ -256,14 +256,14 @@
         }
       ],
       "val_metrics": {
-        "sharpe": -999.0,
-        "cagr": 0.0,
-        "max_dd": 0.0
+        "sharpe": 0.615174,
+        "cagr": 0.170828,
+        "max_dd": 0.185181
       },
       "test_metrics": {
-        "sharpe": -999.0,
-        "cagr": 0.0,
-        "max_dd": 0.0
+        "sharpe": 2.798933,
+        "cagr": 1.457635,
+        "max_dd": 0.145822
       }
     }
   ],
@@ -279,5 +279,5 @@
       120
     ]
   },
-  "split_build_elapsed_s": 0.003542
+  "warmup_context_bars": 120
 }

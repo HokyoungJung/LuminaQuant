@@ -496,8 +496,39 @@ def _add_months(dt: datetime, months: int) -> datetime:
     return dt.replace(year=year, month=month, day=min(dt.day, max_day))
 
 
-def _ma_cross_equity(close: np.ndarray, short_w: int, long_w: int) -> np.ndarray:
-    """Vectorised MA cross equity curve — no event machinery needed for grid search."""
+def _ma_cross_equity(
+    close: np.ndarray,
+    short_w: int,
+    long_w: int,
+    context: np.ndarray | None = None,
+) -> np.ndarray:
+    """Vectorised MA cross equity curve — no event machinery needed for grid search.
+
+    If *context* is supplied it is prepended so both MAs are fully warmed-up
+    at the first bar of *close*.  The returned equity covers *close* only,
+    re-normalised to start at 10 000.  This is variant (a) of the canonical
+    walk-forward spec: feed each eval window the preceding max(long_window)
+    bars as warmup context so indicators are defined from bar 0 of the window.
+    """
+    if context is not None and len(context) > 0:
+        full = np.concatenate([context, close])
+        n_full = len(full)
+        n_ctx = len(context)
+        short_ma = np.convolve(full, np.ones(short_w) / short_w, mode="full")[:n_full]
+        long_ma = np.convolve(full, np.ones(long_w) / long_w, mode="full")[:n_full]
+        signal_full = np.where(short_ma > long_ma, 1.0, -1.0)
+        signal_full[:long_w] = 0.0  # zero-out initial warmup in the context portion
+        daily_ret_full = np.diff(full, prepend=full[0]) / np.where(full == 0.0, 1.0, full)
+        equity_full = 10000.0 * np.cumprod(1.0 + signal_full * daily_ret_full)
+        window_eq = equity_full[n_ctx:]
+        if len(window_eq) == 0:
+            return np.full(len(close), 10000.0)
+        # Re-normalise window equity to start at 10 000 for independent metrics
+        start_val = window_eq[0]
+        if start_val != 0.0:
+            window_eq = window_eq * (10000.0 / start_val)
+        return window_eq
+
     n = len(close)
     if n < long_w + 1:
         return np.full(n, 10000.0)
@@ -512,8 +543,24 @@ def _ma_cross_equity(close: np.ndarray, short_w: int, long_w: int) -> np.ndarray
 
 
 def step_walk_forward(fixtures: dict[str, dict], dry_run: bool) -> dict:
+    """Produce two golden variants in one pass.
+
+    Variant A  walk_forward_results.json          — preservation oracle.
+               Val/test evaluated WITHOUT warmup context; emits the legacy
+               -999 sentinel where MA cannot warm up (lw=120 in 90-day
+               windows).  Freezes current code behaviour exactly.
+
+    Variant B  walk_forward_results_warmup.json   — richer regression target.
+               Val/test evaluated WITH 120-bar warmup context prepended so
+               MAs are fully defined from window bar 0; all folds produce
+               real metrics.  Phase 4 will be compared against this file.
+    """
     n_combos = len(WF_SHORT_WINDOWS) * len(WF_LONG_WINDOWS)
-    print(f"\n[5/7] Running walk-forward grid ({WF_FOLDS} folds × {n_combos} param combos)...")
+    warmup_bars = max(WF_LONG_WINDOWS)  # = 120
+    print(
+        f"\n[5/7] Running walk-forward grid "
+        f"({WF_FOLDS} folds × {n_combos} combos) — variants A (no-ctx) + B ({warmup_bars}-bar ctx)..."
+    )
     from lumina_quant.optimization.walkers import build_walk_forward_splits
     from lumina_quant.optimization.native_backend import evaluate_metrics_backend
 
@@ -521,7 +568,14 @@ def step_walk_forward(fixtures: dict[str, dict], dry_run: bool) -> dict:
     close_full = btc_df["close"].to_numpy()
     dates_full = btc_df["datetime"].to_list()
 
-    wf_start_t = time.perf_counter()
+    def _slice(start: datetime, end: datetime) -> np.ndarray:
+        idxs = [i for i, d in enumerate(dates_full) if start <= d < end]
+        return close_full[idxs] if idxs else np.array([10000.0, 10000.0])
+
+    def _context_before(window_start: datetime) -> np.ndarray:
+        """Return up to warmup_bars immediately preceding window_start."""
+        idxs = [i for i, d in enumerate(dates_full) if d < window_start]
+        return close_full[idxs[-warmup_bars:]] if idxs else np.array([])
 
     splits = build_walk_forward_splits(
         base_start=OHLCV_START,
@@ -532,25 +586,28 @@ def step_walk_forward(fixtures: dict[str, dict], dry_run: bool) -> dict:
         step_months=WF_STEP_MONTHS,
     )
 
-    fold_results = []
+    # Timer wraps the full evaluation work only (split-building above is trivial)
+    wf_start_t = time.perf_counter()
+
+    folds_a: list[dict] = []  # variant A — no warmup context
+    folds_b: list[dict] = []  # variant B — with warmup context
+
     for split in splits:
         fold = split["fold"]
         train_start, train_end = split["train_start"], split["train_end"]
-        val_start, val_end = split["val_start"], split["val_end"]
-        test_start, test_end = split["test_start"], split["test_end"]
-
-        # Slice indices by date
-        def _slice(start: datetime, end: datetime) -> np.ndarray:
-            idxs = [i for i, d in enumerate(dates_full) if start <= d < end]
-            return close_full[idxs] if idxs else np.array([10000.0, 10000.0])
+        val_start,   val_end   = split["val_start"],   split["val_end"]
+        test_start,  test_end  = split["test_start"],  split["test_end"]
 
         train_close = _slice(train_start, train_end)
-        val_close = _slice(val_start, val_end)
-        test_close = _slice(test_start, test_end)
+        val_close   = _slice(val_start,   val_end)
+        test_close  = _slice(test_start,  test_end)
+        val_ctx     = _context_before(val_start)
+        test_ctx    = _context_before(test_start)
 
+        # ── Grid search on train (identical for both variants) ────────────────
         best_sharpe = -999.0
         best_params: dict = {}
-        grid_rows = []
+        grid_rows: list[dict] = []
 
         for sw in WF_SHORT_WINDOWS:
             for lw in WF_LONG_WINDOWS:
@@ -561,44 +618,76 @@ def step_walk_forward(fixtures: dict[str, dict], dry_run: bool) -> dict:
                 grid_rows.append({
                     "short_window": sw, "long_window": lw,
                     "train_sharpe": round(sharpe, 6),
-                    "train_cagr": round(cagr, 6),
-                    "train_max_dd": round(mdd, 6),
+                    "train_cagr":   round(cagr,   6),
+                    "train_max_dd": round(mdd,    6),
                 })
                 if sharpe > best_sharpe:
                     best_sharpe = sharpe
                     best_params = {"short_window": sw, "long_window": lw}
 
-        # Evaluate best params on val + test
-        val_eq = _ma_cross_equity(val_close, best_params["short_window"], best_params["long_window"])
-        test_eq = _ma_cross_equity(test_close, best_params["short_window"], best_params["long_window"])
-        val_metrics = evaluate_metrics_backend(val_eq, ANNUAL_PERIODS)
-        test_metrics = evaluate_metrics_backend(test_eq, ANNUAL_PERIODS)
+        sw_b, lw_b = best_params["short_window"], best_params["long_window"]
 
-        fold_results.append({
+        # ── Variant A: no context (legacy behaviour, may emit -999) ──────────
+        vm_a = evaluate_metrics_backend(_ma_cross_equity(val_close,  sw_b, lw_b), ANNUAL_PERIODS)
+        tm_a = evaluate_metrics_backend(_ma_cross_equity(test_close, sw_b, lw_b), ANNUAL_PERIODS)
+
+        # ── Variant B: with warmup context (real metrics for every fold) ──────
+        vm_b = evaluate_metrics_backend(
+            _ma_cross_equity(val_close,  sw_b, lw_b, context=val_ctx),  ANNUAL_PERIODS)
+        tm_b = evaluate_metrics_backend(
+            _ma_cross_equity(test_close, sw_b, lw_b, context=test_ctx), ANNUAL_PERIODS)
+
+        base = {
             "fold": fold,
-            "train_start": train_start.isoformat(),
-            "train_end": train_end.isoformat(),
-            "val_start": val_start.isoformat(),
-            "val_end": val_end.isoformat(),
-            "test_start": test_start.isoformat(),
-            "test_end": test_end.isoformat(),
+            "train_start": train_start.isoformat(), "train_end": train_end.isoformat(),
+            "val_start":   val_start.isoformat(),   "val_end":   val_end.isoformat(),
+            "test_start":  test_start.isoformat(),  "test_end":  test_end.isoformat(),
             "best_params": best_params,
-            "train_grid": grid_rows,
-            "val_metrics": {"sharpe": round(val_metrics[0], 6), "cagr": round(val_metrics[1], 6), "max_dd": round(val_metrics[2], 6)},
-            "test_metrics": {"sharpe": round(test_metrics[0], 6), "cagr": round(test_metrics[1], 6), "max_dd": round(test_metrics[2], 6)},
+            "train_grid":  grid_rows,
+        }
+        folds_a.append({**base,
+            "val_metrics":  {"sharpe": round(vm_a[0], 6), "cagr": round(vm_a[1], 6), "max_dd": round(vm_a[2], 6)},
+            "test_metrics": {"sharpe": round(tm_a[0], 6), "cagr": round(tm_a[1], 6), "max_dd": round(tm_a[2], 6)},
         })
-        print(f"  fold {fold}: best={best_params}, val_sharpe={val_metrics[0]:.4f}, test_sharpe={test_metrics[0]:.4f}")
+        folds_b.append({**base,
+            "val_metrics":  {"sharpe": round(vm_b[0], 6), "cagr": round(vm_b[1], 6), "max_dd": round(vm_b[2], 6)},
+            "test_metrics": {"sharpe": round(tm_b[0], 6), "cagr": round(tm_b[1], 6), "max_dd": round(tm_b[2], 6)},
+        })
 
-    elapsed_s = round(time.perf_counter() - wf_start_t, 4)
-    print(f"  walk-forward elapsed: {elapsed_s}s")
-    payload = {
-        "splits": fold_results,
-        "grid_params": {"short_windows": WF_SHORT_WINDOWS, "long_windows": WF_LONG_WINDOWS},
-        "elapsed_s": elapsed_s,
+        print(
+            f"  fold {fold}: best={best_params} | "
+            f"A val={vm_a[0]:.4f}/test={tm_a[0]:.4f} | "
+            f"B val={vm_b[0]:.4f}/test={tm_b[0]:.4f}"
+        )
+
+    # split_build_elapsed_s is the numpy-path eval time — NOT the event-driven
+    # E2E framework time.  Authoritative E2E timing lives in worker-3's
+    # perf-baseline.json (170.71 s for the identical 27-eval workload).
+    split_build_elapsed_s = round(time.perf_counter() - wf_start_t, 6)
+    print(f"  numpy-path elapsed: {split_build_elapsed_s}s (authoritative E2E: worker-3 perf-baseline.json)")
+
+    grid_params = {"short_windows": WF_SHORT_WINDOWS, "long_windows": WF_LONG_WINDOWS}
+
+    payload_a = {
+        "variant": "A",
+        "description": "preservation oracle — current behaviour incl. -999 sentinels",
+        "splits": folds_a,
+        "grid_params": grid_params,
+        "split_build_elapsed_s": split_build_elapsed_s,
     }
+    payload_b = {
+        "variant": "B",
+        "description": "warmup-context oracle — real metrics for all folds",
+        "splits": folds_b,
+        "grid_params": grid_params,
+        "warmup_context_bars": warmup_bars,
+    }
+
     if not dry_run:
-        _write_json(GOLDEN_DIR / "walk_forward_results.json", payload)
-    return payload
+        _write_json(GOLDEN_DIR / "walk_forward_results.json",         payload_a)
+        _write_json(GOLDEN_DIR / "walk_forward_results_warmup.json",  payload_b)
+
+    return {"variant_a": payload_a, "variant_b": payload_b}
 
 
 # ── Step 6: Verify aggTrades fixture ─────────────────────────────────────────
@@ -704,7 +793,8 @@ def step_write_provenance(
         "goldens": {
             **backtest_goldens,
             "native_backends": "baseline/golden/native_backends.json",
-            "walk_forward_results": "baseline/golden/walk_forward_results.json",
+            "walk_forward_variant_a": "baseline/golden/walk_forward_results.json",
+            "walk_forward_variant_b": "baseline/golden/walk_forward_results_warmup.json",
         },
         "backends": {
             "rust_metrics": {
@@ -763,7 +853,18 @@ def step_write_provenance(
                 "long_window": WF_LONG_WINDOWS,
             },
             "n_combos": len(WF_SHORT_WINDOWS) * len(WF_LONG_WINDOWS),
-            "elapsed_s": wf_result.get("elapsed_s"),
+            "variant_a": {
+                "file": "baseline/golden/walk_forward_results.json",
+                "description": "preservation oracle — current behaviour incl. -999 sentinels",
+                "note": "Phase 4 improvement will NOT reproduce -999; divergence documented per procedure",
+            },
+            "variant_b": {
+                "file": "baseline/golden/walk_forward_results_warmup.json",
+                "description": "warmup-context oracle — real metrics for all folds",
+                "warmup_context_bars": wf_result.get("variant_b", {}).get("warmup_context_bars"),
+            },
+            "split_build_elapsed_s": wf_result.get("variant_a", {}).get("split_build_elapsed_s"),
+            "authoritative_e2e_timing": "baseline/perf-baseline.json (worker-3, 170.71s)",
         },
     }
 
