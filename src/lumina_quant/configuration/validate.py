@@ -157,6 +157,40 @@ def _validate_kill_switch_and_risk_envelope(runtime: RuntimeConfig) -> None:
             f"live.go_live_stage='{stage}'. "
             "Canary and full stages require entry freeze on breach to contain runaway positions."
         )
+    # 6. Structural prod-routing gate: canary/full stage MUST use mode='real'.
+    # Stage determines the exchange endpoint (testnet=False for canary/full).
+    # Combining stage=canary/full with mode=paper is an operator error that would
+    # route paper-commission-simulated orders to the production REST endpoint.
+    mode = str(getattr(runtime.live, "mode", "paper")).strip().lower()
+    if stage in {"canary", "full"} and mode != "real":
+        raise ValueError(
+            f"live.go_live_stage='{stage}' requires live.mode='real'. "
+            "Canary and full stages route orders to the production exchange endpoint; "
+            "combining them with mode='paper' would place real orders while simulating paper commissions. "
+            "Set live.mode='real' and set LUMINA_ENABLE_LIVE_REAL=true in the environment."
+        )
+    # 7. Per-order absolute value cap — must be positive (zero silently disables the cap
+    # in RiskManager.check_order, bypassing all per-order notional limits)
+    max_order_val = float(getattr(runtime.risk, "max_order_value", 5000.0))
+    if max_order_val <= 0:
+        raise ValueError(
+            f"risk.max_order_value={max_order_val!r} must be > 0. "
+            "Zero disables the per-order absolute value cap in the risk engine."
+        )
+    # 8. Per-symbol exposure cap — (0, 1.0]; zero silently disables symbol-level cap
+    max_sym_exp = float(getattr(runtime.risk, "max_symbol_exposure_pct", 0.25))
+    if max_sym_exp <= 0 or max_sym_exp > 1.0:
+        raise ValueError(
+            f"risk.max_symbol_exposure_pct={max_sym_exp!r} must be in (0, 1.0]. "
+            "Zero disables the per-symbol exposure cap."
+        )
+    # 9. Total margin/notional cap — (0, 5.0]; zero silently disables portfolio-level cap
+    max_total_margin = float(getattr(runtime.risk, "max_total_margin_pct", 0.5))
+    if max_total_margin <= 0 or max_total_margin > 5.0:
+        raise ValueError(
+            f"risk.max_total_margin_pct={max_total_margin!r} must be in (0, 5.0]. "
+            "Zero disables the total margin/notional cap."
+        )
 
 
 def _validate_live_mode_and_sources(runtime: RuntimeConfig) -> tuple[str, str]:

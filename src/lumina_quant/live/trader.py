@@ -117,6 +117,7 @@ def _build_live_config_namespace(rt, *, symbols) -> SimpleNamespace:
         COMPUTE_BACKEND=str(run_ex.compute_backend),
         GPU_VRAM_GB=float(run_ex.gpu_vram_gb),
         STORAGE_BACKEND=str(st.backend),
+        STORAGE_EXPORT_CSV=bool(st.export_csv),
         MARKET_DATA_PARQUET_PATH=str(st.market_data_parquet_path),
         STORAGE_MARKET_DATA_PARQUET_PATH=str(st.market_data_parquet_path),
         MARKET_DATA_EXCHANGE=str(st.market_data_exchange),
@@ -343,6 +344,11 @@ class LiveTrader(TradingEngine):
         self._main_loop_error_timestamps: list[float] = []
         self.outbox_events: list[dict] = []
         self._readiness_preflight_stale_minutes = int(DEFAULT_PREFLIGHT_STALE_MINUTES)
+        # Measured shadow signal-parity ratio fed to the readiness gate for the shadow
+        # stage.  Fail-closed default None blocks shadow entry until an operator/ops
+        # checklist injects an explicitly-measured ratio via set_measured_shadow_parity_ratio
+        # (from ShadowLiveRunner.evaluate_signal_parity).  Ignored by canary/full stages.
+        self._measured_shadow_parity_ratio: float | None = None
 
         # Initialize Notification Manager
         self.notifier = NotificationManager(
@@ -1327,7 +1333,40 @@ class LiveTrader(TradingEngine):
 
     def handle_fill_event(self, event):
         """Override to save trades on every fill."""
+        # Snapshot pre-fill portfolio state for realized-PnL computation.
+        # Must happen before super() which calls update_positions_from_fill and
+        # overwrites entry_prices.
+        _entry_price = None
+        _old_qty = 0.0
+        try:
+            _entry_price = dict(getattr(self.portfolio, "entry_prices", {}) or {}).get(event.symbol)
+            _old_qty = float((self.portfolio.current_positions or {}).get(event.symbol, 0.0))
+        except Exception:
+            pass
+
         super().handle_fill_event(event)  # This calls self.on_fill(event) too
+
+        # Wire Phase-5 consecutive-loss kill-switch: record_loss on every closing/
+        # reducing fill so check_order can halt new entries after N consecutive losses.
+        if _entry_price is not None:
+            try:
+                fill_qty = float(event.quantity or 0.0)
+                fill_cost = float(event.fill_cost or 0.0)
+                if fill_qty > 0.0 and fill_cost > 0.0:
+                    fill_price = fill_cost / fill_qty
+                    commission = float(event.commission or 0.0)
+                    if _old_qty > 1e-12 and event.direction == "SELL":
+                        # Closing/reducing a long position
+                        closed_qty = min(fill_qty, _old_qty)
+                        realized_pnl = (fill_price - _entry_price) * closed_qty - commission
+                        self.risk_manager.record_loss(realized_pnl=realized_pnl)
+                    elif _old_qty < -1e-12 and event.direction == "BUY":
+                        # Closing/reducing a short position
+                        closed_qty = min(fill_qty, abs(_old_qty))
+                        realized_pnl = (_entry_price - fill_price) * closed_qty - commission
+                        self.risk_manager.record_loss(realized_pnl=realized_pnl)
+            except Exception:
+                pass
 
         # Save Live Trades
         if self.config.STORAGE_EXPORT_CSV:
@@ -1512,13 +1551,36 @@ class LiveTrader(TradingEngine):
             },
         )
 
+    def set_measured_shadow_parity_ratio(self, ratio: float | None) -> None:
+        """Inject an explicitly-measured shadow signal-parity ratio.
+
+        Ops/go-live-checklist tooling calls this (with the value from
+        ``ShadowLiveRunner.evaluate_signal_parity``) before ``run()`` so the shadow
+        stage readiness gate can validate ``ratio >= shadow_parity_min_ratio``.  Passing
+        None (the default) keeps the shadow gate fail-closed.
+        """
+        self._measured_shadow_parity_ratio = None if ratio is None else float(ratio)
+
     def _run_live_readiness_gate(self) -> None:
-        if self.live_mode != "real":
+        go_live_stage = (
+            str(getattr(self.config, "GO_LIVE_STAGE", "testnet") or "testnet").strip().lower()
+        )
+        # testnet is the only stage with no artifact/env constraints, and only when not
+        # running real mode.  shadow, canary, and full stages — and ANY real-mode run —
+        # must pass their per-stage entry checks (spec R7: stage selection is free
+        # composition; the selected stage's gate is mandatory, and real mode is always
+        # gated so a real run can never start without the readiness chain).
+        if go_live_stage == "testnet" and self.live_mode != "real":
             return
         payload = enforce_live_readiness_from_files(
             mode=self.live_mode,
             stale_minutes=int(self._readiness_preflight_stale_minutes),
             env=os.environ,
+            go_live_stage=go_live_stage,
+            # Measured shadow parity ratio (fail-closed None by default → shadow stage
+            # stays blocked until an operator injects an explicitly-measured ratio via
+            # set_measured_shadow_parity_ratio). canary/full stages ignore this field.
+            shadow_parity_ratio=self._measured_shadow_parity_ratio,
         )
         self.audit_store.log_risk_event(
             self.run_id,

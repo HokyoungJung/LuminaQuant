@@ -121,12 +121,14 @@ class RiskManager:
                     f"Order Value ${notional_value:.2f} exceeds equity-scaled cap ${order_notional_cap:.2f}",
                 )
 
-            if getattr(portfolio, "circuit_breaker_tripped", False):
-                return False, "Circuit breaker already tripped."
-
-            # reduce-only orders are allowed through to let the system de-risk.
+            # reduce-only orders bypass circuit-breaker and all downstream exposure caps
+            # so the system can always de-risk open positions after a daily-loss trip.
+            # (trade-freeze and consecutive-loss halt already exempt reduce-only above.)
             if bool(getattr(order_event, "reduce_only", False)):
                 return True, "Passed (reduce-only bypass)."
+
+            if getattr(portfolio, "circuit_breaker_tripped", False):
+                return False, "Circuit breaker already tripped."
 
             # Approximate symbol exposure after order execution.
             current_legs = self._portfolio_position_legs(portfolio, order_event.symbol)

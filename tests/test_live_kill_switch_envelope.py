@@ -195,11 +195,27 @@ def test_invalid_go_live_stage_is_rejected():
 
 
 def test_all_valid_go_live_stages_are_accepted():
-    for stage in ("testnet", "shadow", "canary", "full"):
+    # testnet/shadow are testnet-routed and valid in paper mode; canary/full route to
+    # the production endpoint and require mode='real' (structural prod-routing gate).
+    paper_stages = {"testnet": "paper", "shadow": "paper", "canary": "real", "full": "real"}
+    for stage, mode in paper_stages.items():
         raw = _base_raw()
         raw["live"]["go_live_stage"] = stage
+        raw["live"]["mode"] = mode
         runtime = build_runtime_config(raw, env={})
         validate_runtime_config(runtime)
+
+
+def test_canary_stage_requires_real_mode():
+    # Structural prod-routing gate: canary/full + mode=paper must be rejected so a
+    # paper config can never route signed orders to the production endpoint.
+    for stage in ("canary", "full"):
+        raw = _base_raw()
+        raw["live"]["go_live_stage"] = stage
+        raw["live"]["mode"] = "paper"
+        runtime = build_runtime_config(raw, env={})
+        with pytest.raises(ValueError, match=f"{stage}.*real"):
+            validate_runtime_config(runtime)
 
 
 # ── canary_position_fraction ────────────────────────────────────────────────
