@@ -35,6 +35,7 @@ from lumina_quant.configuration.loader import (
 from lumina_quant.configuration.schema import (
     BacktestExternalConfig,
     BacktestRuntimeConfig,
+    DataConfig,
     ExecutionConfig,
     LiveExchangeConfig,
     LiveExternalConfig,
@@ -130,6 +131,7 @@ __all__ = [
     # Schema types
     "BacktestExternalConfig",
     "BacktestRuntimeConfig",
+    "DataConfig",
     "ExecutionConfig",
     "LiveExchangeConfig",
     "LiveExternalConfig",

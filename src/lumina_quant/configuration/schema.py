@@ -292,6 +292,27 @@ class ValidationConfig:
     golden_rtol: float = 1e-8
 
 
+_VALID_DATA_KINDS: frozenset[str] = frozenset(
+    {"ohlcv", "funding", "feature_points", "aggtrades_tick"}
+)
+
+
+@dataclass(slots=True)
+class DataConfig:
+    """Data-collection settings.
+
+    ``kinds`` is the explicit list of data kinds the collector will fetch.
+    Valid values: ohlcv, funding, feature_points, aggtrades_tick.
+    ``aggtrades_tick`` is validation-only (testnet/paper/replay; no live orders).
+    ``tick_path`` overrides the parquet root for raw aggTrades archives.
+    """
+
+    kinds: list[str] = field(
+        default_factory=lambda: ["ohlcv", "funding", "feature_points"]
+    )
+    tick_path: str = ""
+
+
 @dataclass(slots=True)
 class RuntimeConfig:
     """Full runtime configuration bundle."""
@@ -301,6 +322,7 @@ class RuntimeConfig:
     risk: RiskConfig = field(default_factory=RiskConfig)
     execution: ExecutionConfig = field(default_factory=ExecutionConfig)
     storage: StorageConfig = field(default_factory=StorageConfig)
+    data: DataConfig = field(default_factory=DataConfig)
     backtest: BacktestRuntimeConfig = field(default_factory=BacktestRuntimeConfig)
     live: LiveRuntimeConfig = field(default_factory=LiveRuntimeConfig)
     optimization: OptimizationRuntimeConfig = field(default_factory=OptimizationRuntimeConfig)
