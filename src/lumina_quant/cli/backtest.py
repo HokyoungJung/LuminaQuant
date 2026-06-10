@@ -26,7 +26,6 @@ from lumina_quant.core.plugin_registry import (
     load_strategy_registry,
 )
 from lumina_quant.configuration import (
-    BacktestConfigView,
     get_default_runtime_config,
     load_runtime_config,
 )
