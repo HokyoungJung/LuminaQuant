@@ -28,6 +28,7 @@ from lumina_quant.core.plugin_registry import (
 from lumina_quant.configuration import (
     get_default_runtime_config,
 )
+from lumina_quant.core.memory_budget import enforce_runtime_memory_cap
 from lumina_quant.live_selection import (
     normalize_portfolio_mode_reference,
     resolve_portfolio_mode_runtime_config,
@@ -726,6 +727,10 @@ def run(
     portfolio_mode=None,
 ):
     settings = _current_backtest_runtime_settings()
+    # Engine-start memory guard: errors clearly (MemoryCapExceededError) if the
+    # process already exceeds the config-driven RSS cap, instead of risking an
+    # OOM kill mid-run. Lowering memory.cap_gb in config genuinely lowers the cap.
+    enforce_runtime_memory_cap(get_default_runtime_config(), label="backtest engine start")
     symbol_list = list(settings["symbol_list"])
     start_date = settings["start_date"]
     end_date = settings["end_date"]

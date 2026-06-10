@@ -9,10 +9,30 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from lumina_quant.core.memory_budget import DEFAULT_EXECUTION_MEMORY_POLICY
+from lumina_quant.core.memory_budget import (
+    DEFAULT_EXECUTION_MEMORY_POLICY,
+    ExecutionMemoryPolicy,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-_DEFAULT_POLICY = DEFAULT_EXECUTION_MEMORY_POLICY
+
+
+def _config_memory_policy() -> ExecutionMemoryPolicy:
+    """Derive the memory policy from ``RuntimeConfig.memory.cap_gb``.
+
+    The gate's default ``--rss-limit-gib`` then tracks the config knob: changing
+    ``memory.cap_gb`` changes the enforced default cap. Falls back to the static
+    policy if config is unavailable.
+    """
+    try:
+        from lumina_quant.configuration import get_default_runtime_config
+
+        return ExecutionMemoryPolicy.from_runtime(get_default_runtime_config())
+    except Exception:
+        return DEFAULT_EXECUTION_MEMORY_POLICY
+
+
+_DEFAULT_POLICY = _config_memory_policy()
 TIME_RSS_PATTERN = re.compile(
     r"Maximum resident set size \(kbytes\):\s*(\d+)",
     flags=re.IGNORECASE,
