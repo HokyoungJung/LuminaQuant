@@ -409,6 +409,15 @@ docs/
 - **Phase 1 config knobs**: `RuntimeConfig.memory.cap_gb` (default 8.0 GiB) and `RuntimeConfig.validation.golden_rtol` (default 1e-8). Golden comparisons must use `rtol=rt.validation.golden_rtol`; no hardcoded tolerances.
 - **No os.environ hidden bus**: config must flow through explicit `RuntimeConfig` objects. `os.environ` access is only allowed inside `get_default_runtime_config()` and `load_runtime_config()`.
 
+### Phase 3 architecture notes (2026-06-10)
+
+- **DataCollector entry-point**: `lumina_quant.data.collector.DataCollector.from_runtime_config(rt)` is the single factory for all data-collection paths. Never call `data_collector.py` functions or `data_sync.py` sync functions directly from new code; go through `DataCollector`.
+- **DataConfig schema**: `RuntimeConfig.data.kinds` (list of `ohlcv | funding | feature_points | aggtrades_tick`) is the config-only switch for data-kind selection. Invalid tokens raise `ValueError` at load time — silent drops are forbidden. Empty list falls back to the default `[ohlcv, funding, feature_points]`.
+- **Driver-keyed adapter selection**: `live.exchange.driver` in the profile YAML drives `from_runtime_config()` to the correct exchange adapter (`binance_futures` → `BinanceFuturesRESTClient`, `mt5` → `MT5Exchange`, `polymarket` → `PolymarketExchange`). No special-casing outside `_build_exchange_client()`.
+- **Tick collection safety axis**: `aggtrades_tick` collection (`DataCollector.collect_aggtrades_raw`) is keyless read-only public market data — it has NO order side effects and does NOT require a testnet endpoint. The Phase 0 aggTrades fixture (`BTCUSDT_1h_…parquet`) was captured from the production public REST endpoint (`fapi.binance.com`). The safety gate is `data.kinds` config: `real.yaml` excludes `aggtrades_tick` so the always-on live process never runs this path. **Do NOT gate tick collection on `is_testnet`** — that would forbid capturing validation fixtures from real market data, which is their purpose.
+- **Storage root**: `DataCollector.repo` returns a `ParquetMarketDataRepository` whose root comes from `storage.market_data_parquet_path`. For raw aggTrades archives, `data.tick_path` overrides the root. Never construct `ParquetMarketDataRepository` with a manually-threaded path in new code; use `collector.repo`.
+- **Profile data.kinds defaults**: `paper.yaml` = `[ohlcv, funding, feature_points, aggtrades_tick]`; `real.yaml` = `[ohlcv, funding, feature_points]`; `research.yaml` = `[ohlcv, feature_points]`.
+
 ### How to add a strategy (Phase 1+)
 
 1. Create `src/lumina_quant/strategies/<name>.py` with a class that subclasses `Strategy` (event-driven) or `StrategyPlugin` (polars-batch).

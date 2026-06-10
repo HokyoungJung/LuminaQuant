@@ -6,7 +6,9 @@ Design:
 - Driver-keyed adapter selection: binance_futures / mt5 / polymarket.
 - Data-kind selection via ``data.kinds`` in the profile YAML:
   ohlcv / funding / feature_points / aggtrades_tick.
-- ``aggtrades_tick`` is validation-only — testnet/paper/replay; NEVER real orders.
+- ``aggtrades_tick`` is keyless read-only public market data; safety gate is
+  ``data.kinds`` config (``real.yaml`` excludes it for always-on live).
+  See AGENTS.md "tick collection safety axis" for rationale.
 - Storage root follows ``storage.market_data_parquet_path`` (``DataConfig.tick_path``
   overrides it for raw aggTrades archives).
 - MT5 and Polymarket are reachable through the same factory (driver-keyed), not
