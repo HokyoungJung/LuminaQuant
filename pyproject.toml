@@ -7,10 +7,10 @@ name = "lumina-quant"
 version = "0.1.0"
 description = "High-perf event-driven algo trading engine"
 readme = "README.md"
-requires-python = ">=3.11,<3.14"
+requires-python = ">=3.14"
 dependencies = [
-    "numpy>=1.26.0,<3",
-    "polars>=1.35.2,<1.36",
+    "numpy>=2.0,<3",
+    "polars>=1.35.2",
     "pandas>=2.2.0,<3",
     "psycopg[binary]>=3.3.3",
     "python-dotenv>=1.2.2",
@@ -54,7 +54,7 @@ all = [
     "matplotlib>=3.8.0",
 ]
 gpu = [
-    "cudf-polars-cu12>=26.2,<26.3; platform_system == 'Linux' and platform_machine == 'x86_64'",
+    "cudf-polars-cu12>=26.6; platform_system == 'Linux' and platform_machine == 'x86_64'",
     "nvidia-nvjitlink-cu12>=12; platform_system == 'Linux' and platform_machine == 'x86_64'",
 ]
 dashboard = [
