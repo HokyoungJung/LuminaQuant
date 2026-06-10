@@ -779,8 +779,14 @@ def _normalize_data_runtime_section(runtime: RuntimeConfig) -> None:
         normalized: list[str] = []
         for item in raw_kinds:
             token = str(item or "").strip().lower()
-            if token in _VALID_DATA_KINDS:
-                normalized.append(token)
+            if not token:
+                continue  # skip blank entries
+            if token not in _VALID_DATA_KINDS:
+                raise ValueError(
+                    f"Invalid data.kinds token: {token!r}. "
+                    f"Valid values: {sorted(_VALID_DATA_KINDS)}"
+                )
+            normalized.append(token)
         runtime.data.kinds = list(dict.fromkeys(normalized)) or list(DataConfig().kinds)
     else:
         runtime.data.kinds = list(DataConfig().kinds)

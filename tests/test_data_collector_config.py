@@ -128,15 +128,18 @@ def test_config_only_switch_data_kinds():
     assert cfg_tick.tick_path == Path("data/raw_ticks")
 
 
-def test_invalid_data_kinds_silently_dropped():
-    """Unknown kind tokens are dropped; known ones survive."""
-    cfg = DataCollectorConfig.from_runtime_config(
-        _rt_from_yaml("""
-            data:
-              kinds: [ohlcv, unknown_kind, funding]
-        """)
-    )
-    assert cfg.kinds == [DATA_KIND_OHLCV, DATA_KIND_FUNDING]
+def test_invalid_data_kinds_raises_value_error():
+    """Invalid data.kinds token raises ValueError at load time — no silent drops.
+
+    A typo like 'fundig' must fail the process, not silently collect less data
+    than the operator configured (same anti-pattern as -999 sentinels).
+    """
+    import yaml
+    from lumina_quant.configuration import build_runtime_config
+
+    raw = yaml.safe_load("data:\n  kinds: [ohlcv, fundig, funding]") or {}
+    with pytest.raises(ValueError, match="Invalid data.kinds token.*fundig"):
+        build_runtime_config(raw, {})
 
 
 def test_empty_data_kinds_falls_back_to_default():
@@ -259,48 +262,56 @@ def test_unknown_driver_raises():
 
 
 # ---------------------------------------------------------------------------
-# Safety invariant tests
+# Tick-collection safety axis tests
 # ---------------------------------------------------------------------------
 
 
-def test_aggtrades_tick_blocked_on_non_testnet():
-    """collect_aggtrades_raw() raises RuntimeError when is_testnet=False."""
-    rt = _rt_from_yaml("""
-        live:
-          mode: live
-          testnet: false
-          exchange:
-            driver: binance_futures
-    """)
-    collector = DataCollector.from_runtime_config(rt)
-    try:
-        with pytest.raises(RuntimeError, match="validation-only"):
-            collector.collect_aggtrades_raw(symbol="BTC/USDT")
-    finally:
-        collector.close()
+def test_aggtrades_tick_callable_in_any_mode():
+    """collect_aggtrades_raw() is not gated on is_testnet.
+
+    Tick collection is public read-only market data — no order side effects.
+    The Phase 0 aggTrades fixture was captured from the prod public REST
+    endpoint (fapi.binance.com, keyless).  The real gate is data.kinds:
+    real.yaml excludes aggtrades_tick so the live process never runs it.
+    """
+    for yaml_mode in [
+        "live:\n  mode: paper\n  exchange:\n    driver: binance_futures",
+        "live:\n  mode: live\n  testnet: false\n  exchange:\n    driver: binance_futures",
+    ]:
+        rt = _rt_from_yaml(yaml_mode)
+        collector = DataCollector.from_runtime_config(rt)
+        try:
+            with patch(
+                "lumina_quant.data_collector.collect_binance_aggtrades_raw",
+                return_value={"fetched_rows": 0, "upserted_rows": 0},
+            ) as mock_fn:
+                result = collector.collect_aggtrades_raw(symbol="BTC/USDT")
+                mock_fn.assert_called_once()
+                assert result["fetched_rows"] == 0
+        finally:
+            collector.close()
 
 
-def test_aggtrades_tick_allowed_on_testnet():
-    """collect_aggtrades_raw() is callable when is_testnet=True (no real orders)."""
-    rt = _rt_from_yaml("""
-        live:
-          mode: paper
-          exchange:
-            driver: binance_futures
-    """)
-    collector = DataCollector.from_runtime_config(rt)
-    try:
-        assert collector.config.is_testnet is True
-        # Patch the underlying function so no real network call is made
-        with patch(
-            "lumina_quant.data.collector.DataCollector.collect_aggtrades_raw",
-            return_value={"fetched_rows": 0, "upserted_rows": 0},
-        ) as mock_fn:
-            result = collector.collect_aggtrades_raw(symbol="BTC/USDT")
-            mock_fn.assert_called_once_with(symbol="BTC/USDT")
-            assert result["fetched_rows"] == 0
-    finally:
-        collector.close()
+def test_aggtrades_tick_uses_config_testnet_flag():
+    """collect_aggtrades_raw passes is_testnet from config — not hard-wired True."""
+    for testnet_expected, yaml_text in [
+        (True, "live:\n  mode: paper\n  exchange:\n    driver: binance_futures"),
+        (False, "live:\n  mode: live\n  testnet: false\n  exchange:\n    driver: binance_futures"),
+    ]:
+        rt = _rt_from_yaml(yaml_text)
+        collector = DataCollector.from_runtime_config(rt)
+        try:
+            with patch(
+                "lumina_quant.data_collector.collect_binance_aggtrades_raw",
+                return_value={"fetched_rows": 0, "upserted_rows": 0},
+            ) as mock_fn:
+                collector.collect_aggtrades_raw(symbol="BTC/USDT")
+                _, kwargs = mock_fn.call_args
+                assert kwargs["testnet"] == testnet_expected, (
+                    f"expected testnet={testnet_expected} for {yaml_text!r}"
+                )
+        finally:
+            collector.close()
 
 
 # ---------------------------------------------------------------------------

@@ -258,15 +258,12 @@ class DataCollector:
 
         Maps to ``DATA_KIND_AGGTRADES_TICK``.
 
-        .. note::
-            Validation-only path — NEVER places real exchange orders.
-            Raises ``RuntimeError`` when ``is_testnet`` is False.
+        Public read-only market data — no order side effects.  The safety gate
+        is the ``data.kinds`` config knob: ``real.yaml`` excludes
+        ``aggtrades_tick`` so the always-on live process never runs this path.
+        Testnet vs prod is irrelevant here — the Phase 0 aggTrades fixture was
+        captured from the prod public REST endpoint (fapi.binance.com, keyless).
         """
-        if not self._cfg.is_testnet:
-            raise RuntimeError(
-                "aggtrades_tick collection is validation-only. "
-                "Set live.is_testnet=true or live.mode=paper in the config profile."
-            )
         from lumina_quant.data_collector import collect_binance_aggtrades_raw
 
         tick_db = str(self._cfg.tick_path or self._cfg.parquet_root)
@@ -277,7 +274,7 @@ class DataCollector:
             market_type=self._cfg.market_type,
             api_key=self._cfg.api_key,
             secret_key=self._cfg.secret_key,
-            testnet=True,  # always testnet — safety invariant
+            testnet=self._cfg.is_testnet,
             since_ms=since_ms,
             until_ms=until_ms,
             bootstrap_lookback_hours=bootstrap_lookback_hours,
