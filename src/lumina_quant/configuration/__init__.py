@@ -15,16 +15,18 @@ Schema types re-exported so callers never need to import from sub-modules:
   MarketWindowConfig, MemoryConfig, ValidationConfig, PromotionGateConfig,
   BacktestExternalConfig, LiveExchangeConfig, LiveExternalConfig, LivePolymarketConfig
 
-Engine compat views (Phase 1 bridge — Phase 3/4 will migrate to typed attrs):
+Engine views (Phase 1 bridge — deletion-gated):
   BacktestConfigView — uppercase-attr bag for Backtest / Portfolio / ExecutionSim
+                       DELETION-GATE: Phase 4
   LiveConfigView     — uppercase-attr bag for LiveTrader / RiskManager
+                       DELETION-GATE: Phase 5
 """
 
 from __future__ import annotations
 
 import os
 
-from lumina_quant.configuration.compat import BacktestConfigView, LiveConfigView
+from lumina_quant.configuration.views import BacktestConfigView, LiveConfigView
 from lumina_quant.configuration.loader import (
     build_runtime_config,
     load_runtime_config,

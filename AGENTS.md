@@ -402,10 +402,30 @@ docs/
 ### Phase 1 architecture notes (2026-06-10)
 
 - **Unified config entry-point**: `lumina_quant.configuration` is the ONLY config entry-point. `runtime_access.py` has been deleted. `config.py` is a thin backward-compat shim (Phase 7 removal). Never add a second global config loader.
+- **Config engine views**: `configuration/compat.py` was renamed to `configuration/views.py` (canonical). A thin `compat.py` re-exporter is kept for existing code that imports `lumina_quant.configuration.compat`; deletion gate is Phase 3 (backtest engine) / Phase 5 (live trader). New code must import from `lumina_quant.configuration` or `lumina_quant.configuration.views`.
 - **Plugin registry**: `lumina_quant.core.plugin_registry` owns the `@register(kind, name, *, interface=None)` decorator and the `GLOBAL_REGISTRY` accessor. Kinds: `"strategy"`, `"indicator"`, `"portfolio"`. `cli/_strategy_registry_fallback.py` has been deleted; `PublicStubStrategy` / `PublicStrategyRegistry` / `load_strategy_registry` now live in `core/plugin_registry`.
+- **Strategies package — eager imports**: `lumina_quant.strategies.__init__` no longer uses lazy `__getattr__`. All `strategies.registry` exports are imported eagerly; `register` and `GLOBAL_REGISTRY` from `core.plugin_registry` are re-exported so callers can do `from lumina_quant.strategies import register`.
 - **Dual ABC (Strategy vs StrategyPlugin)**: Phase 4 owns unification. Do NOT merge the two ABCs now. Register both with explicit `interface` tags (`"event_driven"` / `"polars_batch"`).
 - **Phase 1 config knobs**: `RuntimeConfig.memory.cap_gb` (default 8.0 GiB) and `RuntimeConfig.validation.golden_rtol` (default 1e-8). Golden comparisons must use `rtol=rt.validation.golden_rtol`; no hardcoded tolerances.
 - **No os.environ hidden bus**: config must flow through explicit `RuntimeConfig` objects. `os.environ` access is only allowed inside `get_default_runtime_config()` and `load_runtime_config()`.
+
+### How to add a strategy (Phase 1+)
+
+1. Create `src/lumina_quant/strategies/<name>.py` with a class that subclasses `Strategy` (event-driven) or `StrategyPlugin` (polars-batch).
+2. Decorate with `@register("strategy", "ClassName", interface="event_driven"|"polars_batch")` from `lumina_quant.core.plugin_registry`.
+3. Import the module in `src/lumina_quant/strategies/registry.py` (add to the explicit import block and `_STRATEGY_MAP`).
+4. Add param schema entry in `src/lumina_quant/tuning/param_registry.py`.
+5. Write at least one unit test under `tests/` verifying signals output shape and `GLOBAL_REGISTRY.get("strategy", "ClassName")` returns the class.
+
+### How to use a compute module (Phase 1+)
+
+Native compute modules live in `native/` (Rust via pyo3) and `native/c_metrics/` (C cdylib).  All are loaded lazily via `src/lumina_quant/compute/`.
+
+- **Import path**: `from lumina_quant.compute import indicators`, `from lumina_quant.compute.ops import ...`
+- **Memory budget**: read `RuntimeConfig.memory.cap_gb` and pass to `lumina_quant.core.memory_budget` helpers before allocating large GPU arrays.
+- **Backend selection**: `RuntimeConfig.execution.compute_backend` (`"gpu"` | `"cpu"`). Never hardcode; read from config.
+- **Golden tolerance**: `RuntimeConfig.validation.golden_rtol` (default `1e-8`). Pass as `rtol=` to `numpy.testing.assert_allclose` or equivalent.
+- **Do NOT** call `ctypes.CDLL` or `cffi` directly from strategy code; go through `lumina_quant.compute` only.
 
 ### Guardrails for future agents
 
