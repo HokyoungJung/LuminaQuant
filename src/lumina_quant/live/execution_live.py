@@ -1064,14 +1064,6 @@ class LiveExecutionHandler(ExecutionHandler):
             status="passed",
         )
 
-    def _estimate_commission(self, fill_price, quantity):
-        fee_rate = getattr(
-            self.config,
-            "TAKER_FEE_RATE",
-            getattr(self.config, "COMMISSION_RATE", 0.0),
-        )
-        return float(fill_price * quantity * fee_rate)
-
     def _emit_fill_event(self, event, order, filled_qty, status, submitted_at=None):
         if filled_qty <= 0:
             return
@@ -1107,22 +1099,46 @@ class LiveExecutionHandler(ExecutionHandler):
             except Exception:
                 submit_to_fill_ms = None
         live_mode = str(getattr(self.config, "MODE", "paper") or "paper").strip().lower()
-        if live_mode != "real" and float(fill_price or 0.0) > 0.0:
-            # Paper / testnet: compute commission through the unified ExecutionModel so
-            # backtest ↔ live cost paths share the same single formula.
-            # apply_liquidity_cap=False: executed qty is already determined by exchange.
-            _order_type = str(getattr(event, "order_type", "MKT") or "MKT").upper()
-            _fill_result = self._execution_model.compute_fill(
-                raw_price=float(fill_price),
-                qty=float(filled_qty),
-                direction=str(getattr(event, "direction", "BUY")),
-                bar_volume=0.0,
-                is_maker=(_order_type == "LMT"),
-                apply_liquidity_cap=False,
-            )
-            commission = _fill_result.commission
+        _order_type = str(getattr(event, "order_type", "MKT") or "MKT").upper()
+        _is_maker = _order_type == "LMT"
+        if float(fill_price or 0.0) > 0.0:
+            if live_mode == "real":
+                # Real fills: the exchange already determined the fill price (slippage
+                # is in the price, not to be re-applied).  Use commission_for — the
+                # single fee path: fill_price * qty * fee_rate, maker vs taker.
+                # Prefer exchange-reported fee (ccxt order["fee"]["cost"]) when present;
+                # commission_for is the fallback so config-driven rates are consistent.
+                _exchange_fee: float | None = None
+                try:
+                    _fee_info = order.get("fee") if isinstance(order, dict) else None
+                    if isinstance(_fee_info, dict) and float(_fee_info.get("cost") or 0.0) > 0.0:
+                        _exchange_fee = float(_fee_info["cost"])
+                except Exception:
+                    pass
+                commission = (
+                    _exchange_fee
+                    if _exchange_fee is not None
+                    else self._execution_model.commission_for(
+                        fill_price=float(fill_price),
+                        qty=float(filled_qty),
+                        is_maker=_is_maker,
+                    )
+                )
+            else:
+                # Paper / testnet: simulate slippage + commission through the unified
+                # ExecutionModel so backtest ↔ live cost paths share one formula.
+                # apply_liquidity_cap=False: qty already determined by the simulation.
+                _fill_result = self._execution_model.compute_fill(
+                    raw_price=float(fill_price),
+                    qty=float(filled_qty),
+                    direction=str(getattr(event, "direction", "BUY")),
+                    bar_volume=0.0,
+                    is_maker=_is_maker,
+                    apply_liquidity_cap=False,
+                )
+                commission = _fill_result.commission
         else:
-            commission = self._estimate_commission(fill_price, filled_qty)
+            commission = 0.0
         fill_event = FillEvent(
             timeindex=self.bars.get_latest_bar_datetime(event.symbol),
             symbol=event.symbol,
