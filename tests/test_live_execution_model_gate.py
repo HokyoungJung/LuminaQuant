@@ -89,3 +89,80 @@ def test_execution_model_config_from_runtime_live_mode():
     assert cfg.leverage == 3
     assert cfg.margin_mode == "isolated"
     assert cfg.taker_fee_rate > 0
+
+
+def test_execution_live_instantiates_execution_model_ast():
+    """execution_live.py must INSTANTIATE ExecutionModel (not just import it).
+
+    AST check: at least one ``ExecutionModel(`` call-expression must appear
+    in the source so the gate can never be satisfied by a bare import.
+    """
+    import ast
+
+    source = _EXECUTION_LIVE_PATH.read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    found = False
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            func = node.func
+            # Direct call: ExecutionModel(...)
+            if isinstance(func, ast.Name) and func.id == "ExecutionModel":
+                found = True
+                break
+            # Attribute call: something.ExecutionModel(...)
+            if isinstance(func, ast.Attribute) and func.attr == "ExecutionModel":
+                found = True
+                break
+    assert found, (
+        "live/execution_live.py must instantiate ExecutionModel(...) — "
+        "bare import is not sufficient (Phase 5 structural gate)"
+    )
+
+
+def test_live_execution_handler_has_execution_model_attribute():
+    """LiveExecutionHandler.__init__ must set self._execution_model to an ExecutionModel."""
+    import queue
+    from types import SimpleNamespace
+
+    from lumina_quant.backtesting.execution_model import ExecutionModel
+    from lumina_quant.live.execution_live import LiveExecutionHandler
+
+    events = queue.Queue()
+    bars = SimpleNamespace(
+        get_latest_bar_value=lambda *a, **kw: 0.0,
+        get_latest_bar_datetime=lambda *a, **kw: None,
+    )
+    config = SimpleNamespace(
+        MODE="paper",
+        ORDER_TIMEOUT=10,
+        ORDER_STATE_SOURCE="polling",
+        RECONCILIATION_POLL_FALLBACK_ENABLED=True,
+        TAKER_FEE_RATE=0.0004,
+        MAKER_FEE_RATE=0.0002,
+        SLIPPAGE_RATE=0.0005,
+        SPREAD_RATE=0.0002,
+        LEVERAGE=3,
+        MARGIN_MODE="isolated",
+        MAINTENANCE_MARGIN_RATE=0.005,
+        LIQUIDATION_BUFFER_RATE=0.0005,
+        FUNDING_RATE_PER_8H=0.0,
+        FUNDING_INTERVAL_HOURS=8,
+        MARKET_TYPE="future",
+        PAPER_EXCHANGE_PROTECTIVE_ORDERS=False,
+        ALLOW_MARKET_ORDERS=False,
+    )
+
+    class _FakeGateway:
+        def __init__(self, *a, **kw):
+            pass
+
+    class _FakeExchange:
+        pass
+
+    handler = LiveExecutionHandler(events, bars, config, _FakeExchange())
+    assert hasattr(handler, "_execution_model"), (
+        "LiveExecutionHandler must set self._execution_model in __init__"
+    )
+    assert isinstance(handler._execution_model, ExecutionModel), (
+        "self._execution_model must be an ExecutionModel instance"
+    )

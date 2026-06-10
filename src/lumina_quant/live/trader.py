@@ -222,6 +222,9 @@ def _build_live_config_namespace(rt, *, symbols) -> SimpleNamespace:
         EFFECTIVE_POSITION_FRACTION=(
             float(lv.canary_position_fraction) if _stage == "canary" else 1.0
         ),
+        # Raw RuntimeConfig reference so LiveExecutionHandler can call
+        # ExecutionModelConfig.from_runtime(config._rt, mode="live") directly.
+        _rt=rt,
     )
 
 

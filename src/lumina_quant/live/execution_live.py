@@ -4,9 +4,10 @@ import time
 from types import SimpleNamespace
 from typing import Any
 
-from lumina_quant.backtesting.execution_model import (  # noqa: F401  # Phase 5 structural gate: live/ must share unified cost model
+from lumina_quant.backtesting.execution_model import (  # Phase 5 structural gate: live/ must share unified cost model
     ExecutionModel,
     ExecutionModelConfig,
+    _config_from_attrs,
 )
 from lumina_quant.backtesting.execution_sim import ExecutionHandler
 from lumina_quant.core.events import FillEvent
@@ -90,6 +91,15 @@ class LiveExecutionHandler(ExecutionHandler):
         self._last_exchange_open_snapshot_ts = 0.0
         self.protective_orders: dict[str, dict[str, Any]] = {}
         self._protected_parent_client_ids: set[str] = set()
+        # Unified cost model — same formula as backtest (Phase 5 structural gate).
+        # Used for paper/testnet simulated fill commission and pre-trade
+        # liquidation_price / cost estimation in all modes.
+        _rt = getattr(config, "_rt", None)
+        if _rt is not None:
+            _em_cfg = ExecutionModelConfig.from_runtime(_rt, mode="live")
+        else:
+            _em_cfg = _config_from_attrs(config)  # unit-test path: mock config without _rt
+        self._execution_model: ExecutionModel = ExecutionModel(_em_cfg)
 
     def set_order_state_callback(self, callback) -> None:
         """Set a callback to receive order-state transition events."""
@@ -1096,7 +1106,23 @@ class LiveExecutionHandler(ExecutionHandler):
                 submit_to_fill_ms = max(0, int((time.time() - float(submitted_at)) * 1000.0))
             except Exception:
                 submit_to_fill_ms = None
-        commission = self._estimate_commission(fill_price, filled_qty)
+        live_mode = str(getattr(self.config, "MODE", "paper") or "paper").strip().lower()
+        if live_mode != "real" and float(fill_price or 0.0) > 0.0:
+            # Paper / testnet: compute commission through the unified ExecutionModel so
+            # backtest ↔ live cost paths share the same single formula.
+            # apply_liquidity_cap=False: executed qty is already determined by exchange.
+            _order_type = str(getattr(event, "order_type", "MKT") or "MKT").upper()
+            _fill_result = self._execution_model.compute_fill(
+                raw_price=float(fill_price),
+                qty=float(filled_qty),
+                direction=str(getattr(event, "direction", "BUY")),
+                bar_volume=0.0,
+                is_maker=(_order_type == "LMT"),
+                apply_liquidity_cap=False,
+            )
+            commission = _fill_result.commission
+        else:
+            commission = self._estimate_commission(fill_price, filled_qty)
         fill_event = FillEvent(
             timeindex=self.bars.get_latest_bar_datetime(event.symbol),
             symbol=event.symbol,

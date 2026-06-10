@@ -158,6 +158,190 @@ def test_evaluate_parity_nan_signal_does_not_match():
     assert result.parity_ratio == 0.0
 
 
+# ── Fill / cost parity: live paper vs backtest ExecutionModel ────────────────
+
+
+def test_live_paper_lmt_fill_commission_matches_execution_model():
+    """LMT fill commission from live paper path must match backtest ExecutionModel.
+
+    This validates the Phase 5 requirement that backtest ↔ live share a single
+    cost formula.  LMT fills are deterministic (no random slippage) so the
+    comparison is exact within floating-point tolerance.
+    """
+    import queue
+
+    import pytest
+
+    from lumina_quant.backtesting.execution_model import ExecutionModel, ExecutionModelConfig
+    from lumina_quant.live.execution_live import LiveExecutionHandler
+
+    FILL_PRICE = 50_000.0
+    FILL_QTY = 0.01
+    MAKER_FEE = 0.0002
+
+    events_q = queue.Queue()
+    bars = SimpleNamespace(
+        get_latest_bar_value=lambda *a, **kw: FILL_PRICE,
+        get_latest_bar_datetime=lambda *a, **kw: None,
+    )
+    config = SimpleNamespace(
+        MODE="paper",
+        ORDER_TIMEOUT=10,
+        ORDER_STATE_SOURCE="polling",
+        RECONCILIATION_POLL_FALLBACK_ENABLED=True,
+        TAKER_FEE_RATE=0.0004,
+        MAKER_FEE_RATE=MAKER_FEE,
+        SLIPPAGE_RATE=0.0005,
+        SPREAD_RATE=0.0002,
+        LEVERAGE=3,
+        MARGIN_MODE="isolated",
+        MAINTENANCE_MARGIN_RATE=0.005,
+        LIQUIDATION_BUFFER_RATE=0.0005,
+        FUNDING_RATE_PER_8H=0.0,
+        FUNDING_INTERVAL_HOURS=8,
+        MARKET_TYPE="future",
+        PAPER_EXCHANGE_PROTECTIVE_ORDERS=False,
+        ALLOW_MARKET_ORDERS=False,
+        EXCHANGE_ID="TESTNET",
+    )
+
+    class _FakeExchange:
+        pass
+
+    handler = LiveExecutionHandler(events_q, bars, config, _FakeExchange())
+
+    event = SimpleNamespace(
+        type="ORDER",
+        symbol="BTC/USDT",
+        direction="BUY",
+        quantity=FILL_QTY,
+        order_type="LMT",
+        price=FILL_PRICE,
+        position_side="LONG",
+        reduce_only=False,
+        client_order_id="test-parity-lmt",
+        metadata={},
+    )
+    order = {
+        "id": "order-parity-1",
+        "average": FILL_PRICE,
+        "price": FILL_PRICE,
+        "amount": FILL_QTY,
+        "filled": FILL_QTY,
+    }
+    handler._emit_fill_event(event, order, FILL_QTY, status="filled")
+
+    fill_ev = events_q.get_nowait()
+    live_commission = fill_ev.commission
+
+    # Backtest reference: same config, same inputs
+    em_cfg = ExecutionModelConfig(
+        taker_fee_rate=0.0004,
+        maker_fee_rate=MAKER_FEE,
+        slippage_rate=0.0005,
+        spread_rate=0.0002,
+        leverage=3,
+        margin_mode="isolated",
+        maintenance_margin_rate=0.005,
+        liquidation_buffer_rate=0.0005,
+        funding_rate_per_8h=0.0,
+        funding_interval_hours=8,
+        random_seed=42,
+    )
+    em = ExecutionModel(em_cfg)
+    bt_result = em.compute_fill(
+        raw_price=FILL_PRICE,
+        qty=FILL_QTY,
+        direction="BUY",
+        bar_volume=0.0,
+        is_maker=True,  # LMT → maker
+        apply_liquidity_cap=False,
+    )
+
+    assert live_commission == pytest.approx(bt_result.commission, rel=1e-9), (
+        f"Live paper LMT commission {live_commission!r} != "
+        f"backtest ExecutionModel commission {bt_result.commission!r}"
+    )
+    # Sanity: LMT commission = fill_price * qty * maker_fee_rate
+    assert live_commission == pytest.approx(FILL_PRICE * FILL_QTY * MAKER_FEE, rel=1e-9)
+
+
+def test_live_paper_mkt_fill_commission_uses_taker_fee():
+    """MKT fill in paper mode must apply taker fee (not maker fee)."""
+    import queue
+
+    import pytest
+
+    from lumina_quant.live.execution_live import LiveExecutionHandler
+
+    FILL_PRICE = 30_000.0
+    FILL_QTY = 0.005
+    TAKER_FEE = 0.0004
+
+    events_q = queue.Queue()
+    bars = SimpleNamespace(
+        get_latest_bar_value=lambda *a, **kw: FILL_PRICE,
+        get_latest_bar_datetime=lambda *a, **kw: None,
+    )
+    config = SimpleNamespace(
+        MODE="paper",
+        ORDER_TIMEOUT=10,
+        ORDER_STATE_SOURCE="polling",
+        RECONCILIATION_POLL_FALLBACK_ENABLED=True,
+        TAKER_FEE_RATE=TAKER_FEE,
+        MAKER_FEE_RATE=0.0002,
+        SLIPPAGE_RATE=0.0005,
+        SPREAD_RATE=0.0002,
+        LEVERAGE=3,
+        MARGIN_MODE="isolated",
+        MAINTENANCE_MARGIN_RATE=0.005,
+        LIQUIDATION_BUFFER_RATE=0.0005,
+        FUNDING_RATE_PER_8H=0.0,
+        FUNDING_INTERVAL_HOURS=8,
+        MARKET_TYPE="future",
+        PAPER_EXCHANGE_PROTECTIVE_ORDERS=False,
+        ALLOW_MARKET_ORDERS=True,
+        EXCHANGE_ID="TESTNET",
+    )
+
+    class _FakeExchange:
+        pass
+
+    handler = LiveExecutionHandler(events_q, bars, config, _FakeExchange())
+
+    event = SimpleNamespace(
+        type="ORDER",
+        symbol="ETH/USDT",
+        direction="SELL",
+        quantity=FILL_QTY,
+        order_type="MKT",
+        price=None,
+        position_side="SHORT",
+        reduce_only=False,
+        client_order_id="test-parity-mkt",
+        metadata={},
+    )
+    order = {
+        "id": "order-parity-2",
+        "average": FILL_PRICE,
+        "price": FILL_PRICE,
+        "amount": FILL_QTY,
+        "filled": FILL_QTY,
+    }
+    handler._emit_fill_event(event, order, FILL_QTY, status="filled")
+
+    fill_ev = events_q.get_nowait()
+    live_commission = fill_ev.commission
+
+    # MKT applies slippage via compute_fill — commission is based on slipped price.
+    # At minimum, commission must exceed zero and must NOT equal maker-fee * notional.
+    maker_commission = FILL_PRICE * FILL_QTY * 0.0002
+    assert live_commission > 0.0, "MKT commission must be positive"
+    assert live_commission != pytest.approx(maker_commission, rel=1e-6), (
+        "MKT fill must use taker fee path, not maker fee"
+    )
+
+
 def test_evaluate_parity_window_truncated_to_parity_window_bars():
     """Only up to parity_window_bars windows are evaluated."""
     runner = ShadowLiveRunner(
