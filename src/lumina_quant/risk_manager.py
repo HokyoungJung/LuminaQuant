@@ -31,6 +31,11 @@ class RiskManager:
             getattr(config, "FREEZE_NEW_ENTRIES_ON_BREACH", True)
         )
         self.auto_flatten_on_breach = bool(getattr(config, "AUTO_FLATTEN_ON_BREACH", False))
+        # Phase 5 kill-switch envelope: consecutive-loss halt trigger
+        self.consecutive_loss_halt_count = max(
+            1, int(getattr(config, "CONSECUTIVE_LOSS_HALT_COUNT", 5))
+        )
+        self._consecutive_loss_count: int = 0
 
     @staticmethod
     def _portfolio_position_legs(portfolio, symbol) -> dict[str, float] | None:
@@ -94,6 +99,17 @@ class RiskManager:
                 getattr(order_event, "reduce_only", False)
             ):
                 return False, "Trade freeze active: new entries blocked."
+
+            # Phase 5 kill-switch: consecutive-loss auto-halt (reduce-only exempt)
+            if (
+                self._consecutive_loss_count >= self.consecutive_loss_halt_count
+                and not bool(getattr(order_event, "reduce_only", False))
+            ):
+                return (
+                    False,
+                    f"Consecutive-loss halt: {self._consecutive_loss_count} losses "
+                    f">= limit {self.consecutive_loss_halt_count}. Only reduce-only orders allowed.",
+                )
 
             total_equity = float(portfolio.current_holdings.get("total", 0.0))
             if total_equity <= 0:
@@ -232,3 +248,19 @@ class RiskManager:
         """Check if daily loss limit is hit."""
         # Already handled in Portfolio circuit breaker, but can add redundancy here.
         return True, "Passed"
+
+    # Phase 5 kill-switch: consecutive-loss tracking
+    def record_loss(self, *, realized_pnl: float) -> int:
+        """Record a realized loss.  Increments the consecutive-loss counter when
+        ``realized_pnl < 0``; resets it on a profitable fill.  Returns the updated
+        consecutive-loss count so callers can log or audit it.
+        """
+        if float(realized_pnl) < 0.0:
+            self._consecutive_loss_count += 1
+        else:
+            self._consecutive_loss_count = 0
+        return self._consecutive_loss_count
+
+    def reset_consecutive_losses(self) -> None:
+        """Manually reset the consecutive-loss counter (e.g. after operator review)."""
+        self._consecutive_loss_count = 0
