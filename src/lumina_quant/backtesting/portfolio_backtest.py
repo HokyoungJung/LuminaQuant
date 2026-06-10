@@ -3,6 +3,7 @@ from collections import deque
 from datetime import UTC, date, datetime
 
 import polars as pl
+from lumina_quant.backtesting.execution_model import ExecutionModel, ExecutionModelConfig
 from lumina_quant.core.events import FillEvent, OrderEvent
 from lumina_quant.core.order_policy import (
     canonical_order_type,
@@ -81,6 +82,8 @@ class Portfolio:
         )
         self.leverage = getattr(config, "LEVERAGE", 1.0)
         self.default_stop_loss_pct = getattr(config, "DEFAULT_STOP_LOSS_PCT", 0.01)
+        # Phase 4 unified cost model — funding and liquidation delegate to this.
+        self.execution_model = ExecutionModel(ExecutionModelConfig.from_config_obj(config))
         self._current_day = None
         self._last_funding_ts = dict.fromkeys(self.symbol_list)
         self.total_funding_paid = 0.0
@@ -484,9 +487,8 @@ class Portfolio:
             return None
 
     def _apply_funding(self, latest_datetime):
-        interval_hours = max(1, int(getattr(self.config, "FUNDING_INTERVAL_HOURS", 8)))
-        interval_seconds = interval_hours * 3600
-        default_rate_per_8h = float(getattr(self.config, "FUNDING_RATE_PER_8H", 0.0))
+        interval_seconds = self.execution_model.cfg.funding_interval_hours * 3600
+        default_rate_per_8h = self.execution_model.cfg.funding_rate_per_8h
 
         now_ts = self._to_unix_seconds(latest_datetime)
         if now_ts is None:
@@ -519,14 +521,14 @@ class Portfolio:
                 self._last_funding_ts[symbol] = now_ts
                 continue
 
-            interval_rate = float(rate_per_8h) * (interval_hours / 8.0)
-            if abs(interval_rate) <= 1e-12:
-                self._last_funding_ts[symbol] = last_ts + periods * interval_seconds
-                continue
-
-            # Positive funding rate: longs pay, shorts receive.
-            signed = 1.0 if qty > 0 else -1.0
-            funding_payment = signed * notional * interval_rate * periods
+            # Delegate payment computation to the unified ExecutionModel.
+            # Returns 0.0 when abs(rate) <= 1e-12 — timestamp still advances below.
+            funding_payment = self.execution_model.compute_funding_payment(
+                signed_qty=qty,
+                price=price,
+                periods=periods,
+                rate=rate_per_8h,
+            )
             self.current_holdings["cash"] -= funding_payment
             self.current_holdings["total"] -= funding_payment
             self.current_holdings["funding"] += funding_payment
@@ -561,36 +563,11 @@ class Portfolio:
         return float(default)
 
     def _check_liquidations(self, latest_datetime):
-        leverage = max(1, int(getattr(self.config, "LEVERAGE", 1)))
+        # leverage <= 1 guard is implicit: execution_model.liquidation_price() returns None.
         configured_margin_mode = (
             str(getattr(self.config, "MARGIN_MODE", "isolated") or "isolated").strip().lower()
         )
         modeled_margin_mode = "isolated"
-        mmr = float(getattr(self.config, "MAINTENANCE_MARGIN_RATE", 0.005))
-        liq_buffer = float(getattr(self.config, "LIQUIDATION_BUFFER_RATE", 0.0))
-        if leverage <= 1:
-            return
-
-        fee_rate = float(
-            getattr(
-                self.config,
-                "TAKER_FEE_RATE",
-                getattr(self.config, "COMMISSION_RATE", 0.001),
-            )
-        )
-
-        def calc_liq_price(entry_price, qty):
-            """Approximate isolated USDT-M liquidation price with maintenance margin and fee/buffer safety.
-            Long  : entry * (1 - 1/L + MMR + fee + buffer)
-            Short : entry * (1 + 1/L - MMR - fee - buffer)
-            """
-            if qty > 0:
-                factor = 1.0 - (1.0 / leverage) + mmr + fee_rate + liq_buffer
-                factor = max(0.0, min(factor, 1.0))
-                return entry_price * factor
-            factor = 1.0 + (1.0 / leverage) - mmr - fee_rate - liq_buffer
-            factor = max(1.0, factor)
-            return entry_price * factor
 
         for symbol in self.symbol_list:
             qty = float(self.current_positions.get(symbol, 0.0))
@@ -609,25 +586,27 @@ class Portfolio:
             if close_price <= 0:
                 continue
 
-            liq_price = calc_liq_price(entry_price, qty)
+            # Delegate liquidation price and breach detection to ExecutionModel.
+            liq_price = self.execution_model.liquidation_price(qty=qty, entry_price=entry_price)
+            if liq_price is None:
+                # leverage <= 1 — no liquidation possible for this symbol.
+                continue
 
-            if qty > 0:
-                breached = (bar_low > 0 and bar_low <= liq_price) or close_price <= liq_price
-                direction = "SELL"
-                position_side = "LONG"
-                trigger_price = bar_low if (bar_low > 0 and bar_low <= liq_price) else close_price
-            else:
-                breached = (bar_high > 0 and bar_high >= liq_price) or close_price >= liq_price
-                direction = "BUY"
-                position_side = "SHORT"
-                trigger_price = (
-                    bar_high if (bar_high > 0 and bar_high >= liq_price) else close_price
-                )
-
+            breached, trigger_price = self.execution_model.check_liquidation(
+                qty=qty,
+                entry_price=entry_price,
+                bar_low=bar_low,
+                bar_high=bar_high,
+                close_price=close_price,
+            )
             if not breached:
                 continue
 
+            direction = "SELL" if qty > 0 else "BUY"
+            position_side = "LONG" if qty > 0 else "SHORT"
             abs_qty = abs(qty)
+            fee_rate = self.execution_model.cfg.taker_fee_rate
+            leverage = self.execution_model.cfg.leverage
             fill_cost = trigger_price * abs_qty
             commission = fill_cost * fee_rate
             fill_event = FillEvent(

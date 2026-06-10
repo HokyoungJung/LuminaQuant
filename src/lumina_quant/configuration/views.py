@@ -74,6 +74,7 @@ class BacktestConfigView:
         self.FUNDING_INTERVAL_HOURS = int(ex.funding_interval_hours)
         self.MAINTENANCE_MARGIN_RATE = float(ex.maintenance_margin_rate)
         self.LIQUIDATION_BUFFER_RATE = float(ex.liquidation_buffer_rate)
+        self.SIM_MAX_BAR_VOLUME_RATIO = float(ex.max_bar_volume_ratio)
         self.GPU_MODE = str(ex.gpu_mode)
         self.COMPUTE_BACKEND = str(ex.compute_backend)
         self.GPU_VRAM_GB = float(ex.gpu_vram_gb)

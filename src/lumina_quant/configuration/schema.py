@@ -75,6 +75,7 @@ class ExecutionConfig:
     funding_interval_hours: int = 8
     maintenance_margin_rate: float = 0.005
     liquidation_buffer_rate: float = 0.0005
+    max_bar_volume_ratio: float = 0.1
     compute_backend: str = "gpu"
     gpu_mode: str = "gpu"
     gpu_vram_gb: float = 8.0
