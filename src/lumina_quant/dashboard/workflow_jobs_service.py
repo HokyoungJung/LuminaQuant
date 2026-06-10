@@ -198,3 +198,40 @@ __all__ = [
     "normalize_workflow_jobs_frame",
     "resolve_dashboard_postgres_dsn",
 ]
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Module-mode entry for workflow-jobs and workflow-jobs/control routes.
+
+    ``--fn load``    → load_recent_workflow_jobs_payload (default)
+    ``--fn control`` → control_workflow_job (requires --job-id and --action)
+    """
+    import argparse
+    import json
+
+    parser = argparse.ArgumentParser(
+        prog="lumina_quant.dashboard.workflow_jobs_service",
+        description="Emit workflow-jobs payload or control a job.",
+    )
+    parser.add_argument("--json", action="store_true", default=True,
+                        help="Output as JSON (default and only output mode).")
+    parser.add_argument("--fn", choices=["load", "control"], default="load",
+                        help="Function to invoke (default: load).")
+    parser.add_argument("--limit", type=int, default=10,
+                        help="Max jobs to return (load only, default: 10).")
+    parser.add_argument("--job-id", default="", dest="job_id",
+                        help="Job ID for control action.")
+    parser.add_argument("--action", default="stop",
+                        help="Control action: stop | kill (default: stop).")
+    args = parser.parse_args(argv)
+
+    if args.fn == "control":
+        payload = control_workflow_job(dsn=None, job_id=args.job_id, action=args.action)
+    else:
+        payload = load_recent_workflow_jobs_payload(limit=args.limit)
+    print(json.dumps(payload, indent=2, sort_keys=True, default=str))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

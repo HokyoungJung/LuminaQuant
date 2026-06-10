@@ -155,11 +155,21 @@ def test_load_exact_window_bundle_records_followup_parse_warnings(tmp_path: Path
     assert "broken.json" in payload["warnings"][0]
 
 
-def test_main_dashboard_stub_points_users_to_next_dashboard():
-    root = Path(__file__).resolve().parents[1]
-    source = (root / "src" / "lumina_quant" / "dashboard" / "retired_stub.py").read_text(
-        encoding="utf-8"
+def test_bridge_module_exposes_v2_contract() -> None:
+    """Regression guard: bridge.py must expose DashboardBridgeContractV2 with 11 routes.
+
+    The retired_stub.py was deleted in Phase 6; this test replaces the old stub
+    text assertion with a structural check on the v2 contract.
+    """
+    from lumina_quant.dashboard.bridge import (
+        DashboardBridgeContractV2,
+        build_dashboard_bridge_contract_v2,
     )
 
-    assert "Dashboard Runtime Retired" in source
-    assert "uv run lq dashboard --run" in source
+    contract = build_dashboard_bridge_contract_v2()
+    assert contract.CONTRACT_VERSION == 2
+    assert contract.launch_mode == "next"
+    assert len(contract.routes) == 11
+    route_paths = [r.route for r in contract.routes]
+    assert "/api/python/dashboard/overview" in route_paths
+    assert "/api/python/dashboard/risk-health" in route_paths

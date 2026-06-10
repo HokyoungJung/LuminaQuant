@@ -46,7 +46,7 @@ def empty_overview_payload(*, contract: Any, reason: str) -> dict[str, Any]:
         "drawdown_curve": [],
         "source": {
             "mode": contract.launch_mode,
-            "backend": contract.python_backend,
+            "backend": getattr(contract, "python_backend", "python"),
             "status": reason,
         },
     }
@@ -177,7 +177,7 @@ def build_overview_payload_from_frames(
         ],
         "source": {
             "mode": contract.launch_mode,
-            "backend": contract.python_backend,
+            "backend": getattr(contract, "python_backend", "python"),
             "status": "ok",
             "run_id": run_id,
         },

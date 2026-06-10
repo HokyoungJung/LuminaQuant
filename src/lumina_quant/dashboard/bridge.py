@@ -267,49 +267,40 @@ __all__ = [
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Print the dashboard migration bridge contract.")
-    parser.add_argument("--json", action="store_true", help="Print the contract as JSON.")
-    parser.add_argument(
-        "--next-app-dir",
-        default=str(Path(__file__).resolve().parents[3] / "apps" / "dashboard_web"),
+    """Module-mode entry for the dashboard overview route.
+
+    Default (``--json``) emits the overview payload — this is what the frontend
+    calls via ``runUvPythonModuleJson("lumina_quant.dashboard.bridge", "--json")``.
+
+    ``--print-contract`` emits the v2 bridge contract (diagnostic).
+    ``--overview-json`` is a legacy alias for ``--json``.
+    """
+    parser = argparse.ArgumentParser(
+        prog="lumina_quant.dashboard.bridge",
+        description="Emit dashboard overview payload or print the v2 bridge contract.",
     )
-    parser.add_argument(
-        "--retired-stub-path",
-        default=str(
-            Path(__file__).resolve().parents[3]
-            / "src"
-            / "lumina_quant"
-            / "dashboard"
-            / "retired_stub.py"
-        ),
-    )
-    parser.add_argument("--compat-path", default=DEFAULT_DASHBOARD_COMPAT_PATH)
-    parser.add_argument("--overview-json", action="store_true", help="Print overview payload JSON.")
+    parser.add_argument("--json", action="store_true", default=False,
+                        help="Emit overview payload as JSON (module-mode default).")
+    parser.add_argument("--overview-json", action="store_true", dest="overview_json",
+                        help="Alias for --json (legacy compat).")
+    parser.add_argument("--print-contract", action="store_true", dest="print_contract",
+                        help="Print DashboardBridgeContractV2 as JSON and exit.")
     args = parser.parse_args(argv)
 
-    if args.overview_json:
-        print(
-            json.dumps(
-                load_overview_payload(
-                    launch_mode="next",
-                    compatibility_path=args.compat_path,
-                ),
-                indent=2,
-                sort_keys=True,
-            )
-        )
+    if args.print_contract:
+        contract = build_dashboard_bridge_contract_v2()
+        print(json.dumps(contract.to_dict(), indent=2, sort_keys=True))
         return 0
 
-    contract = resolve_dashboard_bridge_contract(
-        launch_mode="next",
-        retired_stub_path=args.retired_stub_path,
-        next_app_dir=args.next_app_dir,
-        compatibility_path=args.compat_path,
+    # Default: emit overview payload (--json or --overview-json or bare invocation)
+    print(
+        json.dumps(
+            load_overview_payload(launch_mode="next"),
+            indent=2,
+            sort_keys=True,
+            default=str,
+        )
     )
-    if args.json:
-        print(json.dumps(contract.to_dict(), indent=2, sort_keys=True))
-    else:
-        print(contract.compatibility_path)
     return 0
 
 

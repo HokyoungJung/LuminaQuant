@@ -122,3 +122,26 @@ def load_risk_health_payload(*, dsn: str | None = None, limit: int = 25) -> dict
 
 
 __all__ = ["empty_risk_health_payload", "load_risk_health_payload"]
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Module-mode entry: uv run python -m lumina_quant.dashboard.risk_health_service --json."""
+    import argparse
+    import json
+
+    parser = argparse.ArgumentParser(
+        prog="lumina_quant.dashboard.risk_health_service",
+        description="Emit risk-health dashboard payload as JSON.",
+    )
+    parser.add_argument("--json", action="store_true", default=True,
+                        help="Output payload as JSON (default and only output mode).")
+    parser.add_argument("--limit", type=int, default=25,
+                        help="Max rows per table (default: 25).")
+    args = parser.parse_args(argv)
+    payload = load_risk_health_payload(limit=args.limit)
+    print(json.dumps(payload, indent=2, sort_keys=True, default=str))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
