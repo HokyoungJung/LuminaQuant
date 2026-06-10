@@ -2,9 +2,9 @@
 
 Bar engine pipeline:
     data_handler  →  events queue  →  strategy / portfolio / execution_handler
-    BacktestConfigView (Phase 1 bridge, DELETION-GATE: Phase 4) carries uppercase-attr
-    config to Portfolio and ExecutionHandler.  Pass a plain ``RuntimeConfig`` and this
-    module wraps it automatically.
+    BacktestConfigView (permanent engine-private adapter, backtesting/_config_view.py)
+    carries uppercase-attr config to Portfolio and ExecutionHandler.  Pass a plain
+    ``RuntimeConfig`` and this module wraps it automatically.
 
 Compute backends (Phase 2):
     Metric evaluation routes through ``optimization.native_backend`` →

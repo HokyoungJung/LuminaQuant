@@ -1,7 +1,18 @@
-"""BacktestConfigView — private uppercase-attr adapter for the backtest engine.
+"""BacktestConfigView — permanent engine-private uppercase-attr adapter.
 
-Moved here from configuration/views.py in Phase 6 (views.py deletion gate).
-Only backtest.py should import this; all new code uses RuntimeConfig directly.
+Status: PERMANENT BY DESIGN (Phase 6, 2026-06-10).
+
+Rationale: ~15 research scripts and the backtest engine internals (portfolio_backtest,
+execution_sim) legitimately depend on the uppercase-attr surface.  Migrating all call
+sites to RuntimeConfig direct access would be pure churn with no correctness benefit.
+BacktestConfigView is intentional API — private to this package, engine-scoped.
+
+Migration path (to remove entirely one day): replace all uppercase-attr access in
+scripts and engine internals with typed RuntimeConfig dotpath access, then delete.
+No timeline is committed; Phase 7 may audit but does NOT own the deletion.
+
+configuration/__init__.py re-exports this class so research scripts can continue to
+``from lumina_quant.configuration import BacktestConfigView`` without change.
 """
 
 from __future__ import annotations
