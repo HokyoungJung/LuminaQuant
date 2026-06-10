@@ -25,7 +25,7 @@ from typing import Any
 
 @dataclass(slots=True)
 class ExecutionModelConfig:
-    """Immutable parameter bundle — build via ``from_runtime()`` or ``from_config_obj()``."""
+    """Immutable parameter bundle — build via ``from_runtime()``."""
 
     taker_fee_rate: float
     maker_fee_rate: float
@@ -80,31 +80,33 @@ class ExecutionModelConfig:
             max_bar_volume_ratio=float(getattr(ex, "max_bar_volume_ratio", 0.1)),
         )
 
-    @classmethod
-    def from_config_obj(cls, config: Any) -> ExecutionModelConfig:
-        """Construct from a ``BacktestConfigView`` (Phase 1 bridge, DELETION-GATE: Phase 4).
 
-        ``getattr`` fallbacks are identical to the legacy engine defaults so behaviour
-        is unchanged while ``BacktestConfigView`` is still in use.
-        """
-        return cls(
-            taker_fee_rate=float(
-                getattr(config, "TAKER_FEE_RATE", getattr(config, "COMMISSION_RATE", 0.001))
-            ),
-            maker_fee_rate=float(getattr(config, "MAKER_FEE_RATE", 0.0002)),
-            slippage_rate=float(getattr(config, "SLIPPAGE_RATE", 0.0005)),
-            spread_rate=float(getattr(config, "SPREAD_RATE", 0.0002)),
-            leverage=max(1, int(getattr(config, "LEVERAGE", 1))),
-            margin_mode=str(
-                getattr(config, "MARGIN_MODE", "isolated") or "isolated"
-            ).strip().lower(),
-            maintenance_margin_rate=float(getattr(config, "MAINTENANCE_MARGIN_RATE", 0.005)),
-            liquidation_buffer_rate=float(getattr(config, "LIQUIDATION_BUFFER_RATE", 0.0)),
-            funding_rate_per_8h=float(getattr(config, "FUNDING_RATE_PER_8H", 0.0)),
-            funding_interval_hours=max(1, int(getattr(config, "FUNDING_INTERVAL_HOURS", 8))),
-            random_seed=int(getattr(config, "RANDOM_SEED", 42)),
-            max_bar_volume_ratio=float(getattr(config, "SIM_MAX_BAR_VOLUME_RATIO", 0.1)),
-        )
+def _config_from_attrs(config: Any) -> ExecutionModelConfig:
+    """Build ``ExecutionModelConfig`` from an uppercase-attr config object.
+
+    Used only by ``SimulatedExecutionHandler`` and ``Portfolio`` when they receive
+    a plain mock config (unit-test path).  Production code supplies a
+    ``BacktestConfigView`` which carries ``._rt``; those callers use
+    ``ExecutionModelConfig.from_runtime(config._rt)`` instead.
+    """
+    return ExecutionModelConfig(
+        taker_fee_rate=float(
+            getattr(config, "TAKER_FEE_RATE", getattr(config, "COMMISSION_RATE", 0.001))
+        ),
+        maker_fee_rate=float(getattr(config, "MAKER_FEE_RATE", 0.0002)),
+        slippage_rate=float(getattr(config, "SLIPPAGE_RATE", 0.0005)),
+        spread_rate=float(getattr(config, "SPREAD_RATE", 0.0002)),
+        leverage=max(1, int(getattr(config, "LEVERAGE", 1))),
+        margin_mode=str(
+            getattr(config, "MARGIN_MODE", "isolated") or "isolated"
+        ).strip().lower(),
+        maintenance_margin_rate=float(getattr(config, "MAINTENANCE_MARGIN_RATE", 0.005)),
+        liquidation_buffer_rate=float(getattr(config, "LIQUIDATION_BUFFER_RATE", 0.0)),
+        funding_rate_per_8h=float(getattr(config, "FUNDING_RATE_PER_8H", 0.0)),
+        funding_interval_hours=max(1, int(getattr(config, "FUNDING_INTERVAL_HOURS", 8))),
+        random_seed=int(getattr(config, "RANDOM_SEED", 42)),
+        max_bar_volume_ratio=float(getattr(config, "SIM_MAX_BAR_VOLUME_RATIO", 0.1)),
+    )
 
 
 @dataclass(slots=True)

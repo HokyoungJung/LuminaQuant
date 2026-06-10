@@ -3,7 +3,11 @@ from collections import deque
 from datetime import UTC, date, datetime
 
 import polars as pl
-from lumina_quant.backtesting.execution_model import ExecutionModel, ExecutionModelConfig
+from lumina_quant.backtesting.execution_model import (
+    ExecutionModel,
+    ExecutionModelConfig,
+    _config_from_attrs,
+)
 from lumina_quant.core.events import FillEvent, OrderEvent
 from lumina_quant.core.order_policy import (
     canonical_order_type,
@@ -83,7 +87,13 @@ class Portfolio:
         self.leverage = getattr(config, "LEVERAGE", 1.0)
         self.default_stop_loss_pct = getattr(config, "DEFAULT_STOP_LOSS_PCT", 0.01)
         # Phase 4 unified cost model — funding and liquidation delegate to this.
-        self.execution_model = ExecutionModel(ExecutionModelConfig.from_config_obj(config))
+        # BacktestConfigView carries ._rt (RuntimeConfig); use from_runtime for production.
+        # Plain class configs (unit tests) use _config_from_attrs.
+        _rt = getattr(config, "_rt", None)
+        self.execution_model = ExecutionModel(
+            ExecutionModelConfig.from_runtime(_rt) if _rt is not None
+            else _config_from_attrs(config)
+        )
         self._current_day = None
         self._last_funding_ts = dict.fromkeys(self.symbol_list)
         self.total_funding_paid = 0.0

@@ -28,7 +28,7 @@ Usage
 
     validator = TickReplayValidator(
         aggtrades_df=df,
-        execution_cfg=ExecutionModelConfig.from_config_obj(config),
+        execution_cfg=ExecutionModelConfig.from_runtime(rt),
     )
     verdict = validator.validate()
     assert verdict["lmt_verdict"] == "PASS"

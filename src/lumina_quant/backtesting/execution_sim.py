@@ -4,7 +4,11 @@ from abc import ABC, abstractmethod
 from copy import deepcopy
 from typing import Any
 
-from lumina_quant.backtesting.execution_model import ExecutionModel, ExecutionModelConfig
+from lumina_quant.backtesting.execution_model import (
+    ExecutionModel,
+    ExecutionModelConfig,
+    _config_from_attrs,
+)
 from lumina_quant.core.events import FillEvent
 
 
@@ -47,7 +51,13 @@ class SimulatedExecutionHandler(ExecutionHandler):
         self._order_seq = 0
 
         # Phase 4 unified cost model — replaces FillModel + LiquidityModel for fills.
-        self.execution_model = ExecutionModel(ExecutionModelConfig.from_config_obj(config))
+        # BacktestConfigView carries ._rt (RuntimeConfig); production path uses from_runtime.
+        # Plain mock configs (unit tests) fall back to _config_from_attrs.
+        _rt = getattr(config, "_rt", None)
+        self.execution_model = ExecutionModel(
+            ExecutionModelConfig.from_runtime(_rt) if _rt is not None
+            else _config_from_attrs(config)
+        )
         # Keep FillModel and LiquidityModel instances for any external callers that
         # reference them directly (deprecated — DELETION-GATE: Phase 4).
         self.fill_model = FillModel(config)

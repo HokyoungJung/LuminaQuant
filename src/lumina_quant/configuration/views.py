@@ -9,7 +9,8 @@ no global state, no os.environ mutation.
 Consumers and deletion schedule
 ---------------------------------
 BacktestConfigView  — consumed by backtesting/backtest.py, cli/backtest.py
-                      DELETION-GATE: Phase 4 (Backtest & validation engine overhaul)
+                      DELETION-GATE: Phase 5 (Live trading path rewrite — uppercase attrs
+                      not needed once engine migrates to typed RuntimeConfig attrs directly)
 LiveConfigView      — consumed by live/trader.py
                       DELETION-GATE: Phase 5 (Live trading path rewrite)
 """
@@ -19,17 +20,24 @@ from __future__ import annotations
 from lumina_quant.configuration.schema import RuntimeConfig
 
 
-# DELETION-GATE: Phase 4
+# DELETION-GATE: Phase 5
 class BacktestConfigView:
     """Typed config bag for backtest engine — uppercase attrs from RuntimeConfig.
 
     Covers BaseConfig + BacktestConfig + LiveConfig attribute sets that
     portfolio_backtest.py, execution_sim.py, and backtest.py need.
 
-    DELETION-GATE: Phase 4 — migrate consumers to typed RuntimeConfig attrs directly.
+    Stores ``._rt`` (the originating ``RuntimeConfig``) so engine components can call
+    ``ExecutionModelConfig.from_runtime(config._rt)`` directly.
+
+    DELETION-GATE: Phase 5 — migrate consumers to typed RuntimeConfig attrs directly.
     """
 
     def __init__(self, runtime: RuntimeConfig) -> None:
+        # Stored so ExecutionModelConfig.from_runtime() can be called by engine
+        # components that receive a BacktestConfigView rather than a RuntimeConfig.
+        self._rt: RuntimeConfig = runtime
+
         bt = runtime.backtest
         tr = runtime.trading
         rk = runtime.risk
