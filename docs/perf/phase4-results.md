@@ -1,8 +1,13 @@
 # Phase 4 Performance Results
 
-Measured 2026-06-10 on the Phase 4 refactor tree (`refactor/overhaul`).
-Workload is SHA-pinned (PROVENANCE.json): BTCUSDT + ETHUSDT synthetic 1 000-day
-fixtures, seed 42, identical hardware to Phase 0 baseline.
+Measured on the `refactor/overhaul` tree. Speedups are correctness-gated: the
+golden integration test (`tests/integration/test_walk_forward_golden.py`) asserts
+Variant-B fold metrics match the committed baseline at **rtol 1e-8**, so every
+number below produces bit-identical results to the pre-refactor engine.
+
+Baseline denominator (frozen Phase 0): `baseline/bench_backtest.json` —
+**MovingAverageCrossStrategy, 2 symbols (BTC/USDT + ETH/USDT), 22.443 bars/sec**,
+py3.11.15. This is the immutable denominator for the single-backtest axis.
 
 ---
 
@@ -10,77 +15,94 @@ fixtures, seed 42, identical hardware to Phase 0 baseline.
 
 | Axis | Baseline (Phase 0) | Phase 4 | Speedup |
 |------|--------------------|---------|---------|
-| **bars/sec** (median, 3 iters, 1 268 bars, 14 symbols, RsiStrategy, seed 42) | 22.44 | 6 632 | **295×** |
-| **Single-backtest median wall-clock** (same workload) | 56.50 s | 0.191 s | 295× |
-| **Walk-forward E2E** (27 runs: 3 folds × 9 MA-cross combos, SHA-pinned fixtures) | 170.71 s | 1.768 s | **97×** |
-| **Walk-forward runs/sec** | 0.158 | 15.27 | 97× |
+| **Single backtest — like-for-like** (MA-cross, 2 symbols, seed 42, bit-identical) | 22.443 bars/sec | ~5 900 bars/sec | **~263×** |
+| **Walk-forward E2E** (27 runs: 3 folds × 9 MA-cross combos, SHA-pinned fixtures) | 170.71 s | 1.768 s | **~97×** |
+| **Walk-forward runs/sec** | 0.158 | 15.27 | ~97× |
 
-Independent verification (team-lead, same workload): 6 904 bars/sec (308×),
-1.800 s E2E (95×).  Difference is run-to-run noise (JIT warm-up, OS scheduler).
+The single-backtest figure is now an **honest like-for-like**: numerator and
+denominator run the *same* workload (MA-cross / 2 symbols). A contended in-repo
+re-run via `scripts/benchmark_backtest.py --strategy MovingAverageCrossStrategy
+--symbols BTC/USDT,ETH/USDT` reproduces ~5 660 bars/sec (~252×) under concurrent
+CPU load — consistent with the ~263× isolated figure (run-to-run + scheduler
+noise). The benchmark records the deterministic trade activity it exercised:
+**106 signals → 106 orders → 118 fills** per iteration.
 
-Baseline source: `baseline/perf-baseline.json`
-Phase 4 snapshots: `reports/benchmarks/baseline_snapshot.json`,
-`baseline/bench_walkforward_e2e.json`
+> **Correction to the prior version of this doc.** The earlier "295×" headline
+> compared *different* workloads: the numerator was `RsiStrategy` over 14 symbols
+> (`reports/benchmarks/baseline_snapshot.json`, 6 632 bars/sec) while the frozen
+> denominator is `MovingAverageCrossStrategy` over 2 symbols (22.443 bars/sec).
+> The Before/After table also mislabelled the baseline row as "14 symbols,
+> RsiStrategy". Strategy choice changes the old-engine cost dramatically (RSI
+> fired fewer signals → fewer config reloads → looked faster), so 295× was a
+> cross-workload ratio, not a like-for-like speedup. The honest same-workload
+> number is ~263×, published above.
 
 ---
 
 ## Attribution
 
-All speedup is correctness-gated: the golden integration test
-(`tests/integration/test_walk_forward_golden.py`) asserts Variant-B fold metrics
-agree with the committed baseline at **rtol 1e-8**.
+### Single-backtest axis — NOT the Phase 2 native kernels
 
-### Primary driver — Phase 2 pyo3 kernels
+The earlier doc credited the single-backtest speedup to the Phase 2 pyo3 signal
+kernels. **That attribution was false for this benchmark.** The like-for-like
+workload is `MovingAverageCrossStrategy`, whose signals come from
+`indicators/moving_average.RollingMeanWindow` — **pure Python; it never calls
+`lumina_quant._compute`**. The pyo3 live-signal kernels
+(`debounced_state_signal` / `trailing_state_signal`) are part of the *live*
+debounced/trailing state path and are **not exercised by the bars/sec
+benchmark** at all.
 
-The walk-forward optimizer loop calls `fast_eval.py` → `walkers.py` →
-`lumina_quant._compute.evaluate_metrics` (Rust) and
-`lumina_quant._compute.simulate_symbol_fold` (Rust).  These replace the
-pure-Python per-bar event loop for the inner fold evaluation.  A single
-`simulate_symbol_fold` call vectorises the entire fold in Rust; Python overhead
-is one FFI call per fold, not one Python function call per bar.
+The actual driver is the **`BacktestConfigView` refactor**: the pre-refactor
+engine re-read and re-parsed the YAML config on the hot path — on the order of
+**~1,494 config reloads per backtest** (once per fill/decision cycle through the
+old `getattr(config, "UPPER_ATTR")` chain that reloaded settings). The refactor
+constructs one typed config view at engine start and reads dataclass fields
+thereafter, eliminating those reloads. The **Python 3.14 interpreter stack lift**
+(faster call/attribute dispatch) contributes the rest. Both are correctness-
+neutral, hence the bit-identical golden.
 
-### Secondary driver — Phase 4.1 unified ExecutionModel
+### Walk-forward axis — the Phase 2 native fold simulator
 
-`ExecutionModelConfig.from_runtime()` is called once at construction and the
-hot-path `compute_fill()` method is a plain Python function with no attribute
-lookup overhead beyond `self._rng`.  The previous per-fill `getattr` chain
-(FillModel + LiquidityModel + LatencyModel all reading from BacktestConfigView
-at fill time) is replaced by a single dataclass field access.
+The walk-forward optimizer loop *does* use the native kernels: `fast_eval.py` →
+`walkers.py` → `lumina_quant._compute.evaluate_metrics` and
+`lumina_quant._compute.simulate_symbol_fold` (Rust). A single
+`simulate_symbol_fold` call vectorises an entire fold in Rust; Python overhead is
+one FFI call per fold rather than one Python call per bar. This is where the
+~97× on the optimization axis (spec R4, the primary user bottleneck) comes from.
 
-### Why the single-backtest event loop is untouched
+### Why the single-backtest event loop stays pure-Python
 
-The `Backtest` event loop in `backtest.py` is intentionally left as an
-event-driven pure-Python loop in Phase 4.  The loop processes one bar per
-iteration (`market → signals → orders → fills`); this structure is needed for
-live parity (Phase 5) and for correct LMT order lifecycle management.
+The `Backtest` event loop processes one bar per iteration
+(`market → signals → orders → fills`) by design — required for live parity
+(Phase 5) and correct LMT order lifecycle management. A future vectorised bar
+engine could cut event-dispatch overhead further; tracked as a Phase 7+
+follow-up. It is not on the critical path for optimization workloads.
 
-The speedup on the single-backtest axis comes entirely from the fact that
-`benchmark_backtest.py` exercises `RsiStrategy`, which routes signal computation
-through `lumina_quant._compute.debounced_state_signal` / `trailing_state_signal`
-(Phase 2 kernels).  The per-bar overhead of the Python event dispatch
-(`Queue.put` / `Queue.get`) is now amortised by the fast kernel; on the 1 268-bar
-benchmark the combined event-loop overhead is ~0.19 s.
+---
 
-**Path to further improvement**: a vectorised bar engine (processing all bars in
-a single NumPy/Rust pass before feeding the event queue) would further reduce the
-event-loop overhead for the single-backtest axis.  This is tracked as a Phase 7+
-follow-up.  The walk-forward optimizer is the primary user bottleneck (spec R4)
-and is already ~97× faster; the event-loop is not on the critical path for
-optimization workloads.
+## Data coverage caveat
+
+Only **2 of the 14 symbols** in `config.yaml`'s `trading.symbols` ship committed
+CSV data (`data/BTCUSDT.csv`, `data/ETHUSDT.csv`). `benchmark_backtest.py` now
+**trims the symbol list to those with data files and reports the skipped
+symbols** (it never silently benchmarks empty/phantom series), and it **asserts
+`signals > 0` and `fills > 0`** so a no-op run can never masquerade as a fast one.
 
 ---
 
 ## Measurement commands
 
 ```bash
-uv run python scripts/benchmark_backtest.py --iters 3 --seed 42
-uv run python scripts/measure_walkforward_e2e.py --output docs/perf/data/bench_walkforward_e2e.json
+# Like-for-like single-backtest (same workload as the frozen baseline):
+uv run python scripts/benchmark_backtest.py \
+  --strategy MovingAverageCrossStrategy --symbols BTC/USDT,ETH/USDT \
+  --iters 3 --seed 42 --output docs/perf/data/bench_backtest_macross.json
+
+# Walk-forward E2E:
+uv run python scripts/measure_walkforward_e2e.py \
+  --output docs/perf/data/bench_walkforward_e2e.json
 ```
 
-> **Frozen-baseline rule**: `baseline/` is a frozen Phase 0 artifact set — the numbers
-> in `baseline/perf-baseline.json` are the permanent denominators.  Re-measurements
-> MUST write outside `baseline/` (e.g. `docs/perf/data/` or `/tmp/`).  Never pass
-> `--output baseline/...` or allow a script's default to target that directory.
-> `benchmark_backtest.py` already defaults to `reports/benchmarks/`; the
-> `measure_walkforward_e2e.py` default was corrected from `baseline/` to
-> `docs/perf/data/` in the same commit as this doc.
+> **Frozen-baseline rule**: `baseline/` is an immutable Phase 0 artifact set.
+> Re-measurements MUST write outside `baseline/` (e.g. `docs/perf/data/`). Never
+> pass `--output baseline/...` or let a script default there.
