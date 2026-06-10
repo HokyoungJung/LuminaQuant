@@ -167,6 +167,13 @@ jobs:
       - name: Run full pytest suite
         run: uv run pytest -q
 
+      - name: Generate benchmark smoke data
+        # The perf/8GB smoke gate needs OHLCV CSVs; the repo ships none (data/ is
+        # gitignored). Generate BTCUSDT/ETHUSDT via the repo's own generator so the
+        # benchmark has real symbols to run — benchmark_backtest now fails loudly
+        # (rather than silently skipping) when no symbol data is present.
+        run: uv run python generate_data.py
+
       - name: Benchmark smoke + 8GB baseline gate
         env:
           LQ_GPU_MODE: cpu
