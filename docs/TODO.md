@@ -7,7 +7,37 @@ is specified so a future agent can implement it without re-deriving context.
 
 ## 1. Warmup context end-to-end in the event-driven engine (priority: HIGH before live walk-forward param selection)
 
-**Status:** documented gap — see `docs/divergences/walk_forward_warmup_engine_gap.md`.
+**Status:** DONE (2026-06-11) — implemented per the plan below; see the
+resolution section in `docs/divergences/walk_forward_warmup_engine_gap.md`.
+Implementation summary:
+
+- `Backtest(warmup_bars=N)`: data handler loads from
+  `start_date - warmup_bars x strategy_timeframe`; `start_date` stays the
+  trading boundary. Raises `InsufficientWarmupError` when the loaded data
+  provides fewer than `warmup_bars` strategy-timeframe buckets of context.
+  Skip-ahead is disabled inside the warmup region (it would drop warmup bars).
+- `TradingEngine(live_start_ms=...)`: warmup events still reach
+  `strategy.calculate_signals` (and the timeframe aggregator), but
+  `update_timeindex` / `check_open_orders` / signal→order→fill handling are
+  suppressed — per-bar inside `handle_market_window_event` for straddling
+  windows. Warmup boundary uses naive-UTC bar-time semantics (matches
+  `HistoricCSVDataHandler._bar_time_ms`, NOT local-tz `datetime.timestamp()`).
+- `run_backtest_chunked(warmup_bars=N)`: warmup attaches to the first
+  non-empty chunk only; the runner extends that chunk's `data_loader` call
+  backwards by the warmup span (`cli/optimize.py`'s `_chunk_loader` therefore
+  passes `warmup_bars=0` to the repo — single point of extension).
+- `cli/optimize.py`: `BT_CHUNK_WARMUP_BARS` honoured in BOTH fold-eval paths
+  (chunked parquet + in-memory slice); fold windows are filtered against
+  `data_start + warmup_span` so every fold has full context;
+  `InsufficientWarmupError` propagates; `-999.0` sentinel kept ONLY for
+  no-data windows and `ValueError` infeasible-param combos (`"infeasible":
+  True` row) — all other exceptions now propagate.
+- Acceptance tests: `tests/test_engine_warmup.py`,
+  `tests/test_optimize_warmup_sentinels.py`.
+
+Original analysis and plan kept below for context.
+
+**Previous status:** documented gap — see `docs/divergences/walk_forward_warmup_engine_gap.md`.
 The Variant B golden (`baseline/golden/walk_forward_results_warmup.json`) is a
 **numpy reference oracle only**; the production optimizer evaluates every
 fold/chunk with cold indicators.
@@ -72,6 +102,22 @@ amortized); current goldens/gates (consistent with documented behavior).
 - Full suite + ruff + golden rtol gate + CI green.
 
 ---
+
+## 1a. Warmup operational hardening for gappy real data (priority: medium, before unattended live walk-forward)
+
+Follow-ups from the item-1 review (mechanism is correct; these are blast-radius
+controls for long unattended runs):
+
+- `main()` shifts fold windows by *calendar* warmup span, but
+  `Backtest._assert_warmup_available` counts *loaded* strategy-tf buckets — a
+  data gap inside the warmup region of a calendar-valid fold raises
+  `InsufficientWarmupError` and aborts the whole run. Decide per-fold policy:
+  catch at the fold level, log loudly, and skip the fold (never -999).
+- Non-`ValueError` exceptions now abort the entire study/grid (intended loud
+  contract). If unattended runs need resilience, pass a curated `catch=` set to
+  `study.optimize` rather than re-widening `_execute_backtest`.
+- Optional strictness: exclude the partial bucket straddling `live_start` from
+  the warmup-availability count when base data is finer than the strategy tf.
 
 ## 2. Vectorized bar engine (priority: low — current throughput ~6.4k bars/sec suffices)
 

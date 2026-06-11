@@ -48,7 +48,33 @@ backtest exceptions as `-999.0` (`cli/optimize.py`).
 This divergence doc makes that explicit so the gap is no longer silent: a reader
 of the Variant B golden must not assume the live optimizer reproduces it.
 
-## Remediation (future work — cross-cutting, multiple owners)
+## Resolution (2026-06-11) — warmup context is now an engine capability
+
+The remediation below was implemented (docs/TODO.md item 1):
+
+- `Backtest(warmup_bars=N)` + `TradingEngine(live_start_ms=...)`: the data
+  handler loads `warmup_bars` strategy-timeframe bars before `start_date`;
+  warmup events prime strategy/aggregator state but produce **no orders, no
+  fills, no equity rows** (suppression is applied per-bar inside
+  `handle_market_window_event` for windows straddling the boundary).
+- `run_backtest_chunked(warmup_bars=N)` threads warmup into the first
+  non-empty chunk and extends that chunk's `data_loader` request backwards.
+- `cli/optimize.py` honours `BT_CHUNK_WARMUP_BARS` end-to-end, shifts fold
+  windows to keep warmup inside the data range, propagates
+  `InsufficientWarmupError` (never `-999`), and restricts the `-999.0`
+  sentinel to no-data windows and `ValueError` infeasible-param combos —
+  unexpected exceptions propagate.
+- `warmup_bars=0` (the default) is bit-identical to the previous engine, so
+  existing goldens are unconstrained by this change.
+
+Note: the engine still does NOT reproduce Variant B numerically (the oracle is
+costless signal×returns; the engine applies `ExecutionModel` costs). Variant B
+remains a reference-oracle golden; the engine guarantee is warmup *semantics*
+(warm indicator state at the first in-window bar, no pre-start artifacts),
+asserted by `tests/test_engine_warmup.py` and
+`tests/test_optimize_warmup_sentinels.py`.
+
+## Original remediation plan (implemented above)
 
 > **Tracked:** full implementation plan + acceptance criteria live in
 > [`docs/TODO.md`](../TODO.md) item 1 (priority HIGH before relying on

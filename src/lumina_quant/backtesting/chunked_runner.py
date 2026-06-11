@@ -18,6 +18,15 @@ from lumina_quant.backtesting.data import HistoricCSVDataHandler
 from lumina_quant.backtesting.data_windowed_parquet import HistoricParquetWindowedDataHandler
 from lumina_quant.backtesting.execution_sim import SimulatedExecutionHandler
 from lumina_quant.backtesting.portfolio_backtest import Portfolio
+from lumina_quant.market_data import normalize_timeframe_token, timeframe_to_milliseconds
+
+
+def _strategy_timeframe_ms(strategy_timeframe: str) -> int:
+    """Mirror Backtest's timeframe parsing (fallback: 1m)."""
+    try:
+        return max(1, int(timeframe_to_milliseconds(normalize_timeframe_token(strategy_timeframe))))
+    except Exception:
+        return 60_000
 
 
 def iter_chunk_windows(
@@ -150,6 +159,7 @@ def run_backtest_chunked(
     track_metrics: bool = True,
     record_trades: bool = True,
     config: Any = None,
+    warmup_bars: int = 0,
 ) -> Backtest:
     """Execute one logical backtest by loading bounded chunks sequentially.
 
@@ -159,6 +169,13 @@ def run_backtest_chunked(
         Optional ``RuntimeConfig`` or ``BacktestConfigView``.  When ``None`` the
         default runtime config is used.  Pass an explicit config to avoid global
         state — required for the Phase 4.3 per-fold optimizer path.
+    warmup_bars:
+        Strategy-timeframe bars of indicator warmup context for the FIRST
+        executed chunk only (later chunks stay warm via the carried-over
+        strategy state).  The runner extends that chunk's ``data_loader`` call
+        backwards by ``warmup_bars x strategy_timeframe`` so the loader is
+        explicitly asked for the warmup region; ``Backtest`` raises
+        ``InsufficientWarmupError`` when the loader cannot provide it.
     """
     mode_token = str(backtest_mode or "windowed").strip().lower()
     if mode_token not in {"windowed", "legacy_batch", "legacy_1s"}:
@@ -183,8 +200,17 @@ def run_backtest_chunked(
     carry: dict[str, Any] = {}
     final_backtest: Backtest | None = None
 
+    requested_warmup = max(0, int(warmup_bars or 0))
+    warmup_span = timedelta(
+        milliseconds=requested_warmup * _strategy_timeframe_ms(str(strategy_timeframe))
+    )
+    # Warmup attaches to the first chunk that actually yields data; later
+    # chunks stay warm through the carried-over strategy state.
+    warmup_pending = requested_warmup > 0
+
     for chunk_start, chunk_end in windows:
-        chunk_data = data_loader(chunk_start, chunk_end)
+        load_start = chunk_start - warmup_span if warmup_pending else chunk_start
+        chunk_data = data_loader(load_start, chunk_end)
         if not chunk_data:
             continue
 
@@ -205,7 +231,9 @@ def run_backtest_chunked(
             record_trades=record_trades,
             strategy_timeframe=str(strategy_timeframe),
             config=config,
+            warmup_bars=requested_warmup if warmup_pending else 0,
         )
+        warmup_pending = False
 
         if carry:
             _restore_backtest_state(backtest, carry)

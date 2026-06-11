@@ -42,7 +42,7 @@ from lumina_quant.optimization.search_policy import (
     suggest_params_from_optuna_config,
 )
 from lumina_quant.optimization.threading_control import configure_numba_threads
-from lumina_quant.optimization.walkers import build_walk_forward_splits
+from lumina_quant.optimization.walkers import InsufficientWarmupError, build_walk_forward_splits
 from lumina_quant.storage.parquet import (
     ParquetMarketDataRepository,
     is_parquet_market_data_store,
@@ -715,6 +715,7 @@ def _execute_backtest(
         strategy_name,
         params if isinstance(params, dict) else {},
     )
+    warmup_bars = max(0, int(BT_CHUNK_WARMUP_BARS))
     try:
         sim_start = time.perf_counter()
         if PARQUET_MODE:
@@ -723,6 +724,9 @@ def _execute_backtest(
             resolved_backtest_mode = "windowed"
 
             def _chunk_loader(chunk_start, chunk_end):
+                # warmup_bars=0: run_backtest_chunked already extends the first
+                # chunk's load window backwards by the warmup span, so the repo
+                # must not extend it a second time.
                 return load_data_dict_from_parquet(
                     str(ACTIVE_MARKET_DB_PATH),
                     exchange=str(ACTIVE_MARKET_EXCHANGE),
@@ -731,7 +735,7 @@ def _execute_backtest(
                     start_date=chunk_start,
                     end_date=chunk_end,
                     chunk_days=max(1, int(BT_CHUNK_DAYS)),
-                    warmup_bars=max(0, int(BT_CHUNK_WARMUP_BARS)),
+                    warmup_bars=0,
                     data_mode=str(ACTIVE_DATA_MODE),
                 )
 
@@ -756,15 +760,20 @@ def _execute_backtest(
                 record_history=False,
                 track_metrics=True,
                 record_trades=False,
+                warmup_bars=warmup_bars,
             )
         else:
+            slice_start = start_date
+            if warmup_bars > 0 and start_date is not None:
+                tf_ms = max(1, int(timeframe_to_milliseconds(str(STRATEGY_TIMEFRAME))))
+                slice_start = start_date - timedelta(milliseconds=warmup_bars * tf_ms)
             current_data = _slice_data_dict_frames(
-                data_dict if data_dict is not None else DATA_DICT, start_date, end_date
+                data_dict if data_dict is not None else DATA_DICT, slice_start, end_date
             )
             backtest = Backtest(
                 csv_dir=csv_dir,
                 symbol_list=symbol_list,
-                start_date=start_date,  # Specific Start
+                start_date=start_date,  # Specific Start (trading boundary)
                 end_date=end_date,  # Specific End
                 data_handler_cls=HistoricCSVDataHandler,
                 execution_handler_cls=SimulatedExecutionHandler,
@@ -776,6 +785,7 @@ def _execute_backtest(
                 track_metrics=True,
                 record_trades=False,
                 strategy_timeframe=str(STRATEGY_TIMEFRAME),
+                warmup_bars=warmup_bars,
             )
             backtest.simulate_trading(output=False)
 
@@ -802,9 +812,17 @@ def _execute_backtest(
         }
     except RawFirstDataMissingError, RawFirstManifestInvalidError, RawFirstStaleWindowError:
         raise
-    except Exception as e:
-        # print(f"Backtest Error: {e}")
-        return {"params": resolved_params, "error": str(e), "sharpe": -999.0}
+    except InsufficientWarmupError:
+        # Requested warmup context is unavailable — a loud failure by contract,
+        # never a -999 sentinel (docs/TODO.md item 1).
+        raise
+    except ValueError as e:
+        # Infeasible parameter combination (strategy/param validation): prune as
+        # worst-score sentinel so grid/optuna can continue. Every other
+        # exception type is an unexpected bug and must propagate — the old
+        # blanket `except Exception` silently converted real engine bugs into
+        # -999 rows (docs/divergences/walk_forward_warmup_engine_gap.md).
+        return {"params": resolved_params, "error": str(e), "sharpe": -999.0, "infeasible": True}
     finally:
         _profile_add("orchestration_seconds", time.perf_counter() - orchestration_start)
         PROFILE_TOTALS["calls"] = int(PROFILE_TOTALS.get("calls", 0)) + 1
@@ -1395,6 +1413,22 @@ def main(argv: list[str] | None = None) -> int:
             print("No usable datetime range found in loaded data.")
             sys.exit(1)
 
+        # Warmup feasibility: every fold window must keep warmup_bars of context
+        # INSIDE the loaded data range, otherwise Backtest raises
+        # InsufficientWarmupError. Shift the earliest usable window start so the
+        # split builders/filters only produce folds with full warmup coverage.
+        optimization_data_start = data_start
+        if int(BT_CHUNK_WARMUP_BARS) > 0:
+            _tf_ms = max(1, int(timeframe_to_milliseconds(str(settings.strategy_timeframe))))
+            optimization_data_start = data_start + timedelta(
+                milliseconds=int(BT_CHUNK_WARMUP_BARS) * _tf_ms
+            )
+            print(
+                f"[INFO] Warmup context enabled: {int(BT_CHUNK_WARMUP_BARS)} bars "
+                f"({settings.strategy_timeframe}). Earliest window start shifted "
+                f"{data_start} -> {optimization_data_start}."
+            )
+
         if configured_numba_threads is not None:
             print(f"[INFO] Numba threads configured: {configured_numba_threads}")
         if TWO_STAGE_ENABLED:
@@ -1426,12 +1460,14 @@ def main(argv: list[str] | None = None) -> int:
             f"[{final_oos_start.date()} ~ {final_oos_end.date()}]"
         )
 
-        valid_splits = _filter_valid_splits(splits, data_start, data_end)
+        valid_splits = _filter_valid_splits(splits, optimization_data_start, data_end)
         if in_sample_end < data_end:
-            valid_splits = _filter_valid_splits(valid_splits, data_start, in_sample_end)
+            valid_splits = _filter_valid_splits(
+                valid_splits, optimization_data_start, in_sample_end
+            )
 
         strict_recent_split = _build_recent_validation_split(
-            data_start,
+            optimization_data_start,
             in_sample_end=in_sample_end,
             oos_start=final_oos_start,
             oos_end=final_oos_end,
@@ -1452,7 +1488,7 @@ def main(argv: list[str] | None = None) -> int:
 
         if not valid_splits:
             fallback_split = strict_recent_split or _build_data_aware_split(
-                data_start, in_sample_end
+                optimization_data_start, in_sample_end
             )
             if fallback_split is None:
                 print(

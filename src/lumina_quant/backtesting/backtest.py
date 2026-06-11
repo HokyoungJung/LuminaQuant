@@ -22,10 +22,12 @@ import collections
 import logging
 import os
 import queue
+from datetime import UTC, timedelta
 from pprint import pprint
 from typing import Any
 
 from lumina_quant.backtesting._config_view import BacktestConfigView
+from lumina_quant.compute.ohlcv_loader import OHLCVFrameLoader
 from lumina_quant.configuration import get_default_runtime_config
 from lumina_quant.core.engine import TradingEngine
 from lumina_quant.market_data import normalize_timeframe_token, timeframe_to_milliseconds
@@ -166,6 +168,7 @@ class Backtest(TradingEngine):
         strategy_timeframe=None,
         data_handler_kwargs=None,
         config=None,
+        warmup_bars=0,
     ):
         self.csv_dir = csv_dir
         self.symbol_list = symbol_list
@@ -207,6 +210,26 @@ class Backtest(TradingEngine):
         self.skip_ahead_jumps = 0
         self.skip_ahead_rows_skipped = 0
 
+        # Warmup context (docs/TODO.md item 1): `start_date` stays the trading
+        # boundary (live_start); the data handler loads from
+        # `start_date - warmup_bars x strategy_timeframe` so stateful indicators
+        # are warm at the first in-window bar. warmup_bars=0 keeps every code
+        # path bit-identical to the pre-warmup engine.
+        self.warmup_bars = max(0, int(warmup_bars or 0))
+        self._live_start_ms: int | None = None
+        self._effective_load_start = start_date
+        if self.warmup_bars > 0:
+            live_start_dt = OHLCVFrameLoader._coerce_bound(start_date)
+            if live_start_dt is None:
+                raise ValueError(
+                    f"warmup_bars={self.warmup_bars} requires a parseable start_date, "
+                    f"got {start_date!r}"
+                )
+            # Naive datetimes are treated as UTC throughout the data layer.
+            self._live_start_ms = int(live_start_dt.replace(tzinfo=UTC).timestamp() * 1000)
+            warmup_ms = self.warmup_bars * max(1, int(self._strategy_timeframe_ms))
+            self._effective_load_start = live_start_dt - timedelta(milliseconds=warmup_ms)
+
         self.data_handler_cls = data_handler_cls
         self.execution_handler_cls = execution_handler_cls
         self.portfolio_cls = portfolio_cls
@@ -216,6 +239,8 @@ class Backtest(TradingEngine):
         # Use FastQueue for Backtest (No Locks)
         self.events = FastQueue()
         self._generate_trading_instances()
+        if self.warmup_bars > 0:
+            self._assert_warmup_available()
 
         # Initialize Base Engine
         super().__init__(
@@ -224,6 +249,7 @@ class Backtest(TradingEngine):
             self.strategy,
             self.portfolio,
             self.execution_handler,
+            live_start_ms=self._live_start_ms,
         )
 
     def _generate_trading_instances(self):
@@ -236,7 +262,7 @@ class Backtest(TradingEngine):
                 self.events,
                 self.csv_dir,
                 self.symbol_list,
-                self.start_date,
+                self._effective_load_start,
                 self.end_date,
                 self.data_dict,
                 **self.data_handler_kwargs,
@@ -246,7 +272,7 @@ class Backtest(TradingEngine):
                 self.events,
                 self.csv_dir,
                 self.symbol_list,
-                self.start_date,
+                self._effective_load_start,
                 self.end_date,
                 self.data_dict,
             )
@@ -302,6 +328,37 @@ class Backtest(TradingEngine):
     def bars(self):
         return self.data_handler
 
+    def _assert_warmup_available(self) -> None:
+        """Raise ``InsufficientWarmupError`` when requested warmup data is missing.
+
+        Counts distinct strategy-timeframe buckets before ``start_date`` per
+        symbol; each loaded symbol must provide at least ``warmup_bars`` of
+        context. Symbols with no rows at all keep the legacy no-data path.
+        """
+        if self._live_start_ms is None:
+            return
+        from lumina_quant.optimization.walkers import InsufficientWarmupError
+
+        tf_ms = max(1, int(self._strategy_timeframe_ms))
+        required = int(self.warmup_bars)
+        live_start_ms = int(self._live_start_ms)
+        timestamps_by_symbol = getattr(self.data_handler, "symbol_timestamps_ms", None)
+        if not isinstance(timestamps_by_symbol, dict):
+            return
+        for ts_list in timestamps_by_symbol.values():
+            buckets: set[int] = set()
+            for ts in ts_list or ():
+                if ts is None:
+                    continue
+                if int(ts) >= live_start_ms:
+                    break  # timestamps are sorted ascending
+                buckets.add(int(ts) // tf_ms)
+            if len(buckets) < required:
+                raise InsufficientWarmupError(
+                    window_bars=len(buckets),
+                    required_bars=required,
+                )
+
     def _supports_skip_ahead(self) -> bool:
         if not bool(self._skip_ahead_enabled):
             return False
@@ -319,6 +376,13 @@ class Backtest(TradingEngine):
     def _can_skip_ahead_now(self) -> bool:
         if not self._supports_skip_ahead():
             return False
+        # Never skip inside the warmup region: warmup bars exist solely to feed
+        # indicator state, and skip-ahead would drop them (positions are always
+        # flat during warmup, so the flat-position fast path would fire).
+        if self._live_start_ms is not None:
+            current_ms = getattr(self.data_handler, "last_emitted_timestamp_ms", None)
+            if current_ms is None or int(current_ms) < int(self._live_start_ms):
+                return False
         if bool(getattr(self.strategy, "requires_intrabar_checks", False)):
             return False
         active_orders = getattr(self.execution_handler, "active_orders", None)

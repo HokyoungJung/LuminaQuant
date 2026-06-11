@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC
+from datetime import UTC, datetime
 from typing import Any
 
 from lumina_quant.core.events import MarketEvent
@@ -29,12 +30,49 @@ def _event_time_to_ms(value: Any) -> int | None:
     return None
 
 
+def _warmup_time_to_ms(value: Any) -> int | None:
+    """Bar-time coercion for warmup-boundary checks.
+
+    Mirrors ``HistoricCSVDataHandler._bar_time_ms``: naive datetimes are UTC.
+    (``_event_time_to_ms`` calls ``datetime.timestamp()``, which interprets
+    naive datetimes in the host's local timezone — comparing that against the
+    UTC-based live-start boundary would shift the warmup region by the host's
+    UTC offset.)
+    """
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        numeric = int(float(value))
+        if abs(numeric) < 100_000_000_000:
+            return numeric * 1000
+        return numeric
+    if isinstance(value, datetime):
+        dt = value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+        return int(dt.astimezone(UTC).timestamp() * 1000)
+    try:
+        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=UTC)
+        return int(dt.astimezone(UTC).timestamp() * 1000)
+    except Exception:
+        return None
+
+
 class TradingEngine(ABC):
     """Abstract base class for trading engines (Backtest and LiveTrader).
     Encapsulates common event processing logic (The "Kernel").
     """
 
-    def __init__(self, events, data_handler, strategy, portfolio, execution_handler):
+    def __init__(
+        self,
+        events,
+        data_handler,
+        strategy,
+        portfolio,
+        execution_handler,
+        *,
+        live_start_ms: int | None = None,
+    ):
         self.events = events
         self.data_handler = data_handler
         self.strategy = strategy
@@ -44,12 +82,33 @@ class TradingEngine(ABC):
         self.message_bus = MessageBus()
         self.timeframe_aggregator = None
         self._window_decision_last_bucket: int | None = None
+        # Warmup boundary: events strictly before this epoch-ms only prime
+        # strategy/indicator state — no portfolio accounting, no orders, no fills.
+        # None disables suppression entirely (live trading, plain backtests).
+        self._live_start_ms = int(live_start_ms) if live_start_ms is not None else None
+        self._warmup_active = False
 
         # Stats
         self.market_events = 0
         self.signals = 0
         self.orders = 0
         self.fills = 0
+
+    def _is_warmup_time(self, time_value: Any) -> bool:
+        if self._live_start_ms is None:
+            return False
+        event_ms = _warmup_time_to_ms(time_value)
+        return event_ms is not None and event_ms < self._live_start_ms
+
+    def _update_warmup_state(self, time_value: Any) -> bool:
+        """Track whether the current market event sits in the warmup region.
+
+        Signals/orders/fills are emitted into the queue by the market handlers
+        and processed afterwards, so the flag set here governs suppression of
+        the downstream events spawned by this market event.
+        """
+        self._warmup_active = self._is_warmup_time(time_value)
+        return self._warmup_active
 
     def _required_inputs(self) -> tuple[str, ...]:
         raw = getattr(self.strategy, "required_inputs", ())
@@ -108,6 +167,7 @@ class TradingEngine(ABC):
 
     def handle_market_event(self, event):
         self.market_events += 1
+        warmup = self._update_warmup_state(getattr(event, "time", None))
         should_process = True
         strategy_guard = getattr(self.strategy, "should_process_market_event", None)
         if callable(strategy_guard):
@@ -121,6 +181,9 @@ class TradingEngine(ABC):
                 feature_lookup=getattr(self.data_handler, "_feature_lookup", None),
             )
             self.strategy.calculate_signals(event)
+        if warmup:
+            # Warmup bars only prime indicator state — no equity rows, no order checks.
+            return
         self.portfolio.update_timeindex(event)
         # Optional: Simulated execution handler might need to check open orders
         if hasattr(self.execution_handler, "check_open_orders"):
@@ -131,6 +194,7 @@ class TradingEngine(ABC):
         if not batch_events:
             return
 
+        warmup = self._update_warmup_state(getattr(event, "time", None))
         strategy_guard = getattr(self.strategy, "should_process_market_event", None)
         for market_event in batch_events:
             self.market_events += 1
@@ -152,11 +216,19 @@ class TradingEngine(ABC):
                 )
                 self.strategy.calculate_signals(market_event)
 
+        if warmup:
+            # Batch events share one timestamp, so the event-level warmup check
+            # is exact per-bar suppression: indicators advanced above, but no
+            # accounting rows and no order checks in the warmup region.
+            return
+
         # Timestamp-level accounting update (once per second).
         self.portfolio.update_timeindex(event)
 
         if hasattr(self.execution_handler, "check_open_orders"):
             for market_event in batch_events:
+                if self._is_warmup_time(getattr(market_event, "time", None)):
+                    continue
                 self.execution_handler.check_open_orders(market_event)
 
     def _resolve_required_timeframes(self) -> list[str]:
@@ -287,6 +359,11 @@ class TradingEngine(ABC):
         bars_1s = getattr(event, "bars_1s", {}) or {}
         total_bars = sum(len(values or ()) for values in bars_1s.values())
         self.market_events += int(total_bars if total_bars > 0 else 1)
+        # Warmup is decided on the window watermark: a window whose watermark is
+        # still before live_start only primes state; a straddling window already
+        # decides at a live timestamp and is processed normally (its pre-live
+        # bars are still excluded per-bar from open-order checks below).
+        warmup = self._update_warmup_state(getattr(event, "time", None))
 
         aggregator = (
             self._ensure_timeframe_aggregator()
@@ -347,6 +424,11 @@ class TradingEngine(ABC):
             else:
                 self.strategy.calculate_signals(event)
 
+        if warmup:
+            # Warmup windows advance strategy/aggregator state above, but emit
+            # no equity rows and perform no order checks.
+            return
+
         # Update portfolio once per decision tick.
         self.portfolio.update_timeindex(event)
 
@@ -367,18 +449,30 @@ class TradingEngine(ABC):
                         row=row,
                         fallback_time=fallback_time,
                     )
-                    if market_event is not None:
-                        self.execution_handler.check_open_orders(market_event)
+                    if market_event is None:
+                        continue
+                    # Per-bar warmup suppression: a straddling window may carry
+                    # bars from before live_start — those must not trigger
+                    # stop/limit evaluation.
+                    if self._is_warmup_time(getattr(market_event, "time", None)):
+                        continue
+                    self.execution_handler.check_open_orders(market_event)
 
     def handle_signal_event(self, event):
+        if self._warmup_active:
+            return
         self.signals += 1
         self.portfolio.update_signal(event)
 
     def handle_order_event(self, event):
+        if self._warmup_active:
+            return
         self.orders += 1
         self.execution_handler.execute_order(event)
 
     def handle_fill_event(self, event):
+        if self._warmup_active:
+            return
         self.fills += 1
         self.portfolio.update_fill(event)
         # Hook for state saving (LiveTrader can override or we add a hook)
