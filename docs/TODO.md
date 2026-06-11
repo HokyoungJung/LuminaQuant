@@ -105,27 +105,56 @@ amortized); current goldens/gates (consistent with documented behavior).
 
 ## 1a. Warmup operational hardening for gappy real data (priority: medium, before unattended live walk-forward)
 
-Follow-ups from the item-1 review (mechanism is correct; these are blast-radius
-controls for long unattended runs):
+**Status:** DONE (2026-06-11). Implementation summary:
 
-- `main()` shifts fold windows by *calendar* warmup span, but
-  `Backtest._assert_warmup_available` counts *loaded* strategy-tf buckets — a
-  data gap inside the warmup region of a calendar-valid fold raises
-  `InsufficientWarmupError` and aborts the whole run. Decide per-fold policy:
-  catch at the fold level, log loudly, and skip the fold (never -999).
-- Non-`ValueError` exceptions now abort the entire study/grid (intended loud
-  contract). If unattended runs need resilience, pass a curated `catch=` set to
-  `study.optimize` rather than re-widening `_execute_backtest`.
-- Optional strictness: exclude the partial bucket straddling `live_start` from
-  the warmup-availability count when base data is finer than the strategy tf.
+- Per-fold policy (`cli/optimize.py:_run_fold_under_policy`): a calendar-valid
+  fold whose warmup region hides a data gap raises `InsufficientWarmupError`
+  (a `ValueError` subclass — caught before any generic handling), which skips
+  JUST that fold with a loud `[Fold N] SKIPPED` line — never a `-999` row,
+  never a whole-run abort. Any other unexpected exception still aborts that
+  fold's study/grid loudly (`_execute_backtest` contract unchanged) and is
+  surfaced at the fold level with a full traceback before the run continues
+  with the remaining folds. Fold-row persistence failures are logged
+  separately and no longer drop an already-evaluated report.
+- Decision — no optuna `catch=` set wired: fold-level isolation is the
+  resilience boundary for unattended runs; a curated `catch=` inside
+  `study.optimize` would silently mark mid-study trials failed.
+  `_execute_backtest` stays narrow (only `ValueError` prunes as infeasible).
+- Partial-bucket strictness (`Backtest._assert_warmup_available`): the bucket
+  straddling `live_start` (mid-bucket boundary with base data finer than the
+  strategy tf) is a partial strategy-tf bar and no longer counts toward warmup
+  availability. Bucket-aligned boundaries keep pre-strictness semantics
+  exactly.
+- Acceptance tests: `tests/test_optimize_warmup_sentinels.py` (per-fold
+  policy), `tests/test_engine_warmup.py::test_partial_bucket_straddling_live_start_is_not_warm_context`.
 
-## 2. Vectorized bar engine (priority: low — current throughput ~6.4k bars/sec suffices)
+Original review notes (context): `main()` shifts fold windows by *calendar*
+warmup span while `Backtest._assert_warmup_available` counts *loaded*
+strategy-tf buckets, so a calendar-valid fold could die on a warmup-region data
+gap; the items above are the blast-radius controls chosen for that.
+
+## 2. Vectorized bar engine (priority: low — current throughput suffices)
 
 See `docs/perf/phase4-results.md` ("future work"). Only worth it for very large
 parameter grids; measure first.
+
+**Measure-first gate executed (2026-06-11):** `scripts/benchmark_backtest.py
+--strategy MovingAverageCrossStrategy --symbols BTC/USDT,ETH/USDT --seed 42`
+(deterministic `generate_data.py` fixtures) → median **6,837 bars/sec**
+(mean 6,734), consistent with the phase-4 like-for-like figure. The gate
+condition is unmet — no vectorized engine work is justified at current grid
+sizes. Re-run the same command and revisit only if parameter grids grow to
+where walk-forward wall-clock hurts.
 
 ## 3. God-module decomposition seams (priority: low)
 
 See AGENTS.md "Monolithic-module disposition" — `data_sync.py`, `trader.py`,
 `cutover_surfaces_service.py` decomposition seams are documented there; extract
 only along those seams.
+
+**Disposition (2026-06-11):** deliberately NOT implemented as part of TODO
+clearing. AGENTS.md's rule stands: decomposition is its own change with its own
+regression-test gate, never an opportunistic edit; `cutover_surfaces_service.py`
+and `postgres_state.py` seams are explicitly conditional ("only if routes
+diverge" / "once a state-store interface is introduced") and the conditions do
+not hold. This entry stays open as the pointer to those documented seams.

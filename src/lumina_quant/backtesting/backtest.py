@@ -331,9 +331,12 @@ class Backtest(TradingEngine):
     def _assert_warmup_available(self) -> None:
         """Raise ``InsufficientWarmupError`` when requested warmup data is missing.
 
-        Counts distinct strategy-timeframe buckets before ``start_date`` per
-        symbol; each loaded symbol must provide at least ``warmup_bars`` of
-        context. Symbols with no rows at all keep the legacy no-data path.
+        Counts distinct COMPLETE strategy-timeframe buckets before
+        ``start_date`` per symbol; each loaded symbol must provide at least
+        ``warmup_bars`` of context. When ``start_date`` falls mid-bucket, the
+        straddling bucket is a partial strategy-tf bar and does not count as
+        warm context, regardless of base-data granularity (docs/TODO.md item
+        1a). Symbols with no rows at all keep the legacy no-data path.
         """
         if self._live_start_ms is None:
             return
@@ -345,6 +348,7 @@ class Backtest(TradingEngine):
         timestamps_by_symbol = getattr(self.data_handler, "symbol_timestamps_ms", None)
         if not isinstance(timestamps_by_symbol, dict):
             return
+        live_bucket, live_bucket_offset = divmod(live_start_ms, tf_ms)
         for ts_list in timestamps_by_symbol.values():
             buckets: set[int] = set()
             for ts in ts_list or ():
@@ -353,6 +357,8 @@ class Backtest(TradingEngine):
                 if int(ts) >= live_start_ms:
                     break  # timestamps are sorted ascending
                 buckets.add(int(ts) // tf_ms)
+            if live_bucket_offset:
+                buckets.discard(live_bucket)
             if len(buckets) < required:
                 raise InsufficientWarmupError(
                     window_bars=len(buckets),

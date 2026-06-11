@@ -256,8 +256,11 @@ def test_windowed_handler_warmup_parity_and_suppression(monkeypatch):
     monkeypatch.setenv("LQ__BACKTEST__SKIP_AHEAD_ENABLED", "0")
     frame = _build_second_frame(T0, seconds=40 * 60)
     # Live boundary intentionally NOT aligned to the 20s poll grid so one
-    # MARKET_WINDOW event straddles it (per-bar suppression crux).
-    live_start = T0 + timedelta(minutes=19, seconds=30)
+    # MARKET_WINDOW event straddles it (per-bar suppression crux). It is also
+    # mid-bucket on the 1m strategy tf, so the straddling partial bucket is NOT
+    # warm context (item 1a strict count) — warmup_bars=20 therefore needs 20
+    # COMPLETE 1m buckets before the boundary.
+    live_start = T0 + timedelta(minutes=20, seconds=30)
     live_start_ms = _to_ms(live_start)
     handler_kwargs = {"backtest_poll_seconds": 20, "backtest_window_seconds": 20}
 
@@ -305,6 +308,45 @@ def test_insufficient_warmup_raises_loudly():
     # Partial context (5 bars available, 10 requested).
     with pytest.raises(InsufficientWarmupError):
         _run_backtest(frame, start_date=T0 + timedelta(minutes=5), warmup_bars=10)
+
+
+def test_partial_bucket_straddling_live_start_is_not_warm_context():
+    """docs/TODO.md item 1a: strict warmup-availability count.
+
+    1m base data, 5m strategy timeframe, live_start mid-bucket at 00:13. The
+    bucket [00:10, 00:15) only holds base rows BEFORE live_start, so it is a
+    partial strategy-tf bar and must not count toward warmup availability.
+    """
+    frame = _build_minute_frame(T0, minutes=120)
+    mid_bucket_start = T0 + timedelta(minutes=13)
+
+    # Two COMPLETE 5m buckets fit before 00:13 — warmup_bars=2 is satisfiable.
+    _run_backtest(
+        frame,
+        start_date=mid_bucket_start,
+        warmup_bars=2,
+        strategy_timeframe="5m",
+        strategy_params={"flip_minutes": 30},
+    )
+
+    # A third bucket exists only as the partial straddling bucket — reject it.
+    with pytest.raises(InsufficientWarmupError):
+        _run_backtest(
+            frame,
+            start_date=mid_bucket_start,
+            warmup_bars=3,
+            strategy_timeframe="5m",
+            strategy_params={"flip_minutes": 30},
+        )
+
+    # Bucket-aligned live_start keeps its exact pre-strictness semantics.
+    _run_backtest(
+        frame,
+        start_date=T0 + timedelta(minutes=15),
+        warmup_bars=3,
+        strategy_timeframe="5m",
+        strategy_params={"flip_minutes": 30},
+    )
 
 
 def test_chunked_runner_extends_first_loader_call_by_warmup():

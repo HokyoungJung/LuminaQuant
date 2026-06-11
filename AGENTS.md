@@ -567,7 +567,10 @@ editing the file for another reason, and add a unit test for the extracted helpe
    work. Item 1 (engine warmup context) is DONE (2026-06-11): set
    `BT_CHUNK_WARMUP_BARS` / pass `warmup_bars` to enable it; `warmup_bars=0`
    stays bit-identical. `InsufficientWarmupError` is loud by contract — do not
-   reintroduce `-999` sentinels for warmup/unexpected failures.
+   reintroduce `-999` sentinels for warmup/unexpected failures. Item 1a
+   (operational hardening) is DONE (2026-06-11): a warmup data gap skips just
+   that fold via `_run_fold_under_policy` (loud log, never `-999`), and the
+   partial bucket straddling `live_start` no longer counts as warm context.
 1. Before broad optimizer edits, read `.omx/plans/ralplan-portfolio-optimizer-integration-cleanup-20260507.md` and the latest `docs/session_handoff_*portfolio_optimizer*` file.
 2. Add/extend regression tests before moving optimizer/tuner behavior.
 3. Keep the outer portfolio memory guard in CLI paths and preserve RSS evidence fields.

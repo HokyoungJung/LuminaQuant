@@ -5,6 +5,7 @@ import multiprocessing
 import os
 import sys
 import time
+import traceback
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -1197,6 +1198,37 @@ def run_walk_forward_fold(split):
     }
 
 
+def _run_fold_under_policy(split, fold_runner=None):
+    """Evaluate one walk-forward fold under the per-fold failure policy.
+
+    docs/TODO.md item 1a: a calendar-valid fold can still hit a data gap inside
+    its warmup region — ``InsufficientWarmupError`` (a ``ValueError`` subclass,
+    so it must be caught first) skips JUST that fold with a loud log line and
+    never produces a ``-999`` row. Any other unexpected exception aborted the
+    fold's whole study/grid by contract; here it is logged with a full
+    traceback and the fold is dropped, so one bad fold cannot silently poison
+    selection nor kill a long unattended run.
+    """
+    runner = fold_runner if fold_runner is not None else run_walk_forward_fold
+    fold = split.get("fold") if isinstance(split, dict) else None
+    try:
+        report = runner(split)
+    except InsufficientWarmupError as exc:
+        print(
+            f"[Fold {fold}] SKIPPED — insufficient warmup data inside a "
+            f"calendar-valid window (never scored as -999): {exc}"
+        )
+        return None
+    except Exception:
+        print(f"[Fold {fold}] FAILED — unexpected error; full traceback follows.")
+        traceback.print_exc()
+        return None
+    if report is None:
+        print(f"[Fold {fold}] No valid optimization results.")
+        return None
+    return report
+
+
 def main(argv: list[str] | None = None) -> int:
     global OPTUNA_TRIALS, MAX_WORKERS
     global ACTIVE_DATA_SOURCE, ACTIVE_DATA_MODE
@@ -1508,12 +1540,11 @@ def main(argv: list[str] | None = None) -> int:
 
         fold_reports = []
         for split in valid_splits:
+            report = _run_fold_under_policy(split)
+            if report is None:
+                continue
+            fold_reports.append(report)
             try:
-                report = run_walk_forward_fold(split)
-                if report is None:
-                    print(f"[Fold {split['fold']}] No valid optimization results.")
-                    continue
-                fold_reports.append(report)
                 save_optimization_rows(
                     db_path,
                     run_id,
@@ -1533,7 +1564,7 @@ def main(argv: list[str] | None = None) -> int:
                     [report["test_result"]],
                 )
             except Exception as e:
-                print(f"[Fold {split['fold']}] Failed: {e}")
+                print(f"[Fold {split['fold']}] Failed to persist fold rows: {e}")
 
         if not fold_reports:
             print("No valid fold report generated.")

@@ -1,4 +1,4 @@
-"""Fold-evaluator warmup wiring + sentinel-semantics tests (docs/TODO.md item 1).
+"""Fold-evaluator warmup wiring + sentinel-semantics tests (docs/TODO.md item 1/1a).
 
 Contract under test (``cli/optimize.py:_execute_backtest``):
 - ``BT_CHUNK_WARMUP_BARS`` is honoured end-to-end (warmup bars reach the
@@ -6,6 +6,10 @@ Contract under test (``cli/optimize.py:_execute_backtest``):
 - ``InsufficientWarmupError`` propagates (never a ``-999`` sentinel).
 - Infeasible parameter combinations (``ValueError``) and no-data windows keep
   the worst-score sentinel; any other exception propagates.
+
+Per-fold policy under test (``cli/optimize.py:_run_fold_under_policy``, item 1a):
+- ``InsufficientWarmupError`` skips just that fold with a loud log line.
+- Unexpected exceptions drop the fold with a full traceback (run continues).
 """
 
 from __future__ import annotations
@@ -162,3 +166,38 @@ def test_execute_backtest_propagates_unexpected_exceptions(_non_parquet_mode):
             T0 + timedelta(hours=2),
             data_dict={SYMBOL: frame},
         )
+
+
+def test_fold_policy_skips_warmup_gap_loudly(capsys):
+    def _gap(split):
+        raise InsufficientWarmupError(window_bars=3, required_bars=10, fold=split["fold"])
+
+    report = optimize._run_fold_under_policy({"fold": 2}, fold_runner=_gap)
+
+    assert report is None
+    out = capsys.readouterr().out
+    assert "[Fold 2] SKIPPED" in out
+    assert "warmup" in out
+    assert "-999" in out  # the policy line documents the no-sentinel contract
+
+
+def test_fold_policy_logs_unexpected_failures_with_traceback(capsys):
+    def _bug(split):
+        _ = split
+        raise RuntimeError("engine bug surfaced at fold level")
+
+    report = optimize._run_fold_under_policy({"fold": 1}, fold_runner=_bug)
+
+    assert report is None
+    captured = capsys.readouterr()
+    assert "[Fold 1] FAILED" in captured.out
+    assert "engine bug surfaced at fold level" in captured.err
+    assert "Traceback" in captured.err
+
+
+def test_fold_policy_passes_reports_through_and_flags_empty_folds(capsys):
+    sentinel = {"fold": 3, "selected": {}}
+
+    assert optimize._run_fold_under_policy({"fold": 3}, fold_runner=lambda s: sentinel) is sentinel
+    assert optimize._run_fold_under_policy({"fold": 4}, fold_runner=lambda s: None) is None
+    assert "[Fold 4] No valid optimization results." in capsys.readouterr().out
