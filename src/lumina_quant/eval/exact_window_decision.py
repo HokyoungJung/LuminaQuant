@@ -214,19 +214,23 @@ def _monthly_hurdle_rows(
     }
     rows: list[dict[str, Any]] = []
     for month in sorted(realized):
-        benchmark = dict(thresholds.get(month) or {})
         actual = float(realized.get(month, 0.0))
-        threshold = float(benchmark.get("threshold", 0.02))
-        btc_ret = float(benchmark.get("btc_buy_hold_return", 0.0))
-        strict_pass = bool(actual >= threshold)
-        btc_pass = bool(actual >= btc_ret)
+        benchmark = dict(thresholds.get(month) or {})
+        benchmark_missing = (
+            "threshold" not in benchmark or "btc_buy_hold_return" not in benchmark
+        )
+        threshold = None if benchmark_missing else float(benchmark["threshold"])
+        btc_ret = None if benchmark_missing else float(benchmark["btc_buy_hold_return"])
+        strict_pass = bool((not benchmark_missing) and threshold is not None and actual >= threshold)
+        btc_pass = bool((not benchmark_missing) and btc_ret is not None and actual >= btc_ret)
         rows.append(
             {
                 "month": month,
                 "strategy_return": actual,
                 "btc_buy_hold_return": btc_ret,
                 "threshold": threshold,
-                "excess_vs_threshold": actual - threshold,
+                "benchmark_missing": benchmark_missing,
+                "excess_vs_threshold": None if threshold is None else actual - threshold,
                 "strict_pass": strict_pass,
                 "btc_pass": btc_pass,
                 "pass": strict_pass,
@@ -249,7 +253,27 @@ def _recent_three_month_two_pct_pass(*row_groups: list[dict[str, Any]]) -> bool:
     latest_rows = _latest_three_month_rows(*row_groups)
     if len(latest_rows) < 3:
         return False
+    if any(bool(row.get("benchmark_missing")) for row in latest_rows):
+        return False
     return all(float(row.get("strategy_return", 0.0)) >= 0.02 for row in latest_rows)
+
+
+def _all_required_months_pass(
+    rows: list[dict[str, Any]],
+    *,
+    month_prefix: str | None = None,
+    field: str,
+) -> bool:
+    selected = [
+        row
+        for row in list(rows or [])
+        if month_prefix is None or str(row.get("month", "")).startswith(month_prefix)
+    ]
+    if not selected:
+        return False
+    if any(bool(row.get("benchmark_missing")) for row in selected):
+        return False
+    return all(bool(row.get(field)) for row in selected)
 
 
 def _summary_candidates(
@@ -390,17 +414,15 @@ def _best_row_for_timeframe(
     oos_months = _monthly_hurdle_rows(
         list((top.get("return_streams") or {}).get("oos") or []), thresholds
     )
-    val_hurdle_pass = all(
-        bool(row.get("strict_pass"))
-        for row in val_months
-        if str(row.get("month", "")).startswith("2026-01")
+    val_hurdle_pass = _all_required_months_pass(
+        val_months, month_prefix="2026-01", field="strict_pass"
     )
-    val_btc_hurdle_pass = all(
-        bool(row.get("btc_pass"))
-        for row in val_months
-        if str(row.get("month", "")).startswith("2026-01")
+    val_btc_hurdle_pass = _all_required_months_pass(
+        val_months, month_prefix="2026-01", field="btc_pass"
     )
-    oos_btc_hurdle_pass = all(bool(row.get("btc_pass")) for row in oos_months)
+    oos_btc_hurdle_pass = _all_required_months_pass(
+        oos_months, month_prefix=None, field="btc_pass"
+    )
     recent_three_months = _latest_three_month_rows(val_months, oos_months)
     recent_three_month_two_pct_pass = _recent_three_month_two_pct_pass(val_months, oos_months)
     train_pass = bool((top.get("hurdle_fields") or {}).get("train", {}).get("pass"))

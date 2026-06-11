@@ -1206,8 +1206,8 @@ def _run_fold_under_policy(split, fold_runner=None):
     so it must be caught first) skips JUST that fold with a loud log line and
     never produces a ``-999`` row. Any other unexpected exception aborted the
     fold's whole study/grid by contract; here it is logged with a full
-    traceback and the fold is dropped, so one bad fold cannot silently poison
-    selection nor kill a long unattended run.
+    traceback and then re-raised, so one bad fold cannot silently shrink the
+    validation universe and still select parameters from surviving folds.
     """
     runner = fold_runner if fold_runner is not None else run_walk_forward_fold
     fold = split.get("fold") if isinstance(split, dict) else None
@@ -1222,7 +1222,7 @@ def _run_fold_under_policy(split, fold_runner=None):
     except Exception:
         print(f"[Fold {fold}] FAILED — unexpected error; full traceback follows.")
         traceback.print_exc()
-        return None
+        raise
     if report is None:
         print(f"[Fold {fold}] No valid optimization results.")
         return None

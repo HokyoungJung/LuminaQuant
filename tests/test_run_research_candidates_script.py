@@ -7,6 +7,7 @@ import subprocess
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import polars as pl
@@ -421,6 +422,89 @@ def test_synthetic_fallback_is_disabled_by_default_and_requires_explicit_opt_in(
     assert bool(default_args.enable_synthetic_fallback) is False
     assert bool(default_args.disable_synthetic_fallback) is False
     assert bool(enabled_args.enable_synthetic_fallback) is True
+
+
+def test_build_parser_resolves_default_symbols_from_current_runtime_config(monkeypatch):
+    monkeypatch.setattr(
+        MODULE,
+        "_current_base_config",
+        lambda: SimpleNamespace(SYMBOLS=("ETH/USDT", "SOL/USDT")),
+    )
+
+    args = MODULE._build_parser().parse_args([])
+
+    assert args.symbols == ["ETH/USDT", "SOL/USDT"]
+
+
+def test_exact_split_coverage_rebuild_reads_market_data_config_at_call_time(monkeypatch):
+    start = datetime(2025, 1, 1, tzinfo=UTC)
+    end = datetime(2026, 3, 7, tzinfo=UTC)
+    frame = pl.DataFrame(
+        {
+            "datetime": pl.datetime_range(
+                start.replace(tzinfo=None),
+                end.replace(tzinfo=None),
+                interval="1d",
+                eager=True,
+            ),
+            "open": pl.Series([1.0] * 431, dtype=pl.Float64),
+            "high": pl.Series([1.0] * 431, dtype=pl.Float64),
+            "low": pl.Series([1.0] * 431, dtype=pl.Float64),
+            "close": pl.Series([1.0] * 431, dtype=pl.Float64),
+            "volume": pl.Series([1.0] * 431, dtype=pl.Float64),
+        }
+    )
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        MODULE,
+        "_current_base_config",
+        lambda: SimpleNamespace(
+            MARKET_DATA_PARQUET_PATH="runtime/market_parquet",
+            MARKET_DATA_EXCHANGE="kraken",
+        ),
+    )
+
+    def _mock_load_data_dict_from_parquet(root_path, *, exchange, symbol_list, timeframe, **kwargs):
+        captured.update(
+            {
+                "root_path": root_path,
+                "exchange": exchange,
+                "symbol_list": list(symbol_list),
+                "timeframe": timeframe,
+                "kwargs": dict(kwargs),
+            }
+        )
+        return dict.fromkeys(symbol_list, frame)
+
+    monkeypatch.setattr(MODULE, "load_data_dict_from_parquet", _mock_load_data_dict_from_parquet)
+
+    rebuilt, _split, summary = MODULE._rebuild_candidates_after_coverage(
+        candidates=[
+            {
+                "candidate_id": "keep",
+                "strategy_timeframe": "1d",
+                "symbols": ["BTC/USDT"],
+            }
+        ],
+        symbols=["BTC/USDT"],
+        timeframes=["1d"],
+        split={
+            "train_start": "2025-01-01T00:00:00Z",
+            "train_end": "2025-12-31T23:59:59.999000Z",
+            "val_start": "2026-01-01T00:00:00Z",
+            "val_end": "2026-01-31T23:59:59.999000Z",
+            "oos_start": "2026-02-01T00:00:00Z",
+            "oos_end": "2026-03-07T00:00:00Z",
+            "strategy_timeframe": "1d",
+            "mode": "exact_dates",
+        },
+    )
+
+    assert captured["root_path"] == "runtime/market_parquet"
+    assert captured["exchange"] == "kraken"
+    assert [row["candidate_id"] for row in rebuilt] == ["keep"]
+    assert summary["used_candidate_count"] == 1
 
 
 def test_exact_split_coverage_rebuild_clamps_oos_end_and_filters_candidates(monkeypatch):

@@ -52,14 +52,14 @@ def _as_bool(value: Any, default: bool = False) -> bool:
 def _as_float(value: Any, default: float) -> float:
     try:
         return float(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return float(default)
 
 
 def _as_int(value: Any, default: int) -> int:
     try:
         return int(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return int(default)
 
 
@@ -122,7 +122,7 @@ def _normalize_timeframe_list(value: Any) -> list[str]:
         if token.startswith("[") and token.endswith("]"):
             try:
                 parsed = json.loads(token)
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 parsed = [part for part in token.split(",")]
             items = list(parsed) if isinstance(parsed, list) else [token]
         else:
@@ -193,7 +193,7 @@ def _parse_env_scalar(raw: str) -> Any:
     if raw.strip().startswith(("[", "{")):
         try:
             return json.loads(raw)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return raw
     try:
         if "." in raw:
@@ -299,18 +299,8 @@ def _build_live_runtime_config(
         polymarket=LivePolymarketConfig(
             **_coerce_dataclass_kwargs(live_polymarket_raw, LivePolymarketConfig)
         ),
-        api_key=str(
-            env.get("BINANCE_API_KEY")
-            or env.get("EXCHANGE_API_KEY")
-            or live_raw.get("api_key")
-            or ""
-        ),
-        secret_key=str(
-            env.get("BINANCE_SECRET_KEY")
-            or env.get("EXCHANGE_SECRET_KEY")
-            or live_raw.get("secret_key")
-            or ""
-        ),
+        api_key=str(env.get("BINANCE_API_KEY") or env.get("EXCHANGE_API_KEY") or ""),
+        secret_key=str(env.get("BINANCE_SECRET_KEY") or env.get("EXCHANGE_SECRET_KEY") or ""),
         telegram_bot_token=env.get("TELEGRAM_BOT_TOKEN") or live_raw.get("telegram_bot_token"),
         telegram_chat_id=env.get("TELEGRAM_CHAT_ID") or live_raw.get("telegram_chat_id"),
     )

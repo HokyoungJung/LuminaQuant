@@ -9,7 +9,7 @@ Contract under test (``cli/optimize.py:_execute_backtest``):
 
 Per-fold policy under test (``cli/optimize.py:_run_fold_under_policy``, item 1a):
 - ``InsufficientWarmupError`` skips just that fold with a loud log line.
-- Unexpected exceptions drop the fold with a full traceback (run continues).
+- Unexpected exceptions log a full traceback and propagate.
 """
 
 from __future__ import annotations
@@ -186,9 +186,9 @@ def test_fold_policy_logs_unexpected_failures_with_traceback(capsys):
         _ = split
         raise RuntimeError("engine bug surfaced at fold level")
 
-    report = optimize._run_fold_under_policy({"fold": 1}, fold_runner=_bug)
+    with pytest.raises(RuntimeError, match="engine bug surfaced at fold level"):
+        optimize._run_fold_under_policy({"fold": 1}, fold_runner=_bug)
 
-    assert report is None
     captured = capsys.readouterr()
     assert "[Fold 1] FAILED" in captured.out
     assert "engine bug surfaced at fold level" in captured.err

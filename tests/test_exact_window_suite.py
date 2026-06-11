@@ -19,6 +19,7 @@ from lumina_quant.eval.exact_window_suite import (
     resolve_coverage_adaptive_windows,
     strict_align_bundles,
 )
+from lumina_quant.strategy_factory import research_runner as rr
 
 
 def _ts(value: str) -> int:
@@ -79,6 +80,19 @@ def test_monthly_hurdle_rows_track_btc_pass_separately_from_strict_floor():
     assert rows[0]["pass"] is False
 
 
+def test_monthly_hurdle_rows_fail_closed_when_benchmark_month_is_missing():
+    stream = [{"t": _ts("2026-01-15T00:00:00Z"), "v": 0.25}]
+
+    rows = _monthly_hurdle_rows(stream, {})
+
+    assert rows[0]["benchmark_missing"] is True
+    assert rows[0]["threshold"] is None
+    assert rows[0]["btc_buy_hold_return"] is None
+    assert rows[0]["strict_pass"] is False
+    assert rows[0]["btc_pass"] is False
+    assert rows[0]["pass"] is False
+
+
 def test_strict_align_bundles_rejects_leading_benchmark_gap_without_backward_fill():
     datetimes = [datetime(2026, 1, day) for day in range(1, 31)]
     symbol_frame = pl.DataFrame(
@@ -108,6 +122,96 @@ def test_strict_align_bundles_rejects_leading_benchmark_gap_without_backward_fil
     )
 
     assert aligned is None
+
+
+def test_strict_align_bundles_rejects_interior_benchmark_gap_without_forward_fill():
+    datetimes = [datetime(2026, 1, day) for day in range(1, 31)]
+    symbol_frame = pl.DataFrame(
+        {
+            "datetime": datetimes,
+            "open": [100.0] * 30,
+            "high": [101.0] * 30,
+            "low": [99.0] * 30,
+            "close": [100.5] * 30,
+            "volume": [1_000.0] * 30,
+        }
+    )
+    benchmark_frame = pl.DataFrame(
+        {
+            "datetime": datetimes[:10] + datetimes[11:],
+            "close": [100.0] * 29,
+        }
+    )
+
+    aligned = strict_align_bundles(
+        symbol_frames={"BTC/USDT": symbol_frame},
+        feature_cache={},
+        benchmark_frame=benchmark_frame,
+        window_start=datetime(2026, 1, 1, tzinfo=UTC),
+        window_end_exclusive=datetime(2026, 1, 31, tzinfo=UTC),
+        timeframe="1d",
+    )
+
+    assert aligned is None
+
+
+def test_strict_align_bundles_rejects_empty_benchmark_frame():
+    datetimes = [datetime(2026, 1, day) for day in range(1, 31)]
+    symbol_frame = pl.DataFrame(
+        {
+            "datetime": datetimes,
+            "open": [100.0] * 30,
+            "high": [101.0] * 30,
+            "low": [99.0] * 30,
+            "close": [100.5] * 30,
+            "volume": [1_000.0] * 30,
+        }
+    )
+
+    aligned = strict_align_bundles(
+        symbol_frames={"BTC/USDT": symbol_frame},
+        feature_cache={},
+        benchmark_frame=pl.DataFrame(),
+        window_start=datetime(2026, 1, 1, tzinfo=UTC),
+        window_end_exclusive=datetime(2026, 1, 31, tzinfo=UTC),
+        timeframe="1d",
+    )
+
+    assert aligned is None
+
+
+def test_strict_align_bundles_does_not_asof_join_stale_feature_points():
+    datetimes = [datetime(2026, 1, day) for day in range(1, 31)]
+    symbol_frame = pl.DataFrame(
+        {
+            "datetime": datetimes,
+            "open": [100.0] * 30,
+            "high": [101.0] * 30,
+            "low": [99.0] * 30,
+            "close": [100.5] * 30,
+            "volume": [1_000.0] * 30,
+        }
+    )
+    benchmark_frame = pl.DataFrame({"datetime": datetimes, "close": [100.0] * 30})
+    feature_payload = {
+        "datetime": [datetimes[0]],
+        **{field: [None] for field in rr._FEATURE_POINT_COLUMNS},
+    }
+    feature_payload["funding_rate"] = [0.0001]
+    feature_frame = pl.DataFrame(feature_payload)
+
+    aligned = strict_align_bundles(
+        symbol_frames={"BTC/USDT": symbol_frame},
+        feature_cache={"BTC/USDT": feature_frame},
+        benchmark_frame=benchmark_frame,
+        window_start=datetime(2026, 1, 1, tzinfo=UTC),
+        window_end_exclusive=datetime(2026, 1, 31, tzinfo=UTC),
+        timeframe="1d",
+    )
+
+    assert aligned is not None
+    assert aligned["BTC/USDT:funding_rate"][0] == 0.0001
+    assert np.isnan(aligned["BTC/USDT:funding_rate"][1])
 
 
 def test_portfolio_weights_fallback_prefers_btc_beating_candidates_before_full_fallback():

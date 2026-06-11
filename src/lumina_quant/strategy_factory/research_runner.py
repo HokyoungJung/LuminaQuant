@@ -51,6 +51,7 @@ _PERIODS_PER_YEAR = {
 _MIN_BARS = 360
 _METALS = {"XAU/USDT", "XAG/USDT", "XPT/USDT", "XPD/USDT"}
 _LEADERS = ("BTC/USDT", "ETH/USDT", "BNB/USDT", "SOL/USDT")
+_FEATURE_POINT_MAX_STALE_MS = 8 * 60 * 60 * 1000
 _FEATURE_POINT_COLUMNS: tuple[str, ...] = (
     "funding_rate",
     "funding_mark_price",
@@ -368,7 +369,7 @@ def _load_feature_frame(
         if "unexpected keyword argument" not in str(exc):
             raise
         return pl.DataFrame()
-    except FileNotFoundError, OSError, RuntimeError, ValueError:
+    except (FileNotFoundError, OSError, RuntimeError, ValueError):
         return pl.DataFrame()
 
 
@@ -394,16 +395,44 @@ def _normalize_feature_frame(frame: pl.DataFrame) -> pl.DataFrame:
             keep="last",
         )
     )
-    return cleaned.with_columns(
+    source_cols = [f"__{field}_source_timestamp_ms" for field in _FEATURE_POINT_COLUMNS]
+    value_cols = [f"__{field}_ffill" for field in _FEATURE_POINT_COLUMNS]
+    bounded = cleaned.with_columns(
         [
             pl.col("timestamp_ms").cast(pl.Int64),
             pl.from_epoch("timestamp_ms", time_unit="ms").alias("datetime"),
             *[
-                pl.col(field).cast(pl.Float64).fill_null(strategy="forward").alias(field)
-                for field in _FEATURE_POINT_COLUMNS
+                pl.when(pl.col(field).is_not_null())
+                .then(pl.col("timestamp_ms"))
+                .otherwise(None)
+                .cast(pl.Int64)
+                .forward_fill()
+                .alias(source_col)
+                for field, source_col in zip(_FEATURE_POINT_COLUMNS, source_cols, strict=True)
+            ],
+            *[
+                pl.col(field).cast(pl.Float64).forward_fill().alias(value_col)
+                for field, value_col in zip(_FEATURE_POINT_COLUMNS, value_cols, strict=True)
             ],
         ]
+    ).with_columns(
+        [
+            pl.when(
+                pl.col(source_col).is_not_null()
+                & ((pl.col("timestamp_ms") - pl.col(source_col)) <= _FEATURE_POINT_MAX_STALE_MS)
+            )
+            .then(pl.col(value_col))
+            .otherwise(None)
+            .alias(field)
+            for field, source_col, value_col in zip(
+                _FEATURE_POINT_COLUMNS,
+                source_cols,
+                value_cols,
+                strict=True,
+            )
+        ]
     )
+    return bounded.drop([*source_cols, *value_cols])
 
 
 def _crowding_support_series(
@@ -872,22 +901,21 @@ def _align_series_to_timestamps(
     *,
     source_timestamps: np.ndarray,
     values: np.ndarray,
-) -> np.ndarray:
+) -> np.ndarray | None:
     target = np.asarray(target_timestamps, dtype="datetime64[ms]")
     source = np.asarray(source_timestamps, dtype="datetime64[ms]")
     arr = np.asarray(values, dtype=float)
     if target.size == 0 or source.size == 0 or arr.size == 0:
-        return np.zeros(target.size, dtype=float)
+        return None
+    if arr.size != source.size:
+        return None
     idx = np.searchsorted(source, target)
     valid = (idx >= 0) & (idx < source.size)
-    out = np.zeros(target.size, dtype=float)
-    if not np.any(valid):
-        return out
-    matched = valid.copy()
-    matched[valid] = source[idx[valid]] == target[valid]
-    if np.any(matched):
-        out[matched] = arr[idx[matched]]
-    return out
+    if not np.all(valid):
+        return None
+    if not np.all(source[idx] == target):
+        return None
+    return arr[idx]
 
 
 def _series_to_stream(
@@ -3225,6 +3253,7 @@ def _aligned_feature_points(
         feature_points.sort("datetime"),
         on="datetime",
         strategy="backward",
+        tolerance=timedelta(milliseconds=_FEATURE_POINT_MAX_STALE_MS),
     )
 
 
@@ -6409,7 +6438,7 @@ def _candidate_benchmark_series(
     timeframe: str,
     timestamps: np.ndarray,
     returns_size: int,
-) -> np.ndarray:
+) -> np.ndarray | None:
     benchmark_entry = benchmark_cache.get(timeframe)
     if isinstance(benchmark_entry, Mapping):
         benchmark_datetime = benchmark_entry.get("datetime")
@@ -6427,7 +6456,7 @@ def _candidate_benchmark_series(
 
     benchmark = np.asarray(benchmark_entry if benchmark_entry is not None else [], dtype=float)
     if benchmark.size < returns_size:
-        benchmark = np.zeros(returns_size, dtype=float)
+        return None
     return benchmark[-returns_size:]
 
 
@@ -6650,7 +6679,7 @@ def _evaluate_candidate_metric_payload(
     benchmark_cache: Mapping[str, Mapping[str, np.ndarray] | np.ndarray],
     candidate_count: int,
     split: Mapping[str, Any] | None,
-) -> _CandidateMetricPayload:
+) -> _CandidateMetricPayload | None:
     split_masks = _split_masks_from_datetimes(signal_payload.timestamps, split=split)
     periods_per_year = int(_PERIODS_PER_YEAR.get(signal_payload.timeframe, 365))
     benchmark = _candidate_benchmark_series(
@@ -6659,6 +6688,8 @@ def _evaluate_candidate_metric_payload(
         timestamps=signal_payload.timestamps,
         returns_size=signal_payload.returns.size,
     )
+    if benchmark is None:
+        return None
     train_metrics, val_metrics, oos_metrics = _candidate_stage_metrics(
         returns=signal_payload.returns,
         turnover=signal_payload.turnover,
@@ -6794,6 +6825,14 @@ def _evaluate_candidate(
         candidate_count=candidate_count,
         split=effective_split,
     )
+    if metric_payload is None:
+        return _call_insufficient_candidate_result(
+            candidate,
+            symbols=symbols,
+            timeframe=timeframe,
+            cache=cache,
+            effective_split=effective_split,
+        )
     hurdle_fields, passed, hard_reject = _evaluate_candidate_hurdles(
         metric_payload,
         scoring_config=scoring_config,
@@ -6910,9 +6949,7 @@ def _read_csv_ohlcv(path: Path) -> pl.DataFrame:
             pl.Datetime(time_unit="ms")
         )
     else:
-        # Synthesize monotonic timestamps.
-        dt_expr = pl.int_range(0, frame.height, eager=False).cast(pl.Int64) * 1000
-        dt_expr = pl.from_epoch(dt_expr, time_unit="ms").cast(pl.Datetime(time_unit="ms"))
+        return pl.DataFrame()
 
     out = (
         frame.select(

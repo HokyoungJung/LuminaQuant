@@ -20,8 +20,6 @@ from lumina_quant.strategy_factory import (
 from lumina_quant.strategy_factory.selection import select_diversified_shortlist
 from lumina_quant.symbols import CANONICAL_STRATEGY_TIMEFRAMES, canonicalize_symbol_list
 
-BaseConfig = BacktestConfigView(get_default_runtime_config())
-
 _METALS = {"XAU/USDT", "XAG/USDT", "XPT/USDT", "XPD/USDT"}
 _RESEARCH_PROMOTION_MAX_SPLIT_DRAWDOWN = 0.15
 _RESEARCH_STRICT_LIQUIDATION_COUNT_MAX = 0
@@ -37,6 +35,11 @@ _TIMEFRAME_SECONDS = {
     "4h": 4 * 60 * 60,
     "1d": 24 * 60 * 60,
 }
+
+
+def _current_base_config() -> BacktestConfigView:
+    return BacktestConfigView(get_default_runtime_config())
+
 
 DEFAULT_SHORTLIST_SELECTION_CONFIG: dict[str, Any] = {
     "drop_single_without_metrics": False,
@@ -208,9 +211,10 @@ def _resolve_shortlist_selection_config(
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run advanced candidate research pipeline.")
+    base_config = _current_base_config()
     parser.add_argument("--output-dir", default="reports")
     parser.add_argument("--manifest", default="", help="Optional candidate manifest JSON path.")
-    parser.add_argument("--symbols", nargs="+", default=list(BaseConfig.SYMBOLS))
+    parser.add_argument("--symbols", nargs="+", default=list(base_config.SYMBOLS))
     parser.add_argument("--timeframes", nargs="+", default=list(CANONICAL_STRATEGY_TIMEFRAMES))
     parser.add_argument("--base-timeframe", default="1s")
     parser.add_argument("--stage1-keep-ratio", type=float, default=0.35)
@@ -469,8 +473,9 @@ def _rebuild_candidates_after_coverage(
     if start_bound is None or requested_end is None:
         return candidates, split, {"enabled": False, "used_candidate_count": len(candidates)}
 
-    db_path = str(getattr(BaseConfig, "MARKET_DATA_PARQUET_PATH", "data/market_parquet"))
-    exchange = str(getattr(BaseConfig, "MARKET_DATA_EXCHANGE", "binance") or "binance")
+    base_config = _current_base_config()
+    db_path = str(getattr(base_config, "MARKET_DATA_PARQUET_PATH", "data/market_parquet"))
+    exchange = str(getattr(base_config, "MARKET_DATA_EXCHANGE", "binance") or "binance")
     coverage: dict[tuple[str, str], dict[str, Any]] = {}
     last_values: list[datetime] = []
     if progress_callback is not None:

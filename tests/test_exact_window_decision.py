@@ -351,6 +351,46 @@ def test_write_exact_window_decision_bundle_tracks_recent_three_month_two_pct_ca
     assert row["monthly_hurdle_outcomes"]["recent_three_month_two_pct_pass"] is True
 
 
+def test_write_exact_window_decision_bundle_fails_closed_on_missing_benchmark_month(
+    tmp_path: Path,
+):
+    _write_slice(
+        tmp_path,
+        "timeframe_1m",
+        generated_at="2026-03-09T10:00:00+00:00",
+        requested_timeframes=["1m"],
+        details=[
+            _detail(
+                candidate_id="1m-missing-benchmark",
+                timeframe="1m",
+                strategy_class="CompositeTrendStrategy",
+                val_sharpe=3.0,
+                val_return=0.25,
+                oos_sharpe=2.0,
+                oos_return=0.20,
+                val_stream=[(2026, 1, 15, 0.25)],
+                oos_stream=[(2026, 2, 15, 0.20)],
+            )
+        ],
+        peak_rss_mib=96.0,
+        monthly_thresholds={
+            "2026-02": {"btc_buy_hold_return": 0.01, "threshold": 0.02},
+        },
+    )
+
+    payload = write_exact_window_decision_bundle(tmp_path)["payload"]
+    row = payload["timeframe_rows"][0]
+    best = row["best_row"]
+
+    assert best["validation_hurdle_pass"] is False
+    assert best["validation_btc_hurdle_pass"] is False
+    assert best["promoted"] is False
+    assert best["btc_beating_candidate"] is False
+    assert best["validation_monthly_hurdle"][0]["benchmark_missing"] is True
+    assert payload["promoted_total"] == 0
+    assert payload["btc_beating_candidate_total"] == 0
+
+
 def test_write_exact_window_decision_bundle_penalizes_zero_trade_best_rows(tmp_path: Path):
     zero_trade = _detail(
         candidate_id="4h-zero-trade",

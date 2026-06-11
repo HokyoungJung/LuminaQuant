@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from lumina_quant.data.feature_points import FeaturePointLookup
+from lumina_quant.data.feature_points import FEATURE_POINT_MAX_STALE_MS, FeaturePointLookup
 from lumina_quant.market_data import upsert_futures_feature_points_rows
 
 
@@ -84,3 +84,23 @@ def test_feature_point_lookup_sums_raw_feature_window(tmp_path):
         )
         is None
     )
+
+
+def test_feature_point_lookup_does_not_forward_fill_beyond_staleness_limit(tmp_path):
+    db_path = tmp_path / "market_parquet"
+    start_ms = 1_700_000_000_000
+    stale_ms = start_ms + FEATURE_POINT_MAX_STALE_MS + 1
+    upsert_futures_feature_points_rows(
+        str(db_path),
+        exchange="binance",
+        symbol="BTC/USDT",
+        rows=[
+            {"timestamp_ms": start_ms, "funding_rate": 0.0001},
+            {"timestamp_ms": stale_ms, "mark_price": 50_000.0},
+        ],
+    )
+
+    lookup = FeaturePointLookup(db_path=str(db_path), exchange="binance")
+
+    assert lookup.get_latest("BTC/USDT", "funding_rate", timestamp_ms=start_ms) == 0.0001
+    assert lookup.get_latest("BTC/USDT", "funding_rate", timestamp_ms=stale_ms) is None

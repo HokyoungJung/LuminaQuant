@@ -67,6 +67,23 @@ def test_flow_imbalance_is_null_when_no_real_taker_flow():
     assert frame["flow"].to_list() == [None, -0.5]
 
 
+def test_stale_bounded_forward_fill_drops_values_after_staleness_limit():
+    stale_ms = screen.FEATURE_POINT_MAX_STALE_MS + 1
+    frame = screen._stale_bounded_forward_fill(
+        pl.DataFrame(
+            {
+                "timestamp_ms": [0, stale_ms],
+                "mark_price": [100.0, None],
+                "funding_rate": [0.001, None],
+            }
+        ),
+        ("mark_price", "funding_rate"),
+    )
+
+    assert frame["mark_price"].to_list() == [100.0, None]
+    assert frame["funding_rate"].to_list() == [0.001, None]
+
+
 def test_leadlag_screen_requires_oos_sample_and_positive_hit_rate():
     too_sparse = _candidate(0.0005, 0.0007, 0.0006, oos_count=12, oos_hit=0.70)
     weak_hit = _candidate(0.0005, 0.0007, 0.0006, oos_count=50, oos_hit=0.49)

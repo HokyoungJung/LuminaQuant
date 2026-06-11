@@ -30,6 +30,7 @@ FRED_SERIES = {
     "DGS10": "ust10y",
     "DCOILWTICO": "wti",
 }
+MAX_EXTERNAL_STATE_STALE_DAYS = 10
 
 
 def _fred_csv_url(series_id: str, start: date, end: date) -> str:
@@ -60,6 +61,61 @@ def _rolling_z(expr: pl.Expr, window: int = 60) -> pl.Expr:
     return (expr - mean) / std
 
 
+def _stale_bounded_daily_forward_fill(
+    panel: pl.DataFrame,
+    columns: list[str],
+    *,
+    max_stale_days: int = MAX_EXTERNAL_STATE_STALE_DAYS,
+) -> pl.DataFrame:
+    if panel.is_empty() or "date" not in panel.columns:
+        return panel
+    present_columns = [column for column in columns if column in panel.columns]
+    if not present_columns:
+        return panel
+
+    day_col = "__date_day"
+    source_cols = [f"__{column}_source_day" for column in present_columns]
+    value_cols = [f"__{column}_ffill" for column in present_columns]
+    bounded = (
+        panel.with_columns(pl.col("date").dt.epoch("d").cast(pl.Int64).alias(day_col))
+        .with_columns(
+            [
+                *[
+                    pl.when(pl.col(column).is_not_null())
+                    .then(pl.col(day_col))
+                    .otherwise(None)
+                    .cast(pl.Int64)
+                    .forward_fill()
+                    .alias(source_col)
+                    for column, source_col in zip(present_columns, source_cols, strict=True)
+                ],
+                *[
+                    pl.col(column).cast(pl.Float64).forward_fill().alias(value_col)
+                    for column, value_col in zip(present_columns, value_cols, strict=True)
+                ],
+            ]
+        )
+        .with_columns(
+            [
+                pl.when(
+                    pl.col(source_col).is_not_null()
+                    & ((pl.col(day_col) - pl.col(source_col)) <= int(max_stale_days))
+                )
+                .then(pl.col(value_col))
+                .otherwise(None)
+                .alias(column)
+                for column, source_col, value_col in zip(
+                    present_columns,
+                    source_cols,
+                    value_cols,
+                    strict=True,
+                )
+            ]
+        )
+    )
+    return bounded.drop([day_col, *source_cols, *value_cols])
+
+
 def _build_external_state_panel(series_frames: list[pl.DataFrame]) -> pl.DataFrame:
     if not series_frames:
         return pl.DataFrame(schema={"date": pl.Date})
@@ -68,7 +124,7 @@ def _build_external_state_panel(series_frames: list[pl.DataFrame]) -> pl.DataFra
         panel = panel.join(frame, on="date", how="full", coalesce=True)
     panel = panel.sort("date")
     raw_columns = [column for column in panel.columns if column != "date"]
-    panel = panel.with_columns([pl.col(column).forward_fill() for column in raw_columns])
+    panel = _stale_bounded_daily_forward_fill(panel, raw_columns)
     panel = panel.with_columns(
         [
             pl.col("usd_broad").pct_change(5).alias("usd_ret_5d"),

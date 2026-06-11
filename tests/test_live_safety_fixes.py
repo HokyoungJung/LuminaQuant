@@ -779,9 +779,6 @@ def test_live_trader_typed_config_handles_market_bar(monkeypatch):
                 "go_live_stage": "testnet",
                 "market_data_source": "committed",
                 "order_state_source": "polling",
-                # Dummy keys satisfy the for_live=True API-key check; not used in paper mode.
-                "api_key": "test_key",
-                "secret_key": "test_secret",
                 "exchange": {
                     "driver": "binance_futures",
                     "name": "binance",
@@ -792,7 +789,8 @@ def test_live_trader_typed_config_handles_market_bar(monkeypatch):
                 },
             },
         },
-        env={},
+        # Dummy env keys satisfy the for_live=True API-key check; not used in paper mode.
+        env={"BINANCE_API_KEY": "test_key", "BINANCE_SECRET_KEY": "test_secret"},
     )
 
     class _FakeExchangeT:

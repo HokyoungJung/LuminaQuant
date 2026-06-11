@@ -229,6 +229,24 @@ def test_load_bundle_cache_uses_csv_fallback_with_date_bounds(
     assert bundle.close.tolist() == [101.5]
 
 
+def test_read_csv_ohlcv_rejects_files_without_timestamp_evidence(tmp_path: Path):
+    csv_path = tmp_path / "BTCUSDT.csv"
+    csv_path.write_text(
+        "\n".join(
+            [
+                "open,high,low,close,volume",
+                "100,101,99,100.5,10",
+                "101,102,100,101.5,12",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    frame = research_runner._read_csv_ohlcv(csv_path)
+
+    assert frame.is_empty()
+
+
 def test_load_bundle_cache_uses_synthetic_fallback_when_other_sources_are_missing(monkeypatch):
     bundle = research_runner.SeriesBundle(
         symbol="BTC/USDT",
@@ -543,6 +561,42 @@ def test_load_feature_cache_normalizes_feature_frames(monkeypatch):
     assert trailing_field in frame.columns
 
 
+def test_normalize_feature_frame_does_not_forward_fill_stale_feature_points():
+    lead_field = research_runner._FEATURE_POINT_COLUMNS[0]
+    stale_ms = research_runner._FEATURE_POINT_MAX_STALE_MS + 1
+    frame = research_runner._normalize_feature_frame(
+        pl.DataFrame(
+            {
+                "timestamp_ms": [0, stale_ms],
+                lead_field: [0.1, None],
+            }
+        )
+    )
+
+    assert frame[lead_field].to_list() == [0.1, None]
+
+
+def test_aligned_feature_points_rejects_stale_asof_matches():
+    lead_field = research_runner._FEATURE_POINT_COLUMNS[0]
+    stale_ms = research_runner._FEATURE_POINT_MAX_STALE_MS + 1
+    feature_frame = pl.DataFrame(
+        {
+            "datetime": [
+                datetime(1970, 1, 1, 0, 0, 0),
+            ],
+            lead_field: [0.1],
+        }
+    )
+
+    joined = research_runner._aligned_feature_points(
+        common_datetime=np.asarray([0, stale_ms], dtype="datetime64[ms]"),
+        feature_frame=feature_frame,
+    )
+
+    assert joined is not None
+    assert joined[lead_field].to_list() == [0.1, None]
+
+
 def test_load_feature_cache_emits_symbol_progress(monkeypatch):
     lead_field = research_runner._FEATURE_POINT_COLUMNS[0]
     events: list[tuple[str, dict[str, object]]] = []
@@ -643,6 +697,72 @@ def test_benchmark_cache_emits_timeframe_progress():
             },
         ),
     ]
+
+
+def test_candidate_benchmark_series_rejects_missing_timestamp_rows():
+    target_timestamps = np.asarray(
+        [
+            "2024-01-01T00:00:00",
+            "2024-01-01T00:01:00",
+            "2024-01-01T00:02:00",
+        ],
+        dtype="datetime64[ms]",
+    )
+    benchmark_cache = {
+        "1m": {
+            "datetime": np.asarray(
+                ["2024-01-01T00:00:00", "2024-01-01T00:02:00"],
+                dtype="datetime64[ms]",
+            ),
+            "returns": np.asarray([0.0, 0.02], dtype=float),
+        }
+    }
+
+    aligned = research_runner._candidate_benchmark_series(
+        benchmark_cache=benchmark_cache,
+        timeframe="1m",
+        timestamps=target_timestamps,
+        returns_size=target_timestamps.size,
+    )
+
+    assert aligned is None
+
+
+def test_evaluate_candidate_metric_payload_returns_insufficient_when_benchmark_missing():
+    timestamps = np.asarray(
+        [
+            "2024-01-01T00:00:00",
+            "2024-01-01T00:01:00",
+            "2024-01-01T00:02:00",
+        ],
+        dtype="datetime64[ms]",
+    )
+    signal_payload = research_runner._CandidateSignalPayload(
+        symbols=["ETH/USDT"],
+        timeframe="1m",
+        timestamps=timestamps,
+        returns_raw=np.asarray([0.0, 0.01, -0.005], dtype=float),
+        returns=np.asarray([0.0, 0.01, -0.005], dtype=float),
+        turnover=np.zeros(timestamps.size, dtype=float),
+        exposure=np.ones(timestamps.size, dtype=float),
+        meta={},
+        cost_rate=0.0,
+    )
+    benchmark_cache = {
+        "1m": {
+            "datetime": timestamps[:-1],
+            "returns": np.asarray([0.0, 0.01], dtype=float),
+        }
+    }
+
+    payload = research_runner._evaluate_candidate_metric_payload(
+        signal_payload,
+        benchmark_cache=benchmark_cache,
+        candidate_count=1,
+        split=None,
+    )
+
+    assert payload is None
 
 
 def test_synthetic_bundle_is_deterministic_for_symbol_and_timeframe():

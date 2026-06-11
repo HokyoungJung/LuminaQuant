@@ -38,6 +38,7 @@ FEATURE_COLUMNS: Final[tuple[str, ...]] = (
     "book_depth_ask_notional_1pct",
     "book_depth_imbalance_1pct",
 )
+FEATURE_POINT_MAX_STALE_MS: Final[int] = 8 * 60 * 60 * 1000
 
 
 @dataclass(slots=True)
@@ -45,6 +46,7 @@ class _FeatureCache:
     timestamps_ms: list[int]
     columns: dict[str, list[float | None]]
     raw_columns: dict[str, list[float | None]]
+    source_timestamps_ms: dict[str, list[int | None]]
 
 
 class FeaturePointLookup:
@@ -89,6 +91,11 @@ class FeaturePointLookup:
 
         value = cache.columns.get(token, [None])[idx]
         if value is None:
+            return None
+        source_timestamp = cache.source_timestamps_ms.get(token, [None])[idx]
+        if source_timestamp is None:
+            return None
+        if int(timestamp_ms) - int(source_timestamp) > FEATURE_POINT_MAX_STALE_MS:
             return None
         try:
             parsed = float(value)
@@ -160,14 +167,24 @@ class FeaturePointLookup:
         )
         if frame.is_empty():
             empty = {field: [] for field in FEATURE_COLUMNS}
-            return _FeatureCache(timestamps_ms=[], columns=empty, raw_columns=dict(empty))
+            return _FeatureCache(
+                timestamps_ms=[],
+                columns=empty,
+                raw_columns=dict(empty),
+                source_timestamps_ms=dict(empty),
+            )
 
         cleaned = frame.filter(pl.col("timestamp_ms").is_not_null()).with_columns(
             pl.col("timestamp_ms").cast(pl.Int64)
         )
         if cleaned.is_empty():
             empty = {field: [] for field in FEATURE_COLUMNS}
-            return _FeatureCache(timestamps_ms=[], columns=empty, raw_columns=dict(empty))
+            return _FeatureCache(
+                timestamps_ms=[],
+                columns=empty,
+                raw_columns=dict(empty),
+                source_timestamps_ms=dict(empty),
+            )
 
         for field in FEATURE_COLUMNS:
             if field not in cleaned.columns:
@@ -188,22 +205,63 @@ class FeaturePointLookup:
             ]
             for field in FEATURE_COLUMNS
         }
-        cleaned = cleaned.with_columns(
+        source_cols = [f"__{field}_source_timestamp_ms" for field in FEATURE_COLUMNS]
+        value_cols = [f"__{field}_ffill" for field in FEATURE_COLUMNS]
+        bounded = cleaned.with_columns(
             [
-                pl.col(field).cast(pl.Float64).fill_null(strategy="forward").alias(field)
-                for field in FEATURE_COLUMNS
+                *[
+                    pl.when(pl.col(field).is_not_null())
+                    .then(pl.col("timestamp_ms"))
+                    .otherwise(None)
+                    .cast(pl.Int64)
+                    .forward_fill()
+                    .alias(source_col)
+                    for field, source_col in zip(FEATURE_COLUMNS, source_cols, strict=True)
+                ],
+                *[
+                    pl.col(field).cast(pl.Float64).forward_fill().alias(value_col)
+                    for field, value_col in zip(FEATURE_COLUMNS, value_cols, strict=True)
+                ],
+            ]
+        ).with_columns(
+            [
+                pl.when(
+                    pl.col(source_col).is_not_null()
+                    & ((pl.col("timestamp_ms") - pl.col(source_col)) <= FEATURE_POINT_MAX_STALE_MS)
+                )
+                .then(pl.col(value_col))
+                .otherwise(None)
+                .alias(field)
+                for field, source_col, value_col in zip(
+                    FEATURE_COLUMNS,
+                    source_cols,
+                    value_cols,
+                    strict=True,
+                )
             ]
         )
 
-        timestamps_ms = [int(value) for value in cleaned.get_column("timestamp_ms").to_list()]
+        timestamps_ms = [int(value) for value in bounded.get_column("timestamp_ms").to_list()]
         columns = {
             field: [
                 float(value) if value is not None else None
-                for value in cleaned.get_column(field).to_list()
+                for value in bounded.get_column(field).to_list()
             ]
             for field in FEATURE_COLUMNS
         }
-        return _FeatureCache(timestamps_ms=timestamps_ms, columns=columns, raw_columns=raw_columns)
+        source_timestamps_ms = {
+            field: [
+                int(value) if value is not None else None
+                for value in bounded.get_column(source_col).to_list()
+            ]
+            for field, source_col in zip(FEATURE_COLUMNS, source_cols, strict=True)
+        }
+        return _FeatureCache(
+            timestamps_ms=timestamps_ms,
+            columns=columns,
+            raw_columns=raw_columns,
+            source_timestamps_ms=source_timestamps_ms,
+        )
 
 
-__all__ = ["FEATURE_COLUMNS", "FeaturePointLookup"]
+__all__ = ["FEATURE_COLUMNS", "FEATURE_POINT_MAX_STALE_MS", "FeaturePointLookup"]

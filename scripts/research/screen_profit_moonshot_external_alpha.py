@@ -47,6 +47,7 @@ FUNDING_HORIZONS = {"1h": 180, "4h": 720, "8h": 1440}
 # accidentally duplicated by downsampling.
 LEADLAG_LAGS_HOURS = {"1h": 1, "2h": 2, "4h": 4}
 LEADLAG_HORIZONS_HOURS = {"1h": 1, "2h": 2, "4h": 4, "8h": 8}
+FEATURE_POINT_MAX_STALE_MS = 8 * 60 * 60 * 1000
 
 SOURCE_LINKS = [
     {
@@ -275,6 +276,58 @@ def _load_feature_points(db_path: str, symbol: str, start_date: str, end_date: s
     return frame.sort("timestamp_ms")
 
 
+def _stale_bounded_forward_fill(
+    frame: pl.DataFrame,
+    fields: tuple[str, ...],
+    *,
+    max_stale_ms: int = FEATURE_POINT_MAX_STALE_MS,
+) -> pl.DataFrame:
+    if frame.is_empty() or "timestamp_ms" not in frame.columns:
+        return frame
+
+    cleaned = frame.sort("timestamp_ms").with_columns(pl.col("timestamp_ms").cast(pl.Int64))
+    present_fields = [field for field in fields if field in cleaned.columns]
+    source_cols = [f"__{field}_source_timestamp_ms" for field in present_fields]
+    value_cols = [f"__{field}_ffill" for field in present_fields]
+    if not present_fields:
+        return cleaned
+
+    bounded = cleaned.with_columns(
+        [
+            *[
+                pl.when(pl.col(field).is_not_null())
+                .then(pl.col("timestamp_ms"))
+                .otherwise(None)
+                .cast(pl.Int64)
+                .forward_fill()
+                .alias(source_col)
+                for field, source_col in zip(present_fields, source_cols, strict=True)
+            ],
+            *[
+                pl.col(field).cast(pl.Float64).forward_fill().alias(value_col)
+                for field, value_col in zip(present_fields, value_cols, strict=True)
+            ],
+        ]
+    ).with_columns(
+        [
+            pl.when(
+                pl.col(source_col).is_not_null()
+                & ((pl.col("timestamp_ms") - pl.col(source_col)) <= max_stale_ms)
+            )
+            .then(pl.col(value_col))
+            .otherwise(None)
+            .alias(field)
+            for field, source_col, value_col in zip(
+                present_fields,
+                source_cols,
+                value_cols,
+                strict=True,
+            )
+        ]
+    )
+    return bounded.drop([*source_cols, *value_cols])
+
+
 def _screen_funding_taker(
     *,
     db_path: str,
@@ -298,10 +351,11 @@ def _screen_funding_taker(
             ]
         )
         frame = (
-            frame.with_columns(
+            _stale_bounded_forward_fill(frame, ("mark_price", "funding_rate"))
+            .with_columns(
                 [
-                    pl.col("mark_price").cast(pl.Float64).fill_null(strategy="forward"),
-                    pl.col("funding_rate").cast(pl.Float64).fill_null(strategy="forward"),
+                    pl.col("mark_price").cast(pl.Float64),
+                    pl.col("funding_rate").cast(pl.Float64),
                     pl.col("taker_buy_quote_volume").cast(pl.Float64).fill_null(0.0),
                     pl.col("taker_sell_quote_volume").cast(pl.Float64).fill_null(0.0),
                 ]
@@ -451,12 +505,14 @@ def _screen_funding_taker(
 
 def _hourly_mark_frame(db_path: str, symbol: str, start_date: str, end_date: str) -> pl.DataFrame:
     token = _symbol_token(symbol)
+    frame = _load_feature_points(db_path, symbol, start_date, end_date).select(
+        ["timestamp_ms", "mark_price"]
+    )
     return (
-        _load_feature_points(db_path, symbol, start_date, end_date)
-        .select(["timestamp_ms", "mark_price"])
+        _stale_bounded_forward_fill(frame, ("mark_price",))
         .with_columns(
             [
-                pl.col("mark_price").cast(pl.Float64).fill_null(strategy="forward"),
+                pl.col("mark_price").cast(pl.Float64),
                 pl.from_epoch("timestamp_ms", time_unit="ms").alias("dt"),
             ]
         )

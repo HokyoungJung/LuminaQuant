@@ -1206,6 +1206,28 @@ def test_external_state_panel_is_lagged_and_joined_to_hourly_panel(tmp_path: Pat
     assert joined["external_risk_off_score_lag1"][0] == joined["external_risk_off_score_lag1"][1]
 
 
+def test_external_state_forward_fill_is_staleness_bounded() -> None:
+    module_path = ROOT / "scripts" / "research" / "fetch_profit_moonshot_external_state.py"
+    spec = importlib.util.spec_from_file_location(
+        "fetch_profit_moonshot_external_state", module_path
+    )
+    assert spec is not None and spec.loader is not None
+    external_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(external_module)
+
+    panel = external_module._stale_bounded_daily_forward_fill(
+        pl.DataFrame(
+            {
+                "date": [date(2025, 1, 1), date(2025, 1, 15)],
+                "vix": [12.0, None],
+            }
+        ),
+        ["vix"],
+    )
+
+    assert panel["vix"].to_list() == [12.0, None]
+
+
 def test_candidate_specs_include_external_inspired_families() -> None:
     arrays = {
         "btcusdt_rv_24h": np.linspace(0.002, 0.003, 6),

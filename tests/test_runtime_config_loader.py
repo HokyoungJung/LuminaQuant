@@ -67,6 +67,65 @@ class TestRuntimeConfigLoader(unittest.TestCase):
         finally:
             os.remove(path)
 
+    def test_live_api_credentials_are_not_loaded_from_yaml(self):
+        yaml_text = textwrap.dedent(
+            """
+            trading:
+              symbols: ["BTC/USDT"]
+            live:
+              mode: "paper"
+              api_key: "yaml-api-key"
+              secret_key: "yaml-secret-key"
+              exchange:
+                driver: "binance_futures"
+                name: "binance"
+                market_type: "future"
+                position_mode: "HEDGE"
+                margin_mode: "isolated"
+                leverage: 2
+            """
+        ).strip()
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False, encoding="utf-8") as fp:
+            fp.write(yaml_text)
+            path = fp.name
+        try:
+            runtime = load_runtime_config(config_path=path, env={})
+            self.assertEqual(runtime.live.api_key, "")
+            self.assertEqual(runtime.live.secret_key, "")
+        finally:
+            os.remove(path)
+
+    def test_live_api_credentials_are_loaded_from_env(self):
+        yaml_text = textwrap.dedent(
+            """
+            trading:
+              symbols: ["BTC/USDT"]
+            live:
+              mode: "paper"
+              api_key: "yaml-api-key"
+              secret_key: "yaml-secret-key"
+              exchange:
+                driver: "binance_futures"
+                name: "binance"
+                market_type: "future"
+                position_mode: "HEDGE"
+                margin_mode: "isolated"
+                leverage: 2
+            """
+        ).strip()
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False, encoding="utf-8") as fp:
+            fp.write(yaml_text)
+            path = fp.name
+        try:
+            runtime = load_runtime_config(
+                config_path=path,
+                env={"BINANCE_API_KEY": "env-api-key", "EXCHANGE_SECRET_KEY": "env-secret-key"},
+            )
+            self.assertEqual(runtime.live.api_key, "env-api-key")
+            self.assertEqual(runtime.live.secret_key, "env-secret-key")
+        finally:
+            os.remove(path)
+
     def test_invalid_compute_backend_raises(self):
         yaml_text = textwrap.dedent(
             """
