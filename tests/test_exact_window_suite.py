@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 import textwrap
 
 import numpy as np
+import polars as pl
 import pytest
 
 from lumina_quant.eval.exact_window_suite import (
@@ -16,6 +17,7 @@ from lumina_quant.eval.exact_window_suite import (
     half_open_slice_indices,
     run_exact_window_suite,
     resolve_coverage_adaptive_windows,
+    strict_align_bundles,
 )
 
 
@@ -75,6 +77,37 @@ def test_monthly_hurdle_rows_track_btc_pass_separately_from_strict_floor():
     assert rows[0]["strict_pass"] is False
     assert rows[0]["btc_pass"] is True
     assert rows[0]["pass"] is False
+
+
+def test_strict_align_bundles_rejects_leading_benchmark_gap_without_backward_fill():
+    datetimes = [datetime(2026, 1, day) for day in range(1, 31)]
+    symbol_frame = pl.DataFrame(
+        {
+            "datetime": datetimes,
+            "open": [100.0] * 30,
+            "high": [101.0] * 30,
+            "low": [99.0] * 30,
+            "close": [100.5] * 30,
+            "volume": [1_000.0] * 30,
+        }
+    )
+    benchmark_frame = pl.DataFrame(
+        {
+            "datetime": datetimes[1:],
+            "close": [100.0] * 29,
+        }
+    )
+
+    aligned = strict_align_bundles(
+        symbol_frames={"BTC/USDT": symbol_frame},
+        feature_cache={},
+        benchmark_frame=benchmark_frame,
+        window_start=datetime(2026, 1, 1, tzinfo=UTC),
+        window_end_exclusive=datetime(2026, 1, 31, tzinfo=UTC),
+        timeframe="1d",
+    )
+
+    assert aligned is None
 
 
 def test_portfolio_weights_fallback_prefers_btc_beating_candidates_before_full_fallback():

@@ -242,6 +242,11 @@ def test_load_bundle_cache_uses_synthetic_fallback_when_other_sources_are_missin
     )
 
     monkeypatch.setattr(research_runner, "load_data_dict_from_parquet", lambda *args, **kwargs: {})
+    monkeypatch.setattr(
+        research_runner,
+        "_load_partitioned_1m_resample_bundle",
+        lambda **kwargs: None,
+    )
     monkeypatch.setattr(research_runner, "_load_csv_bundle", lambda **kwargs: None)
     monkeypatch.setattr(research_runner, "_synthetic_bundle", lambda *args, **kwargs: bundle)
 
@@ -260,6 +265,38 @@ def test_load_bundle_cache_uses_synthetic_fallback_when_other_sources_are_missin
 
     assert cache[("BTC/USDT", "1m")] is bundle
     assert source_map["synthetic"] == ["BTC/USDT@1m"]
+
+
+def test_run_candidate_research_disables_synthetic_fallback_by_default(monkeypatch):
+    monkeypatch.setattr(research_runner, "load_data_dict_from_parquet", lambda *args, **kwargs: {})
+    monkeypatch.setattr(
+        research_runner,
+        "_load_partitioned_1m_resample_bundle",
+        lambda **kwargs: None,
+    )
+    monkeypatch.setattr(research_runner, "_load_csv_bundle", lambda **kwargs: None)
+    monkeypatch.setattr(
+        research_runner,
+        "_synthetic_bundle",
+        lambda *args, **kwargs: pytest.fail("synthetic fallback should be explicit opt-in"),
+    )
+
+    with pytest.raises(research_runner.RawFirstDataMissingError):
+        research_runner.run_candidate_research(
+            candidates=[
+                {
+                    "candidate_id": "missing",
+                    "strategy_class": "CompositeTrendStrategy",
+                    "strategy_timeframe": "1m",
+                    "symbols": ["BTC/USDT"],
+                    "params": {},
+                }
+            ],
+            strategy_timeframes=["1m"],
+            symbol_universe=["BTC/USDT"],
+            max_candidates=1,
+            min_bundle_bars=1,
+        )
 
 
 def test_load_bundle_cache_prefers_parquet_frames_and_records_their_source(monkeypatch):

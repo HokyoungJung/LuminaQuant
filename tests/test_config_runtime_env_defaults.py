@@ -11,6 +11,8 @@ The new invariants:
 from __future__ import annotations
 
 import textwrap
+import os
+from pathlib import Path
 
 from lumina_quant.configuration import (
     current_market_data_runtime_settings,
@@ -97,6 +99,31 @@ def test_load_runtime_config_parses_all_sections(tmp_path):
     assert rt.live.market_data_source == "external"
     assert rt.live.exchange.name == "binance"
     assert rt.live.exchange.leverage == 2
+
+
+def test_load_runtime_config_uses_config_local_dotenv_without_mutating_process_env(
+    tmp_path,
+    monkeypatch,
+):
+    workdir = tmp_path / "workdir"
+    config_dir = tmp_path / "isolated_config"
+    workdir.mkdir()
+    config_dir.mkdir()
+    (workdir / ".env").write_text(
+        "LQ__STORAGE__BACKEND=parquet-postgres\n"
+        "LQ__STORAGE__MARKET_DATA_PARQUET_PATH=data/market_parquet\n",
+        encoding="utf-8",
+    )
+    cfg_path = Path(_write_config(config_dir))
+    monkeypatch.chdir(workdir)
+    monkeypatch.delenv("LQ__STORAGE__BACKEND", raising=False)
+    monkeypatch.delenv("LQ__STORAGE__MARKET_DATA_PARQUET_PATH", raising=False)
+
+    rt = load_runtime_config(str(cfg_path))
+
+    assert rt.storage.backend == "local"
+    assert rt.storage.market_data_parquet_path == "var/data/custom_parquet"
+    assert "LQ__STORAGE__BACKEND" not in os.environ
 
 
 def test_get_default_runtime_config_uses_LQ_CONFIG_PATH(tmp_path, monkeypatch):

@@ -598,20 +598,20 @@ def _rebuild_candidates_after_coverage(
             adjusted_count += 1
         filtered.append(candidate)
         available_pairs.update((symbol, timeframe) for symbol in candidate_symbols)
-    used = filtered or candidates
     summary = {
         "enabled": True,
         "requested_candidate_count": len(candidates),
         "filtered_candidate_count": len(filtered),
-        "used_candidate_count": len(used),
+        "used_candidate_count": len(filtered),
         "candidate_window_adjusted_count": int(adjusted_count),
-        "fallback_to_precoverage": bool(not filtered and candidates),
+        "fallback_to_precoverage": False,
+        "dropped_candidate_count": max(0, len(candidates) - len(filtered)),
         "actual_max_timestamp": resolved_split.get("actual_max_timestamp"),
         "available_pairs": sorted(f"{symbol}@{timeframe}" for symbol, timeframe in available_pairs),
     }
     if progress_callback is not None:
         progress_callback("coverage_rebuilt", summary)
-    return used, resolved_split, summary
+    return filtered, resolved_split, summary
 
 
 def _symbols_from_candidates(
@@ -654,7 +654,7 @@ def _run_candidate_research_with_optional_split(
     exact_split: dict[str, str] | None,
     min_bundle_bars: int = 360,
     allow_csv_fallback: bool = True,
-    allow_synthetic_fallback: bool = True,
+    allow_synthetic_fallback: bool = False,
     progress_callback: Any = None,
 ) -> dict[str, Any]:
     kwargs: dict[str, Any] = {

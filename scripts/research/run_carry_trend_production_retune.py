@@ -62,8 +62,9 @@ def build_command(
     validation_end: str,
     oos_start: str,
     oos_end: str,
+    skip_coverage_rebuild: bool = False,
 ) -> list[str]:
-    return [
+    command = [
         sys.executable,
         str(ROOT / "scripts" / "run_research_candidates.py"),
         "--manifest",
@@ -88,10 +89,12 @@ def build_command(
         str(oos_start),
         "--oos-end",
         str(oos_end),
-        "--skip-coverage-rebuild",
         "--score-config",
         str(score_config),
     ]
+    if skip_coverage_rebuild:
+        command.append("--skip-coverage-rebuild")
+    return command
 
 
 def run_retune(**kwargs: Any) -> subprocess.CompletedProcess[str]:
@@ -142,6 +145,14 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--validation-end", default="2026-02-28")
     parser.add_argument("--oos-start", default="2026-03-01")
     parser.add_argument("--oos-end", default="2026-04-14")
+    parser.add_argument(
+        "--skip-coverage-rebuild",
+        action="store_true",
+        help=(
+            "Legacy/debug opt-out only: bypass candidate data-window coverage rebuilding. "
+            "Production runs keep this disabled."
+        ),
+    )
     return parser
 
 
@@ -164,6 +175,7 @@ def main(argv: list[str] | None = None) -> int:
         validation_end=str(args.validation_end),
         oos_start=str(args.oos_start),
         oos_end=str(args.oos_end),
+        skip_coverage_rebuild=bool(args.skip_coverage_rebuild),
     )
     if result.stdout:
         print(result.stdout, end="")

@@ -574,6 +574,59 @@ def test_exact_split_coverage_rebuild_uses_late_asset_data_window(monkeypatch):
     assert MODULE._timeframes_from_candidates(rebuilt, fallback=["30m"]) == ["1h"]
 
 
+def test_exact_split_coverage_rebuild_does_not_fallback_when_all_candidates_lack_data(
+    monkeypatch,
+):
+    frame = pl.DataFrame(
+        {
+            "datetime": pl.datetime_range(
+                datetime(2026, 5, 15),
+                datetime(2026, 5, 15, 10),
+                interval="1h",
+                eager=True,
+            ),
+            "open": pl.Series([1.0] * 11, dtype=pl.Float64),
+            "high": pl.Series([1.0] * 11, dtype=pl.Float64),
+            "low": pl.Series([1.0] * 11, dtype=pl.Float64),
+            "close": pl.Series([1.0] * 11, dtype=pl.Float64),
+            "volume": pl.Series([1.0] * 11, dtype=pl.Float64),
+        }
+    )
+
+    monkeypatch.setattr(
+        MODULE,
+        "load_data_dict_from_parquet",
+        lambda *args, **kwargs: {"ORCL/USDT": frame},
+    )
+
+    rebuilt, _split, summary = MODULE._rebuild_candidates_after_coverage(
+        candidates=[
+            {
+                "candidate_id": "drop",
+                "strategy_timeframe": "1h",
+                "symbols": ["ORCL/USDT"],
+            }
+        ],
+        symbols=["ORCL/USDT"],
+        timeframes=["1h"],
+        split={
+            "train_start": "2026-01-01T00:00:00Z",
+            "train_end": "2026-02-01T00:00:00Z",
+            "val_start": "2026-02-01T00:00:00Z",
+            "val_end": "2026-03-01T00:00:00Z",
+            "oos_start": "2026-03-01T00:00:00Z",
+            "oos_end": "2026-06-06T23:59:59.999000Z",
+            "strategy_timeframe": "1h",
+            "mode": "exact_dates",
+        },
+    )
+
+    assert rebuilt == []
+    assert summary["used_candidate_count"] == 0
+    assert summary["dropped_candidate_count"] == 1
+    assert summary["fallback_to_precoverage"] is False
+
+
 def test_manifest_candidates_can_be_restricted_to_screened_symbol_subset():
     candidates = [
         {

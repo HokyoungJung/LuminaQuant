@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from dotenv import load_dotenv
+from dotenv import dotenv_values
 from lumina_quant.configuration.schema import (
     BacktestExternalConfig,
     BacktestRuntimeConfig,
@@ -920,7 +920,16 @@ def load_runtime_config(
     config_path: str = "config.yaml", env: Mapping[str, str] | None = None
 ) -> RuntimeConfig:
     """Load `.env`, read YAML, apply overrides, and produce typed config."""
-    load_dotenv()
-    effective_env = env or os.environ
+    effective_env: Mapping[str, str]
+    if env is None:
+        dotenv_path = Path(config_path).expanduser().resolve().parent / ".env"
+        merged_env = dict(os.environ)
+        if dotenv_path.exists():
+            for key, value in dotenv_values(dotenv_path).items():
+                if key and key not in merged_env:
+                    merged_env[key] = "" if value is None else str(value)
+        effective_env = merged_env
+    else:
+        effective_env = env
     raw = load_yaml_config(config_path=config_path)
     return build_runtime_config(raw, effective_env)

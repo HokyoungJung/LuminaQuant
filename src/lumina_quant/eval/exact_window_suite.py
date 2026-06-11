@@ -704,12 +704,10 @@ def strict_align_bundles(
         for key, values in support.items():
             aligned[f"{symbol}:{key}"] = values
     if "__bench_close" in merged.columns:
-        aligned["benchmark_close"] = (
-            merged.get_column("__bench_close")
-            .fill_null(strategy="forward")
-            .fill_null(strategy="backward")
-            .to_numpy()
-        )
+        benchmark_close = merged.get_column("__bench_close").fill_null(strategy="forward")
+        if benchmark_close.null_count() > 0:
+            return None
+        aligned["benchmark_close"] = benchmark_close.to_numpy()
     return aligned
 
 

@@ -221,7 +221,7 @@ def run_candidate_research(
     split: Mapping[str, Any] | None = None,
     data_mode: str = "legacy",
     allow_csv_fallback: bool = True,
-    allow_synthetic_fallback: bool = True,
+    allow_synthetic_fallback: bool = False,
     min_bundle_bars: int = 360,
     progress_callback: Callable[[str, Mapping[str, Any]], None] | None = None,
 ) -> dict[str, Any]:

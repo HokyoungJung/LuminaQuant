@@ -42,6 +42,26 @@ def test_build_command_contains_exact_split_and_manifest(tmp_path: Path) -> None
     assert "1m" in command
     assert "--validation-start" in command
     assert "2026-04-14" in command
+    assert "--skip-coverage-rebuild" not in command
+
+
+def test_build_command_allows_explicit_coverage_rebuild_skip_for_debug(tmp_path: Path) -> None:
+    command = MODULE.build_command(
+        manifest=tmp_path / "manifest.json",
+        output_dir=tmp_path / "out",
+        score_config=tmp_path / "score.json",
+        symbols=["BTC/USDT", "ETH/USDT"],
+        timeframes=["1h", "4h"],
+        base_timeframe="1m",
+        train_start="2025-01-01",
+        train_end="2025-12-31",
+        validation_start="2026-01-01",
+        validation_end="2026-02-28",
+        oos_start="2026-03-01",
+        oos_end="2026-04-14",
+        skip_coverage_rebuild=True,
+    )
+
     assert "--skip-coverage-rebuild" in command
 
 

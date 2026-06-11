@@ -39,6 +39,7 @@ def test_quant_pipeline_end_to_end(tmp_path: Path, monkeypatch):
         symbol_universe=symbols,
         stage1_keep_ratio=0.5,
         max_candidates=4,
+        allow_synthetic_fallback=True,
     )
 
     rows = list(report.get("candidates") or [])
