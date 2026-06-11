@@ -216,12 +216,12 @@ def _monthly_hurdle_rows(
     for month in sorted(realized):
         actual = float(realized.get(month, 0.0))
         benchmark = dict(thresholds.get(month) or {})
-        benchmark_missing = (
-            "threshold" not in benchmark or "btc_buy_hold_return" not in benchmark
-        )
+        benchmark_missing = "threshold" not in benchmark or "btc_buy_hold_return" not in benchmark
         threshold = None if benchmark_missing else float(benchmark["threshold"])
         btc_ret = None if benchmark_missing else float(benchmark["btc_buy_hold_return"])
-        strict_pass = bool((not benchmark_missing) and threshold is not None and actual >= threshold)
+        strict_pass = bool(
+            (not benchmark_missing) and threshold is not None and actual >= threshold
+        )
         btc_pass = bool((not benchmark_missing) and btc_ret is not None and actual >= btc_ret)
         rows.append(
             {
@@ -420,9 +420,7 @@ def _best_row_for_timeframe(
     val_btc_hurdle_pass = _all_required_months_pass(
         val_months, month_prefix="2026-01", field="btc_pass"
     )
-    oos_btc_hurdle_pass = _all_required_months_pass(
-        oos_months, month_prefix=None, field="btc_pass"
-    )
+    oos_btc_hurdle_pass = _all_required_months_pass(oos_months, month_prefix=None, field="btc_pass")
     recent_three_months = _latest_three_month_rows(val_months, oos_months)
     recent_three_month_two_pct_pass = _recent_three_month_two_pct_pass(val_months, oos_months)
     train_pass = bool((top.get("hurdle_fields") or {}).get("train", {}).get("pass"))

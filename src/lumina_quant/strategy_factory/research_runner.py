@@ -369,7 +369,7 @@ def _load_feature_frame(
         if "unexpected keyword argument" not in str(exc):
             raise
         return pl.DataFrame()
-    except (FileNotFoundError, OSError, RuntimeError, ValueError):
+    except FileNotFoundError, OSError, RuntimeError, ValueError:
         return pl.DataFrame()
 
 

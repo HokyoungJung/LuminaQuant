@@ -776,12 +776,12 @@ def _monthly_hurdle_rows(
     for month in sorted(realized):
         actual = float(realized.get(month, 0.0))
         benchmark = dict(thresholds.get(month) or {})
-        benchmark_missing = (
-            "threshold" not in benchmark or "btc_buy_hold_return" not in benchmark
-        )
+        benchmark_missing = "threshold" not in benchmark or "btc_buy_hold_return" not in benchmark
         threshold = None if benchmark_missing else float(benchmark["threshold"])
         btc_ret = None if benchmark_missing else float(benchmark["btc_buy_hold_return"])
-        strict_pass = bool((not benchmark_missing) and threshold is not None and actual >= threshold)
+        strict_pass = bool(
+            (not benchmark_missing) and threshold is not None and actual >= threshold
+        )
         btc_pass = bool((not benchmark_missing) and btc_ret is not None and actual >= btc_ret)
         rows.append(
             {
