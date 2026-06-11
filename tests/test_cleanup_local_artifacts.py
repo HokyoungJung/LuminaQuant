@@ -36,7 +36,6 @@ def test_discovery_preserves_research_notes_data_and_evidence_roots(tmp_path: Pa
         ".env",
         ".venv/lib/python/site-packages/pkg/__pycache__/kept.pyc",
         "best_optimized_parameters/params.json",
-        ".gitnexus/parse-cache/cache.bin",
     ]
     for rel_path in preserved:
         _touch(root / rel_path)
@@ -82,7 +81,6 @@ def test_discovery_preserves_research_notes_data_and_evidence_roots(tmp_path: Pa
     for rel_path in preserved:
         assert rel_path not in candidates
     assert ".venv" not in candidates
-    assert ".gitnexus/parse-cache" not in candidates
 
 
 def test_apply_removes_only_generated_local_artifacts(tmp_path: Path) -> None:
@@ -116,21 +114,17 @@ def test_apply_removes_only_generated_local_artifacts(tmp_path: Path) -> None:
 
 def test_optional_cleanup_flags_are_explicit(tmp_path: Path) -> None:
     root = _repo(tmp_path)
-    _touch(root / ".gitnexus/parse-cache/cache.bin")
     _touch(root / ".venv/lib/python/site-packages/pkg.py")
     _touch(root / "native/lumina_compute/target/release/_compute.cpython-314-x86_64-linux-gnu.so")
 
     default_candidates = _candidate_paths(root)
     explicit_candidates = _candidate_paths(
         root,
-        include_gitnexus_parse_cache=True,
         include_venv=True,
         include_native_targets=True,
     )
 
-    assert ".gitnexus/parse-cache" not in default_candidates
     assert ".venv" not in default_candidates
     assert "native/lumina_compute/target" not in default_candidates
-    assert ".gitnexus/parse-cache" in explicit_candidates
     assert ".venv" in explicit_candidates
     assert "native/lumina_compute/target" in explicit_candidates

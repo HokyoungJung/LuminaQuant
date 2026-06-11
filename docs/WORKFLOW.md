@@ -8,20 +8,16 @@ This repository uses a dual-branch strategy to maintain a **private codebase** (
 - Private repo: `https://github.com/hoky1227/Quants-agent.git` (typical folder: `Quants-agent`)
 - Package/import namespace: `lumina_quant`
 
-## 0. Worktree and code-intelligence discipline
+## 0. Worktree discipline
 
 - Treat local `private-main` as the working source of truth after it has been
   synchronized to `private/main`; worker worktrees are temporary evidence lanes,
   not final integration targets.
-- Before a broad `omx team` run, keep the leader workspace clean. If GitNexus
-  refreshes generated context first, commit that local context update before
-  opening worker worktrees.
+- Before a broad `omx team` run, keep the leader workspace clean; commit any
+  generated context updates before opening worker worktrees.
 - Do not merge worker worktree changes or push `private/main` until the leader
-  has run the agreed verification gates, changed-file deslop review, GitNexus
-  status/detect fallback, and staged diff checks.
-- If GitNexus reports a stale index, run `npx gitnexus analyze` before symbol
-  renames/extractions/splits. Run `npx gitnexus detect-changes` before commit
-  when available; otherwise document the CLI/status fallback used.
+  has run the agreed verification gates, changed-file deslop review, and staged
+  diff checks.
 
 ## 1. Branch Structure
 

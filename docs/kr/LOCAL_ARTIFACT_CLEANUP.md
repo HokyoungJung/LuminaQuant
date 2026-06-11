@@ -43,7 +43,6 @@ Native Rust `target/` 디렉터리는 기본 보존합니다. 그래야 Python w
 - `.env`
 - `.venv` (재설치 없이 verification을 돌리기 위해 보존)
 - `best_optimized_parameters/`
-- `.gitnexus/` (source 변경 후 `npx gitnexus analyze`로 refresh)
 - `native/rust_*/target/` 아래 native Rust release build 출력(Python wrapper가 로드하는 optional accelerator)
 
-`.gitnexus/parse-cache`, `.venv`, native Rust `target/`까지 지우는 optional flag가 있지만 기본값은 꺼져 있습니다.
+`.venv`, native Rust `target/`까지 지우는 optional flag가 있지만 기본값은 꺼져 있습니다.
