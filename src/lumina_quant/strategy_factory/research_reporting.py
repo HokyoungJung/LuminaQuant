@@ -141,9 +141,13 @@ class ResearchReportBuilder:
         row = dict(result.get("candidate") or {})
         timeframe = str(row.get("strategy_timeframe") or row.get("timeframe") or "1m")
         returns = np.asarray(result.get("returns"), dtype=float)
+        result_metadata = dict(result.get("metadata") or {})
+        effective_split = result_metadata.get("effective_split")
+        if not isinstance(effective_split, Mapping):
+            effective_split = resolved_split
         timestamps, split_masks, has_aligned_timestamps = self.result_timestamps_and_split_masks(
             result,
-            resolved_split=resolved_split,
+            resolved_split=effective_split,
         )
         train = dict(result.get("train") or {})
         val = dict(result.get("val") or {})
@@ -188,9 +192,11 @@ class ResearchReportBuilder:
             "pass": bool(result.get("pass", False)) and not hard_reject_flag,
             "metadata": {
                 **dict(row.get("metadata") or {}),
-                **dict(result.get("metadata") or {}),
+                **result_metadata,
             },
         }
+        if isinstance(effective_split, Mapping):
+            candidate_payload["effective_split"] = dict(effective_split)
         candidate_payload["selection_score"] = self.candidate_rank_score(
             candidate_payload,
             scoring_config=resolved_scoring_config,

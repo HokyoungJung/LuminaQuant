@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 
 import pandas as pd
+import polars as pl
 
 
 MODULE_PATH = (
@@ -53,6 +54,41 @@ def test_daily_market_feature_frame_builds_expected_flags() -> None:
     assert isinstance(float(latest["basket_ret96_top3_mean"]), float)
     assert isinstance(float(latest["basket_ret96_dispersion"]), float)
     assert isinstance(float(latest["basket_vol_ratio"]), float)
+
+
+def test_feature_point_close_loader_starts_at_first_observed_without_bfill(
+    tmp_path: Path, monkeypatch
+) -> None:
+    feature_root = tmp_path / "feature_points" / "exchange=binance"
+    materialized_root = tmp_path / "market_data_materialized" / "binance"
+    symbol_root = feature_root / "symbol=ORCLUSDT" / "date=2026-05-03"
+    symbol_root.mkdir(parents=True)
+    materialized_root.mkdir(parents=True)
+    pl.DataFrame(
+        {
+            "datetime": [
+                "2026-05-03T00:00:00Z",
+                "2026-05-03T00:30:00Z",
+                "2026-05-03T01:00:00Z",
+            ],
+            "mark_price": [100.0, 101.0, 102.0],
+            "index_price": [None, None, None],
+        }
+    ).write_parquet(symbol_root / "compact-000.parquet")
+    monkeypatch.setattr(MODULE, "FEATURE_POINT_ROOT", feature_root)
+    monkeypatch.setattr(MODULE, "MATERIALIZED_ROOT", materialized_root)
+
+    frame, summary = MODULE._load_symbol_close_30m_from_feature_points(
+        "ORCL/USDT",
+        start_day=pd.Timestamp("2026-05-01", tz="UTC"),
+        end_day=pd.Timestamp("2026-05-03", tz="UTC"),
+    )
+
+    assert frame["datetime"].min() == pd.Timestamp("2026-05-03T00:00:00Z")
+    assert set(frame["date"].dt.date.astype(str)) == {"2026-05-03"}
+    assert summary["effective_first_date"] == "2026-05-03"
+    assert summary["leading_unfilled_day_count"] == 2
+    assert summary["leading_unfilled_days_preview"] == ["2026-05-01", "2026-05-02"]
 
 
 def test_current_judgement_uses_market_rules() -> None:

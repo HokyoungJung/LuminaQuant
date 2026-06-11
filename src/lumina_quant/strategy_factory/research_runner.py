@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import math
+import os
 import queue
 import random
 from collections.abc import Callable, Iterable, Mapping, Sequence
@@ -19,6 +20,7 @@ from lumina_quant.backtesting.cli_contract import RawFirstDataMissingError
 from lumina_quant.configuration import get_default_runtime_config
 from lumina_quant.market_data import load_futures_feature_points_from_db
 from lumina_quant.storage.parquet import load_data_dict_from_parquet
+from lumina_quant.data.timeframe import timeframe_to_milliseconds
 from lumina_quant.symbols import (
     canonical_symbol,
     canonicalize_symbol_list,
@@ -6294,6 +6296,48 @@ def _candidate_symbols_and_timeframe(
     return symbols, timeframe
 
 
+def _candidate_effective_split(
+    candidate: Mapping[str, Any],
+    fallback_split: Mapping[str, Any] | None,
+    *,
+    timeframe: str,
+) -> dict[str, Any] | None:
+    """Resolve a candidate-specific split when coverage metadata provides one."""
+    metadata = candidate.get("metadata") if isinstance(candidate.get("metadata"), Mapping) else {}
+    candidates: tuple[Any, ...] = (
+        candidate.get("effective_split"),
+        candidate.get("candidate_split"),
+        metadata.get("effective_split") if isinstance(metadata, Mapping) else None,
+        metadata.get("candidate_split") if isinstance(metadata, Mapping) else None,
+        (
+            metadata.get("data_window", {}).get("effective_split")
+            if isinstance(metadata, Mapping) and isinstance(metadata.get("data_window"), Mapping)
+            else None
+        ),
+    )
+    for raw in candidates:
+        if isinstance(raw, Mapping):
+            resolved = dict(raw)
+            resolved["strategy_timeframe"] = str(
+                resolved.get("strategy_timeframe")
+                or candidate.get("strategy_timeframe")
+                or candidate.get("timeframe")
+                or timeframe
+            )
+            return _resolve_split_config(resolved, strategy_timeframe=str(timeframe))
+
+    if isinstance(fallback_split, Mapping):
+        resolved = dict(fallback_split)
+        resolved["strategy_timeframe"] = str(
+            resolved.get("strategy_timeframe")
+            or candidate.get("strategy_timeframe")
+            or candidate.get("timeframe")
+            or timeframe
+        )
+        return _resolve_split_config(resolved, strategy_timeframe=str(timeframe))
+    return None
+
+
 def _candidate_bundle_list(
     *,
     symbols: Sequence[str],
@@ -6315,17 +6359,48 @@ def _insufficient_candidate_result(
     symbols: Sequence[str],
     timeframe: str,
     cache: Mapping[tuple[str, str], SeriesBundle],
+    effective_split: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
+    metadata: dict[str, Any] = {
+        "missing_symbols": [symbol for symbol in symbols if (symbol, timeframe) not in cache]
+    }
+    if isinstance(effective_split, Mapping):
+        metadata["effective_split"] = dict(effective_split)
     return {
         "error": "insufficient_data",
         "candidate": candidate,
         "returns": np.asarray([], dtype=float),
         "turnover": np.asarray([], dtype=float),
         "exposure": np.asarray([], dtype=float),
-        "metadata": {
-            "missing_symbols": [symbol for symbol in symbols if (symbol, timeframe) not in cache]
-        },
+        "metadata": metadata,
     }
+
+
+def _call_insufficient_candidate_result(
+    candidate: dict[str, Any],
+    *,
+    symbols: Sequence[str],
+    timeframe: str,
+    cache: Mapping[tuple[str, str], SeriesBundle],
+    effective_split: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    try:
+        return _insufficient_candidate_result(
+            candidate,
+            symbols=symbols,
+            timeframe=timeframe,
+            cache=cache,
+            effective_split=effective_split,
+        )
+    except TypeError as exc:
+        if "effective_split" not in str(exc):
+            raise
+        return _insufficient_candidate_result(
+            candidate,
+            symbols=symbols,
+            timeframe=timeframe,
+            cache=cache,
+        )
 
 
 def _candidate_benchmark_series(
@@ -6645,7 +6720,16 @@ def _candidate_result_payload(
     hurdle_fields: dict[str, dict[str, Any]],
     passed: bool,
     hard_reject: dict[str, Any],
+    effective_split: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
+    metadata = {
+        "strategy_family": _family_from_strategy(str(candidate.get("strategy_class") or "")),
+        "cost_rate": float(signal_payload.cost_rate),
+        "aligned_bars": int(signal_payload.timestamps.size),
+        **signal_payload.meta,
+    }
+    if isinstance(effective_split, Mapping):
+        metadata["effective_split"] = dict(effective_split)
     return {
         "candidate": candidate,
         "timestamps": signal_payload.timestamps,
@@ -6668,12 +6752,7 @@ def _candidate_result_payload(
         "hurdle_fields": hurdle_fields,
         "pass": bool(passed),
         "hard_reject_reasons": hard_reject,
-        "metadata": {
-            "strategy_family": _family_from_strategy(str(candidate.get("strategy_class") or "")),
-            "cost_rate": float(signal_payload.cost_rate),
-            "aligned_bars": int(signal_payload.timestamps.size),
-            **signal_payload.meta,
-        },
+        "metadata": metadata,
     }
 
 
@@ -6688,6 +6767,12 @@ def _evaluate_candidate(
     scoring_config: Mapping[str, Any] | None = None,
     split: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
+    symbols, timeframe = _candidate_symbols_and_timeframe(candidate)
+    effective_split = _candidate_effective_split(
+        candidate,
+        split,
+        timeframe=timeframe,
+    )
     signal_payload = _load_candidate_signal_payload(
         candidate,
         cache=cache,
@@ -6695,19 +6780,19 @@ def _evaluate_candidate(
         aligned_cache=aligned_cache,
     )
     if signal_payload is None:
-        symbols, timeframe = _candidate_symbols_and_timeframe(candidate)
-        return _insufficient_candidate_result(
+        return _call_insufficient_candidate_result(
             candidate,
             symbols=symbols,
             timeframe=timeframe,
             cache=cache,
+            effective_split=effective_split,
         )
 
     metric_payload = _evaluate_candidate_metric_payload(
         signal_payload,
         benchmark_cache=benchmark_cache,
         candidate_count=candidate_count,
-        split=split,
+        split=effective_split,
     )
     hurdle_fields, passed, hard_reject = _evaluate_candidate_hurdles(
         metric_payload,
@@ -6720,6 +6805,7 @@ def _evaluate_candidate(
         hurdle_fields=hurdle_fields,
         passed=passed,
         hard_reject=hard_reject,
+        effective_split=effective_split,
     )
 
 
@@ -6963,6 +7049,141 @@ def _frame_to_bundle(symbol: str, timeframe: str, frame: pl.DataFrame) -> Series
     )
 
 
+def _partitioned_1m_symbol_dir(
+    *,
+    parquet_root: str,
+    exchange: str,
+    symbol: str,
+) -> Path:
+    return (
+        Path(parquet_root)
+        / f"exchange={exchange}"
+        / f"symbol={str(symbol).replace('/', '')}"
+        / "timeframe=1m"
+    )
+
+
+def _partition_date_from_path(path: Path) -> datetime | None:
+    if not path.name.startswith("date="):
+        return None
+    try:
+        return datetime.fromisoformat(path.name.split("=", 1)[1]).replace(tzinfo=UTC)
+    except ValueError:
+        return None
+
+
+def _load_partitioned_1m_frame(
+    *,
+    symbol: str,
+    parquet_root: str,
+    exchange: str,
+    start_date: Any,
+    end_date: Any,
+    raw_cache: dict[tuple[str, str, str], pl.DataFrame],
+) -> pl.DataFrame:
+    start_dt = _coerce_utc_datetime(start_date)
+    end_dt = _coerce_utc_datetime(end_date, end_of_day=True)
+    cache_key = (
+        str(symbol),
+        _datetime_to_iso_z(start_dt) or "",
+        _datetime_to_iso_z(end_dt) or "",
+    )
+    cached = raw_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    timeframe_dir = _partitioned_1m_symbol_dir(
+        parquet_root=parquet_root,
+        exchange=exchange,
+        symbol=symbol,
+    )
+    if not timeframe_dir.exists():
+        raw_cache[cache_key] = pl.DataFrame()
+        return raw_cache[cache_key]
+
+    paths: list[str] = []
+    for date_dir in sorted(timeframe_dir.glob("date=*")):
+        partition_dt = _partition_date_from_path(date_dir)
+        if partition_dt is None:
+            continue
+        if start_dt is not None and partition_dt.date() < start_dt.date():
+            continue
+        if end_dt is not None and partition_dt.date() > end_dt.date():
+            continue
+        paths.extend(str(path) for path in sorted(date_dir.glob("*.parquet")))
+    if not paths:
+        raw_cache[cache_key] = pl.DataFrame()
+        return raw_cache[cache_key]
+
+    try:
+        lazy = pl.scan_parquet(paths).select(["datetime", "open", "high", "low", "close", "volume"])
+        if start_dt is not None:
+            lazy = lazy.filter(pl.col("datetime") >= start_dt.replace(tzinfo=None))
+        if end_dt is not None:
+            lazy = lazy.filter(pl.col("datetime") <= end_dt.replace(tzinfo=None))
+        frame = lazy.collect().sort("datetime")
+    except FileNotFoundError, OSError, RuntimeError, ValueError:
+        frame = pl.DataFrame()
+    raw_cache[cache_key] = frame
+    return frame
+
+
+def _resample_partitioned_1m_frame(frame: pl.DataFrame, *, timeframe: str) -> pl.DataFrame:
+    if frame.is_empty():
+        return frame
+    timeframe_token = str(timeframe).strip().lower()
+    if timeframe_token == "1m":
+        return frame.select(["datetime", "open", "high", "low", "close", "volume"])
+    try:
+        tf_ms = int(timeframe_to_milliseconds(timeframe_token))
+    except ValueError:
+        return pl.DataFrame()
+    return (
+        frame.lazy()
+        .with_columns(pl.col("datetime").dt.epoch("ms").alias("timestamp_ms"))
+        .with_columns(((pl.col("timestamp_ms") // tf_ms) * tf_ms).alias("bucket_ms"))
+        .group_by("bucket_ms")
+        .agg(
+            [
+                pl.col("open").first().alias("open"),
+                pl.col("high").max().alias("high"),
+                pl.col("low").min().alias("low"),
+                pl.col("close").last().alias("close"),
+                pl.col("volume").sum().alias("volume"),
+            ]
+        )
+        .sort("bucket_ms")
+        .with_columns(pl.from_epoch("bucket_ms", time_unit="ms").alias("datetime"))
+        .select(["datetime", "open", "high", "low", "close", "volume"])
+        .collect()
+    )
+
+
+def _load_partitioned_1m_resample_bundle(
+    *,
+    symbol: str,
+    timeframe: str,
+    parquet_root: str,
+    exchange: str,
+    start_date: Any,
+    end_date: Any,
+    min_bars: int,
+    raw_cache: dict[tuple[str, str, str], pl.DataFrame],
+) -> SeriesBundle | None:
+    raw_1m = _load_partitioned_1m_frame(
+        symbol=symbol,
+        parquet_root=parquet_root,
+        exchange=exchange,
+        start_date=start_date,
+        end_date=end_date,
+        raw_cache=raw_cache,
+    )
+    resampled = _resample_partitioned_1m_frame(raw_1m, timeframe=timeframe)
+    if resampled.is_empty() or resampled.height < max(1, int(min_bars)):
+        return None
+    return _frame_to_bundle(symbol, timeframe, resampled)
+
+
 def _load_timeframe_parquet_frames(
     *,
     symbols: Sequence[str],
@@ -6972,32 +7193,44 @@ def _load_timeframe_parquet_frames(
     start_date: Any,
     end_date: Any,
     data_mode: str,
+    chunk_days: int = 7,
     progress_callback: Callable[[str, Mapping[str, Any]], None] | None = None,
 ) -> dict[str, pl.DataFrame]:
+    base_kwargs: dict[str, Any] = {
+        "exchange": exchange,
+        "symbol_list": list(symbols),
+        "timeframe": timeframe,
+        "start_date": start_date,
+        "end_date": end_date,
+        "data_mode": str(data_mode or "legacy"),
+    }
+    attempts: list[dict[str, Any]] = [
+        {
+            **base_kwargs,
+            "chunk_days": max(1, int(chunk_days)),
+            "progress_callback": progress_callback,
+        },
+        {
+            **base_kwargs,
+            "chunk_days": max(1, int(chunk_days)),
+        },
+        dict(base_kwargs),
+    ]
     try:
-        try:
-            return load_data_dict_from_parquet(
-                parquet_root,
-                exchange=exchange,
-                symbol_list=list(symbols),
-                timeframe=timeframe,
-                start_date=start_date,
-                end_date=end_date,
-                data_mode=str(data_mode or "legacy"),
-                progress_callback=progress_callback,
-            )
-        except TypeError as exc:
-            if "unexpected keyword argument" not in str(exc):
-                raise
-            return load_data_dict_from_parquet(
-                parquet_root,
-                exchange=exchange,
-                symbol_list=list(symbols),
-                timeframe=timeframe,
-                start_date=start_date,
-                end_date=end_date,
-                data_mode=str(data_mode or "legacy"),
-            )
+        last_type_error: TypeError | None = None
+        for kwargs in attempts:
+            if kwargs.get("progress_callback") is None:
+                kwargs.pop("progress_callback", None)
+            try:
+                return load_data_dict_from_parquet(parquet_root, **kwargs)
+            except TypeError as exc:
+                if "unexpected keyword argument" not in str(exc):
+                    raise
+                last_type_error = exc
+                continue
+        if last_type_error is not None:
+            raise last_type_error
+        return {}
     except TypeError as exc:
         if "unexpected keyword argument" not in str(exc):
             raise
@@ -7088,11 +7321,14 @@ def _resolve_bundle_cache_entry(
     symbol: str,
     timeframe: str,
     frame: pl.DataFrame | None,
+    parquet_root: str,
+    exchange: str,
     start_date: Any,
     end_date: Any,
     allow_csv_fallback: bool,
     allow_synthetic_fallback: bool,
     min_bars: int,
+    partitioned_1m_cache: dict[tuple[str, str, str], pl.DataFrame],
 ) -> tuple[SeriesBundle, str]:
     parquet_bundle = _bundle_from_frame(
         symbol=symbol,
@@ -7102,6 +7338,19 @@ def _resolve_bundle_cache_entry(
     )
     if parquet_bundle is not None:
         return parquet_bundle, "parquet"
+
+    partitioned_bundle = _load_partitioned_1m_resample_bundle(
+        symbol=symbol,
+        timeframe=timeframe,
+        parquet_root=parquet_root,
+        exchange=exchange,
+        start_date=start_date,
+        end_date=end_date,
+        min_bars=min_bars,
+        raw_cache=partitioned_1m_cache,
+    )
+    if partitioned_bundle is not None:
+        return partitioned_bundle, "partitioned_1m_resample"
 
     if not allow_csv_fallback and not allow_synthetic_fallback:
         raise _strict_missing_bundle_error(symbol=symbol, timeframe=timeframe)
@@ -7129,6 +7378,7 @@ def _load_bundle_cache(
     *,
     symbols: Sequence[str],
     timeframes: Sequence[str],
+    required_pairs: Sequence[tuple[str, str]] | None = None,
     start_date: Any = None,
     end_date: Any = None,
     data_mode: str = "legacy",
@@ -7140,35 +7390,67 @@ def _load_bundle_cache(
 ) -> tuple[dict[tuple[str, str], SeriesBundle], dict[str, list[str]]]:
     cache: dict[tuple[str, str], SeriesBundle] = {}
     source_map: dict[str, list[str]] = {"parquet": [], "csv": [], "synthetic": []}
+    partitioned_1m_cache: dict[tuple[str, str, str], pl.DataFrame] = {}
 
     defaults = _current_research_market_data_settings(market_data_settings)
     parquet_root = str(defaults["parquet_root"])
     exchange = str(defaults["exchange"])
+    chunk_days = max(
+        1,
+        int(
+            (market_data_settings or {}).get(
+                "chunk_days",
+                os.getenv("LQ_RESEARCH_CHUNK_DAYS", "7"),
+            )
+            or 7
+        ),
+    )
 
-    total_count = len(symbols) * len(timeframes)
+    required_by_timeframe: dict[str, list[str]] | None = None
+    if required_pairs:
+        required_by_timeframe = {}
+        for raw_symbol, raw_timeframe in required_pairs:
+            symbol = str(raw_symbol)
+            timeframe = str(raw_timeframe)
+            bucket = required_by_timeframe.setdefault(timeframe, [])
+            if symbol not in bucket:
+                bucket.append(symbol)
+    load_plan: list[tuple[str, list[str]]] = []
+    for timeframe in timeframes:
+        if required_by_timeframe is None:
+            timeframe_symbols = list(symbols)
+        else:
+            timeframe_symbols = list(required_by_timeframe.get(str(timeframe), []))
+        if not timeframe_symbols:
+            continue
+        load_plan.append((str(timeframe), timeframe_symbols))
+
+    total_count = sum(len(timeframe_symbols) for _, timeframe_symbols in load_plan)
     loaded_count = 0
-    for timeframe_index, timeframe in enumerate(timeframes, start=1):
+    timeframe_count = len(load_plan)
+    for timeframe_index, (timeframe, timeframe_symbols) in enumerate(load_plan, start=1):
         if progress_callback is not None:
             progress_callback(
                 "resource_bundle_timeframe_started",
                 {
                     "timeframe": timeframe,
                     "timeframe_index": timeframe_index,
-                    "timeframe_count": len(timeframes),
-                    "symbol_count": len(symbols),
+                    "timeframe_count": timeframe_count,
+                    "symbol_count": len(timeframe_symbols),
                     "loaded_count": loaded_count,
                     "total_count": total_count,
                 },
             )
         timeframe_started_at = perf_counter()
         loaded = _load_timeframe_parquet_frames(
-            symbols=symbols,
+            symbols=timeframe_symbols,
             timeframe=timeframe,
             parquet_root=parquet_root,
             exchange=exchange,
             start_date=start_date,
             end_date=end_date,
             data_mode=data_mode,
+            chunk_days=chunk_days,
             progress_callback=progress_callback,
         )
         if progress_callback is not None:
@@ -7177,31 +7459,35 @@ def _load_bundle_cache(
                 {
                     "timeframe": timeframe,
                     "timeframe_index": timeframe_index,
-                    "timeframe_count": len(timeframes),
-                    "symbol_count": len(symbols),
+                    "timeframe_count": timeframe_count,
+                    "symbol_count": len(timeframe_symbols),
                     "parquet_symbol_count": len(loaded),
-                    "missing_symbol_count": max(0, len(symbols) - len(loaded)),
+                    "missing_symbol_count": max(0, len(timeframe_symbols) - len(loaded)),
                     "loaded_count": loaded_count,
                     "total_count": total_count,
                     "elapsed_seconds": round(max(0.0, perf_counter() - timeframe_started_at), 6),
                 },
             )
 
-        symbol_count = len(symbols)
-        for symbol_index, symbol in enumerate(symbols, start=1):
+        symbol_count = len(timeframe_symbols)
+        for symbol_index, symbol in enumerate(timeframe_symbols, start=1):
             key = (symbol, timeframe)
             started_at = perf_counter()
             bundle, source = _resolve_bundle_cache_entry(
                 symbol=symbol,
                 timeframe=timeframe,
                 frame=loaded.get(symbol),
+                parquet_root=parquet_root,
+                exchange=exchange,
                 start_date=start_date,
                 end_date=end_date,
                 allow_csv_fallback=allow_csv_fallback,
                 allow_synthetic_fallback=allow_synthetic_fallback,
                 min_bars=min_bars,
+                partitioned_1m_cache=partitioned_1m_cache,
             )
             cache[key] = bundle
+            source_map.setdefault(source, [])
             source_map[source].append(f"{symbol}@{timeframe}")
             loaded_count += 1
             if progress_callback is not None:
@@ -7213,7 +7499,7 @@ def _load_bundle_cache(
                         "symbol_count": symbol_count,
                         "timeframe": timeframe,
                         "timeframe_index": timeframe_index,
-                        "timeframe_count": len(timeframes),
+                        "timeframe_count": timeframe_count,
                         "loaded_count": loaded_count,
                         "total_count": total_count,
                         "source": source,

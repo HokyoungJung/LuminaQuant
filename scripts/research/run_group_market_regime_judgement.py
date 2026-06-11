@@ -220,28 +220,51 @@ def _load_symbol_close_30m_from_feature_points(
             "close": pd.Series(collected["close"].to_list(), dtype="float64"),
         }
     )
+    frame = frame.dropna(subset=["datetime", "close"]).sort_values("datetime")
+    if frame.empty:
+        raise FileNotFoundError(f"no usable feature_point prices selected for {symbol}")
+    first_observed = pd.Timestamp(frame["datetime"].min()).floor("30min")
+    effective_start = max(start_day, first_observed)
     full_index = pd.date_range(
-        start=start_day,
+        start=effective_start,
         end=(end_day + pd.Timedelta(days=1) - pd.Timedelta(minutes=30)),
         freq="30min",
         tz="UTC",
     )
+    if full_index.empty:
+        raise FileNotFoundError(
+            f"no feature_point price window overlaps request for {symbol}: "
+            f"first_observed={first_observed.isoformat()} end_day={end_day.isoformat()}"
+        )
     repaired = (
         frame.set_index("datetime")
         .reindex(full_index)
         .sort_index()
         .ffill()
-        .bfill()
         .rename_axis("datetime")
         .reset_index()
     )
+    repaired = repaired.dropna(subset=["close"]).reset_index(drop=True)
+    if repaired.empty:
+        raise FileNotFoundError(f"no forward-fillable feature_point prices selected for {symbol}")
     repaired["symbol"] = symbol
     repaired["date"] = repaired["datetime"].dt.floor("D")
     coverage_days = sorted(repaired["date"].dt.date.astype(str).unique().tolist())
     materialized = _materialized_date_coverage(symbol)
     filled_days = sorted(set(coverage_days) - set(materialized["dates"]))
+    requested_days = pd.date_range(start=start_day, end=end_day, freq="D", tz="UTC")
+    leading_missing_days = [
+        day.date().isoformat()
+        for day in requested_days
+        if day.floor("D") < effective_start.floor("D")
+    ]
     summary = {
         "symbol": symbol,
+        "requested_first_date": start_day.date().isoformat(),
+        "requested_last_date": end_day.date().isoformat(),
+        "effective_first_date": coverage_days[0] if coverage_days else None,
+        "leading_unfilled_day_count": len(leading_missing_days),
+        "leading_unfilled_days_preview": leading_missing_days[:10],
         "feature_points_first_date": coverage_days[0] if coverage_days else None,
         "feature_points_last_date": coverage_days[-1] if coverage_days else None,
         "feature_points_day_count": len(coverage_days),

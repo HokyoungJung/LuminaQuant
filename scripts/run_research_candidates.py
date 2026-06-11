@@ -6,7 +6,7 @@ import argparse
 import csv
 import inspect
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from collections.abc import Mapping
@@ -25,6 +25,18 @@ BaseConfig = BacktestConfigView(get_default_runtime_config())
 _METALS = {"XAU/USDT", "XAG/USDT", "XPT/USDT", "XPD/USDT"}
 _RESEARCH_PROMOTION_MAX_SPLIT_DRAWDOWN = 0.15
 _RESEARCH_STRICT_LIQUIDATION_COUNT_MAX = 0
+_TIMEFRAME_MIN_COVERAGE_BARS = {
+    "30m": 360,
+    "1h": 240,
+    "4h": 90,
+    "1d": 20,
+}
+_TIMEFRAME_SECONDS = {
+    "30m": 30 * 60,
+    "1h": 60 * 60,
+    "4h": 4 * 60 * 60,
+    "1d": 24 * 60 * 60,
+}
 
 DEFAULT_SHORTLIST_SELECTION_CONFIG: dict[str, Any] = {
     "drop_single_without_metrics": False,
@@ -224,6 +236,30 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Skip the exact-split preflight coverage scan and evaluate the requested windows directly.",
     )
+    parser.add_argument(
+        "--min-bundle-bars",
+        type=int,
+        default=360,
+        help="Minimum bars required when loading each symbol/timeframe bundle.",
+    )
+    parser.add_argument(
+        "--disable-csv-fallback",
+        action="store_true",
+        help="Do not use CSV fallback data when parquet data is missing.",
+    )
+    parser.add_argument(
+        "--disable-synthetic-fallback",
+        action="store_true",
+        help=(
+            "Do not synthesize missing market data; missing bundles remain missing. "
+            "This is the default production/backtest policy."
+        ),
+    )
+    parser.add_argument(
+        "--enable-synthetic-fallback",
+        action="store_true",
+        help="Opt in to synthetic data fallback for isolated smoke tests only.",
+    )
     parser.add_argument("--dry-run", action="store_true")
     return parser
 
@@ -364,6 +400,60 @@ def _split_bounds(split: dict[str, Any] | None) -> tuple[datetime | None, dateti
     )
 
 
+def _min_coverage_bars_for_timeframe(timeframe: str) -> int:
+    return int(_TIMEFRAME_MIN_COVERAGE_BARS.get(str(timeframe).lower(), _MIN_COVERAGE_BARS))
+
+
+def _timeframe_delta(timeframe: str) -> timedelta:
+    return timedelta(seconds=int(_TIMEFRAME_SECONDS.get(str(timeframe).lower(), 60 * 60)))
+
+
+def _candidate_window_split(
+    *,
+    template_split: dict[str, Any],
+    window_start: datetime,
+    window_end: datetime,
+    timeframe: str,
+) -> dict[str, Any] | None:
+    if window_end <= window_start:
+        return None
+    min_stage = _timeframe_delta(timeframe)
+    if window_end - window_start < min_stage * 3:
+        return None
+
+    span_seconds = (window_end - window_start).total_seconds()
+    train_end = window_start + timedelta(seconds=span_seconds * 0.60)
+    val_end = window_start + timedelta(seconds=span_seconds * 0.80)
+    if train_end <= window_start or val_end <= train_end or window_end <= val_end:
+        return None
+
+    return {
+        **{
+            key: value
+            for key, value in dict(template_split).items()
+            if key
+            not in {
+                "train_start",
+                "train_end",
+                "val_start",
+                "val_end",
+                "oos_start",
+                "oos_end",
+                "validation_start",
+                "validation_end",
+            }
+        },
+        "train_start": _isoformat_z(window_start),
+        "train_end": _isoformat_z(train_end),
+        "val_start": _isoformat_z(train_end),
+        "val_end": _isoformat_z(val_end),
+        "oos_start": _isoformat_z(val_end),
+        "oos_end": _isoformat_z(window_end),
+        "strategy_timeframe": str(timeframe),
+        "mode": "candidate_data_window",
+    }
+
+
 def _rebuild_candidates_after_coverage(
     *,
     candidates: list[dict[str, Any]],
@@ -411,14 +501,18 @@ def _rebuild_candidates_after_coverage(
             last = _coerce_utc_datetime(frame["datetime"].max())
             rows = int(frame.height)
             coverage[(symbol, timeframe)] = {"rows": rows, "first": first, "last": last}
-            if rows >= _MIN_COVERAGE_BARS and first is not None and last is not None:
+            if (
+                rows >= _min_coverage_bars_for_timeframe(timeframe)
+                and first is not None
+                and last is not None
+            ):
                 last_values.append(last)
         if progress_callback is not None:
             available_symbol_count = sum(
                 1
                 for symbol in symbols
                 if int((coverage.get((symbol, timeframe)) or {}).get("rows", 0))
-                >= _MIN_COVERAGE_BARS
+                >= _min_coverage_bars_for_timeframe(timeframe)
             )
             progress_callback(
                 "coverage_timeframe_loaded",
@@ -438,33 +532,79 @@ def _rebuild_candidates_after_coverage(
         resolved_split["oos_end"] = _isoformat_z(min(requested_end, actual_max))
     effective_oos_end = _coerce_utc_datetime(resolved_split.get("oos_end"), end_of_day=True)
 
-    available_pairs = {
-        pair
-        for pair, item in coverage.items()
-        if int(item.get("rows", 0)) >= _MIN_COVERAGE_BARS
-        and item.get("first") is not None
-        and item.get("last") is not None
-        and item["first"] <= start_bound
-        and (effective_oos_end is None or item["last"] >= effective_oos_end)
-    }
-    filtered = [
-        row
-        for row in candidates
-        if all(
-            (
-                symbol,
-                str(row.get("strategy_timeframe") or row.get("timeframe") or "1m"),
+    available_pairs: set[tuple[str, str]] = set()
+    filtered: list[dict[str, Any]] = []
+    adjusted_count = 0
+    for row in candidates:
+        timeframe = str(row.get("strategy_timeframe") or row.get("timeframe") or "1m")
+        candidate_symbols = canonicalize_symbol_list(list(row.get("symbols") or []))
+        if not candidate_symbols:
+            continue
+        symbol_coverages = [coverage.get((symbol, timeframe)) or {} for symbol in candidate_symbols]
+        min_rows = _min_coverage_bars_for_timeframe(timeframe)
+        if any(
+            int(item.get("rows", 0) or 0) < min_rows
+            or item.get("first") is None
+            or item.get("last") is None
+            for item in symbol_coverages
+        ):
+            continue
+
+        data_start = max(item["first"] for item in symbol_coverages)
+        data_end = min(item["last"] for item in symbol_coverages)
+        window_start = max(start_bound, data_start)
+        window_end = min(requested_end, data_end)
+        if effective_oos_end is not None:
+            window_end = min(window_end, effective_oos_end)
+        full_requested_end = effective_oos_end or requested_end
+        if data_start <= start_bound and data_end >= full_requested_end:
+            candidate_split = {**dict(resolved_split), "strategy_timeframe": str(timeframe)}
+        else:
+            candidate_split = _candidate_window_split(
+                template_split=resolved_split,
+                window_start=window_start,
+                window_end=window_end,
+                timeframe=timeframe,
             )
-            in available_pairs
-            for symbol in canonicalize_symbol_list(list(row.get("symbols") or []))
-        )
-    ]
+        if candidate_split is None:
+            continue
+
+        candidate = dict(row)
+        metadata = dict(candidate.get("metadata") or {})
+        metadata["effective_split"] = dict(candidate_split)
+        metadata["data_window"] = {
+            "mode": "candidate_data_window",
+            "first": _isoformat_z(data_start),
+            "last": _isoformat_z(data_end),
+            "window_start": _isoformat_z(window_start),
+            "window_end": _isoformat_z(window_end),
+            "min_rows": int(min_rows),
+            "symbols": {
+                symbol: {
+                    "rows": int((coverage.get((symbol, timeframe)) or {}).get("rows", 0) or 0),
+                    "first": _isoformat_z((coverage.get((symbol, timeframe)) or {}).get("first")),
+                    "last": _isoformat_z((coverage.get((symbol, timeframe)) or {}).get("last")),
+                }
+                for symbol in candidate_symbols
+            },
+        }
+        candidate["metadata"] = metadata
+        candidate["effective_split"] = dict(candidate_split)
+        if (
+            _coerce_utc_datetime(candidate_split.get("train_start")) != start_bound
+            or _coerce_utc_datetime(candidate_split.get("oos_end"), end_of_day=True)
+            != effective_oos_end
+        ):
+            adjusted_count += 1
+        filtered.append(candidate)
+        available_pairs.update((symbol, timeframe) for symbol in candidate_symbols)
     used = filtered or candidates
     summary = {
         "enabled": True,
         "requested_candidate_count": len(candidates),
         "filtered_candidate_count": len(filtered),
         "used_candidate_count": len(used),
+        "candidate_window_adjusted_count": int(adjusted_count),
         "fallback_to_precoverage": bool(not filtered and candidates),
         "actual_max_timestamp": resolved_split.get("actual_max_timestamp"),
         "available_pairs": sorted(f"{symbol}@{timeframe}" for symbol, timeframe in available_pairs),
@@ -472,6 +612,34 @@ def _rebuild_candidates_after_coverage(
     if progress_callback is not None:
         progress_callback("coverage_rebuilt", summary)
     return used, resolved_split, summary
+
+
+def _symbols_from_candidates(
+    candidates: list[dict[str, Any]],
+    *,
+    fallback: list[str],
+) -> list[str]:
+    symbols = canonicalize_symbol_list(
+        symbol for candidate in candidates for symbol in list(candidate.get("symbols") or [])
+    )
+    return symbols or list(fallback)
+
+
+def _timeframes_from_candidates(
+    candidates: list[dict[str, Any]],
+    *,
+    fallback: list[str],
+) -> list[str]:
+    out: list[str] = []
+    for candidate in candidates:
+        token = (
+            str(candidate.get("strategy_timeframe") or candidate.get("timeframe") or "")
+            .strip()
+            .lower()
+        )
+        if token and token not in out:
+            out.append(token)
+    return out or list(fallback)
 
 
 def _run_candidate_research_with_optional_split(
@@ -484,6 +652,9 @@ def _run_candidate_research_with_optional_split(
     max_candidates: int,
     score_config: dict[str, Any] | None,
     exact_split: dict[str, str] | None,
+    min_bundle_bars: int = 360,
+    allow_csv_fallback: bool = True,
+    allow_synthetic_fallback: bool = True,
     progress_callback: Any = None,
 ) -> dict[str, Any]:
     kwargs: dict[str, Any] = {
@@ -505,6 +676,12 @@ def _run_candidate_research_with_optional_split(
         "progress_callback" in param_names or supports_var_kwargs
     ):
         kwargs["progress_callback"] = progress_callback
+    if "min_bundle_bars" in param_names or supports_var_kwargs:
+        kwargs["min_bundle_bars"] = max(1, int(min_bundle_bars))
+    if "allow_csv_fallback" in param_names or supports_var_kwargs:
+        kwargs["allow_csv_fallback"] = bool(allow_csv_fallback)
+    if "allow_synthetic_fallback" in param_names or supports_var_kwargs:
+        kwargs["allow_synthetic_fallback"] = bool(allow_synthetic_fallback)
     if not exact_split:
         return run_candidate_research(**kwargs)
 
@@ -1574,15 +1751,23 @@ def main() -> int:
                     "reason": "cli_skip_coverage_rebuild",
                 },
             )
+        research_symbols = _symbols_from_candidates(list(candidates), fallback=symbols)
+        research_timeframes = _timeframes_from_candidates(list(candidates), fallback=timeframes)
+        allow_synthetic_fallback = bool(
+            getattr(args, "enable_synthetic_fallback", False)
+        ) and not bool(getattr(args, "disable_synthetic_fallback", False))
         report = _run_candidate_research_with_optional_split(
             candidates=candidates,
             base_timeframe=str(args.base_timeframe),
-            strategy_timeframes=timeframes,
-            symbol_universe=symbols,
+            strategy_timeframes=research_timeframes,
+            symbol_universe=research_symbols,
             stage1_keep_ratio=float(args.stage1_keep_ratio),
             max_candidates=max(1, int(args.max_candidates)),
             score_config=score_config_scope or None,
             exact_split=exact_split,
+            min_bundle_bars=max(1, int(getattr(args, "min_bundle_bars", 360))),
+            allow_csv_fallback=not bool(getattr(args, "disable_csv_fallback", False)),
+            allow_synthetic_fallback=allow_synthetic_fallback,
             progress_callback=progress_writer,
         )
     except ValueError as exc:

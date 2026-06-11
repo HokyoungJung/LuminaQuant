@@ -45,6 +45,54 @@ def test_research_resource_loader_loads_feature_symbols_for_carry_trend_rotation
     assert captured.get("symbols") == ["BTC/USDT", "ETH/USDT"]
 
 
+def test_research_resource_loader_passes_exact_candidate_bundle_pairs():
+    captured: dict[str, object] = {}
+
+    def _load_bundle_cache(**kwargs):
+        captured.update(kwargs)
+        return {}, {}
+
+    def _load_feature_cache(**kwargs):
+        _ = kwargs
+        return {}
+
+    loader = ResearchResourceLoader(
+        split_window_bounds=lambda split: (None, None),
+        datetime_to_iso_z=lambda value: None,
+        load_bundle_cache=_load_bundle_cache,
+        load_feature_cache=_load_feature_cache,
+        benchmark_cache=lambda cache, normalized_timeframes: {},
+        canonicalize_symbol_list=lambda values: list(dict.fromkeys(values)),
+    )
+
+    loader.load(
+        adapted=[
+            {
+                "strategy_class": "CompositeTrendStrategy",
+                "strategy_timeframe": "1h",
+                "symbols": ["BTC/USDT"],
+            },
+            {
+                "strategy_class": "AbnormalReturnContinuationStrategy",
+                "strategy_timeframe": "1d",
+                "symbols": ["ORCL/USDT"],
+            },
+        ],
+        normalized_timeframes=["1h", "1d"],
+        universe=["BTC/USDT", "ORCL/USDT"],
+        resolved_split={},
+        data_mode="legacy",
+        allow_csv_fallback=True,
+        allow_synthetic_fallback=False,
+        min_bundle_bars=360,
+    )
+
+    assert captured["required_pairs"] == [
+        ("BTC/USDT", "1h"),
+        ("ORCL/USDT", "1d"),
+    ]
+
+
 def test_research_resource_loader_emits_finer_grained_resource_progress(monkeypatch):
     events: list[tuple[str, dict[str, object]]] = []
     counter = iter([1.0, 1.4, 2.0, 2.3, 3.0, 3.6])

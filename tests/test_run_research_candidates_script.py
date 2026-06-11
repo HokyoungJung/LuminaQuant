@@ -47,6 +47,7 @@ def test_run_research_candidates_script_smoke(tmp_path: Path):
         "BTC/USDT",
         "ETH/USDT",
         "SOL/USDT",
+        "--enable-synthetic-fallback",
     ]
 
     result = subprocess.run(
@@ -144,6 +145,7 @@ def test_run_research_candidates_script_smoke_with_score_config(tmp_path: Path):
         "SOL/USDT",
         "--score-config",
         str(score_cfg_path),
+        "--enable-synthetic-fallback",
     ]
 
     result = subprocess.run(
@@ -250,6 +252,9 @@ def test_run_research_candidates_forwards_max_per_lineage_and_persists_it(
         max_candidates,
         score_config,
         exact_split,
+        min_bundle_bars,
+        allow_csv_fallback,
+        allow_synthetic_fallback,
         progress_callback,
     ):
         _ = (
@@ -261,6 +266,9 @@ def test_run_research_candidates_forwards_max_per_lineage_and_persists_it(
             max_candidates,
             score_config,
             exact_split,
+            min_bundle_bars,
+            allow_csv_fallback,
+            allow_synthetic_fallback,
             progress_callback,
         )
         return {
@@ -406,6 +414,15 @@ def test_exact_split_builder_and_passthrough_support():
     assert captured["strategy_timeframes"] == ["1m"]
 
 
+def test_synthetic_fallback_is_disabled_by_default_and_requires_explicit_opt_in():
+    default_args = MODULE._build_parser().parse_args([])
+    enabled_args = MODULE._build_parser().parse_args(["--enable-synthetic-fallback"])
+
+    assert bool(default_args.enable_synthetic_fallback) is False
+    assert bool(default_args.disable_synthetic_fallback) is False
+    assert bool(enabled_args.enable_synthetic_fallback) is True
+
+
 def test_exact_split_coverage_rebuild_clamps_oos_end_and_filters_candidates(monkeypatch):
     start = datetime(2025, 1, 1, tzinfo=UTC)
     oos_cap = datetime(2026, 3, 7, tzinfo=UTC)
@@ -494,6 +511,67 @@ def test_exact_split_coverage_rebuild_clamps_oos_end_and_filters_candidates(monk
     assert split["oos_end"] == "2026-03-07T00:00:00Z"
     assert split["actual_max_timestamp"] == "2026-03-07T00:00:00Z"
     assert summary["used_candidate_count"] == 1
+
+
+def test_exact_split_coverage_rebuild_uses_late_asset_data_window(monkeypatch):
+    late_start = datetime(2026, 5, 15, tzinfo=UTC)
+    end = datetime(2026, 6, 6, tzinfo=UTC)
+    frame = pl.DataFrame(
+        {
+            "datetime": pl.datetime_range(
+                late_start.replace(tzinfo=None),
+                end.replace(tzinfo=None),
+                interval="1h",
+                eager=True,
+            ),
+            "open": pl.Series([1.0] * 529, dtype=pl.Float64),
+            "high": pl.Series([1.0] * 529, dtype=pl.Float64),
+            "low": pl.Series([1.0] * 529, dtype=pl.Float64),
+            "close": pl.Series([1.0] * 529, dtype=pl.Float64),
+            "volume": pl.Series([1.0] * 529, dtype=pl.Float64),
+        }
+    )
+
+    def _mock_load_data_dict_from_parquet(root_path, *, symbol_list, **kwargs):
+        _ = root_path, kwargs
+        return {symbol: frame for symbol in symbol_list if symbol == "ORCL/USDT"}
+
+    monkeypatch.setattr(MODULE, "load_data_dict_from_parquet", _mock_load_data_dict_from_parquet)
+
+    rebuilt, split, summary = MODULE._rebuild_candidates_after_coverage(
+        candidates=[
+            {
+                "candidate_id": "late-tradfi",
+                "name": "late-tradfi",
+                "strategy_class": "CompositeTrendStrategy",
+                "strategy_timeframe": "1h",
+                "symbols": ["ORCL/USDT"],
+                "params": {},
+            }
+        ],
+        symbols=["ORCL/USDT"],
+        timeframes=["1h"],
+        split={
+            "train_start": "2026-01-01T00:00:00Z",
+            "train_end": "2026-04-01T00:00:00Z",
+            "val_start": "2026-04-01T00:00:00Z",
+            "val_end": "2026-05-01T00:00:00Z",
+            "oos_start": "2026-05-01T00:00:00Z",
+            "oos_end": "2026-06-06T23:59:59.999000Z",
+            "strategy_timeframe": "1h",
+            "mode": "exact_dates",
+        },
+    )
+
+    assert split is not None
+    assert summary["candidate_window_adjusted_count"] == 1
+    assert [row["candidate_id"] for row in rebuilt] == ["late-tradfi"]
+    effective_split = rebuilt[0]["effective_split"]
+    assert effective_split["mode"] == "candidate_data_window"
+    assert effective_split["train_start"] == "2026-05-15T00:00:00Z"
+    assert rebuilt[0]["metadata"]["data_window"]["first"] == "2026-05-15T00:00:00Z"
+    assert MODULE._symbols_from_candidates(rebuilt, fallback=["BTC/USDT"]) == ["ORCL/USDT"]
+    assert MODULE._timeframes_from_candidates(rebuilt, fallback=["30m"]) == ["1h"]
 
 
 def test_manifest_candidates_can_be_restricted_to_screened_symbol_subset():

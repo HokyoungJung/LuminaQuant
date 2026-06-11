@@ -13,6 +13,28 @@ import numpy as np
 import polars as pl
 
 
+def _candidate_timeframe(row: Mapping[str, Any]) -> str:
+    return str(row.get("strategy_timeframe") or row.get("timeframe") or "1m")
+
+
+def _required_bundle_pairs(
+    *,
+    adapted: Sequence[dict[str, Any]],
+    canonicalize_symbol_list: Callable[[Any], list[str]],
+) -> list[tuple[str, str]]:
+    pairs: list[tuple[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for row in adapted:
+        timeframe = _candidate_timeframe(row)
+        for symbol in canonicalize_symbol_list(list(row.get("symbols") or [])):
+            pair = (symbol, timeframe)
+            if pair in seen:
+                continue
+            seen.add(pair)
+            pairs.append(pair)
+    return pairs
+
+
 def _call_with_supported_kwargs(
     func: Callable[..., Any],
     /,
@@ -86,9 +108,14 @@ class ResearchResourceLoader:
         dict[str, dict[str, np.ndarray] | np.ndarray],
     ]:
         load_start, load_end = self.split_window_bounds(resolved_split)
+        required_pairs = _required_bundle_pairs(
+            adapted=adapted,
+            canonicalize_symbol_list=self.canonicalize_symbol_list,
+        )
         load_bundle_kwargs = {
             "symbols": universe,
             "timeframes": normalized_timeframes,
+            "required_pairs": required_pairs,
             "start_date": self.datetime_to_iso_z(load_start),
             "end_date": self.datetime_to_iso_z(load_end),
             "data_mode": str(data_mode or "legacy"),
@@ -103,7 +130,10 @@ class ResearchResourceLoader:
                 {
                     "symbol_count": len(universe),
                     "timeframe_count": len(normalized_timeframes),
-                    "total_count": len(universe) * len(normalized_timeframes),
+                    "total_count": len(required_pairs)
+                    if required_pairs
+                    else len(universe) * len(normalized_timeframes),
+                    "required_pair_count": len(required_pairs),
                     "symbol_universe": list(universe),
                     "normalized_timeframes": list(normalized_timeframes),
                 },
@@ -119,7 +149,10 @@ class ResearchResourceLoader:
                 "resource_bundle_load_completed",
                 {
                     "bundle_count": len(cache),
-                    "total_count": len(universe) * len(normalized_timeframes),
+                    "total_count": len(required_pairs)
+                    if required_pairs
+                    else len(universe) * len(normalized_timeframes),
+                    "required_pair_count": len(required_pairs),
                     "elapsed_seconds": round(max(0.0, perf_counter() - bundle_started_at), 6),
                     "source_counts": {
                         str(source): len(list(items or []))

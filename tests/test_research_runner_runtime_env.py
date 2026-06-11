@@ -306,6 +306,55 @@ def test_load_bundle_cache_prefers_parquet_frames_and_records_their_source(monke
     assert source_map["parquet"] == ["BTC/USDT@1m"]
 
 
+def test_load_bundle_cache_only_loads_required_symbol_timeframe_pairs(monkeypatch):
+    frame = pl.DataFrame(
+        {
+            "datetime": [datetime(2024, 1, 1, 0, 0, 0)],
+            "open": [100.0],
+            "high": [101.0],
+            "low": [99.0],
+            "close": [100.5],
+            "volume": [10.0],
+        }
+    )
+    calls: list[tuple[str, list[str]]] = []
+
+    def _stub_load_data_dict(root_path, *, exchange, symbol_list, timeframe, **kwargs):
+        _ = root_path, exchange, kwargs
+        calls.append((str(timeframe), list(symbol_list)))
+        return {str(symbol_list[0]): frame}
+
+    monkeypatch.setattr(research_runner, "load_data_dict_from_parquet", _stub_load_data_dict)
+    monkeypatch.setattr(
+        research_runner,
+        "_load_csv_bundle",
+        lambda **kwargs: pytest.fail("csv fallback should not run"),
+    )
+    monkeypatch.setattr(
+        research_runner,
+        "_synthetic_bundle",
+        lambda *args, **kwargs: pytest.fail("synthetic fallback should not run"),
+    )
+
+    cache, source_map = research_runner._load_bundle_cache(
+        symbols=["ETH/USDT", "SOL/USDT"],
+        timeframes=["1h", "1d"],
+        required_pairs=[("ETH/USDT", "1h"), ("SOL/USDT", "1d")],
+        allow_csv_fallback=False,
+        allow_synthetic_fallback=False,
+        min_bars=1,
+        market_data_settings={
+            "symbols": ["ETH/USDT", "SOL/USDT"],
+            "market_data_parquet_path": "unused",
+            "market_data_exchange": "binance",
+        },
+    )
+
+    assert calls == [("1h", ["ETH/USDT"]), ("1d", ["SOL/USDT"])]
+    assert sorted(cache) == [("ETH/USDT", "1h"), ("SOL/USDT", "1d")]
+    assert source_map["parquet"] == ["ETH/USDT@1h", "SOL/USDT@1d"]
+
+
 def test_load_bundle_cache_emits_symbol_timeframe_progress(monkeypatch):
     frame = pl.DataFrame(
         {
