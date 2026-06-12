@@ -1,5 +1,18 @@
 # Research Note
 
+## 2026-06-13 KST — 30m+ 후보 재검토: 최고 수익은 dynamic switch, 실거래는 아직 금지
+
+사용자 요청에 따라 최신 `1m` scoreboards가 아니라 며칠 전까지 작업했던 `30m+` 연구만 다시 보았다. 세부 handoff는 `docs/session_handoff_20260613_30m_plus_live_candidate_review.md`에 남겼다. 포함 timeframe은 `30m, 1h, 2h, 4h, 6h, 8h, 12h, 1d`이고, 최신 저봉/1m 후보는 제외했다.
+
+결론:
+- **실거래(real-money) 승인 후보는 0개**다. `var/reports` JSON audit 기준 `ready_for_real=true`, `real_money_execution=true`, `real_execution_allowed=true`가 모두 0건이었다.
+- Paper/testnet/live-shadow 후보까지 포함하면 최고 수익은 `dynamic_conviction_switch:t0.90_risk_capped_fallback`: OOS comp `+53.38%`, Sharpe `2.07`, Sortino `15.31`, hit `5/10`, max OOS MDD `18.80%`, `ready_for_paper_folds=10`. 단, risk-capped fallback은 해당 research iteration 이후 도입된 규칙이므로 forward-shadow challenger일 뿐 real-money approval이 아니다.
+- 보수적/운영 default는 `cross_candidate_hybrid:hybrid_v3_5`: OOS comp `+27.01%`, Sharpe `1.24`, hit `5/10`, max OOS MDD `13.72%`, `ready_for_paper_folds=4`. Final recommendation도 robust full-run default를 이 후보로 유지한다.
+- 기존 후보 재활용 selector의 `robust_balanced_v1_top1`도 `30m/1h/4h`만 고른 비교 후보로 OOS comp `+27.03%`, annualized approx `+33.26%`, monthly MDD `2.72%`, hit `7/10`, PF `7.92`를 냈지만 post-failure diagnostic이므로 fresh-forward 전 승격 금지다.
+- 30m+ strategy factory strict pass는 `pair_spread_4h_participation_btcusdt_bnbusdt_2.0_0.50`가 OOS `+4.48%`, Sharpe `2.409`로 가장 깨끗한 strict-pass 아이디어지만 최고 수익 후보는 아니다.
+
+운영 판단: `dynamic_conviction_switch:t0.90_risk_capped_fallback`을 aggressive paper/live-shadow challenger로 freeze하고, `cross_candidate_hybrid:hybrid_v3_5`를 conservative paper control/default로 둔다. 새 unseen slice에서 selector 변경 없이 forward-shadow를 돌리고, 10/15/20bps 비용 stress, BBO/spread/fill, reject/cancel/partial-fill/reconciliation telemetry가 통과하기 전까지 real-money execution은 금지한다.
+
 ## 2026-06-09 KST — 기존 후보 재활용 selector 한계 및 microstructure alpha 전환
 
 이번 세션 결론은 기존 후보 pool 안에서 selector를 계속 깎는 방식은 한계가 있다는 것이다. 기존 full candidate artifact `indicator_kalman_ml_robust_selector_full_universe_20260609/clean_new_alpha_discovery_latest.json`는 10 folds / 100,000 rows이고, 이를 train+validation-only 방식으로 재활용하면 기존 clean default 대비 수치는 개선되지만 fresh-forward 전 실전 승격 근거는 아니다.
