@@ -38,7 +38,7 @@ def request_job_stop(stop_file: str | None, *, timestamp: str) -> bool:
 def terminate_process(pid: object) -> tuple[bool, str]:
     try:
         resolved_pid = int(pid)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return False, "invalid pid"
     if resolved_pid <= 0:
         return False, "invalid pid"

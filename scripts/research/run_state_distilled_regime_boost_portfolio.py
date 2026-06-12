@@ -305,7 +305,7 @@ def zscore(values: np.ndarray) -> np.ndarray:
 def safe_float(value: Any, default: float = 0.0) -> float:
     try:
         out = float(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return float(default)
     return out if math.isfinite(out) else float(default)
 

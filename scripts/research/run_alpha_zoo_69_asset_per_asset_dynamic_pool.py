@@ -89,7 +89,7 @@ def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
 def _safe_float(value: Any, default: float = 0.0) -> float:
     try:
         parsed = float(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return default
     return parsed if math.isfinite(parsed) else default
 

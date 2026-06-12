@@ -35,7 +35,7 @@ def _resolve_constant(
     if param_overrides is not None and key in param_overrides:
         try:
             return float(param_overrides[key])
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return float(default)
     if param_registry is None:
         return float(default)

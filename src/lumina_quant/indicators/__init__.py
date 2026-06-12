@@ -15,6 +15,20 @@ from .accelerated import rolling_std_latest_numpy as rolling_std_latest_numpy
 from .accelerated import talib_feature_pack as talib_feature_pack
 from .accelerated import yang_zhang_volatility as yang_zhang_volatility
 from .advanced_alpha import cross_leadlag_spillover as cross_leadlag_spillover
+from .alpha_features import AlphaFeaturePack as AlphaFeaturePack
+from .alpha_features import amihud_illiquidity as amihud_illiquidity
+from .alpha_features import basis_bps as basis_bps
+from .alpha_features import clipped_tanh_score as clipped_tanh_score
+from .alpha_features import drawdown_from_peak as drawdown_from_peak
+from .alpha_features import finite_floats as finite_floats
+from .alpha_features import log_return as log_return
+from .alpha_features import order_flow_imbalance as order_flow_imbalance
+from .alpha_features import range_zscore as range_zscore
+from .alpha_features import realized_volatility as realized_volatility
+from .alpha_features import simple_return as simple_return
+from .alpha_features import trend_efficiency as trend_efficiency
+from .alpha_features import volatility_ratio as volatility_ratio
+from .alpha_features import volume_zscore as volume_zscore
 from .atr import average_true_range as average_true_range
 from .atr import true_range as true_range
 from .bands import bollinger_bands as bollinger_bands
@@ -163,6 +177,7 @@ __all__ = [
     "NUMBA_AVAILABLE",
     "POLARS_AVAILABLE",
     "TALIB_AVAILABLE",
+    "AlphaFeaturePack",
     "IncrementalRsi",
     "RareEventScore",
     "RollingMeanWindow",
@@ -196,17 +211,20 @@ __all__ = [
     "alpha_054",
     "alpha_055",
     "alpha_101",
+    "amihud_illiquidity",
     "aroon_indicator",
     "atr_percent",
     "average_directional_index",
     "average_true_range",
     "awesome_oscillator",
+    "basis_bps",
     "bollinger_bands",
     "bollinger_bandwidth",
     "chaikin_money_flow",
     "chaikin_oscillator",
     "chande_momentum_oscillator",
     "choppiness_index",
+    "clipped_tanh_score",
     "close_to_close_volatility",
     "commodity_channel_index",
     "compute_fast_alpha_bundle",
@@ -220,9 +238,11 @@ __all__ = [
     "donchian_channel",
     "double_exponential_moving_average",
     "downside_volatility",
+    "drawdown_from_peak",
     "ease_of_movement",
     "exponential_moving_average",
     "exponential_moving_average_series",
+    "finite_floats",
     "fisher_transform",
     "force_index",
     "garman_klass_volatility",
@@ -235,6 +255,7 @@ __all__ = [
     "linear_regression_slope",
     "load_close_tail_from_lazy",
     "local_extremum_score_latest",
+    "log_return",
     "log_returns",
     "max_drawdown",
     "momentum_return",
@@ -244,6 +265,7 @@ __all__ = [
     "negative_volume_index",
     "normalized_true_range_latest",
     "on_balance_volume",
+    "order_flow_imbalance",
     "parkinson_volatility",
     "percentage_price_oscillator",
     "percentile_rank",
@@ -251,12 +273,14 @@ __all__ = [
     "positive_volume_index",
     "price_volume_correlation",
     "pv_trend_score",
+    "range_zscore",
     "rank_pct",
     "rare_event_scores_from_frame",
     "rare_event_scores_latest",
     "rare_return_score_latest",
     "rare_streak_score_latest",
     "rate_of_change",
+    "realized_volatility",
     "relative_strength_index",
     "returns_from_close",
     "rogers_satchell_volatility",
@@ -275,12 +299,14 @@ __all__ = [
     "sample_std",
     "signed_power",
     "simple_moving_average",
+    "simple_return",
     "stochastic_oscillator",
     "stochastic_rsi",
     "supertrend",
     "talib_feature_pack",
     "time_key",
     "trend_break_score_latest",
+    "trend_efficiency",
     "trend_efficiency_latest",
     "triple_exponential_average_rate_of_change",
     "triple_exponential_moving_average",
@@ -299,11 +325,13 @@ __all__ = [
     "ulcer_index",
     "ultimate_oscillator",
     "value_at_risk",
+    "volatility_ratio",
     "volcomp_vwap_pressure",
     "volume_oscillator",
     "volume_price_trend",
     "volume_shock_zscore_latest",
     "volume_weighted_moving_average",
+    "volume_zscore",
     "vortex_indicator",
     "vwap_deviation",
     "vwap_from_sums",

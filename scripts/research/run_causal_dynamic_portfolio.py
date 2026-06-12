@@ -45,7 +45,7 @@ OOS_START = OOS_START_DATE
 def _safe_float(value: Any, default: float = 0.0) -> float:
     try:
         out = float(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return float(default)
     if not math.isfinite(out):
         return float(default)

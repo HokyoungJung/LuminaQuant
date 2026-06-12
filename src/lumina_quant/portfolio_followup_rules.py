@@ -37,7 +37,7 @@ MEMORY_LEDGER_SCHEMA_VERSION = "1.0"
 def safe_float(value: Any, default: float = 0.0) -> float:
     try:
         numeric = float(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return float(default)
     if not math.isfinite(numeric):
         return float(default)
@@ -215,7 +215,7 @@ def _point_datetime(point: Mapping[str, Any]) -> datetime | None:
     raw_t = point.get("t")
     try:
         numeric = float(raw_t)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
     scale = 1000.0 if abs(numeric) >= 1e12 else 1.0
     return datetime.fromtimestamp(numeric / scale, tz=UTC)

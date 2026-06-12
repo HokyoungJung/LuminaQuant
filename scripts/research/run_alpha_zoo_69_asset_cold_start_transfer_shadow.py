@@ -256,7 +256,7 @@ def _json_safe(value: Any) -> Any:
 def _safe_float(value: Any, default: float = 0.0) -> float:
     try:
         parsed = float(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return default
     return parsed if math.isfinite(parsed) else default
 

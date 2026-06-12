@@ -135,14 +135,14 @@ def _json_load(path: str | Path | None) -> Any:
         return None
     try:
         return json.loads(resolved.read_text(encoding="utf-8"))
-    except OSError, json.JSONDecodeError:
+    except (OSError, json.JSONDecodeError):
         return None
 
 
 def _safe_float(value: Any) -> float | None:
     try:
         out = float(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
     if out != out or out in {float("inf"), float("-inf")}:
         return None

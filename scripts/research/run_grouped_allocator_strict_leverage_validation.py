@@ -321,7 +321,7 @@ def _apply_candidate_level_leverage_to_stream(
         if raw_t is not None:
             try:
                 raw_numeric = float(raw_t)
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 raw_numeric = None
             if raw_numeric is not None:
                 unit = (

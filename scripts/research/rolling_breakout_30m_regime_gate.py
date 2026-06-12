@@ -85,7 +85,7 @@ TARGET_RULES: tuple[dict[str, Any], ...] = (
 def _safe_float(value: Any, default: float = 0.0) -> float:
     try:
         out = float(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return float(default)
     if not np.isfinite(out):
         return float(default)

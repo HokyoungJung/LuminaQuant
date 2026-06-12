@@ -128,7 +128,7 @@ def resolve_memory_budget_bytes() -> int | None:
 def _process_running(pid: int | None) -> bool:
     try:
         resolved = int(pid or 0)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return False
     if resolved <= 0:
         return False
@@ -166,7 +166,7 @@ class HeavyRunLock:
     def _read_payload(lock_path: Path) -> dict[str, Any]:
         try:
             raw = json.loads(lock_path.read_text(encoding="utf-8"))
-        except OSError, json.JSONDecodeError:
+        except (OSError, json.JSONDecodeError):
             return {}
         return raw if isinstance(raw, dict) else {}
 

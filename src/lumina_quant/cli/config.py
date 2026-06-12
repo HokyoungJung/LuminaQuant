@@ -36,7 +36,7 @@ def _rt_to_dict(rt) -> dict:
             try:
                 json.dumps(value)
                 result[attr] = value
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 result[attr] = str(value)
         return result
 

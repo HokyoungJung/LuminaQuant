@@ -77,7 +77,7 @@ def normalize_limit_price_mode(value: Any, *, default: str = ONE_TICK_WORSE_MODE
 def _positive_float(value: Any, default: float = 0.0) -> float:
     try:
         out = float(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return float(default)
     return out if out > 0.0 else float(default)
 

@@ -126,7 +126,7 @@ class AlphaZooOptunaHybridLiveStrategy(Strategy):
             if key in self._last_signal_by_sleeve:
                 try:
                     parsed = int(value)
-                except TypeError, ValueError:
+                except (TypeError, ValueError):
                     continue
                 if parsed in {-1, 0, 1}:
                     self._last_signal_by_sleeve[key] = parsed

@@ -19,7 +19,7 @@ def _now_iso() -> str:
 def _json_load(path: Path) -> dict[str, Any] | None:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
-    except OSError, json.JSONDecodeError:
+    except (OSError, json.JSONDecodeError):
         return None
     return payload if isinstance(payload, dict) else None
 
@@ -57,11 +57,11 @@ def _prefer_int(primary: Any, secondary: Any) -> int:
         left = int(primary)
         if left != 0:
             return left
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         pass
     try:
         return int(secondary)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return 0
 
 
@@ -70,11 +70,11 @@ def _prefer_float(primary: Any, secondary: Any) -> float:
         left = float(primary)
         if left > 0.0:
             return left
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         pass
     try:
         right = float(secondary)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return 0.0
     return right if right > 0.0 else 0.0
 
@@ -212,7 +212,7 @@ def _memory_peak_rss_mib(path: str | None) -> float:
         return 0.0
     try:
         value = float(payload.get("peak_rss_mib") or 0.0)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return 0.0
     return value if value > 0.0 else 0.0
 
