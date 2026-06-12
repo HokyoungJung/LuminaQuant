@@ -63,9 +63,9 @@ def completed_bars_only(
         except TypeError:
             try:
                 bars = list(aggregator.get_bars(alias, timeframe, max(2, int(lookback_bars) + 1)))
-            except (AttributeError, KeyError, TypeError, ValueError):
+            except AttributeError, KeyError, TypeError, ValueError:
                 bars = []
-        except (AttributeError, KeyError, ValueError):
+        except AttributeError, KeyError, ValueError:
             bars = []
         if len(bars) >= 2:
             return bars[:-1]

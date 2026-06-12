@@ -27,6 +27,57 @@ def test_latest_alpha_sleeve_strategy_catalog_is_complete():
     assert subject.FEATURE_SYMBOLS == ("BTC/USDT", "ETH/USDT", "SOL/USDT")
 
 
+def test_strategy_specs_can_expand_live_scope_without_research_only_names():
+    specs = subject._strategy_specs(scope="live")
+    names = {spec.strategy for spec in specs}
+
+    assert "RsiStrategy" in names
+    assert "FundingDislocationTrendCarryStrategy" in names
+    assert "Alpha101FormulaStrategy" not in names
+
+
+def test_zero_trade_reason_distinguishes_no_signal_from_runtime_failure():
+    reason = subject._zero_trade_reason(
+        {
+            "status": "pass",
+            "trade_count": 0,
+            "market_events": 120,
+            "signals": 0,
+            "orders": 0,
+            "fills": 0,
+            "feature_audit_status": "pass",
+        }
+    )
+
+    assert reason == "no_signal_generated_under_default_params_window"
+
+
+def test_required_features_supports_instance_property_shape():
+    class PropertyFeatureStrategy:
+        def __init__(self, bars, events) -> None:
+            self.bars = bars
+            self.events = events
+
+        @property
+        def required_features(self):
+            return ("funding_rate", "open_interest")
+
+    assert subject._required_features_for_strategy(PropertyFeatureStrategy) == (
+        "funding_rate",
+        "open_interest",
+    )
+
+
+def test_main_returns_success_for_unavailable_warnings(monkeypatch):
+    monkeypatch.setattr(
+        subject,
+        "run_latest_alpha_sleeve_backtests",
+        lambda _args: {"issues": [{"severity": "warn", "scope": "S", "message": "excluded"}]},
+    )
+
+    assert subject.main([]) == 0
+
+
 def test_audit_ohlcv_frame_passes_contiguous_real_bars():
     frame = _frame(
         [

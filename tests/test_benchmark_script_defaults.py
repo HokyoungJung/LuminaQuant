@@ -38,3 +38,11 @@ def test_benchmark_backtest_loop_parser_defaults():
     args = module._build_parser().parse_args([])
     assert args.iters >= 1
     assert args.warmup >= 0
+
+
+def test_benchmark_backtest_disables_heavy_profiling_and_feature_lookup_by_default(monkeypatch):
+    module = _load_module("benchmark_backtest_script", "scripts/benchmark_backtest.py")
+    monkeypatch.setattr(sys, "argv", ["benchmark_backtest.py"])
+    args = module._parse_args()
+    assert args.track_tracemalloc is False
+    assert args.enable_feature_lookup is False

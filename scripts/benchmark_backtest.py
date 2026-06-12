@@ -89,11 +89,11 @@ def _load_best_params(strategy_name: str) -> dict[str, Any]:
                         "[WARN] best_params metadata indicates non validation-only selection basis "
                         f"for {strategy_name}."
                     )
-            except (OSError, ValueError, TypeError):
+            except OSError, ValueError, TypeError:
                 print(f"[WARN] Failed to parse best_params metadata for {strategy_name}.")
         else:
             print(f"[WARN] best_params metadata missing for {strategy_name}.")
-    except (OSError, ValueError, TypeError):
+    except OSError, ValueError, TypeError:
         pass
     return params
 
@@ -174,7 +174,7 @@ def _load_snapshot(path: str) -> dict[str, Any] | None:
             data = json.load(file)
         if isinstance(data, dict):
             return data
-    except (OSError, ValueError, TypeError):
+    except OSError, ValueError, TypeError:
         return None
     return None
 
@@ -218,11 +218,14 @@ def _run_once(
     start_date: datetime,
     params: dict[str, Any],
     record_history: bool,
+    track_tracemalloc: bool,
+    enable_feature_lookup: bool,
 ) -> BenchmarkSample:
     """Execute one backtest and collect timing/memory metrics."""
     strategy_cls = STRATEGY_MAP[strategy_name]
     rss_before = _get_rss_mb()
-    tracemalloc.start()
+    if track_tracemalloc:
+        tracemalloc.start()
     started = time.perf_counter()
 
     backtest = Backtest(
@@ -234,14 +237,17 @@ def _run_once(
         portfolio_cls=Portfolio,
         strategy_cls=strategy_cls,
         strategy_params=params,
+        data_handler_kwargs={} if enable_feature_lookup else {"feature_db_path": ""},
         record_history=record_history,
         track_metrics=record_history,
         record_trades=record_history,
     )
     backtest.simulate_trading(output=False)
     ended = time.perf_counter()
-    _current, peak = tracemalloc.get_traced_memory()
-    tracemalloc.stop()
+    peak = 0
+    if track_tracemalloc:
+        _current, peak = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
 
     bars_processed = int(backtest.market_events)
     seconds = ended - started
@@ -306,6 +312,8 @@ def build_benchmark_summary(args: argparse.Namespace) -> BenchmarkSummary:
             start_date=start_date,
             params=params,
             record_history=args.record_history,
+            track_tracemalloc=args.track_tracemalloc,
+            enable_feature_lookup=args.enable_feature_lookup,
         )
 
     samples: list[BenchmarkSample] = []
@@ -316,6 +324,8 @@ def build_benchmark_summary(args: argparse.Namespace) -> BenchmarkSummary:
             start_date=start_date,
             params=params,
             record_history=args.record_history,
+            track_tracemalloc=args.track_tracemalloc,
+            enable_feature_lookup=args.enable_feature_lookup,
         )
         samples.append(sample)
 
@@ -382,6 +392,25 @@ def _parse_args() -> argparse.Namespace:
         "--record-history",
         action="store_true",
         help="Keep full portfolio history during the benchmark run.",
+    )
+    parser.add_argument(
+        "--track-tracemalloc",
+        action="store_true",
+        help=(
+            "Enable Python allocation tracing. Disabled by default because "
+            "tracemalloc metadata materially inflates RSS and makes the 8GB CI "
+            "smoke gate measure the profiler rather than the backtest."
+        ),
+    )
+    parser.add_argument(
+        "--enable-feature-lookup",
+        action="store_true",
+        help=(
+            "Allow HistoricCSVDataHandler to resolve feature parquet lookups during "
+            "the benchmark. Disabled by default for the CI RsiStrategy smoke run so "
+            "funding checks cannot lazy-load large feature partitions unrelated to "
+            "the benchmark workload."
+        ),
     )
     parser.add_argument(
         "--output",

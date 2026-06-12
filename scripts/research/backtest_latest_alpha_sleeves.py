@@ -34,7 +34,11 @@ from lumina_quant.backtesting.execution_sim import SimulatedExecutionHandler
 from lumina_quant.backtesting.portfolio_backtest import Portfolio
 from lumina_quant.configuration import get_default_runtime_config
 from lumina_quant.market_data import MarketDataRepository, normalize_symbol
-from lumina_quant.strategies.registry import resolve_strategy_class
+from lumina_quant.strategies.registry import (
+    get_strategy_names,
+    get_strategy_tier,
+    resolve_strategy_class,
+)
 
 
 NEW_ALPHA_SLEEVE_STRATEGIES: tuple[str, ...] = (
@@ -85,6 +89,8 @@ CORE_CRYPTO_METAL_SYMBOLS: tuple[str, ...] = (
 # sleeves because the local feature partitions have no taker quote volume for it.
 FEATURE_SYMBOLS: tuple[str, ...] = ("BTC/USDT", "ETH/USDT", "SOL/USDT")
 PAIR_SYMBOLS: tuple[str, ...] = ("BTC/USDT", "ETH/USDT", "XAU/USDT", "XAG/USDT")
+CRYPTO_PAIR_SYMBOLS: tuple[str, ...] = ("BTC/USDT", "ETH/USDT")
+CRYPTO_FEATURE_SYMBOLS: tuple[str, ...] = ("BTC/USDT", "ETH/USDT", "SOL/USDT")
 METAL_PAIR_SYMBOLS: tuple[str, ...] = ("XAU/USDT", "XAG/USDT")
 CROSS_ASSET_SYMBOLS: tuple[str, ...] = (
     "BTC/USDT",
@@ -102,6 +108,18 @@ CROSS_ASSET_SYMBOLS: tuple[str, ...] = (
 )
 
 STRATEGY_SYMBOLS: dict[str, tuple[str, ...]] = {
+    "BitcoinBuyHoldStrategy": ("BTC/USDT",),
+    "PairTradingZScoreStrategy": CRYPTO_PAIR_SYMBOLS,
+    "PairSpreadZScoreStrategy": CRYPTO_PAIR_SYMBOLS,
+    "SessionFilteredPairCarryStrategy": CRYPTO_PAIR_SYMBOLS,
+    "TimeframePairZScoreReversionStrategy": CRYPTO_PAIR_SYMBOLS,
+    "LeadLagSpilloverStrategy": CRYPTO_PAIR_SYMBOLS,
+    "CrossCryptoSlowDiffusionStrategy": CRYPTO_FEATURE_SYMBOLS,
+    "CryptoFxAlphaZooStateStrategy": CRYPTO_FEATURE_SYMBOLS,
+    "DerivativesFlowSqueezeStrategy": CRYPTO_FEATURE_SYMBOLS,
+    "HourlyShockReversionStrategy": CRYPTO_FEATURE_SYMBOLS,
+    "PerpCrowdingCarryStrategy": CRYPTO_FEATURE_SYMBOLS,
+    "TakerFlowExhaustionReversalStrategy": CRYPTO_FEATURE_SYMBOLS,
     "FundingDislocationTrendCarryStrategy": FEATURE_SYMBOLS,
     "TakerFlowImbalanceContinuationStrategy": FEATURE_SYMBOLS,
     "PairsSpreadMeanReversionStrategy": PAIR_SYMBOLS,
@@ -160,13 +178,88 @@ def _compact_symbol(symbol: str) -> str:
     return normalize_symbol(symbol).replace("/", "")
 
 
-def _strategy_specs(selected: list[str] | None = None) -> list[StrategyRunSpec]:
-    requested = tuple(selected or NEW_ALPHA_SLEEVE_STRATEGIES)
+def _strategy_names_for_scope(scope: str) -> tuple[str, ...]:
+    token = str(scope or "latest").strip().lower().replace("_", "-")
+    if token == "latest":
+        return NEW_ALPHA_SLEEVE_STRATEGIES
+    if token in {"live", "all-live"}:
+        return tuple(get_strategy_names(include_research_only=False))
+    if token == "all":
+        return tuple(get_strategy_names(include_research_only=True))
+    raise ValueError(f"unsupported scope: {scope}")
+
+
+def _strategy_specs(
+    selected: list[str] | None = None,
+    *,
+    scope: str = "latest",
+) -> list[StrategyRunSpec]:
+    available = set(get_strategy_names(include_research_only=True))
+    requested = tuple(selected or _strategy_names_for_scope(scope))
     specs: list[StrategyRunSpec] = []
     for strategy in requested:
+        if strategy not in available:
+            raise ValueError(f"Unknown strategy: {strategy}")
         symbols = STRATEGY_SYMBOLS.get(strategy, CORE_CRYPTO_METAL_SYMBOLS)
         specs.append(StrategyRunSpec(strategy=strategy, symbols=tuple(symbols)))
     return specs
+
+
+def _zero_trade_reason(row: dict[str, Any]) -> str:
+    if str(row.get("status")) != "pass":
+        return ""
+    if int(row.get("trade_count") or 0) > 0:
+        return ""
+    market_events = int(row.get("market_events") or 0)
+    signals = int(row.get("signals") or 0)
+    orders = int(row.get("orders") or 0)
+    fills = int(row.get("fills") or 0)
+    feature_status = str(row.get("feature_audit_status") or "")
+    if market_events <= 0:
+        return "no_market_events_loaded"
+    if feature_status == "warn":
+        return "no_trade_with_partial_feature_coverage"
+    if signals <= 0:
+        return "no_signal_generated_under_default_params_window"
+    if orders <= 0:
+        return "signals_generated_but_no_orders"
+    if fills <= 0:
+        return "orders_generated_but_no_fills"
+    return "flat_after_rounding_or_zero_net_position"
+
+
+def _required_features_for_strategy(strategy_cls: type) -> tuple[str, ...]:
+    """Return declared feature dependencies without fabricating unknown needs.
+
+    Most strategies expose ``required_features`` as a class-level tuple.  A few
+    older/live strategies expose it as an instance property derived from default
+    parameters.  For the scoreboard audit we instantiate only that property shape
+    with ``bars=None, events=None``; if the property cannot be resolved safely, we
+    return an empty tuple and let the actual backtest engine exercise the strategy.
+    """
+    raw_features = getattr(strategy_cls, "required_features", ())
+    if isinstance(raw_features, property):
+        try:
+            raw_features = raw_features.__get__(strategy_cls(None, None), strategy_cls)
+        except Exception:
+            raw_features = ()
+    if raw_features is None:
+        return ()
+    if isinstance(raw_features, str):
+        return (raw_features,) if raw_features else ()
+    try:
+        return tuple(str(item) for item in tuple(raw_features) if str(item))
+    except TypeError:
+        return ()
+
+
+def _is_unavailable_runtime_error(message: str) -> bool:
+    lowered = str(message or "").lower()
+    return (
+        "required_inputs are unavailable" in lowered
+        or "required_features are unavailable" in lowered
+        or "declared unsupported required_features" in lowered
+    )
 
 
 def _official_binance_symbols(timeout_seconds: int = 20) -> dict[str, Any]:
@@ -488,9 +581,20 @@ def _benchmark_return(audits: list[dict[str, Any]]) -> float:
 
 
 def _markdown_report(payload: dict[str, Any]) -> str:
+    passed_results = [
+        row for row in list(payload.get("strategy_results") or []) if row.get("status") == "pass"
+    ]
+    traded_results = [row for row in passed_results if int(row.get("trade_count") or 0) > 0]
+    sorted_results = sorted(
+        traded_results,
+        key=lambda row: _safe_float(row.get("total_return")),
+        reverse=True,
+    )
+    top_n = max(1, int(payload.get("top_n") or 20))
     lines = [
-        "# Latest alpha-sleeve backtest report",
+        "# Strategy backtest scoreboard",
         "",
+        f"- scope: `{payload.get('scope', 'latest')}`",
         f"- generated_at: `{payload['generated_at']}`",
         f"- data_root: `{payload['data_root']}`",
         f"- exchange: `{payload['exchange']}`",
@@ -498,6 +602,8 @@ def _markdown_report(payload: dict[str, Any]) -> str:
         f"- period: `{payload['start']}` → `{payload['end']}`",
         f"- annual_periods: `{payload['annual_periods']}`",
         f"- strategy_count: `{len(payload['strategy_results'])}`",
+        f"- pass_count: `{len(passed_results)}`",
+        f"- excluded_count: `{len([row for row in payload['strategy_results'] if row.get('status') == 'excluded'])}`",
         "",
         "## Data integrity summary",
         "",
@@ -524,18 +630,71 @@ def _markdown_report(payload: dict[str, Any]) -> str:
             "- Required external features must be present on at least one traded symbol; absent feature columns are not inferred or filled.",
             "- Zero-volume bars are reported as warnings, not imputed.",
             "",
-            "## Strategy results",
+            f"## Top {min(top_n, len(sorted_results))} traded performers by total return",
             "",
-            "| Strategy | Symbols | Return | Sharpe | CAGR | MDD | Trades | Signals | Feature audit | Status |",
-            "|---|---:|---:|---:|---:|---:|---:|---:|---|---|",
+            "- Pass-status strategies with zero completed trades are not treated as performance winners; they are listed in zero-trade diagnostics instead.",
+            "| Rank | Strategy | Tier | Symbols | Return | Sharpe | CAGR | MDD | Trades | Signals | Zero-trade reason |",
+            "|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---|",
+        ]
+    )
+    for idx, row in enumerate(sorted_results[:top_n], start=1):
+        stats = dict(row.get("fast_stats") or {})
+        lines.append(
+            "| {rank} | `{strategy}` | `{tier}` | {symbol_count} | {ret:.2%} | {sharpe:.3f} | "
+            "{cagr:.2%} | {mdd:.2%} | {trades} | {signals} | `{zero_reason}` |".format(
+                rank=idx,
+                strategy=row.get("strategy"),
+                tier=row.get("tier", ""),
+                symbol_count=len(row.get("symbols") or []),
+                ret=_safe_float(row.get("total_return")),
+                sharpe=_safe_float(stats.get("sharpe")),
+                cagr=_safe_float(stats.get("cagr")),
+                mdd=_safe_float(stats.get("max_drawdown")),
+                trades=int(row.get("trade_count") or 0),
+                signals=int(row.get("signals") or 0),
+                zero_reason=row.get("zero_trade_reason") or "",
+            )
+        )
+
+    zero_trade_rows = [row for row in passed_results if int(row.get("trade_count") or 0) == 0]
+    lines.extend(["", "## Zero-trade diagnostics", ""])
+    if not zero_trade_rows:
+        lines.append("- No pass-status strategy finished with zero trades.")
+    else:
+        lines.extend(
+            [
+                "| Strategy | Market events | Signals | Orders | Fills | Reason |",
+                "|---|---:|---:|---:|---:|---|",
+            ]
+        )
+        for row in zero_trade_rows:
+            lines.append(
+                "| `{strategy}` | {market_events} | {signals} | {orders} | {fills} | `{reason}` |".format(
+                    strategy=row.get("strategy"),
+                    market_events=int(row.get("market_events") or 0),
+                    signals=int(row.get("signals") or 0),
+                    orders=int(row.get("orders") or 0),
+                    fills=int(row.get("fills") or 0),
+                    reason=row.get("zero_trade_reason") or "",
+                )
+            )
+
+    lines.extend(
+        [
+            "",
+            "## All strategy results",
+            "",
+            "| Strategy | Tier | Symbols | Return | Sharpe | CAGR | MDD | Trades | Signals | Feature audit | Status |",
+            "|---|---|---:|---:|---:|---:|---:|---:|---:|---|---|",
         ]
     )
     for row in payload["strategy_results"]:
         stats = dict(row.get("fast_stats") or {})
         lines.append(
-            "| `{strategy}` | {symbol_count} | {ret:.2%} | {sharpe:.3f} | "
+            "| `{strategy}` | `{tier}` | {symbol_count} | {ret:.2%} | {sharpe:.3f} | "
             "{cagr:.2%} | {mdd:.2%} | {trades} | {signals} | `{feature_status}` | `{status}` |".format(
                 strategy=row.get("strategy"),
+                tier=row.get("tier", ""),
                 symbol_count=len(row.get("symbols") or []),
                 ret=_safe_float(row.get("total_return")),
                 sharpe=_safe_float(stats.get("sharpe")),
@@ -595,7 +754,9 @@ def run_latest_alpha_sleeve_backtests(args: argparse.Namespace) -> dict[str, Any
     if end <= start:
         raise ValueError("--end must be after --start")
 
-    specs = _strategy_specs(args.strategy)
+    scope = str(getattr(args, "scope", "latest") or "latest")
+    top_n = int(getattr(args, "top_n", 20) or 20)
+    specs = _strategy_specs(args.strategy, scope=scope)
     all_symbols = sorted({symbol for spec in specs for symbol in spec.symbols})
     exchange_audit = _audit_exchange_symbols(
         all_symbols,
@@ -606,6 +767,7 @@ def run_latest_alpha_sleeve_backtests(args: argparse.Namespace) -> dict[str, Any
         raise RuntimeError("exchange symbol audit failed: " + json.dumps(exchange_audit))
 
     repo = MarketDataRepository(args.data_root)
+    allow_unavailable = bool(getattr(args, "allow_unavailable", False))
     strategy_results: list[dict[str, Any]] = []
     data_audits: dict[str, list[dict[str, Any]]] = {}
     feature_audits: dict[str, Any] = {}
@@ -632,13 +794,19 @@ def run_latest_alpha_sleeve_backtests(args: argparse.Namespace) -> dict[str, Any
                 {
                     "status": "fail",
                     "strategy": spec.strategy,
+                    "tier": get_strategy_tier(spec.strategy),
                     "symbols": list(spec.symbols),
                     "error": message,
                     "benchmark_return_first_symbol": _benchmark_return(audits),
                     "fast_stats": {},
                     "trade_count": 0,
+                    "market_events": 0,
                     "signals": 0,
+                    "orders": 0,
+                    "fills": 0,
                     "total_return": 0.0,
+                    "feature_audit_status": "not_run",
+                    "zero_trade_reason": "",
                 }
             )
             if bool(args.fail_fast):
@@ -646,11 +814,7 @@ def run_latest_alpha_sleeve_backtests(args: argparse.Namespace) -> dict[str, Any
             continue
 
         strategy_cls = resolve_strategy_class(spec.strategy)
-        required_features = tuple(
-            str(item)
-            for item in tuple(getattr(strategy_cls, "required_features", ()) or ())
-            if str(item)
-        )
+        required_features = _required_features_for_strategy(strategy_cls)
         feature_audits[spec.strategy] = _feature_audit(
             db_path=args.data_root,
             exchange=args.exchange,
@@ -662,22 +826,33 @@ def run_latest_alpha_sleeve_backtests(args: argparse.Namespace) -> dict[str, Any
         feature_status = str(feature_audits[spec.strategy].get("status") or "")
         if feature_status == "fail":
             message = "required feature audit failed for all symbols"
-            issues.append({"severity": "fail", "scope": spec.strategy, "message": message})
+            severity = "warn" if allow_unavailable else "fail"
+            issues.append({"severity": severity, "scope": spec.strategy, "message": message})
             strategy_results.append(
                 {
-                    "status": "fail",
+                    "status": "excluded" if allow_unavailable else "fail",
                     "strategy": spec.strategy,
+                    "tier": get_strategy_tier(spec.strategy),
                     "symbols": list(spec.symbols),
                     "error": message,
+                    "exclusion_reason": (
+                        "required feature data unavailable; no missing feature was inferred, filled, or synthesized"
+                        if allow_unavailable
+                        else ""
+                    ),
                     "benchmark_return_first_symbol": _benchmark_return(audits),
                     "fast_stats": {},
                     "trade_count": 0,
+                    "market_events": 0,
                     "signals": 0,
+                    "orders": 0,
+                    "fills": 0,
                     "total_return": 0.0,
                     "feature_audit_status": feature_status,
+                    "zero_trade_reason": "",
                 }
             )
-            if bool(args.fail_fast):
+            if bool(args.fail_fast) and not allow_unavailable:
                 raise RuntimeError(message)
             continue
 
@@ -690,31 +865,53 @@ def run_latest_alpha_sleeve_backtests(args: argparse.Namespace) -> dict[str, Any
                 end=end,
                 annual_periods=int(args.annual_periods),
             )
+            result["tier"] = get_strategy_tier(spec.strategy)
             result["benchmark_return_first_symbol"] = _benchmark_return(audits)
             result["feature_audit_status"] = feature_status
+            result["zero_trade_reason"] = _zero_trade_reason(result)
             strategy_results.append(result)
         except Exception as exc:
             message = repr(exc)
-            issues.append({"severity": "fail", "scope": spec.strategy, "message": message})
+            unavailable = allow_unavailable and _is_unavailable_runtime_error(message)
+            issues.append(
+                {
+                    "severity": "warn" if unavailable else "fail",
+                    "scope": spec.strategy,
+                    "message": message,
+                }
+            )
             strategy_results.append(
                 {
-                    "status": "fail",
+                    "status": "excluded" if unavailable else "fail",
                     "strategy": spec.strategy,
+                    "tier": get_strategy_tier(spec.strategy),
                     "symbols": list(spec.symbols),
                     "error": message,
+                    "exclusion_reason": (
+                        "runtime input/feature unavailable for this local execution path; no proxy data was fabricated"
+                        if unavailable
+                        else ""
+                    ),
                     "benchmark_return_first_symbol": _benchmark_return(audits),
                     "fast_stats": {},
                     "trade_count": 0,
+                    "market_events": 0,
                     "signals": 0,
+                    "orders": 0,
+                    "fills": 0,
                     "total_return": 0.0,
+                    "feature_audit_status": feature_status,
+                    "zero_trade_reason": "",
                 }
             )
-            if bool(args.fail_fast):
+            if bool(args.fail_fast) and not unavailable:
                 raise
 
     generated_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     payload: dict[str, Any] = {
-        "artifact_kind": "latest_alpha_sleeves_backtest_report",
+        "artifact_kind": "strategy_backtest_scoreboard",
+        "scope": scope,
+        "top_n": top_n,
         "generated_at": generated_at,
         "git_commit": _git_commit(),
         "data_root": str(Path(args.data_root).resolve()),
@@ -762,7 +959,7 @@ def _git_commit() -> str:
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Run audited backtests for the latest alpha-sleeve strategy additions."
+        description="Run audited strategy backtests and write a fail-closed performance scoreboard."
     )
     parser.add_argument("--data-root", default="data/market_parquet")
     parser.add_argument("--exchange", default="binance")
@@ -773,12 +970,31 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--strategy",
         action="append",
-        choices=NEW_ALPHA_SLEEVE_STRATEGIES,
-        help="Run one strategy; repeat to select multiple. Defaults to all latest additions.",
+        help="Run one named strategy; repeat to select multiple. Defaults to the selected --scope.",
+    )
+    parser.add_argument(
+        "--scope",
+        choices=("latest", "live", "all"),
+        default="latest",
+        help="Strategy universe when --strategy is omitted.",
+    )
+    parser.add_argument(
+        "--top-n",
+        type=int,
+        default=20,
+        help="Number of traded performers to show in the markdown top table.",
     )
     parser.add_argument("--output-dir", default="var/reports/latest_new_strategy_backtests")
     parser.add_argument("--no-exchange-audit", action="store_true")
     parser.add_argument("--fail-on-exchange-audit-error", action="store_true")
+    parser.add_argument(
+        "--allow-unavailable",
+        action="store_true",
+        help=(
+            "Record strategies with unavailable required inputs/features as excluded instead of "
+            "fabricating data or failing the whole scoreboard."
+        ),
+    )
     parser.add_argument("--fail-fast", action="store_true")
     return parser
 
@@ -786,7 +1002,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_arg_parser().parse_args(argv)
     payload = run_latest_alpha_sleeve_backtests(args)
-    return 1 if payload.get("issues") else 0
+    return 1 if any(issue.get("severity") == "fail" for issue in payload.get("issues") or []) else 0
 
 
 if __name__ == "__main__":

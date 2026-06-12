@@ -13,7 +13,11 @@ from dataclasses import dataclass
 from typing import Any
 
 from lumina_quant.core.plugin_registry import register
-from lumina_quant.indicators.alpha_features import drawdown_from_peak, log_return, realized_volatility
+from lumina_quant.indicators.alpha_features import (
+    drawdown_from_peak,
+    log_return,
+    realized_volatility,
+)
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.strategies.adaptive_crypto_alpha_sleeves import (
     _age_cross_positions,
@@ -195,8 +199,12 @@ class GoldSilverRatioMeanReversionStrategy(Strategy):
             "exit_z": HyperParam.floating("exit_z", default=0.30, low=0.0, high=5.0),
             "stop_z": HyperParam.floating("stop_z", default=4.0, low=0.5, high=20.0),
             "max_hold_bars": HyperParam.integer("max_hold_bars", default=1440, low=1, high=200000),
-            "target_allocation": HyperParam.floating("target_allocation", default=0.015, low=0.0, high=2.0, tunable=False),
-            "max_order_value": HyperParam.floating("max_order_value", default=400.0, low=0.0, high=1_000_000.0, tunable=False),
+            "target_allocation": HyperParam.floating(
+                "target_allocation", default=0.015, low=0.0, high=2.0, tunable=False
+            ),
+            "max_order_value": HyperParam.floating(
+                "max_order_value", default=400.0, low=0.0, high=1_000_000.0, tunable=False
+            ),
         }
 
     def __init__(self, bars: Any, events: Any, **params: Any) -> None:
@@ -214,7 +222,13 @@ class GoldSilverRatioMeanReversionStrategy(Strategy):
         self.target_allocation = max(0.0, float(resolved["target_allocation"]))
         self.max_order_value = max(0.0, float(resolved["max_order_value"]))
         size = _state_size(self.ratio_window, self.max_hold_bars)
-        self._pair = _RatioPairState(gold, silver, deque(maxlen=size), deque(maxlen=size), deque(maxlen=size)) if gold and silver and gold != silver else None
+        self._pair = (
+            _RatioPairState(
+                gold, silver, deque(maxlen=size), deque(maxlen=size), deque(maxlen=size)
+            )
+            if gold and silver and gold != silver
+            else None
+        )
         self._last_seen: dict[str, str] = {}
         self._latest: dict[str, float] = {}
 
@@ -246,7 +260,11 @@ class GoldSilverRatioMeanReversionStrategy(Strategy):
         if not isinstance(state, dict) or self._pair is None:
             return
         self._last_seen = {str(k): str(v) for k, v in dict(state.get("last_seen") or {}).items()}
-        self._latest = {str(k): float(v) for k, v in dict(state.get("latest") or {}).items() if safe_float(v) is not None}
+        self._latest = {
+            str(k): float(v)
+            for k, v in dict(state.get("latest") or {}).items()
+            if safe_float(v) is not None
+        }
         payload = state.get("pair")
         if not isinstance(payload, dict):
             return
@@ -302,7 +320,10 @@ class GoldSilverRatioMeanReversionStrategy(Strategy):
         if event_key:
             if pair.last_eval_key == event_key:
                 return
-            if self._last_seen.get(pair.gold) != event_key or self._last_seen.get(pair.silver) != event_key:
+            if (
+                self._last_seen.get(pair.gold) != event_key
+                or self._last_seen.get(pair.silver) != event_key
+            ):
                 return
             pair.last_eval_key = event_key
         ratio_value = _ratio(self._latest.get(pair.gold), self._latest.get(pair.silver))
@@ -322,11 +343,21 @@ class GoldSilverRatioMeanReversionStrategy(Strategy):
                 self._exit_pair(event_time, ratio_value, zscore, "max_hold")
             return
         if zscore >= self.entry_z:
-            self._enter_pair(event_time, ratio_value, zscore, "SHORT_RATIO", ratio_mean, ratio_sigma)
+            self._enter_pair(
+                event_time, ratio_value, zscore, "SHORT_RATIO", ratio_mean, ratio_sigma
+            )
         elif zscore <= -self.entry_z:
             self._enter_pair(event_time, ratio_value, zscore, "LONG_RATIO", ratio_mean, ratio_sigma)
 
-    def _enter_pair(self, event_time: Any, ratio_value: float, zscore: float, mode: str, ratio_mean: float | None, ratio_sigma: float | None) -> None:
+    def _enter_pair(
+        self,
+        event_time: Any,
+        ratio_value: float,
+        zscore: float,
+        mode: str,
+        ratio_mean: float | None,
+        ratio_sigma: float | None,
+    ) -> None:
         pair = self._pair
         if pair is None:
             return
@@ -334,11 +365,44 @@ class GoldSilverRatioMeanReversionStrategy(Strategy):
             gold_signal, silver_signal = "SHORT", "LONG"
         else:
             gold_signal, silver_signal = "LONG", "SHORT"
-        extra = {"zscore": zscore, "ratio_mean": ratio_mean, "ratio_sigma": ratio_sigma, "mode": mode}
+        extra = {
+            "zscore": zscore,
+            "ratio_mean": ratio_mean,
+            "ratio_sigma": ratio_sigma,
+            "mode": mode,
+        }
         strategy_id = self._pair_strategy_id()
         strategy_name = self._pair_strategy_name()
-        _emit_pair_leg(self.events, strategy_id=strategy_id, strategy_name=strategy_name, symbol=pair.gold, event_time=event_time, signal_type=gold_signal, price=self._latest.get(pair.gold), ratio_value=ratio_value, reason="ratio_entry", target_allocation=self.target_allocation / 2.0, max_order_value=self.max_order_value, leg="gold", **extra)
-        _emit_pair_leg(self.events, strategy_id=strategy_id, strategy_name=strategy_name, symbol=pair.silver, event_time=event_time, signal_type=silver_signal, price=self._latest.get(pair.silver), ratio_value=ratio_value, reason="ratio_entry", target_allocation=self.target_allocation / 2.0, max_order_value=self.max_order_value, leg="silver", **extra)
+        _emit_pair_leg(
+            self.events,
+            strategy_id=strategy_id,
+            strategy_name=strategy_name,
+            symbol=pair.gold,
+            event_time=event_time,
+            signal_type=gold_signal,
+            price=self._latest.get(pair.gold),
+            ratio_value=ratio_value,
+            reason="ratio_entry",
+            target_allocation=self.target_allocation / 2.0,
+            max_order_value=self.max_order_value,
+            leg="gold",
+            **extra,
+        )
+        _emit_pair_leg(
+            self.events,
+            strategy_id=strategy_id,
+            strategy_name=strategy_name,
+            symbol=pair.silver,
+            event_time=event_time,
+            signal_type=silver_signal,
+            price=self._latest.get(pair.silver),
+            ratio_value=ratio_value,
+            reason="ratio_entry",
+            target_allocation=self.target_allocation / 2.0,
+            max_order_value=self.max_order_value,
+            leg="silver",
+            **extra,
+        )
         pair.mode = mode
         pair.entry_ratio = ratio_value
         pair.bars_held = 0
@@ -349,8 +413,36 @@ class GoldSilverRatioMeanReversionStrategy(Strategy):
             return
         strategy_id = self._pair_strategy_id()
         strategy_name = self._pair_strategy_name()
-        _emit_pair_leg(self.events, strategy_id=strategy_id, strategy_name=strategy_name, symbol=pair.gold, event_time=event_time, signal_type="EXIT", price=self._latest.get(pair.gold), ratio_value=ratio_value, reason=reason, target_allocation=self.target_allocation / 2.0, max_order_value=self.max_order_value, leg="gold", zscore=zscore)
-        _emit_pair_leg(self.events, strategy_id=strategy_id, strategy_name=strategy_name, symbol=pair.silver, event_time=event_time, signal_type="EXIT", price=self._latest.get(pair.silver), ratio_value=ratio_value, reason=reason, target_allocation=self.target_allocation / 2.0, max_order_value=self.max_order_value, leg="silver", zscore=zscore)
+        _emit_pair_leg(
+            self.events,
+            strategy_id=strategy_id,
+            strategy_name=strategy_name,
+            symbol=pair.gold,
+            event_time=event_time,
+            signal_type="EXIT",
+            price=self._latest.get(pair.gold),
+            ratio_value=ratio_value,
+            reason=reason,
+            target_allocation=self.target_allocation / 2.0,
+            max_order_value=self.max_order_value,
+            leg="gold",
+            zscore=zscore,
+        )
+        _emit_pair_leg(
+            self.events,
+            strategy_id=strategy_id,
+            strategy_name=strategy_name,
+            symbol=pair.silver,
+            event_time=event_time,
+            signal_type="EXIT",
+            price=self._latest.get(pair.silver),
+            ratio_value=ratio_value,
+            reason=reason,
+            target_allocation=self.target_allocation / 2.0,
+            max_order_value=self.max_order_value,
+            leg="silver",
+            zscore=zscore,
+        )
         pair.mode = "OUT"
         pair.entry_ratio = None
         pair.bars_held = 0
@@ -365,9 +457,13 @@ class GoldSilverRatioTrendStrategy(GoldSilverRatioMeanReversionStrategy):
         schema = dict(super().get_param_schema())
         schema.update(
             {
-                "breakout_lookback": HyperParam.integer("breakout_lookback", default=240, low=20, high=20000),
+                "breakout_lookback": HyperParam.integer(
+                    "breakout_lookback", default=240, low=20, high=20000
+                ),
                 "exit_lookback": HyperParam.integer("exit_lookback", default=80, low=5, high=10000),
-                "ratio_break_buffer": HyperParam.floating("ratio_break_buffer", default=0.001, low=0.0, high=0.20),
+                "ratio_break_buffer": HyperParam.floating(
+                    "ratio_break_buffer", default=0.001, low=0.0, high=0.20
+                ),
             }
         )
         return schema
@@ -392,7 +488,10 @@ class GoldSilverRatioTrendStrategy(GoldSilverRatioMeanReversionStrategy):
         if event_key:
             if pair.last_eval_key == event_key:
                 return
-            if self._last_seen.get(pair.gold) != event_key or self._last_seen.get(pair.silver) != event_key:
+            if (
+                self._last_seen.get(pair.gold) != event_key
+                or self._last_seen.get(pair.silver) != event_key
+            ):
                 return
             pair.last_eval_key = event_key
         ratio_value = _ratio(self._latest.get(pair.gold), self._latest.get(pair.silver))
@@ -405,11 +504,15 @@ class GoldSilverRatioTrendStrategy(GoldSilverRatioMeanReversionStrategy):
         prior_low = min(prior_ratios[-self.breakout_lookback :]) if enough_breakout else None
         exit_mid = None
         if enough_exit:
-            exit_mid = (max(prior_ratios[-self.exit_lookback :]) + min(prior_ratios[-self.exit_lookback :])) / 2.0
+            exit_mid = (
+                max(prior_ratios[-self.exit_lookback :]) + min(prior_ratios[-self.exit_lookback :])
+            ) / 2.0
         pair.ratios.append(ratio_value)
         if pair.mode != "OUT":
             pair.bars_held += 1
-            if (pair.mode == "LONG_RATIO" and exit_mid is not None and ratio_value < exit_mid) or (pair.mode == "SHORT_RATIO" and exit_mid is not None and ratio_value > exit_mid):
+            if (pair.mode == "LONG_RATIO" and exit_mid is not None and ratio_value < exit_mid) or (
+                pair.mode == "SHORT_RATIO" and exit_mid is not None and ratio_value > exit_mid
+            ):
                 self._exit_pair(event_time, ratio_value, 0.0, "ratio_mid_exit")
             elif pair.bars_held >= self.max_hold_bars:
                 self._exit_pair(event_time, ratio_value, 0.0, "max_hold")
@@ -435,19 +538,37 @@ class EquityMetalRiskRegimeRotationStrategy(Strategy):
             "metal_symbols": HyperParam.string("metal_symbols", default="", tunable=False),
             "gold_symbol": HyperParam.string("gold_symbol", default="", tunable=False),
             "silver_symbol": HyperParam.string("silver_symbol", default="", tunable=False),
-            "equity_benchmark_symbol": HyperParam.string("equity_benchmark_symbol", default="", tunable=False),
-            "momentum_lookback_bars": HyperParam.integer("momentum_lookback_bars", default=120, low=4, high=10080),
+            "equity_benchmark_symbol": HyperParam.string(
+                "equity_benchmark_symbol", default="", tunable=False
+            ),
+            "momentum_lookback_bars": HyperParam.integer(
+                "momentum_lookback_bars", default=120, low=4, high=10080
+            ),
             "vol_window": HyperParam.integer("vol_window", default=96, low=4, high=4096),
             "rebalance_bars": HyperParam.integer("rebalance_bars", default=24, low=1, high=10080),
-            "risk_off_return": HyperParam.floating("risk_off_return", default=-0.025, low=-1.0, high=0.0),
-            "risk_off_drawdown": HyperParam.floating("risk_off_drawdown", default=-0.060, low=-1.0, high=0.0),
-            "risk_on_return": HyperParam.floating("risk_on_return", default=0.006, low=-1.0, high=1.0),
+            "risk_off_return": HyperParam.floating(
+                "risk_off_return", default=-0.025, low=-1.0, high=0.0
+            ),
+            "risk_off_drawdown": HyperParam.floating(
+                "risk_off_drawdown", default=-0.060, low=-1.0, high=0.0
+            ),
+            "risk_on_return": HyperParam.floating(
+                "risk_on_return", default=0.006, low=-1.0, high=1.0
+            ),
             "max_longs": HyperParam.integer("max_longs", default=4, low=0, high=128),
-            "allow_equity_short_risk_off": HyperParam.boolean("allow_equity_short_risk_off", default=True, grid=[True, False]),
-            "stop_loss_pct": HyperParam.floating("stop_loss_pct", default=0.045, low=0.0, high=0.50),
+            "allow_equity_short_risk_off": HyperParam.boolean(
+                "allow_equity_short_risk_off", default=True, grid=[True, False]
+            ),
+            "stop_loss_pct": HyperParam.floating(
+                "stop_loss_pct", default=0.045, low=0.0, high=0.50
+            ),
             "max_hold_bars": HyperParam.integer("max_hold_bars", default=1440, low=1, high=200000),
-            "target_gross_exposure": HyperParam.floating("target_gross_exposure", default=0.45, low=0.0, high=5.0, tunable=False),
-            "max_order_value": HyperParam.floating("max_order_value", default=500.0, low=0.0, high=1_000_000.0, tunable=False),
+            "target_gross_exposure": HyperParam.floating(
+                "target_gross_exposure", default=0.45, low=0.0, high=5.0, tunable=False
+            ),
+            "max_order_value": HyperParam.floating(
+                "max_order_value", default=500.0, low=0.0, high=1_000_000.0, tunable=False
+            ),
             "min_price": HyperParam.floating("min_price", default=0.10, low=0.0, high=1_000_000.0),
         }
 
@@ -457,11 +578,19 @@ class EquityMetalRiskRegimeRotationStrategy(Strategy):
         self.symbol_list = list(getattr(self.bars, "symbol_list", []) or [])
         resolved = resolve_params_from_schema(self.get_param_schema(), params, keep_unknown=False)
         explicit_metals = _parse_symbols(str(resolved["metal_symbols"]), self.symbol_list)
-        auto_metals = _auto_metals(self.symbol_list, str(resolved["gold_symbol"]), str(resolved["silver_symbol"]))
+        auto_metals = _auto_metals(
+            self.symbol_list, str(resolved["gold_symbol"]), str(resolved["silver_symbol"])
+        )
         self.metal_symbols = explicit_metals or auto_metals
-        self.equity_symbols = _parse_symbols(str(resolved["equity_symbols"]), self.symbol_list) or _auto_equities(self.symbol_list, set(self.metal_symbols))
+        self.equity_symbols = _parse_symbols(
+            str(resolved["equity_symbols"]), self.symbol_list
+        ) or _auto_equities(self.symbol_list, set(self.metal_symbols))
         preferred_benchmark = str(resolved["equity_benchmark_symbol"] or "")
-        self.equity_benchmark_symbol = preferred_benchmark if preferred_benchmark in self.symbol_list else (self.equity_symbols[0] if self.equity_symbols else "")
+        self.equity_benchmark_symbol = (
+            preferred_benchmark
+            if preferred_benchmark in self.symbol_list
+            else (self.equity_symbols[0] if self.equity_symbols else "")
+        )
         self.momentum_lookback_bars = max(1, int(resolved["momentum_lookback_bars"]))
         self.vol_window = max(2, int(resolved["vol_window"]))
         self.rebalance_bars = max(1, int(resolved["rebalance_bars"]))
@@ -476,12 +605,19 @@ class EquityMetalRiskRegimeRotationStrategy(Strategy):
         self.max_order_value = max(0.0, float(resolved["max_order_value"]))
         self.min_price = max(0.0, float(resolved["min_price"]))
         size = _state_size(self.momentum_lookback_bars, self.vol_window, self.max_hold_bars)
-        self._state = {symbol: _CrossSectionalState(deque(maxlen=size), deque(maxlen=size)) for symbol in self.symbol_list}
+        self._state = {
+            symbol: _CrossSectionalState(deque(maxlen=size), deque(maxlen=size))
+            for symbol in self.symbol_list
+        }
         self._tick = 0
         self._last_eval_time_key = ""
 
     def get_state(self) -> dict[str, Any]:
-        return {"last_eval_time_key": self._last_eval_time_key, "tick": self._tick, "symbol_state": {symbol: _pack_cross(item) for symbol, item in self._state.items()}}
+        return {
+            "last_eval_time_key": self._last_eval_time_key,
+            "tick": self._tick,
+            "symbol_state": {symbol: _pack_cross(item) for symbol, item in self._state.items()},
+        }
 
     def set_state(self, state: dict[str, Any]) -> None:
         if not isinstance(state, dict):
@@ -538,14 +674,24 @@ class EquityMetalRiskRegimeRotationStrategy(Strategy):
 
     def _rebalance(self, event_time: Any) -> None:
         if self._tick % self.rebalance_bars:
-            _age_cross_positions(self.events, self._state, event_time=event_time, strategy_id="equity_metal_risk_regime_rotation", strategy_name="EquityMetalRiskRegimeRotationStrategy", stop_loss_pct=self.stop_loss_pct, max_hold_bars=self.max_hold_bars)
+            _age_cross_positions(
+                self.events,
+                self._state,
+                event_time=event_time,
+                strategy_id="equity_metal_risk_regime_rotation",
+                strategy_name="EquityMetalRiskRegimeRotationStrategy",
+                stop_loss_pct=self.stop_loss_pct,
+                max_hold_bars=self.max_hold_bars,
+            )
             return
         benchmark = self._state.get(self.equity_benchmark_symbol)
         if benchmark is None:
             return
         bench_ret = log_return(benchmark.closes, lookback=self.momentum_lookback_bars)
         bench_dd = drawdown_from_peak(benchmark.closes, window=self.momentum_lookback_bars)
-        risk_off = (bench_ret is not None and bench_ret <= self.risk_off_return) or (bench_dd is not None and bench_dd <= self.risk_off_drawdown)
+        risk_off = (bench_ret is not None and bench_ret <= self.risk_off_return) or (
+            bench_dd is not None and bench_dd <= self.risk_off_drawdown
+        )
         risk_on = bench_ret is not None and bench_ret >= self.risk_on_return and not risk_off
         rows: list[tuple[float, str, dict[str, Any]]] = []
         if risk_off:
@@ -557,12 +703,34 @@ class EquityMetalRiskRegimeRotationStrategy(Strategy):
                 vol = realized_volatility(item.closes, window=self.vol_window)
                 if mom is None or vol is None or vol <= _EPS:
                     continue
-                rows.append((mom / vol, symbol, {"regime": "risk_off", "momentum": mom, "realized_vol": vol, "benchmark_return": bench_ret, "benchmark_drawdown": bench_dd}))
+                rows.append(
+                    (
+                        mom / vol,
+                        symbol,
+                        {
+                            "regime": "risk_off",
+                            "momentum": mom,
+                            "realized_vol": vol,
+                            "benchmark_return": bench_ret,
+                            "benchmark_drawdown": bench_dd,
+                        },
+                    )
+                )
             if self.allow_equity_short_risk_off:
                 for symbol in self.equity_symbols[: self.max_longs]:
                     if symbol == self.equity_benchmark_symbol or symbol not in self._state:
                         continue
-                    rows.append((-1.0, symbol, {"regime": "risk_off_equity_hedge", "benchmark_return": bench_ret, "benchmark_drawdown": bench_dd}))
+                    rows.append(
+                        (
+                            -1.0,
+                            symbol,
+                            {
+                                "regime": "risk_off_equity_hedge",
+                                "benchmark_return": bench_ret,
+                                "benchmark_drawdown": bench_dd,
+                            },
+                        )
+                    )
         elif risk_on:
             for symbol in self.equity_symbols:
                 item = self._state.get(symbol)
@@ -572,9 +740,39 @@ class EquityMetalRiskRegimeRotationStrategy(Strategy):
                 vol = realized_volatility(item.closes, window=self.vol_window)
                 if mom is None or vol is None or vol <= _EPS or mom <= 0.0:
                     continue
-                rows.append((mom / vol, symbol, {"regime": "risk_on", "momentum": mom, "realized_vol": vol, "benchmark_return": bench_ret, "benchmark_drawdown": bench_dd}))
-        targets = _ranked_targets(rows, threshold=0.0, max_longs=self.max_longs, max_shorts=self.max_longs if risk_off and self.allow_equity_short_risk_off else 0, allow_short=True)
-        _emit_rebalance_targets(self.events, self._state, targets, event_time=event_time, strategy_id="equity_metal_risk_regime_rotation", strategy_name="EquityMetalRiskRegimeRotationStrategy", target_gross_exposure=self.target_gross_exposure, max_order_value=self.max_order_value, stop_loss_pct=self.stop_loss_pct, max_hold_bars=self.max_hold_bars, threshold=1.0)
+                rows.append(
+                    (
+                        mom / vol,
+                        symbol,
+                        {
+                            "regime": "risk_on",
+                            "momentum": mom,
+                            "realized_vol": vol,
+                            "benchmark_return": bench_ret,
+                            "benchmark_drawdown": bench_dd,
+                        },
+                    )
+                )
+        targets = _ranked_targets(
+            rows,
+            threshold=0.0,
+            max_longs=self.max_longs,
+            max_shorts=self.max_longs if risk_off and self.allow_equity_short_risk_off else 0,
+            allow_short=True,
+        )
+        _emit_rebalance_targets(
+            self.events,
+            self._state,
+            targets,
+            event_time=event_time,
+            strategy_id="equity_metal_risk_regime_rotation",
+            strategy_name="EquityMetalRiskRegimeRotationStrategy",
+            target_gross_exposure=self.target_gross_exposure,
+            max_order_value=self.max_order_value,
+            stop_loss_pct=self.stop_loss_pct,
+            max_hold_bars=self.max_hold_bars,
+            threshold=1.0,
+        )
 
 
 @register("strategy", "EquityBenchmarkResidualReversalStrategy", interface="event_driven")
@@ -598,10 +796,16 @@ class EquityBenchmarkResidualReversalStrategy(Strategy):
             "max_longs": HyperParam.integer("max_longs", default=4, low=0, high=128),
             "max_shorts": HyperParam.integer("max_shorts", default=4, low=0, high=128),
             "allow_short": HyperParam.boolean("allow_short", default=True, grid=[True, False]),
-            "stop_loss_pct": HyperParam.floating("stop_loss_pct", default=0.035, low=0.0, high=0.50),
+            "stop_loss_pct": HyperParam.floating(
+                "stop_loss_pct", default=0.035, low=0.0, high=0.50
+            ),
             "max_hold_bars": HyperParam.integer("max_hold_bars", default=96, low=1, high=100000),
-            "target_gross_exposure": HyperParam.floating("target_gross_exposure", default=0.36, low=0.0, high=5.0, tunable=False),
-            "max_order_value": HyperParam.floating("max_order_value", default=400.0, low=0.0, high=1_000_000.0, tunable=False),
+            "target_gross_exposure": HyperParam.floating(
+                "target_gross_exposure", default=0.36, low=0.0, high=5.0, tunable=False
+            ),
+            "max_order_value": HyperParam.floating(
+                "max_order_value", default=400.0, low=0.0, high=1_000_000.0, tunable=False
+            ),
             "min_price": HyperParam.floating("min_price", default=0.10, low=0.0, high=1_000_000.0),
         }
 
@@ -613,8 +817,16 @@ class EquityBenchmarkResidualReversalStrategy(Strategy):
         self.benchmark_symbol = str(resolved["benchmark_symbol"] or "")
         if self.benchmark_symbol not in self.symbol_list:
             equity_guess = _auto_equities(self.symbol_list, set())
-            self.benchmark_symbol = equity_guess[0] if equity_guess else (self.symbol_list[0] if self.symbol_list else "")
-        self.equity_symbols = _parse_symbols(str(resolved["equity_symbols"]), self.symbol_list) or [symbol for symbol in _auto_equities(self.symbol_list, set()) if symbol != self.benchmark_symbol]
+            self.benchmark_symbol = (
+                equity_guess[0]
+                if equity_guess
+                else (self.symbol_list[0] if self.symbol_list else "")
+            )
+        self.equity_symbols = _parse_symbols(str(resolved["equity_symbols"]), self.symbol_list) or [
+            symbol
+            for symbol in _auto_equities(self.symbol_list, set())
+            if symbol != self.benchmark_symbol
+        ]
         self.lookback_bars = max(1, int(resolved["lookback_bars"]))
         self.beta_window = max(3, int(resolved["beta_window"]))
         self.vol_window = max(2, int(resolved["vol_window"]))
@@ -628,13 +840,22 @@ class EquityBenchmarkResidualReversalStrategy(Strategy):
         self.target_gross_exposure = max(0.0, float(resolved["target_gross_exposure"]))
         self.max_order_value = max(0.0, float(resolved["max_order_value"]))
         self.min_price = max(0.0, float(resolved["min_price"]))
-        size = _state_size(self.lookback_bars, self.beta_window, self.vol_window, self.max_hold_bars)
-        self._state = {symbol: _CrossSectionalState(deque(maxlen=size), deque(maxlen=size)) for symbol in self.symbol_list}
+        size = _state_size(
+            self.lookback_bars, self.beta_window, self.vol_window, self.max_hold_bars
+        )
+        self._state = {
+            symbol: _CrossSectionalState(deque(maxlen=size), deque(maxlen=size))
+            for symbol in self.symbol_list
+        }
         self._tick = 0
         self._last_eval_time_key = ""
 
     def get_state(self) -> dict[str, Any]:
-        return {"last_eval_time_key": self._last_eval_time_key, "tick": self._tick, "symbol_state": {symbol: _pack_cross(item) for symbol, item in self._state.items()}}
+        return {
+            "last_eval_time_key": self._last_eval_time_key,
+            "tick": self._tick,
+            "symbol_state": {symbol: _pack_cross(item) for symbol, item in self._state.items()},
+        }
 
     def set_state(self, state: dict[str, Any]) -> None:
         if not isinstance(state, dict):
@@ -691,7 +912,15 @@ class EquityBenchmarkResidualReversalStrategy(Strategy):
 
     def _rebalance(self, event_time: Any) -> None:
         if self._tick % self.rebalance_bars:
-            _age_cross_positions(self.events, self._state, event_time=event_time, strategy_id="equity_benchmark_residual_reversal", strategy_name="EquityBenchmarkResidualReversalStrategy", stop_loss_pct=self.stop_loss_pct, max_hold_bars=self.max_hold_bars)
+            _age_cross_positions(
+                self.events,
+                self._state,
+                event_time=event_time,
+                strategy_id="equity_benchmark_residual_reversal",
+                strategy_name="EquityBenchmarkResidualReversalStrategy",
+                stop_loss_pct=self.stop_loss_pct,
+                max_hold_bars=self.max_hold_bars,
+            )
             return
         benchmark = self._state.get(self.benchmark_symbol)
         if benchmark is None:
@@ -711,9 +940,39 @@ class EquityBenchmarkResidualReversalStrategy(Strategy):
                 continue
             residual = raw_ret - beta * bench_ret
             score = -residual / max(vol, _EPS)
-            rows.append((float(score), symbol, {"raw_return": raw_ret, "benchmark_return": bench_ret, "beta": beta, "residual_return": residual, "realized_vol": vol}))
-        targets = _ranked_targets(rows, threshold=self.entry_score, max_longs=self.max_longs, max_shorts=self.max_shorts, allow_short=self.allow_short)
-        _emit_rebalance_targets(self.events, self._state, targets, event_time=event_time, strategy_id="equity_benchmark_residual_reversal", strategy_name="EquityBenchmarkResidualReversalStrategy", target_gross_exposure=self.target_gross_exposure, max_order_value=self.max_order_value, stop_loss_pct=self.stop_loss_pct, max_hold_bars=self.max_hold_bars, threshold=self.entry_score)
+            rows.append(
+                (
+                    float(score),
+                    symbol,
+                    {
+                        "raw_return": raw_ret,
+                        "benchmark_return": bench_ret,
+                        "beta": beta,
+                        "residual_return": residual,
+                        "realized_vol": vol,
+                    },
+                )
+            )
+        targets = _ranked_targets(
+            rows,
+            threshold=self.entry_score,
+            max_longs=self.max_longs,
+            max_shorts=self.max_shorts,
+            allow_short=self.allow_short,
+        )
+        _emit_rebalance_targets(
+            self.events,
+            self._state,
+            targets,
+            event_time=event_time,
+            strategy_id="equity_benchmark_residual_reversal",
+            strategy_name="EquityBenchmarkResidualReversalStrategy",
+            target_gross_exposure=self.target_gross_exposure,
+            max_order_value=self.max_order_value,
+            stop_loss_pct=self.stop_loss_pct,
+            max_hold_bars=self.max_hold_bars,
+            threshold=self.entry_score,
+        )
 
 
 @register("strategy", "MetalEquityDivergenceReversalStrategy", interface="event_driven")
@@ -732,12 +991,22 @@ class MetalEquityDivergenceReversalStrategy(Strategy):
             "gold_symbol": HyperParam.string("gold_symbol", default="", tunable=False),
             "silver_symbol": HyperParam.string("silver_symbol", default="", tunable=False),
             "lookback_bars": HyperParam.integer("lookback_bars", default=48, low=2, high=4096),
-            "divergence_threshold": HyperParam.floating("divergence_threshold", default=0.035, low=0.0, high=1.0),
-            "exit_threshold": HyperParam.floating("exit_threshold", default=0.008, low=0.0, high=1.0),
-            "stop_loss_pct": HyperParam.floating("stop_loss_pct", default=0.030, low=0.0, high=0.50),
+            "divergence_threshold": HyperParam.floating(
+                "divergence_threshold", default=0.035, low=0.0, high=1.0
+            ),
+            "exit_threshold": HyperParam.floating(
+                "exit_threshold", default=0.008, low=0.0, high=1.0
+            ),
+            "stop_loss_pct": HyperParam.floating(
+                "stop_loss_pct", default=0.030, low=0.0, high=0.50
+            ),
             "max_hold_bars": HyperParam.integer("max_hold_bars", default=240, low=1, high=100000),
-            "target_allocation": HyperParam.floating("target_allocation", default=0.012, low=0.0, high=2.0, tunable=False),
-            "max_order_value": HyperParam.floating("max_order_value", default=350.0, low=0.0, high=1_000_000.0, tunable=False),
+            "target_allocation": HyperParam.floating(
+                "target_allocation", default=0.012, low=0.0, high=2.0, tunable=False
+            ),
+            "max_order_value": HyperParam.floating(
+                "max_order_value", default=350.0, low=0.0, high=1_000_000.0, tunable=False
+            ),
             "min_price": HyperParam.floating("min_price", default=0.10, low=0.0, high=1_000_000.0),
         }
 
@@ -746,8 +1015,14 @@ class MetalEquityDivergenceReversalStrategy(Strategy):
         self.events = events
         self.symbol_list = list(getattr(self.bars, "symbol_list", []) or [])
         resolved = resolve_params_from_schema(self.get_param_schema(), params, keep_unknown=False)
-        self.metal_symbols = _parse_symbols(str(resolved["metal_symbols"]), self.symbol_list) or _auto_metals(self.symbol_list, str(resolved["gold_symbol"]), str(resolved["silver_symbol"]))
-        self.equity_symbols = _parse_symbols(str(resolved["equity_symbols"]), self.symbol_list) or _auto_equities(self.symbol_list, set(self.metal_symbols))
+        self.metal_symbols = _parse_symbols(
+            str(resolved["metal_symbols"]), self.symbol_list
+        ) or _auto_metals(
+            self.symbol_list, str(resolved["gold_symbol"]), str(resolved["silver_symbol"])
+        )
+        self.equity_symbols = _parse_symbols(
+            str(resolved["equity_symbols"]), self.symbol_list
+        ) or _auto_equities(self.symbol_list, set(self.metal_symbols))
         self.lookback_bars = max(1, int(resolved["lookback_bars"]))
         self.divergence_threshold = max(0.0, float(resolved["divergence_threshold"]))
         self.exit_threshold = max(0.0, float(resolved["exit_threshold"]))
@@ -757,22 +1032,28 @@ class MetalEquityDivergenceReversalStrategy(Strategy):
         self.max_order_value = max(0.0, float(resolved["max_order_value"]))
         self.min_price = max(0.0, float(resolved["min_price"]))
         size = _state_size(self.lookback_bars, self.max_hold_bars)
-        self._state = {symbol: _CrossSectionalState(deque(maxlen=size), deque(maxlen=size)) for symbol in self.symbol_list}
+        self._state = {
+            symbol: _CrossSectionalState(deque(maxlen=size), deque(maxlen=size))
+            for symbol in self.symbol_list
+        }
         self._mode = "OUT"
         self._bars_held = 0
         self._last_eval_time_key = ""
 
     def get_state(self) -> dict[str, Any]:
-        return {"mode": self._mode, "bars_held": self._bars_held, "last_eval_time_key": self._last_eval_time_key, "symbol_state": {symbol: _pack_cross(item) for symbol, item in self._state.items()}}
+        return {
+            "mode": self._mode,
+            "bars_held": self._bars_held,
+            "last_eval_time_key": self._last_eval_time_key,
+            "symbol_state": {symbol: _pack_cross(item) for symbol, item in self._state.items()},
+        }
 
     def set_state(self, state: dict[str, Any]) -> None:
         if not isinstance(state, dict):
             return
         mode = str(state.get("mode", "OUT")).upper()
         self._mode = (
-            mode
-            if mode in {"OUT", "SHORT_METAL_LONG_EQUITY", "LONG_METAL_SHORT_EQUITY"}
-            else "OUT"
+            mode if mode in {"OUT", "SHORT_METAL_LONG_EQUITY", "LONG_METAL_SHORT_EQUITY"} else "OUT"
         )
         self._bars_held = _safe_non_negative_int(state.get("bars_held"))
         self._last_eval_time_key = str(state.get("last_eval_time_key", ""))
@@ -835,16 +1116,35 @@ class MetalEquityDivergenceReversalStrategy(Strategy):
             return None
         return float(sum(returns) / len(returns))
 
-    def _emit_group(self, event_time: Any, symbols: list[str], signal_type: str, reason: str, divergence: float) -> None:
+    def _emit_group(
+        self, event_time: Any, symbols: list[str], signal_type: str, reason: str, divergence: float
+    ) -> None:
         per_symbol_alloc = self.target_allocation / max(1, len(symbols))
         for symbol in symbols:
             item = self._state.get(symbol)
             price = item.closes[-1] if item and item.closes else None
             stop_loss = None
             if price is not None and self.stop_loss_pct > 0.0 and signal_type in {"LONG", "SHORT"}:
-                stop_loss = price * (1.0 - self.stop_loss_pct if signal_type == "LONG" else 1.0 + self.stop_loss_pct)
-            metadata = _target_metadata(strategy="MetalEquityDivergenceReversalStrategy", target_allocation=per_symbol_alloc, max_order_value=self.max_order_value, reason=reason, divergence=divergence)
-            _emit(self.events, strategy_id="metal_equity_divergence_reversal", symbol=symbol, event_time=event_time, signal_type=signal_type, price=price, stop_loss=stop_loss, metadata=metadata)
+                stop_loss = price * (
+                    1.0 - self.stop_loss_pct if signal_type == "LONG" else 1.0 + self.stop_loss_pct
+                )
+            metadata = _target_metadata(
+                strategy="MetalEquityDivergenceReversalStrategy",
+                target_allocation=per_symbol_alloc,
+                max_order_value=self.max_order_value,
+                reason=reason,
+                divergence=divergence,
+            )
+            _emit(
+                self.events,
+                strategy_id="metal_equity_divergence_reversal",
+                symbol=symbol,
+                event_time=event_time,
+                signal_type=signal_type,
+                price=price,
+                stop_loss=stop_loss,
+                metadata=metadata,
+            )
 
     def _evaluate(self, event_time: Any) -> None:
         metal_ret = self._basket_return(self.metal_symbols)
@@ -855,18 +1155,32 @@ class MetalEquityDivergenceReversalStrategy(Strategy):
         if self._mode != "OUT":
             self._bars_held += 1
             if abs(divergence) <= self.exit_threshold or self._bars_held >= self.max_hold_bars:
-                self._emit_group(event_time, self.metal_symbols + self.equity_symbols, "EXIT", "divergence_closed" if abs(divergence) <= self.exit_threshold else "max_hold", divergence)
+                self._emit_group(
+                    event_time,
+                    self.metal_symbols + self.equity_symbols,
+                    "EXIT",
+                    "divergence_closed" if abs(divergence) <= self.exit_threshold else "max_hold",
+                    divergence,
+                )
                 self._mode = "OUT"
                 self._bars_held = 0
             return
         if divergence >= self.divergence_threshold:
-            self._emit_group(event_time, self.metal_symbols, "SHORT", "metal_outperformance_fade", divergence)
-            self._emit_group(event_time, self.equity_symbols, "LONG", "equity_underperformance_fade", divergence)
+            self._emit_group(
+                event_time, self.metal_symbols, "SHORT", "metal_outperformance_fade", divergence
+            )
+            self._emit_group(
+                event_time, self.equity_symbols, "LONG", "equity_underperformance_fade", divergence
+            )
             self._mode = "SHORT_METAL_LONG_EQUITY"
             self._bars_held = 0
         elif divergence <= -self.divergence_threshold:
-            self._emit_group(event_time, self.metal_symbols, "LONG", "metal_underperformance_fade", divergence)
-            self._emit_group(event_time, self.equity_symbols, "SHORT", "equity_outperformance_fade", divergence)
+            self._emit_group(
+                event_time, self.metal_symbols, "LONG", "metal_underperformance_fade", divergence
+            )
+            self._emit_group(
+                event_time, self.equity_symbols, "SHORT", "equity_outperformance_fade", divergence
+            )
             self._mode = "LONG_METAL_SHORT_EQUITY"
             self._bars_held = 0
 

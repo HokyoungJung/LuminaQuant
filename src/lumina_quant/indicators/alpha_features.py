@@ -144,7 +144,9 @@ def volatility_ratio(
     return float(fast / slow)
 
 
-def trend_efficiency(values: Sequence[float] | Iterable[float], *, window: int = 64) -> float | None:
+def trend_efficiency(
+    values: Sequence[float] | Iterable[float], *, window: int = 64
+) -> float | None:
     """Return Kaufman-style trend efficiency in ``[0, 1]``."""
     vals = finite_floats(values)
     win = max(2, int(window))
@@ -177,7 +179,9 @@ def range_zscore(
     n = min(len(hi), len(lo), len(cl))
     if n < max(4, int(window) + 1):
         return None
-    ranges = [max(0.0, hi[-n + idx] - lo[-n + idx]) / max(abs(cl[-n + idx]), _EPS) for idx in range(n)]
+    ranges = [
+        max(0.0, hi[-n + idx] - lo[-n + idx]) / max(abs(cl[-n + idx]), _EPS) for idx in range(n)
+    ]
     return rolling_zscore(ranges, window=max(3, int(window)), history_excludes_latest=True)
 
 
@@ -246,7 +250,9 @@ def amihud_illiquidity(
     return float(sum(values) / len(values) * max(1.0, float(scale)))
 
 
-def drawdown_from_peak(values: Sequence[float] | Iterable[float], *, window: int = 64) -> float | None:
+def drawdown_from_peak(
+    values: Sequence[float] | Iterable[float], *, window: int = 64
+) -> float | None:
     """Return latest drawdown from trailing peak as a negative or zero fraction."""
     vals = finite_floats(values)
     win = max(2, int(window))

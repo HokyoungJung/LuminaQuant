@@ -369,7 +369,7 @@ def _load_feature_frame(
         if "unexpected keyword argument" not in str(exc):
             raise
         return pl.DataFrame()
-    except (FileNotFoundError, OSError, RuntimeError, ValueError):
+    except FileNotFoundError, OSError, RuntimeError, ValueError:
         return pl.DataFrame()
 
 
@@ -7159,7 +7159,7 @@ def _load_partitioned_1m_frame(
         if end_dt is not None:
             lazy = lazy.filter(pl.col("datetime") <= end_dt.replace(tzinfo=None))
         frame = lazy.collect().sort("datetime")
-    except (FileNotFoundError, OSError, RuntimeError, ValueError):
+    except FileNotFoundError, OSError, RuntimeError, ValueError:
         frame = pl.DataFrame()
     raw_cache[cache_key] = frame
     return frame
@@ -7272,7 +7272,7 @@ def _load_timeframe_parquet_frames(
         if "unexpected keyword argument" not in str(exc):
             raise
         return {}
-    except (FileNotFoundError, OSError, RuntimeError, ValueError):
+    except FileNotFoundError, OSError, RuntimeError, ValueError:
         return {}
 
 
@@ -7316,7 +7316,7 @@ def _load_csv_bundle(
             continue
         try:
             frame_csv = _read_csv_ohlcv(csv_path)
-        except (FileNotFoundError, OSError, RuntimeError, ValueError):
+        except FileNotFoundError, OSError, RuntimeError, ValueError:
             frame_csv = pl.DataFrame()
         frame_csv = _filter_csv_frame_date_bounds(
             frame_csv,

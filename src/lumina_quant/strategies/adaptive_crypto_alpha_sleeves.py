@@ -98,7 +98,9 @@ def _ranked_targets(
     allow_short: bool,
 ) -> dict[str, tuple[str, float, dict[str, Any]]]:
     targets: dict[str, tuple[str, float, dict[str, Any]]] = {}
-    long_rows = [row for row in sorted(rows, key=lambda item: item[0], reverse=True) if row[0] >= threshold]
+    long_rows = [
+        row for row in sorted(rows, key=lambda item: item[0], reverse=True) if row[0] >= threshold
+    ]
     short_rows: list[tuple[float, str, dict[str, Any]]] = []
     if allow_short:
         short_rows = [row for row in sorted(rows, key=lambda item: item[0]) if row[0] <= -threshold]
@@ -159,7 +161,9 @@ def _emit_rebalance_targets(
             )
         stop_loss = None
         if price is not None and stop_loss_pct > 0.0:
-            stop_loss = price * (1.0 - stop_loss_pct if target_mode == "LONG" else 1.0 + stop_loss_pct)
+            stop_loss = price * (
+                1.0 - stop_loss_pct if target_mode == "LONG" else 1.0 + stop_loss_pct
+            )
         metadata = _target_metadata(
             strategy=strategy_name,
             target_allocation=max(0.0, base_alloc),
@@ -256,19 +260,37 @@ class BenchmarkLeadLagContinuationStrategy(Strategy):
     @classmethod
     def get_param_schema(cls) -> dict[str, HyperParam]:
         return {
-            "benchmark_symbol": HyperParam.string("benchmark_symbol", default="BTC/USDT", tunable=False),
-            "leader_lookback_bars": HyperParam.integer("leader_lookback_bars", default=6, low=1, high=4096),
-            "follower_lookback_bars": HyperParam.integer("follower_lookback_bars", default=3, low=1, high=4096),
-            "leader_threshold": HyperParam.floating("leader_threshold", default=0.006, low=0.0, high=1.0),
-            "max_follower_move": HyperParam.floating("max_follower_move", default=0.010, low=0.0, high=1.0),
+            "benchmark_symbol": HyperParam.string(
+                "benchmark_symbol", default="BTC/USDT", tunable=False
+            ),
+            "leader_lookback_bars": HyperParam.integer(
+                "leader_lookback_bars", default=6, low=1, high=4096
+            ),
+            "follower_lookback_bars": HyperParam.integer(
+                "follower_lookback_bars", default=3, low=1, high=4096
+            ),
+            "leader_threshold": HyperParam.floating(
+                "leader_threshold", default=0.006, low=0.0, high=1.0
+            ),
+            "max_follower_move": HyperParam.floating(
+                "max_follower_move", default=0.010, low=0.0, high=1.0
+            ),
             "min_volume_z": HyperParam.floating("min_volume_z", default=-0.5, low=-5.0, high=20.0),
             "volume_window": HyperParam.integer("volume_window", default=96, low=8, high=4096),
             "allow_short": HyperParam.boolean("allow_short", default=True, grid=[True, False]),
-            "stop_loss_pct": HyperParam.floating("stop_loss_pct", default=0.025, low=0.0, high=0.50),
-            "take_profit_pct": HyperParam.floating("take_profit_pct", default=0.055, low=0.0, high=1.0),
+            "stop_loss_pct": HyperParam.floating(
+                "stop_loss_pct", default=0.025, low=0.0, high=0.50
+            ),
+            "take_profit_pct": HyperParam.floating(
+                "take_profit_pct", default=0.055, low=0.0, high=1.0
+            ),
             "max_hold_bars": HyperParam.integer("max_hold_bars", default=120, low=1, high=100000),
-            "target_allocation": HyperParam.floating("target_allocation", default=0.010, low=0.0, high=2.0, tunable=False),
-            "max_order_value": HyperParam.floating("max_order_value", default=250.0, low=0.0, high=1_000_000.0, tunable=False),
+            "target_allocation": HyperParam.floating(
+                "target_allocation", default=0.010, low=0.0, high=2.0, tunable=False
+            ),
+            "max_order_value": HyperParam.floating(
+                "max_order_value", default=250.0, low=0.0, high=1_000_000.0, tunable=False
+            ),
             "min_price": HyperParam.floating("min_price", default=0.10, low=0.0, high=1_000_000.0),
         }
 
@@ -277,7 +299,9 @@ class BenchmarkLeadLagContinuationStrategy(Strategy):
         self.events = events
         self.symbol_list = list(getattr(self.bars, "symbol_list", []) or [])
         resolved = resolve_params_from_schema(self.get_param_schema(), params, keep_unknown=False)
-        self.benchmark_symbol = _default_benchmark(self.symbol_list, str(resolved["benchmark_symbol"]))
+        self.benchmark_symbol = _default_benchmark(
+            self.symbol_list, str(resolved["benchmark_symbol"])
+        )
         self.leader_lookback_bars = max(1, int(resolved["leader_lookback_bars"]))
         self.follower_lookback_bars = max(1, int(resolved["follower_lookback_bars"]))
         self.leader_threshold = max(0.0, float(resolved["leader_threshold"]))
@@ -291,8 +315,16 @@ class BenchmarkLeadLagContinuationStrategy(Strategy):
         self.target_allocation = max(0.0, float(resolved["target_allocation"]))
         self.max_order_value = max(0.0, float(resolved["max_order_value"]))
         self.min_price = max(0.0, float(resolved["min_price"]))
-        size = _state_size(self.leader_lookback_bars, self.follower_lookback_bars, self.volume_window, self.max_hold_bars)
-        self._state = {symbol: _LeadLagState(deque(maxlen=size), deque(maxlen=size)) for symbol in self.symbol_list}
+        size = _state_size(
+            self.leader_lookback_bars,
+            self.follower_lookback_bars,
+            self.volume_window,
+            self.max_hold_bars,
+        )
+        self._state = {
+            symbol: _LeadLagState(deque(maxlen=size), deque(maxlen=size))
+            for symbol in self.symbol_list
+        }
         self._last_eval_time_key = ""
 
     def get_state(self) -> dict[str, Any]:
@@ -369,7 +401,9 @@ class BenchmarkLeadLagContinuationStrategy(Strategy):
         item.volumes.append(max(0.0, float(snapshot.volume or 0.0)))
         return True
 
-    def _exit_if_needed(self, symbol: str, item: _LeadLagState, event_time: Any, leader_ret: float | None) -> None:
+    def _exit_if_needed(
+        self, symbol: str, item: _LeadLagState, event_time: Any, leader_ret: float | None
+    ) -> None:
         if item.mode == "OUT":
             return
         price = item.closes[-1] if item.closes else None
@@ -377,16 +411,24 @@ class BenchmarkLeadLagContinuationStrategy(Strategy):
         reason = ""
         if price is not None and item.entry_price is not None:
             if item.mode == "LONG":
-                if self.stop_loss_pct > 0.0 and price <= item.entry_price * (1.0 - self.stop_loss_pct):
+                if self.stop_loss_pct > 0.0 and price <= item.entry_price * (
+                    1.0 - self.stop_loss_pct
+                ):
                     reason = "stop_loss"
-                elif self.take_profit_pct > 0.0 and price >= item.entry_price * (1.0 + self.take_profit_pct):
+                elif self.take_profit_pct > 0.0 and price >= item.entry_price * (
+                    1.0 + self.take_profit_pct
+                ):
                     reason = "take_profit"
                 elif leader_ret is not None and leader_ret < 0.0:
                     reason = "leader_reversed"
             elif item.mode == "SHORT":
-                if self.stop_loss_pct > 0.0 and price >= item.entry_price * (1.0 + self.stop_loss_pct):
+                if self.stop_loss_pct > 0.0 and price >= item.entry_price * (
+                    1.0 + self.stop_loss_pct
+                ):
                     reason = "stop_loss"
-                elif self.take_profit_pct > 0.0 and price <= item.entry_price * (1.0 - self.take_profit_pct):
+                elif self.take_profit_pct > 0.0 and price <= item.entry_price * (
+                    1.0 - self.take_profit_pct
+                ):
                     reason = "take_profit"
                 elif leader_ret is not None and leader_ret > 0.0:
                     reason = "leader_reversed"
@@ -394,7 +436,19 @@ class BenchmarkLeadLagContinuationStrategy(Strategy):
             reason = "max_hold"
         if not reason:
             return
-        _emit(self.events, strategy_id="benchmark_lead_lag_continuation", symbol=symbol, event_time=event_time, signal_type="EXIT", price=price, metadata={"strategy": "BenchmarkLeadLagContinuationStrategy", "reason": reason, "leader_return": leader_ret})
+        _emit(
+            self.events,
+            strategy_id="benchmark_lead_lag_continuation",
+            symbol=symbol,
+            event_time=event_time,
+            signal_type="EXIT",
+            price=price,
+            metadata={
+                "strategy": "BenchmarkLeadLagContinuationStrategy",
+                "reason": reason,
+                "leader_return": leader_ret,
+            },
+        )
         item.mode = "OUT"
         item.entry_price = None
         item.bars_held = 0
@@ -421,7 +475,11 @@ class BenchmarkLeadLagContinuationStrategy(Strategy):
             signal_type = ""
             if leader_ret >= self.leader_threshold and follower_ret <= self.max_follower_move:
                 signal_type = "LONG"
-            elif self.allow_short and leader_ret <= -self.leader_threshold and follower_ret >= -self.max_follower_move:
+            elif (
+                self.allow_short
+                and leader_ret <= -self.leader_threshold
+                and follower_ret >= -self.max_follower_move
+            ):
                 signal_type = "SHORT"
             if not signal_type:
                 continue
@@ -429,9 +487,15 @@ class BenchmarkLeadLagContinuationStrategy(Strategy):
             stop_loss = None
             take_profit = None
             if price is not None and self.stop_loss_pct > 0.0:
-                stop_loss = price * (1.0 - self.stop_loss_pct if signal_type == "LONG" else 1.0 + self.stop_loss_pct)
+                stop_loss = price * (
+                    1.0 - self.stop_loss_pct if signal_type == "LONG" else 1.0 + self.stop_loss_pct
+                )
             if price is not None and self.take_profit_pct > 0.0:
-                take_profit = price * (1.0 + self.take_profit_pct if signal_type == "LONG" else 1.0 - self.take_profit_pct)
+                take_profit = price * (
+                    1.0 + self.take_profit_pct
+                    if signal_type == "LONG"
+                    else 1.0 - self.take_profit_pct
+                )
             metadata = _target_metadata(
                 strategy="BenchmarkLeadLagContinuationStrategy",
                 target_allocation=self.target_allocation,
@@ -442,7 +506,18 @@ class BenchmarkLeadLagContinuationStrategy(Strategy):
                 volume_z=vol_z,
                 target_mode=signal_type,
             )
-            _emit(self.events, strategy_id="benchmark_lead_lag_continuation", symbol=symbol, event_time=event_time, signal_type=signal_type, strength=max(0.25, min(3.0, abs(leader_ret) / max(self.leader_threshold, _EPS))), price=price, stop_loss=stop_loss, take_profit=take_profit, metadata=metadata)
+            _emit(
+                self.events,
+                strategy_id="benchmark_lead_lag_continuation",
+                symbol=symbol,
+                event_time=event_time,
+                signal_type=signal_type,
+                strength=max(0.25, min(3.0, abs(leader_ret) / max(self.leader_threshold, _EPS))),
+                price=price,
+                stop_loss=stop_loss,
+                take_profit=take_profit,
+                metadata=metadata,
+            )
             item.mode = signal_type
             item.entry_price = price
             item.bars_held = 0
@@ -459,19 +534,31 @@ class ResidualMomentumRotationStrategy(_CrossSectionPackingMixin, Strategy):
     @classmethod
     def get_param_schema(cls) -> dict[str, HyperParam]:
         return {
-            "benchmark_symbol": HyperParam.string("benchmark_symbol", default="BTC/USDT", tunable=False),
-            "momentum_lookback_bars": HyperParam.integer("momentum_lookback_bars", default=168, low=4, high=10080),
+            "benchmark_symbol": HyperParam.string(
+                "benchmark_symbol", default="BTC/USDT", tunable=False
+            ),
+            "momentum_lookback_bars": HyperParam.integer(
+                "momentum_lookback_bars", default=168, low=4, high=10080
+            ),
             "beta_window": HyperParam.integer("beta_window", default=240, low=20, high=20000),
             "vol_window": HyperParam.integer("vol_window", default=96, low=4, high=4096),
             "rebalance_bars": HyperParam.integer("rebalance_bars", default=24, low=1, high=10080),
-            "signal_threshold": HyperParam.floating("signal_threshold", default=0.30, low=0.0, high=20.0),
+            "signal_threshold": HyperParam.floating(
+                "signal_threshold", default=0.30, low=0.0, high=20.0
+            ),
             "max_longs": HyperParam.integer("max_longs", default=3, low=0, high=128),
             "max_shorts": HyperParam.integer("max_shorts", default=3, low=0, high=128),
             "allow_short": HyperParam.boolean("allow_short", default=True, grid=[True, False]),
-            "stop_loss_pct": HyperParam.floating("stop_loss_pct", default=0.050, low=0.0, high=0.50),
+            "stop_loss_pct": HyperParam.floating(
+                "stop_loss_pct", default=0.050, low=0.0, high=0.50
+            ),
             "max_hold_bars": HyperParam.integer("max_hold_bars", default=1440, low=1, high=200000),
-            "target_gross_exposure": HyperParam.floating("target_gross_exposure", default=0.42, low=0.0, high=5.0, tunable=False),
-            "max_order_value": HyperParam.floating("max_order_value", default=500.0, low=0.0, high=1_000_000.0, tunable=False),
+            "target_gross_exposure": HyperParam.floating(
+                "target_gross_exposure", default=0.42, low=0.0, high=5.0, tunable=False
+            ),
+            "max_order_value": HyperParam.floating(
+                "max_order_value", default=500.0, low=0.0, high=1_000_000.0, tunable=False
+            ),
             "min_price": HyperParam.floating("min_price", default=0.10, low=0.0, high=1_000_000.0),
         }
 
@@ -480,7 +567,9 @@ class ResidualMomentumRotationStrategy(_CrossSectionPackingMixin, Strategy):
         self.events = events
         self.symbol_list = list(getattr(self.bars, "symbol_list", []) or [])
         resolved = resolve_params_from_schema(self.get_param_schema(), params, keep_unknown=False)
-        self.benchmark_symbol = _default_benchmark(self.symbol_list, str(resolved["benchmark_symbol"]))
+        self.benchmark_symbol = _default_benchmark(
+            self.symbol_list, str(resolved["benchmark_symbol"])
+        )
         self.momentum_lookback_bars = max(1, int(resolved["momentum_lookback_bars"]))
         self.beta_window = max(3, int(resolved["beta_window"]))
         self.vol_window = max(2, int(resolved["vol_window"]))
@@ -494,13 +583,24 @@ class ResidualMomentumRotationStrategy(_CrossSectionPackingMixin, Strategy):
         self.target_gross_exposure = max(0.0, float(resolved["target_gross_exposure"]))
         self.max_order_value = max(0.0, float(resolved["max_order_value"]))
         self.min_price = max(0.0, float(resolved["min_price"]))
-        size = _state_size(self.momentum_lookback_bars, self.beta_window, self.vol_window, self.max_hold_bars)
-        self._state = {symbol: _CrossSectionalState(deque(maxlen=size), deque(maxlen=size)) for symbol in self.symbol_list}
+        size = _state_size(
+            self.momentum_lookback_bars, self.beta_window, self.vol_window, self.max_hold_bars
+        )
+        self._state = {
+            symbol: _CrossSectionalState(deque(maxlen=size), deque(maxlen=size))
+            for symbol in self.symbol_list
+        }
         self._last_eval_time_key = ""
         self._tick = 0
 
     def get_state(self) -> dict[str, Any]:
-        return {"last_eval_time_key": self._last_eval_time_key, "tick": self._tick, "symbol_state": {symbol: self._pack_state(item) for symbol, item in self._state.items()}}
+        return {
+            "last_eval_time_key": self._last_eval_time_key,
+            "tick": self._tick,
+            "symbol_state": {
+                symbol: self._pack_state(item) for symbol, item in self._state.items()
+            },
+        }
 
     def set_state(self, state: dict[str, Any]) -> None:
         if not isinstance(state, dict):
@@ -573,7 +673,19 @@ class ResidualMomentumRotationStrategy(_CrossSectionPackingMixin, Strategy):
                 continue
             residual = raw_ret - beta * bench_ret
             score = residual / max(vol, _EPS)
-            rows.append((float(score), symbol, {"raw_return": raw_ret, "benchmark_return": bench_ret, "beta": beta, "residual_return": residual, "realized_vol": vol}))
+            rows.append(
+                (
+                    float(score),
+                    symbol,
+                    {
+                        "raw_return": raw_ret,
+                        "benchmark_return": bench_ret,
+                        "beta": beta,
+                        "residual_return": residual,
+                        "realized_vol": vol,
+                    },
+                )
+            )
         return rows
 
     def _rebalance(self, event_time: Any) -> None:
@@ -588,8 +700,26 @@ class ResidualMomentumRotationStrategy(_CrossSectionPackingMixin, Strategy):
                 max_hold_bars=self.max_hold_bars,
             )
             return
-        targets = _ranked_targets(self._score_rows(), threshold=self.signal_threshold, max_longs=self.max_longs, max_shorts=self.max_shorts, allow_short=self.allow_short)
-        _emit_rebalance_targets(self.events, self._state, targets, event_time=event_time, strategy_id="residual_momentum_rotation", strategy_name="ResidualMomentumRotationStrategy", target_gross_exposure=self.target_gross_exposure, max_order_value=self.max_order_value, stop_loss_pct=self.stop_loss_pct, max_hold_bars=self.max_hold_bars, threshold=self.signal_threshold)
+        targets = _ranked_targets(
+            self._score_rows(),
+            threshold=self.signal_threshold,
+            max_longs=self.max_longs,
+            max_shorts=self.max_shorts,
+            allow_short=self.allow_short,
+        )
+        _emit_rebalance_targets(
+            self.events,
+            self._state,
+            targets,
+            event_time=event_time,
+            strategy_id="residual_momentum_rotation",
+            strategy_name="ResidualMomentumRotationStrategy",
+            target_gross_exposure=self.target_gross_exposure,
+            max_order_value=self.max_order_value,
+            stop_loss_pct=self.stop_loss_pct,
+            max_hold_bars=self.max_hold_bars,
+            threshold=self.signal_threshold,
+        )
 
 
 @register("strategy", "LowVolatilityMomentumStrategy", interface="event_driven")
@@ -603,16 +733,24 @@ class LowVolatilityMomentumStrategy(_CrossSectionPackingMixin, Strategy):
     @classmethod
     def get_param_schema(cls) -> dict[str, HyperParam]:
         return {
-            "momentum_lookback_bars": HyperParam.integer("momentum_lookback_bars", default=168, low=4, high=10080),
+            "momentum_lookback_bars": HyperParam.integer(
+                "momentum_lookback_bars", default=168, low=4, high=10080
+            ),
             "vol_window": HyperParam.integer("vol_window", default=96, low=4, high=4096),
             "rebalance_bars": HyperParam.integer("rebalance_bars", default=24, low=1, high=10080),
             "min_momentum": HyperParam.floating("min_momentum", default=0.004, low=-1.0, high=1.0),
             "max_vol_rank": HyperParam.floating("max_vol_rank", default=0.50, low=0.05, high=1.0),
             "max_longs": HyperParam.integer("max_longs", default=4, low=0, high=128),
-            "stop_loss_pct": HyperParam.floating("stop_loss_pct", default=0.045, low=0.0, high=0.50),
+            "stop_loss_pct": HyperParam.floating(
+                "stop_loss_pct", default=0.045, low=0.0, high=0.50
+            ),
             "max_hold_bars": HyperParam.integer("max_hold_bars", default=1440, low=1, high=200000),
-            "target_gross_exposure": HyperParam.floating("target_gross_exposure", default=0.40, low=0.0, high=5.0, tunable=False),
-            "max_order_value": HyperParam.floating("max_order_value", default=500.0, low=0.0, high=1_000_000.0, tunable=False),
+            "target_gross_exposure": HyperParam.floating(
+                "target_gross_exposure", default=0.40, low=0.0, high=5.0, tunable=False
+            ),
+            "max_order_value": HyperParam.floating(
+                "max_order_value", default=500.0, low=0.0, high=1_000_000.0, tunable=False
+            ),
             "min_price": HyperParam.floating("min_price", default=0.10, low=0.0, high=1_000_000.0),
         }
 
@@ -633,12 +771,21 @@ class LowVolatilityMomentumStrategy(_CrossSectionPackingMixin, Strategy):
         self.max_order_value = max(0.0, float(resolved["max_order_value"]))
         self.min_price = max(0.0, float(resolved["min_price"]))
         size = _state_size(self.momentum_lookback_bars, self.vol_window, self.max_hold_bars)
-        self._state = {symbol: _CrossSectionalState(deque(maxlen=size), deque(maxlen=size)) for symbol in self.symbol_list}
+        self._state = {
+            symbol: _CrossSectionalState(deque(maxlen=size), deque(maxlen=size))
+            for symbol in self.symbol_list
+        }
         self._last_eval_time_key = ""
         self._tick = 0
 
     def get_state(self) -> dict[str, Any]:
-        return {"last_eval_time_key": self._last_eval_time_key, "tick": self._tick, "symbol_state": {symbol: self._pack_state(item) for symbol, item in self._state.items()}}
+        return {
+            "last_eval_time_key": self._last_eval_time_key,
+            "tick": self._tick,
+            "symbol_state": {
+                symbol: self._pack_state(item) for symbol, item in self._state.items()
+            },
+        }
 
     def set_state(self, state: dict[str, Any]) -> None:
         if not isinstance(state, dict):
@@ -721,9 +868,33 @@ class LowVolatilityMomentumStrategy(_CrossSectionPackingMixin, Strategy):
             if mom < self.min_momentum:
                 continue
             score = mom / max(vol, _EPS)
-            rows.append((float(score), symbol, {"momentum": mom, "realized_vol": vol, "vol_rank_bucket": "low"}))
-        targets = _ranked_targets(rows, threshold=max(abs(self.min_momentum), _EPS), max_longs=self.max_longs, max_shorts=0, allow_short=False)
-        _emit_rebalance_targets(self.events, self._state, targets, event_time=event_time, strategy_id="low_volatility_momentum", strategy_name="LowVolatilityMomentumStrategy", target_gross_exposure=self.target_gross_exposure, max_order_value=self.max_order_value, stop_loss_pct=self.stop_loss_pct, max_hold_bars=self.max_hold_bars, threshold=max(abs(self.min_momentum), _EPS))
+            rows.append(
+                (
+                    float(score),
+                    symbol,
+                    {"momentum": mom, "realized_vol": vol, "vol_rank_bucket": "low"},
+                )
+            )
+        targets = _ranked_targets(
+            rows,
+            threshold=max(abs(self.min_momentum), _EPS),
+            max_longs=self.max_longs,
+            max_shorts=0,
+            allow_short=False,
+        )
+        _emit_rebalance_targets(
+            self.events,
+            self._state,
+            targets,
+            event_time=event_time,
+            strategy_id="low_volatility_momentum",
+            strategy_name="LowVolatilityMomentumStrategy",
+            target_gross_exposure=self.target_gross_exposure,
+            max_order_value=self.max_order_value,
+            stop_loss_pct=self.stop_loss_pct,
+            max_hold_bars=self.max_hold_bars,
+            threshold=max(abs(self.min_momentum), _EPS),
+        )
 
 
 @register("strategy", "NearHighMomentumStrategy", interface="event_driven")
@@ -737,16 +908,26 @@ class NearHighMomentumStrategy(_StatePackingMixin, Strategy):
     @classmethod
     def get_param_schema(cls) -> dict[str, HyperParam]:
         return {
-            "high_lookback_bars": HyperParam.integer("high_lookback_bars", default=720, low=20, high=50000),
-            "momentum_lookback_bars": HyperParam.integer("momentum_lookback_bars", default=168, low=4, high=10080),
+            "high_lookback_bars": HyperParam.integer(
+                "high_lookback_bars", default=720, low=20, high=50000
+            ),
+            "momentum_lookback_bars": HyperParam.integer(
+                "momentum_lookback_bars", default=168, low=4, high=10080
+            ),
             "rebalance_bars": HyperParam.integer("rebalance_bars", default=24, low=1, high=10080),
             "near_high_pct": HyperParam.floating("near_high_pct", default=0.06, low=0.0, high=1.0),
             "min_momentum": HyperParam.floating("min_momentum", default=0.006, low=-1.0, high=1.0),
             "max_longs": HyperParam.integer("max_longs", default=4, low=0, high=128),
-            "stop_loss_pct": HyperParam.floating("stop_loss_pct", default=0.055, low=0.0, high=0.50),
+            "stop_loss_pct": HyperParam.floating(
+                "stop_loss_pct", default=0.055, low=0.0, high=0.50
+            ),
             "max_hold_bars": HyperParam.integer("max_hold_bars", default=2880, low=1, high=200000),
-            "target_gross_exposure": HyperParam.floating("target_gross_exposure", default=0.40, low=0.0, high=5.0, tunable=False),
-            "max_order_value": HyperParam.floating("max_order_value", default=500.0, low=0.0, high=1_000_000.0, tunable=False),
+            "target_gross_exposure": HyperParam.floating(
+                "target_gross_exposure", default=0.40, low=0.0, high=5.0, tunable=False
+            ),
+            "max_order_value": HyperParam.floating(
+                "max_order_value", default=500.0, low=0.0, high=1_000_000.0, tunable=False
+            ),
             "min_price": HyperParam.floating("min_price", default=0.10, low=0.0, high=1_000_000.0),
         }
 
@@ -767,12 +948,28 @@ class NearHighMomentumStrategy(_StatePackingMixin, Strategy):
         self.max_order_value = max(0.0, float(resolved["max_order_value"]))
         self.min_price = max(0.0, float(resolved["min_price"]))
         size = _state_size(self.high_lookback_bars, self.momentum_lookback_bars, self.max_hold_bars)
-        self._state = {symbol: _ChannelState(deque(maxlen=size), deque(maxlen=size), deque(maxlen=size), deque(maxlen=size), deque(maxlen=size), deque(maxlen=size)) for symbol in self.symbol_list}
+        self._state = {
+            symbol: _ChannelState(
+                deque(maxlen=size),
+                deque(maxlen=size),
+                deque(maxlen=size),
+                deque(maxlen=size),
+                deque(maxlen=size),
+                deque(maxlen=size),
+            )
+            for symbol in self.symbol_list
+        }
         self._last_eval_time_key = ""
         self._tick = 0
 
     def get_state(self) -> dict[str, Any]:
-        return {"last_eval_time_key": self._last_eval_time_key, "tick": self._tick, "symbol_state": {symbol: self._pack_channel_state(item) for symbol, item in self._state.items()}}
+        return {
+            "last_eval_time_key": self._last_eval_time_key,
+            "tick": self._tick,
+            "symbol_state": {
+                symbol: self._pack_channel_state(item) for symbol, item in self._state.items()
+            },
+        }
 
     def set_state(self, state: dict[str, Any]) -> None:
         if not isinstance(state, dict):
@@ -829,7 +1026,10 @@ class NearHighMomentumStrategy(_StatePackingMixin, Strategy):
             return
         rows: list[tuple[float, str, dict[str, Any]]] = []
         for symbol, item in self._state.items():
-            if len(item.highs) < self.high_lookback_bars or len(item.closes) <= self.momentum_lookback_bars:
+            if (
+                len(item.highs) < self.high_lookback_bars
+                or len(item.closes) <= self.momentum_lookback_bars
+            ):
                 continue
             close = item.closes[-1]
             trailing_high = max(list(item.highs)[-self.high_lookback_bars :])
@@ -840,13 +1040,48 @@ class NearHighMomentumStrategy(_StatePackingMixin, Strategy):
             if momentum is None or momentum < self.min_momentum or distance < -self.near_high_pct:
                 continue
             score = momentum + max(-self.near_high_pct, distance)
-            rows.append((float(score), symbol, {"momentum": momentum, "distance_to_high": distance, "trailing_high": trailing_high}))
-        targets = _ranked_targets(rows, threshold=max(self.min_momentum * 0.5, _EPS), max_longs=self.max_longs, max_shorts=0, allow_short=False)
+            rows.append(
+                (
+                    float(score),
+                    symbol,
+                    {
+                        "momentum": momentum,
+                        "distance_to_high": distance,
+                        "trailing_high": trailing_high,
+                    },
+                )
+            )
+        targets = _ranked_targets(
+            rows,
+            threshold=max(self.min_momentum * 0.5, _EPS),
+            max_longs=self.max_longs,
+            max_shorts=0,
+            allow_short=False,
+        )
         proxy_state = {
-            symbol: _CrossSectionalState(item.closes, item.volumes, item.mode, item.entry_price, item.bars_held, item.last_time_key)
+            symbol: _CrossSectionalState(
+                item.closes,
+                item.volumes,
+                item.mode,
+                item.entry_price,
+                item.bars_held,
+                item.last_time_key,
+            )
             for symbol, item in self._state.items()
         }
-        _emit_rebalance_targets(self.events, proxy_state, targets, event_time=event_time, strategy_id="near_high_momentum", strategy_name="NearHighMomentumStrategy", target_gross_exposure=self.target_gross_exposure, max_order_value=self.max_order_value, stop_loss_pct=self.stop_loss_pct, max_hold_bars=self.max_hold_bars, threshold=max(self.min_momentum * 0.5, _EPS))
+        _emit_rebalance_targets(
+            self.events,
+            proxy_state,
+            targets,
+            event_time=event_time,
+            strategy_id="near_high_momentum",
+            strategy_name="NearHighMomentumStrategy",
+            target_gross_exposure=self.target_gross_exposure,
+            max_order_value=self.max_order_value,
+            stop_loss_pct=self.stop_loss_pct,
+            max_hold_bars=self.max_hold_bars,
+            threshold=max(self.min_momentum * 0.5, _EPS),
+        )
         for symbol, proxy in proxy_state.items():
             item = self._state[symbol]
             item.mode = proxy.mode
@@ -865,17 +1100,31 @@ class FalseBreakoutReversalStrategy(_StatePackingMixin, Strategy):
     @classmethod
     def get_param_schema(cls) -> dict[str, HyperParam]:
         return {
-            "channel_lookback": HyperParam.integer("channel_lookback", default=96, low=4, high=10080),
-            "break_buffer_pct": HyperParam.floating("break_buffer_pct", default=0.002, low=0.0, high=0.20),
+            "channel_lookback": HyperParam.integer(
+                "channel_lookback", default=96, low=4, high=10080
+            ),
+            "break_buffer_pct": HyperParam.floating(
+                "break_buffer_pct", default=0.002, low=0.0, high=0.20
+            ),
             "min_volume_z": HyperParam.floating("min_volume_z", default=0.8, low=-5.0, high=20.0),
             "volume_window": HyperParam.integer("volume_window", default=96, low=8, high=4096),
-            "max_trend_efficiency": HyperParam.floating("max_trend_efficiency", default=0.65, low=0.0, high=1.0),
-            "stop_loss_pct": HyperParam.floating("stop_loss_pct", default=0.020, low=0.0, high=0.50),
-            "take_profit_pct": HyperParam.floating("take_profit_pct", default=0.040, low=0.0, high=1.0),
+            "max_trend_efficiency": HyperParam.floating(
+                "max_trend_efficiency", default=0.65, low=0.0, high=1.0
+            ),
+            "stop_loss_pct": HyperParam.floating(
+                "stop_loss_pct", default=0.020, low=0.0, high=0.50
+            ),
+            "take_profit_pct": HyperParam.floating(
+                "take_profit_pct", default=0.040, low=0.0, high=1.0
+            ),
             "allow_short": HyperParam.boolean("allow_short", default=True, grid=[True, False]),
             "max_hold_bars": HyperParam.integer("max_hold_bars", default=96, low=1, high=100000),
-            "target_allocation": HyperParam.floating("target_allocation", default=0.010, low=0.0, high=2.0, tunable=False),
-            "max_order_value": HyperParam.floating("max_order_value", default=250.0, low=0.0, high=1_000_000.0, tunable=False),
+            "target_allocation": HyperParam.floating(
+                "target_allocation", default=0.010, low=0.0, high=2.0, tunable=False
+            ),
+            "max_order_value": HyperParam.floating(
+                "max_order_value", default=250.0, low=0.0, high=1_000_000.0, tunable=False
+            ),
             "min_price": HyperParam.floating("min_price", default=0.10, low=0.0, high=1_000_000.0),
         }
 
@@ -897,10 +1146,24 @@ class FalseBreakoutReversalStrategy(_StatePackingMixin, Strategy):
         self.max_order_value = max(0.0, float(resolved["max_order_value"]))
         self.min_price = max(0.0, float(resolved["min_price"]))
         size = _state_size(self.channel_lookback, self.volume_window, self.max_hold_bars)
-        self._state = {symbol: _ChannelState(deque(maxlen=size), deque(maxlen=size), deque(maxlen=size), deque(maxlen=size), deque(maxlen=size), deque(maxlen=size)) for symbol in self.symbol_list}
+        self._state = {
+            symbol: _ChannelState(
+                deque(maxlen=size),
+                deque(maxlen=size),
+                deque(maxlen=size),
+                deque(maxlen=size),
+                deque(maxlen=size),
+                deque(maxlen=size),
+            )
+            for symbol in self.symbol_list
+        }
 
     def get_state(self) -> dict[str, Any]:
-        return {"symbol_state": {symbol: self._pack_channel_state(item) for symbol, item in self._state.items()}}
+        return {
+            "symbol_state": {
+                symbol: self._pack_channel_state(item) for symbol, item in self._state.items()
+            }
+        }
 
     def set_state(self, state: dict[str, Any]) -> None:
         raw = state.get("symbol_state") if isinstance(state, dict) else None
@@ -937,18 +1200,30 @@ class FalseBreakoutReversalStrategy(_StatePackingMixin, Strategy):
         if item.mode == "LONG":
             if self.stop_loss_pct > 0.0 and close <= item.entry_price * (1.0 - self.stop_loss_pct):
                 reason = "stop_loss"
-            elif self.take_profit_pct > 0.0 and close >= item.entry_price * (1.0 + self.take_profit_pct):
+            elif self.take_profit_pct > 0.0 and close >= item.entry_price * (
+                1.0 + self.take_profit_pct
+            ):
                 reason = "take_profit"
         else:
             if self.stop_loss_pct > 0.0 and close >= item.entry_price * (1.0 + self.stop_loss_pct):
                 reason = "stop_loss"
-            elif self.take_profit_pct > 0.0 and close <= item.entry_price * (1.0 - self.take_profit_pct):
+            elif self.take_profit_pct > 0.0 and close <= item.entry_price * (
+                1.0 - self.take_profit_pct
+            ):
                 reason = "take_profit"
         if not reason and item.bars_held >= self.max_hold_bars:
             reason = "max_hold"
         if not reason:
             return
-        _emit(self.events, strategy_id="false_breakout_reversal", symbol=symbol, event_time=snapshot.time, signal_type="EXIT", price=close, metadata={"strategy": "FalseBreakoutReversalStrategy", "reason": reason})
+        _emit(
+            self.events,
+            strategy_id="false_breakout_reversal",
+            symbol=symbol,
+            event_time=snapshot.time,
+            signal_type="EXIT",
+            price=close,
+            metadata={"strategy": "FalseBreakoutReversalStrategy", "reason": reason},
+        )
         item.mode = "OUT"
         item.entry_price = None
         item.bars_held = 0
@@ -970,16 +1245,47 @@ class FalseBreakoutReversalStrategy(_StatePackingMixin, Strategy):
         self._exit_if_needed(symbol, item, snapshot)
         if item.mode == "OUT" and ready and prior_upper is not None and prior_lower is not None:
             vol_z = volume_zscore(item.volumes, window=self.volume_window)
-            eff = trend_efficiency(item.closes, window=min(self.channel_lookback, max(3, self.volume_window)))
-            if (vol_z is None or vol_z >= self.min_volume_z) and (eff is None or eff <= self.max_trend_efficiency):
+            eff = trend_efficiency(
+                item.closes, window=min(self.channel_lookback, max(3, self.volume_window))
+            )
+            if (vol_z is None or vol_z >= self.min_volume_z) and (
+                eff is None or eff <= self.max_trend_efficiency
+            ):
                 signal_type = ""
-                if high is not None and high > prior_upper * (1.0 + self.break_buffer_pct) and close < prior_upper and self.allow_short:
+                if (
+                    high is not None
+                    and high > prior_upper * (1.0 + self.break_buffer_pct)
+                    and close < prior_upper
+                    and self.allow_short
+                ):
                     signal_type = "SHORT"
-                elif low is not None and low < prior_lower * (1.0 - self.break_buffer_pct) and close > prior_lower:
+                elif (
+                    low is not None
+                    and low < prior_lower * (1.0 - self.break_buffer_pct)
+                    and close > prior_lower
+                ):
                     signal_type = "LONG"
                 if signal_type:
-                    stop_loss = close * (1.0 - self.stop_loss_pct if signal_type == "LONG" else 1.0 + self.stop_loss_pct) if self.stop_loss_pct > 0.0 else None
-                    take_profit = close * (1.0 + self.take_profit_pct if signal_type == "LONG" else 1.0 - self.take_profit_pct) if self.take_profit_pct > 0.0 else None
+                    stop_loss = (
+                        close
+                        * (
+                            1.0 - self.stop_loss_pct
+                            if signal_type == "LONG"
+                            else 1.0 + self.stop_loss_pct
+                        )
+                        if self.stop_loss_pct > 0.0
+                        else None
+                    )
+                    take_profit = (
+                        close
+                        * (
+                            1.0 + self.take_profit_pct
+                            if signal_type == "LONG"
+                            else 1.0 - self.take_profit_pct
+                        )
+                        if self.take_profit_pct > 0.0
+                        else None
+                    )
                     metadata = _target_metadata(
                         strategy="FalseBreakoutReversalStrategy",
                         target_allocation=self.target_allocation,
@@ -990,7 +1296,18 @@ class FalseBreakoutReversalStrategy(_StatePackingMixin, Strategy):
                         trend_efficiency=eff,
                         target_mode=signal_type,
                     )
-                    _emit(self.events, strategy_id="false_breakout_reversal", symbol=symbol, event_time=snapshot.time, signal_type=signal_type, strength=1.0, price=close, stop_loss=stop_loss, take_profit=take_profit, metadata=metadata)
+                    _emit(
+                        self.events,
+                        strategy_id="false_breakout_reversal",
+                        symbol=symbol,
+                        event_time=snapshot.time,
+                        signal_type=signal_type,
+                        strength=1.0,
+                        price=close,
+                        stop_loss=stop_loss,
+                        take_profit=take_profit,
+                        metadata=metadata,
+                    )
                     item.mode = signal_type
                     item.entry_price = close
                     item.bars_held = 0

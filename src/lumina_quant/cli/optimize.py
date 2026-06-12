@@ -811,7 +811,7 @@ def _execute_backtest(
             "num_trades": int(getattr(backtest.portfolio, "trade_count", 0)),
             "no_data": no_data,
         }
-    except (RawFirstDataMissingError, RawFirstManifestInvalidError, RawFirstStaleWindowError):
+    except RawFirstDataMissingError, RawFirstManifestInvalidError, RawFirstStaleWindowError:
         raise
     except InsufficientWarmupError:
         # Requested warmup context is unavailable — a loud failure by contract,

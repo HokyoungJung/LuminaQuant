@@ -177,7 +177,13 @@ class TradingEngine(ABC):
                 should_process = True
         if should_process:
             self._assert_strategy_requirements(
-                available_inputs={"market_event", "data_handler", "execution_handler", "exchange"},
+                available_inputs={
+                    "market_event",
+                    "ohlcv",
+                    "data_handler",
+                    "execution_handler",
+                    "exchange",
+                },
                 feature_lookup=getattr(self.data_handler, "_feature_lookup", None),
             )
             self.strategy.calculate_signals(event)
@@ -208,6 +214,7 @@ class TradingEngine(ABC):
                 self._assert_strategy_requirements(
                     available_inputs={
                         "market_event",
+                        "ohlcv",
                         "data_handler",
                         "execution_handler",
                         "exchange",
@@ -383,7 +390,13 @@ class TradingEngine(ABC):
             )
             window_fn = getattr(self.strategy, "calculate_signals_window", None)
             context_fn = getattr(self.strategy, "calculate_signals_context", None)
-            available_inputs = {"market_window", "data_handler", "execution_handler", "exchange"}
+            available_inputs = {
+                "market_window",
+                "ohlcv",
+                "data_handler",
+                "execution_handler",
+                "exchange",
+            }
             if aggregator is not None:
                 available_inputs.add("aggregator")
             if callable(context_fn):

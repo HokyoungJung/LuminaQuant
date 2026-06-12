@@ -24,7 +24,6 @@ from lumina_quant.indicators.futures_fast import (
 )
 from lumina_quant.indicators.rare_event import rare_event_scores_latest
 from lumina_quant.indicators.volatility import bollinger_bandwidth, choppiness_index
-from lumina_quant.indicators.vwap import rolling_vwap, vwap_deviation
 from lumina_quant.symbols import canonical_symbol
 
 _METALS = frozenset({"XAU/USDT", "XAG/USDT", "XPT/USDT", "XPD/USDT"})
@@ -91,14 +90,70 @@ def _rolling_bandwidth_series(closes: np.ndarray, *, window: int) -> np.ndarray:
     win = max(8, int(window))
     if closes.size < win:
         return np.asarray([], dtype=float)
-    out: list[float] = []
-    for idx in range(win, closes.size + 1):
-        value = bollinger_bandwidth(closes[:idx], window=win)
-        if value is None or not math.isfinite(float(value)):
-            out.append(float("nan"))
-        else:
-            out.append(float(value))
-    return np.asarray(out, dtype=float)
+    values = np.asarray(closes, dtype=float)
+    finite = np.isfinite(values)
+    safe = np.where(finite, values, 0.0)
+    sums = np.r_[0.0, np.cumsum(safe)]
+    sums_sq = np.r_[0.0, np.cumsum(safe * safe)]
+    counts = np.r_[0, np.cumsum(finite.astype(np.int64))]
+
+    window_sums = sums[win:] - sums[:-win]
+    window_sums_sq = sums_sq[win:] - sums_sq[:-win]
+    window_counts = counts[win:] - counts[:-win]
+
+    out = np.full(window_sums.shape, np.nan, dtype=float)
+    valid = window_counts == win
+    if not np.any(valid):
+        return out
+
+    means = window_sums[valid] / float(win)
+    variances = (
+        window_sums_sq[valid] - (window_sums[valid] * window_sums[valid] / float(win))
+    ) / float(win - 1)
+    valid_values = (np.abs(means) > 1e-12) & (variances > 0.0)
+    computed = np.full(means.shape, np.nan, dtype=float)
+    computed[valid_values] = (4.0 * np.sqrt(variances[valid_values])) / means[valid_values]
+    out[valid] = computed
+    return out
+
+
+def _rolling_vwap_deviation_series(
+    typical: np.ndarray,
+    closes: np.ndarray,
+    volumes: np.ndarray,
+    *,
+    window: int,
+) -> np.ndarray:
+    win = max(2, int(window))
+    n = min(typical.size, closes.size, volumes.size)
+    if n < win:
+        return np.asarray([], dtype=float)
+
+    typical = np.asarray(typical[-n:], dtype=float)
+    closes = np.asarray(closes[-n:], dtype=float)
+    weights = np.clip(np.asarray(volumes[-n:], dtype=float), 0.0, np.inf)
+    finite = np.isfinite(typical) & np.isfinite(closes) & np.isfinite(weights)
+    safe_weights = np.where(finite, weights, 0.0)
+    safe_notional = np.where(finite, typical * safe_weights, 0.0)
+
+    volume_sums = np.r_[0.0, np.cumsum(safe_weights)]
+    notional_sums = np.r_[0.0, np.cumsum(safe_notional)]
+    counts = np.r_[0, np.cumsum(finite.astype(np.int64))]
+
+    window_volume = volume_sums[win:] - volume_sums[:-win]
+    window_notional = notional_sums[win:] - notional_sums[:-win]
+    window_counts = counts[win:] - counts[:-win]
+    close_tail = closes[win - 1 :]
+
+    out = np.full(window_volume.shape, np.nan, dtype=float)
+    valid = (window_counts == win) & (window_volume > 1e-12) & np.isfinite(close_tail)
+    if np.any(valid):
+        vwap = window_notional[valid] / window_volume[valid]
+        positive = vwap > 1e-12
+        computed = np.full(vwap.shape, np.nan, dtype=float)
+        computed[positive] = (close_tail[valid][positive] / vwap[positive]) - 1.0
+        out[valid] = computed
+    return out
 
 
 def pv_trend_score(
@@ -279,17 +334,10 @@ def volcomp_vwap_pressure(
     closes = closes[-n:]
     volumes = np.clip(volumes[-n:], 0.0, np.inf)
 
-    typical = (highs + lows + closes) / 3.0
-    vwap_val = rolling_vwap(typical, volumes, window=max(8, int(vwap_window)))
-    deviation = vwap_deviation(float(closes[-1]), vwap_val)
-
-    dev_hist: list[float] = []
     vw = max(8, int(vwap_window))
-    for idx in range(vw, n + 1):
-        vwap_i = rolling_vwap(typical[:idx], volumes[:idx], window=vw)
-        dev_i = vwap_deviation(float(closes[idx - 1]), vwap_i)
-        dev_hist.append(float(dev_i if dev_i is not None else 0.0))
-    dev_arr = np.asarray(dev_hist, dtype=float)
+    typical = (highs + lows + closes) / 3.0
+    dev_arr = _rolling_vwap_deviation_series(typical, closes, volumes, window=vw)
+    deviation = float(dev_arr[-1]) if dev_arr.size and math.isfinite(float(dev_arr[-1])) else None
     dev_z = _latest_zscore(dev_arr, window=max(16, int(z_window)))
 
     bw = bollinger_bandwidth(closes, window=max(8, int(bandwidth_window)))

@@ -149,7 +149,7 @@ def to_series(value, index: pd.Index) -> pd.Series:
         try:
             scalar_arr = np.asarray(value, dtype=float)
             scalar = float(scalar_arr.reshape(-1)[0]) if scalar_arr.size > 0 else float("nan")
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             scalar = float("nan")
         return pd.Series(scalar, index=index, dtype=float)
     arr = np.asarray(list(value), dtype=float)
@@ -168,7 +168,7 @@ def as_window(value) -> int:
         return 1
     try:
         return max(1, int(float(value)))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return 1
 
 

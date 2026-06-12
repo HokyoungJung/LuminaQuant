@@ -260,9 +260,7 @@ class LiquidityShockReversionStrategy(Strategy):
             "volume_shock_z": HyperParam.floating(
                 "volume_shock_z", default=2.0, low=0.0, high=20.0
             ),
-            "range_shock_z": HyperParam.floating(
-                "range_shock_z", default=1.5, low=0.0, high=20.0
-            ),
+            "range_shock_z": HyperParam.floating("range_shock_z", default=1.5, low=0.0, high=20.0),
             "return_shock_pct": HyperParam.floating(
                 "return_shock_pct", default=0.012, low=0.0, high=0.50
             ),
@@ -325,7 +323,9 @@ class LiquidityShockReversionStrategy(Strategy):
         }
 
     def get_state(self) -> dict[str, Any]:
-        return {"symbol_state": {symbol: self._pack_state(item) for symbol, item in self._state.items()}}
+        return {
+            "symbol_state": {symbol: self._pack_state(item) for symbol, item in self._state.items()}
+        }
 
     @staticmethod
     def _pack_state(item: _SingleAssetState) -> dict[str, Any]:
@@ -413,7 +413,9 @@ class LiquidityShockReversionStrategy(Strategy):
                 reason = "stop_loss"
             elif item.target_price is not None and close >= item.target_price:
                 reason = "reversion_target"
-            elif self.take_profit_pct > 0.0 and close >= item.entry_price * (1.0 + self.take_profit_pct):
+            elif self.take_profit_pct > 0.0 and close >= item.entry_price * (
+                1.0 + self.take_profit_pct
+            ):
                 reason = "take_profit"
             elif (
                 self.trailing_exit_pct > 0.0
@@ -427,7 +429,9 @@ class LiquidityShockReversionStrategy(Strategy):
                 reason = "stop_loss"
             elif item.target_price is not None and close <= item.target_price:
                 reason = "reversion_target"
-            elif self.take_profit_pct > 0.0 and close <= item.entry_price * (1.0 - self.take_profit_pct):
+            elif self.take_profit_pct > 0.0 and close <= item.entry_price * (
+                1.0 - self.take_profit_pct
+            ):
                 reason = "take_profit"
             elif (
                 self.trailing_exit_pct > 0.0
@@ -480,7 +484,11 @@ class LiquidityShockReversionStrategy(Strategy):
         rng_z = range_zscore(item.highs, item.lows, item.closes, window=self.range_window)
         if vol_z is None or rng_z is None:
             return
-        if abs(ret) < self.return_shock_pct or vol_z < self.volume_shock_z or rng_z < self.range_shock_z:
+        if (
+            abs(ret) < self.return_shock_pct
+            or vol_z < self.volume_shock_z
+            or rng_z < self.range_shock_z
+        ):
             return
         if ret < 0.0:
             signal_type = "LONG"
@@ -497,7 +505,9 @@ class LiquidityShockReversionStrategy(Strategy):
             strategy="LiquidityShockReversionStrategy",
             target_allocation=self.target_allocation,
             max_order_value=self.max_order_value,
-            reason="downside_liquidity_shock" if signal_type == "LONG" else "upside_liquidity_shock",
+            reason="downside_liquidity_shock"
+            if signal_type == "LONG"
+            else "upside_liquidity_shock",
             shock_return=float(ret),
             volume_z=float(vol_z),
             range_z=float(rng_z),
@@ -603,13 +613,16 @@ class VolManagedMomentumCrashGateStrategy(Strategy):
         if self.btc_symbol not in self.symbol_list:
             self.btc_symbol = default_btc
         self.min_price = max(0.0, float(resolved["min_price"]))
-        size = max(
-            self.momentum_lookback_bars,
-            self.vol_window,
-            self.crash_window_bars,
-            self.vol_ratio_window,
-            self.max_hold_bars,
-        ) + 8
+        size = (
+            max(
+                self.momentum_lookback_bars,
+                self.vol_window,
+                self.crash_window_bars,
+                self.vol_ratio_window,
+                self.max_hold_bars,
+            )
+            + 8
+        )
         self._state = {
             symbol: _RotationState(closes=deque(maxlen=size)) for symbol in self.symbol_list
         }
@@ -732,13 +745,17 @@ class VolManagedMomentumCrashGateStrategy(Strategy):
         if vr is not None and self.vol_ratio_max > 0.0 and vr >= self.vol_ratio_max:
             crash = True
         multiplier = self.stress_reduce if crash else 1.0
-        return crash, multiplier, {
-            "benchmark_symbol": self.btc_symbol,
-            "benchmark_return": ret,
-            "benchmark_drawdown": drawdown,
-            "benchmark_vol_ratio": vr,
-            "stress_multiplier": multiplier,
-        }
+        return (
+            crash,
+            multiplier,
+            {
+                "benchmark_symbol": self.btc_symbol,
+                "benchmark_return": ret,
+                "benchmark_drawdown": drawdown,
+                "benchmark_vol_ratio": vr,
+                "stress_multiplier": multiplier,
+            },
+        )
 
     def _rebalance(self, event_time: Any) -> None:
         if self._tick % self.rebalance_bars:
@@ -852,7 +869,9 @@ class VolManagedMomentumCrashGateStrategy(Strategy):
                 )
             stop_loss = None
             if close is not None and self.stop_loss_pct > 0.0:
-                stop_loss = close * (1.0 - self.stop_loss_pct if target_mode == "LONG" else 1.0 + self.stop_loss_pct)
+                stop_loss = close * (
+                    1.0 - self.stop_loss_pct if target_mode == "LONG" else 1.0 + self.stop_loss_pct
+                )
             metadata = _target_metadata(
                 strategy="VolManagedMomentumCrashGateStrategy",
                 target_allocation=max(0.0, float(alloc)),
@@ -968,14 +987,17 @@ class FundingDislocationTrendCarryStrategy(Strategy):
         self.max_hold_bars = max(1, int(resolved["max_hold_bars"]))
         self.allow_short = bool(resolved["allow_short"])
         self.min_price = max(0.0, float(resolved["min_price"]))
-        size = max(
-            self.fast_lookback_bars,
-            self.mid_lookback_bars,
-            self.slow_lookback_bars,
-            self.vol_window,
-            self.crowding_window,
-            self.max_hold_bars,
-        ) + 8
+        size = (
+            max(
+                self.fast_lookback_bars,
+                self.mid_lookback_bars,
+                self.slow_lookback_bars,
+                self.vol_window,
+                self.crowding_window,
+                self.max_hold_bars,
+            )
+            + 8
+        )
         self._state = {
             symbol: _CarryState(
                 closes=deque(maxlen=size),
@@ -1279,7 +1301,9 @@ class FundingDislocationTrendCarryStrategy(Strategy):
                 )
             stop_loss = None
             if close is not None and self.stop_loss_pct > 0.0:
-                stop_loss = close * (1.0 - self.stop_loss_pct if target_mode == "LONG" else 1.0 + self.stop_loss_pct)
+                stop_loss = close * (
+                    1.0 - self.stop_loss_pct if target_mode == "LONG" else 1.0 + self.stop_loss_pct
+                )
             alloc = min(self.max_abs_exposure, max(0.0, base_alloc * min(2.0, abs(score))))
             metadata = _target_metadata(
                 strategy="FundingDislocationTrendCarryStrategy",
@@ -1377,7 +1401,10 @@ class OpeningRangeContinuationStrategy(Strategy):
         self.target_allocation = max(0.0, float(resolved["target_allocation"]))
         self.max_order_value = max(0.0, float(resolved["max_order_value"]))
         self.min_price = max(0.0, float(resolved["min_price"]))
-        size = max(self.volume_window, self.vol_window, self.opening_range_bars, self.max_hold_bars) + 8
+        size = (
+            max(self.volume_window, self.vol_window, self.opening_range_bars, self.max_hold_bars)
+            + 8
+        )
         self._state = {
             symbol: _SingleAssetState(
                 opens=deque(maxlen=size),
@@ -1508,7 +1535,9 @@ class OpeningRangeContinuationStrategy(Strategy):
             item.high_watermark = max(float(item.high_watermark or close), close)
             if self.stop_loss_pct > 0.0 and close <= item.entry_price * (1.0 - self.stop_loss_pct):
                 reason = "stop_loss"
-            elif self.take_profit_pct > 0.0 and close >= item.entry_price * (1.0 + self.take_profit_pct):
+            elif self.take_profit_pct > 0.0 and close >= item.entry_price * (
+                1.0 + self.take_profit_pct
+            ):
                 reason = "take_profit"
             elif (
                 self.trailing_exit_pct > 0.0
@@ -1520,7 +1549,9 @@ class OpeningRangeContinuationStrategy(Strategy):
             item.low_watermark = min(float(item.low_watermark or close), close)
             if self.stop_loss_pct > 0.0 and close >= item.entry_price * (1.0 + self.stop_loss_pct):
                 reason = "stop_loss"
-            elif self.take_profit_pct > 0.0 and close <= item.entry_price * (1.0 - self.take_profit_pct):
+            elif self.take_profit_pct > 0.0 and close <= item.entry_price * (
+                1.0 - self.take_profit_pct
+            ):
                 reason = "take_profit"
             elif (
                 self.trailing_exit_pct > 0.0
@@ -1571,12 +1602,24 @@ class OpeningRangeContinuationStrategy(Strategy):
         lower_break = float(item.session_low) * (1.0 - self.breakout_buffer_pct)
         if opening_ret > 0.0 and float(snapshot.close) > upper_break:
             signal_type = "LONG"
-            stop_loss = snapshot.close * (1.0 - self.stop_loss_pct) if self.stop_loss_pct > 0.0 else None
-            take_profit = snapshot.close * (1.0 + self.take_profit_pct) if self.take_profit_pct > 0.0 else None
+            stop_loss = (
+                snapshot.close * (1.0 - self.stop_loss_pct) if self.stop_loss_pct > 0.0 else None
+            )
+            take_profit = (
+                snapshot.close * (1.0 + self.take_profit_pct)
+                if self.take_profit_pct > 0.0
+                else None
+            )
         elif self.allow_short and float(snapshot.close) < lower_break:
             signal_type = "SHORT"
-            stop_loss = snapshot.close * (1.0 + self.stop_loss_pct) if self.stop_loss_pct > 0.0 else None
-            take_profit = snapshot.close * (1.0 - self.take_profit_pct) if self.take_profit_pct > 0.0 else None
+            stop_loss = (
+                snapshot.close * (1.0 + self.stop_loss_pct) if self.stop_loss_pct > 0.0 else None
+            )
+            take_profit = (
+                snapshot.close * (1.0 - self.take_profit_pct)
+                if self.take_profit_pct > 0.0
+                else None
+            )
         else:
             return
         metadata = _target_metadata(
@@ -1598,7 +1641,9 @@ class OpeningRangeContinuationStrategy(Strategy):
             symbol=symbol,
             event_time=snapshot.time,
             signal_type=signal_type,
-            strength=min(3.0, max(0.25, abs(opening_ret) / max(self.opening_return_threshold, _EPS))),
+            strength=min(
+                3.0, max(0.25, abs(opening_ret) / max(self.opening_return_threshold, _EPS))
+            ),
             price=snapshot.close,
             stop_loss=stop_loss,
             take_profit=take_profit,

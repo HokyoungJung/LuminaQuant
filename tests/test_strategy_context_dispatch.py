@@ -33,6 +33,10 @@ class _WindowStrategy(Strategy):
         self.calls.append(("window", aggregator))
 
 
+class _OhlcvWindowStrategy(_WindowStrategy):
+    required_inputs = ("ohlcv",)
+
+
 class _AggregatorWindowStrategy(_WindowStrategy):
     uses_timeframe_aggregator = True
     required_timeframes = ("20s",)
@@ -96,6 +100,16 @@ def test_engine_preserves_window_callback_for_legacy_strategies():
     assert strategy.calls[0][0] == "window"
     assert strategy.calls[0][1] is None
     assert engine.timeframe_aggregator is None
+
+
+def test_engine_treats_market_window_bars_as_ohlcv_input():
+    strategy = _OhlcvWindowStrategy()
+    engine = _build_engine(strategy)
+
+    engine.handle_market_window_event(_event())
+
+    assert len(strategy.calls) == 1
+    assert strategy.calls[0][0] == "window"
 
 
 def test_engine_builds_aggregator_only_for_explicit_aggregator_users():

@@ -32,7 +32,7 @@ def _safe_base_config_value(name: str, default: Any) -> Any:
         from lumina_quant.configuration import get_default_runtime_config
 
         rt = get_default_runtime_config()
-    except (AttributeError, ImportError, ModuleNotFoundError, FileNotFoundError, RuntimeError):
+    except AttributeError, ImportError, ModuleNotFoundError, FileNotFoundError, RuntimeError:
         return default
     # Map known uppercase names to typed RuntimeConfig fields.
     _MAP = {
@@ -66,7 +66,7 @@ def default_research_symbol_universe() -> tuple[str, ...]:
     raw_symbols = _safe_base_config_value("SYMBOLS", _DEFAULT_SYMBOL_FALLBACK)
     try:
         return tuple(canonicalize_symbol_list(list(raw_symbols)))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return _DEFAULT_SYMBOL_FALLBACK
 
 
@@ -79,7 +79,7 @@ def current_research_market_data_settings(
     else:
         try:
             from lumina_quant.configuration import current_market_data_runtime_settings
-        except (AttributeError, ImportError, ModuleNotFoundError):
+        except AttributeError, ImportError, ModuleNotFoundError:
             defaults = _default_market_data_settings()
         else:
             try:
