@@ -59,6 +59,8 @@ class _SingleAssetState:
     last_signal_session: str = ""
     session_key: str = ""
     session_open: float | None = None
+    session_high: float | None = None
+    session_low: float | None = None
     session_bars: int = 0
 
 
@@ -1324,6 +1326,9 @@ class OpeningRangeContinuationStrategy(Strategy):
             "opening_return_threshold": HyperParam.floating(
                 "opening_return_threshold", default=0.006, low=0.0, high=0.50
             ),
+            "breakout_buffer_pct": HyperParam.floating(
+                "breakout_buffer_pct", default=0.0, low=0.0, high=0.05
+            ),
             "min_volume_z": HyperParam.floating("min_volume_z", default=0.0, low=-5.0, high=20.0),
             "volume_window": HyperParam.integer("volume_window", default=96, low=8, high=4096),
             "max_realized_vol": HyperParam.floating(
@@ -1359,6 +1364,7 @@ class OpeningRangeContinuationStrategy(Strategy):
         self.opening_range_bars = max(2, int(resolved["opening_range_bars"]))
         self.entry_delay_bars = max(0, int(resolved["entry_delay_bars"]))
         self.opening_return_threshold = max(0.0, float(resolved["opening_return_threshold"]))
+        self.breakout_buffer_pct = max(0.0, float(resolved["breakout_buffer_pct"]))
         self.min_volume_z = float(resolved["min_volume_z"])
         self.volume_window = max(3, int(resolved["volume_window"]))
         self.max_realized_vol = max(0.0, float(resolved["max_realized_vol"]))
@@ -1391,6 +1397,8 @@ class OpeningRangeContinuationStrategy(Strategy):
                     "last_signal_session": item.last_signal_session,
                     "session_key": item.session_key,
                     "session_open": item.session_open,
+                    "session_high": item.session_high,
+                    "session_low": item.session_low,
                     "session_bars": int(item.session_bars),
                 }
                 for symbol, item in self._state.items()
@@ -1423,6 +1431,8 @@ class OpeningRangeContinuationStrategy(Strategy):
             item.last_signal_session = str(payload.get("last_signal_session", ""))
             item.session_key = str(payload.get("session_key", ""))
             item.session_open = safe_float(payload.get("session_open"))
+            item.session_high = safe_float(payload.get("session_high"))
+            item.session_low = safe_float(payload.get("session_low"))
             item.session_bars = _safe_non_negative_int(payload.get("session_bars"))
 
     def calculate_signals_window(self, event: Any, aggregator: Any = None) -> None:
@@ -1449,11 +1459,20 @@ class OpeningRangeContinuationStrategy(Strategy):
         if not key:
             return False
         new_session = key != item.session_key
+        high = snapshot.high if snapshot.high is not None else snapshot.close
+        low = snapshot.low if snapshot.low is not None else snapshot.close
         if new_session:
             item.session_key = key
             item.session_open = snapshot.open if snapshot.open is not None else snapshot.close
+            item.session_high = high
+            item.session_low = low
             item.session_bars = 0
             item.last_signal_session = ""
+        elif item.session_bars < self.opening_range_bars:
+            if high is not None:
+                item.session_high = max(float(item.session_high or high), float(high))
+            if low is not None:
+                item.session_low = min(float(item.session_low or low), float(low))
         item.session_bars += 1
         return new_session
 
@@ -1534,8 +1553,10 @@ class OpeningRangeContinuationStrategy(Strategy):
         self._maybe_exit(symbol, item, snapshot)
         if item.mode != "OUT" or item.last_signal_session == item.session_key:
             return
-        trigger_bar = self.opening_range_bars + self.entry_delay_bars
+        trigger_bar = self.opening_range_bars + self.entry_delay_bars + 1
         if item.session_bars < trigger_bar or item.session_open is None or item.session_open <= 0.0:
+            return
+        if item.session_high is None or item.session_low is None:
             return
         opening_ret = float(snapshot.close / item.session_open - 1.0)
         if abs(opening_ret) < self.opening_return_threshold:
@@ -1546,11 +1567,13 @@ class OpeningRangeContinuationStrategy(Strategy):
         rv = realized_volatility(item.closes, window=self.vol_window)
         if self.max_realized_vol > 0.0 and rv is not None and rv > self.max_realized_vol:
             return
-        if opening_ret > 0.0:
+        upper_break = float(item.session_high) * (1.0 + self.breakout_buffer_pct)
+        lower_break = float(item.session_low) * (1.0 - self.breakout_buffer_pct)
+        if opening_ret > 0.0 and float(snapshot.close) > upper_break:
             signal_type = "LONG"
             stop_loss = snapshot.close * (1.0 - self.stop_loss_pct) if self.stop_loss_pct > 0.0 else None
             take_profit = snapshot.close * (1.0 + self.take_profit_pct) if self.take_profit_pct > 0.0 else None
-        elif self.allow_short:
+        elif self.allow_short and float(snapshot.close) < lower_break:
             signal_type = "SHORT"
             stop_loss = snapshot.close * (1.0 + self.stop_loss_pct) if self.stop_loss_pct > 0.0 else None
             take_profit = snapshot.close * (1.0 - self.take_profit_pct) if self.take_profit_pct > 0.0 else None
@@ -1563,6 +1586,9 @@ class OpeningRangeContinuationStrategy(Strategy):
             session_key=item.session_key,
             opening_return=float(opening_ret),
             opening_range_bars=int(self.opening_range_bars),
+            opening_range_high=float(item.session_high),
+            opening_range_low=float(item.session_low),
+            breakout_buffer_pct=float(self.breakout_buffer_pct),
             volume_z=vol_z,
             realized_vol=rv,
         )
