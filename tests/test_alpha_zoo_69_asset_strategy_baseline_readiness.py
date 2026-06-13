@@ -178,9 +178,28 @@ def test_build_payload_summarizes_leaf_rebuild_and_preflight(tmp_path: Path) -> 
         source_paths={
             "leaf_rebuild_shadow_20260613": leaf,
             "live_readiness_preflight_20260613": preflight,
+            "missing_provenance_boundary": tmp_path / "missing.json",
         },
         generated_at_utc="2026-06-13T00:00:00Z",
     )
+
+    assert payload["baseline_labels"] == list(module.BASELINE_LABELS)
+    assert payload["missing_json_sources"] == ["missing_provenance_boundary"]
+    source_manifest = payload["source_manifest"]
+    assert set(source_manifest) == {
+        "leaf_rebuild_shadow_20260613",
+        "live_readiness_preflight_20260613",
+        "missing_provenance_boundary",
+    }
+    assert source_manifest["leaf_rebuild_shadow_20260613"]["exists"] is True
+    assert source_manifest["leaf_rebuild_shadow_20260613"]["sha256"]
+    assert source_manifest["leaf_rebuild_shadow_20260613"]["size_bytes"] > 0
+    assert source_manifest["live_readiness_preflight_20260613"]["exists"] is True
+    assert source_manifest["live_readiness_preflight_20260613"]["sha256"]
+    assert source_manifest["live_readiness_preflight_20260613"]["size_bytes"] > 0
+    assert source_manifest["missing_provenance_boundary"]["exists"] is False
+    assert source_manifest["missing_provenance_boundary"]["sha256"] is None
+    assert source_manifest["missing_provenance_boundary"]["size_bytes"] is None
 
     assert payload["latest_leaf_rebuild_shadow"]["loaded_symbol_count"] == 69
     assert (
