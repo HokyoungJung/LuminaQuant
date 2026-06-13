@@ -869,6 +869,140 @@ def test_teacher_leaf_blend_evaluates_as_clean_non_nested_candidate() -> None:
     }
 
 
+def _tradfi_source_stream(
+    *,
+    symbol: str,
+    model_id: str,
+    cash_session_return: float,
+    asset_group: str = "tradfi_equity",
+    timeframe: str = "30m",
+    dominant_anchor: str = "us_equity_beta_spy",
+    dominant_anchor_abs_corr: float = 0.25,
+) -> module.broad69.CandidateStream:
+    index = pd.date_range("2025-01-01", "2025-03-31 23:30", freq="30min")
+    returns = pd.Series(0.0, index=index, dtype=float)
+    returns.iloc[module._us_equity_cash_session_mask(index)] = cash_session_return
+    row = {
+        "model_id": model_id,
+        "family": "cross_sectional_momentum_rank",
+        "symbol": symbol,
+        "asset_group": asset_group,
+        "timeframe": timeframe,
+        "side": "long",
+        "notional_fraction": 0.10,
+        "validation_return_per_turnover_proxy_bps": 30.0,
+        "dominant_anchor": dominant_anchor,
+        "dominant_anchor_abs_corr": dominant_anchor_abs_corr,
+    }
+    return module.broad69.CandidateStream(
+        row=row,
+        returns=returns,
+        position=pd.Series(1.0, index=index, dtype=float),
+    )
+
+
+def test_tradfi_us_equity_session_switch_is_clean_and_cash_session_masked() -> None:
+    fold = module.MonthlyFold(
+        fold_id="2025-03",
+        refit_at=pd.Timestamp("2025-03-01"),
+        train=(pd.Timestamp("2025-01-01"), pd.Timestamp("2025-01-31")),
+        validation=(pd.Timestamp("2025-02-01"), pd.Timestamp("2025-02-28")),
+        locked_oos=(pd.Timestamp("2025-03-01"), pd.Timestamp("2025-03-31")),
+    )
+    streams = [
+        _tradfi_source_stream(
+            symbol="SPYUSDT",
+            asset_group="tradfi_etf_index",
+            model_id="spy_cash_session",
+            cash_session_return=0.00020,
+        ),
+        _tradfi_source_stream(
+            symbol="NVDAUSDT",
+            model_id="nvda_cash_session",
+            cash_session_return=0.00018,
+            dominant_anchor="tech_growth_qqq",
+            dominant_anchor_abs_corr=0.30,
+        ),
+        _tradfi_source_stream(
+            symbol="AAPLUSDT",
+            model_id="aapl_cash_session",
+            cash_session_return=0.00016,
+            dominant_anchor="tech_growth_qqq",
+            dominant_anchor_abs_corr=0.35,
+        ),
+        _tradfi_source_stream(
+            symbol="BTCUSDT",
+            asset_group="crypto_core",
+            model_id="btc_should_be_ignored",
+            cash_session_return=0.00200,
+            dominant_anchor="crypto_beta_btc",
+            dominant_anchor_abs_corr=0.10,
+        ),
+    ]
+
+    candidates = module._tradfi_us_equity_session_switch_candidates(streams, fold)
+    by_label = {candidate.candidate_label: candidate for candidate in candidates}
+
+    assert set(by_label) == {
+        "tradfi_us_equity_session_switch:cash_session_top8_mdd15",
+        "tradfi_us_equity_session_switch:cash_session_top12_mdd20",
+        "tradfi_us_equity_session_switch:cash_session_beta_guard_mdd12",
+    }
+    candidate = by_label["tradfi_us_equity_session_switch:cash_session_top8_mdd15"]
+    row = module._evaluate_candidate(candidate, fold)
+
+    assert row["clean_promotion_eligible"] is True
+    assert row["uses_locked_oos_for_selection"] is False
+    assert row["post_oos_research_variant"] is False
+    assert row["requires_fresh_forward_shadow"] is False
+    assert row["ready_for_paper"] is True
+    assert row["ready_for_real"] is False
+    assert row["real_money_execution"] is False
+    assert "BTCUSDT" not in row["selected_symbols"]
+    assert set(row["selected_symbols"]) <= {"SPYUSDT", "NVDAUSDT", "AAPLUSDT"}
+    assert row["selection_inputs"] == [
+        "train",
+        "validation",
+        "us_equity_market_structure_priors",
+    ]
+    assert row["tradfi_us_equity_controls"]["overnight_gap_policy"] == (
+        "no_non_cash_session_return_exposure_in_research_proxy"
+    )
+    assert candidate.returns.loc[pd.Timestamp("2025-02-03 03:00:00")] == 0.0
+    assert module._leaf_strategy_material_candidate(candidate) is False
+
+
+def test_tradfi_us_equity_session_switch_cash_guards_when_no_tradfi_signal() -> None:
+    fold = module.MonthlyFold(
+        fold_id="2025-03",
+        refit_at=pd.Timestamp("2025-03-01"),
+        train=(pd.Timestamp("2025-01-01"), pd.Timestamp("2025-01-31")),
+        validation=(pd.Timestamp("2025-02-01"), pd.Timestamp("2025-02-28")),
+        locked_oos=(pd.Timestamp("2025-03-01"), pd.Timestamp("2025-03-31")),
+    )
+    streams = [
+        _tradfi_source_stream(
+            symbol="BTCUSDT",
+            asset_group="crypto_core",
+            model_id="btc_only",
+            cash_session_return=0.001,
+            dominant_anchor="crypto_beta_btc",
+            dominant_anchor_abs_corr=0.10,
+        )
+    ]
+
+    candidates = module._tradfi_us_equity_session_switch_candidates(streams, fold)
+
+    assert len(candidates) == 3
+    assert all(candidate.returns.sum() == 0.0 for candidate in candidates)
+    assert all(
+        candidate.row["selected_candidate_label"]
+        == "cash_no_eligible_tradfi_us_equity_session_signal"
+        for candidate in candidates
+    )
+    assert all(module._evaluate_candidate(candidate, fold)["clean_promotion_eligible"] is True for candidate in candidates)
+
+
 def test_asset_timeframe_leverage_family_marks_clean_train_validation_policy(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1469,6 +1603,7 @@ def test_non_leaf_reference_detector_covers_portfolio_families_and_selected_toke
         "cross_candidate_hybrid:hybrid_v3_5",
         "meta_portfolio:validation_balanced",
         "dynamic_conviction_switch:t0.90_risk_capped_fallback",
+        "tradfi_us_equity_session_switch:cash_session_top8_mdd15",
         "validation_selector:top_clean",
         "mdd30_high_vol_gate:breakout_x1_50",
         "profile_optuna:selected_optuna",

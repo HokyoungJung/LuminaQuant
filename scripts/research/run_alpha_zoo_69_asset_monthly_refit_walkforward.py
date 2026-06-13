@@ -33,6 +33,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
@@ -41,7 +42,12 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from lumina_quant.research_universe import BINANCE_EXTENDED_RESEARCH_SYMBOLS  # noqa: E402
+from lumina_quant.research_universe import (  # noqa: E402
+    BINANCE_EXTENDED_RESEARCH_SYMBOLS,
+    BINANCE_TRADFI_EQUITY_SYMBOLS,
+    BINANCE_TRADFI_ETF_INDEX_SYMBOLS,
+    BINANCE_TRADFI_PREMARKET_SYMBOLS,
+)
 from scripts.research import run_alpha_zoo_69_asset_efficiency_repair_optuna as strict_eff  # noqa: E402
 from scripts.research import run_alpha_zoo_69_asset_optuna_hybrid_refit as broad69  # noqa: E402
 from scripts.research import run_alpha_zoo_69_asset_profile_optuna_hybrid_refit as profile69  # noqa: E402
@@ -770,6 +776,7 @@ _NON_LEAF_PORTFOLIO_FAMILIES = {
     "mdd30_risk_scaled",
     "mdd30_high_vol_gate",
     "dynamic_conviction_switch",
+    "tradfi_us_equity_session_switch",
     "regime_opportunity_leaf_switch",
     "lagged_shadow_leaf_router",
 }
@@ -785,6 +792,7 @@ _NON_LEAF_LABEL_TOKENS = (
     "validation_selector:",
     "strict_calm_leaf_selector:",
     "dynamic_conviction_switch:",
+    "tradfi_us_equity_session_switch:",
     "regime_opportunity_leaf_switch:",
     "lagged_shadow_leaf_router:",
 )
@@ -799,6 +807,16 @@ _NON_LEAF_PROFILE_KIND_TOKENS = (
     "scaled",
     "assimilation",
 )
+
+US_EQUITY_LINKED_TRADFI_SYMBOLS = frozenset(
+    (
+        *BINANCE_TRADFI_ETF_INDEX_SYMBOLS,
+        *BINANCE_TRADFI_EQUITY_SYMBOLS,
+        *BINANCE_TRADFI_PREMARKET_SYMBOLS,
+    )
+)
+US_EQUITY_CASH_SESSION_TZ = ZoneInfo("America/New_York")
+US_EQUITY_CASH_SESSION_TIMEFRAMES = frozenset({"30m", "1h", "2h"})
 
 _CALENDAR_PRIMARY_FAMILIES = {"calendar_rotation", "calendar_spread"}
 
@@ -1789,6 +1807,537 @@ def _dynamic_conviction_switch_candidates(
                             },
                         )
                     )
+    return out
+
+
+def _as_utc_datetime_index(index: pd.Index | pd.DatetimeIndex) -> pd.DatetimeIndex:
+    datetimes = pd.DatetimeIndex(pd.to_datetime(index))
+    if datetimes.tz is None:
+        return datetimes.tz_localize("UTC")
+    return datetimes.tz_convert("UTC")
+
+
+def _us_equity_cash_session_mask(index: pd.Index | pd.DatetimeIndex) -> np.ndarray:
+    """Mask bars whose timestamp falls inside the US cash equity session.
+
+    Binance TRADIFI_PERPETUAL contracts can print outside exchange hours, but
+    the economically relevant underlying for US equities and ETFs is the US
+    cash market.  This mask uses the timestamp as the bar close time and keeps
+    only weekdays from 09:30 to 16:00 America/New_York, including DST shifts.
+    """
+    if len(index) == 0:
+        return np.asarray([], dtype=bool)
+    local = _as_utc_datetime_index(index).tz_convert(US_EQUITY_CASH_SESSION_TZ)
+    minutes = local.hour * 60 + local.minute
+    return np.asarray(
+        (local.dayofweek < 5) & (minutes >= 9 * 60 + 30) & (minutes < 16 * 60),
+        dtype=bool,
+    )
+
+
+def _window_mask(index: pd.Index | pd.DatetimeIndex, window: tuple[pd.Timestamp, pd.Timestamp]) -> np.ndarray:
+    datetimes = pd.DatetimeIndex(pd.to_datetime(index))
+    start = _coerce_ts(window[0])
+    end = _coerce_ts(window[1])
+    if datetimes.tz is not None:
+        datetimes = datetimes.tz_convert("UTC").tz_localize(None)
+    return np.asarray((datetimes >= start) & (datetimes <= end), dtype=bool)
+
+
+def _stream_us_equity_cash_session_returns(stream: broad69.CandidateStream) -> pd.Series:
+    returns = stream.returns.astype(float).sort_index()
+    mask = _us_equity_cash_session_mask(returns.index)
+    return pd.Series(
+        np.where(mask, returns.to_numpy(dtype=float), 0.0),
+        index=returns.index,
+        dtype=float,
+    )
+
+
+def _nonzero_count_in_window(
+    returns: pd.Series, window: tuple[pd.Timestamp, pd.Timestamp]
+) -> int:
+    mask = _window_mask(returns.index, window)
+    values = returns.to_numpy(dtype=float)[mask]
+    return int(np.count_nonzero(np.abs(values) > 1e-12))
+
+
+def _active_session_bar_count(
+    returns: pd.Series, window: tuple[pd.Timestamp, pd.Timestamp]
+) -> int:
+    return int(
+        np.count_nonzero(
+            _window_mask(returns.index, window) & _us_equity_cash_session_mask(returns.index)
+        )
+    )
+
+
+def _blend_stream_returns(
+    items: Sequence[Mapping[str, Any]], weights: Mapping[str, float]
+) -> pd.Series:
+    active = [
+        (item, float(weights.get(str(item["source_model_id"]), 0.0)))
+        for item in items
+        if float(weights.get(str(item["source_model_id"]), 0.0)) > 0.0
+    ]
+    if not active:
+        return pd.Series(dtype=float)
+    index = pd.DatetimeIndex(
+        sorted(set().union(*(set(item["returns"].index) for item, _ in active)))
+    )
+    blended = pd.Series(0.0, index=index, dtype=float)
+    for item, weight in active:
+        blended = blended.add(item["returns"].reindex(index, fill_value=0.0) * weight)
+    return blended.sort_index()
+
+
+def _weights_by_item_field(
+    items: Sequence[Mapping[str, Any]],
+    weights: Mapping[str, float],
+    field: str,
+) -> dict[str, float]:
+    out: dict[str, float] = defaultdict(float)
+    for item in items:
+        key = str(item["source_model_id"])
+        weight = float(weights.get(key, 0.0))
+        if weight <= 0.0:
+            continue
+        value = item.get(field)
+        if value:
+            out[str(value)] += weight
+    return dict(sorted(out.items(), key=lambda kv: (-kv[1], kv[0])))
+
+
+def _scale_returns_to_validation_mdd_budget(
+    returns: pd.Series,
+    fold: MonthlyFold,
+    *,
+    target_validation_mdd: float,
+    max_scale: float,
+    min_train_return: float = 0.02,
+) -> tuple[float, dict[str, Any]]:
+    """Choose a coarse scale from train+validation only."""
+    best_scale = 0.0
+    best_metrics: dict[str, Any] = {
+        "train": _period_metrics(returns * 0.0, fold.train),
+        "validation": _period_metrics(returns * 0.0, fold.validation),
+        "scale_score": 0.0,
+    }
+    best_score = -float("inf")
+    for scale in (0.25, 0.50, 0.75, 1.0, 1.25, 1.50, 1.75, 2.0, 2.25):
+        if scale > max_scale + 1e-12:
+            continue
+        scaled = returns.astype(float) * float(scale)
+        train = _period_metrics(scaled, fold.train)
+        validation = _period_metrics(scaled, fold.validation)
+        train_return = _safe_float(train.get("total_return"))
+        validation_return = _safe_float(validation.get("total_return"))
+        validation_mdd = _safe_float(validation.get("mdd"))
+        train_mdd = _safe_float(train.get("mdd"))
+        if train_return < min_train_return or validation_return <= 0.0:
+            continue
+        if validation_mdd > target_validation_mdd + 1e-12 or train_mdd > 0.60:
+            continue
+        score = (
+            validation_return / max(validation_mdd, 0.02)
+            + 0.15 * min(train_return, 1.50)
+            - 0.05 * float(scale)
+        )
+        if score > best_score:
+            best_score = float(score)
+            best_scale = float(scale)
+            best_metrics = {
+                "train": train,
+                "validation": validation,
+                "scale_score": float(score),
+            }
+    return best_scale, best_metrics
+
+
+def _tradfi_us_equity_session_pool(
+    candidate_streams: Sequence[broad69.CandidateStream],
+    fold: MonthlyFold,
+) -> list[dict[str, Any]]:
+    pool: list[dict[str, Any]] = []
+    seen_model_ids: set[str] = set()
+    for idx, stream in enumerate(candidate_streams):
+        row = dict(stream.row)
+        symbol = str(row.get("symbol") or "").upper()
+        if symbol not in US_EQUITY_LINKED_TRADFI_SYMBOLS:
+            continue
+        timeframe = str(row.get("timeframe") or "")
+        if timeframe not in US_EQUITY_CASH_SESSION_TIMEFRAMES:
+            continue
+        source_model_id = str(row.get("model_id") or f"tradfi_stream_{idx}_{symbol}_{timeframe}")
+        if source_model_id in seen_model_ids:
+            continue
+        seen_model_ids.add(source_model_id)
+        session_returns = _stream_us_equity_cash_session_returns(stream)
+        validation_active_bars = _active_session_bar_count(session_returns, fold.validation)
+        validation_nonzero_bars = _nonzero_count_in_window(session_returns, fold.validation)
+        if validation_active_bars < 16 or validation_nonzero_bars < 1:
+            continue
+        train = _period_metrics(session_returns, fold.train)
+        validation = _period_metrics(session_returns, fold.validation)
+        train_return = _safe_float(train.get("total_return"))
+        validation_return = _safe_float(validation.get("total_return"))
+        train_mdd = _safe_float(train.get("mdd"))
+        validation_mdd = _safe_float(validation.get("mdd"))
+        if train_return <= -0.03 or validation_return <= 0.0:
+            continue
+        if train_mdd > 0.55 or validation_mdd > 0.24:
+            continue
+        anchor_abs = _safe_float(row.get("dominant_anchor_abs_corr"))
+        if anchor_abs > 0.95:
+            continue
+        validation_rpt = _safe_float(row.get("validation_return_per_turnover_proxy_bps"), 0.0)
+        validation_sharpe = _safe_float(validation.get("sharpe"))
+        score = (
+            validation_return / max(validation_mdd, 0.025)
+            + 0.20 * min(train_return, 1.50)
+            + 0.03 * min(validation_sharpe, 5.0)
+            + 0.0015 * max(-20.0, min(validation_rpt, 120.0))
+            - 0.90 * max(0.0, anchor_abs - 0.65)
+            - 0.35 * max(0.0, validation_mdd - 0.12)
+        )
+        pool.append(
+            {
+                "source_model_id": source_model_id,
+                "symbol": symbol,
+                "asset_group": str(row.get("asset_group") or "tradfi_equity"),
+                "family": str(row.get("family") or ""),
+                "timeframe": timeframe,
+                "side": str(row.get("side") or ""),
+                "dominant_anchor": row.get("dominant_anchor"),
+                "dominant_anchor_abs_corr": anchor_abs,
+                "returns": session_returns,
+                "row": row,
+                "train": train,
+                "validation": validation,
+                "score": float(score),
+                "validation_active_session_bars": validation_active_bars,
+                "validation_nonzero_bars": validation_nonzero_bars,
+            }
+        )
+    return sorted(pool, key=lambda item: float(item["score"]), reverse=True)
+
+
+def _tradfi_us_equity_cash_guard_candidates(
+    *,
+    reference_returns: pd.Series,
+    reason: str,
+    specs: Sequence[tuple[str, float, float]] | None = None,
+) -> list[CandidateResult]:
+    zero_returns = pd.Series(0.0, index=reference_returns.index, dtype=float)
+    out: list[CandidateResult] = []
+    for suffix, target_mdd, max_scale in specs or (
+        ("cash_session_top8_mdd15", 0.15, 2.0),
+        ("cash_session_top12_mdd20", 0.20, 2.25),
+        ("cash_session_beta_guard_mdd12", 0.12, 1.75),
+    ):
+        label = f"tradfi_us_equity_session_switch:{suffix}"
+        row = {
+            "profile_id": label,
+            "profile_kind": "tradfi_us_equity_cash_session_guard",
+            "candidate_tier": "clean_train_validation_selected_paper_shadow",
+            "selection_inputs": ["train", "validation", "us_equity_market_structure_priors"],
+            "selection_policy": (
+                "us_equity_cash_session_only_cash_guard_no_locked_oos_selection"
+            ),
+            "selected_candidate_label": "cash_no_eligible_tradfi_us_equity_session_signal",
+            "selection_notes": [reason, "locked_oos_not_read"],
+            "target_validation_mdd": float(target_mdd),
+            "max_scale": float(max_scale),
+            "risk_scale": 0.0,
+            "risk_scale_mode": "train_validation_cash_guard",
+            "weights": {},
+            "final_weights": {},
+            "source_model_ids": [],
+            "selected_symbols": [],
+            "session_filter_policy": (
+                "America/New_York weekday 09:30-16:00 cash-session bar-close mask"
+            ),
+            "session_return_construction": "zero_out_non_us_cash_session_source_returns",
+            "tradfi_us_equity_controls": {
+                "tradfi_symbol_scope": "us_equity_etf_index_and_premarket_perpetuals_only",
+                "overnight_gap_policy": "no_non_cash_session_return_exposure_in_research_proxy",
+                "holiday_calendar_status": "not_modeled_requires_broker_calendar_pre_live",
+                "single_symbol_stream_cap": 0.0,
+                "dominant_anchor_soft_cap": None,
+            },
+            "uses_locked_oos_for_selection": False,
+            "same_month_self_feeding": False,
+            "current_fold_oos_used_for_weighting": False,
+            "post_oos_research_variant": False,
+            "requires_fresh_forward_shadow": False,
+            "ready_for_paper": True,
+            "ready_for_real": False,
+            "real_money_execution": False,
+        }
+        out.append(
+            _candidate_eval(
+                family="tradfi_us_equity_session_switch",
+                label=label,
+                row=row,
+                returns=zero_returns,
+            )
+        )
+    return out
+
+
+def _tradfi_us_equity_session_switch_candidates(
+    candidate_streams: Sequence[broad69.CandidateStream],
+    fold: MonthlyFold,
+) -> list[CandidateResult]:
+    """US-equity-aware clean selector over source streams.
+
+    The source rows trade Binance perps, but when the symbol is a US equity or
+    ETF proxy the primary risk is the US cash market.  This family therefore
+    rebuilds candidate returns by zeroing bars outside the New York cash
+    session, then selects and sizes streams from train+validation only.  Locked
+    OOS remains report-only; real-money stays false until live venue telemetry
+    proves session liquidity, holiday, halt, spread, and fill behavior.
+    """
+    reference = next((stream.returns for stream in candidate_streams if stream.returns.size), None)
+    if reference is None:
+        return []
+    pool = _tradfi_us_equity_session_pool(candidate_streams, fold)
+    if not pool:
+        return _tradfi_us_equity_cash_guard_candidates(
+            reference_returns=reference,
+            reason="no_train_validation_eligible_us_equity_cash_session_stream",
+        )
+
+    specs: tuple[dict[str, Any], ...] = (
+        {
+            "suffix": "cash_session_top8_mdd15",
+            "top_n": 8,
+            "stream_cap": 0.22,
+            "max_per_symbol": 1,
+            "target_validation_mdd": 0.15,
+            "max_scale": 2.0,
+            "max_anchor_abs": 0.90,
+            "min_sources": 2,
+            "learning_rate": 0.55,
+        },
+        {
+            "suffix": "cash_session_top12_mdd20",
+            "top_n": 12,
+            "stream_cap": 0.18,
+            "max_per_symbol": 1,
+            "target_validation_mdd": 0.20,
+            "max_scale": 2.25,
+            "max_anchor_abs": 0.92,
+            "min_sources": 3,
+            "learning_rate": 0.50,
+        },
+        {
+            "suffix": "cash_session_beta_guard_mdd12",
+            "top_n": 10,
+            "stream_cap": 0.16,
+            "max_per_symbol": 1,
+            "target_validation_mdd": 0.12,
+            "max_scale": 1.75,
+            "max_anchor_abs": 0.72,
+            "min_sources": 2,
+            "learning_rate": 0.45,
+        },
+    )
+    out: list[CandidateResult] = []
+    for spec in specs:
+        selected: list[dict[str, Any]] = []
+        symbol_counts: dict[str, int] = defaultdict(int)
+        for item in pool:
+            if float(item["dominant_anchor_abs_corr"]) > float(spec["max_anchor_abs"]):
+                continue
+            symbol = str(item["symbol"])
+            if symbol_counts[symbol] >= int(spec["max_per_symbol"]):
+                continue
+            selected.append(item)
+            symbol_counts[symbol] += 1
+            if len(selected) >= int(spec["top_n"]):
+                break
+        if len(selected) < int(spec["min_sources"]):
+            out.extend(
+                _tradfi_us_equity_cash_guard_candidates(
+                    reference_returns=reference,
+                    reason=(
+                        f"insufficient_eligible_sources_for_{spec['suffix']}:"
+                        f"{len(selected)}_lt_{int(spec['min_sources'])}"
+                    ),
+                    specs=[
+                        (
+                            str(spec["suffix"]),
+                            float(spec["target_validation_mdd"]),
+                            float(spec["max_scale"]),
+                        )
+                    ],
+                )
+            )
+            continue
+
+        raw_scores = {
+            str(item["source_model_id"]): float(item["score"]) for item in selected
+        }
+        weights = _softmax_weights(
+            raw_scores,
+            learning_rate=float(spec["learning_rate"]),
+            cap=float(spec["stream_cap"]),
+        )
+        base_returns = _blend_stream_returns(selected, weights)
+        if base_returns.empty:
+            continue
+        base_train = _period_metrics(base_returns, fold.train)
+        base_validation = _period_metrics(base_returns, fold.validation)
+        base_train_return = _safe_float(base_train.get("total_return"))
+        base_validation_return = _safe_float(base_validation.get("total_return"))
+        if base_train_return < 0.02:
+            out.extend(
+                _tradfi_us_equity_cash_guard_candidates(
+                    reference_returns=reference,
+                    reason=(
+                        f"train_stability_floor_rejected_{spec['suffix']}:"
+                        f"{base_train_return:.6f}_lt_0.020000"
+                    ),
+                    specs=[
+                        (
+                            str(spec["suffix"]),
+                            float(spec["target_validation_mdd"]),
+                            float(spec["max_scale"]),
+                        )
+                    ],
+                )
+            )
+            continue
+        if base_validation_return > max(0.12, base_train_return + 0.12):
+            out.extend(
+                _tradfi_us_equity_cash_guard_candidates(
+                    reference_returns=reference,
+                    reason=(
+                        f"validation_spike_guard_rejected_{spec['suffix']}:"
+                        f"validation_{base_validation_return:.6f}_train_{base_train_return:.6f}"
+                    ),
+                    specs=[
+                        (
+                            str(spec["suffix"]),
+                            float(spec["target_validation_mdd"]),
+                            float(spec["max_scale"]),
+                        )
+                    ],
+                )
+            )
+            continue
+        scale, scale_metrics = _scale_returns_to_validation_mdd_budget(
+            base_returns,
+            fold,
+            target_validation_mdd=float(spec["target_validation_mdd"]),
+            max_scale=float(spec["max_scale"]),
+            min_train_return=0.02,
+        )
+        if scale <= 0.0:
+            out.extend(
+                _tradfi_us_equity_cash_guard_candidates(
+                    reference_returns=reference,
+                    reason=f"validation_mdd_budget_rejected_{spec['suffix']}",
+                    specs=[
+                        (
+                            str(spec["suffix"]),
+                            float(spec["target_validation_mdd"]),
+                            float(spec["max_scale"]),
+                        )
+                    ],
+                )
+            )
+            continue
+        final_weights = {key: float(value) * float(scale) for key, value in weights.items()}
+        symbol_weights = _weights_by_item_field(selected, weights, "symbol")
+        asset_group_weights = _weights_by_item_field(selected, weights, "asset_group")
+        anchor_weights = _weights_by_item_field(selected, weights, "dominant_anchor")
+        label = f"tradfi_us_equity_session_switch:{spec['suffix']}"
+        selected_symbols = list(symbol_weights)
+        row = {
+            "profile_id": label,
+            "profile_kind": "tradfi_us_equity_cash_session_validation_portfolio",
+            "candidate_tier": "clean_train_validation_selected_paper_shadow",
+            "selection_inputs": ["train", "validation", "us_equity_market_structure_priors"],
+            "selection_policy": (
+                "source_stream_scores_from_train_validation_cash_session_returns_only"
+            ),
+            "selection_notes": [
+                "locked_oos_not_read",
+                "hybrid_rows_excluded_source_streams_only",
+                "us_equity_cash_session_bar_close_mask_applied",
+            ],
+            "source_model_ids": [str(item["source_model_id"]) for item in selected],
+            "selected_symbols": selected_symbols,
+            "selected_timeframes": sorted({str(item["timeframe"]) for item in selected}),
+            "selected_asset_groups": sorted({str(item["asset_group"]) for item in selected}),
+            "selected_anchor_names": sorted(
+                {str(item["dominant_anchor"]) for item in selected if item.get("dominant_anchor")}
+            ),
+            "source_selection_snapshot": [
+                {
+                    "source_model_id": str(item["source_model_id"]),
+                    "symbol": str(item["symbol"]),
+                    "asset_group": str(item["asset_group"]),
+                    "timeframe": str(item["timeframe"]),
+                    "side": str(item["side"]),
+                    "dominant_anchor": item.get("dominant_anchor"),
+                    "dominant_anchor_abs_corr": float(item["dominant_anchor_abs_corr"]),
+                    "score": float(item["score"]),
+                    "validation_return": _safe_float(item["validation"].get("total_return")),
+                    "validation_mdd": _safe_float(item["validation"].get("mdd")),
+                    "validation_active_session_bars": int(item["validation_active_session_bars"]),
+                    "validation_nonzero_bars": int(item["validation_nonzero_bars"]),
+                }
+                for item in selected
+            ],
+            "weights": dict(weights),
+            "final_weights": dict(final_weights),
+            "symbol_weights": symbol_weights,
+            "asset_group_weights": asset_group_weights,
+            "anchor_weights": anchor_weights,
+            "gross_notional_fraction": float(sum(abs(value) for value in final_weights.values())),
+            "asset_gross_notional_fraction": {
+                symbol: float(weight) * float(scale) for symbol, weight in symbol_weights.items()
+            },
+            "target_validation_mdd": float(spec["target_validation_mdd"]),
+            "max_scale": float(spec["max_scale"]),
+            "risk_scale": float(scale),
+            "risk_scale_mode": "train_validation_grid_target_validation_mdd",
+            "train_validation_scale_metrics": scale_metrics,
+            "session_filter_policy": (
+                "America/New_York weekday 09:30-16:00 cash-session bar-close mask"
+            ),
+            "session_return_construction": "zero_out_non_us_cash_session_source_returns",
+            "tradfi_us_equity_controls": {
+                "tradfi_symbol_scope": "us_equity_etf_index_and_premarket_perpetuals_only",
+                "eligible_symbol_count": len(US_EQUITY_LINKED_TRADFI_SYMBOLS),
+                "allowed_timeframes": sorted(US_EQUITY_CASH_SESSION_TIMEFRAMES),
+                "overnight_gap_policy": "no_non_cash_session_return_exposure_in_research_proxy",
+                "holiday_calendar_status": "not_modeled_requires_broker_calendar_pre_live",
+                "single_symbol_stream_cap": float(spec["stream_cap"]),
+                "max_per_symbol": int(spec["max_per_symbol"]),
+                "dominant_anchor_abs_corr_hard_filter": float(spec["max_anchor_abs"]),
+                "dominant_anchor_weight_report": anchor_weights,
+            },
+            "uses_locked_oos_for_selection": False,
+            "same_month_self_feeding": False,
+            "current_fold_oos_used_for_weighting": False,
+            "post_oos_research_variant": False,
+            "requires_fresh_forward_shadow": False,
+            "ready_for_paper": True,
+            "ready_for_real": False,
+            "real_money_execution": False,
+        }
+        out.append(
+            _candidate_eval(
+                family="tradfi_us_equity_session_switch",
+                label=label,
+                row=row,
+                returns=base_returns.astype(float) * float(scale),
+            )
+        )
     return out
 
 
@@ -4948,6 +5497,15 @@ def _evaluate_candidate(candidate: CandidateResult, fold: MonthlyFold) -> dict[s
         "gross_notional_fraction": row.get("gross_notional_fraction"),
         "final_weights": row.get("final_weights") or row.get("weights") or {},
         "asset_gross_notional_fraction": row.get("asset_gross_notional_fraction") or {},
+        "symbol_weights": row.get("symbol_weights") or {},
+        "asset_group_weights": row.get("asset_group_weights") or {},
+        "anchor_weights": row.get("anchor_weights") or {},
+        "selected_symbols": row.get("selected_symbols") or [],
+        "selected_timeframes": row.get("selected_timeframes") or [],
+        "session_filter_policy": row.get("session_filter_policy"),
+        "session_return_construction": row.get("session_return_construction"),
+        "tradfi_us_equity_controls": row.get("tradfi_us_equity_controls") or {},
+        "source_model_ids": row.get("source_model_ids") or [],
         "timeframe": row.get("timeframe"),
         "profile_kind": row.get("profile_kind"),
         "rebalance_policy": row.get("rebalance_policy"),
@@ -6125,6 +6683,16 @@ def run_walkforward(args: argparse.Namespace) -> dict[str, Any]:
         else:
             asset_tf_leverage_candidates = []
             asset_tf_leverage_aux = {}
+        if "tradfi_us_equity_session_switch" in args.families:
+            tradfi_us_equity_session_switch_candidates = (
+                _tradfi_us_equity_session_switch_candidates(
+                    source_aux["individual_streams"],
+                    fold,
+                )
+            )
+            all_candidates.extend(tradfi_us_equity_session_switch_candidates)
+        else:
+            tradfi_us_equity_session_switch_candidates = []
         if "strict_efficiency" in args.families:
             strict_candidates, strict_aux = _run_efficiency_family(
                 fold=fold,
@@ -6250,6 +6818,9 @@ def run_walkforward(args: argparse.Namespace) -> dict[str, Any]:
             "strict_efficiency_aux": strict_aux,
             "relaxed_efficiency_aux": relaxed_aux,
             "asset_timeframe_leverage_count": len(asset_tf_leverage_candidates),
+            "tradfi_us_equity_session_switch_count": len(
+                tradfi_us_equity_session_switch_candidates
+            ),
             "teacher_leaf_blend_count": len(teacher_leaf_blend_candidates),
             "strict_calm_leaf_selector_count": len(strict_calm_leaf_selector_candidates),
             "regime_opportunity_leaf_switch_count": len(regime_opportunity_leaf_switch_candidates),
@@ -6319,15 +6890,17 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--families",
         default=(
             "profile_optuna,individual_robust,asset_timeframe_leverage,"
+            "tradfi_us_equity_session_switch,"
             "strict_efficiency,relaxed_efficiency,teacher_leaf_blend,"
             "strict_calm_leaf_selector,regime_opportunity_leaf_switch,"
             "lagged_shadow_leaf_router"
         ),
         help=(
             "Comma-separated families. profile_optuna is always included; optional: "
-            "individual_robust, asset_timeframe_leverage, strict_efficiency, "
-            "relaxed_efficiency, teacher_leaf_blend, strict_calm_leaf_selector, "
-            "regime_opportunity_leaf_switch, lagged_shadow_leaf_router."
+            "individual_robust, asset_timeframe_leverage, "
+            "tradfi_us_equity_session_switch, strict_efficiency, relaxed_efficiency, "
+            "teacher_leaf_blend, strict_calm_leaf_selector, regime_opportunity_leaf_switch, "
+            "lagged_shadow_leaf_router."
         ),
     )
     parser.add_argument("--bridge-protocol-manifest", default=str(DEFAULT_BRIDGE_PROTOCOL_MANIFEST))

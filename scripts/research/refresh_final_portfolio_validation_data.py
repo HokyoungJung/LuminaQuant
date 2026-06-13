@@ -763,6 +763,7 @@ def refresh_symbol_raw_first_ohlcv(
     cutoff_dt: datetime,
     floor_dt: datetime,
     guard: RSSGuard | None = None,
+    skip_live_tail: bool = False,
 ) -> OhlcvRefreshResult:
     symbol = _canonical_refresh_symbol(symbol)
     refresh_started_at = time.perf_counter()
@@ -895,7 +896,9 @@ def refresh_symbol_raw_first_ohlcv(
                 )
 
     if live_start_ms <= cutoff_ms:
-        if not _supports_live_raw_symbol(symbol):
+        if skip_live_tail:
+            live_tail_status = "skipped_by_policy"
+        elif not _supports_live_raw_symbol(symbol):
             live_tail_status = "skipped_unsupported_symbol"
         else:
             started_at = time.perf_counter()
@@ -1016,6 +1019,7 @@ def refresh_symbol_raw_first_ohlcv_worker(
     exchange_id: str,
     cutoff_utc: str,
     floor_utc: str,
+    skip_live_tail: bool = False,
 ) -> OhlcvRefreshWorkerPayload:
     repo = ParquetMarketDataRepository(str(db_path))
     cutoff_dt = parse_utc(cutoff_utc)
@@ -1030,6 +1034,7 @@ def refresh_symbol_raw_first_ohlcv_worker(
         cutoff_dt=cutoff_dt,
         floor_dt=floor_dt,
         guard=None,
+        skip_live_tail=bool(skip_live_tail),
     )
     return OhlcvRefreshWorkerPayload(
         result=result,
@@ -1050,6 +1055,7 @@ def refresh_ohlcv_symbols(
     reserve_memory_bytes: int,
     per_worker_memory_bytes: int,
     historical_cost_report_path: Path | str | None = None,
+    skip_live_tail: bool = False,
 ) -> tuple[list[OhlcvRefreshResult], dict[str, Any]]:
     ordered_symbols = _canonicalize_refresh_symbols(list(symbols or []))
     if not ordered_symbols:
@@ -1104,6 +1110,7 @@ def refresh_ohlcv_symbols(
                 cutoff_dt=cutoff_dt,
                 floor_dt=floor_dt,
                 guard=guard,
+                skip_live_tail=bool(skip_live_tail),
             )
             ordered_results[symbol] = result
         worker_meta["peak_worker_rss_bytes"] = 0
@@ -1120,6 +1127,7 @@ def refresh_ohlcv_symbols(
                 exchange_id=exchange_id,
                 cutoff_utc=cutoff_utc,
                 floor_utc=floor_utc,
+                skip_live_tail=bool(skip_live_tail),
             ): symbol
             for symbol in ordered_symbols
         }
@@ -1329,6 +1337,22 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=DEFAULT_PARALLEL_WORKER_MEMORY_BYTES,
     )
+    parser.add_argument(
+        "--skip-live-tail",
+        action="store_true",
+        help=(
+            "Archive-only refresh mode for bounded historical chunks. "
+            "Default keeps live-tail fetching enabled."
+        ),
+    )
+    parser.add_argument(
+        "--skip-feature-refresh",
+        action="store_true",
+        help=(
+            "Skip feature-point refresh/support inventory work for intermediate "
+            "OHLCV backfill chunks. Default keeps feature refresh enabled."
+        ),
+    )
     return parser
 
 
@@ -1354,7 +1378,7 @@ def main(argv: list[str] | None = None) -> int:
         portfolio_symbols,
         priority_symbols=parse_symbol_tokens(args.priority_symbols),
     )
-    feature_symbols = load_feature_symbols(bundle_override)
+    feature_symbols = [] if bool(args.skip_feature_refresh) else load_feature_symbols(bundle_override)
     effective_memory_budget_bytes, system_memory_budget_bytes = (
         resolve_effective_memory_budget_bytes(int(args.memory_budget_bytes))
     )
@@ -1385,6 +1409,8 @@ def main(argv: list[str] | None = None) -> int:
         "collection_cutoff_utc": iso_utc(cutoff_dt),
         "portfolio_symbols": portfolio_symbols,
         "feature_symbols": feature_symbols,
+        "skip_live_tail": bool(args.skip_live_tail),
+        "skip_feature_refresh": bool(args.skip_feature_refresh),
         "memory_budget_bytes": int(args.memory_budget_bytes),
         "effective_memory_budget_bytes": int(effective_memory_budget_bytes),
         "safe_session_memory_cap_bytes": int(DEFAULT_SAFE_SESSION_MEMORY_CAP_BYTES),
@@ -1439,6 +1465,7 @@ def main(argv: list[str] | None = None) -> int:
             reserve_memory_bytes=max(0, int(args.parallel_reserve_bytes)),
             per_worker_memory_bytes=max(1, int(args.parallel_per_worker_bytes)),
             historical_cost_report_path=output_json,
+            skip_live_tail=bool(args.skip_live_tail),
         )
         payload["ohlcv_results"] = [asdict(result) for result in ohlcv_results]
         payload["parallel"] = dict(parallel_meta)
