@@ -97,7 +97,10 @@ def test_build_payload_hashes_artifacts_and_records_baselines(tmp_path: Path) ->
     assert payload["source_artifacts"]["prd"]["sha256"] == module._sha256_file(prd)
     assert payload["data_coverage"]["latest_available_data_utc"] == "2026-06-13T08:30:00"
     assert payload["universe"]["symbols"] == ["AAPLUSDT", "BTCUSDT", "SPYUSDT"]
-    assert payload["current_baseline_labels"][0]["candidate_label"] == "dynamic_conviction_switch:clean"
+    assert (
+        payload["current_baseline_labels"][0]["candidate_label"]
+        == "dynamic_conviction_switch:clean"
+    )
     assert (
         payload["current_baseline_labels"][2]["readiness_label"]
         == "shadow_freeze_only_requires_fresh_forward"
@@ -119,7 +122,9 @@ def test_source_registry_validation_rejects_cycle_allowed_credentialed_source() 
     validation = module.validate_source_registry(bad)
 
     assert validation["valid"] is False
-    assert validation["violations"][0]["reason"] == "cycle_allowed_source_requires_disallowed_access"
+    assert (
+        validation["violations"][0]["reason"] == "cycle_allowed_source_requires_disallowed_access"
+    )
 
 
 def test_write_outputs_persists_snapshot_registry_and_hash(tmp_path: Path) -> None:
