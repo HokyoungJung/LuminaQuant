@@ -797,6 +797,11 @@ _NON_LEAF_LABEL_TOKENS = (
     "lagged_shadow_leaf_router:",
 )
 
+_MOONSHOT_LABEL_PREFIXES = (
+    "moonshot",
+    "profit_moonshot",
+)
+
 _NON_LEAF_PROFILE_KIND_TOKENS = (
     "hybrid",
     "blend",
@@ -944,6 +949,8 @@ def _leaf_strategy_material_candidate(candidate: CandidateResult) -> bool:
     if any(token in label for token in _NON_LEAF_LABEL_TOKENS):
         return False
     if any(token in profile_id for token in _NON_LEAF_LABEL_TOKENS):
+        return False
+    if _row_uses_moonshot_namespace(row, candidate.candidate_label):
         return False
     if _row_calendar_primary_reasons(row):
         return False
@@ -3749,6 +3756,7 @@ def _clean_source_candidate(candidate: CandidateResult) -> bool:
         candidate.returns.size
         and _leaf_strategy_material_candidate(candidate)
         and not _row_references_non_leaf_material(row)
+        and not _row_uses_moonshot_namespace(row, candidate.candidate_label)
         and not row.get("uses_locked_oos_for_selection")
         and not row.get("same_month_self_feeding")
         and not row.get("current_fold_oos_used_for_weighting")
@@ -3790,12 +3798,22 @@ def _candidate_label_is_non_leaf_reference(label: str) -> bool:
     )
 
 
+def _candidate_label_is_moonshot_namespace(label: str) -> bool:
+    lower = str(label or "").lower()
+    family = lower.split(":", 1)[0]
+    return any(
+        lower.startswith(prefix) or family.startswith(prefix)
+        for prefix in _MOONSHOT_LABEL_PREFIXES
+    )
+
+
 def _row_reference_labels(row: Mapping[str, Any]) -> set[str]:
     refs: set[str] = set()
     for key in (
         "selected_candidate_label",
         "aggressive_candidate_label",
         "fallback_candidate_label",
+        "cash_guard_source_candidate_label",
         "dynamic_expert_label",
         "source_candidate_label",
     ):
@@ -3818,6 +3836,22 @@ def _row_reference_labels(row: Mapping[str, Any]) -> set[str]:
 
 def _row_references_non_leaf_material(row: Mapping[str, Any]) -> bool:
     return any(_candidate_label_is_non_leaf_reference(ref) for ref in _row_reference_labels(row))
+
+
+def _row_uses_moonshot_namespace(
+    row: Mapping[str, Any],
+    candidate_label: str | None = None,
+) -> bool:
+    labels = set(_row_reference_labels(row))
+    for value in (
+        candidate_label,
+        row.get("candidate_label"),
+        row.get("profile_id"),
+        row.get("source_profile_id"),
+    ):
+        if value:
+            labels.add(str(value))
+    return any(_candidate_label_is_moonshot_namespace(label) for label in labels)
 
 
 def _mdd30_high_volatility_candidates(
@@ -5484,6 +5518,7 @@ def _evaluate_candidate(candidate: CandidateResult, fold: MonthlyFold) -> dict[s
     source_post_oos_research_variant = bool(row.get("source_post_oos_research_variant", False))
     uses_locked_oos_for_selection = bool(row.get("uses_locked_oos_for_selection", False))
     nested_hybrid_dependency = _row_references_non_leaf_material(row)
+    moonshot_label_namespace = _row_uses_moonshot_namespace(row, candidate.candidate_label)
     return {
         "fold_id": fold.fold_id,
         "family": candidate.family,
@@ -5518,11 +5553,13 @@ def _evaluate_candidate(candidate: CandidateResult, fold: MonthlyFold) -> dict[s
         "post_oos_research_variant": post_oos_research_variant,
         "requires_fresh_forward_shadow": requires_fresh_forward_shadow,
         "nested_hybrid_dependency": nested_hybrid_dependency,
+        "moonshot_label_namespace": moonshot_label_namespace,
         "clean_promotion_eligible": not uses_locked_oos_for_selection
         and not post_oos_research_variant
         and not requires_fresh_forward_shadow
         and not source_post_oos_research_variant
-        and not nested_hybrid_dependency,
+        and not nested_hybrid_dependency
+        and not moonshot_label_namespace,
         "ready_for_paper": bool(row.get("ready_for_paper") or row.get("paper_testnet_candidate")),
         "ready_for_real": bool(row.get("ready_for_real", False)),
         "real_money_execution": bool(row.get("real_money_execution", False)),
@@ -5655,6 +5692,7 @@ def _aggregate_rows(fold_rows: Sequence[Mapping[str, Any]]) -> list[dict[str, An
             and max(oos_mdds, default=0.0) <= ROBUST_DEFAULT_MAX_OOS_MDD_LIMIT
         )
         nested_hybrid_dependency = any(bool(row.get("nested_hybrid_dependency")) for row in rows)
+        moonshot_label_namespace = any(bool(row.get("moonshot_label_namespace")) for row in rows)
         post_oos_research_variant = any(bool(row.get("post_oos_research_variant")) for row in rows)
         requires_fresh_forward_shadow = any(
             bool(row.get("requires_fresh_forward_shadow")) for row in rows
@@ -5666,6 +5704,7 @@ def _aggregate_rows(fold_rows: Sequence[Mapping[str, Any]]) -> list[dict[str, An
             reason
             for reason, active in (
                 ("nested_hybrid_dependency", nested_hybrid_dependency),
+                ("moonshot_label_namespace", moonshot_label_namespace),
                 ("post_oos_research_variant", post_oos_research_variant),
                 ("requires_fresh_forward_shadow", requires_fresh_forward_shadow),
                 ("uses_locked_oos_for_selection", uses_locked_oos_for_selection),
@@ -5684,6 +5723,7 @@ def _aggregate_rows(fold_rows: Sequence[Mapping[str, Any]]) -> list[dict[str, An
                 "fold_count": len(rows),
                 "clean_promotion_eligible": clean_candidate,
                 "nested_hybrid_dependency": nested_hybrid_dependency,
+                "moonshot_label_namespace": moonshot_label_namespace,
                 "post_oos_research_variant": post_oos_research_variant,
                 "requires_fresh_forward_shadow": requires_fresh_forward_shadow,
                 "uses_locked_oos_for_selection": uses_locked_oos_for_selection,
@@ -5797,6 +5837,7 @@ def _demoted_nested_or_historical_rankings(
         if not bool(row.get("clean_promotion_eligible"))
         and (
             bool(row.get("nested_hybrid_dependency"))
+            or bool(row.get("moonshot_label_namespace"))
             or bool(row.get("post_oos_research_variant"))
             or bool(row.get("requires_fresh_forward_shadow"))
             or bool(row.get("uses_locked_oos_for_selection"))
@@ -5858,6 +5899,7 @@ def _sanitize_research_dependency_flags(
     for row in mutable_rows:
         label = str(row.get("candidate_label"))
         nested_hybrid_dependency = _row_references_non_leaf_material(row)
+        moonshot_label_namespace = _row_uses_moonshot_namespace(row, label)
         contaminated = label in post_oos_labels or any(
             label.startswith(prefix) for prefix in post_oos_prefixes
         )
@@ -5866,11 +5908,13 @@ def _sanitize_research_dependency_flags(
             row["requires_fresh_forward_shadow"] = True
         uses_oos = bool(row.get("uses_locked_oos_for_selection", False))
         row["nested_hybrid_dependency"] = nested_hybrid_dependency
+        row["moonshot_label_namespace"] = moonshot_label_namespace
         row["clean_promotion_eligible"] = (
             not uses_oos
             and not bool(row.get("post_oos_research_variant", False))
             and not bool(row.get("requires_fresh_forward_shadow", False))
             and not nested_hybrid_dependency
+            and not moonshot_label_namespace
         )
     return mutable_rows
 
@@ -5992,6 +6036,7 @@ def _row_is_clean_leaf_material(row: Mapping[str, Any]) -> bool:
         and not any(token in label for token in _NON_LEAF_LABEL_TOKENS)
         and not any(token in source_profile_id for token in _NON_LEAF_LABEL_TOKENS)
         and not any(token in profile_kind for token in _NON_LEAF_PROFILE_KIND_TOKENS)
+        and not _row_uses_moonshot_namespace(row, label)
         and not _row_calendar_primary_reasons(row)
         and not _row_references_non_leaf_material(row)
         and not row.get("selection_reasons")
