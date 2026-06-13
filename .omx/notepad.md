@@ -1010,3 +1010,13 @@ Continued strategy digging after Rust fold acceleration. Added two clean-discove
 - Best clean under 15% MDD remains `dynamic_conviction_switch:t0.85_risk_capped_fallback_val_ret02_calmar80_gate`: OOS comp 12.97%, max OOS MDD 10.08%, hit 3/10, hard-stop promotable false.
 - TradFi cash-session candidates all cash-guarded after stability gates: OOS comp 0.00%, MDD 0.00%; conclusion: TradFi module is currently risk-control/shadow-watchlist, not alpha/promotable sleeve.
 - Real-money remains blocked by preflight: `block_until_preflight_gaps_closed`; blockers include decision_allows_live_start=false, decision_runtime_compatible=false, shadow_parity_ratio=null / shadow_parity_satisfied=false.
+
+## 2026-06-14 KST — TradFi external-alpha follow-up committed note
+
+- Added durable research handoff: `docs/session_handoff_20260614_tradfi_external_alpha_followup.md`.
+- Follow-up verdict artifact: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/tradfi_external_alpha_search_20260613/wf_110_asset_external_v1/tradfi_external_alpha_improvement_followup_latest.json|md`.
+- Current decision: no clean/promotable improvement found; real/paper/shadow all blocked.
+- Best clean baseline: `dynamic_conviction_switch:t0.85_risk_capped_fallback_val_ret02_calmar80_gate_val_mdd30_scaled`, OOS comp +34.39%, MDD 27.69%, hit 3/10, hard-stop not promotable.
+- Freeze-only moonshot: `codex_lagged_leaf_router_grid:h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_exact_unscaled`, OOS comp +79.42%, MDD 27.69%, hit 4/10, post-OOS/fresh-forward only.
+- Additional attempts failed promotion: row-level selector -18.87%, clean new-alpha TradFi+leaders -8.54%, raw TradFi lead-lag selector -91.21% despite invalid post-hoc upper bound +1324.50%.
+- Verification: py_compile pass; targeted pytest 59 passed; ruff check pass.

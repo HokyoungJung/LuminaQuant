@@ -190,6 +190,130 @@ def test_cost_model_is_pinned_to_10bps_round_trip() -> None:
     assert result.returns.sum() == pytest.approx(-0.001)
 
 
+def test_report_rows_include_cost_mdd_concentration_and_readiness_schema() -> None:
+    index = pd.date_range("2025-01-01", "2025-03-31", freq="1D")
+    fold = module.MonthlyFold(
+        fold_id="2025-03",
+        refit_at=pd.Timestamp("2025-03-01"),
+        train=(pd.Timestamp("2025-01-01"), pd.Timestamp("2025-01-31")),
+        validation=(pd.Timestamp("2025-02-01"), pd.Timestamp("2025-02-28")),
+        locked_oos=(pd.Timestamp("2025-03-01"), pd.Timestamp("2025-03-31")),
+    )
+    candidate = module.CandidateResult(
+        family="tradfi_vol_managed_v1",
+        candidate_label="tradfi_vol_managed_v1:schema_probe",
+        source_profile_id="tradfi_vol_managed_v1:schema_probe",
+        row={
+            "profile_id": "tradfi_vol_managed_v1:schema_probe",
+            "ready_for_paper": True,
+            "readiness_label": "clean_shadow_candidate",
+            "allowed_usage_label": "clean_candidate",
+            "external_evidence_refs": ["moreira_muir_volatility_managed_portfolios"],
+            "selected_symbols": ["SPYUSDT", "NVDAUSDT"],
+            "selected_timeframes": ["1h"],
+            "symbol_weights": {"SPYUSDT": 0.60, "NVDAUSDT": 0.40},
+            "locked_oos_return_per_turnover_proxy_bps": 35.0,
+            "locked_oos_return_stress_10bps_proxy": 0.050,
+            "locked_oos_return_stress_15bps_proxy": 0.045,
+            "locked_oos_return_stress_20bps_proxy": 0.040,
+        },
+        returns=pd.Series(0.001, index=index, dtype=float),
+    )
+
+    row = module._evaluate_candidate(candidate, fold)
+    aggregate = module._aggregate_rows([row])[0]
+
+    assert row["cost_stress"]["stress_bps"] == [10, 15, 20]
+    assert row["cost_stress"]["splits"]["locked_oos"]["stress_returns"]["15bps"] == 0.045
+    assert aggregate["cost_stress_bps"] == [10, 15, 20]
+    assert aggregate["latest_cost_stress"]["has_turnover_proxy"] is True
+    assert aggregate["max_oos_mdd"] >= 0.0
+    assert aggregate["latest_oos_return"] == row["locked_oos"]["total_return"]
+    assert aggregate["concentration_summary"]["max_top_symbol_weight"] == pytest.approx(0.60)
+    assert aggregate["selected_symbol_count"] == 2
+    assert aggregate["readiness_labels"] == ["clean_shadow_candidate"]
+
+
+def test_tradfi_external_alpha_default_family_budget_is_bounded() -> None:
+    args = module.parse_args([])
+    external_families = {
+        "tradfi_vol_managed_v1",
+        "tradfi_momentum_regime_v1",
+        "tradfi_intraday_session_v1",
+        "tradfi_overnight_split_v1",
+        "factor_regime_router_v1",
+    }
+
+    assert external_families.issubset(set(args.families))
+    assert len(external_families) == 5
+
+    fold = module.MonthlyFold(
+        fold_id="2025-03",
+        refit_at=pd.Timestamp("2025-03-01"),
+        train=(pd.Timestamp("2025-01-01"), pd.Timestamp("2025-01-31")),
+        validation=(pd.Timestamp("2025-02-01"), pd.Timestamp("2025-02-28")),
+        locked_oos=(pd.Timestamp("2025-03-01"), pd.Timestamp("2025-03-31")),
+    )
+    leaf = _candidate(
+        "profile_optuna:growth_mdd20_gross8_69_asset_profile_optuna",
+        daily_return=0.003,
+    )
+    streams = [
+        _tradfi_source_stream(
+            symbol="SPYUSDT",
+            asset_group="tradfi_etf_index",
+            model_id="spy_budget",
+            timeframe="1h",
+            cash_session_return=0.00020,
+        ),
+        _tradfi_source_stream(
+            symbol="NVDAUSDT",
+            model_id="nvda_budget",
+            timeframe="1h",
+            cash_session_return=0.00018,
+        ),
+        _tradfi_source_stream(
+            symbol="BTCUSDT",
+            asset_group="crypto_core",
+            model_id="btc_budget",
+            timeframe="1h",
+            cash_session_return=0.00016,
+        ),
+        _tradfi_source_stream(
+            symbol="ETHUSDT",
+            asset_group="crypto_core",
+            model_id="eth_budget",
+            timeframe="1h",
+            cash_session_return=0.00014,
+        ),
+    ]
+    reference = pd.Series(0.0001, index=pd.date_range("2025-01-01", "2025-03-31"), dtype=float)
+    runtime_counts = {
+        "tradfi_vol_managed_v1": len(module._tradfi_vol_managed_v1_candidates([leaf], fold)),
+        "tradfi_momentum_regime_v1": len(
+            module._tradfi_momentum_regime_v1_candidates(streams, fold)
+        ),
+        "tradfi_intraday_session_v1": len(
+            module._tradfi_intraday_session_v1_candidates(streams, fold)
+        ),
+        "tradfi_overnight_split_v1": len(
+            module._tradfi_overnight_split_v1_candidates(streams, fold)
+        ),
+        "factor_regime_router_v1": len(
+            module._factor_regime_router_v1_candidates(reference)
+        ),
+    }
+
+    assert runtime_counts == {
+        "tradfi_vol_managed_v1": 3,
+        "tradfi_momentum_regime_v1": 3,
+        "tradfi_intraday_session_v1": 2,
+        "tradfi_overnight_split_v1": 1,
+        "factor_regime_router_v1": 1,
+    }
+    assert sum(runtime_counts.values()) <= 10
+
+
 def test_leaf_strategy_material_filter_rejects_nested_hybrid_inputs() -> None:
     leaf = _candidate("profile_optuna:growth_mdd20_gross8_69_asset_profile_optuna")
     hybrid = _candidate("cross_candidate_hybrid:hybrid_v3_5", family="cross_candidate_hybrid")
@@ -1003,6 +1127,216 @@ def test_tradfi_us_equity_session_switch_cash_guards_when_no_tradfi_signal() -> 
     assert all(module._evaluate_candidate(candidate, fold)["clean_promotion_eligible"] is True for candidate in candidates)
 
 
+def test_tradfi_vol_managed_v1_is_clean_and_lagged() -> None:
+    fold = module.MonthlyFold(
+        fold_id="2025-03",
+        refit_at=pd.Timestamp("2025-03-01"),
+        train=(pd.Timestamp("2025-01-01"), pd.Timestamp("2025-01-31")),
+        validation=(pd.Timestamp("2025-02-01"), pd.Timestamp("2025-02-28")),
+        locked_oos=(pd.Timestamp("2025-03-01"), pd.Timestamp("2025-03-31")),
+    )
+    leaf = _candidate(
+        "profile_optuna:growth_mdd20_gross8_69_asset_profile_optuna",
+        daily_return=0.003,
+    )
+
+    candidates = module._tradfi_vol_managed_v1_candidates([leaf], fold)
+    by_label = {candidate.candidate_label: candidate for candidate in candidates}
+
+    assert {
+        "tradfi_vol_managed_v1:leaf_top1_l20_target80_mdd_convex",
+        "tradfi_vol_managed_v1:leaf_top1_l40_target65_defensive",
+        "tradfi_vol_managed_v1:leaf_top3_l40_equal_target70",
+    } == set(by_label)
+    row = module._evaluate_candidate(
+        by_label["tradfi_vol_managed_v1:leaf_top1_l20_target80_mdd_convex"],
+        fold,
+    )
+    assert row["clean_promotion_eligible"] is True
+    assert row["uses_locked_oos_for_selection"] is False
+    assert row["external_evidence_refs"] == ["moreira_muir_volatility_managed_portfolios"]
+    assert row["readiness_label"] == "clean_shadow_candidate"
+    assert (
+        by_label[
+            "tradfi_vol_managed_v1:leaf_top1_l20_target80_mdd_convex"
+        ].row["volatility_management"]["signal_lag_policy"]
+        == "rolling_volatility_and_drawdown_shifted_one_bar"
+    )
+
+
+def test_tradfi_external_no_signal_cash_guards_are_diagnostic_only() -> None:
+    fold = module.MonthlyFold(
+        fold_id="2025-03",
+        refit_at=pd.Timestamp("2025-03-01"),
+        train=(pd.Timestamp("2025-01-01"), pd.Timestamp("2025-01-31")),
+        validation=(pd.Timestamp("2025-02-01"), pd.Timestamp("2025-02-28")),
+        locked_oos=(pd.Timestamp("2025-03-01"), pd.Timestamp("2025-03-31")),
+    )
+    losing_leaf = _candidate(
+        "profile_optuna:growth_mdd20_gross8_69_asset_profile_optuna",
+        daily_return=-0.001,
+    )
+    weak_stream = _tradfi_source_stream(
+        symbol="SPYUSDT",
+        asset_group="tradfi_etf_index",
+        model_id="spy_weak",
+        timeframe="1h",
+        cash_session_return=-0.00020,
+    )
+
+    vol_guard = module._tradfi_vol_managed_v1_candidates([losing_leaf], fold)[0]
+    momentum_guard = module._tradfi_momentum_regime_v1_candidates([weak_stream], fold)[0]
+
+    for candidate in (vol_guard, momentum_guard):
+        row = module._evaluate_candidate(candidate, fold)
+        assert row["clean_promotion_eligible"] is False
+        assert row["requires_fresh_forward_shadow"] is True
+        assert row["ready_for_paper"] is False
+        assert row["candidate_tier"] == "diagnostic_only"
+        assert row["readiness_label"] == "diagnostic_only"
+        assert str(row["allowed_usage_label"]).startswith("diagnostic_only")
+
+
+def test_tradfi_momentum_regime_v1_balances_tradfi_and_crypto_sources() -> None:
+    fold = module.MonthlyFold(
+        fold_id="2025-03",
+        refit_at=pd.Timestamp("2025-03-01"),
+        train=(pd.Timestamp("2025-01-01"), pd.Timestamp("2025-01-31")),
+        validation=(pd.Timestamp("2025-02-01"), pd.Timestamp("2025-02-28")),
+        locked_oos=(pd.Timestamp("2025-03-01"), pd.Timestamp("2025-03-31")),
+    )
+    streams = [
+        _tradfi_source_stream(
+            symbol="SPYUSDT",
+            asset_group="tradfi_etf_index",
+            model_id="spy_trend",
+            timeframe="1h",
+            cash_session_return=0.00020,
+        ),
+        _tradfi_source_stream(
+            symbol="NVDAUSDT",
+            model_id="nvda_trend",
+            timeframe="1h",
+            cash_session_return=0.00018,
+        ),
+        _tradfi_source_stream(
+            symbol="BTCUSDT",
+            asset_group="crypto_core",
+            model_id="btc_trend",
+            timeframe="1h",
+            cash_session_return=0.00016,
+        ),
+        _tradfi_source_stream(
+            symbol="ETHUSDT",
+            asset_group="crypto_core",
+            model_id="eth_trend",
+            timeframe="1h",
+            cash_session_return=0.00014,
+        ),
+    ]
+
+    candidates = module._tradfi_momentum_regime_v1_candidates(streams, fold)
+    evaluated = [module._evaluate_candidate(candidate, fold) for candidate in candidates]
+
+    assert {
+        "tradfi_momentum_regime_v1:trend_top12_balanced_mdd15",
+        "tradfi_momentum_regime_v1:trend_top8_us_equity_tilt_mdd18",
+        "tradfi_momentum_regime_v1:trend_defensive_top6_mdd12",
+    } == {candidate.candidate_label for candidate in candidates}
+    assert all(row["clean_promotion_eligible"] is True for row in evaluated)
+    assert all(row["uses_locked_oos_for_selection"] is False for row in evaluated)
+    balanced = next(
+        row
+        for row in evaluated
+        if row["candidate_label"] == "tradfi_momentum_regime_v1:trend_top12_balanced_mdd15"
+    )
+    assert {"us_equity_tradfi", "crypto_24_7"}.issubset(
+        balanced["tradfi_us_equity_controls"]["regime_bucket_weights"]
+    )
+    assert balanced["external_evidence_refs"] == [
+        "moskowitz_ooi_pedersen_time_series_momentum"
+    ]
+
+
+def test_tradfi_intraday_session_v1_uses_open_signal_before_close_exposure() -> None:
+    fold = module.MonthlyFold(
+        fold_id="2025-03",
+        refit_at=pd.Timestamp("2025-03-01"),
+        train=(pd.Timestamp("2025-01-01"), pd.Timestamp("2025-01-31")),
+        validation=(pd.Timestamp("2025-02-01"), pd.Timestamp("2025-02-28")),
+        locked_oos=(pd.Timestamp("2025-03-01"), pd.Timestamp("2025-03-31")),
+    )
+    streams = [
+        _tradfi_source_stream(
+            symbol="SPYUSDT",
+            asset_group="tradfi_etf_index",
+            model_id="spy_intraday",
+            cash_session_return=0.00030,
+        ),
+        _tradfi_source_stream(
+            symbol="NVDAUSDT",
+            model_id="nvda_intraday",
+            cash_session_return=0.00025,
+        ),
+        _tradfi_source_stream(
+            symbol="AAPLUSDT",
+            model_id="aapl_intraday",
+            cash_session_return=0.00022,
+        ),
+    ]
+
+    candidates = module._tradfi_intraday_session_v1_candidates(streams, fold)
+    by_label = {candidate.candidate_label: candidate for candidate in candidates}
+    candidate = by_label["tradfi_intraday_session_v1:open_impulse_close_top6_mdd12"]
+    row = module._evaluate_candidate(candidate, fold)
+
+    assert row["clean_promotion_eligible"] is True
+    assert row["bar_close_lag_policy"] == "signal_window_ends_before_close_window_exposure"
+    assert row["external_evidence_refs"] == [
+        "gao_han_li_zhou_intraday_momentum",
+        "nyse_hours_calendars",
+    ]
+    assert candidate.returns.loc[pd.Timestamp("2025-02-03 11:00:00")] == 0.0
+    assert candidate.returns.loc[pd.Timestamp("2025-02-03 20:00:00")] > 0.0
+
+
+def test_tradfi_overnight_and_factor_router_are_diagnostic_only() -> None:
+    fold = module.MonthlyFold(
+        fold_id="2025-03",
+        refit_at=pd.Timestamp("2025-03-01"),
+        train=(pd.Timestamp("2025-01-01"), pd.Timestamp("2025-01-31")),
+        validation=(pd.Timestamp("2025-02-01"), pd.Timestamp("2025-02-28")),
+        locked_oos=(pd.Timestamp("2025-03-01"), pd.Timestamp("2025-03-31")),
+    )
+    index = pd.date_range("2025-01-01", "2025-03-31 23:30", freq="30min")
+    returns = pd.Series(0.00010, index=index, dtype=float)
+    returns.iloc[module._us_equity_cash_session_mask(index)] = 0.0
+    stream = module.broad69.CandidateStream(
+        row={
+            "model_id": "spy_overnight",
+            "family": "cross_sectional_momentum_rank",
+            "symbol": "SPYUSDT",
+            "asset_group": "tradfi_etf_index",
+            "timeframe": "30m",
+            "side": "long",
+        },
+        returns=returns,
+        position=pd.Series(1.0, index=index, dtype=float),
+    )
+
+    overnight = module._tradfi_overnight_split_v1_candidates([stream], fold)[0]
+    factor = module._factor_regime_router_v1_candidates(returns)[0]
+    overnight_row = module._evaluate_candidate(overnight, fold)
+    factor_row = module._evaluate_candidate(factor, fold)
+
+    assert overnight_row["clean_promotion_eligible"] is False
+    assert overnight_row["requires_fresh_forward_shadow"] is True
+    assert overnight_row["allowed_usage_label"] == "diagnostic_only_until_timestamp_validated"
+    assert factor_row["clean_promotion_eligible"] is False
+    assert factor_row["factor_release_lag_status"] == "missing_publication_timestamp_cache"
+    assert factor_row["external_evidence_refs"] == ["fama_french_data_library"]
+
+
 def test_asset_timeframe_leverage_family_marks_clean_train_validation_policy(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1645,6 +1979,11 @@ def test_non_leaf_reference_detector_covers_portfolio_families_and_selected_toke
         "meta_portfolio:validation_balanced",
         "dynamic_conviction_switch:t0.90_risk_capped_fallback",
         "tradfi_us_equity_session_switch:cash_session_top8_mdd15",
+        "tradfi_vol_managed_v1:leaf_top1_l20_target80_mdd_convex",
+        "tradfi_momentum_regime_v1:trend_top12_balanced_mdd15",
+        "tradfi_intraday_session_v1:open_impulse_close_top6_mdd12",
+        "tradfi_overnight_split_v1:diagnostic_non_cash_session_top6",
+        "factor_regime_router_v1:release_lag_not_encoded_diagnostic_reject",
         "validation_selector:top_clean",
         "mdd30_high_vol_gate:breakout_x1_50",
         "profile_optuna:selected_optuna",
