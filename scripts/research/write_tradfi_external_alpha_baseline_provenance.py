@@ -20,7 +20,12 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ALPHA_V2_ROOT = (
-    REPO_ROOT / "var" / "reports" / "profit_moonshot_20260501" / "current_tail_20260508" / "alpha_v2"
+    REPO_ROOT
+    / "var"
+    / "reports"
+    / "profit_moonshot_20260501"
+    / "current_tail_20260508"
+    / "alpha_v2"
 )
 SOURCE_REPORT_DIR = ALPHA_V2_ROOT / "alpha_zoo_110_asset_tradfi_aware_wf_20260613"
 DEFAULT_BASELINE_WF_JSON = SOURCE_REPORT_DIR / "tradfi_aware_wf_latest.json"
@@ -168,7 +173,9 @@ def _extract_data_coverage(
     universe = universe if isinstance(universe, Mapping) else {}
 
     latest = summary_coverage.get("latest_available_data") or wf_coverage.get("global_latest_utc")
-    requested = summary_coverage.get("requested_symbol_count") or universe.get("requested_symbol_count")
+    requested = summary_coverage.get("requested_symbol_count") or universe.get(
+        "requested_symbol_count"
+    )
     loaded = summary_coverage.get("loaded_symbol_count") or universe.get("loaded_symbol_count")
     missing = summary_coverage.get("missing_symbol_count") or universe.get("missing_symbol_count")
     fold_count = summary_coverage.get("fold_count")
@@ -195,13 +202,23 @@ def _extract_universe(wf_payload: Mapping[str, Any]) -> dict[str, Any]:
     data_coverage = wf_payload.get("data_coverage")
     universe = universe if isinstance(universe, Mapping) else {}
     data_coverage = data_coverage if isinstance(data_coverage, Mapping) else {}
-    symbols = universe.get("symbols") or universe.get("loaded_symbols") or data_coverage.get(
-        "symbols_with_any_rows"
+    symbols = (
+        universe.get("symbols")
+        or universe.get("loaded_symbols")
+        or data_coverage.get("symbols_with_any_rows")
     )
-    normalized = sorted(str(symbol) for symbol in symbols if str(symbol).strip()) if isinstance(symbols, list) else []
+    normalized = (
+        sorted(str(symbol) for symbol in symbols if str(symbol).strip())
+        if isinstance(symbols, list)
+        else []
+    )
     missing = universe.get("missing_symbols")
     if not isinstance(missing, list):
-        missing = data_coverage.get("missing_symbols") if isinstance(data_coverage.get("missing_symbols"), list) else []
+        missing = (
+            data_coverage.get("missing_symbols")
+            if isinstance(data_coverage.get("missing_symbols"), list)
+            else []
+        )
     payload = {
         "symbol_count": len(normalized),
         "symbols": normalized,
@@ -575,7 +592,7 @@ def render_markdown(payload: Mapping[str, Any]) -> str:
 def _pct(value: Any) -> str:
     try:
         number = float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return "n/a"
     if number != number or abs(number) == float("inf"):
         return "n/a"
@@ -592,7 +609,9 @@ def write_outputs(payload: Mapping[str, Any], *, output_dir: Path) -> dict[str, 
     registry_path = output_dir / "external_source_registry.json"
     sha_path = output_dir / "baseline_evidence_snapshot.sha256"
 
-    snapshot_path.write_text(json.dumps(snapshot, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    snapshot_path.write_text(
+        json.dumps(snapshot, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     snapshot_md_path.write_text(render_markdown(snapshot), encoding="utf-8")
     registry_path.write_text(
         json.dumps(source_registry, indent=2, sort_keys=True) + "\n", encoding="utf-8"
