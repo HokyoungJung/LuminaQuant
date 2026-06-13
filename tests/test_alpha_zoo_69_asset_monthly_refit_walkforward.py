@@ -1526,20 +1526,61 @@ def test_recompute_payload_separates_raw_clean_and_demoted_rankings() -> None:
         "validation": {"total_return": 0.18, "mdd": 0.04},
         "locked_oos": {"total_return": 0.30, "mdd": 0.03},
     }
+    moonshot_research_row = {
+        "fold_id": "2025-03",
+        "family": "profit_moonshot_breakout",
+        "candidate_label": "profit_moonshot_breakout:raw_winner",
+        "clean_promotion_eligible": True,
+        "train": {"total_return": 0.22, "mdd": 0.05},
+        "validation": {"total_return": 0.20, "mdd": 0.04},
+        "locked_oos": {"total_return": 0.35, "mdd": 0.03},
+    }
+    clean_label_wrapping_moonshot_source = {
+        "fold_id": "2025-03",
+        "family": "relaxed_efficiency",
+        "candidate_label": "relaxed_efficiency:cash_guard_wrapper",
+        "clean_promotion_eligible": True,
+        "cash_guard_source_candidate_label": "profit_moonshot_breakout:raw_winner",
+        "train": {"total_return": 0.18, "mdd": 0.05},
+        "validation": {"total_return": 0.16, "mdd": 0.04},
+        "locked_oos": {"total_return": 0.25, "mdd": 0.03},
+    }
 
     recomputed = module._recompute_payload_from_existing(
-        {"fold_candidate_rows": [clean_row, raw_winner_nested]}
+        {
+            "fold_candidate_rows": [
+                clean_row,
+                raw_winner_nested,
+                moonshot_research_row,
+                clean_label_wrapping_moonshot_source,
+            ]
+        }
     )
 
-    assert recomputed["aggregate_rankings"][0]["candidate_label"] == "meta_portfolio:raw_winner"
+    aggregate_by_label = {
+        row["candidate_label"]: row for row in recomputed["aggregate_rankings"]
+    }
+    demoted_by_label = {
+        row["candidate_label"]: row for row in recomputed["demoted_nested_or_historical_rankings"]
+    }
+
+    assert recomputed["aggregate_rankings"][0]["candidate_label"] == (
+        "profit_moonshot_breakout:raw_winner"
+    )
     assert recomputed["aggregate_rankings"][0]["clean_promotion_eligible"] is False
-    assert recomputed["clean_promotion_rankings"][0]["candidate_label"] == (
+    assert [row["candidate_label"] for row in recomputed["clean_promotion_rankings"]] == [
         "relaxed_efficiency:growth_leaf"
-    )
-    assert recomputed["demoted_nested_or_historical_rankings"][0]["candidate_label"] == (
-        "meta_portfolio:raw_winner"
-    )
-    assert recomputed["demoted_nested_or_historical_rankings"][0]["non_clean_reasons"] == [
+    ]
+    assert aggregate_by_label["profit_moonshot_breakout:raw_winner"][
+        "moonshot_label_namespace"
+    ] is True
+    assert demoted_by_label["profit_moonshot_breakout:raw_winner"]["non_clean_reasons"] == [
+        "moonshot_label_namespace"
+    ]
+    assert demoted_by_label["relaxed_efficiency:cash_guard_wrapper"]["non_clean_reasons"] == [
+        "moonshot_label_namespace"
+    ]
+    assert demoted_by_label["meta_portfolio:raw_winner"]["non_clean_reasons"] == [
         "nested_hybrid_dependency"
     ]
 
