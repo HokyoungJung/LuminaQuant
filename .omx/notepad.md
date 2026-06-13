@@ -408,6 +408,28 @@ Final portfolio validation rule: collect to the latest available tail at run tim
 
 
 ## MANUAL
+
+### 2026-06-13 KST — User-designated 69-asset WF strategy baseline set
+
+User-designated reference strategies for subsequent comparison/improvement work:
+
+1. **69-asset WF 연구 성과 최고 / clean 후보 중 최고**
+   - `relaxed_efficiency:hybrid_v3_5`
+   - OOS comp: **156.03%**
+   - Status: clean candidate top.
+
+2. **성능/실전 균형 shadow**
+   - `fixed_relaxed_dynamic_blend:relaxed60_dynamic40`
+   - OOS comp: **111.75%**, MDD: **16.19%**
+   - Status: strong performance/practical balance, but post-OOS/non-clean; requires fresh-forward validation before promotion.
+
+3. **기존 clean recommendation**
+   - `dynamic_conviction_switch:t0.90_risk_capped_fallback`
+   - OOS comp: **53.38%**
+   - Status: train/validation-only walk-forward selection, but forward-shadow only; not real-money eligible.
+
+Directive: Use these three strategies as the reference baseline set unless the user explicitly changes it.
+
 User directive for final validation: use the maximum currently available market-data tail, not a last-complete-day cutoff. Follow the repo's canonical data flow: raw Binance aggTrades -> materialized/derived OHLCV -> strategy/portfolio validation. Treat any 'strict validation' instinct that truncates current-day data as incorrect for this workflow. OOS start remains fixed at 2026-02-01T00:00:00Z.
 [2026-04-02T14:10:17Z] 2026-04-02 strict leverage resume: restored strict candidate resolution without old worktree exact_window artifacts. Added followup artifact fallback for .omx/worktrees/manual-worktrees, and run_grouped_allocator_strict_leverage_validation.py now falls back to strict_validation_cache candidate rows when source_components paths are dead. Verified: pytest 16 passed, ruff PASS, compileall PASS, live resolver smoke resolved root autoresearch artifact + both raw55_45 candidates with params. Heavy strict run was started under 5/6 GiB caps and observed around 1.25 GiB RSS, then stopped intentionally to avoid a long blocking run; no new validation artifact from that smoke.
 
@@ -980,3 +1002,11 @@ Fold-loop acceleration and alpha overlay continuation: added Rust `native/rust_a
 ## Working Memory — 2026-06-09T22:45:00KST
 
 Continued strategy digging after Rust fold acceleration. Added two clean-discovery families: `cross_sectional_residual_reversal` and `cross_sectional_dispersion_gated_momentum` (search hash `4dd982a04779707f11d4530059f314ebe965cdee32fbd5a92a87a946ca3c7be7`). Tests: clean-discovery + reuse-selector `30 passed`, ruff pass. Smoke results at 10bps, BTC/ETH/SOL/BNB 1h 3fold lev2: residual reversal standalone `-0.25%` comp / 0/2; dispersion standalone `+0.69%` / 2/3; overlay with dispersion degraded to `+0.75%` / 2/3; overlay excluding dispersion preserved prior best `+4.16%` comp / `+17.73%` ann / 3/3. Existing-candidate reuse `robust_quality_v1_top1` improved diagnostic to `+24.55%` comp / `+30.14%` ann / 7/10 but remains post-failure/fresh-forward-required. No live/shadow promotion; allocation 0%. Summary: var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/current_search_residual_dispersion_summary_20260609/current_search_residual_dispersion_summary_20260609.md.
+
+## 2026-06-13 TradFi-aware latest WF improvement result
+- Added/validated `tradfi_us_equity_session_switch` for US equity/ETF/premarket Binance TRADIFI perps: New-York cash-session bar-close mask, no overnight/perp after-hours return exposure in research proxy, train-stability floor, validation-spike guard, single-symbol/source caps, OOS never used for selection, real-money false.
+- Latest 110-symbol WF artifact: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_110_asset_tradfi_aware_wf_20260613/tradfi_aware_wf_latest.json` (110/110 loaded, latest data 2026-06-13T08:30:00, 10 folds).
+- Current best clean remains `dynamic_conviction_switch:t0.85_risk_capped_fallback_val_ret02_calmar80_gate_val_mdd30_scaled`: OOS comp 34.39%, max OOS MDD 27.69%, hit 3/10, hard-stop promotable false.
+- Best clean under 15% MDD remains `dynamic_conviction_switch:t0.85_risk_capped_fallback_val_ret02_calmar80_gate`: OOS comp 12.97%, max OOS MDD 10.08%, hit 3/10, hard-stop promotable false.
+- TradFi cash-session candidates all cash-guarded after stability gates: OOS comp 0.00%, MDD 0.00%; conclusion: TradFi module is currently risk-control/shadow-watchlist, not alpha/promotable sleeve.
+- Real-money remains blocked by preflight: `block_until_preflight_gaps_closed`; blockers include decision_allows_live_start=false, decision_runtime_compatible=false, shadow_parity_ratio=null / shadow_parity_satisfied=false.
