@@ -260,6 +260,117 @@ def test_alpha_zoo_optuna_hybrid_real_mode_is_vetoed_by_artifact_flags(
     assert payload["recommended_action"] == "block_until_preflight_gaps_closed"
 
 
+def test_alpha_zoo_optuna_hybrid_real_mode_requires_fresh_forward_after_post_oos(
+    monkeypatch, tmp_path: Path
+) -> None:
+    fresh_cutoff = (
+        (datetime.now(UTC) - timedelta(minutes=5))
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "storage:",
+                '  postgres_dsn: "postgresql://demo"',
+                "live:",
+                '  mode: "real"',
+                "  testnet: false",
+                "  require_real_enable_flag: true",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    refresh = tmp_path / "refresh.json"
+    refresh.write_text(
+        json.dumps(
+            {
+                "status": "completed",
+                "collection_cutoff_utc": fresh_cutoff,
+                "feature_results": [{"last_timestamp_utc": fresh_cutoff}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    optuna_artifact = tmp_path / "optuna.json"
+    optuna_artifact.write_text(
+        json.dumps(
+            {
+                "paper_testnet_only": False,
+                "ready_for_real": True,
+                "real_execution_allowed": True,
+                "real_money_execution": True,
+                "post_oos_research_variant": True,
+                "requires_fresh_forward_shadow": True,
+                "clean_promotion_eligible": False,
+                "selected_optuna_hybrid_profile": {
+                    "paper_testnet_candidate": False,
+                    "ready_for_real": True,
+                    "real_money_execution": True,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    integer_artifact = tmp_path / "integer.json"
+    integer_artifact.write_text(
+        json.dumps(
+            {
+                "paper_testnet_only": False,
+                "ready_for_real": True,
+                "real_execution_allowed": True,
+                "real_money_execution": True,
+                "selected_profile": {
+                    "paper_testnet_candidate": False,
+                    "ready_for_real": True,
+                    "real_money_execution": True,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    decision = tmp_path / "decision.json"
+    decision.write_text(
+        json.dumps(
+            {
+                "decision": "selected_live_mode",
+                "selected_mode": "alpha_zoo_integer_leverage_optuna_hybrid",
+                "strategy_name": "AlphaZooOptunaHybridLiveStrategy",
+                "strategy_params": {
+                    "optuna_hybrid_artifact_path": str(optuna_artifact),
+                    "integer_portfolio_artifact_path": str(integer_artifact),
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("LUMINA_ENABLE_LIVE_REAL", "true")
+
+    payload = PREFLIGHT.build_preflight_payload(
+        config_path=config_path,
+        refresh_json=refresh,
+        decision_json=decision,
+        stale_minutes=10_000,
+    )
+
+    assert payload["checks"]["artifact_ready_for_real"] is True
+    assert payload["checks"]["artifact_real_execution_allowed"] is True
+    assert payload["checks"]["artifact_real_money_execution"] is True
+    assert payload["checks"]["artifact_post_oos_research_variant"] is True
+    assert payload["checks"]["artifact_requires_fresh_forward_shadow"] is True
+    assert payload["checks"]["artifact_clean_promotion_eligible"] is False
+    assert payload["checks"]["artifact_real_money_veto"] is True
+    assert payload["checks"]["artifact_governance_veto_reasons"] == [
+        "post_oos_research_variant",
+        "requires_fresh_forward_shadow",
+        "clean_promotion_eligible_false",
+    ]
+    assert payload["status"]["ready_for_real"] is False
+    assert payload["recommended_action"] == "block_until_preflight_gaps_closed"
+
+
 def test_alpha_zoo_optuna_hybrid_paper_mode_can_pass_with_testnet(tmp_path: Path) -> None:
     fresh_cutoff = (
         (datetime.now(UTC) - timedelta(minutes=5))

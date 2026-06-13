@@ -186,6 +186,36 @@ def _is_alpha_zoo_optuna_hybrid_decision(
     )
 
 
+def _explicit_false(payload: Mapping[str, Any], key: str) -> bool:
+    return key in payload and payload.get(key) is False
+
+
+def _artifact_governance_veto_checks(
+    payloads: Mapping[str, Mapping[str, Any]],
+) -> dict[str, Any]:
+    containers = list(payloads.values())
+    post_oos = any(item.get("post_oos_research_variant") is True for item in containers)
+    fresh_forward = any(item.get("requires_fresh_forward_shadow") is True for item in containers)
+    clean_promotion = not any(
+        _explicit_false(item, "clean_promotion_eligible") for item in containers
+    )
+    blockers = [
+        reason
+        for reason, active in (
+            ("post_oos_research_variant", post_oos),
+            ("requires_fresh_forward_shadow", fresh_forward),
+            ("clean_promotion_eligible_false", not clean_promotion),
+        )
+        if active
+    ]
+    return {
+        "artifact_post_oos_research_variant": post_oos,
+        "artifact_requires_fresh_forward_shadow": fresh_forward,
+        "artifact_clean_promotion_eligible": clean_promotion,
+        "artifact_governance_veto_reasons": blockers,
+    }
+
+
 def _artifact_real_money_veto_checks(
     decision: Mapping[str, Any],
     *,
@@ -202,6 +232,10 @@ def _artifact_real_money_veto_checks(
             "artifact_ready_for_real": None,
             "artifact_real_execution_allowed": None,
             "artifact_real_money_execution": None,
+            "artifact_post_oos_research_variant": False,
+            "artifact_requires_fresh_forward_shadow": False,
+            "artifact_clean_promotion_eligible": True,
+            "artifact_governance_veto_reasons": [],
             "artifact_validation_error": "",
         }
 
@@ -219,6 +253,16 @@ def _artifact_real_money_veto_checks(
         optuna = _read_json(optuna_path)
         integer = _read_json(integer_path)
         selected = dict(optuna.get("selected_optuna_hybrid_profile") or {})
+        integer_selected = dict(integer.get("selected_profile") or {})
+        governance_checks = _artifact_governance_veto_checks(
+            {
+                "optuna": optuna,
+                "integer": integer,
+                "selected_optuna_hybrid_profile": selected,
+                "selected_integer_profile": integer_selected,
+            }
+        )
+        governance_veto = bool(governance_checks["artifact_governance_veto_reasons"])
         paper_only = bool(
             optuna.get("paper_testnet_only") is True
             and integer.get("paper_testnet_only") is True
@@ -249,12 +293,14 @@ def _artifact_real_money_veto_checks(
                 or not ready_for_real
                 or not real_execution_allowed
                 or not real_money_execution
+                or governance_veto
             ),
             "artifact_paper_testnet_only": paper_only,
             "artifact_ready_for_real": ready_for_real,
             "artifact_real_execution_allowed": real_execution_allowed,
             "artifact_real_money_execution": real_money_execution,
             "artifact_canary_execution_allowed": canary_execution_allowed,
+            **governance_checks,
             "artifact_validation_error": "",
             "artifact_optuna_hybrid_path": str(optuna_path),
             "artifact_integer_portfolio_path": str(integer_path),
@@ -266,6 +312,10 @@ def _artifact_real_money_veto_checks(
             "artifact_ready_for_real": None,
             "artifact_real_execution_allowed": None,
             "artifact_real_money_execution": None,
+            "artifact_post_oos_research_variant": None,
+            "artifact_requires_fresh_forward_shadow": None,
+            "artifact_clean_promotion_eligible": None,
+            "artifact_governance_veto_reasons": ["artifact_validation_error"],
             "artifact_validation_error": str(exc),
             "artifact_optuna_hybrid_path": str(optuna_path),
             "artifact_integer_portfolio_path": str(integer_path),

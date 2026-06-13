@@ -166,6 +166,10 @@ def test_build_payload_summarizes_leaf_rebuild_and_preflight(tmp_path: Path) -> 
                 "decision_allows_live_start": False,
                 "refresh_is_stale": True,
                 "testnet": True,
+                "artifact_real_money_veto": True,
+                "artifact_post_oos_research_variant": True,
+                "artifact_requires_fresh_forward_shadow": True,
+                "artifact_clean_promotion_eligible": False,
             },
         },
     )
@@ -189,6 +193,14 @@ def test_build_payload_summarizes_leaf_rebuild_and_preflight(tmp_path: Path) -> 
         payload["live_readiness_preflight"]["recommended_action"]
         == "block_until_preflight_gaps_closed"
     )
+    key_checks = payload["live_readiness_preflight"]["key_checks"]
+    assert key_checks["artifact_real_money_veto"] is True
+    assert key_checks["artifact_post_oos_research_variant"] is True
+    assert key_checks["artifact_requires_fresh_forward_shadow"] is True
+    assert key_checks["artifact_clean_promotion_eligible"] is False
+
+    markdown = module.render_markdown(payload)
+    assert "artifact_requires_fresh_forward_shadow" in markdown
 
 
 def test_render_markdown_keeps_real_money_blocked(tmp_path: Path) -> None:

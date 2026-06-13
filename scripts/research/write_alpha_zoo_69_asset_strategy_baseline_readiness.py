@@ -383,13 +383,17 @@ def _live_preflight_summary(loaded_sources: Mapping[str, Mapping[str, Any]]) -> 
                 "decision_runtime_compatible",
                 "refresh_is_stale",
                 "shadow_parity_satisfied",
-                "paper_mode",
-                "testnet",
-                "real_mode",
-                "postgres_dsn_present",
-            )
-            if key in checks
-        },
+            "paper_mode",
+            "testnet",
+            "real_mode",
+            "postgres_dsn_present",
+            "artifact_real_money_veto",
+            "artifact_post_oos_research_variant",
+            "artifact_requires_fresh_forward_shadow",
+            "artifact_clean_promotion_eligible",
+        )
+        if key in checks
+    },
         "failed_readiness_flags": failed_keys,
         "blocking_check_flags": blocking_checks,
     }
