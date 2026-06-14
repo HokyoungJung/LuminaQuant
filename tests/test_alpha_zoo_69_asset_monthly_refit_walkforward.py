@@ -1972,6 +1972,38 @@ def test_row_level_leaf_selectors_are_oos_clean_non_nested_shadow_rows() -> None
         for row in augmented["demoted_nested_or_historical_rankings"]
     )
 
+def test_defensive_row_level_selector_penalizes_drawdown_and_unbacked_validation_spikes() -> None:
+    stable_leaf = {
+        "fold_id": "2025-03",
+        "family": "profile_optuna",
+        "candidate_label": "profile_optuna:stable_leaf",
+        "source_profile_id": "profile_optuna:stable_leaf",
+        "profile_kind": "leaf_momentum_profile",
+        "selection_reasons": [],
+        "clean_promotion_eligible": True,
+        "uses_locked_oos_for_selection": False,
+        "train": {"total_return": 0.30, "mdd": 0.05, "calmar": 6.0},
+        "validation": {"total_return": 0.18, "mdd": 0.04, "calmar": 4.5},
+        "locked_oos": {"total_return": 0.03, "mdd": 0.02},
+    }
+    spiky_leaf = {
+        **stable_leaf,
+        "candidate_label": "profile_optuna:spiky_leaf",
+        "source_profile_id": "profile_optuna:spiky_leaf",
+        "train": {"total_return": 0.10, "mdd": 0.16, "calmar": 0.625},
+        "validation": {"total_return": 0.30, "mdd": 0.15, "calmar": 2.0},
+        "locked_oos": {"total_return": 0.40, "mdd": 0.10},
+    }
+
+    selector_rows = module._row_level_leaf_selector_rows([stable_leaf, spiky_leaf])
+    by_label = {row["candidate_label"]: row for row in selector_rows}
+
+    defensive = by_label["row_level_leaf_selector:defensive_validation_utility_mdd20"]
+    assert defensive["selected_candidate_label"] == "profile_optuna:stable_leaf"
+    assert defensive["selection_inputs"] == ["train", "validation"]
+    assert defensive["uses_locked_oos_for_selection"] is False
+    assert defensive["post_oos_research_variant"] is True
+    assert defensive["locked_oos"]["total_return"] == pytest.approx(0.03)
 
 def test_non_leaf_reference_detector_covers_portfolio_families_and_selected_tokens() -> None:
     forbidden = [

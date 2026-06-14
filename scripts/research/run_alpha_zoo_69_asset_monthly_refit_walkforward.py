@@ -6945,6 +6945,24 @@ ROW_LEVEL_LEAF_SELECTOR_SPECS: tuple[
         ),
     ),
     (
+        "row_level_leaf_selector:defensive_validation_utility_mdd20",
+        0.20,
+        lambda row: (
+            min(_row_metric(row, "validation", "total_return"), 1.5)
+            - 3.00 * _row_metric(row, "validation", "mdd")
+            - 1.00 * _row_metric(row, "train", "mdd")
+            - 0.50
+            * max(
+                0.0,
+                _row_metric(row, "validation", "total_return")
+                - max(_row_metric(row, "train", "total_return"), 0.0),
+            ),
+            _row_metric(row, "validation", "total_return"),
+            -_row_metric(row, "validation", "mdd"),
+            -_row_metric(row, "train", "mdd"),
+        ),
+    ),
+    (
         "row_level_leaf_selector:high_conviction_mdd30",
         0.30,
         lambda row: (

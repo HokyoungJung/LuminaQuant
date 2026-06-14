@@ -1,5 +1,29 @@
 # Research Note
 
+## 2026-06-14 KST — defensive row-level selector salvage: 소폭 플러스, 실전은 계속 금지
+
+TradFi/external-alpha 110-asset WF artifact를 빠르게 재계산해 row-level leaf selector 계열을 살렸다. 새 후보는 `row_level_leaf_selector:defensive_validation_utility_mdd20`이고, validation 수익만 쫓던 기존 fast selector보다 validation MDD, train MDD, train 대비 과한 validation spike를 강하게 패널티한다. 선택 입력은 train/validation row metric뿐이며 current-fold OOS는 선택에 쓰지 않는다.
+
+결과:
+- Recompute artifact: `/tmp/lumina_defensive_selector_wf.json|md`.
+- 신규 defensive selector: OOS comp `+6.72%`, max OOS MDD `14.37%`, positive folds `3/10`.
+- 기존 fast row-level selector 대비 개선:
+  - `row_level_leaf_selector:validation_calmar_mdd20`: OOS comp `-18.87%`, max OOS MDD `26.62%`, positive folds `4/10`.
+  - `row_level_leaf_selector:validation_return_mdd25`: OOS comp `-20.01%`, max OOS MDD `26.62%`, positive folds `4/10`.
+  - `row_level_leaf_selector:high_conviction_mdd30`: OOS comp `-31.34%`, max OOS MDD `26.62%`, positive folds `3/10`.
+  - `row_level_leaf_selector:stability_utility_mdd25`: OOS comp `-50.99%`, max OOS MDD `26.62%`, positive folds `2/10`.
+
+판단:
+- 이건 “살린 후보”지만 clean promotion 후보가 아니다. historical locked-OOS를 본 뒤 추가한 post-OOS research selector이므로 `post_oos_research_variant=true`, `requires_fresh_forward_shadow=true`, `clean_promotion_eligible=false`가 맞다.
+- 실전/페이퍼 투입은 계속 금지. frozen rule로 새 forward slice에서 selector 변경 없이 살아남는지 봐야 한다.
+- 백테스팅 로직은 focused parity/contract/chunked/live-vs-backtest tests로 재검증했다.
+
+Verification:
+- `.venv/bin/python -m pytest tests/test_alpha_zoo_69_asset_monthly_refit_walkforward.py -q` → `51 passed`.
+- `.venv/bin/python -m pytest tests/test_windowed_backtest_parity.py tests/test_chunked_backtest.py tests/test_run_backtest_data_mode_contract.py tests/test_market_window_emission_parity_live_vs_backtest.py -q` → `17 passed`.
+- `.venv/bin/python -m py_compile scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py tests/test_alpha_zoo_69_asset_monthly_refit_walkforward.py` → pass.
+- `.venv/bin/ruff check scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py tests/test_alpha_zoo_69_asset_monthly_refit_walkforward.py` → pass.
+
 ## 2026-06-13 KST — 30m+ 후보 재검토: 최고 수익은 dynamic switch, 실거래는 아직 금지
 
 사용자 요청에 따라 최신 `1m` scoreboards가 아니라 며칠 전까지 작업했던 `30m+` 연구만 다시 보았다. 세부 handoff는 `docs/session_handoff_20260613_30m_plus_live_candidate_review.md`에 남겼다. 포함 timeframe은 `30m, 1h, 2h, 4h, 6h, 8h, 12h, 1d`이고, 최신 저봉/1m 후보는 제외했다.
