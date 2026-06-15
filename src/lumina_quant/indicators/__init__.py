@@ -30,6 +30,7 @@ from .alpha_features import trend_efficiency as trend_efficiency
 from .alpha_features import volatility_ratio as volatility_ratio
 from .alpha_features import volume_zscore as volume_zscore
 from .atr import average_true_range as average_true_range
+from .fast_ops import cross_sectional_rank as cross_sectional_rank
 from .atr import true_range as true_range
 from .bands import bollinger_bands as bollinger_bands
 from .bands import donchian_channel as donchian_channel
@@ -128,9 +129,15 @@ from .research_factors import perp_crowding_score as perp_crowding_score
 from .research_factors import pv_trend_score as pv_trend_score
 from .research_factors import volcomp_vwap_pressure as volcomp_vwap_pressure
 from .rolling_stats import RollingZScoreWindow as RollingZScoreWindow
+from .rolling_stats import ewma_volatility as ewma_volatility
+from .rolling_stats import hurst_exponent as hurst_exponent
 from .rolling_stats import rolling_beta as rolling_beta
 from .rolling_stats import rolling_corr as rolling_corr
+from .rolling_stats import rolling_quantile as rolling_quantile
 from .rolling_stats import sample_std as sample_std
+from .rolling_stats import ts_regression_intercept as ts_regression_intercept
+from .rolling_stats import ts_regression_rsquared as ts_regression_rsquared
+from .rolling_stats import ts_regression_slope as ts_regression_slope
 from .rsi import IncrementalRsi as IncrementalRsi
 from .trend import aroon_indicator as aroon_indicator
 from .trend import average_directional_index as average_directional_index
@@ -230,6 +237,7 @@ __all__ = [
     "compute_fast_alpha_bundle",
     "conditional_value_at_risk",
     "cross_leadlag_spillover",
+    "cross_sectional_rank",
     "cumulative_return",
     "decay_linear",
     "delay",
@@ -240,6 +248,7 @@ __all__ = [
     "downside_volatility",
     "drawdown_from_peak",
     "ease_of_movement",
+    "ewma_volatility",
     "exponential_moving_average",
     "exponential_moving_average_series",
     "finite_floats",
@@ -248,6 +257,7 @@ __all__ = [
     "garman_klass_volatility",
     "historical_volatility",
     "hull_moving_average",
+    "hurst_exponent",
     "ichimoku_cloud",
     "kaufman_efficiency_ratio",
     "keltner_channel",
@@ -290,6 +300,7 @@ __all__ = [
     "rolling_feature_frame_polars",
     "rolling_log_return_volatility_latest",
     "rolling_mean_latest_numpy",
+    "rolling_quantile",
     "rolling_sharpe_ratio",
     "rolling_sortino_ratio",
     "rolling_std_latest_numpy",
@@ -320,6 +331,9 @@ __all__ = [
     "ts_min",
     "ts_product",
     "ts_rank",
+    "ts_regression_intercept",
+    "ts_regression_rsquared",
+    "ts_regression_slope",
     "ts_stddev",
     "ts_sum",
     "ulcer_index",
