@@ -12,6 +12,10 @@ from itertools import product
 from pathlib import Path
 from typing import Any
 
+from lumina_quant.research_universe import (
+    BINANCE_TRADFI_EQUITY_SYMBOLS,
+    BINANCE_TRADFI_ETF_INDEX_SYMBOLS,
+)
 from lumina_quant.strategies.pair_spread_zscore import bounded_pair_retune_params
 from lumina_quant.symbols import (
     CANONICAL_STRATEGY_TIMEFRAMES,
@@ -2588,6 +2592,18 @@ class _CandidateBuildContext:
         _build_pair_and_intermarket_candidates(self)
         _build_deep_research_report_candidates(self)
         _build_optional_carry_and_micro_candidates(self)
+        # New decorrelated alpha sleeves (Pass-1 live universe + dormant tranche).
+        _build_hurst_regime_gated_candidates(self)
+        _build_confidence_gated_trend_candidates(self)
+        _build_metals_relative_value_basket_candidates(self)
+        _build_liquidation_cascade_reversion_candidates(self)
+        _build_orderbook_imbalance_reversion_candidates(self)
+        _build_cross_sectional_equity_momentum_candidates(self)
+        _build_residual_equity_momentum_candidates(self)
+        _build_betting_against_beta_candidates(self)
+        _build_semis_leadlag_rotation_candidates(self)
+        _build_dual_momentum_index_rotation_candidates(self)
+        _build_calendar_seasonality_overlay_candidates(self)
         return self.candidates
 
 
@@ -4334,6 +4350,1032 @@ def _build_optional_carry_and_micro_candidates(ctx: _CandidateBuildContext) -> N
                     "research_only": True,
                 },
             )
+
+
+# ---------------------------------------------------------------------------
+# New decorrelated alpha sleeves (Pass-1 live universe + dormant equity tranche)
+# ---------------------------------------------------------------------------
+#
+# Selection-admission contract (selection.py:209,223-253): any candidate whose
+# ``candidate_mix_type`` is ``"multi"`` (>=3 symbols) is dropped from the default
+# shortlist UNLESS it is wired ``family="cross_sectional"`` AND its tags are a
+# superset of {"cross_sectional", "carry", "momentum"}.  EVERY multi-symbol sleeve
+# below therefore mirrors ``CarryTrendFactorRotationStrategy`` exactly.  The
+# single-asset sleeves (S13 ConfidenceGatedTrend per-symbol, S11 calendar overlay
+# per-index, S4 dual-momentum per-index) emit one symbol per candidate, are
+# ``candidate_mix_type=="single"``, and intentionally use their natural family.
+
+# Equity/ETF perp universe for the DORMANT tranche.  These are compact-form
+# symbols; ``_add_candidate``/``canonicalize_symbol_list`` slash + canonicalize
+# them and self-skip on empty intersections.
+_EQUITY_FACTOR_UNIVERSE: tuple[str, ...] = tuple(
+    dict.fromkeys(BINANCE_TRADFI_EQUITY_SYMBOLS)
+)
+_INDEX_ROTATION_UNIVERSE: tuple[str, ...] = tuple(
+    dict.fromkeys(BINANCE_TRADFI_ETF_INDEX_SYMBOLS)
+)
+# Semis lead-lag follower basket (leader = SOXLUSDT lives in the ETF/index set).
+_SEMIS_FOLLOWER_SYMBOLS: tuple[str, ...] = (
+    "NVDAUSDT",
+    "AMDUSDT",
+    "AVGOUSDT",
+    "MUUSDT",
+    "TSMUSDT",
+    "QCOMUSDT",
+    "MRVLUSDT",
+    "ARMUSDT",
+)
+_SEMIS_LEADLAG_UNIVERSE: tuple[str, ...] = ("SOXLUSDT", *_SEMIS_FOLLOWER_SYMBOLS)
+_INDEX_PER_ASSET_PREFERENCES: tuple[str, ...] = (
+    "SPYUSDT",
+    "QQQUSDT",
+)
+
+
+def _intersect_universe(
+    universe: Sequence[str], normalized_symbols: Sequence[str]
+) -> tuple[str, ...]:
+    """Intersect a compact-form universe with the canonicalized live symbols."""
+    available = set(canonicalize_symbol_list(normalized_symbols))
+    out: list[str] = []
+    for symbol in canonicalize_symbol_list(universe):
+        if symbol in available and symbol not in out:
+            out.append(symbol)
+    return tuple(out)
+
+
+# Cross_sectional/carry/momentum trio is MANDATORY for every multi-symbol sleeve.
+_CROSS_SECTIONAL_ADMISSION_TAGS: tuple[str, ...] = (
+    "cross_sectional",
+    "carry",
+    "momentum",
+)
+
+
+_HURST_REGIME_GATED_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "1h": (
+        {
+            "variant": "balanced_lo",
+            "hurst_window": 60,
+            "trend_threshold": 0.55,
+            "mr_threshold": 0.45,
+            "hysteresis": 0.04,
+            "mid_weight": 0.30,
+            "ema_fast": 20,
+            "ema_slow": 60,
+            "zscore_window": 60,
+            "entry_z": 1.5,
+            "lookback_bars": 120,
+            "rebalance_band": 0.25,
+            "max_positions": 5,
+            "stop_loss_pct": 0.060,
+            "max_hold_bars": 240,
+            "allow_short": False,
+        },
+        {
+            "variant": "guarded_ls",
+            "hurst_window": 96,
+            "trend_threshold": 0.58,
+            "mr_threshold": 0.42,
+            "hysteresis": 0.05,
+            "mid_weight": 0.30,
+            "ema_fast": 24,
+            "ema_slow": 96,
+            "zscore_window": 96,
+            "entry_z": 1.8,
+            "lookback_bars": 192,
+            "rebalance_band": 0.30,
+            "max_positions": 4,
+            "stop_loss_pct": 0.050,
+            "max_hold_bars": 360,
+            "allow_short": True,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "balanced_lo",
+            "hurst_window": 48,
+            "trend_threshold": 0.55,
+            "mr_threshold": 0.45,
+            "hysteresis": 0.04,
+            "mid_weight": 0.30,
+            "ema_fast": 12,
+            "ema_slow": 48,
+            "zscore_window": 48,
+            "entry_z": 1.5,
+            "lookback_bars": 96,
+            "rebalance_band": 0.25,
+            "max_positions": 4,
+            "stop_loss_pct": 0.070,
+            "max_hold_bars": 120,
+            "allow_short": False,
+        },
+    ),
+}
+
+
+def _build_hurst_regime_gated_candidates(ctx: _CandidateBuildContext) -> None:
+    """S9 — Hurst-gated trend/mean-reversion basket overlay (live crypto)."""
+    crypto_symbols = ctx.crypto_symbols
+    if len(crypto_symbols) < 4:
+        return
+    for timeframe in ctx._present("1h", "4h"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _HURST_REGIME_GATED_SLICE.get(timeframe, ()):
+            params = {
+                "hurst_window": int(spec["hurst_window"]),
+                "trend_threshold": float(spec["trend_threshold"]),
+                "mr_threshold": float(spec["mr_threshold"]),
+                "hysteresis": float(spec["hysteresis"]),
+                "mid_weight": float(spec["mid_weight"]),
+                "ema_fast": int(spec["ema_fast"]),
+                "ema_slow": int(spec["ema_slow"]),
+                "zscore_window": int(spec["zscore_window"]),
+                "entry_z": float(spec["entry_z"]),
+                "lookback_bars": int(spec["lookback_bars"]),
+                "rebalance_band": float(spec["rebalance_band"]),
+                "max_positions": int(spec["max_positions"]),
+                "stop_loss_pct": float(spec["stop_loss_pct"]),
+                "max_hold_bars": int(spec["max_hold_bars"]),
+                "allow_short": bool(spec["allow_short"]),
+            }
+            _add_candidate(
+                ctx.candidates,
+                name=(
+                    f"hurst_regime_gated_{tf_tag}_{spec['variant']}_"
+                    f"{int(spec['hurst_window'])}_{float(spec['trend_threshold']):.2f}"
+                ),
+                family="cross_sectional",
+                strategy_class="HurstRegimeGatedStrategy",
+                timeframe=timeframe,
+                symbols=crypto_symbols,
+                params=params,
+                notes=(
+                    "Hurst-gated regime overlay that blends a trend child and a "
+                    "mean-reversion child per symbol with hysteresis to avoid "
+                    f"thrash near H~0.5 for {timeframe} ({spec['variant']})."
+                ),
+                tags=(
+                    *_CROSS_SECTIONAL_ADMISSION_TAGS,
+                    "regime",
+                    "hurst",
+                    "mean_reversion",
+                    "crypto",
+                ),
+                metadata={
+                    "timeframe": timeframe,
+                    "retune_profile": str(spec["variant"]),
+                    "symbol_scope": "crypto",
+                    "allow_short": bool(spec["allow_short"]),
+                    "decision_cadence_seconds": 3600,
+                },
+            )
+
+
+_CONFIDENCE_GATED_TREND_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "1h": (
+        {
+            "variant": "calm_lo",
+            "ema_fast": 20,
+            "ema_slow": 60,
+            "confidence_threshold": 0.55,
+            "vol_ratio_short_window": 16,
+            "vol_ratio_long_window": 96,
+            "max_vol_ratio": 1.4,
+            "funding_z_window": 96,
+            "max_funding_z": 2.0,
+            "win_rate_window": 24,
+            "trend_lookback_bars": 24,
+            "lookback_bars": 120,
+            "rebalance_band": 0.15,
+            "allow_short": False,
+            "stop_loss_pct": 0.040,
+            "take_profit_pct": 0.0,
+            "max_hold_bars": 240,
+        },
+        {
+            "variant": "conviction_ls",
+            "ema_fast": 24,
+            "ema_slow": 96,
+            "confidence_threshold": 0.62,
+            "vol_ratio_short_window": 24,
+            "vol_ratio_long_window": 144,
+            "max_vol_ratio": 1.3,
+            "funding_z_window": 120,
+            "max_funding_z": 1.8,
+            "win_rate_window": 36,
+            "trend_lookback_bars": 36,
+            "lookback_bars": 192,
+            "rebalance_band": 0.20,
+            "allow_short": True,
+            "stop_loss_pct": 0.035,
+            "take_profit_pct": 0.0,
+            "max_hold_bars": 360,
+        },
+    ),
+}
+
+
+def _build_confidence_gated_trend_candidates(ctx: _CandidateBuildContext) -> None:
+    """S13 — per-symbol confidence-gated trend (single-asset, outside the gate)."""
+    crypto_symbols = ctx.crypto_symbols
+    if not crypto_symbols:
+        return
+    for timeframe in ctx._present("1h"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _CONFIDENCE_GATED_TREND_SLICE.get(timeframe, ()):
+            for symbol in crypto_symbols:
+                params = {
+                    "ema_fast": int(spec["ema_fast"]),
+                    "ema_slow": int(spec["ema_slow"]),
+                    "confidence_threshold": float(spec["confidence_threshold"]),
+                    "vol_ratio_short_window": int(spec["vol_ratio_short_window"]),
+                    "vol_ratio_long_window": int(spec["vol_ratio_long_window"]),
+                    "max_vol_ratio": float(spec["max_vol_ratio"]),
+                    "funding_z_window": int(spec["funding_z_window"]),
+                    "max_funding_z": float(spec["max_funding_z"]),
+                    "win_rate_window": int(spec["win_rate_window"]),
+                    "trend_lookback_bars": int(spec["trend_lookback_bars"]),
+                    "lookback_bars": int(spec["lookback_bars"]),
+                    "rebalance_band": float(spec["rebalance_band"]),
+                    "allow_short": bool(spec["allow_short"]),
+                    "stop_loss_pct": float(spec["stop_loss_pct"]),
+                    "take_profit_pct": float(spec["take_profit_pct"]),
+                    "max_hold_bars": int(spec["max_hold_bars"]),
+                }
+                _add_candidate(
+                    ctx.candidates,
+                    name=(
+                        f"confidence_gated_trend_{tf_tag}_{spec['variant']}_"
+                        f"{symbol.replace('/', '').lower()}_"
+                        f"{float(spec['confidence_threshold']):.2f}"
+                    ),
+                    family="trend",
+                    strategy_class="ConfidenceGatedTrendStrategy",
+                    timeframe=timeframe,
+                    symbols=(symbol,),
+                    params=params,
+                    notes=(
+                        "Per-symbol rule-based confidence-gated trend sleeve that "
+                        "only trades high-conviction setups (calm funding, low "
+                        "vol ratio, positive recent win-rate) to lift deflated "
+                        f"Sharpe and lower PBO for {symbol} on {timeframe} "
+                        f"({spec['variant']})."
+                    ),
+                    tags=(
+                        "trend",
+                        "confidence_gated",
+                        "single_asset",
+                        "meta_gate",
+                        "crypto",
+                    ),
+                    metadata={
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": symbol,
+                        "allow_short": bool(spec["allow_short"]),
+                        "decision_cadence_seconds": 3600,
+                    },
+                )
+
+
+_METALS_RELATIVE_VALUE_BASKET_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "4h": (
+        {
+            "variant": "rv_core",
+            "zscore_window": 90,
+            "entry_z": 2.0,
+            "exit_z": 0.40,
+            "max_hold_bars": 120,
+        },
+        {
+            "variant": "rv_patient",
+            "zscore_window": 120,
+            "entry_z": 2.3,
+            "exit_z": 0.30,
+            "max_hold_bars": 180,
+        },
+    ),
+    "1d": (
+        {
+            "variant": "rv_swing",
+            "zscore_window": 60,
+            "entry_z": 1.8,
+            "exit_z": 0.40,
+            "max_hold_bars": 30,
+        },
+    ),
+}
+
+
+def _build_metals_relative_value_basket_candidates(
+    ctx: _CandidateBuildContext,
+) -> None:
+    """S7 — market-neutral precious-metal relative-value basket (live metals)."""
+    metals = tuple(
+        symbol for symbol in ctx.normalized_symbols if symbol in _METALS
+    )
+    if len(metals) < 3:
+        return
+    for timeframe in ctx._present("4h", "1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _METALS_RELATIVE_VALUE_BASKET_SLICE.get(timeframe, ()):
+            params = {
+                "zscore_window": int(spec["zscore_window"]),
+                "entry_z": float(spec["entry_z"]),
+                "exit_z": float(spec["exit_z"]),
+                "max_hold_bars": int(spec["max_hold_bars"]),
+            }
+            _add_candidate(
+                ctx.candidates,
+                name=(
+                    f"metals_relative_value_basket_{tf_tag}_{spec['variant']}_"
+                    f"{int(spec['zscore_window'])}_{float(spec['entry_z']):.1f}"
+                ),
+                family="cross_sectional",
+                strategy_class="MetalsRelativeValueBasketStrategy",
+                timeframe=timeframe,
+                symbols=metals,
+                params=params,
+                notes=(
+                    "Market-neutral relative-value basket across the precious-metal "
+                    "perps (XAU/XAG/XPT/XPD) that fades z-scored ratio dislocations "
+                    f"on an event-banded cadence for {timeframe} ({spec['variant']})."
+                ),
+                tags=(
+                    *_CROSS_SECTIONAL_ADMISSION_TAGS,
+                    "metals",
+                    "relative_value",
+                    "market_neutral",
+                ),
+                metadata={
+                    "timeframe": timeframe,
+                    "retune_profile": str(spec["variant"]),
+                    "symbol_scope": "metals",
+                    "decision_cadence_seconds": 14400,
+                },
+            )
+
+
+_LIQUIDATION_CASCADE_REVERSION_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "1h": (
+        {
+            "variant": "cascade_core",
+            "btc_return_trigger": -0.03,
+            "volume_mult": 2.0,
+            "oi_drop_trigger": 0.05,
+            "hold_bars": 12,
+            "basket_size": 4,
+            "beta_window": 72,
+        },
+        {
+            "variant": "cascade_deep",
+            "btc_return_trigger": -0.05,
+            "volume_mult": 2.5,
+            "oi_drop_trigger": 0.07,
+            "hold_bars": 18,
+            "basket_size": 4,
+            "beta_window": 96,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "cascade_swing",
+            "btc_return_trigger": -0.04,
+            "volume_mult": 2.0,
+            "oi_drop_trigger": 0.06,
+            "hold_bars": 6,
+            "basket_size": 4,
+            "beta_window": 48,
+        },
+    ),
+}
+
+
+def _build_liquidation_cascade_reversion_candidates(
+    ctx: _CandidateBuildContext,
+) -> None:
+    """S10 — crisis-conditional liquidation-cascade reversion (live crypto)."""
+    if not ctx.perp_support_data_available:
+        return
+    crypto_symbols = ctx.crypto_symbols
+    if len(crypto_symbols) < 4:
+        return
+    for timeframe in ctx._present("1h", "4h"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _LIQUIDATION_CASCADE_REVERSION_SLICE.get(timeframe, ()):
+            params = {
+                "btc_return_trigger": float(spec["btc_return_trigger"]),
+                "volume_mult": float(spec["volume_mult"]),
+                "oi_drop_trigger": float(spec["oi_drop_trigger"]),
+                "hold_bars": int(spec["hold_bars"]),
+                "basket_size": int(spec["basket_size"]),
+                "beta_window": int(spec["beta_window"]),
+            }
+            _add_candidate(
+                ctx.candidates,
+                name=(
+                    f"liquidation_cascade_reversion_{tf_tag}_{spec['variant']}_"
+                    f"{abs(float(spec['btc_return_trigger'])):.2f}_{int(spec['hold_bars'])}"
+                ),
+                family="cross_sectional",
+                strategy_class="LiquidationCascadeReversionStrategy",
+                timeframe=timeframe,
+                symbols=crypto_symbols,
+                params=params,
+                notes=(
+                    "Crisis-conditional sleeve that buys beaten-down alts into a "
+                    "BTC-led deleveraging cascade (sharp drop + volume spike + OI "
+                    "contraction), BTC-beta-hedged, with a fixed hold and no-re-"
+                    f"layer lock for {timeframe} ({spec['variant']})."
+                ),
+                tags=(
+                    *_CROSS_SECTIONAL_ADMISSION_TAGS,
+                    "liquidation",
+                    "crisis",
+                    "reversion",
+                    "crypto",
+                ),
+                metadata={
+                    "timeframe": timeframe,
+                    "retune_profile": str(spec["variant"]),
+                    "symbol_scope": "crypto",
+                    "data_dependent": True,
+                    "decision_cadence_seconds": 3600,
+                },
+            )
+
+
+_ORDERBOOK_IMBALANCE_REVERSION_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "5m": (
+        {
+            "variant": "fade_core",
+            "imbalance_z_window": 120,
+            "entry_z": 2.0,
+            "exit_z": 0.40,
+            "spread_z_window": 120,
+            "max_spread_z": 3.0,
+            "spread_quantile_window": 240,
+            "max_spread_quantile": 0.90,
+            "hold_bars": 12,
+            "stop_pct": 0.010,
+            "cooldown_bars": 6,
+            "allow_short": True,
+        },
+        {
+            "variant": "fade_tight",
+            "imbalance_z_window": 180,
+            "entry_z": 2.4,
+            "exit_z": 0.30,
+            "spread_z_window": 180,
+            "max_spread_z": 2.5,
+            "spread_quantile_window": 360,
+            "max_spread_quantile": 0.85,
+            "hold_bars": 8,
+            "stop_pct": 0.008,
+            "cooldown_bars": 8,
+            "allow_short": True,
+        },
+    ),
+    "15m": (
+        {
+            "variant": "fade_swing",
+            "imbalance_z_window": 96,
+            "entry_z": 2.0,
+            "exit_z": 0.40,
+            "spread_z_window": 96,
+            "max_spread_z": 3.0,
+            "spread_quantile_window": 192,
+            "max_spread_quantile": 0.90,
+            "hold_bars": 6,
+            "stop_pct": 0.012,
+            "cooldown_bars": 4,
+            "allow_short": True,
+        },
+    ),
+}
+
+
+def _build_orderbook_imbalance_reversion_candidates(
+    ctx: _CandidateBuildContext,
+) -> None:
+    """S12 — microstructure order-book imbalance reversion (live crypto)."""
+    if not ctx.perp_support_data_available:
+        return
+    crypto_symbols = ctx.crypto_symbols
+    if len(crypto_symbols) < 4:
+        return
+    for timeframe in ctx._present("5m", "15m"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _ORDERBOOK_IMBALANCE_REVERSION_SLICE.get(timeframe, ()):
+            params = {
+                "imbalance_z_window": int(spec["imbalance_z_window"]),
+                "entry_z": float(spec["entry_z"]),
+                "exit_z": float(spec["exit_z"]),
+                "spread_z_window": int(spec["spread_z_window"]),
+                "max_spread_z": float(spec["max_spread_z"]),
+                "spread_quantile_window": int(spec["spread_quantile_window"]),
+                "max_spread_quantile": float(spec["max_spread_quantile"]),
+                "hold_bars": int(spec["hold_bars"]),
+                "stop_pct": float(spec["stop_pct"]),
+                "cooldown_bars": int(spec["cooldown_bars"]),
+                "allow_short": bool(spec["allow_short"]),
+            }
+            _add_candidate(
+                ctx.candidates,
+                name=(
+                    f"orderbook_imbalance_reversion_{tf_tag}_{spec['variant']}_"
+                    f"{float(spec['entry_z']):.1f}_{int(spec['hold_bars'])}"
+                ),
+                family="cross_sectional",
+                strategy_class="OrderBookImbalanceReversionStrategy",
+                timeframe=timeframe,
+                symbols=crypto_symbols,
+                params=params,
+                notes=(
+                    "Microstructure mean-reversion sleeve that fades extreme "
+                    "order-book depth-imbalance/spread z-scores with a short hold, "
+                    "tight stop, and per-symbol cooldown to bound turnover for "
+                    f"{timeframe} ({spec['variant']})."
+                ),
+                tags=(
+                    *_CROSS_SECTIONAL_ADMISSION_TAGS,
+                    "microstructure",
+                    "order_book",
+                    "reversion",
+                    "crypto",
+                ),
+                metadata={
+                    "timeframe": timeframe,
+                    "retune_profile": str(spec["variant"]),
+                    "symbol_scope": "crypto",
+                    "data_dependent": True,
+                    "decision_cadence_seconds": 300,
+                },
+            )
+
+
+# --- DORMANT equity / index / calendar tranche -----------------------------
+# These self-skip until the equity/ETF perps materialize on the test PC.
+
+_CROSS_SECTIONAL_EQUITY_MOMENTUM_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "1d": (
+        {
+            "variant": "xs_12_1_lo",
+            "lookback_bars": 252,
+            "skip_bars": 21,
+            "vol_window": 63,
+            "regime_sma_bars": 200,
+            "rebalance_bars": 21,
+            "quintile_pct": 0.20,
+            "allow_short": False,
+            "stop_loss_pct": 0.12,
+            "max_hold_bars": 252,
+        },
+        {
+            "variant": "xs_12_1_ls",
+            "lookback_bars": 252,
+            "skip_bars": 21,
+            "vol_window": 63,
+            "regime_sma_bars": 200,
+            "rebalance_bars": 21,
+            "quintile_pct": 0.20,
+            "allow_short": True,
+            "stop_loss_pct": 0.12,
+            "max_hold_bars": 252,
+        },
+    ),
+}
+
+
+def _build_cross_sectional_equity_momentum_candidates(
+    ctx: _CandidateBuildContext,
+) -> None:
+    """S1 (DORMANT) — vol-scaled 12-1 cross-sectional equity momentum."""
+    filtered = _intersect_universe(_EQUITY_FACTOR_UNIVERSE, ctx.normalized_symbols)
+    if len(filtered) < 4:
+        return
+    for timeframe in ctx._present("1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _CROSS_SECTIONAL_EQUITY_MOMENTUM_SLICE.get(timeframe, ()):
+            params = {
+                "lookback_bars": int(spec["lookback_bars"]),
+                "skip_bars": int(spec["skip_bars"]),
+                "vol_window": int(spec["vol_window"]),
+                "regime_sma_bars": int(spec["regime_sma_bars"]),
+                "rebalance_bars": int(spec["rebalance_bars"]),
+                "quintile_pct": float(spec["quintile_pct"]),
+                "allow_short": bool(spec["allow_short"]),
+                "stop_loss_pct": float(spec["stop_loss_pct"]),
+                "max_hold_bars": int(spec["max_hold_bars"]),
+            }
+            _add_candidate(
+                ctx.candidates,
+                name=(
+                    f"cross_sectional_equity_momentum_{tf_tag}_{spec['variant']}_"
+                    f"{int(spec['lookback_bars'])}_{int(spec['skip_bars'])}"
+                ),
+                family="cross_sectional",
+                strategy_class="CrossSectionalEquityMomentumStrategy",
+                timeframe=timeframe,
+                symbols=filtered,
+                params=params,
+                notes=(
+                    "DORMANT equity tranche: vol-scaled 12-1 cross-sectional "
+                    "momentum on equity perps with a basket-SMA short gate for "
+                    f"{timeframe} ({spec['variant']}); self-skips until equity "
+                    "perps materialize."
+                ),
+                tags=(
+                    *_CROSS_SECTIONAL_ADMISSION_TAGS,
+                    "equity",
+                    "factor",
+                    "dormant",
+                ),
+                metadata={
+                    "timeframe": timeframe,
+                    "retune_profile": str(spec["variant"]),
+                    "symbol_scope": "equity",
+                    "dormant_tranche": True,
+                    "decision_cadence_seconds": 86400,
+                },
+            )
+
+
+_RESIDUAL_EQUITY_MOMENTUM_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "1d": (
+        {
+            "variant": "imom_ls",
+            "lookback_bars": 252,
+            "skip_bars": 21,
+            "beta_window": 252,
+            "rebalance_bars": 21,
+            "quintile_pct": 0.20,
+            "allow_short": True,
+            "stop_loss_pct": 0.12,
+            "max_hold_bars": 252,
+        },
+    ),
+}
+
+
+def _build_residual_equity_momentum_candidates(
+    ctx: _CandidateBuildContext,
+) -> None:
+    """S2 (DORMANT) — residual (idiosyncratic) momentum vs benchmark."""
+    filtered = _intersect_universe(_EQUITY_FACTOR_UNIVERSE, ctx.normalized_symbols)
+    if len(filtered) < 4:
+        return
+    for timeframe in ctx._present("1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _RESIDUAL_EQUITY_MOMENTUM_SLICE.get(timeframe, ()):
+            params = {
+                "lookback_bars": int(spec["lookback_bars"]),
+                "skip_bars": int(spec["skip_bars"]),
+                "beta_window": int(spec["beta_window"]),
+                "rebalance_bars": int(spec["rebalance_bars"]),
+                "quintile_pct": float(spec["quintile_pct"]),
+                "allow_short": bool(spec["allow_short"]),
+                "stop_loss_pct": float(spec["stop_loss_pct"]),
+                "max_hold_bars": int(spec["max_hold_bars"]),
+            }
+            _add_candidate(
+                ctx.candidates,
+                name=(
+                    f"residual_equity_momentum_{tf_tag}_{spec['variant']}_"
+                    f"{int(spec['lookback_bars'])}_{int(spec['beta_window'])}"
+                ),
+                family="cross_sectional",
+                strategy_class="ResidualEquityMomentumStrategy",
+                timeframe=timeframe,
+                symbols=filtered,
+                params=params,
+                notes=(
+                    "DORMANT equity tranche: residual (idiosyncratic) momentum "
+                    "that strips benchmark beta before ranking, inverse-residual-"
+                    f"vol sized, for {timeframe} ({spec['variant']}); self-skips "
+                    "until equity perps materialize."
+                ),
+                tags=(
+                    *_CROSS_SECTIONAL_ADMISSION_TAGS,
+                    "equity",
+                    "residual",
+                    "factor",
+                    "dormant",
+                ),
+                metadata={
+                    "timeframe": timeframe,
+                    "retune_profile": str(spec["variant"]),
+                    "symbol_scope": "equity",
+                    "dormant_tranche": True,
+                    "decision_cadence_seconds": 86400,
+                },
+            )
+
+
+_BETTING_AGAINST_BETA_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "1d": (
+        {
+            "variant": "bab_ls",
+            "beta_window": 252,
+            "rebalance_bars": 21,
+            "quintile_pct": 0.20,
+            "beta_z_window": 63,
+            "allow_short": True,
+            "stop_loss_pct": 0.12,
+            "max_hold_bars": 252,
+        },
+    ),
+}
+
+
+def _build_betting_against_beta_candidates(
+    ctx: _CandidateBuildContext,
+) -> None:
+    """S3 (DORMANT) — betting-against-beta (long low-beta / short high-beta)."""
+    filtered = _intersect_universe(_EQUITY_FACTOR_UNIVERSE, ctx.normalized_symbols)
+    if len(filtered) < 4:
+        return
+    for timeframe in ctx._present("1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _BETTING_AGAINST_BETA_SLICE.get(timeframe, ()):
+            params = {
+                "beta_window": int(spec["beta_window"]),
+                "rebalance_bars": int(spec["rebalance_bars"]),
+                "quintile_pct": float(spec["quintile_pct"]),
+                "beta_z_window": int(spec["beta_z_window"]),
+                "allow_short": bool(spec["allow_short"]),
+                "stop_loss_pct": float(spec["stop_loss_pct"]),
+                "max_hold_bars": int(spec["max_hold_bars"]),
+            }
+            _add_candidate(
+                ctx.candidates,
+                name=(
+                    f"betting_against_beta_{tf_tag}_{spec['variant']}_"
+                    f"{int(spec['beta_window'])}_{float(spec['quintile_pct']):.2f}"
+                ),
+                family="cross_sectional",
+                strategy_class="BettingAgainstBetaStrategy",
+                timeframe=timeframe,
+                symbols=filtered,
+                params=params,
+                notes=(
+                    "DORMANT equity tranche: betting-against-beta sleeve that goes "
+                    "long the low-beta quintile and short the high-beta quintile, "
+                    f"beta-neutralized, for {timeframe} ({spec['variant']}); self-"
+                    "skips until equity perps materialize."
+                ),
+                tags=(
+                    *_CROSS_SECTIONAL_ADMISSION_TAGS,
+                    "equity",
+                    "low_beta",
+                    "factor",
+                    "dormant",
+                ),
+                metadata={
+                    "timeframe": timeframe,
+                    "retune_profile": str(spec["variant"]),
+                    "symbol_scope": "equity",
+                    "dormant_tranche": True,
+                    "decision_cadence_seconds": 86400,
+                },
+            )
+
+
+_SEMIS_LEADLAG_ROTATION_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "4h": (
+        {
+            "variant": "soxl_lead",
+            "leader_lookback_bars": 6,
+            "leader_z_window": 96,
+            "follower_lookback_bars": 6,
+            "leader_sigma": 1.0,
+            "spillover_window": 96,
+            "rebalance_bars": 2,
+            "max_longs": 3,
+            "allow_short": True,
+            "stop_loss_pct": 0.08,
+            "max_hold_bars": 96,
+        },
+    ),
+    "1d": (
+        {
+            "variant": "soxl_lead_swing",
+            "leader_lookback_bars": 3,
+            "leader_z_window": 60,
+            "follower_lookback_bars": 3,
+            "leader_sigma": 1.0,
+            "spillover_window": 60,
+            "rebalance_bars": 1,
+            "max_longs": 3,
+            "allow_short": False,
+            "stop_loss_pct": 0.08,
+            "max_hold_bars": 21,
+        },
+    ),
+}
+
+
+def _build_semis_leadlag_rotation_candidates(
+    ctx: _CandidateBuildContext,
+) -> None:
+    """S8 (DORMANT) — semis lead-lag rotation (SOXL leads the chip names)."""
+    filtered = _intersect_universe(_SEMIS_LEADLAG_UNIVERSE, ctx.normalized_symbols)
+    # Require the leader plus at least three followers.
+    leader = canonicalize_symbol_list(("SOXLUSDT",))
+    has_leader = bool(leader) and leader[0] in filtered
+    if not has_leader or len(filtered) < 4:
+        return
+    for timeframe in ctx._present("4h", "1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _SEMIS_LEADLAG_ROTATION_SLICE.get(timeframe, ()):
+            params = {
+                "leader_lookback_bars": int(spec["leader_lookback_bars"]),
+                "leader_z_window": int(spec["leader_z_window"]),
+                "follower_lookback_bars": int(spec["follower_lookback_bars"]),
+                "leader_sigma": float(spec["leader_sigma"]),
+                "spillover_window": int(spec["spillover_window"]),
+                "rebalance_bars": int(spec["rebalance_bars"]),
+                "max_longs": int(spec["max_longs"]),
+                "allow_short": bool(spec["allow_short"]),
+                "stop_loss_pct": float(spec["stop_loss_pct"]),
+                "max_hold_bars": int(spec["max_hold_bars"]),
+            }
+            _add_candidate(
+                ctx.candidates,
+                name=(
+                    f"semis_leadlag_rotation_{tf_tag}_{spec['variant']}_"
+                    f"{int(spec['leader_lookback_bars'])}_{int(spec['rebalance_bars'])}"
+                ),
+                family="cross_sectional",
+                strategy_class="SemisLeadLagRotationStrategy",
+                timeframe=timeframe,
+                symbols=filtered,
+                params=params,
+                notes=(
+                    "DORMANT equity tranche: semis lead-lag rotation where a SOXL "
+                    "move beyond one sigma tilts the book toward under-reacted "
+                    f"laggard chip names for {timeframe} ({spec['variant']}); self-"
+                    "skips until semis perps materialize."
+                ),
+                tags=(
+                    *_CROSS_SECTIONAL_ADMISSION_TAGS,
+                    "equity",
+                    "lead_lag",
+                    "semis",
+                    "dormant",
+                ),
+                metadata={
+                    "timeframe": timeframe,
+                    "retune_profile": str(spec["variant"]),
+                    "symbol_scope": "equity",
+                    "dormant_tranche": True,
+                    "decision_cadence_seconds": 14400,
+                },
+            )
+
+
+_DUAL_MOMENTUM_INDEX_ROTATION_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "1d": (
+        {
+            "variant": "absrel_top3",
+            "absolute_lookback_bars": 12,
+            "blend_lookbacks": "1,3,6,12",
+            "sma_bars": 200,
+            "rebalance_bars": 21,
+            "max_holdings": 3,
+            "stop_loss_pct": 0.10,
+            "max_hold_bars": 252,
+        },
+    ),
+}
+
+
+def _build_dual_momentum_index_rotation_candidates(
+    ctx: _CandidateBuildContext,
+) -> None:
+    """S4 (DORMANT) — dual-momentum index rotation (multi-symbol cross_sectional basket)."""
+    filtered = _intersect_universe(_INDEX_ROTATION_UNIVERSE, ctx.normalized_symbols)
+    if len(filtered) < 4:
+        return
+    for timeframe in ctx._present("1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _DUAL_MOMENTUM_INDEX_ROTATION_SLICE.get(timeframe, ()):
+            params = {
+                "absolute_lookback_bars": int(spec["absolute_lookback_bars"]),
+                "blend_lookbacks": str(spec["blend_lookbacks"]),
+                "sma_bars": int(spec["sma_bars"]),
+                "rebalance_bars": int(spec["rebalance_bars"]),
+                "max_holdings": int(spec["max_holdings"]),
+                "stop_loss_pct": float(spec["stop_loss_pct"]),
+                "max_hold_bars": int(spec["max_hold_bars"]),
+            }
+            _add_candidate(
+                ctx.candidates,
+                name=(
+                    f"dual_momentum_index_rotation_{tf_tag}_{spec['variant']}_"
+                    f"{int(spec['max_holdings'])}_{int(spec['sma_bars'])}"
+                ),
+                family="cross_sectional",
+                strategy_class="DualMomentumIndexRotationStrategy",
+                timeframe=timeframe,
+                symbols=filtered,
+                params=params,
+                notes=(
+                    "DORMANT index tranche: dual-momentum rotation that gates on an "
+                    "absolute-return filter then rotates into the top blended-"
+                    f"momentum index perps for {timeframe} ({spec['variant']}); "
+                    "self-skips until index perps materialize."
+                ),
+                tags=(
+                    *_CROSS_SECTIONAL_ADMISSION_TAGS,
+                    "index",
+                    "dual_momentum",
+                    "rotation",
+                    "dormant",
+                ),
+                metadata={
+                    "timeframe": timeframe,
+                    "retune_profile": str(spec["variant"]),
+                    "symbol_scope": "index",
+                    "dormant_tranche": True,
+                    "decision_cadence_seconds": 86400,
+                },
+            )
+
+
+_CALENDAR_SEASONALITY_OVERLAY_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "1d": (
+        {
+            "variant": "tom_dow",
+            "turn_of_month_pre_days": 3,
+            "turn_of_month_post_days": 3,
+            "enable_turn_of_month": True,
+            "enable_day_of_week": True,
+            "weekday_long_mask": "1,1,0,0,1,0,0",
+            "hold_bars": 2,
+            "stop_loss_pct": 0.05,
+        },
+    ),
+}
+
+
+def _build_calendar_seasonality_overlay_candidates(
+    ctx: _CandidateBuildContext,
+) -> None:
+    """S11 (DORMANT) — per-index calendar seasonality tilt (single-asset)."""
+    filtered = _intersect_universe(_INDEX_ROTATION_UNIVERSE, ctx.normalized_symbols)
+    if not filtered:
+        return
+    # Wire one single-asset candidate per preferred index that is present.
+    preferred = _intersect_universe(_INDEX_PER_ASSET_PREFERENCES, ctx.normalized_symbols)
+    index_symbols = preferred or filtered
+    for timeframe in ctx._present("1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _CALENDAR_SEASONALITY_OVERLAY_SLICE.get(timeframe, ()):
+            for symbol in index_symbols:
+                params = {
+                    "index_symbol": symbol,
+                    "turn_of_month_pre_days": int(spec["turn_of_month_pre_days"]),
+                    "turn_of_month_post_days": int(spec["turn_of_month_post_days"]),
+                    "enable_turn_of_month": bool(spec["enable_turn_of_month"]),
+                    "enable_day_of_week": bool(spec["enable_day_of_week"]),
+                    "weekday_long_mask": str(spec["weekday_long_mask"]),
+                    "hold_bars": int(spec["hold_bars"]),
+                    "stop_loss_pct": float(spec["stop_loss_pct"]),
+                }
+                _add_candidate(
+                    ctx.candidates,
+                    name=(
+                        f"calendar_seasonality_overlay_{tf_tag}_{spec['variant']}_"
+                        f"{symbol.replace('/', '').lower()}"
+                    ),
+                    family="seasonality",
+                    strategy_class="CalendarSeasonalityOverlayStrategy",
+                    timeframe=timeframe,
+                    symbols=(symbol,),
+                    params=params,
+                    notes=(
+                        "DORMANT index tranche: per-index turn-of-month and day-of-"
+                        "week seasonality tilt computed from the calendar only for "
+                        f"{symbol} on {timeframe} ({spec['variant']}); no-ops until "
+                        "the index perp materializes."
+                    ),
+                    tags=(
+                        "seasonality",
+                        "calendar",
+                        "single_asset",
+                        "index",
+                        "dormant",
+                    ),
+                    metadata={
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": symbol,
+                        "dormant_tranche": True,
+                        "decision_cadence_seconds": 86400,
+                    },
+                )
 
 
 def build_binance_futures_candidates(

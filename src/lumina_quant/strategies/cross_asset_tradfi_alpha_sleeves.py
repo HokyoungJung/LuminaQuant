@@ -17,6 +17,7 @@ from lumina_quant.indicators.alpha_features import (
     drawdown_from_peak,
     log_return,
     realized_volatility,
+    rolling_zscore,
 )
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.strategies.adaptive_crypto_alpha_sleeves import (
@@ -47,7 +48,10 @@ from lumina_quant.tuning import HyperParam, resolve_params_from_schema
 
 _GOLD_HINTS = ("XAU", "GOLD", "GC", "GLD")
 _SILVER_HINTS = ("XAG", "SILVER", "SI", "SLV")
+_PLATINUM_HINTS = ("XPT", "PLATINUM", "PL", "PPLT")
+_PALLADIUM_HINTS = ("XPD", "PALLADIUM", "PA", "PALL")
 _EQUITY_HINTS = ("SPY", "QQQ", "IWM", "DIA", "ES", "NQ", "YM", "RTY", "STOCK", "EQUITY")
+_METAL_HINT_GROUPS = (_GOLD_HINTS, _SILVER_HINTS, _PLATINUM_HINTS, _PALLADIUM_HINTS)
 
 
 @dataclass(slots=True)
@@ -1185,10 +1189,317 @@ class MetalEquityDivergenceReversalStrategy(Strategy):
             self._bars_held = 0
 
 
+def _resolve_metal_basket(
+    symbols: list[str],
+    raw: str,
+    *,
+    gold_symbol: str = "",
+    silver_symbol: str = "",
+    platinum_symbol: str = "",
+    palladium_symbol: str = "",
+) -> list[str]:
+    """Resolve the ordered XAU/XAG/XPT/XPD basket from config or symbol hints."""
+    explicit = _parse_symbols(raw, symbols)
+    if len(explicit) >= 2:
+        out: list[str] = []
+        for symbol in explicit:
+            if symbol not in out:
+                out.append(symbol)
+        return out
+    out = []
+    preferred = (gold_symbol, silver_symbol, platinum_symbol, palladium_symbol)
+    for explicit_symbol, hints in zip(preferred, _METAL_HINT_GROUPS, strict=True):
+        found = _find_symbol(symbols, str(explicit_symbol or ""), hints)
+        if found and found not in out:
+            out.append(found)
+    return out
+
+
+@dataclass(slots=True)
+class _MetalLegState:
+    numerator: str
+    denominator: str
+    ratios: deque[float]
+    mode: str = "OUT"
+    bars_held: int = 0
+    entry_ratio: float | None = None
+
+
+@register("strategy", "MetalsRelativeValueBasketStrategy", interface="event_driven")
+class MetalsRelativeValueBasketStrategy(Strategy):
+    """Market-neutral relative-value basket across precious-metal perps.
+
+    The sleeve forms a chain of metal-pair ratio legs across the configured
+    XAU/XAG/XPT/XPD basket (reusing the ``_RatioPairState`` ratio-leg pattern)
+    and z-scores each ratio against its own trailing window.  When a leg's
+    z-score crosses ``entry_z`` it fades the dislocation by going long the cheap
+    metal and short the rich metal (each leg is dollar-balanced, so the book is
+    market-neutral by construction); the leg unwinds when the z-score reverts
+    inside ``exit_z`` or ``max_hold_bars`` elapses.  Rebalance is event-banded
+    (only on a z-cross) so turnover stays well under the 2.5 hard cap.
+    """
+
+    decision_cadence_seconds = 14400
+    preferred_contract = "market_window"
+    uses_timeframe_aggregator = False
+
+    @classmethod
+    def get_param_schema(cls) -> dict[str, HyperParam]:
+        return {
+            "metal_symbols": HyperParam.string("metal_symbols", default="", tunable=False),
+            "gold_symbol": HyperParam.string("gold_symbol", default="", tunable=False),
+            "silver_symbol": HyperParam.string("silver_symbol", default="", tunable=False),
+            "platinum_symbol": HyperParam.string("platinum_symbol", default="", tunable=False),
+            "palladium_symbol": HyperParam.string("palladium_symbol", default="", tunable=False),
+            "zscore_window": HyperParam.integer("zscore_window", default=120, low=10, high=20000),
+            "entry_z": HyperParam.floating("entry_z", default=2.0, low=0.25, high=10.0),
+            "exit_z": HyperParam.floating("exit_z", default=0.40, low=0.0, high=5.0),
+            "max_hold_bars": HyperParam.integer("max_hold_bars", default=240, low=1, high=200000),
+            "min_price": HyperParam.floating("min_price", default=0.0, low=0.0, high=1_000_000.0),
+            "target_allocation": HyperParam.floating(
+                "target_allocation", default=0.020, low=0.0, high=2.0, tunable=False
+            ),
+            "max_order_value": HyperParam.floating(
+                "max_order_value", default=400.0, low=0.0, high=1_000_000.0, tunable=False
+            ),
+        }
+
+    def __init__(self, bars: Any, events: Any, **params: Any) -> None:
+        self.bars = bars
+        self.events = events
+        self.symbol_list = list(getattr(self.bars, "symbol_list", []) or [])
+        resolved = resolve_params_from_schema(self.get_param_schema(), params, keep_unknown=False)
+        self.metal_symbols = _resolve_metal_basket(
+            self.symbol_list,
+            str(resolved["metal_symbols"]),
+            gold_symbol=str(resolved["gold_symbol"]),
+            silver_symbol=str(resolved["silver_symbol"]),
+            platinum_symbol=str(resolved["platinum_symbol"]),
+            palladium_symbol=str(resolved["palladium_symbol"]),
+        )
+        self.zscore_window = max(3, int(resolved["zscore_window"]))
+        self.entry_z = max(0.0, float(resolved["entry_z"]))
+        self.exit_z = max(0.0, float(resolved["exit_z"]))
+        self.max_hold_bars = max(1, int(resolved["max_hold_bars"]))
+        self.min_price = max(0.0, float(resolved["min_price"]))
+        self.target_allocation = max(0.0, float(resolved["target_allocation"]))
+        self.max_order_value = max(0.0, float(resolved["max_order_value"]))
+        size = _state_size(self.zscore_window, self.max_hold_bars)
+        # Chain consecutive metals into ratio legs (XAU/XAG, XAG/XPT, XPT/XPD, ...).
+        self._legs: list[_MetalLegState] = []
+        for numerator, denominator in zip(
+            self.metal_symbols, self.metal_symbols[1:], strict=False
+        ):
+            self._legs.append(
+                _MetalLegState(numerator, denominator, deque(maxlen=size))
+            )
+        self._latest: dict[str, float] = {}
+        self._last_seen: dict[str, str] = {}
+        self._last_eval_key = ""
+
+    def get_state(self) -> dict[str, Any]:
+        return {
+            "latest": dict(self._latest),
+            "last_seen": dict(self._last_seen),
+            "last_eval_key": self._last_eval_key,
+            "legs": [
+                {
+                    "ratios": list(leg.ratios),
+                    "mode": leg.mode,
+                    "bars_held": int(leg.bars_held),
+                    "entry_ratio": leg.entry_ratio,
+                }
+                for leg in self._legs
+            ],
+        }
+
+    def set_state(self, state: dict[str, Any]) -> None:
+        if not isinstance(state, dict):
+            return
+        self._latest = {
+            str(k): float(v)
+            for k, v in dict(state.get("latest") or {}).items()
+            if safe_float(v) is not None
+        }
+        self._last_seen = {
+            str(k): str(v) for k, v in dict(state.get("last_seen") or {}).items()
+        }
+        self._last_eval_key = str(state.get("last_eval_key", ""))
+        payload = state.get("legs")
+        if isinstance(payload, list):
+            for leg, leg_payload in zip(self._legs, payload, strict=False):
+                if not isinstance(leg_payload, dict):
+                    continue
+                _restore_deque(leg.ratios, leg_payload.get("ratios"))
+                leg.mode = _mode(leg_payload.get("mode"))
+                leg.bars_held = _safe_non_negative_int(leg_payload.get("bars_held"))
+                leg.entry_ratio = safe_float(leg_payload.get("entry_ratio"))
+
+    def calculate_signals_window(self, event: Any, aggregator: Any = None) -> None:
+        _ = aggregator
+        for symbol in _event_symbols(event, self.metal_symbols):
+            snapshot = _window_snapshot(event, symbol)
+            if snapshot is not None:
+                self._update(symbol, snapshot)
+        self._evaluate(getattr(event, "time", None), time_key(getattr(event, "time", None)))
+
+    def calculate_signals(self, event: Any) -> None:
+        if str(getattr(event, "type", "")).upper() == "MARKET_WINDOW":
+            self.calculate_signals_window(event, None)
+            return
+        if getattr(event, "type", None) != "MARKET":
+            return
+        symbol = getattr(event, "symbol", None)
+        if symbol in self.metal_symbols:
+            snapshot = _market_snapshot(event)
+            if snapshot is not None:
+                self._update(str(symbol), snapshot)
+                self._evaluate(snapshot.time, time_key(snapshot.time))
+
+    def _update(self, symbol: str, snapshot: _Snapshot) -> None:
+        close = safe_float(snapshot.close)
+        if close is None or close <= self.min_price or close <= 0.0:
+            return
+        key = time_key(snapshot.time)
+        if key and key == self._last_seen.get(symbol):
+            return
+        self._last_seen[symbol] = key
+        self._latest[symbol] = close
+
+    def _evaluate(self, event_time: Any, event_key: str = "") -> None:
+        # Graceful degradation: need at least one valid ratio leg (>=2 metals).
+        if not self._legs:
+            return
+        if event_key:
+            if self._last_eval_key == event_key:
+                return
+            self._last_eval_key = event_key
+        for leg in self._legs:
+            self._evaluate_leg(leg, event_time)
+
+    def _evaluate_leg(self, leg: _MetalLegState, event_time: Any) -> None:
+        ratio_value = _ratio(self._latest.get(leg.numerator), self._latest.get(leg.denominator))
+        if ratio_value is None:
+            return
+        leg.ratios.append(ratio_value)
+        zscore = rolling_zscore(leg.ratios, window=self.zscore_window)
+        if zscore is None:
+            return
+        if leg.mode != "OUT":
+            leg.bars_held += 1
+            if abs(zscore) <= self.exit_z:
+                self._exit_leg(leg, event_time, ratio_value, zscore, "ratio_mean_reverted")
+            elif leg.bars_held >= self.max_hold_bars:
+                self._exit_leg(leg, event_time, ratio_value, zscore, "max_hold")
+            return
+        if zscore >= self.entry_z:
+            # Rich numerator vs basket -> short numerator, long denominator.
+            self._enter_leg(leg, event_time, ratio_value, zscore, "SHORT_RATIO")
+        elif zscore <= -self.entry_z:
+            self._enter_leg(leg, event_time, ratio_value, zscore, "LONG_RATIO")
+
+    def _leg_allocation(self) -> float:
+        # Dollar-balance each leg across the whole basket so gross stays bounded.
+        legs = max(1, len(self._legs))
+        return self.target_allocation / float(2 * legs)
+
+    def _emit_leg(
+        self,
+        *,
+        symbol: str,
+        event_time: Any,
+        signal_type: str,
+        price: float | None,
+        ratio_value: float | None,
+        zscore: float,
+        reason: str,
+        leg_role: str,
+    ) -> None:
+        if signal_type == "EXIT":
+            # EXIT closes regardless of allocation; match the bare-metadata EXIT
+            # convention used by the sibling sleeves.
+            metadata = {
+                "strategy": "MetalsRelativeValueBasketStrategy",
+                "reason": reason,
+                "leg_role": leg_role,
+                "ratio": ratio_value,
+                "zscore": zscore,
+            }
+        else:
+            metadata = _target_metadata(
+                strategy="MetalsRelativeValueBasketStrategy",
+                target_allocation=self._leg_allocation(),
+                max_order_value=self.max_order_value,
+                ratio=ratio_value,
+                zscore=zscore,
+                reason=reason,
+                leg_role=leg_role,
+            )
+        _emit(
+            self.events,
+            strategy_id="metals_relative_value_basket",
+            symbol=symbol,
+            event_time=event_time,
+            signal_type=signal_type,
+            price=price,
+            metadata=metadata,
+        )
+
+    def _enter_leg(
+        self, leg: _MetalLegState, event_time: Any, ratio_value: float, zscore: float, mode: str
+    ) -> None:
+        if mode == "SHORT_RATIO":
+            numerator_signal, denominator_signal = "SHORT", "LONG"
+        else:
+            numerator_signal, denominator_signal = "LONG", "SHORT"
+        self._emit_leg(
+            symbol=leg.numerator,
+            event_time=event_time,
+            signal_type=numerator_signal,
+            price=self._latest.get(leg.numerator),
+            ratio_value=ratio_value,
+            zscore=zscore,
+            reason="ratio_entry",
+            leg_role="numerator",
+        )
+        self._emit_leg(
+            symbol=leg.denominator,
+            event_time=event_time,
+            signal_type=denominator_signal,
+            price=self._latest.get(leg.denominator),
+            ratio_value=ratio_value,
+            zscore=zscore,
+            reason="ratio_entry",
+            leg_role="denominator",
+        )
+        leg.mode = mode
+        leg.entry_ratio = ratio_value
+        leg.bars_held = 0
+
+    def _exit_leg(
+        self, leg: _MetalLegState, event_time: Any, ratio_value: float, zscore: float, reason: str
+    ) -> None:
+        for symbol, leg_role in ((leg.numerator, "numerator"), (leg.denominator, "denominator")):
+            self._emit_leg(
+                symbol=symbol,
+                event_time=event_time,
+                signal_type="EXIT",
+                price=self._latest.get(symbol),
+                ratio_value=ratio_value,
+                zscore=zscore,
+                reason=reason,
+                leg_role=leg_role,
+            )
+        leg.mode = "OUT"
+        leg.entry_ratio = None
+        leg.bars_held = 0
+
+
 __all__ = [
     "EquityBenchmarkResidualReversalStrategy",
     "EquityMetalRiskRegimeRotationStrategy",
     "GoldSilverRatioMeanReversionStrategy",
     "GoldSilverRatioTrendStrategy",
     "MetalEquityDivergenceReversalStrategy",
+    "MetalsRelativeValueBasketStrategy",
 ]
