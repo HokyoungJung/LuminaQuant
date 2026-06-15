@@ -259,15 +259,27 @@ def _strategy_schema(strategy_cls: StrategyClass) -> dict[str, Any]:
 
 
 _PARAM_REGISTRY = ParamRegistry()
-for _strategy_name, _strategy_cls in _STRATEGY_MAP.items():
-    _schema = _strategy_schema(_strategy_cls)
-    if not _schema:
-        continue
+
+
+def _register_strategy_schema(strategy_name: str, strategy_cls: StrategyClass) -> None:
+    if _PARAM_REGISTRY.has_strategy(strategy_name):
+        return
+    schema = _strategy_schema(strategy_cls)
+    if not schema:
+        return
     _PARAM_REGISTRY.register(
-        _strategy_name,
-        _schema,
-        optuna_trials=_resolve_optuna_trial_budget(_OPTUNA_TRIAL_OVERRIDES.get(_strategy_name)),
+        strategy_name,
+        schema,
+        optuna_trials=_resolve_optuna_trial_budget(_OPTUNA_TRIAL_OVERRIDES.get(strategy_name)),
     )
+
+
+def _sync_param_registry(strategy_map: dict[str, StrategyClass]) -> None:
+    for strategy_name, strategy_cls in strategy_map.items():
+        _register_strategy_schema(strategy_name, strategy_cls)
+
+
+_sync_param_registry(_STRATEGY_MAP)
 
 
 def get_strategy_metadata(strategy_name: str) -> dict[str, Any]:
@@ -351,6 +363,7 @@ def get_strategy_map() -> dict[str, StrategyClass]:
     _discover_plugin_strategies()
     combined: dict[str, StrategyClass] = dict(_STRATEGY_MAP)
     combined.update(_registry_strategy_classes())
+    _sync_param_registry(combined)
     return combined
 
 

@@ -1,5 +1,48 @@
 # Research Note
 
+## 2026-06-15 KST — latest merge + 신규 decorrelated sleeves 실측: 신규 단일 알파는 아직 탈락
+
+최신 `private/main`(`aa0582b3`)을 `private-main`에 병합했고, 환경은 `uv sync --group dev --extra dev --extra gpu` 및 native backend rebuild까지 다시 맞췄다. 현재 검증 환경은 Python `3.14.5`, `pytest 9.0.2`, `ruff 0.15.1`, `cudf-polars-cu12 26.6.0`, `nvidia-nvjitlink-cu12 12.9.86`, `maturin 1.13.3`이고 `_compute` native kernels 및 numba/pyo3 metric backend load를 확인했다.
+
+수정/검증 내용:
+- `StrategyFactory` lazy plugin discovery 후 새 전략 이름은 보이지만 param schema/default가 비는 registry bug를 수정했다. `get_strategy_map()` discovery 결과를 `ParamRegistry`에 동기화하도록 `src/lumina_quant/strategies/registry.py`를 고쳤다.
+- 신규 test `tests/test_new_decorrelated_alpha_sleeves.py`는 rolling primitive, lazy-discovered strategy schema/default, candidate-library wiring/admission tags를 검증한다.
+- `tests/test_strategy_factory_library.py`의 carry tag assertion은 obsolete rule을 제거하고 `family == "carry"` 행만 data-dependent carry로 강제하도록 정정했다.
+
+Asset 확장 상태:
+- Candidate build는 broadened universe 기준 총 `729` rows, 신규 sleeve rows `59`개까지 나온다: `ConfidenceGatedTrendStrategy 40`, `HurstRegimeGatedStrategy 3`, `MetalsRelativeValueBasketStrategy 3`, `LiquidationCascadeReversionStrategy 3`, `OrderBookImbalanceReversionStrategy 1`, `CrossSectionalEquityMomentumStrategy 2`, `ResidualEquityMomentumStrategy 1`, `BettingAgainstBetaStrategy 1`, `SemisLeadLagRotationStrategy 2`, `DualMomentumIndexRotationStrategy 1`, `CalendarSeasonalityOverlayStrategy 2`.
+- 하지만 “asset을 넓혔다”와 “장기 성능평가가 가능하다”는 다르다. Local Binance parquet coverage는 crypto core `5/5`가 `>=252d`, metals `4/4`가 `>=120d`지만 `>=252d`는 0, tradfi equity `76/76` 중 `>=120d`는 8·`>=252d`는 0, tradfi ETF/index `12/12`는 `>=120d`와 `>=252d` 모두 0, semis required `9/9`도 `>=120d`와 `>=252d` 모두 0이다. 200/252-bar daily lookback 계열은 현 로컬 데이터만으로 clean 장기 점수를 낼 수 없다.
+- 주의할 source-level issue: candidate context의 `crypto_symbols`가 “metals가 아닌 모든 normalized symbol”로 잡혀 equity/ETF가 crypto sleeve 쪽으로 섞일 수 있다. 이번 실측 scorer는 crypto/metals/equity/semis/index universe를 명시 override해서 proxy/fill 없이 평가했다.
+
+신규 sleeve 실측 score:
+- Artifact: `var/reports/update_validation/new_alpha_real_score/new_alpha_real_score_latest.json|md`.
+- 조건: local Binance `1m` parquet only, synthetic/proxy/fill 없음, 기간 `2026-05-16T00:00:00Z` → `2026-06-13T09:25:00Z`, deterministic representative 11 strategies.
+- Summary: pass/traded/excluded/fail = `4 / 3 / 1 / 6`.
+- 실제 거래된 3개는 모두 손실:
+  - `HurstRegimeGatedStrategy`: return `-81.77%`, MDD `109.22%`, trades `761`, signals `726`.
+  - `OrderBookImbalanceReversionStrategy`: return `-0.45%`, Sharpe `-55.513`, MDD `0.45%`, trades `417`.
+  - `ConfidenceGatedTrendStrategy`: return `-0.05%`, Sharpe `-32.830`, MDD `0.09%`, trades `5`.
+- `CalendarSeasonalityOverlayStrategy`는 pass지만 no-trade `0.00%`라 성능 후보가 아니다.
+- `LiquidationCascadeReversionStrategy`는 required feature data unavailable로 제외했다. `MetalsRelativeValueBasket`, cross-sectional equity, residual equity, BAB, semis lead-lag, dual-momentum index 계열은 warmup/history 부족으로 fail-closed했다.
+
+기존 성능 우수 후보 baseline:
+- `dynamic_conviction_switch:t0.90_risk_capped_fallback`: OOS comp `+53.38%`, Sharpe `2.07`, max OOS MDD `18.80%`, hit `5/10`; highest paper/shadow challenger.
+- `cross_candidate_hybrid:hybrid_v3_5`: OOS comp `+27.01%`, Sharpe `1.24`, max OOS MDD `13.72%`, hit `5/10`; robust full-run conservative default.
+- `robust_balanced_v1_top1`: OOS comp `+27.03%`, annualized approx `+33.26%`, monthly MDD `2.72%`, hit `7/10`; existing-candidate reuse selector, fresh-forward 전 승격 금지.
+- `robust_quality_v1_top1`: OOS comp `+24.55%`, monthly MDD `3.10%`, hit `7/10`; existing-candidate reuse selector, fresh-forward 전 승격 금지.
+- `profile_optuna:selected_train_validation_legal`: paper candidate, OOS comp `+18.32%`, Sharpe `0.80`, max OOS MDD `18.80%`, hit `5/10`.
+- `strict_efficiency:growth_mdd20_gross8_69_asset_efficiency_repair_optuna`: defensive fallback, OOS comp `+6.97%`, Sharpe `0.66`, max OOS MDD `7.32%`, hit `4/10`.
+- 결론: 현재 강한 후보는 composite/selector 계열이고, 이번 신규 decorrelated single-alpha sleeves는 현 로컬 실측으로는 기존 우수 후보를 대체하지 못한다. Real-money 승격 후보는 여전히 0개다.
+
+Verification:
+- `uv run pytest tests/test_new_decorrelated_alpha_sleeves.py -q` → `3 passed`.
+- `uv run pytest tests/test_indicators_core.py tests/test_strategy_factory_library.py tests/test_exact_window_pair_focus_profiles.py tests/test_symbol_canonicalization_pipeline.py tests/test_new_decorrelated_alpha_sleeves.py -q` → `44 passed`.
+- `uv run ruff check src/lumina_quant/strategies/registry.py tests/test_strategy_factory_library.py tests/test_new_decorrelated_alpha_sleeves.py` → pass.
+- `uv run ruff format --check src/lumina_quant/strategies/registry.py tests/test_strategy_factory_library.py tests/test_new_decorrelated_alpha_sleeves.py` → pass.
+- `uv run pytest -q` → `1936 passed in 165.80s`.
+- Backtest perf benchmark: median `0.043093s`, median `29424.42 bars/sec`, old baseline 대비 speedup `1311.07x`.
+- RSS probe: max RSS `242.22MiB`; 8GB gate PASS (`242.22MiB < 7372.80MiB`, disk snapshot `20.051GiB <= 30GiB`).
+
 ## 2026-06-14 KST — defensive row-level selector salvage: 소폭 플러스, 실전은 계속 금지
 
 TradFi/external-alpha 110-asset WF artifact를 빠르게 재계산해 row-level leaf selector 계열을 살렸다. 새 후보는 `row_level_leaf_selector:defensive_validation_utility_mdd20`이고, validation 수익만 쫓던 기존 fast selector보다 validation MDD, train MDD, train 대비 과한 validation spike를 강하게 패널티한다. 선택 입력은 train/validation row metric뿐이며 current-fold OOS는 선택에 쓰지 않는다.

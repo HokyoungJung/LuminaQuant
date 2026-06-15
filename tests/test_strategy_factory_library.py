@@ -1048,6 +1048,13 @@ def test_strategy_library_rows_include_tags_and_metadata():
     assert any("vol_compression" in row["tags"] for row in row_dicts)
     assert any("pair" in row["tags"] for row in row_dicts)
     assert any("leadlag" in row["tags"] for row in row_dicts)
-    carry_rows = [row for row in row_dicts if "carry" in row["tags"]]
+    carry_rows = [row for row in row_dicts if row["family"] == "carry"]
+    assert carry_rows
     assert all(row["metadata"].get("data_dependent") is True for row in carry_rows)
+    admission_tag_rows = [
+        row for row in row_dicts if row["family"] == "cross_sectional" and "carry" in row["tags"]
+    ]
+    assert all(
+        {"cross_sectional", "carry", "momentum"}.issubset(row["tags"]) for row in admission_tag_rows
+    )
     assert any(item["metadata"].get("timeframe") is not None for item in row_dicts)
