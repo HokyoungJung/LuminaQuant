@@ -16,7 +16,11 @@ from itertools import pairwise
 from typing import Any
 
 from lumina_quant.core.events import SignalEvent
+from lumina_quant.core.plugin_registry import register
+from lumina_quant.indicators.alpha_features import simple_return
 from lumina_quant.indicators.common import safe_float, time_key
+from lumina_quant.indicators.rolling_stats import rolling_beta
+from lumina_quant.strategies.external_alpha_sleeves import _emit, _target_metadata
 from lumina_quant.strategy import Strategy
 from lumina_quant.tuning import HyperParam, resolve_params_from_schema
 
@@ -1080,3 +1084,461 @@ class DerivativesFlowSqueezeStrategy(Strategy):
             "volume": safe_float(getattr(event, "volume", None)),
         }
         self._process_symbol(event, symbol, snapshot=snapshot)
+
+
+_BTC_HINTS = ("BTCUSDT", "BTCUSD", "BTC")
+
+
+@dataclass(slots=True)
+class _CascadeSymbolState:
+    closes: deque[float]
+    volumes: deque[float]
+    open_interest: deque[float]
+    last_time_key: str = ""
+
+
+@register("strategy", "LiquidationCascadeReversionStrategy", interface="event_driven")
+class LiquidationCascadeReversionStrategy(Strategy):
+    """Buy beaten-down alts into a BTC-led deleveraging cascade, BTC-beta-hedged.
+
+    The sleeve is crisis-conditional and event-triggered: it only fires when BTC
+    prints a sharp 1h-equivalent drop on a volume spike AND open interest
+    contracts (a classic liquidation cascade).  On a trigger it goes long an
+    equal-weight basket of the most beaten-down alts for a fixed ``hold_bars``
+    window and shorts BTC sized by the basket's rolling beta to BTC so the book
+    stays roughly market-neutral.  A no-re-layer lock prevents stacking entries
+    during the hold window, keeping turnover intrinsically low (cascades are
+    rare), well under the 2.5 hard cap.
+    """
+
+    decision_cadence_seconds = 3600
+    preferred_contract = "market_window"
+    uses_timeframe_aggregator = False
+    required_features = (
+        "open_interest",
+        "liquidation_long_notional",
+        "liquidation_short_notional",
+    )
+
+    @classmethod
+    def get_param_schema(cls) -> dict[str, HyperParam]:
+        return {
+            "btc_symbol": HyperParam.string("btc_symbol", default="", tunable=False),
+            "btc_return_trigger": HyperParam.floating(
+                "btc_return_trigger", default=-0.03, low=-0.50, high=0.0
+            ),
+            "volume_mult": HyperParam.floating("volume_mult", default=2.0, low=1.0, high=20.0),
+            "oi_drop_trigger": HyperParam.floating(
+                "oi_drop_trigger", default=0.05, low=0.0, high=0.90
+            ),
+            "hold_bars": HyperParam.integer("hold_bars", default=12, low=1, high=10_080),
+            "basket_size": HyperParam.integer("basket_size", default=4, low=1, high=64),
+            "beta_window": HyperParam.integer("beta_window", default=72, low=4, high=10_080),
+            "return_lookback_bars": HyperParam.integer(
+                "return_lookback_bars", default=1, low=1, high=2_880, tunable=False
+            ),
+            "alt_return_lookback_bars": HyperParam.integer(
+                "alt_return_lookback_bars", default=4, low=1, high=2_880, tunable=False
+            ),
+            "volume_avg_bars": HyperParam.integer(
+                "volume_avg_bars", default=24, low=2, high=10_080, tunable=False
+            ),
+            "oi_lookback_bars": HyperParam.integer(
+                "oi_lookback_bars", default=4, low=1, high=2_880, tunable=False
+            ),
+            "min_basket": HyperParam.integer("min_basket", default=2, low=1, high=64, tunable=False),
+            "min_price": HyperParam.floating("min_price", default=0.0, low=0.0, high=1_000_000.0),
+            "target_allocation": HyperParam.floating(
+                "target_allocation", default=0.020, low=0.0, high=2.0, tunable=False
+            ),
+            "max_order_value": HyperParam.floating(
+                "max_order_value", default=400.0, low=0.0, high=1_000_000.0, tunable=False
+            ),
+        }
+
+    def __init__(self, bars: Any, events: Any, **params: Any) -> None:
+        self.bars = bars
+        self.events = events
+        self.symbol_list = list(getattr(self.bars, "symbol_list", []) or [])
+        resolved = resolve_params_from_schema(self.get_param_schema(), params, keep_unknown=False)
+        self.btc_symbol = self._resolve_btc_symbol(str(resolved["btc_symbol"]))
+        self.alt_symbols = [
+            symbol for symbol in self.symbol_list if symbol != self.btc_symbol
+        ]
+        self.btc_return_trigger = min(0.0, float(resolved["btc_return_trigger"]))
+        self.volume_mult = max(1.0, float(resolved["volume_mult"]))
+        self.oi_drop_trigger = max(0.0, float(resolved["oi_drop_trigger"]))
+        self.hold_bars = max(1, int(resolved["hold_bars"]))
+        self.basket_size = max(1, int(resolved["basket_size"]))
+        self.beta_window = max(2, int(resolved["beta_window"]))
+        self.return_lookback_bars = max(1, int(resolved["return_lookback_bars"]))
+        self.alt_return_lookback_bars = max(1, int(resolved["alt_return_lookback_bars"]))
+        self.volume_avg_bars = max(2, int(resolved["volume_avg_bars"]))
+        self.oi_lookback_bars = max(1, int(resolved["oi_lookback_bars"]))
+        self.min_basket = max(1, int(resolved["min_basket"]))
+        self.min_price = max(0.0, float(resolved["min_price"]))
+        self.target_allocation = max(0.0, float(resolved["target_allocation"]))
+        self.max_order_value = max(0.0, float(resolved["max_order_value"]))
+        size = (
+            max(
+                self.beta_window,
+                self.volume_avg_bars,
+                self.oi_lookback_bars,
+                self.alt_return_lookback_bars,
+                self.return_lookback_bars,
+            )
+            + 8
+        )
+        self._state = {
+            symbol: _CascadeSymbolState(
+                closes=deque(maxlen=size),
+                volumes=deque(maxlen=size),
+                open_interest=deque(maxlen=size),
+            )
+            for symbol in self.symbol_list
+        }
+        # Position bookkeeping for the no-re-layer lock + fixed-hold exit.
+        self._in_position = False
+        self._bars_held = 0
+        self._active_symbols: list[str] = []
+        self._last_eval_time_key = ""
+
+    def _resolve_btc_symbol(self, explicit: str) -> str:
+        if explicit and explicit in self.symbol_list:
+            return explicit
+        for symbol in self.symbol_list:
+            upper = str(symbol).upper().replace("/", "").replace("-", "").replace("_", "")
+            if any(hint in upper for hint in _BTC_HINTS):
+                return symbol
+        return ""
+
+    def get_state(self) -> dict[str, Any]:
+        return {
+            "in_position": bool(self._in_position),
+            "bars_held": int(self._bars_held),
+            "active_symbols": list(self._active_symbols),
+            "last_eval_time_key": self._last_eval_time_key,
+            "symbol_state": {
+                symbol: {
+                    "closes": list(item.closes),
+                    "volumes": list(item.volumes),
+                    "open_interest": list(item.open_interest),
+                    "last_time_key": item.last_time_key,
+                }
+                for symbol, item in self._state.items()
+            },
+        }
+
+    def set_state(self, state: dict[str, Any]) -> None:
+        if not isinstance(state, dict):
+            return
+        self._in_position = bool(state.get("in_position", False))
+        self._bars_held = self._safe_non_negative_int(state.get("bars_held"))
+        self._active_symbols = [
+            str(symbol)
+            for symbol in list(state.get("active_symbols") or [])
+            if str(symbol) in self._state
+        ]
+        self._last_eval_time_key = str(state.get("last_eval_time_key", ""))
+        raw = state.get("symbol_state")
+        if not isinstance(raw, dict):
+            return
+        for symbol, payload in raw.items():
+            if symbol not in self._state or not isinstance(payload, dict):
+                continue
+            item = self._state[symbol]
+            for attr in ("closes", "volumes", "open_interest"):
+                target = getattr(item, attr)
+                target.clear()
+                for value in list(payload.get(attr) or [])[-int(target.maxlen or 0) :]:
+                    parsed = safe_float(value)
+                    if parsed is not None:
+                        target.append(parsed)
+            item.last_time_key = str(payload.get("last_time_key", ""))
+
+    @staticmethod
+    def _safe_non_negative_int(value: Any) -> int:
+        try:
+            return max(0, int(value))
+        except Exception:
+            return 0
+
+    def _extract_feature(self, event: Any, symbol: str, field: str) -> float | None:
+        direct = safe_float(getattr(event, field, None))
+        if direct is not None:
+            return direct
+        getter = getattr(self.bars, "get_latest_feature_value", None)
+        if callable(getter):
+            try:
+                value = getter(symbol, field)
+            except Exception:
+                value = None
+            parsed = safe_float(value)
+            if parsed is not None:
+                return parsed
+        getter = getattr(self.bars, "get_latest_bar_value", None)
+        if callable(getter):
+            try:
+                value = getter(symbol, field)
+            except Exception:
+                value = None
+            return safe_float(value)
+        return None
+
+    def calculate_signals_window(self, event: Any, aggregator: Any = None) -> None:
+        _ = aggregator
+        if str(getattr(event, "type", "")).upper() != "MARKET_WINDOW":
+            self.calculate_signals(event)
+            return
+        event_key = time_key(getattr(event, "time", None))
+        updated = False
+        for symbol in self.symbol_list:
+            if symbol not in self._state:
+                continue
+            snapshot = self._window_snapshot(event, symbol)
+            if self._update(event, symbol, snapshot):
+                updated = True
+        if updated and event_key and event_key != self._last_eval_time_key:
+            self._last_eval_time_key = event_key
+            self._evaluate(getattr(event, "time", None))
+
+    def calculate_signals(self, event: Any) -> None:
+        event_type = str(getattr(event, "type", "")).upper()
+        if event_type == "MARKET_WINDOW":
+            self.calculate_signals_window(event, None)
+            return
+        if event_type != "MARKET":
+            return
+        symbol = str(getattr(event, "symbol", ""))
+        if symbol not in self._state:
+            return
+        snapshot = {
+            "close": safe_float(getattr(event, "close", None)),
+            "volume": safe_float(getattr(event, "volume", None)),
+        }
+        if self._update(event, symbol, snapshot):
+            key = time_key(getattr(event, "time", None))
+            if key and key != self._last_eval_time_key:
+                self._last_eval_time_key = key
+                self._evaluate(getattr(event, "time", None))
+
+    def _window_snapshot(self, event: Any, symbol: str) -> dict[str, float | None]:
+        bars_1s = dict(getattr(event, "bars_1s", {}) or {})
+        rows = list(bars_1s.get(symbol) or [])
+        if not rows:
+            return {}
+        closes: list[float] = []
+        volumes: list[float] = []
+        for row in rows:
+            if isinstance(row, dict):
+                close = safe_float(row.get("close"))
+                volume = safe_float(row.get("volume"))
+            elif isinstance(row, (tuple, list)):
+                close = safe_float(row[4]) if len(row) > 4 else None
+                volume = safe_float(row[5]) if len(row) > 5 else None
+            else:
+                close = None
+                volume = None
+            if close is not None:
+                closes.append(close)
+            if volume is not None:
+                volumes.append(max(0.0, volume))
+        return {
+            "close": closes[-1] if closes else None,
+            "volume": float(sum(volumes)) if volumes else None,
+        }
+
+    def _update(self, event: Any, symbol: str, snapshot: dict[str, float | None]) -> bool:
+        item = self._state[symbol]
+        key = time_key(getattr(event, "time", getattr(event, "datetime", None)))
+        if key and key == item.last_time_key:
+            return False
+        close = snapshot.get("close")
+        if close is None:
+            close = self._extract_feature(event, symbol, "close")
+        if close is None or close <= self.min_price or close <= 0.0:
+            return False
+        item.last_time_key = key
+        volume = snapshot.get("volume")
+        if volume is None:
+            volume = self._extract_feature(event, symbol, "volume")
+        open_interest = self._extract_feature(event, symbol, "open_interest")
+        item.closes.append(float(close))
+        item.volumes.append(max(0.0, float(volume)) if volume is not None else 0.0)
+        item.open_interest.append(
+            float(open_interest) if open_interest is not None and open_interest > 0.0 else 0.0
+        )
+        return True
+
+    @staticmethod
+    def _pct_change(values: deque[float], lookback: int) -> float | None:
+        if len(values) <= lookback:
+            return None
+        latest = float(values[-1])
+        base = float(values[-1 - lookback])
+        if abs(base) <= 1e-12:
+            return None
+        return latest / base - 1.0
+
+    def _volume_spike(self, item: _CascadeSymbolState) -> bool:
+        if len(item.volumes) < self.volume_avg_bars + 1:
+            return False
+        latest = float(item.volumes[-1])
+        history = list(item.volumes)[-(self.volume_avg_bars + 1) : -1]
+        if not history:
+            return False
+        avg = sum(history) / float(len(history))
+        if avg <= 1e-12:
+            return False
+        return latest >= self.volume_mult * avg
+
+    def _btc_triggered(self) -> tuple[bool, dict[str, Any]]:
+        item = self._state.get(self.btc_symbol)
+        if item is None:
+            return False, {}
+        btc_return = self._pct_change(item.closes, self.return_lookback_bars)
+        oi_change = self._pct_change(item.open_interest, self.oi_lookback_bars)
+        if btc_return is None or oi_change is None:
+            return False, {}
+        return_ok = btc_return <= self.btc_return_trigger
+        volume_ok = self._volume_spike(item)
+        oi_ok = oi_change <= -self.oi_drop_trigger
+        diagnostics = {
+            "btc_return": float(btc_return),
+            "btc_oi_change": float(oi_change),
+            "btc_volume_spike": bool(volume_ok),
+        }
+        return bool(return_ok and volume_ok and oi_ok), diagnostics
+
+    def _select_basket(self) -> list[tuple[str, float]]:
+        rows: list[tuple[float, str]] = []
+        for symbol in self.alt_symbols:
+            item = self._state.get(symbol)
+            if item is None:
+                continue
+            ret = simple_return(item.closes, lookback=self.alt_return_lookback_bars)
+            if ret is None:
+                continue
+            rows.append((float(ret), symbol))
+        # Most beaten-down (most negative return) alts lead the reversion basket.
+        rows.sort(key=lambda entry: entry[0])
+        return [(symbol, ret) for ret, symbol in rows[: self.basket_size]]
+
+    def _basket_beta(self, symbols: list[str]) -> float | None:
+        btc_item = self._state.get(self.btc_symbol)
+        if btc_item is None or len(btc_item.closes) < 4:
+            return None
+        betas: list[float] = []
+        for symbol in symbols:
+            item = self._state.get(symbol)
+            if item is None:
+                continue
+            beta = rolling_beta(list(item.closes), list(btc_item.closes))
+            if beta is not None:
+                betas.append(float(beta))
+        if not betas:
+            return None
+        return float(sum(betas) / len(betas))
+
+    def _evaluate(self, event_time: Any) -> None:
+        # Manage an open position: fixed-hold exit + no-re-layer lock.
+        if self._in_position:
+            self._bars_held += 1
+            if self._bars_held >= self.hold_bars:
+                self._exit_all(event_time, "hold_window_elapsed")
+            return
+        if not self.btc_symbol or len(self.alt_symbols) < self.min_basket:
+            return
+        triggered, diagnostics = self._btc_triggered()
+        if not triggered:
+            return
+        basket = self._select_basket()
+        if len(basket) < self.min_basket:
+            return
+        basket_symbols = [symbol for symbol, _ in basket]
+        beta = self._basket_beta(basket_symbols)
+        self._enter_basket(event_time, basket, beta, diagnostics)
+
+    def _enter_basket(
+        self,
+        event_time: Any,
+        basket: list[tuple[str, float]],
+        beta: float | None,
+        diagnostics: dict[str, Any],
+    ) -> None:
+        if self.target_allocation <= 0.0 or self.max_order_value <= 0.0:
+            return
+        per_alt = self.target_allocation / float(len(basket))
+        emitted: list[str] = []
+        for symbol, ret in basket:
+            item = self._state.get(symbol)
+            price = float(item.closes[-1]) if item and item.closes else None
+            metadata = _target_metadata(
+                strategy="LiquidationCascadeReversionStrategy",
+                target_allocation=per_alt,
+                max_order_value=self.max_order_value,
+                reason="liquidation_cascade_reversion_long",
+                recent_return=float(ret),
+                basket_beta=beta,
+                **diagnostics,
+            )
+            _emit(
+                self.events,
+                strategy_id="liquidation_cascade_reversion",
+                symbol=symbol,
+                event_time=event_time,
+                signal_type="LONG",
+                price=price,
+                metadata=metadata,
+            )
+            emitted.append(symbol)
+        # BTC-beta hedge: short BTC sized by the basket's average beta.
+        if self.btc_symbol and beta is not None and beta > 0.0:
+            btc_item = self._state.get(self.btc_symbol)
+            btc_price = float(btc_item.closes[-1]) if btc_item and btc_item.closes else None
+            hedge_alloc = min(self.target_allocation, self.target_allocation * float(beta))
+            if hedge_alloc > 0.0:
+                metadata = _target_metadata(
+                    strategy="LiquidationCascadeReversionStrategy",
+                    target_allocation=hedge_alloc,
+                    max_order_value=self.max_order_value,
+                    reason="btc_beta_hedge",
+                    basket_beta=beta,
+                    **diagnostics,
+                )
+                _emit(
+                    self.events,
+                    strategy_id="liquidation_cascade_reversion",
+                    symbol=self.btc_symbol,
+                    event_time=event_time,
+                    signal_type="SHORT",
+                    price=btc_price,
+                    metadata=metadata,
+                )
+                emitted.append(self.btc_symbol)
+        self._in_position = True
+        self._bars_held = 0
+        self._active_symbols = emitted
+
+    def _exit_all(self, event_time: Any, reason: str) -> None:
+        for symbol in self._active_symbols:
+            item = self._state.get(symbol)
+            price = float(item.closes[-1]) if item and item.closes else None
+            metadata = _target_metadata(
+                strategy="LiquidationCascadeReversionStrategy",
+                target_allocation=0.0,
+                max_order_value=0.0,
+                reason=reason,
+            )
+            _emit(
+                self.events,
+                strategy_id="liquidation_cascade_reversion",
+                symbol=symbol,
+                event_time=event_time,
+                signal_type="EXIT",
+                price=price,
+                metadata=metadata,
+            )
+        self._in_position = False
+        self._bars_held = 0
+        self._active_symbols = []
