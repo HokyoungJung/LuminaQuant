@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-06-16T00:42:53.921363+00:00",
+  "generated_at_utc": "2026-06-16T06:59:41.198117+00:00",
   "literal_paths": [
     "src/lumina_quant/strategies",
     "lumina_quant/strategies"
@@ -666,6 +666,12 @@
     "literal:src/lumina_quant/strategies/robust_meta_overlays.py:538:33:0.1",
     "literal:src/lumina_quant/strategies/robust_meta_overlays.py:749:35:3.0",
     "literal:src/lumina_quant/strategies/robust_meta_overlays.py:749:53:3.0",
+    "literal:src/lumina_quant/strategies/selection_aware_alpha_sleeves.py:281:59:60",
+    "literal:src/lumina_quant/strategies/selection_aware_alpha_sleeves.py:283:30:14",
+    "literal:src/lumina_quant/strategies/selection_aware_alpha_sleeves.py:380:31:3600",
+    "literal:src/lumina_quant/strategies/selection_aware_alpha_sleeves.py:443:32:0.01",
+    "literal:src/lumina_quant/strategies/selection_aware_alpha_sleeves.py:522:31:3600",
+    "literal:src/lumina_quant/strategies/selection_aware_alpha_sleeves.py:585:32:0.01",
     "literal:src/lumina_quant/strategies/session_filtered_pair_carry.py:75:28:23",
     "literal:src/lumina_quant/strategies/taker_flow_exhaustion_reversal.py:232:28:23",
     "literal:src/lumina_quant/strategies/taker_flow_exhaustion_reversal.py:245:25:100_000_000_000",
