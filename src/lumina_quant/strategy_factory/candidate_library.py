@@ -2595,6 +2595,11 @@ class _CandidateBuildContext:
         # New decorrelated alpha sleeves (Pass-1 live universe + dormant tranche).
         _build_hurst_regime_gated_candidates(self)
         _build_confidence_gated_trend_candidates(self)
+        # Per-symbol directional RETURN-RIDER sleeves (>=30m only; ride winners
+        # with ATR trailing stops + pyramiding for high compound return).
+        _build_adaptive_trend_rider_candidates(self)
+        _build_volatility_breakout_rider_candidates(self)
+        _build_acceleration_rider_candidates(self)
         _build_metals_relative_value_basket_candidates(self)
         _build_liquidation_cascade_reversion_candidates(self)
         _build_orderbook_imbalance_reversion_candidates(self)
@@ -4638,6 +4643,422 @@ def _build_confidence_gated_trend_candidates(ctx: _CandidateBuildContext) -> Non
                         "symbol_scope": symbol,
                         "allow_short": bool(spec["allow_short"]),
                         "decision_cadence_seconds": 3600,
+                    },
+                )
+
+
+# Per-symbol directional RETURN-RIDER sleeves: meaningful TopCap-scale exposure,
+# ATR trailing stops that let winners run, and pyramiding into continuation for
+# high compound return.  Wired ONLY at >=30m timeframes (never 1s/1m/5m/15m) with
+# SHORT windows so they fire many trades on a ~1-month window.
+# Per-timeframe decision cadence (seconds) for the >=30m return riders, so a 4h
+# row decides every 4h and a 1d row every day (not every 30m).
+_RIDER_TF_CADENCE_SECONDS: dict[str, int] = {
+    "30m": 1800,
+    "1h": 3600,
+    "4h": 14400,
+    "1d": 86400,
+}
+
+_ADAPTIVE_TREND_RIDER_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "30m": (
+        {
+            "variant": "fast_ls",
+            "kama_period": 10,
+            "kama_fast": 2,
+            "kama_slow": 24,
+            "min_efficiency": 0.28,
+            "slope_lookback": 2,
+            "trail_atr_mult": 3.0,
+            "atr_period": 14,
+            "max_adds": 3,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 200,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "core_ls",
+            "kama_period": 12,
+            "kama_fast": 2,
+            "kama_slow": 30,
+            "min_efficiency": 0.30,
+            "slope_lookback": 3,
+            "trail_atr_mult": 3.2,
+            "atr_period": 14,
+            "max_adds": 3,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 180,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "swing_ls",
+            "kama_period": 10,
+            "kama_fast": 2,
+            "kama_slow": 24,
+            "min_efficiency": 0.30,
+            "slope_lookback": 2,
+            "trail_atr_mult": 3.5,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 36,
+            "target_vol": 0.030,
+            "max_hold_bars": 120,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1d": (
+        {
+            "variant": "macro_ls",
+            "kama_period": 8,
+            "kama_fast": 2,
+            "kama_slow": 20,
+            "min_efficiency": 0.30,
+            "slope_lookback": 1,
+            "trail_atr_mult": 4.0,
+            "atr_period": 10,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 24,
+            "target_vol": 0.040,
+            "max_hold_bars": 60,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+}
+
+_VOLATILITY_BREAKOUT_RIDER_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "30m": (
+        {
+            "variant": "fast_ls",
+            "donchian_window": 20,
+            "atr_expansion_mult": 1.05,
+            "atr_baseline_window": 48,
+            "trail_atr_mult": 3.5,
+            "atr_period": 14,
+            "max_adds": 3,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 200,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "core_ls",
+            "donchian_window": 24,
+            "atr_expansion_mult": 1.10,
+            "atr_baseline_window": 60,
+            "trail_atr_mult": 3.5,
+            "atr_period": 14,
+            "max_adds": 3,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 180,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "swing_ls",
+            "donchian_window": 18,
+            "atr_expansion_mult": 1.10,
+            "atr_baseline_window": 48,
+            "trail_atr_mult": 4.0,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 36,
+            "target_vol": 0.030,
+            "max_hold_bars": 120,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1d": (
+        {
+            "variant": "macro_ls",
+            "donchian_window": 14,
+            "atr_expansion_mult": 1.10,
+            "atr_baseline_window": 30,
+            "trail_atr_mult": 4.5,
+            "atr_period": 10,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 24,
+            "target_vol": 0.040,
+            "max_hold_bars": 60,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+}
+
+_ACCELERATION_RIDER_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "30m": (
+        {
+            "variant": "fast_ls",
+            "roc_period": 8,
+            "min_roc": 0.0,
+            "decel_tolerance": 0.0,
+            "trail_atr_mult": 2.5,
+            "atr_period": 14,
+            "max_adds": 4,
+            "add_step_atr": 0.75,
+            "vol_window": 48,
+            "target_vol": 0.025,
+            "max_hold_bars": 160,
+            "allow_short": True,
+            "add_alloc_fraction": 0.6,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "core_ls",
+            "roc_period": 10,
+            "min_roc": 0.0,
+            "decel_tolerance": 0.0,
+            "trail_atr_mult": 2.8,
+            "atr_period": 14,
+            "max_adds": 4,
+            "add_step_atr": 0.75,
+            "vol_window": 48,
+            "target_vol": 0.025,
+            "max_hold_bars": 150,
+            "allow_short": True,
+            "add_alloc_fraction": 0.6,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "swing_ls",
+            "roc_period": 8,
+            "min_roc": 0.0,
+            "decel_tolerance": 0.0,
+            "trail_atr_mult": 3.0,
+            "atr_period": 14,
+            "max_adds": 3,
+            "add_step_atr": 0.75,
+            "vol_window": 36,
+            "target_vol": 0.030,
+            "max_hold_bars": 100,
+            "allow_short": True,
+            "add_alloc_fraction": 0.6,
+        },
+    ),
+    "1d": (
+        {
+            "variant": "macro_ls",
+            "roc_period": 6,
+            "min_roc": 0.0,
+            "decel_tolerance": 0.0,
+            "trail_atr_mult": 3.5,
+            "atr_period": 10,
+            "max_adds": 2,
+            "add_step_atr": 0.75,
+            "vol_window": 24,
+            "target_vol": 0.040,
+            "max_hold_bars": 60,
+            "allow_short": True,
+            "add_alloc_fraction": 0.6,
+        },
+    ),
+}
+
+
+def _build_adaptive_trend_rider_candidates(ctx: _CandidateBuildContext) -> None:
+    """Per-symbol KAMA/efficiency adaptive-trend rider (single-asset, return-max)."""
+    crypto_symbols = ctx.crypto_symbols
+    if not crypto_symbols:
+        return
+    for timeframe in ctx._present("30m", "1h", "4h", "1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _ADAPTIVE_TREND_RIDER_SLICE.get(timeframe, ()):
+            for symbol in crypto_symbols:
+                params = {
+                    "kama_period": int(spec["kama_period"]),
+                    "kama_fast": int(spec["kama_fast"]),
+                    "kama_slow": int(spec["kama_slow"]),
+                    "min_efficiency": float(spec["min_efficiency"]),
+                    "slope_lookback": int(spec["slope_lookback"]),
+                    "trail_atr_mult": float(spec["trail_atr_mult"]),
+                    "atr_period": int(spec["atr_period"]),
+                    "max_adds": int(spec["max_adds"]),
+                    "add_step_atr": float(spec["add_step_atr"]),
+                    "vol_window": int(spec["vol_window"]),
+                    "target_vol": float(spec["target_vol"]),
+                    "max_hold_bars": int(spec["max_hold_bars"]),
+                    "allow_short": bool(spec["allow_short"]),
+                    "add_alloc_fraction": float(spec["add_alloc_fraction"]),
+                }
+                _add_candidate(
+                    ctx.candidates,
+                    name=(
+                        f"adaptive_trend_rider_{tf_tag}_{spec['variant']}_"
+                        f"{symbol.replace('/', '').lower()}_"
+                        f"{float(spec['trail_atr_mult']):.1f}"
+                    ),
+                    family="trend",
+                    strategy_class="AdaptiveTrendRiderStrategy",
+                    timeframe=timeframe,
+                    symbols=(symbol,),
+                    params=params,
+                    notes=(
+                        "Per-symbol KAMA/efficiency-confirmed adaptive-trend rider "
+                        "that rides winners with an ATR trailing stop and pyramids "
+                        "into continuation for high compound return on "
+                        f"{symbol} at {timeframe} ({spec['variant']})."
+                    ),
+                    tags=(
+                        "trend",
+                        "return_rider",
+                        "trailing_stop",
+                        "pyramiding",
+                        "single_asset",
+                        "crypto",
+                    ),
+                    metadata={
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": symbol,
+                        "allow_short": bool(spec["allow_short"]),
+                        "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                    },
+                )
+
+
+def _build_volatility_breakout_rider_candidates(ctx: _CandidateBuildContext) -> None:
+    """Per-symbol Donchian/ATR-expansion breakout rider (single-asset, return-max)."""
+    crypto_symbols = ctx.crypto_symbols
+    if not crypto_symbols:
+        return
+    for timeframe in ctx._present("30m", "1h", "4h", "1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _VOLATILITY_BREAKOUT_RIDER_SLICE.get(timeframe, ()):
+            for symbol in crypto_symbols:
+                params = {
+                    "donchian_window": int(spec["donchian_window"]),
+                    "atr_expansion_mult": float(spec["atr_expansion_mult"]),
+                    "atr_baseline_window": int(spec["atr_baseline_window"]),
+                    "trail_atr_mult": float(spec["trail_atr_mult"]),
+                    "atr_period": int(spec["atr_period"]),
+                    "max_adds": int(spec["max_adds"]),
+                    "add_step_atr": float(spec["add_step_atr"]),
+                    "vol_window": int(spec["vol_window"]),
+                    "target_vol": float(spec["target_vol"]),
+                    "max_hold_bars": int(spec["max_hold_bars"]),
+                    "allow_short": bool(spec["allow_short"]),
+                    "add_alloc_fraction": float(spec["add_alloc_fraction"]),
+                }
+                _add_candidate(
+                    ctx.candidates,
+                    name=(
+                        f"volatility_breakout_rider_{tf_tag}_{spec['variant']}_"
+                        f"{symbol.replace('/', '').lower()}_"
+                        f"{int(spec['donchian_window'])}"
+                    ),
+                    family="breakout",
+                    strategy_class="VolatilityBreakoutRiderStrategy",
+                    timeframe=timeframe,
+                    symbols=(symbol,),
+                    params=params,
+                    notes=(
+                        "Per-symbol Donchian breakout rider confirmed by ATR "
+                        "expansion that rides the move with an ATR trailing stop "
+                        "and pyramids on follow-through to capture explosive "
+                        f"range expansions on {symbol} at {timeframe} "
+                        f"({spec['variant']})."
+                    ),
+                    tags=(
+                        "breakout",
+                        "return_rider",
+                        "trailing_stop",
+                        "pyramiding",
+                        "single_asset",
+                        "crypto",
+                    ),
+                    metadata={
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": symbol,
+                        "allow_short": bool(spec["allow_short"]),
+                        "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                    },
+                )
+
+
+def _build_acceleration_rider_candidates(ctx: _CandidateBuildContext) -> None:
+    """Per-symbol accelerating-momentum rider (single-asset, return-max)."""
+    crypto_symbols = ctx.crypto_symbols
+    if not crypto_symbols:
+        return
+    for timeframe in ctx._present("30m", "1h", "4h", "1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _ACCELERATION_RIDER_SLICE.get(timeframe, ()):
+            for symbol in crypto_symbols:
+                params = {
+                    "roc_period": int(spec["roc_period"]),
+                    "min_roc": float(spec["min_roc"]),
+                    "decel_tolerance": float(spec["decel_tolerance"]),
+                    "trail_atr_mult": float(spec["trail_atr_mult"]),
+                    "atr_period": int(spec["atr_period"]),
+                    "max_adds": int(spec["max_adds"]),
+                    "add_step_atr": float(spec["add_step_atr"]),
+                    "vol_window": int(spec["vol_window"]),
+                    "target_vol": float(spec["target_vol"]),
+                    "max_hold_bars": int(spec["max_hold_bars"]),
+                    "allow_short": bool(spec["allow_short"]),
+                    "add_alloc_fraction": float(spec["add_alloc_fraction"]),
+                }
+                _add_candidate(
+                    ctx.candidates,
+                    name=(
+                        f"acceleration_rider_{tf_tag}_{spec['variant']}_"
+                        f"{symbol.replace('/', '').lower()}_"
+                        f"{int(spec['roc_period'])}"
+                    ),
+                    family="momentum",
+                    strategy_class="AccelerationRiderStrategy",
+                    timeframe=timeframe,
+                    symbols=(symbol,),
+                    params=params,
+                    notes=(
+                        "Per-symbol accelerating-momentum rider that enters when "
+                        "rate-of-change is positive and rising (or negative and "
+                        "falling), rides with an ATR trailing stop, and pyramids "
+                        "while acceleration persists to capture parabolic moves on "
+                        f"{symbol} at {timeframe} ({spec['variant']})."
+                    ),
+                    tags=(
+                        "momentum",
+                        "return_rider",
+                        "trailing_stop",
+                        "pyramiding",
+                        "single_asset",
+                        "crypto",
+                    ),
+                    metadata={
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": symbol,
+                        "allow_short": bool(spec["allow_short"]),
+                        "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
                     },
                 )
 
