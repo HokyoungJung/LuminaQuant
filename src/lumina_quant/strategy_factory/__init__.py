@@ -18,6 +18,15 @@ from .pipeline import (
 )
 from .research_entrypoints import build_default_candidate_rows, run_candidate_research
 from .strategy_signal_dispatch import StrategySignalDispatcher
+from .universe_selection import (
+    DEFAULT_FACTOR_WEIGHTS,
+    DEFAULT_HARD_FILTERS,
+    SymbolFactorBreakdown,
+    TargetPoolResult,
+    TargetPoolSelector,
+    UniverseSelectionConfig,
+    select_target_pool_from_frames,
+)
 from .selection import (
     DEFAULT_ROBUST_SCORE_PARAMS,
     DEFAULT_ROBUST_SCORE_WEIGHTS,
@@ -34,11 +43,17 @@ from .selection import (
 
 __all__ = [
     "DEFAULT_BINANCE_TOP10_PLUS_METALS",
+    "DEFAULT_FACTOR_WEIGHTS",
+    "DEFAULT_HARD_FILTERS",
     "DEFAULT_ROBUST_SCORE_PARAMS",
     "DEFAULT_ROBUST_SCORE_WEIGHTS",
     "DEFAULT_TIMEFRAMES",
     "StrategyCandidate",
     "StrategySignalDispatcher",
+    "SymbolFactorBreakdown",
+    "TargetPoolResult",
+    "TargetPoolSelector",
+    "UniverseSelectionConfig",
     "allocate_portfolio_weights",
     "build_article_pipeline_candidates",
     "build_article_pipeline_manifest",
@@ -56,6 +71,7 @@ __all__ = [
     "robust_score_from_metrics",
     "run_candidate_research",
     "select_diversified_shortlist",
+    "select_target_pool_from_frames",
     "strategy_family",
     "summarize_shortlist",
     "write_candidate_manifest",
