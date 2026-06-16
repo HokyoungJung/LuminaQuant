@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-06-16T06:59:41.198117+00:00",
+  "generated_at_utc": "2026-06-16T08:06:35.798640+00:00",
   "literal_paths": [
     "src/lumina_quant/strategies",
     "lumina_quant/strategies"
@@ -516,6 +516,21 @@
     "literal:src/lumina_quant/strategies/cross_asset_tradfi_alpha_sleeves.py:986:31:60",
     "literal:src/lumina_quant/strategies/cross_crypto_slow_diffusion.py:147:58:5",
     "literal:src/lumina_quant/strategies/cross_crypto_slow_diffusion.py:297:44:999.0",
+    "literal:src/lumina_quant/strategies/cross_sectional_anomaly_alpha_sleeves.py:207:31:86400",
+    "literal:src/lumina_quant/strategies/cross_sectional_anomaly_alpha_sleeves.py:245:32:0.01",
+    "literal:src/lumina_quant/strategies/cross_sectional_anomaly_alpha_sleeves.py:315:22:-1.0e18",
+    "literal:src/lumina_quant/strategies/cross_sectional_anomaly_alpha_sleeves.py:339:31:86400",
+    "literal:src/lumina_quant/strategies/cross_sectional_anomaly_alpha_sleeves.py:369:31:3",
+    "literal:src/lumina_quant/strategies/cross_sectional_anomaly_alpha_sleeves.py:373:32:0.01",
+    "literal:src/lumina_quant/strategies/cross_sectional_anomaly_alpha_sleeves.py:391:30:3",
+    "literal:src/lumina_quant/strategies/cross_sectional_anomaly_alpha_sleeves.py:436:22:-1.0e18",
+    "literal:src/lumina_quant/strategies/cross_sectional_anomaly_alpha_sleeves.py:460:31:86400",
+    "literal:src/lumina_quant/strategies/cross_sectional_anomaly_alpha_sleeves.py:499:32:0.01",
+    "literal:src/lumina_quant/strategies/cross_sectional_anomaly_alpha_sleeves.py:584:31:86400",
+    "literal:src/lumina_quant/strategies/cross_sectional_anomaly_alpha_sleeves.py:620:32:0.01",
+    "literal:src/lumina_quant/strategies/cross_sectional_anomaly_alpha_sleeves.py:87:15:3",
+    "literal:src/lumina_quant/strategies/cross_sectional_anomaly_alpha_sleeves.py:94:33:3",
+    "literal:src/lumina_quant/strategies/cross_sectional_anomaly_alpha_sleeves.py:95:25:3",
     "literal:src/lumina_quant/strategies/derivatives_flow_squeeze.py:1001:52:0.45",
     "literal:src/lumina_quant/strategies/derivatives_flow_squeeze.py:1001:92:0.15",
     "literal:src/lumina_quant/strategies/derivatives_flow_squeeze.py:1039:23:0.55",
