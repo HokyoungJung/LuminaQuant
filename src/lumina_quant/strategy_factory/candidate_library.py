@@ -2598,6 +2598,8 @@ class _CandidateBuildContext:
         _build_metals_relative_value_basket_candidates(self)
         _build_liquidation_cascade_reversion_candidates(self)
         _build_orderbook_imbalance_reversion_candidates(self)
+        _build_selection_gated_momentum_candidates(self)
+        _build_selection_gated_reversion_candidates(self)
         _build_cross_sectional_equity_momentum_candidates(self)
         _build_residual_equity_momentum_candidates(self)
         _build_betting_against_beta_candidates(self)
@@ -4905,6 +4907,222 @@ def _build_orderbook_imbalance_reversion_candidates(
                     "symbol_scope": "crypto",
                     "data_dependent": True,
                     "decision_cadence_seconds": 300,
+                },
+            )
+
+
+# --- Selection-aware cross-sectional sleeves (live crypto) -----------------
+# These compose the multi-factor target-pool selector with a directional signal:
+# each rebalance screens the universe into a tradeable pool, then trades only
+# inside it.  They are multi-symbol (>=3) so they MUST be wired
+# family="cross_sectional" with the mandatory admission trio.
+
+_SELECTION_GATED_MOMENTUM_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "1h": (
+        {
+            "variant": "screened_lo",
+            "momentum_lookback_bars": 48,
+            "vol_window": 24,
+            "rebalance_bars": 24,
+            "history_window": 120,
+            "pool_size": 12,
+            "top_fraction": 0.34,
+            "selection_tilt": 0.25,
+            "allow_short": False,
+            "stop_loss_pct": 0.060,
+            "max_hold_bars": 240,
+        },
+        {
+            "variant": "screened_ls",
+            "momentum_lookback_bars": 72,
+            "vol_window": 36,
+            "rebalance_bars": 24,
+            "history_window": 168,
+            "pool_size": 10,
+            "top_fraction": 0.30,
+            "selection_tilt": 0.30,
+            "allow_short": True,
+            "stop_loss_pct": 0.050,
+            "max_hold_bars": 360,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "screened_swing",
+            "momentum_lookback_bars": 30,
+            "vol_window": 14,
+            "rebalance_bars": 12,
+            "history_window": 96,
+            "pool_size": 10,
+            "top_fraction": 0.34,
+            "selection_tilt": 0.25,
+            "allow_short": False,
+            "stop_loss_pct": 0.070,
+            "max_hold_bars": 120,
+        },
+    ),
+}
+
+
+def _build_selection_gated_momentum_candidates(
+    ctx: _CandidateBuildContext,
+) -> None:
+    """Selection-gated cross-sectional momentum on a screened crypto pool."""
+    crypto_symbols = ctx.crypto_symbols
+    if len(crypto_symbols) < 4:
+        return
+    for timeframe in ctx._present("1h", "4h"):
+        tf_tag = timeframe.replace("/", "-")
+        cadence = 3600 if timeframe == "1h" else 14400
+        for spec in _SELECTION_GATED_MOMENTUM_SLICE.get(timeframe, ()):
+            params = {
+                "momentum_lookback_bars": int(spec["momentum_lookback_bars"]),
+                "vol_window": int(spec["vol_window"]),
+                "rebalance_bars": int(spec["rebalance_bars"]),
+                "history_window": int(spec["history_window"]),
+                "pool_size": int(spec["pool_size"]),
+                "top_fraction": float(spec["top_fraction"]),
+                "selection_tilt": float(spec["selection_tilt"]),
+                "allow_short": bool(spec["allow_short"]),
+                "stop_loss_pct": float(spec["stop_loss_pct"]),
+                "max_hold_bars": int(spec["max_hold_bars"]),
+            }
+            _add_candidate(
+                ctx.candidates,
+                name=(
+                    f"selection_gated_momentum_{tf_tag}_{spec['variant']}_"
+                    f"{int(spec['momentum_lookback_bars'])}_{int(spec['pool_size'])}"
+                ),
+                family="cross_sectional",
+                strategy_class="SelectionGatedMomentumStrategy",
+                timeframe=timeframe,
+                symbols=crypto_symbols,
+                params=params,
+                notes=(
+                    "Selection-aware sleeve that screens the universe into the "
+                    "multi-factor target pool (price-position/volume/volatility/"
+                    "vwap) each rebalance, then runs vol-scaled cross-sectional "
+                    f"momentum only inside that pool for {timeframe} "
+                    f"({spec['variant']})."
+                ),
+                tags=(
+                    *_CROSS_SECTIONAL_ADMISSION_TAGS,
+                    "selection_aware",
+                    "universe_selection",
+                    "factor",
+                    "crypto",
+                ),
+                metadata={
+                    "timeframe": timeframe,
+                    "retune_profile": str(spec["variant"]),
+                    "symbol_scope": "crypto",
+                    "allow_short": bool(spec["allow_short"]),
+                    "decision_cadence_seconds": cadence,
+                },
+            )
+
+
+_SELECTION_GATED_REVERSION_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "1h": (
+        {
+            "variant": "screened_fade_lo",
+            "reversion_lookback_bars": 6,
+            "vol_window": 24,
+            "rebalance_bars": 12,
+            "history_window": 120,
+            "pool_size": 12,
+            "top_fraction": 0.34,
+            "selection_tilt": 0.25,
+            "allow_short": False,
+            "stop_loss_pct": 0.040,
+            "max_hold_bars": 96,
+        },
+        {
+            "variant": "screened_fade_ls",
+            "reversion_lookback_bars": 8,
+            "vol_window": 36,
+            "rebalance_bars": 12,
+            "history_window": 168,
+            "pool_size": 10,
+            "top_fraction": 0.30,
+            "selection_tilt": 0.30,
+            "allow_short": True,
+            "stop_loss_pct": 0.035,
+            "max_hold_bars": 144,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "screened_fade_swing",
+            "reversion_lookback_bars": 4,
+            "vol_window": 14,
+            "rebalance_bars": 6,
+            "history_window": 96,
+            "pool_size": 10,
+            "top_fraction": 0.34,
+            "selection_tilt": 0.25,
+            "allow_short": False,
+            "stop_loss_pct": 0.050,
+            "max_hold_bars": 48,
+        },
+    ),
+}
+
+
+def _build_selection_gated_reversion_candidates(
+    ctx: _CandidateBuildContext,
+) -> None:
+    """Selection-gated short-horizon reversion on a screened crypto pool."""
+    crypto_symbols = ctx.crypto_symbols
+    if len(crypto_symbols) < 4:
+        return
+    for timeframe in ctx._present("1h", "4h"):
+        tf_tag = timeframe.replace("/", "-")
+        cadence = 3600 if timeframe == "1h" else 14400
+        for spec in _SELECTION_GATED_REVERSION_SLICE.get(timeframe, ()):
+            params = {
+                "reversion_lookback_bars": int(spec["reversion_lookback_bars"]),
+                "vol_window": int(spec["vol_window"]),
+                "rebalance_bars": int(spec["rebalance_bars"]),
+                "history_window": int(spec["history_window"]),
+                "pool_size": int(spec["pool_size"]),
+                "top_fraction": float(spec["top_fraction"]),
+                "selection_tilt": float(spec["selection_tilt"]),
+                "allow_short": bool(spec["allow_short"]),
+                "stop_loss_pct": float(spec["stop_loss_pct"]),
+                "max_hold_bars": int(spec["max_hold_bars"]),
+            }
+            _add_candidate(
+                ctx.candidates,
+                name=(
+                    f"selection_gated_reversion_{tf_tag}_{spec['variant']}_"
+                    f"{int(spec['reversion_lookback_bars'])}_{int(spec['pool_size'])}"
+                ),
+                family="cross_sectional",
+                strategy_class="SelectionGatedReversionStrategy",
+                timeframe=timeframe,
+                symbols=crypto_symbols,
+                params=params,
+                notes=(
+                    "Selection-aware sleeve that screens the universe into the "
+                    "multi-factor target pool each rebalance, then fades the most "
+                    "recent return only on screened mid-range liquid names for "
+                    f"{timeframe} ({spec['variant']}); decorrelated from the "
+                    "selection-gated momentum sleeve."
+                ),
+                tags=(
+                    *_CROSS_SECTIONAL_ADMISSION_TAGS,
+                    "selection_aware",
+                    "universe_selection",
+                    "reversion",
+                    "crypto",
+                ),
+                metadata={
+                    "timeframe": timeframe,
+                    "retune_profile": str(spec["variant"]),
+                    "symbol_scope": "crypto",
+                    "allow_short": bool(spec["allow_short"]),
+                    "decision_cadence_seconds": cadence,
                 },
             )
 
