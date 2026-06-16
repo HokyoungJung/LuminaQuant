@@ -19,7 +19,12 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ALPHA_V2_ROOT = (
-    REPO_ROOT / "var" / "reports" / "profit_moonshot_20260501" / "current_tail_20260508" / "alpha_v2"
+    REPO_ROOT
+    / "var"
+    / "reports"
+    / "profit_moonshot_20260501"
+    / "current_tail_20260508"
+    / "alpha_v2"
 )
 
 DEFAULT_OUTPUT_DIR = ALPHA_V2_ROOT / "alpha_zoo_69_asset_strategy_baseline_readiness_20260613"
@@ -58,7 +63,8 @@ DEFAULT_SOURCE_PATHS = {
     / "existing_candidate_reuse_selector_20260609"
     / "existing_candidate_reuse_selector_latest.json",
     "leaf_rebuild_shadow_20260613": DEFAULT_OUTPUT_DIR / "leaf_rebuild_shadow_latest.json",
-    "live_readiness_preflight_20260613": DEFAULT_OUTPUT_DIR / "live_readiness_preflight_latest.json",
+    "live_readiness_preflight_20260613": DEFAULT_OUTPUT_DIR
+    / "live_readiness_preflight_latest.json",
 }
 
 ROW_SECTIONS = (
@@ -121,7 +127,7 @@ def _load_json(path: Path) -> Any:
 def _safe_float(value: Any) -> float | None:
     try:
         number = float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     return number if number == number and abs(number) != float("inf") else None
 
@@ -212,7 +218,11 @@ def _status_for_label(label: str, primary: Mapping[str, Any] | None) -> tuple[st
             "no paper/testnet fill, BBO, slippage, partial-fill, cancel/reconcile telemetry",
             "historical OOS hit rate is only 5/10",
         ]
-        if primary and _safe_float(primary.get("max_oos_mdd")) and float(primary["max_oos_mdd"]) >= 0.18:
+        if (
+            primary
+            and _safe_float(primary.get("max_oos_mdd"))
+            and float(primary["max_oos_mdd"]) >= 0.18
+        ):
             blockers.append("max OOS MDD near or above 18% review threshold")
         return ("historical_clean_reference_shadow_only", blockers)
     if label == "dynamic_conviction_switch:t0.90_risk_capped_fallback":
@@ -302,7 +312,9 @@ def _leaf_rebuild_summary(loaded_sources: Mapping[str, Mapping[str, Any]]) -> di
     if not isinstance(payload, Mapping):
         return {"exists": False}
 
-    data_coverage = payload.get("data_coverage") if isinstance(payload.get("data_coverage"), Mapping) else {}
+    data_coverage = (
+        payload.get("data_coverage") if isinstance(payload.get("data_coverage"), Mapping) else {}
+    )
     universe = payload.get("universe") if isinstance(payload.get("universe"), Mapping) else {}
     clean_rows = _rows_from_section(payload, "clean_promotion_rankings") or [
         row
@@ -313,7 +325,11 @@ def _leaf_rebuild_summary(loaded_sources: Mapping[str, Mapping[str, Any]]) -> di
         label: _first_candidate_row(
             payload,
             label,
-            sections=("aggregate_rankings", "clean_promotion_rankings", "demoted_nested_or_historical_rankings"),
+            sections=(
+                "aggregate_rankings",
+                "clean_promotion_rankings",
+                "demoted_nested_or_historical_rankings",
+            ),
         )
         for label in BASELINE_LABELS
     }
@@ -328,7 +344,8 @@ def _leaf_rebuild_summary(loaded_sources: Mapping[str, Mapping[str, Any]]) -> di
         "latest_available_data_utc": data_coverage.get("global_latest_utc"),
         "requested_symbol_count": data_coverage.get("requested_symbol_count")
         or universe.get("requested_symbol_count"),
-        "loaded_symbol_count": data_coverage.get("loaded_symbol_count") or universe.get("loaded_symbol_count"),
+        "loaded_symbol_count": data_coverage.get("loaded_symbol_count")
+        or universe.get("loaded_symbol_count"),
         "fold_count": len(payload.get("folds") or []),
         "top_clean_rankings": top_clean,
         "top_hard_stop_promotable_rankings": top_promotable,
@@ -383,17 +400,17 @@ def _live_preflight_summary(loaded_sources: Mapping[str, Mapping[str, Any]]) -> 
                 "decision_runtime_compatible",
                 "refresh_is_stale",
                 "shadow_parity_satisfied",
-            "paper_mode",
-            "testnet",
-            "real_mode",
-            "postgres_dsn_present",
-            "artifact_real_money_veto",
-            "artifact_post_oos_research_variant",
-            "artifact_requires_fresh_forward_shadow",
-            "artifact_clean_promotion_eligible",
-        )
-        if key in checks
-    },
+                "paper_mode",
+                "testnet",
+                "real_mode",
+                "postgres_dsn_present",
+                "artifact_real_money_veto",
+                "artifact_post_oos_research_variant",
+                "artifact_requires_fresh_forward_shadow",
+                "artifact_clean_promotion_eligible",
+            )
+            if key in checks
+        },
         "failed_readiness_flags": failed_keys,
         "blocking_check_flags": blocking_checks,
     }
@@ -538,7 +555,9 @@ def render_markdown(payload: Mapping[str, Any]) -> str:
                 "| --- | ---: | ---: | ---: | ---: | --- | --- |",
             ]
         )
-        baseline_rows = leaf.get("baseline_rows") if isinstance(leaf.get("baseline_rows"), Mapping) else {}
+        baseline_rows = (
+            leaf.get("baseline_rows") if isinstance(leaf.get("baseline_rows"), Mapping) else {}
+        )
         for label in BASELINE_LABELS:
             row = baseline_rows.get(label) if isinstance(baseline_rows, Mapping) else None
             if not isinstance(row, Mapping):
@@ -565,7 +584,11 @@ def render_markdown(payload: Mapping[str, Any]) -> str:
                 "| ---: | --- | ---: | ---: | ---: | ---: | --- |",
             ]
         )
-        top_rows = leaf.get("top_clean_rankings") if isinstance(leaf.get("top_clean_rankings"), list) else []
+        top_rows = (
+            leaf.get("top_clean_rankings")
+            if isinstance(leaf.get("top_clean_rankings"), list)
+            else []
+        )
         for rank, row in enumerate(top_rows, start=1):
             if not isinstance(row, Mapping):
                 continue
@@ -666,7 +689,9 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 0
     write_outputs(payload, output_json=Path(args.output_json), output_md=Path(args.output_md))
-    print(json.dumps({"output_json": args.output_json, "output_md": args.output_md}, sort_keys=True))
+    print(
+        json.dumps({"output_json": args.output_json, "output_md": args.output_md}, sort_keys=True)
+    )
     return 0
 
 

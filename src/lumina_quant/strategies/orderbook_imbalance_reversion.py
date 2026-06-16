@@ -80,9 +80,7 @@ class OrderBookImbalanceReversionStrategy(Strategy):
             ),
             "entry_z": HyperParam.floating("entry_z", default=2.0, low=0.25, high=10.0),
             "exit_z": HyperParam.floating("exit_z", default=0.40, low=0.0, high=5.0),
-            "spread_z_window": HyperParam.integer(
-                "spread_z_window", default=120, low=8, high=4096
-            ),
+            "spread_z_window": HyperParam.integer("spread_z_window", default=120, low=8, high=4096),
             "max_spread_z": HyperParam.floating("max_spread_z", default=3.0, low=0.0, high=20.0),
             "spread_quantile_window": HyperParam.integer(
                 "spread_quantile_window", default=240, low=8, high=20000

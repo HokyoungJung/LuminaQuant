@@ -82,9 +82,7 @@ class DualMomentumIndexRotationStrategy(Strategy):
             "rebalance_bars": HyperParam.integer("rebalance_bars", default=21, low=1, high=10080),
             "max_holdings": HyperParam.integer("max_holdings", default=3, low=1, high=64),
             "min_symbols": HyperParam.integer("min_symbols", default=4, low=2, high=512),
-            "stop_loss_pct": HyperParam.floating(
-                "stop_loss_pct", default=0.12, low=0.0, high=0.50
-            ),
+            "stop_loss_pct": HyperParam.floating("stop_loss_pct", default=0.12, low=0.0, high=0.50),
             "max_hold_bars": HyperParam.integer("max_hold_bars", default=252, low=1, high=200000),
             "target_gross_exposure": HyperParam.floating(
                 "target_gross_exposure", default=0.45, low=0.0, high=5.0, tunable=False

@@ -107,9 +107,7 @@ class CalendarSeasonalityOverlayStrategy(Strategy):
                 "weekday_long_mask", default="1,1,0,0,1,0,0", tunable=False
             ),
             "hold_bars": HyperParam.integer("hold_bars", default=2, low=1, high=4096),
-            "stop_loss_pct": HyperParam.floating(
-                "stop_loss_pct", default=0.05, low=0.0, high=0.50
-            ),
+            "stop_loss_pct": HyperParam.floating("stop_loss_pct", default=0.05, low=0.0, high=0.50),
             "target_allocation": HyperParam.floating(
                 "target_allocation", default=0.015, low=0.0, high=2.0, tunable=False
             ),

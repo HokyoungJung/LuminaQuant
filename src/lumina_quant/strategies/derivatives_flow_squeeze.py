@@ -1146,7 +1146,9 @@ class LiquidationCascadeReversionStrategy(Strategy):
             "oi_lookback_bars": HyperParam.integer(
                 "oi_lookback_bars", default=4, low=1, high=2_880, tunable=False
             ),
-            "min_basket": HyperParam.integer("min_basket", default=2, low=1, high=64, tunable=False),
+            "min_basket": HyperParam.integer(
+                "min_basket", default=2, low=1, high=64, tunable=False
+            ),
             "min_price": HyperParam.floating("min_price", default=0.0, low=0.0, high=1_000_000.0),
             "target_allocation": HyperParam.floating(
                 "target_allocation", default=0.020, low=0.0, high=2.0, tunable=False
@@ -1162,9 +1164,7 @@ class LiquidationCascadeReversionStrategy(Strategy):
         self.symbol_list = list(getattr(self.bars, "symbol_list", []) or [])
         resolved = resolve_params_from_schema(self.get_param_schema(), params, keep_unknown=False)
         self.btc_symbol = self._resolve_btc_symbol(str(resolved["btc_symbol"]))
-        self.alt_symbols = [
-            symbol for symbol in self.symbol_list if symbol != self.btc_symbol
-        ]
+        self.alt_symbols = [symbol for symbol in self.symbol_list if symbol != self.btc_symbol]
         self.btc_return_trigger = min(0.0, float(resolved["btc_return_trigger"]))
         self.volume_mult = max(1.0, float(resolved["volume_mult"]))
         self.oi_drop_trigger = max(0.0, float(resolved["oi_drop_trigger"]))

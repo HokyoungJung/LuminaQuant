@@ -50,11 +50,9 @@ from lumina_quant.strategies.adaptive_crypto_alpha_sleeves import (
 from lumina_quant.strategies.external_alpha_sleeves import (
     _EPS,
     _Snapshot,
-    _emit,
     _event_symbols,
     _market_snapshot,
     _safe_non_negative_int,
-    _target_metadata,
     _window_snapshot,
 )
 from lumina_quant.strategies.robust_alpha_sleeves import (
@@ -122,9 +120,7 @@ class _CrossUpdateMixin:
         return {
             "last_eval_time_key": self._last_eval_time_key,
             "tick": int(self._tick),
-            "symbol_state": {
-                symbol: _pack_cross(item) for symbol, item in self._state.items()
-            },
+            "symbol_state": {symbol: _pack_cross(item) for symbol, item in self._state.items()},
         }
 
     def set_state(self, state: dict[str, Any]) -> None:
@@ -192,9 +188,7 @@ class CrossSectionalEquityMomentumStrategy(_CrossUpdateMixin, Strategy):
             "quintile_pct": HyperParam.floating("quintile_pct", default=0.20, low=0.05, high=0.50),
             "min_symbols": HyperParam.integer("min_symbols", default=4, low=2, high=512),
             "allow_short": HyperParam.boolean("allow_short", default=True, grid=[True, False]),
-            "stop_loss_pct": HyperParam.floating(
-                "stop_loss_pct", default=0.12, low=0.0, high=0.50
-            ),
+            "stop_loss_pct": HyperParam.floating("stop_loss_pct", default=0.12, low=0.0, high=0.50),
             "max_hold_bars": HyperParam.integer("max_hold_bars", default=252, low=1, high=200000),
             "target_gross_exposure": HyperParam.floating(
                 "target_gross_exposure", default=0.40, low=0.0, high=5.0, tunable=False
@@ -338,9 +332,7 @@ class ResidualEquityMomentumStrategy(_CrossUpdateMixin, Strategy):
             "quintile_pct": HyperParam.floating("quintile_pct", default=0.20, low=0.05, high=0.50),
             "min_symbols": HyperParam.integer("min_symbols", default=4, low=2, high=512),
             "allow_short": HyperParam.boolean("allow_short", default=True, grid=[True, False]),
-            "stop_loss_pct": HyperParam.floating(
-                "stop_loss_pct", default=0.12, low=0.0, high=0.50
-            ),
+            "stop_loss_pct": HyperParam.floating("stop_loss_pct", default=0.12, low=0.0, high=0.50),
             "max_hold_bars": HyperParam.integer("max_hold_bars", default=252, low=1, high=200000),
             "target_gross_exposure": HyperParam.floating(
                 "target_gross_exposure", default=0.40, low=0.0, high=5.0, tunable=False
@@ -500,9 +492,7 @@ class BettingAgainstBetaStrategy(_CrossUpdateMixin, Strategy):
             "beta_z_window": HyperParam.integer("beta_z_window", default=63, low=4, high=20000),
             "min_symbols": HyperParam.integer("min_symbols", default=4, low=2, high=512),
             "allow_short": HyperParam.boolean("allow_short", default=True, grid=[True, False]),
-            "stop_loss_pct": HyperParam.floating(
-                "stop_loss_pct", default=0.12, low=0.0, high=0.50
-            ),
+            "stop_loss_pct": HyperParam.floating("stop_loss_pct", default=0.12, low=0.0, high=0.50),
             "max_hold_bars": HyperParam.integer("max_hold_bars", default=252, low=1, high=200000),
             "target_gross_exposure": HyperParam.floating(
                 "target_gross_exposure", default=0.40, low=0.0, high=5.0, tunable=False
@@ -625,9 +615,7 @@ class SemisLeadLagRotationStrategy(_CrossUpdateMixin, Strategy):
     @classmethod
     def get_param_schema(cls) -> dict[str, HyperParam]:
         return {
-            "leader_symbol": HyperParam.string(
-                "leader_symbol", default="SOXLUSDT", tunable=False
-            ),
+            "leader_symbol": HyperParam.string("leader_symbol", default="SOXLUSDT", tunable=False),
             "leader_lookback_bars": HyperParam.integer(
                 "leader_lookback_bars", default=4, low=1, high=4096
             ),

@@ -4368,12 +4368,8 @@ def _build_optional_carry_and_micro_candidates(ctx: _CandidateBuildContext) -> N
 # Equity/ETF perp universe for the DORMANT tranche.  These are compact-form
 # symbols; ``_add_candidate``/``canonicalize_symbol_list`` slash + canonicalize
 # them and self-skip on empty intersections.
-_EQUITY_FACTOR_UNIVERSE: tuple[str, ...] = tuple(
-    dict.fromkeys(BINANCE_TRADFI_EQUITY_SYMBOLS)
-)
-_INDEX_ROTATION_UNIVERSE: tuple[str, ...] = tuple(
-    dict.fromkeys(BINANCE_TRADFI_ETF_INDEX_SYMBOLS)
-)
+_EQUITY_FACTOR_UNIVERSE: tuple[str, ...] = tuple(dict.fromkeys(BINANCE_TRADFI_EQUITY_SYMBOLS))
+_INDEX_ROTATION_UNIVERSE: tuple[str, ...] = tuple(dict.fromkeys(BINANCE_TRADFI_ETF_INDEX_SYMBOLS))
 # Semis lead-lag follower basket (leader = SOXLUSDT lives in the ETF/index set).
 _SEMIS_FOLLOWER_SYMBOLS: tuple[str, ...] = (
     "NVDAUSDT",
@@ -4672,9 +4668,7 @@ def _build_metals_relative_value_basket_candidates(
     ctx: _CandidateBuildContext,
 ) -> None:
     """S7 — market-neutral precious-metal relative-value basket (live metals)."""
-    metals = tuple(
-        symbol for symbol in ctx.normalized_symbols if symbol in _METALS
-    )
+    metals = tuple(symbol for symbol in ctx.normalized_symbols if symbol in _METALS)
     if len(metals) < 3:
         return
     for timeframe in ctx._present("4h", "1d"):

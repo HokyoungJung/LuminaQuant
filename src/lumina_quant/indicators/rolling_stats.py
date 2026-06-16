@@ -73,9 +73,7 @@ def ts_regression_slope(x_values, y_values) -> float | None:
         return None
     x_tail, y_tail, mean_x, mean_y, var_x = aligned
     count = len(x_tail)
-    cov_xy = sum(
-        (xv - mean_x) * (yv - mean_y) for xv, yv in zip(x_tail, y_tail, strict=False)
-    )
+    cov_xy = sum((xv - mean_x) * (yv - mean_y) for xv, yv in zip(x_tail, y_tail, strict=False))
     cov_xy /= float(count - 1)
     slope = cov_xy / var_x
     if not math.isfinite(slope):
@@ -90,9 +88,7 @@ def ts_regression_intercept(x_values, y_values) -> float | None:
         return None
     x_tail, y_tail, mean_x, mean_y, var_x = aligned
     count = len(x_tail)
-    cov_xy = sum(
-        (xv - mean_x) * (yv - mean_y) for xv, yv in zip(x_tail, y_tail, strict=False)
-    )
+    cov_xy = sum((xv - mean_x) * (yv - mean_y) for xv, yv in zip(x_tail, y_tail, strict=False))
     cov_xy /= float(count - 1)
     slope = cov_xy / var_x
     intercept = mean_y - (slope * mean_x)
@@ -111,14 +107,11 @@ def ts_regression_rsquared(x_values, y_values) -> float | None:
     syy = sum((value - mean_y) ** 2 for value in y_tail)
     if syy <= 1e-12:
         return None
-    cov_xy = sum(
-        (xv - mean_x) * (yv - mean_y) for xv, yv in zip(x_tail, y_tail, strict=False)
-    )
+    cov_xy = sum((xv - mean_x) * (yv - mean_y) for xv, yv in zip(x_tail, y_tail, strict=False))
     cov_xy /= float(count - 1)
     slope = cov_xy / var_x
     sse = sum(
-        (yv - (mean_y + slope * (xv - mean_x))) ** 2
-        for xv, yv in zip(x_tail, y_tail, strict=False)
+        (yv - (mean_y + slope * (xv - mean_x))) ** 2 for xv, yv in zip(x_tail, y_tail, strict=False)
     )
     rsquared = 1.0 - (sse / syy)
     if not math.isfinite(rsquared):
@@ -233,8 +226,8 @@ def rolling_quantile(values, *, window: int, q: float) -> float | None:
         return ordered[0]
 
     position = q_val * (count - 1)
-    lower_idx = int(math.floor(position))
-    upper_idx = int(math.ceil(position))
+    lower_idx = math.floor(position)
+    upper_idx = math.ceil(position)
     if lower_idx == upper_idx:
         result = ordered[lower_idx]
     else:

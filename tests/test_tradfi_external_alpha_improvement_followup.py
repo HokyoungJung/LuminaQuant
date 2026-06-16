@@ -126,12 +126,17 @@ def test_followup_records_no_clean_improvement_and_freeze_candidate(tmp_path: Pa
     assert payload["decision"]["clean_performance_improvement_found"] is False
     assert payload["decision"]["promotable_improvement_found"] is False
     assert payload["decision"]["real_money_execution"] is False
-    assert payload["freeze_candidate"]["candidate_label"] == "codex_lagged_leaf_router_grid:moonshot"
+    assert (
+        payload["freeze_candidate"]["candidate_label"] == "codex_lagged_leaf_router_grid:moonshot"
+    )
     assert "fresh_forward_shadow_only" in payload["freeze_candidate"]["allowed_usage"]
     attempts = {attempt["name"]: attempt for attempt in payload["attempts"]}
-    assert attempts["raw_tradfi_leadlag_moonshot_probe"]["top_static_post_hoc"][
-        "compounded_oos_return"
-    ] == 13.2450
+    assert (
+        attempts["raw_tradfi_leadlag_moonshot_probe"]["top_static_post_hoc"][
+            "compounded_oos_return"
+        ]
+        == 13.2450
+    )
     assert attempts["raw_tradfi_leadlag_moonshot_probe"]["promotable"] is False
     markdown = module.render_markdown(payload)
     assert "no_clean_performance_improvement_found" in markdown

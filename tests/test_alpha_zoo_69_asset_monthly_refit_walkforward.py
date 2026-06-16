@@ -299,9 +299,7 @@ def test_tradfi_external_alpha_default_family_budget_is_bounded() -> None:
         "tradfi_overnight_split_v1": len(
             module._tradfi_overnight_split_v1_candidates(streams, fold)
         ),
-        "factor_regime_router_v1": len(
-            module._factor_regime_router_v1_candidates(reference)
-        ),
+        "factor_regime_router_v1": len(module._factor_regime_router_v1_candidates(reference)),
     }
 
     assert runtime_counts == {
@@ -1124,7 +1122,10 @@ def test_tradfi_us_equity_session_switch_cash_guards_when_no_tradfi_signal() -> 
         == "cash_no_eligible_tradfi_us_equity_session_signal"
         for candidate in candidates
     )
-    assert all(module._evaluate_candidate(candidate, fold)["clean_promotion_eligible"] is True for candidate in candidates)
+    assert all(
+        module._evaluate_candidate(candidate, fold)["clean_promotion_eligible"] is True
+        for candidate in candidates
+    )
 
 
 def test_tradfi_vol_managed_v1_is_clean_and_lagged() -> None:
@@ -1157,9 +1158,9 @@ def test_tradfi_vol_managed_v1_is_clean_and_lagged() -> None:
     assert row["external_evidence_refs"] == ["moreira_muir_volatility_managed_portfolios"]
     assert row["readiness_label"] == "clean_shadow_candidate"
     assert (
-        by_label[
-            "tradfi_vol_managed_v1:leaf_top1_l20_target80_mdd_convex"
-        ].row["volatility_management"]["signal_lag_policy"]
+        by_label["tradfi_vol_managed_v1:leaf_top1_l20_target80_mdd_convex"].row[
+            "volatility_management"
+        ]["signal_lag_policy"]
         == "rolling_volatility_and_drawdown_shifted_one_bar"
     )
 
@@ -1253,9 +1254,7 @@ def test_tradfi_momentum_regime_v1_balances_tradfi_and_crypto_sources() -> None:
     assert {"us_equity_tradfi", "crypto_24_7"}.issubset(
         balanced["tradfi_us_equity_controls"]["regime_bucket_weights"]
     )
-    assert balanced["external_evidence_refs"] == [
-        "moskowitz_ooi_pedersen_time_series_momentum"
-    ]
+    assert balanced["external_evidence_refs"] == ["moskowitz_ooi_pedersen_time_series_momentum"]
 
 
 def test_tradfi_intraday_session_v1_uses_open_signal_before_close_exposure() -> None:
@@ -1891,9 +1890,7 @@ def test_recompute_payload_separates_raw_clean_and_demoted_rankings() -> None:
         }
     )
 
-    aggregate_by_label = {
-        row["candidate_label"]: row for row in recomputed["aggregate_rankings"]
-    }
+    aggregate_by_label = {row["candidate_label"]: row for row in recomputed["aggregate_rankings"]}
     demoted_by_label = {
         row["candidate_label"]: row for row in recomputed["demoted_nested_or_historical_rankings"]
     }
@@ -1905,9 +1902,10 @@ def test_recompute_payload_separates_raw_clean_and_demoted_rankings() -> None:
     assert [row["candidate_label"] for row in recomputed["clean_promotion_rankings"]] == [
         "relaxed_efficiency:growth_leaf"
     ]
-    assert aggregate_by_label["profit_moonshot_breakout:raw_winner"][
-        "moonshot_label_namespace"
-    ] is True
+    assert (
+        aggregate_by_label["profit_moonshot_breakout:raw_winner"]["moonshot_label_namespace"]
+        is True
+    )
     assert demoted_by_label["profit_moonshot_breakout:raw_winner"]["non_clean_reasons"] == [
         "moonshot_label_namespace"
     ]
@@ -1972,6 +1970,7 @@ def test_row_level_leaf_selectors_are_oos_clean_non_nested_shadow_rows() -> None
         for row in augmented["demoted_nested_or_historical_rankings"]
     )
 
+
 def test_defensive_row_level_selector_penalizes_drawdown_and_unbacked_validation_spikes() -> None:
     stable_leaf = {
         "fold_id": "2025-03",
@@ -2004,6 +2003,7 @@ def test_defensive_row_level_selector_penalizes_drawdown_and_unbacked_validation
     assert defensive["uses_locked_oos_for_selection"] is False
     assert defensive["post_oos_research_variant"] is True
     assert defensive["locked_oos"]["total_return"] == pytest.approx(0.03)
+
 
 def test_non_leaf_reference_detector_covers_portfolio_families_and_selected_tokens() -> None:
     forbidden = [

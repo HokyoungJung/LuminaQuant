@@ -86,7 +86,11 @@ def test_real_money_path_blocks_all_execution_when_wf_and_preflight_block(tmp_pa
         tmp_path / "preflight.json",
         {
             "recommended_action": "block_until_preflight_gaps_closed",
-            "status": {"ready_for_paper": False, "ready_for_shadow": False, "ready_for_real": False},
+            "status": {
+                "ready_for_paper": False,
+                "ready_for_shadow": False,
+                "ready_for_real": False,
+            },
             "checks": {"refresh_is_stale": True, "decision_allows_live_start": False},
         },
     )

@@ -1287,12 +1287,8 @@ class MetalsRelativeValueBasketStrategy(Strategy):
         size = _state_size(self.zscore_window, self.max_hold_bars)
         # Chain consecutive metals into ratio legs (XAU/XAG, XAG/XPT, XPT/XPD, ...).
         self._legs: list[_MetalLegState] = []
-        for numerator, denominator in zip(
-            self.metal_symbols, self.metal_symbols[1:], strict=False
-        ):
-            self._legs.append(
-                _MetalLegState(numerator, denominator, deque(maxlen=size))
-            )
+        for numerator, denominator in zip(self.metal_symbols, self.metal_symbols[1:], strict=False):
+            self._legs.append(_MetalLegState(numerator, denominator, deque(maxlen=size)))
         self._latest: dict[str, float] = {}
         self._last_seen: dict[str, str] = {}
         self._last_eval_key = ""
@@ -1321,9 +1317,7 @@ class MetalsRelativeValueBasketStrategy(Strategy):
             for k, v in dict(state.get("latest") or {}).items()
             if safe_float(v) is not None
         }
-        self._last_seen = {
-            str(k): str(v) for k, v in dict(state.get("last_seen") or {}).items()
-        }
+        self._last_seen = {str(k): str(v) for k, v in dict(state.get("last_seen") or {}).items()}
         self._last_eval_key = str(state.get("last_eval_key", ""))
         payload = state.get("legs")
         if isinstance(payload, list):

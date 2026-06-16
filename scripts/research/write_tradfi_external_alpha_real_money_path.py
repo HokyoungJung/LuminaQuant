@@ -19,12 +19,15 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ALPHA_V2_ROOT = (
-    REPO_ROOT / "var" / "reports" / "profit_moonshot_20260501" / "current_tail_20260508" / "alpha_v2"
+    REPO_ROOT
+    / "var"
+    / "reports"
+    / "profit_moonshot_20260501"
+    / "current_tail_20260508"
+    / "alpha_v2"
 )
 DEFAULT_REPORT_ROOT = (
-    ALPHA_V2_ROOT
-    / "tradfi_external_alpha_search_20260613"
-    / "wf_110_asset_external_v1"
+    ALPHA_V2_ROOT / "tradfi_external_alpha_search_20260613" / "wf_110_asset_external_v1"
 )
 DEFAULT_SUMMARY_JSON = DEFAULT_REPORT_ROOT / "tradfi_external_alpha_improvement_summary_latest.json"
 DEFAULT_WF_JSON = DEFAULT_REPORT_ROOT / "tradfi_external_alpha_wf_110_asset_external_v1.json"
@@ -107,7 +110,7 @@ def _source_entry(path: Path) -> dict[str, Any]:
 def _safe_float(value: Any) -> float | None:
     try:
         number = float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     return number if number == number and abs(number) != float("inf") else None
 
@@ -115,7 +118,7 @@ def _safe_float(value: Any) -> float | None:
 def _safe_int(value: Any) -> int | None:
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 
@@ -155,11 +158,15 @@ def _summary_rows(summary: Mapping[str, Any]) -> dict[str, Any]:
             if isinstance(moonshot_section, Mapping)
             else None
         ),
-        "baseline_sections": dict(baseline_sections) if isinstance(baseline_sections, Mapping) else {},
+        "baseline_sections": dict(baseline_sections)
+        if isinstance(baseline_sections, Mapping)
+        else {},
     }
 
 
-def _gate(gate: str, status: str, detail: str, evidence: Mapping[str, Any] | None = None) -> dict[str, Any]:
+def _gate(
+    gate: str, status: str, detail: str, evidence: Mapping[str, Any] | None = None
+) -> dict[str, Any]:
     return {
         "gate": gate,
         "status": status,
@@ -209,7 +216,9 @@ def _build_gates(
     run_coverage = (
         summary.get("run_coverage") if isinstance(summary.get("run_coverage"), Mapping) else {}
     )
-    checks = summary.get("schema_checks") if isinstance(summary.get("schema_checks"), Mapping) else {}
+    checks = (
+        summary.get("schema_checks") if isinstance(summary.get("schema_checks"), Mapping) else {}
+    )
     best_clean = rows.get("best_clean") if isinstance(rows.get("best_clean"), Mapping) else {}
     best_new = (
         rows.get("best_new_clean_external_family")
@@ -240,7 +249,9 @@ def _build_gates(
             if (source_status.get("summary_json") or {}).get("valid") is True
             else "blocked_fail_closed",
             "Summary artifact must exist and parse as a JSON object; otherwise write a fresh disabled artifact.",
-            source_status.get("summary_json") if isinstance(source_status.get("summary_json"), Mapping) else {},
+            source_status.get("summary_json")
+            if isinstance(source_status.get("summary_json"), Mapping)
+            else {},
         ),
         _gate(
             "wf_source_valid",
@@ -248,7 +259,9 @@ def _build_gates(
             if (source_status.get("wf_json") or {}).get("valid") is True
             else "blocked_fail_closed",
             "Walk-forward artifact must exist and parse as a JSON object for provenance.",
-            source_status.get("wf_json") if isinstance(source_status.get("wf_json"), Mapping) else {},
+            source_status.get("wf_json")
+            if isinstance(source_status.get("wf_json"), Mapping)
+            else {},
         ),
         _gate(
             "live_preflight_source_valid",
@@ -319,7 +332,8 @@ def _build_gates(
         _gate(
             "live_preflight_paper_or_shadow",
             "passed"
-            if live_status.get("ready_for_paper") is True or live_status.get("ready_for_shadow") is True
+            if live_status.get("ready_for_paper") is True
+            or live_status.get("ready_for_shadow") is True
             else "blocked",
             "Live preflight must pass paper/testnet or shadow entry checks.",
             {
@@ -426,7 +440,9 @@ def _global_verdict_and_stage_statuses(
 
     stage_statuses = {
         "research_block": "cleared" if allowed_start_modes else "current_state",
-        "freeze_candidate": "complete" if _all_passed(status_by_gate, research_gate_names) else "not_started",
+        "freeze_candidate": "complete"
+        if _all_passed(status_by_gate, research_gate_names)
+        else "not_started",
         "fresh_forward_shadow": "allowed" if shadow_start else "blocked",
         "paper_or_testnet_execution": "allowed" if paper_start else "blocked",
         "canary_real_money": "allowed" if real_start else "blocked",
@@ -459,12 +475,14 @@ def build_payload(
     source_status = {
         "summary_json": {key: value for key, value in summary_input.items() if key != "payload"},
         "wf_json": {key: value for key, value in wf_input.items() if key != "payload"},
-        "live_preflight_json": {key: value for key, value in live_input.items() if key != "payload"},
+        "live_preflight_json": {
+            key: value for key, value in live_input.items() if key != "payload"
+        },
     }
-    summary = (
-        summary_input["payload"] if isinstance(summary_input.get("payload"), Mapping) else {}
+    summary = summary_input["payload"] if isinstance(summary_input.get("payload"), Mapping) else {}
+    live_preflight = (
+        live_input["payload"] if isinstance(live_input.get("payload"), Mapping) else None
     )
-    live_preflight = live_input["payload"] if isinstance(live_input.get("payload"), Mapping) else None
     rows = _summary_rows(summary)
     live = _live_status(live_preflight)
     gates = _build_gates(source_status=source_status, summary=summary, live=live, rows=rows)
@@ -557,11 +575,15 @@ def build_payload(
 
 
 def render_markdown(payload: Mapping[str, Any]) -> str:
-    verdict = payload.get("global_verdict") if isinstance(payload.get("global_verdict"), Mapping) else {}
+    verdict = (
+        payload.get("global_verdict") if isinstance(payload.get("global_verdict"), Mapping) else {}
+    )
     real_status = "allowed" if verdict.get("real_money_execution") is True else "blocked"
     paper_status = "allowed" if verdict.get("paper_trading_start") is True else "blocked"
     shadow_status = "allowed" if verdict.get("shadow_trading_start") is True else "blocked"
-    key_results = payload.get("key_results") if isinstance(payload.get("key_results"), Mapping) else {}
+    key_results = (
+        payload.get("key_results") if isinstance(payload.get("key_results"), Mapping) else {}
+    )
     rows = [
         ("Best clean", key_results.get("best_clean")),
         ("Best clean <15% MDD", key_results.get("best_clean_under_15pct_mdd")),
@@ -599,8 +621,16 @@ def render_markdown(payload: Mapping[str, Any]) -> str:
         )
 
     live = payload.get("live_readiness_preflight")
-    live_status = live.get("status") if isinstance(live, Mapping) and isinstance(live.get("status"), Mapping) else {}
-    live_checks = live.get("checks") if isinstance(live, Mapping) and isinstance(live.get("checks"), Mapping) else {}
+    live_status = (
+        live.get("status")
+        if isinstance(live, Mapping) and isinstance(live.get("status"), Mapping)
+        else {}
+    )
+    live_checks = (
+        live.get("checks")
+        if isinstance(live, Mapping) and isinstance(live.get("checks"), Mapping)
+        else {}
+    )
     lines.extend(
         [
             "",
@@ -621,7 +651,9 @@ def render_markdown(payload: Mapping[str, Any]) -> str:
     )
     for gate in payload.get("promotion_gates", []):
         if isinstance(gate, Mapping):
-            lines.append(f"| `{gate.get('gate')}` | `{gate.get('status')}` | {gate.get('detail')} |")
+            lines.append(
+                f"| `{gate.get('gate')}` | `{gate.get('status')}` | {gate.get('detail')} |"
+            )
 
     lines.extend(["", "## Required path", ""])
     for stage in payload.get("real_money_path", []):

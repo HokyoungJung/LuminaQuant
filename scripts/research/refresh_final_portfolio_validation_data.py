@@ -1378,7 +1378,9 @@ def main(argv: list[str] | None = None) -> int:
         portfolio_symbols,
         priority_symbols=parse_symbol_tokens(args.priority_symbols),
     )
-    feature_symbols = [] if bool(args.skip_feature_refresh) else load_feature_symbols(bundle_override)
+    feature_symbols = (
+        [] if bool(args.skip_feature_refresh) else load_feature_symbols(bundle_override)
+    )
     effective_memory_budget_bytes, system_memory_budget_bytes = (
         resolve_effective_memory_budget_bytes(int(args.memory_budget_bytes))
     )

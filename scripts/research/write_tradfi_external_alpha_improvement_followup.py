@@ -19,7 +19,12 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ALPHA_V2_ROOT = (
-    REPO_ROOT / "var" / "reports" / "profit_moonshot_20260501" / "current_tail_20260508" / "alpha_v2"
+    REPO_ROOT
+    / "var"
+    / "reports"
+    / "profit_moonshot_20260501"
+    / "current_tail_20260508"
+    / "alpha_v2"
 )
 DEFAULT_REPORT_ROOT = (
     ALPHA_V2_ROOT / "tradfi_external_alpha_search_20260613" / "wf_110_asset_external_v1"
@@ -91,7 +96,7 @@ def _load_input(path: Path) -> dict[str, Any]:
 def _safe_float(value: Any) -> float | None:
     try:
         number = float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     return number if number == number and abs(number) != float("inf") else None
 
@@ -132,7 +137,9 @@ def _best_mapping(rows: Any, key: str = "compounded_oos_return") -> dict[str, An
 
 
 def _summary_rows(summary: Mapping[str, Any]) -> dict[str, Any]:
-    clean = summary.get("clean_section") if isinstance(summary.get("clean_section"), Mapping) else {}
+    clean = (
+        summary.get("clean_section") if isinstance(summary.get("clean_section"), Mapping) else {}
+    )
     moonshot = (
         summary.get("moonshot_shadow_section")
         if isinstance(summary.get("moonshot_shadow_section"), Mapping)
@@ -170,12 +177,16 @@ def _fast_selector_attempt(fast_selector: Mapping[str, Any] | None) -> dict[str,
         }
     aggregate = fast_selector.get("aggregate_rankings")
     clean_rankings = fast_selector.get("clean_promotion_rankings")
-    selector_rows = [
-        dict(row)
-        for row in aggregate
-        if isinstance(row, Mapping)
-        and str(row.get("candidate_label", "")).startswith("row_level_leaf_selector:")
-    ] if isinstance(aggregate, Sequence) else []
+    selector_rows = (
+        [
+            dict(row)
+            for row in aggregate
+            if isinstance(row, Mapping)
+            and str(row.get("candidate_label", "")).startswith("row_level_leaf_selector:")
+        ]
+        if isinstance(aggregate, Sequence)
+        else []
+    )
     best_selector = _best_mapping(selector_rows)
     best_clean_after = _first_mapping(clean_rankings) or _best_mapping(
         aggregate,
@@ -208,7 +219,9 @@ def _new_alpha_attempt(new_alpha: Mapping[str, Any] | None) -> dict[str, Any]:
             "promotable": False,
             "status": "missing_source_fail_closed",
         }
-    aggregate = new_alpha.get("aggregate") if isinstance(new_alpha.get("aggregate"), Mapping) else {}
+    aggregate = (
+        new_alpha.get("aggregate") if isinstance(new_alpha.get("aggregate"), Mapping) else {}
+    )
     compounded = _safe_float(aggregate.get("compounded_oos_return"))
     mdd = _safe_float(aggregate.get("max_oos_mdd"))
     improved = bool(
@@ -285,7 +298,9 @@ def _payload_or_none(input_info: Mapping[str, Any]) -> dict[str, Any] | None:
     return dict(payload) if isinstance(payload, Mapping) else None
 
 
-def _beats_baseline(candidate: Mapping[str, Any] | None, baseline: Mapping[str, Any] | None) -> bool:
+def _beats_baseline(
+    candidate: Mapping[str, Any] | None, baseline: Mapping[str, Any] | None
+) -> bool:
     candidate_comp = _safe_float(candidate.get("compounded_oos_return")) if candidate else None
     baseline_comp = _safe_float(baseline.get("compounded_oos_return")) if baseline else None
     if candidate_comp is None or baseline_comp is None:
@@ -321,10 +336,14 @@ def build_payload(
     ]
     best_clean = rows.get("best_clean")
     best_moonshot = rows.get("best_moonshot_demoted")
-    any_clean_improvement = any(attempt.get("clean_improvement_found") is True for attempt in attempts)
+    any_clean_improvement = any(
+        attempt.get("clean_improvement_found") is True for attempt in attempts
+    )
     any_promotable = any(attempt.get("promotable") is True for attempt in attempts)
     source_failures = [
-        name for name, item in inputs.items() if item.get("valid") is not True and name != "raw_probe_json"
+        name
+        for name, item in inputs.items()
+        if item.get("valid") is not True and name != "raw_probe_json"
     ]
     raw_probe_missing = inputs["raw_probe_json"].get("valid") is not True
     clean_beats_old_best = _beats_baseline(rows.get("best_new_clean_external_family"), best_clean)
@@ -350,7 +369,9 @@ def build_payload(
     freeze_candidate = {
         "candidate_label": best_moonshot.get("candidate_label") if best_moonshot else None,
         "family": best_moonshot.get("family") if best_moonshot else None,
-        "compounded_oos_return": best_moonshot.get("compounded_oos_return") if best_moonshot else None,
+        "compounded_oos_return": best_moonshot.get("compounded_oos_return")
+        if best_moonshot
+        else None,
         "max_oos_mdd": best_moonshot.get("max_oos_mdd") if best_moonshot else None,
         "positive_oos_folds": best_moonshot.get("positive_oos_folds") if best_moonshot else None,
         "validity": "post_oos_research_variant_requires_fresh_forward_shadow",
@@ -400,8 +421,14 @@ def build_payload(
 def render_markdown(payload: Mapping[str, Any]) -> str:
     decision = payload.get("decision") if isinstance(payload.get("decision"), Mapping) else {}
     baseline = payload.get("baseline") if isinstance(payload.get("baseline"), Mapping) else {}
-    freeze = payload.get("freeze_candidate") if isinstance(payload.get("freeze_candidate"), Mapping) else {}
-    best_clean = baseline.get("best_clean") if isinstance(baseline.get("best_clean"), Mapping) else {}
+    freeze = (
+        payload.get("freeze_candidate")
+        if isinstance(payload.get("freeze_candidate"), Mapping)
+        else {}
+    )
+    best_clean = (
+        baseline.get("best_clean") if isinstance(baseline.get("best_clean"), Mapping) else {}
+    )
     best_moonshot = (
         baseline.get("best_moonshot_demoted")
         if isinstance(baseline.get("best_moonshot_demoted"), Mapping)
@@ -454,7 +481,11 @@ def render_markdown(payload: Mapping[str, Any]) -> str:
             "| `{}` | `{}` | {} | {} | `{}` |".format(
                 attempt.get("name", "attempt"),
                 attempt.get("status", "unknown"),
-                _pct(metric_row.get("compounded_oos_return") if isinstance(metric_row, Mapping) else None),
+                _pct(
+                    metric_row.get("compounded_oos_return")
+                    if isinstance(metric_row, Mapping)
+                    else None
+                ),
                 _pct(metric_row.get("max_oos_mdd") if isinstance(metric_row, Mapping) else None),
                 "promotable" if attempt.get("promotable") is True else "not promotable",
             )

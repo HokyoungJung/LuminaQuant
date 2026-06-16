@@ -89,9 +89,12 @@ def test_build_payload_classifies_user_designated_baselines(tmp_path: Path) -> N
         by_label["fixed_relaxed_dynamic_blend:relaxed60_dynamic40"]["status"]
         == "diagnostic_shadow_only_rebuild_leaf_first"
     )
-    assert by_label["fixed_relaxed_dynamic_blend:relaxed60_dynamic40"]["primary_metrics"][
-        "clean_promotion_eligible"
-    ] is False
+    assert (
+        by_label["fixed_relaxed_dynamic_blend:relaxed60_dynamic40"]["primary_metrics"][
+            "clean_promotion_eligible"
+        ]
+        is False
+    )
     assert (
         by_label["dynamic_conviction_switch:t0.90_risk_capped_fallback"]["status"]
         == "paper_control_shadow_only"
@@ -203,9 +206,9 @@ def test_build_payload_summarizes_leaf_rebuild_and_preflight(tmp_path: Path) -> 
 
     assert payload["latest_leaf_rebuild_shadow"]["loaded_symbol_count"] == 69
     assert (
-        payload["latest_leaf_rebuild_shadow"]["baseline_rows"][
-            "relaxed_efficiency:hybrid_v3_5"
-        ]["compounded_oos_return"]
+        payload["latest_leaf_rebuild_shadow"]["baseline_rows"]["relaxed_efficiency:hybrid_v3_5"][
+            "compounded_oos_return"
+        ]
         == -0.2949
     )
     assert (

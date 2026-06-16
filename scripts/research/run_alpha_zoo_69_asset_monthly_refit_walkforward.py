@@ -241,7 +241,7 @@ def _utc_now_iso() -> str:
 def _safe_float(value: Any, default: float = 0.0) -> float:
     try:
         parsed = float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
     return parsed if math.isfinite(parsed) else default
 
@@ -780,9 +780,7 @@ def _row_cost_stress_report(
             elif int(cost_bps) == int(DEFAULT_SLIPPAGE_BPS):
                 stress_return = base_return
             split_report["stress_returns"][f"{int(cost_bps)}bps"] = stress_return
-            split_report["stress_return_per_turnover_proxy_bps"][
-                f"{int(cost_bps)}bps"
-            ] = stress_rpt
+            split_report["stress_return_per_turnover_proxy_bps"][f"{int(cost_bps)}bps"] = stress_rpt
         split_reports[split] = split_report
     return {
         "stress_bps": list(COST_STRESS_BPS),
@@ -1914,7 +1912,9 @@ def _us_equity_cash_session_mask(index: pd.Index | pd.DatetimeIndex) -> np.ndarr
     )
 
 
-def _window_mask(index: pd.Index | pd.DatetimeIndex, window: tuple[pd.Timestamp, pd.Timestamp]) -> np.ndarray:
+def _window_mask(
+    index: pd.Index | pd.DatetimeIndex, window: tuple[pd.Timestamp, pd.Timestamp]
+) -> np.ndarray:
     datetimes = pd.DatetimeIndex(pd.to_datetime(index))
     start = _coerce_ts(window[0])
     end = _coerce_ts(window[1])
@@ -1933,17 +1933,13 @@ def _stream_us_equity_cash_session_returns(stream: broad69.CandidateStream) -> p
     )
 
 
-def _nonzero_count_in_window(
-    returns: pd.Series, window: tuple[pd.Timestamp, pd.Timestamp]
-) -> int:
+def _nonzero_count_in_window(returns: pd.Series, window: tuple[pd.Timestamp, pd.Timestamp]) -> int:
     mask = _window_mask(returns.index, window)
     values = returns.to_numpy(dtype=float)[mask]
     return int(np.count_nonzero(np.abs(values) > 1e-12))
 
 
-def _active_session_bar_count(
-    returns: pd.Series, window: tuple[pd.Timestamp, pd.Timestamp]
-) -> int:
+def _active_session_bar_count(returns: pd.Series, window: tuple[pd.Timestamp, pd.Timestamp]) -> int:
     return int(
         np.count_nonzero(
             _window_mask(returns.index, window) & _us_equity_cash_session_mask(returns.index)
@@ -2120,9 +2116,7 @@ def _tradfi_us_equity_cash_guard_candidates(
             "profile_kind": "tradfi_us_equity_cash_session_guard",
             "candidate_tier": "clean_train_validation_selected_paper_shadow",
             "selection_inputs": ["train", "validation", "us_equity_market_structure_priors"],
-            "selection_policy": (
-                "us_equity_cash_session_only_cash_guard_no_locked_oos_selection"
-            ),
+            "selection_policy": ("us_equity_cash_session_only_cash_guard_no_locked_oos_selection"),
             "selected_candidate_label": "cash_no_eligible_tradfi_us_equity_session_signal",
             "selection_notes": [reason, "locked_oos_not_read"],
             "target_validation_mdd": float(target_mdd),
@@ -2255,9 +2249,7 @@ def _tradfi_us_equity_session_switch_candidates(
             )
             continue
 
-        raw_scores = {
-            str(item["source_model_id"]): float(item["score"]) for item in selected
-        }
+        raw_scores = {str(item["source_model_id"]): float(item["score"]) for item in selected}
         weights = _softmax_weights(
             raw_scores,
             learning_rate=float(spec["learning_rate"]),
@@ -2500,9 +2492,7 @@ def _volatility_managed_returns(
     base_vol = float(in_sample.std(ddof=0)) if not in_sample.empty else 0.0
     target_vol = min(max(base_vol * float(target_multiplier), 1e-5), 0.025)
     lagged_vol = (
-        series.rolling(int(lookback), min_periods=max(3, int(lookback) // 3))
-        .std(ddof=0)
-        .shift(1)
+        series.rolling(int(lookback), min_periods=max(3, int(lookback) // 3)).std(ddof=0).shift(1)
     )
     vol_scale = (target_vol / lagged_vol.replace(0.0, np.nan)).clip(0.0, float(max_scale))
     equity = (1.0 + series.fillna(0.0)).cumprod()
@@ -2609,8 +2599,7 @@ def _tradfi_vol_managed_v1_candidates(
     for spec in specs:
         selected = pool[: int(spec["top_n"])]
         raw_weights = {
-            candidate.candidate_label: 1.0 / float(len(selected))
-            for candidate, _, _ in selected
+            candidate.candidate_label: 1.0 / float(len(selected)) for candidate, _, _ in selected
         }
         blended = _blend_candidate_returns([candidate for candidate, _, _ in selected], raw_weights)
         managed, vol_meta = _volatility_managed_returns(
@@ -2646,7 +2635,9 @@ def _tradfi_vol_managed_v1_candidates(
             "selected_candidate_label": selected[0][0].candidate_label,
             "source_model_ids": [candidate.candidate_label for candidate, _, _ in selected],
             "weights": raw_weights,
-            "final_weights": {key: float(value) * float(scale) for key, value in raw_weights.items()},
+            "final_weights": {
+                key: float(value) * float(scale) for key, value in raw_weights.items()
+            },
             "risk_scale": float(scale),
             "risk_scale_mode": "train_validation_validation_mdd_budget_after_vol_management",
             "train_validation_scale_metrics": scale_metrics,
@@ -2918,10 +2909,7 @@ def _tradfi_intraday_session_pool(
         validation_mdd = _safe_float(validation.get("mdd"))
         if train_return <= -0.01 or validation_return <= 0.0 or validation_mdd > 0.18:
             continue
-        score = (
-            validation_return / max(validation_mdd, 0.02)
-            + 0.10 * min(train_return, 1.0)
-        )
+        score = validation_return / max(validation_mdd, 0.02) + 0.10 * min(train_return, 1.0)
         pool.append(
             {
                 "source_model_id": source_model_id,
@@ -4670,8 +4658,7 @@ def _candidate_label_is_moonshot_namespace(label: str) -> bool:
     lower = str(label or "").lower()
     family = lower.split(":", 1)[0]
     return any(
-        lower.startswith(prefix) or family.startswith(prefix)
-        for prefix in _MOONSHOT_LABEL_PREFIXES
+        lower.startswith(prefix) or family.startswith(prefix) for prefix in _MOONSHOT_LABEL_PREFIXES
     )
 
 
@@ -6599,7 +6586,9 @@ def _aggregate_rows(fold_rows: Sequence[Mapping[str, Any]]) -> list[dict[str, An
             beats_challenger or material_risk_improvement or robust_default_improvement
         )
         cost_stress_rows = [
-            dict(row.get("cost_stress") or {}) for row in rows if isinstance(row.get("cost_stress"), Mapping)
+            dict(row.get("cost_stress") or {})
+            for row in rows
+            if isinstance(row.get("cost_stress"), Mapping)
         ]
         selected_symbols = sorted(
             {
@@ -6640,7 +6629,10 @@ def _aggregate_rows(fold_rows: Sequence[Mapping[str, Any]]) -> list[dict[str, An
             }
         )
         top_symbol_weights = [
-            max((_safe_float(value) for value in dict(row.get("symbol_weights") or {}).values()), default=0.0)
+            max(
+                (_safe_float(value) for value in dict(row.get("symbol_weights") or {}).values()),
+                default=0.0,
+            )
             for row in rows
         ]
         aggregate.append(

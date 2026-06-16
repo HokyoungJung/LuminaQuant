@@ -32,7 +32,6 @@ from typing import Any
 
 from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.alpha_features import (
-    realized_volatility,
     rolling_zscore,
     simple_return,
     volatility_ratio,
@@ -188,9 +187,7 @@ class HurstRegimeGatedStrategy(Strategy):
             )
             + 8
         )
-        self._state = {
-            symbol: _RegimeState(deque(maxlen=size)) for symbol in self.symbol_list
-        }
+        self._state = {symbol: _RegimeState(deque(maxlen=size)) for symbol in self.symbol_list}
         self._last_eval_time_key = ""
 
     def get_state(self) -> dict[str, Any]:
@@ -275,12 +272,10 @@ class HurstRegimeGatedStrategy(Strategy):
             return "MID"
         trend_exit = self.trend_threshold - self.hysteresis
         mr_exit = self.mr_threshold + self.hysteresis
-        if prior == "TREND":
-            if hurst >= trend_exit:
-                return "TREND"
-        elif prior == "MR":
-            if hurst <= mr_exit:
-                return "MR"
+        if prior == "TREND" and hurst >= trend_exit:
+            return "TREND"
+        if prior == "MR" and hurst <= mr_exit:
+            return "MR"
         if hurst >= self.trend_threshold:
             return "TREND"
         if hurst <= self.mr_threshold:
@@ -290,8 +285,12 @@ class HurstRegimeGatedStrategy(Strategy):
     def _child_scores(self, closes: list[float]) -> tuple[float | None, float | None]:
         """Return (trend_score, mr_score); ``None`` legs lack history."""
         trend_score: float | None = None
-        ema_fast = _ema(closes[-self.ema_slow :], self.ema_fast) if len(closes) >= self.ema_slow else None
-        ema_slow = _ema(closes[-self.ema_slow :], self.ema_slow) if len(closes) >= self.ema_slow else None
+        ema_fast = (
+            _ema(closes[-self.ema_slow :], self.ema_fast) if len(closes) >= self.ema_slow else None
+        )
+        ema_slow = (
+            _ema(closes[-self.ema_slow :], self.ema_slow) if len(closes) >= self.ema_slow else None
+        )
         if ema_fast is not None and ema_slow is not None and ema_slow > _EPS:
             trend_score = (ema_fast - ema_slow) / max(abs(ema_slow), _EPS)
         mr_score: float | None = None
@@ -368,9 +367,7 @@ class HurstRegimeGatedStrategy(Strategy):
                 continue
             if item.mode != "OUT" and item.mode != target_mode:
                 self._exit_position(symbol, item, event_time, price, "side_flip")
-            self._enter_position(
-                symbol, item, event_time, price, target_mode, score, child
-            )
+            self._enter_position(symbol, item, event_time, price, target_mode, score, child)
         # Age any non-target positions through stop/max-hold.
         for symbol, item in self._state.items():
             if symbol in targets or item.mode == "OUT":
