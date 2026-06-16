@@ -5,24 +5,13 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from lumina_quant.research_universe import BINANCE_EXTENDED_RESEARCH_SYMBOLS_SLASHED
 from lumina_quant.symbols import canonicalize_symbol_list
 
-_DEFAULT_SYMBOL_FALLBACK: tuple[str, ...] = (
-    "BTC/USDT",
-    "ETH/USDT",
-    "XRP/USDT",
-    "BNB/USDT",
-    "SOL/USDT",
-    "TRX/USDT",
-    "DOGE/USDT",
-    "ADA/USDT",
-    "TON/USDT",
-    "AVAX/USDT",
-    "XAU/USDT",
-    "XAG/USDT",
-    "XPT/USDT",
-    "XPD/USDT",
-)
+# Falls back to the full research universe (crypto + metals + tradfi perps),
+# which grows automatically as instruments are added to
+# BINANCE_EXTENDED_RESEARCH_SYMBOLS_SLASHED in lumina_quant.research_universe.
+_DEFAULT_SYMBOL_FALLBACK: tuple[str, ...] = tuple(BINANCE_EXTENDED_RESEARCH_SYMBOLS_SLASHED)
 _DEFAULT_PARQUET_ROOT = "data/market_parquet"
 _DEFAULT_EXCHANGE = "binance"
 

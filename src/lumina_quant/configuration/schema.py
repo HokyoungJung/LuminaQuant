@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from lumina_quant.research_universe import BINANCE_EXTENDED_RESEARCH_SYMBOLS_SLASHED
+
 
 @dataclass(slots=True)
 class SystemConfig:
@@ -17,23 +19,11 @@ class SystemConfig:
 class TradingConfig:
     """Shared trading settings."""
 
+    # Defaults to the full research universe (crypto + metals + tradfi perps),
+    # which grows automatically as instruments are added to
+    # BINANCE_EXTENDED_RESEARCH_SYMBOLS_SLASHED in lumina_quant.research_universe.
     symbols: list[str] = field(
-        default_factory=lambda: [
-            "BTC/USDT",
-            "ETH/USDT",
-            "XRP/USDT",
-            "BNB/USDT",
-            "SOL/USDT",
-            "TRX/USDT",
-            "DOGE/USDT",
-            "ADA/USDT",
-            "TON/USDT",
-            "AVAX/USDT",
-            "XAU/USDT",
-            "XAG/USDT",
-            "XPT/USDT",
-            "XPD/USDT",
-        ]
+        default_factory=lambda: list(BINANCE_EXTENDED_RESEARCH_SYMBOLS_SLASHED)
     )
     timeframes: list[str] = field(
         default_factory=lambda: ["1s", "1m", "5m", "15m", "30m", "1h", "4h", "1d"]

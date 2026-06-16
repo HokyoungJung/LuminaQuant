@@ -25,22 +25,14 @@ def test_default_research_symbol_universe_falls_back_when_config_import_is_unava
 ) -> None:
     monkeypatch.setitem(sys.modules, "lumina_quant.configuration", None)
 
-    assert runtime_settings.default_research_symbol_universe() == (
-        "BTC/USDT",
-        "ETH/USDT",
-        "XRP/USDT",
-        "BNB/USDT",
-        "SOL/USDT",
-        "TRX/USDT",
-        "DOGE/USDT",
-        "ADA/USDT",
-        "TON/USDT",
-        "AVAX/USDT",
-        "XAU/USDT",
-        "XAG/USDT",
-        "XPT/USDT",
-        "XPD/USDT",
+    # Falls back to the full research universe constant (grows with tradfi), not a
+    # frozen list, so this tracks the single source of truth.
+    assert (
+        runtime_settings.default_research_symbol_universe()
+        == runtime_settings._DEFAULT_SYMBOL_FALLBACK
     )
+    assert runtime_settings.default_research_symbol_universe()[0] == "BTC/USDT"
+    assert len(runtime_settings.default_research_symbol_universe()) >= 100
 
 
 def test_current_research_market_data_settings_reads_from_typed_config(
