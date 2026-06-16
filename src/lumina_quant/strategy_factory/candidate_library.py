@@ -2606,6 +2606,11 @@ class _CandidateBuildContext:
         _build_semis_leadlag_rotation_candidates(self)
         _build_dual_momentum_index_rotation_candidates(self)
         _build_calendar_seasonality_overlay_candidates(self)
+        # Cross-sectional anomaly sleeves (decorrelated factor families).
+        _build_idiosyncratic_volatility_candidates(self)
+        _build_lottery_skewness_candidates(self)
+        _build_trend_efficiency_momentum_candidates(self)
+        _build_dispersion_conditioned_reversion_candidates(self)
         return self.candidates
 
 
@@ -5588,6 +5593,342 @@ def _build_calendar_seasonality_overlay_candidates(
                         "decision_cadence_seconds": 86400,
                     },
                 )
+
+
+_IDIOSYNCRATIC_VOLATILITY_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "4h": (
+        {
+            "variant": "ivol_lo",
+            "beta_window": 120,
+            "vol_window": 60,
+            "rebalance_bars": 6,
+            "quantile_pct": 0.25,
+            "rebalance_band": 0.25,
+            "allow_short": False,
+            "stop_loss_pct": 0.080,
+            "max_hold_bars": 120,
+        },
+    ),
+    "1d": (
+        {
+            "variant": "ivol_ls",
+            "beta_window": 120,
+            "vol_window": 60,
+            "rebalance_bars": 5,
+            "quantile_pct": 0.25,
+            "rebalance_band": 0.30,
+            "allow_short": True,
+            "stop_loss_pct": 0.080,
+            "max_hold_bars": 120,
+        },
+    ),
+}
+
+
+def _build_idiosyncratic_volatility_candidates(ctx: _CandidateBuildContext) -> None:
+    """Idiosyncratic-volatility anomaly basket (long low / short high residual vol)."""
+    crypto_symbols = ctx.crypto_symbols
+    if len(crypto_symbols) < 4:
+        return
+    for timeframe in ctx._present("4h", "1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _IDIOSYNCRATIC_VOLATILITY_SLICE.get(timeframe, ()):
+            params = {
+                "beta_window": int(spec["beta_window"]),
+                "vol_window": int(spec["vol_window"]),
+                "rebalance_bars": int(spec["rebalance_bars"]),
+                "quantile_pct": float(spec["quantile_pct"]),
+                "rebalance_band": float(spec["rebalance_band"]),
+                "allow_short": bool(spec["allow_short"]),
+                "stop_loss_pct": float(spec["stop_loss_pct"]),
+                "max_hold_bars": int(spec["max_hold_bars"]),
+            }
+            _add_candidate(
+                ctx.candidates,
+                name=(
+                    f"idiosyncratic_volatility_{tf_tag}_{spec['variant']}_"
+                    f"{int(spec['beta_window'])}_{int(spec['vol_window'])}"
+                ),
+                family="cross_sectional",
+                strategy_class="IdiosyncraticVolatilityStrategy",
+                timeframe=timeframe,
+                symbols=crypto_symbols,
+                params=params,
+                notes=(
+                    "Idiosyncratic-volatility anomaly sleeve: ranks symbols by the "
+                    "volatility of their benchmark-residual returns and goes long the "
+                    "low-idio-vol quantile / short the high one for "
+                    f"{timeframe} ({spec['variant']})."
+                ),
+                tags=(
+                    *_CROSS_SECTIONAL_ADMISSION_TAGS,
+                    "anomaly",
+                    "low_vol",
+                    "idiosyncratic",
+                    "crypto",
+                ),
+                metadata={
+                    "timeframe": timeframe,
+                    "retune_profile": str(spec["variant"]),
+                    "symbol_scope": "crypto",
+                    "allow_short": bool(spec["allow_short"]),
+                    "decision_cadence_seconds": 86400,
+                },
+            )
+
+
+_LOTTERY_SKEWNESS_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "4h": (
+        {
+            "variant": "lottery_lo",
+            "skew_window": 60,
+            "max_window": 20,
+            "max_weight": 0.50,
+            "rebalance_bars": 6,
+            "quantile_pct": 0.25,
+            "rebalance_band": 0.25,
+            "allow_short": False,
+            "stop_loss_pct": 0.080,
+            "max_hold_bars": 120,
+        },
+    ),
+    "1d": (
+        {
+            "variant": "lottery_ls",
+            "skew_window": 60,
+            "max_window": 20,
+            "max_weight": 0.50,
+            "rebalance_bars": 5,
+            "quantile_pct": 0.25,
+            "rebalance_band": 0.30,
+            "allow_short": True,
+            "stop_loss_pct": 0.080,
+            "max_hold_bars": 120,
+        },
+    ),
+}
+
+
+def _build_lottery_skewness_candidates(ctx: _CandidateBuildContext) -> None:
+    """Lottery-preference (skewness / MAX) anomaly basket (short lottery names)."""
+    crypto_symbols = ctx.crypto_symbols
+    if len(crypto_symbols) < 4:
+        return
+    for timeframe in ctx._present("4h", "1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _LOTTERY_SKEWNESS_SLICE.get(timeframe, ()):
+            params = {
+                "skew_window": int(spec["skew_window"]),
+                "max_window": int(spec["max_window"]),
+                "max_weight": float(spec["max_weight"]),
+                "rebalance_bars": int(spec["rebalance_bars"]),
+                "quantile_pct": float(spec["quantile_pct"]),
+                "rebalance_band": float(spec["rebalance_band"]),
+                "allow_short": bool(spec["allow_short"]),
+                "stop_loss_pct": float(spec["stop_loss_pct"]),
+                "max_hold_bars": int(spec["max_hold_bars"]),
+            }
+            _add_candidate(
+                ctx.candidates,
+                name=(
+                    f"lottery_skewness_{tf_tag}_{spec['variant']}_"
+                    f"{int(spec['skew_window'])}_{int(spec['max_window'])}"
+                ),
+                family="cross_sectional",
+                strategy_class="LotterySkewnessStrategy",
+                timeframe=timeframe,
+                symbols=crypto_symbols,
+                params=params,
+                notes=(
+                    "Lottery-preference anomaly sleeve: blends trailing return "
+                    "skewness with the Bali-Cakici-Whitelaw MAX single-bar return, "
+                    "shorting high-lottery names and going long low-skew names for "
+                    f"{timeframe} ({spec['variant']})."
+                ),
+                tags=(
+                    *_CROSS_SECTIONAL_ADMISSION_TAGS,
+                    "anomaly",
+                    "skewness",
+                    "lottery",
+                    "crypto",
+                ),
+                metadata={
+                    "timeframe": timeframe,
+                    "retune_profile": str(spec["variant"]),
+                    "symbol_scope": "crypto",
+                    "allow_short": bool(spec["allow_short"]),
+                    "decision_cadence_seconds": 86400,
+                },
+            )
+
+
+_TREND_EFFICIENCY_MOMENTUM_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "1h": (
+        {
+            "variant": "teff_lo",
+            "efficiency_period": 20,
+            "trend_lookback_bars": 20,
+            "rebalance_bars": 6,
+            "quantile_pct": 0.25,
+            "signal_threshold": 0.10,
+            "rebalance_band": 0.25,
+            "allow_short": False,
+            "stop_loss_pct": 0.080,
+            "max_hold_bars": 120,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "teff_ls",
+            "efficiency_period": 20,
+            "trend_lookback_bars": 20,
+            "rebalance_bars": 5,
+            "quantile_pct": 0.25,
+            "signal_threshold": 0.10,
+            "rebalance_band": 0.30,
+            "allow_short": True,
+            "stop_loss_pct": 0.080,
+            "max_hold_bars": 120,
+        },
+    ),
+}
+
+
+def _build_trend_efficiency_momentum_candidates(ctx: _CandidateBuildContext) -> None:
+    """Trend-quality (Kaufman efficiency) momentum basket (long clean uptrends)."""
+    crypto_symbols = ctx.crypto_symbols
+    if len(crypto_symbols) < 4:
+        return
+    for timeframe in ctx._present("1h", "4h"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _TREND_EFFICIENCY_MOMENTUM_SLICE.get(timeframe, ()):
+            params = {
+                "efficiency_period": int(spec["efficiency_period"]),
+                "trend_lookback_bars": int(spec["trend_lookback_bars"]),
+                "rebalance_bars": int(spec["rebalance_bars"]),
+                "quantile_pct": float(spec["quantile_pct"]),
+                "signal_threshold": float(spec["signal_threshold"]),
+                "rebalance_band": float(spec["rebalance_band"]),
+                "allow_short": bool(spec["allow_short"]),
+                "stop_loss_pct": float(spec["stop_loss_pct"]),
+                "max_hold_bars": int(spec["max_hold_bars"]),
+            }
+            _add_candidate(
+                ctx.candidates,
+                name=(
+                    f"trend_efficiency_momentum_{tf_tag}_{spec['variant']}_"
+                    f"{int(spec['efficiency_period'])}_{int(spec['trend_lookback_bars'])}"
+                ),
+                family="cross_sectional",
+                strategy_class="TrendEfficiencyMomentumStrategy",
+                timeframe=timeframe,
+                symbols=crypto_symbols,
+                params=params,
+                notes=(
+                    "Trend-quality momentum sleeve: scores each symbol by Kaufman "
+                    "efficiency ratio times the sign of its trailing trend, going long "
+                    "clean high-efficiency uptrends / short low-efficiency downtrends "
+                    f"for {timeframe} ({spec['variant']})."
+                ),
+                tags=(
+                    *_CROSS_SECTIONAL_ADMISSION_TAGS,
+                    "anomaly",
+                    "trend_quality",
+                    "efficiency",
+                    "crypto",
+                ),
+                metadata={
+                    "timeframe": timeframe,
+                    "retune_profile": str(spec["variant"]),
+                    "symbol_scope": "crypto",
+                    "allow_short": bool(spec["allow_short"]),
+                    "decision_cadence_seconds": 86400,
+                },
+            )
+
+
+_DISPERSION_CONDITIONED_REVERSION_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "1h": (
+        {
+            "variant": "disp_lo",
+            "reversion_lookback_bars": 5,
+            "dispersion_threshold": 0.020,
+            "rebalance_bars": 3,
+            "quantile_pct": 0.25,
+            "rebalance_band": 0.25,
+            "allow_short": False,
+            "stop_loss_pct": 0.060,
+            "max_hold_bars": 48,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "disp_ls",
+            "reversion_lookback_bars": 5,
+            "dispersion_threshold": 0.030,
+            "rebalance_bars": 2,
+            "quantile_pct": 0.25,
+            "rebalance_band": 0.30,
+            "allow_short": True,
+            "stop_loss_pct": 0.060,
+            "max_hold_bars": 48,
+        },
+    ),
+}
+
+
+def _build_dispersion_conditioned_reversion_candidates(ctx: _CandidateBuildContext) -> None:
+    """Regime-gated cross-sectional reversion basket (fade extremes in high dispersion)."""
+    crypto_symbols = ctx.crypto_symbols
+    if len(crypto_symbols) < 4:
+        return
+    for timeframe in ctx._present("1h", "4h"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _DISPERSION_CONDITIONED_REVERSION_SLICE.get(timeframe, ()):
+            params = {
+                "reversion_lookback_bars": int(spec["reversion_lookback_bars"]),
+                "dispersion_threshold": float(spec["dispersion_threshold"]),
+                "rebalance_bars": int(spec["rebalance_bars"]),
+                "quantile_pct": float(spec["quantile_pct"]),
+                "rebalance_band": float(spec["rebalance_band"]),
+                "allow_short": bool(spec["allow_short"]),
+                "stop_loss_pct": float(spec["stop_loss_pct"]),
+                "max_hold_bars": int(spec["max_hold_bars"]),
+            }
+            _add_candidate(
+                ctx.candidates,
+                name=(
+                    f"dispersion_conditioned_reversion_{tf_tag}_{spec['variant']}_"
+                    f"{int(spec['reversion_lookback_bars'])}_"
+                    f"{float(spec['dispersion_threshold']):.3f}"
+                ),
+                family="cross_sectional",
+                strategy_class="DispersionConditionedReversionStrategy",
+                timeframe=timeframe,
+                symbols=crypto_symbols,
+                params=params,
+                notes=(
+                    "Regime-gated cross-sectional reversion sleeve: only trades when "
+                    "cross-sectional return dispersion exceeds a threshold, then fades "
+                    "extreme movers toward the basket mean for "
+                    f"{timeframe} ({spec['variant']})."
+                ),
+                tags=(
+                    *_CROSS_SECTIONAL_ADMISSION_TAGS,
+                    "anomaly",
+                    "mean_reversion",
+                    "dispersion",
+                    "regime",
+                    "crypto",
+                ),
+                metadata={
+                    "timeframe": timeframe,
+                    "retune_profile": str(spec["variant"]),
+                    "symbol_scope": "crypto",
+                    "allow_short": bool(spec["allow_short"]),
+                    "decision_cadence_seconds": 86400,
+                },
+            )
 
 
 def build_binance_futures_candidates(
