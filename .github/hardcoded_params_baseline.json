@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-06-16T08:06:35.798640+00:00",
+  "generated_at_utc": "2026-06-16T23:41:35.432678+00:00",
   "literal_paths": [
     "src/lumina_quant/strategies",
     "lumina_quant/strategies"
@@ -647,6 +647,10 @@
     "literal:src/lumina_quant/strategies/profit_moonshot.py:623:61:0.001",
     "literal:src/lumina_quant/strategies/profit_moonshot.py:689:30:3",
     "literal:src/lumina_quant/strategies/profit_moonshot.py:713:56:0.05",
+    "literal:src/lumina_quant/strategies/return_rider_alpha_sleeves.py:211:31:1800",
+    "literal:src/lumina_quant/strategies/return_rider_alpha_sleeves.py:249:31:0.1",
+    "literal:src/lumina_quant/strategies/return_rider_alpha_sleeves.py:423:35:3.0",
+    "literal:src/lumina_quant/strategies/return_rider_alpha_sleeves.py:687:38:0.1",
     "literal:src/lumina_quant/strategies/robust_alpha_sleeves.py:1035:35:3.0",
     "literal:src/lumina_quant/strategies/robust_alpha_sleeves.py:1050:31:60",
     "literal:src/lumina_quant/strategies/robust_alpha_sleeves.py:1087:33:3",
