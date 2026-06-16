@@ -1035,7 +1035,8 @@ def test_build_single_asset_portfolio_sets_from_shortlist():
     assert abs(sum(float(row.get("portfolio_weight", 0.0)) for row in top["members"]) - 1.0) < 1e-9
 
 
-def test_strategy_library_rows_include_tags_and_metadata():
+def test_strategy_library_rows_include_tags_and_metadata(monkeypatch):
+    monkeypatch.setattr(candidate_library, "_has_perp_support_data", lambda: True)
     rows = build_binance_futures_candidates(
         timeframes=["5m", "1h", "4h"],
         symbols=["BTC/USDT", "ETH/USDT", "SOL/USDT", "XAU/USDT", "TRX/USDT"],

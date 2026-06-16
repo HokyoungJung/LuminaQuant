@@ -101,7 +101,10 @@ def test_new_plugin_strategy_schemas_register_after_lazy_discovery():
         assert set(defaults).issubset(schema)
 
 
-def test_candidate_library_wires_new_alpha_sleeves_with_admission_safe_tags():
+def test_candidate_library_wires_new_alpha_sleeves_with_admission_safe_tags(monkeypatch):
+    from lumina_quant.strategy_factory import candidate_library
+
+    monkeypatch.setattr(candidate_library, "_has_perp_support_data", lambda: True)
     rows = build_binance_futures_candidates(
         timeframes=["15m", "30m", "1h", "4h", "1d"],
         symbols=[
