@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-06-17T09:12:36.406109+00:00",
+  "generated_at_utc": "2026-06-17T09:32:43.757490+00:00",
   "literal_paths": [
     "src/lumina_quant/strategies",
     "lumina_quant/strategies"
@@ -637,6 +637,12 @@
     "literal:src/lumina_quant/strategies/intraday_overnight_alpha_sleeves.py:438:51:23",
     "literal:src/lumina_quant/strategies/intraday_overnight_alpha_sleeves.py:439:49:24",
     "literal:src/lumina_quant/strategies/intraday_overnight_alpha_sleeves.py:440:33:0.001",
+    "literal:src/lumina_quant/strategies/kalman_semivar_alpha_sleeves.py:168:31:1800",
+    "literal:src/lumina_quant/strategies/kalman_semivar_alpha_sleeves.py:216:39:1e-14",
+    "literal:src/lumina_quant/strategies/kalman_semivar_alpha_sleeves.py:317:27:5",
+    "literal:src/lumina_quant/strategies/kalman_semivar_alpha_sleeves.py:318:68:3",
+    "literal:src/lumina_quant/strategies/kalman_semivar_alpha_sleeves.py:340:31:1800",
+    "literal:src/lumina_quant/strategies/kalman_semivar_alpha_sleeves.py:389:34:3",
     "literal:src/lumina_quant/strategies/micro_signal_alpha_sleeves.py:1069:55:3.0",
     "literal:src/lumina_quant/strategies/micro_signal_alpha_sleeves.py:111:21:3",
     "literal:src/lumina_quant/strategies/micro_signal_alpha_sleeves.py:1174:35:3.0",
