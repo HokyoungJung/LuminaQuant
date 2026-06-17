@@ -2632,6 +2632,14 @@ class _CandidateBuildContext:
         # Both >=30m only; single-asset so they bypass the multi-asset gate.
         _build_carry_trend_confluence_rider_candidates(self)
         _build_volatility_squeeze_breakout_rider_candidates(self)
+        # Session opening-range-breakout rider (per-symbol single-asset, OHLCV):
+        # a SESSION-anchored opening range (reset each UTC day) arms a one-shot
+        # breakout; and the open-interest trend-confirmation rider (per-symbol
+        # single-asset, crypto-perp): rides a trend ONLY when rising OI confirms
+        # it (fresh money, not short-covering). Both >=30m only; single-asset so
+        # they bypass the multi-asset gate. The OI sleeve is perp-gated.
+        _build_opening_range_breakout_rider_candidates(self)
+        _build_open_interest_trend_confirmation_rider_candidates(self)
         _build_metals_relative_value_basket_candidates(self)
         _build_liquidation_cascade_reversion_candidates(self)
         _build_orderbook_imbalance_reversion_candidates(self)
@@ -7132,6 +7140,293 @@ def _build_volatility_squeeze_breakout_rider_candidates(ctx: _CandidateBuildCont
                         "retune_profile": str(spec["variant"]),
                         "symbol_scope": symbol,
                         "allow_short": bool(spec["allow_short"]),
+                        "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                    },
+                )
+
+
+# Session opening-range-breakout rider: anchor a SESSION by the UTC calendar day,
+# accumulate the opening-range high/low over the first ``opening_range_bars``
+# decision bars (no trading), then arm a one-shot breakout (LONG above the range
+# high + ATR buffer; SHORT below the range low) and ride. Per-symbol single-asset,
+# OHLCV-only, >=30m. The opening range RESETS each UTC day.
+_OPENING_RANGE_BREAKOUT_RIDER_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "30m": (
+        {
+            "variant": "fast_ls",
+            "opening_range_bars": 4,
+            "session_start_minute_utc": 0,
+            "buffer_atr_mult": 0.10,
+            "trail_atr_mult": 3.0,
+            "atr_period": 14,
+            "max_adds": 3,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 48,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "core_ls",
+            "opening_range_bars": 3,
+            "session_start_minute_utc": 0,
+            "buffer_atr_mult": 0.10,
+            "trail_atr_mult": 3.2,
+            "atr_period": 14,
+            "max_adds": 3,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 24,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "swing_ls",
+            "opening_range_bars": 1,
+            "session_start_minute_utc": 0,
+            "buffer_atr_mult": 0.15,
+            "trail_atr_mult": 3.5,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 36,
+            "target_vol": 0.030,
+            "max_hold_bars": 18,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+}
+
+
+def _build_opening_range_breakout_rider_candidates(ctx: _CandidateBuildContext) -> None:
+    """Per-symbol session opening-range-breakout rider (single-asset, OHLCV-only)."""
+    # Crypto-only: tradfi equity/ETF perps are routed through the dedicated
+    # equity/commodity breakout builders, so this crypto sleeve excludes them.
+    crypto_symbols = ctx.crypto_only_symbols
+    if not crypto_symbols:
+        return
+    # 1d is excluded: a daily-bar session would be a single bar per UTC day, so an
+    # intraday opening-range anchor is meaningless; ORB lives at 30m/1h/4h.
+    for timeframe in ctx._present("30m", "1h", "4h"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _OPENING_RANGE_BREAKOUT_RIDER_SLICE.get(timeframe, ()):
+            for symbol in crypto_symbols:
+                params = {
+                    "opening_range_bars": int(spec["opening_range_bars"]),
+                    "session_start_minute_utc": int(spec["session_start_minute_utc"]),
+                    "buffer_atr_mult": float(spec["buffer_atr_mult"]),
+                    "trail_atr_mult": float(spec["trail_atr_mult"]),
+                    "atr_period": int(spec["atr_period"]),
+                    "max_adds": int(spec["max_adds"]),
+                    "add_step_atr": float(spec["add_step_atr"]),
+                    "vol_window": int(spec["vol_window"]),
+                    "target_vol": float(spec["target_vol"]),
+                    "max_hold_bars": int(spec["max_hold_bars"]),
+                    "allow_short": bool(spec["allow_short"]),
+                    "add_alloc_fraction": float(spec["add_alloc_fraction"]),
+                }
+                _add_candidate(
+                    ctx.candidates,
+                    name=(
+                        f"opening_range_breakout_rider_{tf_tag}_{spec['variant']}_"
+                        f"{symbol.replace('/', '').lower()}_"
+                        f"{int(spec['opening_range_bars'])}"
+                    ),
+                    family="breakout",
+                    strategy_class="OpeningRangeBreakoutRiderStrategy",
+                    timeframe=timeframe,
+                    symbols=(symbol,),
+                    params=params,
+                    notes=(
+                        "Per-symbol SESSION opening-range-breakout rider: anchors a "
+                        "session by the UTC calendar day, accumulates the opening-range "
+                        "high/low over the first k decision bars (no trading), then arms "
+                        "a one-shot breakout (LONG above the range high + ATR buffer; "
+                        "SHORT below the range low) and rides with an ATR trailing stop + "
+                        f"pyramiding on {symbol} at {timeframe} ({spec['variant']}). The "
+                        "opening range resets each UTC day."
+                    ),
+                    tags=(
+                        "breakout",
+                        "opening_range",
+                        "session_anchored",
+                        "return_rider",
+                        "trailing_stop",
+                        "pyramiding",
+                        "single_asset",
+                        "crypto",
+                    ),
+                    metadata={
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": symbol,
+                        "allow_short": bool(spec["allow_short"]),
+                        "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                    },
+                )
+
+
+# Open-interest trend-confirmation rider: ride a trend ONLY when RISING open
+# interest confirms it (fresh money committing -> healthy/persistent trend);
+# suppress entries when OI is falling (unwind / short-covering -> low conviction).
+# Per-symbol single-asset, crypto-perp only, >=30m. SHORT trend/OI windows so it
+# fires on a ~1-month window. ``oi_rise_threshold`` is the min fractional OI rise
+# over ``oi_lookback`` required to confirm.
+_OPEN_INTEREST_TREND_CONFIRMATION_RIDER_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "30m": (
+        {
+            "variant": "fast_ls",
+            "trend_lookback": 48,
+            "trend_ma_window": 48,
+            "min_trend_roc": 0.0,
+            "oi_lookback": 8,
+            "oi_rise_threshold": 0.0,
+            "trail_atr_mult": 3.0,
+            "atr_period": 14,
+            "max_adds": 3,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 240,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "core_ls",
+            "trend_lookback": 48,
+            "trend_ma_window": 48,
+            "min_trend_roc": 0.0,
+            "oi_lookback": 8,
+            "oi_rise_threshold": 0.0,
+            "trail_atr_mult": 3.2,
+            "atr_period": 14,
+            "max_adds": 3,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 200,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "swing_ls",
+            "trend_lookback": 36,
+            "trend_ma_window": 36,
+            "min_trend_roc": 0.0,
+            "oi_lookback": 6,
+            "oi_rise_threshold": 0.0,
+            "trail_atr_mult": 3.5,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 36,
+            "target_vol": 0.030,
+            "max_hold_bars": 120,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1d": (
+        {
+            "variant": "macro_ls",
+            "trend_lookback": 24,
+            "trend_ma_window": 24,
+            "min_trend_roc": 0.0,
+            "oi_lookback": 4,
+            "oi_rise_threshold": 0.0,
+            "trail_atr_mult": 4.0,
+            "atr_period": 10,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 24,
+            "target_vol": 0.040,
+            "max_hold_bars": 60,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+}
+
+
+def _build_open_interest_trend_confirmation_rider_candidates(
+    ctx: _CandidateBuildContext,
+) -> None:
+    """Per-symbol open-interest trend-confirmation rider (single-asset, perp-gated)."""
+    if not ctx.perp_support_data_available:
+        return
+    # Crypto-only: open-interest is a crypto-perp field; tradfi perps are routed
+    # through the dedicated equity/commodity builders, so this sleeve excludes them.
+    crypto_symbols = ctx.crypto_only_symbols
+    if not crypto_symbols:
+        return
+    for timeframe in ctx._present("30m", "1h", "4h", "1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _OPEN_INTEREST_TREND_CONFIRMATION_RIDER_SLICE.get(timeframe, ()):
+            for symbol in crypto_symbols:
+                params = {
+                    "trend_lookback": int(spec["trend_lookback"]),
+                    "trend_ma_window": int(spec["trend_ma_window"]),
+                    "min_trend_roc": float(spec["min_trend_roc"]),
+                    "oi_lookback": int(spec["oi_lookback"]),
+                    "oi_rise_threshold": float(spec["oi_rise_threshold"]),
+                    "trail_atr_mult": float(spec["trail_atr_mult"]),
+                    "atr_period": int(spec["atr_period"]),
+                    "max_adds": int(spec["max_adds"]),
+                    "add_step_atr": float(spec["add_step_atr"]),
+                    "vol_window": int(spec["vol_window"]),
+                    "target_vol": float(spec["target_vol"]),
+                    "max_hold_bars": int(spec["max_hold_bars"]),
+                    "allow_short": bool(spec["allow_short"]),
+                    "add_alloc_fraction": float(spec["add_alloc_fraction"]),
+                }
+                _add_candidate(
+                    ctx.candidates,
+                    name=(
+                        f"open_interest_trend_confirmation_rider_{tf_tag}_{spec['variant']}_"
+                        f"{symbol.replace('/', '').lower()}_"
+                        f"{int(spec['oi_lookback'])}"
+                    ),
+                    family="trend",
+                    strategy_class="OpenInterestTrendConfirmationRiderStrategy",
+                    timeframe=timeframe,
+                    symbols=(symbol,),
+                    params=params,
+                    notes=(
+                        "Per-symbol open-interest trend-confirmation rider: rides a "
+                        "trend ONLY when RISING open interest confirms it (fresh money "
+                        "committing -> healthy, persistent trend: LONG into an uptrend "
+                        "with rising OI, SHORT into a downtrend with rising OI), and "
+                        "SUPPRESSES entries when OI is falling (unwind / short-covering "
+                        "-> low conviction), riding the winner with an ATR trailing stop "
+                        f"+ pyramiding on {symbol} at {timeframe} ({spec['variant']})."
+                    ),
+                    tags=(
+                        "trend",
+                        "open_interest",
+                        "confirmation",
+                        "return_rider",
+                        "trailing_stop",
+                        "pyramiding",
+                        "single_asset",
+                        "crypto",
+                    ),
+                    metadata={
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": symbol,
+                        "allow_short": bool(spec["allow_short"]),
+                        "data_dependent": True,
                         "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
                     },
                 )
