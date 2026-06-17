@@ -670,6 +670,22 @@ def test_lagged_shadow_leaf_router_uses_only_prior_completed_oos_and_leaf_source
     assert preregistered[0]["current_fold_oos_used_for_weighting"] is False
     assert preregistered[0]["nested_hybrid_dependency"] is False
     assert preregistered[0]["clean_promotion_eligible"] is False
+    risk_trimmed = [
+        module._evaluate_candidate(candidate, fold)
+        for candidate in routed
+        if candidate.candidate_label == module.PREREGISTERED_LAGGED_LEAF_ROUTER_RISK_TRIMMED_LABEL
+    ]
+    assert len(risk_trimmed) == 1
+    assert risk_trimmed[0]["selected_candidate_label"] == relaxed_label
+    assert risk_trimmed[0]["router_branch"] == "pre_registered_lagged_plus_validation_leaf"
+    assert (
+        risk_trimmed[0]["strict_core_fallback_target_validation_mdd"]
+        == module.PREREGISTERED_LAGGED_LEAF_FALLBACK_TARGET_VALIDATION_MDD
+    )
+    assert (
+        risk_trimmed[0]["strict_core_fallback_max_scale"]
+        == module.PREREGISTERED_LAGGED_LEAF_FALLBACK_MAX_SCALE
+    )
 
 
 def test_preregistered_lagged_leaf_router_replay_uses_prior_leaf_history() -> None:
@@ -778,7 +794,44 @@ def test_preregistered_lagged_leaf_router_replay_uses_prior_leaf_history() -> No
     assert router_rows[-1]["uses_locked_oos_for_selection"] is False
     assert router_rows[-1]["post_oos_research_variant"] is True
     assert router_rows[-1]["requires_fresh_forward_shadow"] is True
+    risk_trimmed_rows = [
+        item
+        for item in replayed
+        if item["candidate_label"] == module.PREREGISTERED_LAGGED_LEAF_ROUTER_RISK_TRIMMED_LABEL
+    ]
+    assert len(risk_trimmed_rows) == 5
+    assert risk_trimmed_rows[-1]["selected_candidate_label"] == relaxed_label
+    assert risk_trimmed_rows[-1]["locked_oos"]["total_return"] == pytest.approx(0.42)
+    assert risk_trimmed_rows[-1]["strict_core_fallback_max_scale"] == pytest.approx(2.0)
     assert router_rows[-1]["nested_hybrid_dependency"] is False
+
+
+def test_preregistered_lagged_leaf_risk_trimmed_replay_caps_strict_core() -> None:
+    row = {
+        "router_branch": "strict_core_scaled",
+        "selected_candidate_label": (
+            "strict_efficiency:balanced_mdd12_gross5_69_asset_efficiency_repair_optuna"
+        ),
+        "risk_scale": 3.0,
+        "selected_validation_mdd": 0.09,
+        "weights": {
+            "strict_efficiency:balanced_mdd12_gross5_69_asset_efficiency_repair_optuna": 3.0
+        },
+        "final_weights": {
+            "strict_efficiency:balanced_mdd12_gross5_69_asset_efficiency_repair_optuna": 3.0
+        },
+        "train": {"total_return": 0.30, "mdd": 0.15, "calmar": 2.0},
+        "validation": {"total_return": 0.24, "mdd": 0.09, "calmar": 2.6666666667},
+        "locked_oos": {"total_return": 0.33, "mdd": 0.27, "calmar": 1.2222222222},
+    }
+
+    trimmed = module._risk_trimmed_preregistered_replay_row(row)
+
+    assert trimmed["risk_scale"] == pytest.approx(2.0)
+    assert trimmed["locked_oos"]["total_return"] == pytest.approx(0.22)
+    assert trimmed["locked_oos"]["mdd"] == pytest.approx(0.18)
+    assert trimmed["aggregate_replay_scale_approximation"] is True
+    assert trimmed["strict_core_fallback_target_validation_mdd"] == pytest.approx(0.20)
 
 
 def test_dynamic_aware_hybrid_is_disabled_for_nested_hybrid_materials(

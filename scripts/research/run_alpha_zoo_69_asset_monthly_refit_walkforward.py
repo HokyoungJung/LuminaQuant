@@ -4123,6 +4123,11 @@ PREREGISTERED_LAGGED_LEAF_ROUTER_LABEL = (
     "codex_lagged_leaf_router_grid:"
     "h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_exact_unscaled"
 )
+PREREGISTERED_LAGGED_LEAF_ROUTER_RISK_TRIMMED_LABEL = (
+    "codex_lagged_leaf_router_grid:"
+    "h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_"
+    "lagged_plus_val025_fallback_mdd20_cap2"
+)
 PREREGISTERED_LAGGED_LEAF_MIN_HISTORY = 4
 PREREGISTERED_LAGGED_LEAF_AVG_WINDOW = 1
 PREREGISTERED_LAGGED_LEAF_MIN_TRAIN_RETURN = -0.02
@@ -4130,6 +4135,8 @@ PREREGISTERED_LAGGED_LEAF_MAX_TRAIN_MDD = 0.50
 PREREGISTERED_LAGGED_LEAF_MIN_VALIDATION_RETURN = 0.0
 PREREGISTERED_LAGGED_LEAF_MAX_VALIDATION_MDD = 0.25
 PREREGISTERED_LAGGED_LEAF_VALIDATION_WEIGHT = 0.25
+PREREGISTERED_LAGGED_LEAF_FALLBACK_TARGET_VALIDATION_MDD = 0.20
+PREREGISTERED_LAGGED_LEAF_FALLBACK_MAX_SCALE = 2.00
 LAGGED_SHADOW_LEAF_ROUTER_SPECS: tuple[dict[str, float | str], ...] = (
     {
         "label": LAGGED_SHADOW_LEAF_ROUTER_LABEL,
@@ -4218,7 +4225,11 @@ def _lagged_shadow_leaf_router_candidates(
 
     by_label = {candidate.candidate_label: candidate for candidate in candidates}
 
-    def strict_core_branch() -> tuple[CandidateResult | None, pd.Series, dict[str, Any], str]:
+    def strict_core_branch(
+        *,
+        target_validation_mdd: float = 0.30,
+        max_scale: float = 3.00,
+    ) -> tuple[CandidateResult | None, pd.Series, dict[str, Any], str]:
         balanced = by_label.get(
             "strict_efficiency:balanced_mdd12_gross5_69_asset_efficiency_repair_optuna"
         )
@@ -4298,8 +4309,8 @@ def _lagged_shadow_leaf_router_candidates(
         scale, scaled_snapshot = _validation_budget_scale_for_candidate(
             selected,
             fold,
-            target_validation_mdd=0.30,
-            max_scale=3.00,
+            target_validation_mdd=target_validation_mdd,
+            max_scale=max_scale,
         )
         returns = _scaled_candidate_returns(selected, scale)
         return (
@@ -4312,7 +4323,12 @@ def _lagged_shadow_leaf_router_candidates(
                 "selected_validation_mdd": snap["validation_mdd"],
                 "selected_validation_calmar": validation_calmar,
                 "risk_scale": float(scale),
-                "risk_scale_mode": "strict_core_validation_mdd30_cap3",
+                "risk_scale_mode": (
+                    f"strict_core_validation_mdd{int(target_validation_mdd * 100):02d}_"
+                    f"cap{max_scale:g}"
+                ),
+                "strict_core_target_validation_mdd": float(target_validation_mdd),
+                "strict_core_max_scale": float(max_scale),
                 "scaled_validation_return": _safe_float(
                     scaled_snapshot["validation"]["total_return"]
                 ),
@@ -4533,6 +4549,9 @@ def _lagged_shadow_leaf_router_candidates(
             "weights": {preregistered_selected.candidate_label: 1.0},
             "final_weights": {preregistered_selected.candidate_label: 1.0},
         }
+        risk_trimmed_returns = preregistered_returns
+        risk_trimmed_row_extra = dict(preregistered_row_extra)
+        risk_trimmed_branch = preregistered_branch
     else:
         (
             _preregistered_selected,
@@ -4540,6 +4559,15 @@ def _lagged_shadow_leaf_router_candidates(
             preregistered_row_extra,
             preregistered_branch,
         ) = strict_core_branch()
+        (
+            _risk_trimmed_selected,
+            risk_trimmed_returns,
+            risk_trimmed_row_extra,
+            risk_trimmed_branch,
+        ) = strict_core_branch(
+            target_validation_mdd=PREREGISTERED_LAGGED_LEAF_FALLBACK_TARGET_VALIDATION_MDD,
+            max_scale=PREREGISTERED_LAGGED_LEAF_FALLBACK_MAX_SCALE,
+        )
     preregistered_row = {
         **common_row,
         **preregistered_row_extra,
@@ -4567,6 +4595,41 @@ def _lagged_shadow_leaf_router_candidates(
             label=PREREGISTERED_LAGGED_LEAF_ROUTER_LABEL,
             row=preregistered_row,
             returns=preregistered_returns,
+        )
+    )
+    risk_trimmed_row = {
+        **common_row,
+        **risk_trimmed_row_extra,
+        "profile_id": PREREGISTERED_LAGGED_LEAF_ROUTER_RISK_TRIMMED_LABEL,
+        "router_branch": risk_trimmed_branch,
+        "selection_policy": (
+            "pre_registered_warmup4_last1_lagged_shadow_return_plus_"
+            "0.25_validation_score_leaf_router_val_return00_val_mdd25_"
+            "strict_core_fallback_mdd20_cap2_no_current_oos"
+        ),
+        "lagged_shadow_min_history": PREREGISTERED_LAGGED_LEAF_MIN_HISTORY,
+        "lagged_shadow_avg_window": PREREGISTERED_LAGGED_LEAF_AVG_WINDOW,
+        "lagged_shadow_min_train_return": PREREGISTERED_LAGGED_LEAF_MIN_TRAIN_RETURN,
+        "lagged_shadow_max_train_mdd": PREREGISTERED_LAGGED_LEAF_MAX_TRAIN_MDD,
+        "lagged_shadow_min_validation_return": (PREREGISTERED_LAGGED_LEAF_MIN_VALIDATION_RETURN),
+        "lagged_shadow_max_validation_mdd": PREREGISTERED_LAGGED_LEAF_MAX_VALIDATION_MDD,
+        "lagged_shadow_validation_weight": PREREGISTERED_LAGGED_LEAF_VALIDATION_WEIGHT,
+        "lagged_shadow_scale_target_validation_mdd": 0.0,
+        "lagged_shadow_scale_max": 1.0,
+        "lagged_shadow_scale_applied": False,
+        "strict_core_fallback_target_validation_mdd": (
+            PREREGISTERED_LAGGED_LEAF_FALLBACK_TARGET_VALIDATION_MDD
+        ),
+        "strict_core_fallback_max_scale": PREREGISTERED_LAGGED_LEAF_FALLBACK_MAX_SCALE,
+        "pre_registered_after_diagnostic_commit": True,
+        "pre_registered_risk_trimmed_after_diagnostic_commit": True,
+    }
+    out.append(
+        _candidate_eval(
+            family="lagged_shadow_leaf_router",
+            label=PREREGISTERED_LAGGED_LEAF_ROUTER_RISK_TRIMMED_LABEL,
+            row=risk_trimmed_row,
+            returns=risk_trimmed_returns,
         )
     )
     return out
@@ -6441,6 +6504,16 @@ def _evaluate_candidate(candidate: CandidateResult, fold: MonthlyFold) -> dict[s
         "router_branch": row.get("router_branch"),
         "risk_scale": row.get("risk_scale"),
         "risk_scale_mode": row.get("risk_scale_mode"),
+        "strict_core_fallback_target_validation_mdd": row.get(
+            "strict_core_fallback_target_validation_mdd"
+        ),
+        "strict_core_fallback_max_scale": row.get("strict_core_fallback_max_scale"),
+        "aggregate_replay_scale_approximation": bool(
+            row.get("aggregate_replay_scale_approximation", False)
+        ),
+        "pre_registered_risk_trimmed_after_diagnostic_commit": bool(
+            row.get("pre_registered_risk_trimmed_after_diagnostic_commit", False)
+        ),
         "selected_train_return": row.get("selected_train_return"),
         "selected_train_mdd": row.get("selected_train_mdd"),
         "selected_validation_return": row.get("selected_validation_return"),
@@ -7032,6 +7105,63 @@ def _row_passes_preregistered_lagged_leaf_gate(row: Mapping[str, Any]) -> bool:
     )
 
 
+def _scale_replay_metrics(row: dict[str, Any], scale_ratio: float) -> dict[str, Any]:
+    """Apply a conservative proportional replay scale to aggregate-only rows."""
+    scaled = dict(row)
+    ratio = max(0.0, float(scale_ratio))
+    for split in ("train", "validation", "locked_oos"):
+        metrics = row.get(split)
+        if not isinstance(metrics, Mapping):
+            continue
+        updated = dict(metrics)
+        for field in ("total_return", "mdd"):
+            if field in updated:
+                updated[field] = _safe_float(updated[field]) * ratio
+        mdd = _safe_float(updated.get("mdd"))
+        if "calmar" in updated:
+            updated["calmar"] = _safe_float(updated.get("total_return")) / mdd if mdd > 0.0 else 0.0
+        scaled[split] = updated
+    return scaled
+
+
+def _risk_trimmed_preregistered_replay_row(row: dict[str, Any]) -> dict[str, Any]:
+    """Trim only the strict-core warmup fallback risk in aggregate replay mode."""
+    trimmed = dict(row)
+    if str(trimmed.get("router_branch") or "") == "strict_core_scaled":
+        current_scale = _safe_float(trimmed.get("risk_scale"), 1.0)
+        selected_validation_mdd = max(_safe_float(trimmed.get("selected_validation_mdd")), 0.01)
+        target_scale = min(
+            PREREGISTERED_LAGGED_LEAF_FALLBACK_MAX_SCALE,
+            PREREGISTERED_LAGGED_LEAF_FALLBACK_TARGET_VALIDATION_MDD / selected_validation_mdd,
+        )
+        if current_scale > 0.0 and target_scale < current_scale:
+            trimmed = _scale_replay_metrics(trimmed, target_scale / current_scale)
+            selected_label = str(trimmed.get("selected_candidate_label") or "")
+            trimmed.update(
+                {
+                    "risk_scale": float(target_scale),
+                    "risk_scale_mode": (
+                        "strict_core_validation_mdd20_cap2_fast_replay_proportional"
+                    ),
+                    "weights": {selected_label: float(target_scale)} if selected_label else {},
+                    "final_weights": {selected_label: float(target_scale)}
+                    if selected_label
+                    else {},
+                    "aggregate_replay_scale_approximation": True,
+                }
+            )
+    trimmed.update(
+        {
+            "strict_core_fallback_target_validation_mdd": (
+                PREREGISTERED_LAGGED_LEAF_FALLBACK_TARGET_VALIDATION_MDD
+            ),
+            "strict_core_fallback_max_scale": PREREGISTERED_LAGGED_LEAF_FALLBACK_MAX_SCALE,
+            "pre_registered_risk_trimmed_after_diagnostic_commit": True,
+        }
+    )
+    return trimmed
+
+
 def _append_preregistered_lagged_leaf_router_rows(
     rows: Sequence[Mapping[str, Any]],
 ) -> list[dict[str, Any]]:
@@ -7042,10 +7172,14 @@ def _append_preregistered_lagged_leaf_router_rows(
     validation, and prior completed leaf OOS returns.  The family remains
     post-OOS shadow because the rule was registered after a diagnostic sweep.
     """
+    preregistered_labels = {
+        PREREGISTERED_LAGGED_LEAF_ROUTER_LABEL,
+        PREREGISTERED_LAGGED_LEAF_ROUTER_RISK_TRIMMED_LABEL,
+    }
     base_rows = [
         dict(row)
         for row in rows
-        if str(row.get("candidate_label") or "") != PREREGISTERED_LAGGED_LEAF_ROUTER_LABEL
+        if str(row.get("candidate_label") or "") not in preregistered_labels
     ]
     by_fold: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for row in base_rows:
@@ -7196,6 +7330,20 @@ def _append_preregistered_lagged_leaf_router_rows(
                 "selection_reasons": [],
             }
         )
+        risk_trimmed_row = _risk_trimmed_preregistered_replay_row(dict(new_row))
+        risk_trimmed_row.update(
+            {
+                "candidate_label": PREREGISTERED_LAGGED_LEAF_ROUTER_RISK_TRIMMED_LABEL,
+                "source_profile_id": PREREGISTERED_LAGGED_LEAF_ROUTER_RISK_TRIMMED_LABEL,
+                "profile_id": PREREGISTERED_LAGGED_LEAF_ROUTER_RISK_TRIMMED_LABEL,
+                "selection_policy": (
+                    "pre_registered_warmup4_last1_lagged_shadow_return_plus_"
+                    "0.25_validation_score_leaf_router_val_return00_val_mdd25_"
+                    "strict_core_fallback_mdd20_cap2_no_current_oos"
+                ),
+            }
+        )
+        replay_rows.append(risk_trimmed_row)
         replay_rows.append(new_row)
 
         for row in fold_rows:

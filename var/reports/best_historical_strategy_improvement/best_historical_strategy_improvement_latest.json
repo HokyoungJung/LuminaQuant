@@ -1,0 +1,623 @@
+{
+  "artifact_kind": "best_historical_strategy_improvement",
+  "comparisons": {
+    "expanded_110_latest_tail_full": {
+      "codex_lagged_leaf_router_grid:h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_exact_unscaled": {
+        "annualized_oos_return_approx": 1.0167319960522772,
+        "compounded_oos_return": 0.7942108989233605,
+        "fold_count": 10,
+        "fold_returns": [
+          0.0,
+          0.0,
+          0.3347813736333429,
+          0.0,
+          0.1602776809923423,
+          0.08440769094531331,
+          -0.00045742797179848527,
+          -0.04456784683970316,
+          -0.006151729992135535,
+          0.1256090878899181
+        ],
+        "fold_rows": [
+          {
+            "fold_id": "2025-09",
+            "oos_mdd": 0.0,
+            "oos_return": 0.0,
+            "risk_scale": 0.0,
+            "router_branch": "strict_core_cash",
+            "selected_candidate_label": "cash_strict_core_validation_strength_guard"
+          },
+          {
+            "fold_id": "2025-10",
+            "oos_mdd": 0.0,
+            "oos_return": 0.0,
+            "risk_scale": 0.0,
+            "router_branch": "strict_core_cash",
+            "selected_candidate_label": "cash_strict_core_validation_strength_guard"
+          },
+          {
+            "fold_id": "2025-11",
+            "oos_mdd": 0.27690078457641154,
+            "oos_return": 0.3347813736333429,
+            "risk_scale": 3.0,
+            "router_branch": "strict_core_scaled",
+            "selected_candidate_label": "strict_efficiency:balanced_mdd12_gross5_69_asset_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2025-12",
+            "oos_mdd": 0.0,
+            "oos_return": 0.0,
+            "risk_scale": 0.0,
+            "router_branch": "strict_core_cash",
+            "selected_candidate_label": "cash_strict_core_validation_strength_guard"
+          },
+          {
+            "fold_id": "2026-01",
+            "oos_mdd": 0.0933538584390391,
+            "oos_return": 0.1602776809923423,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:growth_mdd20_gross8_69_asset_relaxed_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-02",
+            "oos_mdd": 0.11813078790403786,
+            "oos_return": 0.08440769094531331,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "strict_efficiency:aggressive_mdd30_gross10_69_asset_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-03",
+            "oos_mdd": 0.0392997342470679,
+            "oos_return": -0.00045742797179848527,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:balanced_mdd12_gross5_69_asset_relaxed_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-04",
+            "oos_mdd": 0.10056346511818892,
+            "oos_return": -0.04456784683970316,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:growth_mdd20_gross8_69_asset_relaxed_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-05",
+            "oos_mdd": 0.14373210328780572,
+            "oos_return": -0.006151729992135535,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:growth_mdd20_gross8_69_asset_relaxed_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-06",
+            "oos_mdd": 0.11359361307513616,
+            "oos_return": 0.1256090878899181,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:aggressive_mdd30_gross10_69_asset_relaxed_efficiency_repair_optuna"
+          }
+        ],
+        "max_oos_mdd": 0.27690078457641154,
+        "monthly_equity_mdd": 0.050879760303122135,
+        "monthly_sharpe_approx": 1.9622215928554807,
+        "positive_oos_folds": 4,
+        "profit_factor": 13.77720005628009,
+        "return_to_max_oos_mdd": 2.868214693354167
+      },
+      "codex_lagged_leaf_router_grid:h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_fallback_mdd20_cap2": {
+        "annualized_oos_return_approx": 0.8161332084850634,
+        "compounded_oos_return": 0.6442067106733085,
+        "fold_count": 10,
+        "fold_returns": [
+          0.0,
+          0.0,
+          0.2231875824222286,
+          0.0,
+          0.1602776809923423,
+          0.08440769094531331,
+          -0.00045742797179848527,
+          -0.04456784683970316,
+          -0.006151729992135535,
+          0.1256090878899181
+        ],
+        "fold_rows": [
+          {
+            "fold_id": "2025-09",
+            "oos_mdd": 0.0,
+            "oos_return": 0.0,
+            "risk_scale": 0.0,
+            "router_branch": "strict_core_cash",
+            "selected_candidate_label": "cash_strict_core_validation_strength_guard"
+          },
+          {
+            "fold_id": "2025-10",
+            "oos_mdd": 0.0,
+            "oos_return": 0.0,
+            "risk_scale": 0.0,
+            "router_branch": "strict_core_cash",
+            "selected_candidate_label": "cash_strict_core_validation_strength_guard"
+          },
+          {
+            "fold_id": "2025-11",
+            "oos_mdd": 0.18460052305094102,
+            "oos_return": 0.2231875824222286,
+            "risk_scale": 2.0,
+            "router_branch": "strict_core_scaled",
+            "selected_candidate_label": "strict_efficiency:balanced_mdd12_gross5_69_asset_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2025-12",
+            "oos_mdd": 0.0,
+            "oos_return": 0.0,
+            "risk_scale": 0.0,
+            "router_branch": "strict_core_cash",
+            "selected_candidate_label": "cash_strict_core_validation_strength_guard"
+          },
+          {
+            "fold_id": "2026-01",
+            "oos_mdd": 0.0933538584390391,
+            "oos_return": 0.1602776809923423,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:growth_mdd20_gross8_69_asset_relaxed_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-02",
+            "oos_mdd": 0.11813078790403786,
+            "oos_return": 0.08440769094531331,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "strict_efficiency:aggressive_mdd30_gross10_69_asset_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-03",
+            "oos_mdd": 0.0392997342470679,
+            "oos_return": -0.00045742797179848527,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:balanced_mdd12_gross5_69_asset_relaxed_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-04",
+            "oos_mdd": 0.10056346511818892,
+            "oos_return": -0.04456784683970316,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:growth_mdd20_gross8_69_asset_relaxed_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-05",
+            "oos_mdd": 0.14373210328780572,
+            "oos_return": -0.006151729992135535,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:growth_mdd20_gross8_69_asset_relaxed_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-06",
+            "oos_mdd": 0.11359361307513616,
+            "oos_return": 0.1256090878899181,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:aggressive_mdd30_gross10_69_asset_relaxed_efficiency_repair_optuna"
+          }
+        ],
+        "max_oos_mdd": 0.18460052305094102,
+        "monthly_equity_mdd": 0.050879760303122135,
+        "monthly_sharpe_approx": 2.114797749962446,
+        "positive_oos_folds": 4,
+        "profit_factor": 11.596654484312905,
+        "return_to_max_oos_mdd": 3.489733940220407
+      }
+    },
+    "historical_85_preregistered": {
+      "codex_lagged_leaf_router_grid:h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_exact_unscaled": {
+        "annualized_oos_return_approx": 2.6979634551515757,
+        "compounded_oos_return": 1.9737344161689019,
+        "fold_count": 10,
+        "fold_returns": [
+          0.0,
+          0.0,
+          0.3347813736333429,
+          0.0,
+          0.1602776809923423,
+          0.08440769094531331,
+          -0.00045742797179848527,
+          -0.04456784683970316,
+          0.12508961845577438,
+          0.6479697981061889
+        ],
+        "fold_rows": [
+          {
+            "fold_id": "2025-09",
+            "oos_mdd": 0.0,
+            "oos_return": 0.0,
+            "risk_scale": 0.0,
+            "router_branch": "strict_core_cash",
+            "selected_candidate_label": "cash_strict_core_validation_strength_guard"
+          },
+          {
+            "fold_id": "2025-10",
+            "oos_mdd": 0.0,
+            "oos_return": 0.0,
+            "risk_scale": 0.0,
+            "router_branch": "strict_core_cash",
+            "selected_candidate_label": "cash_strict_core_validation_strength_guard"
+          },
+          {
+            "fold_id": "2025-11",
+            "oos_mdd": 0.27690078457641154,
+            "oos_return": 0.3347813736333429,
+            "risk_scale": 3.0,
+            "router_branch": "strict_core_scaled",
+            "selected_candidate_label": "strict_efficiency:balanced_mdd12_gross5_69_asset_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2025-12",
+            "oos_mdd": 0.0,
+            "oos_return": 0.0,
+            "risk_scale": 0.0,
+            "router_branch": "strict_core_cash",
+            "selected_candidate_label": "cash_strict_core_validation_strength_guard"
+          },
+          {
+            "fold_id": "2026-01",
+            "oos_mdd": 0.0933538584390391,
+            "oos_return": 0.1602776809923423,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:growth_mdd20_gross8_69_asset_relaxed_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-02",
+            "oos_mdd": 0.11813078790403786,
+            "oos_return": 0.08440769094531331,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "strict_efficiency:aggressive_mdd30_gross10_69_asset_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-03",
+            "oos_mdd": 0.0392997342470679,
+            "oos_return": -0.00045742797179848527,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:balanced_mdd12_gross5_69_asset_relaxed_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-04",
+            "oos_mdd": 0.10056346511818892,
+            "oos_return": -0.04456784683970316,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:growth_mdd20_gross8_69_asset_relaxed_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-05",
+            "oos_mdd": 0.2025811903747926,
+            "oos_return": 0.12508961845577438,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:balanced_mdd12_gross5_69_asset_relaxed_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-06",
+            "oos_mdd": 0.06694777191184476,
+            "oos_return": 0.6479697981061889,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:aggressive_mdd30_gross10_69_asset_relaxed_efficiency_repair_optuna"
+          }
+        ],
+        "max_oos_mdd": 0.27690078457641154,
+        "monthly_equity_mdd": 0.045004888231714335,
+        "monthly_sharpe_approx": 2.1183768015017526,
+        "positive_oos_folds": 5,
+        "profit_factor": 30.039265008271773,
+        "return_to_max_oos_mdd": 7.1279480814336384
+      },
+      "codex_lagged_leaf_router_grid:h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_fallback_mdd20_cap2": {
+        "annualized_oos_return_approx": 2.3301371961229354,
+        "compounded_oos_return": 1.7251166993573883,
+        "fold_count": 10,
+        "fold_returns": [
+          0.0,
+          0.0,
+          0.2231875824222286,
+          0.0,
+          0.1602776809923423,
+          0.08440769094531331,
+          -0.00045742797179848527,
+          -0.04456784683970316,
+          0.12508961845577438,
+          0.6479697981061889
+        ],
+        "fold_rows": [
+          {
+            "fold_id": "2025-09",
+            "oos_mdd": 0.0,
+            "oos_return": 0.0,
+            "risk_scale": 0.0,
+            "router_branch": "strict_core_cash",
+            "selected_candidate_label": "cash_strict_core_validation_strength_guard"
+          },
+          {
+            "fold_id": "2025-10",
+            "oos_mdd": 0.0,
+            "oos_return": 0.0,
+            "risk_scale": 0.0,
+            "router_branch": "strict_core_cash",
+            "selected_candidate_label": "cash_strict_core_validation_strength_guard"
+          },
+          {
+            "fold_id": "2025-11",
+            "oos_mdd": 0.18460052305094102,
+            "oos_return": 0.2231875824222286,
+            "risk_scale": 2.0,
+            "router_branch": "strict_core_scaled",
+            "selected_candidate_label": "strict_efficiency:balanced_mdd12_gross5_69_asset_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2025-12",
+            "oos_mdd": 0.0,
+            "oos_return": 0.0,
+            "risk_scale": 0.0,
+            "router_branch": "strict_core_cash",
+            "selected_candidate_label": "cash_strict_core_validation_strength_guard"
+          },
+          {
+            "fold_id": "2026-01",
+            "oos_mdd": 0.0933538584390391,
+            "oos_return": 0.1602776809923423,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:growth_mdd20_gross8_69_asset_relaxed_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-02",
+            "oos_mdd": 0.11813078790403786,
+            "oos_return": 0.08440769094531331,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "strict_efficiency:aggressive_mdd30_gross10_69_asset_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-03",
+            "oos_mdd": 0.0392997342470679,
+            "oos_return": -0.00045742797179848527,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:balanced_mdd12_gross5_69_asset_relaxed_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-04",
+            "oos_mdd": 0.10056346511818892,
+            "oos_return": -0.04456784683970316,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:growth_mdd20_gross8_69_asset_relaxed_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-05",
+            "oos_mdd": 0.2025811903747926,
+            "oos_return": 0.12508961845577438,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:balanced_mdd12_gross5_69_asset_relaxed_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-06",
+            "oos_mdd": 0.06694777191184476,
+            "oos_return": 0.6479697981061889,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:aggressive_mdd30_gross10_69_asset_relaxed_efficiency_repair_optuna"
+          }
+        ],
+        "max_oos_mdd": 0.2025811903747926,
+        "monthly_equity_mdd": 0.045004888231714335,
+        "monthly_sharpe_approx": 2.023847479033902,
+        "positive_oos_folds": 5,
+        "profit_factor": 27.560795044938917,
+        "return_to_max_oos_mdd": 8.515680533645666
+      }
+    }
+  },
+  "expanded_110_clean_input_meta_selector_frozen": {
+    "annualized_oos_return_approx": 0.11807436989322517,
+    "choices": [
+      {
+        "candidate_label": "relaxed_efficiency:selected_train_validation_legal",
+        "family": "relaxed_efficiency",
+        "fold_id": "2025-09",
+        "oos_mdd": 0.06639477567286312,
+        "oos_return": -0.0610171940232771,
+        "selector_score": 2.415911010243407,
+        "train_return": 0.38007393762271313,
+        "validation_mdd": 0.054329890293328575,
+        "validation_return": 0.2728709951778576
+      },
+      {
+        "candidate_label": "relaxed_efficiency:selected_optuna",
+        "family": "relaxed_efficiency",
+        "fold_id": "2025-10",
+        "oos_mdd": 0.06352379573650657,
+        "oos_return": -0.002304206358792693,
+        "selector_score": 0.6366218594139624,
+        "train_return": 0.19642631741953265,
+        "validation_mdd": 0.03526246851517212,
+        "validation_return": 0.07691045889359627
+      },
+      {
+        "candidate_label": "dynamic_conviction_switch:t1.00_strict_fallback_val_ret02_calmar80_gate_val_mdd15_scaled",
+        "family": "dynamic_conviction_switch",
+        "fold_id": "2025-11",
+        "oos_mdd": 0.19289743503240053,
+        "oos_return": 0.23526965541742673,
+        "selector_score": 3.0298962022971634,
+        "train_return": 0.45686357187874926,
+        "validation_mdd": 0.14844614542603485,
+        "validation_return": 0.5581267993456185
+      },
+      {
+        "candidate_label": "relaxed_efficiency:selected_optuna",
+        "family": "relaxed_efficiency",
+        "fold_id": "2025-12",
+        "oos_mdd": 0.030143946050121162,
+        "oos_return": -0.033466149427984426,
+        "selector_score": 2.9713659814118256,
+        "train_return": 0.47183115074886195,
+        "validation_mdd": 0.04084545525561378,
+        "validation_return": 0.30879313295063593
+      },
+      {
+        "candidate_label": "relaxed_efficiency:selected_optuna",
+        "family": "relaxed_efficiency",
+        "fold_id": "2026-01",
+        "oos_mdd": 0.06769905001597964,
+        "oos_return": 0.050978822541883684,
+        "selector_score": 6.631720224031799,
+        "train_return": 0.9579244913076579,
+        "validation_mdd": 0.07513561405230651,
+        "validation_return": 0.7786269378300101
+      },
+      {
+        "candidate_label": "relaxed_efficiency:selected_train_validation_legal",
+        "family": "relaxed_efficiency",
+        "fold_id": "2026-02",
+        "oos_mdd": 0.117067718904307,
+        "oos_return": -0.010265654058415397,
+        "selector_score": 5.137225575418545,
+        "train_return": 3.254955015648507,
+        "validation_mdd": 0.12572831942638096,
+        "validation_return": 0.602298120980133
+      },
+      {
+        "candidate_label": "relaxed_efficiency:selected_train_validation_legal",
+        "family": "relaxed_efficiency",
+        "fold_id": "2026-03",
+        "oos_mdd": 0.03264072079146718,
+        "oos_return": 0.0039309420676396645,
+        "selector_score": 1.6672908017443373,
+        "train_return": 0.3061895125704317,
+        "validation_mdd": 0.06470881700171616,
+        "validation_return": 0.2099693775251854
+      },
+      {
+        "candidate_label": "relaxed_efficiency:selected_train_validation_legal",
+        "family": "relaxed_efficiency",
+        "fold_id": "2026-04",
+        "oos_mdd": 0.10056346511818892,
+        "oos_return": -0.04456784683970316,
+        "selector_score": 2.029452197110967,
+        "train_return": 1.286623271616416,
+        "validation_mdd": 0.1400876124723529,
+        "validation_return": 0.27287304848776506
+      },
+      {
+        "candidate_label": "relaxed_efficiency:static_guarded",
+        "family": "relaxed_efficiency",
+        "fold_id": "2026-05",
+        "oos_mdd": 0.14373210328780572,
+        "oos_return": -0.006151729992135535,
+        "selector_score": 1.406125009115847,
+        "train_return": 0.1722930060767338,
+        "validation_mdd": 0.06912603482416235,
+        "validation_return": 0.1761166305978521
+      },
+      {
+        "candidate_label": "strict_efficiency:selected_optuna",
+        "family": "strict_efficiency",
+        "fold_id": "2026-06",
+        "oos_mdd": 0.019815717817821765,
+        "oos_return": -0.010487611894963722,
+        "selector_score": 0.3398159456879185,
+        "train_return": 0.06880419034859653,
+        "validation_mdd": 0.013089950328329936,
+        "validation_return": 0.02410699732221233
+      }
+    ],
+    "clean_promotion_eligible": false,
+    "compounded_oos_return": 0.09746895384406673,
+    "deployment_label": "shadow-freeze-only",
+    "evidence_class": "shadow-freeze-only",
+    "fold_count": 10,
+    "gate_summary": {
+      "allowed_labels": [
+        "deployable-paper",
+        "small-real-sleeve candidate",
+        "shadow-freeze-only",
+        "reject"
+      ],
+      "clean_mechanics": {
+        "candidate_filter_rejects_post_oos_rows": true,
+        "fold_choice_uses_locked_oos": false,
+        "nested_hybrid_dependency": false
+      },
+      "deployment_label": "shadow-freeze-only",
+      "evidence_class": "shadow-freeze-only",
+      "label_blockers": [
+        "post_oos_selector_grid_ranking_uses_historical_locked_oos",
+        "fresh_forward_required_before_promotion",
+        "positive_oos_folds_below_5_of_10"
+      ],
+      "numeric_gates": {
+        "fifteen_bps_stress_required_for_real_sleeve": true,
+        "fold_count": 10,
+        "max_oos_mdd": 0.19289743503240053,
+        "positive_oos_folds": 3,
+        "ten_bps_base_cost_required": true
+      },
+      "ready_for_real": false,
+      "real_money_execution": false,
+      "real_sleeve_allowed": false,
+      "theory_plausibility": {
+        "rationale": "The selector ranks clean leaf/dynamic rows by train/validation return, Calmar-style risk efficiency, drawdown, and validation-spike penalty. Those are economically interpretable risk/return controls, but the formula family/grid was chosen after historical OOS review.",
+        "status": "plausible_as_freeze_candidate_only"
+      }
+    },
+    "latest_oos_return": -0.010487611894963722,
+    "max_oos_mdd": 0.19289743503240053,
+    "min_oos_return": -0.0610171940232771,
+    "monthly_equity_mdd": 0.06639395393308489,
+    "monthly_sharpe_approx": 0.5025340926424562,
+    "params": {
+      "calmar_weight": 0.05,
+      "family_group": "dynamic_strict_relaxed",
+      "mdd_weight": 2.0,
+      "return_weight": 8.0,
+      "spike_penalty_weight": 2.0,
+      "train_mdd_cap": 0.4,
+      "validation_mdd_cap": 0.25,
+      "validation_spike_cap": 0.15
+    },
+    "positive_oos_folds": 3,
+    "post_oos_research_variant": true,
+    "profit_factor": 1.7245854211510014,
+    "profit_factor_unbounded": false,
+    "ready_for_real": false,
+    "real_money_execution": false,
+    "requires_fresh_forward_shadow": true,
+    "selector_id": "clean_input_meta_selector",
+    "uses_locked_oos_for_fold_selection": false,
+    "uses_locked_oos_for_selector_grid_ranking": true
+  },
+  "improved_strategy": "codex_lagged_leaf_router_grid:h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_fallback_mdd20_cap2",
+  "interpretation": "risk-trimmed variant of historical best selected lagged leaf router; shadow/paper only, not real-money approved",
+  "source_strategy": "codex_lagged_leaf_router_grid:h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_exact_unscaled",
+  "sources": {
+    "expanded_110_latest_tail_full": {
+      "artifact_kind": "alpha_zoo_69_asset_monthly_refit_walkforward",
+      "path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/alpha_zoo_110_asset_latest_tail_full_wf_20260613/latest_tail_full_wf_latest.json",
+      "universe_loaded_symbol_count": 110
+    },
+    "historical_85_preregistered": {
+      "artifact_kind": "alpha_zoo_69_asset_monthly_refit_walkforward",
+      "path": "var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/codex_preregistered_lagged_router_pass_20260607/preregistered_lagged_router_pass_20260607.json",
+      "universe_loaded_symbol_count": 85
+    }
+  }
+}

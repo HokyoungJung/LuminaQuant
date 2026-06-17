@@ -1,5 +1,24 @@
 # Research Note
 
+## 2026-06-17 KST (o) — 과거 선택 전체 전략 최고성적 모델 재개선: lagged leaf router risk-trim
+
+사용자 정정에 따라 TopCap이 아니라 `var/reports` 전체 historical selected/high-water 후보를 다시 audit했다. 최고 headline은 `codex_lagged_leaf_router_grid:h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_exact_unscaled`였고, 기존 deep-research의 `clean_input_meta_selector`(+85.91%)보다 높다: 85-symbol pre-registered replay에서 OOS comp `+197.37%`, ann approx `+269.80%`, max OOS MDD `27.69%`, monthly MDD `4.50%`, Sharpe `2.12`, PF `30.04`, hit `5/10`. expanded 110 latest-tail artifact에서도 같은 frozen rule은 `+79.42%`, Sharpe `1.96`, max OOS MDD `27.69%`로 여전히 110-asset report rank 1이다.
+
+개선은 headline 수익 뻥튀기가 아니라 위험효율 개선으로 잡았다. 기존 최고 모델의 큰 bar-MDD는 warmup/no-history 구간 strict-core fallback이 validation-MDD30/cap3까지 스케일되는 데서 나온다. 새 후보 `codex_lagged_leaf_router_grid:h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_fallback_mdd20_cap2`를 추가했다. lagged leaf 선택식(완료된 prior OOS + validation score, current-fold OOS 미사용)은 그대로 두고, strict-core fallback만 validation-MDD20/cap2로 낮춘다. 따라서 warmup 후 leaf choice는 동일하고, 위험 컷은 2025-11 fallback 같은 구간에만 작동한다.
+
+Report: `var/reports/best_historical_strategy_improvement/best_historical_strategy_improvement_latest.md|json`.
+
+결과:
+- Historical 85 replay baseline: comp `+197.37%`, max OOS MDD `27.69%`, return/MDD `7.13`.
+- Historical 85 risk-trim: comp `+172.51%`, max OOS MDD `20.26%`, return/MDD `8.52`.
+- Expanded 110 latest-tail baseline: comp `+79.42%`, max OOS MDD `27.69%`, return/MDD `2.87`, Sharpe `1.96`.
+- Expanded 110 risk-trim: comp `+64.42%`, max OOS MDD `18.46%`, return/MDD `3.49`, Sharpe `2.11`.
+- Frozen `clean_input_meta_selector`를 expanded 110 latest-tail에 그대로 적용하면 comp `+9.75%`, Sharpe `0.50`뿐이라, 개선 대상은 clean-input meta selector가 아니라 이 lagged leaf router가 맞다.
+
+판단: raw return champion은 기존 exact-unscaled baseline이고, 채용 가능성이 더 나은 건 신규 `fallback_mdd20_cap2` risk-trim shadow variant다. 둘 다 여전히 `post_oos_research_variant` / `requires_fresh_forward_shadow` / `ready_for_real=false`다. 실전 승격은 금지이고, paper/shadow에서 같은 frozen rule로 1~2개월 이상 forward 확인 + 10/15/20bps cost/fill telemetry가 필요하다.
+
+검증: lagged/preregistered focused tests `2 passed`; ruff check/format targeted 통과. Fast replay report는 existing fold rows 기반이며 risk-trim replay는 strict-core fallback aggregate metrics에 proportional scale approximation flag를 단다. Full WF path에는 exact return-stream scaling 후보도 추가되어 다음 full rerun에서는 exact metrics로 나온다.
+
 ## 2026-06-17 KST (n) — 기존 최고성적 TopCap 개선: target-pool selector 전처리
 
 사용자 확인 요청에 따라 universe/selection 경로부터 재검증했다. `config.yaml`은 `trading.symbols`를 의도적으로 생략하고 `TradingConfig.symbols` 기본값이 `BINANCE_EXTENDED_RESEARCH_SYMBOLS_SLASHED`를 쓰므로 runtime/default research/candidate universe가 모두 **110개**(crypto 10 + tradfi/commodity/ETF/equity/premarket 100)로 확장되어 있다. 후보 3504개가 110개 전부를 커버했고, 로컬 Binance 1m parquet도 2026-05-15~06-13 창에서 110개 모두 200 bars 이상 로드됐다. selector 자체도 110개 입력에서 정상 동작해 pool 12개(`TON/CL/BZ/DOGE/AVAX/AMAT/SPCX/ADA/XAU/STXX/BTC/TRX`)를 골랐다.
