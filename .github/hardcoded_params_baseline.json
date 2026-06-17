@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-06-17T08:08:57.203065+00:00",
+  "generated_at_utc": "2026-06-17T08:30:24.539591+00:00",
   "literal_paths": [
     "src/lumina_quant/strategies",
     "lumina_quant/strategies"
@@ -638,6 +638,10 @@
     "literal:src/lumina_quant/strategies/micro_signal_alpha_sleeves.py:542:31:1800",
     "literal:src/lumina_quant/strategies/micro_signal_alpha_sleeves.py:625:35:0.1",
     "literal:src/lumina_quant/strategies/micro_signal_alpha_sleeves.py:911:31:1800",
+    "literal:src/lumina_quant/strategies/orb_oi_trend_alpha_sleeves.py:154:51:1439",
+    "literal:src/lumina_quant/strategies/orb_oi_trend_alpha_sleeves.py:344:31:1800",
+    "literal:src/lumina_quant/strategies/orb_oi_trend_alpha_sleeves.py:392:34:3",
+    "literal:src/lumina_quant/strategies/orb_oi_trend_alpha_sleeves.py:98:31:1800",
     "literal:src/lumina_quant/strategies/orderbook_imbalance_reversion.py:109:38:3",
     "literal:src/lumina_quant/strategies/orderbook_imbalance_reversion.py:112:35:3",
     "literal:src/lumina_quant/strategies/orderbook_imbalance_reversion.py:115:39:0.01",
