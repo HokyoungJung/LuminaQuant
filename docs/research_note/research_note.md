@@ -1,5 +1,14 @@
 # Research Note
 
+## 2026-06-17 KST (i) — intraday 시간대 시즈널-모멘텀 라이더 + overnight 세션 리턴 틸트 라이더
+
+레지스트리가 93종으로 포화 — 리드랙(6슬리브)·트렌드·돌파·반전·carry·vol-레짐·day-level 시즈널은 이미 커버. **미커버 niche인 sub-day 시간구조** 2종(`intraday_overnight_alpha_sleeves.py`, 둘 다 `_ReturnRiderBase` 상속·per-symbol 단일자산·>=30m). *(주: 이번 배치는 build Workflow가 API 529로 2회 죽어 세션 내 직접 작성→독립 critic 적대 리뷰로 검증.)*
+
+- **IntradaySeasonalMomentumRiderStrategy** (OHLCV-only). 이론: 일중 주기성/시간대 드리프트(Aleti-Bollerslev intraday periodicity; crypto hour-of-day 효과). 각 결정바를 UTC 시간대 **슬롯**(`_event_datetime_utc`, slot_minutes 폭)으로 버킷팅하고, 슬롯별 **decay-weighted (mean,var,n)** 을 **one-bar-deferred**로 갱신(결정 중인 바는 자기 슬롯 통계에 미포함 → 룩어헤드 없음). 슬롯이 (a)`min_slot_observations` 이상 (b)유사 t-통계(`|mean|/std*sqrt(eff_n)`, eff_n은 `1/decay`로 캡) `>=slot_t_threshold` (c)추세 부호와 **정렬**일 때만 그 방향 라이드, 아니면 진입 억제. **차별점**: CalendarSeasonalityOverlay는 day-of-week/month 정적 틸트(sub-day 해상도·온라인 드리프트·추세 조건화 없음); 순수 트렌드라이더와 달리 **불리/이력부족 슬롯이 진입을 억제**(동일 상승추세에서 plain 라이더는 진입, 본 슬리브는 차단 — 테스트로 증명).
+- **OvernightSessionReturnRiderStrategy** (OHLCV-only). 이론: overnight-vs-active 세션 리턴 아노말리(Cooper-Cliff-Gulen overnight returns; Lou-Polk-Skouras "A Tug of War"). UTC 일을 "overnight" 창(`[start,end)` UTC시, 자정 wrap 처리)과 "active"로 분할, 세션별 decay-weighted 평균 리턴을 동일 deferred 방식으로 추적. 현재 세션의 과거 평균이 **유의 양(+)**이면 구조적으로 LONG 틸트(유의 음이면 `allow_short` 시 SHORT), 그 외 진입 억제 — **추세 비조건** 세션-리턴 하베스터(intraday 슬리브와의 분리점). 청산은 상속된 ATR 트레일링/`max_hold`로 관리(force-flat 훅 없음 → 음의 세션은 진입 억제로 표현).
+
+유니버스 둘 다 `ctx.crypto_only_symbols`, 30m/1h/4h(1d는 sub-day 구조 없어 제외). per-TF cadence `_RIDER_TF_CADENCE_SECONDS`(>=1800). 독립 critic 적대 리뷰 verdict **clean** — 두 슬리브 모두 진짜 비중복(KEEP, 상호 간에도 구분: 추세-조건 슬롯 라이드 vs 무조건 세션 틸트), **룩어헤드 경험적 반증**(97결정 0불일치), suppression 실재. minor 2건: ①절대 유의 임계값 약함(t=1.0≈1σ) → **선제 반영해 기본값 1.0→1.5 상향**(과적합 저항↑), ②`_symbol_for` O(N)은 N=1 단일자산이라 무해(보류). 검증: `.venv/bin/python`(3.14) ruff·format·py_compile·audit(baseline 749/new=0)·check_architecture·신규 11테스트·full pytest 통과. 백테스트는 데이터 PC.
+
 ## 2026-06-17 KST (h) — 세션 오프닝-레인지 돌파 라이더 + 오픈인터레스트 확정 추세 라이더
 
 고확신·비중복 2종(`orb_oi_trend_alpha_sleeves.py`, 둘 다 `_ReturnRiderBase` 상속·per-symbol 단일자산·방향성·>=30m).
