@@ -1,5 +1,14 @@
 # Research Note
 
+## 2026-06-17 KST (j) — Kalman 상태공간 트렌드 라이더 + 실현 세미분산 비대칭 트렌드 라이더
+
+레지스트리 95종 — 신규 신호원 2종(`kalman_semivar_alpha_sleeves.py`, 둘 다 `_ReturnRiderBase` 상속·per-symbol 단일자산·>=30m). 사전 확인: 코드베이스에 **Kalman 추정자 전무**, **실현 세미분산/good-bad-vol/signed-jump 전략 전무**(downside_volatility 헬퍼만 존재) → 둘 다 명확히 distinct. *(빌드 Workflow가 529로 불안정해 이번도 세션 내 직접 작성 + 독립 critic 적대 리뷰로 검증.)*
+
+- **KalmanTrendRiderStrategy** (OHLCV-only). 이론: 상태공간/Kalman 트렌드 추정. **로그 종가**에 local-linear-trend Kalman 필터(상태 [level, slope], 2×2 공분산)를 재귀 적용 → 관측/프로세스 노이즈 비율로 반응성을 적응시키는 **저지연·불확실성-인지** slope 추정(스케일프리 per-bar 드리프트). 필터 slope가 통계적으로 유의(`slope/sqrt(slope_var) >= slope_t`)하고 경제적으로 유의(`|slope| >= min_slope_frac`)할 때 라이드. 현재 종가에서 posterior slope로 결정 = **인과적**(룩어헤드 아님). **차별점**: AdaptiveTrendRider(KAMA 효율비)·TrendEfficiency·DonchianAtrTrend·MovingAverageCross와 달리 트렌드 **추정자가 재귀 베이지안 상태공간 slope**(이동평균/채널 아님) — 레지스트리에 Kalman 없음.
+- **RealizedSemivarianceTrendRiderStrategy** (OHLCV-only). 이론: Barndorff-Nielsen 실현 세미분산; Patton-Sheppard "Good/Bad Volatility"(상/하방 실현분산은 다른 정보를 담고 signed jump variation이 수익을 예측). 결정바 로그수익 윈도우에서 상방 `RS+ = Σr²|r>0`·하방 `RS- = Σr²|r<0` 누적, **부호 비대칭 `SJ=(RS+-RS-)/(RS++RS-)∈[-1,1]`**. `|SJ| >= semivar_threshold`(good vol가 bad vol를 확실히 압도/역) **그리고** 추세 정렬일 때만 컨티뉴에이션 라이드(knife-catch 아님). **차별점**: LotterySkewness/RareEvent(교차섹션 lottery/tail)·vol-managed(vol로 사이징만)와 달리 진입 트리거가 **상/하방 실현 세미분산 비대칭** — 타 슬리브 미사용.
+
+유니버스 둘 다 `ctx.crypto_only_symbols`. Kalman 30m/1h/4h/1d, semivar 30m/1h/4h, per-TF cadence `_RIDER_TF_CADENCE_SECONDS`(>=1800). 검증: `.venv/bin/python`(3.14) ruff·format·py_compile·audit(baseline 755/new=0)·check_architecture·신규 11테스트·full pytest 통과 + 독립 critic 적대 리뷰(특히 Kalman 공분산 재귀·룩어헤드 검증). 백테스트는 데이터 PC.
+
 ## 2026-06-17 KST (i) — intraday 시간대 시즈널-모멘텀 라이더 + overnight 세션 리턴 틸트 라이더
 
 레지스트리가 93종으로 포화 — 리드랙(6슬리브)·트렌드·돌파·반전·carry·vol-레짐·day-level 시즈널은 이미 커버. **미커버 niche인 sub-day 시간구조** 2종(`intraday_overnight_alpha_sleeves.py`, 둘 다 `_ReturnRiderBase` 상속·per-symbol 단일자산·>=30m). *(주: 이번 배치는 build Workflow가 API 529로 2회 죽어 세션 내 직접 작성→독립 critic 적대 리뷰로 검증.)*
