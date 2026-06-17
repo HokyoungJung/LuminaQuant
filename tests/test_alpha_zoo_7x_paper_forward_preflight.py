@@ -62,7 +62,10 @@ def test_build_paper_forward_bundle_from_frozen_10bps_sources(tmp_path: Path) ->
     )
 
     assert payload["artifact_kind"] == "alpha_zoo_7x_paper_forward_preflight_bundle"
-    assert payload["ready_for_paper"] is True
+    # Paper readiness was intentionally demoted (see "Demote weak validation Alpha
+    # Zoo exposure before paper trials"); the frozen 10bps evidence now yields
+    # ready_for_paper=False, so this asserts the current demoted gate state.
+    assert payload["ready_for_paper"] is False
     assert payload["ready_for_real"] is False
     assert payload["real_money_execution"] is False
     assert payload["locked_oos_governance"]["uses_locked_oos_for_selection"] is False
@@ -78,9 +81,9 @@ def test_build_paper_forward_bundle_from_frozen_10bps_sources(tmp_path: Path) ->
         10_500.0
     )
     assert balanced["paper_equivalent_sizing"]["live_notional"] == pytest.approx(10_500.0)
-    assert active["preflight"]["status"]["ready_for_paper"] is True
+    assert active["preflight"]["status"]["ready_for_paper"] is False
     assert active["preflight"]["status"]["ready_for_real"] is False
-    assert balanced["preflight"]["status"]["ready_for_paper"] is True
+    assert balanced["preflight"]["status"]["ready_for_paper"] is False
     assert balanced["preflight"]["status"]["ready_for_real"] is False
 
     active_decision = Path(payload["output_paths"]["active_decision"])

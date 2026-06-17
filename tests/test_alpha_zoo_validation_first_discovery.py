@@ -71,7 +71,10 @@ def test_build_validation_first_discovery_from_frozen_10bps_sources(tmp_path: Pa
 
     assert payload["artifact_kind"] == "alpha_zoo_validation_first_discovery"
     assert payload["research_primary_round_trip_cost_bps"] == pytest.approx(10.0)
-    assert payload["ready_for_paper"] is True
+    # Paper readiness was intentionally demoted (see "Demote weak validation Alpha
+    # Zoo exposure before paper trials"); the frozen 10bps evidence now yields
+    # ready_for_paper=False, so this asserts the current demoted gate state.
+    assert payload["ready_for_paper"] is False
     assert payload["ready_for_real"] is False
     assert payload["real_money_execution"] is False
     assert payload["selection_policy"]["selection_inputs"] == ["train", "validation"]
@@ -84,11 +87,11 @@ def test_build_validation_first_discovery_from_frozen_10bps_sources(tmp_path: Pa
         "fresh_tv10_filter_abs_score_ge_1p5_alpha_zoo_quality_single_pair_5p0x_0p2alloc"
     )
     assert leader["validation_return"] > 0.005
-    assert leader["preflight"]["status"]["ready_for_paper"] is True
+    assert leader["preflight"]["status"]["ready_for_paper"] is False
     assert leader["preflight"]["status"]["ready_for_real"] is False
     assert leader["paper_equivalent_sizing"]["expected_replay_notional"] == pytest.approx(10_000.0)
     assert efficient["validation_mdd"] < leader["validation_mdd"]
-    assert efficient["preflight"]["status"]["ready_for_paper"] is True
+    assert efficient["preflight"]["status"]["ready_for_paper"] is False
     assert efficient["preflight"]["status"]["ready_for_real"] is False
 
     quarantine = payload["high_validation_quarantine"]
