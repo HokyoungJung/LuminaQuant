@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-06-17T07:10:17.978499+00:00",
+  "generated_at_utc": "2026-06-17T07:41:51.444189+00:00",
   "literal_paths": [
     "src/lumina_quant/strategies",
     "lumina_quant/strategies"
@@ -737,6 +737,8 @@
     "literal:src/lumina_quant/strategies/timeframe_pair_zscore_reversion.py:245:28:23",
     "literal:src/lumina_quant/strategies/timeframe_pair_zscore_reversion.py:261:58:5",
     "literal:src/lumina_quant/strategies/timeframe_pair_zscore_reversion.py:289:25:100_000_000_000",
-    "literal:src/lumina_quant/strategies/timeframe_pair_zscore_reversion.py:290:22:1000.0"
+    "literal:src/lumina_quant/strategies/timeframe_pair_zscore_reversion.py:290:22:1000.0",
+    "literal:src/lumina_quant/strategies/vol_term_breadth_alpha_sleeves.py:336:31:86400",
+    "literal:src/lumina_quant/strategies/vol_term_breadth_alpha_sleeves.py:625:39:3.0"
   ]
 }
