@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-06-17T08:30:24.539591+00:00",
+  "generated_at_utc": "2026-06-17T09:12:36.406109+00:00",
   "literal_paths": [
     "src/lumina_quant/strategies",
     "lumina_quant/strategies"
@@ -628,6 +628,15 @@
     "literal:src/lumina_quant/strategies/index_rotation_alpha_sleeves.py:141:32:12",
     "literal:src/lumina_quant/strategies/index_rotation_alpha_sleeves.py:252:57:12",
     "literal:src/lumina_quant/strategies/index_rotation_alpha_sleeves.py:65:31:86400",
+    "literal:src/lumina_quant/strategies/intraday_overnight_alpha_sleeves.py:164:31:1800",
+    "literal:src/lumina_quant/strategies/intraday_overnight_alpha_sleeves.py:221:39:1440",
+    "literal:src/lumina_quant/strategies/intraday_overnight_alpha_sleeves.py:222:34:0.001",
+    "literal:src/lumina_quant/strategies/intraday_overnight_alpha_sleeves.py:225:34:3",
+    "literal:src/lumina_quant/strategies/intraday_overnight_alpha_sleeves.py:239:26:60",
+    "literal:src/lumina_quant/strategies/intraday_overnight_alpha_sleeves.py:383:31:1800",
+    "literal:src/lumina_quant/strategies/intraday_overnight_alpha_sleeves.py:438:51:23",
+    "literal:src/lumina_quant/strategies/intraday_overnight_alpha_sleeves.py:439:49:24",
+    "literal:src/lumina_quant/strategies/intraday_overnight_alpha_sleeves.py:440:33:0.001",
     "literal:src/lumina_quant/strategies/micro_signal_alpha_sleeves.py:1069:55:3.0",
     "literal:src/lumina_quant/strategies/micro_signal_alpha_sleeves.py:111:21:3",
     "literal:src/lumina_quant/strategies/micro_signal_alpha_sleeves.py:1174:35:3.0",
