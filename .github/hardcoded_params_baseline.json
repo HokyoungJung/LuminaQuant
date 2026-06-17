@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-06-17T09:32:43.757490+00:00",
+  "generated_at_utc": "2026-06-17T09:51:44.763876+00:00",
   "literal_paths": [
     "src/lumina_quant/strategies",
     "lumina_quant/strategies"
@@ -573,6 +573,11 @@
     "literal:src/lumina_quant/strategies/derivatives_flow_squeeze.py:988:92:0.15",
     "literal:src/lumina_quant/strategies/derivatives_flow_squeeze.py:996:20:0.35",
     "literal:src/lumina_quant/strategies/derivatives_flow_squeeze.py:998:22:0.35",
+    "literal:src/lumina_quant/strategies/entropy_amihud_alpha_sleeves.py:133:31:1800",
+    "literal:src/lumina_quant/strategies/entropy_amihud_alpha_sleeves.py:172:33:7",
+    "literal:src/lumina_quant/strategies/entropy_amihud_alpha_sleeves.py:175:34:3",
+    "literal:src/lumina_quant/strategies/entropy_amihud_alpha_sleeves.py:254:31:1800",
+    "literal:src/lumina_quant/strategies/entropy_amihud_alpha_sleeves.py:311:34:3",
     "literal:src/lumina_quant/strategies/equity_return_alpha_sleeves.py:239:31:86400",
     "literal:src/lumina_quant/strategies/equity_return_alpha_sleeves.py:299:46:12",
     "literal:src/lumina_quant/strategies/equity_return_alpha_sleeves.py:332:26:3",
