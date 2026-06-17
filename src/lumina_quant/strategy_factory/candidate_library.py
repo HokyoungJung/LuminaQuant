@@ -2666,6 +2666,12 @@ class _CandidateBuildContext:
         # ETF). Both >=30m (4h + 1d) and admission-safe cross_sectional.
         _build_cross_asset_diversified_trend_candidates(self)
         _build_intermarket_leadlag_continuation_candidates(self)
+        # Realized-vol-term-structure recovery rider (per-symbol single-asset) and
+        # the breadth-gated total-exposure trend timer (cross_sectional basket).
+        # Both >=30m only; the RV-term sleeve keys on the RV_s/RV_l ratio itself
+        # and the breadth timer gates TOTAL exposure on cross-sectional breadth.
+        _build_realized_vol_term_structure_candidates(self)
+        _build_breadth_regime_trend_timer_candidates(self)
         return self.candidates
 
 
@@ -7829,6 +7835,284 @@ def _build_intermarket_leadlag_continuation_candidates(
                     "timeframe": timeframe,
                     "retune_profile": str(spec["variant"]),
                     "symbol_scope": "commodity_equity",
+                    "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                },
+            )
+
+
+# Per-symbol realized-vol TERM-STRUCTURE recovery rider (single-asset, return-max).
+# RV_s/RV_l spike (panic vol backwardation) -> LONG the V-recovery, ride with the
+# inherited ATR trailing stop; exit on vol normalization. Wired >=30m only with
+# SHORT windows so it fires on many spikes over a ~1-month window.
+_RV_TERM_STRUCTURE_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "30m": (
+        {
+            "variant": "fast_recovery",
+            "short_window": 6,
+            "long_window": 48,
+            "shock_ratio": 1.8,
+            "exit_ratio": 1.1,
+            "use_micro_short": True,
+            "fade_upside_short": False,
+            "upside_return": 0.04,
+            "trail_atr_mult": 3.0,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.025,
+            "max_hold_bars": 160,
+            "allow_short": False,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "core_recovery",
+            "short_window": 6,
+            "long_window": 48,
+            "shock_ratio": 1.9,
+            "exit_ratio": 1.1,
+            "use_micro_short": True,
+            "fade_upside_short": False,
+            "upside_return": 0.05,
+            "trail_atr_mult": 3.2,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.025,
+            "max_hold_bars": 120,
+            "allow_short": False,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "swing_recovery",
+            "short_window": 5,
+            "long_window": 36,
+            "shock_ratio": 2.0,
+            "exit_ratio": 1.15,
+            "use_micro_short": True,
+            "fade_upside_short": False,
+            "upside_return": 0.06,
+            "trail_atr_mult": 3.5,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 36,
+            "target_vol": 0.030,
+            "max_hold_bars": 90,
+            "allow_short": False,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1d": (
+        {
+            "variant": "macro_recovery",
+            "short_window": 4,
+            "long_window": 24,
+            "shock_ratio": 2.0,
+            "exit_ratio": 1.15,
+            "use_micro_short": False,
+            "fade_upside_short": False,
+            "upside_return": 0.08,
+            "trail_atr_mult": 4.0,
+            "atr_period": 10,
+            "max_adds": 1,
+            "add_step_atr": 1.0,
+            "vol_window": 24,
+            "target_vol": 0.040,
+            "max_hold_bars": 45,
+            "allow_short": False,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+}
+
+
+def _build_realized_vol_term_structure_candidates(ctx: _CandidateBuildContext) -> None:
+    """Per-symbol realized-vol-term-structure recovery rider (single-asset, return-max).
+
+    Crypto-only: tradfi equity/ETF perps are routed through the dedicated equity
+    builders, so this crypto sleeve excludes them (never ``ctx.crypto_symbols``).
+    """
+    crypto_symbols = ctx.crypto_only_symbols
+    if not crypto_symbols:
+        return
+    for timeframe in ctx._present("30m", "1h", "4h", "1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _RV_TERM_STRUCTURE_SLICE.get(timeframe, ()):
+            for symbol in crypto_symbols:
+                params = {
+                    "short_window": int(spec["short_window"]),
+                    "long_window": int(spec["long_window"]),
+                    "shock_ratio": float(spec["shock_ratio"]),
+                    "exit_ratio": float(spec["exit_ratio"]),
+                    "use_micro_short": bool(spec["use_micro_short"]),
+                    "fade_upside_short": bool(spec["fade_upside_short"]),
+                    "upside_return": float(spec["upside_return"]),
+                    "trail_atr_mult": float(spec["trail_atr_mult"]),
+                    "atr_period": int(spec["atr_period"]),
+                    "max_adds": int(spec["max_adds"]),
+                    "add_step_atr": float(spec["add_step_atr"]),
+                    "vol_window": int(spec["vol_window"]),
+                    "target_vol": float(spec["target_vol"]),
+                    "max_hold_bars": int(spec["max_hold_bars"]),
+                    "allow_short": bool(spec["allow_short"]),
+                    "add_alloc_fraction": float(spec["add_alloc_fraction"]),
+                }
+                _add_candidate(
+                    ctx.candidates,
+                    name=(
+                        f"realized_vol_term_structure_{tf_tag}_{spec['variant']}_"
+                        f"{symbol.replace('/', '').lower()}_"
+                        f"{float(spec['shock_ratio']):.1f}"
+                    ),
+                    family="mean_reversion",
+                    strategy_class="RealizedVolTermStructureStrategy",
+                    timeframe=timeframe,
+                    symbols=(symbol,),
+                    params=params,
+                    notes=(
+                        "Per-symbol realized-vol-term-structure recovery rider: a "
+                        "short/long realized-vol ratio spike (panic vol "
+                        "backwardation) enters LONG the V-recovery and rides it with "
+                        "an ATR trailing stop, exiting on vol normalization, on "
+                        f"{symbol} at {timeframe} ({spec['variant']})."
+                    ),
+                    tags=(
+                        "mean_reversion",
+                        "volatility",
+                        "term_structure",
+                        "return_rider",
+                        "trailing_stop",
+                        "single_asset",
+                        "crypto",
+                    ),
+                    metadata={
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": symbol,
+                        "allow_short": bool(spec["allow_short"]),
+                        "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                    },
+                )
+
+
+# Top-down BREADTH-gated total-exposure trend timer over the crypto basket. Each
+# decision bar scales TOTAL net-long gross by cross-sectional breadth (fraction of
+# the basket above its own trend); strong breadth -> long the up-trenders with a
+# breadth-scaled gross, collapsing breadth -> flat (risk-off). Multi-symbol basket
+# (admission-safe cross_sectional). >=30m only (1h/4h/1d).
+_BREADTH_REGIME_TREND_TIMER_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "1h": (
+        {
+            "variant": "breadth_timer_core",
+            "trend_window": 50,
+            "risk_on_breadth": 0.60,
+            "risk_off_breadth": 0.40,
+            "require_positive_return": True,
+            "max_positions": 8,
+            "min_trend": 0.0,
+            "max_gross": 0.80,
+            "rebalance_bars": 3,
+            "stop_loss_pct": 0.12,
+            "max_hold_bars": 240,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "breadth_timer_swing",
+            "trend_window": 40,
+            "risk_on_breadth": 0.58,
+            "risk_off_breadth": 0.38,
+            "require_positive_return": True,
+            "max_positions": 8,
+            "min_trend": 0.0,
+            "max_gross": 0.85,
+            "rebalance_bars": 3,
+            "stop_loss_pct": 0.12,
+            "max_hold_bars": 180,
+        },
+    ),
+    "1d": (
+        {
+            "variant": "breadth_timer_macro",
+            "trend_window": 50,
+            "risk_on_breadth": 0.55,
+            "risk_off_breadth": 0.35,
+            "require_positive_return": True,
+            "max_positions": 6,
+            "min_trend": 0.0,
+            "max_gross": 0.90,
+            "rebalance_bars": 2,
+            "stop_loss_pct": 0.14,
+            "max_hold_bars": 90,
+        },
+    ),
+}
+
+
+def _build_breadth_regime_trend_timer_candidates(ctx: _CandidateBuildContext) -> None:
+    """Breadth-gated total-exposure crypto trend timer (cross_sectional basket).
+
+    Crypto-only basket over ``ctx.crypto_only_symbols`` with a >=``min_symbols``
+    guard so it only fires once a genuinely broad basket is available; never leaks
+    ``ctx.crypto_symbols`` / raw symbols.
+    """
+    crypto_symbols = tuple(ctx.crypto_only_symbols)
+    for timeframe in ctx._present("1h", "4h", "1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _BREADTH_REGIME_TREND_TIMER_SLICE.get(timeframe, ()):
+            min_symbols = 5
+            if len(crypto_symbols) < min_symbols:
+                continue
+            params = {
+                "trend_window": int(spec["trend_window"]),
+                "risk_on_breadth": float(spec["risk_on_breadth"]),
+                "risk_off_breadth": float(spec["risk_off_breadth"]),
+                "require_positive_return": bool(spec["require_positive_return"]),
+                "max_positions": int(spec["max_positions"]),
+                "min_trend": float(spec["min_trend"]),
+                "max_gross": float(spec["max_gross"]),
+                "rebalance_bars": int(spec["rebalance_bars"]),
+                "stop_loss_pct": float(spec["stop_loss_pct"]),
+                "max_hold_bars": int(spec["max_hold_bars"]),
+                "min_symbols": int(min_symbols),
+                "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+            }
+            _add_candidate(
+                ctx.candidates,
+                name=(
+                    f"breadth_regime_trend_timer_{tf_tag}_{spec['variant']}_"
+                    f"{int(spec['trend_window'])}_{int(spec['risk_on_breadth'] * 100)}"
+                ),
+                family="cross_sectional",
+                strategy_class="BreadthRegimeTrendTimerStrategy",
+                timeframe=timeframe,
+                symbols=crypto_symbols,
+                params=params,
+                notes=(
+                    "Top-down breadth-gated trend timer: cross-sectional breadth "
+                    "(fraction of the crypto basket above its own trend) scales TOTAL "
+                    "net-long gross exposure; strong breadth holds a breadth-scaled "
+                    "long basket of up-trenders, collapsing breadth goes flat "
+                    f"(risk-off) for {timeframe} ({spec['variant']})."
+                ),
+                tags=(
+                    *_CROSS_SECTIONAL_ADMISSION_TAGS,
+                    "breadth",
+                    "regime",
+                    "market_timing",
+                    "trend",
+                    "crypto",
+                ),
+                metadata={
+                    "timeframe": timeframe,
+                    "retune_profile": str(spec["variant"]),
+                    "symbol_scope": "crypto_basket",
                     "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
                 },
             )
