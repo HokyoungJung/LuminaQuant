@@ -2653,6 +2653,12 @@ class _CandidateBuildContext:
         _build_lottery_skewness_candidates(self)
         _build_trend_efficiency_momentum_candidates(self)
         _build_dispersion_conditioned_reversion_candidates(self)
+        # Coordinated cross-asset managed-futures trend book (inverse-vol risk
+        # parity + portfolio vol-targeting over the FULL universe) and the
+        # commodity->equity intermarket lead-lag continuation sleeve (oil->energy
+        # ETF). Both >=30m (4h + 1d) and admission-safe cross_sectional.
+        _build_cross_asset_diversified_trend_candidates(self)
+        _build_intermarket_leadlag_continuation_candidates(self)
         return self.candidates
 
 
@@ -7098,6 +7104,245 @@ def _build_semis_leadlag_rotation_candidates(
                     "symbol_scope": "equity",
                     "dormant_tranche": True,
                     "decision_cadence_seconds": 14400,
+                },
+            )
+
+
+# Commodity -> equity intermarket lead-lag continuation universe: the energy
+# leaders (WTI ``CL``, Brent ``BZ``, industrial ``COPPER``) plus the energy ETF
+# follower ``XLE``. Verified members of the TradFi commodity + ETF/index sets.
+_INTERMARKET_LEADLAG_UNIVERSE: tuple[str, ...] = (
+    "CLUSDT",
+    "BZUSDT",
+    "COPPERUSDT",
+    "XLEUSDT",
+)
+# Default leader>follower continuation pairs (oil -> energy ETF). Copper is held
+# in the universe for an optional industrial-proxy extension but is only added to
+# the pair spec when a copper-led equity follower also materializes.
+_INTERMARKET_LEADLAG_PAIRS: tuple[tuple[str, str], ...] = (
+    ("CL/USDT", "XLE/USDT"),
+    ("BZ/USDT", "XLE/USDT"),
+)
+
+
+_CROSS_ASSET_DIVERSIFIED_TREND_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "1d": (
+        {
+            "variant": "diversified_ls_core",
+            "trend_lookback": 90,
+            "vol_window": 60,
+            "min_trend": 0.02,
+            "max_positions": 10,
+            "target_vol": 0.020,
+            "rebalance_band": 0.25,
+            "confirm_sma_slope": True,
+            "rebalance_bars": 5,
+            "allow_short": True,
+            "stop_loss_pct": 0.12,
+            "max_hold_bars": 252,
+        },
+        {
+            "variant": "diversified_lo_slow",
+            "trend_lookback": 120,
+            "vol_window": 90,
+            "min_trend": 0.03,
+            "max_positions": 8,
+            "target_vol": 0.018,
+            "rebalance_band": 0.30,
+            "confirm_sma_slope": True,
+            "rebalance_bars": 7,
+            "allow_short": False,
+            "stop_loss_pct": 0.14,
+            "max_hold_bars": 300,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "diversified_ls_swing",
+            "trend_lookback": 60,
+            "vol_window": 48,
+            "min_trend": 0.025,
+            "max_positions": 8,
+            "target_vol": 0.030,
+            "rebalance_band": 0.25,
+            "confirm_sma_slope": True,
+            "rebalance_bars": 6,
+            "allow_short": True,
+            "stop_loss_pct": 0.10,
+            "max_hold_bars": 180,
+        },
+    ),
+}
+
+
+def _build_cross_asset_diversified_trend_candidates(
+    ctx: _CandidateBuildContext,
+) -> None:
+    """Risk-budgeted cross-asset trend book over the FULL normalized universe.
+
+    One coordinated managed-futures book: per-symbol TSMOM trend, inverse-vol
+    risk-parity weights, portfolio vol-targeting, long up-trenders / short
+    down-trenders. Targets ``ctx.normalized_symbols`` (crypto + equity +
+    commodity + metals) with a >=``min_symbols`` guard so it only fires once a
+    genuinely diversified book is available.
+    """
+    normalized_symbols = ctx.normalized_symbols
+    for timeframe in ctx._present("4h", "1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _CROSS_ASSET_DIVERSIFIED_TREND_SLICE.get(timeframe, ()):
+            min_symbols = 6
+            if len(normalized_symbols) < min_symbols:
+                continue
+            params = {
+                "trend_lookback": int(spec["trend_lookback"]),
+                "vol_window": int(spec["vol_window"]),
+                "min_trend": float(spec["min_trend"]),
+                "max_positions": int(spec["max_positions"]),
+                "target_vol": float(spec["target_vol"]),
+                "rebalance_band": float(spec["rebalance_band"]),
+                "confirm_sma_slope": bool(spec["confirm_sma_slope"]),
+                "rebalance_bars": int(spec["rebalance_bars"]),
+                "allow_short": bool(spec["allow_short"]),
+                "stop_loss_pct": float(spec["stop_loss_pct"]),
+                "max_hold_bars": int(spec["max_hold_bars"]),
+                "min_symbols": int(min_symbols),
+                "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+            }
+            _add_candidate(
+                ctx.candidates,
+                name=(
+                    f"cross_asset_diversified_trend_{tf_tag}_{spec['variant']}_"
+                    f"{int(spec['trend_lookback'])}_{int(spec['vol_window'])}"
+                ),
+                family="cross_sectional",
+                strategy_class="CrossAssetDiversifiedTrendStrategy",
+                timeframe=timeframe,
+                symbols=normalized_symbols,
+                params=params,
+                notes=(
+                    "Coordinated cross-asset managed-futures trend book: per-symbol "
+                    "TSMOM trend with inverse-vol risk-parity weights and portfolio "
+                    f"vol-targeting over the full universe for {timeframe} "
+                    f"({spec['variant']}); diversification across weakly-correlated "
+                    "asset classes raises risk-adjusted return."
+                ),
+                tags=(
+                    *_CROSS_SECTIONAL_ADMISSION_TAGS,
+                    "trend",
+                    "managed_futures",
+                    "risk_parity",
+                    "cross_asset",
+                ),
+                metadata={
+                    "timeframe": timeframe,
+                    "retune_profile": str(spec["variant"]),
+                    "symbol_scope": "cross_asset",
+                    "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                },
+            )
+
+
+_INTERMARKET_LEADLAG_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "1d": (
+        {
+            "variant": "oil_energy_ls",
+            "lead_lookback": 5,
+            "follow_lookback": 3,
+            "z_window": 60,
+            "entry_z": 1.5,
+            "min_leader_move": 0.01,
+            "max_follower_move": 0.01,
+            "catch_up_fraction": 0.70,
+            "allow_short": True,
+            "stop_loss_pct": 0.04,
+            "max_hold_bars": 20,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "oil_energy_fast",
+            "lead_lookback": 6,
+            "follow_lookback": 4,
+            "z_window": 96,
+            "entry_z": 1.5,
+            "min_leader_move": 0.012,
+            "max_follower_move": 0.012,
+            "catch_up_fraction": 0.70,
+            "allow_short": True,
+            "stop_loss_pct": 0.04,
+            "max_hold_bars": 36,
+        },
+    ),
+}
+
+
+def _build_intermarket_leadlag_continuation_candidates(
+    ctx: _CandidateBuildContext,
+) -> None:
+    """Commodity -> equity intermarket lead-lag continuation (oil -> energy ETF).
+
+    Self-skips unless at least one configured leader>follower pair has BOTH legs
+    live in the intersected commodity+ETF universe.
+    """
+    filtered = _intersect_universe(_INTERMARKET_LEADLAG_UNIVERSE, ctx.normalized_symbols)
+    available = set(filtered)
+    live_pairs = [
+        (leader, follower)
+        for leader, follower in _INTERMARKET_LEADLAG_PAIRS
+        if leader in available and follower in available
+    ]
+    if not live_pairs:
+        return
+    pair_spec = ",".join(f"{leader}>{follower}" for leader, follower in live_pairs)
+    leg_symbols = tuple(dict.fromkeys(symbol for pair in live_pairs for symbol in pair))
+    for timeframe in ctx._present("4h", "1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _INTERMARKET_LEADLAG_SLICE.get(timeframe, ()):
+            params = {
+                "pair_spec": pair_spec,
+                "lead_lookback": int(spec["lead_lookback"]),
+                "follow_lookback": int(spec["follow_lookback"]),
+                "z_window": int(spec["z_window"]),
+                "entry_z": float(spec["entry_z"]),
+                "min_leader_move": float(spec["min_leader_move"]),
+                "max_follower_move": float(spec["max_follower_move"]),
+                "catch_up_fraction": float(spec["catch_up_fraction"]),
+                "allow_short": bool(spec["allow_short"]),
+                "stop_loss_pct": float(spec["stop_loss_pct"]),
+                "max_hold_bars": int(spec["max_hold_bars"]),
+                "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+            }
+            _add_candidate(
+                ctx.candidates,
+                name=(
+                    f"intermarket_lead_lag_continuation_{tf_tag}_{spec['variant']}_"
+                    f"{int(spec['lead_lookback'])}_{int(spec['follow_lookback'])}"
+                ),
+                family="cross_sectional",
+                strategy_class="IntermarketLeadLagContinuationStrategy",
+                timeframe=timeframe,
+                symbols=leg_symbols,
+                params=params,
+                notes=(
+                    "Commodity -> equity intermarket lead-lag continuation: an oil "
+                    "(CL/BZ) leader move beyond an entry z-threshold enters the energy "
+                    f"ETF follower (XLE) in the same direction for {timeframe} "
+                    f"({spec['variant']}); exits on follower catch-up / stop / max-hold; "
+                    "self-skips until both legs materialize."
+                ),
+                tags=(
+                    *_CROSS_SECTIONAL_ADMISSION_TAGS,
+                    "lead_lag",
+                    "intermarket",
+                    "commodity",
+                    "equity",
+                ),
+                metadata={
+                    "timeframe": timeframe,
+                    "retune_profile": str(spec["variant"]),
+                    "symbol_scope": "commodity_equity",
+                    "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
                 },
             )
 
