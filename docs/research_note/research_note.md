@@ -1,5 +1,14 @@
 # Research Note
 
+## 2026-06-17 KST (l) — CUSUM 변화점 트렌드 라이더 + 분산비(Variance-Ratio) 트렌드 라이더
+
+레지스트리 99종 — 새 추정자 2종(`cusum_varratio_alpha_sleeves.py`, 둘 다 `_ReturnRiderBase` 상속·per-symbol 단일자산·>=30m). 사전 확인: **CUSUM/change-point·variance-ratio 전략·인디케이터 전무** → 둘 다 distinct. *(빌드 Workflow 529 불안정 → 세션 내 직접 작성 + 독립 critic 적대 리뷰.)*
+
+- **CusumChangePointTrendRiderStrategy** (OHLCV-only). 이론: Page(1954) 누적합 변화점 검출. 수익을 롤링 변동성으로 표준화한 뒤 양측 CUSUM control chart: `S_hi=max(0,S_hi+z-k)`, `S_lo=min(0,S_lo+z+k)`. `S_hi>=cusum_h`면 상방 드리프트 레짐 전환 선언→LONG 진입+`S_hi` 리셋, `S_lo<=-cusum_h`면 하방→SHORT. **검출 방향 자체가 진입**, ATR 트레일링 라이드. **차별점**: KalmanTrend(연속 상태공간 slope)·AdaptiveTrend(KAMA)·MA/채널 트렌드와 달리 **이산 순차 변화점 검출기** — 타 슬리브 미사용.
+- **VarianceRatioTrendRiderStrategy** (OHLCV-only). 이론: Lo-MacKinlay(1988) 분산비 랜덤워크 검정. `VR(k)=Var(k기간수익)/(k·Var(1기간수익))`은 랜덤워크에서 ~1, 양의 자기상관(지속/추세)에서 >1, 평균회귀에서 <1. `VR(k) >= 1+vr_threshold`(랜덤워크가 지속성 쪽으로 기각)이고 추세 확인 시에만 라이드. **차별점**: HurstRegimeGated(R/S Hurst)·PermutationEntropy(ordinal 엔트로피)·TrendEfficiency(Kaufman ER)와 달리 게이트가 **Lo-MacKinlay 분산비 통계량** — 타 슬리브 미계산.
+
+유니버스 둘 다 `ctx.crypto_only_symbols`, 30m/1h/4h/1d, per-TF cadence `_RIDER_TF_CADENCE_SECONDS`(>=1800). 검증: `.venv/bin/python`(3.14) ruff·format·py_compile·audit(baseline 764/new=0)·check_architecture·verify_docs·신규 11테스트(VR 헬퍼 단위검증[지속>1·평균회귀<1]·CUSUM 상/하 검출·VR 진입/억제 대조 포함)·full pytest 통과 + 독립 critic 적대 리뷰(특히 CUSUM 시그널 래치/리셋·VR 통계량). 백테스트는 데이터 PC.
+
 ## 2026-06-17 KST (k) — 순열 엔트로피 레짐 트렌드 라이더 + Amihud 비유동성 프리미엄 모멘텀 라이더
 
 레지스트리 97종 — 새 신호원 2종(`entropy_amihud_alpha_sleeves.py`, 둘 다 `_ReturnRiderBase` 상속·per-symbol 단일자산·>=30m). 사전 확인: **순열-엔트로피/ordinal-pattern 전략 전무**, `amihud_illiquidity` **인디케이터는 존재하나 사용 전략 전무**(재사용) → 둘 다 distinct. *(빌드 Workflow 529 불안정 → 세션 내 직접 작성 + 독립 critic 적대 리뷰.)*
