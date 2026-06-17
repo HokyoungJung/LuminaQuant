@@ -1,5 +1,14 @@
 # Research Note
 
+## 2026-06-17 KST (h) — 세션 오프닝-레인지 돌파 라이더 + 오픈인터레스트 확정 추세 라이더
+
+고확신·비중복 2종(`orb_oi_trend_alpha_sleeves.py`, 둘 다 `_ReturnRiderBase` 상속·per-symbol 단일자산·방향성·>=30m).
+
+- **OpeningRangeBreakoutRiderStrategy** (OHLCV-only, crypto_only). 이론: 세션 오프닝-레인지 돌파(Toby Crabel ORB; Zarattini-Aziz 2023 ORB 연구 — 강한 위험조정 수익). 메커니즘: 바 타임스탬프를 **UTC 캘린더 일자로 버킷팅**(`_session_key`/`_event_datetime_utc` 재사용), 각 새 UTC 일의 첫 `opening_range_bars` 결정바 동안 오프닝-레인지 high/low를 누적(무거래), 확립 후 **one-shot** 돌파 무장 — close가 레인지 상단(+ATR 버퍼) 돌파 시 LONG / 하단 돌파 시 SHORT, 세션마다 1회(`_session_fired` 래치). 오프닝-레인지는 매 UTC 일 **리셋**. ATR 트레일링+피라미딩 라이드. **차별점**: VolatilityBreakoutRider는 롤링 N바 Donchian 채널(세션 앵커·리셋 없음), VolatilitySqueezeBreakoutRider는 변동성 수축-전제 필요 — ORB는 **세션 앵커 오프닝-레인지(일일 리셋, 그날 첫 k바 극값)**가 트리거. 1d는 의도적 제외(일봉=UTC일당 단일바라 일중 앵커 무의미). 룩어헤드 없음(돌파바 high/low는 누적 종료 후라 레인지에서 제외).
+- **OpenInterestTrendConfirmationRiderStrategy** (crypto-perp only, `ctx.perp_support_data_available` 게이트). 이론: 선물 미시구조 OI-가격 관계 — 상승추세가 **OI 증가**로 받쳐지면 신규 자금 유입(건강·지속), OI 감소 상 상승은 숏커버링(약함, 페이드). **엔트리 = 추세 부호 ∧ OI가 `oi_lookback`에 걸쳐 상승**일 때만(롱: 추세↑∧OI↑ = 신규 롱; `allow_short`면 추세↓∧OI↑ = 신규 숏); OI 평탄/하락이면 진입 억제. `open_interest` 피처를 FundingHarvestCarry와 동일하게 None-safe로 읽고, OI 없으면 graceful no-entry. ATR 트레일링 라이드. **차별점**: CarryTrendConfluence/FundingHarvest는 **funding** 부호로 게이팅·거래, 순수 트렌드라이더는 포지셔닝 데이터 미사용 — 신규는 **OI 변화(OI/가격 사분면)**가 추세 확정 게이트(다른 피처·다른 게이트 의미). 검증: 평탄 OI 깨끗한 상승추세 = 진입 0(순수 트렌드라이더면 발화했을 것).
+
+유니버스 둘 다 `ctx.crypto_only_symbols`(tradfi 누수 없음). ORB 30m/1h/4h, OI 30m/1h/4h/1d, per-TF cadence `_RIDER_TF_CADENCE_SECONDS`(>=1800). 적대적 리뷰 verdict **clean** — 두 슬리브 모두 진짜 비중복(KEEP; 기존 비-라이더 `OpeningRangeContinuationStrategy`[60s cadence·고정 TP/stop]와도 구분). minor 2건은 선택적 향후 리팩토링(perp-feature 공유 mixin DRY·`_symbol_for` O(n)) — PR 범위 밖, 보류. 검증: `.venv/bin/python`(3.14) ruff·format·py_compile·audit(baseline 740/new=0)·check_architecture·verify_docs·compileall·신규 14테스트·full pytest 통과. 백테스트는 데이터 PC.
+
 ## 2026-06-17 KST (g) — carry×trend 컨플루언스 라이더 + 변동성 스퀴즈 브레이크아웃 라이더
 
 고확신·비중복 2종(`carry_trend_squeeze_alpha_sleeves.py`, 둘 다 `_ReturnRiderBase` 상속·per-symbol 단일자산·방향성·>=30m).
