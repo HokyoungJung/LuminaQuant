@@ -2640,6 +2640,8 @@ class _CandidateBuildContext:
         # they bypass the multi-asset gate. The OI sleeve is perp-gated.
         _build_opening_range_breakout_rider_candidates(self)
         _build_open_interest_trend_confirmation_rider_candidates(self)
+        _build_intraday_seasonal_momentum_rider_candidates(self)
+        _build_overnight_session_return_rider_candidates(self)
         _build_metals_relative_value_basket_candidates(self)
         _build_liquidation_cascade_reversion_candidates(self)
         _build_orderbook_imbalance_reversion_candidates(self)
@@ -7427,6 +7429,273 @@ def _build_open_interest_trend_confirmation_rider_candidates(
                         "symbol_scope": symbol,
                         "allow_short": bool(spec["allow_short"]),
                         "data_dependent": True,
+                        "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                    },
+                )
+
+
+# Intraday time-of-day seasonal-momentum rider: ride a trend ONLY in a UTC
+# time-of-day slot whose decay-weighted drift is statistically significant AND
+# aligned with the trend. Per-symbol single-asset, crypto-only, >=30m. 1d is
+# excluded (a daily bar has no sub-day slot structure).
+_INTRADAY_SEASONAL_MOMENTUM_RIDER_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "30m": (
+        {
+            "variant": "hourly_core_ls",
+            "slot_minutes": 60,
+            "seasonal_decay": 0.05,
+            "min_slot_observations": 12,
+            "slot_t_threshold": 1.5,
+            "trend_lookback": 48,
+            "trend_ma_window": 48,
+            "min_trend_roc": 0.0,
+            "trail_atr_mult": 3.0,
+            "atr_period": 14,
+            "max_adds": 3,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 48,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "hourly_swing_ls",
+            "slot_minutes": 60,
+            "seasonal_decay": 0.04,
+            "min_slot_observations": 12,
+            "slot_t_threshold": 1.5,
+            "trend_lookback": 48,
+            "trend_ma_window": 48,
+            "min_trend_roc": 0.0,
+            "trail_atr_mult": 3.2,
+            "atr_period": 14,
+            "max_adds": 3,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 24,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "quartile_swing_ls",
+            "slot_minutes": 240,
+            "seasonal_decay": 0.04,
+            "min_slot_observations": 10,
+            "slot_t_threshold": 1.5,
+            "trend_lookback": 36,
+            "trend_ma_window": 36,
+            "min_trend_roc": 0.0,
+            "trail_atr_mult": 3.5,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 36,
+            "target_vol": 0.030,
+            "max_hold_bars": 18,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+}
+
+
+def _build_intraday_seasonal_momentum_rider_candidates(ctx: _CandidateBuildContext) -> None:
+    """Per-symbol intraday time-of-day seasonal-momentum rider (single-asset)."""
+    crypto_symbols = ctx.crypto_only_symbols
+    if not crypto_symbols:
+        return
+    # 1d excluded: a daily bar maps to a single intraday slot, so the time-of-day
+    # statistic degenerates; the sleeve lives at 30m/1h/4h.
+    for timeframe in ctx._present("30m", "1h", "4h"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _INTRADAY_SEASONAL_MOMENTUM_RIDER_SLICE.get(timeframe, ()):
+            for symbol in crypto_symbols:
+                params = {
+                    "slot_minutes": int(spec["slot_minutes"]),
+                    "seasonal_decay": float(spec["seasonal_decay"]),
+                    "min_slot_observations": int(spec["min_slot_observations"]),
+                    "slot_t_threshold": float(spec["slot_t_threshold"]),
+                    "trend_lookback": int(spec["trend_lookback"]),
+                    "trend_ma_window": int(spec["trend_ma_window"]),
+                    "min_trend_roc": float(spec["min_trend_roc"]),
+                    "trail_atr_mult": float(spec["trail_atr_mult"]),
+                    "atr_period": int(spec["atr_period"]),
+                    "max_adds": int(spec["max_adds"]),
+                    "add_step_atr": float(spec["add_step_atr"]),
+                    "vol_window": int(spec["vol_window"]),
+                    "target_vol": float(spec["target_vol"]),
+                    "max_hold_bars": int(spec["max_hold_bars"]),
+                    "allow_short": bool(spec["allow_short"]),
+                    "add_alloc_fraction": float(spec["add_alloc_fraction"]),
+                }
+                _add_candidate(
+                    ctx.candidates,
+                    name=(
+                        f"intraday_seasonal_momentum_rider_{tf_tag}_{spec['variant']}_"
+                        f"{symbol.replace('/', '').lower()}"
+                    ),
+                    family="momentum",
+                    strategy_class="IntradaySeasonalMomentumRiderStrategy",
+                    timeframe=timeframe,
+                    symbols=(symbol,),
+                    params=params,
+                    notes=(
+                        "Per-symbol intraday seasonal-momentum rider: rides the trend "
+                        "ONLY in a UTC time-of-day slot whose decay-weighted drift is "
+                        "statistically significant and aligned with the trend; an "
+                        "unfavorable/insufficient-history slot suppresses entry. ATR "
+                        f"trailing stop + pyramiding on {symbol} at {timeframe} "
+                        f"({spec['variant']})."
+                    ),
+                    tags=(
+                        "momentum",
+                        "intraday_seasonality",
+                        "time_of_day",
+                        "return_rider",
+                        "trailing_stop",
+                        "pyramiding",
+                        "single_asset",
+                        "crypto",
+                    ),
+                    metadata={
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": symbol,
+                        "allow_short": bool(spec["allow_short"]),
+                        "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                    },
+                )
+
+
+# Overnight-session return-tilt rider: structurally tilt LONG during the UTC
+# session whose decay-weighted mean return is significantly positive (SHORT when
+# negative), suppress otherwise. NOT trend-conditioned. Per-symbol single-asset,
+# crypto-only, >=30m. 1d excluded (a daily bar cannot resolve overnight vs active).
+_OVERNIGHT_SESSION_RETURN_RIDER_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "30m": (
+        {
+            "variant": "asia_window_ls",
+            "overnight_start_hour_utc": 0,
+            "overnight_end_hour_utc": 8,
+            "session_decay": 0.02,
+            "min_session_observations": 12,
+            "session_t_threshold": 1.5,
+            "trail_atr_mult": 3.0,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 24,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "asia_window_swing_ls",
+            "overnight_start_hour_utc": 0,
+            "overnight_end_hour_utc": 8,
+            "session_decay": 0.02,
+            "min_session_observations": 12,
+            "session_t_threshold": 1.5,
+            "trail_atr_mult": 3.2,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 12,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "asia_window_macro_ls",
+            "overnight_start_hour_utc": 0,
+            "overnight_end_hour_utc": 8,
+            "session_decay": 0.02,
+            "min_session_observations": 10,
+            "session_t_threshold": 1.5,
+            "trail_atr_mult": 3.5,
+            "atr_period": 14,
+            "max_adds": 1,
+            "add_step_atr": 1.0,
+            "vol_window": 36,
+            "target_vol": 0.030,
+            "max_hold_bars": 6,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+}
+
+
+def _build_overnight_session_return_rider_candidates(ctx: _CandidateBuildContext) -> None:
+    """Per-symbol overnight-session return-tilt rider (single-asset, OHLCV-only)."""
+    crypto_symbols = ctx.crypto_only_symbols
+    if not crypto_symbols:
+        return
+    # 1d excluded: a daily bar cannot resolve the overnight vs active session.
+    for timeframe in ctx._present("30m", "1h", "4h"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _OVERNIGHT_SESSION_RETURN_RIDER_SLICE.get(timeframe, ()):
+            for symbol in crypto_symbols:
+                params = {
+                    "overnight_start_hour_utc": int(spec["overnight_start_hour_utc"]),
+                    "overnight_end_hour_utc": int(spec["overnight_end_hour_utc"]),
+                    "session_decay": float(spec["session_decay"]),
+                    "min_session_observations": int(spec["min_session_observations"]),
+                    "session_t_threshold": float(spec["session_t_threshold"]),
+                    "trail_atr_mult": float(spec["trail_atr_mult"]),
+                    "atr_period": int(spec["atr_period"]),
+                    "max_adds": int(spec["max_adds"]),
+                    "add_step_atr": float(spec["add_step_atr"]),
+                    "vol_window": int(spec["vol_window"]),
+                    "target_vol": float(spec["target_vol"]),
+                    "max_hold_bars": int(spec["max_hold_bars"]),
+                    "allow_short": bool(spec["allow_short"]),
+                    "add_alloc_fraction": float(spec["add_alloc_fraction"]),
+                }
+                _add_candidate(
+                    ctx.candidates,
+                    name=(
+                        f"overnight_session_return_rider_{tf_tag}_{spec['variant']}_"
+                        f"{symbol.replace('/', '').lower()}"
+                    ),
+                    family="seasonality",
+                    strategy_class="OvernightSessionReturnRiderStrategy",
+                    timeframe=timeframe,
+                    symbols=(symbol,),
+                    params=params,
+                    notes=(
+                        "Per-symbol overnight-session return-tilt rider: structurally "
+                        "tilts LONG during the UTC session whose decay-weighted mean "
+                        "return is significantly positive (SHORT when negative), "
+                        "suppresses otherwise. NOT trend-conditioned; ATR trailing stop "
+                        f"manages exits on {symbol} at {timeframe} ({spec['variant']})."
+                    ),
+                    tags=(
+                        "seasonality",
+                        "overnight_session",
+                        "time_of_day",
+                        "return_rider",
+                        "trailing_stop",
+                        "single_asset",
+                        "crypto",
+                    ),
+                    metadata={
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": symbol,
+                        "allow_short": bool(spec["allow_short"]),
                         "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
                     },
                 )
