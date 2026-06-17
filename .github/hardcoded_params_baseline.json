@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-06-17T02:33:21.748867+00:00",
+  "generated_at_utc": "2026-06-17T04:49:13.399093+00:00",
   "literal_paths": [
     "src/lumina_quant/strategies",
     "lumina_quant/strategies"
@@ -560,6 +560,13 @@
     "literal:src/lumina_quant/strategies/derivatives_flow_squeeze.py:988:92:0.15",
     "literal:src/lumina_quant/strategies/derivatives_flow_squeeze.py:996:20:0.35",
     "literal:src/lumina_quant/strategies/derivatives_flow_squeeze.py:998:22:0.35",
+    "literal:src/lumina_quant/strategies/equity_return_alpha_sleeves.py:239:31:86400",
+    "literal:src/lumina_quant/strategies/equity_return_alpha_sleeves.py:299:46:12",
+    "literal:src/lumina_quant/strategies/equity_return_alpha_sleeves.py:332:26:3",
+    "literal:src/lumina_quant/strategies/equity_return_alpha_sleeves.py:332:29:6",
+    "literal:src/lumina_quant/strategies/equity_return_alpha_sleeves.py:332:32:12",
+    "literal:src/lumina_quant/strategies/equity_return_alpha_sleeves.py:426:85:12",
+    "literal:src/lumina_quant/strategies/equity_return_alpha_sleeves.py:452:57:12",
     "literal:src/lumina_quant/strategies/equity_xs_factor_alpha_sleeves.py:171:31:86400",
     "literal:src/lumina_quant/strategies/equity_xs_factor_alpha_sleeves.py:213:32:0.01",
     "literal:src/lumina_quant/strategies/equity_xs_factor_alpha_sleeves.py:315:31:86400",
