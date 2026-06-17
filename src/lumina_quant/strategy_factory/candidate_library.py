@@ -2646,6 +2646,8 @@ class _CandidateBuildContext:
         _build_realized_semivariance_trend_rider_candidates(self)
         _build_permutation_entropy_trend_rider_candidates(self)
         _build_amihud_illiquidity_momentum_rider_candidates(self)
+        _build_cusum_change_point_trend_rider_candidates(self)
+        _build_variance_ratio_trend_rider_candidates(self)
         _build_metals_relative_value_basket_candidates(self)
         _build_liquidation_cascade_reversion_candidates(self)
         _build_orderbook_imbalance_reversion_candidates(self)
@@ -8262,6 +8264,291 @@ def _build_amihud_illiquidity_momentum_rider_candidates(ctx: _CandidateBuildCont
                         "momentum",
                         "amihud_illiquidity",
                         "illiquidity_premium",
+                        "return_rider",
+                        "trailing_stop",
+                        "pyramiding",
+                        "single_asset",
+                        "crypto",
+                    ),
+                    metadata={
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": symbol,
+                        "allow_short": bool(spec["allow_short"]),
+                        "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                    },
+                )
+
+
+# CUSUM change-point trend rider: ride the drift regime shift a two-sided CUSUM
+# control chart declares. Per-symbol single-asset, crypto-only, >=30m.
+_CUSUM_CHANGE_POINT_TREND_RIDER_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "30m": (
+        {
+            "variant": "core_ls",
+            "cusum_vol_window": 48,
+            "cusum_k": 0.5,
+            "cusum_h": 5.0,
+            "trail_atr_mult": 3.0,
+            "atr_period": 14,
+            "max_adds": 3,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 96,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "swing_ls",
+            "cusum_vol_window": 48,
+            "cusum_k": 0.5,
+            "cusum_h": 5.0,
+            "trail_atr_mult": 3.2,
+            "atr_period": 14,
+            "max_adds": 3,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 72,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "macro_ls",
+            "cusum_vol_window": 36,
+            "cusum_k": 0.5,
+            "cusum_h": 5.0,
+            "trail_atr_mult": 3.5,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 36,
+            "target_vol": 0.030,
+            "max_hold_bars": 36,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1d": (
+        {
+            "variant": "daily_ls",
+            "cusum_vol_window": 30,
+            "cusum_k": 0.5,
+            "cusum_h": 4.5,
+            "trail_atr_mult": 4.0,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 30,
+            "target_vol": 0.030,
+            "max_hold_bars": 30,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+}
+
+
+def _build_cusum_change_point_trend_rider_candidates(ctx: _CandidateBuildContext) -> None:
+    """Per-symbol CUSUM change-point trend rider (single-asset, OHLCV-only)."""
+    crypto_symbols = ctx.crypto_only_symbols
+    if not crypto_symbols:
+        return
+    for timeframe in ctx._present("30m", "1h", "4h", "1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _CUSUM_CHANGE_POINT_TREND_RIDER_SLICE.get(timeframe, ()):
+            for symbol in crypto_symbols:
+                params = {
+                    "cusum_vol_window": int(spec["cusum_vol_window"]),
+                    "cusum_k": float(spec["cusum_k"]),
+                    "cusum_h": float(spec["cusum_h"]),
+                    "trail_atr_mult": float(spec["trail_atr_mult"]),
+                    "atr_period": int(spec["atr_period"]),
+                    "max_adds": int(spec["max_adds"]),
+                    "add_step_atr": float(spec["add_step_atr"]),
+                    "vol_window": int(spec["vol_window"]),
+                    "target_vol": float(spec["target_vol"]),
+                    "max_hold_bars": int(spec["max_hold_bars"]),
+                    "allow_short": bool(spec["allow_short"]),
+                    "add_alloc_fraction": float(spec["add_alloc_fraction"]),
+                }
+                _add_candidate(
+                    ctx.candidates,
+                    name=(
+                        f"cusum_change_point_trend_rider_{tf_tag}_{spec['variant']}_"
+                        f"{symbol.replace('/', '').lower()}"
+                    ),
+                    family="trend",
+                    strategy_class="CusumChangePointTrendRiderStrategy",
+                    timeframe=timeframe,
+                    symbols=(symbol,),
+                    params=params,
+                    notes=(
+                        "Per-symbol CUSUM change-point trend rider: a two-sided CUSUM "
+                        "control chart on vol-standardized returns declares an up/down drift "
+                        "regime shift; the detected direction opens a ride with an ATR "
+                        f"trailing stop + pyramiding on {symbol} at {timeframe} "
+                        f"({spec['variant']})."
+                    ),
+                    tags=(
+                        "trend",
+                        "cusum",
+                        "change_point",
+                        "return_rider",
+                        "trailing_stop",
+                        "pyramiding",
+                        "single_asset",
+                        "crypto",
+                    ),
+                    metadata={
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": symbol,
+                        "allow_short": bool(spec["allow_short"]),
+                        "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                    },
+                )
+
+
+# Variance-ratio trend rider: ride a confirmed trend only when the Lo-MacKinlay
+# variance ratio signals persistence (VR >= 1 + threshold). Per-symbol single-asset,
+# crypto-only, >=30m.
+_VARIANCE_RATIO_TREND_RIDER_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "30m": (
+        {
+            "variant": "core_ls",
+            "vr_window": 96,
+            "vr_k": 4,
+            "vr_threshold": 0.10,
+            "trend_lookback": 48,
+            "trend_ma_window": 48,
+            "min_trend_roc": 0.0,
+            "trail_atr_mult": 3.0,
+            "atr_period": 14,
+            "max_adds": 3,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 96,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "swing_ls",
+            "vr_window": 96,
+            "vr_k": 4,
+            "vr_threshold": 0.10,
+            "trend_lookback": 48,
+            "trend_ma_window": 48,
+            "min_trend_roc": 0.0,
+            "trail_atr_mult": 3.2,
+            "atr_period": 14,
+            "max_adds": 3,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 72,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "macro_ls",
+            "vr_window": 72,
+            "vr_k": 4,
+            "vr_threshold": 0.10,
+            "trend_lookback": 36,
+            "trend_ma_window": 36,
+            "min_trend_roc": 0.0,
+            "trail_atr_mult": 3.5,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 36,
+            "target_vol": 0.030,
+            "max_hold_bars": 36,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1d": (
+        {
+            "variant": "daily_ls",
+            "vr_window": 60,
+            "vr_k": 4,
+            "vr_threshold": 0.10,
+            "trend_lookback": 30,
+            "trend_ma_window": 30,
+            "min_trend_roc": 0.0,
+            "trail_atr_mult": 4.0,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 30,
+            "target_vol": 0.030,
+            "max_hold_bars": 30,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+}
+
+
+def _build_variance_ratio_trend_rider_candidates(ctx: _CandidateBuildContext) -> None:
+    """Per-symbol variance-ratio-gated trend rider (single-asset, OHLCV-only)."""
+    crypto_symbols = ctx.crypto_only_symbols
+    if not crypto_symbols:
+        return
+    for timeframe in ctx._present("30m", "1h", "4h", "1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _VARIANCE_RATIO_TREND_RIDER_SLICE.get(timeframe, ()):
+            for symbol in crypto_symbols:
+                params = {
+                    "vr_window": int(spec["vr_window"]),
+                    "vr_k": int(spec["vr_k"]),
+                    "vr_threshold": float(spec["vr_threshold"]),
+                    "trend_lookback": int(spec["trend_lookback"]),
+                    "trend_ma_window": int(spec["trend_ma_window"]),
+                    "min_trend_roc": float(spec["min_trend_roc"]),
+                    "trail_atr_mult": float(spec["trail_atr_mult"]),
+                    "atr_period": int(spec["atr_period"]),
+                    "max_adds": int(spec["max_adds"]),
+                    "add_step_atr": float(spec["add_step_atr"]),
+                    "vol_window": int(spec["vol_window"]),
+                    "target_vol": float(spec["target_vol"]),
+                    "max_hold_bars": int(spec["max_hold_bars"]),
+                    "allow_short": bool(spec["allow_short"]),
+                    "add_alloc_fraction": float(spec["add_alloc_fraction"]),
+                }
+                _add_candidate(
+                    ctx.candidates,
+                    name=(
+                        f"variance_ratio_trend_rider_{tf_tag}_{spec['variant']}_"
+                        f"{symbol.replace('/', '').lower()}"
+                    ),
+                    family="trend",
+                    strategy_class="VarianceRatioTrendRiderStrategy",
+                    timeframe=timeframe,
+                    symbols=(symbol,),
+                    params=params,
+                    notes=(
+                        "Per-symbol variance-ratio trend rider: rides a confirmed trend only "
+                        "when the Lo-MacKinlay variance ratio VR(k) >= 1 + vr_threshold (the "
+                        "random walk is rejected toward persistence). ATR trailing stop + "
+                        f"pyramiding on {symbol} at {timeframe} ({spec['variant']})."
+                    ),
+                    tags=(
+                        "trend",
+                        "variance_ratio",
+                        "random_walk_rejection",
                         "return_rider",
                         "trailing_stop",
                         "pyramiding",
