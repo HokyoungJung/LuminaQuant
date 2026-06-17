@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-06-16T23:41:35.432678+00:00",
+  "generated_at_utc": "2026-06-17T02:33:21.748867+00:00",
   "literal_paths": [
     "src/lumina_quant/strategies",
     "lumina_quant/strategies"
@@ -31,6 +31,11 @@
     "literal:src/lumina_quant/strategies/adaptive_regime_momentum.py:486:38:-998.0",
     "literal:src/lumina_quant/strategies/adaptive_regime_momentum.py:512:22:0.70",
     "literal:src/lumina_quant/strategies/adaptive_regime_momentum.py:512:51:0.30",
+    "literal:src/lumina_quant/strategies/aggressive_return_alpha_sleeves.py:145:42:3",
+    "literal:src/lumina_quant/strategies/aggressive_return_alpha_sleeves.py:202:29:3.0",
+    "literal:src/lumina_quant/strategies/aggressive_return_alpha_sleeves.py:203:34:1.5",
+    "literal:src/lumina_quant/strategies/aggressive_return_alpha_sleeves.py:203:71:5.0",
+    "literal:src/lumina_quant/strategies/aggressive_return_alpha_sleeves.py:269:34:3",
     "literal:src/lumina_quant/strategies/artifact_portfolio_mode.py:1002:26:0.35",
     "literal:src/lumina_quant/strategies/artifact_portfolio_mode.py:1006:26:0.35",
     "literal:src/lumina_quant/strategies/artifact_portfolio_mode.py:1010:26:0.20",
