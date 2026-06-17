@@ -1,5 +1,22 @@
 # Research Note
 
+## 2026-06-17 KST (n) — 기존 최고성적 TopCap 개선: target-pool selector 전처리
+
+사용자 확인 요청에 따라 universe/selection 경로부터 재검증했다. `config.yaml`은 `trading.symbols`를 의도적으로 생략하고 `TradingConfig.symbols` 기본값이 `BINANCE_EXTENDED_RESEARCH_SYMBOLS_SLASHED`를 쓰므로 runtime/default research/candidate universe가 모두 **110개**(crypto 10 + tradfi/commodity/ETF/equity/premarket 100)로 확장되어 있다. 후보 3504개가 110개 전부를 커버했고, 로컬 Binance 1m parquet도 2026-05-15~06-13 창에서 110개 모두 200 bars 이상 로드됐다. selector 자체도 110개 입력에서 정상 동작해 pool 12개(`TON/CL/BZ/DOGE/AVAX/AMAT/SPCX/ADA/XAU/STXX/BTC/TRX`)를 골랐다.
+
+수정 1 — selection-aware cross-sectional 후보가 실제로는 `ctx.crypto_symbols`(=metals 제외 106개)를 써서 XAU/XAG/XPT/XPD를 selector universe에서 빼고 있었다. 이를 `ctx.normalized_symbols`로 바꿔 **SelectionGatedMomentum/Reversion도 full 110개**를 스크리닝하게 했다(커밋 `3fdcfbda`). 검증: 생성 후보 6개 모두 `symbols=110`, `symbol_scope=expanded_research_universe`.
+
+수정 2 — 기존 최고 성과 축인 **`TopCapTimeSeriesMomentumStrategy`** 자체를 개선했다. 기본 동작은 완전 보존(`selector_enabled=False`)하되, 옵션으로 target-pool selector를 먼저 돌린 뒤 그 pool 안에서 기존 TopCap momentum long/short를 고르게 했다. 새 파라미터: `selector_enabled`, `selector_pool_size`, `selector_history_window`, `selector_min_history_bars`, selector factor weights, `selector_vwap_sign`. 이를 위해 TopCap이 close만 저장하던 구조를 OHLCV deques로 확장하고 state roundtrip도 high/low/volume까지 복원하도록 했다. candidate slice에는 1h selector TopCap 3개를 추가: `selector_exec_tightstop_20`, `selector_exec_tightstop_12`, `selector_resid_btc_20`; selector variant는 **full 110개** 입력에서 TopCap을 실행한다.
+
+**실측(`var/reports/topcap_selector_improvement/`, strict local Binance 1m parquet, CSV/synthetic fallback 없음, 2026-05-15~06-13).** 기존 expanded TopCap `topcap_tsmom_1h_exec_tightstop_16_4_0.015`(106 symbols)는 +5.26%, Sharpe 3.44, MDD 2.88%, 3109 fills. 개선 후보:
+- `selector_exec_tightstop_12`: **+8.22%, Sharpe 5.13, MDD 2.82%, fills 1039** — return +2.96%p, Sharpe +1.69, MDD 소폭 개선, fill 수 67% 감소.
+- `selector_exec_tightstop_20`: +5.70%, Sharpe 3.81, MDD 2.58%, fills 1322 — return/Sharpe/MDD 모두 개선.
+- `selector_resid_btc_20`: +4.72%, Sharpe 4.74, MDD 1.78%, fills 1127 — return은 낮지만 방어형 Sharpe/MDD 개선 후보.
+
+결론: 기존 최고성적 전략 개선의 1차 답은 **TopCap + full-universe target-pool selector**다. 채용 후보는 `selector_exec_tightstop_12`(수익 개선)와 `selector_resid_btc_20`(방어형). 기존 TopCap을 바로 대체하지 말고 paper/shadow에서 5~10거래일 forward 확인 후, `selector_exec_tightstop_12`를 primary replacement 후보로 본다.
+
+검증: TopCap/strategy-factory/selection-aware focused tests 44개 통과, ruff check/format, `check_architecture.py`, hardcoded-params audit(768/new=0), `verify_docs.py`, compileall, full pytest 2137개 통과.
+
 ## 2026-06-17 KST (m) — Seasonal Micro Breakout Rider: 1s/1m 미시 확인 + 30m/1h 거래
 
 새 전략 **`SeasonalMicroBreakoutRiderStrategy`** 추가(`micro_signal_alpha_sleeves.py`, `_ReturnRiderBase` 상속·per-symbol 단일자산·crypto-only·>=30m). 사용자 제약을 그대로 반영: **알파는 마지막 market-window의 1s tape/VWAP를 확인용으로 볼 수 있지만, 실제 signal/order 결정은 `decision_cadence_seconds=1800` 이상**. 후보 라이브러리는 30m/1h/4h만 발행하고 1d는 제외(일중 slot 구조 희석).

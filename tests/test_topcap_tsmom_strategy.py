@@ -11,16 +11,27 @@ class _MomentumBarStore:
     symbol_list: list[str]
 
     def __post_init__(self):
-        self._latest_close = dict.fromkeys(self.symbol_list)
+        self._latest = {
+            symbol: {"close": None, "high": None, "low": None, "volume": None}
+            for symbol in self.symbol_list
+        }
         self._latest_time = dict.fromkeys(self.symbol_list)
 
-    def set_bar(self, symbol, time_index, close_price):
+    def set_bar(self, symbol, time_index, close_price, *, high=None, low=None, volume=1000.0):
         self._latest_time[symbol] = time_index
-        self._latest_close[symbol] = float(close_price)
+        close = float(close_price)
+        self._latest[symbol] = {
+            "close": close,
+            "high": float(high if high is not None else close),
+            "low": float(low if low is not None else close),
+            "volume": float(volume),
+        }
 
     def get_latest_bar_value(self, symbol, value_type):
-        _ = value_type
-        value = self._latest_close.get(symbol)
+        values = self._latest.get(symbol, {})
+        value = values.get(str(value_type))
+        if value is None and str(value_type) != "close":
+            value = values.get("close")
         return float(value) if value is not None else 0.0
 
     def get_latest_bar_datetime(self, symbol):
@@ -302,6 +313,58 @@ class TestTopCapTimeSeriesMomentumStrategy(unittest.TestCase):
         long_signal = next(signal for signal in signals if str(signal.signal_type) == "LONG")
         assert long_signal.take_profit is not None
         assert long_signal.take_profit > 0.0
+
+    def test_selector_pool_limits_topcap_candidates(self):
+        symbols, rows = _build_price_rows(length=80)
+        bars = _MomentumBarStore(symbols)
+        events = queue.Queue()
+        strategy = TopCapTimeSeriesMomentumStrategy(
+            bars,
+            events,
+            lookback_bars=8,
+            rebalance_bars=2,
+            signal_threshold=0.01,
+            stop_loss_pct=0.08,
+            max_longs=2,
+            max_shorts=2,
+            min_price=0.1,
+            btc_regime_ma=0,
+            selector_enabled=True,
+            selector_pool_size=4,
+            selector_history_window=20,
+            selector_min_history_bars=8,
+        )
+
+        for time_index, frame in rows:
+            for rank, symbol in enumerate(symbols):
+                price = frame[symbol]
+                volume = 10_000.0 - rank * 1000.0
+                bars.set_bar(
+                    symbol,
+                    time_index,
+                    price,
+                    high=price * 1.001,
+                    low=price * 0.999,
+                    volume=volume,
+                )
+                event = MarketEvent(
+                    time_index, symbol, price, price * 1.001, price * 0.999, price, volume
+                )
+                strategy.calculate_signals(event)
+
+        signals = []
+        while not events.empty():
+            signals.append(events.get())
+
+        selector_signals = [signal for signal in signals if signal.metadata.get("selector_enabled")]
+        assert selector_signals
+        assert all(
+            signal.metadata.get("selector_pool_count", 0) <= 4 for signal in selector_signals
+        )
+        assert all(
+            signal.symbol in set(signal.metadata.get("selector_pool") or [])
+            for signal in selector_signals
+        )
 
 
 if __name__ == "__main__":

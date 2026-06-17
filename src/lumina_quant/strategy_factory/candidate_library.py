@@ -1366,6 +1366,59 @@ _TOPCAP_TSMOM_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
             "btc_symbol": "BTC/USDT",
         },
         {
+            "variant": "selector_exec_tightstop_20",
+            "lookback_bars": 16,
+            "rebalance_bars": 4,
+            "signal_threshold": 0.015,
+            "stop_loss_pct": 0.05,
+            "max_longs": 2,
+            "max_shorts": 2,
+            "min_price": 0.10,
+            "btc_regime_ma": 48,
+            "btc_symbol": "BTC/USDT",
+            "selector_enabled": True,
+            "selector_pool_size": 20,
+            "selector_history_window": 96,
+            "selector_min_history_bars": 60,
+            "selector_vwap_sign": 1.0,
+        },
+        {
+            "variant": "selector_exec_tightstop_12",
+            "lookback_bars": 16,
+            "rebalance_bars": 4,
+            "signal_threshold": 0.015,
+            "stop_loss_pct": 0.05,
+            "max_longs": 2,
+            "max_shorts": 2,
+            "min_price": 0.10,
+            "btc_regime_ma": 48,
+            "btc_symbol": "BTC/USDT",
+            "selector_enabled": True,
+            "selector_pool_size": 12,
+            "selector_history_window": 96,
+            "selector_min_history_bars": 60,
+            "selector_vwap_sign": 1.0,
+        },
+        {
+            "variant": "selector_resid_btc_20",
+            "lookback_bars": 16,
+            "rebalance_bars": 4,
+            "signal_threshold": 0.010,
+            "stop_loss_pct": 0.08,
+            "max_longs": 2,
+            "max_shorts": 2,
+            "min_price": 0.10,
+            "btc_regime_ma": 48,
+            "btc_symbol": "BTC/USDT",
+            "residualize_btc": True,
+            "residualize_mean": False,
+            "selector_enabled": True,
+            "selector_pool_size": 20,
+            "selector_history_window": 96,
+            "selector_min_history_bars": 60,
+            "selector_vwap_sign": 1.0,
+        },
+        {
             "variant": "exec_fastrebalance_tp",
             "lookback_bars": 16,
             "rebalance_bars": 2,
@@ -3260,6 +3313,17 @@ def _build_cross_sectional_rotation_candidates(ctx: _CandidateBuildContext) -> N
                     params["benchmark_drawdown_window"] = int(spec["benchmark_drawdown_window"])
                 if "benchmark_drawdown_limit" in spec:
                     params["benchmark_drawdown_limit"] = float(spec["benchmark_drawdown_limit"])
+                if bool(spec.get("selector_enabled", False)):
+                    params["selector_enabled"] = True
+                    params["selector_pool_size"] = int(spec["selector_pool_size"])
+                    params["selector_history_window"] = int(spec["selector_history_window"])
+                    params["selector_min_history_bars"] = int(spec["selector_min_history_bars"])
+                    params["selector_vwap_sign"] = float(spec.get("selector_vwap_sign", 1.0))
+                candidate_symbols = (
+                    tuple(ctx.normalized_symbols)
+                    if bool(spec.get("selector_enabled", False))
+                    else tuple(crypto_symbols)
+                )
                 tags = ["cross_sectional", "relative_momentum", "topcap", "crypto"]
                 residual_notes = []
                 if bool(spec.get("residualize_btc", False)):
@@ -3279,6 +3343,11 @@ def _build_cross_sectional_rotation_candidates(ctx: _CandidateBuildContext) -> N
                 if str(spec.get("variant") or "").startswith("exec_"):
                     tags.append("execution_risk")
                     residual_notes.append("execution-risk retune")
+                if bool(spec.get("selector_enabled", False)):
+                    tags.extend(["universe_selection", "selector_gated", "expanded_universe"])
+                    residual_notes.append(
+                        f"target-pool selector top-{int(spec['selector_pool_size'])} over expanded universe"
+                    )
                 if float(spec.get("take_profit_pct", 0.0) or 0.0) > 0.0:
                     tags.append("take_profit")
                     residual_notes.append(f"take profit {float(spec['take_profit_pct']):.1%}")
@@ -3292,7 +3361,7 @@ def _build_cross_sectional_rotation_candidates(ctx: _CandidateBuildContext) -> N
                     family="cross_sectional",
                     strategy_class="TopCapTimeSeriesMomentumStrategy",
                     timeframe=timeframe,
-                    symbols=crypto_symbols,
+                    symbols=candidate_symbols,
                     params=params,
                     notes=(
                         "Top-cap long/short relative-momentum rotation with BTC regime gating "
@@ -3302,7 +3371,9 @@ def _build_cross_sectional_rotation_candidates(ctx: _CandidateBuildContext) -> N
                     metadata={
                         "timeframe": timeframe,
                         "retune_profile": str(spec["variant"]),
-                        "symbol_scope": "crypto",
+                        "symbol_scope": "expanded_research_universe"
+                        if bool(spec.get("selector_enabled", False))
+                        else "crypto",
                         "residualize_btc": bool(spec.get("residualize_btc", False)),
                         "residualize_mean": bool(spec.get("residualize_mean", False)),
                         "benchmark_drawdown_window": int(
@@ -3311,6 +3382,8 @@ def _build_cross_sectional_rotation_candidates(ctx: _CandidateBuildContext) -> N
                         "benchmark_drawdown_limit": float(
                             spec.get("benchmark_drawdown_limit", 0.0) or 0.0
                         ),
+                        "selector_enabled": bool(spec.get("selector_enabled", False)),
+                        "selector_pool_size": int(spec.get("selector_pool_size", 0) or 0),
                     },
                 )
 

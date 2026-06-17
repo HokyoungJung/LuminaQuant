@@ -122,6 +122,67 @@ class TopCapTimeSeriesMomentumStrategy(Strategy):
                 tunable=False,
             ),
             "btc_symbol": HyperParam.string("btc_symbol", default="BTC/USDT", tunable=False),
+            "selector_enabled": HyperParam.boolean(
+                "selector_enabled",
+                default=False,
+                tunable=False,
+            ),
+            "selector_pool_size": HyperParam.integer(
+                "selector_pool_size",
+                default=0,
+                low=0,
+                high=512,
+                tunable=False,
+            ),
+            "selector_history_window": HyperParam.integer(
+                "selector_history_window",
+                default=120,
+                low=2,
+                high=20000,
+                tunable=False,
+            ),
+            "selector_min_history_bars": HyperParam.integer(
+                "selector_min_history_bars",
+                default=60,
+                low=2,
+                high=20000,
+                tunable=False,
+            ),
+            "selector_weight_price_position": HyperParam.floating(
+                "selector_weight_price_position",
+                default=1.0,
+                low=0.0,
+                high=10.0,
+                tunable=False,
+            ),
+            "selector_weight_volume": HyperParam.floating(
+                "selector_weight_volume",
+                default=1.5,
+                low=0.0,
+                high=10.0,
+                tunable=False,
+            ),
+            "selector_weight_volatility": HyperParam.floating(
+                "selector_weight_volatility",
+                default=1.0,
+                low=0.0,
+                high=10.0,
+                tunable=False,
+            ),
+            "selector_weight_vwap": HyperParam.floating(
+                "selector_weight_vwap",
+                default=0.8,
+                low=0.0,
+                high=10.0,
+                tunable=False,
+            ),
+            "selector_vwap_sign": HyperParam.floating(
+                "selector_vwap_sign",
+                default=1.0,
+                low=-1.0,
+                high=1.0,
+                tunable=False,
+            ),
         }
 
     def __init__(
@@ -142,6 +203,15 @@ class TopCapTimeSeriesMomentumStrategy(Strategy):
         residualize_btc=False,
         residualize_mean=False,
         btc_symbol=None,
+        selector_enabled=False,
+        selector_pool_size=0,
+        selector_history_window=120,
+        selector_min_history_bars=60,
+        selector_weight_price_position=1.0,
+        selector_weight_volume=1.5,
+        selector_weight_volatility=1.0,
+        selector_weight_vwap=0.8,
+        selector_vwap_sign=1.0,
     ):
         self.bars = bars
         self.events = events
@@ -166,6 +236,15 @@ class TopCapTimeSeriesMomentumStrategy(Strategy):
                 "residualize_btc": residualize_btc,
                 "residualize_mean": residualize_mean,
                 "btc_symbol": btc_symbol,
+                "selector_enabled": selector_enabled,
+                "selector_pool_size": selector_pool_size,
+                "selector_history_window": selector_history_window,
+                "selector_min_history_bars": selector_min_history_bars,
+                "selector_weight_price_position": selector_weight_price_position,
+                "selector_weight_volume": selector_weight_volume,
+                "selector_weight_volatility": selector_weight_volatility,
+                "selector_weight_vwap": selector_weight_vwap,
+                "selector_vwap_sign": selector_vwap_sign,
             },
             keep_unknown=False,
         )
@@ -183,6 +262,17 @@ class TopCapTimeSeriesMomentumStrategy(Strategy):
         self.benchmark_drawdown_limit = float(resolved["benchmark_drawdown_limit"])
         self.residualize_btc = bool(resolved["residualize_btc"])
         self.residualize_mean = bool(resolved["residualize_mean"])
+        self.selector_enabled = bool(resolved["selector_enabled"])
+        self.selector_pool_size = max(0, int(resolved["selector_pool_size"]))
+        self.selector_history_window = max(2, int(resolved["selector_history_window"]))
+        self.selector_min_history_bars = max(2, int(resolved["selector_min_history_bars"]))
+        self.selector_weight_price_position = max(
+            0.0, float(resolved["selector_weight_price_position"])
+        )
+        self.selector_weight_volume = max(0.0, float(resolved["selector_weight_volume"]))
+        self.selector_weight_volatility = max(0.0, float(resolved["selector_weight_volatility"]))
+        self.selector_weight_vwap = max(0.0, float(resolved["selector_weight_vwap"]))
+        self.selector_vwap_sign = max(-1.0, min(1.0, float(resolved["selector_vwap_sign"])))
 
         default_btc = "BTC/USDT" if "BTC/USDT" in self.symbol_list else self.symbol_list[0]
         btc_symbol = resolved["btc_symbol"]
@@ -190,8 +280,20 @@ class TopCapTimeSeriesMomentumStrategy(Strategy):
         if self.btc_symbol not in self.symbol_list:
             self.btc_symbol = default_btc
 
-        history_len = max(self.lookback_bars, self.btc_regime_ma) + 2
+        history_len = (
+            max(
+                self.lookback_bars,
+                self.btc_regime_ma,
+                self.benchmark_drawdown_window,
+                self.selector_history_window if self.selector_enabled else 0,
+            )
+            + 2
+        )
         self._price_history = {symbol: deque(maxlen=history_len) for symbol in self.symbol_list}
+        self._high_history = {symbol: deque(maxlen=history_len) for symbol in self.symbol_list}
+        self._low_history = {symbol: deque(maxlen=history_len) for symbol in self.symbol_list}
+        self._volume_history = {symbol: deque(maxlen=history_len) for symbol in self.symbol_list}
+        self._last_selector_pool: tuple[str, ...] = tuple(self.symbol_list)
 
         self._position_state = dict.fromkeys(self.symbol_list, "OUT")
         self._last_symbol_time_key = dict.fromkeys(self.symbol_list, "")
@@ -206,6 +308,13 @@ class TopCapTimeSeriesMomentumStrategy(Strategy):
             "tick": int(self._tick),
             "price_history": {
                 symbol: list(history) for symbol, history in self._price_history.items()
+            },
+            "high_history": {
+                symbol: list(history) for symbol, history in self._high_history.items()
+            },
+            "low_history": {symbol: list(history) for symbol, history in self._low_history.items()},
+            "volume_history": {
+                symbol: list(history) for symbol, history in self._volume_history.items()
             },
         }
 
@@ -228,29 +337,53 @@ class TopCapTimeSeriesMomentumStrategy(Strategy):
         self._last_eval_time_key = str(state.get("last_eval_time_key", ""))
         self._tick = max(0, safe_int(state.get("tick", 0), 0))
 
-        raw_history = state.get("price_history")
-        if not isinstance(raw_history, dict):
-            return
-        for symbol, values in raw_history.items():
-            if symbol not in self._price_history or not isinstance(values, list):
-                continue
-            target = self._price_history[symbol]
-            target.clear()
-            keep = int(target.maxlen) if target.maxlen is not None else len(values)
-            for value in values[-keep:]:
-                parsed = safe_float(value)
-                if parsed is not None and parsed > 0.0:
-                    target.append(parsed)
+        def _restore_history(raw_payload, target_map, *, positive_only: bool) -> None:
+            if not isinstance(raw_payload, dict):
+                return
+            for symbol, values in raw_payload.items():
+                if symbol not in target_map or not isinstance(values, list):
+                    continue
+                target = target_map[symbol]
+                target.clear()
+                keep = int(target.maxlen) if target.maxlen is not None else len(values)
+                for value in values[-keep:]:
+                    parsed = safe_float(value)
+                    if parsed is None:
+                        continue
+                    if positive_only and parsed <= 0.0:
+                        continue
+                    target.append(parsed if positive_only else max(0.0, parsed))
 
-    def _resolve_close(self, symbol, event):
+        _restore_history(state.get("price_history"), self._price_history, positive_only=True)
+        _restore_history(state.get("high_history"), self._high_history, positive_only=True)
+        _restore_history(state.get("low_history"), self._low_history, positive_only=True)
+        _restore_history(state.get("volume_history"), self._volume_history, positive_only=False)
+
+    def _resolve_latest_bar(self, symbol, event):
+        close = None
+        high = None
+        low = None
+        volume = None
         if getattr(event, "symbol", None) == symbol:
             close = safe_float(getattr(event, "close", None))
-            if close is not None and close > 0.0:
-                return close
-        close = safe_float(self.bars.get_latest_bar_value(symbol, "close"))
+            high = safe_float(getattr(event, "high", None))
+            low = safe_float(getattr(event, "low", None))
+            volume = safe_float(getattr(event, "volume", None))
+        if close is None or close <= 0.0:
+            close = safe_float(self.bars.get_latest_bar_value(symbol, "close"))
         if close is None or close <= 0.0:
             return None
-        return close
+        if high is None or high <= 0.0:
+            high = safe_float(self.bars.get_latest_bar_value(symbol, "high"))
+        if low is None or low <= 0.0:
+            low = safe_float(self.bars.get_latest_bar_value(symbol, "low"))
+        if volume is None:
+            volume = safe_float(self.bars.get_latest_bar_value(symbol, "volume"))
+        high = float(high) if high is not None and high > 0.0 else float(close)
+        low = float(low) if low is not None and low > 0.0 else float(close)
+        if low > high:
+            low, high = high, low
+        return float(close), high, low, max(0.0, float(volume or 0.0))
 
     def _btc_regime(self):
         btc_history = self._price_history.get(self.btc_symbol)
@@ -300,6 +433,10 @@ class TopCapTimeSeriesMomentumStrategy(Strategy):
             "benchmark_drawdown_limit": float(self.benchmark_drawdown_limit),
             "residualize_btc": bool(self.residualize_btc),
             "residualize_mean": bool(self.residualize_mean),
+            "selector_enabled": bool(self.selector_enabled),
+            "selector_pool_size": int(self.selector_pool_size),
+            "selector_pool_count": len(self._last_selector_pool),
+            "selector_pool": list(self._last_selector_pool),
         }
         self.events.put(
             SignalEvent(
@@ -313,6 +450,75 @@ class TopCapTimeSeriesMomentumStrategy(Strategy):
                 metadata=metadata,
             )
         )
+
+    def _select_aligned_pool(self, aligned_symbols):
+        if not self.selector_enabled or self.selector_pool_size <= 0:
+            self._last_selector_pool = tuple(aligned_symbols)
+            return list(aligned_symbols)
+
+        try:
+            from lumina_quant.strategy_factory.universe_selection import (
+                TargetPoolSelector,
+                UniverseSelectionConfig,
+            )
+        except Exception:
+            self._last_selector_pool = tuple(aligned_symbols)
+            return list(aligned_symbols)
+
+        aligned_set = set(aligned_symbols)
+        series = {}
+        for symbol in aligned_symbols:
+            closes = list(self._price_history.get(symbol, ()))
+            highs = list(self._high_history.get(symbol, ()))
+            lows = list(self._low_history.get(symbol, ()))
+            volumes = list(self._volume_history.get(symbol, ()))
+            usable = min(len(closes), len(highs), len(lows), len(volumes))
+            if usable < self.selector_min_history_bars:
+                continue
+            series[symbol] = {
+                "high": highs[-usable:],
+                "low": lows[-usable:],
+                "close": closes[-usable:],
+                "volume": volumes[-usable:],
+            }
+        if not series:
+            self._last_selector_pool = tuple(aligned_symbols)
+            return list(aligned_symbols)
+
+        config = UniverseSelectionConfig(
+            weights={
+                "price_position": self.selector_weight_price_position,
+                "volume": self.selector_weight_volume,
+                "volatility": self.selector_weight_volatility,
+                "vwap": self.selector_weight_vwap,
+            },
+            hard_filters={
+                "min_dollar_volume": 0.0,
+                "min_history_bars": float(self.selector_min_history_bars),
+                "vol_band_low": 0.0,
+                "vol_band_high": 1.0,
+            },
+            windows={
+                "price_position": min(self.selector_history_window, self.selector_min_history_bars),
+                "volume": min(self.selector_history_window, 64),
+                "volatility": min(self.selector_history_window, 64),
+                "vwap": min(self.selector_history_window, 64),
+            },
+            pool_size=self.selector_pool_size,
+            vwap_sign=self.selector_vwap_sign,
+        )
+        try:
+            result = TargetPoolSelector(config).select(series)
+        except Exception:
+            self._last_selector_pool = tuple(aligned_symbols)
+            return list(aligned_symbols)
+
+        pool = [symbol for symbol in result.pool if symbol in aligned_set]
+        if not pool:
+            self._last_selector_pool = tuple(aligned_symbols)
+            return list(aligned_symbols)
+        self._last_selector_pool = tuple(pool)
+        return pool
 
     def _build_targets(self, aligned_symbols):
         momentum_rows = []
@@ -385,10 +591,14 @@ class TopCapTimeSeriesMomentumStrategy(Strategy):
             return
         self._last_symbol_time_key[event_symbol] = event_time_key
 
-        close_price = self._resolve_close(event_symbol, event)
-        if close_price is None:
+        latest_bar = self._resolve_latest_bar(event_symbol, event)
+        if latest_bar is None:
             return
+        close_price, high_price, low_price, volume = latest_bar
         self._price_history[event_symbol].append(close_price)
+        self._high_history[event_symbol].append(high_price)
+        self._low_history[event_symbol].append(low_price)
+        self._volume_history[event_symbol].append(volume)
 
         if event_time_key == self._last_eval_time_key:
             return
@@ -405,12 +615,17 @@ class TopCapTimeSeriesMomentumStrategy(Strategy):
         if len(aligned_symbols) < minimum:
             return
 
+        selected_symbols = self._select_aligned_pool(aligned_symbols)
+        selected_minimum = max(4, min(len(selected_symbols), self.max_longs + self.max_shorts))
+        if len(selected_symbols) < selected_minimum:
+            return
+
         self._last_eval_time_key = event_time_key
         self._tick += 1
         if self._tick % self.rebalance_bars != 0:
             return
 
-        targets, momentum_map, regime = self._build_targets(aligned_symbols)
+        targets, momentum_map, regime = self._build_targets(selected_symbols)
 
         for symbol, state in list(self._position_state.items()):
             target_state = targets.get(symbol, "OUT")
