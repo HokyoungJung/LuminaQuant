@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from lumina_quant.research_universe import (
+    BINANCE_TRADFI_COMMODITY_SYMBOLS,
     BINANCE_TRADFI_EQUITY_SYMBOLS,
     BINANCE_TRADFI_ETF_INDEX_SYMBOLS,
     BINANCE_TRADFI_PERP_RESEARCH_SYMBOLS,
@@ -2633,6 +2634,17 @@ class _CandidateBuildContext:
         # targets the equity/ETF universe cleanly via _intersect_universe (never
         # ctx.crypto_symbols) so no crypto leaks in.
         _build_equity_single_name_trend_rider_candidates(self)
+        # Commodity/macro MANAGED-FUTURES trend riders (S-CMDY1/2/3): REUSE the
+        # three proven return-rider classes routed to the 8 commodity perps via
+        # _intersect_universe(_COMMODITY_TREND_UNIVERSE) (never ctx.crypto_symbols).
+        # Long AND short — commodities trend strongly both ways. 4h + 1d only.
+        _build_commodity_adaptive_trend_rider_candidates(self)
+        _build_commodity_breakout_rider_candidates(self)
+        _build_commodity_acceleration_rider_candidates(self)
+        # Equity 52-WEEK-HIGH breakout momentum rider (S-EQ-52WH): REUSE
+        # VolatilityBreakoutRiderStrategy with a long-only ~252-bar new-high
+        # Donchian lookback (George/Hwang 52-week-high momentum). 1d primary + 4h.
+        _build_equity_new_high_breakout_rider_candidates(self)
         _build_leveraged_trend_timing_candidates(self)
         _build_dual_momentum_defensive_candidates(self)
         _build_calendar_seasonality_overlay_candidates(self)
@@ -4407,6 +4419,11 @@ def _build_optional_carry_and_micro_candidates(ctx: _CandidateBuildContext) -> N
 # them and self-skip on empty intersections.
 _EQUITY_FACTOR_UNIVERSE: tuple[str, ...] = tuple(dict.fromkeys(BINANCE_TRADFI_EQUITY_SYMBOLS))
 _INDEX_ROTATION_UNIVERSE: tuple[str, ...] = tuple(dict.fromkeys(BINANCE_TRADFI_ETF_INDEX_SYMBOLS))
+# Commodity/macro managed-futures trend universe: the 8 Binance TradFi commodity
+# perps (precious metals XAU/XAG/XPT/XPD + energy/industrial COPPER/CL/BZ/NATGAS).
+# Commodities trend strongly BOTH ways, so the managed-futures riders routed here
+# are long AND short (allow_short=True).
+_COMMODITY_TREND_UNIVERSE: tuple[str, ...] = tuple(dict.fromkeys(BINANCE_TRADFI_COMMODITY_SYMBOLS))
 # Semis lead-lag follower basket (leader = SOXLUSDT lives in the ETF/index set).
 _SEMIS_FOLLOWER_SYMBOLS: tuple[str, ...] = (
     "NVDAUSDT",
@@ -5214,6 +5231,420 @@ def _build_equity_single_name_trend_rider_candidates(ctx: _CandidateBuildContext
                         "symbol_scope": symbol,
                         "allow_short": bool(spec["allow_short"]),
                         "dormant_tranche": True,
+                        "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                    },
+                )
+
+
+# S-CMDY1/2/3 commodity/macro MANAGED-FUTURES trend riders: REUSE the three proven
+# return-rider classes (AdaptiveTrendRiderStrategy / VolatilityBreakoutRiderStrategy /
+# AccelerationRiderStrategy) routed to the 8 commodity perps. Commodities trend
+# strongly BOTH ways (oil/metals/gas have long structural bull AND bear legs), so
+# every commodity rider is LONG AND SHORT (allow_short=True). One single-asset
+# candidate per commodity symbol; commodity-tuned slice params at 4h + 1d
+# (short-enough trend/breakout/ROC windows that the sleeves actually trade).
+_COMMODITY_ADAPTIVE_TREND_RIDER_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "4h": (
+        {
+            "variant": "macro_swing_ls",
+            "kama_period": 12,
+            "kama_fast": 2,
+            "kama_slow": 28,
+            "min_efficiency": 0.30,
+            "slope_lookback": 2,
+            "trail_atr_mult": 3.5,
+            "atr_period": 14,
+            "max_adds": 3,
+            "add_step_atr": 1.0,
+            "vol_window": 36,
+            "target_vol": 0.020,
+            "max_hold_bars": 240,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1d": (
+        {
+            "variant": "macro_trend_ls",
+            "kama_period": 10,
+            "kama_fast": 2,
+            "kama_slow": 24,
+            "min_efficiency": 0.30,
+            "slope_lookback": 1,
+            "trail_atr_mult": 4.0,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 24,
+            "target_vol": 0.030,
+            "max_hold_bars": 120,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+}
+
+_COMMODITY_BREAKOUT_RIDER_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "4h": (
+        {
+            "variant": "macro_swing_ls",
+            "donchian_window": 20,
+            "atr_expansion_mult": 1.10,
+            "atr_baseline_window": 48,
+            "trail_atr_mult": 3.8,
+            "atr_period": 14,
+            "max_adds": 3,
+            "add_step_atr": 1.0,
+            "vol_window": 36,
+            "target_vol": 0.020,
+            "max_hold_bars": 240,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1d": (
+        {
+            "variant": "macro_trend_ls",
+            "donchian_window": 20,
+            "atr_expansion_mult": 1.10,
+            "atr_baseline_window": 40,
+            "trail_atr_mult": 4.2,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 24,
+            "target_vol": 0.030,
+            "max_hold_bars": 120,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+}
+
+_COMMODITY_ACCELERATION_RIDER_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "4h": (
+        {
+            "variant": "macro_swing_ls",
+            "roc_period": 10,
+            "min_roc": 0.0,
+            "decel_tolerance": 0.0,
+            "trail_atr_mult": 3.0,
+            "atr_period": 14,
+            "max_adds": 3,
+            "add_step_atr": 0.75,
+            "vol_window": 36,
+            "target_vol": 0.025,
+            "max_hold_bars": 200,
+            "allow_short": True,
+            "add_alloc_fraction": 0.6,
+        },
+    ),
+    "1d": (
+        {
+            "variant": "macro_trend_ls",
+            "roc_period": 8,
+            "min_roc": 0.0,
+            "decel_tolerance": 0.0,
+            "trail_atr_mult": 3.5,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 0.75,
+            "vol_window": 24,
+            "target_vol": 0.030,
+            "max_hold_bars": 100,
+            "allow_short": True,
+            "add_alloc_fraction": 0.6,
+        },
+    ),
+}
+
+
+def _build_commodity_adaptive_trend_rider_candidates(ctx: _CandidateBuildContext) -> None:
+    """S-CMDY1 — commodity managed-futures KAMA trend rider (reuse AdaptiveTrendRider, long/short)."""
+    commodity_symbols = _intersect_universe(_COMMODITY_TREND_UNIVERSE, ctx.normalized_symbols)
+    if not commodity_symbols:
+        return
+    for timeframe in ctx._present("4h", "1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _COMMODITY_ADAPTIVE_TREND_RIDER_SLICE.get(timeframe, ()):
+            for symbol in commodity_symbols:
+                params = {
+                    "kama_period": int(spec["kama_period"]),
+                    "kama_fast": int(spec["kama_fast"]),
+                    "kama_slow": int(spec["kama_slow"]),
+                    "min_efficiency": float(spec["min_efficiency"]),
+                    "slope_lookback": int(spec["slope_lookback"]),
+                    "trail_atr_mult": float(spec["trail_atr_mult"]),
+                    "atr_period": int(spec["atr_period"]),
+                    "max_adds": int(spec["max_adds"]),
+                    "add_step_atr": float(spec["add_step_atr"]),
+                    "vol_window": int(spec["vol_window"]),
+                    "target_vol": float(spec["target_vol"]),
+                    "max_hold_bars": int(spec["max_hold_bars"]),
+                    "allow_short": bool(spec["allow_short"]),
+                    "add_alloc_fraction": float(spec["add_alloc_fraction"]),
+                }
+                _add_candidate(
+                    ctx.candidates,
+                    name=(
+                        f"commodity_adaptive_trend_rider_{tf_tag}_{spec['variant']}_"
+                        f"{symbol.replace('/', '').lower()}_"
+                        f"{float(spec['trail_atr_mult']):.1f}"
+                    ),
+                    family="trend",
+                    strategy_class="AdaptiveTrendRiderStrategy",
+                    timeframe=timeframe,
+                    symbols=(symbol,),
+                    params=params,
+                    notes=(
+                        "Commodity/macro managed-futures KAMA/efficiency trend rider "
+                        "that rides commodity trends BOTH ways (long and short) with "
+                        "an ATR trailing stop and pyramids into continuation for high "
+                        f"compound return on {symbol} at {timeframe} ({spec['variant']})."
+                    ),
+                    tags=(
+                        "trend",
+                        "return_rider",
+                        "trailing_stop",
+                        "pyramiding",
+                        "single_asset",
+                        "commodity",
+                        "managed_futures",
+                    ),
+                    metadata={
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": symbol,
+                        "allow_short": bool(spec["allow_short"]),
+                        "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                    },
+                )
+
+
+def _build_commodity_breakout_rider_candidates(ctx: _CandidateBuildContext) -> None:
+    """S-CMDY2 — commodity managed-futures Donchian breakout rider (reuse VolBreakoutRider, long/short)."""
+    commodity_symbols = _intersect_universe(_COMMODITY_TREND_UNIVERSE, ctx.normalized_symbols)
+    if not commodity_symbols:
+        return
+    for timeframe in ctx._present("4h", "1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _COMMODITY_BREAKOUT_RIDER_SLICE.get(timeframe, ()):
+            for symbol in commodity_symbols:
+                params = {
+                    "donchian_window": int(spec["donchian_window"]),
+                    "atr_expansion_mult": float(spec["atr_expansion_mult"]),
+                    "atr_baseline_window": int(spec["atr_baseline_window"]),
+                    "trail_atr_mult": float(spec["trail_atr_mult"]),
+                    "atr_period": int(spec["atr_period"]),
+                    "max_adds": int(spec["max_adds"]),
+                    "add_step_atr": float(spec["add_step_atr"]),
+                    "vol_window": int(spec["vol_window"]),
+                    "target_vol": float(spec["target_vol"]),
+                    "max_hold_bars": int(spec["max_hold_bars"]),
+                    "allow_short": bool(spec["allow_short"]),
+                    "add_alloc_fraction": float(spec["add_alloc_fraction"]),
+                }
+                _add_candidate(
+                    ctx.candidates,
+                    name=(
+                        f"commodity_breakout_rider_{tf_tag}_{spec['variant']}_"
+                        f"{symbol.replace('/', '').lower()}_"
+                        f"{int(spec['donchian_window'])}"
+                    ),
+                    family="breakout",
+                    strategy_class="VolatilityBreakoutRiderStrategy",
+                    timeframe=timeframe,
+                    symbols=(symbol,),
+                    params=params,
+                    notes=(
+                        "Commodity/macro managed-futures Donchian breakout rider "
+                        "confirmed by ATR expansion that rides commodity range "
+                        "expansions BOTH ways (long and short) with an ATR trailing "
+                        "stop and pyramids on follow-through for high compound return "
+                        f"on {symbol} at {timeframe} ({spec['variant']})."
+                    ),
+                    tags=(
+                        "breakout",
+                        "return_rider",
+                        "trailing_stop",
+                        "pyramiding",
+                        "single_asset",
+                        "commodity",
+                        "managed_futures",
+                    ),
+                    metadata={
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": symbol,
+                        "allow_short": bool(spec["allow_short"]),
+                        "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                    },
+                )
+
+
+def _build_commodity_acceleration_rider_candidates(ctx: _CandidateBuildContext) -> None:
+    """S-CMDY3 — commodity managed-futures accelerating-momentum rider (reuse AccelerationRider, long/short)."""
+    commodity_symbols = _intersect_universe(_COMMODITY_TREND_UNIVERSE, ctx.normalized_symbols)
+    if not commodity_symbols:
+        return
+    for timeframe in ctx._present("4h", "1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _COMMODITY_ACCELERATION_RIDER_SLICE.get(timeframe, ()):
+            for symbol in commodity_symbols:
+                params = {
+                    "roc_period": int(spec["roc_period"]),
+                    "min_roc": float(spec["min_roc"]),
+                    "decel_tolerance": float(spec["decel_tolerance"]),
+                    "trail_atr_mult": float(spec["trail_atr_mult"]),
+                    "atr_period": int(spec["atr_period"]),
+                    "max_adds": int(spec["max_adds"]),
+                    "add_step_atr": float(spec["add_step_atr"]),
+                    "vol_window": int(spec["vol_window"]),
+                    "target_vol": float(spec["target_vol"]),
+                    "max_hold_bars": int(spec["max_hold_bars"]),
+                    "allow_short": bool(spec["allow_short"]),
+                    "add_alloc_fraction": float(spec["add_alloc_fraction"]),
+                }
+                _add_candidate(
+                    ctx.candidates,
+                    name=(
+                        f"commodity_acceleration_rider_{tf_tag}_{spec['variant']}_"
+                        f"{symbol.replace('/', '').lower()}_"
+                        f"{int(spec['roc_period'])}"
+                    ),
+                    family="momentum",
+                    strategy_class="AccelerationRiderStrategy",
+                    timeframe=timeframe,
+                    symbols=(symbol,),
+                    params=params,
+                    notes=(
+                        "Commodity/macro managed-futures accelerating-momentum rider "
+                        "that enters on positive-and-rising (or negative-and-falling) "
+                        "rate-of-change, rides commodity trends BOTH ways (long and "
+                        "short) with an ATR trailing stop, and pyramids while "
+                        "acceleration persists for high compound return on "
+                        f"{symbol} at {timeframe} ({spec['variant']})."
+                    ),
+                    tags=(
+                        "momentum",
+                        "return_rider",
+                        "trailing_stop",
+                        "pyramiding",
+                        "single_asset",
+                        "commodity",
+                        "managed_futures",
+                    ),
+                    metadata={
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": symbol,
+                        "allow_short": bool(spec["allow_short"]),
+                        "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                    },
+                )
+
+
+# S-EQ-52WH equity 52-WEEK-HIGH breakout momentum rider: REUSES
+# VolatilityBreakoutRiderStrategy with a LONG ~252-bar (52-week daily) Donchian
+# new-high lookback. George/Hwang 52-week-high momentum — stocks trading near
+# their 52-week high keep outperforming; ride the new high with the inherited ATR
+# trailing stop. LONG-ONLY (allow_short=False — the 52w-high effect is a long
+# anomaly). One single-asset candidate per equity perp, 1d primary (~252 = 52
+# weeks) + 4h faster variant (~252 4h bars). donchian_window schema max is 4096,
+# so 252 is well within range.
+_EQUITY_NEW_HIGH_BREAKOUT_RIDER_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "4h": (
+        {
+            "variant": "fast_52wh_long",
+            "donchian_window": 252,
+            "atr_expansion_mult": 1.05,
+            "atr_baseline_window": 96,
+            "trail_atr_mult": 3.5,
+            "atr_period": 14,
+            "max_adds": 3,
+            "add_step_atr": 1.0,
+            "vol_window": 36,
+            "target_vol": 0.020,
+            "max_hold_bars": 504,
+            "allow_short": False,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1d": (
+        {
+            "variant": "macro_52wh_long",
+            "donchian_window": 252,
+            "atr_expansion_mult": 1.05,
+            "atr_baseline_window": 60,
+            "trail_atr_mult": 4.0,
+            "atr_period": 14,
+            "max_adds": 3,
+            "add_step_atr": 1.0,
+            "vol_window": 20,
+            "target_vol": 0.025,
+            "max_hold_bars": 252,
+            "allow_short": False,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+}
+
+
+def _build_equity_new_high_breakout_rider_candidates(ctx: _CandidateBuildContext) -> None:
+    """S-EQ-52WH — equity 52-week-high breakout momentum rider (reuse VolBreakoutRider, long-only)."""
+    equity_symbols = _intersect_universe(_EQUITY_FACTOR_UNIVERSE, ctx.normalized_symbols)
+    if not equity_symbols:
+        return
+    for timeframe in ctx._present("4h", "1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _EQUITY_NEW_HIGH_BREAKOUT_RIDER_SLICE.get(timeframe, ()):
+            for symbol in equity_symbols:
+                params = {
+                    "donchian_window": int(spec["donchian_window"]),
+                    "atr_expansion_mult": float(spec["atr_expansion_mult"]),
+                    "atr_baseline_window": int(spec["atr_baseline_window"]),
+                    "trail_atr_mult": float(spec["trail_atr_mult"]),
+                    "atr_period": int(spec["atr_period"]),
+                    "max_adds": int(spec["max_adds"]),
+                    "add_step_atr": float(spec["add_step_atr"]),
+                    "vol_window": int(spec["vol_window"]),
+                    "target_vol": float(spec["target_vol"]),
+                    "max_hold_bars": int(spec["max_hold_bars"]),
+                    "allow_short": bool(spec["allow_short"]),
+                    "add_alloc_fraction": float(spec["add_alloc_fraction"]),
+                }
+                _add_candidate(
+                    ctx.candidates,
+                    name=(
+                        f"equity_new_high_breakout_rider_{tf_tag}_{spec['variant']}_"
+                        f"{symbol.replace('/', '').lower()}_"
+                        f"{int(spec['donchian_window'])}"
+                    ),
+                    family="breakout",
+                    strategy_class="VolatilityBreakoutRiderStrategy",
+                    timeframe=timeframe,
+                    symbols=(symbol,),
+                    params=params,
+                    notes=(
+                        "George/Hwang 52-week-high momentum: long-only single-name "
+                        "equity rider that buys a fresh ~252-bar (52-week) new high "
+                        "and rides it with the inherited ATR trailing stop, pyramiding "
+                        "on follow-through. Stocks near their 52-week high keep "
+                        f"outperforming on {symbol} at {timeframe} ({spec['variant']})."
+                    ),
+                    tags=(
+                        "breakout",
+                        "momentum",
+                        "52w_high",
+                        "single_asset",
+                        "equity",
+                        "return_rider",
+                    ),
+                    metadata={
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": symbol,
+                        "allow_short": bool(spec["allow_short"]),
                         "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
                     },
                 )
