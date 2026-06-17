@@ -1,5 +1,14 @@
 # Research Note
 
+## 2026-06-17 KST (g) — carry×trend 컨플루언스 라이더 + 변동성 스퀴즈 브레이크아웃 라이더
+
+고확신·비중복 2종(`carry_trend_squeeze_alpha_sleeves.py`, 둘 다 `_ReturnRiderBase` 상속·per-symbol 단일자산·방향성·>=30m).
+
+- **CarryTrendConfluenceRiderStrategy** (crypto-perp only). 이론: Koijen-Moskowitz-Pedersen-Vrij "Carry" + Asness-Moskowitz-Pedersen "Value and Momentum Everywhere" — carry와 momentum은 상보적 수익원. **엔트리 = 추세 부호 ∧ carry 부호 합치(both-agree)**: 추세 상승 ∧ 평균 funding <= `long_carry_funding`(롱 perp이 carry를 받음/적어도 안 깎임)일 때만 LONG; `allow_short`면 추세 하락 ∧ funding >= `short_carry_funding`일 때 SHORT. ATR 트레일링+피라미딩으로 라이드. **차별점**: FundingHarvestCarry는 funding 부호만으로 진입(추세를 거스를 수 있고 ROC는 약한 veto뿐)·|funding| 사이징; 순수 트렌드라이더는 funding 비용 무시(크라우디드 롱에서 음의 carry로 출혈). 신규는 추세 라이드를 **carry 순풍으로 필터**하는 both-agree 게이트가 novelty. funding 데이터 없으면 graceful no-entry.
+- **VolatilitySqueezeBreakoutRiderStrategy** (OHLCV-only, crypto_only). 이론: 변동성 클러스터링·수축→확장 사이클(Bollinger squeeze; John Carter TTM squeeze). **저변동성 스퀴즈(Bollinger bandwidth 다중바 퍼센타일 최저)를 필수 전제**로 latch한 뒤, 확장(bandwidth >= `expansion_mult`×스퀴즈 baseline) + 직전 N바 Donchian 레인지 돌파 시 **돌파 방향으로 진입**·라이드. 선택적으로 `require_bb_in_kc`(BB가 Keltner 채널 안 = 정통 TTM 스퀴즈). **차별점**: VWAPCompressionReversion은 같은 수축 레짐을 **반전(페이드)**으로 — 정반대 폴라리티; VolatilityBreakoutRider는 Donchian 채널 돌파지만 수축-전제 없음(아무 변동성 레짐에서나 발화). 신규는 **수축-레짐 전제**가 돌파 컨티뉴에이션을 게이팅하는 게 edge.
+
+유니버스는 둘 다 `ctx.crypto_only_symbols`(tradfi perp 누수 없음; carry 빌더는 추가로 `ctx.perp_support_data_available` 게이트). 30m/1h/4h/1d, per-TF cadence `_RIDER_TF_CADENCE_SECONDS`(>=1800). 적대적 리뷰: **두 슬리브 모두 진짜 비중복(KEEP)**. major 1건 수정 — 스퀴즈의 Keltner 게이트(`_bb_inside_kc`)가 latch 경로에 미배선이라 `require_bb_in_kc`/`keltner_*` 4개 파라미터가 무효였음 → `_refresh_squeeze` latch에 Keltner 조건 배선 + dead `_is_squeeze` 제거 + 게이트 동작변경 회귀 테스트 추가. 검증: `.venv/bin/python`(3.14) ruff·format·py_compile·audit(baseline 736/new=0)·check_architecture·verify_docs·compileall·신규 15테스트·full pytest 통과. 백테스트는 데이터 PC.
+
 ## 2026-06-17 KST (f) — 실현변동성 term-structure 쇼크-라이드 + 교차섹션 breadth 레짐 타이머
 
 고확신·비중복 2종(`vol_term_breadth_alpha_sleeves.py`). 둘 다 방향성·리턴지향, >=30m.
