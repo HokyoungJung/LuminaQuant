@@ -34,6 +34,10 @@ Sleeves:
   gated by ``volcomp_vwap_pressure`` (only acts when its compression regime is
   active), anchored to the boundary window's 1s volume-weighted typical price for
   a precise deviation.  OHLCV-only.  Long and short.
+- :class:`SeasonalMicroBreakoutRiderStrategy` (#6): per-symbol breakout
+  continuation gated by the online intraday slot drift that just proved useful in
+  backtest, then confirmed by the latest window's 1s tick agreement / VWAP edge.
+  OHLCV-only.  Long and short.
 
 All classes are data-local (no fetching, no artifact writes, no hidden
 environment state), ``None``-safe (never raise on sparse / degenerate input),
@@ -45,6 +49,7 @@ data-bearing machine.
 from __future__ import annotations
 
 import statistics
+import math
 from collections import deque
 from dataclasses import dataclass, field
 from itertools import pairwise
@@ -52,6 +57,7 @@ from typing import Any
 
 from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.accelerated import garman_klass_volatility
+from lumina_quant.indicators.oscillators import rate_of_change
 from lumina_quant.indicators.advanced_alpha import (
     pv_trend_score,
     volcomp_vwap_pressure,
@@ -65,10 +71,12 @@ from lumina_quant.indicators.alpha_features import (
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.indicators.momentum import kaufman_efficiency_ratio
 from lumina_quant.strategies.external_alpha_sleeves import (
+    _event_datetime_utc,
     _EPS,
     _Snapshot,
     _emit,
     _event_symbols,
+    _market_snapshot,
     _row_dict,
     _safe_non_negative_int,
     _target_metadata,
@@ -157,6 +165,54 @@ def _window_vwap(rows: list[dict[str, Any]]) -> float | None:
     if typicals:
         return float(sum(typicals) / len(typicals))
     return None
+
+
+_MicroSlotStat = tuple[float, float, int]
+
+
+def _slot_stat_update(
+    stats: dict[int, _MicroSlotStat],
+    key: int,
+    ret: float,
+    decay: float,
+) -> None:
+    """One-bar-deferred EW mean/variance update for an intraday slot."""
+    rec = stats.get(key)
+    if rec is None:
+        stats[key] = (float(ret), 0.0, 1)
+        return
+    mean, var, n = rec
+    delta = float(ret) - mean
+    mean += decay * delta
+    var = (1.0 - decay) * (var + decay * delta * delta)
+    stats[key] = (mean, var, n + 1)
+
+
+def _slot_stat_signal(
+    stats: dict[int, _MicroSlotStat],
+    key: int | None,
+    *,
+    min_obs: int,
+    t_threshold: float,
+    decay: float,
+) -> int:
+    """Return significant slot-drift direction, capped by EW effective sample size."""
+    if key is None:
+        return 0
+    rec = stats.get(key)
+    if rec is None:
+        return 0
+    mean, var, n = rec
+    if n < min_obs:
+        return 0
+    eff_n = min(float(n), 1.0 / decay if decay > _EPS else float(n))
+    std = math.sqrt(var) if var > 0.0 else 0.0
+    if std <= _EPS:
+        return 1 if mean > 0.0 else (-1 if mean < 0.0 else 0)
+    t_stat = abs(mean) / std * math.sqrt(max(eff_n, 1.0))
+    if t_stat < t_threshold:
+        return 0
+    return 1 if mean > 0.0 else (-1 if mean < 0.0 else 0)
 
 
 # --------------------------------------------------------------------------- #
@@ -858,6 +914,318 @@ class VolOfVolRegimeTrendGateStrategy(_ReturnRiderBase):
 
 
 # --------------------------------------------------------------------------- #
+# #6 SeasonalMicroBreakoutRiderStrategy
+# --------------------------------------------------------------------------- #
+@dataclass(slots=True)
+class _SeasonalMicroBreakoutExtra:
+    """Per-symbol slot statistics + latest micro confirmation state."""
+
+    slot_stats: dict[int, _MicroSlotStat] = field(default_factory=dict)
+    decision_slot: int | None = None
+    micro_vwap: float | None = None
+    micro_agreement: float | None = None
+    micro_rows: tuple[dict[str, Any], ...] = ()
+    breakout_direction: str = ""
+    breakout_level: float | None = None
+
+
+@register("strategy", "SeasonalMicroBreakoutRiderStrategy", interface="event_driven")
+class SeasonalMicroBreakoutRiderStrategy(_ReturnRiderBase):
+    """Ride range breakouts only in historically favorable intraday slots.
+
+    This sleeve deliberately combines the two strongest patterns from the latest
+    local evaluation: sub-day slot drift (``IntradaySeasonalMomentumRider``) and
+    directional range expansion (``VolatilityBreakoutRider``).  The robust core is
+    computed on accumulated >=30m decision bars:
+
+    1. maintain one-bar-deferred online mean/variance for each UTC time-of-day
+       slot, so the current bar is never in its own statistic;
+    2. require the current close to break the trailing decision-bar high/low;
+    3. require the current slot's statistically significant drift to agree with
+       the breakout direction and the medium-horizon ROC trend.
+
+    When the boundary window carries a 1s tape, the sleeve uses it as a fresh
+    micro confirmation: tick signs must agree with the breakout and, optionally,
+    the close must finish on the correct side of the window VWAP.  If the 1s tape
+    is absent or too sparse, the micro check is neutral rather than fabricated.
+    Trades are still emitted only at ``decision_cadence_seconds == 1800``.
+    """
+
+    decision_cadence_seconds = 1800
+    preferred_contract = "market_window"
+    uses_timeframe_aggregator = False
+
+    strategy_name = "SeasonalMicroBreakoutRiderStrategy"
+    strategy_id = "seasonal_micro_breakout_rider"
+
+    @classmethod
+    def get_param_schema(cls) -> dict[str, HyperParam]:
+        return {
+            "slot_minutes": HyperParam.integer(
+                "slot_minutes", default=60, low=1, high=1440, tunable=False
+            ),
+            "seasonal_decay": HyperParam.floating(
+                "seasonal_decay", default=0.08, low=0.001, high=1.0
+            ),
+            "min_slot_observations": HyperParam.integer(
+                "min_slot_observations", default=6, low=1, high=100000
+            ),
+            "slot_t_threshold": HyperParam.floating(
+                "slot_t_threshold", default=1.0, low=0.0, high=20.0
+            ),
+            "breakout_window": HyperParam.integer("breakout_window", default=24, low=2, high=20000),
+            "breakout_buffer_atr_mult": HyperParam.floating(
+                "breakout_buffer_atr_mult", default=0.05, low=0.0, high=20.0
+            ),
+            "trend_lookback": HyperParam.integer("trend_lookback", default=24, low=2, high=20000),
+            "min_trend_roc": HyperParam.floating("min_trend_roc", default=0.0, low=0.0, high=1.0),
+            "tick_agree_frac": HyperParam.floating(
+                "tick_agree_frac", default=0.55, low=0.0, high=1.0
+            ),
+            "require_micro_vwap_edge": HyperParam.boolean(
+                "require_micro_vwap_edge", default=True, grid=[True, False]
+            ),
+            "trail_atr_mult": HyperParam.floating(
+                "trail_atr_mult", default=3.0, low=0.1, high=20.0
+            ),
+            "atr_period": HyperParam.integer("atr_period", default=14, low=2, high=1024),
+            "max_adds": HyperParam.integer("max_adds", default=2, low=0, high=32),
+            "add_step_atr": HyperParam.floating("add_step_atr", default=1.0, low=0.0, high=20.0),
+            "vol_window": HyperParam.integer("vol_window", default=48, low=2, high=4096),
+            "target_vol": HyperParam.floating("target_vol", default=0.02, low=0.0, high=1.0),
+            "max_hold_bars": HyperParam.integer("max_hold_bars", default=180, low=1, high=200000),
+            "allow_short": HyperParam.boolean("allow_short", default=True, grid=[True, False]),
+            "add_alloc_fraction": HyperParam.floating(
+                "add_alloc_fraction", default=0.5, low=0.0, high=1.0
+            ),
+            "target_allocation": HyperParam.floating(
+                "target_allocation", default=0.30, low=0.0, high=5.0, tunable=False
+            ),
+            "max_order_value": HyperParam.floating(
+                "max_order_value", default=5000.0, low=0.0, high=1_000_000.0, tunable=False
+            ),
+            "min_price": HyperParam.floating("min_price", default=0.10, low=0.0, high=1_000_000.0),
+        }
+
+    def __init__(self, bars: Any, events: Any, **params: Any) -> None:
+        super().__init__(bars, events, **params)
+        self._extra = {symbol: _SeasonalMicroBreakoutExtra() for symbol in self.symbol_list}
+
+    def _bind_params(self, resolved: dict[str, Any]) -> None:
+        self.slot_minutes = max(1, min(1440, int(resolved["slot_minutes"])))
+        self.seasonal_decay = max(0.001, min(1.0, float(resolved["seasonal_decay"])))
+        self.min_slot_observations = max(1, int(resolved["min_slot_observations"]))
+        self.slot_t_threshold = max(0.0, float(resolved["slot_t_threshold"]))
+        self.breakout_window = max(2, int(resolved["breakout_window"]))
+        self.breakout_buffer_atr_mult = max(0.0, float(resolved["breakout_buffer_atr_mult"]))
+        self.trend_lookback = max(2, int(resolved["trend_lookback"]))
+        self.min_trend_roc = max(0.0, float(resolved["min_trend_roc"]))
+        self.tick_agree_frac = max(0.0, min(1.0, float(resolved["tick_agree_frac"])))
+        self.require_micro_vwap_edge = bool(resolved["require_micro_vwap_edge"])
+
+    def _common_config(self, resolved: dict[str, Any]) -> _RiderCommon:
+        return self._resolve_common(
+            resolved,
+            extra_window=max(int(resolved["breakout_window"]), int(resolved["trend_lookback"])) + 2,
+        )
+
+    def calculate_signals_window(self, event: Any, aggregator: Any = None) -> None:
+        _ = aggregator
+        for symbol in _event_symbols(event, self.symbol_list):
+            snapshot = _window_snapshot(event, symbol)
+            if snapshot is None:
+                continue
+            rows = _window_rows(event, symbol)
+            self._prepare_context(symbol, snapshot, rows)
+            self._process_symbol(symbol, snapshot)
+
+    def calculate_signals(self, event: Any) -> None:
+        if str(getattr(event, "type", "")).upper() == "MARKET_WINDOW":
+            self.calculate_signals_window(event, None)
+            return
+        if getattr(event, "type", None) != "MARKET":
+            return
+        symbol = getattr(event, "symbol", None)
+        if symbol in self._state:
+            snapshot = _market_snapshot(event)
+            if snapshot is not None:
+                # Backtest/event-driven paths may not expose MARKET_WINDOW bars_1s.
+                # Treat the micro read as neutral while keeping the same >=30m
+                # class-level decision cadence in the engine.
+                self._prepare_context(str(symbol), snapshot, [])
+                self._process_symbol(str(symbol), snapshot)
+
+    def _slot_of(self, snapshot: _Snapshot) -> int | None:
+        dt = _event_datetime_utc(snapshot.time)
+        if dt is None:
+            return None
+        return (dt.hour * 60 + dt.minute) // self.slot_minutes
+
+    def _prepare_context(
+        self, symbol: str, snapshot: _Snapshot, rows: list[dict[str, Any]]
+    ) -> None:
+        item = self._state.get(symbol)
+        extra = self._extra.get(symbol)
+        if item is None or extra is None:
+            return
+        key = time_key(snapshot.time)
+        if key and key == item.last_time_key:
+            return
+        close = safe_float(snapshot.close)
+        if close is None or close <= self.min_price:
+            return
+        closes = list(item.closes)
+        if extra.decision_slot is not None and len(closes) >= 2 and closes[-2] > _EPS:
+            ret = closes[-1] / closes[-2] - 1.0
+            if math.isfinite(ret):
+                _slot_stat_update(
+                    extra.slot_stats,
+                    int(extra.decision_slot),
+                    ret,
+                    self.seasonal_decay,
+                )
+        extra.decision_slot = self._slot_of(snapshot)
+        extra.micro_rows = tuple(rows)
+        extra.micro_vwap = _window_vwap(rows)
+        extra.micro_agreement = None
+        extra.breakout_direction = ""
+        extra.breakout_level = None
+
+    def _symbol_for_state(self, item: _RiderState) -> str | None:
+        for symbol, state in self._state.items():
+            if state is item:
+                return symbol
+        return None
+
+    def _trend_allows(self, closes: list[float], direction: str) -> bool:
+        trend = rate_of_change(closes, period=self.trend_lookback)
+        if trend is None or abs(trend) < self.min_trend_roc:
+            return False
+        return trend > 0.0 if direction == "LONG" else trend < 0.0
+
+    def _breakout_direction(self, item: _RiderState) -> tuple[str, float | None]:
+        closes = list(item.closes)
+        highs = list(item.highs)
+        lows = list(item.lows)
+        if len(closes) <= self.breakout_window:
+            return "", None
+        close = closes[-1]
+        previous_high = max(highs[-(self.breakout_window + 1) : -1])
+        previous_low = min(lows[-(self.breakout_window + 1) : -1])
+        atr = self._current_atr(item)
+        buffer = (atr if atr is not None else 0.0) * self.breakout_buffer_atr_mult
+        if close > previous_high + buffer:
+            return "LONG", float(previous_high)
+        if close < previous_low - buffer:
+            return "SHORT", float(previous_low)
+        return "", None
+
+    def _aligned_direction(self, symbol: str, item: _RiderState) -> str:
+        extra = self._extra.get(symbol)
+        if extra is None:
+            return ""
+        direction, level = self._breakout_direction(item)
+        extra.breakout_direction = direction
+        extra.breakout_level = level
+        if direction == "" or not self._trend_allows(list(item.closes), direction):
+            return ""
+        slot_sig = _slot_stat_signal(
+            extra.slot_stats,
+            extra.decision_slot,
+            min_obs=self.min_slot_observations,
+            t_threshold=self.slot_t_threshold,
+            decay=self.seasonal_decay,
+        )
+        required = 1 if direction == "LONG" else -1
+        if slot_sig != required:
+            return ""
+        agreement = _tick_agreement(list(extra.micro_rows), direction=direction)
+        extra.micro_agreement = agreement
+        if agreement is not None and agreement < self.tick_agree_frac:
+            return ""
+        if self.require_micro_vwap_edge and extra.micro_vwap is not None and item.closes:
+            close = item.closes[-1]
+            if direction == "LONG" and close < extra.micro_vwap:
+                return ""
+            if direction == "SHORT" and close > extra.micro_vwap:
+                return ""
+        return direction
+
+    def _entry_decision(self, item: _RiderState) -> str:
+        symbol = self._symbol_for_state(item)
+        if symbol is None:
+            return ""
+        return self._aligned_direction(symbol, item)
+
+    def _should_pyramid(self, item: _RiderState) -> bool:
+        symbol = self._symbol_for_state(item)
+        if symbol is None:
+            return False
+        return self._aligned_direction(symbol, item) == item.mode
+
+    def _entry_metadata(self, item: _RiderState) -> dict[str, Any]:
+        symbol = self._symbol_for_state(item)
+        extra = self._extra.get(symbol) if symbol is not None else None
+        rec = None
+        if extra is not None and extra.decision_slot is not None:
+            rec = extra.slot_stats.get(int(extra.decision_slot))
+        return {
+            "slot": int(extra.decision_slot)
+            if extra is not None and extra.decision_slot is not None
+            else None,
+            "slot_mean_return": float(rec[0]) if rec is not None else None,
+            "slot_observations": int(rec[2]) if rec is not None else 0,
+            "breakout_direction": extra.breakout_direction if extra is not None else "",
+            "breakout_level": float(extra.breakout_level)
+            if extra is not None and extra.breakout_level is not None
+            else None,
+            "micro_tick_agreement": float(extra.micro_agreement)
+            if extra is not None and extra.micro_agreement is not None
+            else None,
+            "micro_vwap": float(extra.micro_vwap)
+            if extra is not None and extra.micro_vwap is not None
+            else None,
+        }
+
+    def get_state(self) -> dict[str, Any]:
+        state = super().get_state()
+        state["seasonal_micro_breakout_state"] = {
+            symbol: {
+                "slot_stats": {
+                    int(k): [float(v[0]), float(v[1]), int(v[2])]
+                    for k, v in extra.slot_stats.items()
+                },
+                "decision_slot": extra.decision_slot,
+            }
+            for symbol, extra in self._extra.items()
+        }
+        return state
+
+    def set_state(self, state: dict[str, Any]) -> None:
+        super().set_state(state)
+        raw = state.get("seasonal_micro_breakout_state") if isinstance(state, dict) else None
+        if not isinstance(raw, dict):
+            return
+        for symbol, payload in raw.items():
+            extra = self._extra.get(symbol)
+            if extra is None or not isinstance(payload, dict):
+                continue
+            stats: dict[int, _MicroSlotStat] = {}
+            for key, value in (payload.get("slot_stats") or {}).items():
+                try:
+                    seq = list(value)
+                    stats[int(key)] = (float(seq[0]), float(seq[1]), int(seq[2]))
+                except Exception:
+                    continue
+            extra.slot_stats = stats
+            try:
+                slot = payload.get("decision_slot")
+                extra.decision_slot = int(slot) if slot is not None else None
+            except Exception:
+                extra.decision_slot = None
+
+
+# --------------------------------------------------------------------------- #
 # #5 VWAPCompressionReversionStrategy
 # --------------------------------------------------------------------------- #
 @dataclass(slots=True)
@@ -1221,6 +1589,7 @@ class VWAPCompressionReversionStrategy(Strategy):
 
 __all__ = [
     "IntradayFlowPressureRiderStrategy",
+    "SeasonalMicroBreakoutRiderStrategy",
     "VWAPCompressionReversionStrategy",
     "VolOfVolRegimeTrendGateStrategy",
 ]

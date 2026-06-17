@@ -1,9 +1,9 @@
 """Deterministic unit tests for the micro-signal-informed >=30m alpha sleeves.
 
-These tests exercise the three sleeves entirely through the local
+These tests exercise the four sleeves entirely through the local
 MARKET_WINDOW event / bar contract (no backtest, no data fetch):
 
-- registry presence for all three classes;
+- registry presence for all four classes;
 - each sleeve pins ``decision_cadence_seconds == 1800``;
 - #1 IntradayFlowPressureRiderStrategy goes LONG on persistent positive taker
   flow and SHORT on persistent negative flow (taker volumes stubbed via
@@ -12,6 +12,8 @@ MARKET_WINDOW event / bar contract (no backtest, no data fetch):
   down-sizes/vetoes a high-GK choppy trend (allocation differs by regime);
 - #5 VWAPCompressionReversionStrategy only acts when the compression regime is
   active and fades the VWAP deviation;
+- #6 SeasonalMicroBreakoutRiderStrategy requires a range breakout, favorable
+  one-bar-deferred intraday slot drift, and fresh micro confirmation;
 - candidate-wiring asserts ``decision_cadence_seconds == 1800`` and timeframes
   are a subset of {30m, 1h, 4h, 1d}.
 """
@@ -26,6 +28,7 @@ from typing import Any
 from lumina_quant.core.market_window_contract import build_market_window_event
 from lumina_quant.strategies.micro_signal_alpha_sleeves import (
     IntradayFlowPressureRiderStrategy,
+    SeasonalMicroBreakoutRiderStrategy,
     VolOfVolRegimeTrendGateStrategy,
     VWAPCompressionReversionStrategy,
 )
@@ -38,6 +41,7 @@ MICRO_STRATEGIES = (
     "IntradayFlowPressureRiderStrategy",
     "VolOfVolRegimeTrendGateStrategy",
     "VWAPCompressionReversionStrategy",
+    "SeasonalMicroBreakoutRiderStrategy",
 )
 
 _TF = {"30m", "1h", "4h", "1d"}
@@ -137,6 +141,7 @@ def test_decision_cadence_is_1800() -> None:
         IntradayFlowPressureRiderStrategy,
         VolOfVolRegimeTrendGateStrategy,
         VWAPCompressionReversionStrategy,
+        SeasonalMicroBreakoutRiderStrategy,
     ):
         assert cls.decision_cadence_seconds == 1800
         assert cls.preferred_contract == "market_window"
@@ -416,6 +421,80 @@ def test_vwap_compression_fades_negative_deviation_long() -> None:
     assert entry.metadata.get("deviation_z") is not None
     assert entry.metadata.get("deviation_z") <= 0.0
     assert entry.metadata.get("target_allocation", 0.0) > 0.0
+
+
+# --------------------------------------------------------------------------- #
+# #6 SeasonalMicroBreakoutRiderStrategy
+# --------------------------------------------------------------------------- #
+def _run_seasonal_micro_breakout(*, micro_agrees: bool, min_slot_obs: int = 4) -> list[Any]:
+    symbol = "BTC/USDT"
+    bars = _Bars(symbol_list=[symbol])
+    events: queue.Queue = queue.Queue()
+    strat = SeasonalMicroBreakoutRiderStrategy(
+        bars,
+        events,
+        slot_minutes=1440,
+        seasonal_decay=0.35,
+        min_slot_observations=min_slot_obs,
+        slot_t_threshold=0.2,
+        breakout_window=5,
+        breakout_buffer_atr_mult=0.0,
+        trend_lookback=3,
+        tick_agree_frac=0.60,
+        require_micro_vwap_edge=True,
+        atr_period=3,
+        vol_window=8,
+        max_adds=1,
+        max_hold_bars=80,
+        min_price=0.0,
+    )
+    price = 100.0
+    ts = _STEP_MS
+    emitted: list[Any] = []
+    for step in range(28):
+        drift = 0.25 if step < 12 else 0.85
+        close = price + drift
+        if micro_agrees:
+            sub = [price + drift * (idx + 1) / 6.0 for idx in range(6)]
+        else:
+            # Same positive decision-bar breakout, but the last-window tape sells
+            # down into the close, so tick agreement and micro-VWAP edge veto.
+            sub = [close + 0.35 - idx * 0.07 for idx in range(6)]
+            sub[-1] = close
+        rows = _ohlc_rows(
+            ts,
+            open_=price,
+            high=max(price, close) + 0.05,
+            low=min(price, close) - 0.05,
+            close=close,
+            volume=1000.0,
+            sub_closes=sub,
+        )
+        strat.calculate_signals_window(_window(ts, {symbol: rows}), None)
+        emitted.extend(_drain(events))
+        price = close
+        ts += _STEP_MS
+    return emitted
+
+
+def test_seasonal_micro_breakout_enters_on_aligned_slot_breakout() -> None:
+    signals = _run_seasonal_micro_breakout(micro_agrees=True)
+    longs = [s for s in signals if s.signal_type == "LONG"]
+    assert longs, "expected LONG on favorable slot drift + breakout + micro confirmation"
+    first = longs[0]
+    assert first.metadata.get("slot_observations", 0) >= 4
+    assert first.metadata.get("breakout_direction") == "LONG"
+    assert first.metadata.get("micro_tick_agreement") is not None
+
+
+def test_seasonal_micro_breakout_vetoes_bad_micro_tape() -> None:
+    signals = _run_seasonal_micro_breakout(micro_agrees=False)
+    assert not [s for s in signals if s.signal_type == "LONG"]
+
+
+def test_seasonal_micro_breakout_requires_slot_history() -> None:
+    signals = _run_seasonal_micro_breakout(micro_agrees=True, min_slot_obs=10_000)
+    assert not [s for s in signals if s.signal_type in {"LONG", "SHORT"}]
 
 
 # --------------------------------------------------------------------------- #

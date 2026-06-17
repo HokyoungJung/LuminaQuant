@@ -2619,6 +2619,7 @@ class _CandidateBuildContext:
         _build_intraday_flow_pressure_rider_candidates(self)
         _build_vol_of_vol_regime_trend_gate_candidates(self)
         _build_vwap_compression_reversion_candidates(self)
+        _build_seasonal_micro_breakout_rider_candidates(self)
         # Aggressive per-symbol directional RETURN-maximizing sleeves (>=30m only;
         # multi-horizon trend agreement, buy-the-dip continuation, funding-carry
         # harvest — ride winners with ATR trailing stops + pyramiding).
@@ -5438,6 +5439,81 @@ _VWAP_COMPRESSION_REVERSION_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
 }
 
 
+# #6 SeasonalMicroBreakoutRiderStrategy: breakout continuation gated by proven
+# intraday slot drift, plus best-effort 1s tick/VWAP confirmation. OHLCV-only.
+_SEASONAL_MICRO_BREAKOUT_RIDER_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "30m": (
+        {
+            "variant": "fast_slot_breakout_ls",
+            "slot_minutes": 60,
+            "seasonal_decay": 0.08,
+            "min_slot_observations": 6,
+            "slot_t_threshold": 1.0,
+            "breakout_window": 16,
+            "breakout_buffer_atr_mult": 0.03,
+            "trend_lookback": 16,
+            "tick_agree_frac": 0.55,
+            "require_micro_vwap_edge": True,
+            "trail_atr_mult": 3.0,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 200,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "core_slot_breakout_ls",
+            "slot_minutes": 60,
+            "seasonal_decay": 0.08,
+            "min_slot_observations": 6,
+            "slot_t_threshold": 1.0,
+            "breakout_window": 24,
+            "breakout_buffer_atr_mult": 0.05,
+            "trend_lookback": 24,
+            "tick_agree_frac": 0.55,
+            "require_micro_vwap_edge": True,
+            "trail_atr_mult": 3.0,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 180,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "swing_slot_breakout_ls",
+            "slot_minutes": 240,
+            "seasonal_decay": 0.10,
+            "min_slot_observations": 4,
+            "slot_t_threshold": 0.8,
+            "breakout_window": 12,
+            "breakout_buffer_atr_mult": 0.05,
+            "trend_lookback": 12,
+            "tick_agree_frac": 0.55,
+            "require_micro_vwap_edge": True,
+            "trail_atr_mult": 3.5,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 36,
+            "target_vol": 0.030,
+            "max_hold_bars": 120,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+}
+
+
 def _build_intraday_flow_pressure_rider_candidates(ctx: _CandidateBuildContext) -> None:
     """Per-symbol taker-flow CONTINUATION ride (#1, single-asset, crypto-perp).
 
@@ -5637,6 +5713,80 @@ def _build_vwap_compression_reversion_candidates(ctx: _CandidateBuildContext) ->
                         "single_asset",
                         "crypto",
                         "micro_signal",
+                    ),
+                    metadata={
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": symbol,
+                        "allow_short": bool(spec["allow_short"]),
+                        "decision_cadence_seconds": _MICRO_SIGNAL_DECISION_CADENCE_SECONDS,
+                    },
+                )
+
+
+def _build_seasonal_micro_breakout_rider_candidates(ctx: _CandidateBuildContext) -> None:
+    """Seasonal slot drift + range-breakout rider (#6, OHLCV-only micro-aware).
+
+    Crypto-only universe.  The class may read the boundary window's 1s tape for
+    tick/VWAP confirmation, but every candidate is hard-pinned to a 30m decision
+    cadence.  1d is intentionally excluded: sub-day slots and micro confirmation
+    are not meaningful on a once-per-day decision bar.
+    """
+    crypto_symbols = ctx.crypto_only_symbols
+    if not crypto_symbols:
+        return
+    for timeframe in ctx._present("30m", "1h", "4h"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _SEASONAL_MICRO_BREAKOUT_RIDER_SLICE.get(timeframe, ()):
+            for symbol in crypto_symbols:
+                params = {
+                    "slot_minutes": int(spec["slot_minutes"]),
+                    "seasonal_decay": float(spec["seasonal_decay"]),
+                    "min_slot_observations": int(spec["min_slot_observations"]),
+                    "slot_t_threshold": float(spec["slot_t_threshold"]),
+                    "breakout_window": int(spec["breakout_window"]),
+                    "breakout_buffer_atr_mult": float(spec["breakout_buffer_atr_mult"]),
+                    "trend_lookback": int(spec["trend_lookback"]),
+                    "tick_agree_frac": float(spec["tick_agree_frac"]),
+                    "require_micro_vwap_edge": bool(spec["require_micro_vwap_edge"]),
+                    "trail_atr_mult": float(spec["trail_atr_mult"]),
+                    "atr_period": int(spec["atr_period"]),
+                    "max_adds": int(spec["max_adds"]),
+                    "add_step_atr": float(spec["add_step_atr"]),
+                    "vol_window": int(spec["vol_window"]),
+                    "target_vol": float(spec["target_vol"]),
+                    "max_hold_bars": int(spec["max_hold_bars"]),
+                    "allow_short": bool(spec["allow_short"]),
+                    "add_alloc_fraction": float(spec["add_alloc_fraction"]),
+                }
+                _add_candidate(
+                    ctx.candidates,
+                    name=(
+                        f"seasonal_micro_breakout_rider_{tf_tag}_{spec['variant']}_"
+                        f"{symbol.replace('/', '').lower()}_"
+                        f"{int(spec['breakout_window'])}"
+                    ),
+                    family="breakout",
+                    strategy_class="SeasonalMicroBreakoutRiderStrategy",
+                    timeframe=timeframe,
+                    symbols=(symbol,),
+                    params=params,
+                    notes=(
+                        "Per-symbol breakout continuation gated by one-bar-deferred "
+                        "intraday slot drift and confirmed by latest-window 1s tick/VWAP "
+                        "micro structure when available.  It fuses the strongest recent "
+                        "seasonal-slot and breakout sleeves while still deciding at 30m "
+                        f"on {symbol} at {timeframe} ({spec['variant']})."
+                    ),
+                    tags=(
+                        "breakout",
+                        "seasonality",
+                        "micro_signal",
+                        "return_rider",
+                        "trailing_stop",
+                        "pyramiding",
+                        "single_asset",
+                        "crypto",
                     ),
                     metadata={
                         "timeframe": timeframe,

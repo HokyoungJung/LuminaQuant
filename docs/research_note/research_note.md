@@ -1,5 +1,19 @@
 # Research Note
 
+## 2026-06-17 KST (m) — Seasonal Micro Breakout Rider: 1s/1m 미시 확인 + 30m/1h 거래
+
+새 전략 **`SeasonalMicroBreakoutRiderStrategy`** 추가(`micro_signal_alpha_sleeves.py`, `_ReturnRiderBase` 상속·per-symbol 단일자산·crypto-only·>=30m). 사용자 제약을 그대로 반영: **알파는 마지막 market-window의 1s tape/VWAP를 확인용으로 볼 수 있지만, 실제 signal/order 결정은 `decision_cadence_seconds=1800` 이상**. 후보 라이브러리는 30m/1h/4h만 발행하고 1d는 제외(일중 slot 구조 희석).
+
+- **신호 구조.** 결정바 close-to-close 수익률을 UTC `slot_minutes` 버킷별 decay-weighted 평균/분산으로 **one-bar-deferred** 업데이트(현재 바는 자기 슬롯 통계에 미포함 → 룩어헤드 방지). 슬롯 t-like signal이 `slot_t_threshold`를 넘고, 직전 `breakout_window` Donchian high/low + ATR buffer 돌파와 `trend_lookback` ROC 방향이 정렬될 때만 진입. 마지막 1s window는 tick 부호 일치율(`tick_agree_frac`)과 micro VWAP edge를 fresh confirmation으로만 사용하며, 이벤트 백테스트의 `MARKET` fallback에서는 micro가 없으면 neutral로 처리한다(위조/합성 없음).
+- **차별점.** 기존 `IntradaySeasonalMomentumRider`는 slot drift × trend 조건만 보고, `VolatilityBreakoutRider`는 rolling breakout만 본다. 신규는 **시간대 slot drift + trailing breakout + ROC trend + micro tape/VWAP 확인**이 동시에 맞아야 발화한다. `TakerFlow*` 류의 60s/flow fade와도 반대: 본 전략은 30m/1h decision bar에서 continuation ride.
+- **후보/selector 반영.** `candidate_library.py`에 `seasonal_micro_breakout_rider_{30m,1h,4h}` 슬라이스 추가. `ctx.crypto_only_symbols`만 사용해 tradfi/equity perp 누수 없음. 생성 확인: 총 30개(30m 10, 1h 10, 4h 10).
+
+**실측(엄격 로컬 Binance 1m parquet, CSV/synthetic fallback 없음, 2026-05-15~2026-06-13, `var/reports/seasonal_micro_breakout_eval/`).** 단독 상위: BNB 1h +4.86%, Sharpe 3.37, MDD 3.32~3.43%, 40 trades; TON 1h +4.00%, Sharpe 2.87, MDD 3.20~3.31%, 27 trades; BTC 1h +3.96%, Sharpe 2.95, MDD 3.78~3.93%, 35 trades; BTC 30m +2.55%, Sharpe 1.82; TON 30m +2.12%, Sharpe 1.24. 반대로 ETH/SOL/XRP/DOGE/ADA/AVAX는 대체로 음수이고 4h는 1개월 window에서 slot history 부족으로 0거래. 결론: **범용 승격은 불가**, 1h BNB/TON/BTC만 paper/shadow 후보.
+
+**기존 TopCap에 추가 가능성.** 동일 창에서 incumbent `topcap_tsmom_1h_exec_tightstop_16_4_0.015`(BTC/ETH/SOL/BNB/TRX)는 +2.37%, Sharpe 3.09, MDD 1.62%. 1h sampled blend(`seasonal_micro_topcap_blend_check_latest.md`)는 BNB sleeve 5/10/20/30% overlay가 각각 +2.50/+2.62/+2.87/+3.12%, Sharpe 3.27/3.43/3.66/3.79, MDD 1.67/1.73/1.89/2.09%. TON/BTC overlay도 return과 Sharpe는 개선, MDD는 소폭 증가. 운영 판단: **TopCap 대체가 아니라 5~20% shadow overlay 후보**(30%는 MDD 상승이 명확).
+
+**검증.** 신규/관련 테스트 `tests/test_micro_signal_alpha_sleeves.py`, `tests/test_strategy_factory_library.py` 43개 통과. 로컬 CI: ruff check/format, native maturin build, live-data/market-window/native-Binance architecture gates, `check_architecture.py`, hardcoded-params audit(768/new=0; baseline 갱신), `verify_docs.py`, compileall, full pytest 2136개, dashboard lint/test/typecheck/build, GPU contract smoke, benchmark smoke+8GB gate 모두 통과.
+
 ## 2026-06-17 KST (l) — CUSUM 변화점 트렌드 라이더 + 분산비(Variance-Ratio) 트렌드 라이더
 
 레지스트리 99종 — 새 추정자 2종(`cusum_varratio_alpha_sleeves.py`, 둘 다 `_ReturnRiderBase` 상속·per-symbol 단일자산·>=30m). 사전 확인: **CUSUM/change-point·variance-ratio 전략·인디케이터 전무** → 둘 다 distinct. *(빌드 Workflow 529 불안정 → 세션 내 직접 작성 + 독립 critic 적대 리뷰.)*
