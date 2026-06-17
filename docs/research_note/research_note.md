@@ -19,6 +19,8 @@ Report: `var/reports/best_historical_strategy_improvement/best_historical_strate
 
 검증: lagged/preregistered focused tests `2 passed`; ruff check/format targeted 통과. Fast replay report는 existing fold rows 기반이며 risk-trim replay는 strict-core fallback aggregate metrics에 proportional scale approximation flag를 단다. Full WF path에는 exact return-stream scaling 후보도 추가되어 다음 full rerun에서는 exact metrics로 나온다.
 
+운영 원칙 업데이트: clean OOS 후보도 동일하게 **expanded universe 유지**가 기본이다. 단기 성적이 흔들려도 universe를 축소해서 숫자를 예쁘게 만들지 않는다. 대신 110개 이상으로 계속 넓힌 뒤 selector/lagged-router/clean-OOS gate가 그 안에서 스스로 걸러내게 두고, 신규 자산은 충분한 train+validation history가 생기기 전까지 promotion evidence가 아니라 monitored feature support로만 다룬다.
+
 ## 2026-06-17 KST (n) — 기존 최고성적 TopCap 개선: target-pool selector 전처리
 
 사용자 확인 요청에 따라 universe/selection 경로부터 재검증했다. `config.yaml`은 `trading.symbols`를 의도적으로 생략하고 `TradingConfig.symbols` 기본값이 `BINANCE_EXTENDED_RESEARCH_SYMBOLS_SLASHED`를 쓰므로 runtime/default research/candidate universe가 모두 **110개**(crypto 10 + tradfi/commodity/ETF/equity/premarket 100)로 확장되어 있다. 후보 3504개가 110개 전부를 커버했고, 로컬 Binance 1m parquet도 2026-05-15~06-13 창에서 110개 모두 200 bars 이상 로드됐다. selector 자체도 110개 입력에서 정상 동작해 pool 12개(`TON/CL/BZ/DOGE/AVAX/AMAT/SPCX/ADA/XAU/STXX/BTC/TRX`)를 골랐다.
