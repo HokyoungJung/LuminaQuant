@@ -1,5 +1,14 @@
 # Research Note
 
+## 2026-06-17 KST (f) — 실현변동성 term-structure 쇼크-라이드 + 교차섹션 breadth 레짐 타이머
+
+고확신·비중복 2종(`vol_term_breadth_alpha_sleeves.py`). 둘 다 방향성·리턴지향, >=30m.
+
+- **RealizedVolTermStructureStrategy** (per-symbol 단일자산, `_ReturnRiderBase` 상속). 엔트리 트리거가 **실현변동성 term-structure 비율 `RV_s/RV_l`** 자체 — 단기창 close-to-close RV_s와 장기창 RV_l. 비율 >= `shock_ratio`(변동성 쇼크/백워데이션)면 V-회복을 **롱 라이드**(또는 `fade_upside_short`+`allow_short`이면 상단 블로우오프를 숏 페이드), ATR 트레일링 스톱+피라미딩으로 라이딩, 변동성 정상화(`ratio<=exit_ratio`)·트레일·max_hold에서 청산. 단기 레그는 마지막 윈도우의 Parkinson 단일바 추정 `log(high/low)/(2*sqrt(ln2))`을 max()로 블렌딩해 micro 정보를 장기 레그와 **동일 per-bar 단위**로 정렬. **차별점**: PanicRebound(가격 드로다운+거래량 z-쇼크+VWAP 리클레임), HourlyShock(완성바 가격쇼크 페이드), vol-managed(기존 모멘텀을 사이징만)와 달리 vol-비율 자체가 진입 신호.
+- **BreadthRegimeTrendTimerStrategy** (multi-symbol basket, cross_sectional). 톱다운 **breadth**(바스켓 중 자기추세 위 비중)가 **총 net-long 그로스**를 게이팅·스케일: `gross = target_allocation*max_gross*breadth`, risk_off/on breadth 사이 히스테리시스. risk-on은 상위 업트렌더 롱 바스켓을 breadth-스케일로, risk-off는 flat. **차별점**: CrossAssetDiversifiedTrend(per-symbol inverse-vol 리스크패리티+포트폴리오 vol-target, 총노출 breadth 게이트 없음), DualMomentum(단일상품 절대/상대 로테이션), TopCap TSMOM(breadth 게이트 없는 모멘텀 랭킹)와 달리 **교차섹션 breadth가 net long/flat 레짐 스위치 + 그로스 스칼라를 구동**.
+
+유니버스는 둘 다 `ctx.crypto_only_symbols`(주식/ETF 누수 없음). RV-term 30m/1h/4h/1d per-symbol, breadth 1h/4h/1d basket(>=min_symbols 가드), per-TF cadence는 `_RIDER_TF_CADENCE_SECONDS`(>=1800). 검증: `.venv/bin/python`(3.14) ruff·format·py_compile·audit(baseline 731/new=0)·check_architecture·신규 8테스트·verify_docs·compileall·full pytest 통과. 적대적 리뷰 verdict **clean**(minor 2건 — 중립밴드 docstring 과대표현·미사용 `window` 인자 — 둘 다 반영 수정). 백테스트는 데이터 PC.
+
 ## 2026-06-17 KST (e) — micro-signal / >=30m-cadence 배치 (intrabar 시그널, 30m 거래)
 
 사용자 지시: "알파 시그널은 micro 타임프레임을 봐도 되지만 거래빈도는 >=30m." 메커니즘(엔진 매핑): **Pattern A** — `decision_cadence_seconds=1800` + `preferred_contract="market_window"`. 엔진은 1s 데이터를 매 윈도우 ingest하고 스톱/트레일링은 1s 해상도로 평가하되(core/engine.py:448-472), 결정 콜백은 30m 버킷마다 1회만 발화(engine.py:339-363). **트랩**: 게이트된 콜백은 마지막 윈도우의 bars_1s만 봄 → 코어 시그널은 **누적 30m 결정-바**로 계산하고, 마지막 윈도우 bars_1s는 결정 순간의 **fresh micro 리딩/확인**으로만 사용.
