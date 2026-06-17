@@ -1,5 +1,9 @@
 # Research Note
 
+## 2026-06-17 KST (c) — 상품/매크로 추세 라이더 + 주식 52주 신고가 라이더(라이더 재사용·신규 유니버스)
+
+검증된 리턴-라이더 클래스를 **신규 방향성 유니버스로 라우팅**(신규 전략 클래스 없음): (1) **상품 managed-futures 추세 라이더** — `_COMMODITY_TREND_UNIVERSE`(=BINANCE_TRADFI_COMMODITY_SYMBOLS: CL/BZ/COPPER/NATGAS + XAU/XAG/XPT/XPD) 8종에 AdaptiveTrend/Breakout/Acceleration 라이더를 per-symbol·**롱숏**(상품은 양방향 추세)·4h+1d로; (2) **주식 52주 신고가 브레이크아웃 라이더**(George-Hwang) — `VolatilityBreakoutRiderStrategy`를 `_EQUITY_FACTOR_UNIVERSE`에 donchian_window=252(=52주 일봉)·**롱온리**로. 전부 `_intersect_universe(상수, normalized_symbols)`로 라우팅(crypto_symbols 미사용), per-TF cadence, ATR 트레일링 라이딩. de-leak로 crypto 라이더는 crypto-only라 상품/주식과 중복 없음. 검증: ruff·audit(711/new=0, 슬라이스는 데이터 dict)·architecture·신규 7테스트 + 기존 라이더 19통과, 적대적 리뷰 clean(잔여 minor: 4h 52w는 빠른 확인 변형·상품 가속 게이트 = 스키마 기본값, 둘 다 no-change). 백테스트는 데이터 PC(상품/주식 장기 일봉 필요).
+
 ## 2026-06-17 KST (b) — tradfi/equity 고수익 방향성 배치(리서치 기반) + crypto 누수 de-leak
 
 **문헌 리서치(웹).** 고수익·이론근거 directional 주식/ETF 전략을 정리: TSMOM on equity-index ETFs(Moskowitz-Ooi-Pedersen; 12개월 모멘텀, 약세 시 현금, Sharpe~1.3), **Dual Momentum GEM**(Antonacci; 절대+상대 모멘텀, 약세 시 방어자산 로테이션, 17.4% CAGR / maxDD 22.7% vs buy-hold 60%), **레버리지-ETF 추세타이밍**(TQQQ/SOXL+200일 SMA: 26.7% CAGR vs 10.9%, 디케이는 추세필터로 회피), 섹터 상대강도 로테이션, 52주 신고가 모멘텀(George-Hwang), residual momentum(Blitz), **vol-managed momentum**(Barroso-Santa-Clara; inverse-vol 스케일로 Sharpe 0.53→0.97). 핵심 통찰: 교차섹션 마켓뉴트럴은 절대수익이 낮음 → 고수익엔 **방향성(롱바이어스)·추세 라이딩·컴파운딩**이 맞다.
