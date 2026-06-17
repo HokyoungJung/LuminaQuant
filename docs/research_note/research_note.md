@@ -1,5 +1,27 @@
 # Research Note
 
+## 2026-06-17 KST — 성적 피드백 반영: return-우선 피벗(>=30m), 리턴-라이더 2배치 + CI 정상화
+
+**성적 평가(`var/reports/new_strategy_eval_20260616/REPORT.md`) 해석.** crypto5(BTC/ETH/BNB/SOL/TRX), 2026-05-16~06-13, 1h/4h 직접 백테스트:
+- 신규 단일 알파 6종 중 **`TrendEfficiencyMomentum`(1h)만 양수**: +0.1495%, Sharpe 11.9, 55 trades, TopCap과 **per-step 상관 0.25**, 5~10% 블렌딩 시 포트 MDD 1.60%→1.44%. = 비상관 DD-감소 diversifier(수익 enhancer는 아님).
+- 교차섹션/selection 6종은 음수/무거래. 4h·1d·긴 윈도우 후보는 1개월 창에서 대거 **무거래**. `IdiosyncraticVolatility`/`LotterySkewness`는 0거래.
+- 인컴번트 `topcap_tsmom_1h_exec_tightstop_tp_16_4_0.015` = +2.40%, Sharpe 24.8, 157 trades — 절대수익 기준 여전히 최강.
+- 핵심 제약: (1) **장기·다심볼 평가 불가** — full research runner가 106심볼/기본 리소스 로딩에서 900s, 상위10 크립토에서도 1200s 타임아웃. (2) tradfi/equity perp는 로컬 parquet 장기 커버리지 부족(>=252d 0개). 따라서 교차섹션/주식 알파의 진짜 성과는 데이터 PC에서만 채점 가능.
+
+**사용자 지시.** "return·compound return이 너무 낮다 + >=30m 전략만 사용." → 설계 목표를 **DD-감소에서 수익 극대화로 전환**.
+
+**조치 1 — 유니버스 기본값 동적 확장(main `e1b34c2`).** `config.trading.symbols`와 리서치/후보 기본 유니버스가 단일 상수 `BINANCE_EXTENDED_RESEARCH_SYMBOLS_SLASHED`(110: 크립토+금속+tradfi perp)에서 파생되도록 변경(`configuration/schema.py` `TradingConfig.symbols` 기본값 + `runtime_settings._DEFAULT_SYMBOL_FALLBACK`; `config.yaml`는 `trading.symbols` 생략→상속). 상수 하나만 키우면 라이브·리서치가 자동 확장.
+
+**조치 2 — target-pool selector(main `12451fd`).** `strategy_factory/universe_selection.py`: 가격위치(Donchian)·거래량(달러볼륨 랭크+서지)·변동성(ATR% inverted-U)·VWAP 다팩터 복합점수로 유니버스를 target pool로 스크리닝(opt-in, 기본 off). `selection_aware_alpha_sleeves.py`로 selector를 알파에 조합.
+
+**조치 3 — 리턴-라이더 2배치(>=30m, 수익 라이딩).** 전부 per-symbol 단일자산, ATR 트레일링으로 추세 끝까지 타기(고정 TP 없음)+피라미딩+vol-타게팅, TopCap 스케일 사이징(target_allocation 0.30, max_order_value 5000), TF별 cadence(30m/1h/4h/1d→1800/3600/14400/86400):
+- 배치 A(`ea71cdb`): `AdaptiveTrendRider`(KAMA/효율), `VolatilityBreakoutRider`(Donchian/ATR확장), `AccelerationRider`(가속 모멘텀).
+- 배치 B(이번): `MultiTimeframeTrendEnsemble`(단/중/장 호라이즌 정렬 시에만 진입, conviction 사이징), `PullbackTrendContinuation`(추세 내 눌림목 진입=더 좋은 엔트리), `FundingHarvestCarry`(funding 부호 지속성 carry 수확, perp 데이터 게이트). FundingDislocationTrendCarry(디슬로케이션)·PerpCrowdingCarry(크라우딩 페이드)와 메커니즘 구분.
+
+**조치 4 — CI 정상화(main `a972e55`).** 팀의 `07539f3 "Demote weak validation Alpha Zoo exposure before paper trials"`로 페이퍼 readiness가 의도적으로 False로 강등됐는데 `test_alpha_zoo_7x_paper_forward_preflight`/`test_alpha_zoo_validation_first_discovery`가 여전히 `ready_for_paper is True`를 단언해 main ci가 red였음. readiness 데이터/게이트는 그대로 두고 **stale 단언만 현실(False)에 정렬**. 재승급은 train+validation 리튠이 locked-OOS 게이트를 통과할 때.
+
+**검증.** 모든 배치는 `.venv/bin/python`(3.14) 기준 ruff check/format, hardcoded-params audit(baseline 갱신), check_architecture, verify_docs, compileall, 전체 pytest 통과 + 적대적 리뷰. 단 **수익 실측은 데이터 PC 백테스트 필요** — 라이더는 "수익을 끝까지 타도록" 설계됐을 뿐, crypto5에서 TopCap(+2.4%)을 능가하는지는 코드만으로 보장 불가. 다음: (1) 리턴-라이더 백테스트로 엑싯/사이징 튜닝, (2) 110-유니버스 리소스 타임아웃 해소로 교차섹션/tradfi 알파 채점 경로 개방.
+
 ## 2026-06-15 KST — latest merge + 신규 decorrelated sleeves 실측: 신규 단일 알파는 아직 탈락
 
 최신 `private/main`(`aa0582b3`)을 `private-main`에 병합했고, 환경은 `uv sync --group dev --extra dev --extra gpu` 및 native backend rebuild까지 다시 맞췄다. 현재 검증 환경은 Python `3.14.5`, `pytest 9.0.2`, `ruff 0.15.1`, `cudf-polars-cu12 26.6.0`, `nvidia-nvjitlink-cu12 12.9.86`, `maturin 1.13.3`이고 `_compute` native kernels 및 numba/pyo3 metric backend load를 확인했다.
