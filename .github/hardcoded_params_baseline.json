@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-06-17T04:49:13.399093+00:00",
+  "generated_at_utc": "2026-06-17T06:25:22.155989+00:00",
   "literal_paths": [
     "src/lumina_quant/strategies",
     "lumina_quant/strategies"
@@ -519,6 +519,14 @@
     "literal:src/lumina_quant/strategies/cross_asset_tradfi_alpha_sleeves.py:835:31:3",
     "literal:src/lumina_quant/strategies/cross_asset_tradfi_alpha_sleeves.py:942:87:5.0",
     "literal:src/lumina_quant/strategies/cross_asset_tradfi_alpha_sleeves.py:986:31:60",
+    "literal:src/lumina_quant/strategies/cross_asset_trend_alpha_sleeves.py:117:31:86400",
+    "literal:src/lumina_quant/strategies/cross_asset_trend_alpha_sleeves.py:278:32:3",
+    "literal:src/lumina_quant/strategies/cross_asset_trend_alpha_sleeves.py:285:28:3",
+    "literal:src/lumina_quant/strategies/cross_asset_trend_alpha_sleeves.py:422:39:3.0",
+    "literal:src/lumina_quant/strategies/cross_asset_trend_alpha_sleeves.py:507:31:86400",
+    "literal:src/lumina_quant/strategies/cross_asset_trend_alpha_sleeves.py:551:28:3",
+    "literal:src/lumina_quant/strategies/cross_asset_trend_alpha_sleeves.py:555:37:0.01",
+    "literal:src/lumina_quant/strategies/cross_asset_trend_alpha_sleeves.py:730:35:3.0",
     "literal:src/lumina_quant/strategies/cross_crypto_slow_diffusion.py:147:58:5",
     "literal:src/lumina_quant/strategies/cross_crypto_slow_diffusion.py:297:44:999.0",
     "literal:src/lumina_quant/strategies/cross_sectional_anomaly_alpha_sleeves.py:207:31:86400",
