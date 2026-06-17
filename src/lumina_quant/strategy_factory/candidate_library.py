@@ -2600,6 +2600,12 @@ class _CandidateBuildContext:
         _build_adaptive_trend_rider_candidates(self)
         _build_volatility_breakout_rider_candidates(self)
         _build_acceleration_rider_candidates(self)
+        # Aggressive per-symbol directional RETURN-maximizing sleeves (>=30m only;
+        # multi-horizon trend agreement, buy-the-dip continuation, funding-carry
+        # harvest — ride winners with ATR trailing stops + pyramiding).
+        _build_multi_timeframe_trend_ensemble_candidates(self)
+        _build_pullback_trend_continuation_candidates(self)
+        _build_funding_harvest_carry_candidates(self)
         _build_metals_relative_value_basket_candidates(self)
         _build_liquidation_cascade_reversion_candidates(self)
         _build_orderbook_imbalance_reversion_candidates(self)
@@ -5058,6 +5064,455 @@ def _build_acceleration_rider_candidates(ctx: _CandidateBuildContext) -> None:
                         "retune_profile": str(spec["variant"]),
                         "symbol_scope": symbol,
                         "allow_short": bool(spec["allow_short"]),
+                        "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                    },
+                )
+
+
+# Per-symbol multi-horizon trend-ENSEMBLE rider (enter only when short/medium/long
+# horizons agree; ride + pyramid). Short windows so it fires often on a ~1-month
+# >=30m crypto5 window. Single-asset, family ``trend``.
+_MULTI_TF_TREND_ENSEMBLE_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "30m": (
+        {
+            "variant": "fast_ls",
+            "short_lookback": 6,
+            "mid_lookback": 18,
+            "long_lookback": 48,
+            "align_threshold": 2,
+            "min_horizon_roc": 0.0,
+            "trail_atr_mult": 3.0,
+            "atr_period": 14,
+            "max_adds": 3,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 200,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "core_ls",
+            "short_lookback": 6,
+            "mid_lookback": 18,
+            "long_lookback": 48,
+            "align_threshold": 2,
+            "min_horizon_roc": 0.0,
+            "trail_atr_mult": 3.2,
+            "atr_period": 14,
+            "max_adds": 3,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 180,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "swing_ls",
+            "short_lookback": 4,
+            "mid_lookback": 12,
+            "long_lookback": 36,
+            "align_threshold": 2,
+            "min_horizon_roc": 0.0,
+            "trail_atr_mult": 3.5,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 36,
+            "target_vol": 0.030,
+            "max_hold_bars": 120,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1d": (
+        {
+            "variant": "macro_ls",
+            "short_lookback": 3,
+            "mid_lookback": 8,
+            "long_lookback": 21,
+            "align_threshold": 2,
+            "min_horizon_roc": 0.0,
+            "trail_atr_mult": 4.0,
+            "atr_period": 10,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 24,
+            "target_vol": 0.040,
+            "max_hold_bars": 60,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+}
+
+# Per-symbol buy-the-dip / sell-the-rally trend-continuation rider. Short windows
+# so it fires often. Single-asset, family ``trend``.
+_PULLBACK_TREND_CONTINUATION_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "30m": (
+        {
+            "variant": "fast_ls",
+            "trend_lookback": 48,
+            "trend_ma_window": 48,
+            "short_ma_window": 10,
+            "pullback_roc_period": 3,
+            "pullback_atr_mult": 0.5,
+            "min_trend_roc": 0.0,
+            "trail_atr_mult": 3.0,
+            "atr_period": 14,
+            "max_adds": 3,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 200,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "core_ls",
+            "trend_lookback": 48,
+            "trend_ma_window": 48,
+            "short_ma_window": 10,
+            "pullback_roc_period": 3,
+            "pullback_atr_mult": 0.5,
+            "min_trend_roc": 0.0,
+            "trail_atr_mult": 3.2,
+            "atr_period": 14,
+            "max_adds": 3,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 180,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "swing_ls",
+            "trend_lookback": 36,
+            "trend_ma_window": 36,
+            "short_ma_window": 8,
+            "pullback_roc_period": 2,
+            "pullback_atr_mult": 0.5,
+            "min_trend_roc": 0.0,
+            "trail_atr_mult": 3.5,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 36,
+            "target_vol": 0.030,
+            "max_hold_bars": 120,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1d": (
+        {
+            "variant": "macro_ls",
+            "trend_lookback": 21,
+            "trend_ma_window": 21,
+            "short_ma_window": 5,
+            "pullback_roc_period": 2,
+            "pullback_atr_mult": 0.5,
+            "min_trend_roc": 0.0,
+            "trail_atr_mult": 4.0,
+            "atr_period": 10,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 24,
+            "target_vol": 0.040,
+            "max_hold_bars": 60,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+}
+
+# Per-symbol directional funding-carry HARVEST rider (collect persistent funding
+# sign as directional income). Single-asset, family ``carry``. Funding feature
+# required -> builder gates on ``ctx.perp_support_data_available``.
+_FUNDING_HARVEST_CARRY_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "30m": (
+        {
+            "variant": "fast_ls",
+            "funding_window": 8,
+            "entry_funding": 0.00005,
+            "exit_funding": 0.0,
+            "funding_scale": 0.0003,
+            "no_fight_roc_period": 6,
+            "no_fight_roc": 0.05,
+            "trail_atr_mult": 3.5,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 480,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "core_ls",
+            "funding_window": 8,
+            "entry_funding": 0.00005,
+            "exit_funding": 0.0,
+            "funding_scale": 0.0003,
+            "no_fight_roc_period": 6,
+            "no_fight_roc": 0.05,
+            "trail_atr_mult": 3.5,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 360,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "swing_ls",
+            "funding_window": 6,
+            "entry_funding": 0.00005,
+            "exit_funding": 0.0,
+            "funding_scale": 0.0003,
+            "no_fight_roc_period": 4,
+            "no_fight_roc": 0.06,
+            "trail_atr_mult": 4.0,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 36,
+            "target_vol": 0.030,
+            "max_hold_bars": 180,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1d": (
+        {
+            "variant": "macro_ls",
+            "funding_window": 4,
+            "entry_funding": 0.00005,
+            "exit_funding": 0.0,
+            "funding_scale": 0.0003,
+            "no_fight_roc_period": 3,
+            "no_fight_roc": 0.08,
+            "trail_atr_mult": 4.5,
+            "atr_period": 10,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 24,
+            "target_vol": 0.040,
+            "max_hold_bars": 90,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+}
+
+
+def _build_multi_timeframe_trend_ensemble_candidates(ctx: _CandidateBuildContext) -> None:
+    """Per-symbol multi-horizon trend-ensemble rider (single-asset, return-max)."""
+    crypto_symbols = ctx.crypto_symbols
+    if not crypto_symbols:
+        return
+    for timeframe in ctx._present("30m", "1h", "4h", "1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _MULTI_TF_TREND_ENSEMBLE_SLICE.get(timeframe, ()):
+            for symbol in crypto_symbols:
+                params = {
+                    "short_lookback": int(spec["short_lookback"]),
+                    "mid_lookback": int(spec["mid_lookback"]),
+                    "long_lookback": int(spec["long_lookback"]),
+                    "align_threshold": int(spec["align_threshold"]),
+                    "min_horizon_roc": float(spec["min_horizon_roc"]),
+                    "trail_atr_mult": float(spec["trail_atr_mult"]),
+                    "atr_period": int(spec["atr_period"]),
+                    "max_adds": int(spec["max_adds"]),
+                    "add_step_atr": float(spec["add_step_atr"]),
+                    "vol_window": int(spec["vol_window"]),
+                    "target_vol": float(spec["target_vol"]),
+                    "max_hold_bars": int(spec["max_hold_bars"]),
+                    "allow_short": bool(spec["allow_short"]),
+                    "add_alloc_fraction": float(spec["add_alloc_fraction"]),
+                }
+                _add_candidate(
+                    ctx.candidates,
+                    name=(
+                        f"multi_timeframe_trend_ensemble_{tf_tag}_{spec['variant']}_"
+                        f"{symbol.replace('/', '').lower()}_"
+                        f"{int(spec['align_threshold'])}of3"
+                    ),
+                    family="trend",
+                    strategy_class="MultiTimeframeTrendEnsembleStrategy",
+                    timeframe=timeframe,
+                    symbols=(symbol,),
+                    params=params,
+                    notes=(
+                        "Per-symbol multi-horizon trend-ensemble rider that enters "
+                        "only when the short/medium/long-horizon trends agree, sizes "
+                        "by agreement conviction, and rides winners with an ATR "
+                        "trailing stop + pyramiding for high compound return on "
+                        f"{symbol} at {timeframe} ({spec['variant']})."
+                    ),
+                    tags=(
+                        "trend",
+                        "return_rider",
+                        "multi_horizon",
+                        "trailing_stop",
+                        "pyramiding",
+                        "single_asset",
+                        "crypto",
+                    ),
+                    metadata={
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": symbol,
+                        "allow_short": bool(spec["allow_short"]),
+                        "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                    },
+                )
+
+
+def _build_pullback_trend_continuation_candidates(ctx: _CandidateBuildContext) -> None:
+    """Per-symbol buy-the-dip / sell-the-rally continuation rider (single-asset)."""
+    crypto_symbols = ctx.crypto_symbols
+    if not crypto_symbols:
+        return
+    for timeframe in ctx._present("30m", "1h", "4h", "1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _PULLBACK_TREND_CONTINUATION_SLICE.get(timeframe, ()):
+            for symbol in crypto_symbols:
+                params = {
+                    "trend_lookback": int(spec["trend_lookback"]),
+                    "trend_ma_window": int(spec["trend_ma_window"]),
+                    "short_ma_window": int(spec["short_ma_window"]),
+                    "pullback_roc_period": int(spec["pullback_roc_period"]),
+                    "pullback_atr_mult": float(spec["pullback_atr_mult"]),
+                    "min_trend_roc": float(spec["min_trend_roc"]),
+                    "trail_atr_mult": float(spec["trail_atr_mult"]),
+                    "atr_period": int(spec["atr_period"]),
+                    "max_adds": int(spec["max_adds"]),
+                    "add_step_atr": float(spec["add_step_atr"]),
+                    "vol_window": int(spec["vol_window"]),
+                    "target_vol": float(spec["target_vol"]),
+                    "max_hold_bars": int(spec["max_hold_bars"]),
+                    "allow_short": bool(spec["allow_short"]),
+                    "add_alloc_fraction": float(spec["add_alloc_fraction"]),
+                }
+                _add_candidate(
+                    ctx.candidates,
+                    name=(
+                        f"pullback_trend_continuation_{tf_tag}_{spec['variant']}_"
+                        f"{symbol.replace('/', '').lower()}_"
+                        f"{int(spec['short_ma_window'])}"
+                    ),
+                    family="trend",
+                    strategy_class="PullbackTrendContinuationStrategy",
+                    timeframe=timeframe,
+                    symbols=(symbol,),
+                    params=params,
+                    notes=(
+                        "Per-symbol trend-continuation rider that establishes the "
+                        "long-horizon trend then enters on a pullback in the trend "
+                        "direction (buy-the-dip / sell-the-rally) for a better entry "
+                        "price, riding with an ATR trailing stop + pyramiding on "
+                        f"{symbol} at {timeframe} ({spec['variant']})."
+                    ),
+                    tags=(
+                        "trend",
+                        "return_rider",
+                        "pullback",
+                        "trailing_stop",
+                        "pyramiding",
+                        "single_asset",
+                        "crypto",
+                    ),
+                    metadata={
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": symbol,
+                        "allow_short": bool(spec["allow_short"]),
+                        "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                    },
+                )
+
+
+def _build_funding_harvest_carry_candidates(ctx: _CandidateBuildContext) -> None:
+    """Per-symbol directional funding-carry harvest rider (single-asset, feature-gated)."""
+    if not ctx.perp_support_data_available:
+        return
+    crypto_symbols = ctx.crypto_symbols
+    if not crypto_symbols:
+        return
+    for timeframe in ctx._present("30m", "1h", "4h", "1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _FUNDING_HARVEST_CARRY_SLICE.get(timeframe, ()):
+            for symbol in crypto_symbols:
+                params = {
+                    "funding_window": int(spec["funding_window"]),
+                    "entry_funding": float(spec["entry_funding"]),
+                    "exit_funding": float(spec["exit_funding"]),
+                    "funding_scale": float(spec["funding_scale"]),
+                    "no_fight_roc_period": int(spec["no_fight_roc_period"]),
+                    "no_fight_roc": float(spec["no_fight_roc"]),
+                    "trail_atr_mult": float(spec["trail_atr_mult"]),
+                    "atr_period": int(spec["atr_period"]),
+                    "max_adds": int(spec["max_adds"]),
+                    "add_step_atr": float(spec["add_step_atr"]),
+                    "vol_window": int(spec["vol_window"]),
+                    "target_vol": float(spec["target_vol"]),
+                    "max_hold_bars": int(spec["max_hold_bars"]),
+                    "allow_short": bool(spec["allow_short"]),
+                    "add_alloc_fraction": float(spec["add_alloc_fraction"]),
+                }
+                _add_candidate(
+                    ctx.candidates,
+                    name=(
+                        f"funding_harvest_carry_{tf_tag}_{spec['variant']}_"
+                        f"{symbol.replace('/', '').lower()}_"
+                        f"{int(spec['funding_window'])}"
+                    ),
+                    family="carry",
+                    strategy_class="FundingHarvestCarryStrategy",
+                    timeframe=timeframe,
+                    symbols=(symbol,),
+                    params=params,
+                    notes=(
+                        "Per-symbol directional funding-carry harvest that goes long "
+                        "into persistently negative funding (longs paid) and short "
+                        "into persistently positive funding (shorts paid), with a "
+                        "trend-no-fight guard, riding the carry with an ATR trailing "
+                        f"stop + pyramiding on {symbol} at {timeframe} "
+                        f"({spec['variant']})."
+                    ),
+                    tags=(
+                        "carry",
+                        "funding",
+                        "return_rider",
+                        "trailing_stop",
+                        "pyramiding",
+                        "single_asset",
+                        "crypto",
+                    ),
+                    metadata={
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": symbol,
+                        "allow_short": bool(spec["allow_short"]),
+                        "data_dependent": True,
                         "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
                     },
                 )
