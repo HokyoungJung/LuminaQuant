@@ -2612,6 +2612,13 @@ class _CandidateBuildContext:
         _build_adaptive_trend_rider_candidates(self)
         _build_volatility_breakout_rider_candidates(self)
         _build_acceleration_rider_candidates(self)
+        # Micro-signal-informed sleeves: LOOK at intrabar 1s tape / perp features
+        # but DECIDE at 30m (class-pinned decision_cadence_seconds=1800). Core
+        # signals are computed from accumulated >=30m decision bars; the last
+        # window's 1s tape is only a fresh micro confirm at the decision instant.
+        _build_intraday_flow_pressure_rider_candidates(self)
+        _build_vol_of_vol_regime_trend_gate_candidates(self)
+        _build_vwap_compression_reversion_candidates(self)
         # Aggressive per-symbol directional RETURN-maximizing sleeves (>=30m only;
         # multi-horizon trend agreement, buy-the-dip continuation, funding-carry
         # harvest — ride winners with ATR trailing stops + pyramiding).
@@ -5128,6 +5135,486 @@ def _build_acceleration_rider_candidates(ctx: _CandidateBuildContext) -> None:
                         "symbol_scope": symbol,
                         "allow_short": bool(spec["allow_short"]),
                         "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                    },
+                )
+
+
+# --------------------------------------------------------------------------- #
+# Micro-signal-informed sleeves: LOOK intrabar, TRADE at >=30m.
+#
+# Every candidate below carries decision_cadence_seconds=1800 in metadata REGARDLESS
+# of its base candidate timeframe -- the underlying classes hard-pin the 30m decision
+# throttle as a class attribute, so the candidate timeframe is only the bar grain the
+# sleeve accumulates as DECISION BARS. Candidate timeframes are kept >=30m
+# (30m/1h/4h/1d) for consistency with the >=30m mandate.
+# --------------------------------------------------------------------------- #
+# Cadence stamped on every micro-signal candidate's metadata. Unlike the return
+# riders (which scale cadence with the base TF), these sleeves decide at 30m for
+# EVERY base timeframe because the class attribute pins it there.
+_MICRO_SIGNAL_DECISION_CADENCE_SECONDS = 1800
+
+# #1 IntradayFlowPressureRiderStrategy: per-symbol taker-flow CONTINUATION ride.
+# Crypto-only (taker fields are crypto-perp) and gated on perp_support_data.
+_INTRADAY_FLOW_PRESSURE_RIDER_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "30m": (
+        {
+            "variant": "fast_ls",
+            "flow_z_window": 6,
+            "entry_z": 1.4,
+            "pyramid_z": 1.9,
+            "tick_agree_frac": 0.55,
+            "trail_atr_mult": 3.0,
+            "atr_period": 14,
+            "max_adds": 3,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 200,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "core_ls",
+            "flow_z_window": 8,
+            "entry_z": 1.5,
+            "pyramid_z": 2.0,
+            "tick_agree_frac": 0.55,
+            "trail_atr_mult": 3.2,
+            "atr_period": 14,
+            "max_adds": 3,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 180,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "swing_ls",
+            "flow_z_window": 6,
+            "entry_z": 1.6,
+            "pyramid_z": 2.1,
+            "tick_agree_frac": 0.55,
+            "trail_atr_mult": 3.5,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 36,
+            "target_vol": 0.030,
+            "max_hold_bars": 120,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1d": (
+        {
+            "variant": "macro_ls",
+            "flow_z_window": 5,
+            "entry_z": 1.6,
+            "pyramid_z": 2.1,
+            "tick_agree_frac": 0.55,
+            "trail_atr_mult": 4.0,
+            "atr_period": 10,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 24,
+            "target_vol": 0.040,
+            "max_hold_bars": 60,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+}
+
+# #2 VolOfVolRegimeTrendGateStrategy: directional trend SIZED by a GK/rv vol-of-vol
+# governor + KER cleanliness gate. OHLCV-only -> widest crypto universe.
+_VOL_OF_VOL_REGIME_TREND_GATE_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "30m": (
+        {
+            "variant": "fast_ls",
+            "trend_z_window": 48,
+            "trend_score_min": 0.10,
+            "gk_window": 20,
+            "rv_window": 20,
+            "ker_period": 10,
+            "clean_threshold": 0.40,
+            "choppy_threshold": 0.20,
+            "gk_rv_history_window": 32,
+            "gk_rv_veto_rel": 1.6,
+            "gk_rv_clean_rel": 1.0,
+            "downsize_floor": 0.40,
+            "upsize_cap": 1.5,
+            "trail_atr_mult": 3.0,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 200,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "core_ls",
+            "trend_z_window": 48,
+            "trend_score_min": 0.12,
+            "gk_window": 20,
+            "rv_window": 20,
+            "ker_period": 12,
+            "clean_threshold": 0.42,
+            "choppy_threshold": 0.22,
+            "gk_rv_history_window": 32,
+            "gk_rv_veto_rel": 1.6,
+            "gk_rv_clean_rel": 1.0,
+            "downsize_floor": 0.40,
+            "upsize_cap": 1.5,
+            "trail_atr_mult": 3.2,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 180,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "swing_ls",
+            "trend_z_window": 36,
+            "trend_score_min": 0.12,
+            "gk_window": 16,
+            "rv_window": 16,
+            "ker_period": 10,
+            "clean_threshold": 0.42,
+            "choppy_threshold": 0.22,
+            "gk_rv_history_window": 32,
+            "gk_rv_veto_rel": 1.6,
+            "gk_rv_clean_rel": 1.0,
+            "downsize_floor": 0.40,
+            "upsize_cap": 1.5,
+            "trail_atr_mult": 3.5,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 36,
+            "target_vol": 0.030,
+            "max_hold_bars": 120,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1d": (
+        {
+            "variant": "macro_ls",
+            "trend_z_window": 24,
+            "trend_score_min": 0.12,
+            "gk_window": 12,
+            "rv_window": 12,
+            "ker_period": 8,
+            "clean_threshold": 0.42,
+            "choppy_threshold": 0.22,
+            "gk_rv_history_window": 32,
+            "gk_rv_veto_rel": 1.6,
+            "gk_rv_clean_rel": 1.0,
+            "downsize_floor": 0.40,
+            "upsize_cap": 1.5,
+            "trail_atr_mult": 4.0,
+            "atr_period": 10,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 24,
+            "target_vol": 0.040,
+            "max_hold_bars": 60,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+}
+
+# #5 VWAPCompressionReversionStrategy: vol-compression-gated VWAP-deviation mean
+# reversion (wires volcomp_vwap_pressure). OHLCV-only.
+_VWAP_COMPRESSION_REVERSION_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "30m": (
+        {
+            "variant": "fast_ls",
+            "vwap_window": 48,
+            "z_window": 96,
+            "bandwidth_window": 48,
+            "percentile_window": 192,
+            "compression_percentile": 0.30,
+            "compression_vol_ratio": 0.85,
+            "entry_z": 2.0,
+            "exit_z": 0.0,
+            "max_hold_bars": 48,
+            "stop_loss_pct": 0.03,
+            "allow_short": True,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "core_ls",
+            "vwap_window": 48,
+            "z_window": 96,
+            "bandwidth_window": 48,
+            "percentile_window": 192,
+            "compression_percentile": 0.30,
+            "compression_vol_ratio": 0.85,
+            "entry_z": 2.0,
+            "exit_z": 0.0,
+            "max_hold_bars": 36,
+            "stop_loss_pct": 0.03,
+            "allow_short": True,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "swing_ls",
+            "vwap_window": 36,
+            "z_window": 72,
+            "bandwidth_window": 36,
+            "percentile_window": 160,
+            "compression_percentile": 0.30,
+            "compression_vol_ratio": 0.85,
+            "entry_z": 2.1,
+            "exit_z": 0.0,
+            "max_hold_bars": 24,
+            "stop_loss_pct": 0.04,
+            "allow_short": True,
+        },
+    ),
+    "1d": (
+        {
+            "variant": "macro_ls",
+            "vwap_window": 24,
+            "z_window": 60,
+            "bandwidth_window": 24,
+            "percentile_window": 120,
+            "compression_percentile": 0.30,
+            "compression_vol_ratio": 0.85,
+            "entry_z": 2.1,
+            "exit_z": 0.0,
+            "max_hold_bars": 16,
+            "stop_loss_pct": 0.05,
+            "allow_short": True,
+        },
+    ),
+}
+
+
+def _build_intraday_flow_pressure_rider_candidates(ctx: _CandidateBuildContext) -> None:
+    """Per-symbol taker-flow CONTINUATION ride (#1, single-asset, crypto-perp).
+
+    Gated on perp-support data because the core taker-flow read is a crypto-perp
+    field; crypto-only symbols (tradfi perps routed elsewhere). Decides at 30m for
+    EVERY base timeframe (the class hard-pins decision_cadence_seconds=1800).
+    """
+    if not ctx.perp_support_data_available:
+        return
+    crypto_symbols = ctx.crypto_only_symbols
+    if not crypto_symbols:
+        return
+    for timeframe in ctx._present("30m", "1h", "4h", "1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _INTRADAY_FLOW_PRESSURE_RIDER_SLICE.get(timeframe, ()):
+            for symbol in crypto_symbols:
+                params = {
+                    "flow_z_window": int(spec["flow_z_window"]),
+                    "entry_z": float(spec["entry_z"]),
+                    "pyramid_z": float(spec["pyramid_z"]),
+                    "tick_agree_frac": float(spec["tick_agree_frac"]),
+                    "trail_atr_mult": float(spec["trail_atr_mult"]),
+                    "atr_period": int(spec["atr_period"]),
+                    "max_adds": int(spec["max_adds"]),
+                    "add_step_atr": float(spec["add_step_atr"]),
+                    "vol_window": int(spec["vol_window"]),
+                    "target_vol": float(spec["target_vol"]),
+                    "max_hold_bars": int(spec["max_hold_bars"]),
+                    "allow_short": bool(spec["allow_short"]),
+                    "add_alloc_fraction": float(spec["add_alloc_fraction"]),
+                }
+                _add_candidate(
+                    ctx.candidates,
+                    name=(
+                        f"intraday_flow_pressure_rider_{tf_tag}_{spec['variant']}_"
+                        f"{symbol.replace('/', '').lower()}_"
+                        f"{float(spec['entry_z']):.1f}"
+                    ),
+                    family="flow",
+                    strategy_class="IntradayFlowPressureRiderStrategy",
+                    timeframe=timeframe,
+                    symbols=(symbol,),
+                    params=params,
+                    notes=(
+                        "Per-symbol taker-flow PRESSURE continuation rider: a 30m "
+                        "decision-bar flow-imbalance z-score gate confirmed by the "
+                        "latest 1s tick-agreement, ridden with an ATR trailing stop "
+                        "and pyramided on flow extension. Looks intrabar, decides at "
+                        f"30m on {symbol} at {timeframe} ({spec['variant']})."
+                    ),
+                    tags=(
+                        "flow",
+                        "taker_flow",
+                        "continuation",
+                        "return_rider",
+                        "trailing_stop",
+                        "pyramiding",
+                        "single_asset",
+                        "crypto",
+                        "micro_signal",
+                    ),
+                    metadata={
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": symbol,
+                        "allow_short": bool(spec["allow_short"]),
+                        "data_dependent": ctx.perp_support_data_available,
+                        "decision_cadence_seconds": _MICRO_SIGNAL_DECISION_CADENCE_SECONDS,
+                    },
+                )
+
+
+def _build_vol_of_vol_regime_trend_gate_candidates(ctx: _CandidateBuildContext) -> None:
+    """Directional trend SIZED by a GK/rv vol-of-vol governor (#2, OHLCV-only).
+
+    Crypto-only universe (tradfi perps routed through the equity builders).
+    Decides at 30m for every base timeframe (class hard-pins the throttle).
+    """
+    crypto_symbols = ctx.crypto_only_symbols
+    if not crypto_symbols:
+        return
+    for timeframe in ctx._present("30m", "1h", "4h", "1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _VOL_OF_VOL_REGIME_TREND_GATE_SLICE.get(timeframe, ()):
+            for symbol in crypto_symbols:
+                params = {
+                    "trend_z_window": int(spec["trend_z_window"]),
+                    "trend_score_min": float(spec["trend_score_min"]),
+                    "gk_window": int(spec["gk_window"]),
+                    "rv_window": int(spec["rv_window"]),
+                    "ker_period": int(spec["ker_period"]),
+                    "clean_threshold": float(spec["clean_threshold"]),
+                    "choppy_threshold": float(spec["choppy_threshold"]),
+                    "gk_rv_history_window": int(spec["gk_rv_history_window"]),
+                    "gk_rv_veto_rel": float(spec["gk_rv_veto_rel"]),
+                    "gk_rv_clean_rel": float(spec["gk_rv_clean_rel"]),
+                    "downsize_floor": float(spec["downsize_floor"]),
+                    "upsize_cap": float(spec["upsize_cap"]),
+                    "trail_atr_mult": float(spec["trail_atr_mult"]),
+                    "atr_period": int(spec["atr_period"]),
+                    "max_adds": int(spec["max_adds"]),
+                    "add_step_atr": float(spec["add_step_atr"]),
+                    "vol_window": int(spec["vol_window"]),
+                    "target_vol": float(spec["target_vol"]),
+                    "max_hold_bars": int(spec["max_hold_bars"]),
+                    "allow_short": bool(spec["allow_short"]),
+                    "add_alloc_fraction": float(spec["add_alloc_fraction"]),
+                }
+                _add_candidate(
+                    ctx.candidates,
+                    name=(
+                        f"vol_of_vol_regime_trend_gate_{tf_tag}_{spec['variant']}_"
+                        f"{symbol.replace('/', '').lower()}_"
+                        f"{float(spec['gk_rv_veto_rel']):.1f}"
+                    ),
+                    family="trend",
+                    strategy_class="VolOfVolRegimeTrendGateStrategy",
+                    timeframe=timeframe,
+                    symbols=(symbol,),
+                    params=params,
+                    notes=(
+                        "Per-symbol directional trend (pv_trend_score) whose SIZE is "
+                        "governed by a Garman-Klass-vs-realized vol-of-vol read plus "
+                        "a Kaufman-efficiency cleanliness gate: hidden intrabar stress "
+                        "down-sizes/vetoes, clean efficient trends up-size. Decides at "
+                        f"30m on {symbol} at {timeframe} ({spec['variant']})."
+                    ),
+                    tags=(
+                        "trend",
+                        "vol_of_vol",
+                        "regime_gate",
+                        "return_rider",
+                        "trailing_stop",
+                        "single_asset",
+                        "crypto",
+                        "micro_signal",
+                    ),
+                    metadata={
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": symbol,
+                        "allow_short": bool(spec["allow_short"]),
+                        "decision_cadence_seconds": _MICRO_SIGNAL_DECISION_CADENCE_SECONDS,
+                    },
+                )
+
+
+def _build_vwap_compression_reversion_candidates(ctx: _CandidateBuildContext) -> None:
+    """Vol-compression-gated VWAP-deviation mean reversion (#5, OHLCV-only).
+
+    Crypto-only universe. Decides at 30m for every base timeframe (the class
+    hard-pins decision_cadence_seconds=1800).
+    """
+    crypto_symbols = ctx.crypto_only_symbols
+    if not crypto_symbols:
+        return
+    for timeframe in ctx._present("30m", "1h", "4h", "1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _VWAP_COMPRESSION_REVERSION_SLICE.get(timeframe, ()):
+            for symbol in crypto_symbols:
+                params = {
+                    "vwap_window": int(spec["vwap_window"]),
+                    "z_window": int(spec["z_window"]),
+                    "bandwidth_window": int(spec["bandwidth_window"]),
+                    "percentile_window": int(spec["percentile_window"]),
+                    "compression_percentile": float(spec["compression_percentile"]),
+                    "compression_vol_ratio": float(spec["compression_vol_ratio"]),
+                    "entry_z": float(spec["entry_z"]),
+                    "exit_z": float(spec["exit_z"]),
+                    "max_hold_bars": int(spec["max_hold_bars"]),
+                    "stop_loss_pct": float(spec["stop_loss_pct"]),
+                    "allow_short": bool(spec["allow_short"]),
+                }
+                _add_candidate(
+                    ctx.candidates,
+                    name=(
+                        f"vwap_compression_reversion_{tf_tag}_{spec['variant']}_"
+                        f"{symbol.replace('/', '').lower()}_"
+                        f"{float(spec['entry_z']):.1f}"
+                    ),
+                    family="mean_reversion",
+                    strategy_class="VWAPCompressionReversionStrategy",
+                    timeframe=timeframe,
+                    symbols=(symbol,),
+                    params=params,
+                    notes=(
+                        "Per-symbol VWAP-deviation mean reversion gated by a coiled "
+                        "vol-compression regime (volcomp_vwap_pressure): only acts when "
+                        "compression is active, anchored to the boundary window's 1s "
+                        "volume-weighted typical price for a precise deviation. Decides "
+                        f"at 30m on {symbol} at {timeframe} ({spec['variant']})."
+                    ),
+                    tags=(
+                        "mean_reversion",
+                        "vwap",
+                        "vol_compression",
+                        "single_asset",
+                        "crypto",
+                        "micro_signal",
+                    ),
+                    metadata={
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": symbol,
+                        "allow_short": bool(spec["allow_short"]),
+                        "decision_cadence_seconds": _MICRO_SIGNAL_DECISION_CADENCE_SECONDS,
                     },
                 )
 
