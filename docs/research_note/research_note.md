@@ -1,5 +1,21 @@
 # Research Note
 
+## 2026-06-17 KST (b) — tradfi/equity 고수익 방향성 배치(리서치 기반) + crypto 누수 de-leak
+
+**문헌 리서치(웹).** 고수익·이론근거 directional 주식/ETF 전략을 정리: TSMOM on equity-index ETFs(Moskowitz-Ooi-Pedersen; 12개월 모멘텀, 약세 시 현금, Sharpe~1.3), **Dual Momentum GEM**(Antonacci; 절대+상대 모멘텀, 약세 시 방어자산 로테이션, 17.4% CAGR / maxDD 22.7% vs buy-hold 60%), **레버리지-ETF 추세타이밍**(TQQQ/SOXL+200일 SMA: 26.7% CAGR vs 10.9%, 디케이는 추세필터로 회피), 섹터 상대강도 로테이션, 52주 신고가 모멘텀(George-Hwang), residual momentum(Blitz), **vol-managed momentum**(Barroso-Santa-Clara; inverse-vol 스케일로 Sharpe 0.53→0.97). 핵심 통찰: 교차섹션 마켓뉴트럴은 절대수익이 낮음 → 고수익엔 **방향성(롱바이어스)·추세 라이딩·컴파운딩**이 맞다.
+
+**유니버스 매핑에서 발견한 버그.** candidate context의 `ctx.crypto_symbols`는 "`_METALS`가 아닌 모든 심볼"이라 **equity/ETF perp이 crypto 라이더 슬리브로 누수**됐다(crypto 라이더가 주식을 잘못 거래). 주식 슬리브는 반드시 `_intersect_universe(research_universe 상수, ctx.normalized_symbols)`로 타겟해야 한다.
+
+**구현(이번, main에 반영 예정).** 디자인 랭크 백로그 중 S-EQ1/EQ2/EQ3 + 누수 수정:
+- **S-EQ1 단일종목 주식 추세 라이더** — `AdaptiveTrendRiderStrategy`를 그대로 재사용, `_EQUITY_FACTOR_UNIVERSE`(76 단일종목)에 per-symbol 단일자산, 롱온리(allow_short=False), ATR 트레일링으로 NVDA/TSLA형 추세를 끝까지 + 피라미딩, 1d(+4h). 코드 재사용이라 구현 리스크 최소.
+- **S-EQ2 `LeveragedTrendTimingRiderStrategy`(신규)** — SOXL/URNM, `close>SMA200` AND 골든크로스(SMA50>SMA200)+confirm 버퍼에서만 롱; `_vol_scaled_allocation`에 **디케이 페널티**(실현변동성↑→사이징↓); 추세필터 이탈 시 flat. LETF 디케이는 추세 밖에서 발생하므로 필터가 곧 엣지.
+- **S-EQ3 `DualMomentumDefensiveRotationStrategy`(신규)** — 절대 모멘텀 게이트(약세면 방어), 강세면 ETF 상대강도 top-N(>200SMA), 약세면 **방어자산(XAU/XLE/UVXY 중 모멘텀 최강)으로 100% 롱 로테이션**(S4는 flat만 함 → 이게 차별점). 1d.
+- **de-leak**: `ctx.crypto_only_symbols`(= crypto_symbols − tradfi perp) 추가, 기존 crypto 라이더 3종을 crypto-only로 전환 → 주식 누수 제거 + S-EQ1과 중복 방지. crypto-only 입력 유니버스 테스트엔 무영향(no-op)이라 골든 깨짐 없음.
+
+**검증.** `.venv/bin/python`(3.14): ruff·hardcoded-params audit(baseline 711/new=0)·check_architecture·신규 13테스트 + 관련 531테스트 통과. 적대적 리뷰 verdict clean(잔여 minor는 의도된 설계: 약세에서 방어자산도 음수면 flat, 200SMA 워밍업 ≥252d 필요). S-EQ4(상대강도 로테이션, S-EQ3와 중복)·S-EQ5(vol-managed overlay, 레버리지 경로 리스크)는 보류.
+
+**데이터/평가 주의.** 전부 OHLCV·≥30m(1d 주). 주식 perp 장기 일봉(≥252d)+200SMA 워밍업이 데이터 PC에 있어야 1d 트랜치가 발화. LETF는 실제 3x perp 시계열로 백테스트(3×기초자산 합성 금지). survivorship: 유니버스는 2026-06-13 스냅샷(megacap/AI 편중)이라 모멘텀 백테스트는 다소 낙관적 → 롤링/OOS 평가 권장.
+
 ## 2026-06-17 KST — 성적 피드백 반영: return-우선 피벗(>=30m), 리턴-라이더 2배치 + CI 정상화
 
 **성적 평가(`var/reports/new_strategy_eval_20260616/REPORT.md`) 해석.** crypto5(BTC/ETH/BNB/SOL/TRX), 2026-05-16~06-13, 1h/4h 직접 백테스트:
