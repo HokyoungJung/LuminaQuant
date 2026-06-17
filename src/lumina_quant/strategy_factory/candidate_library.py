@@ -2625,6 +2625,13 @@ class _CandidateBuildContext:
         _build_multi_timeframe_trend_ensemble_candidates(self)
         _build_pullback_trend_continuation_candidates(self)
         _build_funding_harvest_carry_candidates(self)
+        # Carry-trend CONFLUENCE rider (per-symbol single-asset, crypto-perp): only
+        # rides a trend when the funding/carry sign AGREES with the trend sign, and
+        # the volatility-SQUEEZE breakout rider (per-symbol single-asset, OHLCV):
+        # a low-vol contraction precondition gating a directional breakout ride.
+        # Both >=30m only; single-asset so they bypass the multi-asset gate.
+        _build_carry_trend_confluence_rider_candidates(self)
+        _build_volatility_squeeze_breakout_rider_candidates(self)
         _build_metals_relative_value_basket_candidates(self)
         _build_liquidation_cascade_reversion_candidates(self)
         _build_orderbook_imbalance_reversion_candidates(self)
@@ -6786,6 +6793,345 @@ def _build_funding_harvest_carry_candidates(ctx: _CandidateBuildContext) -> None
                         "symbol_scope": symbol,
                         "allow_short": bool(spec["allow_short"]),
                         "data_dependent": True,
+                        "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                    },
+                )
+
+
+# Carry-trend CONFLUENCE rider: ride a trend ONLY when the funding/carry sign
+# agrees with the trend sign (long needs low/negative funding so the long perp
+# receives carry; short needs high-positive funding). Per-symbol single-asset,
+# crypto-perp only, >=30m. SHORT trend/funding windows so it fires on a ~1-month
+# window. ``long_carry_funding`` / ``short_carry_funding`` are the confluence
+# thresholds on the trailing-average funding rate.
+_CARRY_TREND_CONFLUENCE_RIDER_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "30m": (
+        {
+            "variant": "fast_ls",
+            "trend_lookback": 48,
+            "trend_ma_window": 48,
+            "min_trend_roc": 0.0,
+            "funding_window": 8,
+            "long_carry_funding": 0.00005,
+            "short_carry_funding": 0.00005,
+            "trail_atr_mult": 3.0,
+            "atr_period": 14,
+            "max_adds": 3,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 240,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "core_ls",
+            "trend_lookback": 48,
+            "trend_ma_window": 48,
+            "min_trend_roc": 0.0,
+            "funding_window": 8,
+            "long_carry_funding": 0.00005,
+            "short_carry_funding": 0.00005,
+            "trail_atr_mult": 3.2,
+            "atr_period": 14,
+            "max_adds": 3,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 200,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "swing_ls",
+            "trend_lookback": 36,
+            "trend_ma_window": 36,
+            "min_trend_roc": 0.0,
+            "funding_window": 6,
+            "long_carry_funding": 0.00005,
+            "short_carry_funding": 0.00005,
+            "trail_atr_mult": 3.5,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 36,
+            "target_vol": 0.030,
+            "max_hold_bars": 120,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1d": (
+        {
+            "variant": "macro_ls",
+            "trend_lookback": 24,
+            "trend_ma_window": 24,
+            "min_trend_roc": 0.0,
+            "funding_window": 4,
+            "long_carry_funding": 0.00005,
+            "short_carry_funding": 0.00005,
+            "trail_atr_mult": 4.0,
+            "atr_period": 10,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 24,
+            "target_vol": 0.040,
+            "max_hold_bars": 60,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+}
+
+
+def _build_carry_trend_confluence_rider_candidates(ctx: _CandidateBuildContext) -> None:
+    """Per-symbol carry-trend CONFLUENCE rider (single-asset, crypto-perp, feature-gated)."""
+    if not ctx.perp_support_data_available:
+        return
+    # Crypto-only: funding is a crypto-perp field; tradfi perps are routed through
+    # the dedicated equity/commodity builders, so this crypto sleeve excludes them.
+    crypto_symbols = ctx.crypto_only_symbols
+    if not crypto_symbols:
+        return
+    for timeframe in ctx._present("30m", "1h", "4h", "1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _CARRY_TREND_CONFLUENCE_RIDER_SLICE.get(timeframe, ()):
+            for symbol in crypto_symbols:
+                params = {
+                    "trend_lookback": int(spec["trend_lookback"]),
+                    "trend_ma_window": int(spec["trend_ma_window"]),
+                    "min_trend_roc": float(spec["min_trend_roc"]),
+                    "funding_window": int(spec["funding_window"]),
+                    "long_carry_funding": float(spec["long_carry_funding"]),
+                    "short_carry_funding": float(spec["short_carry_funding"]),
+                    "trail_atr_mult": float(spec["trail_atr_mult"]),
+                    "atr_period": int(spec["atr_period"]),
+                    "max_adds": int(spec["max_adds"]),
+                    "add_step_atr": float(spec["add_step_atr"]),
+                    "vol_window": int(spec["vol_window"]),
+                    "target_vol": float(spec["target_vol"]),
+                    "max_hold_bars": int(spec["max_hold_bars"]),
+                    "allow_short": bool(spec["allow_short"]),
+                    "add_alloc_fraction": float(spec["add_alloc_fraction"]),
+                }
+                _add_candidate(
+                    ctx.candidates,
+                    name=(
+                        f"carry_trend_confluence_rider_{tf_tag}_{spec['variant']}_"
+                        f"{symbol.replace('/', '').lower()}_"
+                        f"{int(spec['funding_window'])}"
+                    ),
+                    family="carry",
+                    strategy_class="CarryTrendConfluenceRiderStrategy",
+                    timeframe=timeframe,
+                    symbols=(symbol,),
+                    params=params,
+                    notes=(
+                        "Per-symbol carry-trend CONFLUENCE rider: rides a trend ONLY "
+                        "when the funding/carry sign AGREES with the trend (long into "
+                        "an uptrend with low/negative funding so the long perp receives "
+                        "carry; short into a downtrend with high-positive funding), "
+                        "riding the winner with an ATR trailing stop + pyramiding on "
+                        f"{symbol} at {timeframe} ({spec['variant']})."
+                    ),
+                    tags=(
+                        "carry",
+                        "funding",
+                        "trend",
+                        "confluence",
+                        "return_rider",
+                        "trailing_stop",
+                        "pyramiding",
+                        "single_asset",
+                        "crypto",
+                    ),
+                    metadata={
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": symbol,
+                        "allow_short": bool(spec["allow_short"]),
+                        "data_dependent": True,
+                        "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                    },
+                )
+
+
+# Volatility-SQUEEZE breakout rider: a low-vol contraction regime (Bollinger
+# Bandwidth at a multi-bar percentile low) is a required PRECONDITION; on the
+# volatility expansion + prior-N-bar range break it enters in the breakout
+# direction and rides. Per-symbol single-asset, OHLCV-only, >=30m. SHORT windows
+# so it fires on a ~1-month window.
+_VOLATILITY_SQUEEZE_BREAKOUT_RIDER_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "30m": (
+        {
+            "variant": "fast_ls",
+            "bandwidth_window": 20,
+            "bandwidth_num_std": 2.0,
+            "squeeze_percentile_window": 48,
+            "squeeze_percentile": 0.25,
+            "expansion_mult": 1.4,
+            "breakout_window": 20,
+            "require_bb_in_kc": False,
+            "keltner_window": 20,
+            "keltner_atr_window": 10,
+            "keltner_atr_mult": 1.5,
+            "trail_atr_mult": 3.5,
+            "atr_period": 14,
+            "max_adds": 3,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 200,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "core_ls",
+            "bandwidth_window": 20,
+            "bandwidth_num_std": 2.0,
+            "squeeze_percentile_window": 60,
+            "squeeze_percentile": 0.25,
+            "expansion_mult": 1.5,
+            "breakout_window": 24,
+            "require_bb_in_kc": False,
+            "keltner_window": 20,
+            "keltner_atr_window": 10,
+            "keltner_atr_mult": 1.5,
+            "trail_atr_mult": 3.5,
+            "atr_period": 14,
+            "max_adds": 3,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 180,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "swing_ls",
+            "bandwidth_window": 18,
+            "bandwidth_num_std": 2.0,
+            "squeeze_percentile_window": 48,
+            "squeeze_percentile": 0.25,
+            "expansion_mult": 1.5,
+            "breakout_window": 18,
+            "require_bb_in_kc": False,
+            "keltner_window": 18,
+            "keltner_atr_window": 10,
+            "keltner_atr_mult": 1.5,
+            "trail_atr_mult": 4.0,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 36,
+            "target_vol": 0.030,
+            "max_hold_bars": 120,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1d": (
+        {
+            "variant": "macro_ls",
+            "bandwidth_window": 14,
+            "bandwidth_num_std": 2.0,
+            "squeeze_percentile_window": 30,
+            "squeeze_percentile": 0.25,
+            "expansion_mult": 1.5,
+            "breakout_window": 14,
+            "require_bb_in_kc": False,
+            "keltner_window": 14,
+            "keltner_atr_window": 10,
+            "keltner_atr_mult": 1.5,
+            "trail_atr_mult": 4.5,
+            "atr_period": 10,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 24,
+            "target_vol": 0.040,
+            "max_hold_bars": 60,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+}
+
+
+def _build_volatility_squeeze_breakout_rider_candidates(ctx: _CandidateBuildContext) -> None:
+    """Per-symbol volatility-SQUEEZE breakout rider (single-asset, OHLCV-only)."""
+    # Crypto-only: tradfi equity/ETF perps are routed through the dedicated
+    # equity/commodity breakout builders, so this crypto sleeve excludes them.
+    crypto_symbols = ctx.crypto_only_symbols
+    if not crypto_symbols:
+        return
+    for timeframe in ctx._present("30m", "1h", "4h", "1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _VOLATILITY_SQUEEZE_BREAKOUT_RIDER_SLICE.get(timeframe, ()):
+            for symbol in crypto_symbols:
+                params = {
+                    "bandwidth_window": int(spec["bandwidth_window"]),
+                    "bandwidth_num_std": float(spec["bandwidth_num_std"]),
+                    "squeeze_percentile_window": int(spec["squeeze_percentile_window"]),
+                    "squeeze_percentile": float(spec["squeeze_percentile"]),
+                    "expansion_mult": float(spec["expansion_mult"]),
+                    "breakout_window": int(spec["breakout_window"]),
+                    "require_bb_in_kc": bool(spec["require_bb_in_kc"]),
+                    "keltner_window": int(spec["keltner_window"]),
+                    "keltner_atr_window": int(spec["keltner_atr_window"]),
+                    "keltner_atr_mult": float(spec["keltner_atr_mult"]),
+                    "trail_atr_mult": float(spec["trail_atr_mult"]),
+                    "atr_period": int(spec["atr_period"]),
+                    "max_adds": int(spec["max_adds"]),
+                    "add_step_atr": float(spec["add_step_atr"]),
+                    "vol_window": int(spec["vol_window"]),
+                    "target_vol": float(spec["target_vol"]),
+                    "max_hold_bars": int(spec["max_hold_bars"]),
+                    "allow_short": bool(spec["allow_short"]),
+                    "add_alloc_fraction": float(spec["add_alloc_fraction"]),
+                }
+                _add_candidate(
+                    ctx.candidates,
+                    name=(
+                        f"volatility_squeeze_breakout_rider_{tf_tag}_{spec['variant']}_"
+                        f"{symbol.replace('/', '').lower()}_"
+                        f"{int(spec['breakout_window'])}"
+                    ),
+                    family="breakout",
+                    strategy_class="VolatilitySqueezeBreakoutRiderStrategy",
+                    timeframe=timeframe,
+                    symbols=(symbol,),
+                    params=params,
+                    notes=(
+                        "Per-symbol volatility-SQUEEZE breakout rider: a low-vol "
+                        "Bollinger-Bandwidth contraction regime (percentile-low) is a "
+                        "required PRECONDITION; on the volatility expansion + prior-bar "
+                        "range break it enters in the breakout direction and rides with "
+                        f"an ATR trailing stop + pyramiding on {symbol} at {timeframe} "
+                        f"({spec['variant']})."
+                    ),
+                    tags=(
+                        "breakout",
+                        "volatility_squeeze",
+                        "contraction_expansion",
+                        "return_rider",
+                        "trailing_stop",
+                        "pyramiding",
+                        "single_asset",
+                        "crypto",
+                    ),
+                    metadata={
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": symbol,
+                        "allow_short": bool(spec["allow_short"]),
                         "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
                     },
                 )
