@@ -15,6 +15,7 @@ from typing import Any
 from lumina_quant.research_universe import (
     BINANCE_TRADFI_EQUITY_SYMBOLS,
     BINANCE_TRADFI_ETF_INDEX_SYMBOLS,
+    BINANCE_TRADFI_PERP_RESEARCH_SYMBOLS,
 )
 from lumina_quant.strategies.pair_spread_zscore import bounded_pair_retune_params
 from lumina_quant.symbols import (
@@ -2540,6 +2541,7 @@ class _CandidateBuildContext:
     carry_tfs: list[str] = field(init=False)
     micro_tfs: list[str] = field(init=False)
     crypto_symbols: list[str] = field(init=False)
+    crypto_only_symbols: list[str] = field(init=False)
     laggard_symbols: list[str] = field(init=False)
     perp_support_data_available: bool = field(init=False)
 
@@ -2572,6 +2574,15 @@ class _CandidateBuildContext:
         self.micro_tfs = self._present("1s")
         self.crypto_symbols = [
             symbol for symbol in self.normalized_symbols if symbol not in _METALS
+        ]
+        # Crypto-ONLY: drop every tradfi perp (equity/ETF/commodity/premarket) so
+        # the per-symbol crypto riders never trade equity/ETF perps (which would
+        # both leak tradfi into a crypto sleeve and double-trade the dedicated
+        # equity single-name rider). Tradfi perps are routed through the explicit
+        # equity/ETF builders that intersect named research-universe constants.
+        _tradfi_perps = set(canonicalize_symbol_list(BINANCE_TRADFI_PERP_RESEARCH_SYMBOLS))
+        self.crypto_only_symbols = [
+            symbol for symbol in self.crypto_symbols if symbol not in _tradfi_perps
         ]
         self.laggard_symbols = [
             symbol for symbol in self.crypto_symbols if symbol not in _CRYPTO_LEADERS
@@ -2616,6 +2627,14 @@ class _CandidateBuildContext:
         _build_betting_against_beta_candidates(self)
         _build_semis_leadlag_rotation_candidates(self)
         _build_dual_momentum_index_rotation_candidates(self)
+        # Directional, long-biased EQUITY/ETF return sleeves (S-EQ1/2/3): ride
+        # secular single-name winners, time leveraged ETFs above-trend with decay-
+        # aware sizing, and dual-momentum-rotate with a long defensive leg. Each
+        # targets the equity/ETF universe cleanly via _intersect_universe (never
+        # ctx.crypto_symbols) so no crypto leaks in.
+        _build_equity_single_name_trend_rider_candidates(self)
+        _build_leveraged_trend_timing_candidates(self)
+        _build_dual_momentum_defensive_candidates(self)
         _build_calendar_seasonality_overlay_candidates(self)
         # Cross-sectional anomaly sleeves (decorrelated factor families).
         _build_idiosyncratic_volatility_candidates(self)
@@ -4404,6 +4423,21 @@ _INDEX_PER_ASSET_PREFERENCES: tuple[str, ...] = (
     "SPYUSDT",
     "QQQUSDT",
 )
+# Leveraged / high-beta thematic ETFs that live in the ETF/index perp universe
+# (verified members of BINANCE_TRADFI_ETF_INDEX_SYMBOLS): a long-only trend timer
+# converts their volatility-decay buy-hold disaster into a high-CAGR vehicle.
+_LEVERAGED_ETF_UNIVERSE: tuple[str, ...] = (
+    "SOXLUSDT",
+    "URNMUSDT",
+)
+# Defensive risk-off rotation leg (verified members of the tradfi perp universe):
+# precious metal (XAU), energy (XLE), long-vol (UVXY). Rotated LONG into the best
+# of these by its own momentum when the absolute-momentum gate is risk-off.
+_DEFENSIVE_ROTATION_UNIVERSE: tuple[str, ...] = (
+    "XAUUSDT",
+    "XLEUSDT",
+    "UVXYUSDT",
+)
 
 
 def _intersect_universe(
@@ -4890,7 +4924,9 @@ _ACCELERATION_RIDER_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
 
 def _build_adaptive_trend_rider_candidates(ctx: _CandidateBuildContext) -> None:
     """Per-symbol KAMA/efficiency adaptive-trend rider (single-asset, return-max)."""
-    crypto_symbols = ctx.crypto_symbols
+    # Crypto-only: tradfi equity/ETF perps are routed through the dedicated
+    # equity single-name rider, so this crypto sleeve must not trade them.
+    crypto_symbols = ctx.crypto_only_symbols
     if not crypto_symbols:
         return
     for timeframe in ctx._present("30m", "1h", "4h", "1d"):
@@ -4951,7 +4987,9 @@ def _build_adaptive_trend_rider_candidates(ctx: _CandidateBuildContext) -> None:
 
 def _build_volatility_breakout_rider_candidates(ctx: _CandidateBuildContext) -> None:
     """Per-symbol Donchian/ATR-expansion breakout rider (single-asset, return-max)."""
-    crypto_symbols = ctx.crypto_symbols
+    # Crypto-only: tradfi equity/ETF perps are routed through the dedicated
+    # equity/leveraged-ETF trend builders, so this crypto sleeve excludes them.
+    crypto_symbols = ctx.crypto_only_symbols
     if not crypto_symbols:
         return
     for timeframe in ctx._present("30m", "1h", "4h", "1d"):
@@ -5011,7 +5049,9 @@ def _build_volatility_breakout_rider_candidates(ctx: _CandidateBuildContext) -> 
 
 def _build_acceleration_rider_candidates(ctx: _CandidateBuildContext) -> None:
     """Per-symbol accelerating-momentum rider (single-asset, return-max)."""
-    crypto_symbols = ctx.crypto_symbols
+    # Crypto-only: tradfi equity/ETF perps are routed through the dedicated
+    # equity trend/rotation builders, so this crypto sleeve excludes them.
+    crypto_symbols = ctx.crypto_only_symbols
     if not crypto_symbols:
         return
     for timeframe in ctx._present("30m", "1h", "4h", "1d"):
@@ -5067,6 +5107,309 @@ def _build_acceleration_rider_candidates(ctx: _CandidateBuildContext) -> None:
                         "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
                     },
                 )
+
+
+# S-EQ1 single-name EQUITY trend rider: REUSES AdaptiveTrendRiderStrategy with
+# equity-tuned, LONG-ONLY params (equities drift up; shorting single names invites
+# squeeze risk). One single-asset candidate per equity perp, 1d primary + 4h
+# faster variant. Long, slower trend windows than the crypto rider profiles.
+_EQUITY_SINGLE_NAME_TREND_RIDER_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "4h": (
+        {
+            "variant": "swing_long",
+            "kama_period": 14,
+            "kama_fast": 2,
+            "kama_slow": 30,
+            "min_efficiency": 0.32,
+            "slope_lookback": 2,
+            "trail_atr_mult": 3.2,
+            "atr_period": 14,
+            "max_adds": 3,
+            "add_step_atr": 1.0,
+            "vol_window": 36,
+            "target_vol": 0.020,
+            "max_hold_bars": 360,
+            "allow_short": False,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1d": (
+        {
+            "variant": "macro_long",
+            "kama_period": 20,
+            "kama_fast": 2,
+            "kama_slow": 40,
+            "min_efficiency": 0.35,
+            "slope_lookback": 3,
+            "trail_atr_mult": 3.5,
+            "atr_period": 14,
+            "max_adds": 3,
+            "add_step_atr": 1.0,
+            "vol_window": 20,
+            "target_vol": 0.025,
+            "max_hold_bars": 252,
+            "allow_short": False,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+}
+
+
+def _build_equity_single_name_trend_rider_candidates(ctx: _CandidateBuildContext) -> None:
+    """S-EQ1 — single-name EQUITY trend rider (reuse AdaptiveTrendRider, long-only)."""
+    equity_symbols = _intersect_universe(_EQUITY_FACTOR_UNIVERSE, ctx.normalized_symbols)
+    if not equity_symbols:
+        return
+    for timeframe in ctx._present("4h", "1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _EQUITY_SINGLE_NAME_TREND_RIDER_SLICE.get(timeframe, ()):
+            for symbol in equity_symbols:
+                params = {
+                    "kama_period": int(spec["kama_period"]),
+                    "kama_fast": int(spec["kama_fast"]),
+                    "kama_slow": int(spec["kama_slow"]),
+                    "min_efficiency": float(spec["min_efficiency"]),
+                    "slope_lookback": int(spec["slope_lookback"]),
+                    "trail_atr_mult": float(spec["trail_atr_mult"]),
+                    "atr_period": int(spec["atr_period"]),
+                    "max_adds": int(spec["max_adds"]),
+                    "add_step_atr": float(spec["add_step_atr"]),
+                    "vol_window": int(spec["vol_window"]),
+                    "target_vol": float(spec["target_vol"]),
+                    "max_hold_bars": int(spec["max_hold_bars"]),
+                    "allow_short": bool(spec["allow_short"]),
+                    "add_alloc_fraction": float(spec["add_alloc_fraction"]),
+                }
+                _add_candidate(
+                    ctx.candidates,
+                    name=(
+                        f"equity_single_name_trend_rider_{tf_tag}_{spec['variant']}_"
+                        f"{symbol.replace('/', '').lower()}_"
+                        f"{float(spec['trail_atr_mult']):.1f}"
+                    ),
+                    family="trend",
+                    strategy_class="AdaptiveTrendRiderStrategy",
+                    timeframe=timeframe,
+                    symbols=(symbol,),
+                    params=params,
+                    notes=(
+                        "DORMANT equity tranche: long-only single-name KAMA/"
+                        "efficiency adaptive-trend rider that rides secular equity "
+                        "winners with an ATR trailing stop and pyramids into "
+                        f"continuation for high compound return on {symbol} at "
+                        f"{timeframe} ({spec['variant']}); self-skips until equity "
+                        "perps materialize."
+                    ),
+                    tags=(
+                        "trend",
+                        "return_rider",
+                        "trailing_stop",
+                        "pyramiding",
+                        "single_asset",
+                        "equity",
+                    ),
+                    metadata={
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": symbol,
+                        "allow_short": bool(spec["allow_short"]),
+                        "dormant_tranche": True,
+                        "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                    },
+                )
+
+
+# S-EQ2 leveraged-ETF trend timing: NEW LeveragedTrendTimingRiderStrategy, LONG
+# only above the long regime SMA + golden cross, with decay-aware sizing. One
+# single-asset candidate per leveraged/high-beta ETF, 1d primary + 4h variant.
+_LEVERAGED_TREND_TIMING_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "4h": (
+        {
+            "variant": "swing_timer",
+            "regime_sma_bars": 200,
+            "fast_sma_bars": 50,
+            "slow_sma_bars": 200,
+            "confirm_bars": 3,
+            "trend_buffer": 0.0,
+            "decay_vol_ref": 0.035,
+            "decay_floor": 0.25,
+            "trail_atr_mult": 3.0,
+            "atr_period": 14,
+            "max_adds": 3,
+            "add_step_atr": 1.0,
+            "vol_window": 30,
+            "target_vol": 0.020,
+            "max_hold_bars": 360,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1d": (
+        {
+            "variant": "macro_timer",
+            "regime_sma_bars": 200,
+            "fast_sma_bars": 50,
+            "slow_sma_bars": 200,
+            "confirm_bars": 3,
+            "trend_buffer": 0.0,
+            "decay_vol_ref": 0.030,
+            "decay_floor": 0.25,
+            "trail_atr_mult": 3.5,
+            "atr_period": 14,
+            "max_adds": 3,
+            "add_step_atr": 1.0,
+            "vol_window": 20,
+            "target_vol": 0.025,
+            "max_hold_bars": 252,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+}
+
+
+def _build_leveraged_trend_timing_candidates(ctx: _CandidateBuildContext) -> None:
+    """S-EQ2 — leveraged-ETF trend timer with decay-aware sizing (single-asset, long-only)."""
+    letf_symbols = _intersect_universe(_LEVERAGED_ETF_UNIVERSE, ctx.normalized_symbols)
+    if not letf_symbols:
+        return
+    for timeframe in ctx._present("4h", "1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _LEVERAGED_TREND_TIMING_SLICE.get(timeframe, ()):
+            for symbol in letf_symbols:
+                params = {
+                    "regime_sma_bars": int(spec["regime_sma_bars"]),
+                    "fast_sma_bars": int(spec["fast_sma_bars"]),
+                    "slow_sma_bars": int(spec["slow_sma_bars"]),
+                    "confirm_bars": int(spec["confirm_bars"]),
+                    "trend_buffer": float(spec["trend_buffer"]),
+                    "decay_vol_ref": float(spec["decay_vol_ref"]),
+                    "decay_floor": float(spec["decay_floor"]),
+                    "trail_atr_mult": float(spec["trail_atr_mult"]),
+                    "atr_period": int(spec["atr_period"]),
+                    "max_adds": int(spec["max_adds"]),
+                    "add_step_atr": float(spec["add_step_atr"]),
+                    "vol_window": int(spec["vol_window"]),
+                    "target_vol": float(spec["target_vol"]),
+                    "max_hold_bars": int(spec["max_hold_bars"]),
+                    "allow_short": False,
+                    "add_alloc_fraction": float(spec["add_alloc_fraction"]),
+                }
+                _add_candidate(
+                    ctx.candidates,
+                    name=(
+                        f"leveraged_trend_timing_rider_{tf_tag}_{spec['variant']}_"
+                        f"{symbol.replace('/', '').lower()}_"
+                        f"{int(spec['regime_sma_bars'])}"
+                    ),
+                    family="trend",
+                    strategy_class="LeveragedTrendTimingRiderStrategy",
+                    timeframe=timeframe,
+                    symbols=(symbol,),
+                    params=params,
+                    notes=(
+                        "DORMANT index tranche: long-only leveraged-ETF trend timer "
+                        "that holds only above the long regime SMA and a confirmed "
+                        "golden cross, rides with an ATR trailing stop, and shrinks "
+                        "size as realized volatility rises (decay penalty) on "
+                        f"{symbol} at {timeframe} ({spec['variant']}); self-skips "
+                        "until the leveraged ETF perp materializes."
+                    ),
+                    tags=(
+                        "trend",
+                        "return_rider",
+                        "trailing_stop",
+                        "pyramiding",
+                        "single_asset",
+                        "index",
+                        "leveraged_etf",
+                    ),
+                    metadata={
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": symbol,
+                        "allow_short": False,
+                        "dormant_tranche": True,
+                        "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                    },
+                )
+
+
+# S-EQ3 dual-momentum index rotation WITH a defensive leg: NEW
+# DualMomentumDefensiveRotationStrategy. Risk-on -> rank index/ETF universe and
+# hold top-N above SMA; risk-off -> rotate 100% LONG into the best of the
+# defensive universe (XAU/XLE/UVXY) by its own momentum. Basket/multi, 1d only.
+_DUAL_MOMENTUM_DEFENSIVE_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "1d": (
+        {
+            "variant": "absrel_defensive_top3",
+            "absolute_lookback_bars": 12,
+            "blend_lookbacks": "1,3,6,12",
+            "sma_bars": 200,
+            "rebalance_bars": 21,
+            "max_holdings": 3,
+            "stop_loss_pct": 0.12,
+            "max_hold_bars": 252,
+        },
+    ),
+}
+
+
+def _build_dual_momentum_defensive_candidates(ctx: _CandidateBuildContext) -> None:
+    """S-EQ3 — dual-momentum index rotation with a long defensive leg (multi basket)."""
+    filtered = _intersect_universe(_INDEX_ROTATION_UNIVERSE, ctx.normalized_symbols)
+    defensive = _intersect_universe(_DEFENSIVE_ROTATION_UNIVERSE, ctx.normalized_symbols)
+    # Need >=4 rotation ETFs AND at least one defensive instrument so the risk-off
+    # leg has somewhere to rotate; otherwise self-skip (no flat-only duplication of
+    # the plain dual-momentum rotation sleeve).
+    if len(filtered) < 4 or not defensive:
+        return
+    union_symbols = tuple(dict.fromkeys((*filtered, *defensive)))
+    for timeframe in ctx._present("1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _DUAL_MOMENTUM_DEFENSIVE_SLICE.get(timeframe, ()):
+            params = {
+                "defensive_symbols": ",".join(defensive),
+                "absolute_lookback_bars": int(spec["absolute_lookback_bars"]),
+                "blend_lookbacks": str(spec["blend_lookbacks"]),
+                "sma_bars": int(spec["sma_bars"]),
+                "rebalance_bars": int(spec["rebalance_bars"]),
+                "max_holdings": int(spec["max_holdings"]),
+                "stop_loss_pct": float(spec["stop_loss_pct"]),
+                "max_hold_bars": int(spec["max_hold_bars"]),
+            }
+            _add_candidate(
+                ctx.candidates,
+                name=(
+                    f"dual_momentum_defensive_rotation_{tf_tag}_{spec['variant']}_"
+                    f"{int(spec['max_holdings'])}_{int(spec['sma_bars'])}"
+                ),
+                family="cross_sectional",
+                strategy_class="DualMomentumDefensiveRotationStrategy",
+                timeframe=timeframe,
+                symbols=union_symbols,
+                params=params,
+                notes=(
+                    "DORMANT index tranche: dual-momentum rotation that gates on an "
+                    "absolute-return filter, rotates into the top blended-momentum "
+                    "index perps above their SMA when risk-on, and rotates 100% LONG "
+                    "into the best defensive instrument (metal/energy/long-vol) by "
+                    f"its own momentum when risk-off for {timeframe} "
+                    f"({spec['variant']}); self-skips until index perps materialize."
+                ),
+                tags=(
+                    *_CROSS_SECTIONAL_ADMISSION_TAGS,
+                    "index",
+                    "rotation",
+                    "defensive",
+                    "dormant",
+                ),
+                metadata={
+                    "timeframe": timeframe,
+                    "retune_profile": str(spec["variant"]),
+                    "symbol_scope": "index",
+                    "dormant_tranche": True,
+                    "decision_cadence_seconds": 86400,
+                },
+            )
 
 
 # Per-symbol multi-horizon trend-ENSEMBLE rider (enter only when short/medium/long
