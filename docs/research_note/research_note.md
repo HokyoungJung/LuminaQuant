@@ -1,5 +1,16 @@
 # Research Note
 
+## 2026-06-17 KST (e) — micro-signal / >=30m-cadence 배치 (intrabar 시그널, 30m 거래)
+
+사용자 지시: "알파 시그널은 micro 타임프레임을 봐도 되지만 거래빈도는 >=30m." 메커니즘(엔진 매핑): **Pattern A** — `decision_cadence_seconds=1800` + `preferred_contract="market_window"`. 엔진은 1s 데이터를 매 윈도우 ingest하고 스톱/트레일링은 1s 해상도로 평가하되(core/engine.py:448-472), 결정 콜백은 30m 버킷마다 1회만 발화(engine.py:339-363). **트랩**: 게이트된 콜백은 마지막 윈도우의 bars_1s만 봄 → 코어 시그널은 **누적 30m 결정-바**로 계산하고, 마지막 윈도우 bars_1s는 결정 순간의 **fresh micro 리딩/확인**으로만 사용.
+
+신규 3종(`micro_signal_alpha_sleeves.py`, 전부 decision_cadence_seconds=1800):
+- **IntradayFlowPressureRider** — 30m 결정-바 누적 `order_flow_imbalance`(taker quote vol, OHLCV up/down-vol 폴백) z-score로 방향성 진입, 마지막 윈도우 1s 틱 부호 일치 + 윈도우 VWAP 체결로 micro 확인, ATR 트레일링 라이드. TakerFlow*(60s fade)와 반대(1800s continuation).
+- **VolOfVolRegimeTrendGate** — 추세 방향(pv_trend_score 게이트) × **GK vs close-to-close 변동성 발산 사이즈 거버너**. 주의: GK는 구조적으로 close-to-close의 ~2~2.5배라 절대 임계값이면 정상 바에서도 veto → 무거래(리뷰가 잡음). 그래서 **자기 자신의 롤링-median 대비 상대값**으로 판정(상대 스트레스), 워밍업엔 neutral. KER 게이트로 깨끗한 추세만 up-size. OHLCV-only.
+- **VWAPCompressionReversion** — `volcomp_vwap_pressure`(처음 live 활성화) 게이트로 vol-압축 레짐에서만 VWAP 이격 z-score 반전, 마지막 윈도우 1s VWAP로 이격 anchor 정밀화, +-6 zero-sigma 가드. 비상관 diversifier.
+
+**dead-primitive 5종 처음/재활성화**: pv_trend_score, garman_klass_volatility, kaufman_efficiency_ratio(라이브 게이트), volcomp_vwap_pressure, order_flow_imbalance. 적대적 리뷰가 MAJOR(GK/rv 거버너 무거래 오보정)를 잡아 상대-median으로 교정 + 디폴트 파라미터로 LONG 진입하는 no-trade 회귀 테스트 추가; minor 2건(symbol 값-동등 매칭→명시 전달, #1 required_features 제거로 OHLCV 폴백 도달)도 수정. 검증: ruff·audit(729/new=0)·architecture·신규 10테스트 통과. 백테스트는 데이터 PC.
+
 ## 2026-06-17 KST (c) — 상품/매크로 추세 라이더 + 주식 52주 신고가 라이더(라이더 재사용·신규 유니버스)
 
 검증된 리턴-라이더 클래스를 **신규 방향성 유니버스로 라우팅**(신규 전략 클래스 없음): (1) **상품 managed-futures 추세 라이더** — `_COMMODITY_TREND_UNIVERSE`(=BINANCE_TRADFI_COMMODITY_SYMBOLS: CL/BZ/COPPER/NATGAS + XAU/XAG/XPT/XPD) 8종에 AdaptiveTrend/Breakout/Acceleration 라이더를 per-symbol·**롱숏**(상품은 양방향 추세)·4h+1d로; (2) **주식 52주 신고가 브레이크아웃 라이더**(George-Hwang) — `VolatilityBreakoutRiderStrategy`를 `_EQUITY_FACTOR_UNIVERSE`에 donchian_window=252(=52주 일봉)·**롱온리**로. 전부 `_intersect_universe(상수, normalized_symbols)`로 라우팅(crypto_symbols 미사용), per-TF cadence, ATR 트레일링 라이딩. de-leak로 crypto 라이더는 crypto-only라 상품/주식과 중복 없음. 검증: ruff·audit(711/new=0, 슬라이스는 데이터 dict)·architecture·신규 7테스트 + 기존 라이더 19통과, 적대적 리뷰 clean(잔여 minor: 4h 52w는 빠른 확인 변형·상품 가속 게이트 = 스키마 기본값, 둘 다 no-change). 백테스트는 데이터 PC(상품/주식 장기 일봉 필요).
