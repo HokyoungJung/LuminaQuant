@@ -1,5 +1,14 @@
 # Research Note
 
+## 2026-06-17 KST (k) — 순열 엔트로피 레짐 트렌드 라이더 + Amihud 비유동성 프리미엄 모멘텀 라이더
+
+레지스트리 97종 — 새 신호원 2종(`entropy_amihud_alpha_sleeves.py`, 둘 다 `_ReturnRiderBase` 상속·per-symbol 단일자산·>=30m). 사전 확인: **순열-엔트로피/ordinal-pattern 전략 전무**, `amihud_illiquidity` **인디케이터는 존재하나 사용 전략 전무**(재사용) → 둘 다 distinct. *(빌드 Workflow 529 불안정 → 세션 내 직접 작성 + 독립 critic 적대 리뷰.)*
+
+- **PermutationEntropyTrendRiderStrategy** (OHLCV-only). 이론: Bandt-Pompe 순열 엔트로피(연속 `pe_dim`개 값의 ordinal-pattern 분포의 Shannon 엔트로피를 `log(dim!)`로 정규화 → [0,1], 0=구조적 1=랜덤). 정규화 엔트로피가 `pe_threshold` 미만(예측가능/구조적 레짐)이고 추세가 확인될 때만 라이드, 고엔트로피(랜덤)면 진입 억제. **차별점**: HurstRegimeGated(R/S Hurst)·TrendEfficiency(Kaufman ER)·AdaptiveTrend(KAMA)·KalmanTrend(상태공간 slope)과 달리 레짐 게이트가 **정보이론 ordinal-pattern 엔트로피** — 타 슬리브 미계산. 인과적(현재 종가까지로 계산).
+- **AmihudIlliquidityMomentumRiderStrategy** (OHLCV-only). 이론: Amihud(2002) 비유동성 프리미엄(단위 달러거래량당 가격충격↑ = 비유동 → 모멘텀/수익 강함). 기존 `amihud_illiquidity` 프록시(`mean |logret|/dollar-vol`) 재사용, volume을 병렬 deque로 캡처. 현재 Amihud가 자기 **롤링-median 대비 elevated**(`>= illiquidity_rel*median`, 비유동 프리미엄 레짐)이고 추세 확인 시에만 라이드. **차별점**: LiquidityShock/OrderBookImbalance(미시구조 반전)·순수 트렌드라이더(유동성 비조건)와 달리 게이트가 **Amihud 비유동성 프리미엄 레짐**.
+
+유니버스 둘 다 `ctx.crypto_only_symbols`, 30m/1h/4h/1d, per-TF cadence `_RIDER_TF_CADENCE_SECONDS`(>=1800). 검증: `.venv/bin/python`(3.14) ruff·format·py_compile·audit(baseline 760/new=0)·check_architecture·verify_docs·신규 10테스트(순열엔트로피 헬퍼 단위검증·entry/suppress 대조 포함)·full pytest 통과 + 독립 critic 적대 리뷰(특히 Amihud closes/volumes 정렬·룩어헤드). 백테스트는 데이터 PC.
+
 ## 2026-06-17 KST (j) — Kalman 상태공간 트렌드 라이더 + 실현 세미분산 비대칭 트렌드 라이더
 
 레지스트리 95종 — 신규 신호원 2종(`kalman_semivar_alpha_sleeves.py`, 둘 다 `_ReturnRiderBase` 상속·per-symbol 단일자산·>=30m). 사전 확인: 코드베이스에 **Kalman 추정자 전무**, **실현 세미분산/good-bad-vol/signed-jump 전략 전무**(downside_volatility 헬퍼만 존재) → 둘 다 명확히 distinct. *(빌드 Workflow가 529로 불안정해 이번도 세션 내 직접 작성 + 독립 critic 적대 리뷰로 검증.)*
