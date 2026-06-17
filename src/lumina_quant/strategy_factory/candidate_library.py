@@ -8989,7 +8989,7 @@ def _build_orderbook_imbalance_reversion_candidates(
             )
 
 
-# --- Selection-aware cross-sectional sleeves (live crypto) -----------------
+# --- Selection-aware cross-sectional sleeves (expanded research universe) ---
 # These compose the multi-factor target-pool selector with a directional signal:
 # each rebalance screens the universe into a tradeable pool, then trades only
 # inside it.  They are multi-symbol (>=3) so they MUST be wired
@@ -9045,9 +9045,9 @@ _SELECTION_GATED_MOMENTUM_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
 def _build_selection_gated_momentum_candidates(
     ctx: _CandidateBuildContext,
 ) -> None:
-    """Selection-gated cross-sectional momentum on a screened crypto pool."""
-    crypto_symbols = ctx.crypto_symbols
-    if len(crypto_symbols) < 4:
+    """Selection-gated cross-sectional momentum on a screened expanded universe."""
+    selection_symbols = list(ctx.normalized_symbols)
+    if len(selection_symbols) < 4:
         return
     for timeframe in ctx._present("1h", "4h"):
         tf_tag = timeframe.replace("/", "-")
@@ -9074,13 +9074,13 @@ def _build_selection_gated_momentum_candidates(
                 family="cross_sectional",
                 strategy_class="SelectionGatedMomentumStrategy",
                 timeframe=timeframe,
-                symbols=crypto_symbols,
+                symbols=selection_symbols,
                 params=params,
                 notes=(
-                    "Selection-aware sleeve that screens the universe into the "
-                    "multi-factor target pool (price-position/volume/volatility/"
-                    "vwap) each rebalance, then runs vol-scaled cross-sectional "
-                    f"momentum only inside that pool for {timeframe} "
+                    "Selection-aware sleeve that screens the full expanded research "
+                    "universe into the multi-factor target pool (price-position/"
+                    "volume/volatility/vwap) each rebalance, then runs vol-scaled "
+                    f"cross-sectional momentum only inside that pool for {timeframe} "
                     f"({spec['variant']})."
                 ),
                 tags=(
@@ -9088,12 +9088,12 @@ def _build_selection_gated_momentum_candidates(
                     "selection_aware",
                     "universe_selection",
                     "factor",
-                    "crypto",
+                    "expanded_universe",
                 ),
                 metadata={
                     "timeframe": timeframe,
                     "retune_profile": str(spec["variant"]),
-                    "symbol_scope": "crypto",
+                    "symbol_scope": "expanded_research_universe",
                     "allow_short": bool(spec["allow_short"]),
                     "decision_cadence_seconds": cadence,
                 },
@@ -9150,9 +9150,9 @@ _SELECTION_GATED_REVERSION_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
 def _build_selection_gated_reversion_candidates(
     ctx: _CandidateBuildContext,
 ) -> None:
-    """Selection-gated short-horizon reversion on a screened crypto pool."""
-    crypto_symbols = ctx.crypto_symbols
-    if len(crypto_symbols) < 4:
+    """Selection-gated short-horizon reversion on a screened expanded universe."""
+    selection_symbols = list(ctx.normalized_symbols)
+    if len(selection_symbols) < 4:
         return
     for timeframe in ctx._present("1h", "4h"):
         tf_tag = timeframe.replace("/", "-")
@@ -9179,26 +9179,26 @@ def _build_selection_gated_reversion_candidates(
                 family="cross_sectional",
                 strategy_class="SelectionGatedReversionStrategy",
                 timeframe=timeframe,
-                symbols=crypto_symbols,
+                symbols=selection_symbols,
                 params=params,
                 notes=(
-                    "Selection-aware sleeve that screens the universe into the "
-                    "multi-factor target pool each rebalance, then fades the most "
-                    "recent return only on screened mid-range liquid names for "
-                    f"{timeframe} ({spec['variant']}); decorrelated from the "
-                    "selection-gated momentum sleeve."
+                    "Selection-aware sleeve that screens the full expanded research "
+                    "universe into the multi-factor target pool each rebalance, then "
+                    "fades the most recent return only on screened mid-range liquid "
+                    f"names for {timeframe} ({spec['variant']}); decorrelated from "
+                    "the selection-gated momentum sleeve."
                 ),
                 tags=(
                     *_CROSS_SECTIONAL_ADMISSION_TAGS,
                     "selection_aware",
                     "universe_selection",
                     "reversion",
-                    "crypto",
+                    "expanded_universe",
                 ),
                 metadata={
                     "timeframe": timeframe,
                     "retune_profile": str(spec["variant"]),
-                    "symbol_scope": "crypto",
+                    "symbol_scope": "expanded_research_universe",
                     "allow_short": bool(spec["allow_short"]),
                     "decision_cadence_seconds": cadence,
                 },
