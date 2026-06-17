@@ -2642,6 +2642,8 @@ class _CandidateBuildContext:
         _build_open_interest_trend_confirmation_rider_candidates(self)
         _build_intraday_seasonal_momentum_rider_candidates(self)
         _build_overnight_session_return_rider_candidates(self)
+        _build_kalman_trend_rider_candidates(self)
+        _build_realized_semivariance_trend_rider_candidates(self)
         _build_metals_relative_value_basket_candidates(self)
         _build_liquidation_cascade_reversion_candidates(self)
         _build_orderbook_imbalance_reversion_candidates(self)
@@ -7686,6 +7688,278 @@ def _build_overnight_session_return_rider_candidates(ctx: _CandidateBuildContext
                         "seasonality",
                         "overnight_session",
                         "time_of_day",
+                        "return_rider",
+                        "trailing_stop",
+                        "single_asset",
+                        "crypto",
+                    ),
+                    metadata={
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": symbol,
+                        "allow_short": bool(spec["allow_short"]),
+                        "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                    },
+                )
+
+
+# Kalman state-space trend rider: ride when a local-linear-trend Kalman SLOPE on
+# the log close is significant. Per-symbol single-asset, crypto-only, >=30m.
+_KALMAN_TREND_RIDER_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "30m": (
+        {
+            "variant": "responsive_ls",
+            "obs_noise": 0.0001,
+            "level_process_noise": 2e-5,
+            "slope_process_noise": 2e-7,
+            "slope_t": 2.0,
+            "min_slope_frac": 0.0,
+            "trail_atr_mult": 3.0,
+            "atr_period": 14,
+            "max_adds": 3,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 96,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "core_ls",
+            "obs_noise": 0.0001,
+            "level_process_noise": 1e-5,
+            "slope_process_noise": 1e-7,
+            "slope_t": 2.0,
+            "min_slope_frac": 0.0,
+            "trail_atr_mult": 3.2,
+            "atr_period": 14,
+            "max_adds": 3,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 72,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "swing_ls",
+            "obs_noise": 0.0001,
+            "level_process_noise": 5e-6,
+            "slope_process_noise": 5e-8,
+            "slope_t": 2.2,
+            "min_slope_frac": 0.0,
+            "trail_atr_mult": 3.5,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 36,
+            "target_vol": 0.030,
+            "max_hold_bars": 36,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1d": (
+        {
+            "variant": "macro_ls",
+            "obs_noise": 0.0001,
+            "level_process_noise": 5e-6,
+            "slope_process_noise": 5e-8,
+            "slope_t": 2.2,
+            "min_slope_frac": 0.0,
+            "trail_atr_mult": 4.0,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 30,
+            "target_vol": 0.030,
+            "max_hold_bars": 30,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+}
+
+
+def _build_kalman_trend_rider_candidates(ctx: _CandidateBuildContext) -> None:
+    """Per-symbol Kalman state-space trend rider (single-asset, OHLCV-only)."""
+    crypto_symbols = ctx.crypto_only_symbols
+    if not crypto_symbols:
+        return
+    for timeframe in ctx._present("30m", "1h", "4h", "1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _KALMAN_TREND_RIDER_SLICE.get(timeframe, ()):
+            for symbol in crypto_symbols:
+                params = {
+                    "obs_noise": float(spec["obs_noise"]),
+                    "level_process_noise": float(spec["level_process_noise"]),
+                    "slope_process_noise": float(spec["slope_process_noise"]),
+                    "slope_t": float(spec["slope_t"]),
+                    "min_slope_frac": float(spec["min_slope_frac"]),
+                    "trail_atr_mult": float(spec["trail_atr_mult"]),
+                    "atr_period": int(spec["atr_period"]),
+                    "max_adds": int(spec["max_adds"]),
+                    "add_step_atr": float(spec["add_step_atr"]),
+                    "vol_window": int(spec["vol_window"]),
+                    "target_vol": float(spec["target_vol"]),
+                    "max_hold_bars": int(spec["max_hold_bars"]),
+                    "allow_short": bool(spec["allow_short"]),
+                    "add_alloc_fraction": float(spec["add_alloc_fraction"]),
+                }
+                _add_candidate(
+                    ctx.candidates,
+                    name=(
+                        f"kalman_trend_rider_{tf_tag}_{spec['variant']}_"
+                        f"{symbol.replace('/', '').lower()}"
+                    ),
+                    family="trend",
+                    strategy_class="KalmanTrendRiderStrategy",
+                    timeframe=timeframe,
+                    symbols=(symbol,),
+                    params=params,
+                    notes=(
+                        "Per-symbol Kalman state-space trend rider: a local-linear-trend "
+                        "Kalman filter on the log close yields a low-lag, uncertainty-aware "
+                        "slope; a ride is armed when the filtered slope is statistically "
+                        "significant (slope/sqrt(var) >= slope_t). ATR trailing stop + "
+                        f"pyramiding on {symbol} at {timeframe} ({spec['variant']})."
+                    ),
+                    tags=(
+                        "trend",
+                        "kalman",
+                        "state_space",
+                        "return_rider",
+                        "trailing_stop",
+                        "pyramiding",
+                        "single_asset",
+                        "crypto",
+                    ),
+                    metadata={
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": symbol,
+                        "allow_short": bool(spec["allow_short"]),
+                        "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                    },
+                )
+
+
+# Realized-semivariance trend rider: ride a trend confirmed by an upside/downside
+# realized-semivariance asymmetry (Patton-Sheppard good/bad volatility). Per-symbol
+# single-asset, crypto-only, >=30m.
+_REALIZED_SEMIVARIANCE_TREND_RIDER_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "30m": (
+        {
+            "variant": "core_ls",
+            "semivar_window": 48,
+            "semivar_threshold": 0.20,
+            "trend_lookback": 48,
+            "trend_ma_window": 48,
+            "min_trend_roc": 0.0,
+            "trail_atr_mult": 3.0,
+            "atr_period": 14,
+            "max_adds": 3,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 96,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "swing_ls",
+            "semivar_window": 48,
+            "semivar_threshold": 0.20,
+            "trend_lookback": 48,
+            "trend_ma_window": 48,
+            "min_trend_roc": 0.0,
+            "trail_atr_mult": 3.2,
+            "atr_period": 14,
+            "max_adds": 3,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 72,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "macro_ls",
+            "semivar_window": 36,
+            "semivar_threshold": 0.22,
+            "trend_lookback": 36,
+            "trend_ma_window": 36,
+            "min_trend_roc": 0.0,
+            "trail_atr_mult": 3.5,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 36,
+            "target_vol": 0.030,
+            "max_hold_bars": 36,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+}
+
+
+def _build_realized_semivariance_trend_rider_candidates(ctx: _CandidateBuildContext) -> None:
+    """Per-symbol realized-semivariance-asymmetry trend rider (single-asset)."""
+    crypto_symbols = ctx.crypto_only_symbols
+    if not crypto_symbols:
+        return
+    for timeframe in ctx._present("30m", "1h", "4h"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _REALIZED_SEMIVARIANCE_TREND_RIDER_SLICE.get(timeframe, ()):
+            for symbol in crypto_symbols:
+                params = {
+                    "semivar_window": int(spec["semivar_window"]),
+                    "semivar_threshold": float(spec["semivar_threshold"]),
+                    "trend_lookback": int(spec["trend_lookback"]),
+                    "trend_ma_window": int(spec["trend_ma_window"]),
+                    "min_trend_roc": float(spec["min_trend_roc"]),
+                    "trail_atr_mult": float(spec["trail_atr_mult"]),
+                    "atr_period": int(spec["atr_period"]),
+                    "max_adds": int(spec["max_adds"]),
+                    "add_step_atr": float(spec["add_step_atr"]),
+                    "vol_window": int(spec["vol_window"]),
+                    "target_vol": float(spec["target_vol"]),
+                    "max_hold_bars": int(spec["max_hold_bars"]),
+                    "allow_short": bool(spec["allow_short"]),
+                    "add_alloc_fraction": float(spec["add_alloc_fraction"]),
+                }
+                _add_candidate(
+                    ctx.candidates,
+                    name=(
+                        f"realized_semivariance_trend_rider_{tf_tag}_{spec['variant']}_"
+                        f"{symbol.replace('/', '').lower()}"
+                    ),
+                    family="trend",
+                    strategy_class="RealizedSemivarianceTrendRiderStrategy",
+                    timeframe=timeframe,
+                    symbols=(symbol,),
+                    params=params,
+                    notes=(
+                        "Per-symbol realized-semivariance trend rider: rides the trend only "
+                        "when the upside/downside realized-semivariance asymmetry "
+                        "SJ=(RS+ - RS-)/(RS+ + RS-) clears a threshold AND agrees with the "
+                        "trend (Patton-Sheppard good/bad volatility). ATR trailing stop + "
+                        f"pyramiding on {symbol} at {timeframe} ({spec['variant']})."
+                    ),
+                    tags=(
+                        "trend",
+                        "realized_semivariance",
+                        "good_bad_volatility",
+                        "signed_jump",
                         "return_rider",
                         "trailing_stop",
                         "single_asset",
