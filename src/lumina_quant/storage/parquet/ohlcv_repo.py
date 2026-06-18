@@ -802,6 +802,7 @@ class ParquetMarketDataRepository:
                         else self._next_raw_part_path(part_path)
                     )
                     payload.write_parquet(output_path, compression="zstd", statistics=True)
+                    self._fsync_file(output_path)
                     self._fsync_dir(output_path.parent)
                     total_rows += int(payload.height)
                     self._enforce_raw_partition_controls(
@@ -834,6 +835,7 @@ class ParquetMarketDataRepository:
                 output_path = part_path / "part-0000.parquet"
                 tmp_output_path = output_path.with_suffix(".tmp.parquet")
                 merged.write_parquet(tmp_output_path, compression="zstd", statistics=True)
+                self._fsync_file(tmp_output_path)
                 tmp_output_path.replace(output_path)
                 for existing_path in existing_paths:
                     if existing_path == output_path:

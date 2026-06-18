@@ -67,7 +67,18 @@ class PortfolioSizingService:
         target_allocation_mode: str = "legacy_notional_cap",
         leverage: float = 1.0,
         max_order_notional_pct: float = 0.0,
+        allow_metadata_risk_override: bool = False,
+        max_leverage: float = 0.0,
     ) -> float:
+        # Config ceilings captured before any signal-metadata override is applied.
+        # When allow_metadata_risk_override is False (the SAFE default) overrides may
+        # only LOWER these ceilings; any override that would RAISE a risk cap above its
+        # configured value is clamped back to the ceiling.
+        config_max_symbol_exposure_pct = float(max_symbol_exposure_pct)
+        config_max_order_value = float(max_order_value)
+        config_max_order_notional_pct = float(max_order_notional_pct)
+        leverage_ceiling = float(max_leverage) if float(max_leverage) > 0.0 else float(leverage)
+
         metadata = dict(getattr(signal, "metadata", None) or {})
         override_target_allocation = metadata.get("target_allocation")
         if (
@@ -78,6 +89,8 @@ class PortfolioSizingService:
                 metadata.get("target_allocation_scale")
             )
         if override_target_allocation is not None:
+            # target_allocation override may remain unclamped here: it is transitively
+            # bounded by the now-clamped exposure cap applied below (lines ~150-160).
             target_allocation = max(0.0, float(override_target_allocation))
 
         override_target_mode = metadata.get("target_allocation_mode", metadata.get("sizing_mode"))
@@ -90,14 +103,25 @@ class PortfolioSizingService:
         override_leverage = metadata.get("leverage")
         if override_leverage is not None:
             leverage = max(0.0, float(override_leverage))
+            if not allow_metadata_risk_override:
+                # leverage override may LOWER but not RAISE the configured ceiling.
+                leverage = min(leverage, leverage_ceiling)
 
         override_max_symbol_exposure = metadata.get("max_symbol_exposure_pct")
         if override_max_symbol_exposure is not None:
             max_symbol_exposure_pct = max(0.0, float(override_max_symbol_exposure))
+            if not allow_metadata_risk_override:
+                max_symbol_exposure_pct = min(
+                    max_symbol_exposure_pct, config_max_symbol_exposure_pct
+                )
 
         override_max_order_notional_pct = metadata.get("max_order_notional_pct")
         if override_max_order_notional_pct is not None:
             max_order_notional_pct = max(0.0, float(override_max_order_notional_pct))
+            # Clamp only when a cap is configured (> 0). 0.0 means "no cap configured";
+            # leave the override since max_order_value + exposure caps still bind.
+            if not allow_metadata_risk_override and config_max_order_notional_pct > 0.0:
+                max_order_notional_pct = min(max_order_notional_pct, config_max_order_notional_pct)
 
         override_max_order_value = metadata.get("max_order_value")
         if override_max_order_value is None and metadata.get("max_order_value_scale") is not None:
@@ -106,6 +130,9 @@ class PortfolioSizingService:
             )
         if override_max_order_value is not None:
             max_order_value = max(0.0, float(override_max_order_value))
+            # Clamp only when a fixed per-order cap is configured (> 0).
+            if not allow_metadata_risk_override and config_max_order_value > 0.0:
+                max_order_value = min(max_order_value, config_max_order_value)
 
         if float(current_price) <= 0 or float(equity) <= 0:
             return 0.0

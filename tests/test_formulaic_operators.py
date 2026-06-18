@@ -40,8 +40,9 @@ class TestFormulaicOperators(unittest.TestCase):
 
     def test_rank_decay_and_stats(self):
         values = [1.0, 2.0, 3.0, 4.0, 5.0]
-        self.assertAlmostEqual(rank_pct(values, 5), 0.9)
-        self.assertAlmostEqual(ts_rank(values, 5), 0.9)
+        # Canonical pct-rank convention: rank(pct=True) average-tie — max of N unique is 1.0
+        self.assertAlmostEqual(rank_pct(values, 5), 1.0)
+        self.assertAlmostEqual(ts_rank(values, 5), 1.0)
         self.assertAlmostEqual(decay_linear(values, 5), 55.0 / 15.0)
         self.assertEqual(signed_power(-2.0, 3.0), -8.0)
         self.assertIsNotNone(ts_stddev(values, 5))

@@ -74,6 +74,9 @@ class BacktestConfigView:
         self.AUTO_FLATTEN_ON_BREACH = bool(rk.auto_flatten_on_breach)
         self.MAX_POSITION_SIZE_PCT = float(rk.max_position_size_pct)
         self.CONSECUTIVE_LOSS_HALT_COUNT = int(rk.consecutive_loss_halt_count)
+        self.HARD_DRAWDOWN_FLATTEN_PCT = float(rk.hard_drawdown_flatten_pct)
+        self.ALLOW_METADATA_RISK_OVERRIDE = bool(rk.allow_metadata_risk_override)
+        self.MAX_LEVERAGE = float(rk.max_leverage)
 
         # Execution
         self.MAKER_FEE_RATE = float(ex.maker_fee_rate)

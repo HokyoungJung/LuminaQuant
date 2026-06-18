@@ -14,6 +14,12 @@ class RiskManager:
             "MAX_INTRADAY_DRAWDOWN_PCT",
             self.max_daily_loss,
         )
+        # Hard de-risk tier above the soft FREEZE threshold: when > 0 and intraday
+        # drawdown exceeds it, force FLATTEN even if auto_flatten_on_breach is False.
+        # 0.0 disables the tier (legacy behavior).
+        self.hard_drawdown_flatten_pct = float(
+            getattr(config, "HARD_DRAWDOWN_FLATTEN_PCT", 0.0) or 0.0
+        )
         self.max_rolling_loss_pct_1h = getattr(config, "MAX_ROLLING_LOSS_PCT_1H", 0.05)
         self.max_symbol_exposure_pct = getattr(config, "MAX_SYMBOL_EXPOSURE_PCT", 0.25)
         self.max_total_margin_pct = getattr(config, "MAX_TOTAL_MARGIN_PCT", 0.5)
@@ -194,6 +200,23 @@ class RiskManager:
         else:
             margin_utilization = total_notional / equity if equity > 0 else 0.0
 
+        # Hard de-risk tier (defense-in-depth): a drawdown beyond hard_drawdown_flatten_pct
+        # forces FLATTEN regardless of auto_flatten_on_breach. Evaluated before the soft
+        # intraday check so the hard tier wins. 0.0 disables the tier (legacy).
+        if (
+            self.hard_drawdown_flatten_pct > 0.0
+            and intraday_loss_pct >= self.hard_drawdown_flatten_pct
+        ):
+            return (
+                False,
+                "Hard drawdown flatten breach",
+                "FLATTEN",
+                {
+                    "intraday_loss_pct": intraday_loss_pct,
+                    "threshold": float(self.hard_drawdown_flatten_pct),
+                },
+            )
+
         if intraday_loss_pct >= float(self.max_intraday_drawdown_pct):
             action = "FLATTEN" if self.auto_flatten_on_breach else "FREEZE"
             return (
@@ -203,6 +226,22 @@ class RiskManager:
                 {
                     "intraday_loss_pct": intraday_loss_pct,
                     "threshold": float(self.max_intraday_drawdown_pct),
+                },
+            )
+
+        # Defense-in-depth daily-loss cap: mirrors the intraday-DD / rolling-loss handling.
+        # Typically a looser threshold than the intraday cap, so it only fires when the
+        # intraday cap is configured higher (or absent). FLATTEN if auto_flatten_on_breach
+        # else FREEZE.
+        if intraday_loss_pct >= float(self.max_daily_loss):
+            action = "FLATTEN" if self.auto_flatten_on_breach else "FREEZE"
+            return (
+                False,
+                "Daily loss breach",
+                action,
+                {
+                    "intraday_loss_pct": intraday_loss_pct,
+                    "threshold": float(self.max_daily_loss),
                 },
             )
 

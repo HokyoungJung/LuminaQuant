@@ -59,9 +59,15 @@ def ts_rank(values, window: int = 20) -> float | None:
     if tail is None:
         return None
     latest = tail[-1]
-    below = sum(1 for value in tail if value < latest)
-    equal = sum(1 for value in tail if value == latest)
-    return (below + 0.5 * equal) / float(len(tail))
+    if not math.isfinite(latest):
+        return None
+    finite_tail = [v for v in tail if math.isfinite(v)]
+    n = len(finite_tail)
+    if n == 0:
+        return None
+    below = sum(1 for v in finite_tail if v < latest)
+    equal = sum(1 for v in finite_tail if v == latest)
+    return (below + (equal + 1.0) / 2.0) / float(n)
 
 
 def rolling_rank(values, window: int = 20) -> float | None:

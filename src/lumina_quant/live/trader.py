@@ -105,6 +105,9 @@ def _build_live_config_namespace(rt, *, symbols) -> SimpleNamespace:
         AUTO_FLATTEN_ON_BREACH=bool(rk.auto_flatten_on_breach),
         MAX_POSITION_SIZE_PCT=float(rk.max_position_size_pct),
         CONSECUTIVE_LOSS_HALT_COUNT=int(rk.consecutive_loss_halt_count),
+        HARD_DRAWDOWN_FLATTEN_PCT=float(rk.hard_drawdown_flatten_pct),
+        ALLOW_METADATA_RISK_OVERRIDE=bool(rk.allow_metadata_risk_override),
+        MAX_LEVERAGE=float(rk.max_leverage),
         MAKER_FEE_RATE=float(run_ex.maker_fee_rate),
         TAKER_FEE_RATE=float(run_ex.taker_fee_rate),
         SPREAD_RATE=float(run_ex.spread_rate),
@@ -174,6 +177,7 @@ def _build_live_config_namespace(rt, *, symbols) -> SimpleNamespace:
             lv.materialized_staleness_alert_cooldown_seconds
         ),
         ORDER_TIMEOUT=int(lv.order_timeout),
+        MAX_BBO_AGE_SECONDS=float(lv.max_bbo_age_seconds),
         HEARTBEAT_INTERVAL_SEC=int(lv.heartbeat_interval_sec),
         RECONCILIATION_INTERVAL_SEC=int(lv.reconciliation_interval_sec),
         EXCHANGE={
@@ -672,6 +676,16 @@ class LiveTrader(TradingEngine):
                 },
             )
 
+    def _relinquish_fallback_polling(self) -> None:
+        """Close any active fallback-poll window once authoritative user-stream
+        order events resume, so the polling path stops mutating order state that
+        the user-stream thread now owns (race avoidance, fix/audit-hardening).
+        """
+        if float(self._fallback_poll_until_monotonic) <= 0.0:
+            return
+        self._fallback_poll_until_monotonic = 0.0
+        self._last_fallback_reason = ""
+
     def _is_fallback_polling_required(self) -> bool:
         if self.order_state_source != "user_stream":
             return True
@@ -701,6 +715,9 @@ class LiveTrader(TradingEngine):
         if event_type == "executionReport" and hasattr(
             self.execution_handler, "ingest_user_stream_event"
         ):
+            # Authoritative order event resumed: relinquish the fallback-poll window
+            # so the polling path no longer mutates the same order state concurrently.
+            self._relinquish_fallback_polling()
             self.execution_handler.ingest_user_stream_event(payload)
             return
 

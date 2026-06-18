@@ -31,6 +31,13 @@ DEFAULT_ROBUST_SCORE_PARAMS: dict[str, float] = {
     "weight_exp_clamp_floor": -60.0,
     "pair_multi_mix_bonus": 1.05,
     "mdd_risk_penalty_coeff": 2.5,
+    # Hard-gate (opt-in). DSR/SPA are advisory soft-score weights by default;
+    # set ``dsr_spa_hard_gate`` truthy to instead REJECT candidates that fail the
+    # floors below. Defaults keep the gate disabled so selection output is
+    # unchanged unless a caller explicitly enables it.
+    "dsr_spa_hard_gate": 0.0,
+    "dsr_gate_floor": 0.0,
+    "spa_gate_ceiling": 1.0,
     **DEFAULT_ROBUST_SCORE_WEIGHTS,
 }
 
@@ -273,6 +280,37 @@ def _mode_metrics(candidate: dict[str, Any], *, mode: str) -> dict[str, Any]:
     if isinstance(metrics, dict):
         return metrics
     return {}
+
+
+def passes_dsr_spa_hard_gate(
+    candidate: dict[str, Any],
+    *,
+    mode: str = "oos",
+    robust_score_params: dict[str, Any] | None = None,
+) -> bool:
+    """Return True unless the (opt-in) DSR/SPA hard gate rejects the candidate.
+
+    The Deflated Sharpe Ratio and SPA reality-check p-value are advisory soft-score
+    weights by default; a candidate clearing the Sharpe/PBO floors is still accepted
+    even when its DSR/SPA are weak. When ``dsr_spa_hard_gate`` is enabled this gate
+    instead REJECTS any candidate whose mode metrics report a DSR below
+    ``dsr_gate_floor`` or an SPA p-value above ``spa_gate_ceiling``. The gate is a
+    strict no-op when disabled (the default) so existing selection output is
+    unchanged.
+    """
+    cfg = _resolve_robust_score_params(robust_score_params)
+    if float(cfg["dsr_spa_hard_gate"]) <= 0.0:
+        return True
+
+    metrics = _mode_metrics(candidate, mode=mode)
+    dsr_floor = float(cfg["dsr_gate_floor"])
+    spa_ceiling = float(cfg["spa_gate_ceiling"])
+
+    deflated_sharpe = safe_float(metrics.get("deflated_sharpe"), 0.0)
+    if deflated_sharpe < dsr_floor:
+        return False
+    spa_pvalue = safe_float(metrics.get("spa_pvalue"), 1.0)
+    return spa_pvalue <= spa_ceiling
 
 
 def allocate_portfolio_weights(
@@ -519,6 +557,8 @@ def select_diversified_shortlist(
         score = float(hurdle_score(row, mode=mode, robust_score_params=robust_score_params))
 
         if identity in seen_identities:
+            continue
+        if not passes_dsr_spa_hard_gate(row, mode=mode, robust_score_params=robust_score_params):
             continue
         if (
             not bool(allow_multi_asset)

@@ -56,6 +56,30 @@ class RiskConfig:
     consecutive_loss_halt_count: int = (
         5  # > 0 — freeze new entries after N consecutive realized losses
     )
+    # Audit-hardening (fix/audit-hardening) risk controls.
+    #   allow_metadata_risk_override: when False (default, SAFE) signal-metadata risk
+    #     overrides may only LOWER a config ceiling — any override that would RAISE
+    #     leverage / target_allocation / max_symbol_exposure_pct / max_order_value /
+    #     max_order_notional_pct above its config value is clamped back to the config
+    #     ceiling.  Set True only to restore the legacy unclamped behavior.
+    allow_metadata_risk_override: bool = False
+    #   max_leverage: absolute leverage ceiling applied to metadata leverage overrides
+    #     when allow_metadata_risk_override is False.  0.0 => clamp to the configured
+    #     run leverage instead (metadata may not raise leverage at all).
+    max_leverage: float = 0.0
+    #   attach_default_protective_stop: when True, a signal that carries no stop_loss is
+    #     given a synthetic protective stop at default_stop_loss_pct from entry so no
+    #     position runs naked.  Default False preserves existing backtest numerics
+    #     (enable on the backtest machine to measure the cost).
+    attach_default_protective_stop: bool = False
+    #   hard_drawdown_flatten_pct: > 0 => a hard de-risk tier above the soft FREEZE
+    #     threshold; when intraday drawdown exceeds this fraction ALL open positions are
+    #     flattened even if auto_flatten_on_breach is False.  0.0 => disabled (legacy).
+    hard_drawdown_flatten_pct: float = 0.0
+    #   enforce_order_risk_gate_in_backtest: when True the backtest order path runs the
+    #     same RiskManager.check_order gate as live, so one enforcement path governs both.
+    #     Default False preserves the golden baseline (enable on the backtest machine).
+    enforce_order_risk_gate_in_backtest: bool = False
 
 
 @dataclass(slots=True)
@@ -74,6 +98,21 @@ class ExecutionConfig:
     compute_backend: str = "gpu"
     gpu_mode: str = "gpu"
     gpu_vram_gb: float = 8.0
+    # Audit-hardening (fix/audit-hardening) fill realism.
+    #   slippage_impact_model: "flat" (default, golden-stable) keeps the legacy
+    #     size-blind slippage; "sqrt_impact" adds a square-root market-impact term
+    #     scaled by order participation so large/leveraged orders pay more.
+    slippage_impact_model: str = "flat"
+    #   slippage_impact_coefficient: impact strength (bps-per-sqrt-participation) for the
+    #     sqrt_impact model.  Only used when slippage_impact_model == "sqrt_impact".
+    slippage_impact_coefficient: float = 0.0
+    #   slippage_adv_quote: reference average daily traded value (quote ccy) used as the
+    #     participation denominator for sqrt_impact.  0.0 => fall back to per-bar volume.
+    slippage_adv_quote: float = 0.0
+    #   require_funding_coverage: when True a leveraged backtest fails / flags instead of
+    #     silently charging 0.0 funding when funding feature data is absent.  Default
+    #     False preserves current behavior (enable on the backtest machine).
+    require_funding_coverage: bool = False
 
 
 @dataclass(slots=True)
@@ -235,6 +274,10 @@ class LiveRuntimeConfig:
     order_timeout: int = 10
     heartbeat_interval_sec: int = 30
     reconciliation_interval_sec: int = 30
+    # Audit-hardening (fix/audit-hardening): reject limit orders validated against a
+    # cached best-bid/offer older than this many seconds (fail-closed during websocket
+    # stalls / dislocations).  Live-only — no backtest impact.  0.0 => disabled (legacy).
+    max_bbo_age_seconds: float = 2.0
     exchange: LiveExchangeConfig = field(default_factory=LiveExchangeConfig)
     external: LiveExternalConfig = field(default_factory=LiveExternalConfig)
     polymarket: LivePolymarketConfig = field(default_factory=LivePolymarketConfig)

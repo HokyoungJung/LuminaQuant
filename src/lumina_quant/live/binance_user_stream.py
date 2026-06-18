@@ -7,6 +7,9 @@ import threading
 import time
 from collections.abc import Callable
 
+_PROD_WS_BASE_URL = "wss://fstream.binance.com"
+_TESTNET_WS_BASE_URL = "wss://stream.binancefuture.com"
+
 
 class BinanceUserStreamClient:
     """Native Binance USDⓈ-M Futures user stream client."""
@@ -23,8 +26,24 @@ class BinanceUserStreamClient:
         self.market_type = str(market_type or "future").strip().lower()
         self.reconnect_delay_sec = max(0.25, float(reconnect_delay_sec))
         self.keepalive_interval_sec = max(60.0, float(keepalive_interval_sec))
+        self.testnet = self._resolve_testnet(exchange)
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+
+    @staticmethod
+    def _resolve_testnet(exchange) -> bool:
+        """Best-effort testnet detection mirroring binance_futures_client config."""
+        for value in (
+            getattr(exchange, "testnet", None),
+            getattr(getattr(exchange, "config", None), "IS_TESTNET", None),
+            getattr(getattr(exchange, "rest_client", None), "config", None),
+        ):
+            if value is None:
+                continue
+            candidate = getattr(value, "testnet", value)
+            if isinstance(candidate, bool):
+                return candidate
+        return False
 
     def start(
         self,
@@ -113,7 +132,7 @@ class BinanceUserStreamClient:
             token = str(candidate or "").strip()
             if token:
                 return token.rstrip("/")
-        return "wss://fstream.binance.com"
+        return _TESTNET_WS_BASE_URL if self.testnet else _PROD_WS_BASE_URL
 
     def _build_ws_url(self, listen_key: str) -> str:
         return f"{self._ws_base_url()}/ws/{listen_key}"

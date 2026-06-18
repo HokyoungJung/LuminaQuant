@@ -167,6 +167,25 @@ jobs:
       - name: Run full pytest suite
         run: uv run pytest -q
 
+      - name: Install pytest-cov for coverage gate
+        run: uv pip install pytest-cov
+
+      - name: Financial-core coverage gate
+        # Measures branch coverage for the financial-core packages and enforces a
+        # conservative 70% floor.  pytest-cov is installed above; --cov is NOT
+        # added to pyproject.toml addopts so local runs are unaffected.
+        run: |
+          uv run pytest -q \
+            --cov=lumina_quant.backtesting \
+            --cov=lumina_quant.optimization \
+            --cov=lumina_quant.risk_manager \
+            --cov=lumina_quant.services \
+            --cov=lumina_quant.strategy_factory \
+            --cov=lumina_quant.alpha_zoo \
+            --cov-branch \
+            --cov-report=term-missing \
+            --cov-fail-under=70
+
       - name: Generate benchmark smoke data
         # The perf/8GB smoke gate needs OHLCV CSVs; the repo ships none (data/ is
         # gitignored). Generate BTCUSDT/ETHUSDT via the repo's own generator so the

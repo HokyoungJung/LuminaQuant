@@ -110,7 +110,18 @@ def test_live_readiness_preflight_reports_ready_for_real(monkeypatch, tmp_path: 
         encoding="utf-8",
     )
     decision = tmp_path / "decision.json"
-    decision.write_text(json.dumps({"decision": "keep_incumbent"}), encoding="utf-8")
+    decision.write_text(
+        json.dumps(
+            {
+                "decision": "keep_incumbent",
+                "ready_for_real": True,
+                "real_money_execution": True,
+                "real_execution_allowed": True,
+                "clean_promotion_eligible": True,
+            }
+        ),
+        encoding="utf-8",
+    )
     monkeypatch.setenv("LUMINA_ENABLE_LIVE_REAL", "true")
 
     payload = PREFLIGHT.build_preflight_payload(
@@ -427,6 +438,227 @@ def test_alpha_zoo_optuna_hybrid_paper_mode_can_pass_with_testnet(tmp_path: Path
     assert payload["status"]["ready_for_real"] is False
 
 
+def _write_real_mode_config(tmp_path: Path) -> Path:
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "storage:",
+                '  postgres_dsn: "postgresql://demo"',
+                "live:",
+                '  mode: "real"',
+                "  testnet: false",
+                "  require_real_enable_flag: true",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return config_path
+
+
+def _write_fresh_refresh(tmp_path: Path) -> Path:
+    fresh_cutoff = (
+        (datetime.now(UTC) - timedelta(minutes=5))
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+    refresh = tmp_path / "refresh.json"
+    refresh.write_text(
+        json.dumps(
+            {
+                "status": "completed",
+                "collection_cutoff_utc": fresh_cutoff,
+                "feature_results": [{"last_timestamp_utc": fresh_cutoff}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    return refresh
+
+
+def test_non_alpha_zoo_real_mode_vetoed_when_no_readiness_flags(
+    monkeypatch, tmp_path: Path
+) -> None:
+    config_path = _write_real_mode_config(tmp_path)
+    refresh = _write_fresh_refresh(tmp_path)
+    decision = tmp_path / "decision.json"
+    decision.write_text(
+        json.dumps(
+            {
+                "decision": "selected_live_mode",
+                "selected_mode": "MovingAverageCrossStrategy",
+                "candidate_key": "moving_average_cross",
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("LUMINA_ENABLE_LIVE_REAL", "true")
+
+    payload = PREFLIGHT.build_preflight_payload(
+        config_path=config_path,
+        refresh_json=refresh,
+        decision_json=decision,
+        stale_minutes=10_000,
+    )
+
+    assert payload["checks"]["decision_runtime_compatible"] is True
+    assert payload["checks"]["artifact_real_money_veto"] is True
+    assert payload["checks"]["artifact_ready_for_real"] is False
+    assert payload["status"]["ready_for_real"] is False
+    assert payload["recommended_action"] == "block_until_preflight_gaps_closed"
+
+
+def test_non_alpha_zoo_real_mode_passes_when_explicitly_ready(monkeypatch, tmp_path: Path) -> None:
+    config_path = _write_real_mode_config(tmp_path)
+    refresh = _write_fresh_refresh(tmp_path)
+    decision = tmp_path / "decision.json"
+    decision.write_text(
+        json.dumps(
+            {
+                "decision": "selected_live_mode",
+                "selected_mode": "MovingAverageCrossStrategy",
+                "candidate_key": "moving_average_cross",
+                "ready_for_real": True,
+                "real_money_execution": True,
+                "real_execution_allowed": True,
+                "clean_promotion_eligible": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("LUMINA_ENABLE_LIVE_REAL", "true")
+
+    payload = PREFLIGHT.build_preflight_payload(
+        config_path=config_path,
+        refresh_json=refresh,
+        decision_json=decision,
+        stale_minutes=10_000,
+    )
+
+    assert payload["checks"]["artifact_real_money_veto"] is False
+    assert payload["checks"]["artifact_ready_for_real"] is True
+    assert payload["checks"]["artifact_real_money_execution"] is True
+    assert payload["checks"]["artifact_real_execution_allowed"] is True
+    assert payload["checks"]["artifact_governance_veto_reasons"] == []
+    assert payload["status"]["ready_for_real"] is True
+    assert payload["recommended_action"] == "real_run_allowed"
+
+
+def test_non_alpha_zoo_real_mode_vetoed_by_governance_blocker(monkeypatch, tmp_path: Path) -> None:
+    config_path = _write_real_mode_config(tmp_path)
+    refresh = _write_fresh_refresh(tmp_path)
+    decision = tmp_path / "decision.json"
+    decision.write_text(
+        json.dumps(
+            {
+                "decision": "selected_live_mode",
+                "selected_mode": "MovingAverageCrossStrategy",
+                "candidate_key": "moving_average_cross",
+                "ready_for_real": True,
+                "real_money_execution": True,
+                "real_execution_allowed": True,
+                "clean_promotion_eligible": True,
+                "post_oos_research_variant": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("LUMINA_ENABLE_LIVE_REAL", "true")
+
+    payload = PREFLIGHT.build_preflight_payload(
+        config_path=config_path,
+        refresh_json=refresh,
+        decision_json=decision,
+        stale_minutes=10_000,
+    )
+
+    assert payload["checks"]["artifact_real_money_veto"] is True
+    assert payload["checks"]["artifact_post_oos_research_variant"] is True
+    assert "post_oos_research_variant" in payload["checks"]["artifact_governance_veto_reasons"]
+    assert payload["status"]["ready_for_real"] is False
+
+
+def test_non_alpha_zoo_real_mode_reads_referenced_artifact_and_passes(
+    monkeypatch, tmp_path: Path
+) -> None:
+    config_path = _write_real_mode_config(tmp_path)
+    refresh = _write_fresh_refresh(tmp_path)
+    selected_artifact = tmp_path / "selected.json"
+    selected_artifact.write_text(
+        json.dumps(
+            {
+                "ready_for_real": True,
+                "real_money_execution": True,
+                "real_execution_allowed": True,
+                "clean_promotion_eligible": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+    decision = tmp_path / "decision.json"
+    decision.write_text(
+        json.dumps(
+            {
+                "decision": "selected_live_mode",
+                "selected_mode": "MovingAverageCrossStrategy",
+                "candidate_key": "moving_average_cross",
+                "strategy_params": {"selected_artifact_path": str(selected_artifact)},
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("LUMINA_ENABLE_LIVE_REAL", "true")
+
+    payload = PREFLIGHT.build_preflight_payload(
+        config_path=config_path,
+        refresh_json=refresh,
+        decision_json=decision,
+        stale_minutes=10_000,
+    )
+
+    assert payload["checks"]["artifact_real_money_veto"] is False
+    assert payload["checks"]["artifact_ready_for_real"] is True
+    assert payload["status"]["ready_for_real"] is True
+
+
+def test_non_alpha_zoo_real_mode_vetoed_when_referenced_artifact_unreadable(
+    monkeypatch, tmp_path: Path
+) -> None:
+    config_path = _write_real_mode_config(tmp_path)
+    refresh = _write_fresh_refresh(tmp_path)
+    decision = tmp_path / "decision.json"
+    decision.write_text(
+        json.dumps(
+            {
+                "decision": "selected_live_mode",
+                "selected_mode": "MovingAverageCrossStrategy",
+                "candidate_key": "moving_average_cross",
+                "ready_for_real": True,
+                "real_money_execution": True,
+                "real_execution_allowed": True,
+                "clean_promotion_eligible": True,
+                "strategy_params": {
+                    "candidate_artifact": str(tmp_path / "does_not_exist.json"),
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("LUMINA_ENABLE_LIVE_REAL", "true")
+
+    payload = PREFLIGHT.build_preflight_payload(
+        config_path=config_path,
+        refresh_json=refresh,
+        decision_json=decision,
+        stale_minutes=10_000,
+    )
+
+    assert payload["checks"]["artifact_real_money_veto"] is True
+    assert payload["checks"]["artifact_validation_error"]
+    assert payload["status"]["ready_for_real"] is False
+
+
 def test_live_readiness_preflight_honors_runtime_env_mode_override(
     monkeypatch, tmp_path: Path
 ) -> None:
@@ -462,7 +694,18 @@ def test_live_readiness_preflight_honors_runtime_env_mode_override(
         encoding="utf-8",
     )
     decision = tmp_path / "decision.json"
-    decision.write_text(json.dumps({"decision": "keep_incumbent"}), encoding="utf-8")
+    decision.write_text(
+        json.dumps(
+            {
+                "decision": "keep_incumbent",
+                "ready_for_real": True,
+                "real_money_execution": True,
+                "real_execution_allowed": True,
+                "clean_promotion_eligible": True,
+            }
+        ),
+        encoding="utf-8",
+    )
     monkeypatch.setenv("LQ__LIVE__MODE", "real")
     monkeypatch.setenv("LQ__LIVE__TESTNET", "false")
     monkeypatch.setenv("LUMINA_ENABLE_LIVE_REAL", "true")

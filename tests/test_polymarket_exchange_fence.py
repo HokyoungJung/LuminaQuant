@@ -1,11 +1,17 @@
+"""Tests for the PolymarketExchange real-money execution fence (supports_real_money=False)."""
+
 from __future__ import annotations
 
 from types import SimpleNamespace
 
 import pytest
 
-from lumina_quant.exchanges import get_exchange
 from lumina_quant.exchanges.polymarket_exchange import PolymarketExchange
+
+
+# ---------------------------------------------------------------------------
+# Minimal fake SDK (copied from test_polymarket_exchange.py pattern)
+# ---------------------------------------------------------------------------
 
 
 class _FakeOrderType:
@@ -37,10 +43,6 @@ class _FakeClient:
     def __init__(self, **kwargs):
         self.kwargs = kwargs
         self.creds = None
-        self.last_post = None
-        self.last_cancel = None
-        self.last_get_orders = None
-        self.last_get_order = None
 
     def create_or_derive_api_creds(self):
         return {"api_key": "k", "api_secret": "s", "api_passphrase": "p"}
@@ -55,7 +57,6 @@ class _FakeClient:
         return {"kind": "market", "args": args.kwargs}
 
     def post_order(self, order, order_type):
-        self.last_post = (order, order_type)
         return {
             "orderID": "ord-1",
             "status": "open",
@@ -63,18 +64,6 @@ class _FakeClient:
             "price": order["args"].get("price", 0.55),
             "side": order["args"]["side"],
         }
-
-    def get_orders(self, params):
-        self.last_get_orders = params.kwargs
-        return [{"id": "open-1", "status": "open", "size": 5, "price": 0.5}]
-
-    def get_order(self, order_id):
-        self.last_get_order = order_id
-        return {"id": order_id, "status": "filled", "size": 5, "price": 0.6, "filled": 5}
-
-    def cancel(self, order_id):
-        self.last_cancel = order_id
-        return {"success": True}
 
 
 def _sdk():
@@ -107,57 +96,63 @@ def _config(mode="paper", allow_real=False):
     )
 
 
-def test_get_exchange_supports_polymarket_driver(monkeypatch):
+# ---------------------------------------------------------------------------
+# Class-level capability flag
+# ---------------------------------------------------------------------------
+
+
+def test_polymarket_supports_real_money_is_false():
+    assert PolymarketExchange.supports_real_money is False
+
+
+# ---------------------------------------------------------------------------
+# Fence: real-money path raises regardless of private key presence
+# ---------------------------------------------------------------------------
+
+
+def test_polymarket_fence_raises_with_private_key(monkeypatch):
+    """Real-money execution must raise even when private key is configured."""
     monkeypatch.setattr("lumina_quant.exchanges.polymarket_exchange._load_sdk_symbols", _sdk)
-    exchange = get_exchange(_config())
-    assert isinstance(exchange, PolymarketExchange)
-
-
-def test_polymarket_exchange_paper_execute_order_returns_stub(monkeypatch):
-    monkeypatch.setattr("lumina_quant.exchanges.polymarket_exchange._load_sdk_symbols", _sdk)
-    exchange = PolymarketExchange(_config())
-    result = exchange.execute_order("asset-1", "limit", "buy", 5.0, price=0.55)
-    assert result["status"] == "paper"
-
-
-def test_polymarket_exchange_real_limit_order_is_fenced(monkeypatch):
-    # Real-money execution is fenced: adapter raises even with credentials present.
-    monkeypatch.setattr("lumina_quant.exchanges.polymarket_exchange._load_sdk_symbols", _sdk)
-    monkeypatch.setenv("POLYMARKET_PRIVATE_KEY", "priv")
+    monkeypatch.setenv("POLYMARKET_PRIVATE_KEY", "priv-key-value")
     exchange = PolymarketExchange(_config(mode="real", allow_real=True))
     with pytest.raises(RuntimeError, match="not approved for real-money execution"):
         exchange.execute_order("asset-1", "limit", "buy", 5.0, price=0.55)
 
 
-def test_polymarket_exchange_real_market_order_is_fenced(monkeypatch):
-    # Real-money execution is fenced: adapter raises even with credentials present.
+def test_polymarket_fence_raises_for_market_order(monkeypatch):
+    """Market orders are also blocked by the fence."""
     monkeypatch.setattr("lumina_quant.exchanges.polymarket_exchange._load_sdk_symbols", _sdk)
-    monkeypatch.setenv("POLYMARKET_PRIVATE_KEY", "priv")
+    monkeypatch.setenv("POLYMARKET_PRIVATE_KEY", "priv-key-value")
     exchange = PolymarketExchange(_config(mode="real", allow_real=True))
     with pytest.raises(RuntimeError, match="not approved for real-money execution"):
         exchange.execute_order("asset-1", "market", "sell", 3.0, price=None)
 
 
-def test_polymarket_exchange_fetch_open_orders_and_cancel(monkeypatch):
+# ---------------------------------------------------------------------------
+# Paper path: must be completely unaffected by the fence
+# ---------------------------------------------------------------------------
+
+
+def test_polymarket_paper_execute_order_unaffected(monkeypatch):
+    """Paper mode must return a stub without raising."""
+    monkeypatch.setattr("lumina_quant.exchanges.polymarket_exchange._load_sdk_symbols", _sdk)
+    exchange = PolymarketExchange(_config(mode="paper", allow_real=False))
+    result = exchange.execute_order("asset-1", "limit", "buy", 5.0, price=0.55)
+    assert result["status"] == "paper"
+    assert result["symbol"] == "asset-1"
+
+
+def test_polymarket_paper_with_allow_real_false_unaffected(monkeypatch):
+    """allow_real=False must always fall through to paper regardless of MODE."""
+    monkeypatch.setattr("lumina_quant.exchanges.polymarket_exchange._load_sdk_symbols", _sdk)
+    exchange = PolymarketExchange(_config(mode="real", allow_real=False))
+    result = exchange.execute_order("asset-1", "market", "buy", 2.0)
+    assert result["status"] == "paper"
+
+
+def test_polymarket_paper_default_config_unaffected(monkeypatch):
+    """Default config (no MODE, no allow_real) must not raise."""
     monkeypatch.setattr("lumina_quant.exchanges.polymarket_exchange._load_sdk_symbols", _sdk)
     exchange = PolymarketExchange(_config())
-    rows = exchange.fetch_open_orders("asset-1")
-    assert rows[0]["id"] == "open-1"
-    assert exchange.client.last_get_orders == {"asset_id": "asset-1"}
-    assert exchange.cancel_order("open-1") is True
-    assert exchange.client.last_cancel == "open-1"
-
-
-def test_polymarket_exchange_fetch_order(monkeypatch):
-    monkeypatch.setattr("lumina_quant.exchanges.polymarket_exchange._load_sdk_symbols", _sdk)
-    exchange = PolymarketExchange(_config())
-    row = exchange.fetch_order("ord-9", "asset-1")
-    assert row["id"] == "ord-9"
-    assert row["status"] == "filled"
-
-
-def test_polymarket_exchange_real_execution_requires_private_key(monkeypatch):
-    monkeypatch.setattr("lumina_quant.exchanges.polymarket_exchange._load_sdk_symbols", _sdk)
-    exchange = PolymarketExchange(_config(mode="real", allow_real=True))
-    with pytest.raises(RuntimeError):
-        exchange.execute_order("asset-1", "limit", "buy", 5.0, price=0.55)
+    result = exchange.execute_order("asset-99", "limit", "sell", 1.0, price=0.4)
+    assert result["status"] == "paper"

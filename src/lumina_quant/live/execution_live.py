@@ -1,5 +1,6 @@
 import hashlib
 import logging
+import threading
 import time
 from types import SimpleNamespace
 from typing import Any
@@ -73,9 +74,27 @@ class LiveExecutionHandler(ExecutionHandler):
         self.exchange = exchange
         self.logger = logging.getLogger("LiveExecutionHandler")
         self.order_timeout_sec = max(1, int(getattr(config, "ORDER_TIMEOUT", 10)))
+        # Single reentrant lock guarding ALL reads/writes of tracked_orders /
+        # last_filled and the fill-emission path.  The user-stream thread and the
+        # polling-fallback path both mutate this state concurrently; without the
+        # lock a fill can be double-counted or lost (corrupt position).  Reentrant
+        # so the public entrypoints can nest internal helpers that also acquire it.
+        self._state_lock = threading.RLock()
         self.tracked_orders = {}
         self.client_id_to_order = {}
+        # Cross-path fill ledger: highest cumulative-filled qty already emitted per
+        # order_id (across user-stream AND polling).  Guards the resurrect-after-
+        # forget race where one path terminally resolves + forgets an order while
+        # the other still re-creates it and re-emits the same fill.  Bounded FIFO.
+        self._emitted_cum_filled: dict[str, float] = {}
+        self._emitted_cum_filled_max_keys = 100_000
         self._state_callback = None
+        # Best-bid/offer freshness guard (live-only, fail-closed).  Cache the most
+        # recent snapshot together with the monotonic time its *content* last
+        # changed so a websocket stall (no new ticks) ages out instead of passing
+        # orders against a stale quote.  config.MAX_BBO_AGE_SECONDS<=0 => disabled.
+        self.max_bbo_age_seconds = float(getattr(config, "MAX_BBO_AGE_SECONDS", 0.0) or 0.0)
+        self._bbo_cache: dict[str, tuple[dict[str, Any], float]] = {}
         self.order_gateway = OrderGateway(exchange)
         self.order_state_source = (
             str(getattr(config, "ORDER_STATE_SOURCE", "polling") or "polling").strip().lower()
@@ -222,6 +241,25 @@ class LiveExecutionHandler(ExecutionHandler):
         if client_order_id and self.client_id_to_order.get(client_order_id) == order_id:
             self.client_id_to_order.pop(client_order_id, None)
 
+    def _ledger_residual_delta(self, order_id: str | None, new_cumulative: float) -> float:
+        """Return the not-yet-emitted residual for ``order_id`` and record it.
+
+        Must be called under ``self._state_lock``.  Both the user-stream and the
+        polling paths route fills through this single chokepoint so a fill is
+        emitted at most once even if one path terminally resolves and forgets the
+        order while the other re-creates it from the same exchange snapshot.
+        """
+        if order_id is None:
+            return max(0.0, float(new_cumulative))
+        key = str(order_id)
+        already = float(self._emitted_cum_filled.get(key, 0.0))
+        residual = max(0.0, float(new_cumulative) - already)
+        if residual > 0.0:
+            self._emitted_cum_filled[key] = float(new_cumulative)
+            while len(self._emitted_cum_filled) > int(self._emitted_cum_filled_max_keys):
+                self._emitted_cum_filled.pop(next(iter(self._emitted_cum_filled)))
+        return residual
+
     def _build_event_stub(self, payload: dict[str, Any]) -> SimpleNamespace:
         metadata = dict(payload.get("metadata") or {})
         return SimpleNamespace(
@@ -277,88 +315,103 @@ class LiveExecutionHandler(ExecutionHandler):
         if raw_order_id in {None, ""}:
             return
         order_id = str(raw_order_id)
-        entry = self.tracked_orders.get(order_id)
 
-        if entry is None:
-            symbol = normalize_stream_symbol(str(payload.get("symbol") or ""))
-            synthetic = SimpleNamespace(
-                symbol=symbol,
-                direction=str(payload.get("side") or "BUY"),
-                order_type="MKT",
-                quantity=float(payload.get("cum_fill_qty") or payload.get("last_fill_qty") or 0.0),
-                price=float(payload.get("last_fill_price") or 0.0),
-                position_side=payload.get("position_side"),
-                reduce_only=bool(payload.get("reduce_only", False)),
-                client_order_id=str(payload.get("client_order_id") or ""),
-                time_in_force=None,
-                stop_loss=None,
-                take_profit=None,
-                metadata={},
-                type="ORDER",
-            )
-            entry = {
-                "event": synthetic,
-                "symbol": symbol,
-                "last_filled": 0.0,
-                "state": STATE_SUBMITTED,
-                "created_at": time.time(),
-                "updated_at": time.time(),
-            }
-            self.tracked_orders[order_id] = entry
-            if synthetic.client_order_id:
-                self.client_id_to_order[synthetic.client_order_id] = order_id
+        # Read-modify-write of tracked_orders/last_filled, fill dedup (projector
+        # idempotency) and fill emission are performed atomically so the polling
+        # fallback cannot interleave and double-count / lose the same fill.  No
+        # blocking network I/O is performed under the lock; protective-order
+        # submission (network) is deferred until after the lock is released.
+        emit_protection_for: Any | None = None
+        with self._state_lock:
+            entry = self.tracked_orders.get(order_id)
 
-        previous_state = str(entry.get("state") or STATE_SUBMITTED).upper()
-        previous_filled = float(entry.get("last_filled") or 0.0)
-        projection = self.state_projector.project_execution_report(
-            payload,
-            previous_state=previous_state,
-            previous_filled=previous_filled,
-        )
-        if not projection.accepted:
-            if projection.reason == "ORDER_INVALID_TRANSITION":
-                self._notify_state(
-                    order_id=order_id,
-                    entry=entry,
-                    state=previous_state,
-                    message="invalid_transition",
-                    metadata={"reason": projection.reason, "event_key": projection.event_key},
+            if entry is None:
+                symbol = normalize_stream_symbol(str(payload.get("symbol") or ""))
+                synthetic = SimpleNamespace(
+                    symbol=symbol,
+                    direction=str(payload.get("side") or "BUY"),
+                    order_type="MKT",
+                    quantity=float(
+                        payload.get("cum_fill_qty") or payload.get("last_fill_qty") or 0.0
+                    ),
+                    price=float(payload.get("last_fill_price") or 0.0),
+                    position_side=payload.get("position_side"),
+                    reduce_only=bool(payload.get("reduce_only", False)),
+                    client_order_id=str(payload.get("client_order_id") or ""),
+                    time_in_force=None,
+                    stop_loss=None,
+                    take_profit=None,
+                    metadata={},
+                    type="ORDER",
                 )
-            return
+                entry = {
+                    "event": synthetic,
+                    "symbol": symbol,
+                    "last_filled": 0.0,
+                    "state": STATE_SUBMITTED,
+                    "created_at": time.time(),
+                    "updated_at": time.time(),
+                }
+                self.tracked_orders[order_id] = entry
+                if synthetic.client_order_id:
+                    self.client_id_to_order[synthetic.client_order_id] = order_id
 
-        if projection.fill_delta > 0:
-            order_payload = {
-                "id": order_id,
-                "status": payload.get("order_status"),
-                "filled": projection.cumulative_filled,
-                "amount": max(
-                    float(getattr(entry.get("event"), "quantity", 0.0) or 0.0),
-                    projection.cumulative_filled,
-                ),
-                "average": float(payload.get("last_fill_price") or 0.0),
-                "price": float(payload.get("last_fill_price") or 0.0),
-            }
-            self._emit_fill_event(
-                entry.get("event"),
-                order_payload,
-                float(projection.fill_delta),
-                status=str(payload.get("order_status") or "").lower(),
-                submitted_at=entry.get("created_at"),
+            previous_state = str(entry.get("state") or STATE_SUBMITTED).upper()
+            previous_filled = float(entry.get("last_filled") or 0.0)
+            projection = self.state_projector.project_execution_report(
+                payload,
+                previous_state=previous_state,
+                previous_filled=previous_filled,
             )
+            if not projection.accepted:
+                if projection.reason == "ORDER_INVALID_TRANSITION":
+                    self._notify_state(
+                        order_id=order_id,
+                        entry=entry,
+                        state=previous_state,
+                        message="invalid_transition",
+                        metadata={"reason": projection.reason, "event_key": projection.event_key},
+                    )
+                return
 
-        entry["last_filled"] = float(projection.cumulative_filled)
-        entry["state"] = str(projection.next_state).upper()
-        entry["updated_at"] = time.time()
-        self._notify_state(
-            order_id=order_id,
-            entry=entry,
-            state=entry["state"],
-            metadata={"event_key": projection.event_key},
-        )
-        if str(entry["state"]).upper() in TERMINAL_STATES:
-            if str(entry["state"]).upper() == STATE_FILLED:
-                self._submit_paper_exchange_protection(entry.get("event"), parent_order_id=order_id)
-            self._forget_order(order_id, entry)
+            if projection.fill_delta > 0:
+                residual = self._ledger_residual_delta(order_id, projection.cumulative_filled)
+                if residual > 0:
+                    order_payload = {
+                        "id": order_id,
+                        "status": payload.get("order_status"),
+                        "filled": projection.cumulative_filled,
+                        "amount": max(
+                            float(getattr(entry.get("event"), "quantity", 0.0) or 0.0),
+                            projection.cumulative_filled,
+                        ),
+                        "average": float(payload.get("last_fill_price") or 0.0),
+                        "price": float(payload.get("last_fill_price") or 0.0),
+                    }
+                    self._emit_fill_event(
+                        entry.get("event"),
+                        order_payload,
+                        float(residual),
+                        status=str(payload.get("order_status") or "").lower(),
+                        submitted_at=entry.get("created_at"),
+                    )
+
+            entry["last_filled"] = float(projection.cumulative_filled)
+            entry["state"] = str(projection.next_state).upper()
+            entry["updated_at"] = time.time()
+            self._notify_state(
+                order_id=order_id,
+                entry=entry,
+                state=entry["state"],
+                metadata={"event_key": projection.event_key},
+            )
+            if str(entry["state"]).upper() in TERMINAL_STATES:
+                if str(entry["state"]).upper() == STATE_FILLED:
+                    emit_protection_for = entry.get("event")
+                self._forget_order(order_id, entry)
+
+        if emit_protection_for is not None:
+            self._submit_paper_exchange_protection(emit_protection_for, parent_order_id=order_id)
 
     def _build_reconciliation_payload(
         self,
@@ -444,9 +497,14 @@ class LiveExecutionHandler(ExecutionHandler):
                 "created_at": time.time(),
                 "updated_at": time.time(),
             }
-            self.tracked_orders[order_id] = entry
-            if client_order_id:
-                self.client_id_to_order[client_order_id] = order_id
+            with self._state_lock:
+                if order_id in self.tracked_orders:
+                    # The user-stream thread tracked this order between the open-orders
+                    # snapshot and now; do not clobber its (authoritative) fill state.
+                    continue
+                self.tracked_orders[order_id] = entry
+                if client_order_id:
+                    self.client_id_to_order[client_order_id] = order_id
 
             self._notify_state(
                 order_id=order_id,
@@ -516,58 +574,66 @@ class LiveExecutionHandler(ExecutionHandler):
             filled_now = float(latest.get("filled") or 0.0)
             total_amount = float(latest.get("amount") or getattr(order_event, "quantity", 0.0))
             exchange_state = self._to_state(status, filled_now, total_amount)
-            delta = filled_now - float(entry.get("last_filled", 0.0))
-            if delta > 0:
-                self._emit_fill_event(
-                    order_event,
-                    latest,
-                    delta,
-                    status=status,
-                    submitted_at=entry.get("created_at"),
-                )
-                entry["last_filled"] = filled_now
-                records.append(
-                    self._build_reconciliation_payload(
-                        order_id=order_id,
-                        entry=entry,
-                        local_state=local_state,
-                        exchange_state=exchange_state,
-                        local_filled=local_filled,
-                        exchange_filled=filled_now,
-                        reason="FILL_DELTA",
-                        metadata={"delta": delta},
+            emit_protection_for: Any | None = None
+            # Apply the polled reconciliation atomically: re-read last_filled under
+            # the lock so a concurrent user-stream fill is not double-counted.
+            with self._state_lock:
+                delta = self._ledger_residual_delta(order_id, filled_now)
+                if delta > 0:
+                    self._emit_fill_event(
+                        order_event,
+                        latest,
+                        delta,
+                        status=status,
+                        submitted_at=entry.get("created_at"),
                     )
-                )
-            entry["state"] = exchange_state
-            entry["updated_at"] = time.time()
-            self._notify_state(order_id=order_id, entry=entry, state=entry["state"])
-            if exchange_state != local_state:
-                records.append(
-                    self._build_reconciliation_payload(
-                        order_id=order_id,
-                        entry=entry,
-                        local_state=local_state,
-                        exchange_state=exchange_state,
-                        local_filled=local_filled,
-                        exchange_filled=filled_now,
-                        reason="STATE_CHANGE",
+                    entry["last_filled"] = filled_now
+                    records.append(
+                        self._build_reconciliation_payload(
+                            order_id=order_id,
+                            entry=entry,
+                            local_state=local_state,
+                            exchange_state=exchange_state,
+                            local_filled=local_filled,
+                            exchange_filled=filled_now,
+                            reason="FILL_DELTA",
+                            metadata={"delta": delta},
+                        )
                     )
-                )
-            if entry["state"] in TERMINAL_STATES:
-                records.append(
-                    self._build_reconciliation_payload(
-                        order_id=order_id,
-                        entry=entry,
-                        local_state=local_state,
-                        exchange_state=exchange_state,
-                        local_filled=local_filled,
-                        exchange_filled=filled_now,
-                        reason="TERMINAL_RESOLVED",
+                entry["state"] = exchange_state
+                entry["updated_at"] = time.time()
+                self._notify_state(order_id=order_id, entry=entry, state=entry["state"])
+                if exchange_state != local_state:
+                    records.append(
+                        self._build_reconciliation_payload(
+                            order_id=order_id,
+                            entry=entry,
+                            local_state=local_state,
+                            exchange_state=exchange_state,
+                            local_filled=local_filled,
+                            exchange_filled=filled_now,
+                            reason="STATE_CHANGE",
+                        )
                     )
+                if entry["state"] in TERMINAL_STATES:
+                    records.append(
+                        self._build_reconciliation_payload(
+                            order_id=order_id,
+                            entry=entry,
+                            local_state=local_state,
+                            exchange_state=exchange_state,
+                            local_filled=local_filled,
+                            exchange_filled=filled_now,
+                            reason="TERMINAL_RESOLVED",
+                        )
+                    )
+                    if entry["state"] == STATE_FILLED:
+                        emit_protection_for = order_event
+                    self._forget_order(order_id, entry)
+            if emit_protection_for is not None:
+                self._submit_paper_exchange_protection(
+                    emit_protection_for, parent_order_id=order_id
                 )
-                if entry["state"] == STATE_FILLED:
-                    self._submit_paper_exchange_protection(order_event, parent_order_id=order_id)
-                self._forget_order(order_id, entry)
         return records
 
     def exchange_open_order_count(self) -> int:
@@ -902,15 +968,63 @@ class LiveExecutionHandler(ExecutionHandler):
         return policy
 
     def _latest_bbo_snapshot(self, symbol: str) -> dict[str, Any] | None:
+        snapshot, _age = self._latest_bbo_snapshot_with_age(symbol)
+        return snapshot
+
+    @staticmethod
+    def _bbo_identity(snapshot: dict[str, Any]) -> tuple[Any, ...]:
+        """Content signature used to detect whether the quote actually changed."""
+        return (
+            snapshot.get("exchange_ts_ms"),
+            snapshot.get("receive_ts_ms"),
+            snapshot.get("bid_price"),
+            snapshot.get("ask_price"),
+            snapshot.get("bid_quantity"),
+            snapshot.get("ask_quantity"),
+        )
+
+    def _latest_bbo_snapshot_with_age(
+        self, symbol: str
+    ) -> tuple[dict[str, Any] | None, float | None]:
+        """Return (snapshot, monotonic-age-seconds).
+
+        The age is measured from the monotonic instant the snapshot *content* last
+        changed.  A stalled websocket keeps returning the same quote, so its age
+        keeps growing and the freshness guard fails closed once it exceeds the
+        configured limit.  Age is ``None`` (unknown) when no snapshot is available.
+        """
         getter = getattr(self.bars, "get_latest_book_ticker", None)
+        snapshot: dict[str, Any] | None = None
         if callable(getter):
             try:
-                snapshot = getter(symbol)
+                fetched = getter(symbol)
             except Exception:
-                snapshot = None
-            if isinstance(snapshot, dict):
-                return dict(snapshot)
-        return None
+                fetched = None
+            if isinstance(fetched, dict):
+                snapshot = dict(fetched)
+        now = time.monotonic()
+        with self._state_lock:
+            if snapshot is None:
+                self._bbo_cache.pop(str(symbol), None)
+                return None, None
+            identity = self._bbo_identity(snapshot)
+            cached = self._bbo_cache.get(str(symbol))
+            if cached is not None and self._bbo_identity(cached[0]) == identity:
+                first_seen = float(cached[1])
+            else:
+                first_seen = now
+                self._bbo_cache[str(symbol)] = (dict(snapshot), now)
+            return snapshot, max(0.0, now - first_seen)
+
+    def invalidate_bbo_cache(self, symbol: str | None = None) -> None:
+        """Drop cached BBO snapshot(s) so a stale quote is not reused after a
+        websocket gap-recovery / reconnect.  ``symbol=None`` clears all symbols.
+        """
+        with self._state_lock:
+            if symbol is None:
+                self._bbo_cache.clear()
+            else:
+                self._bbo_cache.pop(str(symbol), None)
 
     @staticmethod
     def _bbo_spread_bps(snapshot: dict[str, Any]) -> float | None:
@@ -978,7 +1092,9 @@ class LiveExecutionHandler(ExecutionHandler):
             policy.get("require_bbo_snapshot")
             or getattr(self.config, "REQUIRE_BBO_FOR_LIMIT_ORDERS", False)
         )
-        snapshot = self._latest_bbo_snapshot(str(getattr(event, "symbol", "")))
+        snapshot, bbo_age_seconds = self._latest_bbo_snapshot_with_age(
+            str(getattr(event, "symbol", ""))
+        )
         if not snapshot:
             self._record_slippage_guard_check(
                 event,
@@ -1005,6 +1121,47 @@ class LiveExecutionHandler(ExecutionHandler):
                     "Limit slippage guard requires a fresh BBO snapshot; order skipped with no market fallback."
                 )
             return
+
+        # Fail-closed freshness guard: after a websocket stall/reconnect the cached
+        # BBO can be stale; reject rather than validate against a dislocated quote.
+        # MAX_BBO_AGE_SECONDS<=0 disables the check (legacy behavior).
+        if self.max_bbo_age_seconds > 0.0 and (
+            bbo_age_seconds is None or bbo_age_seconds > self.max_bbo_age_seconds
+        ):
+            reason = (
+                "bbo_age_unknown"
+                if bbo_age_seconds is None
+                else f"bbo_age_seconds={bbo_age_seconds:.6g}>{self.max_bbo_age_seconds:.6g}"
+            )
+            self._record_slippage_guard_check(
+                event,
+                snapshot=snapshot,
+                spread_bps=self._bbo_spread_bps(snapshot),
+                estimated_bps=self._estimated_one_way_slippage_bps(event, snapshot),
+                status="stale_bbo",
+                reason=reason,
+            )
+            self._notify_state(
+                order_id=None,
+                entry={
+                    "event": event,
+                    "symbol": getattr(event, "symbol", None),
+                    "last_filled": 0.0,
+                    "created_at": time.time(),
+                },
+                state=STATE_REJECTED,
+                message="slippage_guard_stale_bbo",
+                metadata={
+                    "reason": reason,
+                    "bbo_age_seconds": bbo_age_seconds,
+                    "max_bbo_age_seconds": self.max_bbo_age_seconds,
+                    "market_fallback_allowed": False,
+                },
+            )
+            raise RuntimeError(
+                "Limit slippage guard BBO snapshot is stale; order skipped with no market fallback: "
+                + reason
+            )
 
         spread_bps = self._bbo_spread_bps(snapshot)
         estimated_bps = self._estimated_one_way_slippage_bps(event, snapshot)
@@ -1215,12 +1372,13 @@ class LiveExecutionHandler(ExecutionHandler):
         order_type = "limit" if requested_order_type == "LMT" else "market"
         event.client_order_id = event.client_order_id or self._make_client_order_id(event)
 
-        if event.client_order_id in self.client_id_to_order:
-            self.logger.warning(
-                "Duplicate client_order_id detected, skipping submit: %s",
-                event.client_order_id,
-            )
-            return
+        with self._state_lock:
+            if event.client_order_id in self.client_id_to_order:
+                self.logger.warning(
+                    "Duplicate client_order_id detected, skipping submit: %s",
+                    event.client_order_id,
+                )
+                return
 
         params = self._build_exchange_params(event)
         self._validate_protective_order_params(event, params)
@@ -1261,45 +1419,59 @@ class LiveExecutionHandler(ExecutionHandler):
         total_amount = float(order.get("amount") or event.quantity)
         state = self._to_state(status, filled_qty, total_amount)
 
-        if order_id:
-            self.client_id_to_order[event.client_order_id] = order_id
-            self.tracked_orders[order_id] = {
-                "event": event,
-                "symbol": event.symbol,
-                "last_filled": filled_qty,
-                "state": state,
-                "created_at": time.time(),
-                "updated_at": time.time(),
-            }
-            self._notify_state(order_id=order_id, entry=self.tracked_orders[order_id], state=state)
-        else:
+        if not order_id:
             self.logger.error(
                 "Exchange order id is missing for client_id=%s", event.client_order_id
             )
             return
 
-        if state == STATE_FILLED:
-            if filled_qty <= 0:
-                filled_qty = total_amount
-            self._emit_fill_event(
-                event,
-                order,
-                filled_qty,
-                status="filled",
-                submitted_at=self.tracked_orders.get(order_id, {}).get("created_at"),
-            )
-            self._submit_paper_exchange_protection(event, parent_order_id=order_id)
-            self._forget_order(order_id, self.tracked_orders.get(order_id, {}))
-        elif state in {STATE_OPEN, STATE_NEW, STATE_ACKED, STATE_PARTIAL}:
-            self.logger.info("Order tracked order_id=%s state=%s", order_id, state)
-        elif state in {STATE_CANCELED, STATE_REJECTED}:
-            self.logger.warning("Order terminal without fill id=%s state=%s", order_id, state)
-            self._notify_state(
-                order_id=order_id, entry=self.tracked_orders.get(order_id), state=state
-            )
-            self._forget_order(order_id, self.tracked_orders.get(order_id, {}))
-        else:
-            self.logger.info("Order tracked id=%s state=%s", order_id, state)
+        # Register tracking and emit the submit-response fill atomically.  If the
+        # user-stream thread already created/advanced this order_id between the
+        # network submit and here, only emit the residual delta and keep the
+        # higher cumulative last_filled so the fill is counted exactly once.
+        emit_protection_for: Any | None = None
+        with self._state_lock:
+            self.client_id_to_order[event.client_order_id] = order_id
+            existing = self.tracked_orders.get(order_id)
+            prior_filled = float(existing.get("last_filled", 0.0)) if existing else 0.0
+            self.tracked_orders[order_id] = {
+                "event": event,
+                "symbol": event.symbol,
+                "last_filled": max(filled_qty, prior_filled),
+                "state": state,
+                "created_at": (
+                    float(existing.get("created_at", time.time())) if existing else time.time()
+                ),
+                "updated_at": time.time(),
+            }
+            self._notify_state(order_id=order_id, entry=self.tracked_orders[order_id], state=state)
+
+            if state == STATE_FILLED:
+                response_filled = filled_qty if filled_qty > 0 else total_amount
+                delta = self._ledger_residual_delta(order_id, response_filled)
+                if delta > 0:
+                    self._emit_fill_event(
+                        event,
+                        order,
+                        delta,
+                        status="filled",
+                        submitted_at=self.tracked_orders.get(order_id, {}).get("created_at"),
+                    )
+                emit_protection_for = event
+                self._forget_order(order_id, self.tracked_orders.get(order_id, {}))
+            elif state in {STATE_OPEN, STATE_NEW, STATE_ACKED, STATE_PARTIAL}:
+                self.logger.info("Order tracked order_id=%s state=%s", order_id, state)
+            elif state in {STATE_CANCELED, STATE_REJECTED}:
+                self.logger.warning("Order terminal without fill id=%s state=%s", order_id, state)
+                self._notify_state(
+                    order_id=order_id, entry=self.tracked_orders.get(order_id), state=state
+                )
+                self._forget_order(order_id, self.tracked_orders.get(order_id, {}))
+            else:
+                self.logger.info("Order tracked id=%s state=%s", order_id, state)
+
+        if emit_protection_for is not None:
+            self._submit_paper_exchange_protection(emit_protection_for, parent_order_id=order_id)
 
     def check_open_orders(self, event=None):
         """Poll tracked exchange orders and emit delta fills for partial/full executions."""
@@ -1336,51 +1508,58 @@ class LiveExecutionHandler(ExecutionHandler):
                     except Exception:
                         latest_after_cancel = {}
 
-                    if latest_after_cancel:
-                        status_after_cancel = self._normalize_status(
-                            latest_after_cancel.get("status")
-                        )
-                        filled_after_cancel = float(latest_after_cancel.get("filled") or 0.0)
-                        amount_after_cancel = float(
-                            latest_after_cancel.get("amount") or order_event.quantity
-                        )
-                        delta_after_cancel = filled_after_cancel - float(
-                            entry.get("last_filled", 0.0)
-                        )
-                        if delta_after_cancel > 0:
-                            self._emit_fill_event(
-                                order_event,
-                                latest_after_cancel,
-                                delta_after_cancel,
-                                status=status_after_cancel,
-                                submitted_at=entry.get("created_at"),
+                    emit_protection_for: Any | None = None
+                    # Apply the post-cancel reconciliation atomically: re-read
+                    # last_filled under the lock so a concurrent user-stream fill
+                    # cannot be double-counted, then emit only the residual delta.
+                    with self._state_lock:
+                        if latest_after_cancel:
+                            status_after_cancel = self._normalize_status(
+                                latest_after_cancel.get("status")
                             )
-                            entry["last_filled"] = filled_after_cancel
-                        terminal_after_cancel = self._to_state(
-                            status_after_cancel,
-                            filled_after_cancel,
-                            amount_after_cancel,
-                        )
-                        if terminal_after_cancel in TERMINAL_STATES:
-                            entry["state"] = terminal_after_cancel
-                            timeout_message = "timeout_reconciled"
+                            filled_after_cancel = float(latest_after_cancel.get("filled") or 0.0)
+                            amount_after_cancel = float(
+                                latest_after_cancel.get("amount") or order_event.quantity
+                            )
+                            delta_after_cancel = self._ledger_residual_delta(
+                                order_id, filled_after_cancel
+                            )
+                            if delta_after_cancel > 0:
+                                self._emit_fill_event(
+                                    order_event,
+                                    latest_after_cancel,
+                                    delta_after_cancel,
+                                    status=status_after_cancel,
+                                    submitted_at=entry.get("created_at"),
+                                )
+                                entry["last_filled"] = filled_after_cancel
+                            terminal_after_cancel = self._to_state(
+                                status_after_cancel,
+                                filled_after_cancel,
+                                amount_after_cancel,
+                            )
+                            if terminal_after_cancel in TERMINAL_STATES:
+                                entry["state"] = terminal_after_cancel
+                                timeout_message = "timeout_reconciled"
+                            else:
+                                entry["state"] = STATE_TIMEOUT
                         else:
                             entry["state"] = STATE_TIMEOUT
-                    else:
-                        entry["state"] = STATE_TIMEOUT
 
-                    entry["updated_at"] = now
-                    self._notify_state(
-                        order_id=order_id,
-                        entry=entry,
-                        state=entry["state"],
-                        message=timeout_message,
-                    )
-                    if entry["state"] == STATE_FILLED:
-                        self._submit_paper_exchange_protection(
-                            order_event, parent_order_id=order_id
+                        entry["updated_at"] = now
+                        self._notify_state(
+                            order_id=order_id,
+                            entry=entry,
+                            state=entry["state"],
+                            message=timeout_message,
                         )
-                    self._forget_order(order_id, entry)
+                        if entry["state"] == STATE_FILLED:
+                            emit_protection_for = order_event
+                        self._forget_order(order_id, entry)
+                    if emit_protection_for is not None:
+                        self._submit_paper_exchange_protection(
+                            emit_protection_for, parent_order_id=order_id
+                        )
                     continue
 
             try:
@@ -1400,22 +1579,31 @@ class LiveExecutionHandler(ExecutionHandler):
             status = self._normalize_status(latest.get("status"))
             filled_now = float(latest.get("filled") or 0.0)
             total_amount = float(latest.get("amount") or order_event.quantity)
-            delta = filled_now - float(entry.get("last_filled", 0.0))
-            if delta > 0:
-                self._emit_fill_event(
-                    order_event,
-                    latest,
-                    delta,
-                    status=status,
-                    submitted_at=entry.get("created_at"),
-                )
-                entry["last_filled"] = filled_now
+            emit_protection_for = None
+            # Apply the polled result atomically: re-read last_filled under the lock
+            # so a concurrent user-stream fill (same order) is never double-counted
+            # or lost — only the residual cumulative delta is emitted.
+            with self._state_lock:
+                delta = self._ledger_residual_delta(order_id, filled_now)
+                if delta > 0:
+                    self._emit_fill_event(
+                        order_event,
+                        latest,
+                        delta,
+                        status=status,
+                        submitted_at=entry.get("created_at"),
+                    )
+                    entry["last_filled"] = filled_now
 
-            entry["state"] = self._to_state(status, filled_now, total_amount)
-            entry["updated_at"] = time.time()
-            if entry["state"] != previous_state:
-                self._notify_state(order_id=order_id, entry=entry, state=entry["state"])
-            if entry["state"] in TERMINAL_STATES:
-                if entry["state"] == STATE_FILLED:
-                    self._submit_paper_exchange_protection(order_event, parent_order_id=order_id)
-                self._forget_order(order_id, entry)
+                entry["state"] = self._to_state(status, filled_now, total_amount)
+                entry["updated_at"] = time.time()
+                if entry["state"] != previous_state:
+                    self._notify_state(order_id=order_id, entry=entry, state=entry["state"])
+                if entry["state"] in TERMINAL_STATES:
+                    if entry["state"] == STATE_FILLED:
+                        emit_protection_for = order_event
+                    self._forget_order(order_id, entry)
+            if emit_protection_for is not None:
+                self._submit_paper_exchange_protection(
+                    emit_protection_for, parent_order_id=order_id
+                )

@@ -216,6 +216,95 @@ def _artifact_governance_veto_checks(
     }
 
 
+def _artifact_reference_paths(decision: Mapping[str, Any]) -> list[str]:
+    """Collect artifact-path references declared by a non-AlphaZoo decision.
+
+    Inspects both the decision dict and its strategy params for any key ending
+    in ``_artifact_path`` plus the ``candidate_artifact`` / ``selected_artifact``
+    aliases, returning de-duplicated string paths in declaration order.
+    """
+    references: list[str] = []
+    for source in (_decision_strategy_params(decision), decision):
+        for key, value in source.items():
+            key_text = str(key)
+            if not (
+                key_text.endswith("_artifact_path")
+                or key_text in {"candidate_artifact", "selected_artifact"}
+            ):
+                continue
+            path_text = str(value or "").strip()
+            if path_text and path_text not in references:
+                references.append(path_text)
+    return references
+
+
+def _flag_clean_for_real_money(payload: Mapping[str, Any]) -> bool:
+    """A single payload establishes clean real-money readiness only if explicit."""
+    return bool(
+        payload.get("ready_for_real") is True
+        and not (
+            "real_money_execution" in payload and payload.get("real_money_execution") is not True
+        )
+        and not (
+            "real_execution_allowed" in payload
+            and payload.get("real_execution_allowed") is not True
+        )
+        and not _explicit_false(payload, "clean_promotion_eligible")
+        and payload.get("post_oos_research_variant") is not True
+        and payload.get("requires_fresh_forward_shadow") is not True
+        and payload.get("paper_testnet_only") is not True
+    )
+
+
+def _strategy_agnostic_real_money_veto_checks(
+    decision: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Fail-closed real-money veto for non-AlphaZoo live decisions.
+
+    The veto stays True unless the decision payload itself (or any artifact JSON
+    it references) EXPLICITLY establishes clean real-money readiness.  Absence of
+    an explicit ``ready_for_real=True`` keeps the veto active; any read error on a
+    referenced artifact also forces veto=True with ``artifact_validation_error``.
+    """
+    params = _decision_strategy_params(decision)
+    containers: dict[str, Mapping[str, Any]] = {"decision": decision, "strategy_params": params}
+    try:
+        for index, reference in enumerate(_artifact_reference_paths(decision)):
+            artifact_path = _resolve_repo_artifact_path(Path(reference))
+            containers[f"artifact_{index}"] = _read_json(artifact_path)
+    except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+        return {
+            "artifact_real_money_veto": True,
+            "artifact_paper_testnet_only": None,
+            "artifact_ready_for_real": None,
+            "artifact_real_execution_allowed": None,
+            "artifact_real_money_execution": None,
+            "artifact_post_oos_research_variant": None,
+            "artifact_requires_fresh_forward_shadow": None,
+            "artifact_clean_promotion_eligible": None,
+            "artifact_governance_veto_reasons": ["artifact_validation_error"],
+            "artifact_validation_error": str(exc),
+        }
+
+    governance_checks = _artifact_governance_veto_checks(containers)
+    governance_veto = bool(governance_checks["artifact_governance_veto_reasons"])
+    items = list(containers.values())
+    paper_only = any(item.get("paper_testnet_only") is True for item in items)
+    ready_for_real = any(item.get("ready_for_real") is True for item in items)
+    real_execution_allowed = any(item.get("real_execution_allowed") is True for item in items)
+    real_money_execution = any(item.get("real_money_execution") is True for item in items)
+    clean_ready = any(_flag_clean_for_real_money(item) for item in items)
+    return {
+        "artifact_real_money_veto": not (clean_ready and not governance_veto),
+        "artifact_paper_testnet_only": paper_only,
+        "artifact_ready_for_real": ready_for_real,
+        "artifact_real_execution_allowed": real_execution_allowed,
+        "artifact_real_money_execution": real_money_execution,
+        **governance_checks,
+        "artifact_validation_error": "",
+    }
+
+
 def _artifact_real_money_veto_checks(
     decision: Mapping[str, Any],
     *,
@@ -226,18 +315,7 @@ def _artifact_real_money_veto_checks(
         selected_reference=selected_reference,
     )
     if not target:
-        return {
-            "artifact_real_money_veto": False,
-            "artifact_paper_testnet_only": False,
-            "artifact_ready_for_real": None,
-            "artifact_real_execution_allowed": None,
-            "artifact_real_money_execution": None,
-            "artifact_post_oos_research_variant": False,
-            "artifact_requires_fresh_forward_shadow": False,
-            "artifact_clean_promotion_eligible": True,
-            "artifact_governance_veto_reasons": [],
-            "artifact_validation_error": "",
-        }
+        return _strategy_agnostic_real_money_veto_checks(decision)
 
     params = _decision_strategy_params(decision)
     optuna_path = _resolve_repo_artifact_path(

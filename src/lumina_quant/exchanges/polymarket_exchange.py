@@ -46,7 +46,16 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
 
 
 class PolymarketExchange(ExchangeInterface):
-    """Polymarket adapter with paper-first fallback and optional real execution."""
+    """Polymarket adapter with paper-first fallback and optional real execution.
+
+    NOTE: This adapter is NOT approved for real-money execution.
+    Paper/shadow usage is always available.  Real execution requires
+    both POLYMARKET_ALLOW_REAL_EXECUTION=True and MODE='real' after an
+    explicit operational sign-off.
+    """
+
+    #: Capability fence — deliberately False until the adapter reaches production parity.
+    supports_real_money: bool = False
 
     def __init__(self, config):
         self.config = config
@@ -153,10 +162,15 @@ class PolymarketExchange(ExchangeInterface):
         allow_real = bool(getattr(self.config, "POLYMARKET_ALLOW_REAL_EXECUTION", False))
         mode = str(getattr(self.config, "MODE", "paper") or "paper").strip().lower()
         if not allow_real or mode != "real":
+            # Paper/shadow path — real-money execution is fenced off.
             return None
-        if not self._private_key():
-            raise RuntimeError("Polymarket real execution requires a configured private key env.")
-        return self._require_client()
+        # Both POLYMARKET_ALLOW_REAL_EXECUTION=True and MODE='real' are set.
+        # The adapter is not yet approved; raise a hard fence error.
+        raise RuntimeError(
+            "Polymarket adapter is not approved for real-money execution. "
+            "supports_real_money=False. Use paper mode or switch to a "
+            "production-approved adapter."
+        )
 
     def _normalize_order(
         self, payload: dict[str, Any], *, symbol: str | None = None

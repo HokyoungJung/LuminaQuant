@@ -216,11 +216,14 @@ class BinaryWAL:
                 if not chunk:
                     break
                 if len(chunk) != RECORD_LEN:
+                    # Partial trailing bytes — cannot form a complete record.
                     break
 
                 record = decode_record(chunk)
                 if record is None:
-                    break
+                    # Corrupt slot: skip and continue scanning for valid records
+                    # further in the file (skip-and-resync).
+                    continue
 
                 if start is not None and record.ts_ms < start:
                     continue
@@ -232,22 +235,54 @@ class BinaryWAL:
                 yield record
 
     def scan_valid_length(self) -> int:
-        """Return byte length up to the last valid record boundary."""
+        """Return byte length up to the last valid record boundary.
+
+        Scans the entire file, skipping over corrupt records so that valid
+        records appearing *after* a mid-file corruption are not silently lost.
+        The returned length covers all records up to (and including) the last
+        contiguous-or-scattered valid record; repair() will truncate everything
+        past the last valid boundary.
+        """
+        import logging
+
         valid_end = 0
+        corrupt_skipped = 0
+        offset = 0
         with self.path.open("rb") as fh:
             while True:
                 chunk = fh.read(RECORD_LEN)
                 if not chunk:
                     break
                 if len(chunk) != RECORD_LEN:
+                    # Partial trailing bytes — note as corrupt, stop scanning.
+                    corrupt_skipped += 1
                     break
                 if decode_record(chunk) is None:
-                    break
-                valid_end += RECORD_LEN
+                    # Corrupt record: skip past it and keep scanning for more
+                    # valid records further in the file.
+                    corrupt_skipped += 1
+                    offset += RECORD_LEN
+                    continue
+                offset += RECORD_LEN
+                valid_end = offset
+
+        if corrupt_skipped:
+            logging.getLogger(__name__).warning(
+                "WAL %s: skipped %d corrupt/partial record slot(s) during scan; "
+                "last valid byte offset=%d",
+                self.path,
+                corrupt_skipped,
+                valid_end,
+            )
         return valid_end
 
     def repair(self) -> int:
-        """Truncate trailing invalid/partial bytes and return bytes removed."""
+        """Truncate past the last valid record boundary and return bytes removed.
+
+        Unlike a simple leading-scan, this first calls scan_valid_length() which
+        skips mid-file corrupt records, so repair discards only the unreachable
+        tail bytes rather than everything after the first bad slot.
+        """
         file_size = self.path.stat().st_size if self.path.exists() else 0
         valid_end = self.scan_valid_length()
         if valid_end >= file_size:
@@ -280,6 +315,8 @@ class BinaryWAL:
                     break
                 record = decode_record(chunk)
                 if record is None:
-                    break
+                    # Corrupt slot: skip and continue (skip-and-resync).
+                    cursor += RECORD_LEN
+                    continue
                 yield record
                 cursor += RECORD_LEN

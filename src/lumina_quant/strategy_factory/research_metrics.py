@@ -16,6 +16,104 @@ from lumina_quant.utils.risk_free import (
 )
 
 
+# Euler-Mascheroni constant used by the canonical expected-maximum-Sharpe estimator.
+_EULER_MASCHERONI = 0.5772156649015329
+
+
+def _norm_cdf(x: float) -> float:
+    """Standard-normal CDF via the error function (no scipy dependency)."""
+    return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
+
+
+def _norm_ppf(p: float) -> float:
+    """Standard-normal inverse CDF (quantile) via Acklam's rational approximation.
+
+    Accurate to roughly 1e-9 across (0, 1); used in place of scipy.stats.norm.ppf
+    because scipy is not a dependency of this package.
+    """
+    if not math.isfinite(p):
+        return 0.0
+    if p <= 0.0:
+        return -math.inf
+    if p >= 1.0:
+        return math.inf
+
+    a = (
+        -3.969683028665376e01,
+        2.209460984245205e02,
+        -2.759285104469687e02,
+        1.383577518672690e02,
+        -3.066479806614716e01,
+        2.506628277459239e00,
+    )
+    b = (
+        -5.447609879822406e01,
+        1.615858368580409e02,
+        -1.556989798598866e02,
+        6.680131188771972e01,
+        -1.328068155288572e01,
+    )
+    c = (
+        -7.784894002430293e-03,
+        -3.223964580411365e-01,
+        -2.400758277161838e00,
+        -2.549732539343734e00,
+        4.374664141464968e00,
+        2.938163982698783e00,
+    )
+    d = (
+        7.784695709041462e-03,
+        3.224671290700398e-01,
+        2.445134137142996e00,
+        3.754408661907416e00,
+    )
+    p_low = 0.02425
+    p_high = 1.0 - p_low
+
+    if p < p_low:
+        q = math.sqrt(-2.0 * math.log(p))
+        return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / (
+            (((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1.0
+        )
+    if p <= p_high:
+        q = p - 0.5
+        r = q * q
+        return (
+            (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5])
+            * q
+            / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1.0)
+        )
+    q = math.sqrt(-2.0 * math.log(1.0 - p))
+    return -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / (
+        (((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1.0
+    )
+
+
+def expected_max_sharpe(*, variance_across_trials: float, num_trials: int) -> float:
+    """Canonical expected maximum Sharpe across ``num_trials`` independent trials.
+
+    Bailey & Lopez de Prado (2014), "The Deflated Sharpe Ratio":
+
+        E[max SR] = sqrt(Var(SR_across_trials)) *
+                    ((1 - gamma) * Phi^-1(1 - 1/k) + gamma * Phi^-1(1 - 1/(k*e)))
+
+    with ``gamma`` the Euler-Mascheroni constant. This is the multiple-testing
+    benchmark Sharpe that an overfit search is expected to surpass by chance; it
+    is NOT scaled by the series length (the previous proxy divided by sqrt(n),
+    conflating the cross-trial penalty with per-period scaling).
+    """
+    k = float(max(1, int(num_trials)))
+    if k <= 1.0:
+        return 0.0
+    var = max(0.0, float(variance_across_trials))
+    if var <= 0.0:
+        return 0.0
+    z1 = _norm_ppf(1.0 - 1.0 / k)
+    z2 = _norm_ppf(1.0 - 1.0 / (k * math.e))
+    gamma = _EULER_MASCHERONI
+    return math.sqrt(var) * ((1.0 - gamma) * z1 + gamma * z2)
+
+
 def safe_std(values: np.ndarray) -> float:
     if values.size < 2:
         return 0.0
@@ -79,7 +177,39 @@ def worst_month(returns: np.ndarray, *, bars_per_month: int) -> float:
     return float(min(monthly))
 
 
-def deflated_sharpe_ratio(returns: np.ndarray, *, num_trials: int = 1) -> float:
+def _estimate_sr_variance_across_trials(sharpe: float, n: float) -> float:
+    """Fallback estimate of Var(SR) across trials when none is supplied.
+
+    With no cross-trial sample available, use the asymptotic sampling variance of
+    a single Sharpe estimate, Var(SR) ~= (1 + SR^2 / 2) / (n - 1) (Lo, 2002).
+    This is a conservative, defensible stand-in for the dispersion of trial
+    Sharpes that keeps ``deflated_sharpe_ratio`` usable on a single return series.
+    """
+    denom = max(1.0, n - 1.0)
+    return max(0.0, (1.0 + 0.5 * (sharpe**2)) / denom)
+
+
+def deflated_sharpe_ratio(
+    returns: np.ndarray,
+    *,
+    num_trials: int = 1,
+    variance_across_trials: float | None = None,
+) -> float:
+    """Canonical Deflated Sharpe Ratio (Bailey & Lopez de Prado, 2014).
+
+    Steps:
+      1. SR is the observed (per-period, non-annualized) Sharpe of ``returns``.
+      2. SR0 = E[max SR] over ``num_trials`` independent trials, using
+         ``variance_across_trials`` (the dispersion of trial Sharpes). When that
+         dispersion is not supplied it is approximated from SR's own sampling
+         variance (see ``_estimate_sr_variance_across_trials``).
+      3. DSR = Phi( ((SR - SR0) * sqrt(n - 1)) /
+                    sqrt(1 - skew*SR + ((kurt - 1)/4)*SR^2) ),
+         with non-Gaussian (skew/kurtosis) adjustment to the SR sampling error.
+
+    Returns a probability in [0, 1]: the confidence that the true SR exceeds the
+    multiple-testing benchmark SR0.
+    """
     if returns.size < 16:
         return 0.0
     mu = safe_mean(returns)
@@ -89,8 +219,15 @@ def deflated_sharpe_ratio(returns: np.ndarray, *, num_trials: int = 1) -> float:
 
     sharpe = mu / sigma
     n = float(max(2, returns.size))
-    k = float(max(1, num_trials))
-    expected_max = math.sqrt(2.0 * math.log(k)) / math.sqrt(n)
+
+    if variance_across_trials is None:
+        var_sr = _estimate_sr_variance_across_trials(sharpe, n)
+    else:
+        var_sr = max(0.0, float(variance_across_trials))
+    expected_max = expected_max_sharpe(
+        variance_across_trials=var_sr,
+        num_trials=num_trials,
+    )
 
     centered = returns - mu
     m3 = float(np.mean(centered**3))
@@ -100,11 +237,9 @@ def deflated_sharpe_ratio(returns: np.ndarray, *, num_trials: int = 1) -> float:
 
     denom_term = 1.0 - (skew * sharpe) + (((kurt - 1.0) / 4.0) * (sharpe**2))
     denom_term = max(1e-8, denom_term)
-    denom = math.sqrt(denom_term / max(1.0, n - 1.0))
-    z = (sharpe - expected_max) / max(1e-8, denom)
+    z = ((sharpe - expected_max) * math.sqrt(max(1.0, n - 1.0))) / math.sqrt(denom_term)
 
-    cdf = 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
-    return float(max(0.0, min(1.0, cdf)))
+    return float(max(0.0, min(1.0, _norm_cdf(z))))
 
 
 def approx_pbo(returns: np.ndarray) -> float:
@@ -180,24 +315,66 @@ def fold_participation_stats(returns: np.ndarray) -> tuple[float, float, float]:
     return float(active / trials), float(inactive), float(failures / trials)
 
 
-def spa_like_pvalue(returns: np.ndarray, *, bootstrap_rounds: int = 200) -> float:
-    """Simple bootstrap p-value proxy for data-snooping correction."""
-    if returns.size < 16:
+def spa_like_pvalue(
+    returns: np.ndarray,
+    *,
+    bootstrap_rounds: int = 200,
+    block_size: int | None = None,
+    seed: int = 12345,
+) -> float:
+    """Stationary (circular) block-bootstrap reality-check p-value.
+
+    A White (2000) Reality Check / Hansen (2005) SPA in the single-strategy case:
+    test H0 that the strategy's expected studentized excess return is <= 0 against
+    the data-snooping null, preserving serial dependence via a circular block
+    bootstrap (Politis & Romano, 1994) rather than i.i.d. resampling.
+
+    Procedure:
+      1. Studentize the observed mean: t_obs = mean(r) / (std(r) / sqrt(n)).
+      2. Centre the series, then draw ``bootstrap_rounds`` circular block-bootstrap
+         resamples of the centred series (block length defaults to ~ n**(1/3),
+         the standard rate for dependent data) and recompute the studentized
+         statistic on each.
+      3. p-value = fraction of bootstrap statistics >= the observed statistic.
+
+    A non-positive observed mean returns 1.0 (no evidence against the null). Pure
+    noise yields a p-value near uniform (~0.5 on average, far from significant).
+    """
+    n = returns.size
+    if n < 16:
         return 1.0
-    observed = safe_mean(returns)
-    if observed <= 0.0:
+    observed_mean = safe_mean(returns)
+    if observed_mean <= 0.0:
+        return 1.0
+    sigma = safe_std(returns)
+    if sigma <= 1e-12:
         return 1.0
 
-    rng = np.random.default_rng(12345)
+    rounds = max(64, int(bootstrap_rounds))
+    if block_size is None:
+        block_len = max(1, round(n ** (1.0 / 3.0)))
+    else:
+        block_len = max(1, min(n, int(block_size)))
+    sqrt_n = math.sqrt(float(n))
+
+    centered = returns - observed_mean
+    t_obs = observed_mean / (sigma / sqrt_n)
+
+    rng = np.random.default_rng(seed)
+    num_blocks = math.ceil(n / block_len)
     exceed = 0
-    centered = returns - safe_mean(returns)
-    n = centered.size
-    for _ in range(max(64, int(bootstrap_rounds))):
-        idx = rng.integers(0, n, size=n)
-        sample = centered[idx]
-        if safe_mean(sample) >= observed:
+    for _ in range(rounds):
+        starts = rng.integers(0, n, size=num_blocks)
+        offsets = (starts[:, None] + np.arange(block_len)[None, :]) % n
+        sample = centered[offsets.reshape(-1)[:n]]
+        sample_mean = safe_mean(sample)
+        sample_sigma = safe_std(sample)
+        if sample_sigma <= 1e-12:
+            continue
+        t_boot = sample_mean / (sample_sigma / sqrt_n)
+        if t_boot >= t_obs:
             exceed += 1
-    return float(exceed / max(1, int(bootstrap_rounds)))
+    return float(exceed / rounds)
 
 
 def correlation(x: np.ndarray, y: np.ndarray) -> float:
@@ -431,6 +608,7 @@ __all__ = [
     "correlation",
     "deflated_sharpe_ratio",
     "empty_compute_metric_payload",
+    "expected_max_sharpe",
     "fold_participation_stats",
     "max_drawdown",
     "resolve_compute_metric_payload",

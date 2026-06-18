@@ -45,6 +45,27 @@ risk:
   default_stop_loss_pct: 0.01
   freeze_new_entries_on_breach: true
   auto_flatten_on_breach: false
+  # --- Audit-hardening risk controls (fix/audit-hardening) ---
+  # allow_metadata_risk_override: when false (SAFE default) a strategy's signal
+  #   metadata may only LOWER a risk ceiling — any override raising leverage /
+  #   exposure / order value / notional-pct above its config value is clamped back.
+  #   Set true only to restore the legacy unclamped behavior.
+  allow_metadata_risk_override: false
+  # max_leverage: absolute ceiling for metadata leverage overrides when the clamp is
+  #   active. 0.0 => metadata may not raise leverage above the configured run leverage.
+  max_leverage: 0.0
+  # hard_drawdown_flatten_pct: > 0 => flatten ALL open positions when intraday
+  #   drawdown exceeds this fraction, even if auto_flatten_on_breach is false
+  #   (a hard de-risk tier above the soft FREEZE threshold). 0.0 => disabled.
+  hard_drawdown_flatten_pct: 0.0
+  # attach_default_protective_stop: true => give a signal with no stop_loss a
+  #   synthetic stop at default_stop_loss_pct so no position runs naked.
+  #   Default false preserves existing backtest numerics (enable on the backtest PC).
+  attach_default_protective_stop: false
+  # enforce_order_risk_gate_in_backtest: true => run the same RiskManager.check_order
+  #   gate in the backtest order path as in live. Default false preserves the golden
+  #   baseline (enable on the backtest PC to unify backtest/live enforcement).
+  enforce_order_risk_gate_in_backtest: false
 
 # ------------------------------------------
 # Execution Model (Shared)
@@ -58,6 +79,16 @@ execution:
   funding_interval_hours: 8
   maintenance_margin_rate: 0.005
   liquidation_buffer_rate: 0.0005
+  # --- Audit-hardening fill realism (fix/audit-hardening) ---
+  # slippage_impact_model: "flat" (default, golden-stable, size-blind) or
+  #   "sqrt_impact" (adds a sqrt market-impact term scaled by order participation
+  #   so large/leveraged orders pay more). Enable on the backtest PC to measure cost.
+  slippage_impact_model: "flat"
+  slippage_impact_coefficient: 0.0   # impact strength (only used by sqrt_impact)
+  slippage_adv_quote: 0.0            # participation denominator; 0 => per-bar volume
+  # require_funding_coverage: true => a leveraged backtest fails instead of silently
+  #   charging 0.0 funding when funding feature data is absent. Default false.
+  require_funding_coverage: false
   compute_backend: "auto" # auto|cpu|gpu|forced-gpu
   gpu_mode: "auto" # auto|cpu|gpu|forced-gpu
   gpu_vram_gb: 8.0
@@ -185,6 +216,10 @@ live:
   heartbeat_interval_sec: 30
   order_timeout: 10 # Seconds
   reconciliation_interval_sec: 30
+  # Audit-hardening (fix/audit-hardening): reject limit orders validated against a
+  # cached best-bid/offer older than this many seconds (fail-closed during websocket
+  # stalls / dislocations). Live-only, no backtest impact. 0.0 => disabled.
+  max_bbo_age_seconds: 2.0
   # API Keys are best loaded from .env, but can be set here if needed (NOT RECOMMENDED for git)
   # api_key: "YOUR_KEY"
   # secret_key: "YOUR_SECRET"

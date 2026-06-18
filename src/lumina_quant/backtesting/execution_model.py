@@ -21,6 +21,7 @@ this module (enforced by CI grep gate after Phase 5 completes).
 
 from __future__ import annotations
 
+import math
 import random
 from dataclasses import dataclass
 from typing import Any
@@ -42,6 +43,9 @@ class ExecutionModelConfig:
     funding_interval_hours: int
     random_seed: int
     max_bar_volume_ratio: float = 0.1
+    slippage_impact_model: str = "flat"
+    slippage_impact_coefficient: float = 0.0
+    slippage_adv_quote: float = 0.0
 
     @classmethod
     def from_runtime(cls, rt: Any, *, mode: str = "backtest") -> ExecutionModelConfig:
@@ -81,6 +85,9 @@ class ExecutionModelConfig:
             funding_interval_hours=max(1, int(ex.funding_interval_hours)),
             random_seed=random_seed,
             max_bar_volume_ratio=float(getattr(ex, "max_bar_volume_ratio", 0.1)),
+            slippage_impact_model=str(getattr(ex, "slippage_impact_model", "flat")).strip().lower(),
+            slippage_impact_coefficient=float(getattr(ex, "slippage_impact_coefficient", 0.0)),
+            slippage_adv_quote=float(getattr(ex, "slippage_adv_quote", 0.0)),
         )
 
 
@@ -107,6 +114,9 @@ def _config_from_attrs(config: Any) -> ExecutionModelConfig:
         funding_interval_hours=max(1, int(getattr(config, "FUNDING_INTERVAL_HOURS", 8))),
         random_seed=int(getattr(config, "RANDOM_SEED", 42)),
         max_bar_volume_ratio=float(getattr(config, "SIM_MAX_BAR_VOLUME_RATIO", 0.1)),
+        slippage_impact_model=str(getattr(config, "SLIPPAGE_IMPACT_MODEL", "flat")).strip().lower(),
+        slippage_impact_coefficient=float(getattr(config, "SLIPPAGE_IMPACT_COEFFICIENT", 0.0)),
+        slippage_adv_quote=float(getattr(config, "SLIPPAGE_ADV_QUOTE", 0.0)),
     )
 
 
@@ -153,6 +163,7 @@ class ExecutionModel:
         volatility: float = 0.0,
         is_maker: bool = False,
         apply_liquidity_cap: bool = True,
+        order_notional: float | None = None,
     ) -> FillResult:
         """Simulate a single fill: (optional liquidity cap) → price → fee.
 
@@ -161,6 +172,16 @@ class ExecutionModel:
             fill_price = raw_price * (1 +/- (slip + spread/2)); fee = taker_fee_rate.
             The RNG is consumed once per call regardless of cap outcome, matching the
             legacy ``FillModel`` sequence (deterministic golden preservation).
+
+            When ``slippage_impact_model == "sqrt_impact"`` and ``order_notional`` is
+            provided (and > 0), an additional market-impact term is added to the penalty:
+                participation = order_notional / denominator
+                denominator   = slippage_adv_quote  (if > 0)
+                                else bar_volume * raw_price  (per-bar quote volume)
+                impact        = slippage_impact_coefficient * sqrt(participation)
+                total penalty = base_flat_penalty + impact
+            When ``order_notional`` is ``None`` or the model is ``"flat"``, the path is
+            identical to the legacy flat model (byte-for-byte same RNG draw and arithmetic).
 
         For passive fills (``is_maker=True``, LMT):
             fill_price = raw_price exactly; fee = maker_fee_rate; RNG not consumed.
@@ -183,6 +204,10 @@ class ExecutionModel:
         apply_liquidity_cap:
             ``False`` disables the bar-volume cap — use for STOP/TP/TRAIL_STOP orders
             where the full quantity fills on trigger.
+        order_notional:
+            Optional order value in quote currency.  Only used when
+            ``slippage_impact_model == "sqrt_impact"``; ignored (and defaults to
+            ``None``) for the ``"flat"`` model so existing callers are unaffected.
         """
         if apply_liquidity_cap:
             max_qty = max(0.0, float(bar_volume) * self.cfg.max_bar_volume_ratio)
@@ -203,6 +228,23 @@ class ExecutionModel:
             if float(volatility) > 0.01:
                 slip *= 2.0
             penalty = slip + self.cfg.spread_rate / 2.0
+            # Optional sqrt market-impact term — only active when explicitly configured.
+            # The "flat" branch (default) is byte-identical to the legacy path.
+            if (
+                self.cfg.slippage_impact_model == "sqrt_impact"
+                and order_notional is not None
+                and float(order_notional) > 0.0
+                and self.cfg.slippage_impact_coefficient != 0.0
+            ):
+                adv = self.cfg.slippage_adv_quote
+                if adv > 0.0:
+                    denominator = adv
+                else:
+                    denominator = float(bar_volume) * float(raw_price)
+                if denominator > 0.0:
+                    participation = float(order_notional) / denominator
+                    impact = self.cfg.slippage_impact_coefficient * math.sqrt(participation)
+                    penalty = penalty + impact
             if str(direction).upper() == "BUY":
                 fill_price = float(raw_price) * (1.0 + penalty)
             else:

@@ -18,6 +18,7 @@ from lumina_quant.core.order_policy import (
     price_tick_size_from_sources,
 )
 from lumina_quant.market_data import normalize_timeframe_token, timeframe_to_milliseconds
+from lumina_quant.risk_manager import RiskManager
 from lumina_quant.services.portfolio import PortfolioPerformanceService, PortfolioSizingService
 
 
@@ -86,6 +87,25 @@ class Portfolio:
         )
         self.leverage = getattr(config, "LEVERAGE", 1.0)
         self.default_stop_loss_pct = getattr(config, "DEFAULT_STOP_LOSS_PCT", 0.01)
+        # Audit-hardening (fix/audit-hardening) backtest-path risk gates. Each flag
+        # defaults False so the golden baseline stays byte-identical; reading prefers
+        # an uppercase attr (plain-class unit-test configs) and falls back to the
+        # RuntimeConfig dotpath carried on BacktestConfigView._rt for production runs.
+        self.enforce_order_risk_gate = self._audit_flag(
+            config,
+            "ENFORCE_ORDER_RISK_GATE_IN_BACKTEST",
+            "risk",
+            "enforce_order_risk_gate_in_backtest",
+        )
+        self.attach_default_protective_stop = self._audit_flag(
+            config, "ATTACH_DEFAULT_PROTECTIVE_STOP", "risk", "attach_default_protective_stop"
+        )
+        self.require_funding_coverage = self._audit_flag(
+            config, "REQUIRE_FUNDING_COVERAGE", "execution", "require_funding_coverage"
+        )
+        # Lazily-constructed RiskManager backstop for the order-time gate (only when
+        # enforce_order_risk_gate is True). Mirrors the live/trader.py:1713 usage.
+        self._risk_manager = None
         # Phase 4 unified cost model — funding and liquidation delegate to this.
         # BacktestConfigView carries ._rt (RuntimeConfig); use from_runtime for production.
         # Plain class configs (unit tests) use _config_from_attrs.
@@ -205,6 +225,26 @@ class Portfolio:
                 self.day_start_equity = float(state.get("day_start_equity"))
             except Exception:
                 pass
+
+    @staticmethod
+    def _audit_flag(config, upper_attr: str, section: str, field: str) -> bool:
+        """Resolve an audit-hardening bool flag, default False.
+
+        Prefers an uppercase attr on ``config`` (plain-class unit-test configs);
+        falls back to the RuntimeConfig dotpath carried on ``config._rt`` (the
+        BacktestConfigView surface used in production). Absent everywhere => False,
+        so each gate is a strict no-op at its schema default.
+        """
+        sentinel = object()
+        value = getattr(config, upper_attr, sentinel)
+        if value is not sentinel:
+            return bool(value)
+        runtime = getattr(config, "_rt", None)
+        if runtime is not None:
+            section_obj = getattr(runtime, section, None)
+            if section_obj is not None:
+                return bool(getattr(section_obj, field, False))
+        return False
 
     @staticmethod
     def _component_id_from_metadata(metadata) -> str | None:
@@ -576,6 +616,19 @@ class Portfolio:
             except Exception:
                 pass
 
+        # Audit-hardening: when funding coverage is required and the run is
+        # leveraged, refuse to silently charge 0.0 funding because no per-bar
+        # funding data (dynamic feature or bar column) was available. Default OFF
+        # preserves the legacy silent-0.0 / config-default behavior.
+        if self.require_funding_coverage and float(self.execution_model.cfg.leverage) > 1.0:
+            raise ValueError(
+                "require_funding_coverage: no per-bar funding data available for "
+                f"symbol {symbol!r} on a leveraged run "
+                f"(leverage={float(self.execution_model.cfg.leverage)}); refusing to "
+                "charge 0.0 funding silently. Provide funding_rate feature/bar data "
+                "or disable execution.require_funding_coverage."
+            )
+
         if abs(float(default)) <= 1e-12:
             return None
         return float(default)
@@ -831,6 +884,10 @@ class Portfolio:
             target_allocation_mode=str(self.target_allocation_mode),
             leverage=float(self.leverage),
             max_order_notional_pct=float(self.max_order_notional_pct),
+            allow_metadata_risk_override=bool(
+                getattr(self.config, "ALLOW_METADATA_RISK_OVERRIDE", False)
+            ),
+            max_leverage=float(getattr(self.config, "MAX_LEVERAGE", 0.0)),
         )
         # Apply canary position fraction: EFFECTIVE_POSITION_FRACTION == canary_position_fraction
         # when stage=canary, 1.0 otherwise.  Clamped to (0, 1] to prevent zero/negative qty.
@@ -917,6 +974,27 @@ class Portfolio:
         )
         return price, limits
 
+    def _resolve_stop_loss(self, signal, *, side: str, entry_price: float):
+        """Stop-loss for a new entry order.
+
+        Returns ``signal.stop_loss`` verbatim (default behavior). When
+        ``attach_default_protective_stop`` is enabled and the signal carries no
+        stop, synthesizes a protective stop at ``default_stop_loss_pct`` from the
+        entry price so the position never runs naked
+        (LONG: entry*(1-pct); SHORT: entry*(1+pct)). Default OFF => unchanged.
+        """
+        signal_stop = getattr(signal, "stop_loss", None)
+        if signal_stop is not None:
+            return signal_stop
+        if not self.attach_default_protective_stop:
+            return None
+        pct = float(self.default_stop_loss_pct)
+        if pct <= 0.0 or entry_price <= 0.0:
+            return None
+        if side == "LONG":
+            return float(entry_price) * (1.0 - pct)
+        return float(entry_price) * (1.0 + pct)
+
     def generate_order_from_signal(self, signal) -> OrderEvent | None:
         """Generates an OrderEvent from a SignalEvent.
         Uses risk-based sizing with exchange constraints.
@@ -958,7 +1036,7 @@ class Portfolio:
                 position_side=position_side,
                 reduce_only=False,
                 client_order_id=signal.client_order_id,
-                stop_loss=signal.stop_loss,
+                stop_loss=self._resolve_stop_loss(signal, side="LONG", entry_price=current_price),
                 take_profit=signal.take_profit,
                 trailing_percent=signal.trailing_percent,
                 time_in_force=self._order_time_in_force(signal, order_type),
@@ -993,7 +1071,7 @@ class Portfolio:
                 position_side=position_side,
                 reduce_only=False,
                 client_order_id=signal.client_order_id,
-                stop_loss=signal.stop_loss,
+                stop_loss=self._resolve_stop_loss(signal, side="SHORT", entry_price=current_price),
                 take_profit=signal.take_profit,
                 trailing_percent=signal.trailing_percent,
                 time_in_force=self._order_time_in_force(signal, order_type),
@@ -1052,7 +1130,22 @@ class Portfolio:
         if event.type == "SIGNAL":
             order_event = self.generate_order_from_signal(event)
             if order_event is not None:
+                if self.enforce_order_risk_gate and not self._passes_order_risk_gate(order_event):
+                    return  # Audit-hardening gate rejected the order; skip it.
                 self.events.put(order_event)
+
+    def _passes_order_risk_gate(self, order_event) -> bool:
+        """Run the live RiskManager.check_order backstop on a backtest order.
+
+        Mirrors the live/trader.py order-time gate so one enforcement path governs
+        both. Only invoked when ``enforce_order_risk_gate`` is True; default OFF
+        leaves this path untouched and the golden baseline byte-identical.
+        """
+        if self._risk_manager is None:
+            self._risk_manager = RiskManager(self.config)
+        current_price = self.bars.get_latest_bar_value(order_event.symbol, "close")
+        passed, _reason = self._risk_manager.check_order(order_event, current_price, portfolio=self)
+        return bool(passed)
 
     def create_equity_curve_dataframe(self):
         """Creates a Polars DataFrame from the all_holdings list (list of Tuples)."""

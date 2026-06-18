@@ -40,7 +40,14 @@ class MT5Exchange(ExchangeInterface):
     On Windows, this uses in-process MetaTrader5 Python package.
     On WSL/Linux, set `LQ_MT5_BRIDGE_PYTHON` to a Windows Python executable path
     to use bridge mode through `scripts/mt5_bridge_worker.py`.
+
+    NOTE: This adapter is NOT approved for real-money execution.
+    Paper/shadow/demo usage is supported.  Set MT5_ALLOW_REAL_EXECUTION=True
+    and MODE='real' only after an explicit operational sign-off.
     """
+
+    #: Capability fence — deliberately False until the adapter reaches Binance parity.
+    supports_real_money: bool = False
 
     def __init__(self, config):
         self.config = config
@@ -291,6 +298,22 @@ class MT5Exchange(ExchangeInterface):
             payload["tick"] = dict(tick_asdict())
         return payload
 
+    def _check_real_money_fence(self) -> None:
+        """Raise if the adapter is being used for real-money execution.
+
+        Real-money execution requires both MODE='real' *and*
+        MT5_ALLOW_REAL_EXECUTION=True in config.  This adapter is not
+        approved for real-money use; the guard is fail-closed by default.
+        """
+        mode = str(getattr(self.config, "MODE", "paper") or "paper").strip().lower()
+        allow_real = bool(getattr(self.config, "MT5_ALLOW_REAL_EXECUTION", False))
+        if mode == "real" and allow_real:
+            raise RuntimeError(
+                "MT5 adapter is not approved for real-money execution. "
+                "supports_real_money=False. Use paper/demo mode or switch to "
+                "a production-approved adapter."
+            )
+
     def execute_order(
         self,
         symbol: str,
@@ -300,6 +323,7 @@ class MT5Exchange(ExchangeInterface):
         price: float | None = None,
         params: dict | None = None,
     ) -> dict:
+        self._check_real_money_fence()
         if not self.connected:
             raise RuntimeError("Not connected to MT5")
         params = params or {}
@@ -402,6 +426,7 @@ class MT5Exchange(ExchangeInterface):
                 )
             except Exception:
                 return {}
+            # Bridge response includes a real 'status' field — pass it through.
             return result if isinstance(result, dict) else {}
 
         try:
@@ -413,6 +438,12 @@ class MT5Exchange(ExchangeInterface):
         if not orders:
             return {}
         order = orders[0]
+        # MT5 orders_get() only returns pending (not-yet-filled) orders, so
+        # a found ticket is genuinely pending/open.  Filled/cancelled orders
+        # are not returned by orders_get — callers needing those must query
+        # history_deals_get.  Mapping to "open" is therefore correct for the
+        # in-process path; mapping from history would require a separate call
+        # which is left as a residual improvement (noted in residual_risks).
         return {
             "id": str(order.ticket),
             "status": "open",
