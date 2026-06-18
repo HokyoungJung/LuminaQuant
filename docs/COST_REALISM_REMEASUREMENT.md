@@ -94,10 +94,18 @@ uv run lq data collect            # (see docs/EXTERNAL_DATA.md for sources)
 uv run lq backtest --run-id baseline_flat
 uv run lq optimize --folds 10 --oos-days 30 --validation-days 30 --run-id baseline_flat_wf
 
-# 2) REALISTIC — apply the §2 overlay to config.yaml, then re-run the SAME thing
-uv run lq backtest --run-id realistic
-uv run lq optimize --folds 10 --oos-days 30 --validation-days 30 --run-id realistic_wf
+# 2) REALISTIC — use the ready-made profile (config.yaml + cost-realism flags ON).
+#    LQ_CONFIG_PATH REPLACES config.yaml (no merge), so the profile is a full copy
+#    of config.yaml with only the flags flipped — keep it in sync if you edit config.yaml.
+LQ_CONFIG_PATH=configs/profiles/backtest_cost_realistic.yaml uv run lq backtest --run-id realistic
+LQ_CONFIG_PATH=configs/profiles/backtest_cost_realistic.yaml \
+  uv run lq optimize --folds 10 --oos-days 30 --validation-days 30 --run-id realistic_wf
 ```
+
+> The baseline (step 1) uses the root `config.yaml` (flags OFF) and the realistic
+> run uses `configs/profiles/backtest_cost_realistic.yaml` (flags ON) — a clean A/B
+> differing only in the cost/risk realism block. To hand-tune instead, apply the §2
+> overlay to your own config copy.
 
 - Keep `backtest.random_seed`, universe, window, fold count, and `--oos-days` /
   `--validation-days` **identical** between baseline and realistic runs — only the cost/risk

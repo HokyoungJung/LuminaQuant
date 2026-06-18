@@ -90,10 +90,17 @@ uv run lq data collect            # (소스는 docs/EXTERNAL_DATA.md 참조)
 uv run lq backtest --run-id baseline_flat
 uv run lq optimize --folds 10 --oos-days 30 --validation-days 30 --run-id baseline_flat_wf
 
-# 2) 현실 — config.yaml에 §2 오버레이 적용 후 동일하게 재실행
-uv run lq backtest --run-id realistic
-uv run lq optimize --folds 10 --oos-days 30 --validation-days 30 --run-id realistic_wf
+# 2) 현실 — 준비된 프로파일 사용 (config.yaml + 비용현실성 플래그 ON).
+#    LQ_CONFIG_PATH는 config.yaml을 "대체"한다(병합 아님). 프로파일은 config.yaml
+#    전체 복사본에서 플래그만 켠 것 — config.yaml을 수정하면 동기화 유지할 것.
+LQ_CONFIG_PATH=configs/profiles/backtest_cost_realistic.yaml uv run lq backtest --run-id realistic
+LQ_CONFIG_PATH=configs/profiles/backtest_cost_realistic.yaml \
+  uv run lq optimize --folds 10 --oos-days 30 --validation-days 30 --run-id realistic_wf
 ```
+
+> 기준선(1단계)은 루트 `config.yaml`(플래그 OFF), 현실 실행은
+> `configs/profiles/backtest_cost_realistic.yaml`(플래그 ON) — 비용/리스크 현실성
+> 블록만 다른 깨끗한 A/B. 직접 손튜닝하려면 §2 오버레이를 본인 config 복사본에 적용.
 
 - 기준선과 현실 실행 간 `backtest.random_seed`, 유니버스, 구간, 폴드 수,
   `--oos-days`/`--validation-days`를 **동일하게** 유지하고 비용/리스크 플래그만 바꾼다.
