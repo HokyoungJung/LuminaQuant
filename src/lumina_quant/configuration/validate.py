@@ -573,7 +573,20 @@ def validate_runtime_config(runtime: RuntimeConfig, *, for_live: bool = False) -
             "Set this explicitly to confirm intent to place real orders."
         )
 
-    if for_live and (not runtime.live.api_key or not runtime.live.secret_key):
-        raise ValueError(
-            "API keys are missing. Set BINANCE_API_KEY and BINANCE_SECRET_KEY via environment."
-        )
+    if for_live:
+        driver = str(getattr(runtime.live.exchange, "driver", "") or "").strip().lower()
+        if driver in {"binance_futures", "binance_native"}:
+            if not runtime.live.api_key or not runtime.live.secret_key:
+                raise ValueError(
+                    "API keys are missing for Binance driver. "
+                    "Set BINANCE_API_KEY and BINANCE_SECRET_KEY via environment."
+                )
+        elif driver == "polymarket":
+            private_key_env = str(
+                getattr(runtime.live.polymarket, "private_key_env", "POLYMARKET_PRIVATE_KEY")
+                or "POLYMARKET_PRIVATE_KEY"
+            )
+            if not os.environ.get(private_key_env, "").strip():
+                raise ValueError(
+                    f"Polymarket private key is missing. Set {private_key_env} in the environment."
+                )

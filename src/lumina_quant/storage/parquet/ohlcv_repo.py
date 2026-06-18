@@ -1448,6 +1448,7 @@ class ParquetMarketDataRepository:
         output_path = partition_root / "part-0000.parquet"
         tmp_output_path = output_path.with_suffix(".tmp.parquet")
         merged.write_parquet(tmp_output_path, compression="zstd", statistics=True)
+        self._fsync_file(tmp_output_path)
         tmp_output_path.replace(output_path)
         for path in part_paths:
             if path == output_path:

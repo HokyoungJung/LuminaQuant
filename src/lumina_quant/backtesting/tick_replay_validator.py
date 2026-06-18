@@ -457,14 +457,16 @@ class TickReplayValidator:
         tape_high = float(prices.max()) if prices.size else bar_high
         tape_volume = float(qtys.sum()) if qtys.size else 0.0
 
+        _mkt_qty = float(case.qty)
         fill_result = self._execution_model.compute_fill(
             raw_price=bar_open,
-            qty=float(case.qty),
+            qty=_mkt_qty,
             direction=str(case.direction).upper(),
             bar_volume=bar_vol,
             volatility=(bar_high - bar_low) / bar_open if bar_open > 0 else 0.0,
             is_maker=False,
             apply_liquidity_cap=True,
+            order_notional=_mkt_qty * bar_open,
         )
 
         fp = float(fill_result.fill_price)

@@ -205,3 +205,74 @@ def test_evaluate_portfolio_risk_blocks_isolated_margin_when_margin_cap_breached
     assert reason == "Margin utilization breach"
     assert action == "FREEZE"
     assert details["margin_utilization"] == 0.15
+
+
+# --- Daily-loss tier regression tests ---
+# The dead "Daily loss breach" tier was removed because it measured the same
+# intraday_loss_pct metric as the intraday drawdown check (which always fires
+# first at equal or lower thresholds), making the daily tier unreachable dead
+# code.  The canonical daily-loss circuit breaker lives in
+# PortfolioBacktest._check_circuit_breaker().
+
+
+def test_no_dead_daily_loss_tier_when_same_metric_as_intraday():
+    """When MAX_DAILY_LOSS_PCT == MAX_INTRADAY_DRAWDOWN_PCT (schema default),
+    a loss exactly at the intraday threshold must be caught by the intraday
+    tier, never by a duplicate daily-loss tier with the same reason string."""
+
+    class _EqualConfig(_Config):
+        MAX_INTRADAY_DRAWDOWN_PCT = 0.03
+        MAX_DAILY_LOSS_PCT = 0.03  # same as intraday — was the dead-tier scenario
+
+    manager = RiskManager(_EqualConfig)
+    # equity 3% below day_start => exactly hits the intraday threshold
+    portfolio = _portfolio(equity=9700.0, day_start=10000.0, rolling_loss=0.0)
+
+    passed, reason, _action, _details = manager.evaluate_portfolio_risk(portfolio)
+
+    assert passed is False
+    assert reason == "Intraday drawdown breach", (
+        f"Expected 'Intraday drawdown breach', got {reason!r}. "
+        "The removed dead 'Daily loss breach' tier must not re-appear."
+    )
+
+
+def test_intraday_tier_fires_before_daily_when_intraday_is_tighter():
+    """Even when MAX_DAILY_LOSS_PCT > MAX_INTRADAY_DRAWDOWN_PCT, a drawdown
+    between the two thresholds must be caught by the intraday tier — confirming
+    evaluation order is hard_drawdown > intraday > rolling, with no daily tier
+    between intraday and rolling."""
+
+    class _TighterIntraday(_Config):
+        MAX_INTRADAY_DRAWDOWN_PCT = 0.02  # tighter
+        MAX_DAILY_LOSS_PCT = 0.05  # looser — old dead tier would have fired
+
+    manager = RiskManager(_TighterIntraday)
+    # equity 3% below day_start => between intraday (2%) and old daily (5%)
+    portfolio = _portfolio(equity=9700.0, day_start=10000.0, rolling_loss=0.0)
+
+    passed, reason, _action, details = manager.evaluate_portfolio_risk(portfolio)
+
+    assert passed is False
+    assert reason == "Intraday drawdown breach"
+    assert details["threshold"] == 0.02
+
+
+def test_daily_loss_breach_fires_when_daily_tighter_than_intraday():
+    """Regression: when MAX_DAILY_LOSS_PCT < MAX_INTRADAY_DRAWDOWN_PCT, a loss
+    between those two thresholds must be caught by the daily-loss tier (not the
+    intraday tier, which hasn't been hit yet)."""
+
+    class _LooseIntraday(_Config):
+        MAX_INTRADAY_DRAWDOWN_PCT = 0.10  # looser
+        MAX_DAILY_LOSS_PCT = 0.03  # tighter
+
+    manager = RiskManager(_LooseIntraday)
+    # equity 4% below day_start => above daily cap (3%) but below intraday cap (10%)
+    portfolio = _portfolio(equity=9600.0, day_start=10000.0, rolling_loss=0.0)
+
+    passed, reason, _action, details = manager.evaluate_portfolio_risk(portfolio)
+
+    assert passed is False
+    assert reason == "Daily loss breach"
+    assert float(details["threshold"]) == 0.03

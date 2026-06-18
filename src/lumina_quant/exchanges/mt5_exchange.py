@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +13,11 @@ except ImportError:
     mt5 = None
 
 from lumina_quant.core.protocols import ExchangeInterface
+
+#: Auth-payload keys that must never appear on the subprocess argv
+#: (visible via ``/proc/<pid>/cmdline``).  These are routed through a
+#: private 0600 temp file instead.
+_SECRET_PAYLOAD_KEYS = ("password", "login", "server")
 
 
 def _as_bool(value: Any, default: bool = False) -> bool:
@@ -86,12 +92,10 @@ class MT5Exchange(ExchangeInterface):
             "mt5_comment": getattr(self.config, "MT5_COMMENT", "LuminaQuant"),
         }
 
-    def _bridge_script_for_target(self) -> str:
-        script_path = Path(self._bridge_script)
-        if not script_path.is_absolute():
-            script_path = Path.cwd() / script_path
-        script_local = str(script_path)
-
+    def _to_target_path(self, local_path: str) -> str:
+        """Translate a local (WSL) path to a Windows path when bridging to a
+        Windows Python interpreter; otherwise return the path unchanged.
+        """
         python_token = self._bridge_python.lower()
         if (
             self._bridge_use_wslpath
@@ -99,7 +103,7 @@ class MT5Exchange(ExchangeInterface):
             and (python_token.endswith(".exe") or "\\\\" in python_token)
         ):
             proc = subprocess.run(
-                ["wslpath", "-w", script_local],
+                ["wslpath", "-w", local_path],
                 capture_output=True,
                 text=True,
                 check=False,
@@ -107,7 +111,16 @@ class MT5Exchange(ExchangeInterface):
             converted = (proc.stdout or "").strip()
             if proc.returncode == 0 and converted:
                 return converted
-        return script_local
+        return local_path
+
+    def _bridge_script_for_target(self) -> str:
+        script_path = Path(self._bridge_script)
+        if not script_path.is_absolute():
+            script_path = Path.cwd() / script_path
+        return self._to_target_path(str(script_path))
+
+    def _payload_file_for_target(self, payload_path: str) -> str:
+        return self._to_target_path(payload_path)
 
     def _bridge_call(self, action: str, payload: dict[str, Any] | None = None) -> Any:
         if not self._bridge_enabled():
@@ -115,20 +128,49 @@ class MT5Exchange(ExchangeInterface):
         merged_payload = dict(payload or {})
         merged_payload.update(self._bridge_auth_payload())
 
-        cmd = [
-            self._bridge_python,
-            self._bridge_script_for_target(),
-            "--action",
-            str(action),
-            "--payload",
-            json.dumps(merged_payload, ensure_ascii=True),
-        ]
-        proc = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+        # SECURITY: the merged payload carries the MT5 password (and login /
+        # server).  Anything placed on argv is world-readable via
+        # ``/proc/<pid>/cmdline``, so the full payload is written to a private
+        # 0600 temp file and only the file *path* is passed on argv.  The argv
+        # ``--payload`` value is stripped of every secret-bearing key so that a
+        # legacy worker reading ``--payload`` never receives credentials.
+        #
+        # NOTE: the bridge worker (``scripts/mt5_bridge_worker.py``, out of this
+        # module's edit scope) must read ``--payload-file`` to obtain the auth
+        # fields.  Until it does, secrets are simply absent from both argv and
+        # the worker input — the connection auth must be supplied to the worker
+        # via ``--payload-file`` rather than ``--payload``.
+        argv_payload = {
+            key: value for key, value in merged_payload.items() if key not in _SECRET_PAYLOAD_KEYS
+        }
+
+        secret_fd, secret_path = tempfile.mkstemp(prefix="lq_mt5_bridge_", suffix=".json")
+        try:
+            os.chmod(secret_path, 0o600)
+            with os.fdopen(secret_fd, "w", encoding="ascii") as handle:
+                json.dump(merged_payload, handle, ensure_ascii=True)
+
+            cmd = [
+                self._bridge_python,
+                self._bridge_script_for_target(),
+                "--action",
+                str(action),
+                "--payload",
+                json.dumps(argv_payload, ensure_ascii=True),
+                "--payload-file",
+                self._payload_file_for_target(secret_path),
+            ]
+            proc = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        finally:
+            try:
+                os.unlink(secret_path)
+            except OSError:
+                pass
         if proc.returncode != 0:
             detail = (proc.stderr or proc.stdout or "").strip()
             raise RuntimeError(f"MT5 bridge command failed ({action}): {detail}")

@@ -229,11 +229,17 @@ class RiskManager:
                 },
             )
 
-        # Defense-in-depth daily-loss cap: mirrors the intraday-DD / rolling-loss handling.
-        # Typically a looser threshold than the intraday cap, so it only fires when the
-        # intraday cap is configured higher (or absent). FLATTEN if auto_flatten_on_breach
-        # else FREEZE.
-        if intraday_loss_pct >= float(self.max_daily_loss):
+        # Daily-loss cap tier: guards when max_daily_loss_pct < max_intraday_drawdown_pct
+        # (i.e. the daily cap is tighter than the intraday drawdown cap).  If the two
+        # thresholds are equal or the daily cap is looser, this tier is unreachable and
+        # enforcement falls through to PortfolioBacktest._check_circuit_breaker(), which
+        # measures the same equity-vs-day_start quantity and sets circuit_breaker_tripped.
+        # Ordering guarantee: hard_drawdown_flatten_pct > intraday > daily > rolling.
+        # When max_daily_loss_pct >= max_intraday_drawdown_pct the tier is intentionally
+        # skipped; the intraday check above already provides the enforcement.
+        if float(self.max_daily_loss) < float(self.max_intraday_drawdown_pct) and (
+            intraday_loss_pct >= float(self.max_daily_loss)
+        ):
             action = "FLATTEN" if self.auto_flatten_on_breach else "FREEZE"
             return (
                 False,

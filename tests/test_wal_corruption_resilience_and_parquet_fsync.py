@@ -17,6 +17,7 @@ from lumina_quant.storage.wal.binary import (
     VERSION,
     BinaryWAL,
     WALRecord,
+    decode_record,
     encode_record,
 )
 from lumina_quant.storage.parquet import ParquetMarketDataRepository
@@ -147,14 +148,14 @@ class TestWALMidFileCorruptionResilience:
         assert removed == 17
         assert wal_path.stat().st_size == 2 * RECORD_LEN
 
-    def test_repair_mid_file_corrupt_slot_followed_by_valid_records_nothing_removed(
+    def test_repair_mid_file_corrupt_slot_followed_by_valid_records_slot_removed(
         self, tmp_path: Path
     ):
-        """When a corrupt slot is followed by valid records, repair() removes nothing.
+        """repair() physically removes an interior corrupt slot, leaving only valid records.
 
-        Layout: [V, C, V] — valid_end == 3*RECORD_LEN == file_size, so 0 bytes removed
-        and all three slots (2 valid + 1 corrupt) remain in the file.  iter_all()
-        still yields only the 2 valid records because corrupt slots are skipped.
+        Layout: [V, C, V] — repair() rewrites to [V, V], removing the corrupt slot.
+        The file shrinks by RECORD_LEN and iter_all() yields both valid records without
+        rescanning dead slots.
         """
         wal_path = tmp_path / "wal.bin"
         before = [_make_record(1_000_000_000_000)]
@@ -164,10 +165,10 @@ class TestWALMidFileCorruptionResilience:
         wal = BinaryWAL(wal_path, auto_repair=False)
         removed = wal.repair()
 
-        # Nothing is trimmed because the last valid record ends at file boundary.
-        assert removed == 0
-        assert wal_path.stat().st_size == 3 * RECORD_LEN
-        # iter_all still recovers both valid records.
+        # The corrupt interior slot is physically removed.
+        assert removed == RECORD_LEN
+        assert wal_path.stat().st_size == 2 * RECORD_LEN
+        # iter_all recovers both valid records from the compacted file.
         records = list(wal.iter_all())
         assert [r.ts_ms for r in records] == [1_000_000_000_000, 1_000_000_001_000]
 
@@ -277,3 +278,189 @@ class TestParquetRawWriteFsync:
             repo.append_raw_aggtrades(exchange="binance", symbol="BTC/USDT", rows=frame2)
 
         assert len(fsync_calls) >= 1, "Expected at least one os.fsync call on merged parquet write"
+
+    def test_compact_raw_partition_fsyncs_before_replace(self, tmp_path: Path):
+        """_compact_raw_partition must fsync the tmp parquet before atomic-replace.
+
+        We write enough parts to exceed the default compact threshold, then spy on
+        os.fsync to confirm it is called (via _fsync_file) before the rename/replace.
+        A crash between write_parquet and fsync would leave a corrupt compacted file;
+        this test guards against regressing that durability gap.
+        """
+        repo = ParquetMarketDataRepository(tmp_path)
+
+        # Write 6 separate batches with non-overlapping agg_trade_ids so each
+        # lands as a distinct part file, ensuring the compact threshold is crossed.
+        base_ts = 1_700_000_000_000
+        for i in range(6):
+            frame = pl.DataFrame(
+                {
+                    "agg_trade_id": [i * 100],
+                    "timestamp_ms": [base_ts + i * 1_000],
+                    "price": [100.0 + i],
+                    "quantity": [1.0],
+                    "is_buyer_maker": [False],
+                }
+            )
+            # Bypass compaction enforcement on each intermediate write by calling
+            # the low-level writer directly to build up multiple parts.
+            part_root = (
+                tmp_path
+                / "market_raw_aggtrades"
+                / "binance"
+                / "BTCUSDT"
+                / f"date={base_ts // 86_400_000}"
+            )
+            part_root.mkdir(parents=True, exist_ok=True)
+            frame.write_parquet(part_root / f"part-{i:04d}.parquet")
+
+        fsync_calls: list[int] = []
+        real_fsync = os.fsync
+
+        def _spy_fsync(fd: int) -> None:
+            fsync_calls.append(fd)
+            real_fsync(fd)
+
+        part_root_path = (
+            tmp_path
+            / "market_raw_aggtrades"
+            / "binance"
+            / "BTCUSDT"
+            / f"date={base_ts // 86_400_000}"
+        )
+        with patch("lumina_quant.storage.parquet.ohlcv_repo.os.fsync", side_effect=_spy_fsync):
+            repo._compact_raw_partition(
+                exchange="binance",
+                symbol="BTC/USDT",
+                partition_root=part_root_path,
+            )
+
+        # os.fsync must have been called (covers the _fsync_file call on the tmp parquet).
+        assert fsync_calls, "os.fsync was never called during _compact_raw_partition"
+
+
+# ---------------------------------------------------------------------------
+# WAL interior-corruption compaction tests
+# ---------------------------------------------------------------------------
+
+
+class TestWALRepairInteriorCompaction:
+    """repair() must physically remove interior corrupt slots."""
+
+    def test_repair_interior_corruption_produces_clean_file(self, tmp_path: Path):
+        """Layout [V1][CORRUPT][V2]: repair() rewrites to [V1][V2], 0 dead slots left."""
+        wal_path = tmp_path / "wal.bin"
+        r1 = _make_record(1_000_000_000_000)
+        r2 = _make_record(1_000_000_002_000)
+        _write_wal_with_mid_corruption(wal_path, [r1], [r2])
+
+        wal = BinaryWAL(wal_path, auto_repair=False)
+        removed = wal.repair()
+
+        assert removed == RECORD_LEN, f"Expected {RECORD_LEN} bytes removed, got {removed}"
+        assert wal_path.stat().st_size == 2 * RECORD_LEN
+
+        # File must decode cleanly — no corrupt slots remain.
+        with wal_path.open("rb") as fh:
+            slots = [fh.read(RECORD_LEN) for _ in range(2)]
+        assert all(decode_record(s) is not None for s in slots), (
+            "Compact file still has corrupt slots"
+        )
+
+    def test_repair_interior_corruption_no_rescan_of_dead_slots(self, tmp_path: Path):
+        """After repair(), a fresh iter_all() touches zero dead slots.
+
+        We verify by reading the compacted file slot-by-slot: every decoded record
+        must be valid (no None returns from decode_record), confirming dead slots
+        have been physically removed and cannot be re-encountered on future reads.
+        """
+        wal_path = tmp_path / "wal.bin"
+        before = [_make_record(1_000_000_000_000), _make_record(1_000_000_001_000)]
+        after = [_make_record(1_000_000_003_000), _make_record(1_000_000_004_000)]
+        # Layout: [V, V, C, V, V] — one interior corrupt slot
+        _write_wal_with_mid_corruption(wal_path, before, after)
+
+        wal = BinaryWAL(wal_path, auto_repair=False)
+        removed = wal.repair()
+
+        assert removed == RECORD_LEN
+        assert wal_path.stat().st_size == 4 * RECORD_LEN
+
+        # Raw slot scan: every slot must be decodable — no dead slots in the file.
+        null_slots = 0
+        with wal_path.open("rb") as fh:
+            while True:
+                chunk = fh.read(RECORD_LEN)
+                if not chunk or len(chunk) != RECORD_LEN:
+                    break
+                if decode_record(chunk) is None:
+                    null_slots += 1
+        assert null_slots == 0, f"Found {null_slots} dead slot(s) after repair()"
+
+        # iter_all must yield all 4 valid records.
+        records = list(wal.iter_all())
+        assert [r.ts_ms for r in records] == [
+            1_000_000_000_000,
+            1_000_000_001_000,
+            1_000_000_003_000,
+            1_000_000_004_000,
+        ]
+
+    def test_repair_fsyncs_tmp_before_replace(self, tmp_path: Path):
+        """repair() must fsync the tmp WAL file before atomic-replace (crash durability)."""
+        wal_path = tmp_path / "wal.bin"
+        r1 = _make_record(1_000_000_000_000)
+        r2 = _make_record(1_000_000_002_000)
+        _write_wal_with_mid_corruption(wal_path, [r1], [r2])
+
+        fsync_fds: list[int] = []
+        real_fsync = os.fsync
+
+        def _spy(fd: int) -> None:
+            fsync_fds.append(fd)
+            real_fsync(fd)
+
+        wal = BinaryWAL(wal_path, auto_repair=False)
+        with patch("lumina_quant.storage.wal.binary.os.fsync", side_effect=_spy):
+            wal.repair()
+
+        assert fsync_fds, "os.fsync was never called during repair()"
+
+    def test_repair_preserves_all_valid_records_no_data_loss(self, tmp_path: Path):
+        """repair() must not drop any valid record — no-data-loss guarantee."""
+        wal_path = tmp_path / "wal.bin"
+        # Multiple corrupt slots interspersed: [V, C, V, C, V]
+        with wal_path.open("wb") as fh:
+            fh.write(encode_record(_make_record(1_000_000_000_000)))
+            fh.write(_corrupt_bytes(RECORD_LEN))
+            fh.write(encode_record(_make_record(1_000_000_001_000)))
+            fh.write(_corrupt_bytes(RECORD_LEN))
+            fh.write(encode_record(_make_record(1_000_000_002_000)))
+
+        wal = BinaryWAL(wal_path, auto_repair=False)
+        removed = wal.repair()
+
+        assert removed == 2 * RECORD_LEN
+        assert wal_path.stat().st_size == 3 * RECORD_LEN
+
+        records = list(wal.iter_all())
+        assert [r.ts_ms for r in records] == [
+            1_000_000_000_000,
+            1_000_000_001_000,
+            1_000_000_002_000,
+        ]
+
+    def test_repair_clean_file_returns_zero_no_rewrite(self, tmp_path: Path):
+        """repair() on a file with no corruption returns 0 and does not rewrite."""
+        wal_path = tmp_path / "wal.bin"
+        with wal_path.open("wb") as fh:
+            fh.write(encode_record(_make_record(1_000_000_000_000)))
+            fh.write(encode_record(_make_record(1_000_000_001_000)))
+
+        mtime_before = wal_path.stat().st_mtime_ns
+        wal = BinaryWAL(wal_path, auto_repair=False)
+        removed = wal.repair()
+
+        assert removed == 0
+        # File must not have been rewritten (mtime unchanged).
+        assert wal_path.stat().st_mtime_ns == mtime_before

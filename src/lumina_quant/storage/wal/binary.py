@@ -277,23 +277,67 @@ class BinaryWAL:
         return valid_end
 
     def repair(self) -> int:
-        """Truncate past the last valid record boundary and return bytes removed.
+        """Remove corrupt records (including interior corruption) and return bytes removed.
 
-        Unlike a simple leading-scan, this first calls scan_valid_length() which
-        skips mid-file corrupt records, so repair discards only the unreachable
-        tail bytes rather than everything after the first bad slot.
+        Reads all valid records via skip-resync scan, writes them to a tmp WAL,
+        fsyncs, then atomic-replaces the original so subsequent reads never
+        re-scan dead slots.  If no corruption is detected (all slots valid and
+        file size matches), returns 0 without rewriting.
         """
+        import logging
+
         file_size = self.path.stat().st_size if self.path.exists() else 0
-        valid_end = self.scan_valid_length()
-        if valid_end >= file_size:
+        if file_size == 0:
             return 0
 
-        with self.path.open("r+b") as fh:
-            fh.truncate(valid_end)
-            fh.flush()
-            os.fsync(fh.fileno())
+        # Collect all valid records and count corrupt slots in one pass.
+        valid_records: list[bytes] = []
+        corrupt_count = 0
+        with self.path.open("rb") as fh:
+            while True:
+                chunk = fh.read(RECORD_LEN)
+                if not chunk:
+                    break
+                if len(chunk) != RECORD_LEN:
+                    # Partial trailing bytes — treat as corrupt.
+                    corrupt_count += 1
+                    break
+                if decode_record(chunk) is None:
+                    corrupt_count += 1
+                    continue
+                valid_records.append(chunk)
 
-        return int(file_size - valid_end)
+        clean_size = len(valid_records) * RECORD_LEN
+        if corrupt_count == 0 and clean_size == file_size:
+            # Nothing to do.
+            return 0
+
+        # Write valid records to a sibling tmp file, fsync, then atomic-replace.
+        tmp_path = self.path.with_suffix(".repair.tmp")
+        try:
+            with tmp_path.open("wb") as fh:
+                for raw in valid_records:
+                    fh.write(raw)
+                fh.flush()
+                os.fsync(fh.fileno())
+            tmp_path.replace(self.path)
+        except Exception:
+            # Best-effort cleanup; do not swallow the original exception.
+            try:
+                tmp_path.unlink(missing_ok=True)
+            except Exception:
+                pass
+            raise
+
+        removed = file_size - clean_size
+        if corrupt_count:
+            logging.getLogger(__name__).warning(
+                "WAL %s: repair removed %d corrupt/partial slot(s), reclaimed %d bytes",
+                self.path,
+                corrupt_count,
+                removed,
+            )
+        return removed
 
     def truncate(self) -> None:
         with self.path.open("r+b") as fh:

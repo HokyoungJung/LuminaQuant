@@ -169,6 +169,96 @@ def test_spa_pvalue_is_deterministic_for_fixed_seed() -> None:
 
 
 # --------------------------------------------------------------------------- #
+# SPA denominator-bias fix (degenerate resample handling)
+# --------------------------------------------------------------------------- #
+
+
+def test_spa_pvalue_degenerate_resamples_not_spuriously_significant() -> None:
+    # Regression: when many bootstrap resamples are degenerate (near-zero std),
+    # the OLD code divided exceed by the full ``rounds`` denominator even though
+    # those resamples never incremented exceed.  For a series where all valid
+    # resamples exceed t_obs but most resamples are degenerate, the old code
+    # would return a spuriously small p-value (exceed / rounds << 1) while the
+    # fixed code returns exceed / valid_rounds.
+    #
+    # We inject controlled degeneracy: patch safe_std so that 90 % of bootstrap
+    # calls return 0 (degenerate) and 10 % return a value that causes t_boot to
+    # always exceed t_obs.  Old code: p = ~0.1 * (1/rounds) -> tiny.
+    # Fixed code: p = exceed / valid_rounds -> should be >= 0.5 on average.
+    import lumina_quant.strategy_factory.research_metrics as _rm
+
+    original_safe_std = _rm.safe_std
+
+    bootstrap_call = [0]  # counts calls inside the loop (after the 1st pre-loop call)
+
+    def patched_safe_std(values: np.ndarray) -> float:
+        result = original_safe_std(values)
+        bootstrap_call[0] += 1
+        # First call is the pre-loop sigma check — return real value so we enter the loop.
+        if bootstrap_call[0] == 1:
+            return result
+        # Every 10th bootstrap call is valid and returns a tiny sigma so that
+        # t_boot = sample_mean / (tiny_sigma / sqrt_n) is enormous -> exceeds t_obs.
+        # All other calls are degenerate (return 0).
+        if bootstrap_call[0] % 10 == 0:
+            return 1e-15  # valid but tiny -> huge t_boot -> always exceeds t_obs
+        return 0.0  # degenerate
+
+    _rm.safe_std = patched_safe_std  # type: ignore[assignment]
+    try:
+        returns = _make_returns(mean=0.002, sd=0.01, n=200, seed=55)
+        p_fixed = rm.spa_like_pvalue(returns, bootstrap_rounds=200, seed=3)
+    finally:
+        _rm.safe_std = original_safe_std  # type: ignore[assignment]
+
+    # With the fix: valid_rounds ≈ 20 (every 10th), all exceed -> p ≈ 1.0.
+    # The old code would give p ≈ 20/200 = 0.1 (spuriously significant direction
+    # only applies when non-exceeding resamples are skipped; here all valid ones
+    # exceed, so old code underestimates, but the key invariant is that the fixed
+    # denominator gives a LARGER p-value than the biased denominator).
+    assert p_fixed >= 0.5, (
+        f"Fixed denominator should yield p >= 0.5 when all valid resamples exceed: {p_fixed}"
+    )
+
+
+def test_spa_pvalue_normal_series_unchanged() -> None:
+    # A normal series with genuine signal should still yield a small p-value.
+    signal = _make_returns(mean=0.004, sd=0.01, n=400, seed=7)
+    p = rm.spa_like_pvalue(signal, bootstrap_rounds=500, seed=7)
+    assert p < 0.05, f"Genuine signal series should be significant: {p}"
+    # And the result is still in [0, 1].
+    assert 0.0 <= p <= 1.0
+
+
+def test_spa_pvalue_zero_valid_resamples_returns_conservative() -> None:
+    # Monkey-patch safe_std to always return 0 inside the bootstrap loop so
+    # that every resample is degenerate -> valid_rounds stays zero -> must
+    # return the conservative value 1.0.
+    import lumina_quant.strategy_factory.research_metrics as _rm
+
+    original_safe_std = _rm.safe_std
+
+    call_count = [0]
+
+    def patched_safe_std(values: np.ndarray) -> float:
+        call_count[0] += 1
+        # First call is the pre-loop observed sigma check (returns real value).
+        # All subsequent calls are inside the bootstrap loop -> return 0.
+        if call_count[0] <= 1:
+            return original_safe_std(values)
+        return 0.0
+
+    _rm.safe_std = patched_safe_std  # type: ignore[assignment]
+    try:
+        returns = _make_returns(mean=0.002, sd=0.01, n=200, seed=77)
+        p = rm.spa_like_pvalue(returns, bootstrap_rounds=50, seed=1)
+    finally:
+        _rm.safe_std = original_safe_std  # type: ignore[assignment]
+
+    assert p == 1.0, f"Expected 1.0 for zero valid resamples, got {p}"
+
+
+# --------------------------------------------------------------------------- #
 # Hard gate in selection (opt-in; default no-op)
 # --------------------------------------------------------------------------- #
 

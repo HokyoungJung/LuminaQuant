@@ -1,6 +1,7 @@
 import atexit
 import os
 import queue
+import threading
 import time
 from copy import deepcopy
 from types import SimpleNamespace
@@ -301,6 +302,13 @@ class LiveTrader(TradingEngine):
             int(self.config.RECONCILIATION_INTERVAL_SEC),
         )
         self.runtime_cache = RuntimeCache()
+        # Reentrant lock protecting cross-thread reads/writes of the portfolio
+        # position dicts (current_positions / current_position_legs).  The
+        # user-stream thread (_apply_account_update) and the main loop
+        # (_reconcile_positions / _sync_portfolio) mutate the same dicts and the
+        # main loop reads them for sizing.  RuntimeCache has its own internal lock;
+        # never held across blocking exchange I/O (snapshot first, mutate under lock).
+        self._portfolio_lock = threading.RLock()
         self.order_state_source = (
             str(getattr(self.config, "ORDER_STATE_SOURCE", "polling") or "polling").strip().lower()
         )
@@ -483,6 +491,19 @@ class LiveTrader(TradingEngine):
             self._close_audit_store(status="FAILED")
             raise
 
+    @property
+    def portfolio_lock(self) -> threading.RLock:
+        """Lazy accessor for the portfolio-position lock.
+
+        Lazily created so traders built via ``__new__`` in unit tests (which skip
+        ``__init__``) still get a real lock instead of an AttributeError.
+        """
+        lock = getattr(self, "_portfolio_lock", None)
+        if lock is None:
+            lock = threading.RLock()
+            self._portfolio_lock = lock
+        return lock
+
     def _filter_unavailable_symbols(self, symbols):
         requested = [str(symbol) for symbol in list(symbols or [])]
 
@@ -653,7 +674,21 @@ class LiveTrader(TradingEngine):
             reason="USER_STREAM_ERROR",
             details={"error": str(exc)},
         )
+        # Stream connectivity degraded (reconnect imminent): drop any cached BBO so a
+        # stale quote is not reused once the stream resumes.  The market-stream
+        # reconnect is confined to the (unassigned) data handler's closures and is not
+        # reachable from here, so the user-stream error is the closest available gap
+        # signal owned by the trader.  invalidate_bbo_cache is a no-op safe to skip.
+        self._invalidate_execution_bbo_cache()
         self._activate_fallback_polling("user_stream_error")
+
+    def _invalidate_execution_bbo_cache(self) -> None:
+        invalidate = getattr(self.execution_handler, "invalidate_bbo_cache", None)
+        if callable(invalidate):
+            try:
+                invalidate(None)
+            except Exception as exc:  # pragma: no cover - defensive guard
+                self.logger.error("Failed to invalidate BBO cache on stream gap: %s", exc)
 
     def _activate_fallback_polling(self, reason: str) -> None:
         if not self.reconciliation_poll_fallback_enabled:
@@ -727,6 +762,9 @@ class LiveTrader(TradingEngine):
                 reason="USER_STREAM_LISTEN_KEY_EXPIRED",
                 details={"exchange_ts_ms": payload.get("exchange_ts_ms")},
             )
+            # listenKeyExpired forces a stream reconnect (gap): drop the cached BBO so a
+            # stale quote cannot be reused on resume.
+            self._invalidate_execution_bbo_cache()
             self._activate_fallback_polling("listen_key_expired")
             return
 
@@ -791,10 +829,11 @@ class LiveTrader(TradingEngine):
             self.runtime_cache.update_position_legs(legs)
             portfolio = getattr(self, "portfolio", None)
             if portfolio is not None:
-                portfolio.current_position_legs = dict(legs)
-                for symbol, qty in net_positions.items():
-                    if symbol in portfolio.current_positions:
-                        portfolio.current_positions[symbol] = float(qty)
+                with self.portfolio_lock:
+                    portfolio.current_position_legs = dict(legs)
+                    for symbol, qty in net_positions.items():
+                        if symbol in portfolio.current_positions:
+                            portfolio.current_positions[symbol] = float(qty)
 
     def _on_order_state(self, state_payload):
         self.runtime_cache.update_order_state(state_payload.get("order_id"), state_payload)
@@ -925,18 +964,22 @@ class LiveTrader(TradingEngine):
                     details={"error": str(exc)},
                 )
 
-        local = self.portfolio.current_positions
         self.runtime_cache.update_positions(exchange_positions)
-        if exchange_position_legs:
-            effective_position_legs = self._best_available_position_legs(exchange_position_legs)
-            self.runtime_cache.update_position_legs(effective_position_legs)
-            self.portfolio.current_position_legs = dict(effective_position_legs)
-        elif hedge_mode:
-            effective_position_legs = self._best_available_position_legs()
-        else:
-            effective_position_legs = {}
-            self.runtime_cache.update_position_legs({})
-            self.portfolio.current_position_legs = {}
+        # Snapshot the local positions and apply leg mutations atomically under the
+        # portfolio lock so the user-stream thread's _apply_account_update cannot
+        # interleave.  Audit/notifier I/O below uses the snapshot, never the lock.
+        with self.portfolio_lock:
+            local = dict(self.portfolio.current_positions or {})
+            if exchange_position_legs:
+                effective_position_legs = self._best_available_position_legs(exchange_position_legs)
+                self.runtime_cache.update_position_legs(effective_position_legs)
+                self.portfolio.current_position_legs = dict(effective_position_legs)
+            elif hedge_mode:
+                effective_position_legs = self._best_available_position_legs()
+            else:
+                effective_position_legs = {}
+                self.runtime_cache.update_position_legs({})
+                self.portfolio.current_position_legs = {}
 
         if hedge_mode:
             dual_leg_signature = tuple(
@@ -1256,9 +1299,10 @@ class LiveTrader(TradingEngine):
                 exchange_positions = self.exchange.get_all_positions()
                 self.logger.info(f"Exchange Positions: {exchange_positions}")
 
-                for s, qty in exchange_positions.items():
-                    if s in self.symbol_list:
-                        self.portfolio.current_positions[s] = qty
+                with self.portfolio_lock:
+                    for s, qty in exchange_positions.items():
+                        if s in self.symbol_list:
+                            self.portfolio.current_positions[s] = qty
 
                 # 3. Recalculate Total Holdings (Cash + Position Value)
                 total_equity = self.portfolio.current_holdings["cash"]
@@ -1352,42 +1396,96 @@ class LiveTrader(TradingEngine):
         """Override to save trades on every fill."""
         # Snapshot pre-fill portfolio state for realized-PnL computation.
         # Must happen before super() which calls update_positions_from_fill and
-        # overwrites entry_prices.
-        _entry_price = None
+        # overwrites entry_prices.  The pre-fill QUANTITY (which tells us this is a
+        # closing/reducing fill) is captured independently of the entry PRICE so a
+        # failure to read the entry price still lets the kill-switch advance
+        # conservatively below.
         _old_qty = 0.0
+        _old_qty_ok = True
+        try:
+            with self.portfolio_lock:
+                _old_qty = float((self.portfolio.current_positions or {}).get(event.symbol, 0.0))
+        except Exception as exc:
+            _old_qty_ok = False
+            self.logger.error("Pre-fill position snapshot failed for %s: %s", event.symbol, exc)
+            self._log_risk_event_safe(
+                reason="FILL_POSITION_SNAPSHOT_ERROR",
+                details={"symbol": getattr(event, "symbol", None), "error": str(exc)},
+            )
+
+        _entry_price = None
+        _entry_price_ok = True
         try:
             _entry_price = dict(getattr(self.portfolio, "entry_prices", {}) or {}).get(event.symbol)
-            _old_qty = float((self.portfolio.current_positions or {}).get(event.symbol, 0.0))
-        except Exception:
-            pass
+        except Exception as exc:
+            # NEVER silent: a failed entry-price snapshot must not silently bypass the
+            # consecutive-loss kill-switch.  Log + audit so a closing fill below can
+            # still record a loss conservatively (fail-closed for the kill-switch).
+            _entry_price_ok = False
+            self.logger.error("Pre-fill entry-price snapshot failed for %s: %s", event.symbol, exc)
+            self._log_risk_event_safe(
+                reason="FILL_ENTRY_SNAPSHOT_ERROR",
+                details={"symbol": getattr(event, "symbol", None), "error": str(exc)},
+            )
 
         super().handle_fill_event(event)  # This calls self.on_fill(event) too
 
         # Wire Phase-5 consecutive-loss kill-switch: record_loss on every closing/
         # reducing fill so check_order can halt new entries after N consecutive losses.
-        if _entry_price is not None:
-            try:
-                fill_qty = float(event.quantity or 0.0)
-                fill_cost = float(event.fill_cost or 0.0)
-                if fill_qty > 0.0 and fill_cost > 0.0:
-                    fill_price = fill_cost / fill_qty
-                    commission = float(event.commission or 0.0)
-                    if _old_qty > 1e-12 and event.direction == "SELL":
-                        # Closing/reducing a long position
-                        closed_qty = min(fill_qty, _old_qty)
-                        realized_pnl = (fill_price - _entry_price) * closed_qty - commission
-                        self.risk_manager.record_loss(realized_pnl=realized_pnl)
-                    elif _old_qty < -1e-12 and event.direction == "BUY":
-                        # Closing/reducing a short position
-                        closed_qty = min(fill_qty, abs(_old_qty))
-                        realized_pnl = (_entry_price - fill_price) * closed_qty - commission
-                        self.risk_manager.record_loss(realized_pnl=realized_pnl)
-            except Exception:
-                pass
+        # Decoupled from the snapshot: a snapshot failure must not skip the loss.
+        is_closing_sell = _old_qty > 1e-12 and event.direction == "SELL"
+        is_closing_buy = _old_qty < -1e-12 and event.direction == "BUY"
+        is_closing_fill = _old_qty_ok and (is_closing_sell or is_closing_buy)
+        try:
+            fill_qty = float(event.quantity or 0.0)
+            fill_cost = float(event.fill_cost or 0.0)
+            commission = float(event.commission or 0.0)
+            if (
+                is_closing_fill
+                and _entry_price_ok
+                and _entry_price is not None
+                and fill_qty > 0.0
+                and fill_cost > 0.0
+            ):
+                fill_price = fill_cost / fill_qty
+                if is_closing_sell:
+                    # Closing/reducing a long position
+                    closed_qty = min(fill_qty, _old_qty)
+                    realized_pnl = (fill_price - _entry_price) * closed_qty - commission
+                    self.risk_manager.record_loss(realized_pnl=realized_pnl)
+                else:
+                    # Closing/reducing a short position
+                    closed_qty = min(fill_qty, abs(_old_qty))
+                    realized_pnl = (_entry_price - fill_price) * closed_qty - commission
+                    self.risk_manager.record_loss(realized_pnl=realized_pnl)
+            elif is_closing_fill and not _entry_price_ok:
+                # The entry-price snapshot was unavailable for a closing/reducing
+                # fill: record a conservative loss so the kill-switch advances rather
+                # than being silently bypassed (realized PnL unknown -> treat as loss).
+                self.risk_manager.record_loss(realized_pnl=-1.0)
+                self.logger.warning(
+                    "Recorded conservative loss for %s closing fill (entry snapshot unavailable).",
+                    event.symbol,
+                )
+        except Exception as exc:
+            # NEVER silent: a record_loss failure must be surfaced, not swallowed,
+            # so the operator can see the kill-switch did not advance.
+            self.logger.error("Consecutive-loss record_loss failed for %s: %s", event.symbol, exc)
+            self._log_risk_event_safe(
+                reason="RECORD_LOSS_ERROR",
+                details={"symbol": getattr(event, "symbol", None), "error": str(exc)},
+            )
 
         # Save Live Trades
         if self.config.STORAGE_EXPORT_CSV:
             self.portfolio.output_trade_log(os.path.join("data", "live_trades.csv"))
+
+    def _log_risk_event_safe(self, *, reason: str, details: dict) -> None:
+        """Best-effort audit log that never raises (used inside fill error paths)."""
+        try:
+            self.audit_store.log_risk_event(self.run_id, reason=reason, details=details)
+        except Exception:  # pragma: no cover - defensive audit guard
+            pass
 
     def _resolve_market_window_staleness(self, event) -> tuple[bool, int]:
         threshold_ms = int(self.materialized_staleness_threshold_seconds) * 1000

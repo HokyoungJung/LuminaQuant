@@ -415,6 +415,7 @@ class SimulatedExecutionHandler(ExecutionHandler):
                     volatility=float(volatility),
                     is_maker=False,
                     apply_liquidity_cap=True,
+                    order_notional=float(original_qty) * float(exec_price),
                 )
 
                 if _fill_result.unfilled_qty > 0.0:
@@ -558,14 +559,16 @@ class SimulatedExecutionHandler(ExecutionHandler):
                     comm = _fill_result.commission
                 else:
                     # STOP, TAKE_PROFIT, TRAIL_STOP — no liquidity cap; aggressive fill.
+                    _cond_qty = float(order["quantity"])
                     cond_result = self.execution_model.compute_fill(
                         raw_price=float(exec_price),
-                        qty=float(order["quantity"]),
+                        qty=_cond_qty,
                         direction=str(order["direction"]),
                         bar_volume=float(bar_volume),
                         volatility=float(volatility),
                         is_maker=False,
                         apply_liquidity_cap=False,
+                        order_notional=_cond_qty * float(exec_price),
                     )
                     fill_price = cond_result.fill_price
                     comm = cond_result.commission

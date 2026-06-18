@@ -21,10 +21,13 @@ this module (enforced by CI grep gate after Phase 5 completes).
 
 from __future__ import annotations
 
+import logging
 import math
 import random
 from dataclasses import dataclass
 from typing import Any
+
+_LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -89,6 +92,14 @@ class ExecutionModelConfig:
             slippage_impact_coefficient=float(getattr(ex, "slippage_impact_coefficient", 0.0)),
             slippage_adv_quote=float(getattr(ex, "slippage_adv_quote", 0.0)),
         )
+        _impact_model = str(getattr(ex, "slippage_impact_model", "flat")).strip().lower()
+        _impact_coeff = float(getattr(ex, "slippage_impact_coefficient", 0.0))
+        if _impact_model == "sqrt_impact" and _impact_coeff <= 0.0:
+            _LOGGER.warning(
+                "slippage_impact_model='sqrt_impact' but slippage_impact_coefficient=%s <= 0 "
+                "— market impact is inert (no extra slippage will be applied).",
+                _impact_coeff,
+            )
 
 
 def _config_from_attrs(config: Any) -> ExecutionModelConfig:
@@ -245,6 +256,11 @@ class ExecutionModel:
                     participation = float(order_notional) / denominator
                     impact = self.cfg.slippage_impact_coefficient * math.sqrt(participation)
                     penalty = penalty + impact
+            # Safety clamp: a misconfigured coefficient must never produce a
+            # negative fill price (SELL) or a >99% cost (BUY).
+            # The "flat" model path is byte-identical: its penalty is typically
+            # ~0.001-0.002 and is nowhere near the 0.99 ceiling.
+            penalty = max(0.0, min(penalty, 0.99))
             if str(direction).upper() == "BUY":
                 fill_price = float(raw_price) * (1.0 + penalty)
             else:

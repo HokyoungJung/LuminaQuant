@@ -10,6 +10,7 @@ Each control has an OFF case (default — behavior unchanged) and an ON case.
 Fixtures are tiny in-memory synthetics; no real backtest is run.
 """
 
+import os
 import queue
 import unittest
 from datetime import datetime, timedelta
@@ -229,6 +230,158 @@ class TestFundingCoverage(unittest.TestCase):
         bars.current_dt += timedelta(hours=8)
         p.update_timeindex(None)  # feature funding present -> charged, no raise
         self.assertGreater(p.total_funding_paid, 0.0)
+
+    def test_flag_on_honors_configured_nonzero_static_default(self):
+        # Regression: a legitimately configured non-zero funding_rate_per_8h is
+        # usable coverage. With no per-bar data the gate must honor the static
+        # default and charge funding, NOT raise (round-1 raised before the static
+        # fallback). leverage > 1 so funding exposure exists.
+        class Cfg(BaseConfig):
+            REQUIRE_FUNDING_COVERAGE = True
+            FUNDING_RATE_PER_8H = 0.0001
+
+        events = queue.Queue()
+        bars = MockBars(datetime(2026, 1, 1, 0, 0), 100.0, funding_rate=None, has_feature=False)
+        p = Portfolio(bars, events, bars.current_dt, Cfg)
+        # Direct call: configured static default honored, no raise.
+        rate = p._resolve_funding_rate("BTC/USDT", default=0.0001)
+        self.assertAlmostEqual(rate, 0.0001, places=9)
+        # End-to-end: funding is actually charged off the static default.
+        p.current_positions["BTC/USDT"] = 1.0
+        p.entry_prices["BTC/USDT"] = 100.0
+        p.update_timeindex(None)
+        bars.current_dt += timedelta(hours=8)
+        p.update_timeindex(None)
+        self.assertGreater(p.total_funding_paid, 0.0)
+
+    def test_flag_on_real_zero_funding_bar_does_not_raise(self):
+        # Regression: a genuine 0.0 per-bar funding rate is real data, NOT
+        # "absent". round-1 treated bar 0.0 as missing (fallback not in (None, 0.0))
+        # and raised on a leveraged run. A real 0.0 bar must skip silently (no raise,
+        # no charge) even with no static default.
+        class ZeroBars(MockBars):
+            def get_latest_bar_value(self, symbol, val_type):
+                _ = symbol
+                if val_type == "funding_rate":
+                    return 0.0  # genuine zero funding for this bar
+                return self.close
+
+        class Cfg(BaseConfig):
+            REQUIRE_FUNDING_COVERAGE = True  # FUNDING_RATE_PER_8H stays 0.0
+
+        events = queue.Queue()
+        bars = ZeroBars(datetime(2026, 1, 1, 0, 0), 100.0, funding_rate=None, has_feature=False)
+        p = Portfolio(bars, events, bars.current_dt, Cfg)
+        self.assertEqual(p._resolve_funding_rate("BTC/USDT", default=0.0), 0.0)
+        p.current_positions["BTC/USDT"] = 1.0
+        p.entry_prices["BTC/USDT"] = 100.0
+        p.update_timeindex(None)
+        bars.current_dt += timedelta(hours=8)
+        p.update_timeindex(None)  # real 0.0 funding -> no raise, no charge
+        self.assertEqual(p.total_funding_paid, 0.0)
+
+    def test_flag_on_truly_no_data_no_default_raises(self):
+        # The raise survives only for the genuine failure: leveraged, require
+        # coverage, NO per-bar data (feature + bar both None) AND no usable
+        # non-zero static default.
+        class Cfg(BaseConfig):
+            REQUIRE_FUNDING_COVERAGE = True  # FUNDING_RATE_PER_8H == 0.0
+
+        events = queue.Queue()
+        bars = MockBars(datetime(2026, 1, 1, 0, 0), 100.0, funding_rate=None, has_feature=False)
+        p = Portfolio(bars, events, bars.current_dt, Cfg)
+        with self.assertRaises(ValueError) as ctx:
+            p._resolve_funding_rate("BTC/USDT", default=0.0)
+        self.assertIn("BTC/USDT", str(ctx.exception))
+        self.assertIn("require_funding_coverage", str(ctx.exception))
+
+
+# --------------------------------------------------------------------------- #
+# Fix: tz-correct epoch helpers (naive datetimes are UTC, not host-local)
+# --------------------------------------------------------------------------- #
+class TestTimestampHelpersUTC(unittest.TestCase):
+    """_to_timestamp_ms / _to_unix_seconds must treat naive datetimes as UTC so
+    equity-sampling cadence (_should_sample) is host-tz independent. Regression
+    for the host-local datetime.timestamp() skew.
+    """
+
+    @staticmethod
+    def _portfolio():
+        events = queue.Queue()
+        bars = MockBars(datetime(2026, 1, 1, 0, 0), 100.0)
+        return Portfolio(bars, events, bars.current_dt, BaseConfig)
+
+    def test_to_timestamp_ms_naive_is_utc(self):
+        p = self._portfolio()
+        # 2026-01-01T00:00:00Z == 1767225600000 ms, regardless of host tz.
+        self.assertEqual(p._to_timestamp_ms(datetime(2026, 1, 1, 0, 0)), 1767225600000)
+
+    def test_to_unix_seconds_naive_is_utc(self):
+        p = self._portfolio()
+        self.assertEqual(p._to_unix_seconds(datetime(2026, 1, 1, 0, 0)), 1767225600.0)
+
+    def test_naive_equals_explicit_utc(self):
+        # A naive datetime and the same instant tagged UTC must map identically.
+        from datetime import UTC as _UTC
+
+        p = self._portfolio()
+        naive = datetime(2026, 6, 18, 12, 30, 15)
+        aware = naive.replace(tzinfo=_UTC)
+        self.assertEqual(p._to_timestamp_ms(naive), p._to_timestamp_ms(aware))
+        self.assertEqual(p._to_unix_seconds(naive), p._to_unix_seconds(aware))
+
+    def test_iso_string_naive_is_utc(self):
+        p = self._portfolio()
+        self.assertEqual(p._to_timestamp_ms("2026-01-01T00:00:00"), 1767225600000)
+        self.assertEqual(p._to_timestamp_ms("2026-01-01T00:00:00Z"), 1767225600000)
+
+    def test_to_timestamp_ms_independent_of_host_tz(self):
+        # Monkeypatch the process tz to a non-UTC offset and confirm the naive
+        # datetime still maps to the UTC-based epoch (host-local .timestamp()
+        # would have shifted it by the host offset).
+        import time
+
+        p = self._portfolio()
+        expected = 1767225600000
+        original_tz = os.environ.get("TZ")
+        try:
+            os.environ["TZ"] = "America/New_York"  # UTC-5 / UTC-4
+            if hasattr(time, "tzset"):
+                time.tzset()
+            self.assertEqual(p._to_timestamp_ms(datetime(2026, 1, 1, 0, 0)), expected)
+            self.assertEqual(p._to_unix_seconds(datetime(2026, 1, 1, 0, 0)), 1767225600.0)
+        finally:
+            if original_tz is None:
+                os.environ.pop("TZ", None)
+            else:
+                os.environ["TZ"] = original_tz
+            if hasattr(time, "tzset"):
+                time.tzset()
+
+    def test_should_sample_cadence_host_tz_independent(self):
+        # _should_sample uses _to_timestamp_ms; with a sampling interval the
+        # alignment (ts_ms % interval) must be computed against UTC epochs so the
+        # sampled set is identical regardless of host tz.
+        import time
+
+        events = queue.Queue()
+        bars = MockBars(datetime(2026, 1, 1, 0, 0), 100.0)
+        p = Portfolio(bars, events, bars.current_dt, BaseConfig, sampling_timeframe="1h")
+        sample_at = datetime(2026, 1, 1, 1, 0)  # exactly on a 1h boundary in UTC
+        original_tz = os.environ.get("TZ")
+        try:
+            os.environ["TZ"] = "Asia/Kolkata"  # UTC+5:30 (off the hour grid)
+            if hasattr(time, "tzset"):
+                time.tzset()
+            p._last_sample_timestamp_ms = None
+            self.assertTrue(p._should_sample(sample_at))
+        finally:
+            if original_tz is None:
+                os.environ.pop("TZ", None)
+            else:
+                os.environ["TZ"] = original_tz
+            if hasattr(time, "tzset"):
+                time.tzset()
 
 
 if __name__ == "__main__":

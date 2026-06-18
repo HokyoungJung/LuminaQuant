@@ -354,13 +354,20 @@ class Portfolio:
                 ts *= 1000
             return ts
         if isinstance(value, datetime):
-            return int(value.timestamp() * 1000)
+            # Convention (core/engine.py): naive datetimes are UTC. Calling
+            # .timestamp() on a naive datetime interprets it in the host-local
+            # tz, which would skew equity-sampling cadence on a non-UTC host —
+            # localize to UTC first (mirrors market_data._coerce_timestamp_ms).
+            dt = value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+            return int(dt.timestamp() * 1000)
         if isinstance(value, date):
-            return int(datetime(value.year, value.month, value.day).timestamp() * 1000)
+            return int(datetime(value.year, value.month, value.day, tzinfo=UTC).timestamp() * 1000)
         try:
             parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
         except Exception:
             return None
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=UTC)
         return int(parsed.timestamp() * 1000)
 
     def _should_sample(self, latest_datetime):
@@ -530,9 +537,12 @@ class Portfolio:
         if value is None:
             return None
         if isinstance(value, datetime):
-            return value.timestamp()
+            # Naive datetimes are UTC (core/engine.py convention); localize before
+            # .timestamp() so funding/equity epochs are host-tz independent.
+            dt = value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+            return dt.timestamp()
         if isinstance(value, date):
-            return datetime(value.year, value.month, value.day).timestamp()
+            return datetime(value.year, value.month, value.day, tzinfo=UTC).timestamp()
         if isinstance(value, (int, float)):
             ts = float(value)
             if ts > 10_000_000_000:
@@ -540,9 +550,11 @@ class Portfolio:
             return ts
         try:
             dt = datetime.fromisoformat(str(value))
-            return dt.timestamp()
         except Exception:
             return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=UTC)
+        return dt.timestamp()
 
     def _apply_funding(self, latest_datetime):
         interval_seconds = self.execution_model.cfg.funding_interval_hours * 3600
@@ -594,6 +606,10 @@ class Portfolio:
             self._last_funding_ts[symbol] = last_ts + periods * interval_seconds
 
     def _resolve_funding_rate(self, symbol, *, default: float) -> float | None:
+        # Per-bar funding data is "present" only when a source yields a non-None
+        # value. A real 0.0 is genuine data (rate is exactly zero), NOT "absent" —
+        # so we must not conflate it with a missing series. Track presence
+        # explicitly instead of inferring absence from a 0.0 value.
         getter = getattr(self.bars, "get_latest_feature_value", None)
         if callable(getter):
             try:
@@ -610,28 +626,33 @@ class Portfolio:
             fallback = self.bars.get_latest_bar_value(symbol, "funding_rate")
         except Exception:
             fallback = None
-        if fallback not in (None, 0.0):
+        if fallback is not None:
             try:
                 return float(fallback)
             except Exception:
                 pass
 
+        # No per-bar funding data (dynamic feature AND bar column both absent).
+        # Honor a configured non-zero static default before any coverage raise:
+        # a legitimately configured funding_rate_per_8h is usable coverage.
+        if abs(float(default)) > 1e-12:
+            return float(default)
+
         # Audit-hardening: when funding coverage is required and the run is
-        # leveraged, refuse to silently charge 0.0 funding because no per-bar
-        # funding data (dynamic feature or bar column) was available. Default OFF
-        # preserves the legacy silent-0.0 / config-default behavior.
+        # leveraged, refuse to silently charge 0.0 funding because truly no
+        # per-bar funding data AND no usable static default were available.
+        # Default OFF preserves the legacy silent-0.0 behavior.
         if self.require_funding_coverage and float(self.execution_model.cfg.leverage) > 1.0:
             raise ValueError(
                 "require_funding_coverage: no per-bar funding data available for "
                 f"symbol {symbol!r} on a leveraged run "
                 f"(leverage={float(self.execution_model.cfg.leverage)}); refusing to "
-                "charge 0.0 funding silently. Provide funding_rate feature/bar data "
+                "charge 0.0 funding silently. Provide funding_rate feature/bar data, "
+                "configure a non-zero execution.funding_rate_per_8h default, "
                 "or disable execution.require_funding_coverage."
             )
 
-        if abs(float(default)) <= 1e-12:
-            return None
-        return float(default)
+        return None
 
     @staticmethod
     def _window_extremes_from_event(event) -> dict[str, tuple[float, float, float]]:

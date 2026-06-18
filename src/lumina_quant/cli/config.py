@@ -24,21 +24,84 @@ def _resolve_config_path(path_arg: str | None) -> str:
     return str(path_arg or os.environ.get("LQ_CONFIG_PATH", "config.yaml"))
 
 
+#: Field names whose values are secrets and must be masked before display.
+#: Matching is case-insensitive on the exact key name.
+_SECRET_FIELD_NAMES = frozenset(
+    {
+        "api_key",
+        "secret_key",
+        "telegram_bot_token",
+    }
+)
+
+#: Field names whose values are connection strings that may embed a password
+#: (``scheme://user:password@host/db``); the password component is scrubbed.
+_DSN_FIELD_NAMES = frozenset(
+    {
+        "postgres_dsn",
+        "dsn",
+    }
+)
+
+
+def _mask_secret(value) -> str:
+    """Mask a secret value, preserving the last 4 characters for identification."""
+    text = str(value or "")
+    if not text:
+        return ""
+    if len(text) <= 4:
+        return "***"
+    return "***" + text[-4:]
+
+
+def _scrub_dsn_password(value) -> str:
+    """Replace the password component of a ``scheme://user:password@host`` DSN."""
+    text = str(value or "")
+    if "@" not in text or "://" not in text:
+        return text
+    scheme, _, rest = text.partition("://")
+    creds, sep, hostpart = rest.partition("@")
+    if sep and ":" in creds:
+        user, _, _ = creds.partition(":")
+        creds = f"{user}:***"
+    return f"{scheme}://{creds}{sep}{hostpart}"
+
+
+def _redact_secrets(value):
+    """Recursively mask secret-bearing fields in a JSON-serialisable structure."""
+    if isinstance(value, dict):
+        redacted: dict = {}
+        for key, item in value.items():
+            key_l = str(key).lower()
+            if key_l in _SECRET_FIELD_NAMES:
+                redacted[key] = None if item is None else _mask_secret(item)
+            elif key_l in _DSN_FIELD_NAMES:
+                redacted[key] = _scrub_dsn_password(item) if item else item
+            else:
+                redacted[key] = _redact_secrets(item)
+        return redacted
+    if isinstance(value, list):
+        return [_redact_secrets(item) for item in value]
+    if isinstance(value, tuple):
+        return [_redact_secrets(item) for item in value]
+    return value
+
+
 def _rt_to_dict(rt) -> dict:
-    """Convert RuntimeConfig to a JSON-serialisable dict."""
+    """Convert RuntimeConfig to a JSON-serialisable dict with secrets redacted."""
     try:
-        return asdict(rt)
+        payload = asdict(rt)
     except Exception:
         # Fallback: build dict manually for any non-standard dataclass shape.
-        result: dict = {}
+        payload = {}
         for attr in vars(rt):
             value = getattr(rt, attr, None)
             try:
                 json.dumps(value)
-                result[attr] = value
+                payload[attr] = value
             except TypeError, ValueError:
-                result[attr] = str(value)
-        return result
+                payload[attr] = str(value)
+    return _redact_secrets(payload)
 
 
 def cmd_show(args: argparse.Namespace) -> int:

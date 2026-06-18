@@ -38,6 +38,44 @@ DEFAULT_ALPHA_ZOO_INTEGER_PORTFOLIO_ARTIFACT = (
 _ALPHA_ZOO_OPTUNA_STRATEGY = "AlphaZooOptunaHybridLiveStrategy"
 
 _TRUTHY = {"1", "true", "yes", "on"}
+_BOOL_TRUE_TOKENS = {"true", "1", "yes", "on"}
+_BOOL_FALSE_TOKENS = {"false", "0", "no", "off"}
+
+
+def _as_bool_flag(value: Any) -> bool | None:
+    """Coerce an external JSON flag to a tri-state bool.
+
+    Maps bool/str/int encodings of truth ({True, 'true', '1', 1, 'yes', 'on'})
+    to True and ({False, 'false', '0', 0, 'no', 'off'}) to False; anything else
+    (None, absent, unrecognized) returns None so callers can treat it as "not
+    asserted".  Used for BOTH positive readiness flags and blocking/governance
+    flags so a flag encoded as ``'true'``/1 is honored regardless of JSON typing.
+    """
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        if value == 1:
+            return True
+        if value == 0:
+            return False
+        return None
+    if isinstance(value, str):
+        token = value.strip().lower()
+        if token in _BOOL_TRUE_TOKENS:
+            return True
+        if token in _BOOL_FALSE_TOKENS:
+            return False
+    return None
+
+
+def _flag_is_true(payload: Mapping[str, Any], key: str) -> bool:
+    """True only when ``key`` is present and coerces to a truthy flag."""
+    return key in payload and _as_bool_flag(payload.get(key)) is True
+
+
+def _flag_is_false(payload: Mapping[str, Any], key: str) -> bool:
+    """True only when ``key`` is present and coerces to a falsy flag."""
+    return key in payload and _as_bool_flag(payload.get(key)) is False
 
 
 class LiveReadinessBlockedError(RuntimeError):
@@ -187,15 +225,15 @@ def _is_alpha_zoo_optuna_hybrid_decision(
 
 
 def _explicit_false(payload: Mapping[str, Any], key: str) -> bool:
-    return key in payload and payload.get(key) is False
+    return _flag_is_false(payload, key)
 
 
 def _artifact_governance_veto_checks(
     payloads: Mapping[str, Mapping[str, Any]],
 ) -> dict[str, Any]:
     containers = list(payloads.values())
-    post_oos = any(item.get("post_oos_research_variant") is True for item in containers)
-    fresh_forward = any(item.get("requires_fresh_forward_shadow") is True for item in containers)
+    post_oos = any(_flag_is_true(item, "post_oos_research_variant") for item in containers)
+    fresh_forward = any(_flag_is_true(item, "requires_fresh_forward_shadow") for item in containers)
     clean_promotion = not any(
         _explicit_false(item, "clean_promotion_eligible") for item in containers
     )
@@ -238,22 +276,49 @@ def _artifact_reference_paths(decision: Mapping[str, Any]) -> list[str]:
     return references
 
 
-def _flag_clean_for_real_money(payload: Mapping[str, Any]) -> bool:
-    """A single payload establishes clean real-money readiness only if explicit."""
-    return bool(
-        payload.get("ready_for_real") is True
-        and not (
-            "real_money_execution" in payload and payload.get("real_money_execution") is not True
-        )
-        and not (
-            "real_execution_allowed" in payload
-            and payload.get("real_execution_allowed") is not True
-        )
-        and not _explicit_false(payload, "clean_promotion_eligible")
-        and payload.get("post_oos_research_variant") is not True
-        and payload.get("requires_fresh_forward_shadow") is not True
-        and payload.get("paper_testnet_only") is not True
+# Nested profile keys inspected the same way the AlphaZoo path inspects its
+# selected sub-profiles, so a clean top-level payload cannot mask a dirty
+# selected/strategy profile.
+_NESTED_PROFILE_KEYS = ("selected_profile", "selected_live_profile", "strategy_profiles")
+
+
+def _profile_paper_only(profile: Mapping[str, Any]) -> bool:
+    """A nested profile is paper-only when it self-identifies as a paper candidate."""
+    return _flag_is_true(profile, "paper_testnet_only") or _flag_is_true(
+        profile, "paper_testnet_candidate"
     )
+
+
+def _payload_blocks_real_money(payload: Mapping[str, Any]) -> bool:
+    """A single payload blocks real money if it explicitly asserts anything dirty.
+
+    Mirrors the AlphaZoo veto conditions at payload granularity: a payload blocks
+    when it declares paper-only, explicitly negates any of the positive readiness
+    flags (``ready_for_real`` / ``real_execution_allowed`` / ``real_money_execution``),
+    or trips a governance blocker.  A silent payload (no relevant keys) does not
+    block; it simply fails to assert readiness.
+    """
+    return bool(
+        _flag_is_true(payload, "paper_testnet_only")
+        or _flag_is_false(payload, "ready_for_real")
+        or _flag_is_false(payload, "real_execution_allowed")
+        or _flag_is_false(payload, "real_money_execution")
+        or _flag_is_true(payload, "post_oos_research_variant")
+        or _flag_is_true(payload, "requires_fresh_forward_shadow")
+        or _flag_is_false(payload, "clean_promotion_eligible")
+    )
+
+
+def _collect_profile_payloads(payload: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    """Return nested profile mappings declared by ``payload`` (one level deep)."""
+    nested: list[Mapping[str, Any]] = []
+    for key in _NESTED_PROFILE_KEYS:
+        value = payload.get(key)
+        if isinstance(value, Mapping):
+            nested.append(value)
+        elif isinstance(value, (list, tuple)):
+            nested.extend(item for item in value if isinstance(item, Mapping))
+    return nested
 
 
 def _strategy_agnostic_real_money_veto_checks(
@@ -261,10 +326,21 @@ def _strategy_agnostic_real_money_veto_checks(
 ) -> dict[str, Any]:
     """Fail-closed real-money veto for non-AlphaZoo live decisions.
 
-    The veto stays True unless the decision payload itself (or any artifact JSON
-    it references) EXPLICITLY establishes clean real-money readiness.  Absence of
-    an explicit ``ready_for_real=True`` keeps the veto active; any read error on a
-    referenced artifact also forces veto=True with ``artifact_validation_error``.
+    The veto stays True unless EVERY relevant payload is clean and at least one
+    payload positively asserts ``ready_for_real``.  This makes the strategy-agnostic
+    veto at least as strict as the AlphaZoo sibling:
+
+    * any payload (decision, strategy_params, referenced artifact, or a nested
+      selected/strategy profile) that asserts ``paper_testnet_only`` /
+      ``paper_testnet_candidate``, explicitly negates a positive readiness flag,
+      or trips a governance blocker forces veto=True — a self-attesting decision
+      CANNOT override a referenced dirty artifact;
+    * absence of an explicit positive ``ready_for_real`` keeps the veto active;
+    * a referenced artifact that cannot be read forces veto=True with
+      ``artifact_validation_error``.
+
+    Flags are coerced via :func:`_as_bool_flag`, so ``'true'``/1 and
+    ``'false'``/0 string/int encodings are honored in both directions.
     """
     params = _decision_strategy_params(decision)
     containers: dict[str, Mapping[str, Any]] = {"decision": decision, "strategy_params": params}
@@ -286,16 +362,29 @@ def _strategy_agnostic_real_money_veto_checks(
             "artifact_validation_error": str(exc),
         }
 
-    governance_checks = _artifact_governance_veto_checks(containers)
+    # Expand to include any nested selected/strategy profiles so a clean
+    # top-level payload cannot mask a dirty selected profile.
+    items: list[Mapping[str, Any]] = list(containers.values())
+    for payload in list(items):
+        items.extend(_collect_profile_payloads(payload))
+
+    governance_payloads = {f"payload_{i}": item for i, item in enumerate(items)}
+    governance_checks = _artifact_governance_veto_checks(governance_payloads)
     governance_veto = bool(governance_checks["artifact_governance_veto_reasons"])
-    items = list(containers.values())
-    paper_only = any(item.get("paper_testnet_only") is True for item in items)
-    ready_for_real = any(item.get("ready_for_real") is True for item in items)
-    real_execution_allowed = any(item.get("real_execution_allowed") is True for item in items)
-    real_money_execution = any(item.get("real_money_execution") is True for item in items)
-    clean_ready = any(_flag_clean_for_real_money(item) for item in items)
+
+    paper_only = any(
+        _flag_is_true(item, "paper_testnet_only") or _profile_paper_only(item) for item in items
+    )
+    ready_for_real = any(_flag_is_true(item, "ready_for_real") for item in items)
+    real_execution_allowed = any(_flag_is_true(item, "real_execution_allowed") for item in items)
+    real_money_execution = any(_flag_is_true(item, "real_money_execution") for item in items)
+    any_blocks = any(_payload_blocks_real_money(item) for item in items)
+
+    # Fail-closed: veto unless a positive ready flag is asserted AND no payload
+    # blocks (paper-only / explicit negation / governance) AND no governance veto.
+    clean_ready = ready_for_real and not any_blocks and not paper_only and not governance_veto
     return {
-        "artifact_real_money_veto": not (clean_ready and not governance_veto),
+        "artifact_real_money_veto": not clean_ready,
         "artifact_paper_testnet_only": paper_only,
         "artifact_ready_for_real": ready_for_real,
         "artifact_real_execution_allowed": real_execution_allowed,

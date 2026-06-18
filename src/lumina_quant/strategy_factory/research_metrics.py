@@ -363,6 +363,7 @@ def spa_like_pvalue(
     rng = np.random.default_rng(seed)
     num_blocks = math.ceil(n / block_len)
     exceed = 0
+    valid_rounds = 0
     for _ in range(rounds):
         starts = rng.integers(0, n, size=num_blocks)
         offsets = (starts[:, None] + np.arange(block_len)[None, :]) % n
@@ -371,10 +372,13 @@ def spa_like_pvalue(
         sample_sigma = safe_std(sample)
         if sample_sigma <= 1e-12:
             continue
+        valid_rounds += 1
         t_boot = sample_mean / (sample_sigma / sqrt_n)
         if t_boot >= t_obs:
             exceed += 1
-    return float(exceed / rounds)
+    if valid_rounds == 0:
+        return 1.0
+    return float(exceed / valid_rounds)
 
 
 def correlation(x: np.ndarray, y: np.ndarray) -> float:

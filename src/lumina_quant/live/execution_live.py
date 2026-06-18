@@ -110,6 +110,11 @@ class LiveExecutionHandler(ExecutionHandler):
         self._last_exchange_open_snapshot_ts = 0.0
         self.protective_orders: dict[str, dict[str, Any]] = {}
         self._protected_parent_client_ids: set[str] = set()
+        # Dedicated lock guarding the protective-order dedup set check-and-add.
+        # _submit_paper_exchange_protection runs OUTSIDE _state_lock from both the
+        # user-stream and polling threads; this lock makes the dedup atomic without
+        # being held across the (network) protective-order submission.
+        self._protection_lock = threading.Lock()
         # Unified cost model — same formula as backtest (Phase 5 structural gate).
         # Used for paper/testnet simulated fill commission and pre-trade
         # liquidation_price / cost estimation in all modes.
@@ -200,7 +205,17 @@ class LiveExecutionHandler(ExecutionHandler):
         state: str,
         message: str | None = None,
         metadata: dict[str, Any] | None = None,
+        defer_to: list[dict[str, Any]] | None = None,
     ) -> None:
+        """Prepare an order-state callback payload.
+
+        The downstream callback (trader._on_order_state) performs blocking disk +
+        network + DB I/O, so it must never run under ``self._state_lock``.  Callers
+        that hold the lock pass ``defer_to`` (a list collected while locked); the
+        prepared payload is appended to it and fired by ``_fire_deferred_notifications``
+        AFTER the lock is released — exactly once, preserving call order.  When
+        ``defer_to`` is None (no lock held) the callback fires immediately.
+        """
         callback = self._state_callback
         if callback is None:
             return
@@ -229,10 +244,28 @@ class LiveExecutionHandler(ExecutionHandler):
             payload_meta["stop_loss"] = getattr(event, "stop_loss", None)
             payload_meta["take_profit"] = getattr(event, "take_profit", None)
             payload_meta["client_order_id"] = getattr(event, "client_order_id", None)
+        if defer_to is not None:
+            defer_to.append(payload)
+            return
+        self._dispatch_notification(payload)
+
+    def _dispatch_notification(self, payload: dict[str, Any]) -> None:
+        callback = self._state_callback
+        if callback is None:
+            return
         try:
             callback(payload)
         except Exception as exc:  # pragma: no cover - defensive callback guard
             self.logger.error("Order state callback failed: %s", exc)
+
+    def _fire_deferred_notifications(self, deferred: list[dict[str, Any]]) -> None:
+        """Fire callback payloads collected under the lock, after it is released.
+
+        Preserves enqueue order and fires each exactly once so no blocking disk /
+        network / DB I/O is performed while ``self._state_lock`` is held.
+        """
+        for payload in deferred:
+            self._dispatch_notification(payload)
 
     def _forget_order(self, order_id: str, entry: dict[str, Any]) -> None:
         self.tracked_orders.pop(order_id, None)
@@ -240,6 +273,12 @@ class LiveExecutionHandler(ExecutionHandler):
         client_order_id = getattr(event, "client_order_id", None)
         if client_order_id and self.client_id_to_order.get(client_order_id) == order_id:
             self.client_id_to_order.pop(client_order_id, None)
+        # NOTE: the dedup-ledger key is intentionally NOT removed here.  It must
+        # outlive _forget_order so the resurrect-after-forget race is still guarded
+        # (one path terminally resolves + forgets while the other re-creates the
+        # order from the same exchange snapshot and would otherwise re-emit the same
+        # cumulative).  The key is reclaimed lazily by _evict_ledger_keys, which only
+        # evicts keys whose order is no longer live (i.e. already forgotten).
 
     def _ledger_residual_delta(self, order_id: str | None, new_cumulative: float) -> float:
         """Return the not-yet-emitted residual for ``order_id`` and record it.
@@ -256,9 +295,27 @@ class LiveExecutionHandler(ExecutionHandler):
         residual = max(0.0, float(new_cumulative) - already)
         if residual > 0.0:
             self._emitted_cum_filled[key] = float(new_cumulative)
-            while len(self._emitted_cum_filled) > int(self._emitted_cum_filled_max_keys):
-                self._emitted_cum_filled.pop(next(iter(self._emitted_cum_filled)))
+            self._evict_ledger_keys()
         return residual
+
+    def _evict_ledger_keys(self) -> None:
+        """Bound the dedup ledger, but never evict a key whose order is still live.
+
+        Eviction pops oldest-inserted keys; if the oldest belongs to an order still
+        in ``tracked_orders`` (a long-resting partial fill), dropping its baseline
+        would re-emit its full cumulative on the next poll/stream event.  Skip such
+        live keys and only evict terminally-resolved / forgotten ones.  Must be
+        called under ``self._state_lock``.
+        """
+        max_keys = int(self._emitted_cum_filled_max_keys)
+        if len(self._emitted_cum_filled) <= max_keys:
+            return
+        for key in list(self._emitted_cum_filled.keys()):
+            if len(self._emitted_cum_filled) <= max_keys:
+                break
+            if key in self.tracked_orders:
+                continue
+            self._emitted_cum_filled.pop(key, None)
 
     def _build_event_stub(self, payload: dict[str, Any]) -> SimpleNamespace:
         metadata = dict(payload.get("metadata") or {})
@@ -281,26 +338,36 @@ class LiveExecutionHandler(ExecutionHandler):
         )
 
     def rehydrate_orders(self, open_orders: dict[str, dict[str, Any]]) -> None:
-        for order_id, payload in dict(open_orders or {}).items():
-            if not isinstance(payload, dict):
-                continue
-            state = str(payload.get("state") or "").upper()
-            if state in TERMINAL_STATES:
-                continue
-            event = self._build_event_stub(payload)
-            oid = str(order_id)
-            last_filled = float(payload.get("last_filled") or 0.0)
-            created_at = float(payload.get("created_at") or time.time())
-            self.tracked_orders[oid] = {
-                "event": event,
-                "symbol": event.symbol,
-                "last_filled": last_filled,
-                "state": state or STATE_OPEN,
-                "created_at": created_at,
-                "updated_at": time.time(),
-            }
-            if event.client_order_id:
-                self.client_id_to_order[event.client_order_id] = oid
+        # Guarded by _state_lock: the user-stream thread (started before _load_state
+        # calls rehydrate) already mutates tracked_orders/client_id_to_order under
+        # the same lock via ingest_user_stream_event.
+        with self._state_lock:
+            for order_id, payload in dict(open_orders or {}).items():
+                if not isinstance(payload, dict):
+                    continue
+                state = str(payload.get("state") or "").upper()
+                if state in TERMINAL_STATES:
+                    continue
+                event = self._build_event_stub(payload)
+                oid = str(order_id)
+                last_filled = float(payload.get("last_filled") or 0.0)
+                created_at = float(payload.get("created_at") or time.time())
+                self.tracked_orders[oid] = {
+                    "event": event,
+                    "symbol": event.symbol,
+                    "last_filled": last_filled,
+                    "state": state or STATE_OPEN,
+                    "created_at": created_at,
+                    "updated_at": time.time(),
+                }
+                if event.client_order_id:
+                    self.client_id_to_order[event.client_order_id] = oid
+                # Seed the dedup ledger with the already-counted cumulative filled
+                # using the SAME key derivation _ledger_residual_delta uses (str(oid)).
+                # Without this, the first reconcile/poll after restart re-emits the
+                # restored cumulative as a fresh FillEvent (double-counted position).
+                if last_filled > 0.0:
+                    self._emitted_cum_filled[oid] = last_filled
 
     def ingest_user_stream_event(self, payload: dict[str, Any]) -> None:
         """Apply one normalized user-stream event to tracked order state."""
@@ -322,6 +389,7 @@ class LiveExecutionHandler(ExecutionHandler):
         # blocking network I/O is performed under the lock; protective-order
         # submission (network) is deferred until after the lock is released.
         emit_protection_for: Any | None = None
+        deferred_notifications: list[dict[str, Any]] = []
         with self._state_lock:
             entry = self.tracked_orders.get(order_id)
 
@@ -371,7 +439,9 @@ class LiveExecutionHandler(ExecutionHandler):
                         state=previous_state,
                         message="invalid_transition",
                         metadata={"reason": projection.reason, "event_key": projection.event_key},
+                        defer_to=deferred_notifications,
                     )
+                self._fire_deferred_notifications(deferred_notifications)
                 return
 
             if projection.fill_delta > 0:
@@ -404,12 +474,14 @@ class LiveExecutionHandler(ExecutionHandler):
                 entry=entry,
                 state=entry["state"],
                 metadata={"event_key": projection.event_key},
+                defer_to=deferred_notifications,
             )
             if str(entry["state"]).upper() in TERMINAL_STATES:
                 if str(entry["state"]).upper() == STATE_FILLED:
                     emit_protection_for = entry.get("event")
                 self._forget_order(order_id, entry)
 
+        self._fire_deferred_notifications(deferred_notifications)
         if emit_protection_for is not None:
             self._submit_paper_exchange_protection(emit_protection_for, parent_order_id=order_id)
 
@@ -575,6 +647,7 @@ class LiveExecutionHandler(ExecutionHandler):
             total_amount = float(latest.get("amount") or getattr(order_event, "quantity", 0.0))
             exchange_state = self._to_state(status, filled_now, total_amount)
             emit_protection_for: Any | None = None
+            deferred_notifications: list[dict[str, Any]] = []
             # Apply the polled reconciliation atomically: re-read last_filled under
             # the lock so a concurrent user-stream fill is not double-counted.
             with self._state_lock:
@@ -602,7 +675,12 @@ class LiveExecutionHandler(ExecutionHandler):
                     )
                 entry["state"] = exchange_state
                 entry["updated_at"] = time.time()
-                self._notify_state(order_id=order_id, entry=entry, state=entry["state"])
+                self._notify_state(
+                    order_id=order_id,
+                    entry=entry,
+                    state=entry["state"],
+                    defer_to=deferred_notifications,
+                )
                 if exchange_state != local_state:
                     records.append(
                         self._build_reconciliation_payload(
@@ -630,6 +708,7 @@ class LiveExecutionHandler(ExecutionHandler):
                     if entry["state"] == STATE_FILLED:
                         emit_protection_for = order_event
                     self._forget_order(order_id, entry)
+            self._fire_deferred_notifications(deferred_notifications)
             if emit_protection_for is not None:
                 self._submit_paper_exchange_protection(
                     emit_protection_for, parent_order_id=order_id
@@ -864,11 +943,19 @@ class LiveExecutionHandler(ExecutionHandler):
         if event is None:
             return
         parent_client_id = str(getattr(event, "client_order_id", "") or "")
-        if not parent_client_id or parent_client_id in self._protected_parent_client_ids:
+        if not parent_client_id:
             return
         specs = self._build_paper_protective_algo_specs(event)
         if not specs:
             return
+        # Atomic check-and-reserve so two threads (user-stream + polling) cannot both
+        # submit protective orders for the same parent.  The reservation is added
+        # BEFORE the (network) submission and rolled back only if nothing was
+        # submitted; the lock is never held across submit_algo.
+        with self._protection_lock:
+            if parent_client_id in self._protected_parent_client_ids:
+                return
+            self._protected_parent_client_ids.add(parent_client_id)
         submitted: list[dict[str, Any]] = []
         for spec in specs:
             params = dict(spec["params"])
@@ -915,11 +1002,15 @@ class LiveExecutionHandler(ExecutionHandler):
                 "status": str(order.get("status") or STATE_SUBMITTED).upper(),
             }
             if protective_id:
-                self.protective_orders[protective_id] = record
+                with self._protection_lock:
+                    self.protective_orders[protective_id] = record
             submitted.append(record)
         if not submitted:
+            # Nothing made it to the exchange; release the reservation so a later
+            # attempt (e.g. after a transient outage) can retry the protection.
+            with self._protection_lock:
+                self._protected_parent_client_ids.discard(parent_client_id)
             return
-        self._protected_parent_client_ids.add(parent_client_id)
         metadata = {
             "parent_order_id": parent_order_id,
             "parent_client_order_id": parent_client_id,
@@ -1430,6 +1521,7 @@ class LiveExecutionHandler(ExecutionHandler):
         # network submit and here, only emit the residual delta and keep the
         # higher cumulative last_filled so the fill is counted exactly once.
         emit_protection_for: Any | None = None
+        deferred_notifications: list[dict[str, Any]] = []
         with self._state_lock:
             self.client_id_to_order[event.client_order_id] = order_id
             existing = self.tracked_orders.get(order_id)
@@ -1444,7 +1536,12 @@ class LiveExecutionHandler(ExecutionHandler):
                 ),
                 "updated_at": time.time(),
             }
-            self._notify_state(order_id=order_id, entry=self.tracked_orders[order_id], state=state)
+            self._notify_state(
+                order_id=order_id,
+                entry=self.tracked_orders[order_id],
+                state=state,
+                defer_to=deferred_notifications,
+            )
 
             if state == STATE_FILLED:
                 response_filled = filled_qty if filled_qty > 0 else total_amount
@@ -1464,12 +1561,16 @@ class LiveExecutionHandler(ExecutionHandler):
             elif state in {STATE_CANCELED, STATE_REJECTED}:
                 self.logger.warning("Order terminal without fill id=%s state=%s", order_id, state)
                 self._notify_state(
-                    order_id=order_id, entry=self.tracked_orders.get(order_id), state=state
+                    order_id=order_id,
+                    entry=self.tracked_orders.get(order_id),
+                    state=state,
+                    defer_to=deferred_notifications,
                 )
                 self._forget_order(order_id, self.tracked_orders.get(order_id, {}))
             else:
                 self.logger.info("Order tracked id=%s state=%s", order_id, state)
 
+        self._fire_deferred_notifications(deferred_notifications)
         if emit_protection_for is not None:
             self._submit_paper_exchange_protection(emit_protection_for, parent_order_id=order_id)
 
@@ -1509,6 +1610,7 @@ class LiveExecutionHandler(ExecutionHandler):
                         latest_after_cancel = {}
 
                     emit_protection_for: Any | None = None
+                    deferred_notifications: list[dict[str, Any]] = []
                     # Apply the post-cancel reconciliation atomically: re-read
                     # last_filled under the lock so a concurrent user-stream fill
                     # cannot be double-counted, then emit only the residual delta.
@@ -1552,10 +1654,12 @@ class LiveExecutionHandler(ExecutionHandler):
                             entry=entry,
                             state=entry["state"],
                             message=timeout_message,
+                            defer_to=deferred_notifications,
                         )
                         if entry["state"] == STATE_FILLED:
                             emit_protection_for = order_event
                         self._forget_order(order_id, entry)
+                    self._fire_deferred_notifications(deferred_notifications)
                     if emit_protection_for is not None:
                         self._submit_paper_exchange_protection(
                             emit_protection_for, parent_order_id=order_id
@@ -1580,6 +1684,7 @@ class LiveExecutionHandler(ExecutionHandler):
             filled_now = float(latest.get("filled") or 0.0)
             total_amount = float(latest.get("amount") or order_event.quantity)
             emit_protection_for = None
+            deferred_notifications = []
             # Apply the polled result atomically: re-read last_filled under the lock
             # so a concurrent user-stream fill (same order) is never double-counted
             # or lost — only the residual cumulative delta is emitted.
@@ -1598,11 +1703,17 @@ class LiveExecutionHandler(ExecutionHandler):
                 entry["state"] = self._to_state(status, filled_now, total_amount)
                 entry["updated_at"] = time.time()
                 if entry["state"] != previous_state:
-                    self._notify_state(order_id=order_id, entry=entry, state=entry["state"])
+                    self._notify_state(
+                        order_id=order_id,
+                        entry=entry,
+                        state=entry["state"],
+                        defer_to=deferred_notifications,
+                    )
                 if entry["state"] in TERMINAL_STATES:
                     if entry["state"] == STATE_FILLED:
                         emit_protection_for = order_event
                     self._forget_order(order_id, entry)
+            self._fire_deferred_notifications(deferred_notifications)
             if emit_protection_for is not None:
                 self._submit_paper_exchange_protection(
                     emit_protection_for, parent_order_id=order_id
