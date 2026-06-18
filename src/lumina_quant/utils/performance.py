@@ -112,7 +112,10 @@ def create_sharpe_ratio(returns, periods=252, risk_free=0.0):
     if clean.size == 0:
         return 0.0
     excess = clean - rf[mask]
-    std = np.std(clean)
+    # ddof=1 (sample std) to match the canonical convention used everywhere else
+    # (utils.risk_free, optimization.native_backend, research_metrics). size<=1
+    # guard avoids a NaN/RuntimeWarning and falls through to the std==0 -> 0.0 path.
+    std = np.std(clean, ddof=1) if clean.size > 1 else 0.0
     if std == 0 or not np.isfinite(std):
         return 0.0
     sharpe = np.sqrt(periods) * np.mean(excess) / std
@@ -136,7 +139,8 @@ def create_sortino_ratio(returns, periods=252, risk_free=0.0, target=None):
     downside_returns = clean[clean < target_clean] - target_clean[clean < target_clean]
     if downside_returns.size == 0:
         return 0.0
-    downside_std = np.std(downside_returns)
+    # ddof=1 (sample std) to match the canonical Sharpe/Sortino convention.
+    downside_std = np.std(downside_returns, ddof=1) if downside_returns.size > 1 else 0.0
     if downside_std == 0 or not np.isfinite(downside_std):
         return 0.0
     sortino = np.sqrt(periods) * np.mean(clean - target_clean) / downside_std
