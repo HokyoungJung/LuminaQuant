@@ -75,6 +75,10 @@ def strategy_family(name: str, fallback: str = "other") -> str:
 def candidate_identity(candidate: dict[str, Any]) -> str:
     payload = {
         "name": str(candidate.get("name", "")),
+        # strategy_class is part of a candidate's identity: two candidates that
+        # share name/timeframe/symbols/params but run a DIFFERENT strategy class
+        # are distinct and must not collide to the same id (prior bug omitted it).
+        "strategy_class": str(candidate.get("strategy_class", "")),
         "timeframe": str(candidate.get("strategy_timeframe") or candidate.get("timeframe") or ""),
         "symbols": list(candidate.get("symbols") or []),
         "params": candidate.get("params") if isinstance(candidate.get("params"), dict) else {},
