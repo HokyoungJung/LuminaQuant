@@ -244,6 +244,33 @@ def _emit(
     )
 
 
+def _extract_feature(bars: Any, event: Any, symbol: str, field: str) -> float | None:
+    """Resolve a feature value via the 3-tier cascade.
+
+    Tries the event attribute, then ``bars.get_latest_feature_value``, then
+    ``bars.get_latest_bar_value``; returns ``None`` (skip, never raise) when no
+    source provides a finite value.
+    """
+    direct = safe_float(getattr(event, field, None))
+    if direct is not None:
+        return direct
+    getter = getattr(bars, "get_latest_feature_value", None)
+    if callable(getter):
+        try:
+            parsed = safe_float(getter(symbol, field))
+        except Exception:
+            parsed = None
+        if parsed is not None:
+            return parsed
+    getter = getattr(bars, "get_latest_bar_value", None)
+    if callable(getter):
+        try:
+            return safe_float(getter(symbol, field))
+        except Exception:
+            return None
+    return None
+
+
 @register("strategy", "LiquidityShockReversionStrategy", interface="event_driven")
 class LiquidityShockReversionStrategy(Strategy):
     """Fade high-volume, high-range shocks after the shock bar closes."""
@@ -1066,24 +1093,7 @@ class FundingDislocationTrendCarryStrategy(Strategy):
             item.last_time_key = str(payload.get("last_time_key", ""))
 
     def _extract_feature(self, event: Any, symbol: str, field: str) -> float | None:
-        direct = safe_float(getattr(event, field, None))
-        if direct is not None:
-            return direct
-        getter = getattr(self.bars, "get_latest_feature_value", None)
-        if callable(getter):
-            try:
-                parsed = safe_float(getter(symbol, field))
-            except Exception:
-                parsed = None
-            if parsed is not None:
-                return parsed
-        getter = getattr(self.bars, "get_latest_bar_value", None)
-        if callable(getter):
-            try:
-                return safe_float(getter(symbol, field))
-            except Exception:
-                return None
-        return None
+        return _extract_feature(self.bars, event, symbol, field)
 
     def calculate_signals_window(self, event: Any, aggregator: Any = None) -> None:
         _ = aggregator

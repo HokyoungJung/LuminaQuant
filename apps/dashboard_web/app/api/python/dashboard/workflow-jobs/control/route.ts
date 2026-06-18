@@ -17,34 +17,14 @@
  */
 import { NextResponse } from 'next/server';
 import { execFileSync } from 'node:child_process';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const REPO_ROOT = resolve(__dirname, '../../../../../../../');
+import { timingSafeEqualStr } from '@/lib/auth-helpers';
+import { REPO_ROOT } from '@/lib/python-runtime';
 
 export const dynamic = 'force-dynamic';
 
 /** Actions that modify live-trading process state and require authentication. */
 const STATE_CHANGING_ACTIONS = new Set(['kill', 'stop', 'cancel']);
-
-/**
- * Constant-time string comparison — avoids leaking the token via early-exit timing.
- */
-function timingSafeEqualStr(a: string, b: string): boolean {
-  const encoder = new TextEncoder();
-  const aBytes = encoder.encode(a);
-  const bBytes = encoder.encode(b);
-  if (aBytes.length !== bBytes.length) {
-    return false;
-  }
-  let diff = 0;
-  for (let i = 0; i < aBytes.length; i += 1) {
-    diff |= aBytes[i] ^ bBytes[i];
-  }
-  return diff === 0;
-}
 
 /**
  * Verify the shared-secret token for state-changing actions.

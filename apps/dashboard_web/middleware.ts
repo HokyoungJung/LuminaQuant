@@ -17,6 +17,8 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 
+import { timingSafeEqualStr } from '@/lib/auth-helpers';
+
 /** Path prefix that covers all dashboard API routes. */
 const DASHBOARD_API_PREFIX = '/api/python/dashboard';
 
@@ -50,24 +52,6 @@ function isLocalhost(req: NextRequest): boolean {
   // State-changing actions are independently token-gated and fail-closed in route.ts,
   // so this fallback can never enable an unauthenticated kill/stop/cancel.
   return true;
-}
-
-/**
- * Constant-time string comparison (runtime-agnostic: works in both the Edge and
- * Node middleware runtimes). Avoids leaking the token via early-exit timing.
- */
-function timingSafeEqualStr(a: string, b: string): boolean {
-  const encoder = new TextEncoder();
-  const aBytes = encoder.encode(a);
-  const bBytes = encoder.encode(b);
-  if (aBytes.length !== bBytes.length) {
-    return false;
-  }
-  let diff = 0;
-  for (let i = 0; i < aBytes.length; i += 1) {
-    diff |= aBytes[i] ^ bBytes[i];
-  }
-  return diff === 0;
 }
 
 /**

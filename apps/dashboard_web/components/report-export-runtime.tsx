@@ -1,9 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-
-import { readJsonOrThrow } from '@/lib/bridge-fetch';
 import type { ReportExportPayload } from '@/lib/dashboard-contracts';
+import { useBridgeFetch } from '@/lib/use-bridge-fetch';
 
 function downloadTextFile(filename: string | undefined, content: string, mime: string) {
   const blob = new Blob([content], { type: mime });
@@ -16,27 +14,10 @@ function downloadTextFile(filename: string | undefined, content: string, mime: s
 }
 
 export function ReportExportRuntime() {
-  const [payload, setPayload] = useState<ReportExportPayload | null>(null);
-  const [error, setError] = useState<string>('');
-
-  useEffect(() => {
-    let active = true;
-    fetch('/api/python/dashboard/report-export', { cache: 'no-store' })
-      .then(async (response) => {
-        const body = await readJsonOrThrow<ReportExportPayload>(response, 'report export bridge failed');
-        if (active) {
-          setPayload(body);
-        }
-      })
-      .catch((fetchError: unknown) => {
-        if (active) {
-          setError(fetchError instanceof Error ? fetchError.message : String(fetchError));
-        }
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
+  const { payload, error } = useBridgeFetch<ReportExportPayload>(
+    '/api/python/dashboard/report-export',
+    'report export bridge failed',
+  );
 
   if (error) {
     return <p>{error}</p>;

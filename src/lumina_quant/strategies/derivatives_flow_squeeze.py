@@ -20,7 +20,11 @@ from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.alpha_features import simple_return
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.indicators.rolling_stats import rolling_beta
-from lumina_quant.strategies.external_alpha_sleeves import _emit, _target_metadata
+from lumina_quant.strategies.external_alpha_sleeves import (
+    _emit,
+    _extract_feature,
+    _target_metadata,
+)
 from lumina_quant.strategy import Strategy
 from lumina_quant.tuning import HyperParam, resolve_params_from_schema
 
@@ -445,26 +449,7 @@ class DerivativesFlowSqueezeStrategy(Strategy):
         }
 
     def _extract_feature(self, event: Any, symbol: str, field: str) -> float | None:
-        direct = safe_float(getattr(event, field, None))
-        if direct is not None:
-            return direct
-        getter = getattr(self.bars, "get_latest_feature_value", None)
-        if callable(getter):
-            try:
-                value = getter(symbol, field)
-            except Exception:
-                value = None
-            parsed = safe_float(value)
-            if parsed is not None:
-                return parsed
-        getter = getattr(self.bars, "get_latest_bar_value", None)
-        if callable(getter):
-            try:
-                value = getter(symbol, field)
-            except Exception:
-                value = None
-            return safe_float(value)
-        return None
+        return _extract_feature(self.bars, event, symbol, field)
 
     def _resolve_flow_values(
         self,
@@ -1264,26 +1249,7 @@ class LiquidationCascadeReversionStrategy(Strategy):
             return 0
 
     def _extract_feature(self, event: Any, symbol: str, field: str) -> float | None:
-        direct = safe_float(getattr(event, field, None))
-        if direct is not None:
-            return direct
-        getter = getattr(self.bars, "get_latest_feature_value", None)
-        if callable(getter):
-            try:
-                value = getter(symbol, field)
-            except Exception:
-                value = None
-            parsed = safe_float(value)
-            if parsed is not None:
-                return parsed
-        getter = getattr(self.bars, "get_latest_bar_value", None)
-        if callable(getter):
-            try:
-                value = getter(symbol, field)
-            except Exception:
-                value = None
-            return safe_float(value)
-        return None
+        return _extract_feature(self.bars, event, symbol, field)
 
     def calculate_signals_window(self, event: Any, aggregator: Any = None) -> None:
         _ = aggregator

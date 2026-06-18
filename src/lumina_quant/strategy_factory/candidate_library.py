@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from itertools import product
@@ -5055,191 +5055,195 @@ _ACCELERATION_RIDER_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
 }
 
 
+# Per-class parameter coercion schema shared by every single-asset return rider.
+# Each entry is (param_key, coercer); the coercer matches the original literal
+# casts so emitted params stay byte-identical. The three schemas mirror the three
+# rider strategy classes (KAMA adaptive-trend / Donchian breakout / ROC
+# acceleration); the volatility/risk tail is shared verbatim.
+_RIDER_PARAM_TAIL: tuple[tuple[str, Callable[[Any], Any]], ...] = (
+    ("trail_atr_mult", float),
+    ("atr_period", int),
+    ("max_adds", int),
+    ("add_step_atr", float),
+    ("vol_window", int),
+    ("target_vol", float),
+    ("max_hold_bars", int),
+    ("allow_short", bool),
+    ("add_alloc_fraction", float),
+)
+_ADAPTIVE_TREND_RIDER_PARAM_SCHEMA: tuple[tuple[str, Callable[[Any], Any]], ...] = (
+    ("kama_period", int),
+    ("kama_fast", int),
+    ("kama_slow", int),
+    ("min_efficiency", float),
+    ("slope_lookback", int),
+    *_RIDER_PARAM_TAIL,
+)
+_VOLATILITY_BREAKOUT_RIDER_PARAM_SCHEMA: tuple[tuple[str, Callable[[Any], Any]], ...] = (
+    ("donchian_window", int),
+    ("atr_expansion_mult", float),
+    ("atr_baseline_window", int),
+    *_RIDER_PARAM_TAIL,
+)
+_ACCELERATION_RIDER_PARAM_SCHEMA: tuple[tuple[str, Callable[[Any], Any]], ...] = (
+    ("roc_period", int),
+    ("min_roc", float),
+    ("decel_tolerance", float),
+    *_RIDER_PARAM_TAIL,
+)
+
+
+def _emit_rider_candidates(
+    ctx: _CandidateBuildContext,
+    *,
+    symbols: Sequence[str],
+    slice_table: dict[str, tuple[dict[str, Any], ...]],
+    timeframes: Sequence[str],
+    param_schema: tuple[tuple[str, Callable[[Any], Any]], ...],
+    name_prefix: str,
+    name_suffix: Callable[[dict[str, Any]], str],
+    family: str,
+    strategy_class: str,
+    notes: Callable[[dict[str, Any], str, str], str],
+    tags: Sequence[str],
+    extra_metadata: dict[str, Any] | None = None,
+) -> None:
+    """Shared triple-loop + params coercion for single-asset return riders.
+
+    Per-family symbol filters, name prefixes/suffixes, notes, tags, and any extra
+    metadata are passed in verbatim by each builder so candidate identities stay
+    byte-identical; only the duplicated loop/coercion/``_add_candidate`` skeleton
+    is consolidated here.
+    """
+    if not symbols:
+        return
+    for timeframe in ctx._present(*timeframes):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in slice_table.get(timeframe, ()):
+            for symbol in symbols:
+                params = {key: coerce(spec[key]) for key, coerce in param_schema}
+                metadata = {
+                    "timeframe": timeframe,
+                    "retune_profile": str(spec["variant"]),
+                    "symbol_scope": symbol,
+                    "allow_short": bool(spec["allow_short"]),
+                }
+                if extra_metadata:
+                    metadata.update(extra_metadata)
+                metadata["decision_cadence_seconds"] = _RIDER_TF_CADENCE_SECONDS.get(
+                    timeframe, 1800
+                )
+                _add_candidate(
+                    ctx.candidates,
+                    name=(
+                        f"{name_prefix}_{tf_tag}_{spec['variant']}_"
+                        f"{symbol.replace('/', '').lower()}_"
+                        f"{name_suffix(spec)}"
+                    ),
+                    family=family,
+                    strategy_class=strategy_class,
+                    timeframe=timeframe,
+                    symbols=(symbol,),
+                    params=params,
+                    notes=notes(spec, symbol, timeframe),
+                    tags=tuple(tags),
+                    metadata=metadata,
+                )
+
+
 def _build_adaptive_trend_rider_candidates(ctx: _CandidateBuildContext) -> None:
     """Per-symbol KAMA/efficiency adaptive-trend rider (single-asset, return-max)."""
     # Crypto-only: tradfi equity/ETF perps are routed through the dedicated
     # equity single-name rider, so this crypto sleeve must not trade them.
-    crypto_symbols = ctx.crypto_only_symbols
-    if not crypto_symbols:
-        return
-    for timeframe in ctx._present("30m", "1h", "4h", "1d"):
-        tf_tag = timeframe.replace("/", "-")
-        for spec in _ADAPTIVE_TREND_RIDER_SLICE.get(timeframe, ()):
-            for symbol in crypto_symbols:
-                params = {
-                    "kama_period": int(spec["kama_period"]),
-                    "kama_fast": int(spec["kama_fast"]),
-                    "kama_slow": int(spec["kama_slow"]),
-                    "min_efficiency": float(spec["min_efficiency"]),
-                    "slope_lookback": int(spec["slope_lookback"]),
-                    "trail_atr_mult": float(spec["trail_atr_mult"]),
-                    "atr_period": int(spec["atr_period"]),
-                    "max_adds": int(spec["max_adds"]),
-                    "add_step_atr": float(spec["add_step_atr"]),
-                    "vol_window": int(spec["vol_window"]),
-                    "target_vol": float(spec["target_vol"]),
-                    "max_hold_bars": int(spec["max_hold_bars"]),
-                    "allow_short": bool(spec["allow_short"]),
-                    "add_alloc_fraction": float(spec["add_alloc_fraction"]),
-                }
-                _add_candidate(
-                    ctx.candidates,
-                    name=(
-                        f"adaptive_trend_rider_{tf_tag}_{spec['variant']}_"
-                        f"{symbol.replace('/', '').lower()}_"
-                        f"{float(spec['trail_atr_mult']):.1f}"
-                    ),
-                    family="trend",
-                    strategy_class="AdaptiveTrendRiderStrategy",
-                    timeframe=timeframe,
-                    symbols=(symbol,),
-                    params=params,
-                    notes=(
-                        "Per-symbol KAMA/efficiency-confirmed adaptive-trend rider "
-                        "that rides winners with an ATR trailing stop and pyramids "
-                        "into continuation for high compound return on "
-                        f"{symbol} at {timeframe} ({spec['variant']})."
-                    ),
-                    tags=(
-                        "trend",
-                        "return_rider",
-                        "trailing_stop",
-                        "pyramiding",
-                        "single_asset",
-                        "crypto",
-                    ),
-                    metadata={
-                        "timeframe": timeframe,
-                        "retune_profile": str(spec["variant"]),
-                        "symbol_scope": symbol,
-                        "allow_short": bool(spec["allow_short"]),
-                        "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
-                    },
-                )
+    _emit_rider_candidates(
+        ctx,
+        symbols=ctx.crypto_only_symbols,
+        slice_table=_ADAPTIVE_TREND_RIDER_SLICE,
+        timeframes=("30m", "1h", "4h", "1d"),
+        param_schema=_ADAPTIVE_TREND_RIDER_PARAM_SCHEMA,
+        name_prefix="adaptive_trend_rider",
+        name_suffix=lambda spec: f"{float(spec['trail_atr_mult']):.1f}",
+        family="trend",
+        strategy_class="AdaptiveTrendRiderStrategy",
+        notes=lambda spec, symbol, timeframe: (
+            "Per-symbol KAMA/efficiency-confirmed adaptive-trend rider "
+            "that rides winners with an ATR trailing stop and pyramids "
+            "into continuation for high compound return on "
+            f"{symbol} at {timeframe} ({spec['variant']})."
+        ),
+        tags=(
+            "trend",
+            "return_rider",
+            "trailing_stop",
+            "pyramiding",
+            "single_asset",
+            "crypto",
+        ),
+    )
 
 
 def _build_volatility_breakout_rider_candidates(ctx: _CandidateBuildContext) -> None:
     """Per-symbol Donchian/ATR-expansion breakout rider (single-asset, return-max)."""
     # Crypto-only: tradfi equity/ETF perps are routed through the dedicated
     # equity/leveraged-ETF trend builders, so this crypto sleeve excludes them.
-    crypto_symbols = ctx.crypto_only_symbols
-    if not crypto_symbols:
-        return
-    for timeframe in ctx._present("30m", "1h", "4h", "1d"):
-        tf_tag = timeframe.replace("/", "-")
-        for spec in _VOLATILITY_BREAKOUT_RIDER_SLICE.get(timeframe, ()):
-            for symbol in crypto_symbols:
-                params = {
-                    "donchian_window": int(spec["donchian_window"]),
-                    "atr_expansion_mult": float(spec["atr_expansion_mult"]),
-                    "atr_baseline_window": int(spec["atr_baseline_window"]),
-                    "trail_atr_mult": float(spec["trail_atr_mult"]),
-                    "atr_period": int(spec["atr_period"]),
-                    "max_adds": int(spec["max_adds"]),
-                    "add_step_atr": float(spec["add_step_atr"]),
-                    "vol_window": int(spec["vol_window"]),
-                    "target_vol": float(spec["target_vol"]),
-                    "max_hold_bars": int(spec["max_hold_bars"]),
-                    "allow_short": bool(spec["allow_short"]),
-                    "add_alloc_fraction": float(spec["add_alloc_fraction"]),
-                }
-                _add_candidate(
-                    ctx.candidates,
-                    name=(
-                        f"volatility_breakout_rider_{tf_tag}_{spec['variant']}_"
-                        f"{symbol.replace('/', '').lower()}_"
-                        f"{int(spec['donchian_window'])}"
-                    ),
-                    family="breakout",
-                    strategy_class="VolatilityBreakoutRiderStrategy",
-                    timeframe=timeframe,
-                    symbols=(symbol,),
-                    params=params,
-                    notes=(
-                        "Per-symbol Donchian breakout rider confirmed by ATR "
-                        "expansion that rides the move with an ATR trailing stop "
-                        "and pyramids on follow-through to capture explosive "
-                        f"range expansions on {symbol} at {timeframe} "
-                        f"({spec['variant']})."
-                    ),
-                    tags=(
-                        "breakout",
-                        "return_rider",
-                        "trailing_stop",
-                        "pyramiding",
-                        "single_asset",
-                        "crypto",
-                    ),
-                    metadata={
-                        "timeframe": timeframe,
-                        "retune_profile": str(spec["variant"]),
-                        "symbol_scope": symbol,
-                        "allow_short": bool(spec["allow_short"]),
-                        "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
-                    },
-                )
+    _emit_rider_candidates(
+        ctx,
+        symbols=ctx.crypto_only_symbols,
+        slice_table=_VOLATILITY_BREAKOUT_RIDER_SLICE,
+        timeframes=("30m", "1h", "4h", "1d"),
+        param_schema=_VOLATILITY_BREAKOUT_RIDER_PARAM_SCHEMA,
+        name_prefix="volatility_breakout_rider",
+        name_suffix=lambda spec: f"{int(spec['donchian_window'])}",
+        family="breakout",
+        strategy_class="VolatilityBreakoutRiderStrategy",
+        notes=lambda spec, symbol, timeframe: (
+            "Per-symbol Donchian breakout rider confirmed by ATR "
+            "expansion that rides the move with an ATR trailing stop "
+            "and pyramids on follow-through to capture explosive "
+            f"range expansions on {symbol} at {timeframe} "
+            f"({spec['variant']})."
+        ),
+        tags=(
+            "breakout",
+            "return_rider",
+            "trailing_stop",
+            "pyramiding",
+            "single_asset",
+            "crypto",
+        ),
+    )
 
 
 def _build_acceleration_rider_candidates(ctx: _CandidateBuildContext) -> None:
     """Per-symbol accelerating-momentum rider (single-asset, return-max)."""
     # Crypto-only: tradfi equity/ETF perps are routed through the dedicated
     # equity trend/rotation builders, so this crypto sleeve excludes them.
-    crypto_symbols = ctx.crypto_only_symbols
-    if not crypto_symbols:
-        return
-    for timeframe in ctx._present("30m", "1h", "4h", "1d"):
-        tf_tag = timeframe.replace("/", "-")
-        for spec in _ACCELERATION_RIDER_SLICE.get(timeframe, ()):
-            for symbol in crypto_symbols:
-                params = {
-                    "roc_period": int(spec["roc_period"]),
-                    "min_roc": float(spec["min_roc"]),
-                    "decel_tolerance": float(spec["decel_tolerance"]),
-                    "trail_atr_mult": float(spec["trail_atr_mult"]),
-                    "atr_period": int(spec["atr_period"]),
-                    "max_adds": int(spec["max_adds"]),
-                    "add_step_atr": float(spec["add_step_atr"]),
-                    "vol_window": int(spec["vol_window"]),
-                    "target_vol": float(spec["target_vol"]),
-                    "max_hold_bars": int(spec["max_hold_bars"]),
-                    "allow_short": bool(spec["allow_short"]),
-                    "add_alloc_fraction": float(spec["add_alloc_fraction"]),
-                }
-                _add_candidate(
-                    ctx.candidates,
-                    name=(
-                        f"acceleration_rider_{tf_tag}_{spec['variant']}_"
-                        f"{symbol.replace('/', '').lower()}_"
-                        f"{int(spec['roc_period'])}"
-                    ),
-                    family="momentum",
-                    strategy_class="AccelerationRiderStrategy",
-                    timeframe=timeframe,
-                    symbols=(symbol,),
-                    params=params,
-                    notes=(
-                        "Per-symbol accelerating-momentum rider that enters when "
-                        "rate-of-change is positive and rising (or negative and "
-                        "falling), rides with an ATR trailing stop, and pyramids "
-                        "while acceleration persists to capture parabolic moves on "
-                        f"{symbol} at {timeframe} ({spec['variant']})."
-                    ),
-                    tags=(
-                        "momentum",
-                        "return_rider",
-                        "trailing_stop",
-                        "pyramiding",
-                        "single_asset",
-                        "crypto",
-                    ),
-                    metadata={
-                        "timeframe": timeframe,
-                        "retune_profile": str(spec["variant"]),
-                        "symbol_scope": symbol,
-                        "allow_short": bool(spec["allow_short"]),
-                        "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
-                    },
-                )
+    _emit_rider_candidates(
+        ctx,
+        symbols=ctx.crypto_only_symbols,
+        slice_table=_ACCELERATION_RIDER_SLICE,
+        timeframes=("30m", "1h", "4h", "1d"),
+        param_schema=_ACCELERATION_RIDER_PARAM_SCHEMA,
+        name_prefix="acceleration_rider",
+        name_suffix=lambda spec: f"{int(spec['roc_period'])}",
+        family="momentum",
+        strategy_class="AccelerationRiderStrategy",
+        notes=lambda spec, symbol, timeframe: (
+            "Per-symbol accelerating-momentum rider that enters when "
+            "rate-of-change is positive and rising (or negative and "
+            "falling), rides with an ATR trailing stop, and pyramids "
+            "while acceleration persists to capture parabolic moves on "
+            f"{symbol} at {timeframe} ({spec['variant']})."
+        ),
+        tags=(
+            "momentum",
+            "return_rider",
+            "trailing_stop",
+            "pyramiding",
+            "single_asset",
+            "crypto",
+        ),
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -5919,66 +5923,34 @@ _EQUITY_SINGLE_NAME_TREND_RIDER_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
 
 def _build_equity_single_name_trend_rider_candidates(ctx: _CandidateBuildContext) -> None:
     """S-EQ1 — single-name EQUITY trend rider (reuse AdaptiveTrendRider, long-only)."""
-    equity_symbols = _intersect_universe(_EQUITY_FACTOR_UNIVERSE, ctx.normalized_symbols)
-    if not equity_symbols:
-        return
-    for timeframe in ctx._present("4h", "1d"):
-        tf_tag = timeframe.replace("/", "-")
-        for spec in _EQUITY_SINGLE_NAME_TREND_RIDER_SLICE.get(timeframe, ()):
-            for symbol in equity_symbols:
-                params = {
-                    "kama_period": int(spec["kama_period"]),
-                    "kama_fast": int(spec["kama_fast"]),
-                    "kama_slow": int(spec["kama_slow"]),
-                    "min_efficiency": float(spec["min_efficiency"]),
-                    "slope_lookback": int(spec["slope_lookback"]),
-                    "trail_atr_mult": float(spec["trail_atr_mult"]),
-                    "atr_period": int(spec["atr_period"]),
-                    "max_adds": int(spec["max_adds"]),
-                    "add_step_atr": float(spec["add_step_atr"]),
-                    "vol_window": int(spec["vol_window"]),
-                    "target_vol": float(spec["target_vol"]),
-                    "max_hold_bars": int(spec["max_hold_bars"]),
-                    "allow_short": bool(spec["allow_short"]),
-                    "add_alloc_fraction": float(spec["add_alloc_fraction"]),
-                }
-                _add_candidate(
-                    ctx.candidates,
-                    name=(
-                        f"equity_single_name_trend_rider_{tf_tag}_{spec['variant']}_"
-                        f"{symbol.replace('/', '').lower()}_"
-                        f"{float(spec['trail_atr_mult']):.1f}"
-                    ),
-                    family="trend",
-                    strategy_class="AdaptiveTrendRiderStrategy",
-                    timeframe=timeframe,
-                    symbols=(symbol,),
-                    params=params,
-                    notes=(
-                        "DORMANT equity tranche: long-only single-name KAMA/"
-                        "efficiency adaptive-trend rider that rides secular equity "
-                        "winners with an ATR trailing stop and pyramids into "
-                        f"continuation for high compound return on {symbol} at "
-                        f"{timeframe} ({spec['variant']}); self-skips until equity "
-                        "perps materialize."
-                    ),
-                    tags=(
-                        "trend",
-                        "return_rider",
-                        "trailing_stop",
-                        "pyramiding",
-                        "single_asset",
-                        "equity",
-                    ),
-                    metadata={
-                        "timeframe": timeframe,
-                        "retune_profile": str(spec["variant"]),
-                        "symbol_scope": symbol,
-                        "allow_short": bool(spec["allow_short"]),
-                        "dormant_tranche": True,
-                        "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
-                    },
-                )
+    _emit_rider_candidates(
+        ctx,
+        symbols=_intersect_universe(_EQUITY_FACTOR_UNIVERSE, ctx.normalized_symbols),
+        slice_table=_EQUITY_SINGLE_NAME_TREND_RIDER_SLICE,
+        timeframes=("4h", "1d"),
+        param_schema=_ADAPTIVE_TREND_RIDER_PARAM_SCHEMA,
+        name_prefix="equity_single_name_trend_rider",
+        name_suffix=lambda spec: f"{float(spec['trail_atr_mult']):.1f}",
+        family="trend",
+        strategy_class="AdaptiveTrendRiderStrategy",
+        notes=lambda spec, symbol, timeframe: (
+            "DORMANT equity tranche: long-only single-name KAMA/"
+            "efficiency adaptive-trend rider that rides secular equity "
+            "winners with an ATR trailing stop and pyramids into "
+            f"continuation for high compound return on {symbol} at "
+            f"{timeframe} ({spec['variant']}); self-skips until equity "
+            "perps materialize."
+        ),
+        tags=(
+            "trend",
+            "return_rider",
+            "trailing_stop",
+            "pyramiding",
+            "single_asset",
+            "equity",
+        ),
+        extra_metadata={"dormant_tranche": True},
+    )
 
 
 # S-CMDY1/2/3 commodity/macro MANAGED-FUTURES trend riders: REUSE the three proven
@@ -6106,187 +6078,95 @@ _COMMODITY_ACCELERATION_RIDER_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
 
 def _build_commodity_adaptive_trend_rider_candidates(ctx: _CandidateBuildContext) -> None:
     """S-CMDY1 — commodity managed-futures KAMA trend rider (reuse AdaptiveTrendRider, long/short)."""
-    commodity_symbols = _intersect_universe(_COMMODITY_TREND_UNIVERSE, ctx.normalized_symbols)
-    if not commodity_symbols:
-        return
-    for timeframe in ctx._present("4h", "1d"):
-        tf_tag = timeframe.replace("/", "-")
-        for spec in _COMMODITY_ADAPTIVE_TREND_RIDER_SLICE.get(timeframe, ()):
-            for symbol in commodity_symbols:
-                params = {
-                    "kama_period": int(spec["kama_period"]),
-                    "kama_fast": int(spec["kama_fast"]),
-                    "kama_slow": int(spec["kama_slow"]),
-                    "min_efficiency": float(spec["min_efficiency"]),
-                    "slope_lookback": int(spec["slope_lookback"]),
-                    "trail_atr_mult": float(spec["trail_atr_mult"]),
-                    "atr_period": int(spec["atr_period"]),
-                    "max_adds": int(spec["max_adds"]),
-                    "add_step_atr": float(spec["add_step_atr"]),
-                    "vol_window": int(spec["vol_window"]),
-                    "target_vol": float(spec["target_vol"]),
-                    "max_hold_bars": int(spec["max_hold_bars"]),
-                    "allow_short": bool(spec["allow_short"]),
-                    "add_alloc_fraction": float(spec["add_alloc_fraction"]),
-                }
-                _add_candidate(
-                    ctx.candidates,
-                    name=(
-                        f"commodity_adaptive_trend_rider_{tf_tag}_{spec['variant']}_"
-                        f"{symbol.replace('/', '').lower()}_"
-                        f"{float(spec['trail_atr_mult']):.1f}"
-                    ),
-                    family="trend",
-                    strategy_class="AdaptiveTrendRiderStrategy",
-                    timeframe=timeframe,
-                    symbols=(symbol,),
-                    params=params,
-                    notes=(
-                        "Commodity/macro managed-futures KAMA/efficiency trend rider "
-                        "that rides commodity trends BOTH ways (long and short) with "
-                        "an ATR trailing stop and pyramids into continuation for high "
-                        f"compound return on {symbol} at {timeframe} ({spec['variant']})."
-                    ),
-                    tags=(
-                        "trend",
-                        "return_rider",
-                        "trailing_stop",
-                        "pyramiding",
-                        "single_asset",
-                        "commodity",
-                        "managed_futures",
-                    ),
-                    metadata={
-                        "timeframe": timeframe,
-                        "retune_profile": str(spec["variant"]),
-                        "symbol_scope": symbol,
-                        "allow_short": bool(spec["allow_short"]),
-                        "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
-                    },
-                )
+    _emit_rider_candidates(
+        ctx,
+        symbols=_intersect_universe(_COMMODITY_TREND_UNIVERSE, ctx.normalized_symbols),
+        slice_table=_COMMODITY_ADAPTIVE_TREND_RIDER_SLICE,
+        timeframes=("4h", "1d"),
+        param_schema=_ADAPTIVE_TREND_RIDER_PARAM_SCHEMA,
+        name_prefix="commodity_adaptive_trend_rider",
+        name_suffix=lambda spec: f"{float(spec['trail_atr_mult']):.1f}",
+        family="trend",
+        strategy_class="AdaptiveTrendRiderStrategy",
+        notes=lambda spec, symbol, timeframe: (
+            "Commodity/macro managed-futures KAMA/efficiency trend rider "
+            "that rides commodity trends BOTH ways (long and short) with "
+            "an ATR trailing stop and pyramids into continuation for high "
+            f"compound return on {symbol} at {timeframe} ({spec['variant']})."
+        ),
+        tags=(
+            "trend",
+            "return_rider",
+            "trailing_stop",
+            "pyramiding",
+            "single_asset",
+            "commodity",
+            "managed_futures",
+        ),
+    )
 
 
 def _build_commodity_breakout_rider_candidates(ctx: _CandidateBuildContext) -> None:
     """S-CMDY2 — commodity managed-futures Donchian breakout rider (reuse VolBreakoutRider, long/short)."""
-    commodity_symbols = _intersect_universe(_COMMODITY_TREND_UNIVERSE, ctx.normalized_symbols)
-    if not commodity_symbols:
-        return
-    for timeframe in ctx._present("4h", "1d"):
-        tf_tag = timeframe.replace("/", "-")
-        for spec in _COMMODITY_BREAKOUT_RIDER_SLICE.get(timeframe, ()):
-            for symbol in commodity_symbols:
-                params = {
-                    "donchian_window": int(spec["donchian_window"]),
-                    "atr_expansion_mult": float(spec["atr_expansion_mult"]),
-                    "atr_baseline_window": int(spec["atr_baseline_window"]),
-                    "trail_atr_mult": float(spec["trail_atr_mult"]),
-                    "atr_period": int(spec["atr_period"]),
-                    "max_adds": int(spec["max_adds"]),
-                    "add_step_atr": float(spec["add_step_atr"]),
-                    "vol_window": int(spec["vol_window"]),
-                    "target_vol": float(spec["target_vol"]),
-                    "max_hold_bars": int(spec["max_hold_bars"]),
-                    "allow_short": bool(spec["allow_short"]),
-                    "add_alloc_fraction": float(spec["add_alloc_fraction"]),
-                }
-                _add_candidate(
-                    ctx.candidates,
-                    name=(
-                        f"commodity_breakout_rider_{tf_tag}_{spec['variant']}_"
-                        f"{symbol.replace('/', '').lower()}_"
-                        f"{int(spec['donchian_window'])}"
-                    ),
-                    family="breakout",
-                    strategy_class="VolatilityBreakoutRiderStrategy",
-                    timeframe=timeframe,
-                    symbols=(symbol,),
-                    params=params,
-                    notes=(
-                        "Commodity/macro managed-futures Donchian breakout rider "
-                        "confirmed by ATR expansion that rides commodity range "
-                        "expansions BOTH ways (long and short) with an ATR trailing "
-                        "stop and pyramids on follow-through for high compound return "
-                        f"on {symbol} at {timeframe} ({spec['variant']})."
-                    ),
-                    tags=(
-                        "breakout",
-                        "return_rider",
-                        "trailing_stop",
-                        "pyramiding",
-                        "single_asset",
-                        "commodity",
-                        "managed_futures",
-                    ),
-                    metadata={
-                        "timeframe": timeframe,
-                        "retune_profile": str(spec["variant"]),
-                        "symbol_scope": symbol,
-                        "allow_short": bool(spec["allow_short"]),
-                        "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
-                    },
-                )
+    _emit_rider_candidates(
+        ctx,
+        symbols=_intersect_universe(_COMMODITY_TREND_UNIVERSE, ctx.normalized_symbols),
+        slice_table=_COMMODITY_BREAKOUT_RIDER_SLICE,
+        timeframes=("4h", "1d"),
+        param_schema=_VOLATILITY_BREAKOUT_RIDER_PARAM_SCHEMA,
+        name_prefix="commodity_breakout_rider",
+        name_suffix=lambda spec: f"{int(spec['donchian_window'])}",
+        family="breakout",
+        strategy_class="VolatilityBreakoutRiderStrategy",
+        notes=lambda spec, symbol, timeframe: (
+            "Commodity/macro managed-futures Donchian breakout rider "
+            "confirmed by ATR expansion that rides commodity range "
+            "expansions BOTH ways (long and short) with an ATR trailing "
+            "stop and pyramids on follow-through for high compound return "
+            f"on {symbol} at {timeframe} ({spec['variant']})."
+        ),
+        tags=(
+            "breakout",
+            "return_rider",
+            "trailing_stop",
+            "pyramiding",
+            "single_asset",
+            "commodity",
+            "managed_futures",
+        ),
+    )
 
 
 def _build_commodity_acceleration_rider_candidates(ctx: _CandidateBuildContext) -> None:
     """S-CMDY3 — commodity managed-futures accelerating-momentum rider (reuse AccelerationRider, long/short)."""
-    commodity_symbols = _intersect_universe(_COMMODITY_TREND_UNIVERSE, ctx.normalized_symbols)
-    if not commodity_symbols:
-        return
-    for timeframe in ctx._present("4h", "1d"):
-        tf_tag = timeframe.replace("/", "-")
-        for spec in _COMMODITY_ACCELERATION_RIDER_SLICE.get(timeframe, ()):
-            for symbol in commodity_symbols:
-                params = {
-                    "roc_period": int(spec["roc_period"]),
-                    "min_roc": float(spec["min_roc"]),
-                    "decel_tolerance": float(spec["decel_tolerance"]),
-                    "trail_atr_mult": float(spec["trail_atr_mult"]),
-                    "atr_period": int(spec["atr_period"]),
-                    "max_adds": int(spec["max_adds"]),
-                    "add_step_atr": float(spec["add_step_atr"]),
-                    "vol_window": int(spec["vol_window"]),
-                    "target_vol": float(spec["target_vol"]),
-                    "max_hold_bars": int(spec["max_hold_bars"]),
-                    "allow_short": bool(spec["allow_short"]),
-                    "add_alloc_fraction": float(spec["add_alloc_fraction"]),
-                }
-                _add_candidate(
-                    ctx.candidates,
-                    name=(
-                        f"commodity_acceleration_rider_{tf_tag}_{spec['variant']}_"
-                        f"{symbol.replace('/', '').lower()}_"
-                        f"{int(spec['roc_period'])}"
-                    ),
-                    family="momentum",
-                    strategy_class="AccelerationRiderStrategy",
-                    timeframe=timeframe,
-                    symbols=(symbol,),
-                    params=params,
-                    notes=(
-                        "Commodity/macro managed-futures accelerating-momentum rider "
-                        "that enters on positive-and-rising (or negative-and-falling) "
-                        "rate-of-change, rides commodity trends BOTH ways (long and "
-                        "short) with an ATR trailing stop, and pyramids while "
-                        "acceleration persists for high compound return on "
-                        f"{symbol} at {timeframe} ({spec['variant']})."
-                    ),
-                    tags=(
-                        "momentum",
-                        "return_rider",
-                        "trailing_stop",
-                        "pyramiding",
-                        "single_asset",
-                        "commodity",
-                        "managed_futures",
-                    ),
-                    metadata={
-                        "timeframe": timeframe,
-                        "retune_profile": str(spec["variant"]),
-                        "symbol_scope": symbol,
-                        "allow_short": bool(spec["allow_short"]),
-                        "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
-                    },
-                )
+    _emit_rider_candidates(
+        ctx,
+        symbols=_intersect_universe(_COMMODITY_TREND_UNIVERSE, ctx.normalized_symbols),
+        slice_table=_COMMODITY_ACCELERATION_RIDER_SLICE,
+        timeframes=("4h", "1d"),
+        param_schema=_ACCELERATION_RIDER_PARAM_SCHEMA,
+        name_prefix="commodity_acceleration_rider",
+        name_suffix=lambda spec: f"{int(spec['roc_period'])}",
+        family="momentum",
+        strategy_class="AccelerationRiderStrategy",
+        notes=lambda spec, symbol, timeframe: (
+            "Commodity/macro managed-futures accelerating-momentum rider "
+            "that enters on positive-and-rising (or negative-and-falling) "
+            "rate-of-change, rides commodity trends BOTH ways (long and "
+            "short) with an ATR trailing stop, and pyramids while "
+            "acceleration persists for high compound return on "
+            f"{symbol} at {timeframe} ({spec['variant']})."
+        ),
+        tags=(
+            "momentum",
+            "return_rider",
+            "trailing_stop",
+            "pyramiding",
+            "single_asset",
+            "commodity",
+            "managed_futures",
+        ),
+    )
 
 
 # S-EQ-52WH equity 52-WEEK-HIGH breakout momentum rider: REUSES
@@ -6337,62 +6217,32 @@ _EQUITY_NEW_HIGH_BREAKOUT_RIDER_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
 
 def _build_equity_new_high_breakout_rider_candidates(ctx: _CandidateBuildContext) -> None:
     """S-EQ-52WH — equity 52-week-high breakout momentum rider (reuse VolBreakoutRider, long-only)."""
-    equity_symbols = _intersect_universe(_EQUITY_FACTOR_UNIVERSE, ctx.normalized_symbols)
-    if not equity_symbols:
-        return
-    for timeframe in ctx._present("4h", "1d"):
-        tf_tag = timeframe.replace("/", "-")
-        for spec in _EQUITY_NEW_HIGH_BREAKOUT_RIDER_SLICE.get(timeframe, ()):
-            for symbol in equity_symbols:
-                params = {
-                    "donchian_window": int(spec["donchian_window"]),
-                    "atr_expansion_mult": float(spec["atr_expansion_mult"]),
-                    "atr_baseline_window": int(spec["atr_baseline_window"]),
-                    "trail_atr_mult": float(spec["trail_atr_mult"]),
-                    "atr_period": int(spec["atr_period"]),
-                    "max_adds": int(spec["max_adds"]),
-                    "add_step_atr": float(spec["add_step_atr"]),
-                    "vol_window": int(spec["vol_window"]),
-                    "target_vol": float(spec["target_vol"]),
-                    "max_hold_bars": int(spec["max_hold_bars"]),
-                    "allow_short": bool(spec["allow_short"]),
-                    "add_alloc_fraction": float(spec["add_alloc_fraction"]),
-                }
-                _add_candidate(
-                    ctx.candidates,
-                    name=(
-                        f"equity_new_high_breakout_rider_{tf_tag}_{spec['variant']}_"
-                        f"{symbol.replace('/', '').lower()}_"
-                        f"{int(spec['donchian_window'])}"
-                    ),
-                    family="breakout",
-                    strategy_class="VolatilityBreakoutRiderStrategy",
-                    timeframe=timeframe,
-                    symbols=(symbol,),
-                    params=params,
-                    notes=(
-                        "George/Hwang 52-week-high momentum: long-only single-name "
-                        "equity rider that buys a fresh ~252-bar (52-week) new high "
-                        "and rides it with the inherited ATR trailing stop, pyramiding "
-                        "on follow-through. Stocks near their 52-week high keep "
-                        f"outperforming on {symbol} at {timeframe} ({spec['variant']})."
-                    ),
-                    tags=(
-                        "breakout",
-                        "momentum",
-                        "52w_high",
-                        "single_asset",
-                        "equity",
-                        "return_rider",
-                    ),
-                    metadata={
-                        "timeframe": timeframe,
-                        "retune_profile": str(spec["variant"]),
-                        "symbol_scope": symbol,
-                        "allow_short": bool(spec["allow_short"]),
-                        "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
-                    },
-                )
+    _emit_rider_candidates(
+        ctx,
+        symbols=_intersect_universe(_EQUITY_FACTOR_UNIVERSE, ctx.normalized_symbols),
+        slice_table=_EQUITY_NEW_HIGH_BREAKOUT_RIDER_SLICE,
+        timeframes=("4h", "1d"),
+        param_schema=_VOLATILITY_BREAKOUT_RIDER_PARAM_SCHEMA,
+        name_prefix="equity_new_high_breakout_rider",
+        name_suffix=lambda spec: f"{int(spec['donchian_window'])}",
+        family="breakout",
+        strategy_class="VolatilityBreakoutRiderStrategy",
+        notes=lambda spec, symbol, timeframe: (
+            "George/Hwang 52-week-high momentum: long-only single-name "
+            "equity rider that buys a fresh ~252-bar (52-week) new high "
+            "and rides it with the inherited ATR trailing stop, pyramiding "
+            "on follow-through. Stocks near their 52-week high keep "
+            f"outperforming on {symbol} at {timeframe} ({spec['variant']})."
+        ),
+        tags=(
+            "breakout",
+            "momentum",
+            "52w_high",
+            "single_asset",
+            "equity",
+            "return_rider",
+        ),
+    )
 
 
 # S-EQ2 leveraged-ETF trend timing: NEW LeveragedTrendTimingRiderStrategy, LONG
@@ -10651,12 +10501,11 @@ def build_article_pipeline_candidates(
     return article_rows
 
 
-def build_candidate_manifest(
-    *,
-    timeframes: Sequence[str] = DEFAULT_TIMEFRAMES,
-    symbols: Sequence[str] = DEFAULT_BINANCE_TOP10_PLUS_METALS,
-) -> dict[str, Any]:
-    """Build a JSON-ready manifest with aggregate metadata."""
+def _normalize_manifest_inputs(
+    timeframes: Sequence[str],
+    symbols: Sequence[str],
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Canonicalize symbols + normalize timeframes shared by both manifests."""
     normalized_symbols = tuple(canonicalize_symbol_list(symbols))
     normalized_timeframes = tuple(
         normalize_strategy_timeframes(
@@ -10665,15 +10514,22 @@ def build_candidate_manifest(
             strict_subset=True,
         )
     )
-    candidates = build_binance_futures_candidates(
-        timeframes=normalized_timeframes,
-        symbols=normalized_symbols,
-    )
+    return normalized_symbols, normalized_timeframes
 
+
+def _manifest_body(
+    normalized_symbols: tuple[str, ...],
+    normalized_timeframes: tuple[str, ...],
+    candidates: Sequence[StrategyCandidate],
+) -> dict[str, Any]:
+    """Normalize-count-serialize skeleton shared by both manifest builders.
+
+    Returns the common manifest body; callers append any extra aggregates (e.g.
+    article-pipeline family counts) before returning.
+    """
     family_counts: dict[str, int] = {}
     strategy_counts: dict[str, int] = {}
     timeframe_counts: dict[str, int] = {}
-
     for candidate in candidates:
         family_counts[candidate.family] = family_counts.get(candidate.family, 0) + 1
         strategy_counts[candidate.strategy_class] = (
@@ -10691,6 +10547,20 @@ def build_candidate_manifest(
         "timeframe_counts": timeframe_counts,
         "candidates": [candidate.to_dict() for candidate in candidates],
     }
+
+
+def build_candidate_manifest(
+    *,
+    timeframes: Sequence[str] = DEFAULT_TIMEFRAMES,
+    symbols: Sequence[str] = DEFAULT_BINANCE_TOP10_PLUS_METALS,
+) -> dict[str, Any]:
+    """Build a JSON-ready manifest with aggregate metadata."""
+    normalized_symbols, normalized_timeframes = _normalize_manifest_inputs(timeframes, symbols)
+    candidates = build_binance_futures_candidates(
+        timeframes=normalized_timeframes,
+        symbols=normalized_symbols,
+    )
+    return _manifest_body(normalized_symbols, normalized_timeframes, candidates)
 
 
 def build_article_pipeline_manifest(
@@ -10700,14 +10570,7 @@ def build_article_pipeline_manifest(
     max_per_family: int = 0,
     max_total: int = 0,
 ) -> dict[str, Any]:
-    normalized_symbols = tuple(canonicalize_symbol_list(symbols))
-    normalized_timeframes = tuple(
-        normalize_strategy_timeframes(
-            list(timeframes),
-            required=CANONICAL_STRATEGY_TIMEFRAMES,
-            strict_subset=True,
-        )
-    )
+    normalized_symbols, normalized_timeframes = _normalize_manifest_inputs(timeframes, symbols)
     candidates = build_article_pipeline_candidates(
         timeframes=normalized_timeframes,
         symbols=normalized_symbols,
@@ -10715,30 +10578,14 @@ def build_article_pipeline_manifest(
         max_total=max_total,
     )
 
-    family_counts: dict[str, int] = {}
-    strategy_counts: dict[str, int] = {}
-    timeframe_counts: dict[str, int] = {}
     article_family_counts: dict[str, int] = {}
     for candidate in candidates:
-        family_counts[candidate.family] = family_counts.get(candidate.family, 0) + 1
-        strategy_counts[candidate.strategy_class] = (
-            strategy_counts.get(candidate.strategy_class, 0) + 1
-        )
-        timeframe_counts[candidate.timeframe] = timeframe_counts.get(candidate.timeframe, 0) + 1
         for family_id in list(candidate.metadata.get("article_pipeline_family_ids") or []):
             token = str(family_id)
             article_family_counts[token] = article_family_counts.get(token, 0) + 1
 
-    return {
-        "generated_at": datetime.now(UTC).isoformat(),
-        "symbol_universe": list(normalized_symbols),
-        "timeframes": list(normalized_timeframes),
-        "candidate_count": len(candidates),
-        "family_counts": family_counts,
-        "strategy_counts": strategy_counts,
-        "timeframe_counts": timeframe_counts,
-        "article_family_counts": article_family_counts,
-        "max_per_family": int(max_per_family),
-        "max_total": int(max_total),
-        "candidates": [candidate.to_dict() for candidate in candidates],
-    }
+    manifest = _manifest_body(normalized_symbols, normalized_timeframes, candidates)
+    manifest["article_family_counts"] = article_family_counts
+    manifest["max_per_family"] = int(max_per_family)
+    manifest["max_total"] = int(max_total)
+    return manifest

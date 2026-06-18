@@ -1,39 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-
-import { readJsonOrThrow } from '@/lib/bridge-fetch';
 import type { MarketDataPayload } from '@/lib/dashboard-contracts';
-
-function formatMetricValue(value: number | string | null | undefined): string {
-  if (value === null || value === undefined || value === '') {
-    return 'n/a';
-  }
-  return String(value);
-}
+import { formatMetricValue } from '@/lib/format';
+import { useBridgeFetch } from '@/lib/use-bridge-fetch';
 
 export function MarketDataRuntime() {
-  const [payload, setPayload] = useState<MarketDataPayload | null>(null);
-  const [error, setError] = useState<string>('');
-
-  useEffect(() => {
-    let active = true;
-    fetch('/api/python/dashboard/market-data', { cache: 'no-store' })
-      .then(async (response) => {
-        const body = await readJsonOrThrow<MarketDataPayload>(response, 'market data bridge failed');
-        if (active) {
-          setPayload(body);
-        }
-      })
-      .catch((fetchError: unknown) => {
-        if (active) {
-          setError(fetchError instanceof Error ? fetchError.message : String(fetchError));
-        }
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
+  const { payload, error } = useBridgeFetch<MarketDataPayload>(
+    '/api/python/dashboard/market-data',
+    'market data bridge failed',
+  );
 
   if (error) {
     return <p>{error}</p>;

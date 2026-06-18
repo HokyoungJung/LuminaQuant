@@ -43,6 +43,7 @@ from lumina_quant.strategies.external_alpha_sleeves import (
     _Snapshot,
     _emit,
     _event_symbols,
+    _extract_feature,
     _market_snapshot,
     _safe_non_negative_int,
     _target_metadata,
@@ -567,25 +568,7 @@ class ConfidenceGatedTrendStrategy(Strategy):
         }
 
     def _extract_feature(self, event: Any, symbol: str, field: str) -> float | None:
-        """Own 3-arg feature accessor (event -> latest feature -> latest bar)."""
-        direct = safe_float(getattr(event, field, None))
-        if direct is not None:
-            return direct
-        getter = getattr(self.bars, "get_latest_feature_value", None)
-        if callable(getter):
-            try:
-                parsed = safe_float(getter(symbol, field))
-            except Exception:
-                parsed = None
-            if parsed is not None:
-                return parsed
-        getter = getattr(self.bars, "get_latest_bar_value", None)
-        if callable(getter):
-            try:
-                return safe_float(getter(symbol, field))
-            except Exception:
-                return None
-        return None
+        return _extract_feature(self.bars, event, symbol, field)
 
     def get_state(self) -> dict[str, Any]:
         return {

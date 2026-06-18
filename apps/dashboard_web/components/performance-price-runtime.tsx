@@ -1,58 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-
-import { readJsonOrThrow } from '@/lib/bridge-fetch';
 import type { PerformancePricePayload } from '@/lib/dashboard-contracts';
-
-function buildSparklinePath(values: number[], width = 420, height = 120): string {
-  if (values.length === 0) {
-    return '';
-  }
-  if (values.length === 1) {
-    return `M 0 ${height / 2} L ${width} ${height / 2}`;
-  }
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 1;
-  return values
-    .map((value, index) => {
-      const x = (index / (values.length - 1)) * width;
-      const y = height - ((value - min) / range) * height;
-      return `${index === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
-    })
-    .join(' ');
-}
-
-function formatMetricValue(value: number | string | null | undefined): string {
-  if (value === null || value === undefined || value === '') {
-    return 'n/a';
-  }
-  return String(value);
-}
+import { buildSparklinePath, formatMetricValue } from '@/lib/format';
+import { useBridgeFetch } from '@/lib/use-bridge-fetch';
 
 export function PerformancePriceRuntime() {
-  const [payload, setPayload] = useState<PerformancePricePayload | null>(null);
-  const [error, setError] = useState<string>('');
-
-  useEffect(() => {
-    let active = true;
-    fetch('/api/python/dashboard/performance-price', { cache: 'no-store' })
-      .then(async (response) => {
-        const body = await readJsonOrThrow<PerformancePricePayload>(response, 'performance-price bridge failed');
-        if (active) {
-          setPayload(body);
-        }
-      })
-      .catch((fetchError: unknown) => {
-        if (active) {
-          setError(fetchError instanceof Error ? fetchError.message : String(fetchError));
-        }
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
+  const { payload, error } = useBridgeFetch<PerformancePricePayload>(
+    '/api/python/dashboard/performance-price',
+    'performance-price bridge failed',
+  );
 
   if (error) {
     return <p>{error}</p>;

@@ -580,40 +580,6 @@ def _safe_mean(values: np.ndarray) -> float:
     return _research_metrics.safe_mean(values)
 
 
-def _max_drawdown(returns: np.ndarray) -> float:
-    return _research_metrics.max_drawdown(returns)
-
-
-def _rolling_sharpe_min(
-    returns: np.ndarray, *, window: int = 64, periods_per_year: int = 365
-) -> float:
-    return _research_metrics.rolling_sharpe_min(
-        returns,
-        window=window,
-        periods_per_year=periods_per_year,
-    )
-
-
-def _worst_month(returns: np.ndarray, *, bars_per_month: int) -> float:
-    return _research_metrics.worst_month(returns, bars_per_month=bars_per_month)
-
-
-def _deflated_sharpe_ratio(returns: np.ndarray, *, num_trials: int = 1) -> float:
-    return _research_metrics.deflated_sharpe_ratio(returns, num_trials=num_trials)
-
-
-def _approx_pbo(returns: np.ndarray) -> float:
-    return _research_metrics.approx_pbo(returns)
-
-
-def _spa_like_pvalue(returns: np.ndarray, *, bootstrap_rounds: int = 200) -> float:
-    return _research_metrics.spa_like_pvalue(returns, bootstrap_rounds=bootstrap_rounds)
-
-
-def _correlation(x: np.ndarray, y: np.ndarray) -> float:
-    return _research_metrics.correlation(x, y)
-
-
 def _compute_metrics(
     returns: np.ndarray,
     *,
@@ -7760,7 +7726,7 @@ def _research_report_builder() -> ResearchReportBuilder:
         canonicalize_symbol_list=canonicalize_symbol_list,
         series_to_stream=_series_to_stream,
         candidate_rank_score=_candidate_rank_score,
-        correlation=_correlation,
+        correlation=_research_metrics.correlation,
         periods_per_year=_PERIODS_PER_YEAR,
         metric_config=get_default_runtime_config().backtest,
     )

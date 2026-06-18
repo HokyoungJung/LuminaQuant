@@ -1,39 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-
-import { readJsonOrThrow } from '@/lib/bridge-fetch';
 import type { OptimizationInsightsPayload } from '@/lib/dashboard-contracts';
-
-function formatMetricValue(value: number | string | null | undefined): string {
-  if (value === null || value === undefined || value === '') {
-    return 'n/a';
-  }
-  return String(value);
-}
+import { formatMetricValue } from '@/lib/format';
+import { useBridgeFetch } from '@/lib/use-bridge-fetch';
 
 export function OptimizationInsightsRuntime() {
-  const [payload, setPayload] = useState<OptimizationInsightsPayload | null>(null);
-  const [error, setError] = useState<string>('');
-
-  useEffect(() => {
-    let active = true;
-    fetch('/api/python/dashboard/optimization-insights', { cache: 'no-store' })
-      .then(async (response) => {
-        const body = await readJsonOrThrow<OptimizationInsightsPayload>(response, 'optimization insights bridge failed');
-        if (active) {
-          setPayload(body);
-        }
-      })
-      .catch((fetchError: unknown) => {
-        if (active) {
-          setError(fetchError instanceof Error ? fetchError.message : String(fetchError));
-        }
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
+  const { payload, error } = useBridgeFetch<OptimizationInsightsPayload>(
+    '/api/python/dashboard/optimization-insights',
+    'optimization insights bridge failed',
+  );
 
   if (error) {
     return <p>{error}</p>;

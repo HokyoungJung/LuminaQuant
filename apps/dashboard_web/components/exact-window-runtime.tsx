@@ -1,10 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-
-import { readJsonOrThrow } from '@/lib/bridge-fetch';
 import type { ExactWindowPayload } from '@/lib/dashboard-contracts';
 import { buildExactWindowEmptyState } from '@/lib/exact-window-status';
+import { useBridgeFetch } from '@/lib/use-bridge-fetch';
 
 function formatNumber(value: number | null, digits = 2): string {
   if (typeof value !== 'number' || Number.isNaN(value)) {
@@ -21,27 +19,10 @@ function formatPercent(value: number | null): string {
 }
 
 export function ExactWindowRuntime() {
-  const [payload, setPayload] = useState<ExactWindowPayload | null>(null);
-  const [error, setError] = useState<string>('');
-
-  useEffect(() => {
-    let active = true;
-    fetch('/api/python/dashboard/exact-window', { cache: 'no-store' })
-      .then(async (response) => {
-        const body = await readJsonOrThrow<ExactWindowPayload>(response, 'exact-window bridge failed');
-        if (active) {
-          setPayload(body);
-        }
-      })
-      .catch((fetchError: unknown) => {
-        if (active) {
-          setError(fetchError instanceof Error ? fetchError.message : String(fetchError));
-        }
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
+  const { payload, error } = useBridgeFetch<ExactWindowPayload>(
+    '/api/python/dashboard/exact-window',
+    'exact-window bridge failed',
+  );
 
   if (error) {
     return <p>{error}</p>;

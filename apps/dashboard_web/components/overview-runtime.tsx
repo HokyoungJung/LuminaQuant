@@ -1,56 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-
-import { readJsonOrThrow } from '@/lib/bridge-fetch';
 import type { OverviewPayload } from '@/lib/dashboard-contracts';
+import { buildSparklinePath } from '@/lib/format';
 import { buildOverviewEmptyStateMessage } from '@/lib/overview-status';
-
-function buildSparklinePath(
-  values: number[],
-  width = 420,
-  height = 120,
-): string {
-  if (values.length === 0) {
-    return '';
-  }
-  if (values.length === 1) {
-    return `M 0 ${height / 2} L ${width} ${height / 2}`;
-  }
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 1;
-  return values
-    .map((value, index) => {
-      const x = (index / (values.length - 1)) * width;
-      const y = height - ((value - min) / range) * height;
-      return `${index === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
-    })
-    .join(' ');
-}
+import { useBridgeFetch } from '@/lib/use-bridge-fetch';
 
 export function OverviewRuntime() {
-  const [overview, setOverview] = useState<OverviewPayload | null>(null);
-  const [error, setError] = useState<string>('');
-
-  useEffect(() => {
-    let active = true;
-    fetch('/api/python/dashboard/overview', { cache: 'no-store' })
-      .then(async (response) => {
-        const payload = await readJsonOrThrow<OverviewPayload>(response, 'overview bridge failed');
-        if (active) {
-          setOverview(payload);
-        }
-      })
-      .catch((fetchError: unknown) => {
-        if (active) {
-          setError(fetchError instanceof Error ? fetchError.message : String(fetchError));
-        }
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
+  const { payload: overview, error } = useBridgeFetch<OverviewPayload>(
+    '/api/python/dashboard/overview',
+    'overview bridge failed',
+  );
 
   if (error) {
     return <p>{error}</p>;

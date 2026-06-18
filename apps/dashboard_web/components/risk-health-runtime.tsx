@@ -1,32 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-
-import { readJsonOrThrow } from '@/lib/bridge-fetch';
 import type { RiskHealthPayload } from '@/lib/dashboard-contracts';
+import { useBridgeFetch } from '@/lib/use-bridge-fetch';
 
 export function RiskHealthRuntime() {
-  const [payload, setPayload] = useState<RiskHealthPayload | null>(null);
-  const [error, setError] = useState<string>('');
-
-  useEffect(() => {
-    let active = true;
-    fetch('/api/python/dashboard/risk-health', { cache: 'no-store' })
-      .then(async (response) => {
-        const body = await readJsonOrThrow<RiskHealthPayload>(response, 'risk health bridge failed');
-        if (active) {
-          setPayload(body);
-        }
-      })
-      .catch((fetchError: unknown) => {
-        if (active) {
-          setError(fetchError instanceof Error ? fetchError.message : String(fetchError));
-        }
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
+  const { payload, error } = useBridgeFetch<RiskHealthPayload>(
+    '/api/python/dashboard/risk-health',
+    'risk health bridge failed',
+  );
 
   if (error) {
     return <p>{error}</p>;

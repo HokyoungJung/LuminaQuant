@@ -1,32 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-
-import { readJsonOrThrow } from '@/lib/bridge-fetch';
 import type { ExecutionAnalyticsPayload } from '@/lib/dashboard-contracts';
+import { useBridgeFetch } from '@/lib/use-bridge-fetch';
 
 export function ExecutionAnalyticsRuntime() {
-  const [payload, setPayload] = useState<ExecutionAnalyticsPayload | null>(null);
-  const [error, setError] = useState<string>('');
-
-  useEffect(() => {
-    let active = true;
-    fetch('/api/python/dashboard/execution-analytics', { cache: 'no-store' })
-      .then(async (response) => {
-        const body = await readJsonOrThrow<ExecutionAnalyticsPayload>(response, 'execution analytics bridge failed');
-        if (active) {
-          setPayload(body);
-        }
-      })
-      .catch((fetchError: unknown) => {
-        if (active) {
-          setError(fetchError instanceof Error ? fetchError.message : String(fetchError));
-        }
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
+  const { payload, error } = useBridgeFetch<ExecutionAnalyticsPayload>(
+    '/api/python/dashboard/execution-analytics',
+    'execution analytics bridge failed',
+  );
 
   if (error) {
     return <p>{error}</p>;

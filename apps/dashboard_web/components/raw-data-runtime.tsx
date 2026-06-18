@@ -1,32 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-
-import { readJsonOrThrow } from '@/lib/bridge-fetch';
 import type { RawDataPayload } from '@/lib/dashboard-contracts';
+import { useBridgeFetch } from '@/lib/use-bridge-fetch';
 
 export function RawDataRuntime() {
-  const [payload, setPayload] = useState<RawDataPayload | null>(null);
-  const [error, setError] = useState<string>('');
-
-  useEffect(() => {
-    let active = true;
-    fetch('/api/python/dashboard/raw-data', { cache: 'no-store' })
-      .then(async (response) => {
-        const body = await readJsonOrThrow<RawDataPayload>(response, 'raw data bridge failed');
-        if (active) {
-          setPayload(body);
-        }
-      })
-      .catch((fetchError: unknown) => {
-        if (active) {
-          setError(fetchError instanceof Error ? fetchError.message : String(fetchError));
-        }
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
+  const { payload, error } = useBridgeFetch<RawDataPayload>(
+    '/api/python/dashboard/raw-data',
+    'raw data bridge failed',
+  );
 
   if (error) {
     return <p>{error}</p>;
