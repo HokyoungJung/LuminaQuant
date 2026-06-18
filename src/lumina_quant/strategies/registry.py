@@ -190,6 +190,10 @@ _STRATEGY_TIER_HINTS: dict[str, str] = {
     "RegimeBreakoutCandidateStrategy": "research_only",
     "VolatilityCompressionReversionStrategy": "research_only",
     "MicroRangeExpansion1sStrategy": "research_only",
+    # New multi-factor book — research_only until backtest-validated on the
+    # data-bearing machine (see docs/COST_REALISM_REMEASUREMENT.md). Promote to
+    # live_opt_in only after the cost-realistic walk-forward passes the gates.
+    "DiversifiedMultiFactorEnsembleStrategy": "research_only",
 }
 
 _STRATEGY_METADATA: dict[str, dict[str, Any]] = {
@@ -285,7 +289,13 @@ _sync_param_registry(_STRATEGY_MAP)
 def get_strategy_metadata(strategy_name: str) -> dict[str, Any]:
     """Return strategy metadata (tier and name)."""
     token = str(strategy_name)
-    return dict(_STRATEGY_METADATA.get(token, {"name": token, "tier": "live_default"}))
+    if token in _STRATEGY_METADATA:
+        return dict(_STRATEGY_METADATA[token])
+    # Glob-discovered strategies are not in _STRATEGY_METADATA (which is built over
+    # the curated _STRATEGY_MAP), but an explicit _STRATEGY_TIER_HINTS entry must
+    # still be honored so a new drop-in sleeve can pin itself to research_only /
+    # live_opt_in without being edited into _STRATEGY_MAP. Fail safe to the hint.
+    return {"name": token, "tier": str(_STRATEGY_TIER_HINTS.get(token, "live_default"))}
 
 
 def get_strategy_tier(strategy_name: str) -> str:
