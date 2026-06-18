@@ -347,7 +347,13 @@ def _strategy_agnostic_real_money_veto_checks(
     try:
         for index, reference in enumerate(_artifact_reference_paths(decision)):
             artifact_path = _resolve_repo_artifact_path(Path(reference))
-            containers[f"artifact_{index}"] = _read_json(artifact_path)
+            artifact_payload = _read_json(artifact_path)
+            if not isinstance(artifact_payload, Mapping):
+                # A referenced artifact that is not a JSON object (list/scalar) is a
+                # validation failure -> fail closed with a clear error rather than
+                # an AttributeError downstream.
+                raise TypeError(f"referenced artifact is not a JSON object: {reference}")
+            containers[f"artifact_{index}"] = artifact_payload
     except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
         return {
             "artifact_real_money_veto": True,
@@ -380,9 +386,17 @@ def _strategy_agnostic_real_money_veto_checks(
     real_money_execution = any(_flag_is_true(item, "real_money_execution") for item in items)
     any_blocks = any(_payload_blocks_real_money(item) for item in items)
 
-    # Fail-closed: veto unless a positive ready flag is asserted AND no payload
-    # blocks (paper-only / explicit negation / governance) AND no governance veto.
-    clean_ready = ready_for_real and not any_blocks and not paper_only and not governance_veto
+    # Fail-closed: veto unless ALL THREE positive flags are asserted (matching the
+    # AlphaZoo sibling) AND no payload blocks (paper-only / explicit negation /
+    # governance) AND no governance veto.
+    clean_ready = (
+        ready_for_real
+        and real_execution_allowed
+        and real_money_execution
+        and not any_blocks
+        and not paper_only
+        and not governance_veto
+    )
     return {
         "artifact_real_money_veto": not clean_ready,
         "artifact_paper_testnet_only": paper_only,

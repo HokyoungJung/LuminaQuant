@@ -39,10 +39,35 @@ function isLocalhost(req: NextRequest): boolean {
     const clientIp = xForwardedFor.split(',')[0].trim();
     return LOOPBACK.has(clientIp);
   }
-  // When no x-forwarded-for header is present the request is coming directly to the
-  // Node.js process (no proxy), which in practice means localhost. Fail open here is
-  // safe because a remote attacker cannot reach the process without a proxy adding xff.
+  // Prefer the runtime-exposed direct peer IP when available: this DENIES a remote
+  // client that reaches a 0.0.0.0-bound server directly (no proxy, no xff).
+  const directIp = (req as unknown as { ip?: string }).ip;
+  if (directIp) {
+    return LOOPBACK.has(directIp);
+  }
+  // No origin signal at all (some runtimes do not expose a peer IP). The dashboard is
+  // intended to bind to 127.0.0.1; treat unknown-origin as local for READ access only.
+  // State-changing actions are independently token-gated and fail-closed in route.ts,
+  // so this fallback can never enable an unauthenticated kill/stop/cancel.
   return true;
+}
+
+/**
+ * Constant-time string comparison (runtime-agnostic: works in both the Edge and
+ * Node middleware runtimes). Avoids leaking the token via early-exit timing.
+ */
+function timingSafeEqualStr(a: string, b: string): boolean {
+  const encoder = new TextEncoder();
+  const aBytes = encoder.encode(a);
+  const bBytes = encoder.encode(b);
+  if (aBytes.length !== bBytes.length) {
+    return false;
+  }
+  let diff = 0;
+  for (let i = 0; i < aBytes.length; i += 1) {
+    diff |= aBytes[i] ^ bBytes[i];
+  }
+  return diff === 0;
 }
 
 /**
@@ -55,7 +80,7 @@ function hasValidToken(req: NextRequest): boolean {
     return false;
   }
   const provided = req.headers.get('x-lq-control-token') ?? '';
-  return provided === expectedToken;
+  return timingSafeEqualStr(provided, expectedToken);
 }
 
 export function middleware(req: NextRequest): NextResponse {

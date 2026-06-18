@@ -132,6 +132,10 @@ class SimulatedExecutionHandler(ExecutionHandler):
             volatility=float(volatility),
             is_maker=False,
             apply_liquidity_cap=False,
+            # Wire notional so sqrt_impact applies here too if a caller ever uses
+            # this backward-compat helper (impact stays 0 unless slippage_adv_quote
+            # is configured, since bar_volume is intentionally 0 here).
+            order_notional=float(price) * float(quantity),
         )
         return result.fill_price, result.commission
 
