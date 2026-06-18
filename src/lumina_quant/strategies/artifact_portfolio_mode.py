@@ -11,6 +11,7 @@ from lumina_quant.core.events import SignalEvent
 from lumina_quant.portfolio_split_contract import FOLLOWUP_ROOT
 from lumina_quant.strategy import Strategy
 from lumina_quant.strategies import resolve_strategy_class
+from lumina_quant.utils.numeric import safe_float
 
 GROUP_ROOT = FOLLOWUP_ROOT / "portfolio_incumbent_autoresearch_grouped"
 REFRESH_ROOT = GROUP_ROOT / "current_switch_validation_current"
@@ -218,10 +219,7 @@ def _read_json(path: Path) -> dict[str, Any]:
 
 
 def _safe_float(value: Any, default: float = 0.0) -> float:
-    try:
-        return float(value)
-    except Exception:
-        return float(default)
+    return safe_float(value, default)
 
 
 def _ordered_unique(items: list[str]) -> tuple[str, ...]:

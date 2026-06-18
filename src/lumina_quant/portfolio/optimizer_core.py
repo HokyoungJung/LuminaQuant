@@ -14,6 +14,8 @@ from typing import Any
 
 import numpy as np
 
+from lumina_quant.utils.numeric import safe_float as _safe_float_canon
+
 LOCKED_OOS_OBJECTIVE_POLICY = "train_val_only_locked_oos_report"
 DIAGNOSTIC_OOS_OBJECTIVE_POLICY = "diagnostic_oos_in_objective_not_selection_authority"
 LOCKED_OOS_LABEL = "locked_oos_report_only"
@@ -31,13 +33,7 @@ class PortfolioConstraintInfeasibleError(RuntimeError):
 
 
 def safe_float(value: Any, default: float = 0.0) -> float:
-    try:
-        out = float(value)
-    except Exception:
-        return float(default)
-    if not math.isfinite(out):
-        return float(default)
-    return out
+    return _safe_float_canon(value, default, finite_only=True)
 
 
 def canonical_split(value: Any, *, default: str) -> str:

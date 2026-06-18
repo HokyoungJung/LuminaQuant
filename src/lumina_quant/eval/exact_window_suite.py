@@ -24,6 +24,7 @@ from lumina_quant.symbols import (
     canonicalize_symbol_list,
     normalize_strategy_timeframes,
 )
+from lumina_quant.utils.numeric import safe_float
 
 
 DEFAULT_TRAIN_START = "2025-01-01"
@@ -408,13 +409,7 @@ def half_open_slice_indices(timestamps: np.ndarray, start: datetime, end: dateti
 
 
 def _safe_float(value: Any, default: float = 0.0) -> float:
-    try:
-        out = float(value)
-    except Exception:
-        return float(default)
-    if not math.isfinite(out):
-        return float(default)
-    return out
+    return safe_float(value, default, finite_only=True)
 
 
 def _daily_stream_from_timestamps(

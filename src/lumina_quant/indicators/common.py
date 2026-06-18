@@ -2,18 +2,12 @@
 
 from __future__ import annotations
 
-import math
+from lumina_quant.utils.numeric import safe_float as _canon_safe_float
 
 
 def safe_float(value) -> float | None:
     """Return a finite float or ``None`` when parsing fails."""
-    try:
-        parsed = float(value)
-    except Exception:
-        return None
-    if not math.isfinite(parsed):
-        return None
-    return parsed
+    return _canon_safe_float(value, finite_only=True)
 
 
 def safe_int(value, default: int = 0) -> int:

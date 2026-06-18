@@ -39,6 +39,7 @@ from lumina_quant.market_data import (
 from lumina_quant.storage.parquet import is_parquet_market_data_store
 from lumina_quant.strategies.artifact_portfolio_mode import ArtifactPortfolioModeStrategy
 from lumina_quant.utils.audit_store import AuditStore
+from lumina_quant.utils.numeric import safe_float
 
 _strategy_registry = None
 
@@ -533,19 +534,11 @@ def _load_data_dict(
 
 
 def _safe_float(value):
-    try:
-        if value is None:
-            return None
-        return float(value)
-    except Exception:
-        return None
+    return safe_float(value)
 
 
 def _safe_float_or(value, default):
-    parsed = _safe_float(value)
-    if parsed is None:
-        return float(default)
-    return float(parsed)
+    return safe_float(value, default)
 
 
 def _persist_backtest_audit_rows(audit_store, run_id, backtest, *, low_memory=False):

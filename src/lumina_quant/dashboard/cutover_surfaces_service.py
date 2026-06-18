@@ -54,6 +54,8 @@ def _parse_json_dict(value: Any) -> dict[str, Any]:
     return {}
 
 
+# Not delegated to utils.numeric.safe_float: pd.notna rejects NaN but PASSES inf,
+# whereas canonical finite_only rejects both -> not behavior-equivalent.
 def _safe_float(value: Any, default: float = 0.0) -> float:
     try:
         parsed = float(value)

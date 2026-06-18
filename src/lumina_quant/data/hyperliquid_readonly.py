@@ -8,7 +8,6 @@ an execution driver or any trading surface.
 from __future__ import annotations
 
 import json
-import math
 import time
 import urllib.error
 import urllib.request
@@ -16,15 +15,13 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
+from lumina_quant.utils.numeric import safe_float
+
 DEFAULT_INFO_URL = "https://api.hyperliquid.xyz/info"
 
 
 def _safe_float(value: Any) -> float | None:
-    try:
-        parsed = float(value)
-    except Exception:
-        return None
-    return parsed if math.isfinite(parsed) else None
+    return safe_float(value, finite_only=True)
 
 
 def _coin_from_symbol(symbol: str) -> str:

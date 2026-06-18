@@ -15,6 +15,7 @@ import pandas as pd
 from lumina_quant.alpha_zoo.crypto_fx_factors import factor_columns, normalize_symbol
 from lumina_quant.research.candidate_outcome_ledger import CandidateOutcomeLedger
 from lumina_quant.research.triple_barrier import label_triple_barrier
+from lumina_quant.utils.numeric import safe_float
 
 REQUIRED_OHLCV = ("open", "high", "low", "close", "volume")
 OPTIONAL_REAL_FIELDS = (
@@ -44,11 +45,7 @@ def _repo_root() -> Path:
 
 
 def _safe_float(value: Any, default: float = 0.0) -> float:
-    try:
-        parsed = float(value)
-    except Exception:
-        return default
-    return parsed if math.isfinite(parsed) else default
+    return safe_float(value, default, finite_only=True)
 
 
 def _read_parquet_with_polars(path: Path) -> pd.DataFrame:

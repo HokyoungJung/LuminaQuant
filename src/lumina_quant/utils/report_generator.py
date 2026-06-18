@@ -15,6 +15,7 @@ from lumina_quant.utils.performance import (
     create_sharpe_ratio,
     create_sortino_ratio,
 )
+from lumina_quant.utils.numeric import safe_float
 
 
 class ReportGenerator:
@@ -106,13 +107,9 @@ class ReportGenerator:
 
     @staticmethod
     def _safe_float(value: Any, default: float = 0.0) -> float:
-        try:
-            out = float(value)
-        except Exception:
-            return float(default)
-        if not np.isfinite(out):
-            return float(default)
-        return out
+        # Original guarded inf/nan via np.isfinite; finite_only preserves that
+        # contract (np.isfinite and math.isfinite agree for scalar floats).
+        return safe_float(value, default, finite_only=True)
 
     @staticmethod
     def _safe_div(numerator: Any, denominator: Any, default: float = 0.0) -> float:

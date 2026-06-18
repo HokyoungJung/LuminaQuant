@@ -9,6 +9,7 @@ import urllib.request
 from typing import Any
 
 from lumina_quant.core.protocols import ExchangeInterface
+from lumina_quant.utils.numeric import safe_float
 
 
 def _load_sdk_symbols() -> dict[str, Any]:
@@ -39,10 +40,7 @@ def _load_sdk_symbols() -> dict[str, Any]:
 
 
 def _safe_float(value: Any, default: float = 0.0) -> float:
-    try:
-        return float(value)
-    except Exception:
-        return float(default)
+    return safe_float(value, default)
 
 
 class PolymarketExchange(ExchangeInterface):
