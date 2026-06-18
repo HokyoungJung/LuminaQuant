@@ -704,7 +704,7 @@ def _normalize_backtest_runtime_section(
 def _normalize_optimization_runtime_section(runtime: RuntimeConfig) -> None:
     runtime.optimization.walk_forward_folds = _as_int(runtime.optimization.walk_forward_folds, 3)
     runtime.optimization.overfit_penalty = _as_float(runtime.optimization.overfit_penalty, 0.5)
-    runtime.optimization.max_workers = _as_int(runtime.optimization.max_workers, 4)
+    runtime.optimization.max_workers = _as_int(runtime.optimization.max_workers, 1)
     runtime.optimization.persist_best_params = _as_bool(
         runtime.optimization.persist_best_params, False
     )

@@ -29,30 +29,10 @@ from typing import Any
 from lumina_quant.backtesting._config_view import BacktestConfigView
 from lumina_quant.compute.ohlcv_loader import OHLCVFrameLoader
 from lumina_quant.configuration import get_default_runtime_config
-from lumina_quant.core.engine import TradingEngine
+from lumina_quant.core.engine import TradingEngine, _event_time_to_ms
 from lumina_quant.market_data import normalize_timeframe_token, timeframe_to_milliseconds
 
 LOGGER = logging.getLogger(__name__)
-
-
-def _event_time_to_ms(value: Any) -> int | None:
-    if value is None:
-        return None
-    if isinstance(value, (int, float)):
-        numeric = int(float(value))
-        if abs(numeric) < 100_000_000_000:
-            return numeric * 1000
-        return numeric
-    ts_fn = getattr(value, "timestamp", None)
-    if callable(ts_fn):
-        try:
-            ts_value = ts_fn()
-            if isinstance(ts_value, (int, float)):
-                return int(float(ts_value) * 1000)
-            return None
-        except Exception:
-            return None
-    return None
 
 
 def _as_bool(value: Any, default: bool = False) -> bool:

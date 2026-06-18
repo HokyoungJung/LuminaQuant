@@ -168,7 +168,6 @@ def _build_live_config_namespace(rt, *, symbols) -> SimpleNamespace:
         MAIN_LOOP_ERROR_RETRY_LIMIT=int(lv.main_loop_error_retry_limit),
         MAIN_LOOP_ERROR_WINDOW_SECONDS=int(lv.main_loop_error_window_seconds),
         POLL_SECONDS=int(lv.poll_seconds),
-        POLL_INTERVAL=int(lv.poll_seconds),
         LIVE_POLL_SECONDS=int(lv.poll_seconds),
         WINDOW_SECONDS=int(lv.window_seconds),
         INGEST_WINDOW_SECONDS=int(lv.window_seconds),

@@ -226,19 +226,13 @@ __all__ = ["empty_exact_window_payload", "load_exact_window_summary_payload"]
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Module-mode entry: uv run python -m lumina_quant.dashboard.exact_window_service --json."""
+    """Module-mode entry: uv run python -m lumina_quant.dashboard.exact_window_service."""
     import argparse
     import json
 
     parser = argparse.ArgumentParser(
         prog="lumina_quant.dashboard.exact_window_service",
         description="Emit exact-window summary payload as JSON.",
-    )
-    parser.add_argument(
-        "--json",
-        action="store_true",
-        default=True,
-        help="Output as JSON (default and only output mode).",
     )
     parser.add_argument("--root", default=None, help="Override exact-window bundle root path.")
     args = parser.parse_args(argv)

@@ -75,6 +75,14 @@ class ExecutionModelConfig:
             margin_mode = str(rt.backtest.margin_mode).strip().lower()
             slippage_rate = float(rt.backtest.slippage_rate)
             random_seed = int(rt.backtest.random_seed)
+        _impact_model = str(getattr(ex, "slippage_impact_model", "flat")).strip().lower()
+        _impact_coeff = float(getattr(ex, "slippage_impact_coefficient", 0.0))
+        if _impact_model == "sqrt_impact" and _impact_coeff <= 0.0:
+            _LOGGER.warning(
+                "slippage_impact_model='sqrt_impact' but slippage_impact_coefficient=%s <= 0 "
+                "— market impact is inert (no extra slippage will be applied).",
+                _impact_coeff,
+            )
         return cls(
             taker_fee_rate=float(ex.taker_fee_rate),
             maker_fee_rate=float(ex.maker_fee_rate),
@@ -88,18 +96,10 @@ class ExecutionModelConfig:
             funding_interval_hours=max(1, int(ex.funding_interval_hours)),
             random_seed=random_seed,
             max_bar_volume_ratio=float(getattr(ex, "max_bar_volume_ratio", 0.1)),
-            slippage_impact_model=str(getattr(ex, "slippage_impact_model", "flat")).strip().lower(),
-            slippage_impact_coefficient=float(getattr(ex, "slippage_impact_coefficient", 0.0)),
+            slippage_impact_model=_impact_model,
+            slippage_impact_coefficient=_impact_coeff,
             slippage_adv_quote=float(getattr(ex, "slippage_adv_quote", 0.0)),
         )
-        _impact_model = str(getattr(ex, "slippage_impact_model", "flat")).strip().lower()
-        _impact_coeff = float(getattr(ex, "slippage_impact_coefficient", 0.0))
-        if _impact_model == "sqrt_impact" and _impact_coeff <= 0.0:
-            _LOGGER.warning(
-                "slippage_impact_model='sqrt_impact' but slippage_impact_coefficient=%s <= 0 "
-                "— market impact is inert (no extra slippage will be applied).",
-                _impact_coeff,
-            )
 
 
 def _config_from_attrs(config: Any) -> ExecutionModelConfig:

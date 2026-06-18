@@ -47,7 +47,6 @@ class SimulatedExecutionHandler(ExecutionHandler):
         self.events = events
         self.bars = bars
         self.config = config
-        self.rng = random.Random(getattr(config, "RANDOM_SEED", 42))
         self._order_seq = 0
 
         # Phase 4 unified cost model — replaces FillModel + LiquidityModel for fills.
@@ -69,7 +68,6 @@ class SimulatedExecutionHandler(ExecutionHandler):
         state = {
             "active_orders": deepcopy(self.active_orders),
             "order_seq": int(self._order_seq),
-            "rng_state": self.rng.getstate(),
             # Phase 4: execution_model._rng drives all fill randomness — must be
             # checkpointed so chunked runs produce the same sequence as a full run.
             "execution_model_rng_state": self.execution_model._rng.getstate(),
@@ -90,12 +88,6 @@ class SimulatedExecutionHandler(ExecutionHandler):
                 self._order_seq = int(state.get("order_seq", 0))
             except Exception:
                 pass
-        rng_state = state.get("rng_state")
-        if rng_state is not None:
-            try:
-                self.rng.setstate(rng_state)
-            except Exception:
-                pass
         # Restore execution_model rng; gracefully skip if absent (old state dicts).
         em_rng_state = state.get("execution_model_rng_state")
         if em_rng_state is not None:
@@ -111,33 +103,6 @@ class SimulatedExecutionHandler(ExecutionHandler):
     def _next_order_id(self) -> str:
         self._order_seq += 1
         return f"SIM-{self._order_seq}"
-
-    def _apply_slippage_and_comm(
-        self, price: float, quantity: float, direction: str, symbol: str
-    ) -> tuple[float, float]:
-        """Helper to apply physics (Slippage/Fees/Spread) to a raw price.
-
-        Delegates to ExecutionModel.compute_fill with no liquidity cap.
-        Kept for backward compat — internal code now calls compute_fill directly.
-        """
-        high = self.bars.get_latest_bar_value(symbol, "high")
-        low = self.bars.get_latest_bar_value(symbol, "low")
-        open_p = self.bars.get_latest_bar_value(symbol, "open")
-        volatility = (high - low) / open_p if open_p > 0 else 0.0
-        result = self.execution_model.compute_fill(
-            raw_price=float(price),
-            qty=float(quantity),
-            direction=str(direction),
-            bar_volume=0.0,  # apply_liquidity_cap=False, bar_volume ignored
-            volatility=float(volatility),
-            is_maker=False,
-            apply_liquidity_cap=False,
-            # Wire notional so sqrt_impact applies here too if a caller ever uses
-            # this backward-compat helper (impact stays 0 unless slippage_adv_quote
-            # is configured, since bar_volume is intentionally 0 here).
-            order_notional=float(price) * float(quantity),
-        )
-        return result.fill_price, result.commission
 
     def _cancel_protective_orders(self, symbol: str, position_side: str | None = None) -> None:
         protected_types = {"STOP", "TAKE_PROFIT"}
