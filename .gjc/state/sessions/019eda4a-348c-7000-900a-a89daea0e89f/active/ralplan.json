@@ -1,0 +1,33 @@
+{
+  "skill": "ralplan",
+  "phase": "handoff",
+  "active": false,
+  "activated_at": "2026-06-18T13:08:32.798Z",
+  "updated_at": "2026-06-18T13:08:32.798Z",
+  "session_id": "019eda4a-348c-7000-900a-a89daea0e89f",
+  "handoff_to": "ultragoal",
+  "handoff_at": "2026-06-18T13:08:32.798Z",
+  "hud": {
+    "version": 1,
+    "chips": [
+      {
+        "label": "stage",
+        "value": "handoff",
+        "priority": 10
+      }
+    ],
+    "updated_at": "2026-06-18T13:08:32.813Z"
+  },
+  "receipt": {
+    "version": 1,
+    "skill": "ralplan",
+    "owner": "gjc-state-cli",
+    "command": "gjc state ralplan handoff --to ultragoal",
+    "state_path": "/home/hoky/Quants-agent/LuminaQuant/.gjc/state/sessions/019eda4a-348c-7000-900a-a89daea0e89f/skill-active-state.json",
+    "storage_path": "/home/hoky/Quants-agent/LuminaQuant/.gjc/state/sessions/019eda4a-348c-7000-900a-a89daea0e89f/ralplan-state.json",
+    "mutated_at": "2026-06-18T13:08:32.798Z",
+    "fresh_until": "2026-06-18T13:38:32.798Z",
+    "status": "fresh",
+    "mutation_id": "ralplan:handoff:ultragoal:2026-06-18T13:08:32.798Z"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "skill": "deep-interview",
+  "phase": "handoff",
+  "active": true,
+  "activated_at": "2026-06-18T12:50:04.497Z",
+  "updated_at": "2026-06-18T12:50:04.497Z",
+  "hud": {
+    "version": 1,
+    "chips": [
+      {
+        "label": "phase",
+        "value": "handoff",
+        "priority": 10
+      },
+      {
+        "label": "round",
+        "value": "0",
+        "priority": 30
+      },
+      {
+        "label": "spec",
+        "value": "persisted",
+        "priority": 60
+      }
+    ],
+    "updated_at": "2026-06-18T12:50:04.493Z"
+  }
+}

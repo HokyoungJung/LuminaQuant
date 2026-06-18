@@ -1,5 +1,27 @@
 # Research Note
 
+## 2026-06-18 KST — Alpha/strategy improvement execution checkpoint: promotion gates, survivor manifests, artifact-portfolio fail-closed mode
+
+Deep Interview/Ralplan 승인안(`.gjc/specs/deep-interview-alpha-strategy-improvement.md`, `.gjc/plans/ralplan/2026-06-07-0457-b89b/pending-approval.md`) 기반으로 Ultragoal 실행을 G004까지 완료했다. 핵심 제약은 그대로 유지했다: locked-OOS는 selection/objective/tie-break/correlation/sizing에 금지, weak-data TradFi는 shadow-only, MDD cap 30%, liquidation/wipeout 불허, shadow/clean-paper two-tier benchmark, real-money 제외.
+
+완료된 변경:
+- `run_alpha_zoo_clean_new_alpha_discovery.py`: candidate-level promotion gate/report schema 추가. 후보별 family/source/theory, data sufficiency, locked-OOS usage flags, freeze hash, benchmark gate, MDD/liquidation/cost rejection reasons, tried universe, promotion summary를 JSON/Markdown에 노출한다. row-level full-WF advancement는 이제 `selected_by_train_validation_freeze=True`가 필수이고, freeze selection/hash 입력은 `locked_oos_*` report fields를 제거한 train/validation view만 사용한다.
+- survivor manifest workflow: `clean_new_alpha_survivor_manifest_latest.json` 별도 산출. manifest는 train/validation-frozen survivors만 포함하고 `locked_oos` 키를 scrub하며, report-only OOS metric 변경으로 hash가 바뀌지 않는다. unselected-but-eligible 후보와 holdout-contaminated 후보는 full-WF retest candidate가 될 수 없다.
+- `write_alpha_zoo_existing_strategy_reassessment.py`: 기존 registry 전략을 smoke/audit용으로 열거하고, current top evidence는 context로만 붙인다. survivor/full-WF promotion list는 엄격 게이트 통과 전까지 빈 리스트, real-money false.
+- `artifact_portfolio_mode.py` + `live_selection.py`: `artifact_manifest_mode` 및 `manifest:<path>` 지원. manifest source artifact는 regular file + sha256 + freshness + ready/portfolio_ready가 필수이고, child readiness/provenance/schema/correlation/gross/netting cap이 깨지면 100% cash로 fail-closed한다. malformed collections/children, non-file source, OOS contamination, source mismatch, gross cap breach 모두 live component를 만들지 않는다.
+
+증거/산출물:
+- Current top control evidence: `var/reports/current_top_models/current_top_models_20260618.md`, `var/reports/current_top_models/top_strategy_correlation_portfolio_20260618.md`. Shadow risk-trim benchmark는 OOS comp `64.42%` 또는 return/MDD `3.49`, clean/paper benchmark는 OOS comp `34.39%`.
+- Existing strategy reassessment probe: `var/reports/strategy_research/existing_strategy_reassessment_g002_probe_20260618.md|json` — 3개 전략 audit, full-WF/real-money promotion 없음.
+- Clean alpha bounded probe: `var/reports/strategy_research/g005_clean_alpha_probe_20260618/clean_new_alpha_discovery_latest.md|json` 및 `clean_new_alpha_survivor_manifest_latest.json` — 1 family/1 fold smoke에서 no-promotion/watchlist evidence, real-money false.
+
+검증:
+- `uv run pytest tests/test_alpha_zoo_clean_new_alpha_discovery.py tests/test_alpha_zoo_existing_strategy_reassessment.py tests/unit/test_artifact_portfolio_mode.py tests/unit/test_backtest_live_portfolio_mode_resolution.py tests/test_strategy_registry_defaults.py` → `88 passed`.
+- G001~G004 Ultragoal checkpoint 완료. 다음 active story는 G005(`Run focused verification and produce execution evidence`)이며, 이미 focused tests/probe 일부는 수행됐지만 최종 checkpoint와 aggregate goal completion은 다음 세션에서 이어가야 한다.
+
+운영 판단: 이번 변경은 신규 전략을 실전 승격한 것이 아니라 **승격/포트폴리오 구성 경로를 fail-closed로 만드는 안전장치**다. 실제 채용 후보는 여전히 paper/shadow only이며, fresh-forward monthly folds와 cost/fill telemetry가 쌓이기 전까지 real-money는 금지다.
+
+
 ## 2026-06-17 KST (o) — 과거 선택 전체 전략 최고성적 모델 재개선: lagged leaf router risk-trim
 
 사용자 정정에 따라 TopCap이 아니라 `var/reports` 전체 historical selected/high-water 후보를 다시 audit했다. 최고 headline은 `codex_lagged_leaf_router_grid:h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_exact_unscaled`였고, 기존 deep-research의 `clean_input_meta_selector`(+85.91%)보다 높다: 85-symbol pre-registered replay에서 OOS comp `+197.37%`, ann approx `+269.80%`, max OOS MDD `27.69%`, monthly MDD `4.50%`, Sharpe `2.12`, PF `30.04`, hit `5/10`. expanded 110 latest-tail artifact에서도 같은 frozen rule은 `+79.42%`, Sharpe `1.96`, max OOS MDD `27.69%`로 여전히 110-asset report rank 1이다.

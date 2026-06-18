@@ -1,0 +1,34 @@
+{
+  "active": true,
+  "current_phase": "handoff",
+  "skill": "deep-interview",
+  "version": 2,
+  "spec_slug": "alpha-strategy-improvement",
+  "spec_path": "/home/hoky/Quants-agent/LuminaQuant/.gjc/specs/deep-interview-alpha-strategy-improvement.md",
+  "spec_sha256": "452ed1a2e7be742ff857352c613b1f96b13397160b5cd073c38059e47c03d56a",
+  "spec_stage": "final",
+  "spec_persisted_at": "2026-06-18T12:50:04.487Z",
+  "updated_at": "2026-06-18T12:50:04.487Z",
+  "state": {
+    "rounds": [],
+    "established_facts": []
+  },
+  "receipt": {
+    "version": 1,
+    "skill": "deep-interview",
+    "owner": "gjc-runtime",
+    "command": "gjc deep-interview persist-spec-state",
+    "state_path": "/home/hoky/Quants-agent/LuminaQuant/.gjc/state/skill-active-state.json",
+    "storage_path": "/home/hoky/Quants-agent/LuminaQuant/.gjc/state/deep-interview-state.json",
+    "mutated_at": "2026-06-18T12:50:04.487Z",
+    "fresh_until": "2026-06-18T13:20:04.487Z",
+    "status": "fresh",
+    "mutation_id": "deep-interview:2026-06-18T12:50:04.487Z",
+    "content_sha256": {
+      "algorithm": "sha256",
+      "value": "95bf7ac778992a8d2ce0592fff803dbb0f6f813f6734ce05a6a22dd86f201648",
+      "covered_path": "/home/hoky/Quants-agent/LuminaQuant/.gjc/state/deep-interview-state.json",
+      "computed_at": "2026-06-18T12:50:04.490Z"
+    }
+  }
+}

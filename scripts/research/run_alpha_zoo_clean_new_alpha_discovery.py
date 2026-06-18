@@ -46,6 +46,22 @@ DEFAULT_SIMULATION_BACKEND = native_alpha_fold_backend.ALPHA_FOLD_BACKEND_AUTO
 DEFAULT_SELECTION_POLICY = "default_train_validation"
 ROBUST_SELECTION_POLICY = "robust_train_validation_v1"
 SELECTION_POLICIES = (DEFAULT_SELECTION_POLICY, ROBUST_SELECTION_POLICY)
+SHADOW_BENCHMARK_COMPOUNDED_RETURN = 0.6442
+SHADOW_RETURN_MDD_BENCHMARK = 3.49
+CLEAN_PAPER_BENCHMARK_COMPOUNDED_RETURN = 0.3439
+MAX_PROMOTION_MDD = 0.30
+MIN_FEATURE_TRAIN_VALIDATION_COVERAGE = 0.60
+FRESH_FORWARD_MONTHLY_FOLDS_REQUIRED = 2
+_LOCKED_OOS_USAGE_KEYS = (
+    "uses_locked_oos_for_selection",
+    "uses_locked_oos_for_objective",
+    "uses_locked_oos_for_pruning",
+    "uses_locked_oos_for_parameter_fitting",
+    "uses_locked_oos_for_threshold",
+    "uses_locked_oos_for_tie_break",
+    "uses_locked_oos_for_correlation",
+    "uses_locked_oos_for_sizing",
+)
 
 FAMILY_DESCRIPTIONS: dict[str, str] = {
     "volatility_squeeze_breakout": (
@@ -182,7 +198,7 @@ def _utc_now_iso() -> str:
 def _safe_float(value: Any, default: float = 0.0) -> float:
     try:
         out = float(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return default
     return out if math.isfinite(out) else default
 
@@ -484,13 +500,7 @@ def _train_validation_return_ratio(row: Mapping[str, Any]) -> float:
 
 
 def _robust_v1_eligible(row: Mapping[str, Any]) -> bool:
-    if row.get("uses_locked_oos_for_selection"):
-        return False
-    if row.get("uses_locked_oos_for_objective"):
-        return False
-    if row.get("uses_locked_oos_for_pruning"):
-        return False
-    if row.get("uses_locked_oos_for_parameter_fitting"):
+    if any(bool(row.get(key)) for key in _LOCKED_OOS_USAGE_KEYS):
         return False
     train = _safe_float(row.get("train_return"))
     validation = _safe_float(row.get("validation_return"))
@@ -543,6 +553,8 @@ def _selection_score(row: Mapping[str, Any], *, selection_policy: str) -> float:
 
 
 def _eligible_for_policy(row: Mapping[str, Any], *, selection_policy: str) -> bool:
+    if any(bool(row.get(key)) for key in _LOCKED_OOS_USAGE_KEYS):
+        return False
     if selection_policy == DEFAULT_SELECTION_POLICY:
         return _eligible_for_freeze(row)
     if selection_policy == ROBUST_SELECTION_POLICY:
@@ -581,8 +593,8 @@ def _eligible_for_freeze(row: Mapping[str, Any]) -> bool:
     if bool(row.get("feature_backed")):
         coverage = row.get("feature_coverage") or {}
         if (
-            _safe_float(coverage.get("train")) < 0.60
-            or _safe_float(coverage.get("validation")) < 0.60
+            _safe_float(coverage.get("train")) < MIN_FEATURE_TRAIN_VALIDATION_COVERAGE
+            or _safe_float(coverage.get("validation")) < MIN_FEATURE_TRAIN_VALIDATION_COVERAGE
         ):
             return False
     return (
@@ -593,6 +605,423 @@ def _eligible_for_freeze(row: Mapping[str, Any]) -> bool:
         and int(row.get("validation_trade_event_count") or 0) >= 6
         and _safe_float(row.get("validation_return_per_turnover_proxy_bps"), -100.0) > 10.0
     )
+
+
+def _gate_contract_payload(*, selection_policy: str) -> dict[str, Any]:
+    return {
+        "selection_policy": selection_policy,
+        "selection_inputs": ["train", "validation"],
+        "locked_oos_policy": "report_gate_only_after_train_validation_freeze",
+        "locked_oos_forbidden_uses": list(_LOCKED_OOS_USAGE_KEYS),
+        "benchmarks": {
+            "shadow_compounded_oos_return": SHADOW_BENCHMARK_COMPOUNDED_RETURN,
+            "shadow_return_mdd": SHADOW_RETURN_MDD_BENCHMARK,
+            "clean_paper_compounded_oos_return": CLEAN_PAPER_BENCHMARK_COMPOUNDED_RETURN,
+            "max_mdd": MAX_PROMOTION_MDD,
+            "fresh_forward_monthly_folds_required": FRESH_FORWARD_MONTHLY_FOLDS_REQUIRED,
+        },
+        "real_money_execution": False,
+        "weak_data_tradfi_policy": "shadow_research_only",
+    }
+
+
+def _locked_oos_usage_flags(row: Mapping[str, Any]) -> dict[str, bool]:
+    return {key: bool(row.get(key)) for key in _LOCKED_OOS_USAGE_KEYS}
+
+
+def _train_validation_freeze_view(row: Mapping[str, Any]) -> dict[str, Any]:
+    """Return the row shape allowed to influence train/validation freeze decisions."""
+    out: dict[str, Any] = {}
+    for key, value in row.items():
+        token = str(key)
+        if token.startswith("locked_oos_"):
+            continue
+        if token == "feature_coverage" and isinstance(value, Mapping):
+            out[token] = {
+                str(inner_key): inner_value
+                for inner_key, inner_value in value.items()
+                if str(inner_key) != "locked_oos"
+            }
+            continue
+        out[token] = value
+    return out
+
+
+def _data_sufficiency_report(row: Mapping[str, Any]) -> dict[str, Any]:
+    coverage = row.get("feature_coverage") or {}
+    feature_backed = bool(row.get("feature_backed"))
+    train_coverage = _safe_float(
+        coverage.get("train"), 1.0 if not feature_backed else 0.0
+    )
+    validation_coverage = _safe_float(
+        coverage.get("validation"), 1.0 if not feature_backed else 0.0
+    )
+    locked_oos_coverage = _safe_float(
+        coverage.get("locked_oos"), 1.0 if not feature_backed else 0.0
+    )
+    sufficient = (
+        not feature_backed
+        or (
+            train_coverage >= MIN_FEATURE_TRAIN_VALIDATION_COVERAGE
+            and validation_coverage >= MIN_FEATURE_TRAIN_VALIDATION_COVERAGE
+        )
+    )
+    return {
+        "feature_backed": feature_backed,
+        "train_feature_coverage": train_coverage,
+        "validation_feature_coverage": validation_coverage,
+        "locked_oos_feature_coverage_report_only": locked_oos_coverage,
+        "min_required_train_validation_feature_coverage": MIN_FEATURE_TRAIN_VALIDATION_COVERAGE,
+        "sufficient_for_clean_paper_candidate": bool(sufficient),
+        "weak_data_shadow_only": not bool(sufficient),
+    }
+
+
+def _return_mdd_ratio(return_value: float, mdd: float) -> float:
+    return float(return_value / max(mdd, 0.01))
+
+
+def _candidate_rejection_reasons(
+    row: Mapping[str, Any], *, selection_policy: str
+) -> list[str]:
+    reasons: list[str] = []
+    locked_flags = _locked_oos_usage_flags(row)
+    if any(locked_flags.values()):
+        reasons.append("locked_oos_used_by_selection_path")
+    data = _data_sufficiency_report(row)
+    if not data["sufficient_for_clean_paper_candidate"]:
+        reasons.append("insufficient_train_validation_feature_coverage")
+    if not _eligible_for_policy(row, selection_policy=selection_policy):
+        reasons.append("not_train_validation_freeze_eligible")
+    missing_risk_keys = [
+        key
+        for key in (
+            "locked_oos_return_report_only",
+            "locked_oos_mdd_report_only",
+            "locked_oos_liquidation_count_report_only",
+            "locked_oos_account_wipeout_count_report_only",
+        )
+        if row.get(key) is None
+    ]
+    if missing_risk_keys:
+        reasons.append("missing_locked_oos_risk_metrics")
+    locked_mdd = _safe_float(row.get("locked_oos_mdd_report_only"))
+    if locked_mdd > MAX_PROMOTION_MDD:
+        reasons.append("report_gate_mdd_above_30pct")
+    if int(row.get("locked_oos_liquidation_count_report_only") or 0) > 0:
+        reasons.append("report_gate_locked_oos_liquidation")
+    if int(row.get("locked_oos_account_wipeout_count_report_only") or 0) > 0:
+        reasons.append("report_gate_locked_oos_account_wipeout")
+    if _safe_float(row.get("validation_return_per_turnover_proxy_bps"), -100.0) <= 0.0:
+        reasons.append("validation_cost_turnover_proxy_non_positive")
+    reasons.extend(str(item) for item in (row.get("label_blockers") or []) if str(item))
+    return sorted(set(reasons))
+
+
+def _promotion_gate_report(
+    row: Mapping[str, Any], *, selection_policy: str
+) -> dict[str, Any]:
+    data = _data_sufficiency_report(row)
+    locked_flags = _locked_oos_usage_flags(row)
+    rejection_reasons = _candidate_rejection_reasons(row, selection_policy=selection_policy)
+    has_locked_return = row.get("locked_oos_return_report_only") is not None
+    has_locked_mdd = row.get("locked_oos_mdd_report_only") is not None
+    has_locked_liquidation = row.get("locked_oos_liquidation_count_report_only") is not None
+    has_locked_wipeout = row.get("locked_oos_account_wipeout_count_report_only") is not None
+    locked_oos_return = _safe_float(row.get("locked_oos_return_report_only"))
+    locked_oos_mdd = _safe_float(row.get("locked_oos_mdd_report_only"))
+    return_mdd = _return_mdd_ratio(locked_oos_return, locked_oos_mdd)
+    report_risk_metrics_present = (
+        has_locked_return
+        and has_locked_mdd
+        and has_locked_liquidation
+        and has_locked_wipeout
+    )
+    risk_report_gate_pass = (
+        report_risk_metrics_present
+        and locked_oos_mdd <= MAX_PROMOTION_MDD
+        and int(row.get("locked_oos_liquidation_count_report_only") or 0) == 0
+        and int(row.get("locked_oos_account_wipeout_count_report_only") or 0) == 0
+    )
+    clean_paper_report_gate_pass = (
+        locked_oos_return >= CLEAN_PAPER_BENCHMARK_COMPOUNDED_RETURN
+        and risk_report_gate_pass
+    )
+    shadow_report_gate_pass = (
+        (
+            locked_oos_return >= SHADOW_BENCHMARK_COMPOUNDED_RETURN
+            or return_mdd >= SHADOW_RETURN_MDD_BENCHMARK
+        )
+        and risk_report_gate_pass
+    )
+    train_validation_survivor = _eligible_for_policy(
+        _train_validation_freeze_view(row), selection_policy=selection_policy
+    )
+    selected_by_freeze = bool(row.get("selected_by_train_validation_freeze"))
+    can_advance = (
+        selected_by_freeze
+        and train_validation_survivor
+        and data["sufficient_for_clean_paper_candidate"]
+        and risk_report_gate_pass
+        and not any(locked_flags.values())
+    )
+    if data["weak_data_shadow_only"]:
+        status = "shadow_research_only_weak_data"
+    elif not can_advance:
+        status = "rejected_before_full_wf"
+    elif clean_paper_report_gate_pass:
+        status = "full_wf_candidate_clean_paper_report_gate_pass"
+    elif shadow_report_gate_pass:
+        status = "full_wf_candidate_shadow_report_gate_pass"
+    else:
+        status = "full_wf_candidate_needs_benchmark_or_fresh_forward"
+    return {
+        "promotion_status": status,
+        "train_validation_smoke_survivor": bool(train_validation_survivor),
+        "can_advance_to_full_wf": bool(can_advance),
+        "selection_inputs": ["train", "validation"],
+        "locked_oos_usage_flags": locked_flags,
+        "data_sufficiency": data,
+        "report_only_locked_oos": {
+            "return": locked_oos_return,
+            "mdd": locked_oos_mdd,
+            "return_mdd": return_mdd,
+            "risk_metrics_present": report_risk_metrics_present,
+            "clean_paper_benchmark_pass": clean_paper_report_gate_pass,
+            "shadow_benchmark_pass": shadow_report_gate_pass,
+            "risk_gate_pass": risk_report_gate_pass,
+        },
+        "fresh_forward_required": True,
+        "fresh_forward_monthly_folds_required": FRESH_FORWARD_MONTHLY_FOLDS_REQUIRED,
+        "ready_for_real": False,
+        "real_money_execution": False,
+        "rejection_reasons": rejection_reasons,
+    }
+
+
+def _count_values(rows: Sequence[Mapping[str, Any]], key: str) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for row in rows:
+        token = str(row.get(key) or "unknown")
+        counts[token] = counts.get(token, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def _promotion_summary(
+    rows: Sequence[Mapping[str, Any]], selected_rows: Sequence[Mapping[str, Any]]
+) -> dict[str, Any]:
+    status_counts: dict[str, int] = {}
+    reason_counts: dict[str, int] = {}
+    for row in rows:
+        gate = row.get("promotion_gate") or {}
+        status = str(gate.get("promotion_status") or row.get("promotion_status") or "unknown")
+        status_counts[status] = status_counts.get(status, 0) + 1
+        for reason in gate.get("rejection_reasons") or row.get("rejection_reasons") or []:
+            token = str(reason)
+            reason_counts[token] = reason_counts.get(token, 0) + 1
+    return {
+        "candidate_count_total": len(rows),
+        "selected_fold_count": len(selected_rows),
+        "family_counts": _count_values(rows, "family"),
+        "promotion_status_counts": dict(sorted(status_counts.items())),
+        "rejection_reason_counts": dict(sorted(reason_counts.items())),
+        "selected_model_ids": [str(row.get("model_id")) for row in selected_rows],
+    }
+
+
+_SURVIVOR_PARAMETER_KEYS = (
+    "symbol",
+    "timeframe",
+    "side",
+    "lookback",
+    "threshold",
+    "exit_threshold",
+    "min_hold",
+    "cooldown",
+    "integer_leverage",
+    "allocation_fraction",
+    "z_window",
+    "entry_z",
+    "exit_z",
+    "breakout_window",
+    "compression_quantile",
+    "leader_symbol",
+    "beta_window",
+    "residual_window",
+    "vol_window",
+    "dispersion_window",
+)
+
+
+def _json_manifest_value(value: Any) -> Any:
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, pd.Timestamp):
+        return value.isoformat()
+    if isinstance(value, Mapping):
+        return {str(key): _json_manifest_value(inner) for key, inner in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_manifest_value(inner) for inner in value]
+    return value
+
+
+def _scrub_holdout_keys(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {
+            str(key): _scrub_holdout_keys(inner)
+            for key, inner in value.items()
+            if "locked_oos" not in str(key)
+        }
+    if isinstance(value, list):
+        return [_scrub_holdout_keys(inner) for inner in value]
+    return value
+
+
+def _survivor_manifest_row(
+    row: Mapping[str, Any], *, selection_policy: str
+) -> dict[str, Any]:
+    gate = row.get("promotion_gate") or _promotion_gate_report(
+        row, selection_policy=selection_policy
+    )
+    data = gate.get("data_sufficiency") or _data_sufficiency_report(row)
+    locked_flags = _locked_oos_usage_flags(row)
+    selected_by_freeze = bool(row.get("selected_by_train_validation_freeze"))
+    train_validation_survivor = bool(gate.get("train_validation_smoke_survivor"))
+    contamination_detected = any(locked_flags.values())
+    forward_blockers: list[str] = []
+    if not selected_by_freeze:
+        forward_blockers.append("not_selected_by_train_validation_freeze")
+    if not train_validation_survivor:
+        forward_blockers.append("not_train_validation_survivor")
+    if not data.get("sufficient_for_clean_paper_candidate"):
+        forward_blockers.append("insufficient_train_validation_feature_coverage")
+    if contamination_detected:
+        forward_blockers.append("holdout_used_by_train_validation_path")
+    if _safe_float(row.get("validation_return_per_turnover_proxy_bps"), -100.0) <= 0.0:
+        forward_blockers.append("validation_cost_turnover_proxy_non_positive")
+    forward_candidate = not forward_blockers
+    parameters = {
+        key: _json_manifest_value(row.get(key))
+        for key in _SURVIVOR_PARAMETER_KEYS
+        if key in row
+    }
+    payload = {
+        "fold_id": row.get("fold_id"),
+        "model_id": row.get("model_id"),
+        "family": row.get("family"),
+        "source_report": row.get("source_report"),
+        "theory": row.get("theory") or row.get("strategy_theory"),
+        "parameters": parameters,
+        "train_return": _safe_float(row.get("train_return")),
+        "train_mdd": _safe_float(row.get("train_mdd")),
+        "train_trade_event_count": int(row.get("train_trade_event_count") or 0),
+        "validation_return": _safe_float(row.get("validation_return")),
+        "validation_mdd": _safe_float(row.get("validation_mdd")),
+        "validation_trade_event_count": int(row.get("validation_trade_event_count") or 0),
+        "validation_return_per_turnover_proxy_bps": _safe_float(
+            row.get("validation_return_per_turnover_proxy_bps")
+        ),
+        "selection_score_active_train_validation_only": _safe_float(
+            row.get("selection_score_active_train_validation_only")
+        ),
+        "selection_score_robust_v1_train_validation_only": _safe_float(
+            row.get("selection_score_robust_v1_train_validation_only")
+        ),
+        "selected_by_train_validation_freeze": selected_by_freeze,
+        "train_validation_smoke_survivor": train_validation_survivor,
+        "candidate_freeze_sha256": row.get("candidate_freeze_sha256"),
+        "data_sufficiency": {
+            "feature_backed": bool(data.get("feature_backed")),
+            "train_feature_coverage": _safe_float(data.get("train_feature_coverage")),
+            "validation_feature_coverage": _safe_float(
+                data.get("validation_feature_coverage")
+            ),
+            "min_required_train_validation_feature_coverage": _safe_float(
+                data.get("min_required_train_validation_feature_coverage")
+            ),
+            "sufficient_for_clean_paper_candidate": bool(
+                data.get("sufficient_for_clean_paper_candidate")
+            ),
+            "weak_data_shadow_only": bool(data.get("weak_data_shadow_only")),
+        },
+        "holdout_usage_contamination_detected": bool(contamination_detected),
+        "eligible_for_full_wf_retest": bool(forward_candidate),
+        "full_wf_retest_blockers": sorted(set(forward_blockers)),
+        "report_gate_attached_in_discovery_payload": True,
+        "ready_for_real": False,
+        "real_money_execution": False,
+    }
+    return _scrub_holdout_keys(_json_manifest_value(payload))
+
+
+def _survivor_manifest_payload(
+    selected_rows: Sequence[Mapping[str, Any]],
+    *,
+    search_hash: str,
+    selection_policy: str,
+    enabled_families: Sequence[str],
+    leverages: Sequence[int],
+    symbols: Sequence[str],
+    timeframes: Sequence[str],
+) -> dict[str, Any]:
+    survivors = [
+        _survivor_manifest_row(row, selection_policy=selection_policy)
+        for row in selected_rows
+        if row.get("selected_by_train_validation_freeze")
+    ]
+    forward_candidates = [
+        row for row in survivors if row.get("eligible_for_full_wf_retest")
+    ]
+    manifest = {
+        "artifact_kind": "alpha_zoo_clean_new_alpha_survivor_manifest",
+        "generated_at_utc": _utc_now_iso(),
+        "pre_registered_search_space_sha256": search_hash,
+        "selection_policy": selection_policy,
+        "selection_inputs": ["train", "validation"],
+        "oos_holdout_policy": "attach_after_train_validation_freeze_report_gate_only",
+        "optimizer_holdout_use_allowed": False,
+        "fresh_forward_required": True,
+        "fresh_forward_monthly_folds_required": FRESH_FORWARD_MONTHLY_FOLDS_REQUIRED,
+        "enabled_families": list(enabled_families),
+        "integer_leverages": list(leverages),
+        "universe": {"symbols": list(symbols), "timeframes": list(timeframes)},
+        "frozen_survivor_count": len(survivors),
+        "full_wf_retest_candidate_count": len(forward_candidates),
+        "frozen_survivors": survivors,
+        "full_wf_retest_candidates": forward_candidates,
+        "ready_for_real": False,
+        "real_money_execution": False,
+    }
+    hash_payload = dict(manifest)
+    hash_payload.pop("generated_at_utc", None)
+    manifest["survivor_manifest_sha256"] = hashlib.sha256(
+        json.dumps(hash_payload, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    return manifest
+
+
+def _tried_universe_report(
+    *,
+    symbols: Sequence[str],
+    timeframes: Sequence[str],
+    enabled_families: Sequence[str],
+    leverages: Sequence[int],
+    folds: Sequence[monthly.MonthlyFold],
+    rows: Sequence[Mapping[str, Any]],
+    max_candidates_per_fold: int,
+) -> dict[str, Any]:
+    family_counts = _count_values(rows, "family")
+    skipped_families = [family for family in enabled_families if family_counts.get(family, 0) == 0]
+    return {
+        "symbols": list(symbols),
+        "timeframes": list(timeframes),
+        "enabled_families": list(enabled_families),
+        "integer_leverages": list(leverages),
+        "fold_ids": [fold.fold_id for fold in folds],
+        "max_candidates_per_fold": int(max_candidates_per_fold),
+        "family_candidate_counts": family_counts,
+        "skipped_families": skipped_families,
+    }
 
 
 def _window_mask(
@@ -1048,10 +1477,14 @@ def _finalize_row(
             "locked_oos_account_wipeout_count_report_only": locked["account_wipeout_count"],
             "selection_score_train_validation_only": _score_row(row),
             "selection_inputs": ["train", "validation"],
-            "uses_locked_oos_for_selection": False,
-            "uses_locked_oos_for_objective": False,
-            "uses_locked_oos_for_pruning": False,
-            "uses_locked_oos_for_parameter_fitting": False,
+            "uses_locked_oos_for_selection": bool(row.get("uses_locked_oos_for_selection", False)),
+            "uses_locked_oos_for_objective": bool(row.get("uses_locked_oos_for_objective", False)),
+            "uses_locked_oos_for_pruning": bool(row.get("uses_locked_oos_for_pruning", False)),
+            "uses_locked_oos_for_parameter_fitting": bool(row.get("uses_locked_oos_for_parameter_fitting", False)),
+            "uses_locked_oos_for_threshold": bool(row.get("uses_locked_oos_for_threshold", False)),
+            "uses_locked_oos_for_tie_break": bool(row.get("uses_locked_oos_for_tie_break", False)),
+            "uses_locked_oos_for_correlation": bool(row.get("uses_locked_oos_for_correlation", False)),
+            "uses_locked_oos_for_sizing": bool(row.get("uses_locked_oos_for_sizing", False)),
             "post_oos_selector_trusted": False,
             "nested_hybrid_dependency": False,
             "split_simulation_policy": "continuous_full_period_signal_slice_report_only",
@@ -4090,16 +4523,21 @@ def _select_fold_candidate(
     *,
     selection_policy: str = DEFAULT_SELECTION_POLICY,
 ) -> Mapping[str, Any] | None:
-    eligible = [row for row in rows if _eligible_for_policy(row, selection_policy=selection_policy)]
+    eligible: list[tuple[Mapping[str, Any], dict[str, Any]]] = []
+    for row in rows:
+        freeze_view = _train_validation_freeze_view(row)
+        if _eligible_for_policy(freeze_view, selection_policy=selection_policy):
+            eligible.append((row, freeze_view))
     if not eligible:
         return None
-    return max(
+    selected, _selected_view = max(
         eligible,
-        key=lambda row: (
-            _selection_score(row, selection_policy=selection_policy),
-            str(row.get("model_id")),
+        key=lambda item: (
+            _selection_score(item[1], selection_policy=selection_policy),
+            str(item[0].get("model_id")),
         ),
     )
+    return selected
 
 
 def _aggregate(selected_rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
@@ -4291,12 +4729,15 @@ def run(
         selected = _select_fold_candidate(rows, selection_policy=selection_policy)
         for row in rows:
             row["selection_policy"] = selection_policy
+            freeze_view = _train_validation_freeze_view(row)
             row["selection_score_active_train_validation_only"] = _selection_score(
-                row,
+                freeze_view,
                 selection_policy=selection_policy,
             )
-            row["robust_train_validation_v1_eligible"] = _robust_v1_eligible(row)
-            row["selection_score_robust_v1_train_validation_only"] = _robust_v1_score_row(row)
+            row["robust_train_validation_v1_eligible"] = _robust_v1_eligible(freeze_view)
+            row["selection_score_robust_v1_train_validation_only"] = _robust_v1_score_row(
+                freeze_view
+            )
             row["fold_id"] = fold.fold_id
             row["selected_by_train_validation_freeze"] = bool(
                 selected is not None and row.get("model_id") == selected.get("model_id")
@@ -4318,6 +4759,10 @@ def run(
                     separators=(",", ":"),
                 ).encode()
             ).hexdigest()
+            promotion_gate = _promotion_gate_report(row, selection_policy=selection_policy)
+            row["promotion_gate"] = promotion_gate
+            row["promotion_status"] = promotion_gate["promotion_status"]
+            row["rejection_reasons"] = promotion_gate["rejection_reasons"]
         fold_rows.extend(rows)
         if selected is not None:
             selected_payload = dict(selected)
@@ -4325,15 +4770,16 @@ def run(
             selected_payload["selected_by_train_validation_freeze"] = True
             selected_payload["pre_registered_search_space_sha256"] = search_hash
             selected_payload["selection_policy"] = selection_policy
+            selected_freeze_view = _train_validation_freeze_view(selected_payload)
             selected_payload["selection_score_active_train_validation_only"] = _selection_score(
-                selected_payload,
+                selected_freeze_view,
                 selection_policy=selection_policy,
             )
             selected_payload["robust_train_validation_v1_eligible"] = _robust_v1_eligible(
-                selected_payload
+                selected_freeze_view
             )
             selected_payload["selection_score_robust_v1_train_validation_only"] = (
-                _robust_v1_score_row(selected_payload)
+                _robust_v1_score_row(selected_freeze_view)
             )
             selected_rows.append(selected_payload)
 
@@ -4343,12 +4789,22 @@ def run(
         candidate_rows_for_output = fold_rows
     else:
         candidate_rows_for_output = fold_rows[: int(max_candidate_rows_output)]
+    survivor_manifest = _survivor_manifest_payload(
+        selected_rows,
+        search_hash=search_hash,
+        selection_policy=selection_policy,
+        enabled_families=enabled_families_normalized,
+        leverages=actual_leverages,
+        symbols=symbols,
+        timeframes=timeframes,
+    )
     payload = {
         "artifact_kind": "alpha_zoo_clean_new_alpha_discovery",
         "generated_at_utc": _utc_now_iso(),
         "search_space": search_space,
         "pre_registered_search_space_sha256": search_hash,
         "selection_policy": selection_policy,
+        "gate_contract": _gate_contract_payload(selection_policy=selection_policy),
         "enabled_families": list(enabled_families_normalized),
         "integer_leverages": list(actual_leverages),
         "fold_workers": fold_workers,
@@ -4397,10 +4853,21 @@ def run(
             },
         ),
         "universe": {"symbols": list(symbols), "timeframes": list(timeframes)},
+        "tried_universe": _tried_universe_report(
+            symbols=symbols,
+            timeframes=timeframes,
+            enabled_families=enabled_families_normalized,
+            leverages=actual_leverages,
+            folds=folds,
+            rows=fold_rows,
+            max_candidates_per_fold=max_candidates_per_fold,
+        ),
         "data_coverage": coverage,
         "fold_count": len(folds),
         "selected_fold_rows": selected_rows,
         "candidate_rows": candidate_rows_for_output,
+        "promotion_summary": _promotion_summary(fold_rows, selected_rows),
+        "survivor_manifest": survivor_manifest,
         "aggregate": aggregate,
         "realism_diagnostics": _realism_diagnostics(
             selected_rows,
@@ -4420,9 +4887,18 @@ def run(
     output_dir.mkdir(parents=True, exist_ok=True)
     output_json = output_dir / "clean_new_alpha_discovery_latest.json"
     output_md = output_dir / "clean_new_alpha_discovery_latest.md"
-    payload["output_paths"] = {"json": str(output_json), "markdown": str(output_md)}
+    survivor_manifest_json = output_dir / "clean_new_alpha_survivor_manifest_latest.json"
+    payload["output_paths"] = {
+        "json": str(output_json),
+        "markdown": str(output_md),
+        "survivor_manifest_json": str(survivor_manifest_json),
+    }
+    survivor_manifest["output_path"] = str(survivor_manifest_json)
     output_json.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
     output_md.write_text(_render_markdown(payload), encoding="utf-8")
+    survivor_manifest_json.write_text(
+        json.dumps(survivor_manifest, indent=2, sort_keys=True), encoding="utf-8"
+    )
     return payload
 
 
@@ -4452,6 +4928,11 @@ def _render_markdown(payload: Mapping[str, Any]) -> str:
         "- clean promotion eligible: `false`",
         "- post-OOS selector trusted: `false`",
         "- real-money: `false`",
+        "- benchmark gates: "
+        f"shadow `{_fmt_pct((payload.get('gate_contract') or {}).get('benchmarks', {}).get('shadow_compounded_oos_return'))}` "
+        f"or return/MDD `{_safe_float((payload.get('gate_contract') or {}).get('benchmarks', {}).get('shadow_return_mdd')):.2f}`; "
+        f"clean/paper `{_fmt_pct((payload.get('gate_contract') or {}).get('benchmarks', {}).get('clean_paper_compounded_oos_return'))}`; "
+        f"max MDD `{_fmt_pct((payload.get('gate_contract') or {}).get('benchmarks', {}).get('max_mdd'))}`",
         "",
         "## Aggregate selected fold result",
         "",
@@ -4477,6 +4958,80 @@ def _render_markdown(payload: Mapping[str, Any]) -> str:
             f"- max validation Sharpe: `{_safe_float(realism.get('max_validation_sharpe')):.2f}`",
             "- blockers: "
             + (", ".join(f"`{blocker}`" for blocker in blockers) if blockers else "`none`"),
+            "",
+        ]
+    )
+    promotion_summary = payload.get("promotion_summary") or {}
+    tried_universe = payload.get("tried_universe") or {}
+    lines.extend(
+        [
+            "## Promotion gate summary",
+            "",
+            f"- tried families: `{len(tried_universe.get('enabled_families') or [])}`",
+            f"- skipped families: `{len(tried_universe.get('skipped_families') or [])}`",
+            f"- promotion statuses: `{promotion_summary.get('promotion_status_counts', {})}`",
+            f"- top rejection reasons: `{promotion_summary.get('rejection_reason_counts', {})}`",
+            "",
+        ]
+    )
+    survivor_manifest = payload.get("survivor_manifest") or {}
+    lines.extend(
+        [
+            "## Survivor manifest",
+            "",
+            f"- manifest hash: `{survivor_manifest.get('survivor_manifest_sha256', '')}`",
+            f"- frozen survivors: `{survivor_manifest.get('frozen_survivor_count', 0)}`",
+            f"- full-WF retest candidates: `{survivor_manifest.get('full_wf_retest_candidate_count', 0)}`",
+            f"- selection inputs: `{', '.join(survivor_manifest.get('selection_inputs') or ['train', 'validation'])}`",
+            f"- holdout policy: `{survivor_manifest.get('oos_holdout_policy', 'attach_after_train_validation_freeze_report_gate_only')}`",
+            f"- real-money: `{str(bool(survivor_manifest.get('real_money_execution'))).lower()}`",
+            "",
+        ]
+    )
+    candidate_rows = payload.get("candidate_rows") or []
+    lines.extend(
+        [
+            "## Candidate gate audit rows",
+            "",
+            "| Fold | Model | Family | Selected | Promotion | Advance full WF | Freeze hash | Feature T/V | Rejection reasons |",
+            "| --- | --- | --- | ---: | --- | ---: | --- | --- | --- |",
+        ]
+    )
+    for row in candidate_rows:
+        gate = row.get("promotion_gate") or {}
+        data = gate.get("data_sufficiency") or row.get("data_sufficiency") or {}
+        rejection_reasons = gate.get("rejection_reasons") or row.get("rejection_reasons") or []
+        freeze_hash = str(row.get("candidate_freeze_sha256") or "")
+        lines.append(
+            "| `{fold}` | `{model}` | `{family}` | {selected} | `{status}` | {advance} | `{freeze}` | `{train:.2f}/{validation:.2f}` | {reasons} |".format(
+                fold=row.get("fold_id", ""),
+                model=row.get("model_id", ""),
+                family=row.get("family", ""),
+                selected="yes" if row.get("selected_by_train_validation_freeze") else "no",
+                status=gate.get("promotion_status") or row.get("promotion_status") or "unknown",
+                advance="yes" if gate.get("can_advance_to_full_wf") else "no",
+                freeze=freeze_hash[:12],
+                train=_safe_float(data.get("train_feature_coverage"), 1.0),
+                validation=_safe_float(data.get("validation_feature_coverage"), 1.0),
+                reasons=(
+                    ", ".join(f"`{reason}`" for reason in rejection_reasons)
+                    if rejection_reasons
+                    else "`none`"
+                ),
+            )
+        )
+    lines.append("")
+    full_wf_candidates = list(
+        (payload.get("survivor_manifest") or {}).get("full_wf_retest_candidates") or []
+    )
+    lines.extend(
+        [
+            "## Full-WF promotion candidates",
+            "",
+            f"- count: `{len(full_wf_candidates)}`",
+            "- selection rule: `survivor_manifest_train_validation_freeze_only`",
+            "- locked-OOS report gates: `attached_after_freeze_only`",
+            "- real-money: `false`",
             "",
         ]
     )

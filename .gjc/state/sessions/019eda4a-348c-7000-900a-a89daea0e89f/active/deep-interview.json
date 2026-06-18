@@ -1,0 +1,53 @@
+{
+  "skill": "deep-interview",
+  "phase": "handoff",
+  "active": false,
+  "activated_at": "2026-06-18T12:38:00.310Z",
+  "updated_at": "2026-06-18T12:38:00.310Z",
+  "session_id": "019eda4a-348c-7000-900a-a89daea0e89f",
+  "handoff_to": "ralplan",
+  "handoff_at": "2026-06-18T12:38:00.310Z",
+  "hud": {
+    "version": 1,
+    "chips": [
+      {
+        "label": "phase",
+        "value": "handoff",
+        "priority": 10
+      },
+      {
+        "label": "ambiguity",
+        "value": "5%/5%",
+        "priority": 20
+      },
+      {
+        "label": "round",
+        "value": "32",
+        "priority": 30
+      },
+      {
+        "label": "target",
+        "value": "new-alpha-discovery",
+        "priority": 40
+      },
+      {
+        "label": "weakest",
+        "value": "criteria",
+        "priority": 50
+      }
+    ],
+    "updated_at": "2026-06-18T12:38:00.331Z"
+  },
+  "receipt": {
+    "version": 1,
+    "skill": "deep-interview",
+    "owner": "gjc-state-cli",
+    "command": "gjc state deep-interview handoff --to ralplan",
+    "state_path": "/home/hoky/Quants-agent/LuminaQuant/.gjc/state/sessions/019eda4a-348c-7000-900a-a89daea0e89f/skill-active-state.json",
+    "storage_path": "/home/hoky/Quants-agent/LuminaQuant/.gjc/state/sessions/019eda4a-348c-7000-900a-a89daea0e89f/deep-interview-state.json",
+    "mutated_at": "2026-06-18T12:38:00.310Z",
+    "fresh_until": "2026-06-18T13:08:00.310Z",
+    "status": "fresh",
+    "mutation_id": "deep-interview:handoff:ralplan:2026-06-18T12:38:00.310Z"
+  }
+}

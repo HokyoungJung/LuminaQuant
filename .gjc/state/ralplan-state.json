@@ -1,10 +1,13 @@
 {
-  "run_id": "2026-06-07-0457-b89b",
-  "skill": "ralplan",
   "active": true,
-  "current_phase": "planner",
+  "current_phase": "final",
+  "skill": "ralplan",
   "version": 2,
-  "updated_at": "2026-06-07T04:57:35.392Z",
+  "mode": "short",
+  "interactive": false,
+  "task": "Refine the deep-interview spec at .gjc/specs/deep-interview-alpha-strategy-improvement.md into a consensus plan. Stop at pending approval; do not execute implementation.",
+  "run_id": "2026-06-07-0457-b89b",
+  "updated_at": "2026-06-18T13:04:55.648Z",
   "receipt": {
     "version": 1,
     "skill": "ralplan",
@@ -12,15 +15,15 @@
     "command": "gjc ralplan persist-run-id",
     "state_path": "/home/hoky/Quants-agent/LuminaQuant/.gjc/state/skill-active-state.json",
     "storage_path": "/home/hoky/Quants-agent/LuminaQuant/.gjc/state/ralplan-state.json",
-    "mutated_at": "2026-06-07T04:57:35.392Z",
-    "fresh_until": "2026-06-07T05:27:35.392Z",
+    "mutated_at": "2026-06-18T13:04:55.648Z",
+    "fresh_until": "2026-06-18T13:34:55.648Z",
     "status": "fresh",
-    "mutation_id": "ralplan:2026-06-07T04:57:35.392Z",
+    "mutation_id": "ralplan:2026-06-18T13:04:55.648Z",
     "content_sha256": {
       "algorithm": "sha256",
-      "value": "01d545af26d8cda250254999100bf9eabeebf47ad8132e5755fde5c878e11637",
+      "value": "f75fc10aea6ba6348e18f5de6b985da6aa71c232e17de178a978778a4642d245",
       "covered_path": "/home/hoky/Quants-agent/LuminaQuant/.gjc/state/ralplan-state.json",
-      "computed_at": "2026-06-07T04:57:35.393Z"
+      "computed_at": "2026-06-18T13:04:55.648Z"
     }
   }
 }

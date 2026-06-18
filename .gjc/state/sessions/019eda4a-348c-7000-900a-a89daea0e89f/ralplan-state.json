@@ -1,0 +1,33 @@
+{
+  "version": 2,
+  "skill": "ralplan",
+  "current_phase": "handoff",
+  "active": false,
+  "handoff_from": "deep-interview",
+  "handoff_at": "2026-06-18T13:08:32.798Z",
+  "updated_at": "2026-06-18T13:08:32.798Z",
+  "receipt": {
+    "version": 1,
+    "skill": "ralplan",
+    "owner": "gjc-state-cli",
+    "command": "gjc state ralplan handoff --to ultragoal",
+    "state_path": "/home/hoky/Quants-agent/LuminaQuant/.gjc/state/sessions/019eda4a-348c-7000-900a-a89daea0e89f/skill-active-state.json",
+    "storage_path": "/home/hoky/Quants-agent/LuminaQuant/.gjc/state/sessions/019eda4a-348c-7000-900a-a89daea0e89f/ralplan-state.json",
+    "mutated_at": "2026-06-18T13:08:32.798Z",
+    "fresh_until": "2026-06-18T13:38:32.798Z",
+    "status": "fresh",
+    "mutation_id": "ralplan:handoff:ultragoal:2026-06-18T13:08:32.798Z",
+    "content_sha256": {
+      "algorithm": "sha256",
+      "value": "65e638611a2073094b184c8d1d013a1a620e6a8d3a4e8a59bbe02b710352122b",
+      "covered_path": "/home/hoky/Quants-agent/LuminaQuant/.gjc/state/sessions/019eda4a-348c-7000-900a-a89daea0e89f/ralplan-state.json",
+      "computed_at": "2026-06-18T13:08:32.811Z"
+    }
+  },
+  "session_id": "019eda4a-348c-7000-900a-a89daea0e89f",
+  "pending_approval_path": ".gjc/plans/ralplan/2026-06-07-0457-b89b/pending-approval.md",
+  "spec_path": ".gjc/specs/deep-interview-alpha-strategy-improvement.md",
+  "critic_verdict": "APPROVE",
+  "architect_status": "WATCH",
+  "handoff_to": "ultragoal"
+}

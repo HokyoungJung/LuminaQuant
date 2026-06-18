@@ -1,72 +1,18 @@
-# Pending Approval Plan — Clean New-Alpha Discovery Without Post-OOS Trust
+Approved plan: `.gjc/plans/ralplan/2026-06-07-0457-b89b/pending-approval.md`
+Source spec: `.gjc/specs/deep-interview-alpha-strategy-improvement.md`
+Global constraints: no locked-OOS tuning/selection/threshold/tie-break/correlation/sizing; weak-data TradFi is shadow/research-only; MDD<=30%; no liquidation/account wipeout; shadow benchmark >64.42% comp or return/MDD >3.49; clean/paper benchmark >34.39% comp; real-money excluded; no commit/push.
 
-Status: pending approval
-Run: 2026-06-07-0457-b89b
+@goal: Implement alpha promotion schema and discovery reporting gates
+Add reusable gate/report fields for candidate identity, family/source bucket, theory, data sufficiency, weak-data shadow-only status, locked-OOS usage flags, train/validation freeze hashes, benchmark tier, MDD/liquidation/cost/telemetry gate results, promotion status, rejection reasons, and tried-universe coverage. Extend the clean new-alpha discovery smoke output so JSON+Markdown reports expose these fields while preserving train/validation-only selection.
 
-## Decision
-Proceed with Option A: clean discovery ladder + fresh-forward shadow + measured runtime optimization. Do not treat post-OOS meta-selector (+85.91%) or lagged-shadow (+61.40%) artifacts as clean evidence. Use them only as quarantined hypothesis references. The implementation phase must discover or pre-register genuinely new alpha search spaces using train/validation only, then attach locked-OOS as report/gate only, then require strictly later fresh-forward shadow before any paper/testnet recommendation.
+@goal: Add existing strategy reassessment smoke wrapper
+Create or extend a research script that enumerates registered/runnable strategies, records runnable status, tier metadata, skip/audit flags, tried-universe coverage, current known evidence where available, full-WF promotion eligibility, survivor list, correlation/report placeholders, and rejection reasons. Smoke is lenient for coverage, but full-WF promotion requires strict gates.
 
-## Drivers
-1. The user explicitly rejected post-OOS trust; historical OOS-derived selector formulas cannot be promoted.
-2. Current clean anchor is weak (+34.39% OOS / 27.69% MDD), so new alpha discovery is necessary.
-3. Full WF runtime is expensive; optimization must be measured and equivalence-checked, not used to weaken split hygiene.
+@goal: Expand candidate family and survivor manifest workflow
+Broaden discovery/family coverage using existing data only across crypto price/volume, cross-asset/residual/dispersion, funding/OI/taker-flow/BBO/depth/liquidation, existing-winner overlays, and TradFi-linked candidates where data permits. Implement survivor manifest/freeze contract so only train/validation-frozen candidates can be forwarded to full WF, with locked-OOS attached only after freeze.
 
-## Principles
-- Locked-OOS is never objective, selector, pruning, fitting, threshold, tie-break, enqueue, or correlation input.
-- Post-OOS and lagged-shadow artifacts are hypotheses only.
-- No nested/hybrid/selector/meta rows as clean downstream material.
-- Candidate freeze must precede locked-OOS attachment.
-- Fresh-forward validates or rejects only; it does not repair the same lineage.
-- ready_for_real and real_money_execution remain false.
+@goal: Implement artifact portfolio manifest fail-closed mode
+Add manifest-driven portfolio composition beside existing artifact portfolio aliases. It must validate source artifact sha/freshness, child readiness, no-current-fold-OOS provenance, train/validation-only optimizer provenance, gross cap, per-leaf netting, correlation input provenance, and fail closed to cash on missing/stale/unreconciled/OOS-contaminated/gross-cap-breaching children. Keep real-money disabled.
 
-## Chosen execution shape
-1. Define artifact/schema guards: selection policy, locked-OOS policy, post_oos_selector_trusted=false, fresh_forward_policy, pre_registered_search_space_sha256, contamination flags, freeze hash, lineage.
-2. Implement a clean new-alpha discovery lane, preferably a focused runner if extending the monthly runner would mix post-OOS research and clean discovery.
-3. Keep post-OOS meta-selector and lagged-shadow outputs in quarantined benchmark tables only.
-4. Add tests that perturb locked-OOS and prove selection is unchanged.
-5. Add no-nested material tests for hybrid/selector/bridge/meta/dynamic/selected/static labels.
-6. Generate smoke artifact first, then full clean discovery under memory/time limits.
-7. Freeze candidate manifest, then run fresh-forward shadow on strictly later data without feedback into selection.
-8. Continue runtime optimization only with benchmark plus checksum/equivalence proof.
-
-## Likely files
-- `scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py`
-- `scripts/research/run_alpha_zoo_clean_meta_selector_research.py`
-- `scripts/research/run_alpha_zoo_integer_leverage_optuna_hybrid_decision.py`
-- possible new `scripts/research/run_alpha_zoo_clean_new_alpha_discovery.py`
-- `src/lumina_quant/optimization/search_policy.py`
-- `tests/test_alpha_zoo_69_asset_monthly_refit_walkforward.py`
-- `tests/test_alpha_zoo_clean_meta_selector_research.py`
-- `tests/test_alpha_zoo_integer_leverage_optuna_hybrid_decision.py`
-- new focused tests for clean new-alpha discovery artifact invariants
-
-## Acceptance criteria
-- No artifact or row uses locked-OOS for objective, selection, pruning, fitting, threshold tuning, correlation selection, enqueue choice, or tie-break.
-- Candidate ranking is frozen from train+validation before locked-OOS metrics are attached; freeze hash/provenance is recorded.
-- Post-OOS meta-selector and lagged-shadow outputs are never clean_promotion_eligible.
-- Fresh-forward evidence is required and cannot alter same-run selection.
-- No nested/hybrid contamination in clean material.
-- Runtime speedups include benchmark command, baseline/current timing, and equivalence checksum or exact metric preservation.
-- New result either beats the clean anchor honestly or records no-promotion with precise rejection reasons.
-
-## Alternatives considered
-### Option B — Accept post-OOS selector output as shadow benchmark only and optimize around it
-Rejected for promotion because it does not satisfy the user's trust objection. Retained only as quarantined benchmark/hypothesis source.
-
-### Option C — Full greenfield alpha engine rewrite before reruns
-Rejected for this cycle because it delays discovery and duplicates existing WF infrastructure. Reconsider only if measured bottlenecks prove current runners cannot meet throughput needs.
-
-## Architect review
-Architecture status: WATCH. Verdict: APPROVE. Constraint: keep post-OOS/lagged-shadow-inspired hypotheses quarantined until separately pre-registered and frozen before a strictly later fresh-forward window.
-
-## Critic review
-Verdict: OKAY. Constraint: runtime optimization only with checksum/equivalence proof; never label historical OOS selector results clean.
-
-## Consequences
-- Implementation must be slower to approve but more trustworthy.
-- High historical OOS numbers remain useful but non-promotable.
-- No-promotion remains an acceptable result.
-
-## Follow-ups
-- Execute through an approved execution skill after user approval.
-- Prefer ultragoal for durable goal tracking; team only if tmux-based worker coordination is explicitly needed.
+@goal: Run focused verification and produce execution evidence
+Run focused tests for discovery invariants, existing strategy reassessment, survivor manifests, strategy/registry tiering, artifact portfolio manifest fail-closed behavior, and report schemas. Run a bounded smoke/probe only if safe within time and available data; otherwise record no-promotion/watchlist evidence without weakening gates.

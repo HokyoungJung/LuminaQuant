@@ -1034,3 +1034,403 @@ def test_run_writes_policy_flags_with_synthetic_loader(monkeypatch, tmp_path: Pa
         "robust_selector_is_post_failure_diagnostic_requires_fresh_forward"
         in robust_loaded["realism_diagnostics"]["blockers"]
     )
+
+
+
+def test_promotion_gate_contract_exposes_benchmarks_and_forbidden_oos_uses() -> None:
+    contract = module._gate_contract_payload(selection_policy=module.DEFAULT_SELECTION_POLICY)
+
+    assert contract["selection_inputs"] == ["train", "validation"]
+    assert contract["locked_oos_policy"] == "report_gate_only_after_train_validation_freeze"
+    assert contract["benchmarks"]["shadow_compounded_oos_return"] == pytest.approx(0.6442)
+    assert contract["benchmarks"]["shadow_return_mdd"] == pytest.approx(3.49)
+    assert contract["benchmarks"]["clean_paper_compounded_oos_return"] == pytest.approx(0.3439)
+    assert contract["benchmarks"]["max_mdd"] == pytest.approx(0.30)
+    assert "uses_locked_oos_for_tie_break" in contract["locked_oos_forbidden_uses"]
+    assert "uses_locked_oos_for_correlation" in contract["locked_oos_forbidden_uses"]
+    assert "uses_locked_oos_for_sizing" in contract["locked_oos_forbidden_uses"]
+    assert contract["real_money_execution"] is False
+
+
+def test_promotion_gate_report_flags_oos_contamination_without_using_oos_for_selection() -> None:
+    clean = _row(
+        model_id="clean_candidate",
+        locked_oos_return_report_only=0.50,
+        locked_oos_mdd_report_only=0.10,
+        locked_oos_liquidation_count_report_only=0,
+        locked_oos_account_wipeout_count_report_only=0,
+        uses_locked_oos_for_tie_break=False,
+        uses_locked_oos_for_correlation=False,
+        uses_locked_oos_for_sizing=False,
+        selected_by_train_validation_freeze=True,
+    )
+    contaminated = dict(clean)
+    contaminated["uses_locked_oos_for_tie_break"] = True
+    contaminated["locked_oos_return_report_only"] = 10.0
+
+    clean_gate = module._promotion_gate_report(
+        clean, selection_policy=module.DEFAULT_SELECTION_POLICY
+    )
+    contaminated_gate = module._promotion_gate_report(
+        contaminated, selection_policy=module.DEFAULT_SELECTION_POLICY
+    )
+
+    assert clean_gate["can_advance_to_full_wf"] is True
+    assert contaminated_gate["can_advance_to_full_wf"] is False
+    assert "locked_oos_used_by_selection_path" in contaminated_gate["rejection_reasons"]
+    assert module._score_row(clean) == pytest.approx(module._score_row(contaminated))
+
+
+def test_promotion_summary_and_tried_universe_report_retain_rejection_reasons() -> None:
+    accepted = _row(model_id="accepted", family="volatility_squeeze_breakout")
+    accepted.update(
+        module._promotion_gate_report(
+            accepted, selection_policy=module.DEFAULT_SELECTION_POLICY
+        )
+    )
+    weak = _row(
+        model_id="weak",
+        family="feature_bbo_flow_exhaustion_reversal",
+        feature_backed=True,
+        feature_coverage={"train": 0.1, "validation": 0.1, "locked_oos": 1.0},
+    )
+    weak.update(module._promotion_gate_report(weak, selection_policy=module.DEFAULT_SELECTION_POLICY))
+
+    summary = module._promotion_summary([accepted, weak], [accepted])
+
+    assert summary["candidate_count_total"] == 2
+    assert summary["selected_fold_count"] == 1
+    assert summary["family_counts"]["volatility_squeeze_breakout"] == 1
+    assert summary["promotion_status_counts"]["shadow_research_only_weak_data"] == 1
+    assert summary["rejection_reason_counts"]["insufficient_train_validation_feature_coverage"] == 1
+
+
+
+def test_all_locked_oos_usage_flags_fail_selection_eligibility() -> None:
+    for key in module._LOCKED_OOS_USAGE_KEYS:
+        row = _row(**{key: True})
+
+        assert not module._eligible_for_policy(
+            row, selection_policy=module.DEFAULT_SELECTION_POLICY
+        ), key
+        assert not module._eligible_for_policy(
+            row, selection_policy=module.ROBUST_SELECTION_POLICY
+        ), key
+
+
+def test_promotion_gate_fails_closed_for_missing_or_bad_oos_risk_metrics() -> None:
+    missing = _row()
+    for key in (
+        "locked_oos_return_report_only",
+        "locked_oos_mdd_report_only",
+        "locked_oos_liquidation_count_report_only",
+        "locked_oos_account_wipeout_count_report_only",
+    ):
+        missing.pop(key, None)
+    high_mdd = _row(
+        locked_oos_return_report_only=1.0,
+        locked_oos_mdd_report_only=0.31,
+        locked_oos_liquidation_count_report_only=0,
+        locked_oos_account_wipeout_count_report_only=0,
+    )
+    liquidation = _row(
+        locked_oos_return_report_only=1.0,
+        locked_oos_mdd_report_only=0.10,
+        locked_oos_liquidation_count_report_only=1,
+        locked_oos_account_wipeout_count_report_only=0,
+    )
+
+    for row in (missing, high_mdd, liquidation):
+        gate = module._promotion_gate_report(row, selection_policy=module.DEFAULT_SELECTION_POLICY)
+
+        assert gate["can_advance_to_full_wf"] is False
+        assert gate["report_only_locked_oos"]["risk_gate_pass"] is False
+
+    missing_gate = module._promotion_gate_report(
+        missing, selection_policy=module.DEFAULT_SELECTION_POLICY
+    )
+    assert missing_gate["report_only_locked_oos"]["risk_metrics_present"] is False
+    assert "missing_locked_oos_risk_metrics" in missing_gate["rejection_reasons"]
+    assert "report_gate_mdd_above_30pct" in module._promotion_gate_report(
+        high_mdd, selection_policy=module.DEFAULT_SELECTION_POLICY
+    )["rejection_reasons"]
+    assert "report_gate_locked_oos_liquidation" in module._promotion_gate_report(
+        liquidation, selection_policy=module.DEFAULT_SELECTION_POLICY
+    )["rejection_reasons"]
+
+
+
+def test_markdown_exposes_candidate_level_gate_audit_rows() -> None:
+    row = _row(
+        model_id="candidate-a",
+        family="volatility_squeeze_breakout",
+        fold_id="2026-01",
+        candidate_freeze_sha256="abcdef1234567890",
+        selected_by_train_validation_freeze=True,
+        locked_oos_return_report_only=0.50,
+        locked_oos_mdd_report_only=0.10,
+        locked_oos_liquidation_count_report_only=0,
+        locked_oos_account_wipeout_count_report_only=0,
+    )
+    gate = module._promotion_gate_report(row, selection_policy=module.DEFAULT_SELECTION_POLICY)
+    row["promotion_gate"] = gate
+    row["promotion_status"] = gate["promotion_status"]
+    row["rejection_reasons"] = gate["rejection_reasons"]
+    payload = {
+        "generated_at_utc": "2026-06-18T00:00:00Z",
+        "pre_registered_search_space_sha256": "hash",
+        "selection_policy": module.DEFAULT_SELECTION_POLICY,
+        "enabled_families": ["volatility_squeeze_breakout"],
+        "integer_leverages": [2],
+        "fold_workers": 1,
+        "simulation_backend": {"resolved_backend": "python"},
+        "candidate_cap_sort_policy": "eligible_first_active_train_validation_selection_score",
+        "candidate_row_count_total": 1,
+        "candidate_rows": [row],
+        "selected_fold_rows": [row],
+        "gate_contract": module._gate_contract_payload(selection_policy=module.DEFAULT_SELECTION_POLICY),
+        "promotion_summary": module._promotion_summary([row], [row]),
+        "tried_universe": {
+            "enabled_families": ["volatility_squeeze_breakout"],
+            "skipped_families": [],
+        },
+        "aggregate": {"fold_count": 1, "compounded_oos_return": 0.5},
+        "realism_diagnostics": {"blockers": []},
+    }
+
+    markdown = module._render_markdown(payload)
+
+    assert "## Candidate gate audit rows" in markdown
+    assert "`candidate-a`" in markdown
+    assert "abcdef123456" in markdown
+    assert "## Full-WF promotion candidates" in markdown
+    assert "selection rule: `survivor_manifest_train_validation_freeze_only`" in markdown
+
+
+def _manifest_keys(value):
+    if isinstance(value, dict):
+        keys = []
+        for key, inner in value.items():
+            keys.append(str(key))
+            keys.extend(_manifest_keys(inner))
+        return keys
+    if isinstance(value, list):
+        keys = []
+        for inner in value:
+            keys.extend(_manifest_keys(inner))
+        return keys
+    return []
+
+
+def _survivor_row(**overrides):
+    row = _row(
+        model_id="survivor-a",
+        family="volatility_squeeze_breakout",
+        fold_id="2026-01",
+        symbol="BTCUSDT",
+        timeframe="1h",
+        side="long_short",
+        lookback=24,
+        threshold=0.10,
+        exit_threshold=0.0,
+        min_hold=4,
+        integer_leverage=2,
+        allocation_fraction=0.10,
+        selected_by_train_validation_freeze=True,
+        candidate_freeze_sha256="freeze-a",
+        selection_score_active_train_validation_only=0.25,
+        selection_score_robust_v1_train_validation_only=0.18,
+        locked_oos_return_report_only=0.50,
+        locked_oos_mdd_report_only=0.10,
+        locked_oos_liquidation_count_report_only=0,
+        locked_oos_account_wipeout_count_report_only=0,
+    )
+    row.update(overrides)
+    row["promotion_gate"] = module._promotion_gate_report(
+        row, selection_policy=module.DEFAULT_SELECTION_POLICY
+    )
+    row["promotion_status"] = row["promotion_gate"]["promotion_status"]
+    row["rejection_reasons"] = row["promotion_gate"]["rejection_reasons"]
+    return row
+
+
+def test_survivor_manifest_excludes_locked_oos_metrics_from_freeze_contract() -> None:
+    row = _survivor_row()
+
+    manifest = module._survivor_manifest_payload(
+        [row],
+        search_hash="search-hash",
+        selection_policy=module.DEFAULT_SELECTION_POLICY,
+        enabled_families=("volatility_squeeze_breakout",),
+        leverages=(2,),
+        symbols=("BTCUSDT",),
+        timeframes=("1h",),
+    )
+
+    assert manifest["frozen_survivor_count"] == 1
+    assert manifest["full_wf_retest_candidate_count"] == 1
+    assert manifest["selection_inputs"] == ["train", "validation"]
+    assert manifest["optimizer_holdout_use_allowed"] is False
+    assert manifest["fresh_forward_required"] is True
+    assert manifest["real_money_execution"] is False
+    assert not [key for key in _manifest_keys(manifest) if "locked_oos" in key]
+    survivor = manifest["frozen_survivors"][0]
+    assert survivor["eligible_for_full_wf_retest"] is True
+    assert survivor["full_wf_retest_blockers"] == []
+    assert survivor["selected_by_train_validation_freeze"] is True
+
+
+def test_survivor_manifest_hash_ignores_report_only_oos_metric_changes() -> None:
+    base = _survivor_row(
+        locked_oos_return_report_only=0.50,
+        locked_oos_mdd_report_only=0.10,
+    )
+    changed = _survivor_row(
+        locked_oos_return_report_only=-0.90,
+        locked_oos_mdd_report_only=0.90,
+    )
+
+    kwargs = dict(
+        search_hash="search-hash",
+        selection_policy=module.DEFAULT_SELECTION_POLICY,
+        enabled_families=("volatility_squeeze_breakout",),
+        leverages=(2,),
+        symbols=("BTCUSDT",),
+        timeframes=("1h",),
+    )
+
+    assert module._survivor_manifest_payload([base], **kwargs)[
+        "survivor_manifest_sha256"
+    ] == module._survivor_manifest_payload([changed], **kwargs)[
+        "survivor_manifest_sha256"
+    ]
+
+
+def test_survivor_manifest_blocks_holdout_contaminated_retest_candidate() -> None:
+    row = _survivor_row(uses_locked_oos_for_tie_break=True)
+
+    manifest = module._survivor_manifest_payload(
+        [row],
+        search_hash="search-hash",
+        selection_policy=module.DEFAULT_SELECTION_POLICY,
+        enabled_families=("volatility_squeeze_breakout",),
+        leverages=(2,),
+        symbols=("BTCUSDT",),
+        timeframes=("1h",),
+    )
+
+    assert manifest["frozen_survivor_count"] == 1
+    assert manifest["full_wf_retest_candidate_count"] == 0
+    survivor = manifest["frozen_survivors"][0]
+    assert survivor["eligible_for_full_wf_retest"] is False
+    assert survivor["holdout_usage_contamination_detected"] is True
+    assert "holdout_used_by_train_validation_path" in survivor["full_wf_retest_blockers"]
+
+
+def test_unselected_eligible_row_cannot_advance_to_full_wf() -> None:
+    unselected = _survivor_row(
+        model_id="unselected",
+        selected_by_train_validation_freeze=False,
+    )
+    selected = _survivor_row(
+        model_id="selected",
+        selected_by_train_validation_freeze=True,
+    )
+
+    unselected_gate = module._promotion_gate_report(
+        unselected, selection_policy=module.DEFAULT_SELECTION_POLICY
+    )
+    selected_gate = module._promotion_gate_report(
+        selected, selection_policy=module.DEFAULT_SELECTION_POLICY
+    )
+    manifest = module._survivor_manifest_payload(
+        [selected],
+        search_hash="search-hash",
+        selection_policy=module.DEFAULT_SELECTION_POLICY,
+        enabled_families=("volatility_squeeze_breakout",),
+        leverages=(2,),
+        symbols=("BTCUSDT",),
+        timeframes=("1h",),
+    )
+    payload = {
+        "generated_at_utc": "2026-06-18T00:00:00Z",
+        "pre_registered_search_space_sha256": "hash",
+        "selection_policy": module.DEFAULT_SELECTION_POLICY,
+        "enabled_families": ["volatility_squeeze_breakout"],
+        "integer_leverages": [2],
+        "fold_workers": 1,
+        "simulation_backend": {"resolved_backend": "python"},
+        "candidate_cap_sort_policy": "eligible_first_active_train_validation_selection_score",
+        "candidate_row_count_total": 2,
+        "candidate_rows": [
+            {**unselected, "promotion_gate": unselected_gate},
+            {**selected, "promotion_gate": selected_gate},
+        ],
+        "selected_fold_rows": [selected],
+        "survivor_manifest": manifest,
+        "gate_contract": module._gate_contract_payload(selection_policy=module.DEFAULT_SELECTION_POLICY),
+        "promotion_summary": module._promotion_summary([unselected, selected], [selected]),
+        "tried_universe": {"enabled_families": ["volatility_squeeze_breakout"], "skipped_families": []},
+        "aggregate": {"fold_count": 1, "compounded_oos_return": 0.5},
+        "realism_diagnostics": {"blockers": []},
+    }
+
+    assert unselected_gate["train_validation_smoke_survivor"] is True
+    assert unselected_gate["can_advance_to_full_wf"] is False
+    assert selected_gate["can_advance_to_full_wf"] is True
+    markdown = module._render_markdown(payload)
+    assert "full-WF retest candidates: `1`" in markdown
+    assert "count: `1`" in markdown
+
+
+def test_run_writes_survivor_manifest_artifact(monkeypatch, tmp_path: Path) -> None:
+    datetimes = pd.date_range("2025-01-01", periods=240, freq="h")
+    close = np.linspace(100.0, 130.0, len(datetimes))
+    frame = pd.DataFrame(
+        {
+            "datetime": datetimes,
+            "open": close,
+            "high": close * 1.01,
+            "low": close * 0.99,
+            "close": close,
+            "volume": np.linspace(1000.0, 1500.0, len(datetimes)),
+        }
+    )
+
+    def fake_load_all_bars(symbols, *, data_root, timeframes):
+        return {
+            (symbol, timeframe): frame.copy() for symbol in symbols for timeframe in timeframes
+        }, {"latest_available_data": datetimes[-1].isoformat()}
+
+    class Fold:
+        fold_id = "2025-03"
+        train = (datetimes[0], datetimes[80])
+        validation = (datetimes[81], datetimes[160])
+        locked_oos = (datetimes[161], datetimes[-1])
+
+    monkeypatch.setattr(module.broad69, "load_all_bars", fake_load_all_bars)
+    monkeypatch.setattr(module.monthly, "build_monthly_folds", lambda **_: [Fold()])
+
+    payload = module.run(
+        data_root=tmp_path,
+        output_dir=tmp_path / "out",
+        symbols=("BTCUSDT",),
+        timeframes=("1h",),
+        max_folds=None,
+        max_candidates_per_fold=5,
+        enabled_families=("volatility_squeeze_breakout",),
+        max_candidate_rows_output=5,
+    )
+
+    manifest_path = Path(payload["output_paths"]["survivor_manifest_json"])
+    assert manifest_path.exists()
+    manifest = json.loads(manifest_path.read_text())
+    assert manifest["artifact_kind"] == "alpha_zoo_clean_new_alpha_survivor_manifest"
+    assert manifest["selection_inputs"] == ["train", "validation"]
+    assert manifest["optimizer_holdout_use_allowed"] is False
+    assert manifest["real_money_execution"] is False
+    assert manifest["survivor_manifest_sha256"] == payload["survivor_manifest"]["survivor_manifest_sha256"]
+    markdown = Path(payload["output_paths"]["markdown"]).read_text()
+    assert "## Survivor manifest" in markdown
+    assert "full-WF retest candidates" in markdown
+

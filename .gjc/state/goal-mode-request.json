@@ -3,6 +3,7 @@
   "kind": "goal_mode_request",
   "source": "ultragoal",
   "objective": "Complete the durable ultragoal plan in .gjc/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .gjc/ultragoal/ledger.jsonl as the audit trail.",
-  "createdAt": "2026-06-07T05:14:45.683Z",
-  "goalsPath": "/home/hoky/Quants-agent/LuminaQuant/.gjc/ultragoal/goals.json"
+  "createdAt": "2026-06-18T13:06:56.027Z",
+  "goalsPath": "/home/hoky/Quants-agent/LuminaQuant/.gjc/ultragoal/goals.json",
+  "sessionId": "019eda4a-348c-7000-900a-a89daea0e89f"
 }

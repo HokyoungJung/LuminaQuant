@@ -77,6 +77,7 @@ SUPPORTED_LIVE_PORTFOLIO_MODES = frozenset(
         "profit_moonshot_taker_flow_exhaustion_eth_hold_mode",
         "profit_moonshot_taker_flow_exhaustion_eth_slow_momentum_mode",
         "profit_moonshot_precious_metal_pair_aggressive_mode",
+        "artifact_manifest_mode",
     }
 )
 
@@ -131,7 +132,8 @@ def resolve_live_decision_file(decision_file: str = "") -> Path | None:
 
 
 def supports_live_portfolio_mode(reference: str) -> bool:
-    return normalize_portfolio_mode_reference(reference) in SUPPORTED_LIVE_PORTFOLIO_MODES
+    token = normalize_portfolio_mode_reference(reference)
+    return token in SUPPORTED_LIVE_PORTFOLIO_MODES or token.startswith("manifest:")
 
 
 def resolve_portfolio_mode_runtime_config(reference: str) -> dict[str, Any]:

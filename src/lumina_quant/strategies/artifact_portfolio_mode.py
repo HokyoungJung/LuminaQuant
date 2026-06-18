@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections import deque
+from datetime import UTC, datetime
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -78,6 +79,22 @@ PRECIOUS_METAL_PAIR_SCREEN_PATH = (
     / "precious_metal_pair_aggressive"
     / "precious_pair_screen_top.json"
 )
+DEFAULT_ARTIFACT_PORTFOLIO_MANIFEST_PATH = (
+    GROUP_ROOT / "artifact_portfolio_manifest_current" / "artifact_portfolio_manifest_latest.json"
+)
+MANIFEST_PORTFOLIO_MODE_PREFIX = "manifest:"
+MANIFEST_PORTFOLIO_GROSS_CAP = 2.25
+_MANIFEST_FORBIDDEN_OOS_KEYS = (
+    "uses_current_fold_oos",
+    "uses_locked_oos_for_selection",
+    "uses_locked_oos_for_objective",
+    "uses_locked_oos_for_pruning",
+    "uses_locked_oos_for_parameter_fitting",
+    "uses_locked_oos_for_threshold",
+    "uses_locked_oos_for_tie_break",
+    "uses_locked_oos_for_correlation",
+    "uses_locked_oos_for_sizing",
+)
 
 _LIVE_PORTFOLIO_MODE_ALIASES = {
     "aggressive_realized_mode",
@@ -151,6 +168,7 @@ _LIVE_PORTFOLIO_MODE_ALIASES = {
     "profit_moonshot_taker_flow_exhaustion_eth_hold_mode",
     "profit_moonshot_taker_flow_exhaustion_eth_slow_momentum_mode",
     "profit_moonshot_precious_metal_pair_aggressive_mode",
+    "artifact_manifest_mode",
 }
 _PROFIT_MODE_UNBOUNDED_CHILD_TARGET_ALLOCATION = 0.02
 _PROFIT_MODE_UNBOUNDED_CHILD_MAX_ORDER_VALUE = 250.0
@@ -229,6 +247,298 @@ def _ordered_unique(items: list[str]) -> tuple[str, ...]:
         if token and token not in ordered:
             ordered.append(token)
     return tuple(ordered)
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _resolve_manifest_path(raw_path: Any, *, base_dir: Path | None = None) -> Path:
+    path = Path(str(raw_path or "")).expanduser()
+    if not path.is_absolute():
+        path = (base_dir or Path.cwd()) / path
+    return path.resolve()
+
+
+def _selection_inputs_are_train_validation_only(inputs: Any) -> bool:
+    if not isinstance(inputs, list | tuple):
+        return False
+    values = [str(item).lower() for item in inputs]
+    if not values:
+        return False
+    return all(value in {"train", "validation", "train_validation"} for value in values)
+
+
+def _has_forbidden_oos_provenance(payload: dict[str, Any]) -> bool:
+    return any(bool(payload.get(key)) for key in _MANIFEST_FORBIDDEN_OOS_KEYS)
+
+
+def _manifest_fail_closed_definition(
+    *, token: str, source_artifacts: dict[str, str], reason: str
+) -> PortfolioModeDefinition:
+    artifacts = dict(source_artifacts)
+    artifacts["manifest_fail_closed_reason"] = str(reason)
+    artifacts["manifest_fail_closed_to_cash"] = "true"
+    return PortfolioModeDefinition(
+        portfolio_mode=token,
+        components=(),
+        cash_weight=1.0,
+        source_artifacts=artifacts,
+        watch_symbols=(),
+    )
+
+
+def _validate_manifest_source_artifacts(
+    payload: dict[str, Any], *, manifest_path: Path
+) -> tuple[dict[str, Path], str | None]:
+    artifacts: dict[str, Path] = {}
+    base_dir = manifest_path.parent
+    raw_artifacts = payload.get("source_artifacts")
+    if not isinstance(raw_artifacts, list | tuple):
+        return {}, "source_artifacts_not_list"
+    for artifact in raw_artifacts:
+        if not isinstance(artifact, dict):
+            return {}, "source_artifact_not_object"
+        artifact_id = str(artifact.get("id") or artifact.get("artifact_id") or "").strip()
+        raw_path = artifact.get("path")
+        if not artifact_id or not raw_path:
+            return {}, "source_artifact_missing_id_or_path"
+        source_path = _resolve_manifest_path(raw_path, base_dir=base_dir)
+        if not source_path.exists():
+            return {}, f"source_artifact_missing:{artifact_id}"
+        if not source_path.is_file():
+            return {}, f"source_artifact_not_file:{artifact_id}"
+        expected_sha = str(artifact.get("sha256") or "").strip()
+        if not expected_sha:
+            return {}, f"source_artifact_sha_missing:{artifact_id}"
+        try:
+            actual_sha = _file_sha256(source_path)
+        except OSError:
+            return {}, f"source_artifact_unreadable:{artifact_id}"
+        if actual_sha != expected_sha:
+            return {}, f"source_artifact_sha_mismatch:{artifact_id}"
+        max_age_hours = _safe_float(artifact.get("max_age_hours"), 0.0)
+        if max_age_hours <= 0.0:
+            return {}, f"source_artifact_freshness_missing:{artifact_id}"
+        mtime = datetime.fromtimestamp(source_path.stat().st_mtime, UTC)
+        age_hours = (datetime.now(UTC) - mtime).total_seconds() / 3600.0
+        if age_hours > max_age_hours:
+            return {}, f"source_artifact_stale:{artifact_id}"
+        if artifact.get("ready") is not True or artifact.get("portfolio_ready") is not True:
+            return {}, f"source_artifact_not_ready:{artifact_id}"
+        artifacts[artifact_id] = source_path
+    return artifacts, None
+
+
+def _manifest_correlation_ok(provenance: Any) -> bool:
+    if not isinstance(provenance, dict) or not provenance:
+        return False
+    if provenance.get("ready") is not True:
+        return False
+    source = str(provenance.get("source") or "").strip().lower()
+    if not source or "oos" in source or "locked" in source:
+        return False
+    if not _selection_inputs_are_train_validation_only(provenance.get("selection_inputs")):
+        return False
+    return not _has_forbidden_oos_provenance(provenance)
+
+
+def _manifest_optimizer_ok(provenance: Any) -> bool:
+    if not isinstance(provenance, dict) or not provenance:
+        return False
+    if not _selection_inputs_are_train_validation_only(provenance.get("selection_inputs")):
+        return False
+    return not _has_forbidden_oos_provenance(provenance)
+
+
+def _manifest_definition_from_path(
+    manifest_path: Path, *, token: str, source_artifacts: dict[str, str]
+) -> PortfolioModeDefinition:
+    artifacts = dict(source_artifacts)
+    artifacts["artifact_portfolio_manifest_path"] = str(manifest_path)
+    if not manifest_path.exists():
+        return _manifest_fail_closed_definition(
+            token=token, source_artifacts=artifacts, reason="manifest_missing"
+        )
+    try:
+        payload = _read_json(manifest_path)
+    except Exception as exc:  # defensive fail-closed boundary for live routing
+        return _manifest_fail_closed_definition(
+            token=token, source_artifacts=artifacts, reason=f"manifest_unreadable:{type(exc).__name__}"
+        )
+
+    if any(
+        bool(payload.get(key))
+        for key in ("real_money_execution", "allow_real_money", "ready_for_real")
+    ):
+        return _manifest_fail_closed_definition(
+            token=token, source_artifacts=artifacts, reason="manifest_real_money_enabled"
+        )
+    if _has_forbidden_oos_provenance(payload):
+        return _manifest_fail_closed_definition(
+            token=token, source_artifacts=artifacts, reason="manifest_oos_contaminated"
+        )
+    if not _manifest_optimizer_ok(payload.get("optimizer_provenance")):
+        return _manifest_fail_closed_definition(
+            token=token, source_artifacts=artifacts, reason="manifest_optimizer_provenance_invalid"
+        )
+    if not _manifest_correlation_ok(payload.get("correlation_input_provenance")):
+        return _manifest_fail_closed_definition(
+            token=token, source_artifacts=artifacts, reason="manifest_correlation_provenance_invalid"
+        )
+
+    source_paths, source_error = _validate_manifest_source_artifacts(
+        payload, manifest_path=manifest_path
+    )
+    if source_error is not None:
+        return _manifest_fail_closed_definition(
+            token=token, source_artifacts=artifacts, reason=source_error
+        )
+    if not source_paths:
+        return _manifest_fail_closed_definition(
+            token=token, source_artifacts=artifacts, reason="source_artifacts_empty"
+        )
+    for artifact_id, artifact_path in source_paths.items():
+        artifacts[f"manifest_source_artifact:{artifact_id}"] = str(artifact_path)
+
+    gross_cap = min(
+        MANIFEST_PORTFOLIO_GROSS_CAP,
+        _safe_float(payload.get("gross_cap"), MANIFEST_PORTFOLIO_GROSS_CAP),
+    )
+    if gross_cap <= 0.0:
+        return _manifest_fail_closed_definition(
+            token=token, source_artifacts=artifacts, reason="manifest_gross_cap_non_positive"
+        )
+
+    components: list[PortfolioModeComponent] = []
+    gross = 0.0
+    netting_gross: dict[str, float] = {}
+    raw_children = payload.get("children")
+    if not isinstance(raw_children, list | tuple):
+        return _manifest_fail_closed_definition(
+            token=token, source_artifacts=artifacts, reason="manifest_children_not_list"
+        )
+    if not raw_children:
+        return _manifest_fail_closed_definition(
+            token=token, source_artifacts=artifacts, reason="manifest_children_empty"
+        )
+    for index, child in enumerate(raw_children):
+        if not isinstance(child, dict):
+            return _manifest_fail_closed_definition(
+                token=token, source_artifacts=artifacts, reason=f"child_not_object:{index}"
+            )
+        child_id = str(child.get("candidate_id") or child.get("name") or index)
+        if child.get("ready") is not True or child.get("portfolio_ready") is not True:
+            return _manifest_fail_closed_definition(
+                token=token, source_artifacts=artifacts, reason=f"child_not_ready:{child_id}"
+            )
+        if child.get("no_current_fold_oos_provenance") is not True:
+            return _manifest_fail_closed_definition(
+                token=token,
+                source_artifacts=artifacts,
+                reason=f"child_current_fold_oos_provenance_missing:{child_id}",
+            )
+        if child.get("train_validation_optimizer_provenance") is not True:
+            return _manifest_fail_closed_definition(
+                token=token,
+                source_artifacts=artifacts,
+                reason=f"child_train_validation_optimizer_provenance_missing:{child_id}",
+            )
+        if any(
+            bool(child.get(key))
+            for key in ("real_money_execution", "allow_real_money", "ready_for_real")
+        ):
+            return _manifest_fail_closed_definition(
+                token=token, source_artifacts=artifacts, reason=f"child_real_money_enabled:{child_id}"
+            )
+        if _has_forbidden_oos_provenance(child):
+            return _manifest_fail_closed_definition(
+                token=token, source_artifacts=artifacts, reason=f"child_oos_contaminated:{child_id}"
+            )
+        child_optimizer = child.get("optimizer_provenance")
+        if not _manifest_optimizer_ok(child_optimizer):
+            return _manifest_fail_closed_definition(
+                token=token,
+                source_artifacts=artifacts,
+                reason=f"child_optimizer_provenance_invalid:{child_id}",
+            )
+        child_corr = child.get("correlation_input_provenance")
+        if not _manifest_correlation_ok(child_corr):
+            return _manifest_fail_closed_definition(
+                token=token,
+                source_artifacts=artifacts,
+                reason=f"child_correlation_provenance_invalid:{child_id}",
+            )
+        source_id = str(child.get("source_artifact_id") or "").strip()
+        if source_paths and source_id not in source_paths:
+            return _manifest_fail_closed_definition(
+                token=token, source_artifacts=artifacts, reason=f"child_source_unreconciled:{child_id}"
+            )
+        weight = _safe_float(child.get("weight"), 0.0)
+        if not str(child.get("strategy_class") or "").strip():
+            return _manifest_fail_closed_definition(
+                token=token, source_artifacts=artifacts, reason=f"child_invalid:{child_id}"
+            )
+        if not isinstance(child.get("symbols"), list | tuple) or not [
+            symbol for symbol in child.get("symbols") if str(symbol).strip()
+        ]:
+            return _manifest_fail_closed_definition(
+                token=token, source_artifacts=artifacts, reason=f"child_invalid:{child_id}"
+            )
+        if not isinstance(child.get("params"), dict):
+            return _manifest_fail_closed_definition(
+                token=token, source_artifacts=artifacts, reason=f"child_invalid:{child_id}"
+            )
+        leaf_gross = abs(_safe_float(child.get("leaf_gross"), weight))
+        leaf_cap = _safe_float(child.get("leaf_gross_cap"), gross_cap)
+        if leaf_gross > leaf_cap + 1e-12:
+            return _manifest_fail_closed_definition(
+                token=token, source_artifacts=artifacts, reason=f"child_leaf_gross_cap_breach:{child_id}"
+            )
+        group = str(child.get("netting_group") or child_id)
+        netting_gross[group] = netting_gross.get(group, 0.0) + leaf_gross
+        group_cap = _safe_float(child.get("netting_group_gross_cap"), gross_cap)
+        if netting_gross[group] > group_cap + 1e-12:
+            return _manifest_fail_closed_definition(
+                token=token, source_artifacts=artifacts, reason=f"child_netting_group_cap_breach:{group}"
+            )
+        if weight <= 0.0:
+            continue
+        gross += max(abs(weight), leaf_gross)
+        if gross > gross_cap + 1e-12:
+            return _manifest_fail_closed_definition(
+                token=token, source_artifacts=artifacts, reason="manifest_gross_cap_breach"
+            )
+        child_row = dict(child)
+        child_row["weight"] = weight
+        try:
+            component = _component_from_row(
+                child_row,
+                weight=weight,
+                source=f"{token}:manifest:{source_id or 'inline'}",
+            )
+        except (TypeError, ValueError):
+            return _manifest_fail_closed_definition(
+                token=token, source_artifacts=artifacts, reason=f"child_invalid:{child_id}"
+            )
+        components.append(component)
+
+    if not components:
+        return _manifest_fail_closed_definition(
+            token=token, source_artifacts=artifacts, reason="manifest_no_positive_children"
+        )
+    cash_weight = _safe_float(payload.get("cash_weight"), max(0.0, 1.0 - gross))
+    return PortfolioModeDefinition(
+        portfolio_mode=token,
+        components=tuple(_merge_components(components)),
+        cash_weight=float(max(0.0, min(1.0, cash_weight))),
+        source_artifacts=artifacts,
+        watch_symbols=(),
+    )
 
 
 def _component_from_row(
@@ -1880,12 +2190,27 @@ def resolve_portfolio_mode_definition(portfolio_mode: str) -> PortfolioModeDefin
             DERIVATIVES_FLOW_SQUEEZE_MANIFEST_PATH.resolve()
         ),
         "precious_metal_pair_screen_path": str(PRECIOUS_METAL_PAIR_SCREEN_PATH.resolve()),
+        "default_artifact_portfolio_manifest_path": str(
+            DEFAULT_ARTIFACT_PORTFOLIO_MANIFEST_PATH.resolve()
+        ),
     }
 
     components: list[PortfolioModeComponent] = []
     cash_weight = 0.0
     watch_symbols: tuple[str, ...] = ()
 
+    if token == "artifact_manifest_mode":
+        return _manifest_definition_from_path(
+            DEFAULT_ARTIFACT_PORTFOLIO_MANIFEST_PATH.resolve(),
+            token=token,
+            source_artifacts=source_artifacts,
+        )
+    if token.startswith(MANIFEST_PORTFOLIO_MODE_PREFIX):
+        return _manifest_definition_from_path(
+            _resolve_manifest_path(token[len(MANIFEST_PORTFOLIO_MODE_PREFIX) :]),
+            token=token,
+            source_artifacts=source_artifacts,
+        )
     if token == "risk_off_mode":
         cash_weight = 1.0
         watch_symbols = _watch_symbols()

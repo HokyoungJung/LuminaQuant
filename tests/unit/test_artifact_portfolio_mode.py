@@ -1189,3 +1189,315 @@ def test_profit_moonshot_taker_flow_exhaustion_slow_momentum_mode_adds_cooldown(
     assert component.params["cooldown_bars"] == 2160
     assert component.params["target_allocation"] == 0.008
     assert component.params["max_order_value"] == 175.0
+
+
+def _manifest_source_sha(path: Path) -> str:
+    import hashlib
+
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _write_manifest(tmp_path: Path, **overrides) -> Path:
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    source = tmp_path / "source.json"
+    source.write_text(json.dumps({"ready": True, "payload": "ok"}), encoding="utf-8")
+    manifest = {
+        "artifact_kind": "artifact_portfolio_manifest",
+        "real_money_execution": False,
+        "ready_for_real": False,
+        "gross_cap": 2.25,
+        "cash_weight": 0.25,
+        "optimizer_provenance": {
+            "selection_inputs": ["train", "validation"],
+            "uses_current_fold_oos": False,
+            "uses_locked_oos_for_selection": False,
+            "uses_locked_oos_for_objective": False,
+        },
+        "correlation_input_provenance": {
+            "source": "train_validation_correlation_matrix",
+            "selection_inputs": ["train", "validation"],
+            "uses_current_fold_oos": False,
+            "uses_locked_oos_for_correlation": False,
+            "ready": True,
+        },
+        "source_artifacts": [
+            {
+                "id": "survivors",
+                "path": str(source),
+                "sha256": _manifest_source_sha(source),
+                "max_age_hours": 876000,
+                "ready": True,
+                "portfolio_ready": True,
+            }
+        ],
+        "children": [
+            {
+                "candidate_id": "leaf-a",
+                "name": "Leaf A",
+                "strategy_class": "MovingAverageCrossStrategy",
+                "symbols": ["BTC/USDT"],
+                "params": {"short_window": 4, "long_window": 12},
+                "weight": 0.75,
+                "leaf_gross": 0.75,
+                "leaf_gross_cap": 1.0,
+                "netting_group": "btc",
+                "netting_group_gross_cap": 1.0,
+                "source_artifact_id": "survivors",
+                "ready": True,
+                "portfolio_ready": True,
+                "no_current_fold_oos_provenance": True,
+                "train_validation_optimizer_provenance": True,
+                "uses_current_fold_oos": False,
+                "uses_locked_oos_for_selection": False,
+                "uses_locked_oos_for_correlation": False,
+                "optimizer_provenance": {
+                    "selection_inputs": ["train", "validation"],
+                    "uses_current_fold_oos": False,
+                    "uses_locked_oos_for_selection": False,
+                    "uses_locked_oos_for_objective": False,
+                },
+                "correlation_input_provenance": {
+                    "source": "train_validation_correlation_matrix",
+                    "selection_inputs": ["train", "validation"],
+                    "uses_current_fold_oos": False,
+                    "uses_locked_oos_for_correlation": False,
+                    "ready": True,
+                },
+            }
+        ],
+    }
+    for key, value in overrides.items():
+        if key == "child_updates":
+            manifest["children"][0].update(value)
+        elif key == "source_updates":
+            manifest["source_artifacts"][0].update(value)
+        elif key == "optimizer_updates":
+            manifest["optimizer_provenance"].update(value)
+        elif key == "correlation_updates":
+            manifest["correlation_input_provenance"].update(value)
+        else:
+            manifest[key] = value
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    return manifest_path
+
+
+def test_manifest_portfolio_mode_resolves_valid_manifest(tmp_path: Path) -> None:
+    manifest_path = _write_manifest(tmp_path)
+
+    definition = MODULE.resolve_portfolio_mode_definition(f"manifest:{manifest_path}")
+
+    assert definition.cash_weight == 0.25
+    assert "manifest_fail_closed_to_cash" not in definition.source_artifacts
+    assert definition.source_artifacts["artifact_portfolio_manifest_path"] == str(manifest_path.resolve())
+    assert definition.components
+    component = definition.components[0]
+    assert component.component_id == "leaf-a"
+    assert component.weight == 0.75
+    assert component.strategy_class == "MovingAverageCrossStrategy"
+    assert component.params["short_window"] == 4
+    assert definition.source_artifacts["manifest_source_artifact:survivors"].endswith("source.json")
+
+
+def test_manifest_portfolio_mode_fail_closes_to_cash_on_oos_contamination(
+    tmp_path: Path,
+) -> None:
+    manifest_path = _write_manifest(
+        tmp_path,
+        child_updates={"uses_locked_oos_for_selection": True},
+    )
+
+    definition = MODULE.resolve_portfolio_mode_definition(f"manifest:{manifest_path}")
+
+    assert definition.components == ()
+    assert definition.cash_weight == 1.0
+    assert definition.source_artifacts["manifest_fail_closed_to_cash"] == "true"
+    assert definition.source_artifacts["manifest_fail_closed_reason"] == "child_oos_contaminated:leaf-a"
+
+
+def test_manifest_portfolio_mode_fail_closes_to_cash_on_source_sha_mismatch(
+    tmp_path: Path,
+) -> None:
+    manifest_path = _write_manifest(tmp_path, source_updates={"sha256": "bad"})
+
+    definition = MODULE.resolve_portfolio_mode_definition(f"manifest:{manifest_path}")
+
+    assert definition.components == ()
+    assert definition.cash_weight == 1.0
+    assert definition.source_artifacts["manifest_fail_closed_reason"] == "source_artifact_sha_mismatch:survivors"
+
+
+def test_manifest_portfolio_mode_fail_closes_to_cash_on_missing_source_sha(
+    tmp_path: Path,
+) -> None:
+    manifest_path = _write_manifest(tmp_path, source_updates={"sha256": ""})
+
+    definition = MODULE.resolve_portfolio_mode_definition(f"manifest:{manifest_path}")
+
+    assert definition.components == ()
+    assert definition.cash_weight == 1.0
+    assert definition.source_artifacts["manifest_fail_closed_reason"] == "source_artifact_sha_missing:survivors"
+
+
+def test_manifest_portfolio_mode_fail_closes_to_cash_on_directory_source(
+    tmp_path: Path,
+) -> None:
+    source_dir = tmp_path / "source-dir"
+    source_dir.mkdir()
+    manifest_path = _write_manifest(
+        tmp_path / "manifest-dir-source",
+        source_updates={"path": str(source_dir), "sha256": "directory"},
+    )
+
+    definition = MODULE.resolve_portfolio_mode_definition(f"manifest:{manifest_path}")
+
+    assert definition.components == ()
+    assert definition.cash_weight == 1.0
+    assert definition.source_artifacts["manifest_fail_closed_reason"] == "source_artifact_not_file:survivors"
+
+
+def test_manifest_portfolio_mode_fail_closes_to_cash_on_child_optimizer_oos(
+    tmp_path: Path,
+) -> None:
+    manifest_path = _write_manifest(
+        tmp_path,
+        child_updates={
+            "optimizer_provenance": {
+                "selection_inputs": ["train", "validation", "oos"],
+                "uses_current_fold_oos": True,
+            }
+        },
+    )
+
+    definition = MODULE.resolve_portfolio_mode_definition(f"manifest:{manifest_path}")
+
+    assert definition.components == ()
+    assert definition.cash_weight == 1.0
+    assert definition.source_artifacts["manifest_fail_closed_reason"] == "child_optimizer_provenance_invalid:leaf-a"
+
+
+def test_manifest_portfolio_mode_fail_closes_to_cash_on_bad_child_correlation(
+    tmp_path: Path,
+) -> None:
+    manifest_path = _write_manifest(
+        tmp_path,
+        child_updates={
+            "correlation_input_provenance": {
+                "source": "locked_oos_matrix",
+                "selection_inputs": ["train", "validation"],
+                "ready": True,
+            }
+        },
+    )
+
+    definition = MODULE.resolve_portfolio_mode_definition(f"manifest:{manifest_path}")
+
+    assert definition.components == ()
+    assert definition.cash_weight == 1.0
+    assert definition.source_artifacts["manifest_fail_closed_reason"] == "child_correlation_provenance_invalid:leaf-a"
+
+
+def test_manifest_portfolio_mode_fail_closes_to_cash_on_malformed_collections(
+    tmp_path: Path,
+) -> None:
+    for override_key, reason in (
+        ("source_artifacts", "source_artifacts_not_list"),
+        ("children", "manifest_children_not_list"),
+    ):
+        manifest_path = _write_manifest(tmp_path / override_key, **{override_key: 1})
+
+        definition = MODULE.resolve_portfolio_mode_definition(f"manifest:{manifest_path}")
+
+        assert definition.components == ()
+        assert definition.cash_weight == 1.0
+        assert definition.source_artifacts["manifest_fail_closed_reason"] == reason
+
+
+def test_manifest_portfolio_mode_fail_closes_to_cash_on_scalar_child_shapes(
+    tmp_path: Path,
+) -> None:
+    cases = (
+        ({"symbols": "BTC/USDT"}, "child_invalid:leaf-a"),
+        ({"params": "not-a-dict"}, "child_invalid:leaf-a"),
+        ({"portfolio_ready": None}, "child_not_ready:leaf-a"),
+    )
+    for idx, (child_updates, reason) in enumerate(cases):
+        manifest_path = _write_manifest(tmp_path / f"case-{idx}", child_updates=child_updates)
+
+        definition = MODULE.resolve_portfolio_mode_definition(f"manifest:{manifest_path}")
+
+        assert definition.components == ()
+        assert definition.cash_weight == 1.0
+        assert definition.source_artifacts["manifest_fail_closed_reason"] == reason
+
+
+def test_manifest_portfolio_mode_fail_closes_to_cash_on_malformed_child(
+    tmp_path: Path,
+) -> None:
+    manifest_path = _write_manifest(tmp_path, child_updates={"strategy_class": ""})
+
+    definition = MODULE.resolve_portfolio_mode_definition(f"manifest:{manifest_path}")
+
+    assert definition.components == ()
+    assert definition.cash_weight == 1.0
+    assert definition.source_artifacts["manifest_fail_closed_reason"] == "child_invalid:leaf-a"
+
+
+def test_manifest_portfolio_mode_validates_zero_weight_child_shape(
+    tmp_path: Path,
+) -> None:
+    manifest_path = _write_manifest(
+        tmp_path,
+        child_updates={"weight": 0.0, "strategy_class": ""},
+    )
+
+    definition = MODULE.resolve_portfolio_mode_definition(f"manifest:{manifest_path}")
+
+    assert definition.components == ()
+    assert definition.cash_weight == 1.0
+    assert definition.source_artifacts["manifest_fail_closed_reason"] == "child_invalid:leaf-a"
+
+
+def test_manifest_portfolio_mode_fail_closes_to_cash_on_gross_breach(
+    tmp_path: Path,
+) -> None:
+    manifest_path = _write_manifest(
+        tmp_path,
+        gross_cap=0.5,
+        child_updates={"weight": 0.75, "leaf_gross": 0.75, "leaf_gross_cap": 1.0},
+    )
+
+    definition = MODULE.resolve_portfolio_mode_definition(f"manifest:{manifest_path}")
+
+    assert definition.components == ()
+    assert definition.cash_weight == 1.0
+    assert definition.source_artifacts["manifest_fail_closed_reason"] == "manifest_gross_cap_breach"
+
+
+def test_manifest_portfolio_mode_applies_gross_cap_to_leaf_gross(
+    tmp_path: Path,
+) -> None:
+    manifest_path = _write_manifest(
+        tmp_path,
+        gross_cap=0.5,
+        child_updates={"weight": 0.20, "leaf_gross": 0.75, "leaf_gross_cap": 1.0},
+    )
+
+    definition = MODULE.resolve_portfolio_mode_definition(f"manifest:{manifest_path}")
+
+    assert definition.components == ()
+    assert definition.cash_weight == 1.0
+    assert definition.source_artifacts["manifest_fail_closed_reason"] == "manifest_gross_cap_breach"
+
+
+def test_default_manifest_mode_is_supported_and_missing_manifest_is_cash() -> None:
+    assert "artifact_manifest_mode" in MODULE.supported_portfolio_modes()
+    assert supports_live_portfolio_mode("artifact_manifest_mode")
+    assert supports_live_portfolio_mode("manifest:/tmp/example-manifest.json")
+
+    definition = MODULE.resolve_portfolio_mode_definition("artifact_manifest_mode")
+
+    assert definition.components == ()
+    assert definition.cash_weight == 1.0
+    assert definition.source_artifacts["manifest_fail_closed_to_cash"] == "true"
+

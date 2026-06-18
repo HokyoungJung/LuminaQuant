@@ -1,0 +1,36 @@
+{
+  "artifact_kind": "alpha_zoo_clean_new_alpha_survivor_manifest",
+  "enabled_families": [
+    "volatility_squeeze_breakout"
+  ],
+  "fresh_forward_monthly_folds_required": 2,
+  "fresh_forward_required": true,
+  "frozen_survivor_count": 0,
+  "frozen_survivors": [],
+  "full_wf_retest_candidate_count": 0,
+  "full_wf_retest_candidates": [],
+  "generated_at_utc": "2026-06-18T13:55:22.219905Z",
+  "integer_leverages": [
+    2
+  ],
+  "oos_holdout_policy": "attach_after_train_validation_freeze_report_gate_only",
+  "optimizer_holdout_use_allowed": false,
+  "output_path": "var/reports/strategy_research/g005_clean_alpha_probe_20260618/clean_new_alpha_survivor_manifest_latest.json",
+  "pre_registered_search_space_sha256": "b4bdb079ba4d9ad5e7202b053858c6d219359126dddaa2a546e38c863ccccca4",
+  "ready_for_real": false,
+  "real_money_execution": false,
+  "selection_inputs": [
+    "train",
+    "validation"
+  ],
+  "selection_policy": "default_train_validation",
+  "survivor_manifest_sha256": "024446a922c30fb230d9eb407a4948ab041b81ee3f91ba08f47532fb5b00c6ea",
+  "universe": {
+    "symbols": [
+      "BTCUSDT"
+    ],
+    "timeframes": [
+      "1h"
+    ]
+  }
+}
