@@ -316,6 +316,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="MT5 bridge worker")
     parser.add_argument("--action", required=True)
     parser.add_argument("--payload", default="{}")
+    # Credentials (login/password/server) arrive via a private 0600 file, never on
+    # argv (argv is world-readable via /proc/<pid>/cmdline). The exchange writes the
+    # full payload there and passes only the path here; argv --payload carries the
+    # non-secret keys. Merging the file over --payload yields the complete payload.
+    parser.add_argument("--payload-file", default=None)
     args = parser.parse_args()
 
     try:
@@ -324,6 +329,18 @@ def main() -> None:
         _emit(False, error="Invalid JSON payload")
         return
     payload = payload_raw if isinstance(payload_raw, dict) else {}
+
+    payload_file = getattr(args, "payload_file", None)
+    if payload_file:
+        try:
+            with open(payload_file, encoding="ascii") as handle:
+                file_payload = json.load(handle)
+        except Exception as exc:
+            _emit(False, error=f"Invalid payload file: {exc}")
+            return
+        if isinstance(file_payload, dict):
+            payload.update(file_payload)
+
     action_name = str(args.action).strip()
     handler = ACTIONS.get(action_name)
     if handler is None:

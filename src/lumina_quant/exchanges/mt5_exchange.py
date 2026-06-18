@@ -135,11 +135,10 @@ class MT5Exchange(ExchangeInterface):
         # ``--payload`` value is stripped of every secret-bearing key so that a
         # legacy worker reading ``--payload`` never receives credentials.
         #
-        # NOTE: the bridge worker (``scripts/mt5_bridge_worker.py``, out of this
-        # module's edit scope) must read ``--payload-file`` to obtain the auth
-        # fields.  Until it does, secrets are simply absent from both argv and
-        # the worker input — the connection auth must be supplied to the worker
-        # via ``--payload-file`` rather than ``--payload``.
+        # The bridge worker (``scripts/mt5_bridge_worker.py``) reads
+        # ``--payload-file`` and merges it over ``--payload`` so the auth fields
+        # reach ``_initialize``.  Exchange and worker are one atomic contract:
+        # update both together.
         argv_payload = {
             key: value for key, value in merged_payload.items() if key not in _SECRET_PAYLOAD_KEYS
         }

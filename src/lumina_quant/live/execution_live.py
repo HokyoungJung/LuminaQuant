@@ -441,45 +441,46 @@ class LiveExecutionHandler(ExecutionHandler):
                         metadata={"reason": projection.reason, "event_key": projection.event_key},
                         defer_to=deferred_notifications,
                     )
-                self._fire_deferred_notifications(deferred_notifications)
-                return
+                # Do NOT fire callbacks or return here: that would run the blocking
+                # callback I/O under _state_lock (violating the lines ~212-213
+                # invariant). Fall through to the single post-lock fire below.
+            else:
+                if projection.fill_delta > 0:
+                    residual = self._ledger_residual_delta(order_id, projection.cumulative_filled)
+                    if residual > 0:
+                        order_payload = {
+                            "id": order_id,
+                            "status": payload.get("order_status"),
+                            "filled": projection.cumulative_filled,
+                            "amount": max(
+                                float(getattr(entry.get("event"), "quantity", 0.0) or 0.0),
+                                projection.cumulative_filled,
+                            ),
+                            "average": float(payload.get("last_fill_price") or 0.0),
+                            "price": float(payload.get("last_fill_price") or 0.0),
+                        }
+                        self._emit_fill_event(
+                            entry.get("event"),
+                            order_payload,
+                            float(residual),
+                            status=str(payload.get("order_status") or "").lower(),
+                            submitted_at=entry.get("created_at"),
+                        )
 
-            if projection.fill_delta > 0:
-                residual = self._ledger_residual_delta(order_id, projection.cumulative_filled)
-                if residual > 0:
-                    order_payload = {
-                        "id": order_id,
-                        "status": payload.get("order_status"),
-                        "filled": projection.cumulative_filled,
-                        "amount": max(
-                            float(getattr(entry.get("event"), "quantity", 0.0) or 0.0),
-                            projection.cumulative_filled,
-                        ),
-                        "average": float(payload.get("last_fill_price") or 0.0),
-                        "price": float(payload.get("last_fill_price") or 0.0),
-                    }
-                    self._emit_fill_event(
-                        entry.get("event"),
-                        order_payload,
-                        float(residual),
-                        status=str(payload.get("order_status") or "").lower(),
-                        submitted_at=entry.get("created_at"),
-                    )
-
-            entry["last_filled"] = float(projection.cumulative_filled)
-            entry["state"] = str(projection.next_state).upper()
-            entry["updated_at"] = time.time()
-            self._notify_state(
-                order_id=order_id,
-                entry=entry,
-                state=entry["state"],
-                metadata={"event_key": projection.event_key},
-                defer_to=deferred_notifications,
-            )
-            if str(entry["state"]).upper() in TERMINAL_STATES:
-                if str(entry["state"]).upper() == STATE_FILLED:
-                    emit_protection_for = entry.get("event")
-                self._forget_order(order_id, entry)
+                entry["last_filled"] = float(projection.cumulative_filled)
+                entry["state"] = str(projection.next_state).upper()
+                entry["updated_at"] = time.time()
+                self._notify_state(
+                    order_id=order_id,
+                    entry=entry,
+                    state=entry["state"],
+                    metadata={"event_key": projection.event_key},
+                    defer_to=deferred_notifications,
+                )
+                if str(entry["state"]).upper() in TERMINAL_STATES:
+                    if str(entry["state"]).upper() == STATE_FILLED:
+                        emit_protection_for = entry.get("event")
+                    self._forget_order(order_id, entry)
 
         self._fire_deferred_notifications(deferred_notifications)
         if emit_protection_for is not None:

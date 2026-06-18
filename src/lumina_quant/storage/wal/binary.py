@@ -329,6 +329,18 @@ class BinaryWAL:
                 pass
             raise
 
+        # Persist the rename itself: fsync the parent directory so the atomic
+        # replace survives a crash (mirrors the parquet raw-write path).
+        # Best-effort: some filesystems cannot fsync a directory handle.
+        try:
+            dir_fd = os.open(str(self.path.parent), os.O_RDONLY)
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
+        except OSError:
+            pass
+
         removed = file_size - clean_size
         if corrupt_count:
             logging.getLogger(__name__).warning(
