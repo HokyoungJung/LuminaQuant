@@ -227,6 +227,98 @@ def aligned_stream_arrays(
     return lhs_values, rhs_values
 
 
+def ledoit_wolf_shrunk_covariance(
+    returns_matrix: Any,
+    *,
+    window: int | None = None,
+) -> tuple[np.ndarray, float]:
+    """Ledoit-Wolf shrunk covariance ``Sigma_hat`` and its intensity ``d``.
+
+    ``Sigma_hat = (1 - d) * S + d * F`` where ``S`` is the sample covariance (MLE,
+    divisor ``T``) over the trailing ``window`` closed bars, ``F = diag(S)`` is the
+    diagonal-variance shrinkage target, and ``d in [0, 1]`` is the closed-form
+    Ledoit-Wolf (2004) analytic shrinkage intensity (NO tuning parameter).
+    Shrinking toward the PD diagonal target keeps ``Sigma_hat`` positive-definite
+    even when the number of names exceeds the number of observations.
+
+    No-lookahead: only the supplied (already closed) bars are used; when ``window``
+    is given only the trailing ``window`` rows are consulted.
+    """
+    matrix = np.asarray(returns_matrix, dtype=float)
+    if matrix.ndim == 1:
+        matrix = matrix.reshape(-1, 1)
+    if matrix.ndim != 2 or matrix.shape[1] == 0:
+        return np.zeros((0, 0), dtype=float), 0.0
+    if window is not None and int(window) > 0 and matrix.shape[0] > int(window):
+        matrix = matrix[-int(window) :, :]
+    if not np.all(np.isfinite(matrix)):
+        matrix = np.nan_to_num(matrix, nan=0.0, posinf=0.0, neginf=0.0)
+
+    n = int(matrix.shape[1])
+    t = int(matrix.shape[0])
+    if t < 2:
+        # Without two closed bars there is no dispersion to estimate.
+        return np.zeros((n, n), dtype=float), 0.0
+
+    # Sample covariance S (MLE, divisor T) and diagonal target F = diag(S).
+    mean = matrix.mean(axis=0, keepdims=True)
+    demeaned = matrix - mean
+    sample_cov = (demeaned.T @ demeaned) / float(t)
+    target = np.diag(np.diag(sample_cov).copy())
+
+    # Ledoit-Wolf (2004) closed-form analytic intensity toward the diagonal target.
+    # pi_hat: sum of asymptotic variances of the sample covariance entries.
+    squared = demeaned**2
+    pi_matrix = (squared.T @ squared) / float(t) - sample_cov**2
+    pi_hat = float(pi_matrix.sum())
+    # rho_hat: target is diagonal, so only the diagonal asymptotic variances enter.
+    rho_hat = float(np.trace(pi_matrix))
+    # gamma_hat: squared Frobenius distance between S and F.
+    diff = sample_cov - target
+    gamma_hat = float(np.sum(diff * diff))
+
+    if gamma_hat <= 0.0:
+        intensity = 0.0
+    else:
+        kappa = (pi_hat - rho_hat) / gamma_hat
+        intensity = max(0.0, min(1.0, kappa / float(t)))
+
+    shrunk = (1.0 - intensity) * sample_cov + intensity * target
+    return shrunk, float(intensity)
+
+
+def shrunk_portfolio_vol(
+    returns_matrix: Any,
+    weights: Any,
+    *,
+    window: int | None = None,
+) -> float:
+    """Portfolio volatility ``sqrt(w' Sigma_hat w)`` under Ledoit-Wolf shrinkage.
+
+    ``returns_matrix`` is a ``(T, N)`` array-like of closed-bar log returns for the
+    ``N`` selected names (column ``j`` is name ``j``'s trailing return series) and
+    ``weights`` is the matching length-``N`` weight vector.  ``Sigma_hat`` is the
+    Ledoit-Wolf shrunk covariance (see :func:`ledoit_wolf_shrunk_covariance`),
+    which is PD even when ``N`` exceeds the number of observations, so the returned
+    volatility is always real and non-negative.
+
+    No-lookahead: only the supplied (already closed) bars are used; when ``window``
+    is given only the trailing ``window`` rows are consulted.
+    """
+    weights_arr = np.asarray(weights, dtype=float).reshape(-1)
+    n = int(weights_arr.size)
+    if n == 0:
+        return 0.0
+
+    shrunk, _intensity = ledoit_wolf_shrunk_covariance(returns_matrix, window=window)
+    if shrunk.shape != (n, n):
+        return 0.0
+    quad = float(weights_arr @ shrunk @ weights_arr)
+    if not math.isfinite(quad) or quad <= 0.0:
+        return 0.0
+    return math.sqrt(quad)
+
+
 def corr_arrays(x: np.ndarray, y: np.ndarray) -> float:
     n = min(x.size, y.size)
     if n < 8:

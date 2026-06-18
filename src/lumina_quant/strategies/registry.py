@@ -194,6 +194,10 @@ _STRATEGY_TIER_HINTS: dict[str, str] = {
     # data-bearing machine (see docs/COST_REALISM_REMEASUREMENT.md). Promote to
     # live_opt_in only after the cost-realistic walk-forward passes the gates.
     "DiversifiedMultiFactorEnsembleStrategy": "research_only",
+    # Alpha research batch (research_only until cost-realistic walk-forward passes
+    # on the data PC — see docs/COST_REALISM_REMEASUREMENT.md):
+    "VolManagedRiskOverlayStrategy": "research_only",
+    "CrossSectionalFundingMomentumCarryStrategy": "research_only",
 }
 
 _STRATEGY_METADATA: dict[str, dict[str, Any]] = {

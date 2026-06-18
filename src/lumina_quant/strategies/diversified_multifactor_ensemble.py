@@ -31,7 +31,9 @@ the 3-tier no-lookahead feature cascade, and never raises from
 
 from __future__ import annotations
 
+import math
 from collections import deque
+from itertools import pairwise
 from dataclasses import dataclass
 from typing import Any
 
@@ -156,6 +158,9 @@ class DiversifiedMultiFactorEnsembleStrategy(Strategy):
             "base_allocation": HyperParam.floating(
                 "base_allocation", default=0.20, low=0.0, high=2.0, tunable=False
             ),
+            "use_shrunk_cov_vol": HyperParam.boolean(
+                "use_shrunk_cov_vol", default=False, grid=[True, False]
+            ),
             "max_symbol_exposure_pct": HyperParam.floating(
                 "max_symbol_exposure_pct", default=0.40, low=0.0, high=2.0, tunable=False
             ),
@@ -187,6 +192,7 @@ class DiversifiedMultiFactorEnsembleStrategy(Strategy):
         self.min_symbols = max(2, int(resolved["min_symbols"]))
         self.target_gross_exposure = max(0.0, float(resolved["target_gross_exposure"]))
         self.target_vol = max(0.0, float(resolved["target_vol"]))
+        self.use_shrunk_cov_vol = bool(resolved["use_shrunk_cov_vol"])
         self.stop_loss_pct = max(0.0, float(resolved["stop_loss_pct"]))
         self.max_hold_bars = max(0, int(resolved["max_hold_bars"]))
         self.base_allocation = max(0.0, float(resolved["base_allocation"]))
@@ -444,6 +450,10 @@ class DiversifiedMultiFactorEnsembleStrategy(Strategy):
             return {}, 1.0
         # Inverse-vol-weighted realized vol of the selected names.
         portfolio_vol = sum((inv[symbol] / total_inv) * vols[symbol] for symbol in inv)
+        if self.use_shrunk_cov_vol:
+            shrunk = self._shrunk_portfolio_vol(inv, total_inv)
+            if shrunk is not None and shrunk > _EPS:
+                portfolio_vol = shrunk
         scalar = 1.0
         if self.target_vol > 0.0 and portfolio_vol > _EPS:
             scalar = min(1.0, self.target_vol / portfolio_vol)
@@ -452,6 +462,40 @@ class DiversifiedMultiFactorEnsembleStrategy(Strategy):
             for symbol in inv
         }
         return weights, float(scalar)
+
+    def _shrunk_portfolio_vol(self, inv: dict[str, float], total_inv: float) -> float | None:
+        """Ledoit-Wolf shrunk portfolio vol of the selected names (gross scalar only).
+
+        Builds an aligned ``(T, N)`` matrix of closed-bar log returns over the
+        common trailing window of the selected names, weights them by the SAME
+        normalized inverse-vol risk-parity weights used for the naive estimate, and
+        delegates to :func:`shrunk_portfolio_vol`.  Returns ``None`` when the matrix
+        cannot be built (e.g. fewer than two aligned closed bars), so the caller
+        falls back to the naive ``sum(w_i * vol_i)``.
+        """
+        from lumina_quant.portfolio.optimizer_core import shrunk_portfolio_vol
+
+        symbols = list(inv.keys())
+        if not symbols:
+            return None
+        # Per-name closed-bar log-return series (past bars only; no-lookahead).
+        series: dict[str, list[float]] = {}
+        min_len = None
+        for symbol in symbols:
+            closes = list(self._state[symbol].closes)
+            rets: list[float] = []
+            for prev, curr in pairwise(closes):
+                if prev > 0.0 and curr > 0.0:
+                    rets.append(math.log(curr / prev))
+            if len(rets) < 1:
+                return None
+            series[symbol] = rets
+            min_len = len(rets) if min_len is None else min(min_len, len(rets))
+        if not min_len or min_len < 2:
+            return None
+        matrix = [[series[symbol][-min_len + row] for symbol in symbols] for row in range(min_len)]
+        weights = [inv[symbol] / total_inv for symbol in symbols]
+        return float(shrunk_portfolio_vol(matrix, weights, window=self.vol_window))
 
     def _evaluate(self, event_time: Any) -> None:
         if len(self.symbol_list) < self.min_symbols:
