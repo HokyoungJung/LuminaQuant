@@ -206,6 +206,27 @@ The backtest engine uses a **unified `ExecutionModel`** (`backtesting/execution_
 - Tick-replay validator (`TickReplayValidator`) for fill-price parity
 - Walk-forward with configurable fold count and warmup period
 
+### Cost realism & edge re-measurement
+
+Headline backtest numbers are produced under **optimistic defaults**: flat, size-blind
+slippage and zero funding. Several realism controls ship **config-gated OFF** (so the golden
+regression stays byte-identical) and should be enabled on the backtest machine to measure how
+much edge survives realistic execution:
+
+```yaml
+execution:
+  slippage_impact_model: "sqrt_impact"   # size/impact-aware slippage (default "flat")
+  slippage_impact_coefficient: 0.10      # impact strength (calibrate)
+  require_funding_coverage: true         # fail loudly if leveraged + funding data missing
+risk:
+  allow_metadata_risk_override: false    # clamp metadata to config caps (already default)
+  attach_default_protective_stop: true   # no naked positions
+  enforce_order_risk_gate_in_backtest: true  # same RiskManager gate as live
+```
+
+Then re-run `lq backtest` / `lq optimize` and A/B against the flat baseline (plus a
+10/15/20 bps cost-stress grid). Full protocol: **[`docs/COST_REALISM_REMEASUREMENT.md`](docs/COST_REALISM_REMEASUREMENT.md)**.
+
 ### Performance
 
 Measured on the Phase 4 refactor tree vs the Phase 0 pure-Python baseline (source: [`docs/perf/phase4-results.md`](docs/perf/phase4-results.md)):
@@ -278,6 +299,7 @@ The same `@register` pattern applies for indicators (`"indicator"`) and portfoli
 | [`docs/EXCHANGES.md`](docs/EXCHANGES.md) | Binance USDⓈ-M Futures, MetaTrader 5, Polymarket setup |
 | [`docs/EXTERNAL_DATA.md`](docs/EXTERNAL_DATA.md) | Canonical contracts for user-managed data |
 | [`docs/METRICS.md`](docs/METRICS.md) | Sharpe, Sortino, Alpha, Beta, Calmar definitions |
+| [`docs/COST_REALISM_REMEASUREMENT.md`](docs/COST_REALISM_REMEASUREMENT.md) | Enable realistic slippage/funding/risk flags and re-measure edge survival |
 | [`docs/RUST_NATIVE_ACCELERATION.md`](docs/RUST_NATIVE_ACCELERATION.md) | Hotspot-only Rust policy, build commands, benchmarks |
 | [`docs/QUICKSTART_8GB_BASELINE.md`](docs/QUICKSTART_8GB_BASELINE.md) | 8 GB RAM minimal install and smoke flow |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Local checks, CI parity commands, PR expectations |

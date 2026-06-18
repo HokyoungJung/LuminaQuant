@@ -206,6 +206,27 @@ LuminaQuant/
 - 체결 가격 동등성 검증용 틱 재현 검증기(`TickReplayValidator`)
 - 설정 가능한 폴드 수와 워밍업 구간이 있는 워크포워드
 
+### 비용 현실성 & 엣지 재측정
+
+헤드라인 백테스트 수치는 **낙관적 기본값**(플랫·주문크기 무시 슬리피지, 펀딩 0)으로 산출됩니다.
+여러 현실성 제어 플래그가 **config-gated OFF**로 출하되어(황금 회귀 byte-identical 유지),
+백테스트 PC에서 켜서 현실적 체결 비용 하에 엣지가 얼마나 살아남는지 측정해야 합니다:
+
+```yaml
+execution:
+  slippage_impact_model: "sqrt_impact"   # 주문크기/시장충격 반영 슬리피지 (기본 "flat")
+  slippage_impact_coefficient: 0.10      # 충격 강도 (보정 필요)
+  require_funding_coverage: true         # 레버리지인데 펀딩 데이터 없으면 명시적 실패
+risk:
+  allow_metadata_risk_override: false    # metadata를 config 캡으로 클램프 (이미 기본값)
+  attach_default_protective_stop: true   # 무방비 포지션 금지
+  enforce_order_risk_gate_in_backtest: true  # live와 동일한 RiskManager 게이트
+```
+
+이후 `lq backtest` / `lq optimize`를 재실행해 플랫 기준선과 A/B 비교(+ 10/15/20 bps 비용
+스트레스 그리드). 전체 절차: **[`docs/COST_REALISM_REMEASUREMENT.md`](docs/COST_REALISM_REMEASUREMENT.md)**
+(한국어: [`docs/kr/COST_REALISM_REMEASUREMENT.md`](docs/kr/COST_REALISM_REMEASUREMENT.md)).
+
 ### 성능
 
 Phase 4 리팩터 트리를 Phase 0 순수 Python 기준선과 비교한 측정 결과 (출처: [`docs/perf/phase4-results.md`](docs/perf/phase4-results.md)):
@@ -278,6 +299,7 @@ LUMINA_ENABLE_LIVE_REAL=true uv run lq live --enable-live-real
 | [`docs/EXCHANGES.md`](docs/EXCHANGES.md) | Binance USDⓈ-M 선물, MetaTrader 5, Polymarket 설정 |
 | [`docs/EXTERNAL_DATA.md`](docs/EXTERNAL_DATA.md) | 사용자 보유 데이터 연결 canonical contract |
 | [`docs/METRICS.md`](docs/METRICS.md) | Sharpe, Sortino, Alpha, Beta, Calmar 정의 |
+| [`docs/COST_REALISM_REMEASUREMENT.md`](docs/COST_REALISM_REMEASUREMENT.md) | 현실적 슬리피지/펀딩/리스크 플래그를 켜고 엣지 잔존량 재측정 ([한국어](docs/kr/COST_REALISM_REMEASUREMENT.md)) |
 | [`docs/RUST_NATIVE_ACCELERATION.md`](docs/RUST_NATIVE_ACCELERATION.md) | hotspot 전용 Rust 정책, 빌드 명령, 벤치마크 |
 | [`docs/QUICKSTART_8GB_BASELINE.md`](docs/QUICKSTART_8GB_BASELINE.md) | 8 GB RAM 최소 설치 및 스모크 절차 |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | 로컬 검사, CI parity 명령, PR 기준 |
