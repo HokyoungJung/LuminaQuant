@@ -55,7 +55,13 @@ def _synthetic_split_row(
     }
 
 
-def test_sample_guarded_discovery_builds_no_promotion_shadow_bundle(tmp_path: Path) -> None:
+def test_sample_guarded_discovery_builds_no_promotion_shadow_bundle(
+    tmp_path: Path, monkeypatch
+) -> None:
+    class _Usage:
+        ru_maxrss = 512 * 1024
+
+    monkeypatch.setattr(MODULE.resource, "getrusage", lambda _who: _Usage())
     payload = MODULE.build_payload(MODULE.parse_args(["--output-dir", str(tmp_path)]))
 
     assert payload["artifact_kind"] == "alpha_zoo_sample_guarded_alpha_discovery"

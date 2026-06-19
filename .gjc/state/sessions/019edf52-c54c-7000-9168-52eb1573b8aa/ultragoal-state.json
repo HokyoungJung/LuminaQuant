@@ -1,0 +1,76 @@
+{
+  "skill": "ultragoal",
+  "status": "complete",
+  "current_phase": "complete",
+  "active": false,
+  "goals": [
+    {
+      "id": "G001",
+      "title": "Implement alpha promotion schema and discovery reporting gates",
+      "status": "complete"
+    },
+    {
+      "id": "G002",
+      "title": "Add existing strategy reassessment smoke wrapper",
+      "status": "complete"
+    },
+    {
+      "id": "G003",
+      "title": "Expand candidate family and survivor manifest workflow",
+      "status": "complete"
+    },
+    {
+      "id": "G004",
+      "title": "Implement artifact portfolio manifest fail-closed mode",
+      "status": "complete"
+    },
+    {
+      "id": "G005",
+      "title": "Run focused verification and produce execution evidence",
+      "status": "complete"
+    }
+  ],
+  "counts": {
+    "pending": 0,
+    "active": 0,
+    "complete": 5,
+    "failed": 0,
+    "blocked": 0,
+    "review_blocked": 0,
+    "superseded": 0
+  },
+  "ledger_path": "/home/hoky/Quants-agent/LuminaQuant/.gjc/ultragoal/ledger.jsonl",
+  "brief_path": "/home/hoky/Quants-agent/LuminaQuant/.gjc/ultragoal/brief.md",
+  "goals_path": "/home/hoky/Quants-agent/LuminaQuant/.gjc/ultragoal/goals.json",
+  "gjc_objective": "Complete the durable ultragoal plan in .gjc/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .gjc/ultragoal/ledger.jsonl as the audit trail.",
+  "latestLedgerEvent": {
+    "event": "goal_checkpointed",
+    "goalId": "G005",
+    "timestamp": "2026-06-19T10:12:30.933Z"
+  },
+  "version": 2,
+  "updated_at": "2026-06-19T10:13:15.763Z",
+  "receipt": {
+    "version": 1,
+    "skill": "ultragoal",
+    "owner": "gjc-runtime",
+    "command": "gjc ultragoal (reconcile)",
+    "state_path": "/home/hoky/Quants-agent/LuminaQuant/.gjc/state/sessions/019edf52-c54c-7000-9168-52eb1573b8aa/skill-active-state.json",
+    "storage_path": "/home/hoky/Quants-agent/LuminaQuant/.gjc/state/sessions/019edf52-c54c-7000-9168-52eb1573b8aa/ultragoal-state.json",
+    "mutated_at": "2026-06-19T10:13:15.763Z",
+    "fresh_until": "2026-06-19T10:43:15.763Z",
+    "status": "fresh",
+    "mutation_id": "ultragoal:reconcile:2026-06-19T10:13:15.763Z",
+    "verb": "reconcile",
+    "forced": true,
+    "from_phase": "complete",
+    "to_phase": "complete",
+    "content_sha256": {
+      "algorithm": "sha256",
+      "value": "41dfb8787a916fe7c3e850af1f9a6ee42169408168c737ca0005f49990c606c2",
+      "covered_path": "/home/hoky/Quants-agent/LuminaQuant/.gjc/state/sessions/019edf52-c54c-7000-9168-52eb1573b8aa/ultragoal-state.json",
+      "computed_at": "2026-06-19T10:13:15.764Z"
+    }
+  },
+  "session_id": "019edf52-c54c-7000-9168-52eb1573b8aa"
+}

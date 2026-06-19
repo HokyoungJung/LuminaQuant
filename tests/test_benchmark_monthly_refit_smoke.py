@@ -37,7 +37,7 @@ def _load_script():
 
 def test_argparse_defaults():
     """Parser must expose the documented CLI flags with sane defaults."""
-    module = _load_script()
+    _load_script()
     # Rebuild the parser the same way main() does (inline in main, so we
     # replicate it here to test flag names without running main).
     import argparse

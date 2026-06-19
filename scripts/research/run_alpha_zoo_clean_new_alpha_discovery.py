@@ -198,7 +198,7 @@ def _utc_now_iso() -> str:
 def _safe_float(value: Any, default: float = 0.0) -> float:
     try:
         out = float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
     return out if math.isfinite(out) else default
 
@@ -650,21 +650,16 @@ def _train_validation_freeze_view(row: Mapping[str, Any]) -> dict[str, Any]:
 def _data_sufficiency_report(row: Mapping[str, Any]) -> dict[str, Any]:
     coverage = row.get("feature_coverage") or {}
     feature_backed = bool(row.get("feature_backed"))
-    train_coverage = _safe_float(
-        coverage.get("train"), 1.0 if not feature_backed else 0.0
-    )
+    train_coverage = _safe_float(coverage.get("train"), 1.0 if not feature_backed else 0.0)
     validation_coverage = _safe_float(
         coverage.get("validation"), 1.0 if not feature_backed else 0.0
     )
     locked_oos_coverage = _safe_float(
         coverage.get("locked_oos"), 1.0 if not feature_backed else 0.0
     )
-    sufficient = (
-        not feature_backed
-        or (
-            train_coverage >= MIN_FEATURE_TRAIN_VALIDATION_COVERAGE
-            and validation_coverage >= MIN_FEATURE_TRAIN_VALIDATION_COVERAGE
-        )
+    sufficient = not feature_backed or (
+        train_coverage >= MIN_FEATURE_TRAIN_VALIDATION_COVERAGE
+        and validation_coverage >= MIN_FEATURE_TRAIN_VALIDATION_COVERAGE
     )
     return {
         "feature_backed": feature_backed,
@@ -681,9 +676,7 @@ def _return_mdd_ratio(return_value: float, mdd: float) -> float:
     return float(return_value / max(mdd, 0.01))
 
 
-def _candidate_rejection_reasons(
-    row: Mapping[str, Any], *, selection_policy: str
-) -> list[str]:
+def _candidate_rejection_reasons(row: Mapping[str, Any], *, selection_policy: str) -> list[str]:
     reasons: list[str] = []
     locked_flags = _locked_oos_usage_flags(row)
     if any(locked_flags.values()):
@@ -718,9 +711,7 @@ def _candidate_rejection_reasons(
     return sorted(set(reasons))
 
 
-def _promotion_gate_report(
-    row: Mapping[str, Any], *, selection_policy: str
-) -> dict[str, Any]:
+def _promotion_gate_report(row: Mapping[str, Any], *, selection_policy: str) -> dict[str, Any]:
     data = _data_sufficiency_report(row)
     locked_flags = _locked_oos_usage_flags(row)
     rejection_reasons = _candidate_rejection_reasons(row, selection_policy=selection_policy)
@@ -732,10 +723,7 @@ def _promotion_gate_report(
     locked_oos_mdd = _safe_float(row.get("locked_oos_mdd_report_only"))
     return_mdd = _return_mdd_ratio(locked_oos_return, locked_oos_mdd)
     report_risk_metrics_present = (
-        has_locked_return
-        and has_locked_mdd
-        and has_locked_liquidation
-        and has_locked_wipeout
+        has_locked_return and has_locked_mdd and has_locked_liquidation and has_locked_wipeout
     )
     risk_report_gate_pass = (
         report_risk_metrics_present
@@ -744,16 +732,12 @@ def _promotion_gate_report(
         and int(row.get("locked_oos_account_wipeout_count_report_only") or 0) == 0
     )
     clean_paper_report_gate_pass = (
-        locked_oos_return >= CLEAN_PAPER_BENCHMARK_COMPOUNDED_RETURN
-        and risk_report_gate_pass
+        locked_oos_return >= CLEAN_PAPER_BENCHMARK_COMPOUNDED_RETURN and risk_report_gate_pass
     )
     shadow_report_gate_pass = (
-        (
-            locked_oos_return >= SHADOW_BENCHMARK_COMPOUNDED_RETURN
-            or return_mdd >= SHADOW_RETURN_MDD_BENCHMARK
-        )
-        and risk_report_gate_pass
-    )
+        locked_oos_return >= SHADOW_BENCHMARK_COMPOUNDED_RETURN
+        or return_mdd >= SHADOW_RETURN_MDD_BENCHMARK
+    ) and risk_report_gate_pass
     train_validation_survivor = _eligible_for_policy(
         _train_validation_freeze_view(row), selection_policy=selection_policy
     )
@@ -877,9 +861,7 @@ def _scrub_holdout_keys(value: Any) -> Any:
     return value
 
 
-def _survivor_manifest_row(
-    row: Mapping[str, Any], *, selection_policy: str
-) -> dict[str, Any]:
+def _survivor_manifest_row(row: Mapping[str, Any], *, selection_policy: str) -> dict[str, Any]:
     gate = row.get("promotion_gate") or _promotion_gate_report(
         row, selection_policy=selection_policy
     )
@@ -901,9 +883,7 @@ def _survivor_manifest_row(
         forward_blockers.append("validation_cost_turnover_proxy_non_positive")
     forward_candidate = not forward_blockers
     parameters = {
-        key: _json_manifest_value(row.get(key))
-        for key in _SURVIVOR_PARAMETER_KEYS
-        if key in row
+        key: _json_manifest_value(row.get(key)) for key in _SURVIVOR_PARAMETER_KEYS if key in row
     }
     payload = {
         "fold_id": row.get("fold_id"),
@@ -933,9 +913,7 @@ def _survivor_manifest_row(
         "data_sufficiency": {
             "feature_backed": bool(data.get("feature_backed")),
             "train_feature_coverage": _safe_float(data.get("train_feature_coverage")),
-            "validation_feature_coverage": _safe_float(
-                data.get("validation_feature_coverage")
-            ),
+            "validation_feature_coverage": _safe_float(data.get("validation_feature_coverage")),
             "min_required_train_validation_feature_coverage": _safe_float(
                 data.get("min_required_train_validation_feature_coverage")
             ),
@@ -969,9 +947,7 @@ def _survivor_manifest_payload(
         for row in selected_rows
         if row.get("selected_by_train_validation_freeze")
     ]
-    forward_candidates = [
-        row for row in survivors if row.get("eligible_for_full_wf_retest")
-    ]
+    forward_candidates = [row for row in survivors if row.get("eligible_for_full_wf_retest")]
     manifest = {
         "artifact_kind": "alpha_zoo_clean_new_alpha_survivor_manifest",
         "generated_at_utc": _utc_now_iso(),
@@ -1480,10 +1456,14 @@ def _finalize_row(
             "uses_locked_oos_for_selection": bool(row.get("uses_locked_oos_for_selection", False)),
             "uses_locked_oos_for_objective": bool(row.get("uses_locked_oos_for_objective", False)),
             "uses_locked_oos_for_pruning": bool(row.get("uses_locked_oos_for_pruning", False)),
-            "uses_locked_oos_for_parameter_fitting": bool(row.get("uses_locked_oos_for_parameter_fitting", False)),
+            "uses_locked_oos_for_parameter_fitting": bool(
+                row.get("uses_locked_oos_for_parameter_fitting", False)
+            ),
             "uses_locked_oos_for_threshold": bool(row.get("uses_locked_oos_for_threshold", False)),
             "uses_locked_oos_for_tie_break": bool(row.get("uses_locked_oos_for_tie_break", False)),
-            "uses_locked_oos_for_correlation": bool(row.get("uses_locked_oos_for_correlation", False)),
+            "uses_locked_oos_for_correlation": bool(
+                row.get("uses_locked_oos_for_correlation", False)
+            ),
             "uses_locked_oos_for_sizing": bool(row.get("uses_locked_oos_for_sizing", False)),
             "post_oos_selector_trusted": False,
             "nested_hybrid_dependency": False,

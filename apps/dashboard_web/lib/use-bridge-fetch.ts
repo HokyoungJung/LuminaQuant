@@ -33,7 +33,7 @@ export function useBridgeFetch<T>(url: string, errorLabel: string): { payload: T
     return () => {
       active = false;
     };
-  }, []);
+  }, [url, errorLabel]);
 
   return { payload, error };
 }

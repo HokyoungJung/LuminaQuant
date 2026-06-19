@@ -1289,7 +1289,9 @@ def test_manifest_portfolio_mode_resolves_valid_manifest(tmp_path: Path) -> None
 
     assert definition.cash_weight == 0.25
     assert "manifest_fail_closed_to_cash" not in definition.source_artifacts
-    assert definition.source_artifacts["artifact_portfolio_manifest_path"] == str(manifest_path.resolve())
+    assert definition.source_artifacts["artifact_portfolio_manifest_path"] == str(
+        manifest_path.resolve()
+    )
     assert definition.components
     component = definition.components[0]
     assert component.component_id == "leaf-a"
@@ -1312,7 +1314,10 @@ def test_manifest_portfolio_mode_fail_closes_to_cash_on_oos_contamination(
     assert definition.components == ()
     assert definition.cash_weight == 1.0
     assert definition.source_artifacts["manifest_fail_closed_to_cash"] == "true"
-    assert definition.source_artifacts["manifest_fail_closed_reason"] == "child_oos_contaminated:leaf-a"
+    assert (
+        definition.source_artifacts["manifest_fail_closed_reason"]
+        == "child_oos_contaminated:leaf-a"
+    )
 
 
 def test_manifest_portfolio_mode_fail_closes_to_cash_on_source_sha_mismatch(
@@ -1324,7 +1329,10 @@ def test_manifest_portfolio_mode_fail_closes_to_cash_on_source_sha_mismatch(
 
     assert definition.components == ()
     assert definition.cash_weight == 1.0
-    assert definition.source_artifacts["manifest_fail_closed_reason"] == "source_artifact_sha_mismatch:survivors"
+    assert (
+        definition.source_artifacts["manifest_fail_closed_reason"]
+        == "source_artifact_sha_mismatch:survivors"
+    )
 
 
 def test_manifest_portfolio_mode_fail_closes_to_cash_on_missing_source_sha(
@@ -1336,7 +1344,10 @@ def test_manifest_portfolio_mode_fail_closes_to_cash_on_missing_source_sha(
 
     assert definition.components == ()
     assert definition.cash_weight == 1.0
-    assert definition.source_artifacts["manifest_fail_closed_reason"] == "source_artifact_sha_missing:survivors"
+    assert (
+        definition.source_artifacts["manifest_fail_closed_reason"]
+        == "source_artifact_sha_missing:survivors"
+    )
 
 
 def test_manifest_portfolio_mode_fail_closes_to_cash_on_directory_source(
@@ -1353,7 +1364,10 @@ def test_manifest_portfolio_mode_fail_closes_to_cash_on_directory_source(
 
     assert definition.components == ()
     assert definition.cash_weight == 1.0
-    assert definition.source_artifacts["manifest_fail_closed_reason"] == "source_artifact_not_file:survivors"
+    assert (
+        definition.source_artifacts["manifest_fail_closed_reason"]
+        == "source_artifact_not_file:survivors"
+    )
 
 
 def test_manifest_portfolio_mode_fail_closes_to_cash_on_child_optimizer_oos(
@@ -1373,7 +1387,10 @@ def test_manifest_portfolio_mode_fail_closes_to_cash_on_child_optimizer_oos(
 
     assert definition.components == ()
     assert definition.cash_weight == 1.0
-    assert definition.source_artifacts["manifest_fail_closed_reason"] == "child_optimizer_provenance_invalid:leaf-a"
+    assert (
+        definition.source_artifacts["manifest_fail_closed_reason"]
+        == "child_optimizer_provenance_invalid:leaf-a"
+    )
 
 
 def test_manifest_portfolio_mode_fail_closes_to_cash_on_bad_child_correlation(
@@ -1394,7 +1411,10 @@ def test_manifest_portfolio_mode_fail_closes_to_cash_on_bad_child_correlation(
 
     assert definition.components == ()
     assert definition.cash_weight == 1.0
-    assert definition.source_artifacts["manifest_fail_closed_reason"] == "child_correlation_provenance_invalid:leaf-a"
+    assert (
+        definition.source_artifacts["manifest_fail_closed_reason"]
+        == "child_correlation_provenance_invalid:leaf-a"
+    )
 
 
 def test_manifest_portfolio_mode_fail_closes_to_cash_on_malformed_collections(
@@ -1500,4 +1520,3 @@ def test_default_manifest_mode_is_supported_and_missing_manifest_is_cash() -> No
     assert definition.components == ()
     assert definition.cash_weight == 1.0
     assert definition.source_artifacts["manifest_fail_closed_to_cash"] == "true"
-

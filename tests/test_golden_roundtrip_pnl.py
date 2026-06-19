@@ -49,11 +49,11 @@ class _MockBars:
         self.current_dt = start_dt
         self.close = price
 
-    def get_latest_bar_datetime(self, symbol):  # noqa: D401 - stub
+    def get_latest_bar_datetime(self, symbol):
         _ = symbol
         return self.current_dt
 
-    def get_latest_bar_value(self, symbol, val_type):  # noqa: D401 - stub
+    def get_latest_bar_value(self, symbol, val_type):
         _ = (symbol, val_type)
         return self.close
 

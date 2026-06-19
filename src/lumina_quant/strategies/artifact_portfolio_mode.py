@@ -368,7 +368,9 @@ def _manifest_definition_from_path(
         payload = _read_json(manifest_path)
     except Exception as exc:  # defensive fail-closed boundary for live routing
         return _manifest_fail_closed_definition(
-            token=token, source_artifacts=artifacts, reason=f"manifest_unreadable:{type(exc).__name__}"
+            token=token,
+            source_artifacts=artifacts,
+            reason=f"manifest_unreadable:{type(exc).__name__}",
         )
 
     if any(
@@ -388,7 +390,9 @@ def _manifest_definition_from_path(
         )
     if not _manifest_correlation_ok(payload.get("correlation_input_provenance")):
         return _manifest_fail_closed_definition(
-            token=token, source_artifacts=artifacts, reason="manifest_correlation_provenance_invalid"
+            token=token,
+            source_artifacts=artifacts,
+            reason="manifest_correlation_provenance_invalid",
         )
 
     source_paths, source_error = _validate_manifest_source_artifacts(
@@ -453,7 +457,9 @@ def _manifest_definition_from_path(
             for key in ("real_money_execution", "allow_real_money", "ready_for_real")
         ):
             return _manifest_fail_closed_definition(
-                token=token, source_artifacts=artifacts, reason=f"child_real_money_enabled:{child_id}"
+                token=token,
+                source_artifacts=artifacts,
+                reason=f"child_real_money_enabled:{child_id}",
             )
         if _has_forbidden_oos_provenance(child):
             return _manifest_fail_closed_definition(
@@ -476,7 +482,9 @@ def _manifest_definition_from_path(
         source_id = str(child.get("source_artifact_id") or "").strip()
         if source_paths and source_id not in source_paths:
             return _manifest_fail_closed_definition(
-                token=token, source_artifacts=artifacts, reason=f"child_source_unreconciled:{child_id}"
+                token=token,
+                source_artifacts=artifacts,
+                reason=f"child_source_unreconciled:{child_id}",
             )
         weight = _safe_float(child.get("weight"), 0.0)
         if not str(child.get("strategy_class") or "").strip():
@@ -497,14 +505,18 @@ def _manifest_definition_from_path(
         leaf_cap = _safe_float(child.get("leaf_gross_cap"), gross_cap)
         if leaf_gross > leaf_cap + 1e-12:
             return _manifest_fail_closed_definition(
-                token=token, source_artifacts=artifacts, reason=f"child_leaf_gross_cap_breach:{child_id}"
+                token=token,
+                source_artifacts=artifacts,
+                reason=f"child_leaf_gross_cap_breach:{child_id}",
             )
         group = str(child.get("netting_group") or child_id)
         netting_gross[group] = netting_gross.get(group, 0.0) + leaf_gross
         group_cap = _safe_float(child.get("netting_group_gross_cap"), gross_cap)
         if netting_gross[group] > group_cap + 1e-12:
             return _manifest_fail_closed_definition(
-                token=token, source_artifacts=artifacts, reason=f"child_netting_group_cap_breach:{group}"
+                token=token,
+                source_artifacts=artifacts,
+                reason=f"child_netting_group_cap_breach:{group}",
             )
         if weight <= 0.0:
             continue
@@ -521,7 +533,7 @@ def _manifest_definition_from_path(
                 weight=weight,
                 source=f"{token}:manifest:{source_id or 'inline'}",
             )
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return _manifest_fail_closed_definition(
                 token=token, source_artifacts=artifacts, reason=f"child_invalid:{child_id}"
             )

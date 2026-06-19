@@ -144,12 +144,41 @@
       "id": "G005",
       "title": "Run focused verification and produce execution evidence",
       "objective": "Run focused tests for discovery invariants, existing strategy reassessment, survivor manifests, strategy/registry tiering, artifact portfolio manifest fail-closed behavior, and report schemas. Run a bounded smoke/probe only if safe within time and available data; otherwise record no-promotion/watchlist evidence without weakening gates.",
-      "status": "active",
+      "status": "complete",
       "createdAt": "2026-06-18T13:06:55.954Z",
-      "updatedAt": "2026-06-18T14:25:05.326Z",
-      "startedAt": "2026-06-18T14:25:05.326Z"
+      "updatedAt": "2026-06-19T10:12:30.928Z",
+      "startedAt": "2026-06-18T14:25:05.326Z",
+      "completedAt": "2026-06-19T10:12:30.928Z",
+      "evidence": "G005 final focused verification completed. Focused ruff passed; focused pytest passed 88 tests in 2.38s after adding account-wipeout fail-closed coverage; report gate assertions passed over five evidence artifacts with no promotions, no real-money, train/validation-only selection, locked-OOS forbidden usage false, zero survivors/full-WF retest candidates, MDD<=30%, and no liquidation/wipeout. Cleanup, architect, QA, and native ultragoal review gates are clean.",
+      "completionVerification": {
+        "schemaVersion": 1,
+        "receiptId": "fa633453-5759-41b2-aabe-65fedc6aaa9a",
+        "verifiedAt": "2026-06-19T10:12:30.928Z",
+        "goalId": "G005",
+        "receiptKind": "final-aggregate",
+        "goalStatusBeforeCheckpoint": "active",
+        "gjcGoalMode": "aggregate",
+        "gjcObjective": "Complete the durable ultragoal plan in .gjc/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .gjc/ultragoal/ledger.jsonl as the audit trail.",
+        "qualityGateHash": "d5bd72b4183e8e477c227117885c142189431bada7f208eb8b1b7edcf40f3f5d",
+        "gjcGoalSnapshotHash": "a1259e83314427c890c2d408a6a4c1dcea0c69d6aa7336f97e696260326ae286",
+        "planGeneration": "29a4c98ba54695ed63091ad1b06445f6fb986ed6ebef4d1877f471527ef0ca79",
+        "basis": {
+          "planHashBeforeCheckpoint": "3cd67fb8a5aff0d2136885736257fedd679f3353b11746601a1010283bb90927",
+          "latestRelevantLedgerEventIdBeforeCheckpoint": "0c1ee979-4647-4aea-a27b-2b9f2f63fe45",
+          "goalUpdatedAtBeforeCheckpoint": "2026-06-19T10:12:30.928Z",
+          "relevantGoalIdsBeforeCheckpoint": [
+            "G001",
+            "G002",
+            "G003",
+            "G004",
+            "G005"
+          ],
+          "requiredGoalSetHashBeforeCheckpoint": "7bb96422133e45e9d403f645ed414ceab19304de6d8205c2b724023a65822add"
+        },
+        "checkpointLedgerEventId": "05444d35-97c4-4272-b76d-c0c93f24198a"
+      }
     }
   ],
   "createdAt": "2026-06-18T13:06:55.954Z",
-  "updatedAt": "2026-06-18T14:25:05.326Z"
+  "updatedAt": "2026-06-19T10:12:30.928Z"
 }

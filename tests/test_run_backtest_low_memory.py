@@ -68,6 +68,7 @@ def test_run_low_memory_uses_lightweight_backtest_flow(monkeypatch):
     monkeypatch.setattr(run_backtest, "AuditStore", _StubAuditStore)
     monkeypatch.setattr(run_backtest, "Backtest", _StubBacktest)
     monkeypatch.setattr(run_backtest, "_persist_backtest_audit_rows", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(run_backtest, "enforce_runtime_memory_cap", lambda *_args, **_kwargs: None)
 
     run_backtest.run(
         data_source="csv",

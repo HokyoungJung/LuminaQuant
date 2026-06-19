@@ -23,7 +23,10 @@ def test_build_reassessment_payload_enumerates_registry_rows_without_promotion()
     )
 
     assert payload["artifact_kind"] == "alpha_zoo_existing_strategy_reassessment_smoke_manifest"
-    assert payload["selection_inputs"] == ["registry_metadata", "train_validation_future_smoke_only"]
+    assert payload["selection_inputs"] == [
+        "registry_metadata",
+        "train_validation_future_smoke_only",
+    ]
     assert payload["locked_oos_policy"] == "current_known_oos_is_report_context_only_not_selection"
     assert payload["strategy_count"] == 1
     assert payload["skipped_count"] == 1
@@ -68,7 +71,9 @@ def test_reassessment_markdown_exposes_audit_and_control_evidence() -> None:
 def test_write_outputs_round_trips_json_and_markdown(tmp_path) -> None:
     payload = module.build_reassessment_payload(strategy_names=("MeanReversionStdStrategy",))
 
-    paths = module.write_outputs(payload, output_dir=tmp_path, stem="existing_strategy_reassessment_test")
+    paths = module.write_outputs(
+        payload, output_dir=tmp_path, stem="existing_strategy_reassessment_test"
+    )
 
     loaded = json.loads((tmp_path / "existing_strategy_reassessment_test.json").read_text())
     markdown = (tmp_path / "existing_strategy_reassessment_test.md").read_text()
