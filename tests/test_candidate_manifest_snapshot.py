@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+from unittest.mock import patch
+
 
 from lumina_quant.strategy_factory import build_candidate_manifest
 
@@ -15,21 +17,19 @@ FIXED_TIMEFRAMES = ("1h", "4h")
 # the digest is robust to dict-ordering. Captured from current behavior; if the
 # rider-builder consolidation changes any candidate, this digest must be
 # re-captured intentionally.
-EXPECTED_MANIFEST_SHA256 = "c12bf22d221dd04247092c43dae20d3e4bf967986806ef67db7f7e6844ec1dba"
+EXPECTED_MANIFEST_SHA256 = "9397622ad461413610f66da2e2c32735b477b406694422ee34885e50d5f3ccf4"
 
-EXPECTED_CANDIDATE_COUNT = 155
+EXPECTED_CANDIDATE_COUNT = 133
 
 EXPECTED_FAMILY_COUNTS = {
     "breakout": 16,
-    "carry": 14,
     "cross_sectional": 2,
-    "flow": 4,
     "formulaic_alpha": 6,
     "market_neutral": 38,
     "mean_reversion": 8,
     "momentum": 12,
     "seasonality": 4,
-    "trend": 51,
+    "trend": 47,
 }
 
 EXPECTED_STRATEGY_COUNTS = {
@@ -39,20 +39,15 @@ EXPECTED_STRATEGY_COUNTS = {
     "AmihudIlliquidityMomentumRiderStrategy": 4,
     "CompositeTrendStrategy": 3,
     "ConfidenceGatedTrendStrategy": 4,
-    "CarryTrendConfluenceRiderStrategy": 4,
     "CusumChangePointTrendRiderStrategy": 4,
-    "FundingHarvestCarryStrategy": 4,
-    "IntradayFlowPressureRiderStrategy": 4,
     "IntradaySeasonalMomentumRiderStrategy": 4,
     "KalmanTrendRiderStrategy": 4,
     "LastDayLiquidityRegimeStrategy": 2,
     "MultiTimeframeTrendEnsembleStrategy": 4,
-    "OpenInterestTrendConfirmationRiderStrategy": 4,
     "OpeningRangeBreakoutRiderStrategy": 4,
     "OvernightSessionReturnRiderStrategy": 4,
     "PairSpreadZScoreStrategy": 38,
     "PermutationEntropyTrendRiderStrategy": 4,
-    "PerpCrowdingCarryStrategy": 6,
     "PullbackTrendContinuationStrategy": 4,
     "RealizedSemivarianceTrendRiderStrategy": 4,
     "RealizedVolTermStructureStrategy": 4,
@@ -66,7 +61,7 @@ EXPECTED_STRATEGY_COUNTS = {
     "VolatilitySqueezeBreakoutRiderStrategy": 4,
 }
 
-EXPECTED_TIMEFRAME_COUNTS = {"1h": 84, "4h": 71}
+EXPECTED_TIMEFRAME_COUNTS = {"1h": 73, "4h": 60}
 
 # Every rider-builder produced strategy class. The upcoming consolidation must
 # preserve this exact roster (names and per-class candidate counts).
@@ -74,12 +69,9 @@ EXPECTED_RIDER_CLASSES = {
     "AccelerationRiderStrategy",
     "AdaptiveTrendRiderStrategy",
     "AmihudIlliquidityMomentumRiderStrategy",
-    "CarryTrendConfluenceRiderStrategy",
     "CusumChangePointTrendRiderStrategy",
-    "IntradayFlowPressureRiderStrategy",
     "IntradaySeasonalMomentumRiderStrategy",
     "KalmanTrendRiderStrategy",
-    "OpenInterestTrendConfirmationRiderStrategy",
     "OpeningRangeBreakoutRiderStrategy",
     "OvernightSessionReturnRiderStrategy",
     "PermutationEntropyTrendRiderStrategy",
@@ -100,21 +92,14 @@ EXPECTED_TAGS = {
     "article_pipeline",
     "atr",
     "breakout",
-    "carry",
     "change_point",
     "confidence_gated",
-    "confirmation",
-    "confluence",
-    "continuation",
     "contraction_expansion",
     "cross_sectional",
-    "crowding",
     "crypto",
     "cusum",
     "execution_risk",
     "factor",
-    "flow",
-    "funding",
     "formulaic",
     "good_bad_volatility",
     "illiquidity_premium",
@@ -134,9 +119,7 @@ EXPECTED_TAGS = {
     "pair",
     "pair_state",
     "permutation_entropy",
-    "open_interest",
     "predictability_regime",
-    "perp",
     "pullback",
     "pure_momentum",
     "pyramiding",
@@ -152,7 +135,6 @@ EXPECTED_TAGS = {
     "spread",
     "state_space",
     "take_profit",
-    "taker_flow",
     "term_structure",
     "time_of_day",
     "trailing_stop",
@@ -169,10 +151,13 @@ EXPECTED_TAGS = {
 
 
 def _build() -> dict:
-    return build_candidate_manifest(
-        timeframes=list(FIXED_TIMEFRAMES),
-        symbols=list(FIXED_SYMBOLS),
-    )
+    with patch(
+        "lumina_quant.strategy_factory.candidate_library._has_perp_support_data", return_value=False
+    ):
+        return build_candidate_manifest(
+            timeframes=list(FIXED_TIMEFRAMES),
+            symbols=list(FIXED_SYMBOLS),
+        )
 
 
 def _canonical_body(manifest: dict) -> str:
