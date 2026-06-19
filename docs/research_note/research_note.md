@@ -1,5 +1,33 @@
 # Research Note
 
+## 2026-06-19 KST — post-OOS 갱신 규칙 walk-forward 박제 + 주요 shadow 후보 신뢰도 재분류
+
+사용자 정정에 따라 "post-OOS를 봤다면 같은 전략을 다음 달에 갱신하는 방식으로 walk-forward 평가할 수 있느냐"를 별도 규칙으로 분리해 코드/테스트/리포트로 박제했다. 기존 전역 monthly switching 평가는 이 질문의 답으로는 부정확하므로, 새 평가는 **같은 normalized strategy stem 내부에서만** 변형을 고르고 fold `t`의 OOS는 fold `t` 선택/가중치에 쓰지 않는다. fold `t` 선택은 완료된 과거 folds `<t`의 post-OOS Calmar만 사용하고, 히스토리가 없는 첫 fold만 train/validation Calmar로 bootstrap한다.
+
+구현/테스트:
+- `scripts/research/run_same_stem_post_oos_update_walkforward.py`: `hybrid_v3_5`, `hybrid_v3_6`, `fixed_relaxed_dynamic_blend` stem에 대해 same-stem lagged post-OOS update replay를 생성한다. 산출 row는 `post_oos_research_variant=true`, `requires_fresh_forward_shadow=true`, `clean_promotion_eligible=false`, `ready_for_real=false`, `real_money_execution=false`, `paper_order_execution=false`로 fail-closed된다.
+- `tests/test_same_stem_post_oos_update_walkforward.py`: H3.5/H3.6/fixed-blend stem 정규화, "현재 fold OOS 승자"가 아니라 "이전 완료 OOS 승자"를 고르는지, promotion/real-money gate가 닫혀 있고 JSON/Markdown 산출물이 round-trip 되는지를 검증한다.
+
+산출물:
+- Same-stem WF replay: `var/reports/strategy_research/same_stem_post_oos_update_walkforward_20260619/same_stem_post_oos_update_walkforward_latest.md|json`.
+- 선행 same-strategy reassessment: `var/reports/strategy_research/same_strategy_post_oos_update_reassessment_20260619/same_strategy_post_oos_update_reassessment_latest.md|json`.
+- 상관 기반 포트폴리오 진단: `var/reports/strategy_research/corr_aware_hybrid_portfolio_20260619/corr_aware_hybrid_portfolio_latest.md|json`.
+
+결과:
+- `same_stem_post_oos_update:fixed_relaxed_dynamic_blend_lagged_top1_calmar`: comp `+98.66%`, monthly equity MDD `15.43%`, Sharpe `1.84`, hit `5/10`, MDD<=30 pass.
+- `same_stem_post_oos_update:hybrid_v3_5_lagged_top1_calmar`: comp `+89.93%`, monthly equity MDD `15.66%`, Sharpe `1.65`, hit `5/10`, MDD<=30 pass. H3.5는 validation-only selector(`+19.62%`/`+25.87%`)보다 post-OOS 갱신 방식에서 크게 좋아진다.
+- `same_stem_post_oos_update:hybrid_v3_6_lagged_top1_calmar`: comp `-6.18%`, monthly equity MDD `25.88%`, Sharpe `-0.10`, hit `3/10`. H3.6은 이 기준에서 주력 후보가 아니다.
+- Corr-aware portfolio 진단상 실행 가능한 shadow blueprint는 `P2_corr_core`(70% risk-trimmed lagged router + 30% clean MDD20 dynamic switch): comp `+53.85%`, monthly equity MDD `3.43%`, Sharpe `1.96`. `H35_return_overlay_80_20`은 comp `+73.49%`지만 nested-hybrid/report-only라 leaf-decompose + fresh-forward 전에는 executable 후보가 아니다.
+
+신뢰도 판단:
+- **믿을 수 있는 범위**: 동일한 frozen rule을 재실행했을 때 재현되는 research/shadow ranking으로는 신뢰도가 올라갔다. 특히 same-stem WF는 current-fold OOS selection/weighting, same-month self-feeding, real-money/paper execution 카운트가 모두 `0`임을 리포트와 테스트가 확인한다.
+- **믿을 수 없는 범위**: promotion/real-money 신뢰도는 아직 없다. 이 규칙 자체가 과거 locked/post-OOS를 본 뒤 만든 post-OOS research variant이므로 `clean_promotion_eligible=false`가 맞다. 실전 승격에는 leaf-level executable manifest 재구축, cost/fill stress, fresh-forward monthly shadow, reconciliation, MDD/liquidation gates가 별도로 필요하다.
+- 운영 결론: 현 주력 shadow 후보는 (1) 안정형 `P2_corr_core`, (2) 연구용 return 후보 `fixed_relaxed_dynamic_blend` same-stem update, (3) 연구용 H3.5 same-stem update다. H3.6은 제외한다. 모두 real-money 제외다.
+
+검증:
+- `uv run ruff check scripts/research/run_same_stem_post_oos_update_walkforward.py tests/test_same_stem_post_oos_update_walkforward.py` → pass.
+- `uv run pytest -q tests/test_same_stem_post_oos_update_walkforward.py tests/test_alpha_zoo_69_asset_monthly_refit_walkforward.py tests/test_alpha_zoo_existing_strategy_reassessment.py` → `58 passed`.
+
 ## 2026-06-18 KST — Alpha/strategy improvement execution checkpoint: promotion gates, survivor manifests, artifact-portfolio fail-closed mode
 
 Deep Interview/Ralplan 승인안(`.gjc/specs/deep-interview-alpha-strategy-improvement.md`, `.gjc/plans/ralplan/2026-06-07-0457-b89b/pending-approval.md`) 기반으로 Ultragoal 실행을 G004까지 완료했다. 핵심 제약은 그대로 유지했다: locked-OOS는 selection/objective/tie-break/correlation/sizing에 금지, weak-data TradFi는 shadow-only, MDD cap 30%, liquidation/wipeout 불허, shadow/clean-paper two-tier benchmark, real-money 제외.
