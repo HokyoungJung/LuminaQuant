@@ -1,5 +1,53 @@
 # Research Note
 
+## 2026-06-20 KST — DeepLearning forecast bridge + strategy-quality overlay broad reassessment
+
+DeepLearning repo의 FITS/CycleNet/CMamba/PatchTST를 LuminaQuant에 직접 import하지 않고 **artifact-only forecast bridge**로 받는 경로를 만들었다. 학습은 실행하지 않았다. `DeepLearningForecastStore`는 CSV/JSON/JSONL/Parquet 예측 산출물을 읽고, `DeepLearningForecastGateStrategy`는 모델별 예측 return/dispersion/agreement/confidence를 합쳐 LONG/SHORT/EXIT 신호를 낸다. 별도 pipeline manifest/CLI는 export → optional HPO plan → train/predict command plan → artifact validation → strategy profile materialization → backtest/shadow gate 순서만 생성하며, 실제 학습 실행은 금지했다.
+
+구현 범위:
+- Forecast artifact bridge: `src/lumina_quant/data/deep_learning_forecasts.py`.
+- Forecast strategy: `src/lumina_quant/strategies/deep_learning_forecast_gate.py`.
+- Pipeline/CLI/config: `src/lumina_quant/workflows/deep_learning_pipeline.py`, `src/lumina_quant/cli/deep_learning.py`, `deep_learning` config schema/loader/example.
+- 기존 전략 개선 overlay: `src/lumina_quant/portfolio/strategy_quality.py` 및 backtest portfolio 통합. Edge gate, regime router, vol sizing, turnover budget, ATR exit overlay, health cooldown, ProfitMoonshot conflict guard, pair-correlation guard를 공통 portfolio layer에 추가했다.
+
+초기 BTC 단일/5전략 평가는 신뢰 가능한 최종평가가 아니라 smoke check였으므로 폐기 수준으로 낮춰 봐야 한다. 사용자 지적에 따라 즉시 pool/전략/기간을 넓혀 재측정했다.
+
+Broad 평가:
+- 전체 등록 전략 36개 × 3 pools(`BTC`, `ETH`, `BTC+ETH`) × `2024-01-01~2025-12-31`: raw backtest 216회, 비교 108개. 통과 97개, 실제 거래 비교 66개.
+- 실제 거래 비교 기준 최종자산 개선 39 / 악화 24 / 변화 없음 3. MDD 개선 49 / 악화 14.
+- 좋은 쪽: `RsiStrategy`, `RegimeBreakoutCandidateStrategy`, `ProfitMoonshotBreakoutStrategy`, `AdaptiveRegimeMomentumStrategy`, `ProfitMoonshotTrendStrategy`.
+- 나쁜 쪽: `LagConvergenceStrategy`, `Alpha101FormulaStrategy`, `RollingBreakoutStrategy`, `CompressionBreakoutContinuationStrategy`, 일부 vol-compression reversion aliases.
+
+Live-default 다기간 평가:
+- live_default 9개 전략 × 3 pools × 3 periods(`2024`, `2025`, `2024~2025`): raw backtest 162회, 비교 81개. 통과 69개, 실제 거래 비교 60개.
+- 실제 거래 비교 기준 최종자산 개선 27 / 악화 24. MDD 개선 37 / 악화 14.
+- `RsiStrategy`: 8/9 최종자산 개선, 9/9 MDD 개선, 평균 delta equity `+415.58`.
+- `PairTradingZScoreStrategy`: 3/3 개선.
+- `VwapReversionStrategy`: 평균 `+76.12`지만 pool/기간 편차 큼.
+- `MeanReversionStdStrategy`: 혼합/거의 중립.
+- `MovingAverageCrossStrategy`: MDD는 대부분 개선하지만 최종자산 평균은 `-10.97`.
+- `RollingBreakoutStrategy`: MDD는 9/9 개선하지만 평균 delta equity `-126.46`; 추세 수익을 잘라먹는다.
+- `LagConvergenceStrategy`: 평균 delta equity `-809.91`, MDD도 3/3 악화. 현 overlay와 궁합이 나쁘다.
+- `BitcoinBuyHoldStrategy`: 영향 없음.
+
+운영 판단:
+- 공통 overlay를 모든 전략에 일괄 적용하면 안 된다.
+- 적용 후보: `RsiStrategy`, `PairTradingZScoreStrategy`, 일부 reversion 계열.
+- 조건부/개별 튜닝: `VwapReversionStrategy`, `MeanReversionStdStrategy`, `MovingAverageCrossStrategy`.
+- 제외 또는 family-specific 재설계: `LagConvergenceStrategy`, `Alpha101FormulaStrategy`, `RollingBreakoutStrategy`, `CompressionBreakoutContinuationStrategy`.
+- 특히 trend/breakout 계열은 exit overlay와 regime/vol sizing이 upside를 너무 빨리 잘라서 별도 완화 파라미터가 필요하다.
+
+신뢰도 한계:
+- 이번 평가는 로컬 sample CSV(`BTCUSDT.csv`, `ETHUSDT.csv`) 기반이므로 실전 승격 근거가 아니다.
+- 더 믿을 수 있는 판정에는 raw-first 실데이터, multi-asset parquet, 비용/슬리피지 재보정, walk-forward, fresh-forward shadow, live fill telemetry reconciliation이 필요하다.
+- 현재 결론은 “전략군별 overlay 궁합을 가르는 연구 노트”로만 사용한다. real-money/paper 승격 근거 아님.
+
+검증:
+- Focused tests: `uv run pytest tests/test_strategy_quality_overlay.py tests/test_deep_learning_pipeline.py tests/test_deep_learning_forecast_gate_strategy.py tests/test_runtime_config_loader.py` → `27 passed`.
+- Ruff targeted check 통과.
+- Config example load 및 `lq deep-learning plan --json` 확인.
+- Broad eval artifacts: `/tmp/lq_strategy_quality_all_strategies_full_pools.{json,csv}`, `/tmp/lq_strategy_quality_live_default_period_pools.{json,csv}`.
+
 ## 2026-06-19 KST — post-OOS 갱신 규칙 walk-forward 박제 + 주요 shadow 후보 신뢰도 재분류
 
 사용자 정정에 따라 "post-OOS를 봤다면 같은 전략을 다음 달에 갱신하는 방식으로 walk-forward 평가할 수 있느냐"를 별도 규칙으로 분리해 코드/테스트/리포트로 박제했다. 기존 전역 monthly switching 평가는 이 질문의 답으로는 부정확하므로, 새 평가는 **같은 normalized strategy stem 내부에서만** 변형을 고르고 fold `t`의 OOS는 fold `t` 선택/가중치에 쓰지 않는다. fold `t` 선택은 완료된 과거 folds `<t`의 post-OOS Calmar만 사용하고, 히스토리가 없는 첫 fold만 train/validation Calmar로 bootstrap한다.
