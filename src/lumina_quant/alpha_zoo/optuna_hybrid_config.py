@@ -32,8 +32,14 @@ DEFAULT_69_ASSET_EFFICIENCY_REPAIR_ARTIFACT = (
     / "alpha_zoo_69_asset_efficiency_repair_optuna_20260530"
     / "alpha_zoo_69_asset_efficiency_repair_optuna_latest.json"
 )
+DEFAULT_69_ASSET_RELAXED_EFFICIENCY_REPAIR_ARTIFACT = (
+    ALPHA_V2_ROOT
+    / "alpha_zoo_69_asset_relaxed_efficiency_repair_optuna_20260531"
+    / "alpha_zoo_69_asset_relaxed_efficiency_repair_optuna_latest.json"
+)
 DEFAULT_SELECTED_PROFILE_ID = "hybrid_v3_5_optuna_three_profile_blend"
 EFFICIENCY_REPAIR_ARTIFACT_KIND = "alpha_zoo_69_asset_efficiency_repair_optuna"
+RELAXED_EFFICIENCY_REPAIR_ARTIFACT_KIND = "alpha_zoo_69_asset_relaxed_efficiency_repair_optuna"
 EFFICIENCY_REPAIR_FILTER_LABEL = "artifact_69_asset_efficiency_repair"
 EFFICIENCY_REPAIR_SUPPORTED_FAMILIES = frozenset(
     {
@@ -567,7 +573,10 @@ def _validate_source_model_id(sleeve: SourceSleeve) -> None:
 
 
 def _is_69_asset_efficiency_repair_payload(payload: dict[str, Any]) -> bool:
-    return str(payload.get("artifact_kind") or "") == EFFICIENCY_REPAIR_ARTIFACT_KIND
+    return str(payload.get("artifact_kind") or "") in {
+        EFFICIENCY_REPAIR_ARTIFACT_KIND,
+        RELAXED_EFFICIENCY_REPAIR_ARTIFACT_KIND,
+    }
 
 
 def _resolve_selected_profile_id(payload: dict[str, Any], selected_profile_id: str | None) -> str:
@@ -588,11 +597,16 @@ def _extract_69_asset_selected_profile(
         selected = dict(payload.get(key) or {})
         if selected.get("profile_id") == selected_profile_id:
             return selected
-    for row in [
+    rows = [
         dict(payload.get("static_efficiency_guarded_hybrid") or {}),
+        dict(payload.get("static_relaxed_efficiency_guarded_hybrid") or {}),
         dict((payload.get("hybrid_v3_5_optuna") or {}).get("row") or {}),
         dict((payload.get("hybrid_v3_6_optuna") or {}).get("row") or {}),
-    ]:
+    ]
+    rows.extend(
+        dict(row) for row in list(payload.get("profile_rows") or []) if isinstance(row, dict)
+    )
+    for row in rows:
         if row.get("profile_id") == selected_profile_id:
             return row
     raise ValueError(f"selected 69-asset efficiency profile not found: {selected_profile_id}")
@@ -682,14 +696,21 @@ def _load_69_asset_efficiency_repair_live_config(
     ]
     if not source_rows:
         raise ValueError("69-asset efficiency artifact has no selected_sleeve_rows")
-    profile_ids = tuple(dict.fromkeys(str(row.get("profile_id") or "") for row in source_rows))
-    if not all(profile_ids):
-        raise ValueError("69-asset efficiency sleeve row missing profile_id")
     profile_rows = {
         str(row.get("profile_id")): dict(row)
         for row in list(payload.get("profile_rows") or [])
         if isinstance(row, dict) and row.get("profile_id")
     }
+    selected_profile_row_id = str(selected_profile.get("profile_id") or "")
+    if selected_profile_row_id in profile_rows:
+        source_rows = [
+            row
+            for row in source_rows
+            if str(row.get("profile_id") or "") == selected_profile_row_id
+        ]
+    profile_ids = tuple(dict.fromkeys(str(row.get("profile_id") or "") for row in source_rows))
+    if not all(profile_ids):
+        raise ValueError("69-asset efficiency sleeve row missing profile_id")
 
     source_sleeves: list[SourceSleeve] = []
     seen_model_ids: set[str] = set()
@@ -752,6 +773,10 @@ def _load_69_asset_efficiency_repair_live_config(
             or {}
         ).items()
     }
+    if not weights and str(selected_profile.get("profile_id") or "") in profile_ids:
+        weights = {str(selected_profile["profile_id"]): 1.0}
+    if not average_weights and str(selected_profile.get("profile_id") or "") in profile_ids:
+        average_weights = {str(selected_profile["profile_id"]): 1.0}
     for profile_id in profile_ids:
         if profile_id not in weights:
             raise ValueError(f"missing 69-asset final profile weight: {profile_id}")
@@ -766,8 +791,9 @@ def _load_69_asset_efficiency_repair_live_config(
 
     split_policy = dict(payload.get("split_policy") or {})
     locked_oos = dict(split_policy.get("locked_oos") or {})
+    artifact_kind = str(payload.get("artifact_kind") or EFFICIENCY_REPAIR_ARTIFACT_KIND)
     governance = {
-        "artifact_kind": EFFICIENCY_REPAIR_ARTIFACT_KIND,
+        "artifact_kind": artifact_kind,
         "paper_testnet_only": True,
         "ready_for_paper": True,
         "ready_for_real": False,
@@ -952,6 +978,7 @@ def load_alpha_zoo_optuna_hybrid_live_config(
 __all__ = [
     "ALPHA_V2_ROOT",
     "DEFAULT_69_ASSET_EFFICIENCY_REPAIR_ARTIFACT",
+    "DEFAULT_69_ASSET_RELAXED_EFFICIENCY_REPAIR_ARTIFACT",
     "DEFAULT_INTEGER_PORTFOLIO_ARTIFACT",
     "DEFAULT_OPTUNA_HYBRID_ARTIFACT",
     "DEFAULT_SELECTED_PROFILE_ID",
@@ -967,6 +994,7 @@ __all__ = [
     "MAX_REALIZED_ONE_WAY_SLIPPAGE_BPS",
     "MAX_REALIZED_ROUND_TRIP_COST_BPS",
     "PROFILE_IDS",
+    "RELAXED_EFFICIENCY_REPAIR_ARTIFACT_KIND",
     "REPO_ROOT",
     "RETURN_PER_TURNOVER_THRESHOLD_BPS",
     "ROUND_TRIP_COST_BPS",

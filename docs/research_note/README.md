@@ -18,6 +18,8 @@ Canonical research-note directory. Use this stable name instead of strategy/date
 
 ## Latest diary index
 
+- 2026-06-21 KST — H35 executable shadow/testnet adoption checkpoint, fresh-forward evidence, and live decision template.
+
 - 2026-05-28 KST — standardized live refits on refreshed data, latest 8 complete weeks as validation, Optuna full-parameter tuning, and train+validation final refit.
 - 2026-05-28 KST — canonicalized research-note paths to `docs/research_note/` and added stable latest-first diary rules.
 - 2026-05-27 KST — live `MARKET_WINDOW` hot-path optimized with a trusted internal canonical-row fast path; real-money gates remain false.

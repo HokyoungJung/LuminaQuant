@@ -1301,6 +1301,49 @@ def test_manifest_portfolio_mode_resolves_valid_manifest(tmp_path: Path) -> None
     assert definition.source_artifacts["manifest_source_artifact:survivors"].endswith("source.json")
 
 
+def test_manifest_portfolio_mode_allows_lagged_completed_shadow_oos(
+    tmp_path: Path,
+) -> None:
+    manifest_path = _write_manifest(
+        tmp_path,
+        optimizer_updates={
+            "selection_inputs": ["train", "validation", "lagged_completed_shadow_oos"],
+            "uses_current_fold_oos": False,
+            "uses_locked_oos_for_selection": False,
+        },
+        correlation_updates={
+            "source": "train_validation_lagged_shadow_correlation_matrix",
+            "selection_inputs": ["train", "validation", "lagged_completed_shadow_oos"],
+            "uses_current_fold_oos": False,
+            "uses_locked_oos_for_correlation": False,
+            "ready": True,
+        },
+        child_updates={
+            "train_validation_optimizer_provenance": False,
+            "lagged_completed_shadow_optimizer_provenance": True,
+            "optimizer_provenance": {
+                "selection_inputs": ["train", "validation", "lagged_completed_shadow_oos"],
+                "uses_current_fold_oos": False,
+                "uses_locked_oos_for_selection": False,
+                "uses_locked_oos_for_objective": False,
+            },
+            "correlation_input_provenance": {
+                "source": "train_validation_lagged_shadow_correlation_matrix",
+                "selection_inputs": ["train", "validation", "lagged_completed_shadow_oos"],
+                "uses_current_fold_oos": False,
+                "uses_locked_oos_for_correlation": False,
+                "ready": True,
+            },
+        },
+    )
+
+    definition = MODULE.resolve_portfolio_mode_definition(f"manifest:{manifest_path}")
+
+    assert definition.cash_weight == 0.25
+    assert "manifest_fail_closed_to_cash" not in definition.source_artifacts
+    assert definition.components[0].component_id == "leaf-a"
+
+
 def test_manifest_portfolio_mode_fail_closes_to_cash_on_oos_contamination(
     tmp_path: Path,
 ) -> None:

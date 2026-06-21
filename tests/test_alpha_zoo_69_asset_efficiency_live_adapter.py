@@ -8,6 +8,7 @@ import pytest
 
 from lumina_quant.strategies.alpha_zoo_optuna_hybrid_live import (
     DEFAULT_69_ASSET_EFFICIENCY_REPAIR_ARTIFACT,
+    DEFAULT_69_ASSET_RELAXED_EFFICIENCY_REPAIR_ARTIFACT,
     AlphaZooOptunaHybridLiveStrategy,
     load_alpha_zoo_optuna_hybrid_live_config,
 )
@@ -95,6 +96,50 @@ def test_69_asset_efficiency_config_reconstructs_live_universe_and_policies() ->
     assert config.governance["live_slippage_guard_policy"]["market_fallback_allowed"] is False
     assert config.governance["live_slippage_guard_policy"]["require_bbo_snapshot"] is True
     assert config.governance["live_slippage_guard_policy"]["max_bbo_spread_bps_at_submit"] == 4.0
+
+
+def test_69_asset_efficiency_singleton_profile_filters_source_sleeves() -> None:
+    config = load_alpha_zoo_optuna_hybrid_live_config(
+        optuna_hybrid_artifact_path=DEFAULT_69_ASSET_EFFICIENCY_REPAIR_ARTIFACT,
+        selected_profile_id="balanced_mdd12_gross5_69_asset_efficiency_repair_optuna",
+    )
+
+    assert config.selected_profile_id == "balanced_mdd12_gross5_69_asset_efficiency_repair_optuna"
+    assert len(config.source_profiles) == 1
+    assert len(config.source_sleeves) == 5
+    assert config.final_profile_weights == pytest.approx(
+        {"balanced_mdd12_gross5_69_asset_efficiency_repair_optuna": 1.0}
+    )
+    assert config.average_profile_weights == pytest.approx(
+        {"balanced_mdd12_gross5_69_asset_efficiency_repair_optuna": 1.0}
+    )
+    assert config.governance["live_final_weight_gross_notional_fraction"] == pytest.approx(2.2)
+
+
+def test_relaxed_69_asset_efficiency_config_reconstructs_live_profile() -> None:
+    config = load_alpha_zoo_optuna_hybrid_live_config(
+        optuna_hybrid_artifact_path=DEFAULT_69_ASSET_RELAXED_EFFICIENCY_REPAIR_ARTIFACT,
+        selected_profile_id="growth_mdd20_gross8_69_asset_relaxed_efficiency_repair_optuna",
+    )
+
+    assert (
+        config.selected_profile_id
+        == "growth_mdd20_gross8_69_asset_relaxed_efficiency_repair_optuna"
+    )
+    assert config.governance["artifact_kind"] == (
+        "alpha_zoo_69_asset_relaxed_efficiency_repair_optuna"
+    )
+    assert config.governance["paper_testnet_only"] is True
+    assert config.governance["ready_for_real"] is False
+    assert len(config.source_profiles) == 1
+    assert len(config.source_sleeves) == 11
+    assert len(config.watch_symbols) == 69
+    assert config.final_profile_weights == pytest.approx(
+        {"growth_mdd20_gross8_69_asset_relaxed_efficiency_repair_optuna": 1.0}
+    )
+    assert config.governance["live_final_weight_gross_notional_fraction"] == pytest.approx(
+        5.8753125
+    )
 
 
 def test_69_asset_efficiency_live_targets_use_final_weights_and_sleeve_multiplier() -> None:

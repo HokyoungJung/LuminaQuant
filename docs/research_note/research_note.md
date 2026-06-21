@@ -1,5 +1,33 @@
 # Research Note
 
+## 2026-06-21 KST — H35 executable shadow/testnet adoption checkpoint
+
+H35를 현재 공격형 운영 후보의 기준 포트폴리오로 채택했다. 기존 `H35_return_overlay_80_20`은 nested/report-only였으나 leaf-level executable manifest로 분해했고, live/backtest 공통 `manifest:` portfolio-mode resolver가 이 manifest를 읽어 `ArtifactPortfolioModeStrategy`로 실행할 수 있다. 기준 manifest는 `var/reports/current_top_models/executable_shadow_manifests/h35_return_overlay_80_20_leaf_manifest_latest.json`이다.
+
+H35 구성:
+- 56% `p2_latest_relaxed_aggressive_leaf` 계열 relaxed aggressive leaf.
+- 20% `relaxed_efficiency:hybrid_v3_5` overlay.
+- 24% cash.
+- manifest gross cap `2.25`, child/source readiness, source sha/freshness, optimizer/correlation provenance, OOS contamination veto, real-money flag veto, malformed manifest cash fail-closed가 적용된다.
+
+성적:
+- 장기 OOS: `+73.49%`, monthly equity MDD `5.71%`, Sharpe `1.94`, 최신 fold `+7.01%`.
+- fresh-forward window `2026-06-14T00:00:00` → `2026-06-21T11:01:00`: 10bps `+3.91%`, 15bps `+3.16%`, 20bps `+2.41%`, MDD `8.14%`, max gross `3.04x`.
+- 비교 기준 P2: 10bps `+3.79%`, 20bps `+2.39%`, MDD `7.68%`, max gross `2.85x`.
+- 장기 상위 raw aggressive proxy는 fresh `+5.24%`지만 MDD `10.85%`, gross `4.07x`라 core 채택은 보류하고 H35처럼 capped/cash-buffered 형태로만 운용한다.
+
+운영 세팅:
+- committed decision template: `configs/live/h35_shadow_testnet_decision.json`.
+- live/testnet 실행 reference: `manifest:var/reports/current_top_models/executable_shadow_manifests/h35_return_overlay_80_20_leaf_manifest_latest.json`.
+- paper/testnet/shadow 준비 상태는 `ready_for_shadow=true`; real-money는 preflight/fill/slippage/funding/reconciliation telemetry 전까지 계속 fail-closed다.
+- 실전 테스트는 limit-first, market-order disabled, kill-switch/stop-file enabled, testnet/shadow parity and reconciliation collection을 전제로 한다. real endpoint canary/full은 별도 preflight가 통과하고 `LUMINA_ENABLE_LIVE_REAL=true`가 명시될 때만 허용된다.
+
+검증:
+- Manifest resolver smoke: H35/P2 `manifest:` resolution 통과.
+- Fresh-forward performance report: `var/reports/current_top_models/fresh_forward_shadow_eval/fresh_forward_shadow_performance_latest.md`.
+- Long-top3 fresh mapping report: `var/reports/current_top_models/fresh_forward_shadow_eval/long_top3_fresh_forward_mapping_latest.md`.
+- Focused tests: `uv run pytest tests/test_alpha_zoo_69_asset_efficiency_live_adapter.py tests/unit/test_artifact_portfolio_mode.py` → `51 passed`.
+
 ## 2026-06-20 KST — DeepLearning forecast bridge + strategy-quality overlay broad reassessment
 
 DeepLearning repo의 FITS/CycleNet/CMamba/PatchTST를 LuminaQuant에 직접 import하지 않고 **artifact-only forecast bridge**로 받는 경로를 만들었다. 학습은 실행하지 않았다. `DeepLearningForecastStore`는 CSV/JSON/JSONL/Parquet 예측 산출물을 읽고, `DeepLearningForecastGateStrategy`는 모델별 예측 return/dispersion/agreement/confidence를 합쳐 LONG/SHORT/EXIT 신호를 낸다. 별도 pipeline manifest/CLI는 export → optional HPO plan → train/predict command plan → artifact validation → strategy profile materialization → backtest/shadow gate 순서만 생성하며, 실제 학습 실행은 금지했다.

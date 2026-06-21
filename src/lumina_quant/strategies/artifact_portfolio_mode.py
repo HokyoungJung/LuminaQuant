@@ -264,13 +264,14 @@ def _resolve_manifest_path(raw_path: Any, *, base_dir: Path | None = None) -> Pa
     return path.resolve()
 
 
-def _selection_inputs_are_train_validation_only(inputs: Any) -> bool:
+def _selection_inputs_are_train_validation_or_lagged_shadow_only(inputs: Any) -> bool:
     if not isinstance(inputs, list | tuple):
         return False
     values = [str(item).lower() for item in inputs]
     if not values:
         return False
-    return all(value in {"train", "validation", "train_validation"} for value in values)
+    allowed = {"train", "validation", "train_validation", "lagged_completed_shadow_oos"}
+    return all(value in allowed for value in values)
 
 
 def _has_forbidden_oos_provenance(payload: dict[str, Any]) -> bool:
@@ -342,7 +343,9 @@ def _manifest_correlation_ok(provenance: Any) -> bool:
     source = str(provenance.get("source") or "").strip().lower()
     if not source or "oos" in source or "locked" in source:
         return False
-    if not _selection_inputs_are_train_validation_only(provenance.get("selection_inputs")):
+    if not _selection_inputs_are_train_validation_or_lagged_shadow_only(
+        provenance.get("selection_inputs")
+    ):
         return False
     return not _has_forbidden_oos_provenance(provenance)
 
@@ -350,7 +353,9 @@ def _manifest_correlation_ok(provenance: Any) -> bool:
 def _manifest_optimizer_ok(provenance: Any) -> bool:
     if not isinstance(provenance, dict) or not provenance:
         return False
-    if not _selection_inputs_are_train_validation_only(provenance.get("selection_inputs")):
+    if not _selection_inputs_are_train_validation_or_lagged_shadow_only(
+        provenance.get("selection_inputs")
+    ):
         return False
     return not _has_forbidden_oos_provenance(provenance)
 
@@ -446,7 +451,10 @@ def _manifest_definition_from_path(
                 source_artifacts=artifacts,
                 reason=f"child_current_fold_oos_provenance_missing:{child_id}",
             )
-        if child.get("train_validation_optimizer_provenance") is not True:
+        if (
+            child.get("train_validation_optimizer_provenance") is not True
+            and child.get("lagged_completed_shadow_optimizer_provenance") is not True
+        ):
             return _manifest_fail_closed_definition(
                 token=token,
                 source_artifacts=artifacts,
