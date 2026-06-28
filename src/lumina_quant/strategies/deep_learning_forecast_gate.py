@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from lumina_quant.backtesting.cost_models import BPS_PER_UNIT
+from lumina_quant.market_units import BPS_PER_UNIT
 from lumina_quant.core.events import SignalEvent
 from lumina_quant.core.plugin_registry import register
 from lumina_quant.data.deep_learning_forecasts import (

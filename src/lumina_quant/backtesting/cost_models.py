@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 
-
-BPS_PER_UNIT = 10_000.0
+from lumina_quant.market_units import BPS_PER_UNIT
 
 
 @dataclass(slots=True)
@@ -77,7 +76,7 @@ def estimate_cost_bps(
         float(params.impact_k)
         * max(0.0, float(sigma))
         * ((notional / safe_adtv) ** 0.5)
-        * 10_000.0,
+        * BPS_PER_UNIT,
     )
     fees_bps = max(0.0, float(params.fees_bps) + float(params.tax_bps))
     participation_penalty = max(
@@ -97,7 +96,7 @@ def estimate_cost_bps(
 
 def apply_bps_to_price(*, basis_price: float, total_bps: float, side: str) -> float:
     sign = 1.0 if str(side).upper() == "BUY" else -1.0
-    return float(basis_price) * (1.0 + sign * (float(total_bps) / 10_000.0))
+    return float(basis_price) * (1.0 + sign * (float(total_bps) / BPS_PER_UNIT))
 
 
 def simulate_market_fill(
