@@ -1,0 +1,656 @@
+{
+  "artifact_kind": "manual_overall_latest_included_summary",
+  "generated_at_utc": "2026-06-28T11:08:43.990214Z",
+  "base_artifact": "var/reports/best_historical_strategy_improvement/best_historical_strategy_improvement_latest.json",
+  "correction_note": "Earlier 2026-06-21 cutoff was incorrect. Direct 1m parquet timestamp audit found every symbol in both 85 and 110 universes present through 2026-06-28T10:09:00Z; monthly walk-forward can use completed 30m bars through 2026-06-28T09:30:00Z.",
+  "direct_1m_parquet_audit": {
+    "historical_85_preregistered": {
+      "symbols": 85,
+      "missing": 0,
+      "min_last_utc": "2026-06-28T10:09:00Z",
+      "max_last_utc": "2026-06-28T10:09:00Z"
+    },
+    "expanded_110_latest_tail_full": {
+      "symbols": 110,
+      "missing": 0,
+      "min_last_utc": "2026-06-28T10:09:00Z",
+      "max_last_utc": "2026-06-28T10:09:00Z"
+    }
+  },
+  "evaluation_period": {
+    "aggregate_oos_folds": "2025-09 through 2026-06, 10 monthly OOS folds",
+    "latest_fold_oos_utc": "2026-06-01T00:00:00 through 2026-06-28T09:30:00",
+    "latest_fold_train_utc": "2025-01-01T00:00:00 through 2026-03-31T23:30:00",
+    "latest_fold_validation_utc": "2026-04-01T00:00:00 through 2026-05-31T23:30:00"
+  },
+  "method": [
+    "Use existing repository historical-best artifact and monthly walk-forward scoreboard.",
+    "Keep already-closed OOS folds 2025-09..2026-05 unchanged; rerun only the open/latest 2026-06 fold because that is the only fold affected by new data.",
+    "Rerun the fixed June selected leaf relaxed_efficiency:aggressive_mdd30_gross10_69_asset_relaxed_efficiency_repair_optuna on current 1m parquet, resampled by the repo runner to 30m+ timeframes.",
+    "Replace 2026-06 OOS return/MDD in exact and risk-trimmed router variants, then recompute compounded OOS return, annualized approximation, monthly Sharpe approximation, profit factor, monthly equity MDD, max intra-fold OOS MDD, and hit count.",
+    "Costs/slippage remain as encoded in the repo runner/report baseline; no real-money approval is inferred."
+  ],
+  "latest_fold_updates": {
+    "historical_85_preregistered": {
+      "path": "var/reports/manual_reval_20260628_monthly_refit_june_latest_rerun85/june_latest_85_relaxed_efficiency_wf_latest.json",
+      "global_latest_utc": "2026-06-28T09:30:00",
+      "loaded_symbol_count": 85,
+      "selected_candidate_label": "relaxed_efficiency:aggressive_mdd30_gross10_69_asset_relaxed_efficiency_repair_optuna",
+      "locked_oos": {
+        "bar_count": 1286,
+        "calmar": 0.8127856344322196,
+        "end": "2026-06-28T09:30:00",
+        "mdd": 0.3046702425939518,
+        "sharpe": 2.8224906284821922,
+        "sortino": 3.00923386854483,
+        "start": "2026-06-01T00:00:00",
+        "total_return": 0.2476315964193434
+      },
+      "train": {
+        "bar_count": 12129,
+        "calmar": 6.856705234816823,
+        "end": "2026-03-31T23:30:00",
+        "mdd": 0.5115807743585948,
+        "sharpe": 1.7793003326557146,
+        "sortino": 1.5533777304413108,
+        "start": "2025-01-01T00:00:00",
+        "total_return": 3.507758573576221
+      },
+      "validation": {
+        "bar_count": 2928,
+        "calmar": 12.653332059600016,
+        "end": "2026-05-31T23:30:00",
+        "mdd": 0.1666074693239351,
+        "sharpe": 7.187293911608387,
+        "sortino": 7.894907268666204,
+        "start": "2026-04-01T00:00:00",
+        "total_return": 2.1081396329653743
+      }
+    },
+    "expanded_110_latest_tail_full": {
+      "path": "var/reports/manual_reval_20260628_monthly_refit_june_latest_rerun110/june_latest_110_relaxed_efficiency_wf_latest.json",
+      "global_latest_utc": "2026-06-28T09:30:00",
+      "loaded_symbol_count": 110,
+      "selected_candidate_label": "relaxed_efficiency:aggressive_mdd30_gross10_69_asset_relaxed_efficiency_repair_optuna",
+      "locked_oos": {
+        "bar_count": 643,
+        "calmar": 2.6722469135814344,
+        "end": "2026-06-28T09:30:00",
+        "mdd": 0.23578639388045475,
+        "sharpe": 6.864398113085479,
+        "sortino": 7.122738602282106,
+        "start": "2026-06-01T00:00:00",
+        "total_return": 0.6300794633115416
+      },
+      "train": {
+        "bar_count": 10920,
+        "calmar": 5.03049470953398,
+        "end": "2026-03-31T23:30:00",
+        "mdd": 0.5115807743585948,
+        "sharpe": 1.6806254620610102,
+        "sortino": 1.3959703646383883,
+        "start": "2025-01-01T00:00:00",
+        "total_return": 2.5735043789102083
+      },
+      "validation": {
+        "bar_count": 1464,
+        "calmar": 12.387729332234944,
+        "end": "2026-05-31T23:30:00",
+        "mdd": 0.13974866992291768,
+        "sharpe": 8.31343789058315,
+        "sortino": 8.555796506415412,
+        "start": "2026-04-01T00:00:00",
+        "total_return": 1.7311686975449465
+      }
+    }
+  },
+  "updated_comparisons": {
+    "expanded_110_latest_tail_full": {
+      "codex_lagged_leaf_router_grid:h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_exact_unscaled": {
+        "fold_count": 10,
+        "fold_returns": [
+          0.0,
+          0.0,
+          0.3347813736333429,
+          0.0,
+          0.1602776809923423,
+          0.08440769094531331,
+          -0.00045742797179848527,
+          -0.04456784683970316,
+          -0.006151729992135535,
+          0.6300794633115416
+        ],
+        "fold_rows": [
+          {
+            "fold_id": "2025-09",
+            "oos_mdd": 0.0,
+            "oos_return": 0.0,
+            "risk_scale": 0.0,
+            "router_branch": "strict_core_cash",
+            "selected_candidate_label": "cash_strict_core_validation_strength_guard"
+          },
+          {
+            "fold_id": "2025-10",
+            "oos_mdd": 0.0,
+            "oos_return": 0.0,
+            "risk_scale": 0.0,
+            "router_branch": "strict_core_cash",
+            "selected_candidate_label": "cash_strict_core_validation_strength_guard"
+          },
+          {
+            "fold_id": "2025-11",
+            "oos_mdd": 0.27690078457641154,
+            "oos_return": 0.3347813736333429,
+            "risk_scale": 3.0,
+            "router_branch": "strict_core_scaled",
+            "selected_candidate_label": "strict_efficiency:balanced_mdd12_gross5_69_asset_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2025-12",
+            "oos_mdd": 0.0,
+            "oos_return": 0.0,
+            "risk_scale": 0.0,
+            "router_branch": "strict_core_cash",
+            "selected_candidate_label": "cash_strict_core_validation_strength_guard"
+          },
+          {
+            "fold_id": "2026-01",
+            "oos_mdd": 0.0933538584390391,
+            "oos_return": 0.1602776809923423,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:growth_mdd20_gross8_69_asset_relaxed_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-02",
+            "oos_mdd": 0.11813078790403786,
+            "oos_return": 0.08440769094531331,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "strict_efficiency:aggressive_mdd30_gross10_69_asset_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-03",
+            "oos_mdd": 0.0392997342470679,
+            "oos_return": -0.00045742797179848527,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:balanced_mdd12_gross5_69_asset_relaxed_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-04",
+            "oos_mdd": 0.10056346511818892,
+            "oos_return": -0.04456784683970316,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:growth_mdd20_gross8_69_asset_relaxed_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-05",
+            "oos_mdd": 0.14373210328780572,
+            "oos_return": -0.006151729992135535,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:growth_mdd20_gross8_69_asset_relaxed_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-06",
+            "oos_mdd": 0.23578639388045475,
+            "oos_return": 0.6300794633115416,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:aggressive_mdd30_gross10_69_asset_relaxed_efficiency_repair_optuna",
+            "previous_oos_return": 0.1256090878899181,
+            "previous_oos_mdd": 0.11359361307513616,
+            "oos_start": "2026-06-01T00:00:00",
+            "oos_end": "2026-06-28T09:30:00",
+            "bar_count": 643,
+            "latest_update_source_path": "var/reports/manual_reval_20260628_monthly_refit_june_latest_rerun110/june_latest_110_relaxed_efficiency_wf_latest.json"
+          }
+        ],
+        "compounded_oos_return": 1.598332201339458,
+        "annualized_oos_return_approx": 2.1450938597225817,
+        "monthly_sharpe_approx": 1.880647926322795,
+        "profit_factor": 23.634564264233315,
+        "positive_oos_folds": 4,
+        "monthly_equity_mdd": 0.05087976030312216,
+        "max_oos_mdd": 0.27690078457641154,
+        "return_to_max_oos_mdd": 5.7722198360127575,
+        "previous_compounded_oos_return": 0.7942108989233605,
+        "previous_annualized_oos_return_approx": 1.0167319960522772,
+        "previous_monthly_sharpe_approx": 1.9622215928554807,
+        "previous_profit_factor": 13.77720005628009,
+        "previous_max_oos_mdd": 0.27690078457641154,
+        "previous_monthly_equity_mdd": 0.050879760303122135,
+        "previous_return_to_max_oos_mdd": 2.868214693354167,
+        "previous_positive_oos_folds": 4
+      },
+      "codex_lagged_leaf_router_grid:h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_fallback_mdd20_cap2": {
+        "fold_count": 10,
+        "fold_returns": [
+          0.0,
+          0.0,
+          0.2231875824222286,
+          0.0,
+          0.1602776809923423,
+          0.08440769094531331,
+          -0.00045742797179848527,
+          -0.04456784683970316,
+          -0.006151729992135535,
+          0.6300794633115416
+        ],
+        "fold_rows": [
+          {
+            "fold_id": "2025-09",
+            "oos_mdd": 0.0,
+            "oos_return": 0.0,
+            "risk_scale": 0.0,
+            "router_branch": "strict_core_cash",
+            "selected_candidate_label": "cash_strict_core_validation_strength_guard"
+          },
+          {
+            "fold_id": "2025-10",
+            "oos_mdd": 0.0,
+            "oos_return": 0.0,
+            "risk_scale": 0.0,
+            "router_branch": "strict_core_cash",
+            "selected_candidate_label": "cash_strict_core_validation_strength_guard"
+          },
+          {
+            "fold_id": "2025-11",
+            "oos_mdd": 0.18460052305094102,
+            "oos_return": 0.2231875824222286,
+            "risk_scale": 2.0,
+            "router_branch": "strict_core_scaled",
+            "selected_candidate_label": "strict_efficiency:balanced_mdd12_gross5_69_asset_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2025-12",
+            "oos_mdd": 0.0,
+            "oos_return": 0.0,
+            "risk_scale": 0.0,
+            "router_branch": "strict_core_cash",
+            "selected_candidate_label": "cash_strict_core_validation_strength_guard"
+          },
+          {
+            "fold_id": "2026-01",
+            "oos_mdd": 0.0933538584390391,
+            "oos_return": 0.1602776809923423,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:growth_mdd20_gross8_69_asset_relaxed_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-02",
+            "oos_mdd": 0.11813078790403786,
+            "oos_return": 0.08440769094531331,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "strict_efficiency:aggressive_mdd30_gross10_69_asset_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-03",
+            "oos_mdd": 0.0392997342470679,
+            "oos_return": -0.00045742797179848527,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:balanced_mdd12_gross5_69_asset_relaxed_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-04",
+            "oos_mdd": 0.10056346511818892,
+            "oos_return": -0.04456784683970316,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:growth_mdd20_gross8_69_asset_relaxed_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-05",
+            "oos_mdd": 0.14373210328780572,
+            "oos_return": -0.006151729992135535,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:growth_mdd20_gross8_69_asset_relaxed_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-06",
+            "oos_mdd": 0.23578639388045475,
+            "oos_return": 0.6300794633115416,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:aggressive_mdd30_gross10_69_asset_relaxed_efficiency_repair_optuna",
+            "previous_oos_return": 0.1256090878899181,
+            "previous_oos_mdd": 0.11359361307513616,
+            "oos_start": "2026-06-01T00:00:00",
+            "oos_end": "2026-06-28T09:30:00",
+            "bar_count": 643,
+            "latest_update_source_path": "var/reports/manual_reval_20260628_monthly_refit_june_latest_rerun110/june_latest_110_relaxed_efficiency_wf_latest.json"
+          }
+        ],
+        "compounded_oos_return": 1.3810998163953148,
+        "annualized_oos_return_approx": 1.8322600194897594,
+        "monthly_sharpe_approx": 1.7834011517492163,
+        "profit_factor": 21.454018692266136,
+        "positive_oos_folds": 4,
+        "monthly_equity_mdd": 0.05087976030312217,
+        "max_oos_mdd": 0.23578639388045475,
+        "return_to_max_oos_mdd": 5.857419478986313,
+        "previous_compounded_oos_return": 0.6442067106733085,
+        "previous_annualized_oos_return_approx": 0.8161332084850634,
+        "previous_monthly_sharpe_approx": 2.114797749962446,
+        "previous_profit_factor": 11.596654484312905,
+        "previous_max_oos_mdd": 0.18460052305094102,
+        "previous_monthly_equity_mdd": 0.050879760303122135,
+        "previous_return_to_max_oos_mdd": 3.489733940220407,
+        "previous_positive_oos_folds": 4
+      }
+    },
+    "historical_85_preregistered": {
+      "codex_lagged_leaf_router_grid:h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_exact_unscaled": {
+        "fold_count": 10,
+        "fold_returns": [
+          0.0,
+          0.0,
+          0.3347813736333429,
+          0.0,
+          0.1602776809923423,
+          0.08440769094531331,
+          -0.00045742797179848527,
+          -0.04456784683970316,
+          0.12508961845577438,
+          0.2476315964193434
+        ],
+        "fold_rows": [
+          {
+            "fold_id": "2025-09",
+            "oos_mdd": 0.0,
+            "oos_return": 0.0,
+            "risk_scale": 0.0,
+            "router_branch": "strict_core_cash",
+            "selected_candidate_label": "cash_strict_core_validation_strength_guard"
+          },
+          {
+            "fold_id": "2025-10",
+            "oos_mdd": 0.0,
+            "oos_return": 0.0,
+            "risk_scale": 0.0,
+            "router_branch": "strict_core_cash",
+            "selected_candidate_label": "cash_strict_core_validation_strength_guard"
+          },
+          {
+            "fold_id": "2025-11",
+            "oos_mdd": 0.27690078457641154,
+            "oos_return": 0.3347813736333429,
+            "risk_scale": 3.0,
+            "router_branch": "strict_core_scaled",
+            "selected_candidate_label": "strict_efficiency:balanced_mdd12_gross5_69_asset_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2025-12",
+            "oos_mdd": 0.0,
+            "oos_return": 0.0,
+            "risk_scale": 0.0,
+            "router_branch": "strict_core_cash",
+            "selected_candidate_label": "cash_strict_core_validation_strength_guard"
+          },
+          {
+            "fold_id": "2026-01",
+            "oos_mdd": 0.0933538584390391,
+            "oos_return": 0.1602776809923423,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:growth_mdd20_gross8_69_asset_relaxed_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-02",
+            "oos_mdd": 0.11813078790403786,
+            "oos_return": 0.08440769094531331,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "strict_efficiency:aggressive_mdd30_gross10_69_asset_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-03",
+            "oos_mdd": 0.0392997342470679,
+            "oos_return": -0.00045742797179848527,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:balanced_mdd12_gross5_69_asset_relaxed_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-04",
+            "oos_mdd": 0.10056346511818892,
+            "oos_return": -0.04456784683970316,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:growth_mdd20_gross8_69_asset_relaxed_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-05",
+            "oos_mdd": 0.2025811903747926,
+            "oos_return": 0.12508961845577438,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:balanced_mdd12_gross5_69_asset_relaxed_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-06",
+            "oos_mdd": 0.3046702425939518,
+            "oos_return": 0.2476315964193434,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:aggressive_mdd30_gross10_69_asset_relaxed_efficiency_repair_optuna",
+            "previous_oos_return": 0.6479697981061889,
+            "previous_oos_mdd": 0.06694777191184476,
+            "oos_start": "2026-06-01T00:00:00",
+            "oos_end": "2026-06-28T09:30:00",
+            "bar_count": 1286,
+            "latest_update_source_path": "var/reports/manual_reval_20260628_monthly_refit_june_latest_rerun85/june_latest_85_relaxed_efficiency_wf_latest.json"
+          }
+        ],
+        "compounded_oos_return": 1.2513307108149347,
+        "annualized_oos_return_approx": 1.648055937023884,
+        "monthly_sharpe_approx": 2.5057480979820714,
+        "profit_factor": 21.147854498000335,
+        "positive_oos_folds": 5,
+        "monthly_equity_mdd": 0.045004888231714335,
+        "max_oos_mdd": 0.3046702425939518,
+        "return_to_max_oos_mdd": 4.107164192213682,
+        "previous_compounded_oos_return": 1.9737344161689019,
+        "previous_annualized_oos_return_approx": 2.6979634551515757,
+        "previous_monthly_sharpe_approx": 2.1183768015017526,
+        "previous_profit_factor": 30.039265008271773,
+        "previous_max_oos_mdd": 0.27690078457641154,
+        "previous_monthly_equity_mdd": 0.045004888231714335,
+        "previous_return_to_max_oos_mdd": 7.1279480814336384,
+        "previous_positive_oos_folds": 5
+      },
+      "codex_lagged_leaf_router_grid:h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_fallback_mdd20_cap2": {
+        "fold_count": 10,
+        "fold_returns": [
+          0.0,
+          0.0,
+          0.2231875824222286,
+          0.0,
+          0.1602776809923423,
+          0.08440769094531331,
+          -0.00045742797179848527,
+          -0.04456784683970316,
+          0.12508961845577438,
+          0.2476315964193434
+        ],
+        "fold_rows": [
+          {
+            "fold_id": "2025-09",
+            "oos_mdd": 0.0,
+            "oos_return": 0.0,
+            "risk_scale": 0.0,
+            "router_branch": "strict_core_cash",
+            "selected_candidate_label": "cash_strict_core_validation_strength_guard"
+          },
+          {
+            "fold_id": "2025-10",
+            "oos_mdd": 0.0,
+            "oos_return": 0.0,
+            "risk_scale": 0.0,
+            "router_branch": "strict_core_cash",
+            "selected_candidate_label": "cash_strict_core_validation_strength_guard"
+          },
+          {
+            "fold_id": "2025-11",
+            "oos_mdd": 0.18460052305094102,
+            "oos_return": 0.2231875824222286,
+            "risk_scale": 2.0,
+            "router_branch": "strict_core_scaled",
+            "selected_candidate_label": "strict_efficiency:balanced_mdd12_gross5_69_asset_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2025-12",
+            "oos_mdd": 0.0,
+            "oos_return": 0.0,
+            "risk_scale": 0.0,
+            "router_branch": "strict_core_cash",
+            "selected_candidate_label": "cash_strict_core_validation_strength_guard"
+          },
+          {
+            "fold_id": "2026-01",
+            "oos_mdd": 0.0933538584390391,
+            "oos_return": 0.1602776809923423,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:growth_mdd20_gross8_69_asset_relaxed_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-02",
+            "oos_mdd": 0.11813078790403786,
+            "oos_return": 0.08440769094531331,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "strict_efficiency:aggressive_mdd30_gross10_69_asset_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-03",
+            "oos_mdd": 0.0392997342470679,
+            "oos_return": -0.00045742797179848527,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:balanced_mdd12_gross5_69_asset_relaxed_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-04",
+            "oos_mdd": 0.10056346511818892,
+            "oos_return": -0.04456784683970316,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:growth_mdd20_gross8_69_asset_relaxed_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-05",
+            "oos_mdd": 0.2025811903747926,
+            "oos_return": 0.12508961845577438,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:balanced_mdd12_gross5_69_asset_relaxed_efficiency_repair_optuna"
+          },
+          {
+            "fold_id": "2026-06",
+            "oos_mdd": 0.3046702425939518,
+            "oos_return": 0.2476315964193434,
+            "risk_scale": 1.0,
+            "router_branch": "pre_registered_lagged_plus_validation_leaf",
+            "selected_candidate_label": "relaxed_efficiency:aggressive_mdd30_gross10_69_asset_relaxed_efficiency_repair_optuna",
+            "previous_oos_return": 0.6479697981061889,
+            "previous_oos_mdd": 0.06694777191184476,
+            "oos_start": "2026-06-01T00:00:00",
+            "oos_end": "2026-06-28T09:30:00",
+            "bar_count": 1286,
+            "latest_update_source_path": "var/reports/manual_reval_20260628_monthly_refit_june_latest_rerun85/june_latest_85_relaxed_efficiency_wf_latest.json"
+          }
+        ],
+        "compounded_oos_return": 1.0631092280668066,
+        "annualized_oos_return_approx": 1.3846610925839866,
+        "monthly_sharpe_approx": 2.6371694742290392,
+        "profit_factor": 18.669384534667476,
+        "positive_oos_folds": 5,
+        "monthly_equity_mdd": 0.04500488823171432,
+        "max_oos_mdd": 0.3046702425939518,
+        "return_to_max_oos_mdd": 3.4893766421542574,
+        "previous_compounded_oos_return": 1.7251166993573883,
+        "previous_annualized_oos_return_approx": 2.3301371961229354,
+        "previous_monthly_sharpe_approx": 2.023847479033902,
+        "previous_profit_factor": 27.560795044938917,
+        "previous_max_oos_mdd": 0.2025811903747926,
+        "previous_monthly_equity_mdd": 0.045004888231714335,
+        "previous_return_to_max_oos_mdd": 8.515680533645666,
+        "previous_positive_oos_folds": 5
+      }
+    }
+  },
+  "ranked_by_compounded_oos_return": [
+    {
+      "comparison": "expanded_110_latest_tail_full",
+      "strategy": "codex_lagged_leaf_router_grid:h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_exact_unscaled",
+      "compounded_oos_return": 1.598332201339458,
+      "annualized_oos_return_approx": 2.1450938597225817,
+      "monthly_sharpe_approx": 1.880647926322795,
+      "profit_factor": 23.634564264233315,
+      "max_oos_mdd": 0.27690078457641154,
+      "monthly_equity_mdd": 0.05087976030312216,
+      "return_to_max_oos_mdd": 5.7722198360127575,
+      "positive_oos_folds": 4,
+      "fold_count": 10
+    },
+    {
+      "comparison": "expanded_110_latest_tail_full",
+      "strategy": "codex_lagged_leaf_router_grid:h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_fallback_mdd20_cap2",
+      "compounded_oos_return": 1.3810998163953148,
+      "annualized_oos_return_approx": 1.8322600194897594,
+      "monthly_sharpe_approx": 1.7834011517492163,
+      "profit_factor": 21.454018692266136,
+      "max_oos_mdd": 0.23578639388045475,
+      "monthly_equity_mdd": 0.05087976030312217,
+      "return_to_max_oos_mdd": 5.857419478986313,
+      "positive_oos_folds": 4,
+      "fold_count": 10
+    },
+    {
+      "comparison": "historical_85_preregistered",
+      "strategy": "codex_lagged_leaf_router_grid:h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_exact_unscaled",
+      "compounded_oos_return": 1.2513307108149347,
+      "annualized_oos_return_approx": 1.648055937023884,
+      "monthly_sharpe_approx": 2.5057480979820714,
+      "profit_factor": 21.147854498000335,
+      "max_oos_mdd": 0.3046702425939518,
+      "monthly_equity_mdd": 0.045004888231714335,
+      "return_to_max_oos_mdd": 4.107164192213682,
+      "positive_oos_folds": 5,
+      "fold_count": 10
+    },
+    {
+      "comparison": "historical_85_preregistered",
+      "strategy": "codex_lagged_leaf_router_grid:h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_fallback_mdd20_cap2",
+      "compounded_oos_return": 1.0631092280668066,
+      "annualized_oos_return_approx": 1.3846610925839866,
+      "monthly_sharpe_approx": 2.6371694742290392,
+      "profit_factor": 18.669384534667476,
+      "max_oos_mdd": 0.3046702425939518,
+      "monthly_equity_mdd": 0.04500488823171432,
+      "return_to_max_oos_mdd": 3.4893766421542574,
+      "positive_oos_folds": 5,
+      "fold_count": 10
+    }
+  ],
+  "winner": {
+    "comparison": "expanded_110_latest_tail_full",
+    "strategy": "codex_lagged_leaf_router_grid:h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_exact_unscaled",
+    "compounded_oos_return": 1.598332201339458,
+    "annualized_oos_return_approx": 2.1450938597225817,
+    "monthly_sharpe_approx": 1.880647926322795,
+    "profit_factor": 23.634564264233315,
+    "max_oos_mdd": 0.27690078457641154,
+    "monthly_equity_mdd": 0.05087976030312216,
+    "return_to_max_oos_mdd": 5.7722198360127575,
+    "positive_oos_folds": 4,
+    "fold_count": 10
+  }
+}

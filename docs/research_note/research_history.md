@@ -11,6 +11,19 @@ Future profit-moonshot sessions must read this file before repeating searches or
 - local_inventory_count: `2662`
 - ledger_count: `2666`
 
+## Manual addenda after generated ledger
+
+### 2026-06-28 — latest_data_full_scoreboard_correction
+- Research dates: 2026-06-28
+- Source type: `local_artifact + data_coverage_audit`
+- Title/path: latest-data full historical scoreboard correction — `var/reports/manual_reval_20260628_overall_latest_included_rerun/manual_overall_latest_included_summary_latest.md|json`
+- Content summary: Corrected the prior 2026-06-21 cutoff mistake by auditing direct 1m parquet timestamps. Both 85 and 110 universes had all requested symbols through `2026-06-28T10:09:00Z`; completed 30m walk-forward bars reached `2026-06-28T09:30:00Z`. Re-ran only the affected 2026-06 monthly OOS fold and recomputed the full 10-fold `2025-09`~`2026-06` scoreboard.
+- What was used: Used to answer the full-period, latest-data-included champion question and to supersede stale 2026-06-21-only manual revaluation notes.
+- Families: codex_lagged_leaf_router_grid, relaxed_efficiency, monthly_walk_forward, latest_data_revalidation, data_coverage_audit
+- Decision impact: Raw return champion is `expanded_110_latest_tail_full` / `codex_lagged_leaf_router_grid:h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_exact_unscaled` with OOS comp `+159.83%`, ann approx `+214.51%`, Sharpe `1.881`, PF `23.635`, max OOS MDD `27.69%`, hit `4/10`. Risk-trimmed fallback is second with comp `+138.11%` and max OOS MDD `23.58%`. All evidence remains backtest/shadow-paper only; no real-money approval.
+- Staleness/recheck: Recheck after additional post-2026-06-28 data, runner logic changes, symbol universe changes, or cost/fill telemetry updates. / `True`
+- Do-not-repeat note: Do not infer freshness from directory partitions or stale runner state; use direct parquet timestamp audit before claiming latest-data coverage.
+
 ## Strategy chronology
 
 ### 2026-03-02 — raw_first_live_data_foundation

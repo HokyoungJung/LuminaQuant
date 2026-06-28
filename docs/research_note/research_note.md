@@ -1,5 +1,35 @@
 # Research Note
 
+## 2026-06-28 KST — 최신 데이터 포함 전체 WF 재평가 정정
+
+사용자 지적대로 "데이터가 있는데 2026-06-21까지만 본" 것은 데이터 부재가 아니라 검증 오류였다. `date=` partition/이전 runner 상태를 최신성 근거로 착각하지 않고, 이번에는 실제 1m parquet `datetime.max()` 기준으로 커버리지를 재확인했다.
+
+데이터 커버리지:
+- historical 85 universe: 85/85 symbols, missing 0, direct 1m parquet 최신 timestamp `2026-06-28T10:09:00Z`.
+- expanded 110 universe: 110/110 symbols, missing 0, direct 1m parquet 최신 timestamp `2026-06-28T10:09:00Z`.
+- 월별 walk-forward runner는 30m 완료 bar 기준이라 최신 OOS 산출 끝점은 `2026-06-28T09:30:00Z`.
+
+평가 방식:
+- 기존 historical best artifact의 닫힌 OOS folds `2025-09`~`2026-05`는 그대로 유지했다.
+- 최신 데이터 영향을 받는 `2026-06` fold만 repo runner로 재실행한 뒤, 기존 10-fold 전체 성적표에 삽입해 comp/ann/Sharpe/PF/MDD/hit을 재계산했다.
+- 최신 fold train: `2025-01-01T00:00:00`~`2026-03-31T23:30:00`, validation: `2026-04-01T00:00:00`~`2026-05-31T23:30:00`, OOS: `2026-06-01T00:00:00`~`2026-06-28T09:30:00`.
+- June selected leaf는 `relaxed_efficiency:aggressive_mdd30_gross10_69_asset_relaxed_efficiency_repair_optuna`로 유지했다.
+
+최신 반영 결과:
+- 최종 1등: `expanded_110_latest_tail_full` / `codex_lagged_leaf_router_grid:h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_exact_unscaled`.
+- 전체 OOS comp `+159.83%`, annualized approx `+214.51%`, monthly Sharpe `1.881`, PF `23.635`, max intra-fold OOS MDD `27.69%`, monthly equity MDD `5.09%`, hit `4/10`.
+- risk-trimmed `fallback_mdd20_cap2`는 comp `+138.11%`, annualized approx `+183.23%`, Sharpe `1.783`, PF `21.454`, max intra-fold OOS MDD `23.58%`, hit `4/10`.
+- 기존 85-symbol preregistered exact는 최신 June fold에서 return `+24.76%`, MDD `30.47%`가 되어 전체 comp `+125.13%`, Sharpe `2.506`, hit `5/10`로 내려갔다.
+
+산출물:
+- Summary: `var/reports/manual_reval_20260628_overall_latest_included_rerun/manual_overall_latest_included_summary_latest.md|json`.
+- June 85 rerun: `var/reports/manual_reval_20260628_monthly_refit_june_latest_rerun85/june_latest_85_relaxed_efficiency_wf_latest.md|json`.
+- June 110 rerun: `var/reports/manual_reval_20260628_monthly_refit_june_latest_rerun110/june_latest_110_relaxed_efficiency_wf_latest.md|json`.
+
+판단:
+- "전체 성적에 최신 데이터까지 반영" 기준의 raw return champion은 expanded 110 exact-unscaled로 바뀌었다.
+- 단, 이전과 동일하게 backtest/shadow-paper evidence일 뿐이며 `ready_for_real=false` 판단은 유지한다. 실거래 승격에는 fresh-forward shadow, fill/slippage/funding/reconciliation telemetry가 필요하다.
+
 ## 2026-06-21 KST — H35 executable shadow/testnet adoption checkpoint
 
 H35를 현재 공격형 운영 후보의 기준 포트폴리오로 채택했다. 기존 `H35_return_overlay_80_20`은 nested/report-only였으나 leaf-level executable manifest로 분해했고, live/backtest 공통 `manifest:` portfolio-mode resolver가 이 manifest를 읽어 `ArtifactPortfolioModeStrategy`로 실행할 수 있다. 기준 manifest는 `var/reports/current_top_models/executable_shadow_manifests/h35_return_overlay_80_20_leaf_manifest_latest.json`이다.

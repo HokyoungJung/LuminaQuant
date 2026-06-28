@@ -18,6 +18,7 @@ Canonical research-note directory. Use this stable name instead of strategy/date
 
 ## Latest diary index
 
+- 2026-06-28 KST — 최신 데이터 포함 전체 WF 재평가 정정; 85/110 universes to 2026-06-28T10:09Z, full 10-fold ranking updated.
 - 2026-06-21 KST — H35 executable shadow/testnet adoption checkpoint, fresh-forward evidence, and live decision template.
 
 - 2026-05-28 KST — standardized live refits on refreshed data, latest 8 complete weeks as validation, Optuna full-parameter tuning, and train+validation final refit.
