@@ -554,6 +554,11 @@ def _run_backtest(
     final_total = _safe_float(backtest.portfolio.current_holdings.get("total"), first_total)
     total_return = final_total / first_total - 1.0 if first_total > 0 else 0.0
     fast_stats = dict(backtest.portfolio.output_summary_stats_fast() or {})
+    max_drawdown = _safe_float(fast_stats.get("max_drawdown"))
+    min_total = min((_safe_float(value, final_total) for value in totals), default=final_total)
+    equity_breach = bool(
+        min_total <= 0.0 or final_total <= 0.0 or total_return <= -1.0 or max_drawdown > 1.0
+    )
     return {
         "status": "pass",
         "strategy": strategy,
@@ -570,6 +575,9 @@ def _run_backtest(
         "orders": int(getattr(backtest, "orders", 0)),
         "fills": int(getattr(backtest, "fills", 0)),
         "fast_stats": fast_stats,
+        "min_equity": min_total,
+        "equity_breach": equity_breach,
+        "risk_screen_status": "equity_breach" if equity_breach else "pass",
     }
 
 
@@ -868,6 +876,15 @@ def run_latest_alpha_sleeve_backtests(args: argparse.Namespace) -> dict[str, Any
             result["tier"] = get_strategy_tier(spec.strategy)
             result["benchmark_return_first_symbol"] = _benchmark_return(audits)
             result["feature_audit_status"] = feature_status
+            if bool(result.get("equity_breach")):
+                message = "equity_breach_invalidates_performance_ranking"
+                result["status"] = "excluded"
+                result["error"] = message
+                result["exclusion_reason"] = (
+                    "equity path reached <=0 or max drawdown exceeded 100%; "
+                    "this is a bankruptcy/risk-model breach, not a valid performance winner"
+                )
+                issues.append({"severity": "warn", "scope": spec.strategy, "message": message})
             result["zero_trade_reason"] = _zero_trade_reason(result)
             strategy_results.append(result)
         except Exception as exc:

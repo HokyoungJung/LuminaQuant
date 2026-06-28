@@ -19,6 +19,7 @@ from lumina_quant.core.order_policy import (
 )
 from lumina_quant.market_data import normalize_timeframe_token, timeframe_to_milliseconds
 from lumina_quant.risk_manager import RiskManager
+from lumina_quant.portfolio.strategy_quality import StrategyQualityOverlay
 from lumina_quant.services.portfolio import PortfolioPerformanceService, PortfolioSizingService
 
 
@@ -127,6 +128,7 @@ class Portfolio:
         self.trading_frozen = False
         self.component_positions = {}
 
+        self.strategy_quality = StrategyQualityOverlay(config)
         # Initialize first record
         self.update_initial_record()
 
@@ -174,6 +176,7 @@ class Portfolio:
             "equity_points": list(self._equity_points),
             "component_positions": self.component_positions,
             "last_sample_timestamp_ms": self._last_sample_timestamp_ms,
+            "strategy_quality": self.strategy_quality.get_state(),
             "current_day": self._current_day,
             "day_start_equity": self.day_start_equity,
         }
@@ -218,6 +221,8 @@ class Portfolio:
                 )
             except Exception:
                 self._last_sample_timestamp_ms = None
+        if "strategy_quality" in state and isinstance(state["strategy_quality"], dict):
+            self.strategy_quality.set_state(state["strategy_quality"])
         if "current_day" in state:
             self._current_day = state.get("current_day")
         if "day_start_equity" in state:
@@ -263,6 +268,7 @@ class Portfolio:
         _ = event
         primary_symbol = self.symbol_list[0]
         latest_datetime = self.bars.get_latest_bar_datetime(primary_symbol)
+        self.strategy_quality.next_bar(latest_datetime)
         should_sample = self._should_sample(latest_datetime)
         self._update_day_boundary(latest_datetime)
         self._apply_funding(latest_datetime)
@@ -475,6 +481,15 @@ class Portfolio:
 
     def update_fill(self, event):
         if event.type == "FILL":
+            old_qty = float(self.current_positions.get(event.symbol, 0.0) or 0.0)
+            fill_dir = 1.0 if event.direction == "BUY" else -1.0
+            new_qty = old_qty + fill_dir * float(event.quantity)
+            fill_price = (
+                float(event.fill_cost) / float(event.quantity)
+                if event.fill_cost is not None and float(event.quantity) > 0.0
+                else float(self.bars.get_latest_bar_value(event.symbol, "close") or 0.0)
+            )
+            self.strategy_quality.note_fill(event, old_qty, new_qty, fill_price)
             self.update_positions_from_fill(event)
             self.update_holdings_from_fill(event)
             self.trade_count += 1
@@ -1028,6 +1043,17 @@ class Portfolio:
         current_price = self.bars.get_latest_bar_value(symbol, "close")
         if current_price == 0:
             return None
+        quality_decision = self.strategy_quality.apply(
+            signal,
+            bars=self.bars,
+            current_price=float(current_price),
+            current_equity=float(self.current_holdings.get("total", self.initial_capital)),
+        )
+        if quality_decision.signal is None:
+            return None
+        signal = quality_decision.signal
+        symbol = signal.symbol
+        direction = signal.signal_type
 
         position_side = signal.position_side
         if direction == "LONG":

@@ -5,6 +5,9 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 
 
+BPS_PER_UNIT = 10_000.0
+
+
 @dataclass(slots=True)
 class CostModelParams:
     spread_bps: float = 4.0

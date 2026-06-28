@@ -139,6 +139,92 @@ def test_refresh_symbol_raw_first_ohlcv_derives_from_stored_raw_aggtrades(
     assert result.derived_ohlcv_rows_upserted >= 2
 
 
+def test_refresh_symbol_raw_first_ohlcv_repairs_raw_ahead_of_ohlcv_gap(
+    tmp_path: Path, monkeypatch
+) -> None:
+    repo = ParquetMarketDataRepository(str(tmp_path))
+    cutoff_dt = MODULE.parse_utc("2025-01-01T00:00:05Z")
+    floor_dt = MODULE.parse_utc("2025-01-01T00:00:00Z")
+    assert cutoff_dt is not None
+    assert floor_dt is not None
+
+    MODULE.upsert_ohlcv_rows_1s(
+        str(tmp_path),
+        exchange="binance",
+        symbol="TON/USDT",
+        rows=[
+            {
+                "datetime": "2025-01-01T00:00:00Z",
+                "open": 100.0,
+                "high": 100.0,
+                "low": 100.0,
+                "close": 100.0,
+                "volume": 1.0,
+            }
+        ],
+    )
+    repo.append_raw_aggtrades(
+        exchange="binance",
+        symbol="TON/USDT",
+        rows=[
+            {
+                "agg_trade_id": 10,
+                "timestamp_ms": 1_735_689_601_000,
+                "price": 101.0,
+                "quantity": 0.1,
+                "is_buyer_maker": False,
+            },
+            {
+                "agg_trade_id": 11,
+                "timestamp_ms": 1_735_689_603_500,
+                "price": 102.0,
+                "quantity": 0.2,
+                "is_buyer_maker": True,
+            },
+        ],
+    )
+
+    live_calls: list[dict[str, int]] = []
+    monkeypatch.setattr(MODULE, "_utc_today", lambda: date(2025, 1, 1))
+    monkeypatch.setattr(MODULE, "_supports_live_raw_symbol", lambda _symbol: True)
+    monkeypatch.setattr(
+        MODULE,
+        "_collect_live_raw_rows",
+        lambda **kwargs: live_calls.append(dict(kwargs)) or [],
+    )
+
+    result = MODULE.refresh_symbol_raw_first_ohlcv(
+        repo=repo,
+        symbol="TON/USDT",
+        db_path=str(tmp_path),
+        exchange_id="binance",
+        cutoff_dt=cutoff_dt,
+        floor_dt=floor_dt,
+        guard=None,
+    )
+
+    ohlcv = repo.load_ohlcv(
+        exchange="binance",
+        symbol="TON/USDT",
+        timeframe="1s",
+        start_date="2025-01-01T00:00:00Z",
+        end_date="2025-01-01T00:00:05Z",
+    )
+
+    assert result.before_ohlcv_max_utc == "2025-01-01T00:00:00Z"
+    assert result.before_raw_agg_trade_utc == "2025-01-01T00:00:03.500000Z"
+    assert result.after_ohlcv_max_utc == "2025-01-01T00:00:04Z"
+    assert result.live_tail_status == "empty"
+    assert result.source_mix == "existing_raw_or_no_trade_carry_recent_archive_cutover"
+    assert result.derived_ohlcv_rows_upserted >= 4
+    assert result.existing_raw_gap_ohlcv_rows_upserted >= 2
+    assert result.post_live_existing_raw_ohlcv_rows_upserted >= 2
+    assert result.carry_forward_no_trade_ohlcv_rows_upserted == 0
+    assert live_calls and live_calls[0]["start_ms"] == 1_735_689_603_501
+    assert ohlcv.height == 5
+    assert ohlcv.get_column("close").to_list() == [100.0, 101.0, 101.0, 102.0, 102.0]
+
+
 def test_collect_live_raw_rows_reduces_limit_after_rate_limit(monkeypatch) -> None:
     class _Exchange:
         def close(self):
@@ -464,6 +550,9 @@ def test_build_source_skew_summary_flags_unsupported_and_slowest_symbols() -> No
                 live_raw_rows_upserted=1,
                 live_tail_status="fetched",
                 derived_ohlcv_rows_upserted=1,
+                existing_raw_gap_ohlcv_rows_upserted=0,
+                post_live_existing_raw_ohlcv_rows_upserted=0,
+                carry_forward_no_trade_ohlcv_rows_upserted=0,
                 source_mix="live_only",
                 stage_timings_seconds={"live_fetch": 12.0, "total_refresh": 13.0},
             ),
@@ -484,6 +573,9 @@ def test_build_source_skew_summary_flags_unsupported_and_slowest_symbols() -> No
                 live_raw_rows_upserted=0,
                 live_tail_status="skipped_unsupported_symbol",
                 derived_ohlcv_rows_upserted=0,
+                existing_raw_gap_ohlcv_rows_upserted=0,
+                post_live_existing_raw_ohlcv_rows_upserted=0,
+                carry_forward_no_trade_ohlcv_rows_upserted=0,
                 source_mix="noop_recent_archive_cutover",
                 stage_timings_seconds={"total_refresh": 0.5},
             ),

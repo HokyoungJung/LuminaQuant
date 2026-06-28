@@ -27,6 +27,7 @@ from lumina_quant.data.support_inventory import (
     write_strategy_support_inventory,
 )
 from lumina_quant.data.raw_first_lineage import (
+    latest_complete_bucket_start_ms,
     raw_aggtrades_to_1s_frame,
     resolve_raw_aggtrades_backend_name,
 )
@@ -113,6 +114,9 @@ class OhlcvRefreshResult:
     live_raw_rows_upserted: int
     live_tail_status: str
     derived_ohlcv_rows_upserted: int
+    existing_raw_gap_ohlcv_rows_upserted: int
+    post_live_existing_raw_ohlcv_rows_upserted: int
+    carry_forward_no_trade_ohlcv_rows_upserted: int
     source_mix: str
     stage_timings_seconds: dict[str, float]
 
@@ -568,6 +572,101 @@ def _raw_checkpoint_utc(
     return latest
 
 
+def _derive_existing_raw_gap_to_ohlcv(
+    *,
+    repo: ParquetMarketDataRepository,
+    symbol: str,
+    db_path: str,
+    exchange_id: str,
+    start_ms: int,
+    end_ms: int,
+    previous_close: float | None,
+) -> tuple[int, datetime | None, float | None]:
+    if end_ms < start_ms:
+        return 0, None, previous_close
+    raw_frame = repo.load_raw_aggtrades(
+        exchange=str(exchange_id).lower(),
+        symbol=symbol,
+        start_date=datetime.fromtimestamp(int(start_ms) / 1000.0, tz=UTC).isoformat(),
+        end_date=datetime.fromtimestamp(int(end_ms) / 1000.0, tz=UTC).isoformat(),
+    )
+    if raw_frame.is_empty():
+        return 0, None, previous_close
+    derived_frame = raw_aggtrades_to_1s_frame(
+        raw_frame,
+        source=f"{exchange_id}:{symbol}:existing_raw_gap",
+        range_start_ms=int(start_ms),
+        range_end_ms=int(end_ms),
+        previous_close=previous_close,
+        complete_through_ms=int(end_ms),
+    )
+    if derived_frame.is_empty():
+        return 0, None, previous_close
+    upserted = upsert_ohlcv_rows_1s(
+        db_path,
+        exchange=str(exchange_id).lower(),
+        symbol=symbol,
+        rows=derived_frame,
+    )
+    last_dt = _as_utc(derived_frame.get_column("datetime")[-1])
+    last_close = float(derived_frame.get_column("close")[-1])
+    return int(upserted), last_dt, last_close
+
+
+def _carry_forward_no_trade_gap_to_ohlcv(
+    *,
+    symbol: str,
+    db_path: str,
+    exchange_id: str,
+    start_ms: int,
+    end_ms: int,
+    previous_close: float | None,
+) -> tuple[int, datetime | None]:
+    if previous_close is None or end_ms < start_ms:
+        return 0, None
+    last_complete_ms = latest_complete_bucket_start_ms(
+        timeframe="1s",
+        complete_through_ms=int(end_ms),
+    )
+    if last_complete_ms is None:
+        return 0, None
+    start_second_ms = (int(start_ms) // 1000) * 1000
+    if int(last_complete_ms) < start_second_ms:
+        return 0, None
+    buckets = pl.DataFrame(
+        {
+            "bucket_ms": pl.int_range(
+                start_second_ms,
+                int(last_complete_ms) + 1000,
+                step=1000,
+                eager=True,
+            )
+        }
+    )
+    if buckets.is_empty():
+        return 0, None
+    frame = buckets.with_columns(
+        [
+            pl.from_epoch("bucket_ms", time_unit="ms")
+            .dt.replace_time_zone(None)
+            .cast(pl.Datetime(time_unit="ms"))
+            .alias("datetime"),
+            pl.lit(float(previous_close)).cast(pl.Float64).alias("open"),
+            pl.lit(float(previous_close)).cast(pl.Float64).alias("high"),
+            pl.lit(float(previous_close)).cast(pl.Float64).alias("low"),
+            pl.lit(float(previous_close)).cast(pl.Float64).alias("close"),
+            pl.lit(0.0).cast(pl.Float64).alias("volume"),
+        ]
+    ).select(["datetime", "open", "high", "low", "close", "volume"])
+    upserted = upsert_ohlcv_rows_1s(
+        db_path,
+        exchange=str(exchange_id).lower(),
+        symbol=symbol,
+        rows=frame,
+    )
+    return int(upserted), _as_utc(frame.get_column("datetime")[-1])
+
+
 def _archive_rows_to_raw_aggtrades(
     zip_blob: bytes,
     *,
@@ -793,6 +892,9 @@ def refresh_symbol_raw_first_ohlcv(
     live_raw_rows_fetched = 0
     live_raw_rows_upserted = 0
     derived_ohlcv_rows_upserted = 0
+    existing_raw_gap_ohlcv_rows_upserted = 0
+    post_live_existing_raw_ohlcv_rows_upserted = 0
+    carry_forward_no_trade_ohlcv_rows_upserted = 0
     archive_cutover_to_live = False
     live_tail_status = "not_needed"
     stage_timings_seconds: dict[str, float] = {}
@@ -801,6 +903,35 @@ def refresh_symbol_raw_first_ohlcv(
     live_start_ms = cursor_ms
     if before_raw_dt is not None:
         live_start_ms = max(live_start_ms, int(before_raw_dt.timestamp() * 1000) + 1)
+    if before_raw_dt is not None and cursor_ms <= cutoff_ms:
+        raw_gap_end_ms = min(cutoff_ms, int(before_raw_dt.timestamp() * 1000))
+        if cursor_ms <= raw_gap_end_ms:
+            started_at = time.perf_counter()
+            (
+                existing_raw_upserted,
+                existing_raw_after_dt,
+                previous_close,
+            ) = _derive_existing_raw_gap_to_ohlcv(
+                repo=repo,
+                symbol=symbol,
+                db_path=db_path,
+                exchange_id=exchange_id,
+                start_ms=cursor_ms,
+                end_ms=raw_gap_end_ms,
+                previous_close=previous_close,
+            )
+            _record_stage_duration(
+                stage_timings_seconds,
+                "derive_existing_raw_gap",
+                started_at,
+            )
+            if existing_raw_upserted > 0:
+                derived_ohlcv_rows_upserted += existing_raw_upserted
+                existing_raw_gap_ohlcv_rows_upserted += existing_raw_upserted
+                after_max_utc = existing_raw_after_dt or after_max_utc
+                raw_checkpoint_next_ms = int(before_raw_dt.timestamp() * 1000) + 1
+                cursor_ms = max(cursor_ms, min(cutoff_ms + 1, raw_checkpoint_next_ms))
+                live_start_ms = max(live_start_ms, raw_checkpoint_next_ms)
 
     if cursor_ms <= cutoff_ms:
         for day_value in _iter_days(cursor_ms, cutoff_ms):
@@ -968,6 +1099,66 @@ def refresh_symbol_raw_first_ohlcv(
                         },
                     )
 
+    cutoff_complete_ms = latest_complete_bucket_start_ms(
+        timeframe="1s",
+        complete_through_ms=cutoff_ms,
+    )
+    after_max_ms = int(after_max_utc.timestamp() * 1000) if after_max_utc is not None else -1
+
+    if (
+        live_tail_status == "empty"
+        and cutoff_complete_ms is not None
+        and after_max_ms < int(cutoff_complete_ms)
+    ):
+        post_live_gap_start_ms = (
+            int(after_max_ms) + 1000 if after_max_ms >= 0 else int(live_start_ms)
+        )
+        started_at = time.perf_counter()
+        (
+            post_live_raw_upserted,
+            post_live_raw_after_dt,
+            previous_close,
+        ) = _derive_existing_raw_gap_to_ohlcv(
+            repo=repo,
+            symbol=symbol,
+            db_path=db_path,
+            exchange_id=exchange_id,
+            start_ms=post_live_gap_start_ms,
+            end_ms=cutoff_ms,
+            previous_close=previous_close,
+        )
+        _record_stage_duration(
+            stage_timings_seconds,
+            "derive_existing_raw_after_empty_live",
+            started_at,
+        )
+        if post_live_raw_upserted > 0:
+            derived_ohlcv_rows_upserted += post_live_raw_upserted
+            post_live_existing_raw_ohlcv_rows_upserted += post_live_raw_upserted
+            after_max_utc = post_live_raw_after_dt or after_max_utc
+            after_max_ms = (
+                int(after_max_utc.timestamp() * 1000) if after_max_utc is not None else -1
+            )
+        if previous_close is not None and after_max_ms < int(cutoff_complete_ms):
+            carry_start_ms = max(0, int(after_max_ms) + 1000)
+            started_at = time.perf_counter()
+            carried_upserted, carried_after_dt = _carry_forward_no_trade_gap_to_ohlcv(
+                symbol=symbol,
+                db_path=db_path,
+                exchange_id=exchange_id,
+                start_ms=carry_start_ms,
+                end_ms=cutoff_ms,
+                previous_close=previous_close,
+            )
+            _record_stage_duration(
+                stage_timings_seconds,
+                "carry_forward_no_trade_gap",
+                started_at,
+            )
+            if carried_upserted > 0:
+                derived_ohlcv_rows_upserted += carried_upserted
+                carry_forward_no_trade_ohlcv_rows_upserted += carried_upserted
+                after_max_utc = carried_after_dt or after_max_utc
     refreshed_repo = ParquetMarketDataRepository(str(db_path))
     after_raw_dt = _raw_checkpoint_utc(
         refreshed_repo,
@@ -981,7 +1172,7 @@ def refresh_symbol_raw_first_ohlcv(
     elif live_raw_rows_upserted > 0 and archive_raw_rows_upserted <= 0:
         source_mix = "live_only"
     elif archive_raw_rows_upserted <= 0 and live_raw_rows_upserted <= 0:
-        source_mix = "noop"
+        source_mix = "existing_raw_or_no_trade_carry" if derived_ohlcv_rows_upserted > 0 else "noop"
     stage_timings_seconds["total_refresh"] = max(
         0.0,
         time.perf_counter() - refresh_started_at,
@@ -1003,6 +1194,9 @@ def refresh_symbol_raw_first_ohlcv(
         live_raw_rows_upserted=live_raw_rows_upserted,
         live_tail_status=live_tail_status,
         derived_ohlcv_rows_upserted=derived_ohlcv_rows_upserted,
+        existing_raw_gap_ohlcv_rows_upserted=existing_raw_gap_ohlcv_rows_upserted,
+        post_live_existing_raw_ohlcv_rows_upserted=(post_live_existing_raw_ohlcv_rows_upserted),
+        carry_forward_no_trade_ohlcv_rows_upserted=(carry_forward_no_trade_ohlcv_rows_upserted),
         source_mix=source_mix
         if not archive_cutover_to_live
         else f"{source_mix}_recent_archive_cutover",

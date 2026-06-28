@@ -46,6 +46,7 @@ class BacktestConfigView:
         lv = runtime.live
         mw = runtime.market_window
         sys_ = runtime.system
+        sq = runtime.strategy_quality
 
         # System
         self.LOG_LEVEL = sys_.log_level
@@ -146,3 +147,36 @@ class BacktestConfigView:
         # Market window
         self.MARKET_WINDOW_PARITY_V2_ENABLED = bool(mw.parity_v2_enabled)
         self.MARKET_WINDOW_METRICS_LOG_PATH = str(mw.metrics_log_path)
+
+        # Strategy quality overlays
+        self.STRATEGY_QUALITY_ENABLED = bool(sq.enabled)
+        self.STRATEGY_QUALITY_EDGE_GATE_ENABLED = bool(sq.edge_gate_enabled)
+        self.STRATEGY_QUALITY_MIN_EXPECTED_EDGE_BPS = float(sq.min_expected_edge_bps)
+        self.STRATEGY_QUALITY_EDGE_COST_BUFFER_BPS = float(sq.edge_cost_buffer_bps)
+        self.STRATEGY_QUALITY_ALLOW_UNKNOWN_EDGE = bool(sq.allow_unknown_edge)
+        self.STRATEGY_QUALITY_REGIME_ROUTER_ENABLED = bool(sq.regime_router_enabled)
+        self.STRATEGY_QUALITY_REGIME_LOOKBACK_BARS = int(sq.regime_lookback_bars)
+        self.STRATEGY_QUALITY_TREND_RETURN_BPS = float(sq.trend_return_bps)
+        self.STRATEGY_QUALITY_PANIC_RETURN_BPS = float(sq.panic_return_bps)
+        self.STRATEGY_QUALITY_LOW_LIQUIDITY_VOLUME_RATIO = float(sq.low_liquidity_volume_ratio)
+        self.STRATEGY_QUALITY_POSITION_SIZING_ENABLED = bool(sq.position_sizing_enabled)
+        self.STRATEGY_QUALITY_TARGET_VOL_PER_BAR = float(sq.target_vol_per_bar)
+        self.STRATEGY_QUALITY_MIN_POSITION_SCALE = float(sq.min_position_scale)
+        self.STRATEGY_QUALITY_MAX_POSITION_SCALE = float(sq.max_position_scale)
+        self.STRATEGY_QUALITY_TURNOVER_BUDGET_ENABLED = bool(sq.turnover_budget_enabled)
+        self.STRATEGY_QUALITY_MAX_DAILY_TURNOVER_PCT = float(sq.max_daily_turnover_pct)
+        self.STRATEGY_QUALITY_EXIT_OVERLAY_ENABLED = bool(sq.exit_overlay_enabled)
+        self.STRATEGY_QUALITY_ATR_WINDOW_BARS = int(sq.atr_window_bars)
+        self.STRATEGY_QUALITY_ATR_STOP_MULT = float(sq.atr_stop_mult)
+        self.STRATEGY_QUALITY_ATR_TAKE_PROFIT_MULT = float(sq.atr_take_profit_mult)
+        self.STRATEGY_QUALITY_TRAILING_ATR_MULT = float(sq.trailing_atr_mult)
+        self.STRATEGY_QUALITY_MIN_STOP_BPS = float(sq.min_stop_bps)
+        self.STRATEGY_QUALITY_MAX_STOP_BPS = float(sq.max_stop_bps)
+        self.STRATEGY_QUALITY_STRATEGY_HEALTH_ENABLED = bool(sq.strategy_health_enabled)
+        self.STRATEGY_QUALITY_HEALTH_WINDOW_TRADES = int(sq.health_window_trades)
+        self.STRATEGY_QUALITY_MIN_HEALTH_SCALE = float(sq.min_health_scale)
+        self.STRATEGY_QUALITY_LOSS_COOLDOWN_BARS = int(sq.loss_cooldown_bars)
+        self.STRATEGY_QUALITY_PROFIT_MOONSHOT_CONFLICT_COOLDOWN_BARS = int(
+            sq.profit_moonshot_conflict_cooldown_bars
+        )
+        self.STRATEGY_QUALITY_PAIR_MIN_CORRELATION = float(sq.pair_min_correlation)

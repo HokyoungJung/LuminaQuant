@@ -85,3 +85,58 @@ validation:
 data:
   kinds: [ohlcv, funding, feature_points] # ohlcv|funding|feature_points|aggtrades_tick
   tick_path: "" # "" => storage default
+
+# Existing-strategy quality overlays. Disabled by default until a profile is
+# backtest-qualified; enable per research/live profile after validation.
+strategy_quality:
+  enabled: false
+  edge_gate_enabled: true
+  min_expected_edge_bps: 8.0
+  edge_cost_buffer_bps: 3.0
+  regime_router_enabled: true
+  position_sizing_enabled: true
+  turnover_budget_enabled: true
+  max_daily_turnover_pct: 3.0
+  exit_overlay_enabled: true
+  strategy_health_enabled: true
+  pair_min_correlation: 0.35
+
+# External DeepLearning sidecar. This only defines artifact/command format;
+# `lq deep-learning plan` writes a manifest and never starts training.
+deep_learning:
+  enabled: false
+  repo_path: "../../DeepLearning"
+  config_path: "configs/config.yaml"
+  feature_matrix_path: "var/data/deeplearning/features"
+  prediction_path: "var/data/deeplearning/predictions"
+  manifest_path: "var/data/deeplearning/pipeline_manifest.json"
+  training_state_path: "var/data/deeplearning/training_state.json"
+  models: ["FITS", "CycleNet", "CMamba", "PatchTST"]
+  freq: "" # "" => trading.timeframe
+  target_suffix: "close"
+  seq_len: 120
+  pred_len: 30
+  total_pred: 120
+  gpus: "[]"
+  hpo_enabled: false
+  hpo_trials: 20
+  # GPU parallel training is allowed only when free VRAM is enough, GPU utilization is low,
+  # and the input pipeline is not the bottleneck. Model size alone is not the criterion.
+  gpu_parallel_jobs: 1
+  gpu_parallel_min_free_vram_gb: 2.0
+  gpu_parallel_max_utilization_pct: 85.0
+  # Treat shuffle train/val HPO as candidate search; select stable top trials, then run
+  # one chronological pre-test sanity check before final train+val refit and future test.
+  hpo_top_trial_fraction: 0.10
+  hpo_min_top_trials: 5
+  hpo_max_train_val_gap: 0.15
+  hpo_boundary_tolerance: 0.02
+  chronological_sanity_check: true
+  chronological_sanity_val_fraction: 0.20
+  chronological_sanity_max_relative_drop: 0.25
+  partial_hpo_trials: 5
+  min_model_coverage: 2
+  entry_threshold_bps: 10.0
+  min_model_agreement: 0.75
+  max_dispersion_bps: 80.0
+  target_allocation: 0.05

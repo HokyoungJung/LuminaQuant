@@ -1,0 +1,1489 @@
+{
+  "source": "https://github.com/k-dense-ai/scientific-agent-skills",
+  "source_commit": "9c9bd2e92af12311ecd0c1a643e0931643f9ea04",
+  "reviewed_skill_count": 147,
+  "tier_counts": {
+    "A": 22,
+    "B": 24,
+    "C": 27,
+    "D": 74
+  },
+  "tier_legend": {
+    "A": "absorbed into default LuminaQuant alpha-research pipeline",
+    "B": "conditional alpha method/tool",
+    "C": "supporting research/reporting/infrastructure skill",
+    "D": "reviewed and excluded by default"
+  },
+  "skills": [
+    {
+      "skill": "adaptyv",
+      "declared_name": "adaptyv",
+      "tier": "D",
+      "category": "excluded-chemistry",
+      "alpha_use": "Reviewed; chemistry/drug-discovery workflow is not a default LuminaQuant alpha source.",
+      "description": "How to use the Adaptyv Bio Foundry API and Python SDK for protein experiment design, submission, and results retrieval. Use this skill whenever the user mentions Adaptyv, Foundry API, protein binding assays, protein screening experiments, BLI/SPR assays, thermostability assays, or wants to submit protein sequences for experimental characterization. Also trigger when code imports `adaptyv`, `adaptyv_sdk`, or `FoundryClient`, or references `foundry-api-public.adaptyvbio.com`.",
+      "compatibility": "Requires Python 3.10+, an Adaptyv Foundry account, and an API key from foundry.adaptyvbio.com. Install adaptyv-sdk from GitHub with uv pip install.",
+      "reference_count": 1
+    },
+    {
+      "skill": "aeon",
+      "declared_name": "aeon",
+      "tier": "A",
+      "category": "time-series-ml",
+      "alpha_use": "Time-series classification, anomaly detection, segmentation, motifs, similarity search, and temporal features.",
+      "description": "This skill should be used for time series machine learning tasks including classification, regression, clustering, forecasting, anomaly detection, segmentation, and similarity search. Use when working with temporal data, sequential patterns, or time-indexed observations requiring specialized algorithms beyond standard ML approaches. Particularly suited for univariate and multivariate time series analysis with scikit-learn compatible APIs.",
+      "compatibility": "Requires Python 3.10+ and the aeon package (uv pip install). Optional aeon[all_extras] for deep learning and extended dependencies.",
+      "reference_count": 11
+    },
+    {
+      "skill": "anndata",
+      "declared_name": "anndata",
+      "tier": "D",
+      "category": "excluded-biomedical",
+      "alpha_use": "Reviewed; biomedical/genomics workflow is not a default LuminaQuant alpha source.",
+      "description": "Data structure for annotated matrices in single-cell analysis. Use when working with .h5ad files or integrating with the scverse ecosystem. This is the data format skill—for analysis workflows use scanpy; for probabilistic models use scvi-tools; for population-scale queries use cellxgene-census.",
+      "compatibility": "Requires Python 3.11+ and uv. Examples target AnnData 0.12.16, with experimental APIs clearly marked where used.",
+      "reference_count": 5
+    },
+    {
+      "skill": "arbor",
+      "declared_name": "arbor",
+      "tier": "A",
+      "category": "optimization-loop",
+      "alpha_use": "Run hypothesis-tree refinement over concrete alpha artifacts with dev/test split discipline.",
+      "description": "Autonomously improve a real artifact (code, training recipe, agent harness, data pipeline, prompt) against an objective and an evaluator, using Hypothesis Tree Refinement (HTR) from the Arbor paper. Use this whenever someone wants to iteratively optimize something over many experiments without overfitting — e.g. \"get my model's eval score up\", \"improve this agent/harness\", \"tune this pipeline\", \"beat the baseline on this benchmark\", \"run a search over approaches and keep the best\", \"do an MLE-bench / Kaggle-style optimization\", or any long-horizon \"make this artifact better and don't just memorize the dev set\" task. Trigger it even when the user doesn't say \"Arbor\" or \"hypothesis tree\" but describes repeated experiment-and-evaluate loops, branching exploration of competing ideas, or worries about a dev/test gap. Runs Claude itself as the coordinator with subagent executors in isolated git worktrees; for the standalone `arbor` CLI tool see references/arbor-upstream.md.",
+      "compatibility": "",
+      "reference_count": 4
+    },
+    {
+      "skill": "arboreto",
+      "declared_name": "arboreto",
+      "tier": "D",
+      "category": "excluded-lab",
+      "alpha_use": "Reviewed; lab automation/integration workflow is not a default LuminaQuant alpha source.",
+      "description": "Infer gene regulatory networks (GRNs) from gene expression data using scalable algorithms (GRNBoost2, GENIE3). Use when analyzing transcriptomics data (bulk RNA-seq, single-cell RNA-seq) to identify transcription factor-target gene relationships and regulatory interactions. Supports distributed computation for large-scale datasets.",
+      "compatibility": "",
+      "reference_count": 3
+    },
+    {
+      "skill": "astropy",
+      "declared_name": "astropy",
+      "tier": "D",
+      "category": "excluded-astronomy",
+      "alpha_use": "Astronomy workflows not default alpha research.",
+      "description": "Core Python library for astronomy and astrophysics workflows that need Astropy APIs, including units/quantities, coordinates, FITS I/O, tables, time systems, WCS, and cosmology. Use when implementing or debugging astronomical data analysis code with Astropy.",
+      "compatibility": "Requires Python 3.11+ with astropy installed (uv for package installation). Some features (object name resolution, site lookups, remote FITS reads, IERS updates) need network access.",
+      "reference_count": 7
+    },
+    {
+      "skill": "autoskill",
+      "declared_name": "autoskill",
+      "tier": "C",
+      "category": "skill-evolution",
+      "alpha_use": "Derive new local skills from repeated alpha workflows after patterns stabilize.",
+      "description": "Observe the user's screen via screenpipe, detect repeated research workflows, match them against existing scientific-agent-skills, and draft new skills (or composition recipes that chain existing ones) for the patterns not yet covered. Use when the user asks to analyze their recent work and propose skills based on what they actually do. Requires the screenpipe daemon (https://github.com/screenpipe/screenpipe) running locally on port 3030 — the skill has no other data source and will refuse to run if screenpipe is unreachable. All detection runs locally; only redacted cluster summaries reach the LLM.",
+      "compatibility": "",
+      "reference_count": 1
+    },
+    {
+      "skill": "benchling-integration",
+      "declared_name": "benchling-integration",
+      "tier": "D",
+      "category": "excluded-lab",
+      "alpha_use": "Reviewed; lab automation/integration workflow is not a default LuminaQuant alpha source.",
+      "description": "Benchling Python SDK and REST API integration for registry entities, inventory, ELN entries, workflows, Benchling Apps, and Data Warehouse queries. Use when automating lab data with benchling-sdk or the v2 API.",
+      "compatibility": "Requires a Benchling account, tenant URL, and API key or OAuth app credentials. Install benchling-sdk with uv pip install.",
+      "reference_count": 4
+    },
+    {
+      "skill": "bgpt-paper-search",
+      "declared_name": "bgpt-paper-search",
+      "tier": "B",
+      "category": "literature",
+      "alpha_use": "Structured paper extraction where available; useful for evidence fields, not required.",
+      "description": "Search scientific papers and retrieve structured experimental data extracted from full-text studies via the BGPT MCP server. Returns 25+ fields per paper including methods, results, sample sizes, quality scores, and conclusions. Use for literature reviews, evidence synthesis, and finding experimental details not available in abstracts alone.",
+      "compatibility": "Requires the BGPT MCP server configured in the agent host (npx mcp-remote or npx bgpt-mcp), internet access to bgpt.pro, and an optional BGPT API key for paid usage.",
+      "reference_count": 0
+    },
+    {
+      "skill": "bids",
+      "declared_name": "bids",
+      "tier": "D",
+      "category": "excluded-clinical",
+      "alpha_use": "Reviewed; clinical/medical workflow is not a default LuminaQuant alpha source.",
+      "description": "> Use this skill when working with Brain Imaging Data Structure (BIDS) datasets: organizing neuroscience and biomedical data (MRI, EEG, MEG, iEEG, PET, microscopy, NIRS, motion capture, EMG, MR spectroscopy, behavioral), querying BIDS layouts, validating compliance, converting DICOM to BIDS, writing metadata sidecars, or creating BIDS derivatives.",
+      "compatibility": "",
+      "reference_count": 3
+    },
+    {
+      "skill": "biopython",
+      "declared_name": "biopython",
+      "tier": "D",
+      "category": "excluded-chemistry",
+      "alpha_use": "Reviewed; chemistry/drug-discovery workflow is not a default LuminaQuant alpha source.",
+      "description": "Comprehensive molecular biology toolkit. Use for sequence manipulation, file parsing (FASTA/GenBank/PDB), phylogenetics, and programmatic NCBI/PubMed access (Bio.Entrez). Best for batch processing, custom bioinformatics pipelines, BLAST automation. For quick lookups use gget; for multi-service integration use bioservices.",
+      "compatibility": "Requires Python 3.10+, NumPy, and Biopython. Entrez and web BLAST examples require network access; local BLAST/MUSCLE examples require those command-line tools installed separately.",
+      "reference_count": 7
+    },
+    {
+      "skill": "bioservices",
+      "declared_name": "bioservices",
+      "tier": "D",
+      "category": "excluded-chemistry",
+      "alpha_use": "Reviewed; chemistry/drug-discovery workflow is not a default LuminaQuant alpha source.",
+      "description": "Unified Python interface to 40+ bioinformatics services. Use when querying multiple databases (UniProt, KEGG, ChEMBL, Reactome) in a single workflow with consistent API. Best for cross-database analysis, ID mapping across services. For quick single-database lookups use gget; for sequence/file manipulation use biopython.",
+      "compatibility": "Requires Python 3.9–3.12 and internet access to 40+ bioinformatics web APIs. NCBI BLAST requires a contact email (`NCBI_EMAIL` env var or explicit parameter).",
+      "reference_count": 3
+    },
+    {
+      "skill": "bulk-rnaseq",
+      "declared_name": "bulk-rnaseq",
+      "tier": "D",
+      "category": "excluded-biomedical",
+      "alpha_use": "Reviewed; biomedical/genomics workflow is not a default LuminaQuant alpha source.",
+      "description": "End-to-end bulk RNA-seq orchestrator — takes raw FASTQ reads through QC and trimming (FastQC, fastp/Trim Galore), alignment and quantification (STAR, Salmon, featureCounts), assembles a gene-level counts matrix, then hands off to differential expression (pydeseq2), pathway/GSEA enrichment (pathway-enrichment), and publication figures (scientific-visualization). Use whenever the user has bulk RNA-seq reads or quant output and wants a complete, reproducible differential-expression workflow — e.g. \"analyze my RNA-seq\", \"FASTQ to DESeq2\", \"run nf-core/rnaseq\", \"STAR/Salmon quantification\", \"build a counts matrix for DESeq2\", or \"go from reads to differentially expressed genes and enriched pathways\". Routes between an nf-core/rnaseq (Nextflow) path and a standalone STAR/Salmon path, and covers experimental design, strandedness, and QC gates. For single-cell RNA-seq use the scanpy skill instead.",
+      "compatibility": "",
+      "reference_count": 4
+    },
+    {
+      "skill": "cellxgene-census",
+      "declared_name": "cellxgene-census",
+      "tier": "D",
+      "category": "excluded-biomedical",
+      "alpha_use": "Reviewed; biomedical/genomics workflow is not a default LuminaQuant alpha source.",
+      "description": "Query the CZ CELLxGENE Census programmatically for versioned public single-cell and spatial transcriptomics data. Use when you need population-scale cell metadata, gene expression slices, Census summary counts, source H5AD URIs/downloads, embeddings, spatial Census data, or reference atlas comparisons across organisms, tissues, diseases, assays, and cell types. For analyzing your own local single-cell data use scanpy, anndata, or scvi-tools.",
+      "compatibility": "Requires Python >=3.10,<3.13. Examples target cellxgene-census 1.17.x and the 2025-11-08 stable LTS Census; spatial workflows need the spatial extra and TileDB-SOMA >=1.15.5. No authentication is required for public Census data.",
+      "reference_count": 2
+    },
+    {
+      "skill": "cirq",
+      "declared_name": "cirq",
+      "tier": "D",
+      "category": "excluded-quantum",
+      "alpha_use": "Reviewed; quantum computing workflow is not needed for current alpha discovery.",
+      "description": "Google quantum computing framework. Use when targeting Google Quantum AI hardware, designing noise-aware circuits, or running quantum characterization experiments. Best for Google hardware, noise modeling, and low-level circuit design. For IBM hardware use qiskit; for quantum ML with autodiff use pennylane; for physics simulations use qutip.",
+      "compatibility": "",
+      "reference_count": 6
+    },
+    {
+      "skill": "citation-management",
+      "declared_name": "citation-management",
+      "tier": "C",
+      "category": "provenance",
+      "alpha_use": "Citation quality, BibTeX, and source validation for literature-derived alphas.",
+      "description": "Comprehensive citation management for academic research. Search Google Scholar and PubMed for papers, extract accurate metadata, validate citations, and generate properly formatted BibTeX entries. This skill should be used when you need to find papers, verify citation information, convert DOIs to BibTeX, or ensure reference accuracy in scientific writing.",
+      "compatibility": "",
+      "reference_count": 5
+    },
+    {
+      "skill": "clinical-decision-support",
+      "declared_name": "clinical-decision-support",
+      "tier": "D",
+      "category": "excluded-clinical",
+      "alpha_use": "Reviewed; clinical/medical workflow is not a default LuminaQuant alpha source.",
+      "description": "Generate professional clinical decision support (CDS) documents for pharmaceutical and clinical research settings, including patient cohort analyses (biomarker-stratified with outcomes) and treatment recommendation reports (evidence-based guidelines with decision algorithms). Supports GRADE evidence grading, statistical analysis (hazard ratios, survival curves, waterfall plots), biomarker integration, and regulatory compliance. Outputs publication-ready LaTeX/PDF format optimized for drug development, clinical research, and evidence synthesis.",
+      "compatibility": "",
+      "reference_count": 7
+    },
+    {
+      "skill": "clinical-reports",
+      "declared_name": "clinical-reports",
+      "tier": "D",
+      "category": "excluded-clinical",
+      "alpha_use": "Reviewed; clinical/medical workflow is not a default LuminaQuant alpha source.",
+      "description": "Write comprehensive clinical reports including case reports (CARE guidelines), diagnostic reports (radiology/pathology/lab), clinical trial reports (ICH-E3, SAE, CSR), and patient documentation (SOAP, H&P, discharge summaries). Full support with templates, regulatory compliance (HIPAA, FDA, ICH-GCP), and validation tools.",
+      "compatibility": "",
+      "reference_count": 9
+    },
+    {
+      "skill": "cobrapy",
+      "declared_name": "cobrapy",
+      "tier": "D",
+      "category": "excluded-chemistry",
+      "alpha_use": "Reviewed; chemistry/drug-discovery workflow is not a default LuminaQuant alpha source.",
+      "description": "Constraint-based metabolic modeling (COBRA). FBA, FVA, gene knockouts, flux sampling, SBML models, for systems biology and metabolic engineering analysis.",
+      "compatibility": "Requires Python 3.9+ (cobra 0.30+ dropped 3.8). Install with uv pip install. GLPK (swiglpk) is the default solver; CPLEX/Gurobi optional. load_model fetches from bundled data, BiGG, or BioModels (network required for remote models).",
+      "reference_count": 2
+    },
+    {
+      "skill": "consciousness-council",
+      "declared_name": "consciousness-council",
+      "tier": "B",
+      "category": "multi-perspective-review",
+      "alpha_use": "Multi-perspective debate for stuck research directions; not evidence.",
+      "description": "Run a multi-perspective Mind Council deliberation on any question, decision, or creative challenge. Use this skill whenever the user wants diverse viewpoints, needs help making a tough decision, asks for a council/panel/board discussion, wants to explore a problem from multiple angles, requests devil's advocate analysis, or says things like \"what would different experts think about this\", \"help me think through this from all sides\", \"council mode\", \"mind council\", or \"deliberate on this\". Also trigger when the user faces a dilemma, trade-off, or complex choice with no obvious answer.",
+      "compatibility": "",
+      "reference_count": 1
+    },
+    {
+      "skill": "dask",
+      "declared_name": "dask",
+      "tier": "B",
+      "category": "distributed-data",
+      "alpha_use": "Larger-than-RAM or distributed research scans when Polars alone is insufficient.",
+      "description": "Distributed computing for larger-than-RAM pandas/NumPy workflows. Use when you need to scale existing pandas/NumPy code beyond memory or across clusters. Best for parallel file processing, distributed ML, integration with existing pandas code. For out-of-core analytics on single machine use vaex; for in-memory speed use polars.",
+      "compatibility": "Requires Python 3.10+ and dask 2025.1+. DataFrame workflows need pandas 2+ and PyArrow 16+. Cloud paths (s3://, gcs://) need s3fs or gcsfs. Cluster deployment uses dask.distributed (included with dask[complete]).",
+      "reference_count": 6
+    },
+    {
+      "skill": "database-lookup",
+      "declared_name": "database-lookup",
+      "tier": "A",
+      "category": "external-data",
+      "alpha_use": "Deterministic lookup across finance/economic endpoints such as FRED, SEC, ECB, BEA, BLS, Treasury.",
+      "description": "Deterministically query 78 public scientific, biomedical, materials science, regulatory, finance, and demographics databases through documented REST APIs. Use for reproducible lookups of compounds, genes, proteins, pathways, variants, clinical trials, patents, economic indicators, structures, astronomy objects, environmental records, or database-backed scientific facts when endpoints, filters, pagination, and provenance need to be explicit.",
+      "compatibility": "",
+      "reference_count": 79
+    },
+    {
+      "skill": "datamol",
+      "declared_name": "datamol",
+      "tier": "D",
+      "category": "excluded-chemistry",
+      "alpha_use": "Reviewed; chemistry/drug-discovery workflow is not a default LuminaQuant alpha source.",
+      "description": "Pythonic wrapper around RDKit with simplified interface and sensible defaults. Preferred for standard drug discovery including SMILES parsing, standardization, descriptors, fingerprints, clustering, 3D conformers, parallel processing. Returns native rdkit.Chem.Mol objects. For advanced control or custom parameters, use rdkit directly.",
+      "compatibility": "Requires Python 3.8+ and datamol (uv pip install). RDKit is installed automatically as a datamol dependency (since 0.12.2). Optional s3fs/gcsfs for cloud I/O via fsspec.",
+      "reference_count": 6
+    },
+    {
+      "skill": "deepchem",
+      "declared_name": "deepchem",
+      "tier": "D",
+      "category": "excluded-chemistry",
+      "alpha_use": "Reviewed; chemistry/drug-discovery workflow is not a default LuminaQuant alpha source.",
+      "description": "Molecular ML with diverse featurizers and pre-built datasets. Use for property prediction (ADMET, toxicity) with traditional ML or GNNs when you want extensive featurization options and MoleculeNet benchmarks. Best for quick experiments with pre-trained models, diverse molecular representations. For graph-first PyTorch workflows use torchdrug; for benchmark datasets use pytdc.",
+      "compatibility": "Requires Python 3.7–3.11 (PyPI 2.8.0 caps at <3.12). Install PyTorch, TensorFlow, or JAX before the matching deepchem extra. RDKit is a core dependency.",
+      "reference_count": 2
+    },
+    {
+      "skill": "deeptools",
+      "declared_name": "deeptools",
+      "tier": "D",
+      "category": "excluded-biomedical",
+      "alpha_use": "Reviewed; biomedical/genomics workflow is not a default LuminaQuant alpha source.",
+      "description": "NGS analysis toolkit. BAM to bigWig conversion, QC (correlation, PCA, fingerprints), heatmaps/profiles (TSS, peaks), for ChIP-seq, RNA-seq, ATAC-seq visualization.",
+      "compatibility": "Requires Python >3.8 and deepTools 3.5.6-compatible dependencies. The upstream project recommends conda/bioconda for full dependency resolution; repo examples use uv with pinned PyPI installs for reproducible command-line workflows.",
+      "reference_count": 4
+    },
+    {
+      "skill": "depmap",
+      "declared_name": "depmap",
+      "tier": "D",
+      "category": "excluded-chemistry",
+      "alpha_use": "Reviewed; chemistry/drug-discovery workflow is not a default LuminaQuant alpha source.",
+      "description": "Query the Cancer Dependency Map (DepMap) for cancer cell line gene dependency scores (CRISPR Chronos), drug sensitivity data, and gene effect profiles. Use for identifying cancer-specific vulnerabilities, synthetic lethal interactions, and validating oncology drug targets.",
+      "compatibility": "",
+      "reference_count": 1
+    },
+    {
+      "skill": "dhdna-profiler",
+      "declared_name": "dhdna-profiler",
+      "tier": "D",
+      "category": "excluded-cognitive",
+      "alpha_use": "Reviewed; cognitive-style profiling is not needed for alpha research.",
+      "description": "Extract cognitive patterns and thinking fingerprints from any text. Use this skill when the user wants to analyze how someone thinks, understand cognitive style, profile writing or speech patterns, compare thinking styles between people, asks \"what's my thinking style\", \"analyze how this person reasons\", \"cognitive profile\", \"thinking pattern\", \"DHDNA\", \"digital DNA\", or wants to understand the mind behind any text. Also trigger when the user provides text and wants deeper insight into the author's reasoning patterns, decision-making style, or cognitive signature.",
+      "compatibility": "",
+      "reference_count": 1
+    },
+    {
+      "skill": "diffdock",
+      "declared_name": "diffdock",
+      "tier": "D",
+      "category": "excluded-chemistry",
+      "alpha_use": "Reviewed; chemistry/drug-discovery workflow is not a default LuminaQuant alpha source.",
+      "description": "DiffDock and DiffDock-L molecular docking. Use for protein-small-molecule pose prediction from PDB or sequence plus SMILES/SDF/MOL2, batch docking, virtual screening, and pose-confidence interpretation. Not for binding affinity prediction.",
+      "compatibility": "Requires the DiffDock repository, Python 3.9 environment from upstream environment.yml or the official Docker image, RDKit, PyTorch/PyG, and optional CUDA GPU acceleration. Current guidance targets DiffDock v1.1.3 / DiffDock-L.",
+      "reference_count": 3
+    },
+    {
+      "skill": "dnanexus-integration",
+      "declared_name": "dnanexus-integration",
+      "tier": "D",
+      "category": "excluded-lab",
+      "alpha_use": "Reviewed; lab automation/integration workflow is not a default LuminaQuant alpha source.",
+      "description": "DNAnexus cloud genomics platform. Build apps/applets, manage data (upload/download), dxpy Python SDK, run workflows, FASTQ/BAM/VCF, for genomics pipeline development and execution.",
+      "compatibility": "Requires a DNAnexus account",
+      "reference_count": 5
+    },
+    {
+      "skill": "docx",
+      "declared_name": "docx",
+      "tier": "C",
+      "category": "document-ingest",
+      "alpha_use": "Extract/edit Word research notes or reports.",
+      "description": "Use this skill whenever the user wants to create, read, edit, or manipulate Word documents (.docx files). Triggers include: any mention of 'Word doc', 'word document', '.docx', or requests to produce professional documents with formatting like tables of contents, headings, page numbers, or letterheads. Also use when extracting or reorganizing content from .docx files, inserting or replacing images in documents, performing find-and-replace in Word files, working with tracked changes or comments, or converting content into a polished Word document. If the user asks for a 'report', 'memo', 'letter', 'template', or similar deliverable as a Word or .docx file, use this skill. Do NOT use for PDFs, spreadsheets, Google Docs, or general coding tasks unrelated to document generation.",
+      "compatibility": "",
+      "reference_count": 0
+    },
+    {
+      "skill": "esm",
+      "declared_name": "esm",
+      "tier": "D",
+      "category": "excluded-biomedical",
+      "alpha_use": "Reviewed; biomedical/genomics workflow is not a default LuminaQuant alpha source.",
+      "description": "Use when working directly with the `esm` Python SDK, ESM3 or ESMC model IDs, Forge/Biohub inference clients, or ESMFold2 folding workflows.",
+      "compatibility": "",
+      "reference_count": 5
+    },
+    {
+      "skill": "etetoolkit",
+      "declared_name": "etetoolkit",
+      "tier": "D",
+      "category": "excluded-biomedical",
+      "alpha_use": "Reviewed; biomedical/genomics workflow is not a default LuminaQuant alpha source.",
+      "description": "Phylogenetic tree toolkit (ETE). Tree manipulation (Newick/NHX), evolutionary event detection, orthology/paralogy, NCBI taxonomy, visualization (PDF/SVG), for phylogenomics.",
+      "compatibility": "",
+      "reference_count": 3
+    },
+    {
+      "skill": "exa-search",
+      "declared_name": "exa-search",
+      "tier": "B",
+      "category": "web-research",
+      "alpha_use": "Semantic web retrieval for technical alpha sources and source extraction.",
+      "description": "Web toolkit powered by Exa, tuned for scientific and technical content. Use this skill when the user needs to search the web or fetch/extract URL content. Covers: web search (semantic lookups, research, current info — with optional research-paper category and academic domain filtering) and URL extraction (fetching pages, articles, academic PDFs in batch). Use this skill for web-related tasks when the user wants high-quality search or scholarly filtering via category=research paper. Triggers on requests to search, look up, fetch a page, or extract an article.",
+      "compatibility": "Requires exa-py Python SDK, an EXA_API_KEY, and internet access.",
+      "reference_count": 2
+    },
+    {
+      "skill": "experimental-design",
+      "declared_name": "experimental-design",
+      "tier": "A",
+      "category": "experiment-design",
+      "alpha_use": "Pre-register windows, embargoes, candidate budgets, controls, and DOE/ablation plans.",
+      "description": "Design experiments and studies BEFORE data is collected — choosing a design, randomizing, blocking, and laying out treatment combinations so the results will actually be interpretable. Use whenever someone is planning a study, asks how to assign subjects/samples to groups, mentions randomization, blocking, stratification, controls, factorial or fractional-factorial designs, design of experiments (DOE), screening many factors, response-surface optimization, crossover or repeated-measures or split-plot designs, cluster/group randomization, Latin squares, plate layouts, batch/run-order effects, replication vs. pseudoreplication, or sequential/adaptive/group-sequential designs. Trigger this even for informal phrasings like \"how should I set up this experiment\", \"how do I avoid confounding\", \"what's the best way to test these 6 factors\", or \"assign these mice to conditions\". For computing the sample size or power once the design is chosen, use statistical-power; for analyzing data already collected, use statistical-analysis.",
+      "compatibility": "Requires Python >=3.10. Scripts use numpy, pandas, and pyDOE3 (DOE matrices). Install with uv as shown below.",
+      "reference_count": 4
+    },
+    {
+      "skill": "exploratory-data-analysis",
+      "declared_name": "exploratory-data-analysis",
+      "tier": "A",
+      "category": "eda",
+      "alpha_use": "Profile datasets, missingness, distributions, outliers, and quality before alpha fitting.",
+      "description": "Perform comprehensive exploratory data analysis on scientific data files across 200+ file formats. This skill should be used when analyzing any scientific data file to understand its structure, content, quality, and characteristics. Automatically detects file type and generates detailed markdown reports with format-specific analysis, quality metrics, and downstream analysis recommendations. Covers chemistry, bioinformatics, microscopy, spectroscopy, proteomics, metabolomics, and general scientific data formats.",
+      "compatibility": "",
+      "reference_count": 6
+    },
+    {
+      "skill": "flowio",
+      "declared_name": "flowio",
+      "tier": "D",
+      "category": "excluded-other",
+      "alpha_use": "Reviewed; no direct role in finding, validating, analyzing, or reporting LuminaQuant trading alpha by default.",
+      "description": "Parse FCS (Flow Cytometry Standard) files v2.0-3.1. Extract events as NumPy arrays, read metadata/channels, convert to CSV/DataFrame, for flow cytometry data preprocessing.",
+      "compatibility": "",
+      "reference_count": 1
+    },
+    {
+      "skill": "fluidsim",
+      "declared_name": "fluidsim",
+      "tier": "D",
+      "category": "excluded-simulation",
+      "alpha_use": "Physics CFD not default; only analogy/commodity supply-chain special cases.",
+      "description": "Framework for computational fluid dynamics simulations using Python. Use when running fluid dynamics simulations including Navier-Stokes equations (2D/3D), shallow water equations, stratified flows, or when analyzing turbulence, vortex dynamics, or geophysical flows. Provides pseudospectral methods with FFT, HPC support, and comprehensive output analysis.",
+      "compatibility": "",
+      "reference_count": 6
+    },
+    {
+      "skill": "generate-image",
+      "declared_name": "generate-image",
+      "tier": "D",
+      "category": "excluded-chemistry",
+      "alpha_use": "Reviewed; chemistry/drug-discovery workflow is not a default LuminaQuant alpha source.",
+      "description": "Generate or edit images using AI models (FLUX, Nano Banana 2). Use for general-purpose image generation including photos, illustrations, artwork, visual assets, concept art, and any image that is not a technical diagram or schematic. For flowcharts, circuits, pathways, and technical diagrams, use the scientific-schematics skill instead.",
+      "compatibility": "Requires an OpenRouter API key",
+      "reference_count": 0
+    },
+    {
+      "skill": "geniml",
+      "declared_name": "geniml",
+      "tier": "D",
+      "category": "excluded-biomedical",
+      "alpha_use": "Reviewed; biomedical/genomics workflow is not a default LuminaQuant alpha source.",
+      "description": "This skill should be used when working with genomic interval data (BED files) for machine learning tasks. Use for training region embeddings (Region2Vec, BEDspace), single-cell ATAC-seq analysis (scEmbed), building consensus peaks (universes), or any ML-based analysis of genomic regions. Applies to BED file collections, scATAC-seq data, chromatin accessibility datasets, and region-based genomic feature learning.",
+      "compatibility": "",
+      "reference_count": 5
+    },
+    {
+      "skill": "geomaster",
+      "declared_name": "geomaster",
+      "tier": "B",
+      "category": "geospatial-alt-data",
+      "alpha_use": "Satellite/weather/supply-chain/geospatial alternative-data alpha research.",
+      "description": "Comprehensive geospatial science skill covering remote sensing, GIS, spatial analysis, machine learning for earth observation, and 30+ scientific domains. Supports satellite imagery processing (Sentinel, Landsat, MODIS, SAR, hyperspectral), vector and raster data operations, spatial statistics, point cloud processing, network analysis, cloud-native workflows (STAC, COG, Planetary Computer), and 8 programming languages (Python, R, Julia, JavaScript, C++, Java, Go, Rust) with 500+ code examples. Use for remote sensing workflows, GIS analysis, spatial ML, Earth observation data processing, terrain analysis, hydrological modeling, marine spatial analysis, atmospheric science, and any geospatial computation task.",
+      "compatibility": "",
+      "reference_count": 14
+    },
+    {
+      "skill": "geopandas",
+      "declared_name": "geopandas",
+      "tier": "B",
+      "category": "geospatial-alt-data",
+      "alpha_use": "Vector geospatial joins/features for alternative datasets.",
+      "description": "Python library for working with geospatial vector data including shapefiles, GeoJSON, and GeoPackage files. Use when working with geographic data for spatial analysis, geometric operations, coordinate transformations, spatial joins, overlay operations, choropleth mapping, or any task involving reading/writing/analyzing vector geographic data. Supports PostGIS databases, interactive maps, and integration with matplotlib/folium/cartopy. Use for tasks like buffer analysis, spatial joins between datasets, dissolving boundaries, clipping data, calculating areas/distances, reprojecting coordinate systems, creating maps, or converting between spatial file formats.",
+      "compatibility": "",
+      "reference_count": 6
+    },
+    {
+      "skill": "get-available-resources",
+      "declared_name": "get-available-resources",
+      "tier": "A",
+      "category": "preflight",
+      "alpha_use": "Check CPU/GPU/RAM/disk before heavy alpha sweeps.",
+      "description": "This skill should be used at the start of any computationally intensive scientific task to detect and report available system resources (CPU cores, GPUs, memory, disk space). It creates a JSON file with resource information and strategic recommendations that inform computational approach decisions such as whether to use parallel processing (joblib, multiprocessing), out-of-core computing (Dask, Zarr), GPU acceleration (PyTorch, JAX), or memory-efficient strategies. Use this skill before running analyses, training models, processing large datasets, or any task where resource constraints matter.",
+      "compatibility": "",
+      "reference_count": 0
+    },
+    {
+      "skill": "gget",
+      "declared_name": "gget",
+      "tier": "D",
+      "category": "excluded-biomedical",
+      "alpha_use": "Reviewed; biomedical/genomics workflow is not a default LuminaQuant alpha source.",
+      "description": "Fast CLI/Python queries to 20+ bioinformatics databases. Use for quick lookups: gene info, BLAST/BLAT, viral sequence downloads, AlphaFold structures, enrichment analysis, OpenTargets, COSMIC, CELLxGENE, and 8cube mouse specificity/expression data. Best for interactive exploration and simple queries. For batch processing or advanced BLAST use biopython; for multi-database Python workflows use bioservices.",
+      "compatibility": "Requires Python >=3.8 and gget 0.30.5-compatible APIs. Optional setup modules may install scientific dependencies that lag the newest Python releases; use Python 3.9 or 3.10 if `gget setup cellxgene` or `gget setup alphafold` fails.",
+      "reference_count": 3
+    },
+    {
+      "skill": "ginkgo-cloud-lab",
+      "declared_name": "ginkgo-cloud-lab",
+      "tier": "D",
+      "category": "excluded-lab",
+      "alpha_use": "Reviewed; lab automation/integration workflow is not a default LuminaQuant alpha source.",
+      "description": "Submit and manage protocols on Ginkgo Bioworks Cloud Lab (cloud.ginkgo.bio), a web-based interface for autonomous lab execution on Reconfigurable Automation Carts (RACs). Use when the user wants to run protein expression and purification (cell-free, E. coli, or Pichia), HiBiT or A280 or LabChip quantification, IVT mRNA/circRNA synthesis, thermal shift / developability assays, Echo-MS enzyme or analyte methods, SPR target onboarding, fluorescent pixel art, or otherwise interact with Ginkgo Cloud Lab services. Covers protocol selection, input preparation, pricing, and ordering workflows.",
+      "compatibility": "",
+      "reference_count": 17
+    },
+    {
+      "skill": "glycoengineering",
+      "declared_name": "glycoengineering",
+      "tier": "D",
+      "category": "excluded-chemistry",
+      "alpha_use": "Reviewed; chemistry/drug-discovery workflow is not a default LuminaQuant alpha source.",
+      "description": "Analyze and engineer protein glycosylation. Scan sequences for N-glycosylation sequons (N-X-S/T), predict O-glycosylation hotspots, and access curated glycoengineering tools (NetOGlyc, GlycoShield, GlycoWorkbench). For glycoprotein engineering, therapeutic antibody optimization, and vaccine design.",
+      "compatibility": "",
+      "reference_count": 1
+    },
+    {
+      "skill": "gtars",
+      "declared_name": "gtars",
+      "tier": "D",
+      "category": "excluded-biomedical",
+      "alpha_use": "Reviewed; biomedical/genomics workflow is not a default LuminaQuant alpha source.",
+      "description": "High-performance toolkit for genomic interval analysis in Rust with Python bindings. Use when working with genomic regions, BED files, coverage tracks, overlap detection, tokenization for ML models, or fragment analysis in computational genomics and machine learning applications.",
+      "compatibility": "",
+      "reference_count": 6
+    },
+    {
+      "skill": "histolab",
+      "declared_name": "histolab",
+      "tier": "D",
+      "category": "excluded-lab",
+      "alpha_use": "Reviewed; lab automation/integration workflow is not a default LuminaQuant alpha source.",
+      "description": "Lightweight WSI tile extraction and preprocessing. Use for basic slide processing, tissue detection, tile extraction, and stain normalization for H&E images. Best for simple pipelines, dataset preparation, and quick tile-based analysis. For advanced spatial proteomics, multiplexed imaging, or deep learning pipelines use pathml.",
+      "compatibility": "Requires Python 3.8–3.11 (histolab 0.7.0), OpenSlide system libraries, and Linux or macOS. Sample data via histolab.data requires pooch.",
+      "reference_count": 5
+    },
+    {
+      "skill": "hugging-science",
+      "declared_name": "hugging-science",
+      "tier": "D",
+      "category": "excluded-materials",
+      "alpha_use": "Reviewed; materials science workflow is not default unless explicit commodity/materials alt-data research is requested.",
+      "description": "Use when the user is doing AI/ML work in a scientific domain such as biology, chemistry, physics, astronomy, climate, genomics, materials, medicine, ecology, energy, engineering, math, drug discovery, protein design, weather modeling, theorem proving, single-cell, or PDE solving. Hugging Science is a curated catalog of scientific datasets, models, blog posts, and interactive Spaces. This skill helps discover and use resources via `datasets`, `transformers`, the HF Inference API, `gradio_client`, and methodology citations.",
+      "compatibility": "",
+      "reference_count": 5
+    },
+    {
+      "skill": "hypogenic",
+      "declared_name": "hypogenic",
+      "tier": "A",
+      "category": "data-driven-hypotheses",
+      "alpha_use": "Generate/refine hypothesis banks from tabular market feature panels; exploration only, never proof.",
+      "description": "Automated LLM-driven hypothesis generation and testing on tabular datasets. Use when you want to systematically explore hypotheses about patterns in empirical data (e.g., deception detection, content analysis). Combines literature insights with data-driven hypothesis testing. For manual hypothesis formulation use hypothesis-generation; for creative ideation use scientific-brainstorming.",
+      "compatibility": "",
+      "reference_count": 0
+    },
+    {
+      "skill": "hypothesis-generation",
+      "declared_name": "hypothesis-generation",
+      "tier": "A",
+      "category": "ideation",
+      "alpha_use": "Turn observations into falsifiable alpha hypotheses, mechanisms, predictions, and disconfirming evidence.",
+      "description": "Structured hypothesis formulation from observations. Use when you have experimental observations or data and need to formulate testable hypotheses with predictions, propose mechanisms, and design experiments to test them. Follows scientific method framework. For open-ended ideation use scientific-brainstorming; for automated LLM-driven hypothesis testing on datasets use hypogenic.",
+      "compatibility": "",
+      "reference_count": 3
+    },
+    {
+      "skill": "imaging-data-commons",
+      "declared_name": "imaging-data-commons",
+      "tier": "D",
+      "category": "excluded-clinical",
+      "alpha_use": "Reviewed; clinical/medical workflow is not a default LuminaQuant alpha source.",
+      "description": "Query and download public cancer imaging data from NCI Imaging Data Commons using idc-index. Use for accessing large-scale radiology (CT, MR, PET) and pathology datasets for AI training or research. No authentication required. Query by metadata, visualize in browser, check licenses.",
+      "compatibility": "",
+      "reference_count": 10
+    },
+    {
+      "skill": "infographics",
+      "declared_name": "infographics",
+      "tier": "C",
+      "category": "reporting",
+      "alpha_use": "Executive visual summaries after evidence exists.",
+      "description": "Create professional infographics using Nano Banana Pro AI with smart iterative refinement. Uses Gemini 3 Pro for quality review. Integrates research-lookup and web search for accurate data. Supports 10 infographic types, 8 industry styles, and colorblind-safe palettes.",
+      "compatibility": "",
+      "reference_count": 3
+    },
+    {
+      "skill": "iso-13485-certification",
+      "declared_name": "iso-13485-certification",
+      "tier": "D",
+      "category": "excluded-clinical",
+      "alpha_use": "Reviewed; clinical/medical workflow is not a default LuminaQuant alpha source.",
+      "description": "Comprehensive toolkit for preparing ISO 13485 certification documentation for medical device Quality Management Systems. Use when users need help with ISO 13485 QMS documentation, including (1) conducting gap analysis of existing documentation, (2) creating Quality Manuals, (3) developing required procedures and work instructions, (4) preparing Medical Device Files, (5) understanding ISO 13485 requirements, or (6) identifying missing documentation for medical device certification. Also use when users mention medical device regulations, QMS certification, FDA QMSR, EU MDR, or need help with quality system documentation.",
+      "compatibility": "",
+      "reference_count": 4
+    },
+    {
+      "skill": "labarchive-integration",
+      "declared_name": "labarchive-integration",
+      "tier": "D",
+      "category": "excluded-lab",
+      "alpha_use": "Reviewed; lab automation/integration workflow is not a default LuminaQuant alpha source.",
+      "description": "Electronic lab notebook API integration. Access notebooks, manage entries/attachments, backup notebooks, integrate with Protocols.io/Jupyter/REDCap, for programmatic ELN workflows.",
+      "compatibility": "",
+      "reference_count": 3
+    },
+    {
+      "skill": "lamindb",
+      "declared_name": "lamindb",
+      "tier": "C",
+      "category": "lineage",
+      "alpha_use": "Lineage/lakehouse inspiration; prefer LuminaQuant native SHA/source artifact tracking first.",
+      "description": "Use when working with LaminDB, the open-source lineage-native lakehouse for biological datasets and models. Covers setup, artifact registration, query/search, lineage tracking, validation, ontology-backed annotation with Bionty, collections, branches, storage, and workflow integrations.",
+      "compatibility": "",
+      "reference_count": 6
+    },
+    {
+      "skill": "latchbio-integration",
+      "declared_name": "latchbio-integration",
+      "tier": "D",
+      "category": "excluded-lab",
+      "alpha_use": "Reviewed; lab automation/integration workflow is not a default LuminaQuant alpha source.",
+      "description": "Latch platform for bioinformatics workflows. Build pipelines with Latch SDK, @workflow/@task decorators, deploy serverless workflows, LatchFile/LatchDir, Nextflow/Snakemake integration.",
+      "compatibility": "",
+      "reference_count": 4
+    },
+    {
+      "skill": "latex-posters",
+      "declared_name": "latex-posters",
+      "tier": "C",
+      "category": "reporting",
+      "alpha_use": "Poster output only.",
+      "description": "Create professional research posters in LaTeX using beamerposter, tikzposter, or baposter. Support for conference presentations, academic posters, and scientific communication. Includes layout design, color schemes, multi-column formats, figure integration, and poster-specific best practices for visual communication.",
+      "compatibility": "",
+      "reference_count": 5
+    },
+    {
+      "skill": "liteparse",
+      "declared_name": "liteparse",
+      "tier": "C",
+      "category": "document-ingest",
+      "alpha_use": "OCR/layout-aware local PDF/document parsing for RAG inputs.",
+      "description": "Local document and PDF parsing with spatial text and bounding boxes. Use for extracting text from PDFs, DOCX, Office files, and images; OCR on scans; layout-preserved JSON for RAG; batch-ingesting paper folders; or page screenshots for multimodal agents — even when the user does not name liteparse. Prefer over MarkItDown when you need bboxes, fast local parsing, or PNG page renders; prefer over the pdf skill for merge/split/forms.",
+      "compatibility": "Python 3.10+. Optional LibreOffice (Office formats) and ImageMagick (images). Bundled Tesseract for OCR. All processing is local — no cloud API required.",
+      "reference_count": 5
+    },
+    {
+      "skill": "literature-review",
+      "declared_name": "literature-review",
+      "tier": "A",
+      "category": "literature",
+      "alpha_use": "Synthesize alpha-family evidence and gaps across sources before coding.",
+      "description": "Conduct comprehensive, systematic literature reviews using multiple academic databases (PubMed, arXiv, bioRxiv, Semantic Scholar, etc.). This skill should be used when conducting systematic literature reviews, meta-analyses, research synthesis, or comprehensive literature searches across biomedical, scientific, and technical domains. Creates professionally formatted markdown documents and PDFs with verified citations in multiple citation styles (APA, Nature, Vancouver, etc.).",
+      "compatibility": "",
+      "reference_count": 2
+    },
+    {
+      "skill": "markdown-mermaid-writing",
+      "declared_name": "markdown-mermaid-writing",
+      "tier": "C",
+      "category": "reporting",
+      "alpha_use": "Write audit-friendly reports and pipeline diagrams.",
+      "description": "Comprehensive markdown and Mermaid diagram writing skill. Use when creating any scientific document, report, analysis, or visualization. Establishes text-based diagrams as the default documentation standard with full style guides (markdown + mermaid), 24 diagram type references, and 9 document templates.",
+      "compatibility": "",
+      "reference_count": 2
+    },
+    {
+      "skill": "market-research-reports",
+      "declared_name": "market-research-reports",
+      "tier": "C",
+      "category": "macro-context",
+      "alpha_use": "Heavy macro/industry context reports; not proof of alpha.",
+      "description": "Generate comprehensive market research reports (50+ pages) in the style of top consulting firms (McKinsey, BCG, Gartner). Features professional LaTeX formatting, extensive visual generation with scientific-schematics and generate-image, deep integration with research-lookup for data gathering, and multi-framework strategic analysis including Porter Five Forces, PESTLE, SWOT, TAM/SAM/SOM, and BCG Matrix.",
+      "compatibility": "",
+      "reference_count": 3
+    },
+    {
+      "skill": "markitdown",
+      "declared_name": "markitdown",
+      "tier": "C",
+      "category": "document-ingest",
+      "alpha_use": "Convert files into Markdown for auditable research ingestion.",
+      "description": "Convert files and office documents to Markdown. Supports PDF, DOCX, PPTX, XLSX, images (with OCR), audio (with transcription), HTML, CSV, JSON, XML, ZIP, YouTube URLs, EPubs and more.",
+      "compatibility": "",
+      "reference_count": 2
+    },
+    {
+      "skill": "matchms",
+      "declared_name": "matchms",
+      "tier": "D",
+      "category": "excluded-chemistry",
+      "alpha_use": "Reviewed; chemistry/drug-discovery workflow is not a default LuminaQuant alpha source.",
+      "description": "Spectral similarity and compound identification for metabolomics. Use for comparing mass spectra, computing similarity scores (cosine, modified cosine), and identifying unknown compounds from spectral libraries. Best for metabolite identification, spectral matching, library searching. For full LC-MS/MS proteomics pipelines use pyopenms.",
+      "compatibility": "",
+      "reference_count": 4
+    },
+    {
+      "skill": "matlab",
+      "declared_name": "matlab",
+      "tier": "C",
+      "category": "numerics",
+      "alpha_use": "Translate/validate MATLAB/Octave quant prototypes when inherited.",
+      "description": "MATLAB and GNU Octave numerical computing for matrix operations, data analysis, visualization, and scientific computing. Use when writing MATLAB/Octave scripts for linear algebra, signal processing, image processing, differential equations, optimization, statistics, or creating scientific visualizations. Also use when the user needs help with MATLAB syntax, functions, or wants to convert between MATLAB and Python code. Scripts can be executed with MATLAB or the open-source GNU Octave interpreter.",
+      "compatibility": "Requires either MATLAB or Octave to be installed for testing, but not required for just generating scripts.",
+      "reference_count": 8
+    },
+    {
+      "skill": "matplotlib",
+      "declared_name": "matplotlib",
+      "tier": "C",
+      "category": "visualization",
+      "alpha_use": "Low-level plot control for reports.",
+      "description": "Low-level plotting library for full customization. Use when you need fine-grained control over every plot element, creating novel plot types, or integrating with specific scientific workflows. Export to PNG/PDF/SVG for publication. For quick statistical plots use seaborn; for interactive plots use plotly; for publication-ready multi-panel figures with journal styling, use scientific-visualization.",
+      "compatibility": "Requires Python 3.10+ and Matplotlib 3.10.x. Use `uv add matplotlib` in projects; interactive Jupyter widgets require `ipympl`.",
+      "reference_count": 4
+    },
+    {
+      "skill": "medchem",
+      "declared_name": "medchem",
+      "tier": "D",
+      "category": "excluded-chemistry",
+      "alpha_use": "Reviewed; chemistry/drug-discovery workflow is not a default LuminaQuant alpha source.",
+      "description": "Medicinal chemistry filters for compound triage. Apply drug-likeness rules (Lipinski, Veber, CNS), structural alert catalogs (PAINS, NIBR, ChEMBL), complexity metrics, and the medchem query language for library filtering.",
+      "compatibility": "Requires Python 3.9+ and datamol (installed with medchem). Optional Lilly demerit filter requires separate `lilly-medchem-rules` conda package.",
+      "reference_count": 2
+    },
+    {
+      "skill": "modal",
+      "declared_name": "modal",
+      "tier": "C",
+      "category": "cloud-compute",
+      "alpha_use": "Optional cloud/GPU batch execution; avoid unless explicitly authorized.",
+      "description": "Modal is a serverless cloud platform for running Python on demand, including on-demand GPUs. Use when deploying or serving AI/ML models, running GPU-accelerated workloads (training, fine-tuning, inference), serving web endpoints, scheduling batch jobs, or scaling Python code to cloud containers with the Modal SDK.",
+      "compatibility": "",
+      "reference_count": 12
+    },
+    {
+      "skill": "molecular-dynamics",
+      "declared_name": "molecular-dynamics",
+      "tier": "D",
+      "category": "excluded-chemistry",
+      "alpha_use": "Reviewed; chemistry/drug-discovery workflow is not a default LuminaQuant alpha source.",
+      "description": "Run and analyze molecular dynamics simulations with OpenMM and MDAnalysis. Set up protein/small molecule systems, define force fields, run energy minimization and production MD, analyze trajectories (RMSD, RMSF, contact maps, free energy surfaces). For structural biology, drug binding, and biophysics.",
+      "compatibility": "",
+      "reference_count": 1
+    },
+    {
+      "skill": "molfeat",
+      "declared_name": "molfeat",
+      "tier": "D",
+      "category": "excluded-chemistry",
+      "alpha_use": "Reviewed; chemistry/drug-discovery workflow is not a default LuminaQuant alpha source.",
+      "description": "Molecular featurization for ML (100+ featurizers). ECFP, MACCS, descriptors, pretrained models (ChemBERTa), convert SMILES to features, for QSAR and molecular ML.",
+      "compatibility": "Requires Python 3.9–3.10 (molfeat 0.11.0 does not support 3.11+). Requires datamol, PyTorch, and optional extras for GNN/transformer models.",
+      "reference_count": 3
+    },
+    {
+      "skill": "networkx",
+      "declared_name": "networkx",
+      "tier": "B",
+      "category": "graph-alpha",
+      "alpha_use": "Lead-lag, correlation, cluster, asset graph, and propagation hypotheses.",
+      "description": "Create, analyze, and visualize complex networks and graphs in Python with NetworkX. Use when working with network/graph data structures, computing graph algorithms (shortest paths, centrality, clustering), detecting communities, generating synthetic networks (random, scale-free, small-world), reading/writing graph file formats, or drawing network topologies. Common applications include social, biological, transportation, and citation networks.",
+      "compatibility": "",
+      "reference_count": 5
+    },
+    {
+      "skill": "neurokit2",
+      "declared_name": "neurokit2",
+      "tier": "D",
+      "category": "excluded-biosignal",
+      "alpha_use": "Could inspire signal processing, but biomedical signals are not default LuminaQuant data.",
+      "description": "Comprehensive biosignal processing toolkit for analyzing physiological data including ECG, EEG, EDA, RSP, PPG, EMG, and EOG signals. Use this skill when processing cardiovascular signals, brain activity, electrodermal responses, respiratory patterns, muscle activity, or eye movements. Applicable for heart rate variability analysis, event-related potentials, complexity measures, autonomic nervous system assessment, psychophysiology research, and multi-modal physiological signal integration.",
+      "compatibility": "",
+      "reference_count": 12
+    },
+    {
+      "skill": "neuropixels-analysis",
+      "declared_name": "neuropixels-analysis",
+      "tier": "D",
+      "category": "excluded-biomedical",
+      "alpha_use": "Reviewed; biomedical/genomics workflow is not a default LuminaQuant alpha source.",
+      "description": "Analyze Neuropixels extracellular recordings end-to-end with SpikeInterface. Covers loading SpikeGLX/Open Ephys/NWB data, preprocessing, drift/motion correction, Kilosort4 (and CPU) spike sorting, quality metrics, and unit curation (threshold-based, model-based UnitRefine, and AI-assisted visual review). Use when working with Neuropixels 1.0/2.0 recordings, spike sorting, or extracellular electrophysiology analysis.",
+      "compatibility": "",
+      "reference_count": 10
+    },
+    {
+      "skill": "nextflow",
+      "declared_name": "nextflow",
+      "tier": "D",
+      "category": "excluded-biomedical",
+      "alpha_use": "Reviewed; biomedical/genomics workflow is not a default LuminaQuant alpha source.",
+      "description": "Build, run, and debug Nextflow data pipelines and nf-core workflows end to end. Use whenever the user mentions Nextflow, nf-core, .nf files, nextflow.config, DSL2, processes/channels/operators, samplesheets, or wants to run a community pipeline (e.g. nf-core/rnaseq, nf-core/sarek), write or test a module/subworkflow with nf-test, configure executors/containers (Docker, Singularity/Apptainer, Conda, Wave), scale a workflow to HPC/SLURM or cloud (AWS Batch, Google Batch, Azure, Kubernetes), or debug a failed/-resume run. Make sure to use this skill for any reproducible scientific/bioinformatics workflow work even if the user does not say the word \"Nextflow\", and for authoring nf-core-compliant pipelines, modules, configs, and linting.",
+      "compatibility": "",
+      "reference_count": 7
+    },
+    {
+      "skill": "omero-integration",
+      "declared_name": "omero-integration",
+      "tier": "D",
+      "category": "excluded-lab",
+      "alpha_use": "Reviewed; lab automation/integration workflow is not a default LuminaQuant alpha source.",
+      "description": "Microscopy data management platform. Access images via Python, retrieve datasets, analyze pixels, manage ROIs/annotations, batch processing, for high-content screening and microscopy workflows.",
+      "compatibility": "",
+      "reference_count": 8
+    },
+    {
+      "skill": "open-notebook",
+      "declared_name": "open-notebook",
+      "tier": "C",
+      "category": "research-management",
+      "alpha_use": "Organize paper/report corpora into notebooks; optional RAG workspace.",
+      "description": "Self-hosted, open-source alternative to Google NotebookLM for AI-powered research and document analysis. Use when organizing research materials into notebooks, ingesting diverse content sources (PDFs, videos, audio, web pages, Office documents), generating AI-powered notes and summaries, creating multi-speaker podcasts from research, chatting with documents using context-aware AI, searching across materials with full-text and vector search, or running custom content transformations. Supports 16+ AI providers including OpenAI, Anthropic, Google, Ollama, Groq, and Mistral with complete data privacy through self-hosting.",
+      "compatibility": "",
+      "reference_count": 4
+    },
+    {
+      "skill": "opentrons-integration",
+      "declared_name": "opentrons-integration",
+      "tier": "D",
+      "category": "excluded-lab",
+      "alpha_use": "Reviewed; lab automation/integration workflow is not a default LuminaQuant alpha source.",
+      "description": "Official Opentrons Protocol API for OT-2 and Flex robots. Use when writing protocols specifically for Opentrons hardware with full access to Protocol API v2 features. Best for production Opentrons protocols, official API compatibility. For multi-vendor automation or broader equipment control use pylabrobot.",
+      "compatibility": "",
+      "reference_count": 1
+    },
+    {
+      "skill": "optimize-for-gpu",
+      "declared_name": "optimize-for-gpu",
+      "tier": "B",
+      "category": "gpu",
+      "alpha_use": "GPU/CUDA/cuDF/cuML/Numba acceleration for heavy feature/backtest research.",
+      "description": "GPU-accelerate Python code using CuPy, Numba CUDA, Warp, cuDF, cuML, cuGraph, KvikIO, cuCIM, cuxfilter, cuVS, cuSpatial, and RAFT. Use whenever the user mentions GPU/CUDA/NVIDIA acceleration, or wants to speed up NumPy, pandas, scikit-learn, scikit-image, NetworkX, GeoPandas, or Faiss workloads. Covers physics simulation, differentiable rendering, mesh ray casting, particle systems (DEM/SPH/fluids), vector/similarity search, GPUDirect Storage file IO, interactive dashboards, geospatial analysis, medical imaging, and sparse eigensolvers. Also use when you see CPU-bound Python code (loops, large arrays, ML pipelines, graph analytics, image processing) that would benefit from GPU acceleration, even if not explicitly requested.",
+      "compatibility": "",
+      "reference_count": 12
+    },
+    {
+      "skill": "pacsomatic",
+      "declared_name": "pacsomatic",
+      "tier": "D",
+      "category": "excluded-biomedical",
+      "alpha_use": "Reviewed; biomedical/genomics workflow is not a default LuminaQuant alpha source.",
+      "description": "Operator toolkit for nf-core/pacsomatic matched tumor-normal workflows from BAM inputs. Use this skill when the user needs to validate run inputs, generate pacsomatic-compliant samplesheets, prepare reproducible Nextflow launch artifacts, run locally or submit to schedulers (LSF/Slurm/PBS/SGE), and triage execution failures. Triggers on requests to run pacsomatic, prepare launch commands/scripts, perform dry-run checks, or troubleshoot pipeline startup and scheduler submission errors.",
+      "compatibility": "",
+      "reference_count": 3
+    },
+    {
+      "skill": "paper-lookup",
+      "declared_name": "paper-lookup",
+      "tier": "A",
+      "category": "literature",
+      "alpha_use": "Search academic paper APIs for alpha seeds and empirical finance/microstructure evidence.",
+      "description": "Search 10 academic paper databases via REST APIs for research papers, preprints, and scholarly articles. Covers PubMed, PMC (full text), bioRxiv, medRxiv, arXiv, OpenAlex, Crossref, Semantic Scholar, CORE, Unpaywall. Use when searching for papers, citations, DOI/PMID lookups, abstracts, full text, open access, preprints, citation graphs, author search, or any scholarly literature query. Triggers on mentions of any supported database or requests like \"find papers on X\" or \"look up this DOI\".",
+      "compatibility": "",
+      "reference_count": 10
+    },
+    {
+      "skill": "paperzilla",
+      "declared_name": "paperzilla",
+      "tier": "C",
+      "category": "research-management",
+      "alpha_use": "Project/paper recommendation management, optional.",
+      "description": "Chat with your agent about projects, recommendations, and canonical papers in Paperzilla. Use when users ask for recent project recommendations, canonical paper details, markdown-based summaries, recommendation feedback, feed export, or Atom feed URLs.",
+      "compatibility": "",
+      "reference_count": 0
+    },
+    {
+      "skill": "parallel-web",
+      "declared_name": "parallel-web",
+      "tier": "B",
+      "category": "web-research",
+      "alpha_use": "Deep web/source extraction when local paper/database lookup is insufficient.",
+      "description": "All-in-one web toolkit powered by parallel-cli, with a strong emphasis on academic and scientific sources. Use this skill whenever the user needs to search the web, fetch/extract URL content, enrich data with web-sourced fields, or run deep research reports. Covers: web search (fast lookups, research, current info — prioritizing peer-reviewed papers, preprints, and scholarly databases), URL extraction (fetching pages, articles, academic PDFs), bulk data enrichment (adding fields to CSV/lists from the web), and deep research (exhaustive multi-source reports grounded in academic literature). Also handles setup, status checks, and result retrieval. Use this skill for ANY web-related task — even if the user doesn't mention 'parallel' or 'web' explicitly. If they want to look something up, fetch a page, enrich a dataset, investigate a topic, find academic papers, check citations, or review scientific literature, this is the skill to use.",
+      "compatibility": "Requires parallel-cli and internet access.",
+      "reference_count": 4
+    },
+    {
+      "skill": "pathml",
+      "declared_name": "pathml",
+      "tier": "D",
+      "category": "excluded-clinical",
+      "alpha_use": "Reviewed; clinical/medical workflow is not a default LuminaQuant alpha source.",
+      "description": "Full-featured computational pathology toolkit. Use for advanced WSI analysis including multiplexed immunofluorescence (CODEX, Vectra), nucleus segmentation, tissue graph construction, and ML model training on pathology data. Supports 160+ slide formats. For simple tile extraction from H&E slides, histolab may be simpler.",
+      "compatibility": "",
+      "reference_count": 6
+    },
+    {
+      "skill": "pathway-enrichment",
+      "declared_name": "pathway-enrichment",
+      "tier": "D",
+      "category": "excluded-biomedical",
+      "alpha_use": "Reviewed; biomedical/genomics workflow is not a default LuminaQuant alpha source.",
+      "description": "Run pathway and gene-set enrichment analysis on gene lists or ranked gene data, then interpret the results. Use whenever the user has a set of genes (differentially expressed genes from PyDESeq2/Scanpy, CRISPR-screen hits, cluster marker genes, proteomics hits) and wants to know which biological pathways, GO terms, or gene sets are over-represented or enriched. Covers over-representation analysis (ORA / Enrichr / Fisher / hypergeometric), ranked Gene Set Enrichment Analysis (GSEA / preranked), single-sample scoring (ssGSEA/GSVA), and functional profiling via gseapy, g:Profiler, Enrichr libraries, MSigDB, GO, KEGG, Reactome, and WikiPathways — plus gene-ID mapping, choosing the right background universe, multiple-testing correction, redundancy reduction, dotplots/enrichment maps, and publication-ready tables. Use this for \"pathway analysis\", \"enrichment analysis\", \"GO enrichment\", \"KEGG/Reactome pathways\", \"GSEA\", \"over-representation\", \"functional annotation\", or \"what pathways are my genes in\".",
+      "compatibility": "",
+      "reference_count": 3
+    },
+    {
+      "skill": "pdf",
+      "declared_name": "pdf",
+      "tier": "C",
+      "category": "document-ingest",
+      "alpha_use": "Extract tables/text from papers and reports.",
+      "description": "Use this skill whenever the user wants to do anything with PDF files. This includes reading or extracting text/tables from PDFs, combining or merging multiple PDFs into one, splitting PDFs apart, rotating pages, adding watermarks, creating new PDFs, filling PDF forms, encrypting/decrypting PDFs, extracting images, and OCR on scanned PDFs to make them searchable. If the user mentions a .pdf file or asks to produce one, use this skill.",
+      "compatibility": "",
+      "reference_count": 0
+    },
+    {
+      "skill": "peer-review",
+      "declared_name": "peer-review",
+      "tier": "A",
+      "category": "review",
+      "alpha_use": "Structured final methodology/reproducibility review before any promotion claim.",
+      "description": "Structured manuscript/grant review with checklist-based evaluation. Use when writing formal peer reviews with specific criteria methodology assessment, statistical validity, reporting standards compliance (CONSORT/STROBE), and constructive feedback. Best for actual review writing, manuscript revision. For evaluating claims/evidence quality use scientific-critical-thinking; for quantitative scoring frameworks use scholar-evaluation.",
+      "compatibility": "",
+      "reference_count": 2
+    },
+    {
+      "skill": "pennylane",
+      "declared_name": "pennylane",
+      "tier": "D",
+      "category": "excluded-quantum",
+      "alpha_use": "Reviewed; quantum computing workflow is not needed for current alpha discovery.",
+      "description": "Hardware-agnostic quantum ML framework with automatic differentiation. Use when training quantum circuits via gradients, building hybrid quantum-classical models, or needing device portability across IBM/Google/Rigetti/IonQ. Best for variational algorithms (VQE, QAOA), quantum neural networks, and integration with PyTorch or JAX. For hardware-specific optimizations use qiskit (IBM) or cirq (Google); for open quantum systems use qutip.",
+      "compatibility": "",
+      "reference_count": 7
+    },
+    {
+      "skill": "phylogenetics",
+      "declared_name": "phylogenetics",
+      "tier": "D",
+      "category": "excluded-chemistry",
+      "alpha_use": "Reviewed; chemistry/drug-discovery workflow is not a default LuminaQuant alpha source.",
+      "description": "Build and analyze phylogenetic trees using MAFFT (multiple alignment), IQ-TREE 2 (maximum likelihood), and FastTree (fast NJ/ML). Visualize with ETE3 or FigTree. For evolutionary analysis, microbial genomics, viral phylodynamics, protein family analysis, and molecular clock studies.",
+      "compatibility": "",
+      "reference_count": 1
+    },
+    {
+      "skill": "pi-agent",
+      "declared_name": "pi-agent",
+      "tier": "C",
+      "category": "agent-platform",
+      "alpha_use": "Build/run Pi harnesses only if that platform is explicitly used.",
+      "description": "Build with and use Pi, the minimal terminal coding harness. Use for installing Pi, configuring providers/models/settings, creating Pi skills/extensions/packages/themes/prompt templates, embedding Pi through the SDK, integrating over RPC or JSON event streams, parsing sessions, developing custom Pi providers and TUI components, or using ecosystem packages such as pi-subagents (delegation/orchestration), pi-mcp-adapter (MCP servers), pi-interview (interactive forms), and pi-web-access (web search, fetching, video understanding).",
+      "compatibility": "Requires Node.js/npm for Pi CLI and SDK usage. Pi package name is @earendil-works/pi-coding-agent.",
+      "reference_count": 32
+    },
+    {
+      "skill": "polars",
+      "declared_name": "polars",
+      "tier": "A",
+      "category": "dataframe",
+      "alpha_use": "Primary LuminaQuant dataframe engine: lazy scans, streaming, joins, group-by, parquet.",
+      "description": "High-performance DataFrame library for Python ETL, analytics, and pandas migration. Use for expression-based data manipulation with lazy query optimization, parallel execution, streaming out-of-core processing, Arrow interoperability, and optional GPU execution.",
+      "compatibility": "Requires Python 3.10+ for polars 1.41.x. Install with uv pip install; optional extras enable Excel, database, cloud, pandas/NumPy, and GPU integrations.",
+      "reference_count": 6
+    },
+    {
+      "skill": "polars-bio",
+      "declared_name": "polars-bio",
+      "tier": "D",
+      "category": "excluded-biomedical",
+      "alpha_use": "Reviewed; biomedical/genomics workflow is not a default LuminaQuant alpha source.",
+      "description": "High-performance genomic interval operations and bioinformatics file I/O on Polars DataFrames. Overlap, nearest, merge, coverage, complement, subtract for BED/VCF/BAM/GFF intervals. Streaming, cloud-native, faster bioframe alternative.",
+      "compatibility": "Requires Python 3.11–3.14 and polars-bio (uv pip install). Cloud I/O uses standard AWS/GCS/Azure SDK env vars when paths use s3://, gs://, or az:// URIs.",
+      "reference_count": 6
+    },
+    {
+      "skill": "pptx",
+      "declared_name": "pptx",
+      "tier": "C",
+      "category": "document-ingest",
+      "alpha_use": "Extract slide decks or create research presentations.",
+      "description": "Use this skill any time a .pptx file is involved in any way — as input, output, or both. This includes: creating slide decks, pitch decks, or presentations; reading, parsing, or extracting text from any .pptx file (even if the extracted content will be used elsewhere, like in an email or summary); editing, modifying, or updating existing presentations; combining or splitting slide files; working with templates, layouts, speaker notes, or comments. Trigger whenever the user mentions \\\"deck,\\\" \\\"slides,\\\" \\\"presentation,\\\" or references a .pptx filename, regardless of what they plan to do with the content afterward. If a .pptx file needs to be opened, created, or touched, use this skill.",
+      "compatibility": "",
+      "reference_count": 0
+    },
+    {
+      "skill": "pptx-posters",
+      "declared_name": "pptx-posters",
+      "tier": "C",
+      "category": "reporting",
+      "alpha_use": "Poster output only.",
+      "description": "Create research posters using HTML/CSS that can be exported to PDF or PPTX. Use this skill ONLY when the user explicitly requests PowerPoint/PPTX poster format. For standard research posters, use latex-posters instead. This skill provides modern web-based poster design with responsive layouts and easy visual integration.",
+      "compatibility": "",
+      "reference_count": 3
+    },
+    {
+      "skill": "primekg",
+      "declared_name": "primekg",
+      "tier": "D",
+      "category": "excluded-chemistry",
+      "alpha_use": "Reviewed; chemistry/drug-discovery workflow is not a default LuminaQuant alpha source.",
+      "description": "Query the Precision Medicine Knowledge Graph (PrimeKG) for multiscale biological data including genes, drugs, diseases, phenotypes, and more.",
+      "compatibility": "",
+      "reference_count": 0
+    },
+    {
+      "skill": "protocolsio-integration",
+      "declared_name": "protocolsio-integration",
+      "tier": "D",
+      "category": "excluded-lab",
+      "alpha_use": "Reviewed; lab automation/integration workflow is not a default LuminaQuant alpha source.",
+      "description": "Integration with protocols.io API for managing scientific protocols. This skill should be used when working with protocols.io to search, create, update, or publish protocols; manage protocol steps and materials; handle discussions and comments; organize workspaces; upload and manage files; or integrate protocols.io functionality into workflows. Applicable for protocol discovery, collaborative protocol development, experiment tracking, lab protocol management, and scientific documentation.",
+      "compatibility": "",
+      "reference_count": 6
+    },
+    {
+      "skill": "pufferlib",
+      "declared_name": "pufferlib",
+      "tier": "B",
+      "category": "rl",
+      "alpha_use": "High-throughput RL for execution/sizing environments; not first-line alpha discovery.",
+      "description": "High-performance reinforcement learning framework optimized for speed and scale. Use when you need fast parallel training, vectorized environments, multi-agent systems, or integration with game environments (Atari, Procgen, NetHack). Achieves 2-10x speedups over standard implementations. For quick prototyping or standard algorithm implementations with extensive documentation, use stable-baselines3 instead.",
+      "compatibility": "",
+      "reference_count": 5
+    },
+    {
+      "skill": "pydeseq2",
+      "declared_name": "pydeseq2",
+      "tier": "D",
+      "category": "excluded-biomedical",
+      "alpha_use": "Reviewed; biomedical/genomics workflow is not a default LuminaQuant alpha source.",
+      "description": "Differential gene expression analysis for bulk RNA-seq with PyDESeq2, including formulaic designs, Wald tests, FDR correction, LFC shrinkage, and result visualization.",
+      "compatibility": "Requires Python >=3.11 and PyDESeq2 0.5.4-compatible dependencies. Examples target PyDESeq2 0.5.x, formulaic design strings, explicit contrasts, and uv-based installs.",
+      "reference_count": 2
+    },
+    {
+      "skill": "pydicom",
+      "declared_name": "pydicom",
+      "tier": "D",
+      "category": "excluded-clinical",
+      "alpha_use": "Reviewed; clinical/medical workflow is not a default LuminaQuant alpha source.",
+      "description": "Python library for working with DICOM (Digital Imaging and Communications in Medicine) files. Use this skill when reading, writing, or modifying medical imaging data in DICOM format, extracting pixel data from medical images (CT, MRI, X-ray, ultrasound), anonymizing DICOM files, working with DICOM metadata and tags, converting DICOM images to other formats, handling compressed DICOM data, or processing medical imaging datasets. Applies to tasks involving medical image analysis, PACS systems, radiology workflows, and healthcare imaging applications.",
+      "compatibility": "",
+      "reference_count": 2
+    },
+    {
+      "skill": "pyhealth",
+      "declared_name": "pyhealth",
+      "tier": "D",
+      "category": "excluded-clinical",
+      "alpha_use": "Reviewed; clinical/medical workflow is not a default LuminaQuant alpha source.",
+      "description": "Build clinical/healthcare deep-learning pipelines with PyHealth — loading EHR/signal/imaging datasets (MIMIC-III/IV, eICU, OMOP, SleepEDF, ChestXray14, EHRShot), defining tasks (mortality, readmission, length-of-stay, drug recommendation, sleep staging, ICD coding, EEG events), instantiating models (Transformer, RETAIN, GAMENet, SafeDrug, MICRON, StageNet, AdaCare, CNN/RNN/MLP), training with the PyHealth Trainer, computing clinical metrics, and using medical code utilities (ICD/ATC/NDC/RxNorm lookup and cross-mapping). Use this skill whenever the user mentions PyHealth, MIMIC, eICU, OMOP, EHR modeling, clinical prediction, drug recommendation, sleep staging, medical code mapping, ICD/ATC codes, or any healthcare ML pipeline that fits the dataset → task → model → trainer → metrics pattern, even if \"PyHealth\" isn't named explicitly.",
+      "compatibility": "",
+      "reference_count": 6
+    },
+    {
+      "skill": "pylabrobot",
+      "declared_name": "pylabrobot",
+      "tier": "D",
+      "category": "excluded-lab",
+      "alpha_use": "Reviewed; lab automation/integration workflow is not a default LuminaQuant alpha source.",
+      "description": "Vendor-agnostic lab automation framework. Use when controlling multiple equipment types (Hamilton, Tecan, Opentrons, plate readers, pumps) or needing unified programming across different vendors. Best for complex workflows, multi-vendor setups, simulation. For Opentrons-only protocols with official API, opentrons-integration may be simpler.",
+      "compatibility": "",
+      "reference_count": 6
+    },
+    {
+      "skill": "pymatgen",
+      "declared_name": "pymatgen",
+      "tier": "D",
+      "category": "excluded-materials",
+      "alpha_use": "Reviewed; materials science workflow is not default unless explicit commodity/materials alt-data research is requested.",
+      "description": "Materials science toolkit. Crystal structures (CIF, POSCAR), phase diagrams, band structure, DOS, Materials Project integration, format conversion, for computational materials science.",
+      "compatibility": "",
+      "reference_count": 5
+    },
+    {
+      "skill": "pymc",
+      "declared_name": "pymc",
+      "tier": "B",
+      "category": "bayesian",
+      "alpha_use": "Bayesian regimes, uncertainty, hierarchical alpha strength, posterior predictive checks.",
+      "description": "Bayesian modeling with PyMC. Build hierarchical models, MCMC (NUTS), variational inference, LOO/WAIC comparison, posterior checks, for probabilistic programming and inference.",
+      "compatibility": "Requires Python 3.12+ and PyMC 6.0.1-compatible dependencies. Install reproducible environments with `uv pip install \"pymc[nutpie]==6.0.1\"`; optional NumPyro or BlackJAX samplers require separately pinned JAX-compatible dependencies.",
+      "reference_count": 3
+    },
+    {
+      "skill": "pymoo",
+      "declared_name": "pymoo",
+      "tier": "A",
+      "category": "multi-objective-optimization",
+      "alpha_use": "Pareto search over return, drawdown, turnover, gross, stability, and implementation risk.",
+      "description": "Multi-objective optimization framework. NSGA-II, NSGA-III, MOEA/D, Pareto fronts, constraint handling, benchmarks (ZDT, DTLZ), for engineering design and optimization problems.",
+      "compatibility": "Requires Python 3.10+ and pymoo (uv pip install). Optional matplotlib for visualization plots; optional autograd for gradient-based features; optional joblib for JoblibParallelization.",
+      "reference_count": 6
+    },
+    {
+      "skill": "pyopenms",
+      "declared_name": "pyopenms",
+      "tier": "D",
+      "category": "excluded-lab",
+      "alpha_use": "Reviewed; lab automation/integration workflow is not a default LuminaQuant alpha source.",
+      "description": "Complete mass spectrometry analysis platform. Use for proteomics and metabolomics workflows—feature detection, peptide/protein identification, label-free and isobaric quantification, adduct/accurate-mass annotation, and complex LC-MS/MS pipelines. Supports extensive file formats and algorithms. For simple spectral comparison and small-molecule library matching use matchms.",
+      "compatibility": "Requires Python 3.9+ and uv. Examples and scripts target pyOpenMS 3.5.0.",
+      "reference_count": 6
+    },
+    {
+      "skill": "pysam",
+      "declared_name": "pysam",
+      "tier": "D",
+      "category": "excluded-biomedical",
+      "alpha_use": "Reviewed; biomedical/genomics workflow is not a default LuminaQuant alpha source.",
+      "description": "Genomic file toolkit. Read/write SAM/BAM/CRAM alignments, VCF/BCF variants, FASTA/FASTQ sequences, extract regions, calculate coverage, for NGS data processing pipelines.",
+      "compatibility": "",
+      "reference_count": 4
+    },
+    {
+      "skill": "pytdc",
+      "declared_name": "pytdc",
+      "tier": "D",
+      "category": "excluded-chemistry",
+      "alpha_use": "Reviewed; chemistry/drug-discovery workflow is not a default LuminaQuant alpha source.",
+      "description": "Therapeutics Data Commons. AI-ready drug discovery datasets (ADME, toxicity, DTI), benchmarks, scaffold splits, molecular oracles, for therapeutic ML and pharmacological prediction.",
+      "compatibility": "",
+      "reference_count": 3
+    },
+    {
+      "skill": "pytorch-lightning",
+      "declared_name": "pytorch-lightning",
+      "tier": "B",
+      "category": "deep-learning",
+      "alpha_use": "Structured deep learning experiments; use only with pre-registered splits and audits.",
+      "description": "Deep learning framework (PyTorch Lightning / lightning package). Organize PyTorch code into LightningModules, configure Trainers for multi-GPU/TPU, implement data pipelines, callbacks, logging (W&B, TensorBoard, MLflow), distributed training (DDP, FSDP, DeepSpeed), for scalable neural network training.",
+      "compatibility": "Requires Python 3.10+ and lightning 2.6+ (or pytorch-lightning 2.6+). GPU training needs CUDA-capable PyTorch. Optional loggers (wandb, mlflow, comet-ml) and DeepSpeed require separate installs.",
+      "reference_count": 7
+    },
+    {
+      "skill": "pyzotero",
+      "declared_name": "pyzotero",
+      "tier": "C",
+      "category": "provenance",
+      "alpha_use": "Zotero library integration for research provenance if the project uses Zotero.",
+      "description": "Interact with Zotero reference management libraries using the pyzotero Python client. Retrieve, create, update, and delete items, collections, tags, and attachments via the Zotero Web API v3. Use this skill when working with Zotero libraries programmatically, managing bibliographic references, exporting citations, searching library contents, uploading PDF attachments, or building research automation workflows that integrate with Zotero.",
+      "compatibility": "Requires Python 3.10+ and pyzotero 1.13+. Web API access needs a Zotero API key. Optional CLI and MCP extras require Zotero 7 with local API access enabled.",
+      "reference_count": 14
+    },
+    {
+      "skill": "qiskit",
+      "declared_name": "qiskit",
+      "tier": "D",
+      "category": "excluded-quantum",
+      "alpha_use": "Reviewed; quantum computing workflow is not needed for current alpha discovery.",
+      "description": "IBM quantum computing framework. Use when targeting IBM Quantum hardware, working with Qiskit Runtime for production workloads, or needing IBM optimization tools. Best for IBM hardware execution, quantum error mitigation, and enterprise quantum computing. For Google hardware use cirq; for gradient-based quantum ML use pennylane; for open quantum system simulations use qutip.",
+      "compatibility": "",
+      "reference_count": 8
+    },
+    {
+      "skill": "qutip",
+      "declared_name": "qutip",
+      "tier": "D",
+      "category": "excluded-quantum",
+      "alpha_use": "Reviewed; quantum computing workflow is not needed for current alpha discovery.",
+      "description": "Quantum physics simulation library for open quantum systems. Use when studying master equations, Lindblad dynamics, decoherence, quantum optics, or cavity QED. Best for physics research, open system dynamics, and educational simulations. NOT for circuit-based quantum computing—use qiskit, cirq, or pennylane for quantum algorithms and hardware execution.",
+      "compatibility": "",
+      "reference_count": 5
+    },
+    {
+      "skill": "rdkit",
+      "declared_name": "rdkit",
+      "tier": "D",
+      "category": "excluded-chemistry",
+      "alpha_use": "Reviewed; chemistry/drug-discovery workflow is not a default LuminaQuant alpha source.",
+      "description": "Cheminformatics toolkit for fine-grained molecular control. SMILES/SDF parsing, descriptors (MW, LogP, TPSA), fingerprints, substructure search, 2D/3D generation, similarity, reactions. For standard workflows with simpler interface, use datamol (wrapper around RDKit). Use rdkit for advanced control, custom sanitization, specialized algorithms.",
+      "compatibility": "Examples target RDKit 2026.03.x. Use conda-forge for the broadest binary support or PyPI package `rdkit` for supported platform wheels; `rdkit-pypi` is the legacy PyPI name.",
+      "reference_count": 3
+    },
+    {
+      "skill": "research-grants",
+      "declared_name": "research-grants",
+      "tier": "D",
+      "category": "excluded-other",
+      "alpha_use": "Reviewed; no direct role in finding, validating, analyzing, or reporting LuminaQuant trading alpha by default.",
+      "description": "Write competitive research proposals for NSF, NIH, DOE, DARPA, and Taiwan NSTC. Agency-specific formatting, review criteria, budget preparation, broader impacts, significance statements, innovation narratives, and compliance with submission requirements.",
+      "compatibility": "Works in Agent Skills-compatible hosts. Grant-writing guidance needs no network; optional figures via the scientific-schematics skill require OPENROUTER_API_KEY and outbound API access.",
+      "reference_count": 8
+    },
+    {
+      "skill": "research-lookup",
+      "declared_name": "research-lookup",
+      "tier": "A",
+      "category": "literature",
+      "alpha_use": "Find current research, papers, and technical sources for alpha idea sourcing.",
+      "description": "Look up current research information using parallel-cli search (primary, fast web search), the Parallel Chat API (deep research), or Perplexity sonar-pro-search (academic paper searches). Automatically routes queries to the best backend. Use for finding papers, gathering research data, and verifying scientific information. Note: query text is transmitted to api.parallel.ai (PARALLEL_API_KEY) and, for academic searches, to openrouter.ai (OPENROUTER_API_KEY).",
+      "compatibility": "parallel-cli required (primary); PARALLEL_API_KEY and OPENROUTER_API_KEY optional for deep/academic backends",
+      "reference_count": 0
+    },
+    {
+      "skill": "rowan",
+      "declared_name": "rowan",
+      "tier": "D",
+      "category": "excluded-chemistry",
+      "alpha_use": "Reviewed; chemistry/drug-discovery workflow is not a default LuminaQuant alpha source.",
+      "description": "Rowan is a cloud-native molecular modeling and medicinal-chemistry workflow platform with a Python API. Use for pKa and macropKa prediction, conformer and tautomer ensembles, docking and analogue docking, protein-ligand cofolding, MSA generation, molecular dynamics, permeability, descriptor workflows, and related small-molecule or protein modeling tasks. Ideal for programmatic batch screening, multi-step chemistry pipelines, and workflows that would otherwise require maintaining local HPC/GPU infrastructure.",
+      "compatibility": "Python 3.12+, API key required",
+      "reference_count": 0
+    },
+    {
+      "skill": "scanpy",
+      "declared_name": "scanpy",
+      "tier": "D",
+      "category": "excluded-biomedical",
+      "alpha_use": "Reviewed; biomedical/genomics workflow is not a default LuminaQuant alpha source.",
+      "description": "Standard single-cell RNA-seq analysis pipeline. Use for QC, normalization, dimensionality reduction (PCA/UMAP/t-SNE), clustering, differential expression, visualization, and converting R-friendly single-cell formats such as Seurat or SingleCellExperiment RDS files into h5ad for Scanpy. Best for exploratory scRNA-seq analysis with established workflows. For deep learning models use scvi-tools; for data format questions use anndata.",
+      "compatibility": "",
+      "reference_count": 4
+    },
+    {
+      "skill": "scholar-evaluation",
+      "declared_name": "scholar-evaluation",
+      "tier": "B",
+      "category": "review",
+      "alpha_use": "Score imported scholarly claims and paper quality.",
+      "description": "Systematically evaluate scholarly work using the ScholarEval framework, providing structured assessment across research quality dimensions including problem formulation, methodology, analysis, and writing with quantitative scoring and actionable feedback.",
+      "compatibility": "",
+      "reference_count": 1
+    },
+    {
+      "skill": "scientific-brainstorming",
+      "declared_name": "scientific-brainstorming",
+      "tier": "A",
+      "category": "ideation",
+      "alpha_use": "Generate diverse cross-domain alpha families before implementation.",
+      "description": "Creative research ideation and exploration. Use for open-ended brainstorming sessions, exploring interdisciplinary connections, challenging assumptions, or identifying research gaps. Best for early-stage research planning when you do not have specific observations yet. For formulating testable hypotheses from data use hypothesis-generation.",
+      "compatibility": "",
+      "reference_count": 1
+    },
+    {
+      "skill": "scientific-critical-thinking",
+      "declared_name": "scientific-critical-thinking",
+      "tier": "A",
+      "category": "bias-control",
+      "alpha_use": "Attack leakage, p-hacking, confounding, survivorship, cost assumptions, and unsupported claims.",
+      "description": "Evaluate scientific claims and evidence quality. Use for assessing experimental design validity, identifying biases and confounders, applying evidence grading frameworks (GRADE, Cochrane Risk of Bias), or teaching critical analysis. Best for understanding evidence quality, identifying flaws. For formal peer review writing use peer-review.",
+      "compatibility": "Analytical guidance needs no network. Optional figures via the scientific-schematics skill require OPENROUTER_API_KEY and outbound API access to OpenRouter.",
+      "reference_count": 6
+    },
+    {
+      "skill": "scientific-schematics",
+      "declared_name": "scientific-schematics",
+      "tier": "C",
+      "category": "reporting",
+      "alpha_use": "System/pipeline schematics and conceptual diagrams.",
+      "description": "Create publication-quality scientific diagrams using Nano Banana 2 AI with smart iterative refinement. Uses Gemini 3.1 Pro Preview for quality review. Only regenerates if quality is below threshold for your document type. Specialized in neural network architectures, system diagrams, flowcharts, biological pathways, and complex scientific visualizations.",
+      "compatibility": "",
+      "reference_count": 3
+    },
+    {
+      "skill": "scientific-slides",
+      "declared_name": "scientific-slides",
+      "tier": "C",
+      "category": "reporting",
+      "alpha_use": "Research presentation deck creation after evidence exists.",
+      "description": "Build slide decks and presentations for research talks. Use this for making PowerPoint slides, conference presentations, seminar talks, research presentations, thesis defense slides, or any scientific talk. Provides slide structure, design templates, timing guidance, and visual validation. Works with PowerPoint and LaTeX Beamer.",
+      "compatibility": "",
+      "reference_count": 6
+    },
+    {
+      "skill": "scientific-visualization",
+      "declared_name": "scientific-visualization",
+      "tier": "A",
+      "category": "visualization",
+      "alpha_use": "Publication-quality diagnostics for returns, drawdowns, regimes, robustness, and costs.",
+      "description": "Meta-skill for publication-ready figures. Use when creating journal submission figures requiring multi-panel layouts, significance annotations, error bars, colorblind-safe palettes, and specific journal formatting (Nature, Science, Cell). Orchestrates matplotlib/seaborn/plotly with publication styles. For quick exploration use seaborn or plotly directly.",
+      "compatibility": "",
+      "reference_count": 4
+    },
+    {
+      "skill": "scientific-writing",
+      "declared_name": "scientific-writing",
+      "tier": "C",
+      "category": "reporting",
+      "alpha_use": "Convert validated evidence into prose reports.",
+      "description": "Core skill for the deep research and writing tool. Write scientific manuscripts in full paragraphs (never bullet points). Use two-stage process with (1) section outlines with key points using research-lookup then (2) convert to flowing prose. IMRAD structure, citations (APA/AMA/Vancouver), figures/tables, reporting guidelines (CONSORT/STROBE/PRISMA), for research papers and journal submissions.",
+      "compatibility": "",
+      "reference_count": 6
+    },
+    {
+      "skill": "scikit-bio",
+      "declared_name": "scikit-bio",
+      "tier": "D",
+      "category": "excluded-biomedical",
+      "alpha_use": "Reviewed; biomedical/genomics workflow is not a default LuminaQuant alpha source.",
+      "description": "Biological data toolkit. Sequence analysis, alignments, phylogenetic trees, diversity metrics (alpha/beta, UniFrac), ordination (PCoA), PERMANOVA, FASTA/Newick I/O, for microbiome analysis.",
+      "compatibility": "Requires Python 3.10+ and scikit-bio 0.7+ (uv pip install scikit-bio). NumPy 2.0+ is required. Optional matplotlib/seaborn/plotly for plotting; biom-format for BIOM tables; polars/anndata for table interoperability.",
+      "reference_count": 1
+    },
+    {
+      "skill": "scikit-learn",
+      "declared_name": "scikit-learn",
+      "tier": "A",
+      "category": "ml",
+      "alpha_use": "Leakage-safe tabular ML baselines, selectors, clustering, anomaly detectors, and TimeSeriesSplit pipelines.",
+      "description": "Machine learning in Python with scikit-learn. Use when working with supervised learning (classification, regression), unsupervised learning (clustering, dimensionality reduction), model evaluation, hyperparameter tuning, preprocessing, or building ML pipelines. Provides comprehensive reference documentation for algorithms, preprocessing techniques, pipelines, and best practices.",
+      "compatibility": "Requires Python 3.11+ and scikit-learn 1.7+. NumPy and SciPy are required dependencies. Optional matplotlib/seaborn for bundled example scripts that save plots.",
+      "reference_count": 6
+    },
+    {
+      "skill": "scikit-survival",
+      "declared_name": "scikit-survival",
+      "tier": "B",
+      "category": "hazard-modeling",
+      "alpha_use": "Signal decay, stop-out, breakout failure, and time-to-event studies.",
+      "description": "Comprehensive toolkit for survival analysis and time-to-event modeling in Python using scikit-survival. Use this skill when working with censored survival data, performing time-to-event analysis, fitting Cox models, Random Survival Forests, Gradient Boosting models, or Survival SVMs, evaluating survival predictions with concordance index or Brier score, handling competing risks, or implementing any survival analysis workflow with the scikit-survival library.",
+      "compatibility": "",
+      "reference_count": 6
+    },
+    {
+      "skill": "scvelo",
+      "declared_name": "scvelo",
+      "tier": "D",
+      "category": "excluded-biomedical",
+      "alpha_use": "Reviewed; biomedical/genomics workflow is not a default LuminaQuant alpha source.",
+      "description": "RNA velocity analysis with scVelo. Estimate cell state transitions from unspliced/spliced mRNA dynamics, infer trajectory directions, compute latent time, and identify driver genes in single-cell RNA-seq data. Complements Scanpy/scVI-tools for trajectory inference.",
+      "compatibility": "",
+      "reference_count": 1
+    },
+    {
+      "skill": "scvi-tools",
+      "declared_name": "scvi-tools",
+      "tier": "D",
+      "category": "excluded-biomedical",
+      "alpha_use": "Reviewed; biomedical/genomics workflow is not a default LuminaQuant alpha source.",
+      "description": "Deep generative models for single-cell omics. Use when you need probabilistic batch correction (scVI), transfer learning, differential expression with uncertainty, or multi-modal integration (TOTALVI, MultiVI). Best for advanced modeling, batch effects, multimodal data. For standard analysis pipelines use scanpy.",
+      "compatibility": "",
+      "reference_count": 8
+    },
+    {
+      "skill": "seaborn",
+      "declared_name": "seaborn",
+      "tier": "C",
+      "category": "visualization",
+      "alpha_use": "Fast statistical plots for distributions, correlations, and diagnostics.",
+      "description": "Statistical visualization with pandas integration. Use for quick exploration of distributions, relationships, and categorical comparisons with attractive defaults. Best for box plots, violin plots, pair plots, heatmaps. Built on matplotlib. For interactive plots use plotly; for publication styling use scientific-visualization.",
+      "compatibility": "Requires Python 3.8+ and seaborn 0.13.2-compatible dependencies. Install with uv pip install seaborn==0.13.2; use seaborn[stats]==0.13.2 when advanced regression or clustering examples need scipy/statsmodels.",
+      "reference_count": 3
+    },
+    {
+      "skill": "shap",
+      "declared_name": "shap",
+      "tier": "A",
+      "category": "explainability",
+      "alpha_use": "Feature attribution sanity checks and leakage-feature detection for ML alpha models.",
+      "description": "Model interpretability and explainability using SHAP (SHapley Additive exPlanations). Use this skill when explaining machine learning model predictions, computing feature importance, generating SHAP plots (waterfall, beeswarm, bar, scatter, force, heatmap), debugging models, analyzing model bias or fairness, comparing models, or implementing explainable AI. Works with tree-based models (XGBoost, LightGBM, Random Forest), deep learning (TensorFlow, PyTorch), linear models, and any black-box model.",
+      "compatibility": "",
+      "reference_count": 4
+    },
+    {
+      "skill": "simpy",
+      "declared_name": "simpy",
+      "tier": "B",
+      "category": "execution-simulation",
+      "alpha_use": "Discrete-event fill, queue, latency, and slippage simulations.",
+      "description": "Process-based discrete-event simulation framework in Python. Use this skill when building simulations of systems with processes, queues, resources, and time-based events such as manufacturing systems, service operations, network traffic, logistics, or any system where entities interact with shared resources over time.",
+      "compatibility": "",
+      "reference_count": 5
+    },
+    {
+      "skill": "stable-baselines3",
+      "declared_name": "stable-baselines3",
+      "tier": "B",
+      "category": "rl",
+      "alpha_use": "Execution/sizing/risk-control simulation after environment fidelity is proven.",
+      "description": "Production-ready reinforcement learning algorithms (PPO, SAC, DQN, TD3, DDPG, A2C) with scikit-learn-like API. Use for standard RL experiments, quick prototyping, and well-documented algorithm implementations. Best for single-agent RL with Gymnasium environments. For high-performance parallel training, multi-agent systems, or custom vectorized environments, use pufferlib instead.",
+      "compatibility": "Requires Python 3.10+, PyTorch >= 2.3, and stable-baselines3 2.8+. Gymnasium environments; optional extras for TensorBoard and Atari (ale-py).",
+      "reference_count": 4
+    },
+    {
+      "skill": "statistical-analysis",
+      "declared_name": "statistical-analysis",
+      "tier": "A",
+      "category": "validation",
+      "alpha_use": "Choose tests, effect sizes, intervals, robustness checks, and multiple-comparison handling.",
+      "description": "Guided statistical analysis with test selection and reporting. Use when you need help choosing appropriate tests for your data, assumption checking, power analysis, and APA-formatted results. Best for academic research reporting, test selection guidance. For implementing specific models programmatically use statsmodels.",
+      "compatibility": "",
+      "reference_count": 5
+    },
+    {
+      "skill": "statistical-power",
+      "declared_name": "statistical-power",
+      "tier": "B",
+      "category": "validation",
+      "alpha_use": "Minimum detectable effect/sample-size checks for sparse trades or short windows.",
+      "description": "Sample-size and statistical power calculations for planning studies. Use whenever someone asks \"how many subjects/samples/replicates do I need\", wants an a priori power analysis, a minimum detectable effect (MDE), a power curve, or needs to justify a sample size for a grant, IRB protocol, or pre-registration. Covers closed-form power for t-tests, ANOVA, proportions, correlations, chi-square, and regression, plus simulation-based (Monte Carlo) power for designs with no formula — logistic/Poisson regression, mixed models, cluster-randomized trials, survival, and interactions. Use this skill even when the request only mentions an effect size, alpha, or \"80% power\" without saying \"power analysis\" explicitly. For laying out the study (randomization, blocking, factorial/DOE, crossover, sequential designs) use experimental-design; for analyzing data already collected and reporting it use statistical-analysis.",
+      "compatibility": "Requires Python >=3.10. Examples target statsmodels >=0.14.6, scipy >=1.11, pingouin >=0.6, numpy >=1.26, and matplotlib. Optional extras are statsmodels mixed models and lifelines for simulation-based power.",
+      "reference_count": 3
+    },
+    {
+      "skill": "statsmodels",
+      "declared_name": "statsmodels",
+      "tier": "A",
+      "category": "econometrics",
+      "alpha_use": "OLS/GLM/ARIMA/VAR, cointegration, Granger-style tests, robust errors, diagnostics.",
+      "description": "Statistical models library for Python. Use when you need specific model classes (OLS, GLM, mixed models, ARIMA) with detailed diagnostics, residuals, and inference. Best for econometrics, time series, rigorous inference with coefficient tables. For guided statistical test selection with APA reporting use statistical-analysis.",
+      "compatibility": "Requires Python 3.9+ and statsmodels 0.14.6-compatible dependencies. Use `uv pip install statsmodels==0.14.6`; optional predictive-metric examples also need scikit-learn.",
+      "reference_count": 5
+    },
+    {
+      "skill": "sympy",
+      "declared_name": "sympy",
+      "tier": "C",
+      "category": "math",
+      "alpha_use": "Symbolic derivations for transforms, constraints, or report equations.",
+      "description": "Use when you need exact symbolic math in Python — algebra, calculus, equation solving, symbolic linear algebra, or code generation via lambdify/LaTeX. Prefer NumPy or SciPy when floating-point approximations are sufficient.",
+      "compatibility": "Requires Python 3.9+ and SymPy 1.14+. Optional NumPy/SciPy/Matplotlib for lambdify examples; C/Fortran compiler for autowrap/codegen.",
+      "reference_count": 5
+    },
+    {
+      "skill": "tiledbvcf",
+      "declared_name": "tiledbvcf",
+      "tier": "D",
+      "category": "excluded-lab",
+      "alpha_use": "Reviewed; lab automation/integration workflow is not a default LuminaQuant alpha source.",
+      "description": "Efficient storage and retrieval of genomic variant data using TileDB. Scalable VCF/BCF ingestion, incremental sample addition, compressed storage, parallel queries, and export capabilities for population genomics.",
+      "compatibility": "",
+      "reference_count": 0
+    },
+    {
+      "skill": "timesfm-forecasting",
+      "declared_name": "timesfm-forecasting",
+      "tier": "B",
+      "category": "forecasting",
+      "alpha_use": "Zero-shot forecast intervals/anomaly features; never standalone promotion evidence.",
+      "description": "Zero-shot time series forecasting with Google's TimesFM foundation model. Use for any univariate time series (sales, sensors, energy, vitals, weather) without training a custom model. Supports CSV/DataFrame/array inputs with point forecasts and prediction intervals. Includes a preflight system checker script to verify RAM/GPU before first use.",
+      "compatibility": "",
+      "reference_count": 3
+    },
+    {
+      "skill": "torch-geometric",
+      "declared_name": "torch-geometric",
+      "tier": "B",
+      "category": "graph-ml",
+      "alpha_use": "Graph neural network alpha research; high leakage/overfit risk, strict gate required.",
+      "description": "PyTorch Geometric (PyG) for graph neural networks — node/link/graph classification, message passing (GCN, GAT, GraphSAGE, GIN), heterogeneous graphs, neighbor sampling, and custom datasets. Use when working with torch_geometric, not for general NetworkX analytics or non-graph PyTorch models.",
+      "compatibility": "Requires Python 3.10+, PyTorch 2.6+, and torch-geometric 2.7.x. Optional extension wheels (pyg-lib, torch-scatter, torch-sparse, torch-cluster) must match your PyTorch/CUDA build from https://data.pyg.org/whl.",
+      "reference_count": 6
+    },
+    {
+      "skill": "torchdrug",
+      "declared_name": "torchdrug",
+      "tier": "D",
+      "category": "excluded-chemistry",
+      "alpha_use": "Reviewed; chemistry/drug-discovery workflow is not a default LuminaQuant alpha source.",
+      "description": "PyTorch-native graph neural networks for molecules and proteins. Use when building custom GNN architectures for drug discovery, protein modeling, or knowledge graph reasoning. Best for custom model development, protein property prediction, retrosynthesis. For pre-trained models and diverse featurizers use deepchem; for benchmark datasets use pytdc.",
+      "compatibility": "",
+      "reference_count": 8
+    },
+    {
+      "skill": "transformers",
+      "declared_name": "transformers",
+      "tier": "B",
+      "category": "nlp-alt-data",
+      "alpha_use": "Text/news/filing sentiment or representation experiments; strict source/time provenance required.",
+      "description": "Hugging Face Transformers for loading Hub models, running pipeline inference, text generation, and Trainer fine-tuning on NLP, vision, audio, and multimodal tasks. Use when working with AutoModel, pipelines, tokenizers, or TrainingArguments—not for general ML outside the Transformers library.",
+      "compatibility": "Requires Python 3.10+, PyTorch 2.4+, and transformers 5.x. Gated or private Hub models need an HF token (`hf auth login` or `HF_TOKEN`).",
+      "reference_count": 5
+    },
+    {
+      "skill": "treatment-plans",
+      "declared_name": "treatment-plans",
+      "tier": "D",
+      "category": "excluded-clinical",
+      "alpha_use": "Reviewed; clinical/medical workflow is not a default LuminaQuant alpha source.",
+      "description": "Generate concise (3-4 page), focused medical treatment plans in LaTeX/PDF format for all clinical specialties. Supports general medical treatment, rehabilitation therapy, mental health care, chronic disease management, perioperative care, and pain management. Includes SMART goal frameworks, evidence-based interventions with minimal text citations, regulatory compliance (HIPAA), and professional formatting. Prioritizes brevity and clinical actionability.",
+      "compatibility": "",
+      "reference_count": 6
+    },
+    {
+      "skill": "umap-learn",
+      "declared_name": "umap-learn",
+      "tier": "B",
+      "category": "regime-diagnostics",
+      "alpha_use": "Regime visualization/clustering diagnostics; proof must come from backtests/statistics.",
+      "description": "Use UMAP-learn for nonlinear dimensionality reduction, 2D/3D embeddings, clustering preprocessing, supervised or semi-supervised UMAP, DensMAP, AlignedUMAP, and Parametric UMAP workflows.",
+      "compatibility": "",
+      "reference_count": 1
+    },
+    {
+      "skill": "usfiscaldata",
+      "declared_name": "usfiscaldata",
+      "tier": "A",
+      "category": "macro-data",
+      "alpha_use": "Treasury/fiscal data for macro liquidity, rate, auction, and TGA factor research.",
+      "description": "Query the U.S. Treasury Fiscal Data REST API for federal financial data. No API key required. Use for national debt (Debt to the Penny), Daily Treasury Statements, Monthly Treasury Statements, Treasury securities auctions, interest rates, foreign exchange rates, savings bonds, or U.S. government revenue and spending statistics.",
+      "compatibility": "",
+      "reference_count": 8
+    },
+    {
+      "skill": "vaex",
+      "declared_name": "vaex",
+      "tier": "B",
+      "category": "out-of-core-data",
+      "alpha_use": "Optional out-of-core tabular exploration for very large datasets.",
+      "description": "Use this skill for processing and analyzing large tabular datasets (billions of rows) that exceed available RAM. Vaex excels at out-of-core DataFrame operations, lazy evaluation, fast aggregations, efficient visualization of big data, and machine learning on large datasets. Apply when users need to work with large CSV/HDF5/Arrow/Parquet files, perform fast statistics on massive datasets, create visualizations of big data, or build ML pipelines that do not fit in memory.",
+      "compatibility": "Requires Python 3.10+ (3.12+ recommended with vaex 4.19.0). Install with uv pip install vaex. Optional s3fs/gcsfs/adlfs for cloud I/O.",
+      "reference_count": 6
+    },
+    {
+      "skill": "venue-templates",
+      "declared_name": "venue-templates",
+      "tier": "C",
+      "category": "reporting",
+      "alpha_use": "Formatting templates for formal papers/posters if needed.",
+      "description": "Access comprehensive LaTeX templates, formatting requirements, and submission guidelines for major scientific publication venues (Nature, Science, PLOS, IEEE, ACM), academic conferences (NeurIPS, ICML, CVPR, CHI), research posters, and grant proposals (NSF, NIH, DOE, DARPA). This skill should be used when preparing manuscripts for journal submission, conference papers, research posters, or grant proposals and need venue-specific formatting requirements and templates.",
+      "compatibility": "",
+      "reference_count": 11
+    },
+    {
+      "skill": "what-if-oracle",
+      "declared_name": "what-if-oracle",
+      "tier": "B",
+      "category": "scenario",
+      "alpha_use": "Scenario stress exploration; speculative, not proof.",
+      "description": "Run structured What-If scenario analysis with 4–6 branch possibility exploration (best, likely, worst, wild card, contrarian, second-order). Use when the user asks speculative what-if questions about uncertain futures, strategic forks, contingency planning, or stress-testing a decision before committing.",
+      "compatibility": "",
+      "reference_count": 1
+    },
+    {
+      "skill": "xlsx",
+      "declared_name": "xlsx",
+      "tier": "C",
+      "category": "document-ingest",
+      "alpha_use": "Ingest spreadsheets, broker extracts, and research workbooks.",
+      "description": "Create, edit, analyze, or convert Excel spreadsheets (.xlsx, .xlsm) where the workbook file is the primary deliverable. Use for formulas, formatting, financial models, multi-sheet workbooks, and tabular cleanup exported to Excel. Also applies to .csv/.tsv when the user wants spreadsheet output. Do NOT use for Word documents, HTML reports, standalone Python scripts, database pipelines, or Google Sheets API work.",
+      "compatibility": "Requires Python 3.8+, LibreOffice (soffice on PATH), and gcc only when Unix sockets are restricted",
+      "reference_count": 0
+    },
+    {
+      "skill": "zarr-python",
+      "declared_name": "zarr-python",
+      "tier": "B",
+      "category": "array-storage",
+      "alpha_use": "Chunked factor tensors or cloud-native arrays when parquet is not enough.",
+      "description": "Chunked N-D arrays for cloud storage (Zarr-Python 3). Compressed arrays, parallel I/O, S3/GCS via fsspec, NumPy/Dask/Xarray compatible, for large-scale scientific computing pipelines.",
+      "compatibility": "Requires Python 3.12+ and zarr 3.x. Cloud I/O needs zarr[remote] plus pinned s3fs or gcsfs. Legacy Zarr v2 workflows need exact 2.x pins on older Python.",
+      "reference_count": 2
+    }
+  ]
+}

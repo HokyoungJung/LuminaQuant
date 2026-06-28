@@ -7,6 +7,8 @@ from typing import Any
 
 from lumina_quant.research_universe import BINANCE_EXTENDED_RESEARCH_SYMBOLS_SLASHED
 
+_DEFAULT_DEEP_LEARNING_MODELS: tuple[str, ...] = ("FITS", "CycleNet", "CMamba", "PatchTST")
+
 
 @dataclass(slots=True)
 class SystemConfig:
@@ -366,6 +368,95 @@ class DataConfig:
 
 
 @dataclass(slots=True)
+class DeepLearningRuntimeConfig:
+    """External DeepLearning training/prediction pipeline settings."""
+
+    enabled: bool = False
+    repo_path: str = "../../DeepLearning"
+    config_path: str = "configs/config.yaml"
+    test_config_path: str = "configs/config_test.yaml"
+    dataset_path: str = ""
+    feature_matrix_path: str = "var/data/deeplearning/features"
+    feature_format: str = "parquet"
+    prediction_path: str = "var/data/deeplearning/predictions"
+    manifest_path: str = "var/data/deeplearning/pipeline_manifest.json"
+    training_state_path: str = "var/data/deeplearning/training_state.json"
+    metrics_path: str = "var/data/deeplearning/metrics"
+    models: list[str] = field(default_factory=lambda: list(_DEFAULT_DEEP_LEARNING_MODELS))
+    ensemble_models: list[str] = field(default_factory=list)
+    freq: str = ""
+    target_suffix: str = "close"
+    seq_len: int = 120
+    pred_len: int = 30
+    total_pred: int = 120
+    gpus: str = "[]"
+    hpo_enabled: bool = False
+    hpo_trials: int = 20
+    gpu_parallel_jobs: int = 1
+    gpu_parallel_min_free_vram_gb: float = 2.0
+    gpu_parallel_max_utilization_pct: float = 85.0
+    hpo_top_trial_fraction: float = 0.10
+    hpo_min_top_trials: int = 5
+    hpo_max_train_val_gap: float = 0.15
+    hpo_boundary_tolerance: float = 0.02
+    chronological_sanity_check: bool = True
+    chronological_sanity_val_fraction: float = 0.20
+    chronological_sanity_max_relative_drop: float = 0.25
+    partial_hpo_trials: int = 5
+    epochs: int = 0
+    epochs_per_trial: int = 0
+    force_train: bool = False
+    resume: bool = True
+    run_test_after_fit: bool = False
+    no_upload: bool = True
+    strict_source_models: bool = True
+    min_model_coverage: int = 2
+    entry_threshold_bps: float = 10.0
+    exit_threshold_bps: float = 2.0
+    min_model_agreement: float = 0.75
+    max_dispersion_bps: float = 80.0
+    min_confidence: float = 0.0
+    target_allocation: float = 0.05
+    stop_loss_pct: float = 0.0
+    take_profit_pct: float = 0.0
+
+
+@dataclass(slots=True)
+class StrategyQualityConfig:
+    """Portfolio-level strategy quality overlays for existing strategies."""
+
+    enabled: bool = False
+    edge_gate_enabled: bool = True
+    min_expected_edge_bps: float = 8.0
+    edge_cost_buffer_bps: float = 3.0
+    allow_unknown_edge: bool = True
+    regime_router_enabled: bool = True
+    regime_lookback_bars: int = 60
+    trend_return_bps: float = 35.0
+    panic_return_bps: float = 120.0
+    low_liquidity_volume_ratio: float = 0.20
+    position_sizing_enabled: bool = True
+    target_vol_per_bar: float = 0.006
+    min_position_scale: float = 0.20
+    max_position_scale: float = 1.0
+    turnover_budget_enabled: bool = True
+    max_daily_turnover_pct: float = 3.0
+    exit_overlay_enabled: bool = True
+    atr_window_bars: int = 20
+    atr_stop_mult: float = 2.0
+    atr_take_profit_mult: float = 3.0
+    trailing_atr_mult: float = 1.5
+    min_stop_bps: float = 20.0
+    max_stop_bps: float = 500.0
+    strategy_health_enabled: bool = True
+    health_window_trades: int = 20
+    min_health_scale: float = 0.25
+    loss_cooldown_bars: int = 12
+    profit_moonshot_conflict_cooldown_bars: int = 3
+    pair_min_correlation: float = 0.35
+
+
+@dataclass(slots=True)
 class RuntimeConfig:
     """Full runtime configuration bundle."""
 
@@ -375,6 +466,8 @@ class RuntimeConfig:
     execution: ExecutionConfig = field(default_factory=ExecutionConfig)
     storage: StorageConfig = field(default_factory=StorageConfig)
     data: DataConfig = field(default_factory=DataConfig)
+    deep_learning: DeepLearningRuntimeConfig = field(default_factory=DeepLearningRuntimeConfig)
+    strategy_quality: StrategyQualityConfig = field(default_factory=StrategyQualityConfig)
     backtest: BacktestRuntimeConfig = field(default_factory=BacktestRuntimeConfig)
     live: LiveRuntimeConfig = field(default_factory=LiveRuntimeConfig)
     optimization: OptimizationRuntimeConfig = field(default_factory=OptimizationRuntimeConfig)

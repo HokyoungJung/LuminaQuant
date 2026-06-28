@@ -11,8 +11,8 @@ load_experiment_config(path)      — load an ExperimentConfig bundle
 
 Schema types re-exported so callers never need to import from sub-modules:
   RuntimeConfig, BacktestRuntimeConfig, LiveRuntimeConfig, OptimizationRuntimeConfig,
-  StorageConfig, TradingConfig, RiskConfig, ExecutionConfig, SystemConfig,
-  MarketWindowConfig, MemoryConfig, ValidationConfig, PromotionGateConfig,
+  DeepLearningRuntimeConfig, StorageConfig, TradingConfig, RiskConfig, ExecutionConfig,
+  SystemConfig, MarketWindowConfig, MemoryConfig, ValidationConfig, PromotionGateConfig,
   BacktestExternalConfig, LiveExchangeConfig, LiveExternalConfig, LivePolymarketConfig
 """
 
@@ -28,6 +28,7 @@ from lumina_quant.configuration.loader import (
 from lumina_quant.configuration.schema import (
     BacktestExternalConfig,
     BacktestRuntimeConfig,
+    DeepLearningRuntimeConfig,
     DataConfig,
     ExecutionConfig,
     LiveExchangeConfig,
@@ -42,6 +43,7 @@ from lumina_quant.configuration.schema import (
     RuntimeConfig,
     StorageConfig,
     SystemConfig,
+    StrategyQualityConfig,
     TradingConfig,
     ValidationConfig,
 )
@@ -123,6 +125,7 @@ __all__ = [
     "BacktestExternalConfig",
     "BacktestRuntimeConfig",
     "DataConfig",
+    "DeepLearningRuntimeConfig",
     "ExecutionConfig",
     "LiveExchangeConfig",
     "LiveExternalConfig",
@@ -135,6 +138,7 @@ __all__ = [
     "RiskConfig",
     "RuntimeConfig",
     "StorageConfig",
+    "StrategyQualityConfig",
     "SystemConfig",
     "TradingConfig",
     "ValidationConfig",

@@ -14,6 +14,7 @@ COMMAND_MODULES = {
     "live": "live",
     "dashboard": "dashboard",
     "data": "data",
+    "deep_learning": "deep_learning",
     "exact_window": "exact_window",
     "autonomous_research": "autonomous_research",
     "config": "config",
@@ -58,6 +59,8 @@ def main(argv: list[str] | None = None) -> int:
         "autonomous-research": COMMAND_MODULES["autonomous_research"],
         "autonomous_research": COMMAND_MODULES["autonomous_research"],
         "config": COMMAND_MODULES["config"],
+        "deep-learning": COMMAND_MODULES["deep_learning"],
+        "deep_learning": COMMAND_MODULES["deep_learning"],
         "registry": COMMAND_MODULES["registry"],
     }
 

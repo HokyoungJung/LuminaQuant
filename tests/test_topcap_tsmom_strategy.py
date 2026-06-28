@@ -314,6 +314,78 @@ class TestTopCapTimeSeriesMomentumStrategy(unittest.TestCase):
         assert long_signal.take_profit is not None
         assert long_signal.take_profit > 0.0
 
+    def test_default_entry_signals_emit_bounded_live_sizing_metadata(self):
+        symbols, rows = _build_price_rows(length=40)
+        bars = _MomentumBarStore(symbols)
+        events = queue.Queue()
+        strategy = TopCapTimeSeriesMomentumStrategy(
+            bars,
+            events,
+            lookback_bars=8,
+            rebalance_bars=2,
+            signal_threshold=0.01,
+            stop_loss_pct=0.08,
+            max_longs=2,
+            max_shorts=2,
+            min_price=0.1,
+            btc_regime_ma=0,
+        )
+
+        for time_index, frame in rows:
+            for symbol in symbols:
+                price = frame[symbol]
+                bars.set_bar(symbol, time_index, price)
+                event = MarketEvent(time_index, symbol, price, price, price, price, 1000.0)
+                strategy.calculate_signals(event)
+
+        signals = []
+        while not events.empty():
+            signals.append(events.get())
+
+        entries = [signal for signal in signals if str(signal.signal_type) in {"LONG", "SHORT"}]
+        self.assertTrue(entries)
+        for signal in entries:
+            self.assertAlmostEqual(signal.metadata["target_allocation"], 0.10)
+            self.assertAlmostEqual(signal.metadata["max_symbol_exposure_pct"], 0.10)
+            self.assertAlmostEqual(signal.metadata["max_order_value"], 1000.0)
+
+    def test_entry_signals_emit_bounded_live_sizing_metadata(self):
+        symbols, rows = _build_price_rows(length=40)
+        bars = _MomentumBarStore(symbols)
+        events = queue.Queue()
+        strategy = TopCapTimeSeriesMomentumStrategy(
+            bars,
+            events,
+            lookback_bars=8,
+            rebalance_bars=2,
+            signal_threshold=0.01,
+            stop_loss_pct=0.08,
+            max_longs=2,
+            max_shorts=2,
+            min_price=0.1,
+            btc_regime_ma=0,
+            target_allocation=0.12,
+            max_order_value=750.0,
+        )
+
+        for time_index, frame in rows:
+            for symbol in symbols:
+                price = frame[symbol]
+                bars.set_bar(symbol, time_index, price)
+                event = MarketEvent(time_index, symbol, price, price, price, price, 1000.0)
+                strategy.calculate_signals(event)
+
+        signals = []
+        while not events.empty():
+            signals.append(events.get())
+
+        entries = [signal for signal in signals if str(signal.signal_type) in {"LONG", "SHORT"}]
+        self.assertTrue(entries)
+        for signal in entries:
+            self.assertAlmostEqual(signal.metadata["target_allocation"], 0.12)
+            self.assertAlmostEqual(signal.metadata["max_symbol_exposure_pct"], 0.12)
+            self.assertAlmostEqual(signal.metadata["max_order_value"], 750.0)
+
     def test_selector_pool_limits_topcap_candidates(self):
         symbols, rows = _build_price_rows(length=80)
         bars = _MomentumBarStore(symbols)

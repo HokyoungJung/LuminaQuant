@@ -14,6 +14,7 @@ from dotenv import dotenv_values
 from lumina_quant.configuration.schema import (
     BacktestExternalConfig,
     BacktestRuntimeConfig,
+    DeepLearningRuntimeConfig,
     DataConfig,
     ExecutionConfig,
     LiveExchangeConfig,
@@ -29,6 +30,7 @@ from lumina_quant.configuration.schema import (
     StorageConfig,
     SystemConfig,
     TradingConfig,
+    StrategyQualityConfig,
     ValidationConfig,
     _VALID_DATA_KINDS,
 )
@@ -256,6 +258,8 @@ def _extract_runtime_sections(mapped: dict[str, Any]) -> dict[str, dict[str, Any
         "execution": _raw_section(mapped, "execution"),
         "storage": _raw_section(mapped, "storage"),
         "data": _raw_section(mapped, "data"),
+        "deep_learning": _raw_section(mapped, "deep_learning"),
+        "strategy_quality": _raw_section(mapped, "strategy_quality"),
         "backtest": backtest_raw,
         "backtest_external": _raw_section(backtest_raw, "external"),
         "live": live_raw,
@@ -783,6 +787,183 @@ def _normalize_data_runtime_section(runtime: RuntimeConfig) -> None:
     runtime.data.tick_path = str(getattr(runtime.data, "tick_path", "") or "").strip()
 
 
+def _normalize_deep_learning_model_list(value: Any) -> list[str]:
+    supported = {"fits": "FITS", "cyclenet": "CycleNet", "cmamba": "CMamba", "patchtst": "PatchTST"}
+    if isinstance(value, str):
+        raw = [part.strip() for part in value.replace(";", ",").split(",")]
+    elif isinstance(value, (list, tuple, set)):
+        raw = [str(part).strip() for part in value]
+    else:
+        raw = []
+
+    models: list[str] = []
+    for item in raw:
+        model = supported.get(item.lower())
+        if model is not None and model not in models:
+            models.append(model)
+    return models or list(DeepLearningRuntimeConfig().models)
+
+
+def _normalize_deep_learning_runtime_section(runtime: RuntimeConfig) -> None:
+    cfg = runtime.deep_learning
+    cfg.enabled = _as_bool(getattr(cfg, "enabled", False), False)
+    cfg.repo_path = str(getattr(cfg, "repo_path", "") or "../../DeepLearning").strip()
+    cfg.config_path = str(getattr(cfg, "config_path", "") or "configs/config.yaml").strip()
+    cfg.test_config_path = str(
+        getattr(cfg, "test_config_path", "") or "configs/config_test.yaml"
+    ).strip()
+    cfg.dataset_path = str(getattr(cfg, "dataset_path", "") or "").strip()
+    cfg.feature_matrix_path = str(
+        getattr(cfg, "feature_matrix_path", "") or "var/data/deeplearning/features"
+    ).strip()
+    cfg.prediction_path = str(
+        getattr(cfg, "prediction_path", "") or "var/data/deeplearning/predictions"
+    ).strip()
+    cfg.manifest_path = str(
+        getattr(cfg, "manifest_path", "") or "var/data/deeplearning/pipeline_manifest.json"
+    ).strip()
+    cfg.training_state_path = str(
+        getattr(cfg, "training_state_path", "") or "var/data/deeplearning/training_state.json"
+    ).strip()
+    cfg.metrics_path = str(
+        getattr(cfg, "metrics_path", "") or "var/data/deeplearning/metrics"
+    ).strip()
+    feature_format = str(getattr(cfg, "feature_format", "") or "parquet").strip().lower()
+    cfg.feature_format = feature_format.lstrip(".") if feature_format else "parquet"
+    if cfg.feature_format not in {"csv", "parquet"}:
+        cfg.feature_format = "parquet"
+
+    cfg.models = _normalize_deep_learning_model_list(getattr(cfg, "models", None))
+    raw_ensemble_models = getattr(cfg, "ensemble_models", None)
+    cfg.ensemble_models = (
+        _normalize_deep_learning_model_list(raw_ensemble_models)
+        if raw_ensemble_models
+        else list(cfg.models)
+    )
+    cfg.freq = _normalize_timeframe_token(getattr(cfg, "freq", ""), "")
+    cfg.target_suffix = str(getattr(cfg, "target_suffix", "") or "close").strip().lower()
+    cfg.seq_len = max(1, _as_int(getattr(cfg, "seq_len", 120), 120))
+    cfg.pred_len = max(1, _as_int(getattr(cfg, "pred_len", 30), 30))
+    cfg.total_pred = max(cfg.pred_len, _as_int(getattr(cfg, "total_pred", 120), 120))
+    cfg.gpus = str(getattr(cfg, "gpus", "[]") or "[]").strip()
+    cfg.hpo_enabled = _as_bool(getattr(cfg, "hpo_enabled", False), False)
+    cfg.hpo_trials = max(1, _as_int(getattr(cfg, "hpo_trials", 20), 20))
+    cfg.gpu_parallel_jobs = max(1, _as_int(getattr(cfg, "gpu_parallel_jobs", 1), 1))
+    cfg.gpu_parallel_min_free_vram_gb = max(
+        0.0,
+        _as_float(getattr(cfg, "gpu_parallel_min_free_vram_gb", 2.0), 2.0),
+    )
+    cfg.gpu_parallel_max_utilization_pct = max(
+        1.0,
+        min(
+            100.0,
+            _as_float(getattr(cfg, "gpu_parallel_max_utilization_pct", 85.0), 85.0),
+        ),
+    )
+    cfg.hpo_top_trial_fraction = max(
+        0.01,
+        min(1.0, _as_float(getattr(cfg, "hpo_top_trial_fraction", 0.10), 0.10)),
+    )
+    cfg.hpo_min_top_trials = max(
+        1,
+        _as_int(getattr(cfg, "hpo_min_top_trials", 5), 5),
+    )
+    cfg.hpo_max_train_val_gap = max(
+        0.0,
+        _as_float(getattr(cfg, "hpo_max_train_val_gap", 0.15), 0.15),
+    )
+    cfg.hpo_boundary_tolerance = max(
+        0.0,
+        min(0.50, _as_float(getattr(cfg, "hpo_boundary_tolerance", 0.02), 0.02)),
+    )
+    cfg.chronological_sanity_check = _as_bool(
+        getattr(cfg, "chronological_sanity_check", True),
+        True,
+    )
+    cfg.chronological_sanity_val_fraction = max(
+        0.01,
+        min(
+            0.90,
+            _as_float(getattr(cfg, "chronological_sanity_val_fraction", 0.20), 0.20),
+        ),
+    )
+    cfg.chronological_sanity_max_relative_drop = max(
+        0.0,
+        _as_float(
+            getattr(cfg, "chronological_sanity_max_relative_drop", 0.25),
+            0.25,
+        ),
+    )
+    cfg.partial_hpo_trials = max(1, _as_int(getattr(cfg, "partial_hpo_trials", 5), 5))
+    cfg.epochs = max(0, _as_int(getattr(cfg, "epochs", 0), 0))
+    cfg.epochs_per_trial = max(0, _as_int(getattr(cfg, "epochs_per_trial", 0), 0))
+    cfg.force_train = _as_bool(getattr(cfg, "force_train", False), False)
+    cfg.resume = _as_bool(getattr(cfg, "resume", True), True)
+    cfg.run_test_after_fit = _as_bool(getattr(cfg, "run_test_after_fit", False), False)
+    cfg.no_upload = _as_bool(getattr(cfg, "no_upload", True), True)
+    cfg.strict_source_models = _as_bool(getattr(cfg, "strict_source_models", True), True)
+    cfg.min_model_coverage = max(1, min(len(cfg.models), _as_int(cfg.min_model_coverage, 2)))
+    cfg.entry_threshold_bps = max(0.0, _as_float(cfg.entry_threshold_bps, 10.0))
+    cfg.exit_threshold_bps = max(0.0, _as_float(cfg.exit_threshold_bps, 2.0))
+    cfg.min_model_agreement = max(0.0, min(1.0, _as_float(cfg.min_model_agreement, 0.75)))
+    cfg.max_dispersion_bps = max(0.0, _as_float(cfg.max_dispersion_bps, 80.0))
+    cfg.min_confidence = max(0.0, min(1.0, _as_float(cfg.min_confidence, 0.0)))
+    cfg.target_allocation = max(0.0, _as_float(cfg.target_allocation, 0.05))
+    cfg.stop_loss_pct = max(0.0, _as_float(cfg.stop_loss_pct, 0.0))
+    cfg.take_profit_pct = max(0.0, _as_float(cfg.take_profit_pct, 0.0))
+
+
+def _normalize_strategy_quality_runtime_section(runtime: RuntimeConfig) -> None:
+    cfg = runtime.strategy_quality
+    cfg.enabled = _as_bool(getattr(cfg, "enabled", False), False)
+    cfg.edge_gate_enabled = _as_bool(getattr(cfg, "edge_gate_enabled", True), True)
+    cfg.min_expected_edge_bps = max(0.0, _as_float(cfg.min_expected_edge_bps, 8.0))
+    cfg.edge_cost_buffer_bps = max(0.0, _as_float(cfg.edge_cost_buffer_bps, 3.0))
+    cfg.allow_unknown_edge = _as_bool(getattr(cfg, "allow_unknown_edge", True), True)
+    cfg.regime_router_enabled = _as_bool(getattr(cfg, "regime_router_enabled", True), True)
+    cfg.regime_lookback_bars = max(5, _as_int(cfg.regime_lookback_bars, 60))
+    cfg.trend_return_bps = max(0.0, _as_float(cfg.trend_return_bps, 35.0))
+    cfg.panic_return_bps = max(0.0, _as_float(cfg.panic_return_bps, 120.0))
+    cfg.low_liquidity_volume_ratio = max(
+        0.0,
+        min(1.0, _as_float(cfg.low_liquidity_volume_ratio, 0.20)),
+    )
+    cfg.position_sizing_enabled = _as_bool(
+        getattr(cfg, "position_sizing_enabled", True),
+        True,
+    )
+    cfg.target_vol_per_bar = max(0.0, _as_float(cfg.target_vol_per_bar, 0.006))
+    cfg.min_position_scale = max(0.0, min(1.0, _as_float(cfg.min_position_scale, 0.20)))
+    cfg.max_position_scale = max(
+        cfg.min_position_scale,
+        min(1.0, _as_float(cfg.max_position_scale, 1.0)),
+    )
+    cfg.turnover_budget_enabled = _as_bool(
+        getattr(cfg, "turnover_budget_enabled", True),
+        True,
+    )
+    cfg.max_daily_turnover_pct = max(0.0, _as_float(cfg.max_daily_turnover_pct, 3.0))
+    cfg.exit_overlay_enabled = _as_bool(getattr(cfg, "exit_overlay_enabled", True), True)
+    cfg.atr_window_bars = max(2, _as_int(cfg.atr_window_bars, 20))
+    cfg.atr_stop_mult = max(0.0, _as_float(cfg.atr_stop_mult, 2.0))
+    cfg.atr_take_profit_mult = max(0.0, _as_float(cfg.atr_take_profit_mult, 3.0))
+    cfg.trailing_atr_mult = max(0.0, _as_float(cfg.trailing_atr_mult, 1.5))
+    cfg.min_stop_bps = max(0.0, _as_float(cfg.min_stop_bps, 20.0))
+    cfg.max_stop_bps = max(cfg.min_stop_bps, _as_float(cfg.max_stop_bps, 500.0))
+    cfg.strategy_health_enabled = _as_bool(
+        getattr(cfg, "strategy_health_enabled", True),
+        True,
+    )
+    cfg.health_window_trades = max(1, _as_int(cfg.health_window_trades, 20))
+    cfg.min_health_scale = max(0.0, min(1.0, _as_float(cfg.min_health_scale, 0.25)))
+    cfg.loss_cooldown_bars = max(0, _as_int(cfg.loss_cooldown_bars, 12))
+    cfg.profit_moonshot_conflict_cooldown_bars = max(
+        0,
+        _as_int(cfg.profit_moonshot_conflict_cooldown_bars, 3),
+    )
+    cfg.pair_min_correlation = max(0.0, min(1.0, _as_float(cfg.pair_min_correlation, 0.35)))
+
+
 def _normalize_promotion_gate_runtime_section(runtime: RuntimeConfig) -> None:
     runtime.promotion_gate.days = _as_int(runtime.promotion_gate.days, 14)
     runtime.promotion_gate.max_order_rejects = _as_int(runtime.promotion_gate.max_order_rejects, 0)
@@ -824,6 +1005,8 @@ def _normalize_runtime_config(
 
     _normalize_storage_runtime_section(runtime, storage_raw=storage_raw)
     _normalize_data_runtime_section(runtime)
+    _normalize_deep_learning_runtime_section(runtime)
+    _normalize_strategy_quality_runtime_section(runtime)
     _normalize_trading_and_risk_runtime_section(runtime)
     _normalize_execution_runtime_section(runtime, exec_raw=exec_raw)
     _normalize_live_exchange_runtime_section(runtime)
@@ -857,6 +1040,12 @@ def _build_runtime_config_tree(
         ),
         storage=StorageConfig(**_coerce_dataclass_kwargs(sections["storage"], StorageConfig)),
         data=DataConfig(**_coerce_dataclass_kwargs(sections["data"], DataConfig)),
+        deep_learning=DeepLearningRuntimeConfig(
+            **_coerce_dataclass_kwargs(sections["deep_learning"], DeepLearningRuntimeConfig)
+        ),
+        strategy_quality=StrategyQualityConfig(
+            **_coerce_dataclass_kwargs(sections["strategy_quality"], StrategyQualityConfig)
+        ),
         backtest=BacktestRuntimeConfig(
             **{
                 **_coerce_dataclass_kwargs(sections["backtest"], BacktestRuntimeConfig),

@@ -183,6 +183,20 @@ class TopCapTimeSeriesMomentumStrategy(Strategy):
                 high=1.0,
                 tunable=False,
             ),
+            "target_allocation": HyperParam.floating(
+                "target_allocation",
+                default=0.10,
+                low=0.0,
+                high=2.0,
+                tunable=False,
+            ),
+            "max_order_value": HyperParam.floating(
+                "max_order_value",
+                default=1000.0,
+                low=0.0,
+                high=1_000_000.0,
+                tunable=False,
+            ),
         }
 
     def __init__(
@@ -212,6 +226,8 @@ class TopCapTimeSeriesMomentumStrategy(Strategy):
         selector_weight_volatility=1.0,
         selector_weight_vwap=0.8,
         selector_vwap_sign=1.0,
+        target_allocation=0.10,
+        max_order_value=1000.0,
     ):
         self.bars = bars
         self.events = events
@@ -245,6 +261,8 @@ class TopCapTimeSeriesMomentumStrategy(Strategy):
                 "selector_weight_volatility": selector_weight_volatility,
                 "selector_weight_vwap": selector_weight_vwap,
                 "selector_vwap_sign": selector_vwap_sign,
+                "target_allocation": target_allocation,
+                "max_order_value": max_order_value,
             },
             keep_unknown=False,
         )
@@ -273,6 +291,8 @@ class TopCapTimeSeriesMomentumStrategy(Strategy):
         self.selector_weight_volatility = max(0.0, float(resolved["selector_weight_volatility"]))
         self.selector_weight_vwap = max(0.0, float(resolved["selector_weight_vwap"]))
         self.selector_vwap_sign = max(-1.0, min(1.0, float(resolved["selector_vwap_sign"])))
+        self.target_allocation = max(0.0, float(resolved["target_allocation"]))
+        self.max_order_value = max(0.0, float(resolved["max_order_value"]))
 
         default_btc = "BTC/USDT" if "BTC/USDT" in self.symbol_list else self.symbol_list[0]
         btc_symbol = resolved["btc_symbol"]
@@ -438,6 +458,10 @@ class TopCapTimeSeriesMomentumStrategy(Strategy):
             "selector_pool_count": len(self._last_selector_pool),
             "selector_pool": list(self._last_selector_pool),
         }
+        if signal_type in {"LONG", "SHORT"}:
+            metadata["target_allocation"] = float(self.target_allocation)
+            metadata["max_symbol_exposure_pct"] = float(self.target_allocation)
+            metadata["max_order_value"] = float(self.max_order_value)
         self.events.put(
             SignalEvent(
                 strategy_id="topcap_tsmom",

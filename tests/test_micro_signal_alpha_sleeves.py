@@ -485,6 +485,9 @@ def test_seasonal_micro_breakout_enters_on_aligned_slot_breakout() -> None:
     assert first.metadata.get("slot_observations", 0) >= 4
     assert first.metadata.get("breakout_direction") == "LONG"
     assert first.metadata.get("micro_tick_agreement") is not None
+    assert first.metadata.get("target_allocation") == 0.30
+    assert first.metadata.get("max_symbol_exposure_pct") == 0.30
+    assert first.metadata.get("max_order_value") == 5000.0
 
 
 def test_seasonal_micro_breakout_vetoes_bad_micro_tape() -> None:

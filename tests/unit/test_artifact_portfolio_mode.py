@@ -234,6 +234,7 @@ def test_portfolio_mode_strategy_forwards_component_weighted_signals(monkeypatch
     assert signal.metadata["component_id"] == "comp-a"
     assert signal.metadata["target_allocation_scale"] == 0.3
     assert signal.metadata["child_target_allocation"] == 0.20
+    assert signal.metadata["child_max_order_value"] == 500.0
     assert signal.metadata["target_allocation"] == 0.06
     assert signal.metadata["max_symbol_exposure_pct"] == 0.06
     assert signal.metadata["max_order_value"] == 150.0
