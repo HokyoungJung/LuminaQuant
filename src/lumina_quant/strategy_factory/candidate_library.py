@@ -2749,6 +2749,7 @@ class _CandidateBuildContext:
         # and the breadth timer gates TOTAL exposure on cross-sectional breadth.
         _build_realized_vol_term_structure_candidates(self)
         _build_breadth_regime_trend_timer_candidates(self)
+        _build_bull_bear_regime_rotation_candidates(self)
         return self.candidates
 
 
@@ -9960,6 +9961,169 @@ def _build_breadth_regime_trend_timer_candidates(ctx: _CandidateBuildContext) ->
                     "timeframe": timeframe,
                     "retune_profile": str(spec["variant"]),
                     "symbol_scope": "crypto_basket",
+                    "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                },
+            )
+
+
+# Explicit bull/bear directional breadth router over the crypto basket.  This is
+# the data-local follow-up to the latest research-note diagnosis: capture broad
+# upside with a long strongest-name book, broad downside with a short weakest-name
+# book, and stay flat in chop so the incumbent does not depend on a few outsized
+# months.  >=30m only; requires a real crypto basket (min 5 names), so the pinned
+# two-symbol manifest snapshot remains unchanged.
+_BULL_BEAR_REGIME_ROTATION_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "30m": (
+        {
+            "variant": "exec_fast_ls",
+            "momentum_lookback": 48,
+            "trend_ma_window": 48,
+            "signal_threshold": 0.012,
+            "bull_breadth": 0.58,
+            "bear_breadth": 0.56,
+            "exit_breadth": 0.40,
+            "benchmark_lookback": 48,
+            "benchmark_bull_threshold": 0.004,
+            "benchmark_bear_threshold": 0.004,
+            "max_longs": 8,
+            "max_shorts": 6,
+            "max_gross": 1.00,
+            "rebalance_bars": 4,
+            "stop_loss_pct": 0.09,
+            "max_hold_bars": 240,
+            "target_allocation": 0.90,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "swing_core_ls",
+            "momentum_lookback": 48,
+            "trend_ma_window": 48,
+            "signal_threshold": 0.015,
+            "bull_breadth": 0.58,
+            "bear_breadth": 0.55,
+            "exit_breadth": 0.40,
+            "benchmark_lookback": 48,
+            "benchmark_bull_threshold": 0.005,
+            "benchmark_bear_threshold": 0.005,
+            "max_longs": 8,
+            "max_shorts": 6,
+            "max_gross": 1.00,
+            "rebalance_bars": 3,
+            "stop_loss_pct": 0.10,
+            "max_hold_bars": 180,
+            "target_allocation": 0.90,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "macro_bear_capture_ls",
+            "momentum_lookback": 36,
+            "trend_ma_window": 36,
+            "signal_threshold": 0.020,
+            "bull_breadth": 0.56,
+            "bear_breadth": 0.54,
+            "exit_breadth": 0.38,
+            "benchmark_lookback": 36,
+            "benchmark_bull_threshold": 0.007,
+            "benchmark_bear_threshold": 0.007,
+            "max_longs": 8,
+            "max_shorts": 6,
+            "max_gross": 1.00,
+            "rebalance_bars": 2,
+            "stop_loss_pct": 0.12,
+            "max_hold_bars": 120,
+            "target_allocation": 0.95,
+        },
+    ),
+    "1d": (
+        {
+            "variant": "daily_macro_ls",
+            "momentum_lookback": 30,
+            "trend_ma_window": 30,
+            "signal_threshold": 0.025,
+            "bull_breadth": 0.55,
+            "bear_breadth": 0.55,
+            "exit_breadth": 0.35,
+            "benchmark_lookback": 30,
+            "benchmark_bull_threshold": 0.010,
+            "benchmark_bear_threshold": 0.010,
+            "max_longs": 6,
+            "max_shorts": 5,
+            "max_gross": 1.00,
+            "rebalance_bars": 2,
+            "stop_loss_pct": 0.14,
+            "max_hold_bars": 90,
+            "target_allocation": 0.95,
+        },
+    ),
+}
+
+
+def _build_bull_bear_regime_rotation_candidates(ctx: _CandidateBuildContext) -> None:
+    """Bull/bear breadth-regime crypto basket router (cross_sectional basket)."""
+    crypto_symbols = tuple(ctx.crypto_only_symbols)
+    min_symbols = 5
+    if len(crypto_symbols) < min_symbols:
+        return
+    for timeframe in ctx._present("30m", "1h", "4h", "1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _BULL_BEAR_REGIME_ROTATION_SLICE.get(timeframe, ()):
+            params = {
+                "momentum_lookback": int(spec["momentum_lookback"]),
+                "trend_ma_window": int(spec["trend_ma_window"]),
+                "signal_threshold": float(spec["signal_threshold"]),
+                "bull_breadth": float(spec["bull_breadth"]),
+                "bear_breadth": float(spec["bear_breadth"]),
+                "exit_breadth": float(spec["exit_breadth"]),
+                "benchmark_symbol": "BTC/USDT",
+                "benchmark_lookback": int(spec["benchmark_lookback"]),
+                "benchmark_bull_threshold": float(spec["benchmark_bull_threshold"]),
+                "benchmark_bear_threshold": float(spec["benchmark_bear_threshold"]),
+                "max_longs": int(spec["max_longs"]),
+                "max_shorts": int(spec["max_shorts"]),
+                "allow_short": True,
+                "max_gross": float(spec["max_gross"]),
+                "rebalance_bars": int(spec["rebalance_bars"]),
+                "stop_loss_pct": float(spec["stop_loss_pct"]),
+                "max_hold_bars": int(spec["max_hold_bars"]),
+                "min_symbols": int(min_symbols),
+                "target_allocation": float(spec["target_allocation"]),
+                "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+            }
+            _add_candidate(
+                ctx.candidates,
+                name=(
+                    f"bull_bear_regime_rotation_{tf_tag}_{spec['variant']}_"
+                    f"{int(spec['momentum_lookback'])}_{int(spec['bull_breadth'] * 100)}_"
+                    f"{int(spec['bear_breadth'] * 100)}"
+                ),
+                family="cross_sectional",
+                strategy_class="BullBearRegimeRotationStrategy",
+                timeframe=timeframe,
+                symbols=crypto_symbols,
+                params=params,
+                notes=(
+                    "Bull/bear breadth-regime crypto router: broad positive momentum + "
+                    "BTC confirmation opens a long strongest-name basket; broad negative "
+                    "momentum + BTC confirmation opens a short weakest-name basket; "
+                    f"otherwise flat for {timeframe} ({spec['variant']})."
+                ),
+                tags=(
+                    *_CROSS_SECTIONAL_ADMISSION_TAGS,
+                    "bull_bear",
+                    "breadth",
+                    "directional_router",
+                    "regime",
+                    "short_capture",
+                    "trend",
+                    "crypto",
+                ),
+                metadata={
+                    "timeframe": timeframe,
+                    "retune_profile": str(spec["variant"]),
+                    "symbol_scope": "crypto_basket",
+                    "allow_short": True,
                     "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
                 },
             )

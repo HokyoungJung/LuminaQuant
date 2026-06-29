@@ -1,5 +1,26 @@
 # Research Note
 
+## 2026-06-29 KST — BullBearRegimeRotationStrategy research sleeve
+
+최신 winner의 headline OOS는 높지만 monthly hit `4/10`이고 상승/하락 추세장을 명시적으로 나눠 먹는 sleeve가 약하다는 점을 겨냥해, 새 OHLCV-only basket strategy를 추가했다. 목적은 기존 TopCap/leaf router를 즉시 대체하는 것이 아니라, 다음 data-bearing walk-forward에서 **bull long / bear short / chop flat** 후보를 검증할 수 있게 만드는 것이다.
+
+구현:
+- Strategy: `src/lumina_quant/strategies/bull_bear_regime_rotation.py`.
+- Registry tier: `BullBearRegimeRotationStrategy = research_only`.
+- Candidate builder: `build_binance_futures_candidates()`에서 crypto basket 5종목 이상일 때 `30m/1h/4h/1d` 후보를 생성한다.
+- Rule: cross-sectional momentum breadth와 BTC benchmark return이 상승을 확인하면 strongest names LONG, 하락을 확인하면 weakest names SHORT, 중립/chop에서는 stale beta를 EXIT한다.
+
+상태:
+- Backtest/shadow promotion은 아직 없음.
+- `ready_for_real=false` 유지.
+- 다음 검증은 10/15/20bps 비용, bull/bear/chop bucket, hit-rate 개선, outlier-month 의존도 제거 기준으로 incumbent와 비교한다.
+
+검증:
+- `uv run pytest tests/test_bull_bear_regime_rotation.py` → `7 passed`.
+- `uv run pytest tests/test_bull_bear_regime_rotation.py tests/test_candidate_manifest_snapshot.py tests/test_strategy_registry_defaults.py tests/test_strategy_factory_library.py -q` → `45 passed`.
+- `uv run pytest tests/test_bull_bear_regime_rotation.py tests/test_candidate_manifest_snapshot.py tests/test_strategy_registry_defaults.py tests/test_strategy_factory_library.py tests/test_param_registry.py tests/test_scan_param_registry_script.py -q` → `52 passed`.
+- `uv run ruff check src/lumina_quant/strategies/bull_bear_regime_rotation.py src/lumina_quant/strategies/registry.py src/lumina_quant/strategy_factory/candidate_library.py tests/test_bull_bear_regime_rotation.py` → pass.
+
 ## 2026-06-28 KST — 최신 데이터 포함 전체 WF 재평가 정정
 
 사용자 지적대로 "데이터가 있는데 2026-06-21까지만 본" 것은 데이터 부재가 아니라 검증 오류였다. `date=` partition/이전 runner 상태를 최신성 근거로 착각하지 않고, 이번에는 실제 1m parquet `datetime.max()` 기준으로 커버리지를 재확인했다.

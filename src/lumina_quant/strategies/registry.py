@@ -198,6 +198,10 @@ _STRATEGY_TIER_HINTS: dict[str, str] = {
     # on the data PC — see docs/COST_REALISM_REMEASUREMENT.md):
     "VolManagedRiskOverlayStrategy": "research_only",
     "CrossSectionalFundingMomentumCarryStrategy": "research_only",
+    # Directional bull/bear basket router: research_only until cost-realistic
+    # walk-forward proves that the explicit short sleeve improves bear-regime
+    # capture without increasing fold-level drawdown concentration.
+    "BullBearRegimeRotationStrategy": "research_only",
 }
 
 _STRATEGY_METADATA: dict[str, dict[str, Any]] = {
@@ -243,6 +247,7 @@ _OPTUNA_TRIAL_OVERRIDES: dict[str, str] = {
     "TakerFlowExhaustionReversalStrategy": "16",
     "TimeframePairZScoreReversionStrategy": "16",
     "MicroRangeExpansion1sStrategy": "16",
+    "BullBearRegimeRotationStrategy": "16",
 }
 
 
