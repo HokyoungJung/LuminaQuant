@@ -2,7 +2,7 @@
 
 v1 — DashboardBridgeContract / DashboardSliceContract (compat, kept for legacy callers)
 v2 — DashboardBridgeContractV2 / DashboardRouteDescriptor (Phase 6, canonical)
-     All 11 routes use module-mode invocation (runUvPythonModuleJson).
+     All routes use module-mode invocation (runUvPythonModuleJson).
      Zero snippet-bridge invocations.
 """
 
@@ -196,6 +196,11 @@ _V2_ROUTES: tuple[tuple[str, str, str], ...] = (
     (
         "/api/python/dashboard/report-export",
         "lumina_quant.dashboard.cutover_surfaces_service",
+        "active",
+    ),
+    (
+        "/api/python/dashboard/alpha-evidence",
+        "lumina_quant.dashboard.alpha_evidence_service",
         "active",
     ),
 )

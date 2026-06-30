@@ -156,7 +156,7 @@ def test_load_exact_window_bundle_records_followup_parse_warnings(tmp_path: Path
 
 
 def test_bridge_module_exposes_v2_contract() -> None:
-    """Regression guard: bridge.py must expose DashboardBridgeContractV2 with 11 routes.
+    """Regression guard: bridge.py must expose DashboardBridgeContractV2 with 12 routes.
 
     The retired_stub.py was deleted in Phase 6; this test replaces the old stub
     text assertion with a structural check on the v2 contract.
@@ -169,7 +169,8 @@ def test_bridge_module_exposes_v2_contract() -> None:
     contract = build_dashboard_bridge_contract_v2()
     assert contract.CONTRACT_VERSION == 2
     assert contract.launch_mode == "next"
-    assert len(contract.routes) == 11
+    assert len(contract.routes) == 12
     route_paths = [r.route for r in contract.routes]
     assert "/api/python/dashboard/overview" in route_paths
     assert "/api/python/dashboard/risk-health" in route_paths
+    assert "/api/python/dashboard/alpha-evidence" in route_paths

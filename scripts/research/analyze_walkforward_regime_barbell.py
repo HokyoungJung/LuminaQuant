@@ -51,7 +51,9 @@ DEFAULT_CRISIS_FALLBACK_LABEL = (
 DEFAULT_CLEAN_TOP_LABEL = (
     "dynamic_conviction_switch:t0.85_risk_capped_fallback_val_ret02_calmar80_gate_val_mdd30_scaled"
 )
-DEFAULT_POSITIVE_BASELINE_LABEL = "dynamic_conviction_switch:t0.85_risk_capped_fallback_val_mdd30_scaled"
+DEFAULT_POSITIVE_BASELINE_LABEL = (
+    "dynamic_conviction_switch:t0.85_risk_capped_fallback_val_mdd30_scaled"
+)
 BULL_POOL_FAMILIES = {
     "asset_timeframe_leverage",
     "cross_candidate_hybrid",
@@ -126,7 +128,7 @@ def _utc_now_iso() -> str:
 def _safe_float(value: Any, default: float = 0.0) -> float:
     try:
         out = float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return float(default)
     if not math.isfinite(out):
         return float(default)
@@ -137,7 +139,9 @@ def _safe_bool(value: Any) -> bool:
     return bool(value) if value is not None else False
 
 
-def _metric_block(total_return: float, mdd: float = 0.0, *, start: str | None = None, end: str | None = None) -> dict[str, Any]:
+def _metric_block(
+    total_return: float, mdd: float = 0.0, *, start: str | None = None, end: str | None = None
+) -> dict[str, Any]:
     return {
         "start": start,
         "end": end,
@@ -209,7 +213,9 @@ def _aggregate_rows(label: str, rows: Sequence[Mapping[str, Any]]) -> dict[str, 
         "fold_count": fold_count,
         "compounded_oos_return": compounded,
         "positive_oos_folds": int(sum(value > 0.0 for value in oos_returns)),
-        "oos_hit_rate": float(sum(value > 0.0 for value in oos_returns) / fold_count) if fold_count else 0.0,
+        "oos_hit_rate": float(sum(value > 0.0 for value in oos_returns) / fold_count)
+        if fold_count
+        else 0.0,
         "min_oos_return": float(min(oos_returns)) if oos_returns else 0.0,
         "latest_oos_return": float(oos_returns[-1]) if oos_returns else 0.0,
         "mean_oos_return": float(np.mean(arr)) if arr.size else 0.0,
@@ -218,14 +224,20 @@ def _aggregate_rows(label: str, rows: Sequence[Mapping[str, Any]]) -> dict[str, 
         "monthly_equity_mdd": _equity_mdd_from_returns(oos_returns),
         "monthly_volatility": monthly_std,
         "monthly_downside_volatility": downside_std,
-        "monthly_sharpe_approx": float(np.mean(arr) / monthly_std * math.sqrt(12.0)) if monthly_std > 0 else 0.0,
-        "monthly_sortino_approx": float(np.mean(arr) / downside_std * math.sqrt(12.0)) if downside_std > 0 else 0.0,
+        "monthly_sharpe_approx": float(np.mean(arr) / monthly_std * math.sqrt(12.0))
+        if monthly_std > 0
+        else 0.0,
+        "monthly_sortino_approx": float(np.mean(arr) / downside_std * math.sqrt(12.0))
+        if downside_std > 0
+        else 0.0,
         "monthly_var_05": var_05,
         "monthly_quantile_95": q95,
         "monthly_cvar_25": cvar_25,
         "avg_gain": float(np.mean(positive)) if positive.size else 0.0,
         "avg_loss": float(np.mean(negative)) if negative.size else 0.0,
-        "profit_factor": float(np.sum(positive) / abs(np.sum(negative))) if positive.size and negative.size and abs(float(np.sum(negative))) > 0 else 0.0,
+        "profit_factor": float(np.sum(positive) / abs(np.sum(negative)))
+        if positive.size and negative.size and abs(float(np.sum(negative))) > 0
+        else 0.0,
         "max_loss_streak": int(max_loss_streak),
         "mean_train_return": float(np.mean(train_returns)) if train_returns else 0.0,
         "mean_validation_return": float(np.mean(val_returns)) if val_returns else 0.0,
@@ -252,7 +264,9 @@ def _group_rows_by_label(rows: Sequence[Mapping[str, Any]]) -> dict[str, list[Ma
     return dict(out)
 
 
-def _find_row(rows_by_fold: Mapping[str, Sequence[Mapping[str, Any]]], fold_id: str, label: str) -> Mapping[str, Any] | None:
+def _find_row(
+    rows_by_fold: Mapping[str, Sequence[Mapping[str, Any]]], fold_id: str, label: str
+) -> Mapping[str, Any] | None:
     for row in rows_by_fold.get(fold_id, []):
         if str(row.get("candidate_label")) == label:
             return row
@@ -302,7 +316,9 @@ def train_validation_bull_score(row: Mapping[str, Any]) -> float:
     val_mdd = _clip(_row_mdd(row, "validation"), 0.0, 0.80)
     train_mdd = _clip(_row_mdd(row, "train"), 0.0, 1.20)
     val_calmar = val_ret / max(val_mdd, 0.03)
-    return float(1.45 * val_ret + 0.35 * train_ret + 0.06 * val_calmar - 0.75 * val_mdd - 0.20 * train_mdd)
+    return float(
+        1.45 * val_ret + 0.35 * train_ret + 0.06 * val_calmar - 0.75 * val_mdd - 0.20 * train_mdd
+    )
 
 
 def select_bull_sleeve(
@@ -332,7 +348,9 @@ def _lagged_recency_score(values: Sequence[float], *, halflife: float) -> float:
     decay = math.log(2.0) / max(1e-9, float(halflife))
     weights = [math.exp(-decay * (len(values) - 1 - idx)) for idx in range(len(values))]
     denom = sum(weights)
-    return float(sum(weight * value for weight, value in zip(weights, values, strict=False)) / denom)
+    return float(
+        sum(weight * value for weight, value in zip(weights, values, strict=False)) / denom
+    )
 
 
 def select_crisis_sleeve(
@@ -411,9 +429,13 @@ def _combine_split(
     b = dict(bull.get(split) or {}) if bull is not None else {}
     c_w = _safe_float(weights.get("crisis"))
     b_w = _safe_float(weights.get("bull")) if bull is not None else 0.0
-    total_return = c_w * _safe_float(c.get("total_return")) + b_w * _safe_float(b.get("total_return"))
+    total_return = c_w * _safe_float(c.get("total_return")) + b_w * _safe_float(
+        b.get("total_return")
+    )
     mdd = min(1.0, c_w * _safe_float(c.get("mdd")) + b_w * _safe_float(b.get("mdd")))
-    return _metric_block(total_return, mdd, start=c.get("start") or b.get("start"), end=c.get("end") or b.get("end"))
+    return _metric_block(
+        total_return, mdd, start=c.get("start") or b.get("start"), end=c.get("end") or b.get("end")
+    )
 
 
 def build_selector_rows(
@@ -467,7 +489,9 @@ def build_selector_rows(
             "barbell_weights": dict(weights),
             "crisis_sleeve_label": str(crisis.get("candidate_label")),
             "bull_sleeve_label": str(bull.get("candidate_label")) if bull is not None else None,
-            "bull_sleeve_train_validation_score": train_validation_bull_score(bull) if bull is not None else None,
+            "bull_sleeve_train_validation_score": train_validation_bull_score(bull)
+            if bull is not None
+            else None,
             "crisis_candidate_labels": list(spec.crisis_candidate_labels or (spec.crisis_label,)),
             "recency_halflife_folds": spec.recency_halflife_folds,
             "recency_min_history_folds": spec.recency_min_history_folds,
@@ -505,7 +529,9 @@ def _ma_gap_at(frame: pd.DataFrame, end: pd.Timestamp, *, bars: int) -> float:
     return float(close / ma - 1.0) if ma > 0.0 else 0.0
 
 
-def _last_validation_month_window(validation_start: pd.Timestamp, validation_end: pd.Timestamp) -> tuple[pd.Timestamp, pd.Timestamp]:
+def _last_validation_month_window(
+    validation_start: pd.Timestamp, validation_end: pd.Timestamp
+) -> tuple[pd.Timestamp, pd.Timestamp]:
     end_period = validation_end.to_period("M")
     start = max(validation_start, end_period.start_time)
     return pd.Timestamp(start), validation_end
@@ -631,7 +657,9 @@ def _align_frames(frames: Mapping[str, pd.DataFrame]) -> pd.DataFrame:
     return merged.sort_values("datetime").reset_index(drop=True)
 
 
-def _simulate_bull_bear_candidate(aligned: pd.DataFrame, *, params: Mapping[str, Any]) -> pd.DataFrame:
+def _simulate_bull_bear_candidate(
+    aligned: pd.DataFrame, *, params: Mapping[str, Any]
+) -> pd.DataFrame:
     symbols = [col for col in aligned.columns if col != "datetime"]
     if not symbols:
         return pd.DataFrame({"datetime": [], "return": [], "turnover": [], "equity": []})
@@ -699,8 +727,12 @@ def _simulate_bull_bear_candidate(aligned: pd.DataFrame, *, params: Mapping[str,
         active = current != 0.0
         held[active] += 1
         if stop_loss_pct > 0.0:
-            long_stop = (current > 0.0) & np.isfinite(entry) & (prices <= entry * (1.0 - stop_loss_pct))
-            short_stop = (current < 0.0) & np.isfinite(entry) & (prices >= entry * (1.0 + stop_loss_pct))
+            long_stop = (
+                (current > 0.0) & np.isfinite(entry) & (prices <= entry * (1.0 - stop_loss_pct))
+            )
+            short_stop = (
+                (current < 0.0) & np.isfinite(entry) & (prices >= entry * (1.0 + stop_loss_pct))
+            )
             expired = active & (held >= max_hold_bars)
             exit_mask = long_stop | short_stop | expired
             current[exit_mask] = 0.0
@@ -712,7 +744,9 @@ def _simulate_bull_bear_candidate(aligned: pd.DataFrame, *, params: Mapping[str,
             entry[:] = np.nan
             held[:] = 0
         elif tick % rebalance_bars == 0:
-            target_names = list(up.index[:max_longs]) if regime == "BULL" else list(down.index[:max_shorts])
+            target_names = (
+                list(up.index[:max_longs]) if regime == "BULL" else list(down.index[:max_shorts])
+            )
             direction = 1.0 if regime == "BULL" else -1.0
             scale = up_breadth if regime == "BULL" else down_breadth
             gross = target_alloc * min(max_gross, 1.0) * max(exit_breadth, scale)
@@ -775,7 +809,9 @@ def evaluate_bull_bear_candidates(
     if not candidate_defs:
         return []
     by_timeframe: dict[str, pd.DataFrame] = {}
-    for timeframe in sorted({str(item.get("strategy_timeframe") or item.get("timeframe")) for item in candidate_defs}):
+    for timeframe in sorted(
+        {str(item.get("strategy_timeframe") or item.get("timeframe")) for item in candidate_defs}
+    ):
         frames: dict[str, pd.DataFrame] = {}
         for symbol in symbols:
             compact = str(symbol).replace("/", "")
@@ -814,7 +850,11 @@ def evaluate_bull_bear_candidates(
                     "real_execution_allowed": False,
                     "uses_locked_oos_for_selection": False,
                     "current_fold_oos_used_for_weighting": False,
-                    "selection_inputs": ["train", "validation", "pre_oos_static_candidate_definition"],
+                    "selection_inputs": [
+                        "train",
+                        "validation",
+                        "pre_oos_static_candidate_definition",
+                    ],
                     "selection_policy": "candidate_definition_static_then_train_validation_metrics_for_selector_pool",
                     "strategy_class": "BullBearRegimeRotationStrategy",
                     "source_candidate_id": candidate.get("candidate_id"),
@@ -822,8 +862,12 @@ def evaluate_bull_bear_candidates(
                     "selected_timeframes": [timeframe],
                     "timeframe": timeframe,
                     "train": _metrics_from_stream(stream, train["start"], train["end"]),
-                    "validation": _metrics_from_stream(stream, validation["start"], validation["end"]),
-                    "locked_oos": _metrics_from_stream(stream, locked_oos["start"], locked_oos["end"]),
+                    "validation": _metrics_from_stream(
+                        stream, validation["start"], validation["end"]
+                    ),
+                    "locked_oos": _metrics_from_stream(
+                        stream, locked_oos["start"], locked_oos["end"]
+                    ),
                     "cost_model": "10bps_per_abs_weight_turnover_proxy",
                     "data_note": "evaluated after repository/data refresh; shadow-only and not part of original WF JSON",
                 }
@@ -947,27 +991,37 @@ def _baseline_labels(payload: Mapping[str, Any]) -> list[str]:
     return labels
 
 
-def _baseline_comparison(payload: Mapping[str, Any], selector_aggregates: Sequence[Mapping[str, Any]], new_aggregates: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    source_aggs = {str(row.get("candidate_label")): dict(row) for row in list(payload.get("aggregate_rankings") or [])}
+def _baseline_comparison(
+    payload: Mapping[str, Any],
+    selector_aggregates: Sequence[Mapping[str, Any]],
+    new_aggregates: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    source_aggs = {
+        str(row.get("candidate_label")): dict(row)
+        for row in list(payload.get("aggregate_rankings") or [])
+    }
     out: list[dict[str, Any]] = []
     for label in _baseline_labels(payload):
         row = source_aggs.get(label)
         if row:
-            item = {key: row.get(key) for key in (
-                "candidate_label",
-                "family",
-                "compounded_oos_return",
-                "positive_oos_folds",
-                "fold_count",
-                "max_oos_mdd",
-                "monthly_equity_mdd",
-                "monthly_sharpe_approx",
-                "monthly_cvar_25",
-                "min_oos_return",
-                "latest_oos_return",
-                "clean_promotion_eligible",
-                "non_clean_reasons",
-            )}
+            item = {
+                key: row.get(key)
+                for key in (
+                    "candidate_label",
+                    "family",
+                    "compounded_oos_return",
+                    "positive_oos_folds",
+                    "fold_count",
+                    "max_oos_mdd",
+                    "monthly_equity_mdd",
+                    "monthly_sharpe_approx",
+                    "monthly_cvar_25",
+                    "min_oos_return",
+                    "latest_oos_return",
+                    "clean_promotion_eligible",
+                    "non_clean_reasons",
+                )
+            }
             item["comparison_role"] = "source_baseline"
             out.append(item)
     for row in selector_aggregates:
@@ -1055,7 +1109,9 @@ def _render_markdown(payload: Mapping[str, Any]) -> str:
     lines: list[str] = []
     lines.append("# Regime-aware barbell selector analysis")
     lines.append("")
-    lines.append("Shadow/research only. `ready_for_real=false`; current-fold OOS is not used for selector decisions.")
+    lines.append(
+        "Shadow/research only. `ready_for_real=false`; current-fold OOS is not used for selector decisions."
+    )
     lines.append("")
     lines.append("## Contamination audit")
     audit = dict(payload.get("contamination_audit") or {})
@@ -1069,7 +1125,9 @@ def _render_markdown(payload: Mapping[str, Any]) -> str:
     lines.append("")
 
     lines.append("## Baseline / selector comparison")
-    lines.append("| role | label | comp | positive folds | min OOS | latest OOS | max OOS MDD | monthly MDD | Sharpe | CVaR25 |")
+    lines.append(
+        "| role | label | comp | positive folds | min OOS | latest OOS | max OOS MDD | monthly MDD | Sharpe | CVaR25 |"
+    )
     lines.append("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|")
     for row in payload.get("baseline_comparison", []):
         lines.append(
@@ -1088,7 +1146,15 @@ def _render_markdown(payload: Mapping[str, Any]) -> str:
     lines.append("## Fold regime and OOS return table")
     selector_labels = [row["candidate_label"] for row in payload.get("selector_rankings", [])]
     table = list(payload.get("fold_oos_return_table") or [])
-    header = ["fold", "regime", "raw", "fallback", "clean", "pos_base", *[f"selector_{i+1}" for i in range(len(selector_labels))]]
+    header = [
+        "fold",
+        "regime",
+        "raw",
+        "fallback",
+        "clean",
+        "pos_base",
+        *[f"selector_{i + 1}" for i in range(len(selector_labels))],
+    ]
     lines.append("| " + " | ".join(header) + " |")
     lines.append("|" + "---|" * len(header))
     for row in table:
@@ -1108,11 +1174,14 @@ def _render_markdown(payload: Mapping[str, Any]) -> str:
     for idx, label in enumerate(selector_labels, start=1):
         lines.append(f"- selector_{idx}: `{label}`")
     lines.append("")
-    new_labels = [row["candidate_label"] for row in (payload.get("new_strategy_evaluation", {}).get("aggregate_rankings") or [])[:4]]
+    new_labels = [
+        row["candidate_label"]
+        for row in (payload.get("new_strategy_evaluation", {}).get("aggregate_rankings") or [])[:4]
+    ]
     new_table = list(payload.get("new_strategy_fold_oos_return_table") or [])
     if new_labels and new_table:
         lines.append("## Newly added strategy fold OOS table")
-        header = ["fold", *[f"new_{i+1}" for i in range(len(new_labels))]]
+        header = ["fold", *[f"new_{i + 1}" for i in range(len(new_labels))]]
         lines.append("| " + " | ".join(header) + " |")
         lines.append("|" + "---|" * len(header))
         for row in new_table:
@@ -1126,7 +1195,9 @@ def _render_markdown(payload: Mapping[str, Any]) -> str:
             lines.append(f"- new_{idx}: `{label}`")
         lines.append("")
     lines.append("## Regime decision audit")
-    lines.append("| fold | decision | val BTC | last-val-month BTC | val breadth | last breadth | OOS BTC (analysis only) | reason |")
+    lines.append(
+        "| fold | decision | val BTC | last-val-month BTC | val breadth | last breadth | OOS BTC (analysis only) | reason |"
+    )
     lines.append("|---|---|---:|---:|---:|---:|---:|---|")
     for item in payload.get("market_regime_by_fold", []):
         lines.append(
@@ -1163,7 +1234,9 @@ def build_report(
     new_eval_error: str | None = None
     if evaluate_new_strategy:
         try:
-            new_rows = evaluate_bull_bear_candidates(folds=folds, data_root=data_root, symbols=symbols)
+            new_rows = evaluate_bull_bear_candidates(
+                folds=folds, data_root=data_root, symbols=symbols
+            )
         except Exception as exc:  # report-only path: preserve main selector analysis.
             new_eval_error = f"{type(exc).__name__}: {exc}"
     all_rows = [*source_rows, *new_rows]
@@ -1237,7 +1310,9 @@ def build_report(
             "row_count": len(new_rows),
             "aggregate_rankings": new_aggregates,
         },
-        "baseline_comparison": _baseline_comparison(source_payload, selector_aggregates, new_aggregates),
+        "baseline_comparison": _baseline_comparison(
+            source_payload, selector_aggregates, new_aggregates
+        ),
         "fold_oos_return_table": _fold_return_table(
             fold_order=fold_order,
             rows_by_label=rows_by_label,
@@ -1272,7 +1347,9 @@ def build_report(
             "current_fold_oos_role": "evaluation_after_decision_only",
             "new_strategy_real_money": False,
             "shadow_only": True,
-            "post_oos_research_variant_present": any(bool(row.get("post_oos_research_variant")) for row in selector_aggregates),
+            "post_oos_research_variant_present": any(
+                bool(row.get("post_oos_research_variant")) for row in selector_aggregates
+            ),
             "post_oos_research_variant_interpretation": "hypothesis_only_not_clean_scientific_evidence",
         },
         "notes": [
@@ -1315,7 +1392,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         evaluate_new_strategy=not bool(args.skip_new_strategy_eval),
     )
     output_json.parent.mkdir(parents=True, exist_ok=True)
-    output_json.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", "utf-8")
+    output_json.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", "utf-8"
+    )
     output_md.parent.mkdir(parents=True, exist_ok=True)
     output_md.write_text(_render_markdown(payload), "utf-8")
     print(
@@ -1323,7 +1402,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             {
                 "output_json": str(output_json),
                 "output_md": str(output_md),
-                "top_selector": payload["selector_rankings"][0] if payload.get("selector_rankings") else None,
+                "top_selector": payload["selector_rankings"][0]
+                if payload.get("selector_rankings")
+                else None,
                 "new_strategy_error": payload["new_strategy_evaluation"].get("error"),
             },
             ensure_ascii=False,

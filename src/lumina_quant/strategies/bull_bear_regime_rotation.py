@@ -100,9 +100,7 @@ class BullBearRegimeRotationStrategy(Strategy):
             "momentum_lookback": HyperParam.integer(
                 "momentum_lookback", default=48, low=3, high=20000
             ),
-            "trend_ma_window": HyperParam.integer(
-                "trend_ma_window", default=48, low=3, high=20000
-            ),
+            "trend_ma_window": HyperParam.integer("trend_ma_window", default=48, low=3, high=20000),
             "signal_threshold": HyperParam.floating(
                 "signal_threshold", default=0.015, low=0.0, high=1.0
             ),
@@ -263,7 +261,9 @@ class BullBearRegimeRotationStrategy(Strategy):
         item.volumes.append(max(0.0, float(snapshot.volume or 0.0)))
         return True
 
-    def _symbol_score(self, symbol: str, item: _CrossSectionalState) -> tuple[float | None, dict[str, Any]]:
+    def _symbol_score(
+        self, symbol: str, item: _CrossSectionalState
+    ) -> tuple[float | None, dict[str, Any]]:
         closes = list(item.closes)
         ret = simple_return(closes, lookback=self.momentum_lookback)
         ma = simple_moving_average(closes, self.trend_ma_window)
@@ -290,7 +290,12 @@ class BullBearRegimeRotationStrategy(Strategy):
 
     def _breadth_rows(
         self,
-    ) -> tuple[float, float, list[tuple[float, str, dict[str, Any]]], list[tuple[float, str, dict[str, Any]]]]:
+    ) -> tuple[
+        float,
+        float,
+        list[tuple[float, str, dict[str, Any]]],
+        list[tuple[float, str, dict[str, Any]]],
+    ]:
         eligible = 0
         up_count = 0
         down_count = 0
@@ -313,7 +318,9 @@ class BullBearRegimeRotationStrategy(Strategy):
         down_rows.sort(key=lambda row: row[0])
         return float(up_breadth), float(down_breadth), up_rows, down_rows
 
-    def _classify_regime(self, up_breadth: float, down_breadth: float, benchmark_ret: float | None) -> str:
+    def _classify_regime(
+        self, up_breadth: float, down_breadth: float, benchmark_ret: float | None
+    ) -> str:
         bench = 0.0 if benchmark_ret is None else float(benchmark_ret)
         if up_breadth >= self.bull_breadth and bench >= self.benchmark_bull_threshold:
             return "BULL"

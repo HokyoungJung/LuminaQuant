@@ -12,6 +12,8 @@ from typing import Any
 
 import polars as pl
 
+from lumina_quant.compute.ohlcv_validation import assert_valid_ohlcv_frame
+
 REQUIRED_OHLCV_COLUMNS: tuple[str, ...] = (
     "datetime",
     "open",
@@ -37,6 +39,8 @@ class OHLCVFrameLoader:
     start_date: Any = None
     end_date: Any = None
     columns: tuple[str, ...] = REQUIRED_OHLCV_COLUMNS
+    validation: str = "none"
+    allow_eager_fallback: bool = False
 
     @staticmethod
     def _coerce_bound(value: Any) -> datetime | None:
@@ -74,21 +78,69 @@ class OHLCVFrameLoader:
         Returns None when the incoming frame is missing required columns.
         """
         if frame is None:
+            if self._strict_validation:
+                assert_valid_ohlcv_frame(frame, context="ohlcv_normalize")
             return None
         if not has_required_ohlcv_columns(frame, self.columns):
+            if self._strict_validation:
+                assert_valid_ohlcv_frame(
+                    frame,
+                    context="ohlcv_normalize",
+                    required_columns=self.columns,
+                )
             return None
 
         out = self._normalize_datetime_column(frame.select(list(self.columns)))
+        if self._strict_validation:
+            assert_valid_ohlcv_frame(
+                out,
+                context="ohlcv_normalize_pre_sort",
+                required_columns=self.columns,
+            )
         start_bound = self._coerce_bound(self.start_date)
         end_bound = self._coerce_bound(self.end_date)
         if start_bound is not None:
             out = out.filter(pl.col("datetime") >= start_bound)
         if end_bound is not None:
             out = out.filter(pl.col("datetime") <= end_bound)
-        return out.sort("datetime")
+        out = out.sort("datetime")
+        if self._strict_validation:
+            assert_valid_ohlcv_frame(
+                out,
+                context="ohlcv_normalize",
+                required_columns=self.columns,
+            )
+        return out
+
+    @property
+    def _strict_validation(self) -> bool:
+        return str(self.validation or "").strip().lower() in {
+            "strict",
+            "fail_closed",
+            "fail-closed",
+        }
 
     def load_csv(self, csv_path: str) -> pl.DataFrame | None:
-        """Load OHLCV CSV with lazy pushdown first, eager fallback on failure."""
+        """Load OHLCV CSV with lazy pushdown first.
+
+        Strict validation is fail-closed by default: lazy/streaming ingestion
+        failures are raised instead of silently switching engines.  Eager
+        fallback remains an explicit compatibility opt-in for non-production
+        ingestion environments.
+        """
+        if self._strict_validation:
+            try:
+                frame = (
+                    pl.scan_csv(csv_path, try_parse_dates=True)
+                    .select(list(self.columns))
+                    .collect(engine="streaming")
+                )
+            except pl.exceptions.PolarsError:
+                if not self.allow_eager_fallback:
+                    raise
+                frame = pl.read_csv(csv_path, try_parse_dates=True)
+            return self.normalize(frame)
+
         try:
             lazy_frame = pl.scan_csv(csv_path, try_parse_dates=True).select(list(self.columns))
             start_bound = self._coerce_bound(self.start_date)
@@ -98,13 +150,23 @@ class OHLCVFrameLoader:
             if end_bound is not None:
                 lazy_frame = lazy_frame.filter(pl.col("datetime") <= end_bound)
             frame = lazy_frame.collect(engine="streaming")
-            return self._normalize_datetime_column(frame).sort("datetime")
+            out = self._normalize_datetime_column(frame).sort("datetime")
+            if self._strict_validation:
+                assert_valid_ohlcv_frame(
+                    out,
+                    context=f"ohlcv_csv:{csv_path}",
+                    required_columns=self.columns,
+                )
+            return out
         except Exception:
-            pass
+            if self._strict_validation and not self.allow_eager_fallback:
+                raise
 
         try:
             eager = pl.read_csv(csv_path, try_parse_dates=True)
         except Exception:
+            if self._strict_validation:
+                raise
             return None
         return self.normalize(eager)
 
@@ -114,9 +176,10 @@ def normalize_ohlcv_frame(
     *,
     start_date: Any = None,
     end_date: Any = None,
+    validation: str = "none",
 ) -> pl.DataFrame | None:
     """Functional helper for one-off frame normalization."""
-    loader = OHLCVFrameLoader(start_date=start_date, end_date=end_date)
+    loader = OHLCVFrameLoader(start_date=start_date, end_date=end_date, validation=validation)
     return loader.normalize(frame)
 
 
@@ -125,7 +188,8 @@ def load_csv_ohlcv(
     *,
     start_date: Any = None,
     end_date: Any = None,
+    validation: str = "none",
 ) -> pl.DataFrame | None:
     """Functional helper for one-off OHLCV CSV loading."""
-    loader = OHLCVFrameLoader(start_date=start_date, end_date=end_date)
+    loader = OHLCVFrameLoader(start_date=start_date, end_date=end_date, validation=validation)
     return loader.load_csv(csv_path)

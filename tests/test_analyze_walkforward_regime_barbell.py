@@ -22,7 +22,15 @@ def _block(ret: float, mdd: float = 0.05) -> dict[str, float | str]:
     }
 
 
-def _row(label: str, fold: str, *, train: float, val: float, oos: float, family: str = "individual_robust") -> dict:
+def _row(
+    label: str,
+    fold: str,
+    *,
+    train: float,
+    val: float,
+    oos: float,
+    family: str = "individual_robust",
+) -> dict:
     return {
         "candidate_label": label,
         "fold_id": fold,
@@ -69,8 +77,22 @@ def test_bull_selection_uses_train_validation_not_oos() -> None:
 def test_selector_rows_freeze_decision_before_oos() -> None:
     folds = ["2026-01", "2026-02"]
     crisis_rows = [
-        _row(DEFAULT_CRISIS_FALLBACK_LABEL, "2026-01", train=0.10, val=0.02, oos=-0.02, family="lagged_shadow_leaf_router"),
-        _row(DEFAULT_CRISIS_FALLBACK_LABEL, "2026-02", train=0.10, val=0.02, oos=0.10, family="lagged_shadow_leaf_router"),
+        _row(
+            DEFAULT_CRISIS_FALLBACK_LABEL,
+            "2026-01",
+            train=0.10,
+            val=0.02,
+            oos=-0.02,
+            family="lagged_shadow_leaf_router",
+        ),
+        _row(
+            DEFAULT_CRISIS_FALLBACK_LABEL,
+            "2026-02",
+            train=0.10,
+            val=0.02,
+            oos=0.10,
+            family="lagged_shadow_leaf_router",
+        ),
     ]
     bull_rows = [
         _row("bull", "2026-01", train=0.12, val=0.07, oos=0.08),

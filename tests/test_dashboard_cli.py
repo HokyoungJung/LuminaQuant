@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 
 from lumina_quant.cli import dashboard
 
@@ -56,7 +57,15 @@ def test_dashboard_main_print_contract_emits_v2_json(capsys) -> None:
     assert payload["contract_version"] == 2
     assert payload["launch_mode"] == "next"
     assert payload["frontend_target"].endswith("apps/dashboard_web")
-    assert len(payload["routes"]) == 11
+    assert len(payload["routes"]) == 12
+    assert any(
+        route["route"] == "/api/python/dashboard/alpha-evidence" for route in payload["routes"]
+    )
+    repo_root = Path(__file__).resolve().parents[1]
+    assert (
+        repo_root / "apps/dashboard_web/app/api/python/dashboard/alpha-evidence/route.ts"
+    ).is_file()
+    assert (repo_root / "apps/dashboard_web/lib/alpha-evidence-server.ts").is_file()
 
 
 def test_dashboard_main_print_contract_routes_all_module_mode(capsys) -> None:

@@ -89,6 +89,28 @@ export interface RiskHealthPayload {
   status: string;
 }
 
+export interface AlphaEvidencePayload {
+  artifact_kind: string;
+  as_of: string;
+  advisory_only: boolean;
+  real_money_execution_enabled: boolean;
+  summary: {
+    alpha_count: number;
+    run_card_count: number;
+    classifications: Record<string, number>;
+    reality_gates: Record<string, { passed: boolean; observations: number }>;
+    live_readiness_action?: string | null;
+  };
+  evidence: Array<Record<string, unknown>>;
+  run_cards: Array<Record<string, unknown>>;
+  live_readiness: Record<string, unknown>;
+  source: {
+    mode: string;
+    status: string;
+    [key: string]: unknown;
+  };
+}
+
 export interface ExactWindowPayload {
   as_of: string;
   generated_at: string | null;

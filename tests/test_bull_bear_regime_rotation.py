@@ -91,12 +91,16 @@ def _strategy(events: _Events) -> BullBearRegimeRotationStrategy:
     )
 
 
-def _feed_windows(strategy: BullBearRegimeRotationStrategy, prices_by_step: list[dict[str, float]]) -> None:
+def _feed_windows(
+    strategy: BullBearRegimeRotationStrategy, prices_by_step: list[dict[str, float]]
+) -> None:
     for i, prices in enumerate(prices_by_step):
         strategy.calculate_signals(_Window(_ts(i), prices))
 
 
-def _trend_path(mults: dict[str, float], *, steps: int = 12, start: float = 100.0) -> list[dict[str, float]]:
+def _trend_path(
+    mults: dict[str, float], *, steps: int = 12, start: float = 100.0
+) -> list[dict[str, float]]:
     prices = dict.fromkeys(_SYMBOLS, start)
     out: list[dict[str, float]] = []
     for _ in range(steps):
@@ -198,7 +202,10 @@ def test_state_roundtrip_preserves_regime_and_symbol_state() -> None:
     again = restored.get_state()
     assert again["regime"] == snapshot["regime"]
     assert again["tick"] == snapshot["tick"]
-    assert again["symbol_state"]["BTC/USDT"]["closes"] == snapshot["symbol_state"]["BTC/USDT"]["closes"]
+    assert (
+        again["symbol_state"]["BTC/USDT"]["closes"]
+        == snapshot["symbol_state"]["BTC/USDT"]["closes"]
+    )
 
 
 def test_candidate_builder_wires_basket_only_ge_30m() -> None:

@@ -502,6 +502,7 @@
     "literal:src/lumina_quant/strategies/artifact_portfolio_mode.py:992:35:0.025",
     "literal:src/lumina_quant/strategies/artifact_portfolio_mode.py:993:37:0.012",
     "literal:src/lumina_quant/strategies/artifact_portfolio_mode.py:994:33:96",
+    "literal:src/lumina_quant/strategies/bull_bear_regime_rotation.py:91:31:1800",
     "literal:src/lumina_quant/strategies/calendar_overlay_alpha_sleeves.py:153:25:7",
     "literal:src/lumina_quant/strategies/calendar_overlay_alpha_sleeves.py:155:20:7",
     "literal:src/lumina_quant/strategies/calendar_overlay_alpha_sleeves.py:85:31:86400",
