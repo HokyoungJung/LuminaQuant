@@ -495,6 +495,31 @@ class ResearchConfig:
 
 
 @dataclass(slots=True)
+class Qlib158FormulaConfig:
+    """Opt-in gate for the Qlib158-style formulaic factor library.
+
+    ``enabled`` defaults to ``False`` — the factor definitions in
+    ``lumina_quant.indicators.qlib158`` are inert net-new transforms that no
+    default runtime path imports, so the golden backtest / walk-forward
+    numerics stay byte-identical.  Flip this only to opt the mirror factors
+    into a research / candidate-library path.  ``min_abs_ic`` / ``min_icir``
+    expose the documented IC / ICIR eligibility bar as tunable flags (defaults
+    mirror ``qlib158.MIN_ABS_IC`` / ``qlib158.MIN_ICIR``).
+    """
+
+    enabled: bool = False
+    min_abs_ic: float = 0.02
+    min_icir: float = 0.30
+
+
+@dataclass(slots=True)
+class StrategiesConfig:
+    """Opt-in strategy-family toggles (all inert by default)."""
+
+    qlib158_formula: Qlib158FormulaConfig = field(default_factory=Qlib158FormulaConfig)
+
+
+@dataclass(slots=True)
 class RuntimeConfig:
     """Full runtime configuration bundle."""
 
@@ -515,3 +540,4 @@ class RuntimeConfig:
     memory: MemoryConfig = field(default_factory=MemoryConfig)
     validation: ValidationConfig = field(default_factory=ValidationConfig)
     research: ResearchConfig = field(default_factory=ResearchConfig)
+    strategies: StrategiesConfig = field(default_factory=StrategiesConfig)

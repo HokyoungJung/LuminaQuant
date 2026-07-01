@@ -28,8 +28,10 @@ from lumina_quant.configuration.schema import (
     PromotionGateConfig,
     ResearchConfig,
     RiskConfig,
+    Qlib158FormulaConfig,
     RuntimeConfig,
     StorageConfig,
+    StrategiesConfig,
     SystemConfig,
     TradingConfig,
     StrategyQualityConfig,
@@ -275,6 +277,10 @@ def _extract_runtime_sections(mapped: dict[str, Any]) -> dict[str, dict[str, Any
         "memory": _raw_section(mapped, "memory"),
         "validation": _raw_section(mapped, "validation"),
         "research": _raw_section(mapped, "research"),
+        "strategies": _raw_section(mapped, "strategies"),
+        "strategies_qlib158_formula": _raw_section(
+            _raw_section(mapped, "strategies"), "qlib158_formula"
+        ),
     }
 
 
@@ -995,6 +1001,13 @@ def _normalize_research_runtime_section(runtime: RuntimeConfig) -> None:
     )
 
 
+def _normalize_strategies_runtime_section(runtime: RuntimeConfig) -> None:
+    cfg = runtime.strategies.qlib158_formula
+    cfg.enabled = _as_bool(getattr(cfg, "enabled", False), False)
+    cfg.min_abs_ic = max(0.0, _as_float(getattr(cfg, "min_abs_ic", 0.02), 0.02))
+    cfg.min_icir = max(0.0, _as_float(getattr(cfg, "min_icir", 0.30), 0.30))
+
+
 def _normalize_promotion_gate_runtime_section(runtime: RuntimeConfig) -> None:
     runtime.promotion_gate.days = _as_int(runtime.promotion_gate.days, 14)
     runtime.promotion_gate.max_order_rejects = _as_int(runtime.promotion_gate.max_order_rejects, 0)
@@ -1054,6 +1067,7 @@ def _normalize_runtime_config(
     )
     _normalize_promotion_gate_runtime_section(runtime)
     _normalize_research_runtime_section(runtime)
+    _normalize_strategies_runtime_section(runtime)
 
 
 def _build_runtime_config_tree(
@@ -1115,6 +1129,13 @@ def _build_runtime_config_tree(
         ),
         research=ResearchConfig(
             **_coerce_dataclass_kwargs(sections["research"], ResearchConfig)
+        ),
+        strategies=StrategiesConfig(
+            qlib158_formula=Qlib158FormulaConfig(
+                **_coerce_dataclass_kwargs(
+                    sections["strategies_qlib158_formula"], Qlib158FormulaConfig
+                )
+            ),
         ),
         promotion_gate=PromotionGateConfig(
             **promotion_kwargs,
