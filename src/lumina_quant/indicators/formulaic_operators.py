@@ -31,6 +31,14 @@ def ts_sum(values, window: int) -> float | None:
     return compute_ops.ts_sum(values, window=window)
 
 
+def ts_mean(values, window: int) -> float | None:
+    """Return rolling mean over trailing window."""
+    total = compute_ops.ts_sum(values, window=window)
+    if total is None:
+        return None
+    return total / float(max(1, int(window)))
+
+
 def ts_product(values, window: int) -> float | None:
     """Return rolling product over trailing window."""
     tail = _tail(values, window)
@@ -183,6 +191,10 @@ def ts_rank_series(values, window, *, index: pd.Index) -> pd.Series:
 
 def ts_sum_series(values, window, *, index: pd.Index) -> pd.Series:
     return compute_ops.ts_sum_series(to_series(values, index), window=as_window(window))
+
+
+def ts_mean_series(values, window, *, index: pd.Index) -> pd.Series:
+    return to_series(values, index).rolling(as_window(window)).mean()
 
 
 def ts_stddev_series(values, window, *, index: pd.Index) -> pd.Series:
