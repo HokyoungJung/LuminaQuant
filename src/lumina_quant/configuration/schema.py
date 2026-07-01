@@ -457,6 +457,44 @@ class StrategyQualityConfig:
 
 
 @dataclass(slots=True)
+class PortfolioConfig:
+    """Opt-in portfolio allocation-method settings.
+
+    ``allocation_method`` selects the portfolio construction routine.  The
+    default ``"legacy"`` preserves the current behavior — NO code routes through
+    the extra pure-numpy optimizers (ERC / MaxDiversification / MeanVariance /
+    HRP in ``portfolio.optimizers_extra``) unless a non-legacy method is chosen,
+    so the golden backtest / walk-forward numerics stay byte-identical by
+    default.  All other fields are inert tuning knobs for those optimizers and
+    have no effect while ``allocation_method == "legacy"``.
+    """
+
+    allocation_method: str = "legacy"
+    erc_max_iter: int = 10000
+    erc_tol: float = 1e-10
+    mv_risk_aversion: float = 5.0
+    pgd_max_iter: int = 500
+    pgd_step: float = 0.05
+    hrp_corr_threshold: float = 0.60
+    cov_window: int = 0
+
+
+@dataclass(slots=True)
+class ResearchConfig:
+    """Opt-in research-only tooling toggles.
+
+    All fields default to the current behavior; nothing in the default runtime
+    path imports the gated research kernels.  ``execution_attribution_enabled``
+    gates the offline execution-attribution kernel
+    (``research.execution_attribution``): when ``False`` (default) no code
+    constructs or runs it, so backtest / walk-forward numerics stay
+    byte-identical.
+    """
+
+    execution_attribution_enabled: bool = False
+
+
+@dataclass(slots=True)
 class RuntimeConfig:
     """Full runtime configuration bundle."""
 
@@ -468,6 +506,7 @@ class RuntimeConfig:
     data: DataConfig = field(default_factory=DataConfig)
     deep_learning: DeepLearningRuntimeConfig = field(default_factory=DeepLearningRuntimeConfig)
     strategy_quality: StrategyQualityConfig = field(default_factory=StrategyQualityConfig)
+    portfolio: PortfolioConfig = field(default_factory=PortfolioConfig)
     backtest: BacktestRuntimeConfig = field(default_factory=BacktestRuntimeConfig)
     live: LiveRuntimeConfig = field(default_factory=LiveRuntimeConfig)
     optimization: OptimizationRuntimeConfig = field(default_factory=OptimizationRuntimeConfig)
@@ -475,3 +514,4 @@ class RuntimeConfig:
     promotion_gate: PromotionGateConfig = field(default_factory=PromotionGateConfig)
     memory: MemoryConfig = field(default_factory=MemoryConfig)
     validation: ValidationConfig = field(default_factory=ValidationConfig)
+    research: ResearchConfig = field(default_factory=ResearchConfig)

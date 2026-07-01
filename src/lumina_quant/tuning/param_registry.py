@@ -600,3 +600,98 @@ class ParamRegistry:
             if cleaned:
                 out["params"][key] = cleaned
         return out
+
+
+# ---------------------------------------------------------------------------
+# Portfolio allocation-method parameter schema (additive, opt-in).
+#
+# Schema for the pure-numpy optimizers in ``portfolio.optimizers_extra``.  These
+# map 1:1 onto the ``portfolio.*`` config keys (see ``configuration.schema``).
+# They are exposed as a standalone schema builder + registration helper so a
+# caller can opt in without altering any existing strategy schema or default
+# tuning behavior.
+# ---------------------------------------------------------------------------
+
+PORTFOLIO_OPTIMIZER_SCHEMA_NAME = "portfolio_allocation"
+
+
+def portfolio_optimizer_param_schema() -> dict[str, HyperParam]:
+    """Return the ``portfolio.*`` allocation-method HyperParam schema.
+
+    Parameter names are snake_case (accepted by :meth:`ParamRegistry.register`)
+    and mirror the ``PortfolioConfig`` fields.  ``allocation_method`` is
+    non-tunable and defaults to ``"legacy"`` so search spaces never silently
+    switch the allocator away from the current behavior.
+    """
+    return {
+        "allocation_method": HyperParam.categorical(
+            "allocation_method",
+            "legacy",
+            choices=("legacy", "erc", "max_diversification", "mean_variance", "hrp"),
+            tunable=False,
+            description="Portfolio construction routine (default legacy preserves current behavior).",
+        ),
+        "erc_max_iter": HyperParam.integer(
+            "erc_max_iter",
+            10000,
+            low=1,
+            high=100000,
+            tunable=False,
+            description="ERC fixed-point iteration budget.",
+        ),
+        "erc_tol": HyperParam.floating(
+            "erc_tol",
+            1e-10,
+            low=0.0,
+            high=1e-2,
+            tunable=False,
+            description="ERC risk-contribution spread tolerance.",
+        ),
+        "mv_risk_aversion": HyperParam.floating(
+            "mv_risk_aversion",
+            5.0,
+            low=0.0,
+            high=100.0,
+            description="Mean-variance risk-aversion coefficient.",
+        ),
+        "pgd_max_iter": HyperParam.integer(
+            "pgd_max_iter",
+            500,
+            low=1,
+            high=10000,
+            tunable=False,
+            description="Projected-gradient iteration budget (MaxDiversification / MeanVariance).",
+        ),
+        "pgd_step": HyperParam.floating(
+            "pgd_step",
+            0.05,
+            low=1e-4,
+            high=1.0,
+            description="Projected-gradient step size.",
+        ),
+        "hrp_corr_threshold": HyperParam.floating(
+            "hrp_corr_threshold",
+            0.60,
+            low=0.0,
+            high=1.0,
+            description="Correlation threshold for HRP clustering.",
+        ),
+        "cov_window": HyperParam.integer(
+            "cov_window",
+            0,
+            low=0,
+            high=100000,
+            tunable=False,
+            description="Trailing covariance window (0 => use all supplied bars).",
+        ),
+    }
+
+
+def register_portfolio_optimizer_params(
+    registry: ParamRegistry,
+    *,
+    name: str = PORTFOLIO_OPTIMIZER_SCHEMA_NAME,
+    optuna_trials: int = 20,
+) -> None:
+    """Register the portfolio allocation-method schema on ``registry`` (opt-in)."""
+    registry.register(name, portfolio_optimizer_param_schema(), optuna_trials=optuna_trials)

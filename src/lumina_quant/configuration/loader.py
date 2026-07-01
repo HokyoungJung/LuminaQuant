@@ -24,7 +24,9 @@ from lumina_quant.configuration.schema import (
     MarketWindowConfig,
     MemoryConfig,
     OptimizationRuntimeConfig,
+    PortfolioConfig,
     PromotionGateConfig,
+    ResearchConfig,
     RiskConfig,
     RuntimeConfig,
     StorageConfig,
@@ -260,6 +262,7 @@ def _extract_runtime_sections(mapped: dict[str, Any]) -> dict[str, dict[str, Any
         "data": _raw_section(mapped, "data"),
         "deep_learning": _raw_section(mapped, "deep_learning"),
         "strategy_quality": _raw_section(mapped, "strategy_quality"),
+        "portfolio": _raw_section(mapped, "portfolio"),
         "backtest": backtest_raw,
         "backtest_external": _raw_section(backtest_raw, "external"),
         "live": live_raw,
@@ -271,6 +274,7 @@ def _extract_runtime_sections(mapped: dict[str, Any]) -> dict[str, dict[str, Any
         "market_window": _raw_section(mapped, "market_window"),
         "memory": _raw_section(mapped, "memory"),
         "validation": _raw_section(mapped, "validation"),
+        "research": _raw_section(mapped, "research"),
     }
 
 
@@ -964,6 +968,33 @@ def _normalize_strategy_quality_runtime_section(runtime: RuntimeConfig) -> None:
     cfg.pair_min_correlation = max(0.0, min(1.0, _as_float(cfg.pair_min_correlation, 0.35)))
 
 
+_VALID_ALLOCATION_METHODS: frozenset[str] = frozenset(
+    {"legacy", "erc", "max_diversification", "mean_variance", "hrp"}
+)
+
+
+def _normalize_portfolio_runtime_section(runtime: RuntimeConfig) -> None:
+    cfg = runtime.portfolio
+    method = str(getattr(cfg, "allocation_method", "legacy") or "legacy").strip().lower()
+    cfg.allocation_method = method if method in _VALID_ALLOCATION_METHODS else "legacy"
+    cfg.erc_max_iter = max(1, _as_int(getattr(cfg, "erc_max_iter", 10000), 10000))
+    cfg.erc_tol = max(0.0, _as_float(getattr(cfg, "erc_tol", 1e-10), 1e-10))
+    cfg.mv_risk_aversion = max(0.0, _as_float(getattr(cfg, "mv_risk_aversion", 5.0), 5.0))
+    cfg.pgd_max_iter = max(1, _as_int(getattr(cfg, "pgd_max_iter", 500), 500))
+    cfg.pgd_step = max(0.0, _as_float(getattr(cfg, "pgd_step", 0.05), 0.05))
+    cfg.hrp_corr_threshold = min(
+        1.0, max(0.0, _as_float(getattr(cfg, "hrp_corr_threshold", 0.60), 0.60))
+    )
+    cfg.cov_window = max(0, _as_int(getattr(cfg, "cov_window", 0), 0))
+
+
+def _normalize_research_runtime_section(runtime: RuntimeConfig) -> None:
+    runtime.research.execution_attribution_enabled = _as_bool(
+        getattr(runtime.research, "execution_attribution_enabled", False),
+        False,
+    )
+
+
 def _normalize_promotion_gate_runtime_section(runtime: RuntimeConfig) -> None:
     runtime.promotion_gate.days = _as_int(runtime.promotion_gate.days, 14)
     runtime.promotion_gate.max_order_rejects = _as_int(runtime.promotion_gate.max_order_rejects, 0)
@@ -1007,6 +1038,7 @@ def _normalize_runtime_config(
     _normalize_data_runtime_section(runtime)
     _normalize_deep_learning_runtime_section(runtime)
     _normalize_strategy_quality_runtime_section(runtime)
+    _normalize_portfolio_runtime_section(runtime)
     _normalize_trading_and_risk_runtime_section(runtime)
     _normalize_execution_runtime_section(runtime, exec_raw=exec_raw)
     _normalize_live_exchange_runtime_section(runtime)
@@ -1021,6 +1053,7 @@ def _normalize_runtime_config(
         market_window_raw=market_window_raw,
     )
     _normalize_promotion_gate_runtime_section(runtime)
+    _normalize_research_runtime_section(runtime)
 
 
 def _build_runtime_config_tree(
@@ -1045,6 +1078,9 @@ def _build_runtime_config_tree(
         ),
         strategy_quality=StrategyQualityConfig(
             **_coerce_dataclass_kwargs(sections["strategy_quality"], StrategyQualityConfig)
+        ),
+        portfolio=PortfolioConfig(
+            **_coerce_dataclass_kwargs(sections["portfolio"], PortfolioConfig)
         ),
         backtest=BacktestRuntimeConfig(
             **{
@@ -1076,6 +1112,9 @@ def _build_runtime_config_tree(
         memory=MemoryConfig(**_coerce_dataclass_kwargs(sections["memory"], MemoryConfig)),
         validation=ValidationConfig(
             **_coerce_dataclass_kwargs(sections["validation"], ValidationConfig)
+        ),
+        research=ResearchConfig(
+            **_coerce_dataclass_kwargs(sections["research"], ResearchConfig)
         ),
         promotion_gate=PromotionGateConfig(
             **promotion_kwargs,
