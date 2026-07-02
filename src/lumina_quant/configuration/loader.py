@@ -12,6 +12,7 @@ from typing import Any
 import yaml
 from dotenv import dotenv_values
 from lumina_quant.configuration.schema import (
+    AlphaSearchConfig,
     BacktestExternalConfig,
     BacktestRuntimeConfig,
     DeepLearningRuntimeConfig,
@@ -277,6 +278,9 @@ def _extract_runtime_sections(mapped: dict[str, Any]) -> dict[str, dict[str, Any
         "memory": _raw_section(mapped, "memory"),
         "validation": _raw_section(mapped, "validation"),
         "research": _raw_section(mapped, "research"),
+        "research_alpha_search": _raw_section(
+            _raw_section(mapped, "research"), "alpha_search"
+        ),
         "strategies": _raw_section(mapped, "strategies"),
         "strategies_qlib158_formula": _raw_section(
             _raw_section(mapped, "strategies"), "qlib158_formula"
@@ -994,10 +998,41 @@ def _normalize_portfolio_runtime_section(runtime: RuntimeConfig) -> None:
     cfg.cov_window = max(0, _as_int(getattr(cfg, "cov_window", 0), 0))
 
 
+def _build_research_runtime_config(
+    *,
+    research_raw: dict[str, Any],
+    alpha_search_raw: dict[str, Any],
+) -> ResearchConfig:
+    research_kwargs = _coerce_dataclass_kwargs(research_raw, ResearchConfig)
+    # ``alpha_search`` is a nested dataclass built explicitly below; drop any raw
+    # passthrough so it is never assigned as a bare dict.
+    research_kwargs.pop("alpha_search", None)
+    return ResearchConfig(
+        **research_kwargs,
+        alpha_search=AlphaSearchConfig(
+            **_coerce_dataclass_kwargs(alpha_search_raw, AlphaSearchConfig)
+        ),
+    )
+
+
 def _normalize_research_runtime_section(runtime: RuntimeConfig) -> None:
     runtime.research.execution_attribution_enabled = _as_bool(
         getattr(runtime.research, "execution_attribution_enabled", False),
         False,
+    )
+    alpha_search = runtime.research.alpha_search
+    alpha_search.enabled = _as_bool(getattr(alpha_search, "enabled", False), False)
+    alpha_search.max_candidates = max(
+        1, _as_int(getattr(alpha_search, "max_candidates", 256), 256)
+    )
+    alpha_search.seed = _as_int(getattr(alpha_search, "seed", 20260701), 20260701)
+    alpha_search.dsr_threshold = _as_float(
+        getattr(alpha_search, "dsr_threshold", 0.95), 0.95
+    )
+    alpha_search.require_spa = _as_bool(getattr(alpha_search, "require_spa", False), False)
+    alpha_search.require_pbo = _as_bool(getattr(alpha_search, "require_pbo", False), False)
+    alpha_search.enable_llm_proposer = _as_bool(
+        getattr(alpha_search, "enable_llm_proposer", False), False
     )
 
 
@@ -1127,8 +1162,9 @@ def _build_runtime_config_tree(
         validation=ValidationConfig(
             **_coerce_dataclass_kwargs(sections["validation"], ValidationConfig)
         ),
-        research=ResearchConfig(
-            **_coerce_dataclass_kwargs(sections["research"], ResearchConfig)
+        research=_build_research_runtime_config(
+            research_raw=sections["research"],
+            alpha_search_raw=sections["research_alpha_search"],
         ),
         strategies=StrategiesConfig(
             qlib158_formula=Qlib158FormulaConfig(

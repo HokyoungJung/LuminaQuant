@@ -480,6 +480,30 @@ class PortfolioConfig:
 
 
 @dataclass(slots=True)
+class AlphaSearchConfig:
+    """Opt-in gate for the deterministic alpha discovery search loop.
+
+    ``enabled`` defaults to ``False`` — the generate -> evaluate -> select loop in
+    ``lumina_quant.research.alpha_search`` is inert net-new research tooling that
+    no default runtime path imports, so the golden backtest / walk-forward
+    numerics stay byte-identical.  Flip this only to run the offline alpha
+    discovery loop.  The remaining fields expose the loop's deterministic search
+    budget and survivorship thresholds as tunable overrides (defaults mirror the
+    in-module constants in ``research.alpha_search``); ``enable_llm_proposer``
+    gates the frozen/seeded LLM proposer draft channel (still fed through the same
+    deterministic survivorship gate — never a live dependency).
+    """
+
+    enabled: bool = False
+    max_candidates: int = 256
+    seed: int = 20260701
+    dsr_threshold: float = 0.95
+    require_spa: bool = False
+    require_pbo: bool = False
+    enable_llm_proposer: bool = False
+
+
+@dataclass(slots=True)
 class ResearchConfig:
     """Opt-in research-only tooling toggles.
 
@@ -488,10 +512,12 @@ class ResearchConfig:
     gates the offline execution-attribution kernel
     (``research.execution_attribution``): when ``False`` (default) no code
     constructs or runs it, so backtest / walk-forward numerics stay
-    byte-identical.
+    byte-identical.  ``alpha_search`` gates the deterministic alpha discovery
+    loop and is likewise inert by default.
     """
 
     execution_attribution_enabled: bool = False
+    alpha_search: AlphaSearchConfig = field(default_factory=AlphaSearchConfig)
 
 
 @dataclass(slots=True)
