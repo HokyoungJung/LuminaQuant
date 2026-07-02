@@ -12,6 +12,7 @@ from typing import Any
 import yaml
 from dotenv import dotenv_values
 from lumina_quant.configuration.schema import (
+    AlphaSearchConfig,
     BacktestExternalConfig,
     BacktestRuntimeConfig,
     DeepLearningRuntimeConfig,
@@ -24,10 +25,16 @@ from lumina_quant.configuration.schema import (
     MarketWindowConfig,
     MemoryConfig,
     OptimizationRuntimeConfig,
+    PortfolioConfig,
     PromotionGateConfig,
+    ResearchConfig,
     RiskConfig,
+    SharpeConfidenceIntervalConfig,
+    TradFiExternalFetchConfig,
+    Qlib158FormulaConfig,
     RuntimeConfig,
     StorageConfig,
+    StrategiesConfig,
     SystemConfig,
     TradingConfig,
     StrategyQualityConfig,
@@ -260,6 +267,7 @@ def _extract_runtime_sections(mapped: dict[str, Any]) -> dict[str, dict[str, Any
         "data": _raw_section(mapped, "data"),
         "deep_learning": _raw_section(mapped, "deep_learning"),
         "strategy_quality": _raw_section(mapped, "strategy_quality"),
+        "portfolio": _raw_section(mapped, "portfolio"),
         "backtest": backtest_raw,
         "backtest_external": _raw_section(backtest_raw, "external"),
         "live": live_raw,
@@ -271,6 +279,16 @@ def _extract_runtime_sections(mapped: dict[str, Any]) -> dict[str, dict[str, Any
         "market_window": _raw_section(mapped, "market_window"),
         "memory": _raw_section(mapped, "memory"),
         "validation": _raw_section(mapped, "validation"),
+        "research": _raw_section(mapped, "research"),
+        "research_alpha_search": _raw_section(_raw_section(mapped, "research"), "alpha_search"),
+        "research_sharpe_ci": _raw_section(_raw_section(mapped, "research"), "sharpe_ci"),
+        "research_tradfi_external_fetch": _raw_section(
+            _raw_section(mapped, "research"), "tradfi_external_fetch"
+        ),
+        "strategies": _raw_section(mapped, "strategies"),
+        "strategies_qlib158_formula": _raw_section(
+            _raw_section(mapped, "strategies"), "qlib158_formula"
+        ),
     }
 
 
@@ -964,6 +982,95 @@ def _normalize_strategy_quality_runtime_section(runtime: RuntimeConfig) -> None:
     cfg.pair_min_correlation = max(0.0, min(1.0, _as_float(cfg.pair_min_correlation, 0.35)))
 
 
+_VALID_ALLOCATION_METHODS: frozenset[str] = frozenset(
+    {"legacy", "erc", "max_diversification", "mean_variance", "hrp"}
+)
+
+
+def _normalize_portfolio_runtime_section(runtime: RuntimeConfig) -> None:
+    cfg = runtime.portfolio
+    method = str(getattr(cfg, "allocation_method", "legacy") or "legacy").strip().lower()
+    cfg.allocation_method = method if method in _VALID_ALLOCATION_METHODS else "legacy"
+    cfg.erc_max_iter = max(1, _as_int(getattr(cfg, "erc_max_iter", 10000), 10000))
+    cfg.erc_tol = max(0.0, _as_float(getattr(cfg, "erc_tol", 1e-10), 1e-10))
+    cfg.mv_risk_aversion = max(0.0, _as_float(getattr(cfg, "mv_risk_aversion", 5.0), 5.0))
+    cfg.pgd_max_iter = max(1, _as_int(getattr(cfg, "pgd_max_iter", 500), 500))
+    cfg.pgd_step = max(0.0, _as_float(getattr(cfg, "pgd_step", 0.05), 0.05))
+    cfg.hrp_corr_threshold = min(
+        1.0, max(0.0, _as_float(getattr(cfg, "hrp_corr_threshold", 0.60), 0.60))
+    )
+    cfg.cov_window = max(0, _as_int(getattr(cfg, "cov_window", 0), 0))
+
+
+def _build_research_runtime_config(
+    *,
+    research_raw: dict[str, Any],
+    alpha_search_raw: dict[str, Any],
+    sharpe_ci_raw: dict[str, Any],
+    tradfi_external_fetch_raw: dict[str, Any],
+) -> ResearchConfig:
+    research_kwargs = _coerce_dataclass_kwargs(research_raw, ResearchConfig)
+    # Nested dataclasses are built explicitly below; drop any raw passthrough so
+    # they are never assigned as bare dicts.
+    for reserved_key in ("alpha_search", "sharpe_ci", "tradfi_external_fetch"):
+        research_kwargs.pop(reserved_key, None)
+    return ResearchConfig(
+        **research_kwargs,
+        alpha_search=AlphaSearchConfig(
+            **_coerce_dataclass_kwargs(alpha_search_raw, AlphaSearchConfig)
+        ),
+        sharpe_ci=SharpeConfidenceIntervalConfig(
+            **_coerce_dataclass_kwargs(sharpe_ci_raw, SharpeConfidenceIntervalConfig)
+        ),
+        tradfi_external_fetch=TradFiExternalFetchConfig(
+            **_coerce_dataclass_kwargs(tradfi_external_fetch_raw, TradFiExternalFetchConfig)
+        ),
+    )
+
+
+def _normalize_research_runtime_section(runtime: RuntimeConfig) -> None:
+    runtime.research.execution_attribution_enabled = _as_bool(
+        getattr(runtime.research, "execution_attribution_enabled", False),
+        False,
+    )
+    alpha_search = runtime.research.alpha_search
+    alpha_search.enabled = _as_bool(getattr(alpha_search, "enabled", False), False)
+    alpha_search.max_candidates = max(1, _as_int(getattr(alpha_search, "max_candidates", 256), 256))
+    alpha_search.seed = _as_int(getattr(alpha_search, "seed", 20260701), 20260701)
+    alpha_search.dsr_threshold = _as_float(getattr(alpha_search, "dsr_threshold", 0.95), 0.95)
+    alpha_search.require_spa = _as_bool(getattr(alpha_search, "require_spa", False), False)
+    alpha_search.require_pbo = _as_bool(getattr(alpha_search, "require_pbo", False), False)
+    alpha_search.enable_llm_proposer = _as_bool(
+        getattr(alpha_search, "enable_llm_proposer", False), False
+    )
+
+    sharpe_ci = runtime.research.sharpe_ci
+    sharpe_ci.emit_enabled = _as_bool(getattr(sharpe_ci, "emit_enabled", False), False)
+    sharpe_ci.bootstrap_rounds = max(1, _as_int(getattr(sharpe_ci, "bootstrap_rounds", 1000), 1000))
+    sharpe_ci.block_size = max(0, _as_int(getattr(sharpe_ci, "block_size", 0), 0))
+    sharpe_ci.confidence_level = min(
+        0.999999,
+        max(0.5, _as_float(getattr(sharpe_ci, "confidence_level", 0.95), 0.95)),
+    )
+    sharpe_ci.seed = _as_int(getattr(sharpe_ci, "seed", 20260701), 20260701)
+
+    tradfi = runtime.research.tradfi_external_fetch
+    tradfi.enabled = _as_bool(getattr(tradfi, "enabled", False), False)
+    provider = str(getattr(tradfi, "provider", "yahoo") or "yahoo").strip().lower()
+    tradfi.provider = provider if provider in {"yahoo", "stooq", "sec_edgar"} else "yahoo"
+    tradfi.snapshot_dir = str(
+        getattr(tradfi, "snapshot_dir", "") or "var/cache/tradfi_external"
+    ).strip()
+    tradfi.allow_network = _as_bool(getattr(tradfi, "allow_network", False), False)
+
+
+def _normalize_strategies_runtime_section(runtime: RuntimeConfig) -> None:
+    cfg = runtime.strategies.qlib158_formula
+    cfg.enabled = _as_bool(getattr(cfg, "enabled", False), False)
+    cfg.min_abs_ic = max(0.0, _as_float(getattr(cfg, "min_abs_ic", 0.02), 0.02))
+    cfg.min_icir = max(0.0, _as_float(getattr(cfg, "min_icir", 0.30), 0.30))
+
+
 def _normalize_promotion_gate_runtime_section(runtime: RuntimeConfig) -> None:
     runtime.promotion_gate.days = _as_int(runtime.promotion_gate.days, 14)
     runtime.promotion_gate.max_order_rejects = _as_int(runtime.promotion_gate.max_order_rejects, 0)
@@ -1007,6 +1114,7 @@ def _normalize_runtime_config(
     _normalize_data_runtime_section(runtime)
     _normalize_deep_learning_runtime_section(runtime)
     _normalize_strategy_quality_runtime_section(runtime)
+    _normalize_portfolio_runtime_section(runtime)
     _normalize_trading_and_risk_runtime_section(runtime)
     _normalize_execution_runtime_section(runtime, exec_raw=exec_raw)
     _normalize_live_exchange_runtime_section(runtime)
@@ -1021,6 +1129,8 @@ def _normalize_runtime_config(
         market_window_raw=market_window_raw,
     )
     _normalize_promotion_gate_runtime_section(runtime)
+    _normalize_research_runtime_section(runtime)
+    _normalize_strategies_runtime_section(runtime)
 
 
 def _build_runtime_config_tree(
@@ -1045,6 +1155,9 @@ def _build_runtime_config_tree(
         ),
         strategy_quality=StrategyQualityConfig(
             **_coerce_dataclass_kwargs(sections["strategy_quality"], StrategyQualityConfig)
+        ),
+        portfolio=PortfolioConfig(
+            **_coerce_dataclass_kwargs(sections["portfolio"], PortfolioConfig)
         ),
         backtest=BacktestRuntimeConfig(
             **{
@@ -1076,6 +1189,19 @@ def _build_runtime_config_tree(
         memory=MemoryConfig(**_coerce_dataclass_kwargs(sections["memory"], MemoryConfig)),
         validation=ValidationConfig(
             **_coerce_dataclass_kwargs(sections["validation"], ValidationConfig)
+        ),
+        research=_build_research_runtime_config(
+            research_raw=sections["research"],
+            alpha_search_raw=sections["research_alpha_search"],
+            sharpe_ci_raw=sections["research_sharpe_ci"],
+            tradfi_external_fetch_raw=sections["research_tradfi_external_fetch"],
+        ),
+        strategies=StrategiesConfig(
+            qlib158_formula=Qlib158FormulaConfig(
+                **_coerce_dataclass_kwargs(
+                    sections["strategies_qlib158_formula"], Qlib158FormulaConfig
+                )
+            ),
         ),
         promotion_gate=PromotionGateConfig(
             **promotion_kwargs,

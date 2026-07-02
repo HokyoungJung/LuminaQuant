@@ -457,6 +457,145 @@ class StrategyQualityConfig:
 
 
 @dataclass(slots=True)
+class PortfolioConfig:
+    """Opt-in portfolio allocation-method settings.
+
+    ``allocation_method`` selects the portfolio construction routine.  The
+    default ``"legacy"`` preserves the current behavior — NO code routes through
+    the extra pure-numpy optimizers (ERC / MaxDiversification / MeanVariance /
+    HRP in ``portfolio.optimizers_extra``) unless a non-legacy method is chosen,
+    so the golden backtest / walk-forward numerics stay byte-identical by
+    default.  All other fields are inert tuning knobs for those optimizers and
+    have no effect while ``allocation_method == "legacy"``.
+    """
+
+    allocation_method: str = "legacy"
+    erc_max_iter: int = 10000
+    erc_tol: float = 1e-10
+    mv_risk_aversion: float = 5.0
+    pgd_max_iter: int = 500
+    pgd_step: float = 0.05
+    hrp_corr_threshold: float = 0.60
+    cov_window: int = 0
+
+
+@dataclass(slots=True)
+class AlphaSearchConfig:
+    """Opt-in gate for the deterministic alpha discovery search loop.
+
+    ``enabled`` defaults to ``False`` — the generate -> evaluate -> select loop in
+    ``lumina_quant.research.alpha_search`` is inert net-new research tooling that
+    no default runtime path imports, so the golden backtest / walk-forward
+    numerics stay byte-identical.  Flip this only to run the offline alpha
+    discovery loop.  The remaining fields expose the loop's deterministic search
+    budget and survivorship thresholds as tunable overrides (defaults mirror the
+    in-module constants in ``research.alpha_search``); ``enable_llm_proposer``
+    gates the frozen/seeded LLM proposer draft channel (still fed through the same
+    deterministic survivorship gate — never a live dependency).
+    """
+
+    enabled: bool = False
+    max_candidates: int = 256
+    seed: int = 20260701
+    dsr_threshold: float = 0.95
+    require_spa: bool = False
+    require_pbo: bool = False
+    enable_llm_proposer: bool = False
+
+
+@dataclass(slots=True)
+class SharpeConfidenceIntervalConfig:
+    """Opt-in advisory Sharpe confidence-interval sub-block (research-only).
+
+    ``emit_enabled`` defaults to ``False`` — the block-bootstrap Sharpe-CI
+    estimator in ``research.sharpe_ci`` is a net-new advisory diagnostic that no
+    default runtime path constructs, and it NEVER writes into the flat
+    ``dict[str, float]`` metric payload (it is surfaced only as a separate
+    top-level sub-object).  Flip ``emit_enabled`` only to attach the advisory CI
+    sub-object.  The remaining fields expose the deterministic bootstrap budget
+    (``bootstrap_rounds`` / ``block_size`` — 0 means the ``n**(1/3)`` default),
+    the two-sided ``confidence_level``, and the fixed ``seed``.
+    """
+
+    emit_enabled: bool = False
+    bootstrap_rounds: int = 1000
+    block_size: int = 0
+    confidence_level: float = 0.95
+    seed: int = 20260701
+
+
+@dataclass(slots=True)
+class TradFiExternalFetchConfig:
+    """Opt-in gate for the research-only TradFi external fetcher.
+
+    ``enabled`` defaults to ``False`` and ``allow_network`` defaults to ``False``
+    — the fetcher in ``research.tradfi_fetcher`` is snapshot-first and
+    replay-only unless BOTH this gate AND the ``LUMINA_ENABLE_TRADFI_EXTERNAL_FETCH``
+    environment gate are set.  ``provider`` is a single source-pinned choice
+    (``yahoo`` | ``stooq`` | ``sec_edgar``); there is intentionally NO automatic
+    fallback chain — a pinned provider that fails raises loudly.  ``snapshot_dir``
+    is the on-disk cache/replay root.  No default runtime path imports this
+    module, so crypto/perp live and golden numerics stay untouched.
+    """
+
+    enabled: bool = False
+    provider: str = "yahoo"
+    snapshot_dir: str = "var/cache/tradfi_external"
+    allow_network: bool = False
+
+
+@dataclass(slots=True)
+class ResearchConfig:
+    """Opt-in research-only tooling toggles.
+
+    All fields default to the current behavior; nothing in the default runtime
+    path imports the gated research kernels.  ``execution_attribution_enabled``
+    gates the offline execution-attribution kernel
+    (``research.execution_attribution``): when ``False`` (default) no code
+    constructs or runs it, so backtest / walk-forward numerics stay
+    byte-identical.  ``alpha_search`` gates the deterministic alpha discovery
+    loop and is likewise inert by default.  ``sharpe_ci`` and
+    ``tradfi_external_fetch`` are additive, default-OFF research seams (advisory
+    Sharpe-CI sub-object and a snapshot-first TradFi fetcher) that never touch
+    the flat metric payload or any live/backtest execution path.
+    """
+
+    execution_attribution_enabled: bool = False
+    alpha_search: AlphaSearchConfig = field(default_factory=AlphaSearchConfig)
+    sharpe_ci: SharpeConfidenceIntervalConfig = field(
+        default_factory=SharpeConfidenceIntervalConfig
+    )
+    tradfi_external_fetch: TradFiExternalFetchConfig = field(
+        default_factory=TradFiExternalFetchConfig
+    )
+
+
+@dataclass(slots=True)
+class Qlib158FormulaConfig:
+    """Opt-in gate for the Qlib158-style formulaic factor library.
+
+    ``enabled`` defaults to ``False`` — the factor definitions in
+    ``lumina_quant.indicators.qlib158`` are inert net-new transforms that no
+    default runtime path imports, so the golden backtest / walk-forward
+    numerics stay byte-identical.  Flip this only to opt the mirror factors
+    into a research / candidate-library path.  ``min_abs_ic`` / ``min_icir``
+    expose the documented IC / ICIR eligibility bar as tunable flags (defaults
+    mirror ``qlib158.MIN_ABS_IC`` / ``qlib158.MIN_ICIR``).
+    """
+
+    enabled: bool = False
+    min_abs_ic: float = 0.02
+    min_icir: float = 0.30
+
+
+@dataclass(slots=True)
+class StrategiesConfig:
+    """Opt-in strategy-family toggles (all inert by default)."""
+
+    qlib158_formula: Qlib158FormulaConfig = field(default_factory=Qlib158FormulaConfig)
+
+
+@dataclass(slots=True)
 class RuntimeConfig:
     """Full runtime configuration bundle."""
 
@@ -468,6 +607,7 @@ class RuntimeConfig:
     data: DataConfig = field(default_factory=DataConfig)
     deep_learning: DeepLearningRuntimeConfig = field(default_factory=DeepLearningRuntimeConfig)
     strategy_quality: StrategyQualityConfig = field(default_factory=StrategyQualityConfig)
+    portfolio: PortfolioConfig = field(default_factory=PortfolioConfig)
     backtest: BacktestRuntimeConfig = field(default_factory=BacktestRuntimeConfig)
     live: LiveRuntimeConfig = field(default_factory=LiveRuntimeConfig)
     optimization: OptimizationRuntimeConfig = field(default_factory=OptimizationRuntimeConfig)
@@ -475,3 +615,5 @@ class RuntimeConfig:
     promotion_gate: PromotionGateConfig = field(default_factory=PromotionGateConfig)
     memory: MemoryConfig = field(default_factory=MemoryConfig)
     validation: ValidationConfig = field(default_factory=ValidationConfig)
+    research: ResearchConfig = field(default_factory=ResearchConfig)
+    strategies: StrategiesConfig = field(default_factory=StrategiesConfig)

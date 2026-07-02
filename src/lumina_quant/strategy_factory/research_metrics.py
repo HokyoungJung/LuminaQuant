@@ -89,7 +89,7 @@ def _norm_ppf(p: float) -> float:
     )
 
 
-def expected_max_sharpe(*, variance_across_trials: float, num_trials: int) -> float:
+def expected_max_sharpe(*, variance_across_trials: float, num_trials: float) -> float:
     """Canonical expected maximum Sharpe across ``num_trials`` independent trials.
 
     Bailey & Lopez de Prado (2014), "The Deflated Sharpe Ratio":
@@ -102,7 +102,11 @@ def expected_max_sharpe(*, variance_across_trials: float, num_trials: int) -> fl
     is NOT scaled by the series length (the previous proxy divided by sqrt(n),
     conflating the cross-trial penalty with per-period scaling).
     """
-    k = float(max(1, int(num_trials)))
+    # Honor a fractional effective-trial count (e.g. N_eff = 4.99). Flooring via
+    # int() would shrink the multiple-testing benchmark and make a survivorship
+    # reject-gate LENIENT in the dangerous direction. Byte-identical for integer
+    # callers since float(5) == 5.
+    k = max(1.0, float(num_trials))
     if k <= 1.0:
         return 0.0
     var = max(0.0, float(variance_across_trials))
@@ -192,7 +196,7 @@ def _estimate_sr_variance_across_trials(sharpe: float, n: float) -> float:
 def deflated_sharpe_ratio(
     returns: np.ndarray,
     *,
-    num_trials: int = 1,
+    num_trials: float = 1,
     variance_across_trials: float | None = None,
 ) -> float:
     """Canonical Deflated Sharpe Ratio (Bailey & Lopez de Prado, 2014).

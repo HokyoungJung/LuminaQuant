@@ -20,6 +20,7 @@ dependencies = [
 
 [project.scripts]
 lq = "lumina_quant.cli.main:main"
+lq-mcp = "lumina_quant.dashboard.mcp_server:main"
 
 [project.optional-dependencies]
 backtest = [
@@ -60,6 +61,10 @@ gpu = [
 dashboard = [
     "plotly>=5.24.0",
     "matplotlib>=3.8.0",
+]
+mcp = [
+    # Read-only MCP stdio bridge (opt-in; server never started by default).
+    "mcp>=1.2.0",
 ]
 mt5 = [
     "MetaTrader5>=5.0.0; platform_system == 'Windows'",

@@ -368,3 +368,45 @@ export interface ReportExportPayload {
     evidence?: string[];
   };
 }
+
+export interface FactorInsightsPayload {
+  artifact_kind: string;
+  as_of: string;
+  advisory_only: boolean;
+  real_money_execution_enabled: boolean;
+  status: string;
+  summary: {
+    factor_count: number;
+    candidate_count: number;
+    lag_count: number;
+    top_factor: string | null;
+    top_factor_ic_ir: number | null;
+  };
+  ic_heatmap: {
+    factors: string[];
+    lags: string[];
+    cells: Array<Array<number | null>>;
+    ic_mean: Record<string, number | null>;
+    ic_ir: Record<string, number | null>;
+  };
+  factor_ranking: Array<{
+    factor: string;
+    ic_mean: number | null;
+    ic_ir: number | null;
+    ic_positive_ratio: number | null;
+    t_stat: number | null;
+    turnover_mean: number | null;
+    quantile_spread_mean: number | null;
+    n_periods: number;
+  }>;
+  candidate_queue: Array<{
+    candidate_id: string;
+    strategy: string;
+    status: string;
+    score: number | null;
+    sharpe: number | null;
+    robustness_score: number | null;
+    submitted_at: string | null;
+  }>;
+  source: Record<string, unknown>;
+}

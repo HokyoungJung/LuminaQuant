@@ -294,3 +294,15 @@ src/lumina_quant/data/__pycache__/
 src/lumina_quant/data/**/*.pyc
 var/reports/memory/
 var/cache/
+
+# OMC orchestration state/session artifacts (planning specs/plans under
+# .omc/specs and .omc/plans are tracked explicitly; everything else is local noise).
+apps/dashboard_web/.omc/
+native/lumina_compute/.omc/
+.omc/state/
+.omc/sessions/
+.omc/notepads/
+.omc/logs/
+.omc/handoffs/
+.omc/notepad.md
+.omc/project-memory.json

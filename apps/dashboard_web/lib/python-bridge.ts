@@ -265,6 +265,13 @@ export const navigationItems: NavigationItem[] = [
     summary: 'Frame counts and capped previews for runs, execution, market, optimization, and workflow state.',
     status: 'available',
   },
+  {
+    id: 'factor-insights',
+    href: '/factor-insights',
+    label: 'Factor Insights',
+    summary: 'Read-only factor IC-heatmap (rank-decay per factor) and the pending candidate review queue.',
+    status: 'available',
+  },
 ];
 
 export function buildOverviewCards(): OverviewCard[] {

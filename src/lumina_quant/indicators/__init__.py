@@ -77,6 +77,7 @@ from .formulaic_operators import ts_argmin as ts_argmin
 from .formulaic_operators import ts_correlation as ts_correlation
 from .formulaic_operators import ts_covariance as ts_covariance
 from .formulaic_operators import ts_max as ts_max
+from .formulaic_operators import ts_mean as ts_mean
 from .formulaic_operators import ts_min as ts_min
 from .formulaic_operators import ts_product as ts_product
 from .formulaic_operators import ts_rank as ts_rank
@@ -328,6 +329,7 @@ __all__ = [
     "ts_correlation",
     "ts_covariance",
     "ts_max",
+    "ts_mean",
     "ts_min",
     "ts_product",
     "ts_rank",
