@@ -22,7 +22,7 @@ describe('dashboard bridge contract', () => {
   it('marks the migrated routes as available in navigation order', () => {
     const availableRoutes = navigationItems.filter((item) => item.status === 'available');
 
-    expect(availableRoutes).toHaveLength(10);
+    expect(availableRoutes).toHaveLength(11);
     expect(availableRoutes.map((item) => item.href)).toEqual([
       '/',
       '/performance-price',
@@ -34,6 +34,7 @@ describe('dashboard bridge contract', () => {
       '/exact-window',
       '/report-export',
       '/raw-data',
+      '/factor-insights',
     ]);
   });
 
