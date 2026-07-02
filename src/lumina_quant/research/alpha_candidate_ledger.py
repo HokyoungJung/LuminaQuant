@@ -59,11 +59,7 @@ class ResearchLedger:
         self.path = Path(path)
 
     def append(self, record: AlphaCandidateRecord | Mapping[str, Any]) -> None:
-        payload = (
-            record.to_dict()
-            if isinstance(record, AlphaCandidateRecord)
-            else dict(record)
-        )
+        payload = record.to_dict() if isinstance(record, AlphaCandidateRecord) else dict(record)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.path.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(payload, sort_keys=True) + "\n")

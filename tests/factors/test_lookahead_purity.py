@@ -149,9 +149,7 @@ def test_alpha_value_is_causal(alpha_id: int):
     """Factor value at row t must be invariant to perturbing rows t+1..N-1."""
 
     if alpha_id in CROSS_SECTIONAL_ALPHAS:
-        pytest.skip(
-            "uses cross-sectional indneutralize (non-causal on a single-series time axis)"
-        )
+        pytest.skip("uses cross-sectional indneutralize (non-causal on a single-series time axis)")
 
     base_series, _ = _compute_full_series(alpha_id, _BASE_CTX)
 

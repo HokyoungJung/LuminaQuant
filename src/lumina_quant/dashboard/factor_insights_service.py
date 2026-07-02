@@ -48,7 +48,7 @@ def _as_list(value: Any) -> list[Any]:
 def _finite_float(value: Any) -> float | None:
     try:
         out = float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     return out if math.isfinite(out) else None
 
@@ -244,9 +244,7 @@ def load_factor_insights_payload(
     candidate_raw = _read_json(candidate_queue_path)
     return build_factor_insights_payload(
         factor_ic=factor_raw if isinstance(factor_raw, Mapping) else None,
-        candidate_queue=[
-            item for item in _as_list(candidate_raw) if isinstance(item, Mapping)
-        ],
+        candidate_queue=[item for item in _as_list(candidate_raw) if isinstance(item, Mapping)],
         source={
             "factor_ic_path": str(factor_ic_path or ""),
             "candidate_queue_path": str(candidate_queue_path or ""),

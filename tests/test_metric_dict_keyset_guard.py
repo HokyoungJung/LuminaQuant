@@ -185,9 +185,7 @@ def _resolved_rf_namespace() -> SimpleNamespace:
 def _assert_flat_floats(payload: dict[str, object]) -> None:
     """Every value must be a bare ``float`` -- nested sub-objects are rejected."""
     non_float = {
-        key: type(value).__name__
-        for key, value in payload.items()
-        if type(value) is not float
+        key: type(value).__name__ for key, value in payload.items() if type(value) is not float
     }
     assert non_float == {}, f"non-float / nested values leaked into flat payload: {non_float}"
 

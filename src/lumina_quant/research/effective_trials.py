@@ -65,7 +65,7 @@ def effective_number_of_trials(
     raw_n:
         Optional explicit upper clamp. Defaults to ``C.shape[0]``.
 
-    Returns
+    Returns:
     -------
     float
         ``N_eff`` clamped to ``[1, raw_n]``. Computed as

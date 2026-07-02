@@ -122,7 +122,7 @@ def evaluate_survivorship_gate(
         Decision thresholds. DSR is the primary gate; SPA/PBO are auxiliary and
         only affect the verdict when ``require_spa`` / ``require_pbo`` are set.
 
-    Returns
+    Returns:
     -------
     SurvivorshipVerdict
     """

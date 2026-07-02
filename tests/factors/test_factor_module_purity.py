@@ -49,11 +49,7 @@ def _indicator_package_dir() -> Path:
 
 def _iter_module_files() -> list[Path]:
     root = _indicator_package_dir()
-    files = sorted(
-        path
-        for path in root.rglob("*.py")
-        if "__pycache__" not in path.parts
-    )
+    files = sorted(path for path in root.rglob("*.py") if "__pycache__" not in path.parts)
     return files
 
 
@@ -80,9 +76,12 @@ def _import_roots(tree: ast.AST) -> list[tuple[str, int]]:
 def _blocked_calls(tree: ast.AST) -> list[tuple[str, int]]:
     hits: list[tuple[str, int]] = []
     for node in ast.walk(tree):
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
-            if node.func.id in BLOCKED_CALL_NAMES:
-                hits.append((node.func.id, node.lineno))
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id in BLOCKED_CALL_NAMES
+        ):
+            hits.append((node.func.id, node.lineno))
     return hits
 
 
@@ -102,9 +101,7 @@ def test_indicator_module_has_no_blocked_imports(module_path: Path):
     tree = ast.parse(source, filename=str(module_path))
 
     offending_imports = [
-        (root, lineno)
-        for root, lineno in _import_roots(tree)
-        if root in BLOCKED_IMPORT_ROOTS
+        (root, lineno) for root, lineno in _import_roots(tree) if root in BLOCKED_IMPORT_ROOTS
     ]
     assert not offending_imports, (
         f"{module_path.name} imports blocklisted modules: {offending_imports}"

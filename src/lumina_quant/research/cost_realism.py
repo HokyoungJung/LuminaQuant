@@ -97,7 +97,9 @@ REALISTIC_REGIME = CostRegime(
 )
 
 
-def one_side_cost_fraction(regime: CostRegime, participation: float = DEFAULT_PARTICIPATION) -> float:
+def one_side_cost_fraction(
+    regime: CostRegime, participation: float = DEFAULT_PARTICIPATION
+) -> float:
     """Cost fraction of one aggressive fill: fee + half-spread + slippage."""
     return (
         float(regime.taker_fee_rate)
@@ -106,7 +108,9 @@ def one_side_cost_fraction(regime: CostRegime, participation: float = DEFAULT_PA
     )
 
 
-def roundtrip_cost_fraction(regime: CostRegime, participation: float = DEFAULT_PARTICIPATION) -> float:
+def roundtrip_cost_fraction(
+    regime: CostRegime, participation: float = DEFAULT_PARTICIPATION
+) -> float:
     """Cost fraction of a full enter+exit round trip (two aggressive fills)."""
     return 2.0 * one_side_cost_fraction(regime, participation)
 

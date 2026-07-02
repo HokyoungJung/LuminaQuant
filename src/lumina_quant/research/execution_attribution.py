@@ -323,9 +323,7 @@ def noise_bias_severity(
     return _clip01(inside / len(values))
 
 
-def early_exit_bias_severity(
-    realized_bps: Sequence[float], mfe_bps: Sequence[float]
-) -> float:
+def early_exit_bias_severity(realized_bps: Sequence[float], mfe_bps: Sequence[float]) -> float:
     """Mean fraction of favorable excursion left on the table (winners only).
 
     For every trade with a positive favorable excursion, the shortfall ratio is

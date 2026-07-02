@@ -280,12 +280,8 @@ def _extract_runtime_sections(mapped: dict[str, Any]) -> dict[str, dict[str, Any
         "memory": _raw_section(mapped, "memory"),
         "validation": _raw_section(mapped, "validation"),
         "research": _raw_section(mapped, "research"),
-        "research_alpha_search": _raw_section(
-            _raw_section(mapped, "research"), "alpha_search"
-        ),
-        "research_sharpe_ci": _raw_section(
-            _raw_section(mapped, "research"), "sharpe_ci"
-        ),
+        "research_alpha_search": _raw_section(_raw_section(mapped, "research"), "alpha_search"),
+        "research_sharpe_ci": _raw_section(_raw_section(mapped, "research"), "sharpe_ci"),
         "research_tradfi_external_fetch": _raw_section(
             _raw_section(mapped, "research"), "tradfi_external_fetch"
         ),
@@ -1027,9 +1023,7 @@ def _build_research_runtime_config(
             **_coerce_dataclass_kwargs(sharpe_ci_raw, SharpeConfidenceIntervalConfig)
         ),
         tradfi_external_fetch=TradFiExternalFetchConfig(
-            **_coerce_dataclass_kwargs(
-                tradfi_external_fetch_raw, TradFiExternalFetchConfig
-            )
+            **_coerce_dataclass_kwargs(tradfi_external_fetch_raw, TradFiExternalFetchConfig)
         ),
     )
 
@@ -1041,13 +1035,9 @@ def _normalize_research_runtime_section(runtime: RuntimeConfig) -> None:
     )
     alpha_search = runtime.research.alpha_search
     alpha_search.enabled = _as_bool(getattr(alpha_search, "enabled", False), False)
-    alpha_search.max_candidates = max(
-        1, _as_int(getattr(alpha_search, "max_candidates", 256), 256)
-    )
+    alpha_search.max_candidates = max(1, _as_int(getattr(alpha_search, "max_candidates", 256), 256))
     alpha_search.seed = _as_int(getattr(alpha_search, "seed", 20260701), 20260701)
-    alpha_search.dsr_threshold = _as_float(
-        getattr(alpha_search, "dsr_threshold", 0.95), 0.95
-    )
+    alpha_search.dsr_threshold = _as_float(getattr(alpha_search, "dsr_threshold", 0.95), 0.95)
     alpha_search.require_spa = _as_bool(getattr(alpha_search, "require_spa", False), False)
     alpha_search.require_pbo = _as_bool(getattr(alpha_search, "require_pbo", False), False)
     alpha_search.enable_llm_proposer = _as_bool(
@@ -1056,9 +1046,7 @@ def _normalize_research_runtime_section(runtime: RuntimeConfig) -> None:
 
     sharpe_ci = runtime.research.sharpe_ci
     sharpe_ci.emit_enabled = _as_bool(getattr(sharpe_ci, "emit_enabled", False), False)
-    sharpe_ci.bootstrap_rounds = max(
-        1, _as_int(getattr(sharpe_ci, "bootstrap_rounds", 1000), 1000)
-    )
+    sharpe_ci.bootstrap_rounds = max(1, _as_int(getattr(sharpe_ci, "bootstrap_rounds", 1000), 1000))
     sharpe_ci.block_size = max(0, _as_int(getattr(sharpe_ci, "block_size", 0), 0))
     sharpe_ci.confidence_level = min(
         0.999999,

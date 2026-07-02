@@ -194,7 +194,7 @@ def cmd_rank(args: argparse.Namespace) -> int:
         print(f"  {'rank':>4}  {'factor':<28}  {'ic_mean':>10}  {'ic_ir':>10}  {'turnover':>10}")
         for row in rows:
             print(
-                f"  {int(row['rank']):>4}  {str(row['factor']):<28}  "
+                f"  {int(row['rank']):>4}  {row['factor']!s:<28}  "
                 f"{float(row['ic_mean']):>10.5f}  {float(row['ic_ir']):>10.5f}  "
                 f"{float(row['turnover_mean']):>10.5f}"
             )

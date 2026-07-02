@@ -40,9 +40,7 @@ def test_rank_smoke_json_deterministic() -> None:
 
 
 def test_rank_top_and_factor_filter() -> None:
-    rc, out = _run(
-        ["rank", "--json", "--factors", "close", "volume", "ret", "--top", "2"]
-    )
+    rc, out = _run(["rank", "--json", "--factors", "close", "volume", "ret", "--top", "2"])
     assert rc == 0
     payload = json.loads(out)
     assert len(payload["ranking"]) == 2
@@ -58,7 +56,7 @@ def test_rank_text_mode_exit_zero() -> None:
 
 def test_card_stdout_json_deterministic() -> None:
     rc1, out1 = _run(["card", "--factor", "close", "--json"])
-    rc2, out2 = _run(["card", "--factor", "close", "--json"])
+    _rc2, out2 = _run(["card", "--factor", "close", "--json"])
     assert rc1 == 0
     assert out1 == out2
 

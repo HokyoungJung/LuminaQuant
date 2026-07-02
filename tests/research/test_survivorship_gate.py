@@ -123,12 +123,8 @@ def test_dispersion_term_changes_dsr():
     var_tight = empirical_variance_across_trials(_FAM_TIGHT)
     assert var_wide > var_tight > 0.0
 
-    dsr_wide = deflated_sharpe_ratio(
-        candidate, num_trials=6, variance_across_trials=var_wide
-    )
-    dsr_tight = deflated_sharpe_ratio(
-        candidate, num_trials=6, variance_across_trials=var_tight
-    )
+    dsr_wide = deflated_sharpe_ratio(candidate, num_trials=6, variance_across_trials=var_wide)
+    dsr_tight = deflated_sharpe_ratio(candidate, num_trials=6, variance_across_trials=var_tight)
     # Wider trial-Sharpe dispersion -> higher multiple-testing benchmark ->
     # strictly lower confidence. This proves the dispersion term is load bearing.
     assert dsr_wide != dsr_tight
@@ -157,9 +153,7 @@ def test_middle_correlation_calibration():
     var_mid = empirical_variance_across_trials(_FAM)
     var_alt = empirical_variance_across_trials(_FAM_TIGHT)
 
-    base = deflated_sharpe_ratio(
-        candidate, num_trials=n_mid, variance_across_trials=var_mid
-    )
+    base = deflated_sharpe_ratio(candidate, num_trials=n_mid, variance_across_trials=var_mid)
     # Perturb DSR input 1 (N_eff) with dispersion held fixed.
     moved_by_neff = deflated_sharpe_ratio(
         candidate, num_trials=n_low, variance_across_trials=var_mid
@@ -178,12 +172,8 @@ def test_middle_correlation_calibration():
     # and a null is rejected.
     edge = _series(0.35, seed=101)
     null = _series(0.05, seed=202)
-    edge_verdict = evaluate_survivorship_gate(
-        edge, family_sharpes=_FAM, correlation_matrix=c_mid
-    )
-    null_verdict = evaluate_survivorship_gate(
-        null, family_sharpes=_FAM, correlation_matrix=c_mid
-    )
+    edge_verdict = evaluate_survivorship_gate(edge, family_sharpes=_FAM, correlation_matrix=c_mid)
+    null_verdict = evaluate_survivorship_gate(null, family_sharpes=_FAM, correlation_matrix=c_mid)
     assert edge_verdict.passed is True
     assert null_verdict.passed is False
     # Both verdicts consumed a real intermediate N_eff and empirical dispersion.
@@ -203,24 +193,18 @@ def test_reject_null_at_breadth_and_accept_edge_at_n1():
 
     # Accept a genuine edge at N = 1 (single trial, identity correlation).
     identity = np.eye(1, dtype=float)
-    edge_n1 = evaluate_survivorship_gate(
-        edge, family_sharpes=_FAM, correlation_matrix=identity
-    )
+    edge_n1 = evaluate_survivorship_gate(edge, family_sharpes=_FAM, correlation_matrix=identity)
     assert edge_n1.n_eff == 1.0
     assert edge_n1.raw_n == 1
     assert edge_n1.passed is True
 
     # Reject a known null at realistic breadth (near-orthogonal 8-candidate family).
     c_low = candidate_return_correlation_matrix(_correlated_family(0.05, seed=11))
-    null_breadth = evaluate_survivorship_gate(
-        null, family_sharpes=_FAM, correlation_matrix=c_low
-    )
+    null_breadth = evaluate_survivorship_gate(null, family_sharpes=_FAM, correlation_matrix=c_low)
     assert null_breadth.n_eff > 4.0
     assert null_breadth.passed is False
     # The genuine edge still survives even at that realistic breadth.
-    edge_breadth = evaluate_survivorship_gate(
-        edge, family_sharpes=_FAM, correlation_matrix=c_low
-    )
+    edge_breadth = evaluate_survivorship_gate(edge, family_sharpes=_FAM, correlation_matrix=c_low)
     assert edge_breadth.passed is True
 
 
