@@ -1,0 +1,10 @@
+{
+  "bytes": 39705,
+  "cache_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g003_external_prior_cache/arxiv_trendfolios_multi_asset_trend.source",
+  "content_type": "text/html; charset=utf-8",
+  "error": null,
+  "retrieved_at": "2026-07-02T14:21:38Z",
+  "sha256": "9bcd5889b0b8e17385779121391b55e84347786006df278a6602721c90dde42a",
+  "status": 200,
+  "url": "https://arxiv.org/abs/2506.09330"
+}

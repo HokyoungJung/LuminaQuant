@@ -1,0 +1,30 @@
+{
+  "artifact_refs": [
+    "var/reports/ultragoal_full_pool_strategy/g001_safety_inventory.json",
+    "var/reports/ultragoal_full_pool_strategy/g001_safety_inventory.md"
+  ],
+  "commands": [
+    {
+      "checks": [
+        "artifact_kind == ultragoal_safety_inventory",
+        "goal_id == G001",
+        "plan_reference sha256 present",
+        "approval_context present",
+        "symbols_on_disk_count >= 1",
+        "Markdown Approval context present",
+        "live shadow/paper/real blocked"
+      ],
+      "command": "uv run --frozen --all-extras --all-groups python -c <assert G001 inventory schema/path/approval context>",
+      "recorded_stdout": "g001 clarified inventory verification passed\\n",
+      "status": "passed"
+    }
+  ],
+  "generated_at_utc": "2026-07-02T12:51:05Z",
+  "goal_id": "G001",
+  "kind": "artifact-inventory-test-report",
+  "review_agents": {
+    "architect": "5-G001ArtifactReReview CLEAR/CLEAR/CLEAR APPROVE blockers=[]",
+    "executor_qa": "6-G001QaRecheck status=pass redTeamStatus=pass blockers=[]"
+  },
+  "schemaVersion": 1
+}

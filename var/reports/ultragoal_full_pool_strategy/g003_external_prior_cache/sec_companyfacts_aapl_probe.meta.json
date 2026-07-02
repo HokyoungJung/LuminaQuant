@@ -1,0 +1,10 @@
+{
+  "bytes": 3748682,
+  "cache_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g003_external_prior_cache/sec_companyfacts_aapl_probe.source",
+  "content_type": "application/json",
+  "error": null,
+  "retrieved_at": "2026-07-02T14:21:38Z",
+  "sha256": "31f9ab4398402faabc733178497af89dbf94dd5038c6e36d4c894317de8a4647",
+  "status": 200,
+  "url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json"
+}

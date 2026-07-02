@@ -1,0 +1,3632 @@
+{
+  "approved_plan_path": "/tmp/.gjc/_session-019f22a1-90f7-7000-ab18-d0fd7010803b/plans/ralplan/019f22a1-90f7-7000-ab18-d0fd7010803b/pending-approval.md",
+  "approved_plan_sha256": "d0b731a65e81ca27512f92adef975731076abe71fc445adc5b62ebcf291fac88",
+  "artifact_kind": "g002_full_pool_universe_data_coverage_manifest",
+  "counts": {
+    "core_symbols": 10,
+    "exchangeinfo_added_vs_static": 18,
+    "feature_dependent_eligible": 9,
+    "historical_candidate_eligible": 10,
+    "latest_archive_ohlcv_ready": 128,
+    "quarantined_any": 119,
+    "static_missing_from_exchangeInfo": 1,
+    "total_symbols": 128,
+    "tradfi_perpetual_symbols": 118
+  },
+  "coverage_manifest_sha256": "b88508af518a33b339112a1701d658cc8ab2c6ae3487155f6fc50615a420f3d6",
+  "coverage_thresholds": {
+    "feature_latest_floor_date": "2026-06-27",
+    "historical_train_start_policy": "date-level coverage; first bar may be seconds after midnight because raw aggtrade first trade is not guaranteed at exactly 00:00:00",
+    "historical_train_start_utc": "2025-01-01T00:00:00Z",
+    "latest_archive_ohlcv_floor_utc": "2026-07-01T00:00:00Z",
+    "locked_oos_end_utc": "2026-05-17T10:00:00Z",
+    "validation_start_utc": "2026-01-01T00:00:00Z"
+  },
+  "downstream_enforcement_contract": {
+    "candidate_search_scope": "G004/G005 must consume eligible_for_frozen_historical_candidate_search and eligible_for_feature_dependent_families, and must not use quarantined symbols for historical candidate promotion.",
+    "full_pool_coverage_scope": "128/128 latest archive OHLCV coverage proves the refreshed observation pool only.",
+    "paper_live_real_execution": "blocked unless separately approved after later gates",
+    "quarantine_is_fail_closed": true
+  },
+  "generated_at_utc": "2026-07-02T14:05:11.618850Z",
+  "goal_id": "G002",
+  "hash_scope_note": "coverage_manifest_sha256 is the canonical JSON content hash computed before inserting that self hash. artifact_hashes in verification reports are whole-file hashes and therefore differ by design.",
+  "refresh_evidence": {
+    "archive_tail_refresh_count": 83,
+    "archive_tail_refresh_status": "completed",
+    "live_execution_enabled": false,
+    "missing_symbol_ohlcv_count": 19,
+    "missing_symbol_ohlcv_refresh_status": "completed",
+    "paper_execution_enabled": false,
+    "real_money_execution_enabled": false,
+    "support_refresh_status": "executed",
+    "support_refresh_symbol_count": 128,
+    "support_refresh_upserted_rows": 95282
+  },
+  "source_pins": {
+    "archive_tail_refresh_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g002_data_refresh_archive_tail.json",
+    "archive_tail_refresh_sha256": "b23a7b75e8c48a9896ea84ce1c5d22dcdc996510d6c300aca7bfa835e7ce2c6d",
+    "binance_exchange_info_url": "https://fapi.binance.com/fapi/v1/exchangeInfo",
+    "classification_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g002_universe_exchange_info_classification.json",
+    "classification_sha256": "7730cdedcf8a71aa56793c48dcb5055b358aac44fb5ba02bb26d79015f689682",
+    "exchange_info_payload_sha256": "e2a62af464a3bb12caacdbefa2e04d38fe3554f93ad8fdb13817c58e5f2bb01b",
+    "exchange_info_snapshot_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g002_binance_exchange_info_snapshot.json",
+    "exchange_info_snapshot_sha256": "8c55f68c4081ff893b4bed2d4edf554a3946e6a57db2e0e54cbc8f798f1ec9ca",
+    "missing_symbol_refresh_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g002_data_refresh_missing.json",
+    "missing_symbol_refresh_sha256": "ce39ca197d3c465a8cc1843b705ac960a3c0d40b0ccbf23e3166e8a7c0666125",
+    "partial_refresh_rss_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g002_data_refresh_rss.jsonl",
+    "partial_refresh_rss_sha256": "06d90870fad701d59312e4bc5948e6a247912fa0a736009c765d2e5d04b410c2",
+    "support_refresh_full_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g002_support_refresh_full.json",
+    "support_refresh_full_sha256": "114367c1d73fdd7c54e33cd0345b1ede762c8fd9204f870b3b861f54c1558c1e"
+  },
+  "symbols": [
+    {
+      "eligible_for_feature_dependent_families": true,
+      "eligible_for_frozen_historical_candidate_search": true,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2023-11-14",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 956,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "core_crypto",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T12:53:30Z",
+      "ohlcv_min_utc": "2023-11-14T22:13:20Z",
+      "ohlcv_storage": {
+        "monthly_files": 20,
+        "wal_bytes": 25088512
+      },
+      "quarantine_reasons": [],
+      "raw_first_date": "2025-01-01",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 548,
+      "symbol": "BTCUSDT",
+      "train_validation_locked_oos_ready": true,
+      "validation_locked_oos_ready": true
+    },
+    {
+      "eligible_for_feature_dependent_families": true,
+      "eligible_for_frozen_historical_candidate_search": true,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2024-03-30",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 543,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "core_crypto",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T12:53:30Z",
+      "ohlcv_min_utc": "2025-01-01T00:00:05Z",
+      "ohlcv_storage": {
+        "monthly_files": 18,
+        "wal_bytes": 25088512
+      },
+      "quarantine_reasons": [],
+      "raw_first_date": "2025-01-01",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 548,
+      "symbol": "ETHUSDT",
+      "train_validation_locked_oos_ready": true,
+      "validation_locked_oos_ready": true
+    },
+    {
+      "eligible_for_feature_dependent_families": true,
+      "eligible_for_frozen_historical_candidate_search": true,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2024-03-30",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 543,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "core_crypto",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T12:53:30Z",
+      "ohlcv_min_utc": "2025-01-01T00:00:05Z",
+      "ohlcv_storage": {
+        "monthly_files": 18,
+        "wal_bytes": 25088512
+      },
+      "quarantine_reasons": [],
+      "raw_first_date": "2025-01-01",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 548,
+      "symbol": "SOLUSDT",
+      "train_validation_locked_oos_ready": true,
+      "validation_locked_oos_ready": true
+    },
+    {
+      "eligible_for_feature_dependent_families": true,
+      "eligible_for_frozen_historical_candidate_search": true,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2024-03-30",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 543,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "core_crypto",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T12:53:30Z",
+      "ohlcv_min_utc": "2025-01-01T00:00:05Z",
+      "ohlcv_storage": {
+        "monthly_files": 18,
+        "wal_bytes": 25088512
+      },
+      "quarantine_reasons": [],
+      "raw_first_date": "2025-01-01",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 125,
+      "symbol": "BNBUSDT",
+      "train_validation_locked_oos_ready": true,
+      "validation_locked_oos_ready": true
+    },
+    {
+      "eligible_for_feature_dependent_families": true,
+      "eligible_for_frozen_historical_candidate_search": true,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2024-03-30",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 543,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "core_crypto",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T12:53:30Z",
+      "ohlcv_min_utc": "2025-01-01T00:00:05Z",
+      "ohlcv_storage": {
+        "monthly_files": 18,
+        "wal_bytes": 25088512
+      },
+      "quarantine_reasons": [],
+      "raw_first_date": "2025-01-01",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 125,
+      "symbol": "TRXUSDT",
+      "train_validation_locked_oos_ready": true,
+      "validation_locked_oos_ready": true
+    },
+    {
+      "eligible_for_feature_dependent_families": true,
+      "eligible_for_frozen_historical_candidate_search": true,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2025-01-01",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 438,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "core_crypto",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T12:53:30Z",
+      "ohlcv_min_utc": "2025-01-01T00:00:05Z",
+      "ohlcv_storage": {
+        "monthly_files": 18,
+        "wal_bytes": 25088512
+      },
+      "quarantine_reasons": [],
+      "raw_first_date": "2025-01-01",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 119,
+      "symbol": "XRPUSDT",
+      "train_validation_locked_oos_ready": true,
+      "validation_locked_oos_ready": true
+    },
+    {
+      "eligible_for_feature_dependent_families": true,
+      "eligible_for_frozen_historical_candidate_search": true,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2025-01-01",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 438,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "core_crypto",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T12:53:30Z",
+      "ohlcv_min_utc": "2025-01-01T00:00:05Z",
+      "ohlcv_storage": {
+        "monthly_files": 18,
+        "wal_bytes": 25088576
+      },
+      "quarantine_reasons": [],
+      "raw_first_date": "2025-01-01",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 119,
+      "symbol": "DOGEUSDT",
+      "train_validation_locked_oos_ready": true,
+      "validation_locked_oos_ready": true
+    },
+    {
+      "eligible_for_feature_dependent_families": true,
+      "eligible_for_frozen_historical_candidate_search": true,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2025-01-01",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 438,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "core_crypto",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T12:53:30Z",
+      "ohlcv_min_utc": "2025-01-01T00:00:05Z",
+      "ohlcv_storage": {
+        "monthly_files": 18,
+        "wal_bytes": 25088640
+      },
+      "quarantine_reasons": [],
+      "raw_first_date": "2025-01-01",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 119,
+      "symbol": "ADAUSDT",
+      "train_validation_locked_oos_ready": true,
+      "validation_locked_oos_ready": true
+    },
+    {
+      "eligible_for_feature_dependent_families": true,
+      "eligible_for_frozen_historical_candidate_search": true,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2025-01-01",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 438,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "core_crypto",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T12:53:30Z",
+      "ohlcv_min_utc": "2025-01-01T00:00:05Z",
+      "ohlcv_storage": {
+        "monthly_files": 18,
+        "wal_bytes": 25088512
+      },
+      "quarantine_reasons": [],
+      "raw_first_date": "2026-03-07",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 118,
+      "symbol": "AVAXUSDT",
+      "train_validation_locked_oos_ready": true,
+      "validation_locked_oos_ready": true
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": true,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2025-01-01",
+      "feature_last_date": "2026-03-28",
+      "feature_latest_ready": false,
+      "feature_partition_count": 432,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "core_crypto",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T13:31:54Z",
+      "ohlcv_min_utc": "2025-01-01T00:00:05Z",
+      "ohlcv_storage": {
+        "monthly_files": 18,
+        "wal_bytes": 28104448
+      },
+      "quarantine_reasons": [
+        "feature_or_funding_coverage_insufficient_for_feature_dependent_families"
+      ],
+      "raw_first_date": "2025-01-01",
+      "raw_last_date": "2026-06-26",
+      "raw_partition_count": 113,
+      "symbol": "TONUSDT",
+      "train_validation_locked_oos_ready": true,
+      "validation_locked_oos_ready": true
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2025-12-11",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 94,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T12:53:30Z",
+      "ohlcv_min_utc": "2025-12-11T08:05:20Z",
+      "ohlcv_storage": {
+        "monthly_files": 7,
+        "wal_bytes": 25088512
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-03-07",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 118,
+      "symbol": "XAUUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": true
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-01-07",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 67,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T12:53:30Z",
+      "ohlcv_min_utc": "2026-01-07T10:00:01Z",
+      "ohlcv_storage": {
+        "monthly_files": 6,
+        "wal_bytes": 25088512
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-03-07",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 118,
+      "symbol": "XAGUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-01-28T14:30:02Z",
+      "ohlcv_storage": {
+        "monthly_files": 6,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-01-28",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 155,
+      "symbol": "TSLAUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-01-30",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 44,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T12:53:30Z",
+      "ohlcv_min_utc": "2026-01-30T10:00:00Z",
+      "ohlcv_storage": {
+        "monthly_files": 6,
+        "wal_bytes": 25088512
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-03-07",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 118,
+      "symbol": "XPTUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-01-30",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 44,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T12:53:30Z",
+      "ohlcv_min_utc": "2026-01-30T10:15:00Z",
+      "ohlcv_storage": {
+        "monthly_files": 6,
+        "wal_bytes": 25089024
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-03-07",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 118,
+      "symbol": "XPDUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-02-02T14:29:59Z",
+      "ohlcv_storage": {
+        "monthly_files": 5,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-02-02",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 150,
+      "symbol": "INTCUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-02-02T14:45:00Z",
+      "ohlcv_storage": {
+        "monthly_files": 5,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-02-02",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 150,
+      "symbol": "HOODUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-02-09T14:30:00Z",
+      "ohlcv_storage": {
+        "monthly_files": 5,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-02-09",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 143,
+      "symbol": "MSTRUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-02-09T14:40:01Z",
+      "ohlcv_storage": {
+        "monthly_files": 5,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-02-09",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 143,
+      "symbol": "AMZNUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:00Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "CRCLUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:22Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "COINUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:23Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "PLTRUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T12:53:30Z",
+      "ohlcv_min_utc": "2026-03-06T09:00:01Z",
+      "ohlcv_storage": {
+        "monthly_files": 4,
+        "wal_bytes": 25088640
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-03-06",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 119,
+      "symbol": "COPPERUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T12:53:30Z",
+      "ohlcv_min_utc": "2026-03-16T13:30:01Z",
+      "ohlcv_storage": {
+        "monthly_files": 4,
+        "wal_bytes": 25088512
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-03-16",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 109,
+      "symbol": "EWYUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T12:53:30Z",
+      "ohlcv_min_utc": "2026-03-19T13:30:01Z",
+      "ohlcv_storage": {
+        "monthly_files": 4,
+        "wal_bytes": 25088512
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-03-19",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 106,
+      "symbol": "EWJUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:00Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "PAYPUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:06Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "METAUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:05Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "NVDAUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:25Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "GOOGLUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T12:53:30Z",
+      "ohlcv_min_utc": "2026-04-01T09:00:00Z",
+      "ohlcv_storage": {
+        "monthly_files": 3,
+        "wal_bytes": 25088960
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-04-01",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 93,
+      "symbol": "CLUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T12:53:30Z",
+      "ohlcv_min_utc": "2026-04-01T09:10:01Z",
+      "ohlcv_storage": {
+        "monthly_files": 3,
+        "wal_bytes": 25089344
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-04-01",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 93,
+      "symbol": "BZUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T12:53:30Z",
+      "ohlcv_min_utc": "2026-04-01T09:20:01Z",
+      "ohlcv_storage": {
+        "monthly_files": 3,
+        "wal_bytes": 25088960
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-04-01",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 93,
+      "symbol": "NATGASUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T12:53:30Z",
+      "ohlcv_min_utc": "2026-04-06T13:30:02Z",
+      "ohlcv_storage": {
+        "monthly_files": 3,
+        "wal_bytes": 25088576
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-04-06",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 88,
+      "symbol": "QQQUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T12:53:30Z",
+      "ohlcv_min_utc": "2026-04-06T13:40:03Z",
+      "ohlcv_storage": {
+        "monthly_files": 3,
+        "wal_bytes": 25089088
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-04-06",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 88,
+      "symbol": "SPYUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:04:05Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "AAPLUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:06Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "TSMUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:00Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "MUUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:00Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "SNDKUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:21Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "MSFTUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:50Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "AVGOUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:03:02Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "BABAUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:11Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "AMDUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:00Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "QCOMUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:02:38Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "USARUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:24Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "LITEUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:38Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "ORCLUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:04:41Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "DISUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:03:51Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "UBERUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:17:28Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "CSCOUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:02:33Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "HDUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-05-15T14:00:09Z",
+      "ohlcv_storage": {
+        "monthly_files": 2,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-05-15",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 48,
+      "symbol": "SOXLUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:06Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "MRVLUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:32Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "CRWVUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:03:48Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "WMTUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:02:00Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "JPMUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:05:03Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "VUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:23Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "BRKBUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:51Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "FLNCUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:06Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "DRAMUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:05Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "RKLBUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:06Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "CBRSUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:00Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "SPCXUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:06Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "OPENAIUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:00Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "NBISUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:24Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "WDCUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:03Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "ARMUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:11Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "BEUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:54Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "COHRUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:31Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "QNTXUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:02:41Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "LLYUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:02:33Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "NVOUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:02:24Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "BBXUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:06Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "NOKUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T12:53:30Z",
+      "ohlcv_min_utc": "2026-06-01T13:50:00Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 25105728
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-01",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 32,
+      "symbol": "EWTUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:59Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "ASTSUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:00Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "SKHYNIXUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:06Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "SAMSUNGUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:37Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "HYUNDAIUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:25Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "ANTHROPICUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:21Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "DELLUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:14Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "IBMUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:04Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "NOWUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:11:12Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "CRMUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:00Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "IRENUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:00Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "ONDSUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:43:40Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "BXUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:54:50Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "HPEUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:10Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "AMATUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": false,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": true,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "latest_exchangeInfo_trading_status_note": "Static symbol is absent from the latest TRADING TradFi set; if present in exchangeInfo with non-TRADING status it remains quarantined.",
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:00Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "latest_exchangeInfo_status_TRADING_HALT_not_currently_trading",
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "CRWDUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:17:00Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "CRDOUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:00Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "AAOIUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T12:53:30Z",
+      "ohlcv_min_utc": "2026-06-08T09:30:01Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 25110272
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-08",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 25,
+      "symbol": "IWMUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:00Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "AXTIUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:17:39Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "NFLXUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:18:09Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "COSTUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-09T09:10:01Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-09",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 23,
+      "symbol": "URNMUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:05:45Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "HIMSUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:17:24Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "EBAYUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:18:00Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "ZMUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:51Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "DKNGUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:12:08Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "RIVNUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:06Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "GMEUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-10T09:20:01Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-10",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 22,
+      "symbol": "XLEUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T12:53:30Z",
+      "ohlcv_min_utc": "2026-06-10T09:25:01Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 25142144
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-10",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 23,
+      "symbol": "EWZUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:03:26Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "BMNRUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-11T09:20:09Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-11",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 21,
+      "symbol": "UVXYUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:07:47Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "ADBEUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:16Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "GLWUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-11T09:35:01Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-11",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 21,
+      "symbol": "STXXUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": false,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-01T23:59:58Z",
+      "ohlcv_min_utc": "2026-06-21T11:01:45Z",
+      "ohlcv_storage": {
+        "monthly_files": 1,
+        "wal_bytes": 22118080
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-21",
+      "raw_last_date": "2026-07-01",
+      "raw_partition_count": 11,
+      "symbol": "ASMLUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": true,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T13:31:54Z",
+      "ohlcv_min_utc": "2026-06-27T00:00:10Z",
+      "ohlcv_storage": {
+        "monthly_files": 0,
+        "wal_bytes": 30768256
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-27",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 6,
+      "symbol": "LRCXUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": true,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T13:31:54Z",
+      "ohlcv_min_utc": "2026-06-27T00:00:09Z",
+      "ohlcv_storage": {
+        "monthly_files": 0,
+        "wal_bytes": 30768320
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-27",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 6,
+      "symbol": "KLACUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": true,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T13:31:54Z",
+      "ohlcv_min_utc": "2026-06-27T00:05:53Z",
+      "ohlcv_storage": {
+        "monthly_files": 0,
+        "wal_bytes": 30744576
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-27",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 6,
+      "symbol": "ALABUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": true,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T13:31:54Z",
+      "ohlcv_min_utc": "2026-06-27T00:00:10Z",
+      "ohlcv_storage": {
+        "monthly_files": 0,
+        "wal_bytes": 30772416
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-27",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 6,
+      "symbol": "SMCIUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": true,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T13:31:54Z",
+      "ohlcv_min_utc": "2026-06-27T00:00:23Z",
+      "ohlcv_storage": {
+        "monthly_files": 0,
+        "wal_bytes": 30778304
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-27",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 6,
+      "symbol": "CIENUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": true,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T13:31:54Z",
+      "ohlcv_min_utc": "2026-06-27T00:00:00Z",
+      "ohlcv_storage": {
+        "monthly_files": 0,
+        "wal_bytes": 30765568
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-27",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 6,
+      "symbol": "KORUUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": true,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T13:31:54Z",
+      "ohlcv_min_utc": "2026-06-27T00:01:12Z",
+      "ohlcv_storage": {
+        "monthly_files": 0,
+        "wal_bytes": 30776064
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-27",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 6,
+      "symbol": "SONYUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": true,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T13:31:54Z",
+      "ohlcv_min_utc": "2026-06-29T13:35:03Z",
+      "ohlcv_storage": {
+        "monthly_files": 0,
+        "wal_bytes": 16577920
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-29",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 4,
+      "symbol": "MVLLUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": true,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T13:31:54Z",
+      "ohlcv_min_utc": "2026-06-29T13:40:00Z",
+      "ohlcv_storage": {
+        "monthly_files": 0,
+        "wal_bytes": 16557696
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-29",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 4,
+      "symbol": "TQQQUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-06-27",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 6,
+      "is_added_vs_static": true,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T13:31:54Z",
+      "ohlcv_min_utc": "2026-06-29T13:45:02Z",
+      "ohlcv_storage": {
+        "monthly_files": 0,
+        "wal_bytes": 16539072
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-06-29",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 4,
+      "symbol": "SQQQUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-07-02",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 1,
+      "is_added_vs_static": true,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T13:31:54Z",
+      "ohlcv_min_utc": "2026-07-02T09:15:01Z",
+      "ohlcv_storage": {
+        "monthly_files": 0,
+        "wal_bytes": 986496
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-07-02",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 1,
+      "symbol": "STRCUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-07-02",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 1,
+      "is_added_vs_static": true,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T13:31:54Z",
+      "ohlcv_min_utc": "2026-07-02T09:20:00Z",
+      "ohlcv_storage": {
+        "monthly_files": 0,
+        "wal_bytes": 967360
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-07-02",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 1,
+      "symbol": "CATUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-07-02",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 1,
+      "is_added_vs_static": true,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T13:31:54Z",
+      "ohlcv_min_utc": "2026-07-02T09:25:00Z",
+      "ohlcv_storage": {
+        "monthly_files": 0,
+        "wal_bytes": 948160
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-07-02",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 1,
+      "symbol": "TXNUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-07-02",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 1,
+      "is_added_vs_static": true,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T13:31:54Z",
+      "ohlcv_min_utc": "2026-07-02T09:30:10Z",
+      "ohlcv_storage": {
+        "monthly_files": 0,
+        "wal_bytes": 928320
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-07-02",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 1,
+      "symbol": "FLEXUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-07-02",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 1,
+      "is_added_vs_static": true,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T13:31:54Z",
+      "ohlcv_min_utc": "2026-07-02T09:35:03Z",
+      "ohlcv_storage": {
+        "monthly_files": 0,
+        "wal_bytes": 909568
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-07-02",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 1,
+      "symbol": "TERUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-07-02",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 1,
+      "is_added_vs_static": true,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T13:31:54Z",
+      "ohlcv_min_utc": "2026-07-02T09:40:00Z",
+      "ohlcv_storage": {
+        "monthly_files": 0,
+        "wal_bytes": 890560
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-07-02",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 1,
+      "symbol": "TTWOUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-07-02",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 1,
+      "is_added_vs_static": true,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T13:31:54Z",
+      "ohlcv_min_utc": "2026-07-02T09:45:02Z",
+      "ohlcv_storage": {
+        "monthly_files": 0,
+        "wal_bytes": 871232
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-07-02",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 1,
+      "symbol": "KSTRUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    },
+    {
+      "eligible_for_feature_dependent_families": false,
+      "eligible_for_frozen_historical_candidate_search": false,
+      "eligible_for_ohlcv_only_recent_full_pool_analysis": true,
+      "feature_first_date": "2026-07-02",
+      "feature_last_date": "2026-07-02",
+      "feature_latest_ready": true,
+      "feature_partition_count": 1,
+      "is_added_vs_static": true,
+      "is_missing_static_from_exchangeInfo": false,
+      "kind": "tradfi_perpetual",
+      "latest_archive_ohlcv_ready": true,
+      "ohlcv_max_utc": "2026-07-02T13:31:54Z",
+      "ohlcv_min_utc": "2026-07-02T09:50:06Z",
+      "ohlcv_storage": {
+        "monthly_files": 0,
+        "wal_bytes": 851776
+      },
+      "quarantine_reasons": [
+        "insufficient_train_validation_locked_oos_history"
+      ],
+      "raw_first_date": "2026-07-02",
+      "raw_last_date": "2026-07-02",
+      "raw_partition_count": 1,
+      "symbol": "BSPUSDT",
+      "train_validation_locked_oos_ready": false,
+      "validation_locked_oos_ready": false
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "artifact_hashes": {
+    "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g002_binance_exchange_info_snapshot.json": "8c55f68c4081ff893b4bed2d4edf554a3946e6a57db2e0e54cbc8f798f1ec9ca",
+    "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g002_coverage_manifest.json": "a402a830de05747fc2ba2d30161f7bdd6a24490ccb550e2cf4fbdace0b337453",
+    "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g002_coverage_manifest.md": "87f5454275603456ac34c53044509dc01b56312ede919901b99e65ac13862476",
+    "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g002_data_refresh_archive_tail.json": "b23a7b75e8c48a9896ea84ce1c5d22dcdc996510d6c300aca7bfa835e7ce2c6d",
+    "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g002_data_refresh_missing.json": "ce39ca197d3c465a8cc1843b705ac960a3c0d40b0ccbf23e3166e8a7c0666125",
+    "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g002_support_refresh_full.json": "114367c1d73fdd7c54e33cd0345b1ede762c8fd9204f870b3b861f54c1558c1e",
+    "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g002_universe_exchange_info_classification.json": "7730cdedcf8a71aa56793c48dcb5055b358aac44fb5ba02bb26d79015f689682"
+  },
+  "artifact_kind": "g002_verification_test_report",
+  "assertions": [
+    "manifest goal_id is G002",
+    "execution flags live/paper/real are false",
+    "128 full-pool symbols all have latest archive OHLCV coverage",
+    "ExchangeInfo deltas record 18 additions and CRWDUSDT as non-TRADING/TRADING_HALT",
+    "full support refresh executed for 128 symbols with 95,282 upserted rows",
+    "archive-tail refresh completed 83 symbols",
+    "missing-symbol refresh completed 19 symbols",
+    "quarantine reasons include insufficient historical/feature coverage so downstream search fails closed",
+    "downstream enforcement contract prevents using full-pool observation coverage as blanket candidate eligibility",
+    "coverage_manifest_sha256 self-hash semantics recompute correctly",
+    "current artifact hashes were recomputed after final manifest/classification clarification"
+  ],
+  "commands": [
+    {
+      "command": "uv run --frozen --all-extras --all-groups pytest tests/test_research_universe.py tests/test_config_symbols_universe.py tests/test_symbol_universe_validation.py tests/test_parquet_market_data.py",
+      "status": "passed",
+      "summary": "17 passed in 2.32s"
+    },
+    {
+      "command": "uv run --frozen --all-extras --all-groups python - <<current G002 artifact assertions>>",
+      "status": "passed",
+      "summary": "Current G002 manifest/classification/refresh/support assertions passed"
+    }
+  ],
+  "counts": {
+    "core_symbols": 10,
+    "exchangeinfo_added_vs_static": 18,
+    "feature_dependent_eligible": 9,
+    "historical_candidate_eligible": 10,
+    "latest_archive_ohlcv_ready": 128,
+    "quarantined_any": 119,
+    "static_missing_from_exchangeInfo": 1,
+    "total_symbols": 128,
+    "tradfi_perpetual_symbols": 118
+  },
+  "generated_at_utc": "2026-07-02T14:12:40.121672Z",
+  "goal_id": "G002",
+  "status": "passed"
+}
