@@ -49,6 +49,11 @@ from lumina_quant.research.alpha_candidate_ledger import (
     AlphaCandidateRecord,
     ResearchLedger,
 )
+from lumina_quant.research.cost_realism import (
+    DEFAULT_PARTICIPATION,
+    DEFAULT_SURVIVAL_SHARPE_FRACTION,
+    cost_ab_report,
+)
 from lumina_quant.research.effective_trials import (
     candidate_return_correlation_matrix,
     effective_number_of_trials,
@@ -456,6 +461,10 @@ def run_alpha_search(
     ledger: ResearchLedger | None = None,
     enable_llm_proposer: bool = False,
     llm_proposals: Sequence[AlphaSearchCandidate] | None = None,
+    cost_ab_enabled: bool = False,
+    cost_participation: float = DEFAULT_PARTICIPATION,
+    cost_funding_periods_per_step: float = 0.0,
+    cost_survival_fraction: float = DEFAULT_SURVIVAL_SHARPE_FRACTION,
 ) -> AlphaSearchResult:
     """Run the deterministic generate -> evaluate -> select loop.
 
@@ -540,6 +549,21 @@ def run_alpha_search(
             require_pbo=require_pbo,
             spa_seed=spa_seed,
         )
+        # Cost-realism A/B (default OFF -> cost_ab={} and promotion unchanged, so
+        # records stay byte-identical to the pre-cost-gate behaviour). When enabled,
+        # a candidate must ALSO survive realistic costs before it is trusted.
+        cost_ab_map: dict[str, float] = {}
+        cost_survives = True
+        if cost_ab_enabled:
+            cost_ab_map = cost_ab_report(
+                ev.returns,
+                turnover=float(ev.turnover),
+                participation=cost_participation,
+                funding_periods_per_step=cost_funding_periods_per_step,
+                survival_fraction=cost_survival_fraction,
+            )
+            cost_survives = cost_ab_map["survives"] >= 1.0
+        promote = bool(verdict.passed and cost_survives)
         record = AlphaCandidateRecord(
             candidate_id=ev.candidate.candidate_id,
             formula=ev.candidate.formula,
@@ -554,10 +578,11 @@ def run_alpha_search(
             spa_pvalue=float(verdict.spa_pvalue),
             pbo=float(verdict.pbo),
             raw_n=int(raw_n),
-            passed=bool(verdict.passed),
+            passed=promote,
+            cost_ab=cost_ab_map,
         )
         records.append(record.to_dict())
-        if verdict.passed:
+        if promote:
             promoted_ids.append(ev.candidate.candidate_id)
             if ledger is not None:
                 ledger.append(record)
