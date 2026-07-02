@@ -504,6 +504,47 @@ class AlphaSearchConfig:
 
 
 @dataclass(slots=True)
+class SharpeConfidenceIntervalConfig:
+    """Opt-in advisory Sharpe confidence-interval sub-block (research-only).
+
+    ``emit_enabled`` defaults to ``False`` — the block-bootstrap Sharpe-CI
+    estimator in ``research.sharpe_ci`` is a net-new advisory diagnostic that no
+    default runtime path constructs, and it NEVER writes into the flat
+    ``dict[str, float]`` metric payload (it is surfaced only as a separate
+    top-level sub-object).  Flip ``emit_enabled`` only to attach the advisory CI
+    sub-object.  The remaining fields expose the deterministic bootstrap budget
+    (``bootstrap_rounds`` / ``block_size`` — 0 means the ``n**(1/3)`` default),
+    the two-sided ``confidence_level``, and the fixed ``seed``.
+    """
+
+    emit_enabled: bool = False
+    bootstrap_rounds: int = 1000
+    block_size: int = 0
+    confidence_level: float = 0.95
+    seed: int = 20260701
+
+
+@dataclass(slots=True)
+class TradFiExternalFetchConfig:
+    """Opt-in gate for the research-only TradFi external fetcher.
+
+    ``enabled`` defaults to ``False`` and ``allow_network`` defaults to ``False``
+    — the fetcher in ``research.tradfi_fetcher`` is snapshot-first and
+    replay-only unless BOTH this gate AND the ``LUMINA_ENABLE_TRADFI_EXTERNAL_FETCH``
+    environment gate are set.  ``provider`` is a single source-pinned choice
+    (``yahoo`` | ``stooq`` | ``sec_edgar``); there is intentionally NO automatic
+    fallback chain — a pinned provider that fails raises loudly.  ``snapshot_dir``
+    is the on-disk cache/replay root.  No default runtime path imports this
+    module, so crypto/perp live and golden numerics stay untouched.
+    """
+
+    enabled: bool = False
+    provider: str = "yahoo"
+    snapshot_dir: str = "var/cache/tradfi_external"
+    allow_network: bool = False
+
+
+@dataclass(slots=True)
 class ResearchConfig:
     """Opt-in research-only tooling toggles.
 
@@ -513,11 +554,20 @@ class ResearchConfig:
     (``research.execution_attribution``): when ``False`` (default) no code
     constructs or runs it, so backtest / walk-forward numerics stay
     byte-identical.  ``alpha_search`` gates the deterministic alpha discovery
-    loop and is likewise inert by default.
+    loop and is likewise inert by default.  ``sharpe_ci`` and
+    ``tradfi_external_fetch`` are additive, default-OFF research seams (advisory
+    Sharpe-CI sub-object and a snapshot-first TradFi fetcher) that never touch
+    the flat metric payload or any live/backtest execution path.
     """
 
     execution_attribution_enabled: bool = False
     alpha_search: AlphaSearchConfig = field(default_factory=AlphaSearchConfig)
+    sharpe_ci: SharpeConfidenceIntervalConfig = field(
+        default_factory=SharpeConfidenceIntervalConfig
+    )
+    tradfi_external_fetch: TradFiExternalFetchConfig = field(
+        default_factory=TradFiExternalFetchConfig
+    )
 
 
 @dataclass(slots=True)

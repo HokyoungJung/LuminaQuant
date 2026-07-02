@@ -29,6 +29,8 @@ from lumina_quant.configuration.schema import (
     PromotionGateConfig,
     ResearchConfig,
     RiskConfig,
+    SharpeConfidenceIntervalConfig,
+    TradFiExternalFetchConfig,
     Qlib158FormulaConfig,
     RuntimeConfig,
     StorageConfig,
@@ -280,6 +282,12 @@ def _extract_runtime_sections(mapped: dict[str, Any]) -> dict[str, dict[str, Any
         "research": _raw_section(mapped, "research"),
         "research_alpha_search": _raw_section(
             _raw_section(mapped, "research"), "alpha_search"
+        ),
+        "research_sharpe_ci": _raw_section(
+            _raw_section(mapped, "research"), "sharpe_ci"
+        ),
+        "research_tradfi_external_fetch": _raw_section(
+            _raw_section(mapped, "research"), "tradfi_external_fetch"
         ),
         "strategies": _raw_section(mapped, "strategies"),
         "strategies_qlib158_formula": _raw_section(
@@ -1002,15 +1010,26 @@ def _build_research_runtime_config(
     *,
     research_raw: dict[str, Any],
     alpha_search_raw: dict[str, Any],
+    sharpe_ci_raw: dict[str, Any],
+    tradfi_external_fetch_raw: dict[str, Any],
 ) -> ResearchConfig:
     research_kwargs = _coerce_dataclass_kwargs(research_raw, ResearchConfig)
-    # ``alpha_search`` is a nested dataclass built explicitly below; drop any raw
-    # passthrough so it is never assigned as a bare dict.
-    research_kwargs.pop("alpha_search", None)
+    # Nested dataclasses are built explicitly below; drop any raw passthrough so
+    # they are never assigned as bare dicts.
+    for reserved_key in ("alpha_search", "sharpe_ci", "tradfi_external_fetch"):
+        research_kwargs.pop(reserved_key, None)
     return ResearchConfig(
         **research_kwargs,
         alpha_search=AlphaSearchConfig(
             **_coerce_dataclass_kwargs(alpha_search_raw, AlphaSearchConfig)
+        ),
+        sharpe_ci=SharpeConfidenceIntervalConfig(
+            **_coerce_dataclass_kwargs(sharpe_ci_raw, SharpeConfidenceIntervalConfig)
+        ),
+        tradfi_external_fetch=TradFiExternalFetchConfig(
+            **_coerce_dataclass_kwargs(
+                tradfi_external_fetch_raw, TradFiExternalFetchConfig
+            )
         ),
     )
 
@@ -1034,6 +1053,27 @@ def _normalize_research_runtime_section(runtime: RuntimeConfig) -> None:
     alpha_search.enable_llm_proposer = _as_bool(
         getattr(alpha_search, "enable_llm_proposer", False), False
     )
+
+    sharpe_ci = runtime.research.sharpe_ci
+    sharpe_ci.emit_enabled = _as_bool(getattr(sharpe_ci, "emit_enabled", False), False)
+    sharpe_ci.bootstrap_rounds = max(
+        1, _as_int(getattr(sharpe_ci, "bootstrap_rounds", 1000), 1000)
+    )
+    sharpe_ci.block_size = max(0, _as_int(getattr(sharpe_ci, "block_size", 0), 0))
+    sharpe_ci.confidence_level = min(
+        0.999999,
+        max(0.5, _as_float(getattr(sharpe_ci, "confidence_level", 0.95), 0.95)),
+    )
+    sharpe_ci.seed = _as_int(getattr(sharpe_ci, "seed", 20260701), 20260701)
+
+    tradfi = runtime.research.tradfi_external_fetch
+    tradfi.enabled = _as_bool(getattr(tradfi, "enabled", False), False)
+    provider = str(getattr(tradfi, "provider", "yahoo") or "yahoo").strip().lower()
+    tradfi.provider = provider if provider in {"yahoo", "stooq", "sec_edgar"} else "yahoo"
+    tradfi.snapshot_dir = str(
+        getattr(tradfi, "snapshot_dir", "") or "var/cache/tradfi_external"
+    ).strip()
+    tradfi.allow_network = _as_bool(getattr(tradfi, "allow_network", False), False)
 
 
 def _normalize_strategies_runtime_section(runtime: RuntimeConfig) -> None:
@@ -1165,6 +1205,8 @@ def _build_runtime_config_tree(
         research=_build_research_runtime_config(
             research_raw=sections["research"],
             alpha_search_raw=sections["research_alpha_search"],
+            sharpe_ci_raw=sections["research_sharpe_ci"],
+            tradfi_external_fetch_raw=sections["research_tradfi_external_fetch"],
         ),
         strategies=StrategiesConfig(
             qlib158_formula=Qlib158FormulaConfig(
