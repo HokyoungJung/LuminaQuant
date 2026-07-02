@@ -225,3 +225,36 @@ def test_register_portfolio_optimizer_params_roundtrip() -> None:
     assert defaults["allocation_method"] == "legacy"
     assert defaults["mv_risk_aversion"] == pytest.approx(5.0)
     assert defaults["cov_window"] == 0
+
+
+def _risk_contributions(cov: np.ndarray, weights: np.ndarray) -> np.ndarray:
+    marginal = cov @ weights
+    total = float(weights @ marginal)
+    return (weights * marginal) / total
+
+
+@pytest.mark.parametrize("rho", [0.5, 0.9, 0.999])
+def test_erc_equalizes_risk_contributions_on_correlated_cov(rho: float) -> None:
+    """Regression guard: ERC must equalize risk contributions on CORRELATED cov.
+
+    The prior solver renormalized its working vector mid-sweep and converged to a
+    wrong fixed point (e.g. [0.59, 0.41] on a symmetric correlated cov). The
+    diagonal-only KATs above did not catch it because renormalization is harmless
+    when off-diagonals are zero.
+    """
+    cov = np.array([[0.04, 0.04 * rho], [0.04 * rho, 0.04]], dtype=float)
+    weights = ox.erc_weights(cov)
+    # Symmetric inputs must yield symmetric weights and equal risk contributions.
+    np.testing.assert_allclose(weights, [0.5, 0.5], atol=1e-6)
+    rc = _risk_contributions(cov, weights)
+    assert float(rc.max() - rc.min()) < 1e-8
+
+
+def test_erc_equal_risk_contribution_random_correlated() -> None:
+    rng = np.random.default_rng(1)
+    a = rng.standard_normal((3, 3))
+    cov = a @ a.T  # SPD, correlated
+    weights = ox.erc_weights(cov)
+    rc = _risk_contributions(cov, weights)
+    assert float(rc.max() - rc.min()) < 1e-7
+    assert rc == pytest.approx(np.full(3, 1.0 / 3.0), abs=1e-6)

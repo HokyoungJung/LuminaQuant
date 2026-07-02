@@ -184,11 +184,15 @@ def erc_weights(
             c = float(matrix[i] @ weights) - a * float(weights[i])
             root = (-c + np.sqrt(c * c + 4.0 * a * budget)) / (2.0 * a)
             weights[i] = root if root > 0.0 else floor
+        # Convergence is measured on normalized COPIES only; the raw coordinate-
+        # descent iterate (weights) MUST stay un-normalized across sweeps so it
+        # remains on the scale-fixed Griveau-Billion fixed point (Sigma y)_i =
+        # b_i / y_i. Renormalizing the working vector mid-solve moves it off that
+        # scale and converges to a wrong point with UNEQUAL risk contributions on
+        # any correlated covariance. Final normalization happens once, below.
         current = weights / float(weights.sum())
         if float(np.abs(current - previous).max()) <= tolerance:
-            weights = current
             break
-        weights = current
 
     weights = np.clip(weights, 0.0, None)
     total = float(weights.sum())

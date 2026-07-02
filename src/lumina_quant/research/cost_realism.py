@@ -248,13 +248,17 @@ def check_risk_gate_parity(
     risk_config: Any,
     portfolio: Any = None,
 ) -> RiskGateParity:
-    """Assert a live-eligible order clears the identical risk gate in both modes.
+    """Verify the order-risk decision is a deterministic, config-driven pure function.
 
-    A live-eligible candidate must pass the same :class:`RiskManager` order-risk
-    gate whether the surrounding engine is running a backtest or live. This builds
-    a RiskManager from the shared risk config for each mode and compares the
-    ``check_order`` verdict + reason; ``parity`` is ``True`` only when both agree,
-    which is the guarantee against backtest<->live divergence in the risk gate.
+    LuminaQuant applies the SAME :class:`RiskManager` class and risk limits in both
+    backtest and live, so a live-eligible candidate's order must receive the identical
+    verdict in either mode. This evaluates ``check_order`` on two independent
+    RiskManager instances built from the shared ``risk_config`` and reports
+    ``parity`` = both agree (verdict + reason). Because the inputs are identical by
+    construction, ``parity`` is expected to hold; it is a **regression guard** that
+    would FAIL only if the gate ever became mode-dependent, stateful, or
+    non-deterministic. It is deliberately NOT a check that two *different* per-mode
+    configs agree (the risk config is shared, so no such divergence surface exists).
     """
     from lumina_quant.risk_manager import RiskManager
 
