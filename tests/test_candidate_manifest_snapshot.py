@@ -17,29 +17,31 @@ FIXED_TIMEFRAMES = ("1h", "4h")
 # the digest is robust to dict-ordering. Captured from current behavior; if the
 # rider-builder consolidation changes any candidate, this digest must be
 # re-captured intentionally.
-EXPECTED_MANIFEST_SHA256 = "9397622ad461413610f66da2e2c32735b477b406694422ee34885e50d5f3ccf4"
+EXPECTED_MANIFEST_SHA256 = "82a48740355cc93b94a230cc65d7049e081c59648f4ff729f41f8dbf3a82cba5"
 
-EXPECTED_CANDIDATE_COUNT = 133
+EXPECTED_CANDIDATE_COUNT = 145
 
 EXPECTED_FAMILY_COUNTS = {
-    "breakout": 16,
+    "breakout": 20,
     "cross_sectional": 2,
     "formulaic_alpha": 6,
     "market_neutral": 38,
-    "mean_reversion": 8,
+    "mean_reversion": 12,
     "momentum": 12,
-    "seasonality": 4,
+    "seasonality": 8,
     "trend": 47,
 }
 
 EXPECTED_STRATEGY_COUNTS = {
     "AccelerationRiderStrategy": 4,
     "AdaptiveTrendRiderStrategy": 4,
+    "AdfGatedReversionRiderStrategy": 4,
     "Alpha101FormulaStrategy": 6,
     "AmihudIlliquidityMomentumRiderStrategy": 4,
     "CompositeTrendStrategy": 3,
     "ConfidenceGatedTrendStrategy": 4,
     "CusumChangePointTrendRiderStrategy": 4,
+    "GarchInnovationRiderStrategy": 4,
     "IntradaySeasonalMomentumRiderStrategy": 4,
     "KalmanTrendRiderStrategy": 4,
     "LastDayLiquidityRegimeStrategy": 2,
@@ -54,6 +56,7 @@ EXPECTED_STRATEGY_COUNTS = {
     "RegimeBreakoutCandidateStrategy": 2,
     "RollingBreakoutStrategy": 2,
     "SeasonalMicroBreakoutRiderStrategy": 4,
+    "SpectralCycleRiderStrategy": 4,
     "VWAPCompressionReversionStrategy": 4,
     "VarianceRatioTrendRiderStrategy": 4,
     "VolOfVolRegimeTrendGateStrategy": 4,
@@ -61,15 +64,17 @@ EXPECTED_STRATEGY_COUNTS = {
     "VolatilitySqueezeBreakoutRiderStrategy": 4,
 }
 
-EXPECTED_TIMEFRAME_COUNTS = {"1h": 73, "4h": 60}
+EXPECTED_TIMEFRAME_COUNTS = {"1h": 79, "4h": 66}
 
 # Every rider-builder produced strategy class. The upcoming consolidation must
 # preserve this exact roster (names and per-class candidate counts).
 EXPECTED_RIDER_CLASSES = {
     "AccelerationRiderStrategy",
     "AdaptiveTrendRiderStrategy",
+    "AdfGatedReversionRiderStrategy",
     "AmihudIlliquidityMomentumRiderStrategy",
     "CusumChangePointTrendRiderStrategy",
+    "GarchInnovationRiderStrategy",
     "IntradaySeasonalMomentumRiderStrategy",
     "KalmanTrendRiderStrategy",
     "OpeningRangeBreakoutRiderStrategy",
@@ -77,12 +82,14 @@ EXPECTED_RIDER_CLASSES = {
     "PermutationEntropyTrendRiderStrategy",
     "RealizedSemivarianceTrendRiderStrategy",
     "SeasonalMicroBreakoutRiderStrategy",
+    "SpectralCycleRiderStrategy",
     "VarianceRatioTrendRiderStrategy",
     "VolatilityBreakoutRiderStrategy",
     "VolatilitySqueezeBreakoutRiderStrategy",
 }
 
 EXPECTED_TAGS = {
+    "adf",
     "alpha101",
     "amihud_illiquidity",
     "article_family:formulaic-alpha101-research",
@@ -93,17 +100,22 @@ EXPECTED_TAGS = {
     "atr",
     "breakout",
     "change_point",
+    "conditional_volatility",
     "confidence_gated",
     "contraction_expansion",
     "cross_sectional",
     "crypto",
     "cusum",
+    "cycle",
     "execution_risk",
     "factor",
     "formulaic",
+    "garch",
     "good_bad_volatility",
+    "half_life",
     "illiquidity_premium",
     "intraday_seasonality",
+    "jump_filter",
     "kalman",
     "last_day_return",
     "liquidity_conditioned",
@@ -118,6 +130,7 @@ EXPECTED_TAGS = {
     "overnight_session",
     "pair",
     "pair_state",
+    "periodogram",
     "permutation_entropy",
     "predictability_regime",
     "pullback",
@@ -132,8 +145,10 @@ EXPECTED_TAGS = {
     "session_anchored",
     "signed_jump",
     "single_asset",
+    "spectral",
     "spread",
     "state_space",
+    "stationarity",
     "take_profit",
     "term_structure",
     "time_of_day",

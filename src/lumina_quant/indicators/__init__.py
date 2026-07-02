@@ -38,6 +38,16 @@ from .bands import keltner_channel as keltner_channel
 from .common import safe_float as safe_float
 from .common import safe_int as safe_int
 from .common import time_key as time_key
+from .ensemble_weights import blend_weights as blend_weights
+from .ensemble_weights import direction_hit_rate as direction_hit_rate
+from .ensemble_weights import disagreement_coefficient as disagreement_coefficient
+from .ensemble_weights import inverse_error_weights as inverse_error_weights
+from .ensemble_weights import softmax_weights as softmax_weights
+from .flow_share import cdf_extremeness as cdf_extremeness
+from .flow_share import cross_sectional_share as cross_sectional_share
+from .flow_share import dense_rank_desc as dense_rank_desc
+from .flow_share import normal_cdf as normal_cdf
+from .flow_share import share_weighted_return as share_weighted_return
 from .formulaic_alpha import alpha_001 as alpha_001
 from .formulaic_alpha import alpha_002 as alpha_002
 from .formulaic_alpha import alpha_003 as alpha_003
@@ -90,6 +100,8 @@ from .futures_fast import (
 )
 from .futures_fast import trend_efficiency_latest as trend_efficiency_latest
 from .futures_fast import volume_shock_zscore_latest as volume_shock_zscore_latest
+from .garch import garch11_fit as garch11_fit
+from .garch import garch11_next_variance as garch11_next_variance
 from .momentum import chande_momentum_oscillator as chande_momentum_oscillator
 from .momentum import cumulative_return as cumulative_return
 from .momentum import detrended_price_oscillator as detrended_price_oscillator
@@ -140,6 +152,11 @@ from .rolling_stats import ts_regression_intercept as ts_regression_intercept
 from .rolling_stats import ts_regression_rsquared as ts_regression_rsquared
 from .rolling_stats import ts_regression_slope as ts_regression_slope
 from .rsi import IncrementalRsi as IncrementalRsi
+from .spectral_cycle import cycle_phase_fraction as cycle_phase_fraction
+from .spectral_cycle import dominant_cycle as dominant_cycle
+from .stationarity import adf_critical_value as adf_critical_value
+from .stationarity import adf_t_statistic as adf_t_statistic
+from .stationarity import ar1_half_life as ar1_half_life
 from .trend import aroon_indicator as aroon_indicator
 from .trend import average_directional_index as average_directional_index
 from .trend import ichimoku_cloud as ichimoku_cloud
@@ -191,6 +208,8 @@ __all__ = [
     "RollingMeanWindow",
     "RollingZScoreWindow",
     "accumulation_distribution_line",
+    "adf_critical_value",
+    "adf_t_statistic",
     "alpha_001",
     "alpha_002",
     "alpha_003",
@@ -220,14 +239,17 @@ __all__ = [
     "alpha_055",
     "alpha_101",
     "amihud_illiquidity",
+    "ar1_half_life",
     "aroon_indicator",
     "atr_percent",
     "average_directional_index",
     "average_true_range",
     "awesome_oscillator",
     "basis_bps",
+    "blend_weights",
     "bollinger_bands",
     "bollinger_bandwidth",
+    "cdf_extremeness",
     "chaikin_money_flow",
     "chaikin_oscillator",
     "chande_momentum_oscillator",
@@ -239,11 +261,17 @@ __all__ = [
     "conditional_value_at_risk",
     "cross_leadlag_spillover",
     "cross_sectional_rank",
+    "cross_sectional_share",
     "cumulative_return",
+    "cycle_phase_fraction",
     "decay_linear",
     "delay",
     "delta",
+    "dense_rank_desc",
     "detrended_price_oscillator",
+    "direction_hit_rate",
+    "disagreement_coefficient",
+    "dominant_cycle",
     "donchian_channel",
     "double_exponential_moving_average",
     "downside_volatility",
@@ -255,11 +283,14 @@ __all__ = [
     "finite_floats",
     "fisher_transform",
     "force_index",
+    "garch11_fit",
+    "garch11_next_variance",
     "garman_klass_volatility",
     "historical_volatility",
     "hull_moving_average",
     "hurst_exponent",
     "ichimoku_cloud",
+    "inverse_error_weights",
     "kaufman_efficiency_ratio",
     "keltner_channel",
     "leadlag_spillover",
@@ -274,6 +305,7 @@ __all__ = [
     "money_flow_index",
     "moving_average_convergence_divergence",
     "negative_volume_index",
+    "normal_cdf",
     "normalized_true_range_latest",
     "on_balance_volume",
     "order_flow_imbalance",
@@ -309,9 +341,11 @@ __all__ = [
     "safe_float",
     "safe_int",
     "sample_std",
+    "share_weighted_return",
     "signed_power",
     "simple_moving_average",
     "simple_return",
+    "softmax_weights",
     "stochastic_oscillator",
     "stochastic_rsi",
     "supertrend",
