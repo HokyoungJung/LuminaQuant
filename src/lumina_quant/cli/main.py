@@ -19,6 +19,8 @@ COMMAND_MODULES = {
     "autonomous_research": "autonomous_research",
     "config": "config",
     "registry": "registry",
+    "alpha": "alpha",
+    "mcp": "mcp",
 }
 
 
@@ -62,6 +64,8 @@ def main(argv: list[str] | None = None) -> int:
         "deep-learning": COMMAND_MODULES["deep_learning"],
         "deep_learning": COMMAND_MODULES["deep_learning"],
         "registry": COMMAND_MODULES["registry"],
+        "alpha": COMMAND_MODULES["alpha"],
+        "mcp": COMMAND_MODULES["mcp"],
     }
 
     parser = argparse.ArgumentParser(
