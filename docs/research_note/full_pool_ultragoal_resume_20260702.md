@@ -13,8 +13,8 @@ Run `gjc ultragoal` commands from `/tmp`, not from the repo root, because the ac
 
 - `G001 Safety inventory and executable baseline` — complete and checkpointed.
 - `G002 Refresh Binance USD-M universe and market data coverage` — complete and checkpointed.
-- `G003 Build point-in-time external-prior registry` — active; registry artifacts are written, but G003 is not checkpointed yet.
-- `G004 Freeze candidate and portfolio search budgets` — pending.
+- `G003 Build point-in-time external-prior registry` — complete and checkpointed.
+- `G004 Freeze candidate and portfolio search budgets` — active.
 - `G005 Evaluate candidates with walk-forward and cost stress` — pending.
 - `G006 Construct portfolios and compare incumbents` — pending.
 - `G007 Produce fail-closed final research decision` — pending.
@@ -40,11 +40,13 @@ Key completed artifacts:
   - `g002_coverage_manifest.json`
   - `g002_coverage_manifest.md`
   - `g002_verification_test_report.json`
-- G003 partial:
+- G003:
   - `g003_external_prior_registry.json`
   - `g003_external_prior_registry.csv`
   - `g003_external_prior_registry.md`
   - `g003_external_prior_cache/`
+  - `g003_external_prior_cache_manifest.json`
+  - `g003_verification_test_report.json`
 
 G002 checkpoint summary:
 
@@ -62,7 +64,7 @@ G003 current registry summary:
 - Binance schema docs: exchangeInfo and funding-rate history.
 - Yahoo/Stooq/SEC probes are cached and demoted to diagnostic-only where PIT proof is missing.
 - All external priors are research-design priors only; imported external performance claims are not LuminaQuant historical evidence.
-- G003 still needs focused verification, architect review, executor QA/red-team, quality gate, and `gjc ultragoal checkpoint`.
+- G003 was verified and checkpointed: registry assertions passed, external-source tests 39 passed, architect review CLEAR/CLEAR/CLEAR APPROVE, executor QA/red-team passed.
 
 ## Resume prompt for a new session
 
@@ -73,7 +75,7 @@ Run ultragoal commands from /tmp, not from /home/hoky/Quants-agent/LuminaQuant, 
 
 Repo/worktree path is /home/hoky/Quants-agent/LuminaQuant.
 
-Continue the durable plan from current goal G003. Do not restart planning or recreate goals. Preserve:
+Continue the durable plan from current goal G004. Do not restart planning or recreate goals. Preserve:
 - /tmp/.gjc/_session-019f22a1-90f7-7000-ab18-d0fd7010803b/plans/ralplan/019f22a1-90f7-7000-ab18-d0fd7010803b/pending-approval.md
 - /tmp/.gjc/_session-019f22a1-90f7-7000-ab18-d0fd7010803b/ultragoal/goals.json
 - /tmp/.gjc/_session-019f22a1-90f7-7000-ab18-d0fd7010803b/ultragoal/ledger.jsonl
@@ -84,19 +86,19 @@ gjc ultragoal status --json
 Expected state:
 - G001 complete
 - G002 complete
-- G003 active: Build point-in-time external-prior registry
-- G004-G007 pending
+- G003 complete
+- G004 active: Freeze candidate and portfolio search budgets
+- G005-G007 pending
 
 Then run:
 gjc ultragoal complete-goals
 
-If inline goal mode is inactive in the new session, create/resume the aggregate goal using the objective printed by complete-goals. Continue G003 only, checkpoint it only after verification and quality gate.
+If inline goal mode is inactive in the new session, create/resume the aggregate goal using the objective printed by complete-goals. Continue G004 only, checkpoint it only after verification and quality gate.
 ```
 
 ## Next work
 
-1. Verify G003 registry invariants: required metadata fields, source hashes/cache paths, PIT demotion, and live/paper/real flags.
-2. Run G003 focused tests/assertions and create `g003_verification_test_report.json`.
-3. Run architect and executor QA/red-team reviews for G003.
-4. Build `/tmp/g003_quality_gate.json` and checkpoint G003 complete.
-5. Continue G004–G007 under the frozen-budget/no-OOS-selection rules.
+1. Build the immutable G004 candidate/portfolio search budget manifest before any evaluation readout.
+2. Include repo state, G002 universe/source/feature hashes, G003 prior registry hash, candidate family caps, seeds, operator/window/formula inputs, threshold grids, portfolio grids, cost/turnover/MDD/gross constraints, effective-trials accounting, exclusion/quarantine rules, and no-OOS-selection policy.
+3. Verify G004 manifest invariants, run architect and executor QA/red-team reviews, build `/tmp/g004_quality_gate.json`, and checkpoint G004 complete.
+4. Continue G005–G007 under the frozen-budget/no-OOS-selection rules.
