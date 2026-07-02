@@ -1,5 +1,26 @@
 # Research Note
 
+## 2026-07-02 KST — 외부 리서치 레포 3종 흡수: 결정론 지표 5모듈 + rider sleeve 3종 (PR #38 merged)
+
+사용자 요청으로 `HokyoungJung/DeepLearning`(로컬 `/home/hoky/DeepLearning`), `D:\PythonProjects\precious_metal`, `HokyoungJung/Reference-Price` 세 레포에서 지표/알파로 이식 가능한 방법론만 추출해 재구현했다. **데이터는 일절 복사하지 않았고 백테스트도 실행하지 않았다**(data-bearing PC 몫). 이미 흡수된 부분과의 중복을 먼저 확인했다: DeepLearning 신경망 계열은 2026-06-20 artifact-only forecast bridge로, precious-metal pair z-score는 `TimeframePairZScoreReversionStrategy`(+2026-05-05 metals alpha 실패 기록)로, lead-lag은 `cross_asset_lead_lag_momentum`으로 이미 커버되어 있어 제외하고, **main 레지스트리에 전혀 없던 기법**(periodogram 주기 추출, ADF 정상성 검정, GARCH 조건부변동성, 거래대금 점유율 지수, 앙상블 결합 가중)만 선정했다.
+
+구현 (전부 순수 Python — scipy/statsmodels/numpy 불사용, 결정론):
+- `indicators/spectral_cycle.py`: precious_metal `rfft_periodogram.py`의 demean→rFFT→지배주기 추출을 **인과적으로 재설계**(trailing window + 선형 detrend + 후보주기별 직접 Fourier projection). 지배주기/진폭/최신바 위상/스펙트럼 순도(purity) 반환. 순수 톤 purity≈0.38 vs 백색잡음≈0.07 (누설 때문에 1.0이 아님 — sleeve 기본 임계 0.18~0.20은 이를 반영).
+- `indicators/stationarity.py`: precious_metal VECM 노트북의 from-scratch `python_adf_test`를 이식(가우스 소거 OLS, 상수항 ADF, 점근 임계값 1%/5%/10%) + AR(1) half-life. 원 레포 docs/08이 "정량적 pair 스크리닝 부재"를 1순위 과제로 자인한 부분의 구현.
+- `indicators/garch.py`: R fGarch 의존을 제거한 GARCH(1,1) — 분산 타게팅(`omega = s²(1−α−β)`) + (α,β) 300콤보 결정론 그리드 QMLE. 동일 입력→비트 단위 동일 파라미터.
+- `indicators/flow_share.py`: Reference-Price `amt_ratio_index` 계열 — 거래대금 점유율, dense rank, CDF 극단도 `2|Φ(z)−0.5|`, top-N 점유율 가중 합성수익률.
+- `indicators/ensemble_weights.py`: DeepLearning ensemble_strategies/metric — 역오차·softmax·prior blend 가중, disagreement CV 게이트(`std/|mean|`), deadband 방향 적중률. 향후 DL bridge 헬스게이트/시그널 컴바이너 입력용.
+- Rider sleeves 3종(kalman/cusum 선례: `_ReturnRiderBase` 상속, per-symbol single-asset, ≥30m, candidate-library 전용, tier hint 없음): `SpectralCycleRiderStrategy`(순도 게이트 + trough/crest 직후 위상 밴드 진입), `AdfGatedReversionRiderStrategy`(ADF가 unit root를 기각하고 half-life가 보유 예산 이내일 때만 log-price z-극단 fade), `GarchInnovationRiderStrategy`(전 바 σ 예측으로 표준화한 `z=r/σ`가 band_k 도달 시 continuation, trailing-quantile jump-소진 게이트로 blow-off 배제). Candidate manifest 133→145 재고정.
+
+적대적 검증(28-agent 워크플로: lookahead/수학/컨벤션/견고성 4렌즈 × finding당 skeptic 2): raw 12건 중 **7건 확정 → 전부 수정**. 주요: `(x−c)**2`의 huge-finite OverflowError(critical, `set_state` 경유 재현됨 → `d*d`로 inf→None 가드 경로 복원), `set_state`의 bare `int()` 크래시(→`_safe_non_negative_int`), spectral 튜닝 상한의 병리 비용(측정 0.85s/bar → 상한 512/128 축소 + (symbol, time_key) 메모이즈), GARCH `refit_every=1×window=8192` 조합 차단, entry metadata의 σ가 표준화에 쓴 σ와 불일치(→ `z·σ == r` 보장 + 회귀 테스트). 반박된 5건(demean 표준화, 소표본 임계값 등)은 미적용.
+
+검증·전달:
+- Full suite `2946 passed / 21 skipped`, ruff format/check clean. 신규 결정론 테스트(LCG 시드): 기지 주기/위상 복원, AR(0.5) vs random walk ADF 판별, GARCH 결정론+충격 반응, 게이트 차단 케이스(결정론 추세는 ADF 게이트가 항상 차단; 5% 유의수준의 랜덤워크 오검출 ~0.8%는 통계적 본성이라 테스트는 residual-free 추세 사용), 적대적 `set_state`, candidate wiring, manifest byte-pin.
+- CI 1차 실패: quality job **Hardcoded parameter audit** 신규 9건(전부 cadence 1800/클램프 하한/len==3 구조 상수) → 선례(4b2b8e0)대로 `--write-baseline` 갱신으로 통과. **신규 sleeve 추가 시 manifest 스냅샷 + hardcoded-param 베이스라인 2종 재고정이 필수 체크리스트.**
+- **PR #38 main 머지 완료**(merge `e0a563b`), feature 브랜치 및 머지 완료된 feat/vibe-adoption 브랜치 로컬·원격 삭제.
+
+한계/다음 단계: 이 sleeve들은 이론적 타당성 + 합성데이터 단위검증까지만 확보한 **search 입력 후보**다. real/shadow 승격 근거 아님(`0%` 유지). 다음은 data-bearing PC에서 clean walk-forward + 10/15/20bps cost stress로 후보군 평가하고, `min_purity`/`min_amplitude_frac`/`band_k`/`max_half_life_bars` 노브를 실데이터로 조정하는 것. flow_share/ensemble_weights는 아직 소비자가 없는 indicator-layer 자산이므로 factor-IC 파이프라인 또는 DL bridge 헬스게이트에 물리는 후속 작업이 자연스럽다.
+
 ## 2026-06-29 KST — BullBearRegimeRotationStrategy research sleeve
 
 최신 winner의 headline OOS는 높지만 monthly hit `4/10`이고 상승/하락 추세장을 명시적으로 나눠 먹는 sleeve가 약하다는 점을 겨냥해, 새 OHLCV-only basket strategy를 추가했다. 목적은 기존 TopCap/leaf router를 즉시 대체하는 것이 아니라, 다음 data-bearing walk-forward에서 **bull long / bear short / chop flat** 후보를 검증할 수 있게 만드는 것이다.
