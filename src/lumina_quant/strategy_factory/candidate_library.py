@@ -2702,6 +2702,14 @@ class _CandidateBuildContext:
         _build_amihud_illiquidity_momentum_rider_candidates(self)
         _build_cusum_change_point_trend_rider_candidates(self)
         _build_variance_ratio_trend_rider_candidates(self)
+        # External-source absorption riders (per-symbol single-asset, >=30m,
+        # crypto-only): the spectral dominant-cycle phase timer, the ADF
+        # stationarity-gated own-price reversion, and the GARCH standardized-
+        # innovation breakout. Signal math lives in indicators/{spectral_cycle,
+        # stationarity, garch}.py; provenance in each sleeve module docstring.
+        _build_spectral_cycle_rider_candidates(self)
+        _build_adf_gated_reversion_rider_candidates(self)
+        _build_garch_innovation_rider_candidates(self)
         _build_metals_relative_value_basket_candidates(self)
         _build_liquidation_cascade_reversion_candidates(self)
         _build_orderbook_imbalance_reversion_candidates(self)
@@ -8623,6 +8631,467 @@ def _build_variance_ratio_trend_rider_candidates(ctx: _CandidateBuildContext) ->
                         "trend",
                         "variance_ratio",
                         "random_walk_rejection",
+                        "return_rider",
+                        "trailing_stop",
+                        "pyramiding",
+                        "single_asset",
+                        "crypto",
+                    ),
+                    metadata={
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": symbol,
+                        "allow_short": bool(spec["allow_short"]),
+                        "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                    },
+                )
+
+
+# Spectral dominant-cycle phase rider: a trailing detrended periodogram picks the
+# dominant cycle (period/phase/purity) of the log closes; entries fire just after
+# the cycle trough (LONG) or crest (SHORT). Per-symbol single-asset, crypto-only,
+# >=30m. Absorbed from the precious-metal repo's rfft periodogram cycle extractor.
+_SPECTRAL_CYCLE_RIDER_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "30m": (
+        {
+            "variant": "core_ls",
+            "cycle_window": 128,
+            "min_period": 8,
+            "max_period": 48,
+            "min_purity": 0.18,
+            "entry_phase_band": 0.15,
+            "min_amplitude_frac": 0.0,
+            "trail_atr_mult": 3.0,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 96,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "core_ls",
+            "cycle_window": 128,
+            "min_period": 8,
+            "max_period": 48,
+            "min_purity": 0.18,
+            "entry_phase_band": 0.15,
+            "min_amplitude_frac": 0.0,
+            "trail_atr_mult": 3.2,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 72,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "swing_ls",
+            "cycle_window": 96,
+            "min_period": 6,
+            "max_period": 32,
+            "min_purity": 0.20,
+            "entry_phase_band": 0.15,
+            "min_amplitude_frac": 0.0,
+            "trail_atr_mult": 3.5,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 36,
+            "target_vol": 0.030,
+            "max_hold_bars": 36,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1d": (
+        {
+            "variant": "macro_ls",
+            "cycle_window": 96,
+            "min_period": 6,
+            "max_period": 32,
+            "min_purity": 0.20,
+            "entry_phase_band": 0.15,
+            "min_amplitude_frac": 0.0,
+            "trail_atr_mult": 4.0,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 30,
+            "target_vol": 0.030,
+            "max_hold_bars": 30,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+}
+
+
+def _build_spectral_cycle_rider_candidates(ctx: _CandidateBuildContext) -> None:
+    """Per-symbol spectral dominant-cycle phase rider (single-asset, OHLCV-only)."""
+    crypto_symbols = ctx.crypto_only_symbols
+    if not crypto_symbols:
+        return
+    for timeframe in ctx._present("30m", "1h", "4h", "1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _SPECTRAL_CYCLE_RIDER_SLICE.get(timeframe, ()):
+            for symbol in crypto_symbols:
+                params = {
+                    "cycle_window": int(spec["cycle_window"]),
+                    "min_period": int(spec["min_period"]),
+                    "max_period": int(spec["max_period"]),
+                    "min_purity": float(spec["min_purity"]),
+                    "entry_phase_band": float(spec["entry_phase_band"]),
+                    "min_amplitude_frac": float(spec["min_amplitude_frac"]),
+                    "trail_atr_mult": float(spec["trail_atr_mult"]),
+                    "atr_period": int(spec["atr_period"]),
+                    "max_adds": int(spec["max_adds"]),
+                    "add_step_atr": float(spec["add_step_atr"]),
+                    "vol_window": int(spec["vol_window"]),
+                    "target_vol": float(spec["target_vol"]),
+                    "max_hold_bars": int(spec["max_hold_bars"]),
+                    "allow_short": bool(spec["allow_short"]),
+                    "add_alloc_fraction": float(spec["add_alloc_fraction"]),
+                }
+                _add_candidate(
+                    ctx.candidates,
+                    name=(
+                        f"spectral_cycle_rider_{tf_tag}_{spec['variant']}_"
+                        f"{symbol.replace('/', '').lower()}"
+                    ),
+                    family="seasonality",
+                    strategy_class="SpectralCycleRiderStrategy",
+                    timeframe=timeframe,
+                    symbols=(symbol,),
+                    params=params,
+                    notes=(
+                        "Per-symbol spectral dominant-cycle phase rider: a trailing "
+                        "detrended periodogram (direct Fourier projection) picks the "
+                        "dominant cycle of the log closes; entries fire just after the "
+                        "cycle trough (LONG) / crest (SHORT), gated by spectral purity. "
+                        f"ATR trailing stop + pyramiding on {symbol} at {timeframe} "
+                        f"({spec['variant']})."
+                    ),
+                    tags=(
+                        "seasonality",
+                        "cycle",
+                        "spectral",
+                        "periodogram",
+                        "return_rider",
+                        "trailing_stop",
+                        "pyramiding",
+                        "single_asset",
+                        "crypto",
+                    ),
+                    metadata={
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": symbol,
+                        "allow_short": bool(spec["allow_short"]),
+                        "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                    },
+                )
+
+
+# ADF stationarity-gated own-price reversion rider: fades trailing log-close
+# z-score extremes ONLY while an augmented Dickey-Fuller test rejects a unit root
+# AND the AR(1) half-life fits the holding budget. Per-symbol single-asset,
+# crypto-only, >=30m. Absorbed from the precious-metal repo's from-scratch
+# cointegration toolkit (its docs flag this screen as the missing piece).
+_ADF_GATED_REVERSION_RIDER_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "30m": (
+        {
+            "variant": "core_ls",
+            "stat_window": 96,
+            "adf_lags": 1,
+            "adf_significance": "5%",
+            "zscore_entry": 1.5,
+            "max_half_life_bars": 32,
+            "trail_atr_mult": 3.0,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 96,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "core_ls",
+            "stat_window": 96,
+            "adf_lags": 1,
+            "adf_significance": "5%",
+            "zscore_entry": 1.5,
+            "max_half_life_bars": 32,
+            "trail_atr_mult": 3.2,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 72,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "swing_ls",
+            "stat_window": 72,
+            "adf_lags": 1,
+            "adf_significance": "5%",
+            "zscore_entry": 1.8,
+            "max_half_life_bars": 24,
+            "trail_atr_mult": 3.5,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 36,
+            "target_vol": 0.030,
+            "max_hold_bars": 36,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1d": (
+        {
+            "variant": "macro_ls",
+            "stat_window": 60,
+            "adf_lags": 1,
+            "adf_significance": "5%",
+            "zscore_entry": 1.8,
+            "max_half_life_bars": 20,
+            "trail_atr_mult": 4.0,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 30,
+            "target_vol": 0.030,
+            "max_hold_bars": 30,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+}
+
+
+def _build_adf_gated_reversion_rider_candidates(ctx: _CandidateBuildContext) -> None:
+    """Per-symbol ADF stationarity-gated reversion rider (single-asset, OHLCV-only)."""
+    crypto_symbols = ctx.crypto_only_symbols
+    if not crypto_symbols:
+        return
+    for timeframe in ctx._present("30m", "1h", "4h", "1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _ADF_GATED_REVERSION_RIDER_SLICE.get(timeframe, ()):
+            for symbol in crypto_symbols:
+                params = {
+                    "stat_window": int(spec["stat_window"]),
+                    "adf_lags": int(spec["adf_lags"]),
+                    "adf_significance": str(spec["adf_significance"]),
+                    "zscore_entry": float(spec["zscore_entry"]),
+                    "max_half_life_bars": int(spec["max_half_life_bars"]),
+                    "trail_atr_mult": float(spec["trail_atr_mult"]),
+                    "atr_period": int(spec["atr_period"]),
+                    "max_adds": int(spec["max_adds"]),
+                    "add_step_atr": float(spec["add_step_atr"]),
+                    "vol_window": int(spec["vol_window"]),
+                    "target_vol": float(spec["target_vol"]),
+                    "max_hold_bars": int(spec["max_hold_bars"]),
+                    "allow_short": bool(spec["allow_short"]),
+                    "add_alloc_fraction": float(spec["add_alloc_fraction"]),
+                }
+                _add_candidate(
+                    ctx.candidates,
+                    name=(
+                        f"adf_gated_reversion_rider_{tf_tag}_{spec['variant']}_"
+                        f"{symbol.replace('/', '').lower()}"
+                    ),
+                    family="mean_reversion",
+                    strategy_class="AdfGatedReversionRiderStrategy",
+                    timeframe=timeframe,
+                    symbols=(symbol,),
+                    params=params,
+                    notes=(
+                        "Per-symbol ADF-gated own-price reversion rider: fades trailing "
+                        "log-close z-score extremes ONLY while an augmented Dickey-Fuller "
+                        "test rejects a unit root and the AR(1) half-life fits the "
+                        "holding budget. ATR trailing stop + pyramiding on "
+                        f"{symbol} at {timeframe} ({spec['variant']})."
+                    ),
+                    tags=(
+                        "mean_reversion",
+                        "stationarity",
+                        "adf",
+                        "half_life",
+                        "zscore",
+                        "return_rider",
+                        "trailing_stop",
+                        "pyramiding",
+                        "single_asset",
+                        "crypto",
+                    ),
+                    metadata={
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": symbol,
+                        "allow_short": bool(spec["allow_short"]),
+                        "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                    },
+                )
+
+
+# GARCH(1,1) standardized-innovation breakout rider: rides bars whose log return
+# reaches band_k conditional sigmas (deterministic variance-targeted grid-MLE
+# GARCH forecast from the PRIOR bar), with a trailing-quantile jump-exhaustion
+# gate. Per-symbol single-asset, crypto-only, >=30m. Absorbed from the
+# precious-metal repo's ARMA-GARCH band notebook + the DeepLearning repo's
+# rolling jump detector.
+_GARCH_INNOVATION_RIDER_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "30m": (
+        {
+            "variant": "core_ls",
+            "garch_window": 192,
+            "refit_every": 24,
+            "band_k": 2.5,
+            "jump_window": 192,
+            "jump_quantile": 0.99,
+            "jump_mult": 3.0,
+            "trail_atr_mult": 3.0,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 96,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "core_ls",
+            "garch_window": 192,
+            "refit_every": 24,
+            "band_k": 2.5,
+            "jump_window": 192,
+            "jump_quantile": 0.99,
+            "jump_mult": 3.0,
+            "trail_atr_mult": 3.2,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 48,
+            "target_vol": 0.020,
+            "max_hold_bars": 72,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "swing_ls",
+            "garch_window": 144,
+            "refit_every": 12,
+            "band_k": 2.5,
+            "jump_window": 144,
+            "jump_quantile": 0.99,
+            "jump_mult": 3.0,
+            "trail_atr_mult": 3.5,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 36,
+            "target_vol": 0.030,
+            "max_hold_bars": 36,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+    "1d": (
+        {
+            "variant": "macro_ls",
+            "garch_window": 96,
+            "refit_every": 8,
+            "band_k": 2.2,
+            "jump_window": 96,
+            "jump_quantile": 0.99,
+            "jump_mult": 3.0,
+            "trail_atr_mult": 4.0,
+            "atr_period": 14,
+            "max_adds": 2,
+            "add_step_atr": 1.0,
+            "vol_window": 30,
+            "target_vol": 0.030,
+            "max_hold_bars": 30,
+            "allow_short": True,
+            "add_alloc_fraction": 0.5,
+        },
+    ),
+}
+
+
+def _build_garch_innovation_rider_candidates(ctx: _CandidateBuildContext) -> None:
+    """Per-symbol GARCH standardized-innovation rider (single-asset, OHLCV-only)."""
+    crypto_symbols = ctx.crypto_only_symbols
+    if not crypto_symbols:
+        return
+    for timeframe in ctx._present("30m", "1h", "4h", "1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _GARCH_INNOVATION_RIDER_SLICE.get(timeframe, ()):
+            for symbol in crypto_symbols:
+                params = {
+                    "garch_window": int(spec["garch_window"]),
+                    "refit_every": int(spec["refit_every"]),
+                    "band_k": float(spec["band_k"]),
+                    "jump_window": int(spec["jump_window"]),
+                    "jump_quantile": float(spec["jump_quantile"]),
+                    "jump_mult": float(spec["jump_mult"]),
+                    "trail_atr_mult": float(spec["trail_atr_mult"]),
+                    "atr_period": int(spec["atr_period"]),
+                    "max_adds": int(spec["max_adds"]),
+                    "add_step_atr": float(spec["add_step_atr"]),
+                    "vol_window": int(spec["vol_window"]),
+                    "target_vol": float(spec["target_vol"]),
+                    "max_hold_bars": int(spec["max_hold_bars"]),
+                    "allow_short": bool(spec["allow_short"]),
+                    "add_alloc_fraction": float(spec["add_alloc_fraction"]),
+                }
+                _add_candidate(
+                    ctx.candidates,
+                    name=(
+                        f"garch_innovation_rider_{tf_tag}_{spec['variant']}_"
+                        f"{symbol.replace('/', '').lower()}"
+                    ),
+                    family="breakout",
+                    strategy_class="GarchInnovationRiderStrategy",
+                    timeframe=timeframe,
+                    symbols=(symbol,),
+                    params=params,
+                    notes=(
+                        "Per-symbol GARCH(1,1) standardized-innovation breakout rider: "
+                        "rides bars whose log return reaches band_k conditional sigmas "
+                        "(deterministic variance-targeted grid-MLE forecast from the "
+                        "PRIOR bar), skipping blow-off prints beyond the trailing-"
+                        "quantile jump gate. ATR trailing stop + pyramiding on "
+                        f"{symbol} at {timeframe} ({spec['variant']})."
+                    ),
+                    tags=(
+                        "breakout",
+                        "garch",
+                        "conditional_volatility",
+                        "volatility",
+                        "jump_filter",
                         "return_rider",
                         "trailing_stop",
                         "pyramiding",
