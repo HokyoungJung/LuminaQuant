@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-06-21T13:14:28.647021+00:00",
+  "generated_at_utc": "2026-07-02T11:14:44.971061+00:00",
   "literal_paths": [
     "src/lumina_quant/strategies",
     "lumina_quant/strategies"
@@ -632,6 +632,10 @@
     "literal:src/lumina_quant/strategies/external_alpha_sleeves.py:917:29:0.1",
     "literal:src/lumina_quant/strategies/external_alpha_sleeves.py:917:38:3.0",
     "literal:src/lumina_quant/strategies/external_alpha_sleeves.py:931:31:60",
+    "literal:src/lumina_quant/strategies/garch_innovation_alpha_sleeves.py:145:32:48",
+    "literal:src/lumina_quant/strategies/garch_innovation_alpha_sleeves.py:150:29:0.1",
+    "literal:src/lumina_quant/strategies/garch_innovation_alpha_sleeves.py:301:76:3",
+    "literal:src/lumina_quant/strategies/garch_innovation_alpha_sleeves.py:85:31:1800",
     "literal:src/lumina_quant/strategies/hourly_shock_reversion.py:217:58:5",
     "literal:src/lumina_quant/strategies/hourly_shock_reversion.py:250:28:23",
     "literal:src/lumina_quant/strategies/hourly_shock_reversion.py:270:25:100_000_000_000",
@@ -771,6 +775,11 @@
     "literal:src/lumina_quant/strategies/selection_aware_alpha_sleeves.py:522:31:3600",
     "literal:src/lumina_quant/strategies/selection_aware_alpha_sleeves.py:585:32:0.01",
     "literal:src/lumina_quant/strategies/session_filtered_pair_carry.py:75:28:23",
+    "literal:src/lumina_quant/strategies/spectral_cycle_alpha_sleeves.py:123:36:0.01",
+    "literal:src/lumina_quant/strategies/spectral_cycle_alpha_sleeves.py:73:31:1800",
+    "literal:src/lumina_quant/strategies/stationarity_reversion_alpha_sleeves.py:119:31:24",
+    "literal:src/lumina_quant/strategies/stationarity_reversion_alpha_sleeves.py:123:32:0.1",
+    "literal:src/lumina_quant/strategies/stationarity_reversion_alpha_sleeves.py:79:31:1800",
     "literal:src/lumina_quant/strategies/taker_flow_exhaustion_reversal.py:232:28:23",
     "literal:src/lumina_quant/strategies/taker_flow_exhaustion_reversal.py:245:25:100_000_000_000",
     "literal:src/lumina_quant/strategies/taker_flow_exhaustion_reversal.py:246:22:1000.0",
