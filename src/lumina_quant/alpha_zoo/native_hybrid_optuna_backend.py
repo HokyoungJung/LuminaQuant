@@ -5,6 +5,7 @@ Phase 2: pyo3 migration — lumina_quant._compute (pyo3).
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any
 
@@ -24,6 +25,18 @@ _VALID_BACKENDS = {
 # ── pyo3 binding ──────────────────────────────────────────────────────────────
 _PYO3_FN: Any = None
 _PYO3_LOAD_ERROR: str = ""
+
+_logger = logging.getLogger(__name__)
+_warned_once: set[str] = set()
+
+
+def _warn_once(key: str, message: str) -> None:
+    """Loud one-time warning for silent-fallback paths (2026-07-03 audit fix)."""
+    if key in _warned_once:
+        return
+    _warned_once.add(key)
+    _logger.warning(message)
+
 
 try:
     from lumina_quant._compute import (  # type: ignore[attr-defined]
@@ -95,6 +108,13 @@ def evaluate_hybrid_portfolio_native(
     if _PYO3_FN is None:
         if mode == HYBRID_OPTUNA_BACKEND_RUST:
             raise RuntimeError("Rust hybrid Optuna backend requested but unavailable")
+        _warn_once(
+            "pyo3_missing",
+            "Native hybrid-Optuna kernel unavailable "
+            f"({_PYO3_LOAD_ERROR or 'lumina_compute not importable'}); "
+            "falling back to the MUCH slower Python path. Build "
+            "native/lumina_compute to restore the accelerated kernel.",
+        )
         return None
 
     arr = np.asarray(returns, dtype=np.float64)
@@ -132,9 +152,15 @@ def evaluate_hybrid_portfolio_native(
             )
         )
         return portfolio, exposed_weights, raw_weights, default_idx_out, high_vol_feature, exposure
-    except Exception:
+    except Exception as exc:
         if mode == HYBRID_OPTUNA_BACKEND_RUST:
             raise
+        _warn_once(
+            "pyo3_call_failed",
+            f"Native hybrid-Optuna kernel call failed ({exc!r}); "
+            "falling back to the Python path for this and subsequent calls "
+            "in this process.",
+        )
         return None
 
 

@@ -149,10 +149,12 @@ def _arm_numpy_batched(factors: np.ndarray, fwd: np.ndarray, n_ts: int, n_sym: i
 def _try_rust_arm():
     """Return a native kernel if wired, else ``None`` (documents the seam)."""
     try:  # pragma: no cover - no native kernel exists yet.
-        from lumina_quant.native import lumina_compute  # type: ignore
+        # 2026-07-03 audit fix: the old import path (lumina_quant.native.lumina_compute)
+        # never existed — the pyo3 module ships as lumina_quant._compute.
+        from lumina_quant import _compute  # type: ignore
 
-        if hasattr(lumina_compute, "batch_factor_ic"):
-            return lumina_compute.batch_factor_ic
+        if hasattr(_compute, "batch_factor_ic"):
+            return _compute.batch_factor_ic
     except Exception:
         return None
     return None
