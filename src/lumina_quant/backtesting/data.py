@@ -3,14 +3,141 @@ import os
 from abc import ABC, abstractmethod
 from bisect import bisect_left
 from collections import deque
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from itertools import islice
 from typing import Any
+
+import numpy as np
+import polars as pl
 
 from lumina_quant.compute.ohlcv_loader import OHLCVFrameLoader
 from lumina_quant.core.events import MarketBatchEvent, MarketEvent
 from lumina_quant.data.feature_points import FeaturePointLookup
 from lumina_quant.market_data import resolve_symbol_csv_path
+
+_EPOCH_ORIGIN = datetime(1970, 1, 1)
+_EPOCH_UNIT_TO_TIMEDELTA_KWARG = {"us": "microseconds", "ms": "milliseconds"}
+
+
+class _EpochTimestamps:
+    """Epoch-encoded datetime column, materializing `datetime.datetime` lazily.
+
+    Only constructed once `_try_encode_timestamps` has proven, row by row,
+    that reconstructing from the encoded int64 epoch reproduces the exact
+    original ``datetime.datetime`` values -- so this is never used unless it
+    is behaviorally indistinguishable from keeping the original objects.
+    """
+
+    __slots__ = ("_epoch", "_timedelta_kwarg")
+
+    def __init__(self, epoch: np.ndarray, timedelta_kwarg: str) -> None:
+        self._epoch = epoch
+        self._timedelta_kwarg = timedelta_kwarg
+
+    def __len__(self) -> int:
+        return len(self._epoch)
+
+    def __getitem__(self, idx):
+        return _EPOCH_ORIGIN + timedelta(**{self._timedelta_kwarg: int(self._epoch[idx])})
+
+
+def _try_encode_timestamps(series: pl.Series, materialized: list[Any]) -> _EpochTimestamps | None:
+    """Return a compact epoch-backed timestamp column, or None if unsafe.
+
+    Requires a tz-naive `Datetime` dtype at "us"/"ms" precision (the only
+    units representable exactly via `timedelta`), and then proves the
+    encoding lossless by reconstructing every value and comparing it against
+    the values Polars itself already materialized. Any dtype/precision this
+    can't prove identical for (tz-aware, `Date`-only, "ns" precision, etc.)
+    returns None so the caller falls back to keeping the plain object list.
+    """
+    dtype = series.dtype
+    if not isinstance(dtype, pl.Datetime) or dtype.time_zone is not None:
+        return None
+    timedelta_kwarg = _EPOCH_UNIT_TO_TIMEDELTA_KWARG.get(dtype.time_unit)
+    if timedelta_kwarg is None:
+        return None
+    try:
+        epoch = series.dt.epoch(time_unit=dtype.time_unit).to_numpy().astype(np.int64, copy=False)
+    except Exception:
+        return None
+
+    candidate = _EpochTimestamps(epoch, timedelta_kwarg)
+    try:
+        for i, original in enumerate(materialized):
+            if candidate[i] != original:
+                return None
+    except OverflowError, ValueError:
+        return None
+    return candidate
+
+
+class _ColumnarBarRows:
+    """Columnar OHLCV row storage with lazy per-row tuple materialization.
+
+    A per-symbol history used to be kept as one Python tuple per row
+    (``(datetime, open, high, low, close, volume)``), which boxes five
+    Python floats per row on top of the tuple's own overhead. This stores
+    the five numeric fields as a single packed float64 numpy array, and the
+    datetime/timestamp column as either a compact epoch-encoded column (when
+    proven lossless -- see `_try_encode_timestamps`) or a plain Python list
+    preserving the exact original objects. `__getitem__`/`__iter__`
+    reconstruct the original row tuple on demand so every existing consumer
+    of `symbol_rows[s]` (indexing, `len()`, iteration) keeps working
+    unmodified.
+    """
+
+    __slots__ = ("_numeric", "_timestamps")
+
+    def __init__(self, timestamps: list[Any] | _EpochTimestamps, numeric: np.ndarray) -> None:
+        self._timestamps = timestamps
+        self._numeric = numeric
+
+    @classmethod
+    def from_frame(cls, df: Any) -> _ColumnarBarRows:
+        """Build columnar storage from a normalized OHLCV Polars frame.
+
+        Column order follows `col_idx`: datetime, open, high, low, close, volume.
+        """
+        n = df.height
+        numeric = np.empty((n, 5), dtype=np.float64)
+        numeric[:, 0] = df["open"].to_numpy()
+        numeric[:, 1] = df["high"].to_numpy()
+        numeric[:, 2] = df["low"].to_numpy()
+        numeric[:, 3] = df["close"].to_numpy()
+        numeric[:, 4] = df["volume"].to_numpy()
+
+        materialized = df["datetime"].to_list()
+        timestamps = _try_encode_timestamps(df["datetime"], materialized)
+        return cls(timestamps if timestamps is not None else materialized, numeric)
+
+    def __len__(self) -> int:
+        return len(self._timestamps)
+
+    def __bool__(self) -> bool:
+        return len(self._timestamps) > 0
+
+    def __getitem__(self, idx):
+        if isinstance(idx, slice):
+            return tuple(self[i] for i in range(*idx.indices(len(self._timestamps))))
+        n = len(self._timestamps)
+        if idx < 0:
+            idx += n
+        if idx < 0 or idx >= n:
+            raise IndexError("row index out of range")
+        row = self._numeric[idx]
+        return (
+            self._timestamps[idx],
+            float(row[0]),
+            float(row[1]),
+            float(row[2]),
+            float(row[3]),
+            float(row[4]),
+        )
+
+    def __iter__(self):
+        for i in range(len(self._timestamps)):
+            yield self[i]
 
 
 class DataHandler(ABC):
@@ -72,7 +199,10 @@ class HistoricCSVDataHandler(DataHandler):
             end_date=end_date,
         )
 
-        self.symbol_rows: dict[str, tuple[tuple[Any, ...], ...]] = {}
+        # Value is `_ColumnarBarRows` for CSV/parquet-loaded symbols, or the raw
+        # prefrozen tuple-of-tuples when a caller supplies pre-materialized rows
+        # (identity of that tuple is preserved -- see test_data_handler_prefrozen).
+        self.symbol_rows: dict[str, Any] = {}
         self.symbol_timestamps_ms: dict[str, list[int]] = {}
         self.symbol_index: dict[str, int] = {}
         self.next_bar: dict[str, tuple[Any, ...]] = {}
@@ -173,7 +303,7 @@ class HistoricCSVDataHandler(DataHandler):
                             )
                             self.finished_symbols.add(s)
                             continue
-                        rows = tuple(df.iter_rows(named=False))
+                        rows = _ColumnarBarRows.from_frame(df)
                 else:
                     if self._strict_data_dict:
                         # When explicit in-memory data_dict is supplied (chunked DB mode),
@@ -193,7 +323,7 @@ class HistoricCSVDataHandler(DataHandler):
                         )
                         self.finished_symbols.add(s)
                         continue
-                    rows = tuple(df.iter_rows(named=False))
+                    rows = _ColumnarBarRows.from_frame(df)
 
                 if not rows:
                     self.finished_symbols.add(s)
