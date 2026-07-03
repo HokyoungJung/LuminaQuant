@@ -224,3 +224,19 @@ full adoption of the numpy_batched factor-IC arm into reduce_factor_ic (needs it
 parity campaign); .so build-hash handshake; RUST_NATIVE_ACCELERATION.md refresh; the
 UNVERIFIED findings above (TimeframeGated live parity, stop/liquidation liquidity-cap
 bypass, unconsumed config gates) need one verification pass before any code change.
+
+## Backlog completion (2026-07-03, second pass)
+
+| Item | Outcome | Commit |
+|---|---|---|
+| Unverified A (cadence parity) | CONFIRMED, narrowed: divergence only on the opt-in LEGACY handler path (15x cadence gap reproduced); windowed+live gate identically. Loud warning added at the legacy wrap. | da4ab7c |
+| Unverified B (conditional-fill liquidity cap) | CONFIRMED: stop/tp/trail fills bypassed the cap (slippage was applied); liquidation bypasses compute_fill entirely. Gated `execution.apply_liquidity_cap_to_conditional_fills` (default OFF, cost-realistic ON) caps + chases remainder as MKT. Liquidation realism deferred (multi-bar-carry design). | da4ab7c |
+| Unverified C (dead config gates) | CONFIRMED DEAD x4 (alpha_search / sharpe_ci / qlib158_formula / tradfi_external_fetch parsed but consumed nowhere). Wiring is a design decision per block — recorded as follow-ups, not mechanically wired. | — |
+| Rust .so handshake + docs | build_info() handshake (crate 0.1.1, warn-only) wired into all six native load sites; RUST_NATIVE_ACCELERATION.md (+Korean mirror) rewritten and fact-checked. .so rebuilt, parity green. | a1bd19f |
+| Columnar bar storage | 6.2-6.8x memory cut (272->40 B/row; 155->25 MB VmRSS @500k rows), tuples bit-identical, prefrozen identity contract untouched. | 795e638 |
+| Batched factor-IC adoption | Default reduction now vectorized; legacy loop pinned bit-identical by a 57-case parity suite (grouped equal-length pairwise sums; cumsum scan for turnover). 8.45x at the bench shape. | bb1471d |
+
+Remaining follow-ups (design decisions, not mechanical): wire the four dead config
+gates to real entrypoints (C1 alpha_search CLI defaults, C2 sharpe_ci emission,
+C3 qlib158 factor wiring, C4 tradfi fetch has no runner yet); liquidation-fill
+liquidity realism (multi-bar carry).
