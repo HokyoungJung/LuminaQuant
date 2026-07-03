@@ -105,6 +105,9 @@ execution:
   # enforce_reduce_only: true => reduce-only fills clamp to live-exchange semantics
   # (never flip through zero) — 2026-07-03 audit fix #2.
   enforce_reduce_only: true
+  # conditional (stop/tp/trail) fills respect the bar-volume liquidity cap; the
+  # excess chases as a MKT remainder (2026-07-03 audit finding B).
+  apply_liquidity_cap_to_conditional_fills: true
   compute_backend: "auto" # auto|cpu|gpu|forced-gpu
   gpu_mode: "auto" # auto|cpu|gpu|forced-gpu
   gpu_vram_gb: 8.0

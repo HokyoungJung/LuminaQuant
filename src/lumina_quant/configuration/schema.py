@@ -132,6 +132,13 @@ class ExecutionConfig:
     #     book into a phantom opposite position.  Default False preserves legacy
     #     numerics (2026-07-03 audit fix #2).
     enforce_reduce_only: bool = False
+    #   apply_liquidity_cap_to_conditional_fills: when True, triggered STOP /
+    #     TAKE_PROFIT / TRAIL_STOP fills respect the max_bar_volume_ratio liquidity
+    #     cap like MKT/LMT fills do (excess quantity chases as a MKT remainder on
+    #     later bars). Stops fire on exactly the bars where liquidity is worst, so
+    #     the legacy uncapped fill flatters tail risk. Default False preserves
+    #     legacy numerics (2026-07-03 audit finding B).
+    apply_liquidity_cap_to_conditional_fills: bool = False
 
 
 @dataclass(slots=True)

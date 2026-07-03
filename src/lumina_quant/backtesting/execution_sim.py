@@ -48,6 +48,13 @@ class SimulatedExecutionHandler(ExecutionHandler):
         self.bars = bars
         self.config = config
         self._order_seq = 0
+        # 2026-07-03 audit finding B (config-gated, default OFF = legacy): apply
+        # the bar-volume liquidity cap to triggered conditional fills too.
+        self._conditional_liquidity_cap = self._execution_flag(
+            config,
+            "APPLY_LIQUIDITY_CAP_TO_CONDITIONAL_FILLS",
+            "apply_liquidity_cap_to_conditional_fills",
+        )
 
         # Phase 4 unified cost model — replaces FillModel + LiquidityModel for fills.
         # BacktestConfigView carries ._rt (RuntimeConfig); production path uses from_runtime.
@@ -333,6 +340,18 @@ class SimulatedExecutionHandler(ExecutionHandler):
                     }
                 )
 
+    @staticmethod
+    def _execution_flag(config: Any, upper_attr: str, runtime_field: str) -> bool:
+        """Resolve an execution flag from UPPERCASE attr or RuntimeConfig dotpath."""
+        value = getattr(config, upper_attr, None)
+        if value is not None:
+            return bool(value)
+        runtime = getattr(config, "_rt", None)
+        execution = getattr(runtime, "execution", None) if runtime is not None else None
+        if execution is not None:
+            return bool(getattr(execution, runtime_field, False))
+        return False
+
     def check_open_orders(self, event: Any) -> None:
         """Check active orders against the new MarketEvent.
         Handles MKT (Next Open), LMT (strict-cross), STOP/TP, TRAIL_STOP.
@@ -527,7 +546,9 @@ class SimulatedExecutionHandler(ExecutionHandler):
                     fill_price = _fill_result.fill_price
                     comm = _fill_result.commission
                 else:
-                    # STOP, TAKE_PROFIT, TRAIL_STOP — no liquidity cap; aggressive fill.
+                    # STOP, TAKE_PROFIT, TRAIL_STOP — legacy: no liquidity cap
+                    # (aggressive fill). With apply_liquidity_cap_to_conditional_fills
+                    # the cap applies and the excess chases as a MKT remainder.
                     _cond_qty = float(order["quantity"])
                     cond_result = self.execution_model.compute_fill(
                         raw_price=float(exec_price),
@@ -536,11 +557,35 @@ class SimulatedExecutionHandler(ExecutionHandler):
                         bar_volume=float(bar_volume),
                         volatility=float(volatility),
                         is_maker=False,
-                        apply_liquidity_cap=False,
+                        apply_liquidity_cap=self._conditional_liquidity_cap,
                         order_notional=_cond_qty * float(exec_price),
                     )
                     fill_price = cond_result.fill_price
                     comm = cond_result.commission
+                    if self._conditional_liquidity_cap and cond_result.unfilled_qty > 0.0:
+                        if not _env_flag("LQ_BACKTEST_SUPPRESS_PARTIAL_FILL_LOGS", False):
+                            print(
+                                f"[Realism] Partial Conditional Fill: Req {_cond_qty} > "
+                                f"Limit {cond_result.executed_qty:.4f}. Filling "
+                                f"{cond_result.executed_qty} and chasing remainder as MKT."
+                            )
+                        remainder_orders.append(
+                            {
+                                "order_id": f"{order['order_id']}-R",
+                                "symbol": order["symbol"],
+                                "type": "MKT",
+                                "quantity": cond_result.unfilled_qty,
+                                "direction": order["direction"],
+                                "status": "PENDING",
+                                "position_side": order.get("position_side"),
+                                "reduce_only": order.get("reduce_only", False),
+                                "client_order_id": order.get("client_order_id"),
+                                "stop_loss": None,
+                                "take_profit": None,
+                                "trailing_percent": None,
+                            }
+                        )
+                        order["quantity"] = cond_result.executed_qty
 
                 fill_event = FillEvent(
                     timeindex=event.time,

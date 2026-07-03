@@ -272,6 +272,18 @@ class Backtest(TradingEngine):
         except Exception:
             pass
         if self.strategy_timeframe != "1s":
+            # 2026-07-03 audit finding A: this wrapper exists ONLY on the legacy
+            # (non-windowed) path. Live and windowed backtests gate signal cadence
+            # by decision_cadence_seconds instead, so a non-self-gating strategy
+            # sees a DIFFERENT signal cadence here than it would live. Warn loudly
+            # so legacy runs are never mistaken for live-parity evidence.
+            logging.getLogger(__name__).warning(
+                "Legacy backtest path wraps %s in TimeframeGatedStrategy(%s); the "
+                "windowed/live paths gate by decision_cadence_seconds only — signal "
+                "cadence may diverge from live for non-self-gating strategies.",
+                type(self.strategy).__name__,
+                self.strategy_timeframe,
+            )
             self.strategy = TimeframeGatedStrategy(self.strategy, self.strategy_timeframe)
         try:
             self.portfolio = self.portfolio_cls(
