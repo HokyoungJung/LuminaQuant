@@ -4,6 +4,7 @@ import queue
 import threading
 import time
 from copy import deepcopy
+from datetime import UTC, datetime
 from types import SimpleNamespace
 
 from lumina_quant.backtesting.cli_contract import RawFirstDataMissingError
@@ -1314,6 +1315,25 @@ class LiveTrader(TradingEngine):
                             total_equity += qty * last_price
 
                 self.portfolio.current_holdings["total"] = total_equity
+
+                # 3b. Re-baseline the daily-loss / intraday-drawdown guards
+                # (2026-07-03 audit fix #3c): until this sync, day_start_equity
+                # was the CONFIG initial capital (or a value persisted by a
+                # PREVIOUS session), so RiskManager measured "today's loss"
+                # against stale capital — firing far too early or far too late.
+                # Keep a persisted baseline only when it belongs to TODAY.
+                try:
+                    today = datetime.now(UTC).date()
+                except Exception:
+                    today = None
+                restored_day = getattr(self.portfolio, "_current_day", None)
+                if total_equity > 0 and (today is None or restored_day != today):
+                    self.logger.info(
+                        "Re-baselining day_start_equity from %s to synced equity %s",
+                        getattr(self.portfolio, "day_start_equity", None),
+                        total_equity,
+                    )
+                    self.portfolio.day_start_equity = float(total_equity)
 
                 # 4. Reconcile Strategy State with Portfolio State
                 if hasattr(self.strategy, "bought"):
