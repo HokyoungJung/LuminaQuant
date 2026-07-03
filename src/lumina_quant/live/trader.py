@@ -184,6 +184,7 @@ def _build_live_config_namespace(rt, *, symbols) -> SimpleNamespace:
         MAX_BBO_AGE_SECONDS=float(lv.max_bbo_age_seconds),
         HEARTBEAT_INTERVAL_SEC=int(lv.heartbeat_interval_sec),
         RECONCILIATION_INTERVAL_SEC=int(lv.reconciliation_interval_sec),
+        RECONCILIATION_DRIFT_POLICY=str(lv.reconciliation_drift_policy),
         EXCHANGE={
             "driver": str(ex.driver),
             "name": str(ex.name),
@@ -1047,8 +1048,44 @@ class LiveTrader(TradingEngine):
             self.notifier.send_message(
                 f"⚠️ **Reconciliation Drift** detected for {len(drift)} symbol(s)."
             )
+            self._apply_drift_policy(drift)
         if not drift:
             self._last_drift_signature = ()
+
+    def _apply_drift_policy(self, drift):
+        """Act on a detected local-vs-exchange position drift (audit fix #3e).
+
+        The exchange is the source of truth for what is actually at risk — the
+        startup _sync_portfolio already adopts exchange positions; this applies
+        the same semantic continuously when configured.
+        """
+        policy = (
+            str(getattr(self.config, "RECONCILIATION_DRIFT_POLICY", "alert") or "alert")
+            .strip()
+            .lower()
+        )
+        if policy == "adopt_exchange":
+            with self.portfolio_lock:
+                for item in drift:
+                    self.portfolio.current_positions[item["symbol"]] = float(item["exchange_qty"])
+            self.audit_store.log_risk_event(
+                self.run_id,
+                reason="RECONCILIATION_DRIFT_ADOPTED",
+                details={"drift": drift},
+            )
+            self.notifier.send_message(
+                f"🔁 **Drift adopted from exchange** for {len(drift)} symbol(s)."
+            )
+            return
+        if policy == "freeze":
+            if not getattr(self.portfolio, "trading_frozen", False):
+                self._set_trade_freeze(
+                    enabled=True,
+                    reason="reconciliation_drift",
+                    details={"drift": drift},
+                )
+            return
+        # "alert" (default): detection/audit/notification already happened.
 
     def _reconcile_orders(self, force=False):
         now_mono = time.monotonic()

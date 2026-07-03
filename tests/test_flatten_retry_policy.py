@@ -131,3 +131,59 @@ class TestMarketEscalationGuard(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestDriftPolicy(unittest.TestCase):
+    """Reconciliation drift policy (2026-07-03 audit fix #3e)."""
+
+    def _state(self, policy):
+        import threading
+
+        events = []
+
+        class Audit:
+            @staticmethod
+            def log_risk_event(run_id, *, reason, details=None):
+                events.append((reason, details))
+
+        class Notifier:
+            messages = []
+
+            @classmethod
+            def send_message(cls, msg):
+                cls.messages.append(msg)
+
+        state = SimpleNamespace(
+            config=SimpleNamespace(RECONCILIATION_DRIFT_POLICY=policy),
+            portfolio=SimpleNamespace(current_positions={"BTC/USDT": 1.0}, trading_frozen=False),
+            portfolio_lock=threading.Lock(),
+            audit_store=Audit(),
+            notifier=Notifier(),
+            run_id="t",
+            _freeze_calls=[],
+        )
+        state._set_trade_freeze = lambda **kw: state._freeze_calls.append(kw)
+        return state, events
+
+    def _drift(self):
+        return [{"symbol": "BTC/USDT", "local_qty": 1.0, "exchange_qty": 0.25, "delta": -0.75}]
+
+    def test_alert_policy_is_noop(self):
+        state, events = self._state("alert")
+        LiveTrader._apply_drift_policy(state, self._drift())
+        self.assertEqual(state.portfolio.current_positions["BTC/USDT"], 1.0)
+        self.assertEqual(events, [])
+        self.assertEqual(state._freeze_calls, [])
+
+    def test_adopt_exchange_corrects_local_positions(self):
+        state, events = self._state("adopt_exchange")
+        LiveTrader._apply_drift_policy(state, self._drift())
+        self.assertEqual(state.portfolio.current_positions["BTC/USDT"], 0.25)
+        self.assertEqual(events[0][0], "RECONCILIATION_DRIFT_ADOPTED")
+
+    def test_freeze_policy_freezes_new_entries(self):
+        state, _events = self._state("freeze")
+        LiveTrader._apply_drift_policy(state, self._drift())
+        self.assertEqual(state.portfolio.current_positions["BTC/USDT"], 1.0)
+        self.assertEqual(len(state._freeze_calls), 1)
+        self.assertTrue(state._freeze_calls[0]["enabled"])

@@ -293,6 +293,14 @@ class LiveRuntimeConfig:
     order_timeout: int = 10
     heartbeat_interval_sec: int = 30
     reconciliation_interval_sec: int = 30
+    #   reconciliation_drift_policy: what to DO when local vs exchange positions
+    #     drift (2026-07-03 audit fix #3e — detection used to only alert once per
+    #     drift signature and never correct anything):
+    #       "alert" (default, legacy) — audit + notify only;
+    #       "adopt_exchange"          — adopt the exchange quantities as local truth
+    #                                   (same semantic as the startup _sync_portfolio);
+    #       "freeze"                  — alert AND freeze new entries until resolved.
+    reconciliation_drift_policy: str = "alert"
     # Audit-hardening (fix/audit-hardening): reject limit orders validated against a
     # cached best-bid/offer older than this many seconds (fail-closed during websocket
     # stalls / dislocations).  Live-only — no backtest impact.  0.0 => disabled (legacy).
