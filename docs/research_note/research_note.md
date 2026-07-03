@@ -1,6 +1,27 @@
 # Research Note
 
-## 2026-07-02 KST — 외부 리서치 레포 3종 흡수: 결정론 지표 5모듈 + rider sleeve 3종 (PR #38 merged)
+## 2026-07-03 KST — Alpha-hunt 메타-스파인 배치: disagreement 앙상블 + 오프라인 품질-게이트 할당기 + flow-share 로테이션 (+확인형 레짐 라우터) — data-PC 핸드오프
+
+"현 전략 세트를 이길 알파" 요청에 대한 ralplan 컨센서스(Planner→Architect→Critic 2라운드, APPROVE) 실행 결과. 핵심 결정: **단일 leaf 알파는 locked-OOS에서 반복 붕괴해 왔으므로(2026-06-08 -8.77%, deep-research leaf 비용열화 등) 스파인은 결합(meta)+할당(allocation)이고, 신규 leaf는 정확히 1개만** — 77개 live_default 슬리브 대비 직교성이 이 PC에서는 측정 불가하므로, 2번째 leaf부터는 data-PC의 한계 orthogonal factor_ic 게이트 뒤로 이연(N4 stationarity residual reversion 등). 백테스트/데이터 다운로드 없음, 실배분 0% 유지.
+
+구현(5 커밋: `02694c8`/`d12a8b2`/`cacf12d`/`ad01d7c`/`14030b0`):
+- **M1 `DisagreementGatedEnsembleStrategy`** (family=trend, per-symbol single-asset): 4개 인과 OHLCV 컴포넌트(EMA-slope TSMOM, rolling-z 리버전, Donchian 위치, 효율비-부호 추세)를 직전 바 예측 vs 실현수익으로 채점(`direction_hit_rate`)→`inverse_error_weights` 적응 가중, **`disagreement_coefficient`(CV) 게이트가 컴포넌트 불일치 시 진입 자체를 차단**(합의 시에만 ±entry_band 진입, 이후 ATR 트레일링 라이드). `ensemble_weights` 모듈 첫 전략 소비자. 이론: Bates-Granger 1969, Timmermann 2006, Krogh-Vedelsby 1995.
+- **M2 오프라인 품질-게이트 슬리브 할당기** (`portfolio/quality_gated_allocation.py` + `scripts/research/build_quality_gated_allocation.py`, **live 표면 없음**): 슬리브별 정적 품질점수(20bps `CostRegime`으로 `apply_cost_drag`→net Sharpe/Calmar via `optimizer_core.metrics`, hit-rate 자체계산)→net_sharpe≤0 탈락→ERC/HRP 가중→`ArtifactPortfolioModeStrategy`가 fail-close 없이 수용하는 **provenance-완전 manifest** 방출. 실소비자 왕복 happy-path + **fail-closed 사유 14종 파라미터라이즈** + byte-golden(sha256 `27438660…`) 테스트. 이론: Maillard-Roncalli-Teïletche 2010 ERC, López de Prado 2016 HRP.
+- **N1 `CrossSectionalFlowShareRotationStrategy`** (family=cross_sectional 바스켓, `flow_share` 모듈 첫 소비자): 심볼별 달러볼륨의 유니버스 점유율→롤링 share-z + `cdf_extremeness`; 점유율 상승+수익 확인 롱 / 점유율 붕괴·블로우오프(극단 점유율+음수 수익) 숏; |z| 상위 n, 역변동성 사이징. **정직 어드미션**: carry 태그 미부착→기본 숏리스트에서 의도적으로 제외되며, 평가는 `select_diversified_shortlist(..., allow_multi_asset=True)`로만(테스트가 양쪽 모두 고정). 이론: Gervais-Kaniel-Mingelgrin 2001, Barber-Odean 2008, Amihud 2002.
+- **I2 `RegimeRouterConfirmedRotationStrategy`** (family=cross_sectional, BullBear 부모와 동일 어드미션): 부모의 breadth+BTC 기반 투표에 **GARCH 조건부변동성 확인**(상승 vol만 bear 확정; GARCH 불가 시 spectral phase 폴백)과 3-상태 스티키 히스테리시스를 추가. **비중복 게이트 통과**: 동일 chop 픽스처에서 부모는 bear-short 진입(기반 투표 충족을 별도 단언), I2는 확인 불충족으로 CHOP 유지 — 진짜 하락+상승 변동성에서는 정상 진입(게이트 생존 증명).
+- **라이브 안전(이번 배치의 인프라 기여)**: 저작 단계는 `@register` 미적용(미등록 모듈은 레지스트리에 완전 비활성임을 검증), 통합 커밋에서 등록+`research_only` 힌트를 **원자적으로** 적용. 신설 `tests/test_strategy_tier_guard.py`가 하드 게이트: 등록된 모든 클래스는 힌트/레거시맵/**동결 68종 legacy 스냅샷**(append 금지) 중 하나여야 하며, 힌트 누락 시 CI 실패(멤버십 단언 — tier 값으로는 누락 힌트를 구별 불가). manifest 스냅샷 145→149, hardcoded-param 베이스라인 1004 시그니처 재고정.
+
+검증: 독립 verifier PASS — full suite **3010 passed / 21 skipped**, ruff 클린, 3클래스 research_only+live 세트 제외 확인, 가드 실효성(힌트 1개 제거 시뮬레이션→정확히 그 클래스 검출), M1/I2 인과성 스팟체크(직전 바 점수를 당 바 실현수익으로 채점; GARCH 예측은 t−1까지의 수익만 사용), golden 안전(additive-only diff 확인).
+
+### Data-PC 핸드오프 — 승격 결정규칙 (verbatim)
+평가 대상: `DisagreementGatedEnsembleStrategy`(disagreement_ensemble_* 후보 28개@7심볼), `CrossSectionalFlowShareRotationStrategy`(flow_share_rotation_* 8개, **allow_multi_asset=True 필수**), `RegimeRouterConfirmedRotationStrategy`(regime_router_confirmed_* 4개), M2 할당기는 슬리브 수익스트림 확보 후 manifest 생성 경로로 평가. Clean-WF 규칙: train/validation-only 선택, locked-OOS report-only monthly WF, `no_nested_oos_mining=true`, 10/15/20/30bps 비용 그리드.
+- (a) 20bps 기준비용에서 신규 결합 북의 net-of-cost DSR-조정 Sharpe/IR > 현 default 세트 — **동일 WF 윈도·동일 비용모델**로 비교.
+- (b) 30bps에서 default 세트 미만으로 열화 없음.
+- (c) `evaluate_survivorship_gate`/`effective_number_of_trials` 기준 N_eff 페널티 후 DSR > 0.
+- (d) leaf별 한계 테스트: 기존 슬리브 대비 incremental orthogonal factor_ic > 0 (N1 게이트; 이연된 N4/2nd leaf도 동일).
+- (e) 최신-OOS coverage-gate 통과.
+- (f) 사인오프 전까지 실배분 0%.
+M2 manifest 체크리스트: real_money 키 전부 false(톱레벨+자식), oos 클린, optimizer/correlation provenance(source+selection_inputs, ready=True), source-artifact id/path/sha/freshness, 자식별 no_current_fold_oos + train_validation provenance. 후속(비차단): 미힌트 default를 research_only로 뒤집는 fail-safe 강화(H1), N1이 성과를 입증하면 selection.py allowlist 편입, `_restore_deque`의 truthy 비반복자 TypeError(공유 헬퍼) 수정.
 
 사용자 요청으로 `HokyoungJung/DeepLearning`(로컬 `/home/hoky/DeepLearning`), `D:\PythonProjects\precious_metal`, `HokyoungJung/Reference-Price` 세 레포에서 지표/알파로 이식 가능한 방법론만 추출해 재구현했다. **데이터는 일절 복사하지 않았고 백테스트도 실행하지 않았다**(data-bearing PC 몫). 이미 흡수된 부분과의 중복을 먼저 확인했다: DeepLearning 신경망 계열은 2026-06-20 artifact-only forecast bridge로, precious-metal pair z-score는 `TimeframePairZScoreReversionStrategy`(+2026-05-05 metals alpha 실패 기록)로, lead-lag은 `cross_asset_lead_lag_momentum`으로 이미 커버되어 있어 제외하고, **main 레지스트리에 전혀 없던 기법**(periodogram 주기 추출, ADF 정상성 검정, GARCH 조건부변동성, 거래대금 점유율 지수, 앙상블 결합 가중)만 선정했다.
 
