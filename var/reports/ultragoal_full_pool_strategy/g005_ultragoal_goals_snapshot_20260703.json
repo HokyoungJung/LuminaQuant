@@ -1,0 +1,103 @@
+{
+  "version": 1,
+  "brief": "Full-pool LuminaQuant strategy research run recovered from docs/research_note/full_pool_ultragoal_resume_20260702.md. Preserve the approved constraints: live shadow, paper/testnet, and real-money execution remain blocked; imported external performance claims are research-design priors only; G002 source/quarantine flags and G003 point-in-time prior registry are binding inputs; G004 must freeze immutable candidate and portfolio search budgets before any evaluation readout; G005-G007 must obey frozen-budget and no-OOS-selection rules.\n\n@goal: Safety inventory and executable baseline\nInventory the safety gates, current runnable baseline, and verification surface before data refresh or evaluation.\n\n@goal: Refresh Binance USD-M universe and market data coverage\nRefresh Binance USD-M core plus TradFi-perp universe coverage, classify missing/quarantined symbols, and preserve support-data refresh evidence without enabling live/paper/real execution.\n\n@goal: Build point-in-time external-prior registry\nBuild a source-pinned point-in-time external prior registry and cache manifest. Treat all external priors as research-design priors, never LuminaQuant historical evidence.\n\n@goal: Freeze candidate and portfolio search budgets\nBuild the immutable G004 candidate/portfolio search budget manifest before any evaluation readout. Include repo state, G002 universe/source/feature hashes, G003 prior registry hash, candidate family caps, seeds, operator/window/formula inputs, threshold grids, portfolio grids, cost/turnover/MDD/gross constraints, effective-trials accounting, exclusion/quarantine rules, and no-OOS-selection policy.\n\n@goal: Evaluate candidates with walk-forward and cost stress\nEvaluate candidates only under the frozen G004 budget with walk-forward and cost-stress rules. Do not use locked OOS for selection, tuning, tie-breaks, or portfolio construction.\n\n@goal: Construct portfolios and compare incumbents\nConstruct portfolios under the frozen portfolio budget and compare against incumbents using identical windows, costs, constraints, and source eligibility.\n\n@goal: Produce fail-closed final research decision\nProduce the final research decision with fail-closed promotion state, evidence artifacts, and explicit no-real-money/no-paper/no-testnet status unless all gates are proven clean.",
+  "gjcGoalMode": "aggregate",
+  "gjcObjective": "Complete the durable ultragoal plan in .gjc/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .gjc/ultragoal/ledger.jsonl as the audit trail.",
+  "gjcObjectiveAliases": [],
+  "goals": [
+    {
+      "id": "G001",
+      "title": "Safety inventory and executable baseline",
+      "objective": "Inventory the safety gates, current runnable baseline, and verification surface before data refresh or evaluation.",
+      "status": "complete",
+      "createdAt": "2026-07-02T00:00:00Z",
+      "updatedAt": "2026-07-03T13:55:35.946857Z",
+      "startedAt": "2026-07-02T00:00:00Z",
+      "completedAt": "2026-07-02T00:00:00Z",
+      "evidence": "Recovered complete checkpoint from resume note: g001_safety_inventory.json, g001_safety_inventory.md, and g001_verification_test_report.json exist under var/reports/ultragoal_full_pool_strategy."
+    },
+    {
+      "id": "G002",
+      "title": "Refresh Binance USD-M universe and market data coverage",
+      "objective": "Refresh Binance USD-M core plus TradFi-perp universe coverage, classify missing/quarantined symbols, and preserve support-data refresh evidence without enabling live/paper/real execution.",
+      "status": "complete",
+      "createdAt": "2026-07-02T00:00:00Z",
+      "updatedAt": "2026-07-03T13:55:35.946857Z",
+      "startedAt": "2026-07-02T00:00:00Z",
+      "completedAt": "2026-07-02T00:00:00Z",
+      "evidence": "Recovered complete checkpoint from resume note: 128/128 core + TradFi-perp symbols latest archive OHLCV-ready; CRWDUSDT quarantined as TRADING_HALT; support refresh upserted 95,282 rows; g002_* manifests and verification report exist."
+    },
+    {
+      "id": "G003",
+      "title": "Build point-in-time external-prior registry",
+      "objective": "Build a source-pinned point-in-time external prior registry and cache manifest. Treat all external priors as research-design priors, never LuminaQuant historical evidence.",
+      "status": "complete",
+      "createdAt": "2026-07-02T00:00:00Z",
+      "updatedAt": "2026-07-03T13:55:35.946857Z",
+      "startedAt": "2026-07-02T00:00:00Z",
+      "completedAt": "2026-07-02T00:00:00Z",
+      "evidence": "Recovered complete checkpoint from resume note: 9 source-pinned external/web priors registered; PIT cache manifest, registry JSON/CSV/MD, and g003_verification_test_report.json exist; reviews were CLEAR/CLEAR/CLEAR APPROVE with executor QA passed."
+    },
+    {
+      "id": "G004",
+      "title": "Freeze candidate and portfolio search budgets",
+      "objective": "Build the immutable G004 candidate/portfolio search budget manifest before any evaluation readout. Include repo state, G002 universe/source/feature hashes, G003 prior registry hash, candidate family caps, seeds, operator/window/formula inputs, threshold grids, portfolio grids, cost/turnover/MDD/gross constraints, effective-trials accounting, exclusion/quarantine rules, and no-OOS-selection policy.",
+      "status": "complete",
+      "createdAt": "2026-07-02T00:00:00Z",
+      "updatedAt": "2026-07-03T14:05:24.157Z",
+      "startedAt": "2026-07-03T13:55:35.946857Z",
+      "completedAt": "2026-07-03T14:05:24.157Z",
+      "evidence": "G004 frozen search budget complete: budget b35dd9a26b2880f6b5e2c8c091fedcd6956871940573ca9d9fc0405f8ec0ac50; 1466 candidates after fail-closed TONUSDT quarantine exclusion; portfolio grid 23328; effective trials 24794; no-OOS selection and execution disabled verified; architect CLEAR/CLEAR/CLEAR APPROVE and executor QA/red-team passed.",
+      "completionVerification": {
+        "schemaVersion": 1,
+        "receiptId": "6983d7fa-d38b-4529-aaa9-88db7b16d148",
+        "verifiedAt": "2026-07-03T14:05:24.157Z",
+        "goalId": "G004",
+        "receiptKind": "per-goal",
+        "goalStatusBeforeCheckpoint": "active",
+        "gjcGoalMode": "aggregate",
+        "gjcObjective": "Complete the durable ultragoal plan in .gjc/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .gjc/ultragoal/ledger.jsonl as the audit trail.",
+        "qualityGateHash": "f01c22dc1c39ad1bf9728779dc781d73f8da1be6b8c7f3d86e22c6f9e89c0ebd",
+        "planGeneration": "f898a156ab2b6c2475f05a6532893cd3b9ea20c153dfc0a34c4b4a68c8c85a4b",
+        "basis": {
+          "planHashBeforeCheckpoint": "69b788c9cd42cc9963f713757480daa0f660e8268a5d33a8442547fbcac79bb9",
+          "latestRelevantLedgerEventIdBeforeCheckpoint": "f229a2f3-dd0b-4fba-be8e-ce43490d55b2",
+          "goalUpdatedAtBeforeCheckpoint": "2026-07-03T14:05:24.157Z",
+          "relevantGoalIdsBeforeCheckpoint": [
+            "G004"
+          ],
+          "requiredGoalSetHashBeforeCheckpoint": "b02bf4cb9d292487d4b3ef8bb342977464e9b074da988707d690aac445a3469b"
+        },
+        "checkpointLedgerEventId": "6d7d5491-08b9-435f-b447-31a517dd159a"
+      }
+    },
+    {
+      "id": "G005",
+      "title": "Evaluate candidates with walk-forward and cost stress",
+      "objective": "Evaluate candidates only under the frozen G004 budget with walk-forward and cost-stress rules. Do not use locked OOS for selection, tuning, tie-breaks, or portfolio construction.",
+      "status": "active",
+      "createdAt": "2026-07-02T00:00:00Z",
+      "updatedAt": "2026-07-03T14:05:24.167Z",
+      "startedAt": "2026-07-03T14:05:24.167Z"
+    },
+    {
+      "id": "G006",
+      "title": "Construct portfolios and compare incumbents",
+      "objective": "Construct portfolios under the frozen portfolio budget and compare against incumbents using identical windows, costs, constraints, and source eligibility.",
+      "status": "pending",
+      "createdAt": "2026-07-02T00:00:00Z",
+      "updatedAt": "2026-07-03T13:55:35.946857Z"
+    },
+    {
+      "id": "G007",
+      "title": "Produce fail-closed final research decision",
+      "objective": "Produce the final research decision with fail-closed promotion state, evidence artifacts, and explicit no-real-money/no-paper/no-testnet status unless all gates are proven clean.",
+      "status": "pending",
+      "createdAt": "2026-07-02T00:00:00Z",
+      "updatedAt": "2026-07-03T13:55:35.946857Z"
+    }
+  ],
+  "createdAt": "2026-07-02T00:00:00Z",
+  "updatedAt": "2026-07-03T14:05:24.167Z",
+  "state_revision": 2
+}

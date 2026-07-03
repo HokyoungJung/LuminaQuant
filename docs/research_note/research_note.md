@@ -1,5 +1,11 @@
 # Research Note
 
+## 2026-07-03 KST — full-pool Ultragoal G004 checkpoint + G005 stop/handoff
+
+Full-pool Ultragoal durable run was resumed from `/tmp/.gjc/_session-019f22a1-90f7-7000-ab18-d0fd7010803b/ultragoal` and advanced through `G004`. G004 is now checkpointed complete with frozen search-budget artifacts under `var/reports/ultragoal_full_pool_strategy/`: `g004_search_budget_manifest.json`, `g004_frozen_candidate_manifest.json`, `g004_verification_test_report.json`, and `g004_ai_slop_cleanup_report.json`. Frozen budget: 1466 candidates after fail-closed `TONUSDT` quarantine exclusion, 23328 portfolio-grid combinations, total effective-trials denominator 24794, locked-OOS selection/tuning/tie-break/weight use disabled, and live/paper/testnet/real-money execution disabled.
+
+`G005` remains active and not complete. Full single-process evaluation was too slow, so completed-bar candidates were split into 30m/1h/4h/1d manifests. 30m, 4h, and 1d shard final artifacts exist; 1h was still incomplete at user-requested stop and was further split into eleven 40-candidate chunk manifests (`g005_walkforward_candidate_manifest_1h_chunk_01.json` … `_11.json`, index `g005_1h_chunk_index.json`). Running monitors/processes were stopped for new-session resume. Resume from `docs/research_note/full_pool_ultragoal_resume_20260703.md` and `var/reports/ultragoal_full_pool_strategy/g005_session_stop_handoff_20260703.json`; do not checkpoint G005 complete until the 1h chunks are rerun/merged and the mandatory cleanup/review gate is clean.
+
 ## 2026-07-03 KST — Alpha-hunt 메타-스파인 배치: disagreement 앙상블 + 오프라인 품질-게이트 할당기 + flow-share 로테이션 (+확인형 레짐 라우터) — data-PC 핸드오프
 
 "현 전략 세트를 이길 알파" 요청에 대한 ralplan 컨센서스(Planner→Architect→Critic 2라운드, APPROVE) 실행 결과. 핵심 결정: **단일 leaf 알파는 locked-OOS에서 반복 붕괴해 왔으므로(2026-06-08 -8.77%, deep-research leaf 비용열화 등) 스파인은 결합(meta)+할당(allocation)이고, 신규 leaf는 정확히 1개만** — 77개 live_default 슬리브 대비 직교성이 이 PC에서는 측정 불가하므로, 2번째 leaf부터는 data-PC의 한계 orthogonal factor_ic 게이트 뒤로 이연(N4 stationarity residual reversion 등). 백테스트/데이터 다운로드 없음, 실배분 0% 유지.

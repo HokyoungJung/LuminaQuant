@@ -1,0 +1,1145 @@
+{
+  "artifact_kind": "g004_candidate_portfolio_search_budget_manifest",
+  "budget_manifest_sha256": "b35dd9a26b2880f6b5e2c8c091fedcd6956871940573ca9d9fc0405f8ec0ac50",
+  "candidate_budget": {
+    "candidate_count": 1466,
+    "candidate_ids_sha256": "301c12ce4beac2b785c5ecbd21e283e1e9e86e263bf5cc15385aa01b8cfd2750",
+    "candidate_manifest_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g004_frozen_candidate_manifest.json",
+    "candidate_set_sha256": "01ca7a5c04b490b5472a62b49d0fcc7d432f0e2045c0e6fae9b1bfcb079a0564",
+    "cap_policy": "family_caps equal the frozen generated counts; no new family or candidate may be appended without explicit ultragoal steering and a new freeze receipt",
+    "family_caps": {
+      "breakout": 162,
+      "carry": 81,
+      "cross_sectional": 77,
+      "deep_research_leaf": 9,
+      "event_alpha": 18,
+      "flow": 36,
+      "formulaic_alpha": 6,
+      "intraday_alpha": 18,
+      "market_neutral": 209,
+      "mean_reversion": 138,
+      "micro": 3,
+      "momentum": 135,
+      "profit_moonshot_breakout": 2,
+      "profit_moonshot_cross_sectional": 3,
+      "profit_moonshot_reversion": 2,
+      "profit_reboot_cross_sectional": 4,
+      "profit_reboot_mean_reversion": 3,
+      "profit_reboot_pair_carry": 3,
+      "seasonality": 63,
+      "trend": 494
+    },
+    "family_counts": {
+      "breakout": 162,
+      "carry": 81,
+      "cross_sectional": 77,
+      "deep_research_leaf": 9,
+      "event_alpha": 18,
+      "flow": 36,
+      "formulaic_alpha": 6,
+      "intraday_alpha": 18,
+      "market_neutral": 209,
+      "mean_reversion": 138,
+      "micro": 3,
+      "momentum": 135,
+      "profit_moonshot_breakout": 2,
+      "profit_moonshot_cross_sectional": 3,
+      "profit_moonshot_reversion": 2,
+      "profit_reboot_cross_sectional": 4,
+      "profit_reboot_mean_reversion": 3,
+      "profit_reboot_pair_carry": 3,
+      "seasonality": 63,
+      "trend": 494
+    },
+    "strategy_counts": {
+      "AbnormalReturnContinuationStrategy": 18,
+      "AccelerationRiderStrategy": 36,
+      "AdaptiveRegimeMomentumStrategy": 4,
+      "AdaptiveTrendRiderStrategy": 36,
+      "AdfGatedReversionRiderStrategy": 36,
+      "Alpha101FormulaStrategy": 6,
+      "AmihudIlliquidityMomentumRiderStrategy": 36,
+      "BasisSnapbackReversionStrategy": 2,
+      "BreadthRegimeTrendTimerStrategy": 3,
+      "BreadthThrustFailureReversalStrategy": 2,
+      "BullBearRegimeRotationStrategy": 4,
+      "CarryTrendConfluenceRiderStrategy": 36,
+      "CarryTrendFactorRotationStrategy": 6,
+      "CompositeTrendStrategy": 9,
+      "ConfidenceGatedTrendStrategy": 18,
+      "CrossAssetDiversifiedTrendStrategy": 3,
+      "CrossAssetLiquidationContagionFadeStrategy": 2,
+      "CrossSectionalFlowShareRotationStrategy": 8,
+      "CusumChangePointTrendRiderStrategy": 36,
+      "DisagreementGatedEnsembleStrategy": 36,
+      "DispersionConditionedReversionStrategy": 2,
+      "FlowImbalanceLiquidationSweepStrategy": 3,
+      "FundingDislocationTrendCarryStrategy": 3,
+      "FundingHarvestCarryStrategy": 36,
+      "FundingLiquidationCrowdingFadeStrategy": 2,
+      "GarchInnovationRiderStrategy": 36,
+      "HurstRegimeGatedStrategy": 3,
+      "IdiosyncraticVolatilityStrategy": 2,
+      "IntradayFlowPressureRiderStrategy": 36,
+      "IntradaySeasonalMomentumRiderStrategy": 27,
+      "KalmanTrendRiderStrategy": 36,
+      "LastDayLiquidityRegimeStrategy": 4,
+      "LeadLagSpilloverStrategy": 18,
+      "LiquidationCascadeReversionStrategy": 3,
+      "LiquidityShockReversionStrategy": 4,
+      "LotterySkewnessStrategy": 2,
+      "MeanReversionStdStrategy": 6,
+      "MicroRangeExpansion1sStrategy": 3,
+      "MultiHorizonTrendExhaustionFadeStrategy": 2,
+      "MultiTimeframeTrendEnsembleStrategy": 36,
+      "OpenInterestTrendConfirmationRiderStrategy": 36,
+      "OpeningRangeBreakoutRiderStrategy": 27,
+      "OrderBookImbalanceReversionStrategy": 3,
+      "OvernightSessionReturnRiderStrategy": 27,
+      "PairSpreadZScoreStrategy": 209,
+      "PanicReboundMeanReversionStrategy": 3,
+      "PermutationEntropyTrendRiderStrategy": 36,
+      "PerpCrowdingCarryStrategy": 9,
+      "ProfitMoonshotBreakoutStrategy": 2,
+      "ProfitMoonshotReversionStrategy": 2,
+      "ProfitMoonshotTrendStrategy": 3,
+      "PullbackTrendContinuationStrategy": 36,
+      "RealizedSemivarianceTrendRiderStrategy": 27,
+      "RealizedVolTermStructureStrategy": 36,
+      "RegimeBreakoutCandidateStrategy": 4,
+      "RegimeRouterConfirmedRotationStrategy": 4,
+      "ResidualBasketReversionStrategy": 2,
+      "RollingBreakoutStrategy": 4,
+      "SeasonalMicroBreakoutRiderStrategy": 27,
+      "SelectionGatedMomentumStrategy": 3,
+      "SelectionGatedReversionStrategy": 3,
+      "SessionFilteredPairCarryStrategy": 3,
+      "SessionGatedResidualBasketReversionStrategy": 2,
+      "SessionLiquidityVacuumFadeStrategy": 2,
+      "SpectralCycleRiderStrategy": 36,
+      "TailIndexRegimeRiderStrategy": 36,
+      "TopCapTimeSeriesMomentumStrategy": 14,
+      "TrendEfficiencyMomentumStrategy": 2,
+      "VWAPCompressionReversionStrategy": 36,
+      "VarianceRatioTrendRiderStrategy": 36,
+      "VolCompressionVWAPReversionStrategy": 4,
+      "VolManagedMomentumCrashGateStrategy": 3,
+      "VolOfVolExhaustionFadeStrategy": 2,
+      "VolOfVolRegimeTrendGateStrategy": 36,
+      "VolatilityBreakoutRiderStrategy": 36,
+      "VolatilityRegimeResidualBasketReversionStrategy": 2,
+      "VolatilitySqueezeBreakoutRiderStrategy": 36,
+      "VolumeClockMomentumRiderStrategy": 36,
+      "VpinToxicityRiderStrategy": 36,
+      "VwapReversionStrategy": 4
+    },
+    "timeframe_counts": {
+      "15m": 32,
+      "1d": 299,
+      "1h": 440,
+      "1s": 3,
+      "30m": 305,
+      "4h": 360,
+      "5m": 27
+    },
+    "timeframes": [
+      "1s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "4h",
+      "1d"
+    ]
+  },
+  "effective_trials_accounting": {
+    "candidate_trial_count": 1466,
+    "effective_trials_denominator_locked": true,
+    "effective_trials_method": "upper-bound count of frozen candidate definitions plus frozen portfolio-grid combinations; any later split must carry this hash forward and cannot lower the denominator after seeing readouts",
+    "portfolio_trial_count": 23328,
+    "total_declared_trials": 24794
+  },
+  "execution_safety": {
+    "live_shadow_enabled": false,
+    "paper_execution_enabled": false,
+    "promotion_state_before_g007": "blocked_fail_closed",
+    "real_money_execution_enabled": false,
+    "requires_later_human_or_durable_approval_for_execution": true,
+    "testnet_execution_enabled": false
+  },
+  "generated_at_utc": "2026-07-03T14:00:35.611885+00:00",
+  "goal_id": "G004",
+  "immutable_after_checkpoint": true,
+  "input_artifacts": {
+    "g002_coverage_manifest": {
+      "counts": {
+        "core_symbols": 10,
+        "exchangeinfo_added_vs_static": 18,
+        "feature_dependent_eligible": 9,
+        "historical_candidate_eligible": 10,
+        "latest_archive_ohlcv_ready": 128,
+        "quarantined_any": 119,
+        "static_missing_from_exchangeInfo": 1,
+        "total_symbols": 128,
+        "tradfi_perpetual_symbols": 118
+      },
+      "declared_coverage_manifest_sha256": "b88508af518a33b339112a1701d658cc8ab2c6ae3487155f6fc50615a420f3d6",
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g002_coverage_manifest.json",
+      "whole_file_sha256": "a402a830de05747fc2ba2d30161f7bdd6a24490ccb550e2cf4fbdace0b337453"
+    },
+    "g003_external_prior_registry": {
+      "declared_registry_sha256": "32fe1cb8e9ce809c9f94959c1a6348f212f4ef5cd48c0a49f40c7ef4aacb592b",
+      "diagnostic_only_count": 7,
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g003_external_prior_registry.json",
+      "retrieved_count": 9,
+      "whole_file_sha256": "8cdea1fe48f03e637ba237f3a8d61d5860634b4f7255483786638c363aa45ba5"
+    },
+    "g004_frozen_candidate_manifest": {
+      "candidate_manifest_sha256": "1292498b3b729038c74932175a12d910fc4351b2feb3bbfc95f827517e423efe",
+      "candidate_set_sha256": "01ca7a5c04b490b5472a62b49d0fcc7d432f0e2045c0e6fae9b1bfcb079a0564",
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g004_frozen_candidate_manifest.json",
+      "whole_file_sha256": "f2c86ae7bb9f9719143fa0b11e73c68ad021160aeac03a0aa5c6fa93636d57b6"
+    }
+  },
+  "no_oos_selection_policy": {
+    "external_prior_performance_claims_allowed_as_metrics": false,
+    "locked_oos_portfolio_weighting_allowed": false,
+    "locked_oos_reporting_allowed_after_freeze": true,
+    "locked_oos_selection_allowed": false,
+    "locked_oos_tie_break_allowed": false,
+    "policy_text": "G005-G007 may report locked-OOS/fresh-forward results only after candidate and portfolio decisions are fixed from train/validation and frozen manifests. Locked OOS cannot change formulas, params, thresholds, shortlist membership, weights, tie-breaks, or narrative promotion status.",
+    "train_validation_selection_only": true
+  },
+  "operator_window_formula_inputs": {
+    "candidate_manifest_sha256": "1292498b3b729038c74932175a12d910fc4351b2feb3bbfc95f827517e423efe",
+    "formula_or_param_mutation_after_checkpoint_allowed": false,
+    "source": "g004_frozen_candidate_manifest.candidates[].params and metadata",
+    "threshold_grid_source": "candidate params plus threshold_grids below; locked OOS must not mutate either"
+  },
+  "portfolio_budget": {
+    "construction_modes": [
+      "equal_weight_ranked_survivors",
+      "inverse_volatility_ranked_survivors",
+      "quality_gated_erc",
+      "quality_gated_hrp"
+    ],
+    "cost_bps_grid": [
+      10,
+      15,
+      20,
+      30
+    ],
+    "gross_constraint": "candidate and portfolio max gross grids are caps, not targets; real-money gross remains 0 because execution is disabled",
+    "locked_oos_allowed_in_selection": false,
+    "max_family_weight_grid": [
+      0.25,
+      0.35,
+      0.5
+    ],
+    "max_gross_notional_grid": [
+      1.0,
+      1.5,
+      2.0
+    ],
+    "max_symbol_weight_grid": [
+      0.15,
+      0.2,
+      0.3
+    ],
+    "mdd_guard_grid": [
+      0.15,
+      0.2,
+      0.3
+    ],
+    "portfolio_grid_sha256": "ec8fc27739c3e91c09896043d65f0124c0816f95ab124f7f60bb2ebc3638dcf4",
+    "portfolio_selection_uses_locked_oos": false,
+    "portfolio_trial_count": 23328,
+    "rebalance_frequency": [
+      "monthly_completed_fold"
+    ],
+    "selection_score_inputs": [
+      "train.total_return",
+      "train.max_drawdown",
+      "train.deflated_sharpe",
+      "validation.total_return",
+      "validation.max_drawdown",
+      "validation.deflated_sharpe",
+      "validation.turnover_proxy",
+      "validation.return_per_turnover_proxy_bps"
+    ],
+    "shortlist_k": [
+      3,
+      5,
+      8,
+      12,
+      16,
+      24
+    ],
+    "turnover_penalty_bps": [
+      0.0,
+      10.0,
+      20.0
+    ]
+  },
+  "randomness_and_seeds": {
+    "bootstrap_seeds": [
+      2026070204,
+      2026070205,
+      2026070206,
+      2026070207,
+      2026070208
+    ],
+    "candidate_generation_is_deterministic": true,
+    "optuna_or_stochastic_search_allowed": false,
+    "primary_seed": 2026070204,
+    "stochastic_search_exception_policy": "forbidden for G005-G007 unless a later ultragoal steering event records a new budget and seed list before any readout"
+  },
+  "repository_state": {
+    "branch": "private-main",
+    "dirty_critical_freeze_source_paths": [],
+    "dirty_paths_before_g004_artifacts": [
+      "gjc/state/audit.jsonl",
+      ".gjc/state/sessions/019edf52-c54c-7000-9168-52eb1573b8aa/ultragoal-state.json",
+      "apps/dashboard_web/lib/alpha-evidence-server.ts",
+      "apps/dashboard_web/lib/python-runtime.ts",
+      "src/lumina_quant/compute/ohlcv_validation.py",
+      "src/lumina_quant/dashboard/alpha_evidence_service.py",
+      "tests/test_ohlcv_validation.py",
+      ".gjc/_session-019f0366-0dc5-7000-83d8-cd839479368e/",
+      ".gjc/_session-019f046f-794a-7000-91d9-d2274e7e9789/",
+      ".gjc/_session-019f072d-1c28-7000-88c3-2374500c3f19/",
+      ".gjc/_session-019f077f-2cb3-7000-852a-82463263ae66/",
+      ".gjc/_session-019f22a1-90f7-7000-ab18-d0fd7010803b/"
+    ],
+    "head_commit": "42ee1a7eaadabb9d6e9bd4fb3f57d08fbe50dcca",
+    "head_short": "42ee1a7e",
+    "latest_pushed_commit_with_saved_artifacts": "e4e4f282",
+    "repo_path": "/home/hoky/Quants-agent/LuminaQuant",
+    "source_files": [
+      {
+        "path": "src/lumina_quant/strategy_factory/candidate_library.py",
+        "sha256": "d842c1f94dd8c7125bb847e3578a362ad54e6f3d67bf310a63ed07adb282df1c"
+      },
+      {
+        "path": "src/lumina_quant/strategy_factory/runtime_settings.py",
+        "sha256": "0200d5316ad543cc6b30dd9c1dabb91aa2cb327b934794224b04f31399614564"
+      },
+      {
+        "path": "src/lumina_quant/strategies/registry.py",
+        "sha256": "d6cdade650417802128bc98e061433e78025b6efc593436f3ea7d2f7bce4c5ab"
+      },
+      {
+        "path": "src/lumina_quant/portfolio/quality_gated_allocation.py",
+        "sha256": "aac10750b7528963abb5469a4b685c6025275f6498d2de53ae4841ed59a4b341"
+      },
+      {
+        "path": "scripts/research/build_alpha_scoreboard.py",
+        "sha256": "9a06253510209dee0b375b7da06ad9f38169e1278d41cae75a5e453ec2dfb9a9"
+      },
+      {
+        "path": "scripts/research/build_quality_gated_allocation.py",
+        "sha256": "044c5585df9638be23f5a9c31a5226b3f6976234b83c064ec6ea31cf6867f68d"
+      }
+    ],
+    "source_files_sha256": "1229f517ad2dc42c1d8ab68cc9097d5130d24454cd4e4b387ffa1cd4c248dfd5",
+    "upstream": "private/main",
+    "upstream_ahead_behind": "0\t0",
+    "worktree_dirty_before_g004_artifacts": true
+  },
+  "schema_version": 1,
+  "threshold_grids": {
+    "candidate_score_thresholds": {
+      "max_validation_mdd": [
+        0.15,
+        0.2,
+        0.3
+      ],
+      "max_validation_pbo": [
+        0.45,
+        0.55
+      ],
+      "min_train_return": [
+        0.0
+      ],
+      "min_validation_return": [
+        0.0
+      ],
+      "min_validation_return_per_turnover_bps": [
+        10.0,
+        20.0
+      ]
+    },
+    "cost_stress_round_trip_bps": [
+      10,
+      15,
+      20,
+      30
+    ],
+    "liquidation_and_wipeout": {
+      "max_account_wipeout_count": 0,
+      "max_liquidation_count": 0
+    }
+  },
+  "universe_freeze": {
+    "candidate_search_uses_quarantined_symbols": false,
+    "feature_dependent_families_must_intersect": "eligible_for_feature_dependent_families only; otherwise candidate is diagnostic/excluded",
+    "feature_dependent_symbols": [
+      "BTCUSDT",
+      "ETHUSDT",
+      "SOLUSDT",
+      "BNBUSDT",
+      "TRXUSDT",
+      "XRPUSDT",
+      "DOGEUSDT",
+      "ADAUSDT",
+      "AVAXUSDT"
+    ],
+    "g002_historical_ready_symbols": [
+      "BTCUSDT",
+      "ETHUSDT",
+      "SOLUSDT",
+      "BNBUSDT",
+      "TRXUSDT",
+      "XRPUSDT",
+      "DOGEUSDT",
+      "ADAUSDT",
+      "AVAXUSDT",
+      "TONUSDT"
+    ],
+    "g002_historical_ready_symbols_excluded_by_quarantine": [
+      "TONUSDT"
+    ],
+    "historical_candidate_search_symbols": [
+      "BTCUSDT",
+      "ETHUSDT",
+      "SOLUSDT",
+      "BNBUSDT",
+      "TRXUSDT",
+      "XRPUSDT",
+      "DOGEUSDT",
+      "ADAUSDT",
+      "AVAXUSDT"
+    ],
+    "latest_observation_pool_symbol_count": 128,
+    "quarantine_policy": "fail closed: any non-empty quarantine_reasons excludes the symbol from frozen historical candidate search even if G002 historical readiness is true",
+    "quarantined_symbol_count": 119,
+    "quarantined_symbols": [
+      {
+        "reasons": [
+          "feature_or_funding_coverage_insufficient_for_feature_dependent_families"
+        ],
+        "symbol": "TONUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "XAUUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "XAGUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "TSLAUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "XPTUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "XPDUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "INTCUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "HOODUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "MSTRUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "AMZNUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "CRCLUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "COINUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "PLTRUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "COPPERUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "EWYUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "EWJUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "PAYPUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "METAUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "NVDAUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "GOOGLUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "CLUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "BZUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "NATGASUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "QQQUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "SPYUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "AAPLUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "TSMUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "MUUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "SNDKUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "MSFTUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "AVGOUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "BABAUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "AMDUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "QCOMUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "USARUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "LITEUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "ORCLUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "DISUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "UBERUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "CSCOUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "HDUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "SOXLUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "MRVLUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "CRWVUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "WMTUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "JPMUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "VUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "BRKBUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "FLNCUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "DRAMUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "RKLBUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "CBRSUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "SPCXUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "OPENAIUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "NBISUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "WDCUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "ARMUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "BEUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "COHRUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "QNTXUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "LLYUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "NVOUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "BBXUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "NOKUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "EWTUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "ASTSUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "SKHYNIXUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "SAMSUNGUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "HYUNDAIUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "ANTHROPICUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "DELLUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "IBMUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "NOWUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "CRMUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "IRENUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "ONDSUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "BXUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "HPEUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "AMATUSDT"
+      },
+      {
+        "reasons": [
+          "latest_exchangeInfo_status_TRADING_HALT_not_currently_trading",
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "CRWDUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "CRDOUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "AAOIUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "IWMUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "AXTIUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "NFLXUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "COSTUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "URNMUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "HIMSUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "EBAYUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "ZMUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "DKNGUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "RIVNUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "GMEUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "XLEUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "EWZUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "BMNRUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "UVXYUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "ADBEUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "GLWUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "STXXUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "ASMLUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "LRCXUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "KLACUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "ALABUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "SMCIUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "CIENUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "KORUUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "SONYUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "MVLLUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "TQQQUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "SQQQUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "STRCUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "CATUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "TXNUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "FLEXUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "TERUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "TTWOUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "KSTRUSDT"
+      },
+      {
+        "reasons": [
+          "insufficient_train_validation_locked_oos_history"
+        ],
+        "symbol": "BSPUSDT"
+      }
+    ]
+  }
+}

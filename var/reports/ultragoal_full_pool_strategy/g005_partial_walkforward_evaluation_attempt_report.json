@@ -1,0 +1,724 @@
+{
+  "artifact_kind": "g005_partial_walkforward_evaluation_attempt_report",
+  "attempts": [
+    {
+      "name": "full_g004_manifest_foreground",
+      "output_dir": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_latest_fold_candidate_eval",
+      "result": "timed_out_after_1800s"
+    },
+    {
+      "name": "full_g004_manifest_skipcoverage_foreground",
+      "output_dir": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_latest_fold_candidate_eval_skipcoverage",
+      "result": "timed_out_after_1800s"
+    },
+    {
+      "name": "filtered_30m_1h_4h_1d_foreground",
+      "output_dir": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_latest_fold_candidate_eval_30m_1h_4h_1d",
+      "result": "timed_out_after_3600s_after_72_of_1404_candidates"
+    },
+    {
+      "monitor_task": "bg_1",
+      "name": "filtered_30m_1h_4h_1d_monitored",
+      "output_dir": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_latest_fold_candidate_eval_monitored",
+      "result": "running"
+    }
+  ],
+  "completion_blocker": "Full G005 evaluation has not produced final candidate_research_latest.json yet; monitored run must finish before G005 can be checkpointed complete.",
+  "g004_budget_manifest": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g004_search_budget_manifest.json",
+  "g005_candidate_manifest": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_walkforward_candidate_manifest.json",
+  "generated_at_utc": "2026-07-03T16:02:55.159766+00:00",
+  "goal_id": "G005",
+  "no_oos_selection_policy_preserved": true,
+  "objective": "Evaluate frozen candidates with walk-forward and cost stress under G004 no-OOS-selection rules.",
+  "partial_candidate_count": 72,
+  "partial_top_oos_report_only": [
+    {
+      "candidate_count": 1404,
+      "candidate_id": "787d60dbe131566d",
+      "candidate_index": 58,
+      "error": "",
+      "family": "event_alpha",
+      "hard_reject": false,
+      "name": "abnormal_return_continuation_1d_event_ls_adausdt_1.4_2",
+      "oos": {
+        "max_drawdown": 0.04960522472172968,
+        "sharpe": 3.1069390113281736,
+        "total_return": 0.1133774615287253,
+        "trade_count": 11.0
+      },
+      "pass": false,
+      "stage1_prefilter_score": -5.288706618243641,
+      "strategy_class": "AbnormalReturnContinuationStrategy",
+      "strategy_timeframe": "1d",
+      "train": {
+        "max_drawdown": 0.3843223990935404,
+        "sharpe": -0.3527767094108399,
+        "total_return": -0.20415765997109803,
+        "trade_count": 116.0
+      },
+      "val": {
+        "max_drawdown": 0.11865659141487006,
+        "sharpe": -2.6284143904914132,
+        "total_return": -0.08853390077586398,
+        "trade_count": 17.0
+      }
+    },
+    {
+      "candidate_count": 1404,
+      "candidate_id": "b2c422e4ebcbe390",
+      "candidate_index": 51,
+      "error": "",
+      "family": "event_alpha",
+      "hard_reject": false,
+      "name": "abnormal_return_continuation_1d_event_ls_btcusdt_1.4_2",
+      "oos": {
+        "max_drawdown": 0.027575619796928574,
+        "sharpe": 3.9799145658244894,
+        "total_return": 0.09160633475695112,
+        "trade_count": 8.0
+      },
+      "pass": false,
+      "stage1_prefilter_score": -11.399082129621034,
+      "strategy_class": "AbnormalReturnContinuationStrategy",
+      "strategy_timeframe": "1d",
+      "train": {
+        "max_drawdown": 0.42434896652038334,
+        "sharpe": -1.9003612131187095,
+        "total_return": -0.37991798516918074,
+        "trade_count": 116.0
+      },
+      "val": {
+        "max_drawdown": 0.10364166135033104,
+        "sharpe": -3.8686820852551054,
+        "total_return": -0.1008487570204244,
+        "trade_count": 14.0
+      }
+    },
+    {
+      "candidate_count": 1404,
+      "candidate_id": "6afebe39638237ca",
+      "candidate_index": 71,
+      "error": "",
+      "family": "formulaic_alpha",
+      "hard_reject": false,
+      "name": "alpha101_formula_1h_a005_a005_vwap_tuned_dir",
+      "oos": {
+        "max_drawdown": 0.04614085234024379,
+        "sharpe": 4.305831622286577,
+        "total_return": 0.07121227076709613,
+        "trade_count": 421.0
+      },
+      "pass": false,
+      "stage1_prefilter_score": -20.05211698004377,
+      "strategy_class": "Alpha101FormulaStrategy",
+      "strategy_timeframe": "1h",
+      "train": {
+        "max_drawdown": 0.7043219154401248,
+        "sharpe": -3.3153008437555167,
+        "total_return": -0.671075764626637,
+        "trade_count": 7601.0
+      },
+      "val": {
+        "max_drawdown": 0.20280256936314112,
+        "sharpe": -8.186752197499166,
+        "total_return": -0.1948884224445775,
+        "trade_count": 985.0
+      }
+    },
+    {
+      "candidate_count": 1404,
+      "candidate_id": "7da189bdfded8ca7",
+      "candidate_index": 42,
+      "error": "",
+      "family": "cross_sectional",
+      "hard_reject": false,
+      "name": "carry_trend_factor_rotation_1h_guarded_ls_32_8_0.150",
+      "oos": {
+        "max_drawdown": 0.029498168890463528,
+        "sharpe": 5.20004210114815,
+        "total_return": 0.07046523193329346,
+        "trade_count": 70.0
+      },
+      "pass": true,
+      "stage1_prefilter_score": -2.4594432816903153,
+      "strategy_class": "CarryTrendFactorRotationStrategy",
+      "strategy_timeframe": "1h",
+      "train": {
+        "max_drawdown": 0.16278387948685769,
+        "sharpe": -0.43141639974188406,
+        "total_return": -0.06733052411032736,
+        "trade_count": 1082.0
+      },
+      "val": {
+        "max_drawdown": 0.077669715806993,
+        "sharpe": -4.9654371476262265,
+        "total_return": -0.06961853975689669,
+        "trade_count": 146.0
+      }
+    },
+    {
+      "candidate_count": 1404,
+      "candidate_id": "94a8528b842b5296",
+      "candidate_index": 54,
+      "error": "",
+      "family": "event_alpha",
+      "hard_reject": false,
+      "name": "abnormal_return_continuation_1d_event_ls_bnbusdt_1.4_2",
+      "oos": {
+        "max_drawdown": 0.010364913711803925,
+        "sharpe": 3.9592258133641183,
+        "total_return": 0.06114329334213631,
+        "trade_count": 6.0
+      },
+      "pass": false,
+      "stage1_prefilter_score": -1.0293569849981008,
+      "strategy_class": "AbnormalReturnContinuationStrategy",
+      "strategy_timeframe": "1d",
+      "train": {
+        "max_drawdown": 0.28420621791077627,
+        "sharpe": -0.0019018788021594253,
+        "total_return": -0.0012776613696890982,
+        "trade_count": 108.0
+      },
+      "val": {
+        "max_drawdown": 0.06106006781229312,
+        "sharpe": -3.4657570585712385,
+        "total_return": -0.05435308432435093,
+        "trade_count": 16.0
+      }
+    },
+    {
+      "candidate_count": 1404,
+      "candidate_id": "777eca665fe45718",
+      "candidate_index": 18,
+      "error": "",
+      "family": "cross_sectional",
+      "hard_reject": false,
+      "name": "topcap_tsmom_1h_resid_beta_neutral_24_4_0.008",
+      "oos": {
+        "max_drawdown": 0.044200349030430464,
+        "sharpe": 3.2857480856838728,
+        "total_return": 0.04351293433319414,
+        "trade_count": 106.0
+      },
+      "pass": false,
+      "stage1_prefilter_score": -3.622839474298904,
+      "strategy_class": "TopCapTimeSeriesMomentumStrategy",
+      "strategy_timeframe": "1h",
+      "train": {
+        "max_drawdown": 0.2551180038292671,
+        "sharpe": -0.6620445611460967,
+        "total_return": -0.11493751760033555,
+        "trade_count": 1819.0
+      },
+      "val": {
+        "max_drawdown": 0.08447099706343097,
+        "sharpe": -5.87767153152108,
+        "total_return": -0.07299121780793116,
+        "trade_count": 237.0
+      }
+    },
+    {
+      "candidate_count": 1404,
+      "candidate_id": "2324c9e8471e570b",
+      "candidate_index": 29,
+      "error": "",
+      "family": "cross_sectional",
+      "hard_reject": false,
+      "name": "topcap_tsmom_4h_balanced_10_2_0.020",
+      "oos": {
+        "max_drawdown": 0.040102262086850415,
+        "sharpe": 3.2316996954517796,
+        "total_return": 0.040689868085690195,
+        "trade_count": 53.0
+      },
+      "pass": true,
+      "stage1_prefilter_score": 0.9534822478811427,
+      "strategy_class": "TopCapTimeSeriesMomentumStrategy",
+      "strategy_timeframe": "4h",
+      "train": {
+        "max_drawdown": 0.10369120585859382,
+        "sharpe": 0.14044406428040337,
+        "total_return": 0.0586297059660168,
+        "trade_count": 960.0
+      },
+      "val": {
+        "max_drawdown": 0.11438965016505798,
+        "sharpe": -8.70446606334965,
+        "total_return": -0.11451827561433892,
+        "trade_count": 123.0
+      }
+    },
+    {
+      "candidate_count": 1404,
+      "candidate_id": "47f8ad2f503bcf4a",
+      "candidate_index": 53,
+      "error": "",
+      "family": "event_alpha",
+      "hard_reject": false,
+      "name": "abnormal_return_continuation_1d_event_ls_solusdt_1.4_2",
+      "oos": {
+        "max_drawdown": 0.07140389584793838,
+        "sharpe": 1.5367149250858396,
+        "total_return": 0.04016860196958927,
+        "trade_count": 10.0
+      },
+      "pass": false,
+      "stage1_prefilter_score": -8.384174210757793,
+      "strategy_class": "AbnormalReturnContinuationStrategy",
+      "strategy_timeframe": "1d",
+      "train": {
+        "max_drawdown": 0.39572040598658664,
+        "sharpe": -0.830560899478188,
+        "total_return": -0.3361526205900709,
+        "trade_count": 108.0
+      },
+      "val": {
+        "max_drawdown": 0.07340272345402721,
+        "sharpe": 1.0924363786651496,
+        "total_return": 0.042435492598196234,
+        "trade_count": 16.0
+      }
+    },
+    {
+      "candidate_count": 1404,
+      "candidate_id": "d37b0790f6575e7d",
+      "candidate_index": 22,
+      "error": "",
+      "family": "cross_sectional",
+      "hard_reject": false,
+      "name": "topcap_tsmom_1h_exec_fastrebalance_16_2_0.012",
+      "oos": {
+        "max_drawdown": 0.03484342908280402,
+        "sharpe": 3.0319139746512023,
+        "total_return": 0.03986689771257046,
+        "trade_count": 166.0
+      },
+      "pass": true,
+      "stage1_prefilter_score": -4.664325580220238,
+      "strategy_class": "TopCapTimeSeriesMomentumStrategy",
+      "strategy_timeframe": "1h",
+      "train": {
+        "max_drawdown": 0.23969132931401016,
+        "sharpe": -0.8962371298456058,
+        "total_return": -0.14359256602645132,
+        "trade_count": 3074.0
+      },
+      "val": {
+        "max_drawdown": 0.08730810282880086,
+        "sharpe": -6.518720942092636,
+        "total_return": -0.07947219172788289,
+        "trade_count": 369.0
+      }
+    },
+    {
+      "candidate_count": 1404,
+      "candidate_id": "c49978799aff2168",
+      "candidate_index": 72,
+      "error": "",
+      "family": "formulaic_alpha",
+      "hard_reject": false,
+      "name": "alpha101_formula_1h_a011_a011_flow_tuned_dir",
+      "oos": {
+        "max_drawdown": 0.12473265113256171,
+        "sharpe": 1.629285302812752,
+        "total_return": 0.039010115585041305,
+        "trade_count": 493.0
+      },
+      "pass": false,
+      "stage1_prefilter_score": -20.56307146618329,
+      "strategy_class": "Alpha101FormulaStrategy",
+      "strategy_timeframe": "1h",
+      "train": {
+        "max_drawdown": 0.750920218867582,
+        "sharpe": -2.979898104023021,
+        "total_return": -0.7301637629068622,
+        "trade_count": 8191.0
+      },
+      "val": {
+        "max_drawdown": 0.1529176722364144,
+        "sharpe": -5.396091344152079,
+        "total_return": -0.14957375473000656,
+        "trade_count": 1219.0
+      }
+    }
+  ],
+  "partial_top_validation": [
+    {
+      "candidate_count": 1404,
+      "candidate_id": "47f8ad2f503bcf4a",
+      "candidate_index": 53,
+      "error": "",
+      "family": "event_alpha",
+      "hard_reject": false,
+      "name": "abnormal_return_continuation_1d_event_ls_solusdt_1.4_2",
+      "oos": {
+        "max_drawdown": 0.07140389584793838,
+        "sharpe": 1.5367149250858396,
+        "total_return": 0.04016860196958927,
+        "trade_count": 10.0
+      },
+      "pass": false,
+      "stage1_prefilter_score": -8.384174210757793,
+      "strategy_class": "AbnormalReturnContinuationStrategy",
+      "strategy_timeframe": "1d",
+      "train": {
+        "max_drawdown": 0.39572040598658664,
+        "sharpe": -0.830560899478188,
+        "total_return": -0.3361526205900709,
+        "trade_count": 108.0
+      },
+      "val": {
+        "max_drawdown": 0.07340272345402721,
+        "sharpe": 1.0924363786651496,
+        "total_return": 0.042435492598196234,
+        "trade_count": 16.0
+      }
+    },
+    {
+      "candidate_count": 1404,
+      "candidate_id": "8d8d50f568a3eb3a",
+      "candidate_index": 47,
+      "error": "",
+      "family": "cross_sectional",
+      "hard_reject": false,
+      "name": "last_day_liquidity_regime_1h_liquid_momo_ls_24_6_0.012",
+      "oos": {
+        "max_drawdown": 0.059092426374941165,
+        "sharpe": -5.319847371455143,
+        "total_return": -0.04411752635224331,
+        "trade_count": 78.0
+      },
+      "pass": false,
+      "stage1_prefilter_score": -8.412255177155808,
+      "strategy_class": "LastDayLiquidityRegimeStrategy",
+      "strategy_timeframe": "1h",
+      "train": {
+        "max_drawdown": 0.27093369119908806,
+        "sharpe": -1.9907412280866315,
+        "total_return": -0.22153863604912727,
+        "trade_count": 1512.0
+      },
+      "val": {
+        "max_drawdown": 0.020589900324456623,
+        "sharpe": 2.395404836581944,
+        "total_return": 0.03457839038819688,
+        "trade_count": 186.0
+      }
+    },
+    {
+      "candidate_count": 1404,
+      "candidate_id": "116e986127a1116d",
+      "candidate_index": 50,
+      "error": "",
+      "family": "cross_sectional",
+      "hard_reject": false,
+      "name": "last_day_liquidity_regime_1d_guarded_lo_1_1_0.006",
+      "oos": {
+        "max_drawdown": 0.019429867174131865,
+        "sharpe": -3.232628113016808,
+        "total_return": -0.012156466768061702,
+        "trade_count": 12.0
+      },
+      "pass": false,
+      "stage1_prefilter_score": -4.131464276228478,
+      "strategy_class": "LastDayLiquidityRegimeStrategy",
+      "strategy_timeframe": "1d",
+      "train": {
+        "max_drawdown": 0.1232255896670369,
+        "sharpe": -1.1078478906732936,
+        "total_return": -0.09578842474409455,
+        "trade_count": 207.0
+      },
+      "val": {
+        "max_drawdown": 0.012510048833177634,
+        "sharpe": 2.02979284163102,
+        "total_return": 0.03098286441572462,
+        "trade_count": 39.0
+      }
+    },
+    {
+      "candidate_count": 1404,
+      "candidate_id": "c14b83065afface4",
+      "candidate_index": 10,
+      "error": "",
+      "family": "mean_reversion",
+      "hard_reject": false,
+      "name": "mean_reversion_std_30m_balanced_ls_48_1.80",
+      "oos": {
+        "max_drawdown": 0.14746663592993514,
+        "sharpe": -1.3143847701059561,
+        "total_return": -0.04212575500417726,
+        "trade_count": 385.0
+      },
+      "pass": false,
+      "stage1_prefilter_score": -20.999617997725604,
+      "strategy_class": "MeanReversionStdStrategy",
+      "strategy_timeframe": "30m",
+      "train": {
+        "max_drawdown": 0.7791514982720332,
+        "sharpe": -2.782496976576557,
+        "total_return": -0.7717312022286246,
+        "trade_count": 7094.0
+      },
+      "val": {
+        "max_drawdown": 0.06506327267892076,
+        "sharpe": 0.6645089988471777,
+        "total_return": 0.02786031107649256,
+        "trade_count": 890.0
+      }
+    },
+    {
+      "candidate_count": 1404,
+      "candidate_id": "32f47ddb77229ed5",
+      "candidate_index": 49,
+      "error": "",
+      "family": "cross_sectional",
+      "hard_reject": false,
+      "name": "last_day_liquidity_regime_1d_liquid_momo_ls_1_1_0.008",
+      "oos": {
+        "max_drawdown": 0.042645783426312533,
+        "sharpe": -5.124415456566568,
+        "total_return": -0.03877512837036812,
+        "trade_count": 21.0
+      },
+      "pass": false,
+      "stage1_prefilter_score": 0.23443953967813114,
+      "strategy_class": "LastDayLiquidityRegimeStrategy",
+      "strategy_timeframe": "1d",
+      "train": {
+        "max_drawdown": 0.08995311434394848,
+        "sharpe": 0.05470469801452427,
+        "total_return": 0.04375150718245413,
+        "trade_count": 322.0
+      },
+      "val": {
+        "max_drawdown": 0.020867566781963776,
+        "sharpe": 0.3822927379666045,
+        "total_return": 0.009520234906992942,
+        "trade_count": 53.0
+      }
+    },
+    {
+      "candidate_count": 1404,
+      "candidate_id": "b6e9896ea9917ccc",
+      "candidate_index": 11,
+      "error": "",
+      "family": "mean_reversion",
+      "hard_reject": false,
+      "name": "mean_reversion_std_30m_guarded_lo_72_2.20",
+      "oos": {
+        "max_drawdown": 0.15947300928238095,
+        "sharpe": -3.1767336636410124,
+        "total_return": -0.08418319457662704,
+        "trade_count": 172.0
+      },
+      "pass": false,
+      "stage1_prefilter_score": -10.864751067199457,
+      "strategy_class": "MeanReversionStdStrategy",
+      "strategy_timeframe": "30m",
+      "train": {
+        "max_drawdown": 0.4340571004594306,
+        "sharpe": -1.3180165895105573,
+        "total_return": -0.41143589440891704,
+        "trade_count": 2364.0
+      },
+      "val": {
+        "max_drawdown": 0.055127819379133025,
+        "sharpe": -0.022337691873796885,
+        "total_return": 0.004375364852751362,
+        "trade_count": 198.0
+      }
+    },
+    {
+      "candidate_count": 1404,
+      "candidate_id": "aa683a60aca5a5f0",
+      "candidate_index": 12,
+      "error": "",
+      "family": "mean_reversion",
+      "hard_reject": false,
+      "name": "funding_liquidation_crowding_fade_30m_balanced_ls_96_0.85",
+      "oos": {
+        "max_drawdown": 0.0,
+        "sharpe": 0.0,
+        "total_return": 0.0,
+        "trade_count": 0.0
+      },
+      "pass": false,
+      "stage1_prefilter_score": 0.0,
+      "strategy_class": "FundingLiquidationCrowdingFadeStrategy",
+      "strategy_timeframe": "30m",
+      "train": {
+        "max_drawdown": 0.0,
+        "sharpe": 0.0,
+        "total_return": 0.0,
+        "trade_count": 0.0
+      },
+      "val": {
+        "max_drawdown": 0.0,
+        "sharpe": 0.0,
+        "total_return": 0.0,
+        "trade_count": 0.0
+      }
+    },
+    {
+      "candidate_count": 1404,
+      "candidate_id": "512d3068f1b02640",
+      "candidate_index": 13,
+      "error": "",
+      "family": "mean_reversion",
+      "hard_reject": false,
+      "name": "funding_liquidation_crowding_fade_30m_guarded_lo_128_1.00",
+      "oos": {
+        "max_drawdown": 0.0,
+        "sharpe": 0.0,
+        "total_return": 0.0,
+        "trade_count": 0.0
+      },
+      "pass": false,
+      "stage1_prefilter_score": 0.0,
+      "strategy_class": "FundingLiquidationCrowdingFadeStrategy",
+      "strategy_timeframe": "30m",
+      "train": {
+        "max_drawdown": 0.0,
+        "sharpe": 0.0,
+        "total_return": 0.0,
+        "trade_count": 0.0
+      },
+      "val": {
+        "max_drawdown": 0.0,
+        "sharpe": 0.0,
+        "total_return": 0.0,
+        "trade_count": 0.0
+      }
+    },
+    {
+      "candidate_count": 1404,
+      "candidate_id": "d5676212d70daf77",
+      "candidate_index": 64,
+      "error": "",
+      "family": "event_alpha",
+      "hard_reject": false,
+      "name": "abnormal_return_continuation_1d_event_lo_trxusdt_1.8_1",
+      "oos": {
+        "max_drawdown": 0.0,
+        "sharpe": 0.0,
+        "total_return": 0.0,
+        "trade_count": 0.0
+      },
+      "pass": false,
+      "stage1_prefilter_score": -11.998488267726358,
+      "strategy_class": "AbnormalReturnContinuationStrategy",
+      "strategy_timeframe": "1d",
+      "train": {
+        "max_drawdown": 0.2413838898796009,
+        "sharpe": -3.58540523506717,
+        "total_return": -0.2413838898796009,
+        "trade_count": 56.0
+      },
+      "val": {
+        "max_drawdown": 0.00975625221759846,
+        "sharpe": -2.3687714481456688,
+        "total_return": -0.004604554313054843,
+        "trade_count": 4.0
+      }
+    },
+    {
+      "candidate_count": 1404,
+      "candidate_id": "82a5f9c0d73e53b1",
+      "candidate_index": 57,
+      "error": "",
+      "family": "event_alpha",
+      "hard_reject": false,
+      "name": "abnormal_return_continuation_1d_event_ls_dogeusdt_1.4_2",
+      "oos": {
+        "max_drawdown": 0.02560639157390987,
+        "sharpe": 0.7084093468941582,
+        "total_return": 0.008716806333744387,
+        "trade_count": 8.0
+      },
+      "pass": false,
+      "stage1_prefilter_score": -12.205673336911143,
+      "strategy_class": "AbnormalReturnContinuationStrategy",
+      "strategy_timeframe": "1d",
+      "train": {
+        "max_drawdown": 0.5647696395753556,
+        "sharpe": -1.218409402684974,
+        "total_return": -0.4884427265770598,
+        "trade_count": 102.0
+      },
+      "val": {
+        "max_drawdown": 0.04698042398791347,
+        "sharpe": -0.29748932752780693,
+        "total_return": -0.0049819952407983426,
+        "trade_count": 16.0
+      }
+    }
+  ],
+  "progress_snapshots": [
+    {
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_latest_fold_candidate_eval/candidate_research_progress_latest.json",
+      "progress": {
+        "candidate_count": 0,
+        "evaluated_count": 0,
+        "keep_count": 0,
+        "selected_count": 0
+      },
+      "resource_overall": {
+        "active_detail": {},
+        "completed_units": 0,
+        "completion_ratio": 0.0,
+        "total_units": 0
+      },
+      "stage": "coverage_timeframe_loaded",
+      "status": "running",
+      "updated_at": "2026-07-03T14:31:43.881107Z"
+    },
+    {
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_latest_fold_candidate_eval_skipcoverage/candidate_research_progress_latest.json",
+      "progress": {
+        "candidate_count": 0,
+        "evaluated_count": 0,
+        "keep_count": 0,
+        "selected_count": 0
+      },
+      "resource_overall": {
+        "active_detail": {
+          "data_mode": "legacy",
+          "phase": "bundle_symbol_fetch",
+          "symbol": "ETH/USDT",
+          "symbol_count": 9,
+          "symbol_index": 2,
+          "timeframe": "15m"
+        },
+        "completed_units": 27,
+        "completion_ratio": 0.428571,
+        "total_units": 63
+      },
+      "stage": "resource_bundle_symbol_window_loaded",
+      "status": "running",
+      "updated_at": "2026-07-03T15:04:42.454860Z"
+    },
+    {
+      "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_latest_fold_candidate_eval_30m_1h_4h_1d/candidate_research_progress_latest.json",
+      "progress": {
+        "candidate_count": 1404,
+        "evaluated_count": 72,
+        "keep_count": 0,
+        "selected_count": 0
+      },
+      "resource_overall": {
+        "active_detail": {},
+        "completed_units": 49,
+        "completion_ratio": 1.0,
+        "total_units": 49
+      },
+      "stage": "candidate_evaluated",
+      "status": "running",
+      "updated_at": "2026-07-03T15:58:04.509959Z"
+    }
+  ],
+  "report_sha256": "4da0270090d08770421d87af78021cf771988a1907b76ea1bbe6066ddbd75615",
+  "schema_version": 1,
+  "status": "in_progress_monitored"
+}

@@ -1,0 +1,2477 @@
+{
+  "artifact_kind": "g005_walkforward_evaluation_candidate_manifest_1h_chunk",
+  "candidate_count": 40,
+  "candidate_manifest_sha256": "1292498b3b729038c74932175a12d910fc4351b2feb3bbfc95f827517e423efe",
+  "candidate_offset_end": 40,
+  "candidate_offset_start": 1,
+  "candidate_set_sha256": "01ca7a5c04b490b5472a62b49d0fcc7d432f0e2045c0e6fae9b1bfcb079a0564",
+  "candidates": [
+    {
+      "candidate_id": "302a3e3a09b9dba3",
+      "family": "trend",
+      "metadata": {
+        "allow_short": false,
+        "article_pipeline_family_ids": [
+          "regime-conditioned-composite-trend"
+        ],
+        "benchmark_regime_ma": 0,
+        "benchmark_symbol": "",
+        "family": "trend",
+        "hypothesis_origin": "article_research_pipeline",
+        "regime": "lo",
+        "retune_profile": "stable_lo_core",
+        "timeframe": "1h"
+      },
+      "name": "composite_trend_stable_1h_stable_lo_core_lo_0.60_0.75_0.25_0.80",
+      "notes": "Primary RG_PVTM trend sleeve with bounded 30m/1h OOS-stability retune (stable_lo_core, long-only).",
+      "params": {
+        "allow_short": false,
+        "atr_stop_mult": 2.0,
+        "chop_max": 58.0,
+        "crowding_block_threshold": 0.7,
+        "crowding_reduce_threshold": 0.45,
+        "exit_score_cross": 0.03,
+        "long_threshold": 0.6,
+        "max_hold_bars": 720,
+        "max_signal_strength": 1.1,
+        "risk_target_vol": 0.003,
+        "short_threshold": 0.75,
+        "te_min": 0.25,
+        "trail_atr_mult": 3.0,
+        "vol_window": 168,
+        "vr_min": 0.8
+      },
+      "strategy": "CompositeTrendStrategy",
+      "strategy_class": "CompositeTrendStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "trend",
+        "trend-following",
+        "momentum",
+        "oos-stability",
+        "article_pipeline",
+        "article_family:regime-conditioned-composite-trend"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "3d20b008d5d2e6fb",
+      "family": "trend",
+      "metadata": {
+        "allow_short": false,
+        "article_pipeline_family_ids": [
+          "regime-conditioned-composite-trend"
+        ],
+        "benchmark_regime_ma": 0,
+        "benchmark_symbol": "",
+        "family": "trend",
+        "hypothesis_origin": "article_research_pipeline",
+        "regime": "lo",
+        "retune_profile": "stable_lo_highconv",
+        "timeframe": "1h"
+      },
+      "name": "composite_trend_stable_1h_stable_lo_highconv_lo_0.75_0.75_0.25_0.80",
+      "notes": "Primary RG_PVTM trend sleeve with bounded 30m/1h OOS-stability retune (stable_lo_highconv, long-only).",
+      "params": {
+        "allow_short": false,
+        "atr_stop_mult": 2.0,
+        "chop_max": 58.0,
+        "crowding_block_threshold": 0.7,
+        "crowding_reduce_threshold": 0.45,
+        "exit_score_cross": 0.03,
+        "long_threshold": 0.75,
+        "max_hold_bars": 720,
+        "max_signal_strength": 1.0,
+        "risk_target_vol": 0.0028,
+        "short_threshold": 0.75,
+        "te_min": 0.25,
+        "trail_atr_mult": 3.1,
+        "vol_window": 168,
+        "vr_min": 0.8
+      },
+      "strategy": "CompositeTrendStrategy",
+      "strategy_class": "CompositeTrendStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "trend",
+        "trend-following",
+        "momentum",
+        "oos-stability",
+        "article_pipeline",
+        "article_family:regime-conditioned-composite-trend"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "3f58071de41154d3",
+      "family": "trend",
+      "metadata": {
+        "allow_short": false,
+        "article_pipeline_family_ids": [
+          "regime-conditioned-composite-trend"
+        ],
+        "benchmark_regime_ma": 0,
+        "benchmark_symbol": "",
+        "family": "trend",
+        "hypothesis_origin": "article_research_pipeline",
+        "regime": "lo",
+        "retune_profile": "stable_lo_guarded",
+        "timeframe": "1h"
+      },
+      "name": "composite_trend_stable_1h_stable_lo_guarded_lo_0.75_0.60_0.25_0.95",
+      "notes": "Primary RG_PVTM trend sleeve with bounded 30m/1h OOS-stability retune (stable_lo_guarded, long-only).",
+      "params": {
+        "allow_short": false,
+        "atr_stop_mult": 2.1,
+        "chop_max": 56.0,
+        "crowding_block_threshold": 0.65,
+        "crowding_reduce_threshold": 0.4,
+        "exit_score_cross": 0.02,
+        "long_threshold": 0.75,
+        "max_hold_bars": 720,
+        "max_signal_strength": 0.95,
+        "risk_target_vol": 0.0028,
+        "short_threshold": 0.6,
+        "te_min": 0.25,
+        "trail_atr_mult": 3.2,
+        "vol_window": 192,
+        "vr_min": 0.95
+      },
+      "strategy": "CompositeTrendStrategy",
+      "strategy_class": "CompositeTrendStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "trend",
+        "trend-following",
+        "momentum",
+        "oos-stability",
+        "article_pipeline",
+        "article_family:regime-conditioned-composite-trend"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "09c05645c0197dd2",
+      "family": "cross_sectional",
+      "metadata": {
+        "article_pipeline_family_ids": [
+          "topcap-rotation-relative-momentum"
+        ],
+        "benchmark_drawdown_limit": 0.0,
+        "benchmark_drawdown_window": 0,
+        "family": "cross_sectional",
+        "hypothesis_origin": "article_research_pipeline",
+        "residualize_btc": false,
+        "residualize_mean": false,
+        "retune_profile": "balanced",
+        "selector_enabled": false,
+        "selector_pool_size": 0,
+        "symbol_scope": "crypto",
+        "timeframe": "1h"
+      },
+      "name": "topcap_tsmom_1h_balanced_16_4_0.015",
+      "notes": "Top-cap long/short relative-momentum rotation with BTC regime gating for 1h (balanced).",
+      "params": {
+        "btc_regime_ma": 48,
+        "btc_symbol": "BTC/USDT",
+        "lookback_bars": 16,
+        "max_longs": 2,
+        "max_shorts": 2,
+        "min_price": 0.1,
+        "rebalance_bars": 4,
+        "signal_threshold": 0.015,
+        "stop_loss_pct": 0.08
+      },
+      "strategy": "TopCapTimeSeriesMomentumStrategy",
+      "strategy_class": "TopCapTimeSeriesMomentumStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "cross_sectional",
+        "relative_momentum",
+        "topcap",
+        "crypto",
+        "article_pipeline",
+        "article_family:topcap-rotation-relative-momentum"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "1a6241738b9b010a",
+      "family": "cross_sectional",
+      "metadata": {
+        "article_pipeline_family_ids": [
+          "topcap-rotation-relative-momentum"
+        ],
+        "benchmark_drawdown_limit": 0.0,
+        "benchmark_drawdown_window": 0,
+        "family": "cross_sectional",
+        "hypothesis_origin": "article_research_pipeline",
+        "residualize_btc": true,
+        "residualize_mean": false,
+        "retune_profile": "resid_btc",
+        "selector_enabled": false,
+        "selector_pool_size": 0,
+        "symbol_scope": "crypto",
+        "timeframe": "1h"
+      },
+      "name": "topcap_tsmom_1h_resid_btc_16_4_0.010",
+      "notes": "Top-cap long/short relative-momentum rotation with BTC regime gating for 1h (resid_btc) with BTC-common-move residualization.",
+      "params": {
+        "btc_regime_ma": 48,
+        "btc_symbol": "BTC/USDT",
+        "lookback_bars": 16,
+        "max_longs": 2,
+        "max_shorts": 2,
+        "min_price": 0.1,
+        "rebalance_bars": 4,
+        "residualize_btc": true,
+        "residualize_mean": false,
+        "signal_threshold": 0.01,
+        "stop_loss_pct": 0.08
+      },
+      "strategy": "TopCapTimeSeriesMomentumStrategy",
+      "strategy_class": "TopCapTimeSeriesMomentumStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "cross_sectional",
+        "relative_momentum",
+        "topcap",
+        "crypto",
+        "residual_momentum",
+        "article_pipeline",
+        "article_family:topcap-rotation-relative-momentum"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "777eca665fe45718",
+      "family": "cross_sectional",
+      "metadata": {
+        "article_pipeline_family_ids": [
+          "topcap-rotation-relative-momentum"
+        ],
+        "benchmark_drawdown_limit": 0.0,
+        "benchmark_drawdown_window": 0,
+        "family": "cross_sectional",
+        "hypothesis_origin": "article_research_pipeline",
+        "residualize_btc": true,
+        "residualize_mean": true,
+        "retune_profile": "resid_beta_neutral",
+        "selector_enabled": false,
+        "selector_pool_size": 0,
+        "symbol_scope": "crypto",
+        "timeframe": "1h"
+      },
+      "name": "topcap_tsmom_1h_resid_beta_neutral_24_4_0.008",
+      "notes": "Top-cap long/short relative-momentum rotation with BTC regime gating for 1h (resid_beta_neutral) with BTC-common-move residualization + cross-sectional mean neutralization.",
+      "params": {
+        "btc_regime_ma": 48,
+        "btc_symbol": "BTC/USDT",
+        "lookback_bars": 24,
+        "max_longs": 2,
+        "max_shorts": 2,
+        "min_price": 0.1,
+        "rebalance_bars": 4,
+        "residualize_btc": true,
+        "residualize_mean": true,
+        "signal_threshold": 0.008,
+        "stop_loss_pct": 0.07
+      },
+      "strategy": "TopCapTimeSeriesMomentumStrategy",
+      "strategy_class": "TopCapTimeSeriesMomentumStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "cross_sectional",
+        "relative_momentum",
+        "topcap",
+        "crypto",
+        "residual_momentum",
+        "factor_neutral",
+        "article_pipeline",
+        "article_family:topcap-rotation-relative-momentum"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "187ebb229a7081df",
+      "family": "cross_sectional",
+      "metadata": {
+        "article_pipeline_family_ids": [
+          "topcap-rotation-relative-momentum"
+        ],
+        "benchmark_drawdown_limit": 0.0,
+        "benchmark_drawdown_window": 0,
+        "family": "cross_sectional",
+        "hypothesis_origin": "article_research_pipeline",
+        "residualize_btc": false,
+        "residualize_mean": false,
+        "retune_profile": "defensive",
+        "selector_enabled": false,
+        "selector_pool_size": 0,
+        "symbol_scope": "crypto",
+        "timeframe": "1h"
+      },
+      "name": "topcap_tsmom_1h_defensive_24_6_0.020",
+      "notes": "Top-cap long/short relative-momentum rotation with BTC regime gating for 1h (defensive).",
+      "params": {
+        "btc_regime_ma": 64,
+        "btc_symbol": "BTC/USDT",
+        "lookback_bars": 24,
+        "max_longs": 2,
+        "max_shorts": 1,
+        "min_price": 0.1,
+        "rebalance_bars": 6,
+        "signal_threshold": 0.02,
+        "stop_loss_pct": 0.07
+      },
+      "strategy": "TopCapTimeSeriesMomentumStrategy",
+      "strategy_class": "TopCapTimeSeriesMomentumStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "cross_sectional",
+        "relative_momentum",
+        "topcap",
+        "crypto",
+        "article_pipeline",
+        "article_family:topcap-rotation-relative-momentum"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "09d9ab4be85d7ab1",
+      "family": "cross_sectional",
+      "metadata": {
+        "article_pipeline_family_ids": [
+          "topcap-rotation-relative-momentum"
+        ],
+        "benchmark_drawdown_limit": 0.08,
+        "benchmark_drawdown_window": 48,
+        "family": "cross_sectional",
+        "hypothesis_origin": "article_research_pipeline",
+        "residualize_btc": false,
+        "residualize_mean": false,
+        "retune_profile": "crashguard",
+        "selector_enabled": false,
+        "selector_pool_size": 0,
+        "symbol_scope": "crypto",
+        "timeframe": "1h"
+      },
+      "name": "topcap_tsmom_1h_crashguard_16_4_0.015",
+      "notes": "Top-cap long/short relative-momentum rotation with BTC regime gating for 1h (crashguard) with benchmark drawdown gate 48 bars/8.0%.",
+      "params": {
+        "benchmark_drawdown_limit": 0.08,
+        "benchmark_drawdown_window": 48,
+        "btc_regime_ma": 48,
+        "btc_symbol": "BTC/USDT",
+        "lookback_bars": 16,
+        "max_longs": 2,
+        "max_shorts": 2,
+        "min_price": 0.1,
+        "rebalance_bars": 4,
+        "signal_threshold": 0.015,
+        "stop_loss_pct": 0.07
+      },
+      "strategy": "TopCapTimeSeriesMomentumStrategy",
+      "strategy_class": "TopCapTimeSeriesMomentumStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "cross_sectional",
+        "relative_momentum",
+        "topcap",
+        "crypto",
+        "crash_aware",
+        "article_pipeline",
+        "article_family:topcap-rotation-relative-momentum"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "558a2694cfcf27da",
+      "family": "cross_sectional",
+      "metadata": {
+        "article_pipeline_family_ids": [
+          "topcap-rotation-relative-momentum"
+        ],
+        "benchmark_drawdown_limit": 0.0,
+        "benchmark_drawdown_window": 0,
+        "family": "cross_sectional",
+        "hypothesis_origin": "article_research_pipeline",
+        "residualize_btc": false,
+        "residualize_mean": false,
+        "retune_profile": "exec_tightstop",
+        "selector_enabled": false,
+        "selector_pool_size": 0,
+        "symbol_scope": "crypto",
+        "timeframe": "1h"
+      },
+      "name": "topcap_tsmom_1h_exec_tightstop_16_4_0.015",
+      "notes": "Top-cap long/short relative-momentum rotation with BTC regime gating for 1h (exec_tightstop) with execution-risk retune.",
+      "params": {
+        "btc_regime_ma": 48,
+        "btc_symbol": "BTC/USDT",
+        "lookback_bars": 16,
+        "max_longs": 2,
+        "max_shorts": 2,
+        "min_price": 0.1,
+        "rebalance_bars": 4,
+        "signal_threshold": 0.015,
+        "stop_loss_pct": 0.05
+      },
+      "strategy": "TopCapTimeSeriesMomentumStrategy",
+      "strategy_class": "TopCapTimeSeriesMomentumStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "cross_sectional",
+        "relative_momentum",
+        "topcap",
+        "crypto",
+        "execution_risk",
+        "article_pipeline",
+        "article_family:topcap-rotation-relative-momentum"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "d37b0790f6575e7d",
+      "family": "cross_sectional",
+      "metadata": {
+        "article_pipeline_family_ids": [
+          "topcap-rotation-relative-momentum"
+        ],
+        "benchmark_drawdown_limit": 0.0,
+        "benchmark_drawdown_window": 0,
+        "family": "cross_sectional",
+        "hypothesis_origin": "article_research_pipeline",
+        "residualize_btc": false,
+        "residualize_mean": false,
+        "retune_profile": "exec_fastrebalance",
+        "selector_enabled": false,
+        "selector_pool_size": 0,
+        "symbol_scope": "crypto",
+        "timeframe": "1h"
+      },
+      "name": "topcap_tsmom_1h_exec_fastrebalance_16_2_0.012",
+      "notes": "Top-cap long/short relative-momentum rotation with BTC regime gating for 1h (exec_fastrebalance) with execution-risk retune.",
+      "params": {
+        "btc_regime_ma": 48,
+        "btc_symbol": "BTC/USDT",
+        "lookback_bars": 16,
+        "max_longs": 2,
+        "max_shorts": 2,
+        "min_price": 0.1,
+        "rebalance_bars": 2,
+        "signal_threshold": 0.012,
+        "stop_loss_pct": 0.07
+      },
+      "strategy": "TopCapTimeSeriesMomentumStrategy",
+      "strategy_class": "TopCapTimeSeriesMomentumStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "cross_sectional",
+        "relative_momentum",
+        "topcap",
+        "crypto",
+        "execution_risk",
+        "article_pipeline",
+        "article_family:topcap-rotation-relative-momentum"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "e28eae2ac86cfc97",
+      "family": "cross_sectional",
+      "metadata": {
+        "article_pipeline_family_ids": [
+          "topcap-rotation-relative-momentum"
+        ],
+        "benchmark_drawdown_limit": 0.0,
+        "benchmark_drawdown_window": 0,
+        "family": "cross_sectional",
+        "hypothesis_origin": "article_research_pipeline",
+        "residualize_btc": false,
+        "residualize_mean": false,
+        "retune_profile": "exec_takeprofit",
+        "selector_enabled": false,
+        "selector_pool_size": 0,
+        "symbol_scope": "crypto",
+        "timeframe": "1h"
+      },
+      "name": "topcap_tsmom_1h_exec_takeprofit_16_4_0.015",
+      "notes": "Top-cap long/short relative-momentum rotation with BTC regime gating for 1h (exec_takeprofit) with execution-risk retune + take profit 10.0%.",
+      "params": {
+        "btc_regime_ma": 48,
+        "btc_symbol": "BTC/USDT",
+        "lookback_bars": 16,
+        "max_longs": 2,
+        "max_shorts": 2,
+        "min_price": 0.1,
+        "rebalance_bars": 4,
+        "signal_threshold": 0.015,
+        "stop_loss_pct": 0.08,
+        "take_profit_pct": 0.1
+      },
+      "strategy": "TopCapTimeSeriesMomentumStrategy",
+      "strategy_class": "TopCapTimeSeriesMomentumStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "cross_sectional",
+        "relative_momentum",
+        "topcap",
+        "crypto",
+        "execution_risk",
+        "take_profit",
+        "article_pipeline",
+        "article_family:topcap-rotation-relative-momentum"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "6b5636104570785b",
+      "family": "cross_sectional",
+      "metadata": {
+        "article_pipeline_family_ids": [
+          "topcap-rotation-relative-momentum"
+        ],
+        "benchmark_drawdown_limit": 0.0,
+        "benchmark_drawdown_window": 0,
+        "family": "cross_sectional",
+        "hypothesis_origin": "article_research_pipeline",
+        "residualize_btc": false,
+        "residualize_mean": false,
+        "retune_profile": "exec_tightstop_tp",
+        "selector_enabled": false,
+        "selector_pool_size": 0,
+        "symbol_scope": "crypto",
+        "timeframe": "1h"
+      },
+      "name": "topcap_tsmom_1h_exec_tightstop_tp_16_4_0.015",
+      "notes": "Top-cap long/short relative-momentum rotation with BTC regime gating for 1h (exec_tightstop_tp) with execution-risk retune + take profit 10.0%.",
+      "params": {
+        "btc_regime_ma": 48,
+        "btc_symbol": "BTC/USDT",
+        "lookback_bars": 16,
+        "max_longs": 2,
+        "max_shorts": 2,
+        "min_price": 0.1,
+        "rebalance_bars": 4,
+        "signal_threshold": 0.015,
+        "stop_loss_pct": 0.05,
+        "take_profit_pct": 0.1
+      },
+      "strategy": "TopCapTimeSeriesMomentumStrategy",
+      "strategy_class": "TopCapTimeSeriesMomentumStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "cross_sectional",
+        "relative_momentum",
+        "topcap",
+        "crypto",
+        "execution_risk",
+        "take_profit",
+        "article_pipeline",
+        "article_family:topcap-rotation-relative-momentum"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "9c67ded69e498345",
+      "family": "cross_sectional",
+      "metadata": {
+        "article_pipeline_family_ids": [
+          "topcap-rotation-relative-momentum"
+        ],
+        "benchmark_drawdown_limit": 0.0,
+        "benchmark_drawdown_window": 0,
+        "family": "cross_sectional",
+        "hypothesis_origin": "article_research_pipeline",
+        "residualize_btc": false,
+        "residualize_mean": false,
+        "retune_profile": "selector_exec_tightstop_20",
+        "selector_enabled": true,
+        "selector_pool_size": 20,
+        "symbol_scope": "expanded_research_universe",
+        "timeframe": "1h"
+      },
+      "name": "topcap_tsmom_1h_selector_exec_tightstop_20_16_4_0.015",
+      "notes": "Top-cap long/short relative-momentum rotation with BTC regime gating for 1h (selector_exec_tightstop_20) with target-pool selector top-20 over expanded universe.",
+      "params": {
+        "btc_regime_ma": 48,
+        "btc_symbol": "BTC/USDT",
+        "lookback_bars": 16,
+        "max_longs": 2,
+        "max_shorts": 2,
+        "min_price": 0.1,
+        "rebalance_bars": 4,
+        "selector_enabled": true,
+        "selector_history_window": 96,
+        "selector_min_history_bars": 60,
+        "selector_pool_size": 20,
+        "selector_vwap_sign": 1.0,
+        "signal_threshold": 0.015,
+        "stop_loss_pct": 0.05
+      },
+      "strategy": "TopCapTimeSeriesMomentumStrategy",
+      "strategy_class": "TopCapTimeSeriesMomentumStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "cross_sectional",
+        "relative_momentum",
+        "topcap",
+        "crypto",
+        "universe_selection",
+        "selector_gated",
+        "expanded_universe",
+        "article_pipeline",
+        "article_family:topcap-rotation-relative-momentum"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "82cb7d607753be96",
+      "family": "cross_sectional",
+      "metadata": {
+        "article_pipeline_family_ids": [
+          "topcap-rotation-relative-momentum"
+        ],
+        "benchmark_drawdown_limit": 0.0,
+        "benchmark_drawdown_window": 0,
+        "family": "cross_sectional",
+        "hypothesis_origin": "article_research_pipeline",
+        "residualize_btc": false,
+        "residualize_mean": false,
+        "retune_profile": "selector_exec_tightstop_12",
+        "selector_enabled": true,
+        "selector_pool_size": 12,
+        "symbol_scope": "expanded_research_universe",
+        "timeframe": "1h"
+      },
+      "name": "topcap_tsmom_1h_selector_exec_tightstop_12_16_4_0.015",
+      "notes": "Top-cap long/short relative-momentum rotation with BTC regime gating for 1h (selector_exec_tightstop_12) with target-pool selector top-12 over expanded universe.",
+      "params": {
+        "btc_regime_ma": 48,
+        "btc_symbol": "BTC/USDT",
+        "lookback_bars": 16,
+        "max_longs": 2,
+        "max_shorts": 2,
+        "min_price": 0.1,
+        "rebalance_bars": 4,
+        "selector_enabled": true,
+        "selector_history_window": 96,
+        "selector_min_history_bars": 60,
+        "selector_pool_size": 12,
+        "selector_vwap_sign": 1.0,
+        "signal_threshold": 0.015,
+        "stop_loss_pct": 0.05
+      },
+      "strategy": "TopCapTimeSeriesMomentumStrategy",
+      "strategy_class": "TopCapTimeSeriesMomentumStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "cross_sectional",
+        "relative_momentum",
+        "topcap",
+        "crypto",
+        "universe_selection",
+        "selector_gated",
+        "expanded_universe",
+        "article_pipeline",
+        "article_family:topcap-rotation-relative-momentum"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "5d5fefc3ab971ee8",
+      "family": "cross_sectional",
+      "metadata": {
+        "article_pipeline_family_ids": [
+          "topcap-rotation-relative-momentum"
+        ],
+        "benchmark_drawdown_limit": 0.0,
+        "benchmark_drawdown_window": 0,
+        "family": "cross_sectional",
+        "hypothesis_origin": "article_research_pipeline",
+        "residualize_btc": true,
+        "residualize_mean": false,
+        "retune_profile": "selector_resid_btc_20",
+        "selector_enabled": true,
+        "selector_pool_size": 20,
+        "symbol_scope": "expanded_research_universe",
+        "timeframe": "1h"
+      },
+      "name": "topcap_tsmom_1h_selector_resid_btc_20_16_4_0.010",
+      "notes": "Top-cap long/short relative-momentum rotation with BTC regime gating for 1h (selector_resid_btc_20) with BTC-common-move residualization + target-pool selector top-20 over expanded universe.",
+      "params": {
+        "btc_regime_ma": 48,
+        "btc_symbol": "BTC/USDT",
+        "lookback_bars": 16,
+        "max_longs": 2,
+        "max_shorts": 2,
+        "min_price": 0.1,
+        "rebalance_bars": 4,
+        "residualize_btc": true,
+        "residualize_mean": false,
+        "selector_enabled": true,
+        "selector_history_window": 96,
+        "selector_min_history_bars": 60,
+        "selector_pool_size": 20,
+        "selector_vwap_sign": 1.0,
+        "signal_threshold": 0.01,
+        "stop_loss_pct": 0.08
+      },
+      "strategy": "TopCapTimeSeriesMomentumStrategy",
+      "strategy_class": "TopCapTimeSeriesMomentumStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "cross_sectional",
+        "relative_momentum",
+        "topcap",
+        "crypto",
+        "residual_momentum",
+        "universe_selection",
+        "selector_gated",
+        "expanded_universe",
+        "article_pipeline",
+        "article_family:topcap-rotation-relative-momentum"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "5b11516a4938458e",
+      "family": "cross_sectional",
+      "metadata": {
+        "article_pipeline_family_ids": [
+          "topcap-rotation-relative-momentum"
+        ],
+        "benchmark_drawdown_limit": 0.0,
+        "benchmark_drawdown_window": 0,
+        "family": "cross_sectional",
+        "hypothesis_origin": "article_research_pipeline",
+        "residualize_btc": false,
+        "residualize_mean": false,
+        "retune_profile": "exec_fastrebalance_tp",
+        "selector_enabled": false,
+        "selector_pool_size": 0,
+        "symbol_scope": "crypto",
+        "timeframe": "1h"
+      },
+      "name": "topcap_tsmom_1h_exec_fastrebalance_tp_16_2_0.012",
+      "notes": "Top-cap long/short relative-momentum rotation with BTC regime gating for 1h (exec_fastrebalance_tp) with execution-risk retune + take profit 8.0%.",
+      "params": {
+        "btc_regime_ma": 48,
+        "btc_symbol": "BTC/USDT",
+        "lookback_bars": 16,
+        "max_longs": 2,
+        "max_shorts": 2,
+        "min_price": 0.1,
+        "rebalance_bars": 2,
+        "signal_threshold": 0.012,
+        "stop_loss_pct": 0.07,
+        "take_profit_pct": 0.08
+      },
+      "strategy": "TopCapTimeSeriesMomentumStrategy",
+      "strategy_class": "TopCapTimeSeriesMomentumStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "cross_sectional",
+        "relative_momentum",
+        "topcap",
+        "crypto",
+        "execution_risk",
+        "take_profit",
+        "article_pipeline",
+        "article_family:topcap-rotation-relative-momentum"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "19fe9f2467ad4f76",
+      "family": "profit_reboot_cross_sectional",
+      "metadata": {
+        "article_pipeline_family_ids": [
+          "profit-reboot-adaptive-regime-momentum"
+        ],
+        "family": "profit_reboot_cross_sectional",
+        "hypothesis_origin": "article_research_pipeline",
+        "market_window_one_bar_per_decision": true,
+        "retune_profile": "profit_reboot_balanced",
+        "symbol_scope": "crypto",
+        "timeframe": "1h"
+      },
+      "name": "adaptive_regime_momentum_1h_profit_reboot_balanced_360_72_0.040",
+      "notes": "Profit-reboot adaptive regime momentum sleeve that compresses each market-window decision into one bar and switches between long, short, and cash for 1h (profit_reboot_balanced).",
+      "params": {
+        "broad_threshold": 0.0,
+        "btc_symbol": "BTC/USDT",
+        "gross_exposure": 0.005,
+        "lookback_bars": 360,
+        "max_hold_bars": 0,
+        "max_longs": 1,
+        "max_order_value": 200.0,
+        "max_shorts": 2,
+        "min_price": 0.1,
+        "rebalance_bars": 72,
+        "regime_lookback_bars": 360,
+        "risk_off_exit": true,
+        "short_lookback_bars": 24,
+        "signal_threshold": 0.04,
+        "stop_loss_pct": 0.0,
+        "take_profit_pct": 0.0,
+        "trailing_exit_pct": 0.0,
+        "volatility_lookback_bars": 60
+      },
+      "strategy": "AdaptiveRegimeMomentumStrategy",
+      "strategy_class": "AdaptiveRegimeMomentumStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "profit_reboot_20260501",
+        "profit_moonshot_20260501",
+        "cross_sectional",
+        "adaptive_regime",
+        "momentum",
+        "crypto",
+        "article_pipeline",
+        "article_family:profit-reboot-adaptive-regime-momentum"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "d9e6fbd9670b191f",
+      "family": "profit_reboot_cross_sectional",
+      "metadata": {
+        "article_pipeline_family_ids": [
+          "profit-reboot-adaptive-regime-momentum"
+        ],
+        "family": "profit_reboot_cross_sectional",
+        "hypothesis_origin": "article_research_pipeline",
+        "market_window_one_bar_per_decision": true,
+        "retune_profile": "profit_reboot_defensive",
+        "symbol_scope": "crypto",
+        "timeframe": "1h"
+      },
+      "name": "adaptive_regime_momentum_1h_profit_reboot_defensive_168_360_0.080",
+      "notes": "Profit-reboot adaptive regime momentum sleeve that compresses each market-window decision into one bar and switches between long, short, and cash for 1h (profit_reboot_defensive).",
+      "params": {
+        "broad_threshold": 0.0,
+        "btc_symbol": "BTC/USDT",
+        "gross_exposure": 0.005,
+        "lookback_bars": 168,
+        "max_hold_bars": 0,
+        "max_longs": 1,
+        "max_order_value": 200.0,
+        "max_shorts": 2,
+        "min_price": 0.1,
+        "rebalance_bars": 360,
+        "regime_lookback_bars": 168,
+        "risk_off_exit": true,
+        "short_lookback_bars": 24,
+        "signal_threshold": 0.08,
+        "stop_loss_pct": 0.0,
+        "take_profit_pct": 0.0,
+        "trailing_exit_pct": 0.0,
+        "volatility_lookback_bars": 60
+      },
+      "strategy": "AdaptiveRegimeMomentumStrategy",
+      "strategy_class": "AdaptiveRegimeMomentumStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "profit_reboot_20260501",
+        "profit_moonshot_20260501",
+        "cross_sectional",
+        "adaptive_regime",
+        "momentum",
+        "crypto",
+        "article_pipeline",
+        "article_family:profit-reboot-adaptive-regime-momentum"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "858daf85f9be6a92",
+      "family": "profit_reboot_cross_sectional",
+      "metadata": {
+        "article_pipeline_family_ids": [
+          "profit-reboot-adaptive-regime-momentum"
+        ],
+        "family": "profit_reboot_cross_sectional",
+        "hypothesis_origin": "article_research_pipeline",
+        "market_window_one_bar_per_decision": true,
+        "retune_profile": "profit_reboot_short_bias",
+        "symbol_scope": "crypto",
+        "timeframe": "1h"
+      },
+      "name": "adaptive_regime_momentum_1h_profit_reboot_short_bias_168_360_0.080",
+      "notes": "Profit-reboot adaptive regime momentum sleeve that compresses each market-window decision into one bar and switches between long, short, and cash for 1h (profit_reboot_short_bias).",
+      "params": {
+        "broad_threshold": 0.0,
+        "btc_symbol": "BTC/USDT",
+        "gross_exposure": 0.005,
+        "lookback_bars": 168,
+        "max_hold_bars": 0,
+        "max_longs": 0,
+        "max_order_value": 200.0,
+        "max_shorts": 2,
+        "min_price": 0.1,
+        "rebalance_bars": 360,
+        "regime_lookback_bars": 168,
+        "risk_off_exit": true,
+        "short_lookback_bars": 72,
+        "signal_threshold": 0.08,
+        "stop_loss_pct": 0.0,
+        "take_profit_pct": 0.0,
+        "trailing_exit_pct": 0.0,
+        "volatility_lookback_bars": 60
+      },
+      "strategy": "AdaptiveRegimeMomentumStrategy",
+      "strategy_class": "AdaptiveRegimeMomentumStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "profit_reboot_20260501",
+        "profit_moonshot_20260501",
+        "cross_sectional",
+        "adaptive_regime",
+        "momentum",
+        "crypto",
+        "article_pipeline",
+        "article_family:profit-reboot-adaptive-regime-momentum"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "b53c71e2027a66d5",
+      "family": "profit_moonshot_cross_sectional",
+      "metadata": {
+        "article_pipeline_family_ids": [
+          "profit-moonshot-cross-sectional-trend"
+        ],
+        "family": "profit_moonshot_cross_sectional",
+        "hypothesis_origin": "article_research_pipeline",
+        "market_window_one_bar_per_decision": true,
+        "retune_profile": "balanced",
+        "symbol_scope": "crypto",
+        "timeframe": "1h"
+      },
+      "name": "profit_moonshot_trend_1h_balanced_60_0.012",
+      "notes": "Profit-moonshot MARKET_WINDOW sleeve that bypasses TimeframeAggregator and targets higher participation for 1h (balanced, trend).",
+      "params": {
+        "allow_shorts": true,
+        "breadth_threshold": -0.002,
+        "entry_threshold": 0.012,
+        "exit_threshold": 0.002,
+        "fast_lookback_bars": 12,
+        "gross_exposure": 0.1,
+        "lookback_bars": 60,
+        "max_hold_bars": 240,
+        "max_longs": 2,
+        "max_order_value": 1000.0,
+        "max_shorts": 2,
+        "min_price": 0.1,
+        "rebalance_bars": 12,
+        "slow_lookback_bars": 240,
+        "stop_loss_pct": 0.045,
+        "take_profit_pct": 0.12,
+        "trailing_exit_pct": 0.055
+      },
+      "strategy": "ProfitMoonshotTrendStrategy",
+      "strategy_class": "ProfitMoonshotTrendStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "profit_moonshot_20260501",
+        "market_window",
+        "no_timeframe_aggregator",
+        "trend",
+        "crypto",
+        "article_pipeline",
+        "article_family:profit-moonshot-cross-sectional-trend"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "412623652d066d6b",
+      "family": "profit_moonshot_cross_sectional",
+      "metadata": {
+        "article_pipeline_family_ids": [
+          "profit-moonshot-cross-sectional-trend"
+        ],
+        "family": "profit_moonshot_cross_sectional",
+        "hypothesis_origin": "article_research_pipeline",
+        "market_window_one_bar_per_decision": true,
+        "retune_profile": "defensive",
+        "symbol_scope": "crypto",
+        "timeframe": "1h"
+      },
+      "name": "profit_moonshot_trend_1h_defensive_72_0.018",
+      "notes": "Profit-moonshot MARKET_WINDOW sleeve that bypasses TimeframeAggregator and targets higher participation for 1h (defensive, trend).",
+      "params": {
+        "allow_shorts": true,
+        "breadth_threshold": 0.0,
+        "entry_threshold": 0.018,
+        "exit_threshold": 0.004,
+        "fast_lookback_bars": 18,
+        "gross_exposure": 0.05,
+        "lookback_bars": 72,
+        "max_hold_bars": 240,
+        "max_longs": 1,
+        "max_order_value": 500.0,
+        "max_shorts": 1,
+        "min_price": 0.1,
+        "rebalance_bars": 24,
+        "slow_lookback_bars": 288,
+        "stop_loss_pct": 0.035,
+        "take_profit_pct": 0.09,
+        "trailing_exit_pct": 0.04
+      },
+      "strategy": "ProfitMoonshotTrendStrategy",
+      "strategy_class": "ProfitMoonshotTrendStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "profit_moonshot_20260501",
+        "market_window",
+        "no_timeframe_aggregator",
+        "trend",
+        "crypto",
+        "article_pipeline",
+        "article_family:profit-moonshot-cross-sectional-trend"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "10368e1eefb8b8fa",
+      "family": "profit_moonshot_breakout",
+      "metadata": {
+        "article_pipeline_family_ids": [
+          "profit-moonshot-range-expansion-breakout"
+        ],
+        "family": "profit_moonshot_breakout",
+        "hypothesis_origin": "article_research_pipeline",
+        "market_window_one_bar_per_decision": true,
+        "retune_profile": "expansion",
+        "symbol_scope": "crypto",
+        "timeframe": "1h"
+      },
+      "name": "profit_moonshot_breakout_1h_expansion_48_0.006",
+      "notes": "Profit-moonshot MARKET_WINDOW sleeve that bypasses TimeframeAggregator and targets higher participation for 1h (expansion, breakout).",
+      "params": {
+        "allow_shorts": true,
+        "breakout_buffer": 0.002,
+        "entry_threshold": 0.006,
+        "exit_threshold": 0.002,
+        "fast_lookback_bars": 8,
+        "gross_exposure": 0.1,
+        "lookback_bars": 48,
+        "max_hold_bars": 144,
+        "max_longs": 2,
+        "max_order_value": 1000.0,
+        "max_shorts": 2,
+        "min_price": 0.1,
+        "rebalance_bars": 3,
+        "slow_lookback_bars": 168,
+        "squeeze_ratio_max": 1.6,
+        "stop_loss_pct": 0.04,
+        "take_profit_pct": 0.11,
+        "trailing_exit_pct": 0.05,
+        "volume_z_min": -0.25
+      },
+      "strategy": "ProfitMoonshotBreakoutStrategy",
+      "strategy_class": "ProfitMoonshotBreakoutStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "profit_moonshot_20260501",
+        "market_window",
+        "no_timeframe_aggregator",
+        "breakout",
+        "crypto",
+        "article_pipeline",
+        "article_family:profit-moonshot-range-expansion-breakout"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "1df3749650f8427d",
+      "family": "profit_moonshot_reversion",
+      "metadata": {
+        "article_pipeline_family_ids": [
+          "profit-moonshot-shock-reversion"
+        ],
+        "family": "profit_moonshot_reversion",
+        "hypothesis_origin": "article_research_pipeline",
+        "market_window_one_bar_per_decision": true,
+        "retune_profile": "shock_fade",
+        "symbol_scope": "crypto",
+        "timeframe": "1h"
+      },
+      "name": "profit_moonshot_reversion_1h_shock_fade_36_0.750",
+      "notes": "Profit-moonshot MARKET_WINDOW sleeve that bypasses TimeframeAggregator and targets higher participation for 1h (shock_fade, reversion).",
+      "params": {
+        "allow_shorts": true,
+        "entry_threshold": 0.75,
+        "exit_threshold": 0.25,
+        "fast_lookback_bars": 4,
+        "gross_exposure": 0.07,
+        "lookback_bars": 36,
+        "max_hold_bars": 72,
+        "max_longs": 2,
+        "max_order_value": 700.0,
+        "max_shorts": 2,
+        "min_price": 0.1,
+        "range_z_min": 0.25,
+        "rebalance_bars": 2,
+        "return_z_min": 1.2,
+        "slow_lookback_bars": 96,
+        "stop_loss_pct": 0.03,
+        "take_profit_pct": 0.06,
+        "trailing_exit_pct": 0.03,
+        "volume_z_min": 0.25
+      },
+      "strategy": "ProfitMoonshotReversionStrategy",
+      "strategy_class": "ProfitMoonshotReversionStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "profit_moonshot_20260501",
+        "market_window",
+        "no_timeframe_aggregator",
+        "reversion",
+        "crypto",
+        "article_pipeline",
+        "article_family:profit-moonshot-shock-reversion"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "99ac95a048fe9e4b",
+      "family": "cross_sectional",
+      "metadata": {
+        "allow_short": false,
+        "article_pipeline_family_ids": [
+          "carry-trend-factor-rotation"
+        ],
+        "article_reference": "quant-company-profit-mechanisms",
+        "data_dependent": true,
+        "family": "cross_sectional",
+        "hypothesis_origin": "article_research_pipeline",
+        "production_ready": false,
+        "retune_profile": "balanced_lo",
+        "symbol_scope": "crypto",
+        "timeframe": "1h"
+      },
+      "name": "carry_trend_factor_rotation_1h_balanced_lo_24_8_0.200",
+      "notes": "Article-inspired factor rotation that combines trend persistence, carry/crowding pressure, and defensive volatility scaling for 1h (balanced_lo).",
+      "params": {
+        "allow_short": false,
+        "benchmark_drawdown_limit": 0.08,
+        "benchmark_drawdown_window": 48,
+        "btc_regime_ma": 72,
+        "btc_symbol": "BTC/USDT",
+        "carry_weight": 0.2,
+        "crowding_weight": 0.1,
+        "crowding_window": 72,
+        "defensive_weight": 0.15,
+        "lookback_bars": 24,
+        "max_longs": 3,
+        "max_shorts": 0,
+        "min_price": 0.1,
+        "rebalance_bars": 8,
+        "signal_threshold": 0.2,
+        "stop_loss_pct": 0.06,
+        "trend_weight": 0.55,
+        "vol_window": 48
+      },
+      "strategy": "CarryTrendFactorRotationStrategy",
+      "strategy_class": "CarryTrendFactorRotationStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "cross_sectional",
+        "factor",
+        "carry",
+        "momentum",
+        "defensive",
+        "crypto",
+        "article_pipeline",
+        "article_family:carry-trend-factor-rotation"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "7da189bdfded8ca7",
+      "family": "cross_sectional",
+      "metadata": {
+        "allow_short": true,
+        "article_pipeline_family_ids": [
+          "carry-trend-factor-rotation"
+        ],
+        "article_reference": "quant-company-profit-mechanisms",
+        "data_dependent": true,
+        "family": "cross_sectional",
+        "hypothesis_origin": "article_research_pipeline",
+        "production_ready": false,
+        "retune_profile": "guarded_ls",
+        "symbol_scope": "crypto",
+        "timeframe": "1h"
+      },
+      "name": "carry_trend_factor_rotation_1h_guarded_ls_32_8_0.150",
+      "notes": "Article-inspired factor rotation that combines trend persistence, carry/crowding pressure, and defensive volatility scaling for 1h (guarded_ls).",
+      "params": {
+        "allow_short": true,
+        "benchmark_drawdown_limit": 0.1,
+        "benchmark_drawdown_window": 72,
+        "btc_regime_ma": 96,
+        "btc_symbol": "BTC/USDT",
+        "carry_weight": 0.2,
+        "crowding_weight": 0.15,
+        "crowding_window": 96,
+        "defensive_weight": 0.2,
+        "lookback_bars": 32,
+        "max_longs": 2,
+        "max_shorts": 2,
+        "min_price": 0.1,
+        "rebalance_bars": 8,
+        "signal_threshold": 0.15,
+        "stop_loss_pct": 0.05,
+        "trend_weight": 0.45,
+        "vol_window": 72
+      },
+      "strategy": "CarryTrendFactorRotationStrategy",
+      "strategy_class": "CarryTrendFactorRotationStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "cross_sectional",
+        "factor",
+        "carry",
+        "momentum",
+        "defensive",
+        "crypto",
+        "article_pipeline",
+        "article_family:carry-trend-factor-rotation"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "0114b443ec05d8ee",
+      "family": "cross_sectional",
+      "metadata": {
+        "allow_short": false,
+        "article_pipeline_family_ids": [
+          "carry-trend-factor-rotation"
+        ],
+        "article_reference": "quant-company-profit-mechanisms",
+        "data_dependent": true,
+        "family": "cross_sectional",
+        "hypothesis_origin": "article_research_pipeline",
+        "production_ready": true,
+        "retune_profile": "production_lo_guarded",
+        "symbol_scope": "crypto",
+        "timeframe": "1h"
+      },
+      "name": "carry_trend_factor_rotation_1h_production_lo_guarded_48_12_0.250",
+      "notes": "Article-inspired factor rotation that combines trend persistence, carry/crowding pressure, and defensive volatility scaling for 1h (production_lo_guarded).",
+      "params": {
+        "allow_short": false,
+        "benchmark_drawdown_limit": 0.06,
+        "benchmark_drawdown_window": 96,
+        "btc_regime_ma": 120,
+        "btc_symbol": "BTC/USDT",
+        "carry_weight": 0.15,
+        "crowding_weight": 0.1,
+        "crowding_window": 120,
+        "defensive_weight": 0.25,
+        "lookback_bars": 48,
+        "max_longs": 2,
+        "max_shorts": 0,
+        "min_price": 0.1,
+        "rebalance_bars": 12,
+        "signal_threshold": 0.25,
+        "stop_loss_pct": 0.045,
+        "trend_weight": 0.5,
+        "vol_window": 96
+      },
+      "strategy": "CarryTrendFactorRotationStrategy",
+      "strategy_class": "CarryTrendFactorRotationStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "cross_sectional",
+        "factor",
+        "carry",
+        "momentum",
+        "defensive",
+        "crypto",
+        "article_pipeline",
+        "article_family:carry-trend-factor-rotation"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "8d8d50f568a3eb3a",
+      "family": "cross_sectional",
+      "metadata": {
+        "allow_short": true,
+        "family": "cross_sectional",
+        "illiquid_reversal": true,
+        "retune_profile": "liquid_momo_ls",
+        "symbol_scope": "crypto",
+        "timeframe": "1h"
+      },
+      "name": "last_day_liquidity_regime_1h_liquid_momo_ls_24_6_0.012",
+      "notes": "Liquidity-conditioned last-day-return continuation/reversal sleeve for 1h (liquid_momo_ls) based on liquid-momentum / illiquid-reversal evidence.",
+      "params": {
+        "allow_short": true,
+        "illiquid_reversal": true,
+        "liquidity_quantile": 0.6,
+        "liquidity_window": 24,
+        "max_longs": 2,
+        "max_realized_vol": 0.09,
+        "max_shorts": 1,
+        "min_price": 0.1,
+        "momentum_lookback_bars": 24,
+        "rebalance_bars": 6,
+        "signal_skip_bars": 1,
+        "signal_threshold": 0.012,
+        "stop_loss_pct": 0.05,
+        "volatility_window": 24
+      },
+      "strategy": "LastDayLiquidityRegimeStrategy",
+      "strategy_class": "LastDayLiquidityRegimeStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "cross_sectional",
+        "pure_momentum",
+        "liquidity_conditioned",
+        "last_day_return",
+        "crypto"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "10e75f6b58c132a3",
+      "family": "cross_sectional",
+      "metadata": {
+        "allow_short": false,
+        "family": "cross_sectional",
+        "illiquid_reversal": false,
+        "retune_profile": "guarded_lo",
+        "symbol_scope": "crypto",
+        "timeframe": "1h"
+      },
+      "name": "last_day_liquidity_regime_1h_guarded_lo_24_12_0.015",
+      "notes": "Liquidity-conditioned last-day-return continuation/reversal sleeve for 1h (guarded_lo) based on liquid-momentum / illiquid-reversal evidence.",
+      "params": {
+        "allow_short": false,
+        "illiquid_reversal": false,
+        "liquidity_quantile": 0.7,
+        "liquidity_window": 36,
+        "max_longs": 2,
+        "max_realized_vol": 0.07,
+        "max_shorts": 0,
+        "min_price": 0.1,
+        "momentum_lookback_bars": 24,
+        "rebalance_bars": 12,
+        "signal_skip_bars": 1,
+        "signal_threshold": 0.015,
+        "stop_loss_pct": 0.04,
+        "volatility_window": 24
+      },
+      "strategy": "LastDayLiquidityRegimeStrategy",
+      "strategy_class": "LastDayLiquidityRegimeStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "cross_sectional",
+        "pure_momentum",
+        "liquidity_conditioned",
+        "last_day_return",
+        "crypto"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "6afebe39638237ca",
+      "family": "formulaic_alpha",
+      "metadata": {
+        "allow_short": true,
+        "alpha_id": 5,
+        "alpha_param_override_keys": [
+          "alpha101.5.const.001",
+          "alpha101.5.const.002"
+        ],
+        "article_pipeline_family_ids": [
+          "formulaic-alpha101-research"
+        ],
+        "family": "formulaic_alpha",
+        "hypothesis_origin": "article_research_pipeline",
+        "retune_profile": "a005_vwap_tuned",
+        "signal_sign": 1.0,
+        "timeframe": "1h"
+      },
+      "name": "alpha101_formula_1h_a005_a005_vwap_tuned_dir",
+      "notes": "Single-asset Alpha101 factor sleeve with explicit constant overrides for 1h (a005_vwap_tuned).",
+      "params": {
+        "allow_short": true,
+        "alpha_id": 5,
+        "alpha_param_overrides": {
+          "alpha101.5.const.001": 8.0,
+          "alpha101.5.const.002": 14.0
+        },
+        "entry_z": 1.15,
+        "exit_z": 0.3,
+        "history_window": 144,
+        "rank_window": 24,
+        "score_window": 64,
+        "signal_sign": 1.0,
+        "stop_loss_pct": 0.03
+      },
+      "strategy": "Alpha101FormulaStrategy",
+      "strategy_class": "Alpha101FormulaStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "alpha101",
+        "formulaic",
+        "single_asset",
+        "factor",
+        "article_pipeline",
+        "article_family:formulaic-alpha101-research"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "c49978799aff2168",
+      "family": "formulaic_alpha",
+      "metadata": {
+        "allow_short": true,
+        "alpha_id": 11,
+        "alpha_param_override_keys": [
+          "alpha101.11.const.001",
+          "alpha101.11.const.002",
+          "alpha101.11.const.003"
+        ],
+        "article_pipeline_family_ids": [
+          "formulaic-alpha101-research"
+        ],
+        "family": "formulaic_alpha",
+        "hypothesis_origin": "article_research_pipeline",
+        "retune_profile": "a011_flow_tuned",
+        "signal_sign": 1.0,
+        "timeframe": "1h"
+      },
+      "name": "alpha101_formula_1h_a011_a011_flow_tuned_dir",
+      "notes": "Single-asset Alpha101 factor sleeve with explicit constant overrides for 1h (a011_flow_tuned).",
+      "params": {
+        "allow_short": true,
+        "alpha_id": 11,
+        "alpha_param_overrides": {
+          "alpha101.11.const.001": 4.0,
+          "alpha101.11.const.002": 4.0,
+          "alpha101.11.const.003": 5.0
+        },
+        "entry_z": 1.1,
+        "exit_z": 0.3,
+        "history_window": 144,
+        "rank_window": 24,
+        "score_window": 64,
+        "signal_sign": 1.0,
+        "stop_loss_pct": 0.03
+      },
+      "strategy": "Alpha101FormulaStrategy",
+      "strategy_class": "Alpha101FormulaStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "alpha101",
+        "formulaic",
+        "single_asset",
+        "factor",
+        "article_pipeline",
+        "article_family:formulaic-alpha101-research"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "82a31b3aa1d93bb0",
+      "family": "formulaic_alpha",
+      "metadata": {
+        "allow_short": false,
+        "alpha_id": 17,
+        "alpha_param_override_keys": [
+          "alpha101.17.const.001",
+          "alpha101.17.const.002"
+        ],
+        "article_pipeline_family_ids": [
+          "formulaic-alpha101-research"
+        ],
+        "family": "formulaic_alpha",
+        "hypothesis_origin": "article_research_pipeline",
+        "retune_profile": "a017_turn_tuned",
+        "signal_sign": -1.0,
+        "timeframe": "1h"
+      },
+      "name": "alpha101_formula_1h_a017_a017_turn_tuned_inv",
+      "notes": "Single-asset Alpha101 factor sleeve with explicit constant overrides for 1h (a017_turn_tuned).",
+      "params": {
+        "allow_short": false,
+        "alpha_id": 17,
+        "alpha_param_overrides": {
+          "alpha101.17.const.001": 12.0,
+          "alpha101.17.const.002": 7.0
+        },
+        "entry_z": 1.0,
+        "exit_z": 0.25,
+        "history_window": 160,
+        "rank_window": 20,
+        "score_window": 64,
+        "signal_sign": -1.0,
+        "stop_loss_pct": 0.03
+      },
+      "strategy": "Alpha101FormulaStrategy",
+      "strategy_class": "Alpha101FormulaStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "alpha101",
+        "formulaic",
+        "single_asset",
+        "factor",
+        "article_pipeline",
+        "article_family:formulaic-alpha101-research"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "b730cdad557b46e3",
+      "family": "formulaic_alpha",
+      "metadata": {
+        "allow_short": false,
+        "alpha_id": 101,
+        "alpha_param_override_keys": [
+          "alpha101.101.const.001"
+        ],
+        "article_pipeline_family_ids": [
+          "formulaic-alpha101-research"
+        ],
+        "family": "formulaic_alpha",
+        "hypothesis_origin": "article_research_pipeline",
+        "retune_profile": "a101_bodyrange_tuned",
+        "signal_sign": 1.0,
+        "timeframe": "1h"
+      },
+      "name": "alpha101_formula_1h_a101_a101_bodyrange_tuned_dir",
+      "notes": "Single-asset Alpha101 factor sleeve with explicit constant overrides for 1h (a101_bodyrange_tuned).",
+      "params": {
+        "allow_short": false,
+        "alpha_id": 101,
+        "alpha_param_overrides": {
+          "alpha101.101.const.001": 0.01
+        },
+        "entry_z": 1.0,
+        "exit_z": 0.25,
+        "history_window": 96,
+        "rank_window": 20,
+        "score_window": 48,
+        "signal_sign": 1.0,
+        "stop_loss_pct": 0.03
+      },
+      "strategy": "Alpha101FormulaStrategy",
+      "strategy_class": "Alpha101FormulaStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "alpha101",
+        "formulaic",
+        "single_asset",
+        "factor",
+        "article_pipeline",
+        "article_family:formulaic-alpha101-research"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "9c597ecbfc94b622",
+      "family": "trend",
+      "metadata": {
+        "allow_short": false,
+        "article_pipeline_family_ids": [
+          "regime-breakout-thrust"
+        ],
+        "family": "trend",
+        "hypothesis_origin": "article_research_pipeline",
+        "retune_profile": "loose_lo",
+        "timeframe": "1h"
+      },
+      "name": "rolling_breakout_1h_loose_lo_36_0.001",
+      "notes": "Single-asset channel breakout with ATR-aware protective stops for 1h (loose_lo).",
+      "params": {
+        "allow_short": false,
+        "atr_stop_multiplier": 2.0,
+        "atr_window": 14,
+        "breakout_buffer": 0.001,
+        "lookback_bars": 36,
+        "stop_loss_pct": 0.02
+      },
+      "strategy": "RollingBreakoutStrategy",
+      "strategy_class": "RollingBreakoutStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "trend",
+        "breakout",
+        "single_asset",
+        "atr",
+        "article_pipeline",
+        "article_family:regime-breakout-thrust"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "fa62852b1894fd94",
+      "family": "trend",
+      "metadata": {
+        "allow_short": true,
+        "article_pipeline_family_ids": [
+          "regime-breakout-thrust"
+        ],
+        "family": "trend",
+        "hypothesis_origin": "article_research_pipeline",
+        "retune_profile": "guarded_ls",
+        "timeframe": "1h"
+      },
+      "name": "rolling_breakout_1h_guarded_ls_48_0.002",
+      "notes": "Single-asset channel breakout with ATR-aware protective stops for 1h (guarded_ls).",
+      "params": {
+        "allow_short": true,
+        "atr_stop_multiplier": 2.5,
+        "atr_window": 18,
+        "breakout_buffer": 0.002,
+        "lookback_bars": 48,
+        "stop_loss_pct": 0.025
+      },
+      "strategy": "RollingBreakoutStrategy",
+      "strategy_class": "RollingBreakoutStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "trend",
+        "breakout",
+        "single_asset",
+        "atr",
+        "article_pipeline",
+        "article_family:regime-breakout-thrust"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "fca2784a0feff242",
+      "family": "trend",
+      "metadata": {
+        "allow_short": false,
+        "article_pipeline_family_ids": [
+          "regime-breakout-thrust"
+        ],
+        "family": "trend",
+        "hypothesis_origin": "article_research_pipeline",
+        "retune_profile": "trend_guarded",
+        "timeframe": "1h"
+      },
+      "name": "regime_breakout_1h_trend_guarded_36_0.65",
+      "notes": "Regime-gated breakout candidate with trend and volatility filters for 1h (trend_guarded).",
+      "params": {
+        "allow_short": false,
+        "lookback_window": 36,
+        "max_volatility_ratio": 1.9,
+        "momentum_floor": 0.002,
+        "range_entry_threshold": 0.65,
+        "slope_entry_threshold": 0.0008,
+        "slope_window": 18,
+        "stop_loss_pct": 0.02,
+        "volatility_fast_window": 10,
+        "volatility_slow_window": 40
+      },
+      "strategy": "RegimeBreakoutCandidateStrategy",
+      "strategy_class": "RegimeBreakoutCandidateStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "trend",
+        "breakout",
+        "regime",
+        "single_asset",
+        "article_pipeline",
+        "article_family:regime-breakout-thrust"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "ae745773a979b939",
+      "family": "trend",
+      "metadata": {
+        "allow_short": true,
+        "article_pipeline_family_ids": [
+          "regime-breakout-thrust"
+        ],
+        "family": "trend",
+        "hypothesis_origin": "article_research_pipeline",
+        "retune_profile": "trend_ls",
+        "timeframe": "1h"
+      },
+      "name": "regime_breakout_1h_trend_ls_48_0.70",
+      "notes": "Regime-gated breakout candidate with trend and volatility filters for 1h (trend_ls).",
+      "params": {
+        "allow_short": true,
+        "lookback_window": 48,
+        "max_volatility_ratio": 1.8,
+        "momentum_floor": 0.003,
+        "range_entry_threshold": 0.7,
+        "slope_entry_threshold": 0.001,
+        "slope_window": 21,
+        "stop_loss_pct": 0.025,
+        "volatility_fast_window": 12,
+        "volatility_slow_window": 48
+      },
+      "strategy": "RegimeBreakoutCandidateStrategy",
+      "strategy_class": "RegimeBreakoutCandidateStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "TRX/USDT",
+        "XRP/USDT",
+        "DOGE/USDT",
+        "ADA/USDT",
+        "AVAX/USDT"
+      ],
+      "tags": [
+        "trend",
+        "breakout",
+        "regime",
+        "single_asset",
+        "article_pipeline",
+        "article_family:regime-breakout-thrust"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "a5c2bf0f03817754",
+      "family": "market_neutral",
+      "metadata": {
+        "article_pipeline_family_ids": [
+          "sector-dispersion-reversion"
+        ],
+        "family": "market_neutral",
+        "hypothesis_origin": "article_research_pipeline",
+        "pair": "BTC/USDT_ETH/USDT",
+        "pair_variant": "core",
+        "timeframe": "1h"
+      },
+      "name": "pair_spread_1h_core_btcusdt_ethusdt_1.8_0.45",
+      "notes": "Rolling-beta spread z-score with bounded turnover/correlation guardrails.",
+      "params": {
+        "cooldown_bars": 8,
+        "entry_z": 1.8,
+        "exit_z": 0.45,
+        "hedge_window": 192,
+        "lookback_window": 96,
+        "max_hold_bars": 240,
+        "min_correlation": 0.2,
+        "reentry_z_buffer": 0.25,
+        "stop_loss_pct": 0.03,
+        "stop_z": 3.4,
+        "symbol_x": "BTC/USDT",
+        "symbol_y": "ETH/USDT"
+      },
+      "strategy": "PairSpreadZScoreStrategy",
+      "strategy_class": "PairSpreadZScoreStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT"
+      ],
+      "tags": [
+        "market_neutral",
+        "pair",
+        "spread",
+        "zscore",
+        "article_pipeline",
+        "article_family:sector-dispersion-reversion"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "743794ab5f5f880b",
+      "family": "market_neutral",
+      "metadata": {
+        "article_pipeline_family_ids": [
+          "sector-dispersion-reversion"
+        ],
+        "family": "market_neutral",
+        "hypothesis_origin": "article_research_pipeline",
+        "pair": "BTC/USDT_ETH/USDT",
+        "pair_variant": "core",
+        "timeframe": "1h"
+      },
+      "name": "pair_spread_1h_core_btcusdt_ethusdt_2.2_0.55",
+      "notes": "Rolling-beta spread z-score with bounded turnover/correlation guardrails.",
+      "params": {
+        "cooldown_bars": 8,
+        "entry_z": 2.2,
+        "exit_z": 0.55,
+        "hedge_window": 192,
+        "lookback_window": 96,
+        "max_hold_bars": 240,
+        "min_correlation": 0.2,
+        "reentry_z_buffer": 0.25,
+        "stop_loss_pct": 0.03,
+        "stop_z": 3.9,
+        "symbol_x": "BTC/USDT",
+        "symbol_y": "ETH/USDT"
+      },
+      "strategy": "PairSpreadZScoreStrategy",
+      "strategy_class": "PairSpreadZScoreStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT"
+      ],
+      "tags": [
+        "market_neutral",
+        "pair",
+        "spread",
+        "zscore",
+        "article_pipeline",
+        "article_family:sector-dispersion-reversion"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "bfda7f453e928373",
+      "family": "market_neutral",
+      "metadata": {
+        "article_pipeline_family_ids": [
+          "sector-dispersion-reversion"
+        ],
+        "family": "market_neutral",
+        "hypothesis_origin": "article_research_pipeline",
+        "pair": "BTC/USDT_ETH/USDT",
+        "pair_variant": "core",
+        "timeframe": "1h"
+      },
+      "name": "pair_spread_1h_core_btcusdt_ethusdt_2.6_0.70",
+      "notes": "Rolling-beta spread z-score with bounded turnover/correlation guardrails.",
+      "params": {
+        "cooldown_bars": 8,
+        "entry_z": 2.6,
+        "exit_z": 0.7,
+        "hedge_window": 192,
+        "lookback_window": 96,
+        "max_hold_bars": 240,
+        "min_correlation": 0.2,
+        "reentry_z_buffer": 0.25,
+        "stop_loss_pct": 0.03,
+        "stop_z": 4.2,
+        "symbol_x": "BTC/USDT",
+        "symbol_y": "ETH/USDT"
+      },
+      "strategy": "PairSpreadZScoreStrategy",
+      "strategy_class": "PairSpreadZScoreStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT"
+      ],
+      "tags": [
+        "market_neutral",
+        "pair",
+        "spread",
+        "zscore",
+        "article_pipeline",
+        "article_family:sector-dispersion-reversion"
+      ],
+      "timeframe": "1h"
+    },
+    {
+      "candidate_id": "8307f0d0945bb2bc",
+      "family": "market_neutral",
+      "metadata": {
+        "article_pipeline_family_ids": [
+          "sector-dispersion-reversion"
+        ],
+        "family": "market_neutral",
+        "hypothesis_origin": "article_research_pipeline",
+        "pair": "BTC/USDT_ETH/USDT",
+        "pair_variant": "state_vwap",
+        "timeframe": "1h"
+      },
+      "name": "pair_spread_1h_state_vwap_btcusdt_ethusdt_1.8_0.45",
+      "notes": "Rolling-beta spread z-score with bounded turnover/correlation guardrails. VWAP normalization 72; volume ratio >= 0.20.",
+      "params": {
+        "cooldown_bars": 8,
+        "entry_z": 1.8,
+        "exit_z": 0.45,
+        "hedge_window": 192,
+        "lookback_window": 96,
+        "max_hold_bars": 168,
+        "min_correlation": 0.25,
+        "min_volume_ratio": 0.2,
+        "min_volume_window": 24,
+        "reentry_z_buffer": 0.25,
+        "stop_loss_pct": 0.03,
+        "stop_z": 3.4,
+        "symbol_x": "BTC/USDT",
+        "symbol_y": "ETH/USDT",
+        "vwap_window": 72
+      },
+      "strategy": "PairSpreadZScoreStrategy",
+      "strategy_class": "PairSpreadZScoreStrategy",
+      "strategy_timeframe": "1h",
+      "symbols": [
+        "BTC/USDT",
+        "ETH/USDT"
+      ],
+      "tags": [
+        "market_neutral",
+        "pair",
+        "spread",
+        "zscore",
+        "pair_state",
+        "article_pipeline",
+        "article_family:sector-dispersion-reversion"
+      ],
+      "timeframe": "1h"
+    }
+  ],
+  "chunk_count": 11,
+  "chunk_id": "1h_chunk_01",
+  "chunk_index": 1,
+  "chunk_size": 40,
+  "excluded_candidate_count": 62,
+  "family_counts": {
+    "breakout": 162,
+    "carry": 81,
+    "cross_sectional": 77,
+    "deep_research_leaf": 9,
+    "event_alpha": 18,
+    "flow": 36,
+    "formulaic_alpha": 6,
+    "intraday_alpha": 18,
+    "market_neutral": 209,
+    "mean_reversion": 138,
+    "micro": 3,
+    "momentum": 135,
+    "profit_moonshot_breakout": 2,
+    "profit_moonshot_cross_sectional": 3,
+    "profit_moonshot_reversion": 2,
+    "profit_reboot_cross_sectional": 4,
+    "profit_reboot_mean_reversion": 3,
+    "profit_reboot_pair_carry": 3,
+    "seasonality": 63,
+    "trend": 494
+  },
+  "g005_1h_chunk_manifest_sha256": "7a002706265d182ae226cf0ec6872f29770235fa4f9fcca540fea2c055f8e0b6",
+  "g005_manifest_sha256": "f2aee8ccf17f9775b5d0583d90c085919bc9d98780882777267cc34778613cfc",
+  "g005_shard_manifest_sha256": "9ab4087b298140f50c014d7c339ec25ab2db75c40c7c3e2b2caba57ba82e2262",
+  "g005_supported_timeframes": [
+    "1d",
+    "1h",
+    "30m",
+    "4h"
+  ],
+  "generated_at_utc": "2026-07-03T14:00:35.611885+00:00",
+  "goal_id": "G004",
+  "immutable_after_checkpoint": true,
+  "input_symbols_source": "G002 eligible_for_frozen_historical_candidate_search symbols after fail-closed exclusion of any quarantine_reasons",
+  "policy": "G005 latest-fold walk-forward evaluates frozen candidates at supported completed-bar cadences 30m/1h/4h/1d; lower-latency 1s/5m/15m definitions remain frozen by G004 but are excluded from this G005 walk-forward run because the runner/data contract is completed-bar >=30m.",
+  "saved_artifact_commit": "e4e4f282",
+  "schema_version": 1,
+  "shard_key": "1h",
+  "shard_policy": "timeframe shard for parallel G005 frozen-candidate evaluation; union of shards equals g005_walkforward_candidate_manifest candidates",
+  "source_candidate_count": 1466,
+  "source_g004_candidate_manifest": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g004_frozen_candidate_manifest.json",
+  "source_g005_1h_manifest": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_walkforward_candidate_manifest_1h.json",
+  "source_g005_manifest": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_walkforward_candidate_manifest.json",
+  "strategy_counts": {
+    "AbnormalReturnContinuationStrategy": 18,
+    "AccelerationRiderStrategy": 36,
+    "AdaptiveRegimeMomentumStrategy": 4,
+    "AdaptiveTrendRiderStrategy": 36,
+    "AdfGatedReversionRiderStrategy": 36,
+    "Alpha101FormulaStrategy": 6,
+    "AmihudIlliquidityMomentumRiderStrategy": 36,
+    "BasisSnapbackReversionStrategy": 2,
+    "BreadthRegimeTrendTimerStrategy": 3,
+    "BreadthThrustFailureReversalStrategy": 2,
+    "BullBearRegimeRotationStrategy": 4,
+    "CarryTrendConfluenceRiderStrategy": 36,
+    "CarryTrendFactorRotationStrategy": 6,
+    "CompositeTrendStrategy": 9,
+    "ConfidenceGatedTrendStrategy": 18,
+    "CrossAssetDiversifiedTrendStrategy": 3,
+    "CrossAssetLiquidationContagionFadeStrategy": 2,
+    "CrossSectionalFlowShareRotationStrategy": 8,
+    "CusumChangePointTrendRiderStrategy": 36,
+    "DisagreementGatedEnsembleStrategy": 36,
+    "DispersionConditionedReversionStrategy": 2,
+    "FlowImbalanceLiquidationSweepStrategy": 3,
+    "FundingDislocationTrendCarryStrategy": 3,
+    "FundingHarvestCarryStrategy": 36,
+    "FundingLiquidationCrowdingFadeStrategy": 2,
+    "GarchInnovationRiderStrategy": 36,
+    "HurstRegimeGatedStrategy": 3,
+    "IdiosyncraticVolatilityStrategy": 2,
+    "IntradayFlowPressureRiderStrategy": 36,
+    "IntradaySeasonalMomentumRiderStrategy": 27,
+    "KalmanTrendRiderStrategy": 36,
+    "LastDayLiquidityRegimeStrategy": 4,
+    "LeadLagSpilloverStrategy": 18,
+    "LiquidationCascadeReversionStrategy": 3,
+    "LiquidityShockReversionStrategy": 4,
+    "LotterySkewnessStrategy": 2,
+    "MeanReversionStdStrategy": 6,
+    "MicroRangeExpansion1sStrategy": 3,
+    "MultiHorizonTrendExhaustionFadeStrategy": 2,
+    "MultiTimeframeTrendEnsembleStrategy": 36,
+    "OpenInterestTrendConfirmationRiderStrategy": 36,
+    "OpeningRangeBreakoutRiderStrategy": 27,
+    "OrderBookImbalanceReversionStrategy": 3,
+    "OvernightSessionReturnRiderStrategy": 27,
+    "PairSpreadZScoreStrategy": 209,
+    "PanicReboundMeanReversionStrategy": 3,
+    "PermutationEntropyTrendRiderStrategy": 36,
+    "PerpCrowdingCarryStrategy": 9,
+    "ProfitMoonshotBreakoutStrategy": 2,
+    "ProfitMoonshotReversionStrategy": 2,
+    "ProfitMoonshotTrendStrategy": 3,
+    "PullbackTrendContinuationStrategy": 36,
+    "RealizedSemivarianceTrendRiderStrategy": 27,
+    "RealizedVolTermStructureStrategy": 36,
+    "RegimeBreakoutCandidateStrategy": 4,
+    "RegimeRouterConfirmedRotationStrategy": 4,
+    "ResidualBasketReversionStrategy": 2,
+    "RollingBreakoutStrategy": 4,
+    "SeasonalMicroBreakoutRiderStrategy": 27,
+    "SelectionGatedMomentumStrategy": 3,
+    "SelectionGatedReversionStrategy": 3,
+    "SessionFilteredPairCarryStrategy": 3,
+    "SessionGatedResidualBasketReversionStrategy": 2,
+    "SessionLiquidityVacuumFadeStrategy": 2,
+    "SpectralCycleRiderStrategy": 36,
+    "TailIndexRegimeRiderStrategy": 36,
+    "TopCapTimeSeriesMomentumStrategy": 14,
+    "TrendEfficiencyMomentumStrategy": 2,
+    "VWAPCompressionReversionStrategy": 36,
+    "VarianceRatioTrendRiderStrategy": 36,
+    "VolCompressionVWAPReversionStrategy": 4,
+    "VolManagedMomentumCrashGateStrategy": 3,
+    "VolOfVolExhaustionFadeStrategy": 2,
+    "VolOfVolRegimeTrendGateStrategy": 36,
+    "VolatilityBreakoutRiderStrategy": 36,
+    "VolatilityRegimeResidualBasketReversionStrategy": 2,
+    "VolatilitySqueezeBreakoutRiderStrategy": 36,
+    "VolumeClockMomentumRiderStrategy": 36,
+    "VpinToxicityRiderStrategy": 36,
+    "VwapReversionStrategy": 4
+  },
+  "symbol_universe": [
+    "BTC/USDT",
+    "ETH/USDT",
+    "SOL/USDT",
+    "BNB/USDT",
+    "TRX/USDT",
+    "XRP/USDT",
+    "DOGE/USDT",
+    "ADA/USDT",
+    "AVAX/USDT"
+  ],
+  "timeframe_counts": {
+    "15m": 32,
+    "1d": 299,
+    "1h": 440,
+    "1s": 3,
+    "30m": 305,
+    "4h": 360,
+    "5m": 27
+  },
+  "timeframes": [
+    "1s",
+    "1m",
+    "5m",
+    "15m",
+    "30m",
+    "1h",
+    "4h",
+    "1d"
+  ]
+}

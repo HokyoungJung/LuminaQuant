@@ -1,0 +1,146 @@
+{
+  "artifact_kind": "g004_algorithm_boundary_test_report",
+  "assertions": [
+    {
+      "detail": "budget belongs to G004",
+      "evidence": "G004",
+      "name": "expected_goal",
+      "passed": true
+    },
+    {
+      "detail": "G002 declared hash is present",
+      "evidence": null,
+      "name": "g002_hash_present",
+      "passed": true
+    },
+    {
+      "detail": "G003 declared hash is present",
+      "evidence": null,
+      "name": "g003_hash_present",
+      "passed": true
+    },
+    {
+      "detail": "candidate count matches frozen manifest",
+      "evidence": 1466,
+      "name": "candidate_count_matches",
+      "passed": true
+    },
+    {
+      "detail": "family caps freeze exact generated counts",
+      "evidence": null,
+      "name": "family_caps_equal_counts",
+      "passed": true
+    },
+    {
+      "detail": "candidate symbols are a subset of fail-closed G002 historical eligible symbols",
+      "evidence": [
+        "ADAUSDT",
+        "AVAXUSDT",
+        "BNBUSDT",
+        "BTCUSDT",
+        "DOGEUSDT",
+        "ETHUSDT",
+        "SOLUSDT",
+        "TRXUSDT",
+        "XRPUSDT"
+      ],
+      "name": "candidate_symbols_subset",
+      "passed": true
+    },
+    {
+      "detail": "quarantined symbols do not enter candidate search",
+      "evidence": [],
+      "name": "quarantined_excluded",
+      "passed": true
+    },
+    {
+      "detail": "G002 historical-ready but feature-quarantined TONUSDT is recorded as excluded",
+      "evidence": [
+        "TONUSDT"
+      ],
+      "name": "quarantine_exclusion_recorded",
+      "passed": true
+    },
+    {
+      "detail": "feature-dependent eligible symbols are inside final historical set",
+      "evidence": [
+        "BTCUSDT",
+        "ETHUSDT",
+        "SOLUSDT",
+        "BNBUSDT",
+        "TRXUSDT",
+        "XRPUSDT",
+        "DOGEUSDT",
+        "ADAUSDT",
+        "AVAXUSDT"
+      ],
+      "name": "feature_symbols_subset",
+      "passed": true
+    },
+    {
+      "detail": "pre-existing dirty worktree does not touch freeze-critical source files",
+      "evidence": [],
+      "name": "no_dirty_critical_source",
+      "passed": true
+    },
+    {
+      "detail": "locked OOS cannot drive selection/tie-break/weights",
+      "evidence": null,
+      "name": "no_oos_selection",
+      "passed": true
+    },
+    {
+      "detail": "cost stress grid fixed at 10/15/20/30 bps",
+      "evidence": null,
+      "name": "cost_grid_includes_stress",
+      "passed": true
+    },
+    {
+      "detail": "effective trials denominator is locked and includes portfolio grid",
+      "evidence": {
+        "candidate_trial_count": 1466,
+        "effective_trials_denominator_locked": true,
+        "effective_trials_method": "upper-bound count of frozen candidate definitions plus frozen portfolio-grid combinations; any later split must carry this hash forward and cannot lower the denominator after seeing readouts",
+        "portfolio_trial_count": 23328,
+        "total_declared_trials": 24794
+      },
+      "name": "trials_locked",
+      "passed": true
+    },
+    {
+      "detail": "all execution surfaces remain disabled",
+      "evidence": null,
+      "name": "execution_disabled",
+      "passed": true
+    },
+    {
+      "detail": "candidate set hash recomputes from candidate payload",
+      "evidence": null,
+      "name": "candidate_set_hash_recomputes",
+      "passed": true
+    },
+    {
+      "detail": "budget self hash recomputes excluding self hash",
+      "evidence": null,
+      "name": "budget_hash_recomputes",
+      "passed": true
+    }
+  ],
+  "budget_manifest_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g004_search_budget_manifest.json",
+  "budget_manifest_sha256": "b35dd9a26b2880f6b5e2c8c091fedcd6956871940573ca9d9fc0405f8ec0ac50",
+  "candidate_manifest_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g004_frozen_candidate_manifest.json",
+  "candidate_manifest_sha256": "1292498b3b729038c74932175a12d910fc4351b2feb3bbfc95f827517e423efe",
+  "generated_at_utc": "2026-07-03T14:00:35.611885+00:00",
+  "goal_id": "G004",
+  "schema_version": 1,
+  "status": "passed",
+  "summary": {
+    "assertions_passed": 16,
+    "assertions_total": 16,
+    "candidate_count": 1466,
+    "family_count": 20,
+    "portfolio_trial_count": 23328,
+    "total_declared_trials": 24794
+  },
+  "verdict": "passed"
+}
