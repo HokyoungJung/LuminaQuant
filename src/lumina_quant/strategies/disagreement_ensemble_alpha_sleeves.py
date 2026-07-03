@@ -85,6 +85,7 @@ import math
 from collections import deque
 from typing import Any
 
+from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.alpha_features import clipped_tanh_score, rolling_zscore
 from lumina_quant.indicators.bands import donchian_channel
 from lumina_quant.indicators.common import safe_float, time_key
@@ -168,7 +169,7 @@ def _trend_efficiency_score(closes: list[float], *, period: int) -> float:
     return max(-1.0, min(1.0, sign * er))
 
 
-# @register("strategy", "DisagreementGatedEnsembleStrategy", interface="event_driven")  # applied atomically with the research_only tier hint in W3 integration — do NOT apply earlier (live-safety)
+@register("strategy", "DisagreementGatedEnsembleStrategy", interface="event_driven")
 class DisagreementGatedEnsembleStrategy(_ReturnRiderBase):
     """Combine four directional components; trade only when they agree.
 

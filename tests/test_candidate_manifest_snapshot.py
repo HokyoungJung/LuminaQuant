@@ -17,9 +17,9 @@ FIXED_TIMEFRAMES = ("1h", "4h")
 # the digest is robust to dict-ordering. Captured from current behavior; if the
 # rider-builder consolidation changes any candidate, this digest must be
 # re-captured intentionally.
-EXPECTED_MANIFEST_SHA256 = "82a48740355cc93b94a230cc65d7049e081c59648f4ff729f41f8dbf3a82cba5"
+EXPECTED_MANIFEST_SHA256 = "3885baddc57715faa2662b9e31cd58a7765782d752f8c37b7065ec2ae016559f"
 
-EXPECTED_CANDIDATE_COUNT = 145
+EXPECTED_CANDIDATE_COUNT = 149
 
 EXPECTED_FAMILY_COUNTS = {
     "breakout": 20,
@@ -29,7 +29,7 @@ EXPECTED_FAMILY_COUNTS = {
     "mean_reversion": 12,
     "momentum": 12,
     "seasonality": 8,
-    "trend": 47,
+    "trend": 51,
 }
 
 EXPECTED_STRATEGY_COUNTS = {
@@ -41,6 +41,7 @@ EXPECTED_STRATEGY_COUNTS = {
     "CompositeTrendStrategy": 3,
     "ConfidenceGatedTrendStrategy": 4,
     "CusumChangePointTrendRiderStrategy": 4,
+    "DisagreementGatedEnsembleStrategy": 4,
     "GarchInnovationRiderStrategy": 4,
     "IntradaySeasonalMomentumRiderStrategy": 4,
     "KalmanTrendRiderStrategy": 4,
@@ -64,7 +65,7 @@ EXPECTED_STRATEGY_COUNTS = {
     "VolatilitySqueezeBreakoutRiderStrategy": 4,
 }
 
-EXPECTED_TIMEFRAME_COUNTS = {"1h": 79, "4h": 66}
+EXPECTED_TIMEFRAME_COUNTS = {"1h": 81, "4h": 68}
 
 # Every rider-builder produced strategy class. The upcoming consolidation must
 # preserve this exact roster (names and per-class candidate counts).
@@ -107,6 +108,8 @@ EXPECTED_TAGS = {
     "crypto",
     "cusum",
     "cycle",
+    "disagreement_gate",
+    "ensemble",
     "execution_risk",
     "factor",
     "formulaic",

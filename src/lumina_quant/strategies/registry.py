@@ -202,6 +202,13 @@ _STRATEGY_TIER_HINTS: dict[str, str] = {
     # walk-forward proves that the explicit short sleeve improves bear-regime
     # capture without increasing fold-level drawdown concentration.
     "BullBearRegimeRotationStrategy": "research_only",
+    # Alpha-hunt meta-spine batch (2026-07-03 consensus plan): research_only until
+    # the data-PC clean walk-forward passes the operationalized promotion rule in
+    # .omc/plans/alpha-hunt-consensus-plan.md. Registration and these hints land
+    # atomically (live-safety) and are enforced by tests/test_strategy_tier_guard.py.
+    "DisagreementGatedEnsembleStrategy": "research_only",
+    "CrossSectionalFlowShareRotationStrategy": "research_only",
+    "RegimeRouterConfirmedRotationStrategy": "research_only",
 }
 
 _STRATEGY_METADATA: dict[str, dict[str, Any]] = {
@@ -248,6 +255,8 @@ _OPTUNA_TRIAL_OVERRIDES: dict[str, str] = {
     "TimeframePairZScoreReversionStrategy": "16",
     "MicroRangeExpansion1sStrategy": "16",
     "BullBearRegimeRotationStrategy": "16",
+    "CrossSectionalFlowShareRotationStrategy": "16",
+    "RegimeRouterConfirmedRotationStrategy": "16",
 }
 
 

@@ -84,6 +84,7 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Any
 
+from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.alpha_features import realized_volatility, simple_return
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.indicators.flow_share import (
@@ -149,7 +150,7 @@ def _coerce_float_list(value: Any) -> list[float]:
     return out
 
 
-# @register("strategy", "CrossSectionalFlowShareRotationStrategy", interface="event_driven")  # applied atomically with the research_only tier hint in W3 integration — do NOT apply earlier (live-safety)
+@register("strategy", "CrossSectionalFlowShareRotationStrategy", interface="event_driven")
 class CrossSectionalFlowShareRotationStrategy(Strategy):
     """Rotate long/short on cross-sectional dollar-volume turnover-share extremes.
 

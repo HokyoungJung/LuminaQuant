@@ -2710,6 +2710,15 @@ class _CandidateBuildContext:
         _build_spectral_cycle_rider_candidates(self)
         _build_adf_gated_reversion_rider_candidates(self)
         _build_garch_innovation_rider_candidates(self)
+        # Alpha-hunt meta-spine batch (consensus plan 2026-07-03): the
+        # disagreement-gated per-symbol ensemble, the cross-sectional
+        # turnover-share rotation basket (honest tags, NO carry — admission via
+        # allow_multi_asset=True at the data-PC handoff), and the vol/cycle-
+        # confirmed regime router. SLICE constants live in the lane modules;
+        # these builders are thin wiring only.
+        _build_disagreement_ensemble_candidates(self)
+        _build_flow_share_rotation_candidates(self)
+        _build_regime_router_confirmed_candidates(self)
         _build_metals_relative_value_basket_candidates(self)
         _build_liquidation_cascade_reversion_candidates(self)
         _build_orderbook_imbalance_reversion_candidates(self)
@@ -9106,6 +9115,161 @@ def _build_garch_innovation_rider_candidates(ctx: _CandidateBuildContext) -> Non
                         "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
                     },
                 )
+
+
+def _build_disagreement_ensemble_candidates(ctx: _CandidateBuildContext) -> None:
+    """Per-symbol disagreement-gated ensemble rider (single-asset, OHLCV-only)."""
+    from lumina_quant.strategies.disagreement_ensemble_alpha_sleeves import (
+        _DISAGREEMENT_ENSEMBLE_SLICE,
+    )
+
+    crypto_symbols = ctx.crypto_only_symbols
+    if not crypto_symbols:
+        return
+    for timeframe in ctx._present("30m", "1h", "4h", "1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _DISAGREEMENT_ENSEMBLE_SLICE.get(timeframe, ()):
+            for symbol in crypto_symbols:
+                params = {key: value for key, value in spec.items() if key != "variant"}
+                _add_candidate(
+                    ctx.candidates,
+                    name=(
+                        f"disagreement_ensemble_{tf_tag}_{spec['variant']}_"
+                        f"{symbol.replace('/', '').lower()}"
+                    ),
+                    family="trend",
+                    strategy_class="DisagreementGatedEnsembleStrategy",
+                    timeframe=timeframe,
+                    symbols=(symbol,),
+                    params=params,
+                    notes=(
+                        "Per-symbol disagreement-gated ensemble: four causal OHLCV "
+                        "component scores (EMA-slope TSMOM, rolling-z reversion, "
+                        "Donchian position, efficiency-signed trend) combined with "
+                        "inverse-error weights; a disagreement-coefficient gate blocks "
+                        "entry unless components agree. ATR trailing stop + pyramiding "
+                        f"on {symbol} at {timeframe} ({spec['variant']})."
+                    ),
+                    tags=(
+                        "trend",
+                        "ensemble",
+                        "disagreement_gate",
+                        "meta_gate",
+                        "return_rider",
+                        "trailing_stop",
+                        "pyramiding",
+                        "single_asset",
+                        "crypto",
+                    ),
+                    metadata={
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": symbol,
+                        "allow_short": bool(spec["allow_short"]),
+                        "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                    },
+                )
+
+
+def _build_flow_share_rotation_candidates(ctx: _CandidateBuildContext) -> None:
+    """Cross-sectional turnover-share rotation basket (honest tags, no carry)."""
+    from lumina_quant.strategies.flow_share_rotation_alpha_sleeves import (
+        _FLOW_SHARE_ROTATION_SLICE,
+        _SUGGESTED_CANDIDATE_TAGS,
+    )
+
+    crypto_symbols = tuple(ctx.crypto_only_symbols)
+    min_symbols = 5
+    if len(crypto_symbols) < min_symbols:
+        return
+    for timeframe in ctx._present("30m", "1h", "4h", "1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _FLOW_SHARE_ROTATION_SLICE.get(timeframe, ()):
+            params = {key: value for key, value in spec.items() if key != "variant"}
+            _add_candidate(
+                ctx.candidates,
+                name=f"flow_share_rotation_{tf_tag}_{spec['variant']}",
+                family="cross_sectional",
+                strategy_class="CrossSectionalFlowShareRotationStrategy",
+                timeframe=timeframe,
+                symbols=crypto_symbols,
+                params=params,
+                notes=(
+                    "Cross-sectional turnover-share rotation: each symbol's dollar-"
+                    "volume share of the universe feeds a rolling share z-score and "
+                    "CDF extremeness gauge; rising share + return confirmation arms "
+                    "LONG, share collapse or blow-off arms SHORT; top-n per side, "
+                    "inverse-vol sized. Deliberately NOT tagged carry — the default "
+                    "shortlist excludes it; evaluate with allow_multi_asset=True "
+                    f"({timeframe}, {spec['variant']})."
+                ),
+                tags=_SUGGESTED_CANDIDATE_TAGS,
+                metadata={
+                    "timeframe": timeframe,
+                    "retune_profile": str(spec["variant"]),
+                    "symbol_scope": "crypto_basket",
+                    "allow_short": bool(spec["allow_short"]),
+                    "admission_route": "allow_multi_asset_handoff",
+                    "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                },
+            )
+
+
+def _build_regime_router_confirmed_candidates(ctx: _CandidateBuildContext) -> None:
+    """Vol/cycle-confirmed bull/bear regime router basket (cross_sectional)."""
+    from lumina_quant.strategies.regime_router_confirmed_alpha_sleeves import (
+        _REGIME_ROUTER_CONFIRMED_SLICE,
+    )
+
+    crypto_symbols = tuple(ctx.crypto_only_symbols)
+    min_symbols = 5
+    if len(crypto_symbols) < min_symbols:
+        return
+    for timeframe in ctx._present("30m", "1h", "4h", "1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _REGIME_ROUTER_CONFIRMED_SLICE.get(timeframe, ()):
+            params = {key: value for key, value in spec.items() if key != "variant"}
+            params["benchmark_symbol"] = "BTC/USDT"
+            params["min_symbols"] = int(min_symbols)
+            params["allow_short"] = True
+            _add_candidate(
+                ctx.candidates,
+                name=(
+                    f"regime_router_confirmed_{tf_tag}_{spec['variant']}_"
+                    f"{int(spec['momentum_lookback'])}_{int(spec['bull_breadth'] * 100)}"
+                ),
+                family="cross_sectional",
+                strategy_class="RegimeRouterConfirmedRotationStrategy",
+                timeframe=timeframe,
+                symbols=crypto_symbols,
+                params=params,
+                notes=(
+                    "Vol/cycle-confirmed bull/bear router: the parent breadth + BTC "
+                    "base vote must be CONFIRMED by a GARCH conditional-vol regime "
+                    "(spectral cycle phase as fallback) before any directional flip; "
+                    "3-state sticky hysteresis keeps chop flat. Same admission tags "
+                    f"as the parent router ({timeframe}, {spec['variant']})."
+                ),
+                tags=(
+                    *_CROSS_SECTIONAL_ADMISSION_TAGS,
+                    "bull_bear",
+                    "breadth",
+                    "directional_router",
+                    "regime",
+                    "regime_gate",
+                    "conditional_volatility",
+                    "garch",
+                    "trend",
+                    "crypto",
+                ),
+                metadata={
+                    "timeframe": timeframe,
+                    "retune_profile": str(spec["variant"]),
+                    "symbol_scope": "crypto_basket",
+                    "allow_short": True,
+                    "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                },
+            )
 
 
 _METALS_RELATIVE_VALUE_BASKET_SLICE: dict[str, tuple[dict[str, Any], ...]] = {

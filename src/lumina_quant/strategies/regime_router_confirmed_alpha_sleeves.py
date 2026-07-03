@@ -101,6 +101,7 @@ import math
 from collections import deque
 from typing import Any
 
+from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.alpha_features import simple_return
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.indicators.garch import garch11_fit, garch11_next_variance
@@ -180,7 +181,7 @@ def _trailing_log_closes(closes: list[float], window: int) -> list[float] | None
     return logs
 
 
-# @register("strategy", "RegimeRouterConfirmedRotationStrategy", interface="event_driven")  # applied atomically with the research_only tier hint in W3 integration — do NOT apply earlier (live-safety)
+@register("strategy", "RegimeRouterConfirmedRotationStrategy", interface="event_driven")
 class RegimeRouterConfirmedRotationStrategy(Strategy):
     """Breadth+benchmark regime router gated by GARCH/cycle confirmation.
 
