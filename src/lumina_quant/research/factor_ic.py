@@ -116,17 +116,21 @@ def _average_rank(values: np.ndarray) -> np.ndarray:
     """
     n = values.shape[0]
     order = np.argsort(values, kind="stable")
-    ranks = np.empty(n, dtype=np.float64)
     sorted_vals = values[order]
-    i = 0
-    while i < n:
-        j = i + 1
-        while j < n and sorted_vals[j] == sorted_vals[i]:
-            j += 1
-        # Positions i..j-1 are tied; average rank is (i + j - 1)/2 (0-based) + 1.
-        avg = (i + j - 1) / 2.0 + 1.0
-        ranks[order[i:j]] = avg
-        i = j
+    # Vectorized tie grouping (2026-07-03 audit perf fix): the previous Python
+    # while-loop dominated reduce_factor_ic (called per factor per timestamp).
+    # For a tie group starting at i with count c the average 1-based rank is
+    # i + (c - 1)/2 + 1 == (i + j - 1)/2 + 1 with j = i + c -- bit-identical to
+    # the loop for any n < 2**52.
+    new_group = np.empty(n, dtype=bool)
+    new_group[0] = True
+    np.not_equal(sorted_vals[1:], sorted_vals[:-1], out=new_group[1:])
+    group_ids = np.cumsum(new_group) - 1
+    group_starts = np.flatnonzero(new_group)
+    counts = np.diff(np.append(group_starts, n))
+    group_avg = group_starts + (counts - 1) / 2.0 + 1.0
+    ranks = np.empty(n, dtype=np.float64)
+    ranks[order] = group_avg[group_ids]
     return ranks
 
 

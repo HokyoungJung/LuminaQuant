@@ -446,6 +446,14 @@ class TradingEngine(ABC):
         self.portfolio.update_timeindex(event)
 
         if hasattr(self.execution_handler, "check_open_orders"):
+            # 2026-07-03 audit perf fix: with no working conditional orders the
+            # per-row check is a guaranteed no-op (check_open_orders early-outs),
+            # yet a MarketEvent used to be constructed for EVERY 1s row in the
+            # window. Skip the whole sweep when the order book is empty; handlers
+            # without an active_orders contract keep the legacy sweep.
+            active_orders = getattr(self.execution_handler, "active_orders", None)
+            if active_orders is not None and not active_orders:
+                return
             fallback_time = getattr(event, "time", None)
             for symbol, rows in bars_1s.items():
                 if not rows:

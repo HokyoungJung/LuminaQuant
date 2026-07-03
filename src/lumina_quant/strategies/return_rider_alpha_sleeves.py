@@ -130,10 +130,14 @@ def _atr_value(
     n = min(len(highs), len(lows), len(closes))
     if n < period_i + 1:
         return None
-    highs_f = [float(value) for value in highs][-n:]
-    lows_f = [float(value) for value in lows][-n:]
-    closes_f = [float(value) for value in closes][-n:]
-    tr_values = [true_range(highs_f[idx], lows_f[idx], closes_f[idx - 1]) for idx in range(1, n)]
+    # Only the last ``period_i`` true ranges are consumed (simple mean), so slice
+    # the tail instead of recomputing TR over the full history every bar
+    # (2026-07-03 audit perf fix; numerically identical).
+    take = period_i + 1
+    highs_f = [float(value) for value in list(highs)[-take:]]
+    lows_f = [float(value) for value in list(lows)[-take:]]
+    closes_f = [float(value) for value in list(closes)[-take:]]
+    tr_values = [true_range(highs_f[idx], lows_f[idx], closes_f[idx - 1]) for idx in range(1, take)]
     return average_true_range(tr_values, period_i)
 
 
@@ -606,9 +610,29 @@ class AdaptiveTrendRiderStrategy(_ReturnRiderBase):
         )
         return now, prev
 
+    def _kama_now_prev_cached(self, item: _RiderState) -> tuple[float | None, float | None]:
+        """Per-bar memo of :meth:`_kama_now_prev` (2026-07-03 audit perf fix).
+
+        The full-history KAMA recursion is O(n * period) and was recomputed up
+        to three times per accepted bar (_entry_decision, _should_pyramid,
+        _entry_metadata). The memo is keyed by the bar's time key, so the value
+        is computed exactly once per bar and the numbers are identical.
+        """
+        cache = getattr(self, "_kama_bar_cache", None)
+        if cache is None:
+            cache = {}
+            self._kama_bar_cache = cache
+        key = item.last_time_key
+        cached = cache.get(id(item))
+        if cached is not None and cached[0] == key and key:
+            return cached[1]
+        value = self._kama_now_prev(list(item.closes))
+        cache[id(item)] = (key, value)
+        return value
+
     def _entry_decision(self, item: _RiderState) -> str:
         closes = list(item.closes)
-        kama_now, kama_prev = self._kama_now_prev(closes)
+        kama_now, kama_prev = self._kama_now_prev_cached(item)
         if kama_now is None or kama_prev is None:
             return ""
         er = kaufman_efficiency_ratio(closes, period=self.kama_period)
@@ -622,8 +646,7 @@ class AdaptiveTrendRiderStrategy(_ReturnRiderBase):
         return ""
 
     def _should_pyramid(self, item: _RiderState) -> bool:
-        closes = list(item.closes)
-        kama_now, kama_prev = self._kama_now_prev(closes)
+        kama_now, kama_prev = self._kama_now_prev_cached(item)
         if kama_now is None or kama_prev is None:
             return False
         if item.mode == "LONG":
