@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import difflib
 import importlib
 import os
 from pathlib import Path
@@ -421,12 +422,28 @@ def get_live_strategy_names(*, include_opt_in: bool = True) -> list[str]:
 
 
 def resolve_strategy_class(
-    name: str | None, default_name: str = DEFAULT_STRATEGY_NAME
+    name: str | None, default_name: str = DEFAULT_STRATEGY_NAME, *, strict: bool = True
 ) -> StrategyClass:
+    """Resolve a strategy class by registered name.
+
+    An EXPLICIT unknown name raises (2026-07-03 audit fix: a typo'd strategy in
+    config used to silently backtest/live-run the default strategy instead).
+    The default-name fallback chain applies only when ``name`` is empty/None,
+    or when ``strict=False`` is explicitly requested by legacy callers.
+    """
     strategy_map = get_strategy_map()
     requested = str(name or "").strip()
     if requested in strategy_map:
         return strategy_map[requested]
+
+    if requested and strict:
+        suggestions = difflib.get_close_matches(requested, sorted(strategy_map), n=3)
+        hint = f" Did you mean: {', '.join(suggestions)}?" if suggestions else ""
+        raise ValueError(
+            f"Unknown strategy {requested!r} is not in the registry "
+            f"({len(strategy_map)} registered).{hint} Refusing to silently "
+            "substitute the default strategy."
+        )
 
     fallback = str(default_name).strip()
     if fallback in strategy_map:
