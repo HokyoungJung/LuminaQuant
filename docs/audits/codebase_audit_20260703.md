@@ -202,3 +202,25 @@ Inspected: whole src/lumina_quant (338 py files) via a scripted import-graph orp
 7. (hygiene) stale docs (RUST_NATIVE_ACCELERATION.md), dead bench arm, .so version handshake, silent native fallback warnings.
 
 Numerics-affecting fixes (1, 2) must follow the repo rule: default-config byte-identical or config-gated, full suite + golden green, adversarial re-verify.
+## Fix ledger (2026-07-03, same day)
+
+Applied on main (full suite 3100 passed / 21 skipped, golden 13 green after every step):
+
+| # | Finding | Commit | Golden-safety mode |
+|---|---|---|---|
+| 1 | Funding never charged (0.0 sentinel) | 57e4b8a | default-config byte-identical (presence-aware lookup) |
+| 2 | reduce_only unenforced at fill | d57afc6 | config-gated `execution.enforce_reduce_only` default OFF; cost-realistic profile ON |
+| 4 | Silent default-strategy substitution | 67ba9ed | error-surface only (no numerics) |
+| 3a | Retry double-send on unknown outcome | 542be1d | live-only; query-before-resubmit adopts accepted order |
+| 3c | Loss guards vs stale INITIAL_CAPITAL | 5bf4aa5 | live-only; re-baseline at startup sync unless same-day restore |
+| 3d | REST: no throttle/418/time sync | c0b68f0 | live-only; conservative defaults on new config knobs |
+| 3b | FLATTEN one-shot kill switch | 688e807 | live-only; retries default ON (bounded), market escalation gated OFF |
+| 3e | Reconciliation never corrects | dd4cf7c | policy `reconciliation_drift_policy` default "alert" (legacy) |
+| 5 | KAMA 3x/bar, ATR full-history, _average_rank tie-loop, no-order 1s sweep | def0ddc | numerically identical (memo/tail/vectorize/early-out; bit-identity proven for ranks) |
+| 7 (partial) | Silent pyo3 fallback, dead bench Rust arm probe | 4c75fc2 | logging + script-only |
+
+Still open (next pass): #6 columnar bar storage in the data handler (large refactor);
+full adoption of the numpy_batched factor-IC arm into reduce_factor_ic (needs its own
+parity campaign); .so build-hash handshake; RUST_NATIVE_ACCELERATION.md refresh; the
+UNVERIFIED findings above (TimeframeGated live parity, stop/liquidation liquidity-cap
+bypass, unconsumed config gates) need one verification pass before any code change.
