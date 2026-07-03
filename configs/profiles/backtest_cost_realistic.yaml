@@ -102,6 +102,9 @@ execution:
   # require_funding_coverage: true => a leveraged backtest fails instead of silently
   #   charging 0.0 funding when funding feature data is absent. Default false.
   require_funding_coverage: true
+  # enforce_reduce_only: true => reduce-only fills clamp to live-exchange semantics
+  # (never flip through zero) — 2026-07-03 audit fix #2.
+  enforce_reduce_only: true
   compute_backend: "auto" # auto|cpu|gpu|forced-gpu
   gpu_mode: "auto" # auto|cpu|gpu|forced-gpu
   gpu_vram_gb: 8.0

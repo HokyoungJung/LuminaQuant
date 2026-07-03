@@ -1,6 +1,7 @@
 import math
 import os
 from collections import deque
+from dataclasses import replace
 from datetime import UTC, date, datetime
 
 import polars as pl
@@ -104,6 +105,9 @@ class Portfolio:
         )
         self.require_funding_coverage = self._audit_flag(
             config, "REQUIRE_FUNDING_COVERAGE", "execution", "require_funding_coverage"
+        )
+        self.enforce_reduce_only = self._audit_flag(
+            config, "ENFORCE_REDUCE_ONLY", "execution", "enforce_reduce_only"
         )
         # Lazily-constructed RiskManager backstop for the order-time gate (only when
         # enforce_order_risk_gate is True). Mirrors the live/trader.py:1713 usage.
@@ -480,8 +484,43 @@ class Portfolio:
         self.current_holdings["cash"] -= cost + commission
         self.current_holdings["total"] -= commission
 
+    def _clamp_reduce_only_fill(self, event):
+        """Clamp a reduce-only fill to live-exchange semantics.
+
+        A reduce-only order may only move the position toward zero, never
+        through it (Binance rejects/auto-reduces the excess). Returns the fill
+        to apply, ``None`` to skip entirely (reduce-only firing from flat or
+        the same side), or a proportionally scaled copy when only part of the
+        quantity is reducible.
+        """
+        metadata = getattr(event, "metadata", None) or {}
+        if not bool(metadata.get("reduce_only", False)):
+            return event
+        old_qty = float(self.current_positions.get(event.symbol, 0.0) or 0.0)
+        fill_dir = 1.0 if event.direction == "BUY" else -1.0
+        if abs(old_qty) <= 1e-12 or old_qty * fill_dir > 0.0:
+            return None
+        quantity = float(event.quantity)
+        if quantity <= 0.0:
+            return None
+        reducible = min(quantity, abs(old_qty))
+        if reducible >= quantity - 1e-12:
+            return event
+        scale = reducible / quantity
+        return replace(
+            event,
+            quantity=reducible,
+            fill_cost=(float(event.fill_cost) * scale) if event.fill_cost is not None else None,
+            commission=(float(event.commission) * scale if event.commission is not None else None),
+        )
+
     def update_fill(self, event):
         if event.type == "FILL":
+            if self.enforce_reduce_only:
+                clamped = self._clamp_reduce_only_fill(event)
+                if clamped is None:
+                    return
+                event = clamped
             old_qty = float(self.current_positions.get(event.symbol, 0.0) or 0.0)
             fill_dir = 1.0 if event.direction == "BUY" else -1.0
             new_qty = old_qty + fill_dir * float(event.quantity)

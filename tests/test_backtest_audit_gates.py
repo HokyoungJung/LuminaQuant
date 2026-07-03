@@ -470,3 +470,85 @@ class TestFundingSentinelFix(unittest.TestCase):
         bars = SentinelBars(datetime(2026, 1, 1, 0, 0), 100.0)
         p = self._run(BaseConfig, bars)
         self.assertEqual(p.total_funding_paid, 0.0)
+
+
+# --------------------------------------------------------------------------- #
+# Fix (2026-07-03 audit): execution.enforce_reduce_only clamps reduce-only
+# fills to live-exchange semantics (reduce toward zero, never through it).
+# --------------------------------------------------------------------------- #
+class TestEnforceReduceOnly(unittest.TestCase):
+    def _portfolio(self, cfg):
+        from lumina_quant.core.events import FillEvent
+
+        events = queue.Queue()
+        bars = MockBars(datetime(2026, 1, 1, 0, 0), 100.0)
+        p = Portfolio(bars, events, bars.current_dt, cfg)
+        return p, FillEvent
+
+    def _fill(self, FillEvent, *, qty, direction, reduce_only=True):
+        return FillEvent(
+            timeindex=datetime(2026, 1, 1, 0, 0),
+            symbol="BTC/USDT",
+            exchange="SIM",
+            quantity=qty,
+            direction=direction,
+            fill_cost=qty * 100.0,
+            commission=qty * 0.04,
+            metadata={"reduce_only": reduce_only},
+        )
+
+    def test_default_off_preserves_legacy_phantom_flip(self):
+        # Golden safety: default OFF keeps the legacy behavior byte-identical —
+        # an oversized reduce-only exit still flips the book (the bug).
+        p, FillEvent = self._portfolio(BaseConfig)
+        p.current_positions["BTC/USDT"] = 1.0
+        p.update_fill(self._fill(FillEvent, qty=2.0, direction="SELL"))
+        self.assertAlmostEqual(p.current_positions["BTC/USDT"], -1.0)
+
+    def test_flag_on_clamps_oversized_exit_to_flat(self):
+        class Cfg(BaseConfig):
+            ENFORCE_REDUCE_ONLY = True
+
+        p, FillEvent = self._portfolio(Cfg)
+        p.current_positions["BTC/USDT"] = 1.0
+        before_cash = p.current_holdings["cash"]
+        p.update_fill(self._fill(FillEvent, qty=2.0, direction="SELL"))
+        self.assertAlmostEqual(p.current_positions["BTC/USDT"], 0.0)
+        # Only the reducible 1.0 traded: cash moved by ~1.0*100 minus scaled fee.
+        self.assertAlmostEqual(p.current_holdings["cash"] - before_cash, 100.0 - 0.04, places=8)
+
+    def test_flag_on_skips_reduce_only_from_flat(self):
+        class Cfg(BaseConfig):
+            ENFORCE_REDUCE_ONLY = True
+
+        p, FillEvent = self._portfolio(Cfg)
+        trades_before = p.trade_count
+        p.update_fill(self._fill(FillEvent, qty=1.0, direction="SELL"))
+        self.assertAlmostEqual(p.current_positions["BTC/USDT"], 0.0)
+        self.assertEqual(p.trade_count, trades_before)  # true no-op
+
+    def test_flag_on_skips_same_side_reduce_only(self):
+        class Cfg(BaseConfig):
+            ENFORCE_REDUCE_ONLY = True
+
+        p, FillEvent = self._portfolio(Cfg)
+        p.current_positions["BTC/USDT"] = 1.0
+        p.update_fill(self._fill(FillEvent, qty=1.0, direction="BUY"))
+        self.assertAlmostEqual(p.current_positions["BTC/USDT"], 1.0)
+
+    def test_flag_on_partial_reduction_passes_through(self):
+        class Cfg(BaseConfig):
+            ENFORCE_REDUCE_ONLY = True
+
+        p, FillEvent = self._portfolio(Cfg)
+        p.current_positions["BTC/USDT"] = 1.0
+        p.update_fill(self._fill(FillEvent, qty=0.4, direction="SELL"))
+        self.assertAlmostEqual(p.current_positions["BTC/USDT"], 0.6)
+
+    def test_flag_on_non_reduce_only_fills_untouched(self):
+        class Cfg(BaseConfig):
+            ENFORCE_REDUCE_ONLY = True
+
+        p, FillEvent = self._portfolio(Cfg)
+        p.update_fill(self._fill(FillEvent, qty=2.0, direction="SELL", reduce_only=False))
+        self.assertAlmostEqual(p.current_positions["BTC/USDT"], -2.0)

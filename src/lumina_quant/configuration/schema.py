@@ -115,6 +115,12 @@ class ExecutionConfig:
     #     silently charging 0.0 funding when funding feature data is absent.  Default
     #     False preserves current behavior (enable on the backtest machine).
     require_funding_coverage: bool = False
+    #   enforce_reduce_only: when True the backtest clamps reduce-only fills to
+    #     live-exchange semantics (reduce toward zero, never through it), so same-bar
+    #     stop+exit coincidences and post-liquidation bracket fills cannot flip a flat
+    #     book into a phantom opposite position.  Default False preserves legacy
+    #     numerics (2026-07-03 audit fix #2).
+    enforce_reduce_only: bool = False
 
 
 @dataclass(slots=True)
