@@ -121,16 +121,29 @@ def test_columnar_storage_round_trips_bars_identically():
     ]
 
 
-def test_columnar_storage_matches_csv_loaded_symbol():
-    """The plain CSV-loading path (no data_dict) also uses columnar storage."""
+def test_columnar_storage_matches_csv_loaded_symbol(tmp_path):
+    """The plain CSV-loading path (no data_dict) also uses columnar storage.
+
+    Self-contained: writes its own CSV — repo data/ files are absent in the
+    sanitized public-CI checkout, so tests must never depend on them.
+    """
+    rows = [
+        "datetime,open,high,low,close,volume",
+        "2024-01-01T00:00:00.000000,100.1,100.9,99.5,100.4,462",
+        "2024-01-02T00:00:00.000000,100.4,101.2,99.9,100.8,681",
+        "2024-01-03T00:00:00.000000,100.8,101.5,100.2,101.1,523",
+    ]
+    (tmp_path / "BTCUSDT.csv").write_text("\n".join(rows) + "\n")
+
     handler = HistoricCSVDataHandler(
         events=_Queue(),
-        csv_dir="data",
+        csv_dir=str(tmp_path),
         symbol_list=["BTCUSDT"],
     )
     assert isinstance(handler.symbol_rows["BTCUSDT"], _ColumnarBarRows)
-    assert len(handler.symbol_rows["BTCUSDT"]) > 0
+    assert len(handler.symbol_rows["BTCUSDT"]) == 3
 
     bar = handler.symbol_rows["BTCUSDT"][0]
     assert isinstance(bar[0], datetime)
     assert all(isinstance(v, float) for v in bar[1:])
+    assert bar[handler.col_idx["close"]] == 100.4
