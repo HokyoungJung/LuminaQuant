@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -44,6 +45,17 @@ class BinanceFuturesClientConfig:
     testnet: bool = False
     recv_window: int = 5_000
     timeout_sec: float = 30.0
+    # 2026-07-03 audit fix #3d — client-side robustness:
+    #   min_request_interval_ms: floor between REST requests (naive weight-agnostic
+    #     throttle; Binance futures allows 2400 weight/min, so 50ms is conservative
+    #     for this client's light endpoints while preventing accidental bursts).
+    #   max_429_retries: bounded retries honoring Retry-After on 429; HTTP 418
+    #     (IP auto-ban) is NEVER retried.
+    #   sync_server_time: apply a serverTime-vs-local offset to signed timestamps
+    #     (avoids -1021 on clock drift) and resync once when -1021 still occurs.
+    min_request_interval_ms: float = 50.0
+    max_429_retries: int = 3
+    sync_server_time: bool = True
 
 
 def normalize_futures_symbol(symbol: str) -> str:
@@ -59,6 +71,10 @@ class BinanceFuturesRESTClient:
         self.base_url = _TESTNET_REST_BASE_URL if self.config.testnet else _PROD_REST_BASE_URL
         self.ws_base_url = _TESTNET_WS_BASE_URL if self.config.testnet else _PROD_WS_BASE_URL
         self.rateLimit = 0
+        self._throttle_lock = threading.Lock()
+        self._last_request_monotonic = 0.0
+        self._time_offset_ms = 0.0
+        self._time_synced = False
 
     @property
     def api_key(self) -> str:
@@ -106,6 +122,35 @@ class BinanceFuturesRESTClient:
         except json.JSONDecodeError:
             return text
 
+    def _throttle(self) -> None:
+        """Enforce a minimum interval between REST requests (thread-safe)."""
+        interval = max(0.0, float(self.config.min_request_interval_ms)) / 1000.0
+        if interval <= 0.0:
+            return
+        with self._throttle_lock:
+            now = time.monotonic()
+            wait = self._last_request_monotonic + interval - now
+            if wait > 0:
+                time.sleep(wait)
+                now = time.monotonic()
+            self._last_request_monotonic = now
+
+    def _sync_time_offset(self) -> None:
+        """Sync the signed-timestamp offset from the exchange server clock."""
+        try:
+            payload = self._request("GET", "/fapi/v1/time")
+            server_ms = float((payload or {}).get("serverTime"))
+            self._time_offset_ms = server_ms - time.time() * 1000.0
+            self._time_synced = True
+        except Exception:
+            # Leave the previous offset; signed requests fall back to local time.
+            self._time_synced = True
+
+    def _signed_timestamp_ms(self) -> int:
+        if bool(self.config.sync_server_time) and not self._time_synced:
+            self._sync_time_offset()
+        return int(time.time() * 1000.0 + self._time_offset_ms)
+
     def _request(
         self,
         method: str,
@@ -114,6 +159,7 @@ class BinanceFuturesRESTClient:
         params: dict[str, Any] | None = None,
         signed: bool = False,
         api_key_required: bool = False,
+        _retry_count: int = 0,
     ) -> Any:
         payload = dict(params or {})
         headers: dict[str, str] = {"User-Agent": "LuminaQuant/BinanceFutures"}
@@ -123,7 +169,7 @@ class BinanceFuturesRESTClient:
             headers["X-MBX-APIKEY"] = self.api_key
         if signed:
             payload.setdefault("recvWindow", int(self.config.recv_window))
-            payload["timestamp"] = int(time.time() * 1000)
+            payload["timestamp"] = self._signed_timestamp_ms()
             query = self._encode_params(payload)
             query = (
                 f"{query}&signature={self._sign(query)}" if query else f"signature={self._sign('')}"
@@ -143,6 +189,7 @@ class BinanceFuturesRESTClient:
         request = urllib.request.Request(
             url=target, method=method.upper(), headers=headers, data=data
         )
+        self._throttle()
         try:
             with urllib.request.urlopen(
                 request, timeout=float(self.config.timeout_sec)
@@ -162,6 +209,43 @@ class BinanceFuturesRESTClient:
                     )
                 except Exception:
                     error_code = None
+            if int(exc.code) == 418:
+                # IP auto-ban: retrying makes the ban longer. Fail loudly.
+                raise BinanceFuturesAPIError(
+                    (message or "HTTP 418")
+                    + " — Binance IP auto-ban (do NOT retry; back off and review "
+                    "request rates)",
+                    status_code=418,
+                    error_code=error_code,
+                    payload=payload_obj,
+                ) from exc
+            if int(exc.code) == 429 and _retry_count < int(self.config.max_429_retries):
+                retry_after = exc.headers.get("Retry-After") if exc.headers else None
+                try:
+                    delay = max(1.0, float(retry_after))
+                except TypeError, ValueError:
+                    delay = float(2 ** (_retry_count + 1))
+                time.sleep(delay)
+                return self._request(
+                    method,
+                    path,
+                    params=params,
+                    signed=signed,
+                    api_key_required=api_key_required,
+                    _retry_count=_retry_count + 1,
+                )
+            if error_code == -1021 and signed and _retry_count < 1:
+                # Timestamp outside recvWindow: resync the clock offset once.
+                self._time_synced = False
+                self._sync_time_offset()
+                return self._request(
+                    method,
+                    path,
+                    params=params,
+                    signed=signed,
+                    api_key_required=api_key_required,
+                    _retry_count=_retry_count + 1,
+                )
             raise BinanceFuturesAPIError(
                 message or f"HTTP {exc.code} for {path}",
                 status_code=int(exc.code),
