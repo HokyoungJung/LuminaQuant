@@ -78,6 +78,17 @@ class RiskConfig:
     #     threshold; when intraday drawdown exceeds this fraction ALL open positions are
     #     flattened even if auto_flatten_on_breach is False.  0.0 => disabled (legacy).
     hard_drawdown_flatten_pct: float = 0.0
+    #   flatten_retry_seconds / flatten_max_retries: the FLATTEN kill-switch used to
+    #     send ONE batch of reduce-only orders and never retry — unfilled GTC limits
+    #     left the book exposed while the guard stayed breached (2026-07-03 audit
+    #     fix #3b). While the breach persists and positions remain, the flatten
+    #     batch is re-sent every flatten_retry_seconds up to flatten_max_retries.
+    flatten_retry_seconds: float = 30.0
+    flatten_max_retries: int = 3
+    #   flatten_escalate_to_market: when True the FINAL flatten retry escalates to
+    #     reduce-only MARKET orders even if live.allow_market_orders is False (the
+    #     kill switch must be able to actually kill). Default False (conservative).
+    flatten_escalate_to_market: bool = False
     #   enforce_order_risk_gate_in_backtest: when True the backtest order path runs the
     #     same RiskManager.check_order gate as live, so one enforcement path governs both.
     #     Default False preserves the golden baseline (enable on the backtest machine).

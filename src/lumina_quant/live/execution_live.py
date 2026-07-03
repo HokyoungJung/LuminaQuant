@@ -1529,10 +1529,16 @@ class LiveExecutionHandler(ExecutionHandler):
             getattr(event, "order_type", "LMT"), default="LMT"
         )
         market_guard_configured = hasattr(self.config, "ALLOW_MARKET_ORDERS")
+        flatten_escalation = bool(
+            isinstance(getattr(event, "metadata", None), dict)
+            and event.metadata.get("risk_flatten_escalation")
+            and bool(getattr(self.config, "FLATTEN_ESCALATE_TO_MARKET", False))
+        )
         if (
             requested_order_type == "MKT"
             and market_guard_configured
             and not bool(getattr(self.config, "ALLOW_MARKET_ORDERS", False))
+            and not flatten_escalation
         ):
             raise RuntimeError(
                 "Market orders are disabled by live.allow_market_orders=false; "

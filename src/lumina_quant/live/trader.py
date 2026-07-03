@@ -108,6 +108,9 @@ def _build_live_config_namespace(rt, *, symbols) -> SimpleNamespace:
         MAX_POSITION_SIZE_PCT=float(rk.max_position_size_pct),
         CONSECUTIVE_LOSS_HALT_COUNT=int(rk.consecutive_loss_halt_count),
         HARD_DRAWDOWN_FLATTEN_PCT=float(rk.hard_drawdown_flatten_pct),
+        FLATTEN_RETRY_SECONDS=float(rk.flatten_retry_seconds),
+        FLATTEN_MAX_RETRIES=int(rk.flatten_max_retries),
+        FLATTEN_ESCALATE_TO_MARKET=bool(rk.flatten_escalate_to_market),
         ALLOW_METADATA_RISK_OVERRIDE=bool(rk.allow_metadata_risk_override),
         MAX_LEVERAGE=float(rk.max_leverage),
         MAKER_FEE_RATE=float(run_ex.maker_fee_rate),
@@ -296,6 +299,8 @@ class LiveTrader(TradingEngine):
         self._last_dual_leg_signature = ()
         self._reconciliation_drift_events = 0
         self._flatten_inflight = False
+        self._flatten_started_at = None
+        self._flatten_attempts = 0
         self._last_order_reconciliation_monotonic = 0.0
         self._order_reconciliation_interval_sec = max(
             5,
@@ -1153,13 +1158,24 @@ class LiveTrader(TradingEngine):
         )
         return order_type, price, time_in_force, metadata
 
-    def _queue_reduce_only_order(self, *, symbol, quantity, direction, position_side):
+    def _queue_reduce_only_order(
+        self, *, symbol, quantity, direction, position_side, escalate_to_market=False
+    ):
         if float(quantity) <= 1e-12:
             return False
         order_type, price, time_in_force, metadata = self._reduce_only_order_policy_fields(
             symbol=symbol,
             direction=direction,
         )
+        if escalate_to_market:
+            # Kill-switch escalation: reduce-only MARKET regardless of the LMT
+            # order policy; the execution guard honors risk_flatten_escalation
+            # only when risk.flatten_escalate_to_market is enabled.
+            order_type = "MKT"
+            price = None
+            time_in_force = None
+            metadata = dict(metadata or {})
+            metadata["risk_flatten_escalation"] = True
         if not order_type:
             return False
         event = OrderEvent(
@@ -1176,7 +1192,7 @@ class LiveTrader(TradingEngine):
         self.events.put(event)
         return True
 
-    def _flatten_all_positions(self, *, reason, details=None):
+    def _flatten_all_positions(self, *, reason, details=None, escalate_to_market=False):
         orders_sent = 0
         legs = {}
         hedge_mode = str(getattr(self.config, "POSITION_MODE", "")).upper() == "HEDGE"
@@ -1201,6 +1217,7 @@ class LiveTrader(TradingEngine):
                 quantity=long_qty,
                 direction="SELL",
                 position_side="LONG",
+                escalate_to_market=escalate_to_market,
             ):
                 orders_sent += 1
             if self._queue_reduce_only_order(
@@ -1208,6 +1225,7 @@ class LiveTrader(TradingEngine):
                 quantity=short_qty,
                 direction="BUY",
                 position_side="SHORT",
+                escalate_to_market=escalate_to_market,
             ):
                 orders_sent += 1
 
@@ -1241,6 +1259,7 @@ class LiveTrader(TradingEngine):
                 quantity=abs(qty),
                 direction="SELL" if qty > 0 else "BUY",
                 position_side="LONG" if qty > 0 else "SHORT",
+                escalate_to_market=escalate_to_market,
             ):
                 orders_sent += 1
 
@@ -1252,10 +1271,30 @@ class LiveTrader(TradingEngine):
         self.notifier.send_message(f"🛑 **Flatten All Triggered**: {reason} (orders={orders_sent})")
         return orders_sent
 
+    def _flatten_retry_due(self) -> bool:
+        """Whether the in-flight flatten should be re-sent (positions remain)."""
+        if self._flatten_started_at is None:
+            return False
+        if self._flatten_attempts >= max(1, int(getattr(self.config, "FLATTEN_MAX_RETRIES", 3))):
+            return False
+        retry_after = max(1.0, float(getattr(self.config, "FLATTEN_RETRY_SECONDS", 30.0)))
+        if time.time() - float(self._flatten_started_at) < retry_after:
+            return False
+        try:
+            has_position = any(
+                abs(float(self.portfolio.current_positions.get(s, 0.0) or 0.0)) > 1e-12
+                for s in self.symbol_list
+            )
+        except Exception:
+            has_position = True
+        return has_position
+
     def _evaluate_risk_guards(self):
         passed, reason, action, details = self.risk_manager.evaluate_portfolio_risk(self.portfolio)
         if passed:
             self._flatten_inflight = False
+            self._flatten_started_at = None
+            self._flatten_attempts = 0
             if getattr(self.portfolio, "trading_frozen", False):
                 self._set_trade_freeze(enabled=False, reason="risk_recovered", details=details)
             return
@@ -1271,6 +1310,34 @@ class LiveTrader(TradingEngine):
             if not self._flatten_inflight:
                 orders_sent = self._flatten_all_positions(reason=reason, details=details)
                 self._flatten_inflight = orders_sent > 0
+                if self._flatten_inflight:
+                    self._flatten_started_at = time.time()
+                    self._flatten_attempts = 1
+            elif self._flatten_retry_due():
+                # 2026-07-03 audit fix #3b: one unfilled GTC batch must not be the
+                # end of the kill switch. Re-send while positions remain; the
+                # FINAL allowed retry may escalate to reduce-only MARKET orders
+                # when risk.flatten_escalate_to_market is enabled.
+                self._flatten_attempts += 1
+                escalate = bool(
+                    getattr(self.config, "FLATTEN_ESCALATE_TO_MARKET", False)
+                ) and self._flatten_attempts >= int(getattr(self.config, "FLATTEN_MAX_RETRIES", 3))
+                self.audit_store.log_risk_event(
+                    self.run_id,
+                    reason="FLATTEN_ALL_RETRY",
+                    details={
+                        "reason": reason,
+                        "attempt": self._flatten_attempts,
+                        "escalate_to_market": escalate,
+                        **dict(details or {}),
+                    },
+                )
+                self._flatten_all_positions(
+                    reason=f"{reason} (retry {self._flatten_attempts})",
+                    details=details,
+                    escalate_to_market=escalate,
+                )
+                self._flatten_started_at = time.time()
             return
 
         self.audit_store.log_risk_event(
