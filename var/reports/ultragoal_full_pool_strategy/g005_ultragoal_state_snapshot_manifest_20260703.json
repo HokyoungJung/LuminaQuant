@@ -1,7 +1,7 @@
 {
   "artifact_kind": "ultragoal_state_snapshot",
-  "generated_at_utc": "2026-07-03T16:36:04.520714+00:00",
-  "note": "Final snapshot after stop/handoff annotations and pause nudge. Durable G005 remains active; inline goal cleanup is session-local only.",
+  "generated_at_utc": "2026-07-03T16:39:15.476600+00:00",
+  "note": "Final snapshot after user-requested stop, nudge-budget exhaustion, human_blocked classification, and inline goal pause. Durable G005 remains active for new-session resume; inline goal is paused in this session only.",
   "session_id": "019f22a1-90f7-7000-ab18-d0fd7010803b",
   "snapshots": [
     {
@@ -11,9 +11,9 @@
       "source": "/tmp/.gjc/_session-019f22a1-90f7-7000-ab18-d0fd7010803b/ultragoal/goals.json"
     },
     {
-      "bytes": 16009,
+      "bytes": 18697,
       "path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_ultragoal_ledger_snapshot_20260703.jsonl",
-      "sha256": "396af541187874ef0dc3d4bd64c46557926dad572b44ffd46065afdda4f7c856",
+      "sha256": "924ac01473b07ad4664ab6048909ed4440e38fa3a643f197dc9201e834ca7397",
       "source": "/tmp/.gjc/_session-019f22a1-90f7-7000-ab18-d0fd7010803b/ultragoal/ledger.jsonl"
     },
     {

@@ -16,6 +16,7 @@
 - `G005` active, not complete: `Evaluate candidates with walk-forward and cost stress`.
 - `G006` pending.
 - `G007` pending.
+- Inline goal state in the stopped session was paused after a durable `human_blocked` handoff classification; durable `goals.json` still has `G005` active for resume.
 
 ## G004 completed artifacts
 

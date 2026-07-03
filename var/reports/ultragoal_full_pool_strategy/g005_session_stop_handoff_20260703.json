@@ -237,10 +237,11 @@
       }
     ],
     "ultragoal_state_snapshot_manifest": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_ultragoal_state_snapshot_manifest_20260703.json",
-    "ultragoal_state_snapshot_manifest_sha256": "981131bc11bd2a7ed20346acb534d5d22052d4af2935f268c48d7373f9a34758"
+    "ultragoal_state_snapshot_manifest_sha256": "2cdbbb7e743d923f45184e6804f76e438f350fd412c0fffabf81371fc1543ac4"
   },
   "generated_at_utc": "2026-07-03T16:33:23.403153+00:00",
-  "handoff_json_sha256": "c1d7e7b4e60d7bc5c83761ddc0267e29db308f6f27290aa1b11631338bbdd2d9",
+  "handoff_json_sha256": "0e0b2723eb890dd8ea936afce4967de28a776d95b46a3ca774ee2689e65fac72",
+  "inline_goal_state_at_stop": "paused after durable human_blocked classification; durable G005 remains active in goals.json",
   "repo_path": "/home/hoky/Quants-agent/LuminaQuant",
   "running_jobs_stopped": [
     "bg_1 G005 1h chunk monitor",
@@ -255,5 +256,5 @@
   "stop_reason": "User requested saving state, stopping running evaluations, committing/pushing artifacts, and resuming in a new session.",
   "ultragoal_dir": "/tmp/.gjc/_session-019f22a1-90f7-7000-ab18-d0fd7010803b/ultragoal",
   "ultragoal_session": "019f22a1-90f7-7000-ab18-d0fd7010803b",
-  "updated_at_utc": "2026-07-03T16:36:17.913174+00:00"
+  "updated_at_utc": "2026-07-03T16:39:15.477178+00:00"
 }
