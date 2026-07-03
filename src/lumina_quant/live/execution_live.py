@@ -149,6 +149,92 @@ class LiveExecutionHandler(ExecutionHandler):
                 time.sleep(wait)
                 wait *= backoff
 
+    def _lookup_order_by_client_id(self, symbol, client_order_id):
+        """Return the exchange order matching ``client_order_id``, or ``None``.
+
+        Used to make order submission idempotent: after a retryable submit
+        failure the outcome is UNKNOWN (the exchange may have accepted the
+        order even though the response failed), so the order must be looked up
+        by client id before any resubmission.
+        """
+        if not client_order_id:
+            return None
+        try:
+            fetched = self.exchange.fetch_order(
+                None, symbol, params={"origClientOrderId": str(client_order_id)}
+            )
+            if fetched and (fetched.get("id") or fetched.get("clientOrderId")):
+                return dict(fetched)
+        except Exception:
+            pass
+        try:
+            for item in self.order_gateway.query_open_orders(symbol) or []:
+                cid = item.get("clientOrderId") or (item.get("info") or {}).get("clientOrderId")
+                if str(cid or "") == str(client_order_id):
+                    return dict(item)
+        except Exception:
+            pass
+        return None
+
+    def _submit_with_idempotent_retry(
+        self,
+        *,
+        symbol,
+        order_type,
+        side,
+        quantity,
+        price,
+        params,
+        client_order_id,
+        retries=3,
+        delay=1.0,
+        backoff=2.0,
+    ):
+        """Submit an order with query-before-resubmit retry semantics.
+
+        A plain retry loop double-sends on the documented Binance "unknown
+        outcome" path (5xx/timeout after the matching engine accepted the
+        order) because a clientOrderId becomes reusable once the original
+        order fills. Every retry therefore first queries the exchange for the
+        client id and ADOPTS the existing order instead of resubmitting
+        (2026-07-03 audit fix #3a).
+        """
+        attempt = 0
+        wait = delay
+        while True:
+            try:
+                return self.order_gateway.submit(
+                    symbol=symbol,
+                    type=order_type,
+                    side=side,
+                    quantity=quantity,
+                    price=price,
+                    params=params,
+                )
+            except Exception as exc:
+                attempt += 1
+                if attempt >= retries or not _is_retryable_exception(exc):
+                    raise
+                existing = self._lookup_order_by_client_id(symbol, client_order_id)
+                if existing is not None:
+                    self.logger.warning(
+                        "Submit response failed but the exchange accepted the order; "
+                        "adopting it instead of resubmitting (client_id=%s, id=%s)",
+                        client_order_id,
+                        existing.get("id"),
+                    )
+                    return existing
+                self.logger.warning(
+                    "Retryable API error in submit (%s/%s), no order found for "
+                    "client_id=%s -> safe to resubmit: %s",
+                    attempt,
+                    retries,
+                    client_order_id,
+                    exc,
+                )
+                time.sleep(wait)
+                wait *= backoff
+
     def _normalize_status(self, status):
         if status is None:
             return "unknown"
@@ -1493,14 +1579,14 @@ class LiveExecutionHandler(ExecutionHandler):
             state=STATE_SUBMITTED,
         )
 
-        order = self._call_with_retry(
-            self.order_gateway.submit,
+        order = self._submit_with_idempotent_retry(
             symbol=event.symbol,
-            type=order_type,
+            order_type=order_type,
             side=side,
             quantity=event.quantity,
             price=event.price,
             params=params,
+            client_order_id=event.client_order_id,
             retries=3,
             delay=1,
         )
