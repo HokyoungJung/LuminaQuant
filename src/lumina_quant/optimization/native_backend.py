@@ -48,6 +48,11 @@ try:
 except Exception as _exc:
     _PYO3_LOAD_ERROR = str(_exc)
 
+if _PYO3_FN is not None:
+    from lumina_quant._native_kernel_version import check_native_kernel_version
+
+    check_native_kernel_version()
+
 # ── module state ──────────────────────────────────────────────────────────────
 _BACKEND_MODE = NATIVE_MODE_NUMBA if NUMBA_AVAILABLE else NATIVE_MODE_PYTHON
 NATIVE_BACKEND_NAME = _BACKEND_MODE

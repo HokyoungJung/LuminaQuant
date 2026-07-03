@@ -378,6 +378,15 @@ fn aggregate_present_buckets(
 // PyO3 functions
 // ============================================================================
 
+/// Return the crate's compile-time version (`CARGO_PKG_VERSION`).
+///
+/// Lets the Python side detect a stale extension module: compare this
+/// against the version in the checked-out native/lumina_compute/Cargo.toml.
+#[pyfunction]
+fn build_info() -> &'static str {
+    env!("CARGO_PKG_VERSION")
+}
+
 /// Evaluate Sharpe/CAGR/MaxDD from an equity-curve series.
 ///
 /// Args:
@@ -1153,6 +1162,7 @@ fn append_ohlcv_1s_wal<'py>(
 
 #[pymodule]
 fn _compute(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(build_info, m)?)?;
     m.add_function(wrap_pyfunction!(evaluate_metrics, m)?)?;
     m.add_function(wrap_pyfunction!(simulate_symbol_fold, m)?)?;
     m.add_function(wrap_pyfunction!(debounced_state_signal, m)?)?;

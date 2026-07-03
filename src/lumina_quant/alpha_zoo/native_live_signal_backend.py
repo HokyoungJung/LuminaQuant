@@ -47,6 +47,11 @@ try:
 except Exception as _exc:
     _PYO3_LOAD_ERROR = str(_exc)
 
+if _PYO3_DEBOUNCED_FN is not None:
+    from lumina_quant._native_kernel_version import check_native_kernel_version
+
+    check_native_kernel_version()
+
 
 def normalize_live_signal_backend(value: str | None = None) -> str:
     token = (

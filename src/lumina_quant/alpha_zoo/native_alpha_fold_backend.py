@@ -32,6 +32,11 @@ try:
 except Exception as _exc:
     _PYO3_LOAD_ERROR = str(_exc)
 
+if _PYO3_FN is not None:
+    from lumina_quant._native_kernel_version import check_native_kernel_version
+
+    check_native_kernel_version()
+
 
 def normalize_alpha_fold_backend(value: str | None = None) -> str:
     token = str(value or os.getenv(ALPHA_FOLD_BACKEND_ENV, ALPHA_FOLD_BACKEND_AUTO))

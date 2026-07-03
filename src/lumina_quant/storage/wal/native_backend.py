@@ -26,6 +26,11 @@ try:
 except Exception as _exc:
     _PYO3_LOAD_ERROR = str(_exc)
 
+if _PYO3_WAL_FN is not None:
+    from lumina_quant._native_kernel_version import check_native_kernel_version
+
+    check_native_kernel_version()
+
 
 def native_wal_append_available() -> bool:
     return _PYO3_WAL_FN is not None
