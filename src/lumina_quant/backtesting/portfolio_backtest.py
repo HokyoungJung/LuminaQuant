@@ -1,3 +1,4 @@
+import math
 import os
 from collections import deque
 from datetime import UTC, date, datetime
@@ -620,6 +621,39 @@ class Portfolio:
             self.total_funding_paid += funding_payment
             self._last_funding_ts[symbol] = last_ts + periods * interval_seconds
 
+    def _bar_funding_rate(self, symbol) -> float | None:
+        """Return the bar-column funding rate, or ``None`` when genuinely absent.
+
+        ``get_latest_bar_value`` returns a ``0.0`` SENTINEL when neither a bar
+        column nor a feature exists, which must not be conflated with genuine
+        0.0 funding data (that sentinel silently disabled the configured static
+        default and the ``require_funding_coverage`` gate). Only trust the bar
+        path when the handler actually carries a ``funding_rate`` column; the
+        dynamic feature path is consulted separately by the caller.
+        """
+        col_idx = getattr(self.bars, "col_idx", None)
+        if isinstance(col_idx, dict):
+            if "funding_rate" not in col_idx:
+                return None
+            try:
+                value = self.bars.get_latest_bar_value(symbol, "funding_rate")
+            except Exception:
+                return None
+        else:
+            # Handlers without a col_idx contract (test doubles, adapters) keep
+            # the legacy behavior: a non-None value is trusted as-is.
+            try:
+                value = self.bars.get_latest_bar_value(symbol, "funding_rate")
+            except Exception:
+                return None
+        if value is None:
+            return None
+        try:
+            parsed = float(value)
+        except Exception:
+            return None
+        return parsed if math.isfinite(parsed) else None
+
     def _resolve_funding_rate(self, symbol, *, default: float) -> float | None:
         # Per-bar funding data is "present" only when a source yields a non-None
         # value. A real 0.0 is genuine data (rate is exactly zero), NOT "absent" —
@@ -637,15 +671,9 @@ class Portfolio:
                 except Exception:
                     pass
 
-        try:
-            fallback = self.bars.get_latest_bar_value(symbol, "funding_rate")
-        except Exception:
-            fallback = None
+        fallback = self._bar_funding_rate(symbol)
         if fallback is not None:
-            try:
-                return float(fallback)
-            except Exception:
-                pass
+            return fallback
 
         # No per-bar funding data (dynamic feature AND bar column both absent).
         # Honor a configured non-zero static default before any coverage raise:

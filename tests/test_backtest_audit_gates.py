@@ -386,3 +386,87 @@ class TestTimestampHelpersUTC(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# --------------------------------------------------------------------------- #
+# Fix (2026-07-03 audit): 0.0 sentinel from get_latest_bar_value must not be
+# conflated with genuine funding data. Mimics HistoricCSVDataHandler exactly:
+# col_idx WITHOUT funding_rate + get_latest_bar_value returning the 0.0
+# sentinel for unknown fields.
+# --------------------------------------------------------------------------- #
+class SentinelBars(MockBars):
+    """Real-handler-shaped mock: OHLCV col_idx, 0.0 sentinel for absent fields."""
+
+    def __init__(self, start_dt, price, *, with_funding_column=False, column_rate=0.0):
+        super().__init__(start_dt, price, funding_rate=None, has_feature=False)
+        self.col_idx = {"open": 1, "high": 2, "low": 3, "close": 4, "volume": 5}
+        if with_funding_column:
+            self.col_idx["funding_rate"] = 6
+        self._column_rate = column_rate
+
+    def get_latest_bar_value(self, symbol, val_type):
+        _ = symbol
+        if val_type == "funding_rate":
+            if "funding_rate" in self.col_idx:
+                return self._column_rate
+            return 0.0  # the sentinel HistoricCSVDataHandler returns when absent
+        return self.close
+
+
+class TestFundingSentinelFix(unittest.TestCase):
+    def _run(self, cfg, bars):
+        events = queue.Queue()
+        p = Portfolio(bars, events, bars.current_dt, cfg)
+        p.current_positions["BTC/USDT"] = 1.0
+        p.entry_prices["BTC/USDT"] = 100.0
+        p.update_timeindex(None)
+        bars.current_dt += timedelta(hours=8)
+        p.update_timeindex(None)
+        return p
+
+    def test_static_default_charged_despite_sentinel(self):
+        # THE bug: the 0.0 sentinel used to shadow the configured static
+        # default, so funding was never charged on the real CSV/parquet path.
+        class Cfg(BaseConfig):
+            FUNDING_RATE_PER_8H = 1e-4
+
+        bars = SentinelBars(datetime(2026, 1, 1, 0, 0), 100.0)
+        p = self._run(Cfg, bars)
+        self.assertAlmostEqual(p.total_funding_paid, 1e-4 * 100.0, places=10)
+
+    def test_coverage_gate_fires_despite_sentinel(self):
+        # THE bug, gate variant: require_funding_coverage could never raise on
+        # the real handler because the sentinel masqueraded as coverage.
+        class Cfg(BaseConfig):
+            REQUIRE_FUNDING_COVERAGE = True
+
+        bars = SentinelBars(datetime(2026, 1, 1, 0, 0), 100.0)
+        with self.assertRaises(ValueError) as ctx:
+            self._run(Cfg, bars)
+        self.assertIn("require_funding_coverage", str(ctx.exception))
+
+    def test_genuine_funding_column_still_trusted(self):
+        # A handler that actually carries a funding_rate column keeps working,
+        # including a GENUINE 0.0 rate (which must not fall through to the
+        # static default).
+        class Cfg(BaseConfig):
+            FUNDING_RATE_PER_8H = 1e-4
+
+        bars = SentinelBars(
+            datetime(2026, 1, 1, 0, 0), 100.0, with_funding_column=True, column_rate=0.0005
+        )
+        p = self._run(Cfg, bars)
+        self.assertAlmostEqual(p.total_funding_paid, 0.0005 * 100.0, places=10)
+
+        bars_zero = SentinelBars(
+            datetime(2026, 1, 1, 0, 0), 100.0, with_funding_column=True, column_rate=0.0
+        )
+        p_zero = self._run(Cfg, bars_zero)
+        self.assertEqual(p_zero.total_funding_paid, 0.0)
+
+    def test_default_config_unchanged(self):
+        # Golden safety: default config (rate 0.0, gate off) stays at 0.0
+        # funding on the sentinel path — byte-identical behavior.
+        bars = SentinelBars(datetime(2026, 1, 1, 0, 0), 100.0)
+        p = self._run(BaseConfig, bars)
+        self.assertEqual(p.total_funding_paid, 0.0)
