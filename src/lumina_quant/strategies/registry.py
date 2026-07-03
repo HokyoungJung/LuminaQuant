@@ -209,6 +209,13 @@ _STRATEGY_TIER_HINTS: dict[str, str] = {
     "DisagreementGatedEnsembleStrategy": "research_only",
     "CrossSectionalFlowShareRotationStrategy": "research_only",
     "RegimeRouterConfirmedRotationStrategy": "research_only",
+    # Low-correlation alpha batch 2 (2026-07-03): orthogonal statistical axes —
+    # volume-bucketed flow toxicity (VPIN), loss-tail power-law regime (Hill),
+    # and volume-time-sampled momentum. research_only until the data-PC clean
+    # walk-forward passes the promotion rule in the alpha-hunt handoff.
+    "VpinToxicityRiderStrategy": "research_only",
+    "TailIndexRegimeRiderStrategy": "research_only",
+    "VolumeClockMomentumRiderStrategy": "research_only",
 }
 
 _STRATEGY_METADATA: dict[str, dict[str, Any]] = {

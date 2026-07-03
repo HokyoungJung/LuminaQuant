@@ -105,6 +105,7 @@ from dataclasses import dataclass
 from itertools import pairwise
 from typing import Any
 
+from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.indicators.oscillators import percentile_rank, rate_of_change
 from lumina_quant.indicators.rolling_stats import sample_std
@@ -216,6 +217,7 @@ def _new_vpin_extra(*, n_buckets: int, vpin_history: int, volume_window: int) ->
     )
 
 
+@register("strategy", "VpinToxicityRiderStrategy", interface="event_driven")
 class VpinToxicityRiderStrategy(_ReturnRiderBase):
     """Ride the trend when volume-bucketed flow toxicity (VPIN) confirms or is calm.
 
@@ -455,9 +457,6 @@ class VpinToxicityRiderStrategy(_ReturnRiderBase):
             extra.bucket_sell = bucket_sell if bucket_sell is not None else 0.0
             extra.last_vpin = safe_float(payload.get("last_vpin"))
             extra.last_percentile = safe_float(payload.get("last_percentile"))
-
-
-# @register("strategy", "VpinToxicityRiderStrategy", interface="event_driven")  # applied atomically with the research_only tier hint in integration — do NOT apply earlier (live-safety)
 
 
 # Per-timeframe candidate variants for VpinToxicityRiderStrategy, prepared for

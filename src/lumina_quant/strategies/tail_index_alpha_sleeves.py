@@ -62,6 +62,7 @@ import math
 from collections import deque
 from typing import Any
 
+from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.indicators.oscillators import rate_of_change
 from lumina_quant.indicators.tail_index import hill_tail_index
@@ -93,6 +94,7 @@ def _loss_sample(returns: list[float], window: int) -> list[float]:
     return [abs(r) for r in tail if r < 0.0]
 
 
+@register("strategy", "TailIndexRegimeRiderStrategy", interface="event_driven")
 class TailIndexRegimeRiderStrategy(_ReturnRiderBase):
     """Ride the trend confirmed by a Hill tail-index fattening/thinning regime.
 
@@ -283,9 +285,6 @@ class TailIndexRegimeRiderStrategy(_ReturnRiderBase):
                 parsed = safe_float(value)
                 if parsed is not None:
                     target.append(parsed)
-
-
-# @register("strategy", "TailIndexRegimeRiderStrategy", interface="event_driven")  # applied atomically with the research_only tier hint in integration — do NOT apply earlier (live-safety)
 
 
 # Per-timeframe candidate variants for TailIndexRegimeRiderStrategy, prepared

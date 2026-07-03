@@ -2719,6 +2719,13 @@ class _CandidateBuildContext:
         _build_disagreement_ensemble_candidates(self)
         _build_flow_share_rotation_candidates(self)
         _build_regime_router_confirmed_candidates(self)
+        # Low-correlation alpha batch 2 (2026-07-03): orthogonal statistical
+        # axes — volume-bucketed flow toxicity (VPIN), loss-tail power-law
+        # regime (Hill estimator), and volume-time-sampled momentum. Per-symbol
+        # single-asset riders; SLICE constants live in the lane modules.
+        _build_vpin_toxicity_rider_candidates(self)
+        _build_tail_index_regime_rider_candidates(self)
+        _build_volume_clock_momentum_rider_candidates(self)
         _build_metals_relative_value_basket_candidates(self)
         _build_liquidation_cascade_reversion_candidates(self)
         _build_orderbook_imbalance_reversion_candidates(self)
@@ -9213,6 +9220,150 @@ def _build_flow_share_rotation_candidates(ctx: _CandidateBuildContext) -> None:
                     "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
                 },
             )
+
+
+def _build_single_asset_rider_slice_candidates(
+    ctx: _CandidateBuildContext,
+    *,
+    slice_table: dict[str, tuple[dict[str, Any], ...]],
+    name_prefix: str,
+    family: str,
+    strategy_class: str,
+    notes_template: str,
+    tags: tuple[str, ...],
+) -> None:
+    """Shared thin builder for per-symbol rider sleeves whose SLICE lives in the lane module."""
+    crypto_symbols = ctx.crypto_only_symbols
+    if not crypto_symbols:
+        return
+    for timeframe in ctx._present("30m", "1h", "4h", "1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in slice_table.get(timeframe, ()):
+            for symbol in crypto_symbols:
+                params = {key: value for key, value in spec.items() if key != "variant"}
+                _add_candidate(
+                    ctx.candidates,
+                    name=(
+                        f"{name_prefix}_{tf_tag}_{spec['variant']}_"
+                        f"{symbol.replace('/', '').lower()}"
+                    ),
+                    family=family,
+                    strategy_class=strategy_class,
+                    timeframe=timeframe,
+                    symbols=(symbol,),
+                    params=params,
+                    notes=notes_template.format(
+                        symbol=symbol, timeframe=timeframe, variant=spec["variant"]
+                    ),
+                    tags=tags,
+                    metadata={
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": symbol,
+                        "allow_short": bool(spec.get("allow_short", True)),
+                        "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                    },
+                )
+
+
+def _build_vpin_toxicity_rider_candidates(ctx: _CandidateBuildContext) -> None:
+    """Per-symbol VPIN flow-toxicity rider (single-asset, OHLCV-only)."""
+    from lumina_quant.strategies.vpin_toxicity_alpha_sleeves import (
+        _VPIN_TOXICITY_RIDER_SLICE,
+    )
+
+    _build_single_asset_rider_slice_candidates(
+        ctx,
+        slice_table=_VPIN_TOXICITY_RIDER_SLICE,
+        name_prefix="vpin_toxicity_rider",
+        family="trend",
+        strategy_class="VpinToxicityRiderStrategy",
+        notes_template=(
+            "Per-symbol VPIN flow-toxicity rider: bulk-volume-classified signed "
+            "flow accumulates into fixed-size volume buckets; the trailing-bucket "
+            "VPIN toxicity percentile gates trend entries (confirm mode: informed-"
+            "flow continuation). ATR trailing stop + pyramiding on "
+            "{symbol} at {timeframe} ({variant})."
+        ),
+        tags=(
+            "trend",
+            "microstructure",
+            "vpin",
+            "flow_toxicity",
+            "volume_clock",
+            "return_rider",
+            "trailing_stop",
+            "pyramiding",
+            "single_asset",
+            "crypto",
+        ),
+    )
+
+
+def _build_tail_index_regime_rider_candidates(ctx: _CandidateBuildContext) -> None:
+    """Per-symbol Hill tail-index regime rider (single-asset, OHLCV-only)."""
+    from lumina_quant.strategies.tail_index_alpha_sleeves import (
+        _TAIL_INDEX_REGIME_RIDER_SLICE,
+    )
+
+    _build_single_asset_rider_slice_candidates(
+        ctx,
+        slice_table=_TAIL_INDEX_REGIME_RIDER_SLICE,
+        name_prefix="tail_index_regime_rider",
+        family="trend",
+        strategy_class="TailIndexRegimeRiderStrategy",
+        notes_template=(
+            "Per-symbol Hill tail-index regime rider: the loss tail's power-law "
+            "exponent (short vs long horizon) flags fattening tails -> SHORT with "
+            "the downtrend, thinning tails -> LONG with the uptrend. ATR trailing "
+            "stop + pyramiding on {symbol} at {timeframe} ({variant})."
+        ),
+        tags=(
+            "trend",
+            "tail_risk",
+            "extreme_value",
+            "hill_estimator",
+            "regime_gate",
+            "return_rider",
+            "trailing_stop",
+            "pyramiding",
+            "single_asset",
+            "crypto",
+        ),
+    )
+
+
+def _build_volume_clock_momentum_rider_candidates(ctx: _CandidateBuildContext) -> None:
+    """Per-symbol volume-clock momentum rider (single-asset, OHLCV-only)."""
+    from lumina_quant.strategies.volume_clock_alpha_sleeves import (
+        _VOLUME_CLOCK_MOMENTUM_RIDER_SLICE,
+    )
+
+    _build_single_asset_rider_slice_candidates(
+        ctx,
+        slice_table=_VOLUME_CLOCK_MOMENTUM_RIDER_SLICE,
+        name_prefix="volume_clock_momentum_rider",
+        family="momentum",
+        strategy_class="VolumeClockMomentumRiderStrategy",
+        notes_template=(
+            "Per-symbol volume-clock momentum rider: momentum sampled over "
+            "volume bars (dollar-volume buckets sized by a rolling median "
+            "reference) with a stale-clock liveness guard — the sampling clock, "
+            "not the momentum math, is the novelty. ATR trailing stop + "
+            "pyramiding on {symbol} at {timeframe} ({variant})."
+        ),
+        tags=(
+            "momentum",
+            "volume_clock",
+            "subordination",
+            "time_deformation",
+            "return_rider",
+            "trailing_stop",
+            "pyramiding",
+            "single_asset",
+            "crypto",
+        ),
+    )
 
 
 def _build_regime_router_confirmed_candidates(ctx: _CandidateBuildContext) -> None:

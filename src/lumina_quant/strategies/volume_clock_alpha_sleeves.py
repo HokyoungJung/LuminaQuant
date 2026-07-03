@@ -95,6 +95,7 @@ import math
 from collections import deque
 from typing import Any
 
+from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.strategies.external_alpha_sleeves import _EPS, _Snapshot
 from lumina_quant.strategies.return_rider_alpha_sleeves import (
@@ -122,7 +123,7 @@ def _median(values: Any) -> float | None:
     return 0.5 * (seq[mid - 1] + seq[mid])
 
 
-# @register("strategy", "VolumeClockMomentumRiderStrategy", interface="event_driven")  # applied atomically with the research_only tier hint in integration — do NOT apply earlier (live-safety)
+@register("strategy", "VolumeClockMomentumRiderStrategy", interface="event_driven")
 class VolumeClockMomentumRiderStrategy(_ReturnRiderBase):
     """Ride momentum sampled in VOLUME time (a subordinated clock) rather than wall-clock time.
 

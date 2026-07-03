@@ -17,9 +17,9 @@ FIXED_TIMEFRAMES = ("1h", "4h")
 # the digest is robust to dict-ordering. Captured from current behavior; if the
 # rider-builder consolidation changes any candidate, this digest must be
 # re-captured intentionally.
-EXPECTED_MANIFEST_SHA256 = "3885baddc57715faa2662b9e31cd58a7765782d752f8c37b7065ec2ae016559f"
+EXPECTED_MANIFEST_SHA256 = "f2dcb7aeb629ac57e57b1aaea54593e24d786248035e5eed1a8304a1087b6bfd"
 
-EXPECTED_CANDIDATE_COUNT = 149
+EXPECTED_CANDIDATE_COUNT = 161
 
 EXPECTED_FAMILY_COUNTS = {
     "breakout": 20,
@@ -27,9 +27,9 @@ EXPECTED_FAMILY_COUNTS = {
     "formulaic_alpha": 6,
     "market_neutral": 38,
     "mean_reversion": 12,
-    "momentum": 12,
+    "momentum": 16,
     "seasonality": 8,
-    "trend": 51,
+    "trend": 59,
 }
 
 EXPECTED_STRATEGY_COUNTS = {
@@ -58,14 +58,17 @@ EXPECTED_STRATEGY_COUNTS = {
     "RollingBreakoutStrategy": 2,
     "SeasonalMicroBreakoutRiderStrategy": 4,
     "SpectralCycleRiderStrategy": 4,
+    "TailIndexRegimeRiderStrategy": 4,
     "VWAPCompressionReversionStrategy": 4,
     "VarianceRatioTrendRiderStrategy": 4,
     "VolOfVolRegimeTrendGateStrategy": 4,
     "VolatilityBreakoutRiderStrategy": 4,
     "VolatilitySqueezeBreakoutRiderStrategy": 4,
+    "VolumeClockMomentumRiderStrategy": 4,
+    "VpinToxicityRiderStrategy": 4,
 }
 
-EXPECTED_TIMEFRAME_COUNTS = {"1h": 81, "4h": 68}
+EXPECTED_TIMEFRAME_COUNTS = {"1h": 87, "4h": 74}
 
 # Every rider-builder produced strategy class. The upcoming consolidation must
 # preserve this exact roster (names and per-class candidate counts).
@@ -84,9 +87,12 @@ EXPECTED_RIDER_CLASSES = {
     "RealizedSemivarianceTrendRiderStrategy",
     "SeasonalMicroBreakoutRiderStrategy",
     "SpectralCycleRiderStrategy",
+    "TailIndexRegimeRiderStrategy",
     "VarianceRatioTrendRiderStrategy",
     "VolatilityBreakoutRiderStrategy",
     "VolatilitySqueezeBreakoutRiderStrategy",
+    "VolumeClockMomentumRiderStrategy",
+    "VpinToxicityRiderStrategy",
 }
 
 EXPECTED_TAGS = {
@@ -111,11 +117,14 @@ EXPECTED_TAGS = {
     "disagreement_gate",
     "ensemble",
     "execution_risk",
+    "extreme_value",
     "factor",
+    "flow_toxicity",
     "formulaic",
     "garch",
     "good_bad_volatility",
     "half_life",
+    "hill_estimator",
     "illiquidity_premium",
     "intraday_seasonality",
     "jump_filter",
@@ -126,6 +135,7 @@ EXPECTED_TAGS = {
     "mean_reversion",
     "meta_gate",
     "micro_signal",
+    "microstructure",
     "momentum",
     "multi_horizon",
     "oos-stability",
@@ -152,8 +162,11 @@ EXPECTED_TAGS = {
     "spread",
     "state_space",
     "stationarity",
+    "subordination",
+    "tail_risk",
     "take_profit",
     "term_structure",
+    "time_deformation",
     "time_of_day",
     "trailing_stop",
     "trend",
@@ -163,6 +176,8 @@ EXPECTED_TAGS = {
     "vol_of_vol",
     "volatility",
     "volatility_squeeze",
+    "volume_clock",
+    "vpin",
     "vwap",
     "zscore",
 }

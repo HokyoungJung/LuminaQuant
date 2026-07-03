@@ -41,6 +41,10 @@ BATCH_STRATEGIES = (
     "DisagreementGatedEnsembleStrategy",
     "CrossSectionalFlowShareRotationStrategy",
     "RegimeRouterConfirmedRotationStrategy",
+    # Low-correlation batch 2 (2026-07-03):
+    "VpinToxicityRiderStrategy",
+    "TailIndexRegimeRiderStrategy",
+    "VolumeClockMomentumRiderStrategy",
 )
 
 # FROZEN legacy snapshot (generated 2026-07-03; 68 names). Append-only for
