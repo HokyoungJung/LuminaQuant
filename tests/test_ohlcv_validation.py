@@ -92,6 +92,31 @@ def test_strict_loader_validates_non_monotonic_source_before_sorting(tmp_path) -
 
     assert "datetime_not_monotonic" in str(exc_info.value)
 
+def test_validate_ohlcv_frame_checks_symbol_partition_order_and_duplicates() -> None:
+    frame = pl.DataFrame(
+        {
+            "symbol": ["A", "A", "B", "B"],
+            "datetime": [
+                datetime(2026, 1, 2),
+                datetime(2026, 1, 1),
+                datetime(2026, 1, 1),
+                datetime(2026, 1, 1),
+            ],
+            "open": [11.0, 10.0, 10.0, 10.0],
+            "high": [12.5, 12.0, 12.0, 12.0],
+            "low": [10.5, 9.5, 9.5, 9.5],
+            "close": [12.0, 11.0, 11.0, 11.0],
+            "volume": [120.0, 100.0, 100.0, 100.0],
+        }
+    )
+
+    report = validate_ohlcv_frame(frame, symbol_column="symbol")
+    codes = {issue.code for issue in report.issues}
+
+    assert report.passed is False
+    assert "datetime_not_monotonic" in codes
+    assert "duplicate_timestamp" in codes
+
 
 def test_strict_loader_does_not_eager_fallback_on_lazy_failure_by_default(
     tmp_path,

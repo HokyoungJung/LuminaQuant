@@ -1,5 +1,33 @@
 # Research Note
 
+## 2026-07-04 KST — 최신 데이터 전수 walk-forward 정정 리포트
+
+사용자 지적으로 이전 fixed-split/최종 3개 알파 리포트는 폐기 수준으로 낮추고, G005 후보군 전체를 월별 walk-forward 방식으로 다시 평가했다. 데이터 refresh 기준은 Binance fapi 1m universe 128 symbols, `2025-01-01T00:00:00Z` → `2026-07-04T07:15:59.999Z`까지이며, 선별 방식은 expanding train + 직전 2개월 validation만 사용한다. 다음 1개월 locked OOS는 fold별 선별이 고정된 뒤 붙이는 diagnostic/report-only 값이며, rank/status/research-selected 여부에는 쓰지 않는다.
+
+평가 fold:
+- `WF202604`: train `2025-01-01`~`2026-01-31T23:59:59`, validation `2026-02-01`~`2026-03-31T23:59:59`, locked OOS `2026-04-01`~`2026-04-30T23:59:59`.
+- `WF202605`: train `2025-01-01`~`2026-02-28T23:59:59`, validation `2026-03-01`~`2026-04-30T23:59:59`, locked OOS `2026-05-01`~`2026-05-31T23:59:59`.
+- `WF202606`: train `2025-01-01`~`2026-03-31T23:59:59`, validation `2026-04-01`~`2026-05-31T23:59:59`, locked OOS `2026-06-01`~`2026-06-30T23:59:59`.
+- `WF202607_PARTIAL`: train `2025-01-01`~`2026-04-30T23:59:59`, validation `2026-05-01`~`2026-06-30T23:59:59`, locked OOS `2026-07-01`~`2026-07-04T00:00:00`.
+
+범위/회계: 30m 305개 + 4h 360개 + 1d 299개 + 1h 436개 evaluated = fold당 1400개를 실행했고, native runner stall을 일으킨 1h `Alpha101FormulaStrategy` 4개(`6afebe39638237ca`, `c49978799aff2168`, `82a31b3aa1d93bb0`, `b730cdad557b46e3`)는 timeout-filter fail-closed로 회계에 포함해 fold당 accounted 1404개다. 4 folds × 4 consolidated shards = 16/16 reports present, missing 0, failure 0.
+
+결과: train/validation repeated-selection 기준 research-selected 후보는 22개다. Research-selected 22개의 평균 validation return/sharpe는 `+10.24% / 2.621`; locked-OOS diagnostic 평균 return/sharpe는 `-1.98% / -4.289`이며, 평균 OOS return과 sharpe가 둘 다 양수인 후보는 1/22뿐이다. 따라서 이번 리포트의 올바른 결론은 `research_selected_candidates`이지만 배포 판정은 `no_execution_promotion` / `research_only_no_execution`이다. live/paper/testnet/real-money/orders는 전부 disabled이고 `TONUSDT`는 계속 excluded다.
+
+상위 research-selected 후보(선별/랭킹은 train+validation only):
+1. `19d07d85cab54789` `alpha101_formula_4h_a011_a011_flow_swing_dir` — selected folds 3, validation `+10.68% / 2.944`, OOS diagnostic `+3.07% / -2.576`.
+2. `632d6e864ee01bd8` `pair_spread_4h_fast_cycle_btcusdt_bnbusdt_1.6_0.35` — selected folds 2, validation `+10.06% / 6.158`, OOS diagnostic `-0.24% / -20.896`.
+3. `a27ef46e91376b7c` `pair_spread_4h_fast_cycle_btcusdt_bnbusdt_1.8_0.45` — selected folds 2, validation `+9.61% / 5.322`, OOS diagnostic `-0.14% / -22.303`.
+4. `1f1fd241c12f0bc2` `pair_spread_4h_balanced_btcusdt_bnbusdt_1.6_0.35` — selected folds 2, validation `+9.72% / 5.409`, OOS diagnostic `+0.28% / 0.720`.
+5. `914ff36cba1555ea` `pair_spread_4h_balanced_btcusdt_bnbusdt_2.0_0.50` — selected folds 2, validation `+9.02% / 5.039`, OOS diagnostic `-0.54% / -23.974`.
+
+산출물:
+- Final report: `var/reports/latest_alpha_refresh_20260704_full_walkforward/full_all_strategy_walkforward_selection_latest.md|json|csv`.
+- Verification: `var/reports/latest_alpha_refresh_20260704_full_walkforward/full_all_strategy_walkforward_selection_verification.json` (`status=passed`, blockers empty).
+- Cleanup: `var/reports/latest_alpha_refresh_20260704_full_walkforward/full_all_strategy_walkforward_selection_cleanup.json` (`status=passed`, blocking_findings empty).
+- Run summary: `var/reports/latest_alpha_refresh_20260704_full_walkforward/full_walkforward_consolidated_run_summary.json`.
+- Repro scripts preserved under `var/reports/latest_alpha_refresh_20260704_full_walkforward/repro_scripts/`.
+
 ## 2026-07-03 KST — full-pool Ultragoal G004 checkpoint + G005 stop/handoff
 
 Full-pool Ultragoal durable run was resumed from `/tmp/.gjc/_session-019f22a1-90f7-7000-ab18-d0fd7010803b/ultragoal` and advanced through `G004`. G004 is now checkpointed complete with frozen search-budget artifacts under `var/reports/ultragoal_full_pool_strategy/`: `g004_search_budget_manifest.json`, `g004_frozen_candidate_manifest.json`, `g004_verification_test_report.json`, and `g004_ai_slop_cleanup_report.json`. Frozen budget: 1466 candidates after fail-closed `TONUSDT` quarantine exclusion, 23328 portfolio-grid combinations, total effective-trials denominator 24794, locked-OOS selection/tuning/tie-break/weight use disabled, and live/paper/testnet/real-money execution disabled.

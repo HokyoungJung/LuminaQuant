@@ -105,18 +105,21 @@ def main(argv: list[str] | None = None) -> int:
         description="Emit read-only alpha evidence dashboard payload.",
     )
     parser.add_argument("--json", action="store_true", default=True)
+    parser.add_argument("--pretty", action="store_true")
     parser.add_argument("--evidence", default="", dest="evidence_path")
     parser.add_argument("--run-card", default="", dest="run_card_path")
     parser.add_argument("--live-readiness", default="", dest="live_readiness_path")
     args = parser.parse_args(argv)
+    payload = load_alpha_evidence_payload(
+        evidence_path=args.evidence_path,
+        run_card_path=args.run_card_path,
+        live_readiness_path=args.live_readiness_path,
+    )
     print(
         json.dumps(
-            load_alpha_evidence_payload(
-                evidence_path=args.evidence_path,
-                run_card_path=args.run_card_path,
-                live_readiness_path=args.live_readiness_path,
-            ),
-            indent=2,
+            payload,
+            indent=2 if args.pretty else None,
+            separators=None if args.pretty else (",", ":"),
             sort_keys=True,
             default=str,
         )

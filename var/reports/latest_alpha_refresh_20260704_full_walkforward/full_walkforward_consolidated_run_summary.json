@@ -1,0 +1,511 @@
+{
+  "artifact_kind": "full_all_strategy_walkforward_consolidated_run_summary",
+  "failure_count": 0,
+  "folds": [
+    {
+      "fold_id": "WF202604",
+      "oos_end": "2026-04-30T23:59:59",
+      "oos_start": "2026-04-01",
+      "train_end": "2026-01-31T23:59:59",
+      "train_start": "2025-01-01",
+      "validation_end": "2026-03-31T23:59:59",
+      "validation_start": "2026-02-01"
+    },
+    {
+      "fold_id": "WF202605",
+      "oos_end": "2026-05-31T23:59:59",
+      "oos_start": "2026-05-01",
+      "train_end": "2026-02-28T23:59:59",
+      "train_start": "2025-01-01",
+      "validation_end": "2026-04-30T23:59:59",
+      "validation_start": "2026-03-01"
+    },
+    {
+      "fold_id": "WF202606",
+      "oos_end": "2026-06-30T23:59:59",
+      "oos_start": "2026-06-01",
+      "train_end": "2026-03-31T23:59:59",
+      "train_start": "2025-01-01",
+      "validation_end": "2026-05-31T23:59:59",
+      "validation_start": "2026-04-01"
+    },
+    {
+      "fold_id": "WF202607_PARTIAL",
+      "oos_end": "2026-07-04T00:00:00",
+      "oos_start": "2026-07-01",
+      "train_end": "2026-04-30T23:59:59",
+      "train_start": "2025-01-01",
+      "validation_end": "2026-06-30T23:59:59",
+      "validation_start": "2026-05-01"
+    }
+  ],
+  "generated_at_utc": "2026-07-04T16:01:42.595570Z",
+  "max_parallel": 4,
+  "output_root": "/home/hoky/Quants-agent/LuminaQuant/var/reports/latest_alpha_refresh_20260704_full_walkforward",
+  "results": [
+    {
+      "candidate_count": 299,
+      "elapsed_seconds": 0.0,
+      "fold_id": "WF202604",
+      "log_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/latest_alpha_refresh_20260704_full_walkforward/WF202604/1d/runner_stdout_stderr.log",
+      "output_dir": "/home/hoky/Quants-agent/LuminaQuant/var/reports/latest_alpha_refresh_20260704_full_walkforward/WF202604/1d",
+      "report_exists": true,
+      "returncode": 0,
+      "shard_id": "1d",
+      "skipped_existing": true,
+      "split": {
+        "mode": "exact_dates",
+        "oos_end": "2026-04-30T23:59:59Z",
+        "oos_start": "2026-04-01T00:00:00Z",
+        "strategy_timeframe": "1d",
+        "train_end": "2026-01-31T23:59:59Z",
+        "train_start": "2025-01-01T00:00:00Z",
+        "val_end": "2026-03-31T23:59:59Z",
+        "val_start": "2026-02-01T00:00:00Z"
+      },
+      "stage1": {
+        "input_count": 299,
+        "keep_ratio": 1.0,
+        "keep_ratio_applied": 1.0,
+        "selected_count": 299
+      },
+      "timeframe": "1d"
+    },
+    {
+      "candidate_count": 360,
+      "elapsed_seconds": 0.0,
+      "fold_id": "WF202604",
+      "log_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/latest_alpha_refresh_20260704_full_walkforward/WF202604/4h/runner_stdout_stderr.log",
+      "output_dir": "/home/hoky/Quants-agent/LuminaQuant/var/reports/latest_alpha_refresh_20260704_full_walkforward/WF202604/4h",
+      "report_exists": true,
+      "returncode": 0,
+      "shard_id": "4h",
+      "skipped_existing": true,
+      "split": {
+        "mode": "exact_dates",
+        "oos_end": "2026-04-30T23:59:59Z",
+        "oos_start": "2026-04-01T00:00:00Z",
+        "strategy_timeframe": "4h",
+        "train_end": "2026-01-31T23:59:59Z",
+        "train_start": "2025-01-01T00:00:00Z",
+        "val_end": "2026-03-31T23:59:59Z",
+        "val_start": "2026-02-01T00:00:00Z"
+      },
+      "stage1": {
+        "input_count": 360,
+        "keep_ratio": 1.0,
+        "keep_ratio_applied": 1.0,
+        "selected_count": 360
+      },
+      "timeframe": "4h"
+    },
+    {
+      "candidate_count": 305,
+      "elapsed_seconds": 0.0,
+      "fold_id": "WF202604",
+      "log_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/latest_alpha_refresh_20260704_full_walkforward/WF202604/30m/runner_stdout_stderr.log",
+      "output_dir": "/home/hoky/Quants-agent/LuminaQuant/var/reports/latest_alpha_refresh_20260704_full_walkforward/WF202604/30m",
+      "report_exists": true,
+      "returncode": 0,
+      "shard_id": "30m",
+      "skipped_existing": true,
+      "split": {
+        "mode": "exact_dates",
+        "oos_end": "2026-04-30T23:59:59Z",
+        "oos_start": "2026-04-01T00:00:00Z",
+        "strategy_timeframe": "30m",
+        "train_end": "2026-01-31T23:59:59Z",
+        "train_start": "2025-01-01T00:00:00Z",
+        "val_end": "2026-03-31T23:59:59Z",
+        "val_start": "2026-02-01T00:00:00Z"
+      },
+      "stage1": {
+        "input_count": 305,
+        "keep_ratio": 1.0,
+        "keep_ratio_applied": 1.0,
+        "selected_count": 305
+      },
+      "timeframe": "30m"
+    },
+    {
+      "candidate_count": 360,
+      "elapsed_seconds": 0.0,
+      "fold_id": "WF202605",
+      "log_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/latest_alpha_refresh_20260704_full_walkforward/WF202605/4h/runner_stdout_stderr.log",
+      "output_dir": "/home/hoky/Quants-agent/LuminaQuant/var/reports/latest_alpha_refresh_20260704_full_walkforward/WF202605/4h",
+      "report_exists": true,
+      "returncode": 0,
+      "shard_id": "4h",
+      "skipped_existing": true,
+      "split": {
+        "mode": "exact_dates",
+        "oos_end": "2026-05-31T23:59:59Z",
+        "oos_start": "2026-05-01T00:00:00Z",
+        "strategy_timeframe": "4h",
+        "train_end": "2026-02-28T23:59:59Z",
+        "train_start": "2025-01-01T00:00:00Z",
+        "val_end": "2026-04-30T23:59:59Z",
+        "val_start": "2026-03-01T00:00:00Z"
+      },
+      "stage1": {
+        "input_count": 360,
+        "keep_ratio": 1.0,
+        "keep_ratio_applied": 1.0,
+        "selected_count": 360
+      },
+      "timeframe": "4h"
+    },
+    {
+      "candidate_count": 305,
+      "elapsed_seconds": 0.0,
+      "fold_id": "WF202605",
+      "log_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/latest_alpha_refresh_20260704_full_walkforward/WF202605/30m/runner_stdout_stderr.log",
+      "output_dir": "/home/hoky/Quants-agent/LuminaQuant/var/reports/latest_alpha_refresh_20260704_full_walkforward/WF202605/30m",
+      "report_exists": true,
+      "returncode": 0,
+      "shard_id": "30m",
+      "skipped_existing": true,
+      "split": {
+        "mode": "exact_dates",
+        "oos_end": "2026-05-31T23:59:59Z",
+        "oos_start": "2026-05-01T00:00:00Z",
+        "strategy_timeframe": "30m",
+        "train_end": "2026-02-28T23:59:59Z",
+        "train_start": "2025-01-01T00:00:00Z",
+        "val_end": "2026-04-30T23:59:59Z",
+        "val_start": "2026-03-01T00:00:00Z"
+      },
+      "stage1": {
+        "input_count": 305,
+        "keep_ratio": 1.0,
+        "keep_ratio_applied": 1.0,
+        "selected_count": 305
+      },
+      "timeframe": "30m"
+    },
+    {
+      "candidate_count": 299,
+      "elapsed_seconds": 0.0,
+      "fold_id": "WF202605",
+      "log_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/latest_alpha_refresh_20260704_full_walkforward/WF202605/1d/runner_stdout_stderr.log",
+      "output_dir": "/home/hoky/Quants-agent/LuminaQuant/var/reports/latest_alpha_refresh_20260704_full_walkforward/WF202605/1d",
+      "report_exists": true,
+      "returncode": 0,
+      "shard_id": "1d",
+      "skipped_existing": true,
+      "split": {
+        "mode": "exact_dates",
+        "oos_end": "2026-05-31T23:59:59Z",
+        "oos_start": "2026-05-01T00:00:00Z",
+        "strategy_timeframe": "1d",
+        "train_end": "2026-02-28T23:59:59Z",
+        "train_start": "2025-01-01T00:00:00Z",
+        "val_end": "2026-04-30T23:59:59Z",
+        "val_start": "2026-03-01T00:00:00Z"
+      },
+      "stage1": {
+        "input_count": 299,
+        "keep_ratio": 1.0,
+        "keep_ratio_applied": 1.0,
+        "selected_count": 299
+      },
+      "timeframe": "1d"
+    },
+    {
+      "candidate_count": 360,
+      "elapsed_seconds": 897.192,
+      "fold_id": "WF202606",
+      "log_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/latest_alpha_refresh_20260704_full_walkforward/WF202606/4h/runner_stdout_stderr.log",
+      "output_dir": "/home/hoky/Quants-agent/LuminaQuant/var/reports/latest_alpha_refresh_20260704_full_walkforward/WF202606/4h",
+      "report_exists": true,
+      "returncode": 0,
+      "shard_id": "4h",
+      "split": {
+        "mode": "exact_dates",
+        "oos_end": "2026-06-30T23:59:59Z",
+        "oos_start": "2026-06-01T00:00:00Z",
+        "strategy_timeframe": "4h",
+        "train_end": "2026-03-31T23:59:59Z",
+        "train_start": "2025-01-01T00:00:00Z",
+        "val_end": "2026-05-31T23:59:59Z",
+        "val_start": "2026-04-01T00:00:00Z"
+      },
+      "stage1": {
+        "input_count": 360,
+        "keep_ratio": 1.0,
+        "keep_ratio_applied": 1.0,
+        "selected_count": 360
+      },
+      "timeframe": "4h"
+    },
+    {
+      "candidate_count": 305,
+      "elapsed_seconds": 1056.806,
+      "fold_id": "WF202606",
+      "log_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/latest_alpha_refresh_20260704_full_walkforward/WF202606/30m/runner_stdout_stderr.log",
+      "output_dir": "/home/hoky/Quants-agent/LuminaQuant/var/reports/latest_alpha_refresh_20260704_full_walkforward/WF202606/30m",
+      "report_exists": true,
+      "returncode": 0,
+      "shard_id": "30m",
+      "split": {
+        "mode": "exact_dates",
+        "oos_end": "2026-06-30T23:59:59Z",
+        "oos_start": "2026-06-01T00:00:00Z",
+        "strategy_timeframe": "30m",
+        "train_end": "2026-03-31T23:59:59Z",
+        "train_start": "2025-01-01T00:00:00Z",
+        "val_end": "2026-05-31T23:59:59Z",
+        "val_start": "2026-04-01T00:00:00Z"
+      },
+      "stage1": {
+        "input_count": 305,
+        "keep_ratio": 1.0,
+        "keep_ratio_applied": 1.0,
+        "selected_count": 305
+      },
+      "timeframe": "30m"
+    },
+    {
+      "candidate_count": 436,
+      "elapsed_seconds": 1295.864,
+      "fold_id": "WF202604",
+      "log_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/latest_alpha_refresh_20260704_full_walkforward/WF202604/1h_all/runner_stdout_stderr.log",
+      "output_dir": "/home/hoky/Quants-agent/LuminaQuant/var/reports/latest_alpha_refresh_20260704_full_walkforward/WF202604/1h_all",
+      "report_exists": true,
+      "returncode": 0,
+      "shard_id": "1h_all",
+      "split": {
+        "mode": "exact_dates",
+        "oos_end": "2026-04-30T23:59:59Z",
+        "oos_start": "2026-04-01T00:00:00Z",
+        "strategy_timeframe": "1h",
+        "train_end": "2026-01-31T23:59:59Z",
+        "train_start": "2025-01-01T00:00:00Z",
+        "val_end": "2026-03-31T23:59:59Z",
+        "val_start": "2026-02-01T00:00:00Z"
+      },
+      "stage1": {
+        "input_count": 436,
+        "keep_ratio": 1.0,
+        "keep_ratio_applied": 1.0,
+        "selected_count": 436
+      },
+      "timeframe": "1h"
+    },
+    {
+      "candidate_count": 436,
+      "elapsed_seconds": 1357.826,
+      "fold_id": "WF202605",
+      "log_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/latest_alpha_refresh_20260704_full_walkforward/WF202605/1h_all/runner_stdout_stderr.log",
+      "output_dir": "/home/hoky/Quants-agent/LuminaQuant/var/reports/latest_alpha_refresh_20260704_full_walkforward/WF202605/1h_all",
+      "report_exists": true,
+      "returncode": 0,
+      "shard_id": "1h_all",
+      "split": {
+        "mode": "exact_dates",
+        "oos_end": "2026-05-31T23:59:59Z",
+        "oos_start": "2026-05-01T00:00:00Z",
+        "strategy_timeframe": "1h",
+        "train_end": "2026-02-28T23:59:59Z",
+        "train_start": "2025-01-01T00:00:00Z",
+        "val_end": "2026-04-30T23:59:59Z",
+        "val_start": "2026-03-01T00:00:00Z"
+      },
+      "stage1": {
+        "input_count": 436,
+        "keep_ratio": 1.0,
+        "keep_ratio_applied": 1.0,
+        "selected_count": 436
+      },
+      "timeframe": "1h"
+    },
+    {
+      "candidate_count": 299,
+      "elapsed_seconds": 601.724,
+      "fold_id": "WF202606",
+      "log_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/latest_alpha_refresh_20260704_full_walkforward/WF202606/1d/runner_stdout_stderr.log",
+      "output_dir": "/home/hoky/Quants-agent/LuminaQuant/var/reports/latest_alpha_refresh_20260704_full_walkforward/WF202606/1d",
+      "report_exists": true,
+      "returncode": 0,
+      "shard_id": "1d",
+      "split": {
+        "mode": "exact_dates",
+        "oos_end": "2026-06-30T23:59:59Z",
+        "oos_start": "2026-06-01T00:00:00Z",
+        "strategy_timeframe": "1d",
+        "train_end": "2026-03-31T23:59:59Z",
+        "train_start": "2025-01-01T00:00:00Z",
+        "val_end": "2026-05-31T23:59:59Z",
+        "val_start": "2026-04-01T00:00:00Z"
+      },
+      "stage1": {
+        "input_count": 299,
+        "keep_ratio": 1.0,
+        "keep_ratio_applied": 1.0,
+        "selected_count": 299
+      },
+      "timeframe": "1d"
+    },
+    {
+      "candidate_count": 299,
+      "elapsed_seconds": 640.373,
+      "fold_id": "WF202607_PARTIAL",
+      "log_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/latest_alpha_refresh_20260704_full_walkforward/WF202607_PARTIAL/1d/runner_stdout_stderr.log",
+      "output_dir": "/home/hoky/Quants-agent/LuminaQuant/var/reports/latest_alpha_refresh_20260704_full_walkforward/WF202607_PARTIAL/1d",
+      "report_exists": true,
+      "returncode": 0,
+      "shard_id": "1d",
+      "split": {
+        "mode": "exact_dates",
+        "oos_end": "2026-07-04T00:00:00Z",
+        "oos_start": "2026-07-01T00:00:00Z",
+        "strategy_timeframe": "1d",
+        "train_end": "2026-04-30T23:59:59Z",
+        "train_start": "2025-01-01T00:00:00Z",
+        "val_end": "2026-06-30T23:59:59Z",
+        "val_start": "2026-05-01T00:00:00Z"
+      },
+      "stage1": {
+        "input_count": 299,
+        "keep_ratio": 1.0,
+        "keep_ratio_applied": 1.0,
+        "selected_count": 299
+      },
+      "timeframe": "1d"
+    },
+    {
+      "candidate_count": 360,
+      "elapsed_seconds": 821.389,
+      "fold_id": "WF202607_PARTIAL",
+      "log_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/latest_alpha_refresh_20260704_full_walkforward/WF202607_PARTIAL/4h/runner_stdout_stderr.log",
+      "output_dir": "/home/hoky/Quants-agent/LuminaQuant/var/reports/latest_alpha_refresh_20260704_full_walkforward/WF202607_PARTIAL/4h",
+      "report_exists": true,
+      "returncode": 0,
+      "shard_id": "4h",
+      "split": {
+        "mode": "exact_dates",
+        "oos_end": "2026-07-04T00:00:00Z",
+        "oos_start": "2026-07-01T00:00:00Z",
+        "strategy_timeframe": "4h",
+        "train_end": "2026-04-30T23:59:59Z",
+        "train_start": "2025-01-01T00:00:00Z",
+        "val_end": "2026-06-30T23:59:59Z",
+        "val_start": "2026-05-01T00:00:00Z"
+      },
+      "stage1": {
+        "input_count": 360,
+        "keep_ratio": 1.0,
+        "keep_ratio_applied": 1.0,
+        "selected_count": 360
+      },
+      "timeframe": "4h"
+    },
+    {
+      "candidate_count": 305,
+      "elapsed_seconds": 936.306,
+      "fold_id": "WF202607_PARTIAL",
+      "log_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/latest_alpha_refresh_20260704_full_walkforward/WF202607_PARTIAL/30m/runner_stdout_stderr.log",
+      "output_dir": "/home/hoky/Quants-agent/LuminaQuant/var/reports/latest_alpha_refresh_20260704_full_walkforward/WF202607_PARTIAL/30m",
+      "report_exists": true,
+      "returncode": 0,
+      "shard_id": "30m",
+      "split": {
+        "mode": "exact_dates",
+        "oos_end": "2026-07-04T00:00:00Z",
+        "oos_start": "2026-07-01T00:00:00Z",
+        "strategy_timeframe": "30m",
+        "train_end": "2026-04-30T23:59:59Z",
+        "train_start": "2025-01-01T00:00:00Z",
+        "val_end": "2026-06-30T23:59:59Z",
+        "val_start": "2026-05-01T00:00:00Z"
+      },
+      "stage1": {
+        "input_count": 305,
+        "keep_ratio": 1.0,
+        "keep_ratio_applied": 1.0,
+        "selected_count": 305
+      },
+      "timeframe": "30m"
+    },
+    {
+      "candidate_count": 436,
+      "elapsed_seconds": 1247.58,
+      "fold_id": "WF202606",
+      "log_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/latest_alpha_refresh_20260704_full_walkforward/WF202606/1h_all/runner_stdout_stderr.log",
+      "output_dir": "/home/hoky/Quants-agent/LuminaQuant/var/reports/latest_alpha_refresh_20260704_full_walkforward/WF202606/1h_all",
+      "report_exists": true,
+      "returncode": 0,
+      "shard_id": "1h_all",
+      "split": {
+        "mode": "exact_dates",
+        "oos_end": "2026-06-30T23:59:59Z",
+        "oos_start": "2026-06-01T00:00:00Z",
+        "strategy_timeframe": "1h",
+        "train_end": "2026-03-31T23:59:59Z",
+        "train_start": "2025-01-01T00:00:00Z",
+        "val_end": "2026-05-31T23:59:59Z",
+        "val_start": "2026-04-01T00:00:00Z"
+      },
+      "stage1": {
+        "input_count": 436,
+        "keep_ratio": 1.0,
+        "keep_ratio_applied": 1.0,
+        "selected_count": 436
+      },
+      "timeframe": "1h"
+    },
+    {
+      "candidate_count": 436,
+      "elapsed_seconds": 1061.569,
+      "fold_id": "WF202607_PARTIAL",
+      "log_path": "/home/hoky/Quants-agent/LuminaQuant/var/reports/latest_alpha_refresh_20260704_full_walkforward/WF202607_PARTIAL/1h_all/runner_stdout_stderr.log",
+      "output_dir": "/home/hoky/Quants-agent/LuminaQuant/var/reports/latest_alpha_refresh_20260704_full_walkforward/WF202607_PARTIAL/1h_all",
+      "report_exists": true,
+      "returncode": 0,
+      "shard_id": "1h_all",
+      "split": {
+        "mode": "exact_dates",
+        "oos_end": "2026-07-04T00:00:00Z",
+        "oos_start": "2026-07-01T00:00:00Z",
+        "strategy_timeframe": "1h",
+        "train_end": "2026-04-30T23:59:59Z",
+        "train_start": "2025-01-01T00:00:00Z",
+        "val_end": "2026-06-30T23:59:59Z",
+        "val_start": "2026-05-01T00:00:00Z"
+      },
+      "stage1": {
+        "input_count": 436,
+        "keep_ratio": 1.0,
+        "keep_ratio_applied": 1.0,
+        "selected_count": 436
+      },
+      "timeframe": "1h"
+    }
+  ],
+  "shards": [
+    {
+      "manifest": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_walkforward_candidate_manifest_30m.json",
+      "manifest_count": 305,
+      "shard_id": "30m",
+      "timeframe": "30m"
+    },
+    {
+      "manifest": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_walkforward_candidate_manifest_4h.json",
+      "manifest_count": 360,
+      "shard_id": "4h",
+      "timeframe": "4h"
+    },
+    {
+      "manifest": "/home/hoky/Quants-agent/LuminaQuant/var/reports/ultragoal_full_pool_strategy/g005_walkforward_candidate_manifest_1d.json",
+      "manifest_count": 299,
+      "shard_id": "1d",
+      "timeframe": "1d"
+    },
+    {
+      "manifest": "/home/hoky/Quants-agent/LuminaQuant/var/reports/latest_alpha_refresh_20260704_full_walkforward/g005_walkforward_candidate_manifest_1h_no_alpha101_timeout_filtered.json",
+      "manifest_count": 436,
+      "shard_id": "1h_all",
+      "timeframe": "1h"
+    }
+  ]
+}
