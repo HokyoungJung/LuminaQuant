@@ -16,7 +16,7 @@ improvement — see ``docs/divergences/walk_forward_no_sentinel.md``.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 import numpy as np
@@ -41,16 +41,32 @@ def build_walk_forward_splits(
     val_months: int = 6,
     test_months: int = 6,
     step_months: int = 6,
+    *,
+    purge_embargo_bars: int = 0,
+    bar_seconds: int | None = None,
 ) -> list[dict]:
-    """Build rolling walk-forward splits."""
+    """Build rolling walk-forward splits.
+
+    Purge/embargo (opt-in): with ``purge_embargo_bars > 0`` and a ``bar_seconds``
+    duration, a gap of ``purge_embargo_bars * bar_seconds`` is inserted between
+    each fold's contiguous windows (train->val and val->test) so leakage across a
+    boundary is bounded for multi-bar labels. The default (``purge_embargo_bars=0``)
+    keeps the windows abutting exactly (``val_start == train_end`` and
+    ``test_start == val_end``), byte-identical to today.
+    """
+    gap = (
+        timedelta(seconds=int(purge_embargo_bars) * int(bar_seconds))
+        if int(purge_embargo_bars) > 0 and bar_seconds is not None
+        else timedelta(0)
+    )
     splits = []
     cursor = base_start
     for i in range(folds):
         train_start = cursor
         train_end = add_months(train_start, train_months)
-        val_start = train_end
+        val_start = train_end + gap
         val_end = add_months(val_start, val_months)
-        test_start = val_end
+        test_start = val_end + gap
         test_end = add_months(test_start, test_months)
         splits.append(
             {

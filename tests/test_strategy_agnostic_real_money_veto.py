@@ -176,24 +176,126 @@ def test_clean_promotion_eligible_false_encoding_blocks(blocking_value: object) 
 
 
 # --------------------------------------------------------------------------- #
-# positive flags as 'true'/1 with no blockers => veto False                     #
+# positive flags in a REFERENCED artifact with no blockers => veto False         #
+# (P1: positive flags are honored ONLY from a referenced artifact)              #
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize("positive_value", ["true", "True", 1, "1", "yes", "on"])
-def test_positive_flags_string_or_int_encoding_clear_veto(positive_value: object) -> None:
+def test_positive_flags_string_or_int_encoding_clear_veto(
+    positive_value: object, tmp_path: Path
+) -> None:
+    artifact = tmp_path / "attestation.json"
+    artifact.write_text(
+        json.dumps(
+            {
+                "ready_for_real": positive_value,
+                "real_money_execution": positive_value,
+                "real_execution_allowed": positive_value,
+                "clean_promotion_eligible": positive_value,
+            }
+        ),
+        encoding="utf-8",
+    )
     decision = {
         "decision": "selected_live_mode",
         "selected_mode": "MovingAverageCrossStrategy",
-        "ready_for_real": positive_value,
-        "real_money_execution": positive_value,
-        "real_execution_allowed": positive_value,
-        "clean_promotion_eligible": positive_value,
+        "strategy_params": {"selected_artifact_path": str(artifact)},
     }
 
     checks = _strategy_agnostic_real_money_veto_checks(decision)
 
     assert checks["artifact_real_money_veto"] is False
     assert checks["artifact_ready_for_real"] is True
+    assert checks["artifact_referenced_artifact_present"] is True
     assert checks["artifact_governance_veto_reasons"] == []
+
+
+# --------------------------------------------------------------------------- #
+# P1: a self-attesting decision with NO referenced artifact stays vetoed        #
+# --------------------------------------------------------------------------- #
+def test_decision_self_attestation_without_referenced_artifact_is_vetoed() -> None:
+    decision = {
+        "decision": "selected_live_mode",
+        "selected_mode": "MovingAverageCrossStrategy",
+        "candidate_key": "moving_average_cross",
+        # Three hand-typed booleans must NOT unlock real money on their own.
+        "ready_for_real": True,
+        "real_money_execution": True,
+        "real_execution_allowed": True,
+        "clean_promotion_eligible": True,
+    }
+
+    checks = _strategy_agnostic_real_money_veto_checks(decision)
+
+    assert checks["artifact_real_money_veto"] is True
+    assert checks["artifact_referenced_artifact_present"] is False
+    # The decision's own flags are not counted as positive assertions.
+    assert checks["artifact_ready_for_real"] is False
+
+
+def test_inline_nested_profile_cannot_self_attest_without_referenced_artifact() -> None:
+    decision = {
+        "decision": "selected_live_mode",
+        "selected_mode": "MovingAverageCrossStrategy",
+        "ready_for_real": True,
+        "real_money_execution": True,
+        "real_execution_allowed": True,
+        "clean_promotion_eligible": True,
+        # An inline profile is still part of the decision payload -> not a referenced
+        # artifact, so it cannot assert readiness.
+        "selected_profile": {
+            "ready_for_real": True,
+            "real_money_execution": True,
+            "real_execution_allowed": True,
+        },
+    }
+
+    checks = _strategy_agnostic_real_money_veto_checks(decision)
+
+    assert checks["artifact_real_money_veto"] is True
+    assert checks["artifact_referenced_artifact_present"] is False
+
+
+# --------------------------------------------------------------------------- #
+# P1: canary flags surface from a referenced artifact                            #
+# --------------------------------------------------------------------------- #
+def test_canary_flags_surface_from_referenced_artifact(tmp_path: Path) -> None:
+    artifact = tmp_path / "attestation.json"
+    artifact.write_text(
+        json.dumps(
+            {
+                "ready_for_real": True,
+                "real_money_execution": True,
+                "real_execution_allowed": True,
+                "clean_promotion_eligible": True,
+                "canary_execution_allowed": True,
+                "canary_execution_recorded": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+    decision = {
+        "decision": "selected_live_mode",
+        "selected_mode": "MovingAverageCrossStrategy",
+        "strategy_params": {"real_money_attestation_artifact_path": str(artifact)},
+    }
+
+    checks = _strategy_agnostic_real_money_veto_checks(decision)
+
+    assert checks["artifact_real_money_veto"] is False
+    assert checks["artifact_canary_execution_allowed"] is True
+    assert checks["artifact_canary_execution_recorded"] is True
+
+
+def test_canary_flags_default_false_without_referenced_artifact() -> None:
+    decision = {
+        "decision": "selected_live_mode",
+        "selected_mode": "MovingAverageCrossStrategy",
+    }
+
+    checks = _strategy_agnostic_real_money_veto_checks(decision)
+
+    assert checks["artifact_canary_execution_allowed"] is False
+    assert checks["artifact_canary_execution_recorded"] is False
 
 
 # --------------------------------------------------------------------------- #
@@ -256,19 +358,30 @@ def test_dirty_strategy_profiles_list_blocks() -> None:
     assert "post_oos_research_variant" in checks["artifact_governance_veto_reasons"]
 
 
-def test_clean_nested_profile_does_not_block() -> None:
+def test_clean_nested_profile_does_not_block(tmp_path: Path) -> None:
+    # Positive readiness now must come from a referenced artifact; a clean nested
+    # profile inside it must not spuriously block.
+    artifact = tmp_path / "attestation.json"
+    artifact.write_text(
+        json.dumps(
+            {
+                "ready_for_real": True,
+                "real_money_execution": True,
+                "real_execution_allowed": True,
+                "clean_promotion_eligible": True,
+                "selected_profile": {
+                    "ready_for_real": True,
+                    "real_money_execution": True,
+                    "paper_testnet_candidate": False,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
     decision = {
         "decision": "selected_live_mode",
         "selected_mode": "MovingAverageCrossStrategy",
-        "ready_for_real": True,
-        "real_money_execution": True,
-        "real_execution_allowed": True,
-        "clean_promotion_eligible": True,
-        "selected_profile": {
-            "ready_for_real": True,
-            "real_money_execution": True,
-            "paper_testnet_candidate": False,
-        },
+        "strategy_params": {"selected_artifact_path": str(artifact)},
     }
 
     checks = _strategy_agnostic_real_money_veto_checks(decision)

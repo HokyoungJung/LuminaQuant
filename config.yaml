@@ -66,6 +66,13 @@ risk:
   #   gate in the backtest order path as in live. Default false preserves the golden
   #   baseline (enable on the backtest PC to unify backtest/live enforcement).
   enforce_order_risk_gate_in_backtest: false
+  # --- Real-money desk controls (real_money_readiness audit 2026-07-06) ---
+  # All default OFF (0 / false) => byte-identical default config. Enable on the
+  # backtest PC to measure, then set for real-money runs.
+  # max_orders_per_minute: 20            # >0 => cap new orders per rolling minute (M4); 0=disabled
+  # max_daily_notional_turnover_pct: 3.0 # >0 => cap traded notional/day as multiple of equity (M4)
+  # max_position_age_hours: 24.0         # >0 => alert/flatten positions older than N hours (M4)
+  # enforce_gross_exposure_in_hedge: true # HEDGE dual legs count GROSS in exposure/margin (M3)
 
 # ------------------------------------------
 # Execution Model (Shared)
@@ -89,6 +96,13 @@ execution:
   # require_funding_coverage: true => a leveraged backtest fails instead of silently
   #   charging 0.0 funding when funding feature data is absent. Default false.
   require_funding_coverage: false
+  # funding_on_utc_boundary: true => charge funding on the Binance 00:00/08:00/16:00
+  #   UTC settlement snapshots a position is open across, instead of the legacy
+  #   entry-anchored 8h clock (which lets any sub-8h round trip pay ZERO funding —
+  #   ~1-5%/yr inflation for high-turnover long-biased books; strategy_viability
+  #   _assessment 2026-07-06 Axis 3 #7). Default false preserves golden numerics;
+  #   the cost-realistic / strict research profiles turn it ON.
+  # funding_on_utc_boundary: false
   compute_backend: "auto" # auto|cpu|gpu|forced-gpu
   gpu_mode: "auto" # auto|cpu|gpu|forced-gpu
   gpu_vram_gb: 8.0
@@ -220,6 +234,20 @@ live:
   # cached best-bid/offer older than this many seconds (fail-closed during websocket
   # stalls / dislocations). Live-only, no backtest impact. 0.0 => disabled.
   max_bbo_age_seconds: 2.0
+  # --- Real-money live-safety controls (real_money_readiness audit 2026-07-06) ---
+  # All default OFF (0 / false) => paper/testnet behavior unchanged. The real-mode
+  # validate gate (mode=real OR go_live_stage in {canary,full}) REQUIRES the live-safety
+  # subset ON before it will let a Binance real run start. Uncomment + tune for real money:
+  # max_bbo_spread_bps_at_submit: 25.0       # >0 => reject limit orders when BBO spread exceeds N bps (C3)
+  # max_estimated_one_way_slippage_bps: 20.0 # >0 => reject when est. one-way slippage-to-mark exceeds N bps (C3)
+  # require_bbo_for_limit_orders: true       # reject a limit order with no fresh BBO snapshot (C3; needs book_ticker_enabled)
+  # max_limit_price_band_pct: 0.02           # >0 => reject a limit price deviating >N from mark/last_close (C3)
+  # equity_reconciliation_interval_sec: 30.0 # >0 => periodic exchange equity/cash re-sync (C4)
+  # market_data_silence_timeout_sec: 45.0    # >0 => data-silence watchdog (alert + freeze) (C6)
+  # require_state_fingerprint: true          # refuse foreign/mismatched state.json (M1)
+  # real_mode_managed_protective_stops: true # translate stop_loss/take_profit to Binance reduce-only algo orders (C2)
+  # NOTE: for a real run also pin an explicit small trading.symbols list (M6) — the default
+  # inherits the full research universe and is rejected in real mode.
   # API Keys are best loaded from .env, but can be set here if needed (NOT RECOMMENDED for git)
   # api_key: "YOUR_KEY"
   # secret_key: "YOUR_SECRET"
@@ -324,6 +352,40 @@ validation:
   # Relative tolerance for golden-record comparisons (np.testing.assert_allclose
   # rtol=). Tightening this makes regression gates stricter.
   golden_rtol: 1.0e-8
+
+# ------------------------------------------
+# Research / Selection Validation Wiring (default OFF — docs only)
+# ------------------------------------------
+# The flags below correct promotion-gate defects surfaced by
+# docs/audits/strategy_viability_assessment_20260706.md (Axis 3). They ALL default
+# to the legacy value so the shipped config loads byte-identically; they are turned
+# ON only in the honest-research profiles (configs/profiles/backtest_cost_realistic.yaml
+# and configs/profiles/research.yaml). Consumers read them defensively via
+# getattr(config.research, <flag>, <legacy_default>), so leaving this block commented
+# out keeps the current (legacy) behavior. Uncomment + flip a flag to opt a single
+# corrected gate into the default config.
+# research:
+#   # #1 make the deflated-Sharpe / SPA result a HARD reject in the strategy hurdle
+#   #    (instead of a soft 1.2-1.4x score weight). false => legacy advisory-only.
+#   strict_selection_gate: false
+#   # #2 add a 4-way train/val/oos/lockbox split; rank + gate on validation and
+#   #    report the never-touched lockbox as the sole OOS. false => legacy 3-way.
+#   use_lockbox_split: false
+#   # bars to purge + embargo between contiguous splits (multi-bar-label leakage
+#   #    guard). 0 => legacy (no purge/embargo gap).
+#   purge_embargo_bars: 0
+#   # #3 remove the N_eff double-discount in the DSR benchmark so the one binding
+#   #    DSR gate is actually stringent. false => legacy double-discount.
+#   single_correlation_discount: false
+#   # #4/#5 HAC / block-correct the iid inference (the n behind DSR/Sharpe AND the
+#   #    rank-IC t-stat) for autocorrelated / overlapping-horizon P&L. false => iid.
+#   hac_inference: false
+#   # use the CSCV PBO estimator as the binding gate; false => keep approx_pbo
+#   #    fold-instability heuristic (advisory).
+#   cscv_pbo: false
+#   # #6 exposure-normalize the portfolio-superiority promotion objective so leverage
+#   #    cannot buy "superiority". false => legacy scale-mixed objective.
+#   exposure_normalized_promotion: false
 
 # ------------------------------------------
 # Data Collection

@@ -32,6 +32,11 @@ import numpy as np
 
 from lumina_quant.portfolio.optimizer_core import metrics as _core_metrics
 
+# Annualization cadence for the DERIVE path (raw returns -> Sharpe/CAGR/...).
+# Matches ``optimizer_core.metrics`` default so the derive path stays
+# byte-identical unless a caller explicitly supplies a different cadence.
+DEFAULT_PERIODS_PER_YEAR = 365
+
 # Metric direction: +1 higher-is-better, -1 lower-is-better.
 METRIC_DIRECTIONS: dict[str, int] = {
     "return": 1,
@@ -96,13 +101,22 @@ def _safe_float(value: Any, default: float | None = None) -> float | None:
     return parsed if math.isfinite(parsed) else default
 
 
-def _derive_from_returns(returns: Any) -> dict[str, float]:
-    """Derive the metric battery from a raw per-period returns series."""
+def _derive_from_returns(
+    returns: Any, periods_per_year: int = DEFAULT_PERIODS_PER_YEAR
+) -> dict[str, float]:
+    """Derive the metric battery from a raw per-period returns series.
+
+    ``periods_per_year`` sets the annualization cadence for the ratio metrics
+    (Sharpe/Sortino/volatility) and CAGR; it is forwarded to
+    ``optimizer_core.metrics`` so daily vs hourly vs minute series annualize
+    correctly instead of silently assuming 365. Defaults to
+    :data:`DEFAULT_PERIODS_PER_YEAR` (byte-identical to the previous behavior).
+    """
     series = np.asarray(list(returns or []), dtype=np.float64)
     series = series[np.isfinite(series)]
     if series.size == 0:
         return {}
-    core = _core_metrics(series)
+    core = _core_metrics(series, periods_per_year=int(periods_per_year))
     total_return = float(np.expm1(np.log1p(np.clip(series, -0.999999, None)).sum()))
     win_rate = float(np.mean(series > 0.0)) if series.size else 0.0
     derived = {
@@ -118,17 +132,25 @@ def _derive_from_returns(returns: Any) -> dict[str, float]:
     return {key: value for key, value in derived.items() if math.isfinite(value)}
 
 
-def resolve_row(raw: dict[str, Any]) -> ScoreboardRow:
+def resolve_row(
+    raw: dict[str, Any], *, periods_per_year: int = DEFAULT_PERIODS_PER_YEAR
+) -> ScoreboardRow:
     """Normalize one candidate result row into the scoreboard schema.
 
     Accepted fields: ``id`` (required), ``label``, ``family``,
     ``strategy_class``, ``metrics`` (canonical flat dict, takes precedence),
     ``returns`` (raw series, used to derive missing metrics), ``turnover``,
     ``trade_count``/``trades``, ``liquidation_count``, ``bars``.
+
+    ``periods_per_year`` is forwarded to the derive path (see
+    :func:`_derive_from_returns`). ``liquidation_count`` is left ABSENT when the
+    row supplies none: a measured zero and an unmeasured catastrophic path are
+    not the same, so the gate (not a silent ``setdefault``) decides how to treat
+    "never measured".
     """
     candidate_id = str(raw.get("id") or raw.get("candidate_id") or raw.get("name") or "")
     metrics: dict[str, float] = {}
-    metrics.update(_derive_from_returns(raw.get("returns")))
+    metrics.update(_derive_from_returns(raw.get("returns"), periods_per_year=periods_per_year))
     supplied = raw.get("metrics")
     if isinstance(supplied, dict):
         for key, value in supplied.items():
@@ -147,7 +169,9 @@ def resolve_row(raw: dict[str, Any]) -> ScoreboardRow:
     bars = int(_safe_float(raw.get("bars"), 0.0) or 0.0)
     if "trade_frequency" not in metrics and "trade_count" in metrics and bars > 0:
         metrics["trade_frequency"] = metrics["trade_count"] / float(bars)
-    metrics.setdefault("liquidation_count", 0.0)
+    # NOTE: deliberately no ``setdefault("liquidation_count", 0.0)`` -- absence
+    # means the catastrophic path was never measured, which the gate must be
+    # able to distinguish from a measured zero (N4).
     return ScoreboardRow(
         candidate_id=candidate_id,
         label=str(raw.get("label") or candidate_id),
@@ -173,11 +197,19 @@ def apply_gates(
                 f"trade_count {row.metrics.get('trade_count', 0.0):g} < min_trades {min_trades:g}"
             )
         max_liq = gates.get("max_liquidations")
-        if max_liq is not None and row.metrics.get("liquidation_count", 0.0) > float(max_liq):
-            failures.append(
-                f"liquidation_count {row.metrics.get('liquidation_count', 0.0):g} > "
-                f"max_liquidations {max_liq:g}"
-            )
+        if max_liq is not None:
+            # Fail closed when the catastrophic path was never measured: a
+            # missing liquidation_count is NOT a measured zero (N4).
+            if "liquidation_count" not in row.metrics:
+                failures.append(
+                    "liquidation_count missing (catastrophic path unverified); "
+                    "supply liquidation_count or disable max_liquidations to rank"
+                )
+            elif row.metrics["liquidation_count"] > float(max_liq):
+                failures.append(
+                    f"liquidation_count {row.metrics['liquidation_count']:g} > "
+                    f"max_liquidations {max_liq:g}"
+                )
         max_mdd = gates.get("max_mdd")
         if max_mdd is not None and row.metrics.get("mdd", 0.0) > float(max_mdd):
             failures.append(f"mdd {row.metrics.get('mdd', 0.0):g} > max_mdd {max_mdd:g}")
@@ -282,12 +314,18 @@ def build_scoreboard(
     gates: dict[str, float | int | None] | None = None,
     weights: dict[str, float] | None = None,
     top_n: int = 10,
+    periods_per_year: int = DEFAULT_PERIODS_PER_YEAR,
 ) -> dict[str, Any]:
-    """Build the full scoreboard payload from candidate result rows."""
+    """Build the full scoreboard payload from candidate result rows.
+
+    ``periods_per_year`` sets the annualization cadence for any row whose
+    metrics are DERIVED from a raw returns series (precomputed metrics are
+    unaffected). Defaults to :data:`DEFAULT_PERIODS_PER_YEAR`.
+    """
     effective_gates = dict(DEFAULT_GATES)
     if gates:
         effective_gates.update(gates)
-    rows = [resolve_row(raw) for raw in raw_rows]
+    rows = [resolve_row(raw, periods_per_year=periods_per_year) for raw in raw_rows]
     rows = [row for row in rows if row.candidate_id]
     rows.sort(key=lambda row: row.candidate_id)
     eligible, excluded = apply_gates(rows, effective_gates)
@@ -367,6 +405,7 @@ def render_scoreboard_markdown(payload: dict[str, Any], *, title: str = "Alpha S
 __all__ = [
     "DEFAULT_COMPOSITE_METRICS",
     "DEFAULT_GATES",
+    "DEFAULT_PERIODS_PER_YEAR",
     "METRIC_DIRECTIONS",
     "ScoreboardRow",
     "apply_gates",

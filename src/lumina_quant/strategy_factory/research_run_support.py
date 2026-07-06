@@ -97,6 +97,16 @@ def _resolve_score_config(overrides: Mapping[str, Any] | None) -> dict[str, Any]
                     default_value[sub_key] = override_value[sub_key]
         elif override_value is not None and not isinstance(default_value, dict):
             resolved[key] = override_value
+    # Opt-in research-gate section pass-through. The strict-research profile
+    # carries selection flags (``strict_selection_gate`` etc.) under a nested
+    # ``research`` mapping; ``DEFAULT_RESEARCH_SCORING_CONFIG`` intentionally
+    # omits it so that, when no caller provides one, the resolved config (and any
+    # report that serializes it) is byte-identical to today. Consumers read the
+    # flags defensively and fall back to legacy behavior when the section is
+    # absent, keeping this lane independent of any cross-lane ordering.
+    research_overrides = overrides.get("research")
+    if isinstance(research_overrides, Mapping) and research_overrides:
+        resolved["research"] = {str(key): value for key, value in research_overrides.items()}
     return resolved
 
 
@@ -468,6 +478,115 @@ def _resolve_split_config(
     }
 
 
+def research_config_to_overrides(research_config: Any) -> dict[str, Any]:
+    """Map a ``ResearchConfig`` (or a ``RuntimeConfig`` wrapping one) to the
+    override dicts consumed by ``run_candidate_research``'s config-activation seam.
+
+    This is the single, independently-testable place where the strict-research
+    profile's flags are translated into the shapes each downstream consumer
+    already understands. Every flag is read DEFENSIVELY (``getattr`` with a
+    default), so a bare/partial config object -- or ``None`` -- degrades to
+    empty overrides rather than raising. ``research_config=None`` (the default
+    everywhere this is consumed) returns four empty dicts, i.e. a strict no-op.
+
+    Returns a dict with four keys:
+
+    * ``split``: ``use_lockbox_split`` / ``purge_embargo_bars``, consumed by
+      ``_resolve_split_config`` / ``_apply_lockbox_and_purge_masks`` in
+      ``research_runner`` via the ``split`` mapping passed to
+      ``run_candidate_research``.
+    * ``score_config_research``: the nested ``research`` section of
+      ``score_config`` consumed defensively by ``research_runner._research_flag``
+      -- ``strict_selection_gate`` plus ``dsr_gate_floor`` / ``spa_gate_ceiling``
+      when the config object happens to carry them (neither is a
+      ``ResearchConfig`` field today, so they are normally omitted).
+    * ``deflation_kwargs``: ``single_correlation_discount`` / ``hac_inference`` /
+      ``cscv_pbo`` -- the function kwargs of the same name consumed by
+      ``research.survivorship.evaluate_survivorship_gate`` /
+      ``research.alpha_search.run_alpha_search``. NOTE: ``run_candidate_research``
+      itself only has a live sink for ``hac_inference`` (forwarded into the
+      per-candidate ``research_metrics.deflated_sharpe_ratio`` call); the other
+      two travel with the family-wise survivorship gate used by the separate
+      alpha-search pipeline and are surfaced here so a caller of that pipeline
+      can reuse this single mapping instead of re-deriving it.
+    * ``robust_score_params``: ``strict_selection_gate`` for the
+      ``strategy_factory.selection`` shortlist gate (``select_diversified_shortlist``
+      / ``_resolve_robust_score_params`` read a flat dict of this shape).
+
+    ``research_config`` may be a ``ResearchConfig`` instance directly, or a full
+    ``RuntimeConfig`` (its ``.research`` attribute is unwrapped automatically).
+    """
+    empty: dict[str, Any] = {
+        "split": {},
+        "score_config_research": {},
+        "deflation_kwargs": {},
+        "robust_score_params": {},
+    }
+    if research_config is None:
+        return empty
+
+    cfg = research_config
+    if not hasattr(cfg, "strict_selection_gate") and hasattr(cfg, "research"):
+        cfg = cfg.research
+
+    split: dict[str, Any] = {}
+    if hasattr(cfg, "use_lockbox_split"):
+        split["use_lockbox_split"] = bool(cfg.use_lockbox_split)
+    if hasattr(cfg, "purge_embargo_bars"):
+        split["purge_embargo_bars"] = int(cfg.purge_embargo_bars)
+
+    score_config_research: dict[str, Any] = {}
+    if hasattr(cfg, "strict_selection_gate"):
+        score_config_research["strict_selection_gate"] = bool(cfg.strict_selection_gate)
+    if hasattr(cfg, "dsr_gate_floor"):
+        score_config_research["dsr_gate_floor"] = float(cfg.dsr_gate_floor)
+    if hasattr(cfg, "spa_gate_ceiling"):
+        score_config_research["spa_gate_ceiling"] = float(cfg.spa_gate_ceiling)
+
+    deflation_kwargs: dict[str, Any] = {}
+    if hasattr(cfg, "single_correlation_discount"):
+        deflation_kwargs["single_correlation_discount"] = bool(cfg.single_correlation_discount)
+    if hasattr(cfg, "hac_inference"):
+        deflation_kwargs["hac_inference"] = bool(cfg.hac_inference)
+    if hasattr(cfg, "cscv_pbo"):
+        deflation_kwargs["cscv_pbo"] = bool(cfg.cscv_pbo)
+
+    robust_score_params: dict[str, Any] = {}
+    if hasattr(cfg, "strict_selection_gate"):
+        robust_score_params["strict_selection_gate"] = bool(cfg.strict_selection_gate)
+
+    return {
+        "split": split,
+        "score_config_research": score_config_research,
+        "deflation_kwargs": deflation_kwargs,
+        "robust_score_params": robust_score_params,
+    }
+
+
+def apply_split_overrides(
+    resolved_split: Mapping[str, Any],
+    overrides: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Layer ``research_config``-derived split flags onto an ALREADY-RESOLVED split.
+
+    Must be applied AFTER ``_resolve_split_config`` runs on the caller's
+    original ``split`` input, never before: injecting ``use_lockbox_split`` /
+    ``purge_embargo_bars`` into a bare/partial ``split`` mapping ahead of
+    resolution would make ``_resolve_split_config`` treat it as "exact dates
+    supplied" (any ``Mapping``, even one with no date fields, skips the
+    rolling-window default), silently losing the default 360/150/60-day
+    window whenever a caller sets only the research-profile flags and no
+    explicit dates. Applying the merge post-resolution sidesteps that
+    entirely: ``resolved_split`` already carries through any date fields (or
+    the resolved rolling default) untouched, and any key the caller's
+    original ``split`` already set (including ``use_lockbox_split`` /
+    ``purge_embargo_bars`` themselves) continues to win over ``overrides``.
+    """
+    if not overrides:
+        return dict(resolved_split)
+    return {**overrides, **resolved_split}
+
+
 def _empty_candidate_research_report(
     *,
     base_timeframe: str,
@@ -476,15 +595,19 @@ def _empty_candidate_research_report(
     stage1_keep_ratio: float,
     scoring: _ResearchRunScoringConfig,
     split: Mapping[str, Any] | None,
+    split_overrides: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     normalized_timeframes = normalize_strategy_timeframes(
         strategy_timeframes or CANONICAL_STRATEGY_TIMEFRAMES,
         required=CANONICAL_STRATEGY_TIMEFRAMES,
         strict_subset=True,
     )
-    empty_split = _resolve_split_config(
-        split,
-        strategy_timeframe=normalized_timeframes[0] if normalized_timeframes else "1m",
+    empty_split = apply_split_overrides(
+        _resolve_split_config(
+            split,
+            strategy_timeframe=normalized_timeframes[0] if normalized_timeframes else "1m",
+        ),
+        split_overrides,
     )
     return {
         "schema_version": "v2",
@@ -522,4 +645,6 @@ __all__ = [
     "_resolve_split_config",
     "_split_window_bounds",
     "adapt_legacy_candidate",
+    "apply_split_overrides",
+    "research_config_to_overrides",
 ]

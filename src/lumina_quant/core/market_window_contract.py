@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -12,6 +13,51 @@ from lumina_quant.core.events import MarketWindowEvent
 
 class MarketWindowContractError(RuntimeError):
     """Raised when MARKET_WINDOW payload fails strict parity contract."""
+
+
+def assert_bars_1s_sane(
+    bars_1s: dict[str, tuple[tuple[int, float, float, float, float, float], ...]],
+) -> None:
+    """Fail-closed OHLCV sanity gate for MARKET_WINDOW rows.
+
+    Mirrors the invariants enforced by ``compute.ohlcv_validation`` (finite +
+    positive prices, finite non-negative volume, ``high >= low``) but operates
+    directly on the canonical tuple rows so it is cheap enough for the live
+    per-window hot path (no DataFrame construction). This closes the hole where
+    a corrupt/partial commit could push a ``NaN``/negative/inverted bar straight
+    through the seam into indicators, signals and pre-trade sizing.
+    """
+    for symbol, rows in bars_1s.items():
+        for row in rows:
+            open_price = float(row[1])
+            high_price = float(row[2])
+            low_price = float(row[3])
+            close_price = float(row[4])
+            volume = float(row[5])
+            for name, price in (
+                ("open", open_price),
+                ("high", high_price),
+                ("low", low_price),
+                ("close", close_price),
+            ):
+                if not math.isfinite(price):
+                    raise MarketWindowContractError(
+                        f"bars_1s[{symbol}] {name} is not finite: {price!r}"
+                    )
+                if price <= 0.0:
+                    raise MarketWindowContractError(
+                        f"bars_1s[{symbol}] {name} is not positive: {price!r}"
+                    )
+            if not math.isfinite(volume):
+                raise MarketWindowContractError(
+                    f"bars_1s[{symbol}] volume is not finite: {volume!r}"
+                )
+            if volume < 0.0:
+                raise MarketWindowContractError(f"bars_1s[{symbol}] volume is negative: {volume!r}")
+            if high_price < low_price:
+                raise MarketWindowContractError(
+                    f"bars_1s[{symbol}] high < low: {high_price!r} < {low_price!r}"
+                )
 
 
 def _to_epoch_ms(value: Any, *, field_name: str) -> int:
@@ -298,6 +344,7 @@ def build_market_window_event(
     metrics_log_path: str = "logs/live/market_window_metrics.ndjson",
     emit_metrics: bool = False,
     bars_1s_already_normalized: bool = False,
+    sanity_check: bool = False,
 ) -> MarketWindowEvent:
     time_ms = _to_epoch_ms(time, field_name="time")
     normalized_rows = (
@@ -305,6 +352,10 @@ def build_market_window_event(
         if bool(bars_1s_already_normalized)
         else normalize_bars_1s(bars_1s)
     )
+    # Default OFF -> byte-identical for backtest/goldens. Live producers opt in
+    # via config so a corrupt bar fails closed at the seam instead of trading.
+    if bool(sanity_check):
+        assert_bars_1s_sane(normalized_rows)
 
     watermark_ms = (
         _to_epoch_ms(event_time_watermark_ms, field_name="event_time_watermark_ms")
@@ -343,6 +394,7 @@ def build_market_window_event(
 __all__ = [
     "MarketWindowContractError",
     "append_market_window_metrics",
+    "assert_bars_1s_sane",
     "build_market_window_event",
     "emit_market_window_metrics",
     "market_window_event_payload",

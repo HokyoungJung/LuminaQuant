@@ -387,6 +387,23 @@ fn build_info() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
 
+/// Return the crate source-tree hash embedded at build time.
+///
+/// `scripts/build_native_backends.py` computes a deterministic hash of
+/// `native/lumina_compute/src/*.rs` and exports it as `LUMINA_KERNEL_SRC_HASH`
+/// before invoking maturin, so this value is baked into the extension. When the
+/// crate is built without that script (e.g. a plain `maturin develop`) the env
+/// var is unset and this returns "" -- the Python handshake treats an empty
+/// hash as "nothing to compare" and degrades to the version check.
+///
+/// This lets the Python side flag an edited-but-not-rebuilt kernel even when
+/// `CARGO_PKG_VERSION` was not bumped (finding N3): it recomputes the source
+/// hash from the checked-out tree and compares it against this embedded value.
+#[pyfunction]
+fn kernel_src_hash() -> &'static str {
+    option_env!("LUMINA_KERNEL_SRC_HASH").unwrap_or("")
+}
+
 /// Evaluate Sharpe/CAGR/MaxDD from an equity-curve series.
 ///
 /// Args:
@@ -1163,6 +1180,7 @@ fn append_ohlcv_1s_wal<'py>(
 #[pymodule]
 fn _compute(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(build_info, m)?)?;
+    m.add_function(wrap_pyfunction!(kernel_src_hash, m)?)?;
     m.add_function(wrap_pyfunction!(evaluate_metrics, m)?)?;
     m.add_function(wrap_pyfunction!(simulate_symbol_fold, m)?)?;
     m.add_function(wrap_pyfunction!(debounced_state_signal, m)?)?;

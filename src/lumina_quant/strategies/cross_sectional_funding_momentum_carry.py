@@ -28,6 +28,18 @@ This is DISTINCT from every existing funding sleeve, which all trade the funding
 LEVEL (carry sign): this book trades the funding TREND.  It is data-local (no
 I/O, no hidden configuration bus), reuses the shared cross-sectional helpers and
 the no-lookahead feature cascade, and never raises from ``calculate_signals``.
+
+LABELING NOTE (accurate naming).  The ranking signal here is funding-rate
+MOMENTUM / positioning-momentum (the TREND of the funding curve), NOT carry
+harvest.  "Carry" in the name refers only to the funding-accrual cash flow that
+accrues while a name is HELD across funding intervals -- it does not mean the
+side is chosen to collect funding.  In fact, going LONG a name whose funding is
+rising (top of the momentum rank) typically PAYS funding rather than collecting
+it.  A genuine funding-sign-aware carry variant is available opt-in and default
+OFF via ``true_carry_sign``: when ON, a ranked target is kept only if its side
+actually COLLECTS the funding it is exposed to (LONG only when the latest funding
+level is negative; SHORT only when it is positive).  With the flag OFF the book
+is byte-identical to the pure momentum ranking.
 """
 
 from __future__ import annotations
@@ -200,6 +212,12 @@ class CrossSectionalFundingMomentumCarryStrategy(Strategy):
         self.max_symbol_exposure_pct = max(0.0, float(resolved["max_symbol_exposure_pct"]))
         self.max_order_value = max(0.0, float(resolved["max_order_value"]))
         self.min_price = max(0.0, float(resolved["min_price"]))
+        # STRATEGY-IMPROVE (strategy-local, config-gated, default OFF => byte-
+        # identical). Opt-in genuine funding-sign-aware carry: keep a ranked
+        # target only if its side actually COLLECTS the funding it holds (LONG
+        # iff latest funding < 0, SHORT iff latest funding > 0). Read from raw
+        # params (schema uses keep_unknown=False, so it is not in ``resolved``).
+        self.true_carry_sign = bool(params.get("true_carry_sign", False))
         # Enforce the 8h funding cadence floor in code (instances cannot decide
         # faster than the underlying funding accrual interval).
         self.decision_cadence_seconds = max(
@@ -386,6 +404,26 @@ class CrossSectionalFundingMomentumCarryStrategy(Strategy):
         }
         return weights, float(scalar)
 
+    def _filter_carry_sign(
+        self, targets: dict[str, tuple[str, float, dict[str, Any]]]
+    ) -> dict[str, tuple[str, float, dict[str, Any]]]:
+        """Keep only targets whose side actually COLLECTS funding.
+
+        LONG collects when the latest funding level is negative; SHORT collects
+        when it is positive.  Names printing no funding (empty history) contribute
+        nothing and are dropped.  Only invoked when ``true_carry_sign`` is ON.
+        """
+        kept: dict[str, tuple[str, float, dict[str, Any]]] = {}
+        for symbol, entry in targets.items():
+            mode = entry[0]
+            item = self._state.get(symbol)
+            funding = float(item.funding_rate[-1]) if item and item.funding_rate else 0.0
+            long_collects = mode == "LONG" and funding < 0.0
+            short_collects = mode == "SHORT" and funding > 0.0
+            if long_collects or short_collects:
+                kept[symbol] = entry
+        return kept
+
     def _evaluate(self, event_time: Any) -> None:
         if len(self.symbol_list) < self.min_symbols:
             return
@@ -402,6 +440,8 @@ class CrossSectionalFundingMomentumCarryStrategy(Strategy):
             max_shorts=self.max_shorts,
             allow_short=self.allow_short,
         )
+        if self.true_carry_sign:
+            targets = self._filter_carry_sign(targets)
         weights, scalar = self._inverse_vol_weights(targets, vols)
         self._emit_weighted(targets, weights, scalar, event_time)
 

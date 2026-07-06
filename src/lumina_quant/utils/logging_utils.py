@@ -32,6 +32,19 @@ def _resolve_logs_dir() -> str:
     return candidate or "logs"
 
 
+def _console_logging_disabled() -> bool:
+    """Whether to skip the stderr console handler.
+
+    The resilient wrapper (run_bot.sh / run_bot.bat) redirects stdout+stderr into
+    ``logs/crash.log`` while the RotatingFileHandler already captures structured
+    logs.  Setting ``LQ_DISABLE_CONSOLE_LOG=1`` (done by the wrappers) stops the
+    console handler from duplicating every rotated line into the unbounded
+    crash.log (audit O5).  Default (unset) keeps the console handler, so normal
+    interactive/test behavior is byte-identical.
+    """
+    return os.getenv("LQ_DISABLE_CONSOLE_LOG", "0").strip().lower() in {"1", "true", "yes"}
+
+
 def _ensure_root_log_handler(formatter: logging.Formatter) -> None:
     root = logging.getLogger()
     root.setLevel(_get_log_level())
@@ -67,10 +80,12 @@ def setup_logging(name="lumina_quant"):
     formatter = json_formatter if use_json else plain_formatter
     _ensure_root_log_handler(formatter)
 
-    # Console Handler
-    ch = logging.StreamHandler()
-    ch.setFormatter(formatter)
-    logger.addHandler(ch)
+    # Console Handler (skipped when the resilient wrapper already captures
+    # stdout/stderr into crash.log — avoids duplicating every rotated line).
+    if not _console_logging_disabled():
+        ch = logging.StreamHandler()
+        ch.setFormatter(formatter)
+        logger.addHandler(ch)
 
     # File Handler (Rotating: 10MB limit, 5 backups)
     logs_dir = _resolve_logs_dir()

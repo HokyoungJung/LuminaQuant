@@ -17,10 +17,12 @@ from lumina_quant.live_selection import (
     supports_live_portfolio_mode,
 )
 from lumina_quant.system_assembly import build_live_runtime_contract
+from lumina_quant.live.trader import resolve_live_endpoint
 from lumina_quant.strategies.artifact_portfolio_mode import (
     ArtifactPortfolioModeStrategy,
     resolve_portfolio_mode_definition,
 )
+from lumina_quant.utils.notification import NotificationManager
 
 DEFAULT_LIVE_STRATEGY_NAME = "MovingAverageCrossStrategy"
 DEFAULT_WS_STRATEGY_NAME = "RsiStrategy"
@@ -88,8 +90,13 @@ def _resolve_live_banner(live_cfg) -> dict[str, object]:
     """
     stage = str(getattr(live_cfg, "go_live_stage", "testnet")).strip().lower()
     mode = str(getattr(live_cfg, "mode", "paper")).strip().lower()
-    endpoint_is_prod = stage in {"canary", "full"} or (
-        getattr(live_cfg, "testnet", None) is False and mode == "real"
+    # Share the ONE endpoint resolver with the exchange routing (IS_TESTNET) so the
+    # banner can never disagree with where orders actually go.
+    endpoint_is_prod = (
+        resolve_live_endpoint(
+            go_live_stage=stage, mode=mode, testnet=getattr(live_cfg, "testnet", None)
+        )
+        == "production"
     )
     return {
         "stage": stage,
@@ -108,6 +115,64 @@ def _shutdown_on_fatal(trader, exc: Exception) -> None:
     if callable(close_audit):
         close_audit(status="FAILED")
     raise SystemExit(2) from exc
+
+
+def _check_notifier_deliverability(
+    live_cfg, *, real_money_gate: bool, mode_label: str
+) -> str | None:
+    """O1: refuse (or loudly warn) when the alert channel cannot deliver.
+
+    On the documented Binance-only install every notifier alert — kill-switch,
+    freeze, FLATTEN — silently fails when ``TELEGRAM_BOT_TOKEN`` /
+    ``TELEGRAM_CHAT_ID`` are unset. Real-money stages (``mode='real'``, or
+    ``go_live_stage`` in ``{canary, full}``) must refuse to arm trading behind
+    an undeliverable notifier; paper/testnet keeps today's behavior unchanged
+    (a loud warning only — never a new failure).
+
+    Returns a message to print-and-abort with when the caller should hard-fail,
+    else ``None`` to continue (a paper/testnet warning, if any, is printed here
+    directly since it is not a failure).
+    """
+    notifier = NotificationManager(
+        getattr(live_cfg, "telegram_bot_token", None),
+        getattr(live_cfg, "telegram_chat_id", None),
+    )
+    deliverable_check = getattr(notifier, "deliverable", None)
+    if callable(deliverable_check):
+        deliverable = bool(deliverable_check())
+    else:
+        # Defensive fallback if a future refactor ever drops
+        # NotificationManager.deliverable(): fall back to the enabled/configured
+        # flag and attempt one live startup send.
+        deliverable = bool(getattr(notifier, "enabled", False))
+        if deliverable:
+            send_message = getattr(notifier, "send_message", None)
+            if callable(send_message):
+                try:
+                    send_message("LuminaQuant live preflight: startup notifier check.")
+                except Exception:
+                    deliverable = False
+
+    if deliverable:
+        return None
+
+    detail = (
+        "Notifier preflight FAILED: no deliverable alert channel is configured "
+        "(TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID missing or invalid). Kill-switch, "
+        "freeze, and FLATTEN alerts would be silently lost."
+    )
+    if real_money_gate:
+        return (
+            f"[FATAL] {detail}\n"
+            f"[FATAL] Refusing to start real-money trading (mode={mode_label}) without "
+            "a working notifier. Configure Telegram alerting, then relaunch."
+        )
+    print(
+        f"[WARN] {detail}\n"
+        f"[WARN] Continuing in {mode_label} mode without alerting — you will NOT be "
+        "paged if a kill-switch trips."
+    )
+    return None
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -332,6 +397,18 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Mode: {banner['mode']}")
     if banner["endpoint_is_prod"]:
         print("⚠  REAL MONEY — orders route to the PRODUCTION exchange endpoint")
+
+    # O1: a real-money stage must not arm trading behind a notifier that cannot
+    # deliver — every kill-switch/freeze/FLATTEN alert would be silently lost.
+    # Paper/testnet keeps today's behavior unchanged (loud warning only).
+    real_money_gate = banner["mode"] == "REAL" or banner["stage"] in {"canary", "full"}
+    notifier_preflight_failure = _check_notifier_deliverability(
+        rt.live, real_money_gate=real_money_gate, mode_label=banner["mode"]
+    )
+    if notifier_preflight_failure is not None:
+        print(notifier_preflight_failure)
+        return 1
+
     print(f"Exchange: {rt.live.exchange.name} ({rt.live.exchange.market_type})")
     market_data_source = str(rt.live.market_data_source)
     order_state_source = str(rt.live.order_state_source)

@@ -1,4 +1,19 @@
-"""Single-asset Alpha101 formula strategy with tunable constant overrides."""
+"""Alpha101 formula strategy with tunable constant overrides.
+
+IMPORTANT SIGNAL SEMANTICS.  The published WorldQuant Alpha101 formulas are
+CROSS-SECTIONAL: ``rank()`` ranks each name against the *universe* at a single
+timestamp, and the alpha's economic content lives in that cross-section.  The
+default single-asset adaptation here replaces ``rank()`` with a TIME-SERIES
+self-rank (a symbol ranked against its own history), which is a DIFFERENT,
+weaker signal -- NOT the published Alpha101.  Treat single-asset output as a
+time-series factor, not as the cross-sectional alpha.
+
+When a real cross-section is available (>= 2 symbols printing the same bar), the
+opt-in, config-gated ``cross_sectional_rank`` flag (default OFF => byte-identical)
+standardizes each name's raw alpha score across the peer cross-section at that
+bar, restoring the cross-sectional economic content.  With the flag OFF the
+emitted signals are byte-identical to the legacy time-series self-rank book.
+"""
 
 from __future__ import annotations
 
@@ -67,7 +82,14 @@ def _latest_zscore(values: deque, *, window: int) -> float | None:
 
 
 class Alpha101FormulaStrategy(Strategy):
-    """Apply one Alpha101 formula per symbol and trade factor z-score extremes."""
+    """Apply one Alpha101 formula per symbol and trade factor z-score extremes.
+
+    By default the per-symbol score is standardized against its OWN history
+    (time-series self-rank) -- a weaker, DIFFERENT signal than the published
+    cross-sectional Alpha101.  Set ``cross_sectional_rank=True`` (default OFF) to
+    standardize across the peer cross-section at each bar instead, restoring the
+    cross-sectional economic content when >= 2 symbols are available.
+    """
 
     @classmethod
     def get_param_schema(cls) -> dict[str, HyperParam]:
@@ -148,6 +170,7 @@ class Alpha101FormulaStrategy(Strategy):
         stop_loss_pct: float = 0.03,
         allow_short: bool = True,
         alpha_param_overrides: Mapping[str, float] | None = None,
+        cross_sectional_rank: bool = False,
     ):
         self.bars = bars
         self.events = events
@@ -178,6 +201,14 @@ class Alpha101FormulaStrategy(Strategy):
         self.signal_sign = -1.0 if float(resolved["signal_sign"]) < 0.0 else 1.0
         self.stop_loss_pct = float(resolved["stop_loss_pct"])
         self.allow_short = bool(resolved["allow_short"])
+        # STRATEGY-IMPROVE (strategy-local, config-gated, default OFF => byte-
+        # identical to the legacy time-series self-rank). When ON and a real
+        # cross-section is available, standardize the raw alpha score across
+        # peers at each bar (true cross-sectional rank).
+        self.cross_sectional_rank = bool(cross_sectional_rank)
+        # Transient (NOT serialized) cache of each symbol's latest (bar_key,
+        # score) used only for the opt-in cross-sectional standardization.
+        self._xs_latest: dict[str, tuple[str, float]] = {}
         self.alpha_param_overrides = _coerce_override_map(resolved.get("alpha_param_overrides"))
 
         history_len = max(self.history_window + 4, self.score_window + 16)
@@ -279,6 +310,32 @@ class Alpha101FormulaStrategy(Strategy):
         value_f = float(value)
         return self.signal_sign * value_f if math.isfinite(value_f) else None
 
+    def _cross_sectional_zscore(
+        self, item: _Alpha101SymbolState, symbol: str, bar_key: str, score: float
+    ) -> float | None:
+        """Standardize ``score`` across peers printing the same bar.
+
+        Records this symbol's current-bar score, then z-scores it against every
+        symbol whose latest cached score shares ``bar_key`` (a true, causal
+        cross-section: only current-bar scores are used).  When fewer than two
+        peers have printed for this bar it is genuinely single-asset, so it falls
+        back to the time-series self-rank z-score.
+        """
+        self._xs_latest[symbol] = (str(bar_key), float(score))
+        peers = [value for (key, value) in self._xs_latest.values() if bar_key and key == bar_key]
+        if len(peers) < 2:
+            return _latest_zscore(item.scores, window=self.score_window)
+        mean = float(sum(peers) / len(peers))
+        variance = float(sum((value - mean) ** 2 for value in peers) / (len(peers) - 1))
+        std = math.sqrt(max(0.0, variance))
+        if std <= 1e-12:
+            delta = float(score) - mean
+            if abs(delta) <= 1e-12:
+                return 0.0
+            return ALPHA101_ZSCORE_CAP if delta > 0.0 else -ALPHA101_ZSCORE_CAP
+        z = (float(score) - mean) / std
+        return max(-ALPHA101_ZSCORE_CAP, min(ALPHA101_ZSCORE_CAP, z))
+
     def _emit(
         self,
         symbol: str,
@@ -342,7 +399,10 @@ class Alpha101FormulaStrategy(Strategy):
         if score is None:
             return
         item.scores.append(score)
-        zscore = _latest_zscore(item.scores, window=self.score_window)
+        if self.cross_sectional_rank:
+            zscore = self._cross_sectional_zscore(item, symbol, bar_key, score)
+        else:
+            zscore = _latest_zscore(item.scores, window=self.score_window)
         if zscore is None:
             return
 

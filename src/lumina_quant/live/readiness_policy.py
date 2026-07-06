@@ -183,15 +183,46 @@ def _decision_allows_live_start(decision: Mapping[str, Any]) -> tuple[bool, bool
     return decision_allowed, decision_keep, decision_promote, selected_reference
 
 
+def _strategy_name_in_live_map(name: str) -> bool:
+    """True when ``name`` matches a registered live (or opt-in) strategy.
+
+    P2: strategy-factory / G005 winners register their class as ``live_opt_in`` but
+    are not covered by :func:`infer_strategy_class_name`'s prefix table.  Validating an
+    explicit ``strategy_name``/``strategy_class`` against
+    ``registry.get_live_strategy_map(include_opt_in=True)`` lets a new family become
+    promotable without a source edit, while staying fail-closed: an unknown name (or
+    any registry import failure) returns False so the decision falls back to the
+    inference/portfolio-mode path and, absent those, is treated as incompatible.
+    """
+    token = str(name or "").strip()
+    if not token:
+        return False
+    try:
+        from lumina_quant.strategies.registry import get_live_strategy_map
+
+        live_map = get_live_strategy_map(include_opt_in=True)
+    except Exception:  # pragma: no cover - registry import must never open a path
+        return False
+    if token in live_map:
+        return True
+    return any(getattr(cls, "__name__", "") == token for cls in live_map.values())
+
+
 def _decision_runtime_compatible(
     *,
     decision_allowed: bool,
     decision_keep: bool,
     selected_reference: str,
+    strategy_name: str = "",
 ) -> bool:
     if not decision_allowed:
         return False
     if decision_keep:
+        return True
+    # An explicit strategy_name/strategy_class validated against the live registry map
+    # makes the gate agree with cli/live.py's instantiation path (which resolves the
+    # same map), so newly registered live_opt_in families are promotable directly.
+    if _strategy_name_in_live_map(strategy_name):
         return True
     return bool(
         infer_strategy_class_name(selected_reference)
@@ -326,16 +357,25 @@ def _strategy_agnostic_real_money_veto_checks(
 ) -> dict[str, Any]:
     """Fail-closed real-money veto for non-AlphaZoo live decisions.
 
-    The veto stays True unless EVERY relevant payload is clean and at least one
-    payload positively asserts ``ready_for_real``.  This makes the strategy-agnostic
-    veto at least as strict as the AlphaZoo sibling:
+    The veto stays True unless a REFERENCED artifact (not the decision payload
+    itself) positively asserts readiness and EVERY relevant payload is clean.  This
+    makes the strategy-agnostic veto at least as strict as the AlphaZoo sibling:
 
+    * P1 self-attestation fix: the positive readiness flags
+      (``ready_for_real`` / ``real_execution_allowed`` / ``real_money_execution``,
+      plus the canary flags) are honored ONLY when they come from an
+      externally-referenced artifact (a ``*_artifact_path`` / ``candidate_artifact``
+      / ``selected_artifact`` reference, or a profile nested inside one).  Three
+      booleans hand-typed into the decision JSON (or its inline profiles) can no
+      longer unlock real money; at least one referenced artifact must exist and be
+      clean;
     * any payload (decision, strategy_params, referenced artifact, or a nested
       selected/strategy profile) that asserts ``paper_testnet_only`` /
       ``paper_testnet_candidate``, explicitly negates a positive readiness flag,
       or trips a governance blocker forces veto=True — a self-attesting decision
       CANNOT override a referenced dirty artifact;
-    * absence of an explicit positive ``ready_for_real`` keeps the veto active;
+    * absence of a referenced artifact, or absence of an explicit positive
+      ``ready_for_real`` in one, keeps the veto active;
     * a referenced artifact that cannot be read forces veto=True with
       ``artifact_validation_error``.
 
@@ -343,7 +383,11 @@ def _strategy_agnostic_real_money_veto_checks(
     ``'false'``/0 string/int encodings are honored in both directions.
     """
     params = _decision_strategy_params(decision)
+    # ``containers`` feeds the BLOCKING checks (a dirty flag anywhere vetoes).
+    # ``referenced_containers`` holds ONLY externally-referenced artifacts and is the
+    # sole source permitted to positively assert readiness (audit P1).
     containers: dict[str, Mapping[str, Any]] = {"decision": decision, "strategy_params": params}
+    referenced_containers: dict[str, Mapping[str, Any]] = {}
     try:
         for index, reference in enumerate(_artifact_reference_paths(decision)):
             artifact_path = _resolve_repo_artifact_path(Path(reference))
@@ -354,6 +398,7 @@ def _strategy_agnostic_real_money_veto_checks(
                 # an AttributeError downstream.
                 raise TypeError(f"referenced artifact is not a JSON object: {reference}")
             containers[f"artifact_{index}"] = artifact_payload
+            referenced_containers[f"artifact_{index}"] = artifact_payload
     except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
         return {
             "artifact_real_money_veto": True,
@@ -361,6 +406,9 @@ def _strategy_agnostic_real_money_veto_checks(
             "artifact_ready_for_real": None,
             "artifact_real_execution_allowed": None,
             "artifact_real_money_execution": None,
+            "artifact_canary_execution_allowed": None,
+            "artifact_canary_execution_recorded": None,
+            "artifact_referenced_artifact_present": False,
             "artifact_post_oos_research_variant": None,
             "artifact_requires_fresh_forward_shadow": None,
             "artifact_clean_promotion_eligible": None,
@@ -368,29 +416,52 @@ def _strategy_agnostic_real_money_veto_checks(
             "artifact_validation_error": str(exc),
         }
 
-    # Expand to include any nested selected/strategy profiles so a clean
-    # top-level payload cannot mask a dirty selected profile.
-    items: list[Mapping[str, Any]] = list(containers.values())
-    for payload in list(items):
-        items.extend(_collect_profile_payloads(payload))
+    # Blocking scope: decision + strategy_params + referenced artifacts + every
+    # nested selected/strategy profile, so a clean top-level payload cannot mask a
+    # dirty selected profile.
+    blocking_items: list[Mapping[str, Any]] = list(containers.values())
+    for payload in list(blocking_items):
+        blocking_items.extend(_collect_profile_payloads(payload))
 
-    governance_payloads = {f"payload_{i}": item for i, item in enumerate(items)}
+    # Positive-assertion scope: referenced artifacts + profiles nested inside them
+    # ONLY — never the decision/strategy_params payloads themselves.
+    referenced_items: list[Mapping[str, Any]] = list(referenced_containers.values())
+    for payload in list(referenced_items):
+        referenced_items.extend(_collect_profile_payloads(payload))
+
+    governance_payloads = {f"payload_{i}": item for i, item in enumerate(blocking_items)}
     governance_checks = _artifact_governance_veto_checks(governance_payloads)
     governance_veto = bool(governance_checks["artifact_governance_veto_reasons"])
 
     paper_only = any(
-        _flag_is_true(item, "paper_testnet_only") or _profile_paper_only(item) for item in items
+        _flag_is_true(item, "paper_testnet_only") or _profile_paper_only(item)
+        for item in blocking_items
     )
-    ready_for_real = any(_flag_is_true(item, "ready_for_real") for item in items)
-    real_execution_allowed = any(_flag_is_true(item, "real_execution_allowed") for item in items)
-    real_money_execution = any(_flag_is_true(item, "real_money_execution") for item in items)
-    any_blocks = any(_payload_blocks_real_money(item) for item in items)
+    any_blocks = any(_payload_blocks_real_money(item) for item in blocking_items)
 
-    # Fail-closed: veto unless ALL THREE positive flags are asserted (matching the
-    # AlphaZoo sibling) AND no payload blocks (paper-only / explicit negation /
-    # governance) AND no governance veto.
+    has_referenced_artifact = bool(referenced_containers)
+    ready_for_real = any(_flag_is_true(item, "ready_for_real") for item in referenced_items)
+    real_execution_allowed = any(
+        _flag_is_true(item, "real_execution_allowed") for item in referenced_items
+    )
+    real_money_execution = any(
+        _flag_is_true(item, "real_money_execution") for item in referenced_items
+    )
+    canary_execution_allowed = any(
+        _flag_is_true(item, "canary_execution_allowed") for item in referenced_items
+    )
+    canary_execution_recorded = any(
+        _flag_is_true(item, "canary_execution_recorded")
+        or _flag_is_true(item, "canary_evidence_recorded")
+        for item in referenced_items
+    )
+
+    # Fail-closed: veto unless a REFERENCED artifact asserts all three positive flags
+    # (matching the AlphaZoo sibling's referenced-artifact contract) AND no payload
+    # blocks (paper-only / explicit negation / governance) AND no governance veto.
     clean_ready = (
-        ready_for_real
+        has_referenced_artifact
+        and ready_for_real
         and real_execution_allowed
         and real_money_execution
         and not any_blocks
@@ -403,6 +474,9 @@ def _strategy_agnostic_real_money_veto_checks(
         "artifact_ready_for_real": ready_for_real,
         "artifact_real_execution_allowed": real_execution_allowed,
         "artifact_real_money_execution": real_money_execution,
+        "artifact_canary_execution_allowed": canary_execution_allowed,
+        "artifact_canary_execution_recorded": canary_execution_recorded,
+        "artifact_referenced_artifact_present": has_referenced_artifact,
         **governance_checks,
         "artifact_validation_error": "",
     }
@@ -468,6 +542,12 @@ def _artifact_real_money_veto_checks(
             optuna.get("canary_execution_allowed") is True
             and integer.get("canary_execution_allowed") is True
         )
+        # Recorded canary evidence gates ready_for_full (P1): full 100% sizing must
+        # not be reachable until a canary blast-radius run has been recorded.
+        canary_execution_recorded = bool(
+            optuna.get("canary_execution_recorded") is True
+            and integer.get("canary_execution_recorded") is True
+        )
         return {
             "artifact_real_money_veto": bool(
                 paper_only
@@ -481,6 +561,7 @@ def _artifact_real_money_veto_checks(
             "artifact_real_execution_allowed": real_execution_allowed,
             "artifact_real_money_execution": real_money_execution,
             "artifact_canary_execution_allowed": canary_execution_allowed,
+            "artifact_canary_execution_recorded": canary_execution_recorded,
             **governance_checks,
             "artifact_validation_error": "",
             "artifact_optuna_hybrid_path": str(optuna_path),
@@ -493,6 +574,8 @@ def _artifact_real_money_veto_checks(
             "artifact_ready_for_real": None,
             "artifact_real_execution_allowed": None,
             "artifact_real_money_execution": None,
+            "artifact_canary_execution_allowed": None,
+            "artifact_canary_execution_recorded": None,
             "artifact_post_oos_research_variant": None,
             "artifact_requires_fresh_forward_shadow": None,
             "artifact_clean_promotion_eligible": None,
@@ -536,10 +619,14 @@ def _build_live_readiness_verdict(
     decision_allowed, decision_keep, decision_promote, decision_reference = (
         _decision_allows_live_start(decision)
     )
+    explicit_strategy_name = str(
+        decision.get("strategy_name") or decision.get("strategy_class") or ""
+    ).strip()
     decision_runtime_compatible = _decision_runtime_compatible(
         decision_allowed=decision_allowed,
         decision_keep=decision_keep,
         selected_reference=decision_reference,
+        strategy_name=explicit_strategy_name,
     )
     artifact_veto_checks = _artifact_real_money_veto_checks(
         decision,
@@ -633,6 +720,17 @@ def _build_live_readiness_verdict(
         and not artifact_real_money_veto
         and postgres_dsn_present
     )
+    # full: 100% sizing must NOT be the first reachable real stage (P1).  It requires
+    # everything ready_for_real requires PLUS recorded canary evidence (a referenced
+    # artifact flag set only after a canary blast-radius run) or an explicit operator
+    # override (env LUMINA_ALLOW_FULL_WITHOUT_CANARY / live.allow_full_without_canary).
+    canary_evidence_recorded = bool(
+        artifact_veto_checks.get("artifact_canary_execution_recorded", False)
+    )
+    full_stage_override = _env_truthy("LUMINA_ALLOW_FULL_WITHOUT_CANARY", env) or bool(
+        runtime_live.get("allow_full_without_canary", False)
+    )
+    ready_for_full = bool(ready_for_real and (canary_evidence_recorded or full_stage_override))
 
     feature_common_tail = min(
         (
@@ -687,6 +785,8 @@ def _build_live_readiness_verdict(
             "shadow_parity_ratio": shadow_parity_ratio,
             "shadow_parity_satisfied": _shadow_parity_ok,
             "artifact_canary_execution_allowed": artifact_canary_allowed,
+            "canary_evidence_recorded": canary_evidence_recorded,
+            "full_stage_override": full_stage_override,
         },
         latest={
             "refresh_cutoff_utc": refresh.get("collection_cutoff_utc"),
@@ -701,7 +801,9 @@ def _build_live_readiness_verdict(
             "ready_for_real": ready_for_real,
             # Stage-keyed alias for enforce_live_readiness_from_files stage dispatch
             "ready_for_testnet": ready_for_paper,
-            "ready_for_full": ready_for_real,
+            # ready_for_full is stricter than ready_for_real: it additionally requires
+            # recorded canary evidence or an explicit override (P1).
+            "ready_for_full": ready_for_full,
         },
         recommended_action=recommended_action,
     )
@@ -722,13 +824,51 @@ def build_live_readiness_payload(
     raw = load_yaml_config(config_path=str(config_path))
     resolved_refresh_json = _resolve_repo_artifact_path(refresh_json)
     resolved_decision_json = _resolve_repo_artifact_path(decision_json)
-    refresh = _read_json(resolved_refresh_json)
-    decision = _read_json(resolved_decision_json)
+    mode_for_error = str(getattr(runtime.live, "mode", "") or "").strip().lower() or "paper"
+    # A missing/unreadable readiness artifact is a fail-closed BLOCK with structured
+    # diagnostics, never a raw FileNotFoundError stack trace (audit P1).
+    try:
+        refresh = _read_json(resolved_refresh_json)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise LiveReadinessBlockedError(
+            mode=mode_for_error,
+            recommended_action="block_until_readiness_artifacts_present",
+            payload={
+                "artifact_kind": "live_readiness_preflight",
+                "error": "missing_or_unreadable_refresh_artifact",
+                "refresh_json": str(resolved_refresh_json),
+                "detail": str(exc),
+            },
+        ) from exc
+    try:
+        decision = _read_json(resolved_decision_json)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise LiveReadinessBlockedError(
+            mode=mode_for_error,
+            recommended_action="block_until_readiness_artifacts_present",
+            payload={
+                "artifact_kind": "live_readiness_preflight",
+                "error": "missing_or_unreadable_decision_artifact",
+                "decision_json": str(resolved_decision_json),
+                "detail": str(exc),
+            },
+        ) from exc
+    # readiness_preflight_stale_minutes is CONFIG-owned; read it defensively so a
+    # config-provided window takes effect once CONFIG lands the schema field, while
+    # default config (no field) stays byte-identical at the caller default.
+    configured_stale = getattr(runtime.live, "readiness_preflight_stale_minutes", None)
+    if isinstance(configured_stale, bool):
+        configured_stale = None
+    effective_stale = (
+        int(configured_stale)
+        if isinstance(configured_stale, (int, float)) and int(configured_stale) > 0
+        else int(stale_minutes)
+    )
     verdict = _build_live_readiness_verdict(
         config_path=config_path,
         refresh_json=resolved_refresh_json,
         decision_json=resolved_decision_json,
-        stale_minutes=max(1, int(stale_minutes)),
+        stale_minutes=max(1, int(effective_stale)),
         runtime_live=asdict(runtime.live),
         runtime_storage=asdict(runtime.storage),
         raw_storage=dict(raw.get("storage") or {}),
@@ -780,7 +920,9 @@ def enforce_live_readiness_from_files(
         "testnet": "ready_for_paper",
         "shadow": "ready_for_shadow",
         "canary": "ready_for_canary",
-        "full": "ready_for_real",
+        # full stage checks the stricter ready_for_full (canary evidence / override),
+        # not the ready_for_real alias — so 100% sizing cannot start without canary.
+        "full": "ready_for_full",
     }
     if go_live_stage is not None:
         resolved_stage = str(go_live_stage or "testnet").strip().lower()

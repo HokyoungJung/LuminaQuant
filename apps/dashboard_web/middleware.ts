@@ -28,29 +28,48 @@ const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
 /**
  * Return true if the request originates from localhost.
  *
- * We check (in order):
- *   1. x-forwarded-for (set by reverse proxies / Next.js dev server)
- *   2. The raw ip from the NextRequest object
+ * TRUST MODEL (O6): `x-forwarded-for` is a client-supplied header. A remote client can
+ * trivially send `x-forwarded-for: 127.0.0.1`, so it MUST NOT be trusted to prove
+ * locality unless the DIRECT socket peer is itself a trusted local proxy (a loopback
+ * address that we run in front of the dashboard). We therefore decide as follows:
  *
- * We take only the FIRST value from x-forwarded-for (the originating client). A trusted
- * reverse proxy appends entries to the right, so the leftmost address is the client.
+ *   1. Direct peer IP known and NON-loopback: the peer is a genuine remote client (it
+ *      reached a server bound beyond 127.0.0.1, or an untrusted proxy). Use the raw peer
+ *      address EXCLUSIVELY and ignore x-forwarded-for entirely -> not localhost. This is
+ *      what defeats the spoof.
+ *   2. Direct peer IP known and loopback: the peer is either the local client itself, or
+ *      a trusted local reverse proxy forwarding the real client. Honor x-forwarded-for
+ *      here, taking only its leftmost (originating-client) entry.
+ *   3. Direct peer IP not exposed by the runtime (Next 15 removed `NextRequest.ip`, so the
+ *      raw peer is often unavailable): x-forwarded-for is unauthenticated and MUST NOT be
+ *      used to GRANT access. We still honor a self-declared NON-loopback client as a
+ *      fail-closed rejection signal, then fall back to treating unknown-origin as local for
+ *      READ access only. State-changing actions are independently token-gated and
+ *      fail-closed in route.ts, so this fallback can never enable an unauthenticated
+ *      kill/stop/cancel.
  */
 function isLocalhost(req: NextRequest): boolean {
   const xForwardedFor = req.headers.get('x-forwarded-for');
-  if (xForwardedFor) {
-    const clientIp = xForwardedFor.split(',')[0].trim();
-    return LOOPBACK.has(clientIp);
-  }
-  // Prefer the runtime-exposed direct peer IP when available: this DENIES a remote
-  // client that reaches a 0.0.0.0-bound server directly (no proxy, no xff).
+  // Leftmost x-forwarded-for entry = the originating client (a trusted proxy appends to
+  // the right). null when the header is absent.
+  const forwardedClient = xForwardedFor ? xForwardedFor.split(',')[0].trim() : null;
+
   const directIp = (req as unknown as { ip?: string }).ip;
   if (directIp) {
-    return LOOPBACK.has(directIp);
+    if (!LOOPBACK.has(directIp)) {
+      // (1) Genuine remote peer — never trust its x-forwarded-for to claim loopback.
+      return false;
+    }
+    // (2) Peer is loopback: honor the forwarded client if a trusted proxy supplied one;
+    // otherwise the loopback peer IS the client.
+    return forwardedClient === null ? true : LOOPBACK.has(forwardedClient);
   }
-  // No origin signal at all (some runtimes do not expose a peer IP). The dashboard is
-  // intended to bind to 127.0.0.1; treat unknown-origin as local for READ access only.
-  // State-changing actions are independently token-gated and fail-closed in route.ts,
-  // so this fallback can never enable an unauthenticated kill/stop/cancel.
+
+  // (3) No direct peer IP. x-forwarded-for cannot GRANT access here, but a self-declared
+  // non-loopback client is honored as a fail-closed reject.
+  if (forwardedClient !== null && !LOOPBACK.has(forwardedClient)) {
+    return false;
+  }
   return true;
 }
 

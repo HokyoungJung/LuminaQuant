@@ -8,11 +8,14 @@ import json
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 from lumina_quant.portfolio_followup_rules import (
     ROBUST_PROMOTION_GATES,
     evaluate_robustness_gates,
+    multiple_comparison_delta_floor,
+    promotion_gross_exposure,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -321,14 +324,32 @@ def _strict_grouped_allocator_entry(
     return entry
 
 
-def _promotion_score(metrics: dict[str, Any]) -> float:
+def _promotion_score(
+    metrics: dict[str, Any],
+    *,
+    gross_exposure: float = 1.0,
+    exposure_normalized: bool = False,
+) -> float:
+    if not exposure_normalized:
+        return (
+            (1.0 * _safe_float(metrics.get("sharpe"), 0.0))
+            + (0.35 * _safe_float(metrics.get("sortino"), 0.0))
+            + (0.10 * _safe_float(metrics.get("calmar"), 0.0))
+            + (10.0 * _safe_float(metrics.get("total_return", metrics.get("return")), 0.0))
+            - (4.0 * _safe_float(metrics.get("max_drawdown", metrics.get("mdd")), 0.0))
+            - (0.75 * _safe_float(metrics.get("volatility"), 0.0))
+        )
+    # Exposure-normalized objective: divide the scale-dependent return/drawdown/
+    # volatility terms by gross exposure so a levered candidate cannot buy
+    # "superiority".  Sharpe/Sortino/Calmar are already scale-free ratios.
+    divisor = gross_exposure if gross_exposure and gross_exposure > 0.0 else 1.0
     return (
         (1.0 * _safe_float(metrics.get("sharpe"), 0.0))
         + (0.35 * _safe_float(metrics.get("sortino"), 0.0))
         + (0.10 * _safe_float(metrics.get("calmar"), 0.0))
-        + (10.0 * _safe_float(metrics.get("total_return", metrics.get("return")), 0.0))
-        - (4.0 * _safe_float(metrics.get("max_drawdown", metrics.get("mdd")), 0.0))
-        - (0.75 * _safe_float(metrics.get("volatility"), 0.0))
+        + ((10.0 * _safe_float(metrics.get("total_return", metrics.get("return")), 0.0)) / divisor)
+        - ((4.0 * _safe_float(metrics.get("max_drawdown", metrics.get("mdd")), 0.0)) / divisor)
+        - ((0.75 * _safe_float(metrics.get("volatility"), 0.0)) / divisor)
     )
 
 
@@ -513,13 +534,18 @@ def _strict_grouped_gate_failures(
 
 def _decorate_vs_incumbent(
     entries: list[dict[str, Any]],
+    *,
+    exposure_normalized: bool = False,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     if not entries:
         raise RuntimeError("no candidate entries available for decision bundle")
 
     incumbent = dict(entries[0])
     incumbent_oos = dict(incumbent.get("oos") or {})
-    incumbent_score = _promotion_score(incumbent_oos)
+    incumbent_gross = promotion_gross_exposure(incumbent) if exposure_normalized else 1.0
+    incumbent_score = _promotion_score(
+        incumbent_oos, gross_exposure=incumbent_gross, exposure_normalized=exposure_normalized
+    )
     incumbent["promotion_score"] = incumbent_score
     incumbent["promotion_score_delta"] = 0.0
     incumbent["oos_total_return_delta"] = 0.0
@@ -532,9 +558,20 @@ def _decorate_vs_incumbent(
     for raw in entries[1:]:
         entry = dict(raw)
         oos = dict(entry.get("oos") or {})
-        score = _promotion_score(oos)
+        if exposure_normalized:
+            candidate_gross = promotion_gross_exposure(entry)
+            score = _promotion_score(oos, gross_exposure=candidate_gross, exposure_normalized=True)
+            gate_result = evaluate_robustness_gates(
+                entry,
+                incumbent,
+                exposure_normalized_promotion=True,
+                candidate_gross_exposure=candidate_gross,
+                incumbent_gross_exposure=incumbent_gross,
+            )
+        else:
+            score = _promotion_score(oos)
+            gate_result = evaluate_robustness_gates(entry, incumbent)
         score_delta = score - incumbent_score
-        gate_result = evaluate_robustness_gates(entry, incumbent)
         entry["promotion_score"] = score
         entry["promotion_score_delta"] = score_delta
         entry.update(gate_result)
@@ -571,7 +608,9 @@ def build_portfolio_max_performance_decision(
     four_sleeve_comparison_path: Path | str | None = None,
     meta_search_summary_paths: tuple[Path | str, ...] = (),
     extra_candidate_artifact_paths: tuple[Path | str, ...] = (),
+    research_config: Any = None,
 ) -> dict[str, Any]:
+    exposure_normalized = bool(getattr(research_config, "exposure_normalized_promotion", False))
     resolved_incumbent_bundle_path = _resolve_incumbent_bundle_path(Path(incumbent_bundle_path))
     resolved_incumbent_portfolio_path = _resolve_incumbent_portfolio_path(
         Path(incumbent_portfolio_path)
@@ -952,9 +991,23 @@ def build_portfolio_max_performance_decision(
         ]
         entries.extend(extra_entries)
 
-    decorated, incumbent = _decorate_vs_incumbent(entries)
+    decorated, incumbent = _decorate_vs_incumbent(entries, exposure_normalized=exposure_normalized)
     challengers = [dict(entry) for entry in decorated[1:]]
     promotable = [entry for entry in challengers if bool(entry.get("promotable"))]
+    multiplicity_floor = 0.0
+    if exposure_normalized and promotable:
+        # Multiple-comparison-aware floor on the exposure-normalized superiority
+        # argmax: with K challengers ranked against the same incumbent, require
+        # the winner's delta to clear more than the raw 0.0 gate.
+        multiplicity_floor = multiple_comparison_delta_floor(
+            [_safe_float(entry.get("promotion_score_delta"), 0.0) for entry in challengers],
+            challenger_count=len(challengers),
+        )
+        promotable = [
+            entry
+            for entry in promotable
+            if _safe_float(entry.get("promotion_score_delta"), 0.0) > multiplicity_floor
+        ]
     if promotable:
         winner = max(
             promotable,
@@ -972,7 +1025,13 @@ def build_portfolio_max_performance_decision(
     else:
         winner = incumbent
         winner_status = "retained_incumbent"
-        winner_reason = "No challenger cleared the locked-OOS robustness gates; keep the current one-shot incumbent."
+        if exposure_normalized and multiplicity_floor > 0.0:
+            winner_reason = (
+                "No challenger cleared the exposure-normalized, multiple-comparison-adjusted "
+                f"superiority floor ({multiplicity_floor:.6f}); keep the current one-shot incumbent."
+            )
+        else:
+            winner_reason = "No challenger cleared the locked-OOS robustness gates; keep the current one-shot incumbent."
         recommended_action = "Retain the incumbent and continue with cleanup, evidence collation, and reproducibility hardening."
 
     challenger_rankings = [
@@ -990,13 +1049,21 @@ def build_portfolio_max_performance_decision(
         )
     ]
 
+    promotion_formula = PROMOTION_FORMULA
+    if exposure_normalized:
+        promotion_formula = (
+            "(1.0 * oos_sharpe) + (0.35 * oos_sortino) + (0.10 * oos_calmar) + "
+            "((10.0 * oos_total_return) / gross_exposure) - "
+            "((4.0 * oos_max_drawdown) / gross_exposure) - "
+            "((0.75 * oos_volatility) / gross_exposure)"
+        )
     payload = {
         "generated_at": datetime.now(UTC).isoformat(),
         "artifact_kind": "portfolio_max_performance_decision",
         "schema_version": "1.0",
         "selection_basis": "locked_oos_robustness_gates",
         "split_contract": split_contract,
-        "promotion_formula": PROMOTION_FORMULA,
+        "promotion_formula": promotion_formula,
         "promotion_thresholds": PROMOTION_THRESHOLDS,
         "comparison_scope": [entry.get("candidate_key") for entry in decorated],
         "supporting_artifacts": supporting_artifacts,
@@ -1034,6 +1101,14 @@ def build_portfolio_max_performance_decision(
             f"Fallback retune required: {fallback_retune_required}.",
         ],
     }
+    if exposure_normalized:
+        payload["exposure_normalized_promotion"] = True
+        payload["multiple_comparison_delta_floor"] = float(multiplicity_floor)
+        payload["notes"].append(
+            "Exposure-normalized promotion is ON: scale-dependent return/drawdown/volatility "
+            "terms are divided by gross exposure and the locked-OOS superiority argmax must "
+            "clear a multiple-comparison-adjusted floor, so leverage cannot buy superiority."
+        )
     return payload
 
 
@@ -1059,6 +1134,7 @@ def write_portfolio_max_performance_decision(
     extra_candidate_artifact_paths: tuple[Path | str, ...] = (),
     output_json_path: Path | str = DEFAULT_OUTPUT_JSON,
     output_md_path: Path | str = DEFAULT_OUTPUT_MD,
+    research_config: Any = None,
 ) -> dict[str, Any]:
     payload = build_portfolio_max_performance_decision(
         incumbent_bundle_path=incumbent_bundle_path,
@@ -1079,6 +1155,7 @@ def write_portfolio_max_performance_decision(
         four_sleeve_comparison_path=four_sleeve_comparison_path,
         meta_search_summary_paths=meta_search_summary_paths,
         extra_candidate_artifact_paths=extra_candidate_artifact_paths,
+        research_config=research_config,
     )
     json_path = Path(output_json_path)
     md_path = Path(output_md_path)
@@ -1145,6 +1222,14 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--extra-candidate-artifact", action="append", default=[])
     parser.add_argument("--output-json", default=str(DEFAULT_OUTPUT_JSON))
     parser.add_argument("--output-md", default=str(DEFAULT_OUTPUT_MD))
+    parser.add_argument(
+        "--exposure-normalized-promotion",
+        action="store_true",
+        help=(
+            "Opt in to the exposure-normalized promotion objective and the "
+            "multiple-comparison-adjusted superiority argmax (default OFF: legacy behavior)."
+        ),
+    )
     return parser
 
 
@@ -1170,6 +1255,9 @@ def main(argv: list[str] | None = None) -> int:
         ),
         output_json_path=Path(args.output_json).resolve(),
         output_md_path=Path(args.output_md).resolve(),
+        research_config=SimpleNamespace(
+            exposure_normalized_promotion=bool(args.exposure_normalized_promotion)
+        ),
     )
     print(result["json_path"])
     print(result["md_path"])

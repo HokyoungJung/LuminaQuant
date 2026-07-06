@@ -205,8 +205,50 @@ def rank_ic_series(
     return pd.DataFrame(rows, columns=[time_column, "rank_ic", "quantile_spread", "n"])
 
 
-def summarize_split_evidence(ic_frame: pd.DataFrame) -> SplitEvidence:
-    """Summarize a rank-IC frame into JSON-safe evidence statistics."""
+def _hac_variance_inflation(values: np.ndarray, mean: float, label_horizon: int) -> float:
+    """Bartlett-kernel Newey-West variance-inflation factor for the mean of a
+    *chronologically ordered* rank-IC series (``values``), demeaned by ``mean``.
+
+    Widens the iid IC t-stat when horizon-``h`` forward-return labels make the
+    per-period ICs overlap (autocorrelated up to lag ``h - 1``). The lag is
+    ``label_horizon`` (>= the label horizon), clipped to ``n - 1``. Returns
+    exactly ``1.0`` -- the iid t-stat, unchanged -- when the effective lag is
+    <= 0 or the series has no dispersion, so a horizon-1 (non-overlapping)
+    request reproduces the legacy inference. The Bartlett kernel guarantees a
+    non-negative long-run variance; the caller deflates the naive t by
+    ``sqrt(VIF)``.
+    """
+    n = int(values.shape[0])
+    lag = min(max(0, int(label_horizon)), n - 1)
+    if lag <= 0:
+        return 1.0
+    centered = values - mean
+    s0 = float(np.sum(centered * centered))
+    if s0 <= 0.0:
+        return 1.0
+    vif = 1.0
+    for k in range(1, lag + 1):
+        weight = 1.0 - k / (lag + 1.0)
+        gamma_k = float(np.sum(centered[k:] * centered[:-k]))
+        vif += 2.0 * weight * (gamma_k / s0)
+    return vif
+
+
+def summarize_split_evidence(
+    ic_frame: pd.DataFrame,
+    *,
+    hac_inference: bool = False,
+    label_horizon: int = 1,
+) -> SplitEvidence:
+    """Summarize a rank-IC frame into JSON-safe evidence statistics.
+
+    ``hac_inference`` (default OFF -> byte-identical to the legacy iid t-stat)
+    replaces ``t = mean_IC / (std_IC / sqrt(n))`` with a Newey-West/HAC t-stat
+    (Bartlett kernel, lag ``label_horizon``) so overlapping horizon-``h``
+    forward-return ICs are no longer treated as independent. IC mean/std/IR and
+    every other descriptive field are untouched; only ``t_stat`` -- which the
+    alive/reversed gate (``_classify``) reads -- is corrected.
+    """
     if ic_frame.empty or "rank_ic" not in ic_frame.columns:
         return SplitEvidence(0, 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
     values = pd.to_numeric(ic_frame["rank_ic"], errors="coerce").replace([np.inf, -np.inf], np.nan)
@@ -228,6 +270,10 @@ def summarize_split_evidence(ic_frame: pd.DataFrame) -> SplitEvidence:
     else:
         ir = float(mean / std)
         t_stat = float(mean / (std / math.sqrt(float(values.size))))
+        if hac_inference:
+            vif = _hac_variance_inflation(values, mean, label_horizon)
+            if vif > 1e-12:
+                t_stat = float(t_stat / math.sqrt(vif))
     spreads = pd.to_numeric(
         ic_frame.get("quantile_spread", pd.Series(dtype=float)), errors="coerce"
     ).replace([np.inf, -np.inf], np.nan)
@@ -280,8 +326,16 @@ def alpha_benchmark_evidence(
     locked_oos_splits: Sequence[str] = _LOCKED_OOS_SPLITS,
     thresholds: AlphaEvidenceThresholds | None = None,
     min_cross_section: int = 3,
+    hac_inference: bool = False,
+    label_horizon: int = 1,
 ) -> dict[str, Any]:
-    """Classify an alpha using train/validation IC evidence and OOS report-only stats."""
+    """Classify an alpha using train/validation IC evidence and OOS report-only stats.
+
+    ``hac_inference`` (default OFF -> byte-identical) and ``label_horizon`` are
+    forwarded to every :func:`summarize_split_evidence` call, so the alive/
+    reversed gate is driven by the HAC-corrected t-stat when enabled; see that
+    function's docstring.
+    """
     _require_columns(frame, (time_column, factor, label_column))
     limits = thresholds or AlphaEvidenceThresholds()
     split_names = tuple(str(item) for item in selection_splits if str(item).strip())
@@ -313,7 +367,9 @@ def alpha_benchmark_evidence(
                 label_column=label_column,
                 time_column=time_column,
                 min_cross_section=min_cross_section,
-            )
+            ),
+            hac_inference=hac_inference,
+            label_horizon=label_horizon,
         ).to_dict()
 
     selected_ic = rank_ic_series(
@@ -323,7 +379,9 @@ def alpha_benchmark_evidence(
         time_column=time_column,
         min_cross_section=min_cross_section,
     )
-    selected_summary = summarize_split_evidence(selected_ic)
+    selected_summary = summarize_split_evidence(
+        selected_ic, hac_inference=hac_inference, label_horizon=label_horizon
+    )
     classification, passed, reasons = _classify(selected_summary, limits)
     reasons.append("locked_oos_report_only_not_used_for_selection")
     if not split_column_present:
@@ -370,8 +428,14 @@ def attach_evidence_to_screen_payload(
     label_column: str = "forward_return",
     time_column: str = "timestamp",
     split_column: str = "split",
+    hac_inference: bool = False,
+    label_horizon: int = 1,
 ) -> dict[str, Any]:
-    """Attach benchmark evidence to an existing Alpha Zoo screen payload."""
+    """Attach benchmark evidence to an existing Alpha Zoo screen payload.
+
+    ``hac_inference`` (default OFF -> byte-identical) and ``label_horizon`` are
+    forwarded to :func:`alpha_benchmark_evidence`.
+    """
     payload = dict(screen_payload)
     enriched: list[dict[str, Any]] = []
     for row in list(payload.get("selected_factors") or []):
@@ -384,6 +448,8 @@ def attach_evidence_to_screen_payload(
                 label_column=label_column,
                 time_column=time_column,
                 split_column=split_column,
+                hac_inference=hac_inference,
+                label_horizon=label_horizon,
             )
         enriched.append(item)
     payload["selected_factors"] = enriched

@@ -34,6 +34,8 @@ class RollingWindowAggregator:
         max_history_seconds: int | None = None,
         dedupe_ttl_ms: int = 600_000,
         dedupe_max_keys: int = 100_000,
+        stale_symbol_after_ms: int = 0,
+        bar_sanity_check: bool = False,
     ) -> None:
         self.symbol_list = [str(symbol) for symbol in list(symbol_list or [])]
         self.window_seconds = max(1, int(window_seconds))
@@ -42,11 +44,21 @@ class RollingWindowAggregator:
         self.max_history_seconds = max(history_default, int(max_history_seconds or history_default))
         self.dedupe_ttl_ms = max(10_000, int(dedupe_ttl_ms))
         self.dedupe_max_keys = max(1000, int(dedupe_max_keys))
+        # 0 disables per-symbol staleness detection (default -> legacy behavior).
+        self.stale_symbol_after_ms = max(0, int(stale_symbol_after_ms or 0))
+        # Default OFF -> emitted events are byte-identical. When enabled, a bar
+        # failing OHLCV sanity raises at the seam instead of reaching strategies.
+        self.bar_sanity_check = bool(bar_sanity_check)
 
         self._bars: dict[str, dict[int, list[float]]] = {symbol: {} for symbol in self.symbol_list}
         self._dedupe: OrderedDict[str, int] = OrderedDict()
         self._max_seen_ts_ms: int | None = None
         self._last_emitted_sec_ms: int | None = None
+        # Exchange ts of the last *real* trade seen per symbol (flat-fill rows do
+        # not update this), so a single dead/suspended symbol whose window keeps
+        # getting synthesized at the last close can be detected even while the
+        # global watermark advances off surviving symbols.
+        self._last_real_trade_ms: dict[str, int] = {}
 
     def ingest(self, tick: NormalizedTradeTick) -> list[MarketWindowEvent]:
         """Ingest one normalized trade and emit zero or more MARKET_WINDOW events."""
@@ -61,6 +73,11 @@ class RollingWindowAggregator:
         if float(tick.price) <= 0.0:
             return []
         qty = max(0.0, float(tick.quantity))
+
+        # A real trade (even a duplicate) proves the symbol is still alive.
+        prev_real = self._last_real_trade_ms.get(symbol)
+        if prev_real is None or ts_ms > int(prev_real):
+            self._last_real_trade_ms[symbol] = int(ts_ms)
 
         if self._is_duplicate(tick.event_id, ts_ms):
             return self.flush_until(now_ms=int(tick.receive_ts_ms or int(time.time() * 1000)))
@@ -118,6 +135,7 @@ class RollingWindowAggregator:
                 is_stale=False,
                 emit_metrics=False,
                 bars_1s_already_normalized=True,
+                sanity_check=self.bar_sanity_check,
             )
             events.append(event)
             self._last_emitted_sec_ms = int(emit_sec_ms)
@@ -200,6 +218,57 @@ class RollingWindowAggregator:
             for stale in stale_seconds:
                 bars.pop(stale, None)
             self._bars[symbol_key] = bars
+
+    def last_real_trade_ms(self, symbol: str) -> int | None:
+        """Exchange ts of the last real trade seen for ``symbol`` (or None)."""
+        value = self._last_real_trade_ms.get(str(symbol))
+        return int(value) if value is not None else None
+
+    def symbol_trade_age_ms(self, symbol: str, *, reference_ms: int | None = None) -> int | None:
+        """Age (ms) of the last real trade for ``symbol`` vs the event watermark.
+
+        Returns ``None`` when the symbol has never traded or no watermark exists.
+        The reference defaults to the global max-seen exchange ts so per-symbol
+        liveness is measured on exchange time, immune to local clock skew.
+        """
+        if reference_ms is not None:
+            reference = int(reference_ms)
+        elif self._max_seen_ts_ms is not None:
+            reference = int(self._max_seen_ts_ms)
+        else:
+            return None
+        last = self._last_real_trade_ms.get(str(symbol))
+        if last is None:
+            return None
+        return max(0, int(reference) - int(last))
+
+    def stale_symbols(
+        self, *, reference_ms: int | None = None, threshold_ms: int | None = None
+    ) -> list[str]:
+        """Return symbols whose last real trade is older than the stale threshold.
+
+        A symbol that has never delivered a tick counts as stale once a reference
+        watermark exists (covers a typo'd/never-subscribed symbol). Returns an
+        empty list when the threshold is disabled (``<= 0``), preserving legacy
+        behavior at defaults.
+        """
+        threshold = (
+            int(threshold_ms) if threshold_ms is not None else int(self.stale_symbol_after_ms)
+        )
+        if threshold <= 0:
+            return []
+        if reference_ms is not None:
+            reference = int(reference_ms)
+        elif self._max_seen_ts_ms is not None:
+            reference = int(self._max_seen_ts_ms)
+        else:
+            return []
+        stale: list[str] = []
+        for symbol in self.symbol_list:
+            last = self._last_real_trade_ms.get(str(symbol))
+            if last is None or (int(reference) - int(last)) > threshold:
+                stale.append(str(symbol))
+        return stale
 
     def _is_duplicate(self, event_id: str, ts_ms: int) -> bool:
         token = str(event_id or "")

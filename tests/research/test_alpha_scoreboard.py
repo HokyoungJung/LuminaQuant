@@ -240,3 +240,82 @@ def test_all_direction_metrics_have_known_direction():
         "liquidation_count",
         "trade_frequency",
     }
+
+
+# --------------------------------------------------------------------------- #
+# N4: liquidation_count "never measured" != "measured zero"
+# --------------------------------------------------------------------------- #
+def test_resolve_row_omits_missing_liquidation_count():
+    # No setdefault(0.0): a row that supplied no liquidation data must NOT gain a
+    # phantom measured-zero liquidation_count.
+    row = resolve_row({"id": "a", "metrics": {"sharpe": 1.0}, "trade_count": 5, "bars": 100})
+    assert "liquidation_count" not in row.metrics
+
+
+def test_missing_liquidation_count_fails_default_gate_closed():
+    # The default max_liquidations=0 gate must fail CLOSED when the catastrophic
+    # path was never measured -- not pass on an assumed zero.
+    raw = {
+        "id": "unmeasured",
+        "metrics": {"sharpe": 2.0, "return": 0.2},
+        "trade_count": 10,
+        "bars": 500,
+    }
+    payload = build_scoreboard([raw])
+    assert payload["eligible_count"] == 0
+    reasons = payload["excluded"][0]["reasons"]
+    assert any("liquidation_count missing" in reason for reason in reasons)
+
+
+def test_missing_liquidation_count_allowed_when_gate_disabled():
+    raw = {"id": "unmeasured", "metrics": {"sharpe": 2.0}, "trade_count": 10, "bars": 500}
+    payload = build_scoreboard([raw], gates={"max_liquidations": None})
+    assert payload["eligible_count"] == 1
+
+
+def test_measured_zero_liquidation_distinguished_from_missing():
+    measured = {
+        "id": "measured0",
+        "metrics": {"sharpe": 1.0},
+        "trade_count": 10,
+        "liquidation_count": 0,
+        "bars": 500,
+    }
+    unmeasured = {"id": "unmeasured", "metrics": {"sharpe": 1.0}, "trade_count": 10, "bars": 500}
+    payload = build_scoreboard([measured, unmeasured])
+    eligible_ids = {row["id"] for row in payload["metrics_table"]}
+    excluded_ids = {row["id"] for row in payload["excluded"]}
+    assert eligible_ids == {"measured0"}
+    assert excluded_ids == {"unmeasured"}
+
+
+# --------------------------------------------------------------------------- #
+# N4: periods_per_year threaded through the derive path
+# --------------------------------------------------------------------------- #
+def test_derive_periods_per_year_forwarded_to_core_metrics():
+    returns = [0.004, -0.002, 0.006, -0.001, 0.003] * 40
+    arr = np.asarray(returns, dtype=np.float64)
+    default_row = resolve_row({"id": "a", "returns": returns})
+    faster = resolve_row({"id": "a", "returns": returns}, periods_per_year=252)
+    exp_default = core_metrics(arr)  # default cadence (365)
+    exp_252 = core_metrics(arr, periods_per_year=252)
+    assert abs(default_row.metrics["sharpe"] - float(exp_default["sharpe"])) < 1e-12
+    assert abs(faster.metrics["sharpe"] - float(exp_252["sharpe"])) < 1e-12
+    # Cadence must actually move the annualized Sharpe (proves it is not ignored).
+    assert default_row.metrics["sharpe"] != faster.metrics["sharpe"]
+
+
+def test_build_scoreboard_forwards_periods_per_year():
+    returns = [0.004, -0.002, 0.006, -0.001, 0.003] * 40
+    raw = {
+        "id": "a",
+        "returns": returns,
+        "trade_count": 10,
+        "liquidation_count": 0,
+        "bars": 200,
+    }
+    sharpe_365 = build_scoreboard([raw])["metrics_table"][0]["metrics"]["sharpe"]
+    sharpe_252 = build_scoreboard([raw], periods_per_year=252)["metrics_table"][0]["metrics"][
+        "sharpe"
+    ]
+    assert sharpe_365 != sharpe_252

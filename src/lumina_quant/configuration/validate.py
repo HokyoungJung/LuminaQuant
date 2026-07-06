@@ -8,6 +8,7 @@ import re
 from collections.abc import Iterable
 
 from lumina_quant.configuration.schema import RuntimeConfig
+from lumina_quant.research_universe import BINANCE_EXTENDED_RESEARCH_SYMBOLS_SLASHED
 from lumina_quant.core.order_policy import (
     SUPPORTED_LIMIT_PRICE_MODES,
     canonical_order_type,
@@ -322,6 +323,13 @@ def _validate_risk_and_execution_runtime_invariants(runtime: RuntimeConfig) -> N
         raise ValueError("risk.max_order_notional_pct must be >= 0.")
     if runtime.risk.max_total_notional_pct < 0:
         raise ValueError("risk.max_total_notional_pct must be >= 0.")
+    # Real-money desk controls: bounds always enforced; 0 == disabled (legacy).
+    if int(getattr(runtime.risk, "max_orders_per_minute", 0)) < 0:
+        raise ValueError("risk.max_orders_per_minute must be >= 0.")
+    if float(getattr(runtime.risk, "max_daily_notional_turnover_pct", 0.0)) < 0:
+        raise ValueError("risk.max_daily_notional_turnover_pct must be >= 0.")
+    if float(getattr(runtime.risk, "max_position_age_hours", 0.0)) < 0:
+        raise ValueError("risk.max_position_age_hours must be >= 0.")
     if runtime.execution.compute_backend not in {"auto", "cpu", "gpu", "forced-gpu"}:
         raise ValueError("execution.compute_backend must be one of: auto, cpu, gpu, forced-gpu.")
     gpu_mode = str(
@@ -418,6 +426,17 @@ def _validate_live_and_optimization_runtime_invariants(runtime: RuntimeConfig) -
         raise ValueError("live.order_timeout must be >= 1.")
     if runtime.live.reconciliation_interval_sec < 1:
         raise ValueError("live.reconciliation_interval_sec must be >= 1.")
+    # Real-money live-safety controls: bounds always enforced; 0 == disabled (legacy).
+    if float(getattr(runtime.live, "max_bbo_spread_bps_at_submit", 0.0)) < 0:
+        raise ValueError("live.max_bbo_spread_bps_at_submit must be >= 0.")
+    if float(getattr(runtime.live, "max_estimated_one_way_slippage_bps", 0.0)) < 0:
+        raise ValueError("live.max_estimated_one_way_slippage_bps must be >= 0.")
+    if float(getattr(runtime.live, "max_limit_price_band_pct", 0.0)) < 0:
+        raise ValueError("live.max_limit_price_band_pct must be >= 0.")
+    if float(getattr(runtime.live, "equity_reconciliation_interval_sec", 0.0)) < 0:
+        raise ValueError("live.equity_reconciliation_interval_sec must be >= 0.")
+    if float(getattr(runtime.live, "market_data_silence_timeout_sec", 0.0)) < 0:
+        raise ValueError("live.market_data_silence_timeout_sec must be >= 0.")
     default_order_type = canonical_order_type(
         getattr(runtime.live, "default_order_type", "LMT"),
         default="LMT",
@@ -544,6 +563,108 @@ def _validate_strategy_profile_invariants(runtime: RuntimeConfig) -> None:
                 )
 
 
+def _validate_real_money_live_safety_gate(runtime: RuntimeConfig) -> None:
+    """Fail-closed real-money live-safety gate (real_money_readiness audit 2026-07-06).
+
+    Triggers only for a real-money Binance live path — ``live.mode == 'real'`` OR
+    ``live.go_live_stage in {canary, full}`` (both of which already require
+    ``mode == 'real'`` via the prod-routing gate in
+    ``_validate_kill_switch_and_risk_envelope``). Paper / testnet / shadow / backtest
+    validation is therefore unchanged and the shipped default config (paper + testnet)
+    stays byte-identical.
+
+    Scope note: these requirements are Binance-USDⓈ-M-specific (exchange-resident
+    reduce-only algo stops, BBO/mark price bands, equity reconciliation). Non-Binance
+    real paths are fenced elsewhere — Polymarket real execution is blocked in Phase 1
+    by ``_validate_live_exchange_runtime_invariants`` and MT5 is a bridge — so this gate
+    only applies to the ``binance_futures`` / ``binance_native`` drivers.
+    """
+    mode = str(getattr(runtime.live, "mode", "paper")).strip().lower()
+    stage = str(getattr(runtime.live, "go_live_stage", "testnet")).strip().lower()
+    if mode != "real" and stage not in {"canary", "full"}:
+        return
+    driver = str(getattr(runtime.live.exchange, "driver", "") or "").strip().lower()
+    if driver not in {"binance_futures", "binance_native"}:
+        return
+
+    risk = runtime.risk
+    live = runtime.live
+
+    # C1 — the kill-switch must be able to actually de-risk (a reachable FLATTEN tier
+    # AND market escalation), not FREEZE-only.
+    has_flatten_tier = bool(getattr(risk, "auto_flatten_on_breach", False)) or (
+        float(getattr(risk, "hard_drawdown_flatten_pct", 0.0)) > 0.0
+    )
+    if not (has_flatten_tier and bool(getattr(risk, "flatten_escalate_to_market", False))):
+        raise ValueError(
+            "Real-money live requires a reachable kill-switch FLATTEN tier: set "
+            "risk.auto_flatten_on_breach=true OR risk.hard_drawdown_flatten_pct>0, AND "
+            "risk.flatten_escalate_to_market=true so the kill-switch can force-close open "
+            "positions instead of only freezing new entries."
+        )
+
+    # C2 — real-mode managed protective stops (exchange-resident STOP/TP).
+    if not bool(getattr(live, "real_mode_managed_protective_stops", False)):
+        raise ValueError(
+            "Real-money live requires live.real_mode_managed_protective_stops=true so "
+            "stop_loss/take_profit translate to Binance reduce-only algo orders "
+            "(exchange-resident protection survives a process crash / disconnect)."
+        )
+
+    # C3 — fat-finger / price-band guard must be armed.
+    band_pct = float(getattr(live, "max_limit_price_band_pct", 0.0))
+    require_bbo = bool(getattr(live, "require_bbo_for_limit_orders", False))
+    book_ticker = bool(getattr(live, "book_ticker_enabled", False))
+    if not (band_pct > 0.0 or (require_bbo and book_ticker)):
+        raise ValueError(
+            "Real-money live requires a fat-finger price guard: set "
+            "live.max_limit_price_band_pct>0, or set BOTH "
+            "live.require_bbo_for_limit_orders=true and live.book_ticker_enabled=true so "
+            "limit prices are validated against a live best-bid/offer."
+        )
+
+    # C4 — periodic equity/cash reconciliation.
+    if float(getattr(live, "equity_reconciliation_interval_sec", 0.0)) <= 0.0:
+        raise ValueError(
+            "Real-money live requires live.equity_reconciliation_interval_sec>0 so live "
+            "equity/cash is periodically re-synced against the exchange (funding drain and "
+            "exchange-side liquidations must reach the equity kill-switches)."
+        )
+
+    # C6 — market-data-silence watchdog.
+    if float(getattr(live, "market_data_silence_timeout_sec", 0.0)) <= 0.0:
+        raise ValueError(
+            "Real-money live requires live.market_data_silence_timeout_sec>0 so a quietly "
+            "dead market-data feed is detected (alert + freeze) instead of marking equity at "
+            "a frozen last price."
+        )
+
+    # D4 — live bar sanity gate must be armed (finite/positive OHLC, high>=low).
+    if not bool(getattr(live, "bar_sanity_check", False)):
+        raise ValueError(
+            "Real-money live requires live.bar_sanity_check=true so incoming live bars are "
+            "gated on finite/positive OHLC values and high>=low before being accepted."
+        )
+
+    # D2 — per-symbol dead-feed detection must be armed.
+    if int(getattr(live, "stale_symbol_after_ms", 0) or 0) <= 0:
+        raise ValueError(
+            "Real-money live requires live.stale_symbol_after_ms>0 so a per-symbol dead "
+            "market-data feed is detected instead of silently trading on frozen data."
+        )
+
+    # M6 — an explicit, small trading.symbols list (never inherit the research universe).
+    symbols = list(getattr(runtime.trading, "symbols", []) or [])
+    if not symbols:
+        raise ValueError("Real-money live requires an explicit non-empty trading.symbols list.")
+    if set(symbols) == set(BINANCE_EXTENDED_RESEARCH_SYMBOLS_SLASHED):
+        raise ValueError(
+            "Real-money live requires an explicit trading.symbols list; it currently equals "
+            "the full research universe (inherited default). Pin a small explicit set of "
+            "symbols to trade in real mode."
+        )
+
+
 def validate_runtime_config(runtime: RuntimeConfig, *, for_live: bool = False) -> None:
     """Validate runtime configuration invariants."""
     _validate_kill_switch_and_risk_envelope(runtime)
@@ -561,6 +682,7 @@ def validate_runtime_config(runtime: RuntimeConfig, *, for_live: bool = False) -
     _validate_promotion_gate_runtime_invariants(runtime)
     _validate_market_window_parity_invariants(runtime)
     _validate_strategy_profile_invariants(runtime)
+    _validate_real_money_live_safety_gate(runtime)
 
     if (
         for_live

@@ -188,6 +188,72 @@ def test_exchange_submits_conditional_algo_order(monkeypatch) -> None:
     assert order["type"] == "stop_market"
 
 
+def test_exchange_margin_balance_computes_wallet_plus_upnl_equity(monkeypatch) -> None:
+    _stub_exchange_bootstrap(monkeypatch)
+    exchange = BinanceFuturesExchange(MockConfig())
+    monkeypatch.setattr(
+        exchange._client(),
+        "account_info_v3",
+        lambda: {
+            "totalMarginBalance": "1000.00",
+            "assets": [
+                {
+                    "asset": "USDT",
+                    "walletBalance": "950.25",
+                    "unrealizedProfit": "12.75",
+                    "marginBalance": "963.00",
+                },
+                {
+                    "asset": "BNB",
+                    "walletBalance": "1.0",
+                    "unrealizedProfit": "0.0",
+                    "marginBalance": "1.0",
+                },
+            ],
+        },
+    )
+    # marginBalance field is authoritative when present (wallet + uPnL == 963.0).
+    assert exchange.get_margin_balance("USDT") == 963.0
+
+
+def test_exchange_margin_balance_missing_asset_falls_back_to_total(monkeypatch) -> None:
+    _stub_exchange_bootstrap(monkeypatch)
+    exchange = BinanceFuturesExchange(MockConfig())
+    monkeypatch.setattr(
+        exchange._client(),
+        "account_info_v3",
+        lambda: {
+            "totalMarginBalance": "1000.00",
+            "assets": [{"asset": "BNB", "walletBalance": "1.0", "marginBalance": "1.0"}],
+        },
+    )
+    # No USDT row -> fall back to the account-wide totalMarginBalance.
+    assert exchange.get_margin_balance("USDT") == 1000.0
+
+
+def test_exchange_margin_balance_malformed_field_returns_documented_default(monkeypatch) -> None:
+    _stub_exchange_bootstrap(monkeypatch)
+    exchange = BinanceFuturesExchange(MockConfig())
+    monkeypatch.setattr(
+        exchange._client(),
+        "account_info_v3",
+        lambda: {
+            "totalMarginBalance": "garbage",
+            "assets": [
+                {
+                    "asset": "USDT",
+                    "walletBalance": "garbage",
+                    "unrealizedProfit": None,
+                    "marginBalance": None,
+                }
+            ],
+        },
+    )
+    # marginBalance absent and wallet/uPnL malformed -> _as_float default of 0.0
+    # (same silent-default behavior as get_balance; callers treat 0.0 as unavailable).
+    assert exchange.get_margin_balance("USDT") == 0.0
+
+
 def test_exchange_exposes_side_aware_position_legs(monkeypatch) -> None:
     _stub_exchange_bootstrap(monkeypatch)
     exchange = BinanceFuturesExchange(MockConfig())
