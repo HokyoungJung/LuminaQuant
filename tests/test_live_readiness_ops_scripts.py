@@ -128,9 +128,7 @@ def test_live_readiness_preflight_reports_ready_for_real(monkeypatch, tmp_path: 
         json.dumps(
             {
                 "decision": "keep_incumbent",
-                "strategy_params": {
-                    "real_money_attestation_artifact_path": str(attestation)
-                },
+                "strategy_params": {"real_money_attestation_artifact_path": str(attestation)},
             }
         ),
         encoding="utf-8",
@@ -545,9 +543,7 @@ def test_non_alpha_zoo_real_mode_passes_when_explicitly_ready(monkeypatch, tmp_p
                 "decision": "selected_live_mode",
                 "selected_mode": "MovingAverageCrossStrategy",
                 "candidate_key": "moving_average_cross",
-                "strategy_params": {
-                    "real_money_attestation_artifact_path": str(attestation)
-                },
+                "strategy_params": {"real_money_attestation_artifact_path": str(attestation)},
             }
         ),
         encoding="utf-8",
@@ -736,9 +732,7 @@ def test_live_readiness_preflight_honors_runtime_env_mode_override(
         json.dumps(
             {
                 "decision": "keep_incumbent",
-                "strategy_params": {
-                    "real_money_attestation_artifact_path": str(attestation)
-                },
+                "strategy_params": {"real_money_attestation_artifact_path": str(attestation)},
             }
         ),
         encoding="utf-8",
