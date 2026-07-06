@@ -1,4 +1,61 @@
 # Research Note
+## 2026-07-06 KST — Alpha scoreboard persisted + historical champion 재확인
+
+사용자 지시로 2026-07-04 전수 walk-forward 결과에 새 `alpha_scoreboard` persistent runner를 적용해 전체 성적표를 저장했다. 입력 snapshot은 `var/reports/alpha_scoreboard/full_walkforward_score_input_snapshot_latest.json`, validation scoreboard는 `alpha_scoreboard_full_walkforward_validation_latest.json|md`, locked-OOS report-only scoreboard는 `alpha_scoreboard_full_walkforward_oos_report_only_latest.json|md`, 종합 리뷰는 `full_walkforward_score_review_latest.json|md`다. `min_trades=5`, `max_mdd=0.3` gate를 적용했고 source rows에는 measured `liquidation_count`가 없어 liquidation gate는 일부러 켜지 않았다.
+
+전체 회계: unique candidates `1400`, candidate-fold rows `5600`, source reports `16`. 단일 fold라도 pass한 후보는 `28`, 모든 available folds를 통과한 후보는 `0`이다. Fold별 pass율은 `WF202604 2/1400 (0.14%)`, `WF202605 4/1400 (0.29%)`, `WF202606 19/1400 (1.36%)`, `WF202607_PARTIAL 4/1400 (0.29%)`다. 따라서 scoreboard를 persist한 뒤에도 최종 판정은 **do_not_promote / research_only_no_execution**이다.
+
+Validation composite 상위는 BTC/TRX 1h pair-spread 계열이다. `1523ae68946b002a` `pair_spread_1h_core_btcusdt_trxusdt_2.6_0.70`, `c01a3510bb5eab15` tightstop/tp, `f54d2780eb950ba8` takeprofit가 모두 validation `+9.77%`, Sharpe `2.48`, MDD `3.38%`, trades `22`였지만 PBO `0.75`, DSR `0.0832`, pass `0/4`라 실행 후보가 아니다. OOS report-only composite 1위는 `1f1fd241c12f0bc2` `pair_spread_4h_balanced_btcusdt_bnbusdt_1.6_0.35`로 OOS report-only `+10.15%`, Sharpe `4.74`, MDD `1.30%`, trades `9`, PBO `0.75`, DSR `0.0585`, pass `0/4`다. Pair-spread lane은 watchlist로 챙기되, 현재 파라미터를 승자로 보거나 추가 튜닝하는 것은 금지한다.
+
+Historical champion도 다시 명시한다. 최고 raw historical/proxy 성적은 `var/reports/major_candidate_improvement_20260705/historical_router_guard_proxy_latest.json`의 `expanded_110_latest_tail_full` / `codex_lagged_leaf_router_grid:h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_exact_unscaled`다. 10 monthly OOS folds에서 compounded OOS `+159.83%`, max OOS MDD proxy `27.69%`, monthly Sharpe proxy `1.98`, positive folds `4/10`, PF proxy `23.63`이다. Historical 85 preregistered 기준 최대는 compounded OOS `+125.13%`, max OOS MDD proxy `30.47%`, monthly Sharpe proxy `2.64`, positive folds `5/10`이며, 보수형 `post_mdd12_half_exposure`는 return `+85.84%`, MDD proxy `20.26%`, monthly Sharpe proxy `2.77`, positive folds `5/10`다.
+
+우선순위는 `historical router / lagged leaf router` lane을 1순위 watchlist, BTC/BNB·BTC/TRX market-neutral pair-spread를 2순위 watchlist로 둔다. 단 historical router artifact는 exact bar-level rerun이 아니라 fold-level proxy이고, 기존 OOS row 기반 post-OOS research variant이며, PF 20+와 outlier-month 의존이 강해 cost/funding/fill realism 전에는 과대평가 가능성이 크다. 다음 검증은 frozen-rule fresh-forward + cost-realistic 10/15/20bps + funding/BBO/slippage/reconciliation telemetry가 전제이며, 그 전까지 paper/testnet/live/real-money/orders는 계속 금지다.
+
+## 2026-07-05 KST — Alpha101 안정화 후보 research freeze + 즉시 fresh probe
+
+사용자 지시로 개선 실험에서 살아남은 Alpha101 안정화 후보 2개를 research freeze 했다. Freeze manifest는 `var/reports/major_candidate_improvement_20260705/alpha101_research_freeze/alpha101_research_freeze_manifest_latest.json`, exact stream/covariance evidence는 `alpha101_research_freeze_exact_stream_covariance_latest.json`, 요약은 `alpha101_research_freeze_latest.md`다. Frozen candidates는 `4aee63220c8221ec` `alpha101_formula_4h_a011_flow_swing_tight_stop_z14`와 `3fff476361bd1f80` `alpha101_formula_4h_a011_flow_swing_strict_z14`이며, freeze 뒤에는 formula/threshold/membership/weights 변경 금지로 박았다.
+
+동일가중 exact-stream evidence: validation aggregate stream 1430 bars에서 portfolio return `+9.38%`, annualized 4h Sharpe proxy `1.042`, MDD `7.69%`; locked-OOS diagnostic aggregate stream 552 bars에서 return `+10.66%`, Sharpe proxy `2.869`, MDD `6.56%`다. 이 evidence는 exact return streams/covariance/correlation을 갖췄지만 과거 validation/diagnostic 기반이므로 승격 근거가 아니라 freeze 근거다.
+
+가용 데이터로 즉시 micro fresh probe도 실행했다. `2026-07-04T00:00:00Z`~`2026-07-04T07:15:59.999Z` 구간은 기존 partial OOS 종료 뒤 남은 데이터라 probe를 돌렸지만 4h 전략 기준 OOS return stream length가 두 후보 모두 `0`, trades `0`이었다. 산출물 `alpha101_research_freeze_micro_fresh_probe_summary.json|md`의 verdict는 `insufficient_fresh_forward_no_4h_oos_return_streams`다. 따라서 결론은 여전히 **do_not_promote / research_only_no_execution**이며, 다음 유효 검증은 새 4h bars가 충분히 쌓인 genuinely unseen fresh-forward/shadow 구간에서만 가능하다.
+
+## 2026-07-05 KST — 주요 후보 개선 실험 전수 진행
+
+사용자 지시로 주요 후보 개선을 모두 진행했다. 산출물은 `var/reports/major_candidate_improvement_20260705/major_candidate_improvement_walkforward_summary_latest.md|json`, 검증은 `major_candidate_improvement_verification.json`(`status=passed`)이다. 2개 신규 후보 lane(`pairspread_btcbnb_robustness` 10개, `alpha101_flow_stability` 9개)을 4개 fold(`WF202604`~`WF202607_PARTIAL`)에 재평가했고, P2/H35 manifest-level `TONUSDT` 제거본과 historical router guard proxy 분석도 생성했다. 총 8/8 lane-fold reports 존재, failure 0, P2/H35 sanitized manifests의 remaining `TONUSDT` occurrences 0이다.
+
+개선 결과:
+- `pairspread_btcbnb_robustness`: 실패. 보수형/ATR/VWAP/take-profit/low-turnover 변형 모두 promotion 관점에서 lane을 살리지 못했다. 상위 변형도 validation Sharpe가 음수이거나 OOS Sharpe가 음수이고, 전부 `hard_reject_count=4/4`다. 예: `pair_spread_4h_btcbnb_balanced_vwap_volume_1.8_0.45`는 validation `+0.17% / -0.895`, OOS diagnostic `+0.09% / -0.833`; `pair_spread_4h_btcbnb_fast_robust_corr25_1.8_0.45`는 validation `+2.07% / 0.408`, OOS diagnostic `+1.00% / -6.688`.
+- `alpha101_flow_stability`: 의미 있는 research 개선이 나왔다. 원본 `19d07d85cab54789`는 validation `+10.68% / 2.944`지만 OOS diagnostic Sharpe가 `-2.576`이었다. 변형 중 `4aee63220c8221ec` `alpha101_formula_4h_a011_flow_swing_tight_stop_z14`는 validation `+2.66% / 1.073`, OOS diagnostic `+2.49% / 3.023`, OOS return+Sharpe 양수 fold `3/4`, pass/hard `2/2`; `3fff476361bd1f80` `alpha101_formula_4h_a011_flow_swing_strict_z14`는 validation `+2.08% / 0.791`, OOS diagnostic `+2.70% / 3.142`, OOS return+Sharpe 양수 fold `4/4`, pass/hard `2/2`. 즉 원본의 validation headline은 낮아졌지만 OOS diagnostic 안정성은 개선됐다.
+- P2/H35: `p2_corr_core_tonusdt_excluded_research_manifest_latest.json`와 `h35_return_overlay_80_20_tonusdt_excluded_research_manifest_latest.json`를 생성했고 manifest-level `TONUSDT`는 0으로 제거됐다. 단, 이것은 manifest sanitize일 뿐 exact fresh-forward portfolio streams/covariance 검증이 아니므로 계속 research-only다.
+- historical router: fold-level proxy guard를 시험했지만 대부분 base/no-overlay가 return-to-MDD에서 그대로 우세했다. historical_85 fallback만 `post_mdd12_half_exposure`가 MDD를 낮추지만 return도 크게 포기한다. 이 분석은 기존 OOS fold row 기반 proxy라 fresh-forward 전 승격 근거가 아니다.
+
+최신 결론: 개선 실험 후에도 **실행 승격 없음**. 다만 다음 research freeze 후보는 기존 rank 1 원본이 아니라 `alpha101_formula_4h_a011_flow_swing_tight_stop_z14`와 `alpha101_formula_4h_a011_flow_swing_strict_z14` 두 Alpha101 안정화 변형이다. 둘 다 post-hoc 개선 후보이므로 신규 unseen fresh-forward/shadow 검증 전에는 paper/testnet/live/real-money/order 사용 금지다.
+
+## 2026-07-05 KST — 전체 전략 관점 최종 결론 업데이트
+
+사용자 요청에 따라 `G005` 후보군만 보지 않고, 기존 historical/current-top 계열과 2026-07-04 최신 전수 walk-forward 정정판을 함께 놓고 결론을 재정리했다. 최종 판정은 유지한다: **현재 실행 승격할 전략/포트폴리오는 없다.** 모든 후보는 research/shadow-only이며 live/paper/testnet/real-money/orders는 계속 disabled, `TONUSDT`는 최신 안전 기준에서 excluded다.
+
+기간 구분:
+- 최신 전수 monthly walk-forward 정정판: Binance fapi 1m universe 128 symbols, `2025-01-01T00:00:00Z` → `2026-07-04T07:15:59.999Z`. Fold는 `WF202604`~`WF202607_PARTIAL`이며 선별은 expanding train + 직전 2개월 validation만 사용하고 locked OOS는 report-only diagnostic이다.
+- 기존 최고 성적 historical/current-top 계열: 10 monthly OOS folds `2025-09`~`2026-06`. 최신 2026-06 fold는 train `2025-01-01`~`2026-03-31`, validation `2026-04-01`~`2026-05-31`, OOS `2026-06-01`~`2026-06-28T09:30` 기준으로 재삽입/재계산된 산출물이다.
+
+기존 최고 성적 전략들의 상태:
+- `codex_lagged_leaf_router_grid:h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_exact_unscaled`는 110-symbol 최신 재계산 기준 historical headline winner다. 10-fold compounded OOS `+159.83%`, annualized approx `+214.51%`, monthly Sharpe `1.881`, max OOS MDD `27.69%`, hit `4/10`. 성과는 가장 크지만 hit가 낮고 drawdown/최신 fold 의존이 커서 실행 승격 근거가 아니다.
+- risk-trimmed `...fallback_mdd20_cap2`는 compounded OOS `+138.11%`, monthly Sharpe `1.783`, max OOS MDD `23.58%`, hit `4/10`로 drawdown은 낮추지만 역시 shadow/research 성격이다.
+- 기존 85-symbol preregistered exact는 최신 2026-06 fold 재실행 뒤 compounded OOS `+125.13%`, monthly Sharpe `2.506`, hit `5/10`, latest June return `+24.76%`, latest June MDD `30.47%`로 내려갔다. 살아는 있지만 최신 전체 기준 winner는 아니다.
+- `P2_corr_core`는 long OOS `+53.85%`, Sharpe `1.958`, MDD `3.43%`, fresh 10bps `+3.79%`로 balanced shadow 후보이고, `H35_return_overlay_80_20`은 long OOS `+73.49%`, Sharpe `1.941`, hit `6/10`, fresh 10bps `+3.91%`인 return-seeking shadow 후보다. 둘 다 fresh-forward 기간이 짧고 BBO/fill/slippage/funding/reconciliation telemetry가 없으며, 오래된 manifest 계열에는 `TON/USDT`가 포함되어 최신 fail-closed 기준으로 그대로 승격할 수 없다.
+
+최신 full-pool/G004-G007 관점:
+- G004 frozen universe는 1466 candidates. G005는 지원 가능한 30m/1h/4h/1d 1404개를 평가했고, 1s/5m/15m lower-latency 62개는 별도 durable goal 전까지 deferred다.
+- G006의 best metric-proxy portfolio는 `914ff36cba1555ea`, `632d6e864ee01bd8`, `1f1fd241c12f0bc2` 3개 4h BTC/BNB pair-spread 조합(각 0.1 weight, gross 0.3)이며 validation objective proxy `0.08065`로 incumbent proxy보다 높았다. 그러나 exact portfolio return streams/covariance가 없어 `blocked_fail_closed_metric_proxy_only`다.
+- G007 최종 결정은 `do_not_promote` / `blocked_fail_closed`. 실행 weights는 발행하지 않았다.
+
+최신 2026-07-04 전수 walk-forward 정정판의 research shortlist:
+- `19d07d85cab54789` `alpha101_formula_4h_a011_a011_flow_swing_dir`: rank 1, selected folds 3, validation `+10.68% / 2.944`, locked-OOS diagnostic `+3.07% / -2.576`.
+- `1f1fd241c12f0bc2` `pair_spread_4h_balanced_btcusdt_bnbusdt_1.6_0.35`: rank 4, selected folds 2, validation `+9.72% / 5.409`, locked-OOS diagnostic `+0.28% / 0.720`; 상위권 중 평균 OOS return/sharpe가 둘 다 양수인 유일한 후보다.
+- `632d6e864ee01bd8`, `a27ef46e91376b7c`, `914ff36cba1555ea`는 validation Sharpe가 높지만 평균 locked-OOS diagnostic이 나빠서 research-only다.
+
+통합 결론: historical headline winner는 `codex_lagged_leaf_router...exact_unscaled`, 최신 monthly walk-forward rank 1은 `19d07d85cab54789`, OOS diagnostic까지 같이 보면 가장 덜 나쁜 단일 후보는 `1f1fd241c12f0bc2`, portfolio proxy best는 `914/632/1f1` 조합이다. 하지만 이 네 관점 모두 실행 승격 조건을 충족하지 못한다. 신규 승격 작업은 exact portfolio return streams/covariance, fresh-forward/shadow 검증, no-OOS-use review gate, 명시적 실행 승인 없이는 시작하지 않는다.
 
 ## 2026-07-04 KST — 최신 데이터 전수 walk-forward 정정 리포트
 
