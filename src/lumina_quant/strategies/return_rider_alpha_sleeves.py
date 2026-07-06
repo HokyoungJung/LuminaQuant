@@ -108,7 +108,13 @@ def _kama(values: list[float], *, period: int, fast: int, slow: int) -> float | 
     slow_sc = 2.0 / (float(slow_i) + 1.0)
     kama = vals[0]
     for idx in range(1, len(vals)):
-        window = vals[: idx + 1][-(period_i + 1) :]
+        # Only the trailing ``period_i + 1`` closes feed the efficiency ratio, so
+        # slice the tail directly instead of building ``vals[: idx + 1]`` and then
+        # re-slicing it (O(n) copy per bar → O(n^2) overall). ``max(0, idx -
+        # period_i)`` reproduces the ``[-(period_i + 1):]`` tail exactly, including
+        # the short-history case (idx < period_i) where both yield ``vals[0 : idx +
+        # 1]``. Byte-identical; 2026-07-06 audit X1 perf fix.
+        window = vals[max(0, idx - period_i) : idx + 1]
         er = kaufman_efficiency_ratio(window, period=period_i)
         er_value = 0.0 if er is None else max(0.0, min(1.0, float(er)))
         smoothing = (er_value * (fast_sc - slow_sc) + slow_sc) ** 2

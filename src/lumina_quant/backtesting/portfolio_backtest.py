@@ -1,3 +1,4 @@
+import logging
 import math
 import os
 from collections import deque
@@ -23,6 +24,8 @@ from lumina_quant.market_data import normalize_timeframe_token, timeframe_to_mil
 from lumina_quant.risk_manager import RiskManager
 from lumina_quant.portfolio.strategy_quality import StrategyQualityOverlay
 from lumina_quant.services.portfolio import PortfolioPerformanceService, PortfolioSizingService
+
+LOGGER = logging.getLogger(__name__)
 
 
 class Portfolio:
@@ -127,6 +130,21 @@ class Portfolio:
         self.entry_prices = dict.fromkeys(self.symbol_list)
         self.liquidation_events = []
         self._pending_liquidation = set()
+        # M5: the live path disables the *simulated* liquidation engine and the
+        # *simulated* funding charge — on live, liquidations and funding are real
+        # exchange events, so the modeled versions must never fabricate a local
+        # fill or debit cash. Defaults False so the backtest path (and the golden
+        # baseline) is byte-identical; live/portfolio.LivePortfolio flips this
+        # True in its __init__.
+        self._live_liquidation_disabled = False
+        # M5 (live only): modeled maintenance-margin breaches recorded for audit /
+        # alerting instead of being applied as synthetic fills. Never populated on
+        # the backtest path.
+        self._modeled_liquidation_warnings = []
+        # X5: cache the position-invariant liquidation price per symbol keyed by
+        # (qty, entry_price) so a held position does not recompute it every bar.
+        # {symbol: (qty, entry_price, liq_price_or_None)}; invalidated on fill.
+        self._liq_price_cache = {}
         self._metric_totals = [float(self.initial_capital)] if self.track_metrics else []
         self._metric_benchmarks = [0.0] if self.track_metrics else []
         self._equity_points = deque(maxlen=20_000)
@@ -393,6 +411,11 @@ class Portfolio:
         return True
 
     def update_positions_from_fill(self, fill):
+        # X5: any fill can change this symbol's qty and/or entry price, both of
+        # which the cached position-invariant liquidation price depends on — drop
+        # the cache entry so the next bar recomputes it against fresh inputs.
+        self._liq_price_cache.pop(fill.symbol, None)
+
         fill_dir = 0
         if fill.direction == "BUY":
             fill_dir = 1
@@ -612,6 +635,12 @@ class Portfolio:
         return dt.timestamp()
 
     def _apply_funding(self, latest_datetime):
+        if self._live_liquidation_disabled:
+            # M5 (live path): funding is a real balance delta reconciled from the
+            # exchange account by the trader — never simulate a charge here (that
+            # would double-count against the real funding debit). Default False on
+            # the backtest path, so this early-out is a no-op there.
+            return
         interval_seconds = self.execution_model.cfg.funding_interval_hours * 3600
         default_rate_per_8h = self.execution_model.cfg.funding_rate_per_8h
 
@@ -787,6 +816,77 @@ class Portfolio:
             extremes[str(symbol)] = (max(highs), min(lows), last_close)
         return extremes
 
+    def _cached_liquidation_price(self, symbol, qty, entry_price):
+        """Return the position-invariant liquidation price for ``symbol`` (X5).
+
+        The result depends only on ``sign(qty)``, ``entry_price`` and fixed config
+        (leverage / MMR / fee / buffer), so it is cached per symbol keyed by
+        ``(qty, entry_price)`` and reused for every bar the position is held
+        unchanged. On a cache miss — fresh position, size added/reduced, a flip,
+        or post-fill invalidation — it recomputes via
+        ``ExecutionModel.liquidation_price`` and refreshes the cache. The cached
+        value is bit-identical to the uncached call for identical inputs, so the
+        backtest golden baseline is unchanged.
+        """
+        cached = self._liq_price_cache.get(symbol)
+        if cached is not None and cached[0] == qty and cached[1] == entry_price:
+            return cached[2]
+        liq_price = self.execution_model.liquidation_price(qty=qty, entry_price=entry_price)
+        self._liq_price_cache[symbol] = (qty, entry_price, liq_price)
+        return liq_price
+
+    def _record_modeled_liquidation_breach(
+        self,
+        *,
+        latest_datetime,
+        symbol,
+        qty,
+        entry_price,
+        liq_price,
+        trigger_price,
+        close_price,
+        bar_high,
+        bar_low,
+        configured_margin_mode,
+        modeled_margin_mode,
+    ):
+        """Record a modeled maintenance-margin breach without applying a fill (M5).
+
+        Live-path only: the simulated liquidation engine must never enqueue a
+        synthetic ``LIQUIDATED`` fill — a real liquidation, if any, arrives from
+        the exchange as a genuine fill. The modeled breach is retained as an
+        in-memory audit record plus a WARNING so an operator / alerting layer can
+        react, but portfolio state (positions, holdings, the event queue) is left
+        untouched. The record is deliberately kept out of ``liquidation_events``
+        so it never inflates the real liquidation count.
+        """
+        self._modeled_liquidation_warnings.append(
+            {
+                "time": latest_datetime,
+                "symbol": symbol,
+                "position_qty": qty,
+                "entry_price": entry_price,
+                "liquidation_price": liq_price,
+                "trigger_price": trigger_price,
+                "close_price": close_price,
+                "bar_high": bar_high,
+                "bar_low": bar_low,
+                "configured_margin_mode": configured_margin_mode,
+                "modeled_margin_mode": modeled_margin_mode,
+                "modeled_only": True,
+            }
+        )
+        LOGGER.warning(
+            "MODELED_LIQUIDATION_BREACH (live path, no simulated fill applied): "
+            "symbol=%s qty=%s entry=%s liq=%s trigger=%s close=%s",
+            symbol,
+            qty,
+            entry_price,
+            liq_price,
+            trigger_price,
+            close_price,
+        )
+
     def _check_liquidations(self, latest_datetime, event=None):
         # leverage <= 1 guard is implicit: execution_model.liquidation_price() returns None.
         configured_margin_mode = (
@@ -818,7 +918,10 @@ class Portfolio:
                 continue
 
             # Delegate liquidation price and breach detection to ExecutionModel.
-            liq_price = self.execution_model.liquidation_price(qty=qty, entry_price=entry_price)
+            # X5: the position-invariant liquidation price is served from a per
+            # (qty, entry_price) cache (recomputed only when the position changes)
+            # instead of recomputing it every bar — bit-identical result.
+            liq_price = self._cached_liquidation_price(symbol, qty, entry_price)
             if liq_price is None:
                 # leverage <= 1 — no liquidation possible for this symbol.
                 continue
@@ -831,6 +934,29 @@ class Portfolio:
                 close_price=close_price,
             )
             if not breached:
+                continue
+
+            if self._live_liquidation_disabled:
+                # M5: on the live path the simulated liquidation engine must never
+                # fabricate a local fill — a real liquidation arrives as a genuine
+                # exchange fill. Downgrade the modeled breach to a WARNING / audit
+                # record and stop re-evaluating this symbol until its position
+                # changes (the _pending_liquidation marker is cleared on the next
+                # fill via update_positions_from_fill), then skip the fill path.
+                self._record_modeled_liquidation_breach(
+                    latest_datetime=latest_datetime,
+                    symbol=symbol,
+                    qty=qty,
+                    entry_price=entry_price,
+                    liq_price=liq_price,
+                    trigger_price=trigger_price,
+                    close_price=close_price,
+                    bar_high=bar_high,
+                    bar_low=bar_low,
+                    configured_margin_mode=configured_margin_mode,
+                    modeled_margin_mode=modeled_margin_mode,
+                )
+                self._pending_liquidation.add(symbol)
                 continue
 
             direction = "SELL" if qty > 0 else "BUY"

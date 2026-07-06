@@ -17,6 +17,26 @@ from lumina_quant.market_data import resolve_symbol_csv_path
 
 _EPOCH_ORIGIN = datetime(1970, 1, 1)
 _EPOCH_UNIT_TO_TIMEDELTA_KWARG = {"us": "microseconds", "ms": "milliseconds"}
+# Integer divisor turning a native epoch (in the datetime column's own unit)
+# into epoch milliseconds. Proven byte-identical to `_bar_time_ms` of the
+# reconstructed datetime for every non-negative epoch (see test coverage).
+_EPOCH_MS_DIVISOR = {"microseconds": 1000, "milliseconds": 1}
+_NUMERIC_OHLCV_COLUMNS: tuple[str, ...] = ("open", "high", "low", "close", "volume")
+
+
+class _MsTimestampArray(np.ndarray):
+    """int64 epoch-ms timestamps that stay truthy like the legacy list.
+
+    Storing per-symbol millisecond timestamps as a packed int64 array (audit
+    X3) removes the PyLong-list overhead (~40 B/row), but a bare ``ndarray``
+    raises ``ValueError`` on the ``timestamps or ()`` truthiness idiom some
+    consumers use. Overriding ``__bool__`` with a size test keeps every existing
+    consumer working unchanged while indexing / iteration / ``searchsorted``
+    behave exactly like any int64 array and the stored integers are identical.
+    """
+
+    def __bool__(self) -> bool:
+        return self.size > 0
 
 
 class _EpochTimestamps:
@@ -72,6 +92,43 @@ def _try_encode_timestamps(series: pl.Series, materialized: list[Any]) -> _Epoch
     return candidate
 
 
+def _numeric_columns_pack_lossless(df: Any) -> bool:
+    """Return True iff every OHLCV numeric column packs into float64 losslessly.
+
+    The columnar store reconstructs each numeric field as ``float(packed)`` from
+    a single packed ``float64`` array. That is byte-identical to the legacy
+    per-row object tuples only when nothing is silently corrupted on the way in.
+    Two corruptions are guarded here, mirroring the timestamp lossless contract
+    in ``_try_encode_timestamps``:
+
+    * **null bars** -- Polars coerces a null to ``NaN`` in ``to_numpy``, whereas
+      ``iter_rows`` materialized a Python ``None`` (which crashes loudly at the
+      first ``float()``). Any null in a numeric column rejects the fast path.
+    * **wide integers** -- an ``Int64`` value beyond float64's exact-integer
+      range loses precision when packed. Non-``Float64`` numeric columns are
+      accepted only when every value round-trips through ``float`` to the exact
+      value Polars materialized; anything else keeps the legacy object rows.
+
+    ``Float64`` columns (the production shape) are always safe once null-free, so
+    they skip the per-value check -- and genuine ``NaN`` *floats* (distinct from
+    nulls) are preserved exactly, matching legacy behavior.
+    """
+    for column in _NUMERIC_OHLCV_COLUMNS:
+        series = df[column]
+        if series.null_count() != 0:
+            return False
+        if series.dtype == pl.Float64:
+            continue
+        try:
+            packed = series.to_numpy()
+            for original, value in zip(series.to_list(), packed, strict=True):
+                if float(value) != original:
+                    return False
+        except TypeError, ValueError:
+            return False
+    return True
+
+
 class _ColumnarBarRows:
     """Columnar OHLCV row storage with lazy per-row tuple materialization.
 
@@ -94,11 +151,16 @@ class _ColumnarBarRows:
         self._numeric = numeric
 
     @classmethod
-    def from_frame(cls, df: Any) -> _ColumnarBarRows:
+    def from_frame(cls, df: Any) -> _ColumnarBarRows | None:
         """Build columnar storage from a normalized OHLCV Polars frame.
 
         Column order follows `col_idx`: datetime, open, high, low, close, volume.
+        Returns ``None`` when the numeric columns cannot be packed into float64
+        without silent corruption (nulls or precision-losing wide integers), so
+        the caller falls back to keeping the legacy per-row object tuples.
         """
+        if not _numeric_columns_pack_lossless(df):
+            return None
         n = df.height
         numeric = np.empty((n, 5), dtype=np.float64)
         numeric[:, 0] = df["open"].to_numpy()
@@ -203,7 +265,9 @@ class HistoricCSVDataHandler(DataHandler):
         # prefrozen tuple-of-tuples when a caller supplies pre-materialized rows
         # (identity of that tuple is preserved -- see test_data_handler_prefrozen).
         self.symbol_rows: dict[str, Any] = {}
-        self.symbol_timestamps_ms: dict[str, list[int]] = {}
+        # list[int] for prefrozen / non-epoch symbols; a packed int64
+        # `_MsTimestampArray` for columnar epoch-encoded symbols (audit X3).
+        self.symbol_timestamps_ms: dict[str, Any] = {}
         self.symbol_index: dict[str, int] = {}
         self.next_bar: dict[str, tuple[Any, ...]] = {}
         self.finished_symbols = set()
@@ -303,7 +367,7 @@ class HistoricCSVDataHandler(DataHandler):
                             )
                             self.finished_symbols.add(s)
                             continue
-                        rows = _ColumnarBarRows.from_frame(df)
+                        rows = self._rows_from_frame(df)
                 else:
                     if self._strict_data_dict:
                         # When explicit in-memory data_dict is supplied (chunked DB mode),
@@ -323,7 +387,7 @@ class HistoricCSVDataHandler(DataHandler):
                         )
                         self.finished_symbols.add(s)
                         continue
-                    rows = _ColumnarBarRows.from_frame(df)
+                    rows = self._rows_from_frame(df)
 
                 if not rows:
                     self.finished_symbols.add(s)
@@ -336,7 +400,7 @@ class HistoricCSVDataHandler(DataHandler):
                 if s in self._epoch_ms_prefrozen_symbols:
                     timestamps_ms = [int(row[0]) for row in rows]
                 else:
-                    timestamps_ms = [self._bar_time_ms(row[0]) or 0 for row in rows]
+                    timestamps_ms = self._build_timestamps_ms(rows)
                 self.symbol_timestamps_ms[s] = timestamps_ms
                 self._push_heap(s, rows[0])
             except Exception as e:
@@ -345,6 +409,42 @@ class HistoricCSVDataHandler(DataHandler):
 
         if not self.next_bar:
             self.continue_backtest = False
+
+    @staticmethod
+    def _rows_from_frame(df: Any) -> Any:
+        """Columnar rows for a normalized frame, or legacy object tuples.
+
+        Falls back to ``df.iter_rows`` (the exact pre-columnar materialization,
+        preserving ``None`` for nulls and full integer precision) when the frame
+        cannot be packed into float64 losslessly -- see
+        ``_numeric_columns_pack_lossless``.
+        """
+        columnar = _ColumnarBarRows.from_frame(df)
+        if columnar is not None:
+            return columnar
+        return tuple(df.iter_rows(named=False))
+
+    def _build_timestamps_ms(self, rows: Any):
+        """Per-row epoch-ms timestamps for a symbol's loaded rows.
+
+        For columnar rows whose datetime column proved losslessly epoch-encoded
+        (``_EpochTimestamps``), derive milliseconds directly from the packed
+        int64 epoch buffer (audit X3) instead of materializing every row tuple,
+        rebuilding a ``datetime`` and converting back. The result is an int64
+        array (byte-identical integers, ~5x smaller than the PyLong list) that
+        still iterates and compares like the legacy list; ``skip_to_timestamp_ms``
+        consumes it via ``searchsorted``. Any layout this cannot prove identical
+        for (non-epoch datetime encodings, legacy object rows, negative epochs)
+        keeps the exact per-row path.
+        """
+        if isinstance(rows, _ColumnarBarRows):
+            ts = rows._timestamps
+            if isinstance(ts, _EpochTimestamps):
+                divisor = _EPOCH_MS_DIVISOR.get(ts._timedelta_kwarg)
+                epoch = ts._epoch
+                if divisor is not None and epoch.size and int(epoch.min()) >= 0:
+                    return (epoch // divisor).astype(np.int64).view(_MsTimestampArray)
+        return [self._bar_time_ms(row[0]) or 0 for row in rows]
 
     def _resolve_symbol_csv_path(self, symbol):
         return resolve_symbol_csv_path(self.csv_dir, symbol)
@@ -415,7 +515,13 @@ class HistoricCSVDataHandler(DataHandler):
             if not ts_list:
                 continue
             idx = int(self.symbol_index.get(symbol, 0))
-            next_idx = bisect_left(ts_list, target, lo=idx)
+            if isinstance(ts_list, np.ndarray):
+                # Whole-array searchsorted is equivalent to bisect_left(lo=idx):
+                # the array is sorted ascending, so any global position <= idx
+                # is filtered by the `next_idx <= idx` guard below.
+                next_idx = int(np.searchsorted(ts_list, target, side="left"))
+            else:
+                next_idx = bisect_left(ts_list, target, lo=idx)
             if next_idx <= idx:
                 continue
 

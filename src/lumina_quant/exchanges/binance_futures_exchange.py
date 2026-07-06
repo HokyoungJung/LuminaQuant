@@ -231,6 +231,31 @@ class BinanceFuturesExchange(ExchangeInterface):
             )
         return 0.0
 
+    def get_margin_balance(self, currency: str = "USDT") -> float:
+        """Return the true perp account equity (wallet balance + unrealized PnL).
+
+        C4 live equity reconciliation (trader.py `_fetch_exchange_equity`) needs the
+        authoritative marginBalance figure, distinct from ``get_balance``'s
+        availableBalance (which excludes locked position margin). Reads
+        GET /fapi/v3/account via ``account_info_v3`` and prefers the per-asset
+        ``marginBalance`` field (walletBalance + unrealizedProfit) for ``currency``;
+        falls back to the account-wide ``totalMarginBalance`` when no matching
+        per-asset row is present (e.g. multi-assets margin mode).
+
+        NOTE: like ``get_balance``, a missing/malformed field silently coerces to
+        0.0 via ``_as_float`` (it cannot distinguish "absent" from a genuine zero
+        balance) — callers must treat a 0.0 result as unavailable.
+        """
+        asset = str(currency or "USDT").upper()
+        payload = self._client().account_info_v3()
+        for row in list(payload.get("assets") or []):
+            if not isinstance(row, dict) or str(row.get("asset") or "").upper() != asset:
+                continue
+            wallet_balance = self._as_float(row.get("walletBalance"), 0.0)
+            unrealized_pnl = self._as_float(row.get("unrealizedProfit"), 0.0)
+            return self._as_float(row.get("marginBalance"), wallet_balance + unrealized_pnl)
+        return self._as_float(payload.get("totalMarginBalance"), 0.0)
+
     def _position_payload(self, row: dict[str, Any]) -> dict[str, Any]:
         symbol = self._normalize_symbol(str(row.get("symbol") or ""))
         position_side = str(row.get("positionSide") or "BOTH").upper()

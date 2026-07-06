@@ -86,6 +86,7 @@ class BinanceUserStreamClient:
                 ws_url = self._build_ws_url(listen_key)
                 next_keepalive_monotonic = time.monotonic() + float(self.keepalive_interval_sec)
                 connected_at = time.monotonic()
+                keepalive_failures = 0
                 with websockets.sync.client.connect(ws_url, open_timeout=10, close_timeout=5) as ws:
                     while not self._stop.is_set():
                         if time.monotonic() - connected_at >= 23 * 60 * 60:
@@ -95,16 +96,36 @@ class BinanceUserStreamClient:
                         except TimeoutError:
                             raw = None
                         if time.monotonic() >= next_keepalive_monotonic:
-                            next_keepalive_monotonic = time.monotonic() + float(
-                                self.keepalive_interval_sec
-                            )
-                            self._keepalive_listen_key(listen_key)
+                            keepalive_ok = self._keepalive_listen_key(listen_key)
+                            if keepalive_ok:
+                                keepalive_failures = 0
+                                next_keepalive_monotonic = time.monotonic() + float(
+                                    self.keepalive_interval_sec
+                                )
+                            else:
+                                # A silently-swallowed keepalive failure lets the
+                                # listenKey expire at the 60-min hard limit. Retry
+                                # soon, and force a fresh-key reconnect on repeated
+                                # failure rather than waiting a full interval.
+                                keepalive_failures += 1
+                                if keepalive_failures >= 2:
+                                    raise RuntimeError(
+                                        "Binance user stream keepalive failed "
+                                        f"{keepalive_failures}x; forcing reconnect."
+                                    )
+                                next_keepalive_monotonic = time.monotonic() + min(
+                                    60.0, float(self.keepalive_interval_sec)
+                                )
                         if raw is None:
                             continue
                         payload = json.loads(raw)
                         normalized = self.parse_message(payload)
                         if normalized is not None:
                             on_event(normalized)
+                            if str(normalized.get("event_type") or "") == "listenKeyExpired":
+                                # The current listenKey is dead: break to reconnect
+                                # with a freshly-created key on the next loop turn.
+                                break
             except TimeoutError:
                 continue
             except Exception as exc:  # pragma: no cover - live reconnect path
@@ -230,6 +251,15 @@ class BinanceUserStreamClient:
                 "balances": [dict(item or {}) for item in list(account.get("B") or [])],
                 "positions": [dict(item or {}) for item in list(account.get("P") or [])],
                 "reason": str(account.get("m") or ""),
+            }
+        if event_type == "listenKeyExpired":
+            # Pass the expiry through so the trader can invalidate its BBO cache,
+            # activate fallback polling, and force a fresh-key reconnect. Filtering
+            # this frame to None (the previous behavior) made that handling dead code.
+            return {
+                "event_type": "listenKeyExpired",
+                "exchange_ts_ms": int(payload.get("E") or 0),
+                "listen_key": str(payload.get("listenKey") or ""),
             }
         return None
 

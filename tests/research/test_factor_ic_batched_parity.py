@@ -33,6 +33,7 @@ from lumina_quant.research.factor_ic import (
     FactorICResult,
     _reduce_factor_ic_batched,
     _reduce_factor_ic_loop,
+    evaluate_factor_ic_numpy,
     reduce_factor_ic,
 )
 
@@ -276,3 +277,102 @@ def test_public_entry_point_dispatches_to_batched():
         panel["factor_names"],
     )
     assert via_public.to_dict() == via_batched.to_dict()
+
+
+# ---------------------------------------------------------------------------
+# N2: the (symbol, timestamp) uniqueness precondition is enforced.
+#
+# The dense-scatter batched path resolves a duplicate coordinate last-write-wins
+# while the loop oracle keeps every duplicate, so the two silently diverge on
+# such input. reduce_factor_ic (and the public entry points that funnel through
+# it) must refuse the panel rather than return an order-dependent number.
+# ---------------------------------------------------------------------------
+
+
+def _panel_with_duplicate_coordinate(seed: int) -> dict:
+    """A clean panel with ONE (symbol, timestamp) coordinate duplicated."""
+    panel = _make_panel(seed, n_symbols=8, n_timestamps=20, n_factors=2)
+    # Append a second row carrying the very first row's coordinate but a
+    # different factor/label value -> a genuine duplicate the reducer collides.
+    sym = np.concatenate([panel["symbol"], panel["symbol"][:1]])
+    ts = np.concatenate([panel["timestamp"], panel["timestamp"][:1]])
+    factors = np.concatenate([panel["factors"], panel["factors"][:1] + 0.5], axis=0)
+    fwd = np.concatenate([panel["forward_return"], panel["forward_return"][:1] + 0.5])
+    return {
+        "symbol": sym,
+        "timestamp": ts,
+        "factors": factors,
+        "forward_return": fwd,
+        "factor_names": panel["factor_names"],
+    }
+
+
+def test_reduce_factor_ic_rejects_duplicate_coordinates():
+    panel = _panel_with_duplicate_coordinate(20260706001)
+    with pytest.raises(ValueError, match="duplicate_symbol_timestamp_pairs"):
+        reduce_factor_ic(
+            panel["symbol"],
+            panel["timestamp"],
+            panel["factors"],
+            panel["forward_return"],
+            panel["factor_names"],
+        )
+
+
+def test_public_numpy_entry_rejects_duplicate_coordinates():
+    panel = _panel_with_duplicate_coordinate(20260706002)
+    with pytest.raises(ValueError, match="duplicate"):
+        evaluate_factor_ic_numpy(
+            panel["symbol"],
+            panel["timestamp"],
+            panel["factors"],
+            panel["forward_return"],
+            panel["factor_names"],
+        )
+
+
+def test_unique_coordinate_panel_still_accepted():
+    # Guardrail: the precondition check must be a no-op on the (always unique)
+    # cartesian panels the rest of the suite -- and every real caller -- feeds.
+    panel = _make_panel(20260706003, n_symbols=9, n_timestamps=15, n_factors=3, nan_rate=0.1)
+    result = reduce_factor_ic(
+        panel["symbol"],
+        panel["timestamp"],
+        panel["factors"],
+        panel["forward_return"],
+        panel["factor_names"],
+    )
+    assert result.n_rows == 9 * 15
+
+
+def test_single_row_panel_not_falsely_rejected():
+    # n_rows < 2 -> no pair can duplicate; the check must short-circuit cleanly.
+    result = reduce_factor_ic(
+        np.array(["SYM0"]),
+        np.array([0], dtype=np.int64),
+        np.array([[1.0, 2.0]], dtype=np.float64),
+        np.array([0.1], dtype=np.float64),
+        ["f0", "f1"],
+    )
+    assert result.n_rows == 1
+
+
+# ---------------------------------------------------------------------------
+# X4: the fwd-rank cache (reused across factors sharing a joint finite mask)
+# must be bit-identical to the per-factor computation and to the loop oracle.
+# ---------------------------------------------------------------------------
+
+
+def test_x4_shared_mask_multifactor_is_bit_identical():
+    # No NaNs -> every factor's joint (factor & fwd) finite mask equals fwd's,
+    # so all K factors hit the SAME cache entry: the reuse path is exercised and
+    # must still match the loop oracle bit-for-bit.
+    panel = _make_panel(20260706004, n_symbols=20, n_timestamps=60, n_factors=6, nan_rate=0.0)
+    _run_parity(panel, label="x4_shared_mask_multifactor")
+
+
+def test_x4_mixed_masks_multifactor_is_bit_identical():
+    # NaNs make some factors share a mask and others not -> cache hits AND
+    # misses interleave within one reduce call; still bit-identical to the loop.
+    panel = _make_panel(20260706005, n_symbols=16, n_timestamps=50, n_factors=5, nan_rate=0.15)
+    _run_parity(panel, label="x4_mixed_masks_multifactor")

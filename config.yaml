@@ -66,6 +66,13 @@ risk:
   #   gate in the backtest order path as in live. Default false preserves the golden
   #   baseline (enable on the backtest PC to unify backtest/live enforcement).
   enforce_order_risk_gate_in_backtest: false
+  # --- Real-money desk controls (real_money_readiness audit 2026-07-06) ---
+  # All default OFF (0 / false) => byte-identical default config. Enable on the
+  # backtest PC to measure, then set for real-money runs.
+  # max_orders_per_minute: 20            # >0 => cap new orders per rolling minute (M4); 0=disabled
+  # max_daily_notional_turnover_pct: 3.0 # >0 => cap traded notional/day as multiple of equity (M4)
+  # max_position_age_hours: 24.0         # >0 => alert/flatten positions older than N hours (M4)
+  # enforce_gross_exposure_in_hedge: true # HEDGE dual legs count GROSS in exposure/margin (M3)
 
 # ------------------------------------------
 # Execution Model (Shared)
@@ -220,6 +227,20 @@ live:
   # cached best-bid/offer older than this many seconds (fail-closed during websocket
   # stalls / dislocations). Live-only, no backtest impact. 0.0 => disabled.
   max_bbo_age_seconds: 2.0
+  # --- Real-money live-safety controls (real_money_readiness audit 2026-07-06) ---
+  # All default OFF (0 / false) => paper/testnet behavior unchanged. The real-mode
+  # validate gate (mode=real OR go_live_stage in {canary,full}) REQUIRES the live-safety
+  # subset ON before it will let a Binance real run start. Uncomment + tune for real money:
+  # max_bbo_spread_bps_at_submit: 25.0       # >0 => reject limit orders when BBO spread exceeds N bps (C3)
+  # max_estimated_one_way_slippage_bps: 20.0 # >0 => reject when est. one-way slippage-to-mark exceeds N bps (C3)
+  # require_bbo_for_limit_orders: true       # reject a limit order with no fresh BBO snapshot (C3; needs book_ticker_enabled)
+  # max_limit_price_band_pct: 0.02           # >0 => reject a limit price deviating >N from mark/last_close (C3)
+  # equity_reconciliation_interval_sec: 30.0 # >0 => periodic exchange equity/cash re-sync (C4)
+  # market_data_silence_timeout_sec: 45.0    # >0 => data-silence watchdog (alert + freeze) (C6)
+  # require_state_fingerprint: true          # refuse foreign/mismatched state.json (M1)
+  # real_mode_managed_protective_stops: true # translate stop_loss/take_profit to Binance reduce-only algo orders (C2)
+  # NOTE: for a real run also pin an explicit small trading.symbols list (M6) — the default
+  # inherits the full research universe and is rejected in real mode.
   # API Keys are best loaded from .env, but can be set here if needed (NOT RECOMMENDED for git)
   # api_key: "YOUR_KEY"
   # secret_key: "YOUR_SECRET"

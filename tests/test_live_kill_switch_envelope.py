@@ -202,6 +202,20 @@ def test_all_valid_go_live_stages_are_accepted():
         raw = _base_raw()
         raw["live"]["go_live_stage"] = stage
         raw["live"]["mode"] = mode
+        if mode == "real":
+            # canary/full route to the production Binance endpoint and trip the
+            # real-money live-safety gate (real_money_readiness audit 2026-07-06):
+            # arm the fail-closed live-safety knobs so the stage passes validation.
+            raw["risk"] = {
+                "auto_flatten_on_breach": True,
+                "flatten_escalate_to_market": True,
+            }
+            raw["live"]["real_mode_managed_protective_stops"] = True
+            raw["live"]["max_limit_price_band_pct"] = 0.02
+            raw["live"]["equity_reconciliation_interval_sec"] = 30.0
+            raw["live"]["market_data_silence_timeout_sec"] = 45.0
+            raw["live"]["bar_sanity_check"] = True
+            raw["live"]["stale_symbol_after_ms"] = 5_000
         runtime = build_runtime_config(raw, env={})
         validate_runtime_config(runtime)
 

@@ -309,6 +309,40 @@ class TestLiveExecutionStateMachine(unittest.TestCase):
         self.assertEqual(order.metadata["slippage_guard_check"]["status"], "breach")
         self.assertFalse(order.metadata["slippage_guard_check"]["market_fallback_allowed"])
 
+    def test_active_orders_property_reflects_working_order_lifecycle(self):
+        """M6: engine.py's per-row sweep early-out keys off ``active_orders``.
+
+        It must be non-None (so the empty-book early-out can fire), the SAME
+        live container as ``tracked_orders`` (identity, not a snapshot), and
+        empty again once the order resolves to a terminal state via the normal
+        ``_forget_order`` path.
+        """
+        events = queue.Queue()
+        exchange = MockExchange()
+        handler = LiveExecutionHandler(events, MockBars(), MockConfig, exchange)
+
+        # No orders placed yet: active_orders must be present (not None) and empty.
+        self.assertIsNotNone(handler.active_orders)
+        self.assertEqual(len(handler.active_orders), 0)
+
+        order = OrderEvent("BTC/USDT", "MKT", 2.0, "BUY")
+        handler.execute_order(order)
+
+        self.assertIs(handler.active_orders, handler.tracked_orders)
+        self.assertEqual(len(handler.active_orders), 1)
+        tracked = next(iter(handler.active_orders.values()))
+        self.assertEqual(tracked["state"], STATE_OPEN)
+
+        # Drive the order through PARTIAL to terminal FILLED (per MockExchange's
+        # fetch_order sequence) and confirm active_orders empties out with it.
+        handler.check_open_orders()
+        self.assertEqual(len(handler.active_orders), 1)
+        self.assertEqual(next(iter(handler.active_orders.values()))["state"], STATE_PARTIAL)
+
+        handler.check_open_orders()
+        self.assertEqual(len(handler.active_orders), 0)
+        self.assertIs(handler.active_orders, handler.tracked_orders)
+
     def test_limit_slippage_guard_requires_bbo_when_policy_says_fail_closed(self):
         events = queue.Queue()
         exchange = MockExchange()
@@ -515,6 +549,152 @@ class TestLiveExecutionStateMachine(unittest.TestCase):
         handler.execute_order(order)
         self.assertEqual(exchange.last_params["stopLossPrice"], 99.0)
         self.assertEqual(exchange.last_params["takeProfitPrice"], 101.0)
+
+    # ------------------------------------------------------------------ #
+    # C2: real-mode managed protective stops (opt-in, default OFF).
+    # ------------------------------------------------------------------ #
+    def test_real_managed_protective_stops_place_reduce_only_algo_orders(self):
+        events = queue.Queue()
+        exchange = MockFilledProtectiveExchange()
+
+        class _RealManagedConfig(MockConfig):
+            MODE = "real"
+            REAL_MODE_MANAGED_PROTECTIVE_STOPS = True
+
+        handler = LiveExecutionHandler(events, MockBars(), _RealManagedConfig, exchange)
+        states = []
+        handler.set_order_state_callback(states.append)
+
+        order = OrderEvent(
+            "ETH/USDT",
+            "MKT",
+            1.5,
+            "BUY",
+            position_side="LONG",
+            stop_loss=95.0,
+            take_profit=110.0,
+        )
+
+        # Entry must NOT be rejected in real mode when managed stops are enabled.
+        handler.execute_order(order)
+
+        # Exchange-resident protection is placed as reduce-only market-trigger
+        # algo orders (guaranteed exit), NOT stop-limit orders.
+        self.assertEqual(
+            [item["type"] for item in exchange.algo_orders],
+            ["STOP_MARKET", "TAKE_PROFIT_MARKET"],
+        )
+        self.assertEqual({item["side"] for item in exchange.algo_orders}, {"sell"})
+        self.assertTrue(all(item["params"]["reduceOnly"] is True for item in exchange.algo_orders))
+        self.assertEqual(
+            [item["params"]["triggerPrice"] for item in exchange.algo_orders], [95.0, 110.0]
+        )
+        # Market-style trigger orders carry no working limit price.
+        self.assertNotIn("price", exchange.algo_orders[0]["params"])
+        self.assertNotIn("price", exchange.algo_orders[1]["params"])
+        self.assertTrue(
+            any(
+                payload["message"] == "real_managed_protective_orders_submitted"
+                and payload["metadata"]["real_money_execution"] is True
+                and payload["metadata"]["paper_testnet_only"] is False
+                for payload in states
+            )
+        )
+        self.assertEqual(len(handler.protective_orders), 2)
+
+    def test_real_managed_protective_stops_off_by_default_still_fail_closed(self):
+        events = queue.Queue()
+        exchange = MockProtectiveExchange()
+
+        class _RealConfig(MockConfig):
+            MODE = "real"  # REAL_MODE_MANAGED_PROTECTIVE_STOPS unset => default OFF
+
+        handler = LiveExecutionHandler(events, MockBars(), _RealConfig, exchange)
+        order = OrderEvent(
+            "BTC/USDT",
+            "MKT",
+            1.0,
+            "BUY",
+            stop_loss=99.0,
+            take_profit=101.0,
+        )
+        with self.assertRaisesRegex(RuntimeError, "Real-mode live protective orders require"):
+            handler.execute_order(order)
+        self.assertEqual(exchange.algo_orders, [])
+
+    def test_real_managed_protective_stops_reject_naked_reduce_only_child(self):
+        # reduce_only orders never spawn their own protection (would be recursive).
+        events = queue.Queue()
+        exchange = MockFilledProtectiveExchange()
+
+        class _RealManagedConfig(MockConfig):
+            MODE = "real"
+            REAL_MODE_MANAGED_PROTECTIVE_STOPS = True
+
+        handler = LiveExecutionHandler(events, MockBars(), _RealManagedConfig, exchange)
+        order = OrderEvent(
+            "ETH/USDT",
+            "LMT",
+            1.5,
+            "SELL",
+            price=95.0,
+            position_side="LONG",
+            reduce_only=True,
+        )
+        handler.execute_order(order)
+        self.assertEqual(exchange.algo_orders, [])
+
+    # ------------------------------------------------------------------ #
+    # C3: config-driven slippage/spread thresholds for ordinary strategies.
+    # ------------------------------------------------------------------ #
+    def test_config_slippage_thresholds_apply_to_ordinary_strategies(self):
+        events = queue.Queue()
+        exchange = MockExchange()
+
+        class _GuardedConfig(MockConfig):
+            MAX_BBO_SPREAD_BPS_AT_SUBMIT = 5.0
+            MAX_ESTIMATED_ONE_WAY_SLIPPAGE_BPS = 8.0
+            REQUIRE_BBO_FOR_LIMIT_ORDERS = True
+
+        handler = LiveExecutionHandler(events, MockBars(), _GuardedConfig, exchange)
+        order = OrderEvent("BTC/USDT", "LMT", 1.0, "BUY", price=100.0)
+        policy = handler._slippage_guard_policy_for_event(order)
+        self.assertEqual(policy["max_bbo_spread_bps_at_submit"], 5.0)
+        self.assertEqual(policy["max_estimated_one_way_slippage_bps"], 8.0)
+        self.assertTrue(policy["require_bbo_snapshot"])
+
+    def test_config_slippage_thresholds_zero_is_disabled(self):
+        # Per the config contract 0.0 means DISABLED -> the threshold must NOT be
+        # added to the policy, keeping default config byte-identical.
+        events = queue.Queue()
+        exchange = MockExchange()
+
+        class _ZeroConfig(MockConfig):
+            MAX_BBO_SPREAD_BPS_AT_SUBMIT = 0.0
+            MAX_ESTIMATED_ONE_WAY_SLIPPAGE_BPS = 0.0
+            REQUIRE_BBO_FOR_LIMIT_ORDERS = False
+
+        handler = LiveExecutionHandler(events, MockBars(), _ZeroConfig, exchange)
+        order = OrderEvent("BTC/USDT", "LMT", 1.0, "BUY", price=100.0)
+        policy = handler._slippage_guard_policy_for_event(order)
+        self.assertNotIn("max_bbo_spread_bps_at_submit", policy)
+        self.assertNotIn("max_estimated_one_way_slippage_bps", policy)
+        self.assertNotIn("require_bbo_snapshot", policy)
+
+    def test_config_slippage_threshold_rejects_ordinary_limit_order_on_breach(self):
+        events = queue.Queue()
+        exchange = MockExchange()
+
+        class _TightGuardConfig(MockConfig):
+            MAX_BBO_SPREAD_BPS_AT_SUBMIT = 1.0  # tighter than the ~2 bps mock spread
+
+        handler = LiveExecutionHandler(events, MockBboBars(), _TightGuardConfig, exchange)
+        # Ordinary strategy: NO per-event slippage_guard_policy metadata.
+        order = OrderEvent("BTC/USDT", "LMT", 1.0, "BUY", price=100.02)
+        with self.assertRaisesRegex(RuntimeError, "slippage guard breached"):
+            handler.execute_order(order)
+        self.assertEqual(exchange.orders, [])
+        self.assertEqual(order.metadata["slippage_guard_check"]["status"], "breach")
 
 
 if __name__ == "__main__":

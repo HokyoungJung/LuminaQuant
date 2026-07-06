@@ -259,7 +259,17 @@ Live trading follows a four-stage promotion pipeline gated by `live.go_live_stag
 3. **canary** — small real position fraction (`canary_position_fraction`, default 10%)
 4. **full** — full position sizing
 
-**Kill switch is always on.** Setting `kill_switch_enabled: false` in config is structurally rejected at load time. Real-money mode additionally requires the `LUMINA_ENABLE_LIVE_REAL` environment variable and readiness artifacts proving fill/slippage/BBO parity.
+**Kill switch is always on.** Setting `kill_switch_enabled: false` in config is structurally rejected at load time.
+
+Real-money mode is gated by `enforce_live_readiness_from_files` (`live/readiness_policy.py`), which fail-closes unless **all** of the following hold (it does not itself measure fill/slippage/BBO parity — those must be attested in a referenced artifact):
+
+- the `LUMINA_ENABLE_LIVE_REAL` environment variable is set (with `live.require_real_enable_flag: true`);
+- a **completed, non-stale** portfolio-validation refresh artifact (freshness is judged by its `collection_cutoff_utc` age against `readiness_preflight_stale_minutes`, default 30);
+- a live-readiness **decision** artifact (`keep_incumbent` or a `promote_candidate`/`selected_live_mode` whose strategy is runtime-compatible with the live registry map);
+- a **referenced** readiness artifact (not the decision JSON's own hand-typed flags) that positively asserts `ready_for_real`/`real_execution_allowed`/`real_money_execution` and carries no paper-only/governance blocker — a decision cannot self-attest into real money;
+- a Postgres DSN is configured.
+
+The `full` (100% sizing) stage additionally requires **recorded canary evidence** (`canary_execution_recorded`) or an explicit `LUMINA_ALLOW_FULL_WITHOUT_CANARY` override, so full sizing can never be the first reachable real stage. Use `scripts/ops/write_real_money_attestation.py` to emit the referenced attestation artifact — it refuses to set any positive flag without embedded, on-disk, verified evidence references.
 
 ```bash
 # Paper/testnet (default)

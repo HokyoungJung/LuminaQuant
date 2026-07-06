@@ -109,15 +109,28 @@ def test_live_readiness_preflight_reports_ready_for_real(monkeypatch, tmp_path: 
         ),
         encoding="utf-8",
     )
+    # P1: real-money readiness now requires a REFERENCED attestation artifact; a
+    # decision cannot self-attest with hand-typed booleans alone.
+    attestation = tmp_path / "attestation.json"
+    attestation.write_text(
+        json.dumps(
+            {
+                "ready_for_real": True,
+                "real_money_execution": True,
+                "real_execution_allowed": True,
+                "clean_promotion_eligible": True,
+            }
+        ),
+        encoding="utf-8",
+    )
     decision = tmp_path / "decision.json"
     decision.write_text(
         json.dumps(
             {
                 "decision": "keep_incumbent",
-                "ready_for_real": True,
-                "real_money_execution": True,
-                "real_execution_allowed": True,
-                "clean_promotion_eligible": True,
+                "strategy_params": {
+                    "real_money_attestation_artifact_path": str(attestation)
+                },
             }
         ),
         encoding="utf-8",
@@ -512,6 +525,19 @@ def test_non_alpha_zoo_real_mode_vetoed_when_no_readiness_flags(
 def test_non_alpha_zoo_real_mode_passes_when_explicitly_ready(monkeypatch, tmp_path: Path) -> None:
     config_path = _write_real_mode_config(tmp_path)
     refresh = _write_fresh_refresh(tmp_path)
+    # P1: positive readiness must come from a referenced attestation artifact.
+    attestation = tmp_path / "attestation.json"
+    attestation.write_text(
+        json.dumps(
+            {
+                "ready_for_real": True,
+                "real_money_execution": True,
+                "real_execution_allowed": True,
+                "clean_promotion_eligible": True,
+            }
+        ),
+        encoding="utf-8",
+    )
     decision = tmp_path / "decision.json"
     decision.write_text(
         json.dumps(
@@ -519,10 +545,9 @@ def test_non_alpha_zoo_real_mode_passes_when_explicitly_ready(monkeypatch, tmp_p
                 "decision": "selected_live_mode",
                 "selected_mode": "MovingAverageCrossStrategy",
                 "candidate_key": "moving_average_cross",
-                "ready_for_real": True,
-                "real_money_execution": True,
-                "real_execution_allowed": True,
-                "clean_promotion_eligible": True,
+                "strategy_params": {
+                    "real_money_attestation_artifact_path": str(attestation)
+                },
             }
         ),
         encoding="utf-8",
@@ -693,15 +718,27 @@ def test_live_readiness_preflight_honors_runtime_env_mode_override(
         ),
         encoding="utf-8",
     )
+    # P1: real-money readiness requires a REFERENCED attestation artifact.
+    attestation = tmp_path / "attestation.json"
+    attestation.write_text(
+        json.dumps(
+            {
+                "ready_for_real": True,
+                "real_money_execution": True,
+                "real_execution_allowed": True,
+                "clean_promotion_eligible": True,
+            }
+        ),
+        encoding="utf-8",
+    )
     decision = tmp_path / "decision.json"
     decision.write_text(
         json.dumps(
             {
                 "decision": "keep_incumbent",
-                "ready_for_real": True,
-                "real_money_execution": True,
-                "real_execution_allowed": True,
-                "clean_promotion_eligible": True,
+                "strategy_params": {
+                    "real_money_attestation_artifact_path": str(attestation)
+                },
             }
         ),
         encoding="utf-8",

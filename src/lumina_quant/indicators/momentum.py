@@ -105,11 +105,18 @@ def rolling_mean_dollar_volume(
 def kaufman_efficiency_ratio(values, *, period: int = 10) -> float | None:
     """Return Kaufman Efficiency Ratio over trailing window."""
     period_i = max(1, int(period))
-    values_f = [float(value) for value in values]
-    if len(values_f) <= period_i:
+    # Only the trailing ``period_i + 1`` samples are consumed, so slice the tail
+    # *before* float-converting instead of coercing the entire (potentially very
+    # long) history and discarding all but the tail. For list/tuple inputs (every
+    # production caller) this is O(period) instead of O(n); other iterables are
+    # materialized once, matching the prior behaviour. Byte-identical for finite
+    # inputs; 2026-07-06 audit X1 perf fix.
+    if not isinstance(values, (list, tuple)):
+        values = list(values)
+    if len(values) <= period_i:
         return None
 
-    tail = values_f[-(period_i + 1) :]
+    tail = [float(value) for value in values[-(period_i + 1) :]]
     direction = abs(tail[-1] - tail[0])
     volatility = 0.0
     for idx in range(1, len(tail)):

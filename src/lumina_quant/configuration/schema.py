@@ -93,6 +93,24 @@ class RiskConfig:
     #     same RiskManager.check_order gate as live, so one enforcement path governs both.
     #     Default False preserves the golden baseline (enable on the backtest machine).
     enforce_order_risk_gate_in_backtest: bool = False
+    # --- Real-money desk controls (real_money_readiness audit 2026-07-06) ---
+    #   All default to the OFF/legacy value so the default config is byte-identical; the
+    #   real-mode validate gate (mode=='real' or stage in {canary,full}) requires the
+    #   live-safety subset to be ON.
+    #   max_orders_per_minute: > 0 => cap new orders accepted per rolling minute
+    #     (fail-closed FREEZE once exceeded). 0 => disabled (legacy). (M4)
+    max_orders_per_minute: int = 0
+    #   max_daily_notional_turnover_pct: > 0 => cap cumulative traded notional per UTC
+    #     day as a multiple of equity. 0 => disabled (legacy). (M4)
+    max_daily_notional_turnover_pct: float = 0.0
+    #   max_position_age_hours: > 0 => alert/flatten a position open longer than this many
+    #     hours. 0 => disabled (legacy). (M4)
+    max_position_age_hours: float = 0.0
+    #   enforce_gross_exposure_in_hedge: when True, portfolio total-notional and margin
+    #     utilization accumulate GROSS per-leg exposure in HEDGE mode (dual LONG+SHORT legs
+    #     both count) instead of the legacy net market value. False => legacy net
+    #     accounting (byte-identical). (M3)
+    enforce_gross_exposure_in_hedge: bool = False
 
 
 @dataclass(slots=True)
@@ -312,6 +330,54 @@ class LiveRuntimeConfig:
     # cached best-bid/offer older than this many seconds (fail-closed during websocket
     # stalls / dislocations).  Live-only — no backtest impact.  0.0 => disabled (legacy).
     max_bbo_age_seconds: float = 2.0
+    # --- Real-money live-safety controls (real_money_readiness audit 2026-07-06) ---
+    #   All default to the OFF/legacy value so default (paper/testnet/backtest) behavior is
+    #   byte-identical; the real-mode validate gate requires them ON.
+    #   max_bbo_spread_bps_at_submit: > 0 => reject a limit order when the cached BBO spread
+    #     exceeds this many bps (fat-finger / dislocation guard). 0 => disabled. (C3)
+    max_bbo_spread_bps_at_submit: float = 0.0
+    #   max_estimated_one_way_slippage_bps: > 0 => reject when the estimated one-way slippage
+    #     to mark exceeds this many bps. 0 => disabled. (C3)
+    max_estimated_one_way_slippage_bps: float = 0.0
+    #   require_bbo_for_limit_orders: when True a limit order with no fresh BBO snapshot is
+    #     rejected (fail-closed) instead of passed. (C3)
+    require_bbo_for_limit_orders: bool = False
+    #   max_limit_price_band_pct: > 0 => reject a limit order whose price deviates more than
+    #     this fraction from mark/last_close (price-band guard). 0 => disabled. (C3)
+    max_limit_price_band_pct: float = 0.0
+    #   equity_reconciliation_interval_sec: > 0 => periodically re-sync live equity/cash
+    #     against the exchange (marginBalance + uPnL) so funding drain and exchange-side
+    #     liquidations reach the equity kill-switches. 0 => disabled (no periodic re-sync). (C4)
+    equity_reconciliation_interval_sec: float = 0.0
+    #   market_data_silence_timeout_sec: > 0 => treat this many seconds without a new
+    #     MARKET_WINDOW as a data-silence breach (alert + freeze). 0 => disabled watchdog. (C6)
+    market_data_silence_timeout_sec: float = 0.0
+    #   require_state_fingerprint: when True, state load refuses a state.json whose embedded
+    #     {strategy,symbols,exchange,market_type,mode} fingerprint does not match the running
+    #     config (blocks foreign/mismatched state). (M1)
+    require_state_fingerprint: bool = False
+    #   real_mode_managed_protective_stops: when True, real-mode orders carrying
+    #     stop_loss/take_profit are translated into Binance reduce-only STOP_MARKET /
+    #     TAKE_PROFIT_MARKET algo orders (exchange-resident protection). False => legacy
+    #     (paper/testnet-only exchange protection). (C2)
+    real_mode_managed_protective_stops: bool = False
+    #   stale_symbol_after_ms: > 0 => per-symbol dead-feed detection treats a symbol whose
+    #     market data has not updated in this many ms as stale. 0 => disabled (legacy). (D2)
+    stale_symbol_after_ms: int = 0
+    #   bar_sanity_check: when True, live bars are gated on finite/positive OHLC values
+    #     and high>=low before being accepted. False => legacy (no live bar sanity gate). (D4)
+    bar_sanity_check: bool = False
+    #   ws_max_backoff_sec: cap (seconds) on the market-data websocket reconnect backoff.
+    ws_max_backoff_sec: float = 60.0
+    #   recovery_max_pages: upper bound on the number of pages fetched during gap recovery.
+    recovery_max_pages: int = 240
+    #   readiness_preflight_stale_minutes: staleness window (minutes) used by the readiness
+    #     preflight check when judging a refresh artifact's age. Config-owned override of the
+    #     caller default (DEFAULT_PREFLIGHT_STALE_MINUTES=30).
+    readiness_preflight_stale_minutes: int = 30
+    #   allow_full_without_canary: operator override permitting go_live_stage='full' without
+    #     recorded canary evidence. False => legacy (full requires canary evidence). (P1)
+    allow_full_without_canary: bool = False
     exchange: LiveExchangeConfig = field(default_factory=LiveExchangeConfig)
     external: LiveExternalConfig = field(default_factory=LiveExternalConfig)
     polymarket: LivePolymarketConfig = field(default_factory=LivePolymarketConfig)

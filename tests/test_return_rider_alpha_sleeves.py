@@ -7,10 +7,15 @@ candidate-admission wiring (single-asset, >=30m only).  No backtest is run.
 
 from __future__ import annotations
 
+import math
+import random
+import struct
 from typing import Any
 
 import pytest
 
+from lumina_quant.indicators.alpha_features import finite_floats
+from lumina_quant.indicators.momentum import kaufman_efficiency_ratio
 from lumina_quant.strategies.registry import (
     get_default_strategy_params,
     get_strategy_names,
@@ -20,6 +25,7 @@ from lumina_quant.strategies.return_rider_alpha_sleeves import (
     AccelerationRiderStrategy,
     AdaptiveTrendRiderStrategy,
     VolatilityBreakoutRiderStrategy,
+    _kama,
 )
 from lumina_quant.strategy_factory import build_binance_futures_candidates
 from lumina_quant.strategy_factory.selection import candidate_mix_type
@@ -267,3 +273,119 @@ def test_return_rider_candidates_single_asset_and_only_ge_30m() -> None:
         assert "return_rider" in row.tags
         assert "trailing_stop" in row.tags
         assert row.metadata["timeframe"] == row.timeframe
+
+
+# ---------------------------------------------------------------------------
+# Audit X1 (2026-07-06): the KAMA slice rewrite and the kaufman-efficiency-ratio
+# tail-before-float-convert change MUST be bit-identical to the pre-fix code.
+# The legacy oracles below reproduce the exact pre-fix expressions so any future
+# refactor that perturbs the summation order / slice window trips these asserts.
+# ---------------------------------------------------------------------------
+
+
+def _kaufman_efficiency_ratio_legacy(values: Any, *, period: int = 10) -> float | None:
+    """Pre-fix kaufman_efficiency_ratio: float-convert the full history first."""
+    period_i = max(1, int(period))
+    values_f = [float(value) for value in values]
+    if len(values_f) <= period_i:
+        return None
+    tail = values_f[-(period_i + 1) :]
+    direction = abs(tail[-1] - tail[0])
+    volatility = 0.0
+    for idx in range(1, len(tail)):
+        volatility += abs(tail[idx] - tail[idx - 1])
+    if volatility <= 1e-12:
+        return 0.0
+    ratio = direction / volatility
+    return ratio if math.isfinite(ratio) else None
+
+
+def _kama_legacy(
+    values: list[float], *, period: int, fast: int, slow: int
+) -> float | None:
+    """Pre-fix O(n^2)-sliced KAMA using the legacy ``vals[: idx + 1][-tail:]`` window."""
+    period_i = max(1, int(period))
+    fast_i = max(1, int(fast))
+    slow_i = max(fast_i + 1, int(slow))
+    vals = finite_floats(values)
+    if len(vals) <= period_i:
+        return None
+    fast_sc = 2.0 / (float(fast_i) + 1.0)
+    slow_sc = 2.0 / (float(slow_i) + 1.0)
+    kama = vals[0]
+    for idx in range(1, len(vals)):
+        window = vals[: idx + 1][-(period_i + 1) :]  # legacy slice expression
+        er = _kaufman_efficiency_ratio_legacy(window, period=period_i)
+        er_value = 0.0 if er is None else max(0.0, min(1.0, float(er)))
+        smoothing = (er_value * (fast_sc - slow_sc) + slow_sc) ** 2
+        kama = kama + smoothing * (vals[idx] - kama)
+    if not isinstance(kama, float):
+        kama = float(kama)
+    return kama if kama == kama else None  # NaN guard
+
+
+def _bits(value: float | None) -> str:
+    """Return an exact bit-pattern key so float equality is byte-for-byte."""
+    return "None" if value is None else struct.pack(">d", value).hex()
+
+
+def test_kaufman_efficiency_ratio_tail_slice_is_bit_identical() -> None:
+    rng = random.Random(4242)
+    checked = 0
+    for _ in range(60):
+        n = rng.randint(1, 300)
+        vals = [rng.uniform(-500.0, 500.0) for _ in range(n)]
+        period = rng.randint(1, 40)
+        assert _bits(kaufman_efficiency_ratio(vals, period=period)) == _bits(
+            _kaufman_efficiency_ratio_legacy(vals, period=period)
+        ), (n, period)
+        checked += 1
+    assert checked >= 50
+    # Tuple inputs must also match (isinstance short-circuit path).
+    tup = tuple(rng.uniform(-10.0, 10.0) for _ in range(50))
+    assert _bits(kaufman_efficiency_ratio(tup, period=7)) == _bits(
+        _kaufman_efficiency_ratio_legacy(tup, period=7)
+    )
+    # Boundary lengths around the period guard (<=period -> None).
+    for period in (1, 5, 20):
+        for length in (period - 1, period, period + 1, period + 2):
+            if length < 0:
+                continue
+            seq = [float(i) * 1.5 - 3.0 for i in range(length)]
+            assert _bits(kaufman_efficiency_ratio(seq, period=period)) == _bits(
+                _kaufman_efficiency_ratio_legacy(seq, period=period)
+            ), (length, period)
+
+
+def test_kama_slice_rewrite_is_bit_identical() -> None:
+    rng = random.Random(20260706)
+    checked = 0
+    for _ in range(60):
+        n = rng.randint(2, 400)
+        vals = [rng.uniform(-1000.0, 1000.0) for _ in range(n)]
+        period = rng.randint(1, 30)
+        fast = rng.randint(1, 10)
+        slow = rng.randint(fast + 1, 40)
+        assert _bits(_kama(vals, period=period, fast=fast, slow=slow)) == _bits(
+            _kama_legacy(vals, period=period, fast=fast, slow=slow)
+        ), (n, period, fast, slow)
+        checked += 1
+    assert checked >= 50
+    # Short-history and flat series edge cases.
+    assert _kama([1.0], period=5, fast=2, slow=10) is None
+    for series in ([5.0] * 40, list(range(60)), [3.0, 3.0, 9.0, 1.0, 7.0, 2.0]):
+        seq = [float(x) for x in series]
+        assert _bits(_kama(seq, period=4, fast=2, slow=12)) == _bits(
+            _kama_legacy(seq, period=4, fast=2, slow=12)
+        ), series
+
+
+def test_kama_window_slice_matches_legacy_expression() -> None:
+    """Directly prove the two slice expressions select the identical subsequence."""
+    vals = [float(i) for i in range(50)]
+    for period_i in range(1, 20):
+        for idx in range(1, len(vals)):
+            assert (
+                vals[max(0, idx - period_i) : idx + 1]
+                == vals[: idx + 1][-(period_i + 1) :]
+            ), (period_i, idx)
