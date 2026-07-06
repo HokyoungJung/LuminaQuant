@@ -38,6 +38,7 @@ environment state) and must still be validated on the data-bearing machine.
 
 from __future__ import annotations
 
+import math
 from collections import deque
 from dataclasses import dataclass, field
 from typing import Any
@@ -122,6 +123,125 @@ def _kama(values: list[float], *, period: int, fast: int, slow: int) -> float | 
     if not isinstance(kama, float):
         kama = float(kama)
     return kama if kama == kama else None  # NaN guard
+
+
+# ---------------------------------------------------------------------------
+# Incremental KAMA (opt-in ``incremental_kama`` flag; 2026-07-06 audit stage-2
+# perf fix). ``_kama`` above recomputes the *entire* trailing window every
+# call, so calling it per-bar on a ``list(item.closes)`` of up to
+# ``history_size`` entries costs O(history_size) per bar (the #1 hot path the
+# 2026-07-03 audit flagged). The accumulator below instead maintains a running
+# KAMA value plus small deques bounded to the efficiency-ratio/slope windows
+# (``kama_period``/``slope_lookback``), so each accepted bar costs O(period)
+# -- a small, backtest-length-independent constant -- instead of O(n).
+#
+# PARITY ENVELOPE: ``_kama_inc_update`` mirrors ``_kama``'s loop body exactly
+# (same smoothing formula, same summation order for the efficiency-ratio
+# volatility term, same "insufficient window -> ER forced to 0" clamp for the
+# first ``period - 1`` steps after any seed), so replaying a full close
+# history bar-by-bar through it is bit-identical to a from-scratch ``_kama``
+# recompute over the same prefix. ``item.closes`` is itself a *bounded* ring
+# buffer (``history_size``), though, and the legacy path recomputes ``_kama``
+# from ``list(item.closes)`` fresh every bar -- so once a symbol's bar count
+# exceeds ``history_size`` and the ring buffer starts evicting its oldest
+# close, the legacy computation re-seeds its recursion at a new, later
+# starting point every subsequent bar, while this accumulator keeps running
+# continuously from its own original seed. The two are proven bit-identical
+# for as long as no eviction has occurred (the regime the parity test
+# exercises); beyond that both are well-defined but are expected to diverge by
+# a small, KAMA-smoothing-constant-dependent amount that does not vanish over
+# time (it is bounded by how much a single ``history_size``-bar window fails
+# to forget its own seed, not by elapsed bars since eviction started).
+# ---------------------------------------------------------------------------
+
+
+@dataclass(slots=True)
+class _KamaIncState:
+    """Per-symbol incremental KAMA accumulator; see the module note above."""
+
+    value: float = 0.0
+    count: int = 0
+    last_close: float = 0.0
+    diffs: deque[float] = field(default_factory=deque)
+    recent_closes: deque[float] = field(default_factory=deque)
+    recent_kama: deque[float] = field(default_factory=deque)
+
+
+def _new_kama_inc_state(*, period: int, slope_lookback: int) -> _KamaIncState:
+    """Build a fresh accumulator with deques bounded to the ER/slope windows."""
+    period_i = max(1, int(period))
+    slope_i = max(1, int(slope_lookback))
+    return _KamaIncState(
+        diffs=deque(maxlen=period_i),
+        recent_closes=deque(maxlen=period_i + 1),
+        recent_kama=deque(maxlen=slope_i + 1),
+    )
+
+
+def _kama_inc_seed(state: _KamaIncState, close: float) -> None:
+    """Seed the accumulator at the first raw close it has ever observed."""
+    state.value = close
+    state.count = 1
+    state.last_close = close
+    state.diffs.clear()
+    state.recent_closes.clear()
+    state.recent_closes.append(close)
+    state.recent_kama.clear()
+    state.recent_kama.append(close)
+
+
+def _kama_inc_update(
+    state: _KamaIncState, close: float, *, period: int, fast_sc: float, slow_sc: float
+) -> None:
+    """Apply one O(period) step; mirrors ``_kama``'s loop body exactly.
+
+    ``idx`` is ``state.count`` before this call, which lines up bar-for-bar
+    with the ``idx`` in ``_kama``'s ``for idx in range(1, len(vals))`` loop
+    (the efficiency ratio is forced to ``0`` for the first ``period - 1``
+    updates after any seed, exactly as ``_kama`` forces it for the first
+    ``period - 1`` positions of any window it recomputes).
+    """
+    idx = state.count
+    new_diff = abs(close - state.last_close)
+    state.diffs.append(new_diff)
+    state.recent_closes.append(close)
+    if idx < period:
+        er_value = 0.0
+    else:
+        direction = abs(state.recent_closes[-1] - state.recent_closes[0])
+        volatility = 0.0
+        for diff in state.diffs:
+            volatility += diff
+        if volatility <= 1e-12:
+            er_value = 0.0
+        else:
+            ratio = direction / volatility
+            er_value = max(0.0, min(1.0, ratio)) if math.isfinite(ratio) else 0.0
+    smoothing = (er_value * (fast_sc - slow_sc) + slow_sc) ** 2
+    state.value = state.value + smoothing * (close - state.value)
+    state.recent_kama.append(state.value)
+    state.last_close = close
+    state.count = idx + 1
+
+
+def _bootstrap_kama_inc(
+    closes: list[float], *, period: int, fast_sc: float, slow_sc: float, slope_lookback: int
+) -> _KamaIncState:
+    """Build a fresh accumulator by replaying ``closes`` from its head.
+
+    Runs once per symbol: on the symbol's very first accepted bar
+    (``len(closes) == 1``, the common/cheap case -- the replay loop below is
+    empty) or once if ``incremental_kama`` is engaged on a strategy instance
+    whose state was restored with existing history (an O(len(closes))
+    one-time cost, not a per-bar one).
+    """
+    state = _new_kama_inc_state(period=period, slope_lookback=slope_lookback)
+    if not closes:
+        return state
+    _kama_inc_seed(state, closes[0])
+    for close in closes[1:]:
+        _kama_inc_update(state, close, period=period, fast_sc=fast_sc, slow_sc=slow_sc)
+    return state
 
 
 def _atr_value(
@@ -588,6 +708,15 @@ class AdaptiveTrendRiderStrategy(_ReturnRiderBase):
                 "max_order_value", default=5000.0, low=0.0, high=1_000_000.0, tunable=False
             ),
             "min_price": HyperParam.floating("min_price", default=0.10, low=0.0, high=1_000_000.0),
+            # Opt-in, config-gated (2026-07-06 audit stage-2 perf fix). OFF is
+            # the exact legacy O(history_size)-per-bar recompute path
+            # (byte-identical); ON switches to the O(period)-per-bar
+            # incremental accumulator -- see the module note above
+            # ``_KamaIncState``. Not tunable: it changes the compute path, not
+            # the strategy's economics.
+            "incremental_kama": HyperParam.boolean(
+                "incremental_kama", default=False, tunable=False
+            ),
         }
 
     def _bind_params(self, resolved: dict[str, Any]) -> None:
@@ -596,6 +725,12 @@ class AdaptiveTrendRiderStrategy(_ReturnRiderBase):
         self.kama_slow = max(self.kama_fast + 1, int(resolved["kama_slow"]))
         self.min_efficiency = max(0.0, min(1.0, float(resolved["min_efficiency"])))
         self.slope_lookback = max(1, int(resolved["slope_lookback"]))
+        self.incremental_kama = bool(resolved["incremental_kama"])
+        # Precomputed once (matches ``_kama``'s own internal normalization
+        # exactly, since kama_fast/kama_slow are already clamped above), so the
+        # incremental accumulator never redoes this per bar.
+        self._kama_fast_sc = 2.0 / (float(self.kama_fast) + 1.0)
+        self._kama_slow_sc = 2.0 / (float(self.kama_slow) + 1.0)
 
     def _common_config(self, resolved: dict[str, Any]) -> _RiderCommon:
         return self._resolve_common(
@@ -623,6 +758,11 @@ class AdaptiveTrendRiderStrategy(_ReturnRiderBase):
         to three times per accepted bar (_entry_decision, _should_pyramid,
         _entry_metadata). The memo is keyed by the bar's time key, so the value
         is computed exactly once per bar and the numbers are identical.
+
+        When ``incremental_kama`` is on, the cache-miss branch reads the
+        O(period) accumulator (:meth:`_kama_now_prev_incremental`) instead of
+        recomputing over ``list(item.closes)``; see the module note above
+        ``_KamaIncState`` for the (flag-off-preserving) parity envelope.
         """
         cache = getattr(self, "_kama_bar_cache", None)
         if cache is None:
@@ -632,19 +772,85 @@ class AdaptiveTrendRiderStrategy(_ReturnRiderBase):
         cached = cache.get(id(item))
         if cached is not None and cached[0] == key and key:
             return cached[1]
-        value = self._kama_now_prev(list(item.closes))
+        if getattr(self, "incremental_kama", False):
+            value = self._kama_now_prev_incremental(item)
+        else:
+            value = self._kama_now_prev(list(item.closes))
         cache[id(item)] = (key, value)
         return value
 
+    def _kama_now_prev_incremental(self, item: _RiderState) -> tuple[float | None, float | None]:
+        """Incremental-path equivalent of :meth:`_kama_now_prev` (flag ON only).
+
+        Reads the accumulator maintained by :meth:`_advance_kama_inc` (fed
+        once per accepted bar from :meth:`_append_snapshot`) instead of
+        recomputing the KAMA recursion from scratch.
+        """
+        states = getattr(self, "_kama_inc_states", None)
+        state = states.get(id(item)) if states else None
+        if state is None or state.count <= self.kama_period + self.slope_lookback:
+            return None, None
+        if len(state.recent_kama) <= self.slope_lookback:
+            return state.value, None
+        return state.value, state.recent_kama[0]
+
+    def _append_snapshot(self, item: _RiderState, snapshot: _Snapshot, close: float) -> None:
+        super()._append_snapshot(item, snapshot, close)
+        if getattr(self, "incremental_kama", False):
+            self._advance_kama_inc(item, close)
+
+    def _advance_kama_inc(self, item: _RiderState, close: float) -> None:
+        """Feed one accepted bar into the O(period) incremental KAMA accumulator.
+
+        Called from :meth:`_append_snapshot` so it runs exactly once per
+        accepted bar, in calendar order, with no risk of skipping bars (unlike
+        driving it lazily from :meth:`_kama_now_prev_cached`, which is not
+        guaranteed to be invoked every bar -- e.g. while pyramiding is
+        exhausted). The first call for a given ``item`` bootstraps by
+        replaying its current ``closes`` (see :func:`_bootstrap_kama_inc`),
+        which transparently covers both a brand-new symbol (a single-element
+        replay) and a strategy instance resumed from serialized state with
+        existing history (a one-time O(history) replay).
+        """
+        states = getattr(self, "_kama_inc_states", None)
+        if states is None:
+            states = {}
+            self._kama_inc_states = states
+        key = id(item)
+        state = states.get(key)
+        if state is None:
+            states[key] = _bootstrap_kama_inc(
+                list(item.closes),
+                period=self.kama_period,
+                fast_sc=self._kama_fast_sc,
+                slow_sc=self._kama_slow_sc,
+                slope_lookback=self.slope_lookback,
+            )
+            return
+        _kama_inc_update(
+            state,
+            close,
+            period=self.kama_period,
+            fast_sc=self._kama_fast_sc,
+            slow_sc=self._kama_slow_sc,
+        )
+
     def _entry_decision(self, item: _RiderState) -> str:
-        closes = list(item.closes)
         kama_now, kama_prev = self._kama_now_prev_cached(item)
         if kama_now is None or kama_prev is None:
             return ""
-        er = kaufman_efficiency_ratio(closes, period=self.kama_period)
+        if getattr(self, "incremental_kama", False):
+            # Avoid materializing the (potentially large) ring buffer into a
+            # fresh list just to read its trailing ``kama_period + 1`` entries
+            # -- ``kaufman_efficiency_ratio`` slices a deque's tail directly.
+            er = kaufman_efficiency_ratio(item.closes, period=self.kama_period)
+            close = item.closes[-1]
+        else:
+            closes = list(item.closes)
+            er = kaufman_efficiency_ratio(closes, period=self.kama_period)
+            close = closes[-1]
         if er is None or er < self.min_efficiency:
             return ""
-        close = closes[-1]
         if kama_now > kama_prev and close > kama_now:
             return "LONG"
         if kama_now < kama_prev and close < kama_now:
@@ -660,7 +866,8 @@ class AdaptiveTrendRiderStrategy(_ReturnRiderBase):
         return kama_now < kama_prev
 
     def _entry_metadata(self, item: _RiderState) -> dict[str, Any]:
-        er = kaufman_efficiency_ratio(list(item.closes), period=self.kama_period)
+        closes = item.closes if getattr(self, "incremental_kama", False) else list(item.closes)
+        er = kaufman_efficiency_ratio(closes, period=self.kama_period)
         return {"efficiency_ratio": float(er) if er is not None else None}
 
 

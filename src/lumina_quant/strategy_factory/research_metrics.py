@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import logging
 import math
 from dataclasses import dataclass
+from itertools import combinations
 from typing import Any
 
 import numpy as np
@@ -14,6 +16,8 @@ from lumina_quant.utils.risk_free import (
     sharpe_ratio as compute_sharpe_ratio,
     sortino_ratio as compute_sortino_ratio,
 )
+
+LOGGER = logging.getLogger(__name__)
 
 
 # Euler-Mascheroni constant used by the canonical expected-maximum-Sharpe estimator.
@@ -193,11 +197,54 @@ def _estimate_sr_variance_across_trials(sharpe: float, n: float) -> float:
     return max(0.0, (1.0 + 0.5 * (sharpe**2)) / denom)
 
 
+def _hac_inflation_factor(centered: np.ndarray) -> float:
+    """Newey-West (Bartlett-kernel) variance-inflation factor for a mean estimate.
+
+    Given the demeaned residual series ``centered`` this returns the ratio of the
+    HAC long-run variance of the sample mean to its iid variance,
+
+        VIF = 1 + 2 * sum_{k=1..L} (1 - k/(L+1)) * rho_k
+
+    with ``rho_k`` the lag-``k`` autocorrelation and ``L`` the Newey-West plug-in
+    bandwidth ``floor(4 * (n/100)^(2/9))`` (Lo, 2002 / Newey-West, 1987). Dividing
+    the effective sample size ``n`` by this factor corrects the iid studentization
+    behind the Deflated Sharpe Ratio for serial dependence. Floored at ``1.0`` so
+    the correction can only make the inference MORE conservative -- a positively
+    autocorrelated P&L never earns a *larger* effective sample size than iid, and a
+    negatively autocorrelated one is not rewarded with an easier gate. Returns
+    ``1.0`` (a strict no-op) for a degenerate or too-short series. Uses fixed-order
+    ``np.sum`` reductions so it is byte-reproducible across BLAS thread counts.
+    """
+    e = np.asarray(centered, dtype=float).reshape(-1)
+    n = int(e.size)
+    if n < 4:
+        return 1.0
+    s0 = float(np.sum(e * e))
+    if not math.isfinite(s0) or s0 <= 0.0:
+        return 1.0
+    max_lag = int(4.0 * (n / 100.0) ** (2.0 / 9.0))
+    if max_lag < 1:
+        max_lag = 1
+    if max_lag > n - 1:
+        max_lag = n - 1
+    acc = 0.0
+    for k in range(1, max_lag + 1):
+        s_k = float(np.sum(e[k:] * e[:-k]))
+        rho_k = s_k / s0
+        weight = 1.0 - (k / (max_lag + 1.0))
+        acc += weight * rho_k
+    vif = 1.0 + 2.0 * acc
+    if not math.isfinite(vif):
+        return 1.0
+    return vif if vif > 1.0 else 1.0
+
+
 def deflated_sharpe_ratio(
     returns: np.ndarray,
     *,
     num_trials: float = 1,
     variance_across_trials: float | None = None,
+    hac_inference: bool = False,
 ) -> float:
     """Canonical Deflated Sharpe Ratio (Bailey & Lopez de Prado, 2014).
 
@@ -207,9 +254,16 @@ def deflated_sharpe_ratio(
          ``variance_across_trials`` (the dispersion of trial Sharpes). When that
          dispersion is not supplied it is approximated from SR's own sampling
          variance (see ``_estimate_sr_variance_across_trials``).
-      3. DSR = Phi( ((SR - SR0) * sqrt(n - 1)) /
+      3. DSR = Phi( ((SR - SR0) * sqrt(n_eff - 1)) /
                     sqrt(1 - skew*SR + ((kurt - 1)/4)*SR^2) ),
          with non-Gaussian (skew/kurtosis) adjustment to the SR sampling error.
+
+    ``hac_inference`` (default ``False``) is opt-in: when set, the iid degrees of
+    freedom ``n`` behind the studentization are replaced by the HAC effective
+    sample size ``n / VIF`` (``VIF >= 1`` from :func:`_hac_inflation_factor`,
+    Newey-West), so positively autocorrelated P&L no longer over-states the DSR
+    z-statistic. With the flag OFF ``n_eff == n`` and the result is byte-identical
+    to the legacy math.
 
     Returns a probability in [0, 1]: the confidence that the true SR exceeds the
     multiple-testing benchmark SR0.
@@ -241,7 +295,13 @@ def deflated_sharpe_ratio(
 
     denom_term = 1.0 - (skew * sharpe) + (((kurt - 1.0) / 4.0) * (sharpe**2))
     denom_term = max(1e-8, denom_term)
-    z = ((sharpe - expected_max) * math.sqrt(max(1.0, n - 1.0))) / math.sqrt(denom_term)
+
+    # HAC/serial-dependence correction to the studentization degrees of freedom.
+    # Flag OFF -> effective_n == n -> byte-identical to the legacy iid form.
+    effective_n = n
+    if hac_inference:
+        effective_n = n / _hac_inflation_factor(centered)
+    z = ((sharpe - expected_max) * math.sqrt(max(1.0, effective_n - 1.0))) / math.sqrt(denom_term)
 
     return float(max(0.0, min(1.0, _norm_cdf(z))))
 
@@ -279,6 +339,263 @@ def approx_pbo(returns: np.ndarray) -> float:
     if trials <= 0:
         return 1.0
     return float(failures / trials)
+
+
+def _ascending_average_rank(values: np.ndarray) -> np.ndarray:
+    """Ascending competition ranks (smallest value -> rank 1) with average ties.
+
+    Deterministic fixed-order stable argsort mirroring the factor-IC / alpha-search
+    rankers, so CSCV out-of-sample ranks are byte-reproducible.
+    """
+    v = np.asarray(values, dtype=float).reshape(-1)
+    n = v.shape[0]
+    order = np.argsort(v, kind="stable")
+    ranks = np.empty(n, dtype=np.float64)
+    sorted_vals = v[order]
+    i = 0
+    while i < n:
+        j = i + 1
+        while j < n and sorted_vals[j] == sorted_vals[i]:
+            j += 1
+        avg = (i + j - 1) / 2.0 + 1.0
+        ranks[order[i:j]] = avg
+        i = j
+    return ranks
+
+
+def _average_rank_of_value(values: np.ndarray, index: int) -> float:
+    """Ascending tie-averaged rank of ``values[index]`` within ``values``.
+
+    Equivalent to ``_ascending_average_rank(values)[index]`` but computed
+    directly in one vectorized ``O(n)`` pass instead of materializing the full
+    tie-grouped rank array -- the out-of-sample rank of the in-sample winner is
+    the only rank :func:`cscv_pbo` needs per partition, and profiling showed the
+    full-array rank scan (with its per-row Python tie-detection loop) was the
+    dominant cost once the Sharpe recompute itself was vectorized away.
+
+    If the tie group equal to the target value has size ``k`` and sits at
+    sorted positions ``[L, L + k)`` (``L`` = count of strictly smaller values),
+    every member of that group gets the average rank ``L + (k + 1) / 2`` --
+    the same closed form :func:`_ascending_average_rank` derives from its
+    position scan, so this is bit-identical to it for the same input, not an
+    approximation.
+    """
+    v = np.asarray(values, dtype=float).reshape(-1)
+    target = v[index]
+    less = float(np.sum(v < target))
+    equal = float(np.sum(v == target))
+    return less + (equal + 1.0) / 2.0
+
+
+def _slice_sharpes(block: np.ndarray) -> np.ndarray:
+    """Per-row per-period Sharpe over a time slice (fixed-order, thread-stable).
+
+    Kept as the reslice-and-recompute reference oracle for the
+    :func:`_block_sufficient_stats` / :func:`_sharpe_from_block_stats` fast path
+    used by :func:`cscv_pbo` (parity-tested against it); no longer called on the
+    hot path itself.
+    """
+    rows = int(block.shape[0])
+    out = np.zeros(rows, dtype=np.float64)
+    for i in range(rows):
+        row = block[i]
+        row = row[np.isfinite(row)]
+        m = int(row.shape[0])
+        if m < 2:
+            continue
+        mean = float(np.sum(row)) / m
+        dev = row - mean
+        var = float(np.sum(dev * dev)) / (m - 1)
+        if var <= 1e-24:
+            continue
+        out[i] = mean / math.sqrt(var)
+    return out
+
+
+def _block_sufficient_stats(
+    m: np.ndarray, blocks: list[np.ndarray]
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Per-candidate, per-block finite count / sum / sum-of-squares.
+
+    ``blocks`` are disjoint contiguous column ranges, so for any union of blocks
+    the finite count / sum / sum-of-squares of the concatenated slice equals the
+    elementwise sum of the corresponding per-block statistics: whether an entry is
+    finite does not depend on which *other* blocks it is grouped with. This lets
+    every one of the CSCV ``C(S, S/2)`` in-sample/out-of-sample partitions be
+    scored by summing ``S`` precomputed columns instead of re-slicing and
+    re-scanning the full ``(n_candidates, n_periods)`` return matrix, which is
+    the dominant cost of the naive implementation.
+
+    Returns ``(counts, sums, sumsqs)``, each shaped ``(n_candidates, len(blocks))``.
+    """
+    n_cand = int(m.shape[0])
+    n_blocks = len(blocks)
+    counts = np.empty((n_cand, n_blocks), dtype=np.float64)
+    sums = np.empty((n_cand, n_blocks), dtype=np.float64)
+    sumsqs = np.empty((n_cand, n_blocks), dtype=np.float64)
+    for b, cols in enumerate(blocks):
+        block = m[:, cols]
+        finite = np.isfinite(block)
+        safe = np.where(finite, block, 0.0)
+        counts[:, b] = finite.sum(axis=1)
+        sums[:, b] = safe.sum(axis=1)
+        sumsqs[:, b] = np.sum(safe * safe, axis=1)
+    return counts, sums, sumsqs
+
+
+def _sharpe_from_block_stats(
+    count: np.ndarray, total: np.ndarray, total_sq: np.ndarray
+) -> np.ndarray:
+    """Vectorized per-candidate Sharpe from summed block sufficient statistics.
+
+    Same Sharpe formula and the same ``< 2`` sample / near-zero-variance guards
+    as :func:`_slice_sharpes`, but the variance is derived from the one-pass
+    identity ``var = (sum(x**2) - n*mean**2) / (n - 1)`` over precomputed block
+    totals rather than a two-pass ``sum((x - mean)**2)`` over the reconstructed
+    raw slice. Numerically equivalent (parity-tested at ``rtol=1e-9``), not
+    bit-identical, because the summation association differs -- see
+    :func:`cscv_pbo` docstring.
+    """
+    out = np.zeros(count.shape[0], dtype=np.float64)
+    valid = count >= 2
+    if not np.any(valid):
+        return out
+    c = count[valid]
+    tot = total[valid]
+    sq = total_sq[valid]
+    mean = tot / c
+    var = (sq - c * mean * mean) / (c - 1.0)
+    sharpe = np.zeros_like(mean)
+    ok = var > 1e-24
+    sharpe[ok] = mean[ok] / np.sqrt(var[ok])
+    out[valid] = sharpe
+    return out
+
+
+# Above this many C(S, S/2) partitions, CSCV's inherent combinatorial cost starts
+# to dominate wall-clock time even with the block sufficient-statistics speedup
+# (e.g. S=20 -> C(20,10)=184,756). A misconfigured n_splits should be surfaced,
+# not silently downsized -- warn once per process and let the caller decide.
+_CSCV_PARTITION_WARN_THRESHOLD = 20_000
+_cscv_large_partition_warned = False
+
+
+def _warn_once_if_cscv_partition_count_is_large(n_splits: int, n_partitions: int) -> None:
+    global _cscv_large_partition_warned
+    if _cscv_large_partition_warned or n_partitions <= _CSCV_PARTITION_WARN_THRESHOLD:
+        return
+    _cscv_large_partition_warned = True
+    LOGGER.warning(
+        "cscv_pbo: n_splits=%d enumerates C(%d, %d)=%d in-sample/out-of-sample "
+        "partitions (> %d). This is the standard combinatorial cost of CSCV and "
+        "is NOT reduced automatically -- results are unaffected, but runtime "
+        "grows combinatorially with n_splits; lower it if this becomes a "
+        "bottleneck. (This warning is logged once per process.)",
+        n_splits,
+        n_splits,
+        n_splits // 2,
+        n_partitions,
+        _CSCV_PARTITION_WARN_THRESHOLD,
+    )
+
+
+def cscv_pbo(returns_matrix: np.ndarray, *, n_splits: int = 8) -> float:
+    """Combinatorially-Symmetric Cross-Validation probability of backtest overfitting.
+
+    Bailey, Borwein, Lopez de Prado & Zhu (2017). ``returns_matrix`` is the family
+    of candidate per-period return series with shape ``(n_candidates, n_periods)``
+    (row = candidate). The observation window is partitioned into ``S`` contiguous
+    equal blocks (``S`` forced even, and shrunk until each block holds >= 2 columns);
+    for every ``C(S, S/2)`` split of the blocks into an in-sample and an
+    out-of-sample half the in-sample-best candidate's out-of-sample relative rank
+    ``omega in (0, 1)`` is mapped to the logit ``lambda = ln(omega / (1 - omega))``.
+    PBO is the fraction of splits whose in-sample winner lands below the
+    out-of-sample median (``lambda <= 0``) -- a genuine family-wise overfitting
+    probability rather than the single-series fold-instability heuristic
+    :func:`approx_pbo`.
+
+    Per-candidate, per-block sufficient statistics (finite count / sum / sum of
+    squares -- see :func:`_block_sufficient_stats`) are precomputed once, up
+    front, in ``O(n_candidates * n_periods)``. Every ``C(S, S/2)`` partition then
+    scores its in-sample/out-of-sample Sharpe by summing ``S`` precomputed
+    per-block columns and evaluating the closed-form Sharpe in one vectorized
+    NumPy pass (see :func:`_sharpe_from_block_stats`), in
+    ``O(n_candidates * S)`` -- instead of re-slicing and re-scanning the full
+    return matrix per partition. This is the standard CSCV sufficient-statistics
+    speedup; it does not change which candidates win or how splits are counted,
+    only how each split's Sharpe values are computed. The result is numerically
+    equivalent to (parity-tested at ``rtol=1e-9`` against) the direct
+    reslice-and-recompute form, but not bit-identical: the direct form sums each
+    partition's raw, reconstructed column slice in one shot (NumPy's own
+    reduction order over that concatenated array), while this form sums
+    precomputed per-block totals across the selected blocks -- a different
+    but numerically-equivalent floating-point association order, and the
+    variance is derived from ``sum(x**2) - n*mean**2`` rather than a two-pass
+    ``sum((x - mean)**2)``.
+
+    The out-of-sample rank of the in-sample winner is looked up via
+    :func:`_average_rank_of_value` (bit-identical closed form, ``O(n_candidates)``)
+    rather than materializing the full :func:`_ascending_average_rank` array and
+    indexing into it -- the latter's per-row Python tie-detection loop was, after
+    the Sharpe recompute itself was vectorized away, the new dominant cost.
+
+    Deterministic (canonical ``itertools.combinations`` order, fixed-order NumPy
+    sums, average-rank tie handling); no scipy / sklearn / eigendecomposition.
+    Returns ``1.0`` (fully overfit / undecidable) when the family or window is too
+    small to evaluate.
+    """
+    m = np.asarray(returns_matrix, dtype=float)
+    if m.ndim != 2:
+        raise ValueError("returns_matrix must be a 2-D (n_candidates, n_periods) array")
+    n_cand, n_periods = int(m.shape[0]), int(m.shape[1])
+    if n_cand < 2 or n_periods < 4:
+        return 1.0
+
+    s = int(n_splits)
+    if s < 2:
+        s = 2
+    if s % 2 == 1:
+        s -= 1
+    while s >= 2 and (n_periods // s) < 2:
+        s -= 2
+    if s < 2:
+        return 1.0
+
+    block_size = n_periods // s
+    blocks = [np.arange(b * block_size, (b + 1) * block_size) for b in range(s)]
+    half = s // 2
+
+    n_partitions = math.comb(s, half)
+    _warn_once_if_cscv_partition_count_is_large(s, n_partitions)
+
+    counts, sums, sumsqs = _block_sufficient_stats(m, blocks)
+
+    le_zero = 0
+    total = 0
+    for is_blocks in combinations(range(s), half):
+        is_mask = np.zeros(s, dtype=bool)
+        is_mask[list(is_blocks)] = True
+        oos_mask = ~is_mask
+        is_perf = _sharpe_from_block_stats(
+            counts[:, is_mask].sum(axis=1),
+            sums[:, is_mask].sum(axis=1),
+            sumsqs[:, is_mask].sum(axis=1),
+        )
+        oos_perf = _sharpe_from_block_stats(
+            counts[:, oos_mask].sum(axis=1),
+            sums[:, oos_mask].sum(axis=1),
+            sumsqs[:, oos_mask].sum(axis=1),
+        )
+        best = int(np.argmax(is_perf))
+        omega = _average_rank_of_value(oos_perf, best) / (n_cand + 1.0)
+        omega = min(1.0 - 1e-12, max(1e-12, omega))
+        lam = math.log(omega / (1.0 - omega))
+        total += 1
+        if lam <= 0.0:
+            le_zero += 1
+    if total == 0:
+        return 1.0
+    return float(le_zero / total)
 
 
 def fold_participation_stats(returns: np.ndarray) -> tuple[float, float, float]:
@@ -463,6 +780,7 @@ def resolve_compute_metric_payload(
     periods_per_year: int,
     num_trials: int,
     resolved_rf: Any,
+    hac_inference: bool = False,
 ) -> ComputedMetricPayload:
     total_return = float(np.prod(1.0 + returns) - 1.0)
     years = max(1.0 / float(periods_per_year), returns.size / float(periods_per_year))
@@ -517,7 +835,9 @@ def resolve_compute_metric_payload(
         rolling_sharpe_min=float(rolling_min),
         worst_month=float(worst_month_value),
         benchmark_corr=float(correlation(returns, benchmark_returns)),
-        deflated_sharpe=float(deflated_sharpe_ratio(returns, num_trials=num_trials)),
+        deflated_sharpe=float(
+            deflated_sharpe_ratio(returns, num_trials=num_trials, hac_inference=hac_inference)
+        ),
         pbo=float(approx_pbo(returns)),
         active_fold_ratio=float(active_fold_ratio),
         inactive_fold_count=float(inactive_fold_count),
@@ -580,6 +900,7 @@ def compute_metrics(
     num_trials: int,
     metric_config: Any | None = None,
     timestamps: np.ndarray | None = None,
+    hac_inference: bool = False,
 ) -> dict[str, float]:
     if returns.size == 0:
         return compute_metric_summary(
@@ -601,6 +922,7 @@ def compute_metrics(
         periods_per_year=periods_per_year,
         num_trials=num_trials,
         resolved_rf=resolved_rf,
+        hac_inference=hac_inference,
     )
     return compute_metric_summary(
         metric_payload,
@@ -614,6 +936,7 @@ __all__ = [
     "compute_metric_summary",
     "compute_metrics",
     "correlation",
+    "cscv_pbo",
     "deflated_sharpe_ratio",
     "empty_compute_metric_payload",
     "expected_max_sharpe",

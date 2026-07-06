@@ -141,6 +141,13 @@ def _resolve_robust_score_params(overrides: dict[str, Any] | None = None) -> dic
     for key, value in overrides.items():
         if key in merged:
             merged[key] = safe_float(value, merged[key])
+    # ``strict_selection_gate`` is the research-profile alias that flips the
+    # (otherwise advisory) DSR/SPA soft-score into a binding hard reject. When it
+    # is absent or falsy the gate stays disabled and output is byte-identical to
+    # today; ``dsr_gate_floor`` / ``spa_gate_ceiling`` remain individually
+    # tunable via the recognized keys above.
+    if bool(overrides.get("strict_selection_gate", False)):
+        merged["dsr_spa_hard_gate"] = 1.0
     return merged
 
 

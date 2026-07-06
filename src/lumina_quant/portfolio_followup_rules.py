@@ -878,9 +878,83 @@ def _strict_leverage_evidence(candidate_payload: Mapping[str, Any]) -> dict[str,
     }
 
 
+def promotion_gross_exposure(payload: Mapping[str, Any]) -> float:
+    """Return the gross exposure (sum of ``|weight|``) of a candidate payload.
+
+    Used to exposure-normalize the locked-OOS superiority comparison so a levered
+    book cannot buy "superiority" through scale alone.  Falls back to an explicit
+    gross / leverage / active-exposure scalar, then to ``1.0`` (fully invested,
+    unlevered) when a payload carries no weight evidence.  The result is always
+    strictly positive so it is safe to divide by.
+    """
+    weights = payload.get("weights")
+    if isinstance(weights, list):
+        gross = 0.0
+        seen = False
+        for row in weights:
+            if not isinstance(row, Mapping):
+                continue
+            gross += abs(safe_float(row.get("weight"), 0.0))
+            seen = True
+        if seen and gross > 0.0:
+            return float(gross)
+    for key in ("gross_exposure", "gross_leverage", "active_exposure"):
+        if key in payload:
+            numeric = abs(safe_float(payload.get(key), 0.0))
+            if numeric > 0.0:
+                return float(numeric)
+    metadata = payload.get("metadata")
+    if isinstance(metadata, Mapping):
+        for key in ("gross_exposure", "gross_leverage"):
+            if key in metadata:
+                numeric = abs(safe_float(metadata.get(key), 0.0))
+                if numeric > 0.0:
+                    return float(numeric)
+    return 1.0
+
+
+def multiple_comparison_delta_floor(
+    deltas: list[float],
+    *,
+    challenger_count: int,
+    base_floor: float = 0.0,
+) -> float:
+    """Multiple-comparison-aware floor for the locked-OOS superiority argmax.
+
+    With ``K = challenger_count`` challengers each ranked against the same
+    incumbent on the same locked OOS split, the maximum superiority delta is
+    upward biased even under the null (all challengers equal).  Scale the
+    empirical dispersion of the challenger deltas by the expected maximum of
+    ``K`` iid standard normals (``sqrt(2 * ln K)``) to obtain a floor that sits
+    strictly above ``0`` whenever there is genuine cross-challenger spread, so
+    the argmax must clear more than the ``0.0`` gate to promote.
+    """
+    k = max(1, int(challenger_count))
+    floor = max(0.0, float(base_floor))
+    if k <= 1:
+        return floor
+    finite: list[float] = []
+    for value in deltas:
+        numeric = safe_float(value, float("nan"))
+        if math.isfinite(numeric):
+            finite.append(numeric)
+    if len(finite) >= 2:
+        mean = sum(finite) / len(finite)
+        variance = sum((value - mean) ** 2 for value in finite) / len(finite)
+        spread = math.sqrt(variance) if variance > 0.0 else 0.0
+    else:
+        spread = 0.0
+    gumbel_scale = math.sqrt(2.0 * math.log(float(k)))
+    return max(floor, spread * gumbel_scale)
+
+
 def evaluate_robustness_gates(
     candidate_payload: Mapping[str, Any],
     incumbent_payload: Mapping[str, Any],
+    *,
+    exposure_normalized_promotion: bool = False,
+    candidate_gross_exposure: float | None = None,
+    incumbent_gross_exposure: float | None = None,
 ) -> dict[str, Any]:
     candidate_metrics = extract_split_metrics(candidate_payload)
     incumbent_metrics = extract_split_metrics(incumbent_payload)
@@ -899,6 +973,39 @@ def evaluate_robustness_gates(
     oos_sharpe_delta = safe_float(candidate_oos.get("sharpe"), 0.0) - safe_float(
         incumbent_oos.get("sharpe"), 0.0
     )
+    candidate_gross = 1.0
+    incumbent_gross = 1.0
+    if exposure_normalized_promotion:
+        candidate_gross = (
+            candidate_gross_exposure
+            if candidate_gross_exposure is not None
+            else promotion_gross_exposure(candidate_payload)
+        )
+        incumbent_gross = (
+            incumbent_gross_exposure
+            if incumbent_gross_exposure is not None
+            else promotion_gross_exposure(incumbent_payload)
+        )
+        candidate_gross = candidate_gross if candidate_gross and candidate_gross > 0.0 else 1.0
+        incumbent_gross = incumbent_gross if incumbent_gross and incumbent_gross > 0.0 else 1.0
+        # Exposure-normalize only the scale-dependent superiority signals (return
+        # and drawdown deltas) so leverage cannot buy superiority.  Sharpe/Sortino/
+        # Calmar are already scale free, and the absolute drawdown/leverage caps
+        # below stay on the raw (levered) book because they guard real risk.
+        oos_total_return_delta = (
+            safe_float(candidate_oos.get("total_return", candidate_oos.get("return")), 0.0)
+            / candidate_gross
+        ) - (
+            safe_float(incumbent_oos.get("total_return", incumbent_oos.get("return")), 0.0)
+            / incumbent_gross
+        )
+        oos_max_drawdown_delta = (
+            safe_float(candidate_oos.get("max_drawdown", candidate_oos.get("mdd")), 0.0)
+            / candidate_gross
+        ) - (
+            safe_float(incumbent_oos.get("max_drawdown", incumbent_oos.get("mdd")), 0.0)
+            / incumbent_gross
+        )
     max_drawdown_cap = float(ROBUST_PROMOTION_GATES["candidate_split_max_drawdown_max_inclusive"])
     strict_liquidation_count = _strict_liquidation_evidence_count(candidate_payload)
     strict_leverage = _strict_leverage_evidence(candidate_payload)
@@ -986,7 +1093,7 @@ def evaluate_robustness_gates(
     if not checks["strict_average_leverage"]:
         rejection_reasons.append("strict_average_leverage_above_cap")
 
-    return {
+    result = {
         "promotable": not rejection_reasons,
         "rejection_reasons": rejection_reasons,
         "robustness_gate_checks": checks,
@@ -999,6 +1106,11 @@ def evaluate_robustness_gates(
         "strict_max_leverage": strict_max_leverage,
         "strict_average_leverage": strict_average_leverage,
     }
+    if exposure_normalized_promotion:
+        result["exposure_normalized_promotion"] = True
+        result["candidate_gross_exposure"] = float(candidate_gross)
+        result["incumbent_gross_exposure"] = float(incumbent_gross)
+    return result
 
 
 def build_memory_ledger_row(
@@ -1065,7 +1177,9 @@ __all__ = [
     "infer_basis_lineage",
     "mean_monthly_return",
     "monthly_returns",
+    "multiple_comparison_delta_floor",
     "parse_memory_ledger_row",
+    "promotion_gross_exposure",
     "safe_float",
     "serialize_memory_ledger_row",
     "validate_basis_universe",

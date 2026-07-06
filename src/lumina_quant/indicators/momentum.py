@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import math
+from collections import deque
+from itertools import islice
 
 
 def cumulative_return(values, *, period: int | None = None) -> float | None:
@@ -105,18 +107,33 @@ def rolling_mean_dollar_volume(
 def kaufman_efficiency_ratio(values, *, period: int = 10) -> float | None:
     """Return Kaufman Efficiency Ratio over trailing window."""
     period_i = max(1, int(period))
-    # Only the trailing ``period_i + 1`` samples are consumed, so slice the tail
-    # *before* float-converting instead of coercing the entire (potentially very
-    # long) history and discarding all but the tail. For list/tuple inputs (every
-    # production caller) this is O(period) instead of O(n); other iterables are
-    # materialized once, matching the prior behaviour. Byte-identical for finite
-    # inputs; 2026-07-06 audit X1 perf fix.
-    if not isinstance(values, (list, tuple)):
-        values = list(values)
-    if len(values) <= period_i:
-        return None
+    if isinstance(values, deque):
+        # Opt-in fast path for the incremental-KAMA callers (return-rider
+        # sleeves' ``incremental_kama`` flag): a bounded ring buffer only ever
+        # needs its trailing ``period_i + 1`` entries, so read them directly
+        # off the deque's tail via efficient reverse iteration -- O(period)
+        # -- instead of materializing the full (potentially large) buffer into
+        # a list just to re-slice it. The list/tuple path below is untouched
+        # and stays byte-identical for every existing caller; 2026-07-06 audit
+        # X2 perf fix.
+        take = period_i + 1
+        if len(values) <= period_i:
+            return None
+        newest_first = list(islice(reversed(values), take))
+        tail = [float(value) for value in reversed(newest_first)]
+    else:
+        # Only the trailing ``period_i + 1`` samples are consumed, so slice the tail
+        # *before* float-converting instead of coercing the entire (potentially very
+        # long) history and discarding all but the tail. For list/tuple inputs (every
+        # production caller) this is O(period) instead of O(n); other iterables are
+        # materialized once, matching the prior behaviour. Byte-identical for finite
+        # inputs; 2026-07-06 audit X1 perf fix.
+        if not isinstance(values, (list, tuple)):
+            values = list(values)
+        if len(values) <= period_i:
+            return None
 
-    tail = [float(value) for value in values[-(period_i + 1) :]]
+        tail = [float(value) for value in values[-(period_i + 1) :]]
     direction = abs(tail[-1] - tail[0])
     volatility = 0.0
     for idx in range(1, len(tail)):

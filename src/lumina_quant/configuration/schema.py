@@ -157,6 +157,14 @@ class ExecutionConfig:
     #     the legacy uncapped fill flatters tail risk. Default False preserves
     #     legacy numerics (2026-07-03 audit finding B).
     apply_liquidity_cap_to_conditional_fills: bool = False
+    #   funding_on_utc_boundary: when True the backtest charges funding on the
+    #     Binance 00:00 / 08:00 / 16:00 UTC settlement snapshots a position was open
+    #     across, instead of the legacy entry-anchored 8h clock. The entry-anchored
+    #     clock lets any sub-8h round trip pay ZERO funding, inflating high-turnover
+    #     long-biased returns ~1-5%/yr (strategy_viability_assessment 2026-07-06,
+    #     Axis 3 finding #7). Default False preserves the golden backtest numerics;
+    #     enable in the cost-realistic / strict research profiles.
+    funding_on_utc_boundary: bool = False
 
 
 @dataclass(slots=True)
@@ -656,9 +664,49 @@ class ResearchConfig:
     ``tradfi_external_fetch`` are additive, default-OFF research seams (advisory
     Sharpe-CI sub-object and a snapshot-first TradFi fetcher) that never touch
     the flat metric payload or any live/backtest execution path.
+
+    Selection / validation-wiring flags (strategy_viability_assessment
+    2026-07-06, Axis 3 — each corrects a promotion-gate defect and is consumed
+    DEFENSIVELY by its owning lane via
+    ``getattr(config.research, <flag>, <legacy_default>)`` so a missing field
+    keeps the legacy behavior). Every flag defaults to the legacy value below so
+    the shipped ``config.yaml`` / default ``RuntimeConfig()`` load is
+    byte-identical; they are turned ON only in the honest-research profiles
+    (``configs/profiles/backtest_cost_realistic.yaml`` and
+    ``configs/profiles/research.yaml``):
+
+    * ``strict_selection_gate`` (finding #1) — make the deflated-Sharpe / SPA
+      result a HARD reject in the strategy hurdle instead of a soft score
+      weight.  ``False`` => legacy (DSR/SPA advisory only).
+    * ``use_lockbox_split`` (finding #2) — add a 4-way train/val/oos/lockbox
+      split; rank + gate on validation and report the never-touched lockbox as
+      the sole OOS.  ``False`` => legacy 3-way train/val/oos with selection on
+      the reported OOS window.
+    * ``purge_embargo_bars`` (minor) — number of bars to purge + embargo between
+      contiguous splits (leakage guard for multi-bar labels).  ``0`` => legacy
+      (no purge/embargo gap).
+    * ``single_correlation_discount`` (finding #3) — remove the N_eff
+      double-discount in the DSR benchmark so the one binding DSR gate is
+      actually stringent.  ``False`` => legacy double-discount.
+    * ``hac_inference`` (findings #4/#5) — HAC / block-correct the iid inference
+      (the ``n`` behind DSR/Sharpe AND the rank-IC t-stat) for autocorrelated /
+      overlapping-horizon P&L.  ``False`` => legacy iid inference.
+    * ``cscv_pbo`` (minor) — use the CSCV PBO estimator as the binding gate;
+      ``False`` => keep the ``approx_pbo`` fold-instability heuristic (mark it
+      advisory).
+    * ``exposure_normalized_promotion`` (finding #6) — exposure-normalize the
+      portfolio-superiority promotion objective so leverage cannot buy
+      "superiority".  ``False`` => legacy scale-mixed objective.
     """
 
     execution_attribution_enabled: bool = False
+    strict_selection_gate: bool = False
+    use_lockbox_split: bool = False
+    purge_embargo_bars: int = 0
+    single_correlation_discount: bool = False
+    hac_inference: bool = False
+    cscv_pbo: bool = False
+    exposure_normalized_promotion: bool = False
     alpha_search: AlphaSearchConfig = field(default_factory=AlphaSearchConfig)
     sharpe_ci: SharpeConfidenceIntervalConfig = field(
         default_factory=SharpeConfidenceIntervalConfig

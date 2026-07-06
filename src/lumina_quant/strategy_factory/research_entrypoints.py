@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from datetime import UTC, datetime
-from functools import lru_cache
 from importlib import import_module
 from typing import Any
 
@@ -20,9 +19,19 @@ from lumina_quant.strategy_factory.runtime_settings import (
 from . import research_run_support as _research_run_support
 
 
-@lru_cache(maxsize=1)
 def _runner_module():
-    """Resolve the legacy runner lazily to reduce import-time coupling."""
+    """Resolve the legacy runner lazily to reduce import-time coupling.
+
+    Deliberately NOT ``@lru_cache``-d: ``import_module`` on an already-imported
+    module is just a ``sys.modules`` dict lookup (negligible cost), whereas a
+    cached reference can go stale if anything elsewhere in the process ever
+    replaces ``sys.modules["lumina_quant.strategy_factory.research_runner"]``
+    with a new module object (observed in the wider test suite, where some
+    script-loading test harnesses reload modules under the same dotted name) --
+    a cached stale reference would silently keep resolving to the OLD module
+    object, so callers' ``monkeypatch.setattr(research_runner, ...)`` on the
+    CURRENT module would have no effect on code reached through this accessor.
+    """
     return import_module("lumina_quant.strategy_factory.research_runner")
 
 
@@ -109,6 +118,7 @@ def _run_candidate_research_with_adapted_candidates(
     min_bundle_bars: int,
     market_data_settings: Mapping[str, Any],
     progress_callback: Callable[[str, Mapping[str, Any]], None] | None = None,
+    split_overrides: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     runner = _runner_module()
     normalized_timeframes, universe = (
@@ -119,7 +129,10 @@ def _run_candidate_research_with_adapted_candidates(
         )
     )
     split_timeframe = normalized_timeframes[0] if normalized_timeframes else "1m"
-    resolved_split = runner._resolve_split_config(split, strategy_timeframe=split_timeframe)
+    resolved_split = _research_run_support.apply_split_overrides(
+        runner._resolve_split_config(split, strategy_timeframe=split_timeframe),
+        split_overrides,
+    )
 
     if progress_callback is not None:
         progress_callback(
@@ -209,6 +222,36 @@ def _run_candidate_research_with_adapted_candidates(
     )
 
 
+def _merge_score_config_with_research_overrides(
+    score_config: Mapping[str, Any] | None,
+    *,
+    score_config_research_overrides: Mapping[str, Any],
+    deflation_kwargs: Mapping[str, Any],
+) -> Mapping[str, Any] | None:
+    """Fold ``research_config``-derived flags into ``score_config['research']``.
+
+    Caller-provided keys in the caller's own ``score_config['research']`` section
+    always win; the config only fills gaps. ``deflation_kwargs`` is merged in
+    too because ``hac_inference`` is read back out of this same
+    ``score_config['research']`` section by ``research_runner``'s per-candidate
+    DSR computation (see ``_evaluate_candidate_metric_payload``); the other
+    deflation keys (``single_correlation_discount`` / ``cscv_pbo``) have no
+    consumer in this module today and simply ride along inertly for audit
+    visibility in the report's ``scoring_config``. Returns ``score_config``
+    untouched when there is nothing to inject.
+    """
+    section_overrides: dict[str, Any] = {**score_config_research_overrides, **deflation_kwargs}
+    if not section_overrides:
+        return score_config
+    merged: dict[str, Any] = dict(score_config) if isinstance(score_config, Mapping) else {}
+    caller_research = merged.get("research")
+    merged_research: dict[str, Any] = dict(section_overrides)
+    if isinstance(caller_research, Mapping):
+        merged_research.update(caller_research)
+    merged["research"] = merged_research
+    return merged
+
+
 def run_candidate_research(
     *,
     candidates: Iterable[dict[str, Any]],
@@ -224,11 +267,33 @@ def run_candidate_research(
     allow_synthetic_fallback: bool = False,
     min_bundle_bars: int = 360,
     progress_callback: Callable[[str, Mapping[str, Any]], None] | None = None,
+    research_config: Any = None,
 ) -> dict[str, Any]:
-    """Evaluate candidate manifest into train/val/OOS report contract (v2)."""
+    """Evaluate candidate manifest into train/val/OOS report contract (v2).
+
+    ``research_config`` (default ``None``) is the strict-research-profile
+    activation seam: pass a ``ResearchConfig`` (or a full ``RuntimeConfig``,
+    whose ``.research`` is used) to fold ``use_lockbox_split`` /
+    ``purge_embargo_bars`` into ``split``, ``strict_selection_gate`` /
+    ``hac_inference`` (plus ``dsr_gate_floor`` / ``spa_gate_ceiling`` when
+    present) into ``score_config['research']``, so the strict-selection gate,
+    lockbox split, purge/embargo bars, and HAC-corrected DSR studentization
+    actually activate end-to-end instead of sitting inert on the config object.
+    Any key the caller already set explicitly on ``split`` / ``score_config``
+    wins over the config-derived value. The default ``None`` is a strict no-op:
+    ``split`` / ``score_config`` are forwarded unchanged, so behavior is
+    byte-identical to calling this function before ``research_config`` existed.
+    """
     runner = _runner_module()
     base_tf = runner._normalize_candidate_research_base_timeframe(base_timeframe)
     market_data_settings = _current_research_market_data_settings_impl()
+    overrides = _research_run_support.research_config_to_overrides(research_config)
+    split_overrides = overrides["split"]
+    score_config = _merge_score_config_with_research_overrides(
+        score_config,
+        score_config_research_overrides=overrides["score_config_research"],
+        deflation_kwargs=overrides["deflation_kwargs"],
+    )
     scoring = runner._resolve_research_run_scoring_config(
         score_config=score_config,
         stage1_keep_ratio=stage1_keep_ratio,
@@ -243,6 +308,7 @@ def run_candidate_research(
             stage1_keep_ratio=stage1_keep_ratio,
             scoring=scoring,
             split=split,
+            split_overrides=split_overrides,
         )
 
     return _run_candidate_research_with_adapted_candidates(
@@ -259,6 +325,7 @@ def run_candidate_research(
         min_bundle_bars=min_bundle_bars,
         market_data_settings=market_data_settings,
         progress_callback=progress_callback,
+        split_overrides=split_overrides,
     )
 
 

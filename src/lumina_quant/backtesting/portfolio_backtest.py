@@ -112,6 +112,14 @@ class Portfolio:
         self.enforce_reduce_only = self._audit_flag(
             config, "ENFORCE_REDUCE_ONLY", "execution", "enforce_reduce_only"
         )
+        # Report defect #8 (funding timing). When True, funding is charged on
+        # CROSSED wall-clock 00/08/16 UTC boundaries instead of the entry-anchored
+        # 8h clock, so a sub-8h round trip that straddles a boundary pays one
+        # funding event. Default False keeps the entry-anchored charging exactly
+        # byte-identical (this is a backtest-numerics change, so it must be gated).
+        self.funding_on_utc_boundary = self._audit_flag(
+            config, "FUNDING_ON_UTC_BOUNDARY", "execution", "funding_on_utc_boundary"
+        )
         # Lazily-constructed RiskManager backstop for the order-time gate (only when
         # enforce_order_risk_gate is True). Mirrors the live/trader.py:1713 usage.
         self._risk_manager = None
@@ -660,7 +668,16 @@ class Portfolio:
             if now_ts <= last_ts:
                 continue
 
-            periods = int((now_ts - last_ts) // interval_seconds)
+            if self.funding_on_utc_boundary:
+                # Count crossed wall-clock funding boundaries. The Unix epoch is
+                # aligned to the exchange 00/08/16 UTC funding epoch because
+                # 86400 % 28800 == 0, so floor(ts / interval) is the boundary
+                # index directly. This charges funding independent of holding
+                # duration (a sub-8h hold straddling a boundary pays one event),
+                # versus the entry-anchored elapsed-duration clock below.
+                periods = int(now_ts // interval_seconds) - int(last_ts // interval_seconds)
+            else:
+                periods = int((now_ts - last_ts) // interval_seconds)
             if periods <= 0:
                 continue
 
@@ -687,7 +704,13 @@ class Portfolio:
             self.current_holdings["total"] -= funding_payment
             self.current_holdings["funding"] += funding_payment
             self.total_funding_paid += funding_payment
-            self._last_funding_ts[symbol] = last_ts + periods * interval_seconds
+            if self.funding_on_utc_boundary:
+                # Advance the baseline to the current snapshot: floor(now_ts /
+                # interval) is the last charged boundary index, so the next call
+                # counts only boundaries crossed after this bar.
+                self._last_funding_ts[symbol] = now_ts
+            else:
+                self._last_funding_ts[symbol] = last_ts + periods * interval_seconds
 
     def _bar_funding_rate(self, symbol) -> float | None:
         """Return the bar-column funding rate, or ``None`` when genuinely absent.

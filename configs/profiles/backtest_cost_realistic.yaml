@@ -102,6 +102,11 @@ execution:
   # require_funding_coverage: true => a leveraged backtest fails instead of silently
   #   charging 0.0 funding when funding feature data is absent. Default false.
   require_funding_coverage: true
+  # funding_on_utc_boundary: true => charge funding on the Binance 00:00/08:00/16:00
+  #   UTC settlement snapshots a position is open across, instead of the legacy
+  #   entry-anchored 8h clock (any sub-8h round trip pays ZERO funding otherwise —
+  #   ~1-5%/yr inflation; strategy_viability_assessment 2026-07-06 Axis 3 #7).
+  funding_on_utc_boundary: true
   # enforce_reduce_only: true => reduce-only fills clamp to live-exchange semantics
   # (never flip through zero) — 2026-07-03 audit fix #2.
   enforce_reduce_only: true
@@ -343,6 +348,29 @@ validation:
   # Relative tolerance for golden-record comparisons (np.testing.assert_allclose
   # rtol=). Tightening this makes regression gates stricter.
   golden_rtol: 1.0e-8
+
+# ------------------------------------------
+# Research / Selection Validation Wiring — CORRECTED GATES (all ON)
+# ------------------------------------------
+# This is an honest-research profile: every promotion-gate correction from
+# docs/audits/strategy_viability_assessment_20260706.md (Axis 3) is turned ON so a
+# cost-realistic run uses the stringent gates, not the legacy lie-by-omission ones.
+# Consumers read these defensively via getattr(config.research, <flag>, <legacy>).
+research:
+  # #1 deflated-Sharpe / SPA is a HARD reject in the strategy hurdle (not a soft weight).
+  strict_selection_gate: true
+  # #2 4-way train/val/oos/lockbox split; rank + gate on validation, report lockbox as OOS.
+  use_lockbox_split: true
+  # purge + embargo gap (bars) between contiguous splits (multi-bar-label leakage guard).
+  purge_embargo_bars: 1
+  # #3 remove the N_eff double-discount so the binding DSR gate is actually stringent.
+  single_correlation_discount: true
+  # #4/#5 HAC / block-correct the iid inference (DSR/Sharpe n AND rank-IC t-stat).
+  hac_inference: true
+  # CSCV PBO estimator as the binding gate (else approx_pbo stays advisory).
+  cscv_pbo: true
+  # #6 exposure-normalize the portfolio-superiority objective so leverage cannot buy it.
+  exposure_normalized_promotion: true
 
 # ------------------------------------------
 # Data Collection

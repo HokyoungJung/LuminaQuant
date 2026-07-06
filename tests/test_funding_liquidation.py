@@ -67,6 +67,12 @@ class DynamicFundingConfig(FundingConfig):
     FUNDING_RATE_PER_8H = 0.0
 
 
+class BoundaryFundingConfig(FundingConfig):
+    # Report defect #8: charge funding on crossed 00/08/16 UTC boundaries.
+    FUNDING_ON_UTC_BOUNDARY = True
+    FUNDING_RATE_PER_8H = 0.0
+
+
 class TestFundingAndLiquidation(unittest.TestCase):
     def test_funding_is_applied_on_interval(self):
         events = queue.Queue()
@@ -224,6 +230,99 @@ class TestFundingAndLiquidation(unittest.TestCase):
         fill = events.get()
         self.assertEqual(fill.status, "LIQUIDATED")
         self.assertEqual(fill.symbol, "BTC/USDT")
+
+
+class TestFundingUtcBoundary(unittest.TestCase):
+    """Report defect #8 — execution.funding_on_utc_boundary.
+
+    OFF (default) charges funding on the entry-anchored 8h clock (byte-identical
+    to legacy). ON charges funding on crossed wall-clock 00/08/16 UTC boundaries,
+    so a sub-8h hold that straddles a boundary now pays one funding event.
+    """
+
+    def test_flag_defaults_off_byte_identical_path(self):
+        events = queue.Queue()
+        bars = MockBars(datetime(2026, 1, 1, 7, 0), 100.0, funding_rate=0.001)
+        p = Portfolio(bars, events, bars.current_dt, DynamicFundingConfig)
+        self.assertFalse(p.funding_on_utc_boundary)
+
+    def test_flag_off_sub_interval_straddle_charges_nothing(self):
+        """Legacy entry-anchored clock: a 2h hold across 08:00 UTC pays no funding."""
+        events = queue.Queue()
+        # 07:00 UTC entry, advance 2h to 09:00 UTC -> straddles the 08:00 boundary.
+        bars = MockBars(datetime(2026, 1, 1, 7, 0), 100.0, funding_rate=0.001)
+        p = Portfolio(bars, events, bars.current_dt, DynamicFundingConfig)
+        self.assertFalse(p.funding_on_utc_boundary)
+        p.current_positions["BTC/USDT"] = 1.0
+        p.entry_prices["BTC/USDT"] = 100.0
+
+        p.update_timeindex(None)  # anchors funding ts at 07:00
+        bars.current_dt += timedelta(hours=2)  # 09:00 -> only 2h elapsed (< 8h)
+        p.update_timeindex(None)
+
+        self.assertEqual(p.total_funding_paid, 0.0)
+
+    def test_flag_on_sub_interval_straddle_charges_one_event(self):
+        """Flag ON: the same 2h hold crossing the 08:00 UTC boundary pays one event."""
+        events = queue.Queue()
+        bars = MockBars(datetime(2026, 1, 1, 7, 0), 100.0, funding_rate=0.001)
+        p = Portfolio(bars, events, bars.current_dt, BoundaryFundingConfig)
+        self.assertTrue(p.funding_on_utc_boundary)
+        p.current_positions["BTC/USDT"] = 1.0
+        p.entry_prices["BTC/USDT"] = 100.0
+
+        p.update_timeindex(None)  # anchors at 07:00
+        bars.current_dt += timedelta(hours=2)  # 09:00 -> crosses the 08:00 boundary
+        p.update_timeindex(None)
+
+        # notional 100 * rate 0.001 * 1 period = 0.1 charged to a long.
+        self.assertAlmostEqual(p.total_funding_paid, 0.1, places=9)
+
+    def test_flag_on_within_single_bucket_charges_nothing(self):
+        """Flag ON but no boundary crossed (01:00 -> 05:00 inside [00:00,08:00))."""
+        events = queue.Queue()
+        bars = MockBars(datetime(2026, 1, 1, 1, 0), 100.0, funding_rate=0.001)
+        p = Portfolio(bars, events, bars.current_dt, BoundaryFundingConfig)
+        p.current_positions["BTC/USDT"] = 1.0
+        p.entry_prices["BTC/USDT"] = 100.0
+
+        p.update_timeindex(None)
+        bars.current_dt += timedelta(hours=4)  # 05:00, same funding bucket
+        p.update_timeindex(None)
+
+        self.assertEqual(p.total_funding_paid, 0.0)
+
+    def test_flag_on_multiple_boundaries_charge_each(self):
+        """Flag ON: 07:00 -> 17:00 crosses 08:00 and 16:00 -> two funding events."""
+        events = queue.Queue()
+        bars = MockBars(datetime(2026, 1, 1, 7, 0), 100.0, funding_rate=0.001)
+        p = Portfolio(bars, events, bars.current_dt, BoundaryFundingConfig)
+        p.current_positions["BTC/USDT"] = 1.0
+        p.entry_prices["BTC/USDT"] = 100.0
+
+        p.update_timeindex(None)
+        bars.current_dt += timedelta(hours=10)  # 17:00 -> two boundaries crossed
+        p.update_timeindex(None)
+
+        self.assertAlmostEqual(p.total_funding_paid, 0.2, places=9)
+
+    def test_flag_on_matches_legacy_when_boundary_aligned(self):
+        """With a boundary-aligned entry advancing in whole 8h intervals, the
+        boundary clock and the entry-anchored clock agree exactly."""
+
+        def run(cfg):
+            events = queue.Queue()
+            bars = MockBars(datetime(2026, 1, 1, 0, 0), 100.0, funding_rate=0.001)
+            p = Portfolio(bars, events, bars.current_dt, cfg)
+            p.current_positions["BTC/USDT"] = 1.0
+            p.entry_prices["BTC/USDT"] = 100.0
+            p.update_timeindex(None)  # anchors at the 00:00 boundary
+            for _ in range(3):
+                bars.current_dt += timedelta(hours=8)
+                p.update_timeindex(None)
+            return p.total_funding_paid
+
+        self.assertAlmostEqual(run(DynamicFundingConfig), run(BoundaryFundingConfig), places=12)
 
 
 if __name__ == "__main__":
