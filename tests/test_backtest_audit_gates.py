@@ -552,3 +552,176 @@ class TestEnforceReduceOnly(unittest.TestCase):
         p, FillEvent = self._portfolio(Cfg)
         p.update_fill(self._fill(FillEvent, qty=2.0, direction="SELL", reduce_only=False))
         self.assertAlmostEqual(p.current_positions["BTC/USDT"], -2.0)
+
+
+# --------------------------------------------------------------------------- #
+# Fix M5: the simulated liquidation engine + simulated funding charge must be
+# gated off the live path (self._live_liquidation_disabled). On the live path a
+# modeled maintenance-margin breach is downgraded to a WARNING / audit record
+# and never fabricates a synthetic LIQUIDATED fill; real liquidations/funding
+# arrive as exchange events. Default (backtest) is byte-identical.
+# --------------------------------------------------------------------------- #
+class LiqBars(MockBars):
+    """Bars mock with independently settable high/low/close for a liq breach."""
+
+    def __init__(self, start_dt, close, *, high=None, low=None):
+        super().__init__(start_dt, close)
+        self._high = high if high is not None else close
+        self._low = low if low is not None else close
+
+    def get_latest_bar_value(self, symbol, val_type):
+        _ = symbol
+        if val_type == "funding_rate":
+            return None
+        if val_type == "high":
+            return self._high
+        if val_type == "low":
+            return self._low
+        return self.close
+
+
+class _LiqConfig(BaseConfig):
+    # Long entry 100, leverage 3 => liq_price ~ 67.2; a bar dipping to 60 breaches.
+    MARGIN_MODE = "isolated"
+
+
+class TestLiveLiquidationGate(unittest.TestCase):
+    @staticmethod
+    def _long_position(portfolio, *, entry=100.0):
+        portfolio.current_positions["BTC/USDT"] = 1.0
+        portfolio.entry_prices["BTC/USDT"] = entry
+
+    def test_backtest_path_still_enqueues_synthetic_liquidation_fill(self):
+        # Golden safety: default (backtest) path is unchanged — a modeled breach
+        # still enqueues a LIQUIDATED fill on the SIM_LIQUIDATION exchange.
+        events = queue.Queue()
+        bars = LiqBars(datetime(2026, 1, 1, 0, 0), 60.0, high=60.0, low=60.0)
+        p = Portfolio(bars, events, bars.current_dt, _LiqConfig)
+        self.assertFalse(p._live_liquidation_disabled)
+        self._long_position(p)
+        p._check_liquidations(bars.current_dt, None)
+
+        self.assertEqual(events.qsize(), 1)
+        fill = events.get_nowait()
+        self.assertEqual(fill.status, "LIQUIDATED")
+        self.assertEqual(fill.exchange, "SIM_LIQUIDATION")
+        self.assertEqual(len(p.liquidation_events), 1)
+        self.assertEqual(p._modeled_liquidation_warnings, [])
+        self.assertIn("BTC/USDT", p._pending_liquidation)
+
+    def test_live_path_downgrades_breach_to_audit_record_no_fill(self):
+        events = queue.Queue()
+        bars = LiqBars(datetime(2026, 1, 1, 0, 0), 60.0, high=60.0, low=60.0)
+        p = Portfolio(bars, events, bars.current_dt, _LiqConfig)
+        p._live_liquidation_disabled = True  # emulate the live binding
+        self._long_position(p)
+        with self.assertLogs("lumina_quant.backtesting.portfolio_backtest", level="WARNING"):
+            p._check_liquidations(bars.current_dt, None)
+
+        # No fabricated fill, no real liquidation record, position untouched.
+        self.assertEqual(events.qsize(), 0)
+        self.assertEqual(p.liquidation_events, [])
+        self.assertAlmostEqual(p.current_positions["BTC/USDT"], 1.0)
+        # Modeled breach captured for audit/alerting, flagged modeled_only.
+        self.assertEqual(len(p._modeled_liquidation_warnings), 1)
+        rec = p._modeled_liquidation_warnings[0]
+        self.assertTrue(rec["modeled_only"])
+        self.assertEqual(rec["symbol"], "BTC/USDT")
+        # De-spam: symbol marked pending so it is not re-warned every bar.
+        self.assertIn("BTC/USDT", p._pending_liquidation)
+
+    def test_live_path_does_not_re_warn_while_pending(self):
+        events = queue.Queue()
+        bars = LiqBars(datetime(2026, 1, 1, 0, 0), 60.0, high=60.0, low=60.0)
+        p = Portfolio(bars, events, bars.current_dt, _LiqConfig)
+        p._live_liquidation_disabled = True
+        self._long_position(p)
+        p._check_liquidations(bars.current_dt, None)
+        p._check_liquidations(bars.current_dt, None)  # still pending -> skipped
+        self.assertEqual(len(p._modeled_liquidation_warnings), 1)
+
+    def test_live_portfolio_subclass_sets_flag(self):
+        from lumina_quant.live.portfolio import get_live_portfolio_cls
+
+        events = queue.Queue()
+        bars = MockBars(datetime(2026, 1, 1, 0, 0), 100.0)
+        live_cls = get_live_portfolio_cls()
+        live = live_cls(bars, events, bars.current_dt, BaseConfig)
+        self.assertTrue(live._live_liquidation_disabled)
+        # A plain backtest Portfolio keeps the flag OFF.
+        base = Portfolio(bars, events, bars.current_dt, BaseConfig)
+        self.assertFalse(base._live_liquidation_disabled)
+
+    def test_live_path_skips_simulated_funding_charge(self):
+        # With the live gate on, _apply_funding must not simulate a charge even
+        # when per-bar funding data is present (real funding is reconciled from
+        # the exchange balance by the trader).
+        events = queue.Queue()
+        bars = MockBars(datetime(2026, 1, 1, 0, 0), 100.0, funding_rate=0.001, has_feature=True)
+        p = Portfolio(bars, events, bars.current_dt, BaseConfig)
+        p._live_liquidation_disabled = True
+        p.current_positions["BTC/USDT"] = 1.0
+        p.entry_prices["BTC/USDT"] = 100.0
+        p.update_timeindex(None)  # anchor
+        bars.current_dt += timedelta(hours=8)
+        p.update_timeindex(None)  # would charge in backtest, gated off on live
+        self.assertEqual(p.total_funding_paid, 0.0)
+
+        # Sanity: the same setup on the backtest path DOES charge funding.
+        events2 = queue.Queue()
+        bars2 = MockBars(datetime(2026, 1, 1, 0, 0), 100.0, funding_rate=0.001, has_feature=True)
+        p2 = Portfolio(bars2, events2, bars2.current_dt, BaseConfig)
+        p2.current_positions["BTC/USDT"] = 1.0
+        p2.entry_prices["BTC/USDT"] = 100.0
+        p2.update_timeindex(None)
+        bars2.current_dt += timedelta(hours=8)
+        p2.update_timeindex(None)
+        self.assertGreater(p2.total_funding_paid, 0.0)
+
+
+# --------------------------------------------------------------------------- #
+# Fix X5: the position-invariant liquidation price is cached per symbol keyed by
+# (qty, entry_price) and invalidated on fill — bit-identical to recomputing.
+# --------------------------------------------------------------------------- #
+class TestLiquidationPriceCache(unittest.TestCase):
+    @staticmethod
+    def _portfolio():
+        events = queue.Queue()
+        bars = MockBars(datetime(2026, 1, 1, 0, 0), 100.0)
+        return Portfolio(bars, events, bars.current_dt, BaseConfig)
+
+    def test_cache_is_bit_identical_and_populated(self):
+        p = self._portfolio()
+        expected = p.execution_model.liquidation_price(qty=1.0, entry_price=100.0)
+        got = p._cached_liquidation_price("BTC/USDT", 1.0, 100.0)
+        self.assertEqual(got, expected)
+        self.assertEqual(p._liq_price_cache["BTC/USDT"], (1.0, 100.0, expected))
+        # Second call reuses the cached value (identical result, no divergence).
+        self.assertEqual(p._cached_liquidation_price("BTC/USDT", 1.0, 100.0), expected)
+
+    def test_cache_miss_on_changed_inputs(self):
+        p = self._portfolio()
+        long_liq = p._cached_liquidation_price("BTC/USDT", 1.0, 100.0)
+        # Flipping to a short at a new entry recomputes (different key).
+        short_liq = p._cached_liquidation_price("BTC/USDT", -1.0, 120.0)
+        self.assertNotEqual(long_liq, short_liq)
+        self.assertEqual(p._liq_price_cache["BTC/USDT"], (-1.0, 120.0, short_liq))
+
+    def test_fill_invalidates_cache(self):
+        from lumina_quant.core.events import FillEvent
+
+        p = self._portfolio()
+        p._cached_liquidation_price("BTC/USDT", 1.0, 100.0)
+        self.assertIn("BTC/USDT", p._liq_price_cache)
+        p.update_positions_from_fill(
+            FillEvent(
+                timeindex=datetime(2026, 1, 1, 0, 0),
+                symbol="BTC/USDT",
+                exchange="SIM",
+                quantity=1.0,
+                direction="BUY",
+                fill_cost=100.0,
+                commission=0.04,
+            )
+        )
+        self.assertNotIn("BTC/USDT", p._liq_price_cache)

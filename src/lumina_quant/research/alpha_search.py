@@ -67,6 +67,7 @@ from lumina_quant.research.survivorship import (
     empirical_variance_across_trials,
     evaluate_survivorship_gate,
 )
+from lumina_quant.strategy_factory.research_metrics import cscv_pbo as compute_cscv_pbo
 
 __all__ = [
     "DEFAULT_BINARY_OPERATORS",
@@ -458,6 +459,9 @@ def run_alpha_search(
     require_spa: bool = False,
     require_pbo: bool = False,
     spa_seed: int = DEFAULT_SPA_SEED,
+    single_correlation_discount: bool = False,
+    hac_inference: bool = False,
+    cscv_pbo: bool = False,
     ledger: ResearchLedger | None = None,
     enable_llm_proposer: bool = False,
     llm_proposals: Sequence[AlphaSearchCandidate] | None = None,
@@ -473,6 +477,13 @@ def run_alpha_search(
     (append-only, in canonical order). ``enable_llm_proposer`` (default OFF) merges
     the frozen ``llm_proposals`` specs into the pool; they pass through the same
     survivorship gate and only register if they clear it.
+
+    Three opt-in research-rigor flags (all default OFF -> byte-identical to legacy)
+    are forwarded to the survivorship gate: ``single_correlation_discount`` (feed
+    the DSR benchmark the raw family count instead of the double-discounted
+    ``N_eff``), ``hac_inference`` (HAC-correct the DSR studentization), and
+    ``cscv_pbo`` (replace the per-candidate ``approx_pbo`` heuristic with one
+    family-wise CSCV PBO shared across the family).
 
     Returns an :class:`AlphaSearchResult`. ``raw_n`` is the full generated breadth
     (upper bound) even when the evaluated pool was capped by ``max_candidates``.
@@ -535,6 +546,15 @@ def run_alpha_search(
     n_eff = effective_number_of_trials(corr, raw_n=int(raw_n))
     dispersion = empirical_variance_across_trials(family_sharpes)
 
+    # Family-wise CSCV PBO (opt-in). Computed once over the whole candidate return
+    # matrix and shared by every candidate's gate as the ``pbo`` override -- PBO is a
+    # family property, not a per-series one. Flag OFF -> pbo_override stays ``None``
+    # so each verdict falls back to the legacy per-candidate ``approx_pbo``
+    # (byte-identical to today).
+    pbo_override: float | None = None
+    if cscv_pbo:
+        pbo_override = float(compute_cscv_pbo(return_matrix))
+
     records: list[dict[str, Any]] = []
     promoted_ids: list[str] = []
     for ev in evaluated:
@@ -548,6 +568,9 @@ def run_alpha_search(
             require_spa=require_spa,
             require_pbo=require_pbo,
             spa_seed=spa_seed,
+            single_correlation_discount=single_correlation_discount,
+            hac_inference=hac_inference,
+            pbo_override=pbo_override,
         )
         # Cost-realism A/B (default OFF -> cost_ab={} and promotion unchanged, so
         # records stay byte-identical to the pre-cost-gate behaviour). When enabled,

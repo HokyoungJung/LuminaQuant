@@ -104,6 +104,9 @@ def evaluate_survivorship_gate(
     require_spa: bool = False,
     require_pbo: bool = False,
     spa_seed: int = DEFAULT_SPA_SEED,
+    single_correlation_discount: bool = False,
+    hac_inference: bool = False,
+    pbo_override: float | None = None,
 ) -> SurvivorshipVerdict:
     """Evaluate the survivorship gate for a single candidate return series.
 
@@ -121,6 +124,23 @@ def evaluate_survivorship_gate(
     dsr_threshold / spa_pvalue_threshold / pbo_threshold:
         Decision thresholds. DSR is the primary gate; SPA/PBO are auxiliary and
         only affect the verdict when ``require_spa`` / ``require_pbo`` are set.
+    single_correlation_discount:
+        Opt-in (default OFF). When set, feed the DSR benchmark the *raw* family
+        count instead of the participation-ratio ``N_eff``. The empirical
+        ``variance_across_trials`` already encodes the ~(1-rho)V correlation
+        compression, so also collapsing the trial count to ``N_eff`` would apply
+        the correlation discount twice and leave the benchmark (hence the gate)
+        too lenient. Flag OFF -> byte-identical to the legacy ``N_eff`` path.
+    hac_inference:
+        Opt-in (default OFF). HAC/serial-dependence correct the iid degrees of
+        freedom behind the DSR studentization (forwarded to
+        :func:`deflated_sharpe_ratio`). Flag OFF -> byte-identical.
+    pbo_override:
+        Opt-in (default ``None``). When provided, use this pre-computed
+        probability-of-backtest-overfitting (e.g. a family-wise CSCV PBO from
+        :func:`lumina_quant.strategy_factory.research_metrics.cscv_pbo`) in place
+        of the single-series :func:`approx_pbo` heuristic. ``None`` -> legacy
+        per-candidate ``approx_pbo`` (byte-identical).
 
     Returns:
     -------
@@ -132,15 +152,17 @@ def evaluate_survivorship_gate(
     n_eff = effective_number_of_trials(correlation_matrix, raw_n=raw_n)
     variance = empirical_variance_across_trials(family_sharpes)
 
+    dsr_num_trials = float(raw_n) if single_correlation_discount else float(n_eff)
     dsr = float(
         deflated_sharpe_ratio(
             returns,
-            num_trials=n_eff,
+            num_trials=dsr_num_trials,
             variance_across_trials=variance,
+            hac_inference=hac_inference,
         )
     )
     spa_p = float(spa_like_pvalue(returns, seed=spa_seed))
-    pbo = float(approx_pbo(returns))
+    pbo = float(approx_pbo(returns)) if pbo_override is None else float(pbo_override)
 
     dsr_ok = dsr >= float(dsr_threshold)
     spa_ok = spa_p <= float(spa_pvalue_threshold)

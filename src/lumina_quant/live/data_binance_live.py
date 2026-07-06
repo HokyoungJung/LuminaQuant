@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import queue
 import threading
 import time
@@ -18,6 +19,15 @@ from lumina_quant.live.binance_market_stream import (
     normalize_stream_symbol,
 )
 from lumina_quant.live.market_window_rolling import NormalizedTradeTick, RollingWindowAggregator
+
+LOGGER = logging.getLogger(__name__)
+
+# Rows requested per agg-trade page (matches the exchange fetch limit below); a
+# full page implies more trades may remain in the window and paging continues.
+_RECOVERY_PAGE_LIMIT = 500
+# The exchange caps each agg-trade fetch at ~1h from `since`, so a long outage is
+# recovered by chunking forward one window at a time.
+_ONE_HOUR_MS = 3_600_000
 
 
 class BinanceLiveDataHandler:
@@ -80,11 +90,28 @@ class BinanceLiveDataHandler:
         self._max_lateness_ms = max(
             0, int(getattr(self.config, "LIVE_MAX_LATENESS_MS", 1500) or 1500)
         )
+        # Per-symbol staleness / bar-sanity gates default OFF (0 / False) so the
+        # emitted stream is byte-identical unless real-mode config enables them.
+        self._stale_symbol_after_ms = max(
+            0, int(getattr(self.config, "LIVE_STALE_SYMBOL_AFTER_MS", 0) or 0)
+        )
+        self._bar_sanity_check = bool(getattr(self.config, "LIVE_BAR_SANITY_CHECK", False))
+        self._reconnect_max_backoff_sec = max(
+            0.25, float(getattr(self.config, "LIVE_WS_MAX_BACKOFF_SEC", 60.0) or 60.0)
+        )
+        # Bound the gap-recovery paging so a huge/broken outage cannot spin
+        # unbounded REST calls; hitting it emits a truncation alert.
+        self._recovery_max_pages = max(
+            1, int(getattr(self.config, "LIVE_RECOVERY_MAX_PAGES", 240) or 240)
+        )
+        self._recovery_truncations = 0
 
         self.aggregator = RollingWindowAggregator(
             symbol_list=list(self.symbol_list),
             window_seconds=int(self._window_seconds),
             max_lateness_ms=int(self._max_lateness_ms),
+            stale_symbol_after_ms=int(self._stale_symbol_after_ms),
+            bar_sanity_check=bool(self._bar_sanity_check),
         )
 
         self._cursor_ms: dict[str, int | None] = dict.fromkeys(self.symbol_list)
@@ -151,6 +178,7 @@ class BinanceLiveDataHandler:
                 include_book_ticker=bool(self._book_ticker_enabled),
                 use_agg_trade=True,
                 websocket_base_url=self._ws_base_url(),
+                max_reconnect_backoff_sec=float(self._reconnect_max_backoff_sec),
             )
         )
 
@@ -165,8 +193,16 @@ class BinanceLiveDataHandler:
         def _on_error(exc: Exception) -> None:
             if self._shutdown.is_set() or not self.continue_backtest:
                 return
-            self._recover_gap_ticks()
+            # Always visible to the operator: count the failure and go fatal past
+            # the ceiling. Gap recovery runs on the *reconnect* callback so the
+            # full outage window (including trades during the backoff) is fetched.
             self._ws_consecutive_errors += 1
+            LOGGER.warning(
+                "Binance market websocket error (%s/%s): %r",
+                self._ws_consecutive_errors,
+                self._ws_max_consecutive_errors,
+                exc,
+            )
             if isinstance(exc, (ImportError, ModuleNotFoundError)):
                 self._publish_fatal(exc)
                 return
@@ -178,20 +214,74 @@ class BinanceLiveDataHandler:
                     )
                 )
 
+        def _on_reconnect() -> None:
+            if self._shutdown.is_set() or not self.continue_backtest:
+                return
+            self._recover_gap_ticks()
+
         client.run_ws_loop(
             stop_event=self._shutdown,
             on_trade=_on_trade,
             on_book_ticker=_on_book_ticker,
             on_error=_on_error,
+            on_reconnect=_on_reconnect,
         )
+
+    def _note_recovery_truncated(self, *, symbol: str, pages: int) -> None:
+        self._recovery_truncations += 1
+        LOGGER.warning(
+            "Binance trade recovery truncated for %s after %s pages "
+            "(cursor=%s, max_pages=%s); older trades may be unrecoverable.",
+            symbol,
+            pages,
+            self._cursor_ms.get(symbol),
+            self._recovery_max_pages,
+        )
+
+    def _drain_symbol_ticks(self, *, symbol: str, until_ms: int | None) -> None:
+        """Paginate agg-trade recovery from the per-symbol cursor up to ``until_ms``.
+
+        A single 500-row fetch only recovers the oldest slice of a multi-thousand
+        trade outage, and the exchange caps each fetch to ~1h. This walks the
+        cursor forward one page/window at a time until it catches up, chunking
+        outages longer than an hour and alerting when paging is truncated.
+        """
+        pages = 0
+        while pages < int(self._recovery_max_pages):
+            if not self.continue_backtest or self._shutdown.is_set():
+                return
+            pages += 1
+            ticks = self._fetch_symbol_ticks(symbol=symbol, until_ms=until_ms)
+            for tick in ticks:
+                self._emit_from_tick(tick)
+            cursor = self._cursor_ms.get(symbol)
+            # Caught up to the target time: nothing more to recover.
+            if until_ms is None or cursor is None or int(cursor) > int(until_ms):
+                return
+            if len(ticks) >= _RECOVERY_PAGE_LIMIT:
+                # Dense window: more trades may remain -> page again.
+                continue
+            if not ticks:
+                # Empty <=1h window: chunk forward past the gap toward until_ms.
+                jumped = int(cursor) - 1 + _ONE_HOUR_MS
+                if jumped > int(until_ms):
+                    return
+                self._cursor_ms[symbol] = jumped
+                continue
+            # Partial non-empty page. If still more than a window behind the
+            # target, keep walking from the advanced cursor; otherwise done.
+            if int(until_ms) - int(cursor) > _ONE_HOUR_MS:
+                continue
+            return
+        # Exhausted the page budget without catching up.
+        self._note_recovery_truncated(symbol=symbol, pages=pages)
 
     def _recover_gap_ticks(self) -> None:
         if self.exchange is None:
             return
         now_ms = int(time.time() * 1000)
         for symbol in list(self.symbol_list):
-            for tick in self._fetch_symbol_ticks(symbol=symbol, until_ms=now_ms):
-                self._emit_from_tick(tick)
+            self._drain_symbol_ticks(symbol=symbol, until_ms=now_ms)
         for event in self.aggregator.flush_until(now_ms=now_ms):
             self._push_market_window(event)
 
@@ -199,8 +289,7 @@ class BinanceLiveDataHandler:
         while self.continue_backtest and not self._shutdown.is_set():
             now_ms = int(time.time() * 1000)
             for symbol in list(self.symbol_list):
-                for tick in self._fetch_symbol_ticks(symbol=symbol, until_ms=now_ms):
-                    self._emit_from_tick(tick)
+                self._drain_symbol_ticks(symbol=symbol, until_ms=now_ms)
             for event in self.aggregator.flush_until(now_ms=now_ms):
                 self._push_market_window(event)
             if self.continue_backtest and not self._shutdown.is_set():
@@ -257,13 +346,25 @@ class BinanceLiveDataHandler:
         since_ms = self._cursor_ms.get(symbol)
         effective_until_ms = int(until_ms) if until_ms is not None else None
         try:
-            rows = list(fetch_fn(symbol, since=since_ms, limit=500) or [])
+            rows = list(fetch_fn(symbol, since=since_ms, limit=_RECOVERY_PAGE_LIMIT) or [])
         except TypeError:
             try:
-                rows = list(fetch_fn(symbol, since_ms, 500) or [])
+                rows = list(fetch_fn(symbol, since_ms, _RECOVERY_PAGE_LIMIT) or [])
             except Exception:
+                LOGGER.warning(
+                    "Binance fetch_trades failed for %s (since=%s): recovery incomplete.",
+                    symbol,
+                    since_ms,
+                    exc_info=True,
+                )
                 return []
         except Exception:
+            LOGGER.warning(
+                "Binance fetch_trades failed for %s (since=%s): recovery incomplete.",
+                symbol,
+                since_ms,
+                exc_info=True,
+            )
             return []
 
         ticks: list[NormalizedTradeTick] = []
@@ -387,6 +488,19 @@ class BinanceLiveDataHandler:
         if self.exchange and hasattr(self.exchange, "get_market_spec"):
             return self.exchange.get_market_spec(symbol)
         return {}
+
+    def get_stale_symbols(self) -> list[str]:
+        """Symbols whose last real trade is older than the configured threshold.
+
+        Empty when per-symbol staleness is disabled (``LIVE_STALE_SYMBOL_AFTER_MS``
+        unset/0). Intended for the trader to block new entries / alert per symbol
+        so one dead or suspended feed does not ride a real move flat-filled.
+        """
+        return self.aggregator.stale_symbols()
+
+    def get_symbol_trade_age_ms(self, symbol: str) -> int | None:
+        """Age (ms) of the last real trade for ``symbol`` vs the event watermark."""
+        return self.aggregator.symbol_trade_age_ms(symbol)
 
 
 __all__ = ["BinanceLiveDataHandler"]

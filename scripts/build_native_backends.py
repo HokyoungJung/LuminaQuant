@@ -32,6 +32,32 @@ def _find_maturin(venv_bin: Path) -> str:
     return ""
 
 
+def _load_src_hash(root: Path, src_dir: Path) -> tuple[str, str | None]:
+    """Compute the crate source hash using the shared runtime helper.
+
+    Importing lumina_quant._native_kernel_version.compute_src_hash (rather than
+    reimplementing the hash) guarantees the value embedded into the extension
+    matches what the runtime handshake recomputes -- there is no second
+    algorithm to drift. Returns (env_var_name, hash_or_None); the hash is None
+    when the helper is unavailable or the source tree cannot be read, in which
+    case the build simply proceeds without embedding a hash.
+    """
+    src_path = str(root / "src")
+    if src_path not in sys.path:
+        sys.path.insert(0, src_path)
+    try:
+        from lumina_quant._native_kernel_version import (
+            SRC_HASH_ENV_VAR,
+            compute_src_hash,
+        )
+    except Exception:
+        return "LUMINA_KERNEL_SRC_HASH", None
+    try:
+        return SRC_HASH_ENV_VAR, compute_src_hash(src_dir)
+    except Exception:
+        return SRC_HASH_ENV_VAR, None
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build lumina_compute pyo3 island (maturin)")
     parser.add_argument(
@@ -77,9 +103,18 @@ def main() -> None:
     env = os.environ.copy()
     env["VIRTUAL_ENV"] = str(venv)
 
+    # Embed a hash of the crate's Rust source so the runtime handshake can flag
+    # an edited-but-not-rebuilt kernel even when the crate version is unchanged
+    # (see lumina_quant._native_kernel_version). cargo tracks env vars read via
+    # option_env!, so changing this hash forces a rebuild of the affected unit.
+    hash_env_var, src_hash = _load_src_hash(root, crate_dir / "src")
+    if src_hash:
+        env[hash_env_var] = src_hash
+
     print(f"[maturin] {action}")
     print(f"  crate : {crate_dir}")
     print(f"  venv  : {venv}")
+    print(f"  srchash: {src_hash or '(unavailable)'}")
     print(f"  cmd   : {' '.join(cmd)}")
 
     result = subprocess.run(cmd, cwd=str(crate_dir), env=env)

@@ -129,6 +129,22 @@ class LiveExecutionHandler(ExecutionHandler):
         """Set a callback to receive order-state transition events."""
         self._state_callback = callback
 
+    @property
+    def active_orders(self) -> dict[str, Any]:
+        """Currently-working (non-terminal) tracked orders, keyed by order id.
+
+        Every transition into a ``TERMINAL_STATES`` member (FILLED / CANCELED /
+        REJECTED / TIMEOUT) synchronously pops the order from ``tracked_orders``
+        via ``_forget_order`` before the state lock is released, so this dict
+        already *is* the working-order view — no filtering pass is needed.
+        Returning the live container directly (not a copy) keeps this O(1) and
+        preserves identity/mutation-in-place, matching the contract the engine's
+        per-row sweep relies on (M6): ``getattr(handler, "active_orders", None)``
+        is never ``None`` once a real handler is constructed, and ``not
+        handler.active_orders`` is truthful for both the empty and non-empty book.
+        """
+        return self.tracked_orders
+
     def _call_with_retry(self, fn, *args, retries=3, delay=1.0, backoff=2.0, **kwargs):
         attempt = 0
         wait = delay
@@ -570,7 +586,7 @@ class LiveExecutionHandler(ExecutionHandler):
 
         self._fire_deferred_notifications(deferred_notifications)
         if emit_protection_for is not None:
-            self._submit_paper_exchange_protection(emit_protection_for, parent_order_id=order_id)
+            self._place_exchange_protective_orders(emit_protection_for, parent_order_id=order_id)
 
     def _build_reconciliation_payload(
         self,
@@ -797,7 +813,7 @@ class LiveExecutionHandler(ExecutionHandler):
                     self._forget_order(order_id, entry)
             self._fire_deferred_notifications(deferred_notifications)
             if emit_protection_for is not None:
-                self._submit_paper_exchange_protection(
+                self._place_exchange_protective_orders(
                     emit_protection_for, parent_order_id=order_id
                 )
         return records
@@ -865,6 +881,15 @@ class LiveExecutionHandler(ExecutionHandler):
                 getattr(event, "symbol", ""),
             )
             return
+        # Real mode.  When managed protective stops are enabled the stop_loss /
+        # take_profit are translated into exchange-resident reduce-only
+        # STOP_MARKET / TAKE_PROFIT_MARKET algo orders AFTER the parent entry
+        # fills (see _submit_real_managed_protection).  The parent order itself
+        # must NOT carry embedded protective params, so allow the entry through
+        # here instead of rejecting it.  When the feature is disabled (default)
+        # keep the historical fail-closed raise so nothing weakens at defaults.
+        if self._real_managed_protective_enabled():
+            return
         raise RuntimeError(
             "Real-mode live protective orders require explicit exchange_params mapping. "
             "Provide stop/take-profit exchange_params or omit stop_loss/take_profit."
@@ -878,6 +903,22 @@ class LiveExecutionHandler(ExecutionHandler):
         if market_type != "future":
             return False
         return bool(getattr(self.config, "PAPER_EXCHANGE_PROTECTIVE_ORDERS", True))
+
+    def _real_managed_protective_enabled(self) -> bool:
+        """Whether real-mode managed protective stops are enabled.
+
+        Opt-in (config-gated, default OFF).  When True, real-mode entries that
+        carry stop_loss/take_profit are accepted and their protection is placed
+        as exchange-resident reduce-only STOP_MARKET/TAKE_PROFIT_MARKET algo
+        orders after the parent fills.  Futures-only (Binance perp algo orders).
+        """
+        live_mode = str(getattr(self.config, "MODE", "paper") or "paper").strip().lower()
+        if live_mode != "real":
+            return False
+        market_type = str(getattr(self.config, "MARKET_TYPE", "spot") or "spot").strip().lower()
+        if market_type != "future":
+            return False
+        return bool(getattr(self.config, "REAL_MODE_MANAGED_PROTECTIVE_STOPS", False))
 
     @staticmethod
     def _protective_close_side(event) -> str:
@@ -945,9 +986,25 @@ class LiveExecutionHandler(ExecutionHandler):
         }
 
     def _build_paper_protective_algo_specs(self, event) -> list[dict[str, Any]]:
-        if bool(getattr(event, "reduce_only", False)):
-            return []
         if not self._paper_exchange_protection_enabled():
+            return []
+        return self._build_protective_algo_specs(event, close_reduce_only=False, force_market=False)
+
+    def _build_real_managed_protective_algo_specs(self, event) -> list[dict[str, Any]]:
+        """Real-mode managed protective specs: reduce-only STOP_MARKET/TAKE_PROFIT_MARKET.
+
+        Reuses the shared protective-spec machinery but forces market-style
+        trigger orders (guaranteed exit) tagged reduce-only, so a stop that fires
+        after a crash/disconnect can only reduce the exposed position.
+        """
+        if not self._real_managed_protective_enabled():
+            return []
+        return self._build_protective_algo_specs(event, close_reduce_only=True, force_market=True)
+
+    def _build_protective_algo_specs(
+        self, event, *, close_reduce_only: bool, force_market: bool
+    ) -> list[dict[str, Any]]:
+        if bool(getattr(event, "reduce_only", False)):
             return []
         metadata = dict(getattr(event, "metadata", None) or {})
         exchange_params = dict(metadata.get("exchange_params") or {})
@@ -957,7 +1014,7 @@ class LiveExecutionHandler(ExecutionHandler):
         if quantity <= 0.0:
             return []
         side = self._protective_close_side(event)
-        style = self._protective_order_style()
+        style = "market" if force_market else self._protective_order_style()
         position_side = self._protective_position_side(event)
         parent_client_id = str(getattr(event, "client_order_id", "") or "")
         base_params = {
@@ -967,6 +1024,13 @@ class LiveExecutionHandler(ExecutionHandler):
             "priceProtect": "true",
             "parentClientOrderId": parent_client_id,
         }
+        # Real-mode managed protection is reduce-only so the trigger order can
+        # only close the exposed leg.  NOTE (position-mode caveat): Binance
+        # one-way mode requires reduceOnly while hedge mode rejects it; operators
+        # running hedge (dual-side) position mode should verify placement.  This
+        # is an opt-in, default-OFF path.
+        if close_reduce_only:
+            base_params["reduceOnly"] = True
         specs: list[dict[str, Any]] = []
         stop_loss = getattr(event, "stop_loss", None)
         if stop_loss is not None:
@@ -1026,13 +1090,42 @@ class LiveExecutionHandler(ExecutionHandler):
             )
         return specs
 
+    def _place_exchange_protective_orders(self, event, *, parent_order_id: str | None) -> None:
+        """Dispatch post-fill protective-order placement for the active mode.
+
+        Paper/testnet uses the simulated exchange-protection path; real mode uses
+        the opt-in managed reduce-only path.  When neither is enabled this is a
+        no-op, preserving the historical default behavior.
+        """
+        if self._paper_exchange_protection_enabled():
+            self._submit_paper_exchange_protection(event, parent_order_id=parent_order_id)
+        elif self._real_managed_protective_enabled():
+            self._submit_real_managed_protection(event, parent_order_id=parent_order_id)
+
     def _submit_paper_exchange_protection(self, event, *, parent_order_id: str | None) -> None:
+        self._place_protective_specs(event, parent_order_id=parent_order_id, real_money=False)
+
+    def _submit_real_managed_protection(self, event, *, parent_order_id: str | None) -> None:
+        self._place_protective_specs(event, parent_order_id=parent_order_id, real_money=True)
+
+    def _place_protective_specs(
+        self, event, *, parent_order_id: str | None, real_money: bool
+    ) -> None:
         if event is None:
             return
         parent_client_id = str(getattr(event, "client_order_id", "") or "")
         if not parent_client_id:
             return
-        specs = self._build_paper_protective_algo_specs(event)
+        if real_money:
+            specs = self._build_real_managed_protective_algo_specs(event)
+            fail_log = "Real-mode managed protective algo order submit failed: %s"
+            fail_message = "real_managed_protective_order_submit_failed"
+            ok_message = "real_managed_protective_orders_submitted"
+        else:
+            specs = self._build_paper_protective_algo_specs(event)
+            fail_log = "Paper/testnet protective algo order submit failed: %s"
+            fail_message = "paper_protective_order_submit_failed"
+            ok_message = "paper_exchange_protective_orders_submitted"
         if not specs:
             return
         # Atomic check-and-reserve so two threads (user-stream + polling) cannot both
@@ -1057,7 +1150,7 @@ class LiveExecutionHandler(ExecutionHandler):
                     params=params,
                 )
             except Exception as exc:
-                self.logger.error("Paper/testnet protective algo order submit failed: %s", exc)
+                self.logger.error(fail_log, exc)
                 self._notify_state(
                     order_id=parent_order_id,
                     entry={
@@ -1067,7 +1160,7 @@ class LiveExecutionHandler(ExecutionHandler):
                         "created_at": time.time(),
                     },
                     state=STATE_REJECTED,
-                    message="paper_protective_order_submit_failed",
+                    message=fail_message,
                     metadata={
                         "error": str(exc),
                         "protective_type": str(spec["type"]),
@@ -1103,8 +1196,8 @@ class LiveExecutionHandler(ExecutionHandler):
             "parent_client_order_id": parent_client_id,
             "protective_order_count": len(submitted),
             "protective_order_types": [str(item["type"]) for item in submitted],
-            "paper_testnet_only": True,
-            "real_money_execution": False,
+            "paper_testnet_only": not real_money,
+            "real_money_execution": real_money,
         }
         self._notify_state(
             order_id=parent_order_id,
@@ -1115,7 +1208,7 @@ class LiveExecutionHandler(ExecutionHandler):
                 "created_at": time.time(),
             },
             state=STATE_SUBMITTED,
-            message="paper_exchange_protective_orders_submitted",
+            message=ok_message,
             metadata=metadata,
         )
 
@@ -1132,12 +1225,19 @@ class LiveExecutionHandler(ExecutionHandler):
                 if isinstance(value, dict):
                     return dict(value)
 
+        # Thresholds are read from the live config namespace so ORDINARY strategies
+        # (not just alpha_zoo optuna_hybrid, which injects a per-event policy above)
+        # carry fat-finger/slippage caps.  Per the config contract a value of 0.0
+        # (or any non-positive) means DISABLED, so it must NOT be added to the
+        # policy — otherwise a 0.0 threshold would reject every limit order with a
+        # positive spread.  This keeps default config byte-identical (the fields
+        # default to 0.0) while letting operators opt in with a positive band.
         policy: dict[str, Any] = {}
         max_spread = getattr(self.config, "MAX_BBO_SPREAD_BPS_AT_SUBMIT", None)
         max_slippage = getattr(self.config, "MAX_ESTIMATED_ONE_WAY_SLIPPAGE_BPS", None)
-        if max_spread is not None:
+        if max_spread is not None and float(max_spread) > 0.0:
             policy["max_bbo_spread_bps_at_submit"] = float(max_spread)
-        if max_slippage is not None:
+        if max_slippage is not None and float(max_slippage) > 0.0:
             policy["max_estimated_one_way_slippage_bps"] = float(max_slippage)
         if bool(getattr(self.config, "REQUIRE_BBO_FOR_LIMIT_ORDERS", False)):
             policy["require_bbo_snapshot"] = True
@@ -1665,7 +1765,7 @@ class LiveExecutionHandler(ExecutionHandler):
 
         self._fire_deferred_notifications(deferred_notifications)
         if emit_protection_for is not None:
-            self._submit_paper_exchange_protection(emit_protection_for, parent_order_id=order_id)
+            self._place_exchange_protective_orders(emit_protection_for, parent_order_id=order_id)
 
     def check_open_orders(self, event=None):
         """Poll tracked exchange orders and emit delta fills for partial/full executions."""
@@ -1754,7 +1854,7 @@ class LiveExecutionHandler(ExecutionHandler):
                         self._forget_order(order_id, entry)
                     self._fire_deferred_notifications(deferred_notifications)
                     if emit_protection_for is not None:
-                        self._submit_paper_exchange_protection(
+                        self._place_exchange_protective_orders(
                             emit_protection_for, parent_order_id=order_id
                         )
                     continue
@@ -1808,6 +1908,6 @@ class LiveExecutionHandler(ExecutionHandler):
                     self._forget_order(order_id, entry)
             self._fire_deferred_notifications(deferred_notifications)
             if emit_protection_for is not None:
-                self._submit_paper_exchange_protection(
+                self._place_exchange_protective_orders(
                     emit_protection_for, parent_order_id=order_id
                 )

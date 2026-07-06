@@ -5,3 +5,31 @@ optimization:
 data:
   # research profile: ohlcv + feature_points for strategy development
   kinds: [ohlcv, feature_points]
+
+# Honest-research execution numerics: charge funding on the Binance
+# 00:00/08:00/16:00 UTC settlement snapshots a position is open across, instead of
+# the legacy entry-anchored 8h clock (which lets any sub-8h round trip pay ZERO
+# funding — strategy_viability_assessment 2026-07-06 Axis 3 #7).
+execution:
+  funding_on_utc_boundary: true
+
+# Research / selection validation wiring — CORRECTED GATES (all ON). Every
+# promotion-gate correction from docs/audits/strategy_viability_assessment_20260706.md
+# (Axis 3) is turned ON so research selection uses the stringent gates, not the
+# legacy lie-by-omission ones. Consumers read these defensively via
+# getattr(config.research, <flag>, <legacy_default>).
+research:
+  # #1 deflated-Sharpe / SPA is a HARD reject in the strategy hurdle (not a soft weight).
+  strict_selection_gate: true
+  # #2 4-way train/val/oos/lockbox split; rank + gate on validation, report lockbox as OOS.
+  use_lockbox_split: true
+  # purge + embargo gap (bars) between contiguous splits (multi-bar-label leakage guard).
+  purge_embargo_bars: 1
+  # #3 remove the N_eff double-discount so the binding DSR gate is actually stringent.
+  single_correlation_discount: true
+  # #4/#5 HAC / block-correct the iid inference (DSR/Sharpe n AND rank-IC t-stat).
+  hac_inference: true
+  # CSCV PBO estimator as the binding gate (else approx_pbo stays advisory).
+  cscv_pbo: true
+  # #6 exposure-normalize the portfolio-superiority objective so leverage cannot buy it.
+  exposure_normalized_promotion: true

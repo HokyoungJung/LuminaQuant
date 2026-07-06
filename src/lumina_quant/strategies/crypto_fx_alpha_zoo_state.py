@@ -293,6 +293,12 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
         self.risk_on_short_multiplier = float(resolved["risk_on_short_multiplier"])
         self.min_signal_strength = float(resolved["min_signal_strength"])
         self.decision_cadence_seconds = max(1, int(resolved["decision_cadence_seconds"]))
+        # STRATEGY-IMPROVE (strategy-local, config-gated, default OFF => byte-
+        # identical). The legacy residual-momentum factor residualizes each
+        # crypto vs BTC with a FIXED beta=1, so levered market beta leaks into
+        # the "idiosyncratic" signal. When ON, estimate a trailing rolling beta
+        # so the residual is genuinely idiosyncratic (residual = r - beta*r_btc).
+        self.use_rolling_beta = bool(resolved.get("use_rolling_beta", False))
         self.calibrated_edges = {
             str(key): float(value) for key, value in dict(calibrated_edges or {}).items()
         }
@@ -465,6 +471,29 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
             return True, edge
         return edge is not None and edge > self.min_calibrated_edge_bps, edge
 
+    def _residual_beta(self, item: _SymbolState, btc: _SymbolState) -> float:
+        """Trailing OLS beta of the symbol's fast returns vs BTC's fast returns.
+
+        Used only when ``use_rolling_beta`` is ON. Falls back to ``1.0`` (the
+        legacy fixed beta) on degenerate/insufficient history so the residual
+        degrades gracefully to the market-excess return rather than raising.
+        """
+        sym_rets = _returns(item.closes, self.fast_lookback_bars)
+        btc_rets = _returns(btc.closes, self.fast_lookback_bars)
+        pairs = list(zip(sym_rets, btc_rets, strict=False))[-self.history_window :]
+        if len(pairs) < MIN_ZSCORE_OBS:
+            return 1.0
+        xs = [pair[0] for pair in pairs]
+        bs = [pair[1] for pair in pairs]
+        mean_x = sum(xs) / len(xs)
+        mean_b = sum(bs) / len(bs)
+        var = sum((value - mean_b) ** 2 for value in bs)
+        if var <= 1e-12:
+            return 1.0
+        cov = sum((xs[idx] - mean_x) * (bs[idx] - mean_b) for idx in range(len(xs)))
+        beta = cov / var
+        return float(beta) if math.isfinite(beta) else 1.0
+
     def _score_symbol(self, symbol: str) -> float | None:
         self._last_score_components.pop(symbol, None)
         item = self._state[symbol]
@@ -485,16 +514,32 @@ class CryptoFxAlphaZooStateStrategy(Strategy):
         btc_slow = _ret(btc.closes, self.slow_lookback_bars)
         if fast_ret is None or slow_ret is None or btc_fast is None or btc_slow is None:
             return None
-        residual_fast = fast_ret - btc_fast
-        residual_slow = slow_ret - btc_slow
-        residual_hist = [
-            ret - (btc_ret or 0.0)
-            for ret, btc_ret in zip(
-                _returns(item.closes, self.fast_lookback_bars),
-                _returns(btc.closes, self.fast_lookback_bars),
-                strict=False,
-            )
-        ]
+        if not self.use_rolling_beta:
+            # Legacy fixed beta = 1 residualization (byte-identical path).
+            residual_fast = fast_ret - btc_fast
+            residual_slow = slow_ret - btc_slow
+            residual_hist = [
+                ret - (btc_ret or 0.0)
+                for ret, btc_ret in zip(
+                    _returns(item.closes, self.fast_lookback_bars),
+                    _returns(btc.closes, self.fast_lookback_bars),
+                    strict=False,
+                )
+            ]
+        else:
+            # Rolling-beta residualization: strip levered market beta so the
+            # residual is genuinely idiosyncratic.
+            beta = self._residual_beta(item, btc)
+            residual_fast = fast_ret - beta * btc_fast
+            residual_slow = slow_ret - beta * btc_slow
+            residual_hist = [
+                ret - beta * (btc_ret or 0.0)
+                for ret, btc_ret in zip(
+                    _returns(item.closes, self.fast_lookback_bars),
+                    _returns(btc.closes, self.fast_lookback_bars),
+                    strict=False,
+                )
+            ]
         residual_mom = _zscore(residual_fast, residual_hist[-self.history_window :])
         residual_reversal = (
             -_zscore(residual_slow, residual_hist[-self.history_window :])

@@ -561,6 +561,57 @@ def _resolve_split_config(
     )
 
 
+# ── Research selection/split gate flags (opt-in; legacy default = OFF) ──────────
+# These flags correct three validation-wiring defects from the 2026-07-06
+# strategy-viability review. Every flag defaults to the legacy value so that,
+# when a caller does not set it, the code path is byte-identical to today; the
+# corrected behavior is opt-in via the strict research profile.
+_RESEARCH_STRICT_SELECTION_GATE_DEFAULT = False
+_RESEARCH_DSR_GATE_FLOOR_DEFAULT = 0.0
+_RESEARCH_SPA_GATE_CEILING_DEFAULT = 1.0
+_RESEARCH_USE_LOCKBOX_SPLIT_DEFAULT = False
+_RESEARCH_LOCKBOX_OOS_FRAC_DEFAULT = 0.10
+_RESEARCH_PURGE_EMBARGO_BARS_DEFAULT = 0
+# HAC/Newey-West-correct the iid degrees of freedom behind the per-candidate DSR
+# studentization (``research_metrics.deflated_sharpe_ratio``'s own ``hac_inference``
+# kwarg). Default False -> byte-identical iid math; opt-in via
+# ``score_config['research']['hac_inference']`` (see ``_research_flag``).
+_RESEARCH_HAC_INFERENCE_DEFAULT = False
+_RESEARCH_SENTINEL = object()
+
+
+def _research_flag(config: Any, name: str, default: Any) -> Any:
+    """Read a research-gate flag defensively from a scoring-config carrier.
+
+    The flag lives under a nested ``research`` section of the resolved scoring
+    config (a Mapping). An object-style config (e.g. a SimpleNamespace with a
+    ``research`` attribute or the flag as a direct attribute) is also supported.
+    When the flag is absent the legacy ``default`` is returned, so callers that
+    never set it keep today's behavior exactly.
+    """
+    research: Any = None
+    if isinstance(config, Mapping):
+        research = config.get("research")
+    elif config is not None:
+        research = getattr(config, "research", None)
+    if isinstance(research, Mapping) and name in research:
+        return research[name]
+    if research is not None and not isinstance(research, Mapping):
+        found = getattr(research, name, _RESEARCH_SENTINEL)
+        if found is not _RESEARCH_SENTINEL:
+            return found
+    if config is not None and not isinstance(config, Mapping):
+        return getattr(config, name, default)
+    return default
+
+
+def _split_flag(split: Mapping[str, Any] | None, name: str, default: Any) -> Any:
+    """Read a split-structure flag (lockbox/purge) from the split mapping."""
+    if isinstance(split, Mapping) and name in split:
+        return split[name]
+    return default
+
+
 def _split_lengths(
     total: int, *, train_frac: float = 0.60, val_frac: float = 0.20
 ) -> tuple[slice, slice, slice]:
@@ -570,6 +621,36 @@ def _split_lengths(
     val_end = max(train_end + 1, int(total * (train_frac + val_frac)))
     val_end = min(total - 1, val_end)
     return slice(0, train_end), slice(train_end, val_end), slice(val_end, total)
+
+
+def _split_lengths_lockbox(
+    total: int,
+    *,
+    train_frac: float = 0.60,
+    val_frac: float = 0.20,
+    oos_frac: float = _RESEARCH_LOCKBOX_OOS_FRAC_DEFAULT,
+) -> tuple[slice, slice, slice, slice]:
+    """4-way train/val/oos/lockbox split (opt-in lockbox discipline).
+
+    The train/val boundaries match :func:`_split_lengths` so only the tail of the
+    legacy OOS window is carved into a never-touched lockbox segment. Ranking and
+    the binding hurdle run on validation; the lockbox is scored exactly once and
+    reported as the sole OOS.
+    """
+    if total <= 0:
+        return slice(0, 0), slice(0, 0), slice(0, 0), slice(0, 0)
+    train_end = max(1, int(total * train_frac))
+    val_end = max(train_end + 1, int(total * (train_frac + val_frac)))
+    val_end = min(total - 1, val_end)
+    oos_end = max(val_end + 1, int(total * (train_frac + val_frac + oos_frac)))
+    oos_end = min(total - 1, oos_end) if val_end + 1 <= total - 1 else total
+    oos_end = max(val_end, min(oos_end, total))
+    return (
+        slice(0, train_end),
+        slice(train_end, val_end),
+        slice(val_end, oos_end),
+        slice(oos_end, total),
+    )
 
 
 def _safe_std(values: np.ndarray) -> float:
@@ -590,6 +671,7 @@ def _compute_metrics(
     num_trials: int,
     metric_config: Any | None = None,
     timestamps: np.ndarray | None = None,
+    hac_inference: bool = _RESEARCH_HAC_INFERENCE_DEFAULT,
 ) -> dict[str, float]:
     if returns.size == 0:
         return _compute_metric_summary(
@@ -611,6 +693,7 @@ def _compute_metrics(
         periods_per_year=periods_per_year,
         num_trials=num_trials,
         resolved_rf=resolved_rf,
+        hac_inference=hac_inference,
     )
     return _compute_metric_summary(
         metric_payload,
@@ -658,6 +741,7 @@ def _resolve_compute_metric_payload(
     periods_per_year: int,
     num_trials: int,
     resolved_rf: Any,
+    hac_inference: bool = _RESEARCH_HAC_INFERENCE_DEFAULT,
 ) -> _ComputedMetricPayload:
     payload = _research_metrics.resolve_compute_metric_payload(
         returns,
@@ -667,6 +751,7 @@ def _resolve_compute_metric_payload(
         periods_per_year=periods_per_year,
         num_trials=num_trials,
         resolved_rf=resolved_rf,
+        hac_inference=hac_inference,
     )
     return _ComputedMetricPayload(**{field: getattr(payload, field) for field in payload.__slots__})
 
@@ -694,6 +779,7 @@ def _hurdle_fields(
     max_pbo: float | None = None,
     max_turnover: float | None = None,
     max_drawdown: float | None = None,
+    bind_stage: str = "oos",
 ) -> tuple[dict[str, Any], bool, dict[str, Any]]:
     config = _resolve_hurdle_config(
         scoring_config=scoring_config,
@@ -707,10 +793,16 @@ def _hurdle_fields(
         "val": _pack_hurdle_stage(val, stage="val", config=config),
         "oos": _pack_hurdle_stage(oos, stage="oos", config=config),
     }
-    hard_reject_reasons = _hurdle_hard_reject_reasons(oos, config=config)
+    # Under the lockbox discipline the binding pass/reject runs on validation so
+    # the never-touched lockbox (reported in the ``oos`` slot) is not consumed by
+    # selection. Default ``bind_stage="oos"`` keeps today's oos-binding behavior.
+    binding = val if str(bind_stage).strip().lower() == "val" else oos
+    hard_reject_reasons = _hurdle_hard_reject_reasons(
+        binding, config=config, scoring_config=scoring_config
+    )
     cost_ok = bool(
-        float(oos.get("sharpe", 0.0)) >= config.oos_sharpe_min
-        and float(oos.get("pbo", 1.0)) <= config.max_pbo
+        float(binding.get("sharpe", 0.0)) >= config.oos_sharpe_min
+        and float(binding.get("pbo", 1.0)) <= config.max_pbo
     )
     return fields, bool(cost_ok and not hard_reject_reasons), hard_reject_reasons
 
@@ -789,6 +881,7 @@ def _hurdle_hard_reject_reasons(
     oos: dict[str, float],
     *,
     config: _ResolvedHurdleConfig,
+    scoring_config: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     hard_reject_reasons: dict[str, Any] = {}
     if float(oos.get("sharpe", 0.0)) < config.oos_sharpe_min:
@@ -801,7 +894,81 @@ def _hurdle_hard_reject_reasons(
         hard_reject_reasons["max_drawdown"] = float(oos.get("mdd", 0.0))
     if float(oos.get("trade_count", 0.0)) < config.min_trade_count:
         hard_reject_reasons["trade_count"] = float(oos.get("trade_count", 0.0))
+    # Strict-selection gate (opt-in): promote the deflated Sharpe / SPA reality
+    # check from an advisory soft-score weight to a binding hard reject. The DSR
+    # is already computed with the correct multiplicity count (num_trials =
+    # candidate_count). Legacy default keeps DSR/SPA advisory-only, so this block
+    # is skipped and the reason set is byte-identical when the flag is unset.
+    if bool(
+        _research_flag(
+            scoring_config,
+            "strict_selection_gate",
+            _RESEARCH_STRICT_SELECTION_GATE_DEFAULT,
+        )
+    ):
+        dsr_floor = float(
+            _research_flag(scoring_config, "dsr_gate_floor", _RESEARCH_DSR_GATE_FLOOR_DEFAULT)
+        )
+        spa_ceiling = float(
+            _research_flag(scoring_config, "spa_gate_ceiling", _RESEARCH_SPA_GATE_CEILING_DEFAULT)
+        )
+        deflated_sharpe = float(oos.get("deflated_sharpe", 0.0))
+        if deflated_sharpe < dsr_floor:
+            hard_reject_reasons["deflated_sharpe"] = deflated_sharpe
+        spa_pvalue = float(oos.get("spa_pvalue", 1.0))
+        if spa_pvalue > spa_ceiling:
+            hard_reject_reasons["spa_pvalue"] = spa_pvalue
     return hard_reject_reasons
+
+
+def _apply_lockbox_and_purge_masks(
+    out: dict[str, np.ndarray],
+    *,
+    size: int,
+    split: Mapping[str, Any] | None,
+) -> dict[str, np.ndarray]:
+    """Optionally add a never-touched lockbox mask and purge/embargo bars.
+
+    Both behaviors are opt-in via the ``split`` mapping. With ``use_lockbox_split``
+    the tail portion of the OOS window is carved into a ``lockbox`` mask (scored
+    once, reported as OOS). With ``purge_embargo_bars`` the leading N bars of each
+    downstream split are dropped so contiguous splits no longer abut. When neither
+    flag is set the mask dict is returned unchanged (byte-identical to today).
+    """
+    use_lockbox = bool(_split_flag(split, "use_lockbox_split", _RESEARCH_USE_LOCKBOX_SPLIT_DEFAULT))
+    purge = int(_split_flag(split, "purge_embargo_bars", _RESEARCH_PURGE_EMBARGO_BARS_DEFAULT) or 0)
+    if not use_lockbox and purge <= 0:
+        return out
+
+    if use_lockbox:
+        oos_mask = out.get("oos")
+        oos_idx = (
+            np.flatnonzero(oos_mask) if oos_mask is not None else np.asarray([], dtype=np.intp)
+        )
+        lockbox_mask = np.zeros(size, dtype=bool)
+        if oos_idx.size == 1:
+            lockbox_mask[oos_idx] = True
+            out["oos"] = np.zeros(size, dtype=bool)
+        elif oos_idx.size >= 2:
+            half = oos_idx.size // 2  # front half stays OOS; tail carves the lockbox
+            new_oos = np.zeros(size, dtype=bool)
+            new_oos[oos_idx[:half]] = True
+            lockbox_mask[oos_idx[half:]] = True
+            out["oos"] = new_oos
+        out["lockbox"] = lockbox_mask
+
+    if purge > 0:
+        for stage in ("val", "oos", "lockbox"):
+            mask = out.get(stage)
+            if mask is None:
+                continue
+            idx = np.flatnonzero(mask)
+            if idx.size == 0:
+                continue
+            trimmed = mask.copy()
+            trimmed[idx[:purge]] = False
+            out[stage] = trimmed
+    return out
 
 
 def _split_masks_from_datetimes(
@@ -859,7 +1026,7 @@ def _split_masks_from_datetimes(
         mask &= ~covered
         covered |= mask
         out[stage] = mask
-    return out
+    return _apply_lockbox_and_purge_masks(out, size=size, split=split)
 
 
 def _align_series_to_timestamps(
@@ -6319,6 +6486,14 @@ def _candidate_effective_split(
                 or candidate.get("timeframe")
                 or timeframe
             )
+            # Backfill the research-profile lockbox/purge flags when the
+            # candidate's own coverage-derived split metadata doesn't set them
+            # itself, so a per-candidate data window still honors an active
+            # strict-research profile. The candidate's own value (if any) wins.
+            if isinstance(fallback_split, Mapping):
+                for _flag_name in ("use_lockbox_split", "purge_embargo_bars"):
+                    if _flag_name not in resolved and _flag_name in fallback_split:
+                        resolved[_flag_name] = fallback_split[_flag_name]
             return _resolve_split_config(resolved, strategy_timeframe=str(timeframe))
 
     if isinstance(fallback_split, Mapping):
@@ -6436,6 +6611,7 @@ def _metrics_for_mask(
     mask: np.ndarray,
     periods_per_year: int,
     candidate_count: int,
+    hac_inference: bool = _RESEARCH_HAC_INFERENCE_DEFAULT,
 ) -> dict[str, Any]:
     return _compute_metrics(
         returns[mask],
@@ -6446,6 +6622,7 @@ def _metrics_for_mask(
         num_trials=candidate_count,
         metric_config=get_default_runtime_config().backtest,
         timestamps=timestamps[mask],
+        hac_inference=hac_inference,
     )
 
 
@@ -6459,6 +6636,7 @@ def _candidate_stage_metrics(
     split_masks: Mapping[str, np.ndarray],
     periods_per_year: int,
     candidate_count: int,
+    hac_inference: bool = _RESEARCH_HAC_INFERENCE_DEFAULT,
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     train_metrics = _metrics_for_mask(
         returns=returns,
@@ -6469,6 +6647,7 @@ def _candidate_stage_metrics(
         mask=split_masks["train"],
         periods_per_year=periods_per_year,
         candidate_count=candidate_count,
+        hac_inference=hac_inference,
     )
     val_metrics = _metrics_for_mask(
         returns=returns,
@@ -6479,6 +6658,7 @@ def _candidate_stage_metrics(
         mask=split_masks["val"],
         periods_per_year=periods_per_year,
         candidate_count=candidate_count,
+        hac_inference=hac_inference,
     )
     oos_metrics = _metrics_for_mask(
         returns=returns,
@@ -6489,6 +6669,7 @@ def _candidate_stage_metrics(
         mask=split_masks["oos"],
         periods_per_year=periods_per_year,
         candidate_count=candidate_count,
+        hac_inference=hac_inference,
     )
     return train_metrics, val_metrics, oos_metrics
 
@@ -6504,6 +6685,7 @@ def _candidate_oos_cost_stress_metrics(
     cost_rate: float,
     periods_per_year: int,
     candidate_count: int,
+    hac_inference: bool = _RESEARCH_HAC_INFERENCE_DEFAULT,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     oos_mask = split_masks["oos"]
     oos_turnover = turnover[oos_mask]
@@ -6518,6 +6700,7 @@ def _candidate_oos_cost_stress_metrics(
         num_trials=candidate_count,
         metric_config=get_default_runtime_config().backtest,
         timestamps=timestamps[oos_mask],
+        hac_inference=hac_inference,
     )
     oos_stress_x3 = _compute_metrics(
         oos_x3,
@@ -6528,6 +6711,7 @@ def _candidate_oos_cost_stress_metrics(
         num_trials=candidate_count,
         metric_config=get_default_runtime_config().backtest,
         timestamps=timestamps[oos_mask],
+        hac_inference=hac_inference,
     )
     return oos_stress_x2, oos_stress_x3
 
@@ -6585,6 +6769,9 @@ class _CandidateMetricPayload:
     oos_metrics: dict[str, Any]
     oos_stress_x2: dict[str, Any]
     oos_stress_x3: dict[str, Any]
+    # Populated only under the lockbox discipline (opt-in). When ``None`` the
+    # legacy 3-way train/val/oos payload is used unchanged.
+    lockbox_metrics: dict[str, Any] | None = None
 
 
 def _load_candidate_signal_payload(
@@ -6645,6 +6832,7 @@ def _evaluate_candidate_metric_payload(
     benchmark_cache: Mapping[str, Mapping[str, np.ndarray] | np.ndarray],
     candidate_count: int,
     split: Mapping[str, Any] | None,
+    scoring_config: Mapping[str, Any] | None = None,
 ) -> _CandidateMetricPayload | None:
     split_masks = _split_masks_from_datetimes(signal_payload.timestamps, split=split)
     periods_per_year = int(_PERIODS_PER_YEAR.get(signal_payload.timeframe, 365))
@@ -6656,6 +6844,14 @@ def _evaluate_candidate_metric_payload(
     )
     if benchmark is None:
         return None
+    # Opt-in HAC/Newey-West correction of the per-candidate DSR studentization
+    # (forwarded to ``research_metrics.deflated_sharpe_ratio``). Resolved once
+    # here from the same ``score_config['research']`` section that already
+    # carries ``strict_selection_gate`` etc., so the flag is legacy-off unless
+    # the strict research profile turns it on.
+    hac_inference = bool(
+        _research_flag(scoring_config, "hac_inference", _RESEARCH_HAC_INFERENCE_DEFAULT)
+    )
     train_metrics, val_metrics, oos_metrics = _candidate_stage_metrics(
         returns=signal_payload.returns,
         turnover=signal_payload.turnover,
@@ -6665,6 +6861,7 @@ def _evaluate_candidate_metric_payload(
         split_masks=split_masks,
         periods_per_year=periods_per_year,
         candidate_count=candidate_count,
+        hac_inference=hac_inference,
     )
     oos_stress_x2, oos_stress_x3 = _candidate_oos_cost_stress_metrics(
         returns_raw=signal_payload.returns_raw,
@@ -6676,13 +6873,29 @@ def _evaluate_candidate_metric_payload(
         cost_rate=signal_payload.cost_rate,
         periods_per_year=periods_per_year,
         candidate_count=candidate_count,
+        hac_inference=hac_inference,
     )
+    lockbox_metrics: dict[str, Any] | None = None
+    lockbox_mask = split_masks.get("lockbox")
+    if lockbox_mask is not None:
+        lockbox_metrics = _metrics_for_mask(
+            returns=signal_payload.returns,
+            turnover=signal_payload.turnover,
+            exposure=signal_payload.exposure,
+            benchmark_returns=benchmark,
+            timestamps=signal_payload.timestamps,
+            mask=lockbox_mask,
+            periods_per_year=periods_per_year,
+            candidate_count=candidate_count,
+            hac_inference=hac_inference,
+        )
     return _CandidateMetricPayload(
         train_metrics=train_metrics,
         val_metrics=val_metrics,
         oos_metrics=oos_metrics,
         oos_stress_x2=oos_stress_x2,
         oos_stress_x3=oos_stress_x3,
+        lockbox_metrics=lockbox_metrics,
     )
 
 
@@ -6690,12 +6903,23 @@ def _evaluate_candidate_hurdles(
     metric_payload: _CandidateMetricPayload,
     *,
     scoring_config: Mapping[str, Any] | None,
+    split: Mapping[str, Any] | None = None,
 ) -> tuple[dict[str, dict[str, Any]], bool, dict[str, Any]]:
+    # Lockbox discipline (opt-in): the binding hurdle runs on validation and the
+    # ``oos`` slot reports the never-touched lockbox scored once. Default keeps the
+    # legacy oos-reported / oos-binding contract, byte-identical when the flag is
+    # unset (``lockbox_metrics`` is ``None``).
+    use_lockbox = metric_payload.lockbox_metrics is not None and bool(
+        _split_flag(split, "use_lockbox_split", _RESEARCH_USE_LOCKBOX_SPLIT_DEFAULT)
+    )
+    reported_oos = metric_payload.lockbox_metrics if use_lockbox else metric_payload.oos_metrics
+    bind_stage = "val" if use_lockbox else "oos"
     hurdle_fields, passed, hard_reject = _hurdle_fields(
         metric_payload.train_metrics,
         metric_payload.val_metrics,
-        metric_payload.oos_metrics,
+        reported_oos,
         scoring_config=scoring_config,
+        bind_stage=bind_stage,
     )
     hard_reject = _apply_cost_stress_hard_rejects(
         hard_reject=hard_reject,
@@ -6727,7 +6951,14 @@ def _candidate_result_payload(
     }
     if isinstance(effective_split, Mapping):
         metadata["effective_split"] = dict(effective_split)
-    return {
+    # Under the lockbox discipline the reported ``oos`` is the never-touched
+    # lockbox scored once; the intermediate oos segment is preserved separately
+    # for transparency. Default keeps ``oos`` as the legacy oos metrics.
+    use_lockbox = metric_payload.lockbox_metrics is not None and bool(
+        _split_flag(effective_split, "use_lockbox_split", _RESEARCH_USE_LOCKBOX_SPLIT_DEFAULT)
+    )
+    reported_oos = metric_payload.lockbox_metrics if use_lockbox else metric_payload.oos_metrics
+    payload = {
         "candidate": candidate,
         "timestamps": signal_payload.timestamps,
         "returns": signal_payload.returns,
@@ -6735,7 +6966,7 @@ def _candidate_result_payload(
         "exposure": signal_payload.exposure,
         "train": metric_payload.train_metrics,
         "val": metric_payload.val_metrics,
-        "oos": metric_payload.oos_metrics,
+        "oos": reported_oos,
         "oos_cost_stress": {
             "x2": {
                 "sharpe": float(metric_payload.oos_stress_x2.get("sharpe", 0.0)),
@@ -6751,6 +6982,9 @@ def _candidate_result_payload(
         "hard_reject_reasons": hard_reject,
         "metadata": metadata,
     }
+    if use_lockbox:
+        payload["oos_intermediate"] = metric_payload.oos_metrics
+    return payload
 
 
 def _evaluate_candidate(
@@ -6785,12 +7019,28 @@ def _evaluate_candidate(
             effective_split=effective_split,
         )
 
-    metric_payload = _evaluate_candidate_metric_payload(
-        signal_payload,
-        benchmark_cache=benchmark_cache,
-        candidate_count=candidate_count,
-        split=effective_split,
-    )
+    try:
+        metric_payload = _evaluate_candidate_metric_payload(
+            signal_payload,
+            benchmark_cache=benchmark_cache,
+            candidate_count=candidate_count,
+            split=effective_split,
+            scoring_config=scoring_config,
+        )
+    except TypeError as exc:
+        # Back-compat with call sites (including existing test monkeypatches,
+        # e.g. tests/test_candidate_effective_split.py) that replace
+        # ``_evaluate_candidate_metric_payload`` with a stub predating the
+        # ``scoring_config`` kwarg. Only the "unexpected keyword" shape is
+        # swallowed; any other ``TypeError`` (a real bug) still propagates.
+        if "scoring_config" not in str(exc):
+            raise
+        metric_payload = _evaluate_candidate_metric_payload(
+            signal_payload,
+            benchmark_cache=benchmark_cache,
+            candidate_count=candidate_count,
+            split=effective_split,
+        )
     if metric_payload is None:
         return _call_insufficient_candidate_result(
             candidate,
@@ -6802,6 +7052,7 @@ def _evaluate_candidate(
     hurdle_fields, passed, hard_reject = _evaluate_candidate_hurdles(
         metric_payload,
         scoring_config=scoring_config,
+        split=effective_split,
     )
     return _candidate_result_payload(
         candidate,
@@ -6871,12 +7122,38 @@ def _candidate_no_trade_train_penalty(
     return 0.0
 
 
+def _candidate_row_effective_split(row: Mapping[str, Any]) -> Mapping[str, Any] | None:
+    effective = row.get("effective_split")
+    if isinstance(effective, Mapping):
+        return effective
+    metadata = row.get("metadata")
+    if isinstance(metadata, Mapping):
+        nested = metadata.get("effective_split")
+        if isinstance(nested, Mapping):
+            return nested
+    return None
+
+
 def _candidate_rank_score(
     row: dict[str, Any], *, scoring_config: Mapping[str, Any] | None = None
 ) -> float:
     cfg = _resolve_score_config(scoring_config)
     weights = dict(cfg["candidate_rank_score_weights"])
-    oos = dict(row.get("oos") or {})
+    # Lockbox discipline (opt-in): rank on validation so the reported OOS (the
+    # never-touched lockbox) is not consumed by ranking. Legacy default ranks on
+    # ``oos`` and is byte-identical when the flag is unset.
+    rank_stage = (
+        "val"
+        if bool(
+            _split_flag(
+                _candidate_row_effective_split(row),
+                "use_lockbox_split",
+                _RESEARCH_USE_LOCKBOX_SPLIT_DEFAULT,
+            )
+        )
+        else "oos"
+    )
+    oos = dict(row.get(rank_stage) or {})
     return float(
         (float(weights["sharpe_weight"]) * float(oos.get("sharpe", 0.0)))
         + (float(weights["deflated_sharpe_weight"]) * float(oos.get("deflated_sharpe", 0.0)))
@@ -7600,6 +7877,7 @@ def _empty_candidate_research_report(
     stage1_keep_ratio: float,
     scoring: _ResearchRunScoringConfig,
     split: Mapping[str, Any] | None,
+    split_overrides: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     return _research_run_support._empty_candidate_research_report(
         base_timeframe=base_timeframe,
@@ -7608,6 +7886,7 @@ def _empty_candidate_research_report(
         stage1_keep_ratio=stage1_keep_ratio,
         scoring=scoring,
         split=split,
+        split_overrides=split_overrides,
     )
 
 

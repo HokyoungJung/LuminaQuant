@@ -328,18 +328,34 @@ def _grouped_row_sum(compact: np.ndarray, lengths: np.ndarray) -> np.ndarray:
     return out
 
 
-def _spearman_2d(a_dense: np.ndarray, b_dense: np.ndarray, min_n: int) -> np.ndarray:
+def _spearman_2d(
+    a_dense: np.ndarray,
+    b_dense: np.ndarray,
+    min_n: int,
+    *,
+    valid: np.ndarray | None = None,
+    b_ranks_dense: np.ndarray | None = None,
+) -> np.ndarray:
     """Row-wise cross-sectional Spearman correlation, batched over many rows.
 
     Bit-identical, row by row, to calling ``_spearman(a_dense[row],
     b_dense[row], min_n)``. Used both for the factor/forward-return IC and
     (with rank inputs) for the rank-decay autocorrelation, since both are
     "masked Pearson-on-average-ranks" reductions.
+
+    ``valid`` and ``b_ranks_dense`` are optional caller-supplied precomputations
+    (X4 fwd-rank sharing): when omitted they are derived here exactly as before,
+    so every default call remains byte-identical. When supplied they MUST equal
+    what this function would have computed -- ``valid == isfinite(a) & isfinite(b)``
+    and ``b_ranks_dense == _average_rank_2d(b_dense, valid)`` -- which lets the
+    reducer reuse ``b_dense``'s ranks across factors sharing the same joint
+    finite mask without changing a single low bit.
     """
-    valid = np.isfinite(a_dense) & np.isfinite(b_dense)
+    if valid is None:
+        valid = np.isfinite(a_dense) & np.isfinite(b_dense)
     counts = valid.sum(axis=1)
     ra_dense = _average_rank_2d(a_dense, valid)
-    rb_dense = _average_rank_2d(b_dense, valid)
+    rb_dense = _average_rank_2d(b_dense, valid) if b_ranks_dense is None else b_ranks_dense
     order = _compact_order(valid)
     compact_ra = _apply_compact(ra_dense, order)
     compact_rb = _apply_compact(rb_dense, order)
@@ -452,6 +468,8 @@ def _reduce_factor_ic_loop(
     max_decay_lag: int = DEFAULT_MAX_DECAY_LAG,
     top_quantile: float = DEFAULT_TOP_QUANTILE,
     bottom_quantile: float = DEFAULT_BOTTOM_QUANTILE,
+    hac_inference: bool = False,
+    label_horizon: int = 1,
 ) -> BatchFactorICResult:
     """Reference reduction: per-(factor, timestamp) Python loop.
 
@@ -550,7 +568,7 @@ def _reduce_factor_ic_loop(
             ts_symbol_ranks.append(rmap)
 
         ic_arr = np.asarray(ic_values, dtype=np.float64)
-        summary = _summarize(ic_arr)
+        summary = _summarize(ic_arr, hac_inference=hac_inference, label_horizon=label_horizon)
         turnover_mean = (
             float(np.sum(np.asarray(turnover_values, dtype=np.float64))) / len(turnover_values)
             if turnover_values
@@ -601,6 +619,8 @@ def _reduce_factor_ic_batched(
     max_decay_lag: int = DEFAULT_MAX_DECAY_LAG,
     top_quantile: float = DEFAULT_TOP_QUANTILE,
     bottom_quantile: float = DEFAULT_BOTTOM_QUANTILE,
+    hac_inference: bool = False,
+    label_horizon: int = 1,
 ) -> BatchFactorICResult:
     """The production reduction: batched over timestamps, per factor.
 
@@ -648,6 +668,14 @@ def _reduce_factor_ic_batched(
     fwd_dense = np.full((n_timestamps, n_symbols), np.nan, dtype=np.float64)
     if n_rows > 0:
         fwd_dense[ts_codes, sym_codes] = forward_returns
+    fwd_finite = np.isfinite(fwd_dense)
+
+    # X4: the forward-return ranks used by the IC Spearman depend only on the
+    # JOINT finite mask (factor & fwd), not on the factor's actual values, so
+    # factors sharing that mask (the common no-NaN case: all factors clean ->
+    # every joint mask equals ``fwd_finite``) can reuse one rank pass. Keyed by
+    # the exact mask bytes; the cached array is bit-identical to recomputing.
+    fwd_rank_cache: dict[bytes, np.ndarray] = {}
 
     k = len(names)
     results: list[FactorICResult] = []
@@ -657,8 +685,17 @@ def _reduce_factor_ic_batched(
             factor_dense[ts_codes, sym_codes] = factor_matrix[:, col]
 
         # IC + quantile spread: jointly masked on (factor, forward return).
-        ic_per_row = _spearman_2d(factor_dense, fwd_dense, min_n)
-        n_obs_per_row = (np.isfinite(factor_dense) & np.isfinite(fwd_dense)).sum(axis=1)
+        factor_finite = np.isfinite(factor_dense)
+        ic_valid = factor_finite & fwd_finite
+        cache_key = ic_valid.tobytes()
+        fwd_ranks = fwd_rank_cache.get(cache_key)
+        if fwd_ranks is None:
+            fwd_ranks = _average_rank_2d(fwd_dense, ic_valid)
+            fwd_rank_cache[cache_key] = fwd_ranks
+        ic_per_row = _spearman_2d(
+            factor_dense, fwd_dense, min_n, valid=ic_valid, b_ranks_dense=fwd_ranks
+        )
+        n_obs_per_row = ic_valid.sum(axis=1)
         spread_per_row = _quantile_spread_2d(factor_dense, fwd_dense, top_quantile, bottom_quantile)
 
         ic_finite = np.isfinite(ic_per_row)
@@ -667,13 +704,13 @@ def _reduce_factor_ic_batched(
         spread_finite = ic_finite & np.isfinite(spread_per_row)
         spread_arr = spread_per_row[spread_finite]
 
-        summary = _summarize(ic_arr)
+        summary = _summarize(ic_arr, hac_inference=hac_inference, label_horizon=label_horizon)
         spread_mean = (
             float(np.sum(spread_arr)) / spread_arr.shape[0] if spread_arr.shape[0] else 0.0
         )
 
         # Turnover + decay: masked on factor value alone (labels not involved).
-        valid_factor = np.isfinite(factor_dense)
+        valid_factor = factor_finite  # == np.isfinite(factor_dense); read-only reuse.
         ranks_all = _average_rank_2d(factor_dense, valid_factor)
         weights_dense = _signed_weights_from_ranks(ranks_all, valid_factor)
         if n_timestamps >= 2:
@@ -713,6 +750,40 @@ def _reduce_factor_ic_batched(
     )
 
 
+def _reject_duplicate_coordinates(symbols: np.ndarray, timestamps: np.ndarray) -> None:
+    """Enforce the (symbol, timestamp) uniqueness precondition of the reducer.
+
+    The batched production path scatters the long panel into a dense
+    ``(n_timestamps, n_symbols)`` grid, so two rows sharing a (symbol, timestamp)
+    coordinate collide there (last-write-wins), while the per-row loop oracle
+    keeps *every* duplicate -- the two diverge silently on such input. Neither
+    "winner" is more correct than the other; a repeated (symbol, timestamp) is a
+    data-integrity error the caller must resolve upstream (deduplicate/aggregate).
+    Detect duplicate ``(ts_code, sym_code)`` pairs via ``np.unique`` and refuse
+    the panel with a clear error rather than compute a silently order-dependent
+    result.
+    """
+    symbols = np.asarray(symbols).reshape(-1)
+    timestamps = np.asarray(timestamps).reshape(-1)
+    n_rows = int(symbols.shape[0])
+    if n_rows < 2:
+        return
+    _, sym_codes = np.unique(symbols, return_inverse=True)
+    _, ts_codes = np.unique(timestamps, return_inverse=True)
+    sym_codes = np.asarray(sym_codes, dtype=np.int64).reshape(-1)
+    ts_codes = np.asarray(ts_codes, dtype=np.int64).reshape(-1)
+    pairs = np.stack((ts_codes, sym_codes), axis=1)
+    unique_pairs = np.unique(pairs, axis=0)
+    if int(unique_pairs.shape[0]) != n_rows:
+        n_dupes = n_rows - int(unique_pairs.shape[0])
+        raise ValueError(
+            "factor_ic_duplicate_symbol_timestamp_pairs: "
+            f"{n_dupes} duplicate (symbol, timestamp) coordinate(s) in a panel of "
+            f"{n_rows} rows; the reducer requires at most one row per "
+            "(symbol, timestamp). Deduplicate or aggregate upstream."
+        )
+
+
 def reduce_factor_ic(
     symbols: np.ndarray,
     timestamps: np.ndarray,
@@ -724,6 +795,8 @@ def reduce_factor_ic(
     max_decay_lag: int = DEFAULT_MAX_DECAY_LAG,
     top_quantile: float = DEFAULT_TOP_QUANTILE,
     bottom_quantile: float = DEFAULT_BOTTOM_QUANTILE,
+    hac_inference: bool = False,
+    label_horizon: int = 1,
 ) -> BatchFactorICResult:
     """The SOLE reduction entry point: pure NumPy, canonical order, no BLAS reductions.
 
@@ -732,6 +805,11 @@ def reduce_factor_ic(
     symbols, timestamps:
         1-D arrays of length ``N`` (row-aligned).  Any dtype that ``np.unique``
         can order deterministically (ints, datetime64, strings) is accepted.
+        **Precondition:** each ``(symbol, timestamp)`` coordinate must appear at
+        most once. Duplicate coordinates are rejected (see
+        :func:`_reject_duplicate_coordinates`) because the batched grid scatter
+        would otherwise resolve them last-write-wins, diverging from the loop
+        oracle -- caller must deduplicate/aggregate upstream.
     factor_matrix:
         ``(N, K)`` float array of factor values.
     forward_returns:
@@ -745,6 +823,7 @@ def reduce_factor_ic(
     production path); :func:`_reduce_factor_ic_loop` is kept importable as the
     permanent parity oracle for that path, not for production use.
     """
+    _reject_duplicate_coordinates(symbols, timestamps)
     return _reduce_factor_ic_batched(
         symbols,
         timestamps,
@@ -755,11 +834,54 @@ def reduce_factor_ic(
         max_decay_lag=max_decay_lag,
         top_quantile=top_quantile,
         bottom_quantile=bottom_quantile,
+        hac_inference=hac_inference,
+        label_horizon=label_horizon,
     )
 
 
-def _summarize(ic_arr: np.ndarray) -> tuple[float, float, float, float, float]:
-    """Return (mean, std, ir, positive_ratio, t_stat) from an IC series."""
+def _hac_variance_inflation(values: np.ndarray, mean: float, label_horizon: int) -> float:
+    """Bartlett-kernel Newey-West variance-inflation factor for the mean of a
+    *chronologically ordered* series (``values``), demeaned by ``mean``.
+
+    Used to widen the iid IC t-stat when horizon-``h`` forward-return labels make
+    the per-period ICs overlap (autocorrelated up to lag ``h - 1``). The lag is
+    ``label_horizon`` (>= the label horizon, so the whole overlap window is
+    covered), clipped to ``n - 1``. Returns exactly ``1.0`` -- i.e. the iid
+    t-stat, unchanged -- when the effective lag is <= 0 or the series has no
+    dispersion, so a horizon-1 (non-overlapping) request degrades to the legacy
+    inference. The Bartlett kernel guarantees a non-negative long-run variance;
+    the caller deflates the naive t by ``sqrt(VIF)``.
+    """
+    n = int(values.shape[0])
+    lag = min(max(0, int(label_horizon)), n - 1)
+    if lag <= 0:
+        return 1.0
+    centered = values - mean
+    s0 = float(np.sum(centered * centered))
+    if s0 <= 0.0:
+        return 1.0
+    vif = 1.0
+    for k in range(1, lag + 1):
+        weight = 1.0 - k / (lag + 1.0)
+        gamma_k = float(np.sum(centered[k:] * centered[:-k]))
+        vif += 2.0 * weight * (gamma_k / s0)
+    return vif
+
+
+def _summarize(
+    ic_arr: np.ndarray,
+    *,
+    hac_inference: bool = False,
+    label_horizon: int = 1,
+) -> tuple[float, float, float, float, float]:
+    """Return (mean, std, ir, positive_ratio, t_stat) from an IC series.
+
+    ``hac_inference`` (default OFF -> byte-identical to the legacy iid t-stat)
+    replaces ``t = mean / (std / sqrt(n))`` with a Newey-West/HAC t-stat
+    (Bartlett kernel, lag ``label_horizon``) so overlapping horizon-``h`` forward
+    returns are no longer treated as independent. Only ``t_stat`` changes; mean,
+    std, IR and the positive ratio are the untouched descriptive stats.
+    """
     n = int(ic_arr.shape[0])
     if n == 0:
         return (0.0, 0.0, 0.0, 0.0, 0.0)
@@ -780,6 +902,10 @@ def _summarize(ic_arr: np.ndarray) -> tuple[float, float, float, float, float]:
     else:
         ir = mean / std
         t_stat = mean / (std / math.sqrt(float(n)))
+        if hac_inference:
+            vif = _hac_variance_inflation(ic_arr, mean, label_horizon)
+            if vif > _EPS:
+                t_stat = t_stat / math.sqrt(vif)
     positive_ratio = float(np.count_nonzero(ic_arr > 0.0)) / n
     return (mean, std, ir, positive_ratio, t_stat)
 
@@ -877,12 +1003,17 @@ def evaluate_factor_ic(
     max_decay_lag: int = DEFAULT_MAX_DECAY_LAG,
     top_quantile: float = DEFAULT_TOP_QUANTILE,
     bottom_quantile: float = DEFAULT_BOTTOM_QUANTILE,
+    hac_inference: bool = False,
+    label_horizon: int = 1,
 ) -> BatchFactorICResult:
     """Evaluate a batch of factors from a Polars/pandas long panel.
 
     The panel must contain ``symbol_column``, ``time_column``, ``label_column``
     and every entry of ``factor_columns``.  Polars handles element-wise cleaning
     only; :func:`reduce_factor_ic` performs the sole (deterministic) reduction.
+
+    ``hac_inference`` (default OFF -> byte-identical) and ``label_horizon`` are
+    forwarded to the reducer's t-stat correction; see :func:`_summarize`.
     """
     names = list(factor_columns)
     if not names:
@@ -900,6 +1031,8 @@ def evaluate_factor_ic(
         max_decay_lag=max_decay_lag,
         top_quantile=top_quantile,
         bottom_quantile=bottom_quantile,
+        hac_inference=hac_inference,
+        label_horizon=label_horizon,
     )
 
 
@@ -914,6 +1047,8 @@ def evaluate_factor_ic_numpy(
     max_decay_lag: int = DEFAULT_MAX_DECAY_LAG,
     top_quantile: float = DEFAULT_TOP_QUANTILE,
     bottom_quantile: float = DEFAULT_BOTTOM_QUANTILE,
+    hac_inference: bool = False,
+    label_horizon: int = 1,
 ) -> BatchFactorICResult:
     """Pure-NumPy entry point (no Polars); shares the sole reducer."""
     return reduce_factor_ic(
@@ -926,6 +1061,8 @@ def evaluate_factor_ic_numpy(
         max_decay_lag=max_decay_lag,
         top_quantile=top_quantile,
         bottom_quantile=bottom_quantile,
+        hac_inference=hac_inference,
+        label_horizon=label_horizon,
     )
 
 

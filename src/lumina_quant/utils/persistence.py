@@ -43,6 +43,11 @@ class StateManager:
         Atomic + concurrency-safe: a per-call UNIQUE temp file (mkstemp) is written
         and os.replace'd into place under a dedicated lock so two threads cannot
         clobber a shared temp path and leave a half-written recovery file.
+
+        Returns ``True`` on success and ``False`` on a genuine write failure (disk
+        full, permission error, etc.) so a caller can detect a persistently-failing
+        crash-recovery write and alert/halt (audit O5) — a silently-failing save
+        leaves a stale recovery file that restores stale positions on next restart.
         """
         with self._save_lock:
             tmp_fd = -1
@@ -65,8 +70,10 @@ class StateManager:
                 os.replace(tmp_path, self.file_path)
                 tmp_path = ""
                 self.logger.debug("State saved successfully.")
+                return True
             except Exception as e:
                 self.logger.error(f"Failed to save state: {e}")
+                return False
             finally:
                 if tmp_fd != -1:
                     try:

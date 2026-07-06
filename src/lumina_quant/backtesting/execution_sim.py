@@ -1,3 +1,4 @@
+import logging
 import os
 import random
 from abc import ABC, abstractmethod
@@ -10,6 +11,8 @@ from lumina_quant.backtesting.execution_model import (
     _config_from_attrs,
 )
 from lumina_quant.core.events import FillEvent
+
+LOGGER = logging.getLogger(__name__)
 
 
 def _env_flag(name: str, default: bool = False) -> bool:
@@ -408,10 +411,12 @@ class SimulatedExecutionHandler(ExecutionHandler):
 
                 if _fill_result.unfilled_qty > 0.0:
                     if not _env_flag("LQ_BACKTEST_SUPPRESS_PARTIAL_FILL_LOGS", False):
-                        print(
-                            f"[Realism] Partial Fill: Req {original_qty} > Limit "
-                            f"{_fill_result.executed_qty:.4f}. Filling "
-                            f"{_fill_result.executed_qty} and keeping remainder."
+                        LOGGER.debug(
+                            "[Realism] Partial Fill: Req %s > Limit %.4f. Filling %s "
+                            "and keeping remainder.",
+                            original_qty,
+                            _fill_result.executed_qty,
+                            _fill_result.executed_qty,
                         )
                     remainder_orders.append(
                         {
@@ -543,6 +548,12 @@ class SimulatedExecutionHandler(ExecutionHandler):
             if triggered and exec_price is not None:
                 if _fill_result is not None:
                     # MKT or LMT — fill already computed in the branch above.
+                    # N5: nothing executed this bar (e.g. a zero-volume trigger bar
+                    # under the always-on liquidity cap). The remainder chase, if any,
+                    # was already queued in the branch above; skip the zero-qty
+                    # FillEvent + protective/OCO bookkeeping and drop the spent order.
+                    if _fill_result.executed_qty <= 0.0:
+                        continue
                     fill_price = _fill_result.fill_price
                     comm = _fill_result.commission
                 else:
@@ -564,10 +575,12 @@ class SimulatedExecutionHandler(ExecutionHandler):
                     comm = cond_result.commission
                     if self._conditional_liquidity_cap and cond_result.unfilled_qty > 0.0:
                         if not _env_flag("LQ_BACKTEST_SUPPRESS_PARTIAL_FILL_LOGS", False):
-                            print(
-                                f"[Realism] Partial Conditional Fill: Req {_cond_qty} > "
-                                f"Limit {cond_result.executed_qty:.4f}. Filling "
-                                f"{cond_result.executed_qty} and chasing remainder as MKT."
+                            LOGGER.debug(
+                                "[Realism] Partial Conditional Fill: Req %s > Limit "
+                                "%.4f. Filling %s and chasing remainder as MKT.",
+                                _cond_qty,
+                                cond_result.executed_qty,
+                                cond_result.executed_qty,
                             )
                         remainder_orders.append(
                             {
@@ -586,6 +599,14 @@ class SimulatedExecutionHandler(ExecutionHandler):
                             }
                         )
                         order["quantity"] = cond_result.executed_qty
+
+                    # N5: nothing executed on this trigger bar (e.g. a zero-volume
+                    # bar under the conditional liquidity cap). Keep only the
+                    # remainder chase queued above and skip the zero-qty FillEvent
+                    # + OCO/protective teardown so live protection isn't dismantled
+                    # on a bar where the exit filled nothing.
+                    if cond_result.executed_qty <= 0.0:
+                        continue
 
                 fill_event = FillEvent(
                     timeindex=event.time,

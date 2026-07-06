@@ -6,9 +6,55 @@ import heapq
 from collections import deque
 from typing import Any
 
-from lumina_quant.backtesting.data import HistoricCSVDataHandler
+from lumina_quant.backtesting.data import _ColumnarBarRows, HistoricCSVDataHandler
 from lumina_quant.configuration import get_default_runtime_config
 from lumina_quant.core.market_window_contract import build_market_window_event
+
+
+class _EpochMsWindowRows:
+    """Lazy MARKET_WINDOW row view over a columnar OHLCV store.
+
+    Serves ``(epoch_ms, open, high, low, close, volume)`` tuples on demand from
+    the packed float64 numeric array plus the precomputed epoch-ms timestamps,
+    so the windowed handler keeps the columnar memory layout instead of
+    re-boxing the entire per-symbol history into Python tuples (audit X2). The
+    emitted tuples are byte-identical to the previously eager-frozen tuples;
+    only rows actually consumed into the sliding window are ever materialized.
+    """
+
+    __slots__ = ("_epoch_ms", "_numeric")
+
+    def __init__(self, epoch_ms: Any, numeric: Any) -> None:
+        self._epoch_ms = epoch_ms
+        self._numeric = numeric
+
+    def __len__(self) -> int:
+        return len(self._numeric)
+
+    def __bool__(self) -> bool:
+        return len(self._numeric) > 0
+
+    def __getitem__(self, idx):
+        if isinstance(idx, slice):
+            return tuple(self[i] for i in range(*idx.indices(len(self._numeric))))
+        n = len(self._numeric)
+        if idx < 0:
+            idx += n
+        if idx < 0 or idx >= n:
+            raise IndexError("row index out of range")
+        row = self._numeric[idx]
+        return (
+            int(self._epoch_ms[idx]),
+            float(row[0]),
+            float(row[1]),
+            float(row[2]),
+            float(row[3]),
+            float(row[4]),
+        )
+
+    def __iter__(self):
+        for i in range(len(self._numeric)):
+            yield self[i]
 
 
 class HistoricParquetWindowedDataHandler(HistoricCSVDataHandler):
@@ -78,26 +124,38 @@ class HistoricParquetWindowedDataHandler(HistoricCSVDataHandler):
         """
         for symbol, rows in list(self.symbol_rows.items()):
             timestamps = self.symbol_timestamps_ms.get(symbol)
-            if not rows or not timestamps or len(rows) != len(timestamps):
+            if (
+                not rows
+                or timestamps is None
+                or len(timestamps) == 0
+                or len(rows) != len(timestamps)
+            ):
                 continue
             if symbol in getattr(self, "_epoch_ms_prefrozen_symbols", set()):
                 idx = int(self.symbol_index.get(symbol, 0))
                 if 0 <= idx < len(rows):
                     self.next_bar[symbol] = rows[idx]
                 continue
-            frozen = tuple(
-                (
-                    int(ts_ms),
-                    float(row[1]),
-                    float(row[2]),
-                    float(row[3]),
-                    float(row[4]),
-                    float(row[5]),
+            if isinstance(rows, _ColumnarBarRows):
+                # Keep the columnar float64 buffer; serve epoch-ms tuples lazily
+                # (audit X2) instead of re-materializing the full history.
+                frozen: Any = _EpochMsWindowRows(timestamps, rows._numeric)
+            else:
+                # Legacy object rows (e.g. a null/wide-int fallback frame):
+                # materialize eagerly, which also fails loudly on a null bar.
+                frozen = tuple(
+                    (
+                        int(ts_ms),
+                        float(row[1]),
+                        float(row[2]),
+                        float(row[3]),
+                        float(row[4]),
+                        float(row[5]),
+                    )
+                    for ts_ms, row in zip(timestamps, rows, strict=False)
                 )
-                for ts_ms, row in zip(timestamps, rows, strict=False)
-            )
-            if not frozen:
-                continue
+                if not frozen:
+                    continue
             self.symbol_rows[symbol] = frozen
             idx = int(self.symbol_index.get(symbol, 0))
             if 0 <= idx < len(frozen):

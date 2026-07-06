@@ -167,13 +167,36 @@ jobs:
       - name: Run full pytest suite
         run: uv run pytest -q
 
+      - name: Golden numeric parity gate
+        # Explicitly runs the golden-comparator integration tests so the enforced
+        # numeric pins are visible in CI (audit V1: ci.yml previously had zero
+        # `golden` references and the event-driven engine goldens — ma_cross_* /
+        # buyholdstrategy_* — were compared by NOTHING in pytest). These also run
+        # inside the full suite above; this named, fast-failing step guarantees
+        # the engine + walk-forward goldens stay wired even if collection changes.
+        run: |
+          uv run pytest -q \
+            tests/integration/test_engine_golden.py \
+            tests/integration/test_walk_forward_golden.py
+
       - name: Install pytest-cov for coverage gate
         run: uv pip install pytest-cov
 
-      - name: Financial-core coverage gate
-        # Measures branch coverage for the financial-core packages and enforces a
-        # conservative 70% floor.  pytest-cov is installed above; --cov is NOT
-        # added to pyproject.toml addopts so local runs are unaffected.
+      - name: Coverage gate (financial-core + live/exchanges/core)
+        # Runs the suite ONCE collecting branch coverage for the research-side
+        # financial-core packages AND the live/exchanges/core packages — the
+        # ~4,600 riskiest live-trading lines that previously had NO coverage floor
+        # and could silently decay (audit V2). Two independent floors are enforced
+        # from the single .coverage data file via `coverage report --include ...
+        # --fail-under`, so each group is gated on its OWN measured coverage (a
+        # single combined --cov-fail-under would let the well-covered research
+        # group mask decay in the live group). The 70% financial-core floor is
+        # unchanged (same 6 packages, same threshold). The 65% live/exchanges/core
+        # floor sits below the measured branch coverage (>=69%) with margin for
+        # full-suite vs targeted-subset variance — ratchet it up as coverage grows.
+        # pytest-cov is installed above; --cov is NOT added to pyproject.toml
+        # addopts so local runs are unaffected. --cov-report=term-missing prints
+        # per-file (per-package) coverage.
         run: |
           uv run pytest -q \
             --cov=lumina_quant.backtesting \
@@ -182,9 +205,21 @@ jobs:
             --cov=lumina_quant.services \
             --cov=lumina_quant.strategy_factory \
             --cov=lumina_quant.alpha_zoo \
+            --cov=lumina_quant.live \
+            --cov=lumina_quant.exchanges \
+            --cov=lumina_quant.core \
             --cov-branch \
-            --cov-report=term-missing \
-            --cov-fail-under=70
+            --cov-report=term-missing
+          echo "::group::financial-core coverage floor (70%)"
+          uv run coverage report \
+            --include="*/lumina_quant/backtesting/*,*/lumina_quant/optimization/*,*/lumina_quant/risk_manager/*,*/lumina_quant/services/*,*/lumina_quant/strategy_factory/*,*/lumina_quant/alpha_zoo/*" \
+            --fail-under=70
+          echo "::endgroup::"
+          echo "::group::live/exchanges/core coverage floor (65%)"
+          uv run coverage report \
+            --include="*/lumina_quant/live/*,*/lumina_quant/exchanges/*,*/lumina_quant/core/*" \
+            --fail-under=65
+          echo "::endgroup::"
 
       - name: Generate benchmark smoke data
         # The perf/8GB smoke gate needs OHLCV CSVs; the repo ships none (data/ is

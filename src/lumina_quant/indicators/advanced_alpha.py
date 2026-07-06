@@ -4,7 +4,12 @@ This module centralizes the higher-level factor math used by:
 - Composite trend momentum (RG_PVTM)
 - Volatility-compression VWAP reversion
 - Cross-asset lead/lag spillover
-- Perp crowding carry filters
+- Perp crowding / positioning-momentum filters (``perp_crowding_score``)
+
+Note on "carry": ``perp_crowding_score`` measures crowding / positioning
+momentum, NOT funding-carry harvest.  A positive funding level means longs PAY
+funding (crowded longs), so collecting funding requires the OPPOSITE side; see
+the opt-in ``true_carry_sign`` output on ``perp_crowding_score``.
 """
 
 from __future__ import annotations
@@ -593,11 +598,20 @@ def perp_crowding_score(
     liquidation_long_notional: Sequence[float] | np.ndarray | float | None = None,
     liquidation_short_notional: Sequence[float] | np.ndarray | float | None = None,
     window: int = 96,
+    true_carry_sign: bool = False,
 ) -> dict[str, Any]:
-    """Compute perp crowding diagnostics from support features.
+    """Compute perp crowding / positioning-momentum diagnostics.
 
-    High positive score implies crowded longs.
-    High negative score implies crowded shorts.
+    High positive score implies crowded longs (who PAY funding when the funding
+    level is positive); high negative score implies crowded shorts.  This is a
+    CROWDING / positioning-momentum signal, NOT a funding-carry-harvest signal:
+    to *collect* funding one must take the side OPPOSITE the funding sign.
+
+    When ``true_carry_sign`` is True (default False => output byte-identical) the
+    result gains a genuine funding-sign-aware carry hint derived from the latest
+    funding level: ``carry_harvest_sign`` (+1 long / -1 short / 0 flat -- the
+    side that actually collects funding), ``carry_harvest_side`` and
+    ``latest_funding_rate``.  With the flag OFF no extra keys are added.
     """
 
     def _arr_or_scalar(value: Sequence[float] | np.ndarray | float | None) -> np.ndarray:
@@ -666,7 +680,7 @@ def perp_crowding_score(
 
     score = math.tanh((0.45 * fz) + (0.35 * oz) + (0.15 * bz) + (0.05 * lz))
 
-    return {
+    result = {
         "available": True,
         "score": float(score),
         "crowding_score": float(score),
@@ -679,6 +693,18 @@ def perp_crowding_score(
         "funding_z": float(fz),
         "oi_delta_z": float(oz),
     }
+    if true_carry_sign:
+        # The sign that actually COLLECTS funding: short when funding > 0, long
+        # when funding < 0 (opposite the crowded side). Additive keys only; the
+        # flag-OFF path above is byte-identical to the legacy output.
+        latest_funding = float(fr[-1]) if fr.size else 0.0
+        harvest_sign = -1.0 if latest_funding > 0.0 else (1.0 if latest_funding < 0.0 else 0.0)
+        result["carry_harvest_sign"] = harvest_sign
+        result["carry_harvest_side"] = (
+            "SHORT" if harvest_sign < 0.0 else "LONG" if harvest_sign > 0.0 else "FLAT"
+        )
+        result["latest_funding_rate"] = latest_funding
+    return result
 
 
 __all__ = [

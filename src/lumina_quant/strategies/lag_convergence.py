@@ -1,12 +1,31 @@
-"""Two-asset lag-convergence strategy using relative momentum spread."""
+"""Two-asset lag-convergence strategy using relative momentum spread.
+
+The legacy book assumes relative-momentum mean reversion with **no** spread
+stationarity/cointegration test and a fixed 1:1 notional per leg.  Two config-
+gated, default-OFF improvements are available (byte-identical when OFF):
+
+* ``require_cointegration`` — before taking a convergence trade, require the
+  log-price spread ``log(X) - beta*log(Y)`` (with ``beta`` the trailing OLS
+  hedge ratio) to be stationary by an ADF t-statistic gate.  A momentum spread
+  can diverge indefinitely when the two legs are **not** cointegrated; this gate
+  refuses entries on non-mean-reverting pairs.
+* ``beta_neutral_sizing`` — size the two legs by inverse realized volatility
+  (risk/beta-neutral) instead of 1:1, so a common market move nets out and the
+  position expresses the *relative* view rather than a levered directional bet.
+
+Both flags default OFF; with both OFF the emitted signals (types, order,
+metadata and unit ``strength``) are byte-identical to the legacy behavior.
+"""
 
 from __future__ import annotations
 
+import math
 from collections import deque
 
 from lumina_quant.core.events import SignalEvent
 from lumina_quant.indicators.common import safe_float
 from lumina_quant.indicators.momentum import momentum_return, momentum_spread
+from lumina_quant.indicators.stationarity import adf_t_statistic
 from lumina_quant.strategy import Strategy
 from lumina_quant.tuning import HyperParam, resolve_params_from_schema
 
@@ -81,6 +100,11 @@ class LagConvergenceStrategy(Strategy):
         stop_threshold=0.05,
         max_hold_bars=96,
         stop_loss_pct=0.03,
+        require_cointegration=False,
+        beta_neutral_sizing=False,
+        coint_window=96,
+        coint_max_tstat=-2.0,
+        beta_window=96,
     ):
         self.bars = bars
         self.events = events
@@ -122,8 +146,19 @@ class LagConvergenceStrategy(Strategy):
         self.stop_threshold = max(self.entry_threshold + 1e-9, float(stop_threshold))
         self.max_hold_bars = max(1, int(max_hold_bars))
         self.stop_loss_pct = float(stop_loss_pct)
+        # STRATEGY-IMPROVE (strategy-local, config-gated, default OFF => byte-
+        # identical to the legacy fixed-1:1 / no-stationarity book).
+        self.require_cointegration = bool(require_cointegration)
+        self.beta_neutral_sizing = bool(beta_neutral_sizing)
+        self.coint_window = max(8, int(coint_window))
+        self.coint_max_tstat = float(coint_max_tstat)
+        self.beta_window = max(8, int(beta_window))
 
         history_len = max(16, self.lag_bars + 8)
+        # Retain enough history for the opt-in stationarity/sizing windows. When
+        # both flags are OFF this is exactly ``max(16, lag_bars + 8)`` as before.
+        if self.require_cointegration or self.beta_neutral_sizing:
+            history_len = max(history_len, self.coint_window + 2, self.beta_window + 2)
         self._x_history = deque(maxlen=history_len)
         self._y_history = deque(maxlen=history_len)
 
@@ -185,18 +220,84 @@ class LagConvergenceStrategy(Strategy):
             return None, None
         return close_x, close_y
 
-    def _emit(self, symbol, event_time, signal_type, metadata, stop_loss=None):
+    def _emit(self, symbol, event_time, signal_type, metadata, stop_loss=None, strength=1.0):
         self.events.put(
             SignalEvent(
                 strategy_id="lag_convergence",
                 symbol=symbol,
                 datetime=event_time,
                 signal_type=signal_type,
-                strength=1.0,
+                strength=float(strength),
                 stop_loss=stop_loss,
                 metadata=metadata,
             )
         )
+
+    def _leg_vol(self, hist):
+        """Trailing realized log-return volatility over ``beta_window`` returns."""
+        vals = [float(value) for value in list(hist)[-(self.beta_window + 1) :] if value > 0.0]
+        if len(vals) < self.beta_window + 1:
+            return None
+        rets = [math.log(vals[idx] / vals[idx - 1]) for idx in range(1, len(vals))]
+        if len(rets) < 2:
+            return None
+        mean_r = sum(rets) / len(rets)
+        var = sum((value - mean_r) ** 2 for value in rets) / (len(rets) - 1)
+        if var <= 0.0:
+            return None
+        return math.sqrt(var)
+
+    def _leg_strengths(self):
+        """Per-leg ``(strength_x, strength_y)``.
+
+        Legacy (flag OFF) is a fixed 1:1 book: ``(1.0, 1.0)``.  With
+        ``beta_neutral_sizing`` ON the legs are sized inversely to their realized
+        volatility (risk/beta-neutral), normalized so the dominant leg is 1.0.
+        Falls back to 1:1 when either leg's vol is unavailable/degenerate.
+        """
+        if not self.beta_neutral_sizing:
+            return 1.0, 1.0
+        vol_x = self._leg_vol(self._x_history)
+        vol_y = self._leg_vol(self._y_history)
+        if vol_x is None or vol_y is None or vol_x <= 0.0 or vol_y <= 0.0:
+            return 1.0, 1.0
+        inv_x = 1.0 / vol_x
+        inv_y = 1.0 / vol_y
+        norm = max(inv_x, inv_y)
+        if norm <= 0.0:
+            return 1.0, 1.0
+        return inv_x / norm, inv_y / norm
+
+    def _hedge_beta(self, window):
+        """Trailing OLS cointegrating slope ``beta`` in ``log(X) = a + beta*log(Y)``."""
+        n = min(len(self._x_history), len(self._y_history))
+        if n < window:
+            return None
+        xs = [math.log(float(value)) for value in list(self._x_history)[-window:]]
+        ys = [math.log(float(value)) for value in list(self._y_history)[-window:]]
+        mean_x = sum(xs) / len(xs)
+        mean_y = sum(ys) / len(ys)
+        cov = sum((xs[i] - mean_x) * (ys[i] - mean_y) for i in range(len(xs)))
+        var = sum((ys[i] - mean_y) ** 2 for i in range(len(ys)))
+        if var <= 1e-12:
+            return None
+        beta = cov / var
+        return beta if math.isfinite(beta) else None
+
+    def _spread_is_stationary(self):
+        """ADF stationarity gate on the beta-adjusted log-price spread."""
+        window = self.coint_window
+        n = min(len(self._x_history), len(self._y_history))
+        if n < window:
+            return False
+        beta = self._hedge_beta(window)
+        if beta is None:
+            return False
+        xs = [math.log(float(value)) for value in list(self._x_history)[-window:]]
+        ys = [math.log(float(value)) for value in list(self._y_history)[-window:]]
+        spread = [xs[i] - beta * ys[i] for i in range(len(xs))]
+        tstat = adf_t_statistic(spread, lags=1)
+        return tstat is not None and tstat <= self.coint_max_tstat
 
     def _emit_entry(self, event_time, spread, close_x, close_y, mode):
         metadata = {
@@ -206,6 +307,7 @@ class LagConvergenceStrategy(Strategy):
             "lag_bars": int(self.lag_bars),
             "entry_threshold": float(self.entry_threshold),
         }
+        strength_x, strength_y = self._leg_strengths()
 
         if mode == "LONG_X_SHORT_Y":
             self._emit(
@@ -214,6 +316,7 @@ class LagConvergenceStrategy(Strategy):
                 "LONG",
                 metadata,
                 stop_loss=close_x * (1.0 - self.stop_loss_pct),
+                strength=strength_x,
             )
             self._emit(
                 self.symbol_y,
@@ -221,6 +324,7 @@ class LagConvergenceStrategy(Strategy):
                 "SHORT",
                 metadata,
                 stop_loss=close_y * (1.0 + self.stop_loss_pct),
+                strength=strength_y,
             )
         else:
             self._emit(
@@ -229,6 +333,7 @@ class LagConvergenceStrategy(Strategy):
                 "SHORT",
                 metadata,
                 stop_loss=close_x * (1.0 + self.stop_loss_pct),
+                strength=strength_x,
             )
             self._emit(
                 self.symbol_y,
@@ -236,6 +341,7 @@ class LagConvergenceStrategy(Strategy):
                 "LONG",
                 metadata,
                 stop_loss=close_y * (1.0 - self.stop_loss_pct),
+                strength=strength_y,
             )
 
     def _emit_exit(self, event_time, spread, reason):
@@ -284,11 +390,15 @@ class LagConvergenceStrategy(Strategy):
         self._last_spread = float(spread)
 
         if self._mode == "OUT":
-            if spread <= -self.entry_threshold:
+            # Opt-in cointegration/stationarity gate: refuse convergence entries
+            # when the beta-adjusted spread is not mean-reverting. Short-circuits
+            # to ``True`` when the flag is OFF (byte-identical legacy path).
+            entry_ok = (not self.require_cointegration) or self._spread_is_stationary()
+            if entry_ok and spread <= -self.entry_threshold:
                 self._emit_entry(pair_time, spread, close_x, close_y, "LONG_X_SHORT_Y")
                 self._mode = "LONG_X_SHORT_Y"
                 self._bars_in_position = 0
-            elif spread >= self.entry_threshold:
+            elif entry_ok and spread >= self.entry_threshold:
                 self._emit_entry(pair_time, spread, close_x, close_y, "SHORT_X_LONG_Y")
                 self._mode = "SHORT_X_LONG_Y"
                 self._bars_in_position = 0

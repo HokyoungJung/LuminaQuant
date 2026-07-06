@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import random
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -88,6 +89,7 @@ class BinanceMarketStreamConfig:
     reconnect_delay_sec: float = 1.5
     websocket_base_url: str = _FUTURES_WS_BASE_URL
     max_connection_age_sec: float = 23 * 60 * 60
+    max_reconnect_backoff_sec: float = 60.0
 
 
 class BinanceMarketStreamClient:
@@ -201,6 +203,22 @@ class BinanceMarketStreamClient:
             receive_ts_ms=int(receive_ms),
         )
 
+    def _reconnect_backoff_sleep(self, *, attempt: int, stop_event: Event) -> None:
+        """Sleep with jittered exponential backoff, interruptible by ``stop_event``.
+
+        A quiet/half-open socket must never turn into a reconnect storm: Binance
+        caps connection attempts per IP, so successive failures back off
+        geometrically (capped) with additive jitter to de-correlate retries.
+        """
+        base = max(0.25, float(self.config.reconnect_delay_sec))
+        cap = max(base, float(self.config.max_reconnect_backoff_sec))
+        exponent = max(0, int(attempt) - 1)
+        # Guard against overflow for pathological attempt counts.
+        scale = float(2 ** min(exponent, 20))
+        delay = min(cap, base * scale)
+        jitter = random.uniform(0.0, base)
+        stop_event.wait(timeout=delay + jitter)
+
     def run_ws_loop(
         self,
         *,
@@ -208,8 +226,19 @@ class BinanceMarketStreamClient:
         on_trade: Callable[[NormalizedTradeTick], None],
         on_book_ticker: Callable[[NormalizedBookTicker], None] | None = None,
         on_error: Callable[[Exception], None] | None = None,
+        on_reconnect: Callable[[], None] | None = None,
     ) -> None:
-        """Run websocket loop until stopped. Best-effort reconnect on transient errors."""
+        """Run websocket loop until stopped. Best-effort reconnect on transient errors.
+
+        Stream *idleness* (no aggTrade for one recv poll interval) is handled
+        inside the connection loop and never drops the socket, so a quiet or
+        sparse market cannot self-inflict a reconnect storm. Only genuine
+        connection/transport failures exit the ``with`` block; those are always
+        routed through ``on_error`` and then retried with jittered exponential
+        backoff. ``on_reconnect`` fires once after every *successful reconnect*
+        (not the first connect) so the caller can run gap recovery for the
+        trades missed while the socket was down.
+        """
         try:
             from websockets.sync.client import connect as ws_connect
         except Exception as exc:  # pragma: no cover - optional dependency path
@@ -217,17 +246,33 @@ class BinanceMarketStreamClient:
                 on_error(exc)
             return
 
+        reconnect_attempt = 0
+        had_previous_connection = False
         while not stop_event.is_set():
             try:
                 url = self.stream_url()
                 connected_at = time.monotonic()
                 with ws_connect(url, open_timeout=10, close_timeout=5) as ws:
+                    # Successful (re)connect: reset backoff and recover any gap
+                    # that opened while the socket was down.
+                    reconnect_attempt = 0
+                    if had_previous_connection and on_reconnect is not None:
+                        try:
+                            on_reconnect()
+                        except Exception as exc:  # pragma: no cover - defensive
+                            if on_error is not None:
+                                on_error(exc)
+                    had_previous_connection = True
                     while not stop_event.is_set():
                         if time.monotonic() - connected_at >= max(
                             60.0, float(self.config.max_connection_age_sec)
                         ):
                             break
-                        raw = ws.recv(timeout=1)
+                        try:
+                            raw = ws.recv(timeout=1)
+                        except TimeoutError:
+                            # Idle stream: keep the socket, do NOT reconnect.
+                            raw = None
                         if raw is None:
                             continue
                         try:
@@ -242,14 +287,13 @@ class BinanceMarketStreamClient:
                                 continue
                         for tick in self.parse_message(payload, receive_ts_ms=now_ms):
                             on_trade(tick)
-            except TimeoutError:
-                continue
             except Exception as exc:  # pragma: no cover - network/reconnect path
                 if on_error is not None:
                     on_error(exc)
                 if stop_event.is_set():
                     break
-                time.sleep(max(0.25, float(self.config.reconnect_delay_sec)))
+                reconnect_attempt += 1
+                self._reconnect_backoff_sleep(attempt=reconnect_attempt, stop_event=stop_event)
 
 
 __all__ = [

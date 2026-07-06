@@ -1,17 +1,27 @@
-version: '3.8'
+# Docker is out of scope for the supported runtime (see docs/DEPLOYMENT.md); this
+# compose file mirrors the documented `uv sync --extra optimize --extra live` +
+# `lq live` install for parity/experimentation only.
+#
+#   docker compose up --build
+#
+# Provide TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID and exchange creds via .env.
 
 services:
   lumina-quant:
-    build: .
+    build:
+      context: .
+      args:
+        PYTHON_VERSION: "3.14"
+    image: lumina-quant:latest
     container_name: lumina_quant
-    restart: always
-    volumes:
-      - .:/app
+    # on-failure (not always/unless-stopped): a clean/intentional exit must NOT
+    # be auto-restarted into a kill-switch it just tripped.
+    restart: on-failure
     env_file:
       - .env
-    # To run WebSocket Mode
-    command: python run_live_ws.py
-    # To run Dashboard
-    # command: streamlit run dashboard.py --server.port=8501 --server.address=0.0.0.0
-    ports:
-      - "8501:8501"
+    volumes:
+      # Persist structured logs and local runtime state (state.json, parquet)
+      # across restarts; the source + venv are baked into the image.
+      - ./logs:/app/logs
+      - ./data:/app/data
+    command: ["lq", "live"]

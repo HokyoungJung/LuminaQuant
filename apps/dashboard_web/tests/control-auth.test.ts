@@ -32,6 +32,11 @@
  *   5. Middleware: GET from localhost (no token needed):
  *      curl -X GET http://localhost:3000/api/python/dashboard/workflow-jobs
  *      -> Expected: 200 (read-only, no auth required from localhost)
+ *
+ *   6. Middleware (O6): remote peer spoofing a loopback x-forwarded-for:
+ *      curl -X GET http://<beyond-loopback-host>:3000/api/python/dashboard/overview \
+ *        -H 'x-forwarded-for: 127.0.0.1'
+ *      -> Expected: 403 — the direct socket peer is remote, so the forged XFF is ignored.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
@@ -64,12 +69,25 @@ function checkControlToken(
 
 const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
 
-function isLocalhost(headers: Record<string, string>): boolean {
+// Mirrors middleware.ts isLocalhost (O6 trust model): x-forwarded-for is only trusted to
+// prove locality when the DIRECT socket peer is itself loopback (a trusted local proxy).
+function isLocalhost(headers: Record<string, string>, directIp?: string): boolean {
   const xff = headers['x-forwarded-for'];
-  if (xff) {
-    return LOOPBACK.has(xff.split(',')[0].trim());
+  const forwardedClient = xff ? xff.split(',')[0].trim() : null;
+
+  if (directIp) {
+    if (!LOOPBACK.has(directIp)) {
+      // Genuine remote peer — never trust its x-forwarded-for claim of loopback.
+      return false;
+    }
+    return forwardedClient === null ? true : LOOPBACK.has(forwardedClient);
   }
-  // No xff header means the request arrived directly (no proxy) — treat as localhost.
+
+  // No direct peer IP: x-forwarded-for cannot GRANT access, but a self-declared
+  // non-loopback client is honored as a fail-closed reject.
+  if (forwardedClient !== null && !LOOPBACK.has(forwardedClient)) {
+    return false;
+  }
   return true;
 }
 
@@ -77,11 +95,12 @@ function middlewareDecision(
   headers: Record<string, string>,
   pathname: string,
   envToken: string | undefined,
+  directIp?: string,
 ): { allowed: boolean; status?: number; error?: string } {
   if (!pathname.startsWith('/api/python/dashboard')) {
     return { allowed: true };
   }
-  const local = isLocalhost(headers);
+  const local = isLocalhost(headers, directIp);
   const hasToken = !!envToken && (headers['x-lq-control-token'] ?? '') === envToken;
   if (local || hasToken) {
     return { allowed: true };
@@ -189,6 +208,33 @@ describe('isLocalhost (middleware.ts logic)', () => {
   it('trims whitespace around x-forwarded-for entries', () => {
     expect(isLocalhost({ 'x-forwarded-for': '  127.0.0.1  , 10.0.0.1' })).toBe(true);
   });
+
+  // ---- O6: x-forwarded-for spoof prevention (direct peer IP dimension) ----
+
+  it('O6: rejects a remote peer that spoofs x-forwarded-for: 127.0.0.1', () => {
+    // A genuine remote client reaches a beyond-loopback-bound server and forges XFF.
+    // The direct peer IP (203.0.113.1) is authoritative — the spoof must NOT grant local.
+    expect(isLocalhost({ 'x-forwarded-for': '127.0.0.1' }, '203.0.113.1')).toBe(false);
+    expect(isLocalhost({ 'x-forwarded-for': '::1' }, '203.0.113.1')).toBe(false);
+    expect(isLocalhost({ 'x-forwarded-for': '::ffff:127.0.0.1' }, '198.51.100.7')).toBe(false);
+  });
+
+  it('O6: rejects a remote peer regardless of x-forwarded-for value', () => {
+    expect(isLocalhost({}, '203.0.113.1')).toBe(false);
+    expect(isLocalhost({ 'x-forwarded-for': '203.0.113.1' }, '203.0.113.1')).toBe(false);
+    expect(isLocalhost({ 'x-forwarded-for': '127.0.0.1, 203.0.113.1' }, '10.8.0.2')).toBe(false);
+  });
+
+  it('O6: honors x-forwarded-for only when the direct peer is a loopback proxy', () => {
+    // Trusted local reverse proxy (peer is loopback) forwards the true client.
+    expect(isLocalhost({ 'x-forwarded-for': '127.0.0.1' }, '127.0.0.1')).toBe(true);
+    expect(isLocalhost({ 'x-forwarded-for': '::1' }, '::1')).toBe(true);
+    // Loopback proxy forwarding a REMOTE client => not localhost.
+    expect(isLocalhost({ 'x-forwarded-for': '203.0.113.1' }, '127.0.0.1')).toBe(false);
+    expect(isLocalhost({ 'x-forwarded-for': '203.0.113.1, 127.0.0.1' }, '::1')).toBe(false);
+    // Loopback peer with no forwarded header => the peer itself is the client.
+    expect(isLocalhost({}, '127.0.0.1')).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -268,5 +314,48 @@ describe('middlewareDecision (middleware.ts logic)', () => {
     );
     expect(r.allowed).toBe(false);
     expect(r.status).toBe(403);
+  });
+
+  it('O6: rejects a remote peer that spoofs x-forwarded-for: 127.0.0.1 (read path, no token)', () => {
+    // GET/read on a beyond-loopback server: direct peer is remote, XFF forges loopback.
+    const r = middlewareDecision(
+      { 'x-forwarded-for': '127.0.0.1' },
+      '/api/python/dashboard/overview',
+      undefined,
+      '203.0.113.1',
+    );
+    expect(r.allowed).toBe(false);
+    expect(r.status).toBe(403);
+    expect(r.error).toBe('forbidden');
+  });
+
+  it('O6: spoofed loopback XFF still needs a valid token to reach control route', () => {
+    const spoofHeaders = { 'x-forwarded-for': '::1', 'x-lq-control-token': 'wrong' };
+    const denied = middlewareDecision(
+      spoofHeaders,
+      '/api/python/dashboard/workflow-jobs/control',
+      'correct',
+      '203.0.113.1',
+    );
+    expect(denied.allowed).toBe(false);
+    expect(denied.status).toBe(403);
+    // The same remote peer WITH the correct token is allowed (token, not the spoof).
+    const allowed = middlewareDecision(
+      { 'x-forwarded-for': '::1', 'x-lq-control-token': 'correct' },
+      '/api/python/dashboard/workflow-jobs/control',
+      'correct',
+      '203.0.113.1',
+    );
+    expect(allowed.allowed).toBe(true);
+  });
+
+  it('O6: a trusted loopback proxy forwarding a localhost client is allowed', () => {
+    const r = middlewareDecision(
+      { 'x-forwarded-for': '127.0.0.1' },
+      '/api/python/dashboard/overview',
+      undefined,
+      '127.0.0.1',
+    );
+    expect(r.allowed).toBe(true);
   });
 });
