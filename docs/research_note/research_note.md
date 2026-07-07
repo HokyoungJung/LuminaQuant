@@ -2798,3 +2798,46 @@ Best raw/shadow candidate is `lagged_shadow_leaf_router:core_warmup4_avg2_val05_
 - Existing-candidate reuse diagnostic added/recorded `robust_quality_v1_top1`: `+24.55%` comp / `+30.14%` annualized / `7/10` positive, improving prior `robust_top1` (`+22.14%` comp). This is still **post-failure research**, not clean/fresh-forward promotion.
 - Summary artifact: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/current_search_residual_dispersion_summary_20260609/current_search_residual_dispersion_summary_20260609.md` and `.json`.
 - Decision: **NO LIVE/SHADOW PROMOTION; real allocation remains `0%`**. Do not tune thresholds or family inclusion against these locked-OOS smoke results. If using this branch next, freeze family subset before a genuinely unseen/fresh-forward slice, then run 10/15/20bps cost or paper fill telemetry, turnover/RPT, BBO spread/slippage, partial/cancel/reject, and reconciliation gates.
+
+## 2026-07-07 — Strategy performance improvement pass: guarded lagged-shadow candidate, no full-universe claim
+
+- User objective: improve the highest-performing plausible strategy line without nonsensical/OOS-mined promotion, refresh TradFi discovery evidence, keep data writes/backfill safe, optimize compute/memory under `uv`, run full-universe walk-forward if supported by existing data, pass CI, and push to git.
+- Primary artifacts:
+  - `var/reports/strategy_performance_improvement_20260707/improved_candidate_manifest_latest.json`
+  - `var/reports/strategy_performance_improvement_20260707/wf_report_normalized_latest.json` and `.md`
+  - `var/reports/strategy_performance_improvement_20260707/full_universe_walkforward/full_universe_walkforward_summary_latest.json` and `.md`
+  - `var/reports/strategy_performance_improvement_20260707/data_tradfi_lane/tradfi_data_coverage_summary_latest.json` and `.md`
+  - `var/reports/strategy_performance_improvement_20260707/final_ci_summary_latest.json` and `.md`
+- Implemented candidate: `lagged_shadow_leaf_router:core_warmup4_avg2_val05_mdd12_lag_val_mdd12_cap110_trimmed`.
+  - Family: `lagged_shadow_leaf_router`.
+  - Status: `research/shadow-only`.
+  - `clean_promotion_eligible=false`, `promotion_decision=no_clean_promotion`, `requires_fresh_forward_shadow=true`.
+  - Risk controls: no current-fold OOS selection/weighting, lagged max scale `1.1`, lagged target validation MDD `0.12`.
+- Governance repair: locked-OOS/report rankings are now diagnostic-only for this workflow. Promotion requires fresh-forward shadow evidence rather than selecting or sizing from the same locked OOS report set.
+- Current official full-universe WF result: **blocked / not claimed**.
+  - `full_universe_claim_status=blocked_not_claimed_missing_direct_1m_bars`.
+  - Requested/loaded/missing symbols: `110 / 0 / 110`.
+  - Fold count: `0`; fold candidate rows: `0`.
+  - CAGR/Sharpe/MDD/trade-count: not produced and not claimed.
+  - Blocker: local `data/market_parquet` had no direct 1m-derived bars; runner raised no-direct-1m-bars loaded for any symbol/timeframe.
+  - Peak RSS in blocked runner path: `190.85 MiB`; source-symbol workers: `2`; native backend report: `numba`, `pyo3_available=True`.
+- Historical proxy context preserved but not promoted:
+  - Proxy compounded OOS: `+159.83%`.
+  - Proxy annualized approximate: `+214.51%`.
+  - Caveat: comparison/reference only; current full-universe WF did not complete because direct 1m data was absent, and this proxy is not a deployable or clean-promotion claim.
+- TradFi discovery/coverage lane:
+  - Static TradFi snapshot: `100`.
+  - Discovered TradFi trading contracts: `118`.
+  - Newly discovered since static snapshot: `18` (`ALABUSDT`, `BSPUSDT`, `CATUSDT`, `CIENUSDT`, `FLEXUSDT`, `KLACUSDT`, `KORUUSDT`, `KSTRUSDT`, `LRCXUSDT`, `MVLLUSDT`, `SMCIUSDT`, `SONYUSDT`, `SQQQUSDT`, `STRCUSDT`, `TERUSDT`, `TQQQUSDT`, `TTWOUSDT`, `TXNUSDT`).
+  - Selected symbols: `128` (`10` core crypto + `118` discovered TradFi trading).
+  - Data-write status: `dry_run_discovery_no_data_write`; fetched rows `0`, upserted rows `0`. No uncontrolled backfill was performed.
+- Verification and compute evidence:
+  - Full clean-env pytest: `3571 passed, 20 skipped, 3 xfailed`.
+  - Dashboard gates: `npm install`, `lint`, `test`, `typecheck`, `build` passed; dashboard tests `60`.
+  - Coverage gates: total `79%`, financial core `83% >= 70%`, live/exchanges/core `70% >= 65%`.
+  - Native/Rust gates: native backend build and Binance native architecture gate passed; no untested Rust hot-path change was introduced.
+  - Benchmark/8GB gate: median `0.05218s`, `12149` bars/sec, peak RSS `254.19 MiB`.
+  - Final targeted clean-env tests: `70 passed`.
+- Git/CI delivery: Lore commit `5b48fcd943050141294376e4eb8436b5713964a0` was pushed to `private/main` before this research-note follow-up.
+- Decision: **implementation and governance cleanup succeeded, but performance improvement is not proven**. The new lagged-shadow trimmed candidate is retained only as a research/shadow candidate. Do not report a fresh CAGR/Sharpe/MDD for it until a leader-authorized data plan supplies direct 1m bars and a fresh-forward, no-leak evaluation is run. Do not start backfill automatically; any data write/backfill requires explicit scope, symbols, date range, storage path, and resource/API limits.
+

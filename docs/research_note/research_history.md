@@ -32569,3 +32569,30 @@ Before repeating calendar-salvage research, read `var/reports/profit_moonshot_20
 - Decision impact: No promotion. Current live/shadow allocation remains 0%. Do not use dispersion-gated momentum to improve current overlay; it is a research input requiring fresh-forward before any family-subset decision can be trusted.
 - Staleness/recheck: Recheck only on a fresh unseen slice with pre-frozen family subset and exact 10/15/20bps or paper fill cost telemetry. / `True`
 - Do-not-repeat note: Do not keep adding train/validation-high families into the current overlay and selecting by locked-OOS aftermath. Use small family smokes, quarantine degraders, then freeze before fresh-forward.
+
+---
+
+## 2026-07-07 strategy-performance improvement pass
+
+### `local_artifact:var_reports_strategy_performance_improvement_20260707_wf_report_normalized_latest_json`
+- Research dates: 2026-07-07
+- Source type: `local_artifact + implementation + verification`
+- Title/path: Strategy performance-improvement WF evidence report — `var/reports/strategy_performance_improvement_20260707/wf_report_normalized_latest.json`
+- Content summary: Guarded `lagged_shadow_leaf_router` trimmed candidate was implemented as research/shadow-only, while full-universe walk-forward was blocked because existing local `data/market_parquet` had no direct 1m-derived bars. Requested/loaded/missing symbols were `110 / 0 / 110`, fold count `0`, and CAGR/Sharpe/MDD were not produced or claimed. Historical proxy context remained `+159.83%` compounded OOS / `+214.51%` annualized approx, but was retained as reference only.
+- What was used: Used to preserve the no-leak/no-promotion boundary and record a truthful blocked performance report rather than inflating the historical proxy into a new result.
+- Families: lagged_shadow_leaf_router, full_universe_walkforward, tradfi_discovery, native_backend_verification
+- Decision impact: New candidate `lagged_shadow_leaf_router:core_warmup4_avg2_val05_mdd12_lag_val_mdd12_cap110_trimmed` remains `research/shadow-only`; clean promotion requires fresh-forward shadow evidence and direct 1m data coverage. No real-money or paper promotion.
+- Staleness/recheck: Recheck only after an explicitly authorized data plan supplies direct 1m bars and the WF can run with 10/15/20bps cost, turnover/RPT, and execution telemetry gates. / `True`
+- Do-not-repeat note: Do not backfill automatically. Do not use locked-OOS report rankings for selection or sizing. Do not present the `+159.83%` proxy as a current full-universe WF result.
+
+### `local_artifact:var_reports_strategy_performance_improvement_20260707_data_tradfi_lane_summary_latest_json`
+- Research dates: 2026-07-07
+- Source type: `local_artifact + dry_run_discovery`
+- Title/path: TradFi data lane coverage summary — `var/reports/strategy_performance_improvement_20260707/data_tradfi_lane/tradfi_data_coverage_summary_latest.json`
+- Content summary: TradFi discovery validated `100` static TradFi symbols, `118` discovered trading TradFi contracts, `18` newly discovered since the static snapshot, and `128` selected symbols including `10` core crypto. Mode was `dry_run_discovery_no_data_write`; fetched rows `0`, upserted rows `0`.
+- What was used: Used to update the discovery/coverage view without performing uncontrolled historical backfill or data writes.
+- Families: tradfi_discovery, raw_first_data_pipeline, source_history_ledger
+- Decision impact: Dynamic Binance TRADIFI_PERPETUAL discovery can extend the static universe view, but historical/current data refresh remains a separate explicitly scoped operation.
+- Staleness/recheck: Recheck when Binance listings change or when a scoped data-refresh plan is approved. / `True`
+- Do-not-repeat note: Discovery is not data backfill. Keep fetched/upserted row counts explicit in future reports.
+
