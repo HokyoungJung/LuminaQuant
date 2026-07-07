@@ -1,0 +1,50 @@
+{
+  "blocker": "data/market_parquet has no direct 1m-derived bars; runner raised ValueError: no direct 1m-derived bars loaded for any symbol/timeframe.",
+  "chunk_sizes": {
+    "checkpoint_interval": 1,
+    "checkpoint_markdown_interval": 0,
+    "explicit_chunks": []
+  },
+  "command_log_path": "var/reports/strategy_performance_improvement_20260707/command_log_latest.txt",
+  "cost_grid_bps": [
+    10,
+    15,
+    20
+  ],
+  "created_at": "2026-07-07T11:39:43.237254Z",
+  "data_coverage_counts": {
+    "basis": "WF runner announced symbols=110 then loaded no direct 1m-derived bars from data/market_parquet.",
+    "loaded": 0,
+    "missing": 110,
+    "monitor_only": 0,
+    "train_eligible": 0
+  },
+  "dsr_pbo": null,
+  "full_universe_claim_status": "blocked",
+  "historical_proxy_comparison": {
+    "caveat": "Comparison only; current full-universe run did not complete due missing local 1m-derived bars.",
+    "proxy_annualized_approx_pct": 214.51,
+    "proxy_compounded_oos_pct": 159.83
+  },
+  "leak_checks": {
+    "basis": "Verification lane ran no successful WF selection; targeted no-leak/selection tests passed. Full WF blocked before selection due missing bars.",
+    "uses_locked_oos_for_selection": false,
+    "uses_locked_oos_for_sizing": false,
+    "uses_locked_oos_for_tiebreak": false,
+    "uses_locked_oos_for_weighting": false
+  },
+  "locked_oos_report_only_metrics": null,
+  "mdd": null,
+  "native_backend_status": "No native/Rust/backend paths modified by worker-4; lumina_compute import not installed in this venv; parity tests not required by task scope.",
+  "pass_fail_decision": "FAIL_BLOCKED_NO_DATA",
+  "peak_rss_mb": 190.85,
+  "schema_version": "1.0",
+  "selected_variants": [],
+  "status": "blocked",
+  "trade_count": null,
+  "train_validation_metrics": null,
+  "worker_count": {
+    "source_symbol_workers": 2,
+    "team_worker": "worker-4"
+  }
+}

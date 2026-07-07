@@ -1,0 +1,146 @@
+{
+  "artifact_kind": "final_ci_summary",
+  "checks": [
+    {
+      "command": "uv sync --extra optimize --extra dev --extra live --extra dashboard",
+      "name": "uv_sync_full_extras",
+      "status": "PASS"
+    },
+    {
+      "command": "uv run python scripts/build_native_backends.py",
+      "name": "native_backend_build",
+      "status": "PASS"
+    },
+    {
+      "command": "bash scripts/ci/architecture_gate_live_data.sh",
+      "name": "architecture_gate_live_data",
+      "status": "PASS"
+    },
+    {
+      "command": "bash scripts/ci/architecture_gate_market_window_contract.sh",
+      "name": "architecture_gate_market_window_contract",
+      "status": "PASS"
+    },
+    {
+      "command": "uv run pytest -q <CI raw-first subset>",
+      "name": "raw_first_subset",
+      "status": "PASS",
+      "summary": "78 passed"
+    },
+    {
+      "command": "uv run python scripts/check_architecture.py",
+      "name": "architecture_check",
+      "status": "PASS"
+    },
+    {
+      "command": "uv run python scripts/audit_hardcoded_params.py",
+      "name": "hardcoded_param_audit",
+      "status": "PASS",
+      "summary": "total=1135, new=0"
+    },
+    {
+      "command": "uv run python scripts/verify_docs.py",
+      "name": "docs_verification",
+      "status": "PASS",
+      "summary": "140 markdown files verified"
+    },
+    {
+      "command": "timeout 900s uv run pytest -q",
+      "name": "full_pytest_clean_env",
+      "peak_rss_kb_observed": "~11063712",
+      "status": "PASS",
+      "summary": "3571 passed, 20 skipped, 3 xfailed in 241.52s"
+    },
+    {
+      "command": "npm install --no-fund --no-audit",
+      "name": "dashboard_install",
+      "status": "PASS"
+    },
+    {
+      "command": "npm run lint",
+      "name": "dashboard_lint",
+      "status": "PASS"
+    },
+    {
+      "command": "npm run test",
+      "name": "dashboard_test",
+      "status": "PASS",
+      "summary": "60 tests"
+    },
+    {
+      "command": "npm run typecheck",
+      "name": "dashboard_typecheck",
+      "status": "PASS"
+    },
+    {
+      "command": "npm run build",
+      "name": "dashboard_build",
+      "status": "PASS"
+    },
+    {
+      "command": "uv run pytest -q --cov=... --cov-branch --cov-report=term-missing",
+      "name": "coverage_total",
+      "status": "PASS",
+      "summary": "3571 passed, 20 skipped, 3 xfailed; total coverage 79%"
+    },
+    {
+      "command": "coverage report --include financial core modules",
+      "name": "coverage_financial_core",
+      "status": "PASS",
+      "summary": "83% >= 70% gate"
+    },
+    {
+      "command": "coverage report --include live/exchanges/core modules",
+      "name": "coverage_live_exchanges_core",
+      "status": "PASS",
+      "summary": "70% >= 65% gate"
+    },
+    {
+      "command": "uv run python generate_data.py",
+      "name": "generate_benchmark_data",
+      "status": "PASS"
+    },
+    {
+      "command": "uv run python scripts/benchmark_backtest.py --iters 1 --warmup 0 --output <tmp>/luminaquant-final-ci-20260707/benchmarks/ci_smoke.json",
+      "name": "benchmark_smoke",
+      "status": "PASS",
+      "summary": "median 0.05218s, 12149 bars/sec"
+    },
+    {
+      "command": "uv run python scripts/verify_8gb_baseline.py --benchmark <tmp>/luminaquant-final-ci-20260707/benchmarks/ci_smoke.json --skip-dmesg ...",
+      "name": "8gb_baseline",
+      "status": "PASS",
+      "summary": "peak_rss 254.19 MiB < 7372.80 MiB; disk_total 25.040 GiB <= 30 GiB"
+    },
+    {
+      "command": "bash scripts/ci/architecture_gate_binance_native.sh",
+      "name": "binance_native_gate",
+      "status": "PASS"
+    },
+    {
+      "command": "uv run --extra dev ruff format --check . && uv run --extra dev ruff check . && clean-env uv run --extra dev pytest -q <report+strategy+engine targeted suites>",
+      "name": "review_fix_second_final_sanity",
+      "status": "PASS",
+      "summary": "70 passed in 27.85s"
+    }
+  ],
+  "environment": {
+    "node_package_manager": "npm",
+    "notes": [
+      "Python CI-equivalent runs that import settings were executed with local .env temporarily hidden and restored to prevent machine-local secret/config injection.",
+      "Full-universe WF performance metrics are not claimed because data/market_parquet lacks direct 1m-derived bars."
+    ],
+    "package_manager": "uv"
+  },
+  "final_claims": {
+    "ci_equivalent_passed": true,
+    "dashboard_ci_passed": true,
+    "full_universe_walkforward_blocker": "data/market_parquet has no direct 1m-derived bars; no CAGR/Sharpe/MDD full-universe result is claimed.",
+    "full_universe_walkforward_success_claimed": false,
+    "native_backend_build_passed": true,
+    "strategy_candidate_promotion": "research/shadow-only; requires fresh forward shadow evidence"
+  },
+  "generated_at_utc": "2026-07-07T12:27:37.929129Z",
+  "schema_version": "1.0",
+  "scope": "strategy performance improvement / TradFi discovery / WF report final gate"
+}

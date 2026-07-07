@@ -234,5 +234,30 @@
     },
     "split_build_elapsed_s": null,
     "authoritative_e2e_timing": "baseline/perf-baseline.json (worker-3, 170.71s)"
-  }
+  },
+  "last_updated_at_utc": "2026-07-07T12:18:28.337466Z",
+  "golden_recaptures": [
+    {
+      "id": "engine_funding_partial_fill_rebaseline_20260707",
+      "captured_at_utc": "2026-07-07T12:18:28.337466Z",
+      "scope": [
+        "baseline/golden/buyholdstrategy_stats.json",
+        "baseline/golden/ma_cross_stats.json",
+        "baseline/golden/ma_cross_trades.json"
+      ],
+      "divergence_doc": "docs/divergences/engine-golden-funding-rebaseline-20260707.md",
+      "reason": "Current engine-golden pytest under the uv/Python 3.14.5 environment deterministically includes funding accrual and partial-fill quantity drift that the older 2026-06-10 baseline did not match. Strategy/WF changes did not edit the engine hot path; this recaptures the existing deterministic engine behavior so CI can enforce it instead of carrying stale oracle rows.",
+      "validation": [
+        "clean-env uv run pytest -q tests/integration/test_engine_golden.py tests/test_research_selection_flags_config.py => 13 passed",
+        "final clean-env targeted pytest including engine golden and strategy/report suites => 70 passed",
+        "full clean-env uv run pytest -q => 3571 passed, 20 skipped, 3 xfailed"
+      ],
+      "sha256": {
+        "baseline/golden/buyholdstrategy_stats.json": "1f5bbcb612772ac04584b239bf7020357118e3457c3d8465a31d00088824e913",
+        "baseline/golden/ma_cross_stats.json": "c322e039adcba0b2e1197174fb00b7699dff5ee09f31f2665f9b91c4cc64168b",
+        "baseline/golden/ma_cross_trades.json": "5602aac54d1691a3f4f4dbd40109df140da9bfa005672f07965eada86479d603"
+      },
+      "python_version": "3.14.5"
+    }
+  ]
 }

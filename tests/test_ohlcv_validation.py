@@ -92,6 +92,7 @@ def test_strict_loader_validates_non_monotonic_source_before_sorting(tmp_path) -
 
     assert "datetime_not_monotonic" in str(exc_info.value)
 
+
 def test_validate_ohlcv_frame_checks_symbol_partition_order_and_duplicates() -> None:
     frame = pl.DataFrame(
         {

@@ -449,26 +449,48 @@ def _promotability_decision(best: Mapping[str, Any]) -> dict[str, Any]:
     challenger_mdd = CURRENT_CHALLENGER_MAX_OOS_MDD
     robust_default_comp = ROBUST_DEFAULT_OOS_COMP
     robust_default_mdd_limit = ROBUST_DEFAULT_MAX_OOS_MDD_LIMIT
-    reasons: list[str] = []
+    diagnostic_reasons: list[str] = []
     if not clean_candidate:
         return {
             "promotable": False,
             "promotion_hard_stop_pass": False,
             "promotion_hard_stop_reasons": ["blocked_non_clean_research_variant"],
+            "promotion_metric_basis": "locked_oos_diagnostic_only",
+            "oos_threshold_diagnostic_reasons": [],
             "if_false_recommendation": "fresh_forward_shadow_required_before_promotion",
         }
     if oos_comp > challenger_comp and max_mdd <= challenger_mdd:
-        reasons.append("beats_current_clean_challenger_without_worse_mdd")
+        diagnostic_reasons.append("beats_current_clean_challenger_without_worse_mdd")
     if oos_comp >= challenger_comp * 0.98 and (max_mdd < challenger_mdd or min_oos > -0.0265):
-        reasons.append("comparable_to_challenger_with_material_risk_improvement")
+        diagnostic_reasons.append("comparable_to_challenger_with_material_risk_improvement")
     if oos_comp > robust_default_comp and max_mdd <= robust_default_mdd_limit:
-        reasons.append("beats_robust_default_with_mdd_limit")
+        diagnostic_reasons.append("beats_robust_default_with_mdd_limit")
+    fresh_forward_shadow_pass = bool(best.get("fresh_forward_shadow_pass", False))
+    promotion_metric_basis = str(
+        best.get("promotion_metric_basis")
+        or best.get("ranking_usage_policy")
+        or "locked_oos_diagnostic_only"
+    )
+    if not fresh_forward_shadow_pass or "locked_oos" in promotion_metric_basis:
+        return {
+            "promotable": False,
+            "promotion_hard_stop_pass": False,
+            "promotion_hard_stop_reasons": ["fresh_forward_shadow_required_before_promotion"],
+            "promotion_metric_basis": "locked_oos_diagnostic_only",
+            "oos_threshold_diagnostic_only": bool(diagnostic_reasons),
+            "oos_threshold_diagnostic_reasons": diagnostic_reasons,
+            "if_false_recommendation": "fresh_forward_shadow_required_before_promotion",
+        }
     return {
-        "promotable": bool(reasons),
-        "promotion_hard_stop_pass": bool(reasons),
-        "promotion_hard_stop_reasons": reasons,
+        "promotable": bool(diagnostic_reasons),
+        "promotion_hard_stop_pass": bool(diagnostic_reasons),
+        "promotion_hard_stop_reasons": diagnostic_reasons,
+        "promotion_metric_basis": promotion_metric_basis,
+        "oos_threshold_diagnostic_reasons": diagnostic_reasons,
         "if_false_recommendation": (
-            None if reasons else "paper_shadow_only_further_uplift_would_be_oos_mining_risk"
+            None
+            if diagnostic_reasons
+            else "paper_shadow_only_further_uplift_would_be_oos_mining_risk"
         ),
     }
 
@@ -4114,6 +4136,9 @@ def _regime_opportunity_leaf_switch_candidates(
 
 
 LAGGED_SHADOW_LEAF_ROUTER_LABEL = "lagged_shadow_leaf_router:core_warmup4_avg2_val05_mdd12"
+LAGGED_SHADOW_LEAF_ROUTER_TRIMMED_LABEL = (
+    "lagged_shadow_leaf_router:core_warmup4_avg2_val05_mdd12_lag_val_mdd12_cap110_trimmed"
+)
 LAGGED_SHADOW_LEAF_MIN_HISTORY = 4
 LAGGED_SHADOW_LEAF_AVG_WINDOW = 2
 LAGGED_SHADOW_LEAF_MIN_VALIDATION_RETURN = 0.05
@@ -4137,11 +4162,27 @@ PREREGISTERED_LAGGED_LEAF_MAX_VALIDATION_MDD = 0.25
 PREREGISTERED_LAGGED_LEAF_VALIDATION_WEIGHT = 0.25
 PREREGISTERED_LAGGED_LEAF_FALLBACK_TARGET_VALIDATION_MDD = 0.20
 PREREGISTERED_LAGGED_LEAF_FALLBACK_MAX_SCALE = 2.00
-LAGGED_SHADOW_LEAF_ROUTER_SPECS: tuple[dict[str, float | str], ...] = (
+LAGGED_SHADOW_LEAF_ROUTER_SPECS: tuple[
+    dict[str, float | str | tuple[str, ...]],
+    ...,
+] = (
     {
         "label": LAGGED_SHADOW_LEAF_ROUTER_LABEL,
         "lagged_target_validation_mdd": 0.0,
         "lagged_max_scale": 1.0,
+    },
+    {
+        "label": LAGGED_SHADOW_LEAF_ROUTER_TRIMMED_LABEL,
+        "lagged_target_validation_mdd": 0.12,
+        "lagged_max_scale": 1.10,
+        "guardrail_notes": (
+            "drawdown_trimmed_followup_to_top_lagged_shadow_cap140_cap150_rows",
+            "train_validation_mdd_budget_no_current_oos",
+        ),
+        "derived_from_family_notes": (
+            "strict_relaxed_efficiency_leaf_pool",
+            "lagged_shadow_router_top_shadow_family",
+        ),
     },
     {
         "label": ("lagged_shadow_leaf_router:core_warmup4_avg2_val05_mdd12_lag_val_mdd15_cap125"),
@@ -4458,6 +4499,8 @@ def _lagged_shadow_leaf_router_candidates(
     out: list[CandidateResult] = []
     for spec in LAGGED_SHADOW_LEAF_ROUTER_SPECS:
         label = str(spec["label"])
+        guardrail_notes = spec.get("guardrail_notes") or ()
+        derived_from_family_notes = spec.get("derived_from_family_notes") or ()
         row = {
             **common_row,
             **row_extra,
@@ -4467,6 +4510,10 @@ def _lagged_shadow_leaf_router_candidates(
             ),
             "lagged_shadow_scale_max": float(spec["lagged_max_scale"]),
             "lagged_shadow_scale_applied": False,
+            "guardrail_notes": list(guardrail_notes) if isinstance(guardrail_notes, tuple) else [],
+            "derived_from_family_notes": list(derived_from_family_notes)
+            if isinstance(derived_from_family_notes, tuple)
+            else [],
         }
         spec_returns = returns
         if (
@@ -6467,6 +6514,8 @@ def _evaluate_candidate(candidate: CandidateResult, fold: MonthlyFold) -> dict[s
         "session_return_construction": row.get("session_return_construction"),
         "bar_close_lag_policy": row.get("bar_close_lag_policy"),
         "tradfi_us_equity_controls": row.get("tradfi_us_equity_controls") or {},
+        "guardrail_notes": row.get("guardrail_notes") or [],
+        "derived_from_family_notes": row.get("derived_from_family_notes") or [],
         "external_evidence_refs": row.get("external_evidence_refs") or [],
         "allowed_usage_label": row.get("allowed_usage_label"),
         "readiness_label": row.get("readiness_label"),
@@ -6655,7 +6704,7 @@ def _aggregate_rows(fold_rows: Sequence[Mapping[str, Any]]) -> list[dict[str, An
         ]
         if not clean_candidate and not non_clean_reasons:
             non_clean_reasons.append("non_clean_fold_flag")
-        hard_stop_promotable = clean_candidate and (
+        locked_oos_threshold_hit = clean_candidate and (
             beats_challenger or material_risk_improvement or robust_default_improvement
         )
         cost_stress_rows = [
@@ -6729,6 +6778,9 @@ def _aggregate_rows(fold_rows: Sequence[Mapping[str, Any]]) -> list[dict[str, An
                     "selected_symbol_count": len(selected_symbols),
                 },
                 "clean_promotion_eligible": clean_candidate,
+                "ranking_usage_policy": "locked_oos_diagnostic_only_not_selection",
+                "ranking_diagnostic_only": True,
+                "locked_oos_metrics_used_for_report_ranking_only": True,
                 "nested_hybrid_dependency": nested_hybrid_dependency,
                 "moonshot_label_namespace": moonshot_label_namespace,
                 "post_oos_research_variant": post_oos_research_variant,
@@ -6804,7 +6856,8 @@ def _aggregate_rows(fold_rows: Sequence[Mapping[str, Any]]) -> list[dict[str, An
                 ),
                 "max_loss_streak": int(max_loss_streak),
                 "ready_for_paper_folds": sum(bool(row.get("ready_for_paper")) for row in rows),
-                "hard_stop_promotable": hard_stop_promotable,
+                "hard_stop_promotable": False,
+                "locked_oos_threshold_hit_diagnostic_only": locked_oos_threshold_hit,
                 "hard_stop_reasons": {
                     "beats_challenger": beats_challenger,
                     "material_risk_improvement": material_risk_improvement,
@@ -6862,6 +6915,17 @@ def _refresh_payload_derived_reports(payload: dict[str, Any]) -> None:
     payload["aggregate_rankings"] = aggregate
     payload["clean_promotion_rankings"] = clean
     payload["demoted_nested_or_historical_rankings"] = demoted
+    payload["locked_oos_report_rankings_policy"] = {
+        "usage": "diagnostic_only_not_selection_weighting_sizing_or_live_promotion",
+        "selection_inputs": "train_validation_only",
+        "locked_oos_tables": [
+            "aggregate_rankings",
+            "clean_promotion_rankings",
+            "demoted_nested_or_historical_rankings",
+            "fold_summaries.best_oos_candidate",
+        ],
+        "promotion_gate": "fresh_forward_shadow_required_before_clean_or_live_promotion",
+    }
     payload["dynamic_self_feed_audit"] = _dynamic_self_feed_audit(rows)
     payload["metric_reconciliation"] = _metric_reconciliation_report(payload)
     payload["promotability"] = (
@@ -7529,6 +7593,7 @@ def _render_markdown(payload: Mapping[str, Any]) -> str:
         f"- trials: asset/profile/hybrid = `{payload.get('trial_policy', {}).get('asset_trials')}` / `{payload.get('trial_policy', {}).get('profile_trials')}` / `{payload.get('trial_policy', {}).get('hybrid_trials')}`",
         f"- source symbol workers: `{payload.get('trial_policy', {}).get('source_symbol_workers', 1)}`",
         "- selection/refit input: train + 2M validation only; OOS month is evaluated after frozen fold params.",
+        "- locked-OOS rankings/tables: diagnostic-only; not consumed for selection, weighting, sizing, or clean/live promotion.",
     ]
     if provenance:
         lines.extend(
@@ -7566,7 +7631,9 @@ def _render_markdown(payload: Mapping[str, Any]) -> str:
     lines.extend(
         [
             "",
-            "## Clean-promotion ranking (current recommendation set)",
+            "## Clean candidate OOS diagnostics (not a promotion decision)",
+            "",
+            "These rows are locked-OOS diagnostics for clean-eligible candidates. Promotion still requires the hard-stop gate and fresh forward/shadow evidence; this table is not an input to fold selection, weighting, sizing, or live routing.",
             "",
         ]
     )
@@ -7990,6 +8057,8 @@ def run_walkforward(args: argparse.Namespace) -> dict[str, Any]:
             "fold_id": fold.fold_id,
             "candidate_count": len(rows),
             "best_oos_candidate": best_fold["candidate_label"],
+            "best_oos_candidate_usage": "diagnostic_only_not_selection",
+            "best_oos_candidate_rank_basis": "locked_oos_report_only",
             "best_oos_return": best_fold["locked_oos"]["total_return"],
             "best_oos_mdd": best_fold["locked_oos"]["mdd"],
             "source_aux": {

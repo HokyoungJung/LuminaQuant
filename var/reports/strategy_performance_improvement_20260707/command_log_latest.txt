@@ -1,0 +1,14 @@
+# Strategy performance-improvement command summary (sanitized)
+
+All commands were run from the repository root or OMX worker worktrees and are recorded here without absolute local paths or raw log payloads. Raw worker logs were intentionally omitted from the committed artifact to avoid leaking local environment topology.
+
+| Check | Command | Exit | Result |
+| --- | --- | ---: | --- |
+| collect help | `uv run python scripts/collect_binance_1m_research_universe.py --help` | 0 | collector interface available |
+| walkforward help | `uv run python scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py --help` | 0 | WF runner interface available |
+| compact help | `uv run python scripts/compact_wal_to_monthly_parquet.py --help` | 0 | compactor interface available |
+| compact actual | `uv run python scripts/compact_wal_to_monthly_parquet.py --root-path data/market_parquet --exchange binance` | 0 | no symbols found; no WAL compaction performed |
+| full WF bounded | `uv run python scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py --output-json var/reports/strategy_performance_improvement_20260707/full_universe_walkforward/full_universe_walkforward_summary_latest.json --output-md var/reports/strategy_performance_improvement_20260707/full_universe_walkforward/full_universe_walkforward_summary_latest.md --source-symbol-workers 2 --checkpoint-interval 1 --checkpoint-markdown-interval 0` | 1 | blocked: no direct 1m-derived bars loaded |
+| targeted strategy/report tests | `uv run --extra dev pytest -q tests/test_ohlcv_validation.py tests/test_strategy_performance_improvement_report.py tests/test_alpha_zoo_69_asset_monthly_refit_walkforward.py` | 0 | 63 passed before final review fixes |
+| full clean-env pytest | `uv run pytest -q` with local `.env` temporarily hidden | 0 | 3571 passed, 20 skipped, 3 xfailed |
+| final sanity tests | `uv run --extra dev pytest -q tests/test_strategy_performance_improvement_report.py tests/test_alpha_zoo_69_asset_monthly_refit_walkforward.py tests/integration/test_engine_golden.py tests/test_research_selection_flags_config.py` with local `.env` temporarily hidden | 0 | 67 passed |

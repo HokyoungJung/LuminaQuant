@@ -1,0 +1,14 @@
+{
+  "command_log_path": "var/reports/strategy_performance_improvement_20260707/command_log_latest.txt",
+  "created_at": "2026-07-07T11:39:43.237254Z",
+  "data_coverage_counts": {
+    "basis": "WF runner announced symbols=110 then loaded no direct 1m-derived bars from data/market_parquet.",
+    "loaded": 0,
+    "missing": 110,
+    "monitor_only": 0,
+    "train_eligible": 0
+  },
+  "details": "task 4 worker worktree has no data/market_parquet bars; compaction found no symbols. Data/TradFi refresh is owned by a separate lane, so worker-4 records this as verification blocker evidence only.",
+  "schema_version": "1.0",
+  "status": "blocked_in_worker4_verification_worktree"
+}

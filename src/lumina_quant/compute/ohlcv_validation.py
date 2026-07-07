@@ -87,9 +87,7 @@ def _datetime_dtype_is_supported(dtype: Any) -> bool:
 def _monotonic_expr(datetime_column: str, symbol_column: str | None) -> pl.Expr:
     current = pl.col(datetime_column)
     previous = (
-        current.shift(1).over(symbol_column)
-        if symbol_column is not None
-        else current.shift(1)
+        current.shift(1).over(symbol_column) if symbol_column is not None else current.shift(1)
     )
     return current < previous
 
@@ -206,7 +204,9 @@ def validate_ohlcv_frame(
 
     null_count = counts.get("datetime_null", 0)
     if null_count:
-        issues.append(OHLCVValidationIssue("datetime_null", column=datetime_column, count=null_count))
+        issues.append(
+            OHLCVValidationIssue("datetime_null", column=datetime_column, count=null_count)
+        )
 
     for column in _PRICE_COLUMNS:
         bad_numeric = counts.get(f"{column}_nonfinite", 0)

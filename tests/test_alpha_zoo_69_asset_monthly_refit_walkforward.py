@@ -655,6 +655,23 @@ def test_lagged_shadow_leaf_router_uses_only_prior_completed_oos_and_leaf_source
     assert scaled[0]["lagged_shadow_scale_applied"] is True
     assert scaled[0]["uses_locked_oos_for_selection"] is False
     assert scaled[0]["nested_hybrid_dependency"] is False
+    trimmed = [
+        module._evaluate_candidate(candidate, fold)
+        for candidate in routed
+        if candidate.candidate_label == module.LAGGED_SHADOW_LEAF_ROUTER_TRIMMED_LABEL
+    ]
+    assert len(trimmed) == 1
+    assert trimmed[0]["selected_candidate_label"] == relaxed_label
+    assert trimmed[0]["risk_scale"] <= 1.10
+    assert trimmed[0]["lagged_shadow_scale_target_validation_mdd"] == pytest.approx(0.12)
+    assert trimmed[0]["lagged_shadow_scale_max"] == pytest.approx(1.10)
+    assert trimmed[0]["lagged_shadow_scale_applied"] is True
+    assert trimmed[0]["uses_locked_oos_for_selection"] is False
+    assert trimmed[0]["current_fold_oos_used_for_weighting"] is False
+    assert trimmed[0]["nested_hybrid_dependency"] is False
+    assert trimmed[0]["clean_promotion_eligible"] is False
+    assert "train_validation_mdd_budget_no_current_oos" in trimmed[0]["guardrail_notes"]
+    assert "lagged_shadow_router_top_shadow_family" in trimmed[0]["derived_from_family_notes"]
     preregistered = [
         module._evaluate_candidate(candidate, fold)
         for candidate in routed
@@ -1820,22 +1837,35 @@ def test_metric_reconciliation_recomputes_report_aggregates_from_fold_rows() -> 
     assert report == {"metrics_reconciled": True, "mismatches": [], "candidate_count": 1}
 
 
-def test_promotability_hard_stop_blocks_non_threshold_result() -> None:
+def test_promotability_hard_stop_requires_fresh_forward_shadow() -> None:
     blocked = module._promotability_decision(
         {"compounded_oos_return": 0.20, "max_oos_mdd": 0.16, "min_oos_return": -0.05}
     )
-    allowed = module._promotability_decision(
+    locked_oos_only = module._promotability_decision(
         {"compounded_oos_return": 0.54, "max_oos_mdd": 0.18, "min_oos_return": -0.02}
+    )
+    fresh_forward_allowed = module._promotability_decision(
+        {
+            "compounded_oos_return": 0.54,
+            "max_oos_mdd": 0.18,
+            "min_oos_return": -0.02,
+            "fresh_forward_shadow_pass": True,
+            "promotion_metric_basis": "fresh_forward_shadow",
+        }
     )
 
     assert blocked["promotable"] is False
     assert blocked["promotion_hard_stop_pass"] is False
-    assert (
-        blocked["if_false_recommendation"]
-        == "paper_shadow_only_further_uplift_would_be_oos_mining_risk"
-    )
-    assert allowed["promotable"] is True
-    assert allowed["promotion_hard_stop_reasons"]
+    assert blocked["if_false_recommendation"] == "fresh_forward_shadow_required_before_promotion"
+    assert locked_oos_only["promotable"] is False
+    assert locked_oos_only["promotion_hard_stop_pass"] is False
+    assert locked_oos_only["promotion_hard_stop_reasons"] == [
+        "fresh_forward_shadow_required_before_promotion"
+    ]
+    assert locked_oos_only["oos_threshold_diagnostic_reasons"]
+    assert locked_oos_only["promotion_metric_basis"] == "locked_oos_diagnostic_only"
+    assert fresh_forward_allowed["promotable"] is True
+    assert fresh_forward_allowed["promotion_hard_stop_reasons"]
 
 
 def test_promotability_blocks_post_oos_research_variant_even_if_metrics_are_high() -> None:
@@ -1968,6 +1998,55 @@ def test_recompute_payload_separates_raw_clean_and_demoted_rankings() -> None:
     assert demoted_by_label["meta_portfolio:raw_winner"]["non_clean_reasons"] == [
         "nested_hybrid_dependency"
     ]
+
+
+def test_locked_oos_report_rankings_are_diagnostic_only_not_selection() -> None:
+    clean_validation_winner = {
+        "fold_id": "2025-03",
+        "family": "profile_optuna",
+        "candidate_label": "profile_optuna:validation_winner",
+        "clean_promotion_eligible": True,
+        "uses_locked_oos_for_selection": False,
+        "train": {"total_return": 0.12, "mdd": 0.05},
+        "validation": {"total_return": 0.10, "mdd": 0.04},
+        "locked_oos": {"total_return": 0.01, "mdd": 0.02},
+    }
+    oos_diagnostic_winner = {
+        **clean_validation_winner,
+        "family": "lagged_shadow_leaf_router",
+        "candidate_label": "lagged_shadow_leaf_router:diagnostic_winner",
+        "clean_promotion_eligible": False,
+        "post_oos_research_variant": True,
+        "requires_fresh_forward_shadow": True,
+        "validation": {"total_return": 0.01, "mdd": 0.04},
+        "locked_oos": {"total_return": 0.50, "mdd": 0.02},
+    }
+
+    recomputed = module._recompute_payload_from_existing(
+        {"fold_candidate_rows": [clean_validation_winner, oos_diagnostic_winner]}
+    )
+    diagnostic_top = recomputed["aggregate_rankings"][0]
+
+    assert diagnostic_top["candidate_label"] == "lagged_shadow_leaf_router:diagnostic_winner"
+    assert diagnostic_top["ranking_usage_policy"] == "locked_oos_diagnostic_only_not_selection"
+    assert diagnostic_top["ranking_diagnostic_only"] is True
+    assert diagnostic_top["locked_oos_metrics_used_for_report_ranking_only"] is True
+    assert diagnostic_top["hard_stop_promotable"] is False
+    assert recomputed["locked_oos_report_rankings_policy"] == {
+        "usage": "diagnostic_only_not_selection_weighting_sizing_or_live_promotion",
+        "selection_inputs": "train_validation_only",
+        "locked_oos_tables": [
+            "aggregate_rankings",
+            "clean_promotion_rankings",
+            "demoted_nested_or_historical_rankings",
+            "fold_summaries.best_oos_candidate",
+        ],
+        "promotion_gate": "fresh_forward_shadow_required_before_clean_or_live_promotion",
+    }
+    assert [row["candidate_label"] for row in recomputed["clean_promotion_rankings"]] == [
+        "profile_optuna:validation_winner"
+    ]
+    assert recomputed["promotability"]["promotable"] is False
 
 
 def test_row_level_leaf_selectors_are_oos_clean_non_nested_shadow_rows() -> None:
@@ -2156,6 +2235,7 @@ def test_markdown_renders_clean_and_demoted_sections() -> None:
     markdown = module._render_markdown(payload)
 
     assert "## Raw aggregate ranking (diagnostic only)" in markdown
-    assert "## Clean-promotion ranking (current recommendation set)" in markdown
+    assert "## Clean candidate OOS diagnostics (not a promotion decision)" in markdown
+    assert "not an input to fold selection, weighting, sizing, or live routing" in markdown
     assert "## Demoted nested/historical ranking" in markdown
     assert "Best clean candidate monthly OOS detail" in markdown

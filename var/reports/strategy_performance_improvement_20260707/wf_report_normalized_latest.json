@@ -1,0 +1,69 @@
+{
+  "artifact_kind": "strategy_performance_improvement_wf_report",
+  "chunk_sizes": {
+    "checkpoint_interval": 1,
+    "checkpoint_markdown_interval": 0,
+    "explicit_chunks": [],
+    "fold_candidate_row_count": 0,
+    "fold_count": 0,
+    "fold_summary_count": 0,
+    "rows_by_fold": {},
+    "source": "blocked_walkforward_payload"
+  },
+  "command_log_exists": true,
+  "command_log_path": "var/reports/strategy_performance_improvement_20260707/command_log.md",
+  "data_coverage_counts": {
+    "basis": "WF runner announced symbols=110 then loaded no direct 1m-derived bars from data/market_parquet.",
+    "global_latest_utc": null,
+    "loaded_symbol_count": 0,
+    "missing_symbol_count": 110,
+    "monitor_only_symbol_count": 0,
+    "requested_symbol_count": 110,
+    "source": "blocked_walkforward_payload",
+    "timeframes": {},
+    "train_eligible_symbol_count": 0
+  },
+  "full_universe_claim_status": "blocked_not_claimed_missing_direct_1m_bars",
+  "generated_at_utc": "2026-07-07T12:26:24.138445Z",
+  "leak_checks": {
+    "basis": "Verification lane ran no successful WF selection; targeted no-leak/selection tests passed. Full WF blocked before selection due missing bars.",
+    "bridge_protocol_audit_pass": null,
+    "current_fold_oos_used_for_weighting_true": false,
+    "dynamic_self_feed_audit_pass": null,
+    "pass": false,
+    "real_money_execution_true": null,
+    "same_month_self_feeding_true": null,
+    "status": "not_evaluable_blocked_missing_direct_1m_bars",
+    "uses_locked_oos_for_selection_true": false
+  },
+  "native_backend_status": {
+    "backend": "numba",
+    "mode": "numba",
+    "pyo3_available": "True",
+    "pyo3_load_error": ""
+  },
+  "output_paths": {
+    "json": "var/reports/strategy_performance_improvement_20260707/wf_report_normalized_latest.json",
+    "markdown": "var/reports/strategy_performance_improvement_20260707/wf_report_normalized_latest.md"
+  },
+  "peak_rss_mb": 190.85,
+  "peak_rss_mib": 190.85,
+  "peak_rss_source": "runner_peak_rss_mib_or_blocker_peak_rss_mb",
+  "source_blocker": "data/market_parquet has no direct 1m-derived bars; runner raised ValueError: no direct 1m-derived bars loaded for any symbol/timeframe.",
+  "source_error": null,
+  "source_json_exists": true,
+  "source_json_path": "var/reports/strategy_performance_improvement_20260707/full_universe_walkforward/full_universe_walkforward_summary_latest.json",
+  "source_json_sha256": "4226b24d5bb3bbd0ebdf34db5dfe8effcd9b52f0ac03c26f05a328b94b554de5",
+  "source_status": "loaded",
+  "walkforward_summary": {
+    "aggregate_ranking_count": 0,
+    "clean_promotion_count": 0,
+    "completed_at_utc": null,
+    "fold_count": 0,
+    "output_paths": {},
+    "pass_fail_decision": "FAIL_BLOCKED_NO_DATA",
+    "selected_variant_count": 0,
+    "status": "blocked"
+  },
+  "worker_count": 2
+}
