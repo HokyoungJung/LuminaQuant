@@ -31,13 +31,18 @@ DEFAULT_ROBUST_SCORE_PARAMS: dict[str, float] = {
     "weight_exp_clamp_floor": -60.0,
     "pair_multi_mix_bonus": 1.05,
     "mdd_risk_penalty_coeff": 2.5,
-    # Hard-gate (opt-in). DSR/SPA are advisory soft-score weights by default;
+    # Hard-gate (opt-in). DSR/SPA/PBO are advisory soft-score weights by default;
     # set ``dsr_spa_hard_gate`` truthy to instead REJECT candidates that fail the
     # floors below. Defaults keep the gate disabled so selection output is
-    # unchanged unless a caller explicitly enables it.
+    # unchanged unless a caller explicitly enables it. The base floor values are
+    # themselves no-ops even when the gate is flipped on: ``dsr_gate_floor=0.0``
+    # never rejects a DSR (a probability in [0, 1] is always >= 0.0),
+    # ``spa_gate_ceiling=1.0`` never rejects a p-value, and ``pbo_gate_ceiling=1.0``
+    # never rejects a PBO in [0, 1].
     "dsr_spa_hard_gate": 0.0,
     "dsr_gate_floor": 0.0,
     "spa_gate_ceiling": 1.0,
+    "pbo_gate_ceiling": 1.0,
     **DEFAULT_ROBUST_SCORE_WEIGHTS,
 }
 
@@ -141,12 +146,15 @@ def _resolve_robust_score_params(overrides: dict[str, Any] | None = None) -> dic
     for key, value in overrides.items():
         if key in merged:
             merged[key] = safe_float(value, merged[key])
-    # ``strict_selection_gate`` is the research-profile alias that flips the
-    # (otherwise advisory) DSR/SPA soft-score into a binding hard reject. When it
-    # is absent or falsy the gate stays disabled and output is byte-identical to
-    # today; ``dsr_gate_floor`` / ``spa_gate_ceiling`` remain individually
-    # tunable via the recognized keys above.
-    if bool(overrides.get("strict_selection_gate", False)):
+    # ``strict_selection_gate`` / ``enforce_selection_reject_gate`` are the
+    # research-profile aliases that flip the (otherwise advisory) DSR/SPA/PBO
+    # soft-score into a binding hard reject. When both are absent or falsy the
+    # gate stays disabled and output is byte-identical to today;
+    # ``dsr_gate_floor`` / ``spa_gate_ceiling`` / ``pbo_gate_ceiling`` remain
+    # individually tunable via the recognized keys above.
+    if bool(overrides.get("strict_selection_gate", False)) or bool(
+        overrides.get("enforce_selection_reject_gate", False)
+    ):
         merged["dsr_spa_hard_gate"] = 1.0
     return merged
 
@@ -271,26 +279,53 @@ def _allowlisted_portfolio_native_multi_asset_candidate(candidate: dict[str, Any
     )
 
 
+def _mode_metric_block_keys(mode: str) -> tuple[str, ...]:
+    """Ordered candidate keys to look up a metric block for ``mode``.
+
+    Preserves the legacy behavior for the two modes existing callers use EXACTLY,
+    while ADDING a genuine validation mode (previously ``mode='val'`` aliased to
+    the ``'oos'`` key -- the recorded-artifact overfit bug):
+
+      * ``mode='oos'``          -> ``('oos',)``  (legacy: primary ``'oos'`` ONLY).
+      * ``mode='live'``         -> ``('val',)``  (legacy: primary ``'val'`` ONLY).
+      * ``mode='val'``/``'validation'`` -> ``('validation', 'val',
+        'locked_oos_report_only')``  (NEW validation-gate mode: reads a real
+        validation block instead of the OOS block, tolerating both key naming
+        styles, and accepting the walk-forward artifact's locked-OOS report block
+        as a last-resort fallback).
+
+    The extended fallback list is DELIBERATELY scoped to the new ``val`` /
+    ``validation`` mode only. The legacy ``oos`` and ``live`` reads return a
+    single-key tuple so an existing caller sees the identical ``{}`` / ``False``
+    result it saw before this gate landed when the primary key is absent (e.g. a
+    ``mode='oos'`` read of a row carrying only ``locked_oos_report_only`` must NOT
+    silently pick that block up -- regression pinned in the selection tests).
+    """
+    token = str(mode).strip().lower()
+    if token in ("val", "validation"):
+        return ("validation", "val", "locked_oos_report_only")
+    if token == "live":
+        return ("val",)
+    return ("oos",)
+
+
+def _mode_metrics(candidate: dict[str, Any], *, mode: str) -> dict[str, Any]:
+    for key in _mode_metric_block_keys(mode):
+        metrics = candidate.get(key)
+        if isinstance(metrics, dict):
+            return metrics
+    return {}
+
+
 def _has_mode_metrics(candidate: dict[str, Any], *, mode: str) -> bool:
-    mode_token = str(mode).strip().lower()
-    key = "val" if mode_token == "live" else "oos"
-    metrics = candidate.get(key)
-    if not isinstance(metrics, dict):
+    metrics = _mode_metrics(candidate, mode=mode)
+    if not metrics:
         return False
     # At least one concrete metric should exist.
     for field in ("return", "sharpe", "mdd", "trades"):
         if field in metrics and metrics.get(field) is not None:
             return True
     return False
-
-
-def _mode_metrics(candidate: dict[str, Any], *, mode: str) -> dict[str, Any]:
-    mode_token = str(mode).strip().lower()
-    key = "val" if mode_token == "live" else "oos"
-    metrics = candidate.get(key)
-    if isinstance(metrics, dict):
-        return metrics
-    return {}
 
 
 def passes_dsr_spa_hard_gate(
@@ -301,13 +336,21 @@ def passes_dsr_spa_hard_gate(
 ) -> bool:
     """Return True unless the (opt-in) DSR/SPA hard gate rejects the candidate.
 
-    The Deflated Sharpe Ratio and SPA reality-check p-value are advisory soft-score
-    weights by default; a candidate clearing the Sharpe/PBO floors is still accepted
-    even when its DSR/SPA are weak. When ``dsr_spa_hard_gate`` is enabled this gate
-    instead REJECTS any candidate whose mode metrics report a DSR below
-    ``dsr_gate_floor`` or an SPA p-value above ``spa_gate_ceiling``. The gate is a
-    strict no-op when disabled (the default) so existing selection output is
-    unchanged.
+    The Deflated Sharpe Ratio, SPA reality-check p-value, and PBO are advisory
+    soft-score weights by default; a candidate clearing the Sharpe/PBO floors is
+    still accepted even when its DSR/SPA are weak. When ``dsr_spa_hard_gate`` is
+    enabled this gate instead REJECTS any candidate whose mode metrics report a
+    DSR below ``dsr_gate_floor``, an SPA p-value above ``spa_gate_ceiling``, or a
+    PBO above ``pbo_gate_ceiling``. The gate is a strict no-op when disabled (the
+    default) so existing selection output is unchanged.
+
+    DSR num_trials basis: the ``deflated_sharpe`` consumed here is the value the
+    upstream search RECORDS on the metric block; for the gate to be an honest
+    multiple-testing bar that value must be the whole-search-deflated DSR (the
+    DSR computed against the full candidate-search trial count), consistent with
+    the cross-trial CSCV/PBO of :func:`research_metrics.cscv_pbo`. A per-candidate
+    ``num_trials=1`` DSR would understate deflation and must not be used to feed
+    this gate.
     """
     cfg = _resolve_robust_score_params(robust_score_params)
     if float(cfg["dsr_spa_hard_gate"]) <= 0.0:
@@ -316,12 +359,105 @@ def passes_dsr_spa_hard_gate(
     metrics = _mode_metrics(candidate, mode=mode)
     dsr_floor = float(cfg["dsr_gate_floor"])
     spa_ceiling = float(cfg["spa_gate_ceiling"])
+    pbo_ceiling = float(cfg["pbo_gate_ceiling"])
 
     deflated_sharpe = safe_float(metrics.get("deflated_sharpe"), 0.0)
     if deflated_sharpe < dsr_floor:
         return False
     spa_pvalue = safe_float(metrics.get("spa_pvalue"), 1.0)
-    return spa_pvalue <= spa_ceiling
+    if spa_pvalue > spa_ceiling:
+        return False
+    # Reuse the recorded/computed PBO: the ``pbo`` field carries the
+    # fold-instability estimate (``research_metrics.approx_pbo`` of the mode's
+    # return stream); ``approx_pbo`` is accepted as an alias. Missing -> 0.0 so a
+    # candidate without a recorded PBO is never rejected on this axis (no-op).
+    pbo = safe_float(metrics.get("pbo", metrics.get("approx_pbo")), 0.0)
+    return pbo <= pbo_ceiling
+
+
+def apply_selection_reject_and_dedup(
+    rows: Iterable[dict[str, Any]],
+    *,
+    mode: str = "oos",
+    robust_score_params: dict[str, Any] | None = None,
+    max_per_symbol_basket: int | None = None,
+    max_per_lineage: int | None = None,
+    max_per_family_basket: int | None = None,
+    enabled: bool = False,
+) -> list[dict[str, Any]]:
+    """Order-preserving reject + dedup filter shared by the shortlist and the
+    walk-forward selection engine.
+
+    Reuses the exact per-row reject gate (:func:`passes_dsr_spa_hard_gate`) and
+    the per-key cap logic from :func:`select_diversified_shortlist`
+    (symbol-basket / lineage / family-basket), but WITHOUT re-ranking: rows are
+    consumed in the order given and survivors are returned in that same order.
+    Each cap is applied only when its ``max_per_*`` argument is not ``None``, so
+    the reject gate (via ``robust_score_params``) and the basket dedup are
+    independently switchable.
+
+    When ``enabled`` is ``False`` (the default) this is a STRICT identity no-op:
+    it returns ``list(rows)`` with no row dropped, reordered, or mutated -- the
+    surviving rows are the very same objects, in the same order. This is what the
+    engine's OFF-path relies on to stay byte-identical to the legacy output.
+
+    Ordering: when at least one ``max_per_*`` dedup cap is active, rows are
+    processed in DESCENDING ``hurdle_score`` order (the same score
+    :func:`select_diversified_shortlist` ranks by) so the survivor kept for each
+    capped basket / lineage / family is the BEST-scoring clone, not merely the
+    earliest one in the input. Ties fall back to the original input index -- a
+    deterministic, stable tie-break that leaves equal-score rows in their given
+    order. When NO dedup cap is active (reject-only, or the ``enabled=False``
+    no-op) input order is preserved untouched, so those paths never reorder.
+    """
+    rows_list = list(rows)
+    if not enabled:
+        return rows_list
+
+    dedup_active = any(
+        cap is not None for cap in (max_per_symbol_basket, max_per_lineage, max_per_family_basket)
+    )
+    if dedup_active:
+        # Best-score-first so a cap keeps the top-scoring representative; the
+        # original index tie-break keeps equal-score rows in input order.
+        order = sorted(
+            range(len(rows_list)),
+            key=lambda i: (
+                -hurdle_score(rows_list[i], mode=mode, robust_score_params=robust_score_params),
+                i,
+            ),
+        )
+        ordered_rows = [rows_list[i] for i in order]
+    else:
+        ordered_rows = rows_list
+
+    lineage_count: dict[str, int] = {}
+    symbol_basket_count: dict[str, int] = {}
+    family_basket_count: dict[str, int] = {}
+    out: list[dict[str, Any]] = []
+    for row in ordered_rows:
+        if not passes_dsr_spa_hard_gate(row, mode=mode, robust_score_params=robust_score_params):
+            continue
+        lineage = str(row.get("lineage") or candidate_lineage_key(row))
+        symbol_basket = str(row.get("symbol_basket") or candidate_symbol_basket_key(row))
+        family_basket = str(row.get("family_basket") or candidate_family_basket_key(row))
+        if max_per_lineage is not None and lineage_count.get(lineage, 0) >= int(
+            max(1, max_per_lineage)
+        ):
+            continue
+        if max_per_symbol_basket is not None and symbol_basket_count.get(symbol_basket, 0) >= int(
+            max(1, max_per_symbol_basket)
+        ):
+            continue
+        if max_per_family_basket is not None and family_basket_count.get(family_basket, 0) >= int(
+            max(1, max_per_family_basket)
+        ):
+            continue
+        out.append(row)
+        lineage_count[lineage] = lineage_count.get(lineage, 0) + 1
+        symbol_basket_count[symbol_basket] = symbol_basket_count.get(symbol_basket, 0) + 1
+        family_basket_count[family_basket] = family_basket_count.get(family_basket, 0) + 1
+    return out
 
 
 def allocate_portfolio_weights(

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import math
 from collections import defaultdict
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -11,6 +11,19 @@ from typing import Any
 import numpy as np
 
 from lumina_quant.eval.exact_window_suite import _metrics_daily
+from lumina_quant.strategy_factory.research_metrics import (
+    approx_pbo,
+    deflated_sharpe_ratio,
+    spa_like_pvalue,
+)
+
+# Portfolio-layer honest-gate no-op defaults (performance_lever_measurement
+# 2026-07-08). Every default is a strict no-op: a DSR floor of 0.0 is always
+# cleared by a probability in [0, 1]; an SPA ceiling of 1.0 / a PBO ceiling of 1.0
+# never rejects a value in [0, 1]; and num_trials=1 applies zero extra deflation.
+_PORTFOLIO_HONEST_GATE_DSR_FLOOR_DEFAULT = 0.0
+_PORTFOLIO_HONEST_GATE_SPA_CEILING_DEFAULT = 1.0
+_PORTFOLIO_HONEST_GATE_PBO_CEILING_DEFAULT = 1.0
 
 ROBUST_PROMOTION_GATES = {
     "train_total_return_min_exclusive": 0.0,
@@ -349,10 +362,96 @@ def extract_oos_monthly_returns(payload: Mapping[str, Any]) -> list[dict[str, An
     return monthly_returns(oos_stream)
 
 
+def count_config_grid_trials(axes: Mapping[str, int] | Sequence[int] | None) -> int:
+    """Cross-run trial accountant: total config-grid CELLS searched across runs.
+
+    The portfolio DSR (see :func:`portfolio_honest_gate_report`) must be deflated by
+    the number of ALLOCATION config-grid cells the data-PC harness searched -- NOT
+    the per-candidate count -- so tuning a config grid and shipping the best cell
+    cannot clear the honest gate. ``axes`` declares one entry per searched grid axis
+    (e.g. ``{"band_min_hold": 6, "allocator": 3, "regime_threshold": 4,
+    "order_policy": 2, "funding_window": 2}``); the number of cells is the PRODUCT of
+    the axis sizes. Accepts either a mapping of ``axis_name -> option_count`` or a
+    bare sequence of counts. Non-positive / empty axes are ignored. Returns at least
+    ``1`` (``axes=None`` or empty -> a single-config run, no extra deflation).
+    """
+    if axes is None:
+        return 1
+    counts = list(axes.values()) if isinstance(axes, Mapping) else list(axes)
+    total = 1
+    for count in counts:
+        try:
+            n = int(count)
+        except TypeError, ValueError:
+            continue
+        if n <= 0:
+            continue
+        total *= n
+    return max(1, total)
+
+
+def portfolio_honest_gate_report(
+    net_returns: Any,
+    *,
+    num_trials: int = 1,
+    dsr_gate_floor: float = _PORTFOLIO_HONEST_GATE_DSR_FLOOR_DEFAULT,
+    spa_gate_ceiling: float = _PORTFOLIO_HONEST_GATE_SPA_CEILING_DEFAULT,
+    pbo_gate_ceiling: float = _PORTFOLIO_HONEST_GATE_PBO_CEILING_DEFAULT,
+    stream: str = "net",
+) -> dict[str, Any]:
+    """DSR / CSCV-PBO / SPA honest gate on a portfolio-layer NET return stream.
+
+    Reuses the exact per-candidate machinery -- ``deflated_sharpe_ratio`` (the
+    binding cross-run-deflated axis), ``spa_like_pvalue``, and ``approx_pbo`` (the
+    single-stream fold-instability PBO the per-candidate hard gate also uses) -- but
+    at the WEIGHTED-PORTFOLIO layer. The DSR is deflated by ``num_trials`` = the
+    TOTAL allocation config-grid cells searched (see :func:`count_config_grid_trials`),
+    so a "best-of-many" config cell is rejected once its multiple-testing benchmark
+    is honestly inflated. ``passed`` is ``True`` only when DSR >= ``dsr_gate_floor``
+    AND SPA p-value <= ``spa_gate_ceiling`` AND PBO <= ``pbo_gate_ceiling``. At the
+    shipped no-op floors (0.0 / 1.0 / 1.0) with ``num_trials=1`` nothing is ever
+    rejected.
+    """
+    arr = np.asarray(net_returns, dtype=float).reshape(-1)
+    arr = arr[np.isfinite(arr)]
+    trials = max(1, int(num_trials))
+    dsr = float(deflated_sharpe_ratio(arr, num_trials=trials)) if arr.size else 0.0
+    spa = float(spa_like_pvalue(arr)) if arr.size else 1.0
+    pbo = float(approx_pbo(arr)) if arr.size else 1.0
+    floor = float(dsr_gate_floor)
+    spa_ceiling = float(spa_gate_ceiling)
+    pbo_ceiling = float(pbo_gate_ceiling)
+    reject_reasons: list[str] = []
+    if dsr < floor:
+        reject_reasons.append("dsr_below_floor")
+    if spa > spa_ceiling:
+        reject_reasons.append("spa_above_ceiling")
+    if pbo > pbo_ceiling:
+        reject_reasons.append("pbo_above_ceiling")
+    return {
+        "stream": str(stream),
+        "n": int(arr.size),
+        "num_trials": trials,
+        "deflated_sharpe": dsr,
+        "spa_pvalue": spa,
+        "pbo": pbo,
+        "dsr_gate_floor": floor,
+        "spa_gate_ceiling": spa_ceiling,
+        "pbo_gate_ceiling": pbo_ceiling,
+        "passed": not reject_reasons,
+        "reject_reasons": reject_reasons,
+    }
+
+
 def evaluate_weighted_portfolio(
     rows: list[Mapping[str, Any]],
     *,
     weight_key: str = "_saved_weight",
+    honest_gate: bool = False,
+    num_trials: int = 1,
+    dsr_gate_floor: float = _PORTFOLIO_HONEST_GATE_DSR_FLOOR_DEFAULT,
+    spa_gate_ceiling: float = _PORTFOLIO_HONEST_GATE_SPA_CEILING_DEFAULT,
+    pbo_gate_ceiling: float = _PORTFOLIO_HONEST_GATE_PBO_CEILING_DEFAULT,
 ) -> dict[str, Any]:
     raw_streams = {
         split: _weighted_return_stream(rows, split, weight_key=weight_key)
@@ -362,8 +461,11 @@ def evaluate_weighted_portfolio(
 
     metrics: dict[str, dict[str, Any]] = {}
     weighted_component_summaries: dict[str, dict[str, float]] = {}
+    oos_net_returns = np.asarray([], dtype=float)
     for split, stream in daily_streams.items():
         returns = np.asarray([safe_float(item.get("v"), 0.0) for item in stream], dtype=float)
+        if split == "oos":
+            oos_net_returns = returns
         split_metrics = dict(_metrics_daily(returns))
         split_metrics["return"] = float(split_metrics.get("total_return", 0.0))
         metrics[split] = split_metrics
@@ -391,13 +493,63 @@ def evaluate_weighted_portfolio(
             ),
         }
 
-    return {
+    result: dict[str, Any] = {
         "portfolio_metrics": metrics,
         "weighted_component_summaries": weighted_component_summaries,
         "portfolio_return_streams": raw_streams,
         "portfolio_daily_return_streams": daily_streams,
         "oos_monthly_returns": monthly_returns(daily_streams["oos"]),
     }
+    # Config-gated portfolio-layer honest gate on the OOS NET stream. Default OFF
+    # (``honest_gate=False``, ``num_trials=1``) adds NO key -- byte-identical output.
+    if honest_gate:
+        result["portfolio_honest_gate"] = portfolio_honest_gate_report(
+            oos_net_returns,
+            num_trials=num_trials,
+            dsr_gate_floor=dsr_gate_floor,
+            spa_gate_ceiling=spa_gate_ceiling,
+            pbo_gate_ceiling=pbo_gate_ceiling,
+            stream="net",
+        )
+    return result
+
+
+def portfolio_uplift_gate_report(
+    on_rows: list[Mapping[str, Any]],
+    off_rows: list[Mapping[str, Any]],
+    *,
+    weight_key: str = "_saved_weight",
+    num_trials: int = 1,
+    dsr_gate_floor: float = _PORTFOLIO_HONEST_GATE_DSR_FLOOR_DEFAULT,
+    spa_gate_ceiling: float = _PORTFOLIO_HONEST_GATE_SPA_CEILING_DEFAULT,
+    pbo_gate_ceiling: float = _PORTFOLIO_HONEST_GATE_PBO_CEILING_DEFAULT,
+) -> dict[str, Any]:
+    """Honest gate on the ON-minus-OFF UPLIFT stream (for later lever A/Bs).
+
+    A performance lever must be proven on the INCREMENT it adds, not just on the
+    absolute ON stream. This builds both portfolios' OOS NET daily streams, aligns
+    them by date, and runs :func:`portfolio_honest_gate_report` on the per-day
+    ``on - off`` difference -- deflated by the same cross-run ``num_trials`` config
+    accountant. ``passed`` therefore answers "is the lever's marginal edge real
+    after multiple-testing deflation?". Returns a gate report with ``stream`` set to
+    ``"uplift"`` and the number of aligned days.
+    """
+    on_payload = evaluate_weighted_portfolio(on_rows, weight_key=weight_key)
+    off_payload = evaluate_weighted_portfolio(off_rows, weight_key=weight_key)
+    on_map = _oos_daily_return_map(on_payload)
+    off_map = _oos_daily_return_map(off_payload)
+    common_days = sorted(set(on_map) & set(off_map))
+    uplift = np.asarray([on_map[day] - off_map[day] for day in common_days], dtype=float)
+    report = portfolio_honest_gate_report(
+        uplift,
+        num_trials=num_trials,
+        dsr_gate_floor=dsr_gate_floor,
+        spa_gate_ceiling=spa_gate_ceiling,
+        pbo_gate_ceiling=pbo_gate_ceiling,
+        stream="uplift",
+    )
+    report["aligned_days"] = len(common_days)
+    return report
 
 
 def _sparse_fold_component_score(row: Mapping[str, Any]) -> float:
@@ -1169,6 +1321,7 @@ __all__ = [
     "build_basis_search_universes",
     "build_memory_ledger_row",
     "build_sparse_fold_aware_ensemble",
+    "count_config_grid_trials",
     "evaluate_robustness_gates",
     "evaluate_weighted_portfolio",
     "extract_oos_monthly_returns",
@@ -1179,6 +1332,8 @@ __all__ = [
     "monthly_returns",
     "multiple_comparison_delta_floor",
     "parse_memory_ledger_row",
+    "portfolio_honest_gate_report",
+    "portfolio_uplift_gate_report",
     "promotion_gross_exposure",
     "safe_float",
     "serialize_memory_ledger_row",

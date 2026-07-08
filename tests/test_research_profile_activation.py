@@ -179,13 +179,30 @@ def test_overrides_shape_for_fully_enabled_research_config():
     )
     overrides = research_run_support.research_config_to_overrides(cfg)
     assert overrides["split"] == {"use_lockbox_split": True, "purge_embargo_bars": 5}
-    assert overrides["score_config_research"] == {"strict_selection_gate": True}
+    # The reject-gate floors are emitted at their (legacy no-op) defaults because
+    # this fixture leaves them unset; only strict_selection_gate is flipped on.
+    assert overrides["score_config_research"] == {
+        "strict_selection_gate": True,
+        "enforce_selection_reject_gate": False,
+        "dsr_gate_floor": 0.0,
+        "spa_gate_ceiling": 1.0,
+        "pbo_gate_ceiling": 1.0,
+        "max_cross_trial_pbo": 1.0,
+        "cost_rate_multiplier": 1.0,
+        "cost_rate_bps_override": None,
+    }
     assert overrides["deflation_kwargs"] == {
         "single_correlation_discount": True,
         "hac_inference": True,
         "cscv_pbo": True,
     }
-    assert overrides["robust_score_params"] == {"strict_selection_gate": True}
+    assert overrides["robust_score_params"] == {
+        "strict_selection_gate": True,
+        "enforce_selection_reject_gate": False,
+        "dsr_gate_floor": 0.0,
+        "spa_gate_ceiling": 1.0,
+        "pbo_gate_ceiling": 1.0,
+    }
 
 
 def test_overrides_unwrap_runtime_config():
@@ -201,11 +218,27 @@ def test_overrides_all_flags_off_still_reports_false_not_empty():
     # absent key. Only ``research_config=None`` produces empty dicts.
     overrides = research_run_support.research_config_to_overrides(ResearchConfig())
     assert overrides["split"] == {"use_lockbox_split": False, "purge_embargo_bars": 0}
-    assert overrides["score_config_research"] == {"strict_selection_gate": False}
+    assert overrides["score_config_research"] == {
+        "strict_selection_gate": False,
+        "enforce_selection_reject_gate": False,
+        "dsr_gate_floor": 0.0,
+        "spa_gate_ceiling": 1.0,
+        "pbo_gate_ceiling": 1.0,
+        "max_cross_trial_pbo": 1.0,
+        "cost_rate_multiplier": 1.0,
+        "cost_rate_bps_override": None,
+    }
     assert overrides["deflation_kwargs"] == {
         "single_correlation_discount": False,
         "hac_inference": False,
         "cscv_pbo": False,
+    }
+    assert overrides["robust_score_params"] == {
+        "strict_selection_gate": False,
+        "enforce_selection_reject_gate": False,
+        "dsr_gate_floor": 0.0,
+        "spa_gate_ceiling": 1.0,
+        "pbo_gate_ceiling": 1.0,
     }
 
 

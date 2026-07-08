@@ -707,6 +707,56 @@ class ResearchConfig:
     hac_inference: bool = False
     cscv_pbo: bool = False
     exposure_normalized_promotion: bool = False
+    # Anti-overfit HARD selection-reject gate (overfit_selection_gates 2026-07-08).
+    # ``enforce_selection_reject_gate`` is the master ON switch for the reject +
+    # basket-dedup pass in the monthly-refit walk-forward selection engine; the
+    # three floors calibrate the binding DSR / SPA / PBO thresholds; and
+    # ``max_cross_trial_pbo`` is the cross-trial CSCV/PBO ceiling. EVERY field
+    # below defaults to a strict NO-OP so the shipped ``config.yaml`` /
+    # ``RuntimeConfig()`` load is byte-identical: the gate stays OFF, and even if
+    # a caller flips it on the base floors never reject (``dsr_gate_floor=0.0`` is
+    # always cleared by a DSR probability in [0, 1]; ``spa_gate_ceiling=1.0`` /
+    # ``pbo_gate_ceiling=1.0`` / ``max_cross_trial_pbo=1.0`` never reject a value
+    # in [0, 1]). They are turned ON only in the honest-research profiles.
+    enforce_selection_reject_gate: bool = False
+    dsr_gate_floor: float = 0.0
+    spa_gate_ceiling: float = 1.0
+    pbo_gate_ceiling: float = 1.0
+    max_cross_trial_pbo: float = 1.0
+    # Basket-dedup caps for the same anti-overfit selection pass. ``None`` (the
+    # default) means the cap is OFF -- no clone is ever dropped -- so the shipped
+    # config load stays a strict no-op / byte-identical. The honest-research
+    # profiles set 2 / 1 / 1 so an identical-symbol basket keeps at most 2 clones,
+    # a lineage at most 1, and a family-basket at most 1. The monthly-refit
+    # walk-forward engine reads these back as the dedup caps when a strict profile
+    # is loaded via ``--config`` / ``LQ_CONFIG_PATH``.
+    max_per_symbol_basket: int | None = None
+    max_per_lineage: int | None = None
+    max_per_family_basket: int | None = None
+    # Honest cost/portfolio MEASUREMENT foundation (performance_lever_measurement
+    # 2026-07-08). EVERY field below defaults to a strict no-op so the shipped
+    # ``config.yaml`` / ``RuntimeConfig()`` load is byte-identical; they are turned
+    # ON only in the honest-research profiles.
+    #
+    # ``cost_rate_multiplier`` scales the per-class research-scorer cost map
+    # (``research_runner._candidate_cost_rate``) by a scalar. ``1.0`` (the default)
+    # returns the exact legacy map value. A value ``> 1.0`` can only make every
+    # class's cost WORSE (measurement integrity: it never manufactures a gain).
+    # ``cost_rate_bps_override`` (default ``None``) instead pins an ABSOLUTE
+    # per-turnover cost in basis points, overriding the class map entirely; use it
+    # only when a single flat floor is wanted. Both align a SCALAR to the profile's
+    # fee/spread/slippage -- they do NOT reproduce the nonlinear sqrt-impact +
+    # funding shape charged by the REAL backtest engine (that is why a lever must
+    # still be proven on the real engine, not the linear research scorer).
+    cost_rate_multiplier: float = 1.0
+    cost_rate_bps_override: float | None = None
+    # ``portfolio_honest_gate`` gates the weighted-portfolio NET return stream on
+    # DSR / CSCV-PBO / SPA (reusing the same ``dsr_gate_floor`` / ``spa_gate_ceiling``
+    # / ``pbo_gate_ceiling`` floors above), deflating the portfolio DSR by the TOTAL
+    # number of allocation config-grid cells searched (the cross-run trial
+    # accountant), NOT the per-candidate count. ``False`` (default) => the existing
+    # ``portfolio_followup_rules.evaluate_weighted_portfolio`` output is unchanged.
+    portfolio_honest_gate: bool = False
     alpha_search: AlphaSearchConfig = field(default_factory=AlphaSearchConfig)
     sharpe_ci: SharpeConfidenceIntervalConfig = field(
         default_factory=SharpeConfidenceIntervalConfig

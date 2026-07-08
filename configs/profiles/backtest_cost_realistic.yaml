@@ -371,6 +371,38 @@ research:
   cscv_pbo: true
   # #6 exposure-normalize the portfolio-superiority objective so leverage cannot buy it.
   exposure_normalized_promotion: true
+  # Anti-overfit HARD selection-reject gate (overfit_selection_gates 2026-07-08).
+  # Master ON switch for the reject + basket-dedup pass in the monthly-refit
+  # walk-forward selection engine, with binding DSR / SPA / PBO floors that are
+  # promote-nothing no-ops at their default (0.0 / 1.0 / 1.0 / 1.0) values.
+  enforce_selection_reject_gate: true
+  dsr_gate_floor: 0.90
+  spa_gate_ceiling: 0.05
+  pbo_gate_ceiling: 0.50
+  # cross-trial CSCV/PBO ceiling: reject the run tail when family-wise PBO exceeds this.
+  max_cross_trial_pbo: 0.50
+  # Basket-dedup caps (default None = OFF/byte-identical). Keep at most 2 clones per
+  # identical-symbol basket, 1 per lineage, 1 per family-basket so a single
+  # over-searched basket cannot flood the shortlist with near-identical variants.
+  max_per_symbol_basket: 2
+  max_per_lineage: 1
+  max_per_family_basket: 1
+  # Honest realistic cost floor for the VECTORIZED research scorer
+  # (performance_lever_measurement 2026-07-08). The scorer charges a LINEAR
+  # per-turnover cost (net = returns - turnover * cost_rate); its shipped base map
+  # is ~5 bps/turnover. This multiplier lifts EVERY class's scalar to align with
+  # this profile's one-way execution cost: taker_fee_rate (0.0004) + spread_rate
+  # (0.0002) + slippage_rate (0.0005) = 0.0011 (11 bps) vs the 5 bps base ->
+  # 11/5 = 2.2x. It aligns a SCALAR only; it deliberately does NOT reproduce the
+  # nonlinear sqrt-impact + funding shape the REAL backtest engine charges (that is
+  # measured on the real engine, not here), and it is monotonically >= the legacy
+  # cost for every class -- so it can only make a lever look WORSE, never
+  # manufacture a gain. cost_rate_bps_override stays unset (null) so the multiplier
+  # path is used and the per-class relative structure is preserved.
+  cost_rate_multiplier: 2.2
+  # Portfolio-layer honest gate (DSR/CSCV-PBO/SPA on the weighted-portfolio NET
+  # stream, DSR deflated by the total allocation config-grid cells searched).
+  portfolio_honest_gate: true
 
 # ------------------------------------------
 # Data Collection

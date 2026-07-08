@@ -577,6 +577,13 @@ _RESEARCH_PURGE_EMBARGO_BARS_DEFAULT = 0
 # kwarg). Default False -> byte-identical iid math; opt-in via
 # ``score_config['research']['hac_inference']`` (see ``_research_flag``).
 _RESEARCH_HAC_INFERENCE_DEFAULT = False
+# Config-gated realistic cost floor for the VECTORIZED research scorer
+# (performance_lever_measurement 2026-07-08). ``multiplier == 1.0`` AND
+# ``override is None`` -> the exact legacy per-class map value (byte-identical);
+# opt-in via ``score_config['research']['cost_rate_multiplier']`` /
+# ``['cost_rate_bps_override']`` (see ``_candidate_cost_rate`` / ``_research_flag``).
+_RESEARCH_COST_RATE_MULTIPLIER_DEFAULT = 1.0
+_RESEARCH_COST_RATE_BPS_OVERRIDE_DEFAULT: float | None = None
 _RESEARCH_SENTINEL = object()
 
 
@@ -6437,17 +6444,37 @@ def _strategy_signal(
     return _STRATEGY_SIGNAL_DISPATCHER.dispatch(candidate, aligned=aligned, symbols=symbols)
 
 
-def _candidate_cost_rate(candidate: dict[str, Any]) -> float:
+def _candidate_cost_rate(
+    candidate: dict[str, Any],
+    *,
+    scoring_config: Mapping[str, Any] | None = None,
+) -> float:
     strategy = str(candidate.get("strategy_class") or candidate.get("strategy") or "").lower()
+    # Resolve the per-class map value EXACTLY as before, first.
     if "micro" in strategy:
-        return 0.0012
-    if "pair" in strategy:
-        return 0.0008
-    if "lagconvergence" in strategy or "lag_convergence" in strategy:
-        return 0.0007
-    if "leadlag" in strategy:
-        return 0.0007
-    return 0.0005
+        map_value = 0.0012
+    elif "pair" in strategy:
+        map_value = 0.0008
+    elif "lagconvergence" in strategy or "lag_convergence" in strategy or "leadlag" in strategy:
+        map_value = 0.0007
+    else:
+        map_value = 0.0005
+    # Config-gated realistic cost floor (MEASUREMENT integrity). With the shipped
+    # defaults (``override is None`` AND ``multiplier == 1.0``) this returns the
+    # exact ``map_value`` above -- byte-identical to the legacy scorer -- because
+    # ``x * 1.0 == x`` under IEEE arithmetic and the override short-circuit is
+    # skipped. An absolute bps override wins over the multiplier when both are set.
+    override = _research_flag(
+        scoring_config, "cost_rate_bps_override", _RESEARCH_COST_RATE_BPS_OVERRIDE_DEFAULT
+    )
+    if override is not None:
+        return float(override) / 10_000.0
+    multiplier = _research_flag(
+        scoring_config, "cost_rate_multiplier", _RESEARCH_COST_RATE_MULTIPLIER_DEFAULT
+    )
+    if float(multiplier) != 1.0:
+        return map_value * float(multiplier)
+    return map_value
 
 
 def _candidate_symbols_and_timeframe(
@@ -6780,6 +6807,7 @@ def _load_candidate_signal_payload(
     cache: Mapping[tuple[str, str], SeriesBundle],
     feature_cache: Mapping[str, pl.DataFrame] | None,
     aligned_cache: dict[tuple[Any, ...], Mapping[str, Any]] | None = None,
+    scoring_config: Mapping[str, Any] | None = None,
 ) -> _CandidateSignalPayload | None:
     symbols, timeframe = _candidate_symbols_and_timeframe(candidate)
     bundles = _candidate_bundle_list(symbols=symbols, timeframe=timeframe, cache=cache)
@@ -6811,7 +6839,7 @@ def _load_candidate_signal_payload(
     returns_raw, turnover, exposure, meta = _strategy_signal(
         candidate, aligned=aligned, symbols=symbols
     )
-    cost_rate = _candidate_cost_rate(candidate)
+    cost_rate = _candidate_cost_rate(candidate, scoring_config=scoring_config)
     timestamps = np.asarray(aligned.get("datetime"), dtype="datetime64[ms]")
     return _CandidateSignalPayload(
         symbols=symbols,
@@ -7009,6 +7037,7 @@ def _evaluate_candidate(
         cache=cache,
         feature_cache=feature_cache,
         aligned_cache=aligned_cache,
+        scoring_config=scoring_config,
     )
     if signal_payload is None:
         return _call_insufficient_candidate_result(

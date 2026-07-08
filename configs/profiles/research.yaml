@@ -33,3 +33,26 @@ research:
   cscv_pbo: true
   # #6 exposure-normalize the portfolio-superiority objective so leverage cannot buy it.
   exposure_normalized_promotion: true
+  # Anti-overfit HARD selection-reject gate (overfit_selection_gates 2026-07-08).
+  # Master ON switch for the reject + basket-dedup pass in the monthly-refit
+  # walk-forward selection engine, with binding DSR / SPA / PBO floors that are
+  # promote-nothing no-ops at their default (0.0 / 1.0 / 1.0 / 1.0) values.
+  enforce_selection_reject_gate: true
+  dsr_gate_floor: 0.90
+  spa_gate_ceiling: 0.05
+  pbo_gate_ceiling: 0.50
+  # cross-trial CSCV/PBO ceiling: reject the run tail when family-wise PBO exceeds this.
+  max_cross_trial_pbo: 0.50
+  # Basket-dedup caps (default None = OFF/byte-identical). Keep at most 2 clones per
+  # identical-symbol basket, 1 per lineage, 1 per family-basket so a single
+  # over-searched basket cannot flood the shortlist with near-identical variants.
+  max_per_symbol_basket: 2
+  max_per_lineage: 1
+  max_per_family_basket: 1
+  # Portfolio-layer honest gate (performance_lever_measurement 2026-07-08): run
+  # DSR / CSCV-PBO / SPA on the weighted-portfolio NET stream, deflating the
+  # portfolio DSR by the TOTAL allocation config-grid cells searched (the
+  # cross-run trial accountant) so tuning a config grid and shipping the best cell
+  # cannot clear the gate. No cost_rate_multiplier here: this profile carries no
+  # execution cost model (see backtest_cost_realistic.yaml for the cost floor).
+  portfolio_honest_gate: true
