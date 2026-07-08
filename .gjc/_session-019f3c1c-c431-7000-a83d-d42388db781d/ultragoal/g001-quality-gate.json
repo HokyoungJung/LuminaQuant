@@ -1,0 +1,214 @@
+{
+  "architectReview": {
+    "architectureStatus": "CLEAR",
+    "productStatus": "CLEAR",
+    "codeStatus": "CLEAR",
+    "recommendation": "APPROVE",
+    "evidence": "AI slop cleaner PASS with zero blocking findings in var/reports/strategy_performance_improvement_20260707/ai_slop_cleaner_report_latest.md. Architect artifact review CLEAR/APPROVE (agent://0-ArtifactArchitectureReview) over WF/normalized/final/verification/manifest JSON: 110/110 loaded, 11 folds, 1733 rows, leak checks pass, no stale blocker, no promotion/execution claim. Architect docs review CLEAR/APPROVE (agent://1-DocsArchitectureReview) over research notes and Markdown summaries: prior blocker updated to completed measurement while preserving Track A hard gates, Track B research_only/diagnostic-only separation, and no paper/testnet/live/real-money execution.",
+    "commands": [
+      "agent://0-ArtifactArchitectureReview",
+      "agent://1-DocsArchitectureReview",
+      "var/reports/strategy_performance_improvement_20260707/ai_slop_cleaner_report_latest.md"
+    ],
+    "blockers": []
+  },
+  "executorQa": {
+    "status": "passed",
+    "e2eStatus": "passed",
+    "redTeamStatus": "passed",
+    "evidence": "Executor QA/red-team passed with no blockers (agent://2-EvidenceRedTeamQA). Leader live package/report surface verification passed: ruff format/check; focused clean-env pytest 70 passed; full clean-env pytest 3574 passed/20 skipped/3 xfailed; native build passed; native parity/version tests 32 passed; full-universe WF completed 110/110 symbols, 11 folds, 1733 rows, peak RSS 1834.566 MiB; normalized report claim_status=claimed_loaded_all_requested_symbols_completed_walkforward with zero locked-OOS selection/weighting/sizing/tiebreak and no execution. Row-label caveat was recorded in final/verification/research-note artifacts.",
+    "e2eCommands": [
+      "uv run --extra dev pytest -q tests/test_strategy_performance_improvement_report.py tests/test_alpha_zoo_69_asset_monthly_refit_walkforward.py tests/integration/test_engine_golden.py tests/test_research_selection_flags_config.py (with local .env temporarily hidden) -> 70 passed in 33.53s",
+      "uv run --extra dev pytest -q (with local .env temporarily hidden) -> 3574 passed, 20 skipped, 3 xfailed in 201.01s",
+      "uv run python scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py --output-json var/reports/strategy_performance_improvement_20260707/full_universe_walkforward/full_universe_walkforward_summary_latest.json --output-md var/reports/strategy_performance_improvement_20260707/full_universe_walkforward/full_universe_walkforward_summary_latest.md --source-symbol-workers 2 --checkpoint-interval 0 --checkpoint-markdown-interval 0 -> completed 11 folds"
+    ],
+    "redTeamCommands": [
+      "agent://2-EvidenceRedTeamQA",
+      "uv run --extra dev ruff check . -> All checks passed",
+      "uv run --extra dev ruff format --check . -> 1033 files already formatted",
+      "uv run python scripts/build_native_backends.py -> lumina_compute built successfully",
+      "uv run --extra dev pytest -q tests/test_native_backend_parity.py tests/test_native_kernel_version.py -> 32 passed"
+    ],
+    "artifactRefs": [
+      {
+        "id": "wf-summary",
+        "kind": "api-package-test-report",
+        "path": "var/reports/strategy_performance_improvement_20260707/full_universe_walkforward/full_universe_walkforward_summary_latest.json",
+        "description": "Completed full-universe WF artifact: 110/110 loaded, 11 folds, 1733 fold-candidate rows, diagnostic-only policy and promotability=false."
+      },
+      {
+        "id": "normalized-wf",
+        "kind": "api-package-test-report",
+        "path": "var/reports/strategy_performance_improvement_20260707/wf_report_normalized_latest.json",
+        "description": "Normalized report with claim_status=claimed_loaded_all_requested_symbols_completed_walkforward and leak checks pass."
+      },
+      {
+        "id": "verification-summary",
+        "kind": "api-package-test-report",
+        "path": "var/reports/strategy_performance_improvement_20260707/verification_latest.json",
+        "description": "Verification summary with blockers empty, current ruff/full pytest/native/WF evidence, and no-execution notes."
+      },
+      {
+        "id": "final-ci",
+        "kind": "api-package-test-report",
+        "path": "var/reports/strategy_performance_improvement_20260707/final_ci_summary_latest.json",
+        "description": "Final CI and delivery evidence including current and retained CI/dashboard/coverage/8GB/native gates."
+      },
+      {
+        "id": "candidate-manifest",
+        "kind": "api-package-test-report",
+        "path": "var/reports/strategy_performance_improvement_20260707/improved_candidate_manifest_latest.json",
+        "description": "Candidate manifest preserving research/shadow-only, no_clean_promotion, and fresh-forward shadow requirement."
+      },
+      {
+        "id": "qa-red-team",
+        "kind": "black-box-api-receipt",
+        "path": "agent://2-EvidenceRedTeamQA",
+        "description": "Executor QA/red-team receipt over the report artifact surface."
+      }
+    ],
+    "contractCoverage": [
+      {
+        "id": "coverage-full-wf",
+        "contractRef": "approved-plan-full-universe-walk-forward",
+        "obligation": "Run or resume full-universe WF and persist JSON/Markdown evidence without overstating promotion.",
+        "status": "covered",
+        "surfaceEvidenceRefs": ["surface-wf", "surface-normalized"],
+        "adversarialCaseRefs": ["case-universe-mismatch", "case-row-count-mismatch"]
+      },
+      {
+        "id": "coverage-leak-gates",
+        "contractRef": "no-oos-leakage-and-track-separation",
+        "obligation": "Selection/weighting/sizing/tiebreak must not use locked OOS; Track B rows remain diagnostic/research_only.",
+        "status": "covered",
+        "surfaceEvidenceRefs": ["surface-normalized", "surface-manifest"],
+        "adversarialCaseRefs": ["case-locked-oos-leak", "case-track-b-promotion"]
+      },
+      {
+        "id": "coverage-no-execution",
+        "contractRef": "no-real-paper-testnet-live-orders",
+        "obligation": "No real-money, paper, testnet, live, or order execution may be run or approved.",
+        "status": "covered",
+        "surfaceEvidenceRefs": ["surface-final-ci", "surface-verification"],
+        "adversarialCaseRefs": ["case-execution-label-misread"]
+      },
+      {
+        "id": "coverage-native-ci",
+        "contractRef": "uv-ci-native-evidence",
+        "obligation": "Use uv, run verification/CI, and provide native build/parity evidence when considering Rust/native acceleration.",
+        "status": "covered",
+        "surfaceEvidenceRefs": ["surface-final-ci", "surface-verification"],
+        "adversarialCaseRefs": ["case-native-stale"]
+      }
+    ],
+    "surfaceEvidence": [
+      {
+        "id": "surface-wf",
+        "contractRef": "full-universe report artifact",
+        "surface": "package",
+        "invocation": "uv run python scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py --source-symbol-workers 2 --checkpoint-interval 0 --checkpoint-markdown-interval 0",
+        "verdict": "passed",
+        "artifactRefs": ["wf-summary"]
+      },
+      {
+        "id": "surface-normalized",
+        "contractRef": "normalized report artifact",
+        "surface": "api",
+        "invocation": "uv run python scripts/research/build_strategy_performance_improvement_report.py --source-json var/reports/strategy_performance_improvement_20260707/full_universe_walkforward/full_universe_walkforward_summary_latest.json --worker-count 2",
+        "verdict": "passed",
+        "artifactRefs": ["normalized-wf"]
+      },
+      {
+        "id": "surface-verification",
+        "contractRef": "verification artifact",
+        "surface": "package",
+        "invocation": "json artifact validation plus clean-env pytest/ruff/native commands recorded in verification_latest.json",
+        "verdict": "passed",
+        "artifactRefs": ["verification-summary"]
+      },
+      {
+        "id": "surface-final-ci",
+        "contractRef": "final CI artifact",
+        "surface": "package",
+        "invocation": "current leader CI commands and retained dashboard/coverage/8GB evidence recorded in final_ci_summary_latest.json",
+        "verdict": "passed",
+        "artifactRefs": ["final-ci"]
+      },
+      {
+        "id": "surface-manifest",
+        "contractRef": "candidate manifest artifact",
+        "surface": "api",
+        "invocation": "improved_candidate_manifest_latest.json read as package/report API contract",
+        "verdict": "passed",
+        "artifactRefs": ["candidate-manifest"]
+      }
+    ],
+    "adversarialCases": [
+      {
+        "id": "case-universe-mismatch",
+        "contractRef": "full-universe counts",
+        "scenario": "Requested/loaded/missing symbols disagree across WF, normalized report, and verification.",
+        "expectedBehavior": "All surfaces report 110 requested, 110 loaded, 0 missing.",
+        "verdict": "passed",
+        "artifactRefs": ["wf-summary", "normalized-wf", "verification-summary"]
+      },
+      {
+        "id": "case-row-count-mismatch",
+        "contractRef": "fold and row counts",
+        "scenario": "Fold count, row count, or peak RSS differ across final artifacts.",
+        "expectedBehavior": "All surfaces cite 11 folds, 1733 rows, and peak RSS 1834.566 MiB where applicable.",
+        "verdict": "passed",
+        "artifactRefs": ["wf-summary", "normalized-wf", "final-ci"]
+      },
+      {
+        "id": "case-locked-oos-leak",
+        "contractRef": "no locked-OOS leakage",
+        "scenario": "Locked-OOS metrics are used for selection, weighting, sizing, or tiebreak.",
+        "expectedBehavior": "Leak checks remain zero/false and diagnostic-only policy is preserved.",
+        "verdict": "passed",
+        "artifactRefs": ["normalized-wf", "verification-summary"]
+      },
+      {
+        "id": "case-track-b-promotion",
+        "contractRef": "Track B research-only separation",
+        "scenario": "Lagged-shadow headline rows are treated as deployable or clean promotion evidence.",
+        "expectedBehavior": "Rows and manifest remain hard_stop_promotable=false, clean_promotion_eligible=false for integrated Track B, and require fresh-forward shadow evidence.",
+        "verdict": "passed",
+        "artifactRefs": ["wf-summary", "candidate-manifest"]
+      },
+      {
+        "id": "case-execution-label-misread",
+        "contractRef": "no execution approval",
+        "scenario": "Legacy paper/testnet/live wording in row-level candidate_tier labels is misread as execution approval.",
+        "expectedBehavior": "Final, verification, and research-note artifacts explicitly state artifact-level promotability/final claims are authoritative and no paper/testnet/live/real-money execution is approved.",
+        "verdict": "passed",
+        "artifactRefs": ["final-ci", "verification-summary"]
+      },
+      {
+        "id": "case-native-stale",
+        "contractRef": "native/Rust evidence",
+        "scenario": "Native build/parity evidence is missing or stale relative to final claims.",
+        "expectedBehavior": "Current native build passes and parity/version tests pass; no new Rust hot-path is introduced.",
+        "verdict": "passed",
+        "artifactRefs": ["final-ci", "verification-summary"]
+      }
+    ],
+    "blockers": []
+  },
+  "iteration": {
+    "status": "passed",
+    "evidence": "Cleaner, focused verification, full clean-env pytest, full-universe WF rerun, normalized report generation, native build/parity, architect reviews, and executor QA/red-team all completed with blockers empty. Non-blocking row-label misread caveat was folded into final/verification/research-note artifacts before checkpoint.",
+    "fullRerun": true,
+    "rerunCommands": [
+      "uv run --extra dev ruff format --check .",
+      "uv run --extra dev ruff check .",
+      "uv run --extra dev pytest -q tests/test_strategy_performance_improvement_report.py tests/test_alpha_zoo_69_asset_monthly_refit_walkforward.py tests/integration/test_engine_golden.py tests/test_research_selection_flags_config.py (with local .env temporarily hidden)",
+      "uv run --extra dev pytest -q (with local .env temporarily hidden)",
+      "uv run python scripts/build_native_backends.py",
+      "uv run --extra dev pytest -q tests/test_native_backend_parity.py tests/test_native_kernel_version.py",
+      "uv run python scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py --output-json var/reports/strategy_performance_improvement_20260707/full_universe_walkforward/full_universe_walkforward_summary_latest.json --output-md var/reports/strategy_performance_improvement_20260707/full_universe_walkforward/full_universe_walkforward_summary_latest.md --source-symbol-workers 2 --checkpoint-interval 0 --checkpoint-markdown-interval 0",
+      "uv run python scripts/research/build_strategy_performance_improvement_report.py --source-json var/reports/strategy_performance_improvement_20260707/full_universe_walkforward/full_universe_walkforward_summary_latest.json --output-json var/reports/strategy_performance_improvement_20260707/wf_report_normalized_latest.json --output-md var/reports/strategy_performance_improvement_20260707/wf_report_normalized_latest.md --command-log-path var/reports/strategy_performance_improvement_20260707/command_log.md --worker-count 2"
+    ],
+    "blockers": []
+  }
+}

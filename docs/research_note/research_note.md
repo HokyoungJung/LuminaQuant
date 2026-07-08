@@ -2799,7 +2799,7 @@ Best raw/shadow candidate is `lagged_shadow_leaf_router:core_warmup4_avg2_val05_
 - Summary artifact: `var/reports/profit_moonshot_20260501/current_tail_20260508/alpha_v2/current_search_residual_dispersion_summary_20260609/current_search_residual_dispersion_summary_20260609.md` and `.json`.
 - Decision: **NO LIVE/SHADOW PROMOTION; real allocation remains `0%`**. Do not tune thresholds or family inclusion against these locked-OOS smoke results. If using this branch next, freeze family subset before a genuinely unseen/fresh-forward slice, then run 10/15/20bps cost or paper fill telemetry, turnover/RPT, BBO spread/slippage, partial/cancel/reject, and reconciliation gates.
 
-## 2026-07-07 — Strategy performance improvement pass: guarded lagged-shadow candidate, no full-universe claim
+## 2026-07-07/08 — Strategy performance improvement pass: guarded lagged-shadow candidate, completed full-universe measurement, no promotion
 
 - User objective: improve the highest-performing plausible strategy line without nonsensical/OOS-mined promotion, refresh TradFi discovery evidence, keep data writes/backfill safe, optimize compute/memory under `uv`, run full-universe walk-forward if supported by existing data, pass CI, and push to git.
 - Primary artifacts:
@@ -2814,17 +2814,20 @@ Best raw/shadow candidate is `lagged_shadow_leaf_router:core_warmup4_avg2_val05_
   - `clean_promotion_eligible=false`, `promotion_decision=no_clean_promotion`, `requires_fresh_forward_shadow=true`.
   - Risk controls: no current-fold OOS selection/weighting, lagged max scale `1.1`, lagged target validation MDD `0.12`.
 - Governance repair: locked-OOS/report rankings are now diagnostic-only for this workflow. Promotion requires fresh-forward shadow evidence rather than selecting or sizing from the same locked OOS report set.
-- Current official full-universe WF result: **blocked / not claimed**.
-  - `full_universe_claim_status=blocked_not_claimed_missing_direct_1m_bars`.
-  - Requested/loaded/missing symbols: `110 / 0 / 110`.
-  - Fold count: `0`; fold candidate rows: `0`.
-  - CAGR/Sharpe/MDD/trade-count: not produced and not claimed.
-  - Blocker: local `data/market_parquet` had no direct 1m-derived bars; runner raised no-direct-1m-bars loaded for any symbol/timeframe.
-  - Peak RSS in blocked runner path: `190.85 MiB`; source-symbol workers: `2`; native backend report: `numba`, `pyo3_available=True`.
+- Current official full-universe WF result: **completed measurement / no promotion**.
+  - `full_universe_claim_status=claimed_loaded_all_requested_symbols_completed_walkforward`.
+  - Requested/loaded/missing symbols: `110 / 110 / 0`; latest data timestamp `2026-07-04T06:30:00`.
+  - Fold count: `11`; fold candidate rows: `1733`; aggregate rankings: `165`; clean ranking rows: `131`.
+  - Top diagnostic/research headline remains Track B only: `codex_lagged_leaf_router_grid:h4_avg1_tr-0.02_tmdd0.50_val0.00_vmdd0.25_lagged_plus_val025_exact_unscaled` recorded `+63.36%` compounded OOS / `+70.81%` annualized approximation, but `clean_promotion_eligible=false`, `post_oos_research_variant=true`, `requires_fresh_forward_shadow=true`, and `ranking_usage_policy=locked_oos_diagnostic_only_not_selection`.
+  - Integrated candidate `lagged_shadow_leaf_router:core_warmup4_avg2_val05_mdd12_lag_val_mdd12_cap110_trimmed` recorded `+39.14%` compounded OOS / `+43.39%` annualized approximation, max OOS MDD `27.69%`, return/MDD `1.41`, `3/11` positive OOS folds, and remains research/shadow-only.
+  - Best clean Track A row recorded only `+7.99%` compounded OOS / `+8.75%` annualized approximation, max OOS MDD `23.59%`, return/MDD `0.34`, and `hard_stop_promotable=false`; it does not beat the strict benchmark/hard-stop boundary.
+  - Leak checks pass in the normalized report: zero locked-OOS selection/weighting/sizing/tiebreak use and no same-month self-feed violations.
+  - Raw WF row-level `candidate_tier` labels may contain legacy paper/testnet/live wording; artifact-level promotability and this note are authoritative and do not approve paper/testnet/live/real-money execution.
+  - Peak RSS for the completed WF run: `1834.566 MiB`; source-symbol workers: `2`; native backend report: `numba`, `pyo3_available=True`.
 - Historical proxy context preserved but not promoted:
   - Proxy compounded OOS: `+159.83%`.
   - Proxy annualized approximate: `+214.51%`.
-  - Caveat: comparison/reference only; current full-universe WF did not complete because direct 1m data was absent, and this proxy is not a deployable or clean-promotion claim.
+  - Caveat: comparison/reference only; current completed full-universe WF still does not create a deployable or clean-promotion claim because the high Track B rows are post-OOS research/diagnostic-only and the clean rows do not clear hard-stop promotion gates.
 - TradFi discovery/coverage lane:
   - Static TradFi snapshot: `100`.
   - Discovered TradFi trading contracts: `118`.
@@ -2832,12 +2835,12 @@ Best raw/shadow candidate is `lagged_shadow_leaf_router:core_warmup4_avg2_val05_
   - Selected symbols: `128` (`10` core crypto + `118` discovered TradFi trading).
   - Data-write status: `dry_run_discovery_no_data_write`; fetched rows `0`, upserted rows `0`. No uncontrolled backfill was performed.
 - Verification and compute evidence:
-  - Full clean-env pytest: `3571 passed, 20 skipped, 3 xfailed`.
+  - Full clean-env pytest: `3574 passed, 20 skipped, 3 xfailed`.
   - Dashboard gates: `npm install`, `lint`, `test`, `typecheck`, `build` passed; dashboard tests `60`.
   - Coverage gates: total `79%`, financial core `83% >= 70%`, live/exchanges/core `70% >= 65%`.
   - Native/Rust gates: native backend build and Binance native architecture gate passed; no untested Rust hot-path change was introduced.
   - Benchmark/8GB gate: median `0.05218s`, `12149` bars/sec, peak RSS `254.19 MiB`.
   - Final targeted clean-env tests: `70 passed`.
 - Git/CI delivery: Lore commit `5b48fcd943050141294376e4eb8436b5713964a0` was pushed to `private/main` before this research-note follow-up.
-- Decision: **implementation and governance cleanup succeeded, but performance improvement is not proven**. The new lagged-shadow trimmed candidate is retained only as a research/shadow candidate. Do not report a fresh CAGR/Sharpe/MDD for it until a leader-authorized data plan supplies direct 1m bars and a fresh-forward, no-leak evaluation is run. Do not start backfill automatically; any data write/backfill requires explicit scope, symbols, date range, storage path, and resource/API limits.
+- Decision: **implementation, governance cleanup, and full-universe measurement succeeded, but performance improvement is not promotable**. The new lagged-shadow trimmed candidate is retained only as a research/shadow candidate. Do not report the Track B headline rows as live/paper/testnet/real-money candidates; promotion still requires leader-authorized fresh-forward shadow evidence, cost/funding/slippage telemetry, and explicit future approval.
 

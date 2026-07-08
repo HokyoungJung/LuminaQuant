@@ -1,182 +1,120 @@
 {
-  "blockers": [
-    {
-      "affected_artifact": "full_universe_walkforward/full_universe_walkforward_summary_latest.json",
-      "details": "data/market_parquet has no direct 1m-derived bars; runner raised ValueError: no direct 1m-derived bars loaded for any symbol/timeframe.",
-      "id": "missing_market_parquet_bars",
-      "status": "BLOCKED"
-    }
-  ],
+  "blockers": [],
   "checks": {
-    "collect_help": {
-      "command": "uv run python scripts/collect_binance_1m_research_universe.py --help",
+    "full_universe_walkforward_current": {
+      "command": "uv run python scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py --output-json var/reports/strategy_performance_improvement_20260707/full_universe_walkforward/full_universe_walkforward_summary_latest.json --output-md var/reports/strategy_performance_improvement_20260707/full_universe_walkforward/full_universe_walkforward_summary_latest.md --source-symbol-workers 2 --checkpoint-interval 0 --checkpoint-markdown-interval 0",
       "exit_code": 0,
-      "peak_rss_mb": 171.97,
-      "status": "PASS"
-    },
-    "compact_wal": {
-      "command": "uv run python scripts/compact_wal_to_monthly_parquet.py --root-path data/market_parquet --exchange binance",
-      "exit_code": 0,
-      "note": "No symbols found for compaction.",
-      "peak_rss_mb": 60.12,
-      "status": "PASS_NOOP"
-    },
-    "full_universe_walkforward": {
-      "blocker": "data/market_parquet has no direct 1m-derived bars; runner raised ValueError: no direct 1m-derived bars loaded for any symbol/timeframe.",
-      "command": "uv run python scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py --output-json var/reports/strategy_performance_improvement_20260707/full_universe_walkforward/full_universe_walkforward_summary_latest.json --output-md var/reports/strategy_performance_improvement_20260707/full_universe_walkforward/full_universe_walkforward_summary_latest.md --source-symbol-workers 2 --checkpoint-interval 1 --checkpoint-markdown-interval 0",
-      "exit_code": 1,
-      "peak_rss_mb": 190.85,
-      "status": "BLOCKED"
-    },
-    "leader_final_ci_equivalent": {
-      "artifact": "var/reports/strategy_performance_improvement_20260707/final_ci_summary_latest.json",
-      "command": "see final_ci_summary_latest.json",
-      "status": "PASS_WITH_WF_DATA_BLOCKER",
-      "summary": "Full local CI-equivalent, dashboard, coverage, native build, benchmark/8GB, and Binance-native gates passed; full-universe WF remains blocked/not claimed because direct 1m bars are absent."
-    },
-    "leader_final_sanity_after_review_fixes": {
-      "command": "uv sync --extra optimize --extra dev --extra live --extra dashboard && uv run --extra dev ruff format --check . && uv run --extra dev ruff check . && clean-env uv run --extra dev pytest -q tests/test_strategy_performance_improvement_report.py tests/test_alpha_zoo_69_asset_monthly_refit_walkforward.py tests/integration/test_engine_golden.py tests/test_research_selection_flags_config.py",
+      "peak_rss_mb": 1834.56640625,
       "status": "PASS",
-      "summary": "ruff format/check passed; final targeted clean-env pytest passed with 69 tests in 30.80s after review fixes"
+      "summary": "11 folds completed; 110/110 symbols loaded; 1733 fold-candidate rows; full-universe output is diagnostic/report-only and not a promotion."
     },
-    "leader_final_sanity_after_second_review_fixes": {
-      "command": "uv run --extra dev ruff format --check . && uv run --extra dev ruff check . && clean-env uv run --extra dev pytest -q tests/test_strategy_performance_improvement_report.py tests/test_alpha_zoo_69_asset_monthly_refit_walkforward.py tests/integration/test_engine_golden.py tests/test_research_selection_flags_config.py",
-      "status": "PASS",
-      "summary": "ruff format/check passed; final targeted clean-env pytest passed with 70 tests in 27.85s after second code-review fixes"
-    },
-    "native_backend_status": {
-      "command": "uv run python native/backend status probe",
-      "exit_code": 0,
-      "peak_rss_mb": 124.12,
-      "status": "NOT_REQUIRED_NO_NATIVE_TOUCH",
-      "summary": "No native/Rust/backend paths modified by worker-4; lumina_compute import not installed in this venv; parity tests not required by task scope."
-    },
-    "pytest_focused_ci_hygiene": {
-      "command": "uv run --extra dev pytest -q tests/test_ohlcv_validation.py tests/test_strategy_performance_improvement_report.py tests/test_alpha_zoo_69_asset_monthly_refit_walkforward.py",
+    "normalized_wf_report_current": {
+      "command": "uv run python scripts/research/build_strategy_performance_improvement_report.py --source-json var/reports/strategy_performance_improvement_20260707/full_universe_walkforward/full_universe_walkforward_summary_latest.json --output-json var/reports/strategy_performance_improvement_20260707/wf_report_normalized_latest.json --output-md var/reports/strategy_performance_improvement_20260707/wf_report_normalized_latest.md --command-log-path var/reports/strategy_performance_improvement_20260707/command_log.md --worker-count 2",
       "exit_code": 0,
       "status": "PASS",
-      "summary": "63 passed in 1.74s"
+      "summary": "full_universe_claim_status=claimed_loaded_all_requested_symbols_completed_walkforward; leak checks pass."
     },
-    "pytest_full_ci_extras": {
-      "command": "uv sync --extra optimize --extra dev --extra live --extra dashboard && uv run pytest -q",
+    "ruff_format_check_current": {
+      "command": "uv run --extra dev ruff format --check .",
       "exit_code": 0,
-      "peak_rss_mb": 556.31,
       "status": "PASS",
-      "summary": "3553 passed, 36 skipped, 3 xfailed in 152.75s"
+      "summary": "1033 files already formatted"
     },
-    "pytest_scoreboard": {
-      "command": "uv run --extra dev pytest tests/research/test_alpha_scoreboard.py tests/research/test_run_alpha_scoreboard.py -q",
-      "exit_code": 0,
-      "peak_rss_mb": 186.73,
-      "status": "PASS",
-      "summary": "31 passed in 2.90s"
-    },
-    "pytest_selection_gates": {
-      "command": "uv run --extra dev pytest tests/test_strategy_factory_selection.py tests/test_selection_gate_lockbox_purge.py tests/research/test_deflation_flags.py -q",
-      "exit_code": 0,
-      "peak_rss_mb": 207.91,
-      "status": "PASS",
-      "summary": "40 passed in 4.92s"
-    },
-    "pytest_strategy_specific": {
-      "command": "uv run --extra dev pytest tests/test_strategy_improve_gated_fixes.py tests/test_same_stem_post_oos_update_walkforward.py -q",
-      "exit_code": 0,
-      "peak_rss_mb": 187.68,
-      "status": "PASS",
-      "summary": "18 passed in 0.25s"
-    },
-    "pytest_tradfi_universe": {
-      "command": "uv run --extra dev pytest tests/test_research_universe.py tests/research/test_tradfi_fetcher_gate.py tests/test_collect_binance_1m_research_universe.py -q",
-      "exit_code": 0,
-      "peak_rss_mb": 210.29,
-      "status": "PASS",
-      "summary": "18 passed in 0.40s"
-    },
-    "python_compileall": {
-      "command": "uv run --extra dev python -m compileall -q src scripts tests",
-      "exit_code": 0,
-      "peak_rss_mb": 39.55,
-      "status": "PASS"
-    },
-    "ruff_check": {
+    "ruff_check_current": {
       "command": "uv run --extra dev ruff check .",
       "exit_code": 0,
       "status": "PASS",
       "summary": "All checks passed!"
     },
-    "ruff_format_check": {
-      "command": "uv run --extra dev ruff format --check .",
+    "focused_clean_env_pytest_current": {
+      "command": "uv run --extra dev pytest -q tests/test_strategy_performance_improvement_report.py tests/test_alpha_zoo_69_asset_monthly_refit_walkforward.py tests/integration/test_engine_golden.py tests/test_research_selection_flags_config.py with local .env temporarily hidden",
       "exit_code": 0,
       "status": "PASS",
-      "summary": "1033 files already formatted"
+      "summary": "70 passed in 33.53s"
+    },
+    "full_clean_env_pytest_current": {
+      "command": "uv run --extra dev pytest -q with local .env temporarily hidden",
+      "exit_code": 0,
+      "status": "PASS",
+      "summary": "3574 passed, 20 skipped, 3 xfailed in 201.01s"
+    },
+    "native_backend_build_current": {
+      "command": "uv run python scripts/build_native_backends.py",
+      "exit_code": 0,
+      "status": "PASS",
+      "summary": "lumina_compute built successfully for CPython 3.14; source hash 729fce3d4dca4fab"
+    },
+    "native_parity_version_current": {
+      "command": "uv run --extra dev pytest -q tests/test_native_backend_parity.py tests/test_native_kernel_version.py",
+      "exit_code": 0,
+      "status": "PASS",
+      "summary": "32 passed in 0.24s"
+    },
+    "leader_final_ci_equivalent": {
+      "artifact": "var/reports/strategy_performance_improvement_20260707/final_ci_summary_latest.json",
+      "command": "see final_ci_summary_latest.json",
+      "status": "PASS",
+      "summary": "Current ruff, full pytest, native build/parity, and full-universe walk-forward gates passed; prior dashboard/coverage/architecture/8GB gates remain recorded."
     }
   },
   "chunk_sizes": {
-    "checkpoint_interval": 1,
+    "checkpoint_interval": 0,
     "checkpoint_markdown_interval": 0,
-    "explicit_chunks": []
+    "fold_candidate_row_count": 1733,
+    "fold_count": 11
   },
   "command_log_path": "var/reports/strategy_performance_improvement_20260707/command_log_latest.txt",
   "created_at": "2026-07-07T11:45:32.284151Z",
   "data_coverage_counts": {
-    "basis": "WF runner announced symbols=110 then loaded no direct 1m-derived bars from data/market_parquet.",
-    "loaded": 0,
-    "missing": 110,
+    "basis": "WF runner loaded existing local direct 1m-derived market_parquet data.",
+    "global_latest_utc": "2026-07-04T06:30:00",
+    "loaded": 110,
+    "missing": 0,
     "monitor_only": 0,
-    "train_eligible": 0
+    "requested": 110,
+    "train_eligible": 110
   },
   "final_ci_summary_path": "var/reports/strategy_performance_improvement_20260707/final_ci_summary_latest.json",
-  "full_universe_claim_status": "blocked_not_claimed_missing_direct_1m_bars",
-  "git_head": "e09014ed",
-  "git_head_at_final_artifact_update": "pre_squash_working_tree",
+  "full_universe_claim_status": "claimed_loaded_all_requested_symbols_completed_walkforward",
+  "git_head": "8f6d739e",
   "git_status_tracked_before_artifact_add": [],
   "leak_checks": {
-    "basis": "Verification lane ran no successful WF selection; targeted no-leak/selection tests passed. Full WF blocked before selection due missing bars.",
+    "basis": "Normalized report over completed WF rows reports zero locked-OOS selection/weighting/sizing/tiebreak use and no same-month self-feed violations.",
     "uses_locked_oos_for_selection": false,
     "uses_locked_oos_for_sizing": false,
     "uses_locked_oos_for_tiebreak": false,
     "uses_locked_oos_for_weighting": false
   },
   "native_backend_status": {
-    "command": "uv run python native/backend status probe",
-    "exit_code": 0,
-    "peak_rss_mb": 124.12,
-    "status": "NOT_REQUIRED_NO_NATIVE_TOUCH",
-    "summary": "No native/Rust/backend paths modified by worker-4; lumina_compute import not installed in this venv; parity tests not required by task scope."
+    "build_command": "uv run python scripts/build_native_backends.py",
+    "parity_command": "uv run --extra dev pytest -q tests/test_native_backend_parity.py tests/test_native_kernel_version.py",
+    "status": "PASS_EXISTING_NATIVE_NO_NEW_RUST",
+    "summary": "Existing pyo3/native backend built and parity/version tests passed; no new Rust hot-path was added."
   },
   "notes": [
-    "Initial pytest commands without the project dev extra failed to spawn pytest; reruns with declared dev extra passed.",
-    "Initial help logging wrapper omitted argv[0]; corrected wrapper reran approved help probes successfully.",
-    "No live/paper/testnet orders were run; all task 4 work remained research/verification-only.",
-    "Ruff format blocker fixed by formatting src/lumina_quant/compute/ohlcv_validation.py and tests/test_ohlcv_validation.py; `uv run --extra dev ruff format --check .` now passes.",
-    "Full-universe walk-forward remains blocked/not claimed because data/market_parquet has no direct 1m-derived bars.",
-    "Final clean-env full pytest after golden refresh passed: 3571 passed, 20 skipped, 3 xfailed in 241.52s.",
-    "Dashboard npm install/lint/test/typecheck/build passed; dashboard tests reported 60 tests.",
-    "Coverage gates passed: total 79%, financial core 83% >=70%, live/exchanges/core 70% >=65%.",
-    "Benchmark/8GB gates passed: median 0.05218s, 12149 bars/sec, peak RSS 254.19 MiB under 8GB baseline.",
-    "Native backend build and Binance native architecture gate passed after uv sync with optimize/dev/live/dashboard extras.",
-    "Final clean-env targeted pytest after second code-review fixes passed: 70 passed in 27.85s."
+    "Initial focused pytest with local .env loaded failed because machine-local secrets/config mutate RuntimeConfig; rerun with .env temporarily hidden passed and .env was restored.",
+    "No live/paper/testnet/order execution was run.",
+    "Full-universe walk-forward completed on 2026-07-08 after existing local market_parquet data was available; this supersedes the earlier worker4 no-data blocker artifact.",
+    "Track A strict gates remain hard gates; Track B lagged-shadow headline artifacts remain research_only/diagnostic-only and not deployable.",
+    "Raw WF row-level candidate_tier labels may contain legacy paper/testnet/live wording; artifact-level promotability=false, final claims, and verification notes are authoritative and do not approve execution.",
+    "Full clean-env pytest passed: 3574 passed, 20 skipped, 3 xfailed in 201.01s.",
+    "Full-universe WF peak RSS was 1834.566 MiB; prior benchmark/8GB gate remains 254.19 MiB < 7372.80 MiB."
   ],
-  "peak_rss_mb": 556.31,
-  "peak_rss_source": "max /usr/bin/time -v Maximum resident set size across task 4 logs",
+  "peak_rss_mb": 1834.56640625,
+  "peak_rss_source": "runner_peak_rss_mib from full_universe_walkforward_summary_latest.json",
   "resolved_blockers": [
     {
-      "affected_files": [
-        "src/lumina_quant/compute/ohlcv_validation.py",
-        "tests/test_ohlcv_validation.py"
-      ],
-      "details": "Formatted the two files with `uv run ruff format src/lumina_quant/compute/ohlcv_validation.py tests/test_ohlcv_validation.py`; repository-wide format check now passes.",
-      "fixed_at": "2026-07-07T11:45:32.284151Z",
-      "id": "ruff_format_unowned_files",
-      "status": "FIXED"
+      "details": "Current leader rerun loaded 110/110 requested symbols from existing local market_parquet and completed all 11 WF folds.",
+      "fixed_at": "2026-07-08T11:47:52Z",
+      "id": "missing_market_parquet_bars",
+      "status": "SUPERSEDED_BY_COMPLETED_WF_RERUN"
     }
   ],
   "schema_version": "1.0",
-  "task_id": "4",
-  "updated_at_utc": "2026-07-07T12:27:37.929129Z",
-  "worker": "worker-4",
+  "task_id": "GJC-G001",
+  "updated_at_utc": "2026-07-08T11:48:05Z",
+  "worker": "gjc-leader",
   "worker_count": {
-    "source_symbol_workers": 2,
-    "team_worker": "worker-4"
+    "source_symbol_workers": 2
   }
 }
