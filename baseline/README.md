@@ -70,11 +70,11 @@ All files under `baseline/golden/`. Full metadata in `baseline/golden/PROVENANCE
 | Artifact | File | Description |
 |---|---|---|
 | MA Cross equity curve | `ma_cross_equity_curve.parquet` | 1001-row equity history, MA(10,30) on BTCUSDT+ETHUSDT |
-| MA Cross stats | `ma_cross_stats.json` | Sharpe −0.9342, MaxDD 7.74%, Total Return −3.91% (2026-07-07 recapture) |
+| MA Cross stats | `ma_cross_stats.json` | Sharpe −0.9177, MaxDD 7.65%, Total Return −3.61% (2026-07-08 data-dict isolation recapture) |
 | MA Cross trades | `ma_cross_trades.json` | Full trade log (partial fills exercised) |
 | MA Cross positions | `ma_cross_positions_sample.json` | First 100 position snapshots |
 | BuyHold equity curve | `buyholdstrategy_equity_curve.parquet` | Sanity golden: single LONG entry |
-| BuyHold stats | `buyholdstrategy_stats.json` | Sharpe −1.6917, MaxDD 5.81% (2026-07-07 recapture) |
+| BuyHold stats | `buyholdstrategy_stats.json` | Sharpe −1.6746, MaxDD 5.63% (2026-07-08 data-dict isolation recapture) |
 | Native backends | `native_backends.json` | All 6 backends: sharpe/cagr/mdd + array outputs |
 | Walk-forward results | `walk_forward_results.json` | 3 folds × 4 param combos, best params + metrics |
 | Frozen configs | `configs/config_frozen.yaml`, `configs/research_frozen.yaml` | SHA-256 locked |
@@ -98,9 +98,9 @@ duplication described in plan §2.2 (one is deleted in Phase 2, Rust implementat
 
 ---
 
-## 2026-07-07 Engine Golden Recapture
+## 2026-07-08 Engine Golden Data-Dict Isolation Recapture
 
-`docs/divergences/engine-golden-funding-rebaseline-20260707.md` records a deterministic recapture of the event-driven engine stats/trades goldens under the current uv/Python 3.14.5 stack. The recapture is limited to existing engine behavior and is not a strategy-performance promotion.
+`docs/divergences/engine-golden-funding-rebaseline-20260707.md` now records that the 2026-07-07 recapture was superseded: preloaded `data_dict` fixtures must not read ambient local sidecar feature stores unless a caller passes `feature_db_path`/`feature_exchange` explicitly. The current engine stats/trades goldens match the CI/no-sidecar values and remain synthetic-fixture evidence only, not a strategy-performance promotion.
 
 ## Tolerance Contract
 

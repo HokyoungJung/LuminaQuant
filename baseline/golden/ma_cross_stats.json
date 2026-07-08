@@ -1,7 +1,7 @@
 [
   [
     "Total Return",
-    "-3.91%"
+    "-3.61%"
   ],
   [
     "Benchmark Return",
@@ -9,7 +9,7 @@
   ],
   [
     "CAGR",
-    "-1.00%"
+    "-0.92%"
   ],
   [
     "Ann. Volatility",
@@ -17,19 +17,19 @@
   ],
   [
     "Sharpe Ratio",
-    "-0.9342"
+    "-0.9177"
   ],
   [
     "Sortino Ratio",
-    "-1.5008"
+    "-1.4761"
   ],
   [
     "Calmar Ratio",
-    "-0.1292"
+    "-0.1203"
   ],
   [
     "Max Drawdown",
-    "7.74%"
+    "7.65%"
   ],
   [
     "DD Duration",
@@ -37,7 +37,7 @@
   ],
   [
     "Alpha",
-    "-0.0087"
+    "-0.0079"
   ],
   [
     "Beta",
@@ -45,11 +45,11 @@
   ],
   [
     "Information Ratio",
-    "-0.3255"
+    "-0.3231"
   ],
   [
     "Daily Win Rate",
-    "46.15%"
+    "46.25%"
   ],
   [
     "Risk-Free Reference",
@@ -61,7 +61,7 @@
   ],
   [
     "Funding (Net)",
-    "30.6462"
+    "0.0000"
   ],
   [
     "Liquidations",
