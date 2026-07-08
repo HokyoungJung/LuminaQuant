@@ -188,6 +188,8 @@ def test_overrides_shape_for_fully_enabled_research_config():
         "spa_gate_ceiling": 1.0,
         "pbo_gate_ceiling": 1.0,
         "max_cross_trial_pbo": 1.0,
+        "cost_rate_multiplier": 1.0,
+        "cost_rate_bps_override": None,
     }
     assert overrides["deflation_kwargs"] == {
         "single_correlation_discount": True,
@@ -223,6 +225,8 @@ def test_overrides_all_flags_off_still_reports_false_not_empty():
         "spa_gate_ceiling": 1.0,
         "pbo_gate_ceiling": 1.0,
         "max_cross_trial_pbo": 1.0,
+        "cost_rate_multiplier": 1.0,
+        "cost_rate_bps_override": None,
     }
     assert overrides["deflation_kwargs"] == {
         "single_correlation_discount": False,

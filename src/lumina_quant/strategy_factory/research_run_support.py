@@ -550,6 +550,18 @@ def research_config_to_overrides(research_config: Any) -> dict[str, Any]:
         score_config_research["pbo_gate_ceiling"] = float(cfg.pbo_gate_ceiling)
     if hasattr(cfg, "max_cross_trial_pbo"):
         score_config_research["max_cross_trial_pbo"] = float(cfg.max_cross_trial_pbo)
+    # Honest cost floor for the vectorized research scorer
+    # (performance_lever_measurement 2026-07-08): these ride in
+    # ``score_config['research']`` and are read defensively by
+    # ``research_runner._candidate_cost_rate`` via ``_research_flag``. Both stay
+    # no-ops at their shipped defaults (``multiplier == 1.0`` / ``override is None``).
+    if hasattr(cfg, "cost_rate_multiplier"):
+        score_config_research["cost_rate_multiplier"] = float(cfg.cost_rate_multiplier)
+    if hasattr(cfg, "cost_rate_bps_override"):
+        override = cfg.cost_rate_bps_override
+        score_config_research["cost_rate_bps_override"] = (
+            None if override is None else float(override)
+        )
 
     deflation_kwargs: dict[str, Any] = {}
     if hasattr(cfg, "single_correlation_discount"):

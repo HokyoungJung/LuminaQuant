@@ -49,3 +49,10 @@ research:
   max_per_symbol_basket: 2
   max_per_lineage: 1
   max_per_family_basket: 1
+  # Portfolio-layer honest gate (performance_lever_measurement 2026-07-08): run
+  # DSR / CSCV-PBO / SPA on the weighted-portfolio NET stream, deflating the
+  # portfolio DSR by the TOTAL allocation config-grid cells searched (the
+  # cross-run trial accountant) so tuning a config grid and shipping the best cell
+  # cannot clear the gate. No cost_rate_multiplier here: this profile carries no
+  # execution cost model (see backtest_cost_realistic.yaml for the cost floor).
+  portfolio_honest_gate: true

@@ -387,6 +387,22 @@ research:
   max_per_symbol_basket: 2
   max_per_lineage: 1
   max_per_family_basket: 1
+  # Honest realistic cost floor for the VECTORIZED research scorer
+  # (performance_lever_measurement 2026-07-08). The scorer charges a LINEAR
+  # per-turnover cost (net = returns - turnover * cost_rate); its shipped base map
+  # is ~5 bps/turnover. This multiplier lifts EVERY class's scalar to align with
+  # this profile's one-way execution cost: taker_fee_rate (0.0004) + spread_rate
+  # (0.0002) + slippage_rate (0.0005) = 0.0011 (11 bps) vs the 5 bps base ->
+  # 11/5 = 2.2x. It aligns a SCALAR only; it deliberately does NOT reproduce the
+  # nonlinear sqrt-impact + funding shape the REAL backtest engine charges (that is
+  # measured on the real engine, not here), and it is monotonically >= the legacy
+  # cost for every class -- so it can only make a lever look WORSE, never
+  # manufacture a gain. cost_rate_bps_override stays unset (null) so the multiplier
+  # path is used and the per-class relative structure is preserved.
+  cost_rate_multiplier: 2.2
+  # Portfolio-layer honest gate (DSR/CSCV-PBO/SPA on the weighted-portfolio NET
+  # stream, DSR deflated by the total allocation config-grid cells searched).
+  portfolio_honest_gate: true
 
 # ------------------------------------------
 # Data Collection
