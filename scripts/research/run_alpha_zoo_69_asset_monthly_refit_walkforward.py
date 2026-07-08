@@ -81,6 +81,170 @@ PERIOD_METRICS_CACHE_SIZE = max(
 PREPARED_RETURNS_CACHE_SIZE = max(
     0, int(os.getenv("LQ_MONTHLY_REFIT_PREPARED_RETURNS_CACHE_SIZE", "50000"))
 )
+
+# ---------------------------------------------------------------------------
+# Anti-overfit HARD selection gate (overfit_selection_gates 2026-07-08).
+#
+# Config-gated and DEFAULT OFF: ``_SELECTION_GATE_STATE`` starts disabled so
+# every admit boundary is a STRICT identity pass-through and this runner's
+# default output stays byte-identical. The gate is armed only by explicit CLI
+# flags (``--enforce-selection-reject-gate`` / ``--dedupe-baskets`` / the
+# ``--dsr-gate-floor`` etc. floors) or a strict RuntimeConfig loaded via
+# ``--config`` / ``LQ_CONFIG_PATH`` -- see ``_configure_selection_gate``, called
+# once from ``main`` after ``parse_args``.
+#
+# ``reject_ready`` is intentionally False: this runner's ``_period_metrics`` does
+# NOT (yet) compute per-candidate DSR / SPA / PBO into the train/validation
+# blocks, so the DSR/SPA/PBO REJECT floors would over-reject every DSR-less row.
+# The reject logic itself is fully implemented + unit-proven against the recorded
+# artifact in ``tests/test_overfit_selection_reject_gate.py`` (via
+# ``selection.apply_selection_reject_and_dedup`` /
+# ``selection.passes_dsr_spa_hard_gate``). TODO(overfit-gates): once
+# ``_period_metrics`` emits ``deflated_sharpe`` (deflated against the WHOLE-SEARCH
+# trial count -- the honest num_trials basis, consistent with the cross-trial
+# CSCV/PBO below), ``spa_pvalue`` and ``pbo`` into the ``validation`` block, flip
+# ``reject_ready`` to True to activate the resolved reject floors. Basket dedup
+# (Step 3) needs no such plumbing (it keys off ``symbols`` only) and is active
+# whenever ``--dedupe-baskets`` / a cap is set.
+#
+# WORKED REFERENCE (overfit_selection_gate handoff): this repo's engine is NOT
+# the canonical selection/aggregation pipeline -- production selection, per-fold
+# stamping, and the DSR/SPA/PBO aggregation run on the data PC (``LuminaQuant/``
+# layout, ``private-main``). The wiring below is kept ON-path-inert / byte-
+# identical precisely so it can serve as the WORKED EXAMPLE for
+# ``docs/research_note/overfit_selection_gate_integration.md``: the data-PC
+# pipeline must route both its per-fold admit boundary AND its final
+# merge/consolidation stamp through
+# ``selection.apply_selection_reject_and_dedup`` (with a strict
+# ``robust_score_params``) exactly the way ``_configure_selection_gate`` /
+# ``_apply_selection_gate_rows`` do here. See that guide before porting.
+# ---------------------------------------------------------------------------
+_SELECTION_GATE_STATE: dict[str, Any] = {
+    "enabled": False,
+    "reject_ready": False,
+    "robust_score_params": None,
+    "max_per_symbol_basket": None,
+    "max_per_lineage": None,
+    "max_per_family_basket": None,
+}
+
+
+def _configure_selection_gate(args: argparse.Namespace) -> None:
+    """Resolve reject/dedup gate params (explicit CLI > loaded config > legacy
+    OFF defaults) and stash them in the module-level holder.
+
+    Called once from ``main`` after ``parse_args`` so every downstream path
+    (``run_walkforward``, recompute, augment) sees the same resolved gate. When no
+    flag is set and no strict config is loaded the holder stays disabled -> every
+    admit boundary is a strict identity no-op and the runner's output is
+    byte-identical to the legacy path.
+    """
+    cfg_enforce: bool | None = None
+    cfg_dsr: float | None = None
+    cfg_spa: float | None = None
+    cfg_pbo: float | None = None
+    cfg_symbol_cap: int | None = None
+    cfg_lineage_cap: int | None = None
+    cfg_family_cap: int | None = None
+    config_path = getattr(args, "config", None) or os.getenv("LQ_CONFIG_PATH")
+    if config_path:
+        from lumina_quant.configuration.loader import load_runtime_config
+
+        research = load_runtime_config(str(config_path)).research
+        cfg_enforce = bool(getattr(research, "enforce_selection_reject_gate", False))
+        cfg_dsr = float(getattr(research, "dsr_gate_floor", 0.0))
+        cfg_spa = float(getattr(research, "spa_gate_ceiling", 1.0))
+        cfg_pbo = float(getattr(research, "pbo_gate_ceiling", 1.0))
+        # Basket-dedup caps come from the strict profile too, so loading a strict
+        # config via --config / LQ_CONFIG_PATH ARMS dedup (not just the reject
+        # floors). None on the config keeps the cap OFF.
+        raw_symbol_cap = getattr(research, "max_per_symbol_basket", None)
+        raw_lineage_cap = getattr(research, "max_per_lineage", None)
+        raw_family_cap = getattr(research, "max_per_family_basket", None)
+        cfg_symbol_cap = None if raw_symbol_cap is None else int(raw_symbol_cap)
+        cfg_lineage_cap = None if raw_lineage_cap is None else int(raw_lineage_cap)
+        cfg_family_cap = None if raw_family_cap is None else int(raw_family_cap)
+
+    def _pick(cli: Any, cfg: Any, legacy: Any) -> Any:
+        if cli is not None:
+            return cli
+        if cfg is not None:
+            return cfg
+        return legacy
+
+    # store_true flags can only turn a gate ON (True), otherwise defer to config.
+    enforce = bool(getattr(args, "enforce_selection_reject_gate", False)) or bool(cfg_enforce)
+    dedupe = bool(getattr(args, "dedupe_baskets", False))
+
+    dsr_floor = float(_pick(getattr(args, "dsr_gate_floor", None), cfg_dsr, 0.0))
+    spa_ceiling = float(_pick(getattr(args, "spa_gate_ceiling", None), cfg_spa, 1.0))
+    pbo_ceiling = float(_pick(getattr(args, "pbo_gate_ceiling", None), cfg_pbo, 1.0))
+
+    def _resolve_cap(cli: Any, dedupe_default: int, cfg: int | None) -> int | None:
+        # Resolution order: explicit CLI cap > --dedupe-baskets default > config
+        # cap > None(OFF). An explicit CLI value always wins; --dedupe-baskets
+        # supplies the 2/1/1 defaults; otherwise a strict profile's config cap
+        # arms dedup; else the cap stays OFF (byte-identical no-op).
+        if cli is not None:
+            return int(cli)
+        if dedupe:
+            return dedupe_default
+        if cfg is not None:
+            return int(cfg)
+        return None
+
+    symbol_cap = _resolve_cap(getattr(args, "max_per_symbol_basket", None), 2, cfg_symbol_cap)
+    lineage_cap = _resolve_cap(getattr(args, "max_per_lineage", None), 1, cfg_lineage_cap)
+    family_cap = _resolve_cap(getattr(args, "max_per_family_basket", None), 1, cfg_family_cap)
+
+    dedupe_active = any(cap is not None for cap in (symbol_cap, lineage_cap, family_cap))
+
+    _SELECTION_GATE_STATE.update(
+        {
+            "enabled": bool(enforce or dedupe_active),
+            "reject_ready": False,  # TODO(overfit-gates): flip once metrics land.
+            "robust_score_params": {
+                "enforce_selection_reject_gate": True,
+                "dsr_gate_floor": dsr_floor,
+                "spa_gate_ceiling": spa_ceiling,
+                "pbo_gate_ceiling": pbo_ceiling,
+            }
+            if enforce
+            else None,
+            "max_per_symbol_basket": symbol_cap,
+            "max_per_lineage": lineage_cap,
+            "max_per_family_basket": family_cap,
+        }
+    )
+
+
+def _apply_selection_gate_rows(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    mode: str = "val",
+) -> list[dict[str, Any]]:
+    """Config-gated reject + basket-dedup admit filter for evaluated fold rows.
+
+    Strict identity no-op when the gate is disabled (returns ``list(rows)`` with
+    the same objects, in the same order) -- the OFF-path byte-identity guarantee.
+    """
+    state = _SELECTION_GATE_STATE
+    if not state.get("enabled"):
+        return list(rows)
+    from lumina_quant.strategy_factory.selection import apply_selection_reject_and_dedup
+
+    robust_score_params = state["robust_score_params"] if state.get("reject_ready") else None
+    return apply_selection_reject_and_dedup(
+        rows,
+        mode=mode,
+        robust_score_params=robust_score_params,
+        max_per_symbol_basket=state.get("max_per_symbol_basket"),
+        max_per_lineage=state.get("max_per_lineage"),
+        max_per_family_basket=state.get("max_per_family_basket"),
+        enabled=True,
+    )
+
+
 REQUIRED_BRIDGE_MANIFEST_KEYS = (
     "deployable_expert_roster",
     "allowed_pre_oos_features",
@@ -7501,7 +7665,10 @@ def _row_level_leaf_selector_rows(
                 }
             )
             out.append(new_row)
-    return out
+    # Final train/validation-stamp admit boundary (config-gated, default OFF ->
+    # identity passthrough): apply the same reject + basket-dedup filter to the
+    # single-clean-leaf selector rows before they are recorded.
+    return _apply_selection_gate_rows(out, mode="val")
 
 
 def _augment_payload_with_row_level_leaf_selectors(payload: Mapping[str, Any]) -> dict[str, Any]:
@@ -8048,7 +8215,19 @@ def run_walkforward(args: argparse.Namespace) -> dict[str, Any]:
         )
         all_candidates.extend(bridge_candidates)
         rows = [_evaluate_candidate(candidate, fold) for candidate in all_candidates]
-        fold_candidate_rows.extend(rows)
+        # Anti-overfit admit boundary (config-gated, default OFF -> identity):
+        # reject overfit rows and collapse identical-basket clones before they
+        # enter the recorded selection. Diagnostic priors / best-OOS below stay on
+        # the full evaluated set (they are explicitly "diagnostic_only_not_selection").
+        # TODO(overfit-gates): cross-trial CSCV/PBO reject hook -- once the raw
+        # per-candidate return streams for this fold are retained, assemble the
+        # (n_candidates x n_periods) matrix and call
+        # research_metrics.cross_trial_pbo_rejects_run(matrix,
+        # max_cross_trial_pbo=<config>, enabled=<config>) to drop the run tail.
+        # NOTE(overfit-gates): Step 7 (funding-in-returns -- folding perp funding
+        # into the per-candidate return stream) is DEFERRED, not implemented here.
+        admitted_rows = _apply_selection_gate_rows(rows, mode="val")
+        fold_candidate_rows.extend(admitted_rows)
         _update_lagged_shadow_leaf_prior_returns(lagged_shadow_leaf_prior_returns, rows)
         lagged_shadow_leaf_completed_folds.append(fold.fold_id)
         _update_bridge_prior_utilities(bridge_prior_completed_utilities, rows)
@@ -8205,6 +8384,36 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--output-json", default=str(DEFAULT_OUTPUT_JSON))
     parser.add_argument("--output-md", default=str(DEFAULT_OUTPUT_MD))
+    # Anti-overfit HARD selection gate (overfit_selection_gates 2026-07-08).
+    # All DEFAULT OFF (None sentinels / store_false) so the default run is
+    # byte-identical. Resolution order: explicit CLI > loaded --config > legacy.
+    parser.add_argument(
+        "--config",
+        default=None,
+        help=(
+            "Optional RuntimeConfig path (or set LQ_CONFIG_PATH) to source the "
+            "research.enforce_selection_reject_gate / dsr_gate_floor / spa_gate_ceiling "
+            "/ pbo_gate_ceiling floors; explicit CLI flags below override it."
+        ),
+    )
+    parser.add_argument(
+        "--enforce-selection-reject-gate",
+        action="store_true",
+        default=False,
+        help="Arm the DSR/SPA/PBO hard reject gate (default OFF).",
+    )
+    parser.add_argument("--dsr-gate-floor", type=float, default=None)
+    parser.add_argument("--spa-gate-ceiling", type=float, default=None)
+    parser.add_argument("--pbo-gate-ceiling", type=float, default=None)
+    parser.add_argument(
+        "--dedupe-baskets",
+        action="store_true",
+        default=False,
+        help="Collapse identical symbol-basket clones (default caps 2/1/1; default OFF).",
+    )
+    parser.add_argument("--max-per-symbol-basket", type=int, default=None)
+    parser.add_argument("--max-per-lineage", type=int, default=None)
+    parser.add_argument("--max-per-family-basket", type=int, default=None)
     args = parser.parse_args(argv)
     families = {item.strip() for item in str(args.families).split(",") if item.strip()}
     families.add("profile_optuna")
@@ -8215,6 +8424,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
+    # Arm the (default-OFF) anti-overfit selection gate for every downstream path.
+    _configure_selection_gate(args)
     output_json = Path(args.output_json).expanduser().resolve()
     output_md = Path(args.output_md).expanduser().resolve()
     if args.recompute_from_json:

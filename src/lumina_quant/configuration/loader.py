@@ -1212,12 +1212,45 @@ def _build_runtime_config_tree(
     )
 
 
+def _enforce_strict_research_env(runtime: RuntimeConfig, env: Mapping[str, str]) -> None:
+    """Fail-closed guard: when ``LUMINA_ENABLE_STRICT_RESEARCH`` is set truthy the
+    loaded research config MUST have the anti-overfit reject gate armed with
+    non-trivial floors, or the load raises.
+
+    Mirrors the real-money live-safety pattern (see
+    ``validate.validate_runtime_config`` / ``LUMINA_ENABLE_LIVE_REAL``): an
+    explicit opt-in env var refuses to silently run a strict-research job against
+    a permissive (promote-everything) config. When the env var is unset (or
+    falsy) this is a strict no-op, so the default load stays byte-identical.
+    """
+    flag = str(env.get("LUMINA_ENABLE_STRICT_RESEARCH", "") or "").strip().lower()
+    if flag not in {"1", "true", "yes", "on"}:
+        return
+    research = runtime.research
+    if not bool(getattr(research, "enforce_selection_reject_gate", False)):
+        raise ValueError(
+            "LUMINA_ENABLE_STRICT_RESEARCH=true requires "
+            "research.enforce_selection_reject_gate=true, but the loaded config "
+            "leaves it OFF (the permissive promote-everything path). Load a strict "
+            "profile (configs/profiles/research.yaml or "
+            "configs/profiles/backtest_cost_realistic.yaml) or unset the env var."
+        )
+    if float(getattr(research, "dsr_gate_floor", 0.0)) <= 0.0:
+        raise ValueError(
+            "LUMINA_ENABLE_STRICT_RESEARCH=true requires a non-trivial "
+            "research.dsr_gate_floor (> 0.0); the loaded config leaves it at the "
+            "pass-through default so the DSR gate would never reject. Load a strict "
+            "profile or unset the env var."
+        )
+
+
 def build_runtime_config(data: dict[str, Any], env: Mapping[str, str]) -> RuntimeConfig:
     """Build a strongly typed runtime config from raw dict + environment."""
     mapped = apply_env_overrides(data, env)
     sections = _extract_runtime_sections(mapped)
     runtime = _build_runtime_config_tree(sections=sections, env=env)
     _normalize_runtime_config(runtime, sections=sections)
+    _enforce_strict_research_env(runtime, env)
     return runtime
 
 

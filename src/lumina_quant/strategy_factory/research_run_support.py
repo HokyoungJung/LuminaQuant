@@ -538,10 +538,18 @@ def research_config_to_overrides(research_config: Any) -> dict[str, Any]:
     score_config_research: dict[str, Any] = {}
     if hasattr(cfg, "strict_selection_gate"):
         score_config_research["strict_selection_gate"] = bool(cfg.strict_selection_gate)
+    if hasattr(cfg, "enforce_selection_reject_gate"):
+        score_config_research["enforce_selection_reject_gate"] = bool(
+            cfg.enforce_selection_reject_gate
+        )
     if hasattr(cfg, "dsr_gate_floor"):
         score_config_research["dsr_gate_floor"] = float(cfg.dsr_gate_floor)
     if hasattr(cfg, "spa_gate_ceiling"):
         score_config_research["spa_gate_ceiling"] = float(cfg.spa_gate_ceiling)
+    if hasattr(cfg, "pbo_gate_ceiling"):
+        score_config_research["pbo_gate_ceiling"] = float(cfg.pbo_gate_ceiling)
+    if hasattr(cfg, "max_cross_trial_pbo"):
+        score_config_research["max_cross_trial_pbo"] = float(cfg.max_cross_trial_pbo)
 
     deflation_kwargs: dict[str, Any] = {}
     if hasattr(cfg, "single_correlation_discount"):
@@ -551,9 +559,24 @@ def research_config_to_overrides(research_config: Any) -> dict[str, Any]:
     if hasattr(cfg, "cscv_pbo"):
         deflation_kwargs["cscv_pbo"] = bool(cfg.cscv_pbo)
 
+    # NOTE: the reject-gate floors are emitted into ``robust_score_params`` (not
+    # only ``score_config_research``) so ``_resolve_robust_score_params`` /
+    # ``passes_dsr_spa_hard_gate`` / ``apply_selection_reject_and_dedup`` actually
+    # bind them. ``enforce_selection_reject_gate`` acts as the strict alias that
+    # flips ``dsr_spa_hard_gate`` on (alongside the legacy ``strict_selection_gate``).
     robust_score_params: dict[str, Any] = {}
     if hasattr(cfg, "strict_selection_gate"):
         robust_score_params["strict_selection_gate"] = bool(cfg.strict_selection_gate)
+    if hasattr(cfg, "enforce_selection_reject_gate"):
+        robust_score_params["enforce_selection_reject_gate"] = bool(
+            cfg.enforce_selection_reject_gate
+        )
+    if hasattr(cfg, "dsr_gate_floor"):
+        robust_score_params["dsr_gate_floor"] = float(cfg.dsr_gate_floor)
+    if hasattr(cfg, "spa_gate_ceiling"):
+        robust_score_params["spa_gate_ceiling"] = float(cfg.spa_gate_ceiling)
+    if hasattr(cfg, "pbo_gate_ceiling"):
+        robust_score_params["pbo_gate_ceiling"] = float(cfg.pbo_gate_ceiling)
 
     return {
         "split": split,

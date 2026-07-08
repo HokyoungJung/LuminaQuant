@@ -598,6 +598,41 @@ def cscv_pbo(returns_matrix: np.ndarray, *, n_splits: int = 8) -> float:
     return float(le_zero / total)
 
 
+def cross_trial_pbo_rejects_run(
+    returns_matrix: np.ndarray,
+    *,
+    max_cross_trial_pbo: float = 1.0,
+    enabled: bool = False,
+    n_splits: int = 8,
+) -> bool:
+    """Cross-trial CSCV/PBO reject decision for a whole candidate-search run.
+
+    Consumes :func:`cscv_pbo` (the family-wise probability of backtest overfitting
+    across the in-run candidate return matrix, shape ``(n_candidates, n_periods)``)
+    and returns ``True`` when the run tail should be REJECTED because its
+    family-wise PBO exceeds ``max_cross_trial_pbo``.
+
+    Strict no-op guarantees: with ``enabled=False`` (default) OR
+    ``max_cross_trial_pbo >= 1.0`` (the pass-through default) this always returns
+    ``False`` -- PBO is a probability in ``[0, 1]`` so it can never strictly
+    exceed 1.0, and the estimator is never even run when disabled. The strict
+    profiles set ``max_cross_trial_pbo=0.50``.
+
+    This is deliberately the metrics/helper-level consumer: the monthly-refit
+    walk-forward engine does not currently persist the raw per-candidate return
+    streams needed to assemble ``returns_matrix`` in-process, so the engine holds
+    only a clearly-marked TODO wiring hook that would feed this function once the
+    matrix is materialized. Exercised by a synthetic-matrix unit test.
+    """
+    if not enabled:
+        return False
+    ceiling = float(max_cross_trial_pbo)
+    if ceiling >= 1.0:
+        return False
+    pbo = cscv_pbo(np.asarray(returns_matrix, dtype=float), n_splits=n_splits)
+    return bool(pbo > ceiling)
+
+
 def fold_participation_stats(returns: np.ndarray) -> tuple[float, float, float]:
     """Return active-fold ratio, inactive-fold count, and failed-fold ratio."""
     n = returns.size
