@@ -49,6 +49,23 @@ def test_historic_handler_exposes_feature_points_from_sidecar_store(tmp_path):
     assert handler.get_latest_bar_value("BTC/USDT", "taker_sell_quote_volume") == 300_000.0
 
 
+def test_historic_handler_preloaded_data_disables_ambient_feature_store(tmp_path):
+    rows = [
+        (datetime.fromtimestamp(1_700_000_000_000 / 1000, tz=UTC), 1.0, 1.0, 1.0, 1.0, 10.0),
+    ]
+    handler = HistoricCSVDataHandler(
+        queue.Queue(),
+        str(tmp_path),
+        ["BTC/USDT"],
+        data_dict={"BTC/USDT": rows},
+    )
+
+    handler.update_bars()
+    assert handler._feature_lookup.db_path == ""
+    assert handler.get_latest_feature_value("BTC/USDT", "funding_rate") is None
+    assert handler.get_latest_bar_value("BTC/USDT", "funding_rate") == 0.0
+
+
 def test_historic_handler_scopes_feature_lookup_to_backtest_window(tmp_path):
     db_path = tmp_path / "market_parquet"
     upsert_futures_feature_points_rows(

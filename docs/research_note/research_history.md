@@ -24,6 +24,17 @@ Future profit-moonshot sessions must read this file before repeating searches or
 - Staleness/recheck: Recheck after additional post-2026-06-28 data, runner logic changes, symbol universe changes, or cost/fill telemetry updates. / `True`
 - Do-not-repeat note: Do not infer freshness from directory partitions or stale runner state; use direct parquet timestamp audit before claiming latest-data coverage.
 
+### 2026-07-08 — strategy_performance_improvement_full_universe_measurement
+- Research dates: 2026-07-07..2026-07-08
+- Source type: `local_artifact + full_universe_walkforward + governance_audit`
+- Title/path: Strategy performance improvement full-universe measurement — `var/reports/strategy_performance_improvement_20260707/full_universe_walkforward/full_universe_walkforward_summary_latest.md|json`
+- Content summary: Recovered and completed the previously blocked strategy-performance-improvement WF on existing local direct 1m-derived data: `110/110` requested symbols loaded through `2026-07-04T06:30:00`, `11` folds, `1733` fold-candidate rows, peak RSS `1834.566 MiB`. The integrated lagged-shadow trimmed candidate measured `+39.14%` compounded OOS / `+43.39%` annualized approximation / `27.69%` max OOS MDD but remains post-OOS research/shadow-only and requires fresh-forward shadow evidence. Best clean row measured only `+7.99%` compounded OOS and `hard_stop_promotable=false`.
+- What was used: Used to replace the earlier no-direct-1m-bars blocker with a completed measurement while preserving Track A strict hard gates and Track B research_only/diagnostic-only separation.
+- Families: lagged_shadow_leaf_router, dynamic_conviction_switch, full_universe_walkforward, strategy_performance_improvement
+- Decision impact: Full-universe measurement is now complete, but no clean/live/paper/testnet/real-money promotion is approved. High headline Track B rows are diagnostic/report-only; clean rows do not clear hard-stop promotion gates.
+- Staleness/recheck: Recheck after new data beyond `2026-07-04T06:30:00`, fresh-forward shadow evidence, cost/funding/slippage telemetry, or runner logic changes. / `True`
+- Do-not-repeat note: Do not report post-OOS lagged-shadow headline rows as deployable improvements; promotion still requires fresh-forward evidence and explicit approval.
+
 ## Strategy chronology
 
 ### 2026-03-02 — raw_first_live_data_foundation

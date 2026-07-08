@@ -254,12 +254,22 @@ class HistoricCSVDataHandler(DataHandler):
         self._strict_data_dict = data_dict is not None
         self._single_symbol = len(symbol_list) == 1
         self._frame_loader = OHLCVFrameLoader(start_date=self.start_date, end_date=self.end_date)
-        self._feature_lookup = self._build_feature_lookup(
-            db_path=feature_db_path,
-            exchange=feature_exchange,
-            start_date=start_date,
-            end_date=end_date,
-        )
+        # Pre-loaded frames are complete inputs; sidecar feature enrichment must be
+        # explicit so ambient local market stores cannot skew deterministic runs.
+        if data_dict is not None and feature_db_path is None and feature_exchange is None:
+            self._feature_lookup = FeaturePointLookup(
+                db_path=None,
+                exchange="binance",
+                start_date=start_date,
+                end_date=end_date,
+            )
+        else:
+            self._feature_lookup = self._build_feature_lookup(
+                db_path=feature_db_path,
+                exchange=feature_exchange,
+                start_date=start_date,
+                end_date=end_date,
+            )
 
         # Value is `_ColumnarBarRows` for CSV/parquet-loaded symbols, or the raw
         # prefrozen tuple-of-tuples when a caller supplies pre-materialized rows

@@ -235,7 +235,7 @@
     "split_build_elapsed_s": null,
     "authoritative_e2e_timing": "baseline/perf-baseline.json (worker-3, 170.71s)"
   },
-  "last_updated_at_utc": "2026-07-07T12:18:28.337466Z",
+  "last_updated_at_utc": "2026-07-08T13:11:15Z",
   "golden_recaptures": [
     {
       "id": "engine_funding_partial_fill_rebaseline_20260707",
@@ -256,6 +256,31 @@
         "baseline/golden/buyholdstrategy_stats.json": "1f5bbcb612772ac04584b239bf7020357118e3457c3d8465a31d00088824e913",
         "baseline/golden/ma_cross_stats.json": "c322e039adcba0b2e1197174fb00b7699dff5ee09f31f2665f9b91c4cc64168b",
         "baseline/golden/ma_cross_trades.json": "5602aac54d1691a3f4f4dbd40109df140da9bfa005672f07965eada86479d603"
+      },
+      "python_version": "3.14.5",
+      "superseded_by": "engine_golden_data_dict_feature_isolation_20260708",
+      "supersession_reason": "Remote CI showed the 2026-07-07 recapture depended on an ambient local feature store. Preloaded OHLCV fixtures are now isolated from default sidecar feature lookup unless the caller opts in explicitly."
+    },
+    {
+      "id": "engine_golden_data_dict_feature_isolation_20260708",
+      "captured_at_utc": "2026-07-08T13:11:15Z",
+      "scope": [
+        "baseline/golden/buyholdstrategy_stats.json",
+        "baseline/golden/ma_cross_stats.json",
+        "baseline/golden/ma_cross_trades.json"
+      ],
+      "divergence_doc": "docs/divergences/engine-golden-funding-rebaseline-20260707.md",
+      "reason": "Fix deterministic engine-golden isolation: HistoricCSVDataHandler now treats preloaded data_dict frames as complete inputs and disables ambient default feature-store lookup unless feature_db_path or feature_exchange is supplied. The engine goldens are recaptured to the CI/no-sidecar values with Funding (Net)=0.0000 for synthetic OHLCV fixtures.",
+      "validation": [
+        "clean-env uv run pytest -q tests/integration/test_engine_golden.py tests/test_historic_data_feature_support.py => 7 passed",
+        "clean-env uv run pytest -q => 3575 passed, 20 skipped, 3 xfailed",
+        "uv run ruff check . => passed",
+        "uv run ruff format --check . => 1033 files already formatted"
+      ],
+      "sha256": {
+        "baseline/golden/buyholdstrategy_stats.json": "a4543e116cc571508379972f312f93a4a9439ab01ad27bdc8ce943dc30cf55a1",
+        "baseline/golden/ma_cross_stats.json": "c1778993530a7881bb230e0218308cbb3eff4810bf26f75c7d7be94fd5fea4fd",
+        "baseline/golden/ma_cross_trades.json": "37908ffad55086857bc86c98a0497fbeba0f126f5cf0e6a033defa363c06bb65"
       },
       "python_version": "3.14.5"
     }
