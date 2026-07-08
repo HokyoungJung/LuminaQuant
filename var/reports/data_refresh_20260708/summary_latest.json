@@ -1,0 +1,97 @@
+{
+  "artifact_kind": "data_refresh_summary",
+  "base_commit": "8f6d739ec823cf6d248c5d45336050673b3fa1f7",
+  "branch": "data-refresh-test-20260708",
+  "collection": {
+    "combined_error_count": 0,
+    "combined_fetched_rows": 38178,
+    "combined_request_count": 54,
+    "combined_upserted_rows": 38178,
+    "incremental_window": {
+      "empty_count": 0,
+      "error_count": 0,
+      "fetched_rows": 54,
+      "missing_files": 0,
+      "ok_count": 18,
+      "request_count": 18,
+      "since_utc": "2026-07-08T11:18:00Z",
+      "source_files": 0,
+      "until_utc": "2026-07-08T11:20:59.999000Z",
+      "up_to_date_count": 0,
+      "upserted_rows": 54
+    },
+    "initial_window": {
+      "empty_count": 0,
+      "error_count": 0,
+      "fetched_rows": 38124,
+      "missing_files": 0,
+      "ok_count": 18,
+      "request_count": 36,
+      "since_utc": "2026-07-07T00:00:00Z",
+      "source_files": 0,
+      "until_utc": "2026-07-08T11:17:59.999000Z",
+      "up_to_date_count": 0,
+      "upserted_rows": 38124
+    },
+    "policy": "bounded latest update for newly discovered TradFi symbols only; no full historical universe backfill"
+  },
+  "data_commit_policy": "local ignored parquet data only; reports are commit candidates",
+  "data_root": "data/market_parquet_refresh_20260708",
+  "generated_at_utc": "2026-07-08T11:24:25.106684Z",
+  "mode": "isolated worktree/branch; main/private-main was not modified by this task",
+  "report_paths": {
+    "compact_wal_log": "var/reports/data_refresh_20260708/validation/compact_wal.log",
+    "discovery_json": "var/reports/data_refresh_20260708/discovery/binance_1m_research_universe_collection_latest.json",
+    "incremental_collection_json": "var/reports/data_refresh_20260708/new_symbol_update/binance_1m_research_universe_collection_latest.json",
+    "initial_collection_json": "var/reports/data_refresh_20260708/new_symbol_update/binance_1m_research_universe_collection_20260708T111957Z.json",
+    "summary_json": "var/reports/data_refresh_20260708/summary_latest.json",
+    "summary_md": "var/reports/data_refresh_20260708/summary_latest.md",
+    "targeted_pytest_log": "var/reports/data_refresh_20260708/validation/targeted_pytest.log",
+    "validation_json": "var/reports/data_refresh_20260708/validation/new_symbol_data_validation_latest.json",
+    "validation_md": "var/reports/data_refresh_20260708/validation/new_symbol_data_validation_latest.md"
+  },
+  "source": "Binance USD-M Futures /fapi/v1/klines",
+  "tests": {
+    "compact_wal": "No symbols found for compaction.",
+    "targeted_pytest": "23 passed, 1 skipped in 0.77s"
+  },
+  "timeframe": "1m",
+  "universe": {
+    "current_discovered_tradfi_trading": 118,
+    "new_symbols": [
+      "ALABUSDT",
+      "BSPUSDT",
+      "CATUSDT",
+      "CIENUSDT",
+      "FLEXUSDT",
+      "KLACUSDT",
+      "KORUUSDT",
+      "KSTRUSDT",
+      "LRCXUSDT",
+      "MVLLUSDT",
+      "SMCIUSDT",
+      "SONYUSDT",
+      "SQQQUSDT",
+      "STRCUSDT",
+      "TERUSDT",
+      "TQQQUSDT",
+      "TTWOUSDT",
+      "TXNUSDT"
+    ],
+    "new_tradfi_since_static_snapshot_count": 18,
+    "static_tradfi_snapshot": 100,
+    "total_selected_universe": 128
+  },
+  "validation": {
+    "duplicate_timestamp_total": 0,
+    "expected_rows_per_symbol": 2121,
+    "first_utc": "2026-07-07T00:00:00",
+    "invalid_ohlcv_total": 0,
+    "last_utc": "2026-07-08T11:20:00",
+    "non_1m_gap_total": 0,
+    "status": "pass",
+    "symbol_count": 18,
+    "total_rows": 38178
+  },
+  "worktree": "/home/hoky/Quants-agent/LuminaQuant-worktrees/data-refresh-test-20260708"
+}
