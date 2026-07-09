@@ -32,6 +32,7 @@ from lumina_quant.strategies.low_turnover_trend_alpha_sleeves import (
     LowTurnoverTrendPersistenceStrategy,
 )
 from lumina_quant.strategies.trend_quality_xs_alpha_sleeves import (
+    _TREND_QUALITY_XS_SLICE,
     CrossSectionalRegressionTrendQualityStrategy,
 )
 from lumina_quant.tuning import HyperParam
@@ -416,3 +417,30 @@ def test_schema_keys_snake_case_and_hyperparam() -> None:
         "target_gross_exposure",
     ):
         assert required in schema
+
+
+def test_slice_timeframe_expansion_scales_bar_windows() -> None:
+    """4h/1h cells mirror the 1d variants: the formation / vol bar windows scale
+    x6/x24 (formation capped at the schema high 4096), while the weekly min-hold,
+    quantile bands, score mode, and quality floor stay timeframe-invariant."""
+    slice_ = _TREND_QUALITY_XS_SLICE
+    assert set(slice_) == {"4h", "1h", "1d"}
+    variants = {tf: tuple(cell["variant"] for cell in cells) for tf, cells in slice_.items()}
+    assert variants["4h"] == variants["1h"] == variants["1d"]
+    by = {tf: {cell["variant"]: cell for cell in cells} for tf, cells in slice_.items()}
+    for variant in variants["1d"]:
+        d, h4, h1 = by["1d"][variant], by["4h"][variant], by["1h"][variant]
+        # OLS formation window scales x6/x24 but is pinned to the schema high (4096).
+        assert h4["formation_bars"] == min(d["formation_bars"] * 6, 4096), variant
+        assert h1["formation_bars"] == min(d["formation_bars"] * 24, 4096), variant
+        assert h4["vol_window"] == d["vol_window"] * 6, variant
+        assert h1["vol_window"] == d["vol_window"] * 24, variant
+        for key in (
+            "min_quality",
+            "score_mode",
+            "quantile_entry_pct",
+            "quantile_exit_pct",
+            "min_hold_weeks",
+            "target_gross_exposure",
+        ):
+            assert h4[key] == d[key] == h1[key], (variant, key)

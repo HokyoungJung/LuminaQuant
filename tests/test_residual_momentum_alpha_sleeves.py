@@ -31,6 +31,7 @@ from typing import Any
 from lumina_quant.strategies.adaptive_crypto_alpha_sleeves import ResidualMomentumRotationStrategy
 from lumina_quant.strategies.equity_xs_factor_alpha_sleeves import ResidualEquityMomentumStrategy
 from lumina_quant.strategies.residual_momentum_alpha_sleeves import (
+    _RESIDUAL_MOMENTUM_SLICE,
     TrendGatedResidualMomentumStrategy,
 )
 from lumina_quant.strategies.residual_reversion_alpha_sleeves import (
@@ -628,3 +629,33 @@ def test_schema_keys_snake_case_and_hyperparam() -> None:
 
 def test_decision_cadence_at_least_30m() -> None:
     assert TrendGatedResidualMomentumStrategy.decision_cadence_seconds >= 1800
+
+
+def test_slice_timeframe_expansion_scales_bar_windows() -> None:
+    """4h/1h cells mirror the 1d variants: bar windows scale x6/x24, weekly-decision
+    clock + week-denominated formation + z-thresholds stay timeframe-invariant."""
+    slice_ = _RESIDUAL_MOMENTUM_SLICE
+    assert set(slice_) == {"4h", "1h", "1d"}
+    variants = {tf: tuple(cell["variant"] for cell in cells) for tf, cells in slice_.items()}
+    assert variants["4h"] == variants["1h"] == variants["1d"]
+    by = {tf: {cell["variant"]: cell for cell in cells} for tf, cells in slice_.items()}
+    for variant in variants["1d"]:
+        d, h4, h1 = by["1d"][variant], by["4h"][variant], by["1h"][variant]
+        for key in (
+            "beta_window_bars",
+            "adf_window_bars",
+            "residual_vol_window_bars",
+            "min_history_bars",
+        ):
+            assert h4[key] == d[key] * 6, (variant, key)
+            assert h1[key] == d[key] * 24, (variant, key)
+        assert (d["bars_per_week"], h4["bars_per_week"], h1["bars_per_week"]) == (7, 42, 168)
+        for key in (
+            "formation_weeks",
+            "skip_weeks",
+            "min_hold_decisions",
+            "cooldown_decisions",
+            "quantile_pct",
+            "adf_nonstationarity_min_t",
+        ):
+            assert h4[key] == d[key] == h1[key], (variant, key)

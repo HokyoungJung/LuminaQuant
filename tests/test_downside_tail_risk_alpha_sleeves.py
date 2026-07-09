@@ -36,6 +36,7 @@ from lumina_quant.strategies.cross_sectional_anomaly_alpha_sleeves import (
     LotterySkewnessStrategy,
 )
 from lumina_quant.strategies.downside_tail_risk_alpha_sleeves import (
+    _DOWNSIDE_TAIL_RISK_SLICE,
     DownsideTailRiskPremiumStrategy,
     _average_ranks,
     _expected_shortfall,
@@ -589,3 +590,30 @@ def test_schema_keys_snake_case_and_hyperparam() -> None:
         "min_symbols",
     ):
         assert required in schema
+
+
+def test_slice_timeframe_expansion_scales_bar_windows() -> None:
+    """4h/1h cells mirror the 1d variant: ES / min-history windows + the bar-count
+    weekly rebalance clock scale x6/x24, while the tail fraction / min-hold /
+    hysteresis stay timeframe-invariant."""
+    slice_ = _DOWNSIDE_TAIL_RISK_SLICE
+    assert set(slice_) == {"4h", "1h", "1d"}
+    variants = {tf: tuple(cell["variant"] for cell in cells) for tf, cells in slice_.items()}
+    assert variants["4h"] == variants["1h"] == variants["1d"]
+    by = {tf: {cell["variant"]: cell for cell in cells} for tf, cells in slice_.items()}
+    for variant in variants["1d"]:
+        d, h4, h1 = by["1d"][variant], by["4h"][variant], by["1h"][variant]
+        for key in ("es_window", "min_history_bars"):
+            assert h4[key] == d[key] * 6, (variant, key)
+            assert h1[key] == d[key] * 24, (variant, key)
+        assert (d["rebalance_bars"], h4["rebalance_bars"], h1["rebalance_bars"]) == (7, 42, 168)
+        for key in (
+            "tail_q",
+            "min_hold_periods",
+            "hysteresis_band",
+            "quantile_pct",
+            "target_gross_exposure",
+            "target_vol",
+            "stop_loss_pct",
+        ):
+            assert h4[key] == d[key] == h1[key], (variant, key)

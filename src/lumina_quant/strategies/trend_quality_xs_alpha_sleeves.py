@@ -173,9 +173,70 @@ _SUGGESTED_CANDIDATE_TAGS: tuple[str, ...] = (
     "crypto",
 )
 
-# DAILY bars only: the 56-bar formation window is ~8 weeks of 1d bars, and the
-# weekly decision clock is only honest at the 1d cadence.
+# The weekly decision clock is the internal ISO-week key (``OLSBasisCrossSectional
+# Book``), so it stays honest at every timeframe: the bar-denominated
+# ``formation_bars`` (~8wk / ~26wk) and ``vol_window`` scale x6 (4h) / x24 (1h) to
+# hold their wall-clock span, while ``min_hold_weeks`` / ``max_hold_weeks`` (weekly
+# decisions), the quantile entry/exit bands, and ``min_quality`` are
+# timeframe-invariant.  The 26wk formation at 1h would be 4368 bars but the schema
+# caps ``formation_bars`` at 4096 (~24.4wk), so it is pinned there.
 _TREND_QUALITY_XS_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "4h": (
+        {
+            "variant": "signed_r2_8wk",
+            "formation_bars": 336,
+            "min_quality": 0.30,
+            "score_mode": "signed_r2",
+            "quantile_entry_pct": 0.20,
+            "quantile_exit_pct": 0.40,
+            "min_hold_weeks": 4,
+            "vol_window": 180,
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+        },
+        {
+            "variant": "signed_r2_26wk",
+            "formation_bars": 1092,
+            "min_quality": 0.30,
+            "score_mode": "signed_r2",
+            "quantile_entry_pct": 0.20,
+            "quantile_exit_pct": 0.40,
+            "min_hold_weeks": 4,
+            "vol_window": 270,
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "signed_r2_8wk",
+            "formation_bars": 1344,
+            "min_quality": 0.30,
+            "score_mode": "signed_r2",
+            "quantile_entry_pct": 0.20,
+            "quantile_exit_pct": 0.40,
+            "min_hold_weeks": 4,
+            "vol_window": 720,
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+        },
+        {
+            "variant": "signed_r2_26wk",
+            "formation_bars": 4096,  # 26wk*168 == 4368 capped at the schema high (~24.4wk)
+            "min_quality": 0.30,
+            "score_mode": "signed_r2",
+            "quantile_entry_pct": 0.20,
+            "quantile_exit_pct": 0.40,
+            "min_hold_weeks": 4,
+            "vol_window": 1080,
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+        },
+    ),
     "1d": (
         {
             "variant": "signed_r2_8wk",

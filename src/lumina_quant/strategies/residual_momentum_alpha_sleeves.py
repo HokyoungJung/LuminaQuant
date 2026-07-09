@@ -766,12 +766,96 @@ _SUGGESTED_CANDIDATE_TAGS: tuple[str, ...] = (
     "crypto",
 )
 
-# Candidate slice (DAILY bars; weekly decision clock via the ISO-week key).  The
-# BHM construction (8wk formation, 1wk skip, residual-vol scaling) is only honest
-# at the 1d cadence, so the sleeve is deliberately NOT wired at intraday
-# timeframes.  ``min_hold_decisions`` is in WEEKLY decisions (the proven C1
-# min-hold rescue that lifts RPT above the 10bps floor).
+# Candidate slice.  The BHM construction (8/12wk formation, 1wk skip, residual-vol
+# scaling) is anchored to a WEEKLY decision clock (the internal ISO-week key), so
+# it stays honest at every timeframe once ``bars_per_week`` is scaled to the bar
+# cadence: 7 bars/week (1d) -> 42 (4h) -> 168 (1h).  The bar-denominated estimation
+# windows (beta / adf / residual-vol / min-history) scale x6 (4h) / x24 (1h) to
+# hold their wall-clock span; the week-denominated formation / skip, the weekly
+# ``min_hold_decisions`` / ``cooldown_decisions`` clock (the proven C1 min-hold
+# rescue that lifts RPT above the 10bps floor), the quantile, and the ADF
+# z-thresholds are timeframe-invariant and stay fixed.
 _RESIDUAL_MOMENTUM_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "4h": (
+        {
+            "variant": "bhm_8wk_skip1_gated",
+            "benchmark_symbol": "BTC/USDT",
+            "beta_window_bars": 540,
+            "formation_weeks": 8,
+            "skip_weeks": 1,
+            "bars_per_week": 42,
+            "adf_window_bars": 540,
+            "adf_nonstationarity_min_t": -1.5,
+            "quantile_pct": 0.25,
+            "min_symbols": 5,
+            "residual_vol_window_bars": 336,
+            "min_hold_decisions": 4,
+            "cooldown_decisions": 1,
+            "min_history_bars": 720,
+            "allow_short": True,
+            "hedge_benchmark": False,
+            "max_gross": 1.0,
+        },
+        {
+            "variant": "bhm_12wk_skip1_gated",
+            "benchmark_symbol": "BTC/USDT",
+            "beta_window_bars": 540,
+            "formation_weeks": 12,
+            "skip_weeks": 1,
+            "bars_per_week": 42,
+            "adf_window_bars": 540,
+            "adf_nonstationarity_min_t": -1.5,
+            "quantile_pct": 0.25,
+            "min_symbols": 5,
+            "residual_vol_window_bars": 336,
+            "min_hold_decisions": 4,
+            "cooldown_decisions": 1,
+            "min_history_bars": 900,
+            "allow_short": True,
+            "hedge_benchmark": False,
+            "max_gross": 1.0,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "bhm_8wk_skip1_gated",
+            "benchmark_symbol": "BTC/USDT",
+            "beta_window_bars": 2160,
+            "formation_weeks": 8,
+            "skip_weeks": 1,
+            "bars_per_week": 168,
+            "adf_window_bars": 2160,
+            "adf_nonstationarity_min_t": -1.5,
+            "quantile_pct": 0.25,
+            "min_symbols": 5,
+            "residual_vol_window_bars": 1344,
+            "min_hold_decisions": 4,
+            "cooldown_decisions": 1,
+            "min_history_bars": 2880,
+            "allow_short": True,
+            "hedge_benchmark": False,
+            "max_gross": 1.0,
+        },
+        {
+            "variant": "bhm_12wk_skip1_gated",
+            "benchmark_symbol": "BTC/USDT",
+            "beta_window_bars": 2160,
+            "formation_weeks": 12,
+            "skip_weeks": 1,
+            "bars_per_week": 168,
+            "adf_window_bars": 2160,
+            "adf_nonstationarity_min_t": -1.5,
+            "quantile_pct": 0.25,
+            "min_symbols": 5,
+            "residual_vol_window_bars": 1344,
+            "min_hold_decisions": 4,
+            "cooldown_decisions": 1,
+            "min_history_bars": 3600,
+            "allow_short": True,
+            "hedge_benchmark": False,
+            "max_gross": 1.0,
+        },
+    ),
     "1d": (
         {
             "variant": "bhm_8wk_skip1_gated",

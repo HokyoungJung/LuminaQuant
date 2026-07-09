@@ -31,6 +31,7 @@ from typing import Any
 
 from lumina_quant.indicators.volume import chaikin_money_flow
 from lumina_quant.strategies.clv_accumulation_alpha_sleeves import (
+    _CLV_ACCUMULATION_SLICE,
     CrossSectionalCloseLocationAccumulationStrategy,
 )
 from lumina_quant.strategies.flow_share_rotation_alpha_sleeves import (
@@ -539,3 +540,35 @@ def test_schema_keys_snake_case_and_hyperparam() -> None:
         "min_symbols",
     ):
         assert required in schema
+
+
+def test_slice_timeframe_expansion_scales_bar_windows() -> None:
+    """4h/1h cells mirror the 1d variants: bar windows + the bar-count weekly
+    rebalance clock scale x6/x24, while the min-hold / hysteresis / fractions stay
+    timeframe-invariant."""
+    slice_ = _CLV_ACCUMULATION_SLICE
+    assert set(slice_) == {"4h", "1h", "1d"}
+    variants = {tf: tuple(cell["variant"] for cell in cells) for tf, cells in slice_.items()}
+    assert variants["4h"] == variants["1h"] == variants["1d"]
+    by = {tf: {cell["variant"]: cell for cell in cells} for tf, cells in slice_.items()}
+    for variant in variants["1d"]:
+        d, h4, h1 = by["1d"][variant], by["4h"][variant], by["1h"][variant]
+        for key in (
+            "accumulation_window_bars",
+            "momentum_window_bars",
+            "nearness_window_bars",
+            "min_history_bars",
+            "vol_window",
+        ):
+            assert h4[key] == d[key] * 6, (variant, key)
+            assert h1[key] == d[key] * 24, (variant, key)
+        assert (d["rebalance_bars"], h4["rebalance_bars"], h1["rebalance_bars"]) == (7, 42, 168)
+        for key in (
+            "min_hold_decisions",
+            "rank_hysteresis_buffer",
+            "quantile_pct",
+            "target_gross_exposure",
+            "target_vol",
+            "stop_loss_pct",
+        ):
+            assert h4[key] == d[key] == h1[key], (variant, key)
