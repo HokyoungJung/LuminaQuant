@@ -45,6 +45,13 @@ BATCH_STRATEGIES = (
     "VpinToxicityRiderStrategy",
     "TailIndexRegimeRiderStrategy",
     "VolumeClockMomentumRiderStrategy",
+    # Alpha-pool-expansion-v2 batch (2026-07-09):
+    "CrossSectionalNearHighAnchoringStrategy",
+    "LowTurnoverTrendPersistenceStrategy",
+    "RebalancingPremiumHarvestStrategy",
+    "SlowCrossSectionalLeadLagStrategy",
+    "StationarityGatedResidualReversionStrategy",
+    "RegimeAdaptiveDisagreementEnsembleStrategy",
 )
 
 # FROZEN legacy snapshot (generated 2026-07-03; 68 names). Append-only for

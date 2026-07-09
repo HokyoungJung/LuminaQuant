@@ -2726,6 +2726,21 @@ class _CandidateBuildContext:
         _build_vpin_toxicity_rider_candidates(self)
         _build_tail_index_regime_rider_candidates(self)
         _build_volume_clock_momentum_rider_candidates(self)
+        # Alpha-pool-expansion-v2 batch (consensus plan 2026-07-09): 3 CORE
+        # leaves — A1 cross-sectional 52wk-high anchoring long-short (1d), L1
+        # per-symbol low-turnover multi-week TSMOM (1d), L2 forecast-free
+        # rebalancing-premium basket (1d) — plus 2 CONDITIONAL leaves — A2 broad
+        # cross-sectional weekly lead-lag (1d), N4 ADF-gated market-neutral
+        # residual reversion (4h/1d) — and 1 meta variant, MR2 per-symbol
+        # regime-adaptive disagreement ensemble. The cross-sectional baskets
+        # carry NO carry tag (allow_multi_asset=True at the data-PC handoff);
+        # SLICE constants live in the lane modules; these builders are thin.
+        _build_near_high_anchoring_candidates(self)
+        _build_low_turnover_trend_persistence_candidates(self)
+        _build_rebalancing_premium_harvest_candidates(self)
+        _build_slow_leadlag_xs_candidates(self)
+        _build_stationarity_gated_residual_reversion_candidates(self)
+        _build_regime_adaptive_disagreement_candidates(self)
         _build_metals_relative_value_basket_candidates(self)
         _build_liquidation_cascade_reversion_candidates(self)
         _build_orderbook_imbalance_reversion_candidates(self)
@@ -9421,6 +9436,296 @@ def _build_regime_router_confirmed_candidates(ctx: _CandidateBuildContext) -> No
                     "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
                 },
             )
+
+
+def _build_near_high_anchoring_candidates(ctx: _CandidateBuildContext) -> None:
+    """Cross-sectional 52-week-high anchoring long-short basket (A1; honest tags, no carry)."""
+    from lumina_quant.strategies.near_high_anchoring_alpha_sleeves import (
+        _NEAR_HIGH_ANCHORING_SLICE,
+        _SUGGESTED_CANDIDATE_TAGS,
+    )
+
+    crypto_symbols = tuple(ctx.crypto_only_symbols)
+    min_symbols = 5
+    if len(crypto_symbols) < min_symbols:
+        return
+    for timeframe in ctx._present("1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _NEAR_HIGH_ANCHORING_SLICE.get(timeframe, ()):
+            params = {key: value for key, value in spec.items() if key != "variant"}
+            _add_candidate(
+                ctx.candidates,
+                name=f"near_high_anchoring_{tf_tag}_{spec['variant']}",
+                family="cross_sectional",
+                strategy_class="CrossSectionalNearHighAnchoringStrategy",
+                timeframe=timeframe,
+                symbols=crypto_symbols,
+                params=params,
+                notes=(
+                    "Cross-sectional 52-week-high anchoring: each symbol's PURE "
+                    "nearness of close to its trailing high (decoupled from "
+                    "momentum) is XS z-scored; long the highest-nearness quantile, "
+                    "SHORT the lowest, inverse-vol sized, weekly rebalance + "
+                    "min-hold. Deliberately NOT tagged carry — the default "
+                    "shortlist excludes it; evaluate with allow_multi_asset=True "
+                    f"({timeframe}, {spec['variant']})."
+                ),
+                tags=_SUGGESTED_CANDIDATE_TAGS,
+                metadata={
+                    "timeframe": timeframe,
+                    "retune_profile": str(spec["variant"]),
+                    "symbol_scope": "crypto_basket",
+                    "allow_short": bool(spec["allow_short"]),
+                    "admission_route": "allow_multi_asset_handoff",
+                    "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                },
+            )
+
+
+def _build_low_turnover_trend_persistence_candidates(ctx: _CandidateBuildContext) -> None:
+    """Per-symbol low-turnover multi-week TSMOM with the proven min-hold rescue (L1; 1d)."""
+    from lumina_quant.strategies.low_turnover_trend_alpha_sleeves import (
+        _LOW_TURNOVER_TREND_PERSISTENCE_SLICE,
+        _SUGGESTED_CANDIDATE_TAGS,
+    )
+
+    crypto_symbols = ctx.crypto_only_symbols
+    if not crypto_symbols:
+        return
+    for timeframe in ctx._present("1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _LOW_TURNOVER_TREND_PERSISTENCE_SLICE.get(timeframe, ()):
+            for symbol in crypto_symbols:
+                params = {key: value for key, value in spec.items() if key != "variant"}
+                _add_candidate(
+                    ctx.candidates,
+                    name=(
+                        f"low_turnover_trend_persistence_{tf_tag}_{spec['variant']}_"
+                        f"{symbol.replace('/', '').lower()}"
+                    ),
+                    family="time_series_momentum",
+                    strategy_class="LowTurnoverTrendPersistenceStrategy",
+                    timeframe=timeframe,
+                    symbols=(symbol,),
+                    params=params,
+                    notes=(
+                        "Per-symbol multi-horizon (4/8/12-week on 1d bars) TSMOM "
+                        "sign-agreement, Kaufman-efficiency weighted, ADX + low-vol "
+                        "persistence gated, with a HARD min-hold + cooldown — the "
+                        "repo's proven RPT rescue that clears the 10bps floor "
+                        f"(graveyard #13/#14) on {symbol} at {timeframe} "
+                        f"({spec['variant']})."
+                    ),
+                    tags=_SUGGESTED_CANDIDATE_TAGS,
+                    metadata={
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": symbol,
+                        "allow_short": bool(spec["allow_short"]),
+                        "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                    },
+                )
+
+
+def _build_rebalancing_premium_harvest_candidates(ctx: _CandidateBuildContext) -> None:
+    """Forecast-free diversity-weighted rebalancing-premium basket (L2; honest tags, no carry)."""
+    from lumina_quant.strategies.rebalancing_premium_alpha_sleeves import (
+        _REBALANCING_PREMIUM_HARVEST_SLICE,
+        _SUGGESTED_CANDIDATE_TAGS,
+    )
+
+    crypto_symbols = tuple(ctx.crypto_only_symbols)
+    min_symbols = 5
+    if len(crypto_symbols) < min_symbols:
+        return
+    for timeframe in ctx._present("1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _REBALANCING_PREMIUM_HARVEST_SLICE.get(timeframe, ()):
+            params = {key: value for key, value in spec.items() if key != "variant"}
+            _add_candidate(
+                ctx.candidates,
+                name=f"rebalancing_premium_harvest_{tf_tag}_{spec['variant']}",
+                family="cross_sectional",
+                strategy_class="RebalancingPremiumHarvestStrategy",
+                timeframe=timeframe,
+                symbols=crypto_symbols,
+                params=params,
+                notes=(
+                    "Forecast-free rebalancing-premium harvest: hold a diversity-"
+                    "weighted (softmax over -log dollar-volume rank) or equal-weight "
+                    "liquid basket and rebalance on a slow (monthly/weekly) clock to "
+                    "capture the mechanical excess-growth edge (sell relative "
+                    "winners / buy relative losers). Emits NO directional forecast. "
+                    "Deliberately NOT tagged carry — evaluate with "
+                    f"allow_multi_asset=True ({timeframe}, {spec['variant']})."
+                ),
+                tags=_SUGGESTED_CANDIDATE_TAGS,
+                metadata={
+                    "timeframe": timeframe,
+                    "retune_profile": str(spec["variant"]),
+                    "symbol_scope": "crypto_basket",
+                    "allow_short": bool(spec.get("allow_short", False)),
+                    "admission_route": "allow_multi_asset_handoff",
+                    "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                },
+            )
+
+
+def _build_slow_leadlag_xs_candidates(ctx: _CandidateBuildContext) -> None:
+    """Broad cross-sectional weekly lead-lag long-short basket (A2; honest tags, no carry)."""
+    from lumina_quant.strategies.slow_leadlag_xs_alpha_sleeves import (
+        _SLOW_LEADLAG_XS_SLICE,
+        _SUGGESTED_CANDIDATE_TAGS,
+    )
+
+    crypto_symbols = tuple(ctx.crypto_only_symbols)
+    min_symbols = 5
+    if len(crypto_symbols) < min_symbols:
+        return
+    for timeframe in ctx._present("1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _SLOW_LEADLAG_XS_SLICE.get(timeframe, ()):
+            params = {key: value for key, value in spec.items() if key != "variant"}
+            _add_candidate(
+                ctx.candidates,
+                name=f"slow_leadlag_xs_{tf_tag}_{spec['variant']}",
+                family="cross_sectional",
+                strategy_class="SlowCrossSectionalLeadLagStrategy",
+                timeframe=timeframe,
+                symbols=crypto_symbols,
+                params=params,
+                notes=(
+                    "Broad cross-sectional weekly lead-lag: rank the universe by "
+                    "exposure to lagged leader/basket returns (ridge spillover), "
+                    "long high-loading laggards / short low, XS long-short + min-hold "
+                    "+ hysteresis — the JEDC cost-surviving construction, NOT the "
+                    "dead single-pair form (graveyard #6). Deliberately NOT tagged "
+                    f"carry — evaluate with allow_multi_asset=True ({timeframe}, "
+                    f"{spec['variant']})."
+                ),
+                tags=_SUGGESTED_CANDIDATE_TAGS,
+                metadata={
+                    "timeframe": timeframe,
+                    "retune_profile": str(spec["variant"]),
+                    "symbol_scope": "crypto_basket",
+                    "allow_short": bool(spec["allow_short"]),
+                    "admission_route": "allow_multi_asset_handoff",
+                    "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                },
+            )
+
+
+def _build_stationarity_gated_residual_reversion_candidates(ctx: _CandidateBuildContext) -> None:
+    """ADF-gated market-neutral residual reversion basket (N4; honest tags, no carry)."""
+    from lumina_quant.strategies.residual_reversion_alpha_sleeves import (
+        _RESIDUAL_REVERSION_SLICE,
+        _SUGGESTED_CANDIDATE_TAGS,
+    )
+
+    crypto_symbols = tuple(ctx.crypto_only_symbols)
+    min_symbols = 5
+    if len(crypto_symbols) < min_symbols:
+        return
+    for timeframe in ctx._present("4h", "1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _RESIDUAL_REVERSION_SLICE.get(timeframe, ()):
+            params = {key: value for key, value in spec.items() if key != "variant"}
+            _add_candidate(
+                ctx.candidates,
+                name=f"stationarity_gated_residual_reversion_{tf_tag}_{spec['variant']}",
+                family="cross_sectional",
+                strategy_class="StationarityGatedResidualReversionStrategy",
+                timeframe=timeframe,
+                symbols=crypto_symbols,
+                params=params,
+                notes=(
+                    "ADF-gated market-neutral residual reversion: regress each "
+                    "asset's return on the benchmark (rolling beta), take the "
+                    "idiosyncratic residual, and mean-revert ONLY residuals whose "
+                    "ADF t-stat clears a stationarity gate — beta-hedged, NOT "
+                    "price-level reversal (sidesteps the majors wrong-sign). "
+                    "Deliberately NOT tagged carry — evaluate with "
+                    f"allow_multi_asset=True ({timeframe}, {spec['variant']})."
+                ),
+                tags=_SUGGESTED_CANDIDATE_TAGS,
+                metadata={
+                    "timeframe": timeframe,
+                    "retune_profile": str(spec["variant"]),
+                    "symbol_scope": "crypto_basket",
+                    "allow_short": bool(spec["allow_short"]),
+                    "admission_route": "allow_multi_asset_handoff",
+                    "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                },
+            )
+
+
+def _build_regime_adaptive_disagreement_candidates(ctx: _CandidateBuildContext) -> None:
+    """Per-symbol regime-adaptive disagreement ensemble (MR2; variance-reduction M1 variant)."""
+    from lumina_quant.strategies.disagreement_ensemble_alpha_sleeves import (
+        _DISAGREEMENT_ENSEMBLE_SLICE,
+    )
+
+    crypto_symbols = ctx.crypto_only_symbols
+    if not crypto_symbols:
+        return
+    # The regime overlay params default the variant to base-M1-identical at
+    # regime ratio 1.0; they modulate the disagreement gate by the realized-vol
+    # regime (widen when turbulent, tighten when calm).
+    regime_overlay = {
+        "regime_fast_window": 16,
+        "regime_slow_window": 96,
+        "gate_sensitivity": 1.0,
+        "min_gate_factor": 0.25,
+        "max_gate_factor": 4.0,
+    }
+    for timeframe in ctx._present("30m", "1h", "4h", "1d"):
+        tf_tag = timeframe.replace("/", "-")
+        for spec in _DISAGREEMENT_ENSEMBLE_SLICE.get(timeframe, ()):
+            for symbol in crypto_symbols:
+                params = {key: value for key, value in spec.items() if key != "variant"}
+                params.update(regime_overlay)
+                _add_candidate(
+                    ctx.candidates,
+                    name=(
+                        f"regime_adaptive_disagreement_{tf_tag}_{spec['variant']}_"
+                        f"{symbol.replace('/', '').lower()}"
+                    ),
+                    family="trend",
+                    strategy_class="RegimeAdaptiveDisagreementEnsembleStrategy",
+                    timeframe=timeframe,
+                    symbols=(symbol,),
+                    params=params,
+                    notes=(
+                        "Per-symbol regime-adaptive disagreement ensemble: identical "
+                        "four-component / inverse-error machinery as the base M1 "
+                        "sleeve, but the disagreement admission gate widens in "
+                        "high-dispersion (realized-vol) regimes and tightens in calm "
+                        "ones. Thesis is variance-reduction / drawdown-smoothing "
+                        "(Calmar / MDD), NOT a Sharpe-lift over the best single "
+                        f"sleeve. {symbol} at {timeframe} ({spec['variant']})."
+                    ),
+                    tags=(
+                        "trend",
+                        "ensemble",
+                        "disagreement_gate",
+                        "meta_gate",
+                        "regime_gate",
+                        "regime",
+                        "volatility",
+                        "return_rider",
+                        "trailing_stop",
+                        "pyramiding",
+                        "single_asset",
+                        "crypto",
+                    ),
+                    metadata={
+                        "timeframe": timeframe,
+                        "retune_profile": str(spec["variant"]),
+                        "symbol_scope": symbol,
+                        "allow_short": bool(spec["allow_short"]),
+                        "decision_cadence_seconds": _RIDER_TF_CADENCE_SECONDS.get(timeframe, 1800),
+                    },
+                )
 
 
 _METALS_RELATIVE_VALUE_BASKET_SLICE: dict[str, tuple[dict[str, Any], ...]] = {

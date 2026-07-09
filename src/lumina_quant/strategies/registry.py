@@ -217,6 +217,19 @@ _STRATEGY_TIER_HINTS: dict[str, str] = {
     "VpinToxicityRiderStrategy": "research_only",
     "TailIndexRegimeRiderStrategy": "research_only",
     "VolumeClockMomentumRiderStrategy": "research_only",
+    # Alpha-pool-expansion-v2 batch (2026-07-09 consensus plan
+    # .omc/plans/alpha-pool-expansion-consensus.md): 3 CORE leaves (A1/L1/L2),
+    # 2 CONDITIONAL leaves (A2/N4), and 1 meta variant (MR2). research_only
+    # until the data-PC two-tier gate (net-20bps edge + DSR after N_eff +
+    # incremental orthogonal factor_ic) passes on the cost-realistic
+    # walk-forward. Registration and these hints land atomically (live-safety),
+    # enforced by tests/test_strategy_tier_guard.py.
+    "CrossSectionalNearHighAnchoringStrategy": "research_only",
+    "LowTurnoverTrendPersistenceStrategy": "research_only",
+    "RebalancingPremiumHarvestStrategy": "research_only",
+    "SlowCrossSectionalLeadLagStrategy": "research_only",
+    "StationarityGatedResidualReversionStrategy": "research_only",
+    "RegimeAdaptiveDisagreementEnsembleStrategy": "research_only",
 }
 
 _STRATEGY_METADATA: dict[str, dict[str, Any]] = {

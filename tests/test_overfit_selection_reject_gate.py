@@ -28,11 +28,15 @@ consumer (Step 4), and the fail-closed strict-research env guard (Step 6).
 
 from __future__ import annotations
 
+import argparse
+import importlib
 import json
+import math
 import statistics
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from lumina_quant.configuration.loader import build_runtime_config, load_yaml_config
@@ -411,3 +415,204 @@ def test_strict_env_guard_is_noop_when_env_unset():
     raw = load_yaml_config(config_path=str(_REPO_ROOT / "config.yaml"))
     rt = build_runtime_config(raw, env={})  # never raises
     assert rt.research.enforce_selection_reject_gate is False
+
+
+# --------------------------------------------------------------------------- #
+# E1: config-gated per-candidate SPA/PBO emission into the monthly-refit
+# walk-forward runner's validation block (``_candidate_overfit_stats`` /
+# ``_evaluate_candidate``). Default OFF -> byte-identical validation block; the
+# strict research profile / the explicit flag arms the SPA + approx_pbo emission,
+# and the emitted approx_pbo routes through the shared reject gate as the ``pbo``
+# alias. Data-free: a synthetic candidate on a deterministic daily return series.
+# --------------------------------------------------------------------------- #
+_ENGINE_MODULE = "scripts.research.run_alpha_zoo_69_asset_monthly_refit_walkforward"
+
+
+def _emit_args(**overrides) -> argparse.Namespace:
+    base = dict(
+        config=None,
+        enforce_selection_reject_gate=False,
+        dsr_gate_floor=None,
+        spa_gate_ceiling=None,
+        pbo_gate_ceiling=None,
+        dedupe_baskets=False,
+        max_per_symbol_basket=None,
+        max_per_lineage=None,
+        max_per_family_basket=None,
+        emit_candidate_overfit_stats=False,
+    )
+    base.update(overrides)
+    return argparse.Namespace(**base)
+
+
+@pytest.fixture
+def engine():
+    """The runner module with the E1 emission gate RESET to OFF after each test so
+    module-level state cannot leak into the other suites that import it."""
+    module = importlib.import_module(_ENGINE_MODULE)
+    module._configure_selection_gate(_emit_args())  # start OFF
+    try:
+        yield module
+    finally:
+        module._configure_selection_gate(_emit_args())  # reset OFF
+
+
+def _synthetic_returns(periods: int = 200, *, seed: int = 20260709) -> pd.Series:
+    """A deterministic daily return series with a small positive drift (so the SPA
+    studentized mean is positive and the p-value is a genuine bootstrap number,
+    not the non-positive-mean 1.0 short-circuit)."""
+    rng = np.random.default_rng(seed)
+    index = pd.date_range("2025-01-01", periods=periods, freq="D")
+    values = 0.0015 + 0.012 * rng.standard_normal(periods)
+    return pd.Series(values, index=index)
+
+
+def _synthetic_candidate(engine, returns: pd.Series):
+    return engine.CandidateResult(
+        family="synthetic",
+        candidate_label="synthetic:e1",
+        source_profile_id="synthetic",
+        row={"symbols": ["BTC/USDT"], "candidate_id": "synthetic-e1"},
+        returns=returns,
+    )
+
+
+def _fold(engine, index: pd.DatetimeIndex, *, val_end_pos: int):
+    """A single monthly fold whose validation window ends at ``index[val_end_pos]``
+    (validation obs == val_end_pos - 100 + 1)."""
+    return engine.MonthlyFold(
+        fold_id="synthetic",
+        refit_at=index[100],
+        train=(index[0], index[99]),
+        validation=(index[100], index[val_end_pos]),
+        locked_oos=(index[val_end_pos + 1], index[-1]),
+    )
+
+
+def test_e1_emit_off_validation_block_is_byte_identical(engine):
+    """OFF (default): the emitted validation block is EXACTLY ``_period_metrics``
+    output -- no ``spa_pvalue`` / ``approx_pbo`` keys, byte-identical."""
+    engine._configure_selection_gate(_emit_args())  # explicit OFF
+    returns = _synthetic_returns()
+    candidate = _synthetic_candidate(engine, returns)
+    fold = _fold(engine, returns.index, val_end_pos=179)  # 80 validation obs
+
+    row = engine._evaluate_candidate(candidate, fold)
+    baseline = engine._period_metrics(candidate.returns, fold.validation)
+
+    assert row["validation"] == baseline
+    assert "spa_pvalue" not in row["validation"]
+    assert "approx_pbo" not in row["validation"]
+
+
+def test_e1_emit_on_populates_finite_spa_and_pbo_in_unit_interval(engine):
+    engine._configure_selection_gate(_emit_args(emit_candidate_overfit_stats=True))
+    returns = _synthetic_returns()
+    candidate = _synthetic_candidate(engine, returns)
+    fold = _fold(engine, returns.index, val_end_pos=179)  # 80 validation obs >= 64
+
+    validation = engine._evaluate_candidate(candidate, fold)["validation"]
+
+    assert validation["bar_count"] >= 64
+    for key in ("spa_pvalue", "approx_pbo"):
+        value = validation[key]
+        assert isinstance(value, float)
+        assert math.isfinite(value)
+        assert 0.0 <= value <= 1.0
+    # The base metric keys are preserved (emission only ADDS fields).
+    for key in ("start", "end", "bar_count", "total_return", "mdd", "sharpe"):
+        assert key in validation
+
+
+def test_e1_emit_on_below_min_obs_omits_fields(engine):
+    """A validation window with < 64 obs never emits a degenerate 1.0: the fields
+    are simply absent (never-raise)."""
+    engine._configure_selection_gate(_emit_args(emit_candidate_overfit_stats=True))
+    returns = _synthetic_returns()
+    candidate = _synthetic_candidate(engine, returns)
+    short_fold = _fold(engine, returns.index, val_end_pos=140)  # 41 validation obs < 64
+
+    validation = engine._evaluate_candidate(candidate, short_fold)["validation"]
+
+    assert validation["bar_count"] < 64
+    assert validation.get("spa_pvalue") is None
+    assert validation.get("approx_pbo") is None
+
+
+def test_e1_emit_on_is_deterministic_run_twice(engine):
+    """Seeded block bootstrap -> two INDEPENDENTLY constructed candidates on the
+    same seeded series emit bit-identical spa_pvalue / approx_pbo."""
+    engine._configure_selection_gate(_emit_args(emit_candidate_overfit_stats=True))
+
+    first_returns = _synthetic_returns()
+    first = engine._evaluate_candidate(
+        _synthetic_candidate(engine, first_returns),
+        _fold(engine, first_returns.index, val_end_pos=179),
+    )["validation"]
+
+    second_returns = _synthetic_returns()
+    second = engine._evaluate_candidate(
+        _synthetic_candidate(engine, second_returns),
+        _fold(engine, second_returns.index, val_end_pos=179),
+    )["validation"]
+
+    assert first["spa_pvalue"] == second["spa_pvalue"]
+    assert first["approx_pbo"] == second["approx_pbo"]
+
+
+def test_e1_emitted_approx_pbo_routes_through_selection_as_pbo_alias(engine):
+    """The emitted validation block carries NO ``pbo`` key -- only ``approx_pbo`` --
+    so the reject gate must read it through the documented ``pbo`` alias
+    (``selection.passes_dsr_spa_hard_gate`` -> ``apply_selection_reject_and_dedup``)
+    without error, and the emitted value is the DECIDING pbo axis."""
+    engine._configure_selection_gate(_emit_args(emit_candidate_overfit_stats=True))
+    returns = _synthetic_returns()
+    candidate = _synthetic_candidate(engine, returns)
+    fold = _fold(engine, returns.index, val_end_pos=179)
+
+    row = engine._evaluate_candidate(candidate, fold)
+    row["candidate_id"] = "synthetic-e1"
+    assert "pbo" not in row["validation"]  # only the approx_pbo alias is present
+    emitted_pbo = row["validation"]["approx_pbo"]
+
+    # DSR floor 0.0 (a missing deflated_sharpe -> 0.0 never rejects) and SPA
+    # ceiling 1.0 isolate the PBO axis; a permissive PBO ceiling keeps the row.
+    lenient = {
+        "enforce_selection_reject_gate": True,
+        "dsr_gate_floor": 0.0,
+        "spa_gate_ceiling": 1.0,
+        "pbo_gate_ceiling": 1.0,
+    }
+    assert passes_dsr_spa_hard_gate(row, mode="val", robust_score_params=lenient) is True
+    survivors = apply_selection_reject_and_dedup(
+        [row], mode="val", robust_score_params=lenient, enabled=True
+    )
+    assert survivors == [row]
+
+    # A PBO ceiling just BELOW the emitted approx_pbo rejects the row -> proves the
+    # emitted value (not the missing-key 0.0 default) is what the alias reads.
+    assert emitted_pbo > 0.0
+    strict = {**lenient, "pbo_gate_ceiling": emitted_pbo - 1e-9}
+    assert passes_dsr_spa_hard_gate(row, mode="val", robust_score_params=strict) is False
+
+
+def test_e1_strict_research_profile_arms_emission(engine):
+    """End-to-end plumbing: loading the strict research profile via ``--config``
+    arms ``emit_candidate_overfit_stats`` (research.yaml), so the emission fires
+    without any explicit CLI flag."""
+    engine._configure_selection_gate(
+        _emit_args(config=str(_REPO_ROOT / "configs/profiles/research.yaml"))
+    )
+    assert engine._SELECTION_GATE_STATE["emit_candidate_overfit_stats"] is True
+
+    returns = _synthetic_returns()
+    validation = engine._evaluate_candidate(
+        _synthetic_candidate(engine, returns),
+        _fold(engine, returns.index, val_end_pos=179),
+    )["validation"]
+    assert "spa_pvalue" in validation
+    assert "approx_pbo" in validation
+
+    # Reset guard: a plain (no-config) reconfigure disarms emission again.
+    engine._configure_selection_gate(_emit_args())
+    assert engine._SELECTION_GATE_STATE["emit_candidate_overfit_stats"] is False

@@ -16,10 +16,14 @@ FIXED_TIMEFRAMES = ("1h", "4h")
 # ``generated_at`` field), serialized with sorted keys + compact separators so
 # the digest is robust to dict-ordering. Captured from current behavior; if the
 # rider-builder consolidation changes any candidate, this digest must be
-# re-captured intentionally.
-EXPECTED_MANIFEST_SHA256 = "f2dcb7aeb629ac57e57b1aaea54593e24d786248035e5eed1a8304a1087b6bfd"
+# re-captured intentionally. Last re-pinned for the alpha-pool-expansion-v2
+# batch (2026-07-09): only MR2 (RegimeAdaptiveDisagreementEnsembleStrategy, a
+# per-symbol >=30m sleeve) materializes in this 2-symbol/1h-4h fixture; the five
+# leaves (A1/L1/L2/A2/N4) are 1d and/or cross-sectional >=5-symbol baskets, so
+# they do not appear here (exercised instead by the broad-universe tier-guard).
+EXPECTED_MANIFEST_SHA256 = "fa49ae95fa502b6a9f053a701d9ff623e28a111f7475d3a0f6e5d7973ea5dfaf"
 
-EXPECTED_CANDIDATE_COUNT = 161
+EXPECTED_CANDIDATE_COUNT = 165
 
 EXPECTED_FAMILY_COUNTS = {
     "breakout": 20,
@@ -29,7 +33,7 @@ EXPECTED_FAMILY_COUNTS = {
     "mean_reversion": 12,
     "momentum": 16,
     "seasonality": 8,
-    "trend": 59,
+    "trend": 63,
 }
 
 EXPECTED_STRATEGY_COUNTS = {
@@ -54,6 +58,7 @@ EXPECTED_STRATEGY_COUNTS = {
     "PullbackTrendContinuationStrategy": 4,
     "RealizedSemivarianceTrendRiderStrategy": 4,
     "RealizedVolTermStructureStrategy": 4,
+    "RegimeAdaptiveDisagreementEnsembleStrategy": 4,
     "RegimeBreakoutCandidateStrategy": 2,
     "RollingBreakoutStrategy": 2,
     "SeasonalMicroBreakoutRiderStrategy": 4,
@@ -68,7 +73,7 @@ EXPECTED_STRATEGY_COUNTS = {
     "VpinToxicityRiderStrategy": 4,
 }
 
-EXPECTED_TIMEFRAME_COUNTS = {"1h": 87, "4h": 74}
+EXPECTED_TIMEFRAME_COUNTS = {"1h": 89, "4h": 76}
 
 # Every rider-builder produced strategy class. The upcoming consolidation must
 # preserve this exact roster (names and per-class candidate counts).

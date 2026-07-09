@@ -40,11 +40,16 @@ from typing import Any
 
 from lumina_quant.core.events import SignalEvent
 from lumina_quant.core.plugin_registry import register
+from lumina_quant.indicators.accelerated import (
+    garman_klass_volatility,
+    yang_zhang_volatility,
+)
 from lumina_quant.indicators.alpha_features import (
     drawdown_from_peak,
     realized_volatility,
 )
 from lumina_quant.indicators.common import safe_float, time_key
+from lumina_quant.indicators.volatility import parkinson_volatility
 from lumina_quant.strategies.adaptive_crypto_alpha_sleeves import _state_size
 from lumina_quant.strategies.artifact_portfolio_mode import (
     _BarsSubsetProxy,
@@ -63,6 +68,21 @@ _STRATEGY_ID = "vol_managed_risk_overlay"
 _STRATEGY_NAME = "VolManagedRiskOverlayStrategy"
 _EPS = 1e-12
 
+# The realized-vol estimator that feeds the vol-target clamp. ``close_to_close``
+# is the historical default (byte-identical); the range-based estimators are the
+# opt-in, config-gated additions (their literature-endorsed SIZING role only).
+_CLOSE_TO_CLOSE = "close_to_close"
+_VOL_ESTIMATORS = (_CLOSE_TO_CLOSE, "parkinson", "garman_klass", "yang_zhang")
+
+
+def _restore_bounded_deque(target: deque[float], values: Any) -> None:
+    """Refill a bounded deque from a serialized list, dropping non-finite values."""
+    target.clear()
+    for value in list(values or [])[-int(target.maxlen or 0) :]:
+        parsed = safe_float(value)
+        if parsed is not None:
+            target.append(parsed)
+
 
 def _rolling_z(values: list[float]) -> float:
     """Sample z-score of the last value vs its trailing window (0.0 if degenerate)."""
@@ -78,10 +98,18 @@ def _rolling_z(values: list[float]) -> float:
 
 @dataclass(slots=True)
 class _OverlayState:
-    """Benchmark closed-bar closes plus a rolling realized-vol history."""
+    """Benchmark closed-bar OHLC plus a rolling realized-vol history.
+
+    ``opens``/``highs``/``lows`` are only appended when a range-based
+    ``vol_estimator`` is active; the ``close_to_close`` default leaves them empty
+    so the historical close-only state is preserved byte-for-byte.
+    """
 
     closes: deque[float]
     vol_history: deque[float]
+    opens: deque[float]
+    highs: deque[float]
+    lows: deque[float]
     last_time_key: str = ""
 
 
@@ -112,6 +140,11 @@ class VolManagedRiskOverlayStrategy(Strategy):
                 "target_vol_per_bar", default=0.01, low=0.0, high=1.0
             ),
             "vol_window": HyperParam.integer("vol_window", default=60, low=5, high=500),
+            "vol_estimator": HyperParam.categorical(
+                "vol_estimator",
+                default=_CLOSE_TO_CLOSE,
+                choices=_VOL_ESTIMATORS,
+            ),
             "min_scale": HyperParam.floating("min_scale", default=0.25, low=0.0, high=1.0),
             "max_scale": HyperParam.floating("max_scale", default=1.0, low=0.0, high=1.0),
             "crash_benchmark_symbol": HyperParam.string(
@@ -157,6 +190,11 @@ class VolManagedRiskOverlayStrategy(Strategy):
 
         self.target_vol_per_bar = max(0.0, float(resolved["target_vol_per_bar"]))
         self.vol_window = max(2, int(resolved["vol_window"]))
+        estimator = str(resolved["vol_estimator"]).strip()
+        self.vol_estimator = estimator if estimator in _VOL_ESTIMATORS else _CLOSE_TO_CLOSE
+        # Range estimators need benchmark OHLC; the close_to_close default never
+        # touches the OHL deques, so its state + signals stay byte-identical.
+        self._uses_range_estimator = self.vol_estimator != _CLOSE_TO_CLOSE
         self.min_scale = max(0.0, float(resolved["min_scale"]))
         self.max_scale = max(self.min_scale, min(1.0, float(resolved["max_scale"])))
         self.crash_benchmark_symbol = str(resolved["crash_benchmark_symbol"]).strip()
@@ -200,6 +238,9 @@ class VolManagedRiskOverlayStrategy(Strategy):
         self._overlay = _OverlayState(
             closes=deque(maxlen=size),
             vol_history=deque(maxlen=max(2, self.crash_vol_z_window)),
+            opens=deque(maxlen=size),
+            highs=deque(maxlen=size),
+            lows=deque(maxlen=size),
         )
         # Per-symbol last forwarded record {type, alloc, scale} — the band gate
         # only suppresses a redundant re-size of the SAME child intent.
@@ -210,13 +251,20 @@ class VolManagedRiskOverlayStrategy(Strategy):
     def get_state(self) -> dict[str, Any]:
         child_getter = getattr(self._child, "get_state", None)
         child_state = dict(child_getter() or {}) if callable(child_getter) else {}
+        overlay: dict[str, Any] = {
+            "closes": list(self._overlay.closes),
+            "vol_history": list(self._overlay.vol_history),
+            "last_time_key": self._overlay.last_time_key,
+        }
+        # Only the range estimators carry OHL state; omitting the keys otherwise
+        # keeps the close_to_close serialized snapshot byte-identical to history.
+        if self._uses_range_estimator:
+            overlay["opens"] = list(self._overlay.opens)
+            overlay["highs"] = list(self._overlay.highs)
+            overlay["lows"] = list(self._overlay.lows)
         return {
             "child": child_state,
-            "overlay": {
-                "closes": list(self._overlay.closes),
-                "vol_history": list(self._overlay.vol_history),
-                "last_time_key": self._overlay.last_time_key,
-            },
+            "overlay": overlay,
             "last_forward": {k: dict(v) for k, v in self._last_forward.items()},
         }
 
@@ -244,6 +292,10 @@ class VolManagedRiskOverlayStrategy(Strategy):
                 if parsed is not None:
                     self._overlay.vol_history.append(parsed)
             self._overlay.last_time_key = str(overlay.get("last_time_key") or "")
+            # Absent keys (close_to_close snapshots) leave the OHL deques empty.
+            _restore_bounded_deque(self._overlay.opens, overlay.get("opens"))
+            _restore_bounded_deque(self._overlay.highs, overlay.get("highs"))
+            _restore_bounded_deque(self._overlay.lows, overlay.get("lows"))
         raw_fwd = state.get("last_forward")
         if isinstance(raw_fwd, dict):
             restored: dict[str, dict[str, Any]] = {}
@@ -288,20 +340,75 @@ class VolManagedRiskOverlayStrategy(Strategy):
             return
         self._overlay.last_time_key = key
         self._overlay.closes.append(float(close))
+        if self._uses_range_estimator:
+            open_px, high_px, low_px = self._benchmark_ohl(event, float(close))
+            self._overlay.opens.append(open_px)
+            self._overlay.highs.append(high_px)
+            self._overlay.lows.append(low_px)
         vol = realized_volatility(list(self._overlay.closes), window=self.crash_vol_z_window)
         if vol is not None:
             self._overlay.vol_history.append(float(vol))
 
+    def _benchmark_ohl(self, event: Any, close: float) -> tuple[float, float, float]:
+        """Resolve benchmark ``(open, high, low)`` for the current bar (never raises).
+
+        Only consulted when a range-based estimator is active. Any field that is
+        missing or non-positive falls back to ``close`` so a degenerate bar reduces
+        to a zero-range observation rather than corrupting the estimate.
+        """
+        symbol = self.crash_benchmark_symbol
+        snapshot = _window_snapshot(event, symbol)
+        if snapshot is None and str(getattr(event, "symbol", "")) == symbol:
+            snapshot = _market_snapshot(event)
+        open_px = safe_float(snapshot.open) if snapshot is not None else None
+        high_px = safe_float(snapshot.high) if snapshot is not None else None
+        low_px = safe_float(snapshot.low) if snapshot is not None else None
+        if open_px is None:
+            open_px = safe_float(_extract_feature(self.bars, event, symbol, "open"))
+        if high_px is None:
+            high_px = safe_float(_extract_feature(self.bars, event, symbol, "high"))
+        if low_px is None:
+            low_px = safe_float(_extract_feature(self.bars, event, symbol, "low"))
+        resolved_open = float(open_px) if open_px is not None and open_px > 0.0 else close
+        resolved_high = float(high_px) if high_px is not None and high_px > 0.0 else close
+        resolved_low = float(low_px) if low_px is not None and low_px > 0.0 else close
+        return resolved_open, resolved_high, resolved_low
+
     def _overlay_scale(self) -> float:
         """Compute the vol-target clamp times the crash gate on closed bars only."""
         closes = list(self._overlay.closes)
-        realized = realized_volatility(closes, window=self.vol_window)
+        realized = self._realized_vol_estimate(closes)
         if realized is None:
             vol_scale = self.max_scale
         else:
             raw = self.target_vol_per_bar / max(realized, _EPS)
             vol_scale = max(self.min_scale, min(self.max_scale, raw))
         return float(vol_scale * self._crash_gate(closes))
+
+    def _realized_vol_estimate(self, closes: list[float]) -> float | None:
+        """Per-bar realized vol feeding the vol-target clamp.
+
+        ``close_to_close`` reproduces the historical estimate EXACTLY. The opt-in
+        range estimators consume the benchmark OHLC deques and are evaluated at
+        ``annualization=1.0`` so they stay in the same per-bar units as the
+        close-to-close estimate the clamp was calibrated against.
+        """
+        if self.vol_estimator == _CLOSE_TO_CLOSE:
+            return realized_volatility(closes, window=self.vol_window)
+        highs = list(self._overlay.highs)
+        lows = list(self._overlay.lows)
+        if self.vol_estimator == "parkinson":
+            return parkinson_volatility(highs, lows, window=self.vol_window, annualization=1.0)
+        opens = list(self._overlay.opens)
+        if self.vol_estimator == "garman_klass":
+            return garman_klass_volatility(
+                opens, highs, lows, closes, window=self.vol_window, annualization=1.0
+            )
+        if self.vol_estimator == "yang_zhang":
+            return yang_zhang_volatility(
+                opens, highs, lows, closes, window=self.vol_window, annualization=1.0
+            )
+        return realized_volatility(closes, window=self.vol_window)
 
     def _crash_gate(self, closes: list[float]) -> float:
         """Daniel-Moskowitz conjunction: deep drawdown AND elevated vol-z together."""

@@ -293,3 +293,91 @@ def stamp_merge(consolidated_rows):
 With `enabled=False` (or `robust_score_params=None` and all caps `None`) both
 functions are strict identity no-ops, so the gate can be shipped OFF and turned
 on only under the honest-research profiles.
+
+## 10. E1 worked example -- feeding the gate from the alpha-zoo WF runner
+
+> **Added for the v2 alpha-pool-expansion batch (2026-07-09).** The E1 code-lane
+> (`1eeb1f7`) made this repo's reference runner *emit* the two per-candidate
+> metrics the gate consumes; whole-search DSR stays a data-PC responsibility (it
+> is not computable inside the runner's per-window metric step). This section is
+> the end-to-end wiring: emission -> validation block -> `passes_dsr_spa_hard_gate`
+> -> `apply_selection_reject_and_dedup`.
+
+### 10.1 What E1 emits (and what it deliberately does not)
+
+`scripts/research/run_alpha_zoo_69_asset_monthly_refit_walkforward.py` gained a
+`_candidate_overfit_stats` helper (near `:840`) called from the per-window metric
+path. When (and only when) `emit_candidate_overfit_stats` is armed it stamps two
+keys into the candidate's `validation` block:
+
+| emitted key | source | selection role |
+| :-- | :-- | :-- |
+| `spa_pvalue` | `research_metrics.spa_like_pvalue` (`:674`) -- single-strategy seeded bootstrap | read by `passes_dsr_spa_hard_gate`; rejected if `> spa_gate_ceiling` |
+| `approx_pbo` | `research_metrics.approx_pbo` (`:309`) -- fold-instability estimate | accepted as the `pbo` alias per `selection.py:374`; rejected if `> pbo_gate_ceiling` |
+
+Arming is config-gated and **default OFF -> byte-identical output**. Flip it only
+under a strict `RuntimeConfig` (`--config` / `LQ_CONFIG_PATH` ->
+`configs/profiles/research.yaml`, which sets `research.emit_candidate_overfit_stats:
+true`). With the flag OFF, `_candidate_overfit_stats` no-ops and the runner's
+artifacts are unchanged; proven in `tests/test_overfit_selection_reject_gate.py`
+(default-OFF byte-identity + strict-config emission populates the block +
+determinism).
+
+**What E1 does NOT emit: whole-search DSR.** The runner's per-window metric step
+(`_period_metrics`, `:803`) only sees ONE candidate's return slice. The
+`deflated_sharpe` the gate consumes MUST be deflated against the **full
+candidate-search trial count** (`num_trials = candidate_count`), a search-global
+quantity that structurally does not exist inside `_period_metrics`. So E1 ships
+the two per-candidate metrics in code and leaves DSR stamping to the data-PC (next
+subsection). This is the honest split: the runner is a WORKED REFERENCE, not the
+canonical selection pipeline.
+
+### 10.2 Activating whole-search DSR on the data-PC
+
+The data-PC computes `deflated_sharpe` at the **aggregation layer**, where the
+candidate count is known, exactly as this repo's own aggregation precedent does:
+
+- `research_runner.py:6649` calls `deflated_sharpe_ratio(..., num_trials=candidate_count)`
+  -- the DSR is deflated against the whole search, not a single trial. (The same
+  `num_trials=candidate_count` threading recurs at `:6727`, `:6738`, `:6891`,
+  `:6903`, `:6917`, ... -- the pattern is: resolve `candidate_count` once for the
+  run, forward it into every `deflated_sharpe_ratio` call.)
+- `selection.py:347-353` (the `passes_dsr_spa_hard_gate` docstring) makes the
+  contract explicit: *"A per-candidate `num_trials=1` DSR would understate
+  deflation and must not be used to feed this gate."* A genuine edge still reaches
+  `DSR ~= 0.978` at `num_trials ~= 1400` (achievability proof in
+  `test_strict_dsr_floor_is_achievable_for_a_genuinely_strong_candidate`), so the
+  0.90 floor is honest, not trivial.
+
+**Ownership.** Per-fold, the data-PC stamps each candidate's `validation` block
+with (a) the E1-emitted `spa_pvalue` + `approx_pbo`, and (b) a
+`deflated_sharpe` computed with `num_trials = candidate_count` for that search,
+plus a `num_trials` field recording the basis so a reviewer can audit that the
+deflation was honest (review [MED], section 3). Missing `deflated_sharpe` -> 0.0 ->
+fail-CLOSED (section 5), so a fold that forgets to stamp DSR rejects rather than
+leaks.
+
+### 10.3 How the emitted metrics reach the gate
+
+Once the `validation` block carries `deflated_sharpe` (whole-search),
+`spa_pvalue`, and `approx_pbo`, the gate is purely mechanical:
+
+1. `passes_dsr_spa_hard_gate(candidate, mode="val", robust_score_params=STRICT)`
+   reads the three keys (section 2.2 / section 4 thresholds), rejecting on
+   `deflated_sharpe < 0.90`, `spa_pvalue > 0.05`, or `pbo > 0.50` (with `pbo`
+   resolved from `approx_pbo` when the explicit `pbo` field is absent --
+   `selection.py:374`).
+2. `apply_selection_reject_and_dedup(rows, mode="val", enabled=True, ...)` calls
+   `passes_dsr_spa_hard_gate` per row and then applies the basket / lineage /
+   family caps. Run it at BOTH boundaries (section 6): per-fold admit AND the
+   final merge stamp -- a candidate must be rejected in ALL folds, or it re-enters
+   at merge.
+
+So the data-PC path is: **E1 emits `spa_pvalue` + `approx_pbo` (arm via
+`research.yaml`)** -> **data-PC stamps whole-search `deflated_sharpe`
+(`num_trials=candidate_count`)** -> **`apply_selection_reject_and_dedup` with strict
+`robust_score_params` at admit + merge** -> overfit clones (the recorded 22 /
+14-clone cohort) reject 22 / 22, a genuine edge survives. The v2
+alpha-pool-expansion hand-off
+([`alpha_pool_expansion_v2_handoff.md`](alpha_pool_expansion_v2_handoff.md),
+section 3.2) requires this exact routing for all nine lanes.

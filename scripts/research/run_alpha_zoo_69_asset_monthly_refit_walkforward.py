@@ -93,16 +93,22 @@ PREPARED_RETURNS_CACHE_SIZE = max(
 # ``--config`` / ``LQ_CONFIG_PATH`` -- see ``_configure_selection_gate``, called
 # once from ``main`` after ``parse_args``.
 #
-# ``reject_ready`` is intentionally False: this runner's ``_period_metrics`` does
-# NOT (yet) compute per-candidate DSR / SPA / PBO into the train/validation
-# blocks, so the DSR/SPA/PBO REJECT floors would over-reject every DSR-less row.
-# The reject logic itself is fully implemented + unit-proven against the recorded
-# artifact in ``tests/test_overfit_selection_reject_gate.py`` (via
+# ``reject_ready`` is intentionally False: while the E1 emission below now stamps
+# per-candidate ``spa_pvalue`` + ``approx_pbo`` into the ``validation`` block when
+# ``emit_candidate_overfit_stats`` is armed (``_candidate_overfit_stats`` /
+# ``_evaluate_candidate``), this runner's ``_period_metrics`` still does NOT compute
+# the whole-search-deflated ``deflated_sharpe`` -- that needs the search-global
+# ``num_trials`` this per-fold call site cannot know, so it is stamped at the
+# data-PC aggregation layer (see ``docs/research_note/overfit_selection_gate_integration.md``).
+# With DSR absent the 0.90 ``dsr_gate_floor`` would over-reject every DSR-less row,
+# so the reject axis stays inert. The reject logic itself is fully implemented +
+# unit-proven against the recorded artifact in
+# ``tests/test_overfit_selection_reject_gate.py`` (via
 # ``selection.apply_selection_reject_and_dedup`` /
-# ``selection.passes_dsr_spa_hard_gate``). TODO(overfit-gates): once
-# ``_period_metrics`` emits ``deflated_sharpe`` (deflated against the WHOLE-SEARCH
-# trial count -- the honest num_trials basis, consistent with the cross-trial
-# CSCV/PBO below), ``spa_pvalue`` and ``pbo`` into the ``validation`` block, flip
+# ``selection.passes_dsr_spa_hard_gate``). TODO(overfit-gates): once the data-PC
+# stamps ``deflated_sharpe`` (deflated against the WHOLE-SEARCH trial count -- the
+# honest num_trials basis, consistent with the cross-trial CSCV/PBO below) into the
+# ``validation`` block alongside the E1 ``spa_pvalue`` / ``approx_pbo``, flip
 # ``reject_ready`` to True to activate the resolved reject floors. Basket dedup
 # (Step 3) needs no such plumbing (it keys off ``symbols`` only) and is active
 # whenever ``--dedupe-baskets`` / a cap is set.
@@ -126,6 +132,12 @@ _SELECTION_GATE_STATE: dict[str, Any] = {
     "max_per_symbol_basket": None,
     "max_per_lineage": None,
     "max_per_family_basket": None,
+    # E1 (overfit_selection_gates): config-gated per-candidate SPA/PBO emission
+    # into the ``validation`` block. Default OFF -> ``_candidate_overfit_stats``
+    # is a strict no-op and the runner's output is byte-identical. Independent of
+    # ``enabled`` (the reject/dedup admit switch) -- emission only enriches the
+    # metric block, it never drops a candidate.
+    "emit_candidate_overfit_stats": False,
 }
 
 
@@ -146,12 +158,14 @@ def _configure_selection_gate(args: argparse.Namespace) -> None:
     cfg_symbol_cap: int | None = None
     cfg_lineage_cap: int | None = None
     cfg_family_cap: int | None = None
+    cfg_emit: bool | None = None
     config_path = getattr(args, "config", None) or os.getenv("LQ_CONFIG_PATH")
     if config_path:
         from lumina_quant.configuration.loader import load_runtime_config
 
         research = load_runtime_config(str(config_path)).research
         cfg_enforce = bool(getattr(research, "enforce_selection_reject_gate", False))
+        cfg_emit = bool(getattr(research, "emit_candidate_overfit_stats", False))
         cfg_dsr = float(getattr(research, "dsr_gate_floor", 0.0))
         cfg_spa = float(getattr(research, "spa_gate_ceiling", 1.0))
         cfg_pbo = float(getattr(research, "pbo_gate_ceiling", 1.0))
@@ -175,6 +189,12 @@ def _configure_selection_gate(args: argparse.Namespace) -> None:
     # store_true flags can only turn a gate ON (True), otherwise defer to config.
     enforce = bool(getattr(args, "enforce_selection_reject_gate", False)) or bool(cfg_enforce)
     dedupe = bool(getattr(args, "dedupe_baskets", False))
+    # E1 emission switch: same store_true-OR-config plumbing as ``enforce`` above,
+    # but independent of the reject/dedup admit gate (it only enriches the metric
+    # block). OFF -> ``_candidate_overfit_stats`` no-ops -> byte-identical output.
+    emit_overfit_stats = bool(getattr(args, "emit_candidate_overfit_stats", False)) or bool(
+        cfg_emit
+    )
 
     dsr_floor = float(_pick(getattr(args, "dsr_gate_floor", None), cfg_dsr, 0.0))
     spa_ceiling = float(_pick(getattr(args, "spa_gate_ceiling", None), cfg_spa, 1.0))
@@ -214,6 +234,7 @@ def _configure_selection_gate(args: argparse.Namespace) -> None:
             "max_per_symbol_basket": symbol_cap,
             "max_per_lineage": lineage_cap,
             "max_per_family_basket": family_cap,
+            "emit_candidate_overfit_stats": emit_overfit_stats,
         }
     )
 
@@ -814,6 +835,48 @@ def _period_metrics(
     }
     _bounded_cache_set(_PERIOD_METRICS_CACHE, cache_key, out, limit=PERIOD_METRICS_CACHE_SIZE)
     return dict(out)
+
+
+def _candidate_overfit_stats(
+    returns: pd.Series, window: tuple[pd.Timestamp, pd.Timestamp]
+) -> dict[str, float]:
+    """Config-gated per-candidate overfit statistics for a metric block (E1).
+
+    When ``emit_candidate_overfit_stats`` is armed (strict RuntimeConfig via
+    ``--config`` / ``LQ_CONFIG_PATH``, or the explicit
+    ``--emit-candidate-overfit-stats`` flag) this returns the seeded SPA
+    reality-check p-value (:func:`research_metrics.spa_like_pvalue`) and the
+    fold-instability ``approx_pbo`` (:func:`research_metrics.approx_pbo`) for the
+    ``window``'s return slice. ``approx_pbo`` is the accepted ``pbo`` alias read by
+    :func:`selection.passes_dsr_spa_hard_gate`, so this gives the DSR-less reject
+    axes real values to score. Whole-search-deflated DSR is deliberately NOT
+    emitted here -- it needs the search-global ``num_trials`` this per-fold call
+    site cannot know (data-PC aggregation; see the E1 worked-example doc).
+
+    Cache-safe by construction: emission happens OUTSIDE the memoized
+    :func:`_period_metrics` (whose returned dict is a fresh copy), so the metric
+    cache is never keyed on / poisoned by the flag. The window slice is taken from
+    the shared (cached) ``_prepared_returns`` exactly as ``_period_metrics`` does.
+
+    Strict no-op when disabled -> returns ``{}`` so the caller's ``dict.update({})``
+    leaves the block byte-identical. Both estimators need >= 64 observations; below
+    that this returns ``{}`` (fields absent) rather than emitting a degenerate 1.0
+    (never-raise).
+    """
+    if not _SELECTION_GATE_STATE.get("emit_candidate_overfit_stats"):
+        return {}
+    prepared = _prepared_returns(returns)
+    lo = int(np.searchsorted(prepared.index_ns, _timestamp_ns(window[0]), side="left"))
+    hi = int(np.searchsorted(prepared.index_ns, _timestamp_ns(window[1]), side="right"))
+    values = prepared.values[lo:hi]
+    if values.size < 64:
+        return {}
+    from lumina_quant.strategy_factory.research_metrics import approx_pbo, spa_like_pvalue
+
+    return {
+        "spa_pvalue": float(spa_like_pvalue(values)),
+        "approx_pbo": float(approx_pbo(values)),
+    }
 
 
 def _add_month(ts: pd.Timestamp, months: int) -> pd.Timestamp:
@@ -6640,6 +6703,11 @@ def _fold_feature_cache(
 def _evaluate_candidate(candidate: CandidateResult, fold: MonthlyFold) -> dict[str, Any]:
     train = _period_metrics(candidate.returns, fold.train)
     validation = _period_metrics(candidate.returns, fold.validation)
+    # E1 (overfit_selection_gates): config-gated per-candidate SPA/PBO enrichment of
+    # the validation block that the selection reject gate reads. OFF -> ``{}`` ->
+    # byte-identical. ``validation`` is a fresh ``_period_metrics`` copy, so this
+    # mutation never poisons the metric cache.
+    validation.update(_candidate_overfit_stats(candidate.returns, fold.validation))
     locked_oos = _period_metrics(candidate.returns, fold.locked_oos)
     row = dict(candidate.row)
     post_oos_research_variant = bool(row.get("post_oos_research_variant", False))
@@ -8414,6 +8482,16 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--max-per-symbol-basket", type=int, default=None)
     parser.add_argument("--max-per-lineage", type=int, default=None)
     parser.add_argument("--max-per-family-basket", type=int, default=None)
+    parser.add_argument(
+        "--emit-candidate-overfit-stats",
+        action="store_true",
+        default=False,
+        help=(
+            "E1: stamp per-candidate spa_pvalue + approx_pbo into the validation "
+            "block (default OFF -> byte-identical). Also armed by a strict --config "
+            "(research.emit_candidate_overfit_stats=true)."
+        ),
+    )
     args = parser.parse_args(argv)
     families = {item.strip() for item in str(args.families).split(",") if item.strip()}
     families.add("profile_optuna")
