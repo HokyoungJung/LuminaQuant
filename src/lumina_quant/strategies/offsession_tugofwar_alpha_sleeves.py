@@ -61,6 +61,7 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Any
 
+from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.alpha_features import realized_volatility
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.indicators.cross_sectional_residualize import cross_sectional_residualize
@@ -178,6 +179,7 @@ def _dispersion(values: list[float]) -> float:
     return variance**0.5
 
 
+@register("strategy", "CrossSectionalOffSessionTugOfWarStrategy", interface="event_driven")
 class CrossSectionalOffSessionTugOfWarStrategy(Strategy):
     """Long-short XS fade of the persistent cash-vs-unanchored off-session tilt.
 

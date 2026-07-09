@@ -86,6 +86,7 @@ from dataclasses import dataclass
 from itertools import pairwise
 from typing import Any
 
+from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.alpha_features import realized_volatility
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.strategies.external_alpha_sleeves import (
@@ -161,6 +162,7 @@ def _trailing_std(values: list[float], window: int) -> float | None:
     return float(sigma) if math.isfinite(sigma) else None
 
 
+@register("strategy", "SilentVolumeShockResolutionStrategy", interface="event_driven")
 class SilentVolumeShockResolutionStrategy(Strategy):
     """Arm on a price-flat abnormal-volume shock; enter on the lagged resolution sign.
 

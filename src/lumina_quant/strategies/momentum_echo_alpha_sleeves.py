@@ -63,6 +63,7 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Any
 
+from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.alpha_features import realized_volatility
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.indicators.rolling_stats import sample_std
@@ -142,6 +143,7 @@ def _xs_zscores(values: dict[str, float]) -> dict[str, float]:
     return {symbol: (value - mean_value) / sigma for symbol, value in values.items()}
 
 
+@register("strategy", "CrossSectionalIntermediateEchoMomentumStrategy", interface="event_driven")
 class CrossSectionalIntermediateEchoMomentumStrategy(Strategy):
     """Weekly XS long-short on the echo-minus-recent cross-sectional z-spread.
 

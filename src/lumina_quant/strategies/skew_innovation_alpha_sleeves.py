@@ -67,6 +67,7 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Any
 
+from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.alpha_features import realized_volatility
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.indicators.rolling_stats import rolling_beta
@@ -181,6 +182,7 @@ def _mode(raw: Any) -> str:
     return parsed if parsed in {"OUT", "LONG", "SHORT"} else "OUT"
 
 
+@register("strategy", "IdiosyncraticSkewInnovationStrategy", interface="event_driven")
 class IdiosyncraticSkewInnovationStrategy(Strategy):
     """Weekly XS long-short on the INNOVATION in beta-hedged residual skewness.
 

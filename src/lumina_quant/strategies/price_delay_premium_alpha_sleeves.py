@@ -66,6 +66,7 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Any
 
+from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.alpha_features import realized_volatility
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.indicators.price_delay import price_delay_share
@@ -146,6 +147,7 @@ def _log_returns(closes: list[float], count: int) -> list[float]:
     return out[-count:] if count and len(out) > count else out
 
 
+@register("strategy", "CrossSectionalPriceDelayPremiumStrategy", interface="event_driven")
 class CrossSectionalPriceDelayPremiumStrategy(Strategy):
     """Weekly XS long-short on the Hou-Moskowitz D1 price-delay characteristic.
 

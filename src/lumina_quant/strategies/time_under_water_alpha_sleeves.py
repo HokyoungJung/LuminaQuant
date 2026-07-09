@@ -67,6 +67,7 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Any
 
+from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.alpha_features import realized_volatility
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.indicators.cross_sectional_residualize import cross_sectional_residualize
@@ -182,6 +183,7 @@ def _recovery_slope(closes: list[float], trough_idx: int, recovery_window: int) 
     return float(slope)
 
 
+@register("strategy", "CrossSectionalTimeUnderWaterStrategy", interface="event_driven")
 class CrossSectionalTimeUnderWaterStrategy(Strategy):
     """Long-short XS drawdown-duration book, depth-residualized, underwater-gated.
 

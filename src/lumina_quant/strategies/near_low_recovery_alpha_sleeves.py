@@ -84,6 +84,7 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Any
 
+from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.alpha_features import realized_volatility
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.indicators.cross_sectional_residualize import cross_sectional_residualize
@@ -183,6 +184,7 @@ def _low_recency(window_lows: list[float], eff_lookback: int) -> float | None:
     return float(value)
 
 
+@register("strategy", "CrossSectionalNearLowRecoveryStrategy", interface="event_driven")
 class CrossSectionalNearLowRecoveryStrategy(Strategy):
     """Long-short XS 52-week-LOW rebound/recency, residualized on nearness-to-high.
 

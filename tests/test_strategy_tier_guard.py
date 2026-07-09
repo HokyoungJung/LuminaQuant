@@ -67,6 +67,16 @@ BATCH_STRATEGIES = (
     "DownsideTailRiskPremiumStrategy",
     "CrossSectionalRegressionTrendQualityStrategy",
     "CrossSectionalPathConvexityStrategy",
+    # Alpha-pool-expansion-v2c batch (2026-07-09):
+    "CrossSectionalNearLowRecoveryStrategy",
+    "CrossSectionalTimeUnderWaterStrategy",
+    "CrossSectionalPriceDelayPremiumStrategy",
+    "InformationDiscretenessMomentumStrategy",
+    "CrossSectionalIntermediateEchoMomentumStrategy",
+    "IdiosyncraticSkewInnovationStrategy",
+    "SilentVolumeShockResolutionStrategy",
+    "RoundNumberBarrierStrategy",
+    "CrossSectionalOffSessionTugOfWarStrategy",
 )
 
 # FROZEN legacy snapshot (generated 2026-07-03; 68 names). Append-only for

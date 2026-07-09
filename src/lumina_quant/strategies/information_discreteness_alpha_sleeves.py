@@ -67,6 +67,7 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Any
 
+from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.alpha_features import realized_volatility
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.indicators.information_discreteness import information_discreteness
@@ -135,6 +136,7 @@ def _formation_return(closes: list[float], formation_bars: int, skip_bars: int) 
     return (window[-1] / base) - 1.0
 
 
+@register("strategy", "InformationDiscretenessMomentumStrategy", interface="event_driven")
 class InformationDiscretenessMomentumStrategy(Strategy):
     """Weekly XS momentum conditioned on the frog-in-the-pan sign census.
 
