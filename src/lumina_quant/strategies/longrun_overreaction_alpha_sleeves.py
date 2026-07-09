@@ -61,6 +61,7 @@ import math
 from collections import deque
 from typing import Any
 
+from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.alpha_features import realized_volatility
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.indicators.rolling_stats import sample_std
@@ -122,6 +123,7 @@ def _median(values: list[float]) -> float | None:
     return 0.5 * (ordered[mid - 1] + ordered[mid])
 
 
+@register("strategy", "LongRunOverreactionReversalStrategy", interface="event_driven")
 class LongRunOverreactionReversalStrategy(Strategy):
     """XS fade of extreme 3-6 month formation returns on liquid majors.
 

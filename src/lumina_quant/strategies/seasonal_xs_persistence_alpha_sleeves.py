@@ -68,6 +68,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.alpha_features import realized_volatility
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.strategies.external_alpha_sleeves import (
@@ -151,6 +152,7 @@ def _coerce_float_list(value: Any) -> list[float]:
     return out
 
 
+@register("strategy", "CrossSectionalSeasonalPersistenceStrategy", interface="event_driven")
 class CrossSectionalSeasonalPersistenceStrategy(Strategy):
     """Long-short XS same-week-of-quarter seasonal-persistence book.
 

@@ -93,6 +93,7 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Any
 
+from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.indicators.rolling_stats import rolling_beta, sample_std
 from lumina_quant.indicators.stationarity import adf_t_statistic
@@ -185,6 +186,7 @@ def _log_levels(values: list[float]) -> list[float] | None:
     return out
 
 
+@register("strategy", "TrendGatedResidualMomentumStrategy", interface="event_driven")
 class TrendGatedResidualMomentumStrategy(Strategy):
     """Weekly XS long-short BHM residual momentum, gated on residual NON-stationarity.
 

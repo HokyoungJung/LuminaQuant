@@ -79,6 +79,7 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Any
 
+from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.alpha_features import realized_volatility, simple_return
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.indicators.hl_spread import corwin_schultz_spread
@@ -151,6 +152,7 @@ def _coerce_float_list(value: Any) -> list[float]:
     return out
 
 
+@register("strategy", "SpreadStressLiquidityReversionStrategy", interface="event_driven")
 class SpreadStressLiquidityReversionStrategy(Strategy):
     """Fade trailing returns only inside OHLC-spread-stress episodes on liquid majors.
 

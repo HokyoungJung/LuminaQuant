@@ -230,6 +230,21 @@ _STRATEGY_TIER_HINTS: dict[str, str] = {
     "SlowCrossSectionalLeadLagStrategy": "research_only",
     "StationarityGatedResidualReversionStrategy": "research_only",
     "RegimeAdaptiveDisagreementEnsembleStrategy": "research_only",
+    # Alpha-pool-expansion-v2b batch (2026-07-09): 12 leaves + 2 overlays.
+    "CrossSectionalCapitalGainsOverhangStrategy": "research_only",
+    "CrossSectionalSeasonalPersistenceStrategy": "research_only",
+    "MomentumCrashDynamicScalingOverlayStrategy": "research_only",
+    "AvgCorrelationCrashGuardOverlayStrategy": "research_only",
+    "SpreadStressLiquidityReversionStrategy": "research_only",
+    "LongRunOverreactionReversalStrategy": "research_only",
+    "CrossSectionalDownsideBetaAsymmetryStrategy": "research_only",
+    "SystematicCoskewnessPremiumStrategy": "research_only",
+    "TrendGatedResidualMomentumStrategy": "research_only",
+    "PriceVolumeCorrContinuationStrategy": "research_only",
+    "CrossSectionalCloseLocationAccumulationStrategy": "research_only",
+    "DownsideTailRiskPremiumStrategy": "research_only",
+    "CrossSectionalRegressionTrendQualityStrategy": "research_only",
+    "CrossSectionalPathConvexityStrategy": "research_only",
 }
 
 _STRATEGY_METADATA: dict[str, dict[str, Any]] = {

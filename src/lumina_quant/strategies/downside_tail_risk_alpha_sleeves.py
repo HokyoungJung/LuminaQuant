@@ -66,6 +66,7 @@ import math
 from collections import deque
 from typing import Any
 
+from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.rolling_stats import sample_std
 from lumina_quant.strategies.adaptive_crypto_alpha_sleeves import _age_cross_positions
 from lumina_quant.strategies.cross_sectional_anomaly_alpha_sleeves import _CrossUpdateMixin
@@ -160,6 +161,7 @@ def _rank_residual(y_ranks: list[float], x_ranks: list[float]) -> list[float] | 
 # NOTE: ships WITHOUT ``@register`` (inert).  The atomic integration commit adds
 # ``@register`` + tier hint ``research_only`` + candidate builders + manifest /
 # baseline re-pin for all surviving wave-2b lanes at once (single owner).
+@register("strategy", "DownsideTailRiskPremiumStrategy", interface="event_driven")
 class DownsideTailRiskPremiumStrategy(_CrossUpdateMixin, Strategy):
     """Long worst / short mildest own-return left tail, vol-neutralized, weekly XS.
 

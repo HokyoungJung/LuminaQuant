@@ -87,6 +87,7 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Any
 
+from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.alpha_features import log_return, realized_volatility
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.strategies.external_alpha_sleeves import (
@@ -201,6 +202,7 @@ def _return_volume_change_correlation(closes: Any, volumes: Any, *, window: int)
     return max(-1.0, min(1.0, corr))
 
 
+@register("strategy", "PriceVolumeCorrContinuationStrategy", interface="event_driven")
 class PriceVolumeCorrContinuationStrategy(Strategy):
     """Per-symbol volume-confirmed trend-continuation gate at weekly cadence.
 

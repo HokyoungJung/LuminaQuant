@@ -50,6 +50,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from lumina_quant.core.events import SignalEvent
+from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.alpha_features import (
     drawdown_from_peak,
     realized_volatility,
@@ -142,6 +143,7 @@ class _OverlayState:
     bars_since_bucket_change: int = 0
 
 
+@register("strategy", "MomentumCrashDynamicScalingOverlayStrategy", interface="event_driven")
 class MomentumCrashDynamicScalingOverlayStrategy(Strategy):
     """Continuous momentum-crash de-risk WRAPPER that rescales a child's signals."""
 

@@ -60,6 +60,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.log_price_regression import orthonormal_path_convexity
 from lumina_quant.strategies.ols_basis_xs_common import OLSBasisCrossSectionalBook
 from lumina_quant.tuning import HyperParam, resolve_params_from_schema
@@ -68,6 +69,7 @@ _STRATEGY_ID = "path_convexity_xs"
 _STRATEGY_NAME = "CrossSectionalPathConvexityStrategy"
 
 
+@register("strategy", "CrossSectionalPathConvexityStrategy", interface="event_driven")
 class CrossSectionalPathConvexityStrategy(OLSBasisCrossSectionalBook):
     """Weekly XS long-short on orthonormal path curvature (zero first-order load).
 

@@ -56,6 +56,7 @@ from __future__ import annotations
 import math
 from typing import Any
 
+from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.log_price_regression import (
     signed_trend_quality,
     trend_slope_t_stat,
@@ -69,6 +70,7 @@ _STRATEGY_NAME = "CrossSectionalRegressionTrendQualityStrategy"
 _SCORE_MODES = ("signed_r2", "t_stat")
 
 
+@register("strategy", "CrossSectionalRegressionTrendQualityStrategy", interface="event_driven")
 class CrossSectionalRegressionTrendQualityStrategy(OLSBasisCrossSectionalBook):
     """Weekly XS long-short on signed-R^2 trend quality with a fit-quality floor.
 

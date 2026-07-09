@@ -45,6 +45,7 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Any
 
+from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.alpha_features import realized_volatility
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.indicators.reference_price import (
@@ -95,6 +96,7 @@ def _coerce_float_list(value: Any) -> list[float]:
     return out
 
 
+@register("strategy", "CrossSectionalCapitalGainsOverhangStrategy", interface="event_driven")
 class CrossSectionalCapitalGainsOverhangStrategy(Strategy):
     """Long-short cross-sectional capital-gains-overhang (disposition) book.
 

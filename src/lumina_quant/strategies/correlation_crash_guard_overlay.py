@@ -49,6 +49,7 @@ from typing import Any
 import numpy as np
 
 from lumina_quant.core.events import SignalEvent
+from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.strategies import resolve_strategy_class
 from lumina_quant.strategies.adaptive_crypto_alpha_sleeves import _state_size
@@ -140,6 +141,7 @@ class _GuardState:
     current_scale: float = 1.0
 
 
+@register("strategy", "AvgCorrelationCrashGuardOverlayStrategy", interface="event_driven")
 class AvgCorrelationCrashGuardOverlayStrategy(Strategy):
     """Average-correlation crash-guard WRAPPER that de-risks a child's signals."""
 

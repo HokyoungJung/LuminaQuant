@@ -45,6 +45,7 @@ from collections import deque
 from statistics import mean
 from typing import Any
 
+from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.alpha_features import realized_volatility
 from lumina_quant.indicators.comoment import standardized_coskewness
 from lumina_quant.indicators.common import safe_float, time_key
@@ -106,6 +107,7 @@ def _restore_cross(item: _CrossSectionalState, payload: dict[str, Any]) -> None:
     item.last_time_key = str(payload.get("last_time_key", ""))
 
 
+@register("strategy", "SystematicCoskewnessPremiumStrategy", interface="event_driven")
 class SystematicCoskewnessPremiumStrategy(Strategy):
     """Long most-negative / short most-positive beta-residualized coskewness.
 

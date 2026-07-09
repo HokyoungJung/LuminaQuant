@@ -52,6 +52,21 @@ BATCH_STRATEGIES = (
     "SlowCrossSectionalLeadLagStrategy",
     "StationarityGatedResidualReversionStrategy",
     "RegimeAdaptiveDisagreementEnsembleStrategy",
+    # Alpha-pool-expansion-v2b batch (2026-07-09):
+    "CrossSectionalCapitalGainsOverhangStrategy",
+    "CrossSectionalSeasonalPersistenceStrategy",
+    "MomentumCrashDynamicScalingOverlayStrategy",
+    "AvgCorrelationCrashGuardOverlayStrategy",
+    "SpreadStressLiquidityReversionStrategy",
+    "LongRunOverreactionReversalStrategy",
+    "CrossSectionalDownsideBetaAsymmetryStrategy",
+    "SystematicCoskewnessPremiumStrategy",
+    "TrendGatedResidualMomentumStrategy",
+    "PriceVolumeCorrContinuationStrategy",
+    "CrossSectionalCloseLocationAccumulationStrategy",
+    "DownsideTailRiskPremiumStrategy",
+    "CrossSectionalRegressionTrendQualityStrategy",
+    "CrossSectionalPathConvexityStrategy",
 )
 
 # FROZEN legacy snapshot (generated 2026-07-03; 68 names). Append-only for

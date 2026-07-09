@@ -69,6 +69,7 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Any
 
+from lumina_quant.core.plugin_registry import register
 from lumina_quant.indicators.alpha_features import realized_volatility, simple_return
 from lumina_quant.indicators.common import safe_float, time_key
 from lumina_quant.indicators.cross_sectional_residualize import cross_sectional_residualize
@@ -137,6 +138,7 @@ def _cross_z(values: dict[str, float]) -> dict[str, float]:
 # NOTE: ships WITHOUT ``@register`` (inert).  The atomic integration commit adds
 # ``@register`` + tier hint ``research_only`` + candidate builders + manifest /
 # baseline re-pin for all surviving wave-2 lanes at once (single owner).
+@register("strategy", "CrossSectionalCloseLocationAccumulationStrategy", interface="event_driven")
 class CrossSectionalCloseLocationAccumulationStrategy(Strategy):
     """Long-short XS close-location flow accumulation, doubly residualized.
 
