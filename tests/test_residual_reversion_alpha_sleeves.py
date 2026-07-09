@@ -525,6 +525,66 @@ def test_missing_volume_never_raises() -> None:
 # --------------------------------------------------------------------------- #
 
 
+# --------------------------------------------------------------------------- #
+# (pm) POSTMORTEM of the measured 4h cell
+# `stationarity_gated_residual_reversion_4h_strict_adf` (research_note 2026-07-09:
+# OOS Sharpe -18.41, return -39.26%).  A Sharpe that negative implicates one of
+# two mechanical faults -- a SIGN INVERSION or an every-bar TURNOVER churn -- so
+# these tests pin BOTH as absent.  The residual loss is therefore a DIRECTIONAL
+# (wrong-signed / absent) edge on the crypto-perp universe (the pre-registered
+# EXPECTED-NULL), not a code defect.  They also lock the sign so a future "fix"
+# that silently flips the reversion direction (curve-fitting one OOS cell) fails.
+# --------------------------------------------------------------------------- #
+
+
+def test_pm_sign_is_reversion_buy_the_loser_sell_the_winner() -> None:
+    """THEORY: fade the beta-hedged residual -- LONG an under-performed
+    (dislocated-DOWN) residual, SHORT an over-performed (dislocated-UP) one.
+
+    Both fixtures are stationary (ADF gate open) and differ ONLY in the sign of
+    the terminal dislocation, so the emitted side must track the THEORY
+    direction: this is the culprit-1 (sign-orientation) lock.
+    """
+    down = _prices_from_residual(_stationary_residual(_N))  # shared _TAIL descends
+    up = _prices_from_residual(
+        _stationary_residual(_N, tail=[0.030, 0.042, 0.054, 0.066, 0.078, 0.090])
+    )
+    assert _final_side(_run_n4(down, rebalance_bars=_N).events.items).get("TARGET/USDT") == "LONG"
+    assert _final_side(_run_n4(up, rebalance_bars=_N).events.items).get("TARGET/USDT") == "SHORT"
+
+
+def test_pm_decision_clock_rebalances_weekly_not_every_bar() -> None:
+    """The 4h cell scores on a ``rebalance_bars`` clock (42 bars ~= weekly), NOT
+    every bar: ``_score_rows`` fires ``floor(n_bars / rebalance_bars)`` times.
+
+    This is the culprit-2 (turnover-churn) lock: at a weekly scoring cadence the
+    round-trip count -- and hence the 20bps cost bleed -- is far too small to
+    explain the measured -39% OOS return, so the loss is directional.
+    """
+    n_bars, rebalance_bars = 210, 42
+    benchmark = _benchmark_levels(n_bars)
+    prices = {
+        "BENCH/USDT": [math.exp(v) for v in benchmark],
+        "TARGET/USDT": [math.exp(benchmark[t] + 0.01 * math.sin(t / 3.0)) for t in range(n_bars)],
+    }
+    strategy = StationarityGatedResidualReversionStrategy(
+        _Bars(list(prices)),
+        _Queue(),
+        **_n4_kwargs(rebalance_bars=rebalance_bars, min_hold_bars=rebalance_bars),
+    )
+    calls = {"n": 0}
+    original = strategy._score_rows
+
+    def _counting() -> Any:
+        calls["n"] += 1
+        return original()
+
+    strategy._score_rows = _counting  # type: ignore[method-assign]
+    _feed(strategy, prices, dict.fromkeys(prices, 1000.0))
+    assert strategy._tick == n_bars
+    assert calls["n"] == n_bars // rebalance_bars  # 5 weekly scorings, not 210
+
+
 def test_schema_keys_snake_case_and_hyperparam() -> None:
     schema = StationarityGatedResidualReversionStrategy.get_param_schema()
     assert schema
