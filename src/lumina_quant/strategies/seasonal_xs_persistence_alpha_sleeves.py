@@ -701,10 +701,78 @@ _SUGGESTED_CANDIDATE_TAGS: tuple[str, ...] = (
     "crypto",
 )
 
-# Candidate slice (daily bars; internal quarter-aligned weekly decision clock).
-# The data-PC owns the seasonal-lookback sweep and the +6wk bucket-rotation
-# placebo, so we seed only two lookbacks to keep the candidate library thin.
+# Candidate slice (internal quarter-aligned weekly decision clock).  The data-PC
+# owns the seasonal-lookback sweep and the +6wk bucket-rotation placebo, so we
+# seed only two lookbacks to keep the candidate library thin.
+#
+# MULTI-TIMEFRAME (data-PC parquet carries 1h/4h but not 1d): this sleeve's
+# clock is TIMESTAMP-based -- the week-of-quarter buckets, the K-quarter trailing
+# store, the min-history floor, and the weekly min-hold are all derived from the
+# UTC quarter grid (``_week_of_quarter``/``_quarter_id``), NOT from a bar count,
+# so ``seasonal_lookback_quarters``, ``min_history_quarters`` and
+# ``min_hold_weeks`` are timeframe-INVARIANT and stay UNCHANGED (they already
+# denote the same wall-clock on any intraday bar).  The ONLY bar-denominated
+# param is the realized-vol ``vol_window``, which scales x6 for 4h and x24 for 1h
+# to keep the same ~30d inverse-vol sizing estimate.  Ratios/counts/thresholds
+# (``quantile_pct``, ``min_symbols``, ``allow_short``, ``target_gross_exposure``,
+# per-bar ``target_vol``, ``stop_loss_pct``) stay UNCHANGED.
 _SEASONAL_XS_PERSISTENCE_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "1h": (
+        {
+            "variant": "k6",
+            "seasonal_lookback_quarters": 6,
+            "min_history_quarters": 2,
+            "vol_window": 720,  # 30 x24 (~30d); only bar-denominated param
+            "quantile_pct": 0.25,
+            "min_hold_weeks": 2,
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.12,
+        },
+        {
+            "variant": "k4",
+            "seasonal_lookback_quarters": 4,
+            "min_history_quarters": 2,
+            "vol_window": 720,
+            "quantile_pct": 0.25,
+            "min_hold_weeks": 2,
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.12,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "k6",
+            "seasonal_lookback_quarters": 6,
+            "min_history_quarters": 2,
+            "vol_window": 180,  # 30 x6 (~30d); only bar-denominated param
+            "quantile_pct": 0.25,
+            "min_hold_weeks": 2,
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.12,
+        },
+        {
+            "variant": "k4",
+            "seasonal_lookback_quarters": 4,
+            "min_history_quarters": 2,
+            "vol_window": 180,
+            "quantile_pct": 0.25,
+            "min_hold_weeks": 2,
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.12,
+        },
+    ),
     "1d": (
         {
             "variant": "k6",

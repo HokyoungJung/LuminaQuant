@@ -509,11 +509,85 @@ _SUGGESTED_CANDIDATE_TAGS: tuple[str, ...] = (
     "crypto",
 )
 
-# Candidate slice (daily bars; weekly rebalance via ``rebalance_bars``).  The
-# published effect is a weekly/monthly-horizon reference; the data-PC owns the
-# 4/8/13/26wk window factor_ic sweep, so we seed only two reference lookbacks
-# (~8wk and ~13wk of 1d bars) to keep the candidate library thin.
+# Candidate slice.  The published effect is a weekly/monthly-horizon reference;
+# the data-PC owns the 4/8/13/26wk window factor_ic sweep, so we seed only two
+# reference lookbacks (~8wk and ~13wk) to keep the candidate library thin.
+#
+# MULTI-TIMEFRAME (data-PC parquet carries 1h/4h but not 1d): the ~8wk/~13wk
+# holder-cohort economics are WALL-CLOCK horizons, so every BAR-denominated
+# param (Grinblatt-Han ``window_bars``, ``skip_recent``, the realized-vol
+# ``vol_window``, the per-symbol ``min_history_bars`` floor, and the
+# ``rebalance_bars``/``min_hold_bars`` decision clocks) scales x6 for 4h and x24
+# for 1h to preserve the same weeks-of-wall-clock reference/cadence.  Ratios,
+# counts, and thresholds (``quantile_pct``, ``min_symbols``, ``allow_short``,
+# ``target_gross_exposure``, the per-bar ``target_vol`` sizing target, and the
+# ``stop_loss_pct`` price stop) are timeframe-agnostic and stay UNCHANGED.  No
+# window reaches the ~9000-bar cap.
 _CGO_DISPOSITION_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "1h": (
+        {
+            "variant": "wk8",
+            "window_bars": 1344,  # 56 x24 (~8wk of 1h bars)
+            "skip_recent": 24,  # 1 x24 (~1d)
+            "vol_window": 720,  # 30 x24 (~30d)
+            "quantile_pct": 0.25,
+            "rebalance_bars": 168,  # 7 x24 (~weekly cadence)
+            "min_hold_bars": 168,  # 7 x24
+            "min_history_bars": 1680,  # 70 x24
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.10,
+        },
+        {
+            "variant": "wk13",
+            "window_bars": 2184,  # 91 x24 (~13wk of 1h bars)
+            "skip_recent": 24,
+            "vol_window": 720,
+            "quantile_pct": 0.25,
+            "rebalance_bars": 168,
+            "min_hold_bars": 168,
+            "min_history_bars": 2520,  # 105 x24
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.10,
+        },
+    ),
+    "4h": (
+        {
+            "variant": "wk8",
+            "window_bars": 336,  # 56 x6 (~8wk of 4h bars)
+            "skip_recent": 6,  # 1 x6 (~1d)
+            "vol_window": 180,  # 30 x6 (~30d)
+            "quantile_pct": 0.25,
+            "rebalance_bars": 42,  # 7 x6 (~weekly cadence)
+            "min_hold_bars": 42,  # 7 x6
+            "min_history_bars": 420,  # 70 x6
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.10,
+        },
+        {
+            "variant": "wk13",
+            "window_bars": 546,  # 91 x6 (~13wk of 4h bars)
+            "skip_recent": 6,
+            "vol_window": 180,
+            "quantile_pct": 0.25,
+            "rebalance_bars": 42,
+            "min_hold_bars": 42,
+            "min_history_bars": 630,  # 105 x6
+            "min_symbols": 5,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+            "target_vol": 0.20,
+            "stop_loss_pct": 0.10,
+        },
+    ),
     "1d": (
         {
             "variant": "wk8",
