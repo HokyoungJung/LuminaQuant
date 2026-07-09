@@ -39,6 +39,7 @@ from lumina_quant.strategies.residual_reversion_alpha_sleeves import (
     StationarityGatedResidualReversionStrategy,
 )
 from lumina_quant.strategies.spread_stress_reversion_alpha_sleeves import (
+    _SPREAD_STRESS_REVERSION_SLICE,
     SpreadStressLiquidityReversionStrategy,
 )
 from lumina_quant.timeframe_aggregator import TimeframeAggregator
@@ -520,3 +521,39 @@ def test_schema_keys_snake_case_and_hyperparam() -> None:
         "min_history_bars",
     ):
         assert required in schema
+
+
+def test_slice_multi_timeframe_keys_and_bounds() -> None:
+    """Pin the 1d/4h/1h slice: mirrored variants + keys, scaled cells in-bounds.
+
+    Also pins the load-bearing COST decision for this episodic fade lane:
+    ``z_entry`` is RAISED (not held) at finer tf so the wall-clock episode rate
+    does not explode, and the hold/cooldown clocks scale x6/x24 so wall-clock
+    hold durations are preserved.
+    """
+    slice_dict = _SPREAD_STRESS_REVERSION_SLICE
+    assert set(slice_dict) == {"1d", "4h", "1h"}
+    counts = {tf: len(cells) for tf, cells in slice_dict.items()}
+    assert len(set(counts.values())) == 1, counts
+    base = {cell["variant"]: cell for cell in slice_dict["1d"]}
+    schema = SpreadStressLiquidityReversionStrategy.get_param_schema()
+    for tf, cells in slice_dict.items():
+        assert tuple(c["variant"] for c in cells) == tuple(base), (tf, counts)
+        for cell in cells:
+            assert set(cell) == set(base[cell["variant"]]), (tf, cell["variant"])
+            for key, value in cell.items():
+                if key == "variant" or isinstance(value, bool):
+                    continue
+                hp = schema[key]
+                if hp.low is not None:
+                    assert value >= hp.low, (tf, key, value)
+                if hp.high is not None:
+                    assert value <= hp.high, (tf, key, value)
+    # Hold/cooldown clocks scale wall-clock (x6 at 4h, x24 at 1h).
+    for factor, tf in ((6, "4h"), (24, "1h")):
+        for cell in slice_dict[tf]:
+            b = base[cell["variant"]]
+            for clock in ("min_hold_bars", "max_hold_bars", "cooldown_bars"):
+                assert cell[clock] == factor * b[clock], (tf, clock)
+            # Episode-frequency guard: the stress threshold is raised sub-daily.
+            assert cell["z_entry"] > b["z_entry"], (tf, cell["variant"])
