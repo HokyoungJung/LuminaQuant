@@ -597,7 +597,75 @@ _SUGGESTED_CANDIDATE_TAGS: tuple[str, ...] = (
     "crypto",
 )
 
+# Candidate slice.  This lane is EPISODIC per-symbol on a per-BAR clock (arm ->
+# resolution window -> hold -> cooldown), so every bar knob scales x6 / x24 to hold
+# the same wall-clock: the ``shock_window`` z-estimation window, the
+# ``resolution_max_bars`` arming window, and the ``min_hold_bars`` / ``max_hold_bars``
+# / ``cooldown_bars`` position clocks.  COST-SAFETY CHOICE on the z gates: the shock
+# TRIGGER ``v_shock_z`` is held at its native 2.0/2.5 for 4h (a 6x-denser feed with an
+# x6-longer, more stable sigma window), but bumped +0.5 (2.0->2.5, 2.5->3.0) at 1h,
+# where the 24x arming frequency inflates the multiple-comparisons false-arm rate --
+# the stricter trigger preserves the episodic per-symbol cost profile.  The "quiet"
+# precondition gates (quiet_ret_z, quiet_range_z) and resolution_ret_mult are the
+# statistic's DEFINITION and stay fixed.  Variant NAMES keep their daily z-labels as
+# stable slice identifiers; ``shock_window`` at 1h (2160) sits under the ~9000 cap.
 _SILENT_VOLUME_SHOCK_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "4h": (
+        {
+            "variant": "silent_shock_z20_r10",
+            "shock_window": 540,
+            "v_shock_z": 2.0,
+            "quiet_ret_z": 0.5,
+            "quiet_range_z": 1.0,
+            "resolution_max_bars": 60,
+            "resolution_ret_mult": 1.0,
+            "min_hold_bars": 42,
+            "max_hold_bars": 126,
+            "cooldown_bars": 30,
+            "allow_short": True,
+        },
+        {
+            "variant": "silent_shock_z25_r5",
+            "shock_window": 540,
+            "v_shock_z": 2.5,
+            "quiet_ret_z": 0.5,
+            "quiet_range_z": 1.0,
+            "resolution_max_bars": 30,
+            "resolution_ret_mult": 0.75,
+            "min_hold_bars": 42,
+            "max_hold_bars": 126,
+            "cooldown_bars": 30,
+            "allow_short": True,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "silent_shock_z20_r10",
+            "shock_window": 2160,
+            "v_shock_z": 2.5,
+            "quiet_ret_z": 0.5,
+            "quiet_range_z": 1.0,
+            "resolution_max_bars": 240,
+            "resolution_ret_mult": 1.0,
+            "min_hold_bars": 168,
+            "max_hold_bars": 504,
+            "cooldown_bars": 120,
+            "allow_short": True,
+        },
+        {
+            "variant": "silent_shock_z25_r5",
+            "shock_window": 2160,
+            "v_shock_z": 3.0,
+            "quiet_ret_z": 0.5,
+            "quiet_range_z": 1.0,
+            "resolution_max_bars": 120,
+            "resolution_ret_mult": 0.75,
+            "min_hold_bars": 168,
+            "max_hold_bars": 504,
+            "cooldown_bars": 120,
+            "allow_short": True,
+        },
+    ),
     "1d": (
         {
             "variant": "silent_shock_z20_r10",

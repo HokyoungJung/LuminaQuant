@@ -595,11 +595,83 @@ _SUGGESTED_CANDIDATE_TAGS: tuple[str, ...] = (
     "crypto",
 )
 
-# Candidate slice (DAILY bars, internally weekly-sampled: ``delay_window`` /
-# ``min_hold_decisions`` are DAILY bars / WEEKLY decision bars respectively).
-# Cross-sectional long-short book -- the unconditional delay-premium transplant,
-# NOT the dead conditional single-pair timing form.
+# Candidate slice.  The decision clock is the internal ISO ``_week_key``
+# (timestamp-based, fires once per calendar week at ANY feed frequency), so the
+# WEEKLY-decision params (min_hold_decisions and the exit band) are timeframe
+# INVARIANT and stay fixed at 4h/1h.  The regression, however, is DAY-scaled.
+#
+# FAITHFUL-SCALING CHOICE (task option 2, "scale delay_window so the regression
+# spans the same wall-clock"): ``delay_window`` (the count of trailing log returns
+# feeding the Dimson market-model) scales x6 / x24 to hold the ~180d/270d
+# estimation SPAN, and ``vol_window`` scales likewise.  ``delay_lags`` is the
+# Dimson lag ORDER (number of lagged-benchmark regressors), NOT a wall-clock
+# horizon -- it is held fixed: scaling it to a day-equivalent count (5 -> 30 -> 120)
+# would blow the schema cap (64) and load the normal equations with dozens of
+# near-collinear autocorrelated lag columns, degrading the R^2 share.  NOTE /
+# HONEST FLAG for the PM: with a fixed small lag order at sub-daily bars the
+# statistic measures the BAR-NATIVE (intraday, ~5-bar) lead-lag rather than the
+# multi-day information-diffusion the daily cell captures -- a documented change in
+# economic horizon.  This lane is an explicit falsification probe, so the shift is
+# recorded rather than papered over.  The variant NAMES keep their daily-window
+# labels (d1_180d_l5, d1_270d_l2) as stable slice identifiers across timeframes.
+# ``delay_window`` at 1h (4320/6480) sits under the ~9000-bar cap.
 _PRICE_DELAY_PREMIUM_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "4h": (
+        {
+            "variant": "d1_180d_l5",
+            "delay_window": 1080,
+            "delay_lags": 5,
+            "score_mode": "d1",
+            "quantile_entry_pct": 0.20,
+            "quantile_exit_pct": 0.40,
+            "min_hold_decisions": 4,
+            "min_symbols": 5,
+            "vol_window": 180,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+        },
+        {
+            "variant": "d1_270d_l2",
+            "delay_window": 1620,
+            "delay_lags": 2,
+            "score_mode": "d1",
+            "quantile_entry_pct": 0.20,
+            "quantile_exit_pct": 0.40,
+            "min_hold_decisions": 4,
+            "min_symbols": 5,
+            "vol_window": 180,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "d1_180d_l5",
+            "delay_window": 4320,
+            "delay_lags": 5,
+            "score_mode": "d1",
+            "quantile_entry_pct": 0.20,
+            "quantile_exit_pct": 0.40,
+            "min_hold_decisions": 4,
+            "min_symbols": 5,
+            "vol_window": 720,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+        },
+        {
+            "variant": "d1_270d_l2",
+            "delay_window": 6480,
+            "delay_lags": 2,
+            "score_mode": "d1",
+            "quantile_entry_pct": 0.20,
+            "quantile_exit_pct": 0.40,
+            "min_hold_decisions": 4,
+            "min_symbols": 5,
+            "vol_window": 720,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+        },
+    ),
     "1d": (
         {
             "variant": "d1_180d_l5",

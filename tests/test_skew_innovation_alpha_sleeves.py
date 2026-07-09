@@ -467,3 +467,21 @@ def test_param_schema_is_snake_case() -> None:
     for name, hp in schema.items():
         assert name == name.lower() and " " not in name
         assert isinstance(hp, HyperParam)
+
+
+def test_slice_multi_timeframe_cells_pinned() -> None:
+    """4h/1h scale the non-overlapping skew/beta windows; decisions stay invariant."""
+    from lumina_quant.strategies.skew_innovation_alpha_sleeves import (
+        _SKEW_INNOVATION_SLICE as sl,
+    )
+
+    assert {"1d", "4h", "1h"} <= set(sl)
+    base = tuple(cell["variant"] for cell in sl["1d"])
+    for tf in ("4h", "1h"):
+        assert tuple(cell["variant"] for cell in sl[tf]) == base
+    assert sl["4h"][0]["skew_window"] == 180
+    assert sl["4h"][0]["beta_window"] == 720
+    assert sl["1h"][0]["skew_window"] == 720
+    assert sl["1h"][0]["beta_window"] == 2880
+    for tf in ("1d", "4h", "1h"):
+        assert sl[tf][0]["min_hold_decisions"] == 2

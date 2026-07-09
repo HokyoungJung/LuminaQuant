@@ -629,9 +629,69 @@ _SUGGESTED_CANDIDATE_TAGS: tuple[str, ...] = (
     "crypto",
 )
 
-# Candidate slice (DAILY bars; weekly decision clock via the ISO-week key).  Each
-# variant dict is a pre-registered sweep cell counted toward N_eff at the data-PC.
+# Candidate slice (weekly decision clock via the ISO-week key).  Each variant dict
+# is a pre-registered sweep cell counted toward N_eff at the data-PC.  The decision
+# clock is timestamp-based (ISO week), so ``min_hold_decisions`` is timeframe
+# INVARIANT.  The two NON-OVERLAPPING skew windows and the beta-hedge estimator are
+# day-scaled: ``skew_window`` (each of the W-vs-W windows) and ``beta_window`` scale
+# x6 / x24 to hold the same ~30d/45d/120d calendar spans (the min-history floor is
+# auto-derived as 2 * skew_window + 1), and ``vol_window`` scales likewise.  The
+# variant NAMES keep their daily-window labels (dskew_30v30, dskew_45v45) as stable
+# slice identifiers.  ``skew_window`` at 1h (720/1080) and ``beta_window`` (2880)
+# sit under the ~9000-bar cap.
 _SKEW_INNOVATION_SLICE: dict[str, tuple[dict[str, Any], ...]] = {
+    "4h": (
+        {
+            "variant": "dskew_30v30",
+            "beta_window": 720,
+            "skew_window": 180,
+            "quantile_entry_pct": 0.20,
+            "quantile_exit_pct": 0.40,
+            "min_hold_decisions": 2,
+            "min_symbols": 5,
+            "vol_window": 180,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+        },
+        {
+            "variant": "dskew_45v45",
+            "beta_window": 720,
+            "skew_window": 270,
+            "quantile_entry_pct": 0.20,
+            "quantile_exit_pct": 0.40,
+            "min_hold_decisions": 2,
+            "min_symbols": 5,
+            "vol_window": 180,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+        },
+    ),
+    "1h": (
+        {
+            "variant": "dskew_30v30",
+            "beta_window": 2880,
+            "skew_window": 720,
+            "quantile_entry_pct": 0.20,
+            "quantile_exit_pct": 0.40,
+            "min_hold_decisions": 2,
+            "min_symbols": 5,
+            "vol_window": 720,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+        },
+        {
+            "variant": "dskew_45v45",
+            "beta_window": 2880,
+            "skew_window": 1080,
+            "quantile_entry_pct": 0.20,
+            "quantile_exit_pct": 0.40,
+            "min_hold_decisions": 2,
+            "min_symbols": 5,
+            "vol_window": 720,
+            "allow_short": True,
+            "target_gross_exposure": 1.0,
+        },
+    ),
     "1d": (
         {
             "variant": "dskew_30v30",
