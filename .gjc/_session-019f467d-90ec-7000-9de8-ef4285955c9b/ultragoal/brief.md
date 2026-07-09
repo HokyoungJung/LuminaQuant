@@ -1,0 +1,1 @@
+Sync the latest LuminaQuant private-main, read the updated in-repo data-PC handoff instructions, run the required alpha pool v2/v2b research-only measurement and verification workflows with uv under the no-real/paper/testnet/live/order-execution boundary, record intended tracked results, commit and push only intended changes.

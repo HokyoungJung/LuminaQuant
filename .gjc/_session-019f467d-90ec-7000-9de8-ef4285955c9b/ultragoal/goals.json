@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "brief": "Sync the latest LuminaQuant private-main, read the updated in-repo data-PC handoff instructions, run the required alpha pool v2/v2b research-only measurement and verification workflows with uv under the no-real/paper/testnet/live/order-execution boundary, record intended tracked results, commit and push only intended changes.",
+  "gjcGoalMode": "aggregate",
+  "gjcObjective": "Complete the durable ultragoal plan in .gjc/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .gjc/ultragoal/ledger.jsonl as the audit trail.",
+  "goals": [
+    {
+      "id": "G001",
+      "title": "Sync the latest LuminaQuant private-main, read the updated in-repo data-PC ha...",
+      "objective": "Sync the latest LuminaQuant private-main, read the updated in-repo data-PC handoff instructions, run the required alpha pool v2/v2b research-only measurement and verification workflows with uv under the no-real/paper/testnet/live/order-execution boundary, record intended tracked results, commit and push only intended changes.",
+      "status": "complete",
+      "createdAt": "2026-07-09T11:31:26.076Z",
+      "updatedAt": "2026-07-09T13:07:22.917Z",
+      "pipelineMetadata": {
+        "schemaVersion": 1,
+        "goalId": "G001",
+        "source": "legacy_brief_only",
+        "eligible": false,
+        "dependsOn": [],
+        "independentOf": [],
+        "targets": {
+          "files": [],
+          "surfaces": []
+        },
+        "overlap": "none",
+        "invalidationReason": "missing_pipeline_metadata",
+        "metadataHash": "ee22f050202eddb1df159edbc575f74df1661c7cce97b7394afe3f786d576e94"
+      },
+      "startedAt": "2026-07-09T11:31:44.426Z",
+      "completedAt": "2026-07-09T13:07:22.917Z",
+      "evidence": "Synced latest private/main to 204461ee, ran alpha pool v2/v2b data-PC cost-grid evaluation for 121 research-only candidate rows at 10/15/20/30bps under strict backtest_cost_realistic constraints, recorded all-reject result in docs/research_note/research_note.md, ran full repo/frontend/native/benchmark verification, and preserved no real/paper/testnet/live/order execution with 0% allocation.",
+      "completionVerification": {
+        "schemaVersion": 1,
+        "receiptId": "cff909a8-2fe9-407a-8046-5381611301d2",
+        "verifiedAt": "2026-07-09T13:07:22.917Z",
+        "goalId": "G001",
+        "receiptKind": "final-aggregate",
+        "goalStatusBeforeCheckpoint": "active",
+        "gjcGoalMode": "aggregate",
+        "gjcObjective": "Complete the durable ultragoal plan in .gjc/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .gjc/ultragoal/ledger.jsonl as the audit trail.",
+        "qualityGateHash": "600834a2f5cb7b9631f598ce413c6a67e63f9cde662cd330b6d900386dc78b1a",
+        "planGeneration": "a1db17f6cd650a0d58dcc1ce1b14da9854bffd7f741af79666c412d41eb57867",
+        "basis": {
+          "planHashBeforeCheckpoint": "fd6b9c6e4382c7a4916fe96ea9c50ca1068d4518b3bd376fb57f235efd5517b9",
+          "latestRelevantLedgerEventIdBeforeCheckpoint": "d0ec476b-5b7d-4f05-a288-c6e4dddcb016",
+          "goalUpdatedAtBeforeCheckpoint": "2026-07-09T13:07:22.917Z",
+          "relevantGoalIdsBeforeCheckpoint": [
+            "G001"
+          ],
+          "requiredGoalSetHashBeforeCheckpoint": "c6704f6088f96e9cc6d61a41d2621eed133a0dd50a6ac8fd98bb803613c5f04d"
+        },
+        "checkpointLedgerEventId": "0d724f31-8409-46b1-ae08-9eee0b614109"
+      }
+    }
+  ],
+  "createdAt": "2026-07-09T11:31:26.076Z",
+  "updatedAt": "2026-07-09T13:07:22.917Z",
+  "state_revision": 3
+}

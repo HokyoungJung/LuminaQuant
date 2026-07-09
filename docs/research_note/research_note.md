@@ -1,4 +1,34 @@
 # Research Note
+## 2026-07-09 KST — 알파 풀 v2c data-PC cost-grid 재측정: 전원 리젝트
+
+`private/main` 최신 `28a06e02`(alpha-pool-expansion-v2c)까지 가져온 뒤 추가 핸드오프 `alpha_pool_expansion_v2c_handoff.md`를 같은 research-only/data-PC 경계로 실행했다. v2c 전략 후보는 기본 candidate library에서 9개 `strategy_class`만 필터링해 구성했다: 54개 후보 row. 10번째 family meta-momentum lane은 `@register` 전략 row가 아니라 `quality_gated_allocation.py`의 오프라인 allocator manifest route라 별도 3-arm 측정으로 기록했다. 실행 경계는 유지했다: real-money/paper/testnet/live/order execution 전부 0회, 신규 배분 0%.
+
+측정 조건:
+- Profile: `configs/profiles/backtest_cost_realistic.yaml`
+- Strict research gate: `use_lockbox_split=true`, `purge_embargo_bars=1`, HAC DSR, `enforce_selection_reject_gate=true`, DSR floor `0.90`, SPA ceiling `0.05`, PBO ceiling `0.50`
+- Cost grid: `cost_rate_bps_override = 10 / 15 / 20 / 30`
+- Candidate report: no-survivorship — v2c 54/54 row를 모두 보고하고, 데이터 부족 row도 리젝트로 보존
+- Local artifacts: `/tmp/lq_alpha_pool_v2c_manifest.json`, `/tmp/lq_alpha_pool_v2c_eval/combined_summary.json`, `/tmp/lq_alpha_pool_v2c_allocator_3arm.json`
+
+결과는 v2/v2b와 똑같이 전원 리젝트다. 네 비용 셀 모두 `reported_candidate_count=54`, `pass_count=0`, `hard_reject_count=54`, `shortlist_count_after_strict_merge_gate=0`이다. 비용별로 52개 row는 현재 로컬 parquet coverage에서 `insufficient_data`로 닫혔고, 실제 데이터로 평가된 2개 row는 둘 다 `CrossSectionalOffSessionTugOfWarStrategy`이며 `oos_sharpe`, `max_drawdown`, `deflated_sharpe`, `spa_pvalue`, `stress_x2_sharpe`, `stress_x3_sharpe`에서 실패했다. 상대적으로 덜 나쁜 1위 row는 `offsession_tugofwar_1h_tow_42d_fade`였지만 20bps 기준 OOS return `-63.19%`, OOS Sharpe `-33.95`, MDD `63.85%`, DSR `0.0`, SPA p `1.0`이라 승격 근거가 아니다.
+
+Allocator lane 10도 promotion 신호가 없다. 20bps candidate report의 train+validation return stream을 입력으로 base M2 HRP, MR1 turnover-tilt+shrinkage, family meta-momentum tilt 3-arm을 동일 window에서 재생했고, 비어 있지 않은 stream은 2개뿐이며 세 arm 모두 survivor `0`, children `0`, `cash_fail_closed_no_promotion`으로 닫혔다. 그래서 v2/v2b 121개 row + v2c 54개 row + allocator route까지 이번 최신 배치 판정은 **do_not_promote / research_only_no_execution / 실배분 0% 유지**다. strict gate를 통과한 후보가 없으므로 paper/testnet/live/real-money/order 경로로 이어지는 변경은 없다.
+
+## 2026-07-09 KST — 알파 풀 v2/v2b data-PC cost-grid 재측정: 전원 리젝트
+
+최신 `private/main`을 `204461ee`까지 fast-forward한 뒤 v2/v2b 핸드오프(`alpha_pool_expansion_v2_handoff.md`, `alpha_pool_expansion_v2b_handoff.md`)의 research-only 후보를 data-PC 모드로 재측정했다. 매니페스트는 기본 candidate library에서 정확한 wave-1/v2b `strategy_class`만 필터링해 구성했다: 20개 전략 클래스, 121개 후보 row. MR1/E1은 후보 row가 아닌 allocation/engine 배선이고 X1은 기존 `VolManagedRiskOverlayStrategy`의 config-gated 파라미터라 이 row 매니페스트에 넣지 않았다. 실행 경계는 유지했다: real-money/paper/testnet/live/order execution 전부 0회, 신규 배분 0%.
+
+측정 조건:
+- Profile: `configs/profiles/backtest_cost_realistic.yaml`
+- Strict research gate: `use_lockbox_split=true`, `purge_embargo_bars=1`, HAC DSR, `enforce_selection_reject_gate=true`, DSR floor `0.90`, SPA ceiling `0.05`, PBO ceiling `0.50`
+- Cost grid: `cost_rate_bps_override = 10 / 15 / 20 / 30`
+- Candidate report: no-survivorship — 121/121 row를 모두 보고하고, 데이터 부족 row도 리젝트로 보존
+- Local artifacts: `/tmp/lq_alpha_pool_v2_v2b_manifest.json`, `/tmp/lq_alpha_pool_v2_v2b_eval/combined_summary.json`
+
+결과는 깔끔하게 죽었다. 네 비용 셀 모두 `reported_candidate_count=121`, `pass_count=0`, `shortlist_count_after_strict_merge_gate=0`이다. 비용별 hard reject는 전부 121/121이고, 실제 데이터로 평가된 row는 4개뿐이며 나머지 117개는 현재 로컬 parquet coverage에서 `insufficient_data`로 닫혔다. 평가된 4개도 전부 `oos_sharpe`, `deflated_sharpe`, `spa_pvalue`, `stress_x2_sharpe`, `stress_x3_sharpe`에서 실패했다. 20/30bps에서는 4/4가 `max_drawdown`까지 같이 실패했다. 상대적으로 덜 나쁜 1위 row는 모든 비용 셀에서 `stationarity_gated_residual_reversion_4h_strict_adf`였지만 20bps 기준 OOS return `-39.26%`, OOS Sharpe `-18.41`, MDD `40.52%`, DSR `0.0`, SPA p `1.0`이라 승격 근거가 아니다.
+
+판정: **do_not_promote / research_only_no_execution / 실배분 0% 유지**. 이번 v2/v2b 배치는 기대했던 null을 확인한 falsification 결과이며, strict gate를 통과한 후보가 없으므로 paper/testnet/live/real-money/order 경로로 이어지는 변경은 없다.
+
 ## 2026-07-09 KST — 알파 풀 확장 v2 배치(9개 레인) 저작 완료 + data-PC 2-tier 게이트 핸드오프
 
 ralplan 컨센서스(`.omc/plans/alpha-pool-expansion-consensus.md`, Planner→Architect R1/R2→Critic 2라운드→APPROVE)를 team으로 실행해 v2 알파-헌트 배치를 저작했다. 원칙은 이전 메타-스파인 배치와 동일하다: **이 PC는 코드+테스트+CI만, 백테스트/데이터 수집 없음(build-not-measure)**, 모든 수익/OOS/비용 수치는 data-PC 몫, 신규 슬리브는 W3 원자 통합 전까지 `@register` 미적용(미등록=완전 비활성), 실배분 0% 유지.
